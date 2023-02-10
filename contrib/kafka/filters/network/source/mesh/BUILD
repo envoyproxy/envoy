@@ -224,6 +224,7 @@ envoy_cc_library(
     deps = [
         ":librdkafka_utils_impl_lib",
         ":upstream_kafka_consumer_lib",
+        "//contrib/kafka/filters/network/source:kafka_types_lib",
         "//envoy/event:dispatcher_interface",
         "//source/common/common:minimal_logger_lib",
     ],
