@@ -2331,12 +2331,12 @@ TEST_F(HttpFilter2Test, LastOnDataCallExceedsStreamBufferLimitWouldJustRaiseHigh
     EXPECT_EQ(data.length(), 5);
     data.drain(5);
 
-    decoder_ = &conn_manager_->newStream(response_encoder_);
+    HttpConnectionManagerImplMixin::decoder_ = &conn_manager_->newStream(response_encoder_);
     Http::RequestHeaderMapPtr headers{new Http::TestRequestHeaderMapImpl{
         {":authority", "host"}, {":path", "/bluh"}, {":method", "GET"}}};
-    decoder_->decodeHeaders(std::move(headers), false);
+    HttpConnectionManagerImplMixin::decoder_->decodeHeaders(std::move(headers), false);
     Buffer::OwnedImpl resp_body("Definitely more than 10 bytes data.");
-    decoder_->decodeData(resp_body, true);
+    HttpConnectionManagerImplMixin::decoder_->decodeData(resp_body, true);
     // Now external server returns the request header response.
     auto response = std::make_unique<ProcessingResponse>();
     auto* headers_response = response->mutable_request_headers();
@@ -2348,7 +2348,6 @@ TEST_F(HttpFilter2Test, LastOnDataCallExceedsStreamBufferLimitWouldJustRaiseHigh
     hdr->mutable_header()->set_value("/mutated_path/bluh");
     HttpFilterTest::stream_callbacks_->onReceiveMessage(std::move(response));
 
-    ENVOY_LOG_MISC(error, "DISPATH DONE!");
     return Http::okStatus();
   }));
 
