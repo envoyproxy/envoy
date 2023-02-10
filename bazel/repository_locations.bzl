@@ -1230,7 +1230,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/apache/kafka/archive/{version}.zip"],
         use_category = ["dataplane_ext"],
         extensions = ["envoy.filters.network.kafka_broker", "envoy.filters.network.kafka_mesh"],
-        release_date = "2022-09-29",
+        release_date = "2023-01-31",
         cpe = "cpe:2.3:a:apache:kafka:*",
         license = "Apache-2.0",
         license_url = "https://github.com/apache/kafka/blob/{version}/LICENSE",
@@ -1258,7 +1258,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         sha256 = "67025feb03eb963a8852d4adc5b2810744f493a672c5992728955e38bed43da8",
         strip_prefix = "kafka_2.13-{version}",
         urls = ["https://archive.apache.org/dist/kafka/{version}/kafka_2.13-{version}.tgz"],
-        release_date = "2022-10-02",
+        release_date = "2023-01-31",
         use_category = ["test_only"],
     ),
     kafka_python_client = dict(
