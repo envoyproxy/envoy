@@ -2,6 +2,7 @@
 #include "envoy/extensions/clusters/dynamic_forward_proxy/v3/cluster.pb.h"
 #include "envoy/extensions/clusters/dynamic_forward_proxy/v3/cluster.pb.validate.h"
 
+#include "source/common/router/string_accessor_impl.h"
 #include "source/common/singleton/manager_impl.h"
 #include "source/common/upstream/cluster_factory_impl.h"
 #include "source/extensions/clusters/dynamic_forward_proxy/cluster.h"
@@ -59,6 +60,8 @@ public:
     refreshLb();
 
     ON_CALL(lb_context_, downstreamHeaders()).WillByDefault(Return(&downstream_headers_));
+    ON_CALL(connection_, streamInfo()).WillByDefault(ReturnRef(stream_info_));
+    ON_CALL(lb_context_, downstreamConnection()).WillByDefault(Return(&connection_));
 
     member_update_cb_ = cluster_->prioritySet().addMemberUpdateCb(
         [this](const Upstream::HostVector& hosts_added,
@@ -111,6 +114,18 @@ public:
     return &lb_context_;
   }
 
+  Upstream::MockLoadBalancerContext* setFilterStateHostAndReturnContext(const std::string& host) {
+    StreamInfo::FilterState& filter_state = const_cast<StreamInfo::FilterState&>(
+        lb_context_.downstreamConnection()->streamInfo().filterState());
+
+    filter_state.setData(
+        "envoy.upstream.dynamic_host", std::make_shared<Router::StringAccessorImpl>(host),
+        StreamInfo::FilterState::StateType::Mutable, StreamInfo::FilterState::LifeSpan::Connection,
+        StreamInfo::FilterState::StreamSharing::SharedWithUpstreamConnection);
+
+    return &lb_context_;
+  }
+
   void setOutlierFailed(const std::string& host) {
     for (auto& h : cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()) {
       if (h->hostname() == host) {
@@ -152,6 +167,8 @@ public:
                       std::shared_ptr<Extensions::Common::DynamicForwardProxy::MockDnsHostInfo>>
       host_map_;
   Envoy::Common::CallbackHandlePtr member_update_cb_;
+  NiceMock<StreamInfo::MockStreamInfo> stream_info_;
+  NiceMock<Network::MockConnection> connection_;
 
   const std::string default_yaml_config_ = R"EOF(
 name: name
@@ -250,6 +267,17 @@ TEST_F(ClusterTest, InvalidLbContext) {
   ON_CALL(lb_context_, downstreamHeaders()).WillByDefault(Return(nullptr));
   EXPECT_EQ(nullptr, lb_->chooseHost(&lb_context_));
   EXPECT_EQ(nullptr, lb_->chooseHost(nullptr));
+}
+
+TEST_F(ClusterTest, FilterStateHostOverride) {
+  initialize(default_yaml_config_, false);
+  makeTestHost("host1", "1.2.3.4");
+
+  EXPECT_CALL(*this, onMemberUpdateCb(SizeIs(1), SizeIs(0)));
+  update_callbacks_->onDnsHostAddOrUpdate("host1", host_map_["host1"]);
+  EXPECT_CALL(*host_map_["host1"], touch());
+  EXPECT_EQ("1.2.3.4:0",
+            lb_->chooseHost(setFilterStateHostAndReturnContext("host1"))->address()->asString());
 }
 
 // Verify cluster attaches to a populated cache.

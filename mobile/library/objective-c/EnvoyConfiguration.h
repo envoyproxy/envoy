@@ -17,7 +17,7 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic, assign) UInt32 dnsFailureRefreshSecondsMax;
 @property (nonatomic, assign) UInt32 dnsQueryTimeoutSeconds;
 @property (nonatomic, assign) UInt32 dnsMinRefreshSeconds;
-@property (nonatomic, strong) NSString *dnsPreresolveHostnames;
+@property (nonatomic, strong) NSArray<NSString *> *dnsPreresolveHostnames;
 @property (nonatomic, assign) UInt32 dnsRefreshSeconds;
 @property (nonatomic, assign) BOOL enableDNSCache;
 @property (nonatomic, assign) UInt32 dnsCacheSaveIntervalSeconds;
@@ -40,7 +40,7 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic, assign) UInt32 perTryIdleTimeoutSeconds;
 @property (nonatomic, strong) NSString *appVersion;
 @property (nonatomic, strong) NSString *appId;
-@property (nonatomic, strong) NSString *virtualClusters;
+@property (nonatomic, strong) NSArray<NSString *> *virtualClusters;
 @property (nonatomic, strong) NSString *directResponseMatchers;
 @property (nonatomic, strong) NSString *directResponses;
 @property (nonatomic, strong) NSArray<EnvoyNativeFilterConfig *> *nativeFilterChain;
@@ -53,14 +53,14 @@ NS_ASSUME_NONNULL_BEGIN
  Create a new instance of the configuration.
  */
 - (instancetype)initWithAdminInterfaceEnabled:(BOOL)adminInterfaceEnabled
-                                  GrpcStatsDomain:(nullable NSString *)grpcStatsDomain
+                                  grpcStatsDomain:(nullable NSString *)grpcStatsDomain
                             connectTimeoutSeconds:(UInt32)connectTimeoutSeconds
                                 dnsRefreshSeconds:(UInt32)dnsRefreshSeconds
                      dnsFailureRefreshSecondsBase:(UInt32)dnsFailureRefreshSecondsBase
                       dnsFailureRefreshSecondsMax:(UInt32)dnsFailureRefreshSecondsMax
                            dnsQueryTimeoutSeconds:(UInt32)dnsQueryTimeoutSeconds
                              dnsMinRefreshSeconds:(UInt32)dnsMinRefreshSeconds
-                           dnsPreresolveHostnames:(NSString *)dnsPreresolveHostnames
+                           dnsPreresolveHostnames:(NSArray<NSString *> *)dnsPreresolveHostnames
                                    enableDNSCache:(BOOL)enableDNSCache
                       dnsCacheSaveIntervalSeconds:(UInt32)dnsCacheSaveIntervalSeconds
                               enableHappyEyeballs:(BOOL)enableHappyEyeballs
@@ -83,7 +83,7 @@ NS_ASSUME_NONNULL_BEGIN
                          perTryIdleTimeoutSeconds:(UInt32)perTryIdleTimeoutSeconds
                                        appVersion:(NSString *)appVersion
                                             appId:(NSString *)appId
-                                  virtualClusters:(NSString *)virtualClusters
+                                  virtualClusters:(NSArray<NSString *> *)virtualClusters
                            directResponseMatchers:(NSString *)directResponseMatchers
                                   directResponses:(NSString *)directResponses
                                 nativeFilterChain:

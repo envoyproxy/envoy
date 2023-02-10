@@ -15,8 +15,8 @@ Breaking changes:
 - swift/kotlin: add `cancel` method to `GRPCStream`` type (:issue:`#24780 <24780>`).
 - all: enable HTTP/3 by default in Engine builders.
 - api: remove ``extendKeepaliveTimeout`` method from engine builders.
-- api: move Java and C++ addVirtualClusters taking concatenated cluster YAML to addVirtualCluster with one cluster config at a time (:issue: `#25297 <25297>`, :issue: `#25259 <25259>`)
-- api: move Java and C++ dnsPreresolveHostnames from taking concatenated cluster YAML to taking a list of String hostnames (:issue: `#25297 <25297>`, :issue: `#25259 <25259>`)
+- api: move ``addVirtualClusters`` APIs taking concatenated cluster YAML to ``addVirtualCluster`` with one cluster config at a time (:issue: `#25297 <25297>`, :issue: `#25259 <25259>`, :issue: `#25457 <25457>`)
+- api: move ``dnsPreresolveHostnames`` APIs from taking concatenated cluster YAML to taking a list of String hostnames (:issue: `#25297 <25297>`, :issue: `#25259 <25259>`, :issue: `#25457 <25457>`)
 
 Bugfixes:
 
