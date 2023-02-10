@@ -128,6 +128,9 @@ void TracerUtility::finalizeSpan(Span& span, const TraceContext& trace_context,
       it.second->applySpan(span, ctx);
     }
   }
+
+  // Finish the span.
+  span.finishSpan();
 }
 
 TracerImpl::TracerImpl(DriverSharedPtr driver, const LocalInfo::LocalInfo& local_info)
@@ -140,7 +143,7 @@ SpanPtr TracerImpl::startSpan(const Config& config, TraceContext& trace_context,
 
   if (config.operationName() == OperationName::Egress) {
     span_name.append(" ");
-    span_name.append(std::string(trace_context.authority()));
+    span_name.append(std::string(trace_context.host()));
   }
 
   SpanPtr active_span = driver_->startSpan(config, trace_context, span_name,

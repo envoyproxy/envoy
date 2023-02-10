@@ -38,7 +38,7 @@ const char* alternate_protocols_cache_filter_insert = R"(
         name: default_alternate_protocols_cache
 )";
 
-const char* gzip_config_insert = R"(
+const char* gzip_decompressor_config_insert = R"(
   - name: envoy.filters.http.decompressor
     typed_config:
       "@type": type.googleapis.com/envoy.extensions.filters.http.decompressor.v3.Decompressor
@@ -57,7 +57,26 @@ const char* gzip_config_insert = R"(
           ignore_no_transform_header: true
 )";
 
-const char* brotli_config_insert = R"(
+const char* gzip_compressor_config_insert = R"(
+  - name: envoy.filters.http.compressor
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.compressor.v3.Compressor
+      compressor_library:
+        name: gzip
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.compression.gzip.compressor.v3.Gzip
+          window_bits: 15
+      request_direction_config:
+        common_config:
+          enabled:
+            default_value: true
+      response_direction_config:
+        common_config:
+          enabled:
+            default_value: false
+)";
+
+const char* brotli_decompressor_config_insert = R"(
   - name: envoy.filters.http.decompressor
     typed_config:
       "@type": type.googleapis.com/envoy.extensions.filters.http.decompressor.v3.Decompressor
@@ -73,6 +92,24 @@ const char* brotli_config_insert = R"(
       response_direction_config:
         common_config:
           ignore_no_transform_header: true
+)";
+
+const char* brotli_compressor_config_insert = R"(
+  - name: envoy.filters.http.compressor
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.compressor.v3.Compressor
+      compressor_library:
+        name: text_optimized
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.compression.brotli.compressor.v3.Brotli
+      request_direction_config:
+        common_config:
+          enabled:
+            default_value: true
+      response_direction_config:
+        common_config:
+          enabled:
+            default_value: false
 )";
 
 const char* default_cert_validation_context_template = R"(
@@ -105,7 +142,7 @@ const char* persistent_dns_cache_config_insert = R"(
       "@type": type.googleapis.com/envoymobile.extensions.key_value.platform.PlatformKeyValueStoreConfig
       key: dns_persistent_cache
       save_interval:
-        seconds: 0
+        seconds: *persistent_dns_cache_save_interval
       max_entries: 100
 )";
 
@@ -117,11 +154,11 @@ const std::string config_header = R"(
 - &dns_fail_max_interval 10s
 - &dns_lookup_family ALL
 - &dns_min_refresh_rate 60s
-- &dns_multiple_addresses true
 - &dns_preresolve_hostnames []
 - &dns_query_timeout 25s
 - &dns_refresh_rate 60s
 - &persistent_dns_cache_config NULL
+- &persistent_dns_cache_save_interval 1
 - &force_ipv6 false
 )"
 #if defined(__APPLE__)
@@ -368,7 +405,9 @@ const char* config_template = R"(
 typed_dns_resolver_config:
   name: *dns_resolver_name
   typed_config: *dns_resolver_config
-
+dynamic_resources:
+#{custom_dynamic_resources}
+#{custom_ads}
 static_resources:
   listeners:
 #{custom_listeners}
@@ -507,10 +546,13 @@ stats_config:
         - prefix: http.hcm.downstream_rq_
         - prefix: http.hcm.decompressor.
         - prefix: pulse.
+        - prefix: runtime.load_success
         - safe_regex:
             regex: '^vhost\.[\w]+\.vcluster\.[\w]+?\.upstream_rq_(?:[12345]xx|[3-5][0-9][0-9]|retry|total)'
+#{custom_stats}
   use_all_default_tags:
     false
+#{custom_node_context}
 watchdogs:
   main_thread_watchdog:
     megamiss_timeout: 60s
@@ -531,7 +573,6 @@ layered_runtime:
           # Global stats do not play well with engines with limited lifetimes
           disallow_global_stats: true
           reloadable_features:
-            allow_multiple_dns_addresses: *dns_multiple_addresses
             always_use_v6: *force_ipv6
             skip_dns_lookup_for_proxied_requests: *skip_dns_lookup_for_proxied_requests
 )"
@@ -540,5 +581,33 @@ layered_runtime:
 R"(
         overload:
           global_downstream_max_connections: 0xffffffff # uint32 max
+#{custom_layers}
 )";
+
+const char* rtds_layer_insert = R"(
+    - name: {}
+      rtds_layer:
+        name: {}
+        rtds_config:
+          initial_fetch_timeout:
+            seconds: {}
+          resource_api_version: V3
+          ads: {{}})";
+
+const char* ads_insert = R"(
+  ads_config:
+    transport_api_version: V3
+    api_type: {}
+    set_node_on_first_message_only: true
+    grpc_services:
+      google_grpc:
+        target_uri: '{}:{}')";
+
+const char* cds_layer_insert = R"(
+  cds_config:
+    initial_fetch_timeout:
+      seconds: {}
+    resource_api_version: V3
+    ads: {{}})";
+
 // clang-format on

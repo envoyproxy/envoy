@@ -44,7 +44,7 @@ FakeStream::FakeStream(FakeHttpConnection& parent, Http::ResponseEncoder& encode
   encoder.getStream().addCallbacks(*this);
 }
 
-void FakeStream::decodeHeaders(Http::RequestHeaderMapPtr&& headers, bool end_stream) {
+void FakeStream::decodeHeaders(Http::RequestHeaderMapSharedPtr&& headers, bool end_stream) {
   absl::MutexLock lock(&lock_);
   headers_ = std::move(headers);
   setEndStream(end_stream);
@@ -984,6 +984,15 @@ void FakeHttpConnection::writeRawData(absl::string_view data) {
   Api::IoCallUint64Result result =
       dynamic_cast<Network::ConnectionImpl*>(&connection())->ioHandle().write(buffer);
   ASSERT(result.ok());
+}
+
+AssertionResult FakeHttpConnection::postWriteRawData(std::string data) {
+  return shared_connection_.executeOnDispatcher(
+      [data](Network::Connection& connection) {
+        Buffer::OwnedImpl to_write(data);
+        connection.write(to_write, false);
+      },
+      TestUtility::DefaultTimeout);
 }
 
 } // namespace Envoy

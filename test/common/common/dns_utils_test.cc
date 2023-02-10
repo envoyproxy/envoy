@@ -9,21 +9,7 @@
 namespace Envoy {
 namespace {
 
-TEST(DnsUtils, LegacyGenerateTest) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.allow_multiple_dns_addresses", "false"}});
-
-  std::list<Network::DnsResponse> responses =
-      TestUtility::makeDnsResponse({"10.0.0.1", "10.0.0.2"});
-  std::vector<Network::Address::InstanceConstSharedPtr> addresses =
-      DnsUtils::generateAddressList(responses, 2);
-  EXPECT_EQ(0, addresses.size());
-}
-
 TEST(DnsUtils, MultipleGenerateTest) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.allow_multiple_dns_addresses", "true"}});
-
   std::list<Network::DnsResponse> responses =
       TestUtility::makeDnsResponse({"10.0.0.1", "10.0.0.2"});
   std::vector<Network::Address::InstanceConstSharedPtr> addresses =
@@ -34,9 +20,6 @@ TEST(DnsUtils, MultipleGenerateTest) {
 }
 
 TEST(DnsUtils, ListChanged) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.allow_multiple_dns_addresses", "true"}});
-
   Network::Address::InstanceConstSharedPtr address1 =
       Network::Utility::parseInternetAddress("10.0.0.1");
   Network::Address::InstanceConstSharedPtr address1_dup =

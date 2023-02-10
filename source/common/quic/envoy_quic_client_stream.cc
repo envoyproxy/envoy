@@ -47,18 +47,9 @@ Http::Status EnvoyQuicClientStream::encodeHeaders(const Http::RequestHeaderMap& 
   auto spdy_headers = envoyHeadersToHttp2HeaderBlock(headers);
   if (headers.Method()) {
     if (headers.Method()->value() == "CONNECT") {
-      if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.use_rfc_connect")) {
-        spdy_headers.erase(":scheme");
-        spdy_headers.erase(":path");
-        spdy_headers.erase(":protocol");
-      } else {
-        // Legacy support for abandoned
-        // https://tools.ietf.org/html/draft-kinnear-httpbis-http2-transport-02
-        spdy_headers[":protocol"] = Http::Headers::get().ProtocolValues.Bytestream;
-        if (!headers.Path()) {
-          spdy_headers[":path"] = "/";
-        }
-      }
+      spdy_headers.erase(":scheme");
+      spdy_headers.erase(":path");
+      spdy_headers.erase(":protocol");
     } else if (headers.Method()->value() == "HEAD") {
       sent_head_request_ = true;
     }

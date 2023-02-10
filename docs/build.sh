@@ -5,6 +5,7 @@
 
 set -e
 
+
 if [[ ! $(command -v bazel) ]]; then
     # shellcheck disable=SC2016
     echo 'ERROR: bazel must be installed and available in "$PATH" to build docs' >&2
@@ -28,6 +29,13 @@ if [[ "${AZP_BRANCH}" =~ ^refs/tags/v.* ]]; then
     export BUILD_DOCS_TAG="${AZP_BRANCH/refs\/tags\//}"
     echo "BUILD AZP RELEASE BRANCH ${BUILD_DOCS_TAG}"
     BAZEL_BUILD_OPTIONS+=("--action_env=BUILD_DOCS_TAG")
+elif [[ "${AZP_BRANCH}" =~ ^refs/pull ]]; then
+    # For PRs use the unmerged PR commit in the version string.
+    #
+    # Staged/built docs still use the merged sha in the URL to distinguish builds
+    #
+    export BUILD_DOCS_SHA="${AZP_COMMIT_SHA}"
+    BAZEL_BUILD_OPTIONS+=("--action_env=BUILD_DOCS_SHA")
 fi
 
 if [[ -n "${AZP_BRANCH}" ]] || [[ -n "${SPHINX_QUIET}" ]]; then

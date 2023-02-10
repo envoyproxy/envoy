@@ -1,3 +1,5 @@
+load("@envoy//bazel:envoy_build_system.bzl", "envoy_mobile_copts")
+
 licenses(["notice"])  # Apache 2
 
 exports_files([
@@ -34,6 +36,7 @@ objc_library(
     hdrs = [
         "EnvoyEngine.h",
     ],
+    copts = envoy_mobile_copts("@envoy"),
     module_name = "EnvoyEngine",
     sdk_frameworks = [
         "Network",

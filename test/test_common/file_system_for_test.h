@@ -10,77 +10,13 @@ namespace Envoy {
 
 namespace Filesystem {
 
-struct MemFileInfo {
-  absl::Mutex lock_;
-  std::string data_ ABSL_GUARDED_BY(lock_);
-};
-
-class MemfileImpl : public FileSharedImpl {
-public:
-  MemfileImpl(const FilePathAndType& file_info, std::shared_ptr<MemFileInfo> info)
-      : FileSharedImpl(file_info), info_(std::move(info)) {}
-
-  bool isOpen() const override { return open_; }
-
-protected:
-  Api::IoCallBoolResult open(FlagSet flag) override {
-    ASSERT(!isOpen());
-    flags_ = flag;
-    open_ = true;
-    if (flags_.test(File::Operation::Write) && !flags_.test(File::Operation::Append) &&
-        !flags_.test(File::Operation::KeepExistingData)) {
-      absl::MutexLock l(&info_->lock_);
-      info_->data_.clear();
-    }
-    return resultSuccess(true);
-  }
-
-  Api::IoCallSizeResult write(absl::string_view buffer) override {
-    absl::MutexLock l(&info_->lock_);
-    info_->data_.append(std::string(buffer));
-    const ssize_t size = info_->data_.size();
-    return resultSuccess(size);
-  }
-
-  Api::IoCallBoolResult close() override {
-    ASSERT(isOpen());
-    open_ = false;
-    return resultSuccess(true);
-  }
-
-  Api::IoCallSizeResult pread(void* buf, uint64_t count, uint64_t offset) override;
-  Api::IoCallSizeResult pwrite(const void* buf, uint64_t count, uint64_t offset) override;
-
-private:
-  FlagSet flags_;
-  std::shared_ptr<MemFileInfo> info_;
-  bool open_{false};
-};
+struct MemFileInfo;
 
 class MemfileInstanceImpl : public Instance {
 public:
   MemfileInstanceImpl();
 
-  FilePtr createFile(const FilePathAndType& file_info) override {
-    const std::string& path = file_info.path_;
-    absl::MutexLock m(&lock_);
-    if (!use_memfiles_) {
-      return file_system_->createFile(file_info);
-    }
-    if (file_info.file_type_ == DestinationType::TmpFile) {
-      // tmp files ideally should have no filename, so we create an info
-      // without adding it to files_.
-      return std::make_unique<MemfileImpl>(file_info, std::make_shared<MemFileInfo>());
-    }
-    if (file_system_->fileExists(path)) {
-      return file_system_->createFile(file_info);
-    }
-    std::shared_ptr<MemFileInfo>& info = files_[path];
-    if (info == nullptr) {
-      info = std::make_shared<MemFileInfo>();
-    }
-    return std::make_unique<MemfileImpl>(file_info, info);
-  }
+  FilePtr createFile(const FilePathAndType& file_info) override;
 
   bool fileExists(const std::string& path) override {
     absl::MutexLock m(&lock_);
@@ -92,31 +28,9 @@ public:
     return file_system_->directoryExists(path);
   }
 
-  ssize_t fileSize(const std::string& path) override {
-    {
-      absl::MutexLock m(&lock_);
-      auto it = files_.find(path);
-      if (it != files_.end()) {
-        ASSERT(use_memfiles_);
-        absl::MutexLock n(&it->second->lock_);
-        return it->second->data_.size();
-      }
-    }
-    return file_system_->fileSize(path);
-  }
+  ssize_t fileSize(const std::string& path) override;
 
-  std::string fileReadToEnd(const std::string& path) override {
-    {
-      absl::MutexLock m(&lock_);
-      auto it = files_.find(path);
-      if (it != files_.end()) {
-        absl::MutexLock n(&it->second->lock_);
-        ASSERT(use_memfiles_);
-        return it->second->data_;
-      }
-    }
-    return file_system_->fileReadToEnd(path);
-  }
+  std::string fileReadToEnd(const std::string& path) override;
 
   PathSplitResult splitPathFromFilename(absl::string_view path) override {
     return file_system_->splitPathFromFilename(path);
