@@ -49,7 +49,7 @@ void insertCustomFilter(const std::string& filter_config, std::string& config_te
 // Note that updates to the config.cc bootstrap will require a matching update in
 // generateBootstrap() below
 bool generatedStringMatchesGeneratedBoostrap(
-    const absl::string_view& config_str, const envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    const absl::string_view config_str, const envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
   Thread::SkipAsserts skip;
   ProtobufMessage::StrictValidationVisitorImpl visitor;
   envoy::config::bootstrap::v3::Bootstrap config_bootstrap;
