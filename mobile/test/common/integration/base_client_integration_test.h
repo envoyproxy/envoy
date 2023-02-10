@@ -62,10 +62,13 @@ protected:
   envoyToMobileHeaders(const Http::TestRequestHeaderMapImpl& request_headers);
 
   // Get the value of a Counter in the Envoy instance.
-  uint64_t getCounterValue(const std::string& counter);
+  uint64_t getCounterValue(const std::string& name);
   // Wait until the Counter specified by `name` is >= `value`.
   ABSL_MUST_USE_RESULT testing::AssertionResult waitForCounterGe(const std::string& name,
                                                                  uint64_t value);
+  uint64_t getGaugeValue(const std::string& name);
+  ABSL_MUST_USE_RESULT testing::AssertionResult waitForGaugeGe(const std::string& name,
+                                                               uint64_t value);
 
   Event::ProvisionalDispatcherPtr dispatcher_ = std::make_unique<Event::ProvisionalDispatcher>();
   envoy_http_callbacks bridge_callbacks_;

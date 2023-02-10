@@ -2,6 +2,9 @@ date: Pending
 
 behavior_changes:
 # *Changes that are expected to cause an incompatibility if applicable; deployment changes are likely required*
+- area: oauth2
+  change: |
+    OAuth filter now URL-encodes URL in query parameters. These query parameters are decoded, leaving intact character sequences that must remain encoded in URLs. This behavioral change can be temporarily reverted by setting runtime guard ``envoy.reloadable_features.oauth_use_url_encoding`` to false.
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
@@ -11,10 +14,12 @@ minor_behavior_changes:
 - area: healthcheck
   change: |
     If active HC is enabled and a host is ejected by outlier detection, a successful active health check unejects the host and consider it healthy. This also clears all the outlier detection counters. This behavior change can be reverted by setting ``envoy.reloadable_features_successful_active_health_check_uneject_host`` to ``false``.
-
 - area: local_ratelimit
   change: |
     Tokens from local descriptor's token buckets are burned before tokens from the default token bucket.
+- area: http2
+  change: |
+    Request authorities are now validated with a library function from QUICHE rather than nghttp2. This behavior change can be reverted by setting ``envoy.reloadable_features.http2_validate_authority_with_quiche`` to ``false``.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
@@ -56,6 +61,9 @@ removed_config_or_runtime:
 - area: http
   change: |
     removed ``envoy.reloadable_features.allow_concurrency_for_alpn_pool`` and legacy code path.
+- area: http3
+  change: |
+    removed ``envoy.reloadable_features.conn_pool_new_stream_with_early_data_and_http3`` and legacy code paths.
 
 new_features:
 - area: access_log
@@ -79,5 +87,11 @@ new_features:
 - area: ratelimit
   change: |
     added local rate limit listener filter to enable rate limit before TLS handshake and filter matching.
+- area: tcp_proxy
+  change: |
+    added support for propagating the response trailers in :ref:`TunnelingConfig <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.TunnelingConfig.propagate_response_trailers>` to the downstream info filter state.
+- area: sni_dynamic_forward_proxy
+  change: |
+    added an option to dynamically set the host used by the SNI dynamic forward proxy filter, by setting a filter state object under the key ``envoy.upstream.dynamic_host``.
 
 deprecated:

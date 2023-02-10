@@ -21,7 +21,7 @@ open class EngineBuilder: NSObject {
   private var dnsFailureRefreshSecondsMax: UInt32 = 10
   private var dnsQueryTimeoutSeconds: UInt32 = 25
   private var dnsMinRefreshSeconds: UInt32 = 60
-  private var dnsPreresolveHostnames: String = "[]"
+  private var dnsPreresolveHostnames: [String] = []
   private var dnsRefreshSeconds: UInt32 = 60
   private var enableDNSCache: Bool = false
   private var dnsCacheSaveIntervalSeconds: UInt32 = 1
@@ -30,7 +30,11 @@ open class EngineBuilder: NSObject {
   private var enableGzipCompression: Bool = false
   private var enableBrotliDecompression: Bool = false
   private var enableBrotliCompression: Bool = false
+#if ENVOY_ENABLE_QUIC
   private var enableHttp3: Bool = true
+#else
+  private var enableHttp3: Bool = false
+#endif
   private var enableInterfaceBinding: Bool = false
   private var enforceTrustChainVerification: Bool = true
   private var enablePlatformCertificateValidation: Bool = false
@@ -44,7 +48,7 @@ open class EngineBuilder: NSObject {
   private var perTryIdleTimeoutSeconds: UInt32 = 15
   private var appVersion: String = "unspecified"
   private var appId: String = "unspecified"
-  private var virtualClusters: String = "[]"
+  private var virtualClusters: [String] = []
   private var onEngineRunning: (() -> Void)?
   private var logger: ((String) -> Void)?
   private var eventTracker: (([String: String]) -> Void)?
@@ -161,7 +165,7 @@ open class EngineBuilder: NSObject {
   ///
   /// - returns: This builder.
   @discardableResult
-  public func addDNSPreresolveHostnames(dnsPreresolveHostnames: String) -> Self {
+  public func addDNSPreresolveHostnames(dnsPreresolveHostnames: [String]) -> Self {
     self.dnsPreresolveHostnames = dnsPreresolveHostnames
     return self
   }
@@ -254,6 +258,7 @@ open class EngineBuilder: NSObject {
   }
 #endif
 
+#if ENVOY_ENABLE_QUIC
   /// Specify whether to enable support for HTTP/3 or not.  Defaults to true.
   ///
   /// - parameter enableHttp3: whether or not to enable HTTP/3.
@@ -264,6 +269,7 @@ open class EngineBuilder: NSObject {
     self.enableHttp3 = enableHttp3
     return self
   }
+#endif
 
   /// Specify whether sockets may attempt to bind to a specific interface, based on network
   /// conditions.
@@ -535,15 +541,27 @@ open class EngineBuilder: NSObject {
 
   /// Add virtual cluster configuration.
   ///
-  /// - parameter virtualClusters: The JSON configuration string for virtual clusters.
+  /// - parameter virtualCluster: The JSON configuration string for a virtual cluster.
   ///
   /// - returns: This builder.
   @discardableResult
-  public func addVirtualClusters(_ virtualClusters: String) -> Self {
-    self.virtualClusters = virtualClusters
+  public func addVirtualCluster(_ virtualCluster: String) -> Self {
+    self.virtualClusters.append(virtualCluster)
     return self
   }
 
+  /// Add virtual cluster configurations.
+  ///
+  /// - parameter virtualClusters: The JSON configuration strings for virtual clusters.
+  ///
+  /// - returns: This builder.
+  @discardableResult
+  public func addVirtualClusters(_ virtualClusters: [String]) -> Self {
+    self.virtualClusters.append(contentsOf: virtualClusters)
+    return self
+  }
+
+#if ENVOY_ADMIN_FUNCTIONALITY
   /// Enable admin interface on 127.0.0.1:9901 address. Admin interface is intended to be
   /// used for development/debugging purposes only. Enabling it in production may open
   /// your app to security vulnerabilities.
@@ -557,6 +575,7 @@ open class EngineBuilder: NSObject {
     self.adminInterfaceEnabled = true
     return self
   }
+#endif
 
   /// Builds and runs a new `Engine` instance with the provided configuration.
   ///

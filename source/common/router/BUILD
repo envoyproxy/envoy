@@ -336,6 +336,7 @@ envoy_cc_library(
         "//source/common/upstream:upstream_http_factory_context_lib",
         "//source/extensions/common/proxy_protocol:proxy_protocol_header_lib",
         "//source/extensions/filters/http/common:factory_base_lib",
+        "@envoy_api//envoy/data/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/http/router/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/http/upstream_codec/v3:pkg_cc_proto",
     ],
