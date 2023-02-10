@@ -447,7 +447,7 @@ static void ios_track_event(envoy_map map, const void *context) {
 - (int)registerFilterFactory:(EnvoyHTTPFilterFactory *)filterFactory {
   // TODO(goaway): Everything here leaks, but it's all be tied to the life of the engine.
   // This will need to be updated for https://github.com/envoyproxy/envoy-mobile/issues/332
-  envoy_http_filter *api = safe_malloc(sizeof(envoy_http_filter));
+  envoy_http_filter *api = (envoy_http_filter *)safe_malloc(sizeof(envoy_http_filter));
   api->init_filter = ios_http_filter_init;
   api->on_request_headers = ios_http_filter_on_request_headers;
   api->on_request_data = ios_http_filter_on_request_data;
@@ -474,7 +474,8 @@ static void ios_track_event(envoy_map map, const void *context) {
 - (int)registerStringAccessor:(NSString *)name accessor:(EnvoyStringAccessor *)accessor {
   // TODO(goaway): Everything here leaks, but it's all tied to the life of the engine.
   // This will need to be updated for https://github.com/envoyproxy/envoy-mobile/issues/332
-  envoy_string_accessor *accessorStruct = safe_malloc(sizeof(envoy_string_accessor));
+  envoy_string_accessor *accessorStruct =
+      (envoy_string_accessor *)safe_malloc(sizeof(envoy_string_accessor));
   accessorStruct->get_string = ios_get_string;
   accessorStruct->context = CFBridgingRetain(accessor);
 
@@ -482,7 +483,7 @@ static void ios_track_event(envoy_map map, const void *context) {
 }
 
 - (int)registerKeyValueStore:(NSString *)name keyValueStore:(id<EnvoyKeyValueStore>)keyValueStore {
-  envoy_kv_store *api = safe_malloc(sizeof(envoy_kv_store));
+  envoy_kv_store *api = (envoy_kv_store *)safe_malloc(sizeof(envoy_kv_store));
   api->save = ios_kv_store_save;
   api->read = ios_kv_store_read;
   api->remove = ios_kv_store_remove;

@@ -1670,7 +1670,7 @@ ClusterInfoImpl::getHeaderValidatorStats(Http::Protocol protocol) const {
   case Http::Protocol::Http2:
     return http2CodecStats();
   case Http::Protocol::Http3:
-    return http2CodecStats();
+    return http3CodecStats();
   }
   PANIC_DUE_TO_CORRUPT_ENUM;
 }
