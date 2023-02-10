@@ -61,6 +61,13 @@ private:
    */
   bool decodeMetadataPayloadUsingNghttp2(bool end_metadata);
 
+  /**
+   * Decodes METADATA payload using QUICHE.
+   * @param end_metadata indicates is END_METADATA is true.
+   * @return if decoding succeeds.
+   */
+  bool decodeMetadataPayload(bool end_metadata);
+
   // Metadata that is currently being decoded.
   MetadataMapPtr metadata_map_;
 
