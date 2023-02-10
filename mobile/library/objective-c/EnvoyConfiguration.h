@@ -32,6 +32,7 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic, assign) BOOL enforceTrustChainVerification;
 @property (nonatomic, assign) BOOL forceIPv6;
 @property (nonatomic, assign) BOOL enablePlatformCertificateValidation;
+@property (nonatomic, assign) BOOL enableExperimentalConfigBuilder;
 @property (nonatomic, assign) UInt32 h2ConnectionKeepaliveIdleIntervalMilliseconds;
 @property (nonatomic, assign) UInt32 h2ConnectionKeepaliveTimeoutSeconds;
 @property (nonatomic, assign) UInt32 maxConnectionsPerHost;
@@ -99,7 +100,8 @@ NS_ASSUME_NONNULL_BEGIN
                                            keyValueStores
                                        statsSinks:(NSArray<NSString *> *)statsSinks
                  experimentalValidateYAMLCallback:
-                     (nullable void (^)(BOOL))experimentalValidateYAMLCallback;
+                     (nullable void (^)(BOOL))experimentalValidateYAMLCallback
+                  enableExperimentalConfigBuilder:(BOOL)enableExperimentalConfigBuilder;
 
 /**
  Resolves the provided configuration template using properties on this configuration.

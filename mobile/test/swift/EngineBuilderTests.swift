@@ -492,7 +492,9 @@ final class EngineBuilderTests: XCTestCase {
       ],
       stringAccessors: [:],
       keyValueStores: [:],
-      statsSinks: []
+      statsSinks: [],
+      experimentalValidateYAMLCallback: nil,
+      enableExperimentalConfigBuilder: false
     )
     let resolvedYAML = try XCTUnwrap(config.resolveTemplate(kMockTemplate))
     XCTAssertTrue(resolvedYAML.contains("&connect_timeout 200s"))
@@ -598,7 +600,9 @@ final class EngineBuilderTests: XCTestCase {
       ],
       stringAccessors: [:],
       keyValueStores: [:],
-      statsSinks: []
+      statsSinks: [],
+      experimentalValidateYAMLCallback: nil,
+      enableExperimentalConfigBuilder: false
     )
     let resolvedYAML = try XCTUnwrap(config.resolveTemplate(kMockTemplate))
     XCTAssertTrue(resolvedYAML.contains("&dns_lookup_family V4_PREFERRED"))
@@ -675,7 +679,9 @@ final class EngineBuilderTests: XCTestCase {
       platformFilterChain: [],
       stringAccessors: [:],
       keyValueStores: [:],
-      statsSinks: []
+      statsSinks: [],
+      experimentalValidateYAMLCallback: nil,
+      enableExperimentalConfigBuilder: false
     )
     XCTAssertNil(config.resolveTemplate("{{ missing }}"))
   }

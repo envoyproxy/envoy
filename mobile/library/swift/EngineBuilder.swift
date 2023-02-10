@@ -62,6 +62,7 @@ open class EngineBuilder: NSObject {
   private var directResponses: [DirectResponse] = []
   private var statsSinks: [String] = []
   private var experimentalValidateYAMLCallback: ((Bool) -> Void)?
+  private var enableExperimentalConfigBuilder: Bool = false
 
   // MARK: - Public
 
@@ -598,6 +599,18 @@ open class EngineBuilder: NSObject {
     return self
   }
 
+  /// Specify whether to use the experimental config builder. Defaults to false.
+  ///
+  /// - parameter enableExperimentalConfigBuilder: whether to enable the experimental config
+  ///                                              builder.
+  ///
+  /// - returns: This builder.
+  @discardableResult
+  public func enableExperimentalConfigBuilder(_ enableExperimentalConfigBuilder: Bool) -> Self {
+    self.enableExperimentalConfigBuilder = enableExperimentalConfigBuilder
+    return self
+  }
+
   /// Builds and runs a new `Engine` instance with the provided configuration.
   ///
   /// - note: Must be strongly retained in order for network requests to be performed correctly.
@@ -651,7 +664,8 @@ open class EngineBuilder: NSObject {
       stringAccessors: self.stringAccessors,
       keyValueStores: self.keyValueStores,
       statsSinks: self.statsSinks,
-      experimentalValidateYAMLCallback: self.experimentalValidateYAMLCallback
+      experimentalValidateYAMLCallback: self.experimentalValidateYAMLCallback,
+      enableExperimentalConfigBuilder: self.enableExperimentalConfigBuilder
     )
 
     switch self.base {
