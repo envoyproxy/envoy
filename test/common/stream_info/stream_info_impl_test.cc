@@ -37,8 +37,8 @@ std::chrono::nanoseconds checkDuration(std::chrono::nanoseconds last,
 class StreamInfoImplTest : public testing::Test {
 protected:
   void assertStreamInfoSize(StreamInfoImpl stream_info) {
-    ASSERT_TRUE(sizeof(stream_info) == 800 || sizeof(stream_info) == 816 ||
-                sizeof(stream_info) == 840)
+    ASSERT_TRUE(sizeof(stream_info) == 808 || sizeof(stream_info) == 824 ||
+                sizeof(stream_info) == 848)
         << "If adding fields to StreamInfoImpl, please check to see if you "
            "need to add them to setFromForRecreateStream or setFrom! Current size "
         << sizeof(stream_info);
@@ -419,6 +419,14 @@ TEST_F(StreamInfoImplTest, Details) {
   stream_info.setResponseCodeDetails("two_words");
   ASSERT_TRUE(stream_info.responseCodeDetails().has_value());
   EXPECT_EQ(stream_info.responseCodeDetails().value(), "two_words");
+}
+
+TEST_F(StreamInfoImplTest, DownstreamTransportFailureReason) {
+  StreamInfoImpl stream_info(test_time_.timeSystem(), nullptr);
+  EXPECT_TRUE(stream_info.downstreamTransportFailureReason().empty());
+  stream_info.setDownstreamTransportFailureReason("TLS error");
+  EXPECT_FALSE(stream_info.downstreamTransportFailureReason().empty());
+  EXPECT_EQ(stream_info.downstreamTransportFailureReason(), "TLS error");
 }
 
 TEST(UpstreamInfoImplTest, DumpState) {
