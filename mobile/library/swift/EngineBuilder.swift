@@ -1,6 +1,8 @@
 @_implementationOnly import EnvoyEngine
 import Foundation
 
+// swiftlint:disable file_length
+
 /// Builder used for creating and running a new Engine instance.
 @objcMembers
 open class EngineBuilder: NSObject {
@@ -59,6 +61,7 @@ open class EngineBuilder: NSObject {
   private var keyValueStores: [String: EnvoyKeyValueStore] = [:]
   private var directResponses: [DirectResponse] = []
   private var statsSinks: [String] = []
+  private var experimentalValidateYAMLCallback: ((Bool) -> Void)?
 
   // MARK: - Public
 
@@ -577,6 +580,24 @@ open class EngineBuilder: NSObject {
   }
 #endif
 
+  /// Makes the engine validate the generated YAML against an upcoming, more performant builder
+  /// implementation. If the yaml is consistent between both builders, the callback will be invoked
+  /// with `true`. If a difference was detected, it will be invoked with `false`.
+  ///
+  /// The comparison isn't performed at all if this method isn't called.
+  ///
+  /// Note that this API is temporary and it will not be considered a breaking change once it is
+  /// removed.
+  ///
+  /// - parameter callback: The callback to be invoked.
+  ///
+  /// - returns: This builder.
+  @discardableResult
+  public func setExperimentalValidateYAMLCallback(_ callback: @escaping (Bool) -> Void) -> Self {
+    self.experimentalValidateYAMLCallback = callback
+    return self
+  }
+
   /// Builds and runs a new `Engine` instance with the provided configuration.
   ///
   /// - note: Must be strongly retained in order for network requests to be performed correctly.
@@ -629,7 +650,8 @@ open class EngineBuilder: NSObject {
       platformFilterChain: self.platformFilterChain,
       stringAccessors: self.stringAccessors,
       keyValueStores: self.keyValueStores,
-      statsSinks: self.statsSinks
+      statsSinks: self.statsSinks,
+      experimentalValidateYAMLCallback: self.experimentalValidateYAMLCallback
     )
 
     switch self.base {

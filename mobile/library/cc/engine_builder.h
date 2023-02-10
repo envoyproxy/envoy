@@ -104,8 +104,13 @@ public:
 
   EngineSharedPtr build();
 
+  // Generate the bootstrap config and compare it to the passed-in yaml.
+  // Return true if the comparison is equivalent, false otherwise.
+  bool generateBootstrapAndCompare(absl::string_view yaml) const;
+  // Generate and return the bootstrap config and compare it to the passed-in yaml.
+  // Asserts that the comparison was equivalent.
   std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap>
-  generateBootstrapAndCompareForTests(std::string yaml) const;
+  generateBootstrapAndCompareForTests(absl::string_view yaml) const;
 
 protected:
   void setOverrideConfigForTests(std::string config) {
