@@ -191,7 +191,7 @@ TEST_F(CustomResponseFilterTest, InvalidSchemeRedirect) {
 
   setServerName("server1.example.foo");
   ::Envoy::Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
-  ::Envoy::Http::TestRequestHeaderMapImpl request_headers{};
+  ::Envoy::Http::TestRequestHeaderMapImpl request_headers{{"Host", "example.foo"}};
   // Verify Continue was called, i.e. the redirect policy becomes a no-op.
   EXPECT_EQ(filter_->decodeHeaders(request_headers, false),
             ::Envoy::Http::FilterHeadersStatus::Continue);
