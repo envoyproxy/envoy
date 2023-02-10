@@ -38,7 +38,7 @@ const char* alternate_protocols_cache_filter_insert = R"(
         name: default_alternate_protocols_cache
 )";
 
-const char* gzip_config_insert = R"(
+const char* gzip_decompressor_config_insert = R"(
   - name: envoy.filters.http.decompressor
     typed_config:
       "@type": type.googleapis.com/envoy.extensions.filters.http.decompressor.v3.Decompressor
@@ -57,7 +57,26 @@ const char* gzip_config_insert = R"(
           ignore_no_transform_header: true
 )";
 
-const char* brotli_config_insert = R"(
+const char* gzip_compressor_config_insert = R"(
+  - name: envoy.filters.http.compressor
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.compressor.v3.Compressor
+      compressor_library:
+        name: gzip
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.compression.gzip.compressor.v3.Gzip
+          window_bits: 15
+      request_direction_config:
+        common_config:
+          enabled:
+            default_value: true
+      response_direction_config:
+        common_config:
+          enabled:
+            default_value: false
+)";
+
+const char* brotli_decompressor_config_insert = R"(
   - name: envoy.filters.http.decompressor
     typed_config:
       "@type": type.googleapis.com/envoy.extensions.filters.http.decompressor.v3.Decompressor
@@ -73,6 +92,24 @@ const char* brotli_config_insert = R"(
       response_direction_config:
         common_config:
           ignore_no_transform_header: true
+)";
+
+const char* brotli_compressor_config_insert = R"(
+  - name: envoy.filters.http.compressor
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.compressor.v3.Compressor
+      compressor_library:
+        name: text_optimized
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.compression.brotli.compressor.v3.Brotli
+      request_direction_config:
+        common_config:
+          enabled:
+            default_value: true
+      response_direction_config:
+        common_config:
+          enabled:
+            default_value: false
 )";
 
 const char* default_cert_validation_context_template = R"(
@@ -97,6 +134,18 @@ const char* socket_tag_config_insert = R"(
       "@type": type.googleapis.com/envoymobile.extensions.filters.http.socket_tag.SocketTag
 )";
 
+const char* persistent_dns_cache_config_insert = R"(
+- &persistent_dns_cache_config
+  config:
+    name: "envoy.key_value.platform"
+    typed_config:
+      "@type": type.googleapis.com/envoymobile.extensions.key_value.platform.PlatformKeyValueStoreConfig
+      key: dns_persistent_cache
+      save_interval:
+        seconds: *persistent_dns_cache_save_interval
+      max_entries: 100
+)";
+
 // clang-format off
 const std::string config_header = R"(
 !ignore default_defs:
@@ -105,10 +154,11 @@ const std::string config_header = R"(
 - &dns_fail_max_interval 10s
 - &dns_lookup_family ALL
 - &dns_min_refresh_rate 60s
-- &dns_multiple_addresses true
 - &dns_preresolve_hostnames []
 - &dns_query_timeout 25s
 - &dns_refresh_rate 60s
+- &persistent_dns_cache_config NULL
+- &persistent_dns_cache_save_interval 1
 - &force_ipv6 false
 )"
 #if defined(__APPLE__)
@@ -124,7 +174,6 @@ R"(- &enable_drain_post_dns_refresh false
 - &enable_interface_binding false
 - &h2_connection_keepalive_idle_interval 100000s
 - &h2_connection_keepalive_timeout 10s
-- &h2_delay_keepalive_timeout false
 - &max_connections_per_host 7
 - &metadata {}
 - &stats_domain 127.0.0.1
@@ -156,7 +205,9 @@ R"(- &enable_drain_post_dns_refresh false
 
 !ignore tls_root_ca_defs: &tls_root_certs |
 )"
+#ifndef EXCLUDE_CERTIFICATES
 #include "certificates.inc"
+#endif
 R"(
 
 !ignore validation_context_defs:
@@ -191,6 +242,7 @@ const char* config_template = R"(
     typed_dns_resolver_config:
       name: *dns_resolver_name
       typed_config: *dns_resolver_config
+    key_value_config: *persistent_dns_cache_config
 
 !ignore router_defs: &router_config
   "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
@@ -353,7 +405,9 @@ const char* config_template = R"(
 typed_dns_resolver_config:
   name: *dns_resolver_name
   typed_config: *dns_resolver_config
-
+dynamic_resources:
+#{custom_dynamic_resources}
+#{custom_ads}
 static_resources:
   listeners:
 #{custom_listeners}
@@ -480,32 +534,25 @@ stats_config:
   stats_matcher:
     inclusion_list:
       patterns:
+        - prefix: cluster.base.upstream_rq_
+        - prefix: cluster.base_h2.upstream_rq_
+        - prefix: cluster.stats.upstream_rq_
+        - prefix: cluster.base.upstream_cx_
+        - prefix: cluster.base_h2.upstream_cx_
+        - prefix: cluster.stats.upstream_cx_
+        - exact: cluster.base.http2.keepalive_timeout
+        - exact: cluster.base_h2.http2.keepalive_timeout
+        - exact: cluster.stats.http2.keepalive_timeout
+        - prefix: http.hcm.downstream_rq_
+        - prefix: http.hcm.decompressor.
+        - prefix: pulse.
+        - prefix: runtime.load_success
         - safe_regex:
-            regex: '^cluster\.[\w]+?\.upstream_cx_[\w]+'
-        - safe_regex:
-            regex: '^cluster\.[\w]+?\.upstream_rq_[\w]+'
-        - safe_regex:
-            regex: '^cluster\.[\w]+?\.update_(attempt|success|failure)'
-        - safe_regex:
-            regex: '^cluster\.[\w]+?\.http2.keepalive_timeout'
-        - safe_regex:
-            regex: '^dns.apple.*'
-        - safe_regex:
-            regex: '^http.client.*'
-        - safe_regex:
-            regex: '^http.dispatcher.*'
-        - safe_regex:
-            regex: '^http.hcm.decompressor.*'
-        - safe_regex:
-            regex: '^http.hcm.downstream_rq_[\w]+'
-        - safe_regex:
-            regex: '^pbf_filter.*'
-        - safe_regex:
-            regex: '^pulse.*'
-        - safe_regex:
-            regex: '^vhost\.[\w]+\.vcluster\.[\w]+?\.upstream_rq_(?:[12345]xx|[3-5][0-9][0-9]|retry.*|timeout|total)'
+            regex: '^vhost\.[\w]+\.vcluster\.[\w]+?\.upstream_rq_(?:[12345]xx|[3-5][0-9][0-9]|retry|total)'
+#{custom_stats}
   use_all_default_tags:
     false
+#{custom_node_context}
 watchdogs:
   main_thread_watchdog:
     megamiss_timeout: 60s
@@ -526,9 +573,7 @@ layered_runtime:
           # Global stats do not play well with engines with limited lifetimes
           disallow_global_stats: true
           reloadable_features:
-            allow_multiple_dns_addresses: *dns_multiple_addresses
             always_use_v6: *force_ipv6
-            http2_delay_keepalive_timeout: *h2_delay_keepalive_timeout
             skip_dns_lookup_for_proxied_requests: *skip_dns_lookup_for_proxied_requests
 )"
 // Needed due to warning in
@@ -536,5 +581,33 @@ layered_runtime:
 R"(
         overload:
           global_downstream_max_connections: 0xffffffff # uint32 max
+#{custom_layers}
 )";
+
+const char* rtds_layer_insert = R"(
+    - name: {}
+      rtds_layer:
+        name: {}
+        rtds_config:
+          initial_fetch_timeout:
+            seconds: {}
+          resource_api_version: V3
+          ads: {{}})";
+
+const char* ads_insert = R"(
+  ads_config:
+    transport_api_version: V3
+    api_type: {}
+    set_node_on_first_message_only: true
+    grpc_services:
+      google_grpc:
+        target_uri: '{}:{}')";
+
+const char* cds_layer_insert = R"(
+  cds_config:
+    initial_fetch_timeout:
+      seconds: {}
+    resource_api_version: V3
+    ads: {{}})";
+
 // clang-format on

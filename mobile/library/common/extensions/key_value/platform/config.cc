@@ -2,7 +2,6 @@
 
 #include "envoy/config/common/key_value/v3/config.pb.h"
 #include "envoy/config/common/key_value/v3/config.pb.validate.h"
-#include "envoy/registry/registry.h"
 
 #include "library/common/api/external.h"
 #include "library/common/data/utility.h"

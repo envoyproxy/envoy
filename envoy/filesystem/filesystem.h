@@ -15,9 +15,9 @@
 namespace Envoy {
 namespace Filesystem {
 
-using FlagSet = std::bitset<4>;
+using FlagSet = std::bitset<5>;
 
-enum class DestinationType { File, Stderr, Stdout };
+enum class DestinationType { File, Stderr, Stdout, TmpFile };
 
 /**
  * Abstraction for a basic file on disk.
@@ -29,13 +29,19 @@ public:
   enum Operation {
     // Open a file for reading.
     Read,
-    // Open a file for writing. The file will be truncated if Append is not set.
+    // Open a file for writing. The file will be truncated if neither Append nor
+    // KeepExisting is set.
     Write,
     // Create the file if it does not already exist
     Create,
     // If writing, append to the file rather than writing to the beginning and
     // truncating after write.
     Append,
+    // To open for write, without appending, and without truncating, add the
+    // KeepExistingData flag. It is especially important to set this flag if
+    // using pwrite, as the Windows implementation of truncation will interact
+    // poorly with pwrite.
+    KeepExistingData,
   };
 
   /**
@@ -59,6 +65,26 @@ public:
    * @return bool whether the close succeeded
    */
   virtual Api::IoCallBoolResult close() PURE;
+
+  /**
+   * Read a chunk of data from the file to a buffer. The file must be explicitly opened
+   * before reading.
+   * @param buf The buffer to copy the data into.
+   * @param count The maximum number of bytes to read.
+   * @param offset The offset in the file at which to start reading.
+   * @return ssize_t number of bytes read, or -1 for failure.
+   */
+  virtual Api::IoCallSizeResult pread(void* buf, uint64_t count, uint64_t offset) PURE;
+
+  /**
+   * Write a chunk of data from a buffer to the file. The file must be explicitly opened
+   * before writing.
+   * @param buf The buffer to read the data from.
+   * @param count The maximum number of bytes to write.
+   * @param offset The offset in the file at which to start writing.
+   * @return ssize_t number of bytes written, or -1 for failure.
+   */
+  virtual Api::IoCallSizeResult pwrite(const void* buf, uint64_t count, uint64_t offset) PURE;
 
   /**
    * @return bool is the file open

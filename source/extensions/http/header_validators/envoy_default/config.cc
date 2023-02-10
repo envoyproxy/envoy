@@ -12,15 +12,14 @@ namespace Http {
 namespace HeaderValidators {
 namespace EnvoyDefault {
 
-::Envoy::Http::HeaderValidatorFactoryPtr
-HeaderValidatorFactoryConfig::createFromProto(const Protobuf::Message& message,
-                                              Server::Configuration::FactoryContext& context) {
+::Envoy::Http::HeaderValidatorFactoryPtr HeaderValidatorFactoryConfig::createFromProto(
+    const Protobuf::Message& message, ProtobufMessage::ValidationVisitor& validation_visitor) {
   auto mptr = ::Envoy::Config::Utility::translateAnyToFactoryConfig(
-      dynamic_cast<const ProtobufWkt::Any&>(message), context.messageValidationVisitor(), *this);
+      dynamic_cast<const ProtobufWkt::Any&>(message), validation_visitor, *this);
   const auto& proto_config =
       MessageUtil::downcastAndValidate<const ::envoy::extensions::http::header_validators::
                                            envoy_default::v3::HeaderValidatorConfig&>(
-          *mptr, context.messageValidationVisitor());
+          *mptr, validation_visitor);
   return std::make_unique<HeaderValidatorFactory>(proto_config);
 }
 

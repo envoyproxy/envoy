@@ -12,7 +12,10 @@ fi
 
 raw_arch="$(uname -m)"
 readonly raw_arch
-if [[ "$raw_arch" == "aarch64" || "$raw_arch" == "arm64" ]]; then
+
+if [[ -n "${BAZELW_ARCH+x}" ]]; then
+  readonly bazel_arch="${BAZELW_ARCH}"
+elif [[ "$raw_arch" == "aarch64" || "$raw_arch" == "arm64" ]]; then
   readonly bazel_arch="arm64"
 else
   readonly bazel_arch="amd64"

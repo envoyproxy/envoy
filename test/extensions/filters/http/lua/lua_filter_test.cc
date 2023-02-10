@@ -94,7 +94,7 @@ public:
                    envoy::extensions::filters::http::lua::v3::LuaPerRoute& per_route_proto_config) {
     // Setup filter config for Lua filter.
     config_ = std::make_shared<FilterConfig>(proto_config, tls_, cluster_manager_, api_,
-                                             stats_store_, "test.");
+                                             *stats_store_.rootScope(), "test.");
     // Setup per route config for Lua filter.
     per_route_config_ =
         std::make_shared<FilterConfigPerRoute>(per_route_proto_config, server_factory_context_);
@@ -246,7 +246,7 @@ TEST(LuaHttpFilterConfigTest, BadCode) {
   proto_config.mutable_default_source_code()->set_inline_string(SCRIPT);
 
   EXPECT_THROW_WITH_MESSAGE(
-      FilterConfig(proto_config, tls, cluster_manager, api, stats_store, "lua"),
+      FilterConfig(proto_config, tls, cluster_manager, api, *stats_store.rootScope(), "lua"),
       Filters::Common::Lua::LuaException,
       "script load error: [string \"...\"]:3: '=' expected near '<eof>'");
 }
@@ -1594,7 +1594,7 @@ TEST_F(LuaHttpFilterTest, HttpCallInvalidCluster) {
   EXPECT_EQ(1, stats_store_.counter("test.lua.errors").value());
 }
 
-// HTTP request flow with timeout and sampled flag in options.
+// HTTP request flow with timeout, sampled and send_xff flag in options.
 TEST_F(LuaHttpFilterTest, HttpCallWithTimeoutAndSampledInOptions) {
   const std::string SCRIPT{R"EOF(
     function envoy_on_request(request_handle)
@@ -1609,6 +1609,7 @@ TEST_F(LuaHttpFilterTest, HttpCallWithTimeoutAndSampledInOptions) {
         {
           ["timeout_ms"] = 5000,
           ["trace_sampled"] = false,
+          ["send_xff"] = false,
         })
     end
   )EOF"};
@@ -1627,6 +1628,7 @@ TEST_F(LuaHttpFilterTest, HttpCallWithTimeoutAndSampledInOptions) {
               const Http::AsyncClient::RequestOptions& options) -> Http::AsyncClient::Request* {
             EXPECT_EQ(options.timeout->count(), 5000);
             EXPECT_EQ(options.sampled_.value(), false);
+            EXPECT_EQ(options.send_xff, false);
             callbacks = &cb;
             return &request;
           }));

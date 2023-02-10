@@ -5,32 +5,37 @@
 @implementation EnvoyConfiguration
 
 - (instancetype)initWithAdminInterfaceEnabled:(BOOL)adminInterfaceEnabled
-                                  GrpcStatsDomain:(nullable NSString *)grpcStatsDomain
+                                  grpcStatsDomain:(nullable NSString *)grpcStatsDomain
                             connectTimeoutSeconds:(UInt32)connectTimeoutSeconds
                                 dnsRefreshSeconds:(UInt32)dnsRefreshSeconds
                      dnsFailureRefreshSecondsBase:(UInt32)dnsFailureRefreshSecondsBase
                       dnsFailureRefreshSecondsMax:(UInt32)dnsFailureRefreshSecondsMax
                            dnsQueryTimeoutSeconds:(UInt32)dnsQueryTimeoutSeconds
                              dnsMinRefreshSeconds:(UInt32)dnsMinRefreshSeconds
-                           dnsPreresolveHostnames:(NSString *)dnsPreresolveHostnames
+                           dnsPreresolveHostnames:(NSArray<NSString *> *)dnsPreresolveHostnames
+                                   enableDNSCache:(BOOL)enableDNSCache
+                      dnsCacheSaveIntervalSeconds:(UInt32)dnsCacheSaveIntervalSeconds
                               enableHappyEyeballs:(BOOL)enableHappyEyeballs
-                                       enableGzip:(BOOL)enableGzip
-                                     enableBrotli:(BOOL)enableBrotli
+                                      enableHttp3:(BOOL)enableHttp3
+                          enableGzipDecompression:(BOOL)enableGzipDecompression
+                            enableGzipCompression:(BOOL)enableGzipCompression
+                        enableBrotliDecompression:(BOOL)enableBrotliDecompression
+                          enableBrotliCompression:(BOOL)enableBrotliCompression
                            enableInterfaceBinding:(BOOL)enableInterfaceBinding
                         enableDrainPostDnsRefresh:(BOOL)enableDrainPostDnsRefresh
                     enforceTrustChainVerification:(BOOL)enforceTrustChainVerification
+                                        forceIPv6:(BOOL)forceIPv6
               enablePlatformCertificateValidation:(BOOL)enablePlatformCertificateValidation
     h2ConnectionKeepaliveIdleIntervalMilliseconds:
         (UInt32)h2ConnectionKeepaliveIdleIntervalMilliseconds
               h2ConnectionKeepaliveTimeoutSeconds:(UInt32)h2ConnectionKeepaliveTimeoutSeconds
-                         h2ExtendKeepaliveTimeout:(BOOL)h2ExtendKeepaliveTimeout
                             maxConnectionsPerHost:(UInt32)maxConnectionsPerHost
                                 statsFlushSeconds:(UInt32)statsFlushSeconds
                          streamIdleTimeoutSeconds:(UInt32)streamIdleTimeoutSeconds
                          perTryIdleTimeoutSeconds:(UInt32)perTryIdleTimeoutSeconds
                                        appVersion:(NSString *)appVersion
                                             appId:(NSString *)appId
-                                  virtualClusters:(NSString *)virtualClusters
+                                  virtualClusters:(NSArray<NSString *> *)virtualClusters
                            directResponseMatchers:(NSString *)directResponseMatchers
                                   directResponses:(NSString *)directResponses
                                 nativeFilterChain:
@@ -58,17 +63,22 @@
   self.dnsQueryTimeoutSeconds = dnsQueryTimeoutSeconds;
   self.dnsMinRefreshSeconds = dnsMinRefreshSeconds;
   self.dnsPreresolveHostnames = dnsPreresolveHostnames;
+  self.enableDNSCache = enableDNSCache;
+  self.dnsCacheSaveIntervalSeconds = dnsCacheSaveIntervalSeconds;
   self.enableHappyEyeballs = enableHappyEyeballs;
-  self.enableGzip = enableGzip;
-  self.enableBrotli = enableBrotli;
+  self.enableHttp3 = enableHttp3;
+  self.enableGzipDecompression = enableGzipDecompression;
+  self.enableGzipCompression = enableGzipCompression;
+  self.enableBrotliDecompression = enableBrotliDecompression;
+  self.enableBrotliCompression = enableBrotliCompression;
   self.enableInterfaceBinding = enableInterfaceBinding;
   self.enableDrainPostDnsRefresh = enableDrainPostDnsRefresh;
   self.enforceTrustChainVerification = enforceTrustChainVerification;
+  self.forceIPv6 = forceIPv6;
   self.enablePlatformCertificateValidation = enablePlatformCertificateValidation;
   self.h2ConnectionKeepaliveIdleIntervalMilliseconds =
       h2ConnectionKeepaliveIdleIntervalMilliseconds;
   self.h2ConnectionKeepaliveTimeoutSeconds = h2ConnectionKeepaliveTimeoutSeconds;
-  self.h2ExtendKeepaliveTimeout = h2ExtendKeepaliveTimeout;
   self.maxConnectionsPerHost = maxConnectionsPerHost;
   self.statsFlushSeconds = statsFlushSeconds;
   self.streamIdleTimeoutSeconds = streamIdleTimeoutSeconds;
@@ -110,14 +120,47 @@
     [customFilters appendString:filterConfig];
   }
 
-  if (self.enableGzip) {
-    NSString *gzipFilterInsert = [[NSString alloc] initWithUTF8String:gzip_config_insert];
-    [customFilters appendString:gzipFilterInsert];
+  if (self.enableGzipDecompression) {
+    NSString *insert = [[NSString alloc] initWithUTF8String:gzip_decompressor_config_insert];
+    [customFilters appendString:insert];
   }
 
-  if (self.enableBrotli) {
-    NSString *brotliFilterInsert = [[NSString alloc] initWithUTF8String:brotli_config_insert];
-    [customFilters appendString:brotliFilterInsert];
+  if (self.enableGzipCompression) {
+#if ENVOY_MOBILE_REQUEST_COMPRESSION
+    NSString *insert = [[NSString alloc] initWithUTF8String:gzip_compressor_config_insert];
+    [customFilters appendString:insert];
+#else
+    NSLog(@"[Envoy] error: request compression functionality was not compiled in this build of "
+          @"Envoy Mobile");
+    return nil;
+#endif
+  }
+
+  if (self.enableBrotliDecompression) {
+    NSString *insert = [[NSString alloc] initWithUTF8String:brotli_decompressor_config_insert];
+    [customFilters appendString:insert];
+  }
+
+  if (self.enableBrotliCompression) {
+#if ENVOY_MOBILE_REQUEST_COMPRESSION
+    NSString *insert = [[NSString alloc] initWithUTF8String:brotli_compressor_config_insert];
+    [customFilters appendString:insert];
+#else
+    NSLog(@"[Envoy] error: request compression functionality was not compiled in this build of "
+          @"Envoy Mobile");
+    return nil;
+#endif
+  }
+
+  if (self.enableHttp3) {
+#ifdef ENVOY_ENABLE_QUIC
+    NSString *http3Insert =
+        [[NSString alloc] initWithUTF8String:alternate_protocols_cache_filter_insert];
+    [customFilters appendString:http3Insert];
+#else
+    NSLog(@"[Envoy] error: http3 functionality was not compiled in this build of Envoy Mobile");
+    return nil;
+#endif
   }
 
   BOOL hasDirectResponses = self.directResponses.length > 0;
@@ -154,13 +197,19 @@
       appendFormat:@"- &dns_query_timeout %lus\n", (unsigned long)self.dnsQueryTimeoutSeconds];
   [definitions
       appendFormat:@"- &dns_min_refresh_rate %lus\n", (unsigned long)self.dnsMinRefreshSeconds];
-  [definitions appendFormat:@"- &dns_preresolve_hostnames %@\n", self.dnsPreresolveHostnames];
+  if (self.dnsPreresolveHostnames.count > 0) {
+    NSMutableString *hostnamesYAML = [[NSMutableString alloc] initWithString:@"["];
+    NSString *maybeComma = @"";
+    for (NSString *hostname in self.dnsPreresolveHostnames) {
+      [hostnamesYAML appendString:maybeComma];
+      [hostnamesYAML appendFormat:@"{\"address\": \"%@\", \"port_value\": 443}", hostname];
+      maybeComma = @",";
+    }
+    [hostnamesYAML appendString:@"]"];
+    [definitions appendFormat:@"- &dns_preresolve_hostnames %@\n", hostnamesYAML];
+  }
   [definitions appendFormat:@"- &dns_lookup_family %@\n",
                             self.enableHappyEyeballs ? @"ALL" : @"V4_PREFERRED"];
-  [definitions appendFormat:@"- &dns_multiple_addresses %@\n",
-                            self.enableHappyEyeballs ? @"true" : @"false"];
-  [definitions appendFormat:@"- &h2_delay_keepalive_timeout %@\n",
-                            self.h2ExtendKeepaliveTimeout ? @"true" : @"false"];
   [definitions appendFormat:@"- &dns_refresh_rate %lus\n", (unsigned long)self.dnsRefreshSeconds];
   [definitions appendFormat:@"- &enable_drain_post_dns_refresh %@\n",
                             self.enableDrainPostDnsRefresh ? @"true" : @"false"];
@@ -169,6 +218,7 @@
   [definitions appendFormat:@"- &trust_chain_verification %@\n", self.enforceTrustChainVerification
                                                                      ? @"VERIFY_TRUST_CHAIN"
                                                                      : @"ACCEPT_UNTRUSTED"];
+  [definitions appendFormat:@"- &force_ipv6 %@\n", self.forceIPv6 ? @"true" : @"false"];
   [definitions appendFormat:@"- &h2_connection_keepalive_idle_interval %.*fs\n", 3,
                             (double)self.h2ConnectionKeepaliveIdleIntervalMilliseconds / 1000.0];
   [definitions appendFormat:@"- &h2_connection_keepalive_timeout %lus\n",
@@ -181,7 +231,8 @@
       appendFormat:@"- &per_try_idle_timeout %lus\n", (unsigned long)self.perTryIdleTimeoutSeconds];
   [definitions appendFormat:@"- &metadata { device_os: %@, app_version: %@, app_id: %@ }\n", @"iOS",
                             self.appVersion, self.appId];
-  [definitions appendFormat:@"- &virtual_clusters %@\n", self.virtualClusters];
+  [definitions appendFormat:@"- &virtual_clusters [%@]\n",
+                            [self.virtualClusters componentsJoinedByString:@","]];
 
   [definitions
       appendFormat:@"- &stats_flush_interval %lus\n", (unsigned long)self.statsFlushSeconds];
@@ -191,6 +242,13 @@
                                           : @(default_cert_validation_context_template);
 
   [definitions appendFormat:@"%@\n", cert_validator_template];
+
+  if (self.enableDNSCache) {
+    [definitions appendFormat:@"- &persistent_dns_cache_save_interval %lu\n",
+                              (unsigned long)self.dnsCacheSaveIntervalSeconds];
+    NSString *persistent_dns_cache_config = @(persistent_dns_cache_config_insert);
+    [definitions appendFormat:@"- &persistent_dns_cache_config %@\n", persistent_dns_cache_config];
+  }
 
   NSMutableArray *stat_sinks_config = [self.statsSinks mutableCopy];
 
@@ -206,7 +264,12 @@
   }
 
   if (self.adminInterfaceEnabled) {
+#ifdef ENVOY_ADMIN_FUNCTIONALITY
     [definitions appendString:@"admin: *admin_interface\n"];
+#else
+    NSLog(@"[Envoy] error: admin functionality was not compiled in this build of Envoy Mobile");
+    return nil;
+#endif
   }
 
   [definitions appendString:templateYAML];

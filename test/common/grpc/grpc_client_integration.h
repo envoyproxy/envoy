@@ -146,6 +146,12 @@ public:
   testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),                     \
                    testing::ValuesIn(TestEnvironment::getsGrpcVersionsForTest()),                  \
                    testing::Values(Grpc::LegacyOrUnified::Legacy, Grpc::LegacyOrUnified::Unified))
+#define DELTA_SOTW_UNIFIED_GRPC_CLIENT_INTEGRATION_PARAMS                                          \
+  testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),                     \
+                   testing::ValuesIn(TestEnvironment::getsGrpcVersionsForTest()),                  \
+                   testing::Values(Grpc::SotwOrDelta::Sotw, Grpc::SotwOrDelta::Delta,              \
+                                   Grpc::SotwOrDelta::UnifiedSotw,                                 \
+                                   Grpc::SotwOrDelta::UnifiedDelta))
 
 } // namespace Grpc
 } // namespace Envoy

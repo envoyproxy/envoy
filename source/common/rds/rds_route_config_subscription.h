@@ -54,7 +54,7 @@ public:
 
   ~RdsRouteConfigSubscription() override;
 
-  absl::optional<RouteConfigProvider*>& routeConfigProvider();
+  RouteConfigProvider*& routeConfigProvider() { return route_config_provider_; }
 
   RouteConfigUpdatePtr& routeConfigUpdate() { return config_update_info_; }
 
@@ -98,7 +98,7 @@ protected:
   RdsStats stats_;
   RouteConfigProviderManager& route_config_provider_manager_;
   const uint64_t manager_identifier_;
-  absl::optional<RouteConfigProvider*> route_config_provider_opt_;
+  RouteConfigProvider* route_config_provider_;
   RouteConfigUpdatePtr config_update_info_;
   Envoy::Config::OpaqueResourceDecoderSharedPtr resource_decoder_;
 };

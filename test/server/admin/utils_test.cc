@@ -20,12 +20,6 @@ protected:
 
 // Most utils paths are covered through other tests, these tests take of
 // of special cases to get remaining coverage.
-TEST_F(UtilsTest, BadServerState) {
-  Utility::serverState(Init::Manager::State::Uninitialized, true);
-  EXPECT_ENVOY_BUG(Utility::serverState(static_cast<Init::Manager::State>(123), true),
-                   "unexpected server state");
-}
-
 TEST_F(UtilsTest, HistogramMode) {
   Utility::HistogramBucketsMode histogram_buckets_mode = Utility::HistogramBucketsMode::Cumulative;
   EXPECT_TRUE(Utility::histogramBucketsParam(query_, histogram_buckets_mode).ok());

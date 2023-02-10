@@ -1,6 +1,7 @@
 #import "library/objective-c/EnvoyEngine.h"
 #import "library/objective-c/EnvoyBridgeUtility.h"
 #import "library/objective-c/EnvoyHTTPFilterCallbacksImpl.h"
+#import "library/objective-c/EnvoyKeyValueStoreBridgeImpl.h"
 
 #include "library/common/api/c_types.h"
 
@@ -382,46 +383,6 @@ static envoy_data ios_get_string(const void *context) {
   return toManagedNativeString(accessor.getEnvoyString());
 }
 
-static envoy_data ios_kv_store_read(envoy_data native_key, const void *context) {
-  // This code block runs inside the Envoy event loop. Therefore, an explicit autoreleasepool block
-  // is necessary to act as a breaker for any Objective-C allocation that happens.
-  @autoreleasepool {
-    id<EnvoyKeyValueStore> keyValueStore = (__bridge id<EnvoyKeyValueStore>)context;
-    NSString *key = [[NSString alloc] initWithBytes:native_key.bytes
-                                             length:native_key.length
-                                           encoding:NSUTF8StringEncoding];
-    NSString *value = [keyValueStore readValueForKey:key];
-    return value != nil ? toManagedNativeString(value) : envoy_nodata;
-  }
-}
-
-static void ios_kv_store_save(envoy_data native_key, envoy_data native_value, const void *context) {
-  // This code block runs inside the Envoy event loop. Therefore, an explicit autoreleasepool block
-  // is necessary to act as a breaker for any Objective-C allocation that happens.
-  @autoreleasepool {
-    id<EnvoyKeyValueStore> keyValueStore = (__bridge id<EnvoyKeyValueStore>)context;
-    NSString *key = [[NSString alloc] initWithBytes:native_key.bytes
-                                             length:native_key.length
-                                           encoding:NSUTF8StringEncoding];
-    NSString *value = [[NSString alloc] initWithBytes:native_key.bytes
-                                               length:native_key.length
-                                             encoding:NSUTF8StringEncoding];
-    [keyValueStore saveValue:value toKey:key];
-  }
-}
-
-static void ios_kv_store_remove(envoy_data native_key, const void *context) {
-  // This code block runs inside the Envoy event loop. Therefore, an explicit autoreleasepool block
-  // is necessary to act as a breaker for any Objective-C allocation that happens.
-  @autoreleasepool {
-    id<EnvoyKeyValueStore> keyValueStore = (__bridge id<EnvoyKeyValueStore>)context;
-    NSString *key = [[NSString alloc] initWithBytes:native_key.bytes
-                                             length:native_key.length
-                                           encoding:NSUTF8StringEncoding];
-    [keyValueStore removeKey:key];
-  }
-}
-
 static void ios_track_event(envoy_map map, const void *context) {
   // This code block runs inside the Envoy event loop. Therefore, an explicit autoreleasepool block
   // is necessary to act as a breaker for any Objective-C allocation that happens.
@@ -588,30 +549,6 @@ static void ios_track_event(envoy_map map, const void *context) {
 - (int)recordCounterInc:(NSString *)elements tags:(EnvoyTags *)tags count:(NSUInteger)count {
   // TODO: update to use real tag array when the API layer change is ready.
   return record_counter_inc(_engineHandle, elements.UTF8String, toNativeStatsTags(tags), count);
-}
-
-- (int)recordGaugeSet:(NSString *)elements tags:(EnvoyTags *)tags value:(NSUInteger)value {
-  return record_gauge_set(_engineHandle, elements.UTF8String, toNativeStatsTags(tags), value);
-}
-
-- (int)recordGaugeAdd:(NSString *)elements tags:(EnvoyTags *)tags amount:(NSUInteger)amount {
-  return record_gauge_add(_engineHandle, elements.UTF8String, toNativeStatsTags(tags), amount);
-}
-
-- (int)recordGaugeSub:(NSString *)elements tags:(EnvoyTags *)tags amount:(NSUInteger)amount {
-  return record_gauge_sub(_engineHandle, elements.UTF8String, toNativeStatsTags(tags), amount);
-}
-
-- (int)recordHistogramDuration:(NSString *)elements
-                          tags:(EnvoyTags *)tags
-                    durationMs:(NSUInteger)durationMs {
-  return record_histogram_value(_engineHandle, elements.UTF8String, toNativeStatsTags(tags),
-                                durationMs, MILLISECONDS);
-}
-
-- (int)recordHistogramValue:(NSString *)elements tags:(EnvoyTags *)tags value:(NSUInteger)value {
-  return record_histogram_value(_engineHandle, elements.UTF8String, toNativeStatsTags(tags), value,
-                                UNSPECIFIED);
 }
 
 - (void)flushStats {

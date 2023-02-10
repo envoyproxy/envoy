@@ -81,6 +81,7 @@ final class EngineBuilderTests: XCTestCase {
     self.waitForExpectations(timeout: 0.01)
   }
 
+#if ENVOY_ADMIN_FUNCTIONALITY
   func testEnablingAdminInterfaceAddsToConfigurationWhenRunningEnvoy() {
     let expectation = self.expectation(description: "Run called with enabled admin interface")
     MockEnvoyEngine.onRunWithConfig = { config, _ in
@@ -94,6 +95,7 @@ final class EngineBuilderTests: XCTestCase {
       .build()
     self.waitForExpectations(timeout: 0.01)
   }
+#endif
 
   func testEnablingHappyEyeballsAddsToConfigurationWhenRunningEnvoy() {
     let expectation = self.expectation(description: "Run called with enabled happy eyeballs")
@@ -133,6 +135,20 @@ final class EngineBuilderTests: XCTestCase {
     _ = EngineBuilder()
       .addEngineType(MockEnvoyEngine.self)
       .enforceTrustChainVerification(true)
+      .build()
+    self.waitForExpectations(timeout: 0.01)
+  }
+
+  func testForceIPv6AddsToConfigurationWhenRunningEnvoy() {
+    let expectation = self.expectation(description: "Run called with force IPv6")
+    MockEnvoyEngine.onRunWithConfig = { config, _ in
+      XCTAssertTrue(config.forceIPv6)
+      expectation.fulfill()
+    }
+
+    _ = EngineBuilder()
+      .addEngineType(MockEnvoyEngine.self)
+      .forceIPv6(true)
       .build()
     self.waitForExpectations(timeout: 0.01)
   }
@@ -250,20 +266,6 @@ final class EngineBuilderTests: XCTestCase {
     self.waitForExpectations(timeout: 0.01)
   }
 
-  func testAddingH2ExtendKeepaliveTimeoutAddsToConfigurationWhenRunningEnvoy() {
-    let expectation = self.expectation(description: "Run called with h2ExtendKeepaliveTimeout")
-    MockEnvoyEngine.onRunWithConfig = { config, _ in
-      XCTAssertTrue(config.h2ExtendKeepaliveTimeout)
-      expectation.fulfill()
-    }
-
-    _ = EngineBuilder()
-      .addEngineType(MockEnvoyEngine.self)
-      .h2ExtendKeepaliveTimeout(true)
-      .build()
-    self.waitForExpectations(timeout: 0.01)
-  }
-
   func testSettingMaxConnectionsPerHostAddsToConfigurationWhenRunningEnvoy() {
     let expectation = self.expectation(description: "Run called with expected data")
     MockEnvoyEngine.onRunWithConfig = { config, _ in
@@ -365,13 +367,13 @@ final class EngineBuilderTests: XCTestCase {
   func testAddingVirtualClustersAddsToConfigurationWhenRunningEnvoy() {
     let expectation = self.expectation(description: "Run called with expected data")
     MockEnvoyEngine.onRunWithConfig = { config, _ in
-      XCTAssertEqual("[test]", config.virtualClusters)
+      XCTAssertEqual(["test"], config.virtualClusters)
       expectation.fulfill()
     }
 
     _ = EngineBuilder()
       .addEngineType(MockEnvoyEngine.self)
-      .addVirtualClusters("[test]")
+      .addVirtualClusters(["test"])
       .build()
     self.waitForExpectations(timeout: 0.01)
   }
@@ -441,6 +443,12 @@ final class EngineBuilderTests: XCTestCase {
   }
 
   func testResolvesYAMLWithIndividuallySetValues() throws {
+#if ENVOY_ENABLE_QUIC
+    let http3 = true
+#else
+    let http3 = false
+#endif
+
     let config = EnvoyConfiguration(
       adminInterfaceEnabled: false,
       grpcStatsDomain: "stats.envoyproxy.io",
@@ -450,24 +458,29 @@ final class EngineBuilderTests: XCTestCase {
       dnsFailureRefreshSecondsMax: 500,
       dnsQueryTimeoutSeconds: 800,
       dnsMinRefreshSeconds: 100,
-      dnsPreresolveHostnames: "[test]",
+      dnsPreresolveHostnames: ["host1", "host2"],
+      enableDNSCache: false,
+      dnsCacheSaveIntervalSeconds: 0,
       enableHappyEyeballs: true,
-      enableGzip: true,
-      enableBrotli: false,
+      enableHttp3: http3,
+      enableGzipDecompression: true,
+      enableGzipCompression: false,
+      enableBrotliDecompression: false,
+      enableBrotliCompression: false,
       enableInterfaceBinding: true,
       enableDrainPostDnsRefresh: false,
       enforceTrustChainVerification: false,
+      forceIPv6: false,
       enablePlatformCertificateValidation: false,
       h2ConnectionKeepaliveIdleIntervalMilliseconds: 1,
       h2ConnectionKeepaliveTimeoutSeconds: 333,
-      h2ExtendKeepaliveTimeout: true,
       maxConnectionsPerHost: 100,
       statsFlushSeconds: 600,
       streamIdleTimeoutSeconds: 700,
       perTryIdleTimeoutSeconds: 777,
       appVersion: "v1.2.3",
       appId: "com.envoymobile.ios",
-      virtualClusters: "[test]",
+      virtualClusters: ["test"],
       directResponseMatchers: "",
       directResponses: "",
       nativeFilterChain: [
@@ -487,9 +500,16 @@ final class EngineBuilderTests: XCTestCase {
     XCTAssertTrue(resolvedYAML.contains("&dns_fail_max_interval 500s"))
     XCTAssertTrue(resolvedYAML.contains("&dns_query_timeout 800s"))
     XCTAssertTrue(resolvedYAML.contains("&dns_min_refresh_rate 100s"))
-    XCTAssertTrue(resolvedYAML.contains("&dns_preresolve_hostnames [test]"))
+    XCTAssertTrue(
+      resolvedYAML.contains(
+#"""
+&dns_preresolve_hostnames [{"address": "host1", "port_value": 443},\#
+{"address": "host2", "port_value": 443}]
+"""#
+      )
+    )
     XCTAssertTrue(resolvedYAML.contains("&dns_lookup_family ALL"))
-    XCTAssertTrue(resolvedYAML.contains("&dns_multiple_addresses true"))
+    XCTAssertFalse(resolvedYAML.contains("&persistent_dns_cache_config"))
     XCTAssertTrue(resolvedYAML.contains("&enable_interface_binding true"))
     XCTAssertTrue(resolvedYAML.contains("&trust_chain_verification ACCEPT_UNTRUSTED"))
     XCTAssertTrue(resolvedYAML.contains("""
@@ -503,7 +523,6 @@ final class EngineBuilderTests: XCTestCase {
     // HTTP/2
     XCTAssertTrue(resolvedYAML.contains("&h2_connection_keepalive_idle_interval 0.001s"))
     XCTAssertTrue(resolvedYAML.contains("&h2_connection_keepalive_timeout 333s"))
-    XCTAssertTrue(resolvedYAML.contains("&h2_delay_keepalive_timeout true"))
 
     XCTAssertTrue(resolvedYAML.contains("&max_connections_per_host 100"))
 
@@ -512,9 +531,11 @@ final class EngineBuilderTests: XCTestCase {
 
     XCTAssertFalse(resolvedYAML.contains("admin: *admin_interface"))
 
-    // Decompression
-    XCTAssertTrue(resolvedYAML.contains("decompressor.v3.Gzip"))
-    XCTAssertFalse(resolvedYAML.contains("decompressor.v3.Brotli"))
+    // Compression
+    XCTAssertTrue(resolvedYAML.contains(".decompressor.v3.Gzip"))
+    XCTAssertFalse(resolvedYAML.contains(".compressor.v3.Gzip"))
+    XCTAssertFalse(resolvedYAML.contains(".decompressor.v3.Brotli"))
+    XCTAssertFalse(resolvedYAML.contains(".compressor.v3.Brotli"))
 
     // Metadata
     XCTAssertTrue(resolvedYAML.contains("device_os: iOS"))
@@ -543,24 +564,29 @@ final class EngineBuilderTests: XCTestCase {
       dnsFailureRefreshSecondsMax: 500,
       dnsQueryTimeoutSeconds: 800,
       dnsMinRefreshSeconds: 100,
-      dnsPreresolveHostnames: "[test]",
+      dnsPreresolveHostnames: ["test"],
+      enableDNSCache: true,
+      dnsCacheSaveIntervalSeconds: 10,
       enableHappyEyeballs: false,
-      enableGzip: false,
-      enableBrotli: true,
+      enableHttp3: false,
+      enableGzipDecompression: false,
+      enableGzipCompression: true,
+      enableBrotliDecompression: true,
+      enableBrotliCompression: true,
       enableInterfaceBinding: false,
       enableDrainPostDnsRefresh: true,
       enforceTrustChainVerification: true,
+      forceIPv6: false,
       enablePlatformCertificateValidation: true,
       h2ConnectionKeepaliveIdleIntervalMilliseconds: 1,
       h2ConnectionKeepaliveTimeoutSeconds: 333,
-      h2ExtendKeepaliveTimeout: false,
       maxConnectionsPerHost: 100,
       statsFlushSeconds: 600,
       streamIdleTimeoutSeconds: 700,
       perTryIdleTimeoutSeconds: 777,
       appVersion: "v1.2.3",
       appId: "com.envoymobile.ios",
-      virtualClusters: "[test]",
+      virtualClusters: ["test"],
       directResponseMatchers: "",
       directResponses: "",
       nativeFilterChain: [
@@ -575,7 +601,22 @@ final class EngineBuilderTests: XCTestCase {
     )
     let resolvedYAML = try XCTUnwrap(config.resolveTemplate(kMockTemplate))
     XCTAssertTrue(resolvedYAML.contains("&dns_lookup_family V4_PREFERRED"))
-    XCTAssertTrue(resolvedYAML.contains("&dns_multiple_addresses false"))
+// swiftlint:disable line_length
+    XCTAssertTrue(resolvedYAML.contains(
+"""
+- &persistent_dns_cache_config
+  config:
+    name: "envoy.key_value.platform"
+    typed_config:
+      "@type": type.googleapis.com/envoymobile.extensions.key_value.platform.PlatformKeyValueStoreConfig
+      key: dns_persistent_cache
+      save_interval:
+        seconds: *persistent_dns_cache_save_interval
+      max_entries: 100
+"""
+    ))
+    XCTAssertTrue(resolvedYAML.contains("&persistent_dns_cache_save_interval 10"))
+// swiftlint:enable line_length
     XCTAssertTrue(resolvedYAML.contains("&enable_interface_binding false"))
     XCTAssertTrue(resolvedYAML.contains("&trust_chain_verification VERIFY_TRUST_CHAIN"))
     XCTAssertTrue(resolvedYAML.contains(
@@ -585,12 +626,13 @@ final class EngineBuilderTests: XCTestCase {
     name: "envoy_mobile.cert_validator.platform_bridge_cert_validator"
 """
     ))
-    XCTAssertTrue(resolvedYAML.contains("&h2_delay_keepalive_timeout false"))
     XCTAssertTrue(resolvedYAML.contains("&enable_drain_post_dns_refresh true"))
 
-    // Decompression
-    XCTAssertFalse(resolvedYAML.contains("decompressor.v3.Gzip"))
-    XCTAssertTrue(resolvedYAML.contains("decompressor.v3.Brotli"))
+    // Compression
+    XCTAssertFalse(resolvedYAML.contains(".decompressor.v3.Gzip"))
+    XCTAssertTrue(resolvedYAML.contains(".compressor.v3.Gzip"))
+    XCTAssertTrue(resolvedYAML.contains(".decompressor.v3.Brotli"))
+    XCTAssertTrue(resolvedYAML.contains(".compressor.v3.Brotli"))
   }
 
   func testReturnsNilWhenUnresolvedValueInTemplate() {
@@ -603,24 +645,29 @@ final class EngineBuilderTests: XCTestCase {
       dnsFailureRefreshSecondsMax: 500,
       dnsQueryTimeoutSeconds: 800,
       dnsMinRefreshSeconds: 100,
-      dnsPreresolveHostnames: "[test]",
+      dnsPreresolveHostnames: ["test"],
+      enableDNSCache: false,
+      dnsCacheSaveIntervalSeconds: 0,
       enableHappyEyeballs: false,
-      enableGzip: false,
-      enableBrotli: false,
+      enableHttp3: false,
+      enableGzipDecompression: false,
+      enableGzipCompression: false,
+      enableBrotliDecompression: false,
+      enableBrotliCompression: false,
       enableInterfaceBinding: false,
       enableDrainPostDnsRefresh: false,
       enforceTrustChainVerification: true,
+      forceIPv6: false,
       enablePlatformCertificateValidation: true,
       h2ConnectionKeepaliveIdleIntervalMilliseconds: 222,
       h2ConnectionKeepaliveTimeoutSeconds: 333,
-      h2ExtendKeepaliveTimeout: false,
       maxConnectionsPerHost: 100,
       statsFlushSeconds: 600,
       streamIdleTimeoutSeconds: 700,
       perTryIdleTimeoutSeconds: 700,
       appVersion: "v1.2.3",
       appId: "com.envoymobile.ios",
-      virtualClusters: "[test]",
+      virtualClusters: ["test"],
       directResponseMatchers: "",
       directResponses: "",
       nativeFilterChain: [],

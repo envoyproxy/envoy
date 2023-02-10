@@ -176,7 +176,8 @@ const UpgradeMap& DelegatingRouteEntry::upgradeMap() const {
 }
 
 using ConnectConfig = envoy::config::route::v3::RouteAction::UpgradeConfig::ConnectConfig;
-const absl::optional<ConnectConfig>& DelegatingRouteEntry::connectConfig() const {
+using ConnectConfigOptRef = OptRef<ConnectConfig>;
+const ConnectConfigOptRef DelegatingRouteEntry::connectConfig() const {
   return base_route_->routeEntry()->connectConfig();
 }
 

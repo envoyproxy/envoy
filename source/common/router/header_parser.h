@@ -20,6 +20,18 @@ using HeaderParserPtr = std::unique_ptr<HeaderParser>;
 
 using HeaderAppendAction = envoy::config::core::v3::HeaderValueOption::HeaderAppendAction;
 using HeaderValueOption = envoy::config::core::v3::HeaderValueOption;
+using HeaderValue = envoy::config::core::v3::HeaderValue;
+
+struct HeadersToAddEntry {
+  HeadersToAddEntry(const HeaderValue& header_value, HeaderAppendAction append_action);
+  HeadersToAddEntry(const HeaderValueOption& header_value_option);
+
+  std::string original_value_;
+  bool add_if_empty_ = false;
+
+  HttpHeaderFormatterPtr formatter_;
+  HeaderAppendAction append_action_;
+};
 
 /**
  * HeaderParser manipulates Http::HeaderMap instances. Headers to be added are pre-parsed to select
@@ -105,13 +117,6 @@ protected:
   HeaderParser() = default;
 
 private:
-  struct HeadersToAddEntry {
-    HttpHeaderFormatterPtr formatter_;
-    std::string original_value_;
-    HeaderAppendAction append_action_;
-    bool add_if_empty_ = false;
-  };
-
   std::vector<std::pair<Http::LowerCaseString, HeadersToAddEntry>> headers_to_add_;
   std::vector<Http::LowerCaseString> headers_to_remove_;
 };

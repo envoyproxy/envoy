@@ -109,7 +109,7 @@ public:
   bool includeAttemptCountInRequest() const override;
   bool includeAttemptCountInResponse() const override;
   const UpgradeMap& upgradeMap() const override;
-  const absl::optional<ConnectConfig>& connectConfig() const override;
+  const ConnectConfigOptRef connectConfig() const override;
   const std::string& routeName() const override;
   const EarlyDataPolicy& earlyDataPolicy() const override;
 

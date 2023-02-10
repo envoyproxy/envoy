@@ -4,6 +4,7 @@ import Foundation
 /// Builder used for creating and running a new Engine instance.
 @objcMembers
 open class EngineBuilder: NSObject {
+  // swiftlint:disable:previous type_body_length
   private let base: BaseConfiguration
   private var engineType: EnvoyEngine.Type = EnvoyEngineImpl.self
   private var logLevel: LogLevel = .info
@@ -20,25 +21,34 @@ open class EngineBuilder: NSObject {
   private var dnsFailureRefreshSecondsMax: UInt32 = 10
   private var dnsQueryTimeoutSeconds: UInt32 = 25
   private var dnsMinRefreshSeconds: UInt32 = 60
-  private var dnsPreresolveHostnames: String = "[]"
+  private var dnsPreresolveHostnames: [String] = []
   private var dnsRefreshSeconds: UInt32 = 60
+  private var enableDNSCache: Bool = false
+  private var dnsCacheSaveIntervalSeconds: UInt32 = 1
   private var enableHappyEyeballs: Bool = true
-  private var enableGzip: Bool = true
-  private var enableBrotli: Bool = false
+  private var enableGzipDecompression: Bool = true
+  private var enableGzipCompression: Bool = false
+  private var enableBrotliDecompression: Bool = false
+  private var enableBrotliCompression: Bool = false
+#if ENVOY_ENABLE_QUIC
+  private var enableHttp3: Bool = true
+#else
+  private var enableHttp3: Bool = false
+#endif
   private var enableInterfaceBinding: Bool = false
   private var enforceTrustChainVerification: Bool = true
   private var enablePlatformCertificateValidation: Bool = false
   private var enableDrainPostDnsRefresh: Bool = false
+  private var forceIPv6: Bool = false
   private var h2ConnectionKeepaliveIdleIntervalMilliseconds: UInt32 = 1
   private var h2ConnectionKeepaliveTimeoutSeconds: UInt32 = 10
-  private var h2ExtendKeepaliveTimeout: Bool = false
   private var maxConnectionsPerHost: UInt32 = 7
   private var statsFlushSeconds: UInt32 = 60
   private var streamIdleTimeoutSeconds: UInt32 = 15
   private var perTryIdleTimeoutSeconds: UInt32 = 15
   private var appVersion: String = "unspecified"
   private var appId: String = "unspecified"
-  private var virtualClusters: String = "[]"
+  private var virtualClusters: [String] = []
   private var onEngineRunning: (() -> Void)?
   private var logger: ((String) -> Void)?
   private var eventTracker: (([String: String]) -> Void)?
@@ -155,7 +165,7 @@ open class EngineBuilder: NSObject {
   ///
   /// - returns: This builder.
   @discardableResult
-  public func addDNSPreresolveHostnames(dnsPreresolveHostnames: String) -> Self {
+  public func addDNSPreresolveHostnames(dnsPreresolveHostnames: [String]) -> Self {
     self.dnsPreresolveHostnames = dnsPreresolveHostnames
     return self
   }
@@ -168,6 +178,23 @@ open class EngineBuilder: NSObject {
   @discardableResult
   public func addDNSRefreshSeconds(_ dnsRefreshSeconds: UInt32) -> Self {
     self.dnsRefreshSeconds = dnsRefreshSeconds
+    return self
+  }
+
+  /// Specify whether to enable DNS cache.
+  ///
+  /// Note that DNS cache requires an addition of a key value store named
+  /// 'reserved.platform_store'.
+  ///
+  /// - parameter enableDNSCache: whether to enable DNS cache. Disabled by default.
+  /// - parameter saveInterval:   the interval at which to save results to the configured
+  ///                             key value store.
+  ///
+  /// - returns: This builder.
+  @discardableResult
+  public func enableDNSCache(_ enableDNSCache: Bool, saveInterval: UInt32 = 1) -> Self {
+    self.enableDNSCache = enableDNSCache
+    self.dnsCacheSaveIntervalSeconds = saveInterval
     return self
   }
 
@@ -185,25 +212,64 @@ open class EngineBuilder: NSObject {
 
   /// Specify whether to do gzip response decompression or not.  Defaults to true.
   ///
-  /// - parameter enableGzip: whether or not to gunzip responses.
+  /// - parameter enableGzipDecompression: whether or not to gunzip responses.
   ///
   /// - returns: This builder.
   @discardableResult
-  public func enableGzip(_ enableGzip: Bool) -> Self {
-    self.enableGzip = enableGzip
+  public func enableGzipDecompression(_ enableGzipDecompression: Bool) -> Self {
+    self.enableGzipDecompression = enableGzipDecompression
     return self
   }
 
-  /// Specify whether to do brotli response decompression or not.  Defaults to false.
+#if ENVOY_MOBILE_REQUEST_COMPRESSION
+  /// Specify whether to do gzip request compression or not.  Defaults to false.
   ///
-  /// - parameter enableBrotli: whether or not to brotli decompress responses.
+  /// - parameter enableGzipCompression: whether or not to gunzip requests.
   ///
   /// - returns: This builder.
   @discardableResult
-  public func enableBrotli(_ enableBrotli: Bool) -> Self {
-    self.enableBrotli = enableBrotli
+  public func enableGzipCompression(_ enableGzipCompression: Bool) -> Self {
+    self.enableGzipCompression = enableGzipCompression
     return self
   }
+#endif
+
+  /// Specify whether to do brotli response decompression or not.  Defaults to false.
+  ///
+  /// - parameter enableBrotliDecompression: whether or not to brotli decompress responses.
+  ///
+  /// - returns: This builder.
+  @discardableResult
+  public func enableBrotliDecompression(_ enableBrotliDecompression: Bool) -> Self {
+    self.enableBrotliDecompression = enableBrotliDecompression
+    return self
+  }
+
+#if ENVOY_MOBILE_REQUEST_COMPRESSION
+  /// Specify whether to do brotli request compression or not.  Defaults to false.
+  ///
+  /// - parameter enableBrotliCompression: whether or not to brotli compress requests.
+  ///
+  /// - returns: This builder.
+  @discardableResult
+  public func enableBrotliCompression(_ enableBrotliCompression: Bool) -> Self {
+    self.enableBrotliCompression = enableBrotliCompression
+    return self
+  }
+#endif
+
+#if ENVOY_ENABLE_QUIC
+  /// Specify whether to enable support for HTTP/3 or not.  Defaults to true.
+  ///
+  /// - parameter enableHttp3: whether or not to enable HTTP/3.
+  ///
+  /// - returns: This builder.
+  @discardableResult
+  public func enableHttp3(_ enableHttp3: Bool) -> Self {
+    self.enableHttp3 = enableHttp3
+    return self
+  }
+#endif
 
   /// Specify whether sockets may attempt to bind to a specific interface, based on network
   /// conditions.
@@ -254,6 +320,18 @@ open class EngineBuilder: NSObject {
     return self
   }
 
+  /// Specify whether to remap IPv4 addresses to the IPv6 space and always force connections
+  /// to use IPv6. Note this is an experimental option and should be enabled with caution.
+  ///
+  /// - parameter forceIPv6: whether to force connections to use IPv6.
+  ///
+  /// - returns: This builder.
+  @discardableResult
+  public func forceIPv6(_ forceIPv6: Bool) -> Self {
+    self.forceIPv6 = forceIPv6
+    return self
+  }
+
   /// Add a rate at which to ping h2 connections on new stream creation if the connection has
   /// sat idle. Defaults to 1 millisecond which effectively enables h2 ping functionality
   /// and results in a connection ping on every new stream creation. Set it to
@@ -279,17 +357,6 @@ open class EngineBuilder: NSObject {
   public func addH2ConnectionKeepaliveTimeoutSeconds(
     _ h2ConnectionKeepaliveTimeoutSeconds: UInt32) -> Self {
     self.h2ConnectionKeepaliveTimeoutSeconds = h2ConnectionKeepaliveTimeoutSeconds
-    return self
-  }
-
-  /// Extend the keepalive timeout when *any* frame is received on the owning HTTP/2 connection.
-  ///
-  /// - parameter h2ExtendKeepaliveTimeout: whether to extend the keepalive timeout.
-  ///
-  /// - returns: This builder.
-  @discardableResult
-  public func h2ExtendKeepaliveTimeout(_ h2ExtendKeepaliveTimeout: Bool) -> Self {
-    self.h2ExtendKeepaliveTimeout = h2ExtendKeepaliveTimeout
     return self
   }
 
@@ -474,15 +541,27 @@ open class EngineBuilder: NSObject {
 
   /// Add virtual cluster configuration.
   ///
-  /// - parameter virtualClusters: The JSON configuration string for virtual clusters.
+  /// - parameter virtualCluster: The JSON configuration string for a virtual cluster.
   ///
   /// - returns: This builder.
   @discardableResult
-  public func addVirtualClusters(_ virtualClusters: String) -> Self {
-    self.virtualClusters = virtualClusters
+  public func addVirtualCluster(_ virtualCluster: String) -> Self {
+    self.virtualClusters.append(virtualCluster)
     return self
   }
 
+  /// Add virtual cluster configurations.
+  ///
+  /// - parameter virtualClusters: The JSON configuration strings for virtual clusters.
+  ///
+  /// - returns: This builder.
+  @discardableResult
+  public func addVirtualClusters(_ virtualClusters: [String]) -> Self {
+    self.virtualClusters.append(contentsOf: virtualClusters)
+    return self
+  }
+
+#if ENVOY_ADMIN_FUNCTIONALITY
   /// Enable admin interface on 127.0.0.1:9901 address. Admin interface is intended to be
   /// used for development/debugging purposes only. Enabling it in production may open
   /// your app to security vulnerabilities.
@@ -496,6 +575,7 @@ open class EngineBuilder: NSObject {
     self.adminInterfaceEnabled = true
     return self
   }
+#endif
 
   /// Builds and runs a new `Engine` instance with the provided configuration.
   ///
@@ -516,17 +596,22 @@ open class EngineBuilder: NSObject {
       dnsQueryTimeoutSeconds: self.dnsQueryTimeoutSeconds,
       dnsMinRefreshSeconds: self.dnsMinRefreshSeconds,
       dnsPreresolveHostnames: self.dnsPreresolveHostnames,
+      enableDNSCache: self.enableDNSCache,
+      dnsCacheSaveIntervalSeconds: self.dnsCacheSaveIntervalSeconds,
       enableHappyEyeballs: self.enableHappyEyeballs,
-      enableGzip: self.enableGzip,
-      enableBrotli: self.enableBrotli,
+      enableHttp3: self.enableHttp3,
+      enableGzipDecompression: self.enableGzipDecompression,
+      enableGzipCompression: self.enableGzipCompression,
+      enableBrotliDecompression: self.enableBrotliDecompression,
+      enableBrotliCompression: self.enableBrotliCompression,
       enableInterfaceBinding: self.enableInterfaceBinding,
       enableDrainPostDnsRefresh: self.enableDrainPostDnsRefresh,
       enforceTrustChainVerification: self.enforceTrustChainVerification,
+      forceIPv6: self.forceIPv6,
       enablePlatformCertificateValidation: self.enablePlatformCertificateValidation,
       h2ConnectionKeepaliveIdleIntervalMilliseconds:
         self.h2ConnectionKeepaliveIdleIntervalMilliseconds,
       h2ConnectionKeepaliveTimeoutSeconds: self.h2ConnectionKeepaliveTimeoutSeconds,
-      h2ExtendKeepaliveTimeout: self.h2ExtendKeepaliveTimeout,
       maxConnectionsPerHost: self.maxConnectionsPerHost,
       statsFlushSeconds: self.statsFlushSeconds,
       streamIdleTimeoutSeconds: self.streamIdleTimeoutSeconds,

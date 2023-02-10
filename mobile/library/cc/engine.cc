@@ -8,6 +8,12 @@ namespace Platform {
 
 Engine::Engine(envoy_engine_t engine) : engine_(engine), terminated_(false) {}
 
+Engine::~Engine() {
+  if (!terminated_) {
+    terminate();
+  }
+}
+
 // we lazily construct the stream and pulse clients
 // because they either require or will require a weak ptr
 // which can't be provided from inside of the constructor

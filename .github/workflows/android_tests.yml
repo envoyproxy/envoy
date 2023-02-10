@@ -6,8 +6,13 @@ on:
     - main
   pull_request:
 
+concurrency:
+  group: ${{ github.head_ref-github.workflow || github.run_id }}
+  cancel-in-progress: true
+
 jobs:
   kotlintestsmac:
+    if: github.repository == 'envoyproxy/envoy'
     # revert to //test/kotlin/... once fixed
     # https://github.com/envoyproxy/envoy-mobile/issues/1932
     name: kotlin_tests_mac
@@ -41,6 +46,7 @@ jobs:
             --remote_header="Authorization=Bearer $GITHUB_TOKEN" \
             //test/kotlin/io/...
   javatestsmac:
+    if: github.repository == 'envoyproxy/envoy'
     name: java_tests_mac
     runs-on: macos-12
     timeout-minutes: 120
@@ -68,18 +74,20 @@ jobs:
         cd mobile && ./bazelw test \
             --test_output=all \
             --build_tests_only \
+            --config test-android \
             $([ -z $GITHUB_TOKEN ] || echo "--config=remote-ci-macos") \
             --remote_header="Authorization=Bearer $GITHUB_TOKEN" \
             --define=signal_trace=disabled \
             //test/java/...
   kotlintestslinux:
+    if: github.repository == 'envoyproxy/envoy'
     # Only kotlin tests are executed since with linux:
     # https://github.com/envoyproxy/envoy-mobile/issues/1418.
     name: kotlin_tests_linux
     runs-on: ubuntu-20.04
     timeout-minutes: 90
     container:
-      image: envoyproxy/envoy-build-ubuntu:b0ff77ae3f25b0bf595f9b8bba46b489723ab446
+      image: envoyproxy/envoy-build-ubuntu:7304f974de2724617b7492ccb4c9c58cd420353a
       env:
         CC: /opt/llvm/bin/clang
         CXX: /opt/llvm/bin/clang++
@@ -109,6 +117,7 @@ jobs:
         cd mobile && ./bazelw test \
             --test_output=all \
             --build_tests_only \
+            --config test-android \
             $([ -z $GITHUB_TOKEN ] || echo "--config=remote-ci-linux-clang") \
             --remote_header="Authorization=Bearer $GITHUB_TOKEN" \
             //test/kotlin/...

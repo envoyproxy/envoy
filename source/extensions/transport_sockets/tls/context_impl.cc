@@ -784,6 +784,9 @@ ServerContextImpl::ServerContextImpl(Stats::Scope& scope,
   }
 
   for (auto& ctx : tls_contexts_) {
+    if (ctx.cert_chain_ == nullptr) {
+      continue;
+    }
     bssl::UniquePtr<EVP_PKEY> public_key(X509_get_pubkey(ctx.cert_chain_.get()));
     const int pkey_id = EVP_PKEY_id(public_key.get());
     // Load DNS SAN entries and Subject Common Name as server name patterns after certificate
@@ -889,10 +892,12 @@ void ServerContextImpl::populateServerNamesMap(TlsContext& ctx, int pkey_id) {
     auto sn_match = server_names_map_.try_emplace(sn_pattern, pkey_types_map).first;
     auto pt_match = sn_match->second.find(pkey_id);
     if (pt_match != sn_match->second.end()) {
-      throw EnvoyException(fmt::format(
-          "Failed to load certificate chain from {}, at most one "
-          "certificate of a given type may be specified for each DNS SAN entry or Subject CN: {}",
-          ctx.cert_chain_file_path_, sn_match->first));
+      // When there are duplicate names, prefer the earlier one.
+      //
+      // If all of the SANs in a certificate are unused due to duplicates, it could be useful
+      // to issue a warning, but that would require additional tracking that hasn't been
+      // implemented.
+      return;
     }
     sn_match->second.emplace(std::pair<int, std::reference_wrapper<TlsContext>>(pkey_id, ctx));
   };

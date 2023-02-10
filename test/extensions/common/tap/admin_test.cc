@@ -138,7 +138,7 @@ tap_config:
           max_traces: {}
           timeout: {}
 )EOF";
-    return fmt::format(buffered_admin_request_yaml_, max_traces, timeout_s);
+    return fmt::format(fmt::runtime(buffered_admin_request_yaml_), max_traces, timeout_s);
   }
 
   // Cannot be moved into individual test cases as expected calls are validated on object

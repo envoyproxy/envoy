@@ -17,10 +17,6 @@ namespace Tls {
 
 ContextManagerImpl::ContextManagerImpl(TimeSource& time_source) : time_source_(time_source) {}
 
-ContextManagerImpl::~ContextManagerImpl() {
-  KNOWN_ISSUE_ASSERT(contexts_.empty(), "https://github.com/envoyproxy/envoy/issues/10030");
-}
-
 Envoy::Ssl::ClientContextSharedPtr
 ContextManagerImpl::createSslClientContext(Stats::Scope& scope,
                                            const Envoy::Ssl::ClientContextConfig& config) {

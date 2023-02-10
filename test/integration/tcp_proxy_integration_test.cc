@@ -48,7 +48,7 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, TcpProxyIntegrationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
 
-// Test upstream writing before downstream downstream does.
+// Test upstream writing before downstream does.
 TEST_P(TcpProxyIntegrationTest, TcpProxyUpstreamWritesFirst) {
   initialize();
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
@@ -680,6 +680,47 @@ TEST_P(TcpProxyIntegrationTest, TestIdletimeoutWithNoData) {
   initialize();
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
   tcp_client->waitForDisconnect();
+}
+
+TEST_P(TcpProxyIntegrationTest, TestPerClientIdletimeout) {
+  autonomous_upstream_ = true;
+
+  enableHalfClose(false);
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+    auto* static_resources = bootstrap.mutable_static_resources();
+    for (int i = 0; i < static_resources->clusters_size(); ++i) {
+      auto* cluster = bootstrap.mutable_static_resources()->mutable_clusters(i);
+      auto& cluster_protocol_options = *cluster->mutable_typed_extension_protocol_options();
+      envoy::extensions::upstreams::tcp::v3::TcpProtocolOptions tcp_options;
+      tcp_options.mutable_idle_timeout()->set_nanos(
+          std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::milliseconds(100))
+              .count());
+      cluster_protocol_options["envoy.extensions.upstreams.tcp.v3.TcpProtocolOptions"].PackFrom(
+          tcp_options);
+
+      // two more connections which are going to be closed by the per-client idle timers
+      cluster->mutable_preconnect_policy()->mutable_predictive_preconnect_ratio()->set_value(2);
+
+      auto* load_assignment = cluster->mutable_load_assignment();
+      load_assignment->clear_endpoints();
+      for (int i = 0; i < 5; ++i) {
+        auto locality = load_assignment->add_endpoints();
+        locality->add_lb_endpoints()->mutable_endpoint()->MergeFrom(
+            ConfigHelper::buildEndpoint(Network::Test::getLoopbackAddressString(version_)));
+      }
+    }
+  });
+  setUpstreamCount(5);
+
+  initialize();
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
+  // Platforms could prevent ActiveTcpClient construction unless we explicitly wait for it.
+  test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_total", 1);
+
+  tcp_client->close();
+
+  // Two pre-connections are closed by idle timers.
+  test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_destroy", 2);
 }
 
 TEST_P(TcpProxyIntegrationTest, TestIdletimeoutWithLargeOutstandingData) {
@@ -1570,4 +1611,5 @@ TEST_P(MysqlIntegrationTest, PreconnectWithTls) {
 INSTANTIATE_TEST_SUITE_P(TcpProxyIntegrationTestParams, MysqlIntegrationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
+
 } // namespace Envoy

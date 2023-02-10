@@ -425,11 +425,9 @@ WasmResult serializeValue(Filters::Common::Expr::CelValue value, std::string* re
 }
 
 #define PROPERTY_TOKENS(_f)                                                                        \
-  _f(METADATA) _f(REQUEST) _f(RESPONSE) _f(CONNECTION) _f(UPSTREAM) _f(NODE) _f(SOURCE)            \
-      _f(DESTINATION) _f(LISTENER_DIRECTION) _f(LISTENER_METADATA) _f(CLUSTER_NAME)                \
-          _f(CLUSTER_METADATA) _f(ROUTE_NAME) _f(ROUTE_METADATA) _f(PLUGIN_NAME)                   \
-              _f(UPSTREAM_HOST_METADATA) _f(PLUGIN_ROOT_ID) _f(PLUGIN_VM_ID) _f(CONNECTION_ID)     \
-                  _f(FILTER_STATE)
+  _f(NODE) _f(LISTENER_DIRECTION) _f(LISTENER_METADATA) _f(CLUSTER_NAME) _f(CLUSTER_METADATA)      \
+      _f(ROUTE_NAME) _f(ROUTE_METADATA) _f(PLUGIN_NAME) _f(UPSTREAM_HOST_METADATA)                 \
+          _f(PLUGIN_ROOT_ID) _f(PLUGIN_VM_ID) _f(CONNECTION_ID)
 
 static inline std::string downCase(std::string s) {
   std::transform(s.begin(), s.end(), s.begin(), [](unsigned char c) { return std::tolower(c); });
@@ -445,11 +443,30 @@ static absl::flat_hash_map<std::string, PropertyToken> property_tokens = {PROPER
 #undef _PAIR
 
 absl::optional<google::api::expr::runtime::CelValue>
+Context::FindValue(absl::string_view name, Protobuf::Arena* arena) const {
+  return findValue(name, arena, false);
+}
+
+absl::optional<google::api::expr::runtime::CelValue>
 Context::findValue(absl::string_view name, Protobuf::Arena* arena, bool last) const {
   using google::api::expr::runtime::CelProtoWrapper;
   using google::api::expr::runtime::CelValue;
 
   const StreamInfo::StreamInfo* info = getConstRequestStreamInfo();
+  // In order to delegate to the StreamActivation method, we have to set the
+  // context properties to match the Wasm context properties in all callbacks
+  // (e.g. onLog or onEncodeHeaders) for the duration of the call.
+  activation_info_ = info;
+  activation_request_headers_ = request_headers_ ? request_headers_ : access_log_request_headers_;
+  activation_response_headers_ =
+      response_headers_ ? response_headers_ : access_log_response_headers_;
+  activation_response_trailers_ =
+      response_trailers_ ? response_trailers_ : access_log_response_trailers_;
+  auto value = StreamActivation::FindValue(name, arena);
+  resetActivation();
+  if (value) {
+    return value;
+  }
 
   // Convert into a dense token to enable a jump table implementation.
   auto part_token = property_tokens.find(name);
@@ -473,30 +490,6 @@ Context::findValue(absl::string_view name, Protobuf::Arena* arena, bool last) co
   }
 
   switch (part_token->second) {
-  case PropertyToken::METADATA:
-    if (info) {
-      return CelProtoWrapper::CreateMessage(&info->dynamicMetadata(), arena);
-    }
-    break;
-  case PropertyToken::REQUEST:
-    if (info) {
-      return CelValue::CreateMap(Protobuf::Arena::Create<Filters::Common::Expr::RequestWrapper>(
-          arena, *arena, request_headers_ ? request_headers_ : access_log_request_headers_, *info));
-    }
-    break;
-  case PropertyToken::RESPONSE:
-    if (info) {
-      return CelValue::CreateMap(Protobuf::Arena::Create<Filters::Common::Expr::ResponseWrapper>(
-          arena, *arena, response_headers_ ? response_headers_ : access_log_response_headers_,
-          response_trailers_ ? response_trailers_ : access_log_response_trailers_, *info));
-    }
-    break;
-  case PropertyToken::CONNECTION:
-    if (info) {
-      return CelValue::CreateMap(
-          Protobuf::Arena::Create<Filters::Common::Expr::ConnectionWrapper>(arena, *info));
-    }
-    break;
   case PropertyToken::CONNECTION_ID: {
     auto conn = getConnection();
     if (conn) {
@@ -504,29 +497,11 @@ Context::findValue(absl::string_view name, Protobuf::Arena* arena, bool last) co
     }
     break;
   }
-  case PropertyToken::UPSTREAM:
-    if (info) {
-      return CelValue::CreateMap(
-          Protobuf::Arena::Create<Filters::Common::Expr::UpstreamWrapper>(arena, *info));
-    }
-    break;
   case PropertyToken::NODE:
     if (root_local_info_) {
       return CelProtoWrapper::CreateMessage(&root_local_info_->node(), arena);
     } else if (plugin_) {
       return CelProtoWrapper::CreateMessage(&plugin()->localInfo().node(), arena);
-    }
-    break;
-  case PropertyToken::SOURCE:
-    if (info) {
-      return CelValue::CreateMap(
-          Protobuf::Arena::Create<Filters::Common::Expr::PeerWrapper>(arena, *info, false));
-    }
-    break;
-  case PropertyToken::DESTINATION:
-    if (info) {
-      return CelValue::CreateMap(
-          Protobuf::Arena::Create<Filters::Common::Expr::PeerWrapper>(arena, *info, true));
     }
     break;
   case PropertyToken::LISTENER_DIRECTION:
@@ -582,13 +557,6 @@ Context::findValue(absl::string_view name, Protobuf::Arena* arena, bool last) co
     return CelValue::CreateStringView(toAbslStringView(root_id()));
   case PropertyToken::PLUGIN_VM_ID:
     return CelValue::CreateStringView(toAbslStringView(wasm()->vm_id()));
-  case PropertyToken::FILTER_STATE:
-    if (info) {
-      return Protobuf::Arena::Create<Filters::Common::Expr::FilterStateWrapper>(arena,
-                                                                                info->filterState())
-          ->Produce(arena);
-    }
-    break;
   }
   return {};
 }

@@ -13,7 +13,7 @@ option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/loa
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: Random Load Balancing Policy]
-// [#not-implemented-hide:]
+// [#extension: envoy.load_balancing_policies.random]
 
 // This configuration allows the built-in Random LB policy to be configured via the LB policy
 // extension point. See the :ref:`load balancing architecture overview

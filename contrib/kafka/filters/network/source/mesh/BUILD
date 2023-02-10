@@ -88,6 +88,7 @@ envoy_cc_library(
     deps = [
         "//contrib/kafka/filters/network/source:kafka_response_lib",
         "//contrib/kafka/filters/network/source:tagged_fields_lib",
+        "//envoy/event:dispatcher_interface",
     ],
 )
 
@@ -107,6 +108,51 @@ envoy_cc_library(
         "//envoy/thread:thread_interface",
         "//envoy/thread_local:thread_local_interface",
         "//source/common/common:minimal_logger_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "shared_consumer_manager_lib",
+    srcs = [
+    ],
+    hdrs = [
+        "shared_consumer_manager.h",
+    ],
+    tags = ["skip_on_windows"],
+    deps = [
+        ":upstream_kafka_consumer_lib",
+        "//source/common/common:minimal_logger_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "shared_consumer_manager_impl_lib",
+    srcs = [
+        "shared_consumer_manager_impl.cc",
+    ],
+    hdrs = [
+        "shared_consumer_manager_impl.h",
+    ],
+    tags = ["skip_on_windows"],
+    deps = [
+        ":librdkafka_utils_lib",
+        ":shared_consumer_manager_lib",
+        ":upstream_config_lib",
+        ":upstream_kafka_consumer_impl_lib",
+        "//contrib/kafka/filters/network/source:kafka_types_lib",
+        "//source/common/common:minimal_logger_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "inbound_record_lib",
+    srcs = [
+    ],
+    hdrs = [
+        "inbound_record.h",
+    ],
+    tags = ["skip_on_windows"],
+    deps = [
     ],
 )
 
@@ -148,6 +194,37 @@ envoy_cc_library(
         ":librdkafka_utils_impl_lib",
         ":outbound_record_lib",
         ":upstream_kafka_client_lib",
+        "//envoy/event:dispatcher_interface",
+        "//source/common/common:minimal_logger_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "upstream_kafka_consumer_lib",
+    srcs = [
+    ],
+    hdrs = [
+        "upstream_kafka_consumer.h",
+    ],
+    tags = ["skip_on_windows"],
+    deps = [
+        ":inbound_record_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "upstream_kafka_consumer_impl_lib",
+    srcs = [
+        "upstream_kafka_consumer_impl.cc",
+    ],
+    hdrs = [
+        "upstream_kafka_consumer_impl.h",
+    ],
+    tags = ["skip_on_windows"],
+    deps = [
+        ":librdkafka_utils_impl_lib",
+        ":upstream_kafka_consumer_lib",
+        "//contrib/kafka/filters/network/source:kafka_types_lib",
         "//envoy/event:dispatcher_interface",
         "//source/common/common:minimal_logger_lib",
     ],

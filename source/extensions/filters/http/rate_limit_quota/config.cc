@@ -1,5 +1,7 @@
 #include "source/extensions/filters/http/rate_limit_quota/config.h"
 
+#include <memory>
+
 #include "envoy/registry/registry.h"
 
 #include "source/extensions/filters/http/rate_limit_quota/client_impl.h"
@@ -22,14 +24,6 @@ Http::FilterFactoryCb RateLimitQuotaFilterFactory::createFilterFactoryFromProtoT
       [config = std::move(config), &context](Http::FilterChainFactoryCallbacks& callbacks) -> void {
         callbacks.addStreamFilter(std::make_shared<RateLimitQuotaFilter>(config, context));
       };
-}
-
-Router::RouteSpecificFilterConfigConstSharedPtr
-RateLimitQuotaFilterFactory::createRouteSpecificFilterConfigTyped(
-    const envoy::extensions::filters::http::rate_limit_quota::v3::RateLimitQuotaOverride&,
-    Server::Configuration::ServerFactoryContext&, ProtobufMessage::ValidationVisitor&) {
-  // TODO(tyxia) Added per route config for override later.
-  return nullptr;
 }
 
 /**

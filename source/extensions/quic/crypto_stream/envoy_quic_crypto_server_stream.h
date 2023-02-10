@@ -3,7 +3,7 @@
 #include "envoy/extensions/quic/crypto_stream/v3/crypto_stream.pb.h"
 #include "envoy/registry/registry.h"
 
-#include "source/common/quic/envoy_quic_crypto_stream_factory.h"
+#include "source/common/quic/envoy_quic_server_crypto_stream_factory.h"
 
 namespace Envoy {
 namespace Quic {

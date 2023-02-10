@@ -4,10 +4,15 @@ import io.envoyproxy.envoymobile.engine.EnvoyEngine
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.Test
 import org.mockito.Mockito.mock
+import io.envoyproxy.envoymobile.engine.JniLibrary
 
 class EngineBuilderTest {
   private lateinit var engineBuilder: EngineBuilder
   private var envoyEngine: EnvoyEngine = mock(EnvoyEngine::class.java)
+
+  init {
+    JniLibrary.loadTestLibrary()
+  }
 
   @Test
   fun `adding log level builder uses log level for running Envoy`() {
@@ -27,16 +32,6 @@ class EngineBuilderTest {
 
     val engine = engineBuilder.build() as EngineImpl
     assertThat(engine.envoyConfiguration.grpcStatsDomain).isEqualTo("stats.envoyproxy.io")
-  }
-
-  @Test
-  fun `enabling admin interface overrides default`() {
-    engineBuilder = EngineBuilder(Standard())
-    engineBuilder.addEngineType { envoyEngine }
-    engineBuilder.enableAdminInterface()
-
-    val engine = engineBuilder.build() as EngineImpl
-    assertThat(engine.envoyConfiguration.adminInterfaceEnabled).isTrue()
   }
 
   @Test
@@ -111,6 +106,25 @@ class EngineBuilderTest {
   }
 
   @Test
+  fun `DNS cache is disabled by default`() {
+    engineBuilder = EngineBuilder(Standard())
+    engineBuilder.addEngineType { envoyEngine }
+
+    val engine = engineBuilder.build() as EngineImpl
+    assertThat(engine.envoyConfiguration.enableDNSCache).isFalse()
+  }
+
+  @Test
+  fun `enabling DNS cache overrides default`() {
+    engineBuilder = EngineBuilder(Standard())
+    engineBuilder.addEngineType { envoyEngine }
+    engineBuilder.enableDNSCache(true)
+
+    val engine = engineBuilder.build() as EngineImpl
+    assertThat(engine.envoyConfiguration.enableDNSCache).isTrue()
+  }
+
+  @Test
   fun `specifying H2 Ping idle interval overrides default`() {
     engineBuilder = EngineBuilder(Standard())
     engineBuilder.addEngineType { envoyEngine }
@@ -138,16 +152,6 @@ class EngineBuilderTest {
 
     val engine = engineBuilder.build() as EngineImpl
     assertThat(engine.envoyConfiguration.maxConnectionsPerHost).isEqualTo(1234)
-  }
-
-  @Test
-  fun `enabling h2 keepalive extension overrides default`() {
-    engineBuilder = EngineBuilder(Standard())
-    engineBuilder.addEngineType { envoyEngine }
-    engineBuilder.h2ExtendKeepaliveTimeout(true)
-
-    val engine = engineBuilder.build() as EngineImpl
-    assertThat(engine.envoyConfiguration.h2ExtendKeepaliveTimeout).isTrue()
   }
 
   @Test
@@ -204,10 +208,10 @@ class EngineBuilderTest {
   fun `specifying virtual clusters overrides default`() {
     engineBuilder = EngineBuilder(Standard())
     engineBuilder.addEngineType { envoyEngine }
-    engineBuilder.addVirtualClusters("[test]")
+    engineBuilder.addVirtualCluster("[test]")
 
     val engine = engineBuilder.build() as EngineImpl
-    assertThat(engine.envoyConfiguration.virtualClusters).isEqualTo("[test]")
+    assertThat(engine.envoyConfiguration.virtualClusters.size).isEqualTo(1)
   }
 
   @Test

@@ -1,13 +1,11 @@
 #include "library/common/engine.h"
 
-#include "envoy/stats/histogram.h"
-
+#include "source/common/api/os_sys_calls_impl.h"
 #include "source/common/common/lock_guard.h"
 
 #include "library/common/bridge/utility.h"
 #include "library/common/config/internal.h"
 #include "library/common/data/utility.h"
-#include "library/common/network/android.h"
 #include "library/common/stats/utility.h"
 
 namespace Envoy {
@@ -30,33 +28,26 @@ envoy_status_t Engine::run(const std::string config, const std::string log_level
   // std::thread, main_thread_ is the same object after this call, but its state is replaced with
   // that of the temporary. The temporary object's state becomes the default state, which does
   // nothing.
-  main_thread_ = std::thread(&Engine::main, this, std::string(config), std::string(log_level),
-                             admin_address_path);
+  auto options = std::make_unique<Envoy::OptionsImpl>();
+  options->setConfigYaml(absl::StrCat(config_header, config));
+  if (!log_level.empty()) {
+    options->setLogLevel(options->parseAndValidateLogLevel(log_level.c_str()));
+  }
+  options->setConcurrency(1);
+  if (!admin_address_path.empty()) {
+    options->setAdminAddressPath(admin_address_path);
+  }
+  return run(std::move(options));
+}
+
+envoy_status_t Engine::run(std::unique_ptr<Envoy::OptionsImpl>&& options) {
+  main_thread_ = std::thread(&Engine::main, this, std::move(options));
   return ENVOY_SUCCESS;
 }
 
-envoy_status_t Engine::main(const std::string config, const std::string log_level,
-                            const std::string admin_address_path) {
+envoy_status_t Engine::main(std::unique_ptr<Envoy::OptionsImpl>&& options) {
   // Using unique_ptr ensures main_common's lifespan is strictly scoped to this function.
   std::unique_ptr<EngineCommon> main_common;
-  const std::string name = "envoy";
-  const std::string config_flag = "--config-yaml";
-  const std::string composed_config = absl::StrCat(config_header, config);
-  const std::string log_flag = "-l";
-  const std::string concurrency_option = "--concurrency";
-  const std::string concurrency_arg = "0";
-  std::vector<const char*> envoy_argv = {name.c_str(),
-                                         config_flag.c_str(),
-                                         composed_config.c_str(),
-                                         concurrency_option.c_str(),
-                                         concurrency_arg.c_str(),
-                                         log_flag.c_str(),
-                                         log_level.c_str()};
-  if (!admin_address_path.empty()) {
-    envoy_argv.push_back("--admin-address-path");
-    envoy_argv.push_back(admin_address_path.c_str());
-  }
-  envoy_argv.push_back(nullptr);
   {
     Thread::LockGuard lock(mutex_);
     try {
@@ -84,7 +75,7 @@ envoy_status_t Engine::main(const std::string config, const std::string log_leve
             std::make_unique<Logger::DefaultDelegate>(log_mutex_, Logger::Registry::getSink());
       }
 
-      main_common = std::make_unique<EngineCommon>(envoy_argv.size() - 1, envoy_argv.data());
+      main_common = std::make_unique<EngineCommon>(std::move(options));
       server_ = main_common->server();
       event_dispatcher_ = &server_->dispatcher();
 
@@ -110,7 +101,6 @@ envoy_status_t Engine::main(const std::string config, const std::string log_leve
 
           connectivity_manager_ =
               Network::ConnectivityManagerFactory{server_->serverFactoryContext()}.get();
-          Envoy::Network::Android::Utility::setAlternateGetifaddrs();
           auto v4_interfaces = connectivity_manager_->enumerateV4Interfaces();
           auto v6_interfaces = connectivity_manager_->enumerateV6Interfaces();
           logInterfaces("netconf_get_v4_interfaces", v4_interfaces);
@@ -197,75 +187,6 @@ envoy_status_t Engine::recordCounterInc(const std::string& elements, envoy_stats
   return ENVOY_SUCCESS;
 }
 
-envoy_status_t Engine::recordGaugeSet(const std::string& elements, envoy_stats_tags tags,
-                                      uint64_t value) {
-  ENVOY_LOG(trace, "[pulse.{}] recordGaugeSet", elements);
-  ASSERT(dispatcher_->isThreadSafe(), "pulse calls must run from dispatcher's context");
-  Stats::StatNameTagVector tags_vctr =
-      Stats::Utility::transformToStatNameTagVector(tags, stat_name_set_);
-  std::string name = Stats::Utility::sanitizeStatsName(elements);
-  Stats::Utility::gaugeFromElements(*client_scope_, {Stats::DynamicName(name)},
-                                    Stats::Gauge::ImportMode::NeverImport, tags_vctr)
-      .set(value);
-  return ENVOY_SUCCESS;
-}
-
-envoy_status_t Engine::recordGaugeAdd(const std::string& elements, envoy_stats_tags tags,
-                                      uint64_t amount) {
-  ENVOY_LOG(trace, "[pulse.{}] recordGaugeAdd", elements);
-  ASSERT(dispatcher_->isThreadSafe(), "pulse calls must run from dispatcher's context");
-  Stats::StatNameTagVector tags_vctr =
-      Stats::Utility::transformToStatNameTagVector(tags, stat_name_set_);
-  std::string name = Stats::Utility::sanitizeStatsName(elements);
-  Stats::Utility::gaugeFromElements(*client_scope_, {Stats::DynamicName(name)},
-                                    Stats::Gauge::ImportMode::NeverImport, tags_vctr)
-      .add(amount);
-  return ENVOY_SUCCESS;
-}
-
-envoy_status_t Engine::recordGaugeSub(const std::string& elements, envoy_stats_tags tags,
-                                      uint64_t amount) {
-  ENVOY_LOG(trace, "[pulse.{}] recordGaugeSub", elements);
-  ASSERT(dispatcher_->isThreadSafe(), "pulse calls must run from dispatcher's context");
-  Stats::StatNameTagVector tags_vctr =
-      Stats::Utility::transformToStatNameTagVector(tags, stat_name_set_);
-  std::string name = Stats::Utility::sanitizeStatsName(elements);
-  Stats::Utility::gaugeFromElements(*client_scope_, {Stats::DynamicName(name)},
-                                    Stats::Gauge::ImportMode::NeverImport, tags_vctr)
-      .sub(amount);
-  return ENVOY_SUCCESS;
-}
-
-envoy_status_t Engine::recordHistogramValue(const std::string& elements, envoy_stats_tags tags,
-                                            uint64_t value,
-                                            envoy_histogram_stat_unit_t unit_measure) {
-  ENVOY_LOG(trace, "[pulse.{}] recordHistogramValue", elements);
-  ASSERT(dispatcher_->isThreadSafe(), "pulse calls must run from dispatcher's context");
-  Stats::StatNameTagVector tags_vctr =
-      Stats::Utility::transformToStatNameTagVector(tags, stat_name_set_);
-  std::string name = Stats::Utility::sanitizeStatsName(elements);
-  Stats::Histogram::Unit envoy_unit_measure = Stats::Histogram::Unit::Unspecified;
-  switch (unit_measure) {
-  case MILLISECONDS:
-    envoy_unit_measure = Stats::Histogram::Unit::Milliseconds;
-    break;
-  case MICROSECONDS:
-    envoy_unit_measure = Stats::Histogram::Unit::Microseconds;
-    break;
-  case BYTES:
-    envoy_unit_measure = Stats::Histogram::Unit::Bytes;
-    break;
-  case UNSPECIFIED:
-    envoy_unit_measure = Stats::Histogram::Unit::Unspecified;
-    break;
-  }
-
-  Stats::Utility::histogramFromElements(*client_scope_, {Stats::DynamicName(name)},
-                                        envoy_unit_measure, tags_vctr)
-      .recordValue(value);
-  return ENVOY_SUCCESS;
-}
-
 envoy_status_t Engine::makeAdminCall(absl::string_view path, absl::string_view method,
                                      envoy_data& out) {
   ENVOY_LOG(trace, "admin call {} {}", method, path);
@@ -312,6 +233,11 @@ Upstream::ClusterManager& Engine::getClusterManager() {
   ASSERT(dispatcher_->isThreadSafe(),
          "getClusterManager must be called from the dispatcher's context");
   return server_->clusterManager();
+}
+
+Stats::Store& Engine::getStatsStore() {
+  ASSERT(dispatcher_->isThreadSafe(), "getStatsStore must be called from the dispatcher's context");
+  return server_->stats();
 }
 
 void Engine::logInterfaces(absl::string_view event,

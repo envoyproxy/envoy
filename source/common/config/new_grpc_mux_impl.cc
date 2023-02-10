@@ -40,7 +40,8 @@ NewGrpcMuxImpl::NewGrpcMuxImpl(Grpc::RawAsyncClientPtr&& async_client,
                                Random::RandomGenerator& random, Stats::Scope& scope,
                                const RateLimitSettings& rate_limit_settings,
                                const LocalInfo::LocalInfo& local_info,
-                               CustomConfigValidatorsPtr&& config_validators)
+                               CustomConfigValidatorsPtr&& config_validators,
+                               XdsConfigTrackerOptRef xds_config_tracker)
     : grpc_stream_(this, std::move(async_client), service_method, random, dispatcher, scope,
                    rate_limit_settings),
       local_info_(local_info), config_validators_(std::move(config_validators)),
@@ -48,7 +49,7 @@ NewGrpcMuxImpl::NewGrpcMuxImpl(Grpc::RawAsyncClientPtr&& async_client,
           [this](absl::string_view resource_type_url) {
             onDynamicContextUpdate(resource_type_url);
           })),
-      dispatcher_(dispatcher) {
+      dispatcher_(dispatcher), xds_config_tracker_(xds_config_tracker) {
   AllMuxes::get().insert(this);
 }
 
@@ -89,6 +90,7 @@ void NewGrpcMuxImpl::onDiscoveryResponse(
     ControlPlaneStats& control_plane_stats) {
   ENVOY_LOG(debug, "Received DeltaDiscoveryResponse for {} at version {}", message->type_url(),
             message->system_version_info());
+
   auto sub = subscriptions_.find(message->type_url());
   if (sub == subscriptions_.end()) {
     ENVOY_LOG(warn,
@@ -108,7 +110,14 @@ void NewGrpcMuxImpl::onDiscoveryResponse(
     }
   }
 
-  kickOffAck(sub->second->sub_state_.handleResponse(*message));
+  auto ack = sub->second->sub_state_.handleResponse(*message);
+
+  // Processing point to record error if there is any failure after the response is processed.
+  if (xds_config_tracker_.has_value() &&
+      ack.error_detail_.code() != Grpc::Status::WellKnownGrpcStatus::Ok) {
+    xds_config_tracker_->onConfigRejected(*message, ack.error_detail_.message());
+  }
+  kickOffAck(ack);
   Memory::Utils::tryShrinkHeap();
 }
 
@@ -233,9 +242,9 @@ void NewGrpcMuxImpl::removeWatch(const std::string& type_url, Watch* watch) {
 
 void NewGrpcMuxImpl::addSubscription(const std::string& type_url,
                                      const bool use_namespace_matching) {
-  subscriptions_.emplace(
-      type_url, std::make_unique<SubscriptionStuff>(type_url, local_info_, use_namespace_matching,
-                                                    dispatcher_, *config_validators_.get()));
+  subscriptions_.emplace(type_url, std::make_unique<SubscriptionStuff>(
+                                       type_url, local_info_, use_namespace_matching, dispatcher_,
+                                       *config_validators_.get(), xds_config_tracker_));
   subscription_ordering_.emplace_back(type_url);
 }
 

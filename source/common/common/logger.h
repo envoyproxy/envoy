@@ -200,16 +200,18 @@ public:
   void setLock(Thread::BasicLockable& lock) { stderr_sink_->setLock(lock); }
   void clearLock() { stderr_sink_->clearLock(); }
 
-  template <class... Args>
+  template <class FmtStr, class... Args>
   void logWithStableName(absl::string_view stable_name, absl::string_view level,
-                         absl::string_view component, Args... msg) {
+                         absl::string_view component, FmtStr fmt_str, Args... msg) {
     auto tls_sink = tlsDelegate();
     if (tls_sink != nullptr) {
-      tls_sink->logWithStableName(stable_name, level, component, fmt::format(msg...));
+      tls_sink->logWithStableName(stable_name, level, component,
+                                  fmt::format(fmt::runtime(fmt_str), msg...));
       return;
     }
     absl::ReaderMutexLock sink_lock(&sink_mutex_);
-    sink_->logWithStableName(stable_name, level, component, fmt::format(msg...));
+    sink_->logWithStableName(stable_name, level, component,
+                             fmt::format(fmt::runtime(fmt_str), msg...));
   }
   // spdlog::sinks::sink
   void log(const spdlog::details::log_msg& msg) override;

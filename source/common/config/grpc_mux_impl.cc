@@ -10,6 +10,8 @@
 
 #include "absl/container/btree_map.h"
 #include "absl/container/node_hash_set.h"
+#include "absl/strings/match.h"
+#include "absl/strings/str_cat.h"
 
 namespace Envoy {
 namespace Config {
@@ -31,6 +33,27 @@ private:
   absl::flat_hash_set<GrpcMuxImpl*> muxes_;
 };
 using AllMuxes = ThreadSafeSingleton<AllMuxesState>;
+
+// Returns true if `resource_name` contains the wildcard XdsTp resource, for example:
+// xdstp://test/envoy.config.cluster.v3.Cluster/foo-cluster/*
+// xdstp://test/envoy.config.cluster.v3.Cluster/foo-cluster/*?node.name=my_node
+bool isXdsTpWildcard(const std::string& resource_name) {
+  return XdsResourceIdentifier::hasXdsTpScheme(resource_name) &&
+         (absl::EndsWith(resource_name, "/*") || absl::StrContains(resource_name, "/*?"));
+}
+
+// Converts the XdsTp resource name to its wildcard equivalent.
+// Must only be called on XdsTp resource names.
+std::string convertToWildcard(const std::string& resource_name) {
+  ASSERT(XdsResourceIdentifier::hasXdsTpScheme(resource_name));
+  xds::core::v3::ResourceName xdstp_resource = XdsResourceIdentifier::decodeUrn(resource_name);
+  const auto pos = xdstp_resource.id().find_last_of('/');
+  xdstp_resource.set_id(
+      pos == std::string::npos ? "*" : absl::StrCat(xdstp_resource.id().substr(0, pos), "/*"));
+  XdsResourceIdentifier::EncodeOptions options;
+  options.sort_context_params_ = true;
+  return XdsResourceIdentifier::encodeUrn(xdstp_resource, options);
+}
 } // namespace
 
 GrpcMuxImpl::GrpcMuxImpl(const LocalInfo::LocalInfo& local_info,
@@ -39,12 +62,13 @@ GrpcMuxImpl::GrpcMuxImpl(const LocalInfo::LocalInfo& local_info,
                          Random::RandomGenerator& random, Stats::Scope& scope,
                          const RateLimitSettings& rate_limit_settings, bool skip_subsequent_node,
                          CustomConfigValidatorsPtr&& config_validators,
+                         XdsConfigTrackerOptRef xds_config_tracker,
                          XdsResourcesDelegateOptRef xds_resources_delegate,
                          const std::string& target_xds_authority)
     : grpc_stream_(this, std::move(async_client), service_method, random, dispatcher, scope,
                    rate_limit_settings),
       local_info_(local_info), skip_subsequent_node_(skip_subsequent_node),
-      config_validators_(std::move(config_validators)),
+      config_validators_(std::move(config_validators)), xds_config_tracker_(xds_config_tracker),
       xds_resources_delegate_(xds_resources_delegate), target_xds_authority_(target_xds_authority),
       first_stream_request_(true), dispatcher_(dispatcher),
       dynamic_update_callback_handle_(local_info.contextProvider().addDynamicContextUpdateCallback(
@@ -162,9 +186,9 @@ GrpcMuxWatchPtr GrpcMuxImpl::addWatch(const std::string& type_url,
                                       const absl::flat_hash_set<std::string>& resources,
                                       SubscriptionCallbacks& callbacks,
                                       OpaqueResourceDecoderSharedPtr resource_decoder,
-                                      const SubscriptionOptions&) {
-  auto watch =
-      std::make_unique<GrpcMuxWatchImpl>(resources, callbacks, resource_decoder, type_url, *this);
+                                      const SubscriptionOptions& options) {
+  auto watch = std::make_unique<GrpcMuxWatchImpl>(resources, callbacks, resource_decoder, type_url,
+                                                  *this, options, local_info_);
   ENVOY_LOG(debug, "gRPC mux addWatch for " + type_url);
 
   // Lazily kick off the requests based on first subscription. This has the
@@ -219,6 +243,7 @@ void GrpcMuxImpl::onDiscoveryResponse(
     ControlPlaneStats& control_plane_stats) {
   const std::string type_url = message->type_url();
   ENVOY_LOG(debug, "Received gRPC message for {} at version {}", type_url, message->version_info());
+
   if (api_state_.count(type_url) == 0) {
     // TODO(yuval-k): This should never happen. consider dropping the stream as this is a
     // protocol violation
@@ -286,6 +311,11 @@ void GrpcMuxImpl::onDiscoveryResponse(
 
     processDiscoveryResources(resources, api_state, type_url, message->version_info(),
                               /*call_delegate=*/true);
+
+    // Processing point when resources are successfully ingested.
+    if (xds_config_tracker_.has_value()) {
+      xds_config_tracker_->onConfigAccepted(type_url, resources);
+    }
   }
   END_TRY
   catch (const EnvoyException& e) {
@@ -296,6 +326,11 @@ void GrpcMuxImpl::onDiscoveryResponse(
     ::google::rpc::Status* error_detail = api_state.request_.mutable_error_detail();
     error_detail->set_code(Grpc::Status::WellKnownGrpcStatus::Internal);
     error_detail->set_message(Config::Utility::truncateGrpcStatusMessage(e.what()));
+
+    // Processing point when there is any exception during the parse and ingestion process.
+    if (xds_config_tracker_.has_value()) {
+      xds_config_tracker_->onConfigRejected(*message, error_detail->message());
+    }
   }
   previously_fetched_data_ = true;
   api_state.request_.set_response_nonce(message->nonce());
@@ -326,7 +361,17 @@ void GrpcMuxImpl::processDiscoveryResources(const std::vector<DecodedResourcePtr
     }
 
     all_resource_refs.emplace_back(*resource);
-    resource_ref_map.emplace(resource->name(), *resource);
+    if (XdsResourceIdentifier::hasXdsTpScheme(resource->name())) {
+      // Sort the context params of an xdstp resource, so we can compare them easily.
+      xds::core::v3::ResourceName xdstp_resource =
+          XdsResourceIdentifier::decodeUrn(resource->name());
+      XdsResourceIdentifier::EncodeOptions options;
+      options.sort_context_params_ = true;
+      resource_ref_map.emplace(XdsResourceIdentifier::encodeUrn(xdstp_resource, options),
+                               *resource);
+    } else {
+      resource_ref_map.emplace(resource->name(), *resource);
+    }
   }
 
   // Execute external config validators if there are any watches.
@@ -344,9 +389,22 @@ void GrpcMuxImpl::processDiscoveryResources(const std::vector<DecodedResourcePtr
     }
     std::vector<DecodedResourceRef> found_resources;
     for (const auto& watched_resource_name : watch->resources_) {
+      // Look for a singleton subscription.
       auto it = resource_ref_map.find(watched_resource_name);
       if (it != resource_ref_map.end()) {
         found_resources.emplace_back(it->second);
+      } else if (isXdsTpWildcard(watched_resource_name)) {
+        // See if the resources match the xdstp wildcard subscription.
+        // Note: although it is unlikely that Envoy will need to support a resource that is mapped
+        // to both a singleton and collection watch, this code still supports this use case.
+        // TODO(abeyad): This could be made more efficient, e.g. by pre-computing and having a map
+        // entry for each wildcard watch.
+        for (const auto& resource_ref_it : resource_ref_map) {
+          if (XdsResourceIdentifier::hasXdsTpScheme(resource_ref_it.first) &&
+              convertToWildcard(resource_ref_it.first) == watched_resource_name) {
+            found_resources.emplace_back(resource_ref_it.second);
+          }
+        }
       }
     }
 

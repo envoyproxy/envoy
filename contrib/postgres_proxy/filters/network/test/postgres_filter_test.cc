@@ -55,7 +55,8 @@ public:
         }));
   }
 
-  Stats::IsolatedStoreImpl scope_;
+  Stats::IsolatedStoreImpl store_;
+  Stats::Scope& scope_{*store_.rootScope()};
   std::string stat_prefix_{"test."};
   std::unique_ptr<PostgresFilter> filter_;
   PostgresFilterConfigSharedPtr config_;

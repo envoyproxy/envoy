@@ -182,6 +182,7 @@ private:
       return parent_.upstreamData(buffer);
     }
     void continueDecoding() override;
+    void clearRouteCache() override { parent_.clearRouteCache(); }
     DecoderEventHandler* decodeEventHandler() { return decoder_handle_.get(); }
     ThriftFilters::DecoderFilterSharedPtr decoder_handle_;
   };
@@ -279,6 +280,7 @@ private:
     void sendLocalReply(const DirectResponse& response, bool end_stream) override;
     void startUpstreamResponse(Transport& transport, Protocol& protocol) override;
     ThriftFilters::ResponseStatus upstreamData(Buffer::Instance& buffer) override;
+    void clearRouteCache() override;
     void resetDownstreamConnection() override;
     StreamInfo::StreamInfo& streamInfo() override { return stream_info_; }
     MessageMetadataSharedPtr responseMetadata() override {

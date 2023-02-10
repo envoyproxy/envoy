@@ -16,6 +16,23 @@ namespace NetworkFilters {
 namespace Kafka {
 namespace Mesh {
 
+// Used by librdkafka API.
+using RdKafkaMessageRawPtr = RdKafka::Message*;
+
+using RdKafkaMessagePtr = std::unique_ptr<RdKafka::Message>;
+
+/**
+ * Helper class to wrap librdkafka consumer partition assignment.
+ * This object has to live longer than whatever consumer that uses its "raw" data.
+ * On its own it does not expose any public API, as it is not intended to be interacted with.
+ */
+class ConsumerAssignment {
+public:
+  virtual ~ConsumerAssignment() = default;
+};
+
+using ConsumerAssignmentConstPtr = std::unique_ptr<const ConsumerAssignment>;
+
 /**
  * Helper class responsible for creating librdkafka entities, so we can have mocks in tests.
  */
@@ -43,6 +60,12 @@ public:
 
   // In case of produce failures, we need to dispose of headers manually.
   virtual void deleteHeaders(RdKafka::Headers* librdkafka_headers) const PURE;
+
+  // Assigns partitions to a consumer.
+  // Impl: this method was extracted so that raw-pointer vector does not appear in real code.
+  virtual ConsumerAssignmentConstPtr assignConsumerPartitions(RdKafka::KafkaConsumer& consumer,
+                                                              const std::string& topic,
+                                                              const int32_t partitions) const PURE;
 };
 
 using RawKafkaConfig = std::map<std::string, std::string>;

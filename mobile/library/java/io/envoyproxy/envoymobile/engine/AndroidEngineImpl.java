@@ -7,6 +7,7 @@ import io.envoyproxy.envoymobile.engine.types.EnvoyLogger;
 import io.envoyproxy.envoymobile.engine.types.EnvoyNetworkType;
 import io.envoyproxy.envoymobile.engine.types.EnvoyOnEngineRunning;
 import io.envoyproxy.envoymobile.engine.types.EnvoyStringAccessor;
+import io.envoyproxy.envoymobile.engine.types.EnvoyStatus;
 
 import java.util.Map;
 
@@ -33,13 +34,18 @@ public class AndroidEngineImpl implements EnvoyEngine {
     return envoyEngine.startStream(callbacks, explicitFlowControl);
   }
 
-  public int runWithTemplate(String configurationYAML, EnvoyConfiguration envoyConfiguration,
-                             String logLevel) {
-    return envoyEngine.runWithTemplate(configurationYAML, envoyConfiguration, logLevel);
+  @Override
+  public void performRegistration(EnvoyConfiguration envoyConfiguration) {
+    envoyEngine.performRegistration(envoyConfiguration);
   }
 
   @Override
-  public int runWithConfig(EnvoyConfiguration envoyConfiguration, String logLevel) {
+  public EnvoyStatus runWithYaml(String configurationYAML, String logLevel) {
+    return envoyEngine.runWithYaml(configurationYAML, logLevel);
+  }
+
+  @Override
+  public EnvoyStatus runWithConfig(EnvoyConfiguration envoyConfiguration, String logLevel) {
     return envoyEngine.runWithConfig(envoyConfiguration, logLevel);
   }
 
@@ -61,31 +67,6 @@ public class AndroidEngineImpl implements EnvoyEngine {
   @Override
   public int recordCounterInc(String elements, Map<String, String> tags, int count) {
     return envoyEngine.recordCounterInc(elements, tags, count);
-  }
-
-  @Override
-  public int recordGaugeSet(String elements, Map<String, String> tags, int value) {
-    return envoyEngine.recordGaugeSet(elements, tags, value);
-  }
-
-  @Override
-  public int recordGaugeAdd(String elements, Map<String, String> tags, int amount) {
-    return envoyEngine.recordGaugeAdd(elements, tags, amount);
-  }
-
-  @Override
-  public int recordGaugeSub(String elements, Map<String, String> tags, int amount) {
-    return envoyEngine.recordGaugeSub(elements, tags, amount);
-  }
-
-  @Override
-  public int recordHistogramDuration(String elements, Map<String, String> tags, int durationMs) {
-    return envoyEngine.recordHistogramDuration(elements, tags, durationMs);
-  }
-
-  @Override
-  public int recordHistogramValue(String elements, Map<String, String> tags, int value) {
-    return envoyEngine.recordHistogramValue(elements, tags, value);
   }
 
   @Override

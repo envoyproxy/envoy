@@ -93,7 +93,7 @@ public:
 
   int getErrno() { return HTTP_PARSER_ERRNO(&parser_); }
 
-  uint16_t statusCode() const { return parser_.status_code; }
+  Envoy::Http::Code statusCode() const { return static_cast<Http::Code>(parser_.status_code); }
 
   bool isHttp11() const { return parser_.http_major == 1 && parser_.http_minor == 1; }
 
@@ -148,7 +148,7 @@ CallbackResult LegacyHttpParserImpl::pause() { return impl_->pause(); }
 
 ParserStatus LegacyHttpParserImpl::getStatus() const { return intToStatus(impl_->getErrno()); }
 
-uint16_t LegacyHttpParserImpl::statusCode() const { return impl_->statusCode(); }
+Http::Code LegacyHttpParserImpl::statusCode() const { return impl_->statusCode(); }
 
 bool LegacyHttpParserImpl::isHttp11() const { return impl_->isHttp11(); }
 
