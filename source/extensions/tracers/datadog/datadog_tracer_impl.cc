@@ -22,9 +22,8 @@ Driver::TlsTracer::TlsTracer(const std::shared_ptr<opentracing::Tracer>& tracer,
 Driver::Driver(const envoy::config::trace::v3::DatadogConfig& datadog_config,
                Upstream::ClusterManager& cluster_manager, Stats::Scope& scope,
                ThreadLocal::SlotAllocator& tls, Runtime::Loader&)
-    : OpenTracingDriver{scope},
-      cm_(cluster_manager), tracer_stats_{DATADOG_TRACER_STATS(
-                                POOL_COUNTER_PREFIX(scope, "tracing.datadog."))},
+    : OpenTracingDriver{scope}, cm_(cluster_manager),
+      tracer_stats_{DATADOG_TRACER_STATS(POOL_COUNTER_PREFIX(scope, "tracing.datadog."))},
       tls_(tls.allocateSlot()) {
 
   Config::Utility::checkCluster("envoy.tracers.datadog", datadog_config.collector_cluster(), cm_,
