@@ -2,9 +2,6 @@ syntax = "proto3";
 
 package test.extensions.http.header_validators.envoy_default;
 
-import "google/protobuf/empty.proto";
-import "validate/validate.proto";
-
 import "envoy/extensions/http/header_validators/envoy_default/v3/header_validator.proto";
 
 message PathNormalizerFuzzTestCase {

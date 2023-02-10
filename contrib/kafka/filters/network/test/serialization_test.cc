@@ -568,6 +568,50 @@ TEST(TaggedFieldsDeserializer, ShouldConsumeCorrectAmountOfData) {
   serializeCompactThenDeserializeAndCheckEquality<TaggedFieldsDeserializer>(value);
 }
 
+// Just a helper to write shorter tests.
+template <typename T> Bytes toBytes(uint32_t fn(const T arg, Bytes& out), const T arg) {
+  Bytes res;
+  fn(arg, res);
+  return res;
+}
+
+TEST(VarlenUtils, ShouldEncodeUnsignedVarInt) {
+  const auto testee = VarlenUtils::writeUnsignedVarint;
+  ASSERT_EQ(toBytes<uint32_t>(testee, 0), Bytes({0x00}));
+  ASSERT_EQ(toBytes<uint32_t>(testee, 1), Bytes({0x01}));
+  ASSERT_EQ(toBytes<uint32_t>(testee, 127), Bytes({0x7f}));
+  ASSERT_EQ(toBytes<uint32_t>(testee, 128), Bytes({0x80, 0x01}));
+  ASSERT_EQ(toBytes<uint32_t>(testee, 2147483647), Bytes({0xFF, 0xFF, 0xFF, 0xFF, 0x07}));
+  ASSERT_EQ(toBytes<uint32_t>(testee, std::numeric_limits<uint32_t>::max()),
+            Bytes({0xFF, 0xFF, 0xFF, 0xFF, 0x0F}));
+}
+
+TEST(VarlenUtils, ShouldEncodeSignedVarInt) {
+  const auto testee = VarlenUtils::writeVarint;
+  ASSERT_EQ(toBytes<int32_t>(testee, 0), Bytes({0x00}));
+  ASSERT_EQ(toBytes<int32_t>(testee, 1), Bytes({0x02}));
+  ASSERT_EQ(toBytes<int32_t>(testee, 63), Bytes({0x7e}));
+  ASSERT_EQ(toBytes<int32_t>(testee, 64), Bytes({0x80, 0x01}));
+  ASSERT_EQ(toBytes<int32_t>(testee, -1), Bytes({0x01}));
+  ASSERT_EQ(toBytes<int32_t>(testee, std::numeric_limits<int32_t>::min()),
+            Bytes({0xFF, 0xFF, 0xFF, 0xFF, 0x0F}));
+  ASSERT_EQ(toBytes<int32_t>(testee, std::numeric_limits<int32_t>::max()),
+            Bytes({0xFE, 0xFF, 0xFF, 0xFF, 0x0F}));
+}
+
+TEST(VarlenUtils, ShouldEncodeVarLong) {
+  const auto testee = VarlenUtils::writeVarlong;
+  ASSERT_EQ(toBytes<int64_t>(testee, 0), Bytes({0x00}));
+  ASSERT_EQ(toBytes<int64_t>(testee, 1), Bytes({0x02}));
+  ASSERT_EQ(toBytes<int64_t>(testee, 63), Bytes({0x7e}));
+  ASSERT_EQ(toBytes<int64_t>(testee, 64), Bytes({0x80, 0x01}));
+  ASSERT_EQ(toBytes<int64_t>(testee, -1), Bytes({0x01}));
+  ASSERT_EQ(toBytes<int64_t>(testee, std::numeric_limits<int64_t>::min()),
+            Bytes({0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x01}));
+  ASSERT_EQ(toBytes<int64_t>(testee, std::numeric_limits<int64_t>::max()),
+            Bytes({0xFE, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x01}));
+}
+
 } // namespace SerializationTest
 } // namespace Kafka
 } // namespace NetworkFilters
