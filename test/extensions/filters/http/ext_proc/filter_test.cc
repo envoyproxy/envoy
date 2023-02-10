@@ -2335,8 +2335,8 @@ TEST_F(HttpFilter2Test, LastOnDataCallExceedsStreamBufferLimitWouldJustRaiseHigh
     Http::RequestHeaderMapPtr headers{new Http::TestRequestHeaderMapImpl{
         {":authority", "host"}, {":path", "/bluh"}, {":method", "GET"}}};
     HttpConnectionManagerImplMixin::decoder_->decodeHeaders(std::move(headers), false);
-    Buffer::OwnedImpl resp_body("Definitely more than 10 bytes data.");
-    HttpConnectionManagerImplMixin::decoder_->decodeData(resp_body, true);
+    Buffer::OwnedImpl request_body("Definitely more than 10 bytes data.");
+    HttpConnectionManagerImplMixin::decoder_->decodeData(request_body, true);
     // Now external server returns the request header response.
     auto response = std::make_unique<ProcessingResponse>();
     auto* headers_response = response->mutable_request_headers();
