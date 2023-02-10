@@ -510,6 +510,7 @@ envoy_cc_library(
     srcs = ["header_utility.cc"],
     hdrs = ["header_utility.h"],
     external_deps = [
+        "nghttp2",
         "quiche_http2_adapter",
     ],
     deps = [
