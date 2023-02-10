@@ -89,6 +89,7 @@ new_features:
   change: |
     added an option to dynamically set the host used by the SNI dynamic forward proxy filter, by setting a filter state object under the key ``envoy.upstream.dynamic_host``.
 - area: access_log
+  change: |
     added support for :ref:`%DOWNSTREAM_TRANSPORT_FAILURE_REASON% <config_access_log_format_downstream_transport_failure_reason>` as a log command operator about why listener may have failed due to a transport socket error,
     including TLS handshake failures.
     added the field :ref:`downstream_transport_failure_reason <envoy_v3_api_field_data.accesslog.v3.AccessLogCommon.downstream_transport_failure_reason>` for common usage as well.
