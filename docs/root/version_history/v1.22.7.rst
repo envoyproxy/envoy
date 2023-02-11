@@ -1,4 +1,4 @@
-1.22.7 (February 7, 2022)
+1.22.7 (February 7, 2023)
 =========================
 
 Incompatible Behavior Changes
