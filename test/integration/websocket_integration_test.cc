@@ -444,8 +444,6 @@ TEST_P(WebsocketIntegrationTest, BidirectionalChunkedDataLegacyAddTE) {
     return;
   }
 
-  config_helper_.addRuntimeOverride(
-      "envoy.reloadable_features.http_skip_adding_content_length_to_upgrade", "false");
   config_helper_.addConfigModifier(setRouteUsingWebsocket());
   initialize();
 
@@ -538,8 +536,6 @@ TEST_P(WebsocketIntegrationTest,
     return;
   }
 
-  config_helper_.addRuntimeOverride(
-      "envoy.reloadable_features.http_skip_adding_content_length_to_upgrade", "false");
   config_helper_.addConfigModifier(setRouteUsingWebsocket());
   initialize();
 
