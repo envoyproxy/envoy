@@ -1,14 +1,15 @@
 #pragma once
-#include "envoy/network/filter.h"
 #include "envoy/buffer/buffer.h"
+#include "envoy/network/filter.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats.h"
 #include "envoy/stats/stats_macros.h"
+
 #include "source/common/common/logger.h"
 #include "source/common/common/utility.h"
-#include "contrib/smtp_proxy/filters/network/source/smtp_decoder.h"
 
 #include "contrib/envoy/extensions/filters/network/smtp_proxy/v3alpha/smtp_proxy.pb.h"
+#include "contrib/smtp_proxy/filters/network/source/smtp_decoder.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -100,7 +101,6 @@ public:
   void incSmtpAuthErrors() override;
   void incMailDataTransferErrors() override;
   void incMailRcptErrors() override;
-
 
   bool downstreamStartTls(absl::string_view response) override;
   bool sendReplyDownstream(absl::string_view response) override;

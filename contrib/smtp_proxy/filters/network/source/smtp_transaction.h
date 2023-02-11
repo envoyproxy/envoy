@@ -1,6 +1,5 @@
 #pragma once
 #include <cstdint>
-#include "source/common/common/logger.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -28,7 +27,6 @@ public:
 private:
   SmtpTransaction::State state_{State::NONE};
 };
-
 
 } // namespace SmtpProxy
 } // namespace NetworkFilters

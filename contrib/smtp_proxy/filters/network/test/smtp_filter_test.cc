@@ -50,12 +50,12 @@ TEST_F(SmtpFilterTest, NewSessionStatsTest) {
 TEST_F(SmtpFilterTest, TestDownstreamStarttls) {
   initialize();
 
-  //Upstream TLS is disabled, testing only downstream starttls handling
+  // Upstream TLS is disabled, testing only downstream starttls handling
   filter_->getConfig()->upstream_tls_ =
       envoy::extensions::filters::network::smtp_proxy::v3alpha::SmtpProxy::DISABLE;
   ASSERT_FALSE(filter_->upstreamTlsRequired());
   filter_->getSession().setState(SmtpSession::State::CONNECTION_SUCCESS);
-  
+
   data_.add("EHLO localhost\r\n");
   ASSERT_THAT(Network::FilterStatus::Continue, filter_->onData(data_, false));
   EXPECT_EQ(SmtpSession::State::SESSION_INIT_REQUEST, filter_->getSession().getState());
@@ -67,15 +67,15 @@ TEST_F(SmtpFilterTest, TestDownstreamStarttls) {
   EXPECT_EQ(SmtpSession::State::SESSION_IN_PROGRESS, filter_->getSession().getState());
   data_.drain(data_.length());
   data_.add("STARTTLS\r\n");
-  
-  //Downstream TLS termination successful after STARTTLS
+
+  // Downstream TLS termination successful after STARTTLS
 
   EXPECT_CALL(filter_callbacks_, connection()).WillRepeatedly(ReturnRef(connection_));
   Network::Connection::BytesSentCb cb;
   EXPECT_CALL(connection_, addBytesSentCallback(_)).WillOnce(testing::SaveArg<0>(&cb));
   Buffer::OwnedImpl buf;
   EXPECT_CALL(connection_, write(_, false)).WillOnce(testing::SaveArg<0>(&buf));
-  
+
   ASSERT_THAT(Network::FilterStatus::StopIteration, filter_->onData(data_, false));
   ASSERT_STREQ(SmtpUtils::readyToStartTlsResponse, buf.toString().c_str());
 
@@ -88,21 +88,19 @@ TEST_F(SmtpFilterTest, TestDownstreamStarttls) {
   EXPECT_EQ(SmtpSession::State::SESSION_IN_PROGRESS, filter_->getSession().getState());
   EXPECT_EQ(config_->stats().smtp_tls_terminated_sessions_.value(), 1);
 
-  //Send starttls command again, receive 503 out of order command response from filter.
+  // Send starttls command again, receive 503 out of order command response from filter.
   buf.drain(buf.length());
   data_.add("STARTTLS\r\n");
-  
+
   EXPECT_CALL(connection_, addBytesSentCallback(_)).WillOnce(testing::SaveArg<0>(&cb));
   EXPECT_CALL(connection_, write(_, false)).WillOnce(testing::SaveArg<0>(&buf));
 
   ASSERT_THAT(Network::FilterStatus::StopIteration, filter_->onData(data_, false));
   ASSERT_STREQ(SmtpUtils::outOfOrderCommandResponse, buf.toString().c_str());
-
 }
 
 TEST_F(SmtpFilterTest, TestSendReplyDownstream) {
   initialize();
-
 
   EXPECT_CALL(filter_callbacks_, connection()).WillRepeatedly(ReturnRef(connection_));
   Network::Connection::BytesSentCb cb;
@@ -115,16 +113,14 @@ TEST_F(SmtpFilterTest, TestSendReplyDownstream) {
   ASSERT_STREQ(SmtpUtils::mailboxUnavailableResponse, buf.toString().c_str());
 
   filter_callbacks_.connection().close(Network::ConnectionCloseType::NoFlush);
-  
 
   ASSERT_THAT(true, filter_->sendReplyDownstream(SmtpUtils::mailboxUnavailableResponse));
-
 }
 
-TEST_F(SmtpFilterTest,TestUpstreamStartTls) {
+TEST_F(SmtpFilterTest, TestUpstreamStartTls) {
   initialize();
 
-  //Upstream TLS is disabled, testing only downstream starttls handling
+  // Upstream TLS is disabled, testing only downstream starttls handling
   filter_->getConfig()->upstream_tls_ =
       envoy::extensions::filters::network::smtp_proxy::v3alpha::SmtpProxy::REQUIRE;
   ASSERT_TRUE(filter_->upstreamTlsRequired());
@@ -141,9 +137,9 @@ TEST_F(SmtpFilterTest,TestUpstreamStartTls) {
   EXPECT_EQ(SmtpSession::State::SESSION_IN_PROGRESS, filter_->getSession().getState());
   data_.drain(data_.length());
   data_.add("STARTTLS\r\n");
-  
-  //Upstream TLS termination successful after STARTTLS
-  
+
+  // Upstream TLS termination successful after STARTTLS
+
   ASSERT_THAT(Network::FilterStatus::Continue, filter_->onData(data_, false));
   ASSERT_EQ(SmtpSession::State::UPSTREAM_TLS_NEGOTIATION, filter_->getSession().getState());
 
@@ -173,10 +169,8 @@ TEST_F(SmtpFilterTest,TestUpstreamStartTls) {
 
   ASSERT_THAT(Network::FilterStatus::StopIteration, filter_->onWrite(data_, false));
   ASSERT_EQ(SmtpSession::State::SESSION_TERMINATED, filter_->getSession().getState());
-  // EXPECT_CALL(connection_, close(_)).Times(1);
+  // EXPECT_CALL(connection_, close(_));
   EXPECT_EQ(config_->stats().sessions_upstream_tls_failed_.value(), 1);
-
-
 }
 
 } // namespace SmtpProxy

@@ -33,7 +33,7 @@ public:
   virtual void incSmtpAuthErrors() PURE;
   virtual void incMailDataTransferErrors() PURE;
   virtual void incMailRcptErrors() PURE;
-  
+
   virtual bool downstreamStartTls(absl::string_view) PURE;
   virtual bool sendReplyDownstream(absl::string_view) PURE;
   virtual bool upstreamTlsRequired() const PURE;
@@ -75,10 +75,8 @@ public:
   void decodeSmtpTransactionResponse(uint16_t&);
 
 protected:
- 
   DecoderCallbacks* callbacks_{};
   SmtpSession session_;
-
 };
 
 } // namespace SmtpProxy

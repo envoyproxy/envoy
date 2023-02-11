@@ -1,7 +1,9 @@
 #pragma once
 #include <cstdint>
-#include "contrib/smtp_proxy/filters/network/source/smtp_transaction.h"
+
 #include "source/common/common/logger.h"
+
+#include "contrib/smtp_proxy/filters/network/source/smtp_transaction.h"
 
 namespace Envoy {
 namespace Extensions {

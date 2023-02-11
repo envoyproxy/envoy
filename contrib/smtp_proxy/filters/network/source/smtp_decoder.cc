@@ -1,9 +1,9 @@
-
 #include "contrib/smtp_proxy/filters/network/source/smtp_decoder.h"
-#include "contrib/smtp_proxy/filters/network/source/smtp_utils.h"
 
 #include "source/common/common/logger.h"
+
 #include "absl/strings/match.h"
+#include "contrib/smtp_proxy/filters/network/source/smtp_utils.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -90,7 +90,7 @@ Decoder::Result DecoderImpl::parseCommand(Buffer::Instance& data) {
     }
 
     decodeSmtpTransactionCommands(command);
-   
+
     break;
   } // End case SESSION_IN_PROGRESS
 
@@ -195,7 +195,6 @@ Decoder::Result DecoderImpl::parseResponse(Buffer::Instance& data) {
   return result;
 }
 
-
 void DecoderImpl::decodeSmtpTransactionCommands(std::string& command) {
   switch (session_.getTransactionState()) {
   case SmtpTransaction::State::NONE:
@@ -208,9 +207,9 @@ void DecoderImpl::decodeSmtpTransactionCommands(std::string& command) {
   }
   case SmtpTransaction::State::RCPT_COMMAND:
   case SmtpTransaction::State::MAIL_DATA_TRANSFER_REQUEST:
-  case SmtpTransaction::State::TRANSACTION_IN_PROGRESS: {   
+  case SmtpTransaction::State::TRANSACTION_IN_PROGRESS: {
 
-    if(absl::StartsWithIgnoreCase(command, SmtpUtils::smtpRcptCommand)) {
+    if (absl::StartsWithIgnoreCase(command, SmtpUtils::smtpRcptCommand)) {
       session_.SetTransactionState(SmtpTransaction::State::RCPT_COMMAND);
     } else if (absl::StartsWithIgnoreCase(command, SmtpUtils::smtpDataCommand)) {
       session_.SetTransactionState(SmtpTransaction::State::MAIL_DATA_TRANSFER_REQUEST);
@@ -237,7 +236,7 @@ void DecoderImpl::decodeSmtpTransactionResponse(uint16_t& response_code) {
   case SmtpTransaction::State::RCPT_COMMAND: {
     if (response_code == 250 || response_code == 251) {
       session_.SetTransactionState(SmtpTransaction::State::TRANSACTION_IN_PROGRESS);
-    } else if(response_code >=400 && response_code <= 599) {
+    } else if (response_code >= 400 && response_code <= 599) {
       callbacks_->incMailRcptErrors();
     }
     break;
@@ -246,10 +245,10 @@ void DecoderImpl::decodeSmtpTransactionResponse(uint16_t& response_code) {
     if (response_code == 250) {
       session_.SetTransactionState(SmtpTransaction::State::TRANSACTION_COMPLETED);
       callbacks_->incSmtpTransactions();
-    } else if(response_code >=400 && response_code <= 599) {
+    } else if (response_code >= 400 && response_code <= 599) {
       callbacks_->incMailDataTransferErrors();
       callbacks_->incSmtpTransactions();
-      //Reset the transaction state in case of mail data transfer errors.
+      // Reset the transaction state in case of mail data transfer errors.
       session_.SetTransactionState(SmtpTransaction::State::NONE);
     }
     break;
@@ -265,7 +264,6 @@ void DecoderImpl::decodeSmtpTransactionResponse(uint16_t& response_code) {
     break;
   }
 }
-
 
 void DecoderImpl::handleDownstreamTls() {
   session_.setState(SmtpSession::State::DOWNSTREAM_TLS_NEGOTIATION);

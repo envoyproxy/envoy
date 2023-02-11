@@ -1,11 +1,12 @@
 #include "contrib/smtp_proxy/filters/network/source/smtp_filter.h"
-#include "envoy/network/connection.h"
-#include "envoy/buffer/buffer.h"
-#include "source/common/common/assert.h"
 
 #include <iostream>
 #include <string>
-#include "smtp_filter.h"
+
+#include "envoy/buffer/buffer.h"
+#include "envoy/network/connection.h"
+
+#include "source/common/common/assert.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -15,8 +16,7 @@ namespace SmtpProxy {
 SmtpFilterConfig::SmtpFilterConfig(const SmtpFilterConfigOptions& config_options,
                                    Stats::Scope& scope)
     : scope_{scope}, stats_(generateStats(config_options.stats_prefix_, scope)),
-      upstream_tls_(config_options.upstream_tls_) {
-}
+      upstream_tls_(config_options.upstream_tls_) {}
 SmtpFilter::SmtpFilter(SmtpFilterConfigSharedPtr config) : config_{config} {
   if (!decoder_) {
     decoder_ = createDecoder(this);
@@ -78,7 +78,6 @@ bool SmtpFilter::upstreamTlsRequired() const {
           envoy::extensions::filters::network::smtp_proxy::v3alpha::SmtpProxy::REQUIRE);
 }
 
-
 bool SmtpFilter::upstreamStartTls() {
   // Try to switch upstream connection to use a secure channel.
   if (read_callbacks_->startUpstreamSecureTransport()) {
@@ -111,7 +110,9 @@ void SmtpFilter::incSmtpConnectionEstablishmentErrors() {
   config_->stats_.smtp_connection_establishment_errors_.inc();
 }
 
-void SmtpFilter::incMailDataTransferErrors() { config_->stats_.smtp_mail_data_transfer_errors_.inc(); }
+void SmtpFilter::incMailDataTransferErrors() {
+  config_->stats_.smtp_mail_data_transfer_errors_.inc();
+}
 void SmtpFilter::incMailRcptErrors() { config_->stats_.smtp_rcpt_errors_.inc(); }
 
 void SmtpFilter::incTlsTerminatedSessions() { config_->stats_.smtp_tls_terminated_sessions_.inc(); }
