@@ -1006,6 +1006,86 @@ body_format:
   cleanup();
 }
 
+TEST_P(ExtAuthzLocalReplyIntegrationTest, UpstreamTest) {
+  setUpstreamProtocol(Http::CodecType::HTTP1);
+  config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    auto* ext_authz_cluster = bootstrap.mutable_static_resources()->add_clusters();
+    ext_authz_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
+    ext_authz_cluster->set_name("ext_authz");
+
+    envoy::extensions::filters::http::ext_authz::v3::ExtAuthz proto_config;
+    const std::string ext_authz_config = R"EOF(
+  transport_api_version: V3
+  http_service:
+    server_uri:
+      uri: "ext_authz:9000"
+      cluster: "ext_authz"
+      timeout: 300s
+  )EOF";
+    TestUtility::loadFromYaml(ext_authz_config, proto_config);
+
+    envoy::config::listener::v3::Filter ext_authz_filter;
+    ext_authz_filter.set_name("envoy.filters.http.ext_authz");
+    ext_authz_filter.mutable_typed_config()->PackFrom(proto_config);
+    config_helper_.prependFilter(MessageUtil::getJsonStringFromMessageOrDie(ext_authz_filter),
+                                 /*downstream_filter=*/false);
+  });
+
+  const std::string local_reply_yaml = R"EOF(
+body_format:
+  json_format:
+    code: "%RESPONSE_CODE%"
+    message: "%LOCAL_REPLY_BODY%"
+  )EOF";
+  envoy::extensions::filters::network::http_connection_manager::v3::LocalReplyConfig
+      local_reply_config;
+  TestUtility::loadFromYaml(local_reply_yaml, local_reply_config);
+  config_helper_.setLocalReply(local_reply_config);
+
+  HttpIntegrationTest::initialize();
+
+  auto conn = makeClientConnection(lookupPort("http"));
+  codec_client_ = makeHttpConnection(std::move(conn));
+  auto response = codec_client_->makeHeaderOnlyRequest(Http::TestRequestHeaderMapImpl{
+      {":method", "GET"},
+      {":path", "/"},
+      {":scheme", "http"},
+      {":authority", "host"},
+  });
+
+  AssertionResult result =
+      fake_upstreams_.back()->waitForHttpConnection(*dispatcher_, fake_ext_authz_connection_);
+  RELEASE_ASSERT(result, result.message());
+  FakeStreamPtr ext_authz_request;
+  result = fake_ext_authz_connection_->waitForNewStream(*dispatcher_, ext_authz_request);
+  RELEASE_ASSERT(result, result.message());
+  result = ext_authz_request->waitForEndStream(*dispatcher_);
+  RELEASE_ASSERT(result, result.message());
+
+  Http::TestResponseHeaderMapImpl ext_authz_response_headers{
+      {":status", "401"},
+      {"content-type", "fake-type"},
+  };
+  ext_authz_request->encodeHeaders(ext_authz_response_headers, true);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_TRUE(response->complete());
+
+  EXPECT_EQ("401", response->headers().Status()->value().getStringView());
+  // Without fixing the bug, "content-type" and "content-length" are overridden by the ext_authz
+  // responses as its "content-type: fake-type" and "content-length: 0".
+  EXPECT_EQ("application/json", response->headers().ContentType()->value().getStringView());
+  EXPECT_EQ("26", response->headers().ContentLength()->value().getStringView());
+
+  const std::string expected_body = R"({
+      "code": 401,
+      "message": ""
+})";
+  EXPECT_TRUE(TestUtility::jsonStringEqual(response->body(), expected_body));
+
+  cleanup();
+}
+
 TEST_P(ExtAuthzGrpcIntegrationTest, GoogleAsyncClientCreation) {
   initializeConfig();
   setDownstreamProtocol(Http::CodecType::HTTP2);

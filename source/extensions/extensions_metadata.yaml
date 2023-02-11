@@ -300,6 +300,7 @@ envoy.filters.http.dynamic_forward_proxy:
 envoy.filters.http.ext_authz:
   categories:
   - envoy.filters.http
+  - envoy.filters.http.upstream
   security_posture: robust_to_untrusted_downstream
   status: stable
   type_urls:

@@ -154,6 +154,12 @@ public:
   ~ServerFactoryContext() override = default;
 
   /**
+   *
+   * @return the server-wide http context.
+   */
+  virtual Http::Context& httpContext() PURE;
+
+  /**
    * @return the server-wide grpc context.
    */
   virtual Grpc::Context& grpcContext() PURE;

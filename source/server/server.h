@@ -192,6 +192,7 @@ public:
   OptRef<Admin> admin() override { return server_.admin(); }
   TimeSource& timeSource() override { return api().timeSource(); }
   Api::Api& api() override { return server_.api(); }
+  Http::Context& httpContext() override { return server_.httpContext(); }
   Grpc::Context& grpcContext() override { return server_.grpcContext(); }
   Router::Context& routerContext() override { return server_.routerContext(); }
   Envoy::Server::DrainManager& drainManager() override { return server_.drainManager(); }

@@ -19,12 +19,13 @@ namespace Extensions {
 namespace HttpFilters {
 namespace ExtAuthz {
 
-Http::FilterFactoryCb ExtAuthzFilterConfig::createFilterFactoryFromProtoTyped(
+Http::FilterFactoryCb ExtAuthzFilterFactory::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::ext_authz::v3::ExtAuthz& proto_config,
-    const std::string& stats_prefix, Server::Configuration::FactoryContext& context) {
-  const auto filter_config = std::make_shared<FilterConfig>(
-      proto_config, context.scope(), context.runtime(), context.httpContext(), stats_prefix,
-      context.getServerFactoryContext().bootstrap());
+    const std::string& stats_prefix, DualInfo dual_info,
+    Server::Configuration::ServerFactoryContext& context) {
+  const auto filter_config =
+      std::make_shared<FilterConfig>(proto_config, dual_info.scope, context.runtime(),
+                                     context.httpContext(), stats_prefix, context.bootstrap());
   // The callback is created in main thread and executed in worker thread, variables except factory
   // context must be captured by value into the callback.
   Http::FilterFactoryCb callback;
@@ -48,11 +49,11 @@ Http::FilterFactoryCb ExtAuthzFilterConfig::createFilterFactoryFromProtoTyped(
         PROTOBUF_GET_MS_OR_DEFAULT(proto_config.grpc_service(), timeout, DefaultTimeout);
 
     Config::Utility::checkTransportVersion(proto_config);
-    callback = [&context, filter_config, timeout_ms,
-                proto_config](Http::FilterChainFactoryCallbacks& callbacks) {
+    callback = [&context, filter_config, timeout_ms, proto_config,
+                dual_info](Http::FilterChainFactoryCallbacks& callbacks) {
       auto client = std::make_unique<Filters::Common::ExtAuthz::GrpcClientImpl>(
           context.clusterManager().grpcAsyncClientManager().getOrCreateRawAsyncClient(
-              proto_config.grpc_service(), context.scope(), true),
+              proto_config.grpc_service(), dual_info.scope, true),
           std::chrono::milliseconds(timeout_ms));
       callbacks.addStreamFilter(std::make_shared<Filter>(filter_config, std::move(client)));
     };
@@ -61,11 +62,11 @@ Http::FilterFactoryCb ExtAuthzFilterConfig::createFilterFactoryFromProtoTyped(
     const uint32_t timeout_ms =
         PROTOBUF_GET_MS_OR_DEFAULT(proto_config.grpc_service(), timeout, DefaultTimeout);
     Config::Utility::checkTransportVersion(proto_config);
-    callback = [grpc_service = proto_config.grpc_service(), &context, filter_config,
-                timeout_ms](Http::FilterChainFactoryCallbacks& callbacks) {
+    callback = [grpc_service = proto_config.grpc_service(), &context, filter_config, timeout_ms,
+                dual_info](Http::FilterChainFactoryCallbacks& callbacks) {
       Grpc::RawAsyncClientSharedPtr raw_client =
           context.clusterManager().grpcAsyncClientManager().getOrCreateRawAsyncClient(
-              grpc_service, context.scope(), true);
+              grpc_service, dual_info.scope, true);
       auto client = std::make_unique<Filters::Common::ExtAuthz::GrpcClientImpl>(
           raw_client, std::chrono::milliseconds(timeout_ms));
       callbacks.addStreamFilter(std::make_shared<Filter>(filter_config, std::move(client)));
@@ -76,7 +77,7 @@ Http::FilterFactoryCb ExtAuthzFilterConfig::createFilterFactoryFromProtoTyped(
 }
 
 Router::RouteSpecificFilterConfigConstSharedPtr
-ExtAuthzFilterConfig::createRouteSpecificFilterConfigTyped(
+ExtAuthzFilterFactory::createRouteSpecificFilterConfigTyped(
     const envoy::extensions::filters::http::ext_authz::v3::ExtAuthzPerRoute& proto_config,
     Server::Configuration::ServerFactoryContext&, ProtobufMessage::ValidationVisitor&) {
   return std::make_shared<FilterConfigPerRoute>(proto_config);
@@ -85,8 +86,10 @@ ExtAuthzFilterConfig::createRouteSpecificFilterConfigTyped(
 /**
  * Static registration for the external authorization filter. @see RegisterFactory.
  */
-LEGACY_REGISTER_FACTORY(ExtAuthzFilterConfig, Server::Configuration::NamedHttpFilterConfigFactory,
+LEGACY_REGISTER_FACTORY(ExtAuthzFilterFactory, Server::Configuration::NamedHttpFilterConfigFactory,
                         "envoy.ext_authz");
+LEGACY_REGISTER_FACTORY(UpstreamExtAuthzFilterFactory,
+                        Server::Configuration::UpstreamHttpFilterConfigFactory, "envoy.ext_authz");
 
 } // namespace ExtAuthz
 } // namespace HttpFilters
