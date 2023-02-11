@@ -27,10 +27,11 @@ public:
   SmtpFilterConfigSharedPtr config_;
   SmtpFilterConfig::SmtpFilterConfigOptions config_options_{
       stat_prefix_,
-      envoy::extensions::filters::network::smtp_proxy::v3alpha::SmtpProxy_UpstreamTLSMode_DISABLE};
+      envoy::extensions::filters::network::smtp_proxy::v3alpha::SmtpProxy::DISABLE};
 
   std::unique_ptr<SmtpFilter> filter_;
-  Stats::IsolatedStoreImpl scope_;
+  Stats::IsolatedStoreImpl store_;
+  Stats::Scope& scope_{*store_.rootScope()};
   std::string stat_prefix_{"test."};
   NiceMock<Network::MockReadFilterCallbacks> filter_callbacks_;
   NiceMock<Network::MockConnection> connection_;
@@ -146,12 +147,6 @@ TEST_F(SmtpFilterTest, TestUpstreamStartTls) {
   data_.drain(data_.length());
   data_.add("220 Ready to start TLS\r\n");
 
-  // EXPECT_CALL(filter_callbacks_, connection()).WillRepeatedly(ReturnRef(connection_));
-  // Network::Connection::BytesSentCb cb;
-  // EXPECT_CALL(connection_, addBytesSentCallback(_)).WillOnce(testing::SaveArg<0>(&cb));
-  // Buffer::OwnedImpl buf;
-  // EXPECT_CALL(connection_, write(_, false)).WillOnce(testing::SaveArg<0>(&buf));
-
   EXPECT_CALL(filter_callbacks_, startUpstreamSecureTransport()).WillOnce(testing::Return(true));
 
   ASSERT_THAT(Network::FilterStatus::StopIteration, filter_->onWrite(data_, false));
@@ -169,7 +164,6 @@ TEST_F(SmtpFilterTest, TestUpstreamStartTls) {
 
   ASSERT_THAT(Network::FilterStatus::StopIteration, filter_->onWrite(data_, false));
   ASSERT_EQ(SmtpSession::State::SESSION_TERMINATED, filter_->getSession().getState());
-  // EXPECT_CALL(connection_, close(_));
   EXPECT_EQ(config_->stats().sessions_upstream_tls_failed_.value(), 1);
 }
 

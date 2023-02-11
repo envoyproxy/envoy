@@ -82,16 +82,12 @@ bool SmtpFilter::upstreamStartTls() {
   // Try to switch upstream connection to use a secure channel.
   if (read_callbacks_->startUpstreamSecureTransport()) {
     config_->stats_.sessions_upstream_tls_success_.inc();
-    // read_callbacks_->injectReadDataToFilterChain(data, false);
-    ENVOY_LOG(debug, "smtp_proxy: upstream TLS enabled");
     ENVOY_CONN_LOG(trace, "smtp_proxy: upstream TLS enabled.", read_callbacks_->connection());
   } else {
     ENVOY_CONN_LOG(info,
                    "smtp_proxy: cannot enable upstream secure transport. Check "
                    "configuration. Terminating.",
                    read_callbacks_->connection());
-    ENVOY_LOG(debug, "smtp_proxy: cannot enable upstream secure transport. Check "
-                     "configuration. Terminating.");
     config_->stats_.sessions_upstream_tls_failed_.inc();
     return false;
   }

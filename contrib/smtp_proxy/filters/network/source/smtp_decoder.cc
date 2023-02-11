@@ -57,7 +57,7 @@ Decoder::Result DecoderImpl::parseCommand(Buffer::Instance& data) {
         result = Decoder::Result::Stopped;
         break;
       }
-      if (session.isSessionEncrypted()) {
+      if (session_.isSessionEncrypted()) {
         ENVOY_LOG(error, "smtp_proxy: received starttls when session is already encrypted.");
         callbacks_->sendReplyDownstream(SmtpUtils::outOfOrderCommandResponse);
         result = Decoder::Result::Stopped;
@@ -166,7 +166,6 @@ Decoder::Result DecoderImpl::parseResponse(Buffer::Instance& data) {
       }
     }
     // If upstream server does not support TLS i.e. response code != 220
-    callbacks_->incUpstreamTlsFailed();
     session_.setState(SmtpSession::State::SESSION_TERMINATED);
     callbacks_->sendReplyDownstream(SmtpUtils::tlsNotSupportedResponse);
     callbacks_->closeDownstreamConnection();
@@ -206,7 +205,6 @@ void DecoderImpl::decodeSmtpTransactionCommands(std::string& command) {
     break;
   }
   case SmtpTransaction::State::RCPT_COMMAND:
-  case SmtpTransaction::State::MAIL_DATA_TRANSFER_REQUEST:
   case SmtpTransaction::State::TRANSACTION_IN_PROGRESS: {
 
     if (absl::StartsWithIgnoreCase(command, SmtpUtils::smtpRcptCommand)) {
@@ -219,6 +217,13 @@ void DecoderImpl::decodeSmtpTransactionCommands(std::string& command) {
       session_.SetTransactionState(SmtpTransaction::State::TRANSACTION_ABORT_REQUEST);
     }
     break;
+  }
+  case SmtpTransaction::State::MAIL_DATA_TRANSFER_REQUEST: {
+    if (absl::StartsWithIgnoreCase(command, SmtpUtils::smtpRsetCommand) ||
+               absl::StartsWithIgnoreCase(command, SmtpUtils::smtpEhloCommand) ||
+               absl::StartsWithIgnoreCase(command, SmtpUtils::smtpHeloCommand)) {
+      session_.SetTransactionState(SmtpTransaction::State::TRANSACTION_ABORT_REQUEST);
+    }
   }
   default:
     break;
