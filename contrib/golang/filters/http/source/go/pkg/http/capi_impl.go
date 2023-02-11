@@ -53,13 +53,13 @@ func handleCApiStatus(status C.CAPIStatus) {
 	case C.CAPIOK:
 		return
 	case C.CAPIFilterIsGone:
-		panic(ErrRequestFinished)
+		panic(errRequestFinished)
 	case C.CAPIFilterIsDestroy:
-		panic(ErrFilterDestroyed)
+		panic(errFilterDestroyed)
 	case C.CAPINotInGo:
-		panic(ErrNotInGo)
+		panic(errNotInGo)
 	case C.CAPIInvalidPhase:
-		panic(ErrInvalidPhase)
+		panic(errInvalidPhase)
 	}
 }
 
@@ -68,8 +68,8 @@ func (c *httpCApiImpl) HttpContinue(r unsafe.Pointer, status uint64) {
 	handleCApiStatus(res)
 }
 
-// Only may panic with ErrRequestFinished, ErrFilterDestroyed or ErrNotInGo,
-// won't panic with CAPIInvalidPhase and others, otherwise will cause deadloop, see RecoverPanic for the details.
+// Only may panic with errRequestFinished, errFilterDestroyed or errNotInGo,
+// won't panic with errInvalidPhase and others, otherwise will cause deadloop, see RecoverPanic for the details.
 func (c *httpCApiImpl) HttpSendLocalReply(r unsafe.Pointer, response_code int, body_text string, headers map[string]string, grpc_status int64, details string) {
 	hLen := len(headers)
 	strs := make([]string, 0, hLen)

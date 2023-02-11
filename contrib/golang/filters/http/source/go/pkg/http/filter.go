@@ -53,19 +53,19 @@ func (r *httpRequest) RecoverPanic() {
 	if e := recover(); e != nil {
 		// TODO: print an error message to Envoy error log.
 		switch e {
-		case ErrRequestFinished, ErrFilterDestroyed:
+		case errRequestFinished, errFilterDestroyed:
 			// do nothing
 
-		case ErrNotInGo:
+		case errNotInGo:
 			// We can not send local reply now, since not in go now,
 			// will delay to the next time entering Go.
 			r.paniced = true
 
 		default:
-			// The following safeReplyPanic should only may get ErrRequestFinished,
-			// ErrFilterDestroyed or ErrNotInGo, won't hit this branch, so, won't dead loop here.
+			// The following safeReplyPanic should only may get errRequestFinished,
+			// errFilterDestroyed or errNotInGo, won't hit this branch, so, won't dead loop here.
 
-			// ErrInvalidPhase, or panic from other places, not from not-ok C return status.
+			// errInvalidPhase, or other panic, not from not-ok C return status.
 			// It's safe to try send a local reply with 500 status.
 			r.safeReplyPanic()
 		}

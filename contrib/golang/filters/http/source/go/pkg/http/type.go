@@ -26,10 +26,10 @@ import (
 
 // panic error messages when C API return not ok
 var (
-	ErrRequestFinished = "request has been finished"
-	ErrFilterDestroyed = "golang filter has been destroyed"
-	ErrNotInGo         = "not proccessing Go"
-	ErrInvalidPhase    = "invalid phase, maybe headers/buffer already continued"
+	errRequestFinished = "request has been finished"
+	errFilterDestroyed = "golang filter has been destroyed"
+	errNotInGo         = "not proccessing Go"
+	errInvalidPhase    = "invalid phase, maybe headers/buffer already continued"
 )
 
 type httpHeaderMap struct {
