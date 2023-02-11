@@ -41,7 +41,7 @@ public:
       const envoy::extensions::filters::listener::local_ratelimit::v3::LocalRateLimit& proto_config,
       Event::Dispatcher& dispatcher, Stats::Scope& scope, Runtime::Loader& runtime);
 
-  ~Config();
+  ~Config() = default;
 
   bool canCreateConnection();
   bool enabled() { return enabled_.enabled(); }
@@ -50,9 +50,9 @@ public:
 private:
   static LocalRateLimitStats generateStats(const std::string& prefix, Stats::Scope& scope);
 
-  LocalRateLimiterImplSharedPtr rate_limiter_;
   Runtime::FeatureFlag enabled_;
   LocalRateLimitStats stats_;
+  LocalRateLimiterImplSharedPtr rate_limiter_;
 };
 
 using ConfigSharedPtr = std::shared_ptr<Config>;
