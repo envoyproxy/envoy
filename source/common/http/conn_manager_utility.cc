@@ -95,8 +95,7 @@ ConnectionManagerUtility::MutateRequestHeadersResult ConnectionManagerUtility::m
     // content-length both do not exist this means there is no request body. After
     // transfer-encoding is stripped here, the upstream request becomes invalid. We can fix it by
     // explicitly adding a "content-length: 0" request header here.
-    const bool no_body =
-        (!request_headers.TransferEncoding() && !request_headers.ContentLength());
+    const bool no_body = (!request_headers.TransferEncoding() && !request_headers.ContentLength());
     if (no_body) {
       request_headers.setContentLength(uint64_t(0));
     }
