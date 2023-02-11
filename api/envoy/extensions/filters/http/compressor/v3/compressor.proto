@@ -30,7 +30,8 @@ message Compressor {
   message CommonDirectionConfig {
     // Runtime flag that controls whether compression is enabled or not for the direction this
     // common config is put in. If set to false, the filter will operate as a pass-through filter
-    // in the chosen direction. If the field is omitted, the filter will be enabled.
+    // in the chosen direction, unless overridden by CompressorPerRoute.
+    // If the field is omitted, the filter will be enabled.
     config.core.v3.RuntimeFeatureFlag enabled = 1;
 
     // Minimum value of Content-Length header of request or response messages (depending on the direction
@@ -96,7 +97,8 @@ message Compressor {
       [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 
   // Runtime flag that controls whether the filter is enabled or not. If set to false, the
-  // filter will operate as a pass-through filter. If not specified, defaults to enabled.
+  // filter will operate as a pass-through filter, unless overridden by
+  // CompressorPerRoute. If not specified, defaults to enabled.
   config.core.v3.RuntimeFeatureFlag runtime_enabled = 5
       [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 
@@ -127,4 +129,30 @@ message Compressor {
   // If true, chooses this compressor first to do compression when the q-values in `Accept-Encoding` are same.
   // The last compressor which enables choose_first will be chosen if multiple compressor filters in the chain have choose_first as true.
   bool choose_first = 9;
+}
+
+// Per-route overrides of `ResponseDirectionConfig`. Anything added here should be optional,
+// to allow overriding arbitrary subsets of configuration. Omitted fields must have no affect.
+message ResponseDirectionOverrides {
+}
+
+// Per-route overrides. As per-route overrides are needed, they should be
+// added here, mirroring the structure of `Compressor`. All fields should be
+// optional, to allow overriding arbitrary subsets of configuration.
+message CompressorOverrides {
+  // If present, response compression is enabled.
+  ResponseDirectionOverrides response_direction_config = 1;
+}
+
+message CompressorPerRoute {
+  oneof override {
+    option (validate.required) = true;
+
+    // If set, the filter will operate as a pass-through filter.
+    // Overrides Compressor.runtime_enabled and CommonDirectionConfig.enabled.
+    bool disabled = 1 [(validate.rules).bool = {const: true}];
+
+    // Per-route overrides. Fields set here will override corresponding fields in `Compressor`.
+    CompressorOverrides overrides = 2;
+  }
 }

@@ -64,8 +64,9 @@ public:
   const Outlier::Detector* outlierDetector() const override { return outlier_detector_.get(); }
   void initialize(std::function<void()> callback) override;
   // Compare changes in the cluster proto, and update parts of the cluster as needed.
-  void update(envoy::config::cluster::v3::Cluster cluster, ClusterInfoFactory& info_factory,
-              ThreadLocal::SlotAllocator& tls);
+  void update(envoy::config::cluster::v3::Cluster cluster,
+              const envoy::config::core::v3::BindConfig& bind_config,
+              ClusterInfoFactory& info_factory, ThreadLocal::SlotAllocator& tls);
   // Creates healthcheckers and adds them to the list, then does initial start.
   void initHealthchecks();
 
@@ -82,7 +83,6 @@ private:
 
   Server::Configuration::ServerFactoryContext& server_context_;
   envoy::config::cluster::v3::Cluster cluster_;
-  const envoy::config::core::v3::BindConfig& bind_config_;
   Stats::Store& stats_;
   Ssl::ContextManager& ssl_context_manager_;
   bool added_via_api_;
@@ -161,8 +161,10 @@ private:
   envoy::config::cluster::v3::Cluster
   createClusterConfig(const envoy::service::health::v3::ClusterHealthCheck& cluster_health_check);
   void updateHdsCluster(HdsClusterPtr cluster,
-                        const envoy::config::cluster::v3::Cluster& cluster_health_check);
-  HdsClusterPtr createHdsCluster(const envoy::config::cluster::v3::Cluster& cluster_health_check);
+                        const envoy::config::cluster::v3::Cluster& cluster_health_check,
+                        const envoy::config::core::v3::BindConfig& bind_config);
+  HdsClusterPtr createHdsCluster(const envoy::config::cluster::v3::Cluster& cluster_health_check,
+                                 const envoy::config::core::v3::BindConfig& bind_config);
   HdsDelegateStats stats_;
   const Protobuf::MethodDescriptor& service_method_;
 

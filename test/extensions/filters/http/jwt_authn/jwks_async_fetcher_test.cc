@@ -58,7 +58,6 @@ public:
     // if async_fetch is enabled, timer is created
     if (config_.has_async_fetch()) {
       timer_ = new NiceMock<Event::MockTimer>(&context_.dispatcher_);
-      expected_duration_ = JwksAsyncFetcher::getCacheDuration(config_);
     }
 
     async_fetcher_ = std::make_unique<JwksAsyncFetcher>(
@@ -87,7 +86,6 @@ public:
   Init::TargetHandlePtr init_target_handle_;
   NiceMock<Init::ExpectableWatcherImpl> init_watcher_;
   Event::MockTimer* timer_{};
-  std::chrono::milliseconds expected_duration_;
 };
 
 INSTANTIATE_TEST_SUITE_P(JwksAsyncFetcherTest, JwksAsyncFetcherTest,
@@ -193,7 +191,10 @@ TEST_P(JwksAsyncFetcherTest, TestGoodFetchAndRefresh) {
   EXPECT_EQ(out_jwks_array_.size(), 1);
 
   // Expect refresh timer is enabled.
-  EXPECT_CALL(*timer_, enableTimer(expected_duration_, nullptr));
+  constexpr std::chrono::seconds refetchBeforeExpiredSec(5);
+  const std::chrono::milliseconds expected_refetch_time =
+      JwksAsyncFetcher::getCacheDuration(config_) - refetchBeforeExpiredSec;
+  EXPECT_CALL(*timer_, enableTimer(expected_refetch_time, nullptr));
   timer_->invokeCallback();
 
   // refetch again after cache duration interval: successful.
@@ -207,7 +208,7 @@ TEST_P(JwksAsyncFetcherTest, TestGoodFetchAndRefresh) {
   EXPECT_EQ(0U, stats_.jwks_fetch_failed_.value());
 }
 
-TEST_P(JwksAsyncFetcherTest, TestNetworkFailureFetchAndRefresh) {
+TEST_P(JwksAsyncFetcherTest, TestNetworkFailureFetchWithDefaultRefetch) {
   const char config[] = R"(
       http_uri:
         uri: https://pubkey_server/pubkey_path
@@ -225,7 +226,43 @@ TEST_P(JwksAsyncFetcherTest, TestNetworkFailureFetchAndRefresh) {
   EXPECT_EQ(out_jwks_array_.size(), 0);
 
   // Expect refresh timer is enabled.
-  EXPECT_CALL(*timer_, enableTimer(expected_duration_, nullptr));
+  // Default refetch time for a failed one is 1 second.
+  const std::chrono::milliseconds expected_refetch_time = std::chrono::seconds(1);
+  EXPECT_CALL(*timer_, enableTimer(expected_refetch_time, nullptr));
+  timer_->invokeCallback();
+
+  // refetch again after cache duration interval: network failure.
+  EXPECT_EQ(fetch_receiver_array_.size(), 2);
+  fetch_receiver_array_[1]->onJwksError(Common::JwksFetcher::JwksReceiver::Failure::Network);
+
+  // Output 0 jwks.
+  EXPECT_EQ(out_jwks_array_.size(), 0);
+  EXPECT_EQ(0U, stats_.jwks_fetch_success_.value());
+  EXPECT_EQ(2U, stats_.jwks_fetch_failed_.value());
+}
+
+TEST_P(JwksAsyncFetcherTest, TestNetworkFailureFetchWithCustomRefetch) {
+  const char config[] = R"(
+      http_uri:
+        uri: https://pubkey_server/pubkey_path
+        cluster: pubkey_cluster
+      async_fetch:
+        failed_refetch_duration:
+          seconds: 10
+)";
+
+  // Just start the Jwks fetch call
+  setupAsyncFetcher(config);
+  // first fetch: network failure.
+  EXPECT_EQ(fetch_receiver_array_.size(), 1);
+  fetch_receiver_array_[0]->onJwksError(Common::JwksFetcher::JwksReceiver::Failure::Network);
+
+  // Output 0 jwks.
+  EXPECT_EQ(out_jwks_array_.size(), 0);
+
+  // Expect refresh timer is enabled.
+  const std::chrono::milliseconds expected_refetch_time = std::chrono::seconds(10);
+  EXPECT_CALL(*timer_, enableTimer(expected_refetch_time, nullptr));
   timer_->invokeCallback();
 
   // refetch again after cache duration interval: network failure.

@@ -8,7 +8,7 @@ namespace Envoy {
 // e.g. c-ares. There should only ever be a single instance of this.
 class ProcessWide {
 public:
-  ProcessWide();
+  ProcessWide(bool validate_proto_descriptors = true);
   ~ProcessWide();
 };
 

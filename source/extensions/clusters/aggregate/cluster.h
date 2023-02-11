@@ -95,7 +95,8 @@ private:
                      Runtime::Loader& runtime, Random::RandomGenerator& random,
                      const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config)
         : Upstream::LoadBalancerBase(priority_context.priority_set_, lb_stats, runtime, random,
-                                     common_config),
+                                     PROTOBUF_PERCENT_TO_ROUNDED_INTEGER_OR_DEFAULT(
+                                         common_config, healthy_panic_threshold, 100, 50)),
           priority_context_(priority_context) {}
 
     // Upstream::LoadBalancer

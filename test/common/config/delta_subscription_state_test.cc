@@ -1,6 +1,7 @@
 #include <chrono>
 
 #include "envoy/config/cluster/v3/cluster.pb.h"
+#include "envoy/config/xds_config_tracker.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
 #include "source/common/config/delta_subscription_state.h"
@@ -59,11 +60,11 @@ protected:
     ttl_timer_ = new Event::MockTimer(&dispatcher_);
 
     if (should_use_unified_) {
-      state_ = std::make_unique<Envoy::Config::XdsMux::DeltaSubscriptionState>(type_url, callbacks_,
-                                                                               dispatcher_);
+      state_ = std::make_unique<Envoy::Config::XdsMux::DeltaSubscriptionState>(
+          type_url, callbacks_, dispatcher_, XdsConfigTrackerOptRef());
     } else {
-      state_ = std::make_unique<Envoy::Config::DeltaSubscriptionState>(type_url, callbacks_,
-                                                                       local_info_, dispatcher_);
+      state_ = std::make_unique<Envoy::Config::DeltaSubscriptionState>(
+          type_url, callbacks_, local_info_, dispatcher_, XdsConfigTrackerOptRef());
     }
   }
 

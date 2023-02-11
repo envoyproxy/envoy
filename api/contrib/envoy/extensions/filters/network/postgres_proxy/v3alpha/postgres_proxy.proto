@@ -20,6 +20,16 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // [#extension: envoy.filters.network.postgres_proxy]
 
 message PostgresProxy {
+  // Upstream SSL operational modes.
+  enum SSLMode {
+    // Do not encrypt upstream connection to the server.
+    DISABLE = 0;
+
+    // Establish upstream SSL connection to the server. If the server does not
+    // accept the request for SSL connection, the session is terminated.
+    REQUIRE = 1;
+  }
+
   // The human readable prefix to use when emitting :ref:`statistics
   // <config_network_filters_postgres_proxy_stats>`.
   string stat_prefix = 1 [(validate.rules).string = {min_len: 1}];
@@ -39,4 +49,12 @@ message PostgresProxy {
   // Refer to official documentation for details
   // `SSL Session Encryption Message Flow <https://www.postgresql.org/docs/current/protocol-flow.html#id-1.10.5.7.11>`_.
   bool terminate_ssl = 3;
+
+  // Controls whether to establish upstream SSL connection to the server.
+  // Envoy will try to establish upstream SSL connection to the server only when
+  // Postgres filter is able to read Postgres payload in clear-text. It happens when
+  // a client established a clear-text connection to Envoy or when a client established
+  // SSL connection to Envoy and Postgres filter is configured to terminate SSL.
+  // Defaults to SSL_DISABLE.
+  SSLMode upstream_ssl = 4;
 }

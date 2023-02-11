@@ -21,9 +21,11 @@ Types
   ../type/v3/percent.proto
   ../type/v3/range.proto
   ../type/v3/ratelimit_unit.proto
+  ../type/v3/ratelimit_strategy.proto
   ../type/matcher/v3/regex.proto
   ../type/v3/semantic_version.proto
   ../type/matcher/v3/string.proto
   ../type/matcher/v3/struct.proto
   ../type/v3/token_bucket.proto
   ../type/matcher/v3/value.proto
+  ../type/matcher/v3/status_code_input.proto

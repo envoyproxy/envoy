@@ -6,6 +6,7 @@ ABI
 ACK
 ACL
 AES
+AllMuxes
 ALPN
 ALS
 AMZ
@@ -40,12 +41,14 @@ ar
 btree
 CAS
 CB
+cartid
 cbor
 CDN
 CDS
 CEL
 CWND
 DLE
+DPE
 DSR
 DSS
 EBADF
@@ -59,6 +62,7 @@ ESC
 ETB
 ETX
 FS
+FIXME
 HEXDIG
 HEXDIGIT
 HPE
@@ -156,6 +160,7 @@ FIPS
 FIRSTHDR
 FQDN
 FREEBIND
+freeifaddrs
 FUZZER
 FUZZERS
 delims
@@ -165,6 +170,7 @@ dnsresolvers
 endpos
 fo
 ghi
+golang
 guarddog
 GC
 GCC
@@ -198,6 +204,7 @@ IAM
 IANA
 IDL
 IETF
+IFADDRS
 INADDR
 INET
 INVAL
@@ -278,12 +285,14 @@ Oauth
 OCSP
 OD
 ODCDS
+middlewildcard
 mpd
 oghttp
 OID
 OK
 OOM
 OOMs
+ORCA
 OS
 OSI
 OSS
@@ -578,6 +587,7 @@ codebase
 codec
 codecs
 codepath
+codepoints
 codings
 combinatorial
 comparator
@@ -802,6 +812,8 @@ initializers
 inlined
 inlining
 inobservability
+inode
+inodes
 inotify
 inserter
 instantiation
@@ -933,6 +945,9 @@ negative
 netblock
 netblocks
 netfilter
+netlink
+netmask
+NLMSG
 nonblocking
 noncopyable
 nonresponsive
@@ -954,6 +969,7 @@ ocagent
 offsetof
 oneof
 oneway
+oob
 opcode
 opencensus
 openssl
@@ -1059,6 +1075,7 @@ qdtext
 qps
 quantile
 quantiles
+querydetails
 quiesce
 quitquitquit
 qvalue
@@ -1126,6 +1143,7 @@ responder
 restarter
 resync
 ret
+retransmitted
 retransmitting
 retriable
 retriggers
@@ -1330,6 +1348,7 @@ upcasts
 upstreams
 uptime
 upvalue
+urlencoded
 urls
 userdata
 userinfo
@@ -1358,6 +1377,7 @@ vip
 virtualhost
 virtualize
 vptr
+vtable
 vtt
 wakeup
 wakeups
@@ -1373,6 +1393,7 @@ winsock
 workspace
 writev
 wrsq
+www
 xDS
 xDSes
 xdstp
@@ -1383,6 +1404,8 @@ xid
 xmodem
 xxhash
 xxs
+xyz
+xyzwebservices
 zag
 zig
 zipkin

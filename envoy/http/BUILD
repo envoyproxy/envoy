@@ -29,6 +29,7 @@ envoy_cc_library(
     hdrs = ["async_client.h"],
     external_deps = ["abseil_optional"],
     deps = [
+        ":filter_interface",
         ":message_interface",
         "//envoy/event:dispatcher_interface",
         "//envoy/tracing:http_tracer_interface",
@@ -46,6 +47,7 @@ envoy_cc_library(
         ":metadata_interface",
         ":protocol_interface",
         ":stream_reset_handler_interface",
+        "//envoy/access_log:access_log_interface",
         "//envoy/buffer:buffer_interface",
         "//envoy/grpc:status",
         "//envoy/network:address_interface",
@@ -198,6 +200,17 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "early_header_mutation_interface",
+    hdrs = ["early_header_mutation.h"],
+    deps = [
+        ":header_map_interface",
+        "//envoy/config:typed_config_interface",
+        "//envoy/server:factory_context_interface",
+        "//envoy/stream_info:stream_info_interface",
+    ],
+)
+
+envoy_cc_library(
     name = "header_evaluator",
     hdrs = ["header_evaluator.h"],
     deps = [
@@ -229,7 +242,16 @@ envoy_cc_library(
         "//envoy/config:typed_config_interface",
         "//envoy/http:header_map_interface",
         "//envoy/http:protocol_interface",
-        "//envoy/server:factory_context_interface",
-        "//envoy/stream_info:stream_info_interface",
+        "//envoy/protobuf:message_validator_interface",
+    ],
+)
+
+envoy_cc_library(
+    name = "header_validator_errors",
+    hdrs = [
+        "header_validator_errors.h",
+    ],
+    deps = [
+        "//source/common/singleton:const_singleton",
     ],
 )

@@ -1181,10 +1181,18 @@ TEST_P(HeaderIntegrationTest, PathWithEscapedSlashesByDefaultUnchanghed) {
           {":scheme", "http"},
           {":authority", "path-sanitization.com"},
       },
+#ifdef ENVOY_ENABLE_UHV
+      // UHV normalizes percent encodings to UPPERCASE
+      Http::TestRequestHeaderMapImpl{{":authority", "path-sanitization.com"},
+                                     {":path", "/private/..%2Fpublic%5C"},
+                                     {":method", "GET"},
+                                     {"x-site", "private"}},
+#else
       Http::TestRequestHeaderMapImpl{{":authority", "path-sanitization.com"},
                                      {":path", "/private/..%2Fpublic%5c"},
                                      {":method", "GET"},
                                      {"x-site", "private"}},
+#endif
       Http::TestResponseHeaderMapImpl{
           {"server", "envoy"},
           {"content-length", "0"},
@@ -1259,10 +1267,18 @@ TEST_P(HeaderIntegrationTest, PathWithEscapedSlashesUnmodified) {
           {":scheme", "http"},
           {":authority", "path-sanitization.com"},
       },
+#ifdef ENVOY_ENABLE_UHV
+      // UHV normalizes percent encodings to UPPERCASE
+      Http::TestRequestHeaderMapImpl{{":authority", "path-sanitization.com"},
+                                     {":path", "/private/..%2Fpublic%5C"},
+                                     {":method", "GET"},
+                                     {"x-site", "private"}},
+#else
       Http::TestRequestHeaderMapImpl{{":authority", "path-sanitization.com"},
                                      {":path", "/private/..%2Fpublic%5c"},
                                      {":method", "GET"},
                                      {"x-site", "private"}},
+#endif
       Http::TestResponseHeaderMapImpl{
           {"server", "envoy"},
           {"content-length", "0"},

@@ -39,7 +39,7 @@ public:
     OriginData() = default;
     OriginData(OptRef<std::vector<AlternateProtocol>> protocols, std::chrono::microseconds srtt,
                Http3StatusTrackerPtr&& tracker, uint32_t concurrent_streams)
-        : protocols(protocols), srtt(srtt), h3_status_tracker(std::move(tracker)),
+        : protocols(protocols.copy()), srtt(srtt), h3_status_tracker(std::move(tracker)),
           concurrent_streams(concurrent_streams) {}
 
     // The alternate protocols supported if available.

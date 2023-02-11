@@ -140,3 +140,13 @@ envoy_cc_test(
         "//test/test_common:registry_lib",
     ],
 )
+
+envoy_cc_test(
+    name = "cache_manager_test",
+    srcs = ["cache_manager_test.cc"],
+    deps = [
+        "//contrib/sip_proxy/filters/network/source:utility_interface",
+        "//test/test_common:printers_lib",
+        "//test/test_common:utility_lib",
+    ],
+)

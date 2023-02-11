@@ -1,17 +1,5 @@
 #include "contrib/sip_proxy/filters/network/source/decoder.h"
 
-#include <utility>
-
-#include "envoy/buffer/buffer.h"
-#include "envoy/common/exception.h"
-
-#include "source/common/buffer/buffer_impl.h"
-#include "source/common/common/assert.h"
-#include "source/common/common/macros.h"
-
-#include "contrib/sip_proxy/filters/network/source/app_exception_impl.h"
-#include "contrib/sip_proxy/filters/network/source/decoder_events.h"
-
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
@@ -183,8 +171,10 @@ FilterStatus Decoder::onDataReady(Buffer::Instance& data) {
 }
 
 auto Decoder::sipHeaderType(absl::string_view sip_line) {
-  auto header_type_str = StringUtil::trim(sip_line.substr(0, sip_line.find_first_of(':')));
-  auto header_value = StringUtil::trim(sip_line.substr(sip_line.find_first_of(':') + strlen(":")));
+  // XXX StringUtil::trim has poor performance
+  auto delimiter_index = sip_line.find_first_of(':');
+  auto header_type_str = sip_line.substr(0, delimiter_index);
+  auto header_value = StringUtil::trim(sip_line.substr(delimiter_index + strlen(":")));
   return std::tuple<HeaderType, absl::string_view>{HeaderTypes::get().str2Header(header_type_str),
                                                    header_value};
 }
@@ -221,21 +211,11 @@ MethodType Decoder::sipMethod(absl::string_view top_line) {
   } else if (top_line.find("2.0 4") != absl::string_view::npos) {
     return MethodType::Failure4xx;
   } else {
-    return MethodType::NullMethod;
+    return MethodType::OtherMethod;
   }
 }
 
-Decoder::HeaderHandler::HeaderHandler(MessageHandler& parent)
-    : parent_(parent), header_processors_{
-                           {HeaderType::Via, &HeaderHandler::processVia},
-                           {HeaderType::Route, &HeaderHandler::processRoute},
-                           {HeaderType::Contact, &HeaderHandler::processContact},
-                           {HeaderType::RRoute, &HeaderHandler::processRecordRoute},
-                           {HeaderType::SRoute, &HeaderHandler::processServiceRoute},
-                           {HeaderType::WAuth, &HeaderHandler::processWwwAuth},
-                           {HeaderType::Auth, &HeaderHandler::processAuth},
-                           {HeaderType::PCookieIPMap, &HeaderHandler::processPCookieIPMap},
-                       } {}
+Decoder::HeaderHandler::HeaderHandler(MessageHandler& parent) : parent_(parent) {}
 
 int Decoder::HeaderHandler::processPath(absl::string_view& header) {
   metadata()->deleteInstipOperation(rawOffset(), header);

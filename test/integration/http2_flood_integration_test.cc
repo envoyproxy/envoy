@@ -39,11 +39,11 @@ bool deferredProcessing(std::tuple<Network::Address::IpVersion, bool, bool> para
 
 std::string testParamsToString(
     const ::testing::TestParamInfo<std::tuple<Network::Address::IpVersion, bool, bool>> params) {
-  const bool is_v4 = (std::get<0>(params.param) == Network::Address::IpVersion::v4);
   const bool http2_new_codec_wrapper = std::get<1>(params.param);
-  return absl::StrCat(
-      is_v4 ? "IPv4" : "IPv6", http2_new_codec_wrapper ? "WrappedHttp2" : "BareHttp2",
-      deferredProcessing(params.param) ? "WithDeferredProcessing" : "NoDeferredProcessing");
+  return absl::StrCat(TestUtility::ipVersionToString(std::get<0>(params.param)),
+                      http2_new_codec_wrapper ? "WrappedHttp2" : "BareHttp2",
+                      deferredProcessing(params.param) ? "WithDeferredProcessing"
+                                                       : "NoDeferredProcessing");
 }
 
 // It is important that the new socket interface is installed before any I/O activity starts and

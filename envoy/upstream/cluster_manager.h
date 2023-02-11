@@ -316,10 +316,9 @@ public:
   virtual void shutdown() PURE;
 
   /**
-   * @return const envoy::config::core::v3::BindConfig& cluster manager wide bind configuration for
-   * new upstream connections.
+   * @return cluster manager wide bind configuration for new upstream connections.
    */
-  virtual const envoy::config::core::v3::BindConfig& bindConfig() const PURE;
+  virtual const absl::optional<envoy::config::core::v3::BindConfig>& bindConfig() const PURE;
 
   /**
    * Returns a shared_ptr to the singleton xDS-over-gRPC provider for upstream control plane muxing
@@ -498,7 +497,8 @@ public:
                       ResourcePriority priority,
                       const Network::ConnectionSocket::OptionsSharedPtr& options,
                       Network::TransportSocketOptionsConstSharedPtr transport_socket_options,
-                      ClusterConnectivityState& state) PURE;
+                      ClusterConnectivityState& state,
+                      absl::optional<std::chrono::milliseconds> tcp_pool_idle_timeout) PURE;
 
   /**
    * Allocate a cluster from configuration proto.

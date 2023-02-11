@@ -214,8 +214,8 @@ Http::FilterTrailersStatus FileSystemBufferFilter::decodeTrailers(Http::RequestT
   return receiveTrailers(request_state_.config_->behavior(), request_state_);
 }
 
-Http::FilterHeadersStatus FileSystemBufferFilter::encode1xxHeaders(Http::ResponseHeaderMap&) {
-  return Http::FilterHeadersStatus::Continue;
+Http::Filter1xxHeadersStatus FileSystemBufferFilter::encode1xxHeaders(Http::ResponseHeaderMap&) {
+  return Http::Filter1xxHeadersStatus::Continue;
 }
 
 Http::FilterMetadataStatus FileSystemBufferFilter::encodeMetadata(Http::MetadataMap&) {

@@ -102,13 +102,13 @@ index 0f6e41e3a..c0d2bbccf 100644
  )
  
 diff --git a/python/google/protobuf/__init__.py b/python/google/protobuf/__init__.py
-index 70d564a90..537fbe99d 100644
+index e7555ee10..a93beb1c5 100644
 --- a/python/google/protobuf/__init__.py
 +++ b/python/google/protobuf/__init__.py
 @@ -31,3 +31,10 @@
  # Copyright 2007 Google Inc. All Rights Reserved.
  
- __version__ = '4.21.7'
+ __version__ = '4.21.12'
 +
 +
 +if __name__ != '__main__':

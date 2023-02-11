@@ -344,6 +344,26 @@ config_setting(
 )
 
 config_setting(
+    name = "disable_static_extension_registration",
+    values = {"define": "static_extension_registration=disabled"},
+)
+
+config_setting(
+    name = "disable_envoy_mobile_request_compression",
+    values = {"define": "envoy_mobile_request_compression=disabled"},
+)
+
+config_setting(
+    name = "disable_envoy_mobile_listener",
+    values = {"define": "envoy_mobile_listener=disabled"},
+)
+
+config_setting(
+    name = "disable_logging",
+    values = {"define": "enable_logging=disabled"},
+)
+
+config_setting(
     name = "disable_admin_functionality",
     values = {"define": "admin_functionality=disabled"},
 )

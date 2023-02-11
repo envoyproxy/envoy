@@ -45,7 +45,7 @@ public:
         envoy::extensions::filters::network::sip_proxy::tra::v3alpha::TraServiceConfig>();
     TestUtility::loadFromYaml(tra_yaml, *tra_config);
 
-    SipFilterStats stat = SipFilterStats::generateStats("test.", store_);
+    SipFilterStats stat = SipFilterStats::generateStats("test.", *store_.rootScope());
     auto config = std::make_shared<NiceMock<MockConfig>>();
     EXPECT_CALL(*config, stats()).WillRepeatedly(ReturnRef(stat));
     auto context = std::make_shared<NiceMock<Server::Configuration::MockFactoryContext>>();

@@ -88,7 +88,7 @@ TEST(Status, InboundFramesWithEmptyPayload) {
 
 TEST(Status, ReturnIfError) {
 
-  auto outer = [](Status (*inner)()) {
+  auto outer = [](Status (*inner)()) -> Status {
     RETURN_IF_ERROR(inner());
     return bufferFloodError("boom");
   };
@@ -103,7 +103,7 @@ TEST(Status, ReturnIfError) {
   EXPECT_EQ("foobar", result.message());
 
   // Check that passing a `Status` object directly into the RETURN_IF_ERROR works.
-  auto direct_status = [](const Status& status) {
+  auto direct_status = [](const Status& status) -> Status {
     RETURN_IF_ERROR(status);
     return bufferFloodError("baz");
   };

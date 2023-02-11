@@ -177,7 +177,9 @@ public:
   // Adds a HTTP active health check specifier to the given cluster, and waits for the first health
   // check probe to be received.
   void initHttpHealthCheck(uint32_t cluster_idx, int unhealthy_threshold = 1,
-                           std::unique_ptr<envoy::type::v3::Int64Range> retriable_range = nullptr) {
+                           std::unique_ptr<envoy::type::v3::Int64Range> retriable_range = nullptr,
+                           int interval = 100,
+                           bool disable_health_check_if_active_traffic = false) {
     const envoy::type::v3::CodecClientType codec_client_type =
         (Http::CodecType::HTTP1 == upstream_protocol_) ? envoy::type::v3::CodecClientType::HTTP1
                                                        : envoy::type::v3::CodecClientType::HTTP2;
@@ -186,7 +188,18 @@ public:
     auto* health_check = addHealthCheck(cluster_data.cluster_);
     health_check->mutable_http_health_check()->set_path("/healthcheck");
     health_check->mutable_http_health_check()->set_codec_client_type(codec_client_type);
+    health_check->mutable_interval()->CopyFrom(
+        Protobuf::util::TimeUtil::MillisecondsToDuration(interval));
     health_check->mutable_unhealthy_threshold()->set_value(unhealthy_threshold);
+    health_check->set_disable_health_check_if_active_traffic(
+        disable_health_check_if_active_traffic);
+
+    envoy::extensions::upstreams::http::v3::HttpProtocolOptions protocol_options;
+    if (Http::CodecType::HTTP1 == upstream_protocol_) {
+      protocol_options.mutable_explicit_http_config()->mutable_http_protocol_options();
+    }
+    ConfigHelper::setProtocolOptions(cluster_data.cluster_, protocol_options);
+
     if (retriable_range != nullptr) {
       auto* range = health_check->mutable_http_health_check()->add_retriable_statuses();
       range->set_start(retriable_range->start());
@@ -538,6 +551,46 @@ TEST_P(RealTimeHttpHealthCheckIntegrationTest, SingleEndpointGoAwayErroSingleEnd
   EXPECT_EQ(1, test_server_->counter("cluster.cluster_1.health_check.failure")->value());
 }
 
+TEST_P(HttpHealthCheckIntegrationTest, DisableHCForActiveTraffic) {
+  const uint32_t cluster_idx = 0;
+  auto& cluster_data = clusters_[cluster_idx];
+  initialize();
+  initHttpHealthCheck(cluster_idx, 1, nullptr, 5000, true);
+
+  clusters_[cluster_idx].host_stream_->encodeHeaders(
+      Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
+  clusters_[cluster_idx].host_stream_->encodeData(1024, true);
+
+  test_server_->waitForCounterGe("cluster.cluster_1.health_check.success", 1);
+  EXPECT_EQ(1, test_server_->counter("cluster.cluster_1.health_check.success")->value());
+  EXPECT_EQ(0, test_server_->counter("cluster.cluster_1.health_check.failure")->value());
+
+  timeSystem().advanceTimeWait(std::chrono::milliseconds(1));
+
+  auto codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+  Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},
+                                                 {":path", "/cluster1"},
+                                                 {":scheme", "http"},
+                                                 {":authority", "host"},
+                                                 {"x-lyft-user-id", absl::StrCat(1)}};
+  auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
+
+  ASSERT_TRUE(cluster_data.host_upstream_->waitForHttpConnection(
+      *dispatcher_, cluster_data.host_fake_connection_));
+  ASSERT_TRUE(cluster_data.host_fake_connection_->waitForNewStream(*dispatcher_,
+                                                                   cluster_data.host_stream_));
+  ASSERT_TRUE(cluster_data.host_stream_->waitForEndStream(*dispatcher_));
+
+  // Send the response headers.
+  clusters_[cluster_idx].host_stream_->encodeHeaders(default_response_headers_, false);
+  clusters_[cluster_idx].host_stream_->encodeData(1024, true);
+  test_server_->waitForCounterEq("cluster.cluster_1.health_check.attempt", 2);
+
+  EXPECT_EQ(1, test_server_->counter("cluster.cluster_1.health_check.success")->value());
+  EXPECT_EQ(0, test_server_->counter("cluster.cluster_1.health_check.failure")->value());
+  codec_client_->close();
+}
+
 class TcpHealthCheckIntegrationTest : public Event::TestUsingSimulatedTime,
                                       public testing::TestWithParam<Network::Address::IpVersion>,
                                       public HealthCheckIntegrationTestBase {
@@ -551,11 +604,14 @@ public:
 
   // Adds a TCP active health check specifier to the given cluster, and waits for the first health
   // check probe to be received.
-  void initTcpHealthCheck(uint32_t cluster_idx) {
+  void initTcpHealthCheck(uint32_t cluster_idx,
+                          bool disable_health_check_if_active_traffic = false) {
     auto& cluster_data = clusters_[cluster_idx];
     auto health_check = addHealthCheck(cluster_data.cluster_);
     health_check->mutable_tcp_health_check()->mutable_send()->set_text("50696E67"); // "Ping"
     health_check->mutable_tcp_health_check()->add_receive()->set_text("506F6E67");  // "Pong"
+    health_check->set_disable_health_check_if_active_traffic(
+        disable_health_check_if_active_traffic);
 
     // Introduce the cluster using compareDiscoveryRequest / sendDiscoveryResponse.
     EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "", {}, {}, {}, true));
@@ -585,6 +641,46 @@ TEST_P(TcpHealthCheckIntegrationTest, SingleEndpointHealthyTcp) {
 
   test_server_->waitForCounterGe("cluster.cluster_1.health_check.success", 1);
   EXPECT_EQ(1, test_server_->counter("cluster.cluster_1.health_check.success")->value());
+  EXPECT_EQ(0, test_server_->counter("cluster.cluster_1.health_check.failure")->value());
+}
+
+TEST_P(TcpHealthCheckIntegrationTest, DisableHCForActiveTraffic) {
+  const uint32_t cluster_idx = 0;
+  auto& cluster_data = clusters_[cluster_idx];
+  initialize();
+  initTcpHealthCheck(cluster_idx, true);
+
+  AssertionResult result = clusters_[cluster_idx].host_fake_raw_connection_->write("Pong");
+  RELEASE_ASSERT(result, result.message());
+
+  test_server_->waitForCounterGe("cluster.cluster_1.health_check.success", 1);
+  EXPECT_EQ(1, test_server_->counter("cluster.cluster_1.health_check.success")->value());
+  EXPECT_EQ(0, test_server_->counter("cluster.cluster_1.health_check.failure")->value());
+
+  auto codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+  Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},
+                                                 {":path", "/cluster1"},
+                                                 {":scheme", "http"},
+                                                 {":authority", "host"},
+                                                 {"x-lyft-user-id", absl::StrCat(1)}};
+  auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
+
+  test_server_->waitForCounterEq("cluster.cluster_1.health_check.attempt", 2);
+  codec_client_->close();
+
+  EXPECT_EQ(1, test_server_->counter("cluster.cluster_1.health_check.success")->value());
+  EXPECT_EQ(0, test_server_->counter("cluster.cluster_1.health_check.failure")->value());
+
+  timeSystem().advanceTimeWait(std::chrono::seconds(10));
+
+  test_server_->waitForCounterEq("cluster.cluster_1.health_check.attempt", 3);
+
+  ASSERT_TRUE(cluster_data.host_fake_raw_connection_->waitForData(
+      FakeRawConnection::waitForInexactMatch("Ping")));
+  result = clusters_[cluster_idx].host_fake_raw_connection_->write("Pong");
+  RELEASE_ASSERT(result, result.message());
+
+  EXPECT_EQ(2, test_server_->counter("cluster.cluster_1.health_check.success")->value());
   EXPECT_EQ(0, test_server_->counter("cluster.cluster_1.health_check.failure")->value());
 }
 
@@ -634,10 +730,15 @@ public:
 
   // Adds a gRPC active health check specifier to the given cluster, and waits for the first health
   // check probe to be received.
-  void initGrpcHealthCheck(uint32_t cluster_idx) {
+  void initGrpcHealthCheck(uint32_t cluster_idx, int interval = 100,
+                           bool disable_health_check_if_active_traffic = false) {
     auto& cluster_data = clusters_[cluster_idx];
     auto health_check = addHealthCheck(cluster_data.cluster_);
     health_check->mutable_grpc_health_check();
+    health_check->mutable_interval()->CopyFrom(
+        Protobuf::util::TimeUtil::MillisecondsToDuration(interval));
+    health_check->set_disable_health_check_if_active_traffic(
+        disable_health_check_if_active_traffic);
 
     // Introduce the cluster using compareDiscoveryRequest / sendDiscoveryResponse.
     EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "", {}, {}, {}, true));
@@ -777,6 +878,61 @@ TEST_P(GrpcHealthCheckIntegrationTest, SingleEndpointUnknownStatusGrpc) {
   test_server_->waitForCounterGe("cluster.cluster_1.health_check.failure", 1);
   EXPECT_EQ(0, test_server_->counter("cluster.cluster_1.health_check.success")->value());
   EXPECT_EQ(1, test_server_->counter("cluster.cluster_1.health_check.failure")->value());
+}
+
+TEST_P(GrpcHealthCheckIntegrationTest, DisableHCForActiveTraffic) {
+  const uint32_t cluster_idx = 0;
+  auto& cluster_data = clusters_[cluster_idx];
+  initialize();
+  initGrpcHealthCheck(cluster_idx, 5000, true);
+  // Endpoint responds to the health check
+  grpc::health::v1::HealthCheckResponse response;
+  response.set_status(grpc::health::v1::HealthCheckResponse::SERVING);
+  // Send a grpc response.
+  sendGrpcResponse(
+      cluster_idx,
+      Http::TestResponseHeaderMapImpl{
+          {":status", "200"}, {"content-type", Http::Headers::get().ContentTypeValues.Grpc}},
+      response);
+
+  test_server_->waitForCounterGe("cluster.cluster_1.health_check.success", 1);
+  EXPECT_EQ(1, test_server_->counter("cluster.cluster_1.health_check.success")->value());
+  EXPECT_EQ(0, test_server_->counter("cluster.cluster_1.health_check.failure")->value());
+
+  timeSystem().advanceTimeWait(std::chrono::milliseconds(1));
+
+  auto codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+  auto encoder_decoder = codec_client_->startRequest(
+      Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                     {":path", "/cluster1"},
+                                     {":scheme", "http"},
+                                     {":authority", "sni.lyft.com"},
+                                     {"content-type", "application/grpc"},
+                                     {"x-envoy-retry-grpc-on", "cancelled"}});
+  grpc::health::v1::HealthCheckRequest request;
+  request_encoder_ = &encoder_decoder.first;
+  request_encoder_->encodeData(*Grpc::Common::serializeToGrpcFrame(request), true);
+
+  ASSERT_TRUE(cluster_data.host_upstream_->waitForHttpConnection(
+      *dispatcher_, cluster_data.host_fake_connection_));
+  ASSERT_TRUE(cluster_data.host_fake_connection_->waitForNewStream(*dispatcher_,
+                                                                   cluster_data.host_stream_));
+  ASSERT_TRUE(cluster_data.host_stream_->waitForGrpcMessage(*dispatcher_, request));
+  ASSERT_TRUE(cluster_data.host_stream_->waitForEndStream(*dispatcher_));
+
+  // Send a grpc response.
+  response.set_status(grpc::health::v1::HealthCheckResponse::SERVING);
+  sendGrpcResponse(
+      cluster_idx,
+      Http::TestResponseHeaderMapImpl{
+          {":status", "200"}, {"content-type", Http::Headers::get().ContentTypeValues.Grpc}},
+      response);
+
+  test_server_->waitForCounterEq("cluster.cluster_1.health_check.attempt", 2);
+
+  EXPECT_EQ(1, test_server_->counter("cluster.cluster_1.health_check.success")->value());
+  EXPECT_EQ(0, test_server_->counter("cluster.cluster_1.health_check.failure")->value());
+  codec_client_->close();
 }
 
 class ExternalHealthCheckIntegrationTest

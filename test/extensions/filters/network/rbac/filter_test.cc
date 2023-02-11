@@ -58,7 +58,7 @@ public:
     }
 
     config_ = std::make_shared<RoleBasedAccessControlFilterConfig>(
-        config, store_, context_, ProtobufMessage::getStrictValidationVisitor());
+        config, *store_.rootScope(), context_, ProtobufMessage::getStrictValidationVisitor());
 
     filter_ = std::make_unique<RoleBasedAccessControlFilter>(config_);
     filter_->initializeReadFilterCallbacks(callbacks_);
@@ -161,7 +161,7 @@ on_no_match:
     }
 
     config_ = std::make_shared<RoleBasedAccessControlFilterConfig>(
-        config, store_, context_, ProtobufMessage::getStrictValidationVisitor());
+        config, *store_.rootScope(), context_, ProtobufMessage::getStrictValidationVisitor());
 
     filter_ = std::make_unique<RoleBasedAccessControlFilter>(config_);
     filter_->initializeReadFilterCallbacks(callbacks_);

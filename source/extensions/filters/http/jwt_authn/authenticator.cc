@@ -163,23 +163,29 @@ void AuthenticatorImpl::startVerify() {
   curr_token_ = std::move(tokens_.back());
   tokens_.pop_back();
 
+  bool use_jwt_cache = false;
+  Status status;
   if (provider_.has_value()) {
     jwks_data_ = jwks_cache_.findByProvider(*provider_);
     jwt_ = jwks_data_->getJwtCache().lookup(curr_token_->token());
     if (jwt_ != nullptr) {
-      handleGoodJwt(/*cache_hit=*/true);
-      return;
+      jwks_cache_.stats().jwt_cache_hit_.inc();
+      use_jwt_cache = true;
+    } else {
+      jwks_cache_.stats().jwt_cache_miss_.inc();
     }
   }
 
-  ENVOY_LOG(debug, "{}: Parse Jwt {}", name(), curr_token_->token());
-  owned_jwt_ = std::make_unique<::google::jwt_verify::Jwt>();
-  Status status = owned_jwt_->parseFromString(curr_token_->token());
-  jwt_ = owned_jwt_.get();
+  if (!use_jwt_cache) {
+    ENVOY_LOG(debug, "{}: Parse Jwt {}", name(), curr_token_->token());
+    owned_jwt_ = std::make_unique<::google::jwt_verify::Jwt>();
+    status = owned_jwt_->parseFromString(curr_token_->token());
+    jwt_ = owned_jwt_.get();
 
-  if (status != Status::Ok) {
-    doneWithStatus(status);
-    return;
+    if (status != Status::Ok) {
+      doneWithStatus(status);
+      return;
+    }
   }
 
   ENVOY_LOG(debug, "{}: Verifying JWT token of issuer {}", name(), jwt_->iss_);
@@ -221,6 +227,11 @@ void AuthenticatorImpl::startVerify() {
                                           : jwks_data_->areAudiencesAllowed(jwt_->audiences_);
   if (!is_allowed) {
     doneWithStatus(Status::JwtAudienceNotAllowed);
+    return;
+  }
+
+  if (use_jwt_cache) {
+    handleGoodJwt(/*cache_hit=*/true);
     return;
   }
 

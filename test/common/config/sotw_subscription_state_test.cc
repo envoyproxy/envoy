@@ -100,8 +100,8 @@ protected:
     xds_resources_delegate_ = std::make_unique<TestXdsResourcesDelegate>();
     state_ = std::make_unique<XdsMux::SotwSubscriptionState>(
         Config::getTypeUrl<envoy::config::endpoint::v3::ClusterLoadAssignment>(), callbacks_,
-        dispatcher_, resource_decoder_, *xds_resources_delegate_,
-        /*target_xds_authority=*/"some_random_xds_server");
+        dispatcher_, resource_decoder_, /*xds_config_tracker=*/XdsConfigTrackerOptRef(),
+        *xds_resources_delegate_, /*target_xds_authority=*/"some_random_xds_server");
     state_->updateSubscriptionInterest({"name1", "name2", "name3"}, {});
     auto cur_request = getNextDiscoveryRequestAckless();
     EXPECT_THAT(cur_request->resource_names(), UnorderedElementsAre("name1", "name2", "name3"));

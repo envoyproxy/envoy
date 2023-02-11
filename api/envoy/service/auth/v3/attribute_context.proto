@@ -74,9 +74,10 @@ message AttributeContext {
     // ``URI Subject Alternative Names``, ``DNS Subject Alternate Names`` or ``Subject`` in that order.
     // The primary identity should be the principal. The principal format is issuer specific.
     //
-    // Example:
-    // *    SPIFFE format is ``spiffe://trust-domain/path``
-    // *    Google account format is ``https://accounts.google.com/{userid}``
+    // Examples:
+    //
+    // - SPIFFE format is ``spiffe://trust-domain/path``.
+    // - Google account format is ``https://accounts.google.com/{userid}``.
     string principal = 4;
 
     // The X.509 certificate used to authenticate the identify of this peer.
@@ -121,7 +122,7 @@ message AttributeContext {
     // the URL path and query-string. No decoding is performed.
     string path = 4;
 
-    // The HTTP request ``Host`` or '`Authority`` header value.
+    // The HTTP request ``Host`` or ``:authority`` header value.
     string host = 5;
 
     // The HTTP URL scheme, such as ``http`` and ``https``.

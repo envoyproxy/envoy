@@ -12,12 +12,13 @@
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.validate.h"
 #include "envoy/filter/config_provider_manager.h"
+#include "envoy/http/early_header_mutation.h"
 #include "envoy/http/filter.h"
 #include "envoy/http/header_validator.h"
 #include "envoy/http/original_ip_detection.h"
 #include "envoy/http/request_id_extension.h"
 #include "envoy/router/route_config_provider_manager.h"
-#include "envoy/tracing/http_tracer_manager.h"
+#include "envoy/tracing/tracer_manager.h"
 
 #include "source/common/common/logger.h"
 #include "source/common/filter/config_discovery_impl.h"
@@ -130,7 +131,7 @@ public:
       Server::Configuration::FactoryContext& context, Http::DateProvider& date_provider,
       Router::RouteConfigProviderManager& route_config_provider_manager,
       Config::ConfigProviderManager& scoped_routes_config_provider_manager,
-      Tracing::HttpTracerManager& http_tracer_manager,
+      Tracing::TracerManager& tracer_manager,
       FilterConfigProviderManager& filter_config_provider_manager);
 
   // Http::FilterChainFactory
@@ -230,15 +231,24 @@ public:
   originalIpDetectionExtensions() const override {
     return original_ip_detection_extensions_;
   }
+  const std::vector<Http::EarlyHeaderMutationPtr>& earlyHeaderMutationExtensions() const override {
+    return early_header_mutation_extensions_;
+  }
+
   uint64_t maxRequestsPerConnection() const override { return max_requests_per_connection_; }
   const HttpConnectionManagerProto::ProxyStatusConfig* proxyStatusConfig() const override {
     return proxy_status_config_.get();
   }
-  Http::HeaderValidatorPtr makeHeaderValidator(Http::Protocol protocol,
-                                               StreamInfo::StreamInfo& stream_info) override {
-    return header_validator_factory_ ? header_validator_factory_->create(protocol, stream_info)
-                                     : nullptr;
+  Http::HeaderValidatorPtr makeHeaderValidator([[maybe_unused]] Http::Protocol protocol) override {
+#ifdef ENVOY_ENABLE_UHV
+    return header_validator_factory_
+               ? header_validator_factory_->create(protocol, getHeaderValidatorStats(protocol))
+               : nullptr;
+#else
+    return nullptr;
+#endif
   }
+  bool appendXForwardedPort() const override { return append_x_forwarded_port_; }
 
 private:
   enum class CodecType { HTTP1, HTTP2, HTTP3, AUTO };
@@ -250,6 +260,8 @@ private:
                              bool last_filter_in_current_config);
   void createFilterChainForFactories(Http::FilterChainManager& manager,
                                      const FilterFactoriesList& filter_factories);
+
+  ::Envoy::Http::HeaderValidatorStats& getHeaderValidatorStats(Http::Protocol protocol);
 
   /**
    * Determines what tracing provider to use for a given
@@ -288,7 +300,7 @@ private:
       HttpConnectionManagerProto::OVERWRITE};
   std::string server_name_;
   absl::optional<std::string> scheme_to_set_;
-  Tracing::HttpTracerSharedPtr http_tracer_{std::make_shared<Tracing::HttpNullTracer>()};
+  Tracing::HttpTracerSharedPtr http_tracer_{std::make_shared<Tracing::NullTracer>()};
   Http::TracingConnectionManagerConfigPtr tracing_config_;
   absl::optional<std::string> user_agent_;
   const uint32_t max_request_headers_kb_;
@@ -317,6 +329,7 @@ private:
       headers_with_underscores_action_;
   const LocalReply::LocalReplyPtr local_reply_;
   std::vector<Http::OriginalIPDetectionSharedPtr> original_ip_detection_extensions_{};
+  std::vector<Http::EarlyHeaderMutationPtr> early_header_mutation_extensions_{};
 
   // Default idle timeout is 5 minutes if nothing is specified in the HCM config.
   static const uint64_t StreamIdleTimeoutMs = 5 * 60 * 1000;
@@ -330,6 +343,7 @@ private:
   const uint64_t max_requests_per_connection_;
   const std::unique_ptr<HttpConnectionManagerProto::ProxyStatusConfig> proxy_status_config_;
   const Http::HeaderValidatorFactoryPtr header_validator_factory_;
+  const bool append_x_forwarded_port_;
 };
 
 /**
@@ -353,7 +367,7 @@ public:
     std::shared_ptr<Http::TlsCachingDateProviderImpl> date_provider_;
     Router::RouteConfigProviderManagerSharedPtr route_config_provider_manager_;
     Router::ScopedRoutesConfigProviderManagerSharedPtr scoped_routes_config_provider_manager_;
-    Tracing::HttpTracerManagerSharedPtr http_tracer_manager_;
+    Tracing::TracerManagerSharedPtr tracer_manager_;
     std::shared_ptr<FilterConfigProviderManager> filter_config_provider_manager_;
   };
 
@@ -381,7 +395,7 @@ public:
       Server::Configuration::FactoryContext& context, Http::DateProvider& date_provider,
       Router::RouteConfigProviderManager& route_config_provider_manager,
       Config::ConfigProviderManager& scoped_routes_config_provider_manager,
-      Tracing::HttpTracerManager& http_tracer_manager,
+      Tracing::TracerManager& tracer_manager,
       FilterConfigProviderManager& filter_config_provider_manager);
 };
 

@@ -33,6 +33,9 @@ public:
   // The method of the upstream HTTP request. True if using POST method, CONNECT otherwise.
   virtual bool usePost() const PURE;
 
+  // The path used for POST method.
+  virtual const std::string& postPath() const PURE;
+
   // The evaluator to add additional HTTP request headers to the upstream request.
   virtual Envoy::Http::HeaderEvaluator& headerEvaluator() const PURE;
 
@@ -40,6 +43,11 @@ public:
   virtual void
   propagateResponseHeaders(Http::ResponseHeaderMapPtr&& headers,
                            const StreamInfo::FilterStateSharedPtr& filter_state) const PURE;
+
+  // Save HTTP response trailers to the downstream filter state.
+  virtual void
+  propagateResponseTrailers(Http::ResponseTrailerMapPtr&& trailers,
+                            const StreamInfo::FilterStateSharedPtr& filter_state) const PURE;
 };
 
 using TunnelingConfigHelperOptConstRef = OptRef<const TunnelingConfigHelper>;

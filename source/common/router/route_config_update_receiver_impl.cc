@@ -21,8 +21,8 @@ namespace {
 // Resets 'route_config::virtual_hosts' by merging VirtualHost contained in
 // 'rds_vhosts' and 'vhds_vhosts'.
 void rebuildRouteConfigVirtualHosts(
-    const std::map<std::string, envoy::config::route::v3::VirtualHost>& rds_vhosts,
-    const std::map<std::string, envoy::config::route::v3::VirtualHost>& vhds_vhosts,
+    const RouteConfigUpdateReceiverImpl::VirtualHostMap& rds_vhosts,
+    const RouteConfigUpdateReceiverImpl::VirtualHostMap& vhds_vhosts,
     envoy::config::route::v3::RouteConfiguration& route_config) {
   route_config.clear_virtual_hosts();
   for (const auto& vhost : rds_vhosts) {
@@ -59,14 +59,24 @@ bool RouteConfigUpdateReceiverImpl::onRdsUpdate(const Protobuf::Message& rc,
   new_route_config->CopyFrom(rc);
   const uint64_t new_vhds_config_hash =
       new_route_config->has_vhds() ? MessageUtil::hash(new_route_config->vhds()) : 0ul;
-  std::map<std::string, envoy::config::route::v3::VirtualHost> rds_virtual_hosts;
-  for (const auto& vhost : new_route_config->virtual_hosts()) {
-    rds_virtual_hosts.emplace(vhost.name(), vhost);
+  if (new_route_config->has_vhds()) {
+    // When using VHDS, stash away RDS vhosts, so that they can be merged with VHDS vhosts in
+    // onVhdsUpdate.
+    if (rds_virtual_hosts_ == nullptr) {
+      rds_virtual_hosts_ = std::make_unique<VirtualHostMap>();
+    } else {
+      rds_virtual_hosts_->clear();
+    }
+    for (const auto& vhost : new_route_config->virtual_hosts()) {
+      rds_virtual_hosts_->emplace(vhost.name(), vhost);
+    }
+    if (vhds_virtual_hosts_ != nullptr && !vhds_virtual_hosts_->empty()) {
+      // If there are vhosts supplied by VHDS, merge them with RDS vhosts.
+      rebuildRouteConfigVirtualHosts(*rds_virtual_hosts_, *vhds_virtual_hosts_, *new_route_config);
+    }
   }
-  rebuildRouteConfigVirtualHosts(rds_virtual_hosts, *vhds_virtual_hosts_, *new_route_config);
   base_.updateConfig(std::move(new_route_config));
   base_.updateHash(new_hash);
-  rds_virtual_hosts_ = std::move(rds_virtual_hosts);
   vhds_configuration_changed_ = new_vhds_config_hash != last_vhds_config_hash_;
   last_vhds_config_hash_ = new_vhds_config_hash;
 
@@ -78,17 +88,22 @@ bool RouteConfigUpdateReceiverImpl::onVhdsUpdate(
     const VirtualHostRefVector& added_vhosts, const std::set<std::string>& added_resource_ids,
     const Protobuf::RepeatedPtrField<std::string>& removed_resources,
     const std::string& version_info) {
-
-  auto vhosts_after_this_update =
-      std::make_unique<std::map<std::string, envoy::config::route::v3::VirtualHost>>(
-          *vhds_virtual_hosts_);
+  std::unique_ptr<VirtualHostMap> vhosts_after_this_update;
+  if (vhds_virtual_hosts_ != nullptr) {
+    vhosts_after_this_update = std::make_unique<VirtualHostMap>(*vhds_virtual_hosts_);
+  } else {
+    vhosts_after_this_update = std::make_unique<VirtualHostMap>();
+  }
+  if (rds_virtual_hosts_ == nullptr) {
+    rds_virtual_hosts_ = std::make_unique<VirtualHostMap>();
+  }
   const bool removed = removeVhosts(*vhosts_after_this_update, removed_resources);
   const bool updated = updateVhosts(*vhosts_after_this_update, added_vhosts);
 
   auto route_config_after_this_update =
       std::make_unique<envoy::config::route::v3::RouteConfiguration>();
   route_config_after_this_update->CopyFrom(base_.protobufConfiguration());
-  rebuildRouteConfigVirtualHosts(rds_virtual_hosts_, *vhosts_after_this_update,
+  rebuildRouteConfigVirtualHosts(*rds_virtual_hosts_, *vhosts_after_this_update,
                                  *route_config_after_this_update);
 
   base_.updateConfig(std::move(route_config_after_this_update));
@@ -101,8 +116,7 @@ bool RouteConfigUpdateReceiverImpl::onVhdsUpdate(
 }
 
 bool RouteConfigUpdateReceiverImpl::removeVhosts(
-    std::map<std::string, envoy::config::route::v3::VirtualHost>& vhosts,
-    const Protobuf::RepeatedPtrField<std::string>& removed_vhost_names) {
+    VirtualHostMap& vhosts, const Protobuf::RepeatedPtrField<std::string>& removed_vhost_names) {
   bool vhosts_removed = false;
   for (const auto& vhost_name : removed_vhost_names) {
     auto found = vhosts.find(vhost_name);
@@ -114,9 +128,8 @@ bool RouteConfigUpdateReceiverImpl::removeVhosts(
   return vhosts_removed;
 }
 
-bool RouteConfigUpdateReceiverImpl::updateVhosts(
-    std::map<std::string, envoy::config::route::v3::VirtualHost>& vhosts,
-    const VirtualHostRefVector& added_vhosts) {
+bool RouteConfigUpdateReceiverImpl::updateVhosts(VirtualHostMap& vhosts,
+                                                 const VirtualHostRefVector& added_vhosts) {
   bool vhosts_added = false;
   for (const auto& vhost : added_vhosts) {
     auto found = vhosts.find(vhost.get().name());

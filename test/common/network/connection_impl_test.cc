@@ -2880,6 +2880,19 @@ TEST_F(PostCloseConnectionImplTest, NoReadAfterCloseFlushWriteWriteData) {
   file_ready_cb_(Event::FileReadyType::Read);
 }
 
+// Test that close(ConnectionCloseType::Abort) won't write and flush pending data.
+TEST_F(PostCloseConnectionImplTest, CloseAbort) {
+  InSequence s;
+  initialize();
+  writeSomeData();
+
+  // Connection abort. We have data written above in writeSomeData(),
+  // it won't be written and flushed due to ``ConnectionCloseType::Abort``.
+  EXPECT_CALL(*transport_socket_, doWrite(_, true)).Times(0);
+  EXPECT_CALL(*transport_socket_, closeSocket(_));
+  connection_->close(ConnectionCloseType::Abort);
+}
+
 class ReadBufferLimitTest : public ConnectionImplTest {
 public:
   void readBufferLimitTest(uint32_t read_buffer_limit, uint32_t expected_chunk_size) {

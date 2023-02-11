@@ -106,6 +106,19 @@ enum class FilterHeadersStatus {
 };
 
 /**
+ * Return codes for encode on informative headers filter invocations.
+ */
+enum class Filter1xxHeadersStatus {
+  // Continue filter chain iteration.
+  Continue,
+  // Do not iterate for informative headers on any of the remaining filters in the chain.
+  //
+  // Returning FilterDataStatus::Continue from encodeData() or calling
+  // continueEncoding() MUST be called if continued filter iteration is desired.
+  StopIteration
+};
+
+/**
  * Return codes for encode/decode data filter invocations. The connection manager bases further
  * filter invocations on the return code of the previous filter.
  */
@@ -416,11 +429,33 @@ public:
   virtual OptRef<DownstreamStreamFilterCallbacks> downstreamCallbacks() PURE;
 };
 
+class DecoderFilterWatermarkCallbacks {
+public:
+  virtual ~DecoderFilterWatermarkCallbacks() = default;
+
+  /**
+   * Called when the buffer for a decoder filter or any buffers the filter sends data to go over
+   * their high watermark.
+   *
+   * In the case of a filter such as the router filter, which spills into multiple buffers (codec,
+   * connection etc.) this may be called multiple times. Any such filter is responsible for calling
+   * the low watermark callbacks an equal number of times as the respective buffers are drained.
+   */
+  virtual void onDecoderFilterAboveWriteBufferHighWatermark() PURE;
+
+  /**
+   * Called when a decoder filter or any buffers the filter sends data to go from over its high
+   * watermark to under its low watermark.
+   */
+  virtual void onDecoderFilterBelowWriteBufferLowWatermark() PURE;
+};
 /**
- * Stream decoder filter callbacks add additional callbacks that allow a decoding filter to restart
- * decoding if they decide to hold data (e.g. for buffering or rate limiting).
+ * Stream decoder filter callbacks add additional callbacks that allow a
+ * decoding filter to restart decoding if they decide to hold data (e.g. for
+ * buffering or rate limiting).
  */
-class StreamDecoderFilterCallbacks : public virtual StreamFilterCallbacks {
+class StreamDecoderFilterCallbacks : public virtual StreamFilterCallbacks,
+                                     public virtual DecoderFilterWatermarkCallbacks {
 public:
   /**
    * Continue iterating through the filter chain with buffered headers and body data. This routine
@@ -614,22 +649,6 @@ public:
   virtual void encodeMetadata(MetadataMapPtr&& metadata_map) PURE;
 
   /**
-   * Called when the buffer for a decoder filter or any buffers the filter sends data to go over
-   * their high watermark.
-   *
-   * In the case of a filter such as the router filter, which spills into multiple buffers (codec,
-   * connection etc.) this may be called multiple times. Any such filter is responsible for calling
-   * the low watermark callbacks an equal number of times as the respective buffers are drained.
-   */
-  virtual void onDecoderFilterAboveWriteBufferHighWatermark() PURE;
-
-  /**
-   * Called when a decoder filter or any buffers the filter sends data to go from over its high
-   * watermark to under its low watermark.
-   */
-  virtual void onDecoderFilterBelowWriteBufferLowWatermark() PURE;
-
-  /**
    * This routine can be called by a filter to subscribe to watermark events on the downstream
    * stream and downstream connection.
    *
@@ -648,6 +667,12 @@ public:
 
   /**
    * This routine may be called to change the buffer limit for decoder filters.
+   *
+   * It is recommended (but not required) that filters calling this function should
+   * generally only perform increases to the buffer limit, to avoid potentially
+   * conflicting with the buffer requirements of other filters in the chain, i.e.
+   *
+   * if (desired_limit > decoderBufferLimit()) {setDecoderBufferLimit(desired_limit);}
    *
    * @param limit supplies the desired buffer limit.
    */
@@ -984,6 +1009,12 @@ public:
   /**
    * This routine may be called to change the buffer limit for encoder filters.
    *
+   * It is recommended (but not required) that filters calling this function should
+   * generally only perform increases to the buffer limit, to avoid potentially
+   * conflicting with the buffer requirements of other filters in the chain, i.e.
+   *
+   * if (desired_limit > encoderBufferLimit()) {setEncoderBufferLimit(desired_limit);}
+   *
    * @param limit supplies the desired buffer limit.
    */
   virtual void setEncoderBufferLimit(uint32_t limit) PURE;
@@ -1013,10 +1044,10 @@ public:
    * This will only be invoked once per request.
    *
    * @param headers supplies the 1xx response headers to be encoded.
-   * @return FilterHeadersStatus determines how filter chain iteration proceeds.
+   * @return Filter1xxHeadersStatus determines how filter chain iteration proceeds.
    *
    */
-  virtual FilterHeadersStatus encode1xxHeaders(ResponseHeaderMap& headers) PURE;
+  virtual Filter1xxHeadersStatus encode1xxHeaders(ResponseHeaderMap& headers) PURE;
 
   /**
    * Called with headers to be encoded, optionally indicating end of stream.

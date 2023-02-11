@@ -16,8 +16,10 @@ HTTP filters
   cdn_loop_filter
   compressor_filter
   composite_filter
+  connect_grpc_bridge_filter
   cors_filter
   csrf_filter
+  custom_response_filter
   decompressor_filter
   dynamic_forward_proxy_filter
   dynamodb_filter
@@ -26,6 +28,7 @@ HTTP filters
   fault_filter
   file_system_buffer_filter
   gcp_authn_filter
+  golang_filter
   grpc_http1_bridge_filter
   grpc_http1_reverse_bridge_filter
   grpc_json_transcoder_filter
@@ -43,6 +46,7 @@ HTTP filters
   on_demand_updates_filter
   original_src_filter
   rate_limit_filter
+  rate_limit_quota_filter
   rbac_filter
   router_filter
   set_metadata_filter

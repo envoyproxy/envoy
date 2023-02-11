@@ -190,6 +190,7 @@ function run_ci_verify () {
   sudo apt-get update -y
   sudo apt-get install -y -qq --no-install-recommends expect redis-tools
   export DOCKER_NO_PULL=1
+  export DOCKER_RMI_CLEANUP=1
   umask 027
   chmod -R o-rwx examples/
   "${ENVOY_SRCDIR}"/ci/verify_examples.sh "${@}" || exit
@@ -210,7 +211,7 @@ else
   elif [[ "${CI_TARGET}" == "bazel.msan" ]]; then
     COVERAGE_TEST_TARGETS=("${COVERAGE_TEST_TARGETS[@]}" "-//test/extensions/...")
   fi
-  TEST_TARGETS=("${COVERAGE_TEST_TARGETS[@]}" "@com_github_google_quiche//:ci_tests" "//mobile/test/...")
+  TEST_TARGETS=("${COVERAGE_TEST_TARGETS[@]}" "@com_github_google_quiche//:ci_tests")
 fi
 
 if [[ "$CI_TARGET" == "bazel.release" ]]; then
@@ -411,8 +412,8 @@ elif [[ "$CI_TARGET" == "bazel.compile_time_options" ]]; then
   # "--define log_fast_debug_assert_in_release=enabled" must be tested with a release build, so run only these tests under "-c opt" to save time in CI. This option will test only ASSERT()s without SLOW_ASSERT()s, so additionally disable "--define log_debug_assert_in_release" which compiles in both.
     bazel_with_collection test "${BAZEL_BUILD_OPTIONS[@]}" --define wasm=wavm "${COMPILE_TIME_OPTIONS[@]}" -c opt @envoy//test/common/common:assert_test --define log_fast_debug_assert_in_release=enabled --define log_debug_assert_in_release=disabled
 
-  echo "Building binary with wasm=wavm..."
-  bazel build "${BAZEL_BUILD_OPTIONS[@]}" --define wasm=wavm "${COMPILE_TIME_OPTIONS[@]}" -c dbg @envoy//source/exe:envoy-static --build_tag_filters=-nofips
+  echo "Building binary with wasm=wavm... and logging disabled"
+  bazel build "${BAZEL_BUILD_OPTIONS[@]}" --define wasm=wavm --define enable_logging=disabled "${COMPILE_TIME_OPTIONS[@]}" -c dbg @envoy//source/exe:envoy-static --build_tag_filters=-nofips
   collect_build_profile build
   exit 0
 elif [[ "$CI_TARGET" == "bazel.api" ]]; then
@@ -527,7 +528,19 @@ elif [[ "$CI_TARGET" == "verify_distro" ]]; then
     bazel run "${BAZEL_BUILD_OPTIONS[@]}" //distribution:verify_packages "$PACKAGE_BUILD"
     exit 0
 elif [[ "$CI_TARGET" == "publish" ]]; then
-    bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/project:publish
+    # If we are on a non-main release branch but the patch version is 0 - then this branch
+    # has just been created, and the tag/release was cut from `main` - there is no need to
+    # create the tag/release from here
+    version="$(cat VERSION.txt)"
+    patch_version="$(echo "$version" | rev | cut -d. -f1)"
+    if [[ "$AZP_BRANCH" != "main" && "$patch_version" -eq 0 ]]; then
+        echo "Not creating a tag/release for ${version}"
+        exit 0
+    fi
+    # It can take some time to get here in CI so the branch may have changed - create the release
+    # from the current commit (as this only happens on non-PRs we are safe from merges)
+    BUILD_SHA="$(git rev-parse HEAD)"
+    bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/project:publish -- --publish-commitish="$BUILD_SHA"
     exit 0
 else
   echo "Invalid do_ci.sh target, see ci/README.md for valid targets."

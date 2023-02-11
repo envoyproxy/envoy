@@ -4,8 +4,8 @@
 
 #include "source/extensions/filters/http/common/factory_base.h"
 
-#include "mobile/library/common/extensions/filters/http/assertion/filter.pb.h"
-#include "mobile/library/common/extensions/filters/http/assertion/filter.pb.validate.h"
+#include "library/common/extensions/filters/http/assertion/filter.pb.h"
+#include "library/common/extensions/filters/http/assertion/filter.pb.validate.h"
 
 namespace Envoy {
 namespace Extensions {

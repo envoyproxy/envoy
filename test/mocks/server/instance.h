@@ -180,7 +180,7 @@ public:
   testing::NiceMock<MockDrainManager> drain_manager_;
   testing::NiceMock<LocalInfo::MockLocalInfo> local_info_;
   testing::NiceMock<Envoy::Runtime::MockLoader> runtime_loader_;
-  testing::NiceMock<Stats::MockIsolatedStatsStore> scope_;
+  testing::NiceMock<Stats::MockIsolatedStatsStore> store_;
   testing::NiceMock<ThreadLocal::MockInstance> thread_local_;
   testing::NiceMock<ProtobufMessage::MockValidationContext> validation_context_;
   testing::NiceMock<MockStatsConfig> stats_config_;

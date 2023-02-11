@@ -13,8 +13,9 @@ namespace XdsMux {
 
 DeltaSubscriptionState::DeltaSubscriptionState(std::string type_url,
                                                UntypedConfigUpdateCallbacks& watch_map,
-                                               Event::Dispatcher& dispatcher)
-    : BaseSubscriptionState(std::move(type_url), watch_map, dispatcher),
+                                               Event::Dispatcher& dispatcher,
+                                               XdsConfigTrackerOptRef xds_config_tracker)
+    : BaseSubscriptionState(std::move(type_url), watch_map, dispatcher, xds_config_tracker),
       // TODO(snowp): Hard coding VHDS here is temporary until we can move it away from relying on
       // empty resources as updates.
       supports_heartbeats_(type_url_ != "envoy.config.route.v3.VirtualHost") {}
@@ -139,7 +140,7 @@ bool DeltaSubscriptionState::isHeartbeatResource(
   }
 
   if (const auto itr = ambiguous_resource_state_.find(resource.name());
-      itr != wildcard_resource_state_.end()) {
+      itr != ambiguous_resource_state_.end()) {
     // In theory we should move the ambiguous resource to wildcard, because probably we shouldn't be
     // getting heartbeat responses about resources that we are not interested in, but the server
     // could have sent this heartbeat before it learned about our lack of interest in the resource.
@@ -203,6 +204,12 @@ void DeltaSubscriptionState::handleGoodResponse(
 
   callbacks().onConfigUpdate(non_heartbeat_resources, message.removed_resources(),
                              message.system_version_info());
+
+  // Processing point when resources are successfully ingested.
+  if (xds_config_tracker_.has_value()) {
+    xds_config_tracker_->onConfigAccepted(message.type_url(), non_heartbeat_resources,
+                                          message.removed_resources());
+  }
 
   if (Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.delta_xds_subscription_state_tracking_fix")) {

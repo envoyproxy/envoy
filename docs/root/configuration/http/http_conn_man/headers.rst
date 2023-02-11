@@ -397,6 +397,21 @@ is used and appends its original value to ``x-forwarded-host`` if
 :ref:`append_x_forwarded_host <envoy_v3_api_field_config.route.v3.RouteAction.append_x_forwarded_host>`
 is set.
 
+.. _config_http_conn_man_headers_x-forwarded-port:
+
+x-forwarded-port
+----------------
+
+Usually, the ``x-forwarded-port`` header comes with the ``x-forwarded-proto`` header for service to
+know the originating destination port of the connection, which is the listener port in Envoy's side.
+
+Envoy will append the ``x-forwarded-port`` header if :ref:`append_x_forwarded_port
+<envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.append_x_forwarded_port>`
+is set to true and the header has not been set.
+
+Downstream ``x-forwarded-port`` headers will only be trusted if ``xff_num_trusted_hops`` is non-zero.
+If ``xff_num_trusted_hops`` is zero, downstream ``x-forwarded-port`` headers will be overwritten.
+
 .. _config_http_conn_man_headers_x-forwarded-proto:
 
 x-forwarded-proto

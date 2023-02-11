@@ -17,7 +17,6 @@ option java_package = "io.envoyproxy.envoy.service.ratelimit.v3";
 option java_outer_classname = "RlsProto";
 option java_multiple_files = true;
 option go_package = "github.com/envoyproxy/go-control-plane/envoy/service/ratelimit/v3;ratelimitv3";
-option java_generic_services = true;
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: Rate limit service (RLS)]
@@ -92,6 +91,12 @@ message RateLimitResponse {
 
       // The time unit representing a day.
       DAY = 4;
+
+      // The time unit representing a month.
+      MONTH = 5;
+
+      // The time unit representing a year.
+      YEAR = 6;
     }
 
     // A name or description of this limit.

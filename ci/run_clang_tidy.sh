@@ -78,7 +78,7 @@ function exclude_wasm_examples() {
 
 # Exclude envoy mobile.
 function exclude_envoy_mobile() {
-  grep -v mobile/library | grep -v mobile/test
+  grep -v mobile/
 }
 
 function filter_excludes() {

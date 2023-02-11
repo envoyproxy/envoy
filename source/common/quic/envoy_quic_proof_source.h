@@ -2,8 +2,7 @@
 
 #include "source/common/quic/envoy_quic_proof_source_base.h"
 #include "source/common/quic/quic_transport_socket_factory.h"
-#include "source/server/active_listener_base.h"
-#include "source/server/connection_handler_impl.h"
+#include "source/server/listener_stats.h"
 
 namespace Envoy {
 namespace Quic {

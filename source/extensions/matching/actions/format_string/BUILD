@@ -20,7 +20,6 @@ envoy_cc_extension(
         "//source/common/formatter:substitution_format_string_lib",
         "//source/common/http:header_map_lib",
         "//source/common/matcher:matcher_lib",
-        "//source/server:filter_chain_manager_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )

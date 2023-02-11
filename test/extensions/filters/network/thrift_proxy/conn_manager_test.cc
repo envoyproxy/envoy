@@ -88,7 +88,8 @@ public:
 
 class ThriftConnectionManagerTest : public testing::Test {
 public:
-  ThriftConnectionManagerTest() : stats_(ThriftFilterStats::generateStats("test.", store_)) {
+  ThriftConnectionManagerTest()
+      : stats_(ThriftFilterStats::generateStats("test.", *store_.rootScope())) {
     route_config_provider_manager_ =
         std::make_unique<Router::RouteConfigProviderManagerImpl>(context_.admin_);
     ON_CALL(*context_.access_log_manager_.file_, write(_))
@@ -98,12 +99,13 @@ public:
     filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();
   }
 
-  void initializeFilterWithCustomFilters() {
+  void initializeFilterWithCustomFilters(const std::string& yaml = "",
+                                         const std::vector<std::string>& cluster_names = {}) {
     auto* decoder_filter = new NiceMock<ThriftFilters::MockDecoderFilter>();
     custom_decoder_filter_.reset(decoder_filter);
     auto* encoder_filter = new NiceMock<ThriftFilters::MockEncoderFilter>();
     custom_encoder_filter_.reset(encoder_filter);
-    initializeFilter();
+    initializeFilter(yaml, cluster_names);
   }
   void initializeFilter() { initializeFilter(""); }
 
@@ -270,6 +272,10 @@ stat_prefix: test
     TransportPtr transport =
         NamedTransportConfigFactory::getFactory(transport_type).createTransport();
     transport->encodeFrame(buffer, metadata, msg);
+  }
+
+  void writeHeaderBinaryMessage(Buffer::Instance& buffer, MessageType msg_type, int32_t seq_id) {
+    writeMessage(buffer, TransportType::Header, ProtocolType::Binary, msg_type, seq_id);
   }
 
   void writeFramedBinaryMessage(Buffer::Instance& buffer, MessageType msg_type, int32_t seq_id) {
@@ -445,8 +451,6 @@ stat_prefix: test
     TestScopedRuntime scoped_runtime;
 
     if (draining) {
-      scoped_runtime.mergeValues(
-          {{"envoy.reloadable_features.thrift_connection_draining", "true"}});
       EXPECT_CALL(drain_decision_, drainClose()).WillOnce(Return(true));
     }
 
@@ -1049,6 +1053,67 @@ route_config:
   filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();
 
   EXPECT_EQ(access_log_data_, "");
+}
+
+TEST_F(ThriftConnectionManagerTest, ClearRouteCache) {
+  // Use HEADER transport to determine the route by `cluster_header`.
+  const std::string yaml = R"EOF(
+transport: HEADER
+protocol: BINARY
+stat_prefix: test
+route_config:
+  name: "routes"
+  routes:
+    - match:
+        method_name: name
+      route:
+        cluster_header: mesh-cluster
+)EOF";
+
+  initializeFilterWithCustomFilters(yaml, {"cluster", "cluster_override"});
+  writeHeaderBinaryMessage(buffer_, MessageType::Oneway, 0x0F);
+
+  Http::LowerCaseString cluster_header{"mesh-cluster"};
+
+  ThriftFilters::DecoderFilterCallbacks* custom_callbacks{};
+  EXPECT_CALL(*custom_decoder_filter_, setDecoderFilterCallbacks(_))
+      .WillOnce(Invoke(
+          [&](ThriftFilters::DecoderFilterCallbacks& cb) -> void { custom_callbacks = &cb; }));
+
+  ThriftFilters::DecoderFilterCallbacks* callbacks{};
+  EXPECT_CALL(*decoder_filter_, setDecoderFilterCallbacks(_))
+      .WillOnce(
+          Invoke([&](ThriftFilters::DecoderFilterCallbacks& cb) -> void { callbacks = &cb; }));
+
+  EXPECT_CALL(*custom_decoder_filter_, messageBegin(_))
+      .WillOnce(Invoke([&](MessageMetadataSharedPtr metadata) -> FilterStatus {
+        metadata->requestHeaders().addCopy(cluster_header, "cluster");
+
+        // Route is cached here.
+        Router::RouteConstSharedPtr route = custom_callbacks->route();
+        EXPECT_NE(nullptr, route);
+        EXPECT_NE(nullptr, route->routeEntry());
+        EXPECT_EQ("cluster", route->routeEntry()->clusterName());
+        return FilterStatus::Continue;
+      }));
+
+  EXPECT_CALL(*decoder_filter_, messageBegin(_))
+      .WillOnce(Invoke([&](MessageMetadataSharedPtr metadata) -> FilterStatus {
+        // Override the cluster.
+        metadata->requestHeaders().setCopy(cluster_header, "cluster_override");
+        // Need to clear route cache. Otherwise, we would use the cached route.
+        callbacks->clearRouteCache();
+        return FilterStatus::Continue;
+      }));
+
+  EXPECT_EQ(filter_->onData(buffer_, false), Network::FilterStatus::StopIteration);
+
+  Router::RouteConstSharedPtr route = callbacks->route();
+  EXPECT_NE(nullptr, route);
+  EXPECT_NE(nullptr, route->routeEntry());
+  // The cluster is overridden.
+  EXPECT_EQ("cluster_override", route->routeEntry()->clusterName());
+  filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();
 }
 
 TEST_F(ThriftConnectionManagerTest, RequestAndResponse) { testRequestResponse(false); }
@@ -2084,7 +2149,6 @@ TEST_F(ThriftConnectionManagerTest, EncoderFiltersModifyRequests) {
 
 TEST_F(ThriftConnectionManagerTest, TransportEndWhenRemoteClose) {
   TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.thrift_connection_draining", "true"}});
 
   // We want the Drain header to be set by RemoteClose which triggers end downstream in local reply.
   EXPECT_CALL(drain_decision_, drainClose()).WillOnce(Return(false));

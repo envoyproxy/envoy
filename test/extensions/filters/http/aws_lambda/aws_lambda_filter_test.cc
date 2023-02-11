@@ -55,7 +55,7 @@ public:
   envoy::config::core::v3::Metadata metadata_;
   Arn arn_;
   Stats::IsolatedStoreImpl stats_store_;
-  FilterStats stats_ = generateStats("test", stats_store_);
+  FilterStats stats_ = generateStats("test", *stats_store_.rootScope());
   const std::string metadata_yaml_ = "egress_gateway: true";
 };
 
@@ -74,7 +74,7 @@ TEST_F(AwsLambdaFilterTest, DecodingHeaderStopIteration) {
  */
 TEST_F(AwsLambdaFilterTest, HeaderOnlyShouldContinue) {
   setupFilter({arn_, InvocationMode::Synchronous, true /*passthrough*/});
-  EXPECT_CALL(*signer_, signEmptyPayload(An<Http::RequestHeaderMap&>()));
+  EXPECT_CALL(*signer_, signEmptyPayload(An<Http::RequestHeaderMap&>(), An<absl::string_view>()));
   Http::TestRequestHeaderMapImpl input_headers;
   const auto result = filter_->decodeHeaders(input_headers, true /*end_stream*/);
   EXPECT_EQ("/2015-03-31/functions/arn:aws:lambda:us-west-2:1337:function:fun/invocations",
@@ -132,15 +132,37 @@ TEST_F(AwsLambdaFilterTest, PerRouteConfigCorrectClusterMetadata) {
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, result);
 }
 
+/**
+ * If there's a per route config which has lambda function arn from different region
+ * then the SigV4 signer will sign with the region where the lambda function is present.
+ */
+TEST_F(AwsLambdaFilterTest, PerRouteConfigCorrectRegionForSigning) {
+  setupFilter({arn_, InvocationMode::Synchronous, false /*passthrough*/});
+  const absl::string_view override_region = "us-west-1";
+  const auto per_route_arn =
+      parseArn(fmt::format("arn:aws:lambda:{}:1337:function:fun", override_region)).value();
+  FilterSettings route_settings{per_route_arn, InvocationMode::Synchronous, true /*passthrough*/};
+  ON_CALL(*decoder_callbacks_.route_, mostSpecificPerFilterConfig(_))
+      .WillByDefault(Return(&route_settings));
+
+  EXPECT_CALL(*signer_, signEmptyPayload(An<Http::RequestHeaderMap&>(), override_region));
+  Http::TestRequestHeaderMapImpl headers;
+  const auto result = filter_->decodeHeaders(headers, true /*end_stream*/);
+  EXPECT_EQ(fmt::format("/2015-03-31/functions/arn:aws:lambda:{}:1337:function:fun/invocations",
+                        override_region),
+            headers.getPathValue());
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, result);
+}
+
 TEST_F(AwsLambdaFilterTest, DecodeDataRecordsPayloadSize) {
   FilterSettings settings{arn_, InvocationMode::Synchronous, true /*passthrough*/};
   NiceMock<Stats::MockStore> store;
   NiceMock<Stats::MockHistogram> histogram;
-  EXPECT_CALL(store, histogramFromString(_, _)).WillOnce(ReturnRef(histogram));
+  EXPECT_CALL(store, histogram(_, _)).WillOnce(ReturnRef(histogram));
 
   setupClusterMetadata();
 
-  FilterStats stats(generateStats("test", store));
+  FilterStats stats(generateStats("test", *store.rootScope()));
   signer_ = std::make_shared<NiceMock<MockSigner>>();
   filter_ = std::make_unique<Filter>(settings, stats, signer_);
   filter_->setDecoderFilterCallbacks(decoder_callbacks_);
@@ -179,10 +201,39 @@ TEST_F(AwsLambdaFilterTest, DecodeDataShouldSign) {
   InSequence seq;
   EXPECT_CALL(decoder_callbacks_, addDecodedData(_, false));
   EXPECT_CALL(decoder_callbacks_, decodingBuffer).WillOnce(Return(&buffer));
-  EXPECT_CALL(*signer_, sign(An<Http::RequestHeaderMap&>(), An<const std::string&>()));
+  EXPECT_CALL(*signer_, sign(An<Http::RequestHeaderMap&>(), An<const std::string&>(),
+                             An<absl::string_view>()));
 
   const auto data_result = filter_->decodeData(buffer, true /*end_stream*/);
   EXPECT_EQ("/2015-03-31/functions/arn:aws:lambda:us-west-2:1337:function:fun/invocations",
+            headers.getPathValue());
+  EXPECT_EQ(Http::FilterDataStatus::Continue, data_result);
+}
+
+TEST_F(AwsLambdaFilterTest, DecodeDataSigningWithPerRouteConfig) {
+  setupFilter({arn_, InvocationMode::Synchronous, false /*passthrough*/});
+
+  const absl::string_view override_region = "us-west-1";
+  const auto per_route_arn =
+      parseArn(fmt::format("arn:aws:lambda:{}:1337:function:fun", override_region)).value();
+  FilterSettings route_settings{per_route_arn, InvocationMode::Synchronous, true /*passthrough*/};
+  ON_CALL(*decoder_callbacks_.route_, mostSpecificPerFilterConfig(_))
+      .WillByDefault(Return(&route_settings));
+
+  Http::TestRequestHeaderMapImpl headers;
+  const auto header_result = filter_->decodeHeaders(headers, false /*end_stream*/);
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, header_result);
+  Buffer::OwnedImpl buffer;
+
+  InSequence seq;
+  EXPECT_CALL(decoder_callbacks_, addDecodedData(_, false));
+  EXPECT_CALL(decoder_callbacks_, decodingBuffer).WillOnce(Return(&buffer));
+  EXPECT_CALL(*signer_,
+              sign(An<Http::RequestHeaderMap&>(), An<const std::string&>(), override_region));
+
+  const auto data_result = filter_->decodeData(buffer, true /*end_stream*/);
+  EXPECT_EQ(fmt::format("/2015-03-31/functions/arn:aws:lambda:{}:1337:function:fun/invocations",
+                        override_region),
             headers.getPathValue());
   EXPECT_EQ(Http::FilterDataStatus::Continue, data_result);
 }

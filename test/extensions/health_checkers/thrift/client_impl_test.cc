@@ -132,7 +132,7 @@ TEST_F(ThriftClientImplTest, Success) {
   writeMessage(success_response, NetworkFilters::ThriftProxy::MessageType::Reply);
   read_filter_->onData(success_response, false);
 
-  EXPECT_CALL(*connection_, close(_));
+  EXPECT_CALL(*connection_, close(Network::ConnectionCloseType::Abort));
   client_->close();
 }
 
@@ -154,7 +154,7 @@ TEST_F(ThriftClientImplTest, Execption) {
   writeMessage(exception_response, NetworkFilters::ThriftProxy::MessageType::Exception);
   read_filter_->onData(exception_response, false);
 
-  EXPECT_CALL(*connection_, close(_));
+  EXPECT_CALL(*connection_, close(Network::ConnectionCloseType::Abort));
   client_->close();
 }
 
@@ -176,7 +176,7 @@ TEST_F(ThriftClientImplTest, Error) {
   writeFramedBinaryIDLException(idl_exception_response);
   read_filter_->onData(idl_exception_response, false);
 
-  EXPECT_CALL(*connection_, close(_));
+  EXPECT_CALL(*connection_, close(Network::ConnectionCloseType::Abort));
   client_->close();
 }
 
@@ -226,7 +226,7 @@ TEST_F(ThriftClientImplTest, SuccessWithFixedSeqId) {
   // same sequence id
   EXPECT_EQ(request_strings[0], request_strings[1]);
 
-  EXPECT_CALL(*connection_, close(_));
+  EXPECT_CALL(*connection_, close(Network::ConnectionCloseType::Abort));
   client_->close();
 }
 
@@ -256,7 +256,7 @@ TEST_F(ThriftClientImplTest, SuccessWithIncreasingSeqId) {
   // different sequence ids
   EXPECT_NE(request_strings[0], request_strings[1]);
 
-  EXPECT_CALL(*connection_, close(_));
+  EXPECT_CALL(*connection_, close(Network::ConnectionCloseType::Abort));
   client_->close();
 }
 

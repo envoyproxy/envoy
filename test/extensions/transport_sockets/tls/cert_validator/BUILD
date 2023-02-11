@@ -73,6 +73,8 @@ envoy_cc_test(
     ],
     deps = [
         "//test/integration:http_integration_lib",
+        "//test/test_common:test_runtime_lib",
+        "//test/test_common:utility_lib",
     ],
 )
 

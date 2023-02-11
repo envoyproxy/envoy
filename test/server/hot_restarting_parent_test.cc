@@ -270,9 +270,11 @@ TEST_F(HotRestartingParentTest, RetainDynamicStats) {
   {
     Stats::StatNameDynamicPool dynamic(parent_store.symbolTable());
     parent_store.counter("c1").inc();
-    parent_store.counterFromStatName(dynamic.add("c2")).inc();
+    parent_store.rootScope()->counterFromStatName(dynamic.add("c2")).inc();
     parent_store.gauge("g1", Stats::Gauge::ImportMode::Accumulate).set(123);
-    parent_store.gaugeFromStatName(dynamic.add("g2"), Stats::Gauge::ImportMode::Accumulate).set(42);
+    parent_store.rootScope()
+        ->gaugeFromStatName(dynamic.add("g2"), Stats::Gauge::ImportMode::Accumulate)
+        .set(42);
     hot_restarting_parent_.exportStatsToChild(&stats_proto);
   }
 
@@ -281,10 +283,10 @@ TEST_F(HotRestartingParentTest, RetainDynamicStats) {
     Stats::TestUtil::TestStore child_store(child_symbol_table);
     Stats::StatNameDynamicPool dynamic(child_store.symbolTable());
     Stats::Counter& c1 = child_store.counter("c1");
-    Stats::Counter& c2 = child_store.counterFromStatName(dynamic.add("c2"));
+    Stats::Counter& c2 = child_store.rootScope()->counterFromStatName(dynamic.add("c2"));
     Stats::Gauge& g1 = child_store.gauge("g1", Stats::Gauge::ImportMode::Accumulate);
-    Stats::Gauge& g2 =
-        child_store.gaugeFromStatName(dynamic.add("g2"), Stats::Gauge::ImportMode::Accumulate);
+    Stats::Gauge& g2 = child_store.rootScope()->gaugeFromStatName(
+        dynamic.add("g2"), Stats::Gauge::ImportMode::Accumulate);
 
     HotRestartingChild hot_restarting_child(0, 0, "@envoy_domain_socket", 0);
     hot_restarting_child.mergeParentStats(child_store, stats_proto);

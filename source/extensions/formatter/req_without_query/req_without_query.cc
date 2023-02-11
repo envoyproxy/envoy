@@ -11,7 +11,7 @@ namespace Formatter {
 
 namespace {
 
-void truncate(std::string& str, absl::optional<uint32_t> max_length) {
+void truncate(std::string& str, absl::optional<size_t> max_length) {
   if (!max_length) {
     return;
   }
