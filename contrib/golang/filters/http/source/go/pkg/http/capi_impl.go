@@ -68,6 +68,8 @@ func (c *httpCApiImpl) HttpContinue(r unsafe.Pointer, status uint64) {
 	handleCApiStatus(res)
 }
 
+// Only may panic with ErrRequestFinished, ErrFilterDestroyed or ErrNotInGo,
+// won't panic with CAPIInvalidPhase and others, otherwise will cause deadloop, see RecoverPanic for the details.
 func (c *httpCApiImpl) HttpSendLocalReply(r unsafe.Pointer, response_code int, body_text string, headers map[string]string, grpc_status int64, details string) {
 	hLen := len(headers)
 	strs := make([]string, 0, hLen)

@@ -70,7 +70,7 @@ type FilterCallbacks interface {
 	// Continue or SendLocalReply should be last API invoked, no more code after them.
 	Continue(StatusType)
 	SendLocalReply(responseCode int, bodyText string, headers map[string]string, grpcStatus int64, details string)
-	// RecoverPanic recover panic in defer
+	// RecoverPanic recover panic in defer and terminate the request by SendLocalReply with 500 status code.
 	RecoverPanic()
 	// TODO add more for filter callbacks
 }
