@@ -26,8 +26,7 @@ public:
 
   SmtpFilterConfigSharedPtr config_;
   SmtpFilterConfig::SmtpFilterConfigOptions config_options_{
-      stat_prefix_,
-      envoy::extensions::filters::network::smtp_proxy::v3alpha::SmtpProxy::DISABLE};
+      stat_prefix_, envoy::extensions::filters::network::smtp_proxy::v3alpha::SmtpProxy::DISABLE};
 
   std::unique_ptr<SmtpFilter> filter_;
   Stats::IsolatedStoreImpl store_;

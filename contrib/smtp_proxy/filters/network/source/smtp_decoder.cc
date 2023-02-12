@@ -220,8 +220,8 @@ void DecoderImpl::decodeSmtpTransactionCommands(std::string& command) {
   }
   case SmtpTransaction::State::MAIL_DATA_TRANSFER_REQUEST: {
     if (absl::StartsWithIgnoreCase(command, SmtpUtils::smtpRsetCommand) ||
-               absl::StartsWithIgnoreCase(command, SmtpUtils::smtpEhloCommand) ||
-               absl::StartsWithIgnoreCase(command, SmtpUtils::smtpHeloCommand)) {
+        absl::StartsWithIgnoreCase(command, SmtpUtils::smtpEhloCommand) ||
+        absl::StartsWithIgnoreCase(command, SmtpUtils::smtpHeloCommand)) {
       session_.SetTransactionState(SmtpTransaction::State::TRANSACTION_ABORT_REQUEST);
     }
   }
