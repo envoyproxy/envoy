@@ -448,16 +448,9 @@ TEST_P(WebsocketIntegrationTest, BidirectionalChunkedDataLegacyAddTE) {
   initialize();
 
   auto request_headers = upgradeRequestHeaders();
-  request_headers.removeContentLength();
   auto response_headers = upgradeResponseHeaders();
   response_headers.removeContentLength();
   performUpgrade(request_headers, response_headers);
-
-  // With content-length not present, the HTTP codec will send the request with
-  // transfer-encoding: chunked.
-  if (upstreamProtocol() == Http::CodecType::HTTP1) {
-    ASSERT_TRUE(upstream_request_->headers().TransferEncoding() != nullptr);
-  }
 
   // Send both a chunked request body and "websocket" payload.
   std::string request_payload = "3\r\n123\r\n0\r\n\r\nSomeWebsocketRequestPayload";
@@ -504,8 +497,9 @@ TEST_P(WebsocketIntegrationTest, BidirectionalNoContentLengthNoTransferEncoding)
   std::string received_data;
   ASSERT_TRUE(fake_upstream_connection->waitForData(
       FakeRawConnection::waitForInexactMatch("\r\n\r\n"), &received_data));
-  // Make sure Envoy did not add TE or CL headers
-  ASSERT_FALSE(absl::StrContains(received_data, "content-length"));
+  // Envoy adds 'content-length: 0' header to upgrade requests
+  ASSERT_TRUE(absl::StrContains(received_data, "content-length"));
+  // Make sure Envoy did not add TE header
   ASSERT_FALSE(absl::StrContains(received_data, "transfer-encoding"));
   ASSERT_TRUE(fake_upstream_connection->write(
       "HTTP/1.1 101 Switching Protocols\r\nconnection: upgrade\r\nupgrade: websocket\r\n\r\n",
