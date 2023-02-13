@@ -12,7 +12,7 @@ CacheStats generateStats(CacheStatNames& stat_names, Stats::Scope& scope,
                          absl::string_view cache_path) {
   Stats::StatName cache_path_statname =
       stat_names.pool_.add(absl::StrReplaceAll(cache_path, {{".", "_"}}));
-  return {stat_names, scope, std::move(cache_path_statname)};
+  return {stat_names, scope, cache_path_statname};
 }
 
 } // namespace FileSystemHttpCache

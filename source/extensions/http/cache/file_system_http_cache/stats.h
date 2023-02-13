@@ -42,7 +42,7 @@ MAKE_STAT_NAMES_STRUCT(CacheStatNames, ALL_CACHE_STATS);
 
 struct CacheStats {
   CacheStats(const CacheStatNames& stat_names, Envoy::Stats::Scope& scope,
-             Stats::StatName&& cache_path)
+             Stats::StatName cache_path)
       : stat_names_(stat_names), prefix_(stat_names_.cache_), cache_path_(cache_path),
         tags_({{stat_names_.cache_path_, cache_path_}})
             ALL_CACHE_STATS(COUNTER_HELPER_, GAUGE_HELPER_, HISTOGRAM_HELPER_, TEXT_READOUT_HELPER_,
