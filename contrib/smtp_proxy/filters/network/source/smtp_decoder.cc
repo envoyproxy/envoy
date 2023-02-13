@@ -185,6 +185,8 @@ Decoder::Result DecoderImpl::parseResponse(Buffer::Instance& data) {
         // Increment stats for incomplete transactions when session is abruptly terminated.
         callbacks_->incSmtpTransactionsAborted();
       }
+    } else {
+      session_.setState(SmtpSession::State::SESSION_IN_PROGRESS);
     }
     break;
   }
@@ -235,6 +237,8 @@ void DecoderImpl::decodeSmtpTransactionResponse(uint16_t& response_code) {
   case SmtpTransaction::State::TRANSACTION_REQUEST: {
     if (response_code == 250) {
       session_.SetTransactionState(SmtpTransaction::State::TRANSACTION_IN_PROGRESS);
+    } else {
+      session_.SetTransactionState(SmtpTransaction::State::NONE);
     }
     break;
   }
@@ -262,6 +266,8 @@ void DecoderImpl::decodeSmtpTransactionResponse(uint16_t& response_code) {
     if (response_code == 250) {
       callbacks_->incSmtpTransactionsAborted();
       session_.SetTransactionState(SmtpTransaction::State::NONE);
+    } else {
+      session_.SetTransactionState(SmtpTransaction::State::TRANSACTION_IN_PROGRESS);
     }
     break;
   }
