@@ -44,6 +44,13 @@ final class ViewController: UITableViewController {
       .addKeyValueStore(name: "demo-kv-store", keyValueStore: UserDefaults.standard)
       .setEventTracker { NSLog("Envoy event emitted: \($0)") }
       .forceIPv6(true)
+      .setExperimentalValidateYAMLCallback { success in
+        if success {
+          print("YAML comparison succeeded!")
+        } else {
+          print("YAML comparison failed!")
+        }
+      }
       .build()
     self.streamClient = engine.streamClient()
     self.pulseClient = engine.pulseClient()

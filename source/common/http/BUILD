@@ -512,6 +512,7 @@ envoy_cc_library(
     hdrs = ["header_utility.h"],
     external_deps = [
         "nghttp2",
+        "quiche_http2_adapter",
     ],
     deps = [
         ":header_map_lib",
