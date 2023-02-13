@@ -1231,7 +1231,6 @@ extern "C" JNIEXPORT jstring JNICALL Java_io_envoyproxy_envoymobile_engine_JniLi
 
   setString(env, app_version, &builder, &EngineBuilder::setAppVersion);
   setString(env, app_id, &builder, &EngineBuilder::setAppId);
-  setString(env, app_id, &builder, &EngineBuilder::setAppId);
   builder.setDeviceOs("Android");
 
   builder.setStreamIdleTimeoutSeconds((stream_idle_timeout_seconds));
