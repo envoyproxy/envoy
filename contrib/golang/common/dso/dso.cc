@@ -1,4 +1,4 @@
-#include "contrib/golang/filters/http/source/common/dso/dso.h"
+#include "contrib/golang/common/dso/dso.h"
 
 #include "source/common/common/assert.h"
 

@@ -8,7 +8,7 @@
 #include "source/common/common/logger.h"
 
 #include "absl/synchronization/mutex.h"
-#include "contrib/golang/filters/http/source/common/dso/libgolang.h"
+#include "contrib/golang/common/dso/libgolang.h"
 
 namespace Envoy {
 namespace Dso {

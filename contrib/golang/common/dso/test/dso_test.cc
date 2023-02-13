@@ -5,7 +5,7 @@
 #include "test/test_common/environment.h"
 #include "test/test_common/utility.h"
 
-#include "contrib/golang/filters/http/source/common/dso/dso.h"
+#include "contrib/golang/common/dso/dso.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -14,8 +14,8 @@ namespace Dso {
 namespace {
 
 std::string genSoPath(std::string name) {
-  return TestEnvironment::substitute(
-      "{{ test_rundir }}/contrib/golang/filters/http/test/common/dso/test_data/" + name);
+  return TestEnvironment::substitute("{{ test_rundir }}/contrib/golang/common/dso/test/test_data/" +
+                                     name);
 }
 
 TEST(DsoInstanceTest, SimpleAPI) {
