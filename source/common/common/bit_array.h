@@ -22,7 +22,7 @@ namespace Envoy {
  *
  * Limitations to this class are:
  *  1) It is thread compatible.
- *  2) It assumes little-endianness and a 64-bit architecture.
+ *  2) It assumes a 64-bit architecture.
  *  3) It works with a maximum width of 32-bits
  */
 class BitArray {
