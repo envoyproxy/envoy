@@ -1288,6 +1288,12 @@ void Filter::onUpstreamReset(Http::StreamResetReason reset_reason,
 
   const bool dropped = reset_reason == Http::StreamResetReason::Overflow;
 
+  // Ignore upstream reset caused by a resource overflow.
+  // Currently, circuit breakers can only produce this reset reason.
+  // It means that this reason is cluster-wise, not upstream-related.
+  // Therefore removing an upstream in the case of an overloaded cluster
+  // would make the situation even worse.
+  // https://github.com/envoyproxy/envoy/issues/25487
   if (!dropped) {
     // TODO: The reset may also come from upstream over the wire. In this case it should be
     // treated as external origin error and distinguished from local origin error.

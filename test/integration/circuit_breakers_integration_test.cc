@@ -14,6 +14,9 @@ INSTANTIATE_TEST_SUITE_P(Protocols, CircuitBreakersIntegrationTest,
                          testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams()),
                          HttpProtocolIntegrationTest::protocolTestParamsToString);
 
+// This test checks that trigerred max requests circuit breaker
+// doesn't force outlier detectors to eject upstreams.
+// See https://github.com/envoyproxy/envoy/issues/25487
 TEST_P(CircuitBreakersIntegrationTest, CircuitBreakersWithOutlierDetection) {
   config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
     auto* static_resources = bootstrap.mutable_static_resources();
