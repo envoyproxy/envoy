@@ -542,7 +542,8 @@ typed_config:
   auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_TRUE(response->complete());
-  //      Verify we do not get a modified status value. (500 instead of 292)
+  // Verify we DO get a modified status value. (292 instead of 500) as defined
+  // in `500_action`
   EXPECT_EQ("292", response->headers().getStatusValue());
 }
 
