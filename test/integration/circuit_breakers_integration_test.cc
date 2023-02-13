@@ -14,7 +14,7 @@ INSTANTIATE_TEST_SUITE_P(Protocols, CircuitBreakersIntegrationTest,
                          testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams()),
                          HttpProtocolIntegrationTest::protocolTestParamsToString);
 
-// This test checks that trigerred max requests circuit breaker
+// This test checks that triggered max requests circuit breaker
 // doesn't force outlier detectors to eject an upstream host.
 // See https://github.com/envoyproxy/envoy/issues/25487
 TEST_P(CircuitBreakersIntegrationTest, CircuitBreakersWithOutlierDetection) {
