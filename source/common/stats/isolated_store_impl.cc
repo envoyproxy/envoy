@@ -18,29 +18,33 @@ IsolatedStoreImpl::IsolatedStoreImpl(std::unique_ptr<SymbolTable>&& symbol_table
   symbol_table_storage_ = std::move(symbol_table);
 }
 
+static StatNameTagVector tagVectorFromOpt(StatNameTagVectorOptConstRef tags) {
+  return tags ? tags->get() : StatNameTagVector{};
+}
+
 IsolatedStoreImpl::IsolatedStoreImpl(SymbolTable& symbol_table)
     : alloc_(symbol_table),
       counters_([this](const TagUtility::TagStatNameJoiner& joiner,
                        StatNameTagVectorOptConstRef tags) -> CounterSharedPtr {
         return alloc_.makeCounter(joiner.nameWithTags(), joiner.tagExtractedName(),
-                                  tags ? tags->get() : StatNameTagVector{});
+                                  tagVectorFromOpt(tags));
       }),
       gauges_([this](const TagUtility::TagStatNameJoiner& joiner, StatNameTagVectorOptConstRef tags,
                      Gauge::ImportMode import_mode) -> GaugeSharedPtr {
         return alloc_.makeGauge(joiner.nameWithTags(), joiner.tagExtractedName(),
-                                tags ? tags->get() : StatNameTagVector{}, import_mode);
+                                tagVectorFromOpt(tags), import_mode);
       }),
       histograms_([this](const TagUtility::TagStatNameJoiner& joiner,
                          StatNameTagVectorOptConstRef tags,
                          Histogram::Unit unit) -> HistogramSharedPtr {
         return {new HistogramImpl(joiner.nameWithTags(), unit, *this, joiner.tagExtractedName(),
-                                  tags ? tags->get() : StatNameTagVector{})};
+                                  tagVectorFromOpt(tags))};
       }),
       text_readouts_([this](const TagUtility::TagStatNameJoiner& joiner,
                             StatNameTagVectorOptConstRef tags,
                             TextReadout::Type) -> TextReadoutSharedPtr {
         return alloc_.makeTextReadout(joiner.nameWithTags(), joiner.tagExtractedName(),
-                                      tags ? tags->get() : StatNameTagVector{});
+                                      tagVectorFromOpt(tags));
       }),
       null_counter_(new NullCounterImpl(symbol_table)),
       null_gauge_(new NullGaugeImpl(symbol_table)) {}
