@@ -36,6 +36,8 @@
 namespace Envoy {
 namespace {
 
+// Get request host from the request header map, removing the port if the port
+// does not match the scheme, or if port is provided.
 absl::string_view processRequestHost(const Http::RequestHeaderMap& headers,
                                      absl::string_view new_scheme, absl::string_view new_port) {
 
