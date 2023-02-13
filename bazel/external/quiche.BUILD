@@ -688,6 +688,27 @@ envoy_cc_library(
     ],
 )
 
+#envoy_cc_library(
+#    name = "http2_hpack_decoder_hpack_decoder_lib",
+#    srcs = [
+#        "quiche/http2/hpack/decoder/hpack_decoder.cc",
+#	"quiche/http2/hpack/decoder/hpack_decoder_listener.cc",
+#	"quiche/http2/decoder/decode_buffer.cc",
+#	"quiche/http2/decoder/decode_status.cc",
+#    ],
+#    hdrs = [
+#        "quiche/http2/hpack/decoder/hpack_decoder.h",
+#	"quiche/http2/hpack/decoder/hpack_decoder_listener.h",
+#	"quiche/http2/decoder/decode_buffer.h",
+#	"quiche/http2/decoder/decode_status.h",
+#    ],
+#    copts = quiche_copts,
+#    repository = "@envoy",
+#    deps = [
+#      ":quiche_common_platform",
+#    ],
+#)
+
 envoy_cc_library(
     name = "http2_constants_lib",
     srcs = ["quiche/http2/http2_constants.cc"],
@@ -1072,6 +1093,7 @@ envoy_cc_library(
     hdrs = ["quiche/http2/hpack/decoder/hpack_decoder.h"],
     copts = quiche_copts,
     repository = "@envoy",
+    visibility = ["//visibility:public"],
     deps = [
         ":http2_decoder_decode_buffer_lib",
         ":http2_decoder_decode_status_lib",

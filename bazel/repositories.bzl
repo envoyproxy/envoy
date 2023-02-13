@@ -928,6 +928,10 @@ def _com_github_google_quiche():
         name = "quiche_spdy_hpack",
         actual = "@com_github_google_quiche//:spdy_core_hpack_hpack_lib",
     )
+    native.bind(
+        name = "quiche_http2_hpack_decoder",
+        actual = "@com_github_google_quiche//:http2_hpack_decoder_hpack_decoder_lib",
+    )
 
 def _com_googlesource_googleurl():
     external_http_archive(

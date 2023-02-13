@@ -25,6 +25,7 @@ public:
    * finishes decoding metadata.
    */
   MetadataDecoder(MetadataCallback cb);
+  ~MetadataDecoder();
 
   /**
    * Calls this function when METADATA frame payload is received. The payload doesn't need to be
@@ -54,6 +55,9 @@ private:
   friend class MetadataEncoderDecoderTest_VerifyEncoderDecoderMultipleMetadataReachSizeLimit_Test;
   friend class MetadataEncoderTest_VerifyEncoderDecoderOnMultipleMetadataMaps_Test;
   friend class MetadataEncoderTest_VerifyEncoderDecoderMultipleMetadataReachSizeLimit_Test;
+
+  struct HpackDecoderContext;
+
   /**
    * Decodes METADATA payload using nghttp2.
    * @param end_metadata indicates is END_METADATA is true.
@@ -86,6 +90,8 @@ private:
   // inflater failure on one stream can impact other streams.
   using Inflater = CSmartPtr<nghttp2_hd_inflater, nghttp2_hd_inflate_del>;
   Inflater inflater_;
+
+  std::unique_ptr<HpackDecoderContext> decoder_context_;
 };
 
 } // namespace Http2
