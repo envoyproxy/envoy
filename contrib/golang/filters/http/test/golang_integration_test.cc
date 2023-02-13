@@ -314,6 +314,42 @@ typed_config:
     cleanup();
   }
 
+  void testPanicRecover(std::string path) {
+    initializeBasicFilter(BASIC);
+
+    codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+    Http::TestRequestHeaderMapImpl request_headers{
+        {":method", "POST"}, {":path", path}, {":scheme", "http"}, {":authority", "test.com"}};
+
+    auto encoder_decoder = codec_client_->startRequest(request_headers);
+    Http::RequestEncoder& request_encoder = encoder_decoder.first;
+    auto response = std::move(encoder_decoder.second);
+    codec_client_->sendData(request_encoder, "hello", false);
+    codec_client_->sendData(request_encoder, "world", true);
+
+    // need upstream request then when not seen decode-
+    if (path.find("decode-") == std::string::npos) {
+      waitForNextUpstreamRequest();
+      Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+      upstream_request_->encodeHeaders(response_headers, false);
+      Buffer::OwnedImpl response_data1("good");
+      upstream_request_->encodeData(response_data1, false);
+      Buffer::OwnedImpl response_data2("bye");
+      upstream_request_->encodeData(response_data2, true);
+    }
+
+    ASSERT_TRUE(response->waitForEndStream());
+
+    // check resp status
+    EXPECT_EQ("500", response->headers().getStatusValue());
+
+    // error happened in Golang filter\r\n
+    auto body = StringUtil::toUpper("error happened in Golang filter\r\n");
+    EXPECT_EQ(body, StringUtil::toUpper(response->body()));
+
+    cleanup();
+  }
+
   void cleanup() {
     codec_client_->close();
 
@@ -530,5 +566,33 @@ TEST_P(GolangIntegrationTest, RouteConfig_VirtualHost) {
 TEST_P(GolangIntegrationTest, RouteConfig_Route) {
   testRouteConfig("test.com", "/route-config-test", false, "baz");
 }
+
+// Out of range in decode header phase
+TEST_P(GolangIntegrationTest, PanicRecover_DecodeHeader) {
+  testPanicRecover("/test?panic=decode-header");
+}
+
+// Out of range in decode header phase with async mode
+TEST_P(GolangIntegrationTest, PanicRecover_DecodeHeader_Async) {
+  testPanicRecover("/test?async=1&panic=decode-header");
+}
+
+// Out of range in decode data phase
+TEST_P(GolangIntegrationTest, PanicRecover_DecodeData) {
+  testPanicRecover("/test?panic=decode-data");
+}
+
+// Out of range in decode data phase with async mode & sleep
+TEST_P(GolangIntegrationTest, PanicRecover_DecodeData_Async) {
+  testPanicRecover("/test?async=1&sleep=1&panic=decode-data");
+}
+
+// Out of range in encode data phase with async mode & sleep
+TEST_P(GolangIntegrationTest, PanicRecover_EncodeData_Async) {
+  testPanicRecover("/test?async=1&sleep=1&panic=encode-data");
+}
+
+// Panic ErrInvalidPhase
+TEST_P(GolangIntegrationTest, PanicRecover_BadAPI) { testPanicRecover("/test?badapi=decode-data"); }
 
 } // namespace Envoy

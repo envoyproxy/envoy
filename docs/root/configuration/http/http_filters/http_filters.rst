@@ -16,6 +16,7 @@ HTTP filters
   cdn_loop_filter
   compressor_filter
   composite_filter
+  connect_grpc_bridge_filter
   cors_filter
   csrf_filter
   custom_response_filter
