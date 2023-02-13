@@ -6,8 +6,6 @@
 
 #include "gtest/gtest.h"
 
-#if ABSL_IS_LITTLE_ENDIAN
-
 namespace Envoy {
 namespace {
 
@@ -74,4 +72,3 @@ TEST_P(BitArrayTest, CanSetAndGetAllBits) { populateBitArrayAndCheckValuesStored
 
 } // namespace
 } // namespace Envoy
-#endif

@@ -6,10 +6,6 @@
 #include "source/common/common/assert.h"
 #include "source/common/common/safe_memcpy.h"
 
-#include "absl/base/config.h"
-
-#if ABSL_IS_LITTLE_ENDIAN
-
 namespace Envoy {
 
 /**
@@ -25,7 +21,7 @@ namespace Envoy {
  * inline.
  *
  * Limitations to this class are:
- *  1) It is not thread-safe
+ *  1) It is thread compatible.
  *  2) It assumes little-endianness and a 64-bit architecture.
  *  3) It works with a maximum width of 32-bits
  */
@@ -149,4 +145,3 @@ private:
 };
 
 } // namespace Envoy
-#endif
