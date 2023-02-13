@@ -19,8 +19,8 @@ jobs:
       image: envoyproxy/envoy-build-ubuntu:7304f974de2724617b7492ccb4c9c58cd420353a
     steps:
     - uses: actions/checkout@v3
-      with:
-        set-safe-directory: "$GITHUB_WORKSPACE"
+    - name: Add safe directory
+      run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
     - name: Generate docs
       run: mobile/docs/build.sh
     - name: Set up deploy key
