@@ -15,11 +15,12 @@
  * limitations under the License.
  */
 
-package http
+package cluster_specifier
 
 /*
 // ref https://github.com/golang/go/issues/25832
 
+#cgo CFLAGS: -I../api
 #cgo linux LDFLAGS: -Wl,-unresolved-symbols=ignore-all
 #cgo darwin LDFLAGS: -Wl,-undefined,dynamic_lookup
 
@@ -32,38 +33,23 @@ package http
 import "C"
 
 import (
-	"fmt"
-	"sync"
-	"sync/atomic"
-
-	"google.golang.org/protobuf/proto"
-	"google.golang.org/protobuf/types/known/anypb"
-
-	"github.com/envoyproxy/envoy/contrib/golang/filters/http/source/go/pkg/utils"
+	"github.com/envoyproxy/envoy/contrib/golang/http/common/go/utils"
 )
 
-var (
-	configNumGenerator uint64
-	configCache        = &sync.Map{} // uint64 -> *anypb.Any
-)
-
-//export envoyGoClusterSpecifierNewConfig
-func envoyGoClusterSpecifierNewConfig(configPtr uint64, configLen uint64) uint64 {
-	buf := utils.BytesToSlice(configPtr, configLen)
-	var any anypb.Any
-	proto.Unmarshal(buf, &any)
-
-	configNum := atomic.AddUint64(&configNumGenerator, 1)
-	if httpFilterConfigParser != nil {
-		configCache.Store(configNum, httpFilterConfigParser.Parse(&any))
-	} else {
-		configCache.Store(configNum, &any)
+//export envoyGoOnClusterSpecify
+func envoyGoOnClusterSpecify(headerPtr uint64, configId uint64, bufferPtr uint64, bufferLen uint64) int64 {
+	specifier := getClusterSpecifier(configId)
+	cluster := specifier.Choose()
+	l := uint64(len(cluster))
+	if l == 0 {
+		// means use the default cluster
+		return 0
 	}
-
-	return configNum
-}
-
-//export envoyGoFilterDestroyHttpPluginConfig
-func envoyGoFilterDestroyHttpPluginConfig(id uint64) {
-	configCache.Delete(id)
+	if l > bufferLen {
+		// buffer length is not large enough.
+		return int64(l)
+	}
+	buffer := utils.BufferToSlice(bufferPtr, bufferLen)
+	copy(buffer, cluster)
+	return int64(l)
 }

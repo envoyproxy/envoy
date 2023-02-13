@@ -15,12 +15,11 @@
  * limitations under the License.
  */
 
-package http
+package cluster_specifier
 
 /*
 // ref https://github.com/golang/go/issues/25832
 
-#cgo CFLAGS: -I../api
 #cgo linux LDFLAGS: -Wl,-unresolved-symbols=ignore-all
 #cgo darwin LDFLAGS: -Wl,-undefined,dynamic_lookup
 
@@ -31,44 +30,39 @@ package http
 
 */
 import "C"
-import (
-	"fmt"
-	"unsafe"
 
-	"github.com/envoyproxy/envoy/contrib/golang/filters/http/source/go/pkg/api"
+import (
+	"sync"
+	"sync/atomic"
+
+	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/anypb"
+
+	"github.com/envoyproxy/envoy/contrib/golang/http/common/go/utils"
 )
 
-type httpRequest struct {
-	req        *C.httpRequest
-	httpFilter api.StreamFilter
-}
+var (
+	configNumGenerator uint64
+	configCache        = &sync.Map{} // uint64 -> *anypb.Any
+)
 
-func (r *httpRequest) Continue(status api.StatusType) {
-	if status == api.LocalReply {
-		fmt.Printf("warning: LocalReply status is useless after sendLocalReply, ignoring")
-		return
+//export envoyGoClusterSpecifierNewConfig
+func envoyGoClusterSpecifierNewConfig(configPtr uint64, configLen uint64) uint64 {
+	buf := utils.BytesToSlice(configPtr, configLen)
+	var any anypb.Any
+	proto.Unmarshal(buf, &any)
+
+	configNum := atomic.AddUint64(&configNumGenerator, 1)
+	if clusterSpecifierConfigParser != nil {
+		configCache.Store(configNum, clusterSpecifierConfigParser.Parse(&any))
+	} else {
+		configCache.Store(configNum, &any)
 	}
-	cAPI.HttpContinue(unsafe.Pointer(r.req), uint64(status))
+
+	return configNum
 }
 
-func (r *httpRequest) SendLocalReply(responseCode int, bodyText string, headers map[string]string, grpcStatus int64, details string) {
-	cAPI.HttpSendLocalReply(unsafe.Pointer(r.req), responseCode, bodyText, headers, grpcStatus, details)
-}
-
-func (r *httpRequest) StreamInfo() api.StreamInfo {
-	return &streamInfo{
-		request: r,
-	}
-}
-
-func (r *httpRequest) Finalize(reason int) {
-	cAPI.HttpFinalize(unsafe.Pointer(r.req), reason)
-}
-
-type streamInfo struct {
-	request *httpRequest
-}
-
-func (s *streamInfo) GetRouteName() string {
-	return cAPI.HttpGetRouteName(unsafe.Pointer(s.request.req))
+//export envoyGoClusterSpecifierDestroyConfig
+func envoyGoClusterSpecifierDestroyConfig(id uint64) {
+	configCache.Delete(id)
 }
