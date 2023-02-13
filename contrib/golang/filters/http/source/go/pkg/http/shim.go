@@ -116,10 +116,10 @@ func envoyGoFilterOnHttpHeader(r *C.httpRequest, endStream, headerNum, headerByt
 		}
 	}
 	if req.paniced {
+		// goroutine panic in the previous state that could not sendLocalReply, delay terminating the request here,
+		// to prevent error from spreading.
 		req.safeReplyPanic()
-		// only may hit it when filter is just destroyed
-		// status is meaningless then.
-		return uint64(api.Continue)
+		return uint64(api.LocalReply)
 	}
 	defer req.RecoverPanic()
 	f := req.httpFilter
@@ -149,10 +149,10 @@ func envoyGoFilterOnHttpHeader(r *C.httpRequest, endStream, headerNum, headerByt
 func envoyGoFilterOnHttpData(r *C.httpRequest, endStream, buffer, length uint64) uint64 {
 	req := getRequest(r)
 	if req.paniced {
+		// goroutine panic in the previous state that could not sendLocalReply, delay terminating the request here,
+		// to prevent error from spreading.
 		req.safeReplyPanic()
-		// only may hit it when filter is just destroyed
-		// status is meaningless then.
-		return uint64(api.Continue)
+		return uint64(api.LocalReply)
 	}
 	defer req.RecoverPanic()
 
