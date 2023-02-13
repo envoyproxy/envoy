@@ -42,12 +42,24 @@ SysCallIntResult OsSysCallsImpl::close(os_fd_t fd) {
 }
 
 SysCallSizeResult OsSysCallsImpl::writev(os_fd_t fd, const iovec* iov, int num_iov) {
-  const ssize_t rc = ::writev(fd, iov, num_iov);
+  ssize_t rc;
+  if (num_iov == 1) {
+    // Avoid paying the VFS overhead when there is only one IO buffer to work with
+    rc = ::send(fd, iov[0].iov_base, iov[0].iov_len, 0);
+  } else {
+    rc = ::writev(fd, iov, num_iov);
+  }
   return {rc, rc != -1 ? 0 : errno};
 }
 
 SysCallSizeResult OsSysCallsImpl::readv(os_fd_t fd, const iovec* iov, int num_iov) {
-  const ssize_t rc = ::readv(fd, iov, num_iov);
+  ssize_t rc;
+  if (num_iov == 1) {
+    // Avoid paying the VFS overhead when there is only one IO buffer to work with
+    rc = ::recv(fd, iov[0].iov_base, iov[0].iov_len, 0);
+  } else {
+    rc = ::readv(fd, iov, num_iov);
+  }
   return {rc, rc != -1 ? 0 : errno};
 }
 
