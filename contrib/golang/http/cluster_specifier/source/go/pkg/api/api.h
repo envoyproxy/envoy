@@ -6,10 +6,10 @@
 extern "C" {
 #endif
 
-void envoyGoClusterSpecifierGetHeader(void* h, void* key, void* value);
-void envoyGoClusterSpecifierCopyHeaders(void* h, void* strs, void* buf);
-void envoyGoClusterSpecifierSetHeader(void* h, void* key, void* value);
-void envoyGoClusterSpecifierRemoveHeader(void* h, void* key);
+void envoyGoClusterSpecifierGetHeader(unsigned long long headerPtr, void* key, void* value);
+void envoyGoClusterSpecifierCopyHeaders(unsigned long long headerPtr, void* strs, void* buf);
+void envoyGoClusterSpecifierSetHeader(unsigned long long headerPtr, void* key, void* value);
+void envoyGoClusterSpecifierRemoveHeader(unsigned long long headerPtr, void* key);
 
 #ifdef __cplusplus
 } // extern "C"

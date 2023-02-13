@@ -1,3 +1,3 @@
-module github.com/envoyproxy/envoy/contrib/golang/http/common/go
+module github.com/envoyproxy/envoy/contrib/golang/common/go
 
-go 1.19
+go 1.18

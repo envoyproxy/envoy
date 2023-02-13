@@ -33,7 +33,7 @@ package cluster_specifier
 import "C"
 
 import (
-	"github.com/envoyproxy/envoy/contrib/golang/http/common/go/utils"
+	"github.com/envoyproxy/envoy/contrib/golang/common/go/utils"
 )
 
 //export envoyGoOnClusterSpecify

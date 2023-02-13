@@ -38,7 +38,7 @@ import (
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 
-	"github.com/envoyproxy/envoy/contrib/golang/http/common/go/utils"
+	"github.com/envoyproxy/envoy/contrib/golang/common/go/utils"
 )
 
 var (

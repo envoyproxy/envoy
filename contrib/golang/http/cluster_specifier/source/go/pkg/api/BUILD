@@ -6,10 +6,9 @@ go_library(
     name = "api",
     srcs = [
         "capi.go",
-        "filter.go",
-        "type.go",
+        "cluster.go",
     ],
-    importpath = "github.com/envoyproxy/envoy/contrib/golang/filters/http/source/go/pkg/api",
+    importpath = "github.com/envoyproxy/envoy/contrib/golang/http/cluster_specifier/source/go/pkg/api",
     visibility = ["//visibility:public"],
     deps = [
         "@org_golang_google_protobuf//types/known/anypb",

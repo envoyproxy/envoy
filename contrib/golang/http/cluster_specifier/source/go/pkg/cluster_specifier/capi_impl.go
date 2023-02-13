@@ -42,7 +42,7 @@ import (
 type httpCApiImpl struct{}
 
 func (c *httpCApiImpl) HttpGetHeader(headerPtr uint64, key *string, value *string) {
-	C.envoyGoClusterSpecifierGetHeader(headerPtr, unsafe.Pointer(key), unsafe.Pointer(value))
+	C.envoyGoClusterSpecifierGetHeader(C.ulonglong(headerPtr), unsafe.Pointer(key), unsafe.Pointer(value))
 }
 
 func (c *httpCApiImpl) HttpCopyHeaders(headerPtr uint64, num uint64, bytes uint64) map[string]string {
@@ -57,7 +57,7 @@ func (c *httpCApiImpl) HttpCopyHeaders(headerPtr uint64, num uint64, bytes uint6
 	sHeader := (*reflect.SliceHeader)(unsafe.Pointer(&strs))
 	bHeader := (*reflect.SliceHeader)(unsafe.Pointer(&buf))
 
-	C.envoyGoClusterSpecifierCopyHeaders(headerPtr, unsafe.Pointer(sHeader.Data), unsafe.Pointer(bHeader.Data))
+	C.envoyGoClusterSpecifierCopyHeaders(C.ulonglong(headerPtr), unsafe.Pointer(sHeader.Data), unsafe.Pointer(bHeader.Data))
 
 	m := make(map[string]string, num)
 	for i := uint64(0); i < num*2; i += 2 {
@@ -70,11 +70,11 @@ func (c *httpCApiImpl) HttpCopyHeaders(headerPtr uint64, num uint64, bytes uint6
 }
 
 func (c *httpCApiImpl) HttpSetHeader(headerPtr uint64, key *string, value *string) {
-	C.envoyGoClusterSpecifierSetHeader(headerPtr, unsafe.Pointer(key), unsafe.Pointer(value))
+	C.envoyGoClusterSpecifierSetHeader(C.ulonglong(headerPtr), unsafe.Pointer(key), unsafe.Pointer(value))
 }
 
 func (c *httpCApiImpl) HttpRemoveHeader(headerPtr uint64, key *string) {
-	C.envoyGoClusterSpecifierRemoveHeader(headerPtr, unsafe.Pointer(key))
+	C.envoyGoClusterSpecifierRemoveHeader(C.ulonglong(headerPtr), unsafe.Pointer(key))
 }
 
 var cAPI api.HttpCAPI = &httpCApiImpl{}
