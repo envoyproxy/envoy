@@ -342,7 +342,7 @@ jvm_http_filter_on_request_headers(envoy_headers input_headers, bool end_stream,
   jobjectArray result = static_cast<jobjectArray>(jvm_on_headers(
       "onRequestHeaders", headers, end_stream, stream_intel, const_cast<void*>(context)));
 
-  if (env->GetArrayLength(result) < 2) {
+  if (result == NULL || env->GetArrayLength(result) < 2) {
     env->DeleteLocalRef(result);
     return (envoy_filter_headers_status){/*status*/ kEnvoyFilterHeadersStatusStopIteration,
                                          /*headers*/ {}};
@@ -370,7 +370,7 @@ jvm_http_filter_on_response_headers(envoy_headers input_headers, bool end_stream
   jobjectArray result = static_cast<jobjectArray>(jvm_on_headers(
       "onResponseHeaders", headers, end_stream, stream_intel, const_cast<void*>(context)));
 
-  if (env->GetArrayLength(result) < 2) {
+  if (result == NULL || env->GetArrayLength(result) < 2) {
     env->DeleteLocalRef(result);
     return (envoy_filter_headers_status){/*status*/ kEnvoyFilterHeadersStatusStopIteration,
                                          /*headers*/ {}};
@@ -425,7 +425,7 @@ static envoy_filter_data_status jvm_http_filter_on_request_data(envoy_data data,
   jobjectArray result = static_cast<jobjectArray>(
       jvm_on_data("onRequestData", data, end_stream, stream_intel, const_cast<void*>(context)));
 
-  if (env->GetArrayLength(result) < 2) {
+  if (result == NULL || env->GetArrayLength(result) < 2) {
     env->DeleteLocalRef(result);
     return (envoy_filter_data_status){/*status*/ kEnvoyFilterHeadersStatusStopIteration,
                                       /*data*/ {},
@@ -462,7 +462,7 @@ static envoy_filter_data_status jvm_http_filter_on_response_data(envoy_data data
   jobjectArray result = static_cast<jobjectArray>(
       jvm_on_data("onResponseData", data, end_stream, stream_intel, const_cast<void*>(context)));
 
-  if (env->GetArrayLength(result) < 2) {
+  if (result == NULL || env->GetArrayLength(result) < 2) {
     env->DeleteLocalRef(result);
     return (envoy_filter_data_status){/*status*/ kEnvoyFilterHeadersStatusStopIteration,
                                       /*data*/ {},
@@ -536,7 +536,7 @@ jvm_http_filter_on_request_trailers(envoy_headers trailers, envoy_stream_intel s
   jobjectArray result = static_cast<jobjectArray>(
       jvm_on_trailers("onRequestTrailers", trailers, stream_intel, const_cast<void*>(context)));
 
-  if (env->GetArrayLength(result) < 2) {
+  if (result == NULL || env->GetArrayLength(result) < 2) {
     env->DeleteLocalRef(result);
     return (envoy_filter_trailers_status){/*status*/ kEnvoyFilterHeadersStatusStopIteration,
                                           /*trailers*/ {},
@@ -580,7 +580,7 @@ jvm_http_filter_on_response_trailers(envoy_headers trailers, envoy_stream_intel 
   jobjectArray result = static_cast<jobjectArray>(
       jvm_on_trailers("onResponseTrailers", trailers, stream_intel, const_cast<void*>(context)));
 
-  if (env->GetArrayLength(result) < 2) {
+  if (result == NULL || env->GetArrayLength(result) < 2) {
     env->DeleteLocalRef(result);
     return (envoy_filter_trailers_status){/*status*/ kEnvoyFilterHeadersStatusStopIteration,
                                           /*trailers*/ {},

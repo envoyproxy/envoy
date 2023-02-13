@@ -117,9 +117,8 @@ class SendTrailersTest {
 
     expectation.await(10, TimeUnit.SECONDS)
 
-    // TODO(jpsim) fix and uncomment
-    //builder.remove("send-trailers")
-    //builder.add("send-trailers", "empty")
+    builder.remove("send-trailers")
+    builder.add("send-trailers", "empty")
     val requestHeadersEmpty = builder.build()
     client.newStreamPrototype()
       .setOnResponseHeaders { headers, _, _ ->
