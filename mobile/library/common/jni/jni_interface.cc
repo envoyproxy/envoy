@@ -342,6 +342,12 @@ jvm_http_filter_on_request_headers(envoy_headers input_headers, bool end_stream,
   jobjectArray result = static_cast<jobjectArray>(jvm_on_headers(
       "onRequestHeaders", headers, end_stream, stream_intel, const_cast<void*>(context)));
 
+  if (env->GetArrayLength(result) < 2) {
+    env->DeleteLocalRef(result);
+    return (envoy_filter_headers_status){/*status*/ kEnvoyFilterHeadersStatusStopIteration,
+                                         /*headers*/ {}};
+  }
+
   jobject status = env->GetObjectArrayElement(result, 0);
   jobjectArray j_headers = static_cast<jobjectArray>(env->GetObjectArrayElement(result, 1));
 
@@ -363,6 +369,12 @@ jvm_http_filter_on_response_headers(envoy_headers input_headers, bool end_stream
   const auto headers = Envoy::Types::ManagedEnvoyHeaders(input_headers);
   jobjectArray result = static_cast<jobjectArray>(jvm_on_headers(
       "onResponseHeaders", headers, end_stream, stream_intel, const_cast<void*>(context)));
+
+  if (env->GetArrayLength(result) < 2) {
+    env->DeleteLocalRef(result);
+    return (envoy_filter_headers_status){/*status*/ kEnvoyFilterHeadersStatusStopIteration,
+                                         /*headers*/ {}};
+  }
 
   jobject status = env->GetObjectArrayElement(result, 0);
   jobjectArray j_headers = static_cast<jobjectArray>(env->GetObjectArrayElement(result, 1));
@@ -413,6 +425,13 @@ static envoy_filter_data_status jvm_http_filter_on_request_data(envoy_data data,
   jobjectArray result = static_cast<jobjectArray>(
       jvm_on_data("onRequestData", data, end_stream, stream_intel, const_cast<void*>(context)));
 
+  if (env->GetArrayLength(result) < 2) {
+    env->DeleteLocalRef(result);
+    return (envoy_filter_data_status){/*status*/ kEnvoyFilterHeadersStatusStopIteration,
+                                      /*data*/ {},
+                                      /*pending_headers*/ {}};
+  }
+
   jobject status = env->GetObjectArrayElement(result, 0);
   jobject j_data = static_cast<jobjectArray>(env->GetObjectArrayElement(result, 1));
 
@@ -442,6 +461,13 @@ static envoy_filter_data_status jvm_http_filter_on_response_data(envoy_data data
   JNIEnv* env = get_env();
   jobjectArray result = static_cast<jobjectArray>(
       jvm_on_data("onResponseData", data, end_stream, stream_intel, const_cast<void*>(context)));
+
+  if (env->GetArrayLength(result) < 2) {
+    env->DeleteLocalRef(result);
+    return (envoy_filter_data_status){/*status*/ kEnvoyFilterHeadersStatusStopIteration,
+                                      /*data*/ {},
+                                      /*pending_headers*/ {}};
+  }
 
   jobject status = env->GetObjectArrayElement(result, 0);
   jobject j_data = static_cast<jobjectArray>(env->GetObjectArrayElement(result, 1));
@@ -510,6 +536,14 @@ jvm_http_filter_on_request_trailers(envoy_headers trailers, envoy_stream_intel s
   jobjectArray result = static_cast<jobjectArray>(
       jvm_on_trailers("onRequestTrailers", trailers, stream_intel, const_cast<void*>(context)));
 
+  if (env->GetArrayLength(result) < 2) {
+    env->DeleteLocalRef(result);
+    return (envoy_filter_trailers_status){/*status*/ kEnvoyFilterHeadersStatusStopIteration,
+                                          /*trailers*/ {},
+                                          /*pending_headers*/ {},
+                                          /*pending_data*/ {}};
+  }
+
   jobject status = env->GetObjectArrayElement(result, 0);
   jobjectArray j_trailers = static_cast<jobjectArray>(env->GetObjectArrayElement(result, 1));
 
@@ -545,6 +579,14 @@ jvm_http_filter_on_response_trailers(envoy_headers trailers, envoy_stream_intel 
   JNIEnv* env = get_env();
   jobjectArray result = static_cast<jobjectArray>(
       jvm_on_trailers("onResponseTrailers", trailers, stream_intel, const_cast<void*>(context)));
+
+  if (env->GetArrayLength(result) < 2) {
+    env->DeleteLocalRef(result);
+    return (envoy_filter_trailers_status){/*status*/ kEnvoyFilterHeadersStatusStopIteration,
+                                          /*trailers*/ {},
+                                          /*pending_headers*/ {},
+                                          /*pending_data*/ {}};
+  }
 
   jobject status = env->GetObjectArrayElement(result, 0);
   jobjectArray j_trailers = static_cast<jobjectArray>(env->GetObjectArrayElement(result, 1));
