@@ -25,7 +25,8 @@ jobs:
         ENVOY_BAZEL_PREFIX: "@envoy"
     steps:
     - uses: actions/checkout@v3
-      fetch-depth: 0
+      with:
+        fetch-depth: 0
     - name: Add safe directory
       run: git config --global --add safe.directory /__w/envoy/envoy
     - id: should_run
@@ -41,7 +42,8 @@ jobs:
     timeout-minutes: 45
     steps:
     - uses: actions/checkout@v3
-      fetch-depth: 0
+      with:
+        fetch-depth: 0
     - id: should_run
       name: 'Check whether to run'
       run: ./mobile/tools/should_run_ci.sh
@@ -70,7 +72,8 @@ jobs:
     timeout-minutes: 10
     steps:
     - uses: actions/checkout@v3
-      fetch-depth: 0
+      with:
+        fetch-depth: 0
     - id: should_run
       name: 'Check whether to run'
       run: ./mobile/tools/should_run_ci.sh
@@ -86,7 +89,8 @@ jobs:
     timeout-minutes: 45
     steps:
     - uses: actions/checkout@v3
-      fetch-depth: 0
+      with:
+        fetch-depth: 0
     - id: should_run
       name: 'Check whether to run'
       run: ./mobile/tools/should_run_ci.sh

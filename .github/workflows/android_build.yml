@@ -18,7 +18,8 @@ jobs:
     timeout-minutes: 90
     steps:
     - uses: actions/checkout@v3
-      fetch-depth: 0
+      with:
+        fetch-depth: 0
     - id: should_run
       name: 'Check whether to run'
       run: ./mobile/tools/should_run_ci.sh
@@ -50,7 +51,8 @@ jobs:
     timeout-minutes: 50
     steps:
     - uses: actions/checkout@v3
-      fetch-depth: 0
+      with:
+        fetch-depth: 0
     - id: should_run
       name: 'Check whether to run'
       run: ./mobile/tools/should_run_ci.sh
@@ -97,7 +99,8 @@ jobs:
     timeout-minutes: 50
     steps:
     - uses: actions/checkout@v3
-      fetch-depth: 0
+      with:
+        fetch-depth: 0
     - id: should_run
       name: 'Check whether to run'
       run: ./mobile/tools/should_run_ci.sh
@@ -144,7 +147,8 @@ jobs:
     timeout-minutes: 50
     steps:
     - uses: actions/checkout@v3
-      fetch-depth: 0
+      with:
+        fetch-depth: 0
     - id: should_run
       name: 'Check whether to run'
       run: ./mobile/tools/should_run_ci.sh
@@ -191,7 +195,8 @@ jobs:
     timeout-minutes: 50
     steps:
     - uses: actions/checkout@v3
-      fetch-depth: 0
+      with:
+        fetch-depth: 0
     - id: should_run
       name: 'Check whether to run'
       run: ./mobile/tools/should_run_ci.sh
