@@ -178,7 +178,7 @@ xds_matcher:
                 action:
                     name: skip
                     typed_config:
-                        "@type": type.googleapis.com/envoy.extensions.filters.common.matcher.action.v3.SkipFilter
+                      "@type": type.googleapis.com/envoy.extensions.filters.common.matcher.action.v3.SkipFilter
 )EOF");
 
   MatchDelegateConfig match_delegate_config;
