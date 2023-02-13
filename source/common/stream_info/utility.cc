@@ -156,6 +156,14 @@ Utility::formatDownstreamAddressJustPort(const Network::Address::Instance& addre
   return port;
 }
 
+absl::optional<uint32_t>
+Utility::extractDownstreamAddressJustPort(const Network::Address::Instance& address) {
+  if (address.type() == Network::Address::Type::Ip) {
+    return address.ip()->port();
+  }
+  return {};
+}
+
 const absl::optional<Http::Code>
 ProxyStatusUtils::recommendedHttpStatusCode(const ProxyStatusError proxy_status) {
   // This switch statement was derived from the mapping from proxy error type to

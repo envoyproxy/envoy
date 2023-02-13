@@ -16,12 +16,17 @@ type filter struct {
 	query_params    url.Values
 	path            string
 
+	// for bad api call testing
+	header api.RequestHeaderMap
+
 	// test mode, from query parameters
 	async       bool
 	sleep       bool   // all sleep
 	data_sleep  bool   // only sleep in data phase
 	localreplay string // send local reply
 	databuffer  string // return api.Stop
+	panic       string // hit panic in which phase
+	badapi      bool   // bad api call
 }
 
 func parseQuery(path string) url.Values {
@@ -33,7 +38,15 @@ func parseQuery(path string) url.Values {
 	return make(url.Values)
 }
 
-func (f *filter) initRequest(header api.HeaderMap) {
+func badcode() {
+	// panic index out of range
+	s := []int{1}
+	s[1] = s[5]
+}
+
+func (f *filter) initRequest(header api.RequestHeaderMap) {
+	f.header = header
+
 	f.path, _ = header.Get(":path")
 	f.query_params = parseQuery(f.path)
 	if f.query_params.Get("async") != "" {
@@ -50,6 +63,8 @@ func (f *filter) initRequest(header api.HeaderMap) {
 	}
 	f.databuffer = f.query_params.Get("databuffer")
 	f.localreplay = f.query_params.Get("localreply")
+	f.panic = f.query_params.Get("panic")
+	f.badapi = f.query_params.Get("badapi") != ""
 }
 
 func (f *filter) fail(msg string, a ...any) api.StatusType {
@@ -81,6 +96,10 @@ func (f *filter) decodeHeaders(header api.RequestHeaderMap, endStream bool) api.
 	if !endStream && strings.Contains(f.databuffer, "decode-header") {
 		return api.StopAndBuffer
 	}
+
+	if f.panic == "decode-header" {
+		badcode()
+	}
 	return api.Continue
 }
 
@@ -102,6 +121,14 @@ func (f *filter) decodeData(buffer api.BufferInstance, endStream bool) api.Statu
 	if !endStream && strings.Contains(f.databuffer, "decode-data") {
 		return api.StopAndBuffer
 	}
+
+	if f.panic == "decode-data" {
+		badcode()
+	}
+	if f.badapi {
+		// set header after header continued will panic with the ErrInvalidPhase error message.
+		f.header.Set("foo", "bar")
+	}
 	return api.Continue
 }
 
@@ -111,6 +138,10 @@ func (f *filter) decodeTrailers(trailers api.RequestTrailerMap) api.StatusType {
 	}
 	if strings.Contains(f.localreplay, "decode-trailer") {
 		return f.sendLocalReply("decode-trailer")
+	}
+
+	if f.panic == "decode-trailer" {
+		badcode()
 	}
 	return api.Continue
 }
@@ -129,6 +160,10 @@ func (f *filter) encodeHeaders(header api.ResponseHeaderMap, endStream bool) api
 	header.Set("test-query-param-foo", f.query_params.Get("foo"))
 	header.Set("test-path", f.path)
 	header.Set("rsp-route-name", f.callbacks.StreamInfo().GetRouteName())
+
+	if f.panic == "encode-header" {
+		badcode()
+	}
 	return api.Continue
 }
 
@@ -141,6 +176,10 @@ func (f *filter) encodeData(buffer api.BufferInstance, endStream bool) api.Statu
 	}
 	data := buffer.String()
 	buffer.SetString(strings.ToUpper(data))
+
+	if f.panic == "encode-data" {
+		badcode()
+	}
 	return api.Continue
 }
 
@@ -151,6 +190,10 @@ func (f *filter) encodeTrailers(trailers api.ResponseTrailerMap) api.StatusType 
 	if strings.Contains(f.localreplay, "encode-trailer") {
 		return f.sendLocalReply("encode-trailer")
 	}
+
+	if f.panic == "encode-trailer" {
+		badcode()
+	}
 	return api.Continue
 }
 
@@ -158,6 +201,8 @@ func (f *filter) DecodeHeaders(header api.RequestHeaderMap, endStream bool) api.
 	f.initRequest(header)
 	if f.async {
 		go func() {
+			defer f.callbacks.RecoverPanic()
+
 			status := f.decodeHeaders(header, endStream)
 			if status != api.LocalReply {
 				f.callbacks.Continue(status)
@@ -173,6 +218,8 @@ func (f *filter) DecodeHeaders(header api.RequestHeaderMap, endStream bool) api.
 func (f *filter) DecodeData(buffer api.BufferInstance, endStream bool) api.StatusType {
 	if f.async {
 		go func() {
+			defer f.callbacks.RecoverPanic()
+
 			status := f.decodeData(buffer, endStream)
 			if status != api.LocalReply {
 				f.callbacks.Continue(status)
@@ -188,6 +235,8 @@ func (f *filter) DecodeData(buffer api.BufferInstance, endStream bool) api.Statu
 func (f *filter) DecodeTrailers(trailers api.RequestTrailerMap) api.StatusType {
 	if f.async {
 		go func() {
+			defer f.callbacks.RecoverPanic()
+
 			status := f.decodeTrailers(trailers)
 			if status != api.LocalReply {
 				f.callbacks.Continue(status)
@@ -203,6 +252,8 @@ func (f *filter) DecodeTrailers(trailers api.RequestTrailerMap) api.StatusType {
 func (f *filter) EncodeHeaders(header api.ResponseHeaderMap, endStream bool) api.StatusType {
 	if f.async {
 		go func() {
+			defer f.callbacks.RecoverPanic()
+
 			status := f.encodeHeaders(header, endStream)
 			if status != api.LocalReply {
 				f.callbacks.Continue(status)
@@ -218,6 +269,8 @@ func (f *filter) EncodeHeaders(header api.ResponseHeaderMap, endStream bool) api
 func (f *filter) EncodeData(buffer api.BufferInstance, endStream bool) api.StatusType {
 	if f.async {
 		go func() {
+			defer f.callbacks.RecoverPanic()
+
 			status := f.encodeData(buffer, endStream)
 			if status != api.LocalReply {
 				f.callbacks.Continue(status)
@@ -233,6 +286,8 @@ func (f *filter) EncodeData(buffer api.BufferInstance, endStream bool) api.Statu
 func (f *filter) EncodeTrailers(trailers api.ResponseTrailerMap) api.StatusType {
 	if f.async {
 		go func() {
+			defer f.callbacks.RecoverPanic()
+
 			status := f.encodeTrailers(trailers)
 			if status != api.LocalReply {
 				f.callbacks.Continue(status)
