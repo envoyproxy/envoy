@@ -17,7 +17,6 @@ envoy_cc_library(
         "io_uring_impl.h",
     ],
     external_deps = ["uring"],
-    tags = ["nocompdb"],
     deps = [
         "//envoy/common/io:io_uring_interface",
         "//envoy/thread_local:thread_local_interface",
@@ -32,7 +31,6 @@ envoy_cc_library(
     hdrs = [
         "io_uring_worker_impl.h",
     ],
-    tags = ["nocompdb"],
     deps = [
         ":io_uring_impl_lib",
         "//envoy/common/io:io_uring_interface",
@@ -50,7 +48,6 @@ envoy_cc_library(
     hdrs = [
         "io_uring_factory_impl.h",
     ],
-    tags = ["nocompdb"],
     deps = [
         ":io_uring_worker_lib",
         "//envoy/common/io:io_uring_interface",

@@ -11,10 +11,7 @@ envoy_package()
 envoy_cc_test(
     name = "io_uring_factory_impl_test",
     srcs = ["io_uring_factory_impl_test.cc"],
-    tags = [
-        "nocompdb",
-        "skip_on_windows",
-    ],
+    tags = ["skip_on_windows"],
     deps = [
         "//source/common/io:io_uring_factory_impl_lib",
         "//source/common/io:io_uring_impl_lib",
@@ -27,10 +24,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "io_uring_impl_test",
     srcs = ["io_uring_impl_test.cc"],
-    tags = [
-        "nocompdb",
-        "skip_on_windows",
-    ],
+    tags = ["skip_on_windows"],
     deps = [
         "//source/common/io:io_uring_impl_lib",
         "//source/common/network:address_lib",
@@ -43,10 +37,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "io_uring_worker_impl_test",
     srcs = ["io_uring_worker_impl_test.cc"],
-    tags = [
-        "nocompdb",
-        "skip_on_windows",
-    ],
+    tags = ["skip_on_windows"],
     deps = [
         "//source/common/io:io_uring_worker_lib",
         "//test/mocks/event:event_mocks",
@@ -58,10 +49,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "io_uring_worker_impl_integration_test",
     srcs = ["io_uring_worker_impl_integration_test.cc"],
-    tags = [
-        "nocompdb",
-        "skip_on_windows",
-    ],
+    tags = ["skip_on_windows"],
     deps = [
         "//envoy/api:os_sys_calls_interface",
         "//source/common/api:os_sys_calls_lib",

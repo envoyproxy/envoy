@@ -109,7 +109,7 @@ public:
   virtual IoUringResult submit() PURE;
 
   /**
-   * Inject a request completion into the iouring.
+   * Inject a request completion into the io_uring.
    */
   virtual void injectCompletion(os_fd_t fd, void* user_data, int32_t result) PURE;
 
@@ -120,7 +120,7 @@ public:
 };
 
 /**
- * IoUring request type.
+ * io_uring request type.
  */
 struct RequestType {
   static constexpr uint32_t Accept = 0x1;
@@ -134,7 +134,7 @@ struct RequestType {
 class IoUringSocket;
 
 /**
- * Abstract for IoUring I/O Request.
+ * Abstract for io_uring I/O Request.
  */
 struct Request {
   uint32_t type_;
@@ -245,7 +245,7 @@ public:
 };
 
 /**
- * The handler for IoUring request completion.
+ * The handler for io_uring request completion.
  */
 class IoUringHandler {
 public:
@@ -321,7 +321,7 @@ public:
 };
 
 /**
- * Abstract factory for IoUring wrappers.
+ * Abstract factory for io_uring wrappers.
  */
 class IoUringFactory {
 public:
