@@ -1038,7 +1038,7 @@ private:
   const uint32_t per_connection_buffer_limit_bytes_;
   const uint32_t max_response_headers_count_;
   LoadBalancerType lb_type_;
-    const envoy::config::cluster::v3::Cluster::DiscoveryType type_;
+  const envoy::config::cluster::v3::Cluster::DiscoveryType type_;
   const bool drain_connections_on_host_removal_ : 1;
   const bool connection_pool_per_downstream_connection_ : 1;
   const bool warm_hosts_ : 1;
