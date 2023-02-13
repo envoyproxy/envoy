@@ -302,7 +302,8 @@
 - (BOOL)compareYAMLWithProtoBuilder:(NSString *)yaml {
   Envoy::Platform::EngineBuilder builder;
 
-  for (EnvoyNativeFilterConfig *nativeFilterConfig in self.nativeFilterChain) {
+  for (EnvoyNativeFilterConfig *nativeFilterConfig in
+       [self.nativeFilterChain reverseObjectEnumerator]) {
     builder.addNativeFilter(
         /* name */ [nativeFilterConfig.name toCXXString],
         /* typed_config */ [nativeFilterConfig.typedConfig toCXXString]);
