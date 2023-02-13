@@ -33,7 +33,7 @@ Http1Settings parseHttp1Settings(const envoy::config::core::v3::Http1ProtocolOpt
   }
 
   if (config.has_use_balsa_parser()) {
-    ret.use_balsa_parser_ = config.use_balsa_parser();
+    ret.use_balsa_parser_ = config.use_balsa_parser().value();
   } else {
     ret.use_balsa_parser_ =
         Runtime::runtimeFeatureEnabled("envoy.reloadable_features.http1_use_balsa_parser");

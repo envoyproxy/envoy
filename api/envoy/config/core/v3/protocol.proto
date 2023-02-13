@@ -351,10 +351,11 @@ message Http1ProtocolOptions {
   // (from first line or :path header).
   bool send_fully_qualified_url = 8;
 
+  // [#not-implemented-hide:] Hiding so that field can be removed after BalsaParser is rolled out.
   // If set, force HTTP/1 parser: BalsaParser if true, http-parser if false.
   // If unset, HTTP/1 parser is selected based on
   // envoy.reloadable_features.http1_use_balsa_parser.
-  optional bool use_balsa_parser = 9;
+  google.protobuf.BoolValue use_balsa_parser = 9;
 }
 
 message KeepaliveSettings {
