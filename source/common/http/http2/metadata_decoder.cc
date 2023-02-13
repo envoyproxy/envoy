@@ -2,6 +2,8 @@
 
 #include "source/common/common/assert.h"
 
+#include "source/common/runtime/runtime_features.h"
+
 #include "absl/container/fixed_array.h"
 #include "quiche/http2/decoder/decode_buffer.h"
 #include "quiche/http2/hpack/decoder/hpack_decoder.h"
@@ -64,8 +66,12 @@ bool MetadataDecoder::receiveMetadata(const uint8_t* data, size_t len) {
 }
 
 bool MetadataDecoder::onMetadataFrameComplete(bool end_metadata) {
-  // bool success = decodeMetadataPayloadUsingNghttp2(end_metadata);
-  bool success = decodeMetadataPayload(end_metadata);
+  bool success;
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.http2_decode_metadata_with_quiche")) {
+    success = decodeMetadataPayload(end_metadata);
+  } else {
+    success = decodeMetadataPayloadUsingNghttp2(end_metadata);
+  }
   if (!success) {
     return false;
   }
