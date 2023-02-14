@@ -145,9 +145,9 @@ public:
   }
 
   OptRef<const envoy::config::cluster::v3::Cluster::MaglevLbConfig> lbMaglevConfig() const {
-    if (auto lb_ptr =
-            absl::get_if<std::unique_ptr<const envoy::config::cluster::v3::Cluster::MaglevLbConfig>>(
-                &lbPolicy_)) {
+    if (auto lb_ptr = absl::get_if<
+            std::unique_ptr<const envoy::config::cluster::v3::Cluster::MaglevLbConfig>>(
+            &lbPolicy_)) {
       return makeOptRefFromPtr<const envoy::config::cluster::v3::Cluster::MaglevLbConfig>(
           (*lb_ptr).get());
     } else {
@@ -169,10 +169,10 @@ public:
 
 private:
   absl::variant<std::unique_ptr<const envoy::config::cluster::v3::Cluster::RoundRobinLbConfig>,
-               std::unique_ptr<const envoy::config::cluster::v3::Cluster::LeastRequestLbConfig>,
-               std::unique_ptr<const envoy::config::cluster::v3::Cluster::RingHashLbConfig>,
-               std::unique_ptr<const envoy::config::cluster::v3::Cluster::MaglevLbConfig>,
-               std::unique_ptr<const envoy::config::cluster::v3::Cluster::OriginalDstLbConfig>>
+                std::unique_ptr<const envoy::config::cluster::v3::Cluster::LeastRequestLbConfig>,
+                std::unique_ptr<const envoy::config::cluster::v3::Cluster::RingHashLbConfig>,
+                std::unique_ptr<const envoy::config::cluster::v3::Cluster::MaglevLbConfig>,
+                std::unique_ptr<const envoy::config::cluster::v3::Cluster::OriginalDstLbConfig>>
       lbPolicy_;
 };
 
