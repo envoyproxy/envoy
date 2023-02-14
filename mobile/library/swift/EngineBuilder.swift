@@ -483,7 +483,7 @@ open class EngineBuilder: NSObject {
   ///
   /// - returns: This builder.
   @discardableResult
-  public func addRuntimeGuard(name: String, value: String) -> Self {
+  public func setRuntimeGuard(name: String, value: String) -> Self {
     self.runtimeGuards[name] = value
     return self
   }

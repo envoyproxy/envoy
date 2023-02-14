@@ -20,7 +20,7 @@ Breaking changes:
 - api: move ``dnsPreresolveHostnames`` APIs from taking concatenated cluster YAML to taking a list of String hostnames (:issue: `#25297 <25297>`, :issue: `#25259 <25259>`, :issue: `#25457 <25457>`)
 - api: move Java and C++ addVirtualClusters taking concatenated cluster YAML to addVirtualCluster with one cluster config at a time (:issue: `#25297 <25297>`, :issue: `#25259 <25259>`)
 - api: move Java and C++ dnsPreresolveHostnames from taking concatenated cluster YAML to taking a list of String hostnames (:issue: `#25297 <25297>`, :issue: `#25259 <25259>`)
-- api: added `addRuntimeGuard` APIs for all languages (:issue: `#25434 <25434>`)
+- api: added `setRuntimeGuard` APIs for all languages (:issue: `#25434 <25434>`)
 
 Bugfixes:
 

@@ -93,7 +93,7 @@ public:
   EngineBuilder& addStatsSinks(std::vector<std::string> stat_sinks);
   EngineBuilder& addPlatformFilter(std::string name);
   EngineBuilder& addVirtualCluster(std::string virtual_cluster);
-  EngineBuilder& addRuntimeGuard(std::string guard, bool value);
+  EngineBuilder& setRuntimeGuard(std::string guard, bool value);
 
   // These functions don't affect YAML but instead perform registrations.
   EngineBuilder& addKeyValueStore(std::string name, KeyValueStoreSharedPtr key_value_store);

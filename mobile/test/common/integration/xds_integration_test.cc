@@ -27,7 +27,7 @@ XdsIntegrationTest::XdsIntegrationTest() : BaseClientIntegrationTest(ipVersion()
 
   if (sotw_or_delta_ == Grpc::SotwOrDelta::UnifiedSotw ||
       sotw_or_delta_ == Grpc::SotwOrDelta::UnifiedDelta) {
-    config_helper_.addRuntimeOverride("envoy.reloadable_features.unified_mux", "true");
+    config_helper_.setRuntimeOverride("envoy.reloadable_features.unified_mux", "true");
   }
 
   // xDS upstream is created separately in the test infra, and there's only one non-xDS cluster.

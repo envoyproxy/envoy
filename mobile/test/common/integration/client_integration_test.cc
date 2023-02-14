@@ -349,7 +349,7 @@ TEST_P(ClientIntegrationTest, DirectResponse) {
 
 TEST_P(ClientIntegrationTest, ForceAdmin) {
   override_builder_config_ = true;
-  config_helper_.addRuntimeOverride("envoy.reloadable_features.use_api_listener", "true");
+  config_helper_.setRuntimeOverride("envoy.reloadable_features.use_api_listener", "true");
   basicTest();
   TearDown();
 }
@@ -372,8 +372,8 @@ TEST_P(ClientIntegrationTest, ForceAdminViaBootstrap) {
 }
 
 TEST_P(ClientIntegrationTest, TestRuntimeSet) {
-  builder_.addRuntimeGuard("test_feature_true", false);
-  builder_.addRuntimeGuard("test_feature_false", true);
+  builder_.setRuntimeGuard("test_feature_true", false);
+  builder_.setRuntimeGuard("test_feature_false", true);
   initialize();
 
   // Verify that the Runtime config values are from the RTDS response.

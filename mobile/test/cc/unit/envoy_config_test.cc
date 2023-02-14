@@ -38,7 +38,7 @@ TEST(TestConfig, ConfigIsApplied) {
       .addStatsFlushSeconds(654)
       .setAppVersion("1.2.3")
       .setAppId("1234-1234-1234")
-      .addRuntimeGuard("test_feature_false", true)
+      .setRuntimeGuard("test_feature_false", true)
       .enableDnsCache(true, /* save_interval_seconds */ 101)
       .addDnsPreresolveHostnames({"lyft.com", "google.com"})
 #ifdef ENVOY_ADMIN_FUNCTIONALITY
@@ -78,8 +78,8 @@ TEST(TestConfig, ConfigIsApplied) {
 
 TEST(TestConfig, MultiFlag) {
   EngineBuilder engine_builder;
-  engine_builder.addRuntimeGuard("test_feature_false", true)
-      .addRuntimeGuard("test_feature_true", false);
+  engine_builder.setRuntimeGuard("test_feature_false", true)
+      .setRuntimeGuard("test_feature_true", false);
 
   std::string config_str = engine_builder.generateConfigStr();
   envoy::config::bootstrap::v3::Bootstrap bootstrap;

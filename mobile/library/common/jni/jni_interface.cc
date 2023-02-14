@@ -1319,7 +1319,7 @@ void configureBuilder(JNIEnv* env, jstring grpc_stats_domain, jboolean admin_int
 
   auto guards = javaObjectArrayToStringPairVector(env, runtime_guards);
   for (std::pair<std::string, std::string>& entry : guards) {
-    builder.addRuntimeGuard(entry.first, entry.second == "true");
+    builder.setRuntimeGuard(entry.first, entry.second == "true");
   }
 
   auto filters = javaObjectArrayToStringPairVector(env, filter_chain);

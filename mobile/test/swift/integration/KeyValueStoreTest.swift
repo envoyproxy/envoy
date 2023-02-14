@@ -82,7 +82,7 @@ static_resources:
       .addKeyValueStore(
         name: "envoy.key_value.platform_test",
         keyValueStore: testStore
-      ).addRuntimeGuard(
+      ).setRuntimeGuard(
         name: "test_feature_false",
         value: "true"
       )
