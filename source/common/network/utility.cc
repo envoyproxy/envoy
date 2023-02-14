@@ -236,6 +236,9 @@ Address::InstanceConstSharedPtr Utility::getLocalAddress(const Address::IpVersio
       if (!isLoopbackAddress(*interface_address.interface_addr_) &&
           interface_address.interface_addr_->ip()->version() == version) {
         ret = interface_address.interface_addr_;
+        if (ret->ip()->version() == Address::IpVersion::v6) {
+          ret = ret->ip()->ipv6()->addressWithoutScopeId();
+        }
         break;
       }
     }

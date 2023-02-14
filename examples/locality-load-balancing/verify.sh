@@ -27,14 +27,14 @@ bring_up_backend() {
     local server
     server="$1"
 
-    "$DOCKER_COMPOSE" exec -T client-envoy curl -s "$server":8000/healthy
+    "$DOCKER_COMPOSE" exec -T client-envoy curl -s "$server":8080/healthy
 }
 
 bring_down_backend() {
     local server
     server="$1"
 
-    "$DOCKER_COMPOSE" exec -T client-envoy curl -s "$server":8000/unhealthy
+    "$DOCKER_COMPOSE" exec -T client-envoy curl -s "$server":8080/unhealthy
 }
 
 run_log "=== Demo setup

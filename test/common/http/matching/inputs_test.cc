@@ -107,6 +107,61 @@ TEST(MatchingData, HttpResponseTrailersDataInput) {
   }
 }
 
+TEST(MatchingData, HttpRequestQueryParamsDataInput) {
+  Network::ConnectionInfoSetterImpl connection_info_provider(
+      std::make_shared<Network::Address::Ipv4Instance>(80),
+      std::make_shared<Network::Address::Ipv4Instance>(80));
+  HttpMatchingDataImpl data(connection_info_provider);
+
+  {
+    HttpRequestQueryParamsDataInput input("arg");
+    auto result = input.get(data);
+    EXPECT_EQ(result.data_availability_,
+              Matcher::DataInputGetResult::DataAvailability::NotAvailable);
+    EXPECT_EQ(result.data_, absl::nullopt);
+  }
+
+  {
+    HttpRequestQueryParamsDataInput input("user name");
+    TestRequestHeaderMapImpl request_headers({{":path", "/test?user%20name=foo%20bar"}});
+    data.onRequestHeaders(request_headers);
+
+    EXPECT_EQ(input.get(data).data_, "foo bar");
+  }
+
+  {
+    HttpRequestQueryParamsDataInput input("username");
+    TestRequestHeaderMapImpl request_headers({{":path", "/test?username=fooA&username=fooB"}});
+    data.onRequestHeaders(request_headers);
+
+    EXPECT_EQ(input.get(data).data_, "fooA");
+  }
+
+  {
+    HttpRequestQueryParamsDataInput input("username");
+    TestRequestHeaderMapImpl request_headers({{":path", "/test"}});
+    data.onRequestHeaders(request_headers);
+
+    const auto result = input.get(data);
+
+    EXPECT_EQ(result.data_availability_,
+              Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
+    EXPECT_EQ(result.data_, absl::nullopt);
+  }
+
+  {
+    HttpRequestQueryParamsDataInput input("username");
+    TestRequestHeaderMapImpl request_headers;
+    data.onRequestHeaders(request_headers);
+
+    const auto result = input.get(data);
+
+    EXPECT_EQ(result.data_availability_,
+              Matcher::DataInputGetResult::DataAvailability::NotAvailable);
+    EXPECT_EQ(result.data_, absl::nullopt);
+  }
+}
+
 } // namespace Matching
 } // namespace Http
 } // namespace Envoy

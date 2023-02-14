@@ -571,11 +571,13 @@ void BaseIntegrationTest::createXdsConnection() {
 }
 
 void BaseIntegrationTest::cleanUpXdsConnection() {
-  AssertionResult result = xds_connection_->close();
-  RELEASE_ASSERT(result, result.message());
-  result = xds_connection_->waitForDisconnect();
-  RELEASE_ASSERT(result, result.message());
-  xds_connection_.reset();
+  if (xds_connection_ != nullptr) {
+    AssertionResult result = xds_connection_->close();
+    RELEASE_ASSERT(result, result.message());
+    result = xds_connection_->waitForDisconnect();
+    RELEASE_ASSERT(result, result.message());
+    xds_connection_.reset();
+  }
 }
 
 AssertionResult BaseIntegrationTest::compareDiscoveryRequest(

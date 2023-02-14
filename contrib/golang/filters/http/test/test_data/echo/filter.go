@@ -61,7 +61,3 @@ func (f *filter) EncodeTrailers(trailers api.ResponseTrailerMap) api.StatusType 
 
 func (f *filter) OnDestroy(reason api.DestroyReason) {
 }
-
-func (f *filter) Callbacks() api.FilterCallbacks {
-	return f.callbacks
-}
