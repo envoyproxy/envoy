@@ -201,16 +201,12 @@ public class EnvoyConfiguration {
 
   /**
    * Sets the mode the Engine builder will use for config genreation
+   *
    * @param legacyMode true if the string-based legacy mode should be used
    */
+  void setUseLegacyBuilder(Boolean legacyMode) { useLegacyBuilder = legacyMode; }
 
-  void setUseLegacyBuilder(Boolean legacyMode) {
-    useLegacyBuilder = legacyMode;
-  }
-
-  Boolean useLegacyBuilder() {
-    return useLegacyBuilder;
-  }
+  Boolean useLegacyBuilder() { return useLegacyBuilder; }
 
   /**
    * Creates configuration YAML based on the configuration of the class
