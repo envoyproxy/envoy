@@ -366,7 +366,7 @@ std::string EngineBuilder::generateConfigStr() const {
          fmt::format("{}s", h2_connection_keepalive_timeout_seconds_)},
         {
             "metadata",
-            fmt::format("{{ device_os: {}, app_version: {}, app_id: {} }}", device_os_,
+            fmt::format("{{ device_os: \"{}\", app_version: \"{}\", app_id: \"{}\" }}", device_os_,
                         app_version_, app_id_),
         },
         {"max_connections_per_host", fmt::format("{}", max_connections_per_host_)},
@@ -1068,8 +1068,7 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
   }
 
   // Check equivalence in debug mode.
-  RELEASE_ASSERT(generatedStringMatchesGeneratedBoostrap(generateConfigStr(), *bootstrap),
-                 "Native C++ checks failed");
+  ASSERT(generatedStringMatchesGeneratedBoostrap(generateConfigStr(), *bootstrap));
 
   return bootstrap;
 }

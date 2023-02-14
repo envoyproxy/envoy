@@ -52,6 +52,7 @@ final class DirectResponseFilterMutationIntegrationTest: XCTestCase {
     // configurations (whereas if the filter was not present in the chain, the request would not
     // match any configurations). This behavior is provided by the C++ `RouteCacheResetFilter`.
     let engine = TestEngineBuilder()
+      .useLegacyBuilder(true)
       .addPlatformFilter { MockHeaderMutationFilter(headersToAdd: ["x-foo": "123"]) }
       .addDirectResponse(
         .init(
