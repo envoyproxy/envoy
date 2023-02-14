@@ -308,8 +308,8 @@ void StreamEncoderImpl::endEncode() {
 }
 
 void StreamEncoderImpl::notifyEncodeComplete() {
-  if (stream_adapter_) {
-    stream_adapter_->onCodecEncodeComplete();
+  if (codec_callbacks_) {
+    codec_callbacks_->onCodecEncodeComplete();
   }
   connection_.onEncodeComplete();
 }
@@ -352,9 +352,10 @@ uint64_t ConnectionImpl::flushOutput(bool end_encode) {
   return bytes_encoded;
 }
 
-StreamAdapter* StreamEncoderImpl::registerStreamAdapter(StreamAdapter* adapter) {
-  std::swap(adapter, stream_adapter_);
-  return adapter;
+CodecEventCallbacks*
+StreamEncoderImpl::registerCodecEventCallbacks(CodecEventCallbacks* codec_callbacks) {
+  std::swap(codec_callbacks, codec_callbacks_);
+  return codec_callbacks;
 }
 
 void StreamEncoderImpl::resetStream(StreamResetReason reason) {

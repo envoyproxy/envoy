@@ -110,9 +110,9 @@ public:
     }
   }
 
-  StreamAdapter* registerStreamAdapter(StreamAdapter* adapter) override {
-    std::swap(adapter, stream_adapter_);
-    return adapter;
+  CodecEventCallbacks* registerCodecEventCallbacks(CodecEventCallbacks* codec_callbacks) override {
+    std::swap(codec_callbacks, codec_callbacks_);
+    return codec_callbacks;
   }
 
 protected:
@@ -132,7 +132,7 @@ protected:
 
   virtual bool hasPendingData() PURE;
 
-  StreamAdapter* stream_adapter_{nullptr};
+  CodecEventCallbacks* codec_callbacks_{nullptr};
 
 private:
   Event::Dispatcher& dispatcher_;

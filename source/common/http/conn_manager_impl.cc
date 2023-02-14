@@ -289,7 +289,7 @@ void ConnectionManagerImpl::doDeferredStreamDestroy(ActiveStream& stream) {
     }
 
     if (stream.response_encoder_ != nullptr) {
-      stream.response_encoder_->getStream().registerStreamAdapter(nullptr);
+      stream.response_encoder_->getStream().registerCodecEventCallbacks(nullptr);
     }
   }
 
@@ -375,7 +375,7 @@ RequestDecoder& ConnectionManagerImpl::newStream(ResponseEncoder& response_encod
   new_stream->response_encoder_ = &response_encoder;
   new_stream->response_encoder_->getStream().addCallbacks(*new_stream);
   if (new_stream->expand_agnostic_stream_lifetime_) {
-    new_stream->response_encoder_->getStream().registerStreamAdapter(new_stream.get());
+    new_stream->response_encoder_->getStream().registerCodecEventCallbacks(new_stream.get());
   }
   new_stream->response_encoder_->getStream().setFlushTimeout(new_stream->idle_timeout_ms_);
   new_stream->streamInfo().setDownstreamBytesMeter(response_encoder.getStream().bytesMeter());

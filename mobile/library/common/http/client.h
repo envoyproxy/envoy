@@ -235,9 +235,10 @@ private:
     // Stream
     void addCallbacks(StreamCallbacks& callbacks) override { addCallbacksHelper(callbacks); }
     void removeCallbacks(StreamCallbacks& callbacks) override { removeCallbacksHelper(callbacks); }
-    StreamAdapter* registerStreamAdapter(StreamAdapter* adapter) override {
-      std::swap(adapter, adapter_);
-      return adapter;
+    CodecEventCallbacks*
+    registerCodecEventCallbacks(CodecEventCallbacks* codec_callbacks) override {
+      std::swap(codec_callbacks, codec_callbacks_);
+      return codec_callbacks;
     }
 
     void resetStream(StreamResetReason) override;
@@ -284,17 +285,17 @@ private:
 
     // Used to notify adapter of stream's completion.
     void notifyAdapter(AdapterSignal signal) {
-      if (adapter_) {
+      if (codec_callbacks_) {
         switch (signal) {
         case AdapterSignal::EncodeComplete:
-          adapter_->onCodecEncodeComplete();
+          codec_callbacks_->onCodecEncodeComplete();
           break;
         case AdapterSignal::Error:
           FALLTHRU;
         case AdapterSignal::Cancel:
-          adapter_->onCodecLowLevelReset();
+          codec_callbacks_->onCodecLowLevelReset();
         }
-        registerStreamAdapter(nullptr);
+        registerCodecEventCallbacks(nullptr);
       }
     }
 
@@ -307,7 +308,7 @@ private:
     Client& parent_;
     // Used to communicate with the HTTP Connection Manager that
     // it can destroy the active stream.
-    StreamAdapter* adapter_{nullptr};
+    CodecEventCallbacks* codec_callbacks_{nullptr};
     // Response details used by the connection manager.
     absl::string_view response_details_;
     // Tracks read disable calls. Different buffers can call read disable, and

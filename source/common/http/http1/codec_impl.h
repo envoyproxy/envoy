@@ -56,7 +56,7 @@ public:
   // Http::Stream
   void addCallbacks(StreamCallbacks& callbacks) override { addCallbacksHelper(callbacks); }
   void removeCallbacks(StreamCallbacks& callbacks) override { removeCallbacksHelper(callbacks); }
-  StreamAdapter* registerStreamAdapter(StreamAdapter* adapter) override;
+  CodecEventCallbacks* registerCodecEventCallbacks(CodecEventCallbacks* codec_callbacks) override;
   // After this is called, for the HTTP/1 codec, the connection should be closed, i.e. no further
   // progress may be made with the codec.
   void resetStream(StreamResetReason reason) override;
@@ -127,7 +127,7 @@ private:
 
   absl::string_view details_;
   StreamInfo::BytesMeterSharedPtr bytes_meter_;
-  StreamAdapter* stream_adapter_{nullptr};
+  CodecEventCallbacks* codec_callbacks_{nullptr};
 };
 
 /**

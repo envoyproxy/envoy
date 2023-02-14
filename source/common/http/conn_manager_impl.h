@@ -157,7 +157,7 @@ private:
   struct ActiveStream final : LinkedObject<ActiveStream>,
                               public Event::DeferredDeletable,
                               public StreamCallbacks,
-                              public StreamAdapter,
+                              public CodecEventCallbacks,
                               public RequestDecoder,
                               public Tracing::Config,
                               public ScopeTrackedObject,
@@ -185,7 +185,7 @@ private:
     void onAboveWriteBufferHighWatermark() override;
     void onBelowWriteBufferLowWatermark() override;
 
-    // Http::StreamAdapter
+    // Http::CodecEventCallbacks
     void onCodecEncodeComplete() override;
     void onCodecLowLevelReset() override;
 

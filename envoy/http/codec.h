@@ -325,12 +325,12 @@ public:
 };
 
 /**
- * An adapter for an HTTP Stream that is tightly coupled with both the
- * lifetime of the stream and low-level events that can occur on the stream.
+ * Codec event callbacks for a given HTTP Stream.
+ * This can be used to tightly couple an entity with a streams low-level events.
  */
-class StreamAdapter {
+class CodecEventCallbacks {
 public:
-  virtual ~StreamAdapter() = default;
+  virtual ~CodecEventCallbacks() = default;
   /**
    * Called when the the underlying codec finishes encoding.
    */
@@ -361,12 +361,13 @@ public:
   virtual void removeCallbacks(StreamCallbacks& callbacks) PURE;
 
   /**
-   * Register a stream adapter. The stream can only have a single adapter at a
-   * time.
-   * @param adapter the stream adapter for this stream.
-   * @return StreamAdapter* the prior registered stream adapter.
+   * Register the codec event callbacks for this stream.
+   * The stream can only have a single registered callback at a time.
+   * @param codec_callbacks the codec callbacks for this stream.
+   * @return CodecEventCallbacks* the prior registered codec callbacks.
    */
-  virtual StreamAdapter* registerStreamAdapter(StreamAdapter* adapter) PURE;
+  virtual CodecEventCallbacks*
+  registerCodecEventCallbacks(CodecEventCallbacks* codec_callbacks) PURE;
 
   /**
    * Enable/disable further data from this stream.

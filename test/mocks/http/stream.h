@@ -17,7 +17,7 @@ public:
   // Http::Stream
   MOCK_METHOD(void, addCallbacks, (StreamCallbacks & callbacks));
   MOCK_METHOD(void, removeCallbacks, (StreamCallbacks & callbacks));
-  MOCK_METHOD(StreamAdapter*, registerStreamAdapter, (StreamAdapter * adapter));
+  MOCK_METHOD(CodecEventCallbacks*, registerCodecEventCallbacks, (CodecEventCallbacks * adapter));
   MOCK_METHOD(void, resetStream, (StreamResetReason reason));
   MOCK_METHOD(void, readDisable, (bool disable));
   MOCK_METHOD(void, setWriteBufferWatermarks, (uint32_t));
@@ -51,7 +51,7 @@ public:
 
   const StreamInfo::BytesMeterSharedPtr& bytesMeter() override { return bytes_meter_; }
 
-  StreamAdapter* adapter_{nullptr};
+  CodecEventCallbacks* codec_callbacks_{nullptr};
   StreamInfo::BytesMeterSharedPtr bytes_meter_{std::make_shared<StreamInfo::BytesMeter>()};
 };
 
