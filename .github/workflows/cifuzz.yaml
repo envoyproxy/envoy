@@ -40,8 +40,7 @@ jobs:
        language: c++
        sanitizer: ${{ matrix.sanitizer }}
    - name: Run Fuzzers (${{ matrix.sanitizer }})
-     uses: krajshiva/oss-fuzz/infra/cifuzz/actions/run_fuzzers@v3
-     ref: cifuzz-rbe-integration
+     uses: krajshiva/oss-fuzz/infra/cifuzz/actions/run_fuzzers@cifuzz-rbe-integration
      with:
        oss-fuzz-project-name: 'envoy'
        language: c++
