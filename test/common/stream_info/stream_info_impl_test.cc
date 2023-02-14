@@ -259,6 +259,7 @@ TEST_F(StreamInfoImplTest, SetFromForRecreateStream) {
   EXPECT_EQ(s1.protocol(), s2.protocol());
   EXPECT_EQ(s1.bytesReceived(), s2.bytesReceived());
   EXPECT_EQ(s1.getDownstreamBytesMeter(), s2.getDownstreamBytesMeter());
+  EXPECT_EQ(s1.downstreamTransportFailureReason(), s2.downstreamTransportFailureReason());
 }
 
 TEST_F(StreamInfoImplTest, SetFrom) {
@@ -292,6 +293,7 @@ TEST_F(StreamInfoImplTest, SetFrom) {
   s1.setTraceReason(Tracing::Reason::ClientForced);
   s1.setFilterChainName("foobar");
   s1.setAttemptCount(5);
+  s1.setDownstreamTransportFailureReason("error");
 
 #ifdef __clang__
 #if defined(__linux__)
@@ -313,6 +315,7 @@ TEST_F(StreamInfoImplTest, SetFrom) {
   EXPECT_EQ(s1.protocol(), s2.protocol());
   EXPECT_EQ(s1.bytesReceived(), s2.bytesReceived());
   EXPECT_EQ(s1.getDownstreamBytesMeter(), s2.getDownstreamBytesMeter());
+  EXPECT_EQ(s1.downstreamTransportFailureReason(), s2.downstreamTransportFailureReason());
 
   // Copied by setFrom
   EXPECT_EQ(s1.getRouteName(), s2.getRouteName());

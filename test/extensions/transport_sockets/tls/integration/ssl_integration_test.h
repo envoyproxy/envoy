@@ -28,9 +28,6 @@ public:
   makeSslClientConnection(const ClientSslTransportOptions& options);
   void checkStats();
 
-  // Setup downstream transport failure reason.
-  void setupDownstreamTransportAccessLog();
-
 protected:
   bool server_tlsv1_3_{false};
   bool server_rsa_cert_{true};

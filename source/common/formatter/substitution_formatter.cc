@@ -29,6 +29,7 @@
 #include "source/common/stream_info/utility.h"
 
 #include "absl/strings/str_format.h"
+#include "absl/strings/str_replace.h"
 #include "absl/strings/str_split.h"
 #include "fmt/format.h"
 
@@ -1473,11 +1474,9 @@ const StreamInfoFormatter::FieldExtractorLookupTbl& StreamInfoFormatter::getKnow
                                   [](const StreamInfo::StreamInfo& stream_info) {
                                     absl::optional<std::string> result;
                                     if (!stream_info.downstreamTransportFailureReason().empty()) {
-                                      result = std::string(
-                                          stream_info.downstreamTransportFailureReason());
-                                    }
-                                    if (result) {
-                                      std::replace(result->begin(), result->end(), ' ', '_');
+                                      result = absl::StrReplaceAll(
+                                          stream_info.downstreamTransportFailureReason(),
+                                          {{" ", "_"}});
                                     }
                                     return result;
                                   });

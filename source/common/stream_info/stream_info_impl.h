@@ -335,6 +335,7 @@ struct StreamInfoImpl : public StreamInfo {
     // These two are set in the constructor, but to T(recreate), and should be T(create)
     start_time_ = info.startTime();
     start_time_monotonic_ = info.startTimeMonotonic();
+    downstream_transport_failure_reason_ = std::string(info.downstreamTransportFailureReason());
   }
 
   // This function is used to copy over every field exposed in the StreamInfo interface, with a

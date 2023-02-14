@@ -99,11 +99,6 @@ SslIntegrationTestBase::makeSslClientConnection(const ClientSslTransportOptions&
       client_transport_socket_factory_ptr->createTransportSocket({}, nullptr), nullptr, nullptr);
 }
 
-void SslIntegrationTestBase::setupDownstreamTransportAccessLog() {
-  useListenerAccessLog("DOWNSTREAM_TRANSPORT_FAILURE_REASON=%DOWNSTREAM_TRANSPORT_FAILURE_REASON% "
-                       "FILTER_CHAIN_NAME=%FILTER_CHAIN_NAME%");
-}
-
 void SslIntegrationTestBase::checkStats() {
   const uint32_t expected_handshakes = debug_with_s_client_ ? 2 : 1;
   Stats::CounterSharedPtr counter = test_server_->counter(listenerStatPrefix("ssl.handshake"));
@@ -745,7 +740,8 @@ TEST_P(SslCertficateIntegrationTest, ServerEcdsaClientRsaOnly) {
 // Server has only an ECDSA certificate, client is only RSA capable, leads to a connection fail.
 // Test the access log.
 TEST_P(SslCertficateIntegrationTest, ServerEcdsaClientRsaOnlyWithAccessLog) {
-  setupDownstreamTransportAccessLog();
+  useListenerAccessLog("DOWNSTREAM_TRANSPORT_FAILURE_REASON=%DOWNSTREAM_TRANSPORT_FAILURE_REASON% "
+                       "FILTER_CHAIN_NAME=%FILTER_CHAIN_NAME%");
   server_rsa_cert_ = false;
   server_ecdsa_cert_ = true;
   initialize();
@@ -767,7 +763,8 @@ TEST_P(SslCertficateIntegrationTest, ServerEcdsaClientRsaOnlyWithAccessLog) {
 // Server with RSA/ECDSA certificates and a client with only RSA cipher suites works.
 // Test empty access log with successful connection.
 TEST_P(SslCertficateIntegrationTest, ServerRsaEcdsaClientRsaOnlyWithAccessLog) {
-  setupDownstreamTransportAccessLog();
+  useListenerAccessLog("DOWNSTREAM_TRANSPORT_FAILURE_REASON=%DOWNSTREAM_TRANSPORT_FAILURE_REASON% "
+                       "FILTER_CHAIN_NAME=%FILTER_CHAIN_NAME%");
   server_rsa_cert_ = true;
   server_ecdsa_cert_ = true;
   ConnectionCreationFunction creator = [&]() -> Network::ClientConnectionPtr {
