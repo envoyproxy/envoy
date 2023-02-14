@@ -542,8 +542,8 @@ final class EngineBuilderTests: XCTestCase {
 
     // Metadata
     XCTAssertTrue(resolvedYAML.contains("device_os: iOS"))
-    XCTAssertTrue(resolvedYAML.contains("app_version: v1.2.3"))
-    XCTAssertTrue(resolvedYAML.contains("app_id: com.envoymobile.ios"))
+    XCTAssertTrue(resolvedYAML.contains(#"app_version: "v1.2.3""#))
+    XCTAssertTrue(resolvedYAML.contains(#"app_id: "com.envoymobile.ios""#))
 
     XCTAssertTrue(resolvedYAML.contains("&virtual_clusters [test]"))
 

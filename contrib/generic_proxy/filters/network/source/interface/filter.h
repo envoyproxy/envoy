@@ -49,6 +49,22 @@ public:
    * name will be used to get the config.
    */
   virtual const RouteSpecificFilterConfig* perFilterConfig() const PURE;
+
+  /**
+   * @return StreamInfo::StreamInfo& the stream info object associated with the stream.
+   */
+  virtual const StreamInfo::StreamInfo& streamInfo() const PURE;
+  virtual StreamInfo::StreamInfo& streamInfo() PURE;
+
+  /**
+   * @return Tracing::Span& the active span associated with the stream.
+   */
+  virtual Tracing::Span& activeSpan() PURE;
+
+  /**
+   * @return const Tracing::Config& the tracing configuration.
+   */
+  virtual OptRef<const Tracing::Config> tracingConfig() const PURE;
 };
 
 class DecoderFilterCallback : public virtual StreamFilterCallbacks {
