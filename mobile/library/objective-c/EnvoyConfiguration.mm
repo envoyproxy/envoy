@@ -1,18 +1,34 @@
 #import "library/objective-c/EnvoyEngine.h"
 
 #import "library/common/main_interface.h"
+#import "library/cc/engine_builder.h"
+
+@interface NSString (CXX)
+
+- (std::string)toCXXString;
+
+@end
+
+@implementation NSString (CXX)
+
+- (std::string)toCXXString {
+  return std::string([self UTF8String],
+                     (int)[self lengthOfBytesUsingEncoding:NSUTF8StringEncoding]);
+}
+
+@end
 
 @implementation EnvoyConfiguration
 
 - (instancetype)initWithAdminInterfaceEnabled:(BOOL)adminInterfaceEnabled
-                                  GrpcStatsDomain:(nullable NSString *)grpcStatsDomain
+                                  grpcStatsDomain:(nullable NSString *)grpcStatsDomain
                             connectTimeoutSeconds:(UInt32)connectTimeoutSeconds
                                 dnsRefreshSeconds:(UInt32)dnsRefreshSeconds
                      dnsFailureRefreshSecondsBase:(UInt32)dnsFailureRefreshSecondsBase
                       dnsFailureRefreshSecondsMax:(UInt32)dnsFailureRefreshSecondsMax
                            dnsQueryTimeoutSeconds:(UInt32)dnsQueryTimeoutSeconds
                              dnsMinRefreshSeconds:(UInt32)dnsMinRefreshSeconds
-                           dnsPreresolveHostnames:(NSString *)dnsPreresolveHostnames
+                           dnsPreresolveHostnames:(NSArray<NSString *> *)dnsPreresolveHostnames
                                    enableDNSCache:(BOOL)enableDNSCache
                       dnsCacheSaveIntervalSeconds:(UInt32)dnsCacheSaveIntervalSeconds
                               enableHappyEyeballs:(BOOL)enableHappyEyeballs
@@ -35,7 +51,7 @@
                          perTryIdleTimeoutSeconds:(UInt32)perTryIdleTimeoutSeconds
                                        appVersion:(NSString *)appVersion
                                             appId:(NSString *)appId
-                                  virtualClusters:(NSString *)virtualClusters
+                                  virtualClusters:(NSArray<NSString *> *)virtualClusters
                            directResponseMatchers:(NSString *)directResponseMatchers
                                   directResponses:(NSString *)directResponses
                                 nativeFilterChain:
@@ -48,7 +64,9 @@
                                    keyValueStores:
                                        (NSDictionary<NSString *, id<EnvoyKeyValueStore>> *)
                                            keyValueStores
-                                       statsSinks:(NSArray<NSString *> *)statsSinks {
+                                       statsSinks:(NSArray<NSString *> *)statsSinks
+                 experimentalValidateYAMLCallback:
+                     (nullable void (^)(BOOL))experimentalValidateYAMLCallback {
   self = [super init];
   if (!self) {
     return nil;
@@ -93,6 +111,7 @@
   self.stringAccessors = stringAccessors;
   self.keyValueStores = keyValueStores;
   self.statsSinks = statsSinks;
+  self.experimentalValidateYAMLCallback = experimentalValidateYAMLCallback;
   return self;
 }
 
@@ -118,6 +137,17 @@
             stringByReplacingOccurrencesOfString:@"{{ native_filter_typed_config }}"
                                       withString:nativeFilterConfig.typedConfig];
     [customFilters appendString:filterConfig];
+  }
+
+  if (self.enableHttp3) {
+#ifdef ENVOY_ENABLE_QUIC
+    NSString *http3Insert =
+        [[NSString alloc] initWithUTF8String:alternate_protocols_cache_filter_insert];
+    [customFilters appendString:http3Insert];
+#else
+    NSLog(@"[Envoy] error: http3 functionality was not compiled in this build of Envoy Mobile");
+    return nil;
+#endif
   }
 
   if (self.enableGzipDecompression) {
@@ -150,12 +180,6 @@
           @"Envoy Mobile");
     return nil;
 #endif
-  }
-
-  if (self.enableHttp3) {
-    NSString *http3Insert =
-        [[NSString alloc] initWithUTF8String:alternate_protocols_cache_filter_insert];
-    [customFilters appendString:http3Insert];
   }
 
   BOOL hasDirectResponses = self.directResponses.length > 0;
@@ -192,7 +216,17 @@
       appendFormat:@"- &dns_query_timeout %lus\n", (unsigned long)self.dnsQueryTimeoutSeconds];
   [definitions
       appendFormat:@"- &dns_min_refresh_rate %lus\n", (unsigned long)self.dnsMinRefreshSeconds];
-  [definitions appendFormat:@"- &dns_preresolve_hostnames %@\n", self.dnsPreresolveHostnames];
+  if (self.dnsPreresolveHostnames.count > 0) {
+    NSMutableString *hostnamesYAML = [[NSMutableString alloc] initWithString:@"["];
+    NSString *maybeComma = @"";
+    for (NSString *hostname in self.dnsPreresolveHostnames) {
+      [hostnamesYAML appendString:maybeComma];
+      [hostnamesYAML appendFormat:@"{\"address\": \"%@\", \"port_value\": 443}", hostname];
+      maybeComma = @",";
+    }
+    [hostnamesYAML appendString:@"]"];
+    [definitions appendFormat:@"- &dns_preresolve_hostnames %@\n", hostnamesYAML];
+  }
   [definitions appendFormat:@"- &dns_lookup_family %@\n",
                             self.enableHappyEyeballs ? @"ALL" : @"V4_PREFERRED"];
   [definitions appendFormat:@"- &dns_refresh_rate %lus\n", (unsigned long)self.dnsRefreshSeconds];
@@ -216,7 +250,8 @@
       appendFormat:@"- &per_try_idle_timeout %lus\n", (unsigned long)self.perTryIdleTimeoutSeconds];
   [definitions appendFormat:@"- &metadata { device_os: %@, app_version: %@, app_id: %@ }\n", @"iOS",
                             self.appVersion, self.appId];
-  [definitions appendFormat:@"- &virtual_clusters %@\n", self.virtualClusters];
+  [definitions appendFormat:@"- &virtual_clusters [%@]\n",
+                            [self.virtualClusters componentsJoinedByString:@","]];
 
   [definitions
       appendFormat:@"- &stats_flush_interval %lus\n", (unsigned long)self.statsFlushSeconds];
@@ -248,7 +283,12 @@
   }
 
   if (self.adminInterfaceEnabled) {
+#ifdef ENVOY_ADMIN_FUNCTIONALITY
     [definitions appendString:@"admin: *admin_interface\n"];
+#else
+    NSLog(@"[Envoy] error: admin functionality was not compiled in this build of Envoy Mobile");
+    return nil;
+#endif
   }
 
   [definitions appendString:templateYAML];
@@ -259,7 +299,95 @@
   }
 
   NSLog(@"[Envoy] debug: config:\n%@", definitions);
+  // TODO(jpsim): Set up a way to start the engine with the proto builder
+  if (self.experimentalValidateYAMLCallback) {
+    BOOL result = [self compareYAMLWithProtoBuilder:definitions];
+    self.experimentalValidateYAMLCallback(result);
+  }
   return definitions;
+}
+
+- (BOOL)compareYAMLWithProtoBuilder:(NSString *)yaml {
+  Envoy::Platform::EngineBuilder builder;
+
+  builder.addGrpcStatsDomain([self.grpcStatsDomain toCXXString]);
+  builder.addConnectTimeoutSeconds(self.connectTimeoutSeconds);
+  builder.addDnsRefreshSeconds(self.dnsRefreshSeconds);
+  builder.addDnsFailureRefreshSeconds(self.dnsFailureRefreshSecondsBase,
+                                      self.dnsFailureRefreshSecondsMax);
+  builder.addDnsQueryTimeoutSeconds(self.dnsQueryTimeoutSeconds);
+  builder.addDnsMinRefreshSeconds(self.dnsMinRefreshSeconds);
+  builder.enableDnsCache(self.enableDNSCache, self.dnsCacheSaveIntervalSeconds);
+  builder.addMaxConnectionsPerHost(self.maxConnectionsPerHost);
+  builder.addH2ConnectionKeepaliveIdleIntervalMilliseconds(
+      self.h2ConnectionKeepaliveIdleIntervalMilliseconds);
+  builder.addH2ConnectionKeepaliveTimeoutSeconds(self.h2ConnectionKeepaliveTimeoutSeconds);
+  builder.addStatsFlushSeconds(self.statsFlushSeconds);
+
+  builder.setAppVersion([self.appVersion toCXXString]);
+  builder.setAppId([self.appId toCXXString]);
+  builder.setDeviceOs("iOS");
+
+  builder.setStreamIdleTimeoutSeconds(self.streamIdleTimeoutSeconds);
+  builder.setPerTryIdleTimeoutSeconds(self.perTryIdleTimeoutSeconds);
+#ifdef ENVOY_ADMIN_FUNCTIONALITY
+  builder.enableAdminInterface(self.adminInterfaceEnabled);
+#endif
+  builder.enableGzipDecompression(self.enableGzipDecompression);
+#ifdef ENVOY_MOBILE_REQUEST_COMPRESSION
+  builder.enableGzipCompression(self.enableGzipCompression);
+#endif
+  builder.enableBrotliDecompression(self.enableBrotliDecompression);
+#ifdef ENVOY_MOBILE_REQUEST_COMPRESSION
+  builder.enableBrotliCompression(self.enableBrotliCompression);
+#endif
+  builder.enableHappyEyeballs(self.enableHappyEyeballs);
+#ifdef ENVOY_ENABLE_QUIC
+  builder.enableHttp3(self.enableHttp3);
+#endif
+  builder.enableInterfaceBinding(self.enableInterfaceBinding);
+  builder.enableDrainPostDnsRefresh(self.enableDrainPostDnsRefresh);
+  builder.enforceTrustChainVerification(self.enforceTrustChainVerification);
+  builder.enablePlatformCertificatesValidation(self.enablePlatformCertificateValidation);
+  builder.setForceAlwaysUsev6(self.forceIPv6);
+  for (EnvoyHTTPFilterFactory *filterFactory in
+       [self.httpPlatformFilterFactories reverseObjectEnumerator]) {
+    builder.addPlatformFilter([filterFactory.filterName toCXXString]);
+  }
+  for (EnvoyNativeFilterConfig *nativeFilterConfig in self.nativeFilterChain) {
+    builder.addNativeFilter(
+        /* name */ [nativeFilterConfig.name toCXXString],
+        /* typed_config */ [nativeFilterConfig.typedConfig toCXXString]);
+  }
+
+  for (NSString *cluster in self.virtualClusters) {
+    builder.addVirtualCluster([cluster toCXXString]);
+  }
+
+  if (self.statsSinks.count > 0) {
+    std::vector<std::string> sinks;
+    sinks.reserve(self.statsSinks.count);
+    for (NSString *sink in self.statsSinks) {
+      sinks.push_back([sink toCXXString]);
+    }
+    builder.addStatsSinks(std::move(sinks));
+  }
+
+  if (self.dnsPreresolveHostnames.count > 0) {
+    std::vector<std::string> hostnames;
+    hostnames.reserve(self.dnsPreresolveHostnames.count);
+    for (NSString *hostname in self.dnsPreresolveHostnames) {
+      hostnames.push_back([hostname toCXXString]);
+    }
+    builder.addDnsPreresolveHostnames(hostnames);
+  }
+
+  try {
+    return builder.generateBootstrapAndCompare([yaml toCXXString]);
+  } catch (const std::exception &e) {
+    NSLog(@"[Envoy] error comparing YAML: %@", @(e.what()));
+    return FALSE;
+  }
 }
 
 @end

@@ -48,7 +48,7 @@ TEST_P(CdsIntegrationTest, Basic) {
                                                              {cluster1}, {cluster1}, {}, "55");
   // Wait for cluster to be added
   ASSERT_TRUE(waitForCounterGe("cluster_manager.cluster_added", 1));
-  ASSERT_EQ(cluster_count + 1, getGaugeValue("cluster_manager.active_clusters"));
+  ASSERT_TRUE(waitForGaugeGe("cluster_manager.active_clusters", cluster_count + 1));
 }
 
 } // namespace
