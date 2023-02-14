@@ -95,7 +95,7 @@ LocalRateLimitStats Config::generateStats(const std::string& prefix, Stats::Scop
   return {ALL_LOCAL_RATE_LIMIT_STATS(POOL_COUNTER_PREFIX(scope, final_prefix))};
 }
 
-bool Config::canCreateConnection() { return rate_limiter_->requestAllowed(descriptors_); }
+bool Config::canCreateConnection() { return rate_limiter_->requestAllowed({}); }
 
 void Filter::resetTimerState() {
   if (delay_timer_) {
@@ -127,10 +127,14 @@ Network::FilterStatus Filter::onNewConnection() {
     if (duration.has_value() && duration.value() > std::chrono::milliseconds(0)) {
       delay_timer_ = read_callbacks_->connection().dispatcher().createTimer([this]() -> void {
         resetTimerState();
+        read_callbacks_->connection().streamInfo().setResponseFlag(
+          StreamInfo::ResponseFlag::UpstreamRetryLimitExceeded);
         read_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
       });
       delay_timer_->enableTimer(duration.value());
     } else {
+      read_callbacks_->connection().streamInfo().setResponseFlag(
+        StreamInfo::ResponseFlag::UpstreamRetryLimitExceeded);
       read_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
     }
     return Network::FilterStatus::StopIteration;

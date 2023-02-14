@@ -87,7 +87,6 @@ private:
   Runtime::FeatureFlag enabled_;
   LocalRateLimitStats stats_;
   absl::optional<std::chrono::milliseconds> delay_;
-  std::vector<RateLimit::LocalDescriptor> descriptors_;
   const SharedRateLimitSingleton::Key* shared_bucket_key_{};
   std::shared_ptr<SharedRateLimitSingleton> shared_bucket_registry_;
 
@@ -122,7 +121,7 @@ private:
   void resetTimerState();
   const ConfigSharedPtr config_;
   Network::ReadFilterCallbacks* read_callbacks_{};
-  Event::TimerPtr delay_timer_ = nullptr;
+  Event::TimerPtr delay_timer_{};
 };
 
 } // namespace LocalRateLimitFilter
