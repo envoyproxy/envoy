@@ -349,7 +349,7 @@ TEST_P(ClientIntegrationTest, DirectResponse) {
 
 TEST_P(ClientIntegrationTest, ForceAdmin) {
   override_builder_config_ = true;
-  config_helper_.setRuntimeOverride("envoy.reloadable_features.use_api_listener", "true");
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.use_api_listener", "true");
   basicTest();
   TearDown();
 }
