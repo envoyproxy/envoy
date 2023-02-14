@@ -22,6 +22,7 @@ Bugfixes:
 
 - android: fix engine startup crash for when admin interface is enabled. (:issue:`#2520 <2520>`)
 - android: respect system security policy when determining whether clear text requests are allowed. (:issue:`#2528 <2528>`)
+- android: fix JNI crashes when responses would have empty trailers. (:issue:`#25516 <25516>`)
 
 Features:
 
