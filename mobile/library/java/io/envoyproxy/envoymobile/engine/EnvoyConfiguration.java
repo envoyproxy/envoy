@@ -64,6 +64,7 @@ public class EnvoyConfiguration {
   public final List<String> statSinks;
   public final Boolean enablePlatformCertificatesValidation;
   public final Boolean enableSkipDNSLookupForProxiedRequests;
+  public Boolean useLegacyBuilder;
 
   private static final Pattern UNRESOLVED_KEY_PATTERN = Pattern.compile("\\{\\{ (.+) \\}\\}");
 
@@ -195,7 +196,18 @@ public class EnvoyConfiguration {
     this.statSinks = statSinks;
     this.enablePlatformCertificatesValidation = enablePlatformCertificatesValidation;
     this.enableSkipDNSLookupForProxiedRequests = enableSkipDNSLookupForProxiedRequests;
+    this.useLegacyBuilder = false;
   }
+
+  /**
+   * Sets the mode the Engine builder will use for config generation.
+   *
+   * @param legacyMode true if the string-based legacy mode should be used
+   */
+  void setUseLegacyBuilder(Boolean legacyMode) { useLegacyBuilder = legacyMode; }
+
+  Boolean useLegacyBuilder() { return useLegacyBuilder; }
+
   /**
    * Creates configuration YAML based on the configuration of the class
    *
@@ -373,6 +385,29 @@ public class EnvoyConfiguration {
     }
 
     return resolvedConfiguration;
+  }
+
+  long createBootstrap() {
+    Boolean enforceTrustChainVerification =
+        trustChainVerification == EnvoyConfiguration.TrustChainVerification.VERIFY_TRUST_CHAIN;
+    List<EnvoyNativeFilterConfig> reverseFilterChain = new ArrayList<>(nativeFilterChain);
+    Collections.reverse(reverseFilterChain);
+
+    byte[][] filter_chain = JniBridgeUtility.toJniBytes(reverseFilterChain);
+    byte[][] clusters = JniBridgeUtility.stringsToJniBytes(virtualClusters);
+    byte[][] stats_sinks = JniBridgeUtility.stringsToJniBytes(statSinks);
+    byte[][] dns_preresolve = JniBridgeUtility.stringsToJniBytes(dnsPreresolveHostnames);
+    return JniLibrary.createBootstrap(
+        grpcStatsDomain, adminInterfaceEnabled, connectTimeoutSeconds, dnsRefreshSeconds,
+        dnsFailureRefreshSecondsBase, dnsFailureRefreshSecondsMax, dnsQueryTimeoutSeconds,
+        dnsMinRefreshSeconds, dns_preresolve, enableDNSCache, dnsCacheSaveIntervalSeconds,
+        enableDrainPostDnsRefresh, enableHttp3, enableGzipDecompression, enableGzipCompression,
+        enableBrotliDecompression, enableBrotliCompression, enableSocketTagging,
+        enableHappyEyeballs, enableInterfaceBinding, h2ConnectionKeepaliveIdleIntervalMilliseconds,
+        h2ConnectionKeepaliveTimeoutSeconds, maxConnectionsPerHost, statsFlushSeconds,
+        streamIdleTimeoutSeconds, perTryIdleTimeoutSeconds, appVersion, appId,
+        enforceTrustChainVerification, clusters, filter_chain, stats_sinks,
+        enablePlatformCertificatesValidation, enableSkipDNSLookupForProxiedRequests);
   }
 
   static class ConfigurationException extends RuntimeException {
