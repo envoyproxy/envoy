@@ -1,11 +1,11 @@
 #include "source/extensions/tracers/datadog/agent_http_client.h"
 
-#include <cassert>
 #include <cstddef>
 #include <cstdint>
 #include <memory>
 #include <string>
 
+#include "source/common/common/assert.h"
 #include "source/common/http/message_impl.h"
 #include "source/common/http/utility.h"
 #include "source/extensions/tracers/datadog/dict_util.h"
@@ -30,7 +30,8 @@ AgentHTTPClient::AgentHTTPClient(Upstream::ClusterManager& cluster_manager,
 
 AgentHTTPClient::~AgentHTTPClient() {
   for (const auto& [request_ptr, _] : handlers_) {
-    assert(request_ptr);
+    RELEASE_ASSERT(request_ptr,
+                   "null Http::AsyncClient::Request* in handler map of Datadog::AgentHTTPClient");
     request_ptr->cancel();
   }
 }

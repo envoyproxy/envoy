@@ -414,8 +414,13 @@ TEST_F(DatadogAgentHttpClientTest, SendFailReturnsError) {
             return nullptr; // indicates error
           }));
 
+  // Neither callback will be invoked, because `post` fails immediately (synchronously).
+  EXPECT_CALL(on_error_, Call(_)).Times(0);
+  EXPECT_CALL(on_response_, Call(_, _, _)).Times(0);
+
   const auto ignore = [](auto&&...) {};
-  datadog::tracing::Expected<void> result = client_.post(url_, ignore, "", ignore, ignore);
+  datadog::tracing::Expected<void> result =
+      client_.post(url_, ignore, "", on_response_.AsStdFunction(), on_error_.AsStdFunction());
   ASSERT_FALSE(result);
   EXPECT_EQ(datadog::tracing::Error::ENVOY_HTTP_CLIENT_FAILURE, result.error().code);
   EXPECT_EQ(1, stats_.reports_failed_.value());

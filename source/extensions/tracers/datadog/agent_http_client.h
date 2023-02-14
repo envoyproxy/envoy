@@ -95,8 +95,8 @@ public:
 private:
   absl::flat_hash_map<Http::AsyncClient::Request*, Handlers> handlers_;
   Upstream::ClusterUpdateTracker collector_cluster_;
-  std::string cluster_;
-  std::string reference_host_;
+  const std::string cluster_;
+  const std::string reference_host_;
   TracerStats& stats_;
 };
 
