@@ -87,7 +87,7 @@ private:
   // the previous generation's cluster's lazy-init block. We use the value in this shared gauge to
   // determine whether to instantiate the lazy block on construction.
   Gauge& inited_;
-  // TODO(stevenzzzz, jmarantz): Clean up this ctor_ by moving ownership to AtomicPtr, and drop it
+  // TODO(stevenzzzz, jmarantz): Clean up this ctor_ by moving its ownership to AtomicPtr, and drop the setter lambda
   // when the nested object is created.
   std::function<StatsStructType*()> ctor_;
   Thread::AtomicPtr<StatsStructType, Thread::AtomicPtrAllocMode::DeleteOnDestruct>
