@@ -124,6 +124,9 @@ public class EnvoyEngineImpl implements EnvoyEngine {
   @Override
   public EnvoyStatus runWithConfig(EnvoyConfiguration envoyConfiguration, String logLevel) {
     performRegistration(envoyConfiguration);
+    if (envoyConfiguration.useLegacyBuilder()) {
+      return runWithConfigLegacy(envoyConfiguration, logLevel);
+    }
     try {
       int status = JniLibrary.runEngine(this.engineHandle, envoyConfiguration.createYaml(),
                                         envoyConfiguration.createBootstrap(), logLevel);

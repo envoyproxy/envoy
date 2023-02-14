@@ -64,6 +64,7 @@ public class EnvoyConfiguration {
   public final List<String> statSinks;
   public final Boolean enablePlatformCertificatesValidation;
   public final Boolean enableSkipDNSLookupForProxiedRequests;
+  public Boolean useLegacyBuilder;
 
   private static final Pattern UNRESOLVED_KEY_PATTERN = Pattern.compile("\\{\\{ (.+) \\}\\}");
 
@@ -195,7 +196,22 @@ public class EnvoyConfiguration {
     this.statSinks = statSinks;
     this.enablePlatformCertificatesValidation = enablePlatformCertificatesValidation;
     this.enableSkipDNSLookupForProxiedRequests = enableSkipDNSLookupForProxiedRequests;
+    this.useLegacyBuilder = false;
   }
+
+  /**
+   * Sets the mode the Engine builder will use for config genreation
+   * @param legacyMode true if the string-based legacy mode should be used
+   */
+
+  void setUseLegacyBuilder(Boolean legacyMode) {
+    useLegacyBuilder = legacyMode;
+  }
+
+  Boolean useLegacyBuilder() {
+    return useLegacyBuilder;
+  }
+
   /**
    * Creates configuration YAML based on the configuration of the class
    *
