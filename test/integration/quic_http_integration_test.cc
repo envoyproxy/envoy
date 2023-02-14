@@ -1191,11 +1191,16 @@ TEST_P(QuicHttpIntegrationTest, DeferredLogging) {
       "METADATA("
       "udp.proxy.session:bytes_sent)%,%REQ(:path)%,%STREAM_INFO_REQ(:path)%");
   initialize();
+
+  // Make a header-only request and delay the response by 1ms to ensure that the ROUNDTRIP_DURATION
+  // metric is > 0 if exists.
   codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
-  sendRequestAndWaitForResponse(default_request_headers_, /*request_size=*/0,
-                                default_response_headers_,
-                                /*response_size=*/0,
-                                /*upstream_index=*/0, TestUtility::DefaultTimeout);
+  IntegrationStreamDecoderPtr response =
+      codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  absl::SleepFor(absl::Milliseconds(1));
+  waitForNextUpstreamRequest(0, TestUtility::DefaultTimeout);
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  RELEASE_ASSERT(response->waitForEndStream(TestUtility::DefaultTimeout), "unexpected timeout");
   codec_client_->close();
 
   std::string log = waitForAccessLog(access_log_name_);

@@ -229,6 +229,36 @@ public:
   resolveTransportSocketFactory(const Network::Address::InstanceConstSharedPtr& dest_address,
                                 const envoy::config::core::v3::Metadata* metadata) const;
   absl::optional<MonotonicTime> lastHcPassTime() const override { return last_hc_pass_time_; }
+  MonotonicTime lastSuccessfulTrafficTime(
+      envoy::data::core::v3::HealthCheckerType health_checker_type) const override {
+    switch (health_checker_type) {
+    case envoy::data::core::v3::HealthCheckerType::TCP:
+      return last_traffic_pass_time_;
+    case envoy::data::core::v3::HealthCheckerType::HTTP:
+      return last_traffic_pass_time_2xx_;
+    case envoy::data::core::v3::HealthCheckerType::GRPC:
+      return last_traffic_pass_time_grpc_;
+    default:
+      break;
+    }
+    return creation_time_;
+  }
+
+  void setLastSuccessfulTrafficTime(envoy::data::core::v3::HealthCheckerType health_checker_type,
+                                    MonotonicTime last_successful_traffic_time) const override {
+    switch (health_checker_type) {
+    case envoy::data::core::v3::HealthCheckerType::TCP:
+      last_traffic_pass_time_ = last_successful_traffic_time;
+      break;
+    case envoy::data::core::v3::HealthCheckerType::HTTP:
+      last_traffic_pass_time_2xx_ = last_successful_traffic_time;
+      break;
+    case envoy::data::core::v3::HealthCheckerType::GRPC:
+      last_traffic_pass_time_grpc_ = last_successful_traffic_time;
+    default:
+      break;
+    }
+  }
 
   void setAddressList(const std::vector<Network::Address::InstanceConstSharedPtr>& address_list) {
     address_list_ = address_list;
@@ -274,6 +304,9 @@ private:
       socket_factory_ ABSL_GUARDED_BY(metadata_mutex_);
   const MonotonicTime creation_time_;
   absl::optional<MonotonicTime> last_hc_pass_time_;
+  mutable MonotonicTime last_traffic_pass_time_;
+  mutable MonotonicTime last_traffic_pass_time_2xx_;
+  mutable MonotonicTime last_traffic_pass_time_grpc_;
 };
 
 /**
@@ -909,6 +942,7 @@ public:
   Http::Http1::CodecStats& http1CodecStats() const override;
   Http::Http2::CodecStats& http2CodecStats() const override;
   Http::Http3::CodecStats& http3CodecStats() const override;
+  Http::HeaderValidatorPtr makeHeaderValidator(Http::Protocol protocol) const override;
 
 protected:
   // Gets the retry budget percent/concurrency from the circuit breaker thresholds. If the retry
@@ -939,10 +973,13 @@ private:
     const ClusterRequestResponseSizeStatsPtr request_response_size_stats_;
   };
 
+#ifdef ENVOY_ENABLE_UHV
+  ::Envoy::Http::HeaderValidatorStats& getHeaderValidatorStats(Http::Protocol protocol) const;
+#endif
+
   Runtime::Loader& runtime_;
   const std::string name_;
   const std::string observability_name_;
-  const envoy::config::cluster::v3::Cluster::DiscoveryType type_;
   const absl::flat_hash_map<std::string, ProtocolOptionsConfigConstSharedPtr>
       extension_protocol_options_;
   const std::shared_ptr<const HttpProtocolOptionsConfigImpl> http_protocol_options_;
@@ -978,7 +1015,6 @@ private:
   const std::unique_ptr<const envoy::config::cluster::v3::Cluster::OriginalDstLbConfig>
       lb_original_dst_config_;
   std::unique_ptr<envoy::config::core::v3::TypedExtensionConfig> upstream_config_;
-  const bool added_via_api_;
   LoadBalancerSubsetInfoImpl lb_subset_;
   const envoy::config::core::v3::Metadata metadata_;
   Envoy::Config::TypedMetadataImpl<ClusterTypedMetadataFactory> typed_metadata_;
@@ -1002,10 +1038,12 @@ private:
   const uint32_t per_connection_buffer_limit_bytes_;
   const uint32_t max_response_headers_count_;
   LoadBalancerType lb_type_;
+  const envoy::config::cluster::v3::Cluster::DiscoveryType type_;
   const bool drain_connections_on_host_removal_ : 1;
   const bool connection_pool_per_downstream_connection_ : 1;
   const bool warm_hosts_ : 1;
   const bool set_local_interface_name_on_upstream_connections_ : 1;
+  const bool added_via_api_ : 1;
   // true iff the cluster proto specified upstream http filters.
   bool has_configured_http_filters_ : 1;
 };
