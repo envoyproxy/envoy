@@ -200,7 +200,7 @@ public class EnvoyConfiguration {
   }
 
   /**
-   * Sets the mode the Engine builder will use for config genreation
+   * Sets the mode the Engine builder will use for config generation.
    *
    * @param legacyMode true if the string-based legacy mode should be used
    */
