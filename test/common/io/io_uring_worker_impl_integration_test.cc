@@ -76,23 +76,17 @@ public:
                          .socket(AF_INET, SOCK_STREAM | SOCK_NONBLOCK, IPPROTO_TCP)
                          .return_value_;
     EXPECT_TRUE(SOCKET_VALID(listen_socket_));
-    struct sockaddr_in server_addr;
-    memset(&server_addr, 0, sizeof(server_addr));
-    server_addr.sin_family = AF_INET;
-    server_addr.sin_port = 0;
-    EXPECT_EQ(inet_pton(AF_INET, "127.0.0.1", &server_addr.sin_addr.s_addr), 1);
-    EXPECT_EQ(Api::OsSysCallsSingleton::get()
-                  .bind(listen_socket_, reinterpret_cast<struct sockaddr*>(&server_addr),
-                        sizeof(server_addr))
-                  .return_value_,
-              0);
-    EXPECT_EQ(Api::OsSysCallsSingleton::get().listen(listen_socket_, 5).return_value_, 0);
 
     // Using non blocking for the client socket, then we won't block on the test thread.
     client_socket_ = Api::OsSysCallsSingleton::get()
                          .socket(AF_INET, SOCK_STREAM | SOCK_NONBLOCK, IPPROTO_TCP)
                          .return_value_;
     EXPECT_TRUE(SOCKET_VALID(client_socket_));
+  }
+  void initializeSockets() {
+    listen();
+    connect(getServerPort());
+    accept();
   }
   void cleanup() {
     Api::OsSysCallsSingleton::get().close(client_socket_);
@@ -107,12 +101,25 @@ public:
     return sin.sin_port;
   }
 
-  void connect() {
+  void listen() {
+    struct sockaddr_in server_addr;
+    memset(&server_addr, 0, sizeof(server_addr));
+    server_addr.sin_family = AF_INET;
+    server_addr.sin_port = 0;
+    EXPECT_EQ(inet_pton(AF_INET, "127.0.0.1", &server_addr.sin_addr.s_addr), 1);
+    EXPECT_EQ(Api::OsSysCallsSingleton::get()
+                  .bind(listen_socket_, reinterpret_cast<struct sockaddr*>(&server_addr),
+                        sizeof(server_addr))
+                  .return_value_,
+              0);
+    EXPECT_EQ(Api::OsSysCallsSingleton::get().listen(listen_socket_, 5).return_value_, 0);
+  }
+  void connect(uint32_t port) {
     struct sockaddr_in server_addr;
     memset(&server_addr, 0, sizeof(server_addr));
 
     server_addr.sin_family = AF_INET;
-    server_addr.sin_port = getServerPort();
+    server_addr.sin_port = port;
     server_addr.sin_addr.s_addr = inet_addr("127.0.0.1");
     Api::OsSysCallsSingleton::get().connect(
         client_socket_, reinterpret_cast<struct sockaddr*>(&server_addr), sizeof(server_addr));
@@ -139,45 +146,6 @@ public:
     file_event.reset();
   }
 
-  std::string serverRead(IoUringTestSocket& socket, uint32_t size) {
-    auto buf = std::make_unique<uint8_t[]>(size);
-    struct iovec iov;
-    iov.iov_base = buf.get();
-    iov.iov_len = size;
-
-    // Wait for server socket receiving data.
-    socket.read_result_ = -1;
-    io_uring_worker_->submitReadRequest(socket, &iov);
-    while (socket.read_result_ == -1) {
-      dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
-    }
-    EXPECT_EQ(socket.read_result_, size);
-
-    return {static_cast<char*>(static_cast<void*>(buf.release())), size};
-  }
-  void serverWrite(IoUringTestSocket& socket, std::string& data) {
-    size_t length = data.length();
-
-    struct iovec iov;
-    iov.iov_base = data.data();
-    iov.iov_len = length;
-
-    // Wait for server socket sending data.
-    socket.write_result_ = -1;
-    io_uring_worker_->submitWritevRequest(socket, &iov, 1);
-    while (socket.write_result_ == -1) {
-      dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
-    }
-    EXPECT_EQ(socket.write_result_, length);
-  }
-
-  Api::SysCallSizeResult clientRead(const struct iovec* data) {
-    return Api::OsSysCallsSingleton::get().readv(client_socket_, data, 1);
-  }
-  void clientWrite(const std::string& data) {
-    Api::OsSysCallsSingleton::get().write(client_socket_, data.data(), data.size());
-  }
-
   os_fd_t listen_socket_{INVALID_SOCKET};
   os_fd_t server_socket_{INVALID_SOCKET};
   os_fd_t client_socket_{INVALID_SOCKET};
@@ -190,8 +158,7 @@ public:
 
 TEST_F(IoUringWorkerIntegraionTest, Read) {
   init();
-  connect();
-  accept();
+  initializeSockets();
 
   auto& socket = dynamic_cast<IoUringTestSocket&>(
       io_uring_worker_->addTestSocket(server_socket_, io_uring_handler_));
@@ -199,13 +166,21 @@ TEST_F(IoUringWorkerIntegraionTest, Read) {
 
   // Write data through client socket.
   std::string write_data = "hello world";
-  clientWrite(write_data);
+  Api::OsSysCallsSingleton::get().write(client_socket_, write_data.data(), write_data.size());
 
-  // Read data from server socket.
-  std::string read_data = serverRead(socket, write_data.length());
+  // Waiting for the server socket receive the data.
+  auto read_buf = std::make_unique<uint8_t[]>(20);
+  struct iovec iov;
+  iov.iov_base = read_buf.get();
+  iov.iov_len = 20;
+  io_uring_worker_->submitReadRequest(socket, &iov);
+  while (socket.read_result_ == -1) {
+    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  }
 
-  EXPECT_FALSE(socket.is_read_injected_completion_);
+  std::string read_data(static_cast<char*>(iov.iov_base), socket.read_result_);
   EXPECT_EQ(read_data, write_data);
+  EXPECT_FALSE(socket.is_read_injected_completion_);
 
   socket.cleanup();
   EXPECT_EQ(io_uring_worker_->getSockets().size(), 0);
@@ -214,28 +189,33 @@ TEST_F(IoUringWorkerIntegraionTest, Read) {
 
 TEST_F(IoUringWorkerIntegraionTest, Write) {
   init();
-  connect();
-  accept();
+  initializeSockets();
 
   auto& socket = dynamic_cast<IoUringTestSocket&>(
       io_uring_worker_->addTestSocket(server_socket_, io_uring_handler_));
   EXPECT_EQ(io_uring_worker_->getSockets().size(), 1);
 
-  // Write data through server socket.
+  // Waiting for the server socket sending the data.
   std::string write_data = "hello world";
-  serverWrite(socket, write_data);
+  struct iovec iov;
+  iov.iov_base = write_data.data();
+  iov.iov_len = write_data.length();
+  io_uring_worker_->submitWritevRequest(socket, &iov, 1);
+  while (socket.write_result_ == -1) {
+    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  }
 
   // Read data from client socket.
   struct iovec read_iov;
   auto read_buf = std::make_unique<uint8_t[]>(20);
   read_iov.iov_base = read_buf.get();
   read_iov.iov_len = 20;
-  auto size = clientRead(&read_iov).return_value_;
+  auto size = Api::OsSysCallsSingleton::get().readv(client_socket_, &read_iov, 1).return_value_;
   EXPECT_EQ(size, write_data.length());
 
-  EXPECT_FALSE(socket.is_write_injected_completion_);
   std::string read_data(static_cast<char*>(read_iov.iov_base), size);
   EXPECT_EQ(read_data, write_data);
+  EXPECT_FALSE(socket.is_write_injected_completion_);
 
   socket.cleanup();
   EXPECT_EQ(io_uring_worker_->getSockets().size(), 0);
@@ -244,8 +224,7 @@ TEST_F(IoUringWorkerIntegraionTest, Write) {
 
 TEST_F(IoUringWorkerIntegraionTest, Injection) {
   init();
-  connect();
-  accept();
+  initializeSockets();
 
   auto& socket = dynamic_cast<IoUringTestSocket&>(
       io_uring_worker_->addTestSocket(server_socket_, io_uring_handler_));
@@ -261,28 +240,26 @@ TEST_F(IoUringWorkerIntegraionTest, Injection) {
   EXPECT_TRUE(socket.is_read_injected_completion_);
   EXPECT_EQ(socket.read_result_, -EAGAIN);
 
+  // Expect an inject completion after real read request.
+  socket.injectCompletion(RequestType::Write);
+
   // Write data through client socket.
+  std::string write_data = "hello world";
+  Api::OsSysCallsSingleton::get().write(client_socket_, write_data.data(), write_data.size());
+
+  // Waiting for server socket receive data and injected completion.
   socket.read_result_ = -1;
   struct iovec iov;
   auto read_buf = std::make_unique<uint8_t[]>(20);
   iov.iov_base = read_buf.get();
   iov.iov_len = 20;
   io_uring_worker_->submitReadRequest(socket, &iov);
-  std::string write_data = "hello world";
-
-  // Expect an inject completion after real read request.
-  socket.injectCompletion(RequestType::Write);
-
-  clientWrite(write_data);
-
-  // Waiting for server socket receive data and injected completion.
   while (socket.read_result_ == -1) {
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   }
 
   std::string read_data(static_cast<char*>(iov.iov_base), socket.read_result_);
   EXPECT_EQ(read_data, write_data);
-
   EXPECT_TRUE(socket.is_write_injected_completion_);
   EXPECT_EQ(socket.write_result_, -EAGAIN);
 
@@ -293,8 +270,7 @@ TEST_F(IoUringWorkerIntegraionTest, Injection) {
 
 TEST_F(IoUringWorkerIntegraionTest, MergeInjection) {
   init();
-  connect();
-  accept();
+  initializeSockets();
 
   auto& socket = dynamic_cast<IoUringTestSocket&>(
       io_uring_worker_->addTestSocket(server_socket_, io_uring_handler_));
