@@ -95,7 +95,7 @@ TEST(IoUringWorkerImplTest, delaySubmit) {
         struct iovec iov;
         EXPECT_CALL(mock_io_uring, prepareReadv(io_uring_socket.fd(), &iov, 1, 0, _));
         auto req = worker.submitReadRequest(io_uring_socket, &iov);
-        // Manullay delete requests which have to be deleted in request completion callbacks.
+        // Manually delete requests which have to be deleted in request completion callbacks.
         delete req;
         EXPECT_CALL(mock_io_uring, prepareReadv(io_uring_socket.fd(), &iov, 1, 0, _));
         req = worker.submitReadRequest(io_uring_socket, &iov);

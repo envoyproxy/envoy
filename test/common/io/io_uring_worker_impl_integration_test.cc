@@ -70,6 +70,8 @@ public:
     }
     api_ = Api::createApiForTest(time_system_);
     dispatcher_ = api_->allocateDispatcher("test_thread");
+    io_uring_worker_ = std::make_unique<IoUringWorkerTestImpl>(
+        std::make_unique<IoUringImpl>(8, false), *dispatcher_);
     listen_socket_ = Api::OsSysCallsSingleton::get()
                          .socket(AF_INET, SOCK_STREAM | SOCK_NONBLOCK, IPPROTO_TCP)
                          .return_value_;
@@ -92,7 +94,6 @@ public:
                          .return_value_;
     EXPECT_TRUE(SOCKET_VALID(client_socket_));
   }
-
   void cleanup() {
     Api::OsSysCallsSingleton::get().close(client_socket_);
     Api::OsSysCallsSingleton::get().close(server_socket_);
@@ -117,7 +118,6 @@ public:
         client_socket_, reinterpret_cast<struct sockaddr*>(&server_addr), sizeof(server_addr));
     EXPECT_EQ(errno, EINPROGRESS);
   }
-
   void accept() {
     auto file_event = dispatcher_->createFileEvent(
         listen_socket_,
@@ -139,7 +139,42 @@ public:
     file_event.reset();
   }
 
-  void write(const std::string& data) {
+  std::string serverRead(IoUringTestSocket& socket, uint32_t size) {
+    auto buf = std::make_unique<uint8_t[]>(size);
+    struct iovec iov;
+    iov.iov_base = buf.get();
+    iov.iov_len = size;
+
+    // Wait for server socket receiving data.
+    socket.read_result_ = -1;
+    io_uring_worker_->submitReadRequest(socket, &iov);
+    while (socket.read_result_ == -1) {
+      dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+    }
+    EXPECT_EQ(socket.read_result_, size);
+
+    return {static_cast<char*>(static_cast<void*>(buf.release())), size};
+  }
+  void serverWrite(IoUringTestSocket& socket, std::string& data) {
+    size_t length = data.length();
+
+    struct iovec iov;
+    iov.iov_base = data.data();
+    iov.iov_len = length;
+
+    // Wait for server socket sending data.
+    socket.write_result_ = -1;
+    io_uring_worker_->submitWritevRequest(socket, &iov, 1);
+    while (socket.write_result_ == -1) {
+      dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+    }
+    EXPECT_EQ(socket.write_result_, length);
+  }
+
+  Api::SysCallSizeResult clientRead(const struct iovec* data) {
+    return Api::OsSysCallsSingleton::get().readv(client_socket_, data, 1);
+  }
+  void clientWrite(const std::string& data) {
     Api::OsSysCallsSingleton::get().write(client_socket_, data.data(), data.size());
   }
 
@@ -149,39 +184,61 @@ public:
   Api::ApiPtr api_;
   Event::DispatcherPtr dispatcher_;
   Event::GlobalTimeSystem time_system_;
+  std::unique_ptr<IoUringWorkerTestImpl> io_uring_worker_;
+  TestIoUringHandler io_uring_handler_;
 };
 
-TEST_F(IoUringWorkerIntegraionTest, Basic) {
+TEST_F(IoUringWorkerIntegraionTest, Read) {
   init();
   connect();
   accept();
 
-  IoUringWorkerTestImpl io_uring_worker(std::make_unique<IoUringImpl>(8, false), *dispatcher_);
-  auto handler = TestIoUringHandler();
-  auto& io_uring_socket =
-      dynamic_cast<IoUringTestSocket&>(io_uring_worker.addTestSocket(server_socket_, handler));
-  EXPECT_EQ(io_uring_worker.getSockets().size(), 1);
+  auto& socket = dynamic_cast<IoUringTestSocket&>(
+      io_uring_worker_->addTestSocket(server_socket_, io_uring_handler_));
+  EXPECT_EQ(io_uring_worker_->getSockets().size(), 1);
 
   // Write data through client socket.
-  struct iovec iov;
-  auto read_buf = std::make_unique<uint8_t[]>(20);
-  iov.iov_base = read_buf.get();
-  iov.iov_len = 20;
-  io_uring_worker.submitReadRequest(io_uring_socket, &iov);
   std::string write_data = "hello world";
-  write(write_data);
+  clientWrite(write_data);
 
-  // Waiting for the server socket receive the data.
-  while (io_uring_socket.read_result_ == -1) {
-    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
-  }
+  // Read data from server socket.
+  std::string read_data = serverRead(socket, write_data.length());
 
-  EXPECT_FALSE(io_uring_socket.is_read_injected_completion_);
-  std::string read_data(static_cast<char*>(iov.iov_base), io_uring_socket.read_result_);
+  EXPECT_FALSE(socket.is_read_injected_completion_);
   EXPECT_EQ(read_data, write_data);
 
-  io_uring_socket.cleanup();
-  EXPECT_EQ(io_uring_worker.getSockets().size(), 0);
+  socket.cleanup();
+  EXPECT_EQ(io_uring_worker_->getSockets().size(), 0);
+  cleanup();
+}
+
+TEST_F(IoUringWorkerIntegraionTest, Write) {
+  init();
+  connect();
+  accept();
+
+  auto& socket = dynamic_cast<IoUringTestSocket&>(
+      io_uring_worker_->addTestSocket(server_socket_, io_uring_handler_));
+  EXPECT_EQ(io_uring_worker_->getSockets().size(), 1);
+
+  // Write data through server socket.
+  std::string write_data = "hello world";
+  serverWrite(socket, write_data);
+
+  // Read data from client socket.
+  struct iovec read_iov;
+  auto read_buf = std::make_unique<uint8_t[]>(20);
+  read_iov.iov_base = read_buf.get();
+  read_iov.iov_len = 20;
+  auto size = clientRead(&read_iov).return_value_;
+  EXPECT_EQ(size, write_data.length());
+
+  EXPECT_FALSE(socket.is_write_injected_completion_);
+  std::string read_data(static_cast<char*>(read_iov.iov_base), size);
+  EXPECT_EQ(read_data, write_data);
+
+  socket.cleanup();
+  EXPECT_EQ(io_uring_worker_->getSockets().size(), 0);
   cleanup();
 }
 
@@ -190,49 +247,47 @@ TEST_F(IoUringWorkerIntegraionTest, Injection) {
   connect();
   accept();
 
-  IoUringWorkerTestImpl io_uring_worker(std::make_unique<IoUringImpl>(8, false), *dispatcher_);
-  auto handler = TestIoUringHandler();
-  auto& io_uring_socket =
-      dynamic_cast<IoUringTestSocket&>(io_uring_worker.addTestSocket(server_socket_, handler));
-  EXPECT_EQ(io_uring_worker.getSockets().size(), 1);
+  auto& socket = dynamic_cast<IoUringTestSocket&>(
+      io_uring_worker_->addTestSocket(server_socket_, io_uring_handler_));
+  EXPECT_EQ(io_uring_worker_->getSockets().size(), 1);
 
-  io_uring_socket.injectCompletion(RequestType::Read);
+  socket.injectCompletion(RequestType::Read);
 
-  // Waiting for the server socket receive the injected completion.
-  while (io_uring_socket.read_result_ == -1) {
+  // Wait for server socket receive injected completion.
+  while (socket.read_result_ == -1) {
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   }
 
-  EXPECT_TRUE(io_uring_socket.is_read_injected_completion_);
-  EXPECT_EQ(io_uring_socket.read_result_, -EAGAIN);
+  EXPECT_TRUE(socket.is_read_injected_completion_);
+  EXPECT_EQ(socket.read_result_, -EAGAIN);
 
   // Write data through client socket.
-  io_uring_socket.read_result_ = -1;
+  socket.read_result_ = -1;
   struct iovec iov;
   auto read_buf = std::make_unique<uint8_t[]>(20);
   iov.iov_base = read_buf.get();
   iov.iov_len = 20;
-  io_uring_worker.submitReadRequest(io_uring_socket, &iov);
+  io_uring_worker_->submitReadRequest(socket, &iov);
   std::string write_data = "hello world";
 
   // Expect an inject completion after real read request.
-  io_uring_socket.injectCompletion(RequestType::Write);
+  socket.injectCompletion(RequestType::Write);
 
-  write(write_data);
+  clientWrite(write_data);
 
-  // Waiting for the server socket receive the data and injected completion.
-  while (io_uring_socket.read_result_ == -1) {
+  // Waiting for server socket receive data and injected completion.
+  while (socket.read_result_ == -1) {
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   }
 
-  std::string read_data(static_cast<char*>(iov.iov_base), io_uring_socket.read_result_);
+  std::string read_data(static_cast<char*>(iov.iov_base), socket.read_result_);
   EXPECT_EQ(read_data, write_data);
 
-  EXPECT_TRUE(io_uring_socket.is_write_injected_completion_);
-  EXPECT_EQ(io_uring_socket.write_result_, -EAGAIN);
+  EXPECT_TRUE(socket.is_write_injected_completion_);
+  EXPECT_EQ(socket.write_result_, -EAGAIN);
 
-  io_uring_socket.cleanup();
-  EXPECT_EQ(io_uring_worker.getSockets().size(), 0);
+  socket.cleanup();
+  EXPECT_EQ(io_uring_worker_->getSockets().size(), 0);
   cleanup();
 }
 
@@ -241,23 +296,21 @@ TEST_F(IoUringWorkerIntegraionTest, MergeInjection) {
   connect();
   accept();
 
-  IoUringWorkerTestImpl io_uring_worker(std::make_unique<IoUringImpl>(8, false), *dispatcher_);
-  auto handler = TestIoUringHandler();
-  auto& io_uring_socket =
-      dynamic_cast<IoUringTestSocket&>(io_uring_worker.addTestSocket(server_socket_, handler));
-  EXPECT_EQ(io_uring_worker.getSockets().size(), 1);
+  auto& socket = dynamic_cast<IoUringTestSocket&>(
+      io_uring_worker_->addTestSocket(server_socket_, io_uring_handler_));
+  EXPECT_EQ(io_uring_worker_->getSockets().size(), 1);
 
-  io_uring_socket.injectCompletion(RequestType::Read);
-  io_uring_socket.injectCompletion(RequestType::Read);
+  socket.injectCompletion(RequestType::Read);
+  socket.injectCompletion(RequestType::Read);
 
   // Waiting for the server socket receive the injected completion.
-  while (io_uring_socket.read_result_ == -1) {
+  while (socket.read_result_ == -1) {
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   }
 
-  EXPECT_TRUE(io_uring_socket.is_read_injected_completion_);
-  EXPECT_EQ(io_uring_socket.read_result_, -EAGAIN);
-  EXPECT_EQ(io_uring_socket.nr_completion_, 1);
+  EXPECT_TRUE(socket.is_read_injected_completion_);
+  EXPECT_EQ(socket.read_result_, -EAGAIN);
+  EXPECT_EQ(socket.nr_completion_, 1);
 }
 
 } // namespace
