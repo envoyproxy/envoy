@@ -253,15 +253,18 @@ public class EnvoyConfiguration {
     String maybeComma = "";
     StringBuilder virtualClustersBuilder = new StringBuilder("[");
     for (String cluster : virtualClusters) {
-      virtualClustersBuilder.append(cluster);
       virtualClustersBuilder.append(maybeComma);
+      virtualClustersBuilder.append(cluster);
       maybeComma = ",";
     }
     virtualClustersBuilder.append("]");
 
+    maybeComma = "";
     StringBuilder dnsBuilder = new StringBuilder("[");
     for (String dns : dnsPreresolveHostnames) {
+      dnsBuilder.append(maybeComma);
       dnsBuilder.append("{address: " + dns + ", port_value: 443}");
+      maybeComma = ",";
     }
     dnsBuilder.append("]");
 
@@ -287,8 +290,9 @@ public class EnvoyConfiguration {
         .append(String.format("- &max_connections_per_host %s\n", maxConnectionsPerHost))
         .append(String.format("- &stream_idle_timeout %ss\n", streamIdleTimeoutSeconds))
         .append(String.format("- &per_try_idle_timeout %ss\n", perTryIdleTimeoutSeconds))
-        .append(String.format("- &metadata { device_os: %s, app_version: %s, app_id: %s }\n",
-                              "Android", appVersion, appId))
+        .append(String.format(
+            "- &metadata { device_os: Android, app_version: \"%s\", app_id: \"%s\" }\n", appVersion,
+            appId))
         .append(String.format("- &trust_chain_verification %s\n", trustChainVerification.name()))
         .append(String.format("- &skip_dns_lookup_for_proxied_requests %s\n",
                               enableSkipDNSLookupForProxiedRequests ? "true" : "false"))

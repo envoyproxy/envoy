@@ -241,9 +241,6 @@ def format_header_from_file(
         options.csharp_namespace = '.'.join(names) + 'NS'
         options.ruby_package = '::'.join(names) + 'NS'
 
-    if file_proto.service:
-        options.java_generic_services = True
-
     if file_proto.options.HasExtension(migrate_pb2.file_migrate):
         options.Extensions[migrate_pb2.file_migrate].CopyFrom(
             file_proto.options.Extensions[migrate_pb2.file_migrate])

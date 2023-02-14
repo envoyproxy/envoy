@@ -49,7 +49,7 @@ void insertCustomFilter(const std::string& filter_config, std::string& config_te
 // Note that updates to the config.cc bootstrap will require a matching update in
 // generateBootstrap() below
 bool generatedStringMatchesGeneratedBoostrap(
-    const std::string& config_str, const envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    const absl::string_view config_str, const envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
   Thread::SkipAsserts skip;
   ProtobufMessage::StrictValidationVisitorImpl visitor;
   envoy::config::bootstrap::v3::Bootstrap config_bootstrap;
@@ -225,20 +225,24 @@ EngineBuilder& EngineBuilder::enableSocketTagging(bool socket_tagging_on) {
   return *this;
 }
 
+#ifdef ENVOY_ADMIN_FUNCTIONALITY
 EngineBuilder& EngineBuilder::enableAdminInterface(bool admin_interface_on) {
   admin_interface_enabled_ = admin_interface_on;
   return *this;
 }
+#endif
 
 EngineBuilder& EngineBuilder::enableHappyEyeballs(bool happy_eyeballs_on) {
   enable_happy_eyeballs_ = happy_eyeballs_on;
   return *this;
 }
 
+#ifdef ENVOY_ENABLE_QUIC
 EngineBuilder& EngineBuilder::enableHttp3(bool http3_on) {
   enable_http3_ = http3_on;
   return *this;
 }
+#endif
 
 EngineBuilder& EngineBuilder::setForceAlwaysUsev6(bool value) {
   always_use_v6_ = value;
@@ -331,8 +335,8 @@ std::string EngineBuilder::generateConfigStr() const {
   std::string preresolve_hostnames = "[";
   std::string maybe_comma = "";
   for (auto& hostname : dns_preresolve_hostnames_) {
-    absl::StrAppend(&preresolve_hostnames, maybe_comma, "{address: ", hostname,
-                    ", port_value: 443}");
+    absl::StrAppend(&preresolve_hostnames, maybe_comma, "{address: \"", hostname,
+                    "\", port_value: 443}");
     maybe_comma = ",";
   }
   absl::StrAppend(&preresolve_hostnames, "]");
@@ -362,7 +366,7 @@ std::string EngineBuilder::generateConfigStr() const {
          fmt::format("{}s", h2_connection_keepalive_timeout_seconds_)},
         {
             "metadata",
-            fmt::format("{{ device_os: {}, app_version: {}, app_id: {} }}", device_os_,
+            fmt::format("{{ device_os: \"{}\", app_version: \"{}\", app_id: \"{}\" }}", device_os_,
                         app_version_, app_id_),
         },
         {"max_connections_per_host", fmt::format("{}", max_connections_per_host_)},
@@ -429,7 +433,11 @@ std::string EngineBuilder::generateConfigStr() const {
     insertCustomFilter(gzip_decompressor_config_insert, config_template);
   }
   if (enable_http3_) {
+#ifdef ENVOY_ENABLE_QUIC
     insertCustomFilter(alternate_protocols_cache_filter_insert, config_template);
+#else
+    throw std::runtime_error("http3 functionality was not compiled in this build of Envoy Mobile");
+#endif
   }
 
   for (const NativeFilterConfig& filter : native_filter_chain_) {
@@ -475,7 +483,11 @@ std::string EngineBuilder::generateConfigStr() const {
   config_builder << config_template;
 
   if (admin_interface_enabled_) {
+#ifdef ENVOY_ADMIN_FUNCTIONALITY
     config_builder << "admin: *admin_interface" << std::endl;
+#else
+    throw std::runtime_error("Admin functionality was not compiled in this build of Envoy Mobile");
+#endif
   }
 
   auto config_str = config_builder.str();
@@ -486,11 +498,14 @@ std::string EngineBuilder::generateConfigStr() const {
   return config_str;
 }
 
+bool EngineBuilder::generateBootstrapAndCompare(absl::string_view yaml) const {
+  return generatedStringMatchesGeneratedBoostrap(yaml, *generateBootstrap());
+}
+
 std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap>
-EngineBuilder::generateBootstrapAndCompareForTests(std::string yaml) const {
-  auto bootstrap = generateBootstrap();
-  RELEASE_ASSERT(generatedStringMatchesGeneratedBoostrap(yaml, *generateBootstrap()),
-                 "Failed equivalence");
+EngineBuilder::generateBootstrapAndCompareForTests(absl::string_view yaml) const {
+  std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> bootstrap = generateBootstrap();
+  RELEASE_ASSERT(generateBootstrapAndCompare(yaml), "Failed equivalence");
   return bootstrap;
 }
 
@@ -499,7 +514,8 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
   Thread::SkipAsserts skip;
   ASSERT(!config_bootstrap_incompatible_);
 
-  auto bootstrap = std::make_unique<envoy::config::bootstrap::v3::Bootstrap>();
+  std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> bootstrap =
+      std::make_unique<envoy::config::bootstrap::v3::Bootstrap>();
 
   // Set up the HCM
   envoy::extensions::filters::network::http_connection_manager::v3::EnvoyMobileHttpConnectionManager
@@ -554,12 +570,16 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
 
   // Set up the optional filters
   if (enable_http3_) {
+#ifdef ENVOY_ENABLE_QUIC
     envoy::extensions::filters::http::alternate_protocols_cache::v3::FilterConfig cache_config;
     cache_config.mutable_alternate_protocols_cache_options()->set_name(
         "default_alternate_protocols_cache");
     auto* cache_filter = hcm->add_http_filters();
     cache_filter->set_name("alternate_protocols_cache");
     cache_filter->mutable_typed_config()->PackFrom(cache_config);
+#else
+    throw std::runtime_error("http3 functionality was not compiled in this build of Envoy Mobile");
+#endif
   }
 
   if (gzip_decompression_filter_) {
@@ -975,7 +995,7 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
   (*flags.mutable_fields())["always_use_v6"].set_bool_value(always_use_v6_);
   (*flags.mutable_fields())["skip_dns_lookup_for_proxied_requests"].set_bool_value(
       skip_dns_lookups_for_proxied_requests_);
-  (*runtime_values.mutable_fields())["disallow_global_stats"].set_bool_value("true");
+  (*runtime_values.mutable_fields())["disallow_global_stats"].set_bool_value(true);
   ProtobufWkt::Struct& overload_values =
       *(*envoy_layer.mutable_fields())["overload"].mutable_struct_value();
   (*overload_values.mutable_fields())["global_downstream_max_connections"].set_string_value(
@@ -1038,14 +1058,17 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
 
   // Admin
   if (admin_interface_enabled_) {
+#ifdef ENVOY_ADMIN_FUNCTIONALITY
     auto* admin_address = bootstrap->mutable_admin()->mutable_address()->mutable_socket_address();
     admin_address->set_address("::1");
     admin_address->set_port_value(9901);
+#else
+    throw std::runtime_error("Admin functionality was not compiled in this build of Envoy Mobile");
+#endif
   }
 
   // Check equivalence in debug mode.
-  RELEASE_ASSERT(generatedStringMatchesGeneratedBoostrap(generateConfigStr(), *bootstrap),
-                 "Native C++ checks failed");
+  ASSERT(generatedStringMatchesGeneratedBoostrap(generateConfigStr(), *bootstrap));
 
   return bootstrap;
 }
@@ -1094,9 +1117,11 @@ EngineSharedPtr EngineBuilder::build() {
     }
     options->setLogLevel(options->parseAndValidateLogLevel(logLevelToString(log_level_).c_str()));
     options->setConcurrency(1);
+#ifdef ENVOY_ADMIN_FUNCTIONALITY
     if (!admin_address_path_for_tests_.empty()) {
       options->setAdminAddressPath(admin_address_path_for_tests_);
     }
+#endif
     cast_engine->run(std::move(options));
   }
 

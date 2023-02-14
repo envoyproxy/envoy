@@ -13,6 +13,7 @@ envoy_cc_extension(
     srcs = ["cluster.cc"],
     hdrs = ["cluster.h"],
     deps = [
+        "//envoy/router:string_accessor_interface",
         "//source/common/network:transport_socket_options_lib",
         "//source/common/upstream:cluster_factory_lib",
         "//source/extensions/clusters/common:logical_host_lib",
