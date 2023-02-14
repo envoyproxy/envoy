@@ -23,8 +23,6 @@ jobs:
         CXX: /opt/llvm/bin/clang++
     steps:
     - uses: actions/checkout@v3
-    - name: Add safe directory
-      run: git config --global --add safe.directory /__w/envoy/envoy
     - name: 'Build test binary'
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -51,9 +49,6 @@ jobs:
         CXX: /opt/llvm/bin/clang++
     steps:
     - uses: actions/checkout@v3
-    - name: Add safe directory
-      run: |
-        git config --global --add safe.directory /__w/envoy/envoy
     - name: 'Build test binary'
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
