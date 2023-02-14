@@ -12,6 +12,7 @@
 #include "source/common/stats/symbol_table.h"
 #include "source/common/stream_info/utility.h"
 #include "source/extensions/filters/http/common/pass_through_filter.h"
+#include "source/extensions/filters/http/grpc_stats/response_frame_counter.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -150,7 +151,9 @@ public:
 
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers, bool) override {
     grpc_request_ = Grpc::Common::isGrpcRequestHeaders(headers);
-    if (grpc_request_) {
+    connect_unary_ = Grpc::Common::isConnectRequestHeaders(headers);
+    connect_streaming_request_ = Grpc::Common::isConnectStreamingRequestHeaders(headers);
+    if (grpc_request_ || connect_streaming_request_ || connect_unary_) {
       cluster_ = decoder_callbacks_->clusterInfo();
       if (cluster_) {
         if (config_->stats_for_all_methods_) {
@@ -192,10 +195,11 @@ public:
         }
       }
     }
+
     return Http::FilterHeadersStatus::Continue;
   }
 
-  Http::FilterDataStatus decodeData(Buffer::Instance& data, bool) override {
+  Http::FilterDataStatus decodeData(Buffer::Instance& data, bool end_stream) override {
     if (grpc_request_) {
       uint64_t delta = request_counter_.inspect(data);
       if (delta > 0) {
@@ -204,6 +208,16 @@ public:
           config_->context_.chargeRequestMessageStat(*cluster_, request_names_, delta);
         }
       }
+    } else if (connect_streaming_request_) {
+      uint64_t delta = request_counter_.inspect(data);
+      if (delta > 0) {
+        maybeWriteFilterState();
+        config_->context_.chargeRequestMessageStat(*cluster_, request_names_, delta);
+      }
+    } else if (connect_unary_ && end_stream) {
+      connect_unary_request_body_ = true;
+      maybeWriteFilterState();
+      config_->context_.chargeRequestMessageStat(*cluster_, request_names_, 1);
     }
     return Http::FilterDataStatus::Continue;
   }
@@ -211,9 +225,15 @@ public:
   Http::FilterHeadersStatus encodeHeaders(Http::ResponseHeaderMap& headers,
                                           bool end_stream) override {
     grpc_response_ = Grpc::Common::isGrpcResponseHeaders(headers, end_stream);
+    connect_streaming_response_ = Grpc::Common::isConnectStreamingResponseHeaders(headers);
     if (doStatTracking()) {
-      config_->context_.chargeStat(*cluster_, Grpc::Context::Protocol::Grpc, request_names_,
-                                   headers.GrpcStatus());
+      if (connect_unary_) {
+        config_->context_.chargeStat(*cluster_, Grpc::Context::Protocol::Grpc, request_names_,
+                                     headers.getStatusValue() == "200");
+      } else if (!connect_streaming_response_) {
+        config_->context_.chargeStat(*cluster_, Grpc::Context::Protocol::Grpc, request_names_,
+                                     headers.GrpcStatus());
+      }
       if (end_stream) {
         maybeChargeUpstreamStat();
       }
@@ -221,7 +241,7 @@ public:
     return Http::FilterHeadersStatus::Continue;
   }
 
-  Http::FilterDataStatus encodeData(Buffer::Instance& data, bool) override {
+  Http::FilterDataStatus encodeData(Buffer::Instance& data, bool end_stream) override {
     if (grpc_response_) {
       uint64_t delta = response_counter_.inspect(data);
       if (delta > 0) {
@@ -230,12 +250,28 @@ public:
           config_->context_.chargeResponseMessageStat(*cluster_, request_names_, delta);
         }
       }
+    } else if (connect_streaming_request_) {
+      uint64_t delta = response_counter_.inspect(data);
+      if (delta > 0) {
+        maybeWriteFilterState();
+        config_->context_.chargeResponseMessageStat(*cluster_, request_names_, delta);
+      }
+      if (end_stream) {
+        config_->context_.chargeStat(*cluster_, Grpc::Context::Protocol::Grpc, request_names_,
+                                     response_counter_.connectSuccess());
+        maybeChargeUpstreamStat();
+      }
+    } else if (connect_unary_ && end_stream) {
+      connect_unary_response_body_ = true;
+      maybeWriteFilterState();
+      config_->context_.chargeResponseMessageStat(*cluster_, request_names_, 1);
+      maybeChargeUpstreamStat();
     }
     return Http::FilterDataStatus::Continue;
   }
 
   Http::FilterTrailersStatus encodeTrailers(Http::ResponseTrailerMap& trailers) override {
-    if (doStatTracking()) {
+    if (grpc_request_ && doStatTracking()) {
       config_->context_.chargeStat(*cluster_, Grpc::Context::Protocol::Grpc, request_names_,
                                    trailers.GrpcStatus());
       maybeChargeUpstreamStat();
@@ -257,8 +293,13 @@ public:
           StreamInfo::FilterState::StateType::Mutable,
           StreamInfo::FilterState::LifeSpan::FilterChain);
     }
-    filter_object_->request_message_count = request_counter_.frameCount();
-    filter_object_->response_message_count = response_counter_.frameCount();
+    if (connect_unary_) {
+      filter_object_->request_message_count = connect_unary_request_body_;
+      filter_object_->response_message_count = connect_unary_response_body_;
+    } else {
+      filter_object_->request_message_count = request_counter_.frameCount();
+      filter_object_->response_message_count = response_counter_.frameCount();
+    }
   }
 
   void maybeChargeUpstreamStat() {
@@ -282,8 +323,13 @@ private:
   bool do_stat_tracking_{false};
   bool grpc_request_{false};
   bool grpc_response_{false};
+  bool connect_unary_{false};
+  bool connect_streaming_request_{false};
+  bool connect_streaming_response_{false};
+  bool connect_unary_request_body_{false};
+  bool connect_unary_response_body_{false};
   Grpc::FrameInspector request_counter_;
-  Grpc::FrameInspector response_counter_;
+  ResponseFrameCounter response_counter_;
   Upstream::ClusterInfoConstSharedPtr cluster_;
   absl::optional<Grpc::Context::RequestStatNames> request_names_;
 };

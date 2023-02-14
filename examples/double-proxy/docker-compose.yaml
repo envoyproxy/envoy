@@ -15,6 +15,9 @@ services:
       dockerfile: Dockerfile-proxy
     networks:
       edge:
+    depends_on:
+      app:
+        condition: service_healthy
     ports:
     - "10000:10000"
 

@@ -17,14 +17,16 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic, assign) UInt32 dnsFailureRefreshSecondsMax;
 @property (nonatomic, assign) UInt32 dnsQueryTimeoutSeconds;
 @property (nonatomic, assign) UInt32 dnsMinRefreshSeconds;
-@property (nonatomic, strong) NSString *dnsPreresolveHostnames;
+@property (nonatomic, strong) NSArray<NSString *> *dnsPreresolveHostnames;
 @property (nonatomic, assign) UInt32 dnsRefreshSeconds;
 @property (nonatomic, assign) BOOL enableDNSCache;
 @property (nonatomic, assign) UInt32 dnsCacheSaveIntervalSeconds;
 @property (nonatomic, assign) BOOL enableHappyEyeballs;
 @property (nonatomic, assign) BOOL enableHttp3;
-@property (nonatomic, assign) BOOL enableGzip;
-@property (nonatomic, assign) BOOL enableBrotli;
+@property (nonatomic, assign) BOOL enableGzipDecompression;
+@property (nonatomic, assign) BOOL enableGzipCompression;
+@property (nonatomic, assign) BOOL enableBrotliDecompression;
+@property (nonatomic, assign) BOOL enableBrotliCompression;
 @property (nonatomic, assign) BOOL enableInterfaceBinding;
 @property (nonatomic, assign) BOOL enableDrainPostDnsRefresh;
 @property (nonatomic, assign) BOOL enforceTrustChainVerification;
@@ -38,7 +40,7 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic, assign) UInt32 perTryIdleTimeoutSeconds;
 @property (nonatomic, strong) NSString *appVersion;
 @property (nonatomic, strong) NSString *appId;
-@property (nonatomic, strong) NSString *virtualClusters;
+@property (nonatomic, strong) NSArray<NSString *> *virtualClusters;
 @property (nonatomic, strong) NSString *directResponseMatchers;
 @property (nonatomic, strong) NSString *directResponses;
 @property (nonatomic, strong) NSArray<EnvoyNativeFilterConfig *> *nativeFilterChain;
@@ -46,25 +48,28 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic, strong) NSDictionary<NSString *, EnvoyStringAccessor *> *stringAccessors;
 @property (nonatomic, strong) NSDictionary<NSString *, id<EnvoyKeyValueStore>> *keyValueStores;
 @property (nonatomic, strong) NSArray<NSString *> *statsSinks;
+@property (nonatomic, copy, nullable) void (^experimentalValidateYAMLCallback)(BOOL);
 
 /**
  Create a new instance of the configuration.
  */
 - (instancetype)initWithAdminInterfaceEnabled:(BOOL)adminInterfaceEnabled
-                                  GrpcStatsDomain:(nullable NSString *)grpcStatsDomain
+                                  grpcStatsDomain:(nullable NSString *)grpcStatsDomain
                             connectTimeoutSeconds:(UInt32)connectTimeoutSeconds
                                 dnsRefreshSeconds:(UInt32)dnsRefreshSeconds
                      dnsFailureRefreshSecondsBase:(UInt32)dnsFailureRefreshSecondsBase
                       dnsFailureRefreshSecondsMax:(UInt32)dnsFailureRefreshSecondsMax
                            dnsQueryTimeoutSeconds:(UInt32)dnsQueryTimeoutSeconds
                              dnsMinRefreshSeconds:(UInt32)dnsMinRefreshSeconds
-                           dnsPreresolveHostnames:(NSString *)dnsPreresolveHostnames
+                           dnsPreresolveHostnames:(NSArray<NSString *> *)dnsPreresolveHostnames
                                    enableDNSCache:(BOOL)enableDNSCache
                       dnsCacheSaveIntervalSeconds:(UInt32)dnsCacheSaveIntervalSeconds
                               enableHappyEyeballs:(BOOL)enableHappyEyeballs
                                       enableHttp3:(BOOL)enableHttp3
-                                       enableGzip:(BOOL)enableGzip
-                                     enableBrotli:(BOOL)enableBrotli
+                          enableGzipDecompression:(BOOL)enableGzipDecompression
+                            enableGzipCompression:(BOOL)enableGzipCompression
+                        enableBrotliDecompression:(BOOL)enableBrotliDecompression
+                          enableBrotliCompression:(BOOL)enableBrotliCompression
                            enableInterfaceBinding:(BOOL)enableInterfaceBinding
                         enableDrainPostDnsRefresh:(BOOL)enableDrainPostDnsRefresh
                     enforceTrustChainVerification:(BOOL)enforceTrustChainVerification
@@ -79,7 +84,7 @@ NS_ASSUME_NONNULL_BEGIN
                          perTryIdleTimeoutSeconds:(UInt32)perTryIdleTimeoutSeconds
                                        appVersion:(NSString *)appVersion
                                             appId:(NSString *)appId
-                                  virtualClusters:(NSString *)virtualClusters
+                                  virtualClusters:(NSArray<NSString *> *)virtualClusters
                            directResponseMatchers:(NSString *)directResponseMatchers
                                   directResponses:(NSString *)directResponses
                                 nativeFilterChain:
@@ -92,7 +97,9 @@ NS_ASSUME_NONNULL_BEGIN
                                    keyValueStores:
                                        (NSDictionary<NSString *, id<EnvoyKeyValueStore>> *)
                                            keyValueStores
-                                       statsSinks:(NSArray<NSString *> *)statsSinks;
+                                       statsSinks:(NSArray<NSString *> *)statsSinks
+                 experimentalValidateYAMLCallback:
+                     (nullable void (^)(BOOL))experimentalValidateYAMLCallback;
 
 /**
  Resolves the provided configuration template using properties on this configuration.
@@ -101,6 +108,17 @@ NS_ASSUME_NONNULL_BEGIN
  @return The resolved template. Nil if the template fails to fully resolve.
  */
 - (nullable NSString *)resolveTemplate:(NSString *)templateYAML;
+
+/**
+ * Takes the various fields from EnvoyConfiguration, and the YAML it generates
+ * and compares the YAML generated by the C++ builder to the YAML generated by this
+ * `EnvoyConfiguration`.
+ *
+ * @param yaml The yaml generated by this `EnvoyConfiguration`
+ *
+ * @return True if the YAML matched, false if a difference was found.
+ */
+- (BOOL)compareYAMLWithProtoBuilder:(NSString *)yaml;
 
 @end
 
