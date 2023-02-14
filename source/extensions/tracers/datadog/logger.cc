@@ -1,8 +1,8 @@
 #include "source/extensions/tracers/datadog/logger.h"
 
-#include <datadog/error.h>
-
 #include <sstream>
+
+#include "datadog/error.h"
 
 namespace Envoy {
 namespace Extensions {

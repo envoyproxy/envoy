@@ -1,8 +1,8 @@
 #pragma once
 
-#include <datadog/logger.h>
-
 #include "source/common/common/logger.h"
+
+#include "datadog/logger.h"
 
 namespace Envoy {
 namespace Extensions {

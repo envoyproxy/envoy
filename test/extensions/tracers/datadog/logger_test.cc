@@ -1,12 +1,11 @@
-#include <datadog/error.h>
-#include <datadog/string_view.h>
-
 #include <memory>
 #include <ostream>
 
 #include "source/extensions/tracers/datadog/logger.h"
 
 #include "absl/types/optional.h"
+#include "datadog/error.h"
+#include "datadog/string_view.h"
 #include "gtest/gtest.h"
 #include "spdlog/spdlog.h"
 
