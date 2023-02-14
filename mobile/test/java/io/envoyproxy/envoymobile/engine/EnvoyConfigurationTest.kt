@@ -187,8 +187,8 @@ class EnvoyConfigurationTest {
 
     // Metadata
     assertThat(resolvedTemplate).contains("os: Android")
-    assertThat(resolvedTemplate).contains("app_version: v1.2.3")
-    assertThat(resolvedTemplate).contains("app_id: com.example.myapp")
+    assertThat(resolvedTemplate).contains("app_version: \"v1.2.3\"")
+    assertThat(resolvedTemplate).contains("app_id: \"com.example.myapp\"")
 
     assertThat(resolvedTemplate).contains("virtual_clusters [{name: test1},{name: test2}]")
 
