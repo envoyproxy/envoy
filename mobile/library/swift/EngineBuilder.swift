@@ -62,7 +62,7 @@ open class EngineBuilder: NSObject {
   private var directResponses: [DirectResponse] = []
   private var statsSinks: [String] = []
   private var experimentalValidateYAMLCallback: ((Bool) -> Void)?
-  private var enableExperimentalConfigBuilder: Bool = false
+  private var useLegacyBuilder: Bool = false
 
   // MARK: - Public
 
@@ -599,15 +599,15 @@ open class EngineBuilder: NSObject {
     return self
   }
 
-  /// Specify whether to use the experimental config builder. Defaults to false.
+  /// Specify whether the string-based legacy mode should be used to build the engine.
+  /// Defaults to false.
   ///
-  /// - parameter enableExperimentalConfigBuilder: whether to enable the experimental config
-  ///                                              builder.
+  /// - parameter useLegacyBuilder: true if the string-based legacy mode should be used.
   ///
   /// - returns: This builder.
   @discardableResult
-  public func enableExperimentalConfigBuilder(_ enableExperimentalConfigBuilder: Bool) -> Self {
-    self.enableExperimentalConfigBuilder = enableExperimentalConfigBuilder
+  public func useLegacyBuilder(_ useLegacyBuilder: Bool) -> Self {
+    self.useLegacyBuilder = useLegacyBuilder
     return self
   }
 
@@ -665,7 +665,7 @@ open class EngineBuilder: NSObject {
       keyValueStores: self.keyValueStores,
       statsSinks: self.statsSinks,
       experimentalValidateYAMLCallback: self.experimentalValidateYAMLCallback,
-      enableExperimentalConfigBuilder: self.enableExperimentalConfigBuilder
+      useLegacyBuilder: self.useLegacyBuilder
     )
 
     switch self.base {

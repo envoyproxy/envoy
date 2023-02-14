@@ -59,7 +59,7 @@
                                        statsSinks:(NSArray<NSString *> *)statsSinks
                  experimentalValidateYAMLCallback:
                      (nullable void (^)(BOOL))experimentalValidateYAMLCallback
-                  enableExperimentalConfigBuilder:(BOOL)enableExperimentalConfigBuilder {
+                                 useLegacyBuilder:(BOOL)useLegacyBuilder {
   self = [super init];
   if (!self) {
     return nil;
@@ -105,7 +105,7 @@
   self.keyValueStores = keyValueStores;
   self.statsSinks = statsSinks;
   self.experimentalValidateYAMLCallback = experimentalValidateYAMLCallback;
-  self.enableExperimentalConfigBuilder = enableExperimentalConfigBuilder;
+  self.useLegacyBuilder = useLegacyBuilder;
   return self;
 }
 

@@ -499,12 +499,11 @@ static void ios_track_event(envoy_map map, const void *context) {
 }
 
 - (int)runWithConfig:(EnvoyConfiguration *)config logLevel:(NSString *)logLevel {
-  if (config.enableExperimentalConfigBuilder) {
-    return [self runWithBootstrapConfig:config logLevel:logLevel];
+  if (config.useLegacyBuilder) {
+    return [self runWithTemplate:@(config_template) config:config logLevel:logLevel];
   }
 
-  NSString *templateYAML = [[NSString alloc] initWithUTF8String:config_template];
-  return [self runWithTemplate:templateYAML config:config logLevel:logLevel];
+  return [self runWithBootstrapConfig:config logLevel:logLevel];
 }
 
 - (void)performRegistrationsForConfig:(EnvoyConfiguration *)config {
