@@ -1068,8 +1068,7 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
   }
 
   // Check equivalence in debug mode.
-  RELEASE_ASSERT(generatedStringMatchesGeneratedBoostrap(generateConfigStr(), *bootstrap),
-                 "Native C++ checks failed");
+  ASSERT(generatedStringMatchesGeneratedBoostrap(generateConfigStr(), *bootstrap));
 
   return bootstrap;
 }
