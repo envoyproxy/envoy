@@ -29,27 +29,53 @@ public:
   Credentials getCredentials() override;
 };
 
-class MetadataCredentialsProviderBase : public CredentialsProvider,
-                                        public Logger::Loggable<Logger::Id::aws> {
+class CachedCredentialsProviderBase : public CredentialsProvider,
+                                      public Logger::Loggable<Logger::Id::aws> {
 public:
-  using MetadataFetcher = std::function<absl::optional<std::string>(Http::RequestMessage&)>;
-
-  MetadataCredentialsProviderBase(Api::Api& api, const MetadataFetcher& metadata_fetcher)
-      : api_(api), metadata_fetcher_(metadata_fetcher) {}
-
   Credentials getCredentials() override {
     refreshIfNeeded();
     return cached_credentials_;
   }
 
 protected:
-  Api::Api& api_;
-  MetadataFetcher metadata_fetcher_;
   SystemTime last_updated_;
   Credentials cached_credentials_;
   Thread::MutexBasicLockable lock_;
 
   void refreshIfNeeded();
+
+  virtual bool needsRefresh() PURE;
+  virtual void refresh() PURE;
+};
+
+/**
+ * Retrieve AWS credentials from the credentials file.
+ *
+ * Adheres to conventions specified in:
+ * https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-files.html
+ */
+class CredentialsFileCredentialsProvider : public CachedCredentialsProviderBase {
+public:
+  CredentialsFileCredentialsProvider(Api::Api& api) : api_(api) {}
+
+private:
+  Api::Api& api_;
+
+  bool needsRefresh() override;
+  void refresh() override;
+  void extractCredentials(const std::string& credentials_file, const std::string& profile);
+};
+
+class MetadataCredentialsProviderBase : public CachedCredentialsProviderBase {
+public:
+  using MetadataFetcher = std::function<absl::optional<std::string>(Http::RequestMessage&)>;
+
+  MetadataCredentialsProviderBase(Api::Api& api, const MetadataFetcher& metadata_fetcher)
+      : api_(api), metadata_fetcher_(metadata_fetcher) {}
+
+protected:
+  Api::Api& api_;
+  MetadataFetcher metadata_fetcher_;
 
   virtual bool needsRefresh() PURE;
   virtual void refresh() PURE;
@@ -120,6 +146,9 @@ public:
 
   virtual CredentialsProviderSharedPtr createEnvironmentCredentialsProvider() const PURE;
 
+  virtual CredentialsProviderSharedPtr
+  createCredentialsFileCredentialsProvider(Api::Api& api) const PURE;
+
   virtual CredentialsProviderSharedPtr createTaskRoleCredentialsProvider(
       Api::Api& api, const MetadataCredentialsProviderBase::MetadataFetcher& metadata_fetcher,
       absl::string_view credential_uri, absl::string_view authorization_token = {}) const PURE;
@@ -149,6 +178,11 @@ public:
 private:
   CredentialsProviderSharedPtr createEnvironmentCredentialsProvider() const override {
     return std::make_shared<EnvironmentCredentialsProvider>();
+  }
+
+  CredentialsProviderSharedPtr
+  createCredentialsFileCredentialsProvider(Api::Api& api) const override {
+    return std::make_shared<CredentialsFileCredentialsProvider>(api);
   }
 
   CredentialsProviderSharedPtr createTaskRoleCredentialsProvider(
