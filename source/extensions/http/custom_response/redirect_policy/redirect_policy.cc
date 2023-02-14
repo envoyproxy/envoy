@@ -31,11 +31,11 @@ RedirectPolicy::RedirectPolicy(
     Stats::StatName stats_prefix, Envoy::Server::Configuration::ServerFactoryContext& context)
     : stat_names_(context.scope().symbolTable()),
       stats_(stat_names_, context.scope(), stats_prefix), host_(config.host()),
-      path_(config.path()),
-      status_code_{config.has_status_code()
-                       ? absl::optional<::Envoy::Http::Code>(
-                             static_cast<::Envoy::Http::Code>(config.status_code().value()))
-                       : absl::optional<::Envoy::Http::Code>{}},
+      path_(config.path()), status_code_{config.has_status_code()
+                                             ? absl::optional<::Envoy::Http::Code>(
+                                                   static_cast<::Envoy::Http::Code>(
+                                                       config.status_code().value()))
+                                             : absl::optional<::Envoy::Http::Code>{}},
       response_header_parser_(
           Envoy::Router::HeaderParser::configure(config.response_headers_to_add())),
       request_header_parser_(
