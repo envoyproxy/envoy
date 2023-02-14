@@ -241,8 +241,7 @@ TEST_F(StreamInfoImplTest, SetFromForRecreateStream) {
 
   s1.addBytesReceived(1);
   s1.downstreamTiming().onLastDownstreamRxByteReceived(test_time_.timeSystem());
-  
-  std::cout << "Boteng: SetFromForRecreateStream s1: " << sizeof(s1) << std::endl;
+
 #ifdef __clang__
 #if defined(__linux__)
 #if defined(__has_feature) && !(__has_feature(thread_sanitizer))
@@ -253,7 +252,6 @@ TEST_F(StreamInfoImplTest, SetFromForRecreateStream) {
 
   StreamInfoImpl s2(Http::Protocol::Http11, test_time_.timeSystem(), nullptr);
   s2.setFromForRecreateStream(s1);
-  std::cout << "Boteng: SetFromForRecreateStream s2: " << sizeof(s1) << std::endl;
   EXPECT_EQ(s1.startTime(), s2.startTime());
   EXPECT_EQ(s1.startTimeMonotonic(), s2.startTimeMonotonic());
   EXPECT_EQ(s1.downstreamTiming().lastDownstreamRxByteReceived(),
@@ -305,8 +303,6 @@ TEST_F(StreamInfoImplTest, SetFrom) {
 #endif
 #endif
 
-  std::cout << "Boteng: SetFrom s1:  " << sizeof(s1) << std::endl;
-
   StreamInfoImpl s2(Http::Protocol::Http11, test_time_.timeSystem(), nullptr);
   Http::TestRequestHeaderMapImpl headers2;
   s2.setFrom(s1, &headers2);
@@ -350,8 +346,6 @@ TEST_F(StreamInfoImplTest, SetFrom) {
   EXPECT_EQ(s1.filterChainName(), s2.filterChainName());
   EXPECT_EQ(s1.attemptCount(), s2.attemptCount());
   EXPECT_EQ(s1.getUpstreamBytesMeter(), s2.getUpstreamBytesMeter());
-
-  std::cout << "Boteng: SetFrom s2: " << sizeof(s2) << std::endl;
 }
 
 TEST_F(StreamInfoImplTest, DynamicMetadataTest) {
