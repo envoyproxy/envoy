@@ -188,9 +188,8 @@ MockStreamInfo::MockStreamInfo()
       .WillByDefault(Invoke([this](absl::string_view failure_reason) {
         downstream_transport_failure_reason_ = std::string(failure_reason);
       }));
-  ON_CALL(*this, downstreamTransportFailureReason()).WillByDefault(Invoke([this]() {
-    return absl::string_view(downstream_transport_failure_reason_);
-  }));
+  ON_CALL(*this, downstreamTransportFailureReason())
+      .WillByDefault(ReturnPointee(&downstream_transport_failure_reason_));
 }
 
 MockStreamInfo::~MockStreamInfo() = default;
