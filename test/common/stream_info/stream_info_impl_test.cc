@@ -38,7 +38,7 @@ class StreamInfoImplTest : public testing::Test {
 protected:
   void assertStreamInfoSize(StreamInfoImpl stream_info) {
     ASSERT_TRUE(sizeof(stream_info) == 808 || sizeof(stream_info) == 824 ||
-                sizeof(stream_info) == 840)
+                sizeof(stream_info) == 872)
         << "If adding fields to StreamInfoImpl, please check to see if you "
            "need to add them to setFromForRecreateStream or setFrom! Current size "
         << sizeof(stream_info);
