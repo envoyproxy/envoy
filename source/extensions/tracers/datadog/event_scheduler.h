@@ -1,11 +1,11 @@
 #pragma once
 
-#include <datadog/event_scheduler.h>
-
 #include <vector>
 
 #include "envoy/event/dispatcher.h"
 #include "envoy/event/timer.h"
+
+#include "datadog/event_scheduler.h"
 
 namespace Envoy {
 namespace Extensions {
