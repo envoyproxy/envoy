@@ -64,10 +64,6 @@ private:
       const envoy::extensions::http::custom_response::redirect_policy::v3::RedirectPolicy& config,
       Envoy::Server::Configuration::ServerFactoryContext& context);
 
-  static std::unique_ptr<::Envoy::Http::Utility::RedirectConfig>
-  createRedirectAction(const ::envoy::extensions::http::custom_response::redirect_policy::v3::
-                           RedirectPolicy::RedirectAction& redirect_action);
-
   const CustomResponseRedirectStatNames stat_names_;
   const CustomResponseRedirectStats stats_;
 

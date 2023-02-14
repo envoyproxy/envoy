@@ -3,6 +3,7 @@
 #include <string>
 #include <variant>
 
+#include "envoy/config/route/v3/route_components.pb.h"
 #include "envoy/stream_info/filter_state.h"
 
 #include "source/common/common/enum_to_int.h"
@@ -24,21 +25,25 @@ bool schemeIsHttp(const ::Envoy::Http::RequestHeaderMap& downstream_headers,
 }
 
 ::Envoy::Http::Utility::RedirectConfig
-createRedirectConfig(const ::envoy::extensions::http::custom_response::redirect_policy::v3::
-                         RedirectPolicy::RedirectAction& redirect_action) {
-  return ::Envoy::Http::Utility::RedirectConfig{
+createRedirectConfig(const envoy::config::route::v3::RedirectAction& redirect_action) {
+  ::Envoy::Http::Utility::RedirectConfig redirect_config{
       redirect_action.scheme_redirect(),
       redirect_action.host_redirect(),
-      redirect_action.has_port_redirect()
-          ? ":" + std::to_string(redirect_action.port_redirect().value())
-          : "",
+      redirect_action.port_redirect() ? ":" + std::to_string(redirect_action.port_redirect()) : "",
       redirect_action.path_redirect(),
-      "",
+      "",      // prefix_rewrite
       "",      // regex_rewrite_redirect_substitution
       nullptr, // regex_rewrite_redirect
       redirect_action.path_redirect().find('?') != absl::string_view::npos,
       redirect_action.https_redirect(),
       redirect_action.strip_query()};
+  if (redirect_action.has_regex_rewrite()) {
+    throw Envoy::EnvoyException("regex_rewrite is not supported for Custom Response");
+  }
+  if (redirect_action.has_prefix_rewrite()) {
+    throw Envoy::EnvoyException("prefix_rewrite is not supported for Custom Response");
+  }
+  return redirect_config;
 }
 
 } // namespace

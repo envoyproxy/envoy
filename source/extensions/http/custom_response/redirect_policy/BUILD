@@ -30,6 +30,7 @@ envoy_cc_extension(
         "//source/extensions/filters/http/common:factory_base_lib",
         "//source/extensions/filters/http/custom_response:custom_response_filter",
         "//source/extensions/filters/http/custom_response:policy_interface",
+        "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/http/custom_response/redirect_policy/v3:pkg_cc_proto",
     ],
 )
