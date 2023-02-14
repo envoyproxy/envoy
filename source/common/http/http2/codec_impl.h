@@ -308,8 +308,8 @@ protected:
 
     // Called when the frame with END_STREAM is sent for this stream.
     void onEndStreamEncoded() {
-      if (stream_adapter_) {
-        stream_adapter_->onCodecEncodeComplete();
+      if (codec_callbacks_) {
+        codec_callbacks_->onCodecEncodeComplete();
       }
     }
 

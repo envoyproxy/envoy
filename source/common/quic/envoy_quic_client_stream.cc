@@ -61,8 +61,8 @@ Http::Status EnvoyQuicClientStream::encodeHeaders(const Http::RequestHeaderMap& 
   }
 
   if (local_end_stream_) {
-    if (stream_adapter_) {
-      stream_adapter_->onCodecEncodeComplete();
+    if (codec_callbacks_) {
+      codec_callbacks_->onCodecEncodeComplete();
     }
     onLocalEndStream();
   }
@@ -109,8 +109,8 @@ void EnvoyQuicClientStream::encodeData(Buffer::Instance& data, bool end_stream) 
     return;
   }
   if (local_end_stream_) {
-    if (stream_adapter_) {
-      stream_adapter_->onCodecEncodeComplete();
+    if (codec_callbacks_) {
+      codec_callbacks_->onCodecEncodeComplete();
     }
     onLocalEndStream();
   }
@@ -132,8 +132,8 @@ void EnvoyQuicClientStream::encodeTrailers(const Http::RequestTrailerMap& traile
     ENVOY_BUG(bytes_sent != 0, "Failed to encode trailers");
   }
 
-  if (stream_adapter_) {
-    stream_adapter_->onCodecEncodeComplete();
+  if (codec_callbacks_) {
+    codec_callbacks_->onCodecEncodeComplete();
   }
   onLocalEndStream();
 }

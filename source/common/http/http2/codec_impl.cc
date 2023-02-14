@@ -777,8 +777,8 @@ void ConnectionImpl::StreamImpl::resetStreamWorker(StreamResetReason reason) {
     // Handle the case where client streams are reset before headers are created.
     return;
   }
-  if (stream_adapter_) {
-    stream_adapter_->onCodecLowLevelReset();
+  if (codec_callbacks_) {
+    codec_callbacks_->onCodecLowLevelReset();
   }
   parent_.adapter_->SubmitRst(stream_id_,
                               static_cast<http2::adapter::Http2ErrorCode>(reasonToReset(reason)));

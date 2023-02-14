@@ -35,8 +35,8 @@ MockResponseEncoder::MockResponseEncoder() {
 MockResponseEncoder::~MockResponseEncoder() {
   // We notify the adapter here to avoid NiceMock dtor from
   // no longer suppressing uninteresting calls.
-  if (stream_.adapter_) {
-    stream_.adapter_->onCodecLowLevelReset();
+  if (stream_.codec_callbacks_) {
+    stream_.codec_callbacks_->onCodecLowLevelReset();
   }
 }
 
