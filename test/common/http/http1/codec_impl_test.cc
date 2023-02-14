@@ -4269,5 +4269,42 @@ TEST_P(Http1ClientConnectionImplTest, NoContentLengthResponse) {
   }
 }
 
+// Line folding (also called continuation line) is disallowed per RFC9112 Section 5.2.
+TEST_P(Http1ServerConnectionImplTest, LineFolding) {
+  initialize();
+  InSequence s;
+
+  StrictMock<MockRequestDecoder> decoder;
+  Http::ResponseEncoder* response_encoder = nullptr;
+  EXPECT_CALL(callbacks_, newStream(_, _))
+      .WillOnce(Invoke([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
+        response_encoder = &encoder;
+        return decoder;
+      }));
+
+  TestRequestHeaderMapImpl expected_headers{
+      {":path", "/"}, {":method", "GET"}, {"foo", "folded value"}};
+  if (parser_impl_ == Http1ParserImpl::BalsaParser) {
+    EXPECT_CALL(decoder,
+                sendLocalReply(Http::Code::BadRequest, "Bad Request", _, _, "http1.codec_error"));
+  } else {
+    EXPECT_CALL(decoder, decodeHeaders_(HeaderMapEqual(&expected_headers), true));
+  }
+
+  Buffer::OwnedImpl buffer("GET / HTTP/1.1\r\n"
+                           "foo: \r\n"
+                           " folded value\r\n\r\n");
+  auto status = codec_->dispatch(buffer);
+
+  if (parser_impl_ == Http1ParserImpl::BalsaParser) {
+    EXPECT_TRUE(isCodecProtocolError(status));
+    EXPECT_FALSE(status.ok());
+    EXPECT_EQ(status.message(), "http/1.1 protocol error: INVALID_HEADER_FORMAT");
+    EXPECT_EQ("http1.codec_error", response_encoder->getStream().responseDetails());
+  } else {
+    EXPECT_TRUE(status.ok());
+  }
+}
+
 } // namespace Http
 } // namespace Envoy

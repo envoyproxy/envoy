@@ -381,6 +381,16 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "circuit_breakers_integration_test",
+    srcs = ["circuit_breakers_integration_test.cc"],
+    deps = [
+        ":http_protocol_integration_lib",
+        "//test/test_common:test_time_lib",
+        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_test(
     name = "http2_flood_integration_test",
     srcs = [
         "http2_flood_integration_test.cc",
@@ -442,9 +452,12 @@ envoy_cc_test(
     deps = [
         ":http_integration_lib",
         ":integration_lib",
+        ":socket_interface_swap_lib",
         "//test/integration/filters:add_header_filter_config_lib",
+        "//test/integration/filters:encoder_decoder_buffer_filter_lib",
         "//test/integration/filters:on_local_reply_filter_config_lib",
         "//test/integration/filters:repick_cluster_filter_lib",
+        "//test/test_common:test_runtime_lib",
         "@envoy_api//envoy/extensions/access_loggers/file/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/http/router/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
@@ -482,6 +495,7 @@ envoy_cc_test(
         ":tracked_watermark_buffer_lib",
         "//test/integration/filters:tee_filter_lib",
         "//test/mocks/http:http_mocks",
+        "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
@@ -1516,6 +1530,17 @@ envoy_cc_test(
         "//test/server:utility_lib",
         "//test/test_common:registry_lib",
         "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_test(
+    name = "tcp_async_client_integration_test",
+    srcs = [
+        "tcp_async_client_integration_test.cc",
+    ],
+    deps = [
+        ":integration_lib",
+        "//test/integration/filters:test_network_async_tcp_filter_lib",
     ],
 )
 

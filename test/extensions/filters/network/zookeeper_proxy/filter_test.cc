@@ -91,6 +91,19 @@ public:
     return buffer;
   }
 
+  Buffer::OwnedImpl encodeResponseWithPartialData(const int32_t xid, const int64_t zxid,
+                                                  const int32_t error) const {
+    Buffer::OwnedImpl buffer;
+    const uint32_t message_size = 20;
+
+    buffer.writeBEInt<uint32_t>(message_size);
+    buffer.writeBEInt<uint32_t>(xid);
+    buffer.writeBEInt<uint64_t>(zxid);
+    buffer.writeBEInt<uint32_t>(error);
+    // Deliberately skip adding data to the buffer.
+    return buffer;
+  }
+
   Buffer::OwnedImpl encodeWatchEvent(const std::string& path, const int32_t event_type,
                                      const int32_t client_state) const {
     Buffer::OwnedImpl buffer;
@@ -176,7 +189,7 @@ public:
     const std::string credential = "p@sswd";
     Buffer::OwnedImpl buffer;
 
-    buffer.writeBEInt<uint32_t>(28 + scheme.length() + credential.length());
+    buffer.writeBEInt<uint32_t>(20 + scheme.length() + credential.length());
     buffer.writeBEInt<int32_t>(enumToSignedInt(XidCodes::AuthXid));
     buffer.writeBEInt<int32_t>(enumToSignedInt(OpCodes::SetAuth));
     // Type.
@@ -188,12 +201,12 @@ public:
   }
 
   Buffer::OwnedImpl
-  encodePathWatch(const std::string& path, const bool watch,
+  encodePathWatch(const std::string& path, const bool watch, const int32_t xid = 1000,
                   const int32_t opcode = enumToSignedInt(OpCodes::GetData)) const {
     Buffer::OwnedImpl buffer;
 
     buffer.writeBEInt<int32_t>(13 + path.length());
-    buffer.writeBEInt<int32_t>(1000);
+    buffer.writeBEInt<int32_t>(xid);
     // Opcode.
     buffer.writeBEInt<int32_t>(opcode);
     // Path.
@@ -227,7 +240,7 @@ public:
   Buffer::OwnedImpl encodePath(const std::string& path, const int32_t opcode) const {
     Buffer::OwnedImpl buffer;
 
-    buffer.writeBEInt<int32_t>(8 + path.length());
+    buffer.writeBEInt<int32_t>(12 + path.length());
     buffer.writeBEInt<int32_t>(1000);
     // Opcode.
     buffer.writeBEInt<int32_t>(opcode);
@@ -294,6 +307,23 @@ public:
     // Flags.
     buffer.writeBEInt<int32_t>(static_cast<int32_t>(flags));
 
+    return buffer;
+  }
+
+  Buffer::OwnedImpl encodeCreateRequestWithPartialData(
+      const std::string& path, const std::string& data, const bool txn = false,
+      const int32_t opcode = enumToSignedInt(OpCodes::Create)) const {
+    Buffer::OwnedImpl buffer;
+
+    if (!txn) {
+      buffer.writeBEInt<int32_t>(24 + path.length() + data.length());
+      buffer.writeBEInt<int32_t>(1000);
+      buffer.writeBEInt<int32_t>(opcode);
+    }
+
+    addString(buffer, path);
+    addString(buffer, data);
+    // Deliberately not adding acls and flags to the buffer.
     return buffer;
   }
 
@@ -385,7 +415,7 @@ public:
     addStrings(watches_buffer, existw);
     addStrings(watches_buffer, childw);
 
-    buffer.writeBEInt<int32_t>(8 + watches_buffer.length());
+    buffer.writeBEInt<int32_t>(16 + watches_buffer.length());
     buffer.writeBEInt<int32_t>(xid);
     buffer.writeBEInt<int32_t>(enumToSignedInt(OpCodes::SetWatches));
     buffer.writeBEInt<int64_t>(3000);
@@ -786,7 +816,8 @@ TEST_F(ZooKeeperFilterTest, SetRequest) {
 TEST_F(ZooKeeperFilterTest, GetChildrenRequest) {
   initialize();
 
-  Buffer::OwnedImpl data = encodePathWatch("/foo", false, enumToSignedInt(OpCodes::GetChildren));
+  Buffer::OwnedImpl data =
+      encodePathWatch("/foo", false, 1000, enumToSignedInt(OpCodes::GetChildren));
 
   testRequest(
       data, {{{"opname", "getchildren"}, {"path", "/foo"}, {"watch", "false"}}, {{"bytes", "21"}}},
@@ -799,7 +830,8 @@ TEST_F(ZooKeeperFilterTest, GetChildrenRequest) {
 TEST_F(ZooKeeperFilterTest, GetChildrenRequest2) {
   initialize();
 
-  Buffer::OwnedImpl data = encodePathWatch("/foo", false, enumToSignedInt(OpCodes::GetChildren2));
+  Buffer::OwnedImpl data =
+      encodePathWatch("/foo", false, 1000, enumToSignedInt(OpCodes::GetChildren2));
 
   testRequest(
       data, {{{"opname", "getchildren2"}, {"path", "/foo"}, {"watch", "false"}}, {{"bytes", "21"}}},
@@ -824,7 +856,7 @@ TEST_F(ZooKeeperFilterTest, DeleteRequest) {
 TEST_F(ZooKeeperFilterTest, ExistsRequest) {
   initialize();
 
-  Buffer::OwnedImpl data = encodePathWatch("/foo", false, enumToSignedInt(OpCodes::Exists));
+  Buffer::OwnedImpl data = encodePathWatch("/foo", false, 1000, enumToSignedInt(OpCodes::Exists));
 
   testRequest(data,
               {{{"opname", "exists"}, {"path", "/foo"}, {"watch", "false"}}, {{"bytes", "21"}}},
@@ -1044,6 +1076,152 @@ TEST_F(ZooKeeperFilterTest, MissingXid) {
   EXPECT_EQ(0UL, stat.value());
   EXPECT_EQ(0UL, config_->stats().response_bytes_.value());
   EXPECT_EQ(1UL, config_->stats().decoder_error_.value());
+}
+
+// | REQ 1 ---------  |
+// (onData   )(onData )
+TEST_F(ZooKeeperFilterTest, OneRequestWithMultipleOnDataCalls) {
+  initialize();
+
+  // Request.
+  Buffer::OwnedImpl data =
+      encodeCreateRequestWithPartialData("/foo", "bar", false, enumToSignedInt(OpCodes::Create));
+  EXPECT_EQ(Envoy::Network::FilterStatus::StopIteration, filter_->onData(data, false));
+  EXPECT_EQ(0UL, config_->stats().create_rq_.value());
+  EXPECT_EQ(0UL, config_->stats().request_bytes_.value());
+  EXPECT_EQ(0UL, config_->stats().decoder_error_.value());
+
+  // Add the rest data to the buffer.
+  // Acls.
+  data.writeBEInt<int32_t>(0);
+  // Flags.
+  data.writeBEInt<int32_t>(static_cast<int32_t>(CreateFlags::Persistent));
+
+  EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(data, false));
+  EXPECT_EQ(1UL, config_->stats().create_rq_.value());
+  EXPECT_EQ(35UL, config_->stats().request_bytes_.value());
+  EXPECT_EQ(0UL, config_->stats().decoder_error_.value());
+
+  // Response.
+  testResponse({{{"opname", "create_resp"}, {"zxid", "2000"}, {"error", "0"}}, {{"bytes", "20"}}},
+               config_->stats().create_resp_);
+}
+
+// | REQ 1 ---------  |  REQ 2 ---------|
+// (onData   )(onData     )(onData      )
+TEST_F(ZooKeeperFilterTest, MultipleRequestsWithMultipleOnDataCalls) {
+  initialize();
+
+  // Request.
+  Buffer::OwnedImpl data =
+      encodeCreateRequestWithPartialData("/foo", "bar", false, enumToSignedInt(OpCodes::Create));
+  EXPECT_EQ(Envoy::Network::FilterStatus::StopIteration, filter_->onData(data, false));
+  EXPECT_EQ(0UL, config_->stats().create_rq_.value());
+  EXPECT_EQ(0UL, config_->stats().request_bytes_.value());
+  EXPECT_EQ(0UL, config_->stats().decoder_error_.value());
+
+  // Add the rest data of request1 to the buffer.
+  // Acls.
+  data.writeBEInt<int32_t>(0);
+  // Flags.
+  data.writeBEInt<int32_t>(static_cast<int32_t>(CreateFlags::Persistent));
+  // Add partial data of request2 to the buffer.
+  data.writeBEInt<int32_t>(32);
+  data.writeBEInt<int32_t>(1000);
+  data.writeBEInt<int32_t>(enumToSignedInt(OpCodes::Create));
+
+  EXPECT_EQ(Envoy::Network::FilterStatus::StopIteration, filter_->onData(data, false));
+  EXPECT_EQ(0UL, config_->stats().create_rq_.value());
+  EXPECT_EQ(0UL, config_->stats().request_bytes_.value());
+  EXPECT_EQ(0UL, config_->stats().decoder_error_.value());
+
+  // Add the rest data of request2 to the buffer.
+  addString(data, "/baz");
+  addString(data, "abcd");
+  // Acls.
+  data.writeBEInt<int32_t>(0);
+  // Flags.
+  data.writeBEInt<int32_t>(static_cast<int32_t>(CreateFlags::Persistent));
+
+  EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(data, false));
+  EXPECT_EQ(2UL, config_->stats().create_rq_.value());
+  EXPECT_EQ(71UL, config_->stats().request_bytes_.value());
+  EXPECT_EQ(0UL, config_->stats().decoder_error_.value());
+
+  // Response.
+  testResponse({{{"opname", "create_resp"}, {"zxid", "2000"}, {"error", "0"}}, {{"bytes", "20"}}},
+               config_->stats().create_resp_);
+}
+
+// | RESP 1 --------  |
+// (onWrite )(onWrite )
+TEST_F(ZooKeeperFilterTest, OneResponseWithMultipleOnWriteCalls) {
+  initialize();
+
+  // Request.
+  Buffer::OwnedImpl rq_data = encodePathWatch("/foo", true);
+  EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(rq_data, false));
+  EXPECT_EQ(1UL, config_->stats().getdata_rq_.value());
+  EXPECT_EQ(21, config_->stats().request_bytes_.value());
+  EXPECT_EQ(0UL, config_->stats().decoder_error_.value());
+
+  // Response.
+  Buffer::OwnedImpl resp_data = encodeResponseWithPartialData(1000, 2000, 0);
+  EXPECT_EQ(Envoy::Network::FilterStatus::StopIteration, filter_->onWrite(resp_data, false));
+  EXPECT_EQ(0UL, config_->stats().getdata_resp_.value());
+  EXPECT_EQ(0UL, config_->stats().response_bytes_.value());
+  EXPECT_EQ(0UL, config_->stats().decoder_error_.value());
+
+  // Add the rest data to the buffer.
+  resp_data.add("abcd");
+
+  EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onWrite(resp_data, false));
+  EXPECT_EQ(1UL, config_->stats().getdata_resp_.value());
+  EXPECT_EQ(24UL, config_->stats().response_bytes_.value());
+  EXPECT_EQ(0UL, config_->stats().decoder_error_.value());
+}
+
+// | RESP 1 --------  |  RESP 2 --------|
+// (onWrite  )(onWrite    )(onWrite     )
+TEST_F(ZooKeeperFilterTest, MultipleResponsesWithMultipleOnWriteCalls) {
+  initialize();
+
+  // Request1.
+  Buffer::OwnedImpl rq_data = encodePathWatch("/foo", true);
+  // Request2.
+  rq_data.add(encodePathWatch("/foo", true, 1001));
+  EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(rq_data, false));
+  EXPECT_EQ(2UL, config_->stats().getdata_rq_.value());
+  EXPECT_EQ(42, config_->stats().request_bytes_.value());
+  EXPECT_EQ(0UL, config_->stats().decoder_error_.value());
+
+  // Response.
+  Buffer::OwnedImpl resp_data = encodeResponseWithPartialData(1000, 2000, 0);
+  EXPECT_EQ(Envoy::Network::FilterStatus::StopIteration, filter_->onWrite(resp_data, false));
+  EXPECT_EQ(0UL, config_->stats().getdata_resp_.value());
+  EXPECT_EQ(0UL, config_->stats().response_bytes_.value());
+  EXPECT_EQ(0UL, config_->stats().decoder_error_.value());
+
+  // Add the rest data of response1 to the buffer.
+  resp_data.add("abcd");
+  // Add partial data of response2 to the buffer.
+  resp_data.writeBEInt<uint32_t>(22);
+  resp_data.writeBEInt<uint32_t>(1001);
+  resp_data.writeBEInt<uint64_t>(2001);
+
+  EXPECT_EQ(Envoy::Network::FilterStatus::StopIteration, filter_->onWrite(resp_data, false));
+  EXPECT_EQ(0UL, config_->stats().getdata_resp_.value());
+  EXPECT_EQ(0UL, config_->stats().response_bytes_.value());
+  EXPECT_EQ(0UL, config_->stats().decoder_error_.value());
+
+  // Add the rest data of response2 to the buffer.
+  resp_data.writeBEInt<uint32_t>(0);
+  resp_data.add("abcdef");
+
+  EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onWrite(resp_data, false));
+  EXPECT_EQ(2UL, config_->stats().getdata_resp_.value());
+  EXPECT_EQ(50UL, config_->stats().response_bytes_.value());
+  EXPECT_EQ(0UL, config_->stats().decoder_error_.value());
 }
 
 } // namespace ZooKeeperProxy

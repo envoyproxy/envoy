@@ -37,6 +37,20 @@ is set to true the filter will send over a
 cookie named ``BearerToken`` to the upstream. Additionally, the ``Authorization`` header will be populated
 with the same value.
 
+The OAuth filer encodes URLs in query parameters using the
+`URL encoding algorithm. <https://www.w3.org/TR/html5/forms.html#application/x-www-form-urlencoded-encoding-algorithm>`_
+
+When receiving request redirected from the authorization service the Oauth filer decodes URLs from query parameters.
+However the encoded character sequences that represent ASCII control characters or extended ASCII codepoints are not
+decoded. The characters without defined meaning in URL according to `RFC 3986 <https://datatracker.ietf.org/doc/html/rfc3986>`_
+are also left undecoded. Specifically the following characters are left in the encoded form:
+
+* Control characters with values less than or equal 0x1F
+* Space (0x20)
+* DEL character (0x7F)
+* Extended ASCII characters with values grteater than or equal 0x80
+* Characters without defined meaning in URL: `"<>\^{}|`
+
 .. note::
   By default, OAuth2 filter sets some cookies with the following names:
   ``BearerToken``, ``OauthHMAC``, and ``OauthExpires``. These cookie names can be customized by

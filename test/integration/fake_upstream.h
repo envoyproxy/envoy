@@ -491,6 +491,7 @@ public:
                         std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
 
   void writeRawData(absl::string_view data);
+  ABSL_MUST_USE_RESULT AssertionResult postWriteRawData(std::string data);
 
 private:
   struct ReadFilter : public Network::ReadFilterBaseImpl {

@@ -64,6 +64,21 @@ TEST(UtilityTest, formatDownstreamAddressNoPort) {
             Utility::formatDownstreamAddressNoPort(Network::Address::PipeInstance("/hello")));
 }
 
+TEST(UtilityTest, formatDownstreamAddressJustPort) {
+  EXPECT_EQ("0",
+            Utility::formatDownstreamAddressJustPort(Network::Address::Ipv4Instance("1.2.3.4")));
+  EXPECT_EQ("8080", Utility::formatDownstreamAddressJustPort(
+                        Network::Address::Ipv4Instance("1.2.3.4", 8080)));
+}
+
+TEST(UtilityTest, extractDownstreamAddressJustPort) {
+
+  EXPECT_EQ(0,
+            *Utility::extractDownstreamAddressJustPort(Network::Address::Ipv4Instance("1.2.3.4")));
+  EXPECT_EQ(8080, *Utility::extractDownstreamAddressJustPort(
+                      Network::Address::Ipv4Instance("1.2.3.4", 8080)));
+}
+
 class ProxyStatusTest : public ::testing::Test {
 protected:
   void SetUp() override {

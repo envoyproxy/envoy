@@ -26,6 +26,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // #. Normalization of the URI path according to `Normalization and Comparison <https://datatracker.ietf.org/doc/html/rfc3986#section-6>`_
 //    without `case normalization <https://datatracker.ietf.org/doc/html/rfc3986#section-6.2.2.1>`_
 //
+// [#comment:TODO(yanavlasov): Put #extension: envoy.http.header_validators.envoy_default after it is not hidden any more]
 message HeaderValidatorConfig {
   // Action to take when Envoy receives client request with header names containing underscore
   // characters.

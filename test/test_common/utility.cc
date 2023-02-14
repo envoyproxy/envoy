@@ -45,8 +45,6 @@
 #include "absl/synchronization/notification.h"
 #include "gtest/gtest.h"
 
-using testing::GTEST_FLAG(random_seed);
-
 namespace Envoy {
 
 bool TestUtility::headerMapEqualIgnoreOrder(const Http::HeaderMap& lhs,
@@ -303,8 +301,9 @@ std::vector<std::string> TestUtility::listFiles(const std::string& path, bool re
   return file_names;
 }
 
-std::string TestUtility::uniqueFilename() {
-  return absl::StrCat(getpid(), "_", std::chrono::system_clock::now().time_since_epoch().count());
+std::string TestUtility::uniqueFilename(absl::string_view prefix) {
+  return absl::StrCat(prefix, "_", getpid(), "_",
+                      std::chrono::system_clock::now().time_since_epoch().count());
 }
 
 std::string TestUtility::addLeftAndRightPadding(absl::string_view to_pad, int desired_length) {

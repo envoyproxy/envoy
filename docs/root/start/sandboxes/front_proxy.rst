@@ -47,11 +47,11 @@ Change to the ``examples/front-proxy`` directory.
     $ docker-compose up --build -d
     $ docker-compose ps
 
-              Name                         Command               State                                         Ports
-    ----------------------------------------------------------------------------------------------------------------------------------------------------
-    front-proxy_front-envoy_1   /docker-entrypoint.sh /bin ... Up      10000/tcp, 0.0.0.0:8080->8080/tcp, 0.0.0.0:8001->8001/tcp, 0.0.0.0:8443->8443/tcp
-    front-proxy_service1_1      /bin/sh -c /usr/local/bin/ ... Up      10000/tcp
-    front-proxy_service2_1      /bin/sh -c /usr/local/bin/ ... Up      10000/tcp
+              Name                         Command               State                                           Ports
+    ---------------------------------------------------------------------------------------------------------------------------------------------------------
+    front-proxy_front-envoy_1   /docker-entrypoint.sh /bin ... Up           10000/tcp, 0.0.0.0:8080->8080/tcp, 0.0.0.0:8001->8001/tcp, 0.0.0.0:8443->8443/tcp
+    front-proxy_service1_1      python3 /code/service.py   ... Up (healthy)
+    front-proxy_service2_1      python3 /code/service.py   ... Up (healthy)
 
 Step 2: Test Envoy's routing capabilities
 *****************************************

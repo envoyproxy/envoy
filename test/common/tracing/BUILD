@@ -74,3 +74,13 @@ envoy_cc_test(
         "//test/test_common:test_runtime_lib",
     ],
 )
+
+envoy_cc_test(
+    name = "tracer_config_impl_test",
+    srcs = [
+        "tracer_config_impl_test.cc",
+    ],
+    deps = [
+        "//source/common/tracing:tracer_config_lib",
+    ],
+)
