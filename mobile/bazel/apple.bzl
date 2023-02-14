@@ -8,7 +8,7 @@ def envoy_objc_library(name, hdrs = [], visibility = [], data = [], deps = [], m
         name = name,
         srcs = srcs,
         hdrs = hdrs,
-        copts = envoy_mobile_copts("@envoy") + ["-ObjC++", "-std=c++17"],
+        copts = envoy_mobile_copts("@envoy") + ["-ObjC++", "-std=c++17", "-Wno-shorten-64-to-32"],
         module_name = module_name,
         sdk_frameworks = sdk_frameworks,
         visibility = visibility,

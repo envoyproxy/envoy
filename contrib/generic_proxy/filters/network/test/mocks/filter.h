@@ -85,6 +85,10 @@ public:
   MOCK_METHOD(void, resetStream, ());
   MOCK_METHOD(const RouteEntry*, routeEntry, (), (const));
   MOCK_METHOD(const RouteSpecificFilterConfig*, perFilterConfig, (), (const));
+  MOCK_METHOD(const StreamInfo::StreamInfo&, streamInfo, (), (const));
+  MOCK_METHOD(StreamInfo::StreamInfo&, streamInfo, ());
+  MOCK_METHOD(Tracing::Span&, activeSpan, ());
+  MOCK_METHOD(OptRef<const Tracing::Config>, tracingConfig, (), (const));
 };
 
 class MockDecoderFilterCallback : public MockStreamFilterCallbacks<DecoderFilterCallback> {
