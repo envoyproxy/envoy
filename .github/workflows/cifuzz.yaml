@@ -34,11 +34,14 @@ jobs:
        CFL_EXTRA_BAZEL_REMOTE_INSTANCE: projects/envoy-ci/instances/default_instance
        CFL_EXTRA_BAZEL_TOKEN: ${{secrets.GCP_RBE_TOKEN}}
      with:
+       repository: krajshiva/oss-fuzz
+       ref: cifuzz-rbe-integration
        oss-fuzz-project-name: 'envoy'
        language: c++
        sanitizer: ${{ matrix.sanitizer }}
    - name: Run Fuzzers (${{ matrix.sanitizer }})
-     uses: krajshiva/oss-fuzz/infra/cifuzz/actions/run_fuzzers@cifuzz-rbe-integration
+     uses: krajshiva/oss-fuzz/infra/cifuzz/actions/run_fuzzers@v3
+     ref: cifuzz-rbe-integration
      with:
        oss-fuzz-project-name: 'envoy'
        language: c++
