@@ -523,6 +523,7 @@ The following command operators are supported:
     If downstream connection failed due to transport socket (e.g. TLS handshake), provides the failure
     reason from the transport socket. The format of this field depends on the configured downstream
     transport socket. Common TLS failures are in :ref:`TLS trouble shooting <arch_overview_ssl_trouble_shooting>`.
+    Note: it only works in listener access config, and the HTTP or TCP access logs would observe empty values.
 
   UDP
     Not implemented ("-")

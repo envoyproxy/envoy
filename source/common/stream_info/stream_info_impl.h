@@ -381,7 +381,7 @@ struct StreamInfoImpl : public StreamInfo {
   }
 
   absl::string_view downstreamTransportFailureReason() const override {
-    return downstream_transport_failure_reason_;
+    return absl::string_view(downstream_transport_failure_reason_);
   }
 
   TimeSource& time_source_;

@@ -189,7 +189,7 @@ MockStreamInfo::MockStreamInfo()
         downstream_transport_failure_reason_ = std::string(failure_reason);
       }));
   ON_CALL(*this, downstreamTransportFailureReason()).WillByDefault(Invoke([this]() {
-    return downstream_transport_failure_reason_;
+    return absl::string_view(downstream_transport_failure_reason_);
   }));
 }
 
