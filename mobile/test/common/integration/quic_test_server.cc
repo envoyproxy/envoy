@@ -34,7 +34,7 @@ QuicTestServer::QuicTestServer()
     : api_(Api::createApiForTest(stats_store_, time_system_)),
       version_(Network::Address::IpVersion::v4), upstream_config_(time_system_), port_(0) {
   ON_CALL(factory_context_, api()).WillByDefault(testing::ReturnRef(*api_));
-  ON_CALL(factory_context_, scope()).WillByDefault(testing::ReturnRef(stats_store_));
+  ON_CALL(factory_context_, scope()).WillByDefault(testing::ReturnRef(*stats_store_.rootScope()));
   upstream_config_.udp_fake_upstream_ = FakeUpstreamConfig::UdpConfig();
 }
 

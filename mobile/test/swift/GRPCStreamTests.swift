@@ -83,6 +83,20 @@ final class GRPCStreamTests: XCTestCase {
     XCTAssertEqual(Data(), closedData)
   }
 
+  func testCancelCallsStreamCallback() {
+    let expectation = self.expectation(description: "onCancel callback is called")
+    let streamClient = MockStreamClient { stream in
+      stream.onCancel = expectation.fulfill
+    }
+
+    GRPCClient(streamClient: streamClient)
+      .newGRPCStreamPrototype()
+      .start()
+      .cancel()
+
+    self.waitForExpectations(timeout: 0.1)
+  }
+
   // MARK: - Response tests
 
   func testHeadersCallbackPassesHeaders() {

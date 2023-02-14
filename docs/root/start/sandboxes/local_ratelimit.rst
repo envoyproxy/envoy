@@ -43,7 +43,7 @@ The sandbox is configured with ``10000`` port for upstream service.
 
 If a request reaches the rate limit, Envoy will add ``x-local-rate-limit`` header and refuse the connection with a 429 HTTP response code and with the content ``local_rate_limited``.
 
-Now, use ``curl`` to make a request five times for the limited upsteam service:
+Now, use ``curl`` to make a request five times for the limited upstream service:
 
 .. code-block:: console
 

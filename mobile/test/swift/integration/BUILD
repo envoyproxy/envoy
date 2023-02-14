@@ -1,4 +1,4 @@
-load("@envoy_mobile//bazel:apple_test.bzl", "envoy_mobile_swift_test")
+load("@envoy_mobile//bazel:apple.bzl", "envoy_mobile_swift_test")
 load("@envoy_mobile//bazel:envoy_mobile_test_extensions.bzl", "TEST_EXTENSIONS")
 load("@envoy//bazel:envoy_build_system.bzl", "envoy_cc_library")
 
@@ -38,6 +38,21 @@ envoy_mobile_swift_test(
     visibility = ["//visibility:public"],
     deps = [
         ":test_extensions",
+        "//library/objective-c:envoy_engine_objc_lib",
+    ],
+)
+
+envoy_mobile_swift_test(
+    name = "cancel_grpc_stream_test",
+    srcs = [
+        "CancelGRPCStreamTest.swift",
+    ],
+    # TODO(jpsim): Fix remote execution for these tests
+    tags = [
+        "no-remote-exec",
+    ],
+    visibility = ["//visibility:public"],
+    deps = [
         "//library/objective-c:envoy_engine_objc_lib",
     ],
 )

@@ -1,24 +1,36 @@
+load("//bazel:apple.bzl", "envoy_objc_library")
+
 licenses(["notice"])  # Apache 2
 
 exports_files([
     "EnvoyEngine.h",
 ])
 
-objc_library(
+envoy_objc_library(
     name = "envoy_engine_objc_lib",
     srcs = [
-        "EnvoyConfiguration.m",
+        "EnvoyConfiguration.h",
+        "EnvoyConfiguration.mm",
         "EnvoyEngineImpl.m",
+        "EnvoyEventTracker.h",
         "EnvoyEventTracker.m",
+        "EnvoyHTTPCallbacks.h",
         "EnvoyHTTPCallbacks.m",
+        "EnvoyHTTPFilter.h",
         "EnvoyHTTPFilter.m",
         "EnvoyHTTPFilterCallbacksImpl.h",
         "EnvoyHTTPFilterCallbacksImpl.m",
+        "EnvoyHTTPFilterFactory.h",
         "EnvoyHTTPFilterFactory.m",
+        "EnvoyHTTPStream.h",
         "EnvoyHTTPStreamImpl.m",
+        "EnvoyLogger.h",
         "EnvoyLogger.m",
+        "EnvoyNativeFilterConfig.h",
         "EnvoyNativeFilterConfig.m",
+        "EnvoyNetworkMonitor.h",
         "EnvoyNetworkMonitor.m",
+        "EnvoyStringAccessor.h",
         "EnvoyStringAccessor.m",
     ],
     hdrs = [
@@ -37,18 +49,45 @@ objc_library(
     }),
     visibility = ["//visibility:public"],
     deps = [
+        ":envoy_key_value_store_bridge_impl_lib",
+        ":envoy_key_value_store_lib",
         ":envoy_objc_bridge_lib",
+        "//library/cc:engine_builder_lib",
         "//library/common:envoy_main_interface_lib",
         "//library/common/api:c_types",
         "//library/common/network:apple_platform_cert_verifier",
     ],
 )
 
-objc_library(
+envoy_objc_library(
     name = "envoy_objc_bridge_lib",
     hdrs = ["EnvoyBridgeUtility.h"],
     visibility = ["//visibility:public"],
     deps = [
+        ":envoy_aliases_lib",
         "//library/common/types:c_types_lib",
     ],
+)
+
+envoy_objc_library(
+    name = "envoy_aliases_lib",
+    hdrs = ["EnvoyAliases.h"],
+    visibility = ["//visibility:public"],
+)
+
+envoy_objc_library(
+    name = "envoy_key_value_store_bridge_impl_lib",
+    srcs = ["EnvoyKeyValueStoreBridgeImpl.m"],
+    hdrs = ["EnvoyKeyValueStoreBridgeImpl.h"],
+    visibility = ["//visibility:public"],
+    deps = [
+        ":envoy_key_value_store_lib",
+        ":envoy_objc_bridge_lib",
+    ],
+)
+
+envoy_objc_library(
+    name = "envoy_key_value_store_lib",
+    hdrs = ["EnvoyKeyValueStore.h"],
+    visibility = ["//visibility:public"],
 )

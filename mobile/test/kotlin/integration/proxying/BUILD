@@ -22,8 +22,8 @@ envoy_mobile_android_test(
         "dockerNetwork": "standard",
     },
     native_deps = [
-        "//library/common/jni:libndk_envoy_jni.so",
-        "//library/common/jni:libndk_envoy_jni.jnilib",
+        "//test/common/jni:libenvoy_jni_with_test_extensions.so",
+        "//test/common/jni:libenvoy_jni_with_test_extensions_jnilib",
     ],
     deps = [
         "//library/kotlin/io/envoyproxy/envoymobile:envoy_interfaces_lib",
@@ -43,8 +43,8 @@ envoy_mobile_android_test(
         "dockerNetwork": "standard",
     },
     native_deps = [
-        "//library/common/jni:libndk_envoy_jni.so",
-        "//library/common/jni:libndk_envoy_jni.jnilib",
+        "//test/common/jni:libenvoy_jni_with_test_extensions.so",
+        "//test/common/jni:libenvoy_jni_with_test_extensions_jnilib",
     ],
     deps = [
         "//library/kotlin/io/envoyproxy/envoymobile:envoy_interfaces_lib",
@@ -64,8 +64,8 @@ envoy_mobile_android_test(
         "dockerNetwork": "standard",
     },
     native_deps = [
-        "//library/common/jni:libndk_envoy_jni.so",
-        "//library/common/jni:libndk_envoy_jni.jnilib",
+        "//test/common/jni:libenvoy_jni_with_test_extensions.so",
+        "//test/common/jni:libenvoy_jni_with_test_extensions_jnilib",
     ],
     deps = [
         "//library/kotlin/io/envoyproxy/envoymobile:envoy_interfaces_lib",
@@ -85,8 +85,8 @@ envoy_mobile_android_test(
         "dockerNetwork": "standard",
     },
     native_deps = [
-        "//library/common/jni:libndk_envoy_jni.so",
-        "//library/common/jni:libndk_envoy_jni.jnilib",
+        "//test/common/jni:libenvoy_jni_with_test_extensions.so",
+        "//test/common/jni:libenvoy_jni_with_test_extensions_jnilib",
     ],
     deps = [
         "//library/kotlin/io/envoyproxy/envoymobile:envoy_interfaces_lib",
@@ -106,8 +106,8 @@ envoy_mobile_android_test(
         "dockerNetwork": "standard",
     },
     native_deps = [
-        "//library/common/jni:libndk_envoy_jni.so",
-        "//library/common/jni:libndk_envoy_jni.jnilib",
+        "//test/common/jni:libenvoy_jni_with_test_extensions.so",
+        "//test/common/jni:libenvoy_jni_with_test_extensions_jnilib",
     ],
     deps = [
         "//library/kotlin/io/envoyproxy/envoymobile:envoy_interfaces_lib",
@@ -127,8 +127,8 @@ envoy_mobile_android_test(
         "dockerNetwork": "standard",
     },
     native_deps = [
-        "//library/common/jni:libndk_envoy_jni.so",
-        "//library/common/jni:libndk_envoy_jni.jnilib",
+        "//test/common/jni:libenvoy_jni_with_test_extensions.so",
+        "//test/common/jni:libenvoy_jni_with_test_extensions_jnilib",
     ],
     deps = [
         "//library/kotlin/io/envoyproxy/envoymobile:envoy_interfaces_lib",

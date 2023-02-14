@@ -24,6 +24,9 @@ public:
   MOCK_METHOD(void, incErrors, (ErrorType), (override));
   MOCK_METHOD(void, processQuery, (const std::string&), (override));
   MOCK_METHOD(bool, onSSLRequest, (), (override));
+  MOCK_METHOD(bool, shouldEncryptUpstream, (), (const));
+  MOCK_METHOD(void, sendUpstream, (Buffer::Instance&));
+  MOCK_METHOD(void, encryptUpstream, (bool, Buffer::Instance&));
 };
 
 // Define fixture class with decoder and mock callbacks.
@@ -121,25 +124,8 @@ TEST_F(PostgresProxyDecoderTest, StartupMessage) {
 TEST_F(PostgresProxyDecoderTest, StartupMessageNoAttr) {
   decoder_->state(DecoderImpl::State::InitState);
 
-  buf_[0] = '\0';
-  // Startup message has the following structure:
-  // Length (4 bytes) - payload and length field
-  // version (4 bytes)
-  // Attributes: key/value pairs separated by '\0'
-  data_.writeBEInt<uint32_t>(37);
-  // Add version code
-  data_.writeBEInt<uint32_t>(0x00030000);
-  // user-postgres key-pair
-  data_.add("user"); // 4 bytes
-  data_.add(buf_, 1);
-  data_.add("postgres"); // 8 bytes
-  data_.add(buf_, 1);
-  // database-test-db key-pair
-  // Some other attribute
-  data_.add("attribute"); // 9 bytes
-  data_.add(buf_, 1);
-  data_.add("blah"); // 4 bytes
-  data_.add(buf_, 1);
+  createInitialPostgresRequest(data_);
+
   ASSERT_THAT(decoder_->onData(data_, true), Decoder::Result::ReadyForNext);
   ASSERT_THAT(decoder_->state(), DecoderImpl::State::InSyncState);
   ASSERT_THAT(data_.length(), 0);
@@ -634,6 +620,55 @@ TEST_F(PostgresProxyDecoderTest, TerminateSSL) {
   // Decoder should interpret the session as clear-text stream.
   ASSERT_FALSE(decoder_->encrypted());
 }
+
+class PostgresProxyUpstreamSSLTest
+    : public PostgresProxyDecoderTestBase,
+      public ::testing::TestWithParam<std::tuple<std::string, bool, DecoderImpl::State>> {};
+
+TEST_F(PostgresProxyDecoderTest, UpstreamSSLDisabled) {
+  // Set decoder to wait for initial message.
+  decoder_->state(DecoderImpl::State::InitState);
+
+  createInitialPostgresRequest(data_);
+
+  EXPECT_CALL(callbacks_, shouldEncryptUpstream).WillOnce(testing::Return(false));
+  EXPECT_CALL(callbacks_, encryptUpstream(testing::_, testing::_)).Times(0);
+  ASSERT_THAT(decoder_->onData(data_, true), Decoder::Result::ReadyForNext);
+  ASSERT_THAT(decoder_->state(), DecoderImpl::State::InSyncState);
+}
+
+TEST_P(PostgresProxyUpstreamSSLTest, UpstreamSSLEnabled) {
+  // Set decoder to wait for initial message.
+  decoder_->state(DecoderImpl::State::InitState);
+
+  // Create initial message
+  createInitialPostgresRequest(data_);
+
+  EXPECT_CALL(callbacks_, shouldEncryptUpstream).WillOnce(testing::Return(true));
+  EXPECT_CALL(callbacks_, sendUpstream);
+  ASSERT_THAT(decoder_->onData(data_, true), Decoder::Result::Stopped);
+  ASSERT_THAT(decoder_->state(), DecoderImpl::State::NegotiatingUpstreamSSL);
+
+  // Simulate various responses from the upstream server.
+  // Only "S" and "E" are valid responses.
+  data_.add(std::get<0>(GetParam()));
+
+  EXPECT_CALL(callbacks_, encryptUpstream(std::get<1>(GetParam()), testing::_));
+  // The reply from upstream should not be delivered to the client.
+  ASSERT_THAT(decoder_->onData(data_, false), Decoder::Result::Stopped);
+  ASSERT_THAT(decoder_->state(), std::get<2>(GetParam()));
+  ASSERT_TRUE(data_.length() == 0);
+}
+
+INSTANTIATE_TEST_SUITE_P(BackendEncryptedMessagesTests, PostgresProxyUpstreamSSLTest,
+                         ::testing::Values(
+                             // Correct response from the server (encrypt).
+                             std::make_tuple("S", true, DecoderImpl::State::InitState),
+                             // Correct response from the server (do not encrypt).
+                             std::make_tuple("E", false, DecoderImpl::State::InitState),
+                             // Incorrect response from the server. Move to out-of-sync state.
+                             std::make_tuple("W", false, DecoderImpl::State::OutOfSyncState),
+                             std::make_tuple("WRONG", false, DecoderImpl::State::OutOfSyncState)));
 
 class FakeBuffer : public Buffer::Instance {
 public:

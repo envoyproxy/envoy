@@ -7,7 +7,6 @@
 #include "source/common/network/resolver_impl.h"
 #include "source/common/protobuf/utility.h"
 #include "source/extensions/filters/network/http_connection_manager/config.h"
-#include "source/server/filter_chain_manager_impl.h"
 
 namespace Envoy {
 namespace Server {

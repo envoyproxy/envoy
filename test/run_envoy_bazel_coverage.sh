@@ -28,7 +28,7 @@ fi
 [[ -z "${SRCDIR}" ]] && SRCDIR="${PWD}"
 [[ -z "${VALIDATE_COVERAGE}" ]] && VALIDATE_COVERAGE=true
 [[ -z "${FUZZ_COVERAGE}" ]] && FUZZ_COVERAGE=false
-[[ -z "${COVERAGE_THRESHOLD}" ]] && COVERAGE_THRESHOLD=96.0
+[[ -z "${COVERAGE_THRESHOLD}" ]] && COVERAGE_THRESHOLD=96.1
 COVERAGE_TARGET="${COVERAGE_TARGET:-}"
 read -ra BAZEL_BUILD_OPTIONS <<< "${BAZEL_BUILD_OPTIONS:-}"
 
@@ -119,8 +119,9 @@ set +e
 if [[ "$VALIDATE_COVERAGE" == "true" ]] && [[ "${FUZZ_COVERAGE}" == "false" ]]; then
   echo "Checking per-extension coverage"
   output=$(./test/per_file_coverage.sh)
+  response=$?
 
-  if [ $? -eq 1 ]; then
+  if [ $response -ne 0 ]; then
     echo Per-extension coverage failed:
     echo "$output"
     COVERAGE_FAILED=1

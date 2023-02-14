@@ -1,6 +1,7 @@
 #pragma once
 
 #include "envoy/config/subscription.h"
+#include "envoy/config/xds_config_tracker.h"
 #include "envoy/local_info/local_info.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
@@ -20,7 +21,8 @@ using DeltaSubscriptionStateVariant =
 class DeltaSubscriptionState : public Logger::Loggable<Logger::Id::config> {
 public:
   DeltaSubscriptionState(std::string type_url, UntypedConfigUpdateCallbacks& watch_map,
-                         const LocalInfo::LocalInfo& local_info, Event::Dispatcher& dispatcher);
+                         const LocalInfo::LocalInfo& local_info, Event::Dispatcher& dispatcher,
+                         XdsConfigTrackerOptRef xds_config_tracker);
 
   void updateSubscriptionInterest(const absl::flat_hash_set<std::string>& cur_added,
                                   const absl::flat_hash_set<std::string>& cur_removed);
@@ -37,6 +39,7 @@ public:
 
 private:
   DeltaSubscriptionStateVariant state_;
+  XdsConfigTrackerOptRef xds_config_tracker_;
 };
 
 } // namespace Config

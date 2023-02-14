@@ -4,7 +4,7 @@
 #include "envoy/network/filter.h"
 #include "envoy/network/socket.h"
 
-#include "source/server/active_listener_base.h"
+#include "source/server/listener_stats.h"
 
 #include "quiche/quic/core/crypto/proof_source.h"
 

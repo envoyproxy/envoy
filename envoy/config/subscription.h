@@ -4,6 +4,7 @@
 #include <vector>
 
 #include "envoy/common/exception.h"
+#include "envoy/common/optref.h"
 #include "envoy/common/pure.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
 #include "envoy/stats/stats_macros.h"
@@ -59,6 +60,11 @@ public:
    * @return bool does the xDS discovery response have a set resource payload?
    */
   virtual bool hasResource() const PURE;
+
+  /**
+   * @return optional ref<envoy::config::core::v3::Metadata> of a resource.
+   */
+  virtual const OptRef<const envoy::config::core::v3::Metadata> metadata() const PURE;
 };
 
 using DecodedResourcePtr = std::unique_ptr<DecodedResource>;

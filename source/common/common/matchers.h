@@ -218,6 +218,9 @@ public:
   createSafeRegex(const envoy::type::matcher::v3::RegexMatcher& regex_matcher);
 
   bool match(const absl::string_view path) const override;
+  const StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>& matcher() const {
+    return matcher_;
+  }
 
 private:
   const StringMatcherImpl<envoy::type::matcher::v3::StringMatcher> matcher_;

@@ -1,3 +1,4 @@
+@_spi(YAMLValidation)
 import Envoy
 import EnvoyEngine
 import Foundation
@@ -5,13 +6,16 @@ import TestExtensions
 import XCTest
 
 final class SetEventTrackerTest: XCTestCase {
-  func testEmitEventWithoutSettingEventTracker() throws {
+  override static func setUp() {
+    super.setUp()
     register_test_extensions()
+  }
 
+  func testEmitEventWithoutSettingEventTracker() throws {
     let eventExpectation =
       self.expectation(description: "Passed event tracker receives an event")
 
-    let engine = EngineBuilder()
+    let engine = YAMLValidatingEngineBuilder()
       .setEventTracker { event in
         XCTAssertEqual("bar", event["foo"])
         eventExpectation.fulfill()

@@ -12,7 +12,6 @@
 #include "source/common/quic/envoy_quic_proof_source_factory_interface.h"
 #include "source/common/runtime/runtime_protos.h"
 #include "source/server/active_udp_listener.h"
-#include "source/server/connection_handler_impl.h"
 
 #include "quiche/quic/load_balancer/load_balancer_encoder.h"
 

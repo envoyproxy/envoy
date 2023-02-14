@@ -111,6 +111,34 @@ When request compression is *applied*:
 - *content-encoding* with the compression scheme used (e.g., ``gzip``) is added to
   request headers.
 
+Per-Route Configuration
+-----------------------
+
+Response compression can be enabled and disabled on individual virtual hosts and routes.
+For example, to disable response compression for a particular virtual host, but enable response compression for its ``/static`` route:
+
+.. code-block:: yaml
+
+  route_config:
+    name: local_route
+    virtual_hosts:
+    - name: local_service
+      domains: ["*"]
+      typed_per_filter_config:
+        envoy.filters.http.compression:
+          "@type": type.googleapis.com/envoy.extensions.filters.http.compressor.v3.CompressorPerRoute
+            disabled: true
+      routes:
+      - match: { prefix: "/static" }
+        route: { cluster: some_service }
+        typed_per_filter_config:
+          envoy.filters.http.compression:
+            "@type": type.googleapis.com/envoy.extensions.filters.http.compressor.v3.CompressorPerRoute
+          overrides:
+            response_direction_config:
+      - match: { prefix: "/" }
+        route: { cluster: some_service }
+
 Using different compressors for requests and responses
 --------------------------------------------------------
 

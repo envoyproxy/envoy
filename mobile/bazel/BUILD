@@ -18,8 +18,8 @@ kt_jvm_library(
 )
 
 config_setting(
-    name = "include_ifaddrs",
-    values = {"define": "include_ifaddrs=true"},
+    name = "exclude_certificates",
+    values = {"define": "exclude_certificates=true"},
 )
 
 exports_files([

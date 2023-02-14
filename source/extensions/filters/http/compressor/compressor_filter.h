@@ -8,6 +8,8 @@
 #include "source/common/runtime/runtime_protos.h"
 #include "source/extensions/filters/http/common/pass_through_filter.h"
 
+#include "absl/types/optional.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
@@ -160,6 +162,19 @@ private:
 };
 using CompressorFilterConfigSharedPtr = std::shared_ptr<CompressorFilterConfig>;
 
+class CompressorPerRouteFilterConfig : public Router::RouteSpecificFilterConfig {
+public:
+  CompressorPerRouteFilterConfig(
+      const envoy::extensions::filters::http::compressor::v3::CompressorPerRoute& config);
+
+  // If a value is present, that value overrides
+  // ResponseDirectionConfig::compressionEnabled.
+  absl::optional<bool> responseCompressionEnabled() const { return response_compression_enabled_; }
+
+private:
+  absl::optional<bool> response_compression_enabled_;
+};
+
 /**
  * A filter that compresses data dispatched from the upstream upon client request.
  */
@@ -181,6 +196,7 @@ public:
   Http::FilterTrailersStatus encodeTrailers(Http::ResponseTrailerMap&) override;
 
 private:
+  bool compressionEnabled(const CompressorFilterConfig::ResponseDirectionConfig& config) const;
   bool hasCacheControlNoTransform(Http::ResponseHeaderMap& headers) const;
   bool isAcceptEncodingAllowed(bool maybe_compress, const Http::ResponseHeaderMap& headers) const;
   bool isEtagAllowed(Http::ResponseHeaderMap& headers) const;

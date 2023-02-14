@@ -22,15 +22,14 @@
 #include "fmt/ostream.h"
 #include "spdlog/spdlog.h"
 
-#ifdef ENVOY_ENABLE_LOGGING
-const static bool should_log = true;
-#else
-const static bool should_log = false;
-#endif
-
 namespace Envoy {
-
 namespace Logger {
+
+#ifdef ENVOY_DISABLE_LOGGING
+const static bool should_log = false;
+#else
+const static bool should_log = true;
+#endif
 
 // TODO: find out a way for extensions to register new logger IDs
 #define ALL_LOGGER_IDS(FUNCTION)                                                                   \
@@ -201,16 +200,18 @@ public:
   void setLock(Thread::BasicLockable& lock) { stderr_sink_->setLock(lock); }
   void clearLock() { stderr_sink_->clearLock(); }
 
-  template <class... Args>
+  template <class FmtStr, class... Args>
   void logWithStableName(absl::string_view stable_name, absl::string_view level,
-                         absl::string_view component, Args... msg) {
+                         absl::string_view component, FmtStr fmt_str, Args... msg) {
     auto tls_sink = tlsDelegate();
     if (tls_sink != nullptr) {
-      tls_sink->logWithStableName(stable_name, level, component, fmt::format(msg...));
+      tls_sink->logWithStableName(stable_name, level, component,
+                                  fmt::format(fmt::runtime(fmt_str), msg...));
       return;
     }
     absl::ReaderMutexLock sink_lock(&sink_mutex_);
-    sink_->logWithStableName(stable_name, level, component, fmt::format(msg...));
+    sink_->logWithStableName(stable_name, level, component,
+                             fmt::format(fmt::runtime(fmt_str), msg...));
   }
   // spdlog::sinks::sink
   void log(const spdlog::details::log_msg& msg) override;
@@ -456,7 +457,7 @@ public:
 // The same filtering will also occur in spdlog::logger.
 #define ENVOY_LOG_COMP_AND_LOG(LOGGER, LEVEL, ...)                                                 \
   do {                                                                                             \
-    if (should_log && ENVOY_LOG_COMP_LEVEL(LOGGER, LEVEL)) {                                       \
+    if (Envoy::Logger::should_log && ENVOY_LOG_COMP_LEVEL(LOGGER, LEVEL)) {                        \
       LOGGER.log(::spdlog::source_loc{__FILE__, __LINE__, __func__}, ENVOY_SPDLOG_LEVEL(LEVEL),    \
                  __VA_ARGS__);                                                                     \
     }                                                                                              \
@@ -470,7 +471,7 @@ public:
  */
 #define ENVOY_LOG_TO_LOGGER(LOGGER, LEVEL, ...)                                                    \
   do {                                                                                             \
-    if (should_log && Envoy::Logger::Context::useFineGrainLogger()) {                              \
+    if (Envoy::Logger::should_log && Envoy::Logger::Context::useFineGrainLogger()) {               \
       FINE_GRAIN_LOG(LEVEL, ##__VA_ARGS__);                                                        \
     } else {                                                                                       \
       ENVOY_LOG_COMP_AND_LOG(LOGGER, LEVEL, ##__VA_ARGS__);                                        \

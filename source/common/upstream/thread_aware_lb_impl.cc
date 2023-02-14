@@ -70,8 +70,10 @@ void normalizeLocalityWeights(const HostsPerLocality& hosts_per_locality,
 
 void normalizeWeights(const HostSet& host_set, bool in_panic,
                       NormalizedHostWeightVector& normalized_host_weights,
-                      double& min_normalized_weight, double& max_normalized_weight) {
-  if (host_set.localityWeights() == nullptr || host_set.localityWeights()->empty()) {
+                      double& min_normalized_weight, double& max_normalized_weight,
+                      bool locality_weighted_balancing) {
+  if (!locality_weighted_balancing || host_set.localityWeights() == nullptr ||
+      host_set.localityWeights()->empty()) {
     // If we're not dealing with locality weights, just normalize weights for the flat set of hosts.
     const auto& hosts = in_panic ? host_set.hosts() : host_set.healthyHosts();
     normalizeHostWeights(hosts, 1.0, normalized_host_weights, min_normalized_weight,
@@ -121,7 +123,7 @@ void ThreadAwareLoadBalancerBase::refresh() {
     double min_normalized_weight = 1.0;
     double max_normalized_weight = 0.0;
     normalizeWeights(*host_set, per_priority_state->global_panic_, normalized_host_weights,
-                     min_normalized_weight, max_normalized_weight);
+                     min_normalized_weight, max_normalized_weight, locality_weighted_balancing_);
     per_priority_state->current_lb_ = createLoadBalancer(
         std::move(normalized_host_weights), min_normalized_weight, max_normalized_weight);
   }
@@ -190,7 +192,7 @@ double ThreadAwareLoadBalancerBase::BoundedLoadHashingLoadBalancer::hostOverload
   // TODO(scheler): This will not work if rq_active cluster stat is disabled, need to detect
   // and alert the user if that's the case.
 
-  const uint32_t overall_active = host.cluster().trafficStats().upstream_rq_active_.value();
+  const uint32_t overall_active = host.cluster().trafficStats()->upstream_rq_active_.value();
   const uint32_t host_active = host.stats().rq_active_.value();
 
   const uint32_t total_slots = ((overall_active + 1) * hash_balance_factor_ + 99) / 100;

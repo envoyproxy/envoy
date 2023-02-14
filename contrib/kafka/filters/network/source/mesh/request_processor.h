@@ -28,6 +28,7 @@ public:
 
 private:
   void process(const std::shared_ptr<Request<ProduceRequest>> request) const;
+  void process(const std::shared_ptr<Request<ListOffsetsRequest>> request) const;
   void process(const std::shared_ptr<Request<MetadataRequest>> request) const;
   void process(const std::shared_ptr<Request<ApiVersionsRequest>> request) const;
 

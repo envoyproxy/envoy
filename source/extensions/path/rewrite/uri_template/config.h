@@ -2,6 +2,7 @@
 
 #include "envoy/extensions/path/rewrite/uri_template/v3/uri_template_rewrite.pb.h"
 #include "envoy/extensions/path/rewrite/uri_template/v3/uri_template_rewrite.pb.validate.h"
+#include "envoy/registry/registry.h"
 #include "envoy/router/path_rewriter.h"
 
 #include "source/extensions/path/rewrite/uri_template/uri_template_rewrite.h"
@@ -37,6 +38,8 @@ public:
     return "envoy.path.rewrite.uri_template.uri_template_rewriter";
   }
 };
+
+DECLARE_FACTORY(UriTemplateRewriterFactory);
 
 } // namespace Rewrite
 } // namespace UriTemplate

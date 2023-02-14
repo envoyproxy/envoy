@@ -31,8 +31,8 @@ FaultFilterFactory::createRouteSpecificFilterConfigTyped(
 /**
  * Static registration for the fault filter. @see RegisterFactory.
  */
-REGISTER_FACTORY(FaultFilterFactory,
-                 Server::Configuration::NamedHttpFilterConfigFactory){"envoy.fault"};
+LEGACY_REGISTER_FACTORY(FaultFilterFactory, Server::Configuration::NamedHttpFilterConfigFactory,
+                        "envoy.fault");
 
 } // namespace Fault
 } // namespace HttpFilters

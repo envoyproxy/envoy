@@ -194,6 +194,25 @@ TYPED_TEST(HttpUpstreamTest, DumpsResponseDecoderWithoutAllocatingMemory) {
   EXPECT_THAT(ostream.contents(), EndsWith("has not implemented dumpState\n"));
 }
 
+TYPED_TEST(HttpUpstreamTest, UpstreamTrailersMarksDoneReading) {
+  this->setupUpstream();
+  EXPECT_CALL(this->encoder_.stream_, resetStream(_)).Times(0);
+  this->upstream_->doneWriting();
+  Http::ResponseTrailerMapPtr trailers{new Http::TestResponseTrailerMapImpl{{"key", "value"}}};
+  this->upstream_->responseDecoder().decodeTrailers(std::move(trailers));
+}
+
+TYPED_TEST(HttpUpstreamTest, UpstreamTrailersNotMarksDoneReadingWhenFeatureDisabled) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.finish_reading_on_decode_trailers", "false"}});
+  this->setupUpstream();
+  EXPECT_CALL(this->encoder_.stream_, resetStream(_));
+  this->upstream_->doneWriting();
+  Http::ResponseTrailerMapPtr trailers{new Http::TestResponseTrailerMapImpl{{"key", "value"}}};
+  this->upstream_->responseDecoder().decodeTrailers(std::move(trailers));
+}
+
 template <typename T> class HttpUpstreamRequestEncoderTest : public testing::Test {
 public:
   HttpUpstreamRequestEncoderTest() {
@@ -235,29 +254,6 @@ public:
 };
 
 TYPED_TEST_SUITE(HttpUpstreamRequestEncoderTest, Implementations);
-
-TYPED_TEST(HttpUpstreamRequestEncoderTest, RequestEncoderOld) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.use_rfc_connect", "false"}});
-
-  this->setupUpstream();
-  std::unique_ptr<Http::RequestHeaderMapImpl> expected_headers;
-  expected_headers = Http::createHeaderMap<Http::RequestHeaderMapImpl>({
-      {Http::Headers::get().Method, "CONNECT"},
-      {Http::Headers::get().Host, this->config_->host(this->downstream_stream_info_)},
-  });
-
-  if (this->is_http2_) {
-    expected_headers->setReferenceKey(Http::Headers::get().Path, "/");
-    expected_headers->setReferenceKey(Http::Headers::get().Scheme,
-                                      Http::Headers::get().SchemeValues.Http);
-    expected_headers->setReferenceKey(Http::Headers::get().Protocol,
-                                      Http::Headers::get().ProtocolValues.Bytestream);
-  }
-
-  EXPECT_CALL(this->encoder_, encodeHeaders(HeaderMapEqualRef(expected_headers.get()), false));
-  this->upstream_->setRequestEncoder(this->encoder_, false);
-}
 
 TYPED_TEST(HttpUpstreamRequestEncoderTest, RequestEncoder) {
   this->setupUpstream();

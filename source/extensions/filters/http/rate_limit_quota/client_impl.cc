@@ -35,10 +35,6 @@ absl::Status RateLimitClientImpl::startStream(const StreamInfo::StreamInfo& stre
         *this,
         Http::AsyncClient::RequestOptions().setParentContext(
             Http::AsyncClient::ParentContext{&stream_info}));
-
-    if (stream_ == nullptr) {
-      return absl::InternalError("Unable to establish the new stream");
-    }
   }
   return absl::OkStatus();
 }

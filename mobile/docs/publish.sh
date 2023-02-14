@@ -1,7 +1,7 @@
 #!/bin/bash
 
-# This is run on every commit that CircleCI picks up. It assumes that docs have already been built
-# via docs/build.sh. The push behavior differs depending on the nature of the commit:
+# This is run on every commit that GitHub Actions picks up. It assumes that docs have already been
+# built via docs/build.sh. The push behavior differs depending on the nature of the commit:
 # * Tag commit (e.g. v1.6.0): pushes docs to versioned location.
 # * Main commit: pushes docs to latest. Note that envoy-mobile.github.io uses `master` rather than
 #                `main` because using `main` as the default branch currently results in 404s.
@@ -13,10 +13,10 @@ DOCS_DIR=generated/docs
 CHECKOUT_DIR=../envoy-mobile-docs
 BUILD_SHA="$(git rev-parse HEAD)"
 
-if [ -n "$CIRCLE_TAG" ]
+if [ "$GITHUB_REF_TYPE" == "tag" ]
 then
-  PUBLISH_DIR="$CHECKOUT_DIR"/docs/envoy-mobile/"$CIRCLE_TAG"
-elif [ -z "$CIRCLE_PULL_REQUEST" ] && [ "$CIRCLE_BRANCH" == "main" ]
+  PUBLISH_DIR="$CHECKOUT_DIR"/docs/envoy-mobile/"$GITHUB_REF_NAME"
+elif [ "$GITHUB_REF_NAME" == "main" ]
 then
   PUBLISH_DIR="$CHECKOUT_DIR"/docs/envoy-mobile/latest
 else

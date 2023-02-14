@@ -1,3 +1,4 @@
+@_spi(YAMLValidation)
 import Envoy
 import UIKit
 
@@ -17,13 +18,17 @@ final class ViewController: UITableViewController {
   override func viewDidLoad() {
     super.viewDidLoad()
 
-    let engine = EngineBuilder()
+    let engine = YAMLValidatingEngineBuilder()
       .addLogLevel(.debug)
       .addPlatformFilter(DemoFilter.init)
       .addPlatformFilter(BufferDemoFilter.init)
       .addPlatformFilter(AsyncDemoFilter.init)
-      .h2ExtendKeepaliveTimeout(true)
+#if ENVOY_ADMIN_FUNCTIONALITY
       .enableAdminInterface()
+#endif
+      .enableDNSCache(true)
+      // required by DNS cache
+      .addKeyValueStore(name: "reserved.platform_store", keyValueStore: UserDefaults.standard)
       .enableInterfaceBinding(true)
       .enablePlatformCertificateValidation(true)
       .addNativeFilter(
@@ -39,6 +44,7 @@ final class ViewController: UITableViewController {
       .addStringAccessor(name: "demo-accessor", accessor: { return "PlatformString" })
       .addKeyValueStore(name: "demo-kv-store", keyValueStore: UserDefaults.standard)
       .setEventTracker { NSLog("Envoy event emitted: \($0)") }
+      .forceIPv6(true)
       .build()
     self.streamClient = engine.streamClient()
     self.pulseClient = engine.pulseClient()
@@ -128,16 +134,6 @@ final class ViewController: UITableViewController {
     let counter = pulseClient.counter(elements: ["foo", "bar", "counter"])
     counter.increment()
     counter.increment(count: 5)
-
-    let gauge = pulseClient.gauge(elements: ["foo", "bar", "gauge"])
-    gauge.set(value: 5)
-    gauge.add(amount: 10)
-    gauge.sub(amount: 1)
-
-    let timer = pulseClient.timer(elements: ["foo", "bar", "timer"])
-    let distribution = pulseClient.distribution(elements: ["foo", "bar", "distribution"])
-    timer.recordDuration(durationMs: 15)
-    distribution.recordValue(value: 15)
   }
   // MARK: - UITableView
 

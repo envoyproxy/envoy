@@ -397,14 +397,13 @@ protected:
 
 private:
   void setupEcdsConfigDumpCallbacks(OptRef<Server::Admin> admin) {
-    if (!admin.has_value()) {
-      return;
-    }
-    if (config_tracker_entry_ == nullptr) {
-      config_tracker_entry_ = admin->getConfigTracker().add(
-          getConfigDumpType(), [this](const Matchers::StringMatcher& name_matcher) {
-            return dumpEcdsFilterConfigs(name_matcher);
-          });
+    if (admin.has_value()) {
+      if (config_tracker_entry_ == nullptr) {
+        config_tracker_entry_ = admin->getConfigTracker().add(
+            getConfigDumpType(), [this](const Matchers::StringMatcher& name_matcher) {
+              return dumpEcdsFilterConfigs(name_matcher);
+            });
+      }
     }
   }
 
@@ -415,13 +414,11 @@ private:
       if (!ecds_filter || !name_matcher.match(ecds_filter->name())) {
         continue;
       }
-      // Put the filter info into a typed extension proto.
       envoy::config::core::v3::TypedExtensionConfig filter_config;
       filter_config.set_name(ecds_filter->name());
       if (ecds_filter->lastConfig()) {
         filter_config.mutable_typed_config()->PackFrom(*ecds_filter->lastConfig());
       }
-      // Set up the config dump proto.
       auto& filter_config_dump = *config_dump->mutable_ecds_filters()->Add();
       filter_config_dump.mutable_ecds_filter()->PackFrom(filter_config);
       filter_config_dump.set_version_info(ecds_filter->lastVersionInfo());

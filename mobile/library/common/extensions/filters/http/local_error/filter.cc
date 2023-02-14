@@ -2,6 +2,8 @@
 
 #include "envoy/server/filter_config.h"
 
+#include "library/common/http/header_utility.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
@@ -18,7 +20,7 @@ Http::LocalErrorStatus LocalErrorFilter::onLocalReply(const LocalReplyData& repl
   // ASSERT(reply.details_ == info.responseCodeDetails().value());
   info.setResponseCode(static_cast<uint32_t>(reply.code_));
 
-  return Http::LocalErrorStatus::ContinueAndResetStream;
+  return Http::Utility::statusForOnLocalReply(reply, decoder_callbacks_->streamInfo());
 }
 
 } // namespace LocalError
