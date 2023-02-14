@@ -9,9 +9,14 @@
 namespace Envoy {
 
 /**
- * BitArray is an fixed sized array of fixed width bits. As such once
+ * BitArray is an fixed sized array of fixed bit width elements. As such once
  * constructed it will not grow in the number of elements it can hold, or change
  * the number of bits an element is considered.
+ *
+ * Note that a BitArray is different from std::bitset as std::bitset elements
+ * can only have a bit width of 1, while BitArray elements have a fixed bit width ranging from 1 to
+ * 32 bits. Moreover BitArray is significantly more compact than std::bitset if using bitset to
+ * represent integers.
  *
  * At a minimum this will allocate 2 * word_size worth of bytes. To simplify the
  * implementation for accessing data in the last word, we allocate an additional
