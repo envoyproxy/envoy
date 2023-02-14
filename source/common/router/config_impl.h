@@ -663,6 +663,8 @@ public:
 
   // Router::DirectResponseEntry
   std::string newPath(const Http::RequestHeaderMap& headers) const override;
+  bool newSchemePortMismatch(absl::string_view request_protocol, absl::string_view request_port,
+                             absl::string_view new_scheme) const;
   absl::string_view processRequestHost(const Http::RequestHeaderMap& headers,
                                        absl::string_view new_scheme,
                                        absl::string_view new_port) const;

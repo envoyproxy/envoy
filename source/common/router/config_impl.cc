@@ -996,41 +996,33 @@ absl::optional<std::string> RouteEntryImplBase::currentUrlPathAfterRewriteWithMa
   return {};
 }
 
+bool RouteEntryImplBase::newSchemePortMismatch(absl::string_view request_protocol,
+                                               absl::string_view request_port,
+                                               absl::string_view new_scheme) const {
+  // In the rare case that X-Forwarded-Proto and scheme disagree (say http URL over an HTTPS
+  // connection), do port stripping based on X-Forwarded-Proto so http://foo.com:80 won't
+  // have the port stripped when served over TLS.
+  return ((new_scheme != request_protocol) &&
+          (((request_protocol == Http::Headers::get().SchemeValues.Https.c_str()) &&
+            request_port == ":443") ||
+           ((request_protocol == Http::Headers::get().SchemeValues.Http.c_str()) &&
+            request_port == ":80")));
+}
+
 absl::string_view RouteEntryImplBase::processRequestHost(const Http::RequestHeaderMap& headers,
                                                          absl::string_view new_scheme,
                                                          absl::string_view new_port) const {
 
   absl::string_view request_host = headers.getHostValue();
-  size_t host_end;
   if (request_host.empty()) {
     return request_host;
   }
-  // Detect if IPv6 URI
-  if (request_host[0] == '[') {
-    host_end = request_host.rfind("]:");
-    if (host_end != absl::string_view::npos) {
-      host_end += 1; // advance to :
-    }
-  } else {
-    host_end = request_host.rfind(':');
-  }
+  const size_t host_end = Http::HeaderUtility::getPortStart(request_host);
 
   if (host_end != absl::string_view::npos) {
     absl::string_view request_port = request_host.substr(host_end);
-    // In the rare case that X-Forwarded-Proto and scheme disagree (say http URL over an HTTPS
-    // connection), do port stripping based on X-Forwarded-Proto so http://foo.com:80 won't
-    // have the port stripped when served over TLS.
-    absl::string_view request_protocol = headers.getForwardedProtoValue();
-    bool remove_port = !new_port.empty();
-
-    if (new_scheme != request_protocol) {
-      remove_port |= (request_protocol == Http::Headers::get().SchemeValues.Https.c_str()) &&
-                     request_port == ":443";
-      remove_port |= (request_protocol == Http::Headers::get().SchemeValues.Http.c_str()) &&
-                     request_port == ":80";
-    }
-
-    if (remove_port) {
+    if (!new_port.empty() ||
+        newSchemePortMismatch(headers.getForwardedProtoValue(), request_port, new_scheme)) {
       return request_host.substr(0, host_end);
     }
   }
@@ -1060,6 +1052,17 @@ std::string RouteEntryImplBase::newPath(const Http::RequestHeaderMap& headers) c
     final_port = port_redirect_.c_str();
   } else {
     final_port = "";
+    const absl::string_view current_path = headers.getHostValue();
+    const auto port_start = Http::HeaderUtility::getPortStart(current_path);
+    if (port_start != absl::string_view::npos) {
+      const auto deduced_port = current_path.substr(port_start);
+      // use deduced port only when scheme did not change to avoid using port 80 when scheme
+      // changed from http to https and to avoid using port 443 when scheme changed from
+      // https to http.
+      if (!newSchemePortMismatch(headers.getForwardedProtoValue(), deduced_port, final_scheme)) {
+        final_port = deduced_port;
+      }
+    }
   }
 
   if (!host_redirect_.empty()) {

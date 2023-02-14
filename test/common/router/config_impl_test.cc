@@ -5331,6 +5331,8 @@ virtual_hosts:
     routes:
       - match: { path: /port }
         redirect: { port_redirect: 8181 }
+      - match: { path: /deduce_port }
+        redirect: { host_redirect: new.lyft.com }
   - name: redirect_ipv4
     domains: [10.0.0.1]
     routes:
@@ -5345,6 +5347,8 @@ virtual_hosts:
     routes:
       - match: { path: /port }
         redirect: { port_redirect: 8181 }
+      - match: { path: /deduce_port }
+        redirect: { host_redirect: 20.0.0.2 }
   - name: redirect_ipv4_port_80
     domains: [10.0.0.1:80]
     routes:
@@ -5377,6 +5381,8 @@ virtual_hosts:
     routes:
       - match: { path: /port }
         redirect: { port_redirect: 8181 }
+      - match: { path: /deduce_port }
+        redirect: { host_redirect: "[fe80::2]" }
   - name: redirect_ipv6_port_80
     domains: ["[fe80::1]:80"]
     routes:
@@ -5447,6 +5453,12 @@ virtual_hosts:
     Http::TestRequestHeaderMapImpl headers = genRedirectHeaders(
         "api.lyft.com", "/foo", false, absl::nullopt /* no x-envoy-internal header */);
     EXPECT_EQ("https://api.lyft.com/foo",
+              config.route(headers, 0)->directResponseEntry()->newPath(headers));
+  }
+  {
+    Http::TestRequestHeaderMapImpl headers =
+        genRedirectHeaders("redirect.lyft.com:8080", "/deduce_port", false, false);
+    EXPECT_EQ("http://new.lyft.com:8080/deduce_port",
               config.route(headers, 0)->directResponseEntry()->newPath(headers));
   }
   {
@@ -5601,6 +5613,12 @@ virtual_hosts:
   }
   {
     Http::TestRequestHeaderMapImpl headers =
+        genRedirectHeaders("10.0.0.1:8080", "/deduce_port", false, false);
+    EXPECT_EQ("http://20.0.0.2:8080/deduce_port",
+              config.route(headers, 0)->directResponseEntry()->newPath(headers));
+  }
+  {
+    Http::TestRequestHeaderMapImpl headers =
         genRedirectHeaders("10.0.0.1", "/host_port", false, false);
     EXPECT_EQ("http://20.0.0.2:8080/host_port",
               config.route(headers, 0)->directResponseEntry()->newPath(headers));
@@ -5656,6 +5674,12 @@ virtual_hosts:
     Http::TestRequestHeaderMapImpl headers =
         genRedirectHeaders("[fe80::1]:8080", "/port", false, false);
     EXPECT_EQ("http://[fe80::1]:8181/port",
+              config.route(headers, 0)->directResponseEntry()->newPath(headers));
+  }
+  {
+    Http::TestRequestHeaderMapImpl headers =
+        genRedirectHeaders("[fe80::1]:8080", "/deduce_port", false, false);
+    EXPECT_EQ("http://[fe80::2]:8080/deduce_port",
               config.route(headers, 0)->directResponseEntry()->newPath(headers));
   }
   {
