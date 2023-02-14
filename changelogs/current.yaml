@@ -33,6 +33,9 @@ bug_fixes:
 - area: router
   change: |
     fixed the bug that custom tags of the route metadata type are not set for upstream spans.
+- area: router
+  change: |
+    fixed outlier detection ejections caused by opened circuit breakers.
 - area: dependency
   change: |
     Add boringssl patch to resolve CVE-2023-0286. Note that the FIPS build is not patched/fixed.
@@ -68,6 +71,9 @@ removed_config_or_runtime:
 - area: http3
   change: |
     removed ``envoy.reloadable_features.conn_pool_new_stream_with_early_data_and_http3`` and legacy code paths.
+- area: http3
+  change: |
+    removed ``envoy.reloadable_features.http3_sends_early_data`` and legacy code paths.
 
 new_features:
 - area: access_log
@@ -99,5 +105,8 @@ new_features:
 - area: sni_dynamic_forward_proxy
   change: |
     added an option to dynamically set the host used by the SNI dynamic forward proxy filter, by setting a filter state object under the key ``envoy.upstream.dynamic_host``.
+- area: generic_proxy
+  change: |
+    added :ref:`tracing support <envoy_v3_api_field_extensions.filters.network.generic_proxy.v3.GenericProxy.tracing>` for the generic proxy.
 
 deprecated:

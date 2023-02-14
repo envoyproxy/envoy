@@ -64,6 +64,7 @@ public class EnvoyConfiguration {
   public final List<String> statSinks;
   public final Boolean enablePlatformCertificatesValidation;
   public final Boolean enableSkipDNSLookupForProxiedRequests;
+  public final Boolean useLegacyBuilder;
 
   private static final Pattern UNRESOLVED_KEY_PATTERN = Pattern.compile("\\{\\{ (.+) \\}\\}");
 
@@ -127,6 +128,9 @@ public class EnvoyConfiguration {
    * @param keyValueStores                                platform key-value store implementations.
    * @param enableSkipDNSLookupForProxiedRequests         whether to skip waiting on DNS response
    *     for proxied requests.
+   * @param enablePlatformCertificatesValidation          whether to use the platform verifier.
+   * @param useLegacyBuilder                              whether the string-based legacy mode
+   *     should be used to build the engine.
    */
   public EnvoyConfiguration(
       boolean adminInterfaceEnabled, String grpcStatsDomain, int connectTimeoutSeconds,
@@ -144,7 +148,8 @@ public class EnvoyConfiguration {
       List<EnvoyHTTPFilterFactory> httpPlatformFilterFactories,
       Map<String, EnvoyStringAccessor> stringAccessors,
       Map<String, EnvoyKeyValueStore> keyValueStores, List<String> statSinks,
-      Boolean enableSkipDNSLookupForProxiedRequests, boolean enablePlatformCertificatesValidation) {
+      Boolean enableSkipDNSLookupForProxiedRequests, boolean enablePlatformCertificatesValidation,
+      boolean useLegacyBuilder) {
     JniLibrary.load();
     this.adminInterfaceEnabled = adminInterfaceEnabled;
     this.grpcStatsDomain = grpcStatsDomain;
@@ -195,7 +200,9 @@ public class EnvoyConfiguration {
     this.statSinks = statSinks;
     this.enablePlatformCertificatesValidation = enablePlatformCertificatesValidation;
     this.enableSkipDNSLookupForProxiedRequests = enableSkipDNSLookupForProxiedRequests;
+    this.useLegacyBuilder = useLegacyBuilder;
   }
+
   /**
    * Creates configuration YAML based on the configuration of the class
    *
@@ -290,8 +297,9 @@ public class EnvoyConfiguration {
         .append(String.format("- &max_connections_per_host %s\n", maxConnectionsPerHost))
         .append(String.format("- &stream_idle_timeout %ss\n", streamIdleTimeoutSeconds))
         .append(String.format("- &per_try_idle_timeout %ss\n", perTryIdleTimeoutSeconds))
-        .append(String.format("- &metadata { device_os: %s, app_version: %s, app_id: %s }\n",
-                              "Android", appVersion, appId))
+        .append(String.format(
+            "- &metadata { device_os: Android, app_version: \"%s\", app_id: \"%s\" }\n", appVersion,
+            appId))
         .append(String.format("- &trust_chain_verification %s\n", trustChainVerification.name()))
         .append(String.format("- &skip_dns_lookup_for_proxied_requests %s\n",
                               enableSkipDNSLookupForProxiedRequests ? "true" : "false"))
@@ -372,6 +380,29 @@ public class EnvoyConfiguration {
     }
 
     return resolvedConfiguration;
+  }
+
+  long createBootstrap() {
+    Boolean enforceTrustChainVerification =
+        trustChainVerification == EnvoyConfiguration.TrustChainVerification.VERIFY_TRUST_CHAIN;
+    List<EnvoyNativeFilterConfig> reverseFilterChain = new ArrayList<>(nativeFilterChain);
+    Collections.reverse(reverseFilterChain);
+
+    byte[][] filter_chain = JniBridgeUtility.toJniBytes(reverseFilterChain);
+    byte[][] clusters = JniBridgeUtility.stringsToJniBytes(virtualClusters);
+    byte[][] stats_sinks = JniBridgeUtility.stringsToJniBytes(statSinks);
+    byte[][] dns_preresolve = JniBridgeUtility.stringsToJniBytes(dnsPreresolveHostnames);
+    return JniLibrary.createBootstrap(
+        grpcStatsDomain, adminInterfaceEnabled, connectTimeoutSeconds, dnsRefreshSeconds,
+        dnsFailureRefreshSecondsBase, dnsFailureRefreshSecondsMax, dnsQueryTimeoutSeconds,
+        dnsMinRefreshSeconds, dns_preresolve, enableDNSCache, dnsCacheSaveIntervalSeconds,
+        enableDrainPostDnsRefresh, enableHttp3, enableGzipDecompression, enableGzipCompression,
+        enableBrotliDecompression, enableBrotliCompression, enableSocketTagging,
+        enableHappyEyeballs, enableInterfaceBinding, h2ConnectionKeepaliveIdleIntervalMilliseconds,
+        h2ConnectionKeepaliveTimeoutSeconds, maxConnectionsPerHost, statsFlushSeconds,
+        streamIdleTimeoutSeconds, perTryIdleTimeoutSeconds, appVersion, appId,
+        enforceTrustChainVerification, clusters, filter_chain, stats_sinks,
+        enablePlatformCertificatesValidation, enableSkipDNSLookupForProxiedRequests);
   }
 
   static class ConfigurationException extends RuntimeException {

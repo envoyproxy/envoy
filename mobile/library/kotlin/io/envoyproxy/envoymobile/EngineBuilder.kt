@@ -78,6 +78,7 @@ open class EngineBuilder(
   private var keyValueStores = mutableMapOf<String, EnvoyKeyValueStore>()
   private var statsSinks = listOf<String>()
   private var enablePlatformCertificatesValidation = false
+  private var useLegacyBuilder = false
 
   /**
    * Add a log level to use with Envoy.
@@ -593,7 +594,8 @@ open class EngineBuilder(
       keyValueStores,
       statsSinks,
       enableSkipDNSLookupForProxiedRequests,
-      enablePlatformCertificatesValidation
+      enablePlatformCertificatesValidation,
+      useLegacyBuilder
     )
 
     return when (configuration) {
@@ -636,6 +638,19 @@ open class EngineBuilder(
   fun enablePlatformCertificatesValidation(enablePlatformCertificatesValidation: Boolean):
     EngineBuilder {
     this.enablePlatformCertificatesValidation = enablePlatformCertificatesValidation
+    return this
+  }
+
+  /**
+   * Specify whether the string-based legacy mode should be used to build the engine.
+   * Defaults to false.
+   *
+   * @param useLegacyBuilder true if the string-based legacy mode should be used.
+   *
+   * @return This builder.
+   */
+  fun useLegacyBuilder(useLegacyBuilder: Boolean): EngineBuilder {
+    this.useLegacyBuilder = useLegacyBuilder
     return this
   }
 
