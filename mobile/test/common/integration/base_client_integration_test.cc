@@ -283,13 +283,4 @@ testing::AssertionResult BaseClientIntegrationTest::waitForGaugeGe(const std::st
   }
   return testing::AssertionSuccess();
 }
-
-void BaseClientIntegrationTest::cleanup() {
-  if (xds_connection_ != nullptr) {
-    cleanUpXdsConnection();
-  }
-  test_server_.reset();
-  fake_upstreams_.clear();
-}
-
 } // namespace Envoy
