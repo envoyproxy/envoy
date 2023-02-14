@@ -1,6 +1,22 @@
 #import "library/objective-c/EnvoyEngine.h"
 
 #import "library/common/main_interface.h"
+#import "library/cc/engine_builder.h"
+
+@interface NSString (CXX)
+
+- (std::string)toCXXString;
+
+@end
+
+@implementation NSString (CXX)
+
+- (std::string)toCXXString {
+  return std::string([self UTF8String],
+                     (int)[self lengthOfBytesUsingEncoding:NSUTF8StringEncoding]);
+}
+
+@end
 
 @implementation EnvoyConfiguration
 
@@ -48,7 +64,9 @@
                                    keyValueStores:
                                        (NSDictionary<NSString *, id<EnvoyKeyValueStore>> *)
                                            keyValueStores
-                                       statsSinks:(NSArray<NSString *> *)statsSinks {
+                                       statsSinks:(NSArray<NSString *> *)statsSinks
+                 experimentalValidateYAMLCallback:
+                     (nullable void (^)(BOOL))experimentalValidateYAMLCallback {
   self = [super init];
   if (!self) {
     return nil;
@@ -93,6 +111,7 @@
   self.stringAccessors = stringAccessors;
   self.keyValueStores = keyValueStores;
   self.statsSinks = statsSinks;
+  self.experimentalValidateYAMLCallback = experimentalValidateYAMLCallback;
   return self;
 }
 
@@ -118,6 +137,17 @@
             stringByReplacingOccurrencesOfString:@"{{ native_filter_typed_config }}"
                                       withString:nativeFilterConfig.typedConfig];
     [customFilters appendString:filterConfig];
+  }
+
+  if (self.enableHttp3) {
+#ifdef ENVOY_ENABLE_QUIC
+    NSString *http3Insert =
+        [[NSString alloc] initWithUTF8String:alternate_protocols_cache_filter_insert];
+    [customFilters appendString:http3Insert];
+#else
+    NSLog(@"[Envoy] error: http3 functionality was not compiled in this build of Envoy Mobile");
+    return nil;
+#endif
   }
 
   if (self.enableGzipDecompression) {
@@ -148,17 +178,6 @@
 #else
     NSLog(@"[Envoy] error: request compression functionality was not compiled in this build of "
           @"Envoy Mobile");
-    return nil;
-#endif
-  }
-
-  if (self.enableHttp3) {
-#ifdef ENVOY_ENABLE_QUIC
-    NSString *http3Insert =
-        [[NSString alloc] initWithUTF8String:alternate_protocols_cache_filter_insert];
-    [customFilters appendString:http3Insert];
-#else
-    NSLog(@"[Envoy] error: http3 functionality was not compiled in this build of Envoy Mobile");
     return nil;
 #endif
   }
@@ -280,7 +299,95 @@
   }
 
   NSLog(@"[Envoy] debug: config:\n%@", definitions);
+  // TODO(jpsim): Set up a way to start the engine with the proto builder
+  if (self.experimentalValidateYAMLCallback) {
+    BOOL result = [self compareYAMLWithProtoBuilder:definitions];
+    self.experimentalValidateYAMLCallback(result);
+  }
   return definitions;
+}
+
+- (BOOL)compareYAMLWithProtoBuilder:(NSString *)yaml {
+  Envoy::Platform::EngineBuilder builder;
+
+  builder.addGrpcStatsDomain([self.grpcStatsDomain toCXXString]);
+  builder.addConnectTimeoutSeconds(self.connectTimeoutSeconds);
+  builder.addDnsRefreshSeconds(self.dnsRefreshSeconds);
+  builder.addDnsFailureRefreshSeconds(self.dnsFailureRefreshSecondsBase,
+                                      self.dnsFailureRefreshSecondsMax);
+  builder.addDnsQueryTimeoutSeconds(self.dnsQueryTimeoutSeconds);
+  builder.addDnsMinRefreshSeconds(self.dnsMinRefreshSeconds);
+  builder.enableDnsCache(self.enableDNSCache, self.dnsCacheSaveIntervalSeconds);
+  builder.addMaxConnectionsPerHost(self.maxConnectionsPerHost);
+  builder.addH2ConnectionKeepaliveIdleIntervalMilliseconds(
+      self.h2ConnectionKeepaliveIdleIntervalMilliseconds);
+  builder.addH2ConnectionKeepaliveTimeoutSeconds(self.h2ConnectionKeepaliveTimeoutSeconds);
+  builder.addStatsFlushSeconds(self.statsFlushSeconds);
+
+  builder.setAppVersion([self.appVersion toCXXString]);
+  builder.setAppId([self.appId toCXXString]);
+  builder.setDeviceOs("iOS");
+
+  builder.setStreamIdleTimeoutSeconds(self.streamIdleTimeoutSeconds);
+  builder.setPerTryIdleTimeoutSeconds(self.perTryIdleTimeoutSeconds);
+#ifdef ENVOY_ADMIN_FUNCTIONALITY
+  builder.enableAdminInterface(self.adminInterfaceEnabled);
+#endif
+  builder.enableGzipDecompression(self.enableGzipDecompression);
+#ifdef ENVOY_MOBILE_REQUEST_COMPRESSION
+  builder.enableGzipCompression(self.enableGzipCompression);
+#endif
+  builder.enableBrotliDecompression(self.enableBrotliDecompression);
+#ifdef ENVOY_MOBILE_REQUEST_COMPRESSION
+  builder.enableBrotliCompression(self.enableBrotliCompression);
+#endif
+  builder.enableHappyEyeballs(self.enableHappyEyeballs);
+#ifdef ENVOY_ENABLE_QUIC
+  builder.enableHttp3(self.enableHttp3);
+#endif
+  builder.enableInterfaceBinding(self.enableInterfaceBinding);
+  builder.enableDrainPostDnsRefresh(self.enableDrainPostDnsRefresh);
+  builder.enforceTrustChainVerification(self.enforceTrustChainVerification);
+  builder.enablePlatformCertificatesValidation(self.enablePlatformCertificateValidation);
+  builder.setForceAlwaysUsev6(self.forceIPv6);
+  for (EnvoyHTTPFilterFactory *filterFactory in
+       [self.httpPlatformFilterFactories reverseObjectEnumerator]) {
+    builder.addPlatformFilter([filterFactory.filterName toCXXString]);
+  }
+  for (EnvoyNativeFilterConfig *nativeFilterConfig in self.nativeFilterChain) {
+    builder.addNativeFilter(
+        /* name */ [nativeFilterConfig.name toCXXString],
+        /* typed_config */ [nativeFilterConfig.typedConfig toCXXString]);
+  }
+
+  for (NSString *cluster in self.virtualClusters) {
+    builder.addVirtualCluster([cluster toCXXString]);
+  }
+
+  if (self.statsSinks.count > 0) {
+    std::vector<std::string> sinks;
+    sinks.reserve(self.statsSinks.count);
+    for (NSString *sink in self.statsSinks) {
+      sinks.push_back([sink toCXXString]);
+    }
+    builder.addStatsSinks(std::move(sinks));
+  }
+
+  if (self.dnsPreresolveHostnames.count > 0) {
+    std::vector<std::string> hostnames;
+    hostnames.reserve(self.dnsPreresolveHostnames.count);
+    for (NSString *hostname in self.dnsPreresolveHostnames) {
+      hostnames.push_back([hostname toCXXString]);
+    }
+    builder.addDnsPreresolveHostnames(hostnames);
+  }
+
+  try {
+    return builder.generateBootstrapAndCompare([yaml toCXXString]);
+  } catch (const std::exception &e) {
+    NSLog(@"[Envoy] error comparing YAML: %@", @(e.what()));
+    return FALSE;
+  }
 }
 
 @end
