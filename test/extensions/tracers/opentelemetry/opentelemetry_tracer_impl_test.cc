@@ -41,7 +41,7 @@ public:
     ON_CALL(factory_context, runtime()).WillByDefault(ReturnRef(runtime_));
     ON_CALL(factory_context.cluster_manager_.async_client_manager_, factoryForGrpcService(_, _, _))
         .WillByDefault(Return(ByMove(std::move(mock_client_factory))));
-    ON_CALL(factory_context, scope()).WillByDefault(ReturnRef(stats_));
+    ON_CALL(factory_context, scope()).WillByDefault(ReturnRef(scope_));
 
     driver_ = std::make_unique<Driver>(opentelemetry_config, context_);
   }
@@ -70,6 +70,7 @@ protected:
   NiceMock<Runtime::MockLoader> runtime_;
   NiceMock<Event::MockTimer>* timer_;
   NiceMock<Stats::MockIsolatedStatsStore> stats_;
+  Stats::Scope& scope_{*stats_.rootScope()};
 };
 
 TEST_F(OpenTelemetryDriverTest, InitializeDriverValidConfig) {
@@ -425,6 +426,30 @@ TEST_F(OpenTelemetryDriverTest, IgnoreNotSampledSpan) {
   span->setSampled(false);
 
   EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.opentelemetry.min_flush_spans", 5U)).Times(0);
+  EXPECT_CALL(*mock_stream_ptr_, sendMessageRaw_(_, _)).Times(0);
+  span->finishSpan();
+  EXPECT_EQ(0U, stats_.counter("tracing.opentelemetry.spans_sent").value());
+}
+
+TEST_F(OpenTelemetryDriverTest, NoExportWithoutGrpcService) {
+  const std::string yaml_string = "{}";
+  envoy::config::trace::v3::OpenTelemetryConfig opentelemetry_config;
+  TestUtility::loadFromYaml(yaml_string, opentelemetry_config);
+  setup(opentelemetry_config);
+
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":authority", "test.com"}, {":path", "/"}, {":method", "GET"}};
+
+  Tracing::SpanPtr span =
+      driver_->startSpan(mock_tracing_config_, request_headers, operation_name_,
+                         time_system_.systemTime(), {Tracing::Reason::Sampling, true});
+  EXPECT_NE(span.get(), nullptr);
+
+  // Flush after a single span.
+  EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.opentelemetry.min_flush_spans", 5U))
+      .Times(1)
+      .WillRepeatedly(Return(1));
+  // We should see a call to sendMessage to export that single span.
   EXPECT_CALL(*mock_stream_ptr_, sendMessageRaw_(_, _)).Times(0);
   span->finishSpan();
   EXPECT_EQ(0U, stats_.counter("tracing.opentelemetry.spans_sent").value());

@@ -5,6 +5,7 @@
 
 #include "library/common/jni/import/jni_import.h"
 #include "library/common/types/c_types.h"
+#include "library/common/types/managed_envoy_headers.h"
 
 // NOLINT(namespace-envoy)
 
@@ -42,6 +43,15 @@ void jvm_detach_thread();
 void jni_delete_global_ref(void* context);
 
 void jni_delete_const_global_ref(const void* context);
+
+/**
+ * Clears any pending exceptions that may have been rides in result to a call into Java code.
+ *
+ * @param env, the JNI env pointer.
+ *
+ * @return Whether any pending JNI exception was cleared.
+ */
+bool clear_pending_exceptions(JNIEnv* env);
 
 int unbox_integer(JNIEnv* env, jobject boxedInteger);
 
@@ -99,6 +109,8 @@ jobjectArray ToJavaArrayOfByteArray(JNIEnv* env, const std::vector<std::string>&
 jbyteArray ToJavaByteArray(JNIEnv* env, const uint8_t* bytes, size_t len);
 
 jbyteArray ToJavaByteArray(JNIEnv* env, const std::string& str);
+
+jobjectArray ToJavaArrayOfObjectArray(JNIEnv* env, const Envoy::Types::ManagedEnvoyHeaders& map);
 
 void JavaArrayOfByteArrayToStringVector(JNIEnv* env, jobjectArray array,
                                         std::vector<std::string>* out);

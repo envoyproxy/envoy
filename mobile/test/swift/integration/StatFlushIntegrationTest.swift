@@ -1,12 +1,19 @@
+@_spi(YAMLValidation)
 import Envoy
 import Foundation
+import TestExtensions
 import XCTest
 
 final class StatFlushIntegrationTest: XCTestCase {
+  override static func setUp() {
+    super.setUp()
+    register_test_extensions()
+  }
+
   func testLotsOfFlushesWithHistograms() throws {
     let engineExpectation = self.expectation(description: "Engine Running")
 
-    let engine = EngineBuilder()
+    let engine = YAMLValidatingEngineBuilder()
       .addLogLevel(.debug)
       .addStatsFlushSeconds(1)
       .setOnEngineRunning {
@@ -17,9 +24,9 @@ final class StatFlushIntegrationTest: XCTestCase {
     XCTAssertEqual(XCTWaiter.wait(for: [engineExpectation], timeout: 10), .completed)
 
     let pulseClient = engine.pulseClient()
-    let distribution = pulseClient.distribution(elements: ["foo", "bar", "distribution"])
+    let counter = pulseClient.counter(elements: ["foo", "bar", "distribution"])
 
-    distribution.recordValue(value: 100)
+    counter.increment(count: 100)
 
     // Hit flushStats() many times in a row to make sure that there are no issues with
     // concurrent flushing.
@@ -33,7 +40,7 @@ final class StatFlushIntegrationTest: XCTestCase {
   func testMultipleStatSinks() throws {
     let engineExpectation = self.expectation(description: "Engine Running")
 
-    let engine = EngineBuilder()
+    let engine = YAMLValidatingEngineBuilder()
       .addLogLevel(.debug)
       .addStatsFlushSeconds(1)
       .addGrpcStatsDomain("example.com")

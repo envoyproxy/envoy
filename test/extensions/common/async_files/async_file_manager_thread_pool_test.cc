@@ -25,6 +25,8 @@ namespace Extensions {
 namespace Common {
 namespace AsyncFiles {
 
+using StatusHelpers::HasStatusCode;
+
 enum class BlockerState {
   Start,
   BlockingDuringExecution,
@@ -268,7 +270,7 @@ TEST_F(AsyncFileManagerSingleThreadTest, CreateAnonymousFileWorks) {
   EXPECT_OK(status);
 }
 
-TEST_F(AsyncFileManagerSingleThreadTest, OpenExistingFileAndUnlinkWork) {
+TEST_F(AsyncFileManagerSingleThreadTest, OpenExistingFileStatAndUnlinkWork) {
   char filename[1024];
   snprintf(filename, sizeof(filename), "%s/async_file.XXXXXX", tmpdir_.c_str());
   Api::OsSysCalls& posix = Api::OsSysCallsSingleton().get();
@@ -282,6 +284,11 @@ TEST_F(AsyncFileManagerSingleThreadTest, OpenExistingFileAndUnlinkWork) {
   EXPECT_OK(handle->close(close_blocker.callback()));
   absl::Status status = close_blocker.getResult();
   EXPECT_OK(status);
+  WaitForResult<absl::StatusOr<struct stat>> stat_blocker;
+  manager_->stat(filename, stat_blocker.callback());
+  absl::StatusOr<struct stat> stat_result = stat_blocker.getResult();
+  EXPECT_OK(stat_result);
+  EXPECT_EQ(0, stat_result.value().st_size);
   WaitForResult<absl::Status> unlink_blocker;
   manager_->unlink(filename, unlink_blocker.callback());
   status = unlink_blocker.getResult();
@@ -295,14 +302,21 @@ TEST_F(AsyncFileManagerSingleThreadTest, OpenExistingFileFailsForNonexistent) {
   manager_->openExistingFile(absl::StrCat(tmpdir_, "/nonexistent_file"),
                              AsyncFileManager::Mode::ReadWrite, handle_blocker.callback());
   absl::Status status = handle_blocker.getResult().status();
-  EXPECT_EQ(absl::StatusCode::kNotFound, status.code()) << status;
+  EXPECT_THAT(status, HasStatusCode(absl::StatusCode::kNotFound));
+}
+
+TEST_F(AsyncFileManagerSingleThreadTest, StatFailsForNonexistent) {
+  WaitForResult<absl::StatusOr<struct stat>> stat_blocker;
+  manager_->stat(absl::StrCat(tmpdir_, "/nonexistent_file"), stat_blocker.callback());
+  absl::StatusOr<struct stat> result = stat_blocker.getResult();
+  EXPECT_THAT(result, HasStatusCode(absl::StatusCode::kNotFound));
 }
 
 TEST_F(AsyncFileManagerSingleThreadTest, UnlinkFailsForNonexistent) {
-  WaitForResult<absl::StatusOr<AsyncFileHandle>> handle_blocker;
+  WaitForResult<absl::Status> handle_blocker;
   manager_->unlink(absl::StrCat(tmpdir_, "/nonexistent_file"), handle_blocker.callback());
-  absl::Status status = handle_blocker.getResult().status();
-  EXPECT_EQ(absl::StatusCode::kNotFound, status.code()) << status;
+  absl::Status status = handle_blocker.getResult();
+  EXPECT_THAT(status, HasStatusCode(absl::StatusCode::kNotFound));
 }
 
 } // namespace AsyncFiles

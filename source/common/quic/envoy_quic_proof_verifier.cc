@@ -41,8 +41,8 @@ public:
 
   Event::Dispatcher& dispatcher() override { return dispatcher_; }
 
-  void onCertValidationResult(bool succeeded, const std::string& error_details,
-                              uint8_t /*tls_alert*/) override {
+  void onCertValidationResult(bool succeeded, Ssl::ClientValidationStatus /*detailed_status*/,
+                              const std::string& error_details, uint8_t /*tls_alert*/) override {
     if (!succeeded) {
       std::unique_ptr<quic::ProofVerifyDetails> details = std::make_unique<CertVerifyResult>(false);
       quic_callback_->Run(succeeded, error_details, &details);

@@ -3,6 +3,11 @@ envoy.filters.http.dynamo:
   - envoy.filters.http
   security_posture: requires_trusted_downstream_and_upstream
   status: stable
+envoy.filters.http.golang:
+  categories:
+  - envoy.filters.http
+  security_posture: requires_trusted_downstream_and_upstream
+  status: alpha
 envoy.filters.http.squash:
   categories:
   - envoy.filters.http

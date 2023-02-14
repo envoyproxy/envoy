@@ -156,7 +156,8 @@ void InstanceImpl::ThreadLocalPool::onClusterAddOrUpdateNonVirtual(
   // its members. This is done once to minimize overhead in the data path, makeRequest() in
   // particular.
   Upstream::ClusterInfoConstSharedPtr info = cluster_->info();
-  const auto& cluster_type = info->clusterType();
+  OptRef<const envoy::config::cluster::v3::Cluster::CustomClusterType> cluster_type =
+      info->clusterType();
   is_redis_cluster_ = info->lbType() == Upstream::LoadBalancerType::ClusterProvided &&
                       cluster_type.has_value() && cluster_type->name() == "envoy.clusters.redis";
 }
@@ -454,7 +455,7 @@ void InstanceImpl::PendingRequest::onRedirection(Common::Redis::RespValuePtr&& v
                 host_address);
       auto host = host_;
       onResponse(std::move(resp_value_));
-      host->cluster().trafficStats().upstream_internal_redirect_failed_total_.inc();
+      host->cluster().trafficStats()->upstream_internal_redirect_failed_total_.inc();
     } else {
       doRedirection(std::move(resp_value_),
                     formatAddress(*result.host_info_.value()->address()->ip()), ask_redirection_);
@@ -470,7 +471,7 @@ void InstanceImpl::PendingRequest::onRedirection(Common::Redis::RespValuePtr&& v
               host_address);
     auto host = host_;
     onResponse(std::move(resp_value_));
-    host->cluster().trafficStats().upstream_internal_redirect_failed_total_.inc();
+    host->cluster().trafficStats()->upstream_internal_redirect_failed_total_.inc();
     return;
   }
   PANIC_DUE_TO_CORRUPT_ENUM;
@@ -487,7 +488,7 @@ void InstanceImpl::PendingRequest::onLoadDnsCacheComplete(
     ENVOY_LOG(debug, "DNS lookup failed");
     auto host = host_;
     onResponse(std::move(resp_value_));
-    host->cluster().trafficStats().upstream_internal_redirect_failed_total_.inc();
+    host->cluster().trafficStats()->upstream_internal_redirect_failed_total_.inc();
   } else {
     doRedirection(std::move(resp_value_), formatAddress(*host_info->address()->ip()),
                   ask_redirection_);
@@ -509,16 +510,16 @@ void InstanceImpl::PendingRequest::doRedirection(Common::Redis::RespValuePtr&& v
       !parent_.makeRequestToHost(host_address, Common::Redis::Utility::AskingRequest::instance(),
                                  null_client_callbacks)) {
     onResponse(std::move(value));
-    host->cluster().trafficStats().upstream_internal_redirect_failed_total_.inc();
+    host->cluster().trafficStats()->upstream_internal_redirect_failed_total_.inc();
   } else {
     request_handler_ =
         parent_.makeRequestToHost(host_address, getRequest(incoming_request_), *this);
     if (!request_handler_) {
       onResponse(std::move(value));
-      host->cluster().trafficStats().upstream_internal_redirect_failed_total_.inc();
+      host->cluster().trafficStats()->upstream_internal_redirect_failed_total_.inc();
     } else {
       parent_.refresh_manager_->onRedirection(parent_.cluster_name_);
-      host->cluster().trafficStats().upstream_internal_redirect_succeeded_total_.inc();
+      host->cluster().trafficStats()->upstream_internal_redirect_succeeded_total_.inc();
     }
   }
 }

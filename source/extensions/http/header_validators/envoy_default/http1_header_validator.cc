@@ -1,9 +1,12 @@
 #include "source/extensions/http/header_validators/envoy_default/http1_header_validator.h"
 
+#include "envoy/http/header_validator_errors.h"
+
 #include "source/common/http/utility.h"
 #include "source/extensions/http/header_validators/envoy_default/character_tables.h"
 
 #include "absl/container/node_hash_set.h"
+#include "absl/functional/bind_front.h"
 #include "absl/strings/string_view.h"
 
 namespace Envoy {
@@ -17,8 +20,7 @@ using ::Envoy::Http::HeaderString;
 using ::Envoy::Http::LowerCaseString;
 using ::Envoy::Http::Protocol;
 using ::Envoy::Http::RequestHeaderMap;
-using HeaderValidatorFunction =
-    HeaderValidator::HeaderValueValidationResult (Http1HeaderValidator::*)(const HeaderString&);
+using ::Envoy::Http::UhvResponseCodeDetail;
 
 struct Http1ResponseCodeDetailValues {
   const std::string InvalidTransferEncoding = "uhv.http1.invalid_transfer_encoding";
@@ -39,51 +41,25 @@ using Http1ResponseCodeDetail = ConstSingleton<Http1ResponseCodeDetailValues>;
  *
  */
 Http1HeaderValidator::Http1HeaderValidator(const HeaderValidatorConfig& config, Protocol protocol,
-                                           StreamInfo::StreamInfo& stream_info)
-    : HeaderValidator(config, protocol, stream_info) {}
+                                           ::Envoy::Http::HeaderValidatorStats& stats)
+    : HeaderValidator(config, protocol, stats),
+      request_header_validator_map_{
+          {":method", absl::bind_front(&HeaderValidator::validateMethodHeader, this)},
+          {":authority", absl::bind_front(&HeaderValidator::validateHostHeader, this)},
+          {":scheme", absl::bind_front(&HeaderValidator::validateSchemeHeader, this)},
+          {":path", absl::bind_front(&HeaderValidator::validatePathHeaderCharacters, this)},
+          {"transfer-encoding",
+           absl::bind_front(&Http1HeaderValidator::validateTransferEncodingHeader, this)},
+          {"content-length", absl::bind_front(&HeaderValidator::validateContentLengthHeader, this)},
+      } {}
 
 ::Envoy::Http::HeaderValidator::HeaderEntryValidationResult
 Http1HeaderValidator::validateRequestHeaderEntry(const HeaderString& key,
                                                  const HeaderString& value) {
   // Pseudo headers in HTTP/1.1 are synthesized by the codec from the request line prior to
   // submitting the header map for validation in UHV.
-  static const absl::node_hash_map<absl::string_view, HeaderValidatorFunction> kHeaderValidatorMap{
-      {":method", &Http1HeaderValidator::validateMethodHeader},
-      {":authority", &Http1HeaderValidator::validateHostHeader},
-      {":scheme", &Http1HeaderValidator::validateSchemeHeader},
-      {":path", &Http1HeaderValidator::validatePathHeaderCharacters},
-      {"transfer-encoding", &Http1HeaderValidator::validateTransferEncodingHeader},
-      {"content-length", &Http1HeaderValidator::validateContentLengthHeader},
-  };
 
-  const auto& key_string_view = key.getStringView();
-  if (key_string_view.empty()) {
-    // reject empty header names
-    return {HeaderEntryValidationResult::Action::Reject,
-            UhvResponseCodeDetail::get().EmptyHeaderName};
-  }
-
-  auto validator_it = kHeaderValidatorMap.find(key_string_view);
-  if (validator_it != kHeaderValidatorMap.end()) {
-    const auto& validator = validator_it->second;
-    return (*this.*validator)(value);
-  }
-
-  if (key_string_view.at(0) != ':') {
-    // Validate the (non-pseudo) header name
-    auto name_result = validateGenericHeaderName(key);
-    if (!name_result) {
-      return name_result;
-    }
-  } else {
-    // kHeaderValidatorMap contains every known pseudo header. If the header name starts with ":"
-    // and we don't have a validator registered in the map, then the header name is an unknown
-    // pseudo header.
-    return {HeaderEntryValidationResult::Action::Reject,
-            UhvResponseCodeDetail::get().InvalidPseudoHeader};
-  }
-
-  return validateGenericHeaderValue(value);
+  return validateGenericRequestHeaderEntry(key, value, request_header_validator_map_);
 }
 
 ::Envoy::Http::HeaderValidator::HeaderEntryValidationResult
@@ -268,7 +244,7 @@ Http1HeaderValidator::validateRequestHeaderMap(RequestHeaderMap& header_map) {
     // port value will be validated later on. For a host in reg-name form the delimiter existence
     // check is sufficient. For IPv6, we need to verify that the port delimiter occurs *after* the
     // IPv6 address (following a "]" character).
-    std::size_t port_delim = host.rfind(":");
+    std::size_t port_delim = host.rfind(':');
     if (port_delim == absl::string_view::npos || port_delim == 0) {
       // The uri-host is missing the port
       return {RequestHeaderMapValidationResult::Action::Reject,
@@ -394,7 +370,7 @@ Http1HeaderValidator::validateResponseHeaderMap(::Envoy::Http::ResponseHeaderMap
 }
 
 HeaderValidator::HeaderValueValidationResult
-Http1HeaderValidator::validateTransferEncodingHeader(const HeaderString& value) {
+Http1HeaderValidator::validateTransferEncodingHeader(const HeaderString& value) const {
   // HTTP/1.1 states that requests with an unrecognized transfer encoding should
   // be rejected, from RFC 9112, https://www.rfc-editor.org/rfc/rfc9112.html#section-6.1:
   //
@@ -412,6 +388,16 @@ Http1HeaderValidator::validateTransferEncodingHeader(const HeaderString& value) 
   }
 
   return HeaderValueValidationResult::success();
+}
+
+HeaderValidator::TrailerValidationResult
+Http1HeaderValidator::validateRequestTrailerMap(::Envoy::Http::RequestTrailerMap& trailer_map) {
+  return validateTrailers(trailer_map);
+}
+
+HeaderValidator::TrailerValidationResult
+Http1HeaderValidator::validateResponseTrailerMap(::Envoy::Http::ResponseTrailerMap& trailer_map) {
+  return validateTrailers(trailer_map);
 }
 
 } // namespace EnvoyDefault

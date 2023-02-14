@@ -17,8 +17,8 @@ tasks:
     platform: ubuntu2004
     shell_commands:
     - "sudo apt -y update && sudo apt -y install automake autotools-dev cmake libtool m4 ninja-build"
-    - "wget https://apt.llvm.org/llvm.sh && sudo bash llvm.sh 10"
-    - "bazel/setup_clang.sh /usr/lib/llvm-10"
+    - "wget https://apt.llvm.org/llvm.sh && sudo bash llvm.sh 14"
+    - "bazel/setup_clang.sh /usr/lib/llvm-14"
     test_targets:
     - "//test/common/common/..."
     - "//test/integration/..."

@@ -1,70 +1,22 @@
 #include "contrib/kafka/filters/network/source/mesh/upstream_kafka_client_impl.h"
 
+#include "contrib/kafka/filters/network/source/mesh/librdkafka_utils_impl.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
 namespace Kafka {
 namespace Mesh {
 
-class LibRdKafkaUtilsImpl : public LibRdKafkaUtils {
-
-  // LibRdKafkaUtils
-  RdKafka::Conf::ConfResult setConfProperty(RdKafka::Conf& conf, const std::string& name,
-                                            const std::string& value,
-                                            std::string& errstr) const override {
-    return conf.set(name, value, errstr);
-  }
-
-  // LibRdKafkaUtils
-  RdKafka::Conf::ConfResult setConfDeliveryCallback(RdKafka::Conf& conf,
-                                                    RdKafka::DeliveryReportCb* dr_cb,
-                                                    std::string& errstr) const override {
-    return conf.set("dr_cb", dr_cb, errstr);
-  }
-
-  // LibRdKafkaUtils
-  std::unique_ptr<RdKafka::Producer> createProducer(RdKafka::Conf* conf,
-                                                    std::string& errstr) const override {
-    return std::unique_ptr<RdKafka::Producer>(RdKafka::Producer::create(conf, errstr));
-  }
-
-  // LibRdKafkaUtils
-  RdKafka::Headers* convertHeaders(
-      const std::vector<std::pair<absl::string_view, absl::string_view>>& headers) const override {
-    RdKafka::Headers* result = RdKafka::Headers::create();
-    for (const auto& header : headers) {
-      const RdKafka::Headers::Header librdkafka_header = {
-          std::string(header.first), header.second.data(), header.second.length()};
-      const auto ec = result->add(librdkafka_header);
-      // This should never happen ('add' in 1.7.0 does not return any other error codes).
-      if (RdKafka::ERR_NO_ERROR != ec) {
-        delete result;
-        return nullptr;
-      }
-    }
-    return result;
-  }
-
-  // LibRdKafkaUtils
-  void deleteHeaders(RdKafka::Headers* librdkafka_headers) const override {
-    delete librdkafka_headers;
-  }
-
-public:
-  static const LibRdKafkaUtils& getDefaultInstance() {
-    CONSTRUCT_ON_FIRST_USE(LibRdKafkaUtilsImpl);
-  }
-};
-
 RichKafkaProducer::RichKafkaProducer(Event::Dispatcher& dispatcher,
                                      Thread::ThreadFactory& thread_factory,
-                                     const RawKafkaProducerConfig& configuration)
+                                     const RawKafkaConfig& configuration)
     : RichKafkaProducer(dispatcher, thread_factory, configuration,
                         LibRdKafkaUtilsImpl::getDefaultInstance()){};
 
 RichKafkaProducer::RichKafkaProducer(Event::Dispatcher& dispatcher,
                                      Thread::ThreadFactory& thread_factory,
-                                     const RawKafkaProducerConfig& configuration,
+                                     const RawKafkaConfig& configuration,
                                      const LibRdKafkaUtils& utils)
     : dispatcher_{dispatcher}, utils_{utils} {
 

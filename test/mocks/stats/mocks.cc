@@ -73,6 +73,30 @@ MockSink::~MockSink() = default;
 MockSinkPredicates::MockSinkPredicates() = default;
 MockSinkPredicates::~MockSinkPredicates() = default;
 
+MockScope::MockScope(StatName prefix, MockStore& store)
+    : TestUtil::TestScope(prefix, store), mock_store_(store) {}
+
+Counter& MockScope::counterFromStatNameWithTags(const StatName& name,
+                                                StatNameTagVectorOptConstRef) {
+  // We always just respond with the mocked counter, so the tags don't matter.
+  return mock_store_.counter(symbolTable().toString(name));
+}
+Gauge& MockScope::gaugeFromStatNameWithTags(const StatName& name, StatNameTagVectorOptConstRef,
+                                            Gauge::ImportMode import_mode) {
+  // We always just respond with the mocked gauge, so the tags don't matter.
+  return mock_store_.gauge(symbolTable().toString(name), import_mode);
+}
+Histogram& MockScope::histogramFromStatNameWithTags(const StatName& name,
+                                                    StatNameTagVectorOptConstRef,
+                                                    Histogram::Unit unit) {
+  return mock_store_.histogram(symbolTable().toString(name), unit);
+}
+TextReadout& MockScope::textReadoutFromStatNameWithTags(const StatName& name,
+                                                        StatNameTagVectorOptConstRef) {
+  // We always just respond with the mocked counter, so the tags don't matter.
+  return mock_store_.textReadout(symbolTable().toString(name));
+}
+
 MockStore::MockStore() {
   ON_CALL(*this, counter(_)).WillByDefault(ReturnRef(counter_));
   ON_CALL(*this, gauge(_, _)).WillByDefault(ReturnRef(gauge_));
@@ -85,13 +109,12 @@ MockStore::MockStore() {
         histograms_.emplace_back(histogram);
         return *histogram;
       }));
-
-  ON_CALL(*this, histogramFromString(_, _))
-      .WillByDefault(Invoke([this](const std::string& name, Histogram::Unit unit) -> Histogram& {
-        return TestUtil::TestStore::histogramFromString(name, unit);
-      }));
 }
 MockStore::~MockStore() = default;
+
+ScopeSharedPtr MockStore::makeScope(StatName prefix) {
+  return std::make_shared<MockScope>(prefix, *this);
+}
 
 MockIsolatedStatsStore::MockIsolatedStatsStore() = default;
 MockIsolatedStatsStore::~MockIsolatedStatsStore() = default;

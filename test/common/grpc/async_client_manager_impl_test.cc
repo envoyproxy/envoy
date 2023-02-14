@@ -113,7 +113,8 @@ public:
 
   Upstream::MockClusterManager cm_;
   NiceMock<ThreadLocal::MockInstance> tls_;
-  Stats::MockStore scope_;
+  Stats::MockStore store_;
+  Stats::MockScope& scope_{store_.mockScope()};
   DangerousDeprecatedTestTime test_time_;
   Api::ApiPtr api_;
   StatNames stat_names_;

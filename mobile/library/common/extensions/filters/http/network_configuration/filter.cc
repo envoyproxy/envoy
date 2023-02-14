@@ -4,6 +4,8 @@
 
 #include "source/common/network/filter_state_proxy_info.h"
 
+#include "library/common/http/header_utility.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
@@ -159,7 +161,7 @@ Http::LocalErrorStatus NetworkConfigurationFilter::onLocalReply(const LocalReply
   connectivity_manager_->reportNetworkUsage(extra_stream_info_->configuration_key_.value(),
                                             network_fault);
 
-  return Http::LocalErrorStatus::ContinueAndResetStream;
+  return Http::Utility::statusForOnLocalReply(reply, decoder_callbacks_->streamInfo());
 }
 
 void NetworkConfigurationFilter::onDestroy() { dns_cache_handle_.reset(); }

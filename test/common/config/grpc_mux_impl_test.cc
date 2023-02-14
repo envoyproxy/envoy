@@ -2,6 +2,7 @@
 
 #include "envoy/config/endpoint/v3/endpoint.pb.h"
 #include "envoy/config/endpoint/v3/endpoint.pb.validate.h"
+#include "envoy/config/xds_config_tracker.h"
 #include "envoy/config/xds_resources_delegate.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
@@ -63,7 +64,8 @@ public:
         local_info_, std::unique_ptr<Grpc::MockAsyncClient>(async_client_), dispatcher_,
         *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
             "envoy.service.discovery.v3.AggregatedDiscoveryService.StreamAggregatedResources"),
-        random_, stats_, rate_limit_settings_, true, std::move(config_validators_),
+        random_, *stats_.rootScope(), rate_limit_settings_, true, std::move(config_validators_),
+        /*xds_config_tracker=*/XdsConfigTrackerOptRef(),
         /*xds_resources_delegate=*/XdsResourcesDelegateOptRef(), /*target_xds_authority=*/"");
   }
 
@@ -72,7 +74,9 @@ public:
         local_info_, std::unique_ptr<Grpc::MockAsyncClient>(async_client_), dispatcher_,
         *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
             "envoy.service.discovery.v3.AggregatedDiscoveryService.StreamAggregatedResources"),
-        random_, stats_, custom_rate_limit_settings, true, std::move(config_validators_),
+        random_, *stats_.rootScope(), custom_rate_limit_settings, true,
+        std::move(config_validators_),
+        /*xds_config_tracker=*/XdsConfigTrackerOptRef(),
         /*xds_resources_delegate=*/XdsResourcesDelegateOptRef(), /*target_xds_authority=*/"");
   }
 
@@ -165,6 +169,61 @@ TEST_F(GrpcMuxImplTest, DynamicContextParameters) {
   auto foo_z_sub = grpc_mux_->addWatch("foo", {"z"}, callbacks_, resource_decoder_, {});
   expectSendMessage("foo", {"x", "y"}, "");
   expectSendMessage("foo", {}, "");
+}
+
+// Validate behavior when xdstp naming is used.
+TEST_F(GrpcMuxImplTest, Xdstp) {
+  setup();
+  InSequence s;
+
+  const std::string cluster_type_url = "envoy.config.cluster.v3.Cluster";
+  const std::string cluster_1 = "xdstp://test/" + cluster_type_url + "/x";
+  const std::string cluster_2 = "xdstp://test/" + cluster_type_url + "/y";
+  const std::string listener_type_url = "envoy.config.listener.v3.Listener";
+  const std::string listener_wildcard = "xdstp://test/" + listener_type_url + "/*";
+  SubscriptionOptions subscription_options;
+  auto cluster_sub = grpc_mux_->addWatch(cluster_type_url, {cluster_1, cluster_2}, callbacks_,
+                                         resource_decoder_, subscription_options);
+  auto listener_sub = grpc_mux_->addWatch(listener_type_url, {listener_wildcard}, callbacks_,
+                                          resource_decoder_, subscription_options);
+
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+  expectSendMessage(cluster_type_url, {cluster_1, cluster_2}, /*version=*/"", /*first=*/true);
+  expectSendMessage(listener_type_url, {listener_wildcard}, /*version=*/"");
+  grpc_mux_->start();
+  expectSendMessage(listener_type_url, {}, /*version=*/"");
+  expectSendMessage(cluster_type_url, {}, /*version=*/"");
+}
+
+// Validate behavior when xdstp naming is used with context parameters in the URI.
+TEST_F(GrpcMuxImplTest, XdstpWithContextParams) {
+  setup();
+  InSequence s;
+
+  xds::core::v3::ContextParams context_params;
+  (*context_params.mutable_params())["xds.node.id"] = "node_name";
+  EXPECT_CALL(local_info_.context_provider_, nodeContext())
+      .WillRepeatedly(ReturnRef(context_params));
+
+  const std::string cluster_type_url = "envoy.config.cluster.v3.Cluster";
+  const std::string cluster_1 = "xdstp://test/" + cluster_type_url + "/x?xds.node.id=node_name";
+  const std::string cluster_2 = "xdstp://test/" + cluster_type_url + "/y?xds.node.id=node_name";
+  const std::string listener_type_url = "envoy.config.listener.v3.Listener";
+  const std::string listener_wildcard =
+      "xdstp://test/" + listener_type_url + "/*?xds.node.id=node_name";
+  SubscriptionOptions subscription_options;
+  subscription_options.add_xdstp_node_context_params_ = true;
+  auto cluster_sub = grpc_mux_->addWatch(cluster_type_url, {cluster_1, cluster_2}, callbacks_,
+                                         resource_decoder_, subscription_options);
+  auto listener_sub = grpc_mux_->addWatch(listener_type_url, {listener_wildcard}, callbacks_,
+                                          resource_decoder_, subscription_options);
+
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+  expectSendMessage(cluster_type_url, {cluster_1, cluster_2}, /*version=*/"", /*first=*/true);
+  expectSendMessage(listener_type_url, {listener_wildcard}, /*version=*/"");
+  grpc_mux_->start();
+  expectSendMessage(listener_type_url, {}, /*version=*/"");
+  expectSendMessage(cluster_type_url, {}, /*version=*/"");
 }
 
 // Validate behavior when multiple type URL watches are maintained and the stream is reset.
@@ -891,8 +950,9 @@ TEST_F(GrpcMuxImplTest, BadLocalInfoEmptyClusterName) {
           local_info_, std::unique_ptr<Grpc::MockAsyncClient>(async_client_), dispatcher_,
           *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
               "envoy.service.discovery.v3.AggregatedDiscoveryService.StreamAggregatedResources"),
-          random_, stats_, rate_limit_settings_, true,
+          random_, *stats_.rootScope(), rate_limit_settings_, true,
           std::make_unique<NiceMock<MockCustomConfigValidators>>(),
+          /*xds_config_tracker=*/XdsConfigTrackerOptRef(),
           /*xds_resources_delegate=*/XdsResourcesDelegateOptRef(), /*target_xds_authority=*/""),
       EnvoyException,
       "ads: node 'id' and 'cluster' are required. Set it either in 'node' config or via "
@@ -906,8 +966,9 @@ TEST_F(GrpcMuxImplTest, BadLocalInfoEmptyNodeName) {
           local_info_, std::unique_ptr<Grpc::MockAsyncClient>(async_client_), dispatcher_,
           *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
               "envoy.service.discovery.v3.AggregatedDiscoveryService.StreamAggregatedResources"),
-          random_, stats_, rate_limit_settings_, true,
+          random_, *stats_.rootScope(), rate_limit_settings_, true,
           std::make_unique<NiceMock<MockCustomConfigValidators>>(),
+          /*xds_config_tracker=*/XdsConfigTrackerOptRef(),
           /*xds_resources_delegate=*/XdsResourcesDelegateOptRef(), /*target_xds_authority=*/""),
       EnvoyException,
       "ads: node 'id' and 'cluster' are required. Set it either in 'node' config or via "

@@ -432,6 +432,29 @@ TEST(TagExtractorTest, DefaultTagExtractors) {
   regex_tester.testRegex("redis.my_redis_prefix.response", "redis.response", {redis_prefix});
 }
 
+TEST(TagExtractorTest, ExtAuthzTagExtractors) {
+  const auto& tag_names = Config::TagNames::get();
+
+  Tag listener_http_prefix;
+  listener_http_prefix.name_ = tag_names.HTTP_CONN_MANAGER_PREFIX;
+  listener_http_prefix.value_ = "http_prefix";
+
+  Tag grpc_cluster;
+  grpc_cluster.name_ = tag_names.CLUSTER_NAME;
+  grpc_cluster.value_ = "grpc_cluster";
+
+  DefaultTagRegexTester regex_tester;
+
+  // ExtAuthz Prefix
+  Tag ext_authz_prefix;
+  ext_authz_prefix.name_ = tag_names.EXT_AUTHZ_PREFIX;
+  ext_authz_prefix.value_ = "authpfx";
+  regex_tester.testRegex("http.http_prefix.ext_authz.authpfx.denied", "http.ext_authz.denied",
+                         {listener_http_prefix, ext_authz_prefix});
+  regex_tester.testRegex("cluster.grpc_cluster.ext_authz.authpfx.ok", "cluster.ext_authz.ok",
+                         {grpc_cluster, ext_authz_prefix});
+}
+
 TEST(TagExtractorTest, ExtractRegexPrefix) {
   TagExtractorPtr tag_extractor; // Keep tag_extractor in this scope to prolong prefix lifetime.
   auto extractRegexPrefix = [&tag_extractor](const std::string& regex) -> absl::string_view {

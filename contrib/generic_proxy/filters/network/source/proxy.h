@@ -7,11 +7,14 @@
 #include "envoy/network/connection.h"
 #include "envoy/network/filter.h"
 #include "envoy/server/factory_context.h"
+#include "envoy/tracing/tracer_manager.h"
 
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/linked_object.h"
 #include "source/common/common/logger.h"
 #include "source/common/stream_info/stream_info_impl.h"
+#include "source/common/tracing/tracer_config_impl.h"
+#include "source/common/tracing/tracer_impl.h"
 
 #include "contrib/envoy/extensions/filters/network/generic_proxy/v3/generic_proxy.pb.h"
 #include "contrib/envoy/extensions/filters/network/generic_proxy/v3/generic_proxy.pb.validate.h"
@@ -45,10 +48,13 @@ class FilterConfigImpl : public FilterConfig {
 public:
   FilterConfigImpl(const std::string& stat_prefix, CodecFactoryPtr codec,
                    Rds::RouteConfigProviderSharedPtr route_config_provider,
-                   std::vector<NamedFilterFactoryCb> factories)
+                   std::vector<NamedFilterFactoryCb> factories, Tracing::TracerSharedPtr tracer,
+                   Tracing::ConnectionManagerTracingConfigPtr tracing_config,
+                   Envoy::Server::Configuration::FactoryContext& context)
       : stat_prefix_(stat_prefix), codec_factory_(std::move(codec)),
-        route_config_provider_(std::move(route_config_provider)), factories_(std::move(factories)) {
-  }
+        route_config_provider_(std::move(route_config_provider)), factories_(std::move(factories)),
+        drain_decision_(context.drainDecision()), tracer_(std::move(tracer)),
+        tracing_config_(std::move(tracing_config)) {}
 
   // FilterConfig
   RouteEntryConstSharedPtr routeEntry(const Request& request) const override {
@@ -56,6 +62,13 @@ public:
     return config->routeEntry(request);
   }
   const CodecFactory& codecFactory() const override { return *codec_factory_; }
+  const Network::DrainDecision& drainDecision() const override { return drain_decision_; }
+  OptRef<Tracing::Tracer> tracingProvider() const override {
+    return makeOptRefFromPtr<Tracing::Tracer>(tracer_.get());
+  }
+  OptRef<const Tracing::ConnectionManagerTracingConfig> tracingConfig() const override {
+    return makeOptRefFromPtr<const Tracing::ConnectionManagerTracingConfig>(tracing_config_.get());
+  }
 
   // FilterChainFactory
   void createFilterChain(FilterChainManager& manager) override {
@@ -75,12 +88,18 @@ private:
   Rds::RouteConfigProviderSharedPtr route_config_provider_;
 
   std::vector<NamedFilterFactoryCb> factories_;
+
+  const Network::DrainDecision& drain_decision_;
+
+  Tracing::TracerSharedPtr tracer_;
+  Tracing::ConnectionManagerTracingConfigPtr tracing_config_;
 };
 
 class ActiveStream : public FilterChainManager,
                      public LinkedObject<ActiveStream>,
                      public Envoy::Event::DeferredDeletable,
                      public ResponseEncoderCallback,
+                     public Tracing::Config,
                      Logger::Loggable<Envoy::Logger::Id::filter> {
 public:
   class ActiveFilterBase : public virtual StreamFilterCallbacks {
@@ -99,6 +118,10 @@ public:
       }
       return nullptr;
     }
+    const StreamInfo::StreamInfo& streamInfo() const override { return parent_.stream_info_; }
+    StreamInfo::StreamInfo& streamInfo() override { return parent_.stream_info_; }
+    Tracing::Span& activeSpan() override { return parent_.activeSpan(); }
+    OptRef<const Tracing::Config> tracingConfig() const override { return parent_.tracingConfig(); }
 
     bool isDualFilter() const { return is_dual_; }
 
@@ -171,7 +194,6 @@ public:
   };
 
   ActiveStream(Filter& parent, RequestPtr request);
-  ~ActiveStream() override;
 
   void addDecoderFilter(ActiveDecoderFilterPtr filter) {
     decoder_filters_.emplace_back(std::move(filter));
@@ -208,7 +230,32 @@ public:
   size_t nextDecoderFilterIndexForTest() { return next_decoder_filter_index_; }
   size_t nextEncoderFilterIndexForTest() { return next_encoder_filter_index_; }
 
+  Tracing::Span& activeSpan() {
+    if (active_span_) {
+      return *active_span_;
+    } else {
+      return Tracing::NullSpan::instance();
+    }
+  }
+
+  OptRef<const Tracing::Config> tracingConfig() const {
+    if (connection_manager_tracing_config_.has_value()) {
+      return {*this};
+    }
+    return {};
+  }
+
+  void completeRequest();
+
 private:
+  // Keep these methods private to ensure that these methods are only called by the reference
+  // returned by the public tracingConfig() method.
+  // Tracing::TracingConfig
+  Tracing::OperationName operationName() const override;
+  const Tracing::CustomTagMap* customTags() const override;
+  bool verbose() const override;
+  uint32_t maxPathTagLength() const override;
+
   bool active_stream_reset_{false};
 
   Filter& parent_;
@@ -223,6 +270,11 @@ private:
 
   std::vector<ActiveEncoderFilterPtr> encoder_filters_;
   size_t next_encoder_filter_index_{0};
+
+  StreamInfo::StreamInfoImpl stream_info_;
+
+  OptRef<const Tracing::ConnectionManagerTracingConfig> connection_manager_tracing_config_;
+  Tracing::SpanPtr active_span_;
 };
 using ActiveStreamPtr = std::unique_ptr<ActiveStream>;
 
@@ -231,7 +283,9 @@ class Filter : public Envoy::Network::ReadFilter,
                public Envoy::Logger::Loggable<Envoy::Logger::Id::filter>,
                public RequestDecoderCallback {
 public:
-  Filter(FilterConfigSharedPtr config) : config_(std::move(config)) {
+  Filter(FilterConfigSharedPtr config, TimeSource& time_source, Runtime::Loader& runtime)
+      : config_(std::move(config)), drain_decision_(config_->drainDecision()),
+        time_source_(time_source), runtime_(runtime) {
     decoder_ = config_->codecFactory().requestDecoder();
     decoder_->setDecoderCallback(*this);
     response_encoder_ = config_->codecFactory().responseEncoder();
@@ -281,14 +335,24 @@ public:
 
   void resetStreamsForUnexpectedError();
 
+  void mayBeDrainClose();
+
+protected:
+  // This will be called when drain decision is made and all active streams are handled.
+  // This is a virtual method so that it can be overridden by derived classes.
+  virtual void onDrainCloseAndNoActiveStreams();
+
+  Envoy::Network::ReadFilterCallbacks* callbacks_{nullptr};
+
 private:
   friend class ActiveStream;
 
   bool downstream_connection_closed_{};
 
-  Envoy::Network::ReadFilterCallbacks* callbacks_{nullptr};
-
   FilterConfigSharedPtr config_{};
+  const Network::DrainDecision& drain_decision_;
+  TimeSource& time_source_;
+  Runtime::Loader& runtime_;
 
   RequestDecoderPtr decoder_;
   ResponseEncoderPtr response_encoder_;

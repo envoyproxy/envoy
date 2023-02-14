@@ -1,14 +1,21 @@
+@_spi(YAMLValidation)
 import Envoy
 import EnvoyEngine
 import Foundation
+import TestExtensions
 import XCTest
 
 final class SetEventTrackerTestNoTracker: XCTestCase {
+  override static func setUp() {
+    super.setUp()
+    register_test_extensions()
+  }
+
   // Skipping because this test currently attempts to connect to an invalid remote (example.com)
   func skipped_testSetEventTracker() throws {
     let expectation = self.expectation(description: "Response headers received")
 
-    let engine = EngineBuilder()
+    let engine = YAMLValidatingEngineBuilder()
       .addLogLevel(.trace)
       .addNativeFilter(
         name: "envoy.filters.http.test_event_tracker",

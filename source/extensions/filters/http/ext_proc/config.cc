@@ -33,8 +33,8 @@ ExternalProcessingFilterConfig::createRouteSpecificFilterConfigTyped(
   return std::make_shared<FilterConfigPerRoute>(proto_config);
 }
 
-REGISTER_FACTORY(ExternalProcessingFilterConfig,
-                 Server::Configuration::NamedHttpFilterConfigFactory){"envoy.ext_proc"};
+LEGACY_REGISTER_FACTORY(ExternalProcessingFilterConfig,
+                        Server::Configuration::NamedHttpFilterConfigFactory, "envoy.ext_proc");
 
 } // namespace ExternalProcessing
 } // namespace HttpFilters

@@ -1,7 +1,13 @@
 import Envoy
+import TestExtensions
 import XCTest
 
 final class DirectResponsePrefixPathMatchIntegrationTest: XCTestCase {
+  override static func setUp() {
+    super.setUp()
+    register_test_extensions()
+  }
+
   func testDirectResponseWithPrefixMatch() {
     let headersExpectation = self.expectation(description: "Response headers received")
     let dataExpectation = self.expectation(description: "Response data received")
@@ -11,6 +17,7 @@ final class DirectResponsePrefixPathMatchIntegrationTest: XCTestCase {
     ).build()
 
     let engine = TestEngineBuilder()
+      .useLegacyBuilder(true)
       .addDirectResponse(
         .init(
           matcher: RouteMatcher(pathPrefix: "/v1/foo"),

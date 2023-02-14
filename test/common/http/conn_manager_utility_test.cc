@@ -20,6 +20,7 @@
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/ssl/mocks.h"
+#include "test/mocks/stream_info/mocks.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
@@ -143,8 +144,9 @@ public:
   // the request is internal/external, given the importance of these two pieces of data.
   MutateRequestRet callMutateRequestHeaders(RequestHeaderMap& headers, Protocol) {
     MutateRequestRet ret;
+    NiceMock<StreamInfo::MockStreamInfo> mock_stream_info;
     const auto result = ConnectionManagerUtility::mutateRequestHeaders(
-        headers, connection_, config_, route_config_, local_info_);
+        headers, connection_, config_, route_config_, local_info_, mock_stream_info);
     ret.downstream_address_ = result.final_remote_address->asString();
     ret.reject_request_ = result.reject_request;
     ret.trace_reason_ =

@@ -3,6 +3,7 @@ package io.envoyproxy.envoymobile.engine;
 import io.envoyproxy.envoymobile.engine.types.EnvoyHTTPCallbacks;
 import io.envoyproxy.envoymobile.engine.types.EnvoyNetworkType;
 import io.envoyproxy.envoymobile.engine.types.EnvoyStringAccessor;
+import io.envoyproxy.envoymobile.engine.types.EnvoyStatus;
 
 import java.util.Map;
 
@@ -23,26 +24,35 @@ public interface EnvoyEngine {
   void terminate();
 
   /**
+   * Performs any registrations necessary before running Envoy.
+   *
+   * The envoyConfiguration is used to determined what to register.
+   *
+   * @param envoyConfiguration The EnvoyConfiguration used to start Envoy.
+   */
+  void performRegistration(EnvoyConfiguration envoyConfiguration);
+
+  /**
    * Run the Envoy engine with the provided yaml string and log level.
    *
-   * The envoyConfiguration is used to resolve the configurationYAML.
+   * This does not perform registration, and performRegistration() may need to be called first.
    *
    * @param configurationYAML The configuration yaml with which to start Envoy.
-   * @param envoyConfiguration The EnvoyConfiguration used to start Envoy.
    * @param logLevel          The log level to use when starting Envoy.
    * @return A status indicating if the action was successful.
    */
-  int runWithTemplate(String configurationYAML, EnvoyConfiguration envoyConfiguration,
-                      String logLevel);
+  EnvoyStatus runWithYaml(String configurationYAML, String logLevel);
 
   /**
    * Run the Envoy engine with the provided EnvoyConfiguration and log level.
+   *
+   * This automatically performs any necessary registrations.
    *
    * @param envoyConfiguration The EnvoyConfiguration used to start Envoy.
    * @param logLevel           The log level to use when starting Envoy.
    * @return A status indicating if the action was successful.
    */
-  int runWithConfig(EnvoyConfiguration envoyConfiguration, String logLevel);
+  EnvoyStatus runWithConfig(EnvoyConfiguration envoyConfiguration, String logLevel);
 
   /**
    * Increments a counter with the given count.
@@ -53,56 +63,6 @@ public interface EnvoyEngine {
    * @return A status indicating if the action was successful.
    */
   int recordCounterInc(String elements, Map<String, String> tags, int count);
-
-  /**
-   * Set a gauge of a given string of elements with the given value.
-   *
-   * @param elements Elements of the gauge stat.
-   * @param tags Tags of the gauge stat.
-   * @param value Value to set to the gauge.
-   * @return A status indicating if the action was successful.
-   */
-  int recordGaugeSet(String elements, Map<String, String> tags, int value);
-
-  /**
-   * Add the gauge with the given string of elements and by the given amount.
-   *
-   * @param elements Elements of the gauge stat.
-   * @param tags Tags of the gauge stat.
-   * @param amount Amount to add to the gauge.
-   * @return A status indicating if the action was successful.
-   */
-  int recordGaugeAdd(String elements, Map<String, String> tags, int amount);
-
-  /**
-   * Subtract from the gauge with the given string of elements and by the given amount.
-   *
-   * @param elements Elements of the gauge stat.
-   * @param tags Tags of the gauge stat.
-   * @param amount Amount to subtract from the gauge.
-   * @return A status indicating if the action was successful.
-   */
-  int recordGaugeSub(String elements, Map<String, String> tags, int amount);
-
-  /**
-   * Add another recorded duration in ms to the timer histogram with the given string of elements.
-   *
-   * @param elements Elements of the histogram stat.
-   * @param tags Tags of the histogram stat.
-   * @param durationMs Duration value to record in the histogram timer distribution.
-   * @return A status indicating if the action was successful.
-   */
-  int recordHistogramDuration(String elements, Map<String, String> tags, int durationMs);
-
-  /**
-   * Add another recorded value to the generic histogram with the given string of elements.
-   *
-   * @param elements Elements of the histogram stat.
-   * @param tags Tags of the histogram stat.
-   * @param value Amount to record as a new value for the histogram distribution.
-   * @return A status indicating if the action was successful.
-   */
-  int recordHistogramValue(String elements, Map<String, String> tags, int value);
 
   int registerStringAccessor(String accessor_name, EnvoyStringAccessor accessor);
 

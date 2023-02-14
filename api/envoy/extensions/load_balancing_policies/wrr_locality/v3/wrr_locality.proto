@@ -14,10 +14,10 @@ option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/loa
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: Weighted Round Robin Locality-Picking Load Balancing Policy]
+// [#not-implemented-hide:]
 
 // Configuration for the wrr_locality LB policy. See the :ref:`load balancing architecture overview
 // <arch_overview_load_balancing_types>` for more information.
-// [#extension: envoy.load_balancing_policies]
 message WrrLocality {
   // The child LB policy to create for endpoint-picking within the chosen locality.
   config.cluster.v3.LoadBalancingPolicy endpoint_picking_policy = 1

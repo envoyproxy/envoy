@@ -1,7 +1,13 @@
 import Envoy
+import TestExtensions
 import XCTest
 
 final class DirectResponseSuffixHeadersMatchIntegrationTest: XCTestCase {
+  override static func setUp() {
+    super.setUp()
+    register_test_extensions()
+  }
+
   func testDirectResponseWithSuffixHeadersMatch() {
     let headersExpectation = self.expectation(description: "Response headers received")
     let dataExpectation = self.expectation(description: "Response data received")
@@ -13,6 +19,7 @@ final class DirectResponseSuffixHeadersMatchIntegrationTest: XCTestCase {
     .build()
 
     let engine = TestEngineBuilder()
+      .useLegacyBuilder(true)
       .addDirectResponse(
         .init(
           matcher: RouteMatcher(

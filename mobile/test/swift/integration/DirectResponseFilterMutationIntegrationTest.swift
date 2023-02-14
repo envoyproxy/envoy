@@ -1,4 +1,5 @@
 import Envoy
+import TestExtensions
 import XCTest
 
 private final class MockHeaderMutationFilter: RequestFilter {
@@ -32,6 +33,11 @@ private final class MockHeaderMutationFilter: RequestFilter {
 }
 
 final class DirectResponseFilterMutationIntegrationTest: XCTestCase {
+  override static func setUp() {
+    super.setUp()
+    register_test_extensions()
+  }
+
   func testDirectResponseThatOnlyMatchesWhenUsingHeadersAddedByFilter() {
     let headersExpectation = self.expectation(description: "Response headers received")
     let dataExpectation = self.expectation(description: "Response data received")
@@ -46,6 +52,7 @@ final class DirectResponseFilterMutationIntegrationTest: XCTestCase {
     // configurations (whereas if the filter was not present in the chain, the request would not
     // match any configurations). This behavior is provided by the C++ `RouteCacheResetFilter`.
     let engine = TestEngineBuilder()
+      .useLegacyBuilder(true)
       .addPlatformFilter { MockHeaderMutationFilter(headersToAdd: ["x-foo": "123"]) }
       .addDirectResponse(
         .init(

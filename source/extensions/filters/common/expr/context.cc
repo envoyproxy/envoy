@@ -293,14 +293,49 @@ absl::optional<CelValue> FilterStateWrapper::operator[](CelValue key) const {
       object != nullptr) {
     const CelState* cel_state = dynamic_cast<const CelState*>(object);
     if (cel_state) {
-      return cel_state->exprValue(arena_, false);
+      return cel_state->exprValue(&arena_, false);
     } else if (object != nullptr) {
       absl::optional<std::string> serialized = object->serializeAsString();
       if (serialized.has_value()) {
-        std::string* out = ProtobufWkt::Arena::Create<std::string>(arena_, serialized.value());
+        std::string* out = ProtobufWkt::Arena::Create<std::string>(&arena_, serialized.value());
         return CelValue::CreateBytes(out);
       }
     }
+  }
+  return {};
+}
+
+absl::optional<CelValue> XDSWrapper::operator[](CelValue key) const {
+  if (!key.IsString()) {
+    return {};
+  }
+  auto value = key.StringOrDie().value();
+  if (value == ClusterName) {
+    const auto cluster_info = info_.upstreamClusterInfo();
+    if (cluster_info && cluster_info.value()) {
+      return CelValue::CreateString(&cluster_info.value()->name());
+    }
+  } else if (value == ClusterMetadata) {
+    const auto cluster_info = info_.upstreamClusterInfo();
+    if (cluster_info && cluster_info.value()) {
+      return CelProtoWrapper::CreateMessage(&cluster_info.value()->metadata(), &arena_);
+    }
+  } else if (value == RouteName) {
+    if (info_.route() && info_.route()->routeEntry()) {
+      return CelValue::CreateString(&info_.route()->routeEntry()->routeName());
+    }
+  } else if (value == RouteMetadata) {
+    if (info_.route()) {
+      return CelProtoWrapper::CreateMessage(&info_.route()->metadata(), &arena_);
+    }
+  } else if (value == UpstreamHostMetadata) {
+    const auto upstream_info = info_.upstreamInfo();
+    if (upstream_info && upstream_info->upstreamHost()) {
+      return CelProtoWrapper::CreateMessage(upstream_info->upstreamHost()->metadata().get(),
+                                            &arena_);
+    }
+  } else if (value == FilterChainName) {
+    return CelValue::CreateString(&info_.filterChainName());
   }
   return {};
 }

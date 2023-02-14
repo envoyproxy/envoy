@@ -28,3 +28,4 @@ Types
   ../type/matcher/v3/struct.proto
   ../type/v3/token_bucket.proto
   ../type/matcher/v3/value.proto
+  ../type/matcher/v3/status_code_input.proto

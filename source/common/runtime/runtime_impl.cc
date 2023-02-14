@@ -581,7 +581,7 @@ void LoaderImpl::mergeValues(const absl::node_hash_map<std::string, std::string>
   loadNewSnapshot();
 }
 
-Stats::Scope& LoaderImpl::getRootScope() { return store_; }
+Stats::Scope& LoaderImpl::getRootScope() { return *store_.rootScope(); }
 
 void LoaderImpl::countDeprecatedFeatureUse() const { countDeprecatedFeatureUseInternal(stats_); }
 

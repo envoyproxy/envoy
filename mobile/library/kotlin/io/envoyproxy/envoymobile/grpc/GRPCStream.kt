@@ -51,9 +51,23 @@ class GRPCStream(
   }
 
   /**
-   * Close this connection.
+   * Close stream by sending the "end stream" signal to the peer and
+   * then waiting for the peer to finish before actually closing the stream.
    */
   fun close() {
+    // TODO(Augustyniak): Remove the method once `cancel` method is proved
+    // to work fine.
+
+    // The gRPC protocol requires the client stream to close with a DATA frame.
+    // More information here:
+    // https://github.com/grpc/grpc/blob/master/doc/PROTOCOL-HTTP2.md#requests
     underlyingStream.close(ByteBuffer.allocate(0))
+  }
+
+  /**
+   * Cancel the stream forcefully regardless of whether the peer has more data to send.
+   */
+  fun cancel() {
+    underlyingStream.cancel()
   }
 }

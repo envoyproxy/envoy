@@ -420,7 +420,7 @@ TEST_F(StrictDnsClusterImplTest, Basic) {
   EXPECT_EQ(1U, cluster.info()->resourceManager(ResourcePriority::Default).maxConnectionsPerHost());
   EXPECT_EQ(990U, cluster.info()->resourceManager(ResourcePriority::High).maxConnectionsPerHost());
 
-  cluster.info()->trafficStats().upstream_rq_total_.inc();
+  cluster.info()->trafficStats()->upstream_rq_total_.inc();
   EXPECT_EQ(1UL, stats_.counter("cluster.name.upstream_rq_total").value());
 
   EXPECT_CALL(runtime_.snapshot_, featureEnabled("upstream.maintenance_mode.name", 0));
@@ -837,7 +837,7 @@ TEST_F(StrictDnsClusterImplTest, LoadAssignmentBasic) {
   EXPECT_EQ(3U, cluster.info()->maxRequestsPerConnection());
   EXPECT_EQ(0U, cluster.info()->http2Options().hpack_table_size().value());
 
-  cluster.info()->trafficStats().upstream_rq_total_.inc();
+  cluster.info()->trafficStats()->upstream_rq_total_.inc();
   EXPECT_EQ(1UL, stats_.counter("cluster.name.upstream_rq_total").value());
 
   EXPECT_CALL(runtime_.snapshot_, featureEnabled("upstream.maintenance_mode.name", 0));
@@ -1938,7 +1938,7 @@ TEST_F(StaticClusterImplTest, AltStatName) {
                             std::move(scope), false);
   cluster.initialize([] {});
   // Increment a stat and verify it is emitted with alt_stat_name
-  cluster.info()->trafficStats().upstream_rq_total_.inc();
+  cluster.info()->trafficStats()->upstream_rq_total_.inc();
   EXPECT_EQ(1UL, stats_.counter("cluster.staticcluster_stats.upstream_rq_total").value());
 }
 
@@ -2455,6 +2455,233 @@ TEST_F(StaticClusterImplTest, LoadBalancingPolicyWithLbPolicy) {
   EXPECT_EQ(1UL, cluster.prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
   EXPECT_EQ(LoadBalancerType::LoadBalancingPolicyConfig, cluster.info()->lbType());
   EXPECT_TRUE(cluster.info()->addedViaApi());
+  EXPECT_NE(nullptr, cluster.info()->loadBalancingPolicy());
+  EXPECT_NE(nullptr, cluster.info()->loadBalancerFactory());
+}
+
+// lb_policy is set to LOAD_BALANCING_POLICY_CONFIG and has no load_balancing_policy.
+TEST_F(StaticClusterImplTest, LoadBalancingPolicyWithoutConfiguration) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.no_extension_lookup_by_name", "false"}});
+
+  const std::string yaml = R"EOF(
+    name: staticcluster
+    connect_timeout: 0.25s
+    type: static
+    lb_policy: LOAD_BALANCING_POLICY_CONFIG
+    load_assignment:
+      endpoints:
+        - lb_endpoints:
+          - endpoint:
+              address:
+                socket_address:
+                  address: 10.0.0.1
+                  port_value: 11001
+  )EOF";
+
+  NiceMock<MockTypedLoadBalancerFactory> factory;
+  EXPECT_CALL(factory, name()).WillRepeatedly(Return("custom_lb"));
+  Registry::InjectFactory<TypedLoadBalancerFactory> registered_factory(factory);
+
+  envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
+  Envoy::Stats::ScopeSharedPtr scope = stats_.createScope(fmt::format(
+      "cluster.{}.", cluster_config.alt_stat_name().empty() ? cluster_config.name()
+                                                            : cluster_config.alt_stat_name()));
+  Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
+      server_context_, ssl_context_manager_, *scope, server_context_.cluster_manager_, stats_,
+      validation_visitor_);
+
+  EXPECT_THROW_WITH_MESSAGE(
+      {
+        StaticClusterImpl cluster(server_context_, cluster_config, runtime_, factory_context,
+                                  std::move(scope), true);
+      },
+      EnvoyException, "cluster: field load_balancing_policy need to be set");
+}
+
+// load_balancing_policy is set and common_lb_config is set.
+TEST_F(StaticClusterImplTest, LoadBalancingPolicyWithCommonLbConfig) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.no_extension_lookup_by_name", "false"}});
+
+  const std::string yaml = R"EOF(
+    name: staticcluster
+    connect_timeout: 0.25s
+    type: static
+    load_balancing_policy:
+      policies:
+        - typed_extension_config:
+            name: custom_lb
+    common_lb_config:
+      update_merge_window: 1s
+    load_assignment:
+      endpoints:
+        - lb_endpoints:
+          - endpoint:
+              address:
+                socket_address:
+                  address: 10.0.0.1
+                  port_value: 11001
+  )EOF";
+
+  NiceMock<MockTypedLoadBalancerFactory> factory;
+  EXPECT_CALL(factory, name()).WillRepeatedly(Return("custom_lb"));
+  Registry::InjectFactory<TypedLoadBalancerFactory> registered_factory(factory);
+
+  envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
+  Envoy::Stats::ScopeSharedPtr scope = stats_.createScope(fmt::format(
+      "cluster.{}.", cluster_config.alt_stat_name().empty() ? cluster_config.name()
+                                                            : cluster_config.alt_stat_name()));
+  Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
+      server_context_, ssl_context_manager_, *scope, server_context_.cluster_manager_, stats_,
+      validation_visitor_);
+
+  EXPECT_NO_THROW({
+    StaticClusterImpl cluster(server_context_, cluster_config, runtime_, factory_context,
+                              std::move(scope), true);
+  });
+}
+
+// load_balancing_policy is set and some fields in common_lb_config are set.
+TEST_F(StaticClusterImplTest, LoadBalancingPolicyWithCommonLbConfigAndSpecificFields) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.no_extension_lookup_by_name", "false"}});
+
+  const std::string yaml = R"EOF(
+    name: staticcluster
+    connect_timeout: 0.25s
+    type: static
+    load_balancing_policy:
+      policies:
+        - typed_extension_config:
+            name: custom_lb
+    common_lb_config:
+      locality_weighted_lb_config: {}
+    load_assignment:
+      endpoints:
+        - lb_endpoints:
+          - endpoint:
+              address:
+                socket_address:
+                  address: 10.0.0.1
+                  port_value: 11001
+  )EOF";
+
+  NiceMock<MockTypedLoadBalancerFactory> factory;
+  EXPECT_CALL(factory, name()).WillRepeatedly(Return("custom_lb"));
+  Registry::InjectFactory<TypedLoadBalancerFactory> registered_factory(factory);
+
+  envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
+  Envoy::Stats::ScopeSharedPtr scope = stats_.createScope(fmt::format(
+      "cluster.{}.", cluster_config.alt_stat_name().empty() ? cluster_config.name()
+                                                            : cluster_config.alt_stat_name()));
+  Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
+      server_context_, ssl_context_manager_, *scope, server_context_.cluster_manager_, stats_,
+      validation_visitor_);
+
+  EXPECT_THROW_WITH_MESSAGE(
+      {
+        StaticClusterImpl cluster(server_context_, cluster_config, runtime_, factory_context,
+                                  std::move(scope), true);
+      },
+      EnvoyException,
+      "cluster: load_balancing_policy cannot be combined with partial fields "
+      "(zone_aware_lb_config, "
+      "locality_weighted_lb_config, consistent_hashing_lb_config) of common_lb_config");
+}
+
+// load_balancing_policy is set and lb_subset_config is set.
+TEST_F(StaticClusterImplTest, LoadBalancingPolicyWithLbSubsetConfig) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.no_extension_lookup_by_name", "false"}});
+
+  const std::string yaml = R"EOF(
+    name: staticcluster
+    connect_timeout: 0.25s
+    type: static
+    load_balancing_policy:
+      policies:
+        - typed_extension_config:
+            name: custom_lb
+    lb_subset_config:
+      fallback_policy: ANY_ENDPOINT
+      subset_selectors:
+        - keys: [ "x" ]
+    load_assignment:
+      endpoints:
+        - lb_endpoints:
+          - endpoint:
+              address:
+                socket_address:
+                  address: 10.0.0.1
+                  port_value: 11001
+  )EOF";
+
+  NiceMock<MockTypedLoadBalancerFactory> factory;
+  EXPECT_CALL(factory, name()).WillRepeatedly(Return("custom_lb"));
+  Registry::InjectFactory<TypedLoadBalancerFactory> registered_factory(factory);
+
+  envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
+  Envoy::Stats::ScopeSharedPtr scope = stats_.createScope(fmt::format(
+      "cluster.{}.", cluster_config.alt_stat_name().empty() ? cluster_config.name()
+                                                            : cluster_config.alt_stat_name()));
+  Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
+      server_context_, ssl_context_manager_, *scope, server_context_.cluster_manager_, stats_,
+      validation_visitor_);
+
+  EXPECT_THROW_WITH_MESSAGE(
+      {
+        StaticClusterImpl cluster(server_context_, cluster_config, runtime_, factory_context,
+                                  std::move(scope), true);
+      },
+      EnvoyException, "cluster: load_balancing_policy cannot be combined with lb_subset_config");
+}
+
+// Verify that if Envoy does not have a factory for any of the load balancing policies specified in
+// the load balancing policy config, it is an error.
+TEST_F(StaticClusterImplTest, LbPolicyConfigThrowsExceptionIfNoLbPoliciesFound) {
+  const std::string yaml = fmt::format(R"EOF(
+    name: cluster_1
+    connect_timeout: 0.250s
+    type: STATIC
+    load_balancing_policy:
+      policies:
+      - typed_extension_config:
+          name: envoy.load_balancers.unknown_lb_1
+      - typed_extension_config:
+          name: envoy.load_balancers.unknown_lb_2
+    load_assignment:
+      cluster_name: cluster_1
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: 127.0.0.1
+                port_value: 8000
+  )EOF");
+
+  NiceMock<MockTypedLoadBalancerFactory> factory;
+  EXPECT_CALL(factory, name()).WillRepeatedly(Return("custom_lb"));
+  Registry::InjectFactory<TypedLoadBalancerFactory> registered_factory(factory);
+
+  envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
+  Envoy::Stats::ScopeSharedPtr scope = stats_.createScope(fmt::format(
+      "cluster.{}.", cluster_config.alt_stat_name().empty() ? cluster_config.name()
+                                                            : cluster_config.alt_stat_name()));
+  Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
+      server_context_, ssl_context_manager_, *scope, server_context_.cluster_manager_, stats_,
+      validation_visitor_);
+
+  EXPECT_THROW_WITH_MESSAGE(
+      {
+        StaticClusterImpl cluster(server_context_, cluster_config, runtime_, factory_context,
+                                  std::move(scope), true);
+      },
+      EnvoyException,
+      "cluster: didn't find a registered load balancer factory implementation for cluster: "
+      "'cluster_1' with names from [envoy.load_balancers.unknown_lb_1, "
+      "envoy.load_balancers.unknown_lb_2]");
 }
 
 // load_balancing_policy should also be used when lb_policy is set to something else besides
@@ -2608,7 +2835,8 @@ TEST_F(StaticClusterImplTest, SourceAddressPriorityWitExtraSourceAddress) {
 
   {
     // If the cluster manager gets a source address from the bootstrap proto, use it.
-    server_context_.cluster_manager_.bind_config_.mutable_source_address()->set_address("1.2.3.5");
+    server_context_.cluster_manager_.mutableBindConfig().mutable_source_address()->set_address(
+        "1.2.3.5");
     Envoy::Stats::ScopeSharedPtr scope = stats_.createScope(fmt::format(
         "cluster.{}.", config.alt_stat_name().empty() ? config.name() : config.alt_stat_name()));
     Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
@@ -2626,8 +2854,10 @@ TEST_F(StaticClusterImplTest, SourceAddressPriorityWitExtraSourceAddress) {
 
   {
     // Test extra_source_addresses from bootstrap.
-    server_context_.cluster_manager_.bind_config_.mutable_source_address()->set_address("1.2.3.5");
-    server_context_.cluster_manager_.bind_config_.add_extra_source_addresses()
+    server_context_.cluster_manager_.mutableBindConfig().mutable_source_address()->set_address(
+        "1.2.3.5");
+    server_context_.cluster_manager_.mutableBindConfig()
+        .add_extra_source_addresses()
         ->mutable_address()
         ->set_address("2001::1");
     Envoy::Stats::ScopeSharedPtr scope = stats_.createScope(fmt::format(
@@ -2653,8 +2883,9 @@ TEST_F(StaticClusterImplTest, SourceAddressPriorityWitExtraSourceAddress) {
 
   {
     // Test no same IP version in multiple source addresses.
-    server_context_.cluster_manager_.bind_config_.mutable_source_address()->set_address("1.2.3.5");
-    server_context_.cluster_manager_.bind_config_.clear_extra_source_addresses();
+    server_context_.cluster_manager_.mutableBindConfig().mutable_source_address()->set_address(
+        "1.2.3.5");
+    server_context_.cluster_manager_.mutableBindConfig().clear_extra_source_addresses();
     Envoy::Stats::ScopeSharedPtr scope = stats_.createScope(fmt::format(
         "cluster.{}.", config.alt_stat_name().empty() ? config.name() : config.alt_stat_name()));
     Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
@@ -2672,9 +2903,11 @@ TEST_F(StaticClusterImplTest, SourceAddressPriorityWitExtraSourceAddress) {
 
   {
     // Test two same IP version addresses.
-    server_context_.cluster_manager_.bind_config_.mutable_source_address()->set_address("1.2.3.5");
-    server_context_.cluster_manager_.bind_config_.clear_extra_source_addresses();
-    server_context_.cluster_manager_.bind_config_.add_extra_source_addresses()
+    server_context_.cluster_manager_.mutableBindConfig().mutable_source_address()->set_address(
+        "1.2.3.5");
+    server_context_.cluster_manager_.mutableBindConfig().clear_extra_source_addresses();
+    server_context_.cluster_manager_.mutableBindConfig()
+        .add_extra_source_addresses()
         ->mutable_address()
         ->set_address("1.2.3.6");
     Envoy::Stats::ScopeSharedPtr scope = stats_.createScope(fmt::format(
@@ -2693,12 +2926,15 @@ TEST_F(StaticClusterImplTest, SourceAddressPriorityWitExtraSourceAddress) {
 
   {
     // Test more than two multiple source addresses
-    server_context_.cluster_manager_.bind_config_.mutable_source_address()->set_address("1.2.3.5");
-    server_context_.cluster_manager_.bind_config_.clear_extra_source_addresses();
-    server_context_.cluster_manager_.bind_config_.add_extra_source_addresses()
+    server_context_.cluster_manager_.mutableBindConfig().mutable_source_address()->set_address(
+        "1.2.3.5");
+    server_context_.cluster_manager_.mutableBindConfig().clear_extra_source_addresses();
+    server_context_.cluster_manager_.mutableBindConfig()
+        .add_extra_source_addresses()
         ->mutable_address()
         ->set_address("2001::1");
-    server_context_.cluster_manager_.bind_config_.add_extra_source_addresses()
+    server_context_.cluster_manager_.mutableBindConfig()
+        .add_extra_source_addresses()
         ->mutable_address()
         ->set_address("2001::2");
     Envoy::Stats::ScopeSharedPtr scope = stats_.createScope(fmt::format(
@@ -2715,10 +2951,33 @@ TEST_F(StaticClusterImplTest, SourceAddressPriorityWitExtraSourceAddress) {
   }
 
   {
+    // Test missing bootstrap source_address with extra source address.
+    server_context_.cluster_manager_.mutableBindConfig().clear_source_address();
+    server_context_.cluster_manager_.mutableBindConfig().clear_extra_source_addresses();
+    server_context_.cluster_manager_.mutableBindConfig()
+        .add_extra_source_addresses()
+        ->mutable_address()
+        ->set_address("1.2.3.6");
+    Envoy::Stats::ScopeSharedPtr scope = stats_.createScope(fmt::format(
+        "cluster.{}.", config.alt_stat_name().empty() ? config.name() : config.alt_stat_name()));
+    Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
+        server_context_, ssl_context_manager_, *scope, server_context_.cluster_manager_, stats_,
+        validation_visitor_);
+    EXPECT_THROW_WITH_MESSAGE(StaticClusterImpl cluster(server_context_, config, runtime_,
+                                                        factory_context, std::move(scope), false),
+                              EnvoyException,
+                              "Bootstrap's upstream binding config has extra/additional source "
+                              "addresses but no source_address. Extra/additional addresses cannot "
+                              "be specified if source_address is not set.");
+  }
+
+  {
     // Test non IP address case.
-    server_context_.cluster_manager_.bind_config_.mutable_source_address()->set_address("1.2.3.5");
-    server_context_.cluster_manager_.bind_config_.clear_extra_source_addresses();
-    server_context_.cluster_manager_.bind_config_.add_extra_source_addresses()
+    server_context_.cluster_manager_.mutableBindConfig().mutable_source_address()->set_address(
+        "1.2.3.5");
+    server_context_.cluster_manager_.mutableBindConfig().clear_extra_source_addresses();
+    server_context_.cluster_manager_.mutableBindConfig()
+        .add_extra_source_addresses()
         ->mutable_address()
         ->set_address("2001::1");
     Envoy::Stats::ScopeSharedPtr scope = stats_.createScope(fmt::format(
@@ -2781,8 +3040,32 @@ TEST_F(StaticClusterImplTest, SourceAddressPriorityWitExtraSourceAddress) {
   }
 
   {
+    // Test missing cluster config source_address with extra source address.
+    config.mutable_upstream_bind_config()->clear_source_address();
+    config.mutable_upstream_bind_config()->clear_extra_source_addresses();
+    config.mutable_upstream_bind_config()
+        ->add_extra_source_addresses()
+        ->mutable_address()
+        ->set_address("2001::1");
+    Envoy::Stats::ScopeSharedPtr scope = stats_.createScope(fmt::format(
+        "cluster.{}.", config.alt_stat_name().empty() ? config.name() : config.alt_stat_name()));
+    Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
+        server_context_, ssl_context_manager_, *scope, server_context_.cluster_manager_, stats_,
+        validation_visitor_);
+    EXPECT_THROW_WITH_MESSAGE(
+        StaticClusterImpl cluster(server_context_, config, runtime_, factory_context,
+                                  std::move(scope), false),
+        EnvoyException,
+        "Cluster staticcluster's upstream binding config has extra/additional source "
+        "addresses but no source_address. Extra/additional addresses cannot "
+        "be specified if source_address is not set.");
+  }
+
+  {
     // The source address from cluster config takes precedence over one from the bootstrap proto.
-    server_context_.cluster_manager_.bind_config_.mutable_source_address()->set_address("1.2.3.5");
+    config.mutable_upstream_bind_config()->mutable_source_address()->set_address(cluster_address);
+    server_context_.cluster_manager_.mutableBindConfig().mutable_source_address()->set_address(
+        "1.2.3.5");
     config.mutable_upstream_bind_config()->clear_extra_source_addresses();
     Envoy::Stats::ScopeSharedPtr scope = stats_.createScope(fmt::format(
         "cluster.{}.", config.alt_stat_name().empty() ? config.name() : config.alt_stat_name()));
@@ -2803,7 +3086,8 @@ TEST_F(StaticClusterImplTest, SourceAddressPriorityWitExtraSourceAddress) {
   {
     // The bootstrap config using IPv6 address and the cluster config using IPv4 address, ensure
     // the bootstrap config will be ignored.
-    server_context_.cluster_manager_.bind_config_.mutable_source_address()->set_address("2001::1");
+    server_context_.cluster_manager_.mutableBindConfig().mutable_source_address()->set_address(
+        "2001::1");
     config.mutable_upstream_bind_config()->clear_extra_source_addresses();
     Envoy::Stats::ScopeSharedPtr scope = stats_.createScope(fmt::format(
         "cluster.{}.", config.alt_stat_name().empty() ? config.name() : config.alt_stat_name()));
@@ -2829,10 +3113,13 @@ TEST_F(StaticClusterImplTest, SourceAddressPriorityWithDeprecatedAdditionalSourc
 
   {
     // Test more than two multiple source addresses
-    server_context_.cluster_manager_.bind_config_.mutable_source_address()->set_address("1.2.3.5");
-    server_context_.cluster_manager_.bind_config_.add_additional_source_addresses()->set_address(
-        "2001::1");
-    server_context_.cluster_manager_.bind_config_.add_extra_source_addresses()
+    server_context_.cluster_manager_.mutableBindConfig().mutable_source_address()->set_address(
+        "1.2.3.5");
+    server_context_.cluster_manager_.mutableBindConfig()
+        .add_additional_source_addresses()
+        ->set_address("2001::1");
+    server_context_.cluster_manager_.mutableBindConfig()
+        .add_extra_source_addresses()
         ->mutable_address()
         ->set_address("2001::1");
     Envoy::Stats::ScopeSharedPtr scope = stats_.createScope(fmt::format(
@@ -2846,15 +3133,17 @@ TEST_F(StaticClusterImplTest, SourceAddressPriorityWithDeprecatedAdditionalSourc
         EnvoyException,
         "Can't specify both `extra_source_addresses` and `additional_source_addresses` in the "
         "Bootstrap's upstream binding config");
-    server_context_.cluster_manager_.bind_config_.clear_extra_source_addresses();
-    server_context_.cluster_manager_.bind_config_.clear_additional_source_addresses();
+    server_context_.cluster_manager_.mutableBindConfig().clear_extra_source_addresses();
+    server_context_.cluster_manager_.mutableBindConfig().clear_additional_source_addresses();
   }
 
   {
     // Test additional_source_addresses from bootstrap.
-    server_context_.cluster_manager_.bind_config_.mutable_source_address()->set_address("1.2.3.5");
-    server_context_.cluster_manager_.bind_config_.add_additional_source_addresses()->set_address(
-        "2001::1");
+    server_context_.cluster_manager_.mutableBindConfig().mutable_source_address()->set_address(
+        "1.2.3.5");
+    server_context_.cluster_manager_.mutableBindConfig()
+        .add_additional_source_addresses()
+        ->set_address("2001::1");
     Envoy::Stats::ScopeSharedPtr scope = stats_.createScope(fmt::format(
         "cluster.{}.", config.alt_stat_name().empty() ? config.name() : config.alt_stat_name()));
     Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
@@ -2878,8 +3167,9 @@ TEST_F(StaticClusterImplTest, SourceAddressPriorityWithDeprecatedAdditionalSourc
 
   {
     // Test no same IP version in multiple source addresses.
-    server_context_.cluster_manager_.bind_config_.mutable_source_address()->set_address("1.2.3.5");
-    server_context_.cluster_manager_.bind_config_.clear_additional_source_addresses();
+    server_context_.cluster_manager_.mutableBindConfig().mutable_source_address()->set_address(
+        "1.2.3.5");
+    server_context_.cluster_manager_.mutableBindConfig().clear_additional_source_addresses();
     Envoy::Stats::ScopeSharedPtr scope = stats_.createScope(fmt::format(
         "cluster.{}.", config.alt_stat_name().empty() ? config.name() : config.alt_stat_name()));
     Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
@@ -2897,10 +3187,12 @@ TEST_F(StaticClusterImplTest, SourceAddressPriorityWithDeprecatedAdditionalSourc
 
   {
     // Test two same IP version addresses.
-    server_context_.cluster_manager_.bind_config_.mutable_source_address()->set_address("1.2.3.5");
-    server_context_.cluster_manager_.bind_config_.clear_additional_source_addresses();
-    server_context_.cluster_manager_.bind_config_.add_additional_source_addresses()->set_address(
-        "1.2.3.6");
+    server_context_.cluster_manager_.mutableBindConfig().mutable_source_address()->set_address(
+        "1.2.3.5");
+    server_context_.cluster_manager_.mutableBindConfig().clear_additional_source_addresses();
+    server_context_.cluster_manager_.mutableBindConfig()
+        .add_additional_source_addresses()
+        ->set_address("1.2.3.6");
     Envoy::Stats::ScopeSharedPtr scope = stats_.createScope(fmt::format(
         "cluster.{}.", config.alt_stat_name().empty() ? config.name() : config.alt_stat_name()));
     Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
@@ -2917,12 +3209,15 @@ TEST_F(StaticClusterImplTest, SourceAddressPriorityWithDeprecatedAdditionalSourc
 
   {
     // Test more than two multiple source addresses
-    server_context_.cluster_manager_.bind_config_.mutable_source_address()->set_address("1.2.3.5");
-    server_context_.cluster_manager_.bind_config_.clear_additional_source_addresses();
-    server_context_.cluster_manager_.bind_config_.add_additional_source_addresses()->set_address(
-        "2001::1");
-    server_context_.cluster_manager_.bind_config_.add_additional_source_addresses()->set_address(
-        "2001::2");
+    server_context_.cluster_manager_.mutableBindConfig().mutable_source_address()->set_address(
+        "1.2.3.5");
+    server_context_.cluster_manager_.mutableBindConfig().clear_additional_source_addresses();
+    server_context_.cluster_manager_.mutableBindConfig()
+        .add_additional_source_addresses()
+        ->set_address("2001::1");
+    server_context_.cluster_manager_.mutableBindConfig()
+        .add_additional_source_addresses()
+        ->set_address("2001::2");
     Envoy::Stats::ScopeSharedPtr scope = stats_.createScope(fmt::format(
         "cluster.{}.", config.alt_stat_name().empty() ? config.name() : config.alt_stat_name()));
     Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
@@ -2938,10 +3233,12 @@ TEST_F(StaticClusterImplTest, SourceAddressPriorityWithDeprecatedAdditionalSourc
 
   {
     // Test non IP address case.
-    server_context_.cluster_manager_.bind_config_.mutable_source_address()->set_address("1.2.3.5");
-    server_context_.cluster_manager_.bind_config_.clear_additional_source_addresses();
-    server_context_.cluster_manager_.bind_config_.add_additional_source_addresses()->set_address(
-        "2001::1");
+    server_context_.cluster_manager_.mutableBindConfig().mutable_source_address()->set_address(
+        "1.2.3.5");
+    server_context_.cluster_manager_.mutableBindConfig().clear_additional_source_addresses();
+    server_context_.cluster_manager_.mutableBindConfig()
+        .add_additional_source_addresses()
+        ->set_address("2001::1");
     Envoy::Stats::ScopeSharedPtr scope = stats_.createScope(fmt::format(
         "cluster.{}.", config.alt_stat_name().empty() ? config.name() : config.alt_stat_name()));
     Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
@@ -2981,7 +3278,8 @@ TEST_F(StaticClusterImplTest, SourceAddressPriorityWithDeprecatedAdditionalSourc
 
   {
     // The source address from cluster config takes precedence over one from the bootstrap proto.
-    server_context_.cluster_manager_.bind_config_.mutable_source_address()->set_address("1.2.3.5");
+    server_context_.cluster_manager_.mutableBindConfig().mutable_source_address()->set_address(
+        "1.2.3.5");
     config.mutable_upstream_bind_config()->clear_additional_source_addresses();
     Envoy::Stats::ScopeSharedPtr scope = stats_.createScope(fmt::format(
         "cluster.{}.", config.alt_stat_name().empty() ? config.name() : config.alt_stat_name()));
@@ -3796,6 +4094,30 @@ TEST_F(ClusterInfoImplTest, Timeouts) {
     auto cluster3 = makeCluster(yaml + no_timeout_new);
     EXPECT_FALSE(cluster3->info()->idleTimeout().has_value());
   }
+}
+
+TEST_F(ClusterInfoImplTest, TcpPoolIdleTimeout) {
+  const std::string yaml_base = R"EOF(
+  name: {}
+  type: STRICT_DNS
+  lb_policy: ROUND_ROBIN
+  )EOF";
+
+  const std::string yaml_set_tcp_pool_idle_timeout = yaml_base + R"EOF(
+  typed_extension_protocol_options:
+    envoy.extensions.upstreams.tcp.v3.TcpProtocolOptions:
+      "@type": type.googleapis.com/envoy.extensions.upstreams.tcp.v3.TcpProtocolOptions
+      idle_timeout: {}
+  )EOF";
+
+  auto cluster1 = makeCluster(fmt::format(yaml_base, "cluster1"));
+  EXPECT_EQ(std::chrono::minutes(10), cluster1->info()->tcpPoolIdleTimeout());
+
+  auto cluster2 = makeCluster(fmt::format(yaml_set_tcp_pool_idle_timeout, "cluster2", "9s"));
+  EXPECT_EQ(std::chrono::seconds(9), cluster2->info()->tcpPoolIdleTimeout());
+
+  auto cluster3 = makeCluster(fmt::format(yaml_set_tcp_pool_idle_timeout, "cluster3", "0s"));
+  EXPECT_EQ(absl::nullopt, cluster3->info()->tcpPoolIdleTimeout());
 }
 
 TEST_F(ClusterInfoImplTest, TestTrackTimeoutBudgetsNotSetInConfig) {

@@ -28,13 +28,15 @@ public:
     cleanup();
     BaseClientIntegrationTest::TearDown();
   }
+
+  void basicTest();
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, ClientIntegrationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
 
-TEST_P(ClientIntegrationTest, Basic) {
+void ClientIntegrationTest::basicTest() {
   initialize();
 
   Buffer::OwnedImpl request_data = Buffer::OwnedImpl("request body");
@@ -69,6 +71,11 @@ TEST_P(ClientIntegrationTest, Basic) {
   ASSERT_EQ(cc_.on_complete_calls, 1);
   ASSERT_EQ(cc_.on_header_consumed_bytes_from_response, 27);
   ASSERT_EQ(cc_.on_complete_received_byte_count, 67);
+}
+
+TEST_P(ClientIntegrationTest, Basic) {
+  basicTest();
+  TearDown();
 }
 
 TEST_P(ClientIntegrationTest, BasicNon2xx) {
@@ -241,7 +248,7 @@ TEST_P(ClientIntegrationTest, CaseSensitive) {
 }
 
 TEST_P(ClientIntegrationTest, TimeoutOnRequestPath) {
-  setStreamIdleTimeoutSeconds(1);
+  builder_.setStreamIdleTimeoutSeconds(1);
 
   autonomous_upstream_ = false;
   initialize();
@@ -263,7 +270,7 @@ TEST_P(ClientIntegrationTest, TimeoutOnRequestPath) {
 }
 
 TEST_P(ClientIntegrationTest, TimeoutOnResponsePath) {
-  setStreamIdleTimeoutSeconds(1);
+  builder_.setStreamIdleTimeoutSeconds(1);
   autonomous_upstream_ = false;
   initialize();
 
@@ -291,7 +298,7 @@ TEST_P(ClientIntegrationTest, TimeoutOnResponsePath) {
 
 // TODO(alyssawilk) get this working in a follow-up.
 TEST_P(ClientIntegrationTest, DISABLED_Proxying) {
-  addLogLevel(Platform::LogLevel::trace);
+  builder_.addLogLevel(Platform::LogLevel::trace);
   initialize();
   if (version_ == Network::Address::IpVersion::v6) {
     // Localhost only resolves to an ipv4 address - alas no kernel happy eyeballs.
@@ -313,6 +320,51 @@ TEST_P(ClientIntegrationTest, DISABLED_Proxying) {
   terminal_callback_.waitReady();
   ASSERT_EQ(cc_.status, "200");
   ASSERT_EQ(cc_.on_complete_calls, 2);
+}
+
+TEST_P(ClientIntegrationTest, DirectResponse) {
+  initialize();
+  if (version_ == Network::Address::IpVersion::v6) {
+    // Localhost only resolves to an ipv4 address - alas no kernel happy eyeballs.
+    return;
+  }
+
+  // Override to not validate stream intel.
+  stream_prototype_->setOnComplete(
+      [this](envoy_stream_intel, envoy_final_stream_intel final_intel) {
+        cc_.on_complete_received_byte_count = final_intel.received_byte_count;
+        cc_.on_complete_calls++;
+        cc_.terminal_callback->setReady();
+      });
+
+  default_request_headers_.setHost("127.0.0.1");
+  default_request_headers_.setPath("/");
+
+  stream_->sendHeaders(envoyToMobileHeaders(default_request_headers_), true);
+  terminal_callback_.waitReady();
+  ASSERT_EQ(cc_.status, "404");
+  ASSERT_EQ(cc_.on_headers_calls, 1);
+  stream_.reset();
+}
+
+TEST_P(ClientIntegrationTest, ForceAdmin) {
+  override_builder_config_ = true;
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.use_api_listener", "true");
+  basicTest();
+  TearDown();
+}
+
+TEST_P(ClientIntegrationTest, ForceAdminViaBootstrap) {
+  override_builder_config_ = true;
+
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+    envoy::config::listener::v3::ApiListenerManager api;
+    auto* listener_manager = bootstrap.mutable_listener_manager();
+    listener_manager->mutable_typed_config()->PackFrom(api);
+    listener_manager->set_name("envoy.listener_manager_impl.api");
+  });
+
+  basicTest();
 }
 
 } // namespace

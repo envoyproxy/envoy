@@ -28,7 +28,7 @@ namespace Envoy {
 namespace {
 
 absl::string_view filenameFromPath(absl::string_view full_path) {
-  size_t index = full_path.rfind("/");
+  size_t index = full_path.rfind('/');
   if (index == std::string::npos || index == full_path.size()) {
     return full_path;
   }
@@ -264,6 +264,8 @@ Protobuf::util::Status MessageUtil::loadFromJsonNoThrow(const std::string& json,
   // Let's first try and get a clean parse when checking for unknown fields;
   // this should be the common case.
   options.ignore_unknown_fields = false;
+  // Clear existing values (if any) from the destination message before serialization.
+  message.Clear();
   const auto strict_status = Protobuf::util::JsonStringToMessage(json, &message, options);
   if (strict_status.ok()) {
     // Success, no need to do any extra work.

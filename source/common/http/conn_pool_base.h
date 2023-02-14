@@ -128,12 +128,11 @@ public:
     real_host_description_ = data.host_description_;
     codec_client_ = parent.createCodecClient(data);
     codec_client_->addConnectionCallbacks(*this);
+    Upstream::ClusterTrafficStats& traffic_stats = *parent_.host()->cluster().trafficStats();
     codec_client_->setConnectionStats(
-        {parent_.host()->cluster().trafficStats().upstream_cx_rx_bytes_total_,
-         parent_.host()->cluster().trafficStats().upstream_cx_rx_bytes_buffered_,
-         parent_.host()->cluster().trafficStats().upstream_cx_tx_bytes_total_,
-         parent_.host()->cluster().trafficStats().upstream_cx_tx_bytes_buffered_,
-         &parent_.host()->cluster().trafficStats().bind_errors_, nullptr});
+        {traffic_stats.upstream_cx_rx_bytes_total_, traffic_stats.upstream_cx_rx_bytes_buffered_,
+         traffic_stats.upstream_cx_tx_bytes_total_, traffic_stats.upstream_cx_tx_bytes_buffered_,
+         &traffic_stats.bind_errors_, nullptr});
   }
 
   absl::optional<Http::Protocol> protocol() const override { return codec_client_->protocol(); }

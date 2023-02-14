@@ -16,19 +16,59 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace GenericProxy {
 
-ActiveStream::ActiveStream(Filter& parent, RequestPtr request)
-    : parent_(parent), downstream_request_stream_(std::move(request)) {}
+namespace {
 
-ActiveStream::~ActiveStream() {
-  for (auto& filter : decoder_filters_) {
-    filter->filter_->onDestroy();
+Tracing::Decision tracingDecision(const Tracing::ConnectionManagerTracingConfig& tracing_config,
+                                  Runtime::Loader& runtime) {
+  bool traced = runtime.snapshot().featureEnabled("tracing.random_sampling",
+                                                  tracing_config.getRandomSampling());
+
+  if (traced) {
+    return {Tracing::Reason::Sampling, true};
   }
-  for (auto& filter : encoder_filters_) {
-    if (filter->isDualFilter()) {
-      continue;
-    }
-    filter->filter_->onDestroy();
+  return {Tracing::Reason::NotTraceable, false};
+}
+
+} // namespace
+
+ActiveStream::ActiveStream(Filter& parent, RequestPtr request)
+    : parent_(parent), downstream_request_stream_(std::move(request)),
+      stream_info_(parent_.time_source_,
+                   parent_.callbacks_->connection().connectionInfoProviderSharedPtr()) {
+
+  connection_manager_tracing_config_ = parent_.config_->tracingConfig();
+
+  auto tracer = parent_.config_->tracingProvider();
+
+  if (!connection_manager_tracing_config_.has_value() || !tracer.has_value()) {
+    return;
   }
+
+  auto decision = tracingDecision(connection_manager_tracing_config_.value(), parent_.runtime_);
+  if (decision.traced) {
+    stream_info_.setTraceReason(decision.reason);
+  }
+  active_span_ = tracer->startSpan(*this, *downstream_request_stream_, stream_info_, decision);
+}
+
+Tracing::OperationName ActiveStream::operationName() const {
+  ASSERT(connection_manager_tracing_config_.has_value());
+  return connection_manager_tracing_config_->operationName();
+}
+
+const Tracing::CustomTagMap* ActiveStream::customTags() const {
+  ASSERT(connection_manager_tracing_config_.has_value());
+  return &connection_manager_tracing_config_->getCustomTags();
+}
+
+bool ActiveStream::verbose() const {
+  ASSERT(connection_manager_tracing_config_.has_value());
+  return connection_manager_tracing_config_->verbose();
+}
+
+uint32_t ActiveStream::maxPathTagLength() const {
+  ASSERT(connection_manager_tracing_config_.has_value());
+  return connection_manager_tracing_config_->maxPathTagLength();
 }
 
 Envoy::Event::Dispatcher& ActiveStream::dispatcher() { return parent_.connection().dispatcher(); }
@@ -108,8 +148,8 @@ void ActiveStream::continueEncoding() {
 
 void ActiveStream::onEncodingSuccess(Buffer::Instance& buffer, bool close_connection) {
   ASSERT(parent_.connection().state() == Network::Connection::State::Open);
-  parent_.deferredStream(*this);
   parent_.connection().write(buffer, close_connection);
+  parent_.deferredStream(*this);
 }
 
 void ActiveStream::initializeFilterChain(FilterChainFactory& factory) {
@@ -117,6 +157,25 @@ void ActiveStream::initializeFilterChain(FilterChainFactory& factory) {
   // Reverse the encoder filter chain so that the first encoder filter is the last filter in the
   // chain.
   std::reverse(encoder_filters_.begin(), encoder_filters_.end());
+}
+
+void ActiveStream::completeRequest() {
+  stream_info_.onRequestComplete();
+
+  if (active_span_) {
+    Tracing::TracerUtility::finalizeSpan(*active_span_, *downstream_request_stream_, stream_info_,
+                                         *this, false);
+  }
+
+  for (auto& filter : decoder_filters_) {
+    filter->filter_->onDestroy();
+  }
+  for (auto& filter : encoder_filters_) {
+    if (filter->isDualFilter()) {
+      continue;
+    }
+    filter->filter_->onDestroy();
+  }
 }
 
 Envoy::Network::FilterStatus Filter::onData(Envoy::Buffer::Instance& data, bool) {
@@ -151,16 +210,30 @@ void Filter::newDownstreamRequest(RequestPtr request) {
 }
 
 void Filter::deferredStream(ActiveStream& stream) {
+  stream.completeRequest();
+
   if (!stream.inserted()) {
     return;
   }
   callbacks_->connection().dispatcher().deferredDelete(stream.removeFromList(active_streams_));
+  mayBeDrainClose();
 }
 
 void Filter::resetStreamsForUnexpectedError() {
   while (!active_streams_.empty()) {
     active_streams_.front()->resetStream();
   }
+}
+
+void Filter::mayBeDrainClose() {
+  if (drain_decision_.drainClose() && active_streams_.empty()) {
+    onDrainCloseAndNoActiveStreams();
+  }
+}
+
+// Default implementation for connection draining.
+void Filter::onDrainCloseAndNoActiveStreams() {
+  connection().close(Network::ConnectionCloseType::FlushWrite);
 }
 
 } // namespace GenericProxy

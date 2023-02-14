@@ -57,20 +57,18 @@ static_resources:
         envoy.filters.http.gcp_authn:
           "@type": type.googleapis.com/envoy.extensions.filters.http.gcp_authn.v3.Audience
           url: http://test.com
-  # Cluster for fake metadata server.
+  # Cluster for GCE metadata server
   - name: gcp_authn
+    type: STRICT_DNS
+    connect_timeout: 5s
+    dns_lookup_family: V4_ONLY
     load_assignment:
-      cluster_name: gcp_authn
+      cluster_name: "gcp_authn"
       endpoints:
       - lb_endpoints:
         - endpoint:
             address:
               socket_address:
-                address: 0.0.0.0
-                port_value: 8000
-    typed_extension_protocol_options:
-      envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
-        "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
-        explicit_http_config:
-          http2_protocol_options:
-            {}
+                address: "metadata.google.internal"
+                port_value: 80
+

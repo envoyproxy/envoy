@@ -130,6 +130,14 @@ absl::optional<std::chrono::nanoseconds> TimingUtility::downstreamHandshakeCompl
   return duration(timing.value().get().downstreamHandshakeComplete(), stream_info_);
 }
 
+absl::optional<std::chrono::nanoseconds> TimingUtility::lastDownstreamAckReceived() {
+  OptRef<const DownstreamTiming> timing = stream_info_.downstreamTiming();
+  if (!timing) {
+    return absl::nullopt;
+  }
+  return duration(timing.value().get().lastDownstreamAckReceived(), stream_info_);
+}
+
 const std::string&
 Utility::formatDownstreamAddressNoPort(const Network::Address::Instance& address) {
   if (address.type() == Network::Address::Type::Ip) {
@@ -146,6 +154,14 @@ Utility::formatDownstreamAddressJustPort(const Network::Address::Instance& addre
     port = std::to_string(address.ip()->port());
   }
   return port;
+}
+
+absl::optional<uint32_t>
+Utility::extractDownstreamAddressJustPort(const Network::Address::Instance& address) {
+  if (address.type() == Network::Address::Type::Ip) {
+    return address.ip()->port();
+  }
+  return {};
 }
 
 const absl::optional<Http::Code>
@@ -366,6 +382,8 @@ ProxyStatusUtils::fromStreamInfo(const StreamInfo& stream_info) {
     return ProxyStatusError::HttpProtocolError;
   } else if (stream_info.hasResponseFlag(ResponseFlag::NoClusterFound)) {
     return ProxyStatusError::DestinationUnavailable;
+  } else if (stream_info.hasResponseFlag(ResponseFlag::DnsResolutionFailed)) {
+    return ProxyStatusError::DnsError;
   } else {
     return absl::nullopt;
   }

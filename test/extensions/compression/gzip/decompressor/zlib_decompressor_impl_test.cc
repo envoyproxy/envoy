@@ -45,8 +45,7 @@ protected:
     drainBuffer(buffer);
     ASSERT_EQ(0, buffer.length());
 
-    Stats::IsolatedStoreImpl stats_store{};
-    ZlibDecompressorImpl decompressor{stats_store, "test.", 4096, 100};
+    ZlibDecompressorImpl decompressor{stats_scope_, "test.", 4096, 100};
     decompressor.init(window_bits);
 
     decompressor.decompress(accumulation_buffer, buffer);
@@ -61,25 +60,26 @@ protected:
   static constexpr int64_t gzip_window_bits{31};
   static constexpr int64_t memory_level{8};
   static constexpr uint64_t default_input_size{796};
+
+  Stats::IsolatedStoreImpl stats_store_{};
+  Stats::Scope& stats_scope_{*stats_store_.rootScope()};
 };
 
 class ZlibDecompressorImplFailureTest : public ZlibDecompressorImplTest {
 protected:
-  static void decompressorBadInitTestHelper(int64_t window_bits) {
-    Stats::IsolatedStoreImpl stats_store{};
-    ZlibDecompressorImpl decompressor{stats_store, "test.", 4096, 100};
+  void decompressorBadInitTestHelper(int64_t window_bits) {
+    ZlibDecompressorImpl decompressor{stats_scope_, "test.", 4096, 100};
     decompressor.init(window_bits);
   }
 
-  static void uninitializedDecompressorTestHelper() {
+  void uninitializedDecompressorTestHelper() {
     Buffer::OwnedImpl input_buffer;
     Buffer::OwnedImpl output_buffer;
-    Stats::IsolatedStoreImpl stats_store{};
-    ZlibDecompressorImpl decompressor{stats_store, "test.", 4096, 100};
+    ZlibDecompressorImpl decompressor{stats_scope_, "test.", 4096, 100};
     TestUtility::feedBufferWithRandomCharacters(input_buffer, 100);
     decompressor.decompress(input_buffer, output_buffer);
     ASSERT_TRUE(decompressor.decompression_error_ < 0);
-    ASSERT_EQ(stats_store.counterFromString("test.zlib_stream_error").value(), 1);
+    ASSERT_EQ(stats_store_.counterFromString("test.zlib_stream_error").value(), 1);
   }
 };
 
@@ -108,8 +108,7 @@ TEST_F(ZlibDecompressorImplTest, CallingChecksum) {
   compressor.compress(compressor_buffer, Envoy::Compression::Compressor::State::Flush);
   ASSERT_TRUE(compressor.checksum() > 0);
 
-  Stats::IsolatedStoreImpl stats_store{};
-  ZlibDecompressorImpl decompressor{stats_store, "test.", 4096, 100};
+  ZlibDecompressorImpl decompressor{stats_scope_, "test.", 4096, 100};
   decompressor.init(gzip_window_bits);
   EXPECT_EQ(0, decompressor.checksum());
 
@@ -140,11 +139,10 @@ TEST_F(ZlibDecompressorImplTest, DetectExcessiveCompressionRatio) {
   compressor.compress(buffer, Envoy::Compression::Compressor::State::Finish);
 
   Buffer::OwnedImpl output_buffer;
-  Stats::IsolatedStoreImpl stats_store{};
-  ZlibDecompressorImpl decompressor{stats_store, "test.", 4096, 100};
+  ZlibDecompressorImpl decompressor{stats_scope_, "test.", 4096, 100};
   decompressor.init(gzip_window_bits);
   decompressor.decompress(buffer, output_buffer);
-  ASSERT_EQ(stats_store.counterFromString("test.zlib_data_error").value(), 1);
+  ASSERT_EQ(stats_store_.counterFromString("test.zlib_data_error").value(), 1);
 }
 
 // Exercises compression and decompression by compressing some data, decompressing it and then
@@ -179,8 +177,7 @@ TEST_F(ZlibDecompressorImplTest, CompressAndDecompress) {
   drainBuffer(buffer);
   ASSERT_EQ(0, buffer.length());
 
-  Stats::IsolatedStoreImpl stats_store{};
-  ZlibDecompressorImpl decompressor{stats_store, "test.", 4096, 100};
+  ZlibDecompressorImpl decompressor{stats_scope_, "test.", 4096, 100};
   decompressor.init(gzip_window_bits);
 
   decompressor.decompress(accumulation_buffer, buffer);
@@ -210,14 +207,13 @@ TEST_F(ZlibDecompressorImplTest, FailedDecompression) {
     accumulation_buffer.add(buffer);
     drainBuffer(buffer);
   }
-  Stats::IsolatedStoreImpl stats_store{};
-  ZlibDecompressorImpl decompressor{stats_store, "test.", 4096, 100};
+  ZlibDecompressorImpl decompressor{stats_scope_, "test.", 4096, 100};
   decompressor.init(gzip_window_bits);
 
   decompressor.decompress(accumulation_buffer, buffer);
 
   ASSERT_TRUE(decompressor.decompression_error_ < 0);
-  ASSERT_EQ(stats_store.counterFromString("test.zlib_data_error").value(), 17);
+  ASSERT_EQ(stats_store_.counterFromString("test.zlib_data_error").value(), 17);
 }
 
 // Exercises decompression with a very small output buffer.
@@ -250,8 +246,7 @@ TEST_F(ZlibDecompressorImplTest, DecompressWithSmallOutputBuffer) {
   drainBuffer(buffer);
   ASSERT_EQ(0, buffer.length());
 
-  Stats::IsolatedStoreImpl stats_store{};
-  ZlibDecompressorImpl decompressor{stats_store, "test.", 16, 100};
+  ZlibDecompressorImpl decompressor{stats_scope_, "test.", 16, 100};
   decompressor.init(gzip_window_bits);
 
   decompressor.decompress(accumulation_buffer, buffer);
@@ -317,8 +312,7 @@ TEST_F(ZlibDecompressorImplTest, CompressDecompressOfMultipleSlices) {
   compressor.compress(buffer, Envoy::Compression::Compressor::State::Flush);
   accumulation_buffer.add(buffer);
 
-  Stats::IsolatedStoreImpl stats_store{};
-  ZlibDecompressorImpl decompressor{stats_store, "test.", 4096, 100};
+  ZlibDecompressorImpl decompressor{stats_scope_, "test.", 4096, 100};
   decompressor.init(gzip_window_bits);
 
   drainBuffer(buffer);
@@ -337,7 +331,8 @@ protected:
   void chargeErrorStats(const int result) { decompressor_.chargeErrorStats(result); }
 
   Stats::IsolatedStoreImpl stats_store_{};
-  ZlibDecompressorImpl decompressor_{stats_store_, "test.", 4096, 100};
+  Stats::Scope& stats_scope_{*stats_store_.rootScope()};
+  ZlibDecompressorImpl decompressor_{stats_scope_, "test.", 4096, 100};
 };
 
 TEST_F(ZlibDecompressorStatsTest, ChargeErrorStats) {

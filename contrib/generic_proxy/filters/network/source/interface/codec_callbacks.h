@@ -2,6 +2,7 @@
 #pragma once
 
 #include "envoy/buffer/buffer.h"
+#include "envoy/network/drain_decision.h"
 
 #include "contrib/generic_proxy/filters/network/source/interface/stream.h"
 
