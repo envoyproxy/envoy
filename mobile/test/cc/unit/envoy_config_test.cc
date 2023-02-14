@@ -62,8 +62,8 @@ TEST(TestConfig, ConfigIsApplied) {
                                            "- &force_ipv6 true",
                                            "- &persistent_dns_cache_save_interval 101",
                                            " test_feature_false: true",
-                                           ("- &metadata { device_os: probably-ubuntu-on-CI, "
-                                            "app_version: 1.2.3, app_id: 1234-1234-1234 }"),
+                                           ("- &metadata { device_os: \"probably-ubuntu-on-CI\", "
+                                            "app_version: \"1.2.3\", app_id: \"1234-1234-1234\" }"),
                                            R"(- &validation_context
   trusted_ca:)"};
   for (const auto& string : must_contain) {

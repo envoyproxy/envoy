@@ -49,7 +49,7 @@ void insertCustomFilter(const std::string& filter_config, std::string& config_te
 // Note that updates to the config.cc bootstrap will require a matching update in
 // generateBootstrap() below
 bool generatedStringMatchesGeneratedBoostrap(
-    const std::string& config_str, const envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    const absl::string_view config_str, const envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
   Thread::SkipAsserts skip;
   ProtobufMessage::StrictValidationVisitorImpl visitor;
   envoy::config::bootstrap::v3::Bootstrap config_bootstrap;
@@ -371,7 +371,7 @@ std::string EngineBuilder::generateConfigStr() const {
          fmt::format("{}s", h2_connection_keepalive_timeout_seconds_)},
         {
             "metadata",
-            fmt::format("{{ device_os: {}, app_version: {}, app_id: {} }}", device_os_,
+            fmt::format("{{ device_os: \"{}\", app_version: \"{}\", app_id: \"{}\" }}", device_os_,
                         app_version_, app_id_),
         },
         {"max_connections_per_host", fmt::format("{}", max_connections_per_host_)},
@@ -514,11 +514,14 @@ std::string EngineBuilder::generateConfigStr() const {
   return config_str;
 }
 
+bool EngineBuilder::generateBootstrapAndCompare(absl::string_view yaml) const {
+  return generatedStringMatchesGeneratedBoostrap(yaml, *generateBootstrap());
+}
+
 std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap>
-EngineBuilder::generateBootstrapAndCompareForTests(std::string yaml) const {
-  auto bootstrap = generateBootstrap();
-  RELEASE_ASSERT(generatedStringMatchesGeneratedBoostrap(yaml, *generateBootstrap()),
-                 "Failed equivalence");
+EngineBuilder::generateBootstrapAndCompareForTests(absl::string_view yaml) const {
+  std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> bootstrap = generateBootstrap();
+  RELEASE_ASSERT(generateBootstrapAndCompare(yaml), "Failed equivalence");
   return bootstrap;
 }
 
@@ -527,7 +530,8 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
   Thread::SkipAsserts skip;
   ASSERT(!config_bootstrap_incompatible_);
 
-  auto bootstrap = std::make_unique<envoy::config::bootstrap::v3::Bootstrap>();
+  std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> bootstrap =
+      std::make_unique<envoy::config::bootstrap::v3::Bootstrap>();
 
   // Set up the HCM
   envoy::extensions::filters::network::http_connection_manager::v3::EnvoyMobileHttpConnectionManager
@@ -1010,7 +1014,7 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
   (*flags.mutable_fields())["always_use_v6"].set_bool_value(always_use_v6_);
   (*flags.mutable_fields())["skip_dns_lookup_for_proxied_requests"].set_bool_value(
       skip_dns_lookups_for_proxied_requests_);
-  (*runtime_values.mutable_fields())["disallow_global_stats"].set_bool_value("true");
+  (*runtime_values.mutable_fields())["disallow_global_stats"].set_bool_value(true);
   ProtobufWkt::Struct& overload_values =
       *(*envoy_layer.mutable_fields())["overload"].mutable_struct_value();
   (*overload_values.mutable_fields())["global_downstream_max_connections"].set_string_value(
@@ -1083,8 +1087,7 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
   }
 
   // Check equivalence in debug mode.
-  RELEASE_ASSERT(generatedStringMatchesGeneratedBoostrap(generateConfigStr(), *bootstrap),
-                 "Native C++ checks failed");
+  ASSERT(generatedStringMatchesGeneratedBoostrap(generateConfigStr(), *bootstrap));
 
   return bootstrap;
 }
