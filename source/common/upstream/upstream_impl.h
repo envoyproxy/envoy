@@ -104,7 +104,7 @@ private:
 
 /**
  * Class for LBPolicies
- * Uses a std::variant to store pointers for the LBPolicy
+ * Uses a absl::variant to store pointers for the LBPolicy
  */
 class LBPolicyConfig {
 public:
