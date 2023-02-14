@@ -36,6 +36,7 @@ public:
     flush_ = false;
     pattern_.reset();
     formatter_.reset();
+    set_level(spdlog::level::info);
   }
 
   absl::optional<std::string> payload_;
@@ -86,19 +87,61 @@ TEST(DatadogTracerLoggerTest, Logger) {
   EXPECT_EQ(nullptr, sink->formatter_);
   EXPECT_FALSE(sink->flush_);
 
-  sink->reset();
   // Errors are logged at "error" level, and so if the logger's level threshold
   // is more severe than that, errors will not be logged.
-  // TODO: callback style
-  sink->reset();
-  // TODO: Error style
-  sink->reset();
-  // TODO: string style
+  // `spdlog::level::critical` is more severe than `spdlog::level::error`, and
+  // so if we set the level to `critical`, our `error` messages will not be
+  // logged.
 
   sink->reset();
+  // callback-style error
+  sink->set_level(spdlog::level::critical);
+  logger.log_error([](std::ostream& log) { log << "Beware the ides of March."; });
+  EXPECT_EQ(absl::nullopt, sink->payload_);
+  EXPECT_EQ(absl::nullopt, sink->pattern_);
+  EXPECT_EQ(nullptr, sink->formatter_);
+  EXPECT_FALSE(sink->flush_);
+
+  sink->reset();
+  // Error-style error
+  sink->set_level(spdlog::level::critical);
+  logger.log_error(datadog::tracing::Error{datadog::tracing::Error::OTHER,
+                                           "I'm sorry, Dave, I'm afraid I can't do that."});
+  EXPECT_EQ(absl::nullopt, sink->payload_);
+  EXPECT_EQ(absl::nullopt, sink->pattern_);
+  EXPECT_EQ(nullptr, sink->formatter_);
+  EXPECT_FALSE(sink->flush_);
+
+  sink->reset();
+  // string-style error
+  sink->set_level(spdlog::level::critical);
+  logger.log_error("I must make my witness. I must lead the people from the waters. I must stay "
+                   "their stampede to the sea.");
+  EXPECT_EQ(absl::nullopt, sink->payload_);
+  EXPECT_EQ(absl::nullopt, sink->pattern_);
+  EXPECT_EQ(nullptr, sink->formatter_);
+  EXPECT_FALSE(sink->flush_);
+
   // The startup banner is printed at "info" level, and so if the logger's level
   // threshold is more severe than that, the startup banner will not be logged.
-  // TODO
+
+  sink->reset();
+  // The default level is `info`, so the startup banner will be logged.
+  logger.log_startup([](std::ostream& log) { log << "ג  וַיֹּאמֶר אֱלֹהִים, יְהִי אוֹר; וַיְהִי-אוֹר."; });
+  EXPECT_EQ("ג  וַיֹּאמֶר אֱלֹהִים, יְהִי אוֹר; וַיְהִי-אוֹר.", sink->payload_);
+  EXPECT_EQ(absl::nullopt, sink->pattern_);
+  EXPECT_EQ(nullptr, sink->formatter_);
+  EXPECT_FALSE(sink->flush_);
+
+  sink->reset();
+  // Any level more severe than `info` (`warn`, `error`, `critical`) will
+  // suppress the startup banner. `warn` suffices.
+  sink->set_level(spdlog::level::warn);
+  logger.log_startup([](std::ostream& log) { log << "R - ½ R g + Λ g  =  κ T"; });
+  EXPECT_EQ(absl::nullopt, sink->payload_);
+  EXPECT_EQ(absl::nullopt, sink->pattern_);
+  EXPECT_EQ(nullptr, sink->formatter_);
+  EXPECT_FALSE(sink->flush_);
 }
 
 } // namespace
