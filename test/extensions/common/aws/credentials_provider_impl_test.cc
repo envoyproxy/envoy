@@ -17,6 +17,24 @@ namespace Extensions {
 namespace Common {
 namespace Aws {
 
+const char CREDENTIALS_FILE[] = "test-credentials.json";
+const char CREDENTIALS_FILE_CONTENTS[] =
+    R"(
+[default]
+aws_access_key_id=default_access_key
+aws_secret_access_key=default_secret
+aws_session_token=default_token
+
+[profile1]
+aws_access_key_id=profile1_access=_key
+aws_secret_access_key=profile1_secret
+foo=bar
+aws_session_token=profile1_token
+
+[profile2]
+aws_access_key_id=profile2_access_key
+)";
+
 class EvironmentCredentialsProviderTest : public testing::Test {
 public:
   ~EvironmentCredentialsProviderTest() override {
@@ -60,6 +78,72 @@ TEST_F(EvironmentCredentialsProviderTest, NoSessionToken) {
   EXPECT_EQ("akid", credentials.accessKeyId().value());
   EXPECT_EQ("secret", credentials.secretAccessKey().value());
   EXPECT_FALSE(credentials.sessionToken().has_value());
+}
+
+class CredentialsFileCredentialsProviderTest : public testing::Test {
+public:
+  CredentialsFileCredentialsProviderTest()
+      : api_(Api::createApiForTest(time_system_)), provider_(*api_) {}
+
+  ~CredentialsFileCredentialsProviderTest() override {
+    TestEnvironment::unsetEnvVar("AWS_SHARED_CREDENTIALS_FILE");
+    TestEnvironment::unsetEnvVar("AWS_PROFILE");
+  }
+
+  void SetUpTest(std::string file_contents, std::string profile) {
+    auto file_path = TestEnvironment::writeStringToFileForTest(CREDENTIALS_FILE, file_contents);
+    TestEnvironment::setEnvVar("AWS_SHARED_CREDENTIALS_FILE", file_path, 1);
+    TestEnvironment::setEnvVar("AWS_PROFILE", profile, 1);
+  }
+
+  Event::SimulatedTimeSystem time_system_;
+  Api::ApiPtr api_;
+  CredentialsFileCredentialsProvider provider_;
+};
+
+TEST_F(CredentialsFileCredentialsProviderTest, FileDoesNotExist) {
+  TestEnvironment::setEnvVar("AWS_SHARED_CREDENTIALS_FILE", "/file/does/not/exist", 1);
+
+  const auto credentials = provider_.getCredentials();
+  EXPECT_FALSE(credentials.accessKeyId().has_value());
+  EXPECT_FALSE(credentials.secretAccessKey().has_value());
+  EXPECT_FALSE(credentials.sessionToken().has_value());
+}
+
+TEST_F(CredentialsFileCredentialsProviderTest, ProfileDoesNotExist) {
+  SetUpTest(CREDENTIALS_FILE_CONTENTS, "invalid_profile");
+
+  const auto credentials = provider_.getCredentials();
+  EXPECT_FALSE(credentials.accessKeyId().has_value());
+  EXPECT_FALSE(credentials.secretAccessKey().has_value());
+  EXPECT_FALSE(credentials.sessionToken().has_value());
+}
+
+TEST_F(CredentialsFileCredentialsProviderTest, IncompleteProfile) {
+  SetUpTest(CREDENTIALS_FILE_CONTENTS, "profile2");
+
+  const auto credentials = provider_.getCredentials();
+  EXPECT_EQ("profile2_access_key", credentials.accessKeyId().value());
+  EXPECT_FALSE(credentials.secretAccessKey().has_value());
+  EXPECT_FALSE(credentials.sessionToken().has_value());
+}
+
+TEST_F(CredentialsFileCredentialsProviderTest, DefaultProfile) {
+  SetUpTest(CREDENTIALS_FILE_CONTENTS, "");
+
+  const auto credentials = provider_.getCredentials();
+  EXPECT_EQ("default_access_key", credentials.accessKeyId().value());
+  EXPECT_EQ("default_secret", credentials.secretAccessKey().value());
+  EXPECT_EQ("default_token", credentials.sessionToken().value());
+}
+
+TEST_F(CredentialsFileCredentialsProviderTest, CompleteProfile) {
+  SetUpTest(CREDENTIALS_FILE_CONTENTS, "profile1");
+
+  const auto credentials = provider_.getCredentials();
+  EXPECT_EQ("profile1_access=_key", credentials.accessKeyId().value());
+  EXPECT_EQ("profile1_secret", credentials.secretAccessKey().value());
+  EXPECT_EQ("profile1_token", credentials.sessionToken().value());
 }
 
 class MessageMatcher : public testing::MatcherInterface<Http::RequestMessage&> {
@@ -505,6 +589,7 @@ class DefaultCredentialsProviderChainTest : public testing::Test {
 public:
   DefaultCredentialsProviderChainTest() : api_(Api::createApiForTest(time_system_)) {
     EXPECT_CALL(factories_, createEnvironmentCredentialsProvider());
+    EXPECT_CALL(factories_, createCredentialsFileCredentialsProvider(Ref(*api_)));
   }
 
   ~DefaultCredentialsProviderChainTest() override {
@@ -517,6 +602,8 @@ public:
   class MockCredentialsProviderChainFactories : public CredentialsProviderChainFactories {
   public:
     MOCK_METHOD(CredentialsProviderSharedPtr, createEnvironmentCredentialsProvider, (), (const));
+    MOCK_METHOD(CredentialsProviderSharedPtr, createCredentialsFileCredentialsProvider, (Api::Api&),
+                (const));
     MOCK_METHOD(CredentialsProviderSharedPtr, createTaskRoleCredentialsProvider,
                 (Api::Api&, const MetadataCredentialsProviderBase::MetadataFetcher&,
                  absl::string_view, absl::string_view),

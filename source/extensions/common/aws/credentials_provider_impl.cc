@@ -1,12 +1,17 @@
 #include "source/extensions/common/aws/credentials_provider_impl.h"
 
+#include <fstream>
+
 #include "envoy/common/exception.h"
 
+#include "source/common/common/fmt.h"
 #include "source/common/common/lock_guard.h"
 #include "source/common/http/message_impl.h"
 #include "source/common/http/utility.h"
 #include "source/common/json/json_loader.h"
 #include "source/extensions/common/aws/utility.h"
+
+#include "absl/strings/str_split.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -25,6 +30,11 @@ constexpr char TOKEN[] = "Token";
 constexpr char EXPIRATION[] = "Expiration";
 constexpr char EXPIRATION_FORMAT[] = "%E4Y%m%dT%H%M%S%z";
 constexpr char TRUE[] = "true";
+
+constexpr char AWS_SHARED_CREDENTIALS_FILE[] = "AWS_SHARED_CREDENTIALS_FILE";
+constexpr char AWS_PROFILE[] = "AWS_PROFILE";
+constexpr char DEFAULT_AWS_SHARED_CREDENTIALS_FILE[] = "~/.aws/credentials";
+constexpr char DEFAULT_AWS_PROFILE[] = "default";
 
 constexpr char AWS_CONTAINER_CREDENTIALS_RELATIVE_URI[] = "AWS_CONTAINER_CREDENTIALS_RELATIVE_URI";
 constexpr char AWS_CONTAINER_CREDENTIALS_FULL_URI[] = "AWS_CONTAINER_CREDENTIALS_FULL_URI";
@@ -62,11 +72,83 @@ Credentials EnvironmentCredentialsProvider::getCredentials() {
   return Credentials(access_key_id, secret_access_key, session_token);
 }
 
-void MetadataCredentialsProviderBase::refreshIfNeeded() {
+void CachedCredentialsProviderBase::refreshIfNeeded() {
   const Thread::LockGuard lock(lock_);
   if (needsRefresh()) {
     refresh();
   }
+}
+
+bool CredentialsFileCredentialsProvider::needsRefresh() {
+  return api_.timeSource().systemTime() - last_updated_ > REFRESH_INTERVAL;
+}
+
+std::string GetEnvironmentVariableOrDefault(const std::string& variable_name,
+                                            const std::string& default_value) {
+  const char* value = getenv(variable_name.c_str());
+  return (value != NULL) && (value[0] != '\0') ? value : default_value;
+}
+
+void CredentialsFileCredentialsProvider::refresh() {
+  ENVOY_LOG(debug, "Getting AWS credentials from the credentials file");
+
+  const auto credentials_file = GetEnvironmentVariableOrDefault(
+      AWS_SHARED_CREDENTIALS_FILE, DEFAULT_AWS_SHARED_CREDENTIALS_FILE);
+  const auto profile = GetEnvironmentVariableOrDefault(AWS_PROFILE, DEFAULT_AWS_PROFILE);
+
+  extractCredentials(credentials_file, profile);
+}
+
+void CredentialsFileCredentialsProvider::extractCredentials(const std::string& credentials_file,
+                                                            const std::string& profile) {
+  if (credentials_file.empty() || profile.empty()) {
+    return;
+  }
+
+  std::ifstream file(credentials_file);
+  if (!file) {
+    ENVOY_LOG(error, "Error opening credentials file {}", credentials_file);
+    return;
+  }
+
+  std::string access_key_id, secret_access_key, session_token;
+  std::string profile_start = fmt::format("[{}]", profile);
+
+  bool found_profile = false;
+  std::string line;
+  while (std::getline(file, line)) {
+    if (line == profile_start) {
+      found_profile = true;
+      continue;
+    }
+
+    if (found_profile) {
+      // Stop reading once we find the start of the next profile.
+      if (line.rfind("[", 0) == 0) {
+        break;
+      }
+
+      std::vector<std::string> parts = absl::StrSplit(line, absl::MaxSplits('=', 1));
+      if (parts.size() == 2) {
+        auto upper = StringUtil::toUpper(parts[0]);
+        if (upper == AWS_ACCESS_KEY_ID) {
+          access_key_id = parts[1];
+        } else if (upper == AWS_SECRET_ACCESS_KEY) {
+          secret_access_key = parts[1];
+        } else if (upper == AWS_SESSION_TOKEN) {
+          session_token = parts[1];
+        }
+      }
+    }
+  }
+
+  ENVOY_LOG(debug, "Found following AWS credentials for profile '{}' in {}: {}={}, {}={}, {}={}",
+            profile, credentials_file, AWS_ACCESS_KEY_ID, access_key_id, AWS_SECRET_ACCESS_KEY,
+            secret_access_key.empty() ? "" : "*****", AWS_SESSION_TOKEN,
+            session_token.empty() ? "" : "*****");
+
+  cached_credentials_ = Credentials(access_key_id, secret_access_key, session_token);
+  last_updated_ = api_.timeSource().systemTime();
 }
 
 bool InstanceProfileCredentialsProvider::needsRefresh() {
@@ -252,6 +334,9 @@ DefaultCredentialsProviderChain::DefaultCredentialsProviderChain(
     const CredentialsProviderChainFactories& factories) {
   ENVOY_LOG(debug, "Using environment credentials provider");
   add(factories.createEnvironmentCredentialsProvider());
+
+  ENVOY_LOG(debug, "Using credentials file credentials provider");
+  add(factories.createCredentialsFileCredentialsProvider(api));
 
   const auto relative_uri =
       absl::NullSafeStringView(std::getenv(AWS_CONTAINER_CREDENTIALS_RELATIVE_URI));
