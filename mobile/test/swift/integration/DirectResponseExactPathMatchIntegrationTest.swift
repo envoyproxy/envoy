@@ -17,6 +17,7 @@ final class DirectResponseExactPathMatchIntegrationTest: XCTestCase {
     ).build()
 
     let engine = TestEngineBuilder()
+      .useLegacyBuilder(true)
       .addDirectResponse(
         .init(
           matcher: RouteMatcher(fullPath: "/v1/abc"),

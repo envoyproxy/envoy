@@ -20,6 +20,7 @@ final class DirectResponseContainsHeadersMatchIntegrationTest: XCTestCase {
     .build()
 
     let engine = TestEngineBuilder()
+      .useLegacyBuilder(true)
       .addDirectResponse(
         .init(
           matcher: RouteMatcher(

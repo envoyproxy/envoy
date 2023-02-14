@@ -62,6 +62,7 @@ open class EngineBuilder: NSObject {
   private var directResponses: [DirectResponse] = []
   private var statsSinks: [String] = []
   private var experimentalValidateYAMLCallback: ((Bool) -> Void)?
+  private var useLegacyBuilder: Bool = false
 
   // MARK: - Public
 
@@ -598,6 +599,18 @@ open class EngineBuilder: NSObject {
     return self
   }
 
+  /// Specify whether the string-based legacy mode should be used to build the engine.
+  /// Defaults to false.
+  ///
+  /// - parameter useLegacyBuilder: true if the string-based legacy mode should be used.
+  ///
+  /// - returns: This builder.
+  @discardableResult
+  public func useLegacyBuilder(_ useLegacyBuilder: Bool) -> Self {
+    self.useLegacyBuilder = useLegacyBuilder
+    return self
+  }
+
   /// Builds and runs a new `Engine` instance with the provided configuration.
   ///
   /// - note: Must be strongly retained in order for network requests to be performed correctly.
@@ -651,7 +664,8 @@ open class EngineBuilder: NSObject {
       stringAccessors: self.stringAccessors,
       keyValueStores: self.keyValueStores,
       statsSinks: self.statsSinks,
-      experimentalValidateYAMLCallback: self.experimentalValidateYAMLCallback
+      experimentalValidateYAMLCallback: self.experimentalValidateYAMLCallback,
+      useLegacyBuilder: self.useLegacyBuilder
     )
 
     switch self.base {
