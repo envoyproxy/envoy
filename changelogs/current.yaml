@@ -102,5 +102,8 @@ new_features:
 - area: sni_dynamic_forward_proxy
   change: |
     added an option to dynamically set the host used by the SNI dynamic forward proxy filter, by setting a filter state object under the key ``envoy.upstream.dynamic_host``.
+- area: generic_proxy
+  change: |
+    added :ref:`tracing support <envoy_v3_api_field_extensions.filters.network.generic_proxy.v3.GenericProxy.tracing>` for the generic proxy.
 
 deprecated:
