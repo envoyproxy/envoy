@@ -854,7 +854,7 @@ TEST_F(ConnectionManagerUtilityTest, DoNotRemoveConnectionUpgradeForWebSocketReq
             callMutateRequestHeaders(headers, Protocol::Http11));
   EXPECT_EQ("upgrade", headers.get_("connection"));
   EXPECT_EQ("websocket", headers.get_("upgrade"));
-  // Content-Length header should not be removed.
+  // Content-Length header should not be added
   EXPECT_FALSE(headers.has("content-length"));
 }
 
