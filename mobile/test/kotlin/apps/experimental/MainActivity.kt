@@ -75,6 +75,7 @@ class MainActivity : Activity() {
       .setLogger {
         Log.d("MainActivity", it)
       }
+      .useLegacyBuilder(true)
       .build()
 
     recyclerView = findViewById(R.id.recycler_view) as RecyclerView
