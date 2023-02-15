@@ -217,8 +217,8 @@ message AccessLogCommon {
   bool intermediate_log_entry = 27;
 
   // If downstream connection in listener failed due to transport socket (e.g. TLS handshake), provides the
-  // failure reason from the transport socket. The format of this field depends on the configured
-  // listener socket. Common TLS failures are in :ref:`TLS trouble shooting <arch_overview_ssl_trouble_shooting>`.
+  // failure reason from the transport socket. The format of this field depends on the configured downstream
+  // transport socket. Common TLS failures are in :ref:`TLS trouble shooting <arch_overview_ssl_trouble_shooting>`.
   string downstream_transport_failure_reason = 28;
 }
 
