@@ -311,9 +311,9 @@ TEST_F(AdminStatsTest, HandlerStatsScoped) {
   InSequence s;
   store_->initializeThreading(main_thread_dispatcher_, tls_);
 
-  store_->counterFromStatName(makeStat("foo.c0")).add(0);
+  store_->rootScope()->counterFromStatName(makeStat("foo.c0")).add(0);
   Stats::ScopeSharedPtr scope0 = store_->createScope("");
-  store_->counterFromStatName(makeStat("foo.c1")).add(1);
+  store_->rootScope()->counterFromStatName(makeStat("foo.c1")).add(1);
   Stats::ScopeSharedPtr scope = store_->createScope("scope");
   scope->counterFromStatName(makeStat("c2")).add(2);
   Stats::ScopeSharedPtr scope2 = store_->createScope("scope1.scope2");
