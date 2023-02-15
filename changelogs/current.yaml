@@ -91,6 +91,9 @@ new_features:
 - area: upstream
   change: |
     added :ref:`maglev extension <envoy_v3_api_msg_extensions.load_balancing_policies.maglev.v3.Maglev>` to suppport the :ref:`load balancer policy <envoy_v3_api_field_config.cluster.v3.Cluster.load_balancing_policy>`.
+- area: maglev
+  change: |
+    added ``envoy.reloadable_features.allow_compact_maglev`` to allow the use of a more compact maglev load balancer representation. This can be reverted by setting ``envoy.reloadable_features.allow_compact_maglev`` to false.
 - area: router
   change: |
     support route info in upstream access log.
@@ -111,5 +114,9 @@ new_features:
 - area: generic_proxy
   change: |
     added :ref:`tracing support <envoy_v3_api_field_extensions.filters.network.generic_proxy.v3.GenericProxy.tracing>` for the generic proxy.
+- area: jwt_authn
+  change: |
+    added :ref:`failed_status_in_metadata <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.JwtProvider.failed_status_in_metadata>` to support setting the JWT
+    authentication failure status code and message in dynamic metadata.
 
 deprecated:

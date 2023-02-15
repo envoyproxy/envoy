@@ -38,6 +38,7 @@ jobs:
             --define=admin_html=enabled \
             --define=envoy_mobile_request_compression=disabled \
             --@envoy//bazel:http3=False \
+            --@com_envoyproxy_protoc_gen_validate//bazel:template-flavor= \
             //library/cc/...
   swift_build:
     if: github.repository == 'envoyproxy/envoy'
@@ -67,6 +68,7 @@ jobs:
             --define=admin_html=enabled \
             --define=envoy_mobile_request_compression=disabled \
             --@envoy//bazel:http3=False \
+            --@com_envoyproxy_protoc_gen_validate//bazel:template-flavor= \
             //library/swift:ios_framework
   kotlin_build:
     if: github.repository == 'envoyproxy/envoy'
@@ -102,4 +104,5 @@ jobs:
           --define=admin_html=enabled \
           --define=envoy_mobile_request_compression=disabled \
           --@envoy//bazel:http3=False \
+          --@com_envoyproxy_protoc_gen_validate//bazel:template-flavor= \
           //:android_dist
