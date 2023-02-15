@@ -27,12 +27,10 @@ protected:
   GrpcStreamTest()
       : async_client_owner_(std::make_unique<Grpc::MockAsyncClient>()),
         async_client_(async_client_owner_.get()),
-        backoff_strategy_(
-            Envoy::Config::Utility::prepareDefaultJitteredExponentialBackOffStrategy(random_)),
         grpc_stream_(&callbacks_, std::move(async_client_owner_),
                      *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
                          "envoy.service.endpoint.v3.EndpointDiscoveryService.StreamEndpoints"),
-                     dispatcher_, *stats_.rootScope(), std::move(backoff_strategy_),
+                     random_, dispatcher_, *stats_.rootScope(), std::move(backoff_strategy_),
                      rate_limit_settings_) {}
 
   NiceMock<Event::MockDispatcher> dispatcher_;

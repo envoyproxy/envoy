@@ -51,8 +51,6 @@ public:
   GrpcMuxImplTestBase()
       : async_client_(new Grpc::MockAsyncClient()),
         config_validators_(std::make_unique<NiceMock<MockCustomConfigValidators>>()),
-        backoff_strategy_(
-            Envoy::Config::Utility::prepareDefaultJitteredExponentialBackOffStrategy(random_)),
         resource_decoder_(std::make_shared<NiceMock<MockOpaqueResourceDecoder>>()),
         control_plane_connected_state_(
             stats_.gauge("control_plane.connected_state", Stats::Gauge::ImportMode::NeverImport)),
@@ -66,8 +64,8 @@ public:
         local_info_, std::unique_ptr<Grpc::MockAsyncClient>(async_client_), dispatcher_,
         *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
             "envoy.service.discovery.v3.AggregatedDiscoveryService.StreamAggregatedResources"),
-        *stats_.rootScope(), rate_limit_settings_, true, std::move(config_validators_),
-        std::move(backoff_strategy_),
+        random_, *stats_.rootScope(), rate_limit_settings_, true, std::move(config_validators_),
+        nullptr,
         /*xds_config_tracker=*/XdsConfigTrackerOptRef(),
         /*xds_resources_delegate=*/XdsResourcesDelegateOptRef(), /*target_xds_authority=*/"");
   }
@@ -77,8 +75,8 @@ public:
         local_info_, std::unique_ptr<Grpc::MockAsyncClient>(async_client_), dispatcher_,
         *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
             "envoy.service.discovery.v3.AggregatedDiscoveryService.StreamAggregatedResources"),
-        *stats_.rootScope(), custom_rate_limit_settings, true, std::move(config_validators_),
-        std::move(backoff_strategy_),
+        random_, *stats_.rootScope(), custom_rate_limit_settings, true,
+        std::move(config_validators_), nullptr,
         /*xds_config_tracker=*/XdsConfigTrackerOptRef(),
         /*xds_resources_delegate=*/XdsResourcesDelegateOptRef(), /*target_xds_authority=*/"");
   }
@@ -114,7 +112,6 @@ public:
   Grpc::MockAsyncClient* async_client_;
   Grpc::MockAsyncStream async_stream_;
   CustomConfigValidatorsPtr config_validators_;
-  JitteredExponentialBackOffStrategyPtr backoff_strategy_;
   GrpcMuxImplPtr grpc_mux_;
   NiceMock<MockSubscriptionCallbacks> callbacks_;
   OpaqueResourceDecoderSharedPtr resource_decoder_;
@@ -899,8 +896,8 @@ TEST_F(GrpcMuxImplTest, BadLocalInfoEmptyClusterName) {
           local_info_, std::unique_ptr<Grpc::MockAsyncClient>(async_client_), dispatcher_,
           *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
               "envoy.service.discovery.v3.AggregatedDiscoveryService.StreamAggregatedResources"),
-          *stats_.rootScope(), rate_limit_settings_, true,
-          std::make_unique<NiceMock<MockCustomConfigValidators>>(), std::move(backoff_strategy_),
+          random_, *stats_.rootScope(), rate_limit_settings_, true,
+          std::make_unique<NiceMock<MockCustomConfigValidators>>(), nullptr,
           /*xds_config_tracker=*/XdsConfigTrackerOptRef(),
           /*xds_resources_delegate=*/XdsResourcesDelegateOptRef(),
           /*target_xds_authority=*/""),
@@ -916,8 +913,8 @@ TEST_F(GrpcMuxImplTest, BadLocalInfoEmptyNodeName) {
           local_info_, std::unique_ptr<Grpc::MockAsyncClient>(async_client_), dispatcher_,
           *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
               "envoy.service.discovery.v3.AggregatedDiscoveryService.StreamAggregatedResources"),
-          *stats_.rootScope(), rate_limit_settings_, true,
-          std::make_unique<NiceMock<MockCustomConfigValidators>>(), std::move(backoff_strategy_),
+          random_, *stats_.rootScope(), rate_limit_settings_, true,
+          std::make_unique<NiceMock<MockCustomConfigValidators>>(), nullptr,
           /*xds_config_tracker=*/XdsConfigTrackerOptRef(),
           /*xds_resources_delegate=*/XdsResourcesDelegateOptRef(), /*target_xds_authority=*/""),
       EnvoyException,

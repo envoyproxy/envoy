@@ -53,8 +53,6 @@ public:
   NewGrpcMuxImplTestBase(LegacyOrUnified legacy_or_unified)
       : async_client_(new Grpc::MockAsyncClient()),
         config_validators_(std::make_unique<NiceMock<MockCustomConfigValidators>>()),
-        backoff_strategy_(
-            Envoy::Config::Utility::prepareDefaultJitteredExponentialBackOffStrategy(random_)),
         resource_decoder_(std::make_shared<TestUtility::TestOpaqueResourceDecoderImpl<
                               envoy::config::endpoint::v3::ClusterLoadAssignment>>("cluster_name")),
         control_plane_stats_(Utility::generateControlPlaneStats(*stats_.rootScope())),
@@ -68,8 +66,8 @@ public:
           std::unique_ptr<Grpc::MockAsyncClient>(async_client_), dispatcher_,
           *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
               "envoy.service.discovery.v2.AggregatedDiscoveryService.StreamAggregatedResources"),
-          *stats_.rootScope(), rate_limit_settings_, local_info_, false,
-          std::move(config_validators_), std::move(backoff_strategy_),
+          random_, *stats_.rootScope(), rate_limit_settings_, local_info_, false,
+          std::move(config_validators_), nullptr,
           /*xds_config_tracker=*/XdsConfigTrackerOptRef());
       return;
     }
@@ -77,8 +75,8 @@ public:
         std::unique_ptr<Grpc::MockAsyncClient>(async_client_), dispatcher_,
         *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
             "envoy.service.discovery.v3.AggregatedDiscoveryService.StreamAggregatedResources"),
-        *stats_.rootScope(), rate_limit_settings_, local_info_, std::move(config_validators_),
-        std::move(backoff_strategy_),
+        random_, *stats_.rootScope(), rate_limit_settings_, local_info_,
+        std::move(config_validators_), nullptr,
         /*xds_config_tracker=*/XdsConfigTrackerOptRef());
   }
 
@@ -163,7 +161,6 @@ public:
   Grpc::MockAsyncClient* async_client_;
   NiceMock<Grpc::MockAsyncStream> async_stream_;
   CustomConfigValidatorsPtr config_validators_;
-  JitteredExponentialBackOffStrategyPtr backoff_strategy_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
   std::unique_ptr<GrpcMux> grpc_mux_;
   NiceMock<Config::MockSubscriptionCallbacks> callbacks_;

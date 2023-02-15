@@ -386,12 +386,9 @@ ClusterManagerImpl::ClusterManagerImpl(
 
     JitteredExponentialBackOffStrategyPtr backoff_strategy;
     auto& grpc_services = dyn_resources.ads_config().grpc_services();
-    if (!grpc_services.empty() && grpc_services[0].has_envoy_grpc() &&
-        grpc_services[0].envoy_grpc().has_retry_policy()) {
+    if (!grpc_services.empty() && grpc_services[0].has_envoy_grpc()) {
       backoff_strategy = Config::Utility::prepareJitteredExponentialBackOffStrategy(
-          grpc_services[0].envoy_grpc().retry_policy(), random_);
-    } else {
-      backoff_strategy = Config::Utility::prepareDefaultJitteredExponentialBackOffStrategy(random_);
+          grpc_services[0].envoy_grpc(), random_);
     }
 
     if (dyn_resources.ads_config().api_type() ==
@@ -406,7 +403,7 @@ ClusterManagerImpl::ClusterManagerImpl(
             *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
                 "envoy.service.discovery.v3.AggregatedDiscoveryService."
                 "DeltaAggregatedResources"),
-            *stats_.rootScope(),
+            random_, *stats_.rootScope(),
             Envoy::Config::Utility::parseRateLimitSettings(dyn_resources.ads_config()), local_info,
             dyn_resources.ads_config().set_node_on_first_message_only(),
             std::move(custom_config_validators), std::move(backoff_strategy),
@@ -419,7 +416,7 @@ ClusterManagerImpl::ClusterManagerImpl(
             main_thread_dispatcher,
             *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
                 "envoy.service.discovery.v3.AggregatedDiscoveryService.DeltaAggregatedResources"),
-            *stats_.rootScope(),
+            random_, *stats_.rootScope(),
             Envoy::Config::Utility::parseRateLimitSettings(dyn_resources.ads_config()), local_info,
             std::move(custom_config_validators), std::move(backoff_strategy),
             makeOptRefFromPtr(xds_config_tracker_.get()));
@@ -439,7 +436,7 @@ ClusterManagerImpl::ClusterManagerImpl(
             *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
                 "envoy.service.discovery.v3.AggregatedDiscoveryService."
                 "StreamAggregatedResources"),
-            *stats_.rootScope(),
+            random_, *stats_.rootScope(),
             Envoy::Config::Utility::parseRateLimitSettings(dyn_resources.ads_config()), local_info,
             bootstrap.dynamic_resources().ads_config().set_node_on_first_message_only(),
             std::move(custom_config_validators), std::move(backoff_strategy),
@@ -454,7 +451,7 @@ ClusterManagerImpl::ClusterManagerImpl(
             main_thread_dispatcher,
             *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
                 "envoy.service.discovery.v3.AggregatedDiscoveryService.StreamAggregatedResources"),
-            *stats_.rootScope(),
+            random_, *stats_.rootScope(),
             Envoy::Config::Utility::parseRateLimitSettings(dyn_resources.ads_config()),
             bootstrap.dynamic_resources().ads_config().set_node_on_first_message_only(),
             std::move(custom_config_validators), std::move(backoff_strategy),

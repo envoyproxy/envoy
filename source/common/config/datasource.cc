@@ -10,6 +10,8 @@ namespace Envoy {
 namespace Config {
 namespace DataSource {
 
+static constexpr uint32_t RetryInitialDelayMilliseconds = 1000;
+static constexpr uint32_t RetryMaxDelayMilliseconds = 10 * 1000;
 static constexpr uint32_t RetryCount = 1;
 
 std::string read(const envoy::config::core::v3::DataSource& source, bool allow_empty,
@@ -63,11 +65,10 @@ RemoteAsyncDataProvider::RemoteAsyncDataProvider(
       retries_remaining_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(source.retry_policy(), num_retries, RetryCount)) {
 
-  if (source.has_retry_policy()) {
-    backoff_strategy_ =
-        Utility::prepareJitteredExponentialBackOffStrategy(source.retry_policy(), random);
-  } else {
-    backoff_strategy_ = Utility::prepareDefaultJitteredExponentialBackOffStrategy(random);
+  backoff_strategy_ = Utility::prepareJitteredExponentialBackOffStrategy(source, random);
+  if (backoff_strategy_ == nullptr) {
+    backoff_strategy_ = std::make_unique<JitteredExponentialBackOffStrategy>(
+        RetryInitialDelayMilliseconds, RetryMaxDelayMilliseconds, random);
   }
 
   retry_timer_ = dispatcher.createTimer([this]() -> void { start(); });

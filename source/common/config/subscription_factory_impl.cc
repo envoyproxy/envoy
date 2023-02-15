@@ -81,13 +81,9 @@ SubscriptionPtr SubscriptionFactoryImpl::subscriptionFromConfigSource(
 
       JitteredExponentialBackOffStrategyPtr backoff_strategy;
       auto& grpc_services = api_config_source.grpc_services();
-      if (!grpc_services.empty() && grpc_services[0].has_envoy_grpc() &&
-          grpc_services[0].envoy_grpc().has_retry_policy()) {
+      if (!grpc_services.empty() && grpc_services[0].has_envoy_grpc()) {
         backoff_strategy = Utility::prepareJitteredExponentialBackOffStrategy(
-            grpc_services[0].envoy_grpc().retry_policy(), api_.randomGenerator());
-      } else {
-        backoff_strategy =
-            Utility::prepareDefaultJitteredExponentialBackOffStrategy(api_.randomGenerator());
+            grpc_services[0].envoy_grpc(), api_.randomGenerator());
       }
 
       const std::string control_plane_id =
@@ -98,7 +94,7 @@ SubscriptionPtr SubscriptionFactoryImpl::subscriptionFromConfigSource(
             Utility::factoryForGrpcApiConfigSource(cm_.grpcAsyncClientManager(), api_config_source,
                                                    scope, true)
                 ->createUncachedRawAsyncClient(),
-            dispatcher_, sotwGrpcMethod(type_url), scope,
+            dispatcher_, sotwGrpcMethod(type_url), api_.randomGenerator(), scope,
             Utility::parseRateLimitSettings(api_config_source), local_info_,
             api_config_source.set_node_on_first_message_only(), std::move(custom_config_validators),
             std::move(backoff_strategy), xds_config_tracker_, xds_resources_delegate_,
@@ -109,7 +105,7 @@ SubscriptionPtr SubscriptionFactoryImpl::subscriptionFromConfigSource(
             Utility::factoryForGrpcApiConfigSource(cm_.grpcAsyncClientManager(), api_config_source,
                                                    scope, true)
                 ->createUncachedRawAsyncClient(),
-            dispatcher_, sotwGrpcMethod(type_url), scope,
+            dispatcher_, sotwGrpcMethod(type_url), api_.randomGenerator(), scope,
             Utility::parseRateLimitSettings(api_config_source),
             api_config_source.set_node_on_first_message_only(), std::move(custom_config_validators),
             std::move(backoff_strategy), xds_config_tracker_, xds_resources_delegate_,
@@ -128,13 +124,9 @@ SubscriptionPtr SubscriptionFactoryImpl::subscriptionFromConfigSource(
 
       JitteredExponentialBackOffStrategyPtr backoff_strategy;
       auto& grpc_services = api_config_source.grpc_services();
-      if (!grpc_services.empty() && grpc_services[0].has_envoy_grpc() &&
-          grpc_services[0].envoy_grpc().has_retry_policy()) {
+      if (!grpc_services.empty() && grpc_services[0].has_envoy_grpc()) {
         backoff_strategy = Utility::prepareJitteredExponentialBackOffStrategy(
-            grpc_services[0].envoy_grpc().retry_policy(), api_.randomGenerator());
-      } else {
-        backoff_strategy =
-            Utility::prepareDefaultJitteredExponentialBackOffStrategy(api_.randomGenerator());
+            grpc_services[0].envoy_grpc(), api_.randomGenerator());
       }
 
       if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.unified_mux")) {
@@ -142,7 +134,7 @@ SubscriptionPtr SubscriptionFactoryImpl::subscriptionFromConfigSource(
             Utility::factoryForGrpcApiConfigSource(cm_.grpcAsyncClientManager(), api_config_source,
                                                    scope, true)
                 ->createUncachedRawAsyncClient(),
-            dispatcher_, deltaGrpcMethod(type_url), scope,
+            dispatcher_, deltaGrpcMethod(type_url), api_.randomGenerator(), scope,
             Utility::parseRateLimitSettings(api_config_source), local_info_,
             api_config_source.set_node_on_first_message_only(), std::move(custom_config_validators),
             std::move(backoff_strategy), xds_config_tracker_);
@@ -151,7 +143,7 @@ SubscriptionPtr SubscriptionFactoryImpl::subscriptionFromConfigSource(
             Config::Utility::factoryForGrpcApiConfigSource(cm_.grpcAsyncClientManager(),
                                                            api_config_source, scope, true)
                 ->createUncachedRawAsyncClient(),
-            dispatcher_, deltaGrpcMethod(type_url), scope,
+            dispatcher_, deltaGrpcMethod(type_url), api_.randomGenerator(), scope,
             Utility::parseRateLimitSettings(api_config_source), local_info_,
             std::move(custom_config_validators), std::move(backoff_strategy), xds_config_tracker_);
       }
@@ -206,13 +198,9 @@ SubscriptionPtr SubscriptionFactoryImpl::collectionSubscriptionFromUrl(
 
       JitteredExponentialBackOffStrategyPtr backoff_strategy;
       auto& grpc_services = api_config_source.grpc_services();
-      if (!grpc_services.empty() && grpc_services[0].has_envoy_grpc() &&
-          grpc_services[0].envoy_grpc().has_retry_policy()) {
+      if (!grpc_services.empty() && grpc_services[0].has_envoy_grpc()) {
         backoff_strategy = Utility::prepareJitteredExponentialBackOffStrategy(
-            grpc_services[0].envoy_grpc().retry_policy(), api_.randomGenerator());
-      } else {
-        backoff_strategy =
-            Utility::prepareDefaultJitteredExponentialBackOffStrategy(api_.randomGenerator());
+            grpc_services[0].envoy_grpc(), api_.randomGenerator());
       }
 
       SubscriptionOptions options;
@@ -228,7 +216,7 @@ SubscriptionPtr SubscriptionFactoryImpl::collectionSubscriptionFromUrl(
                 Config::Utility::factoryForGrpcApiConfigSource(cm_.grpcAsyncClientManager(),
                                                                api_config_source, scope, true)
                     ->createUncachedRawAsyncClient(),
-                dispatcher_, deltaGrpcMethod(type_url), scope,
+                dispatcher_, deltaGrpcMethod(type_url), api_.randomGenerator(), scope,
                 Utility::parseRateLimitSettings(api_config_source), local_info_,
                 std::move(custom_config_validators), std::move(backoff_strategy),
                 xds_config_tracker_),

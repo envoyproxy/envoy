@@ -533,21 +533,32 @@ public:
   }
 
   /**
-   * Prepares Jittered Exponential BackOff Strategy from Retry Policy config
-   * @param config retry policy config
+   * Prepares Jittered Exponential BackOff Strategy from config containing the Retry Policy
+   * @param config config containing RetryPolicy <envoy_v3_api_msg_config.core.v3.RetryPolicy>
    * @param random random generator
-   * @return JitteredExponentialBackOffStrategyPtr
+   * @return JitteredExponentialBackOffStrategyPtr if retryPolicy containing backoff values is found
+   * in config else nullptr
    */
-  static JitteredExponentialBackOffStrategyPtr prepareJitteredExponentialBackOffStrategy(
-      const envoy::config::core::v3::RetryPolicy& retry_policy, Random::RandomGenerator& random);
+  template <typename T>
+  static JitteredExponentialBackOffStrategyPtr
+  prepareJitteredExponentialBackOffStrategy(const T& config, Random::RandomGenerator& random) {
+    if (!config.has_retry_policy() || !config.retry_policy().has_retry_back_off()) {
+      return nullptr;
+    }
+    return prepareJitteredExponentialBackOffStrategy(config.retry_policy().retry_back_off(),
+                                                     random);
+  }
 
+private:
   /**
-   * Prepares Jittered Exponential BackOff Strategy with default timer values
+   * Prepares Jittered Exponential BackOff Strategy from BackoffStrategy config
+   * @param config BackoffStrategy config
    * @param random random generator
    * @return JitteredExponentialBackOffStrategyPtr
    */
   static JitteredExponentialBackOffStrategyPtr
-  prepareDefaultJitteredExponentialBackOffStrategy(Random::RandomGenerator& random);
+  prepareJitteredExponentialBackOffStrategy(const envoy::config::core::v3::BackoffStrategy& backoff,
+                                            Random::RandomGenerator& random);
 };
 } // namespace Config
 } // namespace Envoy

@@ -48,16 +48,14 @@ public:
         type_url_("type.googleapis.com/envoy.config.endpoint.v3.ClusterLoadAssignment"),
         subscription_stats_(Config::Utility::generateStats(scope_)),
         async_client_(new Grpc::MockAsyncClient()),
-        config_validators_(std::make_unique<NiceMock<Config::MockCustomConfigValidators>>()),
-        backoff_strategy_(
-            Envoy::Config::Utility::prepareDefaultJitteredExponentialBackOffStrategy(random_)) {
+        config_validators_(std::make_unique<NiceMock<Config::MockCustomConfigValidators>>())
+        ) {
     if (use_unified_mux_) {
       grpc_mux_.reset(new Config::XdsMux::GrpcMuxSotw(
           std::unique_ptr<Grpc::MockAsyncClient>(async_client_), server_context_.dispatcher_,
           *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
               "envoy.service.endpoint.v3.EndpointDiscoveryService.StreamEndpoints"),
-          scope_, {}, local_info_, true, std::move(config_validators_),
-          std::move(backoff_strategy_),
+          random_, scope_, {}, local_info_, true, std::move(config_validators_), nullptr,
           /*xds_config_tracker=*/Config::XdsConfigTrackerOptRef()));
     } else {
       grpc_mux_.reset(new Config::GrpcMuxImpl(
@@ -65,7 +63,7 @@ public:
           server_context_.dispatcher_,
           *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
               "envoy.service.endpoint.v3.EndpointDiscoveryService.StreamEndpoints"),
-          scope_, {}, true, std::move(config_validators_), std::move(backoff_strategy_),
+          random_, scope_, {}, true, std::move(config_validators_), nullptr,
           /*xds_config_tracker=*/Config::XdsConfigTrackerOptRef(),
           /*xds_resources_delegate=*/Config::XdsResourcesDelegateOptRef(),
           /*target_xds_authority=*/""));
@@ -185,8 +183,7 @@ public:
   ProtobufMessage::MockValidationVisitor validation_visitor_;
   Grpc::MockAsyncClient* async_client_;
   Config::CustomConfigValidatorsPtr config_validators_;
-  JitteredExponentialBackOffStrategyPtr backoff_strategy_;
-  NiceMock<Grpc::MockAsyncStream> async_stream_;
+  = NiceMock<Grpc::MockAsyncStream> async_stream_;
   Config::GrpcMuxSharedPtr grpc_mux_;
   Config::GrpcSubscriptionImplPtr subscription_;
   NiceMock<AccessLog::MockAccessLogManager> access_log_manager_;

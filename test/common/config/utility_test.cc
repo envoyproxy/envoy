@@ -294,23 +294,21 @@ TEST(UtilityTest, PrepareDnsRefreshStrategy) {
   }
 }
 
-TEST(UtilityTest, prepareJitteredExponentialBackOffStrategyStrategyDefaultValues) {
+TEST(UtilityTest, prepareJitteredExponentialBackOffStrategyStrategyNoConfig) {
   NiceMock<Random::MockRandomGenerator> random;
   {
-    // Parameters of the jittered backoff strategy.
-    constexpr uint32_t RetryInitialDelayMilliseconds = 1000;
-    constexpr uint32_t RetryMaxDelayMilliseconds = 10 * 1000;
+    envoy::config::core::v3::GrpcService::EnvoyGrpc config;
+    const std::string config_yaml = R"EOF(
+        cluster_name: some_xds_cluster
+    )EOF";
 
-    envoy::config::core::v3::RetryPolicy config;
+    TestUtility::loadFromYaml(config_yaml, config);
+
+    EXPECT_FALSE(config.has_retry_policy());
+
     JitteredExponentialBackOffStrategyPtr strategy =
         Utility::prepareJitteredExponentialBackOffStrategy(config, random);
-    EXPECT_NE(nullptr, dynamic_cast<JitteredExponentialBackOffStrategy*>(strategy.get()));
-
-    EXPECT_EQ(false, dynamic_cast<JitteredExponentialBackOffStrategy*>(strategy.get())
-                         ->isOverTimeLimit(RetryInitialDelayMilliseconds));
-
-    EXPECT_EQ(true, dynamic_cast<JitteredExponentialBackOffStrategy*>(strategy.get())
-                        ->isOverTimeLimit(RetryMaxDelayMilliseconds + 1));
+    EXPECT_EQ(nullptr, dynamic_cast<JitteredExponentialBackOffStrategy*>(strategy.get()));
   }
 }
 
@@ -333,7 +331,7 @@ TEST(UtilityTest, prepareJitteredExponentialBackOffStrategyStrategyConfigFileVal
       EXPECT_TRUE(config.has_retry_policy());
 
       JitteredExponentialBackOffStrategyPtr strategy =
-          Utility::prepareJitteredExponentialBackOffStrategy(config.retry_policy(), random);
+          Utility::prepareJitteredExponentialBackOffStrategy(config, random);
 
       EXPECT_NE(nullptr, dynamic_cast<JitteredExponentialBackOffStrategy*>(strategy.get()));
 
@@ -367,7 +365,7 @@ TEST(UtilityTest, prepareJitteredExponentialBackOffStrategyStrategyCustomValues)
           test_max_interval_ms / 1000);
 
       JitteredExponentialBackOffStrategyPtr strategy =
-          Utility::prepareJitteredExponentialBackOffStrategy(config.retry_policy(), random);
+          Utility::prepareJitteredExponentialBackOffStrategy(config, random);
 
       // provided time limit is equal to max time limit
       EXPECT_EQ(false, dynamic_cast<JitteredExponentialBackOffStrategy*>(strategy.get())
@@ -380,8 +378,6 @@ TEST(UtilityTest, prepareJitteredExponentialBackOffStrategyStrategyCustomValues)
 
     // only set base_interval
     {
-      uint64_t test_base_interval_ms = 5000;
-
       // Provide config values for retry
       envoy::config::core::v3::GrpcService::EnvoyGrpc config;
       const std::string config_yaml = R"EOF(
@@ -389,11 +385,13 @@ TEST(UtilityTest, prepareJitteredExponentialBackOffStrategyStrategyCustomValues)
     )EOF";
       TestUtility::loadFromYaml(config_yaml, config);
 
+      uint64_t test_base_interval_ms = 5000;
+
       config.mutable_retry_policy()->mutable_retry_back_off()->mutable_base_interval()->set_seconds(
           test_base_interval_ms / 1000);
 
       JitteredExponentialBackOffStrategyPtr strategy =
-          Utility::prepareJitteredExponentialBackOffStrategy(config.retry_policy(), random);
+          Utility::prepareJitteredExponentialBackOffStrategy(config, random);
 
       // max_interval should be less than or equal test_base_interval * 10
       EXPECT_EQ(false, dynamic_cast<JitteredExponentialBackOffStrategy*>(strategy.get())
@@ -419,8 +417,7 @@ TEST(UtilityTest, prepareJitteredExponentialBackOffStrategyStrategyCustomValues)
       config.mutable_retry_policy()->mutable_retry_back_off()->mutable_max_interval()->set_seconds(
           test_max_interval_ms);
 
-      EXPECT_ANY_THROW(
-          Utility::prepareJitteredExponentialBackOffStrategy(config.retry_policy(), random));
+      EXPECT_ANY_THROW(Utility::prepareJitteredExponentialBackOffStrategy(config, random));
     }
   }
 }
