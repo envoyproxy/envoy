@@ -110,61 +110,34 @@ class LBPolicyConfig {
 public:
   LBPolicyConfig(const envoy::config::cluster::v3::Cluster& config);
 
-  OptRef<const envoy::config::cluster::v3::Cluster::RoundRobinLbConfig> lbRoundRobinConfig() const {
-    if (auto lb_ptr = absl::get_if<
-            std::unique_ptr<const envoy::config::cluster::v3::Cluster::RoundRobinLbConfig>>(
-            &lbPolicy_)) {
-      return makeOptRefFromPtr<const envoy::config::cluster::v3::Cluster::RoundRobinLbConfig>(
-          (*lb_ptr).get());
+  template <typename T> OptRef<const T> getConfig() const {
+    if (absl::holds_alternative<std::unique_ptr<const T>>(lbPolicy_)) {
+      return *(absl::get<std::unique_ptr<const T>>(lbPolicy_));
     } else {
       return absl::nullopt;
     }
+  }
+
+  OptRef<const envoy::config::cluster::v3::Cluster::RoundRobinLbConfig> lbRoundRobinConfig() const {
+    return getConfig<envoy::config::cluster::v3::Cluster::RoundRobinLbConfig>();
   }
 
   OptRef<const envoy::config::cluster::v3::Cluster::LeastRequestLbConfig>
   lbLeastRequestConfig() const {
-    if (auto lb_ptr = absl::get_if<
-            std::unique_ptr<const envoy::config::cluster::v3::Cluster::LeastRequestLbConfig>>(
-            &lbPolicy_)) {
-      return makeOptRefFromPtr<const envoy::config::cluster::v3::Cluster::LeastRequestLbConfig>(
-          (*lb_ptr).get());
-    } else {
-      return absl::nullopt;
-    }
+    return getConfig<envoy::config::cluster::v3::Cluster::LeastRequestLbConfig>();
   }
 
   OptRef<const envoy::config::cluster::v3::Cluster::RingHashLbConfig> lbRingHashConfig() const {
-    if (auto lb_ptr = absl::get_if<
-            std::unique_ptr<const envoy::config::cluster::v3::Cluster::RingHashLbConfig>>(
-            &lbPolicy_)) {
-      return makeOptRefFromPtr<const envoy::config::cluster::v3::Cluster::RingHashLbConfig>(
-          (*lb_ptr).get());
-    } else {
-      return absl::nullopt;
-    }
+    return getConfig<envoy::config::cluster::v3::Cluster::RingHashLbConfig>();
   }
 
   OptRef<const envoy::config::cluster::v3::Cluster::MaglevLbConfig> lbMaglevConfig() const {
-    if (auto lb_ptr = absl::get_if<
-            std::unique_ptr<const envoy::config::cluster::v3::Cluster::MaglevLbConfig>>(
-            &lbPolicy_)) {
-      return makeOptRefFromPtr<const envoy::config::cluster::v3::Cluster::MaglevLbConfig>(
-          (*lb_ptr).get());
-    } else {
-      return absl::nullopt;
-    }
+    return getConfig<envoy::config::cluster::v3::Cluster::MaglevLbConfig>();
   }
 
   OptRef<const envoy::config::cluster::v3::Cluster::OriginalDstLbConfig>
   lbOriginalDstConfig() const {
-    if (auto lb_ptr = absl::get_if<
-            std::unique_ptr<const envoy::config::cluster::v3::Cluster::OriginalDstLbConfig>>(
-            &lbPolicy_)) {
-      return makeOptRefFromPtr<const envoy::config::cluster::v3::Cluster::OriginalDstLbConfig>(
-          (*lb_ptr).get());
-    } else {
-      return absl::nullopt;
-    }
+    return getConfig<envoy::config::cluster::v3::Cluster::OriginalDstLbConfig>();
   }
 
 private:

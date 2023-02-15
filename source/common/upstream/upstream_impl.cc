@@ -962,6 +962,13 @@ createOptions(const envoy::config::cluster::v3::Cluster& config,
 
 LBPolicyConfig::LBPolicyConfig(const envoy::config::cluster::v3::Cluster& config) {
 
+  // Original DST LB is not in the lb_policy enum so can't be included in the switch
+  if (config.has_original_dst_lb_config()) {
+    lbPolicy_ = std::make_unique<envoy::config::cluster::v3::Cluster::OriginalDstLbConfig>(
+        config.original_dst_lb_config());
+    return;
+  }
+
   switch (config.lb_policy()) {
     PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
   case envoy::config::cluster::v3::Cluster::ROUND_ROBIN:
@@ -991,11 +998,6 @@ LBPolicyConfig::LBPolicyConfig(const envoy::config::cluster::v3::Cluster& config
   default:
     break;
   };
-
-  if (config.has_original_dst_lb_config()) {
-    lbPolicy_ = std::make_unique<envoy::config::cluster::v3::Cluster::OriginalDstLbConfig>(
-        config.original_dst_lb_config());
-  }
 }
 
 ClusterInfoImpl::ClusterInfoImpl(
