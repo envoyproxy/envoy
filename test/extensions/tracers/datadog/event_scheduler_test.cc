@@ -5,6 +5,7 @@
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
 
+#include "datadog/json.hpp"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -94,6 +95,13 @@ TEST(DatadogEventSchedulerTest, DestructorCallsDisableTimerIfCancelDidNot) {
   EXPECT_CALL(*timer_, disableTimer());
 
   (void)scheduler.schedule_recurring_event(interval, callback.AsStdFunction());
+}
+
+TEST(DatadogEventSchedulerTest, ConfigJson) {
+  testing::NiceMock<ThreadLocal::MockInstance> thread_local_storage_;
+  EventScheduler scheduler{thread_local_storage_.dispatcher_};
+  nlohmann::json config = scheduler.config_json();
+  EXPECT_EQ("Envoy::Extensions::Tracers::Datadog::EventScheduler", config["type"]);
 }
 
 } // namespace
