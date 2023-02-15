@@ -325,6 +325,27 @@ void Utility::extractCommonAccessLogProperties(
   if (auto provider = stream_info.getStreamIdProvider(); provider.has_value()) {
     common_access_log.set_stream_id(std::string(provider->toStringView().value_or("")));
   }
+
+  if (stream_info.getDownstreamBytesMeter() != nullptr) {
+    common_access_log.set_downstream_wire_bytes_sent(
+        stream_info.getDownstreamBytesMeter()->wireBytesSent());
+    common_access_log.set_downstream_wire_bytes_received(
+        stream_info.getDownstreamBytesMeter()->wireBytesReceived());
+    common_access_log.set_downstream_header_bytes_sent(
+        stream_info.getDownstreamBytesMeter()->headerBytesSent());
+    common_access_log.set_downstream_header_bytes_received(
+        stream_info.getDownstreamBytesMeter()->headerBytesReceived());
+  }
+  if (stream_info.getUpstreamBytesMeter() != nullptr) {
+    common_access_log.set_upstream_wire_bytes_sent(
+        stream_info.getUpstreamBytesMeter()->wireBytesSent());
+    common_access_log.set_upstream_wire_bytes_received(
+        stream_info.getUpstreamBytesMeter()->wireBytesReceived());
+    common_access_log.set_upstream_header_bytes_sent(
+        stream_info.getUpstreamBytesMeter()->headerBytesSent());
+    common_access_log.set_upstream_header_bytes_received(
+        stream_info.getUpstreamBytesMeter()->headerBytesReceived());
+  }
 }
 
 } // namespace GrpcCommon

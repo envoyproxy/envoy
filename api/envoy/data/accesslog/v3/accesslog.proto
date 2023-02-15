@@ -80,7 +80,7 @@ message ConnectionProperties {
 }
 
 // Defines fields that are shared by all Envoy access logs.
-// [#next-free-field: 28]
+// [#next-free-field: 36]
 message AccessLogCommon {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.data.accesslog.v2.AccessLogCommon";
@@ -215,6 +215,38 @@ message AccessLogCommon {
   // :ref:`stream_id <envoy_v3_api_field_data.accesslog.v3.AccessLogCommon.stream_id>` to
   // correlate all these intermediate log entries and final log entry.
   bool intermediate_log_entry = 27;
+
+  // For HTTP: Total number of bytes sent to the downstream by the http stream.
+  // For TCP: Total number of bytes sent to the downstream by the tcp proxy.
+  uint64 downstream_wire_bytes_sent = 28;
+
+  // For HTTP: Total number of bytes received from the downstream by the http stream. Envoy over counts sizes of received HTTP/1.1 pipelined requests by adding up bytes of requests in the pipeline to the one currently being processed.
+  // For TCP: Total number of bytes received from the downstream by the tcp proxy.
+  uint64 downstream_wire_bytes_received = 29;
+
+  // For HTTP: Number of header bytes sent to the downstream by the http stream.
+  // For TCP: Not implemented (0).
+  uint64 downstream_header_bytes_sent = 30;
+
+  // For HTTP: Number of header bytes received from the downstream by the http stream.
+  // For TCP: Not implemented (0).
+  uint64 downstream_header_bytes_received = 31;
+
+  // For HTTP: Total number of bytes sent to the upstream by the http stream.
+  // For TCP: Total number of bytes sent to the upstream by the tcp proxy.
+  uint64 upstream_wire_bytes_sent = 32;
+
+  // For HTTP: Total number of bytes received from the upstream by the http stream.
+  // For TCP: Total number of bytes sent to the upstream by the tcp proxy.
+  uint64 upstream_wire_bytes_received = 33;
+
+  // For HTTP: Number of header bytes sent to the upstream by the http stream.
+  // For TCP: Not implemented (0).
+  uint64 upstream_header_bytes_sent = 34;
+
+  // For HTTP: Number of header bytes received from the upstream by the http stream.
+  // For TCP: Not implemented (0).
+  uint64 upstream_header_bytes_received = 35;
 }
 
 // Flags indicating occurrences during request/response processing.

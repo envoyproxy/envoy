@@ -141,6 +141,10 @@ http_logs:
     common_properties:
       response_flags:
         no_route_found: true
+      downstream_wire_bytes_sent: 178
+      downstream_wire_bytes_received: 38
+      downstream_header_bytes_sent: 152
+      downstream_header_bytes_received: 11
     protocol_version: HTTP11
     request:
       scheme: http
@@ -165,6 +169,10 @@ http_logs:
     common_properties:
       response_flags:
         no_route_found: true
+      downstream_wire_bytes_sent: 178
+      downstream_wire_bytes_received: 38
+      downstream_header_bytes_sent: 152
+      downstream_header_bytes_received: 11
     protocol_version: HTTP11
     request:
       scheme: http
@@ -214,6 +222,10 @@ http_logs:
     common_properties:
       response_flags:
         no_route_found: true
+      downstream_wire_bytes_sent: 178
+      downstream_wire_bytes_received: 38
+      downstream_header_bytes_sent: 152
+      downstream_header_bytes_received: 11
     protocol_version: HTTP11
     request:
       scheme: http
