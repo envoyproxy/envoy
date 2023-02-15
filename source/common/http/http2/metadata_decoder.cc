@@ -139,7 +139,7 @@ bool MetadataDecoder::decodeMetadataPayload(bool end_metadata) {
 
   // Data consumed by the decoder so far.
   ssize_t payload_size_consumed = 0;
-  for (const auto& slice : slices) {
+  for (const Buffer::RawSlice& slice : slices) {
     http2::DecodeBuffer db(static_cast<char*>(slice.mem_), slice.len_);
     while (db.HasData()) {
       if (!decoder_context_->decoder.DecodeFragment(&db)) {
