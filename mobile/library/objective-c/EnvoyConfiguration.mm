@@ -60,7 +60,8 @@
                                            keyValueStores
                                        statsSinks:(NSArray<NSString *> *)statsSinks
                  experimentalValidateYAMLCallback:
-                     (nullable void (^)(BOOL))experimentalValidateYAMLCallback {
+                     (nullable void (^)(BOOL))experimentalValidateYAMLCallback
+                                 useLegacyBuilder:(BOOL)useLegacyBuilder {
   self = [super init];
   if (!self) {
     return nil;
@@ -107,6 +108,7 @@
   self.keyValueStores = keyValueStores;
   self.statsSinks = statsSinks;
   self.experimentalValidateYAMLCallback = experimentalValidateYAMLCallback;
+  self.useLegacyBuilder = useLegacyBuilder;
   return self;
 }
 
@@ -312,7 +314,7 @@
   return definitions;
 }
 
-- (BOOL)compareYAMLWithProtoBuilder:(NSString *)yaml {
+- (Envoy::Platform::EngineBuilder)applyToCXXBuilder {
   Envoy::Platform::EngineBuilder builder;
 
   for (EnvoyNativeFilterConfig *nativeFilterConfig in
@@ -389,11 +391,26 @@
   builder.enableAdminInterface(self.adminInterfaceEnabled);
 #endif
 
+  return builder;
+}
+
+- (BOOL)compareYAMLWithProtoBuilder:(NSString *)yaml {
   try {
+    Envoy::Platform::EngineBuilder builder = [self applyToCXXBuilder];
     return builder.generateBootstrapAndCompare([yaml toCXXString]);
   } catch (const std::exception &e) {
     NSLog(@"[Envoy] error comparing YAML: %@", @(e.what()));
     return FALSE;
+  }
+}
+
+- (std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap>)generateBootstrap {
+  try {
+    Envoy::Platform::EngineBuilder builder = [self applyToCXXBuilder];
+    return builder.generateBootstrap();
+  } catch (const std::exception &e) {
+    NSLog(@"[Envoy] error generating bootstrap: %@", @(e.what()));
+    return nullptr;
   }
 }
 

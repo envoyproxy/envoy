@@ -602,7 +602,8 @@ const char* ads_insert = R"(
     set_node_on_first_message_only: true
     grpc_services:
       google_grpc:
-        target_uri: '{}:{}')";
+        target_uri: '{}:{}'
+        stat_prefix: ads)";
 
 const char* cds_layer_insert = R"(
   cds_config:

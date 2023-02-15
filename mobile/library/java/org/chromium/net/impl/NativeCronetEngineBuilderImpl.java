@@ -136,6 +136,6 @@ public class NativeCronetEngineBuilderImpl extends CronetEngineBuilderImpl {
         mPerTryIdleTimeoutSeconds, mAppVersion, mAppId, mTrustChainVerification, mVirtualClusters,
         nativeFilterChain, platformFilterChain, stringAccessors, keyValueStores, statSinks,
         runtimeGuards, mEnableSkipDNSLookupForProxiedRequests,
-        mEnablePlatformCertificatesValidation);
+        mEnablePlatformCertificatesValidation, false);
   }
 }

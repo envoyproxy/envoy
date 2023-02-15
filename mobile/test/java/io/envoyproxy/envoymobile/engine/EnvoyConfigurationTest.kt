@@ -100,7 +100,8 @@ class EnvoyConfigurationTest {
     runtimeGuards: Map<String,String> = emptyMap(),
     enableSkipDNSLookupForProxiedRequests: Boolean = false,
     statSinks: MutableList<String> = mutableListOf(),
-    enablePlatformCertificatesValidation: Boolean = false
+    enablePlatformCertificatesValidation: Boolean = false,
+    useLegacyBuilder: Boolean = false
   ): EnvoyConfiguration {
     return EnvoyConfiguration(
       adminInterfaceEnabled,
@@ -140,7 +141,8 @@ class EnvoyConfigurationTest {
       statSinks,
       runtimeGuards,
       enableSkipDNSLookupForProxiedRequests,
-      enablePlatformCertificatesValidation
+      enablePlatformCertificatesValidation,
+      useLegacyBuilder
     )
   }
 

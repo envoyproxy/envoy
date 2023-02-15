@@ -390,6 +390,22 @@ TEST(TestConfig, RtdsWithoutAds) {
   }
 }
 
+TEST(TestConfig, AdsConfig) {
+  EngineBuilder engine_builder;
+  engine_builder.setAggregatedDiscoveryService(
+      /*api_type=*/"GRPC", /*target_uri=*/"fake-td.googleapis.com", /*port=*/12345);
+  std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> bootstrap =
+      engine_builder.generateBootstrap();
+  auto& ads_config = bootstrap->dynamic_resources().ads_config();
+  EXPECT_EQ(ads_config.api_type(), envoy::config::core::v3::ApiConfigSource::GRPC);
+  EXPECT_EQ(ads_config.grpc_services(0).google_grpc().target_uri(), "fake-td.googleapis.com:12345");
+  EXPECT_EQ(ads_config.grpc_services(0).google_grpc().stat_prefix(), "ads");
+  const std::string config_str = engine_builder.generateConfigStr();
+  EXPECT_THAT(config_str, HasSubstr("api_type: GRPC"));
+  EXPECT_THAT(config_str, HasSubstr("target_uri: 'fake-td.googleapis.com:12345'"));
+  EXPECT_THAT(config_str, HasSubstr("stat_prefix: ads"));
+}
+
 TEST(TestConfig, EnablePlatformCertificatesValidation) {
   EngineBuilder engine_builder;
   envoy::config::bootstrap::v3::Bootstrap bootstrap;

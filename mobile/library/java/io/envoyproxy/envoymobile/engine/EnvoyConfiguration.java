@@ -65,7 +65,7 @@ public class EnvoyConfiguration {
   Map<String, String> runtimeGuards;
   public final Boolean enablePlatformCertificatesValidation;
   public final Boolean enableSkipDNSLookupForProxiedRequests;
-  public Boolean useLegacyBuilder;
+  public final Boolean useLegacyBuilder;
 
   private static final Pattern UNRESOLVED_KEY_PATTERN = Pattern.compile("\\{\\{ (.+) \\}\\}");
 
@@ -129,6 +129,9 @@ public class EnvoyConfiguration {
    * @param keyValueStores                                platform key-value store implementations.
    * @param enableSkipDNSLookupForProxiedRequests         whether to skip waiting on DNS response
    *     for proxied requests.
+   * @param enablePlatformCertificatesValidation          whether to use the platform verifier.
+   * @param useLegacyBuilder                              whether the string-based legacy mode
+   *     should be used to build the engine.
    */
   public EnvoyConfiguration(
       boolean adminInterfaceEnabled, String grpcStatsDomain, int connectTimeoutSeconds,
@@ -147,7 +150,7 @@ public class EnvoyConfiguration {
       Map<String, EnvoyStringAccessor> stringAccessors,
       Map<String, EnvoyKeyValueStore> keyValueStores, List<String> statSinks,
       Map<String, String> runtimeGuards, Boolean enableSkipDNSLookupForProxiedRequests,
-      boolean enablePlatformCertificatesValidation) {
+      boolean enablePlatformCertificatesValidation, boolean useLegacyBuilder) {
     JniLibrary.load();
     this.adminInterfaceEnabled = adminInterfaceEnabled;
     this.grpcStatsDomain = grpcStatsDomain;
@@ -199,17 +202,8 @@ public class EnvoyConfiguration {
     this.runtimeGuards = runtimeGuards;
     this.enablePlatformCertificatesValidation = enablePlatformCertificatesValidation;
     this.enableSkipDNSLookupForProxiedRequests = enableSkipDNSLookupForProxiedRequests;
-    this.useLegacyBuilder = false;
+    this.useLegacyBuilder = useLegacyBuilder;
   }
-
-  /**
-   * Sets the mode the Engine builder will use for config generation.
-   *
-   * @param legacyMode true if the string-based legacy mode should be used
-   */
-  void setUseLegacyBuilder(Boolean legacyMode) { useLegacyBuilder = legacyMode; }
-
-  Boolean useLegacyBuilder() { return useLegacyBuilder; }
 
   /**
    * Creates configuration YAML based on the configuration of the class
