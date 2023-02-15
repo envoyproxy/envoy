@@ -986,4 +986,13 @@ void FakeHttpConnection::writeRawData(absl::string_view data) {
   ASSERT(result.ok());
 }
 
+AssertionResult FakeHttpConnection::postWriteRawData(std::string data) {
+  return shared_connection_.executeOnDispatcher(
+      [data](Network::Connection& connection) {
+        Buffer::OwnedImpl to_write(data);
+        connection.write(to_write, false);
+      },
+      TestUtility::DefaultTimeout);
+}
+
 } // namespace Envoy

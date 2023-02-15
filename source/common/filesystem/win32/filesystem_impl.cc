@@ -1,5 +1,6 @@
 #include <fcntl.h>
 
+#include <chrono>
 #include <fstream>
 #include <iostream>
 #include <sstream>
@@ -108,6 +109,81 @@ Api::IoCallSizeResult FileImplWin32::pwrite(const void* buf, uint64_t count, uin
   BOOL result = WriteFile(fd_, buf, count, &write_count, &overlapped);
   return result ? resultSuccess(static_cast<ssize_t>(write_count))
                 : resultFailure<ssize_t>(-1, ::GetLastError());
+}
+
+static uint64_t fileSizeFromAttributeData(const WIN32_FILE_ATTRIBUTE_DATA& data) {
+  ULARGE_INTEGER file_size;
+  file_size.LowPart = data.nFileSizeLow;
+  file_size.HighPart = data.nFileSizeHigh;
+  return static_cast<uint64_t>(file_size.QuadPart);
+}
+
+static absl::optional<SystemTime> systemTimeFromFileTime(const FILETIME& t) {
+  // `FILETIME` is a 64 bit value representing the number of 100-nanosecond
+  // intervals since January 1, 1601 (UTC).
+  // https://learn.microsoft.com/en-us/windows/win32/api/minwinbase/ns-minwinbase-filetime
+  // So we set a SystemTime to that moment, and add that many 100-nanosecond units to that
+  // time, to get a SystemTime representing the same moment as the `FILETIME`, in microsecond
+  // precision.
+  // For timestamps earlier than the unix epoch (1970, `SystemTime{0}`), we assume it's an
+  // invalid value and return nullopt.
+  static const SystemTime windows_file_time_epoch =
+      absl::ToChronoTime(absl::FromCivil(absl::CivilYear(1601), absl::UTCTimeZone()));
+  ULARGE_INTEGER tenths_of_microseconds{t.dwLowDateTime, t.dwHighDateTime};
+  uint64_t v = static_cast<uint64_t>(tenths_of_microseconds.QuadPart);
+  SystemTime ret = windows_file_time_epoch + std::chrono::microseconds{v / 10};
+  if (ret <= SystemTime{}) {
+    // If the timestamp is before the unix epoch, return nullopt.
+    return absl::nullopt;
+  }
+  return ret;
+}
+
+static FileType fileTypeFromAttributeData(const WIN32_FILE_ATTRIBUTE_DATA& data) {
+  if (data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) {
+    return FileType::Directory;
+  }
+  if (data.dwFileAttributes & FILE_ATTRIBUTE_REPARSE_POINT) {
+    return FileType::Other;
+  }
+  return FileType::Regular;
+}
+
+static FileInfo fileInfoFromAttributeData(absl::string_view path,
+                                          const WIN32_FILE_ATTRIBUTE_DATA& data) {
+  absl::optional<uint64_t> sz;
+  FileType type = fileTypeFromAttributeData(data);
+  if (type == FileType::Regular) {
+    sz = fileSizeFromAttributeData(data);
+  }
+  return {
+      std::string{InstanceImplWin32().splitPathFromFilename(path).file_},
+      sz,
+      type,
+      systemTimeFromFileTime(data.ftCreationTime),
+      systemTimeFromFileTime(data.ftLastAccessTime),
+      systemTimeFromFileTime(data.ftLastWriteTime),
+  };
+}
+
+Api::IoCallResult<FileInfo> FileImplWin32::info() {
+  ASSERT(isOpen());
+  WIN32_FILE_ATTRIBUTE_DATA data;
+  BOOL result = GetFileAttributesEx(path().c_str(), GetFileExInfoStandard, &data);
+  if (!result) {
+    return resultFailure<FileInfo>({}, ::GetLastError());
+  }
+  return resultSuccess(fileInfoFromAttributeData(path(), data));
+}
+
+Api::IoCallResult<FileInfo> InstanceImplWin32::stat(absl::string_view path) {
+  WIN32_FILE_ATTRIBUTE_DATA data;
+  std::string full_path{path};
+  BOOL result = GetFileAttributesEx(full_path.c_str(), GetFileExInfoStandard, &data);
+  if (!result) {
+    return resultFailure<FileInfo>({}, ::GetLastError());
+  }
+  return resultSuccess(fileInfoFromAttributeData(full_path, data));
 }
 
 FileImplWin32::FlagsAndMode FileImplWin32::translateFlag(FlagSet in) {

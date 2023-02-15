@@ -1,5 +1,7 @@
 #include "source/common/upstream/health_checker_base_impl.h"
 
+#include <chrono>
+
 #include "envoy/config/core/v3/address.pb.h"
 #include "envoy/config/core/v3/health_check.pb.h"
 #include "envoy/data/core/v3/health_check_event.pb.h"
@@ -18,6 +20,7 @@ HealthCheckerImplBase::HealthCheckerImplBase(const Cluster& cluster,
                                              Random::RandomGenerator& random,
                                              HealthCheckEventLoggerPtr&& event_logger)
     : always_log_health_check_failures_(config.always_log_health_check_failures()),
+      disable_health_check_if_active_traffic_(config.disable_health_check_if_active_traffic()),
       cluster_(cluster), dispatcher_(dispatcher),
       timeout_(PROTOBUF_GET_MS_REQUIRED(config, timeout)),
       unhealthy_threshold_(PROTOBUF_GET_WRAPPED_REQUIRED(config, unhealthy_threshold)),
@@ -279,7 +282,6 @@ void HealthCheckerImplBase::ActiveHealthCheckSession::onDeferredDeleteBase() {
 void HealthCheckerImplBase::ActiveHealthCheckSession::handleSuccess(bool degraded) {
   // If we are healthy, reset the # of unhealthy to zero.
   num_unhealthy_ = 0;
-
   HealthTransition changed_state = HealthTransition::Unchanged;
 
   if (host_->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC)) {
@@ -419,6 +421,22 @@ HealthCheckerImplBase::ActiveHealthCheckSession::clearPendingFlag(HealthTransiti
 }
 
 void HealthCheckerImplBase::ActiveHealthCheckSession::onIntervalBase() {
+  // Only if host is healthy, check whether need disable HC if there was already successful
+  // non-health check traffic
+  if (parent_.disable_health_check_if_active_traffic_ &&
+      !host_->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC)) {
+    MonotonicTime traffic_successful_time =
+        host_->lastSuccessfulTrafficTime(parent_.healthCheckerType());
+    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(
+        time_source_.monotonicTime() - traffic_successful_time);
+    if (duration.count() < parent_.interval_.count()) {
+      // During the time, there was already successful non-health check traffic for the host, no
+      // need to send HC packet
+      parent_.stats_.attempt_.inc();
+      interval_timer_->enableTimer(parent_.interval_);
+      return;
+    }
+  }
   onInterval();
   timeout_timer_->enableTimer(parent_.timeout_);
   parent_.stats_.attempt_.inc();

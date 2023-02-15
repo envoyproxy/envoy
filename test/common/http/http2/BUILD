@@ -27,6 +27,7 @@ envoy_cc_test(
         "//source/common/http/http2:codec_lib",
         "//source/common/runtime:runtime_lib",
         "//source/common/stats:stats_lib",
+        "//source/extensions/http/header_validators/envoy_default:header_validator_factory",
         "//source/extensions/http/header_validators/envoy_default:http2_header_validator",
         "//test/common/http:common_lib",
         "//test/common/http/http2:http2_frame",

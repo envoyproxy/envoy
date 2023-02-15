@@ -15,11 +15,16 @@ envoy_cc_library(
     name = "datadog_tracer_lib",
     srcs = [
         "datadog_tracer_impl.cc",
+        "dict_util.cc",
+        "span.cc",
         "time_util.cc",
     ],
     hdrs = [
         "datadog_tracer_impl.h",
+        "dict_util.h",
+        "span.h",
         "time_util.h",
+        "tracer_stats.h",
     ],
     copts = [
         # Make sure that headers included from dd_trace_cpp use Abseil
@@ -27,8 +32,8 @@ envoy_cc_library(
         "-DDD_USE_ABSEIL_FOR_ENVOY",
     ],
     external_deps = [
-        "dd_opentracing_cpp",
         "dd_trace_cpp",
+        "dd_opentracing_cpp",
     ],
     deps = [
         "//source/common/config:utility_lib",

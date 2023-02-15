@@ -191,7 +191,7 @@ public:
     quic::test::QuicConnectionPeer::SetAddressValidated(quic_connection_);
     quic_connection_->SetEncrypter(
         quic::ENCRYPTION_FORWARD_SECURE,
-        std::make_unique<quic::NullEncrypter>(quic::Perspective::IS_SERVER));
+        std::make_unique<quic::test::TaggingEncrypter>(quic::ENCRYPTION_FORWARD_SECURE));
     quic_connection_->SetDefaultEncryptionLevel(quic::ENCRYPTION_FORWARD_SECURE);
   }
 
@@ -613,7 +613,7 @@ TEST_F(EnvoyQuicServerSessionTest, FlushCloseNoTimeout) {
   quic_connection_->SetDefaultEncryptionLevel(quic::ENCRYPTION_FORWARD_SECURE);
   quic_connection_->SetEncrypter(
       quic::ENCRYPTION_FORWARD_SECURE,
-      std::make_unique<quic::NullEncrypter>(quic::Perspective::IS_SERVER));
+      std::make_unique<quic::test::TaggingEncrypter>(quic::ENCRYPTION_FORWARD_SECURE));
   // Drive congestion control manually.
   auto send_algorithm = new testing::NiceMock<quic::test::MockSendAlgorithm>;
   quic::test::QuicConnectionPeer::SetSendAlgorithm(quic_connection_, send_algorithm);
@@ -857,7 +857,7 @@ TEST_F(EnvoyQuicServerSessionTest, SendBufferWatermark) {
   quic_connection_->SetDefaultEncryptionLevel(quic::ENCRYPTION_FORWARD_SECURE);
   quic_connection_->SetEncrypter(
       quic::ENCRYPTION_FORWARD_SECURE,
-      std::make_unique<quic::NullEncrypter>(quic::Perspective::IS_SERVER));
+      std::make_unique<quic::test::TaggingEncrypter>(quic::ENCRYPTION_FORWARD_SECURE));
   // Drive congestion control manually.
   auto send_algorithm = new testing::NiceMock<quic::test::MockSendAlgorithm>;
   quic::test::QuicConnectionPeer::SetSendAlgorithm(quic_connection_, send_algorithm);
