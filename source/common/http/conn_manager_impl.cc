@@ -1666,12 +1666,14 @@ void ConnectionManagerImpl::ActiveStream::onResetStream(StreamResetReason reset_
   //       3) The codec RX a reset
   //       4) The overload manager reset the stream
   //       If we need to differentiate we need to do it inside the codec. Can start with this.
-  ENVOY_STREAM_LOG(debug, "stream reset", *this);
+  const absl::string_view encoder_details = response_encoder_->getStream().responseDetails();
+  ENVOY_STREAM_LOG(debug, "stream reset: reset reason: {}, response details: {}", *this,
+                   Http::Utility::resetReasonToString(reset_reason),
+                   encoder_details.empty() ? absl::string_view{"-"} : encoder_details);
   connection_manager_.stats_.named_.downstream_rq_rx_reset_.inc();
 
   // If the codec sets its responseDetails() for a reason other than peer reset, set a
   // DownstreamProtocolError. Either way, propagate details.
-  const absl::string_view encoder_details = response_encoder_->getStream().responseDetails();
   if (!encoder_details.empty() && reset_reason == StreamResetReason::LocalReset) {
     filter_manager_.streamInfo().setResponseFlag(StreamInfo::ResponseFlag::DownstreamProtocolError);
   }

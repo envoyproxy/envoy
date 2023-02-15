@@ -131,6 +131,10 @@ HealthCheckerSharedPtr HealthCheckerFactory::create(
     std::unique_ptr<Server::Configuration::HealthCheckerFactoryContext> context(
         new HealthCheckerFactoryContextImpl(cluster, runtime, dispatcher, std::move(event_logger),
                                             validation_visitor, api));
+    if (health_check_config.disable_health_check_if_active_traffic()) {
+      throw EnvoyException(
+          "disable_health_check_if_active_traffic only supports TCP/HTTP/gRPC healthchecking");
+    }
     return factory.createCustomHealthChecker(health_check_config, *context);
   }
   }

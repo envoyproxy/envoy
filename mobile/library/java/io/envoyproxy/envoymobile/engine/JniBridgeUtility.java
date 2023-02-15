@@ -31,6 +31,23 @@ public final class JniBridgeUtility {
     return convertedHeaders.toArray(new byte[0][0]);
   }
 
+  public static byte[][] toJniBytes(List<EnvoyNativeFilterConfig> nativeFilterChain) {
+    final List<byte[]> convertedBytes = new ArrayList<byte[]>(nativeFilterChain.size());
+    for (EnvoyNativeFilterConfig filter : nativeFilterChain) {
+      convertedBytes.add(filter.name.getBytes(StandardCharsets.UTF_8));
+      convertedBytes.add(filter.typedConfig.getBytes(StandardCharsets.UTF_8));
+    }
+    return convertedBytes.toArray(new byte[0][0]);
+  }
+
+  public static byte[][] stringsToJniBytes(List<String> stringList) {
+    final List<byte[]> convertedBytes = new ArrayList<byte[]>(stringList.size());
+    for (String str : stringList) {
+      convertedBytes.add(str.getBytes(StandardCharsets.UTF_8));
+    }
+    return convertedBytes.toArray(new byte[0][0]);
+  }
+
   public static byte[][] toJniTags(Map<String, String> tags) {
     if (tags == null) {
       return null;

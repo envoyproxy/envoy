@@ -1,3 +1,4 @@
+load("@envoy//bazel:envoy_build_system.bzl", "envoy_select_admin_functionality", "envoy_select_enable_http3", "envoy_select_envoy_mobile_request_compression")
 load("@envoy_mobile//bazel:android_artifacts.bzl", "android_artifacts")
 load("@envoy_mobile//bazel:kotlin_lib.bzl", "envoy_mobile_kt_library")
 load("@io_bazel_rules_kotlin//kotlin:android.bzl", "kt_android_library")
@@ -74,7 +75,16 @@ envoy_mobile_kt_library(
         "grpc/*.kt",
         "mocks/*.kt",
         "stats/*.kt",
-    ]),
+    ]) + envoy_select_envoy_mobile_request_compression(
+        ["EngineBuilderCompressionUtil.kt"],
+        "@envoy",
+    ) + envoy_select_enable_http3(
+        ["EngineBuilderHTTP3Util.kt"],
+        "@envoy",
+    ) + envoy_select_admin_functionality(
+        ["EngineBuilderAdminUtil.kt"],
+        "@envoy",
+    ),
     visibility = ["//visibility:public"],
     deps = [
         "//library/java/io/envoyproxy/envoymobile/engine:envoy_base_engine_lib",
