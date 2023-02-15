@@ -961,43 +961,33 @@ createOptions(const envoy::config::cluster::v3::Cluster& config,
 }
 
 LBPolicyConfig::LBPolicyConfig(const envoy::config::cluster::v3::Cluster& config) {
-
-  // Original DST LB is not in the lb_policy enum so can't be included in the switch
+  // TODO: Need to verify that lb type and the config for the policy are forced to match in
+  // a 1-1 relationship. If they are, change this to a switch case using config.lb_policy()
+  if (config.has_round_robin_lb_config()) {
+    lbPolicy_ = std::make_unique<const envoy::config::cluster::v3::Cluster::RoundRobinLbConfig>(
+        config.round_robin_lb_config());
+    return;
+  }
+  if (config.has_least_request_lb_config()) {
+    lbPolicy_ = std::make_unique<envoy::config::cluster::v3::Cluster::LeastRequestLbConfig>(
+        config.least_request_lb_config());
+    return;
+  }
+  if (config.has_ring_hash_lb_config()) {
+    lbPolicy_ = std::make_unique<envoy::config::cluster::v3::Cluster::RingHashLbConfig>(
+        config.ring_hash_lb_config());
+    return;
+  }
+  if (config.has_maglev_lb_config()) {
+    lbPolicy_ = std::make_unique<envoy::config::cluster::v3::Cluster::MaglevLbConfig>(
+        config.maglev_lb_config());
+    return;
+  }
   if (config.has_original_dst_lb_config()) {
     lbPolicy_ = std::make_unique<envoy::config::cluster::v3::Cluster::OriginalDstLbConfig>(
         config.original_dst_lb_config());
     return;
   }
-
-  switch (config.lb_policy()) {
-    PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
-  case envoy::config::cluster::v3::Cluster::ROUND_ROBIN:
-    if (config.has_round_robin_lb_config()) {
-      lbPolicy_ = std::make_unique<const envoy::config::cluster::v3::Cluster::RoundRobinLbConfig>(
-          config.round_robin_lb_config());
-    }
-    break;
-  case envoy::config::cluster::v3::Cluster::LEAST_REQUEST:
-    if (config.has_least_request_lb_config()) {
-      lbPolicy_ = std::make_unique<envoy::config::cluster::v3::Cluster::LeastRequestLbConfig>(
-          config.least_request_lb_config());
-    }
-    break;
-  case envoy::config::cluster::v3::Cluster::RING_HASH:
-    if (config.has_ring_hash_lb_config()) {
-      lbPolicy_ = std::make_unique<envoy::config::cluster::v3::Cluster::RingHashLbConfig>(
-          config.ring_hash_lb_config());
-    }
-    break;
-  case envoy::config::cluster::v3::Cluster::MAGLEV:
-    if (config.has_maglev_lb_config()) {
-      lbPolicy_ = std::make_unique<envoy::config::cluster::v3::Cluster::MaglevLbConfig>(
-          config.maglev_lb_config());
-    }
-    break;
-  default:
-    break;
-  };
 }
 
 ClusterInfoImpl::ClusterInfoImpl(
