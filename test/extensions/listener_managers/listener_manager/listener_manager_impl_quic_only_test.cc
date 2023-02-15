@@ -620,7 +620,7 @@ udp_listener_config:
 
 #if defined(ENVOY_ENABLE_QUIC)
   EXPECT_THROW_WITH_REGEX(addOrUpdateListener(listener_proto), EnvoyException,
-                          "bad server preferred address");
+                          "bad v4 server preferred address");
 #else
   EXPECT_THROW_WITH_REGEX(addOrUpdateListener(listener_proto), EnvoyException,
                           "QUIC is configured but not enabled in the build.");
@@ -684,7 +684,7 @@ udp_listener_config:
 
 #if defined(ENVOY_ENABLE_QUIC)
   EXPECT_THROW_WITH_REGEX(addOrUpdateListener(listener_proto), EnvoyException,
-                          "bad server preferred address");
+                          "bad v6 server preferred address");
 #else
   EXPECT_THROW_WITH_REGEX(addOrUpdateListener(listener_proto), EnvoyException,
                           "QUIC is configured but not enabled in the build.");

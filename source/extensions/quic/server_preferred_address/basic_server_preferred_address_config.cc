@@ -18,15 +18,16 @@ BasicServerPreferredAddressConfigFactory::createServerPreferredAddressConfig(
                                            BasicServerPreferredAddressConfig&>(message,
                                                                                validation_visitor);
   quic::QuicIpAddress ip_v4, ip_v6;
-  const std::string err("bad server preferred address");
   if (!config.ipv4_address().empty()) {
     if (!ip_v4.FromString(config.ipv4_address())) {
-      ProtoExceptionUtil::throwProtoValidationException(err, message);
+      ProtoExceptionUtil::throwProtoValidationException(
+          absl::StrCat("bad v4 server preferred address: ", config.ipv4_address()), message);
     }
   }
   if (!config.ipv6_address().empty()) {
     if (!ip_v6.FromString(config.ipv6_address())) {
-      ProtoExceptionUtil::throwProtoValidationException(err, message);
+      ProtoExceptionUtil::throwProtoValidationException(
+          absl::StrCat("bad v6 server preferred address: ", config.ipv6_address()), message);
     }
   }
   return std::make_unique<BasicServerPreferredAddressConfig>(ip_v4, ip_v6);
