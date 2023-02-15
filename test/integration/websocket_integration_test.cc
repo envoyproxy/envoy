@@ -436,45 +436,6 @@ TEST_P(WebsocketIntegrationTest, WebsocketCustomFilterChain) {
   }
 }
 
-// This test relies on the legacy behavior of the H/1 codec client that uses
-// chunked transfer encoding if request had neither TE nor CL headers.
-TEST_P(WebsocketIntegrationTest, BidirectionalChunkedDataLegacyAddTE) {
-  if (downstreamProtocol() == Http::CodecType::HTTP2 ||
-      upstreamProtocol() == Http::CodecType::HTTP2) {
-    return;
-  }
-
-  config_helper_.addConfigModifier(setRouteUsingWebsocket());
-  initialize();
-
-  auto request_headers = upgradeRequestHeaders();
-  auto response_headers = upgradeResponseHeaders();
-  response_headers.removeContentLength();
-  performUpgrade(request_headers, response_headers);
-
-  // Send both a chunked request body and "websocket" payload.
-  std::string request_payload = "3\r\n123\r\n0\r\n\r\nSomeWebsocketRequestPayload";
-  codec_client_->sendData(*request_encoder_, request_payload, false);
-  ASSERT_TRUE(upstream_request_->waitForData(*dispatcher_, request_payload));
-
-  // Send both a chunked response body and "websocket" payload.
-  std::string response_payload = "4\r\nabcd\r\n0\r\n\r\nSomeWebsocketResponsePayload";
-  upstream_request_->encodeData(response_payload, false);
-  response_->waitForBodyData(response_payload.size());
-  EXPECT_EQ(response_payload, response_->body());
-
-  // Verify follow-up bidirectional data still works.
-  codec_client_->sendData(*request_encoder_, "FinalClientPayload", false);
-  ASSERT_TRUE(upstream_request_->waitForData(*dispatcher_, request_payload + "FinalClientPayload"));
-  upstream_request_->encodeData("FinalServerPayload", false);
-  response_->waitForBodyData(response_->body().size() + 5);
-  EXPECT_EQ(response_payload + "FinalServerPayload", response_->body());
-
-  // Clean up.
-  codec_client_->close();
-  ASSERT_TRUE(waitForUpstreamDisconnectOrReset());
-}
-
 TEST_P(WebsocketIntegrationTest, BidirectionalNoContentLengthNoTransferEncoding) {
   if (downstreamProtocol() != Http::CodecType::HTTP1 ||
       upstreamProtocol() != Http::CodecType::HTTP1) {
@@ -497,9 +458,8 @@ TEST_P(WebsocketIntegrationTest, BidirectionalNoContentLengthNoTransferEncoding)
   std::string received_data;
   ASSERT_TRUE(fake_upstream_connection->waitForData(
       FakeRawConnection::waitForInexactMatch("\r\n\r\n"), &received_data));
-  // Envoy adds 'content-length: 0' header to upgrade requests
-  ASSERT_TRUE(absl::StrContains(received_data, "content-length"));
-  // Make sure Envoy did not add TE header
+  // Make sure Envoy did not add TE or CL headers
+  ASSERT_FALSE(absl::StrContains(received_data, "content-length"));
   ASSERT_FALSE(absl::StrContains(received_data, "transfer-encoding"));
   ASSERT_TRUE(fake_upstream_connection->write(
       "HTTP/1.1 101 Switching Protocols\r\nconnection: upgrade\r\nupgrade: websocket\r\n\r\n",
@@ -546,8 +506,8 @@ TEST_P(WebsocketIntegrationTest,
   std::string received_data;
   ASSERT_TRUE(fake_upstream_connection->waitForData(
       FakeRawConnection::waitForInexactMatch("\r\n\r\n"), &received_data));
-  // Make sure Envoy added content-length: 0 header
-  ASSERT_TRUE(absl::StrContains(received_data, "content-length: 0\r\n"));
+  // Make sure Envoy did not add TE or CL on the response path
+  ASSERT_FALSE(absl::StrContains(received_data, "content-length: 0\r\n"));
   ASSERT_FALSE(absl::StrContains(received_data, "transfer-encoding"));
   ASSERT_TRUE(fake_upstream_connection->write(
       "HTTP/1.1 101 Switching Protocols\r\nconnection: upgrade\r\nupgrade: websocket\r\n\r\n",
