@@ -99,7 +99,8 @@ class EnvoyConfigurationTest {
     platformFilterFactories: MutableList<EnvoyHTTPFilterFactory> = mutableListOf(TestEnvoyHTTPFilterFactory("name1"), TestEnvoyHTTPFilterFactory("name2")),
     enableSkipDNSLookupForProxiedRequests: Boolean = false,
     statSinks: MutableList<String> = mutableListOf(),
-    enablePlatformCertificatesValidation: Boolean = false
+    enablePlatformCertificatesValidation: Boolean = false,
+    useLegacyBuilder: Boolean = false
   ): EnvoyConfiguration {
     return EnvoyConfiguration(
       adminInterfaceEnabled,
@@ -138,7 +139,8 @@ class EnvoyConfigurationTest {
       emptyMap(),
       statSinks,
       enableSkipDNSLookupForProxiedRequests,
-      enablePlatformCertificatesValidation
+      enablePlatformCertificatesValidation,
+      useLegacyBuilder
     )
   }
 
@@ -187,8 +189,8 @@ class EnvoyConfigurationTest {
 
     // Metadata
     assertThat(resolvedTemplate).contains("os: Android")
-    assertThat(resolvedTemplate).contains("app_version: v1.2.3")
-    assertThat(resolvedTemplate).contains("app_id: com.example.myapp")
+    assertThat(resolvedTemplate).contains("app_version: \"v1.2.3\"")
+    assertThat(resolvedTemplate).contains("app_id: \"com.example.myapp\"")
 
     assertThat(resolvedTemplate).contains("virtual_clusters [{name: test1},{name: test2}]")
 
@@ -216,6 +218,14 @@ class EnvoyConfigurationTest {
 
     // Validate ordering between filters and platform filters
     assertThat(resolvedTemplate).matches(Pattern.compile(".*name1.*name2.*buffer_filter_1.*buffer_filter_2.*", Pattern.DOTALL));
+    // Validate that createYaml doesn't change filter order.
+    val resolvedTemplate2 = envoyConfiguration.createYaml()
+    assertThat(resolvedTemplate2).matches(Pattern.compile(".*name1.*name2.*buffer_filter_1.*buffer_filter_2.*", Pattern.DOTALL));
+    // Validate that createBootstrap also doesn't change filter order.
+    // This may leak memory as the boostrap isn't used.
+    envoyConfiguration.createBootstrap()
+    val resolvedTemplate3 = envoyConfiguration.createYaml()
+    assertThat(resolvedTemplate3).matches(Pattern.compile(".*name1.*name2.*buffer_filter_1.*buffer_filter_2.*", Pattern.DOTALL));
   }
 
   @Test

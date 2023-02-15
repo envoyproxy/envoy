@@ -3,19 +3,11 @@
 #import "library/common/main_interface.h"
 #import "library/cc/engine_builder.h"
 
-@interface NSString (CXX)
-
-- (std::string)toCXXString;
-
-@end
-
 @implementation NSString (CXX)
-
 - (std::string)toCXXString {
   return std::string([self UTF8String],
                      (int)[self lengthOfBytesUsingEncoding:NSUTF8StringEncoding]);
 }
-
 @end
 
 @implementation EnvoyConfiguration
@@ -66,7 +58,8 @@
                                            keyValueStores
                                        statsSinks:(NSArray<NSString *> *)statsSinks
                  experimentalValidateYAMLCallback:
-                     (nullable void (^)(BOOL))experimentalValidateYAMLCallback {
+                     (nullable void (^)(BOOL))experimentalValidateYAMLCallback
+                                 useLegacyBuilder:(BOOL)useLegacyBuilder {
   self = [super init];
   if (!self) {
     return nil;
@@ -112,6 +105,7 @@
   self.keyValueStores = keyValueStores;
   self.statsSinks = statsSinks;
   self.experimentalValidateYAMLCallback = experimentalValidateYAMLCallback;
+  self.useLegacyBuilder = useLegacyBuilder;
   return self;
 }
 
@@ -248,8 +242,9 @@
       appendFormat:@"- &stream_idle_timeout %lus\n", (unsigned long)self.streamIdleTimeoutSeconds];
   [definitions
       appendFormat:@"- &per_try_idle_timeout %lus\n", (unsigned long)self.perTryIdleTimeoutSeconds];
-  [definitions appendFormat:@"- &metadata { device_os: %@, app_version: %@, app_id: %@ }\n", @"iOS",
-                            self.appVersion, self.appId];
+  [definitions
+      appendFormat:@"- &metadata { device_os: iOS, app_version: \"%@\", app_id: \"%@\" }\n",
+                   self.appVersion, self.appId];
   [definitions appendFormat:@"- &virtual_clusters [%@]\n",
                             [self.virtualClusters componentsJoinedByString:@","]];
 
@@ -307,32 +302,24 @@
   return definitions;
 }
 
-- (BOOL)compareYAMLWithProtoBuilder:(NSString *)yaml {
+- (Envoy::Platform::EngineBuilder)applyToCXXBuilder {
   Envoy::Platform::EngineBuilder builder;
 
-  builder.addGrpcStatsDomain([self.grpcStatsDomain toCXXString]);
-  builder.addConnectTimeoutSeconds(self.connectTimeoutSeconds);
-  builder.addDnsRefreshSeconds(self.dnsRefreshSeconds);
-  builder.addDnsFailureRefreshSeconds(self.dnsFailureRefreshSecondsBase,
-                                      self.dnsFailureRefreshSecondsMax);
-  builder.addDnsQueryTimeoutSeconds(self.dnsQueryTimeoutSeconds);
-  builder.addDnsMinRefreshSeconds(self.dnsMinRefreshSeconds);
-  builder.enableDnsCache(self.enableDNSCache, self.dnsCacheSaveIntervalSeconds);
-  builder.addMaxConnectionsPerHost(self.maxConnectionsPerHost);
-  builder.addH2ConnectionKeepaliveIdleIntervalMilliseconds(
-      self.h2ConnectionKeepaliveIdleIntervalMilliseconds);
-  builder.addH2ConnectionKeepaliveTimeoutSeconds(self.h2ConnectionKeepaliveTimeoutSeconds);
-  builder.addStatsFlushSeconds(self.statsFlushSeconds);
+  for (EnvoyNativeFilterConfig *nativeFilterConfig in
+       [self.nativeFilterChain reverseObjectEnumerator]) {
+    builder.addNativeFilter(
+        /* name */ [nativeFilterConfig.name toCXXString],
+        /* typed_config */ [nativeFilterConfig.typedConfig toCXXString]);
+  }
+  for (EnvoyHTTPFilterFactory *filterFactory in
+       [self.httpPlatformFilterFactories reverseObjectEnumerator]) {
+    builder.addPlatformFilter([filterFactory.filterName toCXXString]);
+  }
 
-  builder.setAppVersion([self.appVersion toCXXString]);
-  builder.setAppId([self.appId toCXXString]);
-  builder.setDeviceOs("iOS");
-
-  builder.setStreamIdleTimeoutSeconds(self.streamIdleTimeoutSeconds);
-  builder.setPerTryIdleTimeoutSeconds(self.perTryIdleTimeoutSeconds);
-#ifdef ENVOY_ADMIN_FUNCTIONALITY
-  builder.enableAdminInterface(self.adminInterfaceEnabled);
+#ifdef ENVOY_ENABLE_QUIC
+  builder.enableHttp3(self.enableHttp3);
 #endif
+
   builder.enableGzipDecompression(self.enableGzipDecompression);
 #ifdef ENVOY_MOBILE_REQUEST_COMPRESSION
   builder.enableGzipCompression(self.enableGzipCompression);
@@ -341,29 +328,44 @@
 #ifdef ENVOY_MOBILE_REQUEST_COMPRESSION
   builder.enableBrotliCompression(self.enableBrotliCompression);
 #endif
-  builder.enableHappyEyeballs(self.enableHappyEyeballs);
-#ifdef ENVOY_ENABLE_QUIC
-  builder.enableHttp3(self.enableHttp3);
-#endif
-  builder.enableInterfaceBinding(self.enableInterfaceBinding);
-  builder.enableDrainPostDnsRefresh(self.enableDrainPostDnsRefresh);
-  builder.enforceTrustChainVerification(self.enforceTrustChainVerification);
-  builder.enablePlatformCertificatesValidation(self.enablePlatformCertificateValidation);
-  builder.setForceAlwaysUsev6(self.forceIPv6);
-  for (EnvoyHTTPFilterFactory *filterFactory in
-       [self.httpPlatformFilterFactories reverseObjectEnumerator]) {
-    builder.addPlatformFilter([filterFactory.filterName toCXXString]);
-  }
-  for (EnvoyNativeFilterConfig *nativeFilterConfig in self.nativeFilterChain) {
-    builder.addNativeFilter(
-        /* name */ [nativeFilterConfig.name toCXXString],
-        /* typed_config */ [nativeFilterConfig.typedConfig toCXXString]);
-  }
 
+  builder.addConnectTimeoutSeconds(self.connectTimeoutSeconds);
+
+  builder.addDnsFailureRefreshSeconds(self.dnsFailureRefreshSecondsBase,
+                                      self.dnsFailureRefreshSecondsMax);
+
+  builder.addDnsQueryTimeoutSeconds(self.dnsQueryTimeoutSeconds);
+  builder.addDnsMinRefreshSeconds(self.dnsMinRefreshSeconds);
+  if (self.dnsPreresolveHostnames.count > 0) {
+    std::vector<std::string> hostnames;
+    hostnames.reserve(self.dnsPreresolveHostnames.count);
+    for (NSString *hostname in self.dnsPreresolveHostnames) {
+      hostnames.push_back([hostname toCXXString]);
+    }
+    builder.addDnsPreresolveHostnames(hostnames);
+  }
+  builder.enableHappyEyeballs(self.enableHappyEyeballs);
+  builder.addDnsRefreshSeconds(self.dnsRefreshSeconds);
+  builder.enableDrainPostDnsRefresh(self.enableDrainPostDnsRefresh);
+  builder.enableInterfaceBinding(self.enableInterfaceBinding);
+  builder.enforceTrustChainVerification(self.enforceTrustChainVerification);
+  builder.setForceAlwaysUsev6(self.forceIPv6);
+  builder.addH2ConnectionKeepaliveIdleIntervalMilliseconds(
+      self.h2ConnectionKeepaliveIdleIntervalMilliseconds);
+  builder.addH2ConnectionKeepaliveTimeoutSeconds(self.h2ConnectionKeepaliveTimeoutSeconds);
+  builder.addMaxConnectionsPerHost(self.maxConnectionsPerHost);
+  builder.setStreamIdleTimeoutSeconds(self.streamIdleTimeoutSeconds);
+  builder.setPerTryIdleTimeoutSeconds(self.perTryIdleTimeoutSeconds);
+  builder.setAppVersion([self.appVersion toCXXString]);
+  builder.setAppId([self.appId toCXXString]);
+  builder.setDeviceOs("iOS");
   for (NSString *cluster in self.virtualClusters) {
     builder.addVirtualCluster([cluster toCXXString]);
   }
-
+  builder.addStatsFlushSeconds(self.statsFlushSeconds);
+  builder.enablePlatformCertificatesValidation(self.enablePlatformCertificateValidation);
+  builder.enableDnsCache(self.enableDNSCache, self.dnsCacheSaveIntervalSeconds);
+  builder.addGrpcStatsDomain([self.grpcStatsDomain toCXXString]);
   if (self.statsSinks.count > 0) {
     std::vector<std::string> sinks;
     sinks.reserve(self.statsSinks.count);
@@ -373,20 +375,30 @@
     builder.addStatsSinks(std::move(sinks));
   }
 
-  if (self.dnsPreresolveHostnames.count > 0) {
-    std::vector<std::string> hostnames;
-    hostnames.reserve(self.dnsPreresolveHostnames.count);
-    for (NSString *hostname in self.dnsPreresolveHostnames) {
-      hostnames.push_back([hostname toCXXString]);
-    }
-    builder.addDnsPreresolveHostnames(hostnames);
-  }
+#ifdef ENVOY_ADMIN_FUNCTIONALITY
+  builder.enableAdminInterface(self.adminInterfaceEnabled);
+#endif
 
+  return builder;
+}
+
+- (BOOL)compareYAMLWithProtoBuilder:(NSString *)yaml {
   try {
+    Envoy::Platform::EngineBuilder builder = [self applyToCXXBuilder];
     return builder.generateBootstrapAndCompare([yaml toCXXString]);
   } catch (const std::exception &e) {
     NSLog(@"[Envoy] error comparing YAML: %@", @(e.what()));
     return FALSE;
+  }
+}
+
+- (std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap>)generateBootstrap {
+  try {
+    Envoy::Platform::EngineBuilder builder = [self applyToCXXBuilder];
+    return builder.generateBootstrap();
+  } catch (const std::exception &e) {
+    NSLog(@"[Envoy] error generating bootstrap: %@", @(e.what()));
+    return nullptr;
   }
 }
 
