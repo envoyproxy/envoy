@@ -128,6 +128,19 @@ extern GoUint64 envoyGoFilterOnHttpData(httpRequest* r,
 // github.com/envoyproxy/envoy/contrib/golang/filters/http/source/go/pkg/http.envoyGoFilterOnHttpDestroy
 extern void envoyGoFilterOnHttpDestroy(httpRequest* r, GoUint64 reason);
 
+// go:linkname envoyGoOnClusterSpecify
+// github.com/envoyproxy/envoy/contrib/golang/http/cluster_specifier/source/go/pkg/cluster_specifier.envoyGoOnClusterSpecify
+extern GoInt64 envoyGoOnClusterSpecify(GoUint64 headerPtr, GoUint64 configId, GoUint64 bufferPtr,
+                                       GoUint64 bufferLen);
+
+// go:linkname envoyGoClusterSpecifierNewConfig
+// github.com/envoyproxy/envoy/contrib/golang/http/cluster_specifier/source/go/pkg/cluster_specifier.envoyGoClusterSpecifierNewConfig
+extern GoUint64 envoyGoClusterSpecifierNewConfig(GoUint64 configPtr, GoUint64 configLen);
+
+// go:linkname envoyGoClusterSpecifierDestroyConfig
+// github.com/envoyproxy/envoy/contrib/golang/http/cluster_specifier/source/go/pkg/cluster_specifier.envoyGoClusterSpecifierDestroyConfig
+extern void envoyGoClusterSpecifierDestroyConfig(GoUint64 id);
+
 #ifdef __cplusplus
 }
 #endif
