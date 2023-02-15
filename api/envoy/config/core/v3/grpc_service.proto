@@ -45,8 +45,7 @@ message GrpcService {
              {min_len: 0 max_bytes: 16384 well_known_regex: HTTP_HEADER_VALUE strict: false}];
 
     // Indicates the retry policy for re-establishing the gRPC channel
-    // This field is optional. If not provided, base interval is set to 1000 ms, max interval set to 10*base interval
-    // If max interval is not provided, it will be set to ten times the base interval.
+    // This field is optional. If max interval is not provided, it will be set to ten times the provided base interval.
     // Currently only supported for xDS gRPC streams.
     RetryPolicy retry_policy = 3;
   }

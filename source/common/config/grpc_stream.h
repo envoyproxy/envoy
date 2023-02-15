@@ -16,9 +16,11 @@ namespace Envoy {
 namespace Config {
 
 namespace {
+
 // Default Parameters of the jittered backoff strategy.
 constexpr uint32_t RetryInitialDelayMs = 500;
 constexpr uint32_t RetryMaxDelayMs = 30000; // Do not cross more than 30s
+
 } // namespace
 
 template <class ResponseProto> using ResponseProtoPtr = std::unique_ptr<ResponseProto>;
