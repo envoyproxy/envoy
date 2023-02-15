@@ -244,10 +244,8 @@ TEST_F(IoUringWorkerIntegraionTest, Connect) {
 
   // Waiting for the client socket connect.
   struct sockaddr_in listen_addr = getListenSocketAddress();
-  io_uring_worker_->submitConnectRequest(
-      socket,
-      Network::Address::addressFromSockAddrOrThrow(
-          reinterpret_cast<struct sockaddr_storage&>(listen_addr), sizeof(listen_addr), false));
+  auto addr = std::make_shared<Network::Address::Ipv4Instance>(&listen_addr);
+  io_uring_worker_->submitConnectRequest(socket, addr);
 
   // Accept through client socket.
   accept();
