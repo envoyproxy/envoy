@@ -366,7 +366,7 @@ std::string EngineBuilder::generateConfigStr() const {
          fmt::format("{}s", h2_connection_keepalive_timeout_seconds_)},
         {
             "metadata",
-            fmt::format("{{ device_os: {}, app_version: {}, app_id: {} }}", device_os_,
+            fmt::format("{{ device_os: \"{}\", app_version: \"{}\", app_id: \"{}\" }}", device_os_,
                         app_version_, app_id_),
         },
         {"max_connections_per_host", fmt::format("{}", max_connections_per_host_)},
@@ -1043,7 +1043,9 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
     envoy::config::core::v3::ApiConfigSource::ApiType api_type_enum;
     envoy::config::core::v3::ApiConfigSource::ApiType_Parse(ads_api_type_, &api_type_enum);
     ads_config->set_api_type(api_type_enum);
-    ads_config->add_grpc_services()->mutable_google_grpc()->set_target_uri(target_uri);
+    auto& grpc_service = *ads_config->add_grpc_services();
+    grpc_service.mutable_google_grpc()->set_target_uri(target_uri);
+    grpc_service.mutable_google_grpc()->set_stat_prefix("ads");
   }
   if (enable_cds_) {
     auto* cds_config = bootstrap->mutable_dynamic_resources()->mutable_cds_config();
@@ -1068,8 +1070,7 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
   }
 
   // Check equivalence in debug mode.
-  RELEASE_ASSERT(generatedStringMatchesGeneratedBoostrap(generateConfigStr(), *bootstrap),
-                 "Native C++ checks failed");
+  ASSERT(generatedStringMatchesGeneratedBoostrap(generateConfigStr(), *bootstrap));
 
   return bootstrap;
 }

@@ -33,9 +33,16 @@ bug_fixes:
 - area: router
   change: |
     fixed the bug that custom tags of the route metadata type are not set for upstream spans.
+- area: router
+  change: |
+    fixed outlier detection ejections caused by opened circuit breakers.
 - area: dependency
   change: |
     Add boringssl patch to resolve CVE-2023-0286. Note that the FIPS build is not patched/fixed.
+- area: access log
+  change: |
+    in JSON logs, port numbers were logged as strings and are now logged as numbers (``%DOWNSTREAM_LOCAL_PORT%``, ``%DOWNSTREAM_REMOTE_PORT%``, ``%DOWNSTREAM_DIRECT_REMOTE_PORT%``, ``%UPSTREAM_LOCAL_PORT%``, ``%UPSTREAM_REMOTE_PORT%``).
+    This behavioral change can be temporarily reverted by setting runtime guard ``envoy.reloadable_features.format_ports_as_numbers`` to false.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
@@ -67,6 +74,9 @@ removed_config_or_runtime:
 - area: http
   change: |
     removed ``envoy.reloadable_features.http_skip_adding_content_length_to_upgrade`` and legacy code paths.
+- area: http3
+  change: |
+    removed ``envoy.reloadable_features.http3_sends_early_data`` and legacy code paths.
 
 new_features:
 - area: access_log
@@ -98,5 +108,8 @@ new_features:
 - area: sni_dynamic_forward_proxy
   change: |
     added an option to dynamically set the host used by the SNI dynamic forward proxy filter, by setting a filter state object under the key ``envoy.upstream.dynamic_host``.
+- area: generic_proxy
+  change: |
+    added :ref:`tracing support <envoy_v3_api_field_extensions.filters.network.generic_proxy.v3.GenericProxy.tracing>` for the generic proxy.
 
 deprecated:
