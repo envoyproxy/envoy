@@ -22,7 +22,7 @@ RequestHeadersBuilder::RequestHeadersBuilder(RequestMethod request_method, absl:
 
 void RequestHeadersBuilder::initialize(RequestMethod request_method, std::string scheme,
                                        std::string authority, std::string path) {
-  internalSet(":method", {requestMethodToString(request_method)});
+  internalSet(":method", {std::string(requestMethodToString(request_method))});
   internalSet(":scheme", {std::move(scheme)});
   internalSet(":authority", {std::move(authority)});
   internalSet(":path", {std::move(path)});
