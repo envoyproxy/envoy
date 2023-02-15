@@ -48,8 +48,7 @@ public:
         type_url_("type.googleapis.com/envoy.config.endpoint.v3.ClusterLoadAssignment"),
         subscription_stats_(Config::Utility::generateStats(scope_)),
         async_client_(new Grpc::MockAsyncClient()),
-        config_validators_(std::make_unique<NiceMock<Config::MockCustomConfigValidators>>())
-        ) {
+        config_validators_(std::make_unique<NiceMock<Config::MockCustomConfigValidators>>()) {
     if (use_unified_mux_) {
       grpc_mux_.reset(new Config::XdsMux::GrpcMuxSotw(
           std::unique_ptr<Grpc::MockAsyncClient>(async_client_), server_context_.dispatcher_,
