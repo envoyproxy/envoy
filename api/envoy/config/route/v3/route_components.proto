@@ -1659,6 +1659,7 @@ message RedirectAction {
       [(validate.rules).string = {well_known_regex: HTTP_HEADER_VALUE strict: false}];
 
   // The port value of the URL will be swapped with this value.
+  // If not specified, the request's port will be used.
   uint32 port_redirect = 8;
 
   oneof path_rewrite_specifier {
