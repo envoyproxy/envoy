@@ -17,11 +17,11 @@
 #include "source/common/network/utility.h"
 
 #ifdef ENVOY_ENABLE_QUIC
-#include "source/common/quic/codec_impl.h"
+#include "source/common/quic/server_codec_impl.h"
 #include "quiche/quic/test_tools/quic_session_peer.h"
 #endif
 
-#include "source/server/connection_handler_impl.h"
+#include "source/extensions/listener_managers/listener_manager/connection_handler_impl.h"
 
 #include "test/test_common/network_utility.h"
 #include "test/test_common/utility.h"
@@ -44,7 +44,7 @@ FakeStream::FakeStream(FakeHttpConnection& parent, Http::ResponseEncoder& encode
   encoder.getStream().addCallbacks(*this);
 }
 
-void FakeStream::decodeHeaders(Http::RequestHeaderMapPtr&& headers, bool end_stream) {
+void FakeStream::decodeHeaders(Http::RequestHeaderMapSharedPtr&& headers, bool end_stream) {
   absl::MutexLock lock(&lock_);
   headers_ = std::move(headers);
   setEndStream(end_stream);
@@ -333,19 +333,10 @@ public:
                              headers_with_underscores_action) {}
 
   void updateConcurrentStreams(uint32_t max_streams) {
-    int rc;
-    if (use_new_codec_wrapper_) {
-      absl::InlinedVector<http2::adapter::Http2Setting, 1> settings;
-      settings.insert(settings.end(), {{http2::adapter::MAX_CONCURRENT_STREAMS, max_streams}});
-      adapter_->SubmitSettings(settings);
-      rc = adapter_->Send();
-    } else {
-      absl::InlinedVector<nghttp2_settings_entry, 1> settings;
-      settings.insert(settings.end(), {{NGHTTP2_SETTINGS_MAX_CONCURRENT_STREAMS, max_streams}});
-      rc = nghttp2_submit_settings(session_, NGHTTP2_FLAG_NONE, settings.data(), settings.size());
-      ASSERT(rc == 0);
-      rc = nghttp2_session_send(session_);
-    }
+    absl::InlinedVector<http2::adapter::Http2Setting, 1> settings;
+    settings.push_back({http2::adapter::MAX_CONCURRENT_STREAMS, max_streams});
+    adapter_->SubmitSettings(settings);
+    const int rc = adapter_->Send();
     ASSERT(rc == 0);
   }
 };
@@ -594,6 +585,11 @@ FakeUpstream::FakeUpstream(Network::DownstreamTransportSocketFactoryPtr&& transp
         ->mutable_max_rx_datagram_size()
         ->set_value(config.udp_fake_upstream_->max_rx_datagram_size_.value());
   }
+  dispatcher_->post([this]() -> void {
+    socket_factories_[0]->doFinalPreWorkerInit();
+    handler_->addListener(absl::nullopt, listener_, runtime_);
+    server_initialized_.setReady();
+  });
   thread_ = api_->threadFactory().createThread([this]() -> void { threadRoutine(); });
   server_initialized_.waitReady();
 }
@@ -644,9 +640,6 @@ void FakeUpstream::createUdpListenerFilterChain(Network::UdpListenerFilterManage
 }
 
 void FakeUpstream::threadRoutine() {
-  socket_factories_[0]->doFinalPreWorkerInit();
-  handler_->addListener(absl::nullopt, listener_, runtime_);
-  server_initialized_.setReady();
   dispatcher_->run(Event::Dispatcher::RunType::Block);
   handler_.reset();
   {
@@ -991,6 +984,15 @@ void FakeHttpConnection::writeRawData(absl::string_view data) {
   Api::IoCallUint64Result result =
       dynamic_cast<Network::ConnectionImpl*>(&connection())->ioHandle().write(buffer);
   ASSERT(result.ok());
+}
+
+AssertionResult FakeHttpConnection::postWriteRawData(std::string data) {
+  return shared_connection_.executeOnDispatcher(
+      [data](Network::Connection& connection) {
+        Buffer::OwnedImpl to_write(data);
+        connection.write(to_write, false);
+      },
+      TestUtility::DefaultTimeout);
 }
 
 } // namespace Envoy

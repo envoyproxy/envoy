@@ -12,6 +12,7 @@ envoy_cc_library(
     name = "codec_stats_lib",
     hdrs = ["codec_stats.h"],
     deps = [
+        "//envoy/http:header_validator_interface",
         "//envoy/stats:stats_interface",
         "//envoy/stats:stats_macros",
         "//source/common/common:thread_lib",
@@ -92,7 +93,6 @@ envoy_cc_library(
     srcs = ["metadata_encoder.cc"],
     hdrs = ["metadata_encoder.h"],
     external_deps = [
-        "nghttp2",
         "quiche_http2_adapter",
     ],
     deps = [

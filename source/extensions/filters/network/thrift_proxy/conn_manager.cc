@@ -839,6 +839,8 @@ FilterStatus ConnectionManager::ActiveRpc::messageBegin(MessageMetadataSharedPtr
     ASSERT(upgrade_handler_ != nullptr);
   }
 
+  auto result = applyDecoderFilters(DecoderEvent::MessageBegin, metadata);
+
   const auto& route_ptr = route();
 
   ProtobufWkt::Struct stats_obj;
@@ -863,7 +865,7 @@ FilterStatus ConnectionManager::ActiveRpc::messageBegin(MessageMetadataSharedPtr
       metadata_->sequenceId(), metadata->hasMethodName() ? metadata->methodName() : "-",
       metadata->hasFrameSize() ? metadata->frameSize() : -1, metadata->requestHeaders());
 
-  return applyDecoderFilters(DecoderEvent::MessageBegin, metadata);
+  return result;
 }
 
 FilterStatus ConnectionManager::ActiveRpc::messageEnd() {
@@ -974,7 +976,7 @@ Router::RouteConstSharedPtr ConnectionManager::ActiveRpc::route() {
           parent_.config_.routerConfig().route(*metadata_, stream_id_);
       cached_route_ = std::move(route);
     } else {
-      cached_route_ = nullptr;
+      cached_route_ = absl::nullopt;
     }
   }
 
@@ -1048,6 +1050,8 @@ ThriftFilters::ResponseStatus ConnectionManager::ActiveRpc::upstreamData(Buffer:
     return ThriftFilters::ResponseStatus::Reset;
   }
 }
+
+void ConnectionManager::ActiveRpc::clearRouteCache() { cached_route_ = absl::nullopt; }
 
 void ConnectionManager::ActiveRpc::resetDownstreamConnection() {
   ENVOY_CONN_LOG(debug, "resetting downstream connection", parent_.read_callbacks_->connection());

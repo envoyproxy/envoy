@@ -76,7 +76,7 @@ FilterChainUtility::createSingletonDownstreamFilterConfigProviderManager(
   std::shared_ptr<Http::DownstreamFilterConfigProviderManager>
       downstream_filter_config_provider_manager =
           context.singletonManager().getTyped<Http::DownstreamFilterConfigProviderManager>(
-              SINGLETON_MANAGER_REGISTERED_NAME(upstream_filter_config_provider_manager),
+              SINGLETON_MANAGER_REGISTERED_NAME(downstream_filter_config_provider_manager),
               [] { return std::make_shared<Filter::HttpFilterConfigProviderManagerImpl>(); });
   return downstream_filter_config_provider_manager;
 }

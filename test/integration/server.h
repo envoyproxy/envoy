@@ -46,7 +46,8 @@ createTestOptionsImpl(const std::string& config_path, const std::string& config_
                       FieldValidationConfig validation_config = FieldValidationConfig(),
                       uint32_t concurrency = 1,
                       std::chrono::seconds drain_time = std::chrono::seconds(1),
-                      Server::DrainStrategy drain_strategy = Server::DrainStrategy::Gradual);
+                      Server::DrainStrategy drain_strategy = Server::DrainStrategy::Gradual,
+                      bool use_bootstrap_node_metadata = false);
 
 class TestComponentFactory : public ComponentFactory {
 public:
@@ -70,22 +71,18 @@ namespace Stats {
  */
 class TestScopeWrapper : public Scope {
 public:
-  TestScopeWrapper(Thread::MutexBasicLockable& lock, ScopeSharedPtr wrapped_scope)
-      : lock_(lock), wrapped_scope_(std::move(wrapped_scope)) {}
+  TestScopeWrapper(Thread::MutexBasicLockable& lock, ScopeSharedPtr wrapped_scope, Store& store)
+      : lock_(lock), wrapped_scope_(wrapped_scope), store_(store) {}
 
   ScopeSharedPtr createScope(const std::string& name) override {
     Thread::LockGuard lock(lock_);
-    return ScopeSharedPtr{new TestScopeWrapper(lock_, wrapped_scope_->createScope(name))};
+    return std::make_shared<TestScopeWrapper>(lock_, wrapped_scope_->createScope(name), store_);
   }
 
   ScopeSharedPtr scopeFromStatName(StatName name) override {
     Thread::LockGuard lock(lock_);
-    return ScopeSharedPtr{new TestScopeWrapper(lock_, wrapped_scope_->scopeFromStatName(name))};
-  }
-
-  void deliverHistogramToSinks(const Histogram& histogram, uint64_t value) override {
-    Thread::LockGuard lock(lock_);
-    wrapped_scope_->deliverHistogramToSinks(histogram, value);
+    return std::make_shared<TestScopeWrapper>(lock_, wrapped_scope_->scopeFromStatName(name),
+                                              store_);
   }
 
   Counter& counterFromStatNameWithTags(const StatName& name,
@@ -110,10 +107,6 @@ public:
                                                StatNameTagVectorOptConstRef tags) override {
     Thread::LockGuard lock(lock_);
     return wrapped_scope_->textReadoutFromStatNameWithTags(name, tags);
-  }
-
-  NullGaugeImpl& nullGauge(const std::string& str) override {
-    return wrapped_scope_->nullGauge(str);
   }
 
   Counter& counterFromString(const std::string& name) override {
@@ -164,10 +157,13 @@ public:
     return wrapped_scope_->iterate(fn);
   }
   StatName prefix() const override { return wrapped_scope_->prefix(); }
+  Store& store() override { return store_; }
+  const Store& constStore() const override { return store_; }
 
 private:
   Thread::MutexBasicLockable& lock_;
   ScopeSharedPtr wrapped_scope_;
+  Store& store_;
 };
 
 // A counter which signals on a condition variable when it is incremented.
@@ -277,12 +273,7 @@ private:
  */
 class TestIsolatedStoreImpl : public StoreRoot {
 public:
-  // Stats::Scope
-  Counter& counterFromStatNameWithTags(const StatName& name,
-                                       StatNameTagVectorOptConstRef tags) override {
-    Thread::LockGuard lock(lock_);
-    return store_.counterFromStatNameWithTags(name, tags);
-  }
+  // Stats::Store
   void forEachCounter(Stats::SizeFn f_size, StatFn<Counter> f_stat) const override {
     Thread::LockGuard lock(lock_);
     store_.forEachCounter(f_size, f_stat);
@@ -316,65 +307,29 @@ public:
     Thread::LockGuard lock(lock_);
     store_.forEachSinkedTextReadout(f_size, f_stat);
   }
+  void forEachSinkedHistogram(Stats::SizeFn f_size, StatFn<ParentHistogram> f_stat) const override {
+    Thread::LockGuard lock(lock_);
+    store_.forEachSinkedHistogram(f_size, f_stat);
+  }
   void setSinkPredicates(std::unique_ptr<SinkPredicates>&& sink_predicates) override {
     UNREFERENCED_PARAMETER(sink_predicates);
   }
-  Counter& counterFromString(const std::string& name) override {
+  OptRef<SinkPredicates> sinkPredicates() override { return OptRef<SinkPredicates>{}; }
+  void deliverHistogramToSinks(const Histogram& histogram, uint64_t value) override {
     Thread::LockGuard lock(lock_);
-    return store_.counterFromString(name);
+    store_.deliverHistogramToSinks(histogram, value);
   }
-  ScopeSharedPtr createScope(const std::string& name) override {
+  NullGaugeImpl& nullGauge() override { return store_.nullGauge(); }
+  NullCounterImpl& nullCounter() override { return store_.nullCounter(); }
+  ScopeSharedPtr rootScope() override {
     Thread::LockGuard lock(lock_);
-    return ScopeSharedPtr{new TestScopeWrapper(lock_, store_.createScope(name))};
+    if (lazy_default_scope_ == nullptr) {
+      lazy_default_scope_ = std::make_shared<TestScopeWrapper>(lock_, store_.rootScope(), *this);
+    }
+    return lazy_default_scope_;
   }
-  ScopeSharedPtr scopeFromStatName(StatName name) override {
-    Thread::LockGuard lock(lock_);
-    return ScopeSharedPtr{new TestScopeWrapper(lock_, store_.scopeFromStatName(name))};
-  }
-  void deliverHistogramToSinks(const Histogram&, uint64_t) override {}
-  Gauge& gaugeFromStatNameWithTags(const StatName& name, StatNameTagVectorOptConstRef tags,
-                                   Gauge::ImportMode import_mode) override {
-    Thread::LockGuard lock(lock_);
-    return store_.gaugeFromStatNameWithTags(name, tags, import_mode);
-  }
-  Gauge& gaugeFromString(const std::string& name, Gauge::ImportMode import_mode) override {
-    Thread::LockGuard lock(lock_);
-    return store_.gaugeFromString(name, import_mode);
-  }
-  Histogram& histogramFromStatNameWithTags(const StatName& name, StatNameTagVectorOptConstRef tags,
-                                           Histogram::Unit unit) override {
-    Thread::LockGuard lock(lock_);
-    return store_.histogramFromStatNameWithTags(name, tags, unit);
-  }
-  NullGaugeImpl& nullGauge(const std::string& name) override { return store_.nullGauge(name); }
-  Histogram& histogramFromString(const std::string& name, Histogram::Unit unit) override {
-    Thread::LockGuard lock(lock_);
-    return store_.histogramFromString(name, unit);
-  }
-  TextReadout& textReadoutFromStatNameWithTags(const StatName& name,
-                                               StatNameTagVectorOptConstRef tags) override {
-    Thread::LockGuard lock(lock_);
-    return store_.textReadoutFromStatNameWithTags(name, tags);
-  }
-  TextReadout& textReadoutFromString(const std::string& name) override {
-    Thread::LockGuard lock(lock_);
-    return store_.textReadoutFromString(name);
-  }
-  CounterOptConstRef findCounter(StatName name) const override {
-    Thread::LockGuard lock(lock_);
-    return store_.findCounter(name);
-  }
-  GaugeOptConstRef findGauge(StatName name) const override {
-    Thread::LockGuard lock(lock_);
-    return store_.findGauge(name);
-  }
-  HistogramOptConstRef findHistogram(StatName name) const override {
-    Thread::LockGuard lock(lock_);
-    return store_.findHistogram(name);
-  }
-  TextReadoutOptConstRef findTextReadout(StatName name) const override {
-    Thread::LockGuard lock(lock_);
-    return store_.findTextReadout(name);
+  ConstScopeSharedPtr constRootScope() const override {
+    return const_cast<TestIsolatedStoreImpl*>(this)->rootScope();
   }
   const SymbolTable& constSymbolTable() const override { return store_.constSymbolTable(); }
   SymbolTable& symbolTable() override { return store_.symbolTable(); }
@@ -396,7 +351,6 @@ public:
     Thread::LockGuard lock(lock_);
     return store_.textReadouts();
   }
-  StatName prefix() const override { return store_.prefix(); }
 
   bool iterate(const IterateFn<Counter>& fn) const override { return store_.iterate(fn); }
   bool iterate(const IterateFn<Gauge>& fn) const override { return store_.iterate(fn); }
@@ -418,6 +372,7 @@ private:
   mutable Thread::MutexBasicLockable lock_;
   IsolatedStoreImpl store_;
   PostMergeCb merge_cb_;
+  ScopeSharedPtr lazy_default_scope_;
 };
 
 } // namespace Stats
@@ -436,16 +391,18 @@ class IntegrationTestServer : public Logger::Loggable<Logger::Id::testing>,
                               public IntegrationTestServerStats,
                               public Server::ComponentFactory {
 public:
-  static IntegrationTestServerPtr create(
-      const std::string& config_path, const Network::Address::IpVersion version,
-      std::function<void(IntegrationTestServer&)> on_server_ready_function,
-      std::function<void()> on_server_init_function, absl::optional<uint64_t> deterministic_value,
-      Event::TestTimeSystem& time_system, Api::Api& api, bool defer_listener_finalization = false,
-      ProcessObjectOptRef process_object = absl::nullopt,
-      Server::FieldValidationConfig validation_config = Server::FieldValidationConfig(),
-      uint32_t concurrency = 1, std::chrono::seconds drain_time = std::chrono::seconds(1),
-      Server::DrainStrategy drain_strategy = Server::DrainStrategy::Gradual,
-      Buffer::WatermarkFactorySharedPtr watermark_factory = nullptr, bool use_real_stats = false);
+  static IntegrationTestServerPtr
+  create(const std::string& config_path, const Network::Address::IpVersion version,
+         std::function<void(IntegrationTestServer&)> on_server_ready_function,
+         std::function<void()> on_server_init_function,
+         absl::optional<uint64_t> deterministic_value, Event::TestTimeSystem& time_system,
+         Api::Api& api, bool defer_listener_finalization = false,
+         ProcessObjectOptRef process_object = absl::nullopt,
+         Server::FieldValidationConfig validation_config = Server::FieldValidationConfig(),
+         uint32_t concurrency = 1, std::chrono::seconds drain_time = std::chrono::seconds(1),
+         Server::DrainStrategy drain_strategy = Server::DrainStrategy::Gradual,
+         Buffer::WatermarkFactorySharedPtr watermark_factory = nullptr, bool use_real_stats = false,
+         bool use_bootstrap_node_metadata = false);
   // Note that the derived class is responsible for tearing down the server in its
   // destructor.
   ~IntegrationTestServer() override;
@@ -474,7 +431,7 @@ public:
              ProcessObjectOptRef process_object, Server::FieldValidationConfig validation_config,
              uint32_t concurrency, std::chrono::seconds drain_time,
              Server::DrainStrategy drain_strategy,
-             Buffer::WatermarkFactorySharedPtr watermark_factory);
+             Buffer::WatermarkFactorySharedPtr watermark_factory, bool use_bootstrap_node_metadata);
 
   void waitForCounterEq(const std::string& name, uint64_t value,
                         std::chrono::milliseconds timeout = TestUtility::DefaultTimeout,
@@ -592,7 +549,8 @@ private:
                      ProcessObjectOptRef process_object,
                      Server::FieldValidationConfig validation_config, uint32_t concurrency,
                      std::chrono::seconds drain_time, Server::DrainStrategy drain_strategy,
-                     Buffer::WatermarkFactorySharedPtr watermark_factory);
+                     Buffer::WatermarkFactorySharedPtr watermark_factory,
+                     bool use_bootstrap_node_metadata);
 
   Event::TestTimeSystem& time_system_;
   Api::Api& api_;

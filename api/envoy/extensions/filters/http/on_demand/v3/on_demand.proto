@@ -19,6 +19,11 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // [#protodoc-title: On Demand Discovery]
 // On Demand Discovery :ref:`configuration overview <config_http_filters_on_demand>`.
 // [#extension: envoy.filters.http.on_demand]
+//
+// .. warning::
+//
+//    Envoy currently only supports On-demand CDS when using Incremental-xDS and not State-of-the-World.
+//
 
 // Configuration of on-demand CDS.
 message OnDemandCds {

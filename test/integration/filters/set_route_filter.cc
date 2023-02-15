@@ -33,10 +33,11 @@ public:
 
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap&, bool) override {
     auto route_override = std::make_shared<Router::ExampleDerivedDelegatingRoute>(
-        decoder_callbacks_->route(), config_->proto_config_.cluster_override(),
+        decoder_callbacks_->downstreamCallbacks()->route(nullptr),
+        config_->proto_config_.cluster_override(),
         PROTOBUF_GET_OPTIONAL_MS(config_->proto_config_, idle_timeout_override));
 
-    decoder_callbacks_->setRoute(route_override);
+    decoder_callbacks_->downstreamCallbacks()->setRoute(route_override);
     return Http::FilterHeadersStatus::Continue;
   }
 

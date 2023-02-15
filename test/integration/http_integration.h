@@ -11,6 +11,11 @@
 #include "test/integration/integration.h"
 #include "test/integration/utility.h"
 #include "test/test_common/printers.h"
+#include "test/test_common/utility.h"
+
+#ifdef ENVOY_ENABLE_QUIC
+#include "quiche/quic/core/deterministic_connection_id_generator.h"
+#endif
 
 namespace Envoy {
 
@@ -18,7 +23,6 @@ using ::Envoy::Http::Http2::Http2Frame;
 
 enum class Http2Impl {
   Nghttp2,
-  WrappedNghttp2,
   Oghttp2,
 };
 
@@ -134,11 +138,21 @@ public:
   ~HttpIntegrationTest() override;
 
   void initialize() override;
-  void setupHttp2Overrides(Http2Impl implementation);
+  void setupHttp1ImplOverrides(Http1ParserImpl http1_implementation);
+  void setupHttp2ImplOverrides(Http2Impl http2_implementation);
 
 protected:
   void useAccessLog(absl::string_view format = "",
                     std::vector<envoy::config::core::v3::TypedExtensionConfig> formatters = {});
+  std::string waitForAccessLog(const std::string& filename, uint32_t entry = 0,
+                               bool allow_excess_entries = false,
+                               Network::ClientConnection* client_connection = nullptr) {
+    if (client_connection == nullptr && codec_client_) {
+      client_connection = codec_client_->connection();
+    }
+    return BaseIntegrationTest::waitForAccessLog(filename, entry, allow_excess_entries,
+                                                 client_connection);
+  };
 
   IntegrationCodecClientPtr makeHttpConnection(uint32_t port);
   // Makes a http connection object without checking its connected state.
@@ -345,6 +359,10 @@ protected:
   Quic::QuicStatNames quic_stat_names_;
   std::string san_to_match_{"spiffe://lyft.com/backend-team"};
   bool enable_quic_early_data_{true};
+#ifdef ENVOY_ENABLE_QUIC
+  quic::DeterministicConnectionIdGenerator connection_id_generator_{
+      quic::kQuicDefaultConnectionIdLength};
+#endif
 };
 
 // Helper class for integration tests using raw HTTP/2 frames

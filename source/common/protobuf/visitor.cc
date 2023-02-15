@@ -12,7 +12,7 @@ namespace Envoy {
 namespace ProtobufMessage {
 namespace {
 
-std::unique_ptr<Protobuf::Message> typeUrlToMessage(const std::string& type_url) {
+std::unique_ptr<Protobuf::Message> typeUrlToMessage(absl::string_view type_url) {
   const absl::string_view inner_type_name = TypeUtil::typeUrlToDescriptorFullName(type_url);
   const Protobuf::Descriptor* inner_descriptor =
       Protobuf::DescriptorPool::generated_pool()->FindMessageTypeByName(

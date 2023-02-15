@@ -845,13 +845,15 @@ TEST_P(ClusterManagerSubsetInitializationTest, SubsetLoadBalancerInitialization)
   }
   const std::string yaml = fmt::format(yamlPattern, cluster_type, policy_name);
 
-  if (GetParam() == envoy::config::cluster::v3::Cluster::CLUSTER_PROVIDED ||
-      GetParam() == envoy::config::cluster::v3::Cluster::LOAD_BALANCING_POLICY_CONFIG) {
+  if (GetParam() == envoy::config::cluster::v3::Cluster::CLUSTER_PROVIDED) {
     EXPECT_THROW_WITH_MESSAGE(
         create(parseBootstrapFromV3Yaml(yaml)), EnvoyException,
         fmt::format("cluster: LB policy {} cannot be combined with lb_subset_config",
                     envoy::config::cluster::v3::Cluster::LbPolicy_Name(GetParam())));
 
+  } else if (GetParam() == envoy::config::cluster::v3::Cluster::LOAD_BALANCING_POLICY_CONFIG) {
+    EXPECT_THROW_WITH_MESSAGE(create(parseBootstrapFromV3Yaml(yaml)), EnvoyException,
+                              "cluster: field load_balancing_policy need to be set");
   } else {
     create(parseBootstrapFromV3Yaml(yaml));
     checkStats(1 /*added*/, 0 /*modified*/, 0 /*removed*/, 1 /*active*/, 0 /*warming*/);
@@ -1024,74 +1026,6 @@ TEST_F(ClusterManagerImplTest, ClusterProvidedLbNotConfigured) {
                             "'cluster_0' provided one. Check cluster documentation.");
 }
 
-// Verify that specifying LOAD_BALANCING_POLICY_CONFIG with CommonLbConfig is an error.
-TEST_F(ClusterManagerImplTest, LbPolicyConfigCannotSpecifyCommonLbConfig) {
-  // envoy.load_balancers.custom_lb is registered by linking in
-  // //test/integration/load_balancers:custom_lb_policy.
-  const std::string yaml = fmt::format(R"EOF(
- static_resources:
-  clusters:
-  - name: cluster_1
-    connect_timeout: 0.250s
-    type: STATIC
-    lb_policy: LOAD_BALANCING_POLICY_CONFIG
-    load_balancing_policy:
-      policies:
-      - typed_extension_config:
-          name: envoy.load_balancers.custom_lb
-    common_lb_config:
-      update_merge_window: 3s
-    load_assignment:
-      cluster_name: cluster_1
-      endpoints:
-      - lb_endpoints:
-        - endpoint:
-            address:
-              socket_address:
-                address: 127.0.0.1
-                port_value: 8000
-        - endpoint:
-            address:
-              socket_address:
-                address: 127.0.0.1
-                port_value: 8001
-  )EOF");
-
-  EXPECT_THROW_WITH_MESSAGE(
-      create(parseBootstrapFromV3Yaml(yaml)), EnvoyException,
-      "cluster: LB policy LOAD_BALANCING_POLICY_CONFIG cannot be combined with common_lb_config");
-}
-
-// Verify that LOAD_BALANCING_POLICY_CONFIG without specifying load balancing policy is an error.
-TEST_F(ClusterManagerImplTest, LbPolicyConfigMustSpecifyLbPolicy) {
-  const std::string yaml = fmt::format(R"EOF(
- static_resources:
-  clusters:
-  - name: cluster_1
-    connect_timeout: 0.250s
-    type: STATIC
-    lb_policy: LOAD_BALANCING_POLICY_CONFIG
-    load_assignment:
-      cluster_name: cluster_1
-      endpoints:
-      - lb_endpoints:
-        - endpoint:
-            address:
-              socket_address:
-                address: 127.0.0.1
-                port_value: 8000
-        - endpoint:
-            address:
-              socket_address:
-                address: 127.0.0.1
-                port_value: 8001
-  )EOF");
-
-  EXPECT_THROW_WITH_MESSAGE(
-      create(parseBootstrapFromV3Yaml(yaml)), EnvoyException,
-      "cluster: LB policy LOAD_BALANCING_POLICY_CONFIG requires load_balancing_policy to be set");
-}
-
 // Verify that multiple load balancing policies can be specified, and Envoy selects the first
 // policy that it has a factory for.
 TEST_F(ClusterManagerImplTest, LbPolicyConfig) {
@@ -1132,45 +1066,7 @@ TEST_F(ClusterManagerImplTest, LbPolicyConfig) {
   create(parseBootstrapFromV3Yaml(yaml));
   const auto& cluster = cluster_manager_->clusters().getCluster("cluster_1");
   EXPECT_NE(cluster, absl::nullopt);
-  EXPECT_EQ(cluster->get().info()->loadBalancingPolicy().typed_extension_config().name(),
-            "envoy.load_balancers.custom_lb");
-}
-
-// Verify that if Envoy does not have a factory for any of the load balancing policies specified in
-// the load balancing policy config, it is an error.
-TEST_F(ClusterManagerImplTest, LbPolicyConfigThrowsExceptionIfNoLbPoliciesFound) {
-  const std::string yaml = fmt::format(R"EOF(
- static_resources:
-  clusters:
-  - name: cluster_1
-    connect_timeout: 0.250s
-    type: STATIC
-    lb_policy: LOAD_BALANCING_POLICY_CONFIG
-    load_balancing_policy:
-      policies:
-      - typed_extension_config:
-          name: envoy.load_balancers.unknown_lb_1
-      - typed_extension_config:
-          name: envoy.load_balancers.unknown_lb_2
-    load_assignment:
-      cluster_name: cluster_1
-      endpoints:
-      - lb_endpoints:
-        - endpoint:
-            address:
-              socket_address:
-                address: 127.0.0.1
-                port_value: 8000
-        - endpoint:
-            address:
-              socket_address:
-                address: 127.0.0.1
-                port_value: 8001
-  )EOF");
-
-  EXPECT_THROW_WITH_MESSAGE(
-      create(parseBootstrapFromV3Yaml(yaml)), EnvoyException,
-      "Didn't find a registered load balancer factory implementation for cluster: 'cluster_1'");
+  EXPECT_NE(cluster->get().info()->loadBalancingPolicy(), nullptr);
 }
 
 class ClusterManagerImplThreadAwareLbTest : public ClusterManagerImplTest {
@@ -2204,6 +2100,60 @@ TEST_F(ClusterManagerImplTest, CloseHttpConnectionsOnHealthFailure) {
   EXPECT_TRUE(Mock::VerifyAndClearExpectations(cluster1.get()));
 }
 
+// Test that we drain or close all HTTP or TCP connection pool connections when there is a host
+// health failure and 'CLOSE_CONNECTIONS_ON_HOST_HEALTH_FAILURE' set to true.
+TEST_F(ClusterManagerImplTest,
+       CloseConnectionsOnHealthFailureWithCloseConnectionsOnHostHealthFailure) {
+  const std::string json = fmt::sprintf("{\"static_resources\":{%s}}",
+                                        clustersJson({defaultStaticClusterJson("some_cluster")}));
+  std::shared_ptr<MockClusterMockPrioritySet> cluster1(new NiceMock<MockClusterMockPrioritySet>());
+  EXPECT_CALL(*cluster1->info_, features())
+      .WillRepeatedly(Return(ClusterInfo::Features::CLOSE_CONNECTIONS_ON_HOST_HEALTH_FAILURE));
+  cluster1->info_->name_ = "some_cluster";
+  HostSharedPtr test_host = makeTestHost(cluster1->info_, "tcp://127.0.0.1:80", time_system_);
+  cluster1->prioritySet().getMockHostSet(0)->hosts_ = {test_host};
+  ON_CALL(*cluster1, initializePhase()).WillByDefault(Return(Cluster::InitializePhase::Primary));
+
+  MockHealthChecker health_checker;
+  ON_CALL(*cluster1, healthChecker()).WillByDefault(Return(&health_checker));
+
+  Outlier::MockDetector outlier_detector;
+  ON_CALL(*cluster1, outlierDetector()).WillByDefault(Return(&outlier_detector));
+
+  Http::ConnectionPool::MockInstance* cp1 = new NiceMock<Http::ConnectionPool::MockInstance>();
+  Tcp::ConnectionPool::MockInstance* cp2 = new NiceMock<Tcp::ConnectionPool::MockInstance>();
+
+  InSequence s;
+
+  EXPECT_CALL(factory_, clusterFromProto_(_, _, _, _))
+      .WillOnce(Return(std::make_pair(cluster1, nullptr)));
+  EXPECT_CALL(health_checker, addHostCheckCompleteCb(_));
+  EXPECT_CALL(outlier_detector, addChangedStateCb(_));
+  EXPECT_CALL(*cluster1, initialize(_))
+      .WillOnce(Invoke([cluster1](std::function<void()> initialize_callback) {
+        // Test inline init.
+        initialize_callback();
+      }));
+  create(parseBootstrapFromV3Json(json));
+
+  EXPECT_CALL(factory_, allocateConnPool_(_, _, _, _, _)).WillOnce(Return(cp1));
+  cluster_manager_->getThreadLocalCluster("some_cluster")
+      ->httpConnPool(ResourcePriority::Default, Http::Protocol::Http11, nullptr);
+
+  EXPECT_CALL(factory_, allocateTcpConnPool_(_)).WillOnce(Return(cp2));
+  cluster_manager_->getThreadLocalCluster("some_cluster")
+      ->tcpConnPool(ResourcePriority::Default, nullptr);
+
+  // Order of these calls is implementation dependent, so can't sequence them!
+  EXPECT_CALL(*cp1,
+              drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainExistingConnections));
+  EXPECT_CALL(*cp2, closeConnections());
+  test_host->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
+  health_checker.runCallbacks(test_host, HealthTransition::Changed);
+
+  EXPECT_TRUE(Mock::VerifyAndClearExpectations(cluster1.get()));
+}
+
 // Test that we close all HTTP connection pool connections when there is a host health failure.
 // Verify that the pool gets deleted if it is idle, and that a crash does not occur due to
 // deleting a container while iterating through it (see `do_not_delete_` in
@@ -2370,7 +2320,7 @@ TEST_F(ClusterManagerImplTest, CloseTcpConnectionsOnHealthFailure) {
     outlier_detector.runCallbacks(test_host);
     health_checker.runCallbacks(test_host, HealthTransition::Unchanged);
 
-    EXPECT_CALL(*connection1, close(Network::ConnectionCloseType::NoFlush));
+    EXPECT_CALL(*connection1, close(Network::ConnectionCloseType::NoFlush, _));
     test_host->healthFlagSet(Host::HealthFlag::FAILED_OUTLIER_CHECK);
     outlier_detector.runCallbacks(test_host);
 
@@ -2385,8 +2335,8 @@ TEST_F(ClusterManagerImplTest, CloseTcpConnectionsOnHealthFailure) {
   }
 
   // Order of these calls is implementation dependent, so can't sequence them!
-  EXPECT_CALL(*connection1, close(Network::ConnectionCloseType::NoFlush));
-  EXPECT_CALL(*connection2, close(Network::ConnectionCloseType::NoFlush));
+  EXPECT_CALL(*connection1, close(Network::ConnectionCloseType::NoFlush, _));
+  EXPECT_CALL(*connection2, close(Network::ConnectionCloseType::NoFlush, _));
   test_host->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
   health_checker.runCallbacks(test_host, HealthTransition::Changed);
 
@@ -4151,6 +4101,51 @@ TEST_F(ClusterManagerImplTest, UpstreamSocketOptionsPassedToTcpConnPool) {
   EXPECT_TRUE(opt_cp.has_value());
 }
 
+TEST_F(ClusterManagerImplTest, SelectOverrideHostTestNoOverrideHost) {
+  createWithLocalClusterUpdate();
+  NiceMock<MockLoadBalancerContext> context;
+
+  auto to_create = new Tcp::ConnectionPool::MockInstance();
+
+  EXPECT_CALL(context, overrideHostToSelect()).WillOnce(Return(absl::nullopt));
+
+  EXPECT_CALL(factory_, allocateTcpConnPool_(_)).WillOnce(Return(to_create));
+  EXPECT_CALL(*to_create, addIdleCallback(_));
+
+  auto opt_cp = cluster_manager_->getThreadLocalCluster("cluster_1")
+                    ->tcpConnPool(ResourcePriority::Default, &context);
+  EXPECT_TRUE(opt_cp.has_value());
+}
+
+TEST_F(ClusterManagerImplTest, SelectOverrideHostTestWithOverrideHost) {
+  createWithLocalClusterUpdate();
+  NiceMock<MockLoadBalancerContext> context;
+
+  auto to_create = new Tcp::ConnectionPool::MockInstance();
+
+  EXPECT_CALL(context, overrideHostToSelect())
+      .WillRepeatedly(Return(absl::make_optional<absl::string_view>("127.0.0.1:11002")));
+
+  EXPECT_CALL(factory_, allocateTcpConnPool_(_))
+      .WillOnce(testing::Invoke([&](HostConstSharedPtr host) {
+        EXPECT_EQ("127.0.0.1:11002", host->address()->asStringView());
+        return to_create;
+      }));
+  EXPECT_CALL(*to_create, addIdleCallback(_));
+
+  auto opt_cp_1 = cluster_manager_->getThreadLocalCluster("cluster_1")
+                      ->tcpConnPool(ResourcePriority::Default, &context);
+  EXPECT_TRUE(opt_cp_1.has_value());
+
+  auto opt_cp_2 = cluster_manager_->getThreadLocalCluster("cluster_1")
+                      ->tcpConnPool(ResourcePriority::Default, &context);
+  EXPECT_TRUE(opt_cp_2.has_value());
+
+  auto opt_cp_3 = cluster_manager_->getThreadLocalCluster("cluster_1")
+                      ->tcpConnPool(ResourcePriority::Default, &context);
+  EXPECT_TRUE(opt_cp_3.has_value());
+}
+
 TEST_F(ClusterManagerImplTest, UpstreamSocketOptionsPassedToConnPool) {
   createWithLocalClusterUpdate();
   NiceMock<MockLoadBalancerContext> context;
@@ -4736,7 +4731,7 @@ public:
                           Network::Address::InstanceConstSharedPtr, Network::TransportSocketPtr&,
                           const Network::ConnectionSocket::OptionsSharedPtr& options)
                        -> Network::ClientConnection* {
-              EXPECT_EQ(nullptr, options.get());
+              EXPECT_TRUE(options != nullptr && options->empty());
               return connection_;
             }));
     auto conn_data = cluster_manager_->getThreadLocalCluster("SockoptsCluster")->tcpConn(nullptr);
@@ -4912,7 +4907,8 @@ TEST_F(SockoptsTest, SockoptsClusterManagerOnly) {
   expectSetsockopts(names_vals);
 }
 
-TEST_F(SockoptsTest, SockoptsClusterOverride) {
+// The cluster options should override/replace the cluster manager options when both are specified.
+TEST_F(SockoptsTest, SockoptsClusterAndClusterManagerNoAddress) {
   const std::string yaml = R"EOF(
   static_resources:
     clusters:
@@ -4931,8 +4927,173 @@ TEST_F(SockoptsTest, SockoptsClusterOverride) {
                     port_value: 11001
       upstream_bind_config:
         socket_options: [
+          { level: 1, name: 2, int_value: 3, state: STATE_PREBIND }]
+  cluster_manager:
+    upstream_bind_config:
+      socket_options: [
+        { level: 4, name: 5, int_value: 6, state: STATE_PREBIND }]
+  )EOF";
+  initialize(yaml);
+  NameVals names_vals{{ENVOY_MAKE_SOCKET_OPTION_NAME(1, 2), 3}};
+  if (ENVOY_SOCKET_SO_NOSIGPIPE.hasValue()) {
+    names_vals.emplace_back(std::make_pair(ENVOY_SOCKET_SO_NOSIGPIPE, 1));
+  }
+  expectSetsockopts(names_vals);
+}
+
+// The cluster options should override/replace the cluster manager options when both are specified
+// when a source_address is only specified on the cluster manager bind config.
+TEST_F(SockoptsTest, SockoptsClusterAndClusterManagerAddress) {
+  const std::string yaml = R"EOF(
+  static_resources:
+    clusters:
+    - name: SockoptsCluster
+      connect_timeout: 0.250s
+      lb_policy: ROUND_ROBIN
+      type: STATIC
+      load_assignment:
+        cluster_name: SockoptsCluster
+        endpoints:
+          - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: 127.0.0.1
+                    port_value: 11001
+      upstream_bind_config:
+        socket_options: [
+          { level: 1, name: 2, int_value: 3, state: STATE_PREBIND }]
+  cluster_manager:
+    upstream_bind_config:
+      source_address:
+        address: 1.2.3.4
+        port_value: 80
+      socket_options: [
+        { level: 4, name: 5, int_value: 6, state: STATE_PREBIND }]
+  )EOF";
+  initialize(yaml);
+  NameVals names_vals{{ENVOY_MAKE_SOCKET_OPTION_NAME(1, 2), 3}};
+  if (ENVOY_SOCKET_SO_NOSIGPIPE.hasValue()) {
+    names_vals.emplace_back(std::make_pair(ENVOY_SOCKET_SO_NOSIGPIPE, 1));
+  }
+  expectSetsockopts(names_vals);
+}
+
+TEST_F(SockoptsTest, SockoptsWithExtraSourceAddressAndOpts) {
+  const std::string yaml = R"EOF(
+  static_resources:
+    clusters:
+    - name: SockoptsCluster
+      connect_timeout: 0.250s
+      lb_policy: ROUND_ROBIN
+      type: STATIC
+      load_assignment:
+        cluster_name: SockoptsCluster
+        endpoints:
+          - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: 127.0.0.1
+                    port_value: 11001
+      upstream_bind_config:
+        source_address:
+          address: '::'
+          port_value: 12345
+        socket_options: [
           { level: 1, name: 2, int_value: 3, state: STATE_PREBIND },
           { level: 4, name: 5, int_value: 6, state: STATE_PREBIND }]
+        extra_source_addresses:
+        - address:
+            address: 127.0.0.3
+            port_value: 12345
+          socket_options:
+            socket_options: [
+              { level: 10, name: 12, int_value: 13, state: STATE_PREBIND },
+              { level: 14, name: 15, int_value: 16, state: STATE_PREBIND }]
+  cluster_manager:
+    upstream_bind_config:
+      socket_options: [{ level: 7, name: 8, int_value: 9, state: STATE_PREBIND }]
+  )EOF";
+  initialize(yaml);
+  NameVals names_vals{{ENVOY_MAKE_SOCKET_OPTION_NAME(10, 12), 13},
+                      {ENVOY_MAKE_SOCKET_OPTION_NAME(14, 15), 16}};
+  if (ENVOY_SOCKET_SO_NOSIGPIPE.hasValue()) {
+    names_vals.emplace_back(std::make_pair(ENVOY_SOCKET_SO_NOSIGPIPE, 1));
+  }
+  expectSetsockopts(names_vals);
+}
+
+TEST_F(SockoptsTest, SockoptsWithExtraSourceAddressAndEmptyOpts) {
+  const std::string yaml = R"EOF(
+  static_resources:
+    clusters:
+    - name: SockoptsCluster
+      connect_timeout: 0.250s
+      lb_policy: ROUND_ROBIN
+      type: STATIC
+      load_assignment:
+        cluster_name: SockoptsCluster
+        endpoints:
+          - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: 127.0.0.1
+                    port_value: 11001
+      upstream_bind_config:
+        source_address:
+          address: '::'
+          port_value: 12345
+        socket_options: [
+          { level: 1, name: 2, int_value: 3, state: STATE_PREBIND },
+          { level: 4, name: 5, int_value: 6, state: STATE_PREBIND }]
+        extra_source_addresses:
+        - address:
+            address: 127.0.0.3
+            port_value: 12345
+          socket_options:
+            socket_options: []
+  cluster_manager:
+    upstream_bind_config:
+      socket_options: [{ level: 7, name: 8, int_value: 9, state: STATE_PREBIND }]
+  )EOF";
+  initialize(yaml);
+  if (ENVOY_SOCKET_SO_NOSIGPIPE.hasValue()) {
+    expectOnlyNoSigpipeOptions();
+  } else {
+    expectNoSocketOptions();
+  }
+}
+
+TEST_F(SockoptsTest, SockoptsWithExtraSourceAddressAndClusterOpts) {
+  const std::string yaml = R"EOF(
+  static_resources:
+    clusters:
+    - name: SockoptsCluster
+      connect_timeout: 0.250s
+      lb_policy: ROUND_ROBIN
+      type: STATIC
+      load_assignment:
+        cluster_name: SockoptsCluster
+        endpoints:
+          - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: 127.0.0.1
+                    port_value: 11001
+      upstream_bind_config:
+        source_address:
+          address: '::'
+          port_value: 12345
+        socket_options: [
+          { level: 1, name: 2, int_value: 3, state: STATE_PREBIND },
+          { level: 4, name: 5, int_value: 6, state: STATE_PREBIND }]
+        extra_source_addresses:
+        - address:
+            address: 127.0.0.3
+            port_value: 12345
   cluster_manager:
     upstream_bind_config:
       socket_options: [{ level: 7, name: 8, int_value: 9, state: STATE_PREBIND }]
@@ -4940,6 +5101,43 @@ TEST_F(SockoptsTest, SockoptsClusterOverride) {
   initialize(yaml);
   NameVals names_vals{{ENVOY_MAKE_SOCKET_OPTION_NAME(1, 2), 3},
                       {ENVOY_MAKE_SOCKET_OPTION_NAME(4, 5), 6}};
+  if (ENVOY_SOCKET_SO_NOSIGPIPE.hasValue()) {
+    names_vals.emplace_back(std::make_pair(ENVOY_SOCKET_SO_NOSIGPIPE, 1));
+  }
+  expectSetsockopts(names_vals);
+}
+
+TEST_F(SockoptsTest, SockoptsWithExtraSourceAddressAndClusterManangerOpts) {
+  const std::string yaml = R"EOF(
+  static_resources:
+    clusters:
+    - name: SockoptsCluster
+      connect_timeout: 0.250s
+      lb_policy: ROUND_ROBIN
+      type: STATIC
+      load_assignment:
+        cluster_name: SockoptsCluster
+        endpoints:
+          - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: 127.0.0.1
+                    port_value: 11001
+      upstream_bind_config:
+        source_address:
+          address: '::'
+          port_value: 12345
+        extra_source_addresses:
+        - address:
+            address: 127.0.0.3
+            port_value: 12345
+  cluster_manager:
+    upstream_bind_config:
+      socket_options: [{ level: 7, name: 8, int_value: 9, state: STATE_PREBIND }]
+  )EOF";
+  initialize(yaml);
+  NameVals names_vals{{ENVOY_MAKE_SOCKET_OPTION_NAME(7, 8), 9}};
   if (ENVOY_SOCKET_SO_NOSIGPIPE.hasValue()) {
     names_vals.emplace_back(std::make_pair(ENVOY_SOCKET_SO_NOSIGPIPE, 1));
   }
@@ -5068,7 +5266,7 @@ public:
                           Network::Address::InstanceConstSharedPtr, Network::TransportSocketPtr&,
                           const Network::ConnectionSocket::OptionsSharedPtr& options)
                        -> Network::ClientConnection* {
-              EXPECT_EQ(nullptr, options.get());
+              EXPECT_TRUE(options != nullptr && options->empty());
               return connection_;
             }));
     auto conn_data =
@@ -5825,6 +6023,25 @@ TEST_F(PreconnectTest, PreconnectOn) {
       .WillRepeatedly(ReturnNew<NiceMock<Tcp::ConnectionPool::MockInstance>>());
   auto tcp_handle = cluster_manager_->getThreadLocalCluster("cluster_1")
                         ->tcpConnPool(ResourcePriority::Default, nullptr);
+  ASSERT_TRUE(tcp_handle.has_value());
+  tcp_handle.value().newConnection(tcp_callbacks_);
+}
+
+TEST_F(PreconnectTest, PreconnectOnWithOverrideHost) {
+  // With preconnect set to 1.1, maybePreconnect will kick off
+  // preconnecting, so create the pool for both the current connection and the
+  // anticipated one.
+  initialize(1.1);
+
+  NiceMock<MockLoadBalancerContext> context;
+  EXPECT_CALL(context, overrideHostToSelect())
+      .WillRepeatedly(Return(absl::make_optional<absl::string_view>("127.0.0.1:80")));
+
+  // Only allocate connection pool once.
+  EXPECT_CALL(factory_, allocateTcpConnPool_)
+      .WillOnce(ReturnNew<NiceMock<Tcp::ConnectionPool::MockInstance>>());
+  auto tcp_handle = cluster_manager_->getThreadLocalCluster("cluster_1")
+                        ->tcpConnPool(ResourcePriority::Default, &context);
   ASSERT_TRUE(tcp_handle.has_value());
   tcp_handle.value().newConnection(tcp_callbacks_);
 }

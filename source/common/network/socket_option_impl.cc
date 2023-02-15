@@ -21,6 +21,11 @@ bool SocketOptionImpl::setOption(Socket& socket,
       return false;
     }
 
+    if (socket_type_.has_value() && *socket_type_ != socket.socketType()) {
+      ENVOY_LOG(info, "Skipping inapplicable socket option {}", optname_.name());
+      return true;
+    }
+
     const Api::SysCallIntResult result =
         SocketOptionImpl::setSocketOption(socket, optname_, value_.data(), value_.size());
     if (result.return_value_ != 0) {

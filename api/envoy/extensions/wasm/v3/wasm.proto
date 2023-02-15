@@ -7,7 +7,6 @@ import "envoy/config/core/v3/base.proto";
 import "google/protobuf/any.proto";
 
 import "udpa/annotations/status.proto";
-import "validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.wasm.v3";
 option java_outer_classname = "WasmProto";
@@ -50,7 +49,8 @@ message VmConfig {
   // [#comment: TODO: add ref for details.]
   string vm_id = 1;
 
-  // The Wasm runtime type.
+  // The Wasm runtime type, defaults to the first available Wasm engine used at Envoy build-time.
+  // The priority to search for the available engine is: v8 -> wasmtime -> wamr -> wavm.
   // Available Wasm runtime types are registered as extensions. The following runtimes are included
   // in Envoy code base:
   //
@@ -79,7 +79,7 @@ message VmConfig {
   // This runtime is not enabled in the official build.
   //
   // [#extension-category: envoy.wasm.runtime]
-  string runtime = 2 [(validate.rules).string = {min_len: 1}];
+  string runtime = 2;
 
   // The Wasm code that Envoy will execute.
   config.core.v3.AsyncDataSource code = 3;

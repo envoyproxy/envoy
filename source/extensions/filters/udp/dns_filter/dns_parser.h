@@ -125,11 +125,16 @@ struct DnsParserCounters {
   Stats::Counter& underflow_counter;
   Stats::Counter& record_name_overflow;
   Stats::Counter& query_parsing_failure;
+  Stats::Counter& queries_with_additional_rrs;
+  Stats::Counter& queries_with_ans_or_authority_rrs;
 
   DnsParserCounters(Stats::Counter& underflow, Stats::Counter& record_name,
-                    Stats::Counter& query_parsing)
+                    Stats::Counter& query_parsing, Stats::Counter& queries_with_additional_rrs,
+                    Stats::Counter& queries_with_ans_or_authority_rrs)
       : underflow_counter(underflow), record_name_overflow(record_name),
-        query_parsing_failure(query_parsing) {}
+        query_parsing_failure(query_parsing),
+        queries_with_additional_rrs(queries_with_additional_rrs),
+        queries_with_ans_or_authority_rrs(queries_with_ans_or_authority_rrs) {}
 };
 
 // The flags have been verified with dig and this structure should not be modified. The flag

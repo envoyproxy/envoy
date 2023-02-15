@@ -12,6 +12,7 @@
 #include "envoy/stats/stats.h"
 
 #include "source/common/common/lock_guard.h"
+#include "source/common/runtime/runtime_features.h"
 #include "source/common/stats/histogram_impl.h"
 #include "source/common/stats/stats_matcher_impl.h"
 #include "source/common/stats/tag_producer_impl.h"
@@ -37,7 +38,9 @@ ThreadLocalStoreImpl::ThreadLocalStoreImpl(Allocator& alloc)
     well_known_tags_->rememberBuiltin(desc.name_);
   }
   StatNameManagedStorage empty("", alloc.symbolTable());
-  default_scope_ = ThreadLocalStoreImpl::scopeFromStatName(empty.statName());
+  auto new_scope = std::make_shared<ScopeImpl>(*this, StatName(empty.statName()));
+  addScope(new_scope);
+  default_scope_ = new_scope;
 }
 
 ThreadLocalStoreImpl::~ThreadLocalStoreImpl() {
@@ -93,6 +96,7 @@ void ThreadLocalStoreImpl::setStatsMatcher(StatsMatcherPtr&& stats_matcher) {
     for (uint32_t i = first_histogram_index; i < deleted_histograms_.size(); ++i) {
       uint32_t erased = histogram_set_.erase(deleted_histograms_[i].get());
       ASSERT(erased == 1);
+      sinked_histograms_.erase(deleted_histograms_[i].get());
     }
   }
 }
@@ -147,16 +151,21 @@ std::vector<CounterSharedPtr> ThreadLocalStoreImpl::counters() const {
   return ret;
 }
 
-ScopeSharedPtr ThreadLocalStoreImpl::createScope(const std::string& name) {
-  StatNameManagedStorage stat_name_storage(Utility::sanitizeStatsName(name), alloc_.symbolTable());
+ScopeSharedPtr ThreadLocalStoreImpl::ScopeImpl::createScope(const std::string& name) {
+  StatNameManagedStorage stat_name_storage(Utility::sanitizeStatsName(name), symbolTable());
   return scopeFromStatName(stat_name_storage.statName());
 }
 
-ScopeSharedPtr ThreadLocalStoreImpl::scopeFromStatName(StatName name) {
-  auto new_scope = std::make_shared<ScopeImpl>(*this, name);
+ScopeSharedPtr ThreadLocalStoreImpl::ScopeImpl::scopeFromStatName(StatName name) {
+  SymbolTable::StoragePtr joined = symbolTable().join({prefix_.statName(), name});
+  auto new_scope = std::make_shared<ScopeImpl>(parent_, StatName(joined.get()));
+  parent_.addScope(new_scope);
+  return new_scope;
+}
+
+void ThreadLocalStoreImpl::addScope(std::shared_ptr<ScopeImpl>& new_scope) {
   Thread::LockGuard lock(lock_);
   scopes_[new_scope.get()] = std::weak_ptr<ScopeImpl>(new_scope);
-  return new_scope;
 }
 
 std::vector<GaugeSharedPtr> ThreadLocalStoreImpl::gauges() const {
@@ -218,6 +227,7 @@ void ThreadLocalStoreImpl::shutdownThreading() {
     histogram->setShuttingDown(true);
   }
   histogram_set_.clear();
+  sinked_histograms_.clear();
 }
 
 void ThreadLocalStoreImpl::mergeHistograms(PostMergeCb merge_complete_cb) {
@@ -469,44 +479,6 @@ bool ThreadLocalStoreImpl::checkAndRememberRejection(StatName name,
   return false;
 }
 
-CounterOptConstRef ThreadLocalStoreImpl::findCounter(StatName name) const {
-  CounterOptConstRef found_counter;
-  iterateScopes([&found_counter, name](const ScopeImplSharedPtr& scope) -> bool {
-    found_counter =
-        scope->findStatLockHeld<Counter>(name, scope->centralCacheLockHeld()->counters_);
-    return !found_counter.has_value();
-  });
-  return found_counter;
-}
-
-GaugeOptConstRef ThreadLocalStoreImpl::findGauge(StatName name) const {
-  GaugeOptConstRef found_gauge;
-  iterateScopes([&found_gauge, name](const ScopeImplSharedPtr& scope) -> bool {
-    found_gauge = scope->findStatLockHeld<Gauge>(name, scope->centralCacheLockHeld()->gauges_);
-    return !found_gauge.has_value();
-  });
-  return found_gauge;
-}
-
-HistogramOptConstRef ThreadLocalStoreImpl::findHistogram(StatName name) const {
-  HistogramOptConstRef found_histogram;
-  iterateScopes([&found_histogram, name](const ScopeImplSharedPtr& scope) -> bool {
-    found_histogram = scope->findHistogramLockHeld(name);
-    return !found_histogram.has_value();
-  });
-  return found_histogram;
-}
-
-TextReadoutOptConstRef ThreadLocalStoreImpl::findTextReadout(StatName name) const {
-  TextReadoutOptConstRef found_text_readout;
-  iterateScopes([&found_text_readout, name](const ScopeImplSharedPtr& scope) -> bool {
-    found_text_readout =
-        scope->findStatLockHeld<TextReadout>(name, scope->centralCacheLockHeld()->text_readouts_);
-    return !found_text_readout.has_value();
-  });
-  return found_text_readout;
-}
-
 template <class StatType>
 StatType& ThreadLocalStoreImpl::ScopeImpl::safeMakeStat(
     StatName full_stat_name, StatName name_no_tags,
@@ -595,18 +567,17 @@ Counter& ThreadLocalStoreImpl::ScopeImpl::counterFromStatNameWithTags(
       tls_cache, tls_rejected_stats, parent_.null_counter_);
 }
 
-void ThreadLocalStoreImpl::ScopeImpl::deliverHistogramToSinks(const Histogram& histogram,
-                                                              uint64_t value) {
+void ThreadLocalStoreImpl::deliverHistogramToSinks(const Histogram& histogram, uint64_t value) {
   // Thread local deliveries must be blocked outright for histograms and timers during shutdown.
   // This is because the sinks may end up trying to create new connections via the thread local
   // cluster manager which may already be destroyed (there is no way to sequence this because the
   // cluster manager destroying can create deliveries). We special case this explicitly to avoid
   // having to implement a shutdown() method (or similar) on every TLS object.
-  if (parent_.shutting_down_) {
+  if (shutting_down_) {
     return;
   }
 
-  for (Sink& sink : parent_.timer_sinks_) {
+  for (Sink& sink : timer_sinks_) {
     sink.onHistogramComplete(histogram, value);
   }
 }
@@ -710,6 +681,10 @@ Histogram& ThreadLocalStoreImpl::ScopeImpl::histogramFromStatNameWithTags(
                                        *buckets, parent_.next_histogram_id_++);
         if (!parent_.shutting_down_) {
           parent_.histogram_set_.insert(stat.get());
+          if (parent_.sink_predicates_.has_value() &&
+              parent_.sink_predicates_->includeHistogram(*stat)) {
+            parent_.sinked_histograms_.insert(stat.get());
+          }
         }
       }
     }
@@ -909,6 +884,7 @@ bool ThreadLocalStoreImpl::decHistogramRefCount(ParentHistogramImpl& hist,
     if (!shutting_down_) {
       const size_t count = histogram_set_.erase(hist.statName());
       ASSERT(shutting_down_ || count == 1);
+      sinked_histograms_.erase(&hist);
     }
     return true;
   }
@@ -1066,11 +1042,36 @@ void ThreadLocalStoreImpl::forEachSinkedTextReadout(SizeFn f_size,
   alloc_.forEachSinkedTextReadout(f_size, f_stat);
 }
 
+void ThreadLocalStoreImpl::forEachSinkedHistogram(SizeFn f_size,
+                                                  StatFn<ParentHistogram> f_stat) const {
+  if (sink_predicates_.has_value() &&
+      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.enable_include_histograms")) {
+    Thread::LockGuard lock(hist_mutex_);
+
+    if (f_size != nullptr) {
+      f_size(sinked_histograms_.size());
+    }
+    for (auto histogram : sinked_histograms_) {
+      f_stat(*histogram);
+    }
+  } else {
+    forEachHistogram(f_size, f_stat);
+  }
+}
+
 void ThreadLocalStoreImpl::setSinkPredicates(std::unique_ptr<SinkPredicates>&& sink_predicates) {
   ASSERT(sink_predicates != nullptr);
   if (sink_predicates != nullptr) {
     sink_predicates_.emplace(*sink_predicates);
     alloc_.setSinkPredicates(std::move(sink_predicates));
+    // Add histograms to the set of sinked histograms.
+    Thread::LockGuard lock(hist_mutex_);
+    sinked_histograms_.clear();
+    for (auto& histogram : histogram_set_) {
+      if (sink_predicates_->includeHistogram(*histogram)) {
+        sinked_histograms_.insert(histogram);
+      }
+    }
   }
 }
 

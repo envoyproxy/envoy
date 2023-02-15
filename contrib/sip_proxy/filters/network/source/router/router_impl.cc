@@ -1,7 +1,5 @@
 #include "contrib/sip_proxy/filters/network/source/router/router_impl.h"
 
-#include <memory>
-
 #include "envoy/upstream/cluster_manager.h"
 
 #include "source/common/common/logger.h"
@@ -10,7 +8,6 @@
 #include "source/common/router/metadatamatchcriteria_impl.h"
 #include "source/common/tracing/http_tracer_impl.h"
 
-#include "absl/strings/match.h"
 #include "contrib/envoy/extensions/filters/network/sip_proxy/v3alpha/route.pb.h"
 #include "contrib/sip_proxy/filters/network/source/app_exception_impl.h"
 #include "contrib/sip_proxy/filters/network/source/conn_manager.h"
@@ -60,8 +57,13 @@ RouteConstSharedPtr GeneralRouteEntryImpl::matches(MessageMetadata& metadata) co
   header = metadata.header(type).text();
   if (header.empty()) {
     if (type == HeaderType::Route) {
+      if (metadata.header(HeaderType::TopLine).empty()) {
+        ENVOY_LOG(error, "No route and r-uri");
+        return nullptr;
+      }
       header = metadata.header(HeaderType::TopLine).text();
       ENVOY_LOG(debug, "No route, r-uri {} is used ", header);
+      type = HeaderType::TopLine;
     } else {
       ENVOY_LOG(debug, "header {} is empty", header_);
       return nullptr;
@@ -73,7 +75,7 @@ RouteConstSharedPtr GeneralRouteEntryImpl::matches(MessageMetadata& metadata) co
     return clusterEntry(metadata);
   }
 
-  auto domain = metadata.getDomainFromHeaderParameter(header, parameter_);
+  auto domain = metadata.getDomainFromHeaderParameter(type, parameter_);
 
   if (domain_ == domain) {
     ENVOY_LOG(trace, "Route matched with header: {}, parameter: {} and domain: {}", header_,
@@ -142,11 +144,16 @@ QueryStatus Router::handleCustomizedAffinity(const std::string& header, const st
       host = std::string(metadata->opaque().value());
     } else {
       // Handler other Requests except REGISTER
-      if ((metadata->header(HeaderType::Route).empty() &&
-           metadata->header(HeaderType::TopLine).hasParam("ep"))) {
-        host = std::string(metadata->header(HeaderType::TopLine).param("ep"));
-      } else if (metadata->header(HeaderType::Route).hasParam("ep")) {
-        host = std::string(metadata->header(HeaderType::Route).param("ep"));
+      if (metadata->header(HeaderType::Route).empty()) {
+        metadata->parseHeader(HeaderType::TopLine);
+        if (metadata->header(HeaderType::TopLine).hasParam("ep")) {
+          host = std::string(metadata->header(HeaderType::TopLine).param("ep"));
+        }
+      } else {
+        metadata->parseHeader(HeaderType::Route);
+        if (metadata->header(HeaderType::Route).hasParam("ep")) {
+          host = std::string(metadata->header(HeaderType::Route).param("ep"));
+        }
       }
     }
 
@@ -238,10 +245,18 @@ FilterStatus Router::handleAffinity() {
     } else if (metadata->methodType() != MethodType::Register && options->sessionAffinity()) {
       metadata->setStopLoadBalance(false);
 
-      if ((metadata->header(HeaderType::Route).empty() &&
-           metadata->header(HeaderType::TopLine).hasParam("ep")) ||
-          (metadata->header(HeaderType::Route).hasParam("ep"))) {
-        metadata->affinity().emplace_back("Route", "ep", "ep", false, false);
+      if (metadata->header(HeaderType::Route).empty()) {
+        if (!metadata->header(HeaderType::TopLine).empty()) {
+          metadata->parseHeader(HeaderType::TopLine);
+          if (metadata->header(HeaderType::TopLine).hasParam("ep")) {
+            metadata->affinity().emplace_back("Route", "ep", "ep", false, false);
+          }
+        }
+      } else {
+        metadata->parseHeader(HeaderType::Route);
+        if (metadata->header(HeaderType::Route).hasParam("ep")) {
+          metadata->affinity().emplace_back("Route", "ep", "ep", false, false);
+        }
       }
     } else if (metadata->methodType() == MethodType::Register && options->registrationAffinity()) {
       metadata->setStopLoadBalance(false);
@@ -468,11 +483,11 @@ FilterStatus Router::messageEnd() {
   std::shared_ptr<Encoder> encoder = std::make_shared<EncoderImpl>();
   encoder->encode(metadata_, transport_buffer);
 
-  ENVOY_STREAM_LOG(trace, "send buffer : {} bytes\n{}", *callbacks_, transport_buffer.length(),
+  ENVOY_STREAM_LOG(debug, "send buffer : {} bytes\n{}", *callbacks_, transport_buffer.length(),
                    transport_buffer.toString());
 
   callbacks_->stats()
-      .counterFromElements(methodStr[metadata_->methodType()], "request_proxied")
+      .sipMethodCounter(metadata_->methodType(), SipMethodStatsSuffix::RequestProxied)
       .inc();
   upstream_request_->write(transport_buffer, false);
   return FilterStatus::Continue;
@@ -641,12 +656,6 @@ void UpstreamRequest::onUpstreamData(Buffer::Instance& data, bool end_stream) {
             conn_data_->connection().connectionInfoProvider().localAddress()->asStringView(),
             data.length());
 
-  if (!callbacks_) {
-    ENVOY_LOG(error, "There is no activeTrans, drain data.");
-    data.drain(data.length());
-    return;
-  }
-
   upstream_buffer_.move(data);
   auto response_decoder = std::make_unique<ResponseDecoder>(*this);
   response_decoder->onData(upstream_buffer_);
@@ -717,7 +726,7 @@ FilterStatus ResponseDecoder::transportBegin(MessageMetadataSharedPtr metadata) 
 DecoderEventHandler& ResponseDecoder::newDecoderEventHandler(MessageMetadataSharedPtr metadata) {
   parent_.decoderFilterCallbacks()
       .stats()
-      .counterFromElements(methodStr[metadata->methodType()], "response_received")
+      .sipMethodCounter(metadata->methodType(), SipMethodStatsSuffix::ResponseReceived)
       .inc();
   return *this;
 }

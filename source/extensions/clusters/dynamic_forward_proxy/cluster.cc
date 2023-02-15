@@ -5,6 +5,7 @@
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/extensions/clusters/dynamic_forward_proxy/v3/cluster.pb.h"
 #include "envoy/extensions/clusters/dynamic_forward_proxy/v3/cluster.pb.validate.h"
+#include "envoy/router/string_accessor.h"
 
 #include "source/common/http/utility.h"
 #include "source/common/network/transport_socket_options_impl.h"
@@ -54,8 +55,6 @@ void Cluster::addOrUpdateHost(
   Upstream::LogicalHostSharedPtr emplaced_host;
   {
     absl::WriterMutexLock lock{&host_map_lock_};
-    // We should never get a host with no address from the cache.
-    ASSERT(host_info->address() != nullptr);
 
     // NOTE: Right now we allow a DNS cache to be shared between multiple clusters. Though we have
     // connection/request circuit breakers on the cluster, we don't have any way to control the
@@ -155,8 +154,19 @@ Cluster::LoadBalancer::chooseHost(Upstream::LoadBalancerContext* context) {
     return nullptr;
   }
 
+  const Router::StringAccessor* dynamic_host_filter_state = nullptr;
+  if (context->downstreamConnection()) {
+    dynamic_host_filter_state =
+        context->downstreamConnection()
+            ->streamInfo()
+            .filterState()
+            .getDataReadOnly<Router::StringAccessor>("envoy.upstream.dynamic_host");
+  }
+
   absl::string_view host;
-  if (context->downstreamHeaders()) {
+  if (dynamic_host_filter_state) {
+    host = dynamic_host_filter_state->asString();
+  } else if (context->downstreamHeaders()) {
     host = context->downstreamHeaders()->getHostValue();
   } else if (context->downstreamConnection()) {
     host = context->downstreamConnection()->requestedServerName();
@@ -171,7 +181,7 @@ Cluster::LoadBalancer::chooseHost(Upstream::LoadBalancerContext* context) {
     if (host_it == cluster_.host_map_.end()) {
       return nullptr;
     } else {
-      if (host_it->second.logical_host_->health() == Upstream::Host::Health::Unhealthy) {
+      if (host_it->second.logical_host_->coarseHealth() == Upstream::Host::Health::Unhealthy) {
         return nullptr;
       }
       host_it->second.shared_host_info_->touch();

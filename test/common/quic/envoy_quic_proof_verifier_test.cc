@@ -83,7 +83,7 @@ public:
     EXPECT_CALL(cert_validation_ctx_config_, customValidatorConfig())
         .WillRepeatedly(ReturnRef(custom_validator_config_));
     auto context = std::make_shared<Extensions::TransportSockets::Tls::ClientContextImpl>(
-        store_, client_context_config_, time_system_);
+        *store_.rootScope(), client_context_config_, time_system_);
     verifier_ = std::make_unique<EnvoyQuicProofVerifier>(std::move(context));
   }
 
@@ -425,6 +425,18 @@ TEST_P(EnvoyQuicProofVerifierTest, VerifySubjectAltNameListOverrideFailure) {
   EXPECT_EQ("verify cert failed: verify SAN list", error_details);
   EXPECT_NE(verify_details, nullptr);
   EXPECT_FALSE(static_cast<CertVerifyResult&>(*verify_details).isValid());
+}
+
+TEST_P(EnvoyQuicProofVerifierTest, VerifyProof) {
+  configCertVerificationDetails(true);
+  EXPECT_DEATH(verifier_->VerifyProof("", 0, "", quic::QUIC_VERSION_IETF_RFC_V1, "", {}, "", "",
+                                      nullptr, nullptr, nullptr, {}),
+               "not implemented");
+}
+
+TEST_P(EnvoyQuicProofVerifierTest, CreateDefaultContext) {
+  configCertVerificationDetails(true);
+  EXPECT_EQ(nullptr, verifier_->CreateDefaultContext());
 }
 
 } // namespace Quic

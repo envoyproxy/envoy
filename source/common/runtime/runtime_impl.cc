@@ -382,7 +382,7 @@ void ProtoLayer::walkProtoValue(const ProtobufWkt::Value& v, const std::string& 
     if (hasRuntimePrefix(prefix) && !isRuntimeFeature(prefix)) {
       IS_ENVOY_BUG(absl::StrCat(
           "Using a removed guard ", prefix,
-          ". In future version of Enovy this will be treated as invalid configuration"));
+          ". In future version of Envoy this will be treated as invalid configuration"));
     }
     values_.emplace(prefix, SnapshotImpl::createEntry(v));
     break;
@@ -581,7 +581,7 @@ void LoaderImpl::mergeValues(const absl::node_hash_map<std::string, std::string>
   loadNewSnapshot();
 }
 
-Stats::Scope& LoaderImpl::getRootScope() { return store_; }
+Stats::Scope& LoaderImpl::getRootScope() { return *store_.rootScope(); }
 
 void LoaderImpl::countDeprecatedFeatureUse() const { countDeprecatedFeatureUseInternal(stats_); }
 

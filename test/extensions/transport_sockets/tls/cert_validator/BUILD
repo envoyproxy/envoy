@@ -37,16 +37,6 @@ envoy_cc_test(
     ],
 )
 
-envoy_cc_test(
-    name = "utility_test",
-    srcs = [
-        "utility_test.cc",
-    ],
-    deps = [
-        "//source/extensions/transport_sockets/tls/cert_validator:cert_validator_lib",
-    ],
-)
-
 envoy_cc_test_library(
     name = "test_common",
     hdrs = ["test_common.h"],
@@ -83,6 +73,8 @@ envoy_cc_test(
     ],
     deps = [
         "//test/integration:http_integration_lib",
+        "//test/test_common:test_runtime_lib",
+        "//test/test_common:utility_lib",
     ],
 )
 

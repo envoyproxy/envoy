@@ -5,6 +5,7 @@
 
 #include "source/common/common/random_generator.h"
 #include "source/common/common/utility.h"
+#include "source/common/stream_info/stream_id_provider_impl.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -28,8 +29,16 @@ void UUIDRequestIDExtension::setInResponse(Http::ResponseHeaderMap& response_hea
   }
 }
 
+absl::optional<absl::string_view>
+UUIDRequestIDExtension::get(const Http::RequestHeaderMap& request_headers) const {
+  if (request_headers.RequestId() == nullptr) {
+    return absl::nullopt;
+  }
+  return request_headers.getRequestIdValue();
+}
+
 absl::optional<uint64_t>
-UUIDRequestIDExtension::toInteger(const Http::RequestHeaderMap& request_headers) const {
+UUIDRequestIDExtension::getInteger(const Http::RequestHeaderMap& request_headers) const {
   if (request_headers.RequestId() == nullptr) {
     return absl::nullopt;
   }

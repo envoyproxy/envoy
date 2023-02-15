@@ -1,3 +1,4 @@
+#include "protocol_integration_test.h"
 #include "test/integration/protocol_integration_test.h"
 
 #include <functional>
@@ -76,6 +77,12 @@ TEST_P(ProtocolIntegrationTest, LogicalDns) {
     cluster.set_type(envoy::config::cluster::v3::Cluster::LOGICAL_DNS);
     cluster.set_dns_lookup_family(envoy::config::cluster::v3::Cluster::ALL);
   });
+  config_helper_.addConfigModifier(
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             hcm) {
+        auto* route = hcm.mutable_route_config()->mutable_virtual_hosts(0)->mutable_routes(0);
+        route->mutable_route()->mutable_auto_host_rewrite()->set_value(true);
+      });
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
   auto response =
@@ -132,10 +139,6 @@ TEST_P(DownstreamProtocolIntegrationTest, RouterClusterNotFound404) {
 }
 
 TEST_P(DownstreamProtocolIntegrationTest, TestHostWhitespacee) {
-  if (skipForH2Uhv(SkipOnStream::Downstream)) {
-    return;
-  }
-
   config_helper_.addConfigModifier(&setDoNotValidateRouteConfig);
   auto host = config_helper_.createVirtualHost("foo.lyft.com", "/unknown", "unknown_cluster");
   host.mutable_routes(0)->mutable_route()->set_cluster_not_found_response_code(
@@ -282,6 +285,20 @@ TEST_P(ProtocolIntegrationTest, AddBodyToRequestAndWaitForIt) {
   EXPECT_TRUE(upstream_request_->complete());
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
+}
+
+TEST_P(ProtocolIntegrationTest, RouterOnlyTracing) {
+  config_helper_.addConfigModifier(
+      [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) -> void {
+        envoy::extensions::filters::http::router::v3::Router router_config;
+        router_config.set_start_child_span(true);
+        hcm.mutable_http_filters(0)->mutable_typed_config()->PackFrom(router_config);
+      });
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response =
+      sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0);
 }
 
 TEST_P(ProtocolIntegrationTest, AddBodyToResponseAndWaitForIt) {
@@ -572,13 +589,17 @@ TEST_P(DownstreamProtocolIntegrationTest, FaultyFilterWithConnect) {
   // Missing host for CONNECT
   auto headers = Http::TestRequestHeaderMapImpl{
       {":method", "CONNECT"}, {":scheme", "http"}, {":authority", "www.host.com:80"}};
-
-  auto response = std::move((codec_client_->startRequest(headers)).second);
+  auto encoder_decoder = codec_client_->startRequest(headers);
+  auto response = std::move(encoder_decoder.second);
 
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("503", response->headers().getStatusValue());
   EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("missing_required_header"));
+  // Wait to process STOP_SENDING on the client for quic.
+  if (downstreamProtocol() == Http::CodecType::HTTP3) {
+    EXPECT_TRUE(response->waitForReset());
+  }
 }
 
 TEST_P(DownstreamProtocolIntegrationTest, MissingHeadersLocalReply) {
@@ -598,7 +619,7 @@ TEST_P(DownstreamProtocolIntegrationTest, MissingHeadersLocalReply) {
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
-  EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("invalid_header_filter_ready\n"));
+  EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("invalid_header_filter_ready"));
 }
 
 TEST_P(DownstreamProtocolIntegrationTest, MissingHeadersLocalReplyDownstreamBytesCount) {
@@ -665,7 +686,7 @@ TEST_P(DownstreamProtocolIntegrationTest, MissingHeadersLocalReplyWithBody) {
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
-  EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("invalid_header_filter_ready\n"));
+  EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("invalid_header_filter_ready"));
 }
 
 TEST_P(DownstreamProtocolIntegrationTest, MissingHeadersLocalReplyWithBodyBytesCount) {
@@ -802,6 +823,33 @@ TEST_P(ProtocolIntegrationTest, Retry) {
       BytesCountExpectation(2566 + quic_https_extra_bytes, 635, 430 + quic_https_extra_bytes, 54),
       BytesCountExpectation(2262, 548, 196, http2_header_bytes_received),
       BytesCountExpectation(2204, 520, 150, 6));
+}
+
+// Regression test to guarantee that buffering for retries and shadows doesn't double the body size.
+// This test is actually irrelevant for QUIC, as this issue only shows up with header-only requests.
+// QUIC will always send an empty data frame with FIN.
+TEST_P(ProtocolIntegrationTest, RetryWithBuffer) {
+  config_helper_.prependFilter(R"EOF(
+  name: add-body-filter
+  typed_config:
+      "@type": type.googleapis.com/test.integration.filters.AddBodyFilterConfig
+      where_to_add_body: DEFAULT
+  )EOF");
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeHeaderOnlyRequest(
+      Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                     {":path", "/test/long/url"},
+                                     {":scheme", "http"},
+                                     {":authority", "sni.lyft.com"},
+                                     {"x-forwarded-for", "10.0.0.1"},
+                                     {"x-envoy-retry-on", "5xx"}});
+  waitForNextUpstreamRequest();
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_TRUE(upstream_request_->receivedData());
+  EXPECT_EQ(upstream_request_->bodyLength(), 4);
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  ASSERT_TRUE(response->waitForEndStream());
 }
 
 TEST_P(ProtocolIntegrationTest, RetryStreaming) {
@@ -1495,6 +1543,8 @@ TEST_P(ProtocolIntegrationTest, MaxStreamDurationWithRetryPolicyWhenRetryUpstrea
 // Verify that headers with underscores in their names are dropped from client requests
 // but remain in upstream responses.
 TEST_P(ProtocolIntegrationTest, HeadersWithUnderscoresDropped) {
+  config_helper_.addConfigModifier(setEnableDownstreamTrailersHttp1());
+  config_helper_.addConfigModifier(setEnableUpstreamTrailersHttp1());
   config_helper_.addConfigModifier(
       [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
               hcm) -> void {
@@ -1503,21 +1553,34 @@ TEST_P(ProtocolIntegrationTest, HeadersWithUnderscoresDropped) {
       });
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
-  auto response = codec_client_->makeHeaderOnlyRequest(
-      Http::TestRequestHeaderMapImpl{{":method", "GET"},
-                                     {":path", "/test/long/url"},
-                                     {":scheme", "http"},
-                                     {":authority", "sni.lyft.com"},
-                                     {"foo_bar", "baz"}});
+  auto encoder_decoder =
+      codec_client_->startRequest(Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                                                 {":path", "/test/long/url"},
+                                                                 {":scheme", "http"},
+                                                                 {":authority", "sni.lyft.com"},
+                                                                 {"foo_bar", "baz"}});
+  request_encoder_ = &encoder_decoder.first;
+  auto response = std::move(encoder_decoder.second);
+  codec_client_->sendData(*request_encoder_, 1, false);
+  codec_client_->sendTrailers(
+      *request_encoder_,
+      Http::TestRequestTrailerMapImpl{{"trailer1", "value1"}, {"trailer_2", "value2"}});
   waitForNextUpstreamRequest();
 
   EXPECT_THAT(upstream_request_->headers(), Not(HeaderHasValueRef("foo_bar", "baz")));
+  // Headers with underscores should be dropped from request headers and trailers.
+  EXPECT_THAT(*upstream_request_->trailers(), Not(HeaderHasValueRef("trailer_2", "value2")));
   upstream_request_->encodeHeaders(
-      Http::TestResponseHeaderMapImpl{{":status", "200"}, {"bar_baz", "fooz"}}, true);
+      Http::TestResponseHeaderMapImpl{{":status", "200"}, {"bar_baz", "fooz"}}, false);
+  upstream_request_->encodeData("b", false);
+  upstream_request_->encodeTrailers(
+      Http::TestResponseTrailerMapImpl{{"trailer1", "value1"}, {"response_trailer", "ok"}});
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
+  // Both response headers and trailers must retain headers with underscores.
   EXPECT_THAT(response->headers(), HeaderHasValueRef("bar_baz", "fooz"));
+  EXPECT_THAT(*response->trailers(), HeaderHasValueRef("response_trailer", "ok"));
   Stats::Store& stats = test_server_->server().stats();
   std::string stat_name;
   switch (downstreamProtocol()) {
@@ -1534,7 +1597,7 @@ TEST_P(ProtocolIntegrationTest, HeadersWithUnderscoresDropped) {
     RELEASE_ASSERT(false, fmt::format("Unknown downstream protocol {}",
                                       static_cast<int>(downstream_protocol_)));
   };
-  EXPECT_EQ(1L, TestUtility::findCounter(stats, stat_name)->value());
+  EXPECT_EQ(2L, TestUtility::findCounter(stats, stat_name)->value());
 }
 
 // Verify that by default headers with underscores in their names remain in both requests and
@@ -1560,7 +1623,7 @@ TEST_P(ProtocolIntegrationTest, HeadersWithUnderscoresRemainByDefault) {
 }
 
 // Verify that request with headers containing underscores is rejected when configured.
-TEST_P(DownstreamProtocolIntegrationTest, HeadersWithUnderscoresCauseRequestRejectedByDefault) {
+TEST_P(DownstreamProtocolIntegrationTest, HeadersWithUnderscoresCauseRequestRejected) {
   useAccessLog("%RESPONSE_FLAGS% %RESPONSE_CODE_DETAILS%");
   config_helper_.addConfigModifier(
       [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
@@ -1588,6 +1651,76 @@ TEST_P(DownstreamProtocolIntegrationTest, HeadersWithUnderscoresCauseRequestReje
     EXPECT_EQ(Http::StreamResetReason::RemoteReset, response->resetReason());
   }
   EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("unexpected_underscore"));
+}
+
+// Verify that request with trailers containing underscores is rejected when configured.
+TEST_P(DownstreamProtocolIntegrationTest, TrailerWithUnderscoresCauseRequestRejected) {
+  useAccessLog("%RESPONSE_FLAGS% %RESPONSE_CODE_DETAILS%");
+  config_helper_.addConfigModifier(setEnableDownstreamTrailersHttp1());
+  config_helper_.addConfigModifier(setEnableUpstreamTrailersHttp1());
+  config_helper_.addConfigModifier(
+      [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) -> void {
+        hcm.mutable_common_http_protocol_options()->set_headers_with_underscores_action(
+            envoy::config::core::v3::HttpProtocolOptions::REJECT_REQUEST);
+      });
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto encoder_decoder =
+      codec_client_->startRequest(Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                                                 {":path", "/test/long/url"},
+                                                                 {":scheme", "http"},
+                                                                 {":authority", "sni.lyft.com"}});
+  request_encoder_ = &encoder_decoder.first;
+  auto response = std::move(encoder_decoder.second);
+  codec_client_->sendData(*request_encoder_, 1, false);
+  codec_client_->sendTrailers(
+      *request_encoder_,
+      Http::TestRequestTrailerMapImpl{{"trailer1", "value1"}, {"trailer_2", "value2"}});
+
+  if (downstream_protocol_ == Http::CodecType::HTTP1) {
+    ASSERT_TRUE(codec_client_->waitForDisconnect());
+    ASSERT_TRUE(response->complete());
+    EXPECT_EQ("400", response->headers().getStatusValue());
+  } else {
+    ASSERT_TRUE(response->waitForReset());
+    codec_client_->close();
+    ASSERT_TRUE(response->reset());
+    EXPECT_EQ(Http::StreamResetReason::RemoteReset, response->resetReason());
+  }
+  EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("unexpected_underscore"));
+}
+
+// Verify that headers with underscores in response do not cause request to be rejected.
+TEST_P(ProtocolIntegrationTest, HeadersWithUnderscoresInResponseAllowRequest) {
+  config_helper_.addConfigModifier(setEnableDownstreamTrailersHttp1());
+  config_helper_.addConfigModifier(setEnableUpstreamTrailersHttp1());
+  config_helper_.addConfigModifier(
+      [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) -> void {
+        hcm.mutable_common_http_protocol_options()->set_headers_with_underscores_action(
+            envoy::config::core::v3::HttpProtocolOptions::REJECT_REQUEST);
+      });
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeHeaderOnlyRequest(
+      Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                     {":path", "/test/long/url"},
+                                     {":scheme", "http"},
+                                     {":authority", "sni.lyft.com"}});
+  waitForNextUpstreamRequest();
+
+  upstream_request_->encodeHeaders(
+      Http::TestResponseHeaderMapImpl{{":status", "200"}, {"bar_baz", "fooz"}}, false);
+  upstream_request_->encodeData("b", false);
+  upstream_request_->encodeTrailers(
+      Http::TestResponseTrailerMapImpl{{"trailer1", "value1"}, {"response_trailer", "ok"}});
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  // Both response headers and trailers must retain headers with underscores.
+  EXPECT_THAT(response->headers(), HeaderHasValueRef("bar_baz", "fooz"));
+  EXPECT_THAT(*response->trailers(), HeaderHasValueRef("response_trailer", "ok"));
 }
 
 TEST_P(DownstreamProtocolIntegrationTest, ValidZeroLengthContent) {
@@ -1631,7 +1764,10 @@ TEST_P(ProtocolIntegrationTest, 304WithBody) {
     ASSERT_FALSE(response->complete());
   }
 
-  upstream_request_->encodeData(2, true);
+  // Note that at this point the parser is expecting a new response, and it
+  // signals an error because it cannot parse the received data as a valid
+  // status line.
+  upstream_request_->encodeData("aa\r\n", true);
   if (upstreamProtocol() == Http::CodecType::HTTP1) {
     // Any body sent after the request is considered complete will not be handled as part of the
     // active request, but will be flagged as a protocol error for the no-longer-associated
@@ -1652,10 +1788,13 @@ TEST_P(ProtocolIntegrationTest, 304WithBody) {
 }
 
 TEST_P(ProtocolIntegrationTest, OverflowingResponseCode) {
-  if (skipForH2Uhv(SkipOnStream::Upstream)) {
+#ifdef ENVOY_ENABLE_UHV
+  // TODO(#24945): In UHV case this test breaks in the CONNECT/upgrade normalization code in H/2
+  // codec
+  if (upstreamProtocol() != Http::CodecType::HTTP1) {
     return;
   }
-
+#endif
   useAccessLog("%RESPONSE_CODE_DETAILS%");
   initialize();
 
@@ -1683,11 +1822,46 @@ TEST_P(ProtocolIntegrationTest, OverflowingResponseCode) {
   EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("protocol_error"));
 }
 
-TEST_P(ProtocolIntegrationTest, MissingStatus) {
-  if (skipForH2Uhv(SkipOnStream::Upstream)) {
+TEST_P(ProtocolIntegrationTest, OverflowingResponseCodeStreamError) {
+#ifdef ENVOY_ENABLE_UHV
+  // TODO(#24945): In UHV case this test breaks in the CONNECT/upgrade normalization code in H/2
+  // codec
+  if (upstreamProtocol() != Http::CodecType::HTTP1) {
     return;
   }
+#endif
+  // For H/1 this test is equivalent to OverflowingResponseCode
+  if (upstreamProtocol() == Http::CodecType::HTTP1) {
+    return;
+  }
+  setUpstreamOverrideStreamErrorOnInvalidHttpMessage();
+  useAccessLog("%RESPONSE_CODE_DETAILS%");
+  initialize();
 
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  waitForNextUpstreamRequest();
+  default_response_headers_.setStatus(
+      "11111111111111111111111111111111111111111111111111111111111111111");
+  upstream_request_->encodeHeaders(default_response_headers_, false);
+
+  // The upstream stream should be reset
+  ASSERT_TRUE(upstream_request_->waitForReset());
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("502", response->headers().getStatusValue());
+  EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("protocol_error"));
+  // Upstream connection should stay up
+  ASSERT_TRUE(fake_upstream_connection_->connected());
+}
+
+TEST_P(ProtocolIntegrationTest, MissingStatus) {
+#ifdef ENVOY_ENABLE_UHV
+  // TODO(#24945): In UHV case this test breaks in the CONNECT/upgrade normalization code in H/2
+  // codec
+  if (upstreamProtocol() != Http::CodecType::HTTP1) {
+    return;
+  }
+#endif
   initialize();
 
   // HTTP1, uses a defined protocol which doesn't split up messages into raw byte frames
@@ -1722,6 +1896,39 @@ TEST_P(ProtocolIntegrationTest, MissingStatus) {
     ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
   }
 
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("502", response->headers().getStatusValue());
+}
+
+TEST_P(ProtocolIntegrationTest, MissingStatusStreamError) {
+#ifdef ENVOY_ENABLE_UHV
+  // TODO(#24945): In UHV case this test breaks in the CONNECT/upgrade normalization code in H/2
+  // codec
+  if (upstreamProtocol() != Http::CodecType::HTTP1) {
+    return;
+  }
+#endif
+  // For H/1 this test is equivalent to MissingStatus
+  if (upstreamProtocol() == Http::CodecType::HTTP1) {
+    return;
+  }
+  setUpstreamOverrideStreamErrorOnInvalidHttpMessage();
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  waitForNextUpstreamRequest();
+  if (upstreamProtocol() == Http::CodecType::HTTP2) {
+    Http::Http2::Http2Frame missing_status = Http::Http2::Http2Frame::makeHeadersFrameNoStatus(1);
+    ASSERT_TRUE(fake_upstream_connection_->postWriteRawData(std::string(missing_status)));
+  } else {
+    default_response_headers_.removeStatus();
+    upstream_request_->encodeHeaders(default_response_headers_, false);
+  }
+
+  ASSERT_TRUE(upstream_request_->waitForReset());
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_EQ("502", response->headers().getStatusValue());
 }
@@ -1794,10 +2001,6 @@ TEST_P(DownstreamProtocolIntegrationTest, LargeCookieParsingMany) {
 }
 
 TEST_P(DownstreamProtocolIntegrationTest, InvalidContentLength) {
-  if (skipForH2Uhv(SkipOnStream::Downstream)) {
-    return;
-  }
-
   initialize();
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -1822,24 +2025,7 @@ TEST_P(DownstreamProtocolIntegrationTest, InvalidContentLength) {
 }
 
 TEST_P(DownstreamProtocolIntegrationTest, InvalidContentLengthAllowed) {
-  if (skipForH2Uhv(SkipOnStream::Downstream)) {
-    return;
-  }
-
-  config_helper_.addConfigModifier(
-      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
-             hcm) -> void {
-        hcm.mutable_http3_protocol_options()
-            ->mutable_override_stream_error_on_invalid_http_message()
-            ->set_value(true);
-        hcm.mutable_http2_protocol_options()
-            ->mutable_override_stream_error_on_invalid_http_message()
-            ->set_value(true);
-        hcm.mutable_http_protocol_options()
-            ->mutable_override_stream_error_on_invalid_http_message()
-            ->set_value(true);
-      });
-
+  setDownstreamOverrideStreamErrorOnInvalidHttpMessage();
   initialize();
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -1868,10 +2054,6 @@ TEST_P(DownstreamProtocolIntegrationTest, InvalidContentLengthAllowed) {
 }
 
 TEST_P(DownstreamProtocolIntegrationTest, MultipleContentLengths) {
-  if (skipForH2Uhv(SkipOnStream::Downstream)) {
-    return;
-  }
-
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
   auto encoder_decoder =
@@ -1894,21 +2076,7 @@ TEST_P(DownstreamProtocolIntegrationTest, MultipleContentLengths) {
 
 // TODO(PiotrSikora): move this HTTP/2 only variant to http2_integration_test.cc.
 TEST_P(DownstreamProtocolIntegrationTest, MultipleContentLengthsAllowed) {
-  if (skipForH2Uhv(SkipOnStream::Downstream)) {
-    return;
-  }
-
-  config_helper_.addConfigModifier(
-      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
-             hcm) -> void {
-        hcm.mutable_http3_protocol_options()
-            ->mutable_override_stream_error_on_invalid_http_message()
-            ->set_value(true);
-        hcm.mutable_http2_protocol_options()
-            ->mutable_override_stream_error_on_invalid_http_message()
-            ->set_value(true);
-      });
-
+  setDownstreamOverrideStreamErrorOnInvalidHttpMessage();
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
   auto encoder_decoder =
@@ -1971,6 +2139,8 @@ name: local-reply-during-encode-data
   // Wait for the upstream request and begin sending a response with end_stream = false.
   waitForNextUpstreamRequest();
   upstream_request_->encodeHeaders(default_response_headers_, false);
+  // Finish sending response headers before aborting the response.
+  response->waitForHeaders();
   upstream_request_->encodeData(size_, false);
   Http::TestResponseTrailerMapImpl response_trailers{{"response", "trailer"}};
   upstream_request_->encodeTrailers(response_trailers);
@@ -2106,7 +2276,7 @@ TEST_P(DownstreamProtocolIntegrationTest, LargeRequestTrailersRejected) {
 // This test uses an Http::HeaderMapImpl instead of an Http::TestHeaderMapImpl to avoid
 // time-consuming byte size verification that will cause this test to timeout.
 TEST_P(DownstreamProtocolIntegrationTest, ManyTrailerHeaders) {
-  setMaxRequestHeadersKb(96);
+  setMaxRequestHeadersKb(200);
   setMaxRequestHeadersCount(20005);
 
   config_helper_.addConfigModifier(setEnableDownstreamTrailersHttp1());
@@ -2658,36 +2828,6 @@ TEST_P(ProtocolIntegrationTest, MaxStreamTimeoutWhenRequestIsNotComplete) {
   EXPECT_EQ("504", response->headers().getStatusValue());
 }
 
-// Test case above except disabling runtime guard "override_request_timeout_by_gateway_timeout".
-// Verify the old behavior is reverted by disabling the runtime guard.
-TEST_P(ProtocolIntegrationTest, MaxStreamTimeoutWhenRequestIsNotCompleteRuntimeDisabled) {
-  config_helper_.setDownstreamMaxStreamDuration(std::chrono::milliseconds(500));
-
-  config_helper_.addRuntimeOverride(
-      "envoy.reloadable_features.override_request_timeout_by_gateway_timeout", "false");
-  autonomous_upstream_ = false;
-
-  initialize();
-  codec_client_ = makeHttpConnection(lookupPort("http"));
-
-  // The request is not header only. Envoy is expecting more data to end the request.
-  auto encoder_decoder =
-      codec_client_->startRequest(default_request_headers_, /*header_only_request=*/true);
-  request_encoder_ = &encoder_decoder.first;
-  auto response = std::move(encoder_decoder.second);
-
-  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
-  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
-  ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
-
-  test_server_->waitForCounterGe("http.config_test.downstream_rq_max_duration_reached", 1);
-  ASSERT_TRUE(response->waitForEndStream());
-
-  EXPECT_TRUE(upstream_request_->complete());
-  ASSERT_TRUE(response->complete());
-  EXPECT_EQ("408", response->headers().getStatusValue());
-}
-
 TEST_P(DownstreamProtocolIntegrationTest, MaxRequestsPerConnectionReached) {
   config_helper_.setDownstreamMaxRequestsPerConnection(2);
   initialize();
@@ -2732,10 +2872,6 @@ TEST_P(DownstreamProtocolIntegrationTest, MaxRequestsPerConnectionReached) {
 
 // Make sure that invalid authority headers get blocked at or before the HCM.
 TEST_P(DownstreamProtocolIntegrationTest, InvalidAuthority) {
-  if (skipForH2Uhv(SkipOnStream::Downstream)) {
-    return;
-  }
-
   initialize();
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -2774,41 +2910,13 @@ TEST_P(DownstreamProtocolIntegrationTest, ConnectIsBlocked) {
   EXPECT_TRUE(response->complete());
 }
 
-TEST_P(DownstreamProtocolIntegrationTest, ExtendedConnectIsBlocked) {
-  config_helper_.addRuntimeOverride("envoy.reloadable_features.use_rfc_connect", "false");
-  if (downstreamProtocol() == Http::CodecType::HTTP1) {
-    return;
-  }
-  initialize();
-  codec_client_ = makeHttpConnection(lookupPort("http"));
-  auto encoder_decoder = codec_client_->startRequest(
-      Http::TestRequestHeaderMapImpl{{":method", "CONNECT"},
-                                     {":protocol", "bytestream"},
-                                     {":path", "/"},
-                                     {":authority", "sni.lyft.com.com:80"}});
-  request_encoder_ = &encoder_decoder.first;
-  auto response = std::move(encoder_decoder.second);
-
-  ASSERT_TRUE(response->waitForReset());
-  ASSERT_TRUE(codec_client_->waitForDisconnect());
-}
-
 // Make sure that with override_stream_error_on_invalid_http_message true, CONNECT
 // results in stream teardown not connection teardown.
 TEST_P(DownstreamProtocolIntegrationTest, ConnectStreamRejection) {
   if (downstreamProtocol() == Http::CodecType::HTTP1) {
     return;
   }
-  config_helper_.addConfigModifier(
-      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
-             hcm) -> void {
-        hcm.mutable_http3_protocol_options()
-            ->mutable_override_stream_error_on_invalid_http_message()
-            ->set_value(true);
-        hcm.mutable_http2_protocol_options()
-            ->mutable_override_stream_error_on_invalid_http_message()
-            ->set_value(true);
-      });
+  setDownstreamOverrideStreamErrorOnInvalidHttpMessage();
 
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -3076,6 +3184,8 @@ TEST_P(ProtocolIntegrationTest, OverflowEncoderBufferFromEncodeData) {
   waitForNextUpstreamRequest(0);
   Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
   upstream_request_->encodeHeaders(response_headers, false);
+  // Finish sending response headers before aborting the response.
+  response->waitForHeaders();
   // This much data should cause the add-body-filter to overflow response buffer
   upstream_request_->encodeData(16 * 1024, false);
   upstream_request_->encodeData(64 * 1024, false);
@@ -3276,8 +3386,6 @@ TEST_P(ProtocolIntegrationTest, ResetLargeResponseUponReceivingHeaders) {
   if (downstreamProtocol() == Http::CodecType::HTTP1) {
     return;
   }
-  autonomous_upstream_ = true;
-  autonomous_allow_incomplete_streams_ = true;
   initialize();
 
   envoy::config::core::v3::Http2ProtocolOptions http2_options =
@@ -3288,22 +3396,33 @@ TEST_P(ProtocolIntegrationTest, ResetLargeResponseUponReceivingHeaders) {
   codec_client_ = makeRawHttpConnection(makeClientConnection(lookupPort("http")), http2_options);
 
   // The response is larger than the stream flow control window. So the reset of it will
-  // likely be buffered QUIC stream send buffer.
+  // likely be buffered in the QUIC stream send buffer.
   constexpr uint64_t response_size = 100 * 1024;
-  auto encoder_decoder = codec_client_->startRequest(
-      Http::TestRequestHeaderMapImpl{{":method", "POST"},
-                                     {":path", "/"},
-                                     {":scheme", "http"},
-                                     {":authority", "sni.lyft.com"},
-                                     {"content-length", "10"},
-                                     {"response_size_bytes", absl::StrCat(response_size)}});
+
+  auto encoder_decoder =
+      codec_client_->startRequest(Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                                                 {":path", "/"},
+                                                                 {":scheme", "http"},
+                                                                 {":authority", "sni.lyft.com"},
+                                                                 {"content-length", "10"}});
   auto& encoder = encoder_decoder.first;
+
   std::string data(10, 'a');
   codec_client_->sendData(encoder, data, true);
 
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  upstream_request_->encodeHeaders(
+      Http::TestResponseHeaderMapImpl{{":status", "200"},
+                                      {"content-length", absl::StrCat(response_size)}},
+      false);
+
   auto response = std::move(encoder_decoder.second);
   response->waitForHeaders();
-  // Reset stream while the quic server stream might have FIN buffered in its send buffer.
+  encoder.getStream().readDisable(true);
+  upstream_request_->encodeData(response_size, true);
+  ASSERT_TRUE(fake_upstream_connection_->waitForNoPost());
+  // Reset stream while the quic server stream has FIN buffered in its send buffer.
   codec_client_->sendReset(encoder);
   codec_client_->close();
 }
@@ -3682,9 +3801,10 @@ TEST_P(ProtocolIntegrationTest, BufferContinue) {
 }
 
 TEST_P(DownstreamProtocolIntegrationTest, ContentLengthSmallerThanPayload) {
-  if (skipForH2Uhv(SkipOnStream::Downstream)) {
-    return;
-  }
+#ifdef ENVOY_ENABLE_UHV
+  // UHV does not track consistency of content-length and amount of DATA in HTTP/2
+  return;
+#endif
 
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -3713,9 +3833,10 @@ TEST_P(DownstreamProtocolIntegrationTest, ContentLengthSmallerThanPayload) {
 }
 
 TEST_P(DownstreamProtocolIntegrationTest, ContentLengthLargerThanPayload) {
-  if (skipForH2Uhv(SkipOnStream::Downstream)) {
-    return;
-  }
+#ifdef ENVOY_ENABLE_UHV
+  // UHV does not track consistency of content-length and amount of DATA in HTTP/2
+  return;
+#endif
 
   if (downstreamProtocol() == Http::CodecType::HTTP1) {
     // HTTP/1.x request rely on Content-Length header to determine payload length. So there is no
@@ -3765,7 +3886,11 @@ TEST_P(DownstreamProtocolIntegrationTest, HandleDownstreamSocketFail) {
   if (downstreamProtocol() == Http::CodecType::HTTP3) {
     // For HTTP/3 since the packets are black holed, there is no client side
     // indication of connection close. Wait on Envoy stats instead.
-    test_server_->waitForCounterEq("http.config_test.downstream_rq_rx_reset", 1);
+    std::string counter_scope = version_ == Network::Address::IpVersion::v4
+                                    ? "listener.127.0.0.1_0.http3.downstream.tx."
+                                    : "listener.[__1]_0.http3.downstream.tx.";
+    std::string error_code = "quic_connection_close_error_code_QUIC_PACKET_WRITE_ERROR";
+    test_server_->waitForCounterEq(absl::StrCat(counter_scope, error_code), 1);
     codec_client_->close();
   } else {
     ASSERT_TRUE(codec_client_->waitForDisconnect());
@@ -3875,48 +4000,246 @@ TEST_P(ProtocolIntegrationTest, LocalInterfaceNameForUpstreamConnection) {
 }
 #endif
 
-#ifdef NDEBUG
-// These tests send invalid request and response header names which violate ASSERT while creating
-// such request/response headers. So they can only be run in NDEBUG mode.
-TEST_P(DownstreamProtocolIntegrationTest, InvalidReqestHeaderName) {
+TEST_P(DownstreamProtocolIntegrationTest, InvalidRequestHeaderName) {
   initialize();
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
+  // } is invalid character in header name
   auto encoder_decoder =
       codec_client_->startRequest(Http::TestRequestHeaderMapImpl{{":method", "POST"},
                                                                  {":path", "/test/long/url"},
                                                                  {":authority", "sni.lyft.com"},
-                                                                 {"foo\nname", "foo_value"}});
+                                                                 {":scheme", "http"},
+                                                                 {"foo}name", "foo_value"}});
   auto response = std::move(encoder_decoder.second);
 
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
   if (downstream_protocol_ == Http::CodecType::HTTP1) {
-    ASSERT_TRUE(codec_client_->waitForDisconnect());
     ASSERT_TRUE(response->complete());
     EXPECT_EQ("400", response->headers().getStatusValue());
     test_server_->waitForCounterGe("http.config_test.downstream_rq_4xx", 1);
   } else {
-    ASSERT_TRUE(response->waitForReset());
+    // H/2 codec does not send 400 on protocol errors
     EXPECT_EQ(Http::StreamResetReason::ConnectionTermination, response->resetReason());
   }
 }
 
-TEST_P(DownstreamProtocolIntegrationTest, InvalidResponseHeaderName) {
+TEST_P(DownstreamProtocolIntegrationTest, InvalidRequestHeaderNameStreamError) {
+  // For H/1 this test is equivalent to InvalidRequestHeaderName
+  if (downstreamProtocol() == Http::CodecType::HTTP1) {
+    return;
+  }
+  setDownstreamOverrideStreamErrorOnInvalidHttpMessage();
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  // } is invalid character in header name
+  auto encoder_decoder =
+      codec_client_->startRequest(Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                                                 {":path", "/test/long/url"},
+                                                                 {":authority", "sni.lyft.com"},
+                                                                 {":scheme", "http"},
+                                                                 {"foo}name", "foo_value"}});
+  auto response = std::move(encoder_decoder.second);
+  ASSERT_TRUE(response->waitForReset());
+  if (downstream_protocol_ == Http::CodecType::HTTP1) {
+    ASSERT_TRUE(response->complete());
+    EXPECT_EQ("400", response->headers().getStatusValue());
+    test_server_->waitForCounterGe("http.config_test.downstream_rq_4xx", 1);
+  } else {
+    // H/2 codec does not send 400 on protocol errors
+    EXPECT_EQ(Http::StreamResetReason::RemoteReset, response->resetReason());
+  }
+}
+
+TEST_P(ProtocolIntegrationTest, InvalidResponseHeaderName) {
+  useAccessLog("%RESPONSE_CODE_DETAILS%");
   initialize();
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
   auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
   waitForNextUpstreamRequest();
+  // } is invalid character in header name
   upstream_request_->encodeHeaders(
-      Http::TestResponseHeaderMapImpl{{":status", "200"}, {"foo\rname", "foo_value"}}, false);
+      Http::TestResponseHeaderMapImpl{{":status", "200"}, {"foo}name", "foo_value"}}, false);
 
+  ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
   ASSERT_TRUE(response->waitForEndStream());
 
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("502", response->headers().getStatusValue());
   test_server_->waitForCounterGe("http.config_test.downstream_rq_5xx", 1);
+  EXPECT_EQ(waitForAccessLog(access_log_name_),
+            "upstream_reset_before_response_started{protocol_error}");
 }
+
+TEST_P(ProtocolIntegrationTest, InvalidResponseHeaderNameStreamError) {
+  // For H/1 this test is equivalent to InvalidResponseHeaderName
+  if (upstreamProtocol() == Http::CodecType::HTTP1) {
+    return;
+  }
+  useAccessLog("%RESPONSE_CODE_DETAILS%");
+  setUpstreamOverrideStreamErrorOnInvalidHttpMessage();
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  waitForNextUpstreamRequest();
+  // } is invalid character in header name
+  upstream_request_->encodeHeaders(
+      Http::TestResponseHeaderMapImpl{{":status", "200"}, {"foo}name", "foo_value"}}, false);
+
+  ASSERT_TRUE(upstream_request_->waitForReset());
+  ASSERT_TRUE(response->waitForEndStream());
+
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ("502", response->headers().getStatusValue());
+  test_server_->waitForCounterGe("http.config_test.downstream_rq_5xx", 1);
+  EXPECT_EQ(waitForAccessLog(access_log_name_),
+            "upstream_reset_before_response_started{protocol_error}");
+  // Upstream connection should stay up
+  ASSERT_TRUE(fake_upstream_connection_->connected());
+}
+
+TEST_P(DownstreamProtocolIntegrationTest, InvalidSchemeHeaderWithWhitespace) {
+  useAccessLog("%RESPONSE_CODE_DETAILS%");
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  // Start the request.
+  auto response = codec_client_->makeHeaderOnlyRequest(
+      Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                     {":path", "/test/long/url"},
+                                     {":scheme", "/admin http"},
+                                     {":authority", "sni.lyft.com"}});
+
+#ifdef ENVOY_ENABLE_UHV
+  if (downstreamProtocol() != Http::CodecType::HTTP1) {
+    ASSERT_TRUE(response->waitForReset());
+    EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("invalid"));
+    return;
+  }
+#else
+  if (downstreamProtocol() == Http::CodecType::HTTP2 &&
+      GetParam().http2_implementation == Http2Impl::Nghttp2) {
+    ASSERT_TRUE(response->waitForReset());
+    EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("invalid"));
+    return;
+  }
 #endif
+  // Other HTTP codecs accept the bad scheme but the Envoy should replace it with a valid one.
+  waitForNextUpstreamRequest();
+  if (upstreamProtocol() == Http::CodecType::HTTP1) {
+    // The scheme header is not conveyed in HTTP/1.
+    EXPECT_EQ(nullptr, upstream_request_->headers().Scheme());
+  } else {
+    EXPECT_THAT(upstream_request_->headers(), HeaderValueOf(Http::Headers::get().Scheme, "http"));
+  }
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  ASSERT_TRUE(response->waitForEndStream());
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+}
+
+// Verify that request with invalid trailers is rejected.
+TEST_P(DownstreamProtocolIntegrationTest, InvalidTrailer) {
+  useAccessLog("%RESPONSE_FLAGS% %RESPONSE_CODE_DETAILS%");
+  config_helper_.addConfigModifier(setEnableDownstreamTrailersHttp1());
+  config_helper_.addConfigModifier(setEnableUpstreamTrailersHttp1());
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto encoder_decoder =
+      codec_client_->startRequest(Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                                                 {":path", "/test/long/url"},
+                                                                 {":scheme", "http"},
+                                                                 {":authority", "sni.lyft.com"}});
+  request_encoder_ = &encoder_decoder.first;
+  auto response = std::move(encoder_decoder.second);
+  codec_client_->sendData(*request_encoder_, 1, false);
+  Http::TestRequestTrailerMapImpl trailers{{"trailer1", "value1"}};
+  // DEL (0x7F) is invalid header value
+  Http::HeaderString invalid_value;
+  invalid_value.setCopyUnvalidatedForTestOnly("abc\x7Fxyz");
+  trailers.addViaMove(Http::HeaderString(absl::string_view("trailer2")), std::move(invalid_value));
+
+  codec_client_->sendTrailers(*request_encoder_, trailers);
+
+  if (downstream_protocol_ == Http::CodecType::HTTP1) {
+    ASSERT_TRUE(codec_client_->waitForDisconnect());
+    ASSERT_TRUE(response->complete());
+    EXPECT_EQ("400", response->headers().getStatusValue());
+  } else {
+    ASSERT_TRUE(response->waitForReset());
+    codec_client_->close();
+    ASSERT_TRUE(response->reset());
+    EXPECT_EQ(Http::StreamResetReason::ConnectionTermination, response->resetReason());
+  }
+#ifndef ENVOY_ENABLE_UHV
+  // TODO(#24620) UHV does not include the DPE prefix in the downstream protocol error reasons
+  if (downstreamProtocol() != Http::CodecType::HTTP3) {
+    // TODO(#24630) QUIC also does not include the DPE prefix in the downstream protocol error
+    // reasons
+    EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("DPE"));
+  }
+#endif
+}
+
+// Verify that stream is reset with invalid trailers, when configured.
+TEST_P(DownstreamProtocolIntegrationTest, InvalidTrailerStreamError) {
+  // H/1 requests are not affected by the override_stream_error_on_invalid_http_message
+  if (downstream_protocol_ == Http::CodecType::HTTP1) {
+    return;
+  }
+  useAccessLog("%RESPONSE_FLAGS% %RESPONSE_CODE_DETAILS%");
+  config_helper_.addConfigModifier(setEnableDownstreamTrailersHttp1());
+  config_helper_.addConfigModifier(setEnableUpstreamTrailersHttp1());
+  config_helper_.addConfigModifier(
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             hcm) -> void {
+        hcm.mutable_http3_protocol_options()
+            ->mutable_override_stream_error_on_invalid_http_message()
+            ->set_value(true);
+        hcm.mutable_http2_protocol_options()
+            ->mutable_override_stream_error_on_invalid_http_message()
+            ->set_value(true);
+        hcm.mutable_http_protocol_options()
+            ->mutable_override_stream_error_on_invalid_http_message()
+            ->set_value(true);
+      });
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto encoder_decoder =
+      codec_client_->startRequest(Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                                                 {":path", "/test/long/url"},
+                                                                 {":scheme", "http"},
+                                                                 {":authority", "sni.lyft.com"}});
+  request_encoder_ = &encoder_decoder.first;
+  auto response = std::move(encoder_decoder.second);
+  codec_client_->sendData(*request_encoder_, 1, false);
+  Http::TestRequestTrailerMapImpl trailers{{"trailer1", "value1"}};
+  // DEL (0x7F) is invalid header value
+  Http::HeaderString invalid_value;
+  invalid_value.setCopyUnvalidatedForTestOnly("abc\x7Fxyz");
+  trailers.addViaMove(Http::HeaderString(absl::string_view("trailer2")), std::move(invalid_value));
+
+  codec_client_->sendTrailers(*request_encoder_, trailers);
+
+  ASSERT_TRUE(response->waitForReset());
+  codec_client_->close();
+  ASSERT_TRUE(response->reset());
+  EXPECT_EQ(Http::StreamResetReason::RemoteReset, response->resetReason());
+#ifndef ENVOY_ENABLE_UHV
+  // TODO(#24620) UHV does not include the DPE prefix in the downstream protocol error reasons
+  if (downstreamProtocol() != Http::CodecType::HTTP3) {
+    // TODO(#24630) QUIC also does not include the DPE prefix in the downstream protocol error
+    // reasons
+    EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("DPE"));
+  }
+#endif
+}
 
 } // namespace Envoy

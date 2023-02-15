@@ -46,7 +46,7 @@ TEST_F(BrotliDecompressorImplTest, DetectExcessiveCompressionRatio) {
 
   Buffer::OwnedImpl output_buffer;
   Stats::IsolatedStoreImpl stats_store{};
-  BrotliDecompressorImpl decompressor{stats_store, "test.", 16, false};
+  BrotliDecompressorImpl decompressor{*stats_store.rootScope(), "test.", 16, false};
   decompressor.decompress(buffer, output_buffer);
   EXPECT_EQ(1, stats_store.counterFromString("test.brotli_error").value());
 }
@@ -139,7 +139,7 @@ TEST_F(BrotliDecompressorImplTest, DecompressWithSmallOutputBuffer) {
   ASSERT_EQ(0, buffer.length());
 
   Stats::IsolatedStoreImpl stats_store{};
-  BrotliDecompressorImpl decompressor{stats_store, "test.", 16, false};
+  BrotliDecompressorImpl decompressor{*stats_store.rootScope(), "test.", 16, false};
 
   decompressor.decompress(accumulation_buffer, buffer);
   std::string decompressed_text{buffer.toString()};
@@ -158,7 +158,7 @@ TEST_F(BrotliDecompressorImplTest, WrongInput) {
       zeros, 20, [](const void*, size_t, const Buffer::BufferFragmentImpl* frag) { delete frag; });
   buffer.addBufferFragment(*frag);
   Stats::IsolatedStoreImpl stats_store{};
-  BrotliDecompressorImpl decompressor{stats_store, "test.", 16, false};
+  BrotliDecompressorImpl decompressor{*stats_store.rootScope(), "test.", 16, false};
   decompressor.decompress(buffer, output_buffer);
   EXPECT_EQ(1, stats_store.counterFromString("test.brotli_error").value());
 }
@@ -193,7 +193,7 @@ TEST_F(BrotliDecompressorImplTest, CompressDecompressOfMultipleSlices) {
   accumulation_buffer.add(buffer);
 
   Stats::IsolatedStoreImpl stats_store{};
-  BrotliDecompressorImpl decompressor{stats_store, "test.", 16, false};
+  BrotliDecompressorImpl decompressor{*stats_store.rootScope(), "test.", 16, false};
 
   drainBuffer(buffer);
   ASSERT_EQ(0, buffer.length());
@@ -238,7 +238,7 @@ protected:
     ASSERT_EQ(0, buffer.length());
 
     Stats::IsolatedStoreImpl stats_store{};
-    BrotliDecompressorImpl decompressor{stats_store, "test.", 4096,
+    BrotliDecompressorImpl decompressor{*stats_store.rootScope(), "test.", 4096,
                                         disable_ring_buffer_reallocation};
 
     decompressor.decompress(accumulation_buffer, buffer);

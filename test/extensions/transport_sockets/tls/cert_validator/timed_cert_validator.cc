@@ -13,14 +13,10 @@ namespace Tls {
 
 ValidationResults TimedCertValidator::doVerifyCertChain(
     STACK_OF(X509)& cert_chain, Ssl::ValidateResultCallbackPtr callback,
-    Ssl::SslExtendedSocketInfo* ssl_extended_info,
     const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options, SSL_CTX& ssl_ctx,
     const CertValidator::ExtraValidationContext& /*validation_context*/, bool is_server,
     absl::string_view host_name) {
-  if (callback == nullptr) {
-    ASSERT(ssl_extended_info);
-    callback = ssl_extended_info->createValidateResultCallback();
-  }
+  ASSERT(callback != nullptr);
   ASSERT(callback_ == nullptr);
   callback_ = std::move(callback);
   if (expected_host_name_.has_value()) {
@@ -47,14 +43,16 @@ ValidationResults TimedCertValidator::doVerifyCertChain(
           }
         }
         ValidationResults result = DefaultCertValidator::doVerifyCertChain(
-            *certs, nullptr, nullptr, transport_socket_options, ssl_ctx, {}, is_server, host);
+            *certs, nullptr, transport_socket_options, ssl_ctx, {}, is_server, host);
         callback_->onCertValidationResult(
             result.status == ValidationResults::ValidationStatus::Successful,
+            result.detailed_status,
             (result.error_details.has_value() ? result.error_details.value() : ""),
             (result.tls_alert.has_value() ? result.tls_alert.value() : SSL_AD_CERTIFICATE_UNKNOWN));
       });
   validation_timer_->enableTimer(validation_time_out_ms_);
-  return {ValidationResults::ValidationStatus::Pending, absl::nullopt, absl::nullopt};
+  return {ValidationResults::ValidationStatus::Pending,
+          Envoy::Ssl::ClientValidationStatus::NotValidated, absl::nullopt, absl::nullopt};
 }
 
 REGISTER_FACTORY(TimedCertValidatorFactory, CertValidatorFactory);

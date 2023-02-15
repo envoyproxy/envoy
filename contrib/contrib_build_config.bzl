@@ -5,6 +5,7 @@ CONTRIB_EXTENSIONS = {
     #
 
     "envoy.filters.http.dynamo":                                "//contrib/dynamo/filters/http/source:config",
+    "envoy.filters.http.golang":                                "//contrib/golang/filters/http/source:config",
     "envoy.filters.http.language":                              "//contrib/language/filters/http/source:config_lib",
     "envoy.filters.http.squash":                                "//contrib/squash/filters/http/source:config",
     "envoy.filters.http.sxg":                                   "//contrib/sxg/filters/http/source:config",
@@ -19,6 +20,7 @@ CONTRIB_EXTENSIONS = {
     "envoy.filters.network.mysql_proxy":                        "//contrib/mysql_proxy/filters/network/source:config",
     "envoy.filters.network.postgres_proxy":                     "//contrib/postgres_proxy/filters/network/source:config",
     "envoy.filters.network.rocketmq_proxy":                     "//contrib/rocketmq_proxy/filters/network/source:config",
+    "envoy.filters.network.generic_proxy":                      "//contrib/generic_proxy/filters/network/source:config",
 
     #
     # Sip proxy
@@ -57,4 +59,16 @@ CONTRIB_EXTENSIONS = {
     #
 
     "envoy.regex_engines.hyperscan":                            "//contrib/hyperscan/regex_engines/source:config",
+
+    #
+    # Extensions for generic proxy
+    #
+    "envoy.filters.generic.router":                             "//contrib/generic_proxy/filters/network/source/router:config",
+    "envoy.generic_proxy.codecs.dubbo":                         "//contrib/generic_proxy/filters/network/source/codecs/dubbo:config",
+
+    #
+    # xDS delegates
+    #
+
+    "envoy.xds_delegates.kv_store":                            "//contrib/config/source:kv_store_xds_delegate",
 }

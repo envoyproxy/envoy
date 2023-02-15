@@ -14,15 +14,13 @@ run --color=yes
 
 build --color=yes
 build --workspace_status_command="bash bazel/get_workspace_status"
-# TODO: https://github.com/envoyproxy/envoy/issues/22758
-build --incompatible_use_platforms_repo_for_constraints=false
 build --incompatible_strict_action_env
-build --host_force_python=PY3
 build --java_runtime_version=remotejdk_11
 build --tool_java_runtime_version=remotejdk_11
 build --platform_mappings=bazel/platform_mappings
 # silence absl logspam.
 build --copt=-DABSL_MIN_LOG_LEVEL=4
+build --define envoy_mobile_listener=enabled
 
 # Pass PATH, CC, CXX and LLVM_CONFIG variables from the environment.
 build --action_env=CC --host_action_env=CC
@@ -33,6 +31,10 @@ build --action_env=PATH --host_action_env=PATH
 build --enable_platform_specific_config
 build --test_summary=terse
 
+# TODO(keith): Remove once these 2 are the default
+build --incompatible_config_setting_private_default_visibility
+build --incompatible_enforce_config_setting_visibility
+
 # Allow tags to influence execution requirements
 common --experimental_allow_tags_propagation
 
@@ -40,12 +42,16 @@ common --experimental_allow_tags_propagation
 # (Workaround for https://github.com/bazelbuild/rules_foreign_cc/issues/421)
 build:linux --copt=-fPIC
 build:linux --copt=-Wno-deprecated-declarations
-build:linux --cxxopt=-std=c++17
+build:linux --cxxopt=-std=c++17 --host_cxxopt=-std=c++17
 build:linux --conlyopt=-fexceptions
 build:linux --fission=dbg,opt
 build:linux --features=per_object_debug_info
 build:linux --action_env=BAZEL_LINKLIBS=-l%:libstdc++.a
 build:linux --action_env=BAZEL_LINKOPTS=-lm
+
+# TODO(keith): remove once https://github.com/DataDog/dd-opentracing-cpp/pull/252 is integrated
+# this avoids warnings/errors on arm64 Linux builds
+build:linux --per_file_copt=external/com_github_datadog_dd_opentracing_cpp/.*.cpp@-Wno-type-limits
 
 # We already have absl in the build, define absl=1 to tell googletest to use absl for backtrace.
 build --define absl=1
@@ -100,11 +106,10 @@ build:clang-asan --linkopt --rtlib=compiler-rt
 build:clang-asan --linkopt --unwindlib=libgcc
 
 # macOS
-build:macos --cxxopt=-std=c++17
+build:macos --cxxopt=-std=c++17 --host_cxxopt=-std=c++17
 build:macos --action_env=PATH=/opt/homebrew/bin:/opt/local/bin:/usr/local/bin:/usr/bin:/bin
 build:macos --host_action_env=PATH=/opt/homebrew/bin:/opt/local/bin:/usr/local/bin:/usr/bin:/bin
 build:macos --define tcmalloc=disabled
-build:macos --define wasm=disabled
 
 # macOS ASAN/UBSAN
 build:macos-asan --config=asan
@@ -175,7 +180,7 @@ build:coverage --define=dynamic_link_tests=true
 build:coverage --define=ENVOY_CONFIG_COVERAGE=1
 build:coverage --cxxopt="-DENVOY_CONFIG_COVERAGE=1"
 build:coverage --coverage_support=@envoy//bazel/coverage:coverage_support
-build:coverage --test_env=CC_CODE_COVERAGE_SCRIPT=external/envoy/bazel/coverage/collect_cc_coverage.sh
+build:coverage --test_env=CC_CODE_COVERAGE_SCRIPT=bazel/coverage/collect_cc_coverage.sh
 build:coverage --test_env=HEAPCHECK=
 build:coverage --combined_report=lcov
 build:coverage --strategy=TestRunner=sandboxed,local
@@ -183,7 +188,7 @@ build:coverage --strategy=CoverageReport=sandboxed,local
 build:coverage --experimental_use_llvm_covmap
 build:coverage --collect_code_coverage
 build:coverage --test_tag_filters=-nocoverage
-build:coverage --instrumentation_filter="//source(?!/common/quic/platform)[/:],//include[/:],//contrib(?!/.*/test)[/:]"
+build:coverage --instrumentation_filter="//source(?!/common/quic/platform)[/:],//envoy[/:],//contrib(?!/.*/test)[/:]"
 build:test-coverage --test_arg="-l trace"
 build:fuzz-coverage --config=plain-fuzzer
 build:fuzz-coverage --run_under=@envoy//bazel/coverage:fuzz_coverage_wrapper.sh
@@ -290,7 +295,7 @@ build:remote-clang-cl --config=rbe-toolchain-clang-cl
 
 # Docker sandbox
 # NOTE: Update this from https://github.com/envoyproxy/envoy-build-tools/blob/main/toolchains/rbe_toolchains_config.bzl#L8
-build:docker-sandbox --experimental_docker_image=envoyproxy/envoy-build-ubuntu:3de483a98c5e24973e710b4f97b2dabcd3cb621f
+build:docker-sandbox --experimental_docker_image=envoyproxy/envoy-build-ubuntu:7304f974de2724617b7492ccb4c9c58cd420353a
 build:docker-sandbox --spawn_strategy=docker
 build:docker-sandbox --strategy=Javac=docker
 build:docker-sandbox --strategy=Closure=docker
@@ -376,6 +381,7 @@ build:windows --define tcmalloc=disabled
 build:windows --define wasm=disabled
 build:windows --define manual_stamp=manual_stamp
 build:windows --cxxopt="/std:c++17"
+build:windows --output_groups=+pdb_file
 
 # TODO(wrowe,sunjayBhatia): Resolve bugs upstream in curl and rules_foreign_cc
 # See issue https://github.com/bazelbuild/rules_foreign_cc/issues/301

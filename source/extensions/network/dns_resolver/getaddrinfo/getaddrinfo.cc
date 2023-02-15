@@ -102,29 +102,25 @@ private:
     }
 
     std::list<DnsResponse> final_results;
-    switch (query.dns_lookup_family_) {
+    switch (query.dns_lookup_family_)
     case DnsLookupFamily::All: {
       final_results = std::move(v4_results);
       final_results.splice(final_results.begin(), v6_results);
       break;
-    }
-    case DnsLookupFamily::V4Only: {
+    case DnsLookupFamily::V4Only:
       final_results = std::move(v4_results);
       break;
-    }
-    case DnsLookupFamily::V6Only: {
+    case DnsLookupFamily::V6Only:
       final_results = std::move(v6_results);
       break;
-    }
-    case DnsLookupFamily::V4Preferred: {
+    case DnsLookupFamily::V4Preferred:
       if (!v4_results.empty()) {
         final_results = std::move(v4_results);
       } else {
         final_results = std::move(v6_results);
       }
       break;
-    }
-    case DnsLookupFamily::Auto: {
+    case DnsLookupFamily::Auto:
       // This is effectively V6Preferred.
       if (!v6_results.empty()) {
         final_results = std::move(v6_results);
@@ -133,12 +129,12 @@ private:
       }
       break;
     }
-    }
 
-    ENVOY_LOG(debug, "getaddrinfo resolution complete for host '{}': {}", query.dns_name_,
-              accumulateToString<Network::DnsResponse>(final_results, [](const auto& dns_response) {
-                return dns_response.addrInfo().address_->asString();
-              }));
+      ENVOY_LOG(
+          debug, "getaddrinfo resolution complete for host '{}': {}", query.dns_name_,
+          accumulateToString<Network::DnsResponse>(final_results, [](const auto& dns_response) {
+            return dns_response.addrInfo().address_->asString();
+          }));
 
     return std::make_pair(ResolutionStatus::Success, final_results);
   }

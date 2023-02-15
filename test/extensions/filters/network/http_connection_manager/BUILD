@@ -50,6 +50,7 @@ envoy_extension_cc_test(
         "//source/common/buffer:buffer_lib",
         "//source/extensions/access_loggers/file:config",
         "//source/extensions/filters/network/http_connection_manager:config",
+        "//source/extensions/http/early_header_mutation/header_mutation:config",
         "//source/extensions/http/original_ip_detection/custom_header:config",
         "//test/integration/filters:encoder_decoder_buffer_filter_lib",
         "//test/mocks/http:header_validator_mocks",
@@ -60,6 +61,7 @@ envoy_extension_cc_test(
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/trace/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/http/header_validators/envoy_default/v3:pkg_cc_proto",
         "@envoy_api//envoy/type/v3:pkg_cc_proto",
     ],
 )

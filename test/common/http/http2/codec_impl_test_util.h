@@ -77,14 +77,7 @@ public:
                              max_request_headers_kb, max_request_headers_count,
                              headers_with_underscores_action) {}
 
-  nghttp2_session* session() {
-    ASSERT(!use_new_codec_wrapper_);
-    return session_;
-  }
-  http2::adapter::Http2Adapter* adapter() {
-    ASSERT(use_new_codec_wrapper_);
-    return adapter_.get();
-  }
+  http2::adapter::Http2Adapter* adapter() { return adapter_.get(); }
   using ServerConnectionImpl::getStream;
   using ServerConnectionImpl::sendPendingFrames;
 
@@ -110,14 +103,7 @@ public:
                              max_request_headers_kb, max_request_headers_count,
                              http2_session_factory) {}
 
-  nghttp2_session* session() {
-    ASSERT(!use_new_codec_wrapper_);
-    return session_;
-  }
-  http2::adapter::Http2Adapter* adapter() {
-    ASSERT(use_new_codec_wrapper_);
-    return adapter_.get();
-  }
+  http2::adapter::Http2Adapter* adapter() { return adapter_.get(); }
   // Submits an H/2 METADATA frame to the peer.
   // Returns true on success, false otherwise.
   virtual bool submitMetadata(const MetadataMapVector& mm_vector, int32_t stream_id) {

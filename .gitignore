@@ -4,7 +4,9 @@
 !\.bazelci
 !\.bazelignore
 !\.bazelrc
+!\.bazelproject
 !\.bazelversion
+!\.circleci
 !\.clang-format
 !\.clang-tidy
 !\.coveragerc
@@ -16,11 +18,13 @@
 !\.gitignore
 !\.python-version
 !\.style.yapf
+!\.yamllint
 !\.yapfignore
 !\.zuul
 !\.zuul.yaml
 
 /bazel-*
+/mobile/bazel-*
 BROWSE
 /build
 /build_*
@@ -33,7 +37,7 @@ cscope.*
 *.pyc
 **/pyformat
 SOURCE_VERSION
-*.sw*
+*.s??
 tags
 TAGS
 /test/coverage/BUILD

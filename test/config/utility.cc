@@ -348,8 +348,7 @@ typed_config:
 )EOF";
 }
 
-// TODO(#6327) cleaner approach to testing with static config.
-std::string ConfigHelper::discoveredClustersBootstrap(const std::string& api_type) {
+std::string ConfigHelper::clustersNoListenerBootstrap(const std::string& api_type) {
   return fmt::format(
       R"EOF(
 admin:
@@ -389,6 +388,14 @@ static_resources:
               socket_address:
                 address: 127.0.0.1
                 port_value: 0
+)EOF",
+      Platform::null_device_path, api_type);
+}
+
+// TODO(#6327) cleaner approach to testing with static config.
+std::string ConfigHelper::discoveredClustersBootstrap(const std::string& api_type) {
+  return absl::StrCat(clustersNoListenerBootstrap(api_type),
+                      R"EOF(
   listeners:
     name: http
     address:
@@ -421,8 +428,7 @@ static_resources:
                 match:
                   prefix: "/cluster2"
               domains: "*"
-)EOF",
-      Platform::null_device_path, api_type);
+)EOF");
 }
 
 // TODO(#6327) cleaner approach to testing with static config.
@@ -495,6 +501,11 @@ envoy::config::cluster::v3::Cluster ConfigHelper::buildStaticCluster(const std::
                 socket_address:
                   address: {}
                   port_value: {}
+              health_check_config:
+                address:
+                  socket_address:
+                    address: {}
+                    port_value: {}
       lb_policy: {}
       typed_extension_protocol_options:
         envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
@@ -502,7 +513,7 @@ envoy::config::cluster::v3::Cluster ConfigHelper::buildStaticCluster(const std::
           explicit_http_config:
             http2_protocol_options: {{}}
     )EOF",
-                  name, name, address, port, lb_policy));
+                  name, name, address, port, address, port, lb_policy));
 }
 
 envoy::config::cluster::v3::Cluster ConfigHelper::buildH1ClusterWithHighCircuitBreakersLimits(
@@ -811,7 +822,8 @@ void ConfigHelper::addClusterFilterMetadata(absl::string_view metadata_yaml,
 
 void ConfigHelper::setConnectConfig(
     envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager& hcm,
-    bool terminate_connect, bool allow_post, bool http3) {
+    bool terminate_connect, bool allow_post, bool http3,
+    absl::optional<envoy::config::core::v3::ProxyProtocolConfig::Version> proxy_protocol_version) {
   auto* route_config = hcm.mutable_route_config();
   ASSERT_EQ(1, route_config->virtual_hosts_size());
   auto* route = route_config->mutable_virtual_hosts(0)->mutable_routes(0);
@@ -834,6 +846,10 @@ void ConfigHelper::setConnectConfig(
     auto* config = upgrade->mutable_connect_config();
     if (allow_post) {
       config->set_allow_post(true);
+    }
+
+    if (proxy_protocol_version.has_value()) {
+      config->mutable_proxy_protocol_config()->set_version(proxy_protocol_version.value());
     }
   }
 
@@ -930,9 +946,12 @@ void ConfigHelper::setProtocolOptions(envoy::config::cluster::v3::Cluster& clust
     HttpProtocolOptions old_options = MessageUtil::anyConvert<ConfigHelper::HttpProtocolOptions>(
         (*cluster.mutable_typed_extension_protocol_options())
             ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]);
-    ASSERT(!old_options.has_auto_config());
+    bool auto_config = old_options.has_auto_config();
     old_options.MergeFrom(protocol_options);
     protocol_options.CopyFrom(old_options);
+    if (auto_config) {
+      protocol_options.mutable_auto_config();
+    }
   }
   (*cluster.mutable_typed_extension_protocol_options())
       ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]
@@ -1196,6 +1215,9 @@ void ConfigHelper::prependFilter(const std::string& config, bool downstream) {
           (*cluster->mutable_typed_extension_protocol_options())
               ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]);
     }
+    if (old_protocol_options.http_filters().empty()) {
+      old_protocol_options.add_http_filters()->set_name("envoy.filters.http.upstream_codec");
+    }
     auto* filter_list_back = old_protocol_options.add_http_filters();
     TestUtility::loadFromYaml(config, *filter_list_back);
     for (int i = old_protocol_options.http_filters_size() - 1; i > 0; --i) {
@@ -1397,16 +1419,23 @@ void ConfigHelper::initializeTls(
   } else {
     if (options.client_with_intermediate_cert_) {
       validation_context->add_verify_certificate_hash(TEST_CLIENT2_CERT_HASH);
-      std::string cert_yaml = R"EOF(
+      std::string cert_yaml;
+      if (options.trust_root_only_) {
+        cert_yaml = R"EOF(
         trusted_ca:
-          filename: "{{ test_rundir }}/test/config/integration/certs/intermediate_ca_cert_chain.pem"
+          filename: "{{ test_rundir }}/test/config/integration/certs/cacert.pem"
       )EOF";
-      if (options.max_verify_depth_) {
-        cert_yaml += R"EOF(
-        max_verify_depth: 1
+      } else {
+        cert_yaml = R"EOF(
+        trusted_ca:
+          filename: "{{ test_rundir }}/test/config/integration/certs/intermediate_partial_ca_cert_chain.pem"
       )EOF";
       }
       TestUtility::loadFromYaml(TestEnvironment::substitute(cert_yaml), *validation_context);
+      if (options.max_verify_depth_.has_value()) {
+        validation_context->mutable_max_verify_depth()->set_value(
+            options.max_verify_depth_.value());
+      }
     } else {
       validation_context->mutable_trusted_ca()->set_filename(
           TestEnvironment::runfilesPath("test/config/integration/certs/cacert.pem"));

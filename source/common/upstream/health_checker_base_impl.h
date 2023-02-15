@@ -108,6 +108,7 @@ protected:
     uint32_t num_unhealthy_{};
     uint32_t num_healthy_{};
     bool first_check_{true};
+    TimeSource& time_source_;
   };
 
   using ActiveHealthCheckSessionPtr = std::unique_ptr<ActiveHealthCheckSession>;
@@ -121,6 +122,7 @@ protected:
   virtual envoy::data::core::v3::HealthCheckerType healthCheckerType() const PURE;
 
   const bool always_log_health_check_failures_;
+  const bool disable_health_check_if_active_traffic_;
   const Cluster& cluster_;
   Event::Dispatcher& dispatcher_;
   const std::chrono::milliseconds timeout_;

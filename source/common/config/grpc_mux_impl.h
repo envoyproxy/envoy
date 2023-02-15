@@ -8,6 +8,8 @@
 #include "envoy/common/time.h"
 #include "envoy/config/grpc_mux.h"
 #include "envoy/config/subscription.h"
+#include "envoy/config/xds_config_tracker.h"
+#include "envoy/config/xds_resources_delegate.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/grpc/status.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
@@ -21,8 +23,11 @@
 #include "source/common/config/grpc_stream.h"
 #include "source/common/config/ttl.h"
 #include "source/common/config/utility.h"
+#include "source/common/config/xds_context_params.h"
+#include "source/common/config/xds_resource.h"
 
 #include "absl/container/node_hash_map.h"
+#include "xds/core/v3/resource_name.pb.h"
 
 namespace Envoy {
 namespace Config {
@@ -37,7 +42,10 @@ public:
               Event::Dispatcher& dispatcher, const Protobuf::MethodDescriptor& service_method,
               Random::RandomGenerator& random, Stats::Scope& scope,
               const RateLimitSettings& rate_limit_settings, bool skip_subsequent_node,
-              CustomConfigValidatorsPtr&& config_validators);
+              CustomConfigValidatorsPtr&& config_validators,
+              XdsConfigTrackerOptRef xds_config_tracker,
+              XdsResourcesDelegateOptRef xds_resources_delegate,
+              const std::string& target_xds_authority);
 
   ~GrpcMuxImpl() override;
 
@@ -59,7 +67,7 @@ public:
   GrpcMuxWatchPtr addWatch(const std::string& type_url,
                            const absl::flat_hash_set<std::string>& resources,
                            SubscriptionCallbacks& callbacks,
-                           OpaqueResourceDecoder& resource_decoder,
+                           OpaqueResourceDecoderSharedPtr resource_decoder,
                            const SubscriptionOptions& options) override;
 
   void requestOnDemandUpdate(const std::string&, const absl::flat_hash_set<std::string>&) override {
@@ -89,12 +97,14 @@ private:
 
   struct GrpcMuxWatchImpl : public GrpcMuxWatch {
     GrpcMuxWatchImpl(const absl::flat_hash_set<std::string>& resources,
-                     SubscriptionCallbacks& callbacks, OpaqueResourceDecoder& resource_decoder,
-                     const std::string& type_url, GrpcMuxImpl& parent)
+                     SubscriptionCallbacks& callbacks,
+                     OpaqueResourceDecoderSharedPtr resource_decoder, const std::string& type_url,
+                     GrpcMuxImpl& parent, const SubscriptionOptions& options,
+                     const LocalInfo::LocalInfo& local_info)
         : callbacks_(callbacks), resource_decoder_(resource_decoder), type_url_(type_url),
-          parent_(parent), watches_(parent.apiStateFor(type_url).watches_) {
-      std::copy(resources.begin(), resources.end(), std::inserter(resources_, resources_.begin()));
-      iter_ = watches_.emplace(watches_.begin(), this);
+          parent_(parent), subscription_options_(options), local_info_(local_info),
+          watches_(parent.apiStateFor(type_url).watches_) {
+      updateResources(resources);
     }
 
     ~GrpcMuxWatchImpl() override {
@@ -109,22 +119,43 @@ private:
       if (!resources_.empty()) {
         parent_.queueDiscoveryRequest(type_url_);
       }
-      resources_.clear();
-      std::copy(resources.begin(), resources.end(), std::inserter(resources_, resources_.begin()));
-      // move this watch to the beginning of the list
-      iter_ = watches_.emplace(watches_.begin(), this);
+      updateResources(resources);
       parent_.queueDiscoveryRequest(type_url_);
     }
 
     // Maintain deterministic wire ordering via ordered std::set.
     std::set<std::string> resources_;
     SubscriptionCallbacks& callbacks_;
-    OpaqueResourceDecoder& resource_decoder_;
+    OpaqueResourceDecoderSharedPtr resource_decoder_;
     const std::string type_url_;
     GrpcMuxImpl& parent_;
 
   private:
+    void updateResources(const absl::flat_hash_set<std::string>& resources) {
+      resources_.clear();
+      std::transform(
+          resources.begin(), resources.end(), std::inserter(resources_, resources_.begin()),
+          [this](const std::string& resource_name) -> std::string {
+            if (XdsResourceIdentifier::hasXdsTpScheme(resource_name)) {
+              auto xdstp_resource = XdsResourceIdentifier::decodeUrn(resource_name);
+              if (subscription_options_.add_xdstp_node_context_params_) {
+                const auto context = XdsContextParams::encodeResource(
+                    local_info_.contextProvider().nodeContext(), xdstp_resource.context(), {}, {});
+                xdstp_resource.mutable_context()->CopyFrom(context);
+              }
+              XdsResourceIdentifier::EncodeOptions encode_options;
+              encode_options.sort_context_params_ = true;
+              return XdsResourceIdentifier::encodeUrn(xdstp_resource, encode_options);
+            }
+            return resource_name;
+          });
+      // move this watch to the beginning of the list
+      iter_ = watches_.emplace(watches_.begin(), this);
+    }
+
     using WatchList = std::list<GrpcMuxWatchImpl*>;
+    const SubscriptionOptions& subscription_options_;
+    const LocalInfo::LocalInfo& local_info_;
     WatchList& watches_;
     WatchList::iterator iter_;
   };
@@ -164,6 +195,13 @@ private:
   void queueDiscoveryRequest(absl::string_view queue_item);
   // Invoked when dynamic context parameters change for a resource type.
   void onDynamicContextUpdate(absl::string_view resource_type_url);
+  // Must be invoked from the main or test thread.
+  void loadConfigFromDelegate(const std::string& type_url,
+                              const absl::flat_hash_set<std::string>& resource_names);
+  // Must be invoked from the main or test thread.
+  void processDiscoveryResources(const std::vector<DecodedResourcePtr>& resources,
+                                 ApiState& api_state, const std::string& type_url,
+                                 const std::string& version_info, bool call_delegate);
 
   GrpcStream<envoy::service::discovery::v3::DiscoveryRequest,
              envoy::service::discovery::v3::DiscoveryResponse>
@@ -171,7 +209,11 @@ private:
   const LocalInfo::LocalInfo& local_info_;
   const bool skip_subsequent_node_;
   CustomConfigValidatorsPtr config_validators_;
+  XdsConfigTrackerOptRef xds_config_tracker_;
+  XdsResourcesDelegateOptRef xds_resources_delegate_;
+  const std::string target_xds_authority_;
   bool first_stream_request_;
+  bool previously_fetched_data_{false};
 
   // Helper function for looking up and potentially allocating a new ApiState.
   ApiState& apiStateFor(absl::string_view type_url);
@@ -210,7 +252,7 @@ public:
   }
 
   GrpcMuxWatchPtr addWatch(const std::string&, const absl::flat_hash_set<std::string>&,
-                           SubscriptionCallbacks&, OpaqueResourceDecoder&,
+                           SubscriptionCallbacks&, OpaqueResourceDecoderSharedPtr,
                            const SubscriptionOptions&) override {
     ExceptionUtil::throwEnvoyException("ADS must be configured to support an ADS config source");
   }

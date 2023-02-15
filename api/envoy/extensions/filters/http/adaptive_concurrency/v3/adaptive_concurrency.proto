@@ -3,6 +3,7 @@ syntax = "proto3";
 package envoy.extensions.filters.http.adaptive_concurrency.v3;
 
 import "envoy/config/core/v3/base.proto";
+import "envoy/type/v3/http_status.proto";
 import "envoy/type/v3/percent.proto";
 
 import "google/protobuf/duration.proto";
@@ -105,4 +106,12 @@ message AdaptiveConcurrency {
   // If set to false, the adaptive concurrency filter will operate as a pass-through filter. If the
   // message is unspecified, the filter will be enabled.
   config.core.v3.RuntimeFeatureFlag enabled = 2;
+
+  // This field allows for a custom HTTP response status code to the downstream client when
+  // the concurrency limit has been exceeded.
+  // Defaults to 503 (Service Unavailable).
+  //
+  // .. note::
+  //   If this is set to < 400, 503 will be used instead.
+  type.v3.HttpStatus concurrency_limit_exceeded_status = 3;
 }

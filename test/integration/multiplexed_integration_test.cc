@@ -1076,7 +1076,7 @@ TEST_P(MultiplexedIntegrationTest, DEPRECATED_FEATURE_TEST(GrpcRequestTimeoutMix
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
-  EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("via_upstream\n"));
+  EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("via_upstream"));
 }
 
 TEST_P(MultiplexedIntegrationTest, GrpcRequestTimeout) {
@@ -1463,6 +1463,35 @@ TEST_P(MultiplexedIntegrationTest, EmptyTrailers) {
   ASSERT_TRUE(response->complete());
 }
 
+TEST_P(MultiplexedIntegrationTest, TestEncode1xxHeaders) {
+  static std::string encode1xx_local_reply_config = R"EOF(
+  name: encode1xx-local-reply-filter
+  )EOF";
+  config_helper_.prependFilter(encode1xx_local_reply_config);
+  config_helper_.addConfigModifier(
+      [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) -> void { hcm.set_proxy_100_continue(true); });
+
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  // Upstream responds with 100-continue, which the filter turns into a local
+  // reply.
+  auto response =
+      codec_client_->makeRequestWithBody(Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                                                        {":path", "/"},
+                                                                        {":scheme", "http"},
+                                                                        {":authority", "host"},
+                                                                        {"expect", "100-continue"}},
+                                         10);
+
+  waitForNextUpstreamRequest();
+  // This will trigger local reply response.
+  upstream_request_->encode1xxHeaders(Http::TestResponseHeaderMapImpl{{":status", "100"}});
+  ASSERT_TRUE(response->waitForEndStream());
+  ASSERT_TRUE(response->complete());
+}
+
 class MultiplexedRingHashIntegrationTest : public HttpProtocolIntegrationTest {
 public:
   MultiplexedRingHashIntegrationTest();
@@ -1737,30 +1766,22 @@ TEST_P(MultiplexedRingHashIntegrationTest, CookieRoutingWithCookieWithTtlSet) {
 
 struct FrameIntegrationTestParam {
   Network::Address::IpVersion ip_version;
-  bool enable_new_codec_wrapper;
 };
 
 std::string
 frameIntegrationTestParamToString(const testing::TestParamInfo<FrameIntegrationTestParam>& params) {
-  const bool is_ipv4 = params.param.ip_version == Network::Address::IpVersion::v4;
-  const bool new_codec_wrapper = params.param.enable_new_codec_wrapper;
-  return absl::StrCat(is_ipv4 ? "IPv4" : "IPv6", new_codec_wrapper ? "WrappedNghttp2" : "Nghttp2");
+  return TestUtility::ipVersionToString(params.param.ip_version);
 }
 
 class Http2FrameIntegrationTest : public testing::TestWithParam<FrameIntegrationTestParam>,
                                   public Http2RawFrameIntegrationTest {
 public:
-  Http2FrameIntegrationTest() : Http2RawFrameIntegrationTest(GetParam().ip_version) {
-    config_helper_.addRuntimeOverride("envoy.reloadable_features.http2_new_codec_wrapper",
-                                      GetParam().enable_new_codec_wrapper ? "true" : "false");
-  }
+  Http2FrameIntegrationTest() : Http2RawFrameIntegrationTest(GetParam().ip_version) {}
 
   static std::vector<FrameIntegrationTestParam> testParams() {
     std::vector<FrameIntegrationTestParam> v;
     for (auto ip_version : TestEnvironment::getIpVersionsForTest()) {
-      for (bool enable_new_codec_wrapper : {false, true}) {
-        v.push_back({ip_version, enable_new_codec_wrapper});
-      }
+      v.push_back({ip_version});
     }
     return v;
   }

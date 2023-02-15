@@ -1,9 +1,9 @@
 # This configuration listens on port 9999 and creates TCP connections to port 10000 using an
 # intermediate internal listener.
 bootstrap_extensions:
-  - name: envoy.bootstrap.internal_listener
-    typed_config:
-      "@type": type.googleapis.com/envoy.extensions.bootstrap.internal_listener.v3.InternalListener
+- name: envoy.bootstrap.internal_listener
+  typed_config:
+    "@type": type.googleapis.com/envoy.extensions.bootstrap.internal_listener.v3.InternalListener
 static_resources:
   listeners:
   - name: ingress

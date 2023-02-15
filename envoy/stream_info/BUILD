@@ -14,12 +14,13 @@ envoy_cc_library(
     external_deps = ["abseil_optional"],
     deps = [
         ":filter_state_interface",
+        ":stream_id_provider_interface",
         "//envoy/common:time_interface",
         "//envoy/http:header_map_interface",
         "//envoy/http:protocol_interface",
-        "//envoy/http:request_id_extension_interface",
         "//envoy/network:socket_interface",
         "//envoy/ssl:connection_interface",
+        "//envoy/tracing:trace_reason_interface",
         "//envoy/upstream:host_description_interface",
         "//source/common/common:assert_lib",
         "//source/common/protobuf",
@@ -44,4 +45,9 @@ envoy_cc_library(
     deps = [
         ":filter_state_interface",
     ],
+)
+
+envoy_cc_library(
+    name = "stream_id_provider_interface",
+    hdrs = ["stream_id_provider.h"],
 )

@@ -57,6 +57,7 @@ def envoy_cc_extension(
         tags = [],
         extra_visibility = [],
         visibility = EXTENSION_CONFIG_VISIBILITY,
+        alwayslink = 1,
         **kwargs):
     if "//visibility:public" not in visibility:
         visibility = visibility + extra_visibility
@@ -66,6 +67,7 @@ def envoy_cc_extension(
         name = name,
         tags = tags,
         visibility = visibility,
+        alwayslink = alwayslink,
         **kwargs
     )
     native.cc_library(
@@ -83,6 +85,7 @@ def envoy_cc_contrib_extension(
         tags = [],
         extra_visibility = [],
         visibility = CONTRIB_EXTENSION_PACKAGE_VISIBILITY,
+        alwayslink = 1,
         **kwargs):
     envoy_cc_extension(name, tags, extra_visibility, visibility, **kwargs)
 
@@ -101,9 +104,18 @@ def envoy_cc_library(
         strip_include_prefix = None,
         include_prefix = None,
         textual_hdrs = None,
+        alwayslink = None,
         defines = []):
     if tcmalloc_dep:
         deps += tcmalloc_external_deps(repository)
+
+    # If alwayslink is not specified, allow turning it off via --define=library_autolink=disabled
+    # alwayslink is defaulted on for envoy_cc_extensions to ensure the REGISTRY macros work.
+    if alwayslink == None:
+        alwayslink = select({
+            repository + "//bazel:disable_library_autolink": 0,
+            "//conditions:default": 1,
+        })
 
     native.cc_library(
         name = name,
@@ -122,7 +134,7 @@ def envoy_cc_library(
             envoy_external_dep_path("abseil_strings"),
             envoy_external_dep_path("fmtlib"),
         ],
-        alwayslink = 1,
+        alwayslink = alwayslink,
         linkstatic = envoy_linkstatic(),
         strip_include_prefix = strip_include_prefix,
         include_prefix = include_prefix,

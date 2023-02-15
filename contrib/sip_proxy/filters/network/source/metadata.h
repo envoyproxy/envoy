@@ -1,13 +1,7 @@
 #pragma once
 
-#include <vector>
-
-#include "source/common/common/assert.h"
 #include "source/common/common/logger.h"
 
-#include "absl/strings/string_view.h"
-#include "absl/types/optional.h"
-#include "absl/types/variant.h"
 #include "contrib/envoy/extensions/filters/network/sip_proxy/v3alpha/sip_proxy.pb.h"
 #include "contrib/sip_proxy/filters/network/source/operation.h"
 #include "contrib/sip_proxy/filters/network/source/sip.h"
@@ -156,7 +150,7 @@ public:
   };
 
   void addEPOperation(
-      size_t raw_offset, absl::string_view& header,
+      size_t raw_offset, absl::string_view& header, HeaderType type,
       const std::vector<envoy::extensions::filters::network::sip_proxy::v3alpha::LocalService>&
           local_services);
   void addOpaqueOperation(size_t raw_offset, absl::string_view& header);
@@ -164,7 +158,7 @@ public:
 
   void addMsgHeader(HeaderType type, absl::string_view value);
 
-  std::string getDomainFromHeaderParameter(absl::string_view& header, const std::string& parameter);
+  absl::string_view getDomainFromHeaderParameter(HeaderType type, const std::string& parameter);
 
   void parseHeader(HeaderType type, unsigned short index = 0) {
     return headers_[type][index].parseHeader();
@@ -180,7 +174,7 @@ public:
 
   std::vector<SipHeader>& listHeader(HeaderType type) { return headers_[type]; }
 
-  TraContextMap traContext() {
+  TraContextMap& traContext() {
     if (tra_context_map_.empty()) {
       auto fromHeader = listHeader(HeaderType::From).front().text();
       tra_context_map_.emplace(std::make_pair("method_type", methodStr[methodType()]));
@@ -214,7 +208,7 @@ private:
   TraContextMap tra_context_map_{};
 
   bool isDomainMatched(
-      absl::string_view& header,
+      HeaderType type,
       const std::vector<envoy::extensions::filters::network::sip_proxy::v3alpha::LocalService>&
           local_services) {
     for (auto& service : local_services) {
@@ -222,7 +216,7 @@ private:
         // no default value
         continue;
       }
-      if (service.domain() == getDomainFromHeaderParameter(header, service.parameter())) {
+      if (service.domain() == getDomainFromHeaderParameter(type, service.parameter())) {
         return true;
       }
     }

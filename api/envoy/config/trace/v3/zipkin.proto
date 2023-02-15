@@ -21,7 +21,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // Configuration for the Zipkin tracer.
 // [#extension: envoy.tracers.zipkin]
-// [#next-free-field: 7]
+// [#next-free-field: 8]
 message ZipkinConfig {
   option (udpa.annotations.versioning).previous_message_type = "envoy.config.trace.v2.ZipkinConfig";
 
@@ -68,4 +68,19 @@ message ZipkinConfig {
   // Optional hostname to use when sending spans to the collector_cluster. Useful for collectors
   // that require a specific hostname. Defaults to :ref:`collector_cluster <envoy_v3_api_field_config.trace.v3.ZipkinConfig.collector_cluster>` above.
   string collector_hostname = 6;
+
+  // If this is set to true, then Envoy will be treated as an independent hop in trace chain. A complete span pair will be created for a single
+  // request. Server span will be created for the downstream request and client span will be created for the related upstream request.
+  // This should be set to true in the following cases:
+  //
+  // * The Envoy Proxy is used as gateway or ingress.
+  // * The Envoy Proxy is used as sidecar but inbound traffic capturing or outbound traffic capturing is disabled.
+  // * Any case that the `start_child_span of router <envoy_v3_api_field_extensions.filters.http.router.v3.Router.start_child_span>` is set to true.
+  //
+  // .. attention::
+  //
+  //   If this is set to true, then the
+  //   :ref:`start_child_span of router <envoy_v3_api_field_extensions.filters.http.router.v3.Router.start_child_span>`
+  //   SHOULD be set to true also to ensure the correctness of trace chain.
+  bool split_spans_for_request = 7;
 }

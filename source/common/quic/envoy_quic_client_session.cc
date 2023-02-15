@@ -52,9 +52,12 @@ EnvoyQuicClientSession::EnvoyQuicClientSession(
     QuicStatNames& quic_stat_names, OptRef<Http::HttpServerPropertiesCache> rtt_cache,
     Stats::Scope& scope,
     const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options)
-    : QuicFilterManagerConnectionImpl(*connection, connection->connection_id(), dispatcher,
-                                      send_buffer_limit,
-                                      std::make_shared<QuicSslConnectionInfo>(*this)),
+    : QuicFilterManagerConnectionImpl(
+          *connection, connection->connection_id(), dispatcher, send_buffer_limit,
+          std::make_shared<QuicSslConnectionInfo>(*this),
+          std::make_unique<StreamInfo::StreamInfoImpl>(
+              dispatcher.timeSource(),
+              connection->connectionSocket()->connectionInfoProviderSharedPtr())),
       quic::QuicSpdyClientSession(config, supported_versions, connection.release(), server_id,
                                   crypto_config.get(), push_promise_index),
       crypto_config_(crypto_config), crypto_stream_factory_(crypto_stream_factory),
@@ -99,12 +102,14 @@ void EnvoyQuicClientSession::OnConnectionClosed(const quic::QuicConnectionCloseF
 void EnvoyQuicClientSession::Initialize() {
   quic::QuicSpdyClientSession::Initialize();
   initialized_ = true;
-  network_connection_->setEnvoyConnection(*this);
+  network_connection_->setEnvoyConnection(*this, *this);
 }
 
 void EnvoyQuicClientSession::OnCanWrite() {
+  uint64_t old_bytes_to_send = bytesToSend();
   quic::QuicSpdyClientSession::OnCanWrite();
-  maybeApplyDelayClosePolicy();
+  const bool has_sent_any_data = bytesToSend() != old_bytes_to_send;
+  maybeUpdateDelayCloseTimer(has_sent_any_data);
 }
 
 void EnvoyQuicClientSession::OnHttp3GoAway(uint64_t stream_id) {

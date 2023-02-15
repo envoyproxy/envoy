@@ -16,7 +16,7 @@ class PacketsToReadDelegate {
 public:
   virtual ~PacketsToReadDelegate() = default;
 
-  virtual size_t numPacketsExpectedPerEventLoop() PURE;
+  virtual size_t numPacketsExpectedPerEventLoop() const PURE;
 };
 
 // A client QuicConnection instance managing its own file events.
@@ -33,7 +33,8 @@ public:
                             const quic::ParsedQuicVersionVector& supported_versions,
                             Network::Address::InstanceConstSharedPtr local_addr,
                             Event::Dispatcher& dispatcher,
-                            const Network::ConnectionSocket::OptionsSharedPtr& options);
+                            const Network::ConnectionSocket::OptionsSharedPtr& options,
+                            quic::ConnectionIdGeneratorInterface& generator);
 
   EnvoyQuicClientConnection(const quic::QuicConnectionId& server_connection_id,
                             quic::QuicConnectionHelperInterface& helper,
@@ -41,7 +42,8 @@ public:
                             bool owns_writer,
                             const quic::ParsedQuicVersionVector& supported_versions,
                             Event::Dispatcher& dispatcher,
-                            Network::ConnectionSocketPtr&& connection_socket);
+                            Network::ConnectionSocketPtr&& connection_socket,
+                            quic::ConnectionIdGeneratorInterface& generator);
 
   // Network::UdpPacketProcessor
   void processPacket(Network::Address::InstanceConstSharedPtr local_address,
@@ -53,7 +55,7 @@ public:
   }
   size_t numPacketsExpectedPerEventLoop() const override {
     if (delegate_.has_value()) {
-      return delegate_.value().get().numPacketsExpectedPerEventLoop();
+      return delegate_->numPacketsExpectedPerEventLoop();
     }
     return DEFAULT_PACKETS_TO_READ_PER_CONNECTION;
   }
@@ -65,8 +67,10 @@ public:
   // Switch underlying socket with the given one. This is used in connection migration.
   void switchConnectionSocket(Network::ConnectionSocketPtr&& connection_socket);
 
+  // quic::QuicConnection
   // Potentially trigger migration.
   void OnPathDegradingDetected() override;
+  void OnCanWrite() override;
 
   // Called when port migration probing succeeds. Attempts to migrate this connection onto the new
   // socket extracted from context.
@@ -120,7 +124,8 @@ private:
                             quic::QuicAlarmFactory& alarm_factory,
                             const quic::ParsedQuicVersionVector& supported_versions,
                             Event::Dispatcher& dispatcher,
-                            Network::ConnectionSocketPtr&& connection_socket);
+                            Network::ConnectionSocketPtr&& connection_socket,
+                            quic::ConnectionIdGeneratorInterface& generator);
 
   void onFileEvent(uint32_t events, Network::ConnectionSocket& connection_socket);
 

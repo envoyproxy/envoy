@@ -27,7 +27,6 @@ Example filter configuration:
       config:
         name: "my_plugin"
         vm_config:
-          runtime: "envoy.wasm.runtime.v8"
           code:
             local:
               filename: "/etc/envoy_filter_http_wasm_example.wasm"

@@ -21,6 +21,7 @@
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/stream_info/mocks.h"
 #include "test/mocks/upstream/host.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
 #include "test/test_common/utility.h"
 
@@ -53,6 +54,12 @@ public:
       const std::string formatted_string = f.format(stream_info);
       EXPECT_EQ(expected_output, formatted_string);
     }
+    if (test_with_and_without_runtime_) {
+      TestScopedRuntime runtime_;
+      auto f = StreamInfoHeaderFormatter(variable);
+      const std::string formatted_string = f.format(stream_info);
+      EXPECT_EQ(expected_output, formatted_string);
+    }
   }
 
   void testFormatting(const std::string& variable, const std::string& expected_output) {
@@ -64,6 +71,7 @@ public:
     EXPECT_THROW_WITH_MESSAGE(StreamInfoHeaderFormatter{variable}, EnvoyException,
                               fmt::format("field '{}' not supported as custom header", variable));
   }
+  bool test_with_and_without_runtime_ = false;
 };
 
 TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithDownstreamRemoteAddressVariable) {
@@ -165,26 +173,41 @@ TEST_F(StreamInfoHeaderFormatterTest,
 }
 
 TEST_F(StreamInfoHeaderFormatterTest, TestformatWithUpstreamRemoteAddressVariable) {
+  test_with_and_without_runtime_ = true;
   testFormatting("UPSTREAM_REMOTE_ADDRESS", "10.0.0.1:443");
 
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
   stream_info.upstreamInfo()->setUpstreamHost(nullptr);
+  Network::Address::InstanceConstSharedPtr nullptr_address;
+  EXPECT_CALL(*dynamic_cast<StreamInfo::MockUpstreamInfo*>(stream_info.upstream_info_.get()),
+              upstreamRemoteAddress())
+      .WillRepeatedly(ReturnRef(nullptr_address));
   testFormatting(stream_info, "UPSTREAM_REMOTE_ADDRESS", "");
 }
 
 TEST_F(StreamInfoHeaderFormatterTest, TestformatWithUpstreamRemotePortVariable) {
+  test_with_and_without_runtime_ = true;
   testFormatting("UPSTREAM_REMOTE_PORT", "443");
 
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
   stream_info.upstreamInfo()->setUpstreamHost(nullptr);
+  Network::Address::InstanceConstSharedPtr nullptr_address;
+  EXPECT_CALL(*dynamic_cast<StreamInfo::MockUpstreamInfo*>(stream_info.upstream_info_.get()),
+              upstreamRemoteAddress())
+      .WillRepeatedly(ReturnRef(nullptr_address));
   testFormatting(stream_info, "UPSTREAM_REMOTE_PORT", "");
 }
 
 TEST_F(StreamInfoHeaderFormatterTest, TestformatWithUpstreamRemoteAddressWithoutPortVariable) {
+  test_with_and_without_runtime_ = true;
   testFormatting("UPSTREAM_REMOTE_ADDRESS_WITHOUT_PORT", "10.0.0.1");
 
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
   stream_info.upstreamInfo()->setUpstreamHost(nullptr);
+  Network::Address::InstanceConstSharedPtr nullptr_address;
+  EXPECT_CALL(*dynamic_cast<StreamInfo::MockUpstreamInfo*>(stream_info.upstream_info_.get()),
+              upstreamRemoteAddress())
+      .WillRepeatedly(ReturnRef(nullptr_address));
   testFormatting(stream_info, "UPSTREAM_REMOTE_ADDRESS_WITHOUT_PORT", "");
 }
 
@@ -961,6 +984,16 @@ TEST_F(StreamInfoHeaderFormatterTest, WrongFormatOnUpstreamMetadataVariable) {
       "1111111111111111111111111111111111111'\n");
 }
 
+TEST(PlainFormatterTest, BasicTest) { PlainHeaderFormatter formatter("test"); }
+
+TEST(CompoundFormatterTest, BasicTest) {
+  std::vector<HeaderFormatterPtr> formatters;
+  formatters.push_back(std::make_unique<PlainHeaderFormatter>("test1"));
+  formatters.push_back(std::make_unique<PlainHeaderFormatter>("test2"));
+
+  CompoundHeaderFormatter formatter(std::move(formatters));
+}
+
 TEST(HeaderParserTest, TestParseInternal) {
   struct TestCase {
     std::string input_;
@@ -1008,6 +1041,7 @@ TEST(HeaderParserTest, TestParseInternal) {
       {"%START_TIME%", {"2018-04-03T23:06:09.123Z"}, {}},
       {"%RESPONSE_FLAGS%", {"LR"}, {}},
       {"%RESPONSE_CODE_DETAILS%", {"via_upstream"}, {}},
+      {"STATIC_TEXT", {"STATIC_TEXT"}, {}},
 
       // Unescaped %
       {"%", {}, {"Invalid header configuration. Un-escaped % at position 0"}},
@@ -1038,32 +1072,15 @@ TEST(HeaderParserTest, TestParseInternal) {
       {"% ", {}, {"Invalid header configuration. Un-terminated variable expression ' '"}},
 
       // Parsing errors in variable expressions that take a JSON-array parameter.
-      {"%UPSTREAM_METADATA(no array)%",
-       {},
-       {"Invalid header configuration. Expected format "
-        "UPSTREAM_METADATA([\"namespace\", \"k\", ...]), actual format "
-        "UPSTREAM_METADATA(no array), because JSON supplied is not valid. Error(line 1, "
-        "column 2, token no): syntax error while parsing value - invalid literal; last read: "
-        "'no'\n"}},
-      {"%UPSTREAM_METADATA( no array)%",
-       {},
-       {"Invalid header configuration. Expected format "
-        "UPSTREAM_METADATA([\"namespace\", \"k\", ...]), actual format UPSTREAM_METADATA( "
-        "no array), because JSON supplied is not valid. Error(line 1, column 3, token  no): "
-        "syntax error while parsing value - invalid literal; last read: ' no'\n"}},
-      {"%UPSTREAM_METADATA([\"unterminated array\")%",
-       {},
-       {"Invalid header configuration. Expecting ',', ']', or whitespace after "
-        "'UPSTREAM_METADATA([\"unterminated array\"', but found ')'"}},
-      {"%UPSTREAM_METADATA([not-a-string])%",
-       {},
-       {"Invalid header configuration. Expecting '\"' or whitespace after 'UPSTREAM_METADATA([', "
-        "but found 'n'"}},
       {"%UPSTREAM_METADATA([\"\\",
        {},
        {"Invalid header configuration. Un-terminated backslash in JSON string after "
         "'UPSTREAM_METADATA([\"'"}},
       {"%UPSTREAM_METADATA([\"ns\", \"key\"]x",
+       {},
+       {"Invalid header configuration. Expecting ')' or whitespace after "
+        "'UPSTREAM_METADATA([\"ns\", \"key\"]', but found 'x'"}},
+      {"%UPSTREAM_METADATA([\"ns\", \"key\"])% %UPSTREAM_METADATA([\"ns\", \"key\"]x",
        {},
        {"Invalid header configuration. Expecting ')' or whitespace after "
         "'UPSTREAM_METADATA([\"ns\", \"key\"]', but found 'x'"}},
@@ -1091,6 +1108,43 @@ TEST(HeaderParserTest, TestParseInternal) {
        {},
        {"Invalid header configuration. Expected format UPSTREAM_METADATA([\"namespace\", \"k\", "
         "...]), actual format UPSTREAM_METADATA"}},
+  };
+
+  /*
+    The following test cases do not make sense after using unified header formatters.
+    See issue 20389. The test cases are executed only when runtime guard
+    envoy_reloadable_features_unified_header_formatter is false.
+    Comments below explain why unified header formatter parser will not fail.
+    TODO(cpakulski): the following test cases should be removed when
+    envoy_reloadable_features_unified_header_formatter is deprecated.
+    */
+  static const TestCase obsolete_test_cases[] = {
+      // Single key is allowed in UPSTREAM_METADATA
+      {"%UPSTREAM_METADATA(no array)%",
+       {},
+       {"Invalid header configuration. Expected format "
+        "UPSTREAM_METADATA([\"namespace\", \"k\", ...]), actual format "
+        "UPSTREAM_METADATA(no array), because JSON supplied is not valid. Error(line 1, "
+        "column 2, token no): syntax error while parsing value - invalid literal; last read: "
+        "'no'\n"}},
+      // Single key is allowed in UPSTREAM_METADATA
+      {"%UPSTREAM_METADATA( no array)%",
+       {},
+       {"Invalid header configuration. Expected format "
+        "UPSTREAM_METADATA([\"namespace\", \"k\", ...]), actual format UPSTREAM_METADATA( "
+        "no array), because JSON supplied is not valid. Error(line 1, column 3, token  no): "
+        "syntax error while parsing value - invalid literal; last read: ' no'\n"}},
+      // [\"unterminated array\" will treated as key.
+      {"%UPSTREAM_METADATA([\"unterminated array\")%",
+       {},
+       {"Invalid header configuration. Expecting ',', ']', or whitespace after "
+        "'UPSTREAM_METADATA([\"unterminated array\"', but found ')'"}},
+      // [not-a-string] will be treated as key.
+      {"%UPSTREAM_METADATA([not-a-string])%",
+       {},
+       {"Invalid header configuration. Expecting '\"' or whitespace after 'UPSTREAM_METADATA([', "
+        "but found 'n'"}},
+      // [\"ns\"] will be treated as string.
       {"%UPSTREAM_METADATA([\"ns\"])%",
        {},
        {"Invalid header configuration. Expected format UPSTREAM_METADATA([\"namespace\", \"k\", "
@@ -1149,33 +1203,117 @@ TEST(HeaderParserTest, TestParseInternal) {
   absl::optional<std::string> rc_details{"via_upstream"};
   ON_CALL(stream_info, responseCodeDetails()).WillByDefault(ReturnRef(rc_details));
 
+  // Run all tests twice: once using old parser and again using access log's parser.
+  for (const bool use_unified_parser : std::vector<bool>{false, true}) {
+    Runtime::maybeSetRuntimeGuard("envoy.reloadable_features.unified_header_formatter",
+                                  use_unified_parser);
+    for (const auto& test_case : test_cases) {
+      Protobuf::RepeatedPtrField<envoy::config::core::v3::HeaderValueOption> to_add;
+      envoy::config::core::v3::HeaderValueOption* header = to_add.Add();
+      header->mutable_header()->set_key("x-header");
+      header->mutable_header()->set_value(test_case.input_);
+
+      if (test_case.expected_exception_) {
+        EXPECT_FALSE(test_case.expected_output_);
+        if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.unified_header_formatter")) {
+          EXPECT_THROW_WITH_MESSAGE(HeaderParser::configure(to_add), EnvoyException,
+                                    test_case.expected_exception_.value());
+        } else {
+          EXPECT_THROW(HeaderParser::configure(to_add), EnvoyException);
+        }
+        continue;
+      }
+
+      HeaderParserPtr req_header_parser = HeaderParser::configure(to_add);
+
+      Http::TestRequestHeaderMapImpl header_map{{":method", "POST"}};
+      req_header_parser->evaluateHeaders(header_map, stream_info);
+
+      std::string descriptor = fmt::format("for test case input: {}", test_case.input_);
+
+      if (!test_case.expected_output_) {
+        EXPECT_FALSE(header_map.has("x-header")) << descriptor;
+        continue;
+      }
+
+      EXPECT_TRUE(header_map.has("x-header")) << descriptor;
+      EXPECT_EQ(test_case.expected_output_.value(), header_map.get_("x-header")) << descriptor;
+    }
+
+    if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.unified_header_formatter")) {
+      for (const auto& test_case : obsolete_test_cases) {
+        Protobuf::RepeatedPtrField<envoy::config::core::v3::HeaderValueOption> to_add;
+        envoy::config::core::v3::HeaderValueOption* header = to_add.Add();
+        header->mutable_header()->set_key("x-header");
+        header->mutable_header()->set_value(test_case.input_);
+
+        if (test_case.expected_exception_) {
+          EXPECT_FALSE(test_case.expected_output_);
+          EXPECT_THROW_WITH_MESSAGE(HeaderParser::configure(to_add), EnvoyException,
+                                    test_case.expected_exception_.value());
+          continue;
+        }
+      }
+    }
+  }
+}
+
+TEST(HeaderParser, TestMetadataTranslator) {
+  struct TestCase {
+    std::string input_;
+    std::string expected_output_;
+  };
+  static const TestCase test_cases[] = {
+      {"%UPSTREAM_METADATA([\"a\", \"b\"])%", "%UPSTREAM_METADATA(a:b)%"},
+      {"%UPSTREAM_METADATA([\"a\", \"b\",\"c\"])%", "%UPSTREAM_METADATA(a:b:c)%"},
+      {"%UPSTREAM_METADATA([\"a\", \"b\",\"c\"])% %UPSTREAM_METADATA([\"d\", \"e\"])%",
+       "%UPSTREAM_METADATA(a:b:c)% %UPSTREAM_METADATA(d:e)%"},
+      {"%DYNAMIC_METADATA([\"a\", \"b\",\"c\"])%", "%DYNAMIC_METADATA(a:b:c)%"},
+      {"%UPSTREAM_METADATA([\"a\", \"b\",\"c\"])% LEAVE_IT %DYNAMIC_METADATA([\"d\", \"e\"])%",
+       "%UPSTREAM_METADATA(a:b:c)% LEAVE_IT %DYNAMIC_METADATA(d:e)%"},
+      // The following test cases contain parts which should not be translated.
+      {"nothing to translate", "nothing to translate"},
+      {"%UPSTREAM_METADATA([\"a\", \"b\")%", "%UPSTREAM_METADATA([\"a\", \"b\")%"},
+      {"%UPSTREAM_METADATA([\"a\", \"b\"]])%", "%UPSTREAM_METADATA([\"a\", \"b\"]])%"},
+      {"%UPSTREAM_METADATA([\"a\", \"b\",\"c\"])% %DYNAMIC_METADATA([\"d\", \"e\")%",
+       "%UPSTREAM_METADATA(a:b:c)% %DYNAMIC_METADATA([\"d\", \"e\")%"},
+      {"UPSTREAM_METADATA([\"a\", \"b\"])%", "UPSTREAM_METADATA([\"a\", \"b\"])%"}};
+
   for (const auto& test_case : test_cases) {
-    Protobuf::RepeatedPtrField<envoy::config::core::v3::HeaderValueOption> to_add;
-    envoy::config::core::v3::HeaderValueOption* header = to_add.Add();
-    header->mutable_header()->set_key("x-header");
-    header->mutable_header()->set_value(test_case.input_);
+    EXPECT_EQ(test_case.expected_output_, HeaderParser::translateMetadataFormat(test_case.input_));
+  }
+}
 
-    if (test_case.expected_exception_) {
-      EXPECT_FALSE(test_case.expected_output_);
-      EXPECT_THROW_WITH_MESSAGE(HeaderParser::configure(to_add), EnvoyException,
-                                test_case.expected_exception_.value());
-      continue;
-    }
+// Test passing incorrect json. translateMetadataFormat should return
+// the same value without any modifications.
+TEST(HeaderParser, TestMetadataTranslatorExceptions) {
+  static const std::string test_cases[] = {
+      "%UPSTREAM_METADATA([\"a\" - \"b\"])%",
+      "%UPSTREAM_METADATA(\t [ \t\t ] \t)%",
+      "%UPSTREAM_METADATA([\"udp{VTA(r%%%%%TA(r%%%%%b\\\\\\rin\\rsE(r%%%%%b\\\\\\rsi",
+  };
+  for (const auto& test_case : test_cases) {
+    EXPECT_EQ(test_case, HeaderParser::translateMetadataFormat(test_case));
+  }
+}
 
-    HeaderParserPtr req_header_parser = HeaderParser::configure(to_add);
+TEST(HeaderParser, TestPerFilterStateTranslator) {
+  struct TestCase {
+    std::string input_;
+    std::string expected_output_;
+  };
+  static const TestCase test_cases[] = {
+      {"%PER_REQUEST_STATE(some-state)%", "%FILTER_STATE(some-state:PLAIN)%"},
+      {"%PER_REQUEST_STATE(some-state:other-state)%",
+       "%FILTER_STATE(some-state:other-state:PLAIN)%"},
+      {"%PER_REQUEST_STATE(some-state)% %PER_REQUEST_STATE(other-state)%",
+       "%FILTER_STATE(some-state:PLAIN)% %FILTER_STATE(other-state:PLAIN)%"},
+      {"%PER_REQUEST_STATE(\\0)%", "%FILTER_STATE(\\0:PLAIN)%"},
+      {"%PER_REQUEST_STATE(\\1)%", "%FILTER_STATE(\\1:PLAIN)%"},
+  };
 
-    Http::TestRequestHeaderMapImpl header_map{{":method", "POST"}};
-    req_header_parser->evaluateHeaders(header_map, stream_info);
-
-    std::string descriptor = fmt::format("for test case input: {}", test_case.input_);
-
-    if (!test_case.expected_output_) {
-      EXPECT_FALSE(header_map.has("x-header")) << descriptor;
-      continue;
-    }
-
-    EXPECT_TRUE(header_map.has("x-header")) << descriptor;
-    EXPECT_EQ(test_case.expected_output_.value(), header_map.get_("x-header")) << descriptor;
+  for (const auto& test_case : test_cases) {
+    EXPECT_EQ(test_case.expected_output_, HeaderParser::translatePerRequestState(test_case.input_));
   }
 }
 
@@ -1576,6 +1714,14 @@ response_headers_to_add:
       key: "set-cookie"
       value: "bar"
     append_action: APPEND_IF_EXISTS_OR_ADD
+  - header:
+      key: "x-upstream-req-id"
+      value: "%RESP(x-resp-id)%"
+    append_action: APPEND_IF_EXISTS_OR_ADD
+  - header:
+      key: "x-downstream-req-id"
+      value: "%REQ(x-req-id)%"
+    append_action: APPEND_IF_EXISTS_OR_ADD
 
 response_headers_to_remove: ["x-nope"]
 )EOF";
@@ -1583,36 +1729,40 @@ response_headers_to_remove: ["x-nope"]
   const auto route = parseRouteFromV3Yaml(yaml);
   HeaderParserPtr resp_header_parser =
       HeaderParser::configure(route.response_headers_to_add(), route.response_headers_to_remove());
-  Http::TestRequestHeaderMapImpl header_map{
-      {":method", "POST"}, {"x-safe", "safe"}, {"x-nope", "nope"}};
+  Http::TestRequestHeaderMapImpl request_header_map{{":method", "POST"}, {"x-req-id", "543"}};
+  Http::TestResponseHeaderMapImpl response_header_map{
+      {"x-safe", "safe"}, {"x-nope", "nope"}, {"x-resp-id", "321"}};
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
 
   // Initialize start_time as 2018-04-03T23:06:09.123Z in microseconds.
   const SystemTime start_time(std::chrono::microseconds(1522796769123456));
   EXPECT_CALL(stream_info, startTime()).Times(7).WillRepeatedly(Return(start_time));
 
-  resp_header_parser->evaluateHeaders(header_map, stream_info);
-  EXPECT_TRUE(header_map.has("x-client-ip"));
-  EXPECT_TRUE(header_map.has("x-client-ip-port"));
-  EXPECT_TRUE(header_map.has("x-request-start-multiple"));
-  EXPECT_TRUE(header_map.has("x-safe"));
-  EXPECT_FALSE(header_map.has("x-nope"));
-  EXPECT_TRUE(header_map.has("x-request-start"));
-  EXPECT_EQ("1522796769.123", header_map.get_("x-request-start"));
+  resp_header_parser->evaluateHeaders(response_header_map, request_header_map, response_header_map,
+                                      stream_info);
+  EXPECT_TRUE(response_header_map.has("x-client-ip"));
+  EXPECT_TRUE(response_header_map.has("x-client-ip-port"));
+  EXPECT_TRUE(response_header_map.has("x-request-start-multiple"));
+  EXPECT_TRUE(response_header_map.has("x-safe"));
+  EXPECT_FALSE(response_header_map.has("x-nope"));
+  EXPECT_TRUE(response_header_map.has("x-request-start"));
+  EXPECT_EQ("1522796769.123", response_header_map.get_("x-request-start"));
   EXPECT_EQ("1522796769.123 2018-04-03T23:06:09.123Z 1522796769",
-            header_map.get_("x-request-start-multiple"));
-  EXPECT_TRUE(header_map.has("x-request-start-f"));
-  EXPECT_EQ("f", header_map.get_("x-request-start-f"));
-  EXPECT_TRUE(header_map.has("x-request-start-default"));
-  EXPECT_EQ("2018-04-03T23:06:09.123Z", header_map.get_("x-request-start-default"));
-  EXPECT_TRUE(header_map.has("x-request-start-range"));
+            response_header_map.get_("x-request-start-multiple"));
+  EXPECT_TRUE(response_header_map.has("x-request-start-f"));
+  EXPECT_EQ("f", response_header_map.get_("x-request-start-f"));
+  EXPECT_TRUE(response_header_map.has("x-request-start-default"));
+  EXPECT_EQ("2018-04-03T23:06:09.123Z", response_header_map.get_("x-request-start-default"));
+  EXPECT_TRUE(response_header_map.has("x-request-start-range"));
   EXPECT_EQ("123456000, 1, 12, 123, 1234, 12345, 123456, 1234560, 12345600, 123456000",
-            header_map.get_("x-request-start-range"));
-  EXPECT_EQ("foo", header_map.get_("set-cookie"));
+            response_header_map.get_("x-request-start-range"));
+  EXPECT_EQ("foo", response_header_map.get_("set-cookie"));
+  EXPECT_EQ("321", response_header_map.get_("x-upstream-req-id"));
+  EXPECT_EQ("543", response_header_map.get_("x-downstream-req-id"));
 
   // Per https://github.com/envoyproxy/envoy/issues/7488 make sure we don't
   // combine set-cookie headers
-  const auto out = header_map.get(Http::LowerCaseString("set-cookie"));
+  const auto out = response_header_map.get(Http::LowerCaseString("set-cookie"));
   ASSERT_EQ(out.size(), 2);
   ASSERT_EQ(out[0]->value().getStringView(), "foo");
   ASSERT_EQ(out[1]->value().getStringView(), "bar");

@@ -25,7 +25,7 @@ static_resources:
           "@type": type.googleapis.com/envoy.extensions.filters.network.tcp_proxy.v3.TcpProxy
           stat_prefix: default
           cluster: original_dst
-# Snippet: 29-48
+    # Snippet: 29-48
     filter_chain_matcher:
       matcher_tree:
         input:

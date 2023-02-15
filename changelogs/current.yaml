@@ -2,129 +2,111 @@ date: Pending
 
 behavior_changes:
 # *Changes that are expected to cause an incompatibility if applicable; deployment changes are likely required*
-- area: build
+- area: oauth2
   change: |
-    official released binary is now built on Ubuntu 20.04, requires glibc >= 2.30.
-- area: http
-  change: |
-    Envoy no longer adds ``content-length: 0`` header when proxying UPGRADE requests without ``content-length`` and ``transfer-encoding`` headers.
-    This behavior change can be reverted by setting the ``envoy.reloadable_features.http_skip_adding_content_length_to_upgrade`` runtime flag to false.
-- area: tls
-  change: |
-    Change TLS and QUIC transport sockets to support asynchronous cert validation extension. This behavior change can be reverted by setting runtime guard ``envoy.reloadable_features.tls_async_cert_validation`` to false.
+    OAuth filter now URL-encodes URL in query parameters. These query parameters are decoded, leaving intact character sequences that must remain encoded in URLs. This behavioral change can be temporarily reverted by setting runtime guard ``envoy.reloadable_features.oauth_use_url_encoding`` to false.
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
-- area: resource_monitors
+- area: quic
   change: |
-    changed behavior of the fixed heap monitor to count pages allocated to TCMalloc as free memory if it's not used by Envoy. This change can be reverted temporarily by setting the runtime guard ``envoy.reloadable_features.do_not_count_mapped_pages_as_free`` to true.
-- area: prometheus_stats
+    Access logging is now deferred to the QUIC ack listener, and roundtrip response time is added as a downstream timing metric. New runtime flag ``envoy.reloadable_features.quic_defer_logging_to_ack_listener`` can be used for revert this behavior.
+- area: healthcheck
   change: |
-    removed blank line for being compatible with OpenMetrics.
+    If active HC is enabled and a host is ejected by outlier detection, a successful active health check unejects the host and consider it healthy. This also clears all the outlier detection counters. This behavior change can be reverted by setting ``envoy.reloadable_features_successful_active_health_check_uneject_host`` to ``false``.
+- area: local_ratelimit
+  change: |
+    Tokens from local descriptor's token buckets are burned before tokens from the default token bucket.
+- area: http2
+  change: |
+    Request authorities are now validated with a library function from QUICHE rather than nghttp2. This behavior change can be reverted by setting ``envoy.reloadable_features.http2_validate_authority_with_quiche`` to ``false``.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
-- area: listener
+- area: stats
   change: |
-    fixed a bug that doesn't handle of an update for a listener with IPv4-mapped address correctly, and that will lead to a memory leak.
-- area: transport_socket
+    now updating upstream total connection stats as happy eyeballs connections are created.
+- area: eds
   change: |
-    fixed a bug that prevented the tcp stats to be retrieved when running on kernels different than the kernel where Envoy was built.
+    added ``envoy.reloadable_features.multiplex_eds`` to disable eds multiplexing. Eds multiplexing is enabled by default, so that all subscriptions for the same resource type and management server reuse a single channel/mux.
+    When eds multiplexing is disabled each subscription uses a dedicated channel/mux.
+- area: router
+  change: |
+    fixed the bug that custom tags of the route metadata type are not set for upstream spans.
+- area: router
+  change: |
+    fixed outlier detection ejections caused by opened circuit breakers.
+- area: dependency
+  change: |
+    Add boringssl patch to resolve CVE-2023-0286. Note that the FIPS build is not patched/fixed.
+- area: access log
+  change: |
+    in JSON logs, port numbers were logged as strings and are now logged as numbers (``%DOWNSTREAM_LOCAL_PORT%``, ``%DOWNSTREAM_REMOTE_PORT%``, ``%DOWNSTREAM_DIRECT_REMOTE_PORT%``, ``%UPSTREAM_LOCAL_PORT%``, ``%UPSTREAM_REMOTE_PORT%``).
+    This behavioral change can be temporarily reverted by setting runtime guard ``envoy.reloadable_features.format_ports_as_numbers`` to false.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
-- area: auto_config
+- area: config
   change: |
-    removed ``envoy.reloadable_features.correctly_validate_alpn`` and legacy code paths.
-- area: grpc
+    removed ``envoy.reloadable_features.combine_sds_requests`` and legacy code paths.
+- area: dns
   change: |
-    remove ``envoy.reloadable_features.enable_grpc_async_client_cache`` and legacy code paths.
-- area: hcm
-  change: |
-    removed ``envoy.reloadable_features.handle_stream_reset_during_hcm_encoding`` and legacy code paths.
-- area: http
-  change: |
-    removed ``envoy.reloadable_features.proxy_120_103`` and legacy code paths.
-- area: http
-  change: |
-    removed ``envoy.reloadable_features.http2_allow_capacity_increase_by_settings`` and legacy code paths.
-- area: http
-  change: |
-    removed ``envoy.reloadable_features.sanitize_http_header_referer`` and legacy code paths.
-- area: lightstep
-  change: |
-    removed the Lightstep tracer integration, making way for the native OpenTelemetry integration.
-- area: listener
-  change: |
-    removed ``envoy.reloadable_features.internal_address`` and legacy code paths.
+    removed ``envoy.reloadable_features.dns_multiple_addresses`` runtime flag and legacy code paths.
 - area: router
   change: |
-    removed ``envoy.reloadable_features.update_expected_rq_timeout_on_retry`` and legacy code paths.
+    removed ``envoy.reloadable_features.get_route_config_factory_by_type`` runtime flag. The flag is no longer needed as the behavior is now the default.
+- area: http
+  change: |
+    removed ``envoy.reloadable_features.http2_delay_keepalive_timeout`` and legacy code paths.
+- area: http
+  change: |
+    removed ``envoy.reloadable_features.local_ratelimit_match_all_descriptors`` and legacy code paths.
+
+- area: http
+  change: |
+    removed ``envoy.reloadable_features.use_rfc_connect`` and legacy code path.
+- area: http
+  change: |
+    removed ``envoy.reloadable_features.allow_concurrency_for_alpn_pool`` and legacy code path.
+- area: http3
+  change: |
+    removed ``envoy.reloadable_features.conn_pool_new_stream_with_early_data_and_http3`` and legacy code paths.
+- area: http3
+  change: |
+    removed ``envoy.reloadable_features.http3_sends_early_data`` and legacy code paths.
 
 new_features:
-- area: http
-  change: |
-    added default-false ``envoy.reloadable_features.http1_use_balsa_parser`` for experimental BalsaParser.
-  change: |
-    added ``envoy.reloadable_features.allow_upstream_filters`` for experimental upstream filters.
-- area: dns_resolver
-  change: |
-    added DNS stats for c-ares DNS resolver. Detailed documentation is available :ref:`here <arch_overview_dns_resolution>`.
-- area: gzip
-  change: |
-    added support for :ref:`max_inflate_ratio<envoy_v3_api_msg_extensions.compression.gzip.decompressor.v3.Gzip>`.
 - area: access_log
   change: |
-    added downstream handshake timing to connection streamInfo. Can be accessed by custom access loggers.
-- area: build
+    enhanced observability into local close for :ref:`%RESPONSE_CODE_DETAILS% <config_http_conn_man_details>`.
+- area: tracing
   change: |
-    official released binary is now built on Ubuntu 20.04, requires glibc >= 2.30.
-- area: listener
-  change: |
-    added multiple listening addresses in single listener. :ref:`listener additional addresses<envoy_v3_api_field_config.listener.v3.Listener.additional_addresses>`.
-- area: thrift
-  change: |
-    added stats for downstream connection close to detect SR drop.
-- area: cors
-  change: |
-    added support for cors PNA. This behavioral change can be temporarily reverted by setting runtime guard ``envoy_reloadable_features_cors_private_network_access`` to false. More details refer to https://developer.chrome.com/blog/private-network-access-preflight.
+    allow :ref:`grpc_service <envoy_v3_api_field_config.trace.v3.OpenTelemetryConfig.grpc_service>` to be optional. This enables a means to disable collection of traces.
 - area: upstream
   change: |
-    added a filter state object to control the destination address in :ref:`ORIGINAL_DST clusters <arch_overview_load_balancing_types_original_destination_request_header_filter_state>`.
+    added :ref:`ring hash extension <envoy_v3_api_msg_extensions.load_balancing_policies.ring_hash.v3.RingHash>` to suppport the :ref:`load balancer policy <envoy_v3_api_field_config.cluster.v3.Cluster.load_balancing_policy>`.
 - area: upstream
   change: |
-    added a new field :ref:`additional_source_addresses <envoy_v3_api_field_config.core.v3.BindConfig.additional_source_addresses>` to the BindConfig, it enables to specify multiple source addresses, and the source address selection is based on target host's address' version.
-- area: admin
+    added :ref:`maglev extension <envoy_v3_api_msg_extensions.load_balancing_policies.maglev.v3.Maglev>` to suppport the :ref:`load balancer policy <envoy_v3_api_field_config.cluster.v3.Cluster.load_balancing_policy>`.
+- area: router
   change: |
-    added new :ref:`/heap_dump <operations_admin_interface_heap_dump>` endpoint to dump heap profile of Envoy.
-- area: health check
-  change: |
-    added :ref:`method <envoy_v3_api_field_config.core.v3.HealthCheck.HttpHealthCheck.method>` support to configure http health check http method.
-- area: access_log
-  change: |
-    updated command operator ``%GRPC_STATUS%`` to suppoprt the snake case.
-- area: listener
-  change: |
-    expose the implementation of :ref:`internal listener <config_internal_listener>` in xDS API.
-- area: ratelimit
-  change: |
-    add support for :ref:`adding response headers <envoy_v3_api_field_extensions.filters.http.ratelimit.v3.RateLimit.response_headers_to_add>` to rate-limited responses.
-- area: access_log
-  change: |
-    added support for number values in substitution format string in json_format.
-- area: http
-  change: |
-    added the expected :ref:`receive <envoy_v3_api_field_config.core.v3.HealthCheck.HttpHealthCheck.receive>` payload check for HTTP health check.
-    Added :ref:`response_buffer_size <envoy_v3_api_field_config.core.v3.HealthCheck.HttpHealthCheck.response_buffer_size>` to configure the maximum HTTP health check response buffer size.
+    support route info in upstream access log.
 - area: lua
   change: |
-    added stats for lua filter, please see :ref:`lua filter stats <config_http_filters_lua_stats>`.
-- area: listener
+    added an new option to the options of lua ``httpCall``. This allows to skip adding ``x-forwarded-for`` by setting ``{["send_xff"] = false}`` as the ``options``.
+- area: proxy_protocol
   change: |
-    allow network filters other than HTTP Connection Manager to be created for QUIC listeners.
+    added the support :ref:`pass_through_tlvs for listener <envoy_v3_api_field_extensions.filters.listener.proxy_protocol.v3.ProxyProtocol.pass_through_tlvs>`
+    and :ref:`pass_through_tlvs for upsteam <envoy_v3_api_field_config.core.v3.ProxyProtocolConfig.pass_through_tlvs>`.
+    They can control which Proxy Protocol V2 TLVs can be passed through by listener and upstream separately.
+- area: tcp_proxy
+  change: |
+    added support for propagating the response trailers in :ref:`TunnelingConfig <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.TunnelingConfig.propagate_response_trailers>` to the downstream info filter state.
+- area: sni_dynamic_forward_proxy
+  change: |
+    added an option to dynamically set the host used by the SNI dynamic forward proxy filter, by setting a filter state object under the key ``envoy.upstream.dynamic_host``.
+- area: generic_proxy
+  change: |
+    added :ref:`tracing support <envoy_v3_api_field_extensions.filters.network.generic_proxy.v3.GenericProxy.tracing>` for the generic proxy.
 
 deprecated:
-- area: http
-  change: |
-    deprecated :ref:`append <envoy_v3_api_field_config.core.v3.HeaderValueOption.append>` and please use
-    :ref:`append_action <envoy_v3_api_field_config.core.v3.HeaderValueOption.append_action>` first.

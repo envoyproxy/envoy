@@ -41,6 +41,7 @@ TEST_P(BufferIntegrationTest, RouterRequestAndResponseWithZeroByteBodyBuffer) {
 }
 
 TEST_P(BufferIntegrationTest, RouterRequestPopulateContentLength) {
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.allow_upstream_filters", "true");
   config_helper_.prependFilter(ConfigHelper::defaultBufferFilter(), testing_downstream_filter_);
   initialize();
 
@@ -68,6 +69,7 @@ TEST_P(BufferIntegrationTest, RouterRequestPopulateContentLength) {
 }
 
 TEST_P(BufferIntegrationTest, RouterRequestPopulateContentLengthOnTrailers) {
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.allow_upstream_filters", "true");
   config_helper_.prependFilter(ConfigHelper::defaultBufferFilter(), testing_downstream_filter_);
   initialize();
 
@@ -97,6 +99,7 @@ TEST_P(BufferIntegrationTest, RouterRequestPopulateContentLengthOnTrailers) {
 }
 
 TEST_P(BufferIntegrationTest, RouterRequestBufferLimitExceeded) {
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.allow_upstream_filters", "true");
   // Make sure the connection isn't closed during request upload.
   // Without a large drain-close it's possible that the local reply will be sent
   // during request upload, and continued upload will result in TCP reset before

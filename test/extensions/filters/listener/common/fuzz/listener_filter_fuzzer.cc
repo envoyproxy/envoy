@@ -52,10 +52,11 @@ ListenerFilterWithDataFuzzer::ListenerFilterWithDataFuzzer()
   conn_->addConnectionCallbacks(connection_callbacks_);
 }
 
-void ListenerFilterWithDataFuzzer::connect(Network::ListenerFilterPtr filter) {
+void ListenerFilterWithDataFuzzer::connect() {
   EXPECT_CALL(factory_, createListenerFilterChain(_))
-      .WillOnce(Invoke([&](Network::ListenerFilterManager& filter_manager) -> bool {
-        filter_manager.addAcceptFilter(nullptr, std::move(filter));
+      .WillOnce(Invoke([this](Network::ListenerFilterManager& filter_manager) -> bool {
+        ASSERT(filter_ != nullptr);
+        filter_manager.addAcceptFilter(nullptr, std::move(filter_));
         dispatcher_->exit();
         return true;
       }));
@@ -82,7 +83,8 @@ void ListenerFilterWithDataFuzzer::disconnect() {
 void ListenerFilterWithDataFuzzer::fuzz(
     Network::ListenerFilterPtr filter,
     const test::extensions::filters::listener::FilterFuzzWithDataTestCase& input) {
-  connect(std::move(filter));
+  filter_ = std::move(filter);
+  connect();
   for (int i = 0; i < input.data_size(); i++) {
     std::string data(input.data(i).begin(), input.data(i).end());
     write(data);

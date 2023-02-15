@@ -48,7 +48,7 @@ public:
 class SipDecoderTest : public testing::Test {
 public:
   SipDecoderTest()
-      : stats_(SipFilterStats::generateStats("test.", store_)),
+      : stats_(SipFilterStats::generateStats("test.", *store_.rootScope())),
         transaction_infos_(std::make_shared<Router::TransactionInfos>()) {}
   ~SipDecoderTest() override {
     filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();
@@ -99,9 +99,6 @@ public:
     Decoder::REGISTERHandler msgHandler(decoder);
     Decoder::HeaderHandler headerHandler(msgHandler);
     EXPECT_EQ(HeaderType::Via, headerHandler.currentHeader());
-    absl::string_view str("");
-    headerHandler.processEvent(str);
-    headerHandler.processCseq(str);
 
     DecoderStateMachine::DecoderStatus status(State::MessageBegin);
   }

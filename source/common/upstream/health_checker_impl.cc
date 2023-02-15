@@ -131,6 +131,10 @@ HealthCheckerSharedPtr HealthCheckerFactory::create(
     std::unique_ptr<Server::Configuration::HealthCheckerFactoryContext> context(
         new HealthCheckerFactoryContextImpl(cluster, runtime, dispatcher, std::move(event_logger),
                                             validation_visitor, api));
+    if (health_check_config.disable_health_check_if_active_traffic()) {
+      throw EnvoyException(
+          "disable_health_check_if_active_traffic only supports TCP/HTTP/gRPC healthchecking");
+    }
     return factory.createCustomHealthChecker(health_check_config, *context);
   }
   }
@@ -289,6 +293,10 @@ Http::Protocol codecClientTypeToProtocol(Http::CodecType codec_client_type) {
   PANIC_DUE_TO_CORRUPT_ENUM
 }
 
+Http::Protocol HttpHealthCheckerImpl::protocol() const {
+  return codecClientTypeToProtocol(codec_client_type_);
+}
+
 HttpHealthCheckerImpl::HttpActiveHealthCheckSession::HttpActiveHealthCheckSession(
     HttpHealthCheckerImpl& parent, const HostSharedPtr& host)
     : ActiveHealthCheckSession(parent, host), parent_(parent),
@@ -307,7 +315,7 @@ void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onDeferredDelete() {
   if (client_) {
     // If there is an active request it will get reset, so make sure we ignore the reset.
     expect_reset_ = true;
-    client_->close();
+    client_->close(Network::ConnectionCloseType::Abort);
   }
 }
 
@@ -397,7 +405,7 @@ void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onResetStream(Http::St
   }
 
   if (client_ && !reuse_connection_) {
-    client_->close();
+    client_->close(Network::ConnectionCloseType::Abort);
   }
 
   handleFailure(envoy::data::core::v3::NETWORK);
@@ -423,7 +431,7 @@ void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onGoAway(
 
   if (client_) {
     expect_reset_ = true;
-    client_->close();
+    client_->close(Network::ConnectionCloseType::Abort);
   }
 }
 
@@ -501,7 +509,7 @@ void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onResponseComplete() {
   }
 
   if (shouldClose()) {
-    client_->close();
+    client_->close(Network::ConnectionCloseType::Abort);
   }
 
   response_headers_.reset();
@@ -531,7 +539,7 @@ void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onTimeout() {
     // If there is an active request it will get reset, so make sure we ignore the reset.
     expect_reset_ = true;
 
-    client_->close();
+    client_->close(Network::ConnectionCloseType::Abort);
   }
 }
 
@@ -578,7 +586,7 @@ TcpHealthCheckerImpl::TcpActiveHealthCheckSession::~TcpActiveHealthCheckSession(
 void TcpHealthCheckerImpl::TcpActiveHealthCheckSession::onDeferredDelete() {
   if (client_) {
     expect_close_ = true;
-    client_->close(Network::ConnectionCloseType::NoFlush);
+    client_->close(Network::ConnectionCloseType::Abort);
   }
 }
 
@@ -593,7 +601,7 @@ void TcpHealthCheckerImpl::TcpActiveHealthCheckSession::onData(Buffer::Instance&
     handleSuccess(false);
     if (!parent_.reuse_connection_) {
       expect_close_ = true;
-      client_->close(Network::ConnectionCloseType::NoFlush);
+      client_->close(Network::ConnectionCloseType::Abort);
     }
   }
 }
@@ -623,7 +631,7 @@ void TcpHealthCheckerImpl::TcpActiveHealthCheckSession::onEvent(Network::Connect
     // be written, since we currently have no way to know if the bytes actually get written via
     // the connection interface. We might want to figure out how to handle this better later.
     expect_close_ = true;
-    client_->close(Network::ConnectionCloseType::NoFlush);
+    client_->close(Network::ConnectionCloseType::Abort);
     handleSuccess(false);
   }
 }
@@ -657,7 +665,7 @@ void TcpHealthCheckerImpl::TcpActiveHealthCheckSession::onInterval() {
 
 void TcpHealthCheckerImpl::TcpActiveHealthCheckSession::onTimeout() {
   expect_close_ = true;
-  client_->close(Network::ConnectionCloseType::NoFlush);
+  client_->close(Network::ConnectionCloseType::Abort);
 }
 
 GrpcHealthCheckerImpl::GrpcHealthCheckerImpl(const Cluster& cluster,
@@ -696,7 +704,7 @@ void GrpcHealthCheckerImpl::GrpcActiveHealthCheckSession::onDeferredDelete() {
   if (client_) {
     // If there is an active request it will get reset, so make sure we ignore the reset.
     expect_reset_ = true;
-    client_->close();
+    client_->close(Network::ConnectionCloseType::Abort);
   }
 }
 
@@ -856,7 +864,7 @@ void GrpcHealthCheckerImpl::GrpcActiveHealthCheckSession::onResetStream(Http::St
   if (goaway || !parent_.reuse_connection_) {
     // Stream reset was unexpected, so we haven't closed the connection
     // yet in response to a GOAWAY or due to disabled connection reuse.
-    client_->close();
+    client_->close(Network::ConnectionCloseType::Abort);
   }
 
   // TODO(baranov1ch): according to all HTTP standards, we should check if reason is one of
@@ -892,7 +900,7 @@ void GrpcHealthCheckerImpl::GrpcActiveHealthCheckSession::onGoAway(
   }
   // client_ can already be destroyed if the host was removed during the failure callback above.
   if (client_ != nullptr) {
-    client_->close();
+    client_->close(Network::ConnectionCloseType::Abort);
   }
 }
 
@@ -938,7 +946,7 @@ void GrpcHealthCheckerImpl::GrpcActiveHealthCheckSession::onRpcComplete(
 
   // client_ can already be destroyed if the host was removed during the failure callback above.
   if (client_ != nullptr && (!parent_.reuse_connection_ || goaway)) {
-    client_->close();
+    client_->close(Network::ConnectionCloseType::Abort);
   }
 }
 
@@ -955,7 +963,7 @@ void GrpcHealthCheckerImpl::GrpcActiveHealthCheckSession::onTimeout() {
                  HostUtility::healthFlagsToString(*host_));
   expect_reset_ = true;
   if (received_no_error_goaway_ || !parent_.reuse_connection_) {
-    client_->close();
+    client_->close(Network::ConnectionCloseType::Abort);
   } else {
     request_encoder_->getStream().resetStream(Http::StreamResetReason::LocalReset);
   }

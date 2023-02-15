@@ -91,13 +91,15 @@ function cp_binary_for_image_build() {
   mkdir -p "${BASE_TARGET_DIR}"/"${TARGET_DIR}"_stripped
   strip "${FINAL_DELIVERY_DIR}"/envoy -o "${BASE_TARGET_DIR}"/"${TARGET_DIR}"_stripped/envoy
 
-  # Copy for azp which doesn't preserve permissions, creating a tar archive
-  tar czf "${ENVOY_BUILD_DIR}"/"${EXE_NAME}"_binary.tar.gz -C "${BASE_TARGET_DIR}" "${TARGET_DIR}" "${TARGET_DIR}"_stripped
+  # only if BUILD_REASON exists (running in AZP)
+  if [[ "${BUILD_REASON}" ]]; then
+    # Copy for azp which doesn't preserve permissions
+    tar czf "${ENVOY_BUILD_DIR}"/"${EXE_NAME}"_binary.tar.gz -C "${BASE_TARGET_DIR}" "${TARGET_DIR}" "${TARGET_DIR}"_stripped
 
-  # Remove binaries to save space, only if BUILD_REASON exists (running in AZP)
-  [[ -z "${BUILD_REASON}" ]] || \
+    # Remove binaries to save space
     rm -rf "${BASE_TARGET_DIR:?}"/"${TARGET_DIR}" "${BASE_TARGET_DIR:?}"/"${TARGET_DIR}"_stripped "${FINAL_DELIVERY_DIR:?}"/envoy{,.dwp} \
       bazel-bin/"${ENVOY_BIN}"{,.dwp}
+  fi
 }
 
 function bazel_binary_build() {
@@ -188,6 +190,7 @@ function run_ci_verify () {
   sudo apt-get update -y
   sudo apt-get install -y -qq --no-install-recommends expect redis-tools
   export DOCKER_NO_PULL=1
+  export DOCKER_RMI_CLEANUP=1
   umask 027
   chmod -R o-rwx examples/
   "${ENVOY_SRCDIR}"/ci/verify_examples.sh "${@}" || exit
@@ -286,7 +289,10 @@ elif [[ "$CI_TARGET" == "bazel.gcc" ]]; then
 elif [[ "$CI_TARGET" == "bazel.debug" ]]; then
   setup_clang_toolchain
   echo "Testing ${TEST_TARGETS[*]}"
-  bazel test "${BAZEL_BUILD_OPTIONS[@]}" -c dbg "${TEST_TARGETS[@]}"
+  # Make sure that there are no regressions to building Envoy with autolink disabled.
+  EXTRA_OPTIONS=(
+    "--define" "library_autolink=disabled")
+  bazel test "${BAZEL_BUILD_OPTIONS[@]}"  "${EXTRA_OPTIONS[@]}" -c dbg "${TEST_TARGETS[@]}"
 
   echo "bazel debug build with tests..."
   bazel_envoy_binary_build debug
@@ -393,8 +399,8 @@ elif [[ "$CI_TARGET" == "bazel.compile_time_options" ]]; then
   echo "Building and testing with wasm=wamr: ${TEST_TARGETS[*]}"
   bazel_with_collection test "${BAZEL_BUILD_OPTIONS[@]}" --define wasm=wamr "${COMPILE_TIME_OPTIONS[@]}" -c dbg "${TEST_TARGETS[@]}" --test_tag_filters=-nofips --build_tests_only
 
-  echo "Building and testing with wasm=wasmtime: ${TEST_TARGETS[*]}"
-  bazel_with_collection test "${BAZEL_BUILD_OPTIONS[@]}" --define wasm=wasmtime "${COMPILE_TIME_OPTIONS[@]}" -c dbg "${TEST_TARGETS[@]}" --test_tag_filters=-nofips --build_tests_only
+  echo "Building and testing with wasm=wasmtime: and admin_functionality and admin_html disabled ${TEST_TARGETS[*]}"
+  bazel_with_collection test "${BAZEL_BUILD_OPTIONS[@]}" --define wasm=wasmtime --define admin_html=disabled --define admin_functionality=disabled "${COMPILE_TIME_OPTIONS[@]}" -c dbg "${TEST_TARGETS[@]}" --test_tag_filters=-nofips --build_tests_only
 
   echo "Building and testing with wasm=wavm: ${TEST_TARGETS[*]}"
   bazel_with_collection test "${BAZEL_BUILD_OPTIONS[@]}" --define wasm=wavm "${COMPILE_TIME_OPTIONS[@]}" -c dbg "${TEST_TARGETS[@]}" --test_tag_filters=-nofips --build_tests_only
@@ -406,8 +412,8 @@ elif [[ "$CI_TARGET" == "bazel.compile_time_options" ]]; then
   # "--define log_fast_debug_assert_in_release=enabled" must be tested with a release build, so run only these tests under "-c opt" to save time in CI. This option will test only ASSERT()s without SLOW_ASSERT()s, so additionally disable "--define log_debug_assert_in_release" which compiles in both.
     bazel_with_collection test "${BAZEL_BUILD_OPTIONS[@]}" --define wasm=wavm "${COMPILE_TIME_OPTIONS[@]}" -c opt @envoy//test/common/common:assert_test --define log_fast_debug_assert_in_release=enabled --define log_debug_assert_in_release=disabled
 
-  echo "Building binary with wasm=wavm..."
-  bazel build "${BAZEL_BUILD_OPTIONS[@]}" --define wasm=wavm "${COMPILE_TIME_OPTIONS[@]}" -c dbg @envoy//source/exe:envoy-static --build_tag_filters=-nofips
+  echo "Building binary with wasm=wavm... and logging disabled"
+  bazel build "${BAZEL_BUILD_OPTIONS[@]}" --define wasm=wavm --define enable_logging=disabled "${COMPILE_TIME_OPTIONS[@]}" -c dbg @envoy//source/exe:envoy-static --build_tag_filters=-nofips
   collect_build_profile build
   exit 0
 elif [[ "$CI_TARGET" == "bazel.api" ]]; then
@@ -522,7 +528,19 @@ elif [[ "$CI_TARGET" == "verify_distro" ]]; then
     bazel run "${BAZEL_BUILD_OPTIONS[@]}" //distribution:verify_packages "$PACKAGE_BUILD"
     exit 0
 elif [[ "$CI_TARGET" == "publish" ]]; then
-    bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/project:publish
+    # If we are on a non-main release branch but the patch version is 0 - then this branch
+    # has just been created, and the tag/release was cut from `main` - there is no need to
+    # create the tag/release from here
+    version="$(cat VERSION.txt)"
+    patch_version="$(echo "$version" | rev | cut -d. -f1)"
+    if [[ "$AZP_BRANCH" != "main" && "$patch_version" -eq 0 ]]; then
+        echo "Not creating a tag/release for ${version}"
+        exit 0
+    fi
+    # It can take some time to get here in CI so the branch may have changed - create the release
+    # from the current commit (as this only happens on non-PRs we are safe from merges)
+    BUILD_SHA="$(git rev-parse HEAD)"
+    bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/project:publish -- --publish-commitish="$BUILD_SHA"
     exit 0
 else
   echo "Invalid do_ci.sh target, see ci/README.md for valid targets."

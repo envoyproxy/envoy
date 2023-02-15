@@ -18,6 +18,7 @@ configure_make(
     autogen = True,
     configure_in_place = True,
     configure_options = [
+        "--disable-fast-crc-in-assembler",
         "--disable-systemd",
         "--disable-shared",
         "--with-pic",

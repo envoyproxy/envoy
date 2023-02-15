@@ -21,6 +21,7 @@ filegroup(
     srcs = glob(
         ["root/**/*.yaml"],
         exclude = [
+            "root/_configs/go/*",
             "root/**/envoy-dynamic-cds-demo.yaml",
             "root/**/envoy-dynamic-lds-demo.yaml",
             "root/**/envoy-dynamic-filesystem-demo.yaml",
@@ -36,6 +37,14 @@ filegroup(
             "root/configuration/http/http_filters/_include/dns-cache-circuit-breaker.yaml",
             "root/intro/arch_overview/security/_include/ssl.yaml",
         ],
+    }),
+)
+
+filegroup(
+    name = "contrib_configs",
+    srcs = select({
+        "//bazel:windows_x86_64": [],
+        "//conditions:default": glob(["root/_configs/go/*.yaml"]),
     }),
 )
 
@@ -225,7 +234,7 @@ genrule(
     . $(location //bazel:volatile_env) \
     && $(location //tools/docs:sphinx_runner) \
          $${SPHINX_RUNNER_ARGS:-} \
-         --build_sha="$${BUILD_SCM_REVISION:-}" \
+         --build_sha="$${BUILD_DOCS_SHA:-$${BUILD_SCM_REVISION}}" \
          --docs_tag="$${BUILD_DOCS_TAG:-}" \
          --version_file=$(location //:VERSION.txt) \
          --descriptor_path=$(location @envoy_api//:v3_proto_set) \\

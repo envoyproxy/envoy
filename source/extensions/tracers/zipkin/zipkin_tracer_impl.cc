@@ -96,11 +96,14 @@ Driver::Driver(const envoy::config::trace::v3::ZipkinConfig& zipkin_config,
       zipkin_config, shared_span_context, DEFAULT_SHARED_SPAN_CONTEXT);
   collector.shared_span_context_ = shared_span_context;
 
-  tls_->set([this, collector, &random_generator, trace_id_128bit, shared_span_context](
+  const bool split_spans_for_request = zipkin_config.split_spans_for_request();
+
+  tls_->set([this, collector, &random_generator, trace_id_128bit, shared_span_context,
+             split_spans_for_request](
                 Event::Dispatcher& dispatcher) -> ThreadLocal::ThreadLocalObjectSharedPtr {
-    TracerPtr tracer =
-        std::make_unique<Tracer>(local_info_.clusterName(), local_info_.address(), random_generator,
-                                 trace_id_128bit, shared_span_context, time_source_);
+    TracerPtr tracer = std::make_unique<Tracer>(
+        local_info_.clusterName(), local_info_.address(), random_generator, trace_id_128bit,
+        shared_span_context, time_source_, split_spans_for_request);
     tracer->setReporter(
         ReporterImpl::NewInstance(std::ref(*this), std::ref(dispatcher), collector));
     return std::make_shared<TlsTracer>(std::move(tracer), *this);
@@ -119,11 +122,10 @@ Tracing::SpanPtr Driver::startSpan(const Tracing::Config& config,
     auto ret_span_context = extractor.extractSpanContext(sampled);
     if (!ret_span_context.second) {
       // Create a root Zipkin span. No context was found in the headers.
-      new_zipkin_span =
-          tracer.startSpan(config, std::string(trace_context.authority()), start_time);
+      new_zipkin_span = tracer.startSpan(config, std::string(trace_context.host()), start_time);
       new_zipkin_span->setSampled(sampled);
     } else {
-      new_zipkin_span = tracer.startSpan(config, std::string(trace_context.authority()), start_time,
+      new_zipkin_span = tracer.startSpan(config, std::string(trace_context.host()), start_time,
                                          ret_span_context.first);
     }
 

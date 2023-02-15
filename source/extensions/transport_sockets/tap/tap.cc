@@ -48,7 +48,7 @@ Network::IoResult TapSocket::doWrite(Buffer::Instance& buffer, bool end_stream) 
 
 TapSocketFactory::TapSocketFactory(
     const envoy::extensions::transport_sockets::tap::v3::Tap& proto_config,
-    Common::Tap::TapConfigFactoryPtr&& config_factory, Server::Admin& admin,
+    Common::Tap::TapConfigFactoryPtr&& config_factory, OptRef<Server::Admin> admin,
     Singleton::Manager& singleton_manager, ThreadLocal::SlotAllocator& tls,
     Event::Dispatcher& main_thread_dispatcher,
     Network::UpstreamTransportSocketFactoryPtr&& transport_socket_factory)
@@ -66,7 +66,7 @@ TapSocketFactory::createTransportSocket(Network::TransportSocketOptionsConstShar
 
 DownstreamTapSocketFactory::DownstreamTapSocketFactory(
     const envoy::extensions::transport_sockets::tap::v3::Tap& proto_config,
-    Common::Tap::TapConfigFactoryPtr&& config_factory, Server::Admin& admin,
+    Common::Tap::TapConfigFactoryPtr&& config_factory, OptRef<Server::Admin> admin,
     Singleton::Manager& singleton_manager, ThreadLocal::SlotAllocator& tls,
     Event::Dispatcher& main_thread_dispatcher,
     Network::DownstreamTransportSocketFactoryPtr&& transport_socket_factory)

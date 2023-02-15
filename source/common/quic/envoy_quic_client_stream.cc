@@ -47,18 +47,9 @@ Http::Status EnvoyQuicClientStream::encodeHeaders(const Http::RequestHeaderMap& 
   auto spdy_headers = envoyHeadersToHttp2HeaderBlock(headers);
   if (headers.Method()) {
     if (headers.Method()->value() == "CONNECT") {
-      if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.use_rfc_connect")) {
-        spdy_headers.erase(":scheme");
-        spdy_headers.erase(":path");
-        spdy_headers.erase(":protocol");
-      } else {
-        // Legacy support for abandoned
-        // https://tools.ietf.org/html/draft-kinnear-httpbis-http2-transport-02
-        spdy_headers[":protocol"] = Http::Headers::get().ProtocolValues.Bytestream;
-        if (!headers.Path()) {
-          spdy_headers[":path"] = "/";
-        }
-      }
+      spdy_headers.erase(":scheme");
+      spdy_headers.erase(":path");
+      spdy_headers.erase(":protocol");
     } else if (headers.Method()->value() == "HEAD") {
       sent_head_request_ = true;
     }
@@ -228,6 +219,23 @@ void EnvoyQuicClientStream::OnStreamFrame(const quic::QuicStreamFrame& frame) {
   quic::QuicSpdyClientStream::OnStreamFrame(frame);
 }
 
+bool EnvoyQuicClientStream::OnStopSending(quic::QuicResetStreamError error) {
+  // Only called in IETF Quic to close write side.
+  ENVOY_STREAM_LOG(debug, "received STOP_SENDING with reset code={}", *this, error.internal_code());
+  bool end_stream_encoded = local_end_stream_;
+  // This call will close write.
+  if (!quic::QuicSpdyClientStream::OnStopSending(error)) {
+    return false;
+  }
+  if (read_side_closed() && !end_stream_encoded) {
+    stats_.rx_reset_.inc();
+    // If both directions are closed but end stream hasn't been encoded yet, notify reset callbacks.
+    // Treat this as a remote reset, since the stream will be closed in both directions.
+    runResetCallbacks(quicRstErrorToEnvoyRemoteResetReason(error.internal_code()));
+  }
+  return true;
+}
+
 void EnvoyQuicClientStream::OnBodyAvailable() {
   ASSERT(FinishedReadingHeaders());
   if (read_side_closed()) {
@@ -315,8 +323,13 @@ void EnvoyQuicClientStream::maybeDecodeTrailers() {
 void EnvoyQuicClientStream::OnStreamReset(const quic::QuicRstStreamFrame& frame) {
   ENVOY_STREAM_LOG(debug, "received reset code={}", *this, frame.error_code);
   stats_.rx_reset_.inc();
+  bool end_stream_decoded_and_encoded = read_side_closed() && local_end_stream_;
+  // This closes read side in IETF Quic, but doesn't close write side.
   quic::QuicSpdyClientStream::OnStreamReset(frame);
-  runResetCallbacks(quicRstErrorToEnvoyRemoteResetReason(frame.error_code));
+  ASSERT(read_side_closed());
+  if (write_side_closed() && !end_stream_decoded_and_encoded) {
+    runResetCallbacks(quicRstErrorToEnvoyRemoteResetReason(frame.error_code));
+  }
 }
 
 void EnvoyQuicClientStream::ResetWithError(quic::QuicResetStreamError error) {

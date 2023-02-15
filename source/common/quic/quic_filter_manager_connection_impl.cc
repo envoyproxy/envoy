@@ -3,7 +3,8 @@
 #include <initializer_list>
 #include <memory>
 
-#include "quic_ssl_connection_info.h"
+#include "source/common/quic/quic_ssl_connection_info.h"
+#include "source/common/runtime/runtime_features.h"
 
 namespace Envoy {
 namespace Quic {
@@ -11,19 +12,19 @@ namespace Quic {
 QuicFilterManagerConnectionImpl::QuicFilterManagerConnectionImpl(
     QuicNetworkConnection& connection, const quic::QuicConnectionId& connection_id,
     Event::Dispatcher& dispatcher, uint32_t send_buffer_limit,
-    std::shared_ptr<QuicSslConnectionInfo>&& info)
+    std::shared_ptr<QuicSslConnectionInfo>&& info,
+    std::unique_ptr<StreamInfo::StreamInfo>&& stream_info)
     // Using this for purpose other than logging is not safe. Because QUIC connection id can be
     // 18 bytes, so there might be collision when it's hashed to 8 bytes.
     : Network::ConnectionImplBase(dispatcher, /*id=*/connection_id.Hash()),
       network_connection_(&connection), quic_ssl_info_(std::move(info)),
       filter_manager_(
           std::make_unique<Network::FilterManagerImpl>(*this, *connection.connectionSocket())),
-      stream_info_(dispatcher.timeSource(),
-                   connection.connectionSocket()->connectionInfoProviderSharedPtr()),
+      stream_info_(std::move(stream_info)),
       write_buffer_watermark_simulation_(
           send_buffer_limit / 2, send_buffer_limit, [this]() { onSendBufferLowWatermark(); },
           [this]() { onSendBufferHighWatermark(); }, ENVOY_LOGGER()) {
-  stream_info_.protocol(Http::Protocol::Http3);
+  stream_info_->protocol(Http::Protocol::Http3);
   network_connection_->connectionSocket()->connectionInfoProvider().setSslConnection(
       Ssl::ConnectionInfoConstSharedPtr(quic_ssl_info_));
 }
@@ -74,7 +75,7 @@ void QuicFilterManagerConnectionImpl::close(Network::ConnectionCloseType type) {
     return;
   }
   if (!initialized_) {
-    // Delay close till the first OnCanWrite() call.
+    // Delay close till the first ProcessUdpPacket() call.
     close_type_during_initialize_ = type;
     return;
   }
@@ -130,10 +131,10 @@ void QuicFilterManagerConnectionImpl::rawWrite(Buffer::Instance& /*data*/, bool 
   IS_ENVOY_BUG("unexpected call to rawWrite");
 }
 
-void QuicFilterManagerConnectionImpl::updateBytesBuffered(size_t old_buffered_bytes,
-                                                          size_t new_buffered_bytes) {
+void QuicFilterManagerConnectionImpl::updateBytesBuffered(uint64_t old_buffered_bytes,
+                                                          uint64_t new_buffered_bytes) {
   int64_t delta = new_buffered_bytes - old_buffered_bytes;
-  const size_t bytes_to_send_old = bytes_to_send_;
+  const uint64_t bytes_to_send_old = bytes_to_send_;
   bytes_to_send_ += delta;
   if (delta < 0) {
     ENVOY_BUG(bytes_to_send_old > bytes_to_send_, "Underflowed");
@@ -144,21 +145,26 @@ void QuicFilterManagerConnectionImpl::updateBytesBuffered(size_t old_buffered_by
   write_buffer_watermark_simulation_.checkLowWatermark(bytes_to_send_);
 }
 
-void QuicFilterManagerConnectionImpl::maybeApplyDelayClosePolicy() {
+void QuicFilterManagerConnectionImpl::maybeUpdateDelayCloseTimer(bool has_sent_any_data) {
   if (!inDelayedClose()) {
     if (close_type_during_initialize_.has_value()) {
+      ASSERT(!Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.quic_defer_send_in_response_to_packet"));
       close(close_type_during_initialize_.value());
       close_type_during_initialize_ = absl::nullopt;
     }
     return;
   }
-  if (hasDataToWrite() || delayed_close_state_ == DelayedCloseState::CloseAfterFlushAndWait) {
-    if (delayed_close_timer_ != nullptr) {
-      // Re-arm delay close timer on every write event if there are still data
-      // buffered or the connection close is supposed to be delayed.
-      delayed_close_timer_->enableTimer(delayed_close_timeout_);
-    }
-  } else {
+  if (has_sent_any_data && delayed_close_timer_ != nullptr) {
+    // Re-arm delay close timer if at least some buffered data is flushed.
+    delayed_close_timer_->enableTimer(delayed_close_timeout_);
+  }
+}
+
+void QuicFilterManagerConnectionImpl::onWriteEventDone() {
+  // Apply delay close policy if there is any.
+  if (!hasDataToWrite() && inDelayedClose() &&
+      delayed_close_state_ != DelayedCloseState::CloseAfterFlushAndWait) {
     closeConnectionImmediately();
   }
 }
@@ -256,6 +262,13 @@ absl::optional<uint64_t> QuicFilterManagerConnectionImpl::congestionWindowInByte
   }
 
   return cwnd;
+}
+
+void QuicFilterManagerConnectionImpl::maybeHandleCloseDuringInitialize() {
+  if (close_type_during_initialize_.has_value()) {
+    close(close_type_during_initialize_.value());
+    close_type_during_initialize_ = absl::nullopt;
+  }
 }
 
 } // namespace Quic

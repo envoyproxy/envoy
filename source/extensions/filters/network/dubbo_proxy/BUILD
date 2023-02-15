@@ -46,6 +46,7 @@ envoy_cc_library(
         "//envoy/buffer:buffer_interface",
         "//source/common/singleton:const_singleton",
     ],
+    alwayslink = 1,
 )
 
 envoy_cc_library(
@@ -77,6 +78,7 @@ envoy_cc_library(
         ":serializer_interface",
         "//source/common/singleton:const_singleton",
     ],
+    alwayslink = 1,
 )
 
 envoy_cc_library(

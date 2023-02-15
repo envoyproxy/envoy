@@ -59,7 +59,7 @@ public:
                                           bool end_stream) override;
   Http::FilterDataStatus encodeData(Buffer::Instance& data, bool end_stream) override;
   Http::FilterTrailersStatus encodeTrailers(Http::ResponseTrailerMap& trailers) override;
-  Http::FilterHeadersStatus encode1xxHeaders(Http::ResponseHeaderMap& headers) override;
+  Http::Filter1xxHeadersStatus encode1xxHeaders(Http::ResponseHeaderMap& headers) override;
   Http::FilterMetadataStatus encodeMetadata(Http::MetadataMap& metadata) override;
   void onAboveWriteBufferHighWatermark() override;
   void onBelowWriteBufferLowWatermark() override;

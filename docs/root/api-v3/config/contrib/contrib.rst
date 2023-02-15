@@ -1,6 +1,6 @@
 .. _api-v3_config_contrib:
 
-Contrib Extensions
+Contrib extensions
 ==================
 
 .. toctree::

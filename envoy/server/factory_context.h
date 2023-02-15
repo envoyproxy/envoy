@@ -66,9 +66,9 @@ public:
   virtual const LocalInfo::LocalInfo& localInfo() const PURE;
 
   /**
-   * @return Server::Admin& the server's global admin HTTP endpoint.
+   * @return OptRef<Server::Admin> the global HTTP admin endpoint for the server.
    */
-  virtual Server::Admin& admin() PURE;
+  virtual OptRef<Server::Admin> admin() PURE;
 
   /**
    * @return Runtime::Loader& the singleton runtime loader for the server.
@@ -134,7 +134,7 @@ public:
   virtual ServerLifecycleNotifier& lifecycleNotifier() PURE;
 
   /**
-   * @return the init manager of the particular context. This can be used for extensions that need
+   * @return the init manager of the cluster. This can be used for extensions that need
    *         to initialize after cluster manager init but before the server starts listening.
    *         All extensions should register themselves during configuration load. initialize()
    *         will be called on  each registered target after cluster manager init but before the
@@ -288,6 +288,20 @@ public:
 };
 
 using FilterChainFactoryContextPtr = std::unique_ptr<FilterChainFactoryContext>;
+using FilterChainsByName = absl::flat_hash_map<std::string, Network::DrainableFilterChainSharedPtr>;
+
+// This allows matchers to select the correct filter chain for a route.
+class FilterChainBaseAction : public Matcher::Action {
+public:
+  /**
+   * Get the filter chain for this request
+   * @param filter_chains_by_name the configured filter chains
+   * @param info the stream info for this request
+   * @ return Network::FilterChain* a pointer to the filter chain for this request.
+   */
+  virtual const Network::FilterChain* get(const FilterChainsByName& filter_chains_by_name,
+                                          const StreamInfo::StreamInfo& info) const PURE;
+};
 
 /**
  * An implementation of FactoryContext. The life time should cover the lifetime of the filter chains
@@ -327,6 +341,11 @@ public:
    *         the server will start listening.
    */
   virtual Init::Manager& initManager() PURE;
+
+  /*
+   * @return the stats scope of the cluster. This will last as long as the cluster is valid
+   * */
+  virtual Stats::Scope& scope() PURE;
 };
 
 } // namespace Configuration

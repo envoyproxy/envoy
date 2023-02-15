@@ -57,6 +57,7 @@ envoy_cc_library(
         ":utility_lib",
         "//envoy/event:deferred_deletable",
         "//envoy/http:codec_interface",
+        "//envoy/http:header_validator_interface",
         "//envoy/network:connection_interface",
         "//envoy/network:filter_interface",
         "//source/common/common:assert_lib",
@@ -67,8 +68,9 @@ envoy_cc_library(
         "//source/common/http/http1:codec_lib",
         "//source/common/http/http2:codec_lib",
         "//source/common/network:filter_lib",
+        "//source/common/runtime:runtime_features_lib",
     ] + envoy_select_enable_http3([
-        "//source/common/quic:codec_lib",
+        "//source/common/quic:client_codec_lib",
     ]),
 )
 
@@ -238,6 +240,7 @@ envoy_cc_library(
     deps = [
         ":date_provider_lib",
         "//envoy/config:config_provider_interface",
+        "//envoy/http:early_header_mutation_interface",
         "//envoy/http:filter_interface",
         "//envoy/http:header_validator_interface",
         "//envoy/http:original_ip_detection_interface",
@@ -246,6 +249,7 @@ envoy_cc_library(
         "//source/common/local_reply:local_reply_lib",
         "//source/common/network:utility_lib",
         "//source/common/stats:symbol_table_lib",
+        "//source/common/tracing:tracer_config_lib",
         "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
         "@envoy_api//envoy/type/v3:pkg_cc_proto",
     ],
@@ -309,6 +313,7 @@ envoy_cc_library(
         "//envoy/http:context_interface",
         "//envoy/http:filter_interface",
         "//envoy/http:header_map_interface",
+        "//envoy/http:header_validator_errors",
         "//envoy/http:header_validator_interface",
         "//envoy/local_info:local_info_interface",
         "//envoy/network:connection_interface",
@@ -339,6 +344,7 @@ envoy_cc_library(
         "//source/common/http/match_delegate:config",
         "//source/common/network:proxy_protocol_filter_state_lib",
         "//source/common/network:utility_lib",
+        "//source/common/quic:quic_server_factory_stub_lib",
         "//source/common/router:config_lib",
         "//source/common/router:scoped_rds_lib",
         "//source/common/stats:timespan_lib",
@@ -474,7 +480,7 @@ envoy_cc_library(
         "abseil_node_hash_set",
         "abseil_optional",
         "http_parser",
-        "nghttp2",
+        "quiche_http2_protocol",
     ],
     deps = [
         ":exception_lib",
@@ -505,6 +511,7 @@ envoy_cc_library(
     hdrs = ["header_utility.h"],
     external_deps = [
         "nghttp2",
+        "quiche_http2_adapter",
     ],
     deps = [
         ":header_map_lib",
@@ -513,6 +520,7 @@ envoy_cc_library(
         "//envoy/common:matchers_interface",
         "//envoy/common:regex_interface",
         "//envoy/http:header_map_interface",
+        "//envoy/http:header_validator_interface",
         "//source/common/common:matchers_lib",
         "//source/common/common:regex_lib",
         "//source/common/common:utility_lib",

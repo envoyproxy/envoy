@@ -15,6 +15,7 @@
 #include "source/common/http/header_utility.h"
 #include "source/common/network/cidr_range.h"
 #include "source/common/protobuf/utility.h"
+#include "source/common/router/config_utility.h"
 
 #include "absl/types/optional.h"
 
@@ -156,6 +157,7 @@ private:
   const std::string descriptor_key_;
   const std::string default_value_;
   const envoy::config::route::v3::RateLimit::Action::MetaData::Source source_;
+  const bool skip_if_absent_;
 };
 
 /**
@@ -177,6 +179,30 @@ private:
   const std::string descriptor_key_;
   const bool expect_match_;
   const std::vector<Http::HeaderUtility::HeaderDataPtr> action_headers_;
+};
+
+/**
+ * Action for query parameter value match rate limiting.
+ */
+class QueryParameterValueMatchAction : public RateLimit::DescriptorProducer {
+public:
+  QueryParameterValueMatchAction(
+      const envoy::config::route::v3::RateLimit::Action::QueryParameterValueMatch& action);
+
+  // Ratelimit::DescriptorProducer
+  bool populateDescriptor(RateLimit::DescriptorEntry& descriptor_entry,
+                          const std::string& local_service_cluster,
+                          const Http::RequestHeaderMap& headers,
+                          const StreamInfo::StreamInfo& info) const override;
+
+  std::vector<ConfigUtility::QueryParameterMatcherPtr> buildQueryParameterMatcherVector(
+      const envoy::config::route::v3::RateLimit::Action::QueryParameterValueMatch& action);
+
+private:
+  const std::string descriptor_value_;
+  const std::string descriptor_key_;
+  const bool expect_match_;
+  const std::vector<ConfigUtility::QueryParameterMatcherPtr> action_query_parameters_;
 };
 
 /*
@@ -210,6 +236,7 @@ private:
  */
 class RateLimitPolicyImpl : public RateLimitPolicy {
 public:
+  RateLimitPolicyImpl();
   RateLimitPolicyImpl(
       const Protobuf::RepeatedPtrField<envoy::config::route::v3::RateLimit>& rate_limits,
       ProtobufMessage::ValidationVisitor& validator);
@@ -228,6 +255,7 @@ private:
   // Json::Schema::RATE_LIMIT_HTTP_FILTER_SCHEMA from common/json/config_schemas.cc.
   static const uint64_t MAX_STAGE_NUMBER;
 };
+using DefaultRateLimitPolicy = ConstSingleton<RateLimitPolicyImpl>;
 
 } // namespace Router
 } // namespace Envoy

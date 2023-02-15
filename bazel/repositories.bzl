@@ -1,5 +1,4 @@
 load(":dev_binding.bzl", "envoy_dev_binding")
-load(":genrule_repository.bzl", "genrule_repository")
 load("@envoy_api//bazel:envoy_http_archive.bzl", "envoy_http_archive")
 load("@envoy_api//bazel:external_deps.bzl", "load_repository_locations")
 load(":repository_locations.bzl", "PROTOC_VERSIONS", "REPOSITORY_LOCATIONS_SPEC")
@@ -8,6 +7,7 @@ load("@com_google_googleapis//:repository_rules.bzl", "switched_rules_by_languag
 PPC_SKIP_TARGETS = ["envoy.filters.http.lua"]
 
 WINDOWS_SKIP_TARGETS = [
+    "envoy.extensions.http.cache.file_system_http_cache",
     "envoy.filters.http.file_system_buffer",
     "envoy.filters.http.language",
     "envoy.filters.http.sxg",
@@ -31,14 +31,6 @@ def external_http_archive(name, **kwargs):
         name,
         locations = REPOSITORY_LOCATIONS,
         **kwargs
-    )
-
-# Use this macro to reference any genrule_repository sourced from bazel/repository_locations.bzl.
-def external_genrule_repository(name, **kwargs):
-    location = REPOSITORY_LOCATIONS[name]
-    genrule_repository(
-        name = name,
-        **dict(location, **kwargs)
     )
 
 def _default_envoy_build_config_impl(ctx):
@@ -172,6 +164,7 @@ def envoy_dependencies(skip_targets = []):
     _com_github_circonus_labs_libcircllhist()
     _com_github_cyan4973_xxhash()
     _com_github_datadog_dd_opentracing_cpp()
+    _com_github_datadog_dd_trace_cpp()
     _com_github_mirror_tclap()
     _com_github_envoyproxy_sqlparser()
     _com_github_fmtlib_fmt()
@@ -205,7 +198,6 @@ def envoy_dependencies(skip_targets = []):
     _com_github_envoyproxy_sqlparser()
     _v8()
     _com_googlesource_chromium_base_trace_event_common()
-    _com_googlesource_chromium_zlib()
     _com_github_google_quiche()
     _com_googlesource_googleurl()
     _io_hyperscan()
@@ -231,7 +223,12 @@ def envoy_dependencies(skip_targets = []):
     external_http_archive("bazel_toolchains")
     external_http_archive("bazel_compdb")
     external_http_archive("envoy_build_tools")
-    external_http_archive("rules_pkg")
+
+    # TODO(keith): Remove patch when we update rules_pkg
+    external_http_archive(
+        "rules_pkg",
+        patches = ["@envoy//bazel:rules_pkg.patch"],
+    )
     external_http_archive("com_github_aignas_rules_shellcheck")
     external_http_archive("aspect_bazel_lib")
     _com_github_fdio_vpp_vcl()
@@ -256,7 +253,7 @@ def envoy_dependencies(skip_targets = []):
         go = True,
         grpc = True,
         rules_override = {
-            "py_proto_library": "@envoy_api//bazel:api_build_system.bzl",
+            "py_proto_library": ["@envoy_api//bazel:api_build_system.bzl", ""],
         },
     )
     native.bind(
@@ -268,13 +265,15 @@ def _boringssl():
     external_http_archive(
         name = "boringssl",
         patch_args = ["-p1"],
-        patches = ["@envoy//bazel:boringssl_static.patch"],
+        patches = [
+            "@envoy//bazel:boringssl_static.patch",
+            "@envoy//bazel:boringssl_CVE-2023-0286.patch",
+        ],
     )
 
 def _boringssl_fips():
-    external_genrule_repository(
+    external_http_archive(
         name = "boringssl_fips",
-        genrule_cmd_file = "@envoy//bazel/external:boringssl_fips.genrule_cmd",
         build_file = "@envoy//bazel/external:boringssl_fips.BUILD",
         patches = ["@envoy//bazel/external:boringssl_fips.patch"],
     )
@@ -404,12 +403,6 @@ def _com_github_intel_qatlib():
     external_http_archive(
         name = "com_github_intel_qatlib",
         build_file_content = BUILD_ALL_CONTENT,
-        patch_args = ["-p1"],
-        patches = [
-            "@envoy//bazel/foreign_cc:qatlib-0001-qat-Enable-disable-systemd-support-with-configure.ac.patch",
-            "@envoy//bazel/foreign_cc:qatlib-0002-qatlib-Remove-remaining-shared-flags.patch",
-            "@envoy//bazel/foreign_cc:qatlib-0003-configure-Check-if-pkg-config-is-installed-before-us.patch",
-        ],
     )
 
 def _com_github_jbeder_yaml_cpp():
@@ -585,6 +578,13 @@ def _com_github_datadog_dd_opentracing_cpp():
         actual = "@com_github_datadog_dd_opentracing_cpp//:dd_opentracing_cpp",
     )
 
+def _com_github_datadog_dd_trace_cpp():
+    external_http_archive("com_github_datadog_dd_trace_cpp")
+    native.bind(
+        name = "dd_trace_cpp",
+        actual = "@com_github_datadog_dd_trace_cpp//:dd_trace_cpp",
+    )
+
 def _com_github_skyapm_cpp2sky():
     external_http_archive(
         name = "com_github_skyapm_cpp2sky",
@@ -641,7 +641,11 @@ def _com_github_ncopa_suexec():
     )
 
 def _com_google_googletest():
-    external_http_archive("com_google_googletest")
+    external_http_archive(
+        "com_google_googletest",
+        patches = ["@envoy//bazel:googletest.patch"],
+        patch_args = ["-p1"],
+    )
     native.bind(
         name = "googletest",
         actual = "@com_google_googletest//:gtest",
@@ -890,16 +894,6 @@ def _com_googlesource_chromium_base_trace_event_common():
         actual = "@com_googlesource_chromium_base_trace_event_common//:trace_event_common",
     )
 
-def _com_googlesource_chromium_zlib():
-    external_http_archive(
-        name = "com_googlesource_chromium_zlib",
-        build_file = "@v8//:bazel/BUILD.zlib",
-    )
-    native.bind(
-        name = "zlib_compression_utils",
-        actual = "@com_googlesource_chromium_zlib//:zlib_compression_utils",
-    )
-
 def _com_github_google_quiche():
     external_http_archive(
         name = "com_github_google_quiche",
@@ -915,12 +909,24 @@ def _com_github_google_quiche():
         actual = "@com_github_google_quiche//:http2_adapter",
     )
     native.bind(
+        name = "quiche_http2_protocol",
+        actual = "@com_github_google_quiche//:http2_adapter_http2_protocol",
+    )
+    native.bind(
+        name = "quiche_http2_test_tools",
+        actual = "@com_github_google_quiche//:http2_adapter_mock_http2_visitor",
+    )
+    native.bind(
         name = "quiche_quic_platform",
         actual = "@com_github_google_quiche//:quic_platform",
     )
     native.bind(
         name = "quiche_quic_platform_base",
         actual = "@com_github_google_quiche//:quic_platform_base",
+    )
+    native.bind(
+        name = "quiche_spdy_hpack",
+        actual = "@com_github_google_quiche//:spdy_core_hpack_hpack_lib",
     )
 
 def _com_googlesource_googleurl():
@@ -1236,7 +1242,7 @@ filegroup(
     )
 
     # This archive provides Kafka client in Python, so we can use it to interact with Kafka server
-    # during interation tests.
+    # during integration tests.
     external_http_archive(
         name = "kafka_python_client",
         build_file_content = BUILD_ALL_CONTENT,

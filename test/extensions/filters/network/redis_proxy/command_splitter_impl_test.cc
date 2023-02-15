@@ -73,7 +73,7 @@ public:
 
   Event::SimulatedTimeSystem time_system_;
   InstanceImpl splitter_{std::make_unique<NiceMock<MockRouter>>(route_),
-                         store_,
+                         *store_.rootScope(),
                          "redis.foo.",
                          time_system_,
                          latency_in_micros_,
@@ -81,6 +81,13 @@ public:
   MockSplitCallbacks callbacks_;
   SplitRequestPtr handle_;
 };
+
+TEST_F(RedisCommandSplitterImplTest, QuitSuccess) {
+  Common::Redis::RespValuePtr request{new Common::Redis::RespValue()};
+  makeBulkStringArray(*request, {"quit"});
+
+  EXPECT_EQ(0UL, store_.counter("redis.foo.splitter.invalid_request").value());
+}
 
 TEST_F(RedisCommandSplitterImplTest, AuthWithNoPassword) {
   Common::Redis::RespValue response;

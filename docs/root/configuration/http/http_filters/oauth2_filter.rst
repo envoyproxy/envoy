@@ -37,6 +37,20 @@ is set to true the filter will send over a
 cookie named ``BearerToken`` to the upstream. Additionally, the ``Authorization`` header will be populated
 with the same value.
 
+The OAuth filer encodes URLs in query parameters using the
+`URL encoding algorithm. <https://www.w3.org/TR/html5/forms.html#application/x-www-form-urlencoded-encoding-algorithm>`_
+
+When receiving request redirected from the authorization service the Oauth filer decodes URLs from query parameters.
+However the encoded character sequences that represent ASCII control characters or extended ASCII codepoints are not
+decoded. The characters without defined meaning in URL according to `RFC 3986 <https://datatracker.ietf.org/doc/html/rfc3986>`_
+are also left undecoded. Specifically the following characters are left in the encoded form:
+
+* Control characters with values less than or equal 0x1F
+* Space (0x20)
+* DEL character (0x7F)
+* Extended ASCII characters with values grteater than or equal 0x80
+* Characters without defined meaning in URL: `"<>\^{}|`
+
 .. note::
   By default, OAuth2 filter sets some cookies with the following names:
   ``BearerToken``, ``OauthHMAC``, and ``OauthExpires``. These cookie names can be customized by
@@ -61,7 +75,7 @@ The following is an example configuring the filter.
       uri: oauth.com/token
       timeout: 3s
     authorization_endpoint: https://oauth.com/oauth/authorize/
-    redirect_uri: "%REQ(:x-forwarded-proto)%://%REQ(:authority)%/callback"
+    redirect_uri: "%REQ(x-forwarded-proto)%://%REQ(:authority)%/callback"
     redirect_path_matcher:
       path:
         exact: /callback
@@ -118,7 +132,7 @@ Below is a complete code example of how we employ the filter as one of
                     uri: oauth.com/token
                     timeout: 3s
                   authorization_endpoint: https://oauth.com/oauth/authorize/
-                  redirect_uri: "%REQ(:x-forwarded-proto)%://%REQ(:authority)%/callback"
+                  redirect_uri: "%REQ(x-forwarded-proto)%://%REQ(:authority)%/callback"
                   redirect_path_matcher:
                     path:
                       exact: /callback
@@ -229,7 +243,7 @@ sending the user to the configured auth endpoint.
 
 :ref:`pass_through_matcher <envoy_v3_api_field_extensions.filters.http.oauth2.v3.OAuth2Config.pass_through_matcher>` provides
 an interface for users to provide specific header matching criteria such that, when applicable, the OAuth flow is entirely skipped.
-When this occurs, the ``oauth_success`` metric is still incremented.
+When this occurs, the ``oauth_passthrough`` metric is incremented but ``success`` is not.
 
 Generally, allowlisting is inadvisable from a security standpoint.
 
@@ -243,5 +257,6 @@ The OAuth2 filter outputs statistics in the *<stat_prefix>.* namespace.
   :widths: 1, 1, 2
 
   oauth_failure, Counter, Total requests that were denied.
+  oauth_passthrough, Counter, Total request that matched a passthrough header.
   oauth_success, Counter, Total requests that were allowed.
   oauth_unauthorization_rq, Counter, Total unauthorized requests.

@@ -1,5 +1,7 @@
 #include "source/common/upstream/health_checker_base_impl.h"
 
+#include <chrono>
+
 #include "envoy/config/core/v3/address.pb.h"
 #include "envoy/config/core/v3/health_check.pb.h"
 #include "envoy/data/core/v3/health_check_event.pb.h"
@@ -18,6 +20,7 @@ HealthCheckerImplBase::HealthCheckerImplBase(const Cluster& cluster,
                                              Random::RandomGenerator& random,
                                              HealthCheckEventLoggerPtr&& event_logger)
     : always_log_health_check_failures_(config.always_log_health_check_failures()),
+      disable_health_check_if_active_traffic_(config.disable_health_check_if_active_traffic()),
       cluster_(cluster), dispatcher_(dispatcher),
       timeout_(PROTOBUF_GET_MS_REQUIRED(config, timeout)),
       unhealthy_threshold_(PROTOBUF_GET_WRAPPED_REQUIRED(config, unhealthy_threshold)),
@@ -105,7 +108,7 @@ std::chrono::milliseconds HealthCheckerImplBase::interval(HealthState state,
   // If a connection has been established, we choose an interval based on the host's health. Please
   // refer to the HealthCheck API documentation for more details.
   uint64_t base_time_ms;
-  if (cluster_.info()->stats().upstream_cx_total_.used()) {
+  if (cluster_.info()->trafficStats()->upstream_cx_total_.used()) {
     // When healthy/unhealthy threshold is configured the health transition of a host will be
     // delayed. In this situation Envoy should use the edge interval settings between health checks.
     //
@@ -160,6 +163,9 @@ HealthCheckerImplBase::intervalWithJitter(uint64_t base_time_ms,
 
 void HealthCheckerImplBase::addHosts(const HostVector& hosts) {
   for (const HostSharedPtr& host : hosts) {
+    if (host->disableActiveHealthCheck()) {
+      continue;
+    }
     active_sessions_[host] = makeSession(host);
     host->setHealthChecker(
         HealthCheckHostMonitorPtr{new HealthCheckHostMonitorImpl(shared_from_this(), host)});
@@ -171,6 +177,9 @@ void HealthCheckerImplBase::onClusterMemberUpdate(const HostVector& hosts_added,
                                                   const HostVector& hosts_removed) {
   addHosts(hosts_added);
   for (const HostSharedPtr& host : hosts_removed) {
+    if (host->disableActiveHealthCheck()) {
+      continue;
+    }
     auto session_iter = active_sessions_.find(host);
     ASSERT(active_sessions_.end() != session_iter);
     // This deletion can happen inline in response to a host failure, so we deferred delete.
@@ -233,7 +242,8 @@ HealthCheckerImplBase::ActiveHealthCheckSession::ActiveHealthCheckSession(
     HealthCheckerImplBase& parent, HostSharedPtr host)
     : host_(host), parent_(parent),
       interval_timer_(parent.dispatcher_.createTimer([this]() -> void { onIntervalBase(); })),
-      timeout_timer_(parent.dispatcher_.createTimer([this]() -> void { onTimeoutBase(); })) {
+      timeout_timer_(parent.dispatcher_.createTimer([this]() -> void { onTimeoutBase(); })),
+      time_source_(parent.dispatcher_.timeSource()) {
 
   if (!host->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC)) {
     parent.incHealthy();
@@ -272,8 +282,8 @@ void HealthCheckerImplBase::ActiveHealthCheckSession::onDeferredDeleteBase() {
 void HealthCheckerImplBase::ActiveHealthCheckSession::handleSuccess(bool degraded) {
   // If we are healthy, reset the # of unhealthy to zero.
   num_unhealthy_ = 0;
-
   HealthTransition changed_state = HealthTransition::Unchanged;
+
   if (host_->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC)) {
     // If this is the first time we ever got a check result on this host, we immediately move
     // it to healthy. This makes startup faster with a small reduction in overall reliability
@@ -285,7 +295,6 @@ void HealthCheckerImplBase::ActiveHealthCheckSession::handleSuccess(bool degrade
       // A host that was told to exclude based on immediate failure, but is now passing, should
       // no longer be excluded.
       host_->healthFlagClear(Host::HealthFlag::EXCLUDED_VIA_IMMEDIATE_HC_FAIL);
-
       host_->healthFlagClear(Host::HealthFlag::FAILED_ACTIVE_HC);
       parent_.incHealthy();
       changed_state = HealthTransition::Changed;
@@ -295,6 +304,7 @@ void HealthCheckerImplBase::ActiveHealthCheckSession::handleSuccess(bool degrade
     } else {
       changed_state = HealthTransition::ChangePending;
     }
+    host_->setLastHcPassTime(time_source_.monotonicTime());
   }
 
   changed_state = clearPendingFlag(changed_state);
@@ -411,6 +421,22 @@ HealthCheckerImplBase::ActiveHealthCheckSession::clearPendingFlag(HealthTransiti
 }
 
 void HealthCheckerImplBase::ActiveHealthCheckSession::onIntervalBase() {
+  // Only if host is healthy, check whether need disable HC if there was already successful
+  // non-health check traffic
+  if (parent_.disable_health_check_if_active_traffic_ &&
+      !host_->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC)) {
+    MonotonicTime traffic_successful_time =
+        host_->lastSuccessfulTrafficTime(parent_.healthCheckerType());
+    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(
+        time_source_.monotonicTime() - traffic_successful_time);
+    if (duration.count() < parent_.interval_.count()) {
+      // During the time, there was already successful non-health check traffic for the host, no
+      // need to send HC packet
+      parent_.stats_.attempt_.inc();
+      interval_timer_->enableTimer(parent_.interval_);
+      return;
+    }
+  }
   onInterval();
   timeout_timer_->enableTimer(parent_.timeout_);
   parent_.stats_.attempt_.inc();

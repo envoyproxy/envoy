@@ -32,8 +32,11 @@ public:
    */
   struct Origin {
   public:
+    Origin() = default;
+    Origin(const Origin& other) = default;
     Origin(absl::string_view scheme, absl::string_view hostname, uint32_t port)
         : scheme_(scheme), hostname_(hostname), port_(port) {}
+    Origin& operator=(const Origin&) = default;
 
     bool operator==(const Origin& other) const {
       return std::tie(scheme_, hostname_, port_) ==

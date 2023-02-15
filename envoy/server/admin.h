@@ -279,6 +279,11 @@ public:
    */
   static RequestPtr makeStaticTextRequest(absl::string_view response_text, Http::Code code);
   static RequestPtr makeStaticTextRequest(Buffer::Instance& response_text, Http::Code code);
+
+  /**
+   * Closes the listening socket for the admin.
+   */
+  virtual void closeSocket() PURE;
 };
 
 } // namespace Server

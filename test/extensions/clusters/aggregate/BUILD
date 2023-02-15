@@ -41,6 +41,7 @@ envoy_extension_cc_test(
         "//source/common/upstream:cluster_factory_lib",
         "//source/common/upstream:cluster_manager_lib",
         "//source/extensions/clusters/aggregate:cluster",
+        "//source/extensions/clusters/static:static_cluster_lib",
         "//source/extensions/transport_sockets/raw_buffer:config",
         "//test/common/upstream:test_cluster_manager",
         "//test/common/upstream:utility_lib",

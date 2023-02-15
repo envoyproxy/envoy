@@ -151,30 +151,9 @@ TEST_P(AccessLogIntegrationTest, BasicAccessLogFlow) {
   ASSERT_TRUE(waitForAccessLogStream());
   ASSERT_TRUE(waitForAccessLogRequest(EXPECTED_REQUEST_MESSAGE));
 
+  // Make another request and expect a new stream to be used.
   BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
       lookupPort("http"), "GET", "/notfound", "", downstream_protocol_, version_);
-  EXPECT_TRUE(response->complete());
-  EXPECT_EQ("404", response->headers().getStatusValue());
-  ASSERT_TRUE(waitForAccessLogRequest(EXPECTED_REQUEST_MESSAGE));
-
-  // Send an empty response and end the stream. This should never happen but make sure nothing
-  // breaks and we make a new stream on a follow up request.
-  access_log_request_->startGrpcStream();
-  opentelemetry::proto::collector::logs::v1::ExportLogsServiceResponse response_msg;
-  access_log_request_->sendGrpcMessage(response_msg);
-  access_log_request_->finishGrpcStream(Grpc::Status::Ok);
-  switch (clientType()) {
-  case Grpc::ClientType::EnvoyGrpc:
-    test_server_->waitForGaugeEq("cluster.accesslog.upstream_rq_active", 0);
-    break;
-  case Grpc::ClientType::GoogleGrpc:
-    test_server_->waitForCounterGe("grpc.accesslog.streams_closed_0", 1);
-    break;
-  default:
-    PANIC("reached unexpected code");
-  }
-  response = IntegrationUtil::makeSingleRequest(lookupPort("http"), "GET", "/notfound", "",
-                                                downstream_protocol_, version_);
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("404", response->headers().getStatusValue());
   ASSERT_TRUE(waitForAccessLogStream());

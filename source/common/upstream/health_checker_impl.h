@@ -114,6 +114,9 @@ public:
                         Event::Dispatcher& dispatcher, Runtime::Loader& runtime,
                         Random::RandomGenerator& random, HealthCheckEventLoggerPtr&& event_logger);
 
+  // Returns the HTTP protocol used for the health checker.
+  Http::Protocol protocol() const;
+
   /**
    * Utility class checking if given http status matches configured expectations.
    */

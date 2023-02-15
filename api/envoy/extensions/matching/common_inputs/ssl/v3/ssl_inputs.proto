@@ -10,7 +10,7 @@ option java_multiple_files = true;
 option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/matching/common_inputs/ssl/v3;sslv3";
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
-// [#protodoc-title: Common SSL Matching Inputs]
+// [#protodoc-title: Common SSL matching inputs]
 
 // List of comma-delimited URIs in the SAN field of the peer certificate for a downstream.
 // [#extension: envoy.matching.inputs.uri_san]

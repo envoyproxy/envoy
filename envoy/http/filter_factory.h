@@ -67,8 +67,12 @@ public:
    * Called when a new HTTP stream is created on the connection.
    * @param manager supplies the "sink" that is used for actually creating the filter chain. @see
    *                FilterChainManager.
+   * @param only_create_if_configured if true, only creates filter chain if there is a non-default
+   *                                  configured filter chain. Default false.
+   * @return whather a filter chain has been created.
    */
-  virtual void createFilterChain(FilterChainManager& manager) const PURE;
+  virtual bool createFilterChain(FilterChainManager& manager,
+                                 bool only_create_if_configured = false) const PURE;
 
   /**
    * Called when a new upgrade stream is created on the connection.

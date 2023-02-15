@@ -70,9 +70,16 @@ public:
   const LowerCaseString CacheControl{"cache-control"};
   const LowerCaseString CdnLoop{"cdn-loop"};
   const LowerCaseString ContentEncoding{"content-encoding"};
+  const LowerCaseString ConnectAcceptEncoding{"connect-accept-encoding"};
+  const LowerCaseString ConnectContentEncoding{"connect-content-encoding"};
+  const LowerCaseString ConnectProtocolVersion{"connect-protocol-version"};
+  const LowerCaseString ConnectTimeoutMs{"connect-timeout-ms"};
   const LowerCaseString Etag{"etag"};
   const LowerCaseString Expires{"expires"};
   const LowerCaseString GrpcAcceptEncoding{"grpc-accept-encoding"};
+  const LowerCaseString GrpcEncoding{"grpc-encoding"};
+  const LowerCaseString GrpcMessageType{"grpc-message-type"};
+  const LowerCaseString GrpcTimeout{"grpc-timeout"};
   const LowerCaseString IfMatch{"if-match"};
   const LowerCaseString IfNoneMatch{"if-none-match"};
   const LowerCaseString IfModifiedSince{"if-modified-since"};
@@ -154,6 +161,7 @@ public:
       absl::StrCat(prefix(), "-hedge-on-per-try-timeout")};
   const LowerCaseString EnvoyImmediateHealthCheckFail{
       absl::StrCat(prefix(), "-immediate-health-check-fail")};
+  const LowerCaseString EnvoyIsTimeoutRetry{absl::StrCat(prefix(), "-is-timeout-retry")};
   const LowerCaseString EnvoyOriginalUrl{absl::StrCat(prefix(), "-original-url")};
   const LowerCaseString EnvoyInternalRequest{absl::StrCat(prefix(), "-internal")};
   // TODO(mattklein123): EnvoyIpTags should be a custom header registered with the IP tagging
@@ -195,6 +203,7 @@ public:
   const LowerCaseString ForwardedClientCert{"x-forwarded-client-cert"};
   const LowerCaseString ForwardedFor{"x-forwarded-for"};
   const LowerCaseString ForwardedHost{"x-forwarded-host"};
+  const LowerCaseString ForwardedPort{"x-forwarded-port"};
   const LowerCaseString ForwardedProto{"x-forwarded-proto"};
   const LowerCaseString GrpcMessage{"grpc-message"};
   const LowerCaseString GrpcStatus{"grpc-status"};
@@ -243,6 +252,8 @@ public:
     const std::string TextEventStream{"text/event-stream"};
     const std::string TextUtf8{"text/plain; charset=UTF-8"}; // TODO(jmarantz): fold this into Text
     const std::string Html{"text/html; charset=UTF-8"};
+    const std::string Connect{"application/connect"};
+    const std::string ConnectProto{"application/connect+proto"};
     const std::string Grpc{"application/grpc"};
     const std::string GrpcWeb{"application/grpc-web"};
     const std::string GrpcWebProto{"application/grpc-web+proto"};

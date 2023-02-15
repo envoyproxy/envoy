@@ -38,6 +38,10 @@ public:
       headers.addCopy(Http::LowerCaseString("dns_end"),
                       toUsec(stream_info.downstreamTiming().getValue(dns_end).value()));
     }
+    if (stream_info.downstreamAddressProvider().roundTripTime().has_value()) {
+      headers.addCopy(Http::LowerCaseString("round_trip_time"),
+                      stream_info.downstreamAddressProvider().roundTripTime().value().count());
+    }
     if (conn_stream_info.downstreamTiming().has_value() &&
         conn_stream_info.downstreamTiming()->downstreamHandshakeComplete().has_value()) {
       headers.addCopy(
@@ -49,6 +53,11 @@ public:
         headers.addCopy(
             Http::LowerCaseString("alpn"),
             decoder_callbacks_->streamInfo().upstreamInfo()->upstreamSslConnection()->alpn());
+      }
+      if (decoder_callbacks_->streamInfo().upstreamInfo()->upstreamRemoteAddress()) {
+        headers.addCopy(
+            Http::LowerCaseString("remote_address"),
+            decoder_callbacks_->streamInfo().upstreamInfo()->upstreamRemoteAddress()->asString());
       }
 
       headers.addCopy(Http::LowerCaseString("num_streams"),

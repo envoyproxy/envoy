@@ -231,6 +231,7 @@ envoy_cc_test(
         "//source/common/common:matchers_lib",
         "//source/common/config:metadata_lib",
         "//source/common/protobuf:utility_lib",
+        "//source/common/stream_info:filter_state_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/type/matcher/v3:pkg_cc_proto",
@@ -275,6 +276,17 @@ envoy_cc_test(
         "//test/test_common:simulated_time_system_lib",
         "//test/test_common:test_time_lib",
         "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_test(
+    name = "packed_struct_test",
+    srcs = ["packed_struct_test.cc"],
+    deps = [
+        "//source/common/common:packed_struct_lib",
+        "//test/common/stats:stat_test_utility_lib",
+        "//test/test_common:utility_lib",
+        "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
     ],
 )
 
@@ -461,5 +473,13 @@ envoy_cc_test(
     deps = [
         "//source/common/common:scope_tracked_object_stack",
         "//source/common/common:utility_lib",
+    ],
+)
+
+envoy_cc_test(
+    name = "union_string_test",
+    srcs = ["union_string_test.cc"],
+    deps = [
+        "//envoy/common:union_string",
     ],
 )

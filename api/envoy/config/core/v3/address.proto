@@ -6,6 +6,7 @@ import "envoy/config/core/v3/socket_option.proto";
 
 import "google/protobuf/wrappers.proto";
 
+import "envoy/annotations/deprecation.proto";
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
 import "validate/validate.proto";
@@ -115,15 +116,30 @@ message TcpKeepalive {
   google.protobuf.UInt32Value keepalive_interval = 3;
 }
 
+message ExtraSourceAddress {
+  // The additional address to bind.
+  SocketAddress address = 1 [(validate.rules).message = {required: true}];
+
+  // Additional socket options that may not be present in Envoy source code or
+  // precompiled binaries. If specified, this will override the
+  // :ref:`socket_options <envoy_v3_api_field_config.core.v3.BindConfig.socket_options>`
+  // in the BindConfig. If specified with no
+  // :ref:`socket_options <envoy_v3_api_field_config.core.v3.SocketOptionsOverride.socket_options>`
+  // or an empty list of :ref:`socket_options <envoy_v3_api_field_config.core.v3.SocketOptionsOverride.socket_options>`,
+  // it means no socket option will apply.
+  SocketOptionsOverride socket_options = 2;
+}
+
+// [#next-free-field: 6]
 message BindConfig {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.core.BindConfig";
 
   // The address to bind to when creating a socket.
-  SocketAddress source_address = 1 [(validate.rules).message = {required: true}];
+  SocketAddress source_address = 1;
 
   // Whether to set the ``IP_FREEBIND`` option when creating the socket. When this
   // flag is set to true, allows the :ref:`source_address
-  // <envoy_v3_api_field_config.cluster.v3.UpstreamBindConfig.source_address>` to be an IP address
+  // <envoy_v3_api_field_config.core.v3.BindConfig.source_address>` to be an IP address
   // that is not configured on the system running Envoy. When this flag is set
   // to false, the option ``IP_FREEBIND`` is disabled on the socket. When this
   // flag is not set (default), the socket is not modified, i.e. the option is
@@ -134,15 +150,20 @@ message BindConfig {
   // precompiled binaries.
   repeated SocketOption socket_options = 3;
 
-  // Additional source addresses appended to the address specified in the `source_address`
-  // field. This enables to specify multiple source addresses. Currently, only one additional
-  // address can be supported, and the additional address should have a different IP version
+  // Extra source addresses appended to the address specified in the `source_address`
+  // field. This enables to specify multiple source addresses. Currently, only one extra
+  // address can be supported, and the extra address should have a different IP version
   // with the address in the `source_address` field. The address which has the same IP
   // version with the target host's address IP version will be used as bind address. If more
-  // than one additional address specified, only the first address matched IP version will be
+  // than one extra address specified, only the first address matched IP version will be
   // returned. If there is no same IP version address found, the address in the `source_address`
   // will be returned.
-  repeated SocketAddress additional_source_addresses = 4;
+  repeated ExtraSourceAddress extra_source_addresses = 5;
+
+  // Deprecated by
+  // :ref:`extra_source_addresses <envoy_v3_api_field_config.core.v3.BindConfig.extra_source_addresses>`
+  repeated SocketAddress additional_source_addresses = 4
+      [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 }
 
 // Addresses specify either a logical or physical address and port, which are

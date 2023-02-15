@@ -1,0 +1,16 @@
+extends: default
+
+rules:
+  document-start: false
+  indentation:
+    spaces: consistent
+    indent-sequences: false
+  line-length:
+    max: 200
+    level: warning
+  truthy:
+    allowed-values:
+    - "yes"
+    - "no"
+    - "true"
+    - "false"

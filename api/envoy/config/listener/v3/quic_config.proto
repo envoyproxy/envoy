@@ -22,7 +22,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // [#protodoc-title: QUIC listener config]
 
 // Configuration specific to the UDP QUIC listener.
-// [#next-free-field: 8]
+// [#next-free-field: 9]
 message QuicProtocolOptions {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.api.v2.listener.QuicProtocolOptions";
@@ -63,4 +63,9 @@ message QuicProtocolOptions {
   // If not specified the :ref:`default one configured by <envoy_v3_api_msg_extensions.quic.proof_source.v3.ProofSourceConfig>` will be used.
   // [#extension-category: envoy.quic.proof_source]
   core.v3.TypedExtensionConfig proof_source_config = 7;
+
+  // Config which implementation of ``quic::ConnectionIdGeneratorInterface`` to be used for this listener.
+  // If not specified the :ref:`default one configured by <envoy_v3_api_msg_extensions.quic.connection_id_generator.v3.DeterministicConnectionIdGeneratorConfig>` will be used.
+  // [#extension-category: envoy.quic.connection_id_generator]
+  core.v3.TypedExtensionConfig connection_id_generator_config = 8;
 }

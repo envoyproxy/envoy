@@ -127,6 +127,7 @@ message UpstreamHttpProtocolOptions {
 // make an HTTP connection to an origin server. See https://tools.ietf.org/html/rfc7838 for
 // HTTP Alternative Services and https://datatracker.ietf.org/doc/html/draft-ietf-dnsop-svcb-https-04
 // for the "HTTPS" DNS resource record.
+// [#next-free-field: 6]
 message AlternateProtocolsCacheOptions {
   // Allows pre-populating the cache with HTTP/3 alternate protocols entries with a 7 day lifetime.
   // This will cause Envoy to attempt HTTP/3 to those upstreams, even if the upstreams have not
@@ -171,6 +172,17 @@ message AlternateProtocolsCacheOptions {
 
   // Allows pre-populating the cache with entries, as described above.
   repeated AlternateProtocolsCacheEntry prepopulated_entries = 4;
+
+  // Optional list of hostnames suffixes for which Alt-Svc entries can be shared. For example, if
+  // this list contained the value ``.c.example.com``, then an Alt-Svc entry for ``foo.c.example.com``
+  // could be shared with ``bar.c.example.com`` but would not be shared with ``baz.example.com``. On
+  // the other hand, if the list contained the value ``.example.com`` then all three hosts could share
+  // Alt-Svc entries. Each entry must start with ``.``.  If a hostname matches multiple suffixes, the
+  // first listed suffix will be used.
+  //
+  // Since lookup in this list is O(n), it is recommended that the number of suffixes be limited.
+  // [#not-implemented-hide:]
+  repeated string canonical_suffixes = 5;
 }
 
 // [#next-free-field: 7]

@@ -200,7 +200,11 @@ Runtime guarded features may either set true (running the new code by default) i
 after a testing interval, or during the next release cycle, at the PR author's and reviewing
 maintainer's discretion. Generally all runtime guarded features will be set true when a
 release is cut. Old code paths for refactors can be cleaned up after a release and there has been
-some production run time. Old code for behavioral changes will be deprecated after six months.
+some production run time. Old code for behavioral changes will be deprecated after six months if no
+Envoy operators have raised concerns. If the behavioral change is problematic for any Envoy users,
+the maintainers team will work to find a satisfactory resolution, generally in the form of a permanent
+configuration knob for the behavioral differences.
+
 Runtime features are set true by default by inclusion in
 [source/common/runtime/runtime_features.cc](https://github.com/envoyproxy/envoy/blob/main/source/common/runtime/runtime_features.cc)
 
@@ -400,3 +404,11 @@ re-run all the CI tasks. Consider adding an alias into your `.gitconfig` file:
 
 Once you add this alias you can issue the command `git kick-ci` and the PR
 will be sent back for a retest.
+
+# Repo Etiquette
+
+Contributors with push-access to the Envoy project should prefer pushing changes to a personal fork,
+including when creating branches for pull requests.
+
+This helps keep the Envoy repo as lean as possible, which can speed up cloning and synchronizing
+operations for both developers and CI.

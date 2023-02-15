@@ -35,6 +35,13 @@ public:
   // TODO(lambdai): make it friend to only bootstrap extension.
   static ThreadLocal::TypedSlot<Bootstrap::InternalListener::ThreadLocalRegistryImpl>*
       registry_tls_slot_;
+  // The buffer size of the internal client connection. It has to be static because of:
+  // Client factory establishes the buffer while internal listener registry accepts the
+  // client connection. Thus the ownership is not followed - client factory needs to
+  // access buffer_size config of listener registry.
+  static uint32_t buffer_size_;
+  // The default buffer is 1024 K bytes.
+  static constexpr uint32_t DefaultBufferSize = 1024;
 };
 
 } // namespace InternalListener

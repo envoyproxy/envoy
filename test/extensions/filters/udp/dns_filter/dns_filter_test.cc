@@ -44,8 +44,8 @@ public:
   DnsFilterTest()
       : listener_address_(Network::Utility::parseInternetAddressAndPort("127.0.2.1:5353")),
         api_(Api::createApiForTest(random_)),
-        counters_(mock_query_buffer_underflow_, mock_record_name_overflow_,
-                  query_parsing_failure_) {
+        counters_(mock_query_buffer_underflow_, mock_record_name_overflow_, query_parsing_failure_,
+                  queries_with_additional_rrs_, queries_with_ans_or_authority_rrs_) {
     udp_response_.addresses_.local_ = listener_address_;
     udp_response_.addresses_.peer_ = listener_address_;
     udp_response_.buffer_ = std::make_unique<Buffer::OwnedImpl>();
@@ -116,6 +116,8 @@ public:
   NiceMock<Stats::MockCounter> mock_query_buffer_underflow_;
   NiceMock<Stats::MockCounter> mock_record_name_overflow_;
   NiceMock<Stats::MockCounter> query_parsing_failure_;
+  NiceMock<Stats::MockCounter> queries_with_additional_rrs_;
+  NiceMock<Stats::MockCounter> queries_with_ans_or_authority_rrs_;
   DnsParserCounters counters_;
   DnsQueryContextPtr response_ctx_;
   NiceMock<Event::MockDispatcher> dispatcher_;
@@ -1231,6 +1233,8 @@ TEST_F(DnsFilterTest, InvalidAnswersInQueryTest) {
   EXPECT_FALSE(response_ctx_->parse_status_);
   EXPECT_EQ(DNS_RESPONSE_CODE_FORMAT_ERROR, response_ctx_->getQueryResponseCode());
   EXPECT_EQ(0, response_ctx_->answers_.size());
+  EXPECT_EQ(0, config_->stats().queries_with_additional_rrs_.value());
+  EXPECT_EQ(1, config_->stats().queries_with_ans_or_authority_rrs_.value());
 }
 
 TEST_F(DnsFilterTest, InvalidAuthorityRRsInQueryTest) {
@@ -1262,9 +1266,11 @@ TEST_F(DnsFilterTest, InvalidAuthorityRRsInQueryTest) {
   EXPECT_FALSE(response_ctx_->parse_status_);
   EXPECT_EQ(DNS_RESPONSE_CODE_FORMAT_ERROR, response_ctx_->getQueryResponseCode());
   EXPECT_EQ(0, response_ctx_->answers_.size());
+  EXPECT_EQ(0, config_->stats().queries_with_additional_rrs_.value());
+  EXPECT_EQ(1, config_->stats().queries_with_ans_or_authority_rrs_.value());
 }
 
-TEST_F(DnsFilterTest, InvalidAdditionalRRsInQueryTest) {
+TEST_F(DnsFilterTest, IgnoreAdditionalRRsInQueryTest) {
   InSequence s;
 
   setup(forward_query_off_config);
@@ -1290,8 +1296,9 @@ TEST_F(DnsFilterTest, InvalidAdditionalRRsInQueryTest) {
   sendQueryFromClient("10.0.0.1:1000", query);
 
   response_ctx_ = ResponseValidator::createResponseContext(udp_response_, counters_);
-  EXPECT_FALSE(response_ctx_->parse_status_);
-  EXPECT_EQ(DNS_RESPONSE_CODE_FORMAT_ERROR, response_ctx_->getQueryResponseCode());
+  EXPECT_TRUE(response_ctx_->parse_status_);
+  EXPECT_EQ(1, config_->stats().queries_with_additional_rrs_.value());
+  EXPECT_EQ(0, config_->stats().queries_with_ans_or_authority_rrs_.value());
 }
 
 TEST_F(DnsFilterTest, InvalidQueryNameTest) {

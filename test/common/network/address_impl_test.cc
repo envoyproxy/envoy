@@ -279,6 +279,24 @@ TEST(Ipv6InstanceTest, AddressAndPort) {
   EXPECT_TRUE(address.ip()->isUnicastAddress());
 }
 
+TEST(Ipv6InstanceTest, ScopeIdStripping) {
+  sockaddr_in6 addr6;
+  memset(&addr6, 0, sizeof(addr6));
+  addr6.sin6_family = AF_INET6;
+  EXPECT_EQ(1, inet_pton(AF_INET6, "fe80::f8f3:11ff:fef4:25a8", &addr6.sin6_addr));
+  addr6.sin6_port = htons(80);
+  addr6.sin6_scope_id = 20u;
+
+  Ipv6Instance address(addr6);
+  EXPECT_EQ("[fe80::f8f3:11ff:fef4:25a8%20]:80", address.asString());
+  EXPECT_EQ(IpVersion::v6, address.ip()->version());
+  EXPECT_EQ(20U, address.ip()->ipv6()->scopeId());
+  auto no_scope_address = address.ip()->ipv6()->addressWithoutScopeId();
+  EXPECT_EQ("[fe80::f8f3:11ff:fef4:25a8]:80", no_scope_address->asString());
+  EXPECT_EQ(IpVersion::v6, no_scope_address->ip()->version());
+  EXPECT_EQ(0U, no_scope_address->ip()->ipv6()->scopeId());
+}
+
 TEST(Ipv6InstanceTest, PortOnly) {
   Ipv6Instance address(443);
   EXPECT_EQ("[::]:443", address.asString());
@@ -474,6 +492,7 @@ TEST(PipeInstanceTest, UnlinksExistingFile) {
 
 TEST(AddressFromSockAddrDeathTest, IPv4) {
   sockaddr_storage ss;
+  memset(&ss, 0, sizeof(ss));
   auto& sin = reinterpret_cast<sockaddr_in&>(ss);
 
   sin.sin_family = AF_INET;
@@ -493,6 +512,7 @@ TEST(AddressFromSockAddrDeathTest, IPv4) {
 
 TEST(AddressFromSockAddrDeathTest, IPv6) {
   sockaddr_storage ss;
+  memset(&ss, 0, sizeof(ss));
   auto& sin6 = reinterpret_cast<sockaddr_in6&>(ss);
 
   sin6.sin6_family = AF_INET6;
@@ -515,10 +535,20 @@ TEST(AddressFromSockAddrDeathTest, IPv6) {
   EXPECT_EQ(IpVersion::v6, (*addressFromSockAddr(ss, sizeof(sockaddr_in6), true))->ip()->version());
   EXPECT_EQ("[::ffff:192.0.2.128]:32000",
             (*addressFromSockAddr(ss, sizeof(sockaddr_in6), true))->asString());
+
+// Verify that when forceV6() is true, IPv4-mapped IPv6 address will be converted even when |v6only|
+// is true
+#if defined(__APPLE__) || defined(__ANDROID_API__)
+  Runtime::maybeSetRuntimeGuard("envoy.reloadable_features.always_use_v6", true);
+  EXPECT_EQ(IpVersion::v4, (*addressFromSockAddr(ss, sizeof(sockaddr_in6), true))->ip()->version());
+  EXPECT_EQ("192.0.2.128:32000",
+            (*addressFromSockAddr(ss, sizeof(sockaddr_in6), true))->asString());
+#endif
 }
 
 TEST(AddressFromSockAddrDeathTest, Pipe) {
   sockaddr_storage ss;
+  memset(&ss, 0, sizeof(ss));
   auto& sun = reinterpret_cast<sockaddr_un&>(ss);
   sun.sun_family = AF_UNIX;
 

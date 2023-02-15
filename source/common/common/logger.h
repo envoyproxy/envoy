@@ -25,6 +25,12 @@
 namespace Envoy {
 namespace Logger {
 
+#ifdef ENVOY_DISABLE_LOGGING
+const static bool should_log = false;
+#else
+const static bool should_log = true;
+#endif
+
 // TODO: find out a way for extensions to register new logger IDs
 #define ALL_LOGGER_IDS(FUNCTION)                                                                   \
   FUNCTION(admin)                                                                                  \
@@ -65,9 +71,11 @@ namespace Logger {
   FUNCTION(misc)                                                                                   \
   FUNCTION(mongo)                                                                                  \
   FUNCTION(multi_connection)                                                                       \
+  FUNCTION(oauth2)                                                                                 \
   FUNCTION(quic)                                                                                   \
   FUNCTION(quic_stream)                                                                            \
   FUNCTION(pool)                                                                                   \
+  FUNCTION(rate_limit_quota)                                                                       \
   FUNCTION(rbac)                                                                                   \
   FUNCTION(rds)                                                                                    \
   FUNCTION(redis)                                                                                  \
@@ -81,7 +89,8 @@ namespace Logger {
   FUNCTION(tracing)                                                                                \
   FUNCTION(upstream)                                                                               \
   FUNCTION(udp)                                                                                    \
-  FUNCTION(wasm)
+  FUNCTION(wasm)                                                                                   \
+  FUNCTION(websocket)
 
 // clang-format off
 enum class Id {
@@ -191,16 +200,18 @@ public:
   void setLock(Thread::BasicLockable& lock) { stderr_sink_->setLock(lock); }
   void clearLock() { stderr_sink_->clearLock(); }
 
-  template <class... Args>
+  template <class FmtStr, class... Args>
   void logWithStableName(absl::string_view stable_name, absl::string_view level,
-                         absl::string_view component, Args... msg) {
+                         absl::string_view component, FmtStr fmt_str, Args... msg) {
     auto tls_sink = tlsDelegate();
     if (tls_sink != nullptr) {
-      tls_sink->logWithStableName(stable_name, level, component, fmt::format(msg...));
+      tls_sink->logWithStableName(stable_name, level, component,
+                                  fmt::format(fmt::runtime(fmt_str), msg...));
       return;
     }
     absl::ReaderMutexLock sink_lock(&sink_mutex_);
-    sink_->logWithStableName(stable_name, level, component, fmt::format(msg...));
+    sink_->logWithStableName(stable_name, level, component,
+                             fmt::format(fmt::runtime(fmt_str), msg...));
   }
   // spdlog::sinks::sink
   void log(const spdlog::details::log_msg& msg) override;
@@ -377,6 +388,15 @@ protected:
   }
 };
 
+namespace Utility {
+
+/**
+ * Sets the log format for a specific logger.
+ */
+void setLogFormatForLogger(spdlog::logger& logger, const std::string& log_format);
+
+} // namespace Utility
+
 // Contains custom flags to introduce user defined flags in log pattern. Reference:
 // https://github.com/gabime/spdlog#user-defined-flags-in-the-log-pattern.
 namespace CustomFlagFormatter {
@@ -437,7 +457,7 @@ public:
 // The same filtering will also occur in spdlog::logger.
 #define ENVOY_LOG_COMP_AND_LOG(LOGGER, LEVEL, ...)                                                 \
   do {                                                                                             \
-    if (ENVOY_LOG_COMP_LEVEL(LOGGER, LEVEL)) {                                                     \
+    if (Envoy::Logger::should_log && ENVOY_LOG_COMP_LEVEL(LOGGER, LEVEL)) {                        \
       LOGGER.log(::spdlog::source_loc{__FILE__, __LINE__, __func__}, ENVOY_SPDLOG_LEVEL(LEVEL),    \
                  __VA_ARGS__);                                                                     \
     }                                                                                              \
@@ -451,7 +471,7 @@ public:
  */
 #define ENVOY_LOG_TO_LOGGER(LOGGER, LEVEL, ...)                                                    \
   do {                                                                                             \
-    if (Envoy::Logger::Context::useFineGrainLogger()) {                                            \
+    if (Envoy::Logger::should_log && Envoy::Logger::Context::useFineGrainLogger()) {               \
       FINE_GRAIN_LOG(LEVEL, ##__VA_ARGS__);                                                        \
     } else {                                                                                       \
       ENVOY_LOG_COMP_AND_LOG(LOGGER, LEVEL, ##__VA_ARGS__);                                        \

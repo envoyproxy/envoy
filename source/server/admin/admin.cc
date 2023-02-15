@@ -32,9 +32,9 @@
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/protobuf/utility.h"
 #include "source/common/router/config_impl.h"
+#include "source/extensions/listener_managers/listener_manager/listener_impl.h"
 #include "source/extensions/request_id/uuid/config.h"
 #include "source/server/admin/utils.h"
-#include "source/server/listener_impl.h"
 
 #include "absl/strings/str_join.h"
 #include "absl/strings/str_replace.h"
@@ -90,11 +90,11 @@ AdminImpl::AdminImpl(const std::string& profile_path, Server::Instance& server,
     : server_(server),
       request_id_extension_(Extensions::RequestId::UUIDRequestIDExtension::defaultInstance(
           server_.api().randomGenerator())),
-      profile_path_(profile_path),
-      stats_(Http::ConnectionManagerImpl::generateStats("http.admin.", server_.stats())),
+      profile_path_(profile_path), stats_(Http::ConnectionManagerImpl::generateStats(
+                                       "http.admin.", *server_.stats().rootScope())),
       null_overload_manager_(server_.threadLocal()),
-      tracing_stats_(
-          Http::ConnectionManagerImpl::generateTracingStats("http.admin.", no_op_store_)),
+      tracing_stats_(Http::ConnectionManagerImpl::generateTracingStats("http.admin.",
+                                                                       *no_op_store_.rootScope())),
       route_config_provider_(server.timeSource()),
       scoped_route_config_provider_(server.timeSource()), clusters_handler_(server),
       config_dump_handler_(config_tracker_, server), init_dump_handler_(server),
@@ -196,7 +196,7 @@ AdminImpl::AdminImpl(const std::string& profile_path, Server::Instance& server,
                         "Render text_readouts as new gaugues with value 0 (increases Prometheus "
                         "data size)"},
                        {ParamDescriptor::Type::String, "filter",
-                        "Regular expression (ecmascript) for filtering stats"}}),
+                        "Regular expression (Google re2) for filtering stats"}}),
           makeHandler("/stats/recentlookups", "Show recent stat-name lookups",
                       MAKE_ADMIN_HANDLER(stats_handler_.handlerStatsRecentLookups), false, false),
           makeHandler("/stats/recentlookups/clear", "clear list of stat-name lookups and counter",
@@ -243,7 +243,7 @@ Http::ServerConnectionPtr AdminImpl::createCodec(Network::Connection& connection
                                                  const Buffer::Instance& data,
                                                  Http::ServerConnectionCallbacks& callbacks) {
   return Http::ConnectionManagerUtility::autoCreateCodec(
-      connection, data, callbacks, server_.stats(), server_.api().randomGenerator(),
+      connection, data, callbacks, *server_.stats().rootScope(), server_.api().randomGenerator(),
       http1_codec_stats_, http2_codec_stats_, Http::Http1Settings(),
       ::Envoy::Http2::Utility::initializeAndValidateOptions(
           envoy::config::core::v3::Http2ProtocolOptions()),
@@ -261,11 +261,12 @@ bool AdminImpl::createNetworkFilterChain(Network::Connection& connection,
   return true;
 }
 
-void AdminImpl::createFilterChain(Http::FilterChainManager& manager) const {
+bool AdminImpl::createFilterChain(Http::FilterChainManager& manager, bool) const {
   Http::FilterFactoryCb factory = [this](Http::FilterChainFactoryCallbacks& callbacks) {
     callbacks.addStreamFilter(std::make_shared<AdminFilter>(createRequestFunction()));
   };
   manager.applyFilterFactoryCb({}, factory);
+  return true;
 }
 
 namespace {

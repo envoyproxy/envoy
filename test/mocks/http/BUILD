@@ -85,6 +85,7 @@ envoy_cc_mock(
     hdrs = ["stream.h"],
     deps = [
         "//envoy/http:codec_interface",
+        "//source/common/network:socket_lib",
     ],
 )
 
@@ -132,5 +133,14 @@ envoy_cc_mock(
     hdrs = ["stream_reset_handler.h"],
     deps = [
         "//envoy/http:stream_reset_handler_interface",
+    ],
+)
+
+envoy_cc_mock(
+    name = "early_header_mutation_mock",
+    srcs = ["early_header_mutation.cc"],
+    hdrs = ["early_header_mutation.h"],
+    deps = [
+        "//envoy/http:early_header_mutation_interface",
     ],
 )

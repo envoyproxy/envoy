@@ -1,6 +1,7 @@
 #include "envoy/extensions/filters/network/sni_dynamic_forward_proxy/v3/sni_dynamic_forward_proxy.pb.h"
 #include "envoy/network/connection.h"
 
+#include "source/common/router/string_accessor_impl.h"
 #include "source/extensions/filters/network/sni_dynamic_forward_proxy/proxy_filter.h"
 #include "source/extensions/filters/network/well_known_names.h"
 
@@ -44,6 +45,13 @@ public:
     EXPECT_CALL(callbacks_, connection()).Times(AtLeast(0));
   }
 
+  void setFilterStateHost(const std::string& host) {
+    connection_.streamInfo().filterState()->setData(
+        "envoy.upstream.dynamic_host", std::make_shared<Router::StringAccessorImpl>(host),
+        StreamInfo::FilterState::StateType::Mutable, StreamInfo::FilterState::LifeSpan::Connection,
+        StreamInfo::FilterState::StreamSharing::SharedWithUpstreamConnection);
+  }
+
   ~SniDynamicProxyFilterTest() override {
     EXPECT_TRUE(
         cm_.thread_local_cluster_.cluster_.info_->resource_manager_->pendingRequests().canCreate());
@@ -77,7 +85,28 @@ TEST_F(SniDynamicProxyFilterTest, LoadDnsCache) {
       .WillOnce(Return(circuit_breakers_));
   Extensions::Common::DynamicForwardProxy::MockLoadDnsCacheEntryHandle* handle =
       new Extensions::Common::DynamicForwardProxy::MockLoadDnsCacheEntryHandle();
-  EXPECT_CALL(*dns_cache_manager_->dns_cache_, loadDnsCacheEntry_(Eq("foo"), 443, _))
+  EXPECT_CALL(*dns_cache_manager_->dns_cache_, loadDnsCacheEntry_(Eq("foo"), 443, _, _))
+      .WillOnce(Return(
+          MockLoadDnsCacheEntryResult{LoadDnsCacheEntryStatus::Loading, handle, absl::nullopt}));
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onNewConnection());
+
+  EXPECT_CALL(callbacks_, continueReading());
+  filter_->onLoadDnsCacheComplete(
+      std::make_shared<Extensions::Common::DynamicForwardProxy::MockDnsHostInfo>());
+
+  EXPECT_CALL(*handle, onDestroy());
+}
+
+TEST_F(SniDynamicProxyFilterTest, LoadDnsCacheFromFilterState) {
+  EXPECT_CALL(connection_, requestedServerName()).WillRepeatedly(Return(""));
+  setFilterStateHost("foo");
+  Upstream::ResourceAutoIncDec* circuit_breakers_{
+      new Upstream::ResourceAutoIncDec(pending_requests_)};
+  EXPECT_CALL(*dns_cache_manager_->dns_cache_, canCreateDnsRequest_())
+      .WillOnce(Return(circuit_breakers_));
+  Extensions::Common::DynamicForwardProxy::MockLoadDnsCacheEntryHandle* handle =
+      new Extensions::Common::DynamicForwardProxy::MockLoadDnsCacheEntryHandle();
+  EXPECT_CALL(*dns_cache_manager_->dns_cache_, loadDnsCacheEntry_(Eq("foo"), 443, _, _))
       .WillOnce(Return(
           MockLoadDnsCacheEntryResult{LoadDnsCacheEntryStatus::Loading, handle, absl::nullopt}));
   EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onNewConnection());
@@ -95,7 +124,21 @@ TEST_F(SniDynamicProxyFilterTest, LoadDnsInCache) {
       new Upstream::ResourceAutoIncDec(pending_requests_)};
   EXPECT_CALL(*dns_cache_manager_->dns_cache_, canCreateDnsRequest_())
       .WillOnce(Return(circuit_breakers_));
-  EXPECT_CALL(*dns_cache_manager_->dns_cache_, loadDnsCacheEntry_(Eq("foo"), 443, _))
+  EXPECT_CALL(*dns_cache_manager_->dns_cache_, loadDnsCacheEntry_(Eq("foo"), 443, _, _))
+      .WillOnce(Return(
+          MockLoadDnsCacheEntryResult{LoadDnsCacheEntryStatus::InCache, nullptr, absl::nullopt}));
+
+  EXPECT_EQ(Network::FilterStatus::Continue, filter_->onNewConnection());
+}
+
+TEST_F(SniDynamicProxyFilterTest, LoadDnsInCacheFromFilterState) {
+  EXPECT_CALL(connection_, requestedServerName()).WillRepeatedly(Return(""));
+  setFilterStateHost("foo");
+  Upstream::ResourceAutoIncDec* circuit_breakers_{
+      new Upstream::ResourceAutoIncDec(pending_requests_)};
+  EXPECT_CALL(*dns_cache_manager_->dns_cache_, canCreateDnsRequest_())
+      .WillOnce(Return(circuit_breakers_));
+  EXPECT_CALL(*dns_cache_manager_->dns_cache_, loadDnsCacheEntry_(Eq("foo"), 443, _, _))
       .WillOnce(Return(
           MockLoadDnsCacheEntryResult{LoadDnsCacheEntryStatus::InCache, nullptr, absl::nullopt}));
 
@@ -109,7 +152,7 @@ TEST_F(SniDynamicProxyFilterTest, CacheOverflow) {
       new Upstream::ResourceAutoIncDec(pending_requests_)};
   EXPECT_CALL(*dns_cache_manager_->dns_cache_, canCreateDnsRequest_())
       .WillOnce(Return(circuit_breakers_));
-  EXPECT_CALL(*dns_cache_manager_->dns_cache_, loadDnsCacheEntry_(Eq("foo"), 443, _))
+  EXPECT_CALL(*dns_cache_manager_->dns_cache_, loadDnsCacheEntry_(Eq("foo"), 443, _, _))
       .WillOnce(Return(
           MockLoadDnsCacheEntryResult{LoadDnsCacheEntryStatus::Overflow, nullptr, absl::nullopt}));
   EXPECT_CALL(connection_, close(Network::ConnectionCloseType::NoFlush));

@@ -20,15 +20,16 @@ Http::FilterFactoryCb RouterFilterConfig::createFilterFactoryFromProtoTyped(
       std::make_unique<Router::ShadowWriterImpl>(context.clusterManager()), proto_config));
 
   return [filter_config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
-    callbacks.addStreamDecoderFilter(std::make_shared<Router::ProdFilter>(*filter_config));
+    callbacks.addStreamDecoderFilter(
+        std::make_shared<Router::ProdFilter>(*filter_config, filter_config->default_stats_));
   };
 }
 
 /**
  * Static registration for the router filter. @see RegisterFactory.
  */
-REGISTER_FACTORY(RouterFilterConfig,
-                 Server::Configuration::NamedHttpFilterConfigFactory){"envoy.router"};
+LEGACY_REGISTER_FACTORY(RouterFilterConfig, Server::Configuration::NamedHttpFilterConfigFactory,
+                        "envoy.router");
 
 } // namespace RouterFilter
 } // namespace HttpFilters

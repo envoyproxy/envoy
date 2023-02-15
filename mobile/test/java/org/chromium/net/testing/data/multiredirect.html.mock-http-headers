@@ -1,0 +1,3 @@
+HTTP/1.1 302 Found
+Location: /redirect.html
+redirect-header0: header-value

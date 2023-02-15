@@ -24,7 +24,6 @@
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/simulated_time_system.h"
-#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "absl/strings/substitute.h"
@@ -75,7 +74,8 @@ public:
   NiceMock<Server::Configuration::MockFactoryContext> factory_context_;
   Init::ExpectableWatcherImpl init_watcher_;
   Init::TargetHandlePtr init_target_handle_;
-  NiceMock<Stats::MockIsolatedStatsStore> scope_;
+  NiceMock<Stats::MockIsolatedStatsStore> store_;
+  Stats::Scope& scope_{*store_.rootScope()};
   NiceMock<Network::MockListenerConfig> listener_config_;
 };
 
@@ -104,7 +104,7 @@ public:
     }
 
     return filter_config_provider_manager_->createDynamicFilterConfigProvider(
-        config_source, name, factory_context_.getServerFactoryContext(), factory_context_, "xds.",
+        config_source, name, factory_context_.getServerFactoryContext(), factory_context_,
         last_filter_config, getFilterType(), getMatcher());
   }
 
@@ -142,15 +142,15 @@ public:
     EXPECT_CALL(init_watcher_, ready());
     callbacks_->onConfigUpdate(decoded_resources.refvec_, response.version_info());
     EXPECT_NE(absl::nullopt, provider_->config());
-    EXPECT_EQ(1UL, scope_.counter(getConfigReloadCounter()).value());
-    EXPECT_EQ(0UL, scope_.counter(getConfigFailCounter()).value());
+    EXPECT_EQ(1UL, store_.counter(getConfigReloadCounter()).value());
+    EXPECT_EQ(0UL, store_.counter(getConfigFailCounter()).value());
 
     // Ensure that we honor resource removals.
     Protobuf::RepeatedPtrField<std::string> remove;
     *remove.Add() = "foo";
     callbacks_->onConfigUpdate({}, remove, "1");
-    EXPECT_EQ(2UL, scope_.counter(getConfigReloadCounter()).value());
-    EXPECT_EQ(0UL, scope_.counter(getConfigFailCounter()).value());
+    EXPECT_EQ(2UL, store_.counter(getConfigReloadCounter()).value());
+    EXPECT_EQ(0UL, store_.counter(getConfigFailCounter()).value());
   }
 
   const std::string getTypeUrl() const {
@@ -257,11 +257,11 @@ TYPED_TEST(FilterConfigDiscoveryImplTestParameter, Basic) {
                                                      response.version_info());
     EXPECT_NE(absl::nullopt, config_discovery_test.provider_->config());
     EXPECT_EQ(1UL,
-              config_discovery_test.scope_.counter(config_discovery_test.getConfigReloadCounter())
+              config_discovery_test.store_.counter(config_discovery_test.getConfigReloadCounter())
                   .value());
     EXPECT_EQ(
         0UL,
-        config_discovery_test.scope_.counter(config_discovery_test.getConfigFailCounter()).value());
+        config_discovery_test.store_.counter(config_discovery_test.getConfigFailCounter()).value());
   }
 
   // 2nd request with same response. Based on hash should not reload config.
@@ -273,38 +273,12 @@ TYPED_TEST(FilterConfigDiscoveryImplTestParameter, Basic) {
                                                      response.version_info());
 
     EXPECT_EQ(1UL,
-              config_discovery_test.scope_.counter(config_discovery_test.getConfigReloadCounter())
+              config_discovery_test.store_.counter(config_discovery_test.getConfigReloadCounter())
                   .value());
     EXPECT_EQ(
         0UL,
-        config_discovery_test.scope_.counter(config_discovery_test.getConfigFailCounter()).value());
+        config_discovery_test.store_.counter(config_discovery_test.getConfigFailCounter()).value());
   }
-}
-
-TYPED_TEST(FilterConfigDiscoveryImplTestParameter, BasicDeprecatedStatPrefix) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.top_level_ecds_stats", "false"}});
-
-  InSequence s;
-  TypeParam config_discovery_test;
-  config_discovery_test.setup();
-  EXPECT_EQ("foo", config_discovery_test.provider_->name());
-  EXPECT_EQ(absl::nullopt, config_discovery_test.provider_->config());
-
-  const auto response = config_discovery_test.createResponse("1", "foo");
-  const auto decoded_resources =
-      TestUtility::decodeResources<envoy::config::core::v3::TypedExtensionConfig>(response);
-
-  EXPECT_CALL(config_discovery_test.init_watcher_, ready());
-  config_discovery_test.callbacks_->onConfigUpdate(decoded_resources.refvec_,
-                                                   response.version_info());
-  EXPECT_NE(absl::nullopt, config_discovery_test.provider_->config());
-  EXPECT_EQ(1UL,
-            config_discovery_test.scope_.counter("xds.extension_config_discovery.foo.config_reload")
-                .value());
-  EXPECT_EQ(0UL,
-            config_discovery_test.scope_.counter("xds.extension_config_discovery.foo.config_fail")
-                .value());
 }
 
 TYPED_TEST(FilterConfigDiscoveryImplTestParameter, ConfigFailed) {
@@ -316,10 +290,10 @@ TYPED_TEST(FilterConfigDiscoveryImplTestParameter, ConfigFailed) {
       Config::ConfigUpdateFailureReason::FetchTimedout, {});
   EXPECT_EQ(
       0UL,
-      config_discovery_test.scope_.counter(config_discovery_test.getConfigReloadCounter()).value());
+      config_discovery_test.store_.counter(config_discovery_test.getConfigReloadCounter()).value());
   EXPECT_EQ(
       1UL,
-      config_discovery_test.scope_.counter(config_discovery_test.getConfigFailCounter()).value());
+      config_discovery_test.store_.counter(config_discovery_test.getConfigFailCounter()).value());
 }
 
 TYPED_TEST(FilterConfigDiscoveryImplTestParameter, TooManyResources) {
@@ -341,7 +315,7 @@ TYPED_TEST(FilterConfigDiscoveryImplTestParameter, TooManyResources) {
                             "Unexpected number of resources in ExtensionConfigDS response: 2");
   EXPECT_EQ(
       0UL,
-      config_discovery_test.scope_.counter(config_discovery_test.getConfigReloadCounter()).value());
+      config_discovery_test.store_.counter(config_discovery_test.getConfigReloadCounter()).value());
 }
 
 TYPED_TEST(FilterConfigDiscoveryImplTestParameter, WrongName) {
@@ -358,7 +332,7 @@ TYPED_TEST(FilterConfigDiscoveryImplTestParameter, WrongName) {
                             "Unexpected resource name in ExtensionConfigDS response: bar");
   EXPECT_EQ(
       0UL,
-      config_discovery_test.scope_.counter(config_discovery_test.getConfigReloadCounter()).value());
+      config_discovery_test.store_.counter(config_discovery_test.getConfigReloadCounter()).value());
 }
 
 // Without default config.
@@ -391,10 +365,10 @@ TYPED_TEST(FilterConfigDiscoveryImplTestParameter, ApplyWithoutWarming) {
   EXPECT_NE(absl::nullopt, config_discovery_test.provider_->config());
   EXPECT_EQ(
       0UL,
-      config_discovery_test.scope_.counter(config_discovery_test.getConfigReloadCounter()).value());
+      config_discovery_test.store_.counter(config_discovery_test.getConfigReloadCounter()).value());
   EXPECT_EQ(
       0UL,
-      config_discovery_test.scope_.counter(config_discovery_test.getConfigFailCounter()).value());
+      config_discovery_test.store_.counter(config_discovery_test.getConfigFailCounter()).value());
 }
 
 TYPED_TEST(FilterConfigDiscoveryImplTestParameter, DualProviders) {
@@ -414,7 +388,7 @@ TYPED_TEST(FilterConfigDiscoveryImplTestParameter, DualProviders) {
   EXPECT_NE(absl::nullopt, provider2->config());
   EXPECT_EQ(
       1UL,
-      config_discovery_test.scope_.counter(config_discovery_test.getConfigReloadCounter()).value());
+      config_discovery_test.store_.counter(config_discovery_test.getConfigReloadCounter()).value());
 }
 
 TYPED_TEST(FilterConfigDiscoveryImplTestParameter, DualProvidersInvalid) {
@@ -445,7 +419,7 @@ TYPED_TEST(FilterConfigDiscoveryImplTestParameter, DualProvidersInvalid) {
           config_discovery_test.getTypeUrl() + ".");
   EXPECT_EQ(
       0UL,
-      config_discovery_test.scope_.counter(config_discovery_test.getConfigReloadCounter()).value());
+      config_discovery_test.store_.counter(config_discovery_test.getConfigReloadCounter()).value());
 }
 
 // Throw Envoy exception when default config is wrong.
@@ -459,8 +433,8 @@ TYPED_TEST(FilterConfigDiscoveryImplTestParameter, WrongDefaultConfig) {
   EXPECT_THROW_WITH_MESSAGE(
       config_discovery_test.filter_config_provider_manager_->createDynamicFilterConfigProvider(
           config_source, "foo", config_discovery_test.factory_context_.getServerFactoryContext(),
-          config_discovery_test.factory_context_, "xds.", true,
-          config_discovery_test.getFilterType(), config_discovery_test.getMatcher()),
+          config_discovery_test.factory_context_, true, config_discovery_test.getFilterType(),
+          config_discovery_test.getMatcher()),
       EnvoyException,
       "Error: cannot find filter factory foo for default filter "
       "configuration with type URL "
@@ -496,9 +470,9 @@ TYPED_TEST(FilterConfigDiscoveryImplTestParameter, TerminalFilterInvalid) {
       EnvoyException,
       "Error: terminal filter named foo of type envoy.filters.http.router must be the last filter "
       "in a http filter chain.");
-  EXPECT_EQ(0UL,
-            config_discovery_test.scope_.counter("xds.extension_config_discovery.foo.config_reload")
-                .value());
+  EXPECT_EQ(
+      0UL,
+      config_discovery_test.store_.counter("extension_config_discovery.foo.config_reload").value());
 }
 
 // TCP listener filter matcher test.

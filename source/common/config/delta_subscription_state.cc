@@ -9,13 +9,16 @@ namespace {
 DeltaSubscriptionStateVariant getState(std::string type_url,
                                        UntypedConfigUpdateCallbacks& watch_map,
                                        const LocalInfo::LocalInfo& local_info,
-                                       Event::Dispatcher& dispatcher) {
+                                       Event::Dispatcher& dispatcher,
+                                       XdsConfigTrackerOptRef xds_config_tracker) {
   if (Runtime::runtimeFeatureEnabled("envoy.restart_features.explicit_wildcard_resource")) {
     return DeltaSubscriptionStateVariant(absl::in_place_type<NewDeltaSubscriptionState>,
-                                         std::move(type_url), watch_map, local_info, dispatcher);
+                                         std::move(type_url), watch_map, local_info, dispatcher,
+                                         xds_config_tracker);
   } else {
     return DeltaSubscriptionStateVariant(absl::in_place_type<OldDeltaSubscriptionState>,
-                                         std::move(type_url), watch_map, local_info, dispatcher);
+                                         std::move(type_url), watch_map, local_info, dispatcher,
+                                         xds_config_tracker);
   }
 }
 
@@ -24,8 +27,10 @@ DeltaSubscriptionStateVariant getState(std::string type_url,
 DeltaSubscriptionState::DeltaSubscriptionState(std::string type_url,
                                                UntypedConfigUpdateCallbacks& watch_map,
                                                const LocalInfo::LocalInfo& local_info,
-                                               Event::Dispatcher& dispatcher)
-    : state_(getState(std::move(type_url), watch_map, local_info, dispatcher)) {}
+                                               Event::Dispatcher& dispatcher,
+                                               XdsConfigTrackerOptRef xds_config_tracker)
+    : state_(getState(std::move(type_url), watch_map, local_info, dispatcher, xds_config_tracker)) {
+}
 
 void DeltaSubscriptionState::updateSubscriptionInterest(
     const absl::flat_hash_set<std::string>& cur_added,

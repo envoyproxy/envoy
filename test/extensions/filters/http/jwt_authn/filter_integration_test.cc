@@ -43,6 +43,9 @@ std::string getAsyncFetchFilterConfig(const std::string& config_str, bool fast_l
   auto& provider0 = (*proto_config.mutable_providers())[std::string(ProviderName)];
   auto* async_fetch = provider0.mutable_remote_jwks()->mutable_async_fetch();
   async_fetch->set_fast_listener(fast_listener);
+  // Set failed_refetch_duration to a big value to disable failed refetch.
+  // as it interferes the two FailedAsyncFetch integration tests.
+  async_fetch->mutable_failed_refetch_duration()->set_seconds(600);
 
   HttpFilter filter;
   filter.set_name("envoy.filters.http.jwt_authn");

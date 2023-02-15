@@ -135,7 +135,7 @@ TEST(DefaultCertValidatorTest, TestMatchSubjectAltNameNotMatched) {
 
 TEST(DefaultCertValidatorTest, TestCertificateVerificationWithSANMatcher) {
   Stats::TestUtil::TestStore test_store;
-  SslStats stats = generateSslStats(test_store);
+  SslStats stats = generateSslStats(*test_store.rootScope());
   // Create the default validator object.
   auto default_validator =
       std::make_unique<Extensions::TransportSockets::Tls::DefaultCertValidator>(
@@ -168,7 +168,7 @@ TEST(DefaultCertValidatorTest, TestCertificateVerificationWithSANMatcher) {
 
 TEST(DefaultCertValidatorTest, TestCertificateVerificationWithNoValidationContext) {
   Stats::TestUtil::TestStore test_store;
-  SslStats stats = generateSslStats(test_store);
+  SslStats stats = generateSslStats(*test_store.rootScope());
   // Create the default validator object.
   auto default_validator =
       std::make_unique<Extensions::TransportSockets::Tls::DefaultCertValidator>(
@@ -180,7 +180,8 @@ TEST(DefaultCertValidatorTest, TestCertificateVerificationWithNoValidationContex
                                                  nullptr),
             Envoy::Ssl::ClientValidationStatus::NotValidated);
   bssl::UniquePtr<X509> cert(X509_new());
-  EXPECT_EQ(default_validator->doSynchronousVerifyCertChain(/*store_ctx=*/nullptr,
+  bssl::UniquePtr<X509_STORE_CTX> store_ctx(X509_STORE_CTX_new());
+  EXPECT_EQ(default_validator->doSynchronousVerifyCertChain(/*store_ctx=*/store_ctx.get(),
                                                             /*ssl_extended_info=*/nullptr,
                                                             /*leaf_cert=*/*cert,
                                                             /*transport_socket_options=*/nullptr),
@@ -191,14 +192,13 @@ TEST(DefaultCertValidatorTest, TestCertificateVerificationWithNoValidationContex
   EXPECT_EQ(ValidationResults::ValidationStatus::Failed,
             default_validator
                 ->doVerifyCertChain(*cert_chain, /*callback=*/nullptr,
-                                    /*ssl_extended_info=*/nullptr,
                                     /*transport_socket_options=*/nullptr, *ssl_ctx, {}, false, "")
                 .status);
 }
 
 TEST(DefaultCertValidatorTest, TestCertificateVerificationWithEmptyCertChain) {
   Stats::TestUtil::TestStore test_store;
-  SslStats stats = generateSslStats(test_store);
+  SslStats stats = generateSslStats(*test_store.rootScope());
   // Create the default validator object.
   auto default_validator =
       std::make_unique<Extensions::TransportSockets::Tls::DefaultCertValidator>(
@@ -208,13 +208,11 @@ TEST(DefaultCertValidatorTest, TestCertificateVerificationWithEmptyCertChain) {
   SSLContextPtr ssl_ctx = SSL_CTX_new(TLS_method());
   bssl::UniquePtr<STACK_OF(X509)> cert_chain(sk_X509_new_null());
   TestSslExtendedSocketInfo extended_socket_info;
-  EXPECT_EQ(ValidationResults::ValidationStatus::Failed,
-            default_validator
-                ->doVerifyCertChain(*cert_chain, /*callback=*/nullptr, &extended_socket_info,
-                                    /*transport_socket_options=*/nullptr, *ssl_ctx, {}, false, "")
-                .status);
-  EXPECT_EQ(extended_socket_info.certificateValidationStatus(),
-            Ssl::ClientValidationStatus::NotValidated);
+  ValidationResults results = default_validator->doVerifyCertChain(
+      *cert_chain, /*callback=*/nullptr,
+      /*transport_socket_options=*/nullptr, *ssl_ctx, {}, false, "");
+  EXPECT_EQ(ValidationResults::ValidationStatus::Failed, results.status);
+  EXPECT_EQ(Ssl::ClientValidationStatus::NotValidated, results.detailed_status);
 }
 
 TEST(DefaultCertValidatorTest, NoSanInCert) {
@@ -231,7 +229,7 @@ TEST(DefaultCertValidatorTest, NoSanInCert) {
 TEST(DefaultCertValidatorTest, WithVerifyDepth) {
 
   Stats::TestUtil::TestStore test_store;
-  SslStats stats = generateSslStats(test_store);
+  SslStats stats = generateSslStats(*test_store.rootScope());
   envoy::config::core::v3::TypedExtensionConfig typed_conf;
   std::vector<envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher> san_matchers{};
 
@@ -334,7 +332,7 @@ TEST(DefaultCertValidatorTest, TestUnexpectedSanMatcherType) {
   auto matchers =
       std::vector<envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher>();
   Stats::TestUtil::TestStore store;
-  auto ssl_stats = generateSslStats(store);
+  auto ssl_stats = generateSslStats(*store.rootScope());
   auto validator = std::make_unique<DefaultCertValidator>(mock_context_config.get(), ssl_stats,
                                                           Event::GlobalTimeSystem().timeSystem());
   auto ctx = std::vector<SSL_CTX*>();

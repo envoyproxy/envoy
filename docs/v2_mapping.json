@@ -120,6 +120,7 @@
   "envoy/config/trace/v3/datadog.proto": "envoy/config/trace/v2/datadog.proto",
   "envoy/config/trace/v3/dynamic_ot.proto": "envoy/config/trace/v2/dynamic_ot.proto",
   "envoy/config/trace/v3/http_tracer.proto": "envoy/config/trace/v2/http_tracer.proto",
+  "envoy/config/trace/v3/lightstep.proto": "envoy/config/trace/v2/lightstep.proto",
   "envoy/config/trace/v3/opencensus.proto": "envoy/config/trace/v2/opencensus.proto",
   "envoy/config/trace/v3/service.proto": "envoy/config/trace/v2/service.proto",
   "envoy/config/trace/v3/zipkin.proto": "envoy/config/trace/v2/zipkin.proto",

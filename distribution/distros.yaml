@@ -1,4 +1,3 @@
-
 debian_bullseye:
   image: debian:bullseye-slim
   ext: bullseye.changes

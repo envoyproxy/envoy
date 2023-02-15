@@ -3,6 +3,7 @@
 #include "envoy/common/pure.h"
 #include "envoy/network/client_connection_factory.h"
 #include "envoy/network/connection.h"
+#include "envoy/registry/registry.h"
 
 namespace Envoy {
 
@@ -27,6 +28,8 @@ public:
       const Network::ConnectionSocket::OptionsSharedPtr& options,
       const Network::TransportSocketOptionsConstSharedPtr& transport_options) override;
 };
+
+DECLARE_FACTORY(DefaultClientConnectionFactory);
 
 } // namespace Network
 } // namespace Envoy

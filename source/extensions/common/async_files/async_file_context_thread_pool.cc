@@ -37,6 +37,22 @@ protected:
   AsyncFileHandle handle_;
 };
 
+class ActionStat : public AsyncFileActionThreadPool<absl::StatusOr<struct stat>> {
+public:
+  ActionStat(AsyncFileHandle handle, std::function<void(absl::StatusOr<struct stat>)> on_complete)
+      : AsyncFileActionThreadPool<absl::StatusOr<struct stat>>(handle, on_complete) {}
+
+  absl::StatusOr<struct stat> executeImpl() override {
+    ASSERT(fileDescriptor() != -1);
+    struct stat stat_result;
+    auto result = posix().fstat(fileDescriptor(), &stat_result);
+    if (result.return_value_ != 0) {
+      return statusAfterFileError(result);
+    }
+    return stat_result;
+  }
+};
+
 class ActionCreateHardLink : public AsyncFileActionThreadPool<absl::Status> {
 public:
   ActionCreateHardLink(AsyncFileHandle handle, absl::string_view filename,
@@ -170,6 +186,11 @@ public:
 };
 
 } // namespace
+
+absl::StatusOr<CancelFunction>
+AsyncFileContextThreadPool::stat(std::function<void(absl::StatusOr<struct stat>)> on_complete) {
+  return checkFileAndEnqueue(std::make_shared<ActionStat>(handle(), std::move(on_complete)));
+}
 
 absl::StatusOr<CancelFunction>
 AsyncFileContextThreadPool::createHardLink(absl::string_view filename,

@@ -39,6 +39,7 @@ public:
                      Http::ResponseHeaderMap& response_headers, std::string& body) override;
   void addListenerToHandler(Network::ConnectionHandler* handler) override;
   uint32_t concurrency() const override { return 1; }
+  void closeSocket() override {}
 
 private:
   ConfigTrackerImpl config_tracker_;

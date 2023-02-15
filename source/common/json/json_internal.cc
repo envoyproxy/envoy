@@ -675,7 +675,7 @@ bool ObjectHandler::handleValueEvent(FieldSharedPtr ptr) {
 
 ObjectSharedPtr Factory::loadFromString(const std::string& json) {
   ObjectHandler handler;
-  auto json_container = JsonContainer(json.data(), &handler);
+  auto json_container = JsonContainer(json.c_str(), &handler);
 
   nlohmann::json::sax_parse(json_container, &handler);
 

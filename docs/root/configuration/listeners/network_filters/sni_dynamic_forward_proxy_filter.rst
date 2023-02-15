@@ -27,3 +27,11 @@ SNI dynamic forward proxy.
 
 .. literalinclude:: _include/sni-dynamic-forward-proxy-filter.yaml
     :language: yaml
+
+Dynamic host selection
+-------------------------
+
+By default, the SNI dynamic forward proxy uses the SNI as target host, but it can be
+dynamically set by other network filters on a per-connection basis by setting a per-connection
+state object under the key ``envoy.upstream.dynamic_host``. If this object is set,
+it takes precedence over the SNI value. See the implementation for the details.

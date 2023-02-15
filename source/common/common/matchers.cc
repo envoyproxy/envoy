@@ -96,6 +96,33 @@ MetadataMatcher::MetadataMatcher(const envoy::type::matcher::v3::MetadataMatcher
   value_matcher_ = ValueMatcher::create(v);
 }
 
+namespace {
+StringMatcherPtr
+valueMatcherFromProto(const envoy::type::matcher::v3::FilterStateMatcher& matcher) {
+  switch (matcher.matcher_case()) {
+  case envoy::type::matcher::v3::FilterStateMatcher::MatcherCase::kStringMatch:
+    return std::make_unique<const StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>(
+        matcher.string_match());
+    break;
+  default:
+    PANIC_DUE_TO_PROTO_UNSET;
+  }
+}
+
+} // namespace
+
+FilterStateMatcher::FilterStateMatcher(const envoy::type::matcher::v3::FilterStateMatcher& matcher)
+    : key_(matcher.key()), value_matcher_(valueMatcherFromProto(matcher)) {}
+
+bool FilterStateMatcher::match(const StreamInfo::FilterState& filter_state) const {
+  const auto* object = filter_state.getDataReadOnlyGeneric(key_);
+  if (object == nullptr) {
+    return false;
+  }
+  const auto string_value = object->serializeAsString();
+  return string_value && value_matcher_->match(*string_value);
+}
+
 PathMatcherConstSharedPtr PathMatcher::createExact(const std::string& exact, bool ignore_case) {
   envoy::type::matcher::v3::StringMatcher matcher;
   matcher.set_exact(exact);
@@ -103,11 +130,31 @@ PathMatcherConstSharedPtr PathMatcher::createExact(const std::string& exact, boo
   return std::make_shared<const PathMatcher>(matcher);
 }
 
-PathMatcherConstSharedPtr PathMatcher::createPrefix(const std::string& prefix, bool ignore_case) {
+namespace {
+PathMatcherConstSharedPtr createPrefixPathMatcher(const std::string& prefix, bool ignore_case) {
   envoy::type::matcher::v3::StringMatcher matcher;
   matcher.set_prefix(prefix);
   matcher.set_ignore_case(ignore_case);
   return std::make_shared<const PathMatcher>(matcher);
+}
+
+} // namespace
+
+PathMatcherConstSharedPtr PathMatcher::createPrefix(const std::string& prefix, bool ignore_case) {
+  // "" and "/" prefixes are the most common among prefix path matchers (as they effectively
+  // represent "match any path" cases). They are optimized by using the same shared instances of the
+  // matchers, to avoid creating a lot of identical instances of those trivial matchers.
+  if (prefix.empty()) {
+    static const PathMatcherConstSharedPtr emptyPrefixPathMatcher =
+        createPrefixPathMatcher("", false);
+    return emptyPrefixPathMatcher;
+  }
+  if (prefix == "/") {
+    static const PathMatcherConstSharedPtr slashPrefixPathMatcher =
+        createPrefixPathMatcher("/", false);
+    return slashPrefixPathMatcher;
+  }
+  return createPrefixPathMatcher(prefix, ignore_case);
 }
 
 PathMatcherConstSharedPtr PathMatcher::createPattern(const std::string& pattern, bool ignore_case) {

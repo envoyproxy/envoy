@@ -56,11 +56,17 @@ public:
     Network::ConnectionSocket::OptionsSharedPtr options =
         std::make_shared<Network::Socket::Options>();
     options->push_back(socket_option_);
+    ON_CALL(*mockHost().cluster_.upstream_local_address_selector_, getUpstreamLocalAddress(_, _))
+        .WillByDefault(Invoke([](const Network::Address::InstanceConstSharedPtr&,
+                                 const Network::ConnectionSocket::OptionsSharedPtr& socket_options)
+                                  -> Upstream::UpstreamLocalAddress {
+          return Upstream::UpstreamLocalAddress({nullptr, socket_options});
+        }));
     Network::TransportSocketOptionsConstSharedPtr transport_options;
-    pool_ = allocateConnPool(dispatcher_, random_, host_, Upstream::ResourcePriority::Default,
-                             options, transport_options, state_, quic_stat_names_, {}, store_,
-                             makeOptRef<PoolConnectResultCallback>(connect_result_callback_),
-                             quic_info_);
+    pool_ = allocateConnPool(
+        dispatcher_, random_, host_, Upstream::ResourcePriority::Default, options,
+        transport_options, state_, quic_stat_names_, {}, *store_.rootScope(),
+        makeOptRef<PoolConnectResultCallback>(connect_result_callback_), quic_info_);
     EXPECT_EQ(3000, Http3ConnPoolImplPeer::getServerId(*pool_).port());
   }
 
@@ -109,7 +115,7 @@ TEST_F(Http3ConnPoolImplTest, FastFailWithoutSecretsLoaded) {
   Network::TransportSocketOptionsConstSharedPtr transport_options;
   ConnectionPool::InstancePtr pool =
       allocateConnPool(dispatcher_, random_, host_, Upstream::ResourcePriority::Default, options,
-                       transport_options, state_, quic_stat_names_, {}, store_,
+                       transport_options, state_, quic_stat_names_, {}, *store_.rootScope(),
                        makeOptRef<PoolConnectResultCallback>(connect_result_callback_), quic_info_);
 
   EXPECT_EQ(static_cast<Http3ConnPoolImpl*>(pool.get())->instantiateActiveClient(), nullptr);
@@ -133,7 +139,7 @@ TEST_F(Http3ConnPoolImplTest, FailWithSecretsBecomeEmpty) {
   Network::TransportSocketOptionsConstSharedPtr transport_options;
   ConnectionPool::InstancePtr pool =
       allocateConnPool(dispatcher_, random_, host_, Upstream::ResourcePriority::Default, options,
-                       transport_options, state_, quic_stat_names_, {}, store_,
+                       transport_options, state_, quic_stat_names_, {}, *store_.rootScope(),
                        makeOptRef<PoolConnectResultCallback>(connect_result_callback_), quic_info_);
 
   MockResponseDecoder decoder;
@@ -154,6 +160,16 @@ TEST_F(Http3ConnPoolImplTest, CreationAndNewStream) {
   mockHost().cluster_.cluster_socket_options_ = std::make_shared<Network::Socket::Options>();
   std::shared_ptr<Network::MockSocketOption> cluster_socket_option{new Network::MockSocketOption()};
   mockHost().cluster_.cluster_socket_options_->push_back(cluster_socket_option);
+  EXPECT_CALL(*mockHost().cluster_.upstream_local_address_selector_, getUpstreamLocalAddress(_, _))
+      .WillOnce(Invoke([&](const Network::Address::InstanceConstSharedPtr&,
+                           const Network::ConnectionSocket::OptionsSharedPtr& socket_options)
+                           -> Upstream::UpstreamLocalAddress {
+        Network::ConnectionSocket::OptionsSharedPtr options =
+            std::make_shared<Network::ConnectionSocket::Options>();
+        Network::Socket::appendOptions(options, mockHost().cluster_.cluster_socket_options_);
+        Network::Socket::appendOptions(options, socket_options);
+        return Upstream::UpstreamLocalAddress({nullptr, options});
+      }));
   EXPECT_CALL(*cluster_socket_option, setOption(_, _)).Times(3u);
   EXPECT_CALL(*socket_option_, setOption(_, _)).Times(3u);
   auto* async_connect_callback = new NiceMock<Event::MockSchedulableCallback>(&dispatcher_);

@@ -141,7 +141,7 @@ public:
   std::chrono::milliseconds per_try_idle_timeout_{0};
   uint32_t num_retries_{};
   uint32_t retry_on_{};
-  uint32_t host_selection_max_attempts_;
+  uint32_t host_selection_max_attempts_{0};
   std::vector<uint32_t> retriable_status_codes_;
   std::vector<Http::HeaderMatcherSharedPtr> retriable_headers_;
   std::vector<Http::HeaderMatcherSharedPtr> retriable_request_headers_;
@@ -166,6 +166,22 @@ class MockInternalRedirectPredicate : public InternalRedirectPredicate {
 public:
   MOCK_METHOD(bool, acceptTargetRoute, (StreamInfo::FilterState&, absl::string_view, bool, bool));
   MOCK_METHOD(absl::string_view, name, (), (const));
+};
+
+class MockPathRewriter : public PathRewriter {
+public:
+  MOCK_METHOD(absl::string_view, name, (), (const));
+  MOCK_METHOD(absl::StatusOr<std::string>, rewritePath,
+              (absl::string_view path, absl::string_view rewrite_pattern), (const));
+  MOCK_METHOD(absl::string_view, uriTemplate, (), (const));
+  MOCK_METHOD(absl::Status, isCompatiblePathMatcher, (PathMatcherSharedPtr path_matcher), (const));
+};
+
+class MockPathMatcher : public PathMatcher {
+public:
+  MOCK_METHOD(absl::string_view, name, (), (const));
+  MOCK_METHOD(bool, match, (absl::string_view path), (const));
+  MOCK_METHOD(absl::string_view, uriTemplate, (), (const));
 };
 
 class MockRetryState : public RetryState {
@@ -251,6 +267,15 @@ public:
   MOCK_METHOD(void, shadow_,
               (const std::string& cluster, Http::RequestMessagePtr& request,
                const Http::AsyncClient::RequestOptions& options));
+
+  Http::AsyncClient::OngoingRequest*
+  streamingShadow(const std::string& cluster, Http::RequestHeaderMapPtr&& request,
+                  const Http::AsyncClient::RequestOptions& options) override {
+    return streamingShadow_(cluster, request, options);
+  }
+  MOCK_METHOD(Http::AsyncClient::OngoingRequest*, streamingShadow_,
+              (const std::string& cluster, Http::RequestHeaderMapPtr& request,
+               const Http::AsyncClient::RequestOptions& options));
 };
 
 class TestVirtualCluster : public VirtualCluster {
@@ -265,7 +290,7 @@ public:
   Stats::StatNameManagedStorage stat_name_{"fake_virtual_cluster", *symbol_table_};
   Stats::IsolatedStoreImpl stats_store_;
   VirtualClusterStatNames stat_names_{stats_store_.symbolTable()};
-  mutable VirtualClusterStats stats_{generateStats(stats_store_, stat_names_)};
+  mutable VirtualClusterStats stats_{generateStats(*stats_store_.rootScope(), stat_names_)};
 };
 
 class MockVirtualHost : public VirtualHost {
@@ -278,12 +303,17 @@ public:
   MOCK_METHOD(const RateLimitPolicy&, rateLimitPolicy, (), (const));
   MOCK_METHOD(const CorsPolicy*, corsPolicy, (), (const));
   MOCK_METHOD(const Config&, routeConfig, (), (const));
-  MOCK_METHOD(const RouteSpecificFilterConfig*, perFilterConfig, (const std::string&), (const));
+  MOCK_METHOD(const RouteSpecificFilterConfig*, mostSpecificPerFilterConfig, (const std::string&),
+              (const));
   MOCK_METHOD(bool, includeAttemptCountInRequest, (), (const));
   MOCK_METHOD(bool, includeAttemptCountInResponse, (), (const));
+  MOCK_METHOD(bool, includeIsTimeoutRetryHeader, (), (const));
   MOCK_METHOD(Upstream::RetryPrioritySharedPtr, retryPriority, ());
   MOCK_METHOD(Upstream::RetryHostPredicateSharedPtr, retryHostPredicate, ());
   MOCK_METHOD(uint32_t, retryShadowBufferLimit, (), (const));
+  MOCK_METHOD(void, traversePerFilterConfig,
+              (const std::string&, std::function<void(const Router::RouteSpecificFilterConfig&)>),
+              (const));
 
   Stats::StatName statName() const override {
     stat_name_ = std::make_unique<Stats::StatNameManagedStorage>(name(), *symbol_table_);
@@ -380,6 +410,8 @@ public:
   MOCK_METHOD(const RateLimitPolicy&, rateLimitPolicy, (), (const));
   MOCK_METHOD(const RetryPolicy&, retryPolicy, (), (const));
   MOCK_METHOD(const InternalRedirectPolicy&, internalRedirectPolicy, (), (const));
+  MOCK_METHOD(const PathMatcherSharedPtr&, pathMatcher, (), (const));
+  MOCK_METHOD(const PathRewriterSharedPtr&, pathRewriter, (), (const));
   MOCK_METHOD(uint32_t, retryShadowBufferLimit, (), (const));
   MOCK_METHOD(const std::vector<ShadowPolicyPtr>&, shadowPolicies, (), (const));
   MOCK_METHOD(std::chrono::milliseconds, timeout, (), (const));
@@ -402,7 +434,7 @@ public:
   MOCK_METHOD(const PathMatchCriterion&, pathMatchCriterion, (), (const));
   MOCK_METHOD(bool, includeAttemptCountInRequest, (), (const));
   MOCK_METHOD(bool, includeAttemptCountInResponse, (), (const));
-  MOCK_METHOD(const absl::optional<ConnectConfig>&, connectConfig, (), (const));
+  MOCK_METHOD(const ConnectConfigOptRef, connectConfig, (), (const));
   MOCK_METHOD(const UpgradeMap&, upgradeMap, (), (const));
   MOCK_METHOD(const std::string&, routeName, (), (const));
   MOCK_METHOD(const EarlyDataPolicy&, earlyDataPolicy, (), (const));
@@ -417,6 +449,8 @@ public:
   TestVirtualCluster virtual_cluster_;
   TestRetryPolicy retry_policy_;
   testing::NiceMock<MockInternalRedirectPolicy> internal_redirect_policy_;
+  testing::NiceMock<MockPathMatcher> path_matcher_;
+  testing::NiceMock<MockPathRewriter> path_rewriter_;
   TestHedgePolicy hedge_policy_;
   testing::NiceMock<MockRateLimitPolicy> rate_limit_policy_;
   std::vector<ShadowPolicyPtr> shadow_policies_;
@@ -607,8 +641,8 @@ public:
   MOCK_METHOD(void, onPoolReady,
               (std::unique_ptr<GenericUpstream> && upstream,
                Upstream::HostDescriptionConstSharedPtr host,
-               const Network::Address::InstanceConstSharedPtr& upstream_local_address,
-               StreamInfo::StreamInfo& info, absl::optional<Http::Protocol> protocol));
+               const Network::ConnectionInfoProvider& info_provider, StreamInfo::StreamInfo& info,
+               absl::optional<Http::Protocol> protocol));
   MOCK_METHOD(UpstreamToDownstream&, upstreamToDownstream, ());
 
   NiceMock<MockUpstreamToDownstream> upstream_to_downstream_;

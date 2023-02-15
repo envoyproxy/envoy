@@ -93,9 +93,10 @@ TEST_F(FilterManagerTest, SendLocalReplyDuringDecodingGrpcClassiciation) {
       .WillByDefault(Return(makeOptRef(*grpc_headers)));
 
   EXPECT_CALL(filter_factory_, createFilterChain(_))
-      .WillRepeatedly(Invoke([&](FilterChainManager& manager) -> void {
+      .WillRepeatedly(Invoke([&](FilterChainManager& manager) -> bool {
         auto factory = createDecoderFilterFactoryCb(filter);
         manager.applyFilterFactoryCb({}, factory);
+        return true;
       }));
 
   filter_manager_->createFilterChain();
@@ -141,12 +142,13 @@ TEST_F(FilterManagerTest, SendLocalReplyDuringEncodingGrpcClassiciation) {
       }));
 
   EXPECT_CALL(filter_factory_, createFilterChain(_))
-      .WillRepeatedly(Invoke([&](FilterChainManager& manager) -> void {
+      .WillRepeatedly(Invoke([&](FilterChainManager& manager) -> bool {
         auto decoder_factory = createDecoderFilterFactoryCb(decoder_filter);
         manager.applyFilterFactoryCb({}, decoder_factory);
 
         auto stream_factory = createStreamFilterFactoryCb(encoder_filter);
         manager.applyFilterFactoryCb({}, stream_factory);
+        return true;
       }));
 
   RequestHeaderMapPtr grpc_headers{
@@ -186,13 +188,14 @@ TEST_F(FilterManagerTest, OnLocalReply) {
   ON_CALL(filter_manager_callbacks_, requestHeaders()).WillByDefault(Return(makeOptRef(*headers)));
 
   EXPECT_CALL(filter_factory_, createFilterChain(_))
-      .WillRepeatedly(Invoke([&](FilterChainManager& manager) -> void {
+      .WillRepeatedly(Invoke([&](FilterChainManager& manager) -> bool {
         auto decoder_factory = createDecoderFilterFactoryCb(decoder_filter);
         manager.applyFilterFactoryCb({}, decoder_factory);
         auto stream_factory = createStreamFilterFactoryCb(stream_filter);
         manager.applyFilterFactoryCb({}, stream_factory);
         auto encoder_factory = createEncoderFilterFactoryCb(encoder_filter);
         manager.applyFilterFactoryCb({}, encoder_factory);
+        return true;
       }));
 
   filter_manager_->createFilterChain();
@@ -245,13 +248,14 @@ TEST_F(FilterManagerTest, MultipleOnLocalReply) {
   ON_CALL(filter_manager_callbacks_, requestHeaders()).WillByDefault(Return(makeOptRef(*headers)));
 
   EXPECT_CALL(filter_factory_, createFilterChain(_))
-      .WillRepeatedly(Invoke([&](FilterChainManager& manager) -> void {
+      .WillRepeatedly(Invoke([&](FilterChainManager& manager) -> bool {
         auto decoder_factory = createDecoderFilterFactoryCb(decoder_filter);
         manager.applyFilterFactoryCb({}, decoder_factory);
         auto stream_factory = createStreamFilterFactoryCb(stream_filter);
         manager.applyFilterFactoryCb({}, stream_factory);
         auto encoder_factory = createEncoderFilterFactoryCb(encoder_filter);
         manager.applyFilterFactoryCb({}, encoder_factory);
+        return true;
       }));
 
   filter_manager_->createFilterChain();
@@ -303,9 +307,10 @@ TEST_F(FilterManagerTest, ResetIdleTimer) {
   std::shared_ptr<MockStreamDecoderFilter> decoder_filter(new NiceMock<MockStreamDecoderFilter>());
 
   EXPECT_CALL(filter_factory_, createFilterChain(_))
-      .WillRepeatedly(Invoke([&](FilterChainManager& manager) -> void {
+      .WillRepeatedly(Invoke([&](FilterChainManager& manager) -> bool {
         auto decoder_factory = createDecoderFilterFactoryCb(decoder_filter);
         manager.applyFilterFactoryCb({}, decoder_factory);
+        return true;
       }));
   filter_manager_->createFilterChain();
 
@@ -321,9 +326,10 @@ TEST_F(FilterManagerTest, SetAndGetUpstreamOverrideHost) {
   std::shared_ptr<MockStreamDecoderFilter> decoder_filter(new NiceMock<MockStreamDecoderFilter>());
 
   EXPECT_CALL(filter_factory_, createFilterChain(_))
-      .WillRepeatedly(Invoke([&](FilterChainManager& manager) -> void {
+      .WillRepeatedly(Invoke([&](FilterChainManager& manager) -> bool {
         auto decoder_factory = createDecoderFilterFactoryCb(decoder_filter);
         manager.applyFilterFactoryCb({}, decoder_factory);
+        return true;
       }));
   filter_manager_->createFilterChain();
 
@@ -341,16 +347,20 @@ TEST_F(FilterManagerTest, GetRouteLevelFilterConfig) {
   std::shared_ptr<MockStreamDecoderFilter> decoder_filter(new NiceMock<MockStreamDecoderFilter>());
 
   EXPECT_CALL(filter_factory_, createFilterChain(_))
-      .WillRepeatedly(Invoke([&](FilterChainManager& manager) -> void {
+      .WillRepeatedly(Invoke([&](FilterChainManager& manager) -> bool {
         auto decoder_factory = createDecoderFilterFactoryCb(decoder_filter);
         manager.applyFilterFactoryCb({"custom-name", "filter-name"}, decoder_factory);
+        return true;
       }));
   filter_manager_->createFilterChain();
 
   std::shared_ptr<Router::MockRoute> route(new NiceMock<Router::MockRoute>());
   auto route_config = std::make_shared<Router::RouteSpecificFilterConfig>();
 
-  ON_CALL(filter_manager_callbacks_, route(_)).WillByDefault(Return(route));
+  NiceMock<MockDownstreamStreamFilterCallbacks> downstream_callbacks;
+  ON_CALL(filter_manager_callbacks_, downstreamCallbacks)
+      .WillByDefault(Return(OptRef<DownstreamStreamFilterCallbacks>{downstream_callbacks}));
+  ON_CALL(downstream_callbacks, route(_)).WillByDefault(Return(route));
 
   // Get a valid config by the custom filter name.
   EXPECT_CALL(*route, mostSpecificPerFilterConfig(testing::Eq("custom-name")))
@@ -398,9 +408,10 @@ TEST_F(FilterManagerTest, GetRouteLevelFilterConfigForNullRoute) {
   std::shared_ptr<MockStreamDecoderFilter> decoder_filter(new NiceMock<MockStreamDecoderFilter>());
 
   EXPECT_CALL(filter_factory_, createFilterChain(_))
-      .WillRepeatedly(Invoke([&](FilterChainManager& manager) -> void {
+      .WillRepeatedly(Invoke([&](FilterChainManager& manager) -> bool {
         auto decoder_factory = createDecoderFilterFactoryCb(decoder_filter);
         manager.applyFilterFactoryCb({"custom-name", "filter-name"}, decoder_factory);
+        return true;
       }));
   filter_manager_->createFilterChain();
 
@@ -408,10 +419,13 @@ TEST_F(FilterManagerTest, GetRouteLevelFilterConfigForNullRoute) {
   auto route_config = std::make_shared<Router::RouteSpecificFilterConfig>();
 
   // Do nothing for no route.
-  EXPECT_CALL(filter_manager_callbacks_, route(_)).WillOnce(Return(nullptr));
+  NiceMock<MockDownstreamStreamFilterCallbacks> downstream_callbacks;
+  ON_CALL(filter_manager_callbacks_, downstreamCallbacks)
+      .WillByDefault(Return(OptRef<DownstreamStreamFilterCallbacks>{downstream_callbacks}));
+  EXPECT_CALL(downstream_callbacks, route(_)).WillOnce(Return(nullptr));
   decoder_filter->callbacks_->mostSpecificPerFilterConfig();
 
-  EXPECT_CALL(filter_manager_callbacks_, route(_)).WillOnce(Return(nullptr));
+  EXPECT_CALL(downstream_callbacks, route(_)).WillOnce(Return(nullptr));
   decoder_filter->callbacks_->traversePerFilterConfig(
       [](const Router::RouteSpecificFilterConfig&) {});
 

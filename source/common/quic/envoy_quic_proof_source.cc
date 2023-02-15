@@ -6,6 +6,7 @@
 
 #include "source/common/quic/envoy_quic_utils.h"
 #include "source/common/quic/quic_io_handle_wrapper.h"
+#include "source/common/stream_info/stream_info_impl.h"
 
 #include "openssl/bytestring.h"
 #include "quiche/quic/core/crypto/certificate_view.h"
@@ -102,8 +103,10 @@ EnvoyQuicProofSource::getTlsCertConfigAndFilterChain(const quic::QuicSocketAddre
   // TODO(danzh) modify QUICHE to make quic session or ALPN accessible to avoid hard-coded ALPN.
   Network::ConnectionSocketPtr connection_socket = createServerConnectionSocket(
       listen_socket_.ioHandle(), server_address, client_address, hostname, "h3");
+  StreamInfo::StreamInfoImpl info(time_source_,
+                                  connection_socket->connectionInfoProviderSharedPtr());
   const Network::FilterChain* filter_chain =
-      filter_chain_manager_->findFilterChain(*connection_socket);
+      filter_chain_manager_->findFilterChain(*connection_socket, info);
 
   if (filter_chain == nullptr) {
     listener_stats_.no_filter_chain_match_.inc();

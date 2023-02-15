@@ -34,9 +34,10 @@ enum class FilterState {
   // encoding).
   ResponseServedFromCache,
 
-  // The filter won't serve a response from the cache, whether because the
-  // request wasn't cacheable, there was no response in cache, or the response
-  // in cache couldn't be served. This may be set during decoding or encoding.
+  // The filter won't serve a response from the cache, whether because the request wasn't cacheable,
+  // there was no response in cache, the response in cache couldn't be served, or the request was
+  // terminated before the cached response could be written. This may be set during decoding or
+  // encoding.
   NotServingFromCache,
 
   // CacheFilter::onDestroy has been called, the filter will be destroyed soon. Any triggered

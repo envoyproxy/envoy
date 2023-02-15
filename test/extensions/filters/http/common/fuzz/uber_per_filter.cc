@@ -162,7 +162,8 @@ void UberFilterFuzzer::perFilterSetup() {
       .WillByDefault(testing::Return(resolver_));
 
   // Prepare expectations for TAP config.
-  ON_CALL(factory_context_, admin()).WillByDefault(testing::ReturnRef(factory_context_.admin_));
+  ON_CALL(factory_context_, admin())
+      .WillByDefault(testing::Return(OptRef<Server::Admin>{factory_context_.admin_}));
   ON_CALL(factory_context_.admin_, addHandler(_, _, _, _, _, _))
       .WillByDefault(testing::Return(true));
   ON_CALL(factory_context_.admin_, removeHandler(_)).WillByDefault(testing::Return(true));
@@ -178,6 +179,28 @@ void UberFilterFuzzer::perFilterSetup() {
       .WillByDefault([this](Buffer::Instance& data, bool) { decoding_buffer_ = &data; });
   ON_CALL(decoder_callbacks_, decodingBuffer()).WillByDefault([this]() -> const Buffer::Instance* {
     return decoding_buffer_;
+  });
+  ON_CALL(encoder_callbacks_, dispatcher()).WillByDefault([this]() -> Event::Dispatcher& {
+    return *worker_thread_dispatcher_;
+  });
+  ON_CALL(decoder_callbacks_, dispatcher()).WillByDefault([this]() -> Event::Dispatcher& {
+    return *worker_thread_dispatcher_;
+  });
+  ON_CALL(encoder_callbacks_, injectEncodedDataToFilterChain(_, true))
+      .WillByDefault([this]() -> void { finishFilter(encoder_filter_.get()); });
+  ON_CALL(encoder_callbacks_, addEncodedData(_, true)).WillByDefault([this]() -> void {
+    finishFilter(encoder_filter_.get());
+  });
+  ON_CALL(encoder_callbacks_, continueEncoding()).WillByDefault([this]() -> void {
+    finishFilter(encoder_filter_.get());
+  });
+  ON_CALL(decoder_callbacks_, injectDecodedDataToFilterChain(_, true))
+      .WillByDefault([this]() -> void { finishFilter(decoder_filter_.get()); });
+  ON_CALL(decoder_callbacks_, addDecodedData(_, true)).WillByDefault([this]() -> void {
+    finishFilter(decoder_filter_.get());
+  });
+  ON_CALL(decoder_callbacks_, continueDecoding()).WillByDefault([this]() -> void {
+    finishFilter(decoder_filter_.get());
   });
 }
 

@@ -50,9 +50,12 @@ bool ConfigSubscriptionInstance::checkAndApplyConfigUpdate(const Protobuf::Messa
   return true;
 }
 
-ConfigProviderManagerImplBase::ConfigProviderManagerImplBase(Server::Admin& admin,
+ConfigProviderManagerImplBase::ConfigProviderManagerImplBase(OptRef<Server::Admin> admin,
                                                              const std::string& config_name) {
-  config_tracker_entry_ = admin.getConfigTracker().add(
+  if (!admin.has_value()) {
+    return;
+  }
+  config_tracker_entry_ = admin->getConfigTracker().add(
       config_name,
       [this](const Matchers::StringMatcher& name_matcher) { return dumpConfigs(name_matcher); });
   // ConfigTracker keys must be unique. We are asserting that no one has stolen the key

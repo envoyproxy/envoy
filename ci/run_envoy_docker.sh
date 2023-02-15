@@ -41,10 +41,12 @@ else
   BUILD_DIR_MOUNT_DEST=/build
   SOURCE_DIR="${PWD}"
   SOURCE_DIR_MOUNT_DEST=/source
-  START_COMMAND=("/bin/bash" "-lc" "groupadd --gid $(id -g) -f envoygroup \
-    && useradd -o --uid $(id -u) --gid $(id -g) --no-create-home --home-dir /build envoybuild \
+  DOCKER_GID="$(stat -c %g /var/run/docker.sock 2>/dev/null || stat -f %g /var/run/docker.sock)"
+  START_COMMAND=("/bin/bash" "-lc" "groupadd --gid ${DOCKER_GID} -f envoygroup \
+    && useradd -o --uid $(id -u) --gid ${DOCKER_GID} --no-create-home --home-dir /build envoybuild \
     && usermod -a -G pcap envoybuild \
     && chown envoybuild:envoygroup /build \
+    && chown envoybuild /proc/self/fd/2 \
     && sudo -EHs -u envoybuild bash -c 'cd /source && $*'")
 fi
 
@@ -78,7 +80,9 @@ if ! is_windows; then
     VOLUMES+=(-v "${SHARED_TMP_DIR}":"${SHARED_TMP_DIR}")
 fi
 
-time docker pull "${ENVOY_BUILD_IMAGE}"
+if [[ -n "${ENVOY_DOCKER_PULL}" ]]; then
+    time docker pull "${ENVOY_BUILD_IMAGE}"
+fi
 
 
 # Since we specify an explicit hash, docker-run will pull from the remote repo if missing.
@@ -86,6 +90,7 @@ docker run --rm \
        "${ENVOY_DOCKER_OPTIONS[@]}" \
        "${VOLUMES[@]}" \
        -e AZP_BRANCH \
+       -e AZP_COMMIT_SHA \
        -e HTTP_PROXY \
        -e HTTPS_PROXY \
        -e NO_PROXY \

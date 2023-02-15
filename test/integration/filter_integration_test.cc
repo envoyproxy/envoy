@@ -198,6 +198,29 @@ TEST_P(FilterIntegrationTest, MissingHeadersLocalReplyDownstreamBytesCount) {
   }
 }
 
+TEST_P(FilterIntegrationTest, RoundTripTimeForUpstreamConnection) {
+  config_helper_.prependFilter(R"EOF(
+  name: stream-info-to-headers-filter
+  )EOF");
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  // Send a headers only request.
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  waitForNextUpstreamRequest();
+
+  // Make sure that the body was injected to the request.
+  EXPECT_TRUE(upstream_request_->complete());
+
+  // Send a headers only response.
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  ASSERT_TRUE(response->waitForEndStream());
+
+  // Make sure that round trip time was populated
+  EXPECT_FALSE(response->headers().get(Http::LowerCaseString("round_trip_time")).empty());
+}
+
 TEST_P(FilterIntegrationTest, MissingHeadersLocalReplyUpstreamBytesCount) {
   useAccessLog("%UPSTREAM_WIRE_BYTES_SENT% %UPSTREAM_WIRE_BYTES_RECEIVED% "
                "%UPSTREAM_HEADER_BYTES_SENT% %UPSTREAM_HEADER_BYTES_RECEIVED%");
@@ -239,7 +262,7 @@ TEST_P(FilterIntegrationTest, MissingHeadersLocalReplyWithBody) {
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
-  EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("invalid_header_filter_ready\n"));
+  EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("invalid_header_filter_ready"));
 }
 
 TEST_P(FilterIntegrationTest, MissingHeadersLocalReplyWithBodyBytesCount) {
@@ -1199,6 +1222,23 @@ TEST_P(FilterIntegrationTest, ResetFilter) {
       codec_client_->makeHeaderOnlyRequest(default_request_headers_);
   ASSERT_TRUE(response->waitForReset());
   EXPECT_FALSE(response->complete());
+}
+
+TEST_P(FilterIntegrationTest, LocalReplyViaFilterChainDoesNotConcurrentlyInvokeFilter) {
+  if (!Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.http_filter_avoid_reentrant_local_reply")) {
+    return;
+  }
+  prependFilter(R"EOF(
+  name: assert-non-reentrant-filter
+  )EOF");
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  IntegrationStreamDecoderPtr response =
+      codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("AssertNonReentrantFilter local reply during decodeHeaders.", response->body());
 }
 
 } // namespace
