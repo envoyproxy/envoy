@@ -10,6 +10,7 @@ namespace Envoy {
 namespace Config {
 namespace DataSource {
 
+// Default Parameters of the jittered backoff strategy.
 static constexpr uint32_t RetryInitialDelayMilliseconds = 1000;
 static constexpr uint32_t RetryMaxDelayMilliseconds = 10 * 1000;
 static constexpr uint32_t RetryCount = 1;

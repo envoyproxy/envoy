@@ -54,7 +54,6 @@ SubscriptionPtr SubscriptionFactoryImpl::subscriptionFromConfigSource(
     Utility::checkApiConfigSourceSubscriptionBackingCluster(cm_.primaryClusters(),
                                                             api_config_source);
     Utility::checkTransportVersion(api_config_source);
-
     switch (api_config_source.api_type()) {
       PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
     case envoy::config::core::v3::ApiConfigSource::AGGREGATED_GRPC:

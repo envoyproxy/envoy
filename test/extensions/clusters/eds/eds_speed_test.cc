@@ -183,7 +183,7 @@ public:
   ProtobufMessage::MockValidationVisitor validation_visitor_;
   Grpc::MockAsyncClient* async_client_;
   Config::CustomConfigValidatorsPtr config_validators_;
-  = NiceMock<Grpc::MockAsyncStream> async_stream_;
+  NiceMock<Grpc::MockAsyncStream> async_stream_;
   Config::GrpcMuxSharedPtr grpc_mux_;
   Config::GrpcSubscriptionImplPtr subscription_;
   NiceMock<AccessLog::MockAccessLogManager> access_log_manager_;
