@@ -689,8 +689,8 @@ struct RedirectConfig {
 /*
  * Compute new path based on RedirectConfig.
  */
-std::string newPath(::Envoy::OptRef<const RedirectConfig> redirect_config,
-                    const Http::RequestHeaderMap& headers);
+std::string newUri(::Envoy::OptRef<const RedirectConfig> redirect_config,
+                   const Http::RequestHeaderMap& headers);
 
 } // namespace Utility
 } // namespace Http

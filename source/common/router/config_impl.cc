@@ -238,7 +238,7 @@ const std::string& OriginalConnectPort::key() {
   CONSTRUCT_ON_FIRST_USE(std::string, "envoy.router.original_connect_port");
 }
 
-std::string SslRedirector::newPath(const Http::RequestHeaderMap& headers) const {
+std::string SslRedirector::newUri(const Http::RequestHeaderMap& headers) const {
   return Http::Utility::createSslRedirectPath(headers);
 }
 
@@ -1060,9 +1060,9 @@ absl::optional<std::string> RouteEntryImplBase::currentUrlPathAfterRewriteWithMa
   return {};
 }
 
-std::string RouteEntryImplBase::newPath(const Http::RequestHeaderMap& headers) const {
+std::string RouteEntryImplBase::newUri(const Http::RequestHeaderMap& headers) const {
   ASSERT(isDirectResponse());
-  return ::Envoy::Http::Utility::newPath(
+  return ::Envoy::Http::Utility::newUri(
       ::Envoy::makeOptRefFromPtr(
           const_cast<const ::Envoy::Http::Utility::RedirectConfig*>(redirect_config_.get())),
       headers);

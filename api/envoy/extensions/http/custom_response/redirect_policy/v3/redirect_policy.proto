@@ -45,10 +45,10 @@ message RedirectPolicy {
     // Specify elements of the redirect url individually.
     // Note: Do not specify the `response_code` field in `redirect_action`, use
     // `status_code` instead.
-    // The following fields in `redirect_action` are not currently implemented,
+    // The following fields in `redirect_action` are currently not supported,
     // and specifying them will cause the config to be rejected:
-    //   - `prefix_rewrite`
-    //   - `regex_rewrite`
+    // - `prefix_rewrite`
+    // - `regex_rewrite`
     config.route.v3.RedirectAction redirect_action = 2;
   }
 

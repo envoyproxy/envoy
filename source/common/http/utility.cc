@@ -65,10 +65,10 @@ absl::string_view processRequestHost(const Http::RequestHeaderMap& headers,
     bool remove_port = !new_port.empty();
 
     if (new_scheme != request_protocol) {
-      remove_port |= (request_protocol == Http::Headers::get().SchemeValues.Https.c_str()) &&
-                     request_port == ":443";
-      remove_port |= (request_protocol == Http::Headers::get().SchemeValues.Http.c_str()) &&
-                     request_port == ":80";
+      remove_port |=
+          (request_protocol == Http::Headers::get().SchemeValues.Https) && request_port == ":443";
+      remove_port |=
+          (request_protocol == Http::Headers::get().SchemeValues.Http) && request_port == ":80";
     }
 
     if (remove_port) {
@@ -1333,15 +1333,15 @@ Http::Code Utility::maybeRequestTimeoutCode(bool remote_decode_complete) {
                                 : Http::Code::RequestTimeout;
 }
 
-std::string Utility::newPath(::Envoy::OptRef<const Utility::RedirectConfig> redirect_config,
-                             const Http::RequestHeaderMap& headers) {
+std::string Utility::newUri(::Envoy::OptRef<const Utility::RedirectConfig> redirect_config,
+                            const Http::RequestHeaderMap& headers) {
   absl::string_view final_scheme;
   absl::string_view final_host;
   absl::string_view final_port;
   absl::string_view final_path;
 
   if (redirect_config.has_value() && !redirect_config->scheme_redirect_.empty()) {
-    final_scheme = redirect_config->scheme_redirect_.c_str();
+    final_scheme = redirect_config->scheme_redirect_;
   } else if (redirect_config.has_value() && redirect_config->https_redirect_) {
     final_scheme = Http::Headers::get().SchemeValues.Https;
   } else {
@@ -1351,13 +1351,13 @@ std::string Utility::newPath(::Envoy::OptRef<const Utility::RedirectConfig> redi
   }
 
   if (redirect_config.has_value() && !redirect_config->port_redirect_.empty()) {
-    final_port = redirect_config->port_redirect_.c_str();
+    final_port = redirect_config->port_redirect_;
   } else {
     final_port = "";
   }
 
   if (redirect_config.has_value() && !redirect_config->host_redirect_.empty()) {
-    final_host = redirect_config->host_redirect_.c_str();
+    final_host = redirect_config->host_redirect_;
   } else {
     ASSERT(headers.Host());
     final_host = processRequestHost(headers, final_scheme, final_port);
@@ -1368,7 +1368,7 @@ std::string Utility::newPath(::Envoy::OptRef<const Utility::RedirectConfig> redi
     // The path_redirect query string, if any, takes precedence over the request's query string,
     // and it will not be stripped regardless of `strip_query`.
     if (redirect_config->path_redirect_has_query_) {
-      final_path = redirect_config->path_redirect_.c_str();
+      final_path = redirect_config->path_redirect_;
     } else {
       const absl::string_view current_path = headers.getPathValue();
       const size_t path_end = current_path.find('?');
@@ -1378,7 +1378,7 @@ std::string Utility::newPath(::Envoy::OptRef<const Utility::RedirectConfig> redi
         final_path_value.append(current_path.data() + path_end, current_path.length() - path_end);
         final_path = final_path_value;
       } else {
-        final_path = redirect_config->path_redirect_.c_str();
+        final_path = redirect_config->path_redirect_;
       }
     }
   } else {

@@ -72,6 +72,9 @@ RedirectPolicy::RedirectPolicy(
       request_header_parser_(
           Envoy::Router::HeaderParser::configure(config.request_headers_to_add())),
       modify_request_headers_action_(createModifyRequestHeadersAction(config, context)) {
+  // Ensure that exactly one of uri_ or redirect_action_ is specified.
+  ASSERT((uri_ || redirect_action_) && !(uri_ && redirect_action_));
+
   if (uri_) {
     ::Envoy::Http::Utility::Url absolute_url;
     if (!absolute_url.initialize(*uri_, false)) {
@@ -79,11 +82,15 @@ RedirectPolicy::RedirectPolicy(
           absl::StrCat("Invalid uri specified for redirection for custom response: ", *uri_));
     }
   }
+  if (redirect_action_ && redirect_action_->path_redirect_.find('#') != std::string::npos) {
+    throw EnvoyException(
+        absl::StrCat("#fragment is not supported for custom response. Specified path_redirect is ",
+                     redirect_action_->path_redirect_));
+  }
   if (redirect_action_ && redirect_action_->host_redirect_.empty() &&
       redirect_action_->path_redirect_.empty()) {
     throw EnvoyException("At least one of host_redirect and path_redirect needs to be specified");
   }
-  ASSERT((uri_ || redirect_action_) && !(uri_ && redirect_action_));
 }
 
 std::unique_ptr<ModifyRequestHeadersAction> RedirectPolicy::createModifyRequestHeadersAction(
@@ -161,7 +168,7 @@ std::unique_ptr<ModifyRequestHeadersAction> RedirectPolicy::createModifyRequestH
 
   ::Envoy::Http::Utility::Url absolute_url;
   std::string uri(uri_ ? *uri_
-                       : ::Envoy::Http::Utility::newPath(*redirect_action_, *downstream_headers));
+                       : ::Envoy::Http::Utility::newUri(*redirect_action_, *downstream_headers));
   if (!absolute_url.initialize(uri, false)) {
     stats_.custom_response_invalid_uri_.inc();
     ENVOY_BUG(!static_cast<bool>(uri_),
