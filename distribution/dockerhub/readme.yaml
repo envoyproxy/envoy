@@ -1,0 +1,17 @@
+
+envoy:
+  maintained_by: The Envoy community
+  project_url: https://github.com/envoyproxy/envoy
+  issues_url: https://github.com/envoyproxy/envoy/issues
+  docs_url: https://www.envoyproxy.io/docs
+  slack_url: https://envoyproxy.slack.com/
+
+
+architectures:
+- amd64
+- arm64
+
+image_types:
+- contrib
+- debug
+- distroless

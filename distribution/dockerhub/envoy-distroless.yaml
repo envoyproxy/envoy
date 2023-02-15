@@ -1,0 +1,16 @@
+
+image:
+  name: envoyproxy/envoy-distroless
+  production_ready: true
+  description: |
+    The distroless image provides the smallest, most lightweight and most secure way to run Envoy in a container.
+
+    Based upon the [distroless](https://github.com/GoogleContainerTools/distroless) "nonroot/nossl" images, this
+    image contain only the statically compiled Envoy binary and its glibc dependencies.
+
+    Envoy is run as non-root in a container with the most minimal possible attack surface.
+  variants:
+    dev:
+      production_ready: false
+    contrib:
+      production_ready: false
