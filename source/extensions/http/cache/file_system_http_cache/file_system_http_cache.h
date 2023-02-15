@@ -233,6 +233,7 @@ private:
 struct CacheShared {
   CacheShared(ConfigProto config, Stats::Scope& stats_scope);
   const ConfigProto config_;
+  CacheStatNames stat_names_;
   CacheStats stats_;
   // These are part of stats, but we have to track them separately because there is
   // potential to go "less than zero" due to not having sole control of the file cache;
