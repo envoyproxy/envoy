@@ -62,9 +62,9 @@ public:
   MOCK_METHOD(void, encode1xxHeaders, (ResponseHeaderMap&));
   MOCK_METHOD(void, encodeData, (Buffer::Instance&, bool));
   MOCK_METHOD(void, encodeTrailers, (ResponseTrailerMap&));
-  MOCK_METHOD(void, encodeMetadata, (MetadataMapPtr &&));
+  MOCK_METHOD(void, encodeMetadata, (MetadataMapPtr&&));
   MOCK_METHOD(void, chargeStats, (const ResponseHeaderMap&));
-  MOCK_METHOD(void, setRequestTrailers, (RequestTrailerMapPtr &&));
+  MOCK_METHOD(void, setRequestTrailers, (RequestTrailerMapPtr&&));
   MOCK_METHOD(void, setInformationalHeaders_, (ResponseHeaderMap&));
   void setInformationalHeaders(ResponseHeaderMapPtr&& informational_headers) override {
     informational_headers_ = std::move(informational_headers);
@@ -365,7 +365,7 @@ public:
   MOCK_METHOD(void, addEncodedData, (Buffer::Instance & data, bool streaming));
   MOCK_METHOD(void, injectEncodedDataToFilterChain, (Buffer::Instance & data, bool end_stream));
   MOCK_METHOD(ResponseTrailerMap&, addEncodedTrailers, ());
-  MOCK_METHOD(void, addEncodedMetadata, (Http::MetadataMapPtr &&));
+  MOCK_METHOD(void, addEncodedMetadata, (Http::MetadataMapPtr&&));
   MOCK_METHOD(void, continueEncoding, ());
   MOCK_METHOD(const Buffer::Instance*, encodingBuffer, ());
   MOCK_METHOD(void, modifyEncodingBuffer, (std::function<void(Buffer::Instance&)>));
@@ -586,6 +586,7 @@ public:
     ON_CALL(*this, preserveExternalRequestId()).WillByDefault(testing::Return(false));
     ON_CALL(*this, alwaysSetRequestIdInResponse()).WillByDefault(testing::Return(false));
     ON_CALL(*this, schemeToSet()).WillByDefault(testing::ReturnRef(scheme_));
+    ON_CALL(*this, addProxyProtocolConnectionState()).WillByDefault(testing::Return(true));
   }
 
   // Http::ConnectionManagerConfig
@@ -661,6 +662,7 @@ public:
   MOCK_METHOD(const HttpConnectionManagerProto::ProxyStatusConfig*, proxyStatusConfig, (), (const));
   MOCK_METHOD(HeaderValidatorPtr, makeHeaderValidator, (Protocol protocol));
   MOCK_METHOD(bool, appendXForwardedPort, (), (const));
+  MOCK_METHOD(bool, addProxyProtocolConnectionState, (), (const));
 
   std::unique_ptr<Http::InternalAddressConfig> internal_address_config_ =
       std::make_unique<DefaultInternalAddressConfig>();

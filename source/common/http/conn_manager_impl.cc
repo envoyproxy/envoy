@@ -126,7 +126,8 @@ void ConnectionManagerImpl::initializeReadFilterCallbacks(Network::ReadFilterCal
 
   read_callbacks_->connection().addConnectionCallbacks(*this);
 
-  if (!read_callbacks_->connection()
+  if (config_.addProxyProtocolConnectionState() &&
+      !read_callbacks_->connection()
            .streamInfo()
            .filterState()
            ->hasData<Network::ProxyProtocolFilterState>(Network::ProxyProtocolFilterState::key())) {
