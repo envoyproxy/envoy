@@ -173,6 +173,19 @@ struct StreamInfoImpl : public StreamInfo {
     return {*downstream_timing_};
   }
 
+  UpstreamTiming& upstreamTiming() override {
+    if (!upstream_timing_.has_value()) {
+      upstream_timing_ = UpstreamTiming();
+    }
+    return upstream_timing_.value();
+  }
+  OptRef<const UpstreamTiming> upstreamTiming() const override {
+    if (!upstream_timing_.has_value()) {
+      return {};
+    }
+    return {*upstream_timing_};
+  }
+
   void addBytesReceived(uint64_t bytes_received) override { bytes_received_ += bytes_received; }
 
   uint64_t bytesReceived() const override { return bytes_received_; }
@@ -421,6 +434,7 @@ private:
   const Http::RequestHeaderMap* request_headers_{};
   StreamIdProviderSharedPtr stream_id_provider_;
   absl::optional<DownstreamTiming> downstream_timing_;
+  absl::optional<UpstreamTiming> upstream_timing_;
   absl::optional<Upstream::ClusterInfoConstSharedPtr> upstream_cluster_info_;
   std::string filter_chain_name_;
   Tracing::Reason trace_reason_;
