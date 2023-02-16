@@ -2358,6 +2358,7 @@ TEST_F(HttpFilter2Test, LastDecodeDataCallExceedsStreamBufferLimitWouldJustRaise
 // returned, ext_proc filter will buffer the data in the ActiveStream buffer without triggering a
 // buffer over high watermark call, which ends in a 500 error on response path.
 TEST_F(HttpFilter2Test, LastEncodeDataCallExceedsStreamBufferLimitWouldJustRaiseHighWatermark) {
+  // Configure the filter to only pass response headers to ext server.
   initialize(R"EOF(
   grpc_service:
     envoy_grpc:
@@ -2384,6 +2385,8 @@ TEST_F(HttpFilter2Test, LastEncodeDataCallExceedsStreamBufferLimitWouldJustRaise
       .WillOnce(Invoke([&](Http::ResponseHeaderMap& headers, bool end_stream) {
         EXPECT_FALSE(end_stream);
         // The last encode filter will see the mutations from ext server.
+        // NOTE: Without raising a high watermark when end_stream is true in onData(), if the stream
+        // buffer high watermark reached, a 500 response too large error is raised.
         EXPECT_EQ(headers.get(Envoy::Http::LowerCaseString("foo"))[0]->value().getStringView(),
                   "gift-from-external-server");
         EXPECT_EQ(headers.get(Envoy::Http::LowerCaseString("new_response_header"))[0]
