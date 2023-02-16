@@ -99,7 +99,8 @@ class EnvoyConfigurationTest {
     platformFilterFactories: MutableList<EnvoyHTTPFilterFactory> = mutableListOf(TestEnvoyHTTPFilterFactory("name1"), TestEnvoyHTTPFilterFactory("name2")),
     enableSkipDNSLookupForProxiedRequests: Boolean = false,
     statSinks: MutableList<String> = mutableListOf(),
-    enablePlatformCertificatesValidation: Boolean = false
+    enablePlatformCertificatesValidation: Boolean = false,
+    useLegacyBuilder: Boolean = false
   ): EnvoyConfiguration {
     return EnvoyConfiguration(
       adminInterfaceEnabled,
@@ -138,7 +139,8 @@ class EnvoyConfigurationTest {
       emptyMap(),
       statSinks,
       enableSkipDNSLookupForProxiedRequests,
-      enablePlatformCertificatesValidation
+      enablePlatformCertificatesValidation,
+      useLegacyBuilder
     )
   }
 
