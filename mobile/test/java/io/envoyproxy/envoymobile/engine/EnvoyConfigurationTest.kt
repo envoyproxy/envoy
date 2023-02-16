@@ -99,8 +99,7 @@ class EnvoyConfigurationTest {
     platformFilterFactories: MutableList<EnvoyHTTPFilterFactory> = mutableListOf(TestEnvoyHTTPFilterFactory("name1"), TestEnvoyHTTPFilterFactory("name2")),
     enableSkipDNSLookupForProxiedRequests: Boolean = false,
     statSinks: MutableList<String> = mutableListOf(),
-    enablePlatformCertificatesValidation: Boolean = false,
-    useLegacyBuilder: Boolean = false
+    enablePlatformCertificatesValidation: Boolean = false
   ): EnvoyConfiguration {
     return EnvoyConfiguration(
       adminInterfaceEnabled,
@@ -140,7 +139,6 @@ class EnvoyConfigurationTest {
       statSinks,
       enableSkipDNSLookupForProxiedRequests,
       enablePlatformCertificatesValidation,
-      useLegacyBuilder
     )
   }
 
@@ -150,29 +148,27 @@ class EnvoyConfigurationTest {
     val envoyConfiguration = buildTestEnvoyConfiguration()
 
     val resolvedTemplate = envoyConfiguration.createYaml()
-    assertThat(resolvedTemplate).contains("&connect_timeout 123s")
+    assertThat(resolvedTemplate).contains("connect_timeout: 123s")
 
     assertThat(resolvedTemplate).doesNotContain("admin: *admin_interface")
 
     // DNS
-    assertThat(resolvedTemplate).contains("&dns_refresh_rate 234s")
-    assertThat(resolvedTemplate).contains("&dns_fail_base_interval 345s")
-    assertThat(resolvedTemplate).contains("&dns_fail_max_interval 456s")
-    assertThat(resolvedTemplate).contains("&dns_query_timeout 321s")
-    assertThat(resolvedTemplate).contains("&dns_lookup_family V4_PREFERRED")
-    assertThat(resolvedTemplate).contains("&dns_min_refresh_rate 12s")
-    assertThat(resolvedTemplate).contains("&dns_preresolve_hostnames [{address: hostname1, port_value: 443},{address: hostname2, port_value: 443}]")
-    assertThat(resolvedTemplate).contains("&enable_drain_post_dns_refresh false")
-
-    // Interface Binding
-    assertThat(resolvedTemplate).contains("&enable_interface_binding false")
+    assertThat(resolvedTemplate).contains("dns_refresh_rate: 234s")
+    assertThat(resolvedTemplate).contains("base_interval: 345s")
+    assertThat(resolvedTemplate).contains("max_interval: 456s")
+    assertThat(resolvedTemplate).contains("dns_query_timeout: 321s")
+    assertThat(resolvedTemplate).contains("dns_lookup_family: V4_PREFERRED")
+    assertThat(resolvedTemplate).contains("dns_min_refresh_rate: 12s")
+    assertThat(resolvedTemplate).contains("preresolve_hostnames:")
+    assertThat(resolvedTemplate).contains("hostname1")
+    assertThat(resolvedTemplate).contains("hostname1")
 
     // Forcing IPv6
-    assertThat(resolvedTemplate).contains("&force_ipv6 true")
+    assertThat(resolvedTemplate).contains("always_use_v6: true")
 
     // H2 Ping
-    assertThat(resolvedTemplate).contains("&h2_connection_keepalive_idle_interval 0.222s")
-    assertThat(resolvedTemplate).contains("&h2_connection_keepalive_timeout 333s")
+    assertThat(resolvedTemplate).contains("connection_idle_interval: 0.222s")
+    assertThat(resolvedTemplate).contains("timeout: 333s")
 
     // H3
     assertThat(resolvedTemplate).contains("http3_protocol_options:");
@@ -185,26 +181,22 @@ class EnvoyConfigurationTest {
     assertThat(resolvedTemplate).doesNotContain("type.googleapis.com/envoy.extensions.compression.brotli.decompressor.v3.Brotli");
 
     // Per Host Limits
-    assertThat(resolvedTemplate).contains("&max_connections_per_host 543")
+    assertThat(resolvedTemplate).contains("max_connections: 543")
 
     // Metadata
     assertThat(resolvedTemplate).contains("os: Android")
-    assertThat(resolvedTemplate).contains("app_version: \"v1.2.3\"")
-    assertThat(resolvedTemplate).contains("app_id: \"com.example.myapp\"")
+    assertThat(resolvedTemplate).contains("app_version: v1.2.3")
+    assertThat(resolvedTemplate).contains("app_id: com.example.myapp")
 
-    assertThat(resolvedTemplate).contains("virtual_clusters [{name: test1},{name: test2}]")
+    assertThat(resolvedTemplate).matches(Pattern.compile(".*virtual_clusters.*name: test1.*name: test2.*", Pattern.DOTALL));
 
     // Stats
-    assertThat(resolvedTemplate).contains("&stats_domain stats.example.com")
-    assertThat(resolvedTemplate).contains("&stats_flush_interval 567s")
+    assertThat(resolvedTemplate).contains("stats_flush_interval: 567s")
     assertThat(resolvedTemplate).contains("stats.example.com");
 
     // Idle timeouts
-    assertThat(resolvedTemplate).contains("&stream_idle_timeout 678s")
-    assertThat(resolvedTemplate).contains("&per_try_idle_timeout 910s")
-
-    // TlS Verification
-    assertThat(resolvedTemplate).contains("&trust_chain_verification VERIFY_TRUST_CHAIN")
+    assertThat(resolvedTemplate).contains("stream_idle_timeout: 678s")
+    assertThat(resolvedTemplate).contains("per_try_idle_timeout: 910s")
 
     // Filters
     assertThat(resolvedTemplate).contains("buffer_filter_1")
@@ -214,7 +206,7 @@ class EnvoyConfigurationTest {
     assertThat(resolvedTemplate).contains("trusted_ca:")
 
     // Proxying
-    assertThat(resolvedTemplate).contains("&skip_dns_lookup_for_proxied_requests false")
+    assertThat(resolvedTemplate).contains("skip_dns_lookup_for_proxied_requests: false")
 
     // Validate ordering between filters and platform filters
     assertThat(resolvedTemplate).matches(Pattern.compile(".*name1.*name2.*buffer_filter_1.*buffer_filter_2.*", Pattern.DOTALL));
@@ -256,16 +248,19 @@ class EnvoyConfigurationTest {
 
     val resolvedTemplate = envoyConfiguration.createYaml()
 
+    // TlS Verification
+    assertThat(resolvedTemplate).contains("trust_chain_verification: ACCEPT_UNTRUSTED")
+
     // enableDrainPostDnsRefresh = true
-    assertThat(resolvedTemplate).contains("&enable_drain_post_dns_refresh true")
+    assertThat(resolvedTemplate).contains("enable_drain_post_dns_refresh: true")
 
     // enableDNSCache = true
     assertThat(resolvedTemplate).contains("key: dns_persistent_cache")
     // dnsCacheSaveIntervalSeconds = 101
-    assertThat(resolvedTemplate).contains("&persistent_dns_cache_save_interval 101")
+    assertThat(resolvedTemplate).contains("save_interval: 101")
 
     // enableHappyEyeballs = true
-    assertThat(resolvedTemplate).contains("&dns_lookup_family ALL")
+    assertThat(resolvedTemplate).contains("dns_lookup_family: ALL")
 
     // enableHttp3 = false
     assertThat(resolvedTemplate).doesNotContain("name: alternate_protocols_cache");
@@ -283,10 +278,10 @@ class EnvoyConfigurationTest {
     assertThat(resolvedTemplate).contains("type.googleapis.com/envoy.extensions.compression.brotli.compressor.v3.Brotli");
 
     // enableInterfaceBinding = true
-    assertThat(resolvedTemplate).contains("&enable_interface_binding true")
+    assertThat(resolvedTemplate).contains("enable_interface_binding: true")
 
     // enableSkipDNSLookupForProxiedRequests = true
-    assertThat(resolvedTemplate).contains("&skip_dns_lookup_for_proxied_requests true")
+    assertThat(resolvedTemplate).contains("skip_dns_lookup_for_proxied_requests: true")
 
     // enablePlatformCertificatesValidation = true
     assertThat(resolvedTemplate).doesNotContain("trusted_ca:")

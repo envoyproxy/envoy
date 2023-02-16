@@ -64,7 +64,6 @@ public class EnvoyConfiguration {
   public final List<String> statSinks;
   public final Boolean enablePlatformCertificatesValidation;
   public final Boolean enableSkipDNSLookupForProxiedRequests;
-  public final Boolean useLegacyBuilder;
 
   private static final Pattern UNRESOLVED_KEY_PATTERN = Pattern.compile("\\{\\{ (.+) \\}\\}");
 
@@ -129,8 +128,6 @@ public class EnvoyConfiguration {
    * @param enableSkipDNSLookupForProxiedRequests         whether to skip waiting on DNS response
    *     for proxied requests.
    * @param enablePlatformCertificatesValidation          whether to use the platform verifier.
-   * @param useLegacyBuilder                              whether the string-based legacy mode
-   *     should be used to build the engine.
    */
   public EnvoyConfiguration(
       boolean adminInterfaceEnabled, String grpcStatsDomain, int connectTimeoutSeconds,
@@ -148,8 +145,7 @@ public class EnvoyConfiguration {
       List<EnvoyHTTPFilterFactory> httpPlatformFilterFactories,
       Map<String, EnvoyStringAccessor> stringAccessors,
       Map<String, EnvoyKeyValueStore> keyValueStores, List<String> statSinks,
-      Boolean enableSkipDNSLookupForProxiedRequests, boolean enablePlatformCertificatesValidation,
-      boolean useLegacyBuilder) {
+      Boolean enableSkipDNSLookupForProxiedRequests, boolean enablePlatformCertificatesValidation) {
     JniLibrary.load();
     this.adminInterfaceEnabled = adminInterfaceEnabled;
     this.grpcStatsDomain = grpcStatsDomain;
@@ -200,186 +196,30 @@ public class EnvoyConfiguration {
     this.statSinks = statSinks;
     this.enablePlatformCertificatesValidation = enablePlatformCertificatesValidation;
     this.enableSkipDNSLookupForProxiedRequests = enableSkipDNSLookupForProxiedRequests;
-    this.useLegacyBuilder = useLegacyBuilder;
   }
 
-  /**
-   * Creates configuration YAML based on the configuration of the class
-   *
-   * @return String, the resolved yaml.
-   * @throws ConfigurationException, when the yaml provided is not fully
-   *                                 resolved.
-   */
+  // TODO(alyssawilk) move this to the test only JNI library.
   String createYaml() {
-    final String configTemplate = JniLibrary.configTemplate();
-    final String certValidationTemplate =
-        JniLibrary.certValidationTemplate(enablePlatformCertificatesValidation);
-    final String platformFilterTemplate = JniLibrary.platformFilterTemplate();
-    final String nativeFilterTemplate = JniLibrary.nativeFilterTemplate();
+    Boolean enforceTrustChainVerification =
+        trustChainVerification == EnvoyConfiguration.TrustChainVerification.VERIFY_TRUST_CHAIN;
+    List<EnvoyNativeFilterConfig> reverseFilterChain = new ArrayList<>(nativeFilterChain);
+    Collections.reverse(reverseFilterChain);
 
-    final StringBuilder customFiltersBuilder = new StringBuilder();
-
-    for (EnvoyNativeFilterConfig filter : nativeFilterChain) {
-      String filterConfig = nativeFilterTemplate.replace("{{ native_filter_name }}", filter.name)
-                                .replace("{{ native_filter_typed_config }}", filter.typedConfig);
-      customFiltersBuilder.append(filterConfig);
-    }
-
-    if (enableHttp3) {
-      final String altProtocolCacheFilterInsert = JniLibrary.altProtocolCacheFilterInsert();
-      customFiltersBuilder.append(altProtocolCacheFilterInsert);
-    }
-
-    if (enableGzipDecompression) {
-      final String gzipFilterInsert = JniLibrary.gzipDecompressorConfigInsert();
-      customFiltersBuilder.append(gzipFilterInsert);
-    }
-
-    if (enableGzipCompression) {
-      final String gzipFilterInsert = JniLibrary.gzipCompressorConfigInsert();
-      customFiltersBuilder.append(gzipFilterInsert);
-    }
-
-    if (enableBrotliDecompression) {
-      final String brotliFilterInsert = JniLibrary.brotliDecompressorConfigInsert();
-      customFiltersBuilder.append(brotliFilterInsert);
-    }
-
-    if (enableBrotliCompression) {
-      final String brotliFilterInsert = JniLibrary.brotliCompressorConfigInsert();
-      customFiltersBuilder.append(brotliFilterInsert);
-    }
-
-    if (enableSocketTagging) {
-      final String socketTagFilterInsert = JniLibrary.socketTagConfigInsert();
-      customFiltersBuilder.append(socketTagFilterInsert);
-    }
-
-    String processedTemplate =
-        configTemplate.replace("#{custom_filters}", customFiltersBuilder.toString());
-    String maybeComma = "";
-    StringBuilder virtualClustersBuilder = new StringBuilder("[");
-    for (String cluster : virtualClusters) {
-      virtualClustersBuilder.append(maybeComma);
-      virtualClustersBuilder.append(cluster);
-      maybeComma = ",";
-    }
-    virtualClustersBuilder.append("]");
-
-    maybeComma = "";
-    StringBuilder dnsBuilder = new StringBuilder("[");
-    for (String dns : dnsPreresolveHostnames) {
-      dnsBuilder.append(maybeComma);
-      dnsBuilder.append("{address: " + dns + ", port_value: 443}");
-      maybeComma = ",";
-    }
-    dnsBuilder.append("]");
-
-    StringBuilder configBuilder = new StringBuilder("!ignore platform_defs:\n");
-    configBuilder.append(String.format("- &connect_timeout %ss\n", connectTimeoutSeconds))
-        .append(String.format("- &dns_fail_base_interval %ss\n", dnsFailureRefreshSecondsBase))
-        .append(String.format("- &dns_fail_max_interval %ss\n", dnsFailureRefreshSecondsMax))
-        .append(String.format("- &dns_query_timeout %ss\n", dnsQueryTimeoutSeconds))
-        .append(String.format("- &dns_min_refresh_rate %ss\n", dnsMinRefreshSeconds))
-        .append(String.format("- &dns_preresolve_hostnames %s\n", dnsBuilder.toString()))
-        .append(String.format("- &dns_lookup_family %s\n",
-                              enableHappyEyeballs ? "ALL" : "V4_PREFERRED"))
-        .append(String.format("- &dns_refresh_rate %ss\n", dnsRefreshSeconds))
-        .append(String.format("- &enable_drain_post_dns_refresh %s\n",
-                              enableDrainPostDnsRefresh ? "true" : "false"))
-        .append(String.format("- &enable_interface_binding %s\n",
-                              enableInterfaceBinding ? "true" : "false"))
-        .append("- &force_ipv6 true\n")
-        .append(String.format("- &h2_connection_keepalive_idle_interval %ss\n",
-                              h2ConnectionKeepaliveIdleIntervalMilliseconds / 1000.0))
-        .append(String.format("- &h2_connection_keepalive_timeout %ss\n",
-                              h2ConnectionKeepaliveTimeoutSeconds))
-        .append(String.format("- &max_connections_per_host %s\n", maxConnectionsPerHost))
-        .append(String.format("- &stream_idle_timeout %ss\n", streamIdleTimeoutSeconds))
-        .append(String.format("- &per_try_idle_timeout %ss\n", perTryIdleTimeoutSeconds))
-        .append(String.format(
-            "- &metadata { device_os: Android, app_version: \"%s\", app_id: \"%s\" }\n", appVersion,
-            appId))
-        .append(String.format("- &trust_chain_verification %s\n", trustChainVerification.name()))
-        .append(String.format("- &skip_dns_lookup_for_proxied_requests %s\n",
-                              enableSkipDNSLookupForProxiedRequests ? "true" : "false"))
-        .append("- &virtual_clusters ")
-        .append(virtualClustersBuilder.toString())
-        .append("\n");
-
-    if (enableDNSCache) {
-      configBuilder.append(
-          String.format("- &persistent_dns_cache_save_interval %s\n", dnsCacheSaveIntervalSeconds));
-      final String persistentDNSCacheConfigInsert = JniLibrary.persistentDNSCacheConfigInsert();
-      configBuilder.append(
-          String.format("- &persistent_dns_cache_config %s\n", persistentDNSCacheConfigInsert));
-    }
-
-    configBuilder.append(String.format("- &stats_flush_interval %ss\n", statsFlushSeconds));
-
-    List<String> stat_sinks_config = new ArrayList<>(statSinks);
-    if (grpcStatsDomain != null) {
-      if (!grpcStatsDomain.isEmpty()) {
-        stat_sinks_config.add("*base_metrics_service");
-        configBuilder.append("- &stats_domain ").append(grpcStatsDomain).append("\n");
-      } else {
-        configBuilder.append("- &stats_domain ").append("127.0.0.1").append("\n");
-      }
-    }
-
-    if (!stat_sinks_config.isEmpty()) {
-      configBuilder.append("- &stats_sinks [");
-      configBuilder.append(stat_sinks_config.get(0));
-      for (int i = 1; i < stat_sinks_config.size(); i++) {
-        configBuilder.append(',').append(stat_sinks_config.get(i));
-      }
-      configBuilder.append("] \n");
-    }
-
-    // Add a new anchor to override the default anchors in config header.
-    configBuilder.append(certValidationTemplate).append("\n");
-
-    if (adminInterfaceEnabled) {
-      configBuilder.append("admin: *admin_interface\n");
-    }
-
-    configBuilder.append(processedTemplate);
-    String resolvedConfiguration = configBuilder.toString();
-
-    final Matcher unresolvedKeys = UNRESOLVED_KEY_PATTERN.matcher(resolvedConfiguration);
-    if (unresolvedKeys.find()) {
-      throw new ConfigurationException(unresolvedKeys.group(1));
-    }
-
-    for (StackTraceElement element : Thread.currentThread().getStackTrace()) {
-      if (element.getClassName().startsWith("org.junit.")) {
-        List<EnvoyNativeFilterConfig> reverseFilterChain = new ArrayList<>(nativeFilterChain);
-        Collections.reverse(reverseFilterChain);
-        Boolean enforceTrustChainVerification =
-            trustChainVerification == EnvoyConfiguration.TrustChainVerification.VERIFY_TRUST_CHAIN;
-
-        byte[][] filter_chain = JniBridgeUtility.toJniBytes(reverseFilterChain);
-        byte[][] clusters = JniBridgeUtility.stringsToJniBytes(virtualClusters);
-        byte[][] stats_sinks = JniBridgeUtility.stringsToJniBytes(statSinks);
-        byte[][] dns_preresolve = JniBridgeUtility.stringsToJniBytes(dnsPreresolveHostnames);
-
-        JniLibrary.compareYaml(
-            resolvedConfiguration, grpcStatsDomain, adminInterfaceEnabled, connectTimeoutSeconds,
-            dnsRefreshSeconds, dnsFailureRefreshSecondsBase, dnsFailureRefreshSecondsMax,
-            dnsQueryTimeoutSeconds, dnsMinRefreshSeconds, dns_preresolve, enableDNSCache,
-            dnsCacheSaveIntervalSeconds, enableDrainPostDnsRefresh, enableHttp3,
-            enableGzipDecompression, enableGzipCompression, enableBrotliDecompression,
-            enableBrotliCompression, enableSocketTagging, enableHappyEyeballs,
-            enableInterfaceBinding, h2ConnectionKeepaliveIdleIntervalMilliseconds,
-            h2ConnectionKeepaliveTimeoutSeconds, maxConnectionsPerHost, statsFlushSeconds,
-            streamIdleTimeoutSeconds, perTryIdleTimeoutSeconds, appVersion, appId,
-            enforceTrustChainVerification, clusters, filter_chain, stats_sinks,
-            enablePlatformCertificatesValidation, enableSkipDNSLookupForProxiedRequests);
-        break;
-      }
-    }
-
-    return resolvedConfiguration;
+    byte[][] filter_chain = JniBridgeUtility.toJniBytes(reverseFilterChain);
+    byte[][] clusters = JniBridgeUtility.stringsToJniBytes(virtualClusters);
+    byte[][] stats_sinks = JniBridgeUtility.stringsToJniBytes(statSinks);
+    byte[][] dns_preresolve = JniBridgeUtility.stringsToJniBytes(dnsPreresolveHostnames);
+    return JniLibrary.createYaml(
+        grpcStatsDomain, adminInterfaceEnabled, connectTimeoutSeconds, dnsRefreshSeconds,
+        dnsFailureRefreshSecondsBase, dnsFailureRefreshSecondsMax, dnsQueryTimeoutSeconds,
+        dnsMinRefreshSeconds, dns_preresolve, enableDNSCache, dnsCacheSaveIntervalSeconds,
+        enableDrainPostDnsRefresh, enableHttp3, enableGzipDecompression, enableGzipCompression,
+        enableBrotliDecompression, enableBrotliCompression, enableSocketTagging,
+        enableHappyEyeballs, enableInterfaceBinding, h2ConnectionKeepaliveIdleIntervalMilliseconds,
+        h2ConnectionKeepaliveTimeoutSeconds, maxConnectionsPerHost, statsFlushSeconds,
+        streamIdleTimeoutSeconds, perTryIdleTimeoutSeconds, appVersion, appId,
+        enforceTrustChainVerification, clusters, filter_chain, stats_sinks,
+        enablePlatformCertificatesValidation, enableSkipDNSLookupForProxiedRequests);
   }
 
   long createBootstrap() {
