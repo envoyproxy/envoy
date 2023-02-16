@@ -331,6 +331,7 @@ EngineBuilder& EngineBuilder::addPlatformFilter(std::string name) {
 
 EngineBuilder& EngineBuilder::setRuntimeGuard(std::string guard, bool value) {
   runtime_guards_.push_back({guard, value});
+  return *this;
  }
 
 EngineBuilder&
