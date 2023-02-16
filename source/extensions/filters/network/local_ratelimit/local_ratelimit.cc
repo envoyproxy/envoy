@@ -98,7 +98,7 @@ LocalRateLimitStats Config::generateStats(const std::string& prefix, Stats::Scop
 bool Config::canCreateConnection() { return rate_limiter_->requestAllowed({}); }
 
 void Filter::resetTimerState() {
-  if (delay_timer_) {
+  if (delay_timer_ != nullptr) {
     delay_timer_->disableTimer();
     delay_timer_.reset();
   }
