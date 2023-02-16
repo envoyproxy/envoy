@@ -128,13 +128,13 @@ Network::FilterStatus Filter::onNewConnection() {
       delay_timer_ = read_callbacks_->connection().dispatcher().createTimer([this]() -> void {
         resetTimerState();
         read_callbacks_->connection().streamInfo().setResponseFlag(
-          StreamInfo::ResponseFlag::UpstreamRetryLimitExceeded);
+            StreamInfo::ResponseFlag::UpstreamRetryLimitExceeded);
         read_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
       });
       delay_timer_->enableTimer(duration.value());
     } else {
       read_callbacks_->connection().streamInfo().setResponseFlag(
-        StreamInfo::ResponseFlag::UpstreamRetryLimitExceeded);
+          StreamInfo::ResponseFlag::UpstreamRetryLimitExceeded);
       read_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
     }
     return Network::FilterStatus::StopIteration;
