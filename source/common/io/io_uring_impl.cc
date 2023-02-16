@@ -13,7 +13,7 @@ namespace Io {
 #define IORING_REQUIRED_OP(op)                                                                     \
   { op, #op }
 
-static constexpr std::pair<int, const char*> required_io_uring_ops[] = {
+static constexpr std::pair<int, absl::string_view> required_io_uring_ops[] = {
     IORING_REQUIRED_OP(IORING_OP_ACCEPT),       IORING_REQUIRED_OP(IORING_OP_CONNECT),
     IORING_REQUIRED_OP(IORING_OP_ASYNC_CANCEL), IORING_REQUIRED_OP(IORING_OP_CLOSE),
     IORING_REQUIRED_OP(IORING_OP_READV),        IORING_REQUIRED_OP(IORING_OP_WRITEV),
@@ -30,6 +30,12 @@ bool isIoUringSupported() {
   }
 
   struct io_uring_probe* probe = io_uring_get_probe();
+
+  if (probe == nullptr) {
+    ENVOY_LOG_MISC(warn, "the kernel version is too old to support probe iouring capabilities");
+    return false;
+  }
+
   for (auto& op : required_io_uring_ops) {
     if (!io_uring_opcode_supported(probe, op.first)) {
       ENVOY_LOG_MISC(warn, "the kernel doesn't support {}", op.second);
