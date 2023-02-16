@@ -105,18 +105,9 @@ public:
     dispatcher_ = api_->allocateDispatcher("test_thread");
     io_uring_worker_ = std::make_unique<IoUringWorkerTestImpl>(
         std::make_unique<IoUringImpl>(8, false), *dispatcher_);
-    listen_socket_ = Api::OsSysCallsSingleton::get()
-                         .socket(AF_INET, SOCK_STREAM | SOCK_NONBLOCK, IPPROTO_TCP)
-                         .return_value_;
-    EXPECT_TRUE(SOCKET_VALID(listen_socket_));
-
-    // Using non blocking for the client socket, then we won't block on the test thread.
-    client_socket_ = Api::OsSysCallsSingleton::get()
-                         .socket(AF_INET, SOCK_STREAM | SOCK_NONBLOCK, IPPROTO_TCP)
-                         .return_value_;
-    EXPECT_TRUE(SOCKET_VALID(client_socket_));
   }
   void initializeSockets() {
+    socket(true, true);
     listen();
     connect();
     accept();
@@ -134,6 +125,19 @@ public:
     return sin;
   }
 
+  void socket(bool nonblock_listen, bool nonblock_client) {
+    listen_socket_ =
+        Api::OsSysCallsSingleton::get()
+            .socket(AF_INET, SOCK_STREAM | (nonblock_listen ? SOCK_NONBLOCK : 0), IPPROTO_TCP)
+            .return_value_;
+    EXPECT_TRUE(SOCKET_VALID(listen_socket_));
+
+    client_socket_ =
+        Api::OsSysCallsSingleton::get()
+            .socket(AF_INET, SOCK_STREAM | (nonblock_client ? SOCK_NONBLOCK : 0), IPPROTO_TCP)
+            .return_value_;
+    EXPECT_TRUE(SOCKET_VALID(client_socket_));
+  }
   void listen() {
     struct sockaddr_in listen_addr;
     memset(&listen_addr, 0, sizeof(listen_addr));
@@ -186,8 +190,9 @@ public:
 
 TEST_F(IoUringWorkerIntegraionTest, Accept) {
   init();
-
+  socket(false, true);
   listen();
+
   auto& socket = dynamic_cast<IoUringTestSocket&>(
       io_uring_worker_->addTestSocket(listen_socket_, io_uring_handler_));
   EXPECT_EQ(io_uring_worker_->getSockets().size(), 1);
@@ -214,8 +219,9 @@ TEST_F(IoUringWorkerIntegraionTest, Accept) {
 
 TEST_F(IoUringWorkerIntegraionTest, Close) {
   init();
-
+  socket(false, true);
   listen();
+
   auto& socket = dynamic_cast<IoUringTestSocket&>(
       io_uring_worker_->addTestSocket(listen_socket_, io_uring_handler_));
   EXPECT_EQ(io_uring_worker_->getSockets().size(), 1);
@@ -236,6 +242,7 @@ TEST_F(IoUringWorkerIntegraionTest, Close) {
 
 TEST_F(IoUringWorkerIntegraionTest, Connect) {
   init();
+  socket(true, false);
   listen();
 
   auto& socket = dynamic_cast<IoUringTestSocket&>(
