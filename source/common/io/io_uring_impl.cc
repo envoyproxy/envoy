@@ -1,10 +1,13 @@
 #include "source/common/io/io_uring_impl.h"
 
+#if defined(__linux__)
 #include <sys/eventfd.h>
+#endif
 
 namespace Envoy {
 namespace Io {
 
+#if defined(__linux__)
 bool isIoUringSupported() {
   struct io_uring_params p {};
   struct io_uring ring;
@@ -190,6 +193,7 @@ IoUringResult IoUringImpl::submit() {
   RELEASE_ASSERT(res >= 0 || res == -EBUSY, "unable to submit io_uring queue entries");
   return res == -EBUSY ? IoUringResult::Busy : IoUringResult::Ok;
 }
+#endif
 
 } // namespace Io
 } // namespace Envoy
