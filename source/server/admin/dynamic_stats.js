@@ -1,3 +1,15 @@
+// Before first checkin:
+//   * top-n algo to limit compute overhead with high cardinality stats with user control of N.
+//   * alternate sorting criteria, reverse-sort controls, etc.
+//   * hook up current settings in the page (filters, used-only)
+//   * update filter w/o resetting state
+
+// Follow-ups:
+//   * render histograms
+//   * detect when user is not looking at page and stop or slow down pinging the server
+//   * hieararchical display
+//   * json flavor to send hierarchical names to save serialization/deserialization costs
+
 let current_stats = new Map;
 
 function loadStats() {
