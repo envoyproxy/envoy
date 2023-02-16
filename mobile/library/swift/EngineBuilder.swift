@@ -673,6 +673,7 @@ open class EngineBuilder: NSObject {
         .map { $0.resolvedDirectResponseYAML() }
         .joined(separator: "\n"),
       runtimeGuards: self.runtimeGuards,
+      typedDirectResponses: self.directResponses.map({ $0.toObjC() }),
       nativeFilterChain: self.nativeFilterChain,
       platformFilterChain: self.platformFilterChain,
       stringAccessors: self.stringAccessors,

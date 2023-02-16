@@ -10,6 +10,60 @@
 }
 @end
 
+@implementation EMOHeaderMatcher
+- (Envoy::DirectResponseTesting::HeaderMatcher)toCXX {
+  Envoy::DirectResponseTesting::HeaderMatcher result;
+  result.name = [self.name toCXXString];
+  result.value = [self.value toCXXString];
+  switch (self.mode) {
+  case EMOMatchModeContains:
+    result.mode = Envoy::DirectResponseTesting::contains;
+    break;
+  case EMOMatchModeExact:
+    result.mode = Envoy::DirectResponseTesting::exact;
+    break;
+  case EMOMatchModePrefix:
+    result.mode = Envoy::DirectResponseTesting::prefix;
+    break;
+  case EMOMatchModeSuffix:
+    result.mode = Envoy::DirectResponseTesting::suffix;
+    break;
+  }
+  return result;
+}
+@end
+
+@implementation EMORouteMatcher
+- (Envoy::DirectResponseTesting::RouteMatcher)toCXX {
+  Envoy::DirectResponseTesting::RouteMatcher result;
+  result.fullPath = [self.fullPath toCXXString];
+  result.pathPrefix = [self.pathPrefix toCXXString];
+  std::vector<Envoy::DirectResponseTesting::HeaderMatcher> headers;
+  headers.reserve(self.headers.count);
+  for (EMOHeaderMatcher *matcher in self.headers) {
+    headers.push_back([matcher toCXX]);
+  }
+  result.headers = headers;
+  return result;
+}
+@end
+
+@implementation EMODirectResponse
+- (Envoy::DirectResponseTesting::DirectResponse)toCXX {
+  Envoy::DirectResponseTesting::DirectResponse result;
+  result.matcher = [self.matcher toCXX];
+  result.status = (unsigned int)self.status;
+  result.body = [self.body toCXXString];
+  absl::flat_hash_map<std::string, std::string> headers;
+  NSArray *keys = [self.headers allKeys];
+  for (NSString *key in keys) {
+    headers[[key toCXXString]] = [[self.headers objectForKey:key] toCXXString];
+  }
+  result.headers = headers;
+  return result;
+}
+@end
+
 @implementation EnvoyConfiguration
 
 - (instancetype)initWithAdminInterfaceEnabled:(BOOL)adminInterfaceEnabled
@@ -48,6 +102,8 @@
                                   directResponses:(NSString *)directResponses
                                     runtimeGuards:
                                         (NSDictionary<NSString *, NSString *> *)runtimeGuards
+                             typedDirectResponses:
+                                 (NSArray<EMODirectResponse *> *)typedDirectResponses
                                 nativeFilterChain:
                                     (NSArray<EnvoyNativeFilterConfig *> *)nativeFilterChain
                               platformFilterChain:
@@ -102,6 +158,7 @@
   self.directResponseMatchers = directResponseMatchers;
   self.directResponses = directResponses;
   self.runtimeGuards = runtimeGuards;
+  self.typedDirectResponses = typedDirectResponses;
   self.nativeFilterChain = nativeFilterChain;
   self.httpPlatformFilterFactories = httpPlatformFilterFactories;
   self.stringAccessors = stringAccessors;
@@ -340,6 +397,10 @@
 #ifdef ENVOY_MOBILE_REQUEST_COMPRESSION
   builder.enableBrotliCompression(self.enableBrotliCompression);
 #endif
+
+  for (EMODirectResponse *directResponse in self.typedDirectResponses) {
+    builder.addDirectResponse([directResponse toCXX]);
+  }
 
   builder.addConnectTimeoutSeconds(self.connectTimeoutSeconds);
 

@@ -1,5 +1,6 @@
 #import <Foundation/Foundation.h>
 
+@class EMODirectResponse;
 @class EnvoyHTTPFilterFactory;
 @class EnvoyNativeFilterConfig;
 @class EnvoyStringAccessor;
@@ -45,6 +46,7 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic, strong) NSString *directResponseMatchers;
 @property (nonatomic, strong) NSString *directResponses;
 @property (nonatomic, strong) NSDictionary<NSString *, NSString *> *runtimeGuards;
+@property (nonatomic, strong) NSArray<EMODirectResponse *> *typedDirectResponses;
 @property (nonatomic, strong) NSArray<EnvoyNativeFilterConfig *> *nativeFilterChain;
 @property (nonatomic, strong) NSArray<EnvoyHTTPFilterFactory *> *httpPlatformFilterFactories;
 @property (nonatomic, strong) NSDictionary<NSString *, EnvoyStringAccessor *> *stringAccessors;
@@ -91,6 +93,8 @@ NS_ASSUME_NONNULL_BEGIN
                                   directResponses:(NSString *)directResponses
                                     runtimeGuards:
                                         (NSDictionary<NSString *, NSString *> *)runtimeGuards
+                             typedDirectResponses:
+                                 (NSArray<EMODirectResponse *> *)typedDirectResponses
                                 nativeFilterChain:
                                     (NSArray<EnvoyNativeFilterConfig *> *)nativeFilterChain
                               platformFilterChain:

@@ -486,7 +486,8 @@ final class EngineBuilderTests: XCTestCase {
       virtualClusters: ["test"],
       directResponseMatchers: "",
       directResponses: "",
-      runtimeGuards: ["test_feature_false": true],
+      runtimeGuards: ["test_feature_false": "true"],
+      typedDirectResponses: [],
       nativeFilterChain: [
         EnvoyNativeFilterConfig(name: "filter_name", typedConfig: "test_config"),
       ],
@@ -597,6 +598,7 @@ final class EngineBuilderTests: XCTestCase {
       directResponseMatchers: "",
       directResponses: "",
       runtimeGuards: [:],
+      typedDirectResponses: [],
       nativeFilterChain: [
         EnvoyNativeFilterConfig(name: "filter_name", typedConfig: "test_config"),
       ],
@@ -681,6 +683,7 @@ final class EngineBuilderTests: XCTestCase {
       directResponseMatchers: "",
       directResponses: "",
       runtimeGuards: [:],
+      typedDirectResponses: [],
       nativeFilterChain: [],
       platformFilterChain: [],
       stringAccessors: [:],

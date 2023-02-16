@@ -11,7 +11,7 @@
 #include "test/config/utility.h"
 
 namespace Envoy {
-class QuicTestServer {
+class TestServer {
 private:
   testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context_;
   Stats::IsolatedStoreImpl stats_store_;
@@ -24,24 +24,28 @@ private:
   Thread::SkipAsserts skip_asserts_;
   ProcessWide process_wide;
   Thread::MutexBasicLockable lock;
+  Extensions::TransportSockets::Tls::ContextManagerImpl context_manager_{time_system_};
+
+  Network::DownstreamTransportSocketFactoryPtr createQuicUpstreamTlsContext(
+      testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext>&);
 
   Network::DownstreamTransportSocketFactoryPtr createUpstreamTlsContext(
       testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext>&);
 
 public:
-  QuicTestServer();
+  TestServer();
 
   /**
    * Starts the server. Can only have one server active per JVM. This is blocking until the port can
    * start accepting requests.
    */
-  void startQuicTestServer();
+  void startTestServer(bool use_quic);
 
   /**
    * Shutdowns the server. Can be restarted later. This is blocking until the server has freed all
    * resources.
    */
-  void shutdownQuicTestServer();
+  void shutdownTestServer();
 
   /**
    * Returns the port that got attributed. Can only be called once the server has been started.
