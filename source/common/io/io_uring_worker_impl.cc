@@ -10,18 +10,14 @@ namespace Io {
 IoUringSocketEntry::IoUringSocketEntry(os_fd_t fd, IoUringWorkerImpl& parent)
     : fd_(fd), parent_(parent) {}
 
-void IoUringSocketEntry::unlink() {
-  std::unique_ptr<IoUringSocketEntry> socket = parent_.removeSocket(*this);
+void IoUringSocketEntry::cleanup() {
+  parent_.removeInjectedCompletion(*this);
+  IoUringSocketEntryPtr socket = parent_.removeSocket(*this);
   parent_.dispatcher().deferredDelete(std::move(socket));
 }
 
-void IoUringSocketEntry::cleanup() {
-  parent_.removeInjectedCompletion(*this);
-  unlink();
-}
-
 void IoUringSocketEntry::injectCompletion(uint32_t type) {
-  // Avoid injected same type completion multiple times.
+  // Avoid injecting the same completion type multiple times.
   if (injected_completions_ & type) {
     ENVOY_LOG(trace,
               "ignore injected completion since there already has one, injected_completions_: {}, "
@@ -222,7 +218,7 @@ void IoUringWorkerImpl::submit() {
   }
 }
 
-std::unique_ptr<IoUringSocketEntry> IoUringWorkerImpl::removeSocket(IoUringSocketEntry& socket) {
+IoUringSocketEntryPtr IoUringWorkerImpl::removeSocket(IoUringSocketEntry& socket) {
   return socket.removeFromList(sockets_);
 }
 

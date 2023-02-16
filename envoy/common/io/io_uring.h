@@ -186,7 +186,7 @@ public:
   /**
    * Write data to the socket.
    */
-  virtual uint64_t write(Buffer::Instance&) PURE;
+  virtual uint64_t write(Buffer::Instance& data) PURE;
   virtual uint64_t writev(const Buffer::RawSlice*, uint64_t) PURE;
 
   /**
@@ -331,7 +331,7 @@ public:
    * Returns the current thread's IoUringWorker. If it isn't register a worker yet,
    * absl::nullopt returned.
    */
-  virtual OptRef<IoUringWorker> getIoUringWorker() const PURE;
+  virtual OptRef<IoUringWorker> getIoUringWorker() PURE;
 
   /**
    * Initializes a factory upon server readiness. For example this method can be
@@ -340,7 +340,7 @@ public:
   virtual void onServerInitialized() PURE;
 
   /**
-   * Indicates whether the IoUringWorker is registered to the current thread.
+   * Indicates whether the current thread has IoUringWorker
    */
   virtual bool currentThreadRegistered() PURE;
 };

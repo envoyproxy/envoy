@@ -59,14 +59,14 @@ public:
   }
 
 private:
-  void unlink();
-
   os_fd_t fd_;
   IoUringWorkerImpl& parent_;
   uint32_t injected_completions_{0};
 };
 
-class IoUringWorkerImpl : public IoUringWorker, protected Logger::Loggable<Logger::Id::io> {
+using IoUringSocketEntryPtr = std::unique_ptr<IoUringSocketEntry>;
+
+class IoUringWorkerImpl : public IoUringWorker, private Logger::Loggable<Logger::Id::io> {
 public:
   IoUringWorkerImpl(uint32_t io_uring_size, bool use_submission_queue_polling,
                     Event::Dispatcher& dispatcher);
@@ -93,7 +93,7 @@ public:
                                 const Network::Address::InstanceConstSharedPtr& address) override;
 
   // From socket from the worker.
-  std::unique_ptr<IoUringSocketEntry> removeSocket(IoUringSocketEntry& socket);
+  IoUringSocketEntryPtr removeSocket(IoUringSocketEntry& socket);
   // Inject a request completion into the io_uring instance.
   void injectCompletion(IoUringSocket& socket, uint32_t type, int32_t result);
   // Remove all the injected completion for the specific socket.
@@ -109,8 +109,8 @@ protected:
   Event::FileEventPtr file_event_{nullptr};
   Event::Dispatcher& dispatcher_;
   // All the sockets in this worker.
-  std::list<std::unique_ptr<IoUringSocketEntry>> sockets_;
-  // This is used to mark whether the delay submit is enabled.
+  std::list<IoUringSocketEntryPtr> sockets_;
+  // This is used to mark whether delay submit is enabled.
   // The IoUriingWorks delay the submit the requests which are submitted in request completion
   // callback.
   bool delay_submit_{false};

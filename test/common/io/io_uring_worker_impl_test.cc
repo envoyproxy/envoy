@@ -36,7 +36,7 @@ public:
     return *sockets_.back();
   }
 
-  const std::list<std::unique_ptr<IoUringSocketEntry>>& getSockets() const { return sockets_; }
+  const std::list<IoUringSocketEntryPtr>& getSockets() const { return sockets_; }
 };
 
 class TestIoUringHandler : public IoUringHandler {

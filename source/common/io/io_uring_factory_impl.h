@@ -11,7 +11,7 @@ public:
   IoUringFactoryImpl(uint32_t io_uring_size, bool use_submission_queue_polling,
                      ThreadLocal::SlotAllocator& tls);
 
-  OptRef<IoUringWorker> getIoUringWorker() const override;
+  OptRef<IoUringWorker> getIoUringWorker() override;
 
   void onServerInitialized() override;
   bool currentThreadRegistered() override;

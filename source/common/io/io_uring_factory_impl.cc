@@ -10,12 +10,12 @@ IoUringFactoryImpl::IoUringFactoryImpl(uint32_t io_uring_size, bool use_submissi
     : io_uring_size_(io_uring_size), use_submission_queue_polling_(use_submission_queue_polling),
       tls_(tls) {}
 
-OptRef<IoUringWorker> IoUringFactoryImpl::getIoUringWorker() const {
+OptRef<IoUringWorker> IoUringFactoryImpl::getIoUringWorker() {
   auto ret = tls_.get();
   if (ret == absl::nullopt) {
     return absl::nullopt;
   }
-  return ret.ref();
+  return ret;
 }
 
 void IoUringFactoryImpl::onServerInitialized() {

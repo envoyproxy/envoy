@@ -16,9 +16,9 @@ struct InjectedCompletion {
   InjectedCompletion(os_fd_t fd, void* user_data, int32_t result)
       : fd_(fd), user_data_(user_data), result_(result) {}
 
-  os_fd_t fd_;
+  const os_fd_t fd_;
   void* user_data_;
-  int32_t result_;
+  const int32_t result_;
 };
 
 class IoUringImpl : public IoUring,

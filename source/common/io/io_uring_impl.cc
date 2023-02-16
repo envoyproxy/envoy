@@ -110,6 +110,7 @@ void IoUringImpl::removeInjectedCompletion(os_fd_t fd) {
 
 IoUringResult IoUringImpl::prepareAccept(os_fd_t fd, struct sockaddr* remote_addr,
                                          socklen_t* remote_addr_len, void* user_data) {
+  ENVOY_LOG(trace, "prepare accept for fd = {}", fd);
   struct io_uring_sqe* sqe = io_uring_get_sqe(&ring_);
   if (sqe == nullptr) {
     return IoUringResult::Failed;
@@ -123,6 +124,7 @@ IoUringResult IoUringImpl::prepareAccept(os_fd_t fd, struct sockaddr* remote_add
 IoUringResult IoUringImpl::prepareConnect(os_fd_t fd,
                                           const Network::Address::InstanceConstSharedPtr& address,
                                           void* user_data) {
+  ENVOY_LOG(trace, "prepare connect for fd = {}", fd);
   struct io_uring_sqe* sqe = io_uring_get_sqe(&ring_);
   if (sqe == nullptr) {
     return IoUringResult::Failed;
@@ -135,6 +137,7 @@ IoUringResult IoUringImpl::prepareConnect(os_fd_t fd,
 
 IoUringResult IoUringImpl::prepareReadv(os_fd_t fd, const struct iovec* iovecs, unsigned nr_vecs,
                                         off_t offset, void* user_data) {
+  ENVOY_LOG(trace, "prepare readv for fd = {}", fd);
   struct io_uring_sqe* sqe = io_uring_get_sqe(&ring_);
   if (sqe == nullptr) {
     return IoUringResult::Failed;
@@ -147,6 +150,7 @@ IoUringResult IoUringImpl::prepareReadv(os_fd_t fd, const struct iovec* iovecs, 
 
 IoUringResult IoUringImpl::prepareWritev(os_fd_t fd, const struct iovec* iovecs, unsigned nr_vecs,
                                          off_t offset, void* user_data) {
+  ENVOY_LOG(trace, "prepare writev for fd = {}", fd);
   struct io_uring_sqe* sqe = io_uring_get_sqe(&ring_);
   if (sqe == nullptr) {
     return IoUringResult::Failed;
@@ -158,6 +162,7 @@ IoUringResult IoUringImpl::prepareWritev(os_fd_t fd, const struct iovec* iovecs,
 }
 
 IoUringResult IoUringImpl::prepareClose(os_fd_t fd, void* user_data) {
+  ENVOY_LOG(trace, "prepare close for fd = {}", fd);
   struct io_uring_sqe* sqe = io_uring_get_sqe(&ring_);
   if (sqe == nullptr) {
     return IoUringResult::Failed;
@@ -169,6 +174,7 @@ IoUringResult IoUringImpl::prepareClose(os_fd_t fd, void* user_data) {
 }
 
 IoUringResult IoUringImpl::prepareCancel(void* cancelling_user_data, void* user_data) {
+  ENVOY_LOG(trace, "prepare cancels for user data = {}", fmt::ptr(cancelling_user_data));
   struct io_uring_sqe* sqe = io_uring_get_sqe(&ring_);
   if (sqe == nullptr) {
     return IoUringResult::Failed;
