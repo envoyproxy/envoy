@@ -13,8 +13,8 @@ namespace Platform {
 
 // Available algorithms to compress requests.
 enum CompressionAlgorithm {
-  gzip,
-  brotli,
+  Gzip,
+  Brotli,
 };
 
 class RequestHeaders;
