@@ -1,7 +1,6 @@
 #pragma once
 
 #include "envoy/buffer/buffer.h"
-#include "envoy/common/io/io_uring.h"
 #include "envoy/common/pure.h"
 #include "envoy/network/address.h"
 #include "envoy/thread_local/thread_local.h"
