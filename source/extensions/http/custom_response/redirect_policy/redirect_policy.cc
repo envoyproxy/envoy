@@ -169,6 +169,8 @@ std::unique_ptr<ModifyRequestHeadersAction> RedirectPolicy::createModifyRequestH
                        : ::Envoy::Http::Utility::newUri(*redirect_action_, *downstream_headers));
   if (!absolute_url.initialize(uri, false)) {
     stats_.custom_response_invalid_uri_.inc();
+    // We could potentially get an invalid url only if redirect_action_ was specified instead
+    // of uri_. Hence, assert that uri_ is not set.
     ENVOY_BUG(!static_cast<bool>(uri_),
               "uri should not be invalid as this was already validated during config load");
     return ::Envoy::Http::FilterHeadersStatus::Continue;

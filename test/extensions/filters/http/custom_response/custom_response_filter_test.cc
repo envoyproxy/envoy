@@ -174,7 +174,7 @@ TEST_F(CustomResponseFilterTest, InvalidHostRedirect) {
 }
 
 TEST_F(CustomResponseFilterTest, InvalidSchemeRedirect) {
-  // Create config with invalid  field
+  // Create config with invalid scheme field.
   createConfig(R"EOF(
   custom_response_matcher:
     on_no_match:
