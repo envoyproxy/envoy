@@ -6,6 +6,11 @@ namespace Envoy {
 namespace Upstream {
 namespace {
 bool shouldUseCompactTable(size_t num_hosts, uint64_t table_size) {
+  // Don't use compact maglev on 32-bit platforms.
+  if constexpr (!(ENVOY_BIT_ARRAY_SUPPORTED)) {
+    return false;
+  }
+
   if (num_hosts > MaglevTable::MaxNumberOfHostsForCompactMaglev) {
     return false;
   }

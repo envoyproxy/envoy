@@ -10,6 +10,9 @@ namespace Envoy {
 namespace {
 
 TEST(BitArray, ShouldAssertIfInvalidBitWidth) {
+  if (!(ENVOY_BIT_ARRAY_SUPPORTED)) {
+    GTEST_SKIP() << "Skipping test, BitArray not supported.";
+  }
   {
     const int bit_width = 32;
     BitArray c(bit_width, 10);
@@ -45,6 +48,12 @@ public:
     }
 
     verifyEqual(vec, bit_array);
+  }
+
+  void SetUp() override {
+    if (!(ENVOY_BIT_ARRAY_SUPPORTED)) {
+      GTEST_SKIP() << "Skipping all tests for this fixture, BitArray not supported.";
+    }
   }
 
   static void verifyEqual(const std::vector<uint32_t>& vec, const BitArray& bit_array) {
