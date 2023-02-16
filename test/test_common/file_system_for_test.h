@@ -40,6 +40,8 @@ public:
 
   void renameFile(const std::string& old_name, const std::string& new_name);
 
+  Api::IoCallResult<FileInfo> stat(absl::string_view path) override;
+
 private:
   friend class ScopedUseMemfiles;
 

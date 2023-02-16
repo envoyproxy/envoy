@@ -16,11 +16,15 @@ envoy_cc_library(
     srcs = [
         "datadog_tracer_impl.cc",
         "dict_util.cc",
+        "logger.cc",
+        "span.cc",
         "time_util.cc",
     ],
     hdrs = [
         "datadog_tracer_impl.h",
         "dict_util.h",
+        "logger.h",
+        "span.h",
         "time_util.h",
         "tracer_stats.h",
     ],
@@ -30,8 +34,8 @@ envoy_cc_library(
         "-DDD_USE_ABSEIL_FOR_ENVOY",
     ],
     external_deps = [
-        "dd_opentracing_cpp",
         "dd_trace_cpp",
+        "dd_opentracing_cpp",
     ],
     deps = [
         "//source/common/config:utility_lib",

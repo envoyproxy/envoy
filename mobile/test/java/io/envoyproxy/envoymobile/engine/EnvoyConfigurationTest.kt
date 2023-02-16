@@ -73,7 +73,7 @@ class EnvoyConfigurationTest {
     dnsFailureRefreshSecondsMax: Int = 456,
     dnsQueryTimeoutSeconds: Int = 321,
     dnsMinRefreshSeconds: Int = 12,
-    dnsPreresolveHostnames: MutableList<String> = mutableListOf("hostname"),
+    dnsPreresolveHostnames: MutableList<String> = mutableListOf("hostname1", "hostname2"),
     enableDNSCache: Boolean = false,
     dnsCacheSaveIntervalSeconds: Int = 101,
     enableDrainPostDnsRefresh: Boolean = false,
@@ -94,12 +94,13 @@ class EnvoyConfigurationTest {
     appVersion: String = "v1.2.3",
     appId: String = "com.example.myapp",
     trustChainVerification: TrustChainVerification = TrustChainVerification.VERIFY_TRUST_CHAIN,
-    virtualClusters: MutableList<String> = mutableListOf("{name: test}"),
+    virtualClusters: MutableList<String> = mutableListOf("{name: test1}", "{name: test2}"),
     filterChain: MutableList<EnvoyNativeFilterConfig> = mutableListOf(EnvoyNativeFilterConfig("buffer_filter_1", "{'@type': 'type.googleapis.com/envoy.extensions.filters.http.buffer.v3.Buffer'}"), EnvoyNativeFilterConfig("buffer_filter_2", "{'@type': 'type.googleapis.com/envoy.extensions.filters.http.buffer.v3.Buffer'}")),
     platformFilterFactories: MutableList<EnvoyHTTPFilterFactory> = mutableListOf(TestEnvoyHTTPFilterFactory("name1"), TestEnvoyHTTPFilterFactory("name2")),
     enableSkipDNSLookupForProxiedRequests: Boolean = false,
     statSinks: MutableList<String> = mutableListOf(),
-    enablePlatformCertificatesValidation: Boolean = false
+    enablePlatformCertificatesValidation: Boolean = false,
+    useLegacyBuilder: Boolean = false
   ): EnvoyConfiguration {
     return EnvoyConfiguration(
       adminInterfaceEnabled,
@@ -138,7 +139,8 @@ class EnvoyConfigurationTest {
       emptyMap(),
       statSinks,
       enableSkipDNSLookupForProxiedRequests,
-      enablePlatformCertificatesValidation
+      enablePlatformCertificatesValidation,
+      useLegacyBuilder
     )
   }
 
@@ -159,7 +161,7 @@ class EnvoyConfigurationTest {
     assertThat(resolvedTemplate).contains("&dns_query_timeout 321s")
     assertThat(resolvedTemplate).contains("&dns_lookup_family V4_PREFERRED")
     assertThat(resolvedTemplate).contains("&dns_min_refresh_rate 12s")
-    assertThat(resolvedTemplate).contains("&dns_preresolve_hostnames [{address: hostname, port_value: 443}]")
+    assertThat(resolvedTemplate).contains("&dns_preresolve_hostnames [{address: hostname1, port_value: 443},{address: hostname2, port_value: 443}]")
     assertThat(resolvedTemplate).contains("&enable_drain_post_dns_refresh false")
 
     // Interface Binding
@@ -187,10 +189,10 @@ class EnvoyConfigurationTest {
 
     // Metadata
     assertThat(resolvedTemplate).contains("os: Android")
-    assertThat(resolvedTemplate).contains("app_version: v1.2.3")
-    assertThat(resolvedTemplate).contains("app_id: com.example.myapp")
+    assertThat(resolvedTemplate).contains("app_version: \"v1.2.3\"")
+    assertThat(resolvedTemplate).contains("app_id: \"com.example.myapp\"")
 
-    assertThat(resolvedTemplate).contains("virtual_clusters [{name: test}]")
+    assertThat(resolvedTemplate).contains("virtual_clusters [{name: test1},{name: test2}]")
 
     // Stats
     assertThat(resolvedTemplate).contains("&stats_domain stats.example.com")
@@ -216,13 +218,21 @@ class EnvoyConfigurationTest {
 
     // Validate ordering between filters and platform filters
     assertThat(resolvedTemplate).matches(Pattern.compile(".*name1.*name2.*buffer_filter_1.*buffer_filter_2.*", Pattern.DOTALL));
+    // Validate that createYaml doesn't change filter order.
+    val resolvedTemplate2 = envoyConfiguration.createYaml()
+    assertThat(resolvedTemplate2).matches(Pattern.compile(".*name1.*name2.*buffer_filter_1.*buffer_filter_2.*", Pattern.DOTALL));
+    // Validate that createBootstrap also doesn't change filter order.
+    // This may leak memory as the boostrap isn't used.
+    envoyConfiguration.createBootstrap()
+    val resolvedTemplate3 = envoyConfiguration.createYaml()
+    assertThat(resolvedTemplate3).matches(Pattern.compile(".*name1.*name2.*buffer_filter_1.*buffer_filter_2.*", Pattern.DOTALL));
   }
 
   @Test
   fun `configuration resolves with alternate values`() {
     JniLibrary.loadTestLibrary()
     val envoyConfiguration = buildTestEnvoyConfiguration(
-      adminInterfaceEnabled = true,
+      adminInterfaceEnabled = false,
       grpcStatsDomain = "",
       enableDrainPostDnsRefresh = true,
       enableDNSCache = true,
@@ -245,9 +255,6 @@ class EnvoyConfigurationTest {
     )
 
     val resolvedTemplate = envoyConfiguration.createYaml()
-
-    // adminInterfaceEnabled = true
-    assertThat(resolvedTemplate).contains("admin: *admin_interface")
 
     // enableDrainPostDnsRefresh = true
     assertThat(resolvedTemplate).contains("&enable_drain_post_dns_refresh true")

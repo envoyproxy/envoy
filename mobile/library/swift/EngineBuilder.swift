@@ -1,6 +1,8 @@
 @_implementationOnly import EnvoyEngine
 import Foundation
 
+// swiftlint:disable file_length
+
 /// Builder used for creating and running a new Engine instance.
 @objcMembers
 open class EngineBuilder: NSObject {
@@ -21,7 +23,7 @@ open class EngineBuilder: NSObject {
   private var dnsFailureRefreshSecondsMax: UInt32 = 10
   private var dnsQueryTimeoutSeconds: UInt32 = 25
   private var dnsMinRefreshSeconds: UInt32 = 60
-  private var dnsPreresolveHostnames: String = "[]"
+  private var dnsPreresolveHostnames: [String] = []
   private var dnsRefreshSeconds: UInt32 = 60
   private var enableDNSCache: Bool = false
   private var dnsCacheSaveIntervalSeconds: UInt32 = 1
@@ -30,7 +32,11 @@ open class EngineBuilder: NSObject {
   private var enableGzipCompression: Bool = false
   private var enableBrotliDecompression: Bool = false
   private var enableBrotliCompression: Bool = false
+#if ENVOY_ENABLE_QUIC
   private var enableHttp3: Bool = true
+#else
+  private var enableHttp3: Bool = false
+#endif
   private var enableInterfaceBinding: Bool = false
   private var enforceTrustChainVerification: Bool = true
   private var enablePlatformCertificateValidation: Bool = false
@@ -44,7 +50,7 @@ open class EngineBuilder: NSObject {
   private var perTryIdleTimeoutSeconds: UInt32 = 15
   private var appVersion: String = "unspecified"
   private var appId: String = "unspecified"
-  private var virtualClusters: String = "[]"
+  private var virtualClusters: [String] = []
   private var onEngineRunning: (() -> Void)?
   private var logger: ((String) -> Void)?
   private var eventTracker: (([String: String]) -> Void)?
@@ -55,6 +61,8 @@ open class EngineBuilder: NSObject {
   private var keyValueStores: [String: EnvoyKeyValueStore] = [:]
   private var directResponses: [DirectResponse] = []
   private var statsSinks: [String] = []
+  private var experimentalValidateYAMLCallback: ((Bool) -> Void)?
+  private var useLegacyBuilder: Bool = false
 
   // MARK: - Public
 
@@ -161,7 +169,7 @@ open class EngineBuilder: NSObject {
   ///
   /// - returns: This builder.
   @discardableResult
-  public func addDNSPreresolveHostnames(dnsPreresolveHostnames: String) -> Self {
+  public func addDNSPreresolveHostnames(dnsPreresolveHostnames: [String]) -> Self {
     self.dnsPreresolveHostnames = dnsPreresolveHostnames
     return self
   }
@@ -254,6 +262,7 @@ open class EngineBuilder: NSObject {
   }
 #endif
 
+#if ENVOY_ENABLE_QUIC
   /// Specify whether to enable support for HTTP/3 or not.  Defaults to true.
   ///
   /// - parameter enableHttp3: whether or not to enable HTTP/3.
@@ -264,6 +273,7 @@ open class EngineBuilder: NSObject {
     self.enableHttp3 = enableHttp3
     return self
   }
+#endif
 
   /// Specify whether sockets may attempt to bind to a specific interface, based on network
   /// conditions.
@@ -535,15 +545,27 @@ open class EngineBuilder: NSObject {
 
   /// Add virtual cluster configuration.
   ///
-  /// - parameter virtualClusters: The JSON configuration string for virtual clusters.
+  /// - parameter virtualCluster: The JSON configuration string for a virtual cluster.
   ///
   /// - returns: This builder.
   @discardableResult
-  public func addVirtualClusters(_ virtualClusters: String) -> Self {
-    self.virtualClusters = virtualClusters
+  public func addVirtualCluster(_ virtualCluster: String) -> Self {
+    self.virtualClusters.append(virtualCluster)
     return self
   }
 
+  /// Add virtual cluster configurations.
+  ///
+  /// - parameter virtualClusters: The JSON configuration strings for virtual clusters.
+  ///
+  /// - returns: This builder.
+  @discardableResult
+  public func addVirtualClusters(_ virtualClusters: [String]) -> Self {
+    self.virtualClusters.append(contentsOf: virtualClusters)
+    return self
+  }
+
+#if ENVOY_ADMIN_FUNCTIONALITY
   /// Enable admin interface on 127.0.0.1:9901 address. Admin interface is intended to be
   /// used for development/debugging purposes only. Enabling it in production may open
   /// your app to security vulnerabilities.
@@ -555,6 +577,37 @@ open class EngineBuilder: NSObject {
   @discardableResult
   public func enableAdminInterface() -> Self {
     self.adminInterfaceEnabled = true
+    return self
+  }
+#endif
+
+  /// Makes the engine validate the generated YAML against an upcoming, more performant builder
+  /// implementation. If the yaml is consistent between both builders, the callback will be invoked
+  /// with `true`. If a difference was detected, it will be invoked with `false`.
+  ///
+  /// The comparison isn't performed at all if this method isn't called.
+  ///
+  /// Note that this API is temporary and it will not be considered a breaking change once it is
+  /// removed.
+  ///
+  /// - parameter callback: The callback to be invoked.
+  ///
+  /// - returns: This builder.
+  @discardableResult
+  public func setExperimentalValidateYAMLCallback(_ callback: @escaping (Bool) -> Void) -> Self {
+    self.experimentalValidateYAMLCallback = callback
+    return self
+  }
+
+  /// Specify whether the string-based legacy mode should be used to build the engine.
+  /// Defaults to false.
+  ///
+  /// - parameter useLegacyBuilder: true if the string-based legacy mode should be used.
+  ///
+  /// - returns: This builder.
+  @discardableResult
+  public func useLegacyBuilder(_ useLegacyBuilder: Bool) -> Self {
+    self.useLegacyBuilder = useLegacyBuilder
     return self
   }
 
@@ -610,7 +663,9 @@ open class EngineBuilder: NSObject {
       platformFilterChain: self.platformFilterChain,
       stringAccessors: self.stringAccessors,
       keyValueStores: self.keyValueStores,
-      statsSinks: self.statsSinks
+      statsSinks: self.statsSinks,
+      experimentalValidateYAMLCallback: self.experimentalValidateYAMLCallback,
+      useLegacyBuilder: self.useLegacyBuilder
     )
 
     switch self.base {

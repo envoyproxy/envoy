@@ -92,15 +92,13 @@ std::unique_ptr<ModifyRequestHeadersAction> RedirectPolicy::createModifyRequestH
     return ::Envoy::Http::FilterHeadersStatus::Continue;
   }
 
+  auto downstream_headers = custom_response_filter.downstreamHeaders();
   // Modify the request headers & recreate stream.
-  if (custom_response_filter.onLocalReplyCalled()) {
+  if (custom_response_filter.onLocalReplyCalled() && downstream_headers == nullptr) {
     // This condition is true if send local reply is called at any point before
-    // the encode call for the custom response filter.
-    // TODO(pradeepcrao): Currently redirect policy is not compatible with send local reply as we
-    // cannot call recreateStream once sendLocalReply has been called.
+    // the decodeHeaders call for the custom response filter.
     return ::Envoy::Http::FilterHeadersStatus::Continue;
   }
-  auto downstream_headers = custom_response_filter.downstreamHeaders();
   RELEASE_ASSERT(downstream_headers != nullptr, "downstream_headers cannot be nullptr");
 
   ::Envoy::Http::Utility::Url absolute_url;

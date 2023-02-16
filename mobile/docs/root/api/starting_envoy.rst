@@ -101,21 +101,13 @@ Specify the interval at which Envoy should timeout a DNS query.
 ``addDNSPreresolveHostnames``
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. attention::
-
-  This API is non-ideal as it exposes lower-level internals of Envoy than desired by this
-  project.
-
 Add a list of hostnames to preresolve on Engine startup.
-For Swift, the configuration is expected as a JSON list.
-:issue:`#1581 <1581>` tracks enhancing this API.
-For Kotlin, the configuration is expected as a list of hostnames
 
   // Kotlin
-  builder.addDNSPreresolveHostnames("{"lyft.com", "google.com"}")
+  builder.addDNSPreresolveHostnames(listOf("lyft.com", "google.com"))
 
   // Swift
-  builder.addDNSPreresolveHostnames("[{\"address\": \"foo.com", \"port_value\": 443}]")
+  builder.addDNSPreresolveHostnames(["lyft.com", "google.com"])
 
 ~~~~~~~~~~~~~~~
 ``addLogLevel``
@@ -233,12 +225,12 @@ This information is sent as metadata when flushing stats.
   // Swift
   builder.addAppId("com.mydomain.myapp)
 
-~~~~~~~~~~~~~~~~~~~~~~
-``addVirtualClusters``
-~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~
+``addVirtualCluster``
+~~~~~~~~~~~~~~~~~~~~~
 
-Specify the virtual clusters config for Envoy Mobile's configuration.
-The configuration is expected as a JSON list.
+Add a virtual cluster config for Envoy Mobile's configuration.
+The configuration is expected as a JSON object.
 This functionality is used for stat segmentation.
 
 .. attention::

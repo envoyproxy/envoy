@@ -1,3 +1,4 @@
+@_spi(YAMLValidation)
 @testable import Envoy
 import EnvoyEngine
 import Foundation
@@ -29,12 +30,12 @@ final class EngineBuilderTests: XCTestCase {
   }
 
   func testMonitoringModeDefaultsToPathMonitor() {
-    let builder = EngineBuilder()
+    let builder = YAMLValidatingEngineBuilder()
     XCTAssertEqual(builder.monitoringMode, .pathMonitor)
   }
 
   func testMonitoringModeSetsToValue() {
-    let builder = EngineBuilder()
+    let builder = YAMLValidatingEngineBuilder()
       .setNetworkMonitoringMode(.disabled)
     XCTAssertEqual(builder.monitoringMode, .disabled)
     builder.setNetworkMonitoringMode(.reachability)
@@ -61,7 +62,7 @@ final class EngineBuilderTests: XCTestCase {
       expectation.fulfill()
     }
 
-    _ = EngineBuilder()
+    _ = YAMLValidatingEngineBuilder()
       .addEngineType(MockEnvoyEngine.self)
       .addLogLevel(.trace)
       .build()
@@ -75,12 +76,13 @@ final class EngineBuilderTests: XCTestCase {
       expectation.fulfill()
     }
 
-    _ = EngineBuilder()
+    _ = YAMLValidatingEngineBuilder()
       .addEngineType(MockEnvoyEngine.self)
       .build()
     self.waitForExpectations(timeout: 0.01)
   }
 
+#if ENVOY_ADMIN_FUNCTIONALITY
   func testEnablingAdminInterfaceAddsToConfigurationWhenRunningEnvoy() {
     let expectation = self.expectation(description: "Run called with enabled admin interface")
     MockEnvoyEngine.onRunWithConfig = { config, _ in
@@ -88,12 +90,13 @@ final class EngineBuilderTests: XCTestCase {
       expectation.fulfill()
     }
 
-    _ = EngineBuilder()
+    _ = YAMLValidatingEngineBuilder()
       .addEngineType(MockEnvoyEngine.self)
       .enableAdminInterface()
       .build()
     self.waitForExpectations(timeout: 0.01)
   }
+#endif
 
   func testEnablingHappyEyeballsAddsToConfigurationWhenRunningEnvoy() {
     let expectation = self.expectation(description: "Run called with enabled happy eyeballs")
@@ -102,7 +105,7 @@ final class EngineBuilderTests: XCTestCase {
       expectation.fulfill()
     }
 
-    _ = EngineBuilder()
+    _ = YAMLValidatingEngineBuilder()
       .addEngineType(MockEnvoyEngine.self)
       .enableHappyEyeballs(true)
       .build()
@@ -116,7 +119,7 @@ final class EngineBuilderTests: XCTestCase {
       expectation.fulfill()
     }
 
-    _ = EngineBuilder()
+    _ = YAMLValidatingEngineBuilder()
       .addEngineType(MockEnvoyEngine.self)
       .enableInterfaceBinding(true)
       .build()
@@ -130,7 +133,7 @@ final class EngineBuilderTests: XCTestCase {
       expectation.fulfill()
     }
 
-    _ = EngineBuilder()
+    _ = YAMLValidatingEngineBuilder()
       .addEngineType(MockEnvoyEngine.self)
       .enforceTrustChainVerification(true)
       .build()
@@ -144,7 +147,7 @@ final class EngineBuilderTests: XCTestCase {
       expectation.fulfill()
     }
 
-    _ = EngineBuilder()
+    _ = YAMLValidatingEngineBuilder()
       .addEngineType(MockEnvoyEngine.self)
       .forceIPv6(true)
       .build()
@@ -158,7 +161,7 @@ final class EngineBuilderTests: XCTestCase {
       expectation.fulfill()
     }
 
-    _ = EngineBuilder()
+    _ = YAMLValidatingEngineBuilder()
       .addEngineType(MockEnvoyEngine.self)
       .addGrpcStatsDomain("stats.envoyproxy.io")
       .build()
@@ -172,7 +175,7 @@ final class EngineBuilderTests: XCTestCase {
       expectation.fulfill()
     }
 
-    _ = EngineBuilder()
+    _ = YAMLValidatingEngineBuilder()
       .addEngineType(MockEnvoyEngine.self)
       .addConnectTimeoutSeconds(12345)
       .build()
@@ -186,7 +189,7 @@ final class EngineBuilderTests: XCTestCase {
       expectation.fulfill()
     }
 
-    _ = EngineBuilder()
+    _ = YAMLValidatingEngineBuilder()
       .addEngineType(MockEnvoyEngine.self)
       .addDNSRefreshSeconds(23)
       .build()
@@ -200,7 +203,7 @@ final class EngineBuilderTests: XCTestCase {
       expectation.fulfill()
     }
 
-    _ = EngineBuilder()
+    _ = YAMLValidatingEngineBuilder()
       .addEngineType(MockEnvoyEngine.self)
       .addDNSMinRefreshSeconds(23)
       .build()
@@ -214,7 +217,7 @@ final class EngineBuilderTests: XCTestCase {
       expectation.fulfill()
     }
 
-    _ = EngineBuilder()
+    _ = YAMLValidatingEngineBuilder()
       .addEngineType(MockEnvoyEngine.self)
       .addDNSQueryTimeoutSeconds(234)
       .build()
@@ -229,7 +232,7 @@ final class EngineBuilderTests: XCTestCase {
       expectation.fulfill()
     }
 
-    _ = EngineBuilder()
+    _ = YAMLValidatingEngineBuilder()
       .addEngineType(MockEnvoyEngine.self)
       .addDNSFailureRefreshSeconds(base: 1234, max: 5678)
       .build()
@@ -243,7 +246,7 @@ final class EngineBuilderTests: XCTestCase {
       expectation.fulfill()
     }
 
-    _ = EngineBuilder()
+    _ = YAMLValidatingEngineBuilder()
       .addEngineType(MockEnvoyEngine.self)
       .addH2ConnectionKeepaliveIdleIntervalMilliseconds(234)
       .build()
@@ -257,7 +260,7 @@ final class EngineBuilderTests: XCTestCase {
       expectation.fulfill()
     }
 
-    _ = EngineBuilder()
+    _ = YAMLValidatingEngineBuilder()
       .addEngineType(MockEnvoyEngine.self)
       .addH2ConnectionKeepaliveTimeoutSeconds(234)
       .build()
@@ -271,7 +274,7 @@ final class EngineBuilderTests: XCTestCase {
       expectation.fulfill()
     }
 
-    _ = EngineBuilder()
+    _ = YAMLValidatingEngineBuilder()
       .addEngineType(MockEnvoyEngine.self)
       .setMaxConnectionsPerHost(23)
       .build()
@@ -285,7 +288,7 @@ final class EngineBuilderTests: XCTestCase {
       expectation.fulfill()
     }
 
-    _ = EngineBuilder()
+    _ = YAMLValidatingEngineBuilder()
       .addEngineType(MockEnvoyEngine.self)
       .addPlatformFilter(TestFilter.init)
       .build()
@@ -299,7 +302,7 @@ final class EngineBuilderTests: XCTestCase {
       expectation.fulfill()
     }
 
-    _ = EngineBuilder()
+    _ = YAMLValidatingEngineBuilder()
       .addEngineType(MockEnvoyEngine.self)
       .addStatsFlushSeconds(42)
       .build()
@@ -313,7 +316,7 @@ final class EngineBuilderTests: XCTestCase {
       expectation.fulfill()
     }
 
-    _ = EngineBuilder()
+    _ = YAMLValidatingEngineBuilder()
       .addEngineType(MockEnvoyEngine.self)
       .addStreamIdleTimeoutSeconds(42)
       .build()
@@ -327,7 +330,7 @@ final class EngineBuilderTests: XCTestCase {
       expectation.fulfill()
     }
 
-    _ = EngineBuilder()
+    _ = YAMLValidatingEngineBuilder()
       .addEngineType(MockEnvoyEngine.self)
       .addPerTryIdleTimeoutSeconds(21)
       .build()
@@ -341,7 +344,7 @@ final class EngineBuilderTests: XCTestCase {
       expectation.fulfill()
     }
 
-    _ = EngineBuilder()
+    _ = YAMLValidatingEngineBuilder()
       .addEngineType(MockEnvoyEngine.self)
       .addAppVersion("v1.2.3")
       .build()
@@ -355,7 +358,7 @@ final class EngineBuilderTests: XCTestCase {
       expectation.fulfill()
     }
 
-    _ = EngineBuilder()
+    _ = YAMLValidatingEngineBuilder()
       .addEngineType(MockEnvoyEngine.self)
       .addAppId("com.envoymobile.ios")
       .build()
@@ -365,13 +368,13 @@ final class EngineBuilderTests: XCTestCase {
   func testAddingVirtualClustersAddsToConfigurationWhenRunningEnvoy() {
     let expectation = self.expectation(description: "Run called with expected data")
     MockEnvoyEngine.onRunWithConfig = { config, _ in
-      XCTAssertEqual("[test]", config.virtualClusters)
+      XCTAssertEqual(["test"], config.virtualClusters)
       expectation.fulfill()
     }
 
-    _ = EngineBuilder()
+    _ = YAMLValidatingEngineBuilder()
       .addEngineType(MockEnvoyEngine.self)
-      .addVirtualClusters("[test]")
+      .addVirtualClusters(["test"])
       .build()
     self.waitForExpectations(timeout: 0.01)
   }
@@ -383,7 +386,7 @@ final class EngineBuilderTests: XCTestCase {
       expectation.fulfill()
     }
 
-    _ = EngineBuilder()
+    _ = YAMLValidatingEngineBuilder()
       .addEngineType(MockEnvoyEngine.self)
       .addNativeFilter(name: "test_name", typedConfig: "config")
       .build()
@@ -397,7 +400,7 @@ final class EngineBuilderTests: XCTestCase {
       expectation.fulfill()
     }
 
-    _ = EngineBuilder()
+    _ = YAMLValidatingEngineBuilder()
       .addEngineType(MockEnvoyEngine.self)
       .addStringAccessor(name: "name", accessor: { "hello" })
       .build()
@@ -433,7 +436,7 @@ final class EngineBuilderTests: XCTestCase {
 
     testStore.saveValue("bar", toKey: "foo")
 
-    _ = EngineBuilder()
+    _ = YAMLValidatingEngineBuilder()
       .addEngineType(MockEnvoyEngine.self)
       .addKeyValueStore(name: "name", keyValueStore: testStore)
       .build()
@@ -441,6 +444,12 @@ final class EngineBuilderTests: XCTestCase {
   }
 
   func testResolvesYAMLWithIndividuallySetValues() throws {
+#if ENVOY_ENABLE_QUIC
+    let http3 = true
+#else
+    let http3 = false
+#endif
+
     let config = EnvoyConfiguration(
       adminInterfaceEnabled: false,
       grpcStatsDomain: "stats.envoyproxy.io",
@@ -450,11 +459,11 @@ final class EngineBuilderTests: XCTestCase {
       dnsFailureRefreshSecondsMax: 500,
       dnsQueryTimeoutSeconds: 800,
       dnsMinRefreshSeconds: 100,
-      dnsPreresolveHostnames: "[test]",
+      dnsPreresolveHostnames: ["host1", "host2"],
       enableDNSCache: false,
       dnsCacheSaveIntervalSeconds: 0,
       enableHappyEyeballs: true,
-      enableHttp3: true,
+      enableHttp3: http3,
       enableGzipDecompression: true,
       enableGzipCompression: false,
       enableBrotliDecompression: false,
@@ -472,7 +481,7 @@ final class EngineBuilderTests: XCTestCase {
       perTryIdleTimeoutSeconds: 777,
       appVersion: "v1.2.3",
       appId: "com.envoymobile.ios",
-      virtualClusters: "[test]",
+      virtualClusters: ["test"],
       directResponseMatchers: "",
       directResponses: "",
       nativeFilterChain: [
@@ -483,7 +492,9 @@ final class EngineBuilderTests: XCTestCase {
       ],
       stringAccessors: [:],
       keyValueStores: [:],
-      statsSinks: []
+      statsSinks: [],
+      experimentalValidateYAMLCallback: nil,
+      useLegacyBuilder: true
     )
     let resolvedYAML = try XCTUnwrap(config.resolveTemplate(kMockTemplate))
     XCTAssertTrue(resolvedYAML.contains("&connect_timeout 200s"))
@@ -492,7 +503,14 @@ final class EngineBuilderTests: XCTestCase {
     XCTAssertTrue(resolvedYAML.contains("&dns_fail_max_interval 500s"))
     XCTAssertTrue(resolvedYAML.contains("&dns_query_timeout 800s"))
     XCTAssertTrue(resolvedYAML.contains("&dns_min_refresh_rate 100s"))
-    XCTAssertTrue(resolvedYAML.contains("&dns_preresolve_hostnames [test]"))
+    XCTAssertTrue(
+      resolvedYAML.contains(
+#"""
+&dns_preresolve_hostnames [{"address": "host1", "port_value": 443},\#
+{"address": "host2", "port_value": 443}]
+"""#
+      )
+    )
     XCTAssertTrue(resolvedYAML.contains("&dns_lookup_family ALL"))
     XCTAssertFalse(resolvedYAML.contains("&persistent_dns_cache_config"))
     XCTAssertTrue(resolvedYAML.contains("&enable_interface_binding true"))
@@ -524,8 +542,8 @@ final class EngineBuilderTests: XCTestCase {
 
     // Metadata
     XCTAssertTrue(resolvedYAML.contains("device_os: iOS"))
-    XCTAssertTrue(resolvedYAML.contains("app_version: v1.2.3"))
-    XCTAssertTrue(resolvedYAML.contains("app_id: com.envoymobile.ios"))
+    XCTAssertTrue(resolvedYAML.contains(#"app_version: "v1.2.3""#))
+    XCTAssertTrue(resolvedYAML.contains(#"app_id: "com.envoymobile.ios""#))
 
     XCTAssertTrue(resolvedYAML.contains("&virtual_clusters [test]"))
 
@@ -549,7 +567,7 @@ final class EngineBuilderTests: XCTestCase {
       dnsFailureRefreshSecondsMax: 500,
       dnsQueryTimeoutSeconds: 800,
       dnsMinRefreshSeconds: 100,
-      dnsPreresolveHostnames: "[test]",
+      dnsPreresolveHostnames: ["test"],
       enableDNSCache: true,
       dnsCacheSaveIntervalSeconds: 10,
       enableHappyEyeballs: false,
@@ -571,7 +589,7 @@ final class EngineBuilderTests: XCTestCase {
       perTryIdleTimeoutSeconds: 777,
       appVersion: "v1.2.3",
       appId: "com.envoymobile.ios",
-      virtualClusters: "[test]",
+      virtualClusters: ["test"],
       directResponseMatchers: "",
       directResponses: "",
       nativeFilterChain: [
@@ -582,7 +600,9 @@ final class EngineBuilderTests: XCTestCase {
       ],
       stringAccessors: [:],
       keyValueStores: [:],
-      statsSinks: []
+      statsSinks: [],
+      experimentalValidateYAMLCallback: nil,
+      useLegacyBuilder: true
     )
     let resolvedYAML = try XCTUnwrap(config.resolveTemplate(kMockTemplate))
     XCTAssertTrue(resolvedYAML.contains("&dns_lookup_family V4_PREFERRED"))
@@ -630,7 +650,7 @@ final class EngineBuilderTests: XCTestCase {
       dnsFailureRefreshSecondsMax: 500,
       dnsQueryTimeoutSeconds: 800,
       dnsMinRefreshSeconds: 100,
-      dnsPreresolveHostnames: "[test]",
+      dnsPreresolveHostnames: ["test"],
       enableDNSCache: false,
       dnsCacheSaveIntervalSeconds: 0,
       enableHappyEyeballs: false,
@@ -652,14 +672,16 @@ final class EngineBuilderTests: XCTestCase {
       perTryIdleTimeoutSeconds: 700,
       appVersion: "v1.2.3",
       appId: "com.envoymobile.ios",
-      virtualClusters: "[test]",
+      virtualClusters: ["test"],
       directResponseMatchers: "",
       directResponses: "",
       nativeFilterChain: [],
       platformFilterChain: [],
       stringAccessors: [:],
       keyValueStores: [:],
-      statsSinks: []
+      statsSinks: [],
+      experimentalValidateYAMLCallback: nil,
+      useLegacyBuilder: true
     )
     XCTAssertNil(config.resolveTemplate("{{ missing }}"))
   }
