@@ -76,7 +76,10 @@ envoy_mobile_kt_library(
         "mocks/*.kt",
         "stats/*.kt",
     ]) + envoy_select_envoy_mobile_request_compression(
-        ["EngineBuilderCompressionUtil.kt"],
+        [
+            "CompressionAlgorithm.kt",
+            "RequestHeadersBuilderCompressionUtil.kt",
+        ],
         "@envoy",
     ) + envoy_select_enable_http3(
         ["EngineBuilderHTTP3Util.kt"],

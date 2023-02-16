@@ -27,7 +27,7 @@ Bugfixes:
 
 Features:
 
-- api: Add support for brotli and gzip request compression.  (:issue:`#25352 <25352>`)
+- api: Add support for brotli and gzip request compression.  (:issue:`#25352 <25352>`, :issue:`#25595 <25595>`)
 - api: Add a constructor which takes a URL to C++ RequestEngineBuilder.
 - api: add option to support platform provided certificates validation interfaces on iOS and Android. (:issue `#2144 <2144>`)
 - api: Add a ``setPerTryIdleTimeoutSeconds()`` method to C++ EngineBuilder.
