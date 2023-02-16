@@ -102,10 +102,13 @@ genrule(
     srcs = [
         "admin_head_start.html",
         "admin.css",
+        "dynamic_stats.js",
+        "dynamic_stats.html",
     ],
     outs = ["admin_html_gen.h"],
     cmd = "./$(location :generate_admin_html.sh) \
-        $(location admin_head_start.html) $(location admin.css) > $@",
+        $(location admin_head_start.html) $(location admin.css) $(location dynamic_stats.js) \
+        $(location dynamic_stats.html) > $@",
     tools = [":generate_admin_html.sh"],
 )
 
@@ -162,6 +165,7 @@ envoy_cc_library(
         ":utils_lib",
         "//envoy/server:admin_interface",
         "//source/common/buffer:buffer_lib",
+        "//source/common/filesystem:filesystem_lib",
         "//source/common/json:json_sanitizer_lib",
         "//source/common/stats:histogram_lib",
     ] + envoy_select_admin_html([

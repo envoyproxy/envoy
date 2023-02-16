@@ -4,6 +4,7 @@
 
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/assert.h"
+#include "source/common/filesystem/filesystem_impl.h"
 #include "source/common/html/utility.h"
 #include "source/server/admin/admin_html_gen.h"
 
@@ -62,7 +63,13 @@ StatsHtmlRender::StatsHtmlRender(Http::ResponseHeaderMap& response_headers,
   response.add("<!DOCTYPE html>\n");
   response.add("<html lang='en'>\n");
   response.add(absl::StrReplaceAll(AdminHtmlStart, {{"@FAVICON@", EnvoyFavicon}}));
-  response.add("<body>\n");
+  if (dynamic_) {
+    response.add("<script>\n");
+    appendResource(response, "dynamic_stats.js", AdminDynamicStatsJs);
+    response.add("\n</script>\n");
+  } else {
+    response.add("<body>\n");
+  }
 }
 
 void StatsHtmlRender::finalize(Buffer::Instance& response) {
@@ -71,8 +78,28 @@ void StatsHtmlRender::finalize(Buffer::Instance& response) {
   if (has_pre_) {
     response.add("</pre>\n");
   }
+  if (dynamic_) {
+    appendResource(response, "dynamic_stats.html", AdminDynamicStatsHtml);
+    response.add("\n");
+  }
   response.add("</body>\n");
   response.add("</html>");
+}
+
+void StatsHtmlRender::appendResource(Buffer::Instance& response, absl::string_view file,
+                                     absl::string_view default_value) {
+  if (std::getenv("ENVOY_ADMIN_DEBUG_RESOURCES") == nullptr) {
+    response.add(default_value);
+  } else {
+    Filesystem::InstanceImpl file_system;
+    std::string path = absl::StrCat("source/server/admin/", file);
+    TRY_ASSERT_MAIN_THREAD {
+      response.add(file_system.fileReadToEnd(path));
+    } END_TRY
+    catch (EnvoyException e) {
+      ENVOY_LOG_MISC(error, "failed to load " + path);
+    }
+  }
 }
 
 void StatsHtmlRender::startPre(Buffer::Instance& response) {
