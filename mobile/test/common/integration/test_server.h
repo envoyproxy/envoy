@@ -24,7 +24,6 @@ private:
   Thread::SkipAsserts skip_asserts_;
   ProcessWide process_wide;
   Thread::MutexBasicLockable lock;
-  ;
   Extensions::TransportSockets::Tls::ContextManagerImpl context_manager_{time_system_};
 
   Network::DownstreamTransportSocketFactoryPtr createQuicUpstreamTlsContext(
