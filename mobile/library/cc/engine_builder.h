@@ -58,13 +58,7 @@ public:
   EngineBuilder& setStreamIdleTimeoutSeconds(int stream_idle_timeout_seconds);
   EngineBuilder& setPerTryIdleTimeoutSeconds(int per_try_idle_timeout_seconds);
   EngineBuilder& enableGzipDecompression(bool gzip_decompression_on);
-#ifdef ENVOY_MOBILE_REQUEST_COMPRESSION
-  EngineBuilder& enableGzipCompression(bool gzip_compression_on);
-#endif
   EngineBuilder& enableBrotliDecompression(bool brotli_decompression_on);
-#ifdef ENVOY_MOBILE_REQUEST_COMPRESSION
-  EngineBuilder& enableBrotliCompression(bool brotli_compression_on);
-#endif
   EngineBuilder& enableSocketTagging(bool socket_tagging_on);
   EngineBuilder& enableHappyEyeballs(bool happy_eyeballs_on);
 #ifdef ENVOY_ENABLE_QUIC

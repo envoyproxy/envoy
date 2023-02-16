@@ -41,9 +41,7 @@ public class EnvoyConfiguration {
   public final Boolean enableDrainPostDnsRefresh;
   public final Boolean enableHttp3;
   public final Boolean enableGzipDecompression;
-  public final Boolean enableGzipCompression;
   public final Boolean enableBrotliDecompression;
-  public final Boolean enableBrotliCompression;
   public final Boolean enableSocketTagging;
   public final Boolean enableHappyEyeballs;
   public final Boolean enableInterfaceBinding;
@@ -97,11 +95,9 @@ public class EnvoyConfiguration {
    *     HTTP/3 (QUIC).
    * @param enableGzipDecompression                       whether to enable response gzip
    *     decompression.
-   * @param enableGzipCompression                         whether to enable request gzip
    *     compression.
    * @param enableBrotliDecompression                     whether to enable response brotli
    *     decompression.
-   * @param enableBrotliCompression                       whether to enable request brotli
    *     compression.
    * @param enableSocketTagging                           whether to enable socket tagging.
    * @param enableHappyEyeballs                           whether to enable RFC 6555 handling for
@@ -137,8 +133,7 @@ public class EnvoyConfiguration {
       int dnsRefreshSeconds, int dnsFailureRefreshSecondsBase, int dnsFailureRefreshSecondsMax,
       int dnsQueryTimeoutSeconds, int dnsMinRefreshSeconds, List<String> dnsPreresolveHostnames,
       boolean enableDNSCache, int dnsCacheSaveIntervalSeconds, boolean enableDrainPostDnsRefresh,
-      boolean enableHttp3, boolean enableGzipDecompression, boolean enableGzipCompression,
-      boolean enableBrotliDecompression, boolean enableBrotliCompression,
+      boolean enableHttp3, boolean enableGzipDecompression, boolean enableBrotliDecompression,
       boolean enableSocketTagging, boolean enableHappyEyeballs, boolean enableInterfaceBinding,
       int h2ConnectionKeepaliveIdleIntervalMilliseconds, int h2ConnectionKeepaliveTimeoutSeconds,
       int maxConnectionsPerHost, int statsFlushSeconds, int streamIdleTimeoutSeconds,
@@ -165,9 +160,7 @@ public class EnvoyConfiguration {
     this.enableDrainPostDnsRefresh = enableDrainPostDnsRefresh;
     this.enableHttp3 = enableHttp3;
     this.enableGzipDecompression = enableGzipDecompression;
-    this.enableGzipCompression = enableGzipCompression;
     this.enableBrotliDecompression = enableBrotliDecompression;
-    this.enableBrotliCompression = enableBrotliCompression;
     this.enableSocketTagging = enableSocketTagging;
     this.enableHappyEyeballs = enableHappyEyeballs;
     this.enableInterfaceBinding = enableInterfaceBinding;
@@ -235,20 +228,13 @@ public class EnvoyConfiguration {
       customFiltersBuilder.append(gzipFilterInsert);
     }
 
-    if (enableGzipCompression) {
-      final String gzipFilterInsert = JniLibrary.gzipCompressorConfigInsert();
-      customFiltersBuilder.append(gzipFilterInsert);
-    }
-
     if (enableBrotliDecompression) {
       final String brotliFilterInsert = JniLibrary.brotliDecompressorConfigInsert();
       customFiltersBuilder.append(brotliFilterInsert);
     }
 
-    if (enableBrotliCompression) {
-      final String brotliFilterInsert = JniLibrary.brotliCompressorConfigInsert();
-      customFiltersBuilder.append(brotliFilterInsert);
-    }
+    final String compressorFilterInsert = JniLibrary.compressorConfigInsert();
+    customFiltersBuilder.append(compressorFilterInsert);
 
     if (enableSocketTagging) {
       final String socketTagFilterInsert = JniLibrary.socketTagConfigInsert();
@@ -368,13 +354,13 @@ public class EnvoyConfiguration {
             dnsRefreshSeconds, dnsFailureRefreshSecondsBase, dnsFailureRefreshSecondsMax,
             dnsQueryTimeoutSeconds, dnsMinRefreshSeconds, dns_preresolve, enableDNSCache,
             dnsCacheSaveIntervalSeconds, enableDrainPostDnsRefresh, enableHttp3,
-            enableGzipDecompression, enableGzipCompression, enableBrotliDecompression,
-            enableBrotliCompression, enableSocketTagging, enableHappyEyeballs,
-            enableInterfaceBinding, h2ConnectionKeepaliveIdleIntervalMilliseconds,
-            h2ConnectionKeepaliveTimeoutSeconds, maxConnectionsPerHost, statsFlushSeconds,
-            streamIdleTimeoutSeconds, perTryIdleTimeoutSeconds, appVersion, appId,
-            enforceTrustChainVerification, clusters, filter_chain, stats_sinks,
-            enablePlatformCertificatesValidation, enableSkipDNSLookupForProxiedRequests);
+            enableGzipDecompression, enableBrotliDecompression, enableSocketTagging,
+            enableHappyEyeballs, enableInterfaceBinding,
+            h2ConnectionKeepaliveIdleIntervalMilliseconds, h2ConnectionKeepaliveTimeoutSeconds,
+            maxConnectionsPerHost, statsFlushSeconds, streamIdleTimeoutSeconds,
+            perTryIdleTimeoutSeconds, appVersion, appId, enforceTrustChainVerification, clusters,
+            filter_chain, stats_sinks, enablePlatformCertificatesValidation,
+            enableSkipDNSLookupForProxiedRequests);
         break;
       }
     }
@@ -396,13 +382,13 @@ public class EnvoyConfiguration {
         grpcStatsDomain, adminInterfaceEnabled, connectTimeoutSeconds, dnsRefreshSeconds,
         dnsFailureRefreshSecondsBase, dnsFailureRefreshSecondsMax, dnsQueryTimeoutSeconds,
         dnsMinRefreshSeconds, dns_preresolve, enableDNSCache, dnsCacheSaveIntervalSeconds,
-        enableDrainPostDnsRefresh, enableHttp3, enableGzipDecompression, enableGzipCompression,
-        enableBrotliDecompression, enableBrotliCompression, enableSocketTagging,
-        enableHappyEyeballs, enableInterfaceBinding, h2ConnectionKeepaliveIdleIntervalMilliseconds,
-        h2ConnectionKeepaliveTimeoutSeconds, maxConnectionsPerHost, statsFlushSeconds,
-        streamIdleTimeoutSeconds, perTryIdleTimeoutSeconds, appVersion, appId,
-        enforceTrustChainVerification, clusters, filter_chain, stats_sinks,
-        enablePlatformCertificatesValidation, enableSkipDNSLookupForProxiedRequests);
+        enableDrainPostDnsRefresh, enableHttp3, enableGzipDecompression, enableBrotliDecompression,
+        enableSocketTagging, enableHappyEyeballs, enableInterfaceBinding,
+        h2ConnectionKeepaliveIdleIntervalMilliseconds, h2ConnectionKeepaliveTimeoutSeconds,
+        maxConnectionsPerHost, statsFlushSeconds, streamIdleTimeoutSeconds,
+        perTryIdleTimeoutSeconds, appVersion, appId, enforceTrustChainVerification, clusters,
+        filter_chain, stats_sinks, enablePlatformCertificatesValidation,
+        enableSkipDNSLookupForProxiedRequests);
   }
 
   static class ConfigurationException extends RuntimeException {

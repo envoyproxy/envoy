@@ -11,6 +11,11 @@
 namespace Envoy {
 namespace Platform {
 
+enum CompressionAlgorithm {
+  gzip,
+  brotli,
+};
+
 class RequestHeaders;
 struct RetryPolicy;
 
@@ -22,6 +27,7 @@ public:
 
   RequestHeadersBuilder& addRetryPolicy(const RetryPolicy& retry_policy);
   RequestHeadersBuilder& addUpstreamHttpProtocol(UpstreamHttpProtocol upstream_http_protocol);
+  RequestHeadersBuilder& enableRequestCompression(CompressionAlgorithm algorithm);
 
   RequestHeaders build() const;
 

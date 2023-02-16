@@ -49,8 +49,6 @@ public class NativeCronetEngineBuilderImpl extends CronetEngineBuilderImpl {
   private boolean mDnsUseSystemResolver = true;
   private boolean mEnableDrainPostDnsRefresh = false;
   private boolean mEnableGzipDecompression = true;
-  private boolean mEnableGzipCompression = false;
-  private boolean mEnableBrotliCompression = false;
   private boolean mEnableSocketTag = true;
   private boolean mEnableHappyEyeballs = true;
   private boolean mEnableInterfaceBinding = false;
@@ -128,12 +126,12 @@ public class NativeCronetEngineBuilderImpl extends CronetEngineBuilderImpl {
         mDnsFailureRefreshSecondsBase, mDnsFailureRefreshSecondsMax, mDnsQueryTimeoutSeconds,
         mDnsMinRefreshSeconds, mDnsPreresolveHostnames, mEnableDNSCache,
         mDnsCacheSaveIntervalSeconds, mEnableDrainPostDnsRefresh, quicEnabled(),
-        mEnableGzipDecompression, mEnableGzipCompression, brotliEnabled(), mEnableBrotliCompression,
-        mEnableSocketTag, mEnableHappyEyeballs, mEnableInterfaceBinding,
-        mH2ConnectionKeepaliveIdleIntervalMilliseconds, mH2ConnectionKeepaliveTimeoutSeconds,
-        mMaxConnectionsPerHost, mStatsFlushSeconds, mStreamIdleTimeoutSeconds,
-        mPerTryIdleTimeoutSeconds, mAppVersion, mAppId, mTrustChainVerification, mVirtualClusters,
-        nativeFilterChain, platformFilterChain, stringAccessors, keyValueStores, statSinks,
-        mEnableSkipDNSLookupForProxiedRequests, mEnablePlatformCertificatesValidation, false);
+        mEnableGzipDecompression, brotliEnabled(), mEnableSocketTag, mEnableHappyEyeballs,
+        mEnableInterfaceBinding, mH2ConnectionKeepaliveIdleIntervalMilliseconds,
+        mH2ConnectionKeepaliveTimeoutSeconds, mMaxConnectionsPerHost, mStatsFlushSeconds,
+        mStreamIdleTimeoutSeconds, mPerTryIdleTimeoutSeconds, mAppVersion, mAppId,
+        mTrustChainVerification, mVirtualClusters, nativeFilterChain, platformFilterChain,
+        stringAccessors, keyValueStores, statSinks, mEnableSkipDNSLookupForProxiedRequests,
+        mEnablePlatformCertificatesValidation, false);
   }
 }

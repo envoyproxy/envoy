@@ -24,9 +24,7 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic, assign) BOOL enableHappyEyeballs;
 @property (nonatomic, assign) BOOL enableHttp3;
 @property (nonatomic, assign) BOOL enableGzipDecompression;
-@property (nonatomic, assign) BOOL enableGzipCompression;
 @property (nonatomic, assign) BOOL enableBrotliDecompression;
-@property (nonatomic, assign) BOOL enableBrotliCompression;
 @property (nonatomic, assign) BOOL enableInterfaceBinding;
 @property (nonatomic, assign) BOOL enableDrainPostDnsRefresh;
 @property (nonatomic, assign) BOOL enforceTrustChainVerification;
@@ -68,9 +66,7 @@ NS_ASSUME_NONNULL_BEGIN
                               enableHappyEyeballs:(BOOL)enableHappyEyeballs
                                       enableHttp3:(BOOL)enableHttp3
                           enableGzipDecompression:(BOOL)enableGzipDecompression
-                            enableGzipCompression:(BOOL)enableGzipCompression
                         enableBrotliDecompression:(BOOL)enableBrotliDecompression
-                          enableBrotliCompression:(BOOL)enableBrotliCompression
                            enableInterfaceBinding:(BOOL)enableInterfaceBinding
                         enableDrainPostDnsRefresh:(BOOL)enableDrainPostDnsRefresh
                     enforceTrustChainVerification:(BOOL)enforceTrustChainVerification
