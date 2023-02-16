@@ -56,7 +56,8 @@ namespace Server {
 
 StatsHtmlRender::StatsHtmlRender(Http::ResponseHeaderMap& response_headers,
                                  Buffer::Instance& response, const StatsParams& params)
-    : StatsTextRender(params) {
+    : StatsTextRender(params),
+      dynamic_(params.format_ == StatsFormat::Dynamic) {
   response_headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Html);
   response.add("<!DOCTYPE html>\n");
   response.add("<html lang='en'>\n");
@@ -75,8 +76,10 @@ void StatsHtmlRender::finalize(Buffer::Instance& response) {
 }
 
 void StatsHtmlRender::startPre(Buffer::Instance& response) {
-  has_pre_ = true;
-  response.add("<pre>\n");
+  if (!dynamic_) {
+    has_pre_ = true;
+    response.add("<pre>\n");
+  }
 }
 
 void StatsHtmlRender::generate(Buffer::Instance& response, const std::string& name,
@@ -85,7 +88,9 @@ void StatsHtmlRender::generate(Buffer::Instance& response, const std::string& na
 }
 
 void StatsHtmlRender::noStats(Buffer::Instance& response, absl::string_view types) {
-  response.addFragments({"</pre>\n<br/><i>No ", types, " found</i><br/>\n<pre>\n"});
+  if (!dynamic_) {
+    response.addFragments({"</pre>\n<br/><i>No ", types, " found</i><br/>\n<pre>\n"});
+  }
 }
 
 void StatsHtmlRender::tableBegin(Buffer::Instance& response) { response.add(AdminHtmlTableBegin); }

@@ -13,6 +13,7 @@ public:
   void noStats(Buffer::Instance&, absl::string_view types) override;
   void generate(Buffer::Instance& response, const std::string& name,
                 const std::string& value) override;
+  /*
   void generate(Buffer::Instance& response, const std::string& name, uint64_t value) override {
     StatsTextRender::generate(response, name, value);
   }
@@ -20,6 +21,7 @@ public:
                 const Stats::ParentHistogram& histogram) override {
     StatsTextRender::generate(response, name, histogram);
   }
+  */
   void finalize(Buffer::Instance&) override;
 
   /**
@@ -72,6 +74,7 @@ private:
   bool submit_on_change_{false};
   bool has_pre_{false};
   bool finalized_{false};
+  const bool dynamic_{false};
 };
 
 } // namespace Server

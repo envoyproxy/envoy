@@ -34,6 +34,7 @@ Http::Code StatsRequest::start(Http::ResponseHeaderMap& response_headers) {
     render_ = std::make_unique<StatsTextRender>(params_);
     break;
 #ifdef ENVOY_ADMIN_HTML
+  case StatsFormat::Dynamic:
   case StatsFormat::Html: {
     auto html_render = std::make_unique<StatsHtmlRender>(response_headers, response_, params_);
     html_render->setSubmitOnChange(true);
@@ -42,6 +43,9 @@ Http::Code StatsRequest::start(Http::ResponseHeaderMap& response_headers) {
     html_render->tableEnd(response_);
     html_render->startPre(response_);
     render_ = std::move(html_render);
+    if (params_.format_ == StatsFormat::Dynamic) {
+      return Http::Code::OK;
+    }
     break;
   }
 #endif
