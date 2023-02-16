@@ -59,7 +59,7 @@ open class EngineBuilder: NSObject {
   private var platformFilterChain: [EnvoyHTTPFilterFactory] = []
   private var stringAccessors: [String: EnvoyStringAccessor] = [:]
   private var keyValueStores: [String: EnvoyKeyValueStore] = [:]
-  private var runtimeGuards: [String: Bool] = [:]
+  private var runtimeGuards: [String: String] = [:]
   private var directResponses: [DirectResponse] = []
   private var statsSinks: [String] = []
   private var experimentalValidateYAMLCallback: ((Bool) -> Void)?
@@ -483,8 +483,9 @@ open class EngineBuilder: NSObject {
   /// - parameter value: the value fo the runtime guard.
   ///
   /// - returns: This builder.
+  /// TODO(jpsim), who incredibly generously offered to swift for us, convert this to bool.
   @discardableResult
-  public func setRuntimeGuard(name: String, value: Bool) -> Self {
+  public func setRuntimeGuard(name: String, value: String) -> Self {
     self.runtimeGuards[name] = value
     return self
   }

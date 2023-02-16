@@ -120,12 +120,8 @@
   NSMutableString *customRuntime = [[NSMutableString alloc] init];
 
   for (NSString *key in self.runtimeGuards) {
-    if (self.runtimeGuards[key] == true) {
-      NSString *line = [NSString stringWithFormat:@"            %@: true\n", key];
-
-    } else {
-      NSString *line = [NSString stringWithFormat:@"            %@: false\n", key];
-    }
+    NSString *line =
+        [NSString stringWithFormat:@"            %@: %@\n", key, self.runtimeGuards[key]];
     [customRuntime appendString:line];
   }
 

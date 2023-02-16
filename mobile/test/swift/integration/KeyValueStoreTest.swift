@@ -84,7 +84,7 @@ static_resources:
         keyValueStore: testStore
       ).setRuntimeGuard(
         name: "test_feature_false",
-        value: true
+        value: "true"
       )
 
       .build()
