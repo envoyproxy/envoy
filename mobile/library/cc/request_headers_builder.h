@@ -11,6 +11,7 @@
 namespace Envoy {
 namespace Platform {
 
+// Available algorithms to compress requests.
 enum CompressionAlgorithm {
   gzip,
   brotli,
