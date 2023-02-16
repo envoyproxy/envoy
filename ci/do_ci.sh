@@ -383,6 +383,7 @@ elif [[ "$CI_TARGET" == "bazel.compile_time_options" ]]; then
     "--define" "tcmalloc=gperftools"
     "--define" "zlib=ng"
     "--define" "uhv=enabled"
+    "--define" "stdlib_linking=dynamic"
     "--@envoy//bazel:http3=False"
     "--@envoy//source/extensions/filters/http/kill_request:enabled"
     "--test_env=ENVOY_HAS_EXTRA_EXTENSIONS=true")
