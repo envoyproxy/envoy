@@ -130,6 +130,14 @@ absl::optional<std::chrono::nanoseconds> TimingUtility::downstreamHandshakeCompl
   return duration(timing.value().get().downstreamHandshakeComplete(), stream_info_);
 }
 
+absl::optional<std::chrono::nanoseconds> TimingUtility::upstreamHandshakeComplete() {
+  OptRef<const UpstreamTiming> timing = stream_info_.upstreamTiming();
+  if (!timing) {
+    return absl::nullopt;
+  }
+  return duration(timing.value().get().upstreamHandshakeComplete(), stream_info_);
+}
+
 absl::optional<std::chrono::nanoseconds> TimingUtility::lastDownstreamAckReceived() {
   OptRef<const DownstreamTiming> timing = stream_info_.downstreamTiming();
   if (!timing) {
