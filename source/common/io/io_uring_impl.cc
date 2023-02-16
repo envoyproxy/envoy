@@ -2,22 +2,44 @@
 
 #if defined(__linux__)
 #include <sys/eventfd.h>
+#include <utility>
 #endif
 
 namespace Envoy {
 namespace Io {
 
 #if defined(__linux__)
+
+#define IORING_REQUIRED_OP(op)                                                                     \
+  { op, #op }
+
+static constexpr std::pair<int, const char*> required_io_uring_ops[] = {
+    IORING_REQUIRED_OP(IORING_OP_ACCEPT),       IORING_REQUIRED_OP(IORING_OP_CONNECT),
+    IORING_REQUIRED_OP(IORING_OP_ASYNC_CANCEL), IORING_REQUIRED_OP(IORING_OP_CLOSE),
+    IORING_REQUIRED_OP(IORING_OP_READV),        IORING_REQUIRED_OP(IORING_OP_WRITEV),
+};
+
 bool isIoUringSupported() {
   struct io_uring_params p {};
   struct io_uring ring;
 
   bool is_supported = io_uring_queue_init_params(2, &ring, &p) == 0;
-  if (is_supported) {
-    io_uring_queue_exit(&ring);
+  io_uring_queue_exit(&ring);
+  if (!is_supported) {
+    return false;
   }
 
-  return is_supported;
+  struct io_uring_probe* probe = io_uring_get_probe();
+  for (auto& op : required_io_uring_ops) {
+    if (!io_uring_opcode_supported(probe, op.first)) {
+      ENVOY_LOG_MISC(warn, "the kernel doesn't support {}", op.second);
+      io_uring_free_probe(probe);
+      return false;
+    }
+  }
+
+  io_uring_free_probe(probe);
+  return true;
 }
 
 IoUringImpl::IoUringImpl(uint32_t io_uring_size, bool use_submission_queue_polling)

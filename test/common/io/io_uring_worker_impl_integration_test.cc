@@ -97,21 +97,28 @@ public:
 
 class IoUringWorkerIntegraionTest : public testing::Test {
 public:
-  void init() {
-    if (!isIoUringSupported()) {
+  IoUringWorkerIntegraionTest() { should_skip_ = !isIoUringSupported(); }
+
+  void SetUp() {
+    if (should_skip_) {
       GTEST_SKIP();
     }
+  }
+
+  void init() {
     api_ = Api::createApiForTest(time_system_);
     dispatcher_ = api_->allocateDispatcher("test_thread");
     io_uring_worker_ = std::make_unique<IoUringWorkerTestImpl>(
         std::make_unique<IoUringImpl>(8, false), *dispatcher_);
   }
+
   void initializeSockets() {
     socket(true, true);
     listen();
     connect();
     accept();
   }
+
   void cleanup() {
     Api::OsSysCallsSingleton::get().close(client_socket_);
     Api::OsSysCallsSingleton::get().close(server_socket_);
@@ -138,6 +145,7 @@ public:
             .return_value_;
     EXPECT_TRUE(SOCKET_VALID(client_socket_));
   }
+
   void listen() {
     struct sockaddr_in listen_addr;
     memset(&listen_addr, 0, sizeof(listen_addr));
@@ -151,12 +159,14 @@ public:
               0);
     EXPECT_EQ(Api::OsSysCallsSingleton::get().listen(listen_socket_, 5).return_value_, 0);
   }
+
   void connect() {
     struct sockaddr_in listen_addr = getListenSocketAddress();
     Api::OsSysCallsSingleton::get().connect(
         client_socket_, reinterpret_cast<struct sockaddr*>(&listen_addr), sizeof(listen_addr));
     EXPECT_EQ(errno, EINPROGRESS);
   }
+
   void accept() {
     auto file_event = dispatcher_->createFileEvent(
         listen_socket_,
@@ -178,6 +188,7 @@ public:
     file_event.reset();
   }
 
+  bool should_skip_{false};
   os_fd_t listen_socket_{INVALID_SOCKET};
   os_fd_t server_socket_{INVALID_SOCKET};
   os_fd_t client_socket_{INVALID_SOCKET};
