@@ -556,10 +556,10 @@ Note that Envoy will fail to start up in debug mode if an unknown guard is speci
 **Example**::
 
   // Kotlin
-  builder.setRuntimeGuard("feature", "true")
+  builder.setRuntimeGuard("feature", true)
 
   // Swift
-  builder.setRuntimeGuard("feature", "true")
+  builder.setRuntimeGuard("feature", true)
 
 ----------------------
 Advanced configuration
