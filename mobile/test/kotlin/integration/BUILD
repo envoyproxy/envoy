@@ -174,7 +174,8 @@ envoy_mobile_jni_kt_test(
     ],
 )
 
-envoy_mobile_jni_kt_test(
+#envoy_mobile_jni_kt_test(
+envoy_mobile_android_test(
     name = "send_data_test",
     srcs = [
         "SendDataTest.kt",
@@ -185,6 +186,7 @@ envoy_mobile_jni_kt_test(
     ],
     deps = [
         "//library/kotlin/io/envoyproxy/envoymobile:envoy_interfaces_lib",
+        "//test/java/io/envoyproxy/envoymobile/engine/testing",
     ],
 )
 
