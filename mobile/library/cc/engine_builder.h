@@ -96,6 +96,7 @@ public:
   EngineBuilder& addVirtualCluster(std::string virtual_cluster);
 
   // Add a direct response. For testing purposes only.
+  // TODO(jpsim): Move this out of the main engine builder API
   EngineBuilder& addDirectResponse(DirectResponseTesting::DirectResponse direct_response);
 
   // These functions don't affect YAML but instead perform registrations.
