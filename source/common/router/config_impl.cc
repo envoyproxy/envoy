@@ -218,16 +218,15 @@ createRedirectConfig(const envoy::config::route::v3::Route& route) {
                                        : "",
       route.redirect().path_redirect(),
       route.redirect().prefix_rewrite(),
-      "",      // regex_rewrite_redirect_substitution
-      nullptr, // regex_rewrite_redirect
+      route.redirect().has_regex_rewrite() ? route.redirect().regex_rewrite().substitution() : "",
+      route.redirect().has_regex_rewrite()
+          ? Regex::Utility::parseRegex(route.redirect().regex_rewrite().pattern())
+          : nullptr,
       route.redirect().path_redirect().find('?') != absl::string_view::npos,
       route.redirect().https_redirect(),
       route.redirect().strip_query()};
   if (route.redirect().has_regex_rewrite()) {
     ASSERT(redirect_config.prefix_rewrite_redirect_.empty());
-    auto rewrite_spec = route.redirect().regex_rewrite();
-    redirect_config.regex_rewrite_redirect_ = Regex::Utility::parseRegex(rewrite_spec.pattern());
-    redirect_config.regex_rewrite_redirect_substitution_ = rewrite_spec.substitution();
   }
   return redirect_config;
 }
