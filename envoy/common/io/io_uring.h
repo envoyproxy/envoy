@@ -197,6 +197,7 @@ public:
 
   /**
    * On accept request completed.
+   * TODO (soulxu): wrap the raw result into a type. It can be `IoCallUint64Result`.
    * @param result the result of operation in the request.
    * @param injected indicates the completion is injected or not.
    */
@@ -204,6 +205,7 @@ public:
 
   /**
    * On close request completed.
+   * TODO (soulxu): wrap the raw result into a type. It can be `IoCallUint64Result`.
    * @param result the result of operation in the request.
    * @param injected indicates the completion is injected or not.
    */
@@ -211,6 +213,7 @@ public:
 
   /**
    * On cancel request completed.
+   * TODO (soulxu): wrap the raw result into a type. It can be `IoCallUint64Result`.
    * @param result the result of operation in the request.
    * @param injected indicates the completion is injected or not.
    */
@@ -218,6 +221,7 @@ public:
 
   /**
    * On connect request completed.
+   * TODO (soulxu): wrap the raw result into a type. It can be `IoCallUint64Result`.
    * @param result the result of operation in the request.
    * @param injected indicates the completion is injected or not.
    */
@@ -225,6 +229,7 @@ public:
 
   /**
    * On read request completed.
+   * TODO (soulxu): wrap the raw result into a type. It can be `IoCallUint64Result`.
    * @param result the result of operation in the request.
    * @param injected indicates the completion is injected or not.
    */
@@ -232,6 +237,7 @@ public:
 
   /**
    * On write request completed.
+   * TODO (soulxu): wrap the raw result into a type. It can be `IoCallUint64Result`.
    * @param result the result of operation in the request.
    * @param injected indicates the completion is injected or not.
    */
