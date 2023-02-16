@@ -729,13 +729,6 @@ class FormatChecker:
                 + "Lua API (bad light userdata pointer) on ARM64 architecture. See "
                 + "https://github.com/LuaJIT/LuaJIT/issues/450#issuecomment-433659873 for details.")
 
-        if file_path.endswith(self.config.suffixes["proto"]):
-            exclude_path = ['v1', 'v2']
-            result = self.config.re["proto_validation_string"].search(line)
-            if result is not None:
-                if not any(x in file_path for x in exclude_path):
-                    report_error("min_bytes is DEPRECATED, Use min_len.")
-
     def check_build_line(self, line, file_path, report_error):
         if "@bazel_tools" in line and not (self.is_starlark_file(file_path)
                                            or file_path.startswith("./bazel/")

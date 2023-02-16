@@ -128,6 +128,9 @@ void TracerUtility::finalizeSpan(Span& span, const TraceContext& trace_context,
       it.second->applySpan(span, ctx);
     }
   }
+
+  // Finish the span.
+  span.finishSpan();
 }
 
 TracerImpl::TracerImpl(DriverSharedPtr driver, const LocalInfo::LocalInfo& local_info)

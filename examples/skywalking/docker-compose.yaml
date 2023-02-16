@@ -77,6 +77,13 @@ services:
     environment:
       discovery.type: single-node
       ingest.geoip.downloader.enabled: "false"
+
+      cluster.routing.allocation.disk.watermark.low: "${ES_WATERMARK_LOW:-85%}"
+      cluster.routing.allocation.disk.watermark.high: "${ES_WATERMARK_HIGH:-90%}"
+      cluster.routing.allocation.disk.watermark.flood_stage: "${ES_WATERMARK_FLOOD:-95%}"
+      cluster.routing.allocation.disk.watermark.flood_stage.frozen: "${ES_WATERMARK_FLOOD_FROZEN:-95%}"
+      cluster.routing.allocation.disk.watermark.flood_stage.frozen.max_headroom: "${ES_MAX_HEADROOM:-20GB}"
+
       # NB: This setting is for demo purposes only, you are strongly advised to configure
       #   Elasticsearch with security enabled
       xpack.security.enabled: "false"

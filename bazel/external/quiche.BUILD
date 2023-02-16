@@ -2946,6 +2946,34 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "quiche_common_status_utils",
+    hdrs = ["quiche/common/quiche_status_utils.h"],
+    copts = quiche_copts,
+    repository = "@envoy",
+    tags = ["nofips"],
+    deps = [
+        "@com_google_absl//absl/base:core_headers",
+        "@com_google_absl//absl/status",
+        "@com_google_absl//absl/strings",
+    ],
+)
+
+envoy_cc_library(
+    name = "quiche_common_wire_serialization",
+    hdrs = ["quiche/common/wire_serialization.h"],
+    copts = quiche_copts,
+    repository = "@envoy",
+    tags = ["nofips"],
+    deps = [
+        ":quiche_common_buffer_allocator_lib",
+        ":quiche_common_lib",
+        ":quiche_common_platform_logging",
+        ":quiche_common_status_utils",
+        "@com_google_absl//absl/status:statusor",
+    ],
+)
+
+envoy_cc_library(
     name = "quic_core_data_lib",
     srcs = [
         "quiche/quic/core/quic_data_reader.cc",
@@ -3124,6 +3152,7 @@ envoy_cc_library(
         ":quic_core_types_lib",
         ":quic_platform_base",
         ":quiche_common_buffer_allocator_lib",
+        ":quiche_common_wire_serialization",
         ":quiche_web_transport_web_transport_lib",
     ],
 )
@@ -5661,7 +5690,6 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "quiche_balsa_http_validation_policy_lib",
-    srcs = ["quiche/balsa/http_validation_policy.cc"],
     hdrs = ["quiche/balsa/http_validation_policy.h"],
     copts = quiche_copts,
     repository = "@envoy",

@@ -11,6 +11,7 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import io.envoyproxy.envoymobile.android.SharedPreferencesStore
 import io.envoyproxy.envoymobile.AndroidEngineBuilder
+import io.envoyproxy.envoymobile.EngineBuilderAdminUtil.enableAdminInterface
 import io.envoyproxy.envoymobile.Element
 import io.envoyproxy.envoymobile.Engine
 import io.envoyproxy.envoymobile.LogLevel
@@ -74,6 +75,7 @@ class MainActivity : Activity() {
       .setLogger {
         Log.d("MainActivity", it)
       }
+      .useLegacyBuilder(true)
       .build()
 
     recyclerView = findViewById(R.id.recycler_view) as RecyclerView

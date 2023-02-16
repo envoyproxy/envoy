@@ -15,6 +15,12 @@
 #include "envoy/extensions/transport_sockets/quic/v3/quic_transport.pb.h"
 #include "envoy/extensions/transport_sockets/raw_buffer/v3/raw_buffer.pb.h"
 
+#ifdef ENVOY_MOBILE_REQUEST_COMPRESSION
+#include "envoy/extensions/compression/brotli/compressor/v3/brotli.pb.h"
+#include "envoy/extensions/compression/gzip/compressor/v3/gzip.pb.h"
+#include "envoy/extensions/filters/http/compressor/v3/compressor.pb.h"
+#endif
+
 #include "source/common/common/assert.h"
 #include "source/extensions/clusters/dynamic_forward_proxy/cluster.h"
 
@@ -25,6 +31,7 @@
 #include "library/common/engine.h"
 #include "library/common/extensions/cert_validator/platform_bridge/platform_bridge.pb.h"
 #include "library/common/extensions/filters/http/local_error/filter.pb.h"
+#include "library/common/extensions/filters/http/route_cache_reset/filter.pb.h"
 #include "library/common/extensions/filters/http/network_configuration/filter.pb.h"
 #include "library/common/extensions/filters/http/socket_tag/filter.pb.h"
 #include "library/common/extensions/key_value/platform/platform.pb.h"
@@ -40,8 +47,10 @@ void insertCustomFilter(const std::string& filter_config, std::string& config_te
                       &config_template);
 }
 
+// Note that updates to the config.cc bootstrap will require a matching update in
+// generateBootstrap() below
 bool generatedStringMatchesGeneratedBoostrap(
-    std::string& config_str, std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> bootstrap) {
+    const absl::string_view config_str, const envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
   Thread::SkipAsserts skip;
   ProtobufMessage::StrictValidationVisitorImpl visitor;
   envoy::config::bootstrap::v3::Bootstrap config_bootstrap;
@@ -49,14 +58,15 @@ bool generatedStringMatchesGeneratedBoostrap(
 
   Protobuf::util::MessageDifferencer differencer;
   differencer.set_message_field_comparison(Protobuf::util::MessageDifferencer::EQUIVALENT);
-  differencer.set_repeated_field_comparison(Protobuf::util::MessageDifferencer::AS_SET);
+  differencer.set_repeated_field_comparison(Protobuf::util::MessageDifferencer::AS_LIST);
 
-  bool same = differencer.Compare(config_bootstrap, *bootstrap);
-
+  bool same = differencer.Compare(config_bootstrap, bootstrap);
   if (!same) {
-    std::cerr << config_bootstrap.DebugString();
-    std::cerr << "============================================";
-    std::cerr << bootstrap->DebugString();
+    std::cerr << "\n=========== Config bootstrap yaml ============\n";
+    std::cerr << MessageUtil::getYamlStringFromMessage(config_bootstrap);
+    std::cerr << "\n=============== Bootstrap yaml ===============\n";
+    std::cerr << MessageUtil::getYamlStringFromMessage(bootstrap);
+    std::cerr << "\n==============================================\n";
   }
   return same;
 }
@@ -82,14 +92,8 @@ EngineBuilder& EngineBuilder::setOnEngineRunning(std::function<void()> closure) 
   return *this;
 }
 
-void EngineBuilder::bootstrapIncompatible() {
-  ENVOY_BUG(!use_bootstrap_, "Function not compatible with bootstrap builder");
-  config_bootstrap_incompatible_ = true;
-}
-
-EngineBuilder& EngineBuilder::addStatsSinks(const std::vector<std::string>& stat_sinks) {
-  bootstrapIncompatible();
-  stat_sinks_ = stat_sinks;
+EngineBuilder& EngineBuilder::addStatsSinks(std::vector<std::string> stats_sinks) {
+  stats_sinks_ = std::move(stats_sinks);
   return *this;
 }
 
@@ -124,9 +128,8 @@ EngineBuilder& EngineBuilder::addDnsQueryTimeoutSeconds(int dns_query_timeout_se
   return *this;
 }
 
-EngineBuilder& EngineBuilder::addDnsPreresolveHostnames(std::string dns_preresolve_hostnames) {
-  bootstrapIncompatible();
-  dns_preresolve_hostnames_ = std::move(dns_preresolve_hostnames);
+EngineBuilder& EngineBuilder::addDnsPreresolveHostnames(const std::vector<std::string>& hostnames) {
+  dns_preresolve_hostnames_ = std::move(hostnames);
   return *this;
 }
 
@@ -158,15 +161,13 @@ EngineBuilder& EngineBuilder::addStatsFlushSeconds(int stats_flush_seconds) {
   return *this;
 }
 
-EngineBuilder& EngineBuilder::addVirtualClusters(std::string virtual_clusters) {
-  bootstrapIncompatible();
-  virtual_clusters_ = std::move(virtual_clusters);
+EngineBuilder& EngineBuilder::addVirtualCluster(std::string virtual_cluster) {
+  virtual_clusters_.push_back(std::move(virtual_cluster));
   return *this;
 }
 
 EngineBuilder& EngineBuilder::addKeyValueStore(std::string name,
                                                KeyValueStoreSharedPtr key_value_store) {
-  bootstrapIncompatible();
   key_value_stores_[std::move(name)] = std::move(key_value_store);
   return *this;
 }
@@ -196,34 +197,61 @@ EngineBuilder& EngineBuilder::setPerTryIdleTimeoutSeconds(int per_try_idle_timeo
   return *this;
 }
 
-EngineBuilder& EngineBuilder::enableGzip(bool gzip_on) {
-  gzip_filter_ = gzip_on;
+EngineBuilder& EngineBuilder::enableGzipDecompression(bool gzip_decompression_on) {
+  gzip_decompression_filter_ = gzip_decompression_on;
   return *this;
 }
 
-EngineBuilder& EngineBuilder::enableBrotli(bool brotli_on) {
-  brotli_filter_ = brotli_on;
+#ifdef ENVOY_MOBILE_REQUEST_COMPRESSION
+EngineBuilder& EngineBuilder::enableGzipCompression(bool gzip_compression_on) {
+  gzip_compression_filter_ = gzip_compression_on;
   return *this;
 }
+#endif
+
+EngineBuilder& EngineBuilder::enableBrotliDecompression(bool brotli_decompression_on) {
+  brotli_decompression_filter_ = brotli_decompression_on;
+  return *this;
+}
+
+#ifdef ENVOY_MOBILE_REQUEST_COMPRESSION
+EngineBuilder& EngineBuilder::enableBrotliCompression(bool brotli_compression_on) {
+  brotli_compression_filter_ = brotli_compression_on;
+  return *this;
+}
+#endif
 
 EngineBuilder& EngineBuilder::enableSocketTagging(bool socket_tagging_on) {
   socket_tagging_filter_ = socket_tagging_on;
   return *this;
 }
 
+#ifdef ENVOY_ADMIN_FUNCTIONALITY
 EngineBuilder& EngineBuilder::enableAdminInterface(bool admin_interface_on) {
-  bootstrapIncompatible();
   admin_interface_enabled_ = admin_interface_on;
   return *this;
 }
+#endif
 
 EngineBuilder& EngineBuilder::enableHappyEyeballs(bool happy_eyeballs_on) {
   enable_happy_eyeballs_ = happy_eyeballs_on;
   return *this;
 }
 
+#ifdef ENVOY_ENABLE_QUIC
 EngineBuilder& EngineBuilder::enableHttp3(bool http3_on) {
   enable_http3_ = http3_on;
+  return *this;
+}
+#endif
+
+EngineBuilder& EngineBuilder::setForceAlwaysUsev6(bool value) {
+  always_use_v6_ = value;
+  return *this;
+}
+
+EngineBuilder& EngineBuilder::setSkipDnsLookupForProxiedRequests(bool value) {
+  skip_dns_lookups_for_proxied_requests_ = value;
   return *this;
 }
 
@@ -242,50 +270,99 @@ EngineBuilder& EngineBuilder::enforceTrustChainVerification(bool trust_chain_ver
   return *this;
 }
 
+EngineBuilder& EngineBuilder::addRtdsLayer(const std::string& layer_name,
+                                           const int timeout_seconds) {
+  rtds_layer_name_ = layer_name;
+  rtds_timeout_seconds_ = timeout_seconds;
+  return *this;
+}
+EngineBuilder& EngineBuilder::setAggregatedDiscoveryService(const std::string& api_type,
+                                                            const std::string& address,
+                                                            const int port) {
+#ifndef ENVOY_GOOGLE_GRPC
+  throw std::runtime_error("google_grpc must be enabled in bazel to use ADS");
+#endif
+  ads_api_type_ = api_type;
+  ads_address_ = address;
+  ads_port_ = port;
+  return *this;
+}
+
+EngineBuilder& EngineBuilder::addCdsLayer(const int timeout_seconds) {
+  enable_cds_ = true;
+  cds_timeout_seconds_ = timeout_seconds;
+  return *this;
+}
+
 EngineBuilder&
 EngineBuilder::enablePlatformCertificatesValidation(bool platform_certificates_validation_on) {
   platform_certificates_validation_on_ = platform_certificates_validation_on;
   return *this;
 }
 
-EngineBuilder& EngineBuilder::enableDnsCache(bool dns_cache_on) {
+EngineBuilder& EngineBuilder::enableDnsCache(bool dns_cache_on, int save_interval_seconds) {
   dns_cache_on_ = dns_cache_on;
+  dns_cache_save_interval_seconds_ = save_interval_seconds;
   return *this;
 }
 
 EngineBuilder& EngineBuilder::addStringAccessor(std::string name,
                                                 StringAccessorSharedPtr accessor) {
-  bootstrapIncompatible();
   string_accessors_[std::move(name)] = std::move(accessor);
   return *this;
 }
 
 EngineBuilder& EngineBuilder::addNativeFilter(std::string name, std::string typed_config) {
-  bootstrapIncompatible();
   native_filter_chain_.emplace_back(std::move(name), std::move(typed_config));
   return *this;
 }
 
 EngineBuilder& EngineBuilder::addPlatformFilter(std::string name) {
-  bootstrapIncompatible();
-  platform_filters_.push_back(std::move(name));
+  addNativeFilter(
+      "envoy.filters.http.platform_bridge",
+      absl::StrCat(
+          "{'@type': "
+          "type.googleapis.com/envoymobile.extensions.filters.http.platform_bridge.PlatformBridge, "
+          "platform_filter_name: ",
+          name, "}"));
   return *this;
 }
 
-EngineBuilder& EngineBuilder::setUseBootstrap() {
-  ENVOY_BUG(!config_bootstrap_incompatible_, "Config not compatible with bootstrap builder");
-  use_bootstrap_ = true;
+EngineBuilder&
+EngineBuilder::addDirectResponse(DirectResponseTesting::DirectResponse direct_response) {
+  direct_responses_.push_back(direct_response);
   return *this;
 }
 
 std::string EngineBuilder::generateConfigStr() const {
+  if (!config_override_for_tests_.empty()) {
+    return config_override_for_tests_;
+  }
+
+  std::string preresolve_hostnames = "[";
+  std::string maybe_comma = "";
+  for (auto& hostname : dns_preresolve_hostnames_) {
+    absl::StrAppend(&preresolve_hostnames, maybe_comma, "{address: \"", hostname,
+                    "\", port_value: 443}");
+    maybe_comma = ",";
+  }
+  absl::StrAppend(&preresolve_hostnames, "]");
+
+  std::string virtual_clusters = "[";
+  maybe_comma = "";
+  for (auto& cluster : virtual_clusters_) {
+    absl::StrAppend(&virtual_clusters, maybe_comma, cluster);
+    maybe_comma = ",";
+  }
+  absl::StrAppend(&virtual_clusters, "]");
+
   std::vector<std::pair<std::string, std::string>> replacements {
     {"connect_timeout", fmt::format("{}s", connect_timeout_seconds_)},
         {"dns_fail_base_interval", fmt::format("{}s", dns_failure_refresh_seconds_base_)},
         {"dns_fail_max_interval", fmt::format("{}s", dns_failure_refresh_seconds_max_)},
         {"dns_lookup_family", enable_happy_eyeballs_ ? "ALL" : "V4_PREFERRED"},
         {"dns_min_refresh_rate", fmt::format("{}s", dns_min_refresh_seconds_)},
-        {"dns_preresolve_hostnames", dns_preresolve_hostnames_},
+        {"dns_preresolve_hostnames", preresolve_hostnames},
         {"dns_refresh_rate", fmt::format("{}s", dns_refresh_seconds_)},
         {"dns_query_timeout", fmt::format("{}s", dns_query_timeout_seconds_)},
         {"enable_drain_post_dns_refresh", enable_drain_post_dns_refresh_ ? "true" : "false"},
@@ -296,7 +373,7 @@ std::string EngineBuilder::generateConfigStr() const {
          fmt::format("{}s", h2_connection_keepalive_timeout_seconds_)},
         {
             "metadata",
-            fmt::format("{{ device_os: {}, app_version: {}, app_id: {} }}", device_os_,
+            fmt::format("{{ device_os: \"{}\", app_version: \"{}\", app_id: \"{}\" }}", device_os_,
                         app_version_, app_id_),
         },
         {"max_connections_per_host", fmt::format("{}", max_connections_per_host_)},
@@ -305,15 +382,21 @@ std::string EngineBuilder::generateConfigStr() const {
         {"trust_chain_verification",
          enforce_trust_chain_verification_ ? "VERIFY_TRUST_CHAIN" : "ACCEPT_UNTRUSTED"},
         {"per_try_idle_timeout", fmt::format("{}s", per_try_idle_timeout_seconds_)},
-        {"virtual_clusters", virtual_clusters_},
+        {"virtual_clusters", virtual_clusters},
+        {"skip_dns_lookup_for_proxied_requests",
+         skip_dns_lookups_for_proxied_requests_ ? "true" : "false"},
 #if defined(__ANDROID_API__)
         {"force_ipv6", "true"},
+#else
+        {"force_ipv6", always_use_v6_ ? "true" : "false"},
 #endif
   };
   if (!stats_domain_.empty()) {
     replacements.push_back({"stats_domain", stats_domain_});
   }
   if (dns_cache_on_) {
+    replacements.push_back({"persistent_dns_cache_save_interval",
+                            fmt::format("{}", dns_cache_save_interval_seconds_)});
     replacements.push_back({"persistent_dns_cache_config", persistent_dns_cache_config_insert});
   }
 
@@ -324,7 +407,8 @@ std::string EngineBuilder::generateConfigStr() const {
   for (const auto& [key, value] : replacements) {
     config_builder << "- &" << key << " " << value << std::endl;
   }
-  std::vector<std::string> stat_sinks = stat_sinks_;
+
+  std::vector<std::string> stat_sinks = stats_sinks_;
   if (!stats_domain_.empty()) {
     stat_sinks.push_back("*base_metrics_service");
   }
@@ -340,17 +424,27 @@ std::string EngineBuilder::generateConfigStr() const {
   config_builder << cert_validation_template << std::endl;
 
   std::string config_template = config_template_;
-  if (gzip_filter_) {
-    insertCustomFilter(gzip_config_insert, config_template);
-  }
-  if (brotli_filter_) {
-    insertCustomFilter(brotli_config_insert, config_template);
-  }
   if (socket_tagging_filter_) {
     insertCustomFilter(socket_tag_config_insert, config_template);
   }
+  if (brotli_compression_filter_) {
+    insertCustomFilter(brotli_compressor_config_insert, config_template);
+  }
+  if (brotli_decompression_filter_) {
+    insertCustomFilter(brotli_decompressor_config_insert, config_template);
+  }
+  if (gzip_compression_filter_) {
+    insertCustomFilter(gzip_compressor_config_insert, config_template);
+  }
+  if (gzip_decompression_filter_) {
+    insertCustomFilter(gzip_decompressor_config_insert, config_template);
+  }
   if (enable_http3_) {
+#ifdef ENVOY_ENABLE_QUIC
     insertCustomFilter(alternate_protocols_cache_filter_insert, config_template);
+#else
+    throw std::runtime_error("http3 functionality was not compiled in this build of Envoy Mobile");
+#endif
   }
 
   for (const NativeFilterConfig& filter : native_filter_chain_) {
@@ -360,16 +454,47 @@ std::string EngineBuilder::generateConfigStr() const {
     insertCustomFilter(filter_config, config_template);
   }
 
-  for (const std::string& name : platform_filters_) {
-    std::string filter_config =
-        absl::StrReplaceAll(platform_filter_template, {{"{{ platform_filter_name }}", name}});
-    insertCustomFilter(filter_config, config_template);
+  if ((!rtds_layer_name_.empty() || enable_cds_) && ads_api_type_.empty()) {
+    throw std::runtime_error("ADS must be configured when using xDS");
+  }
+  if (!rtds_layer_name_.empty()) {
+    std::string rtds_layer =
+        fmt::format(rtds_layer_insert, rtds_layer_name_, rtds_layer_name_, rtds_timeout_seconds_);
+    absl::StrReplaceAll({{"#{custom_layers}", absl::StrCat("#{custom_layers}\n", rtds_layer)}},
+                        &config_template);
+  }
+  if (!ads_api_type_.empty()) {
+    std::string custom_ads = fmt::format(ads_insert, ads_api_type_, ads_address_, ads_port_);
+    absl::StrReplaceAll({{"#{custom_ads}", absl::StrCat("#{custom_ads}\n", custom_ads)}},
+                        &config_template);
+  }
+  if (enable_cds_) {
+    std::string custom_cds = fmt::format(cds_layer_insert, cds_timeout_seconds_);
+    absl::StrReplaceAll({{"#{custom_dynamic_resources}",
+                          absl::StrCat("#{custom_dynamic_resources}\n", custom_cds)}},
+                        &config_template);
+
+    std::string custom_node_context = R"(node_context_params:
+  - cluster)";
+    absl::StrReplaceAll(
+        {{"#{custom_node_context}", absl::StrCat("#{custom_node_context}\n", custom_node_context)}},
+        &config_template);
+
+    std::string custom_stats_patterns = R"(        - exact: cluster_manager.active_clusters
+        - exact: cluster_manager.cluster_added)";
+    absl::StrReplaceAll(
+        {{"#{custom_stats}", absl::StrCat("#{custom_stats}\n", custom_stats_patterns)}},
+        &config_template);
   }
 
   config_builder << config_template;
 
   if (admin_interface_enabled_) {
+#ifdef ENVOY_ADMIN_FUNCTIONALITY
     config_builder << "admin: *admin_interface" << std::endl;
+#else
+    throw std::runtime_error("Admin functionality was not compiled in this build of Envoy Mobile");
+#endif
   }
 
   auto config_str = config_builder.str();
@@ -377,18 +502,27 @@ std::string EngineBuilder::generateConfigStr() const {
     throw std::runtime_error("could not resolve all template keys in config");
   }
 
-  if (!config_bootstrap_incompatible_) {
-    // In debug mode, unless the config is known to be bootstrap incompatible,
-    // check equivalence.
-    ASSERT(generatedStringMatchesGeneratedBoostrap(config_str, generateBootstrap(true)));
-  }
-
   return config_str;
 }
 
+bool EngineBuilder::generateBootstrapAndCompare(absl::string_view yaml) const {
+  return generatedStringMatchesGeneratedBoostrap(yaml, *generateBootstrap());
+}
+
 std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap>
-EngineBuilder::generateBootstrap(bool trim_whitespace_for_tests) const {
-  auto bootstrap = std::make_unique<envoy::config::bootstrap::v3::Bootstrap>();
+EngineBuilder::generateBootstrapAndCompareForTests(absl::string_view yaml) const {
+  std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> bootstrap = generateBootstrap();
+  RELEASE_ASSERT(generateBootstrapAndCompare(yaml), "Failed equivalence");
+  return bootstrap;
+}
+
+std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generateBootstrap() const {
+  // The yaml utilities have non-relevant thread asserts.
+  Thread::SkipAsserts skip;
+  ASSERT(!config_bootstrap_incompatible_);
+
+  std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> bootstrap =
+      std::make_unique<envoy::config::bootstrap::v3::Bootstrap>();
 
   // Set up the HCM
   envoy::extensions::filters::network::http_connection_manager::v3::EnvoyMobileHttpConnectionManager
@@ -404,6 +538,47 @@ EngineBuilder::generateBootstrap(bool trim_whitespace_for_tests) const {
   auto* remote_service = route_config->add_virtual_hosts();
   remote_service->set_name("remote_service");
   remote_service->add_domains("127.0.0.1");
+
+  for (auto& direct_response_in : direct_responses_) {
+    auto* direct_response_route = remote_service->add_routes();
+    auto* direct_response = direct_response_route->mutable_direct_response();
+    direct_response->set_status(direct_response_in.status);
+    direct_response->mutable_body()->set_inline_string(direct_response_in.body);
+    auto* direct_response_route_match = direct_response_route->mutable_match();
+    auto matcher = direct_response_in.matcher;
+    if (!matcher.fullPath.empty()) {
+      direct_response_route_match->set_path(matcher.fullPath);
+    } else if (!matcher.pathPrefix.empty()) {
+      direct_response_route_match->set_prefix(matcher.pathPrefix);
+    }
+
+    for (auto& header : matcher.headers) {
+      auto* direct_response_headers = direct_response_route_match->add_headers();
+      direct_response_headers->set_name(header.name);
+      switch (header.mode) {
+      case DirectResponseTesting::contains:
+        direct_response_headers->set_contains_match(header.value);
+        break;
+      case DirectResponseTesting::exact:
+        direct_response_headers->set_exact_match(header.value);
+        break;
+      case DirectResponseTesting::prefix:
+        direct_response_headers->set_prefix_match(header.value);
+        break;
+      case DirectResponseTesting::suffix:
+        direct_response_headers->set_suffix_match(header.value);
+        break;
+      }
+    }
+
+    for (auto& header_in : direct_response_in.headers) {
+      auto* resp_header = direct_response_route->add_response_headers_to_add();
+      auto* header = resp_header->mutable_header();
+      header->set_key(header_in.first);
+      header->set_value(header_in.second);
+    }
+  }
+
   auto* route = remote_service->add_routes();
   route->mutable_match()->set_prefix("/");
   route->mutable_direct_response()->set_status(404);
@@ -414,6 +589,44 @@ EngineBuilder::generateBootstrap(bool trim_whitespace_for_tests) const {
   api_service->set_name("api");
   api_service->set_include_attempt_count_in_response(true);
   api_service->add_domains("*");
+  // Virtual clusters
+  for (auto& cluster : virtual_clusters_) {
+    MessageUtil::loadFromYaml(cluster, *api_service->add_virtual_clusters(),
+                              ProtobufMessage::getStrictValidationVisitor());
+  }
+
+  for (auto& direct_response_in : direct_responses_) {
+    auto* this_route = api_service->add_routes();
+    auto* mutable_route = this_route->mutable_route();
+    mutable_route->set_cluster("fake_remote");
+    auto* direct_response_route_match = this_route->mutable_match();
+    auto matcher = direct_response_in.matcher;
+    if (!matcher.fullPath.empty()) {
+      direct_response_route_match->set_path(matcher.fullPath);
+    } else if (!matcher.pathPrefix.empty()) {
+      direct_response_route_match->set_prefix(matcher.pathPrefix);
+    }
+
+    for (auto& header : matcher.headers) {
+      auto* direct_response_headers = direct_response_route_match->add_headers();
+      direct_response_headers->set_name(header.name);
+      switch (header.mode) {
+      case DirectResponseTesting::contains:
+        direct_response_headers->set_contains_match(header.value);
+        break;
+      case DirectResponseTesting::exact:
+        direct_response_headers->set_exact_match(header.value);
+        break;
+      case DirectResponseTesting::prefix:
+        direct_response_headers->set_prefix_match(header.value);
+        break;
+      case DirectResponseTesting::suffix:
+        direct_response_headers->set_suffix_match(header.value);
+        break;
+      }
+    }
+  }
+
   route = api_service->add_routes();
   route->mutable_match()->set_prefix("/");
   route->add_request_headers_to_remove("x-forwarded-proto");
@@ -427,40 +640,29 @@ EngineBuilder::generateBootstrap(bool trim_whitespace_for_tests) const {
   backoff->mutable_base_interval()->set_nanos(250000000);
   backoff->mutable_max_interval()->set_seconds(60);
 
+  for (auto filter = native_filter_chain_.rbegin(); filter != native_filter_chain_.rend();
+       ++filter) {
+    auto* native_filter = hcm->add_http_filters();
+    native_filter->set_name((*filter).name_);
+    MessageUtil::loadFromYaml((*filter).typed_config_, *native_filter->mutable_typed_config(),
+                              ProtobufMessage::getStrictValidationVisitor());
+  }
+
   // Set up the optional filters
   if (enable_http3_) {
+#ifdef ENVOY_ENABLE_QUIC
     envoy::extensions::filters::http::alternate_protocols_cache::v3::FilterConfig cache_config;
     cache_config.mutable_alternate_protocols_cache_options()->set_name(
         "default_alternate_protocols_cache");
     auto* cache_filter = hcm->add_http_filters();
     cache_filter->set_name("alternate_protocols_cache");
     cache_filter->mutable_typed_config()->PackFrom(cache_config);
+#else
+    throw std::runtime_error("http3 functionality was not compiled in this build of Envoy Mobile");
+#endif
   }
 
-  if (socket_tagging_filter_) {
-    envoymobile::extensions::filters::http::socket_tag::SocketTag tag_config;
-    auto* tag_filter = hcm->add_http_filters();
-    tag_filter->set_name("envoy.filters.http.socket_tag");
-    tag_filter->mutable_typed_config()->PackFrom(tag_config);
-  }
-  if (brotli_filter_) {
-    envoy::extensions::compression::brotli::decompressor::v3::Brotli brotli_config;
-    envoy::extensions::filters::http::decompressor::v3::Decompressor decompressor_config;
-    decompressor_config.mutable_decompressor_library()->set_name("text_optimized");
-    decompressor_config.mutable_decompressor_library()->mutable_typed_config()->PackFrom(
-        brotli_config);
-    auto* common_request =
-        decompressor_config.mutable_request_direction_config()->mutable_common_config();
-    common_request->mutable_enabled()->mutable_default_value();
-    common_request->mutable_enabled()->set_runtime_key("request_decompressor_enabled");
-    decompressor_config.mutable_response_direction_config()
-        ->mutable_common_config()
-        ->set_ignore_no_transform_header(true);
-    auto* brotli_filter = hcm->add_http_filters();
-    brotli_filter->set_name("envoy.filters.http.decompressor");
-    brotli_filter->mutable_typed_config()->PackFrom(decompressor_config);
-  }
-  if (gzip_filter_) {
+  if (gzip_decompression_filter_) {
     envoy::extensions::compression::gzip::decompressor::v3::Gzip gzip_config;
     gzip_config.mutable_window_bits()->set_value(15);
     envoy::extensions::filters::http::decompressor::v3::Decompressor decompressor_config;
@@ -477,6 +679,71 @@ EngineBuilder::generateBootstrap(bool trim_whitespace_for_tests) const {
     auto* gzip_filter = hcm->add_http_filters();
     gzip_filter->set_name("envoy.filters.http.decompressor");
     gzip_filter->mutable_typed_config()->PackFrom(decompressor_config);
+  }
+#ifdef ENVOY_MOBILE_REQUEST_COMPRESSION
+  if (gzip_compression_filter_) {
+    envoy::extensions::compression::gzip::compressor::v3::Gzip gzip_config;
+    gzip_config.mutable_window_bits()->set_value(15);
+    envoy::extensions::filters::http::compressor::v3::Compressor compressor_config;
+    compressor_config.mutable_compressor_library()->set_name("gzip");
+    compressor_config.mutable_compressor_library()->mutable_typed_config()->PackFrom(gzip_config);
+    auto* common_request =
+        compressor_config.mutable_request_direction_config()->mutable_common_config();
+    common_request->mutable_enabled()->mutable_default_value()->set_value(true);
+    auto* common_response =
+        compressor_config.mutable_response_direction_config()->mutable_common_config();
+    common_response->mutable_enabled()->mutable_default_value()->set_value(false);
+    auto* gzip_filter = hcm->add_http_filters();
+    gzip_filter->set_name("envoy.filters.http.compressor");
+    gzip_filter->mutable_typed_config()->PackFrom(compressor_config);
+  }
+#endif
+  if (brotli_decompression_filter_) {
+    envoy::extensions::compression::brotli::decompressor::v3::Brotli brotli_config;
+    envoy::extensions::filters::http::decompressor::v3::Decompressor decompressor_config;
+    decompressor_config.mutable_decompressor_library()->set_name("text_optimized");
+    decompressor_config.mutable_decompressor_library()->mutable_typed_config()->PackFrom(
+        brotli_config);
+    auto* common_request =
+        decompressor_config.mutable_request_direction_config()->mutable_common_config();
+    common_request->mutable_enabled()->mutable_default_value();
+    common_request->mutable_enabled()->set_runtime_key("request_decompressor_enabled");
+    decompressor_config.mutable_response_direction_config()
+        ->mutable_common_config()
+        ->set_ignore_no_transform_header(true);
+    auto* brotli_filter = hcm->add_http_filters();
+    brotli_filter->set_name("envoy.filters.http.decompressor");
+    brotli_filter->mutable_typed_config()->PackFrom(decompressor_config);
+  }
+#ifdef ENVOY_MOBILE_REQUEST_COMPRESSION
+  if (brotli_compression_filter_) {
+    envoy::extensions::compression::brotli::compressor::v3::Brotli brotli_config;
+    envoy::extensions::filters::http::compressor::v3::Compressor compressor_config;
+    compressor_config.mutable_compressor_library()->set_name("text_optimized");
+    compressor_config.mutable_compressor_library()->mutable_typed_config()->PackFrom(brotli_config);
+    auto* common_request =
+        compressor_config.mutable_request_direction_config()->mutable_common_config();
+    common_request->mutable_enabled()->mutable_default_value()->set_value(true);
+    auto* common_response =
+        compressor_config.mutable_response_direction_config()->mutable_common_config();
+    common_response->mutable_enabled()->mutable_default_value()->set_value(false);
+    auto* brotli_filter = hcm->add_http_filters();
+    brotli_filter->set_name("envoy.filters.http.compressor");
+    brotli_filter->mutable_typed_config()->PackFrom(compressor_config);
+  }
+#endif
+  if (socket_tagging_filter_) {
+    envoymobile::extensions::filters::http::socket_tag::SocketTag tag_config;
+    auto* tag_filter = hcm->add_http_filters();
+    tag_filter->set_name("envoy.filters.http.socket_tag");
+    tag_filter->mutable_typed_config()->PackFrom(tag_config);
+  }
+
+  if (!direct_responses_.empty()) {
+    envoymobile::extensions::filters::http::route_cache_reset::RouteCacheReset cache_reset;
+    auto* cache_reset_filter = hcm->add_http_filters();
+    cache_reset_filter->set_name("envoy.filters.http.route_cache_reset");
+    cache_reset_filter->mutable_typed_config()->PackFrom(cache_reset);
   }
 
   // Set up the always-present filters
@@ -512,7 +779,7 @@ EngineBuilder::generateBootstrap(bool trim_whitespace_for_tests) const {
   if (dns_cache_on_) {
     envoymobile::extensions::key_value::platform::PlatformKeyValueStoreConfig kv_config;
     kv_config.set_key("dns_persistent_cache");
-    kv_config.mutable_save_interval()->set_seconds(0);
+    kv_config.mutable_save_interval()->set_seconds(dns_cache_save_interval_seconds_);
     kv_config.set_max_entries(100);
     dns_cache_config->mutable_key_value_config()->mutable_config()->set_name(
         "envoy.key_value.platform");
@@ -535,6 +802,12 @@ EngineBuilder::generateBootstrap(bool trim_whitespace_for_tests) const {
   dns_cache_config->mutable_typed_dns_resolver_config()->mutable_typed_config()->PackFrom(
       resolver_config);
 
+  for (auto& hostname : dns_preresolve_hostnames_) {
+    envoy::config::core::v3::SocketAddress* address = dns_cache_config->add_preresolve_hostnames();
+    address->set_address(hostname);
+    address->set_port_value(443);
+  }
+
   auto* dfp_filter = hcm->add_http_filters();
   dfp_filter->set_name("envoy.filters.http.dynamic_forward_proxy");
   dfp_filter->mutable_typed_config()->PackFrom(dfp_config);
@@ -545,6 +818,35 @@ EngineBuilder::generateBootstrap(bool trim_whitespace_for_tests) const {
   router_filter->mutable_typed_config()->PackFrom(router_config);
 
   auto* static_resources = bootstrap->mutable_static_resources();
+
+  if (!direct_responses_.empty()) {
+    auto* fake_remote_listener = static_resources->add_listeners();
+    fake_remote_listener->set_name("fake_remote_listener");
+    auto* base_address = fake_remote_listener->mutable_address();
+    base_address->mutable_socket_address()->set_address("127.0.0.1");
+    base_address->mutable_socket_address()->set_port_value(10101);
+    auto* filter = fake_remote_listener->add_filter_chains()->add_filters();
+    envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager
+        fake_remote_listener_config;
+    filter->set_name("envoy.filters.network.http_connection_manager");
+    fake_remote_listener_config.set_stat_prefix("remote_hcm");
+    auto* route_config = fake_remote_listener_config.mutable_route_config();
+    route_config->set_name("remote_route");
+    auto* virtual_host = route_config->add_virtual_hosts();
+    virtual_host->add_domains("*");
+    virtual_host->set_name("remote_service");
+    auto* route = virtual_host->add_routes();
+    route->mutable_match()->set_prefix("/");
+    route->mutable_direct_response()->set_status(404);
+    route->mutable_direct_response()->mutable_body()->set_inline_string("not found");
+    route->add_request_headers_to_remove("x-forwarded-proto");
+    route->add_request_headers_to_remove("x-envoy-mobile-cluster");
+    auto* router_filter = fake_remote_listener_config.add_http_filters();
+    envoy::extensions::filters::http::router::v3::Router router_config;
+    router_filter->set_name("envoy.router");
+    router_filter->mutable_typed_config()->PackFrom(router_config);
+    filter->mutable_typed_config()->PackFrom(fake_remote_listener_config);
+  }
 
   // Finally create the base listener, and point it at the HCM.
   auto* base_listener = static_resources->add_listeners();
@@ -581,16 +883,11 @@ EngineBuilder::generateBootstrap(bool trim_whitespace_for_tests) const {
 #include "library/common/config/certificates.inc"
 #endif
                                "";
-    if (trim_whitespace_for_tests) {
-      // The certificates in certificates.inc are prefixed with 2 spaces per
-      // line to be ingressed into YAML. This loads fine but fails proto diff checks,
-      // so for comparison testing (done in tests and debug builds) we strip the whitepsace.
-      std::string certs = inline_certs;
-      absl::StrReplaceAll({{"\n  ", "\n"}}, &certs);
-      validation->mutable_trusted_ca()->set_inline_string(certs);
-    } else {
-      validation->mutable_trusted_ca()->set_inline_string(inline_certs);
-    }
+    // The certificates in certificates.inc are prefixed with 2 spaces per
+    // line to be ingressed into YAML.
+    std::string certs = inline_certs;
+    absl::StrReplaceAll({{"\n  ", "\n"}}, &certs);
+    validation->mutable_trusted_ca()->set_inline_string(certs);
   }
   envoy::extensions::transport_sockets::http_11_proxy::v3::Http11ProxyUpstreamTransport
       ssl_proxy_socket;
@@ -600,6 +897,22 @@ EngineBuilder::generateBootstrap(bool trim_whitespace_for_tests) const {
   envoy::config::core::v3::TransportSocket base_tls_socket;
   base_tls_socket.set_name("envoy.transport_sockets.http_11_proxy");
   base_tls_socket.mutable_typed_config()->PackFrom(ssl_proxy_socket);
+
+  if (!direct_responses_.empty()) {
+    // fake remote cluster
+    auto* fake_remote_cluster = static_resources->add_clusters();
+    fake_remote_cluster->set_name("fake_remote");
+    fake_remote_cluster->set_type(envoy::config::cluster::v3::Cluster::LOGICAL_DNS);
+    fake_remote_cluster->mutable_connect_timeout()->set_seconds(30);
+    fake_remote_cluster->mutable_load_assignment()->set_cluster_name("fake_remote");
+    auto* address = fake_remote_cluster->mutable_load_assignment()
+                        ->add_endpoints()
+                        ->add_lb_endpoints()
+                        ->mutable_endpoint()
+                        ->mutable_address();
+    address->mutable_socket_address()->set_address("127.0.0.1");
+    address->mutable_socket_address()->set_port_value(10101);
+  }
 
   // Stats cluster
   auto* stats_cluster = static_resources->add_clusters();
@@ -781,6 +1094,7 @@ EngineBuilder::generateBootstrap(bool trim_whitespace_for_tests) const {
   list->add_patterns()->set_prefix("http.hcm.downstream_rq_");
   list->add_patterns()->set_prefix("http.hcm.decompressor.");
   list->add_patterns()->set_prefix("pulse.");
+  list->add_patterns()->set_prefix("runtime.load_success");
   list->add_patterns()->mutable_safe_regex()->set_regex(
       "^vhost\\.[\\w]+\\.vcluster\\.[\\w]+?\\.upstream_rq_(?:[12345]xx|[3-5][0-9][0-9]|retry|"
       "total)");
@@ -810,9 +1124,10 @@ EngineBuilder::generateBootstrap(bool trim_whitespace_for_tests) const {
       *(*envoy_layer.mutable_fields())["envoy"].mutable_struct_value();
   ProtobufWkt::Struct& flags =
       *(*runtime_values.mutable_fields())["reloadable_features"].mutable_struct_value();
-  (*flags.mutable_fields())["always_use_v6"].set_bool_value(false);
-  (*flags.mutable_fields())["skip_dns_lookup_for_proxied_requests"].set_bool_value(false);
-  (*runtime_values.mutable_fields())["disallow_global_stats"].set_bool_value("true");
+  (*flags.mutable_fields())["always_use_v6"].set_bool_value(always_use_v6_);
+  (*flags.mutable_fields())["skip_dns_lookup_for_proxied_requests"].set_bool_value(
+      skip_dns_lookups_for_proxied_requests_);
+  (*runtime_values.mutable_fields())["disallow_global_stats"].set_bool_value(true);
   ProtobufWkt::Struct& overload_values =
       *(*envoy_layer.mutable_fields())["overload"].mutable_struct_value();
   (*overload_values.mutable_fields())["global_downstream_max_connections"].set_string_value(
@@ -822,6 +1137,10 @@ EngineBuilder::generateBootstrap(bool trim_whitespace_for_tests) const {
   bootstrap->mutable_typed_dns_resolver_config()->CopyFrom(
       *dns_cache_config->mutable_typed_dns_resolver_config());
 
+  for (const std::string& sink_yaml : stats_sinks_) {
+    auto* sink = bootstrap->add_stats_sinks();
+    MessageUtil::loadFromYaml(sink_yaml, *sink, ProtobufMessage::getStrictValidationVisitor());
+  }
   if (!stats_domain_.empty()) {
     envoy::config::metrics::v3::MetricsServiceConfig metrics_config;
     metrics_config.mutable_grpc_service()->mutable_envoy_grpc()->set_cluster_name("stats");
@@ -831,6 +1150,60 @@ EngineBuilder::generateBootstrap(bool trim_whitespace_for_tests) const {
     auto* sink = bootstrap->add_stats_sinks();
     sink->set_name("envoy.metrics_service");
     sink->mutable_typed_config()->PackFrom(metrics_config);
+  }
+
+  bootstrap->mutable_dynamic_resources();
+  if ((!rtds_layer_name_.empty() || enable_cds_) && ads_api_type_.empty()) {
+    throw std::runtime_error("ADS must be configured when using xDS");
+  }
+  if (!rtds_layer_name_.empty()) {
+    auto* layered_runtime = bootstrap->mutable_layered_runtime();
+    auto* layer = layered_runtime->add_layers();
+    layer->set_name(rtds_layer_name_);
+    auto* rtds_layer = layer->mutable_rtds_layer();
+    rtds_layer->set_name(rtds_layer_name_);
+    auto* rtds_config = rtds_layer->mutable_rtds_config();
+    rtds_config->mutable_ads();
+    rtds_config->set_resource_api_version(envoy::config::core::v3::ApiVersion::V3);
+    rtds_config->mutable_initial_fetch_timeout()->set_seconds(rtds_timeout_seconds_);
+  }
+  if (!ads_api_type_.empty()) {
+    std::string target_uri = fmt::format(R"({}:{})", ads_address_, ads_port_);
+    auto* ads_config = bootstrap->mutable_dynamic_resources()->mutable_ads_config();
+    ads_config->set_transport_api_version(envoy::config::core::v3::ApiVersion::V3);
+    ads_config->set_set_node_on_first_message_only(true);
+    envoy::config::core::v3::ApiConfigSource::ApiType api_type_enum;
+    envoy::config::core::v3::ApiConfigSource::ApiType_Parse(ads_api_type_, &api_type_enum);
+    ads_config->set_api_type(api_type_enum);
+    auto& grpc_service = *ads_config->add_grpc_services();
+    grpc_service.mutable_google_grpc()->set_target_uri(target_uri);
+    grpc_service.mutable_google_grpc()->set_stat_prefix("ads");
+  }
+  if (enable_cds_) {
+    auto* cds_config = bootstrap->mutable_dynamic_resources()->mutable_cds_config();
+    cds_config->mutable_initial_fetch_timeout()->set_seconds(cds_timeout_seconds_);
+    cds_config->set_resource_api_version(envoy::config::core::v3::ApiVersion::V3);
+    cds_config->mutable_ads();
+    bootstrap->add_node_context_params("cluster");
+    // add a stat prefix we use in test
+    list->add_patterns()->set_exact("cluster_manager.active_clusters");
+    list->add_patterns()->set_exact("cluster_manager.cluster_added");
+  }
+
+  // Admin
+  if (admin_interface_enabled_) {
+#ifdef ENVOY_ADMIN_FUNCTIONALITY
+    auto* admin_address = bootstrap->mutable_admin()->mutable_address()->mutable_socket_address();
+    admin_address->set_address("::1");
+    admin_address->set_port_value(9901);
+#else
+    throw std::runtime_error("Admin functionality was not compiled in this build of Envoy Mobile");
+#endif
+  }
+
+  if (direct_responses_.empty()) {
+    // Check equivalence in debug mode. Not supported if direct responses are configured.
+    ASSERT(generatedStringMatchesGeneratedBoostrap(generateConfigStr(), *bootstrap));
   }
 
   return bootstrap;
@@ -846,15 +1219,12 @@ EngineSharedPtr EngineBuilder::build() {
 
   std::string config_str;
   std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> bootstrap;
-  if (use_bootstrap_) {
+  if (!config_bootstrap_incompatible_) {
     bootstrap = generateBootstrap();
   } else {
-    if (config_override_for_tests_.empty()) {
-      config_str = generateConfigStr();
-    } else {
-      config_str = config_override_for_tests_;
-    }
+    config_str = generateConfigStr();
   }
+
   envoy_engine_t envoy_engine =
       init_engine(callbacks_->asEnvoyEngineCallbacks(), null_logger, null_tracker);
 
@@ -883,9 +1253,11 @@ EngineSharedPtr EngineBuilder::build() {
     }
     options->setLogLevel(options->parseAndValidateLogLevel(logLevelToString(log_level_).c_str()));
     options->setConcurrency(1);
+#ifdef ENVOY_ADMIN_FUNCTIONALITY
     if (!admin_address_path_for_tests_.empty()) {
       options->setAdminAddressPath(admin_address_path_for_tests_);
     }
+#endif
     cast_engine->run(std::move(options));
   }
 
