@@ -143,7 +143,7 @@ envoy_cc_test_library(
     ],
     repository = "@envoy",
     deps = [
-        ":autonomous_upstream_lib",
+        "@envoy//test/integration:autonomous_upstream_lib",
         "@envoy//source/exe:process_wide_lib",
         "@envoy//test/config:utility_lib",
         "@envoy//test/integration:utility_lib",
@@ -156,18 +156,4 @@ envoy_cc_test_library(
             "@envoy//source/common/signal:sigaction_lib",
         ],
     }),
-)
-
-envoy_cc_test_library(
-    name = "autonomous_upstream_lib",
-    srcs = [
-        "autonomous_upstream.cc",
-    ],
-    hdrs = [
-        "autonomous_upstream.h",
-    ],
-    repository = "@envoy",
-    deps = [
-        "@envoy//test/integration:fake_upstream_lib",
-    ],
 )
