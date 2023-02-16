@@ -72,6 +72,8 @@ private:
    */
   bool decodeMetadataPayload(bool end_metadata);
 
+  void resetDecoderContext();
+
   // Metadata that is currently being decoded.
   MetadataMapPtr metadata_map_;
 

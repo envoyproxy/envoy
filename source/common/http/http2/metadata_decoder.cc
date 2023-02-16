@@ -35,6 +35,8 @@ private:
 
 } // anonymous namespace
 
+// Since QuicheDecoderListener and http2::HpackDecoder are implementation details, this struct is
+// defined here rather than the header file.
 struct MetadataDecoder::HpackDecoderContext {
   HpackDecoderContext(MetadataMap& map, size_t max_payload_size_bound)
       : listener(map), decoder(&listener, max_payload_size_bound) {}
@@ -42,7 +44,7 @@ struct MetadataDecoder::HpackDecoderContext {
   http2::HpackDecoder decoder;
 };
 
-MetadataDecoder::MetadataDecoder(MetadataCallback cb) : metadata_map_(new MetadataMap()) {
+MetadataDecoder::MetadataDecoder(MetadataCallback cb) {
   nghttp2_hd_inflater* inflater;
   int rv = nghttp2_hd_inflate_new(&inflater);
   ASSERT(rv == 0);
@@ -51,7 +53,7 @@ MetadataDecoder::MetadataDecoder(MetadataCallback cb) : metadata_map_(new Metada
   ASSERT(cb != nullptr);
   callback_ = std::move(cb);
 
-  decoder_context_ = std::make_unique<HpackDecoderContext>(*metadata_map_, max_payload_size_bound_);
+  resetDecoderContext();
 }
 
 MetadataDecoder::~MetadataDecoder() = default;
@@ -78,9 +80,7 @@ bool MetadataDecoder::onMetadataFrameComplete(bool end_metadata) {
 
   if (end_metadata) {
     callback_(std::move(metadata_map_));
-    metadata_map_ = std::make_unique<MetadataMap>();
-    decoder_context_ =
-        std::make_unique<HpackDecoderContext>(*metadata_map_, max_payload_size_bound_);
+    resetDecoderContext();
   }
   return true;
 }
@@ -160,6 +160,11 @@ bool MetadataDecoder::decodeMetadataPayload(bool end_metadata) {
   }
   payload_.drain(payload_size_consumed);
   return true;
+}
+
+void MetadataDecoder::resetDecoderContext() {
+  metadata_map_ = std::make_unique<MetadataMap>();
+  decoder_context_ = std::make_unique<HpackDecoderContext>(*metadata_map_, max_payload_size_bound_);
 }
 
 } // namespace Http2
