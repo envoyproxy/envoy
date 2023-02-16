@@ -478,12 +478,12 @@ open class EngineBuilder: NSObject {
   }
 
   /// Set a runtime guard with the provided value.
+  /// TODO(jpsim), who incredibly generously offered to swift for us, convert this to bool.
   ///
   /// - parameter name:  the name of the runtime guard, e.g. test_feature_false.
   /// - parameter value: the value fo the runtime guard.
   ///
   /// - returns: This builder.
-  /// TODO(jpsim), who incredibly generously offered to swift for us, convert this to bool.
   @discardableResult
   public func setRuntimeGuard(name: String, value: String) -> Self {
     self.runtimeGuards[name] = value
