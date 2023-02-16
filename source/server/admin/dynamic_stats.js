@@ -1,8 +1,6 @@
 // Before first checkin:
 //   * top-n algo to limit compute overhead with high cardinality stats with user control of N.
 //   * alternate sorting criteria, reverse-sort controls, etc.
-//   * hook up current settings in the page (filters, used-only)
-//   * update filter w/o resetting state
 
 // Follow-ups:
 //   * render histograms
@@ -12,8 +10,13 @@
 
 let current_stats = new Map;
 
+const param_id_prefix = 'param-1-stats-';
+
 function loadStats() {
-  fetch('/stats?usedonly=on&filter=&format=json&type=All&histogram_buckets=cumulative', {
+  val = name => name + '=' + document.getElementById(param_id_prefix + name).value;
+  const params = ['usedonly', 'filter', 'type', 'histogram_buckets'];
+  const url = '/stats?format=json&' + params.map(val).join('&');
+  fetch(url, {
     method: 'GET',
     headers: {},
   })
@@ -75,4 +78,4 @@ function renderStats(data) {
   window.setTimeout(loadStats, 5000);
 }
 
-loadStats();
+addEventListener('DOMContentLoaded', loadStats);
