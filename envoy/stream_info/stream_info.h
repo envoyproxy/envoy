@@ -630,7 +630,7 @@ public:
   virtual DownstreamTiming& downstreamTiming() PURE;
   virtual OptRef<const DownstreamTiming> downstreamTiming() const PURE;
 
-    /**
+  /**
    * @return the upstream timing information.
    */
   virtual UpstreamTiming& upstreamTiming() PURE;
