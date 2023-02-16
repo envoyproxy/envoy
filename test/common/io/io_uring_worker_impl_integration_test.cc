@@ -180,6 +180,9 @@ public:
                           &server_addr_len)
                   .return_value_;
           EXPECT_TRUE(SOCKET_VALID(server_socket_));
+          // The server socket should block.
+          int flags = fcntl(server_socket_, F_GETFL);
+          fcntl(server_socket_, F_SETFL, flags & ~O_NONBLOCK);
         },
         Event::PlatformDefaultTriggerType, Event::FileReadyType::Read);
     while (!SOCKET_VALID(server_socket_)) {
