@@ -429,6 +429,11 @@ config_setting(
 )
 
 config_setting(
+    name = "force_dynamic_stdlib",
+    values = {"define": "stdlib_linking=dynamic"},
+)
+
+config_setting(
     name = "force_libcpp",
     values = {"define": "force_libcpp=enabled"},
 )
