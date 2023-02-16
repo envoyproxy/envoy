@@ -11,17 +11,17 @@ cc_library(
     name = "envoy_jni_with_test_extensions_lib",
     testonly = True,
     deps = [
-        ":quic_envoy_jni_lib",
+        ":server_envoy_jni_lib",
         "//library/common/jni:envoy_jni_lib",
     ] + TEST_EXTENSIONS,
 )
 
 # Library which contains all the JNI related targets.
 cc_library(
-    name = "quic_envoy_jni_lib",
+    name = "server_envoy_jni_lib",
     testonly = True,
     srcs = [
-        "quic_test_server_jni_interface.cc",
+        "test_server_jni_interface.cc",
     ],
     linkopts = select({
         "@envoy//bazel:dbg_build": ["-Wl,--build-id=sha1"],
@@ -29,7 +29,7 @@ cc_library(
     }),
     deps = [
         "//library/common/jni:envoy_jni_lib",
-        "//test/common/integration:quic_test_server_interface_lib",
+        "//test/common/integration:test_server_interface_lib",
     ],
     # We need this to ensure that we link this into the .so even though there are no code references.
     alwayslink = True,

@@ -127,16 +127,16 @@ envoy_cc_test_library(
     ],
 )
 
-# interface libs for quic test server's jni implementation
+# interface libs for test servers` jni implementations
 envoy_cc_test_library(
-    name = "quic_test_server_interface_lib",
+    name = "test_server_interface_lib",
     srcs = [
-        "quic_test_server.cc",
-        "quic_test_server_interface.cc",
+        "test_server.cc",
+        "test_server_interface.cc",
     ],
     hdrs = [
-        "quic_test_server.h",
-        "quic_test_server_interface.h",
+        "test_server.h",
+        "test_server_interface.h",
     ],
     data = [
         "@envoy//test/config/integration/certs",

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "test/common/integration/quic_test_server.h"
+#include "test/common/integration/test_server.h"
 
 // NOLINT(namespace-envoy)
 

@@ -1,4 +1,4 @@
-#include "quic_test_server.h"
+#include "test_server.h"
 
 #include "source/extensions/transport_sockets/tls/context_config_impl.h"
 

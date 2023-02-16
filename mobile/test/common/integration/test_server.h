@@ -10,7 +10,6 @@
 #include "test/mocks/server/transport_socket_factory_context.h"
 #include "test/config/utility.h"
 
-// TODO(alyssawilk) move this to a non-quic file name.
 namespace Envoy {
 class TestServer {
 private:

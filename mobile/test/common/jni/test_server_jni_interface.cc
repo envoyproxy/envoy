@@ -1,6 +1,6 @@
 #include <jni.h>
 
-#include "test/common/integration/quic_test_server_interface.h"
+#include "test/common/integration/test_server_interface.h"
 
 #include "library/common/jni/jni_support.h"
 #include "library/common/jni/jni_utility.h"
