@@ -2400,6 +2400,8 @@ TEST_F(HttpFilter2Test, LastEncodeDataCallExceedsStreamBufferLimitWouldJustRaise
   EXPECT_CALL(*mock_encode_filter, encodeData(_, true))
       .WillOnce(Invoke([&](Buffer::Instance& data, bool end_stream) {
         EXPECT_TRUE(end_stream);
+        EXPECT_EQ(data.toString(),
+                  "Direct response from mock filter, Definitely more than 10 bytes data.");
         return Http::FilterDataStatus::Continue;
       }));
   EXPECT_CALL(filter_factory_, createFilterChain(_))
