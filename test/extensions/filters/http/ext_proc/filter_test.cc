@@ -2387,6 +2387,7 @@ TEST_F(HttpFilter2Test, LastEncodeDataCallExceedsStreamBufferLimitWouldJustRaise
         // The last encode filter will see the mutations from ext server.
         // NOTE: Without raising a high watermark when end_stream is true in onData(), if the stream
         // buffer high watermark reached, a 500 response too large error is raised.
+        EXPECT_EQ(headers.Status()->value().getStringView(), "200");
         EXPECT_EQ(headers.get(Envoy::Http::LowerCaseString("foo"))[0]->value().getStringView(),
                   "gift-from-external-server");
         EXPECT_EQ(headers.get(Envoy::Http::LowerCaseString("new_response_header"))[0]
