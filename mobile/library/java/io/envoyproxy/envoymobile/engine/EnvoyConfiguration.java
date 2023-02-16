@@ -4,6 +4,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.ArrayList;
 import java.util.Map;
+import java.util.HashMap;
 import java.util.regex.Pattern;
 import java.util.regex.Matcher;
 import java.lang.StringBuilder;
@@ -149,7 +150,7 @@ public class EnvoyConfiguration {
       List<EnvoyHTTPFilterFactory> httpPlatformFilterFactories,
       Map<String, EnvoyStringAccessor> stringAccessors,
       Map<String, EnvoyKeyValueStore> keyValueStores, List<String> statSinks,
-      Map<String, String> runtimeGuards, Boolean enableSkipDNSLookupForProxiedRequests,
+      Map<String, Boolean> runtimeGuards, Boolean enableSkipDNSLookupForProxiedRequests,
       boolean enablePlatformCertificatesValidation, boolean useLegacyBuilder) {
     JniLibrary.load();
     this.adminInterfaceEnabled = adminInterfaceEnabled;
@@ -199,7 +200,11 @@ public class EnvoyConfiguration {
     this.stringAccessors = stringAccessors;
     this.keyValueStores = keyValueStores;
     this.statSinks = statSinks;
-    this.runtimeGuards = runtimeGuards;
+
+    this.runtimeGuards = new HashMap<String, String>();
+    for (Map.Entry<String, Boolean> guardAndValue : runtimeGuards.entrySet()) {
+      this.runtimeGuards.put(guardAndValue.getKey(), String.valueOf(guardAndValue.getValue()));
+    }
     this.enablePlatformCertificatesValidation = enablePlatformCertificatesValidation;
     this.enableSkipDNSLookupForProxiedRequests = enableSkipDNSLookupForProxiedRequests;
     this.useLegacyBuilder = useLegacyBuilder;

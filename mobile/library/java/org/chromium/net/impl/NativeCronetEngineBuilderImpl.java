@@ -122,7 +122,7 @@ public class NativeCronetEngineBuilderImpl extends CronetEngineBuilderImpl {
     Map<String, EnvoyStringAccessor> stringAccessors = Collections.emptyMap();
     Map<String, EnvoyKeyValueStore> keyValueStores = Collections.emptyMap();
     List<String> statSinks = Collections.emptyList();
-    Map<String, String> runtimeGuards = Collections.emptyMap();
+    Map<String, Boolean> runtimeGuards = Collections.emptyMap();
 
     return new EnvoyConfiguration(
         mAdminInterfaceEnabled, mGrpcStatsDomain, mConnectTimeoutSeconds, mDnsRefreshSeconds,

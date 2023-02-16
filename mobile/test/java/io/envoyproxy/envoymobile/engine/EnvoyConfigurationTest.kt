@@ -97,7 +97,7 @@ class EnvoyConfigurationTest {
     virtualClusters: MutableList<String> = mutableListOf("{name: test1}", "{name: test2}"),
     filterChain: MutableList<EnvoyNativeFilterConfig> = mutableListOf(EnvoyNativeFilterConfig("buffer_filter_1", "{'@type': 'type.googleapis.com/envoy.extensions.filters.http.buffer.v3.Buffer'}"), EnvoyNativeFilterConfig("buffer_filter_2", "{'@type': 'type.googleapis.com/envoy.extensions.filters.http.buffer.v3.Buffer'}")),
     platformFilterFactories: MutableList<EnvoyHTTPFilterFactory> = mutableListOf(TestEnvoyHTTPFilterFactory("name1"), TestEnvoyHTTPFilterFactory("name2")),
-    runtimeGuards: Map<String,String> = emptyMap(),
+    runtimeGuards: Map<String,Boolean> = emptyMap(),
     enableSkipDNSLookupForProxiedRequests: Boolean = false,
     statSinks: MutableList<String> = mutableListOf(),
     enablePlatformCertificatesValidation: Boolean = false,
@@ -252,7 +252,7 @@ class EnvoyConfigurationTest {
       dnsPreresolveHostnames = mutableListOf(),
       virtualClusters = mutableListOf(),
       filterChain = mutableListOf(),
-      runtimeGuards = mapOf("test_feature_false" to "true"),
+      runtimeGuards = mapOf("test_feature_false" to true),
       statSinks = mutableListOf("{ name: envoy.stat_sinks.statsd, typed_config: { '@type': type.googleapis.com/envoy.config.metrics.v3.StatsdSink, address: { socket_address: { address: 127.0.0.1, port_value: 123 } } } }"),
       trustChainVerification = TrustChainVerification.ACCEPT_UNTRUSTED
     )
@@ -302,7 +302,7 @@ class EnvoyConfigurationTest {
   fun `test YAML loads with multiple entries`() {
     JniLibrary.loadTestLibrary()
     val envoyConfiguration = buildTestEnvoyConfiguration(
-      runtimeGuards = mapOf("test_feature_false" to "true", "test_feature_true" to "false"),
+      runtimeGuards = mapOf("test_feature_false" to true, "test_feature_true" to false),
     )
 
     val resolvedTemplate = envoyConfiguration.createYaml()

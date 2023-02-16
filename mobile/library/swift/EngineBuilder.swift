@@ -59,7 +59,7 @@ open class EngineBuilder: NSObject {
   private var platformFilterChain: [EnvoyHTTPFilterFactory] = []
   private var stringAccessors: [String: EnvoyStringAccessor] = [:]
   private var keyValueStores: [String: EnvoyKeyValueStore] = [:]
-  private var runtimeGuards: [String: String] = [:]
+  private var runtimeGuards: [String: Bool] = [:]
   private var directResponses: [DirectResponse] = []
   private var statsSinks: [String] = []
   private var experimentalValidateYAMLCallback: ((Bool) -> Void)?
@@ -484,7 +484,7 @@ open class EngineBuilder: NSObject {
   ///
   /// - returns: This builder.
   @discardableResult
-  public func setRuntimeGuard(name: String, value: String) -> Self {
+  public func setRuntimeGuard(name: String, value: Bool) -> Self {
     self.runtimeGuards[name] = value
     return self
   }
