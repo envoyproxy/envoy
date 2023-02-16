@@ -41,7 +41,7 @@ jobs:
         cd mobile && ./bazelw build \
         $([ -z $GITHUB_TOKEN ] || echo "--config=remote-ci-macos") \
           --remote_header="Authorization=Bearer $GITHUB_TOKEN" \
-          --fat_apk_cpu=x86_64 \
+          --fat_apk_cpu=x86_64,x86 \
           //:android_dist
   javahelloworld:
     if: github.repository == 'envoyproxy/envoy'
