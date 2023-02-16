@@ -29,7 +29,8 @@ namespace Envoy {
 namespace Http {
 
 // Base class for HttpConnectionManagerImpl related tests. This base class is used by tests under
-// common/http as well as test/extensions/filters/http/ext_proc/.
+// common/http as well as test/extensions/filters/http/ext_proc/, to reuse the many mocks/default
+// impls of ConnectionManagerConfig that we need to provide to HttpConnectionManagerImpl.
 class HttpConnectionManagerImplMixin : public ConnectionManagerConfig {
 public:
   HttpConnectionManagerImplMixin();
