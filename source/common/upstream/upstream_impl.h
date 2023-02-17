@@ -112,7 +112,10 @@ public:
 
   template <typename T> OptRef<const T> getConfig() const {
     if (absl::holds_alternative<std::unique_ptr<const T>>(lbPolicy_)) {
-      return *(absl::get<std::unique_ptr<const T>>(lbPolicy_));
+      if (absl::get<std::unique_ptr<const T>>(lbPolicy_) != nullptr)
+        return *(absl::get<std::unique_ptr<const T>>(lbPolicy_));
+      else
+        return absl::nullopt;
     } else {
       return absl::nullopt;
     }
