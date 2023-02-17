@@ -104,12 +104,11 @@ genrule(
         "admin.css",
         "dynamic_params.html",
         "dynamic_stats.js",
-        "dynamic_stats.html",
     ],
     outs = ["admin_html_gen.h"],
     cmd = "./$(location :generate_admin_html.sh) \
         $(location admin_head_start.html) $(location admin.css) $(location dynamic_stats.js) \
-        $(location dynamic_stats.html) $(location dynamic_params.html) > $@",
+        $(location dynamic_params.html) > $@",
     tools = [":generate_admin_html.sh"],
 )
 

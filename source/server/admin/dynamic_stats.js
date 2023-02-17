@@ -8,14 +8,44 @@
 //   * hieararchical display
 //   * json flavor to send hierarchical names to save serialization/deserialization costs
 
+
+/**
+ * Maps a stat name to a record containing name, value, and a use-count. This
+ * map is rebuilt every 5 seconds.
+ */
 let current_stats = new Map;
 
+/**
+ * The first time this script loads, it will write PRE element at the end of body.
+ * This is hooked to the DOMContentLoaded event.
+ */
+let dynamic_stats_pre_element = null;
+
+/**
+ * This magic string is derived from C++ in StatsHtmlRender::urlHandler to uniquely
+ * name each paramter. In the stats page there is only one parameter, so it's
+ * always param-1. The reason params are numbered is that on the home page, "/",
+ * all the admin endpoints have uniquely numbered parameters.
+ */
 const param_id_prefix = 'param-1-stats-';
 
+/**
+ * Hook that's run on DOMContentLoaded to create the HTML elements (just one
+ * PRE right now) and kick off the periodic JSON updates.
+ */
+function initHook() {
+  dynamic_stats_pre_element = document.createElement('pre');
+  document.body.appendChild(dynamic_stats_pre_element);
+  loadStats();
+}
+
+/**
+ * Initiates an ajax request for the stats JSON based on the stats parameters.
+ */
 function loadStats() {
-  val = name => name + '=' + document.getElementById(param_id_prefix + name).value;
+  const makeQueryParam = name => name + '=' + document.getElementById(param_id_prefix + name).value;
   const params = ['usedonly', 'filter', 'type', 'histogram_buckets'];
-  const url = '/stats?format=json&' + params.map(val).join('&');
+  const url = '/stats?format=json&' + params.map(makeQueryParam).join('&');
   fetch(url, {
     method: 'GET',
     headers: {},
@@ -24,11 +54,51 @@ function loadStats() {
       .then(data => renderStats(data));
 }
 
-function renderStats(data) {
-  const content = document.getElementById('dynamic-stats');
-  while (content.firstChild) {
-    content.removeChild(content.firstChild);
+/**
+ * Function used to sort stat records. The highest priority is update frequency,
+ * then value (higher values are likely more interesting), and finally alphabetic,
+ * in forward order.
+ */
+function compareStatRecords(a, b) {
+  // Sort higher change-counts first.
+  if (a.change_count != b.change_count) {
+    return b.change_count - a.change_count;
   }
+
+  // Secondarily put higher values first -- they are often more interesting.
+  if (b.value != a.value) {
+    return b.value - a.value;
+  }
+
+  // Fall back to forward alphabetic sort.
+  if (a.name < b.name) {
+    return -1;
+  } else if (a.name > b.name) {
+    return 1;
+  }
+  return 0;
+}
+
+/**
+ * The dynamic display has additional settings for tweaking it -- this helper extracts numeric
+ * values from text widgets
+ */
+function loadSettingOrUseDefault(id, default_value) {
+  const elt = document.getElementById(id);
+  const value = parseInt(elt.value);
+  if (isNaN(value)) {
+    console.log('Invalid ' + id + ': not a number');
+    return default_value;
+  }
+  return value;
+}
+
+/**
+ * Rendering function which interprets the Json response from the server, updates
+ * the most-frequently-used map, reverse-sorts by use-count, and serializes the
+ * top ordered stats into the PRE element created in initHook.
+ */
+function renderStats(data) {
   sorted_stats = [];
   let prev_stats = current_stats;
   current_stats = new Map();
@@ -47,42 +117,22 @@ function renderStats(data) {
   }
   prev_stats = null;
 
-  sorted_stats.sort((a, b) => {
-    // Sort higher change-counts first.
-    if (a.change_count != b.change_count) {
-      return b.change_count - a.change_count;
-    }
+  sorted_stats.sort(compareStatRecords);
 
-    // Secondarily put higher values first -- they are often more interesting.
-    if (b.value != a.value) {
-      return b.value - a.value;
-    }
-
-    // Fall back to forward alphabetic sort.
-    if (a.name < b.name) {
-      return -1;
-    } else if (a.name > b.name) {
-      return 1;
-    }
-    return 0;
-  });
-
-  let text = '';
-  const max_elt = document.getElementById('dynamic-max-display-count');
-  const max_value = max_elt.value;
-  const max = parseInt(max_value) || 50;
+  const max = loadSettingOrUseDefault('dynamic-max-display-count', 50);
   let index = 0;
+  let text = '';
   for (stat_record of sorted_stats) {
-    if (++index == max) {
+    if (++index > max) {
       break;
     }
     text += stat_record.name + ': ' + stat_record.value + ' (' +
         stat_record.change_count + ')' + '\n';
   }
-  content.textContent = text;
+  dynamic_stats_pre_element.textContent = text;
 
-  // Update stats every 5 seconds.
-  window.setTimeout(loadStats, 5000);
+  // Update stats every 5 seconds by default.
+  window.setTimeout(loadStats, 1000*loadSettingOrUseDefault('dynamic-update-interval', 5));
 }
 
-addEventListener('DOMContentLoaded', loadStats);
+addEventListener('DOMContentLoaded', initHook);

@@ -81,10 +81,6 @@ void StatsHtmlRender::finalize(Buffer::Instance& response) {
   if (has_pre_) {
     response.add("</pre>\n");
   }
-  if (dynamic_) {
-    appendResource(response, "dynamic_stats.html", AdminDynamicStatsHtml);
-    response.add("\n");
-  }
   response.add("</body>\n");
   response.add("</html>");
 }
@@ -98,8 +94,8 @@ void StatsHtmlRender::appendResource(Buffer::Instance& response, absl::string_vi
     std::string path = absl::StrCat("source/server/admin/", file);
     TRY_ASSERT_MAIN_THREAD { response.add(file_system.fileReadToEnd(path)); }
     END_TRY
-    catch (EnvoyException e) {
-      ENVOY_LOG_MISC(error, "failed to load " + path);
+    catch (EnvoyException& e) {
+      ENVOY_LOG_MISC(error, "failed to load " + path + ": " + e.what());
     }
   }
 }
@@ -181,6 +177,9 @@ void StatsHtmlRender::urlHandler(Buffer::Instance& response, const Admin::UrlHan
   }
 
   for (const Admin::ParamDescriptor& param : handler.params_) {
+    // Give each parameter a unique number. Note that this naming is also referenced in
+    // dynamic_stats.js which looks directly at the parameter widgets to find the
+    // current values during JavaScript-driven dynamic updates.
     std::string id = absl::StrCat("param-", index_, "-", absl::StrReplaceAll(path, {{"/", "-"}}),
                                   "-", param.id_);
     response.addFragments({"<tr", row_class, ">\n  <td class='option'>"});

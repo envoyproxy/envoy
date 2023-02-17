@@ -13,9 +13,6 @@ echo ')EOF";'
 echo 'constexpr absl::string_view AdminDynamicStatsJs = R"EOF('
 cat "$3"
 echo ')EOF";'
-echo 'constexpr absl::string_view AdminDynamicStatsHtml = R"EOF('
-cat "$4"
-echo ')EOF";'
 echo 'constexpr absl::string_view AdminDynamicParamsHtml = R"EOF('
-cat "$5"
+cat "$4"
 echo ')EOF";'
