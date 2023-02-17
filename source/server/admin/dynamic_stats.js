@@ -13,7 +13,7 @@
  * Maps a stat name to a record containing name, value, and a use-count. This
  * map is rebuilt every 5 seconds.
  */
-let current_stats = new Map;
+let current_stats = new Map();
 
 /**
  * The first time this script loads, it will write PRE element at the end of body.
@@ -27,14 +27,14 @@ let dynamic_stats_pre_element = null;
  * always param-1. The reason params are numbered is that on the home page, "/",
  * all the admin endpoints have uniquely numbered parameters.
  */
-const param_id_prefix = 'param-1-stats-';
+const param_id_prefix = "param-1-stats-";
 
 /**
  * Hook that's run on DOMContentLoaded to create the HTML elements (just one
  * PRE right now) and kick off the periodic JSON updates.
  */
 function initHook() {
-  dynamic_stats_pre_element = document.createElement('pre');
+  dynamic_stats_pre_element = document.createElement("pre");
   document.body.appendChild(dynamic_stats_pre_element);
   loadStats();
 }
@@ -43,15 +43,10 @@ function initHook() {
  * Initiates an ajax request for the stats JSON based on the stats parameters.
  */
 function loadStats() {
-  const makeQueryParam = name => name + '=' + document.getElementById(param_id_prefix + name).value;
-  const params = ['usedonly', 'filter', 'type', 'histogram_buckets'];
-  const url = '/stats?format=json&' + params.map(makeQueryParam).join('&');
-  fetch(url, {
-    method: 'GET',
-    headers: {},
-  })
-      .then(response => response.json())
-      .then(data => renderStats(data));
+  const makeQueryParam = (name) => name + "=" + document.getElementById(param_id_prefix + name).value;
+  const params = ["usedonly", "filter", "type", "histogram_buckets"];
+  const url = "/stats?format=json&" + params.map(makeQueryParam).join("&");
+  fetch(url).then((response) => response.json()).then((data) => renderStats(data));
 }
 
 /**
@@ -73,7 +68,8 @@ function compareStatRecords(a, b) {
   // Fall back to forward alphabetic sort.
   if (a.name < b.name) {
     return -1;
-  } else if (a.name > b.name) {
+  }
+  if (a.name > b.name) {
     return 1;
   }
   return 0;
@@ -86,8 +82,8 @@ function compareStatRecords(a, b) {
 function loadSettingOrUseDefault(id, default_value) {
   const elt = document.getElementById(id);
   const value = parseInt(elt.value);
-  if (isNaN(value)) {
-    console.log('Invalid ' + id + ': not a number');
+  if (Number.isNaN(value)) {
+    console.log("Invalid " + id + ": not a number");
     return default_value;
   }
   return value;
@@ -102,7 +98,7 @@ function renderStats(data) {
   sorted_stats = [];
   let prev_stats = current_stats;
   current_stats = new Map();
-  for (stat of data.stats) {
+  for (const stat of data.stats) {
     let stat_record = prev_stats.get(stat.name);
     if (stat_record) {
       if (stat_record.value != stat.value) {
@@ -119,20 +115,20 @@ function renderStats(data) {
 
   sorted_stats.sort(compareStatRecords);
 
-  const max = loadSettingOrUseDefault('dynamic-max-display-count', 50);
+  const max = loadSettingOrUseDefault("dynamic-max-display-count", 50);
   let index = 0;
-  let text = '';
-  for (stat_record of sorted_stats) {
+  let text = "";
+  for (const stat_record of sorted_stats) {
     if (++index > max) {
       break;
     }
-    text += stat_record.name + ': ' + stat_record.value + ' (' +
-        stat_record.change_count + ')' + '\n';
+    text += stat_record.name + ": " + stat_record.value + " (" +
+        stat_record.change_count + ")" + "\n";
   }
   dynamic_stats_pre_element.textContent = text;
 
   // Update stats every 5 seconds by default.
-  window.setTimeout(loadStats, 1000*loadSettingOrUseDefault('dynamic-update-interval', 5));
+  window.setTimeout(loadStats, 1000*loadSettingOrUseDefault("dynamic-update-interval", 5));
 }
 
-addEventListener('DOMContentLoaded', initHook);
+addEventListener("DOMContentLoaded", initHook);
