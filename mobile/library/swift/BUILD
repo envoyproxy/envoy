@@ -10,6 +10,7 @@ licenses(["notice"])  # Apache 2
 swift_library(
     name = "ios_lib",
     srcs = [
+        "CompressionAlgorithm.swift",
         "DirectResponse.swift",
         "Engine.swift",
         "EngineBuilder.swift",

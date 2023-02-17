@@ -33,14 +33,22 @@ bug_fixes:
 - area: router
   change: |
     fixed the bug that custom tags of the route metadata type are not set for upstream spans.
+- area: router
+  change: |
+    fixed outlier detection ejections caused by opened circuit breakers.
 - area: dependency
   change: |
     Add boringssl patch to resolve CVE-2023-0286. Note that the FIPS build is not patched/fixed.
+- area: access log
+  change: |
+    in JSON logs, port numbers were logged as strings and are now logged as numbers (``%DOWNSTREAM_LOCAL_PORT%``, ``%DOWNSTREAM_REMOTE_PORT%``, ``%DOWNSTREAM_DIRECT_REMOTE_PORT%``, ``%UPSTREAM_LOCAL_PORT%``, ``%UPSTREAM_REMOTE_PORT%``).
+    This behavioral change can be temporarily reverted by setting runtime guard ``envoy.reloadable_features.format_ports_as_numbers`` to false.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
 - area: config
   change: |
+    removed ``envoy.reloadable_features.admin_stats_filter_use_re2`` and legacy code paths.
     removed ``envoy.reloadable_features.combine_sds_requests`` and legacy code paths.
 - area: dns
   change: |
@@ -64,6 +72,9 @@ removed_config_or_runtime:
 - area: http3
   change: |
     removed ``envoy.reloadable_features.conn_pool_new_stream_with_early_data_and_http3`` and legacy code paths.
+- area: http3
+  change: |
+    removed ``envoy.reloadable_features.http3_sends_early_data`` and legacy code paths.
 
 new_features:
 - area: access_log
@@ -87,11 +98,23 @@ new_features:
 - area: ratelimit
   change: |
     added local rate limit listener filter to enable rate limit before TLS handshake and filter matching.
+- area: proxy_protocol
+  change: |
+    added the support :ref:`pass_through_tlvs for listener <envoy_v3_api_field_extensions.filters.listener.proxy_protocol.v3.ProxyProtocol.pass_through_tlvs>`
+    and :ref:`pass_through_tlvs for upsteam <envoy_v3_api_field_config.core.v3.ProxyProtocolConfig.pass_through_tlvs>`.
+    They can control which Proxy Protocol V2 TLVs can be passed through by listener and upstream separately.
 - area: tcp_proxy
   change: |
     added support for propagating the response trailers in :ref:`TunnelingConfig <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.TunnelingConfig.propagate_response_trailers>` to the downstream info filter state.
 - area: sni_dynamic_forward_proxy
   change: |
     added an option to dynamically set the host used by the SNI dynamic forward proxy filter, by setting a filter state object under the key ``envoy.upstream.dynamic_host``.
+- area: generic_proxy
+  change: |
+    added :ref:`tracing support <envoy_v3_api_field_extensions.filters.network.generic_proxy.v3.GenericProxy.tracing>` for the generic proxy.
+- area: jwt_authn
+  change: |
+    added :ref:`failed_status_in_metadata <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.JwtProvider.failed_status_in_metadata>` to support setting the JWT
+    authentication failure status code and message in dynamic metadata.
 
 deprecated:

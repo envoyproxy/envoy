@@ -16,6 +16,8 @@ envoy_extension_cc_test(
     srcs = [
         "datadog_tracer_impl_test.cc",
         "dict_util_test.cc",
+        "logger_test.cc",
+        "span_test.cc",
         "time_util_test.cc",
         "tracer_stats_test.cc",
     ],

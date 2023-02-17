@@ -9,10 +9,16 @@
 #import "library/common/network/apple_platform_cert_verifier.h"
 #import "library/common/types/c_types.h"
 #import "library/common/extensions/key_value/platform/c_types.h"
+#import "library/cc/engine_builder.h"
+#import "library/common/engine.h"
 
 #if TARGET_OS_IPHONE
 #import <UIKit/UIKit.h>
 #endif
+
+@interface EnvoyConfiguration (CXX)
+- (std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap>)generateBootstrap;
+@end
 
 static void ios_on_engine_running(void *context) {
   // This code block runs inside the Envoy event loop. Therefore, an explicit autoreleasepool block
@@ -447,7 +453,7 @@ static void ios_track_event(envoy_map map, const void *context) {
 - (int)registerFilterFactory:(EnvoyHTTPFilterFactory *)filterFactory {
   // TODO(goaway): Everything here leaks, but it's all be tied to the life of the engine.
   // This will need to be updated for https://github.com/envoyproxy/envoy-mobile/issues/332
-  envoy_http_filter *api = safe_malloc(sizeof(envoy_http_filter));
+  envoy_http_filter *api = (envoy_http_filter *)safe_malloc(sizeof(envoy_http_filter));
   api->init_filter = ios_http_filter_init;
   api->on_request_headers = ios_http_filter_on_request_headers;
   api->on_request_data = ios_http_filter_on_request_data;
@@ -474,7 +480,8 @@ static void ios_track_event(envoy_map map, const void *context) {
 - (int)registerStringAccessor:(NSString *)name accessor:(EnvoyStringAccessor *)accessor {
   // TODO(goaway): Everything here leaks, but it's all tied to the life of the engine.
   // This will need to be updated for https://github.com/envoyproxy/envoy-mobile/issues/332
-  envoy_string_accessor *accessorStruct = safe_malloc(sizeof(envoy_string_accessor));
+  envoy_string_accessor *accessorStruct =
+      (envoy_string_accessor *)safe_malloc(sizeof(envoy_string_accessor));
   accessorStruct->get_string = ios_get_string;
   accessorStruct->context = CFBridgingRetain(accessor);
 
@@ -482,7 +489,7 @@ static void ios_track_event(envoy_map map, const void *context) {
 }
 
 - (int)registerKeyValueStore:(NSString *)name keyValueStore:(id<EnvoyKeyValueStore>)keyValueStore {
-  envoy_kv_store *api = safe_malloc(sizeof(envoy_kv_store));
+  envoy_kv_store *api = (envoy_kv_store *)safe_malloc(sizeof(envoy_kv_store));
   api->save = ios_kv_store_save;
   api->read = ios_kv_store_read;
   api->remove = ios_kv_store_remove;
@@ -491,20 +498,7 @@ static void ios_track_event(envoy_map map, const void *context) {
   return register_platform_api(name.UTF8String, api);
 }
 
-- (int)runWithConfig:(EnvoyConfiguration *)config logLevel:(NSString *)logLevel {
-  NSString *templateYAML = [[NSString alloc] initWithUTF8String:config_template];
-  return [self runWithTemplate:templateYAML config:config logLevel:logLevel];
-}
-
-- (int)runWithTemplate:(NSString *)yaml
-                config:(EnvoyConfiguration *)config
-              logLevel:(NSString *)logLevel {
-
-  NSString *resolvedYAML = [config resolveTemplate:yaml];
-  if (resolvedYAML == nil) {
-    return kEnvoyFailure;
-  }
-
+- (void)performRegistrationsForConfig:(EnvoyConfiguration *)config {
   for (EnvoyHTTPFilterFactory *filterFactory in config.httpPlatformFilterFactories) {
     [self registerFilterFactory:filterFactory];
   }
@@ -520,17 +514,38 @@ static void ios_track_event(envoy_map map, const void *context) {
   if (config.enablePlatformCertificateValidation) {
     register_apple_platform_cert_verifier();
   }
-
-  return [self runWithConfigYAML:resolvedYAML logLevel:logLevel];
 }
 
-- (int)runWithConfigYAML:(NSString *)configYAML logLevel:(NSString *)logLevel {
+- (int)runWithConfig:(EnvoyConfiguration *)config logLevel:(NSString *)logLevel {
+  auto bootstrap = [config generateBootstrap];
+  if (bootstrap == nullptr) {
+    return kEnvoyFailure;
+  }
+
+  [self performRegistrationsForConfig:config];
   [self startObservingLifecycleNotifications];
 
-  // Envoy exceptions will only be caught here when compiled for 64-bit arches.
-  // https://developer.apple.com/library/archive/documentation/Cocoa/Conceptual/Exceptions/Articles/Exceptions64Bit.html
   @try {
-    return (int)run_engine(_engineHandle, configYAML.UTF8String, logLevel.UTF8String, "");
+    auto options = std::make_unique<Envoy::OptionsImpl>();
+    options->setConfigProto(std::move(bootstrap));
+    options->setLogLevel(options->parseAndValidateLogLevel(logLevel.UTF8String));
+    options->setConcurrency(1);
+    return reinterpret_cast<Envoy::Engine *>(_engineHandle)->run(std::move(options));
+  } @catch (NSException *exception) {
+    NSLog(@"[Envoy] exception caught: %@", exception);
+    [NSNotificationCenter.defaultCenter postNotificationName:@"EnvoyError" object:self];
+    return kEnvoyFailure;
+  }
+}
+
+- (int)runWithYAML:(NSString *)yaml
+            config:(EnvoyConfiguration *)config
+          logLevel:(NSString *)logLevel {
+  [self performRegistrationsForConfig:config];
+  [self startObservingLifecycleNotifications];
+
+  @try {
+    return (int)run_engine(_engineHandle, yaml.UTF8String, logLevel.UTF8String, "");
   } @catch (NSException *exception) {
     NSLog(@"[Envoy] exception caught: %@", exception);
     [NSNotificationCenter.defaultCenter postNotificationName:@"EnvoyError" object:self];

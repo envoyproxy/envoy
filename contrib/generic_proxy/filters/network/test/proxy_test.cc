@@ -2,6 +2,8 @@
 #include <string>
 #include <utility>
 
+#include "source/common/tracing/tracer_manager_impl.h"
+
 #include "test/mocks/server/factory_context.h"
 #include "test/test_common/registry.h"
 #include "test/test_common/utility.h"
@@ -38,7 +40,22 @@ public:
 
 class FilterConfigTest : public testing::Test {
 public:
-  void initializeFilterConfig() {
+  void initializeFilterConfig(bool with_tracing = false) {
+    if (with_tracing) {
+      tracer_ = std::make_shared<NiceMock<Tracing::MockTracer>>();
+
+      const std::string tracing_config_yaml = R"EOF(
+      max_path_tag_length: 128
+      )EOF";
+
+      Tracing::ConnectionManagerTracingConfigProto tracing_config;
+
+      TestUtility::loadFromYaml(tracing_config_yaml, tracing_config);
+
+      tracing_config_ = std::make_unique<Tracing::ConnectionManagerTracingConfigImpl>(
+          envoy::config::core::v3::TrafficDirection::OUTBOUND, tracing_config);
+    }
+
     std::vector<NamedFilterFactoryCb> factories;
 
     for (const auto& filter : mock_stream_filters_) {
@@ -63,10 +80,13 @@ public:
 
     mock_route_entry_ = std::make_shared<NiceMock<MockRouteEntry>>();
 
-    filter_config_ =
-        std::make_shared<FilterConfigImpl>("test_prefix", std::move(codec_factory),
-                                           route_config_provider_, factories, factory_context_);
+    filter_config_ = std::make_shared<FilterConfigImpl>(
+        "test_prefix", std::move(codec_factory), route_config_provider_, factories, tracer_,
+        std::move(tracing_config_), factory_context_);
   }
+
+  std::shared_ptr<NiceMock<Tracing::MockTracer>> tracer_;
+  Tracing::ConnectionManagerTracingConfigPtr tracing_config_;
 
   std::shared_ptr<FilterConfig> filter_config_;
   NiceMock<Server::Configuration::MockFactoryContext> factory_context_;
@@ -134,8 +154,8 @@ TEST_F(FilterConfigTest, CodecFactory) {
 
 class FilterTest : public FilterConfigTest {
 public:
-  void initializeFilter() {
-    FilterConfigTest::initializeFilterConfig();
+  void initializeFilter(bool with_tracing = false) {
+    FilterConfigTest::initializeFilterConfig(with_tracing);
 
     auto encoder = std::make_unique<NiceMock<MockResponseEncoder>>();
     encoder_ = encoder.get();
@@ -153,7 +173,8 @@ public:
         .WillOnce(
             Invoke([this](RequestDecoderCallback& callback) { decoder_callback_ = &callback; }));
 
-    filter_ = std::make_shared<Filter>(filter_config_);
+    filter_ = std::make_shared<Filter>(filter_config_, factory_context_.time_system_,
+                                       factory_context_.runtime_loader_);
 
     EXPECT_EQ(filter_.get(), decoder_callback_);
 
@@ -678,6 +699,47 @@ TEST_F(FilterTest, NewStreamAndReplyNormallyWithDrainClose) {
   EXPECT_CALL(factory_context_.drain_manager_, drainClose()).WillOnce(Return(true));
   EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_));
   EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::FlushWrite));
+
+  auto response = std::make_unique<FakeStreamCodecFactory::FakeResponse>();
+  active_stream->upstreamResponse(std::move(response));
+}
+
+TEST_F(FilterTest, NewStreamAndReplyNormallyWithTracing) {
+  auto mock_decoder_filter_0 = std::make_shared<NiceMock<MockDecoderFilter>>();
+  mock_decoder_filters_ = {{"mock_0", mock_decoder_filter_0}};
+
+  initializeFilter(true);
+
+  auto request = std::make_unique<FakeStreamCodecFactory::FakeRequest>();
+
+  auto* span = new NiceMock<Tracing::MockSpan>();
+  EXPECT_CALL(*tracer_, startSpan_(_, _, _, _))
+      .WillOnce(
+          Invoke([&](const Tracing::Config& config, Tracing::TraceContext&,
+                     const StreamInfo::StreamInfo&, const Tracing::Decision) -> Tracing::Span* {
+            EXPECT_EQ(Tracing::OperationName::Egress, config.operationName());
+            return span;
+          }));
+
+  filter_->newDownstreamRequest(std::move(request));
+  EXPECT_EQ(1, filter_->activeStreamsForTest().size());
+
+  auto active_stream = filter_->activeStreamsForTest().begin()->get();
+
+  EXPECT_CALL(*span, setTag(_, _)).Times(testing::AnyNumber());
+  EXPECT_CALL(*span, finishSpan());
+
+  EXPECT_CALL(filter_callbacks_.connection_, write(BufferStringEqual("test"), true));
+
+  EXPECT_CALL(*encoder_, encode(_, _))
+      .WillOnce(Invoke([&](const Response&, ResponseEncoderCallback& callback) {
+        Buffer::OwnedImpl buffer;
+        buffer.add("test");
+        callback.onEncodingSuccess(buffer, true);
+      }));
+
+  EXPECT_CALL(factory_context_.drain_manager_, drainClose()).WillOnce(Return(false));
+  EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_));
 
   auto response = std::make_unique<FakeStreamCodecFactory::FakeResponse>();
   active_stream->upstreamResponse(std::move(response));
