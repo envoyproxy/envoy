@@ -57,6 +57,7 @@ envoy_cc_library(
         ":utility_lib",
         "//envoy/event:deferred_deletable",
         "//envoy/http:codec_interface",
+        "//envoy/http:header_validator_interface",
         "//envoy/network:connection_interface",
         "//envoy/network:filter_interface",
         "//source/common/common:assert_lib",
@@ -510,6 +511,7 @@ envoy_cc_library(
     hdrs = ["header_utility.h"],
     external_deps = [
         "nghttp2",
+        "quiche_http2_adapter",
     ],
     deps = [
         ":header_map_lib",

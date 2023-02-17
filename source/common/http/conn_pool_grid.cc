@@ -309,9 +309,6 @@ ConnectionPool::Cancellable* ConnectivityGrid::newStream(Http::ResponseDecoder& 
       delay_tcp_attempt = false;
     }
   } else {
-    ASSERT(options.can_use_http3_ ||
-           Runtime::runtimeFeatureEnabled(Runtime::conn_pool_new_stream_with_early_data_and_http3));
-
     // Before skipping to the next pool, make sure it has been created.
     createNextPool();
     ++pool;
@@ -463,7 +460,6 @@ void ConnectivityGrid::onHandshakeComplete() {
 
 void ConnectivityGrid::onZeroRttHandshakeFailed() {
   ENVOY_LOG(trace, "Marking HTTP/3 failed for host '{}'.", host_->hostname());
-  ASSERT(Runtime::runtimeFeatureEnabled("envoy.reloadable_features.http3_sends_early_data"));
   getHttp3StatusTracker().markHttp3FailedRecently();
 }
 

@@ -1,4 +1,4 @@
-import Foundation
+@_implementationOnly import EnvoyEngine
 
 // TODO(goaway): indentation in here is super brittle; fix to avoid breakage on layout changes.
 
@@ -6,8 +6,7 @@ import Foundation
 /// Especially useful for testing/mocking clients.
 /// https://www.envoyproxy.io/docs/envoy/latest/api-v3/config/route/
 /// v3/route_components.proto#config-route-v3-directresponseaction
-@objcMembers
-public final class DirectResponse: NSObject {
+public struct DirectResponse {
   public let matcher: RouteMatcher
   public let status: UInt
   public let body: String?
@@ -24,7 +23,6 @@ public final class DirectResponse: NSObject {
     self.status = status
     self.body = body
     self.headers = headers
-    super.init()
   }
 
   /// - returns: YAML that can be used for route matching in Envoy configurations.
@@ -83,5 +81,16 @@ public final class DirectResponse: NSObject {
                   \(pathMatch)
 \(formattedHeaderMatches)
 """
+  }
+}
+
+extension DirectResponse {
+  func toObjC() -> EMODirectResponse {
+    let result = EMODirectResponse()
+    result.body = body
+    result.status = status
+    result.matcher = matcher.toObjC()
+    result.headers = headers
+    return result
   }
 }

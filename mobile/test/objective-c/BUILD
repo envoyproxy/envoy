@@ -1,4 +1,4 @@
-load("@envoy_mobile//bazel:apple_test.bzl", "envoy_mobile_objc_test")
+load("@envoy_mobile//bazel:apple.bzl", "envoy_mobile_objc_test")
 
 licenses(["notice"])  # Apache 2
 

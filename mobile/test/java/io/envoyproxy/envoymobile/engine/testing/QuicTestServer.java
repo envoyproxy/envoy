@@ -19,6 +19,26 @@ public final class QuicTestServer {
     nativeStartQuicTestServer();
   }
 
+  /*
+   * Starts the server. Throws an {@link IllegalStateException} if already started.
+   */
+  public static void startTestServer() {
+    if (!sServerRunning.compareAndSet(false, true)) {
+      throw new IllegalStateException("Server is already running");
+    }
+    nativeStartTestServer();
+  }
+
+  /**
+   * Shutdowns the server. No-op if the server is already shutdown.
+   */
+  public static void shutdownTestServer() {
+    if (!sServerRunning.compareAndSet(true, false)) {
+      return;
+    }
+    nativeShutdownTestServer();
+  }
+
   /**
    * Shutdowns the server. No-op if the server is already shutdown.
    */
@@ -48,6 +68,10 @@ public final class QuicTestServer {
   private static native void nativeStartQuicTestServer();
 
   private static native void nativeShutdownQuicTestServer();
+
+  private static native void nativeStartTestServer();
+
+  private static native void nativeShutdownTestServer();
 
   private static native int nativeGetServerPort();
 

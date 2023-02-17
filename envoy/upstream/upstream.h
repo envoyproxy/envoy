@@ -16,6 +16,7 @@
 #include "envoy/config/typed_metadata.h"
 #include "envoy/http/codec.h"
 #include "envoy/http/filter_factory.h"
+#include "envoy/http/header_validator.h"
 #include "envoy/network/connection.h"
 #include "envoy/network/transport_socket.h"
 #include "envoy/ssl/context.h"
@@ -1184,6 +1185,12 @@ public:
    * @return the Http3 Codec Stats.
    */
   virtual Http::Http3::CodecStats& http3CodecStats() const PURE;
+
+  /**
+   * @return create header validator based on cluster configuration. Returns nullptr if
+   * ENVOY_ENABLE_UHV is undefined.
+   */
+  virtual Http::HeaderValidatorPtr makeHeaderValidator(Http::Protocol protocol) const PURE;
 
 protected:
   /**

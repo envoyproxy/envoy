@@ -38,7 +38,7 @@ const char* alternate_protocols_cache_filter_insert = R"(
         name: default_alternate_protocols_cache
 )";
 
-const char* gzip_config_insert = R"(
+const char* gzip_decompressor_config_insert = R"(
   - name: envoy.filters.http.decompressor
     typed_config:
       "@type": type.googleapis.com/envoy.extensions.filters.http.decompressor.v3.Decompressor
@@ -57,7 +57,7 @@ const char* gzip_config_insert = R"(
           ignore_no_transform_header: true
 )";
 
-const char* brotli_config_insert = R"(
+const char* brotli_decompressor_config_insert = R"(
   - name: envoy.filters.http.decompressor
     typed_config:
       "@type": type.googleapis.com/envoy.extensions.filters.http.decompressor.v3.Decompressor
@@ -73,6 +73,69 @@ const char* brotli_config_insert = R"(
       response_direction_config:
         common_config:
           ignore_no_transform_header: true
+)";
+
+const char* compressor_config_insert = R"(
+  - name: envoy.filters.http.compressor
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.common.matching.v3.ExtensionWithMatcher
+      extension_config:
+        name: composite
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.filters.http.composite.v3.Composite
+      xds_matcher:
+        matcher_tree:
+          input:
+            name: request-headers
+            typed_config:
+              "@type": type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput
+              header_name: x-envoy-mobile-compression
+          exact_match_map:
+            map:
+              gzip:
+                action:
+                  name: composite-action
+                  typed_config:
+                    "@type": type.googleapis.com/envoy.extensions.filters.http.composite.v3.ExecuteFilterAction
+                    typed_config:
+                      name: envoy.filters.http.compressor
+                      typed_config:
+                        "@type": type.googleapis.com/envoy.extensions.filters.http.compressor.v3.Compressor
+                        compressor_library:
+                          name: gzip
+                          typed_config:
+                            "@type": type.googleapis.com/envoy.extensions.compression.gzip.compressor.v3.Gzip
+                            window_bits: 15
+                        request_direction_config:
+                          common_config:
+                            enabled:
+                              default_value: true
+                        response_direction_config:
+                          common_config:
+                            enabled:
+                              default_value: false
+              brotli:
+                action:
+                  name: composite-action
+                  typed_config:
+                    "@type": type.googleapis.com/envoy.extensions.filters.http.composite.v3.ExecuteFilterAction
+                    typed_config:
+                      name: envoy.filters.http.compressor
+                      typed_config:
+                        "@type": type.googleapis.com/envoy.extensions.filters.http.compressor.v3.Compressor
+                        compressor_library:
+                          name: text_optimized
+                          typed_config:
+                            "@type": type.googleapis.com/envoy.extensions.compression.brotli.compressor.v3.Brotli
+                        request_direction_config:
+                          common_config:
+                            enabled:
+                              default_value: true
+                        response_direction_config:
+                          common_config:
+                            enabled:
+                              default_value: false
+
 )";
 
 const char* default_cert_validation_context_template = R"(
@@ -368,6 +431,8 @@ const char* config_template = R"(
 typed_dns_resolver_config:
   name: *dns_resolver_name
   typed_config: *dns_resolver_config
+dynamic_resources:
+#{custom_dynamic_resources}
 #{custom_ads}
 static_resources:
   listeners:
@@ -510,8 +575,10 @@ stats_config:
         - prefix: runtime.load_success
         - safe_regex:
             regex: '^vhost\.[\w]+\.vcluster\.[\w]+?\.upstream_rq_(?:[12345]xx|[3-5][0-9][0-9]|retry|total)'
+#{custom_stats}
   use_all_default_tags:
     false
+#{custom_node_context}
 watchdogs:
   main_thread_watchdog:
     megamiss_timeout: 60s
@@ -554,13 +621,20 @@ const char* rtds_layer_insert = R"(
           ads: {{}})";
 
 const char* ads_insert = R"(
-dynamic_resources:
   ads_config:
     transport_api_version: V3
     api_type: {}
     set_node_on_first_message_only: true
     grpc_services:
       google_grpc:
-        target_uri: '{}:{}')";
+        target_uri: '{}:{}'
+        stat_prefix: ads)";
+
+const char* cds_layer_insert = R"(
+  cds_config:
+    initial_fetch_timeout:
+      seconds: {}
+    resource_api_version: V3
+    ads: {{}})";
 
 // clang-format on

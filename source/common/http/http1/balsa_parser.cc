@@ -127,7 +127,7 @@ BalsaParser::BalsaParser(MessageType type, ParserCallbacks* connection, size_t m
   ASSERT(connection_ != nullptr);
 
   quiche::HttpValidationPolicy http_validation_policy;
-  http_validation_policy.disallow_header_continuation_lines = false;
+  http_validation_policy.disallow_header_continuation_lines = true;
   http_validation_policy.require_header_colon = true;
   http_validation_policy.disallow_multiple_content_length = false;
   http_validation_policy.disallow_transfer_encoding_with_content_length = false;
@@ -244,23 +244,14 @@ void BalsaParser::OnBodyChunkInput(absl::string_view input) {
 
 void BalsaParser::OnHeaderInput(absl::string_view /*input*/) {}
 void BalsaParser::OnTrailerInput(absl::string_view /*input*/) {}
+void BalsaParser::OnHeader(absl::string_view /*key*/, absl::string_view /*value*/) {}
 
-void BalsaParser::OnHeader(absl::string_view key, absl::string_view value) {
-  if (status_ == ParserStatus::Error) {
-    return;
-  }
-
-  status_ = convertResult(connection_->onHeaderField(key.data(), key.length()));
-
-  if (status_ == ParserStatus::Error) {
-    return;
-  }
-
-  status_ = convertResult(connection_->onHeaderValue(value.data(), value.length()));
+void BalsaParser::ProcessHeaders(const BalsaHeaders& headers) {
+  ProcessHeadersOrTrailersImpl(headers);
 }
-
-void BalsaParser::ProcessHeaders(const BalsaHeaders& /*headers*/) {}
-void BalsaParser::ProcessTrailers(const BalsaHeaders& /*trailer*/) {}
+void BalsaParser::ProcessTrailers(const BalsaHeaders& trailer) {
+  ProcessHeadersOrTrailersImpl(trailer);
+}
 
 void BalsaParser::OnRequestFirstLineInput(absl::string_view /*line_input*/,
                                           absl::string_view method_input,
@@ -366,6 +357,24 @@ void BalsaParser::HandleError(BalsaFrameEnums::ErrorCode error_code) {
 void BalsaParser::HandleWarning(BalsaFrameEnums::ErrorCode error_code) {
   if (error_code == BalsaFrameEnums::TRAILER_MISSING_COLON) {
     HandleError(error_code);
+  }
+}
+
+void BalsaParser::ProcessHeadersOrTrailersImpl(const quiche::BalsaHeaders& headers) {
+  for (const std::pair<absl::string_view, absl::string_view>& key_value : headers.lines()) {
+    if (status_ == ParserStatus::Error) {
+      return;
+    }
+
+    absl::string_view key = key_value.first;
+    status_ = convertResult(connection_->onHeaderField(key.data(), key.length()));
+
+    if (status_ == ParserStatus::Error) {
+      return;
+    }
+
+    absl::string_view value = key_value.second;
+    status_ = convertResult(connection_->onHeaderValue(value.data(), value.length()));
   }
 }
 

@@ -12,6 +12,8 @@ namespace Grpc {
 const uint8_t GRPC_FH_DEFAULT = 0b0u;
 // Last bit for a compressed message.
 const uint8_t GRPC_FH_COMPRESSED = 0b1u;
+// Bit specifies end-of-stream response in Buf Connect.
+const uint8_t CONNECT_FH_EOS = 0b10u;
 
 constexpr uint64_t GRPC_FRAME_HEADER_SIZE = sizeof(uint8_t) + sizeof(uint32_t);
 
