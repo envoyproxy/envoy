@@ -43,6 +43,9 @@ bug_fixes:
   change: |
     in JSON logs, port numbers were logged as strings and are now logged as numbers (``%DOWNSTREAM_LOCAL_PORT%``, ``%DOWNSTREAM_REMOTE_PORT%``, ``%DOWNSTREAM_DIRECT_REMOTE_PORT%``, ``%UPSTREAM_LOCAL_PORT%``, ``%UPSTREAM_REMOTE_PORT%``).
     This behavioral change can be temporarily reverted by setting runtime guard ``envoy.reloadable_features.format_ports_as_numbers`` to false.
+- area: ext_proc
+  change: |
+    Let onData always raise StopIterationAndWatermark when waiting for headers response, to avoid buffer overflow errors.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
