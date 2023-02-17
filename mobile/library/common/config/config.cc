@@ -57,25 +57,6 @@ const char* gzip_decompressor_config_insert = R"(
           ignore_no_transform_header: true
 )";
 
-const char* gzip_compressor_config_insert = R"(
-  - name: envoy.filters.http.compressor
-    typed_config:
-      "@type": type.googleapis.com/envoy.extensions.filters.http.compressor.v3.Compressor
-      compressor_library:
-        name: gzip
-        typed_config:
-          "@type": type.googleapis.com/envoy.extensions.compression.gzip.compressor.v3.Gzip
-          window_bits: 15
-      request_direction_config:
-        common_config:
-          enabled:
-            default_value: true
-      response_direction_config:
-        common_config:
-          enabled:
-            default_value: false
-)";
-
 const char* brotli_decompressor_config_insert = R"(
   - name: envoy.filters.http.decompressor
     typed_config:
@@ -94,22 +75,67 @@ const char* brotli_decompressor_config_insert = R"(
           ignore_no_transform_header: true
 )";
 
-const char* brotli_compressor_config_insert = R"(
+const char* compressor_config_insert = R"(
   - name: envoy.filters.http.compressor
     typed_config:
-      "@type": type.googleapis.com/envoy.extensions.filters.http.compressor.v3.Compressor
-      compressor_library:
-        name: text_optimized
+      "@type": type.googleapis.com/envoy.extensions.common.matching.v3.ExtensionWithMatcher
+      extension_config:
+        name: composite
         typed_config:
-          "@type": type.googleapis.com/envoy.extensions.compression.brotli.compressor.v3.Brotli
-      request_direction_config:
-        common_config:
-          enabled:
-            default_value: true
-      response_direction_config:
-        common_config:
-          enabled:
-            default_value: false
+          "@type": type.googleapis.com/envoy.extensions.filters.http.composite.v3.Composite
+      xds_matcher:
+        matcher_tree:
+          input:
+            name: request-headers
+            typed_config:
+              "@type": type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput
+              header_name: x-envoy-mobile-compression
+          exact_match_map:
+            map:
+              gzip:
+                action:
+                  name: composite-action
+                  typed_config:
+                    "@type": type.googleapis.com/envoy.extensions.filters.http.composite.v3.ExecuteFilterAction
+                    typed_config:
+                      name: envoy.filters.http.compressor
+                      typed_config:
+                        "@type": type.googleapis.com/envoy.extensions.filters.http.compressor.v3.Compressor
+                        compressor_library:
+                          name: gzip
+                          typed_config:
+                            "@type": type.googleapis.com/envoy.extensions.compression.gzip.compressor.v3.Gzip
+                            window_bits: 15
+                        request_direction_config:
+                          common_config:
+                            enabled:
+                              default_value: true
+                        response_direction_config:
+                          common_config:
+                            enabled:
+                              default_value: false
+              brotli:
+                action:
+                  name: composite-action
+                  typed_config:
+                    "@type": type.googleapis.com/envoy.extensions.filters.http.composite.v3.ExecuteFilterAction
+                    typed_config:
+                      name: envoy.filters.http.compressor
+                      typed_config:
+                        "@type": type.googleapis.com/envoy.extensions.filters.http.compressor.v3.Compressor
+                        compressor_library:
+                          name: text_optimized
+                          typed_config:
+                            "@type": type.googleapis.com/envoy.extensions.compression.brotli.compressor.v3.Brotli
+                        request_direction_config:
+                          common_config:
+                            enabled:
+                              default_value: true
+                        response_direction_config:
+                          common_config:
+                            enabled:
+                              default_value: false
+
 )";
 
 const char* default_cert_validation_context_template = R"(

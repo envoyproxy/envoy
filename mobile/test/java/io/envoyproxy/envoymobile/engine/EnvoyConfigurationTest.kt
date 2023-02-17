@@ -79,9 +79,7 @@ class EnvoyConfigurationTest {
     enableDrainPostDnsRefresh: Boolean = false,
     enableHttp3: Boolean = true,
     enableGzipDecompression: Boolean = true,
-    enableGzipCompression: Boolean = false,
     enableBrotliDecompression: Boolean = false,
-    enableBrotliCompression: Boolean = false,
     enableSocketTagging: Boolean = false,
     enableHappyEyeballs: Boolean = false,
     enableInterfaceBinding: Boolean = false,
@@ -118,9 +116,7 @@ class EnvoyConfigurationTest {
       enableDrainPostDnsRefresh,
       enableHttp3,
       enableGzipDecompression,
-      enableGzipCompression,
       enableBrotliDecompression,
-      enableBrotliCompression,
       enableSocketTagging,
       enableHappyEyeballs,
       enableInterfaceBinding,
@@ -242,9 +238,7 @@ class EnvoyConfigurationTest {
       enableHappyEyeballs = true,
       enableHttp3 = false,
       enableGzipDecompression = false,
-      enableGzipCompression = true,
       enableBrotliDecompression = true,
-      enableBrotliCompression = true,
       enableSocketTagging = true,
       enableInterfaceBinding = true,
       enableSkipDNSLookupForProxiedRequests = true,
@@ -276,13 +270,11 @@ class EnvoyConfigurationTest {
     // enableGzipDecompression = false
     assertThat(resolvedTemplate).doesNotContain("type.googleapis.com/envoy.extensions.compression.gzip.decompressor.v3.Gzip");
 
-    // enableGzipCompression = true
     assertThat(resolvedTemplate).contains("type.googleapis.com/envoy.extensions.compression.gzip.compressor.v3.Gzip");
 
     // enableBrotliDecompression = true
     assertThat(resolvedTemplate).contains("type.googleapis.com/envoy.extensions.compression.brotli.decompressor.v3.Brotli");
 
-    // enableBrotliCompression = true
     assertThat(resolvedTemplate).contains("type.googleapis.com/envoy.extensions.compression.brotli.compressor.v3.Brotli");
 
     // enableInterfaceBinding = true

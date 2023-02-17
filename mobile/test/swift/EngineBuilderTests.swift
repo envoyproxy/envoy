@@ -467,9 +467,7 @@ final class EngineBuilderTests: XCTestCase {
       enableHappyEyeballs: true,
       enableHttp3: http3,
       enableGzipDecompression: true,
-      enableGzipCompression: false,
       enableBrotliDecompression: false,
-      enableBrotliCompression: false,
       enableInterfaceBinding: true,
       enableDrainPostDnsRefresh: false,
       enforceTrustChainVerification: false,
@@ -540,9 +538,7 @@ final class EngineBuilderTests: XCTestCase {
 
     // Compression
     XCTAssertTrue(resolvedYAML.contains(".decompressor.v3.Gzip"))
-    XCTAssertFalse(resolvedYAML.contains(".compressor.v3.Gzip"))
     XCTAssertFalse(resolvedYAML.contains(".decompressor.v3.Brotli"))
-    XCTAssertFalse(resolvedYAML.contains(".compressor.v3.Brotli"))
 
     // Metadata
     XCTAssertTrue(resolvedYAML.contains("device_os: iOS"))
@@ -578,9 +574,7 @@ final class EngineBuilderTests: XCTestCase {
       enableHappyEyeballs: false,
       enableHttp3: false,
       enableGzipDecompression: false,
-      enableGzipCompression: true,
       enableBrotliDecompression: true,
-      enableBrotliCompression: true,
       enableInterfaceBinding: false,
       enableDrainPostDnsRefresh: true,
       enforceTrustChainVerification: true,
@@ -642,9 +636,7 @@ final class EngineBuilderTests: XCTestCase {
 
     // Compression
     XCTAssertFalse(resolvedYAML.contains(".decompressor.v3.Gzip"))
-    XCTAssertTrue(resolvedYAML.contains(".compressor.v3.Gzip"))
     XCTAssertTrue(resolvedYAML.contains(".decompressor.v3.Brotli"))
-    XCTAssertTrue(resolvedYAML.contains(".compressor.v3.Brotli"))
   }
 
   func testReturnsNilWhenUnresolvedValueInTemplate() {
@@ -663,9 +655,7 @@ final class EngineBuilderTests: XCTestCase {
       enableHappyEyeballs: false,
       enableHttp3: false,
       enableGzipDecompression: false,
-      enableGzipCompression: false,
       enableBrotliDecompression: false,
-      enableBrotliCompression: false,
       enableInterfaceBinding: false,
       enableDrainPostDnsRefresh: false,
       enforceTrustChainVerification: true,

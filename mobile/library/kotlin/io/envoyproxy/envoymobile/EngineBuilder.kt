@@ -58,9 +58,7 @@ open class EngineBuilder(
   internal var enableHttp3 = true
   private var enableHappyEyeballs = true
   private var enableGzipDecompression = true
-  internal var enableGzipCompression = false
   private var enableBrotliDecompression = false
-  internal var enableBrotliCompression = false
   private var enableSocketTagging = false
   private var enableInterfaceBinding = false
   private var h2ConnectionKeepaliveIdleIntervalMilliseconds = 1
@@ -573,9 +571,7 @@ open class EngineBuilder(
       enableDrainPostDnsRefresh,
       enableHttp3,
       enableGzipDecompression,
-      enableGzipCompression,
       enableBrotliDecompression,
-      enableBrotliCompression,
       enableSocketTagging,
       enableHappyEyeballs,
       enableInterfaceBinding,
