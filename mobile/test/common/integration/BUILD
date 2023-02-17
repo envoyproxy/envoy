@@ -42,6 +42,25 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "cds_integration_test",
+    srcs = ["cds_integration_test.cc"],
+    exec_properties = {
+        # TODO(willengflow): Remove this once the sandboxNetwork=off works for ipv4 localhost addresses.
+        "sandboxNetwork": "standard",
+    },
+    external_deps = [
+        "abseil_strings",
+    ],
+    repository = "@envoy",
+    deps = [
+        ":xds_integration_test_lib",
+        "@envoy//test/test_common:utility_lib",
+        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
+        "@envoy_api//envoy/service/runtime/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_test(
     name = "sds_integration_test",
     srcs = [
         "sds_integration_test.cc",

@@ -127,7 +127,7 @@ BalsaParser::BalsaParser(MessageType type, ParserCallbacks* connection, size_t m
   ASSERT(connection_ != nullptr);
 
   quiche::HttpValidationPolicy http_validation_policy;
-  http_validation_policy.disallow_header_continuation_lines = false;
+  http_validation_policy.disallow_header_continuation_lines = true;
   http_validation_policy.require_header_colon = true;
   http_validation_policy.disallow_multiple_content_length = false;
   http_validation_policy.disallow_transfer_encoding_with_content_length = false;
