@@ -241,17 +241,25 @@ envoy_cc_library(
     srcs = [
         "io_socket_handle_base_impl.cc",
         "io_socket_handle_impl.cc",
-        "io_uring_socket_handle_impl.cc",
         "socket_interface_impl.cc",
         "win32_socket_handle_impl.cc",
-    ],
+    ] + select({
+        "//bazel:linux": [
+            "io_uring_socket_handle_impl.cc",
+        ],
+        "//conditions:default": [],
+    }),
     hdrs = [
         "io_socket_handle_base_impl.h",
         "io_socket_handle_impl.h",
-        "io_uring_socket_handle_impl.h",
         "socket_interface_impl.h",
         "win32_socket_handle_impl.h",
-    ],
+    ] + select({
+        "//bazel:linux": [
+            "io_uring_socket_handle_impl.h",
+        ],
+        "//conditions:default": [],
+    }),
     deps = [
         ":address_lib",
         ":io_socket_error_lib",
@@ -263,10 +271,14 @@ envoy_cc_library(
         "//source/common/api:os_sys_calls_lib",
         "//source/common/buffer:buffer_lib",
         "//source/common/event:dispatcher_includes",
-        "//source/common/io:io_uring_factory_impl_lib",
-        "//source/common/io:io_uring_impl_lib",
         "@envoy_api//envoy/extensions/network/socket_interface/v3:pkg_cc_proto",
-    ],
+    ] + select({
+        "//bazel:linux": [
+            "//source/common/io:io_uring_factory_impl_lib",
+            "//source/common/io:io_uring_impl_lib",
+        ],
+        "//conditions:default": [],
+    }),
     alwayslink = LEGACY_ALWAYSLINK,
 )
 

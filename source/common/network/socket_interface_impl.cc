@@ -6,12 +6,15 @@
 #include "source/common/api/os_sys_calls_impl.h"
 #include "source/common/common/assert.h"
 #include "source/common/common/utility.h"
-#include "source/common/io/io_uring_factory_impl.h"
-#include "source/common/io/io_uring_impl.h"
 #include "source/common/network/address_impl.h"
 #include "source/common/network/io_socket_handle_impl.h"
-#include "source/common/network/io_uring_socket_handle_impl.h"
 #include "source/common/network/win32_socket_handle_impl.h"
+
+#ifdef __linux__
+#include "source/common/io/io_uring_factory_impl.h"
+#include "source/common/io/io_uring_impl.h"
+#include "source/common/network/io_uring_socket_handle_impl.h"
+#endif
 
 namespace Envoy {
 namespace Network {
@@ -27,13 +30,14 @@ bool SocketInterfaceImpl::hasIoUringFactory(Io::IoUringFactory* io_uring_factory
          io_uring_factory->getIoUringWorker() != absl::nullopt;
 }
 
-IoHandlePtr SocketInterfaceImpl::makePlatformSpecificSocket(int socket_fd, bool socket_v6only,
-                                                            absl::optional<int> domain,
-                                                            Io::IoUringFactory* io_uring_factory) {
+IoHandlePtr SocketInterfaceImpl::makePlatformSpecificSocket(
+    int socket_fd, bool socket_v6only, absl::optional<int> domain,
+    [[maybe_unused]] Io::IoUringFactory* io_uring_factory) {
   if constexpr (Event::PlatformDefaultTriggerType == Event::FileTriggerType::EmulatedEdge) {
     return std::make_unique<Win32SocketHandleImpl>(socket_fd, socket_v6only, domain);
   }
 
+#ifdef __linux__
   // Only create IoUringSocketHandleImpl when the IoUringFactory is created, and
   // it is registered in the TLS, and initialized. There are cases the test may create thread
   // before IoUringFactory add to the TLS and initialized.
@@ -43,6 +47,9 @@ IoHandlePtr SocketInterfaceImpl::makePlatformSpecificSocket(int socket_fd, bool 
   } else {
     return std::make_unique<IoSocketHandleImpl>(socket_fd, socket_v6only, domain);
   }
+#else
+  return std::make_unique<IoSocketHandleImpl>(socket_fd, socket_v6only, domain);
+#endif
 }
 
 IoHandlePtr SocketInterfaceImpl::makeSocket(int socket_fd, bool socket_v6only,
@@ -151,7 +158,9 @@ bool SocketInterfaceImpl::ipFamilySupported(int domain) {
 }
 
 Server::BootstrapExtensionPtr SocketInterfaceImpl::createBootstrapExtension(
-    const Protobuf::Message&, Server::Configuration::ServerFactoryContext& context) {
+    const Protobuf::Message&,
+    [[maybe_unused]] Server::Configuration::ServerFactoryContext& context) {
+#ifdef __linux__
   // TODO (soulxu): Add runtime flag here.
   if (Io::isIoUringSupported()) {
     std::shared_ptr<Io::IoUringFactoryImpl> io_uring_factory =
@@ -163,6 +172,9 @@ Server::BootstrapExtensionPtr SocketInterfaceImpl::createBootstrapExtension(
   } else {
     return std::make_unique<DefaultSocketInterfaceExtension>(*this, nullptr);
   }
+#else
+  return std::make_unique<DefaultSocketInterfaceExtension>(*this, nullptr);
+#endif
 }
 
 ProtobufTypes::MessagePtr SocketInterfaceImpl::createEmptyConfigProto() {
