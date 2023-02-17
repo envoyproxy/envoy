@@ -317,6 +317,11 @@ EngineBuilder& EngineBuilder::addPlatformFilter(std::string name) {
   return *this;
 }
 
+EngineBuilder& EngineBuilder::setRuntimeGuard(std::string guard, bool value) {
+  runtime_guards_.push_back({guard, value});
+  return *this;
+}
+
 EngineBuilder&
 EngineBuilder::addDirectResponse(DirectResponseTesting::DirectResponse direct_response) {
   direct_responses_.push_back(direct_response);
@@ -431,6 +436,17 @@ std::string EngineBuilder::generateConfigStr() const {
 #else
     throw std::runtime_error("http3 functionality was not compiled in this build of Envoy Mobile");
 #endif
+  }
+
+  std::string guards;
+  for (auto& guard_and_value : runtime_guards_) {
+    absl::StrAppend(&guards, "            ", guard_and_value.first,
+                    (guard_and_value.second ? ": true\n" : ": false\n"));
+  }
+
+  if (!guards.empty()) {
+    absl::StrReplaceAll({{"#{custom_runtime}", absl::StrCat("#{custom_runtime}\n", guards)}},
+                        &config_template);
   }
 
   for (const NativeFilterConfig& filter : native_filter_chain_) {
@@ -1132,6 +1148,9 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
       *(*envoy_layer.mutable_fields())["envoy"].mutable_struct_value();
   ProtobufWkt::Struct& flags =
       *(*runtime_values.mutable_fields())["reloadable_features"].mutable_struct_value();
+  for (auto& guard_and_value : runtime_guards_) {
+    (*flags.mutable_fields())[guard_and_value.first].set_bool_value(guard_and_value.second);
+  }
   (*flags.mutable_fields())["always_use_v6"].set_bool_value(always_use_v6_);
   (*flags.mutable_fields())["skip_dns_lookup_for_proxied_requests"].set_bool_value(
       skip_dns_lookups_for_proxied_requests_);

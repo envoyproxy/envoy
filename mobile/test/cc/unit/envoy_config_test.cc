@@ -38,6 +38,7 @@ TEST(TestConfig, ConfigIsApplied) {
       .addStatsFlushSeconds(654)
       .setAppVersion("1.2.3")
       .setAppId("1234-1234-1234")
+      .setRuntimeGuard("test_feature_false", true)
       .enableDnsCache(true, /* save_interval_seconds */ 101)
       .addDnsPreresolveHostnames({"lyft.com", "google.com"})
 #ifdef ENVOY_ADMIN_FUNCTIONALITY
@@ -60,6 +61,7 @@ TEST(TestConfig, ConfigIsApplied) {
                                            "  key: dns_persistent_cache",
                                            "- &force_ipv6 true",
                                            "- &persistent_dns_cache_save_interval 101",
+                                           " test_feature_false: true",
                                            ("- &metadata { device_os: \"probably-ubuntu-on-CI\", "
                                             "app_version: \"1.2.3\", app_id: \"1234-1234-1234\" }"),
                                            R"(- &validation_context
@@ -68,6 +70,18 @@ TEST(TestConfig, ConfigIsApplied) {
     ASSERT_NE(config_str.find(string), std::string::npos)
         << "'" << string << "' not found in" << config_str;
   }
+  envoy::config::bootstrap::v3::Bootstrap bootstrap;
+  TestUtility::loadFromYaml(absl::StrCat(config_header, config_str), bootstrap);
+  engine_builder.generateBootstrap();
+  EXPECT_TRUE(TestUtility::protoEqual(bootstrap, *engine_builder.generateBootstrap()));
+}
+
+TEST(TestConfig, MultiFlag) {
+  EngineBuilder engine_builder;
+  engine_builder.setRuntimeGuard("test_feature_false", true)
+      .setRuntimeGuard("test_feature_true", false);
+
+  std::string config_str = engine_builder.generateConfigStr();
   envoy::config::bootstrap::v3::Bootstrap bootstrap;
   TestUtility::loadFromYaml(absl::StrCat(config_header, config_str), bootstrap);
   engine_builder.generateBootstrap();

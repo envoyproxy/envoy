@@ -98,6 +98,8 @@
                                   virtualClusters:(NSArray<NSString *> *)virtualClusters
                            directResponseMatchers:(NSString *)directResponseMatchers
                                   directResponses:(NSString *)directResponses
+                                    runtimeGuards:
+                                        (NSDictionary<NSString *, NSString *> *)runtimeGuards
                              typedDirectResponses:
                                  (NSArray<EMODirectResponse *> *)typedDirectResponses
                                 nativeFilterChain:
@@ -151,6 +153,7 @@
   self.virtualClusters = virtualClusters;
   self.directResponseMatchers = directResponseMatchers;
   self.directResponses = directResponses;
+  self.runtimeGuards = runtimeGuards;
   self.typedDirectResponses = typedDirectResponses;
   self.nativeFilterChain = nativeFilterChain;
   self.httpPlatformFilterFactories = httpPlatformFilterFactories;
@@ -167,6 +170,13 @@
   NSMutableString *customListeners = [[NSMutableString alloc] init];
   NSMutableString *customRoutes = [[NSMutableString alloc] init];
   NSMutableString *customFilters = [[NSMutableString alloc] init];
+  NSMutableString *customRuntime = [[NSMutableString alloc] init];
+
+  for (NSString *key in self.runtimeGuards) {
+    NSString *line =
+        [NSString stringWithFormat:@"            %@: %@\n", key, self.runtimeGuards[key]];
+    [customRuntime appendString:line];
+  }
 
   NSString *platformFilterTemplate = [[NSString alloc] initWithUTF8String:platform_filter_template];
   for (EnvoyHTTPFilterFactory *filterFactory in self.httpPlatformFilterFactories) {
@@ -231,6 +241,8 @@
                                                          withString:customRoutes];
   templateYAML = [templateYAML stringByReplacingOccurrencesOfString:@"#{custom_filters}"
                                                          withString:customFilters];
+  templateYAML = [templateYAML stringByReplacingOccurrencesOfString:@"#{custom_runtime}\n"
+                                                         withString:customRuntime];
 
   NSMutableString *definitions =
       [[NSMutableString alloc] initWithString:@"!ignore platform_defs:\n"];

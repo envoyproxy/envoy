@@ -357,6 +357,20 @@ TEST_P(ClientIntegrationTest, ForceAdminViaBootstrap) {
   });
 
   basicTest();
+
+  // Verify the default runtime values.
+  EXPECT_FALSE(Runtime::runtimeFeatureEnabled("envoy.reloadable_features.test_feature_false"));
+  EXPECT_TRUE(Runtime::runtimeFeatureEnabled("envoy.reloadable_features.test_feature_true"));
+}
+
+TEST_P(ClientIntegrationTest, TestRuntimeSet) {
+  builder_.setRuntimeGuard("test_feature_true", false);
+  builder_.setRuntimeGuard("test_feature_false", true);
+  initialize();
+
+  // Verify that the Runtime config values are from the RTDS response.
+  EXPECT_TRUE(Runtime::runtimeFeatureEnabled("envoy.reloadable_features.test_feature_false"));
+  EXPECT_FALSE(Runtime::runtimeFeatureEnabled("envoy.reloadable_features.test_feature_true"));
 }
 
 } // namespace

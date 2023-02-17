@@ -88,6 +88,7 @@ public:
   EngineBuilder& addStatsSinks(std::vector<std::string> stat_sinks);
   EngineBuilder& addPlatformFilter(std::string name);
   EngineBuilder& addVirtualCluster(std::string virtual_cluster);
+  EngineBuilder& setRuntimeGuard(std::string guard, bool value);
 
   // Add a direct response. For testing purposes only.
   // TODO(jpsim): Move this out of the main engine builder API
@@ -184,6 +185,7 @@ private:
   std::vector<std::string> virtual_clusters_;
   std::vector<DirectResponseTesting::DirectResponse> direct_responses_;
 
+  std::vector<std::pair<std::string, bool>> runtime_guards_;
   absl::flat_hash_map<std::string, StringAccessorSharedPtr> string_accessors_;
   bool config_bootstrap_incompatible_ = false;
   bool skip_dns_lookups_for_proxied_requests_ = false;
