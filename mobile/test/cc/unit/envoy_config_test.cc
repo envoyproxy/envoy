@@ -16,8 +16,11 @@
 #include "source/extensions/network/dns_resolver/apple/apple_dns_impl.h"
 #endif
 
+using testing::AllOf;
 using testing::HasSubstr;
+using testing::IsEmpty;
 using testing::Not;
+using testing::SizeIs;
 extern const char* alternate_protocols_cache_filter_insert;
 
 namespace Envoy {
@@ -355,18 +358,63 @@ TEST(TestConfig, RtdsWithoutAds) {
 
 TEST(TestConfig, AdsConfig) {
   EngineBuilder engine_builder;
-  engine_builder.setAggregatedDiscoveryService(
-      /*api_type=*/"GRPC", /*target_uri=*/"fake-td.googleapis.com", /*port=*/12345);
+  engine_builder.setAggregatedDiscoveryService(/*target_uri=*/"fake-td.googleapis.com",
+                                               /*port=*/12345);
   std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> bootstrap =
       engine_builder.generateBootstrap();
   auto& ads_config = bootstrap->dynamic_resources().ads_config();
   EXPECT_EQ(ads_config.api_type(), envoy::config::core::v3::ApiConfigSource::GRPC);
   EXPECT_EQ(ads_config.grpc_services(0).google_grpc().target_uri(), "fake-td.googleapis.com:12345");
   EXPECT_EQ(ads_config.grpc_services(0).google_grpc().stat_prefix(), "ads");
-  const std::string config_str = engine_builder.generateConfigStr();
+  EXPECT_THAT(ads_config.grpc_services(0)
+                  .google_grpc()
+                  .channel_credentials()
+                  .ssl_credentials()
+                  .root_certs()
+                  .inline_string(),
+              IsEmpty());
+  EXPECT_THAT(ads_config.grpc_services(0).google_grpc().call_credentials(), SizeIs(0));
+  std::string config_str = engine_builder.generateConfigStr();
   EXPECT_THAT(config_str, HasSubstr("api_type: GRPC"));
   EXPECT_THAT(config_str, HasSubstr("target_uri: 'fake-td.googleapis.com:12345'"));
   EXPECT_THAT(config_str, HasSubstr("stat_prefix: ads"));
+  EXPECT_TRUE(engine_builder.generateBootstrapAndCompare(config_str));
+
+  // With security credentials.
+  engine_builder.setAggregatedDiscoveryService(/*target_uri=*/"fake-td.googleapis.com",
+                                               /*port=*/12345, /*jwt_token=*/"my_jwt_token",
+                                               /*jwt_token_lifetime_seconds=*/500,
+                                               /*ssl_root_certs=*/"my_root_cert");
+  bootstrap = engine_builder.generateBootstrap();
+  auto& ads_config_with_tokens = bootstrap->dynamic_resources().ads_config();
+  EXPECT_EQ(ads_config_with_tokens.api_type(), envoy::config::core::v3::ApiConfigSource::GRPC);
+  EXPECT_EQ(ads_config_with_tokens.grpc_services(0).google_grpc().target_uri(),
+            "fake-td.googleapis.com:12345");
+  EXPECT_EQ(ads_config_with_tokens.grpc_services(0).google_grpc().stat_prefix(), "ads");
+  EXPECT_EQ(ads_config_with_tokens.grpc_services(0)
+                .google_grpc()
+                .channel_credentials()
+                .ssl_credentials()
+                .root_certs()
+                .inline_string(),
+            "my_root_cert");
+  EXPECT_EQ(ads_config_with_tokens.grpc_services(0)
+                .google_grpc()
+                .call_credentials(0)
+                .service_account_jwt_access()
+                .json_key(),
+            "my_jwt_token");
+  EXPECT_EQ(ads_config_with_tokens.grpc_services(0)
+                .google_grpc()
+                .call_credentials(0)
+                .service_account_jwt_access()
+                .token_lifetime_seconds(),
+            500);
+  config_str = engine_builder.generateConfigStr();
+  EXPECT_THAT(config_str, HasSubstr("api_type: GRPC"));
+  EXPECT_THAT(config_str, HasSubstr("target_uri: 'fake-td.googleapis.com:12345'"));
+  EXPECT_THAT(config_str, HasSubstr("stat_prefix: ads"));
+  EXPECT_TRUE(engine_builder.generateBootstrapAndCompare(config_str));
 }
 
 TEST(TestConfig, EnablePlatformCertificatesValidation) {
@@ -481,6 +529,69 @@ TEST(TestConfig, AddVirtualCluster) {
   config_str = engine_builder.generateConfigStr();
   TestUtility::loadFromYaml(absl::StrCat(config_header, config_str), bootstrap);
   ASSERT_THAT(config_str, HasSubstr("cluster2"));
+}
+
+TEST(TestConfig, SetNodeId) {
+  EngineBuilder engine_builder;
+  const std::string default_node_id = "envoy-mobile";
+  std::string yaml_config_str = engine_builder.generateConfigStr();
+  EXPECT_THAT(yaml_config_str, HasSubstr(default_node_id));
+  EXPECT_EQ(engine_builder.generateBootstrap()->node().id(), default_node_id);
+  EXPECT_TRUE(engine_builder.generateBootstrapAndCompare(yaml_config_str));
+
+  const std::string test_node_id = "my_test_node";
+  engine_builder.setNodeId(test_node_id);
+  yaml_config_str = engine_builder.generateConfigStr();
+  EXPECT_THAT(yaml_config_str, HasSubstr(test_node_id));
+  EXPECT_EQ(engine_builder.generateBootstrap()->node().id(), test_node_id);
+  EXPECT_TRUE(engine_builder.generateBootstrapAndCompare(yaml_config_str));
+}
+
+TEST(TestConfig, SetNodeLocality) {
+  EngineBuilder engine_builder;
+  const std::string region = "us-west-1";
+  const std::string zone = "some_zone";
+  const std::string sub_zone = "some_sub_zone";
+  engine_builder.setNodeLocality(region, zone, sub_zone);
+  const std::string yaml_config_str = engine_builder.generateConfigStr();
+  EXPECT_THAT(yaml_config_str, AllOf(HasSubstr(region), HasSubstr(zone), HasSubstr(sub_zone)));
+  std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> bootstrap =
+      engine_builder.generateBootstrap();
+  EXPECT_EQ(bootstrap->node().locality().region(), region);
+  EXPECT_EQ(bootstrap->node().locality().zone(), zone);
+  EXPECT_EQ(bootstrap->node().locality().sub_zone(), sub_zone);
+  EXPECT_TRUE(engine_builder.generateBootstrapAndCompare(yaml_config_str));
+}
+
+TEST(TestConfig, AddCdsLayer) {
+  EngineBuilder engine_builder;
+  engine_builder.setAggregatedDiscoveryService(/*address=*/"fake-xds-server", /*port=*/12345);
+
+  engine_builder.addCdsLayer();
+  std::string yaml_config_str = engine_builder.generateConfigStr();
+  EXPECT_THAT(yaml_config_str, Not(HasSubstr("cds_resources_locator")));
+  std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> bootstrap =
+      engine_builder.generateBootstrap();
+  EXPECT_EQ(bootstrap->dynamic_resources().cds_resources_locator(), "");
+  EXPECT_EQ(bootstrap->dynamic_resources().cds_config().initial_fetch_timeout().seconds(),
+            /*default_timeout=*/5);
+  EXPECT_TRUE(engine_builder.generateBootstrapAndCompare(yaml_config_str));
+
+  const std::string cds_resources_locator =
+      "xdstp://traffic-director-global.xds.googleapis.com/envoy.config.cluster.v3.Cluster";
+  const int timeout_seconds = 300;
+  engine_builder.addCdsLayer(cds_resources_locator, timeout_seconds);
+  yaml_config_str = engine_builder.generateConfigStr();
+  EXPECT_THAT(yaml_config_str, HasSubstr(cds_resources_locator));
+  bootstrap = engine_builder.generateBootstrap();
+  EXPECT_EQ(bootstrap->dynamic_resources().cds_resources_locator(), cds_resources_locator);
+  EXPECT_EQ(bootstrap->dynamic_resources().cds_config().initial_fetch_timeout().seconds(),
+            timeout_seconds);
+  EXPECT_EQ(bootstrap->dynamic_resources().cds_config().api_config_source().api_type(),
+            envoy::config::core::v3::ApiConfigSource::AGGREGATED_GRPC);
+  EXPECT_EQ(bootstrap->dynamic_resources().cds_config().api_config_source().transport_api_version(),
+            envoy::config::core::v3::ApiVersion::V3);
+  EXPECT_TRUE(engine_builder.generateBootstrapAndCompare(yaml_config_str));
 }
 
 } // namespace

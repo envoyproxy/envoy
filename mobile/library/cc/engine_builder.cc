@@ -259,26 +259,46 @@ EngineBuilder& EngineBuilder::enforceTrustChainVerification(bool trust_chain_ver
   return *this;
 }
 
+EngineBuilder& EngineBuilder::setNodeId(std::string node_id) {
+  node_id_ = std::move(node_id);
+  return *this;
+}
+
+EngineBuilder& EngineBuilder::setNodeLocality(std::string region, std::string zone,
+                                              std::string sub_zone) {
+  set_node_locality_ = true;
+  node_locality_region_ = std::move(region);
+  node_locality_zone_ = std::move(zone);
+  node_locality_sub_zone_ = std::move(sub_zone);
+  return *this;
+}
+
+EngineBuilder& EngineBuilder::setAggregatedDiscoveryService(const std::string& address,
+                                                            const int port, std::string jwt_token,
+                                                            const int jwt_token_lifetime_seconds,
+                                                            std::string ssl_root_certs) {
+#ifndef ENVOY_GOOGLE_GRPC
+  throw std::runtime_error("google_grpc must be enabled in bazel to use ADS");
+#endif
+  ads_address_ = address;
+  ads_port_ = port;
+  jwt_token_ = std::move(jwt_token);
+  jwt_token_lifetime_seconds_ = jwt_token_lifetime_seconds;
+  ssl_root_certs_ = std::move(ssl_root_certs);
+  return *this;
+}
+
 EngineBuilder& EngineBuilder::addRtdsLayer(const std::string& layer_name,
                                            const int timeout_seconds) {
   rtds_layer_name_ = layer_name;
   rtds_timeout_seconds_ = timeout_seconds;
   return *this;
 }
-EngineBuilder& EngineBuilder::setAggregatedDiscoveryService(const std::string& api_type,
-                                                            const std::string& address,
-                                                            const int port) {
-#ifndef ENVOY_GOOGLE_GRPC
-  throw std::runtime_error("google_grpc must be enabled in bazel to use ADS");
-#endif
-  ads_api_type_ = api_type;
-  ads_address_ = address;
-  ads_port_ = port;
-  return *this;
-}
 
-EngineBuilder& EngineBuilder::addCdsLayer(const int timeout_seconds) {
+EngineBuilder& EngineBuilder::addCdsLayer(std::string cds_resources_locator,
+                                          const int timeout_seconds) {
   enable_cds_ = true;
+  cds_resources_locator_ = cds_resources_locator;
   cds_timeout_seconds_ = timeout_seconds;
   return *this;
 }
@@ -393,6 +413,12 @@ std::string EngineBuilder::generateConfigStr() const {
                             fmt::format("{}", dns_cache_save_interval_seconds_)});
     replacements.push_back({"persistent_dns_cache_config", persistent_dns_cache_config_insert});
   }
+  if (set_node_locality_) {
+    replacements.push_back(
+        {"node_locality",
+         fmt::format("{{ region: \"{}\", zone: \"{}\", sub_zone: \"{}\" }}", node_locality_region_,
+                     node_locality_zone_, node_locality_sub_zone_)});
+  }
 
   // NOTE: this does not include support for custom filters
   // which are not yet supported in the C++ platform implementation
@@ -456,7 +482,7 @@ std::string EngineBuilder::generateConfigStr() const {
     insertCustomFilter(filter_config, config_template);
   }
 
-  if ((!rtds_layer_name_.empty() || enable_cds_) && ads_api_type_.empty()) {
+  if ((!rtds_layer_name_.empty() || enable_cds_) && ads_address_.empty()) {
     throw std::runtime_error("ADS must be configured when using xDS");
   }
   if (!rtds_layer_name_.empty()) {
@@ -465,15 +491,30 @@ std::string EngineBuilder::generateConfigStr() const {
     absl::StrReplaceAll({{"#{custom_layers}", absl::StrCat("#{custom_layers}\n", rtds_layer)}},
                         &config_template);
   }
-  if (!ads_api_type_.empty()) {
-    std::string custom_ads = fmt::format(ads_insert, ads_api_type_, ads_address_, ads_port_);
+  if (!ads_address_.empty()) {
+    std::string channel_credentials;
+    if (!ssl_root_certs_.empty()) {
+      channel_credentials = fmt::format(ads_channel_credentials_insert, ssl_root_certs_);
+    }
+    std::string call_credentials;
+    if (!jwt_token_.empty()) {
+      call_credentials = fmt::format(ads_call_credentials_insert, jwt_token_, jwt_token_lifetime_seconds_);
+    }
+    std::string ads_insert_replaced = ads_insert;
+    absl::StrReplaceAll({{"#{custom_ads_channel_credentials}", channel_credentials}},
+                        &ads_insert_replaced);
+    absl::StrReplaceAll({{"#{custom_ads_call_credentials}", call_credentials}},
+                        &ads_insert_replaced);
+    std::string custom_ads = fmt::format(ads_insert_replaced, ads_address_, ads_port_);
     absl::StrReplaceAll({{"#{custom_ads}", absl::StrCat("#{custom_ads}\n", custom_ads)}},
                         &config_template);
   }
   if (enable_cds_) {
-    std::string custom_cds = fmt::format(cds_layer_insert, cds_timeout_seconds_);
-    absl::StrReplaceAll({{"#{custom_dynamic_resources}",
-                          absl::StrCat("#{custom_dynamic_resources}\n", custom_cds)}},
+    std::string custom_cds =
+        cds_resources_locator_.empty()
+            ? fmt::format(cds_layer_insert, cds_timeout_seconds_)
+            : fmt::format(xdstp_cds_layer_insert, cds_resources_locator_, cds_timeout_seconds_);
+    absl::StrReplaceAll({{"#{custom_cds}", absl::StrCat("#{custom_cds}\n", custom_cds)}},
                         &config_template);
 
     std::string custom_node_context = R"(node_context_params:
@@ -1025,7 +1066,7 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
   base_cluster->mutable_transport_socket()->set_name("envoy.transport_sockets.http_11_proxy");
   base_cluster->mutable_transport_socket()->mutable_typed_config()->PackFrom(ssl_proxy_socket);
 
-  // Base cleartext cluster set up
+  // Base clear-text cluster set up
   envoy::extensions::transport_sockets::raw_buffer::v3::RawBuffer raw_buffer;
   envoy::extensions::transport_sockets::http_11_proxy::v3::Http11ProxyUpstreamTransport
       cleartext_proxy_socket;
@@ -1037,7 +1078,7 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
   h1_protocol_options.mutable_explicit_http_config()->mutable_http_protocol_options()->CopyFrom(
       *alpn_options.mutable_auto_config()->mutable_http_protocol_options());
 
-  // Base cleartext cluster.
+  // Base clear-text cluster.
   auto* base_clear = static_resources->add_clusters();
   base_clear->set_name("base_clear");
   base_clear->mutable_connect_timeout()->set_seconds(connect_timeout_seconds_);
@@ -1135,6 +1176,15 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
   auto* node = bootstrap->mutable_node();
   node->set_id("envoy-mobile");
   node->set_cluster("envoy-mobile");
+  if (!node_locality_region_.empty()) {
+    node->mutable_locality()->set_region(node_locality_region_);
+  }
+  if (!node_locality_zone_.empty()) {
+    node->mutable_locality()->set_zone(node_locality_zone_);
+  }
+  if (!node_locality_sub_zone_.empty()) {
+    node->mutable_locality()->set_sub_zone(node_locality_sub_zone_);
+  }
   ProtobufWkt::Struct& metadata = *node->mutable_metadata();
   (*metadata.mutable_fields())["app_id"].set_string_value(app_id_);
   (*metadata.mutable_fields())["app_version"].set_string_value(app_version_);
@@ -1180,7 +1230,7 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
   }
 
   bootstrap->mutable_dynamic_resources();
-  if ((!rtds_layer_name_.empty() || enable_cds_) && ads_api_type_.empty()) {
+  if ((!rtds_layer_name_.empty() || enable_cds_) && ads_address_.empty()) {
     throw std::runtime_error("ADS must be configured when using xDS");
   }
   if (!rtds_layer_name_.empty()) {
@@ -1194,23 +1244,43 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
     rtds_config->set_resource_api_version(envoy::config::core::v3::ApiVersion::V3);
     rtds_config->mutable_initial_fetch_timeout()->set_seconds(rtds_timeout_seconds_);
   }
-  if (!ads_api_type_.empty()) {
+  if (!ads_address_.empty()) {
     std::string target_uri = fmt::format(R"({}:{})", ads_address_, ads_port_);
     auto* ads_config = bootstrap->mutable_dynamic_resources()->mutable_ads_config();
     ads_config->set_transport_api_version(envoy::config::core::v3::ApiVersion::V3);
     ads_config->set_set_node_on_first_message_only(true);
-    envoy::config::core::v3::ApiConfigSource::ApiType api_type_enum;
-    envoy::config::core::v3::ApiConfigSource::ApiType_Parse(ads_api_type_, &api_type_enum);
-    ads_config->set_api_type(api_type_enum);
+    ads_config->set_api_type(envoy::config::core::v3::ApiConfigSource::GRPC);
     auto& grpc_service = *ads_config->add_grpc_services();
     grpc_service.mutable_google_grpc()->set_target_uri(target_uri);
     grpc_service.mutable_google_grpc()->set_stat_prefix("ads");
+    if (!ssl_root_certs_.empty()) {
+      grpc_service.mutable_google_grpc()
+          ->mutable_channel_credentials()
+          ->mutable_ssl_credentials()
+          ->mutable_root_certs()
+          ->set_inline_string(ssl_root_certs_);
+    }
+    if (!jwt_token_.empty()) {
+      auto& jwt = *grpc_service.mutable_google_grpc()
+                       ->add_call_credentials()
+                       ->mutable_service_account_jwt_access();
+      jwt.set_json_key(jwt_token_);
+      jwt.set_token_lifetime_seconds(jwt_token_lifetime_seconds_);
+    }
   }
   if (enable_cds_) {
     auto* cds_config = bootstrap->mutable_dynamic_resources()->mutable_cds_config();
+    if (cds_resources_locator_.empty()) {
+    cds_config->mutable_ads();
+    } else {
+    bootstrap->mutable_dynamic_resources()->set_cds_resources_locator(cds_resources_locator_);
+    cds_config->mutable_api_config_source()->set_api_type(
+        envoy::config::core::v3::ApiConfigSource::AGGREGATED_GRPC);
+    cds_config->mutable_api_config_source()->set_transport_api_version(
+        envoy::config::core::v3::ApiVersion::V3);
+    }
     cds_config->mutable_initial_fetch_timeout()->set_seconds(cds_timeout_seconds_);
     cds_config->set_resource_api_version(envoy::config::core::v3::ApiVersion::V3);
-    cds_config->mutable_ads();
     bootstrap->add_node_context_params("cluster");
     // add a stat prefix we use in test
     list->add_patterns()->set_exact("cluster_manager.active_clusters");

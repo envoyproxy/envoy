@@ -186,6 +186,8 @@ const std::string config_header = R"(
 - &persistent_dns_cache_config NULL
 - &persistent_dns_cache_save_interval 1
 - &force_ipv6 false
+- &node_id envoy-mobile
+- &node_locality NULL
 )"
 #if defined(__APPLE__)
 R"(- &dns_resolver_name envoy.network.dns_resolver.apple
@@ -432,7 +434,7 @@ typed_dns_resolver_config:
   name: *dns_resolver_name
   typed_config: *dns_resolver_config
 dynamic_resources:
-#{custom_dynamic_resources}
+#{custom_cds}
 #{custom_ads}
 static_resources:
   listeners:
@@ -590,6 +592,7 @@ node:
   id: envoy-mobile
   cluster: envoy-mobile
   metadata: *metadata
+  locality: *node_locality
 layered_runtime:
   layers:
     - name: static_layer_0
@@ -621,21 +624,45 @@ const char* rtds_layer_insert = R"(
           resource_api_version: V3
           ads: {{}})";
 
+const char* ads_channel_credentials_insert = R"(
+        channel_credentials:
+          ssl_credentials:
+            root_certs:
+              inline_string: {})";
+
+const char* ads_call_credentials_insert = R"(
+        call_credentials:
+        - service_account_jwt_access:
+            json_key: {}
+            token_lifetime_seconds: {})";
+
 const char* ads_insert = R"(
   ads_config:
     transport_api_version: V3
-    api_type: {}
+    api_type: GRPC
     set_node_on_first_message_only: true
     grpc_services:
       google_grpc:
         target_uri: '{}:{}'
-        stat_prefix: ads)";
+        stat_prefix: ads
+        #{custom_ads_channel_credentials}
+        #{custom_ads_call_credentials})";
 
 const char* cds_layer_insert = R"(
   cds_config:
+    ads: {{}}
     initial_fetch_timeout:
       seconds: {}
-    resource_api_version: V3
-    ads: {{}})";
+    resource_api_version: V3)";
+
+const char* xdstp_cds_layer_insert = R"(
+  cds_resources_locator: {}
+  cds_config:
+    api_config_source:
+      api_type: AGGREGATED_GRPC
+      transport_api_version: V3
+    initial_fetch_timeout:
+      seconds: {}
+    resource_api_version: V3)";
 
 // clang-format on
