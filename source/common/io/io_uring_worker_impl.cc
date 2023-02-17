@@ -7,8 +7,9 @@
 namespace Envoy {
 namespace Io {
 
-IoUringSocketEntry::IoUringSocketEntry(os_fd_t fd, IoUringWorkerImpl& parent)
-    : fd_(fd), parent_(parent) {}
+IoUringSocketEntry::IoUringSocketEntry(os_fd_t fd, IoUringWorkerImpl& parent,
+                                       IoUringHandler& io_uring_handler)
+    : fd_(fd), parent_(parent), io_uring_handler_(io_uring_handler) {}
 
 void IoUringSocketEntry::cleanup() {
   parent_.removeInjectedCompletion(*this);
@@ -50,9 +51,12 @@ IoUringWorkerImpl::~IoUringWorkerImpl() {
   dispatcher_.clearDeferredDeleteList();
 }
 
-IoUringSocket& IoUringWorkerImpl::addAcceptSocket(os_fd_t fd, IoUringHandler&) {
+IoUringSocket& IoUringWorkerImpl::addAcceptSocket(os_fd_t fd, IoUringHandler& handler) {
   ENVOY_LOG(trace, "add accept socket, fd = {}", fd);
-  PANIC("not implemented");
+  std::unique_ptr<IoUringAcceptSocket> socket =
+      std::make_unique<IoUringAcceptSocket>(fd, *this, handler);
+  LinkedList::moveIntoListBack(std::move(socket), sockets_);
+  return *sockets_.back();
 }
 
 IoUringSocket& IoUringWorkerImpl::addServerSocket(os_fd_t fd, IoUringHandler&, uint32_t) {
@@ -67,21 +71,20 @@ IoUringSocket& IoUringWorkerImpl::addClientSocket(os_fd_t fd, IoUringHandler&, u
 
 Event::Dispatcher& IoUringWorkerImpl::dispatcher() { return dispatcher_; }
 
-Request* IoUringWorkerImpl::submitAcceptRequest(IoUringSocket& socket,
-                                                sockaddr_storage* remote_addr,
-                                                socklen_t* remote_addr_len) {
-  Request* req = new Request{RequestType::Accept, socket};
+Request* IoUringWorkerImpl::submitAcceptRequest(IoUringSocket& socket) {
+  AcceptRequest* req = new AcceptRequest(RequestType::Accept, socket);
 
   ENVOY_LOG(trace, "submit accept request, fd = {}, accept req = {}", socket.fd(), fmt::ptr(req));
 
-  *remote_addr_len = sizeof(sockaddr_storage);
   auto res = io_uring_instance_->prepareAccept(
-      socket.fd(), reinterpret_cast<struct sockaddr*>(remote_addr), remote_addr_len, req);
+      socket.fd(), reinterpret_cast<struct sockaddr*>(&req->remote_addr_), &req->remote_addr_len_,
+      req);
   if (res == Io::IoUringResult::Failed) {
     // TODO(rojkov): handle `EBUSY` in case the completion queue is never reaped.
     submit();
-    res = io_uring_instance_->prepareAccept(
-        socket.fd(), reinterpret_cast<struct sockaddr*>(remote_addr), remote_addr_len, req);
+    res = io_uring_instance_->prepareAccept(socket.fd(),
+                                            reinterpret_cast<struct sockaddr*>(&req->remote_addr_),
+                                            &req->remote_addr_len_, req);
     RELEASE_ASSERT(res == Io::IoUringResult::Ok, "unable to prepare accept");
   }
   submit();
@@ -91,7 +94,8 @@ Request* IoUringWorkerImpl::submitAcceptRequest(IoUringSocket& socket,
 Request* IoUringWorkerImpl::submitCancelRequest(IoUringSocket& socket, Request* request_to_cancel) {
   Request* req = new Request{RequestType::Cancel, socket};
 
-  ENVOY_LOG(trace, "submit cancel request, fd = {}, cancel req = {}", socket.fd(), fmt::ptr(req));
+  ENVOY_LOG(trace, "submit cancel request, fd = {}, cancel req = {}, req to cancel = {}",
+            socket.fd(), fmt::ptr(req), fmt::ptr(request_to_cancel));
 
   auto res = io_uring_instance_->prepareCancel(request_to_cancel, req);
   if (res == Io::IoUringResult::Failed) {
@@ -177,31 +181,35 @@ void IoUringWorkerImpl::onFileEvent() {
   io_uring_instance_->forEveryCompletion([](void* user_data, int32_t result, bool injected) {
     auto req = static_cast<Io::Request*>(user_data);
 
-    ENVOY_LOG(debug, "receive request completion, result = {}, req = {}", result, fmt::ptr(req));
-
     switch (req->type_) {
     case RequestType::Accept:
-      ENVOY_LOG(trace, "receive accept request completion, fd = {}", req->io_uring_socket_.fd());
-      req->io_uring_socket_.onAccept(result, injected);
+      ENVOY_LOG(trace, "receive accept request completion, fd = {}, req = {}",
+                req->io_uring_socket_.fd(), fmt::ptr(req));
+      req->io_uring_socket_.onAccept(req, result, injected);
       break;
     case RequestType::Connect:
-      ENVOY_LOG(trace, "receive connect request completion, fd = {}", req->io_uring_socket_.fd());
+      ENVOY_LOG(trace, "receive connect request completion, fd = {}, req = {}",
+                req->io_uring_socket_.fd(), fmt::ptr(req));
       req->io_uring_socket_.onConnect(result, injected);
       break;
     case RequestType::Read:
-      ENVOY_LOG(trace, "receive Read request completion, fd = {}", req->io_uring_socket_.fd());
+      ENVOY_LOG(trace, "receive Read request completion, fd = {}, req = {}",
+                req->io_uring_socket_.fd(), fmt::ptr(req));
       req->io_uring_socket_.onRead(result, injected);
       break;
     case RequestType::Write:
-      ENVOY_LOG(trace, "receive write request completion, fd = {}", req->io_uring_socket_.fd());
+      ENVOY_LOG(trace, "receive write request completion, fd = {}, req = {}",
+                req->io_uring_socket_.fd(), fmt::ptr(req));
       req->io_uring_socket_.onWrite(result, injected);
       break;
     case RequestType::Close:
-      ENVOY_LOG(trace, "receive close request completion, fd = {}", req->io_uring_socket_.fd());
+      ENVOY_LOG(trace, "receive close request completion, fd = {}, req = {}",
+                req->io_uring_socket_.fd(), fmt::ptr(req));
       req->io_uring_socket_.onClose(result, injected);
       break;
     case RequestType::Cancel:
-      ENVOY_LOG(trace, "receive cancel request completion, fd = {}", req->io_uring_socket_.fd());
+      ENVOY_LOG(trace, "receive cancel request completion, fd = {}, req = {}",
+                req->io_uring_socket_.fd(), fmt::ptr(req));
       req->io_uring_socket_.onCancel(result, injected);
       break;
     }
@@ -230,6 +238,73 @@ void IoUringWorkerImpl::injectCompletion(IoUringSocket& socket, uint32_t type, i
 
 void IoUringWorkerImpl::removeInjectedCompletion(IoUringSocket& socket) {
   io_uring_instance_->removeInjectedCompletion(socket.fd());
+}
+
+IoUringAcceptSocket::IoUringAcceptSocket(os_fd_t fd, IoUringWorkerImpl& parent,
+                                         IoUringHandler& io_uring_handler, int max_requests)
+    : IoUringSocketEntry(fd, parent, io_uring_handler), max_requests_(max_requests) {
+  enable();
+}
+
+void IoUringAcceptSocket::close() {
+  IoUringSocketEntry::close();
+
+  if (requests_.size() == 0) {
+    parent_.submitCloseRequest(*this);
+    return;
+  }
+
+  // TODO (soulxu): after kernel 5.19, we are able to cancel all requests for the specific fd.
+  for (auto req : requests_) {
+    parent_.submitCancelRequest(*this, req);
+  }
+}
+
+void IoUringAcceptSocket::disable() {
+  IoUringSocketEntry::disable();
+  // TODO (soulxu): after kernel 5.19, we are able to cancel all requests for the specific fd.
+  for (auto req : requests_) {
+    parent_.submitCancelRequest(*this, req);
+  }
+}
+
+void IoUringAcceptSocket::enable() {
+  IoUringSocketEntry::enable();
+  submitRequests();
+}
+
+void IoUringAcceptSocket::onClose(int32_t result, bool injected) {
+  IoUringSocketEntry::onClose(result, injected);
+  ASSERT(!injected);
+  cleanup();
+}
+
+void IoUringAcceptSocket::onAccept(Request* req, int32_t result, bool injected) {
+  IoUringSocketEntry::onAccept(req, result, injected);
+  AcceptRequest* accept_req = static_cast<AcceptRequest*>(req);
+  if (!injected) {
+    requests_.erase(req);
+    if (requests_.size() == 0 && status_ == CLOSING) {
+      parent_.submitCloseRequest(*this);
+    }
+  }
+
+  if (result < 0 && !injected) {
+    ENVOY_LOG(trace, "accept request failed, fd = {}, result = {}", fd_, result);
+    return;
+  }
+
+  ENVOY_LOG(trace, "accept new socket, fd = {}, new socket = {}", fd_, result);
+  AcceptedSocketParam param{result, &accept_req->remote_addr_, accept_req->remote_addr_len_};
+  io_uring_handler_.onAcceptSocket(param);
+  submitRequests();
+}
+
+void IoUringAcceptSocket::submitRequests() {
+  for (int i = requests_.size(); i < max_requests_; i++) {
+    auto req = parent_.submitAcceptRequest(*this);
+    requests_.insert(req);
+  }
 }
 
 } // namespace Io

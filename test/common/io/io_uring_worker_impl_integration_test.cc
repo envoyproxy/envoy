@@ -15,7 +15,8 @@ namespace {
 
 class IoUringTestSocket : public IoUringSocketEntry {
 public:
-  IoUringTestSocket(os_fd_t fd, IoUringWorkerImpl& parent) : IoUringSocketEntry(fd, parent) {}
+  IoUringTestSocket(os_fd_t fd, IoUringWorkerImpl& parent, IoUringHandler& io_uring_handler)
+      : IoUringSocketEntry(fd, parent, io_uring_handler) {}
 
   void close() override {}
   void enable() override {}
@@ -23,8 +24,8 @@ public:
   uint64_t write(Buffer::Instance&) override { PANIC("not implement"); }
   uint64_t writev(const Buffer::RawSlice*, uint64_t) override { PANIC("not implement"); }
   void connect(const Network::Address::InstanceConstSharedPtr&) override {}
-  void onAccept(int32_t result, bool injected) override {
-    IoUringSocketEntry::onAccept(result, injected);
+  void onAccept(Request* req, int32_t result, bool injected) override {
+    IoUringSocketEntry::onAccept(req, result, injected);
     accept_result_ = result;
     is_accept_injected_completion_ = injected;
     nr_completion_++;
@@ -79,8 +80,9 @@ class IoUringWorkerTestImpl : public IoUringWorkerImpl {
 public:
   IoUringWorkerTestImpl(std::unique_ptr<IoUring> io_uring_instance, Event::Dispatcher& dispatcher)
       : IoUringWorkerImpl(std::move(io_uring_instance), dispatcher) {}
-  IoUringSocket& addTestSocket(os_fd_t fd, IoUringHandler&) {
-    std::unique_ptr<IoUringTestSocket> socket = std::make_unique<IoUringTestSocket>(fd, *this);
+  IoUringSocket& addTestSocket(os_fd_t fd, IoUringHandler& handler) {
+    std::unique_ptr<IoUringTestSocket> socket =
+        std::make_unique<IoUringTestSocket>(fd, *this, handler);
     LinkedList::moveIntoListBack(std::move(socket), sockets_);
     return *sockets_.back();
   }
@@ -90,9 +92,11 @@ public:
 
 class TestIoUringHandler : public IoUringHandler {
 public:
-  void onAcceptSocket(AcceptedSocketParam&) override {}
+  void onAcceptSocket(AcceptedSocketParam& param) override { server_socket_fd_ = param.fd_; }
   void onRead(ReadParam&) override {}
   void onWrite(WriteParam&) override {}
+
+  os_fd_t server_socket_fd_{INVALID_SOCKET};
 };
 
 class IoUringWorkerIntegraionTest : public testing::Test {
@@ -109,7 +113,7 @@ public:
     api_ = Api::createApiForTest(time_system_);
     dispatcher_ = api_->allocateDispatcher("test_thread");
     io_uring_worker_ = std::make_unique<IoUringWorkerTestImpl>(
-        std::make_unique<IoUringImpl>(8, false), *dispatcher_);
+        std::make_unique<IoUringImpl>(20, false), *dispatcher_);
   }
   void initializeSockets() {
     socket(true, true);
@@ -210,10 +214,7 @@ TEST_F(IoUringWorkerIntegraionTest, Accept) {
   connect();
 
   // Waiting for the listen socket accept.
-  struct sockaddr remote_addr;
-  socklen_t len = sizeof(remote_addr);
-  io_uring_worker_->submitAcceptRequest(socket, reinterpret_cast<sockaddr_storage*>(&remote_addr),
-                                        &len);
+  io_uring_worker_->submitAcceptRequest(socket);
   while (socket.accept_result_ == -1) {
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   }
@@ -466,6 +467,63 @@ TEST_F(IoUringWorkerIntegraionTest, MergeInjection) {
   EXPECT_TRUE(socket.is_read_injected_completion_);
   EXPECT_EQ(socket.read_result_, -EAGAIN);
   EXPECT_EQ(socket.nr_completion_, 1);
+}
+
+TEST_F(IoUringWorkerIntegraionTest, AcceptSocketBasic) {
+  init();
+  socket(false, true);
+  listen();
+
+  auto& socket = io_uring_worker_->addAcceptSocket(listen_socket_, io_uring_handler_);
+  EXPECT_EQ(io_uring_worker_->getSockets().size(), 1);
+  connect();
+
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  EXPECT_TRUE(SOCKET_VALID(io_uring_handler_.server_socket_fd_));
+
+  socket.close();
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  EXPECT_EQ(io_uring_worker_->getSockets().size(), 0);
+}
+
+TEST_F(IoUringWorkerIntegraionTest, AcceptSocketDisable) {
+  init();
+  socket(false, true);
+  listen();
+
+  auto& socket = io_uring_worker_->addAcceptSocket(listen_socket_, io_uring_handler_);
+  EXPECT_EQ(io_uring_worker_->getSockets().size(), 1);
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+
+  socket.disable();
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+
+  socket.close();
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  EXPECT_EQ(io_uring_worker_->getSockets().size(), 0);
+}
+
+TEST_F(IoUringWorkerIntegraionTest, AcceptSocketDisableEnable) {
+  init();
+  socket(false, true);
+  listen();
+
+  auto& socket = io_uring_worker_->addAcceptSocket(listen_socket_, io_uring_handler_);
+  EXPECT_EQ(io_uring_worker_->getSockets().size(), 1);
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+
+  socket.disable();
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+
+  socket.enable();
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+
+  connect();
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+
+  socket.close();
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  EXPECT_EQ(io_uring_worker_->getSockets().size(), 0);
 }
 
 } // namespace

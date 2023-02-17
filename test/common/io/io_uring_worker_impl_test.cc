@@ -16,7 +16,8 @@ namespace {
 
 class IoUringTestSocket : public IoUringSocketEntry {
 public:
-  IoUringTestSocket(os_fd_t fd, IoUringWorkerImpl& parent) : IoUringSocketEntry(fd, parent) {}
+  IoUringTestSocket(os_fd_t fd, IoUringWorkerImpl& parent, IoUringHandler& io_uring_handler)
+      : IoUringSocketEntry(fd, parent, io_uring_handler) {}
 
   void close() override {}
   void enable() override {}
@@ -30,8 +31,9 @@ class IoUringWorkerTestImpl : public IoUringWorkerImpl {
 public:
   IoUringWorkerTestImpl(std::unique_ptr<IoUring> io_uring_instance, Event::Dispatcher& dispatcher)
       : IoUringWorkerImpl(std::move(io_uring_instance), dispatcher) {}
-  IoUringSocket& addTestSocket(os_fd_t fd, IoUringHandler&) {
-    std::unique_ptr<IoUringTestSocket> socket = std::make_unique<IoUringTestSocket>(fd, *this);
+  IoUringSocket& addTestSocket(os_fd_t fd, IoUringHandler& io_uring_handler) {
+    std::unique_ptr<IoUringTestSocket> socket =
+        std::make_unique<IoUringTestSocket>(fd, *this, io_uring_handler);
     LinkedList::moveIntoListBack(std::move(socket), sockets_);
     return *sockets_.back();
   }

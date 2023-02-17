@@ -135,7 +135,11 @@ class IoUringSocket;
 /**
  * Abstract for io_uring I/O Request.
  */
-struct Request {
+class Request {
+public:
+  Request(uint32_t type, IoUringSocket& io_uring_socket)
+      : type_(type), io_uring_socket_(io_uring_socket) {}
+  virtual ~Request() {}
   uint32_t type_;
   IoUringSocket& io_uring_socket_;
 };
@@ -153,6 +157,17 @@ struct ReadParam {
 
 struct WriteParam {
   int32_t result_;
+};
+
+/**
+ * The Status of IoUringSocket.
+ */
+enum IoUringSocketStatus {
+  INITIALIZED,
+  ENABLED,
+  DISABLED,
+  CLOSING,
+  CLOSED,
 };
 
 /**
@@ -197,10 +212,11 @@ public:
   /**
    * On accept request completed.
    * TODO (soulxu): wrap the raw result into a type. It can be `IoCallUint64Result`.
+   * @param req the AcceptRequest object which is as request user data.
    * @param result the result of operation in the request.
    * @param injected indicates the completion is injected or not.
    */
-  virtual void onAccept(int32_t result, bool injected) PURE;
+  virtual void onAccept(Request* req, int32_t result, bool injected) PURE;
 
   /**
    * On close request completed.
@@ -247,6 +263,12 @@ public:
    * @param type the request type of injected completion.
    */
   virtual void injectCompletion(uint32_t type) PURE;
+
+  /**
+   * Return the currect status of IoUringSocket.
+   * @return the status.
+   */
+  virtual IoUringSocketStatus getStatus() const PURE;
 };
 
 /**
@@ -293,8 +315,7 @@ public:
   /**
    * Submit a accept request for a socket.
    */
-  virtual Request* submitAcceptRequest(IoUringSocket& socket, sockaddr_storage* remote_addr,
-                                       socklen_t* remote_addr_len) PURE;
+  virtual Request* submitAcceptRequest(IoUringSocket& socket) PURE;
 
   /**
    * Submit a cancel request for a socket.

@@ -215,6 +215,7 @@ IoUringResult IoUringImpl::prepareCancel(void* cancelling_user_data, void* user_
 
 IoUringResult IoUringImpl::submit() {
   int res = io_uring_submit(&ring_);
+  ENVOY_LOG(trace, "submit requests to the ring, number of entries = {}", res);
   RELEASE_ASSERT(res >= 0 || res == -EBUSY, "unable to submit io_uring queue entries");
   return res == -EBUSY ? IoUringResult::Busy : IoUringResult::Ok;
 }
