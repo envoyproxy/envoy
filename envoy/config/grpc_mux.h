@@ -43,6 +43,12 @@ public:
    * @param resources set of resource names to watch for
    */
   virtual void update(const absl::flat_hash_set<std::string>& resources) PURE;
+
+  /**
+   * Add resources that the watch is interested in.
+   * @param resources set of resource names to watch for
+   */
+  virtual void add(const absl::flat_hash_set<std::string>& resources) PURE;
 };
 
 using GrpcMuxWatchPtr = std::unique_ptr<GrpcMuxWatch>;

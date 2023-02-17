@@ -68,6 +68,27 @@ WatchMap::updateWatchInterest(Watch* watch,
                       findRemovals(newly_removed_from_watch, watch));
 }
 
+AddedRemoved WatchMap::addWatchInterest(Watch* watch,
+                                        const absl::flat_hash_set<std::string>& names) {
+  if (names.contains(Wildcard)) {
+    wildcard_watches_.insert(watch);
+  } else if (watch->resource_names_.empty()) {
+    wildcard_watches_.erase(watch);
+  }
+
+  absl::flat_hash_set<std::string> newly_added_to_watch;
+  for (const auto& name : names) {
+    auto entry = watch->resource_names_.find(name);
+    if (entry == watch->resource_names_.end()) {
+      newly_added_to_watch.insert(name);
+      watch->resource_names_.insert(name);
+    }
+  }
+
+  return AddedRemoved(findAdditions(newly_added_to_watch, watch),
+                      absl::flat_hash_set<std::string>());
+}
+
 absl::flat_hash_set<Watch*> WatchMap::watchesInterestedIn(const std::string& resource_name) {
   absl::flat_hash_set<Watch*> ret;
   if (!use_namespace_matching_) {

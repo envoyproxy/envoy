@@ -121,6 +121,8 @@ private:
       iter_ = watches_.emplace(watches_.begin(), this);
       parent_.queueDiscoveryRequest(type_url_);
     }
+    // TODO
+    void add(const absl::flat_hash_set<std::string>& resources) override {}
 
     // Maintain deterministic wire ordering via ordered std::set.
     std::set<std::string> resources_;

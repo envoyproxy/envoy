@@ -125,6 +125,10 @@ private:
       parent_.updateWatch(type_url_, watch_, resources, options_);
     }
 
+    void add(const absl::flat_hash_set<std::string>& resources) override {
+      parent_.addWatchInterest(type_url_, watch_, resources, options_);
+    }
+
   private:
     const std::string type_url_;
     Watch* watch_;
@@ -141,6 +145,14 @@ private:
                    const absl::flat_hash_set<std::string>& resources,
                    const SubscriptionOptions& options);
 
+  void addWatchInterest(const std::string& type_url, Watch* watch,
+                        const absl::flat_hash_set<std::string>& resources,
+                        const SubscriptionOptions& options);
+
+  void updateWatchHelper(const std::string& type_url, Watch* watch,
+                         const absl::flat_hash_set<std::string>& resources,
+                         const SubscriptionOptions& options, bool add);
+
   // Adds a subscription for the type_url to the subscriptions map and order list.
   void addSubscription(const std::string& type_url, bool use_namespace_matching);
 
@@ -150,12 +162,11 @@ private:
   // whether we *want* to send a DeltaDiscoveryRequest).
   bool canSendDiscoveryRequest(const std::string& type_url);
 
-  // Checks whether we have something to say in a DeltaDiscoveryRequest, which can be an ACK and/or
-  // a subscription update. (Does not check whether we *can* send that DeltaDiscoveryRequest).
-  // Returns the type_url we should send the DeltaDiscoveryRequest for (if any).
-  // First, prioritizes ACKs over non-ACK subscription interest updates.
-  // Then, prioritizes non-ACK updates in the order the various types
-  // of subscriptions were activated.
+  // Checks whether we have something to say in a DeltaDiscoveryRequest, which can be an ACK
+  // and/or a subscription update. (Does not check whether we *can* send that
+  // DeltaDiscoveryRequest). Returns the type_url we should send the DeltaDiscoveryRequest for (if
+  // any). First, prioritizes ACKs over non-ACK subscription interest updates. Then, prioritizes
+  // non-ACK updates in the order the various types of subscriptions were activated.
   absl::optional<std::string> whoWantsToSendDiscoveryRequest();
 
   // Invoked when dynamic context parameters change for a resource type.
@@ -183,8 +194,8 @@ private:
   Event::Dispatcher& dispatcher_;
   XdsConfigTrackerOptRef xds_config_tracker_;
 
-  // True iff Envoy is shutting down; no messages should be sent on the `grpc_stream_` when this is
-  // true because it may contain dangling pointers.
+  // True iff Envoy is shutting down; no messages should be sent on the `grpc_stream_` when this
+  // is true because it may contain dangling pointers.
   std::atomic<bool> shutdown_{false};
 };
 

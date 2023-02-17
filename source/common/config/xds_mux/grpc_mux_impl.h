@@ -131,6 +131,9 @@ protected:
       parent_.updateWatch(type_url_, watch_, resources, options_);
     }
 
+    // TODO
+    void add(const absl::flat_hash_set<std::string>& resources) override {}
+
   private:
     const std::string type_url_;
     Watch* watch_;

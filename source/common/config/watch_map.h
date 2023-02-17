@@ -20,6 +20,7 @@ namespace Config {
 struct AddedRemoved {
   AddedRemoved(absl::flat_hash_set<std::string>&& added, absl::flat_hash_set<std::string>&& removed)
       : added_(std::move(added)), removed_(std::move(removed)) {}
+  AddedRemoved() {}
   absl::flat_hash_set<std::string> added_;
   absl::flat_hash_set<std::string> removed_;
 };
@@ -78,6 +79,8 @@ public:
   //    Y will be in removed_.
   AddedRemoved updateWatchInterest(Watch* watch,
                                    const absl::flat_hash_set<std::string>& update_to_these_names);
+
+  AddedRemoved addWatchInterest(Watch* watch, const absl::flat_hash_set<std::string>& names);
 
   // Expects that the watch to be removed has already had all of its resource names removed via
   // updateWatchInterest().

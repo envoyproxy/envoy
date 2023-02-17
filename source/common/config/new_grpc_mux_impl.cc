@@ -184,6 +184,18 @@ GrpcMuxWatchPtr NewGrpcMuxImpl::addWatch(const std::string& type_url,
 void NewGrpcMuxImpl::updateWatch(const std::string& type_url, Watch* watch,
                                  const absl::flat_hash_set<std::string>& resources,
                                  const SubscriptionOptions& options) {
+  updateWatchHelper(type_url, watch, resources, options, false);
+}
+
+void NewGrpcMuxImpl::addWatchInterest(const std::string& type_url, Watch* watch,
+                                      const absl::flat_hash_set<std::string>& resources,
+                                      const SubscriptionOptions& options) {
+  updateWatchHelper(type_url, watch, resources, options, true);
+}
+
+void NewGrpcMuxImpl::updateWatchHelper(const std::string& type_url, Watch* watch,
+                                       const absl::flat_hash_set<std::string>& resources,
+                                       const SubscriptionOptions& options, bool add) {
   ASSERT(watch != nullptr);
   auto sub = subscriptions_.find(type_url);
   RELEASE_ASSERT(sub != subscriptions_.end(),
@@ -206,7 +218,12 @@ void NewGrpcMuxImpl::updateWatch(const std::string& type_url, Watch* watch,
       effective_resources.insert(resource);
     }
   }
-  auto added_removed = sub->second->watch_map_.updateWatchInterest(watch, effective_resources);
+  AddedRemoved added_removed;
+  if (add) {
+    added_removed = sub->second->watch_map_.addWatchInterest(watch, effective_resources);
+  } else {
+    added_removed = sub->second->watch_map_.updateWatchInterest(watch, effective_resources);
+  }
   if (options.use_namespace_matching_) {
     // This is to prevent sending out of requests that contain prefixes instead of resource names
     sub->second->sub_state_.updateSubscriptionInterest({}, {});
