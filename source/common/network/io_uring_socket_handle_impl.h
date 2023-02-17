@@ -78,6 +78,7 @@ protected:
     case IoUringSocketType::Accept:
       return "Accept";
     }
+    PANIC("unexpected");
   }
 
   Io::IoUringFactory& io_uring_factory_;
