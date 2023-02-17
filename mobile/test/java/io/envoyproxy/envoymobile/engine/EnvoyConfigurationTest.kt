@@ -65,6 +65,11 @@ class TestEnvoyHTTPFilterFactory(name : String) : EnvoyHTTPFilterFactory {
 class EnvoyConfigurationTest {
 
   fun buildTestEnvoyConfiguration(
+    rtdslayerName: String? = null
+    rtdsTimeoutSeconds: Int = 0
+    adsApiType: String? = null
+    adsAddress: String? = null
+    adsPort: Int = 0
     adminInterfaceEnabled: Boolean = false,
     grpcStatsDomain: String = "stats.example.com",
     connectTimeoutSeconds: Int = 123,
@@ -101,6 +106,11 @@ class EnvoyConfigurationTest {
     enablePlatformCertificatesValidation: Boolean = false
   ): EnvoyConfiguration {
     return EnvoyConfiguration(
+      rtdslayerName,
+      rtdsTimeoutSeconds,
+      adsApiType,
+      adsAddress,
+      adsPort,
       adminInterfaceEnabled,
       grpcStatsDomain,
       connectTimeoutSeconds,

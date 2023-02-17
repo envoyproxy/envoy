@@ -27,7 +27,11 @@ public class EnvoyConfiguration {
     // Used for testing.
     ACCEPT_UNTRUSTED;
   }
-
+  public final String rtdslayerName;
+  public final Integer rtdsTimeoutSeconds;
+  public final String adsApiType;
+  public final String adsAddress;
+  public final Integer adsPort;
   public final Boolean adminInterfaceEnabled;
   public final String grpcStatsDomain;
   public final Integer connectTimeoutSeconds;
@@ -70,6 +74,7 @@ public class EnvoyConfiguration {
   /**
    * Create a new instance of the configuration.
    *
+   * @param TODO
    * @param adminInterfaceEnabled                         whether admin interface should be enabled
    *     or not.
    * @param grpcStatsDomain                               the domain to flush stats to.
@@ -128,6 +133,7 @@ public class EnvoyConfiguration {
    * @param enablePlatformCertificatesValidation          whether to use the platform verifier.
    */
   public EnvoyConfiguration(
+    String rtdslayerName, int rtdsTimeoutSeconds, String adsApiType, String adsAddress, int adsPort,
       boolean adminInterfaceEnabled, String grpcStatsDomain, int connectTimeoutSeconds,
       int dnsRefreshSeconds, int dnsFailureRefreshSecondsBase, int dnsFailureRefreshSecondsMax,
       int dnsQueryTimeoutSeconds, int dnsMinRefreshSeconds, List<String> dnsPreresolveHostnames,
@@ -145,6 +151,11 @@ public class EnvoyConfiguration {
       Map<String, Boolean> runtimeGuards, Boolean enableSkipDNSLookupForProxiedRequests,
       boolean enablePlatformCertificatesValidation) {
     JniLibrary.load();
+    this.rtdslayerName = rtdslayerName;
+    this.rtdsTimeoutSeconds = rtdsTimeoutSeconds;
+    this.adsApiType = adsApiType;
+    this.adsAddress = adsAddress;
+    this.adsPort = adsPort;
     this.adminInterfaceEnabled = adminInterfaceEnabled;
     this.grpcStatsDomain = grpcStatsDomain;
     this.connectTimeoutSeconds = connectTimeoutSeconds;

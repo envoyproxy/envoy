@@ -77,6 +77,11 @@ open class EngineBuilder(
   private var keyValueStores = mutableMapOf<String, EnvoyKeyValueStore>()
   private var statsSinks = listOf<String>()
   private var enablePlatformCertificatesValidation = false
+  private var rtdslayerName: String? = null
+  private var rtdsTimeoutSeconds: Int = 0
+  private var adsApiType: String? = null
+  private var adsAddress: String? = null
+  private var adsPort: Int = 0
 
   /**
    * Add a log level to use with Envoy.
