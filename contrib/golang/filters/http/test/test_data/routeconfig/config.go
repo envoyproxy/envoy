@@ -2,16 +2,17 @@ package main
 
 import (
 	xds "github.com/cncf/xds/go/xds/type/v3"
+	commonapi "github.com/envoyproxy/envoy/contrib/golang/common/go/api"
 	"github.com/envoyproxy/envoy/contrib/golang/filters/http/source/go/pkg/api"
-	"github.com/envoyproxy/envoy/contrib/golang/filters/http/source/go/pkg/http"
+	_ "github.com/envoyproxy/envoy/contrib/golang/http/cluster_specifier/source/go/pkg/cluster_specifier"
 	"google.golang.org/protobuf/types/known/anypb"
 )
 
 const Name = "routeconfig"
 
 func init() {
-	http.RegisterHttpFilterConfigFactory(Name, configFactory)
-	http.RegisterHttpFilterConfigParser(&parser{})
+	commonapi.RegisterHttpFilterConfigFactory(Name, configFactory)
+	commonapi.RegisterHttpFilterConfigParser(&parser{})
 }
 
 func configFactory(c interface{}) api.StreamFilterFactory {

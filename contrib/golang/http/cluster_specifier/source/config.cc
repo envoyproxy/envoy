@@ -14,8 +14,8 @@ GolangClusterSpecifierPluginFactoryConfig::createClusterSpecifierPlugin(
   return std::make_shared<GolangClusterSpecifierPlugin>(cluster_config);
 }
 
-REGISTER_FACTORY(GolangClusterSpecifierPluginFactoryConfig, ClusterSpecifierPluginFactoryConfig){
-    "envoy.router.cluster_specifier_plugin.golang"};
+REGISTER_FACTORY(GolangClusterSpecifierPluginFactoryConfig,
+                 ClusterSpecifierPluginFactoryConfig){"envoy.golang"};
 
 } // namespace Golang
 } // namespace Router
