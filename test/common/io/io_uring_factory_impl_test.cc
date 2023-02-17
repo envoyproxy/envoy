@@ -13,11 +13,7 @@ namespace {
 
 class IoUringFactoryImplTest : public ::testing::Test {
 public:
-  IoUringFactoryImplTest() : api_(Api::createApiForTest()) {
-    if (!isIoUringSupported()) {
-      should_skip_ = true;
-    }
-  }
+  IoUringFactoryImplTest() : api_(Api::createApiForTest()), should_skip_(!isIoUringSupported()) {}
 
   void SetUp() override {
     if (should_skip_) {

@@ -13,11 +13,9 @@ namespace {
 
 class IoUringImplTest : public ::testing::Test {
 public:
-  IoUringImplTest() : api_(Api::createApiForTest()) {
-    if (isIoUringSupported()) {
+  IoUringImplTest() : api_(Api::createApiForTest()), should_skip_(!isIoUringSupported()) {
+    if (!should_skip_) {
       io_uring_ = std::make_unique<IoUringImpl>(2, false);
-    } else {
-      should_skip_ = true;
     }
   }
 
