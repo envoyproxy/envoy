@@ -935,7 +935,7 @@ TEST_F(HttpFilterTest, PostAndChangeBothBodiesBufferedPartialMultiChunk) {
   Buffer::OwnedImpl req_data;
   TestUtility::feedBufferWithRandomCharacters(req_data, 100);
   Buffer::OwnedImpl empty_data;
-  EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(req_data, false));
+  EXPECT_EQ(FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(req_data, false));
   upstream_request_body.move(req_data);
   EXPECT_EQ(FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(empty_data, true));
   upstream_request_body.move(empty_data);
@@ -977,9 +977,9 @@ TEST_F(HttpFilterTest, PostAndChangeBothBodiesBufferedPartialMultiChunk) {
         downstream_response_body.move(data);
       }));
 
-  EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(resp_data_1, false));
+  EXPECT_EQ(FilterDataStatus::StopIterationNoBuffer, filter_->encodeData(resp_data_1, false));
   downstream_response_body.move(resp_data_1);
-  EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(resp_data_2, false));
+  EXPECT_EQ(FilterDataStatus::StopIterationNoBuffer, filter_->encodeData(resp_data_2, false));
   downstream_response_body.move(resp_data_2);
   EXPECT_EQ(FilterDataStatus::StopIterationNoBuffer, filter_->encodeData(resp_data_3, true));
   downstream_response_body.move(resp_data_3);

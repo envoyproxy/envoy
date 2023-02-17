@@ -381,6 +381,16 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "circuit_breakers_integration_test",
+    srcs = ["circuit_breakers_integration_test.cc"],
+    deps = [
+        ":http_protocol_integration_lib",
+        "//test/test_common:test_time_lib",
+        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_test(
     name = "http2_flood_integration_test",
     srcs = [
         "http2_flood_integration_test.cc",
@@ -1520,6 +1530,17 @@ envoy_cc_test(
         "//test/server:utility_lib",
         "//test/test_common:registry_lib",
         "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_test(
+    name = "tcp_async_client_integration_test",
+    srcs = [
+        "tcp_async_client_integration_test.cc",
+    ],
+    deps = [
+        ":integration_lib",
+        "//test/integration/filters:test_network_async_tcp_filter_lib",
     ],
 )
 

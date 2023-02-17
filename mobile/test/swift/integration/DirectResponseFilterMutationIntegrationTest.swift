@@ -1,3 +1,4 @@
+@_spi(YAMLValidation)
 import Envoy
 import TestExtensions
 import XCTest
@@ -51,7 +52,7 @@ final class DirectResponseFilterMutationIntegrationTest: XCTestCase {
     // mutates the outbound request in a way that makes it match one of the direct response
     // configurations (whereas if the filter was not present in the chain, the request would not
     // match any configurations). This behavior is provided by the C++ `RouteCacheResetFilter`.
-    let engine = TestEngineBuilder()
+    let engine = YAMLValidatingTestEngineBuilder()
       .addPlatformFilter { MockHeaderMutationFilter(headersToAdd: ["x-foo": "123"]) }
       .addDirectResponse(
         .init(
