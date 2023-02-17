@@ -411,6 +411,17 @@ TEST_F(DatadogAgentHttpClientTest, SendFailReturnsError) {
           Invoke([this](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks_arg,
                         const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
             callbacks_ = &callbacks_arg;
+            // As of this writing, any time that `send` returns `nullptr`,
+            // `onSuccess` will also be called with a status of 503, even though
+            // no request was sent and so no response was received.
+            // `AgentHTTPClient` does not depend on this behavior, but we
+            // reproduce it here for authenticity.
+            // The relevant branch in `AgentHTTPClient::onSuccess` is the one
+            // where `handlers_.find` returns `handlers.end()`.
+            Http::ResponseMessagePtr response(
+                new Http::ResponseMessageImpl(Http::ResponseHeaderMapPtr{
+                    new Http::TestResponseHeaderMapImpl{{":status", "503"}}}));
+            callbacks_arg.onSuccess(request_, std::move(response));
             return nullptr; // indicates error
           }));
 
