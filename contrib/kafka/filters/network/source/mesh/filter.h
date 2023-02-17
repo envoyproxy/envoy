@@ -28,26 +28,7 @@ namespace Mesh {
  * Filter is going to maintain a list of in-flight-request so it can send responses when they
  * finish.
  *
- *
- * +----------------+    <creates>    +-----------------------+
- * |RequestProcessor+----------------->AbstractInFlightRequest|
- * +-------^--------+                 +----^-----^------------+
- *         |                               |     | <subclass>
- *         |                               |   +-+------------------+
- * +-------+-------+ <in-flight-reference> |   |ProduceRequestHolder|
- * |KafkaMeshFilter+-----------------------+   +-+------------------+
- * +-------+-------+                             |
- *         |                                     |
- *         |                                     |
- * +-------v-----------+                         |<in-flight-reference>
- * |UpstreamKafkaFacade|                         |(for callback when finished)
- * +-------+-----------+                         |
- *         |                                     |
- *         |                                     |
- * +-------v--------------+       +--------------v--+    +-----------------+
- * |<<ThreadLocalObject>> +------->RichKafkaProducer+--->><<librdkafka>>   |
- * |ThreadLocalKafkaFacade|       +-----------------+    |RdKafka::Producer|
- * +----------------------+                              +-----------------+
+ * See command_handlers.md for particular request interactions.
  **/
 class KafkaMeshFilter : public Network::ReadFilter,
                         public Network::ConnectionCallbacks,
