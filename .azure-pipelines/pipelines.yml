@@ -378,7 +378,7 @@ stages:
   dependsOn: ["env", "linux_x64"]
   jobs:
   - job: bazel
-    displayName: "Linux x64"
+    # displayName: "Linux x64"
     dependsOn: []
     # Skip checks if only mobile/ or docs/ have changed.
     condition: and(not(canceled()), succeeded(), ne(stageDependencies.env.repo.outputs['changed.mobileOnly'], 'true'), ne(stageDependencies.env.repo.outputs['changed.docsOnly'], 'true'), ne(stageDependencies.env.repo.outputs['changed.examplesOnly'], 'true'))
