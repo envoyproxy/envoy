@@ -5,9 +5,7 @@
 
 #include "source/common/common/logger.h"
 
-#if defined(__linux__)
 #include "liburing.h"
-#endif
 
 namespace Envoy {
 namespace Io {
@@ -23,7 +21,6 @@ struct InjectedCompletion {
   const int32_t result_;
 };
 
-#if defined(__linux__)
 class IoUringImpl : public IoUring,
                     public ThreadLocal::ThreadLocalObject,
                     protected Logger::Loggable<Logger::Id::io> {
@@ -56,47 +53,6 @@ private:
   os_fd_t event_fd_{INVALID_SOCKET};
   std::list<InjectedCompletion> injected_completions_;
 };
-#else
-
-class IoUringImpl : public IoUring,
-                    public ThreadLocal::ThreadLocalObject,
-                    protected Logger::Loggable<Logger::Id::io> {
-public:
-  IoUringImpl(uint32_t io_uring_size, bool use_submission_queue_polling) {}
-  ~IoUringImpl() override {}
-
-  os_fd_t registerEventfd() override { PANIC("not implemented"); }
-  void unregisterEventfd() override { PANIC("not implemented"); }
-  bool isEventfdRegistered() const override { PANIC("not implemented"); }
-  void forEveryCompletion(const CompletionCb& completion_cb) override { PANIC("not implemented"); }
-  IoUringResult prepareAccept(os_fd_t fd, struct sockaddr* remote_addr, socklen_t* remote_addr_len,
-                              void* user_data) override {
-    PANIC("not implemented");
-  }
-  IoUringResult prepareConnect(os_fd_t fd, const Network::Address::InstanceConstSharedPtr& address,
-                               void* user_data) override {
-    PANIC("not implemented");
-  }
-  IoUringResult prepareReadv(os_fd_t fd, const struct iovec* iovecs, unsigned nr_vecs, off_t offset,
-                             void* user_data) override {
-    PANIC("not implemented");
-  }
-  IoUringResult prepareWritev(os_fd_t fd, const struct iovec* iovecs, unsigned nr_vecs,
-                              off_t offset, void* user_data) override {
-    PANIC("not implemented");
-  }
-  IoUringResult prepareClose(os_fd_t fd, void* user_data) override { PANIC("not implemented"); }
-  IoUringResult prepareCancel(void* cancelling_user_data, void* user_data) override {
-    PANIC("not implemented");
-  }
-  IoUringResult submit() override { PANIC("not implemented"); }
-  void injectCompletion(os_fd_t fd, void* user_data, int32_t result) override {
-    PANIC("not implemented");
-  }
-  void removeInjectedCompletion(os_fd_t fd) override { PANIC("not implemented"); }
-};
-
-#endif
 
 } // namespace Io
 } // namespace Envoy
