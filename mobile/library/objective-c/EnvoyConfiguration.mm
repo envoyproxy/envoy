@@ -96,6 +96,8 @@
                                        appVersion:(NSString *)appVersion
                                             appId:(NSString *)appId
                                   virtualClusters:(NSArray<NSString *> *)virtualClusters
+                                    runtimeGuards:
+                                        (NSDictionary<NSString *, NSString *> *)runtimeGuards
                              typedDirectResponses:
                                  (NSArray<EMODirectResponse *> *)typedDirectResponses
                                 nativeFilterChain:
@@ -144,6 +146,7 @@
   self.appVersion = appVersion;
   self.appId = appId;
   self.virtualClusters = virtualClusters;
+  self.runtimeGuards = runtimeGuards;
   self.typedDirectResponses = typedDirectResponses;
   self.nativeFilterChain = nativeFilterChain;
   self.httpPlatformFilterFactories = httpPlatformFilterFactories;

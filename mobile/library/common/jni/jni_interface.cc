@@ -1265,7 +1265,7 @@ void configureBuilder(JNIEnv* env, jstring grpc_stats_domain, jboolean admin_int
                       jobjectArray filter_chain, jobjectArray stat_sinks,
                       jboolean enable_platform_certificates_validation,
                       jboolean enable_skip_dns_lookup_for_proxied_requests,
-                      Envoy::Platform::EngineBuilder& builder) {
+                      jobjectArray runtime_guards, Envoy::Platform::EngineBuilder& builder) {
   setString(env, grpc_stats_domain, &builder, &EngineBuilder::addGrpcStatsDomain);
   builder.addConnectTimeoutSeconds((connect_timeout_seconds));
   builder.addDnsRefreshSeconds((dns_refresh_seconds));
@@ -1304,6 +1304,11 @@ void configureBuilder(JNIEnv* env, jstring grpc_stats_domain, jboolean admin_int
   builder.setSkipDnsLookupForProxiedRequests(enable_skip_dns_lookup_for_proxied_requests ==
                                              JNI_TRUE);
 
+  auto guards = javaObjectArrayToStringPairVector(env, runtime_guards);
+  for (std::pair<std::string, std::string>& entry : guards) {
+    builder.setRuntimeGuard(entry.first, entry.second == "true");
+  }
+
   auto filters = javaObjectArrayToStringPairVector(env, filter_chain);
   for (std::pair<std::string, std::string>& filter : filters) {
     builder.addNativeFilter(filter.first, filter.second);
@@ -1334,7 +1339,7 @@ extern "C" JNIEXPORT void JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibra
     jlong per_try_idle_timeout_seconds, jstring app_version, jstring app_id,
     jboolean trust_chain_verification, jobjectArray virtual_clusters, jobjectArray filter_chain,
     jobjectArray stat_sinks, jboolean enable_platform_certificates_validation,
-    jboolean enable_skip_dns_lookup_for_proxied_requests) {
+    jboolean enable_skip_dns_lookup_for_proxied_requests, jobjectArray runtime_guards) {
 
   Envoy::Platform::EngineBuilder builder;
   configureBuilder(
@@ -1348,7 +1353,7 @@ extern "C" JNIEXPORT void JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibra
       max_connections_per_host, stats_flush_seconds, stream_idle_timeout_seconds,
       per_try_idle_timeout_seconds, app_version, app_id, trust_chain_verification, virtual_clusters,
       filter_chain, stat_sinks, enable_platform_certificates_validation,
-      enable_skip_dns_lookup_for_proxied_requests, builder);
+      enable_skip_dns_lookup_for_proxied_requests, runtime_guards, builder);
 
   const char* native_yaml = env->GetStringUTFChars(yaml, nullptr);
   builder.generateBootstrapAndCompareForTests(native_yaml);
@@ -1370,7 +1375,7 @@ extern "C" JNIEXPORT jlong JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibr
     jlong per_try_idle_timeout_seconds, jstring app_version, jstring app_id,
     jboolean trust_chain_verification, jobjectArray virtual_clusters, jobjectArray filter_chain,
     jobjectArray stat_sinks, jboolean enable_platform_certificates_validation,
-    jboolean enable_skip_dns_lookup_for_proxied_requests) {
+    jboolean enable_skip_dns_lookup_for_proxied_requests, jobjectArray runtime_guards) {
   Envoy::Platform::EngineBuilder builder;
 
   configureBuilder(
@@ -1384,7 +1389,7 @@ extern "C" JNIEXPORT jlong JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibr
       max_connections_per_host, stats_flush_seconds, stream_idle_timeout_seconds,
       per_try_idle_timeout_seconds, app_version, app_id, trust_chain_verification, virtual_clusters,
       filter_chain, stat_sinks, enable_platform_certificates_validation,
-      enable_skip_dns_lookup_for_proxied_requests, builder);
+      enable_skip_dns_lookup_for_proxied_requests, runtime_guards, builder);
 
   return reinterpret_cast<intptr_t>(builder.generateBootstrap().release());
 }

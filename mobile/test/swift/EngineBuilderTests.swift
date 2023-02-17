@@ -3,7 +3,7 @@ import EnvoyEngine
 import Foundation
 import XCTest
 
-// swiftlint:disable file_length type_body_length
+// swiftlint:disable type_body_length
 
 private let kMockTemplate =
 """
@@ -15,6 +15,8 @@ fixture_template:
 #{custom_listeners}
   filters:
 #{custom_filters}
+  runtime:
+#{custom_runtime}
   routes:
 #{custom_routes}
 """
