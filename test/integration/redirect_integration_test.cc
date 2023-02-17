@@ -700,15 +700,15 @@ TEST_P(RedirectIntegrationTest, InternalRedirectHandledByDirectResponse) {
   ASSERT_TRUE(response->waitForEndStream());
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("204", response->headers().getStatusValue());
-  EXPECT_THAT(waitForAccessLog(access_log_name_, 0, true),
-              HasSubstr("302 internal_redirect test-header-value"));
-  // No test header
-  EXPECT_THAT(waitForAccessLog(access_log_name_, 1), HasSubstr("204 direct_response -"));
   EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.upstream_internal_redirect_succeeded_total")
                    ->value());
   // 302 was never returned downstream
   EXPECT_EQ(0, test_server_->counter("http.config_test.downstream_rq_3xx")->value());
   EXPECT_EQ(1, test_server_->counter("http.config_test.downstream_rq_2xx")->value());
+  EXPECT_THAT(waitForAccessLog(access_log_name_, 0, true),
+              HasSubstr("302 internal_redirect test-header-value"));
+  // No test header
+  EXPECT_THAT(waitForAccessLog(access_log_name_, 1), HasSubstr("204 direct_response -"));
 }
 
 INSTANTIATE_TEST_SUITE_P(Protocols, RedirectIntegrationTest,
