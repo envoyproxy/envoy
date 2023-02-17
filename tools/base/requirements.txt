@@ -414,9 +414,8 @@ docutils==0.19 \
     # via
     #   envoy-docs-sphinx-runner
     #   sphinx
-envoy-base-utils==0.4.1 \
-    --hash=sha256:5c1b3342c0261dd1282f142fdbbb3576b3b45012b8df3525877d2c64f6139d10 \
-    --hash=sha256:772e5805718e61e546010122ce14f28afb435a970270d26ca6f928bbe360d261
+envoy-base-utils==0.4.2 \
+    --hash=sha256:7c3162f69584abbf80ce01e95417415dcde86cb3aad06f31f0bf114d8347bea7
     # via
     #   -r requirements.in
     #   envoy-code-check
