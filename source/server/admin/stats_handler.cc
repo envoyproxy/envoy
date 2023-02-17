@@ -174,8 +174,10 @@ Admin::UrlHandler StatsHandler::statsHandler() {
         "Only include stats that have been written by system since restart"},
        {Admin::ParamDescriptor::Type::String, "filter",
         "Regular expression (Google re2) for filtering stats"},
-       {Admin::ParamDescriptor::Type::Enum, "format", "Format to use", {
-           "html", "dynamic", "text", "json"}},
+       {Admin::ParamDescriptor::Type::Enum,
+        "format",
+        "Format to use",
+        {"html", "dynamic", "text", "json"}},
        {Admin::ParamDescriptor::Type::Enum,
         "type",
         "Stat types to include.",

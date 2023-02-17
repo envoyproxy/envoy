@@ -78,7 +78,8 @@ Http::Code StatsParams::parse(absl::string_view url, Buffer::Instance& response)
 #ifdef ENVOY_ADMIN_HTML
       format_ = StatsFormat::Dynamic;
 #else
-      response.add("Dynamic HTML output was disabled by building with --define=admin_html=disabled");
+      response.add(
+          "Dynamic HTML output was disabled by building with --define=admin_html=disabled");
       return Http::Code::BadRequest;
 #endif
     } else {

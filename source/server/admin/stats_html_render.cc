@@ -57,8 +57,7 @@ namespace Server {
 
 StatsHtmlRender::StatsHtmlRender(Http::ResponseHeaderMap& response_headers,
                                  Buffer::Instance& response, const StatsParams& params)
-    : StatsTextRender(params),
-      dynamic_(params.format_ == StatsFormat::Dynamic) {
+    : StatsTextRender(params), dynamic_(params.format_ == StatsFormat::Dynamic) {
   response_headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Html);
   response.add("<!DOCTYPE html>\n");
   response.add("<html lang='en'>\n");
@@ -97,9 +96,8 @@ void StatsHtmlRender::appendResource(Buffer::Instance& response, absl::string_vi
   } else {
     Filesystem::InstanceImpl file_system;
     std::string path = absl::StrCat("source/server/admin/", file);
-    TRY_ASSERT_MAIN_THREAD {
-      response.add(file_system.fileReadToEnd(path));
-    } END_TRY
+    TRY_ASSERT_MAIN_THREAD { response.add(file_system.fileReadToEnd(path)); }
+    END_TRY
     catch (EnvoyException e) {
       ENVOY_LOG_MISC(error, "failed to load " + path);
     }
@@ -206,7 +204,7 @@ void StatsHtmlRender::input(Buffer::Instance& response, absl::string_view id,
   }
 
   std::string on_change;
-  if (submit_on_change_) {
+  if (submit_on_change_ && (!dynamic_ || name == "format")) {
     on_change = absl::StrCat(" onchange='", path, ".submit()'");
   }
 
