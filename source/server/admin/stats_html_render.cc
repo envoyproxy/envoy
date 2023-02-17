@@ -72,6 +72,10 @@ StatsHtmlRender::StatsHtmlRender(Http::ResponseHeaderMap& response_headers,
   }
 }
 
+void StatsHtmlRender::dynamicParams(Buffer::Instance& response) {
+  appendResource(response, "dynamic_params.html", AdminDynamicParamsHtml);
+}
+
 void StatsHtmlRender::finalize(Buffer::Instance& response) {
   ASSERT(!finalized_);
   finalized_ = true;

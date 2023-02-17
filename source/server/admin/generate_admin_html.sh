@@ -16,3 +16,6 @@ echo ')EOF";'
 echo 'constexpr absl::string_view AdminDynamicStatsHtml = R"EOF('
 cat "$4"
 echo ')EOF";'
+echo 'constexpr absl::string_view AdminDynamicParamsHtml = R"EOF('
+cat "$5"
+echo ')EOF";'

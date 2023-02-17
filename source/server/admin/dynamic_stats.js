@@ -68,7 +68,14 @@ function renderStats(data) {
   });
 
   let text = '';
+  const max_elt = document.getElementById('dynamic-max-display-count');
+  const max_value = max_elt.value;
+  const max = parseInt(max_value) || 50;
+  let index = 0;
   for (stat_record of sorted_stats) {
+    if (++index == max) {
+      break;
+    }
     text += stat_record.name + ': ' + stat_record.value + ' (' +
         stat_record.change_count + ')' + '\n';
   }

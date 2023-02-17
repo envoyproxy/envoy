@@ -10,6 +10,8 @@ public:
   StatsHtmlRender(Http::ResponseHeaderMap& response_headers, Buffer::Instance& response,
                   const StatsParams& params);
 
+  void dynamicParams(Buffer::Instance& response);
+
   void noStats(Buffer::Instance&, absl::string_view types) override;
   void generate(Buffer::Instance& response, const std::string& name,
                 const std::string& value) override;

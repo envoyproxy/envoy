@@ -40,6 +40,9 @@ Http::Code StatsRequest::start(Http::ResponseHeaderMap& response_headers) {
     html_render->setSubmitOnChange(true);
     html_render->tableBegin(response_);
     html_render->urlHandler(response_, url_handler_fn_(), params_.query_);
+    if (params_.format_ == StatsFormat::Dynamic) {
+      html_render->dynamicParams(response_);
+    }
     html_render->tableEnd(response_);
     html_render->startPre(response_);
     render_ = std::move(html_render);
