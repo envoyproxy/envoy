@@ -25,7 +25,7 @@ import (
 )
 
 // panic error messages when C API return not ok
-var (
+const (
 	errRequestFinished = "request has been finished"
 	errFilterDestroyed = "golang filter has been destroyed"
 	errNotInGo         = "not proccessing Go"
