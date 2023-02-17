@@ -9,8 +9,6 @@ licenses(["notice"])  # Apache 2
 
 envoy_contrib_package()
 
-envoy_package()
-
 envoy_cc_test(
     name = "echo_integration_test",
     srcs = [

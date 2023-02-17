@@ -12,14 +12,8 @@ licenses(["notice"])  # Apache 2
 
 envoy_contrib_package()
 
-# Echo L4 network filter. This is primarily a simplistic example.
-# Public docs: https://envoyproxy.io/docs/envoy/latest/configuration/listeners/network_filters/echo_filter
-
-envoy_extension_package()
-
 envoy_cc_library(
     name = "echo",
-    srcs = ["echo.cc"],
     hdrs = ["echo.h"],
     deps = [
         ":bridge",

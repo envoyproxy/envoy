@@ -92,6 +92,7 @@ impl FilterApi {
             read_callbacks,
         }
     }
+
     pub fn data(&mut self) -> DataFuture {
         let handle = unsafe { ffi::notify_waiting_for_data(self.executor) };
 
