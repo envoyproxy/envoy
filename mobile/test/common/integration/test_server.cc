@@ -83,11 +83,20 @@ void TestServer::startTestServer(bool use_quic) {
       use_quic ? createQuicUpstreamTlsContext(factory_context_)
                : createUpstreamTlsContext(factory_context_);
 
-  // TODO(alyssar) move this to using Envoy's AutonomousUpstream.
-  upstream_ =
-      std::make_unique<AutonomousUpstream>(std::move(factory), port_, version_, upstream_config_);
+  upstream_ = std::make_unique<AutonomousUpstream>(std::move(factory), port_, version_,
+                                                   upstream_config_, true);
 
-  // see upstream address
+  // Legacy behavior for cronet tests.
+  if (use_quic) {
+    upstream_->setResponseHeaders(
+        std::make_unique<Http::TestResponseHeaderMapImpl>(Http::TestResponseHeaderMapImpl(
+            {{":status", "200"},
+             {"Cache-Control", "max-age=0"},
+             {"Content-Type", "text/plain"},
+             {"X-Original-Url", "https://test.example.com:6121/simple.txt"}})));
+    upstream_->setResponseBody("This is a simple text file served by QUIC.\n");
+  }
+
   ENVOY_LOG_MISC(debug, "Upstream now listening on {}", upstream_->localAddress()->asString());
 }
 
