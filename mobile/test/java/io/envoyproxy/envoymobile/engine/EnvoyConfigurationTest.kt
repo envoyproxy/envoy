@@ -65,7 +65,7 @@ class TestEnvoyHTTPFilterFactory(name : String) : EnvoyHTTPFilterFactory {
 class EnvoyConfigurationTest {
 
   fun buildTestEnvoyConfiguration(
-    rtdslayerName: String? = null
+    rtdsLayerName: String? = null
     rtdsTimeoutSeconds: Int = 0
     adsApiType: String? = null
     adsAddress: String? = null
@@ -106,7 +106,7 @@ class EnvoyConfigurationTest {
     enablePlatformCertificatesValidation: Boolean = false
   ): EnvoyConfiguration {
     return EnvoyConfiguration(
-      rtdslayerName,
+      rtdsLayerName,
       rtdsTimeoutSeconds,
       adsApiType,
       adsAddress,

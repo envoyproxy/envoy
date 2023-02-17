@@ -231,7 +231,7 @@ class EngineBuilderTest {
     engineBuilder.addRtdsLayer("rtds_layer_name")
     engineBuilder.setAggregatedDiscoveryService("GRPC", "192.168.1.1", 0)
     val engine = engineBuilder.build() as EngineImpl
-    assertThat(engine.envoyConfiguration.rtdslayerName).isEqualTo("rtds_layer_name")
+    assertThat(engine.envoyConfiguration.rtdsLayerName).isEqualTo("rtds_layer_name")
     assertThat(engine.envoyConfiguration.adsApiType).isEqualTo("GRPC")
   }
 

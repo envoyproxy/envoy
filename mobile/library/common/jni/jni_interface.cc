@@ -1264,7 +1264,8 @@ void configureBuilder(JNIEnv* env, jstring grpc_stats_domain, jboolean admin_int
                       jboolean trust_chain_verification, jobjectArray virtual_clusters,
                       jobjectArray filter_chain, jobjectArray stat_sinks,
                       jboolean enable_platform_certificates_validation,
-                      jboolean enable_skip_dns_lookup_for_proxied_requests,
+                      jboolean enable_skip_dns_lookup_for_proxied_requests, jstring rtds_layer_name,
+    jlong rtds_timeout_seconds, jstring ads_api_type, jstring ads_address, jlong ads_port,
                       jobjectArray runtime_guards, Envoy::Platform::EngineBuilder& builder) {
   setString(env, grpc_stats_domain, &builder, &EngineBuilder::addGrpcStatsDomain);
   builder.addConnectTimeoutSeconds((connect_timeout_seconds));
@@ -1322,6 +1323,9 @@ void configureBuilder(JNIEnv* env, jstring grpc_stats_domain, jboolean admin_int
 
   std::vector<std::string> hostnames = javaObjectArrayToStringVector(env, dns_preresolve_hostnames);
   builder.addDnsPreresolveHostnames(hostnames);
+  builder.addRtdsLayer(rtds_layer_name, rtds_timeout_seconds);
+  builder.setAggregatedDiscoveryService(ads_api_type, ads_address, ads_port);
+
 }
 
 extern "C" JNIEXPORT jstring JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibrary_createYaml(

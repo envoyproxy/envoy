@@ -27,7 +27,7 @@ public class EnvoyConfiguration {
     // Used for testing.
     ACCEPT_UNTRUSTED;
   }
-  public final String rtdslayerName;
+  public final String rtdsLayerName;
   public final Integer rtdsTimeoutSeconds;
   public final String adsApiType;
   public final String adsAddress;
@@ -133,7 +133,7 @@ public class EnvoyConfiguration {
    * @param enablePlatformCertificatesValidation          whether to use the platform verifier.
    */
   public EnvoyConfiguration(
-    String rtdslayerName, int rtdsTimeoutSeconds, String adsApiType, String adsAddress, int adsPort,
+    String rtdsLayerName, int rtdsTimeoutSeconds, String adsApiType, String adsAddress, int adsPort,
       boolean adminInterfaceEnabled, String grpcStatsDomain, int connectTimeoutSeconds,
       int dnsRefreshSeconds, int dnsFailureRefreshSecondsBase, int dnsFailureRefreshSecondsMax,
       int dnsQueryTimeoutSeconds, int dnsMinRefreshSeconds, List<String> dnsPreresolveHostnames,
@@ -151,7 +151,7 @@ public class EnvoyConfiguration {
       Map<String, Boolean> runtimeGuards, Boolean enableSkipDNSLookupForProxiedRequests,
       boolean enablePlatformCertificatesValidation) {
     JniLibrary.load();
-    this.rtdslayerName = rtdslayerName;
+    this.rtdsLayerName = rtdsLayerName;
     this.rtdsTimeoutSeconds = rtdsTimeoutSeconds;
     this.adsApiType = adsApiType;
     this.adsAddress = adsAddress;

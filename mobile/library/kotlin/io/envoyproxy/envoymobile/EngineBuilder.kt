@@ -77,7 +77,7 @@ open class EngineBuilder(
   private var keyValueStores = mutableMapOf<String, EnvoyKeyValueStore>()
   private var statsSinks = listOf<String>()
   private var enablePlatformCertificatesValidation = false
-  private var rtdslayerName: String? = null
+  private var rtdsLayerName: String? = null
   private var rtdsTimeoutSeconds: Int = 0
   private var adsApiType: String? = null
   private var adsAddress: String? = null
@@ -554,7 +554,7 @@ open class EngineBuilder(
   }
 
   fun addRtdsLayer(layerName: String, timeoutSeconds: Int = 5): EngineBuilder {
-  this.rtdslayerName = layerName
+  this.rtdsLayerName = layerName
   this.rtdsTimeoutSeconds = timeoutSeconds
   return this
   }
@@ -574,7 +574,7 @@ open class EngineBuilder(
   @Suppress("LongMethod")
   fun build(): Engine {
     val engineConfiguration = EnvoyConfiguration(
-      rtdslayerName,
+      rtdsLayerName,
       rtdsTimeoutSeconds,
       adsApiType,
       adsAddress,
