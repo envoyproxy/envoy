@@ -7,6 +7,7 @@ load("@upb//bazel:workspace_deps.bzl", "upb_deps")
 load("@rules_pkg//:deps.bzl", "rules_pkg_dependencies")
 load("@rules_rust//rust:repositories.bzl", "rules_rust_dependencies", "rust_register_toolchains", "rust_repository_set")
 load("@rules_rust//rust:defs.bzl", "rust_common")
+load("@rules_rust//tools/rust_analyzer:deps.bzl", "rust_analyzer_dependencies")
 load("@proxy_wasm_rust_sdk//bazel:dependencies.bzl", "proxy_wasm_rust_sdk_dependencies")
 load("@base_pip3//:requirements.bzl", pip_dependencies = "install_deps")
 load("@dev_pip3//:requirements.bzl", pip_dev_dependencies = "install_deps")
@@ -52,6 +53,8 @@ def envoy_dependency_imports(go_version = GO_VERSION, jq_version = JQ_VERSION, y
             "wasm32-wasi",
         ],
     )
+
+    rust_analyzer_dependencies()
     shellcheck_dependencies()
     upb_deps()
     proxy_wasm_rust_sdk_dependencies()
