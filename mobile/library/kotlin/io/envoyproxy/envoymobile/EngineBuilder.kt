@@ -37,6 +37,7 @@ open class EngineBuilder(
   protected var logger: ((String) -> Unit)? = null
   protected var eventTracker: ((Map<String, String>) -> Unit)? = null
   protected var enableProxying = false
+  private var runtimeGuards = mapOf<String, Boolean>()
   private var enableSkipDNSLookupForProxiedRequests = false
   private var engineType: () -> EnvoyEngine = {
     EnvoyEngineImpl(onEngineRunning, logger, eventTracker)
@@ -588,6 +589,7 @@ open class EngineBuilder(
       stringAccessors,
       keyValueStores,
       statsSinks,
+      runtimeGuards,
       enableSkipDNSLookupForProxiedRequests,
       enablePlatformCertificatesValidation,
     )

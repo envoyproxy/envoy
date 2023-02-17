@@ -599,6 +599,7 @@ layered_runtime:
           # Global stats do not play well with engines with limited lifetimes
           disallow_global_stats: true
           reloadable_features:
+#{custom_runtime}
             always_use_v6: *force_ipv6
             skip_dns_lookup_for_proxied_requests: *skip_dns_lookup_for_proxied_requests
 )"

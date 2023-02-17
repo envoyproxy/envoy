@@ -374,7 +374,7 @@ public class JniLibrary {
       long perTryIdleTimeoutSeconds, String appVersion, String appId,
       boolean trustChainVerification, byte[][] virtualClusters, byte[][] filterChain,
       byte[][] statSinks, boolean enablePlatformCertificatesValidation,
-      boolean enableSkipDNSLookupForProxiedRequests);
+      boolean enableSkipDNSLookupForProxiedRequests, byte[][] runtimeGuards);
 
   /**
    * Uses the provided fields to generate an Envoy bootstrap proto.
@@ -396,5 +396,5 @@ public class JniLibrary {
       long perTryIdleTimeoutSeconds, String appVersion, String appId,
       boolean trustChainVerification, byte[][] virtualClusters, byte[][] filterChain,
       byte[][] statSinks, boolean enablePlatformCertificatesValidation,
-      boolean enableSkipDNSLookupForProxiedRequests);
+      boolean enableSkipDNSLookupForProxiedRequests, byte[][] runtimeGuards);
 }

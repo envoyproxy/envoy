@@ -1,4 +1,3 @@
-@_spi(YAMLValidation)
 import Envoy
 import UIKit
 
@@ -18,7 +17,7 @@ final class ViewController: UITableViewController {
   override func viewDidLoad() {
     super.viewDidLoad()
 
-    let engine = YAMLValidatingEngineBuilder()
+    let engine = EngineBuilder()
       .addLogLevel(.debug)
       .addPlatformFilter(DemoFilter.init)
       .addPlatformFilter(BufferDemoFilter.init)
@@ -45,7 +44,6 @@ final class ViewController: UITableViewController {
       .addKeyValueStore(name: "demo-kv-store", keyValueStore: UserDefaults.standard)
       .setEventTracker { NSLog("Envoy event emitted: \($0)") }
       .forceIPv6(true)
-      .useLegacyBuilder(true)
       .build()
     self.streamClient = engine.streamClient()
     self.pulseClient = engine.pulseClient()

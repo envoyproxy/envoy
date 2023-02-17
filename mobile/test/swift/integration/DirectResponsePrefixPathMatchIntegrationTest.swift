@@ -1,4 +1,3 @@
-@_spi(YAMLValidation)
 import Envoy
 import TestExtensions
 import XCTest
@@ -17,7 +16,7 @@ final class DirectResponsePrefixPathMatchIntegrationTest: XCTestCase {
       method: .get, authority: "127.0.0.1", path: "/v1/foo/bar?param=1"
     ).build()
 
-    let engine = YAMLValidatingTestEngineBuilder()
+    let engine = TestEngineBuilder()
       .addDirectResponse(
         .init(
           matcher: RouteMatcher(pathPrefix: "/v1/foo"),

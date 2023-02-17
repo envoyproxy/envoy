@@ -511,6 +511,22 @@ A maximum of 100 entries will be stored.
   builder.enableDNSCache(true, saveInterval: 60)
 
 
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+``setRuntimeGuard``
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Adds a runtime guard key value pair to envoy configuration.  The guard is of the short form "feature"
+rather than the fully qualified "envoy.reloadable_features.feature"
+Note that Envoy will fail to start up in debug mode if an unknown guard is specified.
+
+**Example**::
+
+  // Kotlin
+  builder.setRuntimeGuard("feature", true)
+
+  // Swift
+  builder.setRuntimeGuard("feature", true)
+
 ----------------------
 Advanced configuration
 ----------------------
