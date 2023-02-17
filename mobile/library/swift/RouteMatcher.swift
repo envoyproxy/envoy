@@ -31,19 +31,6 @@ public struct RouteMatcher {
           return .suffix
         }
       }
-
-      func resolvedYAML(value: String) -> String {
-        switch self {
-        case .contains:
-          return #"contains_match: "\#(value)""#
-        case .exact:
-          return #"exact_match: "\#(value)""#
-        case .prefix:
-          return #"prefix_match: "\#(value)""#
-        case .suffix:
-          return #"suffix_match: "\#(value)""#
-        }
-      }
     }
 
     public init(name: String, value: String, mode: MatchMode) {
