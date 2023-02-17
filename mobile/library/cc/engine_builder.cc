@@ -499,7 +499,8 @@ std::string EngineBuilder::generateConfigStr() const {
     }
     std::string call_credentials;
     if (!jwt_token_.empty()) {
-      call_credentials = fmt::format(ads_call_credentials_insert, jwt_token_, jwt_token_lifetime_seconds_);
+      call_credentials =
+          fmt::format(ads_call_credentials_insert, jwt_token_, jwt_token_lifetime_seconds_);
     }
     std::string ads_insert_replaced = ads_insert;
     absl::StrReplaceAll({{"#{custom_ads_channel_credentials}", channel_credentials}},
@@ -1272,13 +1273,11 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
   if (enable_cds_) {
     auto* cds_config = bootstrap->mutable_dynamic_resources()->mutable_cds_config();
     if (cds_resources_locator_.empty()) {
-    cds_config->mutable_ads();
+      cds_config->mutable_ads();
     } else {
-    bootstrap->mutable_dynamic_resources()->set_cds_resources_locator(cds_resources_locator_);
-    cds_config->mutable_api_config_source()->set_api_type(
-        envoy::config::core::v3::ApiConfigSource::AGGREGATED_GRPC);
-    cds_config->mutable_api_config_source()->set_transport_api_version(
-        envoy::config::core::v3::ApiVersion::V3);
+      bootstrap->mutable_dynamic_resources()->set_cds_resources_locator(cds_resources_locator_);
+      cds_config->mutable_api_config_source()->set_api_type(envoy::config::core::v3::ApiConfigSource::AGGREGATED_GRPC);
+      cds_config->mutable_api_config_source()->set_transport_api_version(envoy::config::core::v3::ApiVersion::V3);
     }
     cds_config->mutable_initial_fetch_timeout()->set_seconds(cds_timeout_seconds_);
     cds_config->set_resource_api_version(envoy::config::core::v3::ApiVersion::V3);

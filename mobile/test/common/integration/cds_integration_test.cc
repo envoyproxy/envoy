@@ -34,7 +34,7 @@ public:
 
   void SetUp() override { setUpstreamProtocol(Http::CodecType::HTTP1); }
 
- protected:
+protected:
   void executeCdsRequestsAndVerify() {
     initialize();
     const std::string cluster_name =
