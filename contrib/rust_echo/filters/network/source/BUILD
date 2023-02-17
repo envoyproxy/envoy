@@ -3,7 +3,6 @@ load(
     "envoy_cc_extension",
     "envoy_cc_library",
     "envoy_contrib_package",
-    "envoy_extension_package",
     "envoy_rust_cxx_bridge",
     "envoy_rust_library",
 )
