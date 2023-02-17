@@ -71,8 +71,16 @@ StatsHtmlRender::StatsHtmlRender(Http::ResponseHeaderMap& response_headers,
   }
 }
 
-void StatsHtmlRender::dynamicParams(Buffer::Instance& response) {
-  appendResource(response, "dynamic_params.html", AdminDynamicParamsHtml);
+void StatsHtmlRender::setupStatsPage(const Admin::UrlHandler& url_handler,
+                                     const StatsParams& params, Buffer::Instance& response) {
+  setSubmitOnChange(true);
+  tableBegin(response);
+  urlHandler(response, url_handler, params.query_);
+  if (dynamic_) {
+    appendResource(response, "dynamic_params.html", AdminDynamicParamsHtml);
+  }
+  tableEnd(response);
+  startPre(response);
 }
 
 void StatsHtmlRender::finalize(Buffer::Instance& response) {

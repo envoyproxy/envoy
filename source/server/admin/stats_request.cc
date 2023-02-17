@@ -37,14 +37,7 @@ Http::Code StatsRequest::start(Http::ResponseHeaderMap& response_headers) {
   case StatsFormat::Dynamic:
   case StatsFormat::Html: {
     auto html_render = std::make_unique<StatsHtmlRender>(response_headers, response_, params_);
-    html_render->setSubmitOnChange(true);
-    html_render->tableBegin(response_);
-    html_render->urlHandler(response_, url_handler_fn_(), params_.query_);
-    if (params_.format_ == StatsFormat::Dynamic) {
-      html_render->dynamicParams(response_);
-    }
-    html_render->tableEnd(response_);
-    html_render->startPre(response_);
+    html_render->setupStatsPage(url_handler_fn_(), params_, response_);
     render_ = std::move(html_render);
     if (params_.format_ == StatsFormat::Dynamic) {
       return Http::Code::OK;

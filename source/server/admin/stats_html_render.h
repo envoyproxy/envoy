@@ -10,20 +10,13 @@ public:
   StatsHtmlRender(Http::ResponseHeaderMap& response_headers, Buffer::Instance& response,
                   const StatsParams& params);
 
-  void dynamicParams(Buffer::Instance& response);
+  void setupStatsPage(const Admin::UrlHandler& url_handler, const StatsParams& params,
+                      Buffer::Instance& response);
 
+  // StatsTextRender
   void noStats(Buffer::Instance&, absl::string_view types) override;
   void generate(Buffer::Instance& response, const std::string& name,
                 const std::string& value) override;
-  /*
-  void generate(Buffer::Instance& response, const std::string& name, uint64_t value) override {
-    StatsTextRender::generate(response, name, value);
-  }
-  void generate(Buffer::Instance& response, const std::string& name,
-                const Stats::ParentHistogram& histogram) override {
-    StatsTextRender::generate(response, name, histogram);
-  }
-  */
   void finalize(Buffer::Instance&) override;
 
   /**
