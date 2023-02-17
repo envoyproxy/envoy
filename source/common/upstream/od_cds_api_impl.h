@@ -89,7 +89,7 @@ private:
   MissingClusterNotifier& notifier_;
   Stats::ScopeSharedPtr scope_;
   StartStatus status_;
-  absl::flat_hash_set<std::string> registered_cluster_names_;
+  absl::flat_hash_set<std::string> awaiting_names_;
   Config::SubscriptionPtr subscription_;
 };
 

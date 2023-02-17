@@ -51,10 +51,8 @@ void OdCdsApiImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef>&
                                   const std::string& system_version_info) {
   auto exception_msgs =
       helper_.onConfigUpdate(added_resources, removed_resources, system_version_info);
-  if (status_ != StartStatus::InitialFetchDone) {
-    sendAwaiting();
-    status_ = StartStatus::InitialFetchDone;
-  }
+  sendAwaiting();
+  status_ = StartStatus::InitialFetchDone;
   // According to the XDS specification, the server can send a reply with names in the
   // removed_resources field for requested resources that do not exist. That way we can notify the
   // interested parties about the missing resource immediately without waiting for some timeout to
@@ -72,19 +70,21 @@ void OdCdsApiImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef>&
 void OdCdsApiImpl::onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason reason,
                                         const EnvoyException*) {
   ASSERT(Envoy::Config::ConfigUpdateFailureReason::ConnectionFailure != reason);
-  if (status_ != StartStatus::InitialFetchDone) {
-    sendAwaiting();
-    status_ = StartStatus::InitialFetchDone;
-  }
+  sendAwaiting();
+  status_ = StartStatus::InitialFetchDone;
 }
 
 void OdCdsApiImpl::sendAwaiting() {
-  // skip it when there is only the init fetch cluster.
-  if (registered_cluster_names_.size() > 1) {
-    ENVOY_LOG(debug, "odcds: updating watched cluster names {}",
-              fmt::join(registered_cluster_names_, ", "));
-    subscription_->updateResourceInterest(registered_cluster_names_);
+  if (awaiting_names_.empty()) {
+    return;
   }
+  // The awaiting names are sent only once. After the state transition from Starting to
+  // InitialFetchDone (which happens on the first received response), the awaiting names list is not
+  // used any more.
+  ENVOY_LOG(debug, "odcds: sending request for awaiting cluster names {}",
+            fmt::join(awaiting_names_, ", "));
+  subscription_->requestOnDemandUpdate(awaiting_names_);
+  awaiting_names_.clear();
 }
 
 void OdCdsApiImpl::updateOnDemand(std::string cluster_name) {
@@ -92,27 +92,17 @@ void OdCdsApiImpl::updateOnDemand(std::string cluster_name) {
   case StartStatus::NotStarted:
     ENVOY_LOG(trace, "odcds: starting a subscription with cluster name {}", cluster_name);
     status_ = StartStatus::Started;
-    registered_cluster_names_.insert(cluster_name);
     subscription_->start({std::move(cluster_name)});
     return;
 
   case StartStatus::Started:
     ENVOY_LOG(trace, "odcds: putting cluster name {} on awaiting list", cluster_name);
-    registered_cluster_names_.insert(std::move(cluster_name));
+    awaiting_names_.insert(std::move(cluster_name));
     return;
 
   case StartStatus::InitialFetchDone:
-    auto old_size = registered_cluster_names_.size();
-    registered_cluster_names_.insert(cluster_name);
-    if (registered_cluster_names_.size() != old_size) {
-      ENVOY_LOG(debug, "odcds: updating watched cluster names {}",
-                fmt::join(registered_cluster_names_, ", "));
-      subscription_->updateResourceInterest(registered_cluster_names_);
-    } else {
-      ENVOY_LOG(trace, "odcds: requesting for cluster name {}", cluster_name);
-      subscription_->requestOnDemandUpdate({std::move(cluster_name)});
-    }
-
+    ENVOY_LOG(trace, "odcds: requesting for cluster name {}", cluster_name);
+    subscription_->requestOnDemandUpdate({std::move(cluster_name)});
     return;
   }
   PANIC("corrupt enum");
