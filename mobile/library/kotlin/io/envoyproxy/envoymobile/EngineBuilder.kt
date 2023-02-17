@@ -37,6 +37,7 @@ open class EngineBuilder(
   protected var logger: ((String) -> Unit)? = null
   protected var eventTracker: ((Map<String, String>) -> Unit)? = null
   protected var enableProxying = false
+  private var runtimeGuards = mapOf<String, Boolean>()
   private var enableSkipDNSLookupForProxiedRequests = false
   private var engineType: () -> EnvoyEngine = {
     EnvoyEngineImpl(onEngineRunning, logger, eventTracker)
@@ -57,9 +58,7 @@ open class EngineBuilder(
   internal var enableHttp3 = true
   private var enableHappyEyeballs = true
   private var enableGzipDecompression = true
-  internal var enableGzipCompression = false
   private var enableBrotliDecompression = false
-  internal var enableBrotliCompression = false
   private var enableSocketTagging = false
   private var enableInterfaceBinding = false
   private var h2ConnectionKeepaliveIdleIntervalMilliseconds = 1
@@ -572,9 +571,7 @@ open class EngineBuilder(
       enableDrainPostDnsRefresh,
       enableHttp3,
       enableGzipDecompression,
-      enableGzipCompression,
       enableBrotliDecompression,
-      enableBrotliCompression,
       enableSocketTagging,
       enableHappyEyeballs,
       enableInterfaceBinding,
@@ -593,6 +590,7 @@ open class EngineBuilder(
       stringAccessors,
       keyValueStores,
       statsSinks,
+      runtimeGuards,
       enableSkipDNSLookupForProxiedRequests,
       enablePlatformCertificatesValidation,
       useLegacyBuilder

@@ -48,6 +48,7 @@ removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
 - area: config
   change: |
+    removed ``envoy.reloadable_features.admin_stats_filter_use_re2`` and legacy code paths.
     removed ``envoy.reloadable_features.combine_sds_requests`` and legacy code paths.
 - area: dns
   change: |

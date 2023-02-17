@@ -79,7 +79,6 @@ envoy_cc_test(
         "//test/mocks/server:admin_stream_mocks",
         "//test/test_common:logging_lib",
         "//test/test_common:real_threads_test_helper_lib",
-        "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
     ],
 )
@@ -90,7 +89,6 @@ envoy_cc_test(
     deps = [
         "//source/common/buffer:buffer_lib",
         "//source/server/admin:stats_params_lib",
-        "//test/test_common:test_runtime_lib",
     ],
 )
 
@@ -140,7 +138,6 @@ envoy_cc_benchmark_binary(
         "//source/common/http:header_map_lib",
         "//source/common/stats:thread_local_store_lib",
         "//source/server/admin:admin_lib",
-        "//test/test_common:test_runtime_lib",
     ],
 )
 
