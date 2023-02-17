@@ -11,6 +11,7 @@
 #include "library/common/jni/jni_version.h"
 #include "library/common/main_interface.h"
 #include "library/common/types/managed_envoy_headers.h"
+#include <cstddef>
 
 using Envoy::Platform::EngineBuilder;
 
@@ -1192,6 +1193,17 @@ void setString(JNIEnv* env, jstring java_string, EngineBuilder* builder,
   }
 }
 
+// Convert jstring to std::string
+std::string getCppString(JNIEnv* env, jstring java_string) {
+  if (!java_string) {
+    return "";
+  }
+  const char* native_java_string = env->GetStringUTFChars(java_string, nullptr);
+  std::string cpp_string = std::string(native_java_string);
+  env->ReleaseStringUTFChars(java_string, native_java_string);
+  return cpp_string;
+}
+
 // Converts a java byte array to a C++ string.
 std::string javaByteArrayToString(JNIEnv* env, jbyteArray j_data) {
   size_t data_length = static_cast<size_t>(env->GetArrayLength(j_data));
@@ -1323,8 +1335,16 @@ void configureBuilder(JNIEnv* env, jstring grpc_stats_domain, jboolean admin_int
 
   std::vector<std::string> hostnames = javaObjectArrayToStringVector(env, dns_preresolve_hostnames);
   builder.addDnsPreresolveHostnames(hostnames);
-  builder.addRtdsLayer(rtds_layer_name, rtds_timeout_seconds);
-  builder.setAggregatedDiscoveryService(ads_api_type, ads_address, ads_port);
+  std::string rtds_layer_name_cpp = getCppString(env, rtds_layer_name);
+  if (!rtds_layer_name_cpp.empty()) {
+    builder.addRtdsLayer(rtds_layer_name_cpp, rtds_timeout_seconds);
+  }
+
+  std::string ads_api_type_cpp = getCppString(env, ads_api_type);
+  std::string ads_address_cpp = getCppString(env, ads_address);
+  if (!ads_api_type_cpp.empty()) {
+    builder.setAggregatedDiscoveryService(ads_api_type_cpp, ads_address_cpp, ads_port);
+  }
 
 }
 

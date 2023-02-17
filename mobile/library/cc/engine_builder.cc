@@ -259,14 +259,13 @@ EngineBuilder& EngineBuilder::enforceTrustChainVerification(bool trust_chain_ver
   return *this;
 }
 
-EngineBuilder& EngineBuilder::addRtdsLayer(const std::string& layer_name,
-                                           const int timeout_seconds) {
+EngineBuilder& EngineBuilder::addRtdsLayer(std::string layer_name, int timeout_seconds) {
   rtds_layer_name_ = layer_name;
   rtds_timeout_seconds_ = timeout_seconds;
   return *this;
 }
-EngineBuilder& EngineBuilder::setAggregatedDiscoveryService(const std::string& api_type,
-                                                            const std::string& address,
+EngineBuilder& EngineBuilder::setAggregatedDiscoveryService(std::string api_type,
+                                                            std::string address,
                                                             const int port) {
 #ifndef ENVOY_GOOGLE_GRPC
   throw std::runtime_error("google_grpc must be enabled in bazel to use ADS");

@@ -69,14 +69,13 @@ public:
   EngineBuilder& enableDrainPostDnsRefresh(bool drain_post_dns_refresh_on);
   EngineBuilder& enforceTrustChainVerification(bool trust_chain_verification_on);
   EngineBuilder& enablePlatformCertificatesValidation(bool platform_certificates_validation_on);
-  // Adds an RTDS layer to default config. Requires that ADS be configured.
-  EngineBuilder& addRtdsLayer(const std::string& layer_name,
-                              const int timeout_seconds = DefaultXdsTimeout);
   // Adds a CDS layer to default config. Requires that ADS be configured.
   EngineBuilder& addCdsLayer(const int timeout_seconds = DefaultXdsTimeout);
+  // Adds an RTDS layer to default config. Requires that ADS be configured
+  EngineBuilder& addRtdsLayer(std::string layer_name, int timeout_seconds = DefaultXdsTimeout);
   // Adds an ADS layer.
-  EngineBuilder& setAggregatedDiscoveryService(const std::string& api_type,
-                                               const std::string& address, const int port);
+  EngineBuilder& setAggregatedDiscoveryService(std::string api_type,
+                                               std::string address, const int port);
   EngineBuilder& enableDnsCache(bool dns_cache_on, int save_interval_seconds = 1);
   EngineBuilder& setForceAlwaysUsev6(bool value);
   EngineBuilder& setSkipDnsLookupForProxiedRequests(bool value);
