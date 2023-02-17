@@ -404,6 +404,7 @@ std::string EngineBuilder::generateConfigStr() const {
 #else
         {"force_ipv6", always_use_v6_ ? "true" : "false"},
 #endif
+        {"node_id", node_id_.empty() ? "envoy-mobile" : node_id_},
   };
   if (!stats_domain_.empty()) {
     replacements.push_back({"stats_domain", stats_domain_});
@@ -1174,7 +1175,7 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
 
   // Set up node
   auto* node = bootstrap->mutable_node();
-  node->set_id("envoy-mobile");
+  node->set_id(node_id_.empty() ? "envoy-mobile" : node_id_);
   node->set_cluster("envoy-mobile");
   if (!node_locality_region_.empty()) {
     node->mutable_locality()->set_region(node_locality_region_);

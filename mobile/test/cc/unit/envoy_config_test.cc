@@ -48,6 +48,7 @@ TEST(TestConfig, ConfigIsApplied) {
       .enableAdminInterface(true)
 #endif
       .setForceAlwaysUsev6(true)
+      .setNodeId("my_test_node")
       .setDeviceOs("probably-ubuntu-on-CI");
   std::string config_str = engine_builder.generateConfigStr();
 
@@ -63,6 +64,7 @@ TEST(TestConfig, ConfigIsApplied) {
                                            "- &stats_flush_interval 654s",
                                            "  key: dns_persistent_cache",
                                            "- &force_ipv6 true",
+                                           "- &node_id my_test_node",
                                            "- &persistent_dns_cache_save_interval 101",
                                            " test_feature_false: true",
                                            ("- &metadata { device_os: \"probably-ubuntu-on-CI\", "

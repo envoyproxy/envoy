@@ -589,7 +589,7 @@ watchdogs:
     megamiss_timeout: 60s
     miss_timeout: 60s
 node:
-  id: envoy-mobile
+  id: *node_id
   cluster: envoy-mobile
   metadata: *metadata
   locality: *node_locality
