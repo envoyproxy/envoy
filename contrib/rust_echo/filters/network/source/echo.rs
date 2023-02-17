@@ -1,7 +1,7 @@
 #[cxx::bridge]
 mod ffi {
     extern "C++" {
-        include!("contrib/rust_echo/filters/network/executor.rs.h");
+        include!("contrib/rust_echo/filters/network/source/executor.rs.h");
 
         #[namespace = "Envoy::Network"]
         type ReadFilterCallbacks = executor_rs::ffi::ReadFilterCallbacks;
@@ -27,11 +27,11 @@ fn on_new_connection(read_callbacks: *mut ReadFilterCallbacks, executor: *const 
 }
 
 async fn on_new_connection_async(mut api: FilterApi) {
-    let connection = api.connection();
+    let mut connection = api.connection();
 
     loop {
         let (data, end_stream) = api.data().await;
 
-        api.write_to(connection, data, end_stream);
+        connection.write(data, end_stream);
     }
 }

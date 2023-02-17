@@ -53,3 +53,4 @@ bazel.output.txt
 **/.DS_Store
 **/*.iml
 tools/dev/src
+rust-project.json

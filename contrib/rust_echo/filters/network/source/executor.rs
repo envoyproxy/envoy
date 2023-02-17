@@ -46,6 +46,7 @@ use std::pin::Pin;
 use std::task::{Context, Poll, RawWaker, RawWakerVTable, Waker};
 
 fn create_raw_waker(executor: *const ()) -> RawWaker {
+    // TODO(snowp): Some of these are noops, fix once we want to support work resumption.
     RawWaker::new(
         executor,
         &RawWakerVTable::new(
@@ -69,6 +70,16 @@ pub fn register_future(executor: *const Executor, future: impl Future<Output = (
     }
 }
 
+pub struct Connection {
+    inner: *mut ffi::Connection,
+}
+
+impl Connection {
+    pub fn write(&mut self, data: *mut Instance, end_stream: bool) {
+        unsafe { ffi::write_to(self.inner, data, end_stream) };
+    }
+}
+
 pub struct FilterApi {
     executor: *const Executor,
     read_callbacks: *mut ReadFilterCallbacks,
@@ -87,17 +98,10 @@ impl FilterApi {
         DataFuture { handle }
     }
 
-    pub fn connection(&mut self) -> *mut ffi::Connection {
-        unsafe { ffi::connection(self.read_callbacks) }
-    }
-
-    pub fn write_to(
-        &self,
-        connection: *mut ffi::Connection,
-        data: *mut Instance,
-        end_stream: bool,
-    ) {
-        unsafe { ffi::write_to(connection, data, end_stream) }
+    pub fn connection(&mut self) -> Connection {
+        Connection {
+            inner: unsafe { ffi::connection(self.read_callbacks) },
+        }
     }
 }
 
