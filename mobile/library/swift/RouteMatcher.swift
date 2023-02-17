@@ -1,37 +1,47 @@
-import Foundation
+@_implementationOnly import EnvoyEngine
 
 /// Typed representation of a route matcher that may be specified when starting the engine.
 /// https://www.envoyproxy.io/docs/envoy/latest/api-v3/config/route/
 /// v3/route_components.proto#envoy-v3-api-msg-config-route-v3-routematch
-@objcMembers
-public final class RouteMatcher: NSObject {
+public struct RouteMatcher {
   public let fullPath: String?
   public let pathPrefix: String?
   public let headers: [HeaderMatcher]
 
-  @objcMembers
-  public final class HeaderMatcher: NSObject {
+  public struct HeaderMatcher {
     public let name: String
     public let value: String
     public let mode: MatchMode
 
-    @objc
     public enum MatchMode: Int {
       case contains
       case exact
       case prefix
       case suffix
 
+      fileprivate var objcValue: EMOMatchMode {
+        switch self {
+        case .contains:
+          return .contains
+        case .exact:
+          return .exact
+        case .prefix:
+          return .prefix
+        case .suffix:
+          return .suffix
+        }
+      }
+
       func resolvedYAML(value: String) -> String {
         switch self {
         case .contains:
-          return "contains_match: \"\(value)\""
+          return #"contains_match: "\#(value)""#
         case .exact:
-          return "exact_match: \"\(value)\""
+          return #"exact_match: "\#(value)""#
         case .prefix:
-          return "prefix_match: \"\(value)\""
+          return #"prefix_match: "\#(value)""#
         case .suffix:
-          return "suffix_match: \"\(value)\""
+          return #"suffix_match: "\#(value)""#
         }
       }
     }
@@ -40,7 +50,6 @@ public final class RouteMatcher: NSObject {
       self.name = name
       self.value = value
       self.mode = mode
-      super.init()
     }
   }
 
@@ -58,7 +67,6 @@ public final class RouteMatcher: NSObject {
     self.fullPath = nil
     self.pathPrefix = pathPrefix
     self.headers = headers
-    super.init()
   }
 
   /// Initialize a matcher with a full path.
@@ -76,6 +84,25 @@ public final class RouteMatcher: NSObject {
     self.fullPath = fullPath
     self.pathPrefix = nil
     self.headers = headers
-    super.init()
+  }
+}
+
+extension RouteMatcher {
+  func toObjC() -> EMORouteMatcher {
+    let result = EMORouteMatcher()
+    result.fullPath = fullPath
+    result.pathPrefix = pathPrefix
+    result.headers = headers.map { $0.toObjC() }
+    return result
+  }
+}
+
+private extension RouteMatcher.HeaderMatcher {
+  func toObjC() -> EMOHeaderMatcher {
+    let result = EMOHeaderMatcher()
+    result.name = name
+    result.value = value
+    result.mode = mode.objcValue
+    return result
   }
 }

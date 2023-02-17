@@ -9,6 +9,7 @@ exports_files([
 envoy_objc_library(
     name = "envoy_engine_objc_lib",
     srcs = [
+        "EMODirectResponse.h",
         "EnvoyConfiguration.h",
         "EnvoyConfiguration.mm",
         "EnvoyEngineImpl.mm",

@@ -10,6 +10,60 @@
 }
 @end
 
+@implementation EMOHeaderMatcher
+- (Envoy::DirectResponseTesting::HeaderMatcher)toCXX {
+  Envoy::DirectResponseTesting::HeaderMatcher result;
+  result.name = [self.name toCXXString];
+  result.value = [self.value toCXXString];
+  switch (self.mode) {
+  case EMOMatchModeContains:
+    result.mode = Envoy::DirectResponseTesting::contains;
+    break;
+  case EMOMatchModeExact:
+    result.mode = Envoy::DirectResponseTesting::exact;
+    break;
+  case EMOMatchModePrefix:
+    result.mode = Envoy::DirectResponseTesting::prefix;
+    break;
+  case EMOMatchModeSuffix:
+    result.mode = Envoy::DirectResponseTesting::suffix;
+    break;
+  }
+  return result;
+}
+@end
+
+@implementation EMORouteMatcher
+- (Envoy::DirectResponseTesting::RouteMatcher)toCXX {
+  Envoy::DirectResponseTesting::RouteMatcher result;
+  result.fullPath = [self.fullPath toCXXString];
+  result.pathPrefix = [self.pathPrefix toCXXString];
+  std::vector<Envoy::DirectResponseTesting::HeaderMatcher> headers;
+  headers.reserve(self.headers.count);
+  for (EMOHeaderMatcher *matcher in self.headers) {
+    headers.push_back([matcher toCXX]);
+  }
+  result.headers = headers;
+  return result;
+}
+@end
+
+@implementation EMODirectResponse
+- (Envoy::DirectResponseTesting::DirectResponse)toCXX {
+  Envoy::DirectResponseTesting::DirectResponse result;
+  result.matcher = [self.matcher toCXX];
+  result.status = (unsigned int)self.status;
+  result.body = [self.body toCXXString];
+  absl::flat_hash_map<std::string, std::string> headers;
+  NSArray *keys = [self.headers allKeys];
+  for (NSString *key in keys) {
+    headers[[key toCXXString]] = [[self.headers objectForKey:key] toCXXString];
+  }
+  result.headers = headers;
+  return result;
+}
+@end
+
 @implementation EnvoyConfiguration
 
 - (instancetype)initWithAdminInterfaceEnabled:(BOOL)adminInterfaceEnabled
@@ -26,9 +80,7 @@
                               enableHappyEyeballs:(BOOL)enableHappyEyeballs
                                       enableHttp3:(BOOL)enableHttp3
                           enableGzipDecompression:(BOOL)enableGzipDecompression
-                            enableGzipCompression:(BOOL)enableGzipCompression
                         enableBrotliDecompression:(BOOL)enableBrotliDecompression
-                          enableBrotliCompression:(BOOL)enableBrotliCompression
                            enableInterfaceBinding:(BOOL)enableInterfaceBinding
                         enableDrainPostDnsRefresh:(BOOL)enableDrainPostDnsRefresh
                     enforceTrustChainVerification:(BOOL)enforceTrustChainVerification
@@ -46,6 +98,8 @@
                                   virtualClusters:(NSArray<NSString *> *)virtualClusters
                            directResponseMatchers:(NSString *)directResponseMatchers
                                   directResponses:(NSString *)directResponses
+                             typedDirectResponses:
+                                 (NSArray<EMODirectResponse *> *)typedDirectResponses
                                 nativeFilterChain:
                                     (NSArray<EnvoyNativeFilterConfig *> *)nativeFilterChain
                               platformFilterChain:
@@ -79,9 +133,7 @@
   self.enableHappyEyeballs = enableHappyEyeballs;
   self.enableHttp3 = enableHttp3;
   self.enableGzipDecompression = enableGzipDecompression;
-  self.enableGzipCompression = enableGzipCompression;
   self.enableBrotliDecompression = enableBrotliDecompression;
-  self.enableBrotliCompression = enableBrotliCompression;
   self.enableInterfaceBinding = enableInterfaceBinding;
   self.enableDrainPostDnsRefresh = enableDrainPostDnsRefresh;
   self.enforceTrustChainVerification = enforceTrustChainVerification;
@@ -99,6 +151,7 @@
   self.virtualClusters = virtualClusters;
   self.directResponseMatchers = directResponseMatchers;
   self.directResponses = directResponses;
+  self.typedDirectResponses = typedDirectResponses;
   self.nativeFilterChain = nativeFilterChain;
   self.httpPlatformFilterFactories = httpPlatformFilterFactories;
   self.stringAccessors = stringAccessors;
@@ -149,32 +202,14 @@
     [customFilters appendString:insert];
   }
 
-  if (self.enableGzipCompression) {
-#if ENVOY_MOBILE_REQUEST_COMPRESSION
-    NSString *insert = [[NSString alloc] initWithUTF8String:gzip_compressor_config_insert];
-    [customFilters appendString:insert];
-#else
-    NSLog(@"[Envoy] error: request compression functionality was not compiled in this build of "
-          @"Envoy Mobile");
-    return nil;
-#endif
-  }
-
   if (self.enableBrotliDecompression) {
     NSString *insert = [[NSString alloc] initWithUTF8String:brotli_decompressor_config_insert];
     [customFilters appendString:insert];
   }
 
-  if (self.enableBrotliCompression) {
-#if ENVOY_MOBILE_REQUEST_COMPRESSION
-    NSString *insert = [[NSString alloc] initWithUTF8String:brotli_compressor_config_insert];
-    [customFilters appendString:insert];
-#else
-    NSLog(@"[Envoy] error: request compression functionality was not compiled in this build of "
-          @"Envoy Mobile");
-    return nil;
+#ifdef ENVOY_MOBILE_REQUEST_COMPRESSION
+  [customFilters appendString:@(compressor_config_insert)];
 #endif
-  }
 
   BOOL hasDirectResponses = self.directResponses.length > 0;
   if (hasDirectResponses) {
@@ -321,13 +356,11 @@
 #endif
 
   builder.enableGzipDecompression(self.enableGzipDecompression);
-#ifdef ENVOY_MOBILE_REQUEST_COMPRESSION
-  builder.enableGzipCompression(self.enableGzipCompression);
-#endif
   builder.enableBrotliDecompression(self.enableBrotliDecompression);
-#ifdef ENVOY_MOBILE_REQUEST_COMPRESSION
-  builder.enableBrotliCompression(self.enableBrotliCompression);
-#endif
+
+  for (EMODirectResponse *directResponse in self.typedDirectResponses) {
+    builder.addDirectResponse([directResponse toCXX]);
+  }
 
   builder.addConnectTimeoutSeconds(self.connectTimeoutSeconds);
 

@@ -256,19 +256,15 @@ public class JniLibrary {
   public static native String gzipDecompressorConfigInsert();
 
   /**
-   * Provides a configuration insert that may be used to enable gzip compression.
-   */
-  public static native String gzipCompressorConfigInsert();
-
-  /**
    * Provides a configuration insert that may be used to enable brotli decompression.
    */
   public static native String brotliDecompressorConfigInsert();
 
   /**
-   * Provides a configuration insert that may be used to enable brotli compression.
+   * Provides a configuration insert that enables a composite compressor filter
+   * with gzip and brotli.
    */
-  public static native String brotliCompressorConfigInsert();
+  public static native String compressorConfigInsert();
 
   /**
    * Provides a configuration that may be used to enable a persistent DNS cache.
@@ -361,6 +357,26 @@ public class JniLibrary {
   public static native void callClearTestRootCertificateFromNative();
 
   /**
+   * Uses the provided fields to generate an Envoy bootstrap proto, then convert into a YAML string.
+   *
+   * Returns the config yaml.
+   *
+   */
+  public static native String createYaml(
+      String grpcStatsDomain, boolean adminInterfaceEnabled, long connectTimeoutSeconds,
+      long dnsRefreshSeconds, long dnsFailureRefreshSecondsBase, long dnsFailureRefreshSecondsMax,
+      long dnsQueryTimeoutSeconds, long dnsMinRefreshSeconds, byte[][] dnsPreresolveHostnames,
+      boolean enableDNSCache, long dnsCacheSaveIntervalSeconds, boolean enableDrainPostDnsRefresh,
+      boolean enableHttp3, boolean enableGzipDecompression, boolean enableBrotliDecompression,
+      boolean enableSocketTagging, boolean enableHappyEyeballs, boolean enableInterfaceBinding,
+      long h2ConnectionKeepaliveIdleIntervalMilliseconds, long h2ConnectionKeepaliveTimeoutSeconds,
+      long maxConnectionsPerHost, long statsFlushSeconds, long streamIdleTimeoutSeconds,
+      long perTryIdleTimeoutSeconds, String appVersion, String appId,
+      boolean trustChainVerification, byte[][] virtualClusters, byte[][] filterChain,
+      byte[][] statSinks, boolean enablePlatformCertificatesValidation,
+      boolean enableSkipDNSLookupForProxiedRequests);
+
+  /**
    * Uses the provided fields to generate an Envoy bootstrap proto.
    * The returned pointer is "owned" by the caller until ownership is passed back to C++ via
    * runEngine.
@@ -373,29 +389,7 @@ public class JniLibrary {
       long dnsRefreshSeconds, long dnsFailureRefreshSecondsBase, long dnsFailureRefreshSecondsMax,
       long dnsQueryTimeoutSeconds, long dnsMinRefreshSeconds, byte[][] dnsPreresolveHostnames,
       boolean enableDNSCache, long dnsCacheSaveIntervalSeconds, boolean enableDrainPostDnsRefresh,
-      boolean enableHttp3, boolean enableGzipDecompression, boolean enableGzipCompression,
-      boolean enableBrotliDecompression, boolean enableBrotliCompression,
-      boolean enableSocketTagging, boolean enableHappyEyeballs, boolean enableInterfaceBinding,
-      long h2ConnectionKeepaliveIdleIntervalMilliseconds, long h2ConnectionKeepaliveTimeoutSeconds,
-      long maxConnectionsPerHost, long statsFlushSeconds, long streamIdleTimeoutSeconds,
-      long perTryIdleTimeoutSeconds, String appVersion, String appId,
-      boolean trustChainVerification, byte[][] virtualClusters, byte[][] filterChain,
-      byte[][] statSinks, boolean enablePlatformCertificatesValidation,
-      boolean enableSkipDNSLookupForProxiedRequests);
-
-  /**
-   * Uses the provided fields to generate an Envoy bootstrap proto, then convert into a YAML string.
-   *
-   * Returns the config yaml.
-   *
-   */
-  public static native String createYaml(
-      String grpcStatsDomain, boolean adminInterfaceEnabled, long connectTimeoutSeconds,
-      long dnsRefreshSeconds, long dnsFailureRefreshSecondsBase, long dnsFailureRefreshSecondsMax,
-      long dnsQueryTimeoutSeconds, long dnsMinRefreshSeconds, byte[][] dnsPreresolveHostnames,
-      boolean enableDNSCache, long dnsCacheSaveIntervalSeconds, boolean enableDrainPostDnsRefresh,
-      boolean enableHttp3, boolean enableGzipDecompression, boolean enableGzipCompression,
-      boolean enableBrotliDecompression, boolean enableBrotliCompression,
+      boolean enableHttp3, boolean enableGzipDecompression, boolean enableBrotliDecompression,
       boolean enableSocketTagging, boolean enableHappyEyeballs, boolean enableInterfaceBinding,
       long h2ConnectionKeepaliveIdleIntervalMilliseconds, long h2ConnectionKeepaliveTimeoutSeconds,
       long maxConnectionsPerHost, long statsFlushSeconds, long streamIdleTimeoutSeconds,
