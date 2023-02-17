@@ -432,7 +432,10 @@ envoy_cc_test(
 
 envoy_cc_test(
     name = "io_uring_socket_handle_impl_test",
-    srcs = ["io_uring_socket_handle_impl_test.cc"],
+    srcs = select({
+        "//bazel:linux": ["io_uring_socket_handle_impl_test.cc"],
+        "//conditions:default": [],
+    }),
     deps = [
         "//test/mocks/api:api_mocks",
         "//test/mocks/event:event_mocks",
