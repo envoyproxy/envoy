@@ -30,17 +30,13 @@ envoy_cc_library(
 envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
-    # The echo filter is used in integration tests which don't need an upstream.
-    extra_visibility = [
-        "//test/integration:__subpackages__",
-    ],
     deps = [
         ":echo",
         "//envoy/registry",
         "//envoy/server:filter_config_interface",
         "//source/extensions/filters/network:well_known_names",
         "//source/extensions/filters/network/common:factory_base_lib",
-        "@envoy_api//contrib/envoy/extensions/filters/network/rust_echo/v3:pkg_cc_proto",
+        "@envoy_api//contrib/envoy/extensions/filters/network/rust_echo/v3alpha:pkg_cc_proto",
     ],
 )
 
