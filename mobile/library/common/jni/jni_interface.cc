@@ -1389,7 +1389,7 @@ extern "C" JNIEXPORT jlong JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibr
       max_connections_per_host, stats_flush_seconds, stream_idle_timeout_seconds,
       per_try_idle_timeout_seconds, app_version, app_id, trust_chain_verification, virtual_clusters,
       filter_chain, stat_sinks, enable_platform_certificates_validation,
-      enable_skip_dns_lookup_for_proxied_requests, rutime_guards, builder);
+      enable_skip_dns_lookup_for_proxied_requests, runtime_guards, builder);
 
   return reinterpret_cast<intptr_t>(builder.generateBootstrap().release());
 }
