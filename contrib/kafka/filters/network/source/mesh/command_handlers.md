@@ -25,7 +25,7 @@ graph TD;
 
     RequestHolder["...RequestHolder"]
     RequestHolder --> |"subclass"| InFlightRequest
-    
+
     KafkaMeshFilter --> ResponseEncoder
     ResponseEncoder -.- |encodes| AbstractResponse
 ```
