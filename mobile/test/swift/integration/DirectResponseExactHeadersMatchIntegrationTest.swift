@@ -1,4 +1,3 @@
-@_spi(YAMLValidation)
 import Envoy
 import TestExtensions
 import XCTest
@@ -19,7 +18,7 @@ final class DirectResponseExactHeadersMatchIntegrationTest: XCTestCase {
     .add(name: "x-foo", value: "123")
     .build()
 
-    let engine = YAMLValidatingTestEngineBuilder()
+    let engine = TestEngineBuilder()
       .addDirectResponse(
         .init(
           matcher: RouteMatcher(

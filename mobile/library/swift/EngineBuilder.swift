@@ -58,8 +58,6 @@ open class EngineBuilder: NSObject {
   private var runtimeGuards: [String: String] = [:]
   private var directResponses: [DirectResponse] = []
   private var statsSinks: [String] = []
-  private var experimentalValidateYAMLCallback: ((Bool) -> Void)?
-  private var useLegacyBuilder: Bool = false
 
   // MARK: - Public
 
@@ -564,36 +562,6 @@ open class EngineBuilder: NSObject {
   }
 #endif
 
-  /// Makes the engine validate the generated YAML against an upcoming, more performant builder
-  /// implementation. If the yaml is consistent between both builders, the callback will be invoked
-  /// with `true`. If a difference was detected, it will be invoked with `false`.
-  ///
-  /// The comparison isn't performed at all if this method isn't called.
-  ///
-  /// Note that this API is temporary and it will not be considered a breaking change once it is
-  /// removed.
-  ///
-  /// - parameter callback: The callback to be invoked.
-  ///
-  /// - returns: This builder.
-  @discardableResult
-  public func setExperimentalValidateYAMLCallback(_ callback: @escaping (Bool) -> Void) -> Self {
-    self.experimentalValidateYAMLCallback = callback
-    return self
-  }
-
-  /// Specify whether the string-based legacy mode should be used to build the engine.
-  /// Defaults to false.
-  ///
-  /// - parameter useLegacyBuilder: true if the string-based legacy mode should be used.
-  ///
-  /// - returns: This builder.
-  @discardableResult
-  public func useLegacyBuilder(_ useLegacyBuilder: Bool) -> Self {
-    self.useLegacyBuilder = useLegacyBuilder
-    return self
-  }
-
   /// Builds and runs a new `Engine` instance with the provided configuration.
   ///
   /// - note: Must be strongly retained in order for network requests to be performed correctly.
@@ -634,21 +602,13 @@ open class EngineBuilder: NSObject {
       appVersion: self.appVersion,
       appId: self.appId,
       virtualClusters: self.virtualClusters,
-      directResponseMatchers: self.directResponses
-        .map { $0.resolvedRouteMatchYAML() }
-        .joined(separator: "\n"),
-      directResponses: self.directResponses
-        .map { $0.resolvedDirectResponseYAML() }
-        .joined(separator: "\n"),
       runtimeGuards: self.runtimeGuards,
       typedDirectResponses: self.directResponses.map({ $0.toObjC() }),
       nativeFilterChain: self.nativeFilterChain,
       platformFilterChain: self.platformFilterChain,
       stringAccessors: self.stringAccessors,
       keyValueStores: self.keyValueStores,
-      statsSinks: self.statsSinks,
-      experimentalValidateYAMLCallback: self.experimentalValidateYAMLCallback,
-      useLegacyBuilder: self.useLegacyBuilder
+      statsSinks: self.statsSinks
     )
 
     switch self.base {

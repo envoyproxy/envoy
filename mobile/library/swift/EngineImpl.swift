@@ -21,7 +21,7 @@ final class EngineImpl: NSObject {
 
     switch configType {
     case .custom(let yaml, let config):
-      self.engine.run(withTemplate: yaml, config: config, logLevel: logLevel.stringValue)
+      self.engine.run(withYAML: yaml, config: config, logLevel: logLevel.stringValue)
     case .standard(let config):
       self.engine.run(withConfig: config, logLevel: logLevel.stringValue)
     }
