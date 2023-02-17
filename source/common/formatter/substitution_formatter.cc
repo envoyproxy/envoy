@@ -771,6 +771,15 @@ public:
       return unspecifiedValue();
     }
 
+    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.format_ports_as_numbers")) {
+      if (extraction_type_ == StreamInfoFormatter::StreamInfoAddressFieldExtractionType::JustPort) {
+        const auto port = StreamInfo::Utility::extractDownstreamAddressJustPort(*address);
+        if (port) {
+          return ValueUtil::numberValue(*port);
+        }
+        return unspecifiedValue();
+      }
+    }
     return ValueUtil::stringValue(toString(*address));
   }
 

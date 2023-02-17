@@ -111,7 +111,7 @@ type_body_length:
   warning: 300
   error: 400
 file_length:
-  warning: 300
+  warning: 400
   ignore_comment_only_lines: true
 private_over_fileprivate:
   validate_extensions: true

@@ -163,6 +163,8 @@ envoy_cc_library(
         ":grpc_stream_lib",
         ":ttl_lib",
         ":utility_lib",
+        ":xds_context_params_lib",
+        ":xds_resource_lib",
         ":xds_source_id_lib",
         "//envoy/config:grpc_mux_interface",
         "//envoy/config:subscription_interface",

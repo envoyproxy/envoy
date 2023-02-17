@@ -88,7 +88,7 @@ public:
   void encodeHeaders(const Http::HeaderMap& headers, bool end_stream);
   void encodeData(uint64_t size, bool end_stream);
   void encodeData(Buffer::Instance& data, bool end_stream);
-  void encodeData(absl::string_view data, bool end_stream);
+  void encodeData(std::string data, bool end_stream);
   void encodeTrailers(const Http::HeaderMap& trailers);
   void encodeResetStream();
   void encodeMetadata(const Http::MetadataMapVector& metadata_map_vector);
@@ -491,6 +491,7 @@ public:
                         std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
 
   void writeRawData(absl::string_view data);
+  ABSL_MUST_USE_RESULT AssertionResult postWriteRawData(std::string data);
 
 private:
   struct ReadFilter : public Network::ReadFilterBaseImpl {

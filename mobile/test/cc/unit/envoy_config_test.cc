@@ -38,9 +38,12 @@ TEST(TestConfig, ConfigIsApplied) {
       .addStatsFlushSeconds(654)
       .setAppVersion("1.2.3")
       .setAppId("1234-1234-1234")
-      .enableDnsCache(true)
+      .setRuntimeGuard("test_feature_false", true)
+      .enableDnsCache(true, /* save_interval_seconds */ 101)
       .addDnsPreresolveHostnames({"lyft.com", "google.com"})
+#ifdef ENVOY_ADMIN_FUNCTIONALITY
       .enableAdminInterface(true)
+#endif
       .setForceAlwaysUsev6(true)
       .setDeviceOs("probably-ubuntu-on-CI");
   std::string config_str = engine_builder.generateConfigStr();
@@ -57,14 +60,28 @@ TEST(TestConfig, ConfigIsApplied) {
                                            "- &stats_flush_interval 654s",
                                            "  key: dns_persistent_cache",
                                            "- &force_ipv6 true",
-                                           ("- &metadata { device_os: probably-ubuntu-on-CI, "
-                                            "app_version: 1.2.3, app_id: 1234-1234-1234 }"),
+                                           "- &persistent_dns_cache_save_interval 101",
+                                           " test_feature_false: true",
+                                           ("- &metadata { device_os: \"probably-ubuntu-on-CI\", "
+                                            "app_version: \"1.2.3\", app_id: \"1234-1234-1234\" }"),
                                            R"(- &validation_context
   trusted_ca:)"};
   for (const auto& string : must_contain) {
     ASSERT_NE(config_str.find(string), std::string::npos)
         << "'" << string << "' not found in" << config_str;
   }
+  envoy::config::bootstrap::v3::Bootstrap bootstrap;
+  TestUtility::loadFromYaml(absl::StrCat(config_header, config_str), bootstrap);
+  engine_builder.generateBootstrap();
+  EXPECT_TRUE(TestUtility::protoEqual(bootstrap, *engine_builder.generateBootstrap()));
+}
+
+TEST(TestConfig, MultiFlag) {
+  EngineBuilder engine_builder;
+  engine_builder.setRuntimeGuard("test_feature_false", true)
+      .setRuntimeGuard("test_feature_true", false);
+
+  std::string config_str = engine_builder.generateConfigStr();
   envoy::config::bootstrap::v3::Bootstrap bootstrap;
   TestUtility::loadFromYaml(absl::StrCat(config_header, config_str), bootstrap);
   engine_builder.generateBootstrap();
@@ -89,33 +106,33 @@ TEST(TestConfig, ConfigIsValid) {
   EXPECT_TRUE(TestUtility::protoEqual(bootstrap, *engine_builder.generateBootstrap()));
 }
 
-TEST(TestConfig, SetGzip) {
+TEST(TestConfig, SetGzipDecompression) {
   EngineBuilder engine_builder;
 
-  engine_builder.enableGzip(false);
+  engine_builder.enableGzipDecompression(false);
   std::string config_str = engine_builder.generateConfigStr();
   envoy::config::bootstrap::v3::Bootstrap bootstrap;
   TestUtility::loadFromYaml(absl::StrCat(config_header, config_str), bootstrap);
   ASSERT_THAT(bootstrap.DebugString(), Not(HasSubstr("envoy.filters.http.decompressor")));
   EXPECT_TRUE(TestUtility::protoEqual(bootstrap, *engine_builder.generateBootstrap()));
 
-  engine_builder.enableGzip(true);
+  engine_builder.enableGzipDecompression(true);
   config_str = engine_builder.generateConfigStr();
   TestUtility::loadFromYaml(absl::StrCat(config_header, config_str), bootstrap);
   ASSERT_THAT(bootstrap.DebugString(), HasSubstr("envoy.filters.http.decompressor"));
 }
 
-TEST(TestConfig, SetBrotli) {
+TEST(TestConfig, SetBrotliDecompression) {
   EngineBuilder engine_builder;
 
-  engine_builder.enableBrotli(false);
+  engine_builder.enableBrotliDecompression(false);
   std::string config_str = engine_builder.generateConfigStr();
   envoy::config::bootstrap::v3::Bootstrap bootstrap;
   TestUtility::loadFromYaml(absl::StrCat(config_header, config_str), bootstrap);
   ASSERT_THAT(bootstrap.DebugString(), Not(HasSubstr("brotli.decompressor.v3.Brotli")));
   EXPECT_TRUE(TestUtility::protoEqual(bootstrap, *engine_builder.generateBootstrap()));
 
-  engine_builder.enableBrotli(true);
+  engine_builder.enableBrotliDecompression(true);
   config_str = engine_builder.generateConfigStr();
   TestUtility::loadFromYaml(absl::StrCat(config_header, config_str), bootstrap);
   ASSERT_THAT(bootstrap.DebugString(), HasSubstr("brotli.decompressor.v3.Brotli"));
@@ -183,6 +200,7 @@ TEST(TestConfig, PerTryIdleTimeout) {
   EXPECT_TRUE(TestUtility::protoEqual(bootstrap, *engine_builder.generateBootstrap()));
 }
 
+#ifdef ENVOY_ADMIN_FUNCTIONALITY
 TEST(TestConfig, EnableAdminInterface) {
   EngineBuilder engine_builder;
 
@@ -196,6 +214,7 @@ TEST(TestConfig, EnableAdminInterface) {
   ASSERT_THAT(config_str, HasSubstr("admin: *admin_interface"));
   TestUtility::loadFromYaml(absl::StrCat(config_header, config_str), bootstrap);
 }
+#endif
 
 TEST(TestConfig, EnableInterfaceBinding) {
   EngineBuilder engine_builder;
@@ -273,11 +292,11 @@ TEST(TestConfig, AddMaxConnectionsPerHost) {
 }
 
 std::string statsdSinkConfig(int port) {
-  std::string config = R"(
-      {
+  std::string config = R"({ name: envoy.stat_sinks.statsd,
+      typed_config: {
         "@type": type.googleapis.com/envoy.config.metrics.v3.StatsdSink,
         address: { socket_address: { address: 127.0.0.1, port_value: )" +
-                       fmt::format("{}", port) + " } } }";
+                       fmt::format("{}", port) + " } } } }";
   return config;
 }
 
@@ -289,8 +308,7 @@ TEST(TestConfig, AddStatsSinks) {
   envoy::config::bootstrap::v3::Bootstrap bootstrap;
   TestUtility::loadFromYaml(absl::StrCat(config_header, config_str), bootstrap);
 
-  engine_builder.addStatsSink("envoy.stat_sinks.statsd", statsdSinkConfig(1));
-  engine_builder.addStatsSink("envoy.stat_sinks.statsd", statsdSinkConfig(2));
+  engine_builder.addStatsSinks({statsdSinkConfig(1), statsdSinkConfig(2)});
   config_str = engine_builder.generateConfigStr();
   ASSERT_THAT(config_str, HasSubstr(statsdSinkConfig(1)));
   ASSERT_THAT(config_str, HasSubstr(statsdSinkConfig(2)));
@@ -322,6 +340,33 @@ TEST(TestConfig, RemainingTemplatesThrows) {
   } catch (std::runtime_error& err) {
     EXPECT_EQ(err.what(), std::string("could not resolve all template keys in config"));
   }
+}
+
+TEST(TestConfig, RtdsWithoutAds) {
+  EngineBuilder engine_builder;
+  engine_builder.addRtdsLayer("some rtds layer");
+  try {
+    engine_builder.generateConfigStr();
+    FAIL() << "Expected std::runtime_error";
+  } catch (std::runtime_error& err) {
+    EXPECT_EQ(err.what(), std::string("ADS must be configured when using xDS"));
+  }
+}
+
+TEST(TestConfig, AdsConfig) {
+  EngineBuilder engine_builder;
+  engine_builder.setAggregatedDiscoveryService(
+      /*api_type=*/"GRPC", /*target_uri=*/"fake-td.googleapis.com", /*port=*/12345);
+  std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> bootstrap =
+      engine_builder.generateBootstrap();
+  auto& ads_config = bootstrap->dynamic_resources().ads_config();
+  EXPECT_EQ(ads_config.api_type(), envoy::config::core::v3::ApiConfigSource::GRPC);
+  EXPECT_EQ(ads_config.grpc_services(0).google_grpc().target_uri(), "fake-td.googleapis.com:12345");
+  EXPECT_EQ(ads_config.grpc_services(0).google_grpc().stat_prefix(), "ads");
+  const std::string config_str = engine_builder.generateConfigStr();
+  EXPECT_THAT(config_str, HasSubstr("api_type: GRPC"));
+  EXPECT_THAT(config_str, HasSubstr("target_uri: 'fake-td.googleapis.com:12345'"));
+  EXPECT_THAT(config_str, HasSubstr("stat_prefix: ads"));
 }
 
 TEST(TestConfig, EnablePlatformCertificatesValidation) {
@@ -361,24 +406,27 @@ private:
   mutable int count_ = 0;
 };
 
-TEST(TestConfig, AddNativeFilter) {
+TEST(TestConfig, AddNativeFilters) {
   EngineBuilder engine_builder;
 
-  std::string filter_name = "envoy.filters.http.buffer";
+  std::string filter_name1 = "envoy.filters.http.buffer1";
+  std::string filter_name2 = "envoy.filters.http.buffer2";
   std::string filter_config =
       "{\"@type\":\"type.googleapis.com/envoy.extensions.filters.http.buffer.v3.Buffer\","
       "\"max_request_bytes\":5242880}";
 
   std::string config_str = engine_builder.generateConfigStr();
-  ASSERT_THAT(config_str, Not(HasSubstr("- name: " + filter_name)));
+  ASSERT_THAT(config_str, Not(HasSubstr("- name: " + filter_name1)));
   ASSERT_THAT(config_str, Not(HasSubstr("  typed_config: " + filter_config)));
   envoy::config::bootstrap::v3::Bootstrap bootstrap;
   TestUtility::loadFromYaml(absl::StrCat(config_header, config_str), bootstrap);
 
-  engine_builder.addNativeFilter(filter_name, filter_config);
+  engine_builder.addNativeFilter(filter_name1, filter_config);
+  engine_builder.addNativeFilter(filter_name2, filter_config);
 
   config_str = engine_builder.generateConfigStr();
-  ASSERT_THAT(config_str, HasSubstr("- name: " + filter_name));
+  ASSERT_THAT(config_str, HasSubstr("- name: " + filter_name1));
+  ASSERT_THAT(config_str, HasSubstr("- name: " + filter_name2));
   ASSERT_THAT(config_str, HasSubstr("  typed_config: " + filter_config));
   TestUtility::loadFromYaml(absl::StrCat(config_header, config_str), bootstrap);
 }
