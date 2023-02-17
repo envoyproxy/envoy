@@ -113,6 +113,11 @@ function renderStats(data) {
   }
   prev_stats = null;
 
+  // Sorts all the stats. This is inefficient; we should just pick the top N
+  // based on field "dynamic-max-display-count" and sort those. The best
+  // algorithms for this require a heap or priority queue. JS implementations
+  // of those can be found, but that would bloat this relatively modest amount
+  // of code, and compell us to do a better job writing tests.
   sorted_stats.sort(compareStatRecords);
 
   const max = loadSettingOrUseDefault("dynamic-max-display-count", 50);
@@ -131,4 +136,5 @@ function renderStats(data) {
   window.setTimeout(loadStats, 1000*loadSettingOrUseDefault("dynamic-update-interval", 5));
 }
 
+// We don't want to trigger any DOM manipulations until the DOM is fully loaded.
 addEventListener("DOMContentLoaded", initHook);
