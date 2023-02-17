@@ -378,6 +378,7 @@ stages:
   dependsOn: ["env", "linux_x64"]
   jobs:
   - job: bazel
+    displayName: linux_x64
     # displayName: "Linux x64"
     dependsOn: []
     # Skip checks if only mobile/ or docs/ have changed.
