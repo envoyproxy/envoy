@@ -1,9 +1,5 @@
 #include "io_socket_handle_base_impl.h"
 
-#include <asm-generic/errno-base.h>
-#include <fcntl.h>
-#include <sys/socket.h>
-
 #include "envoy/buffer/buffer.h"
 #include "envoy/common/exception.h"
 #include "envoy/event/dispatcher.h"
