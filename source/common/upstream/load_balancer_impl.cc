@@ -383,19 +383,19 @@ ZoneAwareLoadBalancerBase::ZoneAwareLoadBalancerBase(
     const absl::optional<LocalityLbConfig> locality_config)
     : LoadBalancerBase(priority_set, stats, runtime, random, healthy_panic_threshold),
       local_priority_set_(local_priority_set),
-      locality_weighted_balancing_(locality_config.has_value() &&
-                                   locality_config->has_locality_weighted_lb_config()),
-      routing_enabled_(locality_config.has_value()
-                           ? PROTOBUF_PERCENT_TO_ROUNDED_INTEGER_OR_DEFAULT(
-                                 locality_config->zone_aware_lb_config(), routing_enabled, 100, 100)
-                           : 100),
       min_cluster_size_(locality_config.has_value()
                             ? PROTOBUF_GET_WRAPPED_OR_DEFAULT(
                                   locality_config->zone_aware_lb_config(), min_cluster_size, 6U)
                             : 6U),
+      routing_enabled_(locality_config.has_value()
+                           ? PROTOBUF_PERCENT_TO_ROUNDED_INTEGER_OR_DEFAULT(
+                                 locality_config->zone_aware_lb_config(), routing_enabled, 100, 100)
+                           : 100),
       fail_traffic_on_panic_(locality_config.has_value()
                                  ? locality_config->zone_aware_lb_config().fail_traffic_on_panic()
-                                 : false) {
+                                 : false),
+      locality_weighted_balancing_(locality_config.has_value() &&
+                                   locality_config->has_locality_weighted_lb_config()) {
   ASSERT(!priority_set.hostSetsPerPriority().empty());
   resizePerPriorityState();
   priority_update_cb_ = priority_set_.addPriorityUpdateCb(
