@@ -1,5 +1,7 @@
 #pragma once
 
+#include <functional>
+
 #include "envoy/event/dispatcher.h"
 #include "envoy/network/filter.h"
 
@@ -7,7 +9,6 @@
 
 #include "contrib/rust_echo/filters/network/source/echo.rs.h"
 #include "rust/cxx.h"
-#include <functional>
 
 namespace Envoy {
 namespace Extensions {
