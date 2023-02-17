@@ -118,7 +118,7 @@ stages:
       displayName: "Print build environment"
 
 - stage: precheck
-  displayName: Prechecks
+  # displayName: Prechecks
   dependsOn: ["env"]
   jobs:
   - job: format
@@ -153,7 +153,7 @@ stages:
       condition: failed()
 
   - job: proto_format
-    displayName: Protobuf format
+    # displayName: Protobuf format
     dependsOn: []
     pool:
       vmImage: "ubuntu-20.04"
@@ -324,7 +324,7 @@ stages:
         ciTarget: bazel.release
 
   - job: released
-    displayName: Complete
+    # displayName: Complete
     dependsOn: ["release"]
     pool:
       vmImage: "ubuntu-20.04"
@@ -339,7 +339,7 @@ stages:
         echo "linux_x64 released"
 
 - stage: linux_arm64
-  displayName: Linux arm64
+  # displayName: Linux arm64
   dependsOn: ["env", "precheck"]
   # For post-submit builds, continue even if precheck fails
   condition: and(not(canceled()), or(succeeded(), eq(variables['PostSubmit'], true)))
@@ -374,7 +374,7 @@ stages:
         echo "linux_arm64 released"
 
 - stage: check
-  displayName: Checks (Linux x64)
+  # displayName: Checks (Linux x64)
   dependsOn: ["env", "linux_x64"]
   jobs:
   - job: bazel
@@ -411,7 +411,7 @@ stages:
         ciTarget: $(CI_TARGET)
 
   - job: coverage
-    displayName: "Linux x64"
+    # displayName: "Linux x64"
     dependsOn: []
     # Skip checks if only mobile/ or docs/ have changed.
     condition: and(not(canceled()), succeeded(), ne(stageDependencies.env.repo.outputs['changed.mobileOnly'], 'true'), ne(stageDependencies.env.repo.outputs['changed.docsOnly'], 'true'), ne(stageDependencies.env.repo.outputs['changed.examplesOnly'], 'true'))
@@ -442,7 +442,7 @@ stages:
       condition: always()
 
   - job: complete
-    displayName: "Checks complete"
+    # displayName: "Checks complete"
     dependsOn: ["bazel", "coverage"]
     pool:
       vmImage: "ubuntu-20.04"
@@ -719,7 +719,7 @@ stages:
         MAINTAINER_GPG_KEY_PASSPHRASE: $(MaintainerGPGKeyPassphrase)
 
 - stage: verify
-  displayName: Verify
+  # displayName: Verify
   dependsOn: ["env", "publish"]
   jobs:
   - job: examples
@@ -805,7 +805,7 @@ stages:
         echo "checks complete"
 
 - stage: macos
-  displayName: macOS
+  # displayName: macOS
   dependsOn: ["env", "precheck"]
   jobs:
   - job: test
@@ -843,7 +843,7 @@ stages:
         BUILD_URI: $(Build.BuildUri)
 
   - job: tested
-    displayName: Complete
+    # displayName: Complete
     dependsOn: ["test"]
     pool:
       vmImage: "ubuntu-20.04"
@@ -858,7 +858,7 @@ stages:
         echo "macos tested"
 
 - stage: windows
-  displayName: Windows
+  # displayName: Windows
   dependsOn: ["env", "precheck"]
   jobs:
   - job: release
