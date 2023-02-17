@@ -17,3 +17,19 @@ public final class TestEngineBuilder: EngineBuilder {
     return self
   }
 }
+
+/// A test engine builder that validates the YAML configuration and asserts on failure.
+/// Not part of the stable public API.
+///
+/// - returns: The `TestEngineBuilder`.
+@_spi(YAMLValidation)
+public func YAMLValidatingTestEngineBuilder() -> TestEngineBuilder {
+  TestEngineBuilder()
+    .setExperimentalValidateYAMLCallback { success in
+      if success {
+        print("YAML comparison succeeded")
+      } else {
+        assertionFailure("YAML comparison failed")
+      }
+    }
+}

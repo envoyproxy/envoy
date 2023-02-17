@@ -8,6 +8,7 @@
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 
 #include "absl/container/flat_hash_map.h"
+#include "direct_response_testing.h"
 #include "engine.h"
 #include "engine_callbacks.h"
 #include "key_value_store.h"
@@ -58,13 +59,7 @@ public:
   EngineBuilder& setStreamIdleTimeoutSeconds(int stream_idle_timeout_seconds);
   EngineBuilder& setPerTryIdleTimeoutSeconds(int per_try_idle_timeout_seconds);
   EngineBuilder& enableGzipDecompression(bool gzip_decompression_on);
-#ifdef ENVOY_MOBILE_REQUEST_COMPRESSION
-  EngineBuilder& enableGzipCompression(bool gzip_compression_on);
-#endif
   EngineBuilder& enableBrotliDecompression(bool brotli_decompression_on);
-#ifdef ENVOY_MOBILE_REQUEST_COMPRESSION
-  EngineBuilder& enableBrotliCompression(bool brotli_compression_on);
-#endif
   EngineBuilder& enableSocketTagging(bool socket_tagging_on);
   EngineBuilder& enableHappyEyeballs(bool happy_eyeballs_on);
 #ifdef ENVOY_ENABLE_QUIC
@@ -93,6 +88,10 @@ public:
   EngineBuilder& addStatsSinks(std::vector<std::string> stat_sinks);
   EngineBuilder& addPlatformFilter(std::string name);
   EngineBuilder& addVirtualCluster(std::string virtual_cluster);
+
+  // Add a direct response. For testing purposes only.
+  // TODO(jpsim): Move this out of the main engine builder API
+  EngineBuilder& addDirectResponse(DirectResponseTesting::DirectResponse direct_response);
 
   // These functions don't affect YAML but instead perform registrations.
   EngineBuilder& addKeyValueStore(std::string name, KeyValueStoreSharedPtr key_value_store);
@@ -183,6 +182,7 @@ private:
   std::vector<NativeFilterConfig> native_filter_chain_;
   std::vector<std::string> dns_preresolve_hostnames_;
   std::vector<std::string> virtual_clusters_;
+  std::vector<DirectResponseTesting::DirectResponse> direct_responses_;
 
   absl::flat_hash_map<std::string, StringAccessorSharedPtr> string_accessors_;
   bool config_bootstrap_incompatible_ = false;

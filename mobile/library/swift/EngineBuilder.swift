@@ -1,8 +1,6 @@
 @_implementationOnly import EnvoyEngine
 import Foundation
 
-// swiftlint:disable file_length
-
 /// Builder used for creating and running a new Engine instance.
 @objcMembers
 open class EngineBuilder: NSObject {
@@ -29,9 +27,7 @@ open class EngineBuilder: NSObject {
   private var dnsCacheSaveIntervalSeconds: UInt32 = 1
   private var enableHappyEyeballs: Bool = true
   private var enableGzipDecompression: Bool = true
-  private var enableGzipCompression: Bool = false
   private var enableBrotliDecompression: Bool = false
-  private var enableBrotliCompression: Bool = false
 #if ENVOY_ENABLE_QUIC
   private var enableHttp3: Bool = true
 #else
@@ -225,19 +221,6 @@ open class EngineBuilder: NSObject {
     return self
   }
 
-#if ENVOY_MOBILE_REQUEST_COMPRESSION
-  /// Specify whether to do gzip request compression or not.  Defaults to false.
-  ///
-  /// - parameter enableGzipCompression: whether or not to gunzip requests.
-  ///
-  /// - returns: This builder.
-  @discardableResult
-  public func enableGzipCompression(_ enableGzipCompression: Bool) -> Self {
-    self.enableGzipCompression = enableGzipCompression
-    return self
-  }
-#endif
-
   /// Specify whether to do brotli response decompression or not.  Defaults to false.
   ///
   /// - parameter enableBrotliDecompression: whether or not to brotli decompress responses.
@@ -248,19 +231,6 @@ open class EngineBuilder: NSObject {
     self.enableBrotliDecompression = enableBrotliDecompression
     return self
   }
-
-#if ENVOY_MOBILE_REQUEST_COMPRESSION
-  /// Specify whether to do brotli request compression or not.  Defaults to false.
-  ///
-  /// - parameter enableBrotliCompression: whether or not to brotli compress requests.
-  ///
-  /// - returns: This builder.
-  @discardableResult
-  public func enableBrotliCompression(_ enableBrotliCompression: Bool) -> Self {
-    self.enableBrotliCompression = enableBrotliCompression
-    return self
-  }
-#endif
 
 #if ENVOY_ENABLE_QUIC
   /// Specify whether to enable support for HTTP/3 or not.  Defaults to true.
@@ -635,9 +605,7 @@ open class EngineBuilder: NSObject {
       enableHappyEyeballs: self.enableHappyEyeballs,
       enableHttp3: self.enableHttp3,
       enableGzipDecompression: self.enableGzipDecompression,
-      enableGzipCompression: self.enableGzipCompression,
       enableBrotliDecompression: self.enableBrotliDecompression,
-      enableBrotliCompression: self.enableBrotliCompression,
       enableInterfaceBinding: self.enableInterfaceBinding,
       enableDrainPostDnsRefresh: self.enableDrainPostDnsRefresh,
       enforceTrustChainVerification: self.enforceTrustChainVerification,
@@ -659,6 +627,7 @@ open class EngineBuilder: NSObject {
       directResponses: self.directResponses
         .map { $0.resolvedDirectResponseYAML() }
         .joined(separator: "\n"),
+      typedDirectResponses: self.directResponses.map({ $0.toObjC() }),
       nativeFilterChain: self.nativeFilterChain,
       platformFilterChain: self.platformFilterChain,
       stringAccessors: self.stringAccessors,
