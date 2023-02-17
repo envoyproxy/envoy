@@ -3,7 +3,7 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 licenses(["notice"])  # Apache 2
 
 go_library(
-    name = "http",
+    name = "cluster_specifier",
     srcs = [
         "api.h",
         "capi_impl.go",

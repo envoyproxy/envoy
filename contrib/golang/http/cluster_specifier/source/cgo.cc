@@ -11,10 +11,28 @@ namespace Golang {
 
 extern "C" {
 
-void envoyGoClusterSpecifierGetHeader(unsigned long long headerPtr, void* key, void* value) {}
-void envoyGoClusterSpecifierCopyHeaders(unsigned long long headerPtr, void* strs, void* buf) {}
-void envoyGoClusterSpecifierSetHeader(unsigned long long headerPtr, void* key, void* value) {}
-void envoyGoClusterSpecifierRemoveHeader(unsigned long long headerPtr, void* key) {}
+void envoyGoClusterSpecifierGetHeader(unsigned long long headerPtr, void* key, void* value) {
+  UNREFERENCED_PARAMETER(headerPtr);
+  UNREFERENCED_PARAMETER(key);
+  UNREFERENCED_PARAMETER(value);
+}
+
+void envoyGoClusterSpecifierCopyHeaders(unsigned long long headerPtr, void* strs, void* buf) {
+  UNREFERENCED_PARAMETER(headerPtr);
+  UNREFERENCED_PARAMETER(strs);
+  UNREFERENCED_PARAMETER(buf);
+}
+
+void envoyGoClusterSpecifierSetHeader(unsigned long long headerPtr, void* key, void* value) {
+  UNREFERENCED_PARAMETER(headerPtr);
+  UNREFERENCED_PARAMETER(key);
+  UNREFERENCED_PARAMETER(value);
+}
+
+void envoyGoClusterSpecifierRemoveHeader(unsigned long long headerPtr, void* key) {
+  UNREFERENCED_PARAMETER(headerPtr);
+  UNREFERENCED_PARAMETER(key);
+}
 }
 
 } // namespace Golang

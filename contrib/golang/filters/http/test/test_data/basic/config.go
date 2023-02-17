@@ -1,14 +1,14 @@
 package main
 
 import (
+	"github.com/envoyproxy/envoy/contrib/golang/common/go/registry"
 	"github.com/envoyproxy/envoy/contrib/golang/filters/http/source/go/pkg/api"
-	"github.com/envoyproxy/envoy/contrib/golang/filters/http/source/go/pkg/http"
 )
 
 const Name = "basic"
 
 func init() {
-	http.RegisterHttpFilterConfigFactory(Name, ConfigFactory)
+	registry.RegisterHttpFilterConfigFactory(Name, ConfigFactory)
 }
 
 func ConfigFactory(interface{}) api.StreamFilterFactory {

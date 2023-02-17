@@ -17,6 +17,7 @@ envoy_cc_test(
     env = {"GODEBUG": "cgocheck=0"},
     deps = [
         "//contrib/golang/filters/http/source:config",
+        "//contrib/golang/http/cluster_specifier/source:config",
         "//test/mocks/server:factory_context_mocks",
         "//test/test_common:utility_lib",
     ],
@@ -31,6 +32,7 @@ envoy_cc_test(
     env = {"GODEBUG": "cgocheck=0"},
     deps = [
         "//contrib/golang/filters/http/source:golang_filter_lib",
+        "//contrib/golang/http/cluster_specifier/source:config",
         "//source/common/stream_info:stream_info_lib",
         "//test/mocks/api:api_mocks",
         "//test/mocks/http:http_mocks",
@@ -58,6 +60,7 @@ envoy_cc_test(
     env = {"GODEBUG": "cgocheck=0"},
     deps = [
         "//contrib/golang/filters/http/source:config",
+        "//contrib/golang/http/cluster_specifier/source:config",
         "//source/exe:main_common_lib",
         "//test/config:v2_link_hacks",
         "//test/integration:http_integration_lib",
