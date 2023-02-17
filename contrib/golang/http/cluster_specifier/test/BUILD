@@ -12,11 +12,12 @@ envoy_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
     data = [
-        "//contrib/golang/filters/http/test/test_data/passthrough:filter.so",
+        "//contrib/golang/filters/http/cluster_specifier/test/test_data/simple:plugin.so",
     ],
     env = {"GODEBUG": "cgocheck=0"},
     deps = [
         "//contrib/golang/filters/http/source:config",
+        "//contrib/golang/http/cluster_specifier/source:config",
         "//test/mocks/server:factory_context_mocks",
         "//test/test_common:utility_lib",
     ],

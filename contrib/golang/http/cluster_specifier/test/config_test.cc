@@ -22,7 +22,8 @@ namespace {
 
 std::string genSoPath(std::string name) {
   return TestEnvironment::substitute(
-      "{{ test_rundir }}/contrib/golang/filters/http/test/test_data/" + name + "/filter.so");
+      "{{ test_rundir }}/contrib/golang/http/cluster_specifier/test/test_data/" + name +
+      "/plugin.so");
 }
 
 TEST(GolangFilterConfigTest, InvalidateEmptyConfig) {
