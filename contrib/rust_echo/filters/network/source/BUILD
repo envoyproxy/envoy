@@ -2,12 +2,15 @@ load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_extension",
     "envoy_cc_library",
+    "envoy_contrib_package",
     "envoy_extension_package",
     "envoy_rust_cxx_bridge",
     "envoy_rust_library",
 )
 
 licenses(["notice"])  # Apache 2
+
+envoy_contrib_package()
 
 # Echo L4 network filter. This is primarily a simplistic example.
 # Public docs: https://envoyproxy.io/docs/envoy/latest/configuration/listeners/network_filters/echo_filter

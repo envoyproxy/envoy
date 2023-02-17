@@ -4,8 +4,8 @@
 #include "envoy/network/filter.h"
 
 #include "source/common/common/logger.h"
-#include "contrib/rust_echo/filters/network/source/echo.rs.h"
 
+#include "contrib/rust_echo/filters/network/source/echo.rs.h"
 #include "rust/cxx.h"
 
 namespace Envoy {

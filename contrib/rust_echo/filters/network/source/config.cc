@@ -1,11 +1,12 @@
-#include "contrib/envoy/extensions/filters/network/rust_echo/v3/echo.pb.h"
-#include "contrib/envoy/extensions/filters/network/rust_echo/v3/echo.pb.validate.h"
 #include "envoy/registry/registry.h"
 #include "envoy/server/filter_config.h"
 
 #include "source/extensions/filters/network/common/factory_base.h"
-#include "contrib/rust_echo/filters/network/source/echo.h"
 #include "source/extensions/filters/network/well_known_names.h"
+
+#include "contrib/envoy/extensions/filters/network/rust_echo/v3/echo.pb.h"
+#include "contrib/envoy/extensions/filters/network/rust_echo/v3/echo.pb.validate.h"
+#include "contrib/rust_echo/filters/network/source/echo.h"
 
 namespace Envoy {
 namespace Extensions {
