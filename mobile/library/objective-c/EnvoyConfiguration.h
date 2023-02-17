@@ -1,5 +1,6 @@
 #import <Foundation/Foundation.h>
 
+@class EMODirectResponse;
 @class EnvoyHTTPFilterFactory;
 @class EnvoyNativeFilterConfig;
 @class EnvoyStringAccessor;
@@ -17,16 +18,14 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic, assign) UInt32 dnsFailureRefreshSecondsMax;
 @property (nonatomic, assign) UInt32 dnsQueryTimeoutSeconds;
 @property (nonatomic, assign) UInt32 dnsMinRefreshSeconds;
-@property (nonatomic, strong) NSString *dnsPreresolveHostnames;
+@property (nonatomic, strong) NSArray<NSString *> *dnsPreresolveHostnames;
 @property (nonatomic, assign) UInt32 dnsRefreshSeconds;
 @property (nonatomic, assign) BOOL enableDNSCache;
 @property (nonatomic, assign) UInt32 dnsCacheSaveIntervalSeconds;
 @property (nonatomic, assign) BOOL enableHappyEyeballs;
 @property (nonatomic, assign) BOOL enableHttp3;
 @property (nonatomic, assign) BOOL enableGzipDecompression;
-@property (nonatomic, assign) BOOL enableGzipCompression;
 @property (nonatomic, assign) BOOL enableBrotliDecompression;
-@property (nonatomic, assign) BOOL enableBrotliCompression;
 @property (nonatomic, assign) BOOL enableInterfaceBinding;
 @property (nonatomic, assign) BOOL enableDrainPostDnsRefresh;
 @property (nonatomic, assign) BOOL enforceTrustChainVerification;
@@ -40,9 +39,9 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic, assign) UInt32 perTryIdleTimeoutSeconds;
 @property (nonatomic, strong) NSString *appVersion;
 @property (nonatomic, strong) NSString *appId;
-@property (nonatomic, strong) NSString *virtualClusters;
-@property (nonatomic, strong) NSString *directResponseMatchers;
-@property (nonatomic, strong) NSString *directResponses;
+@property (nonatomic, strong) NSArray<NSString *> *virtualClusters;
+@property (nonatomic, strong) NSDictionary<NSString *, NSString *> *runtimeGuards;
+@property (nonatomic, strong) NSArray<EMODirectResponse *> *typedDirectResponses;
 @property (nonatomic, strong) NSArray<EnvoyNativeFilterConfig *> *nativeFilterChain;
 @property (nonatomic, strong) NSArray<EnvoyHTTPFilterFactory *> *httpPlatformFilterFactories;
 @property (nonatomic, strong) NSDictionary<NSString *, EnvoyStringAccessor *> *stringAccessors;
@@ -53,22 +52,20 @@ NS_ASSUME_NONNULL_BEGIN
  Create a new instance of the configuration.
  */
 - (instancetype)initWithAdminInterfaceEnabled:(BOOL)adminInterfaceEnabled
-                                  GrpcStatsDomain:(nullable NSString *)grpcStatsDomain
+                                  grpcStatsDomain:(nullable NSString *)grpcStatsDomain
                             connectTimeoutSeconds:(UInt32)connectTimeoutSeconds
                                 dnsRefreshSeconds:(UInt32)dnsRefreshSeconds
                      dnsFailureRefreshSecondsBase:(UInt32)dnsFailureRefreshSecondsBase
                       dnsFailureRefreshSecondsMax:(UInt32)dnsFailureRefreshSecondsMax
                            dnsQueryTimeoutSeconds:(UInt32)dnsQueryTimeoutSeconds
                              dnsMinRefreshSeconds:(UInt32)dnsMinRefreshSeconds
-                           dnsPreresolveHostnames:(NSString *)dnsPreresolveHostnames
+                           dnsPreresolveHostnames:(NSArray<NSString *> *)dnsPreresolveHostnames
                                    enableDNSCache:(BOOL)enableDNSCache
                       dnsCacheSaveIntervalSeconds:(UInt32)dnsCacheSaveIntervalSeconds
                               enableHappyEyeballs:(BOOL)enableHappyEyeballs
                                       enableHttp3:(BOOL)enableHttp3
                           enableGzipDecompression:(BOOL)enableGzipDecompression
-                            enableGzipCompression:(BOOL)enableGzipCompression
                         enableBrotliDecompression:(BOOL)enableBrotliDecompression
-                          enableBrotliCompression:(BOOL)enableBrotliCompression
                            enableInterfaceBinding:(BOOL)enableInterfaceBinding
                         enableDrainPostDnsRefresh:(BOOL)enableDrainPostDnsRefresh
                     enforceTrustChainVerification:(BOOL)enforceTrustChainVerification
@@ -83,9 +80,11 @@ NS_ASSUME_NONNULL_BEGIN
                          perTryIdleTimeoutSeconds:(UInt32)perTryIdleTimeoutSeconds
                                        appVersion:(NSString *)appVersion
                                             appId:(NSString *)appId
-                                  virtualClusters:(NSString *)virtualClusters
-                           directResponseMatchers:(NSString *)directResponseMatchers
-                                  directResponses:(NSString *)directResponses
+                                  virtualClusters:(NSArray<NSString *> *)virtualClusters
+                                    runtimeGuards:
+                                        (NSDictionary<NSString *, NSString *> *)runtimeGuards
+                             typedDirectResponses:
+                                 (NSArray<EMODirectResponse *> *)typedDirectResponses
                                 nativeFilterChain:
                                     (NSArray<EnvoyNativeFilterConfig *> *)nativeFilterChain
                               platformFilterChain:
@@ -97,15 +96,6 @@ NS_ASSUME_NONNULL_BEGIN
                                        (NSDictionary<NSString *, id<EnvoyKeyValueStore>> *)
                                            keyValueStores
                                        statsSinks:(NSArray<NSString *> *)statsSinks;
-
-/**
- Resolves the provided configuration template using properties on this configuration.
-
- @param templateYAML The template configuration to resolve.
- @return The resolved template. Nil if the template fails to fully resolve.
- */
-- (nullable NSString *)resolveTemplate:(NSString *)templateYAML;
-
 @end
 
 NS_ASSUME_NONNULL_END

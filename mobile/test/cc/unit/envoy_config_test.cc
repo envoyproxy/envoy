@@ -38,9 +38,12 @@ TEST(TestConfig, ConfigIsApplied) {
       .addStatsFlushSeconds(654)
       .setAppVersion("1.2.3")
       .setAppId("1234-1234-1234")
+      .setRuntimeGuard("test_feature_false", true)
       .enableDnsCache(true, /* save_interval_seconds */ 101)
       .addDnsPreresolveHostnames({"lyft.com", "google.com"})
+#ifdef ENVOY_ADMIN_FUNCTIONALITY
       .enableAdminInterface(true)
+#endif
       .setForceAlwaysUsev6(true)
       .setDeviceOs("probably-ubuntu-on-CI");
   std::string config_str = engine_builder.generateConfigStr();
@@ -58,14 +61,27 @@ TEST(TestConfig, ConfigIsApplied) {
                                            "  key: dns_persistent_cache",
                                            "- &force_ipv6 true",
                                            "- &persistent_dns_cache_save_interval 101",
-                                           ("- &metadata { device_os: probably-ubuntu-on-CI, "
-                                            "app_version: 1.2.3, app_id: 1234-1234-1234 }"),
+                                           " test_feature_false: true",
+                                           ("- &metadata { device_os: \"probably-ubuntu-on-CI\", "
+                                            "app_version: \"1.2.3\", app_id: \"1234-1234-1234\" }"),
                                            R"(- &validation_context
   trusted_ca:)"};
   for (const auto& string : must_contain) {
     ASSERT_NE(config_str.find(string), std::string::npos)
         << "'" << string << "' not found in" << config_str;
   }
+  envoy::config::bootstrap::v3::Bootstrap bootstrap;
+  TestUtility::loadFromYaml(absl::StrCat(config_header, config_str), bootstrap);
+  engine_builder.generateBootstrap();
+  EXPECT_TRUE(TestUtility::protoEqual(bootstrap, *engine_builder.generateBootstrap()));
+}
+
+TEST(TestConfig, MultiFlag) {
+  EngineBuilder engine_builder;
+  engine_builder.setRuntimeGuard("test_feature_false", true)
+      .setRuntimeGuard("test_feature_true", false);
+
+  std::string config_str = engine_builder.generateConfigStr();
   envoy::config::bootstrap::v3::Bootstrap bootstrap;
   TestUtility::loadFromYaml(absl::StrCat(config_header, config_str), bootstrap);
   engine_builder.generateBootstrap();
@@ -106,24 +122,6 @@ TEST(TestConfig, SetGzipDecompression) {
   ASSERT_THAT(bootstrap.DebugString(), HasSubstr("envoy.filters.http.decompressor"));
 }
 
-#ifdef ENVOY_MOBILE_REQUEST_COMPRESSION
-TEST(TestConfig, SetGzipCompression) {
-  EngineBuilder engine_builder;
-
-  engine_builder.enableGzipCompression(false);
-  std::string config_str = engine_builder.generateConfigStr();
-  envoy::config::bootstrap::v3::Bootstrap bootstrap;
-  TestUtility::loadFromYaml(absl::StrCat(config_header, config_str), bootstrap);
-  ASSERT_THAT(bootstrap.DebugString(), Not(HasSubstr("envoy.filters.http.compressor")));
-  EXPECT_TRUE(TestUtility::protoEqual(bootstrap, *engine_builder.generateBootstrap()));
-
-  engine_builder.enableGzipCompression(true);
-  config_str = engine_builder.generateConfigStr();
-  TestUtility::loadFromYaml(absl::StrCat(config_header, config_str), bootstrap);
-  ASSERT_THAT(bootstrap.DebugString(), HasSubstr("envoy.filters.http.compressor"));
-}
-#endif
-
 TEST(TestConfig, SetBrotliDecompression) {
   EngineBuilder engine_builder;
 
@@ -140,25 +138,6 @@ TEST(TestConfig, SetBrotliDecompression) {
   ASSERT_THAT(bootstrap.DebugString(), HasSubstr("brotli.decompressor.v3.Brotli"));
   EXPECT_TRUE(TestUtility::protoEqual(bootstrap, *engine_builder.generateBootstrap()));
 }
-
-#ifdef ENVOY_MOBILE_REQUEST_COMPRESSION
-TEST(TestConfig, SetBrotliCompression) {
-  EngineBuilder engine_builder;
-
-  engine_builder.enableBrotliCompression(false);
-  std::string config_str = engine_builder.generateConfigStr();
-  envoy::config::bootstrap::v3::Bootstrap bootstrap;
-  TestUtility::loadFromYaml(absl::StrCat(config_header, config_str), bootstrap);
-  ASSERT_THAT(bootstrap.DebugString(), Not(HasSubstr("brotli.compressor.v3.Brotli")));
-  EXPECT_TRUE(TestUtility::protoEqual(bootstrap, *engine_builder.generateBootstrap()));
-
-  engine_builder.enableBrotliCompression(true);
-  config_str = engine_builder.generateConfigStr();
-  TestUtility::loadFromYaml(absl::StrCat(config_header, config_str), bootstrap);
-  ASSERT_THAT(bootstrap.DebugString(), HasSubstr("brotli.compressor.v3.Brotli"));
-  EXPECT_TRUE(TestUtility::protoEqual(bootstrap, *engine_builder.generateBootstrap()));
-}
-#endif
 
 TEST(TestConfig, SetSocketTag) {
   EngineBuilder engine_builder;
@@ -221,6 +200,7 @@ TEST(TestConfig, PerTryIdleTimeout) {
   EXPECT_TRUE(TestUtility::protoEqual(bootstrap, *engine_builder.generateBootstrap()));
 }
 
+#ifdef ENVOY_ADMIN_FUNCTIONALITY
 TEST(TestConfig, EnableAdminInterface) {
   EngineBuilder engine_builder;
 
@@ -234,6 +214,7 @@ TEST(TestConfig, EnableAdminInterface) {
   ASSERT_THAT(config_str, HasSubstr("admin: *admin_interface"));
   TestUtility::loadFromYaml(absl::StrCat(config_header, config_str), bootstrap);
 }
+#endif
 
 TEST(TestConfig, EnableInterfaceBinding) {
   EngineBuilder engine_builder;
@@ -370,6 +351,22 @@ TEST(TestConfig, RtdsWithoutAds) {
   } catch (std::runtime_error& err) {
     EXPECT_EQ(err.what(), std::string("ADS must be configured when using xDS"));
   }
+}
+
+TEST(TestConfig, AdsConfig) {
+  EngineBuilder engine_builder;
+  engine_builder.setAggregatedDiscoveryService(
+      /*api_type=*/"GRPC", /*target_uri=*/"fake-td.googleapis.com", /*port=*/12345);
+  std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> bootstrap =
+      engine_builder.generateBootstrap();
+  auto& ads_config = bootstrap->dynamic_resources().ads_config();
+  EXPECT_EQ(ads_config.api_type(), envoy::config::core::v3::ApiConfigSource::GRPC);
+  EXPECT_EQ(ads_config.grpc_services(0).google_grpc().target_uri(), "fake-td.googleapis.com:12345");
+  EXPECT_EQ(ads_config.grpc_services(0).google_grpc().stat_prefix(), "ads");
+  const std::string config_str = engine_builder.generateConfigStr();
+  EXPECT_THAT(config_str, HasSubstr("api_type: GRPC"));
+  EXPECT_THAT(config_str, HasSubstr("target_uri: 'fake-td.googleapis.com:12345'"));
+  EXPECT_THAT(config_str, HasSubstr("stat_prefix: ads"));
 }
 
 TEST(TestConfig, EnablePlatformCertificatesValidation) {

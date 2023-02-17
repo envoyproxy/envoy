@@ -21,16 +21,18 @@ open class EngineBuilder: NSObject {
   private var dnsFailureRefreshSecondsMax: UInt32 = 10
   private var dnsQueryTimeoutSeconds: UInt32 = 25
   private var dnsMinRefreshSeconds: UInt32 = 60
-  private var dnsPreresolveHostnames: String = "[]"
+  private var dnsPreresolveHostnames: [String] = []
   private var dnsRefreshSeconds: UInt32 = 60
   private var enableDNSCache: Bool = false
   private var dnsCacheSaveIntervalSeconds: UInt32 = 1
   private var enableHappyEyeballs: Bool = true
   private var enableGzipDecompression: Bool = true
-  private var enableGzipCompression: Bool = false
   private var enableBrotliDecompression: Bool = false
-  private var enableBrotliCompression: Bool = false
+#if ENVOY_ENABLE_QUIC
   private var enableHttp3: Bool = true
+#else
+  private var enableHttp3: Bool = false
+#endif
   private var enableInterfaceBinding: Bool = false
   private var enforceTrustChainVerification: Bool = true
   private var enablePlatformCertificateValidation: Bool = false
@@ -44,7 +46,7 @@ open class EngineBuilder: NSObject {
   private var perTryIdleTimeoutSeconds: UInt32 = 15
   private var appVersion: String = "unspecified"
   private var appId: String = "unspecified"
-  private var virtualClusters: String = "[]"
+  private var virtualClusters: [String] = []
   private var onEngineRunning: (() -> Void)?
   private var logger: ((String) -> Void)?
   private var eventTracker: (([String: String]) -> Void)?
@@ -53,6 +55,7 @@ open class EngineBuilder: NSObject {
   private var platformFilterChain: [EnvoyHTTPFilterFactory] = []
   private var stringAccessors: [String: EnvoyStringAccessor] = [:]
   private var keyValueStores: [String: EnvoyKeyValueStore] = [:]
+  private var runtimeGuards: [String: String] = [:]
   private var directResponses: [DirectResponse] = []
   private var statsSinks: [String] = []
 
@@ -161,7 +164,7 @@ open class EngineBuilder: NSObject {
   ///
   /// - returns: This builder.
   @discardableResult
-  public func addDNSPreresolveHostnames(dnsPreresolveHostnames: String) -> Self {
+  public func addDNSPreresolveHostnames(dnsPreresolveHostnames: [String]) -> Self {
     self.dnsPreresolveHostnames = dnsPreresolveHostnames
     return self
   }
@@ -217,19 +220,6 @@ open class EngineBuilder: NSObject {
     return self
   }
 
-#if ENVOY_MOBILE_REQUEST_COMPRESSION
-  /// Specify whether to do gzip request compression or not.  Defaults to false.
-  ///
-  /// - parameter enableGzipCompression: whether or not to gunzip requests.
-  ///
-  /// - returns: This builder.
-  @discardableResult
-  public func enableGzipCompression(_ enableGzipCompression: Bool) -> Self {
-    self.enableGzipCompression = enableGzipCompression
-    return self
-  }
-#endif
-
   /// Specify whether to do brotli response decompression or not.  Defaults to false.
   ///
   /// - parameter enableBrotliDecompression: whether or not to brotli decompress responses.
@@ -241,19 +231,7 @@ open class EngineBuilder: NSObject {
     return self
   }
 
-#if ENVOY_MOBILE_REQUEST_COMPRESSION
-  /// Specify whether to do brotli request compression or not.  Defaults to false.
-  ///
-  /// - parameter enableBrotliCompression: whether or not to brotli compress requests.
-  ///
-  /// - returns: This builder.
-  @discardableResult
-  public func enableBrotliCompression(_ enableBrotliCompression: Bool) -> Self {
-    self.enableBrotliCompression = enableBrotliCompression
-    return self
-  }
-#endif
-
+#if ENVOY_ENABLE_QUIC
   /// Specify whether to enable support for HTTP/3 or not.  Defaults to true.
   ///
   /// - parameter enableHttp3: whether or not to enable HTTP/3.
@@ -264,6 +242,7 @@ open class EngineBuilder: NSObject {
     self.enableHttp3 = enableHttp3
     return self
   }
+#endif
 
   /// Specify whether sockets may attempt to bind to a specific interface, based on network
   /// conditions.
@@ -466,6 +445,18 @@ open class EngineBuilder: NSObject {
     return self
   }
 
+  /// Set a runtime guard with the provided value.
+  ///
+  /// - parameter name:  the name of the runtime guard, e.g. test_feature_false.
+  /// - parameter value: the value for the runtime guard.
+  ///
+  /// - returns: This builder.
+  @discardableResult
+  public func setRuntimeGuard(_ name: String, _ value: Bool) -> Self {
+    self.runtimeGuards[name] = "\(value)"
+    return self
+  }
+
   /// Set a closure to be called when the engine finishes its async startup and begins running.
   ///
   /// - parameter closure: The closure to be called.
@@ -535,15 +526,27 @@ open class EngineBuilder: NSObject {
 
   /// Add virtual cluster configuration.
   ///
-  /// - parameter virtualClusters: The JSON configuration string for virtual clusters.
+  /// - parameter virtualCluster: The JSON configuration string for a virtual cluster.
   ///
   /// - returns: This builder.
   @discardableResult
-  public func addVirtualClusters(_ virtualClusters: String) -> Self {
-    self.virtualClusters = virtualClusters
+  public func addVirtualCluster(_ virtualCluster: String) -> Self {
+    self.virtualClusters.append(virtualCluster)
     return self
   }
 
+  /// Add virtual cluster configurations.
+  ///
+  /// - parameter virtualClusters: The JSON configuration strings for virtual clusters.
+  ///
+  /// - returns: This builder.
+  @discardableResult
+  public func addVirtualClusters(_ virtualClusters: [String]) -> Self {
+    self.virtualClusters.append(contentsOf: virtualClusters)
+    return self
+  }
+
+#if ENVOY_ADMIN_FUNCTIONALITY
   /// Enable admin interface on 127.0.0.1:9901 address. Admin interface is intended to be
   /// used for development/debugging purposes only. Enabling it in production may open
   /// your app to security vulnerabilities.
@@ -557,6 +560,7 @@ open class EngineBuilder: NSObject {
     self.adminInterfaceEnabled = true
     return self
   }
+#endif
 
   /// Builds and runs a new `Engine` instance with the provided configuration.
   ///
@@ -582,9 +586,7 @@ open class EngineBuilder: NSObject {
       enableHappyEyeballs: self.enableHappyEyeballs,
       enableHttp3: self.enableHttp3,
       enableGzipDecompression: self.enableGzipDecompression,
-      enableGzipCompression: self.enableGzipCompression,
       enableBrotliDecompression: self.enableBrotliDecompression,
-      enableBrotliCompression: self.enableBrotliCompression,
       enableInterfaceBinding: self.enableInterfaceBinding,
       enableDrainPostDnsRefresh: self.enableDrainPostDnsRefresh,
       enforceTrustChainVerification: self.enforceTrustChainVerification,
@@ -600,12 +602,8 @@ open class EngineBuilder: NSObject {
       appVersion: self.appVersion,
       appId: self.appId,
       virtualClusters: self.virtualClusters,
-      directResponseMatchers: self.directResponses
-        .map { $0.resolvedRouteMatchYAML() }
-        .joined(separator: "\n"),
-      directResponses: self.directResponses
-        .map { $0.resolvedDirectResponseYAML() }
-        .joined(separator: "\n"),
+      runtimeGuards: self.runtimeGuards,
+      typedDirectResponses: self.directResponses.map({ $0.toObjC() }),
       nativeFilterChain: self.nativeFilterChain,
       platformFilterChain: self.platformFilterChain,
       stringAccessors: self.stringAccessors,

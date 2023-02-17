@@ -4306,5 +4306,74 @@ TEST_P(Http1ServerConnectionImplTest, LineFolding) {
   }
 }
 
+// Regression test for https://github.com/envoyproxy/envoy/issues/25458.
+TEST_P(Http1ServerConnectionImplTest, EmptyFieldName) {
+  initialize();
+  InSequence s;
+
+  StrictMock<MockRequestDecoder> decoder;
+  Http::ResponseEncoder* response_encoder = nullptr;
+  EXPECT_CALL(callbacks_, newStream(_, _))
+      .WillOnce(Invoke([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
+        response_encoder = &encoder;
+        return decoder;
+      }));
+  EXPECT_CALL(decoder,
+              sendLocalReply(Http::Code::BadRequest, "Bad Request", _, _, "http1.codec_error"));
+
+  Buffer::OwnedImpl buffer("GET / HTTP/1.1\r\n"
+                           ": value-for-empty-key\r\n"
+                           "Host: host\r\n\r\n");
+
+  auto status = codec_->dispatch(buffer);
+
+  EXPECT_TRUE(isCodecProtocolError(status));
+  EXPECT_EQ("http1.codec_error", response_encoder->getStream().responseDetails());
+
+  if (parser_impl_ == Http1ParserImpl::BalsaParser) {
+    EXPECT_EQ(status.message(), "http/1.1 protocol error: INVALID_HEADER_FORMAT");
+  } else {
+    EXPECT_EQ(status.message(), "http/1.1 protocol error: HPE_INVALID_HEADER_TOKEN");
+  }
+}
+
+// Multiple Transfer-Encoding request headers are not allowed, regardless of their value.
+TEST_P(Http1ServerConnectionImplTest, MultipleTransferEncoding) {
+  initialize();
+  InSequence s;
+
+  StrictMock<MockRequestDecoder> decoder;
+  Http::ResponseEncoder* response_encoder = nullptr;
+  EXPECT_CALL(callbacks_, newStream(_, _))
+      .WillOnce(Invoke([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
+        response_encoder = &encoder;
+        return decoder;
+      }));
+  if (parser_impl_ == Http1ParserImpl::BalsaParser) {
+    EXPECT_CALL(decoder,
+                sendLocalReply(Http::Code::BadRequest, "Bad Request", _, _, "http1.codec_error"));
+  } else {
+    EXPECT_CALL(decoder, sendLocalReply(Http::Code::NotImplemented, "Not Implemented", _, _,
+                                        "http1.invalid_transfer_encoding"));
+  }
+
+  Buffer::OwnedImpl buffer("POST / HTTP/1.1\r\n"
+                           "Transfer-Encoding: chunked\r\n"
+                           "Transfer-Encoding: chunked\r\n"
+                           "\r\n");
+
+  auto status = codec_->dispatch(buffer);
+
+  EXPECT_TRUE(isCodecProtocolError(status));
+
+  if (parser_impl_ == Http1ParserImpl::BalsaParser) {
+    EXPECT_EQ("http1.codec_error", response_encoder->getStream().responseDetails());
+    EXPECT_EQ(status.message(), "http/1.1 protocol error: MULTIPLE_TRANSFER_ENCODING_KEYS");
+  } else {
+    EXPECT_EQ("http1.invalid_transfer_encoding", response_encoder->getStream().responseDetails());
+    EXPECT_EQ(status.message(), "http/1.1 protocol error: unsupported transfer encoding");
+  }
+}
+
 } // namespace Http
 } // namespace Envoy

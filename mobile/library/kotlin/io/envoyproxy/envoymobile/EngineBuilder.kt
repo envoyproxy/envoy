@@ -37,12 +37,13 @@ open class EngineBuilder(
   protected var logger: ((String) -> Unit)? = null
   protected var eventTracker: ((Map<String, String>) -> Unit)? = null
   protected var enableProxying = false
+  private var runtimeGuards = mapOf<String, Boolean>()
   private var enableSkipDNSLookupForProxiedRequests = false
   private var engineType: () -> EnvoyEngine = {
     EnvoyEngineImpl(onEngineRunning, logger, eventTracker)
   }
   private var logLevel = LogLevel.INFO
-  private var adminInterfaceEnabled = false
+  internal var adminInterfaceEnabled = false
   private var grpcStatsDomain: String? = null
   private var connectTimeoutSeconds = 30
   private var dnsRefreshSeconds = 60
@@ -54,12 +55,10 @@ open class EngineBuilder(
   private var enableDNSCache = false
   private var dnsCacheSaveIntervalSeconds = 1
   private var enableDrainPostDnsRefresh = false
-  private var enableHttp3 = true
+  internal var enableHttp3 = true
   private var enableHappyEyeballs = true
   private var enableGzipDecompression = true
-  internal var enableGzipCompression = false
   private var enableBrotliDecompression = false
-  internal var enableBrotliCompression = false
   private var enableSocketTagging = false
   private var enableInterfaceBinding = false
   private var h2ConnectionKeepaliveIdleIntervalMilliseconds = 1
@@ -78,6 +77,7 @@ open class EngineBuilder(
   private var keyValueStores = mutableMapOf<String, EnvoyKeyValueStore>()
   private var statsSinks = listOf<String>()
   private var enablePlatformCertificatesValidation = false
+  private var useLegacyBuilder = false
 
   /**
    * Add a log level to use with Envoy.
@@ -225,20 +225,6 @@ open class EngineBuilder(
   fun enableDNSCache(enableDNSCache: Boolean, saveInterval: Int = 1): EngineBuilder {
     this.enableDNSCache = enableDNSCache
     this.dnsCacheSaveIntervalSeconds = saveInterval
-    return this
-  }
-
-  /**
-   * Specify whether to enable experimental HTTP/3 (QUIC) support. Note the actual protocol will
-   * be negotiated with the upstream endpoint and so upstream support is still required for HTTP/3
-   * to be utilized.
-   *
-   * @param enableHttp3 whether to enable HTTP/3.
-   *
-   * @return This builder.
-   */
-  fun enableHttp3(enableHttp3: Boolean): EngineBuilder {
-    this.enableHttp3 = enableHttp3
     return this
   }
 
@@ -564,21 +550,6 @@ open class EngineBuilder(
   }
 
   /**
-   * Enable admin interface on 127.0.0.1:9901 address. Admin interface is intended to be
-   * used for development/debugging purposes only. Enabling it in production may open
-   * your app to security vulnerabilities.
-   *
-   * Note this will not work with the default production build, as it builds with admin
-   * functionality disabled via --define=admin_functionality=disabled
-   *
-   * @return this builder.
-   */
-  fun enableAdminInterface(): EngineBuilder {
-    this.adminInterfaceEnabled = true
-    return this
-  }
-
-  /**
    * Builds and runs a new Engine instance with the provided configuration.
    *
    * @return A new instance of Envoy.
@@ -600,9 +571,7 @@ open class EngineBuilder(
       enableDrainPostDnsRefresh,
       enableHttp3,
       enableGzipDecompression,
-      enableGzipCompression,
       enableBrotliDecompression,
-      enableBrotliCompression,
       enableSocketTagging,
       enableHappyEyeballs,
       enableInterfaceBinding,
@@ -621,8 +590,10 @@ open class EngineBuilder(
       stringAccessors,
       keyValueStores,
       statsSinks,
+      runtimeGuards,
       enableSkipDNSLookupForProxiedRequests,
-      enablePlatformCertificatesValidation
+      enablePlatformCertificatesValidation,
+      useLegacyBuilder
     )
 
     return when (configuration) {
@@ -665,6 +636,19 @@ open class EngineBuilder(
   fun enablePlatformCertificatesValidation(enablePlatformCertificatesValidation: Boolean):
     EngineBuilder {
     this.enablePlatformCertificatesValidation = enablePlatformCertificatesValidation
+    return this
+  }
+
+  /**
+   * Specify whether the string-based legacy mode should be used to build the engine.
+   * Defaults to false.
+   *
+   * @param useLegacyBuilder true if the string-based legacy mode should be used.
+   *
+   * @return This builder.
+   */
+  fun useLegacyBuilder(useLegacyBuilder: Boolean): EngineBuilder {
+    this.useLegacyBuilder = useLegacyBuilder
     return this
   }
 

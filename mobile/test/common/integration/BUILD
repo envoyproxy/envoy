@@ -120,22 +120,23 @@ envoy_cc_test_library(
     deps = [
         ":base_client_integration_test_lib",
         "@envoy//source/common/config:api_version_lib",
+        "@envoy//source/common/grpc:google_grpc_creds_lib",
         "@envoy//test/common/grpc:grpc_client_integration_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
     ],
 )
 
-# interface libs for quic test server's jni implementation
+# interface libs for test servers` jni implementations
 envoy_cc_test_library(
-    name = "quic_test_server_interface_lib",
+    name = "test_server_interface_lib",
     srcs = [
-        "quic_test_server.cc",
-        "quic_test_server_interface.cc",
+        "test_server.cc",
+        "test_server_interface.cc",
     ],
     hdrs = [
-        "quic_test_server.h",
-        "quic_test_server_interface.h",
+        "test_server.h",
+        "test_server_interface.h",
     ],
     data = [
         "@envoy//test/config/integration/certs",
@@ -145,6 +146,7 @@ envoy_cc_test_library(
         ":autonomous_upstream_lib",
         "@envoy//source/exe:process_wide_lib",
         "@envoy//test/config:utility_lib",
+        "@envoy//test/integration:utility_lib",
         "@envoy//test/mocks/server:transport_socket_factory_context_mocks",
         "@envoy//test/test_common:environment_lib",
         "@envoy_build_config//:extension_registry",
