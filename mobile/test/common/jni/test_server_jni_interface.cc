@@ -1,6 +1,6 @@
 #include <jni.h>
 
-#include "test/common/integration/quic_test_server_interface.h"
+#include "test/common/integration/test_server_interface.h"
 
 #include "library/common/jni/jni_support.h"
 #include "library/common/jni/jni_utility.h"
@@ -14,7 +14,7 @@ extern "C" JNIEXPORT void JNICALL
 Java_io_envoyproxy_envoymobile_engine_testing_QuicTestServer_nativeStartQuicTestServer(
     JNIEnv* env, jclass clazz) {
   jni_log("[QTS]", "starting server");
-  start_server();
+  start_server(true);
 }
 
 extern "C" JNIEXPORT jint JNICALL
@@ -26,6 +26,20 @@ Java_io_envoyproxy_envoymobile_engine_testing_QuicTestServer_nativeGetServerPort
 
 extern "C" JNIEXPORT void JNICALL
 Java_io_envoyproxy_envoymobile_engine_testing_QuicTestServer_nativeShutdownQuicTestServer(
+    JNIEnv* env, jclass clazz) {
+  jni_log("[QTS]", "shutting down server");
+  shutdown_server();
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_io_envoyproxy_envoymobile_engine_testing_QuicTestServer_nativeStartTestServer(JNIEnv* env,
+                                                                                   jclass clazz) {
+  jni_log("[QTS]", "starting server");
+  start_server(false);
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_io_envoyproxy_envoymobile_engine_testing_QuicTestServer_nativeShutdownTestServer(
     JNIEnv* env, jclass clazz) {
   jni_log("[QTS]", "shutting down server");
   shutdown_server();

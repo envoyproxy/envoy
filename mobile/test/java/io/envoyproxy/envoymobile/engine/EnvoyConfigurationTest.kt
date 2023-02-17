@@ -79,9 +79,7 @@ class EnvoyConfigurationTest {
     enableDrainPostDnsRefresh: Boolean = false,
     enableHttp3: Boolean = true,
     enableGzipDecompression: Boolean = true,
-    enableGzipCompression: Boolean = false,
     enableBrotliDecompression: Boolean = false,
-    enableBrotliCompression: Boolean = false,
     enableSocketTagging: Boolean = false,
     enableHappyEyeballs: Boolean = false,
     enableInterfaceBinding: Boolean = false,
@@ -97,6 +95,7 @@ class EnvoyConfigurationTest {
     virtualClusters: MutableList<String> = mutableListOf("{name: test1}", "{name: test2}"),
     filterChain: MutableList<EnvoyNativeFilterConfig> = mutableListOf(EnvoyNativeFilterConfig("buffer_filter_1", "{'@type': 'type.googleapis.com/envoy.extensions.filters.http.buffer.v3.Buffer'}"), EnvoyNativeFilterConfig("buffer_filter_2", "{'@type': 'type.googleapis.com/envoy.extensions.filters.http.buffer.v3.Buffer'}")),
     platformFilterFactories: MutableList<EnvoyHTTPFilterFactory> = mutableListOf(TestEnvoyHTTPFilterFactory("name1"), TestEnvoyHTTPFilterFactory("name2")),
+    runtimeGuards: Map<String,Boolean> = emptyMap(),
     enableSkipDNSLookupForProxiedRequests: Boolean = false,
     statSinks: MutableList<String> = mutableListOf(),
     enablePlatformCertificatesValidation: Boolean = false,
@@ -117,9 +116,7 @@ class EnvoyConfigurationTest {
       enableDrainPostDnsRefresh,
       enableHttp3,
       enableGzipDecompression,
-      enableGzipCompression,
       enableBrotliDecompression,
-      enableBrotliCompression,
       enableSocketTagging,
       enableHappyEyeballs,
       enableInterfaceBinding,
@@ -138,6 +135,7 @@ class EnvoyConfigurationTest {
       emptyMap(),
       emptyMap(),
       statSinks,
+      runtimeGuards,
       enableSkipDNSLookupForProxiedRequests,
       enablePlatformCertificatesValidation,
       useLegacyBuilder
@@ -240,9 +238,7 @@ class EnvoyConfigurationTest {
       enableHappyEyeballs = true,
       enableHttp3 = false,
       enableGzipDecompression = false,
-      enableGzipCompression = true,
       enableBrotliDecompression = true,
-      enableBrotliCompression = true,
       enableSocketTagging = true,
       enableInterfaceBinding = true,
       enableSkipDNSLookupForProxiedRequests = true,
@@ -250,6 +246,7 @@ class EnvoyConfigurationTest {
       dnsPreresolveHostnames = mutableListOf(),
       virtualClusters = mutableListOf(),
       filterChain = mutableListOf(),
+      runtimeGuards = mapOf("test_feature_false" to true),
       statSinks = mutableListOf("{ name: envoy.stat_sinks.statsd, typed_config: { '@type': type.googleapis.com/envoy.config.metrics.v3.StatsdSink, address: { socket_address: { address: 127.0.0.1, port_value: 123 } } } }"),
       trustChainVerification = TrustChainVerification.ACCEPT_UNTRUSTED
     )
@@ -273,13 +270,11 @@ class EnvoyConfigurationTest {
     // enableGzipDecompression = false
     assertThat(resolvedTemplate).doesNotContain("type.googleapis.com/envoy.extensions.compression.gzip.decompressor.v3.Gzip");
 
-    // enableGzipCompression = true
     assertThat(resolvedTemplate).contains("type.googleapis.com/envoy.extensions.compression.gzip.compressor.v3.Gzip");
 
     // enableBrotliDecompression = true
     assertThat(resolvedTemplate).contains("type.googleapis.com/envoy.extensions.compression.brotli.decompressor.v3.Brotli");
 
-    // enableBrotliCompression = true
     assertThat(resolvedTemplate).contains("type.googleapis.com/envoy.extensions.compression.brotli.compressor.v3.Brotli");
 
     // enableInterfaceBinding = true
@@ -293,6 +288,19 @@ class EnvoyConfigurationTest {
 
     // statsSinks
     assertThat(resolvedTemplate).contains("envoy.stat_sinks.statsd");
+  }
+
+  @Test
+  fun `test YAML loads with multiple entries`() {
+    JniLibrary.loadTestLibrary()
+    val envoyConfiguration = buildTestEnvoyConfiguration(
+      runtimeGuards = mapOf("test_feature_false" to true, "test_feature_true" to false),
+    )
+
+    val resolvedTemplate = envoyConfiguration.createYaml()
+
+    assertThat(resolvedTemplate).contains("test_feature_false");
+    assertThat(resolvedTemplate).contains("test_feature_true");
   }
 
   @Test

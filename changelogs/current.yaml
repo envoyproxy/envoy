@@ -48,6 +48,7 @@ removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
 - area: config
   change: |
+    removed ``envoy.reloadable_features.admin_stats_filter_use_re2`` and legacy code paths.
     removed ``envoy.reloadable_features.combine_sds_requests`` and legacy code paths.
 - area: dns
   change: |
@@ -88,9 +89,6 @@ new_features:
 - area: upstream
   change: |
     added :ref:`maglev extension <envoy_v3_api_msg_extensions.load_balancing_policies.maglev.v3.Maglev>` to suppport the :ref:`load balancer policy <envoy_v3_api_field_config.cluster.v3.Cluster.load_balancing_policy>`.
-- area: maglev
-  change: |
-    added ``envoy.reloadable_features.allow_compact_maglev`` to allow the use of a more compact maglev load balancer representation. This can be reverted by setting ``envoy.reloadable_features.allow_compact_maglev`` to false.
 - area: router
   change: |
     support route info in upstream access log.
