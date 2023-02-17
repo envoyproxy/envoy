@@ -1,7 +1,7 @@
 #[cxx::bridge]
 mod ffi {
     extern "C++" {
-        include!("source/extensions/filters/network/echo/executor.rs.h");
+        include!("contrib/rust_echo/filters/network/executor.rs.h");
 
         #[namespace = "Envoy::Network"]
         type ReadFilterCallbacks = executor_rs::ffi::ReadFilterCallbacks;

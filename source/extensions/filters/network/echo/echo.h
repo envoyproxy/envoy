@@ -1,12 +1,8 @@
 #pragma once
 
-#include "envoy/event/dispatcher.h"
 #include "envoy/network/filter.h"
 
 #include "source/common/common/logger.h"
-#include "source/extensions/filters/network/echo/echo.rs.h"
-
-#include "rust/cxx.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -16,27 +12,17 @@ namespace Echo {
 /**
  * Implementation of a basic echo filter.
  */
-class Filter : public Network::ReadFilter, Logger::Loggable<Logger::Id::filter> {
+class EchoFilter : public Network::ReadFilter, Logger::Loggable<Logger::Id::filter> {
 public:
   // Network::ReadFilter
-  Network::FilterStatus onData(Buffer::Instance& buffer, bool end_stream) override {
-    executor_->onData(buffer, end_stream);
-    return Network::FilterStatus::Continue;
-  }
-  Network::FilterStatus onNewConnection() override {
-    on_new_connection(callbacks_, &*executor_);
-
-    executor_->poll();
-    return Network::FilterStatus::Continue;
-  }
+  Network::FilterStatus onData(Buffer::Instance& data, bool end_stream) override;
+  Network::FilterStatus onNewConnection() override { return Network::FilterStatus::Continue; }
   void initializeReadFilterCallbacks(Network::ReadFilterCallbacks& callbacks) override {
-    callbacks_ = &callbacks;
-    executor_ = std::make_unique<Executor>(callbacks.connection().dispatcher());
+    read_callbacks_ = &callbacks;
   }
 
 private:
-  std::unique_ptr<Executor> executor_;
-  Network::ReadFilterCallbacks* callbacks_;
+  Network::ReadFilterCallbacks* read_callbacks_{};
 };
 
 } // namespace Echo

@@ -11,7 +11,7 @@ pub mod ffi {
         type Instance;
         #[namespace = "Envoy::Network"]
         type Connection;
-        include!("source/extensions/filters/network/echo/rust_support.h");
+        include!("contrib/rust_echo/filters/network/source/rust_support.h");
 
         type Executor;
 
