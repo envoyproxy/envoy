@@ -1,44 +1,27 @@
 #pragma once
 
-#include "envoy/server/lifecycle_notifier.h"
-
 #include "source/extensions/filters/http/common/factory_base.h"
 
-#include "contrib/envoy/extensions/filters/http/golang/v3alpha/golang.pb.h"
-#include "contrib/envoy/extensions/filters/http/golang/v3alpha/golang.pb.validate.h"
+#include "contrib/golang/http/cluster_specifier/source/golang_cluster_specifier.h"
 
 namespace Envoy {
-namespace Extensions {
-namespace HttpFilters {
+namespace Router {
 namespace Golang {
 
-constexpr char CanonicalName[] = "envoy.filters.http.golang";
-
-/**
- * Config registration for the golang extentions  filter. @see
- * NamedHttpFilterConfigFactory.
- */
-class GolangFilterConfig : public Common::FactoryBase<
-                               envoy::extensions::filters::http::golang::v3alpha::Config,
-                               envoy::extensions::filters::http::golang::v3alpha::ConfigsPerRoute> {
+class GolangClusterSpecifierPluginFactoryConfig : public ClusterSpecifierPluginFactoryConfig {
 public:
-  GolangFilterConfig() : FactoryBase(CanonicalName) {}
+  GolangClusterSpecifierPluginFactoryConfig() = default;
+  ClusterSpecifierPluginSharedPtr
+  createClusterSpecifierPlugin(const Protobuf::Message& config,
+                               Server::Configuration::CommonFactoryContext&) override;
 
-private:
-  Server::ServerLifecycleNotifier::HandlePtr handler_{};
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return std::make_unique<GolangClusterProto>();
+  }
 
-  Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
-      const envoy::extensions::filters::http::golang::v3alpha::Config& proto_config,
-      const std::string& stats_prefix,
-      Server::Configuration::FactoryContext& factory_context) override;
-
-  Router::RouteSpecificFilterConfigConstSharedPtr createRouteSpecificFilterConfigTyped(
-      const envoy::extensions::filters::http::golang::v3alpha::ConfigsPerRoute& proto_config,
-      Server::Configuration::ServerFactoryContext& context,
-      ProtobufMessage::ValidationVisitor& validator) override;
+  std::string name() const override { return "envoy.router.cluster_specifier_plugin.golang"; }
 };
 
 } // namespace Golang
-} // namespace HttpFilters
-} // namespace Extensions
+} // namespace Router
 } // namespace Envoy

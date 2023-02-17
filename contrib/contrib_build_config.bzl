@@ -71,4 +71,10 @@ CONTRIB_EXTENSIONS = {
     #
 
     "envoy.xds_delegates.kv_store":                            "//contrib/config/source:kv_store_xds_delegate",
+
+    #
+    # xDS delegates
+    #
+
+    "envoy.router.cluster_specifier_plugin.golang":             "//contrib/golang/http/cluster_specifier/source:config",
 }

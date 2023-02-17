@@ -110,13 +110,13 @@ void DsoInstance::envoyGoFilterOnHttpDestroy(httpRequest* p0, int p1) {
 
 GoUint64 DsoInstance::envoyGoClusterSpecifierNewConfig(GoUint64 configPtr, GoUint64 configLen) {
   ASSERT(envoy_go_cluster_specifier_new_config_ != nullptr);
-  envoy_go_cluster_specifier_new_config_(configPtr, configLen);
+  return envoy_go_cluster_specifier_new_config_(configPtr, configLen);
 }
 
 GoInt64 DsoInstance::envoyGoOnClusterSpecify(GoUint64 headerPtr, GoUint64 configId,
                                              GoUint64 bufferPtr, GoUint64 bufferLen) {
   ASSERT(envoy_go_on_cluster_specify_ != nullptr);
-  envoy_go_on_cluster_specify_(configPtr, configLen);
+  return envoy_go_on_cluster_specify_(headerPtr, configId, bufferPtr, bufferLen);
 }
 
 } // namespace Dso
