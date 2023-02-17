@@ -79,6 +79,7 @@ class SetEventTrackerTest {
         countDownLatch.countDown()
       }
       .start()
+      .sendHeaders(requestHeaders, true)
       .close(ByteBuffer.allocate(1))
 
     countDownLatch.await(30, TimeUnit.SECONDS)
