@@ -1340,7 +1340,7 @@ extern "C" JNIEXPORT jstring JNICALL Java_io_envoyproxy_envoymobile_engine_JniLi
     jboolean trust_chain_verification, jobjectArray virtual_clusters, jobjectArray filter_chain,
     jobjectArray stat_sinks, jboolean enable_platform_certificates_validation,
     jboolean enable_skip_dns_lookup_for_proxied_requests, jobjectArray runtime_guards) {
-
+  Envoy::Thread::SkipAsserts skip_asserts;
   Envoy::Platform::EngineBuilder builder;
   configureBuilder(
       env, grpc_stats_domain, admin_interface_enabled, connect_timeout_seconds, dns_refresh_seconds,
