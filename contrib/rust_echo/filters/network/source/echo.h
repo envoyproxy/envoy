@@ -7,24 +7,26 @@
 
 #include "contrib/rust_echo/filters/network/source/echo.rs.h"
 #include "rust/cxx.h"
+#include <functional>
 
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
 namespace Echo {
 
-/**
- * Implementation of a basic echo filter.
- */
-class Filter : public Network::ReadFilter, Logger::Loggable<Logger::Id::filter> {
+using EntryPointFunc = std::function<void(Network::ReadFilterCallbacks*, Executor*)>;
+
+class RustExecutorFilter : public Network::ReadFilter {
 public:
+  explicit RustExecutorFilter(EntryPointFunc entry_point) : entry_point_(entry_point) {}
+
   // Network::ReadFilter
   Network::FilterStatus onData(Buffer::Instance& buffer, bool end_stream) override {
     executor_->onData(buffer, end_stream);
     return Network::FilterStatus::Continue;
   }
   Network::FilterStatus onNewConnection() override {
-    on_new_connection(callbacks_, &*executor_);
+    entry_point_(callbacks_, &*executor_);
 
     executor_->poll();
     return Network::FilterStatus::Continue;
@@ -35,8 +37,17 @@ public:
   }
 
 private:
+  EntryPointFunc entry_point_;
   std::unique_ptr<Executor> executor_;
   Network::ReadFilterCallbacks* callbacks_;
+};
+
+/**
+ * The echo filter itself just delegates execution to the Rust entrypoint.
+ */
+class Filter : public RustExecutorFilter {
+public:
+  Filter() : RustExecutorFilter(on_new_connection) {}
 };
 
 } // namespace Echo
