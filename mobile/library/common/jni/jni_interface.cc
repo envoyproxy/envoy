@@ -1324,8 +1324,8 @@ void configureBuilder(JNIEnv* env, jstring grpc_stats_domain, jboolean admin_int
   builder.addDnsPreresolveHostnames(hostnames);
 }
 
-extern "C" JNIEXPORT void JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibrary_compareYaml(
-    JNIEnv* env, jclass, jstring yaml, jstring grpc_stats_domain, jboolean admin_interface_enabled,
+extern "C" JNIEXPORT jstring JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibrary_createYaml(
+    JNIEnv* env, jclass, jstring grpc_stats_domain, jboolean admin_interface_enabled,
     jlong connect_timeout_seconds, jlong dns_refresh_seconds,
     jlong dns_failure_refresh_seconds_base, jlong dns_failure_refresh_seconds_max,
     jlong dns_query_timeout_seconds, jlong dns_min_refresh_seconds,
@@ -1340,7 +1340,7 @@ extern "C" JNIEXPORT void JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibra
     jboolean trust_chain_verification, jobjectArray virtual_clusters, jobjectArray filter_chain,
     jobjectArray stat_sinks, jboolean enable_platform_certificates_validation,
     jboolean enable_skip_dns_lookup_for_proxied_requests, jobjectArray runtime_guards) {
-
+  Envoy::Thread::SkipAsserts skip_asserts;
   Envoy::Platform::EngineBuilder builder;
   configureBuilder(
       env, grpc_stats_domain, admin_interface_enabled, connect_timeout_seconds, dns_refresh_seconds,
@@ -1355,9 +1355,9 @@ extern "C" JNIEXPORT void JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibra
       filter_chain, stat_sinks, enable_platform_certificates_validation,
       enable_skip_dns_lookup_for_proxied_requests, runtime_guards, builder);
 
-  const char* native_yaml = env->GetStringUTFChars(yaml, nullptr);
-  builder.generateBootstrapAndCompareForTests(native_yaml);
-  env->ReleaseStringUTFChars(yaml, native_yaml);
+  auto bootstrap = builder.generateBootstrap();
+  std::string yaml = Envoy::MessageUtil::getYamlStringFromMessage(*bootstrap);
+  return env->NewStringUTF(yaml.c_str());
 }
 
 extern "C" JNIEXPORT jlong JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibrary_createBootstrap(
