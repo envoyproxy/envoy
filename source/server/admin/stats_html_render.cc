@@ -95,17 +95,22 @@ void StatsHtmlRender::finalize(Buffer::Instance& response) {
 
 void StatsHtmlRender::appendResource(Buffer::Instance& response, absl::string_view file,
                                      absl::string_view default_value) {
-  if (std::getenv("ENVOY_ADMIN_DEBUG_RESOURCES") == nullptr) {
+#ifdef ENVOY_ADMIN_DEBUG
+  // Build with --cxxopt=-DENVOY_ADMIN_DEBUG to reload css, js, and html files
+  // from the file-system on every admin page load, which enables fast iteration
+  // when debugging the web site.
+  Filesystem::InstanceImpl file_system;
+  std::string path = absl::StrCat("source/server/admin/", file);
+  TRY_ASSERT_MAIN_THREAD { response.add(file_system.fileReadToEnd(path)); }
+  END_TRY
+  catch (EnvoyException& e) {
+    ENVOY_LOG_MISC(error, "failed to load " + path + ": " + e.what());
     response.add(default_value);
-  } else {
-    Filesystem::InstanceImpl file_system;
-    std::string path = absl::StrCat("source/server/admin/", file);
-    TRY_ASSERT_MAIN_THREAD { response.add(file_system.fileReadToEnd(path)); }
-    END_TRY
-    catch (EnvoyException& e) {
-      ENVOY_LOG_MISC(error, "failed to load " + path + ": " + e.what());
-    }
   }
+#else
+  UNREFERENCED_PARAMETER(file);
+  response.add(default_value);
+#endif
 }
 
 void StatsHtmlRender::startPre(Buffer::Instance& response) {
