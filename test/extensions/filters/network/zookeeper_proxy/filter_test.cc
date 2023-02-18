@@ -424,6 +424,30 @@ public:
     return buffer;
   }
 
+  Buffer::OwnedImpl encodeSetWatches2Request(const std::vector<std::string>& dataw,
+                                             const std::vector<std::string>& existw,
+                                             const std::vector<std::string>& childw,
+                                             const std::vector<std::string>& persistentw,
+                                             const std::vector<std::string>& persistent_recursivew,
+                                             int32_t xid = 1000) const {
+    Buffer::OwnedImpl buffer;
+    Buffer::OwnedImpl watches_buffer;
+
+    addStrings(watches_buffer, dataw);
+    addStrings(watches_buffer, existw);
+    addStrings(watches_buffer, childw);
+    addStrings(watches_buffer, persistentw);
+    addStrings(watches_buffer, persistent_recursivew);
+
+    buffer.writeBEInt<int32_t>(16 + watches_buffer.length());
+    buffer.writeBEInt<int32_t>(xid);
+    buffer.writeBEInt<int32_t>(enumToSignedInt(OpCodes::SetWatches2));
+    buffer.writeBEInt<int64_t>(3000);
+    buffer.add(watches_buffer);
+
+    return buffer;
+  }
+
   Buffer::OwnedImpl
   encodeMultiRequest(const std::vector<std::pair<int32_t, Buffer::OwnedImpl>>& ops) const {
     Buffer::OwnedImpl buffer;
@@ -1012,6 +1036,24 @@ TEST_F(ZooKeeperFilterTest, SetWatchesRequest) {
   testResponse(
       {{{"opname", "setwatches_resp"}, {"zxid", "2000"}, {"error", "0"}}, {{"bytes", "20"}}},
       config_->stats().setwatches_resp_);
+}
+
+TEST_F(ZooKeeperFilterTest, SetWatches2Request) {
+  initialize();
+
+  const std::vector<std::string> dataw = {"/foo", "/bar"};
+  const std::vector<std::string> existw = {"/foo1", "/bar1"};
+  const std::vector<std::string> childw = {"/foo1", "/bar1"};
+  const std::vector<std::string> persistentw = {"/baz", "/qux"};
+  const std::vector<std::string> persistent_recursivew = {"/baz1", "/qux1"};
+
+  Buffer::OwnedImpl data = encodeSetWatches2Request(dataw, existw, childw, persistentw, persistent_recursivew);
+
+  testRequest(data, {{{"opname", "setwatches2"}}, {{"bytes", "126"}}},
+              config_->stats().setwatches2_rq_, 126);
+  testResponse(
+      {{{"opname", "setwatches2_resp"}, {"zxid", "2000"}, {"error", "0"}}, {{"bytes", "20"}}},
+      config_->stats().setwatches2_resp_);
 }
 
 TEST_F(ZooKeeperFilterTest, CheckWatchesRequest) {
