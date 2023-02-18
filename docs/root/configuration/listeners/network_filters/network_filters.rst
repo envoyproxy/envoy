@@ -28,6 +28,7 @@ filters.
   rocketmq_proxy_filter
   tcp_proxy_filter
   thrift_proxy_filter
+  rust_echo_filter
   sni_cluster_filter
   sni_dynamic_forward_proxy_filter
   wasm_filter
