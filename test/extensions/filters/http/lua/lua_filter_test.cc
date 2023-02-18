@@ -1311,29 +1311,11 @@ TEST_F(LuaHttpFilterTest, HttpCallImmediateResponse) {
 
   Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
   Http::MockAsyncClientRequest request(&cluster_manager_.thread_local_cluster_.async_client_);
-  Http::AsyncClient::Callbacks* callbacks;
   EXPECT_CALL(cluster_manager_, getThreadLocalCluster(Eq("cluster")));
   EXPECT_CALL(cluster_manager_.thread_local_cluster_, httpAsyncClient());
-  EXPECT_CALL(cluster_manager_.thread_local_cluster_.async_client_, send_(_, _, _))
-      .WillOnce(
-          Invoke([&](Http::RequestMessagePtr& message, Http::AsyncClient::Callbacks& cb,
-                     const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
-            const Http::TestRequestHeaderMapImpl expected_headers{
-                {":path", "/"}, {":method", "GET"}, {":authority", "foo"}};
-            EXPECT_THAT(&message->headers(), HeaderMapEqualIgnoreOrder(&expected_headers));
-            callbacks = &cb;
-            return &request;
-          }));
-
+  EXPECT_CALL(decoder_callbacks_, sendLocalReply(_, _, _, _, _));
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(request_headers, false));
-
-  Http::ResponseMessagePtr response_message(new Http::ResponseMessageImpl(
-      Http::ResponseHeaderMapPtr{new Http::TestResponseHeaderMapImpl{{":status", "200"}}}));
-  Http::TestResponseHeaderMapImpl expected_headers{{":status", "403"},
-                                                   {"set-cookie", "flavor=chocolate; Path=/"},
-                                                   {"set-cookie", "variant=chewy; Path=/"}};
-  callbacks->onSuccess(request, std::move(response_message));
   EXPECT_EQ(0, stats_store_.counter("test.lua.errors").value());
 }
 
