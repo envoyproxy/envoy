@@ -17,9 +17,13 @@ static Admin::RequestPtr handlerCallback(AdminStream&) {
 }
 
 const Admin::UrlHandler handler() {
-  return Admin::UrlHandler{
-      "/prefix", "help text", handlerCallback,
-      false,     false,       {{Admin::ParamDescriptor::Type::Boolean, "param", "param help"}}};
+  return Admin::UrlHandler{"/prefix",
+                           "help text",
+                           handlerCallback,
+                           false,
+                           false,
+                           {{Admin::ParamDescriptor::Type::Boolean, "boolparam", "bool param help"},
+                            {Admin::ParamDescriptor::Type::String, "strparam", "str param help"}}};
 }
 
 class StatsHtmlRenderTest : public StatsRenderTestBase {
@@ -61,9 +65,8 @@ TEST_F(StatsHtmlRenderTest, RenderTableEnd) {
 TEST_F(StatsHtmlRenderTest, RenderUrlHandlerNoQuery) {
   renderer_.urlHandler(response_, handler(), query_params_);
   std::string out = response_.toString();
-  EXPECT_THAT(
-      out,
-      HasSubstr("<input type='checkbox' name='param' id='param-1-prefix-param' form='prefix'"));
+  EXPECT_THAT(out, HasSubstr("<input type='checkbox' name='boolparam' "
+                             "id='param-1-prefix-boolparam' form='prefix'"));
   EXPECT_THAT(out, Not(HasSubstr(" checked/>")));
   EXPECT_THAT(out, HasSubstr("help text"));
   EXPECT_THAT(out, HasSubstr("param help"));
@@ -73,12 +76,15 @@ TEST_F(StatsHtmlRenderTest, RenderUrlHandlerNoQuery) {
 }
 
 TEST_F(StatsHtmlRenderTest, RenderUrlHandlerWithQuery) {
-  query_params_["param"] = "on";
+  query_params_["boolparam"] = "on";
+  query_params_["strparam"] = "str value";
   renderer_.urlHandler(response_, handler(), query_params_);
   std::string out = response_.toString();
-  EXPECT_THAT(
-      out,
-      HasSubstr("<input type='checkbox' name='param' id='param-1-prefix-param' form='prefix'"));
+  EXPECT_THAT(out,
+              HasSubstr("<input type='checkbox' name='boolparam' id='param-1-prefix-boolparam' "
+                        "form='prefix'"));
+  EXPECT_THAT(out, HasSubstr("<input type='text' name='strparam' id='param-1-prefix-strparam' "
+                             "form='prefix' value='str value'"));
   EXPECT_THAT(out, HasSubstr(" checked/>"));
   EXPECT_THAT(out, HasSubstr("help text"));
   EXPECT_THAT(out, HasSubstr("param help"));

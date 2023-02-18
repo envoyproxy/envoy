@@ -17,14 +17,16 @@ public:
   void noStats(Buffer::Instance&, absl::string_view types) override;
   void generate(Buffer::Instance& response, const std::string& name,
                 const std::string& value) override;
+
+  // This matches the superclass impl exactly, but is needed to allow gcc to compile, which
+  // warns about hidden overrides if we omit it.
   void generate(Buffer::Instance& response, const std::string& name, uint64_t value) override {
-    // This matches the superclass impl exactly, but is needed to allow gcc to compile, which
-    // warns about hidden overrides if we omit it.
     StatsTextRender::generate(response, name, value);
   }
+
+  // Needed to allow gcc t compile, otherwise it warns about hidden overrides.
   void generate(Buffer::Instance& response, const std::string& name,
                 const Stats::ParentHistogram& histogram) override {
-    // Needed to allow gcc t compile, otherwise it warns about hidden overrides.
     StatsTextRender::generate(response, name, histogram);
   }
   void finalize(Buffer::Instance&) override;
