@@ -104,7 +104,6 @@ protected:
   }
 
   std::unique_ptr<StatsHtmlRender> renderer_;
-  // Http::Utility::QueryParams query_params_;
 };
 
 TEST_F(StatsDynamicRenderTest, RenderDynamic) {
