@@ -1047,7 +1047,8 @@ TEST_F(ZooKeeperFilterTest, SetWatches2Request) {
   const std::vector<std::string> persistentw = {"/baz", "/qux"};
   const std::vector<std::string> persistent_recursivew = {"/baz1", "/qux1"};
 
-  Buffer::OwnedImpl data = encodeSetWatches2Request(dataw, existw, childw, persistentw, persistent_recursivew);
+  Buffer::OwnedImpl data =
+      encodeSetWatches2Request(dataw, existw, childw, persistentw, persistent_recursivew);
 
   testRequest(data, {{{"opname", "setwatches2"}}, {{"bytes", "126"}}},
               config_->stats().setwatches2_rq_, 126);
