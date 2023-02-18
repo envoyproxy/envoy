@@ -10,7 +10,7 @@ option java_multiple_files = true;
 option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/network/rust_echo/v3alpha";
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
-// [#protodoc-title: Echo]
+// [#protodoc-title: Rust Echo]
 // Echo :ref:`configuration overview <config_network_filters_echo>`.
 // [#extension: envoy.filters.network.rust_echo]
 
