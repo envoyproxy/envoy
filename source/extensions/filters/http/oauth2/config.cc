@@ -73,7 +73,7 @@ Http::FilterFactoryCb OAuth2Config::createFilterFactoryFromProtoTyped(
       [&context, config, &cluster_manager](Http::FilterChainFactoryCallbacks& callbacks) -> void {
         std::unique_ptr<OAuth2Client> oauth_client =
             std::make_unique<OAuth2ClientImpl>(cluster_manager, config->oauthTokenEndpoint());
-        callbacks.addStreamDecoderFilter(
+        callbacks.addStreamFilter(
             std::make_shared<OAuth2Filter>(config, std::move(oauth_client), context.timeSource()));
       };
 }

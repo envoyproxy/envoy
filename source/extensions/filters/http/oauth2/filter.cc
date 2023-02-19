@@ -167,7 +167,8 @@ FilterConfig::FilterConfig(
       forward_bearer_token_(proto_config.forward_bearer_token()),
       pass_through_header_matchers_(headerMatchers(proto_config.pass_through_matcher())),
       cookie_names_(proto_config.credentials().cookie_names()),
-      auth_type_(getAuthType(proto_config.auth_type())) {
+      auth_type_(getAuthType(proto_config.auth_type())),
+      use_refresh_token_(proto_config.use_refresh_token()) {
   if (!cluster_manager.clusters().hasCluster(oauth_token_endpoint_.cluster())) {
     throw EnvoyException(fmt::format("OAuth2 filter: unknown cluster '{}' in config. Please "
                                      "specify which cluster to direct OAuth requests to.",
@@ -189,7 +190,8 @@ void OAuth2CookieValidator::setParams(const Http::RequestHeaderMap& headers,
                                       const std::string& secret) {
   const auto& cookies = Http::Utility::parseCookies(headers, [this](absl::string_view key) -> bool {
     return key == cookie_names_.oauth_expires_ || key == cookie_names_.bearer_token_ ||
-           key == cookie_names_.oauth_hmac_ || key == cookie_names_.id_token_;
+           key == cookie_names_.oauth_hmac_ || key == cookie_names_.id_token_ ||
+           key == cookie_names_.refresh_token_;
   });
 
   expires_ = findValue(cookies, cookie_names_.oauth_expires_);
@@ -200,6 +202,10 @@ void OAuth2CookieValidator::setParams(const Http::RequestHeaderMap& headers,
   host_ = headers.Host()->value().getStringView();
 
   secret_.assign(secret.begin(), secret.end());
+}
+
+bool OAuth2CookieValidator::canUpdateTokenByRefreshToken() const {
+  return token_ != EMPTY_STRING && refresh_token_ != EMPTY_STRING;
 }
 
 bool OAuth2CookieValidator::hmacIsValid() const {
@@ -319,6 +325,16 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
   // The following conditional could be replaced with a regex pattern-match,
   // if we're concerned about strict matching against the callback path.
   if (!config_->redirectPathMatcher().match(path_str)) {
+
+    // check a possibility to update access token using by refresh token
+    if (config_->useRefreshToken() && validator_->canUpdateTokenByRefreshToken()) {
+      // try to update access token by refresh token
+      oauth_client_->asyncUpdateAccessToken(validator_->refreshToken(), config_->clientId(),
+                                            config_->clientSecret(), config_->authType());
+      // pause while we await the next step from the OAuth server
+      return Http::FilterHeadersStatus::StopAllIterationAndWatermark;
+    }
+
     redirectToOAuthServer(headers);
     return Http::FilterHeadersStatus::StopIteration;
   }
@@ -362,6 +378,15 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
 
   // pause while we await the next step from the OAuth server
   return Http::FilterHeadersStatus::StopAllIterationAndBuffer;
+}
+
+Http::FilterHeadersStatus OAuth2Filter::encodeHeaders(Http::ResponseHeaderMap& headers, bool) {
+  if (response_headers_to_add_) {
+    Http::HeaderMapImpl::copyFrom(headers, *response_headers_to_add_);
+    response_headers_to_add_.reset();
+  }
+
+  return Http::FilterHeadersStatus::Continue;
 }
 
 // Defines a sequence of checks determining whether we should initiate a new OAuth flow or skip to
@@ -494,6 +519,15 @@ void OAuth2Filter::onGetAccessTokenSuccess(const std::string& access_code,
   finishGetAccessTokenFlow();
 }
 
+void OAuth2Filter::onUpdateAccessTokenSuccess(const std::string& access_code,
+                                              const std::string& id_token,
+                                              const std::string& refresh_token,
+                                              std::chrono::seconds expires_in) {
+  ASSERT(config_->useRefreshToken());
+  updateTokens(access_code, id_token, refresh_token, expires_in);
+  finishUpdateAccessTokenFlow();
+}
+
 void OAuth2Filter::finishGetAccessTokenFlow() {
   // At this point we have all of the pieces needed to authorize a user.
   // Now, we construct a redirect request to return the user to their
@@ -507,6 +541,57 @@ void OAuth2Filter::finishGetAccessTokenFlow() {
 
   decoder_callbacks_->encodeHeaders(std::move(response_headers), true, REDIRECT_LOGGED_IN);
   config_->stats().oauth_success_.inc();
+}
+
+void OAuth2Filter::finishUpdateAccessTokenFlow() {
+  ASSERT(config_->useRefreshToken());
+  // update cookie header to send it on actual state to upstream
+  const CookieNames& cookie_names = config_->cookieNames();
+
+  absl::flat_hash_map<std::string, std::string> cookies =
+      Http::Utility::parseCookies(*request_headers_);
+
+  cookies.insert_or_assign(cookie_names.oauth_hmac_, getEncodedToken());
+  cookies.insert_or_assign(cookie_names.oauth_expires_, new_expires_);
+
+  if (config_->forwardBearerToken()) {
+    cookies.insert_or_assign(cookie_names.bearer_token_, access_token_);
+    if (id_token_ != EMPTY_STRING) {
+      cookies.insert_or_assign(cookie_names.id_token_, id_token_);
+    }
+    if (refresh_token_ != EMPTY_STRING) {
+      cookies.insert_or_assign(cookie_names.refresh_token_, refresh_token_);
+    }
+  }
+
+  Http::HeaderString newCookies;
+  for (const auto& p : cookies) {
+    if (!newCookies.empty()) {
+      newCookies.append("; ", 2);
+    }
+    std::string value = absl::StrCat(p.first, "=", p.second);
+    newCookies.append(value.c_str(), value.size());
+  }
+
+  request_headers_->addReferenceKey(Http::Headers::get().Cookie, newCookies.getStringView());
+  if (config_->forwardBearerToken() && !access_token_.empty()) {
+    setBearerToken(*request_headers_, access_token_);
+  }
+
+  // remember cookies for response(need for set cookie)
+  response_headers_to_add_.reset();
+  response_headers_to_add_ = Http::ResponseHeaderMapImpl::create();
+  addResponseCookies(*response_headers_to_add_, getEncodedToken());
+
+  config_->stats().oauth_refreshtoken_success_.inc();
+  config_->stats().oauth_success_.inc();
+  decoder_callbacks_->continueDecoding();
+}
+
+void OAuth2Filter::onUpdateAccessTokenFailure() {
+  config_->stats().oauth_refreshtoken_failure_.inc();
+  // the access token hasn't been got using by refresh token, send a user to oauth endpoint
+  redirectToOAuthServer(*request_headers_);
 }
 
 void OAuth2Filter::addResponseCookies(Http::ResponseHeaderMap& headers,
