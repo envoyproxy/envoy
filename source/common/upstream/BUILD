@@ -64,25 +64,6 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "multiplexed_subscription_factory_lib",
-    srcs = ["multiplexed_subscription_factory.cc"],
-    hdrs = ["multiplexed_subscription_factory.h"],
-    deps = [
-        "//envoy/config:subscription_interface",
-        "//envoy/event:dispatcher_interface",
-        "//envoy/local_info:local_info_interface",
-        "//source/common/common:hash_lib",
-        "//source/common/config:custom_config_validators_lib",
-        "//source/common/config:grpc_mux_lib",
-        "//source/common/config:grpc_subscription_lib",
-        "//source/common/config:subscription_factory_lib",
-        "//source/common/config:utility_lib",
-        "//source/server:transport_socket_config_lib",
-        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
-    ],
-)
-
-envoy_cc_library(
     name = "cluster_discovery_manager_lib",
     srcs = ["cluster_discovery_manager.cc"],
     hdrs = ["cluster_discovery_manager.h"],
@@ -103,7 +84,6 @@ envoy_cc_library(
         ":cluster_discovery_manager_lib",
         ":load_balancer_lib",
         ":load_stats_reporter_lib",
-        ":multiplexed_subscription_factory_lib",
         ":od_cds_api_lib",
         ":ring_hash_lb_lib",
         ":subset_lb_lib",
@@ -141,6 +121,7 @@ envoy_cc_library(
         "//source/common/router:shadow_writer_lib",
         "//source/common/shared_pool:shared_pool_lib",
         "//source/common/tcp:conn_pool_lib",
+        "//source/common/tcp:async_tcp_client_lib",
         "//source/common/upstream:priority_conn_pool_map_impl_lib",
         "//source/common/upstream:upstream_lib",
         "//source/common/quic:quic_stat_names_lib",
@@ -409,6 +390,7 @@ envoy_cc_library(
     deps = [
         ":thread_aware_lb_lib",
         ":upstream_lib",
+        "//source/common/common:bit_array_lib",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/load_balancing_policies/maglev/v3:pkg_cc_proto",
     ],

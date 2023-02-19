@@ -11,6 +11,7 @@
 #include "source/common/http/header_utility.h"
 #include "source/common/quic/envoy_quic_server_session.h"
 #include "source/common/quic/envoy_quic_utils.h"
+#include "source/common/quic/quic_stats_gatherer.h"
 
 #include "quiche/quic/core/http/quic_header_list.h"
 #include "quiche/quic/core/quic_session.h"
@@ -36,6 +37,9 @@ EnvoyQuicServerStream::EnvoyQuicServerStream(
       headers_with_underscores_action_(headers_with_underscores_action) {
   ASSERT(static_cast<uint32_t>(GetReceiveWindow().value()) > 8 * 1024,
          "Send buffer limit should be larger than 8KB.");
+
+  stats_gatherer_ = new QuicStatsGatherer(&connection()->dispatcher().timeSource());
+  set_ack_listener(stats_gatherer_);
 }
 
 void EnvoyQuicServerStream::encode1xxHeaders(const Http::ResponseHeaderMap& headers) {
@@ -55,6 +59,7 @@ void EnvoyQuicServerStream::encodeHeaders(const Http::ResponseHeaderMap& headers
   {
     IncrementalBytesSentTracker tracker(*this, *mutableBytesMeter(), true);
     size_t bytes_sent = WriteHeaders(envoyHeadersToHttp2HeaderBlock(headers), end_stream, nullptr);
+    stats_gatherer_->addBytesSent(bytes_sent, end_stream);
     ENVOY_BUG(bytes_sent != 0, "Failed to encode headers.");
   }
 
@@ -93,6 +98,7 @@ void EnvoyQuicServerStream::encodeData(Buffer::Instance& data, bool end_stream) 
   {
     IncrementalBytesSentTracker tracker(*this, *mutableBytesMeter(), false);
     result = WriteBodySlices(span, end_stream);
+    stats_gatherer_->addBytesSent(result.bytes_consumed, end_stream);
   }
   // QUIC stream must take all.
   if (result.bytes_consumed == 0 && has_data) {
@@ -122,6 +128,7 @@ void EnvoyQuicServerStream::encodeTrailers(const Http::ResponseTrailerMap& trail
     IncrementalBytesSentTracker tracker(*this, *mutableBytesMeter(), true);
     size_t bytes_sent = WriteTrailers(envoyHeadersToHttp2HeaderBlock(trailers), nullptr);
     ENVOY_BUG(bytes_sent != 0, "Failed to encode trailers.");
+    stats_gatherer_->addBytesSent(bytes_sent, true);
   }
   onLocalEndStream();
 }
@@ -381,6 +388,10 @@ void EnvoyQuicServerStream::OnClose() {
     return;
   }
   clearWatermarkBuffer();
+  if (!stats_gatherer_->loggingDone()) {
+    stats_gatherer_->maybeDoDeferredLog(/* record_ack_timing */ false);
+  }
+  stats_gatherer_ = nullptr;
 }
 
 void EnvoyQuicServerStream::clearWatermarkBuffer() {

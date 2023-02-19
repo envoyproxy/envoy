@@ -190,6 +190,7 @@ function run_ci_verify () {
   sudo apt-get update -y
   sudo apt-get install -y -qq --no-install-recommends expect redis-tools
   export DOCKER_NO_PULL=1
+  export DOCKER_RMI_CLEANUP=1
   umask 027
   chmod -R o-rwx examples/
   "${ENVOY_SRCDIR}"/ci/verify_examples.sh "${@}" || exit
@@ -508,8 +509,7 @@ elif [[ "$CI_TARGET" == "deps" ]]; then
   bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/dependency:check \
         --action_env=TODAY_DATE \
         -- -v warn \
-           -c cves release_dates releases \
-      || >&2 echo "Dependency checker still FAILING!"
+           -c cves release_dates releases
 
   # Run pip requirements tests
   echo "check pip..."
@@ -528,7 +528,19 @@ elif [[ "$CI_TARGET" == "verify_distro" ]]; then
     bazel run "${BAZEL_BUILD_OPTIONS[@]}" //distribution:verify_packages "$PACKAGE_BUILD"
     exit 0
 elif [[ "$CI_TARGET" == "publish" ]]; then
-    bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/project:publish
+    # If we are on a non-main release branch but the patch version is 0 - then this branch
+    # has just been created, and the tag/release was cut from `main` - there is no need to
+    # create the tag/release from here
+    version="$(cat VERSION.txt)"
+    patch_version="$(echo "$version" | rev | cut -d. -f1)"
+    if [[ "$AZP_BRANCH" != "main" && "$patch_version" -eq 0 ]]; then
+        echo "Not creating a tag/release for ${version}"
+        exit 0
+    fi
+    # It can take some time to get here in CI so the branch may have changed - create the release
+    # from the current commit (as this only happens on non-PRs we are safe from merges)
+    BUILD_SHA="$(git rev-parse HEAD)"
+    bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/project:publish -- --publish-commitish="$BUILD_SHA"
     exit 0
 else
   echo "Invalid do_ci.sh target, see ci/README.md for valid targets."

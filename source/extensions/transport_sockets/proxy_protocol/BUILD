@@ -31,6 +31,7 @@ envoy_cc_library(
         "//envoy/network:connection_interface",
         "//envoy/network:transport_socket_interface",
         "//source/common/buffer:buffer_lib",
+        "//source/common/common:hex_lib",
         "//source/common/common:scalar_to_byte_vector_lib",
         "//source/common/common:utility_lib",
         "//source/common/network:address_lib",

@@ -127,7 +127,7 @@ public:
     // Send response headers with end_stream false because we want to add response body next.
     request_->encodeHeaders(default_response_headers_, false);
     // Send response data with end_stream true.
-    request_->encodeData(MockTokenString, true);
+    request_->encodeData(std::string(MockTokenString), true);
     result = request_->waitForEndStream(*dispatcher_);
     RELEASE_ASSERT(result, result.message());
     // Verify the proxied request was received upstream, as expected.

@@ -60,8 +60,24 @@ cleanup_stack () {
     "$DOCKER_COMPOSE" down --remove-orphans
 }
 
+debug_failure () {
+    >&2 echo "FAILURE DEBUG"
+    >&2 echo "DISK SPACE"
+    df -h
+    >&2 echo "DOCKER COMPOSE LOGS"
+    "$DOCKER_COMPOSE" logs
+    >&2 echo "DOCKER COMPOSE PS"
+    "$DOCKER_COMPOSE" ps
+}
+
 cleanup () {
-    local path paths
+    local code="$?"
+
+    if [[ "$code" -ne 0 ]]; then
+        debug_failure
+    fi
+
+    local path paths image rmi
     read -ra paths <<< "$(echo "$PATHS" | tr ',' ' ')"
     for path in "${paths[@]}"; do
         pushd "$path" > /dev/null || return 1
@@ -71,6 +87,16 @@ cleanup () {
         }
         popd > /dev/null
     done
+
+    read -ra rmi <<< "$(echo "$RMI" | tr ',' ' ')"
+
+    if [[ -n "$DOCKER_RMI_CLEANUP" ]]; then
+        for image in "${rmi[@]}"; do
+            docker rmi -f "$image"
+        done
+        docker image prune -f
+    fi
+
 }
 
 _curl () {

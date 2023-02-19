@@ -6,7 +6,6 @@
 #include "library/common/bridge/utility.h"
 #include "library/common/config/internal.h"
 #include "library/common/data/utility.h"
-#include "library/common/network/android.h"
 #include "library/common/stats/utility.h"
 
 namespace Envoy {
@@ -29,13 +28,24 @@ envoy_status_t Engine::run(const std::string config, const std::string log_level
   // std::thread, main_thread_ is the same object after this call, but its state is replaced with
   // that of the temporary. The temporary object's state becomes the default state, which does
   // nothing.
-  main_thread_ = std::thread(&Engine::main, this, std::string(config), std::string(log_level),
-                             admin_address_path);
+  auto options = std::make_unique<Envoy::OptionsImpl>();
+  options->setConfigYaml(absl::StrCat(config_header, config));
+  if (!log_level.empty()) {
+    options->setLogLevel(options->parseAndValidateLogLevel(log_level.c_str()));
+  }
+  options->setConcurrency(1);
+  if (!admin_address_path.empty()) {
+    options->setAdminAddressPath(admin_address_path);
+  }
+  return run(std::move(options));
+}
+
+envoy_status_t Engine::run(std::unique_ptr<Envoy::OptionsImpl>&& options) {
+  main_thread_ = std::thread(&Engine::main, this, std::move(options));
   return ENVOY_SUCCESS;
 }
 
-envoy_status_t Engine::main(const std::string config, const std::string log_level,
-                            const std::string admin_address_path) {
+envoy_status_t Engine::main(std::unique_ptr<Envoy::OptionsImpl>&& options) {
   // Using unique_ptr ensures main_common's lifespan is strictly scoped to this function.
   std::unique_ptr<EngineCommon> main_common;
   {
@@ -65,16 +75,6 @@ envoy_status_t Engine::main(const std::string config, const std::string log_leve
             std::make_unique<Logger::DefaultDelegate>(log_mutex_, Logger::Registry::getSink());
       }
 
-      auto options = std::make_unique<Envoy::OptionsImpl>();
-      options->setConfigYaml(absl::StrCat(config_header, config));
-      if (!log_level.empty()) {
-        options->setLogLevel(options->parseAndValidateLogLevel(log_level.c_str()));
-      }
-      options->setConcurrency(1);
-      if (!admin_address_path.empty()) {
-        options->setAdminAddressPath(admin_address_path);
-      }
-
       main_common = std::make_unique<EngineCommon>(std::move(options));
       server_ = main_common->server();
       event_dispatcher_ = &server_->dispatcher();
@@ -101,9 +101,6 @@ envoy_status_t Engine::main(const std::string config, const std::string log_leve
 
           connectivity_manager_ =
               Network::ConnectivityManagerFactory{server_->serverFactoryContext()}.get();
-          if (Api::OsSysCallsSingleton::get().supportsGetifaddrs()) {
-            Envoy::Network::Android::Utility::setAlternateGetifaddrs();
-          }
           auto v4_interfaces = connectivity_manager_->enumerateV4Interfaces();
           auto v6_interfaces = connectivity_manager_->enumerateV6Interfaces();
           logInterfaces("netconf_get_v4_interfaces", v4_interfaces);

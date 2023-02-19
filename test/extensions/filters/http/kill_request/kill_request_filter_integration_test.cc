@@ -48,6 +48,8 @@ TEST_P(KillRequestFilterIntegrationTestAllProtocols, KillRequestCrashEnvoy) {
 
 // Disabled for coverage per #18569
 #if !defined(ENVOY_CONFIG_COVERAGE)
+// KillRequestCrashEnvoyOnResponse is flaky on Windows
+#ifndef WIN32
 // Request crash Envoy controlled via response.
 TEST_P(KillRequestFilterIntegrationTestAllProtocols, KillRequestCrashEnvoyOnResponse) {
   const std::string filter_config_response =
@@ -75,6 +77,7 @@ TEST_P(KillRequestFilterIntegrationTestAllProtocols, KillRequestCrashEnvoyOnResp
   EXPECT_DEATH(sendRequestAndWaitForResponse(request_headers, 0, kill_response_headers, 1024),
                "KillRequestFilter is crashing Envoy!!!");
 }
+#endif
 
 TEST_P(KillRequestFilterIntegrationTestAllProtocols, KillRequestCrashEnvoyWithCustomKillHeader) {
   const std::string filter_config_with_custom_kill_header =

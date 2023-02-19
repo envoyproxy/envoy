@@ -35,8 +35,6 @@ routing PRs, questions, etc. to the right place.
 
 * Joshua Marantz ([jmarantz](https://github.com/jmarantz)) (jmarantz@google.com)
   * Stats, abseil, scalability, and performance.
-* William A Rowe Jr ([wrowe](https://github.com/wrowe)) (wrowe@vmware.com)
-  * Windows port and CI build, `bazel/foreign_cc` build and dependencies liaison.
 * Antonio Vicente ([antoniovicente](https://github.com/antoniovicente)) (avd@google.com)
   * Event management, security, performance, data plane.
 * Adi Peleg ([adisuissa](https://github.com/adisuissa)) (adip@google.com)
@@ -75,7 +73,6 @@ without further review.
 * All senior maintainers
 * Tony Allen ([tonya11en](https://github.com/tonya11en)) (tony@allen.gg)
 * Yan Avlasov ([yanavlasov](https://github.com/yanavlasov)) (yavlasov@google.com)
-* William A Rowe Jr ([wrowe](https://github.com/wrowe)) (wrowe@vmware.com)
 * Otto van der Schaaf ([oschaaf](https://github.com/oschaaf)) (oschaaf@redhat.com)
 * Tim Walsh ([twghu](https://github.com/twghu)) (twalsh@redhat.com)
 * Ryan Northey ([phlax](https://github.com/phlax)) (ryan@synca.io)
@@ -113,6 +110,7 @@ contributors to envoy-setec and relevant Slack channels from:
 * Michael Rebello ([rebello95](https://github.com/rebello95)) (mrebello@lyft.com)
 * Alan Chiu ([buildbreaker](https://github.com/buildbreaker)) (achiu@lyft.com)
 * Charles Le Borgne ([carloseltuerto](https://github.com/carloseltuerto)) (cleborgne@google.com)
+* William A Rowe Jr ([wrowe](https://github.com/wrowe)) (wrowe@rowe-clan.net)
 
 # Friends of Envoy
 

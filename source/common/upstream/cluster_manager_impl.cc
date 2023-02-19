@@ -17,6 +17,9 @@
 #include "envoy/network/dns.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/stats/scope.h"
+#include "envoy/tcp/async_tcp_client.h"
+#include "envoy/upstream/load_balancer.h"
+#include "envoy/upstream/upstream.h"
 
 #include "source/common/common/assert.h"
 #include "source/common/common/enum_to_int.h"
@@ -199,14 +202,10 @@ void ClusterManagerInitHelper::maybeFinishInitialize() {
       // avoid double pause ClusterLoadAssignment.
       Config::ScopedResume maybe_resume_eds_leds_sds;
       if (cm_.adsMux()) {
-
-        std::vector<std::string> paused_xds_types{
+        const std::vector<std::string> paused_xds_types{
             Config::getTypeUrl<envoy::config::endpoint::v3::ClusterLoadAssignment>(),
-            Config::getTypeUrl<envoy::config::endpoint::v3::LbEndpoint>()};
-        if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.combine_sds_requests")) {
-          paused_xds_types.push_back(
-              Config::getTypeUrl<envoy::extensions::transport_sockets::tls::v3::Secret>());
-        }
+            Config::getTypeUrl<envoy::config::endpoint::v3::LbEndpoint>(),
+            Config::getTypeUrl<envoy::extensions::transport_sockets::tls::v3::Secret>()};
         maybe_resume_eds_leds_sds = cm_.adsMux()->pause(paused_xds_types);
       }
       initializeSecondaryClusters();
@@ -345,11 +344,6 @@ ClusterManagerImpl::ClusterManagerImpl(
   }
 
   subscription_factory_ = std::make_unique<Config::SubscriptionFactoryImpl>(
-      local_info, main_thread_dispatcher, *this, validation_context.dynamicValidationVisitor(), api,
-      server, makeOptRefFromPtr(xds_resources_delegate_.get()),
-      makeOptRefFromPtr(xds_config_tracker_.get()));
-
-  multiplexed_subscription_factory_ = std::make_unique<MultiplexedSubscriptionFactory>(
       local_info, main_thread_dispatcher, *this, validation_context.dynamicValidationVisitor(), api,
       server, makeOptRefFromPtr(xds_resources_delegate_.get()),
       makeOptRefFromPtr(xds_config_tracker_.get()));
@@ -1190,6 +1184,13 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::httpAsyncClient
   return *lazy_http_async_client_;
 }
 
+Tcp::AsyncTcpClientPtr
+ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::tcpAsyncClient(
+    LoadBalancerContext* context, Tcp::AsyncTcpClientOptionsConstSharedPtr options) {
+  return std::make_unique<Tcp::AsyncTcpClientImpl>(parent_.thread_local_dispatcher_, *this, context,
+                                                   options->enable_half_close);
+}
+
 void ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::updateHosts(
     const std::string& name, uint32_t priority,
     PrioritySet::UpdateHostsParams&& update_hosts_params,
@@ -1498,7 +1499,9 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::onHostHealthFailure(
         break;
       }
       TcpConnectionsMap& container = it->second;
-      container.connections_.begin()->first->close(Network::ConnectionCloseType::NoFlush);
+      container.connections_.begin()->first->close(
+          Network::ConnectionCloseType::NoFlush,
+          StreamInfo::LocalCloseReasons::get().NonPooledTcpConnectionHostHealthFailure);
     }
   } else {
     drainOrCloseConnPools(host, ConnectionPool::DrainBehavior::DrainExistingConnections);

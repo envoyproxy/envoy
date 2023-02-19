@@ -24,6 +24,7 @@
 #include "envoy/secret/secret_manager.h"
 #include "envoy/ssl/context_manager.h"
 #include "envoy/stats/scope.h"
+#include "envoy/tcp/async_tcp_client.h"
 #include "envoy/thread_local/thread_local.h"
 #include "envoy/upstream/cluster_manager.h"
 
@@ -34,10 +35,10 @@
 #include "source/common/http/http_server_properties_cache_impl.h"
 #include "source/common/http/http_server_properties_cache_manager_impl.h"
 #include "source/common/quic/quic_stat_names.h"
+#include "source/common/tcp/async_tcp_client_impl.h"
 #include "source/common/upstream/cluster_discovery_manager.h"
 #include "source/common/upstream/host_utility.h"
 #include "source/common/upstream/load_stats_reporter.h"
-#include "source/common/upstream/multiplexed_subscription_factory.h"
 #include "source/common/upstream/od_cds_api_impl.h"
 #include "source/common/upstream/priority_conn_pool_map.h"
 #include "source/common/upstream/upstream_impl.h"
@@ -329,10 +330,6 @@ public:
 
   Config::SubscriptionFactory& subscriptionFactory() override { return *subscription_factory_; }
 
-  Config::SubscriptionFactory& multiplexedSubscriptionFactory() override {
-    return *multiplexed_subscription_factory_;
-  }
-
   void
   initializeSecondaryClusters(const envoy::config::bootstrap::v3::Bootstrap& bootstrap) override;
 
@@ -528,6 +525,9 @@ private:
                                               LoadBalancerContext* context) override;
       Host::CreateConnectionData tcpConn(LoadBalancerContext* context) override;
       Http::AsyncClient& httpAsyncClient() override;
+      Tcp::AsyncTcpClientPtr
+      tcpAsyncClient(LoadBalancerContext* context,
+                     Tcp::AsyncTcpClientOptionsConstSharedPtr options) override;
 
       // Updates the hosts in the priority set.
       void updateHosts(const std::string& name, uint32_t priority,
@@ -817,7 +817,6 @@ private:
   ClusterTimeoutBudgetStatNames cluster_timeout_budget_stat_names_;
 
   std::unique_ptr<Config::SubscriptionFactoryImpl> subscription_factory_;
-  std::unique_ptr<MultiplexedSubscriptionFactory> multiplexed_subscription_factory_;
   ClusterSet primary_clusters_;
 
   std::unique_ptr<Config::XdsResourcesDelegate> xds_resources_delegate_;

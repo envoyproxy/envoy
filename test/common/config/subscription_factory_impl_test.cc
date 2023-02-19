@@ -108,28 +108,6 @@ TEST_F(SubscriptionFactoryTest, NoConfigSpecifier) {
       "Missing config source specifier in envoy::config::core::v3::ConfigSource");
 }
 
-TEST_F(SubscriptionFactoryTest, UnsupportedConfigSourceAggregatedGrpc) {
-  envoy::config::core::v3::ConfigSource config;
-  Upstream::ClusterManager::ClusterSet primary_clusters;
-  config.mutable_api_config_source()->set_api_type(
-      envoy::config::core::v3::ApiConfigSource::AGGREGATED_GRPC);
-  config.mutable_api_config_source()->set_transport_api_version(envoy::config::core::v3::V3);
-  EXPECT_CALL(cm_, primaryClusters()).WillOnce(ReturnRef(primary_clusters));
-  EXPECT_THROW_WITH_MESSAGE(subscriptionFromConfigSource(config), EnvoyException,
-                            "Unsupported config source AGGREGATED_GRPC");
-}
-
-TEST_F(SubscriptionFactoryTest, UnsupportedConfigSourceAggregatedDeltaGrpc) {
-  envoy::config::core::v3::ConfigSource config;
-  Upstream::ClusterManager::ClusterSet primary_clusters;
-  config.mutable_api_config_source()->set_api_type(
-      envoy::config::core::v3::ApiConfigSource::AGGREGATED_DELTA_GRPC);
-  config.mutable_api_config_source()->set_transport_api_version(envoy::config::core::v3::V3);
-  EXPECT_CALL(cm_, primaryClusters()).WillOnce(ReturnRef(primary_clusters));
-  EXPECT_THROW_WITH_MESSAGE(subscriptionFromConfigSource(config), EnvoyException,
-                            "Unsupported config source AGGREGATED_DELTA_GRPC");
-}
-
 TEST_F(SubscriptionFactoryTest, RestClusterEmpty) {
   envoy::config::core::v3::ConfigSource config;
   Upstream::ClusterManager::ClusterSet primary_clusters;
@@ -415,14 +393,35 @@ TEST_P(SubscriptionFactoryTestUnifiedOrLegacyMux, GrpcCollectionAggregatedSubscr
   Upstream::ClusterManager::ClusterSet primary_clusters;
   primary_clusters.insert("static_cluster");
   EXPECT_CALL(cm_, primaryClusters()).WillOnce(ReturnRef(primary_clusters));
-  GrpcMuxSharedPtr ads_mux = std::make_shared<NiceMock<MockGrpcMux>>();
+  auto ads_mux = std::make_shared<NiceMock<MockGrpcMux>>();
   EXPECT_CALL(cm_, adsMux()).WillOnce(Return(ads_mux));
   EXPECT_CALL(dispatcher_, createTimer_(_));
   // onConfigUpdateFailed() should not be called for gRPC stream connection failure
   EXPECT_CALL(callbacks_, onConfigUpdateFailed(_, _)).Times(0);
+  // Since this is ADS, the mux's start() should not be called (which attempts to create a gRPC
+  // stream).
+  EXPECT_CALL(*ads_mux, start()).Times(0);
   collectionSubscriptionFromUrl("xdstp://foo/envoy.config.endpoint.v3.ClusterLoadAssignment/bar",
                                 config)
       ->start({});
+}
+
+TEST_P(SubscriptionFactoryTestUnifiedOrLegacyMux, GrpcCollectionAggregatedSotwSubscription) {
+  envoy::config::core::v3::ConfigSource config;
+  auto* api_config_source = config.mutable_api_config_source();
+  api_config_source->set_api_type(envoy::config::core::v3::ApiConfigSource::AGGREGATED_GRPC);
+  api_config_source->set_transport_api_version(envoy::config::core::v3::V3);
+  api_config_source->add_grpc_services()->mutable_envoy_grpc()->set_cluster_name("static_cluster");
+
+  Upstream::ClusterManager::ClusterSet primary_clusters;
+  primary_clusters.insert("static_cluster");
+  EXPECT_CALL(cm_, primaryClusters()).WillOnce(ReturnRef(primary_clusters));
+  const std::string xds_url = "xdstp://foo/envoy.config.endpoint.v3.ClusterLoadAssignment/bar";
+
+  GrpcMuxSharedPtr ads_mux = std::make_shared<NiceMock<MockGrpcMux>>();
+  EXPECT_CALL(cm_, adsMux()).WillOnce(Return(ads_mux));
+  EXPECT_CALL(dispatcher_, createTimer_(_));
+  collectionSubscriptionFromUrl(xds_url, config)->start({});
 }
 
 TEST_P(SubscriptionFactoryTestUnifiedOrLegacyMux, GrpcCollectionDeltaSubscription) {
