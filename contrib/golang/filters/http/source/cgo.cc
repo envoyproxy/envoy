@@ -19,7 +19,7 @@ std::string copyGoString(void* str) {
     return "";
   }
   auto goStr = reinterpret_cast<GoString*>(str);
-  return std::string(goStr->p, goStr->n); // NOLINT(modernize-return-braced-init-list)
+  return std::string{goStr->p, size_t(goStr->n)};
 }
 
 // The returned absl::string_view only refer to the GoString, won't copy the string content into
