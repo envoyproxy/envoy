@@ -28,28 +28,19 @@ ClusterConfig::ClusterConfig(const GolangClusterProto& config)
     throw EnvoyException(fmt::format("golang_cluster_specifier_plugin: get library failed: {} {}",
                                      so_id_, so_path_));
   }
-}
 
-uint64_t ClusterConfig::getConfigId() {
-  if (config_id_ != 0) {
-    return config_id_;
-  }
-
-  auto dlib = getDsoLib();
   std::string str;
   if (!config_.SerializeToString(&str)) {
     ENVOY_LOG(error, "failed to serialize any pb to string");
-    return 0;
+    return;
   }
 
   auto ptr = reinterpret_cast<unsigned long long>(str.data());
   auto len = str.length();
-  config_id_ = dlib->envoyGoClusterSpecifierNewConfig(ptr, len);
-  if (config_id_ == 0) {
+  plugin_id_ = dlib->envoyGoClusterSpecifierNewPlugin(ptr, len);
+  if (plugin_id_ == 0) {
     ENVOY_LOG(error, "invalid golang plugin config");
   }
-
-  return config_id_;
 }
 
 RouteConstSharedPtr
@@ -63,11 +54,11 @@ GolangClusterSpecifierPlugin::route(const RouteEntry& parent,
 
 again:
   buffer.reserve(buffer_len);
-  auto config_id = config_->getConfigId();
+  auto plugin_id = config_->getPluginId();
   auto header_ptr = reinterpret_cast<uint64_t>(&headers);
   auto buffer_ptr = reinterpret_cast<uint64_t>(buffer.data());
   auto new_len = dlib != nullptr
-                     ? dlib->envoyGoOnClusterSpecify(header_ptr, config_id, buffer_ptr, buffer_len)
+                     ? dlib->envoyGoOnClusterSpecify(header_ptr, plugin_id, buffer_ptr, buffer_len)
                      : 0;
 
   if (new_len == 0) {

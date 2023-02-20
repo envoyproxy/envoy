@@ -42,6 +42,8 @@ import (
 	"github.com/envoyproxy/envoy/contrib/golang/common/go/utils"
 )
 
+const errCodeInvalidConfig = 0
+
 var (
 	pluginNumGenerator uint64
 	pluginCache        = map[uint64]api.ClusterSpecifier{}
@@ -49,22 +51,22 @@ var (
 )
 
 //export envoyGoClusterSpecifierNewPlugin
-func envoyGoClusterSpecifierNewConfig(configPtr uint64, configLen uint64) uint64 {
+func envoyGoClusterSpecifierNewPlugin(configPtr uint64, configLen uint64) uint64 {
 	if clusterSpecifierConfigFactory == nil {
 		panic("no cluster specifier config factory registered")
 	}
 
 	buf := utils.BytesToSlice(configPtr, configLen)
 	var any anypb.Any
-	proto.Unmarshal(buf, &any)
+	if err := proto.Unmarshal(buf, &any); err != nil {
+		return errCodeInvalidConfig
+	}
 
 	plugin := clusterSpecifierConfigFactory(&any)
-
 	pluginNum := atomic.AddUint64(&pluginNumGenerator, 1)
 
 	pluginCacheLock.Lock()
 	defer pluginCacheLock.Unlock()
-
 	pluginCache[pluginNum] = plugin
 
 	return pluginNum

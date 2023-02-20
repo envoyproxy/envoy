@@ -68,9 +68,9 @@ DsoInstance::DsoInstance(const std::string dso_name) : dso_name_(dso_name) {
       envoy_go_filter_on_http_data_, handler_, dso_name, "envoyGoFilterOnHttpData");
   loaded_ = dlsymInternal<decltype(envoy_go_filter_on_http_destroy_)>(
       envoy_go_filter_on_http_destroy_, handler_, dso_name, "envoyGoFilterOnHttpDestroy");
-  loaded_ = dlsymInternal<decltype(envoy_go_cluster_specifier_new_config_)>(
-      envoy_go_cluster_specifier_new_config_, handler_, dso_name,
-      "envoyGoClusterSpecifierNewConfig");
+  loaded_ = dlsymInternal<decltype(envoy_go_cluster_specifier_new_plugin_)>(
+      envoy_go_cluster_specifier_new_plugin_, handler_, dso_name,
+      "envoyGoClusterSpecifierNewPlugin");
   loaded_ = dlsymInternal<decltype(envoy_go_on_cluster_specify_)>(
       envoy_go_on_cluster_specify_, handler_, dso_name, "envoyGoOnClusterSpecify");
 }
@@ -108,12 +108,12 @@ void DsoInstance::envoyGoFilterOnHttpDestroy(httpRequest* p0, int p1) {
   envoy_go_filter_on_http_destroy_(p0, GoUint64(p1));
 }
 
-GoUint64 DsoInstance::envoyGoClusterSpecifierNewConfig(GoUint64 configPtr, GoUint64 configLen) {
-  ASSERT(envoy_go_cluster_specifier_new_config_ != nullptr);
-  return envoy_go_cluster_specifier_new_config_(configPtr, configLen);
+GoUint64 DsoInstance::envoyGoClusterSpecifierNewPlugin(GoUint64 configPtr, GoUint64 configLen) {
+  ASSERT(envoy_go_cluster_specifier_new_plugin_ != nullptr);
+  return envoy_go_cluster_specifier_new_plugin_(configPtr, configLen);
 }
 
-GoInt64 DsoInstance::envoyGoOnClusterSpecify(GoUint64 headerPtr, GoUint64 configId,
+GoInt64 DsoInstance::envoyGoOnClusterSpecify(GoUint64 headerPtr, GoUint64 pluginId,
                                              GoUint64 bufferPtr, GoUint64 bufferLen) {
   ASSERT(envoy_go_on_cluster_specify_ != nullptr);
   return envoy_go_on_cluster_specify_(headerPtr, configId, bufferPtr, bufferLen);

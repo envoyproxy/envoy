@@ -21,19 +21,6 @@ import (
 	"github.com/envoyproxy/envoy/contrib/golang/http/cluster_specifier/source/go/pkg/api"
 )
 
-var clusterSpecifierFactory api.ClusterSpecifierFactory
-
-func RegisterClusterSpecifierFactory(f api.ClusterSpecifierFactory) {
-	clusterSpecifierFactory = f
-}
-
-// no parser by default
-var clusterSpecifierConfigParser api.ClusterSpecifierConfigParser = nil
-
-func RegisterClusterSpecifierConfigParser(parser api.ClusterSpecifierConfigParser) {
-	clusterSpecifierConfigParser = parser
-}
-
 var clusterSpecifierConfigFactory api.ClusterSpecifierConfigFactory
 
 func RegisterClusterSpecifierConfigFactory(f api.ClusterSpecifierConfigFactory) {

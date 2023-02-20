@@ -16,5 +16,4 @@ var RegisterHttpFilterConfigParser = httpfilter.RegisterHttpFilterConfigParser
 
 /* cluster specifier plugin */
 
-var RegisterClusterSpecifierFactory = cluster.RegisterClusterSpecifierFactory
-var RegisterClusterSpecifierConfigParser = cluster.RegisterClusterSpecifierConfigParser
+var RegisterClusterSpecifierConfigFactory = cluster.RegisterClusterSpecifierConfigFactory

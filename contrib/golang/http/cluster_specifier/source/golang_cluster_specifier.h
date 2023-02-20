@@ -17,7 +17,7 @@ using GolangClusterProto = envoy::extensions::http::cluster_specifier::golang::v
 class ClusterConfig : Logger::Loggable<Logger::Id::http> {
 public:
   ClusterConfig(const GolangClusterProto& config);
-  uint64_t getConfigId();
+  uint64_t getPluginId() { return plugin_id_; };
   const std::string& defaultCluster() { return default_cluster_; }
   Dso::DsoInstancePtr getDsoLib() { return dynamic_lib_; }
 
@@ -26,7 +26,7 @@ private:
   const std::string so_path_;
   const std::string default_cluster_;
   const Protobuf::Any config_;
-  uint64_t config_id_{0};
+  uint64_t plugin_id_{0};
   Dso::DsoInstancePtr dynamic_lib_;
 };
 
