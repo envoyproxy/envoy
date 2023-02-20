@@ -71,14 +71,14 @@ again:
                      : 0;
 
   if (new_len == 0) {
-    ENVOY_LOG(debug, "golang choose the default cluster");
+    ENVOY_LOG(info, "golang choose the default cluster");
     cluster = config_->defaultCluster();
   } else if (new_len < 0) {
     ENVOY_LOG(error, "error happened while golang choose cluster, using the default cluster");
     cluster = config_->defaultCluster();
   } else if (new_len <= buffer_len) {
-    ENVOY_LOG(debug, "buffer size fit the cluster name from golang");
-    cluster = std::string(buffer.data(), new_len);
+    ENVOY_LOG(debug, "buffer size fit the cluster name from golang: {}", new_len);
+    cluster = std::string{buffer.data(), size_t(new_len)};
   } else {
     ENVOY_LOG(debug, "need larger size of buffer to save the cluster name in golang, try again");
     buffer_len = new_len;

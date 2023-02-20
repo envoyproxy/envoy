@@ -12,7 +12,7 @@ envoy_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
     data = [
-        "//contrib/golang/filters/http/cluster_specifier/test/test_data/simple:plugin.so",
+        "//contrib/golang/http/cluster_specifier/test/test_data/simple:plugin.so",
     ],
     env = {"GODEBUG": "cgocheck=0"},
     deps = [
@@ -51,14 +51,12 @@ envoy_cc_test(
     name = "golang_integration_test",
     srcs = ["golang_integration_test.cc"],
     data = [
-        "//contrib/golang/filters/http/test/test_data/basic:filter.so",
-        "//contrib/golang/filters/http/test/test_data/echo:filter.so",
-        "//contrib/golang/filters/http/test/test_data/passthrough:filter.so",
-        "//contrib/golang/filters/http/test/test_data/routeconfig:filter.so",
+        "//contrib/golang/http/cluster_specifier/test/test_data/simple:plugin.so",
     ],
     env = {"GODEBUG": "cgocheck=0"},
     deps = [
         "//contrib/golang/filters/http/source:config",
+        "//contrib/golang/http/cluster_specifier/source:config",
         "//source/exe:main_common_lib",
         "//test/config:v2_link_hacks",
         "//test/integration:http_integration_lib",

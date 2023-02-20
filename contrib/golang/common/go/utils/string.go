@@ -39,12 +39,12 @@ func BytesToSlice(ptr uint64, len uint64) []byte {
 	return s
 }
 
-// BufferToSlice convert the memory buffer from C to a empty slice with reserved len.
+// BufferToSlice convert the memory buffer from C to a slice with reserved len.
 func BufferToSlice(ptr uint64, len uint64) []byte {
 	var s []byte
 	var sHdr = (*reflect.SliceHeader)(unsafe.Pointer(&s))
 	sHdr.Data = uintptr(ptr)
-	sHdr.Len = 0
+	sHdr.Len = int(len)
 	sHdr.Cap = int(len)
 	return s
 }

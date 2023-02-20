@@ -21,9 +21,9 @@ func (p *parser) Parse(config *anypb.Any) interface{} {
 		panic(err)
 	}
 	var conf pluginConfig
-	if cluster, ok := configStruct.Value.AsMap()["cluster"]; ok {
-		if clusterStr, ok := cluster.(string); ok {
-			conf.cluster = clusterStr
+	if value, ok := configStruct.Value.AsMap()["invalid_prefix"]; ok {
+		if valueStr, ok := value.(string); ok {
+			conf.invalidPrefix = valueStr
 		}
 	}
 	return &conf

@@ -24,9 +24,7 @@ type ClusterSpecifierConfigParser interface {
 }
 
 type ClusterSpecifier interface {
-	// TODO: support header
-	// Choose(RequestHeaderMap) string
-	Choose() string
+	Choose(RequestHeaderMap) string
 }
 
 type ClusterSpecifierFactory func(config interface{}) ClusterSpecifier

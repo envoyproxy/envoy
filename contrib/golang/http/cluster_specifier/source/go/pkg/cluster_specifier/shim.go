@@ -38,21 +38,21 @@ import (
 
 //export envoyGoOnClusterSpecify
 func envoyGoOnClusterSpecify(headerPtr uint64, configId uint64, bufferPtr uint64, bufferLen uint64) int64 {
-	header := httpHeaderMap{
+	header := &httpHeaderMap{
 		headerPtr: headerPtr,
 	}
 	specifier := getClusterSpecifier(configId)
-	cluster := specifier.Choose()
-	l := uint64(len(cluster))
-	if l == 0 {
+	cluster := specifier.Choose(header)
+	clusterLen := uint64(len(cluster))
+	if clusterLen == 0 {
 		// means use the default cluster
 		return 0
 	}
-	if l > bufferLen {
+	if clusterLen > bufferLen {
 		// buffer length is not large enough.
-		return int64(l)
+		return int64(clusterLen)
 	}
-	buffer := utils.BufferToSlice(bufferPtr, bufferLen)
+	buffer := utils.BufferToSlice(bufferPtr, clusterLen)
 	copy(buffer, cluster)
-	return int64(l)
+	return int64(clusterLen)
 }
