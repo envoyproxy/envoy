@@ -1,8 +1,6 @@
 @_implementationOnly import EnvoyEngine
 import Foundation
 
-// swiftlint:disable file_length
-
 /// Builder used for creating and running a new Engine instance.
 @objcMembers
 open class EngineBuilder: NSObject {
@@ -29,9 +27,7 @@ open class EngineBuilder: NSObject {
   private var dnsCacheSaveIntervalSeconds: UInt32 = 1
   private var enableHappyEyeballs: Bool = true
   private var enableGzipDecompression: Bool = true
-  private var enableGzipCompression: Bool = false
   private var enableBrotliDecompression: Bool = false
-  private var enableBrotliCompression: Bool = false
 #if ENVOY_ENABLE_QUIC
   private var enableHttp3: Bool = true
 #else
@@ -59,9 +55,9 @@ open class EngineBuilder: NSObject {
   private var platformFilterChain: [EnvoyHTTPFilterFactory] = []
   private var stringAccessors: [String: EnvoyStringAccessor] = [:]
   private var keyValueStores: [String: EnvoyKeyValueStore] = [:]
+  private var runtimeGuards: [String: String] = [:]
   private var directResponses: [DirectResponse] = []
   private var statsSinks: [String] = []
-  private var experimentalValidateYAMLCallback: ((Bool) -> Void)?
 
   // MARK: - Public
 
@@ -224,19 +220,6 @@ open class EngineBuilder: NSObject {
     return self
   }
 
-#if ENVOY_MOBILE_REQUEST_COMPRESSION
-  /// Specify whether to do gzip request compression or not.  Defaults to false.
-  ///
-  /// - parameter enableGzipCompression: whether or not to gunzip requests.
-  ///
-  /// - returns: This builder.
-  @discardableResult
-  public func enableGzipCompression(_ enableGzipCompression: Bool) -> Self {
-    self.enableGzipCompression = enableGzipCompression
-    return self
-  }
-#endif
-
   /// Specify whether to do brotli response decompression or not.  Defaults to false.
   ///
   /// - parameter enableBrotliDecompression: whether or not to brotli decompress responses.
@@ -247,19 +230,6 @@ open class EngineBuilder: NSObject {
     self.enableBrotliDecompression = enableBrotliDecompression
     return self
   }
-
-#if ENVOY_MOBILE_REQUEST_COMPRESSION
-  /// Specify whether to do brotli request compression or not.  Defaults to false.
-  ///
-  /// - parameter enableBrotliCompression: whether or not to brotli compress requests.
-  ///
-  /// - returns: This builder.
-  @discardableResult
-  public func enableBrotliCompression(_ enableBrotliCompression: Bool) -> Self {
-    self.enableBrotliCompression = enableBrotliCompression
-    return self
-  }
-#endif
 
 #if ENVOY_ENABLE_QUIC
   /// Specify whether to enable support for HTTP/3 or not.  Defaults to true.
@@ -475,6 +445,18 @@ open class EngineBuilder: NSObject {
     return self
   }
 
+  /// Set a runtime guard with the provided value.
+  ///
+  /// - parameter name:  the name of the runtime guard, e.g. test_feature_false.
+  /// - parameter value: the value for the runtime guard.
+  ///
+  /// - returns: This builder.
+  @discardableResult
+  public func setRuntimeGuard(_ name: String, _ value: Bool) -> Self {
+    self.runtimeGuards[name] = "\(value)"
+    return self
+  }
+
   /// Set a closure to be called when the engine finishes its async startup and begins running.
   ///
   /// - parameter closure: The closure to be called.
@@ -580,24 +562,6 @@ open class EngineBuilder: NSObject {
   }
 #endif
 
-  /// Makes the engine validate the generated YAML against an upcoming, more performant builder
-  /// implementation. If the yaml is consistent between both builders, the callback will be invoked
-  /// with `true`. If a difference was detected, it will be invoked with `false`.
-  ///
-  /// The comparison isn't performed at all if this method isn't called.
-  ///
-  /// Note that this API is temporary and it will not be considered a breaking change once it is
-  /// removed.
-  ///
-  /// - parameter callback: The callback to be invoked.
-  ///
-  /// - returns: This builder.
-  @discardableResult
-  public func setExperimentalValidateYAMLCallback(_ callback: @escaping (Bool) -> Void) -> Self {
-    self.experimentalValidateYAMLCallback = callback
-    return self
-  }
-
   /// Builds and runs a new `Engine` instance with the provided configuration.
   ///
   /// - note: Must be strongly retained in order for network requests to be performed correctly.
@@ -622,9 +586,7 @@ open class EngineBuilder: NSObject {
       enableHappyEyeballs: self.enableHappyEyeballs,
       enableHttp3: self.enableHttp3,
       enableGzipDecompression: self.enableGzipDecompression,
-      enableGzipCompression: self.enableGzipCompression,
       enableBrotliDecompression: self.enableBrotliDecompression,
-      enableBrotliCompression: self.enableBrotliCompression,
       enableInterfaceBinding: self.enableInterfaceBinding,
       enableDrainPostDnsRefresh: self.enableDrainPostDnsRefresh,
       enforceTrustChainVerification: self.enforceTrustChainVerification,
@@ -640,18 +602,13 @@ open class EngineBuilder: NSObject {
       appVersion: self.appVersion,
       appId: self.appId,
       virtualClusters: self.virtualClusters,
-      directResponseMatchers: self.directResponses
-        .map { $0.resolvedRouteMatchYAML() }
-        .joined(separator: "\n"),
-      directResponses: self.directResponses
-        .map { $0.resolvedDirectResponseYAML() }
-        .joined(separator: "\n"),
+      runtimeGuards: self.runtimeGuards,
+      typedDirectResponses: self.directResponses.map({ $0.toObjC() }),
       nativeFilterChain: self.nativeFilterChain,
       platformFilterChain: self.platformFilterChain,
       stringAccessors: self.stringAccessors,
       keyValueStores: self.keyValueStores,
-      statsSinks: self.statsSinks,
-      experimentalValidateYAMLCallback: self.experimentalValidateYAMLCallback
+      statsSinks: self.statsSinks
     )
 
     switch self.base {

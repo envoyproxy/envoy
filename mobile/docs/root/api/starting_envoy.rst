@@ -378,23 +378,6 @@ Specify whether to enable transparent response Gzip decompression. Defaults to t
 Default values from the `gzip decompressor proto <https://www.envoyproxy.io/docs/envoy/latest/api-v3/extensions/compression/gzip/decompressor/v3/gzip.proto>`_
 are used.
 
-~~~~~~~~~~~~~~~~~~~~~~~~~~~
-``enableGzipCompression``
-~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-Specify whether to enable transparent request Gzip compression. Defaults to false.
-
-**Example**::
-
-  // Kotlin
-  builder.enableGzipCompression(true)
-
-  // Swift
-  builder.enableGzipCompression(true)
-
-Default values from the `gzip compressor proto <https://www.envoyproxy.io/docs/envoy/latest/api-v3/extensions/compression/gzip/compressor/v3/gzip.proto>`_
-are used.
-
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 ``enableBrotliDecompression``
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -410,23 +393,6 @@ Specify whether to enable transparent response Brotli decompression. Defaults to
   builder.enableBrotliDecompression(true)
 
 Default values from the `brotli decompressor proto <https://www.envoyproxy.io/docs/envoy/latest/api-v3/extensions/compression/brotli/decompressor/v3/brotli.proto>`_
-are used.
-
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-``enableBrotliCompression``
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-Specify whether to enable transparent request Brotli compression. Defaults to false.
-
-**Example**::
-
-  // Kotlin
-  builder.enableBrotliCompression(true)
-
-  // Swift
-  builder.enableBrotliCompression(true)
-
-Default values from the `brotli compressor proto <https://www.envoyproxy.io/docs/envoy/latest/api-v3/extensions/compression/brotli/compressor/v3/brotli.proto>`_
 are used.
 
 ~~~~~~~~~~~~~~~~~~~~~~~
@@ -544,6 +510,22 @@ A maximum of 100 entries will be stored.
   // Swift
   builder.enableDNSCache(true, saveInterval: 60)
 
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+``setRuntimeGuard``
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Adds a runtime guard key value pair to envoy configuration.  The guard is of the short form "feature"
+rather than the fully qualified "envoy.reloadable_features.feature"
+Note that Envoy will fail to start up in debug mode if an unknown guard is specified.
+
+**Example**::
+
+  // Kotlin
+  builder.setRuntimeGuard("feature", true)
+
+  // Swift
+  builder.setRuntimeGuard("feature", true)
 
 ----------------------
 Advanced configuration

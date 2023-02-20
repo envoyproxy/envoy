@@ -130,6 +130,7 @@ public class QuicTestServerTest {
   public void get_simpleTxt() throws Exception {
     RequestScenario requestScenario = new RequestScenario()
                                           .setHttpMethod(RequestMethod.GET)
+                                          .addHeader("no_trailers", "true")
                                           .setUrl(QuicTestServer.getServerURL() + "/simple.txt");
 
     Response response = sendRequest(requestScenario);

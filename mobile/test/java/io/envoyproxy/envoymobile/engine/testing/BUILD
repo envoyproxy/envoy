@@ -30,8 +30,8 @@ envoy_mobile_android_test(
         "sandboxNetwork": "standard",
     },
     native_deps = [
-        "//test/common/jni:libquic_test_server_jni.so",
-        "//test/common/jni:libquic_test_server_jni.jnilib",
+        "//test/common/jni:libenvoy_jni_with_test_extensions.so",
+        "//test/common/jni:libenvoy_jni_with_test_extensions_jnilib",
     ],
     deps = [
         ":testing",

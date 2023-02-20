@@ -109,7 +109,7 @@ void FakeStream::encodeHeaders(const Http::HeaderMap& headers, bool end_stream) 
   });
 }
 
-void FakeStream::encodeData(absl::string_view data, bool end_stream) {
+void FakeStream::encodeData(std::string data, bool end_stream) {
   postToConnectionThread([this, data, end_stream]() -> void {
     {
       absl::MutexLock lock(&lock_);
