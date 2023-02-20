@@ -470,7 +470,7 @@ TEST_F(IoUringWorkerIntegraionTest, MergeInjection) {
 }
 
 TEST_F(IoUringWorkerIntegraionTest, AcceptSocketBasic) {
-  init();
+  initialize();
   socket(false, true);
   listen();
 
@@ -487,7 +487,7 @@ TEST_F(IoUringWorkerIntegraionTest, AcceptSocketBasic) {
 }
 
 TEST_F(IoUringWorkerIntegraionTest, AcceptSocketDisable) {
-  init();
+  initialize();
   socket(false, true);
   listen();
 
@@ -504,7 +504,7 @@ TEST_F(IoUringWorkerIntegraionTest, AcceptSocketDisable) {
 }
 
 TEST_F(IoUringWorkerIntegraionTest, AcceptSocketDisableEnable) {
-  init();
+  initialize();
   socket(false, true);
   listen();
 
