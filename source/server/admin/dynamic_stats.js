@@ -1,8 +1,6 @@
-// Before first checkin:
+// Follow-ups:
 //   * top-n algo to limit compute overhead with high cardinality stats with user control of N.
 //   * alternate sorting criteria, reverse-sort controls, etc.
-
-// Follow-ups:
 //   * render histograms
 //   * detect when user is not looking at page and stop or slow down pinging the server
 //   * hieararchical display
@@ -30,6 +28,17 @@ let dynamic_stats_pre_element = null;
 const param_id_prefix = "param-1-stats-";
 
 /**
+ * To make testing easier, provide a hook for tests to set, to enable tests
+ * to block on rendering.
+ */
+post_render_test_hook = null;
+
+window['setRenderTestHook'] = (hook) => {
+  console.log('setting hook');
+  post_render_test_hook = hook;
+};
+
+/**
  * Hook that's run on DOMContentLoaded to create the HTML elements (just one
  * PRE right now) and kick off the periodic JSON updates.
  */
@@ -45,8 +54,8 @@ function initHook() {
  */
 function loadStats() {
   const makeQueryParam = (name) => name + "=" + document.getElementById(param_id_prefix + name).value;
-  const params = ["usedonly", "filter", "type", "histogram_buckets"];
-  const url = "/stats?format=json&" + params.map(makeQueryParam).join("&");
+  const params = ["filter", "type", "histogram_buckets"];
+  const url = "/stats?format=json&usedonly&" + params.map(makeQueryParam).join("&");
   fetch(url).then((response) => response.json()).then((data) => renderStats(data));
 }
 
@@ -132,6 +141,12 @@ function renderStats(data) {
         stat_record.change_count + ")" + "\n";
   }
   dynamic_stats_pre_element.textContent = text;
+
+  // If a post-render test-hook has been established, call it.
+  //debugger;
+  if (post_render_test_hook) {
+    post_render_test_hook();
+  }
 
   // Update stats every 5 seconds by default.
   window.setTimeout(loadStats, 1000*loadSettingOrUseDefault("dynamic-update-interval", 5));

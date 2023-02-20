@@ -79,9 +79,10 @@ public:
    * and for rendering in /stats?format=html. We share the same UrlHandler in
    * both contexts by defining an API for it here.
    *
+   * @prams dynamic_mode the set of parameters is slightly different for dynamic mode.
    * @return a URL handler for stats.
    */
-  Admin::UrlHandler statsHandler();
+  Admin::UrlHandler statsHandler(bool dynamic_mode);
 
   static Admin::RequestPtr makeRequest(Stats::Store& stats, const StatsParams& params,
                                        StatsRequest::UrlHandlerFn url_handler_fn = nullptr);

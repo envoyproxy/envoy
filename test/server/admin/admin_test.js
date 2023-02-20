@@ -26,26 +26,49 @@ function addTest(url, name, test_function) {
  * run.
  */
 function runTest(url, name, tester) {
-  const results = document.getElementById('test-results');
-  results.textContent += name + ' ...';
-  iframe = document.createElement("iframe");
-  iframe.width = 800;
-  iframe.height = 1000;
-  iframe.src = url;
-  document.body.appendChild(iframe);
   return new Promise((resolve, reject) => {
+    const results = document.getElementById('test-results');
+    results.textContent += name + ' ...';
+    iframe = document.createElement("iframe");
+    iframe.width = 800;
+    iframe.height = 1000;
+    iframe.src = url;
+    iframe.onload = () => {
+      const setRenderTestHook = iframe.contentWindow['setRenderTestHook'];
+      setRenderTestHook(() => {
+        console.log('post render\n');
+        try {
+          tester(iframe);
+          results.textContent += 'passed\n';
+        } catch (err) {
+          results.textContent += 'FAILED: ' + err + '\n';
+        }
+        //iframe.parentElement.removeChild(iframe);
+        resolve(null);
+        setRenderTestHook(null);
+      });
+    };
+    document.body.appendChild(iframe);
+  });
+
+/*
     window.setTimeout(() => {
-      try {
-        tester(iframe);
-        results.textContent += 'passed\n';
-      } catch (err) {
-        results.textContent += 'FAILED: ' + err + '\n';
-      }
-      iframe.parentElement.removeChild(iframe);
-      resolve(null);
+      const setRenderTestHook = iframe.contentWindow['setRenderTestHook'];
+      setRenderTestHook(() => {
+        console.log('post render\n');
+        try {
+          tester(iframe);
+          results.textContent += 'passed\n';
+        } catch (err) {
+          results.textContent += 'FAILED: ' + err + '\n';
+        }
+        //iframe.parentElement.removeChild(iframe);
+        resolve(null);
+      });
     },
                       3000);
   });
+*/
 }
 
 
@@ -62,17 +85,18 @@ function assertTrue(cond, comment) {
  * Runs all tests added via addTest() above.
  */
 function runAllTests() {
-  addEventListener("DOMContentLoaded", () => {
-    const next_test = (test_index) => {
-      if (test_index < test_list.length) {
-        test = test_list[test_index];
-        ++test_index;
-        runTest(test.url, test.name + '(' + test_index + '/' + test_list.length + ')',
-                test.test_function).then(() => {
-          next_test(test_index);
-        });
-      }
-    };
-    next_test(0);
-  });
+  const next_test = (test_index) => {
+    if (test_index < test_list.length) {
+      test = test_list[test_index];
+      ++test_index;
+      runTest(test.url, test.name + '(' + test_index + '/' + test_list.length + ')',
+              test.test_function).then(() => {
+                next_test(test_index);
+              });
+    }
+  };
+  next_test(0);
 }
+
+// Trigger the tests once all JS is loaded.
+addEventListener("DOMContentLoaded", runAllTests);
