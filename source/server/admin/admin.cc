@@ -22,6 +22,7 @@
 #include "source/common/common/fmt.h"
 #include "source/common/common/mutex_tracer_impl.h"
 #include "source/common/common/utility.h"
+#include "source/common/filesystem/filesystem_impl.h"
 #include "source/common/formatter/substitution_formatter.h"
 #include "source/common/http/codes.h"
 #include "source/common/http/conn_manager_utility.h"
@@ -36,6 +37,7 @@
 #include "source/extensions/request_id/uuid/config.h"
 #include "source/server/admin/utils.h"
 
+#include "absl/strings/match.h"
 #include "absl/strings/str_join.h"
 #include "absl/strings/str_replace.h"
 #include "absl/strings/string_view.h"
@@ -225,6 +227,10 @@ AdminImpl::AdminImpl(const std::string& profile_path, Server::Instance& server,
                       MAKE_ADMIN_HANDLER(runtime_handler_.handlerRuntimeModify), false, true),
           makeHandler("/reopen_logs", "reopen access logs",
                       MAKE_ADMIN_HANDLER(logs_handler_.handlerReopenLogs), false, true),
+#ifdef ENVOY_ADMIN_BROWSER_TEST
+          makeHandler("/test", "test the admin site in the browser",
+                      MAKE_ADMIN_HANDLER(handlerTest), false, false),
+#endif
       },
       date_provider_(server.dispatcher().timeSource()),
       admin_filter_chain_(std::make_shared<AdminFilterChain>()),
@@ -391,6 +397,34 @@ Http::Code AdminImpl::handlerHelp(Http::ResponseHeaderMap&, Buffer::Instance& re
   getHelp(response);
   return Http::Code::OK;
 }
+
+#ifdef ENVOY_ADMIN_BROWSER_TEST
+Http::Code AdminImpl::handlerTest(Http::ResponseHeaderMap& response_headers,
+                                  Buffer::Instance& response, AdminStream& admin_stream) {
+
+  Http::Utility::QueryParams query_params = admin_stream.queryParams();
+  auto iter = query_params.find("file");
+  if (iter == query_params.end()) {
+    response.add("query param 'file' missing");
+    return Http::Code::BadRequest;
+  }
+
+  Filesystem::InstanceImpl file_system;
+  std::string path = absl::StrCat("test/server/admin/", iter->second);
+  TRY_ASSERT_MAIN_THREAD { response.add(file_system.fileReadToEnd(path)); }
+  END_TRY
+  catch (EnvoyException& e) {
+    response.add(e.what());
+    return Http::Code::NotFound;
+  }
+  if (absl::EndsWith(path, ".html")) {
+    response_headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Html);
+  } else if (absl::EndsWith(path, ".js")) {
+    response_headers.setReferenceContentType("text/javascript");
+  }
+  return Http::Code::OK;
+}
+#endif
 
 void AdminImpl::getHelp(Buffer::Instance& response) const {
   response.add("admin commands are:\n");

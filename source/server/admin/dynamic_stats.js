@@ -35,6 +35,7 @@ const param_id_prefix = "param-1-stats-";
  */
 function initHook() {
   dynamic_stats_pre_element = document.createElement("pre");
+  dynamic_stats_pre_element.id = 'dynamic-content-pre';
   document.body.appendChild(dynamic_stats_pre_element);
   loadStats();
 }

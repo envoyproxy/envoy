@@ -59,6 +59,7 @@ envoy_cc_library(
         "//source/common/common:minimal_logger_lib",
         "//source/common/common:mutex_tracer_lib",
         "//source/common/common:utility_lib",
+        "//source/common/filesystem:filesystem_lib",
         "//source/common/formatter:substitution_formatter_lib",
         "//source/common/http:codes_lib",
         "//source/common/http:conn_manager_lib",
