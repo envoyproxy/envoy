@@ -4,6 +4,26 @@
 # CI logs.
 set -e
 
+## DEBUGGING (NB: Set these in your env to avoided unwanted changes)
+## Set this to _not_ build/push just print what would be
+# DOCKER_CI_DRYRUN=true
+#
+## Set these to tag/push images to your own repo
+# DOCKER_IMAGE_PREFIX=mydocker/repo
+# DOCKERHUB_USERNAME=me
+# DOCKERHUB_PASSWORD=mypassword
+#
+## Set these to simulate types of CI run
+# AZP_SHA1=MOCKSHA
+# AZP_BRANCH=refs/heads/main
+# AZP_BRANCH=refs/heads/release/v1.43
+# AZP_BRANCH=refs/tags/v1.77
+##
+
+if [[ -n "$DOCKER_CI_DRYRUN" ]]; then
+    AZP_SHA1="${AZP_SHA1:-MOCKSHA}"
+fi
+
 function is_windows() {
   [[ "$(uname -s)" == *NT* ]]
 }
@@ -75,7 +95,15 @@ build_images() {
     args+=("-o" "type=oci,dest=${ENVOY_DOCKER_IMAGE_DIRECTORY}/envoy${TYPE}.tar")
   fi
 
+  echo ">> BUILD: ${BUILD_TAG}"
+  echo "> docker ${BUILD_COMMAND[*]} --platform ${PLATFORM} ${args[*]} -t ${BUILD_TAG} ."
+  if [[ -n "$DOCKER_CI_DRYRUN" ]]; then
+      echo ""
+      return
+  fi
+  echo "..."
   docker "${BUILD_COMMAND[@]}" --platform "${PLATFORM}" "${args[@]}" -t "${BUILD_TAG}" .
+  echo ""
 }
 
 push_images() {
@@ -87,9 +115,19 @@ push_images() {
   _args=$(build_args "${TYPE}")
   read -ra args <<< "$_args"
   PLATFORM="$(build_platforms "${TYPE}")"
+
+  echo ">> PUSH: ${BUILD_TAG}"
+  echo "> docker ${BUILD_COMMAND[*]} --platform ${PLATFORM} ${args[*]} -t ${BUILD_TAG} . --push ||
+    docker push ${BUILD_TAG}"
+  if [[ -n "$DOCKER_CI_DRYRUN" ]]; then
+      echo ""
+      return
+  fi
+  echo "..."
   # docker buildx doesn't do push with default builder
-  docker "${BUILD_COMMAND[@]}" --platform "${PLATFORM}" "${args[@]}" -t "${BUILD_TAG}" . --push || \
-  docker push "${BUILD_TAG}"
+  docker "${BUILD_COMMAND[@]}" --platform "${PLATFORM}" "${args[@]}" -t "${BUILD_TAG}" . --push ||
+    docker push "${BUILD_TAG}"
+  echo ""
 }
 
 MAIN_BRANCH="refs/heads/main"
@@ -120,7 +158,9 @@ else
 
   # Configure docker-buildx tools
   BUILD_COMMAND=("buildx" "build")
-  config_env
+  if [[ -z "$DOCKER_CI_DRYRUN" ]]; then
+      config_env
+  fi
 fi
 
 # Test the docker build in all cases, but use a local tag that we will overwrite before push in the
@@ -138,7 +178,9 @@ if [[ "${AZP_BRANCH}" != "${MAIN_BRANCH}" ]] &&
   exit 0
 fi
 
-docker login -u "$DOCKERHUB_USERNAME" -p "$DOCKERHUB_PASSWORD"
+if [[ -z "$DOCKER_CI_DRYRUN" ]]; then
+    docker login -u "$DOCKERHUB_USERNAME" -p "$DOCKERHUB_PASSWORD"
+fi
 
 for BUILD_TYPE in "${BUILD_TYPES[@]}"; do
   push_images "${BUILD_TYPE}" "${DOCKER_IMAGE_PREFIX}${BUILD_TYPE}${IMAGE_POSTFIX}:${IMAGE_NAME}"
