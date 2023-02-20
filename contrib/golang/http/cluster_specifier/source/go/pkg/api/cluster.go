@@ -29,6 +29,8 @@ type ClusterSpecifier interface {
 
 type ClusterSpecifierFactory func(config interface{}) ClusterSpecifier
 
+type ClusterSpecifierConfigFactory func(any *anypb.Any) ClusterSpecifier
+
 type RequestHeaderMap interface {
 	Get(key string) string
 }

@@ -35,6 +35,7 @@ import (
 	"sync"
 	"sync/atomic"
 
+	"github.com/envoyproxy/envoy/contrib/golang/http/cluster_specifier/source/go/pkg/api"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 
@@ -42,27 +43,34 @@ import (
 )
 
 var (
-	configNumGenerator uint64
-	configCache        = &sync.Map{} // uint64 -> *anypb.Any
+	pluginNumGenerator uint64
+	pluginCache        = map[uint64]api.ClusterSpecifier{}
+	pluginCacheLock    sync.RWMutex
 )
 
-//export envoyGoClusterSpecifierNewConfig
+//export envoyGoClusterSpecifierNewPlugin
 func envoyGoClusterSpecifierNewConfig(configPtr uint64, configLen uint64) uint64 {
+	if clusterSpecifierConfigFactory == nil {
+		panic("no cluster specifier config factory registered")
+	}
+
 	buf := utils.BytesToSlice(configPtr, configLen)
 	var any anypb.Any
 	proto.Unmarshal(buf, &any)
 
-	configNum := atomic.AddUint64(&configNumGenerator, 1)
-	if clusterSpecifierConfigParser != nil {
-		configCache.Store(configNum, clusterSpecifierConfigParser.Parse(&any))
-	} else {
-		configCache.Store(configNum, &any)
-	}
+	plugin := clusterSpecifierConfigFactory(&any)
 
-	return configNum
+	pluginNum := atomic.AddUint64(&pluginNumGenerator, 1)
+
+	pluginCacheLock.Lock()
+	defer pluginCacheLock.Unlock()
+
+	pluginCache[pluginNum] = plugin
+
+	return pluginNum
 }
 
-//export envoyGoClusterSpecifierDestroyConfig
-func envoyGoClusterSpecifierDestroyConfig(id uint64) {
-	configCache.Delete(id)
+//export envoyGoClusterSpecifierDestroyPlugin
+func envoyGoClusterSpecifierDestroyPlugin(id uint64) {
+	delete(pluginCache, id)
 }

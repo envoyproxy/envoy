@@ -18,8 +18,6 @@
 package cluster_specifier
 
 import (
-	"fmt"
-
 	"github.com/envoyproxy/envoy/contrib/golang/http/cluster_specifier/source/go/pkg/api"
 )
 
@@ -36,15 +34,14 @@ func RegisterClusterSpecifierConfigParser(parser api.ClusterSpecifierConfigParse
 	clusterSpecifierConfigParser = parser
 }
 
+var clusterSpecifierConfigFactory api.ClusterSpecifierConfigFactory
+
+func RegisterClusterSpecifierConfigFactory(f api.ClusterSpecifierConfigFactory) {
+	clusterSpecifierConfigFactory = f
+}
+
 func getClusterSpecifier(configId uint64) api.ClusterSpecifier {
-	config, ok := configCache.Load(configId)
-	if !ok {
-		panic(fmt.Sprintf("get cluster specifier config failed, configId: %d", configId))
-	}
-
-	if clusterSpecifierFactory == nil {
-		panic("no cluster specifier factory registered")
-	}
-
-	return clusterSpecifierFactory(config)
+	pluginCacheLock.RLock()
+	defer pluginCacheLock.RUnlock()
+	return pluginCache[configId]
 }
