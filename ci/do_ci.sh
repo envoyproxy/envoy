@@ -57,6 +57,7 @@ function bazel_with_collection() {
       cp --parents -f "$f" "${ENVOY_FAILED_TEST_LOGS}"
     done <<< "$failed_logs"
     popd
+    run_process_test_result
     exit "${BAZEL_STATUS}"
   fi
   collect_build_profile "$1"
