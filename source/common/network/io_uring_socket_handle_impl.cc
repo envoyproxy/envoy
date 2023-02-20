@@ -62,7 +62,13 @@ Api::IoCallUint64Result IoUringSocketHandleImpl::close() {
     return shadow_io_handle_->close();
   }
 
-  ::close(fd_);
+  if (io_uring_socket_type_ == IoUringSocketType::Unknown || !io_uring_socket_.has_value()) {
+    ::close(fd_);
+    SET_SOCKET_INVALID(fd_);
+    return Api::ioCallUint64ResultNoError();
+  }
+
+  io_uring_socket_.ref().close();
   SET_SOCKET_INVALID(fd_);
   return Api::ioCallUint64ResultNoError();
 }
@@ -227,7 +233,27 @@ IoHandlePtr IoUringSocketHandleImpl::accept(struct sockaddr* addr, socklen_t* ad
                                                      socket_v6only_, domain_, true);
   }
 
-  return nullptr;
+  if (!accepted_socket_param_.has_value()) {
+    return nullptr;
+  }
+
+  ENVOY_LOG(
+      trace, "IoUringSocketHandleImpl accept the socket, connect fd = {}, remote address = {}",
+      accepted_socket_param_->fd_,
+      Network::Address::addressFromSockAddrOrThrow(*accepted_socket_param_->remote_addr_,
+                                                   accepted_socket_param_->remote_addr_len_, false)
+          ->asString());
+  ASSERT(io_uring_socket_type_ == IoUringSocketType::Accept);
+
+  memcpy(reinterpret_cast<void*>(addr), // NOLINT(safe-memcpy)
+         reinterpret_cast<void*>(accepted_socket_param_->remote_addr_),
+         accepted_socket_param_->remote_addr_len_);
+  *addrlen = accepted_socket_param_->remote_addr_len_;
+  auto io_handle = std::make_unique<IoUringSocketHandleImpl>(
+      io_uring_factory_, accepted_socket_param_->fd_, socket_v6only_, domain_, true);
+  accepted_socket_param_ = absl::nullopt;
+
+  return io_handle;
 }
 
 Api::SysCallIntResult IoUringSocketHandleImpl::connect(Address::InstanceConstSharedPtr address) {
@@ -263,6 +289,8 @@ void IoUringSocketHandleImpl::initializeFileEvent(Event::Dispatcher& dispatcher,
       ENVOY_LOG(trace, "fallback to IoSocketHandle for accept socket");
       shadow_io_handle_->initializeFileEvent(dispatcher, std::move(cb), trigger, events);
       return;
+    } else {
+      io_uring_socket_ = io_uring_factory_.getIoUringWorker()->addAcceptSocket(fd_, *this);
     }
     break;
   }
@@ -278,6 +306,8 @@ void IoUringSocketHandleImpl::initializeFileEvent(Event::Dispatcher& dispatcher,
       return;
     }
   }
+
+  cb_ = std::move(cb);
 }
 
 void IoUringSocketHandleImpl::activateFileEvents(uint32_t events) {
@@ -290,6 +320,13 @@ void IoUringSocketHandleImpl::activateFileEvents(uint32_t events) {
       (io_uring_socket_type_ == IoUringSocketType::Accept && !enable_accept_socket_)) {
     shadow_io_handle_->activateFileEvents(events);
     return;
+  }
+
+  if (events & Event::FileReadyType::Read) {
+    io_uring_socket_->injectCompletion(Io::RequestType::Read);
+  }
+  if (events & Event::FileReadyType::Write) {
+    io_uring_socket_->injectCompletion(Io::RequestType::Write);
   }
 }
 
@@ -304,6 +341,12 @@ void IoUringSocketHandleImpl::enableFileEvents(uint32_t events) {
     shadow_io_handle_->enableFileEvents(events);
     return;
   }
+
+  if (events & Event::FileReadyType::Read) {
+    io_uring_socket_->enable();
+  } else {
+    io_uring_socket_->disable();
+  }
 }
 
 void IoUringSocketHandleImpl::resetFileEvents() {
@@ -316,6 +359,8 @@ void IoUringSocketHandleImpl::resetFileEvents() {
     shadow_io_handle_->resetFileEvents();
     return;
   }
+
+  io_uring_socket_->disable();
 }
 
 IoHandlePtr IoUringSocketHandleImpl::duplicate() {
@@ -328,7 +373,15 @@ IoHandlePtr IoUringSocketHandleImpl::duplicate() {
                                                          domain_, &io_uring_factory_);
 }
 
-void IoUringSocketHandleImpl::onAcceptSocket(Io::AcceptedSocketParam&) {}
+void IoUringSocketHandleImpl::onAcceptSocket(Io::AcceptedSocketParam& param) {
+  accepted_socket_param_ = param;
+  ENVOY_LOG(trace, "before on accept socket");
+  cb_(Event::FileReadyType::Read);
+  ENVOY_LOG(trace, "after on accept socket");
+
+  // After accept the socket, the accepted_socket_param expected to be cleanup.
+  ASSERT(accepted_socket_param_ == absl::nullopt);
+}
 
 void IoUringSocketHandleImpl::onRead(Io::ReadParam&) {}
 

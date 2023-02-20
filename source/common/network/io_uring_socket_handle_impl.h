@@ -83,13 +83,18 @@ protected:
 
   Io::IoUringFactory& io_uring_factory_;
   IoUringSocketType io_uring_socket_type_{IoUringSocketType::Unknown};
+  OptRef<Io::IoUringSocket> io_uring_socket_{absl::nullopt};
+
+  Event::FileReadyCb cb_;
+
+  OptRef<Io::AcceptedSocketParam> accepted_socket_param_{absl::nullopt};
 
   // TODO(soulxu): This is for debug, it will be deleted after the
   // io_uring implemented.
   std::unique_ptr<IoHandle> shadow_io_handle_;
   bool enable_server_socket_{false};
   bool enable_client_socket_{false};
-  bool enable_accept_socket_{false};
+  bool enable_accept_socket_{true};
 };
 
 } // namespace Network
