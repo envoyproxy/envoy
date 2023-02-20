@@ -42,7 +42,7 @@ class MaglevTable : public ThreadAwareLoadBalancerBase::HashingLoadBalancer,
                     protected Logger::Loggable<Logger::Id::upstream> {
 public:
   MaglevTable(uint64_t table_size, MaglevLoadBalancerStats& stats);
-  virtual ~MaglevTable() = default;
+  ~MaglevTable() override = default;
 
   // Recommended table size in section 5.3 of the paper.
   static constexpr uint64_t DefaultTableSize = 65537;
@@ -100,7 +100,7 @@ public:
     constructMaglevTableInternal(normalized_host_weights, max_normalized_weight,
                                  use_hostname_for_hashing);
   }
-  virtual ~OriginalMaglevTable() = default;
+  ~OriginalMaglevTable() override = default;
 
   // ThreadAwareLoadBalancerBase::HashingLoadBalancer
   HostConstSharedPtr chooseHost(uint64_t hash, uint32_t attempt) const override;
@@ -124,7 +124,7 @@ public:
   CompactMaglevTable(const NormalizedHostWeightVector& normalized_host_weights,
                      double max_normalized_weight, uint64_t table_size,
                      bool use_hostname_for_hashing, MaglevLoadBalancerStats& stats);
-  virtual ~CompactMaglevTable() = default;
+  ~CompactMaglevTable() override = default;
 
   // ThreadAwareLoadBalancerBase::HashingLoadBalancer
   HostConstSharedPtr chooseHost(uint64_t hash, uint32_t attempt) const override;
