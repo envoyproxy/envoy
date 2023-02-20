@@ -5,7 +5,7 @@
 
 
 /**
- * Master list of tests. Each test in a struct with a url, name, and test Function.
+ * List of all tests. Each test in a struct with a url, name, and test Function.
  */
 const test_list = [];
 
@@ -66,8 +66,10 @@ function runAllTests() {
     const next_test = (test_index) => {
       if (test_index < test_list.length) {
         test = test_list[test_index];
-        runTest(test.url, test.name, test.test_function).then(() => {
-          next_test(test_index + 1);
+        ++test_index;
+        runTest(test.url, test.name + '(' + test_index + '/' + test_list.length + ')',
+                test.test_function).then(() => {
+          next_test(test_index);
         });
       }
     };
