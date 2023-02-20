@@ -38,6 +38,9 @@ import (
 
 //export envoyGoOnClusterSpecify
 func envoyGoOnClusterSpecify(headerPtr uint64, configId uint64, bufferPtr uint64, bufferLen uint64) int64 {
+	header := httpHeaderMap{
+		headerPtr: headerPtr,
+	}
 	specifier := getClusterSpecifier(configId)
 	cluster := specifier.Choose()
 	l := uint64(len(cluster))

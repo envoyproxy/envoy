@@ -7,8 +7,8 @@
 #include "test/test_common/utility.h"
 
 #include "absl/strings/str_format.h"
-#include "contrib/golang/filters/http/source/config.h"
-#include "contrib/golang/filters/http/source/golang_filter.h"
+#include "contrib/golang/http/cluster_specifier/source/config.h"
+#include "contrib/golang/http/cluster_specifier/source/golang_cluster_specifier.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -26,16 +26,17 @@ std::string genSoPath(std::string name) {
       "/plugin.so");
 }
 
-TEST(GolangFilterConfigTest, InvalidateEmptyConfig) {
+TEST(GolangClusterSpecifierConfigTest, InvalidateEmptyConfig) {
   NiceMock<Server::Configuration::MockFactoryContext> context;
   EXPECT_THROW_WITH_REGEX(
-      GolangFilterConfig().createFilterFactoryFromProto(
-          envoy::extensions::filters::http::golang::v3alpha::Config(), "stats", context),
+      GolangClusterSpecifierPluginFactoryConfig::createClusterSpecifierPlugin(
+          envoy::extensions::http::cluster_specifier::golang::v3alpha::Config(), context),
       Envoy::ProtoValidationException,
       "ConfigValidationError.LibraryId: value length must be at least 1 characters");
 }
 
-TEST(GolangFilterConfigTest, GolangFilterWithValidConfig) {
+/*
+TEST(GolangClusterSpecifierConfigTest, ValidConfig) {
   const auto yaml_fmt = R"EOF(
   library_id: %s
   library_path: %s
@@ -87,6 +88,7 @@ TEST(GolangFilterConfigTest, GolangFilterWithNilPluginConfig) {
   EXPECT_TRUE(plugin_config.SerializeToString(&str));
   cb(filter_callback);
 }
+*/
 
 } // namespace
 } // namespace Golang

@@ -18,10 +18,5 @@
 package api
 
 type HttpCAPI interface {
-	// experience api, memory unsafe
 	HttpGetHeader(headerPtr uint64, key *string, value *string)
-
-	HttpCopyHeaders(headerPtr uint64, num uint64, bytes uint64) map[string]string
-	HttpSetHeader(headerPtr uint64, key *string, value *string)
-	HttpRemoveHeader(headerPtr uint64, key *string)
 }

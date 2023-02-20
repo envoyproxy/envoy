@@ -31,34 +31,6 @@ type ClusterSpecifier interface {
 
 type ClusterSpecifierFactory func(config interface{}) ClusterSpecifier
 
-type HeaderMap interface {
-	// Get value of key
-	// If multiple values associated with this key, first one will be returned.
-	Get(key string) (string, bool)
-
-	// Set key-value pair in header map, the previous pair will be replaced if exists
-	Set(key, value string)
-
-	// Add value for given key.
-	// Multiple headers with the same key may be added with this function.
-	// Use Set for setting a single header for the given key.
-	Add(key, value string)
-
-	// Del delete pair of specified key
-	Del(key string)
-
-	// ByteSize return size of HeaderMap
-	ByteSize() uint64
-}
-
 type RequestHeaderMap interface {
-	HeaderMap
-	Protocol() string
-	Scheme() string
-	Method() string
-	Host() string
-	Path() string
-
-	// GetRaw is unsafe, reuse the memory from Envoy
-	GetRaw(name string) string
+	Get(key string) string
 }

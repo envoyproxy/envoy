@@ -32,8 +32,6 @@ package cluster_specifier
 */
 import "C"
 import (
-	"reflect"
-	"runtime"
 	"unsafe"
 
 	"github.com/envoyproxy/envoy/contrib/golang/http/cluster_specifier/source/go/pkg/api"
@@ -43,38 +41,6 @@ type httpCApiImpl struct{}
 
 func (c *httpCApiImpl) HttpGetHeader(headerPtr uint64, key *string, value *string) {
 	C.envoyGoClusterSpecifierGetHeader(C.ulonglong(headerPtr), unsafe.Pointer(key), unsafe.Pointer(value))
-}
-
-func (c *httpCApiImpl) HttpCopyHeaders(headerPtr uint64, num uint64, bytes uint64) map[string]string {
-	// TODO: use a memory pool for better performance,
-	// since these go strings in strs, will be copied into the following map.
-	strs := make([]string, num*2)
-	// but, this buffer can not be reused safely,
-	// since strings may refer to this buffer as string data, and string is const in go.
-	// we have to make sure the all strings is not using before reusing,
-	// but strings may be alive beyond the request life.
-	buf := make([]byte, bytes)
-	sHeader := (*reflect.SliceHeader)(unsafe.Pointer(&strs))
-	bHeader := (*reflect.SliceHeader)(unsafe.Pointer(&buf))
-
-	C.envoyGoClusterSpecifierCopyHeaders(C.ulonglong(headerPtr), unsafe.Pointer(sHeader.Data), unsafe.Pointer(bHeader.Data))
-
-	m := make(map[string]string, num)
-	for i := uint64(0); i < num*2; i += 2 {
-		key := strs[i]
-		value := strs[i+1]
-		m[key] = value
-	}
-	runtime.KeepAlive(buf)
-	return m
-}
-
-func (c *httpCApiImpl) HttpSetHeader(headerPtr uint64, key *string, value *string) {
-	C.envoyGoClusterSpecifierSetHeader(C.ulonglong(headerPtr), unsafe.Pointer(key), unsafe.Pointer(value))
-}
-
-func (c *httpCApiImpl) HttpRemoveHeader(headerPtr uint64, key *string) {
-	C.envoyGoClusterSpecifierRemoveHeader(C.ulonglong(headerPtr), unsafe.Pointer(key))
 }
 
 var cAPI api.HttpCAPI = &httpCApiImpl{}

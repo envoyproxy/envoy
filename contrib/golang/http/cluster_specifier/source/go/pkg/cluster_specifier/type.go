@@ -22,47 +22,13 @@ import (
 )
 
 type httpHeaderMap struct {
-	headerPtr   uint64
-	headers     map[string]string
-	headerNum   uint64
-	headerBytes uint64
+	headerPtr uint64
 }
 
-var _ api.HeaderMap = (*httpHeaderMap)(nil)
+var _ api.RequestHeaderMap = (*httpHeaderMap)(nil)
 
-func (h *httpHeaderMap) GetRaw(key string) string {
+func (h *httpHeaderMap) Get(key string) string {
 	var value string
 	cAPI.HttpGetHeader(h.headerPtr, &key, &value)
 	return value
-}
-
-func (h *httpHeaderMap) Get(key string) (string, bool) {
-	if h.headers == nil {
-		h.headers = cAPI.HttpCopyHeaders(h.headerPtr, h.headerNum, h.headerBytes)
-	}
-	value, ok := h.headers[key]
-	return value, ok
-}
-
-func (h *httpHeaderMap) Set(key, value string) {
-	if h.headers != nil {
-		h.headers[key] = value
-	}
-	cAPI.HttpSetHeader(h.headerPtr, &key, &value)
-}
-
-func (h *httpHeaderMap) Add(key, value string) {
-	panic("unsupported yet")
-}
-
-func (h *httpHeaderMap) Del(key string) {
-	if h.headers != nil {
-		delete(h.headers, key)
-	}
-	cAPI.HttpRemoveHeader(h.headerPtr, &key)
-}
-
-// ByteSize return size of HeaderMap
-func (h *httpHeaderMap) ByteSize() uint64 {
-	return h.headerBytes
 }
