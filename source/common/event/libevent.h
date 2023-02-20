@@ -4,12 +4,12 @@
 
 struct event_base;
 extern "C" {
-void event_base_free(event_base*);
+void eventBaseFree(event_base*);
 }
 
 struct evconnlistener;
 extern "C" {
-void evconnlistener_free(evconnlistener*);
+void evconnlistenerFree(evconnlistener*);
 }
 
 namespace Envoy {
@@ -33,7 +33,7 @@ private:
   static bool initialized_;
 };
 
-using BasePtr = CSmartPtr<event_base, event_base_free>;
+using BasePtr = CSmartPtr<event_base, eventBaseFree>;
 
 } // namespace Libevent
 } // namespace Event

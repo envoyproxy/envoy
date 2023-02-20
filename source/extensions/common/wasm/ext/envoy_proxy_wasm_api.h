@@ -4,7 +4,7 @@
 // Note that this file is included in emscripten and NullVM environments and thus depends on
 // the context in which it is included, hence we need to disable clang-tidy warnings.
 
-extern "C" WasmResult envoy_resolve_dns(const char* dns_address, size_t dns_address_size,
+extern "C" WasmResult envoyResolveDns(const char* dns_address, size_t dns_address_size,
                                         uint32_t* token);
 
 class EnvoyContextBase {
@@ -128,4 +128,4 @@ inline StatResult parseStatResults(std::string_view data) {
   return results;
 }
 
-extern "C" WasmResult envoy_resolve_dns(const char* address, size_t address_size, uint32_t* token);
+extern "C" WasmResult envoyResolveDns(const char* address, size_t address_size, uint32_t* token);

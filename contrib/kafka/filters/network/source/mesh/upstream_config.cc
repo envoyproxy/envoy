@@ -1,6 +1,8 @@
 #include "contrib/kafka/filters/network/source/mesh/upstream_config.h"
 
-#include "envoy/common/exception.h"
+#include "absl/strings/match.h"
+
+        #include "envoy/common/exception.h"
 
 #include "source/common/common/assert.h"
 
@@ -83,7 +85,7 @@ absl::optional<ClusterConfig>
 UpstreamKafkaConfigurationImpl::computeClusterConfigForTopic(const std::string& topic) const {
   // We find the first matching prefix (this is why ordering is important).
   for (const auto& it : topic_prefix_to_cluster_config_) {
-    if (topic.rfind(it.first, 0) == 0) {
+    if (absl::StartsWith(topic, it.first)) {
       const ClusterConfig cluster_config = it.second;
       return absl::make_optional(cluster_config);
     }

@@ -132,7 +132,7 @@ public:
 
   // See grpc::PrepareCall().
   virtual std::unique_ptr<grpc::GenericClientAsyncReaderWriter>
-  PrepareCall(grpc::ClientContext* context, const grpc::string& method,
+  prepareCall(grpc::ClientContext* context, const grpc::string& method,
               grpc::CompletionQueue* cq) PURE;
 };
 
@@ -143,7 +143,7 @@ public:
   GoogleGenericStub(std::shared_ptr<grpc::Channel> channel) : stub_(channel) {}
 
   std::unique_ptr<grpc::GenericClientAsyncReaderWriter>
-  PrepareCall(grpc::ClientContext* context, const grpc::string& method,
+  prepareCall(grpc::ClientContext* context, const grpc::string& method,
               grpc::CompletionQueue* cq) override {
     return stub_.PrepareCall(context, method, cq);
   }

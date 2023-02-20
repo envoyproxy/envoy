@@ -15,7 +15,7 @@ namespace Extensions {
 namespace Common {
 namespace Wasm {
 
-proxy_wasm::Word resolve_dns(proxy_wasm::Word dns_address, proxy_wasm::Word dns_address_size,
+proxy_wasm::Word resolveDns(proxy_wasm::Word dns_address, proxy_wasm::Word dns_address_size,
                              proxy_wasm::Word token_ptr);
 
 } // namespace Wasm
@@ -33,7 +33,7 @@ using namespace proxy_wasm::null_plugin;
 #define WS(_x) Word(static_cast<uint64_t>(_x))
 #define WR(_x) Word(reinterpret_cast<uint64_t>(_x))
 
-inline WasmResult envoy_resolve_dns(const char* dns_address, size_t dns_address_size,
+inline WasmResult envoyResolveDns(const char* dns_address, size_t dns_address_size,
                                     uint32_t* token) {
   return static_cast<WasmResult>(
       ::Envoy::Extensions::Common::Wasm::resolve_dns(WR(dns_address),

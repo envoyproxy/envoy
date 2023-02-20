@@ -29,14 +29,14 @@ template <class T> class TestThreadsafeSingletonInjector;
 template <class T> class ThreadSafeSingleton {
 public:
   static T& get() {
-    absl::call_once(ThreadSafeSingleton<T>::create_once_, &ThreadSafeSingleton<T>::Create);
+    absl::call_once(ThreadSafeSingleton<T>::create_once_, &ThreadSafeSingleton<T>::create);
     return *ThreadSafeSingleton<T>::instance_;
   }
 
 protected:
   template <typename A> friend class TestThreadsafeSingletonInjector;
 
-  static void Create() { instance_ = new T(); }
+  static void create() { instance_ = new T(); }
 
   static absl::once_flag create_once_;
   static T* instance_;

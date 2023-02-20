@@ -235,7 +235,7 @@ OutputBufferStream::OutputBufferStream(char* data, size_t size)
 int OutputBufferStream::bytesWritten() const { return pptr() - pbase(); }
 
 absl::string_view OutputBufferStream::contents() const {
-  return absl::string_view(pbase(), bytesWritten());
+  return {pbase(), bytesWritten()};
 }
 
 ConstMemoryStreamBuffer::ConstMemoryStreamBuffer(const char* data, size_t size) {
@@ -433,7 +433,7 @@ size_t StringUtil::strlcpy(char* dst, const char* src, size_t size) {
 }
 
 std::string StringUtil::subspan(absl::string_view source, size_t start, size_t end) {
-  return std::string(source.data() + start, end - start);
+  return {source.data() + start, end - start};
 }
 
 std::string StringUtil::escape(const absl::string_view source) {

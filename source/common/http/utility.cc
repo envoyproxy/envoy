@@ -488,8 +488,8 @@ absl::string_view Utility::findQueryStringStart(const HeaderString& path) {
 std::string Utility::stripQueryString(const HeaderString& path) {
   absl::string_view path_str = path.getStringView();
   size_t query_offset = path_str.find('?');
-  return std::string(path_str.data(),
-                     query_offset != path_str.npos ? query_offset : path_str.size());
+  return {path_str.data(),
+                     query_offset != path_str.npos ? query_offset : path_str.size()};
 }
 
 std::string Utility::replaceQueryString(const HeaderString& path,
@@ -1122,8 +1122,7 @@ bool shouldPercentDecodeChar(char c) { return testChar(kUrlDecodedCharTable, c);
 std::string Utility::PercentEncoding::urlEncodeQueryParameter(absl::string_view value) {
   std::string encoded;
   encoded.reserve(value.size());
-  for (size_t i = 0; i < value.size(); ++i) {
-    const char ch = value[i];
+  for (char ch : value) {
     if (shouldPercentEncodeChar(ch)) {
       // For consistency, URI producers should use uppercase hexadecimal digits for all
       // percent-encodings. https://tools.ietf.org/html/rfc3986#section-2.1.

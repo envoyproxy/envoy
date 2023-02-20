@@ -396,10 +396,10 @@ private:
     uint64_t listenerTag() const override { return 0; }
     const std::string& name() const override { return name_; }
     Network::UdpListenerConfigOptRef udpListenerConfig() override {
-      return Network::UdpListenerConfigOptRef();
+      return {};
     }
     Network::InternalListenerConfigOptRef internalListenerConfig() override {
-      return Network::InternalListenerConfigOptRef();
+      return {};
     }
     envoy::config::core::v3::TrafficDirection direction() const override {
       return envoy::config::core::v3::UNSPECIFIED;

@@ -396,10 +396,10 @@ private:
   void incRefCount(const StatName& stat_name);
 
   struct SharedSymbol {
-    SharedSymbol(Symbol symbol) : symbol_(symbol), ref_count_(1) {}
+    SharedSymbol(Symbol symbol) : symbol_(symbol) {}
 
     Symbol symbol_;
-    uint32_t ref_count_;
+    uint32_t ref_count_{1};
   };
 
   // This must be held during both encode() and free().
@@ -570,7 +570,7 @@ public:
    * hash-table without specifying a functor. See
    * https://abseil.io/docs/cpp/guides/hash for details.
    */
-  template <typename H> friend H AbslHashValue(H h, StatName stat_name) {
+  template <typename H> friend H abslHashValue(H h, StatName stat_name) {
     if (stat_name.empty()) {
       return H::combine(std::move(h), absl::string_view());
     }

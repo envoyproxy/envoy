@@ -18,7 +18,7 @@ namespace MySQLProxy {
 class MySQLConfigFactory
     : public Common::FactoryBase<envoy::extensions::filters::network::mysql_proxy::v3::MySQLProxy> {
 public:
-  MySQLConfigFactory() : FactoryBase(NetworkFilterNames::get().MySQLProxy) {}
+  MySQLConfigFactory() : FactoryBase(NetworkFilterNames::get().MySQLProxy) = default;
 
 private:
   Network::FilterFactoryCb createFilterFactoryFromProtoTyped(

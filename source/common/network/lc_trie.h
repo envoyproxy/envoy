@@ -345,7 +345,7 @@ private:
      *     trie can be nested under another leaf)
      * @return the prefixes associated with the leaf nodes.
      */
-    std::vector<IpPrefix<IpType>> push_leaves() {
+    std::vector<IpPrefix<IpType>> pushLeaves() {
       std::vector<IpPrefix<IpType>> prefixes;
       std::function<void(Node*, DataSetSharedPtr, unsigned, IpType)> visit =
           [&](Node* node, DataSetSharedPtr data, unsigned depth, IpType prefix) {

@@ -1068,7 +1068,7 @@ protected:
   const std::string host_rewrite_;
   std::unique_ptr<ConnectConfig> connect_config_;
 
-  bool case_sensitive() const { return case_sensitive_; }
+  bool caseSensitive() const { return case_sensitive_; }
   RouteConstSharedPtr clusterEntry(const Http::RequestHeaderMap& headers,
                                    uint64_t random_value) const;
 

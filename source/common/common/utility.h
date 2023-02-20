@@ -803,7 +803,7 @@ public:
   /**
    * @return a std::string copy of the InlineString.
    */
-  std::string toString() const { return std::string(data_, size_); }
+  std::string toString() const { return {data_, size_}; }
 
   /**
    * @return a string_view into the InlineString.

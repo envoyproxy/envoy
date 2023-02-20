@@ -36,7 +36,7 @@ public:
   /**
    * The type this deserializer is deserializing.
    */
-  using result_type = T;
+  using ResultType = T;
 
   virtual ~Deserializer() = default;
 
@@ -364,7 +364,7 @@ public:
 
   bool ready() const override { return ready_; }
 
-  std::string get() const override { return std::string(data_buf_.begin(), data_buf_.end()); }
+  std::string get() const override { return {data_buf_.begin(), data_buf_.end()}; }
 
 private:
   Int16Deserializer length_buf_;
@@ -390,7 +390,7 @@ public:
 
   bool ready() const override { return ready_; }
 
-  std::string get() const override { return std::string(data_buf_.begin(), data_buf_.end()); }
+  std::string get() const override { return {data_buf_.begin(), data_buf_.end()}; }
 
 private:
   VarUInt32Deserializer length_buf_;
