@@ -30,7 +30,6 @@
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/printers.h"
-#include "test/test_common/test_runtime.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
 #include "test/test_common/utility.h"
 
@@ -817,11 +816,7 @@ public:
     return resolver_->resolve(
         address, lookup_family,
         [=](DnsResolver::ResolutionStatus status, std::list<DnsResponse>&& results) -> void {
-          if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.cares_accept_nodata")) {
-            EXPECT_EQ(DnsResolver::ResolutionStatus::Success, status);
-          } else {
-            EXPECT_EQ(DnsResolver::ResolutionStatus::Failure, status);
-          }
+          EXPECT_EQ(DnsResolver::ResolutionStatus::Success, status);
           std::list<std::string> address_as_string_list = getAddressAsStringList(results);
           EXPECT_EQ(0, address_as_string_list.size());
           dispatcher_->exit();
@@ -1506,8 +1501,6 @@ TEST_P(DnsImplTest, WithNoRecord) {
 }
 
 TEST_P(DnsImplTest, WithNoRecordAndAcceptNodataDisabled) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.cares_accept_nodata", "false"}});
 
   EXPECT_NE(nullptr, resolveWithNoRecordsExpectation("some.good.domain", DnsLookupFamily::V4Only));
   dispatcher_->run(Event::Dispatcher::RunType::Block);
@@ -1573,8 +1566,6 @@ TEST_P(DnsImplTest, WithARecord) {
 }
 
 TEST_P(DnsImplTest, WithARecordAndAcceptNodataDisabled) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.cares_accept_nodata", "false"}});
 
   server_->addHosts("some.good.domain", {"201.134.56.7"}, RecordType::A);
   EXPECT_NE(nullptr, resolveWithExpectations("some.good.domain", DnsLookupFamily::V4Only,
@@ -1648,8 +1639,6 @@ TEST_P(DnsImplTest, WithAAAARecord) {
 }
 
 TEST_P(DnsImplTest, WithAAAARecordAndAcceptNodataDisabled) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.cares_accept_nodata", "false"}});
 
   server_->addHosts("some.good.domain", {"1::2"}, RecordType::AAAA);
   EXPECT_NE(nullptr, resolveWithNoRecordsExpectation("some.good.domain", DnsLookupFamily::V4Only));
@@ -1726,8 +1715,6 @@ TEST_P(DnsImplTest, WithBothAAndAAAARecord) {
 }
 
 TEST_P(DnsImplTest, WithBothAAndAAAARecordAndAcceptNodataDisabled) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.cares_accept_nodata", "false"}});
 
   server_->addHosts("some.good.domain", {"201.134.56.7"}, RecordType::A);
   server_->addHosts("some.good.domain", {"1::2"}, RecordType::AAAA);
@@ -1799,8 +1786,6 @@ TEST_P(DnsImplTest, FallbackToNodataWithErrorOnA) {
 }
 
 TEST_P(DnsImplTest, FallbackToNodataWithErrorOnAAndAcceptNodataDisabled) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.cares_accept_nodata", "false"}});
 
   server_->setErrorOnQtypeA(true);
   EXPECT_NE(nullptr,
@@ -1869,8 +1854,6 @@ TEST_P(DnsImplTest, FallbackToNodataWithErrorOnAAAA) {
 }
 
 TEST_P(DnsImplTest, FallbackToNodataWithErrorOnAAAAAndAcceptNodataDisabled) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.cares_accept_nodata", "false"}});
 
   server_->setErrorOnQtypeAAAA(true);
   EXPECT_NE(nullptr,
@@ -1942,8 +1925,6 @@ TEST_P(DnsImplTest, ErrorWithAcceptNodataEnabled) {
 }
 
 TEST_P(DnsImplTest, ErrorWithAcceptNodataDisabled) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.cares_accept_nodata", "false"}});
 
   server_->setErrorOnQtypeA(true);
   server_->setErrorOnQtypeAAAA(true);
