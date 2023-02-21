@@ -257,7 +257,8 @@ public class EnvoyConfiguration {
         maxConnectionsPerHost, statsFlushSeconds, streamIdleTimeoutSeconds,
         perTryIdleTimeoutSeconds, appVersion, appId, enforceTrustChainVerification, clusters,
         filter_chain, stats_sinks, enablePlatformCertificatesValidation,
-        enableSkipDNSLookupForProxiedRequests, runtime_guards);
+        enableSkipDNSLookupForProxiedRequests,
+            rtdsLayerName, rtdsTimeoutSeconds, adsApiType, adsAddress, adsPort, runtime_guards);
   }
 
   static class ConfigurationException extends RuntimeException {
