@@ -14,6 +14,7 @@ envoy_extension_package()
 envoy_cc_library(
     name = "datadog_tracer_lib",
     srcs = [
+        "agent_http_client.cc",
         "datadog_tracer_impl.cc",
         "dict_util.cc",
         "event_scheduler.cc",
@@ -22,6 +23,7 @@ envoy_cc_library(
         "time_util.cc",
     ],
     hdrs = [
+        "agent_http_client.h",
         "datadog_tracer_impl.h",
         "dict_util.h",
         "event_scheduler.h",
