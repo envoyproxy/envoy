@@ -112,6 +112,7 @@ void ActiveTcpConnection::onEvent(Network::ConnectionEvent event) {
   // Any event leads to destruction of the connection.
   if (event == Network::ConnectionEvent::LocalClose ||
       event == Network::ConnectionEvent::RemoteClose) {
+    stream_info_->setDownstreamTransportFailureReason(connection_->transportFailureReason());
     active_connections_.listener_.removeConnection(*this);
   }
 }
