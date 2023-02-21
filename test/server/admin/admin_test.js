@@ -34,8 +34,6 @@ function runTest(url, name, tester) {
     iframe.height = 1000;
     iframe.src = url;
     iframe.onload = () => {
-      //const setRenderTestHook =
-      //setRenderTestHook(() => {
       iframe.contentWindow.setRenderTestHook(() => {
         console.log('post render\n');
         try {
@@ -46,30 +44,10 @@ function runTest(url, name, tester) {
         }
         iframe.parentElement.removeChild(iframe);
         resolve(null);
-        // setRenderTestHook(null);
       });
     };
     document.body.appendChild(iframe);
   });
-
-/*
-    window.setTimeout(() => {
-      const setRenderTestHook = iframe.contentWindow['setRenderTestHook'];
-      setRenderTestHook(() => {
-        console.log('post render\n');
-        try {
-          tester(iframe);
-          results.textContent += 'passed\n';
-        } catch (err) {
-          results.textContent += 'FAILED: ' + err + '\n';
-        }
-        iframe.parentElement.removeChild(iframe);
-        resolve(null);
-      });
-    },
-                      3000);
-  });
-*/
 }
 
 
