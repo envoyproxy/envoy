@@ -76,7 +76,6 @@ again:
     goto again;
   }
 
-  // TODO: add cache for it?
   return std::make_shared<RouteEntryImplBase::DynamicRouteEntry>(
       dynamic_cast<const RouteEntryImplBase*>(&parent), cluster);
 }
