@@ -137,6 +137,8 @@ public:
   MOCK_METHOD(void, setDownstreamBytesMeter, (const BytesMeterSharedPtr&));
   MOCK_METHOD(void, dumpState, (std::ostream & os, int indent_level), (const));
   MOCK_METHOD(bool, isShadow, (), (const, override));
+  MOCK_METHOD(void, setDownstreamTransportFailureReason, (absl::string_view failure_reason));
+  MOCK_METHOD(absl::string_view, downstreamTransportFailureReason, (), (const));
   Envoy::Event::SimulatedTimeSystem ts_;
   SystemTime start_time_;
   MonotonicTime start_time_monotonic_;
@@ -161,6 +163,7 @@ public:
   absl::optional<std::string> virtual_cluster_name_;
   DownstreamTiming downstream_timing_;
   UpstreamTiming upstream_timing_;
+  std::string downstream_transport_failure_reason_;
 };
 
 } // namespace StreamInfo

@@ -77,9 +77,13 @@ void AutonomousStream::sendResponse() {
 
   encodeHeaders(upstream_.responseHeaders(), headers_only_response);
   if (!headers_only_response) {
-    for (int32_t i = 0; i < response_data_blocks; ++i) {
-      encodeData(response_body_length,
-                 i == (response_data_blocks - 1) && !send_trailers && end_stream);
+    if (upstream_.responseBody().has_value()) {
+      encodeData(*upstream_.responseBody(), !send_trailers);
+    } else {
+      for (int32_t i = 0; i < response_data_blocks; ++i) {
+        encodeData(response_body_length,
+                   i == (response_data_blocks - 1) && !send_trailers && end_stream);
+      }
     }
     if (send_trailers) {
       encodeTrailers(upstream_.responseTrailers());
@@ -146,6 +150,11 @@ void AutonomousUpstream::setResponseTrailers(
   response_trailers_ = std::move(response_trailers);
 }
 
+void AutonomousUpstream::setResponseBody(std::string body) {
+  Thread::LockGuard lock(headers_lock_);
+  response_body_ = body;
+}
+
 void AutonomousUpstream::setResponseHeaders(
     std::unique_ptr<Http::TestResponseHeaderMapImpl>&& response_headers) {
   Thread::LockGuard lock(headers_lock_);
@@ -162,6 +171,11 @@ Http::TestResponseTrailerMapImpl AutonomousUpstream::responseTrailers() {
   Thread::LockGuard lock(headers_lock_);
   Http::TestResponseTrailerMapImpl return_trailers = *response_trailers_;
   return return_trailers;
+}
+
+absl::optional<std::string> AutonomousUpstream::responseBody() {
+  Thread::LockGuard lock(headers_lock_);
+  return response_body_;
 }
 
 Http::TestResponseHeaderMapImpl AutonomousUpstream::responseHeaders() {
