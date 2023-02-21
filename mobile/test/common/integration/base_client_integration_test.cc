@@ -9,7 +9,6 @@
 #include "gtest/gtest.h"
 #include "library/cc/bridge_utility.h"
 #include "library/cc/log_level.h"
-#include "library/common/config/internal.h"
 #include "library/common/engine.h"
 #include "library/common/engine_handle.h"
 #include "library/common/http/header_utility.h"
@@ -82,8 +81,8 @@ Platform::LogLevel getPlatformLogLevelFromOptions() {
 // Note: This function is only used to build the Engine if `override_builder_config_` is true.
 std::string defaultConfig() {
   Platform::EngineBuilder builder;
-  std::string config_str = absl::StrCat(config_header, builder.generateConfigStr());
-  return config_str;
+  std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> bootstrap = builder.generateBootstrap();
+  return MessageUtil::getYamlStringFromMessage(*bootstrap);
 }
 
 BaseClientIntegrationTest::BaseClientIntegrationTest(Network::Address::IpVersion ip_version,
