@@ -19,6 +19,9 @@ function addTest(url, name, test_function) {
 }
 
 
+/**
+ * Provides an async version of the onload event.
+ */
 async function waitForOnload(iframe) {
   return new Promise((resolve, reject) => {
     iframe.onload = () => {
@@ -40,19 +43,15 @@ async function runTest(url, name, tester) {
   iframe.width = 800;
   iframe.height = 1000;
   iframe.src = url;
-  const finish = (msg) => {
-    results.textContent += msg + '\n';
-    iframe.parentElement.removeChild(iframe);
-    //resolve(null);
-  };
   document.body.appendChild(iframe);
   await waitForOnload(iframe);
   try {
     await tester(iframe);
-    finish('passed');
+    results.textContent += 'passed\n';
   } catch (err) {
-    finish('FAILED: ' + err);
+    results.textContent += 'FAILED: ' + err + '\n';
   }
+  iframe.parentElement.removeChild(iframe);
 }
 
 
@@ -89,14 +88,6 @@ function runAllTests() {
     }
   };
   next_test(0);
-}
-
-function rejectExceptions(reject, fn) {
-  try {
-    fn();
-  } catch (err) {
-    reject(err);
-  }
 }
 
 // Trigger the tests once all JS is loaded.

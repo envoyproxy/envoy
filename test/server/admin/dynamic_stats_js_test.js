@@ -35,6 +35,9 @@ async function testCustomMaxCount(iframme) {
   // Now set the update interval to 5 and re-count lines.
   const max_display_count = idoc.getElementById('dynamic-max-display-count');
   max_display_count.value = 5;
+
+  // Render for two iterations as the first render may race with the update
+  // to display-count. To avoid flakes, we render a second time.
   await waitForRender(iframe);
   await waitForRender(iframe);
   const content = dynamicContent(iframe);
