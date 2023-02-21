@@ -770,8 +770,8 @@ class LoadBalancerSubsetInfoImpl : public LoadBalancerSubsetInfo {
 public:
   LoadBalancerSubsetInfoImpl(
       const envoy::config::cluster::v3::Cluster::LbSubsetConfig& subset_config)
-      : fallback_policy_(subset_config.fallback_policy()),
-        default_subset_(subset_config.default_subset()),
+      : default_subset_(subset_config.default_subset()),
+        fallback_policy_(subset_config.fallback_policy()),
         metadata_fallback_policy_(subset_config.metadata_fallback_policy()),
         enabled_(!subset_config.subset_selectors().empty()),
         locality_weight_aware_(subset_config.locality_weight_aware()),
@@ -806,10 +806,11 @@ public:
   bool listAsAny() const override { return list_as_any_; }
 
 private:
-  const envoy::config::cluster::v3::Cluster::LbSubsetConfig::LbSubsetFallbackPolicy
-      fallback_policy_;
   const ProtobufWkt::Struct default_subset_;
   std::vector<SubsetSelectorPtr> subset_selectors_;
+  // Keep small members (bools and enums) at the end of class, to reduce alignment overhead.
+  const envoy::config::cluster::v3::Cluster::LbSubsetConfig::LbSubsetFallbackPolicy
+      fallback_policy_;
   const envoy::config::cluster::v3::Cluster::LbSubsetConfig::LbSubsetMetadataFallbackPolicy
       metadata_fallback_policy_;
   const bool enabled_ : 1;
