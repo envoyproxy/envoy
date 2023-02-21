@@ -167,26 +167,26 @@ Http::Code StatsHandler::handlerContention(Http::ResponseHeaderMap& response_hea
 
 Admin::UrlHandler StatsHandler::statsHandler(bool dynamic_mode) {
   const Admin::ParamDescriptorVec common_params{
-    {Admin::ParamDescriptor::Type::String, "filter",
-    "Regular expression (Google re2) for filtering stats"},
-    {Admin::ParamDescriptor::Type::Enum,
-    "format",
-    "Format to use",
-    {"html", "dynamic", "text", "json"}},
-    {Admin::ParamDescriptor::Type::Enum,
-    "type",
-    "Stat types to include.",
-    {StatLabels::All, StatLabels::Counters, StatLabels::Histograms, StatLabels::Gauges,
-    StatLabels::TextReadouts}},
-    {Admin::ParamDescriptor::Type::Enum,
-    "histogram_buckets",
-    "Histogram bucket display mode",
-    {"cumulative", "disjoint", "none"}}};
+      {Admin::ParamDescriptor::Type::String, "filter",
+       "Regular expression (Google re2) for filtering stats"},
+      {Admin::ParamDescriptor::Type::Enum,
+       "format",
+       "Format to use",
+       {"html", "dynamic", "text", "json"}},
+      {Admin::ParamDescriptor::Type::Enum,
+       "type",
+       "Stat types to include.",
+       {StatLabels::All, StatLabels::Counters, StatLabels::Histograms, StatLabels::Gauges,
+        StatLabels::TextReadouts}},
+      {Admin::ParamDescriptor::Type::Enum,
+       "histogram_buckets",
+       "Histogram bucket display mode",
+       {"cumulative", "disjoint", "none"}}};
 
   Admin::ParamDescriptorVec params;
   if (!dynamic_mode) {
     params.push_back({Admin::ParamDescriptor::Type::Boolean, "usedonly",
-        "Only include stats that have been written by system since restart"});
+                      "Only include stats that have been written by system since restart"});
   }
   params.insert(params.end(), common_params.begin(), common_params.end());
 
@@ -196,8 +196,7 @@ Admin::UrlHandler StatsHandler::statsHandler(bool dynamic_mode) {
       [this](AdminStream& admin_stream) -> Admin::RequestPtr { return makeRequest(admin_stream); },
       false,
       false,
-      params
-  };
+      params};
 }
 
 } // namespace Server
