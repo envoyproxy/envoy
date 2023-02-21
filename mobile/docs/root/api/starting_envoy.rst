@@ -538,9 +538,9 @@ Adds an RTDS layer to envoy configuration. Requires that ADS be configured via `
   // Kotlin
   builder.addRtdsLayer("rtds_layer_name", 10)
 
-~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 ``setAggregatedDiscoveryService``
-~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Adds ADS to envoy configuration, for instance to be used with RTDS and CDS layers.
 
