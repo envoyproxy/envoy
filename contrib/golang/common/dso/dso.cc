@@ -113,10 +113,11 @@ GoUint64 DsoInstance::envoyGoClusterSpecifierNewPlugin(GoUint64 configPtr, GoUin
   return envoy_go_cluster_specifier_new_plugin_(configPtr, configLen);
 }
 
-GoInt64 DsoInstance::envoyGoOnClusterSpecify(GoUint64 headerPtr, GoUint64 pluginId,
-                                             GoUint64 bufferPtr, GoUint64 bufferLen) {
+GoInt64 DsoInstance::envoyGoOnClusterSpecify(GoUint64 pluginPtr, GoUint64 headerPtr,
+                                             GoUint64 pluginId, GoUint64 bufferPtr,
+                                             GoUint64 bufferLen) {
   ASSERT(envoy_go_on_cluster_specify_ != nullptr);
-  return envoy_go_on_cluster_specify_(headerPtr, pluginId, bufferPtr, bufferLen);
+  return envoy_go_on_cluster_specify_(pluginPtr, headerPtr, pluginId, bufferPtr, bufferLen);
 }
 
 } // namespace Dso

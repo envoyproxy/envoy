@@ -26,8 +26,8 @@ public:
 
   void envoyGoFilterOnHttpDestroy(httpRequest* p0, int p1);
 
-  GoInt64 envoyGoOnClusterSpecify(GoUint64 headerPtr, GoUint64 pluginId, GoUint64 bufferPtr,
-                                  GoUint64 bufferLen);
+  GoInt64 envoyGoOnClusterSpecify(GoUint64 pluginPtr, GoUint64 headerPtr, GoUint64 pluginId,
+                                  GoUint64 bufferPtr, GoUint64 bufferLen);
 
   GoUint64 envoyGoClusterSpecifierNewPlugin(GoUint64 configPtr, GoUint64 configLen);
 
@@ -51,8 +51,9 @@ private:
   GoUint64 (*envoy_go_cluster_specifier_new_plugin_)(GoUint64 configPtr,
                                                      GoUint64 configLen) = {nullptr};
 
-  GoUint64 (*envoy_go_on_cluster_specify_)(GoUint64 headerPtr, GoUint64 pluginId,
-                                           GoUint64 bufferPtr, GoUint64 bufferLen) = {nullptr};
+  GoUint64 (*envoy_go_on_cluster_specify_)(GoUint64 pluginPtr, GoUint64 headerPtr,
+                                           GoUint64 pluginId, GoUint64 bufferPtr,
+                                           GoUint64 bufferLen) = {nullptr};
 };
 
 using DsoInstancePtr = std::shared_ptr<DsoInstance>;

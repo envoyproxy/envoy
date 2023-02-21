@@ -1,8 +1,7 @@
 #include "contrib/golang/http/cluster_specifier/source/golang_cluster_specifier.h"
 
 namespace Envoy {
-namespace Extensions {
-namespace ClusterSpecifier {
+namespace Router {
 namespace Golang {
 
 //
@@ -31,9 +30,14 @@ void envoyGoClusterSpecifierGetHeader(unsigned long long headerPtr, void* key, v
     goValue->n = str.length();
   }
 }
+
+void envoyGoClusterSpecifierLogError(unsigned long long pluginPtr, void* msg) {
+  auto msgStr = referGoString(msg);
+  auto plugin = reinterpret_cast<GolangClusterSpecifierPlugin*>(pluginPtr);
+  plugin->log(msgStr);
+}
 }
 
 } // namespace Golang
-} // namespace ClusterSpecifier
-} // namespace Extensions
+} // namespace Router
 } // namespace Envoy

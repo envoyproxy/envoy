@@ -51,24 +51,25 @@ GolangClusterSpecifierPlugin::route(const RouteEntry& parent,
   std::string buffer;
   std::string cluster;
   auto dlib = config_->getDsoLib();
+  ASSERT(dlib != nullptr);
 
 again:
   buffer.reserve(buffer_len);
   auto plugin_id = config_->getPluginId();
   auto header_ptr = reinterpret_cast<uint64_t>(&headers);
+  auto plugin_ptr = reinterpret_cast<uint64_t>(this);
   auto buffer_ptr = reinterpret_cast<uint64_t>(buffer.data());
-  auto new_len = dlib != nullptr
-                     ? dlib->envoyGoOnClusterSpecify(header_ptr, plugin_id, buffer_ptr, buffer_len)
-                     : 0;
+  auto new_len =
+      dlib->envoyGoOnClusterSpecify(plugin_ptr, header_ptr, plugin_id, buffer_ptr, buffer_len);
 
   if (new_len == 0) {
-    ENVOY_LOG(info, "golang choose the default cluster");
+    ENVOY_LOG(info, "golang cluster specifier choose the default cluster");
     cluster = config_->defaultCluster();
   } else if (new_len < 0) {
     ENVOY_LOG(error, "error happened while golang choose cluster, using the default cluster");
     cluster = config_->defaultCluster();
   } else if (new_len <= buffer_len) {
-    ENVOY_LOG(debug, "buffer size fit the cluster name from golang: {}", new_len);
+    ENVOY_LOG(debug, "buffer size fit the cluster name from golang");
     cluster = std::string{buffer.data(), size_t(new_len)};
   } else {
     ENVOY_LOG(debug, "need larger size of buffer to save the cluster name in golang, try again");
@@ -78,6 +79,10 @@ again:
 
   return std::make_shared<RouteEntryImplBase::DynamicRouteEntry>(
       dynamic_cast<const RouteEntryImplBase*>(&parent), cluster);
+}
+
+void GolangClusterSpecifierPlugin::log(absl::string_view& msg) const {
+  ENVOY_LOG(error, "{}", msg);
 }
 
 } // namespace Golang

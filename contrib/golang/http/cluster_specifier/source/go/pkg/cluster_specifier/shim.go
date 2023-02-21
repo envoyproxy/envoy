@@ -17,28 +17,24 @@
 
 package cluster_specifier
 
-/*
-// ref https://github.com/golang/go/issues/25832
-
-#cgo CFLAGS: -I../api
-#cgo linux LDFLAGS: -Wl,-unresolved-symbols=ignore-all
-#cgo darwin LDFLAGS: -Wl,-undefined,dynamic_lookup
-
-#include <stdlib.h>
-#include <string.h>
-
-#include "api.h"
-
-*/
 import "C"
-
 import (
+	"fmt"
+
 	"github.com/envoyproxy/envoy/contrib/golang/common/go/utils"
 )
 
+const errPanic = -1
+
 //export envoyGoOnClusterSpecify
-func envoyGoOnClusterSpecify(headerPtr uint64, pluginId uint64, bufferPtr uint64, bufferLen uint64) int64 {
-	// TODO: recover panic
+func envoyGoOnClusterSpecify(pluginPtr uint64, headerPtr uint64, pluginId uint64, bufferPtr uint64, bufferLen uint64) (l int64) {
+	defer func() {
+		if err := recover(); err != nil {
+			msg := fmt.Sprintf("golang cluster specifier plugin panic: %v", err)
+			cAPI.HttpLogError(pluginPtr, &msg)
+			l = errPanic
+		}
+	}()
 	header := &httpHeaderMap{
 		headerPtr: headerPtr,
 	}

@@ -43,6 +43,10 @@ func (c *httpCApiImpl) HttpGetHeader(headerPtr uint64, key *string, value *strin
 	C.envoyGoClusterSpecifierGetHeader(C.ulonglong(headerPtr), unsafe.Pointer(key), unsafe.Pointer(value))
 }
 
+func (c *httpCApiImpl) HttpLogError(pluginPtr uint64, msg *string) {
+	C.envoyGoClusterSpecifierLogError(C.ulonglong(pluginPtr), unsafe.Pointer(msg))
+}
+
 var cAPI api.HttpCAPI = &httpCApiImpl{}
 
 // SetHttpCAPI for mock cAPI

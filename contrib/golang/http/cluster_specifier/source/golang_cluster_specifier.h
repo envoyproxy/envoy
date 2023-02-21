@@ -38,6 +38,7 @@ public:
   GolangClusterSpecifierPlugin(ClusterConfigSharedPtr config) : config_(config){};
 
   RouteConstSharedPtr route(const RouteEntry& parent, const Http::RequestHeaderMap&) const;
+  void log(absl::string_view& msg) const;
 
 private:
   ClusterConfigSharedPtr config_;

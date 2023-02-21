@@ -9,6 +9,7 @@ import (
 type clusterSpecifier struct {
 	invalidPrefix string
 	defaultPrefix string
+	panicPrefix   string
 }
 
 func (s *clusterSpecifier) Choose(header api.RequestHeaderMap) string {
@@ -22,6 +23,11 @@ func (s *clusterSpecifier) Choose(header api.RequestHeaderMap) string {
 	// return "" will using the default_cluster in the C++ side.
 	if strings.HasPrefix(path, s.defaultPrefix) {
 		return ""
+	}
+
+	// panic, will using the default_cluster in the C++ side.
+	if strings.HasPrefix(path, s.panicPrefix) {
+		panic("test")
 	}
 
 	return "cluster_0"

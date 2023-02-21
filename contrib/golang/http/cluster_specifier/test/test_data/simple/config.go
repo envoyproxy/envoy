@@ -17,14 +17,20 @@ func configFactory(config *anypb.Any) api.ClusterSpecifier {
 		panic(err)
 	}
 	plugin := &clusterSpecifier{}
-	if value, ok := configStruct.Value.AsMap()["invalid_prefix"]; ok {
+	m := configStruct.Value.AsMap()
+	if value, ok := m["invalid_prefix"]; ok {
 		if valueStr, ok := value.(string); ok {
 			plugin.invalidPrefix = valueStr
 		}
 	}
-	if value, ok := configStruct.Value.AsMap()["default_prefix"]; ok {
+	if value, ok := m["default_prefix"]; ok {
 		if valueStr, ok := value.(string); ok {
 			plugin.defaultPrefix = valueStr
+		}
+	}
+	if value, ok := m["panic_prefix"]; ok {
+		if valueStr, ok := value.(string); ok {
+			plugin.panicPrefix = valueStr
 		}
 	}
 	return plugin

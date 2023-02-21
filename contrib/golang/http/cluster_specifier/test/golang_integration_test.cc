@@ -50,6 +50,7 @@ routes:
             value:
               invalid_prefix: "/admin/"
               default_prefix: "/default/"
+              panic_prefix: "/panic/"
 )EOF";
 
 std::string genSoPath(std::string name) {
@@ -146,6 +147,52 @@ TEST_F(GolangClusterSpecifierIntegrationTest, DefaultCluster_Unknown) {
 
   // Request with the "/default/" prefix URI, the "" empty name will be return by the cluster
   // specifier plugin.
+  auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_TRUE(response->complete());
+  EXPECT_THAT(response->headers(), Http::HttpStatusIs("503"));
+
+  cleanupUpstreamAndDownstream();
+}
+
+// Go plugin panic: "", using the default_cluster: "cluster_0"
+TEST_F(GolangClusterSpecifierIntegrationTest, Panic_OK) {
+  auto so_id = "simple";
+  auto yaml_string = absl::StrFormat(yaml_fmt, so_id, genSoPath(so_id), "cluster_0");
+  initializeRoute(yaml_string);
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  Http::TestResponseHeaderMapImpl response_headers{
+      {"server", "envoy"},
+      {":status", "200"},
+  };
+
+  // The go cluster specifier plugin will panic with the "/panic/" prefix URI.
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "GET"}, {":path", "/panic/1"}, {":scheme", "http"}, {":authority", "test.com"}};
+
+  auto response = sendRequestAndWaitForResponse(request_headers, 0, response_headers, 0);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ(response->headers().getStatusValue(), "200");
+
+  cleanupUpstreamAndDownstream();
+}
+
+// Go plugin panic, using the default_cluster: "cluster_unknown"
+TEST_F(GolangClusterSpecifierIntegrationTest, Panic_Unknown) {
+  auto so_id = "simple";
+  auto yaml_string = absl::StrFormat(yaml_fmt, so_id, genSoPath(so_id), "cluster_unknown");
+  initializeRoute(yaml_string);
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "GET"}, {":path", "/panic/1"}, {":scheme", "http"}, {":authority", "test.com"}};
+
+  // The go cluster specifier plugin will panic with the "/panic/" prefix URI.
   auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_TRUE(response->complete());
