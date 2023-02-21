@@ -31,15 +31,18 @@ ClusterConfig::ClusterConfig(const GolangClusterProto& config)
 
   std::string str;
   if (!config_.SerializeToString(&str)) {
-    ENVOY_LOG(error, "failed to serialize any pb to string");
-    return;
+    throw EnvoyException(
+        fmt::format("golang_cluster_specifier_plugin: serialize config to string failed: {} {}",
+                    so_id_, so_path_));
   }
 
   auto ptr = reinterpret_cast<unsigned long long>(str.data());
   auto len = str.length();
   plugin_id_ = dynamic_lib_->envoyGoClusterSpecifierNewPlugin(ptr, len);
   if (plugin_id_ == 0) {
-    ENVOY_LOG(error, "invalid golang plugin config");
+    throw EnvoyException(
+        fmt::format("golang_cluster_specifier_plugin: generate plugin failed in golang side: {} {}",
+                    so_id_, so_path_));
   }
 }
 
