@@ -58,6 +58,11 @@ open class EngineBuilder: NSObject {
   private var runtimeGuards: [String: String] = [:]
   private var directResponses: [DirectResponse] = []
   private var statsSinks: [String] = []
+  private var rtdsLayerName: String = ""
+  private var rtdsTimeoutSeconds: UInt32 = 0
+  private var adsApiType: String = ""
+  private var adsAddress: String = ""
+  private var adsPort: UInt32 = 0
 
   // MARK: - Public
 
@@ -546,6 +551,37 @@ open class EngineBuilder: NSObject {
     return self
   }
 
+  /// Add RTDS layer.  Requires that ADS be configured via setAggregatedDiscoveryService().
+  ///
+  /// - parameter layerName: the layer name.
+  ///
+  /// - parameter timeoutSeconds: the timeout.
+  ///
+  /// - returns: This builder.
+  @discardableResult
+  public func addRtdsLayer(_ layerName: String, timeoutSeconds: UInt32) -> Self {
+    self.rtdsLayerName = layerName
+    self.rtdsTimeoutSeconds = timeoutSeconds
+    return self
+  }
+
+  /// Add ADS configuration, to be used with RTDS or CDS for example.
+  ///
+  /// - parameter apiType: the API type.
+  ///
+  /// - parameter address: the network address of the server.
+  ///
+  /// - parameter port: the port of the server.
+  ///
+  /// - returns: This builder.
+  @discardableResult
+  public func setAggregatedDiscoveryService(_ apiType: String, address: String, timeoutSeconds: UInt32) -> Self {
+    self.adsApiType = apiType
+    self.adsAddress = address
+    self.adsPort = port
+    return self
+  }
+
 #if ENVOY_ADMIN_FUNCTIONALITY
   /// Enable admin interface on 127.0.0.1:9901 address. Admin interface is intended to be
   /// used for development/debugging purposes only. Enabling it in production may open
@@ -608,7 +644,12 @@ open class EngineBuilder: NSObject {
       platformFilterChain: self.platformFilterChain,
       stringAccessors: self.stringAccessors,
       keyValueStores: self.keyValueStores,
-      statsSinks: self.statsSinks
+      statsSinks: self.statsSinks,
+      rtdsLayerName: self.rtdsLayerName,
+      rtdsTimeoutSeconds: self.rtdsTimeoutSeconds,
+      adsApiType: self.adsApiType,
+      adsAddress: self.adsAddress,
+      adsPort: self.adsPort
     )
 
     switch self.base {

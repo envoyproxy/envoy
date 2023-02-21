@@ -133,7 +133,6 @@ public class EnvoyConfiguration {
    * @param enablePlatformCertificatesValidation          whether to use the platform verifier.
    */
   public EnvoyConfiguration(
-    String rtdsLayerName, int rtdsTimeoutSeconds, String adsApiType, String adsAddress, int adsPort,
       boolean adminInterfaceEnabled, String grpcStatsDomain, int connectTimeoutSeconds,
       int dnsRefreshSeconds, int dnsFailureRefreshSecondsBase, int dnsFailureRefreshSecondsMax,
       int dnsQueryTimeoutSeconds, int dnsMinRefreshSeconds, List<String> dnsPreresolveHostnames,
@@ -149,13 +148,9 @@ public class EnvoyConfiguration {
       Map<String, EnvoyStringAccessor> stringAccessors,
       Map<String, EnvoyKeyValueStore> keyValueStores, List<String> statSinks,
       Map<String, Boolean> runtimeGuards, Boolean enableSkipDNSLookupForProxiedRequests,
-      boolean enablePlatformCertificatesValidation) {
+      boolean enablePlatformCertificatesValidation, String rtdsLayerName, int rtdsTimeoutSeconds,
+      String adsApiType, String adsAddress, int adsPort) {
     JniLibrary.load();
-    this.rtdsLayerName = rtdsLayerName;
-    this.rtdsTimeoutSeconds = rtdsTimeoutSeconds;
-    this.adsApiType = adsApiType;
-    this.adsAddress = adsAddress;
-    this.adsPort = adsPort;
     this.adminInterfaceEnabled = adminInterfaceEnabled;
     this.grpcStatsDomain = grpcStatsDomain;
     this.connectTimeoutSeconds = connectTimeoutSeconds;
@@ -208,6 +203,11 @@ public class EnvoyConfiguration {
     }
     this.enablePlatformCertificatesValidation = enablePlatformCertificatesValidation;
     this.enableSkipDNSLookupForProxiedRequests = enableSkipDNSLookupForProxiedRequests;
+    this.rtdsLayerName = rtdsLayerName;
+    this.rtdsTimeoutSeconds = rtdsTimeoutSeconds;
+    this.adsApiType = adsApiType;
+    this.adsAddress = adsAddress;
+    this.adsPort = adsPort;
   }
 
   // TODO(alyssawilk) move this to the test only JNI library.
@@ -233,8 +233,8 @@ public class EnvoyConfiguration {
         maxConnectionsPerHost, statsFlushSeconds, streamIdleTimeoutSeconds,
         perTryIdleTimeoutSeconds, appVersion, appId, enforceTrustChainVerification, clusters,
         filter_chain, stats_sinks, enablePlatformCertificatesValidation,
-        enableSkipDNSLookupForProxiedRequests, runtime_guards, rtdsLayerName, rtdsTimeoutSeconds, adsApiType,
-        adsAddress, adsPort);
+        enableSkipDNSLookupForProxiedRequests, runtime_guards, rtdsLayerName, rtdsTimeoutSeconds,
+        adsApiType, adsAddress, adsPort);
   }
 
   long createBootstrap() {
@@ -258,8 +258,8 @@ public class EnvoyConfiguration {
         maxConnectionsPerHost, statsFlushSeconds, streamIdleTimeoutSeconds,
         perTryIdleTimeoutSeconds, appVersion, appId, enforceTrustChainVerification, clusters,
         filter_chain, stats_sinks, enablePlatformCertificatesValidation,
-        enableSkipDNSLookupForProxiedRequests, runtime_guards, rtdsLayerName, rtdsTimeoutSeconds, adsApiType,
-        adsAddress, adsPort);
+        enableSkipDNSLookupForProxiedRequests, runtime_guards, rtdsLayerName, rtdsTimeoutSeconds,
+        adsApiType, adsAddress, adsPort);
   }
 
   static class ConfigurationException extends RuntimeException {

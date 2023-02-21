@@ -527,6 +527,28 @@ Note that Envoy will fail to start up in debug mode if an unknown guard is speci
   // Swift
   builder.setRuntimeGuard("feature", true)
 
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+``addRtdsLayer``
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Adds an RTDS layer to envoy configuration. Requires that ADS be configured via `setAggregatedDiscoveryService()`.
+
+**Example**::
+
+  // Kotlin
+  builder.addRtdsLayer("rtds_layer_name", 10)
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+``setAggregatedDiscoveryService``
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Adds ADS to envoy configuration, for instance to be used with RTDS and CDS layers.
+
+**Example**::
+
+  // Kotlin
+  builder.setAggregatedDiscoveryService("GRPC", "192.168.1.1", 0)
+
 ----------------------
 Advanced configuration
 ----------------------

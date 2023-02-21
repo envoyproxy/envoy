@@ -1,3 +1,5 @@
+#include <cstddef>
+
 #include "library/cc/engine_builder.h"
 #include "library/common/api/c_types.h"
 #include "library/common/data/utility.h"
@@ -11,7 +13,6 @@
 #include "library/common/jni/jni_version.h"
 #include "library/common/main_interface.h"
 #include "library/common/types/managed_envoy_headers.h"
-#include <cstddef>
 
 using Envoy::Platform::EngineBuilder;
 

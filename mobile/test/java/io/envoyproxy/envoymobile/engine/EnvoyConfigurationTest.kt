@@ -106,11 +106,6 @@ class EnvoyConfigurationTest {
     adsPort: Int = 0
   ): EnvoyConfiguration {
     return EnvoyConfiguration(
-      rtdsLayerName,
-      rtdsTimeoutSeconds,
-      adsApiType,
-      adsAddress,
-      adsPort,
       adminInterfaceEnabled,
       grpcStatsDomain,
       connectTimeoutSeconds,
@@ -147,6 +142,11 @@ class EnvoyConfigurationTest {
       runtimeGuards,
       enableSkipDNSLookupForProxiedRequests,
       enablePlatformCertificatesValidation,
+      rtdsLayerName,
+      rtdsTimeoutSeconds,
+      adsApiType,
+      adsAddress,
+      adsPort,
     )
   }
 

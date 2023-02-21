@@ -553,12 +553,32 @@ open class EngineBuilder(
     return this
   }
 
+  /**
+   * Add RTDS layer.  Requires that ADS be configured via setAggregatedDiscoveryService().
+   *
+   * @param layerName the layer name.
+   *
+   * @param timeoutSeconds the timeout.
+   *
+   * @return this builder.
+   */
   fun addRtdsLayer(layerName: String, timeoutSeconds: Int = 5): EngineBuilder {
   this.rtdsLayerName = layerName
   this.rtdsTimeoutSeconds = timeoutSeconds
   return this
   }
 
+  /**
+   * Add ADS configuration, to be used with RTDS or CDS for example.
+   *
+   * @param apiType the API type.
+   *
+   * @param address the network address of the server.
+   *
+   * @param port the port of the server.
+   *
+   * @return this builder.
+   */
   fun setAggregatedDiscoveryService(apiType: String, address: String, port: Int): EngineBuilder {
   this.adsApiType = apiType
   this.adsAddress = address
@@ -574,11 +594,6 @@ open class EngineBuilder(
   @Suppress("LongMethod")
   fun build(): Engine {
     val engineConfiguration = EnvoyConfiguration(
-      rtdsLayerName,
-      rtdsTimeoutSeconds,
-      adsApiType,
-      adsAddress,
-      adsPort,
       adminInterfaceEnabled,
       grpcStatsDomain,
       connectTimeoutSeconds,
@@ -615,6 +630,11 @@ open class EngineBuilder(
       runtimeGuards,
       enableSkipDNSLookupForProxiedRequests,
       enablePlatformCertificatesValidation,
+      rtdsLayerName,
+      rtdsTimeoutSeconds,
+      adsApiType,
+      adsAddress,
+      adsPort,
     )
 
     return when (configuration) {

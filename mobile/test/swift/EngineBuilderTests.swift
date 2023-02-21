@@ -5,22 +5,6 @@ import XCTest
 
 // swiftlint:disable type_body_length
 
-private let kMockTemplate =
-"""
-fixture_template:
-- name: mock
-  clusters:
-#{custom_clusters}
-  listeners:
-#{custom_listeners}
-  filters:
-#{custom_filters}
-  runtime:
-#{custom_runtime}
-  routes:
-#{custom_routes}
-"""
-
 private struct TestFilter: Filter {}
 
 final class EngineBuilderTests: XCTestCase {
@@ -404,6 +388,25 @@ final class EngineBuilderTests: XCTestCase {
     _ = EngineBuilder()
       .addEngineType(MockEnvoyEngine.self)
       .addStringAccessor(name: "name", accessor: { "hello" })
+      .build()
+    self.waitForExpectations(timeout: 0.01)
+  }
+
+  func testAddingRtdsAndAdsConfigurationWhenRunningEnvoy() {
+    let expectation = self.expectation(description: "Run called with expected data")
+    MockEnvoyEngine.onRunWithConfig = { config, _ in
+      XCTAssertEqual("rtds_layer_name", config.rtdsLayerName)
+      expectation.fulfill()
+    }
+    MockEnvoyEngine.onRunWithConfig = { config, _ in
+      XCTAssertEqual("FAKE_ADDRESS", config.adsAddress)
+      expectation.fulfill()
+    }
+
+    _ = EngineBuilder()
+      .addEngineType(MockEnvoyEngine.self)
+      .addRtdsLayer(layerName: "rtds_layer_name", timeoutSeconds: 5)
+      .setAggregatedDiscoveryService(apiType: "GRPC", address: "FAKE_ADDRESS", port: 0)
       .build()
     self.waitForExpectations(timeout: 0.01)
   }

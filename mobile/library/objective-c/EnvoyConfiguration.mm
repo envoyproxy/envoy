@@ -110,7 +110,12 @@
                                    keyValueStores:
                                        (NSDictionary<NSString *, id<EnvoyKeyValueStore>> *)
                                            keyValueStores
-                                       statsSinks:(NSArray<NSString *> *)statsSinks {
+                                       statsSinks:(NSArray<NSString *> *)statsSinks
+                                    rtdsLayerName:(NSString *)rtdsLayerName
+                               rtdsTimeoutSeconds:(UInt32 *)rtdsTimeoutSeconds
+                                       adsApiType:(NSString *)adsApiType
+                                       adsAddress:(NSString *)adsAddress
+                                          adsPort:(UInt32 *)adsPort {
   self = [super init];
   if (!self) {
     return nil;
@@ -153,6 +158,11 @@
   self.stringAccessors = stringAccessors;
   self.keyValueStores = keyValueStores;
   self.statsSinks = statsSinks;
+  self.rtdsLayerName = rtdsLayerName;
+  self.rtdsTimeoutSeconds = rtdsTimeoutSeconds;
+  self.adsApiType = adsApiType;
+  self.adsAddress = adsAddress;
+  self.adsPort = adsPort;
   return self;
 }
 
@@ -225,6 +235,12 @@
       sinks.push_back([sink toCXXString]);
     }
     builder.addStatsSinks(std::move(sinks));
+  }
+  if ([self.rtdsLayerName length] != 0) {
+    builder.addRtdsLayer(rtdsLayerName, rtdsTimeoutSeconds);
+  }
+  if ([self.adsApiType length] != 0) {
+    builder.setAggregatedDiscoveryService(adsApiType, adsAddress, adsPort);
   }
 
 #ifdef ENVOY_ADMIN_FUNCTIONALITY

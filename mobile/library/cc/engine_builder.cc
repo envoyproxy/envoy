@@ -265,8 +265,7 @@ EngineBuilder& EngineBuilder::addRtdsLayer(std::string layer_name, int timeout_s
   return *this;
 }
 EngineBuilder& EngineBuilder::setAggregatedDiscoveryService(std::string api_type,
-                                                            std::string address,
-                                                            const int port) {
+                                                            std::string address, const int port) {
 #ifndef ENVOY_GOOGLE_GRPC
   throw std::runtime_error("google_grpc must be enabled in bazel to use ADS");
 #endif
