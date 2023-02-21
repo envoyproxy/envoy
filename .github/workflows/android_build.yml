@@ -14,32 +14,29 @@ jobs:
   androidbuild:
     if: github.repository == 'envoyproxy/envoy'
     name: android_build
-    runs-on: macos-12
+    runs-on: ubuntu-20.04
     timeout-minutes: 90
+    container:
+      image: envoyproxy/envoy-build-ubuntu:mobile-f52df4a4e1e2ecbcda42eb2f27a1550b6c53eef0
+      env:
+        CC: /opt/llvm/bin/clang
+        CXX: /opt/llvm/bin/clang++
     steps:
     - uses: actions/checkout@v3
       with:
         fetch-depth: 0
+    - name: Add safe directory
+      run: git config --global --add safe.directory /__w/envoy/envoy
     - id: should_run
       name: 'Check whether to run'
       run: ./mobile/tools/should_run_ci.sh
-    - uses: actions/setup-java@c3ac5dd0ed8db40fedb61c32fbe677e6b355e94c
-      if: steps.should_run.outputs.run_ci_job == 'true'
-      with:
-        java-version: '8'
-        java-package: jdk
-        architecture: x64
-        distribution: zulu
-    - name: 'Install dependencies'
-      if: steps.should_run.outputs.run_ci_job == 'true'
-      run: cd mobile && ./ci/mac_ci_setup.sh --android
     - name: 'Build envoy.aar distributable'
       if: steps.should_run.outputs.run_ci_job == 'true'
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
         cd mobile && ./bazelw build \
-        $([ -z $GITHUB_TOKEN ] || echo "--config=remote-ci-macos") \
+          $([ -z $GITHUB_TOKEN ] || echo "--config=remote-ci-linux-clang") \
           --remote_header="Authorization=Bearer $GITHUB_TOKEN" \
           --fat_apk_cpu=x86_64 \
           //:android_dist
