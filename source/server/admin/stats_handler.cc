@@ -96,9 +96,9 @@ Admin::RequestPtr StatsHandler::makeRequest(AdminStream& admin_stream) {
     server_.flushStats();
   }
 
-  bool dynamic_mode = params.format_ == StatsFormat::Dynamic;
-  return makeRequest(server_.stats(), params, [this, dynamic_mode]() -> Admin::UrlHandler {
-    return statsHandler(dynamic_mode);
+  bool active_mode = params.format_ == StatsFormat::Active;
+  return makeRequest(server_.stats(), params, [this, active_mode]() -> Admin::UrlHandler {
+    return statsHandler(active_mode);
   });
 }
 
@@ -165,14 +165,14 @@ Http::Code StatsHandler::handlerContention(Http::ResponseHeaderMap& response_hea
   return Http::Code::OK;
 }
 
-Admin::UrlHandler StatsHandler::statsHandler(bool dynamic_mode) {
+Admin::UrlHandler StatsHandler::statsHandler(bool active_mode) {
   const Admin::ParamDescriptorVec common_params{
       {Admin::ParamDescriptor::Type::String, "filter",
        "Regular expression (Google re2) for filtering stats"},
       {Admin::ParamDescriptor::Type::Enum,
        "format",
        "Format to use",
-       {"html", "dynamic", "text", "json"}},
+       {"html", "active", "text", "json"}},
       {Admin::ParamDescriptor::Type::Enum,
        "type",
        "Stat types to include.",
@@ -184,7 +184,7 @@ Admin::UrlHandler StatsHandler::statsHandler(bool dynamic_mode) {
        {"cumulative", "disjoint", "none"}}};
 
   Admin::ParamDescriptorVec params;
-  if (!dynamic_mode) {
+  if (!active_mode) {
     params.push_back({Admin::ParamDescriptor::Type::Boolean, "usedonly",
                       "Only include stats that have been written by system since restart"});
   }

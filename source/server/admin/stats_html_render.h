@@ -84,7 +84,7 @@ private:
   bool submit_on_change_{false};
   bool has_pre_{false};
   bool finalized_{false};
-  const bool dynamic_{false};
+  const bool active_{false};
 };
 
 } // namespace Server

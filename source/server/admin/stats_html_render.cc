@@ -57,14 +57,14 @@ namespace Server {
 
 StatsHtmlRender::StatsHtmlRender(Http::ResponseHeaderMap& response_headers,
                                  Buffer::Instance& response, const StatsParams& params)
-    : StatsTextRender(params), dynamic_(params.format_ == StatsFormat::Dynamic) {
+    : StatsTextRender(params), active_(params.format_ == StatsFormat::Active) {
   response_headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Html);
   response.add("<!DOCTYPE html>\n");
   response.add("<html lang='en'>\n");
   response.add(absl::StrReplaceAll(AdminHtmlStart, {{"@FAVICON@", EnvoyFavicon}}));
-  if (dynamic_) {
+  if (active_) {
     response.add("<script>\n");
-    appendResource(response, "dynamic_stats.js", AdminDynamicStatsJs);
+    appendResource(response, "active_stats.js", AdminActiveStatsJs);
     response.add("\n</script>\n");
   } else {
     response.add("<body>\n");
@@ -76,8 +76,8 @@ void StatsHtmlRender::setupStatsPage(const Admin::UrlHandler& url_handler,
   setSubmitOnChange(true);
   tableBegin(response);
   urlHandler(response, url_handler, params.query_);
-  if (dynamic_) {
-    appendResource(response, "dynamic_params.html", AdminDynamicParamsHtml);
+  if (active_) {
+    appendResource(response, "active_params.html", AdminActiveParamsHtml);
   }
   tableEnd(response);
   startPre(response);
@@ -114,7 +114,7 @@ void StatsHtmlRender::appendResource(Buffer::Instance& response, absl::string_vi
 }
 
 void StatsHtmlRender::startPre(Buffer::Instance& response) {
-  if (!dynamic_) {
+  if (!active_) {
     has_pre_ = true;
     response.add("<pre>\n");
   }
@@ -126,7 +126,7 @@ void StatsHtmlRender::generate(Buffer::Instance& response, const std::string& na
 }
 
 void StatsHtmlRender::noStats(Buffer::Instance& response, absl::string_view types) {
-  if (!dynamic_) {
+  if (!active_) {
     response.addFragments({"</pre>\n<br/><i>No ", types, " found</i><br/>\n<pre>\n"});
   }
 }
@@ -191,8 +191,8 @@ void StatsHtmlRender::urlHandler(Buffer::Instance& response, const Admin::UrlHan
 
   for (const Admin::ParamDescriptor& param : handler.params_) {
     // Give each parameter a unique number. Note that this naming is also referenced in
-    // dynamic_stats.js which looks directly at the parameter widgets to find the
-    // current values during JavaScript-driven dynamic updates.
+    // active_stats.js which looks directly at the parameter widgets to find the
+    // current values during JavaScript-driven active updates.
     std::string id = absl::StrCat("param-", index_, "-", absl::StrReplaceAll(path, {{"/", "-"}}),
                                   "-", param.id_);
     response.addFragments({"<tr", row_class, ">\n  <td class='option'>"});
@@ -216,7 +216,7 @@ void StatsHtmlRender::input(Buffer::Instance& response, absl::string_view id,
   }
 
   std::string on_change;
-  if (submit_on_change_ && (!dynamic_ || name == "format")) {
+  if (submit_on_change_ && (!active_ || name == "format")) {
     on_change = absl::StrCat(" onchange='", path, ".submit()'");
   }
 

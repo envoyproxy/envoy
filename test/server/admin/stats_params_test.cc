@@ -42,11 +42,11 @@ TEST(StatsParamsTest, ParseParamsFormat) {
 #ifdef ENVOY_ADMIN_HTML
   ASSERT_EQ(Http::Code::OK, params.parse("?format=html", response));
   EXPECT_EQ(StatsFormat::Html, params.format_);
-  ASSERT_EQ(Http::Code::OK, params.parse("?format=dynamic", response));
-  EXPECT_EQ(StatsFormat::Dynamic, params.format_);
+  ASSERT_EQ(Http::Code::OK, params.parse("?format=active", response));
+  EXPECT_EQ(StatsFormat::Active, params.format_);
 #else
   EXPECT_EQ(Http::Code::BadRequest, params.parse("?format=html", response));
-  EXPECT_EQ(Http::Code::BadRequest, params.parse("?format=dynamic", response));
+  EXPECT_EQ(Http::Code::BadRequest, params.parse("?format=active", response));
 #endif
   ASSERT_EQ(Http::Code::OK, params.parse("?format=json", response));
   EXPECT_EQ(StatsFormat::Json, params.format_);

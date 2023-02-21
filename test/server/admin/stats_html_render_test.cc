@@ -102,17 +102,17 @@ TEST_F(StatsHtmlRenderTest, RenderUrlHandlerSubmitOnChange) {
   EXPECT_THAT(out, Not(HasSubstr(" type='hidden' ")));
 }
 
-class StatsDynamicRenderTest : public StatsRenderTestBase {
+class StatsActiveRenderTest : public StatsRenderTestBase {
 protected:
-  StatsDynamicRenderTest() {
-    params_.format_ = StatsFormat::Dynamic;
+  StatsActiveRenderTest() {
+    params_.format_ = StatsFormat::Active;
     renderer_ = std::make_unique<StatsHtmlRender>(response_headers_, response_, params_);
   }
 
   std::unique_ptr<StatsHtmlRender> renderer_;
 };
 
-TEST_F(StatsDynamicRenderTest, RenderDynamic) {
+TEST_F(StatsActiveRenderTest, RenderActive) {
   renderer_->setupStatsPage(handler(), params_, response_);
   EXPECT_THAT(response_.toString(), HasSubstr("<script>"));
 }

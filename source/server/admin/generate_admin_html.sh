@@ -10,9 +10,9 @@ cat "$2"
 echo '</style>'
 echo '</head>'
 echo ')EOF";'
-echo 'constexpr absl::string_view AdminDynamicStatsJs = R"EOF('
+echo 'constexpr absl::string_view AdminActiveStatsJs = R"EOF('
 cat "$3"
 echo ')EOF";'
-echo 'constexpr absl::string_view AdminDynamicParamsHtml = R"EOF('
+echo 'constexpr absl::string_view AdminActiveParamsHtml = R"EOF('
 cat "$4"
 echo ')EOF";'

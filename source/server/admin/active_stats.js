@@ -17,7 +17,7 @@ let current_stats = new Map();
  * The first time this script loads, it will write PRE element at the end of body.
  * This is hooked to the DOMContentLoaded event.
  */
-let dynamic_stats_pre_element = null;
+let active_stats_pre_element = null;
 
 /**
  * This magic string is derived from C++ in StatsHtmlRender::urlHandler to uniquely
@@ -43,9 +43,9 @@ function setRenderTestHook(hook) {
  * PRE right now) and kick off the periodic JSON updates.
  */
 function initHook() {
-  dynamic_stats_pre_element = document.createElement("pre");
-  dynamic_stats_pre_element.id = 'dynamic-content-pre';
-  document.body.appendChild(dynamic_stats_pre_element);
+  active_stats_pre_element = document.createElement("pre");
+  active_stats_pre_element.id = 'active-content-pre';
+  document.body.appendChild(active_stats_pre_element);
   loadStats();
 }
 
@@ -86,7 +86,7 @@ function compareStatRecords(a, b) {
 }
 
 /**
- * The dynamic display has additional settings for tweaking it -- this helper extracts numeric
+ * The active display has additional settings for tweaking it -- this helper extracts numeric
  * values from text widgets
  */
 function loadSettingOrUseDefault(id, default_value) {
@@ -127,13 +127,13 @@ function renderStats(data) {
   prev_stats = null;
 
   // Sorts all the stats. This is inefficient; we should just pick the top N
-  // based on field "dynamic-max-display-count" and sort those. The best
+  // based on field "active-max-display-count" and sort those. The best
   // algorithms for this require a heap or priority queue. JS implementations
   // of those can be found, but that would bloat this relatively modest amount
   // of code, and compell us to do a better job writing tests.
   sorted_stats.sort(compareStatRecords);
 
-  const max = loadSettingOrUseDefault("dynamic-max-display-count", 50);
+  const max = loadSettingOrUseDefault("active-max-display-count", 50);
   let index = 0;
   let text = "";
   for (const stat_record of sorted_stats) {
@@ -143,7 +143,7 @@ function renderStats(data) {
     text += stat_record.name + ": " + stat_record.value + " (" +
         stat_record.change_count + ")" + "\n";
   }
-  dynamic_stats_pre_element.textContent = text;
+  active_stats_pre_element.textContent = text;
 
   // If a post-render test-hook has been established, call it, but clear
   // the hook first, so that the callee can set a new hook if it wants to.
@@ -154,7 +154,7 @@ function renderStats(data) {
   }
 
   // Update stats every 5 seconds by default.
-  window.setTimeout(loadStats, 1000*loadSettingOrUseDefault("dynamic-update-interval", 5));
+  window.setTimeout(loadStats, 1000*loadSettingOrUseDefault("active-update-interval", 5));
 }
 
 // We don't want to trigger any DOM manipulations until the DOM is fully loaded.
