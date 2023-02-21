@@ -22,6 +22,11 @@ func configFactory(config *anypb.Any) api.ClusterSpecifier {
 			plugin.invalidPrefix = valueStr
 		}
 	}
+	if value, ok := configStruct.Value.AsMap()["default_prefix"]; ok {
+		if valueStr, ok := value.(string); ok {
+			plugin.defaultPrefix = valueStr
+		}
+	}
 	return plugin
 }
 

@@ -8,13 +8,21 @@ import (
 
 type clusterSpecifier struct {
 	invalidPrefix string
+	defaultPrefix string
 }
 
 func (s *clusterSpecifier) Choose(header api.RequestHeaderMap) string {
-	// block the request with an unknown cluster.
 	path := header.Get(":path")
+
+	// block the request with an unknown cluster.
 	if strings.HasPrefix(path, s.invalidPrefix) {
 		return "cluster_unknown"
 	}
+
+	// return "" will using the default_cluster in the C++ side.
+	if strings.HasPrefix(path, s.defaultPrefix) {
+		return ""
+	}
+
 	return "cluster_0"
 }

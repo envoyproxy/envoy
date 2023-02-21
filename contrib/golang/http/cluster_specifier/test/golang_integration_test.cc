@@ -44,10 +44,12 @@ routes:
           "@type": type.googleapis.com/envoy.extensions.http.cluster_specifier.golang.v3alpha.Config
           library_id: %s
           library_path: %s
+          default_cluster: %s
           config:
             "@type": type.googleapis.com/xds.type.v3.TypedStruct
             value:
               invalid_prefix: "/admin/"
+              default_prefix: "/default/"
 )EOF";
 
 std::string genSoPath(std::string name) {
@@ -56,10 +58,10 @@ std::string genSoPath(std::string name) {
       "/plugin.so");
 }
 
-// return the default cluster: "cluster_0"
+// Go plugin choose cluster: "cluster_0"
 TEST_F(GolangClusterSpecifierIntegrationTest, OK) {
   auto so_id = "simple";
-  auto yaml_string = absl::StrFormat(yaml_fmt, so_id, genSoPath(so_id));
+  auto yaml_string = absl::StrFormat(yaml_fmt, so_id, genSoPath(so_id), "");
   initializeRoute(yaml_string);
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -81,10 +83,10 @@ TEST_F(GolangClusterSpecifierIntegrationTest, OK) {
   cleanupUpstreamAndDownstream();
 }
 
-// return the unknown cluster: "cluster_unknown"
+// Go plugin return cluster: "cluster_unknown"
 TEST_F(GolangClusterSpecifierIntegrationTest, UnknownCluster) {
   auto so_id = "simple";
-  auto yaml_string = absl::StrFormat(yaml_fmt, so_id, genSoPath(so_id));
+  auto yaml_string = absl::StrFormat(yaml_fmt, so_id, genSoPath(so_id), "");
   initializeRoute(yaml_string);
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -94,7 +96,55 @@ TEST_F(GolangClusterSpecifierIntegrationTest, UnknownCluster) {
                                                  {":scheme", "http"},
                                                  {":authority", "test.com"}};
 
-  // Request with the "/admin/" prefix URI, unknown cluster name will be return by the cluster
+  // Request with the "/admin/" prefix URI, the "cluster_unknown" name will be return by the cluster
+  // specifier plugin.
+  auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_TRUE(response->complete());
+  EXPECT_THAT(response->headers(), Http::HttpStatusIs("503"));
+
+  cleanupUpstreamAndDownstream();
+}
+
+// Go plugin choose cluster: "", using the default_cluster: "cluster_0"
+TEST_F(GolangClusterSpecifierIntegrationTest, DefaultCluster_OK) {
+  auto so_id = "simple";
+  auto yaml_string = absl::StrFormat(yaml_fmt, so_id, genSoPath(so_id), "cluster_0");
+  initializeRoute(yaml_string);
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  Http::TestResponseHeaderMapImpl response_headers{
+      {"server", "envoy"},
+      {":status", "200"},
+  };
+
+  // Request with the "/default/" prefix URI, the "" empty name will be return by the cluster
+  // specifier plugin.
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "GET"}, {":path", "/default/1"}, {":scheme", "http"}, {":authority", "test.com"}};
+
+  auto response = sendRequestAndWaitForResponse(request_headers, 0, response_headers, 0);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ(response->headers().getStatusValue(), "200");
+
+  cleanupUpstreamAndDownstream();
+}
+
+// Go plugin choose cluster: "", using the default_cluster: "cluster_unknown"
+TEST_F(GolangClusterSpecifierIntegrationTest, DefaultCluster_Unknown) {
+  auto so_id = "simple";
+  auto yaml_string = absl::StrFormat(yaml_fmt, so_id, genSoPath(so_id), "cluster_unknown");
+  initializeRoute(yaml_string);
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "GET"}, {":path", "/default/1"}, {":scheme", "http"}, {":authority", "test.com"}};
+
+  // Request with the "/default/" prefix URI, the "" empty name will be return by the cluster
   // specifier plugin.
   auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
   ASSERT_TRUE(response->waitForEndStream());
