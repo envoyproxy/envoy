@@ -112,10 +112,10 @@
                                            keyValueStores
                                        statsSinks:(NSArray<NSString *> *)statsSinks
                                     rtdsLayerName:(NSString *)rtdsLayerName
-                               rtdsTimeoutSeconds:(UInt32 *)rtdsTimeoutSeconds
+                               rtdsTimeoutSeconds:(UInt32)rtdsTimeoutSeconds
                                        adsApiType:(NSString *)adsApiType
                                        adsAddress:(NSString *)adsAddress
-                                          adsPort:(UInt32 *)adsPort {
+                                          adsPort:(UInt32)adsPort {
   self = [super init];
   if (!self) {
     return nil;
