@@ -506,10 +506,11 @@ elif [[ "$CI_TARGET" == "deps" ]]; then
   # Using todays date as an action_env expires the NIST cache daily, which is the update frequency
   TODAY_DATE=$(date -u -I"date")
   export TODAY_DATE
+  # TODO(phlax): reenable cve tests when upstream issue resolved
   bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/dependency:check \
         --action_env=TODAY_DATE \
         -- -v warn \
-           -c cves release_dates releases
+           -c release_dates releases
 
   # Run pip requirements tests
   echo "check pip..."
