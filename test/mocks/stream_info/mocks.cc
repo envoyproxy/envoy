@@ -117,8 +117,7 @@ MockStreamInfo::MockStreamInfo()
       .WillByDefault(
           Invoke([this]() -> OptRef<const DownstreamTiming> { return downstream_timing_; }));
   ON_CALL(Const(*this), upstreamTiming())
-      .WillByDefault(
-          Invoke([this]() -> OptRef<const UpstreamTiming> { return upstream_timing_; }));
+      .WillByDefault(Invoke([this]() -> OptRef<const UpstreamTiming> { return upstream_timing_; }));
   ON_CALL(*this, upstreamInfo()).WillByDefault(Invoke([this]() { return upstream_info_; }));
   ON_CALL(testing::Const(*this), upstreamInfo())
       .WillByDefault(Invoke([this]() -> OptRef<const UpstreamInfo> {
