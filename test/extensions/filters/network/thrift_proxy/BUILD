@@ -342,6 +342,7 @@ envoy_extension_cc_test(
     ],
     extension_names = ["envoy.filters.network.thrift_proxy"],
     shard_count = 4,
+    tags = ["skip_on_windows"],
     deps = [
         ":integration_lib",
         ":utility_lib",
