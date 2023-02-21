@@ -264,12 +264,8 @@ EngineBuilder& EngineBuilder::setNodeId(std::string node_id) {
   return *this;
 }
 
-EngineBuilder& EngineBuilder::setNodeLocality(std::string region, std::string zone,
-                                              std::string sub_zone) {
-  set_node_locality_ = true;
-  node_locality_region_ = std::move(region);
-  node_locality_zone_ = std::move(zone);
-  node_locality_sub_zone_ = std::move(sub_zone);
+EngineBuilder& EngineBuilder::setNodeLocality(const NodeLocality& node_locality) {
+  node_locality_ = node_locality;
   return *this;
 }
 
@@ -414,11 +410,11 @@ std::string EngineBuilder::generateConfigStr() const {
                             fmt::format("{}", dns_cache_save_interval_seconds_)});
     replacements.push_back({"persistent_dns_cache_config", persistent_dns_cache_config_insert});
   }
-  if (set_node_locality_) {
+  if (node_locality_) {
     replacements.push_back(
         {"node_locality",
-         fmt::format("{{ region: \"{}\", zone: \"{}\", sub_zone: \"{}\" }}", node_locality_region_,
-                     node_locality_zone_, node_locality_sub_zone_)});
+         fmt::format("{{ region: \"{}\", zone: \"{}\", sub_zone: \"{}\" }}", node_locality_->region,
+                     node_locality_->zone, node_locality_->sub_zone)});
   }
 
   // NOTE: this does not include support for custom filters
@@ -1178,14 +1174,10 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
   auto* node = bootstrap->mutable_node();
   node->set_id(node_id_.empty() ? "envoy-mobile" : node_id_);
   node->set_cluster("envoy-mobile");
-  if (!node_locality_region_.empty()) {
-    node->mutable_locality()->set_region(node_locality_region_);
-  }
-  if (!node_locality_zone_.empty()) {
-    node->mutable_locality()->set_zone(node_locality_zone_);
-  }
-  if (!node_locality_sub_zone_.empty()) {
-    node->mutable_locality()->set_sub_zone(node_locality_sub_zone_);
+  if (node_locality_) {
+    node->mutable_locality()->set_region(node_locality_->region);
+    node->mutable_locality()->set_zone(node_locality_->zone);
+    node->mutable_locality()->set_sub_zone(node_locality_->sub_zone);
   }
   ProtobufWkt::Struct& metadata = *node->mutable_metadata();
   (*metadata.mutable_fields())["app_id"].set_string_value(app_id_);

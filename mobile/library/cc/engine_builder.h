@@ -8,6 +8,7 @@
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 
 #include "absl/container/flat_hash_map.h"
+#include "absl/types/optional.h"
 #include "direct_response_testing.h"
 #include "engine.h"
 #include "engine_callbacks.h"
@@ -20,6 +21,13 @@ namespace Platform {
 
 constexpr int DefaultJwtTokenLifetimeSeconds = 31536000; // 1 year
 constexpr int DefaultXdsTimeout = 5;
+
+// Represents the locality information in the Bootstrap's node.
+struct NodeLocality {
+  std::string region;
+  std::string zone;
+  std::string sub_zone;
+};
 
 // The C++ Engine builder supports 2 ways of building Envoy Mobile config, the 'legacy mode'
 // which uses a yaml config header, blocks of well known yaml configs, and uses string manipulation
@@ -73,7 +81,7 @@ public:
   // Sets the node.id field in the Bootstrap configuration.
   EngineBuilder& setNodeId(std::string node_id);
   // Sets the node.locality field in the Bootstrap configuration.
-  EngineBuilder& setNodeLocality(std::string region, std::string zone, std::string sub_zone);
+  EngineBuilder& setNodeLocality(const NodeLocality& node_locality);
   // Adds an ADS layer. Note that only the state-of-the-world gRPC protocol is supported, not Delta
   // gRPC.
   EngineBuilder&
@@ -172,10 +180,7 @@ private:
   std::string rtds_layer_name_ = "";
   int rtds_timeout_seconds_;
   std::string node_id_;
-  bool set_node_locality_ = false;
-  std::string node_locality_region_;
-  std::string node_locality_zone_;
-  std::string node_locality_sub_zone_;
+  absl::optional<NodeLocality> node_locality_ = absl::nullopt;
   std::string ads_address_ = "";
   int ads_port_;
   std::string ads_jwt_token_;

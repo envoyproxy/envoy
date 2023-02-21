@@ -18,6 +18,7 @@ envoy_cc_library(
     }),
     repository = "@envoy",
     visibility = ["//visibility:public"],
+    external_deps = ["abseil_optional"],
     deps = [
         ":envoy_engine_cc_lib_no_stamp",
         "@envoy//source/common/common:assert_lib",
