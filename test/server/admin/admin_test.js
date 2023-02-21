@@ -36,12 +36,11 @@ function runTest(url, name, tester) {
     iframe.onload = () => {
       iframe.contentWindow.setRenderTestHook(() => {
         console.log('post render\n');
-        try {
-          tester(iframe);
+        tester(iframe).then(() => {
           results.textContent += 'passed\n';
-        } catch (err) {
+        }).catch((err) => {
           results.textContent += 'FAILED: ' + err + '\n';
-        }
+        });
         iframe.parentElement.removeChild(iframe);
         resolve(null);
       });
