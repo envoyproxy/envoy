@@ -233,7 +233,8 @@ public class EnvoyConfiguration {
         maxConnectionsPerHost, statsFlushSeconds, streamIdleTimeoutSeconds,
         perTryIdleTimeoutSeconds, appVersion, appId, enforceTrustChainVerification, clusters,
         filter_chain, stats_sinks, enablePlatformCertificatesValidation,
-        enableSkipDNSLookupForProxiedRequests, runtime_guards);
+        enableSkipDNSLookupForProxiedRequests, runtime_guards, rtdsLayerName, rtdsTimeoutSeconds, adsApiType,
+        adsAddress, adsPort);
   }
 
   long createBootstrap() {
@@ -257,8 +258,8 @@ public class EnvoyConfiguration {
         maxConnectionsPerHost, statsFlushSeconds, streamIdleTimeoutSeconds,
         perTryIdleTimeoutSeconds, appVersion, appId, enforceTrustChainVerification, clusters,
         filter_chain, stats_sinks, enablePlatformCertificatesValidation,
-        enableSkipDNSLookupForProxiedRequests,
-            rtdsLayerName, rtdsTimeoutSeconds, adsApiType, adsAddress, adsPort, runtime_guards);
+        enableSkipDNSLookupForProxiedRequests, runtime_guards, rtdsLayerName, rtdsTimeoutSeconds, adsApiType,
+        adsAddress, adsPort);
   }
 
   static class ConfigurationException extends RuntimeException {

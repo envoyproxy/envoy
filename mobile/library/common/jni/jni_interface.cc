@@ -1276,9 +1276,10 @@ void configureBuilder(JNIEnv* env, jstring grpc_stats_domain, jboolean admin_int
                       jboolean trust_chain_verification, jobjectArray virtual_clusters,
                       jobjectArray filter_chain, jobjectArray stat_sinks,
                       jboolean enable_platform_certificates_validation,
-                      jboolean enable_skip_dns_lookup_for_proxied_requests, jstring rtds_layer_name,
-    jlong rtds_timeout_seconds, jstring ads_api_type, jstring ads_address, jlong ads_port,
-                      jobjectArray runtime_guards, Envoy::Platform::EngineBuilder& builder) {
+                      jboolean enable_skip_dns_lookup_for_proxied_requests,
+                      jobjectArray runtime_guards, jstring rtds_layer_name,
+                      jlong rtds_timeout_seconds, jstring ads_api_type, jstring ads_address,
+                      jlong ads_port, Envoy::Platform::EngineBuilder& builder) {
   setString(env, grpc_stats_domain, &builder, &EngineBuilder::addGrpcStatsDomain);
   builder.addConnectTimeoutSeconds((connect_timeout_seconds));
   builder.addDnsRefreshSeconds((dns_refresh_seconds));
@@ -1345,7 +1346,6 @@ void configureBuilder(JNIEnv* env, jstring grpc_stats_domain, jboolean admin_int
   if (!ads_api_type_cpp.empty()) {
     builder.setAggregatedDiscoveryService(ads_api_type_cpp, ads_address_cpp, ads_port);
   }
-
 }
 
 extern "C" JNIEXPORT jstring JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibrary_createYaml(
@@ -1363,7 +1363,9 @@ extern "C" JNIEXPORT jstring JNICALL Java_io_envoyproxy_envoymobile_engine_JniLi
     jlong per_try_idle_timeout_seconds, jstring app_version, jstring app_id,
     jboolean trust_chain_verification, jobjectArray virtual_clusters, jobjectArray filter_chain,
     jobjectArray stat_sinks, jboolean enable_platform_certificates_validation,
-    jboolean enable_skip_dns_lookup_for_proxied_requests, jobjectArray runtime_guards) {
+    jboolean enable_skip_dns_lookup_for_proxied_requests, jobjectArray runtime_guards,
+    jstring rtds_layer_name, jlong rtds_timeout_seconds, jstring ads_api_type, jstring ads_address,
+    jlong ads_port) {
   Envoy::Thread::SkipAsserts skip_asserts;
   Envoy::Platform::EngineBuilder builder;
   configureBuilder(
@@ -1377,7 +1379,8 @@ extern "C" JNIEXPORT jstring JNICALL Java_io_envoyproxy_envoymobile_engine_JniLi
       max_connections_per_host, stats_flush_seconds, stream_idle_timeout_seconds,
       per_try_idle_timeout_seconds, app_version, app_id, trust_chain_verification, virtual_clusters,
       filter_chain, stat_sinks, enable_platform_certificates_validation,
-      enable_skip_dns_lookup_for_proxied_requests, runtime_guards, builder);
+      enable_skip_dns_lookup_for_proxied_requests, runtime_guards, rtds_layer_name,
+      rtds_timeout_seconds, ads_api_type, ads_address, ads_port, builder);
 
   auto bootstrap = builder.generateBootstrap();
   std::string yaml = Envoy::MessageUtil::getYamlStringFromMessage(*bootstrap);
@@ -1399,7 +1402,9 @@ extern "C" JNIEXPORT jlong JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibr
     jlong per_try_idle_timeout_seconds, jstring app_version, jstring app_id,
     jboolean trust_chain_verification, jobjectArray virtual_clusters, jobjectArray filter_chain,
     jobjectArray stat_sinks, jboolean enable_platform_certificates_validation,
-    jboolean enable_skip_dns_lookup_for_proxied_requests, jobjectArray runtime_guards) {
+    jboolean enable_skip_dns_lookup_for_proxied_requests, jobjectArray runtime_guards,
+    jstring rtds_layer_name, jlong rtds_timeout_seconds, jstring ads_api_type, jstring ads_address,
+    jlong ads_port) {
   Envoy::Platform::EngineBuilder builder;
 
   configureBuilder(
@@ -1413,7 +1418,8 @@ extern "C" JNIEXPORT jlong JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibr
       max_connections_per_host, stats_flush_seconds, stream_idle_timeout_seconds,
       per_try_idle_timeout_seconds, app_version, app_id, trust_chain_verification, virtual_clusters,
       filter_chain, stat_sinks, enable_platform_certificates_validation,
-      enable_skip_dns_lookup_for_proxied_requests, runtime_guards, builder);
+      enable_skip_dns_lookup_for_proxied_requests, runtime_guards, rtds_layer_name,
+      rtds_timeout_seconds, ads_api_type, ads_address, ads_port, builder);
 
   return reinterpret_cast<intptr_t>(builder.generateBootstrap().release());
 }
