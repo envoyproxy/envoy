@@ -8,6 +8,8 @@
 
 namespace Envoy {
 
+#define ENVOY_BIT_ARRAY_SUPPORTED sizeof(uint8_t*) == 8
+
 /**
  * BitArray is an fixed sized array of fixed bit width elements. As such once
  * constructed it will not grow in the number of elements it can hold, or change
@@ -45,9 +47,7 @@ public:
         mask_(static_cast<uint32_t>((static_cast<uint64_t>(1) << width) - 1)),
         num_items_(num_items) {
     RELEASE_ASSERT(width <= MaxBitWidth, "Using BitArray with invalid parameters.");
-    static_assert(
-        sizeof(uint8_t*) == 8,
-        "Pointer underlying size is not 8 bytes, are we running on a 64-bit architecture?");
+    RELEASE_ASSERT(ENVOY_BIT_ARRAY_SUPPORTED, "BitArray requires 64-bit architecture.");
     // Init padding to avoid sanitizer complaints if reading the last elements.
     uint8_t* padding_start = array_start_.get() + (bytesNeeded(width, num_items) - WordSize);
     storeUnsignedWord(padding_start, 0);

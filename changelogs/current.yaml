@@ -48,6 +48,7 @@ removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
 - area: config
   change: |
+    removed ``envoy.reloadable_features.admin_stats_filter_use_re2`` and legacy code paths.
     removed ``envoy.reloadable_features.combine_sds_requests`` and legacy code paths.
 - area: dns
   change: |
@@ -108,6 +109,11 @@ new_features:
 - area: sni_dynamic_forward_proxy
   change: |
     added an option to dynamically set the host used by the SNI dynamic forward proxy filter, by setting a filter state object under the key ``envoy.upstream.dynamic_host``.
+- area: access_log
+  change: |
+    added support for :ref:`%DOWNSTREAM_TRANSPORT_FAILURE_REASON% <config_access_log_format_downstream_transport_failure_reason>` as a log command operator about why listener may have failed due to a transport socket error,
+    including TLS handshake failures.
+    added the field :ref:`downstream_transport_failure_reason <envoy_v3_api_field_data.accesslog.v3.AccessLogCommon.downstream_transport_failure_reason>` for common usage as well.
 - area: generic_proxy
   change: |
     added :ref:`tracing support <envoy_v3_api_field_extensions.filters.network.generic_proxy.v3.GenericProxy.tracing>` for the generic proxy.
