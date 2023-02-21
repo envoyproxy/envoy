@@ -192,12 +192,7 @@ template <class StatType> void StatsRequest::populateStatsFromScopes(const Scope
     // differs in that Prometheus only uses stat->name() for filtering, not
     // rendering, so it only grab the name if there's a filter.
     std::string name = stat->name();
-    if (params_.filter_ != nullptr) {
-      if (!std::regex_search(name, *params_.filter_)) {
-        return true;
-      }
-    } else if (params_.re2_filter_ != nullptr &&
-               !re2::RE2::PartialMatch(name, *params_.re2_filter_)) {
+    if (params_.re2_filter_ != nullptr && !re2::RE2::PartialMatch(name, *params_.re2_filter_)) {
       return true;
     }
     stat_map_[name] = stat;

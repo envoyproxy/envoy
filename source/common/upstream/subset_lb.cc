@@ -32,8 +32,7 @@ SubsetLoadBalancer::SubsetLoadBalancer(
     OptRef<const envoy::config::cluster::v3::Cluster::LeastRequestLbConfig> least_request_config,
     const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config,
     TimeSource& time_source)
-    : lb_type_(lb_type),
-      lb_ring_hash_config_(
+    : lb_ring_hash_config_(
           lb_ring_hash_config.has_value()
               ? std::make_unique<const envoy::config::cluster::v3::Cluster::RingHashLbConfig>(
                     lb_ring_hash_config.ref())
@@ -59,10 +58,9 @@ SubsetLoadBalancer::SubsetLoadBalancer(
       default_subset_metadata_(subsets.defaultSubset().fields().begin(),
                                subsets.defaultSubset().fields().end()),
       subset_selectors_(subsets.subsetSelectors()), original_priority_set_(priority_set),
-      original_local_priority_set_(local_priority_set),
-      locality_weight_aware_(subsets.localityWeightAware()),
-      scale_locality_weight_(subsets.scaleLocalityWeight()), list_as_any_(subsets.listAsAny()),
-      time_source_(time_source) {
+      original_local_priority_set_(local_priority_set), time_source_(time_source),
+      lb_type_(lb_type), locality_weight_aware_(subsets.localityWeightAware()),
+      scale_locality_weight_(subsets.scaleLocalityWeight()), list_as_any_(subsets.listAsAny()) {
   ASSERT(subsets.isEnabled());
 
   if (fallback_policy_ != envoy::config::cluster::v3::Cluster::LbSubsetConfig::NO_FALLBACK) {

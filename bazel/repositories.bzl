@@ -69,6 +69,21 @@ def _envoy_repo_impl(repository_ctx):
     within the constraints of a `genquery`, or that otherwise need access to the repository
     files.
 
+    Project and repo data can be accessed in JSON format using `@envoy_repo//:project`, eg:
+
+    ```starlark
+    load("@aspect_bazel_lib//lib:jq.bzl", "jq")
+
+    jq(
+        name = "project_version",
+        srcs = ["@envoy_repo//:data"],
+        out = "version.txt",
+        args = ["-r"],
+        filter = ".version",
+    )
+
+    ```
+
     """
     repo_version_path = repository_ctx.path(repository_ctx.attr.envoy_version)
     api_version_path = repository_ctx.path(repository_ctx.attr.envoy_api_version)
@@ -78,12 +93,37 @@ def _envoy_repo_impl(repository_ctx):
     repository_ctx.file("path.bzl", "PATH = '%s'" % repo_version_path.dirname)
     repository_ctx.file("__init__.py", "PATH = '%s'\nVERSION = '%s'\nAPI_VERSION = '%s'" % (repo_version_path.dirname, version, api_version))
     repository_ctx.file("WORKSPACE", "")
-    repository_ctx.file("BUILD", """
+    repository_ctx.file("BUILD", '''
 load("@rules_python//python:defs.bzl", "py_library")
+load("@envoy//tools/base:envoy_python.bzl", "envoy_entry_point")
 
-py_library(name = "envoy_repo", srcs = ["__init__.py"], visibility = ["//visibility:public"])
+py_library(
+    name = "envoy_repo",
+    srcs = ["__init__.py"],
+    visibility = ["//visibility:public"],
+)
 
-""")
+envoy_entry_point(
+    name = "get_project_json",
+    pkg = "envoy.base.utils",
+    script = "envoy.project_data",
+)
+
+genrule(
+    name = "project",
+    outs = ["project.json"],
+    cmd = """
+    $(location :get_project_json) . > $@
+    """,
+    tools = [
+        ":get_project_json",
+        "@envoy//:VERSION.txt",
+        "@envoy//changelogs",
+    ],
+    visibility = ["//visibility:public"],
+)
+
+''')
 
 _envoy_repo = repository_rule(
     implementation = _envoy_repo_impl,
@@ -517,7 +557,11 @@ def _com_github_facebook_zstd():
     )
 
 def _com_google_cel_cpp():
-    external_http_archive("com_google_cel_cpp")
+    external_http_archive(
+        "com_google_cel_cpp",
+        patches = ["@envoy//bazel:cel-cpp.patch"],
+        patch_args = ["-p1"],
+    )
 
 def _com_github_google_perfetto():
     external_http_archive(
