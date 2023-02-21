@@ -19,34 +19,40 @@ function addTest(url, name, test_function) {
 }
 
 
+async function waitForOnload(iframe) {
+  return new Promise((resolve, reject) => {
+    iframe.onload = () => {
+      resolve();
+    };
+  });
+}
+
 /**
  * Renders a URL, and after 3 seconds delay, runs the 'tester' function.
  * Log whether that function failed (threw exception) or passed. Either
  * way, when that completes resolve a returned promise so the next test can
  * run.
  */
-function runTest(url, name, tester) {
-  return new Promise((resolve, reject) => {
-    const results = document.getElementById('test-results');
-    results.textContent += name + ' ...';
-    iframe = document.createElement("iframe");
-    iframe.width = 800;
-    iframe.height = 1000;
-    iframe.src = url;
-    const finish = (msg) => {
-      results.textContent += msg + '\n';
-      iframe.parentElement.removeChild(iframe);
-      resolve(null);
-    };
-    iframe.onload = () => {
-      tester(iframe).then(() => {
-        finish('passed');
-      }).catch((err) => {
-        finish('FAILED: ' + err);
-      });
-    };
-    document.body.appendChild(iframe);
-  });
+async function runTest(url, name, tester) {
+  const results = document.getElementById('test-results');
+  results.textContent += name + ' ...';
+  iframe = document.createElement("iframe");
+  iframe.width = 800;
+  iframe.height = 1000;
+  iframe.src = url;
+  const finish = (msg) => {
+    results.textContent += msg + '\n';
+    iframe.parentElement.removeChild(iframe);
+    //resolve(null);
+  };
+  document.body.appendChild(iframe);
+  await waitForOnload(iframe);
+  try {
+    await tester(iframe);
+    finish('passed');
+  } catch (err) {
+    finish('FAILED: ' + err);
+  }
 }
 
 
