@@ -45,7 +45,7 @@ SysCallSizeResult OsSysCallsImpl::writev(os_fd_t fd, const iovec* iov, int num_i
   ssize_t rc;
   if (num_iov == 1) {
     // Avoid paying the VFS overhead when there is only one IO buffer to work with
-    rc = ::send(fd, iov[0].iov_base, iov[0].iov_len, 0);
+    rc = ::write(fd, iov[0].iov_base, iov[0].iov_len);
   } else {
     rc = ::writev(fd, iov, num_iov);
   }
@@ -56,7 +56,7 @@ SysCallSizeResult OsSysCallsImpl::readv(os_fd_t fd, const iovec* iov, int num_io
   ssize_t rc;
   if (num_iov == 1) {
     // Avoid paying the VFS overhead when there is only one IO buffer to work with
-    rc = ::recv(fd, iov[0].iov_base, iov[0].iov_len, 0);
+    rc = ::read(fd, iov[0].iov_base, iov[0].iov_len);
   } else {
     rc = ::readv(fd, iov, num_iov);
   }
