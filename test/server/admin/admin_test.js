@@ -60,6 +60,15 @@ function assertTrue(cond, comment) {
   }
 }
 
+
+/**
+ * Checks for equality, throwing an exception with a comment if it fails.
+ */
+function assertEq(expected, actual) {
+  assertTrue(expected == actual, 'assertEq mismatch: expected ' + expected + ' got ' + actual);
+}
+
+
 /**
  * Runs all tests added via addTest() above.
  */
@@ -75,6 +84,15 @@ function runAllTests() {
     }
   };
   next_test(0);
+}
+
+function rejectExceptions(resolve, reject, fn) {
+  try {
+    fn();
+    resolve();
+  } catch (err) {
+    reject(err);
+  }
 }
 
 // Trigger the tests once all JS is loaded.
