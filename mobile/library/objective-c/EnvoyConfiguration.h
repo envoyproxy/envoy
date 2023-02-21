@@ -48,10 +48,10 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic, strong) NSDictionary<NSString *, id<EnvoyKeyValueStore>> *keyValueStores;
 @property (nonatomic, strong) NSArray<NSString *> *statsSinks;
 @property (nonatomic, strong) NSString *rtdsLayerName;
-@property (nonatomic, strong) UInt32 *rtdsTimeoutSeconds;
+@property (nonatomic, assign) UInt32 *rtdsTimeoutSeconds;
 @property (nonatomic, strong) NSString *adsApiType;
 @property (nonatomic, strong) NSString *adsAddress;
-@property (nonatomic, strong) UInt32 *adsPort;
+@property (nonatomic, assign) UInt32 *adsPort;
 
 /**
  Create a new instance of the configuration.
