@@ -142,11 +142,12 @@ function renderStats(data) {
   }
   dynamic_stats_pre_element.textContent = text;
 
-  // If a post-render test-hook has been established, call it.
-  //debugger;
+  // If a post-render test-hook has been established, call it, but clear
+  // the hook first, so that the callee can set a new hook if it wants to.
   if (post_render_test_hook) {
-    post_render_test_hook();
+    const hook = post_render_test_hook;
     post_render_test_hook = null;
+    hook();
   }
 
   // Update stats every 5 seconds by default.

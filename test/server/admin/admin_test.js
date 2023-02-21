@@ -33,18 +33,17 @@ function runTest(url, name, tester) {
     iframe.width = 800;
     iframe.height = 1000;
     iframe.src = url;
+    const finish = (msg) => {
+      results.textContent += msg + '\n';
+      iframe.parentElement.removeChild(iframe);
+      resolve(null);
+    };
     iframe.onload = () => {
-      iframe.contentWindow.setRenderTestHook(() => {
-        console.log('post render\n');
-        tester(iframe).then(() => {
-          results.textContent += 'passed\n';
-          iframe.parentElement.removeChild(iframe);
-          resolve(null);
-        }).catch((err) => {
-          results.textContent += 'FAILED: ' + err + '\n';
-          iframe.parentElement.removeChild(iframe);
-          resolve(null);
-        });
+      console.log('post render\n');
+      tester(iframe).then(() => {
+        finish('passed');
+      }).catch((err) => {
+        finish('FAILED: ' + err);
       });
     };
     document.body.appendChild(iframe);
