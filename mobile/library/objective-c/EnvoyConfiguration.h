@@ -102,10 +102,10 @@ NS_ASSUME_NONNULL_BEGIN
                                            keyValueStores
                                        statsSinks:(NSArray<NSString *> *)statsSinks
                                     rtdsLayerName:(NSString *)rtdsLayerName
-                               rtdsTimeoutSeconds:(UInt32 *)rtdsTimeoutSeconds
+                               rtdsTimeoutSeconds:(UInt32)rtdsTimeoutSeconds
                                        adsApiType:(NSString *)adsApiType
                                        adsAddress:(NSString *)adsAddress
-                                          adsPort:(UInt32 *)adsPort;
+                                          adsPort:(UInt32)adsPort;
 
 @end
 

@@ -575,7 +575,7 @@ open class EngineBuilder: NSObject {
   ///
   /// - returns: This builder.
   @discardableResult
-  public func setAggregatedDiscoveryService(_ apiType: String, address: String, timeoutSeconds: UInt32) -> Self {
+  public func setAggregatedDiscoveryService(_ apiType: String, address: String, port: UInt32) -> Self {
     self.adsApiType = apiType
     self.adsAddress = address
     self.adsPort = port
