@@ -39,7 +39,8 @@ protected:
   void assertStreamInfoSize(StreamInfoImpl stream_info) {
     ASSERT_TRUE(sizeof(stream_info) == 800 || sizeof(stream_info) == 816 ||
                 sizeof(stream_info) == 824 || sizeof(stream_info) == 840 ||
-                sizeof(stream_info) == 872 || sizeof(stream_info) == 920)
+                sizeof(stream_info) == 872 || sizeof(stream_info) == 920 ||
+                sizeof(stream_info) == 944)
         << "If adding fields to StreamInfoImpl, please check to see if you "
            "need to add them to setFromForRecreateStream or setFrom! Current size "
         << sizeof(stream_info);
