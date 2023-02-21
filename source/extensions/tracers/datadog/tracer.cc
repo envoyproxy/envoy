@@ -1,11 +1,5 @@
 #include "source/extensions/tracers/datadog/tracer.h"
 
-#include "datadog/dict_reader.h"
-#include "datadog/error.h"
-#include "datadog/sampling_priority.h"
-#include "datadog/span_config.h"
-#include "datadog/trace_segment.h"
-
 #include <cassert>
 #include <memory>
 #include <utility>
@@ -20,6 +14,12 @@
 #include "source/extensions/tracers/datadog/logger.h"
 #include "source/extensions/tracers/datadog/span.h"
 #include "source/extensions/tracers/datadog/time_util.h"
+
+#include "datadog/dict_reader.h"
+#include "datadog/error.h"
+#include "datadog/sampling_priority.h"
+#include "datadog/span_config.h"
+#include "datadog/trace_segment.h"
 
 namespace Envoy {
 namespace Extensions {

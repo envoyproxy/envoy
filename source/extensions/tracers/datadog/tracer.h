@@ -1,8 +1,5 @@
 #pragma once
 
-#include <datadog/tracer.h>
-#include <datadog/tracer_config.h>
-
 #include <optional>
 #include <string>
 
@@ -12,30 +9,53 @@
 #include "source/common/common/logger.h"
 #include "source/extensions/tracers/datadog/tracer_stats.h"
 
+#include "datadog/tracer.h"
+#include "datadog/tracer_config.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace Tracers {
 namespace Datadog {
 
+/**
+ * Entry point for Datadog tracing. This class accepts configuration and runtime
+ * dependencies, and installs a thread-local instance of itself from which
+ * traces can be created.
+ */
 class Tracer : public Tracing::Driver, private Logger::Loggable<Logger::Id::tracing> {
 public:
-  // Create a `Tracer` that produces traces according to the specified `config`
-  // and sends those traces to the specified `collector_cluster`, uses the
-  // specified `collector_reference_host` as the "Host" header, uses the
-  // specified `cluster_manager` to send requests to the collector, uses the
-  // specified `scope` to keep track of usage statistics, and uses the specified
-  // `thread_local_slot_allocator` to register this instance with the current
-  // worker thread.
+  /**
+   * Create a \c Tracer that produces traces according to the specified \p config
+   * and sends those traces to the specified \p collector_cluster, uses the
+   * specified \p collector_reference_host as the "Host" header, uses the
+   * specified \p cluster_manager to send requests to the collector, uses the
+   * specified \p scope to keep track of usage statistics, and uses the specified
+   * \p thread_local_slot_allocator to register this instance with the current
+   * worker thread.
+   * @param collector_cluster name of the cluster to which traces will be sent
+   * @param collector_reference_host value of the "Host" header in requests sent
+   * to the \p collector_cluster.
+   * @param config Datadog tracer configuration
+   * @param cluster_manager cluster manager from which the thread local
+   * cluster is retrieved in order to send HTTP request containing traces
+   * @param scope statistics scope from which \c TracerStats can be created
+   * @param thread_local_slot_allocator slot allocator for installing a
+   * thread-local instance of the tracer.
+   */
   explicit Tracer(const std::string& collector_cluster, const std::string& collector_reference_host,
                   const datadog::tracing::TracerConfig& config,
                   Upstream::ClusterManager& cluster_manager, Stats::Scope& scope,
                   ThreadLocal::SlotAllocator& thread_local_slot_allocator);
 
   struct ThreadLocalTracer : public ThreadLocal::ThreadLocalObject {
-    // Create a thread local tracer configured using the specified `config`.
+    /**
+     * Create a thread local tracer configured using the specified `config`.
+     */
     explicit ThreadLocalTracer(const datadog::tracing::FinalizedTracerConfig& config);
 
-    // Create a null (no-op) thread local tracer.
+    /**
+     * Create a null (no-op) thread local tracer.
+     */
     ThreadLocalTracer() = default;
 
     datadog::tracing::Optional<datadog::tracing::Tracer> tracer;
@@ -43,6 +63,23 @@ public:
 
   // Tracer::TracingDriver
 
+  /**
+   * Create a Datadog span from the specified \p trace_context, and having the
+   * specified \p operation_name, \p start_time and \p tracing_decision.
+   * If this tracer encountered an error during initialization, then return a
+   * \c Tracing::NullSpan instead.
+   * @param config this parameter is ignored
+   * @param trace_context possibly contains information about an existing trace
+   * that the returned span will be a part of; otherwise, the returned span is
+   * the root of a new trace
+   * @param operation_name the name of the operation representation by this
+   * span, e.g. "handle.request"
+   * @param start_time when the span begins
+   * @param tracing_decision the sampling decision made in advance by Envoy for
+   * this trace. If the decision is to drop the trace, then this tracer will
+   * honor that decision. If the decision is to keep the trace, then this tracer
+   * will apply its own sampling logic, which might keep or drop the trace.
+   */
   Tracing::SpanPtr startSpan(const Tracing::Config& config, Tracing::TraceContext& trace_context,
                              const std::string& operation_name, SystemTime start_time,
                              const Tracing::Decision tracing_decision) override;
