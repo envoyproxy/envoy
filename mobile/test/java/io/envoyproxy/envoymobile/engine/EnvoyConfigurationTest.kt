@@ -65,11 +65,6 @@ class TestEnvoyHTTPFilterFactory(name : String) : EnvoyHTTPFilterFactory {
 class EnvoyConfigurationTest {
 
   fun buildTestEnvoyConfiguration(
-    rtdsLayerName: String? = null
-    rtdsTimeoutSeconds: Int = 0
-    adsApiType: String? = null
-    adsAddress: String? = null
-    adsPort: Int = 0
     adminInterfaceEnabled: Boolean = false,
     grpcStatsDomain: String = "stats.example.com",
     connectTimeoutSeconds: Int = 123,
@@ -103,7 +98,12 @@ class EnvoyConfigurationTest {
     runtimeGuards: Map<String,Boolean> = emptyMap(),
     enableSkipDNSLookupForProxiedRequests: Boolean = false,
     statSinks: MutableList<String> = mutableListOf(),
-    enablePlatformCertificatesValidation: Boolean = false
+    enablePlatformCertificatesValidation: Boolean = false,
+    rtdsLayerName: String = "rtds_layer_name",
+    rtdsTimeoutSeconds: Int = 0,
+    adsApiType: String = "GRPC",
+    adsAddress: String = "DEFAULT_ADDRESS",
+    adsPort: Int = 0
   ): EnvoyConfiguration {
     return EnvoyConfiguration(
       rtdsLayerName,
@@ -306,6 +306,19 @@ class EnvoyConfigurationTest {
 
     assertThat(resolvedTemplate).contains("test_feature_false");
     assertThat(resolvedTemplate).contains("test_feature_true");
+  }
+
+  @Test
+  fun `test adding RTDS and ADS`() {
+    JniLibrary.loadTestLibrary()
+    val envoyConfiguration = buildTestEnvoyConfiguration(
+      rtdsLayerName = "fake_rtds_layer", adsAddress = "FAKE_ADDRESS", adsPort = 0, adsApiType = "GRPC"
+    )
+
+    val resolvedTemplate = envoyConfiguration.createYaml()
+
+    assertThat(resolvedTemplate).contains("fake_rtds_layer");
+    assertThat(resolvedTemplate).contains("FAKE_ADDRESS");
   }
 
   @Test
