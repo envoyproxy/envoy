@@ -38,10 +38,11 @@ import (
 
 //export envoyGoOnClusterSpecify
 func envoyGoOnClusterSpecify(headerPtr uint64, pluginId uint64, bufferPtr uint64, bufferLen uint64) int64 {
+	// TODO: recover panic
 	header := &httpHeaderMap{
 		headerPtr: headerPtr,
 	}
-	specifier := getClusterSpecifier(configId)
+	specifier := getClusterSpecifier(pluginId)
 	cluster := specifier.Choose(header)
 	clusterLen := uint64(len(cluster))
 	if clusterLen == 0 {

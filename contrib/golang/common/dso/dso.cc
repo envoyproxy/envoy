@@ -116,7 +116,7 @@ GoUint64 DsoInstance::envoyGoClusterSpecifierNewPlugin(GoUint64 configPtr, GoUin
 GoInt64 DsoInstance::envoyGoOnClusterSpecify(GoUint64 headerPtr, GoUint64 pluginId,
                                              GoUint64 bufferPtr, GoUint64 bufferLen) {
   ASSERT(envoy_go_on_cluster_specify_ != nullptr);
-  return envoy_go_on_cluster_specify_(headerPtr, configId, bufferPtr, bufferLen);
+  return envoy_go_on_cluster_specify_(headerPtr, pluginId, bufferPtr, bufferLen);
 }
 
 } // namespace Dso

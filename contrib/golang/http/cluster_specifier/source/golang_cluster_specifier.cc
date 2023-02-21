@@ -37,7 +37,7 @@ ClusterConfig::ClusterConfig(const GolangClusterProto& config)
 
   auto ptr = reinterpret_cast<unsigned long long>(str.data());
   auto len = str.length();
-  plugin_id_ = dlib->envoyGoClusterSpecifierNewPlugin(ptr, len);
+  plugin_id_ = dynamic_lib_->envoyGoClusterSpecifierNewPlugin(ptr, len);
   if (plugin_id_ == 0) {
     ENVOY_LOG(error, "invalid golang plugin config");
   }

@@ -51,7 +51,7 @@ private:
   GoUint64 (*envoy_go_cluster_specifier_new_plugin_)(GoUint64 configPtr,
                                                      GoUint64 configLen) = {nullptr};
 
-  GoUint64 (*envoy_go_on_cluster_specify_)(GoUint64 headerPtr, GoUint64 configId,
+  GoUint64 (*envoy_go_on_cluster_specify_)(GoUint64 headerPtr, GoUint64 pluginId,
                                            GoUint64 bufferPtr, GoUint64 bufferLen) = {nullptr};
 };
 
