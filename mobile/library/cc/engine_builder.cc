@@ -1280,11 +1280,6 @@ EngineSharedPtr EngineBuilder::build() {
     }
     options->setLogLevel(options->parseAndValidateLogLevel(logLevelToString(log_level_).c_str()));
     options->setConcurrency(1);
-#ifdef ENVOY_ADMIN_FUNCTIONALITY
-    if (!admin_address_path_for_tests_.empty()) {
-      options->setAdminAddressPath(admin_address_path_for_tests_);
-    }
-#endif
     cast_engine->run(std::move(options));
   }
 
