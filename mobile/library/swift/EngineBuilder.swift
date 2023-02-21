@@ -553,13 +553,13 @@ open class EngineBuilder: NSObject {
 
   /// Add RTDS layer.  Requires that ADS be configured via setAggregatedDiscoveryService().
   ///
-  /// - parameter layerName: the layer name.
+  /// - parameter layerName:      the layer name.
   ///
   /// - parameter timeoutSeconds: the timeout.
   ///
   /// - returns: This builder.
   @discardableResult
-  public func addRtdsLayer(_ layerName: String, timeoutSeconds: UInt32) -> Self {
+  public func addRtdsLayer(layerName: String, timeoutSeconds: UInt32) -> Self {
     self.rtdsLayerName = layerName
     self.rtdsTimeoutSeconds = timeoutSeconds
     return self
@@ -571,11 +571,15 @@ open class EngineBuilder: NSObject {
   ///
   /// - parameter address: the network address of the server.
   ///
-  /// - parameter port: the port of the server.
+  /// - parameter port:    the port of the server.
   ///
   /// - returns: This builder.
   @discardableResult
-  public func setAggregatedDiscoveryService(_ apiType: String, address: String, port: UInt32) -> Self {
+  public func setAggregatedDiscoveryService(
+    apiType: String,
+    address: String,
+    port: UInt32
+    ) -> Self {
     self.adsApiType = apiType
     self.adsAddress = address
     self.adsPort = port
