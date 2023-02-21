@@ -146,6 +146,7 @@ function renderStats(data) {
   //debugger;
   if (post_render_test_hook) {
     post_render_test_hook();
+    post_render_test_hook = null;
   }
 
   // Update stats every 5 seconds by default.
