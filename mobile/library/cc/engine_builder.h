@@ -178,9 +178,9 @@ private:
   std::string node_locality_sub_zone_;
   std::string ads_address_ = "";
   int ads_port_;
-  std::string jwt_token_;
-  int jwt_token_lifetime_seconds_;
-  std::string ssl_root_certs_;
+  std::string ads_jwt_token_;
+  int ads_jwt_token_lifetime_seconds_;
+  std::string ads_ssl_root_certs_;
   bool enable_cds_ = false;
   std::string cds_resources_locator_;
   int cds_timeout_seconds_;

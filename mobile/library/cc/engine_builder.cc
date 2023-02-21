@@ -282,9 +282,9 @@ EngineBuilder& EngineBuilder::setAggregatedDiscoveryService(const std::string& a
 #endif
   ads_address_ = address;
   ads_port_ = port;
-  jwt_token_ = std::move(jwt_token);
-  jwt_token_lifetime_seconds_ = jwt_token_lifetime_seconds;
-  ssl_root_certs_ = std::move(ssl_root_certs);
+  ads_jwt_token_ = std::move(jwt_token);
+  ads_jwt_token_lifetime_seconds_ = jwt_token_lifetime_seconds;
+  ads_ssl_root_certs_ = std::move(ssl_root_certs);
   return *this;
 }
 
@@ -298,7 +298,7 @@ EngineBuilder& EngineBuilder::addRtdsLayer(const std::string& layer_name,
 EngineBuilder& EngineBuilder::addCdsLayer(std::string cds_resources_locator,
                                           const int timeout_seconds) {
   enable_cds_ = true;
-  cds_resources_locator_ = cds_resources_locator;
+  cds_resources_locator_ = std::move(cds_resources_locator);
   cds_timeout_seconds_ = timeout_seconds;
   return *this;
 }
@@ -494,13 +494,13 @@ std::string EngineBuilder::generateConfigStr() const {
   }
   if (!ads_address_.empty()) {
     std::string channel_credentials;
-    if (!ssl_root_certs_.empty()) {
-      channel_credentials = fmt::format(ads_channel_credentials_insert, ssl_root_certs_);
+    if (!ads_ssl_root_certs_.empty()) {
+      channel_credentials = fmt::format(ads_channel_credentials_insert, ads_ssl_root_certs_);
     }
     std::string call_credentials;
-    if (!jwt_token_.empty()) {
+    if (!ads_jwt_token_.empty()) {
       call_credentials =
-          fmt::format(ads_call_credentials_insert, jwt_token_, jwt_token_lifetime_seconds_);
+          fmt::format(ads_call_credentials_insert, ads_jwt_token_, ads_jwt_token_lifetime_seconds_);
     }
     std::string ads_insert_replaced = ads_insert;
     absl::StrReplaceAll({{"#{custom_ads_channel_credentials}", channel_credentials}},
@@ -1255,19 +1255,19 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
     auto& grpc_service = *ads_config->add_grpc_services();
     grpc_service.mutable_google_grpc()->set_target_uri(target_uri);
     grpc_service.mutable_google_grpc()->set_stat_prefix("ads");
-    if (!ssl_root_certs_.empty()) {
+    if (!ads_ssl_root_certs_.empty()) {
       grpc_service.mutable_google_grpc()
           ->mutable_channel_credentials()
           ->mutable_ssl_credentials()
           ->mutable_root_certs()
-          ->set_inline_string(ssl_root_certs_);
+          ->set_inline_string(ads_ssl_root_certs_);
     }
-    if (!jwt_token_.empty()) {
+    if (!ads_jwt_token_.empty()) {
       auto& jwt = *grpc_service.mutable_google_grpc()
                        ->add_call_credentials()
                        ->mutable_service_account_jwt_access();
-      jwt.set_json_key(jwt_token_);
-      jwt.set_token_lifetime_seconds(jwt_token_lifetime_seconds_);
+      jwt.set_json_key(ads_jwt_token_);
+      jwt.set_token_lifetime_seconds(ads_jwt_token_lifetime_seconds_);
     }
   }
   if (enable_cds_) {
