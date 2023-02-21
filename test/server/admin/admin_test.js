@@ -39,7 +39,6 @@ function runTest(url, name, tester) {
       resolve(null);
     };
     iframe.onload = () => {
-      console.log('post render\n');
       tester(iframe).then(() => {
         finish('passed');
       }).catch((err) => {
@@ -86,10 +85,9 @@ function runAllTests() {
   next_test(0);
 }
 
-function rejectExceptions(resolve, reject, fn) {
+function rejectExceptions(reject, fn) {
   try {
     fn();
-    resolve();
   } catch (err) {
     reject(err);
   }
