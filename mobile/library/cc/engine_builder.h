@@ -117,7 +117,6 @@ protected:
     config_bootstrap_incompatible_ = true;
     config_override_for_tests_ = config;
   }
-  void setAdminAddressPathForTests(std::string admin) { admin_address_path_for_tests_ = admin; }
 
 private:
   friend BaseClientIntegrationTest;
@@ -147,7 +146,6 @@ private:
   std::string app_id_ = "unspecified";
   std::string device_os_ = "unspecified";
   std::string config_override_for_tests_ = "";
-  std::string admin_address_path_for_tests_ = "";
   int stream_idle_timeout_seconds_ = 15;
   int per_try_idle_timeout_seconds_ = 15;
   bool gzip_decompression_filter_ = true;

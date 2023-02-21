@@ -55,9 +55,7 @@ protected:
   void setOverrideConfigForTests(Platform::EngineBuilder builder, std::string config) {
     builder.setOverrideConfigForTests(config);
   }
-  void setAdminAddressPathForTests(Platform::EngineBuilder& builder, std::string admin) {
-    builder.setAdminAddressPathForTests(admin);
-  }
+
   // Converts TestRequestHeaderMapImpl to Envoy::Platform::RequestHeadersSharedPtr
   Envoy::Platform::RequestHeadersSharedPtr
   envoyToMobileHeaders(const Http::TestRequestHeaderMapImpl& request_headers);
