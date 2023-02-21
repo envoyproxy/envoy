@@ -427,6 +427,7 @@ private:
 
   TimeSource& time_source_;
 
+  // Keep small members (bools and enums) at the end of class, to reduce alignment overhead.
   const LoadBalancerType lb_type_;
   const bool locality_weight_aware_ : 1;
   const bool scale_locality_weight_ : 1;
