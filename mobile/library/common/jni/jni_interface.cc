@@ -150,73 +150,6 @@ extern "C" JNIEXPORT void JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibra
   terminate_engine(static_cast<envoy_engine_t>(engine_handle), /* release */ false);
 }
 
-extern "C" JNIEXPORT jstring JNICALL
-Java_io_envoyproxy_envoymobile_engine_JniLibrary_configTemplate(JNIEnv* env, jclass) {
-  jstring result = env->NewStringUTF(config_template);
-  return result;
-}
-
-extern "C" JNIEXPORT jstring JNICALL
-Java_io_envoyproxy_envoymobile_engine_JniLibrary_platformFilterTemplate(JNIEnv* env, jclass) {
-  jstring result = env->NewStringUTF(platform_filter_template);
-  return result;
-}
-
-extern "C" JNIEXPORT jstring JNICALL
-Java_io_envoyproxy_envoymobile_engine_JniLibrary_nativeFilterTemplate(JNIEnv* env, jclass) {
-  jstring result = env->NewStringUTF(native_filter_template);
-  return result;
-}
-
-extern "C" JNIEXPORT jstring JNICALL
-Java_io_envoyproxy_envoymobile_engine_JniLibrary_altProtocolCacheFilterInsert(JNIEnv* env, jclass) {
-  jstring result = env->NewStringUTF(alternate_protocols_cache_filter_insert);
-  return result;
-}
-
-extern "C" JNIEXPORT jstring JNICALL
-Java_io_envoyproxy_envoymobile_engine_JniLibrary_gzipDecompressorConfigInsert(JNIEnv* env, jclass) {
-  jstring result = env->NewStringUTF(gzip_decompressor_config_insert);
-  return result;
-}
-
-extern "C" JNIEXPORT jstring JNICALL
-Java_io_envoyproxy_envoymobile_engine_JniLibrary_brotliDecompressorConfigInsert(JNIEnv* env,
-                                                                                jclass) {
-  jstring result = env->NewStringUTF(brotli_decompressor_config_insert);
-  return result;
-}
-
-extern "C" JNIEXPORT jstring JNICALL
-Java_io_envoyproxy_envoymobile_engine_JniLibrary_compressorConfigInsert(JNIEnv* env, jclass) {
-  jstring result = env->NewStringUTF(compressor_config_insert);
-  return result;
-}
-
-extern "C" JNIEXPORT jstring JNICALL
-Java_io_envoyproxy_envoymobile_engine_JniLibrary_persistentDNSCacheConfigInsert(JNIEnv* env,
-                                                                                jclass) {
-  jstring result = env->NewStringUTF(persistent_dns_cache_config_insert);
-  return result;
-}
-
-extern "C" JNIEXPORT jstring JNICALL
-Java_io_envoyproxy_envoymobile_engine_JniLibrary_socketTagConfigInsert(JNIEnv* env, jclass) {
-  jstring result = env->NewStringUTF(socket_tag_config_insert);
-  return result;
-}
-
-extern "C" JNIEXPORT jstring JNICALL
-Java_io_envoyproxy_envoymobile_engine_JniLibrary_certValidationTemplate(JNIEnv* env, jclass,
-                                                                        jboolean use_platform) {
-  if (use_platform == JNI_TRUE) {
-    jstring result = env->NewStringUTF(platform_cert_validation_context_template);
-    return result;
-  }
-  jstring result = env->NewStringUTF(default_cert_validation_context_template);
-  return result;
-}
-
 extern "C" JNIEXPORT jint JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibrary_recordCounterInc(
     JNIEnv* env,
     jclass, // class
@@ -1324,8 +1257,8 @@ void configureBuilder(JNIEnv* env, jstring grpc_stats_domain, jboolean admin_int
   builder.addDnsPreresolveHostnames(hostnames);
 }
 
-extern "C" JNIEXPORT void JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibrary_compareYaml(
-    JNIEnv* env, jclass, jstring yaml, jstring grpc_stats_domain, jboolean admin_interface_enabled,
+extern "C" JNIEXPORT jstring JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibrary_createYaml(
+    JNIEnv* env, jclass, jstring grpc_stats_domain, jboolean admin_interface_enabled,
     jlong connect_timeout_seconds, jlong dns_refresh_seconds,
     jlong dns_failure_refresh_seconds_base, jlong dns_failure_refresh_seconds_max,
     jlong dns_query_timeout_seconds, jlong dns_min_refresh_seconds,
@@ -1340,7 +1273,7 @@ extern "C" JNIEXPORT void JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibra
     jboolean trust_chain_verification, jobjectArray virtual_clusters, jobjectArray filter_chain,
     jobjectArray stat_sinks, jboolean enable_platform_certificates_validation,
     jboolean enable_skip_dns_lookup_for_proxied_requests, jobjectArray runtime_guards) {
-
+  Envoy::Thread::SkipAsserts skip_asserts;
   Envoy::Platform::EngineBuilder builder;
   configureBuilder(
       env, grpc_stats_domain, admin_interface_enabled, connect_timeout_seconds, dns_refresh_seconds,
@@ -1355,9 +1288,9 @@ extern "C" JNIEXPORT void JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibra
       filter_chain, stat_sinks, enable_platform_certificates_validation,
       enable_skip_dns_lookup_for_proxied_requests, runtime_guards, builder);
 
-  const char* native_yaml = env->GetStringUTFChars(yaml, nullptr);
-  builder.generateBootstrapAndCompareForTests(native_yaml);
-  env->ReleaseStringUTFChars(yaml, native_yaml);
+  auto bootstrap = builder.generateBootstrap();
+  std::string yaml = Envoy::MessageUtil::getYamlStringFromMessage(*bootstrap);
+  return env->NewStringUTF(yaml.c_str());
 }
 
 extern "C" JNIEXPORT jlong JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibrary_createBootstrap(

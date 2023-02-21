@@ -264,7 +264,7 @@ void ConnectionManagerImpl::doEndStream(ActiveStream& stream, bool check_for_def
 }
 
 void ConnectionManagerImpl::doDeferredStreamDestroy(ActiveStream& stream) {
-  if (stream.max_stream_duration_timer_) {
+  if (stream.max_stream_duration_timer_ != nullptr) {
     stream.max_stream_duration_timer_->disableTimer();
     stream.max_stream_duration_timer_ = nullptr;
   }
@@ -276,6 +276,21 @@ void ConnectionManagerImpl::doDeferredStreamDestroy(ActiveStream& stream) {
   if (stream.request_header_timer_ != nullptr) {
     stream.request_header_timer_->disableTimer();
     stream.request_header_timer_ = nullptr;
+  }
+
+  if (stream.expand_agnostic_stream_lifetime_) {
+    // Only destroy the active stream if the underlying codec has notified us of
+    // completion or we've internal redirect the stream.
+    if (!stream.canDestroyStream()) {
+      // Track that this stream is not expecting any additional calls apart from
+      // codec notification.
+      stream.state_.is_zombie_stream_ = true;
+      return;
+    }
+
+    if (stream.response_encoder_ != nullptr) {
+      stream.response_encoder_->getStream().registerCodecEventCallbacks(nullptr);
+    }
   }
 
   stream.completeRequest();
@@ -359,6 +374,9 @@ RequestDecoder& ConnectionManagerImpl::newStream(ResponseEncoder& response_encod
   new_stream->state_.is_internally_created_ = is_internally_created;
   new_stream->response_encoder_ = &response_encoder;
   new_stream->response_encoder_->getStream().addCallbacks(*new_stream);
+  if (new_stream->expand_agnostic_stream_lifetime_) {
+    new_stream->response_encoder_->getStream().registerCodecEventCallbacks(new_stream.get());
+  }
   new_stream->response_encoder_->getStream().setFlushTimeout(new_stream->idle_timeout_ms_);
   new_stream->streamInfo().setDownstreamBytesMeter(response_encoder.getStream().bytesMeter());
   // If the network connection is backed up, the stream should be made aware of it on creation.
@@ -709,6 +727,8 @@ ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connect
                       StreamInfo::FilterState::LifeSpan::Connection),
       request_response_timespan_(new Stats::HistogramCompletableTimespanImpl(
           connection_manager_.stats_.named_.downstream_rq_time_, connection_manager_.timeSource())),
+      expand_agnostic_stream_lifetime_(
+          Runtime::runtimeFeatureEnabled(Runtime::expand_agnostic_stream_lifetime)),
       header_validator_(
           connection_manager.config_.makeHeaderValidator(connection_manager.codec_->protocol())) {
   ASSERT(!connection_manager.config_.isRoutable() ||
@@ -1671,6 +1691,7 @@ void ConnectionManagerImpl::ActiveStream::onResetStream(StreamResetReason reset_
                    Http::Utility::resetReasonToString(reset_reason),
                    encoder_details.empty() ? absl::string_view{"-"} : encoder_details);
   connection_manager_.stats_.named_.downstream_rq_rx_reset_.inc();
+  state_.on_reset_stream_called_ = true;
 
   // If the codec sets its responseDetails() for a reason other than peer reset, set a
   // DownstreamProtocolError. Either way, propagate details.
@@ -1700,6 +1721,35 @@ void ConnectionManagerImpl::ActiveStream::onAboveWriteBufferHighWatermark() {
 void ConnectionManagerImpl::ActiveStream::onBelowWriteBufferLowWatermark() {
   ENVOY_STREAM_LOG(debug, "Enabling upstream stream due to downstream stream watermark.", *this);
   filter_manager_.callLowWatermarkCallbacks();
+}
+
+void ConnectionManagerImpl::ActiveStream::onCodecEncodeComplete() {
+  ASSERT(!state_.codec_encode_complete_);
+  ENVOY_STREAM_LOG(debug, "Codec completed encoding stream.", *this);
+  state_.codec_encode_complete_ = true;
+
+  // Update timing
+  filter_manager_.streamInfo().downstreamTiming().onLastDownstreamTxByteSent(
+      connection_manager_.time_source_);
+  request_response_timespan_->complete();
+
+  // Only reap stream once.
+  if (state_.is_zombie_stream_) {
+    connection_manager_.doDeferredStreamDestroy(*this);
+  }
+}
+
+void ConnectionManagerImpl::ActiveStream::onCodecLowLevelReset() {
+  ASSERT(!state_.codec_encode_complete_);
+  state_.on_reset_stream_called_ = true;
+  ENVOY_STREAM_LOG(debug, "Codec timed out flushing stream", *this);
+
+  // TODO(kbaichoo): Update streamInfo to account for the reset.
+
+  // Only reap stream once.
+  if (state_.is_zombie_stream_) {
+    connection_manager_.doDeferredStreamDestroy(*this);
+  }
 }
 
 Tracing::OperationName ConnectionManagerImpl::ActiveStream::operationName() const {
@@ -1842,12 +1892,15 @@ void ConnectionManagerImpl::ActiveStream::recreateStream(
   }
 
   response_encoder->getStream().removeCallbacks(*this);
+
   // This functionally deletes the stream (via deferred delete) so do not
   // reference anything beyond this point.
   // Make sure to not check for deferred close as we'll be immediately creating a new stream.
+  state_.is_internally_destroyed_ = true;
   connection_manager_.doEndStream(*this, /*check_for_deferred_close*/ false);
 
   RequestDecoder& new_stream = connection_manager_.newStream(*response_encoder, true);
+
   // Set the new RequestDecoder on the ResponseEncoder. Even though all of the decoder callbacks
   // have already been called at this point, the encoder still needs the new decoder for deferred
   // logging in some cases.
