@@ -283,6 +283,7 @@ void HealthCheckerImplBase::ActiveHealthCheckSession::handleSuccess(bool degrade
   // If we are healthy, reset the # of unhealthy to zero.
   num_unhealthy_ = 0;
   HealthTransition changed_state = HealthTransition::Unchanged;
+  std::cout<<"HandleSuccess"<<std::endl;
 
   if (host_->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC)) {
     // If this is the first time we ever got a check result on this host, we immediately move
@@ -423,17 +424,22 @@ HealthCheckerImplBase::ActiveHealthCheckSession::clearPendingFlag(HealthTransiti
 void HealthCheckerImplBase::ActiveHealthCheckSession::onIntervalBase() {
   // Only if host is healthy, check whether need disable HC if there was already successful
   // non-health check traffic
+  std::cout<<"onIntervalBase: "<<std::endl;
   if (parent_.disable_health_check_if_active_traffic_ &&
       !host_->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC)) {
     MonotonicTime traffic_successful_time =
         host_->lastSuccessfulTrafficTime(parent_.healthCheckerType());
     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(
         time_source_.monotonicTime() - traffic_successful_time);
+        std::cout<<"current time:"<<time_source_.monotonicTime().time_since_epoch().count()<<std::endl;
+        std::cout<<"traffic successful time:"<<traffic_successful_time.time_since_epoch().count()<<std::endl;
+        std::cout<<"interval count:"<<parent_.interval_.count()<<std::endl;
     if (duration.count() < parent_.interval_.count()) {
       // During the time, there was already successful non-health check traffic for the host, no
       // need to send HC packet
       parent_.stats_.attempt_.inc();
       interval_timer_->enableTimer(parent_.interval_);
+      std::cout<<"onIntervalBase: no need send HC"<<std::endl;
       return;
     }
   }
