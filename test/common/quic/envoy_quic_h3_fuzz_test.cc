@@ -22,7 +22,7 @@
 #include "test/common/quic/envoy_quic_h3_fuzz.pb.h"
 
 // Uncomment the following line to enable debug visitors
-// #define __DEBUG_QUIC_H3_FUZZER
+//#define __DEBUG_QUIC_H3_FUZZER
 
 namespace Envoy {
 namespace Quic {

@@ -1,0 +1,71 @@
+frames {
+  qframe {
+    stream {
+      unidirectional: true,
+      type: 0,
+      id: 2,
+      fin: false,
+      offset: 0,
+        h3frame {
+          settings {}
+        }
+    }
+  }
+}
+frames {
+  qframe {
+    stream {
+      unidirectional: false,
+      type: 0,
+      id: 4,
+      fin: false,
+      offset: 0,
+      h3frame {
+        headers {
+          headers {
+            headers {
+              key: ":scheme"
+              value: "http"
+            }
+            headers {
+              key: ":path"
+              value: "/"
+            }
+            headers {
+              key: ":method"
+              value: "post"
+            }
+            headers {
+              key: "-retry-on"
+              value: "retriable-headers"
+            }
+            headers {
+              key: "set-cookie"
+              value: "empty"
+            }
+            headers {
+              key: "content-type"
+              value: "application/grpc-web+proto"
+            }
+            headers {
+              key: "-external-address"
+              value: "empty"
+            }
+            headers {
+              key: "-original-method"
+              value: "empty"
+            }
+            headers {
+              key: "access-control-max-age"
+              value: "empty"
+            }
+            headers {
+              key: "-attempt-count"
+              value: "empty"
+            }
+          }
+        }
+      }
+    }
+  }
+}
