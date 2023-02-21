@@ -39,7 +39,7 @@ jobs:
           $([ -z $GITHUB_TOKEN ] || echo "--config=remote-ci-linux-clang") \
           --remote_header="Authorization=Bearer $GITHUB_TOKEN" \
           --fat_apk_cpu=x86_64 \
-          --action_env=LD_LIBRARY_PATH \
+          --linkopt=-fuse-ld=lld \
           //:android_dist
   javahelloworld:
     if: github.repository == 'envoyproxy/envoy'
