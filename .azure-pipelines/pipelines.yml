@@ -443,6 +443,7 @@ stages:
       condition: always()
 
   - job: complete
+    displayName: linux_x64
     # displayName: "Checks complete"
     dependsOn: ["bazel", "coverage"]
     pool:
