@@ -33,10 +33,10 @@ const param_id_prefix = "param-1-stats-";
  */
 post_render_test_hook = null;
 
-window['setRenderTestHook'] = (hook) => {
+function setRenderTestHook(hook) {
   console.log('setting hook');
   post_render_test_hook = hook;
-};
+}
 
 /**
  * Hook that's run on DOMContentLoaded to create the HTML elements (just one
@@ -92,8 +92,8 @@ function compareStatRecords(a, b) {
 function loadSettingOrUseDefault(id, default_value) {
   const elt = document.getElementById(id);
   const value = parseInt(elt.value);
-  if (Number.isNaN(value)) {
-    console.log("Invalid " + id + ": not a number");
+  if (Number.isNaN(value) || value <= 0) {
+    console.log("Invalid " + id + ": invalid positive number");
     return default_value;
   }
   return value;
@@ -108,7 +108,10 @@ function renderStats(data) {
   sorted_stats = [];
   let prev_stats = current_stats;
   current_stats = new Map();
-  for (const stat of data.stats) {
+  for (stat of data.stats) {
+    if (!stat.name) {
+      continue;                 // Skip histograms for now.
+    }
     let stat_record = prev_stats.get(stat.name);
     if (stat_record) {
       if (stat_record.value != stat.value) {
