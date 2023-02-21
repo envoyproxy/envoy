@@ -27,14 +27,16 @@ let active_stats_pre_element = null;
  */
 const param_id_prefix = "param-1-stats-";
 
+post_render_test_hook = null;
+
 /**
  * To make testing easier, provide a hook for tests to set, to enable tests
  * to block on rendering.
  */
-post_render_test_hook = null;
-
 function setRenderTestHook(hook) {
-  console.log('setting hook');
+  if (post_render_test_hook != null) {
+    throw new Exception('setRenderTestHook called with hook already pending');
+  }
   post_render_test_hook = hook;
 }
 
