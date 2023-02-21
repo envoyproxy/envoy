@@ -38,11 +38,13 @@ function runTest(url, name, tester) {
         console.log('post render\n');
         tester(iframe).then(() => {
           results.textContent += 'passed\n';
+          iframe.parentElement.removeChild(iframe);
+          resolve(null);
         }).catch((err) => {
           results.textContent += 'FAILED: ' + err + '\n';
+          iframe.parentElement.removeChild(iframe);
+          resolve(null);
         });
-        iframe.parentElement.removeChild(iframe);
-        resolve(null);
       });
     };
     document.body.appendChild(iframe);
