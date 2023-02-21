@@ -22,30 +22,18 @@ public:
 
   // IoUringSocket
   os_fd_t fd() const override { return fd_; }
-  void injectCompletion(uint32_t type) override;
-
-  void enable() override { status_ = ENABLED; }
-
-  void disable() override { status_ = DISABLED; }
-
   void close() override { status_ = CLOSING; }
-
+  void enable() override { status_ = ENABLED; }
+  void disable() override { status_ = DISABLED; }
+  void connect(const Network::Address::InstanceConstSharedPtr&) override {}
+  uint64_t write(Buffer::Instance&) override { PANIC("not implement"); }
+  uint64_t writev(const Buffer::RawSlice*, uint64_t) override { PANIC("not implement"); }
   // This will cleanup all the injected completions for this socket and
   // unlink itself from the worker.
   void cleanup();
   void onAccept(Request*, int32_t, bool injected) override {
     if (injected && (injected_completions_ & RequestType::Accept)) {
       injected_completions_ &= ~RequestType::Accept;
-    }
-  }
-  void onClose(int32_t, bool injected) override {
-    if (injected && (injected_completions_ & RequestType::Close)) {
-      injected_completions_ &= ~RequestType::Close;
-    }
-  }
-  void onCancel(int32_t, bool injected) override {
-    if (injected && (injected_completions_ & RequestType::Cancel)) {
-      injected_completions_ &= ~RequestType::Cancel;
     }
   }
   void onConnect(int32_t, bool injected) override {
@@ -63,10 +51,18 @@ public:
       injected_completions_ &= ~RequestType::Write;
     }
   }
+  void onClose(int32_t, bool injected) override {
+    if (injected && (injected_completions_ & RequestType::Close)) {
+      injected_completions_ &= ~RequestType::Close;
+    }
+  }
+  void onCancel(int32_t, bool injected) override {
+    if (injected && (injected_completions_ & RequestType::Cancel)) {
+      injected_completions_ &= ~RequestType::Cancel;
+    }
+  }
+  void injectCompletion(uint32_t type) override;
   IoUringSocketStatus getStatus() const override { return status_; }
-  uint64_t write(Buffer::Instance&) override { PANIC("not implement"); }
-  uint64_t writev(const Buffer::RawSlice*, uint64_t) override { PANIC("not implement"); }
-  void connect(const Network::Address::InstanceConstSharedPtr&) override {}
 
 protected:
   os_fd_t fd_;
@@ -95,13 +91,13 @@ public:
   Event::Dispatcher& dispatcher() override;
 
   Request* submitAcceptRequest(IoUringSocket& socket) override;
-  Request* submitCancelRequest(IoUringSocket& socket, Request* request_to_cancel) override;
-  Request* submitCloseRequest(IoUringSocket& socket) override;
+  Request* submitConnectRequest(IoUringSocket& socket,
+                                const Network::Address::InstanceConstSharedPtr& address) override;
   Request* submitReadRequest(IoUringSocket& socket, struct iovec* iov) override;
   Request* submitWritevRequest(IoUringSocket& socket, struct iovec* iovecs,
                                uint64_t num_vecs) override;
-  Request* submitConnectRequest(IoUringSocket& socket,
-                                const Network::Address::InstanceConstSharedPtr& address) override;
+  Request* submitCloseRequest(IoUringSocket& socket) override;
+  Request* submitCancelRequest(IoUringSocket& socket, Request* request_to_cancel) override;
 
   // From socket from the worker.
   IoUringSocketEntryPtr removeSocket(IoUringSocketEntry& socket);
@@ -127,9 +123,7 @@ protected:
   bool delay_submit_{false};
 };
 
-class AcceptRequest : public Request {
-public:
-  AcceptRequest(uint32_t type, IoUringSocket& io_uring_socket) : Request(type, io_uring_socket) {}
+struct AcceptRequest : public Request {
   sockaddr_storage remote_addr_{};
   socklen_t remote_addr_len_{sizeof(remote_addr_)};
 };

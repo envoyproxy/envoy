@@ -135,28 +135,9 @@ class IoUringSocket;
 /**
  * Abstract for io_uring I/O Request.
  */
-class Request {
-public:
-  Request(uint32_t type, IoUringSocket& io_uring_socket)
-      : type_(type), io_uring_socket_(io_uring_socket) {}
-  virtual ~Request() {}
+struct Request {
   uint32_t type_;
   IoUringSocket& io_uring_socket_;
-};
-
-struct AcceptedSocketParam {
-  os_fd_t fd_;
-  sockaddr_storage* remote_addr_;
-  socklen_t remote_addr_len_;
-};
-
-struct ReadParam {
-  Buffer::Instance& pending_read_buf_;
-  int32_t result_;
-};
-
-struct WriteParam {
-  int32_t result_;
 };
 
 /**
@@ -198,16 +179,16 @@ public:
   virtual void disable() PURE;
 
   /**
-   * Write data to the socket.
-   */
-  virtual uint64_t write(Buffer::Instance& data) PURE;
-  virtual uint64_t writev(const Buffer::RawSlice*, uint64_t) PURE;
-
-  /**
    * Connect to an address.
    * @param address the peer of address which is connected to.
    */
   virtual void connect(const Network::Address::InstanceConstSharedPtr& address) PURE;
+
+  /**
+   * Write data to the socket.
+   */
+  virtual uint64_t write(Buffer::Instance& data) PURE;
+  virtual uint64_t writev(const Buffer::RawSlice* slices, uint64_t num_slice) PURE;
 
   /**
    * On accept request completed.
@@ -217,22 +198,6 @@ public:
    * @param injected indicates the completion is injected or not.
    */
   virtual void onAccept(Request* req, int32_t result, bool injected) PURE;
-
-  /**
-   * On close request completed.
-   * TODO (soulxu): wrap the raw result into a type. It can be `IoCallUint64Result`.
-   * @param result the result of operation in the request.
-   * @param injected indicates the completion is injected or not.
-   */
-  virtual void onClose(int32_t result, bool injected) PURE;
-
-  /**
-   * On cancel request completed.
-   * TODO (soulxu): wrap the raw result into a type. It can be `IoCallUint64Result`.
-   * @param result the result of operation in the request.
-   * @param injected indicates the completion is injected or not.
-   */
-  virtual void onCancel(int32_t result, bool injected) PURE;
 
   /**
    * On connect request completed.
@@ -259,6 +224,22 @@ public:
   virtual void onWrite(int32_t result, bool injected) PURE;
 
   /**
+   * On close request completed.
+   * TODO (soulxu): wrap the raw result into a type. It can be `IoCallUint64Result`.
+   * @param result the result of operation in the request.
+   * @param injected indicates the completion is injected or not.
+   */
+  virtual void onClose(int32_t result, bool injected) PURE;
+
+  /**
+   * On cancel request completed.
+   * TODO (soulxu): wrap the raw result into a type. It can be `IoCallUint64Result`.
+   * @param result the result of operation in the request.
+   * @param injected indicates the completion is injected or not.
+   */
+  virtual void onCancel(int32_t result, bool injected) PURE;
+
+  /**
    * Inject a request completion to the io uring instance.
    * @param type the request type of injected completion.
    */
@@ -269,6 +250,21 @@ public:
    * @return the status.
    */
   virtual IoUringSocketStatus getStatus() const PURE;
+};
+
+struct AcceptedSocketParam {
+  os_fd_t fd_;
+  sockaddr_storage* remote_addr_;
+  socklen_t remote_addr_len_;
+};
+
+struct ReadParam {
+  Buffer::Instance& pending_read_buf_;
+  int32_t result_;
+};
+
+struct WriteParam {
+  int32_t result_;
 };
 
 /**
@@ -318,14 +314,11 @@ public:
   virtual Request* submitAcceptRequest(IoUringSocket& socket) PURE;
 
   /**
-   * Submit a cancel request for a socket.
+   * Submit a connect request for a socket.
    */
-  virtual Request* submitCancelRequest(IoUringSocket& socket, Request* request_to_cancel) PURE;
-
-  /**
-   * Submit a close request for a socket.
-   */
-  virtual Request* submitCloseRequest(IoUringSocket& socket) PURE;
+  virtual Request*
+  submitConnectRequest(IoUringSocket& socket,
+                       const Network::Address::InstanceConstSharedPtr& address) PURE;
 
   /**
    * Submit a read request for a socket.
@@ -339,11 +332,14 @@ public:
                                        uint64_t num_vecs) PURE;
 
   /**
-   * Submit a connect request for a socket.
+   * Submit a close request for a socket.
    */
-  virtual Request*
-  submitConnectRequest(IoUringSocket& socket,
-                       const Network::Address::InstanceConstSharedPtr& address) PURE;
+  virtual Request* submitCloseRequest(IoUringSocket& socket) PURE;
+
+  /**
+   * Submit a cancel request for a socket.
+   */
+  virtual Request* submitCancelRequest(IoUringSocket& socket, Request* request_to_cancel) PURE;
 };
 
 /**

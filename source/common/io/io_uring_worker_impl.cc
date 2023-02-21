@@ -72,7 +72,7 @@ IoUringSocket& IoUringWorkerImpl::addClientSocket(os_fd_t fd, IoUringHandler&, u
 Event::Dispatcher& IoUringWorkerImpl::dispatcher() { return dispatcher_; }
 
 Request* IoUringWorkerImpl::submitAcceptRequest(IoUringSocket& socket) {
-  AcceptRequest* req = new AcceptRequest(RequestType::Accept, socket);
+  AcceptRequest* req = new AcceptRequest{{RequestType::Accept, socket}};
 
   ENVOY_LOG(trace, "submit accept request, fd = {}, accept req = {}", socket.fd(), fmt::ptr(req));
 
@@ -91,34 +91,19 @@ Request* IoUringWorkerImpl::submitAcceptRequest(IoUringSocket& socket) {
   return req;
 }
 
-Request* IoUringWorkerImpl::submitCancelRequest(IoUringSocket& socket, Request* request_to_cancel) {
-  Request* req = new Request{RequestType::Cancel, socket};
+Request*
+IoUringWorkerImpl::submitConnectRequest(IoUringSocket& socket,
+                                        const Network::Address::InstanceConstSharedPtr& address) {
+  Request* req = new Request{RequestType::Connect, socket};
 
-  ENVOY_LOG(trace, "submit cancel request, fd = {}, cancel req = {}, req to cancel = {}",
-            socket.fd(), fmt::ptr(req), fmt::ptr(request_to_cancel));
+  ENVOY_LOG(trace, "submit connect request, fd = {}, req = {}", socket.fd(), fmt::ptr(req));
 
-  auto res = io_uring_instance_->prepareCancel(request_to_cancel, req);
+  auto res = io_uring_instance_->prepareConnect(socket.fd(), address, req);
   if (res == Io::IoUringResult::Failed) {
     // TODO(rojkov): handle `EBUSY` in case the completion queue is never reaped.
     submit();
-    res = io_uring_instance_->prepareCancel(request_to_cancel, req);
-    RELEASE_ASSERT(res == Io::IoUringResult::Ok, "unable to prepare cancel");
-  }
-  submit();
-  return req;
-}
-
-Request* IoUringWorkerImpl::submitCloseRequest(IoUringSocket& socket) {
-  Request* req = new Request{RequestType::Close, socket};
-
-  ENVOY_LOG(trace, "submit close request, fd = {}, close req = {}", socket.fd(), fmt::ptr(req));
-
-  auto res = io_uring_instance_->prepareClose(socket.fd(), req);
-  if (res == Io::IoUringResult::Failed) {
-    // TODO(rojkov): handle `EBUSY` in case the completion queue is never reaped.
-    submit();
-    res = io_uring_instance_->prepareClose(socket.fd(), req);
-    RELEASE_ASSERT(res == Io::IoUringResult::Ok, "unable to prepare close");
+    res = io_uring_instance_->prepareConnect(socket.fd(), address, req);
+    RELEASE_ASSERT(res == Io::IoUringResult::Ok, "unable to prepare writev");
   }
   submit();
   return req;
@@ -157,22 +142,51 @@ Request* IoUringWorkerImpl::submitWritevRequest(IoUringSocket& socket, struct io
   return req;
 }
 
-Request*
-IoUringWorkerImpl::submitConnectRequest(IoUringSocket& socket,
-                                        const Network::Address::InstanceConstSharedPtr& address) {
-  Request* req = new Request{RequestType::Connect, socket};
+Request* IoUringWorkerImpl::submitCloseRequest(IoUringSocket& socket) {
+  Request* req = new Request{RequestType::Close, socket};
 
-  ENVOY_LOG(trace, "submit connect request, fd = {}, req = {}", socket.fd(), fmt::ptr(req));
+  ENVOY_LOG(trace, "submit close request, fd = {}, close req = {}", socket.fd(), fmt::ptr(req));
 
-  auto res = io_uring_instance_->prepareConnect(socket.fd(), address, req);
+  auto res = io_uring_instance_->prepareClose(socket.fd(), req);
   if (res == Io::IoUringResult::Failed) {
     // TODO(rojkov): handle `EBUSY` in case the completion queue is never reaped.
     submit();
-    res = io_uring_instance_->prepareConnect(socket.fd(), address, req);
-    RELEASE_ASSERT(res == Io::IoUringResult::Ok, "unable to prepare writev");
+    res = io_uring_instance_->prepareClose(socket.fd(), req);
+    RELEASE_ASSERT(res == Io::IoUringResult::Ok, "unable to prepare close");
   }
   submit();
   return req;
+}
+
+Request* IoUringWorkerImpl::submitCancelRequest(IoUringSocket& socket, Request* request_to_cancel) {
+  Request* req = new Request{RequestType::Cancel, socket};
+
+  ENVOY_LOG(trace, "submit cancel request, fd = {}, cancel req = {}, req to cancel = {}",
+            socket.fd(), fmt::ptr(req), fmt::ptr(request_to_cancel));
+
+  auto res = io_uring_instance_->prepareCancel(request_to_cancel, req);
+  if (res == Io::IoUringResult::Failed) {
+    // TODO(rojkov): handle `EBUSY` in case the completion queue is never reaped.
+    submit();
+    res = io_uring_instance_->prepareCancel(request_to_cancel, req);
+    RELEASE_ASSERT(res == Io::IoUringResult::Ok, "unable to prepare cancel");
+  }
+  submit();
+  return req;
+}
+
+IoUringSocketEntryPtr IoUringWorkerImpl::removeSocket(IoUringSocketEntry& socket) {
+  return socket.removeFromList(sockets_);
+}
+
+void IoUringWorkerImpl::injectCompletion(IoUringSocket& socket, uint32_t type, int32_t result) {
+  Request* req = new Request{type, socket};
+  io_uring_instance_->injectCompletion(socket.fd(), req, result);
+  file_event_->activate(Event::FileReadyType::Read);
+}
+
+void IoUringWorkerImpl::removeInjectedCompletion(IoUringSocket& socket) {
+  io_uring_instance_->removeInjectedCompletion(socket.fd());
 }
 
 void IoUringWorkerImpl::onFileEvent() {
@@ -226,20 +240,6 @@ void IoUringWorkerImpl::submit() {
   }
 }
 
-IoUringSocketEntryPtr IoUringWorkerImpl::removeSocket(IoUringSocketEntry& socket) {
-  return socket.removeFromList(sockets_);
-}
-
-void IoUringWorkerImpl::injectCompletion(IoUringSocket& socket, uint32_t type, int32_t result) {
-  Request* req = new Request{type, socket};
-  io_uring_instance_->injectCompletion(socket.fd(), req, result);
-  file_event_->activate(Event::FileReadyType::Read);
-}
-
-void IoUringWorkerImpl::removeInjectedCompletion(IoUringSocket& socket) {
-  io_uring_instance_->removeInjectedCompletion(socket.fd());
-}
-
 IoUringAcceptSocket::IoUringAcceptSocket(os_fd_t fd, IoUringWorkerImpl& parent,
                                          IoUringHandler& io_uring_handler, int max_requests)
     : IoUringSocketEntry(fd, parent, io_uring_handler), max_requests_(max_requests) {
@@ -249,7 +249,7 @@ IoUringAcceptSocket::IoUringAcceptSocket(os_fd_t fd, IoUringWorkerImpl& parent,
 void IoUringAcceptSocket::close() {
   IoUringSocketEntry::close();
 
-  if (requests_.size() == 0) {
+  if (requests_.empty()) {
     parent_.submitCloseRequest(*this);
     return;
   }
@@ -284,7 +284,7 @@ void IoUringAcceptSocket::onAccept(Request* req, int32_t result, bool injected) 
   AcceptRequest* accept_req = static_cast<AcceptRequest*>(req);
   if (!injected) {
     requests_.erase(req);
-    if (requests_.size() == 0 && status_ == CLOSING) {
+    if (requests_.empty() && status_ == CLOSING) {
       parent_.submitCloseRequest(*this);
     }
   }

@@ -18,28 +18,10 @@ public:
   IoUringTestSocket(os_fd_t fd, IoUringWorkerImpl& parent, IoUringHandler& io_uring_handler)
       : IoUringSocketEntry(fd, parent, io_uring_handler) {}
 
-  void close() override {}
-  void enable() override {}
-  void disable() override {}
-  uint64_t write(Buffer::Instance&) override { PANIC("not implement"); }
-  uint64_t writev(const Buffer::RawSlice*, uint64_t) override { PANIC("not implement"); }
-  void connect(const Network::Address::InstanceConstSharedPtr&) override {}
   void onAccept(Request* req, int32_t result, bool injected) override {
     IoUringSocketEntry::onAccept(req, result, injected);
     accept_result_ = result;
     is_accept_injected_completion_ = injected;
-    nr_completion_++;
-  }
-  void onCancel(int32_t result, bool injected) override {
-    IoUringSocketEntry::onCancel(result, injected);
-    cancel_result_ = result;
-    is_cancel_injected_completion_ = injected;
-    nr_completion_++;
-  }
-  void onClose(int32_t result, bool injected) override {
-    IoUringSocketEntry::onClose(result, injected);
-    close_result_ = result;
-    is_close_injected_completion_ = injected;
     nr_completion_++;
   }
   void onConnect(int32_t result, bool injected) override {
@@ -60,13 +42,21 @@ public:
     is_write_injected_completion_ = injected;
     nr_completion_++;
   }
+  void onClose(int32_t result, bool injected) override {
+    IoUringSocketEntry::onClose(result, injected);
+    close_result_ = result;
+    is_close_injected_completion_ = injected;
+    nr_completion_++;
+  }
+  void onCancel(int32_t result, bool injected) override {
+    IoUringSocketEntry::onCancel(result, injected);
+    cancel_result_ = result;
+    is_cancel_injected_completion_ = injected;
+    nr_completion_++;
+  }
 
   int32_t accept_result_{-1};
   bool is_accept_injected_completion_{false};
-  int32_t cancel_result_{-1};
-  bool is_cancel_injected_completion_{false};
-  int32_t close_result_{-1};
-  bool is_close_injected_completion_{false};
   int32_t connect_result_{-1};
   bool is_connect_injected_completion_{false};
   int32_t read_result_{-1};
@@ -74,6 +64,10 @@ public:
   int32_t write_result_{-1};
   bool is_write_injected_completion_{false};
   int32_t nr_completion_{0};
+  int32_t close_result_{-1};
+  bool is_close_injected_completion_{false};
+  int32_t cancel_result_{-1};
+  bool is_cancel_injected_completion_{false};
 };
 
 class IoUringWorkerTestImpl : public IoUringWorkerImpl {
@@ -227,29 +221,6 @@ TEST_F(IoUringWorkerIntegraionTest, Accept) {
   cleanup();
 }
 
-TEST_F(IoUringWorkerIntegraionTest, Close) {
-  initialize();
-  socket(false, true);
-  listen();
-
-  auto& socket = dynamic_cast<IoUringTestSocket&>(
-      io_uring_worker_->addTestSocket(listen_socket_, io_uring_handler_));
-  EXPECT_EQ(io_uring_worker_->getSockets().size(), 1);
-
-  // Waiting for the listen socket close.
-  io_uring_worker_->submitCloseRequest(socket);
-  while (socket.close_result_ == -1) {
-    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
-  }
-
-  EXPECT_EQ(socket.close_result_, 0);
-  EXPECT_FALSE(socket.is_close_injected_completion_);
-
-  socket.cleanup();
-  EXPECT_EQ(io_uring_worker_->getSockets().size(), 0);
-  cleanup();
-}
-
 TEST_F(IoUringWorkerIntegraionTest, Connect) {
   initialize();
   socket(true, false);
@@ -339,6 +310,29 @@ TEST_F(IoUringWorkerIntegraionTest, Write) {
   std::string read_data(static_cast<char*>(read_iov.iov_base), size);
   EXPECT_EQ(read_data, write_data);
   EXPECT_FALSE(socket.is_write_injected_completion_);
+
+  socket.cleanup();
+  EXPECT_EQ(io_uring_worker_->getSockets().size(), 0);
+  cleanup();
+}
+
+TEST_F(IoUringWorkerIntegraionTest, Close) {
+  initialize();
+  socket(false, true);
+  listen();
+
+  auto& socket = dynamic_cast<IoUringTestSocket&>(
+      io_uring_worker_->addTestSocket(listen_socket_, io_uring_handler_));
+  EXPECT_EQ(io_uring_worker_->getSockets().size(), 1);
+
+  // Waiting for the listen socket close.
+  io_uring_worker_->submitCloseRequest(socket);
+  while (socket.close_result_ == -1) {
+    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  }
+
+  EXPECT_EQ(socket.close_result_, 0);
+  EXPECT_FALSE(socket.is_close_injected_completion_);
 
   socket.cleanup();
   EXPECT_EQ(io_uring_worker_->getSockets().size(), 0);

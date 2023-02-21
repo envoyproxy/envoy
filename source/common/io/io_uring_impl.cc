@@ -123,19 +123,6 @@ void IoUringImpl::forEveryCompletion(const CompletionCb& completion_cb) {
   }
 }
 
-void IoUringImpl::injectCompletion(os_fd_t fd, void* user_data, int32_t result) {
-  injected_completions_.emplace_back(fd, user_data, result);
-  ENVOY_LOG(trace, "inject completion, fd = {}, req = {}, num injects = {}", fd,
-            fmt::ptr(user_data), injected_completions_.size());
-}
-
-void IoUringImpl::removeInjectedCompletion(os_fd_t fd) {
-  ENVOY_LOG(trace, "remove injected completions for fd = {}, size = {}", fd,
-            injected_completions_.size());
-  injected_completions_.remove_if(
-      [fd](InjectedCompletion& completion) { return fd == completion.fd_; });
-}
-
 IoUringResult IoUringImpl::prepareAccept(os_fd_t fd, struct sockaddr* remote_addr,
                                          socklen_t* remote_addr_len, void* user_data) {
   ENVOY_LOG(trace, "prepare accept for fd = {}", fd);
@@ -218,6 +205,19 @@ IoUringResult IoUringImpl::submit() {
   ENVOY_LOG(trace, "submit requests to the ring, number of entries = {}", res);
   RELEASE_ASSERT(res >= 0 || res == -EBUSY, "unable to submit io_uring queue entries");
   return res == -EBUSY ? IoUringResult::Busy : IoUringResult::Ok;
+}
+
+void IoUringImpl::injectCompletion(os_fd_t fd, void* user_data, int32_t result) {
+  injected_completions_.emplace_back(fd, user_data, result);
+  ENVOY_LOG(trace, "inject completion, fd = {}, req = {}, num injects = {}", fd,
+            fmt::ptr(user_data), injected_completions_.size());
+}
+
+void IoUringImpl::removeInjectedCompletion(os_fd_t fd) {
+  ENVOY_LOG(trace, "remove injected completions for fd = {}, size = {}", fd,
+            injected_completions_.size());
+  injected_completions_.remove_if(
+      [fd](InjectedCompletion& completion) { return fd == completion.fd_; });
 }
 
 } // namespace Io

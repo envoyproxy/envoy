@@ -14,26 +14,13 @@ namespace Envoy {
 namespace Io {
 namespace {
 
-class IoUringTestSocket : public IoUringSocketEntry {
-public:
-  IoUringTestSocket(os_fd_t fd, IoUringWorkerImpl& parent, IoUringHandler& io_uring_handler)
-      : IoUringSocketEntry(fd, parent, io_uring_handler) {}
-
-  void close() override {}
-  void enable() override {}
-  void disable() override {}
-  uint64_t write(Buffer::Instance&) override { PANIC("not implement"); }
-  uint64_t writev(const Buffer::RawSlice*, uint64_t) override { PANIC("not implement"); }
-  void connect(const Network::Address::InstanceConstSharedPtr&) override {}
-};
-
 class IoUringWorkerTestImpl : public IoUringWorkerImpl {
 public:
   IoUringWorkerTestImpl(std::unique_ptr<IoUring> io_uring_instance, Event::Dispatcher& dispatcher)
       : IoUringWorkerImpl(std::move(io_uring_instance), dispatcher) {}
   IoUringSocket& addTestSocket(os_fd_t fd, IoUringHandler& io_uring_handler) {
-    std::unique_ptr<IoUringTestSocket> socket =
-        std::make_unique<IoUringTestSocket>(fd, *this, io_uring_handler);
+    std::unique_ptr<IoUringSocketEntry> socket =
+        std::make_unique<IoUringSocketEntry>(fd, *this, io_uring_handler);
     LinkedList::moveIntoListBack(std::move(socket), sockets_);
     return *sockets_.back();
   }
