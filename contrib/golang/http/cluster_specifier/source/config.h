@@ -1,7 +1,5 @@
 #pragma once
 
-#include "source/extensions/filters/http/common/factory_base.h"
-
 #include "contrib/golang/http/cluster_specifier/source/golang_cluster_specifier.h"
 
 namespace Envoy {
