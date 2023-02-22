@@ -22,7 +22,8 @@ namespace Platform {
 constexpr int DefaultJwtTokenLifetimeSeconds = 31536000; // 1 year
 constexpr int DefaultXdsTimeout = 5;
 
-// Represents the locality information in the Bootstrap's node.
+// Represents the locality information in the Bootstrap's node, as defined in:
+// https://www.envoyproxy.io/docs/envoy/latest/api-v3/config/core/v3/base.proto#envoy-v3-api-msg-config-core-v3-locality
 struct NodeLocality {
   std::string region;
   std::string zone;
