@@ -1,11 +1,17 @@
 // This file contains some minimal helper functions to test the admin panel rendering,
 // including server-generated HTML content and pages that include some JavaScript.
 //
-// This is a very minimalistic test framework.
+// The unit test style is similar to that supported by Google's Closure
+// Compiler, but without taking on a large dependency or build infrastructure.
+//
+// Linted with https://validatejavascript.com/, 'Google' settings, long-line
+// checking disabled, indent-checking disabled.
 
 
 /**
  * List of all tests. Each test in a struct with a url, name, and test Function.
+ *
+ * @array{Object}
  */
 const test_list = [];
 
@@ -15,14 +21,14 @@ const test_list = [];
  * load, from admin.html's call to runAllTests().
  */
 function addTest(url, name, test_function) {
-  test_list.push({url: url, name: name, test_function: test_function});
+  test_list.push({"url": url, "name": name, "test_function": test_function});
 }
 
 
 /**
  * Provides an async version of the onload event.
  */
-async function waitForOnload(iframe) {
+function waitForOnload(iframe) {
   return new Promise((resolve, reject) => {
     iframe.onload = () => {
       resolve();
@@ -37,9 +43,9 @@ async function waitForOnload(iframe) {
  * run.
  */
 async function runTest(url, name, tester) {
-  const results = document.getElementById('test-results');
-  results.textContent += name + ' ...';
-  iframe = document.createElement("iframe");
+  const results = document.getElementById("test-results");
+  results.textContent += name + " ...";
+  const iframe = document.createElement("iframe");
   iframe.width = 800;
   iframe.height = 1000;
   iframe.src = url;
@@ -47,9 +53,9 @@ async function runTest(url, name, tester) {
   await waitForOnload(iframe);
   try {
     await tester(iframe);
-    results.textContent += 'passed\n';
+    results.textContent += "passed\n";
   } catch (err) {
-    results.textContent += 'FAILED: ' + err + '\n';
+    results.textContent += "FAILED: " + err + "\n";
   }
   iframe.parentElement.removeChild(iframe);
 }
@@ -69,7 +75,7 @@ function assertTrue(cond, comment) {
  * Checks for equality, throwing an exception with a comment if it fails.
  */
 function assertEq(expected, actual) {
-  assertTrue(expected == actual, 'assertEq mismatch: expected ' + expected + ' got ' + actual);
+  assertTrue(expected == actual, "assertEq mismatch: expected " + expected + " got " + actual);
 }
 
 
@@ -81,7 +87,7 @@ function runAllTests() {
     if (test_index < test_list.length) {
       test = test_list[test_index];
       ++test_index;
-      runTest(test.url, test.name + '(' + test_index + '/' + test_list.length + ')',
+      runTest(test.url, test.name + "(" + test_index + "/" + test_list.length + ")",
               test.test_function).then(() => {
                 next_test(test_index);
               });
@@ -91,4 +97,4 @@ function runAllTests() {
 }
 
 // Trigger the tests once all JS is loaded.
-addEventListener("DOMContentLoaded", runAllTests);
+window.addEventListener("DOMContentLoaded", runAllTests);
