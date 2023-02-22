@@ -32,7 +32,6 @@ static_resources:
               - match: {prefix: "/"}
                 route: {host_rewrite_literal: 127.0.0.1, cluster: service_1}
   clusters:
-  clusters:
   - name: service_1
     connect_timeout: 0.25s
     type: LOGICAL_DNS
