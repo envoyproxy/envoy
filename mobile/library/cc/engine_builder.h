@@ -41,15 +41,6 @@ struct NodeLocality {
 class EngineBuilder {
 public:
   EngineBuilder();
-  // THIS CONSTRUCTOR SHOULD ONLY BE CALLED BY TESTS. Further uses of this constructor are highly
-  // discouraged as this API is likely to go away soon.
-  //
-  // Creates an EngineBuilder from the provided YAML config string. If this constructor is invoked,
-  // then only the config provided in the string will be used to generate the Envoy engine; none of
-  // the builder function invocations will take effect.
-  //
-  // TODO(abeyad): remove the need for this constructor.
-  explicit EngineBuilder(std::string config);
 
   // Use the experimental non-YAML config mode which uses the bootstrap proto directly.
   EngineBuilder& addLogLevel(LogLevel log_level);
@@ -133,10 +124,11 @@ public:
   EngineSharedPtr build();
 
 protected:
-  void setOverrideConfigForTests(std::string config) { config_override_for_tests_ = config; }
+  // Tests that need access to this method should go through the TestEngineBuilder class, which
+  // provides access to this protected method.
+  EngineBuilder& setOverrideConfigForTests(std::string config);
 
 private:
-  friend BaseClientIntegrationTest;
   struct NativeFilterConfig {
     NativeFilterConfig(std::string name, std::string typed_config)
         : name_(std::move(name)), typed_config_(std::move(typed_config)) {}
@@ -165,9 +157,7 @@ private:
   int stream_idle_timeout_seconds_ = 15;
   int per_try_idle_timeout_seconds_ = 15;
   bool gzip_decompression_filter_ = true;
-  bool gzip_compression_filter_ = false;
   bool brotli_decompression_filter_ = false;
-  bool brotli_compression_filter_ = false;
   bool socket_tagging_filter_ = false;
   bool platform_certificates_validation_on_ = false;
   std::string rtds_layer_name_ = "";
@@ -192,7 +182,6 @@ private:
   bool enable_interface_binding_ = false;
   bool enable_drain_post_dns_refresh_ = false;
   bool enforce_trust_chain_verification_ = true;
-  bool h2_extend_keepalive_timeout_ = false;
   bool enable_http3_ = true;
   bool always_use_v6_ = false;
   int dns_min_refresh_seconds_ = 60;

@@ -207,8 +207,7 @@ void BaseClientIntegrationTest::createEnvoy() {
     finalizeConfigWithPorts(config_helper_, ports, use_lds_);
     ASSERT_FALSE(config_helper_.bootstrap().has_admin())
         << "Bootstrap config should not have `admin` configured in Envoy Mobile";
-    builder_.setOverrideConfigForTests(
-        MessageUtil::getYamlStringFromMessage(config_helper_.bootstrap()));
+    builder_.setOverrideConfig(MessageUtil::getYamlStringFromMessage(config_helper_.bootstrap()));
   } else {
     ENVOY_LOG_MISC(warn, "Using builder config and ignoring config modifiers");
   }

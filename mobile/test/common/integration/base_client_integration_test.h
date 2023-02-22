@@ -1,8 +1,8 @@
 #pragma once
 
+#include "test_engine_builder.h"
 #include "test/integration/integration.h"
 
-#include "library/cc/engine_builder.h"
 #include "library/cc/stream.h"
 #include "library/cc/stream_prototype.h"
 #include "library/common/http/client.h"
@@ -80,7 +80,7 @@ protected:
   bool override_builder_config_ = false;
   // True if data plane requests are expected in the test; false otherwise.
   bool expect_data_streams_ = true;
-  Platform::EngineBuilder builder_;
+  TestEngineBuilder builder_;
 };
 
 } // namespace Envoy

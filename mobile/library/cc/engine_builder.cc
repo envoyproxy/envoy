@@ -42,11 +42,7 @@
 namespace Envoy {
 namespace Platform {
 
-EngineBuilder::EngineBuilder(std::string config)
-    : callbacks_(std::make_shared<EngineCallbacks>()),
-      config_override_for_tests_(std::move(config)) {}
-
-EngineBuilder::EngineBuilder() : EngineBuilder("") {}
+EngineBuilder::EngineBuilder() : callbacks_(std::make_shared<EngineCallbacks>()) {}
 
 EngineBuilder& EngineBuilder::addLogLevel(LogLevel log_level) {
   log_level_ = log_level;
@@ -304,6 +300,11 @@ EngineBuilder& EngineBuilder::setRuntimeGuard(std::string guard, bool value) {
 EngineBuilder&
 EngineBuilder::addDirectResponse(DirectResponseTesting::DirectResponse direct_response) {
   direct_responses_.push_back(direct_response);
+  return *this;
+}
+
+EngineBuilder& EngineBuilder::setOverrideConfigForTests(std::string config) {
+  config_override_for_tests_ = std::move(config);
   return *this;
 }
 
