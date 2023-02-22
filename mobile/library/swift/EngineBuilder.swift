@@ -70,7 +70,6 @@ open class EngineBuilder: NSObject {
   private var nodeZone: String?
   private var nodeSubZone: String?
 
-
   // MARK: - Public
 
   /// Initialize a new builder with standard HTTP library configuration.
@@ -560,7 +559,7 @@ open class EngineBuilder: NSObject {
 
   /// Sets the node.id field in the Bootstrap configuration.
   ///
-  /// - Parameter nodeId: The node ID.
+  /// - parameter nodeId: The node ID.
   ///
   /// - Returns: This builder.
   @discardableResult
@@ -571,9 +570,9 @@ open class EngineBuilder: NSObject {
 
   /// Sets the node locality in the Bootstrap configuration.
   ///
-  /// - Parameter region:    The region.
-  /// - Parameter zone:      The zone.
-  /// - Parameter subZone:   The sub-zone.
+  /// - parameter region:  The region.
+  /// - parameter zone:    The zone.
+  /// - parameter subZone: The sub-zone.
   ///
   /// - Returns: This builder.
   @discardableResult
@@ -590,11 +589,11 @@ open class EngineBuilder: NSObject {
 
   /// Adds an aggregated discovery service layer to the configuration.
   ///
-  /// - Parameter address: The network address of the server.
-  /// - Parameter port:    The port of the server.
-  /// - Parameter jwtToken: The JWT token.
-  /// - Parameter jwtTokenLifetimeSeconds: The JWT token lifetime in seconds.
-  /// - Parameter sslRootCerts: The SSL root certificates.
+  /// - parameter address:                 The network address of the server.
+  /// - parameter port:                    The port of the server.
+  /// - parameter jwtToken:                The JWT token.
+  /// - parameter jwtTokenLifetimeSeconds: The JWT token lifetime in seconds.
+  /// - parameter sslRootCerts:            The SSL root certificates.
   ///
   /// - Returns: This builder.
   @discardableResult
@@ -615,8 +614,8 @@ open class EngineBuilder: NSObject {
 
   /// Adds an RTDS layer to the configuration.
   ///
-  /// - Parameter layerName:      The layer name.
-  /// - Parameter timeoutSeconds: The timeout in seconds.
+  /// - parameter layerName:      The layer name.
+  /// - parameter timeoutSeconds: The timeout in seconds.
   ///
   /// - Returns: This builder.
   @discardableResult
@@ -625,7 +624,6 @@ open class EngineBuilder: NSObject {
     self.rtdsTimeoutSeconds = timeoutSeconds
     return self
   }
-
 
 #if ENVOY_ADMIN_FUNCTIONALITY
   /// Enable admin interface on 127.0.0.1:9901 address. Admin interface is intended to be
