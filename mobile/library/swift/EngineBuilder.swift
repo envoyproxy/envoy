@@ -63,7 +63,7 @@ open class EngineBuilder: NSObject {
   private var adsAddress: String = ""
   private var adsPort: UInt32 = 0
   private var adsJwtToken: String = ""
-  private var adsJwtTokenLifetimeSeconds: UInt32 = 0
+  private var adsJwtTokenLifetimeSeconds: UInt32? = 0
   private var adsSslRootCerts: String = ""
   private var nodeId: String = ""
   private var nodeRegion: String = ""
@@ -619,7 +619,7 @@ open class EngineBuilder: NSObject {
   ///
   /// - Returns: This builder.
   @discardableResult
-  public func addRtdsLayer(_ layerName: String, _ timeoutSeconds: UInt32 = nil) -> Self {
+  public func addRtdsLayer(_ layerName: String, _ timeoutSeconds: UInt32? = nil) -> Self {
     self.rtdsLayerName = layerName
     self.rtdsTimeoutSeconds = timeoutSeconds
     return self
@@ -699,7 +699,7 @@ open class EngineBuilder: NSObject {
       nodeId: self.nodeId,
       nodeRegion: self.nodeRegion,
       nodeZone: self.nodeZone,
-      nodeSubZone: self.nodeSubZone,
+      nodeSubZone: self.nodeSubZone
     )
 
     switch self.base {

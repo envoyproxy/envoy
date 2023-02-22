@@ -250,9 +250,9 @@
     }
     builder.addStatsSinks(std::move(sinks));
   }
-  builder.setNodeLocality({self.nodeRegion, self.nodeZone, self.nodeSubZone});
+  builder.setNodeLocality({[self.nodeRegion toCXXString], [self.nodeZone toCXXString], [self.nodeSubZone toCXXString]});
   builder.setNodeId([self.nodeId toCXXString]);
-  builder.addRtdsLayer([self.rtdsLayerName toCXXString], *self.rtdsTimeoutSeconds);
+  builder.addRtdsLayer([self.rtdsLayerName toCXXString], self.rtdsTimeoutSeconds);
   builder.setAggregatedDiscoveryService(
       [self.adsAddress toCXXString], self.adsPort, [self.adsJwtToken toCXXString],
       self.adsJwtTokenLifetimeSeconds, [self.adsSslRootCerts toCXXString]);
