@@ -34,19 +34,8 @@ namespace {
 Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::RequestHeaders>
     authorization_handle(Http::CustomHeaders::get().Authorization);
 
-// Deleted OauthHMAC cookie.
-constexpr const char* SignoutCookieValue =
+constexpr const char* CookieDeleteFormatString =
     "{}=deleted; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
-
-// Deleted BearerToken cookie.
-constexpr const char* SignoutBearerTokenValue =
-    "{}=deleted; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
-
-constexpr absl::string_view SignoutIdTokenValue =
-    "IdToken=deleted; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
-
-constexpr absl::string_view SignoutRefreshTokenValue =
-    "RefreshToken=deleted; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
 
 constexpr const char* CookieTailFormatString = ";version=1;path=/;Max-Age={};secure";
 
@@ -189,7 +178,8 @@ void OAuth2CookieValidator::setParams(const Http::RequestHeaderMap& headers,
                                       const std::string& secret) {
   const auto& cookies = Http::Utility::parseCookies(headers, [this](absl::string_view key) -> bool {
     return key == cookie_names_.oauth_expires_ || key == cookie_names_.bearer_token_ ||
-           key == cookie_names_.oauth_hmac_ || key == cookie_names_.id_token_;
+           key == cookie_names_.oauth_hmac_ || key == cookie_names_.id_token_ ||
+           key == cookie_names_.refresh_token_;
   });
 
   expires_ = findValue(cookies, cookie_names_.oauth_expires_);
@@ -444,12 +434,16 @@ Http::FilterHeadersStatus OAuth2Filter::signOutUser(const Http::RequestHeaderMap
   const std::string new_path = absl::StrCat(headers.getSchemeValue(), "://", host_, "/");
   response_headers->addReferenceKey(
       Http::Headers::get().SetCookie,
-      fmt::format(SignoutCookieValue, config_->cookieNames().oauth_hmac_));
+      fmt::format(CookieDeleteFormatString, config_->cookieNames().oauth_hmac_));
   response_headers->addReferenceKey(
       Http::Headers::get().SetCookie,
-      fmt::format(SignoutBearerTokenValue, config_->cookieNames().bearer_token_));
-  response_headers->addReferenceKey(Http::Headers::get().SetCookie, SignoutIdTokenValue);
-  response_headers->addReferenceKey(Http::Headers::get().SetCookie, SignoutRefreshTokenValue);
+      fmt::format(CookieDeleteFormatString, config_->cookieNames().bearer_token_));
+  response_headers->addReferenceKey(
+      Http::Headers::get().SetCookie,
+      fmt::format(CookieDeleteFormatString, config_->cookieNames().id_token_));
+  response_headers->addReferenceKey(
+      Http::Headers::get().SetCookie,
+      fmt::format(CookieDeleteFormatString, config_->cookieNames().refresh_token_));
   response_headers->setLocation(new_path);
   decoder_callbacks_->encodeHeaders(std::move(response_headers), true, SIGN_OUT);
 
@@ -532,8 +526,9 @@ void OAuth2Filter::addResponseCookies(Http::ResponseHeaderMap& headers,
         Http::Headers::get().SetCookie,
         absl::StrCat(cookie_names.bearer_token_, "=", access_token_, cookie_tail));
     if (id_token_ != EMPTY_STRING) {
-      headers.addReferenceKey(Http::Headers::get().SetCookie,
-                              absl::StrCat(cookie_names.id_token_, "=", id_token_, cookie_tail));
+      headers.addReferenceKey(
+          Http::Headers::get().SetCookie,
+          absl::StrCat(cookie_names.id_token_, "=", id_token_, cookie_tail));
     }
 
     if (refresh_token_ != EMPTY_STRING) {
