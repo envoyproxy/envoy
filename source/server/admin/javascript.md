@@ -53,5 +53,5 @@ optional. If using Closure Compiler, it would use these for strong type
 checking.
 
 The JavaScript here is not currently compiled, but it can be linted by
-https://validatejavascript.com/, 'Google' settings, long-line
-checking disabled, indent-checking disabled.
+https://validatejavascript.com/, 'Google' settings with `max-len` and `indent`
+checkboxes disabled.

@@ -13,20 +13,26 @@
  *
  * @array{Object}
  */
-const test_list = [];
-
+const testList = [];
 
 /**
  * Adds a new test to the test-list. These will be run after all test scripts
  * load, from admin.html's call to runAllTests().
+ *
+ * @param {string} url
+ * @param {string} name
+ * @param {function(!HTMLElement): Promise} testFunction
+ * exported addTest
  */
-function addTest(url, name, test_function) {
-  test_list.push({"url": url, "name": name, "test_function": test_function});
+function addTest(url, name, testFunction) { // eslint-disable-line no-unused-vars
+  testList.push({'url': url, 'name': name, 'testFunction': testFunction});
 }
-
 
 /**
  * Provides an async version of the onload event.
+ *
+ * @param {!HTMLElement} iframe
+ * @return {!Promise}
  */
 function waitForOnload(iframe) {
   return new Promise((resolve, reject) => {
@@ -41,11 +47,16 @@ function waitForOnload(iframe) {
  * Log whether that function failed (threw exception) or passed. Either
  * way, when that completes resolve a returned promise so the next test can
  * run.
+ *
+ * @param {string} url
+ * @param {string} name
+ * @param {function(!HTMLElement): !Promise} tester
+ * @return {!Promise}
  */
 async function runTest(url, name, tester) {
-  const results = document.getElementById("test-results");
-  results.textContent += name + " ...";
-  const iframe = document.createElement("iframe");
+  const results = document.getElementById('test-results');
+  results.textContent += name + ' ...';
+  const iframe = document.createElement('iframe');
   iframe.width = 800;
   iframe.height = 1000;
   iframe.src = url;
@@ -53,9 +64,9 @@ async function runTest(url, name, tester) {
   await waitForOnload(iframe);
   try {
     await tester(iframe);
-    results.textContent += "passed\n";
+    results.textContent += 'passed\n';
   } catch (err) {
-    results.textContent += "FAILED: " + err + "\n";
+    results.textContent += 'FAILED: ' + err + '\n';
   }
   iframe.parentElement.removeChild(iframe);
 }
@@ -63,6 +74,9 @@ async function runTest(url, name, tester) {
 
 /**
  * Checks for a condition, throwing an exception with a comment if it fails.
+ *
+ * @param {Object} cond
+ * @param {string} comment
  */
 function assertTrue(cond, comment) {
   if (!cond) {
@@ -73,9 +87,12 @@ function assertTrue(cond, comment) {
 
 /**
  * Checks for equality, throwing an exception with a comment if it fails.
+ *
+ * @param {Object} expected
+ * @param {Object} actual
  */
-function assertEq(expected, actual) {
-  assertTrue(expected == actual, "assertEq mismatch: expected " + expected + " got " + actual);
+function assertEq(expected, actual) { // eslint-disable-line no-unused-vars
+  assertTrue(expected == actual, 'assertEq mismatch: expected ' + expected + ' got ' + actual);
 }
 
 
@@ -83,18 +100,18 @@ function assertEq(expected, actual) {
  * Runs all tests added via addTest() above.
  */
 function runAllTests() {
-  const next_test = (test_index) => {
-    if (test_index < test_list.length) {
-      test = test_list[test_index];
-      ++test_index;
-      runTest(test.url, test.name + "(" + test_index + "/" + test_list.length + ")",
-              test.test_function).then(() => {
-                next_test(test_index);
+  const next = (index) => {
+    if (index < testList.length) {
+      test = testList[index];
+      ++index;
+      runTest(test.url, test.name + '(' + index + '/' + testList.length + ')',
+              test.testFunction).then(() => {
+                next(index);
               });
     }
   };
-  next_test(0);
+  next(0);
 }
 
 // Trigger the tests once all JS is loaded.
-window.addEventListener("DOMContentLoaded", runAllTests);
+window.addEventListener('DOMContentLoaded', runAllTests);
