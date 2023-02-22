@@ -129,7 +129,7 @@ stages:
     steps:
     - task: Cache@2
       inputs:
-        key: "format | ./WORKSPACE | **/*.bzl"
+        key: "format | ./VERSION.txt | ./WORKSPACE | **/*.bzl"
         path: $(Build.StagingDirectory)/repository_cache
       continueOnError: true
 
@@ -160,7 +160,7 @@ stages:
     steps:
     - task: Cache@2
       inputs:
-        key: "proto_format | ./WORKSPACE | **/*.bzl"
+        key: "proto_format | ./VERSION.txt | ./WORKSPACE | **/*.bzl"
         path: $(Build.StagingDirectory)/repository_cache
       continueOnError: true
 
@@ -191,7 +191,7 @@ stages:
     steps:
     - task: Cache@2
       inputs:
-        key: "docs | ./WORKSPACE | **/*.bzl"
+        key: "docs | ./VERSION.txt | ./WORKSPACE | **/*.bzl"
         path: $(Build.StagingDirectory)/repository_cache
       continueOnError: true
 
@@ -224,7 +224,7 @@ stages:
     steps:
     - task: Cache@2
       inputs:
-        key: "dependencies | ./WORKSPACE | **/*.bzl"
+        key: "dependencies | ./VERSION.txt | ./WORKSPACE | **/*.bzl"
         path: $(Build.StagingDirectory)/repository_cache
       continueOnError: true
 
@@ -589,7 +589,7 @@ stages:
     steps:
     - task: Cache@2
       inputs:
-        key: "docs | ./WORKSPACE | **/*.bzl"
+        key: "docs | ./VERSION.txt | ./WORKSPACE | **/*.bzl"
         path: $(Build.StagingDirectory)/repository_cache
       continueOnError: true
 
@@ -872,7 +872,7 @@ stages:
     steps:
     - task: Cache@2
       inputs:
-        key: '"windows.release" | ./WORKSPACE | **/*.bzl'
+        key: '"windows.release" | ./VERSION.txt | ./WORKSPACE | **/*.bzl'
         path: $(Build.StagingDirectory)/repository_cache
       continueOnError: true
     - bash: ci/run_envoy_docker.sh ci/windows_ci_steps.sh
