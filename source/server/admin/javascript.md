@@ -37,12 +37,12 @@ mechanism does not pull in those infrastructural elements as dependencies. If
 there is significantly more JavaScript needed then migrating to that can be
 considered.
 
-The JavaScript is tested by recompiling envoy-static with
-`--cxxopt=-DENVOY_ADMIN_BROWSER_TEST`, which will add a /test endpoint to the
-admin port, enabling the test files to run in the same origin as the endpoint
-under test. This is needed for deep inspection of the document model during
-tests. For more details on testing mechanics, see
-test/server/admin/admin_test.sh. Note that the test is semi-automatic using a
+The JavaScript is tested using a binary //test/integration:admin_test_server,
+which is like envoy-static, but users a post-server hook to add a /test endpoint
+to the admin port, enabling the test files to run in the same origin as the
+endpoint under test. This is needed for deep inspection of the document model
+during tests. For more details on testing mechanics, see
+test/integration/admin_web_test.sh. Note that the test is semi-automatic using a
 browser, and is not run in blaze tests or CI.
 
 

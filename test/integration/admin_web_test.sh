@@ -10,19 +10,23 @@
 # It then leaves Firefox up, so the developer can examine the results
 # and then quit firefox.
 #
-# These steps can also be perrformed manually rather than via the script.
+# These steps can also be performed manually rather than via the script.
 
 admin_port_file="/tmp/admin_port.$$"
 
-echo "*** Building..."
-bazel build \
-      --//source/extensions/wasm_runtime/v8:enabled=false \
-      --cxxopt=-DENVOY_ADMIN_BROWSER_TEST \
-      source/exe:envoy-static
+ENVOY_BINARY="bazel-bin/test/integration/admin_test_server"
+if [ -e "$ENVOY_BINARY" ]; then
+  echo "*** Re-using binary..."
+  ls -l "$ENVOY_BINARY"
+else
+  echo "*** Building..."
+  bazel build test/integration:admin_test_server
+fi
+
 
 echo "*** Invoking Envoy..."
-./bazel-bin/source/exe/envoy-static \
-      -c test/server/admin/admin_test.yaml \
+$ENVOY_BINARY \
+      -c test/integration/admin_web_test.yaml \
       --admin-address-path "$admin_port_file" &
 
 echo "*** Waiting for the server to go live..."
@@ -34,8 +38,10 @@ done
 
 echo "*** Please ensure Browser test passes and the stats UI looks good..."
 browser="firefox"
-echo $browser "$admin_port/test?file=admin_test.html" "$admin_port/stats?format=active"
-$browser "$admin_port/test?file=admin_test.html" "$admin_port/stats?format=active"
+test_url="$admin_port/test?file=admin_web_test.html"
+active_stats_url="$admin_port/stats?format=active"
+echo $browser "$test_url" "$active_stats_url"
+$browser "$test_url" "$active_stats_url"
 
 curl -X POST "$admin_port/quitquitquit"
 rm -f "$admin_port_file"

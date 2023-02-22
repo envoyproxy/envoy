@@ -6,15 +6,15 @@ admin:
       path: "/dev/null"
   address:
     socket_address:
-      address: "::"
-      port_value: 8080
+      address: "127.0.0.1"
+      port_value: 0
 
 static_resources:
   listeners:
   - name: listener_0
     address:
       socket_address:
-        address: "::"
+        address: "127.0.0.1"
         port_value: 0
     filter_chains:
     - filters:
