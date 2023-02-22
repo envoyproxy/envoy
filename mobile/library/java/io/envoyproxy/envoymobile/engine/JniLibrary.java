@@ -190,15 +190,6 @@ public class JniLibrary {
   // Other native methods
 
   /**
-   * Provides a default configuration template that may be used for starting
-   * Envoy.
-   *
-   * @return A template that may be used as a starting point for constructing
-   * configurations.
-   */
-  public static native String configTemplate();
-
-  /**
    * Increment a counter with the given count.
    *
    * @param engine,  handle to the engine that owns the counter.
@@ -224,65 +215,6 @@ public class JniLibrary {
    * @return The list of active stats and their values, or empty string of the operation failed
    */
   protected static native String dumpStats();
-
-  /**
-   * Provides a configuration template that may be used for building platform
-   * filter config chains.
-   *
-   * @return A template that may be used as a starting point for constructing
-   * platform filter configuration.
-   */
-  public static native String platformFilterTemplate();
-
-  /**
-   * Provides a configuration template that may be used for building native
-   * filter config chains.
-   *
-   * @return A template that may be used as a starting point for constructing
-   * native filter configuration.
-   */
-  public static native String nativeFilterTemplate();
-
-  /**
-   * Provides a configuration insert that may be used to include an instance
-   * of the AlternateProtocolsCacheFilter in the filter chain. Needed only
-   * when (experimental) QUIC/H3 support is enabled.
-   */
-  public static native String altProtocolCacheFilterInsert();
-
-  /**
-   * Provides a configuration insert that may be used to enable gzip decompression.
-   */
-  public static native String gzipDecompressorConfigInsert();
-
-  /**
-   * Provides a configuration insert that may be used to enable brotli decompression.
-   */
-  public static native String brotliDecompressorConfigInsert();
-
-  /**
-   * Provides a configuration insert that enables a composite compressor filter
-   * with gzip and brotli.
-   */
-  public static native String compressorConfigInsert();
-
-  /**
-   * Provides a configuration that may be used to enable a persistent DNS cache.
-   */
-  public static native String persistentDNSCacheConfigInsert();
-
-  /**
-   * Provides a template to config the certification validator to be used.
-   *
-   * @param usePlatform true if the usage of platform validation APIs is desired.
-   * @return string, the config template string.
-   */
-  public static native String certValidationTemplate(boolean usePlatform);
-
-  /**
-   * Provides a configuration insert that may be used to enable socket tagging.
-   */
-  public static native String socketTagConfigInsert();
 
   /**
    * Register a platform-provided key-value store implementation.

@@ -108,16 +108,31 @@ extern const char* default_cert_validation_context_template;
 extern const char* platform_cert_validation_context_template;
 
 /**
- * Config template for an RTDS layer
+ * Config template for an RTDS layer in the dynamic resources field.
  */
 extern const char* rtds_layer_insert;
 
 /**
- * Config template for a CDS layer
+ * Config template for a CDS layer in the dynamic resources field.
  */
 extern const char* cds_layer_insert;
 
 /**
- * ADS config
+ * Config template for a CDS layer using xdstp in the dynamic resources field.
+ */
+extern const char* xdstp_cds_layer_insert;
+
+/**
+ * Insert that sets the ADS config in the dynamic resources field.
  */
 extern const char* ads_insert;
+
+/**
+ * Insert that sets the ADS config's call credentials.
+ */
+extern const char* ads_call_credentials_insert;
+
+/**
+ * Insert that sets the ADS config's channel credentials.
+ */
+extern const char* ads_channel_credentials_insert;

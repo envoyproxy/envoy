@@ -8,6 +8,7 @@
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 
 #include "absl/container/flat_hash_map.h"
+#include "absl/types/optional.h"
 #include "direct_response_testing.h"
 #include "engine.h"
 #include "engine_callbacks.h"
@@ -18,7 +19,15 @@
 namespace Envoy {
 namespace Platform {
 
+constexpr int DefaultJwtTokenLifetimeSeconds = 31536000; // 1 year
 constexpr int DefaultXdsTimeout = 5;
+
+// Represents the locality information in the Bootstrap's node.
+struct NodeLocality {
+  std::string region;
+  std::string zone;
+  std::string sub_zone;
+};
 
 // The C++ Engine builder supports 2 ways of building Envoy Mobile config, the 'legacy mode'
 // which uses a yaml config header, blocks of well known yaml configs, and uses string manipulation
@@ -69,13 +78,26 @@ public:
   EngineBuilder& enableDrainPostDnsRefresh(bool drain_post_dns_refresh_on);
   EngineBuilder& enforceTrustChainVerification(bool trust_chain_verification_on);
   EngineBuilder& enablePlatformCertificatesValidation(bool platform_certificates_validation_on);
-  // Adds a CDS layer to default config. Requires that ADS be configured.
-  EngineBuilder& addCdsLayer(int timeout_seconds = DefaultXdsTimeout);
-  // Adds an RTDS layer to default config. Requires that ADS be configured
-  EngineBuilder& addRtdsLayer(std::string layer_name, int timeout_seconds = DefaultXdsTimeout);
-  // Adds an ADS layer.
-  EngineBuilder& setAggregatedDiscoveryService(std::string api_type, std::string address,
-                                               int port);
+  // Sets the node.id field in the Bootstrap configuration.
+  EngineBuilder& setNodeId(std::string node_id);
+  // Sets the node.locality field in the Bootstrap configuration.
+  EngineBuilder& setNodeLocality(const NodeLocality& node_locality);
+  // Adds an ADS layer. Note that only the state-of-the-world gRPC protocol is supported, not Delta
+  // gRPC.
+  EngineBuilder&
+  setAggregatedDiscoveryService(std::string address, const int port,
+                                std::string jwt_token = "",
+                                int jwt_token_lifetime_seconds = DefaultJwtTokenLifetimeSeconds,
+                                std::string ssl_root_certs = "");
+  // Adds an RTDS layer to default config. Requires that ADS be configured.
+  EngineBuilder& addRtdsLayer(std::string layer_name,
+                              const int timeout_seconds = DefaultXdsTimeout);
+  // Adds a CDS layer to default config. Requires that ADS be configured via
+  // setAggregatedDiscoveryService(). If `cds_resources_locator` is non-empty, the xdstp namespace
+  // is used for identifying resources. If not using xdstp, then set `cds_resources_locator` to the
+  // empty string.
+  EngineBuilder& addCdsLayer(std::string cds_resources_locator = "",
+                             const int timeout_seconds = DefaultXdsTimeout);
   EngineBuilder& enableDnsCache(bool dns_cache_on, int save_interval_seconds = 1);
   EngineBuilder& setForceAlwaysUsev6(bool value);
   EngineBuilder& setSkipDnsLookupForProxiedRequests(bool value);
@@ -157,11 +179,16 @@ private:
   bool platform_certificates_validation_on_ = false;
   std::string rtds_layer_name_ = "";
   int rtds_timeout_seconds_;
-  std::string ads_api_type_ = "";
+  std::string node_id_;
+  absl::optional<NodeLocality> node_locality_ = absl::nullopt;
   std::string ads_address_ = "";
-  bool enable_cds_ = false;
-  int cds_timeout_seconds_;
   int ads_port_;
+  std::string ads_jwt_token_;
+  int ads_jwt_token_lifetime_seconds_;
+  std::string ads_ssl_root_certs_;
+  bool enable_cds_ = false;
+  std::string cds_resources_locator_;
+  int cds_timeout_seconds_;
   bool dns_cache_on_ = false;
   int dns_cache_save_interval_seconds_ = 1;
 
