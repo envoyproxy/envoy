@@ -18,6 +18,7 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 
 // [#protodoc-title: Golang]
 //
+// For an overview of the Golang cluster specifier please see the :ref:`configuration reference documentation <config_http_cluster_specifier_golang>`.
 // [#extension: envoy.router.cluster_specifier_plugin.golang]
 
 message Config {
