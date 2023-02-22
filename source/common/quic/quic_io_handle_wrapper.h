@@ -28,7 +28,7 @@ public:
                                 uint64_t num_slice) override {
     if (closed_) {
       return {0, Api::IoErrorPtr(new Network::IoSocketError(EBADF),
-                                                        Network::IoSocketError::deleteIoError)};
+                                 Network::IoSocketError::deleteIoError)};
     }
     return io_handle_.readv(max_length, slices, num_slice);
   }
@@ -36,21 +36,21 @@ public:
                                absl::optional<uint64_t> max_length) override {
     if (closed_) {
       return {0, Api::IoErrorPtr(new Network::IoSocketError(EBADF),
-                                                        Network::IoSocketError::deleteIoError)};
+                                 Network::IoSocketError::deleteIoError)};
     }
     return io_handle_.read(buffer, max_length);
   }
   Api::IoCallUint64Result writev(const Buffer::RawSlice* slices, uint64_t num_slice) override {
     if (closed_) {
       return {0, Api::IoErrorPtr(new Network::IoSocketError(EBADF),
-                                                        Network::IoSocketError::deleteIoError)};
+                                 Network::IoSocketError::deleteIoError)};
     }
     return io_handle_.writev(slices, num_slice);
   }
   Api::IoCallUint64Result write(Buffer::Instance& buffer) override {
     if (closed_) {
       return {0, Api::IoErrorPtr(new Network::IoSocketError(EBADF),
-                                                        Network::IoSocketError::deleteIoError)};
+                                 Network::IoSocketError::deleteIoError)};
     }
     return io_handle_.write(buffer);
   }
@@ -59,7 +59,7 @@ public:
                                   const Network::Address::Instance& peer_address) override {
     if (closed_) {
       return {0, Api::IoErrorPtr(new Network::IoSocketError(EBADF),
-                                                        Network::IoSocketError::deleteIoError)};
+                                 Network::IoSocketError::deleteIoError)};
     }
     return io_handle_.sendmsg(slices, num_slice, flags, self_ip, peer_address);
   }
@@ -68,7 +68,7 @@ public:
     if (closed_) {
       ASSERT(false, "recvmmsg is called after close.");
       return {0, Api::IoErrorPtr(new Network::IoSocketError(EBADF),
-                                                        Network::IoSocketError::deleteIoError)};
+                                 Network::IoSocketError::deleteIoError)};
     }
     return io_handle_.recvmsg(slices, num_slice, self_port, output);
   }
@@ -77,7 +77,7 @@ public:
     if (closed_) {
       ASSERT(false, "recvmmsg is called after close.");
       return {0, Api::IoErrorPtr(new Network::IoSocketError(EBADF),
-                                                        Network::IoSocketError::deleteIoError)};
+                                 Network::IoSocketError::deleteIoError)};
     }
     return io_handle_.recvmmsg(slices, self_port, output);
   }
@@ -85,7 +85,7 @@ public:
     if (closed_) {
       ASSERT(false, "recv called after close.");
       return {0, Api::IoErrorPtr(new Network::IoSocketError(EBADF),
-                                                        Network::IoSocketError::deleteIoError)};
+                                 Network::IoSocketError::deleteIoError)};
     }
     return io_handle_.recv(buffer, length, flags);
   }
