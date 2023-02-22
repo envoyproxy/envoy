@@ -1,3 +1,5 @@
+#include "test/common/integration/test_engine_builder.h"
+
 #include "absl/synchronization/notification.h"
 #include "gtest/gtest.h"
 #include "library/cc/engine.h"
@@ -6,7 +8,6 @@
 #include "library/cc/request_headers_builder.h"
 #include "library/cc/request_method.h"
 #include "library/cc/response_headers.h"
-#include "test/common/integration/test_engine_builder.h"
 
 namespace Envoy {
 namespace {
