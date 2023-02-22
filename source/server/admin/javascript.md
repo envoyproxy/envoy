@@ -42,6 +42,9 @@ The JavaScript is tested by recompiling envoy-static with
 admin port, enabling the test files to run in the same origin as the endpoint
 under test. This is needed for deep inspection of the document model during
 tests. For more details on testing mechanics, see
+test/server/admin/admin_test.sh. Note that the test is semi-automatic using a
+browser, and is not run in blaze tests or CI.
+
 
 ### Style
 

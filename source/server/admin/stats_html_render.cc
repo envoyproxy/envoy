@@ -10,6 +10,12 @@
 
 #include "absl/strings/str_replace.h"
 
+// Note: if you change this file, it's advisable to manually run
+// test/server/admin/admin_test.sh to semi-automatically validate
+// the web interface, in addition to updating and running unit tests.
+//
+// The admin web test does not yet run automatically.
+
 namespace {
 
 /**
