@@ -11,13 +11,13 @@
  * Maps a stat name to a record containing name, value, and a use-count. This
  * map is rebuilt every 5 seconds.
  */
-let current_stats = new Map();
+let currentStats = new Map();
 
 /**
  * The first time this script loads, it will write PRE element at the end of body.
  * This is hooked to the DOMContentLoaded event.
  */
-let active_stats_pre_element = null;
+let activeStatsPreElement = null;
 
 /**
  * This magic string is derived from C++ in StatsHtmlRender::urlHandler to uniquely
@@ -25,19 +25,21 @@ let active_stats_pre_element = null;
  * always param-1. The reason params are numbered is that on the home page, "/",
  * all the admin endpoints have uniquely numbered parameters.
  */
-const param_id_prefix = "param-1-stats-";
+const paramIdPrefix = 'param-1-stats-';
 
-post_render_test_hook = null;
+let postRenderTestHook = null;
 
 /**
  * To make testing easier, provide a hook for tests to set, to enable tests
  * to block on rendering.
+ *
+ * @param {!function()} hook
  */
-function setRenderTestHook(hook) {
-  if (post_render_test_hook != null) {
+function setRenderTestHook(hook) { // eslint-disable-line no-unused-vars
+  if (postRenderTestHook != null) {
     throw new Exception('setRenderTestHook called with hook already pending');
   }
-  post_render_test_hook = hook;
+  postRenderTestHook = hook;
 }
 
 /**
@@ -45,9 +47,9 @@ function setRenderTestHook(hook) {
  * PRE right now) and kick off the periodic JSON updates.
  */
 function initHook() {
-  active_stats_pre_element = document.createElement("pre");
-  active_stats_pre_element.id = 'active-content-pre';
-  document.body.appendChild(active_stats_pre_element);
+  activeStatsPreElement = document.createElement('pre');
+  activeStatsPreElement.id = 'active-content-pre';
+  document.body.appendChild(activeStatsPreElement);
   loadStats();
 }
 
@@ -55,9 +57,9 @@ function initHook() {
  * Initiates an ajax request for the stats JSON based on the stats parameters.
  */
 function loadStats() {
-  const makeQueryParam = (name) => name + "=" + document.getElementById(param_id_prefix + name).value;
-  const params = ["filter", "type", "histogram_buckets"];
-  const url = "/stats?format=json&usedonly&" + params.map(makeQueryParam).join("&");
+  const makeQueryParam = (name) => name + '=' + document.getElementById(paramIdPrefix + name).value;
+  const params = ['filter', 'type', 'histogram_buckets'];
+  const url = '/stats?format=json&usedonly&' + params.map(makeQueryParam).join('&');
   fetch(url).then((response) => response.json()).then((data) => renderStats(data));
 }
 
@@ -65,6 +67,10 @@ function loadStats() {
  * Function used to sort stat records. The highest priority is update frequency,
  * then value (higher values are likely more interesting), and finally alphabetic,
  * in forward order.
+ *
+ * @param {!Object} a
+ * @param {!Object} b
+ * @return {number}
  */
 function compareStatRecords(a, b) {
   // Sort higher change-counts first.
@@ -90,13 +96,17 @@ function compareStatRecords(a, b) {
 /**
  * The active display has additional settings for tweaking it -- this helper extracts numeric
  * values from text widgets
+ *
+ * @param {string} id
+ * @param {number} defaultValue
+ * @return {number}
  */
-function loadSettingOrUseDefault(id, default_value) {
+function loadSettingOrUseDefault(id, defaultValue) {
   const elt = document.getElementById(id);
   const value = parseInt(elt.value);
   if (Number.isNaN(value) || value <= 0) {
-    console.log("Invalid " + id + ": invalid positive number");
-    return default_value;
+    console.log('Invalid ' + id + ': invalid positive number');
+    return defaultValue;
   }
   return value;
 }
@@ -105,59 +115,61 @@ function loadSettingOrUseDefault(id, default_value) {
  * Rendering function which interprets the Json response from the server, updates
  * the most-frequently-used map, reverse-sorts by use-count, and serializes the
  * top ordered stats into the PRE element created in initHook.
+ *
+ * @param {!Object} data
  */
 function renderStats(data) {
-  sorted_stats = [];
-  let prev_stats = current_stats;
-  current_stats = new Map();
+  sortedStats = [];
+  let prevStats = currentStats;
+  currentStats = new Map();
   for (stat of data.stats) {
     if (!stat.name) {
-      continue;                 // Skip histograms for now.
+      continue; // Skip histograms for now.
     }
-    let stat_record = prev_stats.get(stat.name);
-    if (stat_record) {
-      if (stat_record.value != stat.value) {
-        stat_record.value = stat.value;
-        ++stat_record.change_count;
+    let statRecord = prevStats.get(stat.name);
+    if (statRecord) {
+      if (statRecord.value != stat.value) {
+        statRecord.value = stat.value;
+        ++statRecord.change_count;
       }
     } else {
-      stat_record = {name: stat.name, value: stat.value, change_count: 0};
+      statRecord = {name: stat.name, value: stat.value, change_count: 0};
     }
-    current_stats.set(stat.name, stat_record);
-    sorted_stats.push(stat_record);
+    currentStats.set(stat.name, statRecord);
+    sortedStats.push(statRecord);
   }
-  prev_stats = null;
+  prevStats = null;
 
   // Sorts all the stats. This is inefficient; we should just pick the top N
   // based on field "active-max-display-count" and sort those. The best
   // algorithms for this require a heap or priority queue. JS implementations
   // of those can be found, but that would bloat this relatively modest amount
   // of code, and compell us to do a better job writing tests.
-  sorted_stats.sort(compareStatRecords);
+  sortedStats.sort(compareStatRecords);
 
-  const max = loadSettingOrUseDefault("active-max-display-count", 50);
+  const max = loadSettingOrUseDefault('active-max-display-count', 50);
   let index = 0;
-  let text = "";
-  for (const stat_record of sorted_stats) {
+  let text = '';
+  for (const statRecord of sortedStats) {
     if (++index > max) {
       break;
     }
-    text += stat_record.name + ": " + stat_record.value + " (" +
-        stat_record.change_count + ")" + "\n";
+    text += statRecord.name + ': ' + statRecord.value + ' (' +
+        statRecord.change_count + ')' + '\n';
   }
-  active_stats_pre_element.textContent = text;
+  activeStatsPreElement.textContent = text;
 
   // If a post-render test-hook has been established, call it, but clear
   // the hook first, so that the callee can set a new hook if it wants to.
-  if (post_render_test_hook) {
-    const hook = post_render_test_hook;
-    post_render_test_hook = null;
+  if (postRenderTestHook) {
+    const hook = postRenderTestHook;
+    postRenderTestHook = null;
     hook();
   }
 
   // Update stats every 5 seconds by default.
-  window.setTimeout(loadStats, 1000*loadSettingOrUseDefault("active-update-interval", 5));
+  window.setTimeout(loadStats, 1000*loadSettingOrUseDefault('active-update-interval', 5));
 }
 
 // We don't want to trigger any DOM manipulations until the DOM is fully loaded.
-addEventListener("DOMContentLoaded", initHook);
+addEventListener('DOMContentLoaded', initHook);
