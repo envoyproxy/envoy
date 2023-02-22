@@ -26,10 +26,6 @@ public:
   }
 
   void TearDown() override {
-    if (should_skip_) {
-      return;
-    }
-
     instance_.shutdownGlobalThreading();
     instance_.shutdownThread();
   }
@@ -77,6 +73,7 @@ TEST_F(IoUringSocketHandleImplIntegrationTest, Close) {
 TEST_F(IoUringSocketHandleImplIntegrationTest, CancelAndClose) {
   initialize();
 
+  // Submit accept requests with listening.
   io_handle_->listen(5);
   io_handle_->initializeFileEvent(
       *dispatcher_, [](uint32_t) {}, Event::PlatformDefaultTriggerType, Event::FileReadyType::Read);
@@ -110,6 +107,13 @@ TEST_F(IoUringSocketHandleImplIntegrationTest, Accept) {
   peer_io_handle_->connect(io_handle_->localAddress());
 
   while (!accepted) {
+    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  }
+  EXPECT_TRUE(accepted);
+
+  // Close safely.
+  io_handle_->close();
+  while (fcntl(fd_, F_GETFD, 0) >= 0) {
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   }
 }
