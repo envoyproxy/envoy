@@ -261,9 +261,6 @@ EngineBuilder& EngineBuilder::enforceTrustChainVerification(bool trust_chain_ver
 
 EngineBuilder& EngineBuilder::setNodeId(std::string node_id) {
   node_id_ = std::move(node_id);
-EngineBuilder& EngineBuilder::addRtdsLayer(std::string layer_name, int timeout_seconds) {
-  rtds_layer_name_ = layer_name;
-  rtds_timeout_seconds_ = timeout_seconds;
   return *this;
 }
 
@@ -272,8 +269,8 @@ EngineBuilder& EngineBuilder::setNodeLocality(const NodeLocality& node_locality)
   return *this;
 }
 
-EngineBuilder& EngineBuilder::setAggregatedDiscoveryService(std::string address,
-                                                            const int port, std::string jwt_token,
+EngineBuilder& EngineBuilder::setAggregatedDiscoveryService(std::string address, const int port,
+                                                            std::string jwt_token,
                                                             const int jwt_token_lifetime_seconds,
                                                             std::string ssl_root_certs) {
 #ifndef ENVOY_GOOGLE_GRPC
@@ -287,8 +284,7 @@ EngineBuilder& EngineBuilder::setAggregatedDiscoveryService(std::string address,
   return *this;
 }
 
-EngineBuilder& EngineBuilder::addRtdsLayer(const std::string& layer_name,
-                                           const int timeout_seconds) {
+EngineBuilder& EngineBuilder::addRtdsLayer(std::string layer_name, const int timeout_seconds) {
   rtds_layer_name_ = layer_name;
   rtds_timeout_seconds_ = timeout_seconds;
   return *this;
@@ -413,7 +409,7 @@ std::string EngineBuilder::generateConfigStr() const {
                             fmt::format("{}", dns_cache_save_interval_seconds_)});
     replacements.push_back({"persistent_dns_cache_config", persistent_dns_cache_config_insert});
   }
-  if (node_locality_) {
+  if (node_locality_ && !node_locality_->zone.empty()) {
     replacements.push_back(
         {"node_locality",
          fmt::format("{{ region: \"{}\", zone: \"{}\", sub_zone: \"{}\" }}", node_locality_->region,

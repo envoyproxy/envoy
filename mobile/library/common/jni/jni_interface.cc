@@ -1212,8 +1212,10 @@ void configureBuilder(JNIEnv* env, jstring grpc_stats_domain, jboolean admin_int
                       jboolean enable_platform_certificates_validation,
                       jboolean enable_skip_dns_lookup_for_proxied_requests,
                       jobjectArray runtime_guards, jstring rtds_layer_name,
-                      jlong rtds_timeout_seconds, jstring ads_api_type, jstring ads_address,
-                      jlong ads_port, Envoy::Platform::EngineBuilder& builder) {
+                      jlong rtds_timeout_seconds, jstring ads_address, jlong ads_port,
+                      jstring ads_token, jlong ads_token_lifetime, jstring ads_root_certs,
+                      jstring node_id, jstring node_region, jstring node_zone,
+                      jstring node_sub_zone, Envoy::Platform::EngineBuilder& builder) {
   setString(env, grpc_stats_domain, &builder, &EngineBuilder::addGrpcStatsDomain);
   builder.addConnectTimeoutSeconds((connect_timeout_seconds));
   builder.addDnsRefreshSeconds((dns_refresh_seconds));
@@ -1271,8 +1273,12 @@ void configureBuilder(JNIEnv* env, jstring grpc_stats_domain, jboolean admin_int
   std::vector<std::string> hostnames = javaObjectArrayToStringVector(env, dns_preresolve_hostnames);
   builder.addDnsPreresolveHostnames(hostnames);
   builder.addRtdsLayer(getCppString(env, rtds_layer_name), rtds_timeout_seconds);
-  builder.setAggregatedDiscoveryService(getCppString(env, ads_api_type),
-                                        getCppString(env, ads_address), ads_port);
+  builder.setNodeId(getCppString(env, node_id));
+  builder.setNodeLocality({getCppString(env, node_region), getCppString(env, node_zone),
+                           getCppString(env, node_sub_zone)});
+  builder.setAggregatedDiscoveryService(getCppString(env, ads_address), ads_port,
+                                        getCppString(env, ads_token), ads_token_lifetime,
+                                        getCppString(env, ads_root_certs));
 }
 
 extern "C" JNIEXPORT jstring JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibrary_createYaml(
@@ -1291,8 +1297,9 @@ extern "C" JNIEXPORT jstring JNICALL Java_io_envoyproxy_envoymobile_engine_JniLi
     jboolean trust_chain_verification, jobjectArray virtual_clusters, jobjectArray filter_chain,
     jobjectArray stat_sinks, jboolean enable_platform_certificates_validation,
     jboolean enable_skip_dns_lookup_for_proxied_requests, jobjectArray runtime_guards,
-    jstring rtds_layer_name, jlong rtds_timeout_seconds, jstring ads_api_type, jstring ads_address,
-    jlong ads_port) {
+    jstring rtds_layer_name, jlong rtds_timeout_seconds, jstring ads_address, jlong ads_port,
+    jstring ads_token, jlong ads_token_lifetime, jstring ads_root_certs, jstring node_id,
+    jstring node_region, jstring node_zone, jstring node_sub_zone) {
   Envoy::Thread::SkipAsserts skip_asserts;
   Envoy::Platform::EngineBuilder builder;
   configureBuilder(
@@ -1307,7 +1314,8 @@ extern "C" JNIEXPORT jstring JNICALL Java_io_envoyproxy_envoymobile_engine_JniLi
       per_try_idle_timeout_seconds, app_version, app_id, trust_chain_verification, virtual_clusters,
       filter_chain, stat_sinks, enable_platform_certificates_validation,
       enable_skip_dns_lookup_for_proxied_requests, runtime_guards, rtds_layer_name,
-      rtds_timeout_seconds, ads_api_type, ads_address, ads_port, builder);
+      rtds_timeout_seconds, ads_address, ads_port, ads_token, ads_token_lifetime, ads_root_certs,
+      node_id, node_region, node_zone, node_sub_zone, builder);
 
   auto bootstrap = builder.generateBootstrap();
   std::string yaml = Envoy::MessageUtil::getYamlStringFromMessage(*bootstrap);
@@ -1330,8 +1338,9 @@ extern "C" JNIEXPORT jlong JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibr
     jboolean trust_chain_verification, jobjectArray virtual_clusters, jobjectArray filter_chain,
     jobjectArray stat_sinks, jboolean enable_platform_certificates_validation,
     jboolean enable_skip_dns_lookup_for_proxied_requests, jobjectArray runtime_guards,
-    jstring rtds_layer_name, jlong rtds_timeout_seconds, jstring ads_api_type, jstring ads_address,
-    jlong ads_port) {
+    jstring rtds_layer_name, jlong rtds_timeout_seconds, jstring ads_address, jlong ads_port,
+    jstring ads_token, jlong ads_token_lifetime, jstring ads_root_certs, jstring node_id,
+    jstring node_region, jstring node_zone, jstring node_sub_zone) {
   Envoy::Platform::EngineBuilder builder;
 
   configureBuilder(
@@ -1346,7 +1355,8 @@ extern "C" JNIEXPORT jlong JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibr
       per_try_idle_timeout_seconds, app_version, app_id, trust_chain_verification, virtual_clusters,
       filter_chain, stat_sinks, enable_platform_certificates_validation,
       enable_skip_dns_lookup_for_proxied_requests, runtime_guards, rtds_layer_name,
-      rtds_timeout_seconds, ads_api_type, ads_address, ads_port, builder);
+      rtds_timeout_seconds, ads_address, ads_port, ads_token, ads_token_lifetime, ads_root_certs,
+      node_id, node_region, node_zone, node_sub_zone, builder);
 
   return reinterpret_cast<intptr_t>(builder.generateBootstrap().release());
 }

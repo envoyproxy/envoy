@@ -99,11 +99,18 @@ class EnvoyConfigurationTest {
     enableSkipDNSLookupForProxiedRequests: Boolean = false,
     statSinks: MutableList<String> = mutableListOf(),
     enablePlatformCertificatesValidation: Boolean = false,
-    rtdsLayerName: String = "rtds_layer_name",
-    rtdsTimeoutSeconds: Int = 0,
-    adsApiType: String = "GRPC",
-    adsAddress: String = "DEFAULT_ADDRESS",
-    adsPort: Int = 0
+    rtdsLayerName: String = "rtds_name",
+    rtdsTimeoutSeconds: Int = 5,
+    adsAddress: String = "fake_address",
+    adsPort: Int = 5,
+    adsJwtToken: String = "fake_token",
+    adsJwtTokenLifetimeSeconds: Int = 5,
+    adsSslRootCerts: String = "fake_root_certs",
+    nodeId: String = "fake_node_id",
+    nodeRegion: String = "fake_node_region",
+    nodeZone: String = "fake_node_zone",
+    nodeSubZone: String = "fake_node_sub_zone"
+
   ): EnvoyConfiguration {
     return EnvoyConfiguration(
       adminInterfaceEnabled,
@@ -144,9 +151,15 @@ class EnvoyConfigurationTest {
       enablePlatformCertificatesValidation,
       rtdsLayerName,
       rtdsTimeoutSeconds,
-      adsApiType,
       adsAddress,
       adsPort,
+      adsJwtToken,
+      adsJwtTokenLifetimeSeconds,
+      adsSslRootCerts,
+      nodeId,
+      nodeRegion,
+      nodeZone,
+      nodeSubZone,
     )
   }
 
@@ -312,7 +325,7 @@ class EnvoyConfigurationTest {
   fun `test adding RTDS and ADS`() {
     JniLibrary.loadTestLibrary()
     val envoyConfiguration = buildTestEnvoyConfiguration(
-      rtdsLayerName = "fake_rtds_layer", adsAddress = "FAKE_ADDRESS", adsPort = 0, adsApiType = "GRPC"
+      rtdsLayerName = "fake_rtds_layer", adsAddress = "FAKE_ADDRESS", adsPort = 0
     )
 
     val resolvedTemplate = envoyConfiguration.createYaml()

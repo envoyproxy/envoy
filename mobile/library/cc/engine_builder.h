@@ -46,7 +46,6 @@ public:
   // Use the experimental non-YAML config mode which uses the bootstrap proto directly.
   EngineBuilder& addLogLevel(LogLevel log_level);
   EngineBuilder& setOnEngineRunning(std::function<void()> closure);
-
   EngineBuilder& addGrpcStatsDomain(std::string stats_domain);
   EngineBuilder& addConnectTimeoutSeconds(int connect_timeout_seconds);
   EngineBuilder& addDnsRefreshSeconds(int dns_refresh_seconds);
@@ -85,8 +84,7 @@ public:
   // Adds an ADS layer. Note that only the state-of-the-world gRPC protocol is supported, not Delta
   // gRPC.
   EngineBuilder&
-  setAggregatedDiscoveryService(std::string address, const int port,
-                                std::string jwt_token = "",
+  setAggregatedDiscoveryService(std::string address, const int port, std::string jwt_token = "",
                                 int jwt_token_lifetime_seconds = DefaultJwtTokenLifetimeSeconds,
                                 std::string ssl_root_certs = "");
   // Adds an RTDS layer to default config. Requires that ADS be configured.

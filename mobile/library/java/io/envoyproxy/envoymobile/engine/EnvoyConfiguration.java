@@ -27,11 +27,6 @@ public class EnvoyConfiguration {
     // Used for testing.
     ACCEPT_UNTRUSTED;
   }
-  public final String rtdsLayerName;
-  public final Integer rtdsTimeoutSeconds;
-  public final String adsApiType;
-  public final String adsAddress;
-  public final Integer adsPort;
   public final Boolean adminInterfaceEnabled;
   public final String grpcStatsDomain;
   public final Integer connectTimeoutSeconds;
@@ -68,6 +63,17 @@ public class EnvoyConfiguration {
   Map<String, String> runtimeGuards;
   public final Boolean enablePlatformCertificatesValidation;
   public final Boolean enableSkipDNSLookupForProxiedRequests;
+  public final String rtdsLayerName;
+  public final Integer rtdsTimeoutSeconds;
+  public final String adsAddress;
+  public final Integer adsPort;
+  public final String adsToken;
+  public final Integer adsTokenLifetime;
+  public final String adsRootCerts;
+  public final String nodeId;
+  public final String nodeRegion;
+  public final String nodeZone;
+  public final String nodeSubZone;
 
   private static final Pattern UNRESOLVED_KEY_PATTERN = Pattern.compile("\\{\\{ (.+) \\}\\}");
 
@@ -148,8 +154,10 @@ public class EnvoyConfiguration {
       Map<String, EnvoyStringAccessor> stringAccessors,
       Map<String, EnvoyKeyValueStore> keyValueStores, List<String> statSinks,
       Map<String, Boolean> runtimeGuards, Boolean enableSkipDNSLookupForProxiedRequests,
-      boolean enablePlatformCertificatesValidation, String rtdsLayerName, int rtdsTimeoutSeconds,
-      String adsApiType, String adsAddress, int adsPort) {
+      boolean enablePlatformCertificatesValidation, String rtdsLayerName,
+      Integer rtdsTimeoutSeconds, String adsAddress, Integer adsPort, String adsToken,
+      Integer adsTokenLifetime, String adsRootCerts, String nodeId, String nodeRegion,
+      String nodeZone, String nodeSubZone) {
     JniLibrary.load();
     this.adminInterfaceEnabled = adminInterfaceEnabled;
     this.grpcStatsDomain = grpcStatsDomain;
@@ -205,9 +213,15 @@ public class EnvoyConfiguration {
     this.enableSkipDNSLookupForProxiedRequests = enableSkipDNSLookupForProxiedRequests;
     this.rtdsLayerName = rtdsLayerName;
     this.rtdsTimeoutSeconds = rtdsTimeoutSeconds;
-    this.adsApiType = adsApiType;
     this.adsAddress = adsAddress;
     this.adsPort = adsPort;
+    this.adsToken = adsToken;
+    this.adsTokenLifetime = adsTokenLifetime;
+    this.adsRootCerts = adsRootCerts;
+    this.nodeId = nodeId;
+    this.nodeRegion = nodeRegion;
+    this.nodeZone = nodeZone;
+    this.nodeSubZone = nodeSubZone;
   }
 
   // TODO(alyssawilk) move this to the test only JNI library.
@@ -234,7 +248,8 @@ public class EnvoyConfiguration {
         perTryIdleTimeoutSeconds, appVersion, appId, enforceTrustChainVerification, clusters,
         filter_chain, stats_sinks, enablePlatformCertificatesValidation,
         enableSkipDNSLookupForProxiedRequests, runtime_guards, rtdsLayerName, rtdsTimeoutSeconds,
-        adsApiType, adsAddress, adsPort);
+        adsAddress, adsPort, adsToken, adsTokenLifetime, adsRootCerts, nodeId, nodeRegion, nodeZone,
+        nodeSubZone);
   }
 
   long createBootstrap() {
@@ -259,7 +274,8 @@ public class EnvoyConfiguration {
         perTryIdleTimeoutSeconds, appVersion, appId, enforceTrustChainVerification, clusters,
         filter_chain, stats_sinks, enablePlatformCertificatesValidation,
         enableSkipDNSLookupForProxiedRequests, runtime_guards, rtdsLayerName, rtdsTimeoutSeconds,
-        adsApiType, adsAddress, adsPort);
+        adsAddress, adsPort, adsToken, adsTokenLifetime, adsRootCerts, nodeId, nodeRegion, nodeZone,
+        nodeSubZone);
   }
 
   static class ConfigurationException extends RuntimeException {

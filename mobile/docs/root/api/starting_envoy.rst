@@ -549,6 +549,31 @@ Adds ADS to envoy configuration, for instance to be used with RTDS and CDS layer
   // Kotlin
   builder.setAggregatedDiscoveryService("GRPC", "192.168.1.1", 0)
 
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+``setNodeId``
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Sets the node.id field.
+
+**Example**::
+
+  // Kotlin
+  builder.setNodeId("my_test_node")
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+``setNodeLocality``
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Sets the node.locality field.
+
+**Example**::
+
+  // Kotlin
+  builder.setNodeLocality("us-west-1", "some_zone", "some_sub_zone")
+
+  // C++
+  builder.setNodeLocality({"us-west-1", "some_zone", "some_sub_zone"});
+
 ----------------------
 Advanced configuration
 ----------------------

@@ -554,7 +554,7 @@ TEST(TestConfig, SetNodeLocality) {
   const std::string region = "us-west-1";
   const std::string zone = "some_zone";
   const std::string sub_zone = "some_sub_zone";
-  engine_builder.setNodeLocality({region, zone, sub_zone});
+  engine_builder.setNodeLocality(region, zone, sub_zone);
   const std::string yaml_config_str = engine_builder.generateConfigStr();
   EXPECT_THAT(yaml_config_str, AllOf(HasSubstr(region), HasSubstr(zone), HasSubstr(sub_zone)));
   std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> bootstrap =

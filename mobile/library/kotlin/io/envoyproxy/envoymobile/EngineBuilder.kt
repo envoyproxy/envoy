@@ -78,10 +78,16 @@ open class EngineBuilder(
   private var statsSinks = listOf<String>()
   private var enablePlatformCertificatesValidation = false
   private var rtdsLayerName: String? = null
-  private var rtdsTimeoutSeconds: Int = 0
-  private var adsApiType: String? = null
+  private var rtdsTimeoutSeconds: Int? = null
   private var adsAddress: String? = null
-  private var adsPort: Int = 0
+  private var adsPort: Int? = null
+  private var adsJwtToken: String? = null
+  private var adsJwtTokenLifetimeSeconds: Int? = null
+  private var adsSslRootCerts: String? = null
+  private var nodeId: String? = null
+  private var nodeRegion: String? = null
+  private var nodeZone: String? = null
+  private var nodeSubZone: String? = null
 
   /**
    * Add a log level to use with Envoy.
@@ -553,38 +559,78 @@ open class EngineBuilder(
     return this
   }
 
-  /**
-   * Add RTDS layer.  Requires that ADS be configured via setAggregatedDiscoveryService().
-   *
-   * @param layerName the layer name.
-   *
-   * @param timeoutSeconds the timeout.
-   *
-   * @return this builder.
-   */
-  fun addRtdsLayer(layerName: String, timeoutSeconds: Int = 5): EngineBuilder {
+/**
+ * Sets the node.id field in the Bootstrap configuration.
+ *
+ * @param nodeId the node ID.
+ *
+ * @return this builder.
+ */
+fun setNodeId(nodeId: String): EngineBuilder {
+  this.nodeId = nodeId
+  return this
+}
+
+/**
+ * Sets the node.locality field in the Bootstrap configuration.
+ *
+ * @param region the region of the node locality.
+ * @param zone the zone of the node locality.
+ * @param subZone the sub-zone of the node locality.
+ *
+ * @return this builder.
+ */
+fun setNodeLocality(region: String, zone: String, subZone: String): EngineBuilder {
+  this.nodeRegion = region
+  this.nodeZone = zone
+  this.nodeSubZone = subZone
+  return this
+}
+
+/**
+* Adds an ADS layer. Note that only the state-of-the-world gRPC protocol is supported, not Delta gRPC.
+*
+* @param address the network address of the server.
+*
+* @param port the port of the server.
+*
+* @param jwtToken the JWT token.
+*
+* @param jwtTokenLifetimeSeconds the lifetime of the JWT token in seconds.
+*
+* @param sslRootCerts the SSL root certificates.
+*
+* @return this builder.
+*/
+fun setAggregatedDiscoveryService(
+  address: String,
+  port: Int,
+  jwtToken: String? = null,
+  jwtTokenLifetimeSeconds: Int? = null,
+  sslRootCerts: String? = null
+): EngineBuilder {
+  this.adsAddress = address
+  this.adsPort = port
+  this.adsJwtToken = jwtToken
+  this.adsJwtTokenLifetimeSeconds = jwtTokenLifetimeSeconds
+  this.adsSslRootCerts = sslRootCerts
+  return this
+}
+
+/**
+* Adds an RTDS layer to default config. Requires that ADS be configured.
+*
+* @param layerName the layer name.
+*
+* @param timeoutSeconds the timeout.
+*
+* @return this builder.
+*/
+fun addRtdsLayer(layerName: String, timeoutSeconds: Int? = null): EngineBuilder {
   this.rtdsLayerName = layerName
   this.rtdsTimeoutSeconds = timeoutSeconds
   return this
-  }
-
-  /**
-   * Add ADS configuration, to be used with RTDS or CDS for example.
-   *
-   * @param apiType the API type.
-   *
-   * @param address the network address of the server.
-   *
-   * @param port the port of the server.
-   *
-   * @return this builder.
-   */
-  fun setAggregatedDiscoveryService(apiType: String, address: String, port: Int): EngineBuilder {
-  this.adsApiType = apiType
-  this.adsAddress = address
-  this.adsPort = port
-  return this
-  }
+}
 
   /**
    * Builds and runs a new Engine instance with the provided configuration.
@@ -632,10 +678,17 @@ open class EngineBuilder(
       enablePlatformCertificatesValidation,
       rtdsLayerName,
       rtdsTimeoutSeconds,
-      adsApiType,
       adsAddress,
       adsPort,
+      adsJwtToken,
+      adsJwtTokenLifetimeSeconds,
+      adsSslRootCerts,
+      nodeId,
+      nodeRegion,
+      nodeZone,
+      nodeSubZone,
     )
+
 
     return when (configuration) {
       is Custom -> {

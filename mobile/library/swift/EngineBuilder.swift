@@ -60,9 +60,16 @@ open class EngineBuilder: NSObject {
   private var statsSinks: [String] = []
   private var rtdsLayerName: String = ""
   private var rtdsTimeoutSeconds: UInt32 = 0
-  private var adsApiType: String = ""
   private var adsAddress: String = ""
   private var adsPort: UInt32 = 0
+  private var adsJwtToken: String = ""
+  private var adsJwtTokenLifetimeSeconds: UInt32 = 0
+  private var adsSslRootCerts: String = ""
+  private var nodeId: String = ""
+  private var nodeRegion: String = ""
+  private var nodeZone: String = ""
+  private var nodeSubZone: String = ""
+
 
   // MARK: - Public
 
@@ -550,41 +557,74 @@ open class EngineBuilder: NSObject {
     self.virtualClusters.append(contentsOf: virtualClusters)
     return self
   }
-
-  /// Add RTDS layer.  Requires that ADS be configured via setAggregatedDiscoveryService().
+  /// Sets the node.id field in the Bootstrap configuration.
   ///
-  /// - parameter layerName:      the layer name.
+  /// - Parameter nodeId: The node ID.
   ///
-  /// - parameter timeoutSeconds: the timeout.
-  ///
-  /// - returns: This builder.
+  /// - Returns: This builder.
   @discardableResult
-  public func addRtdsLayer(_ layerName: String, _ timeoutSeconds: UInt32) -> Self {
+  public func setNodeId(_ nodeId: String) -> Self {
+    self.nodeId = nodeId
+    return self
+  }
+
+  /// Sets the node locality in the Bootstrap configuration.
+  ///
+  /// - Parameter region:    The region.
+  /// - Parameter zone:      The zone.
+  /// - Parameter subZone:   The sub-zone.
+  ///
+  /// - Returns: This builder.
+  @discardableResult
+  public func setNodeLocality(
+    _ region: String,
+    _ zone: String,
+    _ subZone: String
+    ) -> Self {
+    self.nodeRegion = region
+    self.nodeZone = zone
+    self.nodeSubZone = subZone
+    return self
+  }
+
+  /// Adds an aggregated discovery service layer to the configuration.
+  ///
+  /// - Parameter address: The network address of the server.
+  /// - Parameter port:    The port of the server.
+  /// - Parameter jwtToken: The JWT token.
+  /// - Parameter jwtTokenLifetimeSeconds: The JWT token lifetime in seconds.
+  /// - Parameter sslRootCerts: The SSL root certificates.
+  ///
+  /// - Returns: This builder.
+  @discardableResult
+  public func setAggregatedDiscoveryService(
+    _ address: String,
+    _ port: UInt32,
+    _ jwtToken: String? = nil,
+    _ jwtTokenLifetimeSeconds: UInt32? = nil,
+    _ sslRootCerts: String? = nil
+  ) -> Self {
+    self.adsAddress = address
+    self.adsPort = port
+    self.adsJwtToken = jwtToken
+    self.adsJwtTokenLifetimeSeconds = jwtTokenLifetimeSeconds
+    self.adsSslRootCerts = sslRootCerts
+    return self
+  }
+
+  /// Adds an RTDS layer to the configuration.
+  ///
+  /// - Parameter layerName:      The layer name.
+  /// - Parameter timeoutSeconds: The timeout in seconds.
+  ///
+  /// - Returns: This builder.
+  @discardableResult
+  public func addRtdsLayer(_ layerName: String, _ timeoutSeconds: UInt32 = nil) -> Self {
     self.rtdsLayerName = layerName
     self.rtdsTimeoutSeconds = timeoutSeconds
     return self
   }
 
-  /// Add ADS configuration, to be used with RTDS or CDS for example.
-  ///
-  /// - parameter apiType: the API type.
-  ///
-  /// - parameter address: the network address of the server.
-  ///
-  /// - parameter port:    the port of the server.
-  ///
-  /// - returns: This builder.
-  @discardableResult
-  public func setAggregatedDiscoveryService(
-    _ apiType: String,
-    _ address: String,
-    _ port: UInt32
-    ) -> Self {
-    self.adsApiType = apiType
-    self.adsAddress = address
-    self.adsPort = port
-    return self
-  }
 
 #if ENVOY_ADMIN_FUNCTIONALITY
   /// Enable admin interface on 127.0.0.1:9901 address. Admin interface is intended to be
@@ -651,9 +691,15 @@ open class EngineBuilder: NSObject {
       statsSinks: self.statsSinks,
       rtdsLayerName: self.rtdsLayerName,
       rtdsTimeoutSeconds: self.rtdsTimeoutSeconds,
-      adsApiType: self.adsApiType,
       adsAddress: self.adsAddress,
-      adsPort: self.adsPort
+      adsPort: self.adsPort,
+      adsJwtToken: self.adsJwtToken,
+      adsJwtTokenLifetimeSeconds: self.adsJwtTokenLifetimeSeconds,
+      adsSslRootCerts: self.adsSslRootCerts,
+      nodeId: self.nodeId,
+      nodeRegion: self.nodeRegion,
+      nodeZone: self.nodeZone,
+      nodeSubZone: self.nodeSubZone,
     )
 
     switch self.base {

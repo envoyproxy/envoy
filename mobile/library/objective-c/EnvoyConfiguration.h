@@ -48,10 +48,16 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic, strong) NSDictionary<NSString *, id<EnvoyKeyValueStore>> *keyValueStores;
 @property (nonatomic, strong) NSArray<NSString *> *statsSinks;
 @property (nonatomic, strong) NSString *rtdsLayerName;
-@property (nonatomic, assign) UInt32 *rtdsTimeoutSeconds;
-@property (nonatomic, strong) NSString *adsApiType;
+@property (nonatomic, assign) UInt32 rtdsTimeoutSeconds;
 @property (nonatomic, strong) NSString *adsAddress;
-@property (nonatomic, assign) UInt32 *adsPort;
+@property (nonatomic, assign) UInt32 adsPort;
+@property (nonatomic, strong) NSString *adsJwtToken;
+@property (nonatomic, assign) UInt32 adsJwtTokenLifetimeSeconds;
+@property (nonatomic, strong) NSString *adsSslRootCerts;
+@property (nonatomic, strong) NSString *nodeId;
+@property (nonatomic, strong) NSString *nodeRegion;
+@property (nonatomic, strong) NSString *nodeZone;
+@property (nonatomic, strong) NSString *nodeSubZone;
 
 /**
  Create a new instance of the configuration.
@@ -103,9 +109,15 @@ NS_ASSUME_NONNULL_BEGIN
                                        statsSinks:(NSArray<NSString *> *)statsSinks
                                     rtdsLayerName:(NSString *)rtdsLayerName
                                rtdsTimeoutSeconds:(UInt32)rtdsTimeoutSeconds
-                                       adsApiType:(NSString *)adsApiType
                                        adsAddress:(NSString *)adsAddress
-                                          adsPort:(UInt32)adsPort;
+                                          adsPort:(UInt32)adsPort
+                                      adsJwtToken:(nullable NSString *)adsJwtToken
+                       adsJwtTokenLifetimeSeconds:(UInt32)adsJwtTokenLifetimeSeconds
+                                  adsSslRootCerts:(nullable NSString *)adsSslRootCerts
+                                           nodeId:(nullable NSString *)nodeId
+                                       nodeRegion:(NSString *)nodeRegion
+                                         nodeZone:(NSString *)nodeZone
+                                      nodeSubZone:(NSString *)nodeSubZone;
 
 @end
 

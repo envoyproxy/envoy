@@ -307,7 +307,9 @@ public class JniLibrary {
       boolean trustChainVerification, byte[][] virtualClusters, byte[][] filterChain,
       byte[][] statSinks, boolean enablePlatformCertificatesValidation,
       boolean enableSkipDNSLookupForProxiedRequests, byte[][] runtimeGuards, String rtdsLayerName,
-      long rtdsTimeoutSeconds, String adsApiType, String adsAddress, long adsPort);
+      long rtdsTimeoutSeconds, String adsAddress, long adsPort, String adsToken,
+      long adsTokenLifetime, String adsRootCerts, String nodeId, String nodeRegion, String nodeZone,
+      String nodeSubZone);
 
   /**
    * Uses the provided fields to generate an Envoy bootstrap proto.
@@ -330,5 +332,7 @@ public class JniLibrary {
       boolean trustChainVerification, byte[][] virtualClusters, byte[][] filterChain,
       byte[][] statSinks, boolean enablePlatformCertificatesValidation,
       boolean enableSkipDNSLookupForProxiedRequests, byte[][] runtimeGuards, String rtdsLayerName,
-      long rtdsTimeoutSeconds, String adsApiType, String adsAddress, long adsPort);
+      long rtdsTimeoutSeconds, String adsAddress, long adsPort, String adsToken,
+      long adsTokenLifetime, String adsRootCerts, String nodeId, String nodeRegion, String nodeZone,
+      String nodeSubZone);
 }

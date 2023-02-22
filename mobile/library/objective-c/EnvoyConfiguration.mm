@@ -113,9 +113,16 @@
                                        statsSinks:(NSArray<NSString *> *)statsSinks
                                     rtdsLayerName:(NSString *)rtdsLayerName
                                rtdsTimeoutSeconds:(UInt32)rtdsTimeoutSeconds
-                                       adsApiType:(NSString *)adsApiType
                                        adsAddress:(NSString *)adsAddress
-                                          adsPort:(UInt32)adsPort {
+                                          adsPort:(UInt32)adsPort
+                                      adsJwtToken:(NSString *)adsJwtToken
+                       adsJwtTokenLifetimeSeconds:(UInt32)adsJwtTokenLifetimeSeconds
+                                  adsSslRootCerts:(NSString *)adsSslRootCerts
+                                           nodeId:(NSString *)nodeId
+                                       nodeRegion:(NSString *)nodeRegion
+                                         nodeZone:(NSString *)nodeZone
+                                      nodeSubZone:(NSString *)nodeSubZone;
+{
   self = [super init];
   if (!self) {
     return nil;
@@ -160,9 +167,16 @@
   self.statsSinks = statsSinks;
   self.rtdsLayerName = rtdsLayerName;
   self.rtdsTimeoutSeconds = rtdsTimeoutSeconds;
-  self.adsApiType = adsApiType;
   self.adsAddress = adsAddress;
   self.adsPort = adsPort;
+  self.adsJwtToken = adsJwtToken;
+  self.adsJwtTokenLifetimeSeconds = adsJwtTokenLifetimeSeconds;
+  self.adsSslRootCerts = adsSslRootCerts;
+  self.nodeId = nodeId;
+  self.nodeRegion = nodeRegion;
+  self.nodeZone = nodeZone;
+  self.nodeSubZone = nodeSubZone;
+
   return self;
 }
 
@@ -236,19 +250,19 @@
     }
     builder.addStatsSinks(std::move(sinks));
   }
-  if ([self.rtdsLayerName length] != 0) {
-    builder.addRtdsLayer([self.rtdsLayerName toCXXString], *self.rtdsTimeoutSeconds);
-  }
-  if ([self.adsApiType length] != 0) {
-    builder.setAggregatedDiscoveryService([self.adsApiType toCXXString],
-                                          [self.adsAddress toCXXString], *self.adsPort);
-  }
+  builder.setNodeLocality({self.nodeRegion, self.nodeZone, self.nodeSubZone});
+  builder.setNodeId([self.nodeId toCXXString]);
+  builder.addRtdsLayer([self.rtdsLayerName toCXXString], *self.rtdsTimeoutSeconds);
+  builder.setAggregatedDiscoveryService(
+      [self.adsAddress toCXXString], self.adsPort, [self.adsJwtToken toCXXString],
+      self.adsJwtTokenLifetimeSeconds, [self.adsSslRootCerts toCXXString]);
+}
 
 #ifdef ENVOY_ADMIN_FUNCTIONALITY
-  builder.enableAdminInterface(self.adminInterfaceEnabled);
+builder.enableAdminInterface(self.adminInterfaceEnabled);
 #endif
 
-  return builder;
+return builder;
 }
 
 - (BOOL)compareYAMLWithProtoBuilder:(NSString *)yaml {

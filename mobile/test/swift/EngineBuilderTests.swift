@@ -399,14 +399,14 @@ final class EngineBuilderTests: XCTestCase {
       expectation.fulfill()
     }
     MockEnvoyEngine.onRunWithConfig = { config, _ in
-      XCTAssertEqual("FAKE_ADDRESS", config.adsAddress)
+      XCTAssertEqual("FAKE_SWIFT_ADDRESS", config.adsAddress)
       expectation.fulfill()
     }
 
     _ = EngineBuilder()
       .addEngineType(MockEnvoyEngine.self)
       .addRtdsLayer(layerName: "rtds_layer_name", timeoutSeconds: 5)
-      .setAggregatedDiscoveryService(apiType: "GRPC", address: "FAKE_ADDRESS", port: 0)
+      .setAggregatedDiscoveryService(address: "FAKE_SWIFT_ADDRESS", port: 0)
       .build()
     self.waitForExpectations(timeout: 0.01)
   }
