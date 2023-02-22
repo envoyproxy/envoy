@@ -329,12 +329,14 @@ TEST(TestConfig, DisableHttp3) {
   envoy::config::bootstrap::v3::Bootstrap bootstrap;
   TestUtility::loadFromYaml(absl::StrCat(config_header, config_str), bootstrap);
 
+#ifdef ENVOY_ENABLE_QUIC
   engine_builder.enableHttp3(false);
   config_str = engine_builder.generateConfigStr();
   ASSERT_THAT(
       config_str,
       Not(HasSubstr("envoy.extensions.filters.http.alternate_protocols_cache.v3.FilterConfig")));
   TestUtility::loadFromYaml(absl::StrCat(config_header, config_str), bootstrap);
+#endif
 }
 
 TEST(TestConfig, RemainingTemplatesThrows) {
