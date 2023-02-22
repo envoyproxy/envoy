@@ -265,14 +265,23 @@ TEST(TestConfig, DisableHttp3) {
   EngineBuilder engine_builder;
 
   std::unique_ptr<Bootstrap> bootstrap = engine_builder.generateBootstrap();
+#ifdef ENVOY_ENABLE_QUIC
   EXPECT_THAT(bootstrap->ShortDebugString(),
               HasSubstr("envoy.extensions.filters.http.alternate_protocols_cache.v3.FilterConfig"));
+#endif
+#ifndef ENVOY_ENABLE_QUIC
+  EXPECT_THAT(
+      bootstrap->ShortDebugString(),
+      Not(HasSubstr("envoy.extensions.filters.http.alternate_protocols_cache.v3.FilterConfig")));
+#endif
 
+#ifdef ENVOY_ENABLE_QUIC
   engine_builder.enableHttp3(false);
   bootstrap = engine_builder.generateBootstrap();
   EXPECT_THAT(
       bootstrap->ShortDebugString(),
       Not(HasSubstr("envoy.extensions.filters.http.alternate_protocols_cache.v3.FilterConfig")));
+#endif
 }
 
 TEST(TestConfig, RtdsWithoutAds) {

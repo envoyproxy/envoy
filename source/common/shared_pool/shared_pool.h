@@ -117,7 +117,7 @@ private:
     Element() = delete;
     Element(const Element&) = delete;
 
-    Element(Element&&) = default;
+    Element(Element&&) noexcept = default;
 
     std::shared_ptr<T> lock() const { return weak_ptr_.lock(); }
     long use_count() const { return weak_ptr_.use_count(); }

@@ -42,7 +42,11 @@
 namespace Envoy {
 namespace Platform {
 
-EngineBuilder::EngineBuilder() : callbacks_(std::make_shared<EngineCallbacks>()) {}
+EngineBuilder::EngineBuilder() : callbacks_(std::make_shared<EngineCallbacks>()) {
+#ifndef ENVOY_ENABLE_QUIC
+  enable_http3_ = false;
+#endif
+}
 
 EngineBuilder& EngineBuilder::addLogLevel(LogLevel log_level) {
   log_level_ = log_level;
