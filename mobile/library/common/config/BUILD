@@ -5,7 +5,7 @@ licenses(["notice"])  # Apache 2
 envoy_package()
 
 envoy_cc_library(
-    name = "config_lib",
+    name = "certificates_lib",
     srcs = select({
         "//bazel:exclude_certificates": [],
         "//conditions:default": [
