@@ -324,8 +324,15 @@ TEST(TestConfig, DisableHttp3) {
   EngineBuilder engine_builder;
 
   std::string config_str = engine_builder.generateConfigStr();
+#ifdef ENVOY_ENABLE_QUIC
   ASSERT_THAT(config_str,
               HasSubstr("envoy.extensions.filters.http.alternate_protocols_cache.v3.FilterConfig"));
+#endif
+#ifndef ENVOY_ENABLE_QUIC
+  ASSERT_THAT(
+      config_str,
+      Not(HasSubstr("envoy.extensions.filters.http.alternate_protocols_cache.v3.FilterConfig")));
+#endif
   envoy::config::bootstrap::v3::Bootstrap bootstrap;
   TestUtility::loadFromYaml(absl::StrCat(config_header, config_str), bootstrap);
 

@@ -78,7 +78,11 @@ bool generatedStringMatchesGeneratedBoostrap(
 
 EngineBuilder::EngineBuilder(std::string config_template)
     : callbacks_(std::make_shared<EngineCallbacks>()), config_template_(config_template),
-      config_bootstrap_incompatible_(true) {}
+      config_bootstrap_incompatible_(true) {
+#ifndef ENVOY_ENABLE_QUIC
+  enable_http3_ = false;
+#endif
+}
 
 EngineBuilder::EngineBuilder() : EngineBuilder(std::string(config_template)) {
   // Using the default config template is bootstrap compatible.
