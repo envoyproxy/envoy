@@ -23,8 +23,8 @@ jobs:
        CFL_EXTRA_BAZEL_TOKEN: ${{ secrets.GCP_RBE_TOKEN }}
      run: |
        echo "token is"
-       echo ${{ secrets.GCP_GITHUB_CI_KEY }} | sed -e 's/^\(.\{5\}\).*/\1/'
-       echo ${{ secrets.GCP_RBE_TOKEN }} | sed -e 's/^\(.\{5\}\).*/\1/'
+       echo t1 ${{ secrets.GCP_GITHUB_CI_KEY }} | sed -e 's/^\(.\{5\}\).*/\1/'
+       echo t2 ${{ secrets.GCP_RBE_TOKEN }} | sed -e 's/^\(.\{5\}\).*/\1/'
    - name: Build Fuzzers (${{ matrix.sanitizer }})
      id: build
      uses: krajshiva/oss-fuzz/infra/cifuzz/actions/build_fuzzers@cifuzz-rbe-integration
