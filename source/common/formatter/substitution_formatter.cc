@@ -29,6 +29,7 @@
 #include "source/common/stream_info/utility.h"
 
 #include "absl/strings/str_format.h"
+#include "absl/strings/str_replace.h"
 #include "absl/strings/str_split.h"
 #include "fmt/format.h"
 
@@ -1473,6 +1474,20 @@ const StreamInfoFormatter::FieldExtractorLookupTbl& StreamInfoFormatter::getKnow
                               return std::make_unique<StreamInfoSslConnectionInfoFieldExtractor>(
                                   [](const Ssl::ConnectionInfo& connection_info) {
                                     return connection_info.urlEncodedPemEncodedPeerCertificate();
+                                  });
+                            }}},
+                          {"DOWNSTREAM_TRANSPORT_FAILURE_REASON",
+                           {CommandSyntaxChecker::COMMAND_ONLY,
+                            [](const std::string&, const absl::optional<size_t>&) {
+                              return std::make_unique<StreamInfoStringFieldExtractor>(
+                                  [](const StreamInfo::StreamInfo& stream_info) {
+                                    absl::optional<std::string> result;
+                                    if (!stream_info.downstreamTransportFailureReason().empty()) {
+                                      result = absl::StrReplaceAll(
+                                          stream_info.downstreamTransportFailureReason(),
+                                          {{" ", "_"}});
+                                    }
+                                    return result;
                                   });
                             }}},
                           {"UPSTREAM_TRANSPORT_FAILURE_REASON",

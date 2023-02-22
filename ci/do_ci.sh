@@ -57,6 +57,7 @@ function bazel_with_collection() {
       cp --parents -f "$f" "${ENVOY_FAILED_TEST_LOGS}"
     done <<< "$failed_logs"
     popd
+    run_process_test_result
     exit "${BAZEL_STATUS}"
   fi
   collect_build_profile "$1"
@@ -163,7 +164,7 @@ function bazel_contrib_binary_build() {
 }
 
 function run_process_test_result() {
-  if [[ -z "$CI_SKIP_PROCESS_TEST_RESULTS" ]] && [[ $(find "$TEST_TMPDIR" -name "*_attempt.xml" 2> /dev/null) ]]; then
+  if [[ -z "$CI_SKIP_PROCESS_TEST_RESULTS" ]] && [[ $(find "$TEST_TMPDIR" -name "*_attempt_*.xml" 2> /dev/null) ]]; then
       echo "running flaky test reporting script"
       bazel run "${BAZEL_BUILD_OPTIONS[@]}" //ci/flaky_test:process_xml "$CI_TARGET"
   else

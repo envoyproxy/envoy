@@ -796,6 +796,17 @@ public:
    * This function is called on Envoy fatal errors so should avoid memory allocation.
    */
   virtual void dumpState(std::ostream& os, int indent_level = 0) const PURE;
+
+  /**
+   * @return absl::string_view the downstream transport failure reason,
+   *         e.g. certificate validation failed.
+   */
+  virtual absl::string_view downstreamTransportFailureReason() const PURE;
+
+  /**
+   * @param failure_reason the downstream transport failure reason.
+   */
+  virtual void setDownstreamTransportFailureReason(absl::string_view failure_reason) PURE;
 };
 
 // An enum representation of the Proxy-Status error space.
