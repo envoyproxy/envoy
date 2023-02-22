@@ -1,6 +1,8 @@
 #include "source/common/filesystem/filesystem_impl.h"
 #include "source/exe/main_common.h"
 
+#include "absl/strings/match.h"
+
 namespace Envoy {
 
 static Http::Code testCallback(Http::ResponseHeaderMap& response_headers,

@@ -350,11 +350,6 @@ private:
                          AdminStream&);
   void getHelp(Buffer::Instance& response) const;
 
-#ifdef ENVOY_ADMIN_BROWSER_TEST
-  Http::Code handlerTest(Http::ResponseHeaderMap& response_headers, Buffer::Instance& response,
-                         AdminStream&);
-#endif
-
   class AdminListenSocketFactory : public Network::ListenSocketFactory {
   public:
     AdminListenSocketFactory(Network::SocketSharedPtr socket) : socket_(socket) {}

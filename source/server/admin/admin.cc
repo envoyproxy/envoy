@@ -7,7 +7,6 @@
 #include <utility>
 #include <vector>
 
-#include "envoy/filesystem/filesystem.h"
 #include "envoy/server/hot_restart.h"
 #include "envoy/server/instance.h"
 #include "envoy/server/options.h"
@@ -22,7 +21,6 @@
 #include "source/common/common/fmt.h"
 #include "source/common/common/mutex_tracer_impl.h"
 #include "source/common/common/utility.h"
-#include "source/common/filesystem/filesystem_impl.h"
 #include "source/common/formatter/substitution_formatter.h"
 #include "source/common/http/codes.h"
 #include "source/common/http/conn_manager_utility.h"
@@ -37,7 +35,6 @@
 #include "source/extensions/request_id/uuid/config.h"
 #include "source/server/admin/utils.h"
 
-#include "absl/strings/match.h"
 #include "absl/strings/str_join.h"
 #include "absl/strings/str_replace.h"
 #include "absl/strings/string_view.h"
