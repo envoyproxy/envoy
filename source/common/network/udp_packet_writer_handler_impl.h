@@ -31,9 +31,9 @@ public:
     return {nullptr, 0, nullptr};
   }
   Api::IoCallUint64Result flush() override {
-    return Api::IoCallUint64Result(
+    return {
         /*rc=*/0,
-        /*err=*/Api::IoErrorPtr(nullptr, Network::IoSocketError::deleteIoError));
+        /*err=*/Api::IoErrorPtr(nullptr, Network::IoSocketError::deleteIoError)};
   }
 
 private:
