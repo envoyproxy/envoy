@@ -4,8 +4,7 @@
 namespace Envoy {
 
 static Http::Code testCallback(Http::ResponseHeaderMap& response_headers,
-                         Buffer::Instance& response,
-                         Server::AdminStream& admin_stream) {
+                               Buffer::Instance& response, Server::AdminStream& admin_stream) {
   Http::Utility::QueryParams query_params = admin_stream.queryParams();
   auto iter = query_params.find("file");
   if (iter == query_params.end()) {
