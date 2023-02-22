@@ -18,7 +18,6 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 
 // [#protodoc-title: Golang]
 //
-// For an overview of the Golang filter please see the :ref:`configuration reference documentation <config_http_filters_golang>`.
 // [#extension: envoy.http.cluster_specifier.golang]
 
 // [#next-free-field: 5]
@@ -34,17 +33,17 @@ message Config {
 
   // Default cluster.
   //
-  // It will be used when the specifier interface return empty string
+  // It will be used when the specifier interface return empty string or panic.
   //
   string default_cluster = 3 [(validate.rules).string = {min_len: 1}];
 
-  // Configuration for the Go plugin.
+  // Configuration for the Go cluster specifier plugin.
   //
   // .. note::
   //     This configuration is only parsed in the go cluster specifier, and is therefore not validated
   //     by Envoy.
   //
-  //     See the :repo:`StreamFilter API <contrib/golang/filters/http/source/go/pkg/api/filter.go>`
+  //     See the :repo:`StreamFilter API <contrib/golang/http/cluster_specifier/source/go/pkg/cluster_specifier/config.go>`
   //     for more information about how the plugin's configuration data can be accessed.
   //
   google.protobuf.Any config = 4;
