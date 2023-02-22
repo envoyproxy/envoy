@@ -36,6 +36,8 @@ while [ "$(curl $admin_port/ready)" != "LIVE" ]; do
   sleep 1
 done
 
+# TODO(jmarantz): at some point it might be worth considering using Selenium
+# or other tools to fully automate the testing of the admin UI.
 echo "*** Please ensure Browser test passes and the stats UI looks good..."
 browser="firefox"
 test_url="$admin_port/test?file=admin_web_test.html"
