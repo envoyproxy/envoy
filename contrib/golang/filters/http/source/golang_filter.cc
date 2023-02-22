@@ -490,9 +490,9 @@ void Filter::sendLocalReplyInternal(
 }
 
 CAPIStatus
-Filter::sendLocalReply(Http::Code response_code, absl::string_view body_text,
+Filter::sendLocalReply(Http::Code response_code, std::string body_text,
                        std::function<void(Http::ResponseHeaderMap& headers)> modify_headers,
-                       Grpc::Status::GrpcStatus grpc_status, absl::string_view details) {
+                       Grpc::Status::GrpcStatus grpc_status, std::string details) {
   Thread::LockGuard lock(mutex_);
   if (has_destroyed_) {
     ENVOY_LOG(debug, "golang filter has been destroyed");
