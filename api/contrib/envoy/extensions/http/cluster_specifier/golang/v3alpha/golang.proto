@@ -21,7 +21,7 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 // For an overview of the Golang filter please see the :ref:`configuration reference documentation <config_http_filters_golang>`.
 // [#extension: envoy.http.cluster_specifier.golang]
 
-// [#next-free-field: 6]
+// [#next-free-field: 5]
 message Config {
   // Globally unique ID for a dynamic library file.
   string library_id = 1 [(validate.rules).string = {min_len: 1}];

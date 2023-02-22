@@ -1,9 +1,9 @@
 #pragma once
 
+#include "envoy/router/cluster_specifier_plugin.h"
+
 #include "source/common/common/base64.h"
 #include "source/common/http/utility.h"
-
-#include "envoy/router/cluster_specifier_plugin.h"
 
 #include "contrib/envoy/extensions/http/cluster_specifier/golang/v3alpha/golang.pb.h"
 #include "contrib/golang/common/dso/dso.h"
@@ -25,7 +25,7 @@ private:
   const std::string so_id_;
   const std::string so_path_;
   const std::string default_cluster_;
-  const Protobuf::Any config_;
+  const ProtobufWkt::Any config_;
   uint64_t plugin_id_{0};
   Dso::DsoInstancePtr dynamic_lib_;
 };

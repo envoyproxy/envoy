@@ -1,8 +1,8 @@
+#include "contrib/golang/http/cluster_specifier/source/golang_cluster_specifier.h"
+
 #include <chrono>
 
 #include "source/common/router/config_impl.h"
-
-#include "contrib/golang/http/cluster_specifier/source/golang_cluster_specifier.h"
 
 namespace Envoy {
 namespace Router {

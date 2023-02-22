@@ -31,8 +31,8 @@ go_library(
     importpath = "github.com/envoyproxy/envoy/contrib/golang/http/cluster_specifier/source/go/pkg/cluster_specifier",
     visibility = ["//visibility:public"],
     deps = [
-        "//contrib/golang/http/cluster_specifier/source/go/pkg/api",
         "//contrib/golang/common/go/utils",
+        "//contrib/golang/http/cluster_specifier/source/go/pkg/api",
         "@org_golang_google_protobuf//proto",
         "@org_golang_google_protobuf//types/known/anypb",
     ],

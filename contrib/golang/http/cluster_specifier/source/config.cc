@@ -1,6 +1,6 @@
-#include <chrono>
-
 #include "contrib/golang/http/cluster_specifier/source/config.h"
+
+#include <chrono>
 
 namespace Envoy {
 namespace Router {
