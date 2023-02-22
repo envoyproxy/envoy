@@ -18,9 +18,8 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 
 // [#protodoc-title: Golang]
 //
-// [#extension: envoy.http.cluster_specifier.golang]
+// [#extension: envoy.router.cluster_specifier_plugin.golang]
 
-// [#next-free-field: 5]
 message Config {
   // Globally unique ID for a dynamic library file.
   string library_id = 1 [(validate.rules).string = {min_len: 1}];

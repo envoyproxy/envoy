@@ -1,7 +1,9 @@
 #pragma once
 
 #include "envoy/router/cluster_specifier_plugin.h"
+
 #include "source/common/http/utility.h"
+
 #include "contrib/envoy/extensions/http/cluster_specifier/golang/v3alpha/golang.pb.h"
 #include "contrib/golang/common/dso/dso.h"
 
