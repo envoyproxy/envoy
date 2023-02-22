@@ -794,8 +794,7 @@ TEST_P(MultiplexedUpstreamIntegrationTest, UpstreamEarlyDataRejected) {
   // TODO: debug why waiting on the 0-rtt upstream connection times out on Windows.
   GTEST_SKIP() << "Skipping on Windows";
 #endif
-  if (upstreamProtocol() != Http::CodecType::HTTP3 ||
-      !Runtime::runtimeFeatureEnabled("envoy.reloadable_features.http3_sends_early_data")) {
+  if (upstreamProtocol() != Http::CodecType::HTTP3) {
     return;
   }
   initialize();
@@ -885,8 +884,7 @@ TEST_P(MultiplexedUpstreamIntegrationTest, UpstreamDisconnectDuringEarlyData) {
   // TODO: debug why waiting on the 0-rtt upstream connection times out on Windows.
   GTEST_SKIP() << "Skipping on Windows";
 #endif
-  if (upstreamProtocol() != Http::CodecType::HTTP3 ||
-      !Runtime::runtimeFeatureEnabled("envoy.reloadable_features.http3_sends_early_data")) {
+  if (upstreamProtocol() != Http::CodecType::HTTP3) {
     return;
   }
   Runtime::maybeSetRuntimeGuard("envoy.reloadable_features.no_extension_lookup_by_name", false);
@@ -943,8 +941,7 @@ TEST_P(MultiplexedUpstreamIntegrationTest, DownstreamDisconnectDuringEarlyData) 
   // TODO: debug why waiting on the 0-rtt upstream connection times out on Windows.
   GTEST_SKIP() << "Skipping on Windows";
 #endif
-  if (upstreamProtocol() != Http::CodecType::HTTP3 ||
-      !Runtime::runtimeFeatureEnabled("envoy.reloadable_features.http3_sends_early_data")) {
+  if (upstreamProtocol() != Http::CodecType::HTTP3) {
     return;
   }
   initialize();
@@ -994,8 +991,7 @@ TEST_P(MultiplexedUpstreamIntegrationTest, ConnPoolQueuingNonSafeRequest) {
   // TODO: debug why waiting on the 0-rtt upstream connection times out on Windows.
   GTEST_SKIP() << "Skipping on Windows";
 #endif
-  if (upstreamProtocol() != Http::CodecType::HTTP3 ||
-      !Runtime::runtimeFeatureEnabled("envoy.reloadable_features.http3_sends_early_data")) {
+  if (upstreamProtocol() != Http::CodecType::HTTP3) {
     return;
   }
   initialize();

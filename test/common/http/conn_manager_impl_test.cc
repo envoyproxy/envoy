@@ -70,6 +70,7 @@ TEST_F(HttpConnectionManagerImplTest, HeaderOnlyRequestAndResponse) {
         ResponseHeaderMapPtr response_headers{new TestResponseHeaderMapImpl{{":status", "200"}}};
         filter->callbacks_->streamInfo().setResponseCodeDetails("");
         filter->callbacks_->encodeHeaders(std::move(response_headers), true, "details");
+        response_encoder_.stream_.codec_callbacks_->onCodecEncodeComplete();
 
         // Drain 2 so that on the 2nd iteration we will hit zero.
         data.drain(2);
@@ -159,6 +160,7 @@ TEST_F(HttpConnectionManagerImplTest, HeaderOnlyRequestAndResponseWithEarlyHeade
         ResponseHeaderMapPtr response_headers{new TestResponseHeaderMapImpl{{":status", "200"}}};
         filter->callbacks_->streamInfo().setResponseCodeDetails("");
         filter->callbacks_->encodeHeaders(std::move(response_headers), true, "details");
+        response_encoder_.stream_.codec_callbacks_->onCodecEncodeComplete();
 
         // Drain 2 so that on the 2nd iteration we will hit zero.
         data.drain(2);
@@ -2197,10 +2199,9 @@ TEST_F(HttpConnectionManagerImplTest, TestFilterCanEnrichAccessLogs) {
         EXPECT_EQ("value", dynamic_meta.fields().at("field").string_value());
       }));
 
-  NiceMock<MockResponseEncoder> encoder;
   EXPECT_CALL(*codec_, dispatch(_))
       .WillRepeatedly(Invoke([&](Buffer::Instance& data) -> Http::Status {
-        RequestDecoder* decoder = &conn_manager_->newStream(encoder);
+        RequestDecoder* decoder = &conn_manager_->newStream(response_encoder_);
 
         RequestHeaderMapPtr headers{new TestRequestHeaderMapImpl{
             {":method", "GET"}, {":authority", "host"}, {":path", "/"}}};
@@ -2209,6 +2210,7 @@ TEST_F(HttpConnectionManagerImplTest, TestFilterCanEnrichAccessLogs) {
         filter->callbacks_->streamInfo().setResponseCodeDetails("");
         ResponseHeaderMapPtr response_headers{new TestResponseHeaderMapImpl{{":status", "200"}}};
         filter->callbacks_->encodeHeaders(std::move(response_headers), true, "details");
+        response_encoder_.stream_.codec_callbacks_->onCodecEncodeComplete();
 
         data.drain(4);
         return Http::okStatus();
@@ -3953,6 +3955,7 @@ TEST_F(HttpConnectionManagerImplTest, DrainCloseRaceWithClose) {
   expectOnDestroy();
   decoder_filters_[0]->callbacks_->streamInfo().setResponseCodeDetails("");
   decoder_filters_[0]->callbacks_->encodeHeaders(std::move(response_headers), true, "details");
+  response_encoder_.stream_.codec_callbacks_->onCodecEncodeComplete();
 
   // Fake a protocol error that races with the drain timeout. This will cause a local close.
   // Also fake the local close not closing immediately.
@@ -4053,6 +4056,7 @@ TEST_F(HttpConnectionManagerImplTest, DrainClose) {
   EXPECT_CALL(*codec_, shutdownNotice());
   filter->callbacks_->streamInfo().setResponseCodeDetails("");
   filter->callbacks_->encodeHeaders(std::move(response_headers), true, "details");
+  response_encoder_.stream_.codec_callbacks_->onCodecEncodeComplete();
   EXPECT_EQ(ssl_connection_.get(), filter->callbacks_->connection()->ssl().get());
 
   EXPECT_CALL(*codec_, goAway());

@@ -41,15 +41,16 @@ public:
   BaseClientIntegrationTest(Network::Address::IpVersion ip_version,
                             const std::string& bootstrap_config = defaultConfig());
   virtual ~BaseClientIntegrationTest() = default;
+  // Note: This class does not inherit from testing::Test and so this TearDown() method
+  // does not override testing::Test::TearDown(). As a result, it will not be called
+  // automatically by gtest during shutdown and must be called manually.
+  void TearDown();
 
 protected:
   envoy_engine_t& rawEngine() { return engine_->engine_; }
   virtual void initialize() override;
-  virtual void cleanup();
   void createEnvoy() override;
   void threadRoutine(absl::Notification& engine_running);
-  // Must be called manually by subclasses in their TearDown();
-  void TearDown();
   // helpers to access protected functions in the friend class
   void setOverrideConfigForTests(Platform::EngineBuilder builder, std::string config) {
     builder.setOverrideConfigForTests(config);

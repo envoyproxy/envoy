@@ -16,6 +16,7 @@ envoy_cc_library(
         "//bazel:exclude_certificates": ["-DEXCLUDE_CERTIFICATES"],
         "//conditions:default": [],
     }),
+    external_deps = ["abseil_optional"],
     repository = "@envoy",
     visibility = ["//visibility:public"],
     deps = [
@@ -43,6 +44,7 @@ envoy_cc_library(
         [
             "@envoy_api//envoy/extensions/compression/brotli/compressor/v3:pkg_cc_proto",
             "@envoy_api//envoy/extensions/compression/gzip/compressor/v3:pkg_cc_proto",
+            "@envoy_api//envoy/extensions/filters/http/composite/v3:pkg_cc_proto",
             "@envoy_api//envoy/extensions/filters/http/compressor/v3:pkg_cc_proto",
         ],
         "@envoy",
@@ -78,6 +80,7 @@ envoy_cc_library(
     ],
     hdrs = [
         "bridge_utility.h",
+        "direct_response_testing.h",
         "engine.h",
         "engine_callbacks.h",
         "envoy_error.h",
