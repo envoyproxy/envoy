@@ -854,7 +854,7 @@ public:
     static constexpr uint64_t HTTP3 = 0x10;
   };
 
-  virtual ~ClusterInfo() = default;
+  ~ClusterInfo() override = default;
 
   /**
    * @return bool whether the cluster was added via API (if false the cluster was present in the

@@ -1057,7 +1057,7 @@ HostConstSharedPtr LeastRequestLoadBalancer::unweightedHostPick(const HostVector
 
   for (uint32_t choice_idx = 0; choice_idx < choice_count_; ++choice_idx) {
     const int rand_idx = random_.random() % hosts_to_use.size();
-    HostSharedPtr sampled_host = hosts_to_use[rand_idx];
+    const HostSharedPtr& sampled_host = hosts_to_use[rand_idx];
 
     if (candidate_host == nullptr) {
 

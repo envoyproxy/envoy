@@ -8,7 +8,6 @@ using testing::AtLeast;
 using testing::InSequence;
 using testing::InvokeWithoutArgs;
 using testing::Return;
-using testing::ReturnRef;
 
 namespace Envoy {
 namespace Http {
