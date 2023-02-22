@@ -126,6 +126,9 @@ else
             git fetch --unshallow
             DIFF_REF="$(git merge-base HEAD "${DIFF_TARGET_BRANCH}")"
         else
+            # TODO(phlax): this is the path used for local CI. Make this work
+            #    similar to above, allow the `remote` to be configurable, and
+            #    document the workflow for devs
             DIFF_REF=$("${ENVOY_SRCDIR}"/tools/git/last_github_commit.sh)
         fi
     fi
