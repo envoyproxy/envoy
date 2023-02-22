@@ -20,11 +20,11 @@ jobs:
    steps:
    - name: Testing secret access
      env:
-       CFL_EXTRA_BAZEL_TOKEN: ${{secrets.GCP_RBE_TOKEN}}
+       CFL_EXTRA_BAZEL_TOKEN: ${{ secrets.GCP_RBE_TOKEN }}
      run: |
        echo "token is"
-       echo ${{secrets.GCP_GITHUB_CI_KEY}} | sed -e 's/^\(.\{5\}\).*/\1/'
-       echo ${{secrets.GCP_RBE_TOKEN}} | sed -e 's/^\(.\{5\}\).*/\1/'
+       echo ${{ secrets.GCP_GITHUB_CI_KEY }} | sed -e 's/^\(.\{5\}\).*/\1/'
+       echo ${{ secrets.GCP_RBE_TOKEN }} | sed -e 's/^\(.\{5\}\).*/\1/'
    - name: Build Fuzzers (${{ matrix.sanitizer }})
      id: build
      uses: krajshiva/oss-fuzz/infra/cifuzz/actions/build_fuzzers@cifuzz-rbe-integration
@@ -33,7 +33,7 @@ jobs:
        CFL_EXTRA_BAZEL_BUILD_OPTIONS: "--config=remote-ci --flaky_test_attempts=2"
        CFL_EXTRA_REMOTE_CACHE: grpcs://remotebuildexecution.googleapis.com
        CFL_EXTRA_BAZEL_REMOTE_INSTANCE: projects/envoy-ci/instances/default_instance
-       CFL_EXTRA_BAZEL_TOKEN: ${{secrets.GCP_GITHUB_CI_KEY}}
+       CFL_EXTRA_BAZEL_TOKEN: ${{ secrets.GCP_GITHUB_CI_KEY }}
      with:
        oss-fuzz-project-name: 'envoy'
        language: c++
