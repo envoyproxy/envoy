@@ -27,9 +27,8 @@ echo "*** Invoking Envoy..."
 
 echo "*** Waiting for the server to go live..."
 sleep 1
-ready=""
 admin_port=$(cat $admin_port_file)
-while [ $(curl "$admin_port/ready") != "LIVE" ]; do
+while [ "$(curl $admin_port/ready)" != "LIVE" ]; do
   sleep 1
 done
 
