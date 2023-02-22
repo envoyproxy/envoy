@@ -118,6 +118,8 @@ public:
   virtual void removeInjectedCompletion(os_fd_t fd) PURE;
 };
 
+using IoUringPtr = std::unique_ptr<IoUring>;
+
 /**
  * io_uring request type.
  */

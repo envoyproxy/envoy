@@ -10,12 +10,8 @@ envoy_package()
 
 envoy_cc_library(
     name = "io_uring_impl_lib",
-    srcs = [
-        "io_uring_impl.cc",
-    ],
-    hdrs = [
-        "io_uring_impl.h",
-    ],
+    srcs = ["io_uring_impl.cc"],
+    hdrs = ["io_uring_impl.h"],
     external_deps = ["uring"],
     deps = [
         "//envoy/common/io:io_uring_interface",
@@ -25,12 +21,8 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "io_uring_worker_lib",
-    srcs = [
-        "io_uring_worker_impl.cc",
-    ],
-    hdrs = [
-        "io_uring_worker_impl.h",
-    ],
+    srcs = ["io_uring_worker_impl.cc"],
+    hdrs = ["io_uring_worker_impl.h"],
     deps = [
         ":io_uring_impl_lib",
         "//envoy/common/io:io_uring_interface",
@@ -42,12 +34,8 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "io_uring_factory_impl_lib",
-    srcs = [
-        "io_uring_factory_impl.cc",
-    ],
-    hdrs = [
-        "io_uring_factory_impl.h",
-    ],
+    srcs = ["io_uring_factory_impl.cc"],
+    hdrs = ["io_uring_factory_impl.h"],
     deps = [
         ":io_uring_worker_lib",
         "//envoy/common/io:io_uring_interface",

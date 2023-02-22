@@ -36,7 +36,7 @@ public:
   }
 
   Api::ApiPtr api_;
-  std::unique_ptr<IoUringImpl> io_uring_{};
+  IoUringPtr io_uring_{};
   bool should_skip_{};
 };
 

@@ -16,10 +16,10 @@ namespace {
 
 class IoUringWorkerTestImpl : public IoUringWorkerImpl {
 public:
-  IoUringWorkerTestImpl(std::unique_ptr<IoUring> io_uring_instance, Event::Dispatcher& dispatcher)
+  IoUringWorkerTestImpl(IoUringPtr io_uring_instance, Event::Dispatcher& dispatcher)
       : IoUringWorkerImpl(std::move(io_uring_instance), dispatcher) {}
   IoUringSocket& addTestSocket(os_fd_t fd, IoUringHandler& io_uring_handler) {
-    std::unique_ptr<IoUringSocketEntry> socket =
+    IoUringSocketEntryPtr socket =
         std::make_unique<IoUringSocketEntry>(fd, *this, io_uring_handler);
     LinkedList::moveIntoListBack(std::move(socket), sockets_);
     return *sockets_.back();
@@ -37,7 +37,7 @@ public:
 
 TEST(IoUringWorkerImplTest, cleanupSocket) {
   Event::MockDispatcher dispatcher;
-  std::unique_ptr<IoUring> io_uring_instance = std::make_unique<MockIoUring>();
+  IoUringPtr io_uring_instance = std::make_unique<MockIoUring>();
   MockIoUring& mock_io_uring = *dynamic_cast<MockIoUring*>(io_uring_instance.get());
 
   EXPECT_CALL(mock_io_uring, registerEventfd());
@@ -61,7 +61,7 @@ TEST(IoUringWorkerImplTest, cleanupSocket) {
 
 TEST(IoUringWorkerImplTest, delaySubmit) {
   Event::MockDispatcher dispatcher;
-  std::unique_ptr<IoUring> io_uring_instance = std::make_unique<MockIoUring>();
+  IoUringPtr io_uring_instance = std::make_unique<MockIoUring>();
   MockIoUring& mock_io_uring = *dynamic_cast<MockIoUring*>(io_uring_instance.get());
   Event::FileReadyCb file_event_callback;
 

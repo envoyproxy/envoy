@@ -72,7 +72,7 @@ public:
 
 class IoUringWorkerTestImpl : public IoUringWorkerImpl {
 public:
-  IoUringWorkerTestImpl(std::unique_ptr<IoUring> io_uring_instance, Event::Dispatcher& dispatcher)
+  IoUringWorkerTestImpl(IoUringPtr io_uring_instance, Event::Dispatcher& dispatcher)
       : IoUringWorkerImpl(std::move(io_uring_instance), dispatcher) {}
   IoUringSocket& addTestSocket(os_fd_t fd, IoUringHandler& handler) {
     std::unique_ptr<IoUringTestSocket> socket =
