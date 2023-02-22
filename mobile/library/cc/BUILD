@@ -16,9 +16,9 @@ envoy_cc_library(
         "//bazel:exclude_certificates": ["-DEXCLUDE_CERTIFICATES"],
         "//conditions:default": [],
     }),
+    external_deps = ["abseil_optional"],
     repository = "@envoy",
     visibility = ["//visibility:public"],
-    external_deps = ["abseil_optional"],
     deps = [
         ":envoy_engine_cc_lib_no_stamp",
         "@envoy//source/common/common:assert_lib",
