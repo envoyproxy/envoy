@@ -237,11 +237,11 @@
     builder.addStatsSinks(std::move(sinks));
   }
   if ([self.rtdsLayerName length] != 0) {
-    builder.addRtdsLayer([self.rtdsLayerName toCXXString], self.rtdsTimeoutSeconds);
+    builder.addRtdsLayer([self.rtdsLayerName toCXXString], *self.rtdsTimeoutSeconds);
   }
   if ([self.adsApiType length] != 0) {
     builder.setAggregatedDiscoveryService([self.adsApiType toCXXString],
-                                          [self.adsAddress toCXXString], self.adsPort);
+                                          [self.adsAddress toCXXString], *self.adsPort);
   }
 
 #ifdef ENVOY_ADMIN_FUNCTIONALITY

@@ -559,7 +559,7 @@ open class EngineBuilder: NSObject {
   ///
   /// - returns: This builder.
   @discardableResult
-  public func addRtdsLayer(layerName: String, timeoutSeconds: UInt32) -> Self {
+  public func addRtdsLayer(_ layerName: String, _ timeoutSeconds: UInt32) -> Self {
     self.rtdsLayerName = layerName
     self.rtdsTimeoutSeconds = timeoutSeconds
     return self
@@ -576,9 +576,9 @@ open class EngineBuilder: NSObject {
   /// - returns: This builder.
   @discardableResult
   public func setAggregatedDiscoveryService(
-    apiType: String,
-    address: String,
-    port: UInt32
+    _ apiType: String,
+    _ address: String,
+    _ port: UInt32
     ) -> Self {
     self.adsApiType = apiType
     self.adsAddress = address

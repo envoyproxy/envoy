@@ -1337,16 +1337,9 @@ void configureBuilder(JNIEnv* env, jstring grpc_stats_domain, jboolean admin_int
 
   std::vector<std::string> hostnames = javaObjectArrayToStringVector(env, dns_preresolve_hostnames);
   builder.addDnsPreresolveHostnames(hostnames);
-  std::string rtds_layer_name_cpp = getCppString(env, rtds_layer_name);
-  if (!rtds_layer_name_cpp.empty()) {
-    builder.addRtdsLayer(rtds_layer_name_cpp, rtds_timeout_seconds);
-  }
-
-  std::string ads_api_type_cpp = getCppString(env, ads_api_type);
-  std::string ads_address_cpp = getCppString(env, ads_address);
-  if (!ads_api_type_cpp.empty()) {
-    builder.setAggregatedDiscoveryService(ads_api_type_cpp, ads_address_cpp, ads_port);
-  }
+  builder.addRtdsLayer(getCppString(env, rtds_layer_name), rtds_timeout_seconds);
+  builder.setAggregatedDiscoveryService(getCppString(env, ads_api_type),
+                                        getCppString(env, ads_address), ads_port);
 }
 
 extern "C" JNIEXPORT jstring JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibrary_createYaml(
