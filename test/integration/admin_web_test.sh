@@ -34,7 +34,7 @@ sleep 1
 admin_port=$(cat $admin_port_file)
 ready=""
 while [ "$ready" != "LIVE" ]; do
-  ready=$(curl "$admin_port/ready"); 
+  ready=$(curl "$admin_port/ready");
   sleep 1
 done
 
