@@ -653,10 +653,8 @@ CAPIStatus Filter::setHeader(absl::string_view key, absl::string_view value) {
     // safety. otherwise, there might be race between reading in the envoy worker thread and writing
     // in the Go thread.
     state.getDispatcher().post([this, weak_ptr, keyStr, valueStr] {
-      // TODO: do not need lock here, since it's the work thread now.
-      Thread::ReleasableLockGuard lock(mutex_);
+      Thread::LockGuard lock(mutex_);
       if (!weak_ptr.expired() && !has_destroyed_) {
-        lock.release();
         headers_->setCopy(Http::LowerCaseString(keyStr), valueStr);
         onHeadersModified();
       } else {
@@ -695,10 +693,8 @@ CAPIStatus Filter::removeHeader(absl::string_view key) {
     // safety. otherwise, there might be race between reading in the envoy worker thread and writing
     // in the Go thread.
     state.getDispatcher().post([this, weak_ptr, keyStr] {
-      // TODO: do not need lock here, since it's the work thread now.
-      Thread::ReleasableLockGuard lock(mutex_);
+      Thread::LockGuard lock(mutex_);
       if (!weak_ptr.expired() && !has_destroyed_) {
-        lock.release();
         headers_->remove(Http::LowerCaseString(keyStr));
         onHeadersModified();
       } else {
