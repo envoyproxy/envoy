@@ -87,6 +87,9 @@ cleanup () {
         }
         popd > /dev/null
     done
+    echo
+    df -h
+    echo
 }
 
 _curl () {
