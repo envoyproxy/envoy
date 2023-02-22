@@ -58,17 +58,17 @@ open class EngineBuilder: NSObject {
   private var runtimeGuards: [String: String] = [:]
   private var directResponses: [DirectResponse] = []
   private var statsSinks: [String] = []
-  private var rtdsLayerName: String = ""
-  private var rtdsTimeoutSeconds: UInt32 = 0
-  private var adsAddress: String = ""
-  private var adsPort: UInt32 = 0
-  private var adsJwtToken: String = ""
-  private var adsJwtTokenLifetimeSeconds: UInt32? = 0
-  private var adsSslRootCerts: String = ""
-  private var nodeId: String = ""
-  private var nodeRegion: String = ""
-  private var nodeZone: String = ""
-  private var nodeSubZone: String = ""
+  private var rtdsLayerName: String?
+  private var rtdsTimeoutSeconds: UInt32?
+  private var adsAddress: String?
+  private var adsPort: UInt32?
+  private var adsJwtToken: String?
+  private var adsJwtTokenLifetimeSeconds: UInt32?
+  private var adsSslRootCerts: String?
+  private var nodeId: String?
+  private var nodeRegion: String?
+  private var nodeZone: String?
+  private var nodeSubZone: String?
 
 
   // MARK: - Public
@@ -557,6 +557,7 @@ open class EngineBuilder: NSObject {
     self.virtualClusters.append(contentsOf: virtualClusters)
     return self
   }
+
   /// Sets the node.id field in the Bootstrap configuration.
   ///
   /// - Parameter nodeId: The node ID.

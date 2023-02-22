@@ -5,6 +5,9 @@
 
 @implementation NSString (CXX)
 - (std::string)toCXXString {
+  if (self == nil) {
+    return nullptr;
+  }
   return std::string([self UTF8String],
                      (int)[self lengthOfBytesUsingEncoding:NSUTF8StringEncoding]);
 }
@@ -250,12 +253,22 @@
     }
     builder.addStatsSinks(std::move(sinks));
   }
-  builder.setNodeLocality({[self.nodeRegion toCXXString], [self.nodeZone toCXXString], [self.nodeSubZone toCXXString]});
-  builder.setNodeId([self.nodeId toCXXString]);
-  builder.addRtdsLayer([self.rtdsLayerName toCXXString], self.rtdsTimeoutSeconds);
-  builder.setAggregatedDiscoveryService(
-      [self.adsAddress toCXXString], self.adsPort, [self.adsJwtToken toCXXString],
-      self.adsJwtTokenLifetimeSeconds, [self.adsSslRootCerts toCXXString]);
+  if (self.nodeRegion != nil) {
+    builder.setNodeLocality({[self.nodeRegion toCXXString],
+                             [self.nodeZone toCXXString],
+                             [self.nodeSubZone toCXXString]});
+  }
+  if (self.nodeId != nil) {
+    builder.setNodeId([self.nodeId toCXXString]);
+  }
+  if (self.rtdsLayerName != nil) {
+    builder.addRtdsLayer([self.rtdsLayerName toCXXString], self.rtdsTimeoutSeconds);
+  }
+  if (self.adsAddress != nil) {
+    builder.setAggregatedDiscoveryService(
+        [self.adsAddress toCXXString], self.adsPort, [self.adsJwtToken toCXXString],
+        self.adsJwtTokenLifetimeSeconds, [self.adsSslRootCerts toCXXString]);
+  }
 }
 
 #ifdef ENVOY_ADMIN_FUNCTIONALITY

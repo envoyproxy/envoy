@@ -137,6 +137,20 @@ public class EnvoyConfiguration {
    * @param enableSkipDNSLookupForProxiedRequests         whether to skip waiting on DNS response
    *     for proxied requests.
    * @param enablePlatformCertificatesValidation          whether to use the platform verifier.
+   * @param rtdsLayerName                                 the RTDS layer name for this client.
+   * @param rtdsTimeoutSeconds                            the timeout for RTDS fetches.
+   * @param adsAddress                                    the address for the ADS server.
+   * @param adsPort                                       the port for the ADS server.
+   * @param adsToken                                      the token to use for authenticating with
+   *                                                      the ADS server.
+   * @param adsTokenLifetime                              the lifetime of the ADS token.
+   * @param adsRootCerts                                  the root certificates to use for validating
+   *     the ADS server.
+   * @param nodeId                                        the node ID to use for the ADS server.
+   * @param nodeRegion                                    the node region to use for the ADS server.
+   * @param nodeZone                                      the node zone to use for the ADS server.
+   * @param nodeSubZone                                   the node sub-zone to use for the ADS
+   *     server.
    */
   public EnvoyConfiguration(
       boolean adminInterfaceEnabled, String grpcStatsDomain, int connectTimeoutSeconds,
