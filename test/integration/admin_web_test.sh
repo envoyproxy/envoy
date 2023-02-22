@@ -32,7 +32,9 @@ $ENVOY_BINARY \
 echo "*** Waiting for the server to go live..."
 sleep 1
 admin_port=$(cat $admin_port_file)
-while [ "$(curl $admin_port/ready)" != "LIVE" ]; do
+ready=""
+while [ "$ready" != "LIVE" ]; do
+  ready=$(curl "$admin_port/ready"); 
   sleep 1
 done
 
