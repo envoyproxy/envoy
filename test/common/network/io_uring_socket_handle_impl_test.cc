@@ -25,8 +25,6 @@ TEST(IoUringSocketHandleImpl, CreateAcceptSocket) {
   Io::MockIoUringFactory factory;
   IoUringSocketHandleTestImpl impl(factory, false);
   EXPECT_EQ(IoUringSocketType::Unknown, impl.ioUringSocketType());
-  // Removed when io uring accept socket implemented.
-  EXPECT_CALL(os_sys_calls, setsocketblocking(_, false));
   EXPECT_CALL(os_sys_calls, listen(_, _));
   impl.listen(5);
   EXPECT_EQ(IoUringSocketType::Accept, impl.ioUringSocketType());
