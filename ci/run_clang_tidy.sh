@@ -13,6 +13,8 @@ CLANG_TIDY=${CLANG_TIDY:-$(${LLVM_CONFIG} --bindir)/clang-tidy}
 CLANG_APPLY_REPLACEMENTS=${CLANG_APPLY_REPLACEMENTS:-$(${LLVM_CONFIG} --bindir)/clang-apply-replacements}
 FIX_YAML=clang-tidy-fixes.yaml
 
+DIFF_TARGET_BRANCH="${DIFF_TARGET_BRANCH:-origin/main}"
+
 # Quick syntax check of .clang-tidy.
 ${CLANG_TIDY} -dump-config > /dev/null 2> clang-tidy-config-errors.txt
 if [[ -s clang-tidy-config-errors.txt ]]; then
@@ -113,15 +115,25 @@ elif [[ "${RUN_FULL_CLANG_TIDY}" == 1 ]]; then
   echo "Running a full clang-tidy"
   run_clang_tidy
 else
-  if [[ -z "${DIFF_REF}" ]]; then
-    if [[ "${BUILD_REASON}" == *CI ]]; then
-      DIFF_REF="HEAD^"
-    else
-      DIFF_REF=$("${ENVOY_SRCDIR}"/tools/git/last_github_commit.sh)
+    if [[ -z "${DIFF_REF}" ]]; then
+        # Postsubmit
+        if [[ "${BUILD_REASON}" == *CI ]]; then
+            DIFF_REF="HEAD^"
+        # Presubmit/PR
+        elif [[ -n "${BUILD_REASON}" ]]; then
+            # Common ancestor commit
+            git fetch origin
+            git fetch --unshallow
+            DIFF_REF="$(git merge-base HEAD "${DIFF_TARGET_BRANCH}")"
+        else
+            # TODO(phlax): this is the path used for local CI. Make this work
+            #    similar to above, allow the `remote` to be configurable, and
+            #    document the workflow for devs
+            DIFF_REF=$("${ENVOY_SRCDIR}"/tools/git/last_github_commit.sh)
+        fi
     fi
-  fi
-  echo "Running clang-tidy-diff against ${DIFF_REF} ($(git rev-parse "${DIFF_REF}")), current HEAD ($(git rev-parse HEAD))"
-  run_clang_tidy_diff "${DIFF_REF}"
+    echo "Running clang-tidy-diff against ${DIFF_REF} ($(git rev-parse "${DIFF_REF}")), current HEAD ($(git rev-parse HEAD))"
+    run_clang_tidy_diff "${DIFF_REF}"
 fi
 
 if [[ -s "${FIX_YAML}" ]]; then
