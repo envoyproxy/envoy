@@ -142,9 +142,9 @@ public:
 
   CAPIStatus continueStatus(GolangStatus status);
 
-  CAPIStatus sendLocalReply(Http::Code response_code, absl::string_view body_text,
+  CAPIStatus sendLocalReply(Http::Code response_code, std::string body_text,
                             std::function<void(Http::ResponseHeaderMap& headers)> modify_headers,
-                            Grpc::Status::GrpcStatus grpc_status, absl::string_view details);
+                            Grpc::Status::GrpcStatus grpc_status, std::string details);
 
   CAPIStatus getHeader(absl::string_view key, GoString* goValue);
   CAPIStatus copyHeaders(GoString* go_strs, char* go_buf);
