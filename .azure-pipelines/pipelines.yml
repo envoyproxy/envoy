@@ -635,12 +635,54 @@ stages:
     pool:
       vmImage: "ubuntu-20.04"
     steps:
+    # TODO(phlax): Move this to `env` stage and improve conditions.
     - bash: |
         VERSION_DEV="$(cat VERSION.txt | cut -d- -f2)"
         if [[ $VERSION_DEV != "dev" ]]; then
             echo "##vso[task.setvariable variable=isDev]false"
         fi
       displayName: Set development/release env
+
+    - task: DownloadBuildArtifacts@0
+      condition: eq(variables['isDev'], 'false')
+      inputs:
+        buildType: current
+        artifactName: "bazel.release"
+        itemPattern: "bazel.release/envoy_binary.tar.gz"
+        downloadType: single
+        targetPath: $(Build.StagingDirectory)
+    - task: DownloadBuildArtifacts@0
+      condition: eq(variables['isDev'], 'false')
+      inputs:
+        buildType: current
+        artifactName: "bazel.release"
+        itemPattern: "bazel.release/envoy-contrib_binary.tar.gz"
+        downloadType: single
+        targetPath: $(Build.StagingDirectory)
+    - task: DownloadBuildArtifacts@0
+      condition: eq(variables['isDev'], 'false')
+      inputs:
+        buildType: current
+        artifactName: "bazel.release.arm64"
+        itemPattern: "bazel.release.arm64/envoy_binary.tar.gz"
+        downloadType: single
+        targetPath: $(Build.StagingDirectory)
+    - task: DownloadBuildArtifacts@0
+      condition: eq(variables['isDev'], 'false')
+      inputs:
+        buildType: current
+        artifactName: "bazel.release.arm64"
+        itemPattern: "bazel.release.arm64/envoy-contrib_binary.tar.gz"
+        downloadType: single
+        targetPath: $(Build.StagingDirectory)
+
+    - task: DownloadSecureFile@1
+      condition: eq(variables['isDev'], 'false')
+      name: MaintainerGPGKey
+      displayName: 'Download maintainer GPG key'
+      inputs:
+        # NB: This is the path to the key and **must** be set on a per-pipeline basis
+        secureFile: '$(maintainerGPGKey)'
 
     - script: ./ci/run_envoy_docker.sh './ci/do_ci.sh publish'
       displayName: "Publish release to Github"
@@ -650,49 +692,7 @@ stages:
         AZP_BRANCH: $(Build.SourceBranch)
         GITHUB_TOKEN: $(GitHubPublicRepoOnlyAccessToken)
 
-  - job: assets
-    displayName: Publish release assets
-    condition: and(succeeded(), eq(variables['PostSubmit'], true), ne(variables['NoSync'], true), eq(variables['isTaggedRelease'], 'true'))
-    dependsOn: ["success"]
-    pool:
-      vmImage: "ubuntu-20.04"
-    steps:
-    - task: DownloadBuildArtifacts@0
-      inputs:
-        buildType: current
-        artifactName: "bazel.release"
-        itemPattern: "bazel.release/envoy_binary.tar.gz"
-        downloadType: single
-        targetPath: $(Build.StagingDirectory)
-    - task: DownloadBuildArtifacts@0
-      inputs:
-        buildType: current
-        artifactName: "bazel.release"
-        itemPattern: "bazel.release/envoy-contrib_binary.tar.gz"
-        downloadType: single
-        targetPath: $(Build.StagingDirectory)
-    - task: DownloadBuildArtifacts@0
-      inputs:
-        buildType: current
-        artifactName: "bazel.release.arm64"
-        itemPattern: "bazel.release.arm64/envoy_binary.tar.gz"
-        downloadType: single
-        targetPath: $(Build.StagingDirectory)
-    - task: DownloadBuildArtifacts@0
-      inputs:
-        buildType: current
-        artifactName: "bazel.release.arm64"
-        itemPattern: "bazel.release.arm64/envoy-contrib_binary.tar.gz"
-        downloadType: single
-        targetPath: $(Build.StagingDirectory)
-
-    - task: DownloadSecureFile@1
-      name: MaintainerGPGKey
-      displayName: 'Download maintainer GPG key'
-      inputs:
-        # NB: This is the path to the key and **must** be set on a per-pipeline basis
-        secureFile: '$(maintainerGPGKey)'
-
+    # TODO(phlax): combine this with publish step
     - bash: |
         set -e
 
@@ -715,6 +715,7 @@ stages:
         echo "$MAINTAINER_GPG_KEY_PASSPHRASE" | gpg --batch --yes --passphrase-fd 0 --import "$(MaintainerGPGKey.secureFilePath)"
 
         ci/publish_github_assets.sh "v${VERSION}" "${PWD}/publish"
+      condition: eq(variables['isDev'], 'false')
       workingDirectory: $(Build.SourcesDirectory)
       env:
         GITHUB_TOKEN: $(GitHubPublicRepoOnlyAccessToken)
