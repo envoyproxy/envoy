@@ -624,6 +624,8 @@ CAPIStatus Filter::copyHeaders(GoString* go_strs, char* go_buf) {
   return CAPIStatus::CAPIOK;
 }
 
+// It won't take affect immidiately while it's invoked from a Go thread, instead, it will post a
+// callback to run in the envoy worker thread.
 CAPIStatus Filter::setHeader(absl::string_view key, absl::string_view value) {
   Thread::LockGuard lock(mutex_);
   if (has_destroyed_) {
@@ -665,6 +667,8 @@ CAPIStatus Filter::setHeader(absl::string_view key, absl::string_view value) {
   return CAPIStatus::CAPIOK;
 }
 
+// It won't take affect immidiately while it's invoked from a Go thread, instead, it will post a
+// callback to run in the envoy worker thread.
 CAPIStatus Filter::removeHeader(absl::string_view key) {
   Thread::LockGuard lock(mutex_);
   if (has_destroyed_) {
