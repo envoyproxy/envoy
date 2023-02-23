@@ -49,7 +49,7 @@ void DecoderImpl::decodeOnData(Buffer::Instance& data, uint64_t& offset) {
   // Check message length.
   const int32_t len = helper_.peekInt32(data, offset);
   ENVOY_LOG(trace, "zookeeper_proxy: decoding request with len {} at offset {}", len, offset);
-  ensureMinLength(len, INT_LENGTH + XID_LENGTH);
+  ensureMinLength(len, XID_LENGTH + INT_LENGTH); // xid + opcode
   ensureMaxLength(len);
 
   auto start_time = time_source_.monotonicTime();
@@ -175,7 +175,7 @@ void DecoderImpl::decodeOnWrite(Buffer::Instance& data, uint64_t& offset) {
   // Check message length.
   const int32_t len = helper_.peekInt32(data, offset);
   ENVOY_LOG(trace, "zookeeper_proxy: decoding response with len {} at offset {}", len, offset);
-  ensureMinLength(len, INT_LENGTH + XID_LENGTH);
+  ensureMinLength(len, XID_LENGTH + ZXID_LENGTH + INT_LENGTH); // xid + zxid + err
   ensureMaxLength(len);
 
   const auto xid = helper_.peekInt32(data, offset);
@@ -476,41 +476,87 @@ void DecoderImpl::skipStrings(Buffer::Instance& data, uint64_t& offset) {
 }
 
 Network::FilterStatus DecoderImpl::onData(Buffer::Instance& data) {
-  return decodeAfterBuffer(data, DecodeType::READ);
+  return decodeAndBuffer(data, zk_filter_read_buffer_, DecodeType::READ);
 }
 
 Network::FilterStatus DecoderImpl::onWrite(Buffer::Instance& data) {
-  return decodeAfterBuffer(data, DecodeType::WRITE);
+  return decodeAndBuffer(data, zk_filter_write_buffer_, DecodeType::WRITE);
 }
 
-Network::FilterStatus DecoderImpl::decodeAfterBuffer(Buffer::Instance& data, DecodeType dtype) {
-  uint64_t offset = 0;
-  int32_t len = 0;
+Network::FilterStatus DecoderImpl::decodeAndBuffer(Buffer::Instance& data,
+                                                   Buffer::OwnedImpl& zk_filter_buffer,
+                                                   DecodeType dtype) {
+  uint32_t zk_filter_buffer_len = zk_filter_buffer.length();
+  uint32_t data_len = data.length();
 
-  while (offset < data.length()) {
+  if (zk_filter_buffer_len > 0) {
+    if (zk_filter_buffer_len + data_len > INT_LENGTH) {
+      // Prepend ZooKeeper filter buffer to current buffer.
+      data.prepend(zk_filter_buffer);
+      decodeAndBufferHelper(data, data_len, zk_filter_buffer, zk_filter_buffer_len, dtype);
+      // Drain the prepended ZooKeeper filter buffer.
+      data.drain(zk_filter_buffer_len);
+    } else {
+      zk_filter_buffer.add(data);
+    }
+  } else if (zk_filter_buffer_len == 0) {
+    decodeAndBufferHelper(data, data_len, zk_filter_buffer, zk_filter_buffer_len, dtype);
+  }
+  return Network::FilterStatus::Continue;
+}
+
+void DecoderImpl::decodeAndBufferHelper(Buffer::Instance& data, uint32_t data_len,
+                                        Buffer::OwnedImpl& zk_filter_buffer,
+                                        uint32_t zk_filter_buffer_len, DecodeType dtype) {
+  uint64_t offset = 0;
+  uint32_t len = 0;
+  // Boolean to check whether there is at least one full packet in the buffer.
+  bool has_full_packets = false;
+
+  while (offset < data_len) {
     try {
       // Peek packet length.
       len = helper_.peekInt32(data, offset);
-      ensureMinLength(len, INT_LENGTH + XID_LENGTH);
+      if (dtype == DecodeType::READ) {
+        ensureMinLength(len, XID_LENGTH + INT_LENGTH);
+      } else if (dtype == DecodeType::WRITE) {
+        ensureMinLength(len, XID_LENGTH + ZXID_LENGTH + INT_LENGTH);
+      }
       ensureMaxLength(len);
       offset += len;
+      if (offset <= data_len) {
+        has_full_packets = true;
+      }
     } catch (const EnvoyException& e) {
       ENVOY_LOG(debug, "zookeeper_proxy: decoding exception {}", e.what());
       callbacks_.onDecodeError();
-      return Network::FilterStatus::Continue;
+      return;
     }
   }
 
-  if (offset == data.length()) {
+  if (offset == data_len) {
     decode(data, dtype);
-    return Network::FilterStatus::Continue;
-  }
+  } else if (offset > data_len) {
+    std::string temp_data;
 
-  ENVOY_LOG(trace,
-            "zookeeper_proxy: waiting for entire packets in the buffer, current buffer "
-            "is {} bytes",
-            data.length());
-  return Network::FilterStatus::StopIteration;
+    if (has_full_packets) {
+      offset -= INT_LENGTH + len;
+      // Decode full packets.
+      data.copyOut(0, offset, temp_data.data());
+      Buffer::OwnedImpl full_packets;
+      full_packets.add(temp_data.data(), temp_data.length());
+      decode(full_packets, dtype);
+      // Drain the ZooKeeper filter buffer.
+      zk_filter_buffer.drain(zk_filter_buffer_len);
+      // Copy out the rest of the data to the ZooKeeper filter buffer.
+      data.copyOut(offset, data_len - offset, temp_data.data());
+      zk_filter_buffer.add(temp_data.data(), temp_data.length());
+    } else {
+      // Copy out all the new data to the ZooKeeper filter buffer.
+      data.copyOut(zk_filter_buffer_len, data_len - zk_filter_buffer_len, temp_data.data());
+      zk_filter_buffer.add(temp_data.data(), temp_data.length());
+    }
+  }
 }
 
 void DecoderImpl::decode(Buffer::Instance& data, DecodeType dtype) {

@@ -137,9 +137,16 @@ private:
     MonotonicTime start_time;
   };
 
-  // decodeAfterBuffer waits until the buffer contains all data for one or more packets before
-  // decoding.
-  Network::FilterStatus decodeAfterBuffer(Buffer::Instance& data, DecodeType dtype);
+  // decodeAndBuffer
+  //       (1) prepends previous partial data to the current buffer,
+  //       (2) decodes all full packet(s),
+  //       (3) adds the rest of the data to the ZooKeeper filter buffer,
+  //       (4) removes the prepended data.
+  Network::FilterStatus decodeAndBuffer(Buffer::Instance& data, Buffer::OwnedImpl& zk_filter_buffer,
+                                        DecodeType dtype);
+  void decodeAndBufferHelper(Buffer::Instance& data, uint32_t data_len,
+                             Buffer::OwnedImpl& zk_filter_buffer, uint32_t zk_filter_buffer_len,
+                             DecodeType dtype);
   void decode(Buffer::Instance& data, DecodeType dtype);
   void decodeOnData(Buffer::Instance& data, uint64_t& offset);
   void decodeOnWrite(Buffer::Instance& data, uint64_t& offset);
@@ -175,6 +182,8 @@ private:
   BufferHelper helper_;
   TimeSource& time_source_;
   absl::node_hash_map<int32_t, RequestBegin> requests_by_xid_;
+  Buffer::OwnedImpl zk_filter_read_buffer_;
+  Buffer::OwnedImpl zk_filter_write_buffer_;
 };
 
 } // namespace ZooKeeperProxy

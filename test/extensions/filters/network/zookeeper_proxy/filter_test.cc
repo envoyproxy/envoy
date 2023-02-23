@@ -1086,7 +1086,7 @@ TEST_F(ZooKeeperFilterTest, OneRequestWithMultipleOnDataCalls) {
   // Request.
   Buffer::OwnedImpl data =
       encodeCreateRequestWithPartialData("/foo", "bar", false, enumToSignedInt(OpCodes::Create));
-  EXPECT_EQ(Envoy::Network::FilterStatus::StopIteration, filter_->onData(data, false));
+  EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(data, false));
   EXPECT_EQ(0UL, config_->stats().create_rq_.value());
   EXPECT_EQ(0UL, config_->stats().request_bytes_.value());
   EXPECT_EQ(0UL, config_->stats().decoder_error_.value());
@@ -1115,7 +1115,7 @@ TEST_F(ZooKeeperFilterTest, MultipleRequestsWithMultipleOnDataCalls) {
   // Request.
   Buffer::OwnedImpl data =
       encodeCreateRequestWithPartialData("/foo", "bar", false, enumToSignedInt(OpCodes::Create));
-  EXPECT_EQ(Envoy::Network::FilterStatus::StopIteration, filter_->onData(data, false));
+  EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(data, false));
   EXPECT_EQ(0UL, config_->stats().create_rq_.value());
   EXPECT_EQ(0UL, config_->stats().request_bytes_.value());
   EXPECT_EQ(0UL, config_->stats().decoder_error_.value());
@@ -1130,7 +1130,7 @@ TEST_F(ZooKeeperFilterTest, MultipleRequestsWithMultipleOnDataCalls) {
   data.writeBEInt<int32_t>(1000);
   data.writeBEInt<int32_t>(enumToSignedInt(OpCodes::Create));
 
-  EXPECT_EQ(Envoy::Network::FilterStatus::StopIteration, filter_->onData(data, false));
+  EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(data, false));
   EXPECT_EQ(0UL, config_->stats().create_rq_.value());
   EXPECT_EQ(0UL, config_->stats().request_bytes_.value());
   EXPECT_EQ(0UL, config_->stats().decoder_error_.value());
@@ -1167,7 +1167,7 @@ TEST_F(ZooKeeperFilterTest, OneResponseWithMultipleOnWriteCalls) {
 
   // Response.
   Buffer::OwnedImpl resp_data = encodeResponseWithPartialData(1000, 2000, 0);
-  EXPECT_EQ(Envoy::Network::FilterStatus::StopIteration, filter_->onWrite(resp_data, false));
+  EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onWrite(resp_data, false));
   EXPECT_EQ(0UL, config_->stats().getdata_resp_.value());
   EXPECT_EQ(0UL, config_->stats().response_bytes_.value());
   EXPECT_EQ(0UL, config_->stats().decoder_error_.value());
@@ -1197,7 +1197,7 @@ TEST_F(ZooKeeperFilterTest, MultipleResponsesWithMultipleOnWriteCalls) {
 
   // Response.
   Buffer::OwnedImpl resp_data = encodeResponseWithPartialData(1000, 2000, 0);
-  EXPECT_EQ(Envoy::Network::FilterStatus::StopIteration, filter_->onWrite(resp_data, false));
+  EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onWrite(resp_data, false));
   EXPECT_EQ(0UL, config_->stats().getdata_resp_.value());
   EXPECT_EQ(0UL, config_->stats().response_bytes_.value());
   EXPECT_EQ(0UL, config_->stats().decoder_error_.value());
@@ -1209,7 +1209,7 @@ TEST_F(ZooKeeperFilterTest, MultipleResponsesWithMultipleOnWriteCalls) {
   resp_data.writeBEInt<uint32_t>(1001);
   resp_data.writeBEInt<uint64_t>(2001);
 
-  EXPECT_EQ(Envoy::Network::FilterStatus::StopIteration, filter_->onWrite(resp_data, false));
+  EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onWrite(resp_data, false));
   EXPECT_EQ(0UL, config_->stats().getdata_resp_.value());
   EXPECT_EQ(0UL, config_->stats().response_bytes_.value());
   EXPECT_EQ(0UL, config_->stats().decoder_error_.value());
