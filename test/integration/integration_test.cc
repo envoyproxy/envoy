@@ -1053,10 +1053,12 @@ TEST_P(IntegrationTest, MissingDelimiter) {
 }
 
 TEST_P(IntegrationTest, InvalidCharacterInFirstline) {
+#ifndef ENVOY_ENABLE_UHV
   if (http1_implementation_ == Http1ParserImpl::BalsaParser) {
-    // BalsaParser allows custom methods.
+    // BalsaParser allows custom methods if UHV is enabled.
     return;
   }
+#endif
 
   initialize();
   std::string response;

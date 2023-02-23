@@ -1213,18 +1213,27 @@ TEST_P(Http1ServerConnectionImplTest, BadRequestNoStream) {
 }
 
 TEST_P(Http1ServerConnectionImplTest, CustomMethod) {
+  bool reject_custom_methods = true;
+#ifdef ENVOY_ENABLE_UHV
+  if (parser_impl_ == Http1ParserImpl::BalsaParser) {
+    // When both BalsaParser and UHV are enabled, custom methods are allowed by
+    // default.
+    reject_custom_methods = false;
+  }
+#endif
+
   initialize();
 
   MockRequestDecoder decoder;
   EXPECT_CALL(callbacks_, newStream(_, _)).WillOnce(ReturnRef(decoder));
-  if (parser_impl_ == Http1ParserImpl::HttpParser) {
+  if (reject_custom_methods) {
     EXPECT_CALL(decoder, sendLocalReply(_, _, _, _, _));
   }
 
   Buffer::OwnedImpl buffer("BAD / HTTP/1.1\r\n");
   auto status = codec_->dispatch(buffer);
 
-  if (parser_impl_ == Http1ParserImpl::HttpParser) {
+  if (reject_custom_methods) {
     // http-parser rejects unknown methods.
     // This behavior was observed during CVE-2019-18801 and helped to limit the
     // scope of affected Envoy configurations.
@@ -3964,10 +3973,12 @@ TEST_P(Http1ServerConnectionImplTest, ValidMethodFirstCharacter) {
 
 // Receiving a first byte that cannot start a valid method name is an error.
 TEST_P(Http1ServerConnectionImplTest, InvalidMethodFirstCharacter) {
+#ifdef ENVOY_ENABLE_UHV
   if (parser_impl_ == Http1ParserImpl::BalsaParser) {
-    // BalsaParser allows custom methods.
+    // BalsaParser allows custom methods if UHV is enabled.
     return;
   }
+#endif
 
   initialize();
 
