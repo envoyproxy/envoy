@@ -99,7 +99,7 @@ Admin::RequestPtr StatsHandler::makeRequest(AdminStream& admin_stream) {
 #ifdef ENVOY_ADMIN_HTML
   const bool active_mode = params.format_ == StatsFormat::Active;
 #else
-  const bool active_mode = params.format_ == false;
+  const bool active_mode = false;
 #endif
   return makeRequest(server_.stats(), params, [this, active_mode]() -> Admin::UrlHandler {
     return statsHandler(active_mode);
