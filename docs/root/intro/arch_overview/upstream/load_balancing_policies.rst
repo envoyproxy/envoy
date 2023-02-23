@@ -7,11 +7,15 @@ Extendable load balancing policies can be
 
 Developers can implement custom, configurable policies in C++.
 
-In the past, Envoy used an
-:ref:`enum <envoy_v3_api_field_config.cluster.v3.Cluster.lb_policy>`
-to specify load balancing policies. This enum is still supported for
-backward compatibility, but deprecated; extendable load balancing policies
-should be used instead.
+.. note::
+
+  In the past, Envoy used an
+  :ref:`enum <envoy_v3_api_field_config.cluster.v3.Cluster.lb_policy>`
+  to specify load balancing policies. This ``enum`` is still supported for
+  backward compatibility, but deprecated.
+
+  :ref:`extendable load balancing policies <envoy_v3_api_config_load_balancer_policies>`
+  should be used instead.
 
 Taking :ref:`random load balancing policy <envoy_v3_api_msg_extensions.load_balancing_policies.random.v3.Random>`
 as an example:
