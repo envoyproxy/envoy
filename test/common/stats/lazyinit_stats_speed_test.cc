@@ -1,5 +1,3 @@
-#include "envoy/upstream/upstream.h"
-
 #include "source/common/common/random_generator.h"
 #include "source/common/stats/isolated_store_impl.h"
 #include "source/common/stats/lazy_init.h"
@@ -17,7 +15,73 @@
 namespace Envoy {
 namespace Stats {
 
-using Upstream::ClusterTrafficStats;
+// Creates a copy of Upstream::ALL_CLUSTER_TRAFFIC_STATS, such that per Joshua, we have a "a stable
+// set of stats for performance" test.
+#define AWESOME_STATS(COUNTER, GAUGE, HISTOGRAM, TEXT_READOUT, STATNAME)                           \
+  COUNTER(bind_errors)                                                                             \
+  COUNTER(original_dst_host_invalid)                                                               \
+  COUNTER(retry_or_shadow_abandoned)                                                               \
+  COUNTER(upstream_cx_close_notify)                                                                \
+  COUNTER(upstream_cx_connect_attempts_exceeded)                                                   \
+  COUNTER(upstream_cx_connect_fail)                                                                \
+  COUNTER(upstream_cx_connect_timeout)                                                             \
+  COUNTER(upstream_cx_connect_with_0_rtt)                                                          \
+  COUNTER(upstream_cx_destroy)                                                                     \
+  COUNTER(upstream_cx_destroy_local)                                                               \
+  COUNTER(upstream_cx_destroy_local_with_active_rq)                                                \
+  COUNTER(upstream_cx_destroy_remote)                                                              \
+  COUNTER(upstream_cx_destroy_remote_with_active_rq)                                               \
+  COUNTER(upstream_cx_destroy_with_active_rq)                                                      \
+  COUNTER(upstream_cx_http1_total)                                                                 \
+  COUNTER(upstream_cx_http2_total)                                                                 \
+  COUNTER(upstream_cx_http3_total)                                                                 \
+  COUNTER(upstream_cx_idle_timeout)                                                                \
+  COUNTER(upstream_cx_max_duration_reached)                                                        \
+  COUNTER(upstream_cx_max_requests)                                                                \
+  COUNTER(upstream_cx_none_healthy)                                                                \
+  COUNTER(upstream_cx_overflow)                                                                    \
+  COUNTER(upstream_cx_pool_overflow)                                                               \
+  COUNTER(upstream_cx_protocol_error)                                                              \
+  COUNTER(upstream_cx_rx_bytes_total)                                                              \
+  COUNTER(upstream_cx_total)                                                                       \
+  COUNTER(upstream_cx_tx_bytes_total)                                                              \
+  COUNTER(upstream_flow_control_backed_up_total)                                                   \
+  COUNTER(upstream_flow_control_drained_total)                                                     \
+  COUNTER(upstream_flow_control_paused_reading_total)                                              \
+  COUNTER(upstream_flow_control_resumed_reading_total)                                             \
+  COUNTER(upstream_internal_redirect_failed_total)                                                 \
+  COUNTER(upstream_internal_redirect_succeeded_total)                                              \
+  COUNTER(upstream_rq_cancelled)                                                                   \
+  COUNTER(upstream_rq_completed)                                                                   \
+  COUNTER(upstream_rq_maintenance_mode)                                                            \
+  COUNTER(upstream_rq_max_duration_reached)                                                        \
+  COUNTER(upstream_rq_pending_failure_eject)                                                       \
+  COUNTER(upstream_rq_pending_overflow)                                                            \
+  COUNTER(upstream_rq_pending_total)                                                               \
+  COUNTER(upstream_rq_0rtt)                                                                        \
+  COUNTER(upstream_rq_per_try_timeout)                                                             \
+  COUNTER(upstream_rq_per_try_idle_timeout)                                                        \
+  COUNTER(upstream_rq_retry)                                                                       \
+  COUNTER(upstream_rq_retry_backoff_exponential)                                                   \
+  COUNTER(upstream_rq_retry_backoff_ratelimited)                                                   \
+  COUNTER(upstream_rq_retry_limit_exceeded)                                                        \
+  COUNTER(upstream_rq_retry_overflow)                                                              \
+  COUNTER(upstream_rq_retry_success)                                                               \
+  COUNTER(upstream_rq_rx_reset)                                                                    \
+  COUNTER(upstream_rq_timeout)                                                                     \
+  COUNTER(upstream_rq_total)                                                                       \
+  COUNTER(upstream_rq_tx_reset)                                                                    \
+  COUNTER(upstream_http3_broken)                                                                   \
+  GAUGE(upstream_cx_active, Accumulate)                                                            \
+  GAUGE(upstream_cx_rx_bytes_buffered, Accumulate)                                                 \
+  GAUGE(upstream_cx_tx_bytes_buffered, Accumulate)                                                 \
+  GAUGE(upstream_rq_active, Accumulate)                                                            \
+  GAUGE(upstream_rq_pending_active, Accumulate)                                                    \
+  HISTOGRAM(upstream_cx_connect_ms, Milliseconds)                                                  \
+  HISTOGRAM(upstream_cx_length_ms, Milliseconds)
+
+MAKE_STAT_NAMES_STRUCT(AwesomeStatNames, AWESOME_STATS);
+MAKE_STATS_STRUCT(AwesomeStats, AwesomeStatNames, AWESOME_STATS);
 
 class LazyInitStatsBenchmarkBase {
 public:
@@ -30,14 +94,11 @@ public:
       std::string new_cluster_name = absl::StrCat("cluster_", i);
       ScopeSharedPtr scope = stat_store_.createScope(new_cluster_name);
       scopes_.push_back(scope);
-      if (lazy_init_) {
-        auto lazy_stat = std::make_shared<LazyInit<ClusterTrafficStats>>(stat_names_, scope);
-        lazy_stats_.push_back(lazy_stat);
-        if (!defer_init) {
-          *(*lazy_stat);
-        }
-      } else {
-        normal_stats_.push_back(std::make_shared<ClusterTrafficStats>(stat_names_, *scope));
+      auto lazy_stat = std::make_shared<LazyCompatibleStats<AwesomeStats>>(
+          LazyCompatibleStats<AwesomeStats>::create(scope, stat_names_, lazy_init_));
+      lazy_stats_.push_back(lazy_stat);
+      if (!defer_init) {
+        *(*lazy_stat);
       }
     }
   }
@@ -46,9 +107,8 @@ public:
   const uint64_t num_clusters_;
   Store& stat_store_;
   std::vector<ScopeSharedPtr> scopes_;
-  std::vector<std::shared_ptr<LazyInit<ClusterTrafficStats>>> lazy_stats_;
-  std::vector<std::shared_ptr<ClusterTrafficStats>> normal_stats_;
-  Upstream::ClusterTrafficStatNames stat_names_;
+  std::vector<std::shared_ptr<LazyCompatibleStats<AwesomeStats>>> lazy_stats_;
+  AwesomeStatNames stat_names_;
 };
 
 // Benchmark no-lazy-init on stats, the lazy init version is much faster since no allocation.
@@ -116,13 +176,11 @@ void benchmarkLazyInitCreationInstantiateOnWorkerThreads(::benchmark::State& sta
       uint64_t begin = t_idx * batch_size;
       uint64_t end = std::min(begin + batch_size, test.num_clusters_);
       for (uint64_t idx = begin; idx < end; ++idx) {
-        // Instantiate the actual ClusterTrafficStats objects in worker threads, in batches to avoid
+        // Instantiate the actual AwesomeStats objects in worker threads, in batches to avoid
         // possible contention.
         if (test.lazy_init_) {
           // Lazy-init on workers happen when the "index"-th stat instance is not created.
           *(*test.lazy_stats_[idx]);
-        } else {
-          *test.normal_stats_[idx];
         }
       }
     });
@@ -145,13 +203,8 @@ void benchmarkLazyInitStatsAccess(::benchmark::State& state) {
     test.runOnAllWorkersBlocking([&]() {
       // 50 x num_clusters_ inc() calls.
       for (uint64_t idx = 0; idx < 10 * test.num_clusters_; ++idx) {
-        if (test.lazy_init_) {
-          ClusterTrafficStats& stats = *(*test.lazy_stats_[idx % test.num_clusters_]);
-          stats.upstream_cx_active_.inc();
-        } else {
-          ClusterTrafficStats& stats = *test.normal_stats_[idx % test.num_clusters_];
-          stats.upstream_cx_active_.inc();
-        }
+        AwesomeStats& stats = *(*test.lazy_stats_[idx % test.num_clusters_]);
+        stats.upstream_cx_active_.inc();
       }
     });
   }
