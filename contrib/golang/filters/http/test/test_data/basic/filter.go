@@ -90,6 +90,15 @@ func (f *filter) decodeHeaders(header api.RequestHeaderMap, endStream bool) api.
 	}
 
 	origin, _ := header.Get("x-test-header-0")
+	hdrs := header.Values("x-test-header-0")
+	if origin != "" {
+		if origin != hdrs[0] {
+			return f.fail("Values return incorrect data %v", hdrs)
+		}
+	} else if hdrs != nil {
+		return f.fail("Values return unexpected data %v", hdrs)
+	}
+
 	header.Set("test-x-set-header-0", origin)
 	header.Del("x-test-header-1")
 	header.Set("req-route-name", f.callbacks.StreamInfo().GetRouteName())
@@ -154,6 +163,15 @@ func (f *filter) encodeHeaders(header api.ResponseHeaderMap, endStream bool) api
 		return f.sendLocalReply("encode-header")
 	}
 	origin, _ := header.Get("x-test-header-0")
+	hdrs := header.Values("x-test-header-0")
+	if origin != "" {
+		if origin != hdrs[0] {
+			return f.fail("Values return incorrect data %v", hdrs)
+		}
+	} else if hdrs != nil {
+		return f.fail("Values return unexpected data %v", hdrs)
+	}
+
 	header.Set("test-x-set-header-0", origin)
 	header.Del("x-test-header-1")
 	header.Set("test-req-body-length", strconv.Itoa(int(f.req_body_length)))
