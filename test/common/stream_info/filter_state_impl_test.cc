@@ -130,10 +130,10 @@ TEST_F(FilterStateImplTest, SameTypes) {
 }
 
 TEST_F(FilterStateImplTest, SimpleTypeReadOnly) {
-  filterState().setData("test_1", std::make_unique<SimpleType>(1),
-                         FilterState::StateType::ReadOnly, FilterState::LifeSpan::FilterChain);
-  filterState().setData("test_2", std::make_unique<SimpleType>(2),
-                         FilterState::StateType::ReadOnly, FilterState::LifeSpan::FilterChain);
+  filterState().setData("test_1", std::make_unique<SimpleType>(1), FilterState::StateType::ReadOnly,
+                        FilterState::LifeSpan::FilterChain);
+  filterState().setData("test_2", std::make_unique<SimpleType>(2), FilterState::StateType::ReadOnly,
+                        FilterState::LifeSpan::FilterChain);
 
   EXPECT_EQ(1, filterState().getDataReadOnly<SimpleType>("test_1")->access());
   EXPECT_EQ(2, filterState().getDataReadOnly<SimpleType>("test_2")->access());
@@ -141,9 +141,9 @@ TEST_F(FilterStateImplTest, SimpleTypeReadOnly) {
 
 TEST_F(FilterStateImplTest, SimpleTypeMutable) {
   filterState().setData("test_1", std::make_unique<SimpleType>(1), FilterState::StateType::Mutable,
-                         FilterState::LifeSpan::FilterChain);
+                        FilterState::LifeSpan::FilterChain);
   filterState().setData("test_2", std::make_unique<SimpleType>(2), FilterState::StateType::Mutable,
-                         FilterState::LifeSpan::FilterChain);
+                        FilterState::LifeSpan::FilterChain);
 
   EXPECT_EQ(1, filterState().getDataReadOnly<SimpleType>("test_1")->access());
   EXPECT_EQ(2, filterState().getDataReadOnly<SimpleType>("test_2")->access());
@@ -156,36 +156,35 @@ TEST_F(FilterStateImplTest, SimpleTypeMutable) {
 
 TEST_F(FilterStateImplTest, NameConflictReadOnly) {
   // read only data cannot be overwritten (by any state type)
-  filterState().setData("test_1", std::make_unique<SimpleType>(1),
-                         FilterState::StateType::ReadOnly, FilterState::LifeSpan::FilterChain);
+  filterState().setData("test_1", std::make_unique<SimpleType>(1), FilterState::StateType::ReadOnly,
+                        FilterState::LifeSpan::FilterChain);
   EXPECT_THROW_WITH_MESSAGE(
       filterState().setData("test_1", std::make_unique<SimpleType>(2),
-                             FilterState::StateType::ReadOnly, FilterState::LifeSpan::FilterChain),
+                            FilterState::StateType::ReadOnly, FilterState::LifeSpan::FilterChain),
       EnvoyException, "FilterState::setData<T> called twice on same ReadOnly state.");
   EXPECT_THROW_WITH_MESSAGE(
       filterState().setData("test_1", std::make_unique<SimpleType>(2),
-                             FilterState::StateType::Mutable, FilterState::LifeSpan::FilterChain),
+                            FilterState::StateType::Mutable, FilterState::LifeSpan::FilterChain),
       EnvoyException, "FilterState::setData<T> called twice on same ReadOnly state.");
   EXPECT_EQ(1, filterState().getDataReadOnly<SimpleType>("test_1")->access());
 }
 
 TEST_F(FilterStateImplTest, NameConflictDifferentTypesReadOnly) {
-  filterState().setData("test_1", std::make_unique<SimpleType>(1),
-                         FilterState::StateType::ReadOnly, FilterState::LifeSpan::FilterChain);
+  filterState().setData("test_1", std::make_unique<SimpleType>(1), FilterState::StateType::ReadOnly,
+                        FilterState::LifeSpan::FilterChain);
   EXPECT_THROW_WITH_MESSAGE(
-      filterState().setData("test_1",
-                             std::make_unique<TestStoredTypeTracking>(2, nullptr, nullptr),
-                             FilterState::StateType::ReadOnly, FilterState::LifeSpan::FilterChain),
+      filterState().setData("test_1", std::make_unique<TestStoredTypeTracking>(2, nullptr, nullptr),
+                            FilterState::StateType::ReadOnly, FilterState::LifeSpan::FilterChain),
       EnvoyException, "FilterState::setData<T> called twice on same ReadOnly state.");
 }
 
 TEST_F(FilterStateImplTest, NameConflictMutableAndReadOnly) {
   // Mutable data cannot be overwritten by read only data.
   filterState().setData("test_1", std::make_unique<SimpleType>(1), FilterState::StateType::Mutable,
-                         FilterState::LifeSpan::FilterChain);
+                        FilterState::LifeSpan::FilterChain);
   EXPECT_THROW_WITH_MESSAGE(
       filterState().setData("test_1", std::make_unique<SimpleType>(2),
-                             FilterState::StateType::ReadOnly, FilterState::LifeSpan::FilterChain),
+                            FilterState::StateType::ReadOnly, FilterState::LifeSpan::FilterChain),
       EnvoyException, "FilterState::setData<T> called twice with different state types.");
 }
 
@@ -194,16 +193,16 @@ TEST_F(FilterStateImplTest, NoNameConflictMutableAndMutable) {
 
   // mutable + mutable - same type
   filterState().setData("test_2", std::make_unique<SimpleType>(3), FilterState::StateType::Mutable,
-                         FilterState::LifeSpan::FilterChain);
+                        FilterState::LifeSpan::FilterChain);
   filterState().setData("test_2", std::make_unique<SimpleType>(4), FilterState::StateType::Mutable,
-                         FilterState::LifeSpan::FilterChain);
+                        FilterState::LifeSpan::FilterChain);
   EXPECT_EQ(4, filterState().getDataMutable<SimpleType>("test_2")->access());
 
   // mutable + mutable - different types
   filterState().setData("test_4", std::make_unique<SimpleType>(7), FilterState::StateType::Mutable,
-                         FilterState::LifeSpan::FilterChain);
+                        FilterState::LifeSpan::FilterChain);
   filterState().setData("test_4", std::make_unique<TestStoredTypeTracking>(8, nullptr, nullptr),
-                         FilterState::StateType::Mutable, FilterState::LifeSpan::FilterChain);
+                        FilterState::StateType::Mutable, FilterState::LifeSpan::FilterChain);
   EXPECT_EQ(8, filterState().getDataReadOnly<TestStoredTypeTracking>("test_4")->access());
 }
 
@@ -215,7 +214,7 @@ TEST_F(FilterStateImplTest, UnknownName) {
 
 TEST_F(FilterStateImplTest, WrongTypeGet) {
   filterState().setData("test_name", std::make_unique<TestStoredTypeTracking>(5, nullptr, nullptr),
-                         FilterState::StateType::ReadOnly, FilterState::LifeSpan::FilterChain);
+                        FilterState::StateType::ReadOnly, FilterState::LifeSpan::FilterChain);
   EXPECT_EQ(5, filterState().getDataReadOnly<TestStoredTypeTracking>("test_name")->access());
   EXPECT_EQ(nullptr, filterState().getDataReadOnly<SimpleType>("test_name"));
 }
@@ -223,7 +222,7 @@ TEST_F(FilterStateImplTest, WrongTypeGet) {
 TEST_F(FilterStateImplTest, ErrorAccessingReadOnlyAsMutable) {
   // Accessing read only data as mutable should throw error
   filterState().setData("test_name", std::make_unique<TestStoredTypeTracking>(5, nullptr, nullptr),
-                         FilterState::StateType::ReadOnly, FilterState::LifeSpan::FilterChain);
+                        FilterState::StateType::ReadOnly, FilterState::LifeSpan::FilterChain);
   EXPECT_THROW_WITH_MESSAGE(filterState().getDataMutable<TestStoredTypeTracking>("test_name"),
                             EnvoyException,
                             "FilterState tried to access immutable data as mutable.");
@@ -243,21 +242,21 @@ class C : public B {};
 
 TEST_F(FilterStateImplTest, FungibleInheritance) {
   filterState().setData("testB", std::make_unique<B>(), FilterState::StateType::ReadOnly,
-                         FilterState::LifeSpan::FilterChain);
+                        FilterState::LifeSpan::FilterChain);
   EXPECT_TRUE(filterState().hasData<B>("testB"));
   EXPECT_TRUE(filterState().hasData<A>("testB"));
   EXPECT_FALSE(filterState().hasData<C>("testB"));
 
   filterState().setData("testC", std::make_unique<C>(), FilterState::StateType::ReadOnly,
-                         FilterState::LifeSpan::FilterChain);
+                        FilterState::LifeSpan::FilterChain);
   EXPECT_TRUE(filterState().hasData<B>("testC"));
   EXPECT_TRUE(filterState().hasData<A>("testC"));
   EXPECT_TRUE(filterState().hasData<C>("testC"));
 }
 
 TEST_F(FilterStateImplTest, HasData) {
-  filterState().setData("test_1", std::make_unique<SimpleType>(1),
-                         FilterState::StateType::ReadOnly, FilterState::LifeSpan::FilterChain);
+  filterState().setData("test_1", std::make_unique<SimpleType>(1), FilterState::StateType::ReadOnly,
+                        FilterState::LifeSpan::FilterChain);
   EXPECT_TRUE(filterState().hasData<SimpleType>("test_1"));
   EXPECT_FALSE(filterState().hasData<SimpleType>("test_2"));
   EXPECT_FALSE(filterState().hasData<TestStoredTypeTracking>("test_1"));
@@ -267,18 +266,18 @@ TEST_F(FilterStateImplTest, HasData) {
 }
 
 TEST_F(FilterStateImplTest, LifeSpanInitFromParent) {
-  filterState().setData("test_1", std::make_unique<SimpleType>(1),
-                         FilterState::StateType::ReadOnly, FilterState::LifeSpan::FilterChain);
+  filterState().setData("test_1", std::make_unique<SimpleType>(1), FilterState::StateType::ReadOnly,
+                        FilterState::LifeSpan::FilterChain);
   filterState().setData("test_2", std::make_unique<SimpleType>(2), FilterState::StateType::Mutable,
-                         FilterState::LifeSpan::FilterChain);
-  filterState().setData("test_3", std::make_unique<SimpleType>(3),
-                         FilterState::StateType::ReadOnly, FilterState::LifeSpan::Request);
+                        FilterState::LifeSpan::FilterChain);
+  filterState().setData("test_3", std::make_unique<SimpleType>(3), FilterState::StateType::ReadOnly,
+                        FilterState::LifeSpan::Request);
   filterState().setData("test_4", std::make_unique<SimpleType>(4), FilterState::StateType::Mutable,
-                         FilterState::LifeSpan::Request);
-  filterState().setData("test_5", std::make_unique<SimpleType>(5),
-                         FilterState::StateType::ReadOnly, FilterState::LifeSpan::Connection);
+                        FilterState::LifeSpan::Request);
+  filterState().setData("test_5", std::make_unique<SimpleType>(5), FilterState::StateType::ReadOnly,
+                        FilterState::LifeSpan::Connection);
   filterState().setData("test_6", std::make_unique<SimpleType>(6), FilterState::StateType::Mutable,
-                         FilterState::LifeSpan::Connection);
+                        FilterState::LifeSpan::Connection);
 
   FilterStateImpl new_filter_state(filterState().parent(), FilterState::LifeSpan::FilterChain);
   EXPECT_FALSE(new_filter_state.hasDataWithName("test_1"));
@@ -299,18 +298,18 @@ TEST_F(FilterStateImplTest, LifeSpanInitFromParent) {
 }
 
 TEST_F(FilterStateImplTest, LifeSpanInitFromGrandparent) {
-  filterState().setData("test_1", std::make_unique<SimpleType>(1),
-                         FilterState::StateType::ReadOnly, FilterState::LifeSpan::FilterChain);
+  filterState().setData("test_1", std::make_unique<SimpleType>(1), FilterState::StateType::ReadOnly,
+                        FilterState::LifeSpan::FilterChain);
   filterState().setData("test_2", std::make_unique<SimpleType>(2), FilterState::StateType::Mutable,
-                         FilterState::LifeSpan::FilterChain);
-  filterState().setData("test_3", std::make_unique<SimpleType>(3),
-                         FilterState::StateType::ReadOnly, FilterState::LifeSpan::Request);
+                        FilterState::LifeSpan::FilterChain);
+  filterState().setData("test_3", std::make_unique<SimpleType>(3), FilterState::StateType::ReadOnly,
+                        FilterState::LifeSpan::Request);
   filterState().setData("test_4", std::make_unique<SimpleType>(4), FilterState::StateType::Mutable,
-                         FilterState::LifeSpan::Request);
-  filterState().setData("test_5", std::make_unique<SimpleType>(5),
-                         FilterState::StateType::ReadOnly, FilterState::LifeSpan::Connection);
+                        FilterState::LifeSpan::Request);
+  filterState().setData("test_5", std::make_unique<SimpleType>(5), FilterState::StateType::ReadOnly,
+                        FilterState::LifeSpan::Connection);
   filterState().setData("test_6", std::make_unique<SimpleType>(6), FilterState::StateType::Mutable,
-                         FilterState::LifeSpan::Connection);
+                        FilterState::LifeSpan::Connection);
 
   FilterStateImpl new_filter_state(filterState().parent()->parent(),
                                    FilterState::LifeSpan::FilterChain);
@@ -326,18 +325,18 @@ TEST_F(FilterStateImplTest, LifeSpanInitFromGrandparent) {
 }
 
 TEST_F(FilterStateImplTest, LifeSpanInitFromNonParent) {
-  filterState().setData("test_1", std::make_unique<SimpleType>(1),
-                         FilterState::StateType::ReadOnly, FilterState::LifeSpan::FilterChain);
+  filterState().setData("test_1", std::make_unique<SimpleType>(1), FilterState::StateType::ReadOnly,
+                        FilterState::LifeSpan::FilterChain);
   filterState().setData("test_2", std::make_unique<SimpleType>(2), FilterState::StateType::Mutable,
-                         FilterState::LifeSpan::FilterChain);
-  filterState().setData("test_3", std::make_unique<SimpleType>(3),
-                         FilterState::StateType::ReadOnly, FilterState::LifeSpan::Request);
+                        FilterState::LifeSpan::FilterChain);
+  filterState().setData("test_3", std::make_unique<SimpleType>(3), FilterState::StateType::ReadOnly,
+                        FilterState::LifeSpan::Request);
   filterState().setData("test_4", std::make_unique<SimpleType>(4), FilterState::StateType::Mutable,
-                         FilterState::LifeSpan::Request);
-  filterState().setData("test_5", std::make_unique<SimpleType>(5),
-                         FilterState::StateType::ReadOnly, FilterState::LifeSpan::Connection);
+                        FilterState::LifeSpan::Request);
+  filterState().setData("test_5", std::make_unique<SimpleType>(5), FilterState::StateType::ReadOnly,
+                        FilterState::LifeSpan::Connection);
   filterState().setData("test_6", std::make_unique<SimpleType>(6), FilterState::StateType::Mutable,
-                         FilterState::LifeSpan::Connection);
+                        FilterState::LifeSpan::Connection);
 
   FilterStateImpl new_filter_state(filterState().parent(), FilterState::LifeSpan::Request);
   EXPECT_FALSE(new_filter_state.hasDataWithName("test_1"));
@@ -351,23 +350,23 @@ TEST_F(FilterStateImplTest, LifeSpanInitFromNonParent) {
 TEST_F(FilterStateImplTest, SharedWithUpstream) {
   auto shared = std::make_shared<SimpleType>(1);
   filterState().setData("shared_1", shared, FilterState::StateType::ReadOnly,
-                         FilterState::LifeSpan::FilterChain,
-                         FilterState::StreamSharing::SharedWithUpstreamConnection);
+                        FilterState::LifeSpan::FilterChain,
+                        FilterState::StreamSharing::SharedWithUpstreamConnection);
   filterState().setData("test_2", std::make_shared<SimpleType>(2), FilterState::StateType::Mutable,
-                         FilterState::LifeSpan::FilterChain);
-  filterState().setData("test_3", std::make_shared<SimpleType>(3),
-                         FilterState::StateType::ReadOnly, FilterState::LifeSpan::Request);
+                        FilterState::LifeSpan::FilterChain);
+  filterState().setData("test_3", std::make_shared<SimpleType>(3), FilterState::StateType::ReadOnly,
+                        FilterState::LifeSpan::Request);
   filterState().setData("shared_4", std::make_shared<SimpleType>(4),
-                         FilterState::StateType::Mutable, FilterState::LifeSpan::Request,
-                         FilterState::StreamSharing::SharedWithUpstreamConnection);
+                        FilterState::StateType::Mutable, FilterState::LifeSpan::Request,
+                        FilterState::StreamSharing::SharedWithUpstreamConnection);
   filterState().setData("shared_5", std::make_shared<SimpleType>(5),
-                         FilterState::StateType::ReadOnly, FilterState::LifeSpan::Connection,
-                         FilterState::StreamSharing::SharedWithUpstreamConnection);
+                        FilterState::StateType::ReadOnly, FilterState::LifeSpan::Connection,
+                        FilterState::StreamSharing::SharedWithUpstreamConnection);
   filterState().setData("test_6", std::make_shared<SimpleType>(6), FilterState::StateType::Mutable,
-                         FilterState::LifeSpan::Connection);
+                        FilterState::LifeSpan::Connection);
   filterState().setData("shared_7", std::make_shared<SimpleType>(7),
-                         FilterState::StateType::ReadOnly, FilterState::LifeSpan::Connection,
-                         FilterState::StreamSharing::SharedWithUpstreamConnectionOnce);
+                        FilterState::StateType::ReadOnly, FilterState::LifeSpan::Connection,
+                        FilterState::StreamSharing::SharedWithUpstreamConnectionOnce);
   auto objects = filterState().objectsSharedWithUpstreamConnection();
   EXPECT_EQ(objects->size(), 4);
   std::sort(objects->begin(), objects->end(),
@@ -391,20 +390,20 @@ TEST_F(FilterStateImplTest, SharedWithUpstream) {
 }
 
 TEST_F(FilterStateImplTest, HasDataAtOrAboveLifeSpan) {
-  filterState().setData("test_1", std::make_unique<SimpleType>(1),
-                         FilterState::StateType::ReadOnly, FilterState::LifeSpan::FilterChain);
+  filterState().setData("test_1", std::make_unique<SimpleType>(1), FilterState::StateType::ReadOnly,
+                        FilterState::LifeSpan::FilterChain);
   EXPECT_TRUE(filterState().hasDataAtOrAboveLifeSpan(FilterState::LifeSpan::FilterChain));
   EXPECT_FALSE(filterState().hasDataAtOrAboveLifeSpan(FilterState::LifeSpan::Request));
   EXPECT_FALSE(filterState().hasDataAtOrAboveLifeSpan(FilterState::LifeSpan::Connection));
 
-  filterState().setData("test_2", std::make_unique<SimpleType>(2),
-                         FilterState::StateType::ReadOnly, FilterState::LifeSpan::Request);
+  filterState().setData("test_2", std::make_unique<SimpleType>(2), FilterState::StateType::ReadOnly,
+                        FilterState::LifeSpan::Request);
   EXPECT_TRUE(filterState().hasDataAtOrAboveLifeSpan(FilterState::LifeSpan::FilterChain));
   EXPECT_TRUE(filterState().hasDataAtOrAboveLifeSpan(FilterState::LifeSpan::Request));
   EXPECT_FALSE(filterState().hasDataAtOrAboveLifeSpan(FilterState::LifeSpan::Connection));
 
-  filterState().setData("test_3", std::make_unique<SimpleType>(3),
-                         FilterState::StateType::ReadOnly, FilterState::LifeSpan::Connection);
+  filterState().setData("test_3", std::make_unique<SimpleType>(3), FilterState::StateType::ReadOnly,
+                        FilterState::LifeSpan::Connection);
   EXPECT_TRUE(filterState().hasDataAtOrAboveLifeSpan(FilterState::LifeSpan::FilterChain));
   EXPECT_TRUE(filterState().hasDataAtOrAboveLifeSpan(FilterState::LifeSpan::Request));
   EXPECT_TRUE(filterState().hasDataAtOrAboveLifeSpan(FilterState::LifeSpan::Connection));
@@ -412,41 +411,41 @@ TEST_F(FilterStateImplTest, HasDataAtOrAboveLifeSpan) {
 
 TEST_F(FilterStateImplTest, SetSameDataWithDifferentLifeSpan) {
   filterState().setData("test_1", std::make_unique<SimpleType>(1), FilterState::StateType::Mutable,
-                         FilterState::LifeSpan::Connection);
+                        FilterState::LifeSpan::Connection);
   // Test reset on smaller LifeSpan
   EXPECT_THROW_WITH_MESSAGE(
       filterState().setData("test_1", std::make_unique<SimpleType>(2),
-                             FilterState::StateType::Mutable, FilterState::LifeSpan::FilterChain),
+                            FilterState::StateType::Mutable, FilterState::LifeSpan::FilterChain),
       EnvoyException,
       "FilterState::setData<T> called twice with conflicting life_span on the same data_name.");
   EXPECT_THROW_WITH_MESSAGE(
       filterState().setData("test_1", std::make_unique<SimpleType>(2),
-                             FilterState::StateType::Mutable, FilterState::LifeSpan::Request),
+                            FilterState::StateType::Mutable, FilterState::LifeSpan::Request),
       EnvoyException,
       "FilterState::setData<T> called twice with conflicting life_span on the same data_name.");
 
   // Still mutable on the correct LifeSpan.
   filterState().setData("test_1", std::make_unique<SimpleType>(2), FilterState::StateType::Mutable,
-                         FilterState::LifeSpan::Connection);
+                        FilterState::LifeSpan::Connection);
   EXPECT_EQ(2, filterState().getDataMutable<SimpleType>("test_1")->access());
 
   filterState().setData("test_2", std::make_unique<SimpleType>(1), FilterState::StateType::Mutable,
-                         FilterState::LifeSpan::Request);
+                        FilterState::LifeSpan::Request);
   // Test reset on smaller and greater LifeSpan
   EXPECT_THROW_WITH_MESSAGE(
       filterState().setData("test_2", std::make_unique<SimpleType>(2),
-                             FilterState::StateType::Mutable, FilterState::LifeSpan::FilterChain),
+                            FilterState::StateType::Mutable, FilterState::LifeSpan::FilterChain),
       EnvoyException,
       "FilterState::setData<T> called twice with conflicting life_span on the same data_name.");
   EXPECT_THROW_WITH_MESSAGE(
       filterState().setData("test_2", std::make_unique<SimpleType>(2),
-                             FilterState::StateType::Mutable, FilterState::LifeSpan::Connection),
+                            FilterState::StateType::Mutable, FilterState::LifeSpan::Connection),
       EnvoyException,
       "FilterState::setData<T> called twice with conflicting life_span on the same data_name.");
 
   // Still mutable on the correct LifeSpan.
   filterState().setData("test_2", std::make_unique<SimpleType>(2), FilterState::StateType::Mutable,
-                         FilterState::LifeSpan::Request);
+                        FilterState::LifeSpan::Request);
   EXPECT_EQ(2, filterState().getDataMutable<SimpleType>("test_2")->access());
 }
 
