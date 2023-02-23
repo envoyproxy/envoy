@@ -409,7 +409,7 @@ bool ListenerManagerImpl::addOrUpdateListener(const envoy::config::listener::v3:
     }
   }
 
-  if (!config.has_address()) {
+  if (!config.has_internal_listener() && !config.has_api_listener() && !config.has_address()) {
     throw EnvoyException(
         fmt::format("error adding listener named '{}': address is necessary", name));
   }
