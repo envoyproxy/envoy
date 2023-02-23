@@ -26,10 +26,10 @@ public:
 
   void envoyGoFilterOnHttpDestroy(httpRequest* p0, int p1);
 
-  GoInt64 envoyGoOnClusterSpecify(GoUint64 pluginPtr, GoUint64 headerPtr, GoUint64 pluginId,
-                                  GoUint64 bufferPtr, GoUint64 bufferLen);
+  GoInt64 envoyGoOnClusterSpecify(GoUint64 plugin_ptr, GoUint64 header_ptr, GoUint64 plugin_id,
+                                  GoUint64 buffer_ptr, GoUint64 buffer_len);
 
-  GoUint64 envoyGoClusterSpecifierNewPlugin(GoUint64 configPtr, GoUint64 configLen);
+  GoUint64 envoyGoClusterSpecifierNewPlugin(GoUint64 config_ptr, GoUint64 config_len);
 
   bool loaded() { return loaded_; }
 
@@ -48,12 +48,12 @@ private:
 
   void (*envoy_go_filter_on_http_destroy_)(httpRequest* p0, GoUint64 p1) = {nullptr};
 
-  GoUint64 (*envoy_go_cluster_specifier_new_plugin_)(GoUint64 configPtr,
-                                                     GoUint64 configLen) = {nullptr};
+  GoUint64 (*envoy_go_cluster_specifier_new_plugin_)(GoUint64 config_ptr,
+                                                     GoUint64 config_len) = {nullptr};
 
-  GoUint64 (*envoy_go_on_cluster_specify_)(GoUint64 pluginPtr, GoUint64 headerPtr,
-                                           GoUint64 pluginId, GoUint64 bufferPtr,
-                                           GoUint64 bufferLen) = {nullptr};
+  GoUint64 (*envoy_go_on_cluster_specify_)(GoUint64 plugin_ptr, GoUint64 header_ptr,
+                                           GoUint64 plugin_id, GoUint64 buffer_ptr,
+                                           GoUint64 buffer_len) = {nullptr};
 };
 
 using DsoInstancePtr = std::shared_ptr<DsoInstance>;

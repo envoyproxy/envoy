@@ -108,16 +108,16 @@ void DsoInstance::envoyGoFilterOnHttpDestroy(httpRequest* p0, int p1) {
   envoy_go_filter_on_http_destroy_(p0, GoUint64(p1));
 }
 
-GoUint64 DsoInstance::envoyGoClusterSpecifierNewPlugin(GoUint64 configPtr, GoUint64 configLen) {
+GoUint64 DsoInstance::envoyGoClusterSpecifierNewPlugin(GoUint64 config_ptr, GoUint64 config_len) {
   ASSERT(envoy_go_cluster_specifier_new_plugin_ != nullptr);
-  return envoy_go_cluster_specifier_new_plugin_(configPtr, configLen);
+  return envoy_go_cluster_specifier_new_plugin_(config_ptr, config_len);
 }
 
-GoInt64 DsoInstance::envoyGoOnClusterSpecify(GoUint64 pluginPtr, GoUint64 headerPtr,
-                                             GoUint64 pluginId, GoUint64 bufferPtr,
-                                             GoUint64 bufferLen) {
+GoInt64 DsoInstance::envoyGoOnClusterSpecify(GoUint64 plugin_ptr, GoUint64 header_ptr,
+                                             GoUint64 plugin_id, GoUint64 buffer_ptr,
+                                             GoUint64 buffer_len) {
   ASSERT(envoy_go_on_cluster_specify_ != nullptr);
-  return envoy_go_on_cluster_specify_(pluginPtr, headerPtr, pluginId, bufferPtr, bufferLen);
+  return envoy_go_on_cluster_specify_(plugin_ptr, header_ptr, plugin_id, buffer_ptr, buffer_len);
 }
 
 } // namespace Dso

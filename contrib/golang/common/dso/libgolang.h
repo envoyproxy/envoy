@@ -130,12 +130,17 @@ extern void envoyGoFilterOnHttpDestroy(httpRequest* r, GoUint64 reason);
 
 // go:linkname envoyGoOnClusterSpecify
 // github.com/envoyproxy/envoy/contrib/golang/http/cluster_specifier/source/go/pkg/cluster_specifier.envoyGoOnClusterSpecify
-extern GoInt64 envoyGoOnClusterSpecify(GoUint64 pluginPtr, GoUint64 headerPtr, GoUint64 pluginId,
-                                       GoUint64 bufferPtr, GoUint64 bufferLen);
+extern GoInt64 envoyGoOnClusterSpecify(GoUint64 pluginPtr,  // NOLINT(readability-identifier-naming)
+                                       GoUint64 headerPtr,  // NOLINT(readability-identifier-naming)
+                                       GoUint64 pluginId,   // NOLINT(readability-identifier-naming)
+                                       GoUint64 bufferPtr,  // NOLINT(readability-identifier-naming)
+                                       GoUint64 bufferLen); // NOLINT(readability-identifier-naming)
 
 // go:linkname envoyGoClusterSpecifierNewPlugin
 // github.com/envoyproxy/envoy/contrib/golang/http/cluster_specifier/source/go/pkg/cluster_specifier.envoyGoClusterSpecifierNewPlugin
-extern GoUint64 envoyGoClusterSpecifierNewPlugin(GoUint64 configPtr, GoUint64 configLen);
+extern GoUint64
+envoyGoClusterSpecifierNewPlugin(GoUint64 configPtr,  // NOLINT(readability-identifier-naming)
+                                 GoUint64 configLen); // NOLINT(readability-identifier-naming)
 
 // go:linkname envoyGoClusterSpecifierDestroyConfig
 // github.com/envoyproxy/envoy/contrib/golang/http/cluster_specifier/source/go/pkg/cluster_specifier.envoyGoClusterSpecifierDestroyConfig
