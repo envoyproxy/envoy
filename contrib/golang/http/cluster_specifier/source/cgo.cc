@@ -18,8 +18,8 @@ absl::string_view referGoString(void* str) {
 
 extern "C" {
 
-void envoyGoClusterSpecifierGetHeader(unsigned long long headerPtr, void* key, void* value) {
-  auto header = reinterpret_cast<Http::RequestHeaderMap*>(headerPtr);
+void envoyGoClusterSpecifierGetHeader(unsigned long long header_ptr, void* key, void* value) {
+  auto header = reinterpret_cast<Http::RequestHeaderMap*>(header_ptr);
   auto keyStr = referGoString(key);
   auto goValue = reinterpret_cast<GoString*>(value);
   auto result = header->get(Http::LowerCaseString(keyStr));
@@ -31,9 +31,9 @@ void envoyGoClusterSpecifierGetHeader(unsigned long long headerPtr, void* key, v
   }
 }
 
-void envoyGoClusterSpecifierLogError(unsigned long long pluginPtr, void* msg) {
+void envoyGoClusterSpecifierLogError(unsigned long long plugin_ptr, void* msg) {
   auto msgStr = referGoString(msg);
-  auto plugin = reinterpret_cast<GolangClusterSpecifierPlugin*>(pluginPtr);
+  auto plugin = reinterpret_cast<GolangClusterSpecifierPlugin*>(plugin_ptr);
   plugin->log(msgStr);
 }
 }

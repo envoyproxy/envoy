@@ -48,7 +48,7 @@ ClusterConfig::ClusterConfig(const GolangClusterProto& config)
 
 RouteConstSharedPtr
 GolangClusterSpecifierPlugin::route(const RouteEntry& parent,
-                                    const Http::RequestHeaderMap& headers) const {
+                                    const Http::RequestHeaderMap& header) const {
   ASSERT(dynamic_cast<const RouteEntryImplBase*>(&parent) != nullptr);
   int buffer_len = 256;
   std::string buffer;
@@ -59,7 +59,7 @@ GolangClusterSpecifierPlugin::route(const RouteEntry& parent,
 again:
   buffer.reserve(buffer_len);
   auto plugin_id = config_->getPluginId();
-  auto header_ptr = reinterpret_cast<uint64_t>(&headers);
+  auto header_ptr = reinterpret_cast<uint64_t>(&header);
   auto plugin_ptr = reinterpret_cast<uint64_t>(this);
   auto buffer_ptr = reinterpret_cast<uint64_t>(buffer.data());
   auto new_len =

@@ -52,9 +52,6 @@ CAPIStatus envoyGoFilterHttpGetStringValue(void* r, int id, void* value);
 
 void envoyGoFilterHttpFinalize(void* r, int reason);
 
-void envoyGoClusterSpecifierGetHeader(unsigned long long headerPtr, void* key, void* value);
-void envoyGoClusterSpecifierLogError(unsigned long long pluginPtr, void* msg);
-
 #ifdef __cplusplus
 } // extern "C"
 #endif
