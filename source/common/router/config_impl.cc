@@ -1880,8 +1880,9 @@ RouteConstSharedPtr VirtualHostImpl::getRouteFromEntries(const RouteCallback& cb
       if (result->typeUrl() == RouteMatchAction::staticTypeUrl()) {
         const RouteMatchAction& route_action = result->getTyped<RouteMatchAction>();
 
-        if (route_action.route()->matches(headers, stream_info, random_value)) {
-          return route_action.route();
+        RouteConstSharedPtr route_entry = route_action.route()->matches(headers, stream_info, random_value);
+        if (nullptr != route_entry) {
+          return route_entry;
         }
 
         ENVOY_LOG(debug, "route was resolved but final route did not match incoming request");
@@ -1890,8 +1891,11 @@ RouteConstSharedPtr VirtualHostImpl::getRouteFromEntries(const RouteCallback& cb
         const RouteListMatchAction& action = result->getTyped<RouteListMatchAction>();
 
         for (const auto& route : action.routes()) {
-          if (route->matches(headers, stream_info, random_value)) {
-            return route;
+          RouteConstSharedPtr route_entry = route->matches(headers, stream_info, random_value);
+          if (nullptr == route_entry) {
+            continue;
+          } else {
+            return route_entry;
           }
         }
 

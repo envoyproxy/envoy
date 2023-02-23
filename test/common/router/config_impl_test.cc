@@ -1394,6 +1394,43 @@ virtual_hosts:
       "cannot set both matcher and routes on virtual host");
 }
 
+TEST_F(RouteMatcherTest, TestMatchTreeDynamicCluster) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+- name: www2
+  domains:
+  - lyft.com
+  matcher:
+    matcher_tree:
+      input:
+        name: request-headers
+        typed_config:
+          "@type": type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput
+          header_name: :path
+      exact_match_map:
+        map:
+          "/new_endpoint/foo":
+            action:
+              name: route
+              typed_config:
+                "@type": type.googleapis.com/envoy.config.route.v3.Route
+                match:
+                  prefix: /
+                route:
+                  cluster_header: x-cluster-header
+  )EOF";
+
+  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+  TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true);
+
+  {
+    Http::TestRequestHeaderMapImpl headers = genHeaders("lyft.com", "/new_endpoint/foo", "GET");
+    headers.setByKey("x-cluster-header", "www2");
+    const RouteEntry* route = config.route(headers, 0)->routeEntry();
+    EXPECT_EQ("www2", route->clusterName());
+  }
+}
+
 // Validates using RouteList as the mapper action.
 TEST_F(RouteMatcherTest, TestRouteList) {
   const std::string yaml = R"EOF(
@@ -1509,6 +1546,44 @@ virtual_hosts:
   }
   Http::TestRequestHeaderMapImpl headers = genHeaders("lyft.com", "/new_endpoint/baz", "GET");
   EXPECT_EQ(nullptr, config.route(headers, 0));
+}
+
+TEST_F(RouteMatcherTest, TestRouteListDynamicCluster) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+- name: www2
+  domains:
+  - lyft.com
+  matcher:
+    matcher_tree:
+      input:
+        name: request-headers
+        typed_config:
+          "@type": type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput
+          header_name: :path
+      prefix_match_map:
+        map:
+          "/new_endpoint/foo":
+            action:
+              name: route
+              typed_config:
+                "@type": type.googleapis.com/envoy.config.route.v3.RouteList
+                routes:
+                - match:
+                    prefix: /new_endpoint/foo/1
+                  route:
+                    cluster_header: x-cluster-header
+  )EOF";
+
+  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+  TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true);
+
+  {
+    Http::TestRequestHeaderMapImpl headers = genHeaders("lyft.com", "/new_endpoint/foo/1", "GET");
+    headers.setByKey("x-cluster-header", "www2");
+    const RouteEntry* route = config.route(headers, 0)->routeEntry();
+    EXPECT_EQ("www2", route->clusterName());
+  }
 }
 
 // Validates behavior of request_headers_to_add at router, vhost, and route levels.
