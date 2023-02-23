@@ -756,7 +756,7 @@ public:
                   Stats::ScopeSharedPtr&& stats_scope, bool added_via_api,
                   Server::Configuration::TransportSocketFactoryContext&);
 
-  static std::unique_ptr<LazyCompatibleClusterTrafficStats>
+  static LazyCompatibleClusterTrafficStats
   generateStats(Stats::ScopeSharedPtr scope, const ClusterTrafficStatNames& cluster_stat_names,
                 bool lazyinit);
   static ClusterLoadReportStats
@@ -870,8 +870,7 @@ public:
   ResourceManager& resourceManager(ResourcePriority priority) const override;
   TransportSocketMatcher& transportSocketMatcher() const override { return *socket_matcher_; }
   LazyCompatibleClusterTrafficStats& trafficStats() const override {
-    ASSERT(traffic_stats_ != nullptr);
-    return *traffic_stats_;
+    return traffic_stats_;
   }
   ClusterConfigUpdateStats& configUpdateStats() const override { return config_update_stats_; }
   ClusterLbStats& lbStats() const override { return lb_stats_; }
@@ -999,7 +998,7 @@ private:
   const float peekahead_ratio_;
   TransportSocketMatcherPtr socket_matcher_;
   Stats::ScopeSharedPtr stats_scope_;
-  const std::unique_ptr<LazyCompatibleClusterTrafficStats> traffic_stats_;
+  mutable LazyCompatibleClusterTrafficStats traffic_stats_;
   mutable ClusterConfigUpdateStats config_update_stats_;
   mutable ClusterLbStats lb_stats_;
   mutable ClusterEndpointStats endpoint_stats_;

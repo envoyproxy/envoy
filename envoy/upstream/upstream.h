@@ -36,7 +36,7 @@
 namespace Envoy {
 
 namespace Stats {
-template <typename StatsStructType> class LazyCompatibleInterface;
+template <typename StatsStructType> class LazyCompatibleStats;
 }
 
 namespace Http {
@@ -772,7 +772,7 @@ MAKE_STATS_STRUCT(ClusterLbStats, ClusterLbStatNames, ALL_CLUSTER_LB_STATS);
  */
 MAKE_STAT_NAMES_STRUCT(ClusterTrafficStatNames, ALL_CLUSTER_TRAFFIC_STATS);
 MAKE_STATS_STRUCT(ClusterTrafficStats, ClusterTrafficStatNames, ALL_CLUSTER_TRAFFIC_STATS);
-using LazyCompatibleClusterTrafficStats = Stats::LazyCompatibleInterface<ClusterTrafficStats>;
+using LazyCompatibleClusterTrafficStats = Stats::LazyCompatibleStats<ClusterTrafficStats>;
 
 MAKE_STAT_NAMES_STRUCT(ClusterLoadReportStatNames, ALL_CLUSTER_LOAD_REPORT_STATS);
 MAKE_STATS_STRUCT(ClusterLoadReportStats, ClusterLoadReportStatNames,

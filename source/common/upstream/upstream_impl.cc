@@ -847,10 +847,10 @@ void MainPrioritySetImpl::updateCrossPriorityHostMap(const HostVector& hosts_add
   }
 }
 
-std::unique_ptr<LazyCompatibleClusterTrafficStats>
+LazyCompatibleClusterTrafficStats
 ClusterInfoImpl::generateStats(Stats::ScopeSharedPtr scope,
                                const ClusterTrafficStatNames& stat_names, bool lazyinit) {
-  return Stats::LazyCompatibleInterface<ClusterTrafficStats>::create(scope, stat_names, lazyinit);
+  return LazyCompatibleClusterTrafficStats::create(scope, stat_names, lazyinit);
 }
 
 ClusterRequestResponseSizeStats ClusterInfoImpl::generateRequestResponseSizeStats(

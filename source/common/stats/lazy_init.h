@@ -18,16 +18,6 @@ template <typename StatsStructType> class LazyInit;
  */
 template <typename StatsStructType> class LazyCompatibleInterface {
 public:
-  static std::unique_ptr<LazyCompatibleInterface>
-  create(Stats::ScopeSharedPtr scope, const typename StatsStructType::StatNameType& stat_names,
-         bool lazyinit) {
-    if (lazyinit) {
-      return std::make_unique<LazyInit<StatsStructType>>(stat_names, scope);
-    } else {
-      return std::make_unique<DirectStats<StatsStructType>>(stat_names, *scope);
-    }
-  }
-
   // Helper operators to get-or-create and return the StatsStructType object.
   virtual StatsStructType* operator->() PURE;
   virtual StatsStructType& operator*() PURE;
@@ -87,8 +77,8 @@ private:
   // the previous generation's cluster's lazy-init block. We use the value in this shared gauge to
   // determine whether to instantiate the lazy block on construction.
   Gauge& inited_;
-  // TODO(stevenzzzz, jmarantz): Clean up this ctor_ by moving its ownership to AtomicPtr, and drop the setter lambda
-  // when the nested object is created.
+  // TODO(stevenzzzz, jmarantz): Clean up this ctor_ by moving its ownership to AtomicPtr, and drop
+  // the setter lambda when the nested object is created.
   std::function<StatsStructType*()> ctor_;
   Thread::AtomicPtr<StatsStructType, Thread::AtomicPtrAllocMode::DeleteOnDestruct>
       internal_stats_{};
@@ -107,6 +97,34 @@ public:
 
 private:
   StatsStructType stats_;
+};
+
+// A helper class to remove the double indirections on "operator ->/&" for a lazy compatible stats
+// struct.
+template <typename StatsStructType> class LazyCompatibleStats {
+public:
+  static LazyCompatibleStats create(Stats::ScopeSharedPtr scope,
+                                    const typename StatsStructType::StatNameType& stat_names,
+                                    bool lazyinit) {
+    if (lazyinit) {
+      return {std::make_unique<LazyInit<StatsStructType>>(stat_names, scope)};
+    } else {
+      return {std::make_unique<DirectStats<StatsStructType>>(stat_names, *scope)};
+    }
+  }
+
+  // Allows move construct and assign.
+  LazyCompatibleStats& operator=(LazyCompatibleStats&&) = default;
+  LazyCompatibleStats(LazyCompatibleStats&&) = default;
+
+  inline StatsStructType* operator->() { return data_->operator->(); };
+  inline StatsStructType& operator*() { return data_->operator*(); };
+
+private:
+  LazyCompatibleStats(std::unique_ptr<LazyCompatibleInterface<StatsStructType>> d)
+      : data_(std::move(d)) {}
+
+  std::unique_ptr<LazyCompatibleInterface<StatsStructType>> data_;
 };
 
 } // namespace Stats
