@@ -91,7 +91,7 @@ jobs:
     runs-on: ubuntu-20.04
     timeout-minutes: 90
     container:
-      image: envoyproxy/envoy-build-ubuntu:mobile-f52df4a4e1e2ecbcda42eb2f27a1550b6c53eef0
+      image: envoyproxy/envoy-build-ubuntu:mobile-458cb49ca2013c0ccf057d00ad1d4407920c4e52
       env:
         CC: /opt/llvm/bin/clang
         CXX: /opt/llvm/bin/clang++
