@@ -104,7 +104,7 @@ parseMetadataField(absl::string_view params_str, bool upstream = true) {
     if (upstream && stream_info.upstreamInfo()) {
       Upstream::HostDescriptionConstSharedPtr host = stream_info.upstreamInfo()->upstreamHost();
       if (!host) {
-        return {};
+        return std::string();
       }
       metadata = host->metadata().get();
     } else {
@@ -116,7 +116,7 @@ parseMetadataField(absl::string_view params_str, bool upstream = true) {
     if (value->kind_case() == ProtobufWkt::Value::KIND_NOT_SET) {
       // No kind indicates default ProtobufWkt::Value which means namespace or key not
       // found.
-      return {};
+      return std::string();
     }
 
     size_t i = 2;
@@ -127,7 +127,7 @@ parseMetadataField(absl::string_view params_str, bool upstream = true) {
 
       const auto field_it = value->struct_value().fields().find(params[i]);
       if (field_it == value->struct_value().fields().end()) {
-        return {};
+        return std::string();
       }
 
       value = &field_it->second;
@@ -136,7 +136,7 @@ parseMetadataField(absl::string_view params_str, bool upstream = true) {
 
     if (i < params.size()) {
       // Didn't find all the keys.
-      return {};
+      return std::string();
     }
 
     switch (value->kind_case()) {
@@ -153,7 +153,7 @@ parseMetadataField(absl::string_view params_str, bool upstream = true) {
       // Unsupported type or null value.
       ENVOY_LOG_MISC(debug, "unsupported value type for metadata [{}]",
                      absl::StrJoin(params, ", "));
-      return {};
+      return std::string();
     }
   };
 }
@@ -187,7 +187,7 @@ parsePerRequestStateField(absl::string_view param_str) {
                      "Invalid header information: PER_REQUEST_STATE value \"{}\" "
                      "exists but is not string accessible",
                      param);
-      return {};
+      return std::string();
     }
 
     return std::string(typed_state->asString());
@@ -217,7 +217,7 @@ parseRequestHeader(absl::string_view param) {
         return std::string(entry[0]->value().getStringView());
       }
     }
-    return {};
+    return std::string();
   };
 }
 

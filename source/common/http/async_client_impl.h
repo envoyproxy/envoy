@@ -257,7 +257,7 @@ private:
     const Router::CorsPolicy* corsPolicy() const override { return nullptr; }
     absl::optional<std::string>
     currentUrlPathAfterRewrite(const Http::RequestHeaderMap&) const override {
-      return {};
+      return absl::optional<std::string>();
     }
     void finalizeRequestHeaders(Http::RequestHeaderMap&, const StreamInfo::StreamInfo&,
                                 bool) const override {}
