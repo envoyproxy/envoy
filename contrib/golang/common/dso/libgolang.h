@@ -142,10 +142,6 @@ extern GoUint64
 envoyGoClusterSpecifierNewPlugin(GoUint64 configPtr,  // NOLINT(readability-identifier-naming)
                                  GoUint64 configLen); // NOLINT(readability-identifier-naming)
 
-// go:linkname envoyGoClusterSpecifierDestroyConfig
-// github.com/envoyproxy/envoy/contrib/golang/http/cluster_specifier/source/go/pkg/cluster_specifier.envoyGoClusterSpecifierDestroyConfig
-extern void envoyGoClusterSpecifierDestroyConfig(GoUint64 id);
-
 #ifdef __cplusplus
 }
 #endif
