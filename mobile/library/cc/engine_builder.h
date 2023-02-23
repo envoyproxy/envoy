@@ -41,8 +41,6 @@ struct NodeLocality {
 class EngineBuilder {
 public:
   EngineBuilder();
-  // This constructor is not compatible with bootstrap mode.
-  EngineBuilder(std::string config_template);
 
   // Use the experimental non-YAML config mode which uses the bootstrap proto directly.
   EngineBuilder& addLogLevel(LogLevel log_level);
@@ -121,28 +119,16 @@ public:
   EngineBuilder& addStringAccessor(std::string name, StringAccessorSharedPtr accessor);
 
   // This is separated from build() for the sake of testability
-  std::string generateConfigStr() const;
   std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> generateBootstrap() const;
 
   EngineSharedPtr build();
 
-  // Generate the bootstrap config and compare it to the passed-in yaml.
-  // Return true if the comparison is equivalent, false otherwise.
-  bool generateBootstrapAndCompare(absl::string_view yaml) const;
-  // Generate and return the bootstrap config and compare it to the passed-in yaml.
-  // Asserts that the comparison was equivalent.
-  std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap>
-  generateBootstrapAndCompareForTests(absl::string_view yaml) const;
-
 protected:
-  void setOverrideConfigForTests(std::string config) {
-    config_bootstrap_incompatible_ = true;
-    config_override_for_tests_ = config;
-  }
-  void setAdminAddressPathForTests(std::string admin) { admin_address_path_for_tests_ = admin; }
+  // Tests that need access to this method should go through the TestEngineBuilder class, which
+  // provides access to this protected method.
+  EngineBuilder& setOverrideConfigForTests(std::string config);
 
 private:
-  friend BaseClientIntegrationTest;
   struct NativeFilterConfig {
     NativeFilterConfig(std::string name, std::string typed_config)
         : name_(std::move(name)), typed_config_(std::move(typed_config)) {}
@@ -154,7 +140,6 @@ private:
   LogLevel log_level_ = LogLevel::info;
   EngineCallbacksSharedPtr callbacks_;
 
-  std::string config_template_;
   std::string stats_domain_;
   int connect_timeout_seconds_ = 30;
   int dns_refresh_seconds_ = 60;
@@ -169,13 +154,10 @@ private:
   std::string app_id_ = "unspecified";
   std::string device_os_ = "unspecified";
   std::string config_override_for_tests_ = "";
-  std::string admin_address_path_for_tests_ = "";
   int stream_idle_timeout_seconds_ = 15;
   int per_try_idle_timeout_seconds_ = 15;
   bool gzip_decompression_filter_ = true;
-  bool gzip_compression_filter_ = false;
   bool brotli_decompression_filter_ = false;
-  bool brotli_compression_filter_ = false;
   bool socket_tagging_filter_ = false;
   bool platform_certificates_validation_on_ = false;
   std::string rtds_layer_name_ = "";
@@ -200,7 +182,6 @@ private:
   bool enable_interface_binding_ = false;
   bool enable_drain_post_dns_refresh_ = false;
   bool enforce_trust_chain_verification_ = true;
-  bool h2_extend_keepalive_timeout_ = false;
   bool enable_http3_ = true;
   bool always_use_v6_ = false;
   int dns_min_refresh_seconds_ = 60;
@@ -214,7 +195,6 @@ private:
 
   std::vector<std::pair<std::string, bool>> runtime_guards_;
   absl::flat_hash_map<std::string, StringAccessorSharedPtr> string_accessors_;
-  bool config_bootstrap_incompatible_ = false;
   bool skip_dns_lookups_for_proxied_requests_ = false;
 };
 
