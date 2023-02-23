@@ -69,17 +69,13 @@ extern const char* alternate_protocols_cache_filter_insert;
  */
 extern const char* gzip_decompressor_config_insert;
 
-/* Insert that enables a compressor filter with gzip
- */
-extern const char* gzip_compressor_config_insert;
-
 /* Insert that enables a decompressor filter with brotli
  */
 extern const char* brotli_decompressor_config_insert;
 
-/* Insert that enables a compressor filter with brotli
+/* Insert that enables a composite compressor filter with gzip and brotli
  */
-extern const char* brotli_compressor_config_insert;
+extern const char* compressor_config_insert;
 
 /* Insert that enables a socket tagging filter.
  */
@@ -112,16 +108,31 @@ extern const char* default_cert_validation_context_template;
 extern const char* platform_cert_validation_context_template;
 
 /**
- * Config template for an RTDS layer
+ * Config template for an RTDS layer in the dynamic resources field.
  */
 extern const char* rtds_layer_insert;
 
 /**
- * Config template for a CDS layer
+ * Config template for a CDS layer in the dynamic resources field.
  */
 extern const char* cds_layer_insert;
 
 /**
- * ADS config
+ * Config template for a CDS layer using xdstp in the dynamic resources field.
+ */
+extern const char* xdstp_cds_layer_insert;
+
+/**
+ * Insert that sets the ADS config in the dynamic resources field.
  */
 extern const char* ads_insert;
+
+/**
+ * Insert that sets the ADS config's call credentials.
+ */
+extern const char* ads_call_credentials_insert;
+
+/**
+ * Insert that sets the ADS config's channel credentials.
+ */
+extern const char* ads_channel_credentials_insert;

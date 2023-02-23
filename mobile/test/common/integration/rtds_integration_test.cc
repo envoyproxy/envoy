@@ -18,16 +18,10 @@ public:
     initializeXdsStream();
   }
   void createEnvoy() override {
-    // Add the layered runtime config, which includes the RTDS layer.
-    const std::string api_type = sotw_or_delta_ == Grpc::SotwOrDelta::Sotw ||
-                                         sotw_or_delta_ == Grpc::SotwOrDelta::UnifiedSotw
-                                     ? "GRPC"
-                                     : "DELTA_GRPC";
-    builder_.addRtdsLayer("some_rtds_layer", 1);
-
-    builder_.setAggregatedDiscoveryService(api_type,
-                                           Network::Test::getLoopbackAddressUrlString(ipVersion()),
+    builder_.setAggregatedDiscoveryService(Network::Test::getLoopbackAddressUrlString(ipVersion()),
                                            fake_upstreams_[1]->localAddress()->ip()->port());
+    // Add the layered runtime config, which includes the RTDS layer.
+    builder_.addRtdsLayer("some_rtds_layer", 1);
     XdsIntegrationTest::createEnvoy();
   }
 
@@ -35,8 +29,12 @@ public:
   void SetUp() override { setUpstreamProtocol(Http::CodecType::HTTP1); }
 };
 
-INSTANTIATE_TEST_SUITE_P(IpVersionsClientTypeDelta, RtdsIntegrationTest,
-                         DELTA_SOTW_GRPC_CLIENT_INTEGRATION_PARAMS);
+INSTANTIATE_TEST_SUITE_P(
+    IpVersionsClientTypeDelta, RtdsIntegrationTest,
+    testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                     testing::ValuesIn(TestEnvironment::getsGrpcVersionsForTest()),
+                     // Envoy Mobile's xDS APIs only support state-of-the-world, not delta.
+                     testing::Values(Grpc::SotwOrDelta::Sotw, Grpc::SotwOrDelta::UnifiedSotw)));
 
 TEST_P(RtdsIntegrationTest, RtdsReload) {
   initialize();
