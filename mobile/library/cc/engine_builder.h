@@ -30,19 +30,13 @@ struct NodeLocality {
   std::string sub_zone;
 };
 
-// The C++ Engine builder supports 2 ways of building Envoy Mobile config, the 'legacy mode'
-// which uses a yaml config header, blocks of well known yaml configs, and uses string manipulation
-// to glue them together, and the 'bootstrap mode' which creates a structured bootstrap proto and
-// modifies it to produce the same config. We retain the legacy mode to be able to regression
-// test that changes to the config yaml are reflected in generateBootstrap, until all languages use
-// the C++ bootstrap builder.
-//
-// Bootstrap mode will be used unless the config_template constructor is used.
+// The C++ Engine builder creates a structured bootstrap proto and modifies it through parameters
+// set through the EngineBuilder API calls to produce the Bootstrap config that the Engine is
+// created from.
 class EngineBuilder {
 public:
   EngineBuilder();
 
-  // Use the experimental non-YAML config mode which uses the bootstrap proto directly.
   EngineBuilder& addLogLevel(LogLevel log_level);
   EngineBuilder& setOnEngineRunning(std::function<void()> closure);
 
@@ -114,7 +108,7 @@ public:
   // TODO(jpsim): Move this out of the main engine builder API
   EngineBuilder& addDirectResponse(DirectResponseTesting::DirectResponse direct_response);
 
-  // These functions don't affect YAML but instead perform registrations.
+  // These functions don't affect the Bootstrap configuration but instead perform registrations.
   EngineBuilder& addKeyValueStore(std::string name, KeyValueStoreSharedPtr key_value_store);
   EngineBuilder& addStringAccessor(std::string name, StringAccessorSharedPtr accessor);
 
@@ -124,8 +118,14 @@ public:
   EngineSharedPtr build();
 
 protected:
+  // Overrides the EngineBuilder's constructed configuration with the YAML config supplied in the
+  // `config` parameter. Any prior or subsequent calls to the EngineBuilder's APIs are ignored in
+  // favor of using the YAML string to construct the Envoy Engine's Bootsrap configuration.
+  //
+  // This method is protected so that production code does not rely on it.
+  //
   // Tests that need access to this method should go through the TestEngineBuilder class, which
-  // provides access to this protected method.
+  // provides access to this method.
   EngineBuilder& setOverrideConfigForTests(std::string config);
 
 private:
