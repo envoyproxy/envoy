@@ -35,7 +35,6 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"github.com/envoyproxy/envoy/contrib/golang/http/cluster_specifier/source/go/pkg/api"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 
@@ -46,8 +45,7 @@ const errCodeInvalidConfig = 0
 
 var (
 	pluginNumGenerator uint64
-	pluginCache        = map[uint64]api.ClusterSpecifier{}
-	pluginCacheLock    sync.RWMutex
+	pluginCache        = sync.Map{}
 )
 
 //export envoyGoClusterSpecifierNewPlugin
@@ -65,14 +63,12 @@ func envoyGoClusterSpecifierNewPlugin(configPtr uint64, configLen uint64) uint64
 	plugin := clusterSpecifierConfigFactory(&any)
 	pluginNum := atomic.AddUint64(&pluginNumGenerator, 1)
 
-	pluginCacheLock.Lock()
-	defer pluginCacheLock.Unlock()
-	pluginCache[pluginNum] = plugin
+	pluginCache.Store(pluginNum, plugin)
 
 	return pluginNum
 }
 
 //export envoyGoClusterSpecifierDestroyPlugin
 func envoyGoClusterSpecifierDestroyPlugin(id uint64) {
-	delete(pluginCache, id)
+	pluginCache.Delete(id)
 }

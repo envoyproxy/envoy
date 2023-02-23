@@ -24,7 +24,9 @@ type ClusterSpecifierConfigParser interface {
 }
 
 type ClusterSpecifier interface {
-	Choose(RequestHeaderMap) string
+	// Cluster return the cluster name that will be used in the Envoy side,
+	// Envoy will use the default_cluster in the plugin config when return an empty string, or panic happens.
+	Cluster(RequestHeaderMap) string
 }
 
 type ClusterSpecifierFactory func(config interface{}) ClusterSpecifier

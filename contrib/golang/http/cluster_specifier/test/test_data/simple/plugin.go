@@ -12,7 +12,7 @@ type clusterSpecifier struct {
 	panicPrefix   string
 }
 
-func (s *clusterSpecifier) Choose(header api.RequestHeaderMap) string {
+func (s *clusterSpecifier) Cluster(header api.RequestHeaderMap) string {
 	path := header.Get(":path")
 
 	// block the request with an unknown cluster.

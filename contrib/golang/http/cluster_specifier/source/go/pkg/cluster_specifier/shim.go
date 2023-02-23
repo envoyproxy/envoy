@@ -39,7 +39,7 @@ func envoyGoOnClusterSpecify(pluginPtr uint64, headerPtr uint64, pluginId uint64
 		headerPtr: headerPtr,
 	}
 	specifier := getClusterSpecifier(pluginId)
-	cluster := specifier.Choose(header)
+	cluster := specifier.Cluster(header)
 	clusterLen := uint64(len(cluster))
 	if clusterLen == 0 {
 		// means use the default cluster

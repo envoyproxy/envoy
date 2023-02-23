@@ -28,7 +28,8 @@ func RegisterClusterSpecifierConfigFactory(f api.ClusterSpecifierConfigFactory) 
 }
 
 func getClusterSpecifier(configId uint64) api.ClusterSpecifier {
-	pluginCacheLock.RLock()
-	defer pluginCacheLock.RUnlock()
-	return pluginCache[configId]
+	if v, ok := pluginCache.Load(configId); ok {
+		return v.(api.ClusterSpecifier)
+	}
+	return nil
 }
