@@ -20,6 +20,11 @@ let currentStats = new Map();
 let activeStatsPreElement = null;
 
 /**
+ * A small div for displaying status and error messages.
+ */
+let statusDiv = null;
+
+/**
  * This magic string is derived from C++ in StatsHtmlRender::urlHandler to uniquely
  * name each paramter. In the stats page there is only one parameter, so it's
  * always param-1. The reason params are numbered is that on the home page, "/",
@@ -47,8 +52,11 @@ function setRenderTestHook(hook) { // eslint-disable-line no-unused-vars
  * PRE right now) and kick off the periodic JSON updates.
  */
 function initHook() {
+  statusDiv = document.createElement('div');
+  statusDiv.className = 'error-status-line';
   activeStatsPreElement = document.createElement('pre');
   activeStatsPreElement.id = 'active-content-pre';
+  document.body.appendChild(statusDiv);
   document.body.appendChild(activeStatsPreElement);
   loadStats();
 }
@@ -56,11 +64,21 @@ function initHook() {
 /**
  * Initiates an ajax request for the stats JSON based on the stats parameters.
  */
-function loadStats() {
-  const makeQueryParam = (name) => name + '=' + document.getElementById(paramIdPrefix + name).value;
+async function loadStats() {
+  const makeQueryParam = (name) => name + '=' + encodeURIComponent(
+      document.getElementById(paramIdPrefix + name).value);
   const params = ['filter', 'type', 'histogram_buckets'];
   const url = '/stats?format=json&usedonly&' + params.map(makeQueryParam).join('&');
-  fetch(url).then((response) => response.json()).then((data) => renderStats(data));
+  try {
+    const response = await fetch(url);
+    const data = await response.json();
+    renderStats(data);
+  } catch (e) {
+    statusDiv.textContent = 'Error fetching ' + url + ': ' + e;
+  }
+
+  // Update stats every 5 seconds by default.
+  window.setTimeout(loadStats, 1000*loadSettingOrUseDefault('active-update-interval', 5));
 }
 
 /**
@@ -167,8 +185,7 @@ function renderStats(data) {
     hook();
   }
 
-  // Update stats every 5 seconds by default.
-  window.setTimeout(loadStats, 1000*loadSettingOrUseDefault('active-update-interval', 5));
+  statusDiv.textContent = '';
 }
 
 // We don't want to trigger any DOM manipulations until the DOM is fully loaded.

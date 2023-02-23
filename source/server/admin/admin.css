@@ -40,3 +40,9 @@
   padding-left: 20px;
   text-align: right;
 }
+
+.error-status-line {
+  font-family: sans-serif;
+  font-size: medium;
+  color: #c00;
+}
