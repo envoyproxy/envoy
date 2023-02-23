@@ -495,6 +495,12 @@ public:
   virtual void
   setUpstreamSslConnection(const Ssl::ConnectionInfoConstSharedPtr& ssl_connection_info) PURE;
 
+    /*
+   * @return the upstream timing for this stream
+   * */
+  virtual UpstreamTiming& upstreamTiming() PURE;
+  virtual const UpstreamTiming& upstreamTiming() const PURE;
+
   /**
    * @return the upstream SSL connection. This will be nullptr if the upstream
    * connection does not use SSL.
@@ -720,12 +726,6 @@ public:
    */
   virtual DownstreamTiming& downstreamTiming() PURE;
   virtual OptRef<const DownstreamTiming> downstreamTiming() const PURE;
-
-  /**
-   * @return the upstream timing information.
-   */
-  virtual UpstreamTiming& upstreamTiming() PURE;
-  virtual OptRef<const UpstreamTiming> upstreamTiming() const PURE;
 
   /**
    * @param bytes_sent denotes the number of bytes to add to total sent bytes.
