@@ -82,8 +82,6 @@ public:
   MOCK_METHOD(absl::optional<std::chrono::nanoseconds>, requestComplete, (), (const));
   MOCK_METHOD(DownstreamTiming&, downstreamTiming, ());
   MOCK_METHOD(OptRef<const DownstreamTiming>, downstreamTiming, (), (const));
-  MOCK_METHOD(UpstreamTiming&, upstreamTiming, ());
-  MOCK_METHOD(OptRef<const UpstreamTiming>, upstreamTiming, (), (const));
   MOCK_METHOD(void, addBytesReceived, (uint64_t));
   MOCK_METHOD(uint64_t, bytesReceived, (), (const));
   MOCK_METHOD(void, addWireBytesReceived, (uint64_t));
@@ -162,7 +160,6 @@ public:
   absl::optional<uint32_t> attempt_count_;
   absl::optional<std::string> virtual_cluster_name_;
   DownstreamTiming downstream_timing_;
-  UpstreamTiming upstream_timing_;
   std::string downstream_transport_failure_reason_;
 };
 

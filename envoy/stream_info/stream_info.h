@@ -425,12 +425,6 @@ public:
    */
   virtual Ssl::ConnectionInfoConstSharedPtr upstreamSslConnection() const PURE;
 
-  /*
-   * @return the upstream timing for this stream
-   * */
-  virtual UpstreamTiming& upstreamTiming() PURE;
-  virtual const UpstreamTiming& upstreamTiming() const PURE;
-
   /**
    * @param upstream_local_address sets the local address of the upstream connection. Note that it
    * can be different than the local address of the downstream connection.

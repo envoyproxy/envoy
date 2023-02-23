@@ -131,7 +131,7 @@ absl::optional<std::chrono::nanoseconds> TimingUtility::downstreamHandshakeCompl
 }
 
 absl::optional<std::chrono::nanoseconds> TimingUtility::upstreamHandshakeComplete() {
-  OptRef<const UpstreamTiming> timing = stream_info_.upstreamTiming();
+  OptRef<const UpstreamTiming> timing = getUpstreamTiming(stream_info_);
   if (!timing) {
     return absl::nullopt;
   }
