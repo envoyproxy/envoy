@@ -18,9 +18,9 @@ template <typename StatsStructType> class LazyInit;
  */
 template <typename StatsStructType> class LazyCompatibleInterface {
 public:
-  // Helper operators to get-or-create and return the StatsStructType object.
-  virtual StatsStructType* operator->() PURE;
-  virtual StatsStructType& operator*() PURE;
+  // Helper function to get-or-create and return the StatsStructType object.
+  virtual StatsStructType* instantiate() = 0;
+
   virtual ~LazyCompatibleInterface() = default;
 };
 
@@ -29,6 +29,9 @@ public:
  * of stats that might not be needed in a given Envoy process.
  *
  * This class is thread-safe -- instantiations can occur on multiple concurrent threads.
+ * This is used when
+ * :ref:`enable_lazyinit_stats
+ * <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.enable_lazyinit_stats>` is enabled.
  */
 template <typename StatsStructType>
 class LazyInit : public LazyCompatibleInterface<StatsStructType> {
@@ -49,9 +52,6 @@ public:
       ctor_ = nullptr;
     }
   }
-  // Helper operators to get-or-create and return the StatsStructType object.
-  inline StatsStructType* operator->() override { return instantiate(); }
-  inline StatsStructType& operator*() override { return *instantiate(); }
   ~LazyInit() {
     if (inited_.value() > 0) {
       inited_.dec();
@@ -59,7 +59,7 @@ public:
   }
 
 private:
-  inline StatsStructType* instantiate() { return internal_stats_.get(ctor_); }
+  inline StatsStructType* instantiate() override { return internal_stats_.get(ctor_); }
 
   // In order to preserve stat value continuity across a config reload, we need to automatically
   // re-instantiate lazy stats when they are constructed, if there is already a live instantiation
@@ -84,18 +84,17 @@ private:
       internal_stats_{};
 };
 
-// Non-LazyInit wrapper over StatsStructType.
+// Non-LazyInit wrapper over StatsStructType. This is used when
+// :ref:`enable_lazyinit_stats
+// <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.enable_lazyinit_stats>` is not enabled.
 template <typename StatsStructType>
 class DirectStats : public LazyCompatibleInterface<StatsStructType> {
 public:
   DirectStats(const typename StatsStructType::StatNameType& stat_names, Stats::Scope& scope)
       : stats_(stat_names, scope) {}
 
-  // Helper operators to get-or-create and return the StatsStructType object.
-  inline StatsStructType* operator->() override { return &stats_; };
-  inline StatsStructType& operator*() override { return stats_; };
-
 private:
+  inline StatsStructType* instantiate() override { return &stats_; }
   StatsStructType stats_;
 };
 
@@ -117,8 +116,8 @@ public:
   LazyCompatibleStats& operator=(LazyCompatibleStats&&) = default;
   LazyCompatibleStats(LazyCompatibleStats&&) = default;
 
-  inline StatsStructType* operator->() { return data_->operator->(); };
-  inline StatsStructType& operator*() { return data_->operator*(); };
+  inline StatsStructType* operator->() { return data_->instantiate(); };
+  inline StatsStructType& operator*() { return *data_->instantiate(); };
 
 private:
   LazyCompatibleStats(std::unique_ptr<LazyCompatibleInterface<StatsStructType>> d)

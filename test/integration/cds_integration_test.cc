@@ -195,7 +195,7 @@ TEST_P(CdsIntegrationTest, CdsClusterUpDownUp) {
 TEST_P(CdsIntegrationTest, CdsClusterTeardownWhileConnecting) {
   initialize();
   test_server_->waitForCounterGe("cluster_manager.cluster_added", 1);
-  EXPECT_NE(test_server_->counter("cluster.cluster_1.upstream_cx_total"), nullptr);
+  test_server_->waitForCounterExists("cluster.cluster_1.upstream_cx_total");
   Stats::CounterSharedPtr cx_counter = test_server_->counter("cluster.cluster_1.upstream_cx_total");
   // Confirm no upstream connection is attempted so far.
   EXPECT_EQ(0, cx_counter->value());
@@ -244,6 +244,7 @@ TEST_P(CdsIntegrationTest, LazyInitTrafficStatsWithClusterCreateUpdateDelete) {
   ASSERT_TRUE(response->complete());
   cleanupUpstreamAndDownstream();
 
+  // Cluster_1 trafficStats updated.
   EXPECT_EQ(test_server_->gauge("cluster.cluster_1.ClusterTrafficStats.inited")->value(), 1);
   EXPECT_EQ(test_server_->counter("cluster.cluster_1.upstream_cx_total")->value(), 1);
   envoy::config::cluster::v3::Cluster cluster1_updated =
@@ -252,9 +253,14 @@ TEST_P(CdsIntegrationTest, LazyInitTrafficStatsWithClusterCreateUpdateDelete) {
   sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(
       Config::TypeUrl::get().Cluster, {cluster1_updated}, {cluster1_updated}, {}, "42");
   test_server_->waitForCounterGe("cluster_manager.cds.update_success", 2);
+  // Now the ClusterTrafficStats 'inited_' gauge >= 1, since there is a small race window between
+  // the testing thread fetching the value before the old version ClusterTrafficStats gets deleted
+  // from main thread and worker thread.
   EXPECT_GE(test_server_->gauge("cluster.cluster_1.ClusterTrafficStats.inited")->value(), 1);
+  // cluster_1 traffic stats not lost.
   EXPECT_EQ(test_server_->counter("cluster.cluster_1.upstream_cx_total")->value(), 1);
 
+  // Remove "cluster_1".
   sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(Config::TypeUrl::get().Cluster, {}, {},
                                                              {ClusterName1}, "42");
   test_server_->waitForCounterGe("cluster_manager.cluster_removed", 1);
@@ -263,8 +269,10 @@ TEST_P(CdsIntegrationTest, LazyInitTrafficStatsWithClusterCreateUpdateDelete) {
                                                              {cluster2_}, {cluster2_}, {}, "43");
   test_server_->waitForCounterGe("cluster_manager.cds.update_success", 4);
   EXPECT_EQ(test_server_->counter("cluster_manager.cluster_added")->value(), 3);
+  // Now the cluster_1 stats are gone, as well as the lazy init wrapper.
   EXPECT_EQ(test_server_->gauge("cluster.cluster_1.ClusterTrafficStats.inited"), nullptr);
   EXPECT_EQ(test_server_->counter("cluster.cluster_1.upstream_cx_total"), nullptr);
+  // No cluster_2 stats yet.
   EXPECT_NE(test_server_->gauge("cluster.cluster_2.ClusterTrafficStats.inited"), nullptr);
   EXPECT_EQ(test_server_->gauge("cluster.cluster_2.ClusterTrafficStats.inited")->value(), 0);
   EXPECT_EQ(test_server_->counter("cluster.cluster_2.upstream_cx_total"), nullptr);
@@ -294,9 +302,10 @@ TEST_P(CdsIntegrationTest, LazyInitTrafficStatsWithClusterCreateDeleteRecrete) {
     cleanupUpstreamAndDownstream();
   };
   send_http_request_to_cluster_and_wait_for_response("cluster_1");
-
+  // Cluster_1 trafficStats updated.
   EXPECT_EQ(test_server_->gauge("cluster.cluster_1.ClusterTrafficStats.inited")->value(), 1);
   EXPECT_EQ(test_server_->counter("cluster.cluster_1.upstream_cx_total")->value(), 1);
+  // Remove "cluster_1".
   sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(Config::TypeUrl::get().Cluster, {}, {},
                                                              {ClusterName1}, "42");
   test_server_->waitForCounterGe("cluster_manager.cluster_removed", 1);
@@ -305,23 +314,26 @@ TEST_P(CdsIntegrationTest, LazyInitTrafficStatsWithClusterCreateDeleteRecrete) {
                                                              {cluster2_}, {cluster2_}, {}, "43");
   test_server_->waitForCounterGe("cluster_manager.cds.update_success", 3);
   EXPECT_EQ(test_server_->counter("cluster_manager.cluster_added")->value(), 3);
+  // No cluster_2 stats yet.
   EXPECT_NE(test_server_->gauge("cluster.cluster_2.ClusterTrafficStats.inited"), nullptr);
   EXPECT_EQ(test_server_->gauge("cluster.cluster_2.ClusterTrafficStats.inited")->value(), 0);
   EXPECT_EQ(test_server_->counter("cluster.cluster_2.upstream_cx_total"), nullptr);
-
+  // Now the cluster_1 stats are gone, as well as the lazy init wrapper.
   EXPECT_EQ(test_server_->gauge("cluster.cluster_1.ClusterTrafficStats.inited"), nullptr);
   EXPECT_EQ(test_server_->counter("cluster.cluster_1.upstream_cx_total"), nullptr);
-
+  // Now add cluster1 again.
   envoy::config::cluster::v3::Cluster cluster1_updated =
       cluster_creator_(ClusterName1, fake_upstreams_[UpstreamIndex2]->localAddress()->ip()->port(),
                        Network::Test::getLoopbackAddressString(ipVersion()), "ROUND_ROBIN");
   sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(
       Config::TypeUrl::get().Cluster, {cluster1_updated}, {cluster1_updated}, {}, "42");
   test_server_->waitForCounterGe("cluster_manager.cds.update_success", 4);
+  // Now the cluster_1.ClusterTrafficStats.inited gauge is 0, since it didn't see previous stats.
   EXPECT_EQ(test_server_->gauge("cluster.cluster_1.ClusterTrafficStats.inited")->value(), 0);
   EXPECT_EQ(test_server_->counter("cluster.cluster_1.upstream_cx_total"), nullptr);
 
   send_http_request_to_cluster_and_wait_for_response("cluster_1");
+  // cluster_1 traffic stats created, due to the above http request.
   EXPECT_EQ(test_server_->gauge("cluster.cluster_1.ClusterTrafficStats.inited")->value(), 1);
   EXPECT_EQ(test_server_->counter("cluster.cluster_1.upstream_cx_total")->value(), 1);
 }

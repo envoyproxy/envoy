@@ -15,8 +15,8 @@
 namespace Envoy {
 namespace Stats {
 
-// Creates a copy of Upstream::ALL_CLUSTER_TRAFFIC_STATS, such that per Joshua, we have a "a stable
-// set of stats for performance" test.
+// Creates a copy of Upstream::ALL_CLUSTER_TRAFFIC_STATS, such that we have a stable
+// set of stats for performance test.
 #define AWESOME_STATS(COUNTER, GAUGE, HISTOGRAM, TEXT_READOUT, STATNAME)                           \
   COUNTER(bind_errors)                                                                             \
   COUNTER(original_dst_host_invalid)                                                               \
