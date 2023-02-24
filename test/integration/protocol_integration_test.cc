@@ -2337,19 +2337,23 @@ TEST_P(DownstreamProtocolIntegrationTest, ManyTrailerHeaders) {
 // large methods. The table below describes the expected behaviors (in addition
 // we should never see an ASSERT or ASAN failure trigger).
 //
-// Downstream    Upstream   Behavior expected
-// ------------------------------------------
-// accepts       accepts    Success
-// accepts       rejects    Envoy will forward but backend will reject
-// rejects       accepts    Envoy will reject
-// rejects       rejects    Envoy will reject
+// Downstream proto  Upstream proto  Behavior expected
+// --------------------------------------------------------
+// accepts           accepts         Success
+// accepts           rejects         Envoy will forward; backend will reject
+// rejects           accepts         Envoy will reject
+// rejects           rejects         Envoy will reject
 TEST_P(ProtocolIntegrationTest, LargeRequestMethod) {
-  bool http1_codec_accepts_large_method = false;
+  bool http1_codec_rejects_large_method = true;
 #ifdef ENVOY_ENABLE_UHV
   if (GetParam().http1_implementation == Http1ParserImpl::BalsaParser) {
-    http1_codec_accepts_large_method = true;
+    http1_codec_rejects_large_method = false;
   }
 #endif
+  const bool downstream_proto_rejects_large_method =
+      downstreamProtocol() == Http::CodecType::HTTP1 && http1_codec_rejects_large_method;
+  const bool upstream_proto_rejects_large_method =
+      upstreamProtocol() == Http::CodecType::HTTP1 && http1_codec_rejects_large_method;
 
   // There will be no upstream connections for HTTP/1 downstream, we need to
   // test the full mesh regardless.
@@ -2363,7 +2367,7 @@ TEST_P(ProtocolIntegrationTest, LargeRequestMethod) {
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
-  if (downstreamProtocol() == Http::CodecType::HTTP1 && !http1_codec_accepts_large_method) {
+  if (downstream_proto_rejects_large_method) {
     auto encoder_decoder = codec_client_->startRequest(request_headers);
     request_encoder_ = &encoder_decoder.first;
     auto response = std::move(encoder_decoder.second);
@@ -2371,8 +2375,7 @@ TEST_P(ProtocolIntegrationTest, LargeRequestMethod) {
     EXPECT_TRUE(response->complete());
     EXPECT_EQ("400", response->headers().getStatusValue());
   } else {
-    ASSERT(downstreamProtocol() >= Http::CodecType::HTTP2 || http1_codec_accepts_large_method);
-    if (upstreamProtocol() == Http::CodecType::HTTP1 && !http1_codec_accepts_large_method) {
+    if (upstream_proto_rejects_large_method) {
       auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
       ASSERT_TRUE(
           fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
@@ -2380,7 +2383,6 @@ TEST_P(ProtocolIntegrationTest, LargeRequestMethod) {
       EXPECT_TRUE(response->complete());
       EXPECT_EQ("400", response->headers().getStatusValue());
     } else {
-      ASSERT(upstreamProtocol() >= Http::CodecType::HTTP2 || http1_codec_accepts_large_method);
       auto response =
           sendRequestAndWaitForResponse(request_headers, 0, default_response_headers_, 0);
       EXPECT_TRUE(response->complete());
