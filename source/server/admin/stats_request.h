@@ -32,17 +32,12 @@ protected:
   // is not a significant cost to this, but in a future PR we may choose to
   // co-mingle the types. Note that histograms are grouped together in the data
   // JSON data model, so we won't be able to fully co-mingle.
-  enum class PhaseName {
+  enum class Phase {
     TextReadouts,
     CountersAndGauges,
     Counters,
     Gauges,
     Histograms,
-  };
-
-  struct Phase {
-    PhaseName phase;
-    std::string phase_label;
   };
 
 public:
@@ -135,15 +130,20 @@ protected:
   Stats::Store& stats_;
   ScopeVec scopes_;
   absl::btree_map<std::string, StatOrScopes> stat_map_;
-  std::unique_ptr<StatsRender> render_;
+  std::unique_ptr<StatsRenderBase> render_;
   Buffer::OwnedImpl response_;
   UrlHandlerFn url_handler_fn_;
   uint64_t chunk_size_{DefaultChunkSize};
 
-  // phase-related state
+  // Phase-related state.
   uint64_t phase_stat_count_{0};
   uint32_t phase_index_{0};
   std::vector<Phase> phases_;
+  std::map<Phase, std::string> phase_labels_{{Phase::TextReadouts, "Text Readouts"},
+                                             {Phase::CountersAndGauges, "Counters and Gauges"},
+                                             {Phase::Histograms, "Histograms"},
+                                             {Phase::Counters, "Counters"},
+                                             {Phase::Gauges, "Gauges"}};
 };
 
 } // namespace Server

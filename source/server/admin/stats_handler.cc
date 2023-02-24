@@ -72,11 +72,10 @@ Http::Code StatsHandler::handlerStatsRecentLookupsEnable(Http::ResponseHeaderMap
   return Http::Code::OK;
 }
 
-Admin::RequestPtr StatsHandler::makeRequest(AdminStream& admin_stream) {
+Admin::RequestPtr StatsHandler::makeRequest(AdminStream& admin_stream, bool is_prometheus_path) {
   StatsParams params;
   Buffer::OwnedImpl response;
-  absl::string_view path = admin_stream.getRequestHeaders().getPathValue();
-  Http::Code code = params.parse(path, response);
+  Http::Code code = params.parse(admin_stream.getRequestHeaders().getPathValue(), response);
   if (code != Http::Code::OK) {
     return Admin::makeStaticTextRequest(response, code);
   }
@@ -85,7 +84,7 @@ Admin::RequestPtr StatsHandler::makeRequest(AdminStream& admin_stream) {
     server_.flushStats();
   }
 
-  if (params.format_ == StatsFormat::Prometheus || path == "/stats/prometheus") {
+  if (params.format_ == StatsFormat::Prometheus || is_prometheus_path) {
     params.format_ = StatsFormat::Prometheus;
     return makePrometheusRequest(
         server_.stats(), params, server_.api().customStatNamespaces(),
@@ -130,7 +129,9 @@ Admin::UrlHandler StatsHandler::statsHandler() {
   return {
       "/stats",
       "print server stats",
-      [this](AdminStream& admin_stream) -> Admin::RequestPtr { return makeRequest(admin_stream); },
+      [this](AdminStream& admin_stream) -> Admin::RequestPtr {
+        return makeRequest(admin_stream, false);
+      },
       false,
       false,
       {{Admin::ParamDescriptor::Type::Boolean, "usedonly",
@@ -150,19 +151,20 @@ Admin::UrlHandler StatsHandler::statsHandler() {
 }
 
 Admin::UrlHandler StatsHandler::prometheusStatsHandler() {
-  return {
-      "/stats/prometheus",
-      "print server stats in prometheus format",
-      [this](AdminStream& admin_stream) -> Admin::RequestPtr { return makeRequest(admin_stream); },
-      false,
-      false,
-      {{Admin::ParamDescriptor::Type::Boolean, "usedonly",
-        "Only include stats that have been written by system since restart"},
-       {Admin::ParamDescriptor::Type::Boolean, "text_readouts",
-        "Render text_readouts as new gaugues with value 0 (increases Prometheus "
-        "data size)"},
-       {Admin::ParamDescriptor::Type::String, "filter",
-        "Regular expression (Google re2) for filtering stats"}}};
+  return {"/stats/prometheus",
+          "print server stats in prometheus format",
+          [this](AdminStream& admin_stream) -> Admin::RequestPtr {
+            return makeRequest(admin_stream, true);
+          },
+          false,
+          false,
+          {{Admin::ParamDescriptor::Type::Boolean, "usedonly",
+            "Only include stats that have been written by system since restart"},
+           {Admin::ParamDescriptor::Type::Boolean, "text_readouts",
+            "Render text_readouts as new gaugues with value 0 (increases Prometheus "
+            "data size)"},
+           {Admin::ParamDescriptor::Type::String, "filter",
+            "Regular expression (Google re2) for filtering stats"}}};
 }
 
 } // namespace Server

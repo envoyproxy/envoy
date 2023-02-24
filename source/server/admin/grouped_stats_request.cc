@@ -15,28 +15,25 @@ GroupedStatsRequest::GroupedStatsRequest(Stats::Store& stats, const StatsParams&
     : StatsRequest(stats, params, url_handler_fn), custom_namespaces_(custom_namespaces),
       global_symbol_table_(stats.constSymbolTable()) {
 
-  // the "type" query param is ignored for prometheus stats, so always start from
+  // The "type" query param is ignored for prometheus stats, so always start from
   // counters; also, skip the TextReadouts phase unless that stat type is explicitly
-  // requested via query param
+  // requested via query param.
   if (params_.prometheus_text_readouts_) {
-    phases_ = {Phase{PhaseName::Counters, "Counters"}, Phase{PhaseName::Gauges, "Gauges"},
-               Phase{PhaseName::TextReadouts, "Text Readouts"},
-               Phase{PhaseName::Histograms, "Histograms"}};
+    phases_ = {Phase::Counters, Phase::Gauges, Phase::TextReadouts, Phase::Histograms};
   } else {
-    phases_ = {Phase{PhaseName::Counters, "Counters"}, Phase{PhaseName::Gauges, "Gauges"},
-               Phase{PhaseName::Histograms, "Histograms"}};
+    phases_ = {Phase::Counters, Phase::Gauges, Phase::Histograms};
   }
   phase_index_ = 0;
 }
 
 template <class StatType> Stats::IterateFn<StatType> GroupedStatsRequest::saveMatchingStat() {
   return [this](const Stats::RefcountPtr<StatType>& stat) -> bool {
-    // check if unused
+    // Check if unused.
     if (params_.used_only_ && !stat->used()) {
       return true;
     }
 
-    // check if filtered
+    // Check if filtered.
     if (params_.filter_ != nullptr) {
       if (!std::regex_search(stat->name(), *params_.filter_)) {
         return true;
@@ -46,7 +43,7 @@ template <class StatType> Stats::IterateFn<StatType> GroupedStatsRequest::saveMa
       return true;
     }
 
-    // capture stat
+    // Capture stat.
     std::string tag_extracted_name = global_symbol_table_.toString(stat->tagExtractedStatName());
     stat_map_.insert({tag_extracted_name, std::vector<Stats::RefcountPtr<StatType>>({})});
     absl::get<std::vector<Stats::RefcountPtr<StatType>>>(stat_map_[tag_extracted_name])
@@ -80,13 +77,13 @@ void GroupedStatsRequest::renderStat(const std::string& name, Buffer::Instance& 
         dynamic_cast<PrometheusStatsRender*>(render_.get());
     ++phase_stat_count_;
 
-    // sort group
+    // Sort group.
     std::vector<SharedStatType> group = absl::get<std::vector<SharedStatType>>(variant);
     global_symbol_table_.sortByStatNames<SharedStatType>(
         group.begin(), group.end(),
         [](const SharedStatType& stat_ptr) -> Stats::StatName { return stat_ptr->statName(); });
 
-    // render group
+    // Render group.
     prometheus_render->generate(response, prefixed_tag_extracted_name.value(), group);
   }
 }

@@ -72,7 +72,7 @@ bool StatsRequest<TextReadoutTyoe, CounterType, GaugeType, HistogramType>::nextC
   while (response.length() - starting_response_length < chunk_size_) {
     while (stat_map_.empty()) {
       if (phase_stat_count_ == 0) {
-        render_->noStats(response, phases_.at(phase_index_).phase_label);
+        render_->noStats(response, phase_labels_[phases_.at(phase_index_)]);
       } else {
         phase_stat_count_ = 0;
       }
@@ -81,8 +81,8 @@ bool StatsRequest<TextReadoutTyoe, CounterType, GaugeType, HistogramType>::nextC
         return false;
       }
 
-      // check if we are at the last phase: in that case, we are done;
-      // if not, increment phase index and start next phase
+      // Check if we are at the last phase: in that case, we are done;
+      // if not, increment phase index and start next phase.
       if (phase_index_ == phases_.size() - 1) {
         render_->finalize(response);
         return false;
@@ -128,7 +128,6 @@ bool StatsRequest<TextReadoutTyoe, CounterType, GaugeType, HistogramType>::nextC
 
 template <class TextReadoutTyoe, class CounterType, class GaugeType, class HistogramType>
 void StatsRequest<TextReadoutTyoe, CounterType, GaugeType, HistogramType>::startPhase() {
-  Phase current_phase = phases_.at(phase_index_);
   ASSERT(stat_map_.empty());
 
   // Insert all the scopes in the alphabetically ordered map. As we iterate
@@ -148,11 +147,11 @@ void StatsRequest<TextReadoutTyoe, CounterType, GaugeType,
                   HistogramType>::populateStatsForCurrentPhase(const ScopeVec& scope_vec) {
   Phase current_phase = phases_.at(phase_index_);
   for (const Stats::ConstScopeSharedPtr& scope : scope_vec) {
-    switch (current_phase.phase) {
-    case PhaseName::TextReadouts:
+    switch (current_phase) {
+    case Phase::TextReadouts:
       scope->iterate(saveMatchingStatForTextReadout());
       break;
-    case PhaseName::CountersAndGauges:
+    case Phase::CountersAndGauges:
       if (params_.type_ != StatsType::Gauges) {
         scope->iterate(saveMatchingStatForCounter());
       }
@@ -160,13 +159,13 @@ void StatsRequest<TextReadoutTyoe, CounterType, GaugeType,
         scope->iterate(saveMatchingStatForGauge());
       }
       break;
-    case PhaseName::Counters:
+    case Phase::Counters:
       scope->iterate(saveMatchingStatForCounter());
       break;
-    case PhaseName::Gauges:
+    case Phase::Gauges:
       scope->iterate(saveMatchingStatForGauge());
       break;
-    case PhaseName::Histograms:
+    case Phase::Histograms:
       scope->iterate(saveMatchingStatForHistogram());
       break;
     }

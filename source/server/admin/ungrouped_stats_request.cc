@@ -6,11 +6,7 @@ namespace Server {
 UngroupedStatsRequest::UngroupedStatsRequest(Stats::Store& stats, const StatsParams& params,
                                              UrlHandlerFn url_handler_fn)
     : StatsRequest(stats, params, url_handler_fn) {
-
-  phases_ = {Phase{PhaseName::TextReadouts, "Text Readouts"},
-             Phase{PhaseName::CountersAndGauges, "Counters and Gauges"},
-             Phase{PhaseName::Histograms, "Histograms"}};
-
+  phases_ = {Phase::TextReadouts, Phase::CountersAndGauges, Phase::Histograms};
   switch (params_.type_) {
   case StatsType::TextReadouts:
   case StatsType::All:
@@ -28,7 +24,7 @@ UngroupedStatsRequest::UngroupedStatsRequest(Stats::Store& stats, const StatsPar
 
 template <class StatType> Stats::IterateFn<StatType> UngroupedStatsRequest::saveMatchingStat() {
   return [this](const Stats::RefcountPtr<StatType>& stat) -> bool {
-    // check if used
+    // Check if used.
     if (params_.used_only_ && !stat->used()) {
       return true;
     }
@@ -38,9 +34,12 @@ template <class StatType> Stats::IterateFn<StatType> UngroupedStatsRequest::save
     // stat->name() takes a symbol table lock and builds a string, so we only
     // want to call it once.
     //
+    // This duplicates logic in saveMatchingStat in grouped_stats_request.cc, but
+    // differs in that Prometheus only uses stat->name() for filtering, not
+    // rendering, so it only grabs the name if there's a filter.
     std::string name = stat->name();
 
-    // check if filtered
+    // Check if filtered.
     if (params_.filter_ != nullptr) {
       if (!std::regex_search(name, *params_.filter_)) {
         return true;
@@ -75,7 +74,7 @@ template <class SharedStatType>
 void UngroupedStatsRequest::renderStat(const std::string& name, Buffer::Instance& response,
                                        const StatOrScopes& variant) {
   auto stat = absl::get<SharedStatType>(variant);
-  render_->generate(response, name, stat->value());
+  dynamic_cast<StatsRender*>(render_.get())->generate(response, name, stat->value());
   phase_stat_count_++;
 }
 
@@ -99,7 +98,7 @@ void UngroupedStatsRequest::processHistogram(const std::string& name, Buffer::In
   auto histogram = absl::get<Stats::HistogramSharedPtr>(variant);
   auto parent_histogram = dynamic_cast<Stats::ParentHistogram*>(histogram.get());
   if (parent_histogram != nullptr) {
-    render_->generate(response, name, *parent_histogram);
+    dynamic_cast<StatsRender*>(render_.get())->generate(response, name, *parent_histogram);
     ++phase_stat_count_;
   }
 }

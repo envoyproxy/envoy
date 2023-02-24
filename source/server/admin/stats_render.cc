@@ -16,36 +16,9 @@ constexpr absl::string_view JsonValueTagQuote = "\",\"value\":\"";
 constexpr absl::string_view JsonCloseBrace = "}";
 constexpr absl::string_view JsonQuoteCloseBrace = "\"}";
 
-const Envoy::Regex::CompiledGoogleReMatcher& promRegex() {
+const Envoy::Regex::CompiledGoogleReMatcher& prometheusRegex() {
   CONSTRUCT_ON_FIRST_USE(Envoy::Regex::CompiledGoogleReMatcher, "[^a-zA-Z0-9_]", false);
 }
-
-/**
- * Take a string and sanitize it according to Prometheus conventions.
- */
-std::string sanitizeName(const absl::string_view name) {
-  // The name must match the regex [a-zA-Z_][a-zA-Z0-9_]* as required by
-  // prometheus. Refer to https://prometheus.io/docs/concepts/data_model/.
-  // The initial [a-zA-Z_] constraint is always satisfied by the namespace prefix.
-  return promRegex().replaceAll(name, "_");
-}
-
-/**
- * Take tag values and sanitize it for text serialization, according to
- * Prometheus conventions.
- */
-std::string sanitizeValue(const absl::string_view value) {
-  // Removes problematic characters from Prometheus tag values to prevent
-  // text serialization issues. This matches the prometheus text formatting code:
-  // https://github.com/prometheus/common/blob/88f1636b699ae4fb949d292ffb904c205bf542c9/expfmt/text_create.go#L419-L420.
-  // The goal is to replace '\' with "\\", newline with "\n", and '"' with "\"".
-  return absl::StrReplaceAll(value, {
-                                        {R"(\)", R"(\\)"},
-                                        {"\n", R"(\n)"},
-                                        {R"(")", R"(\")"},
-                                    });
-}
-
 } // namespace
 
 namespace Envoy {
@@ -303,22 +276,17 @@ void StatsJsonRender::collectBuckets(const std::string& name,
 void PrometheusStatsRender::generate(Buffer::Instance& response,
                                      const std::string& prefixed_tag_extracted_name,
                                      const std::vector<Stats::GaugeSharedPtr>& gauge) {
-  response.add(fmt::format("# TYPE {0} {1}\n", prefixed_tag_extracted_name, "gauge"));
-  for (const Stats::GaugeSharedPtr& metric : gauge) {
-    const std::string tags = formattedTags(metric->tags());
-    response.add(absl::StrCat(prefixed_tag_extracted_name, "{", tags, "} ", metric->value(), "\n"));
-  }
+  outputStatType<Stats::GaugeSharedPtr>(response, gauge, prefixed_tag_extracted_name,
+                                        generateNumericOutput<Stats::GaugeSharedPtr>, "gauge");
 }
 
 // Writes output for a Prometheus stat of type Counter.
 void PrometheusStatsRender::generate(Buffer::Instance& response,
                                      const std::string& prefixed_tag_extracted_name,
                                      const std::vector<Stats::CounterSharedPtr>& counter) {
-  response.add(fmt::format("# TYPE {0} {1}\n", prefixed_tag_extracted_name, "counter"));
-  for (const Stats::CounterSharedPtr& metric : counter) {
-    const std::string tags = formattedTags(metric->tags());
-    response.add(absl::StrCat(prefixed_tag_extracted_name, "{", tags, "} ", metric->value(), "\n"));
-  }
+  outputStatType<Stats::CounterSharedPtr>(response, counter, prefixed_tag_extracted_name,
+                                          generateNumericOutput<Stats::CounterSharedPtr>,
+                                          "counter");
 }
 
 // Writes output for a Prometheus stat of type Text Readout.
@@ -326,68 +294,25 @@ void PrometheusStatsRender::generate(Buffer::Instance& response,
                                      const std::string& prefixed_tag_extracted_name,
                                      const std::vector<Stats::TextReadoutSharedPtr>& text_readout) {
   // text readout stats are returned in gauge format, so "gauge" type is set intentionally.
-  response.add(fmt::format("# TYPE {0} {1}\n", prefixed_tag_extracted_name, "gauge"));
-  for (const Stats::TextReadoutSharedPtr& metric : text_readout) {
-    auto tags = metric->tags();
-    tags.push_back(Stats::Tag{"text_value", metric->value()});
-    const std::string formTags = formattedTags(tags);
-    response.add(absl::StrCat(prefixed_tag_extracted_name, "{", formTags, "} 0\n"));
-  }
+  outputStatType<Stats::TextReadoutSharedPtr>(response, text_readout, prefixed_tag_extracted_name,
+                                              generateTextReadoutOutput, "gauge");
 }
 
 // Writes output for a Prometheus stat of type Histogram.
 void PrometheusStatsRender::generate(Buffer::Instance& response,
                                      const std::string& prefixed_tag_extracted_name,
                                      const std::vector<Stats::HistogramSharedPtr>& histogram) {
-  response.add(fmt::format("# TYPE {0} {1}\n", prefixed_tag_extracted_name, "histogram"));
-  for (const auto& metric : histogram) {
-    auto parent_histogram = dynamic_cast<Stats::ParentHistogram*>(metric.get());
-    if (parent_histogram != nullptr) {
-      // TODO(rulex123): support for the 3 histogram "bucket modes" offered in other
-      // stats formats hasn't been ported to Prometheus yet (see Utility::HistogramBucketsMode in
-      // source/server/admin/utils.h).
-      const std::string tags = formattedTags(parent_histogram->tags());
-      const std::string hist_tags = parent_histogram->tags().empty() ? EMPTY_STRING : (tags + ",");
-
-      const Stats::HistogramStatistics& stats = parent_histogram->cumulativeStatistics();
-      Stats::ConstSupportedBuckets& supported_buckets = stats.supportedBuckets();
-      const std::vector<uint64_t>& computed_buckets = stats.computedBuckets();
-      for (size_t i = 0; i < supported_buckets.size(); ++i) {
-        double bucket = supported_buckets[i];
-        uint64_t value = computed_buckets[i];
-        // We want to print the bucket in a fixed point (non-scientific) format. The fmt library
-        // doesn't have a specific modifier to format as a fixed-point value only so we use the
-        // 'g' operator which prints the number in general fixed point format or scientific format
-        // with precision 50 to round the number up to 32 significant digits in fixed point format
-        // which should cover pretty much all cases
-        response.add(absl::StrCat(prefixed_tag_extracted_name, "_bucket{", hist_tags, "le=\"",
-                                  fmt::format("{0:.32g}", bucket), "\"} ", value, "\n"));
-      }
-
-      response.add(absl::StrCat(prefixed_tag_extracted_name, "_bucket{", hist_tags, "le=\"+Inf\"} ",
-                                stats.sampleCount(), "\n"));
-      response.add(absl::StrCat(prefixed_tag_extracted_name, "_sum{", tags, "} ",
-                                fmt::format("{0:.32g}", stats.sampleSum()), "\n"));
-      response.add(absl::StrCat(prefixed_tag_extracted_name, "_count{", tags, "} ",
-                                stats.sampleCount(), "\n"));
-    }
-  }
+  outputStatType<Stats::HistogramSharedPtr>(response, histogram, prefixed_tag_extracted_name,
+                                            generateHistogramOutput, "histogram");
 }
 
 void PrometheusStatsRender::finalize(Buffer::Instance&) {}
-
-void PrometheusStatsRender::generate(Buffer::Instance&, const std::string&, const std::string&) {}
-
-void PrometheusStatsRender::generate(Buffer::Instance&, const std::string&, uint64_t) {}
-
-void PrometheusStatsRender::generate(Buffer::Instance&, const std::string&,
-                                     const Stats::ParentHistogram&) {}
 
 std::string PrometheusStatsRender::formattedTags(const std::vector<Stats::Tag>& tags) {
   std::vector<std::string> buf;
   buf.reserve(tags.size());
   for (const Stats::Tag& tag : tags) {
-    buf.push_back(fmt::format("{}=\"{}\"", sanitizeName(tag.name_), sanitizeValue(tag.value_)));
+    buf.push_back(absl::StrCat(sanitizeName(tag.name_), "=\"", sanitizeValue(tag.value_), "\""));
   }
   return absl::StrJoin(buf, ",");
 }
@@ -416,6 +341,93 @@ PrometheusStatsRender::metricName(const std::string& extracted_name,
   // practice: https://prometheus.io/docs/practices/naming/#metric-names Also, naming conventions on
   // https://prometheus.io/docs/concepts/data_model/
   return absl::StrCat("envoy_", sanitizeName(extracted_name));
+}
+
+std::string PrometheusStatsRender::sanitizeName(const absl::string_view name) {
+  // The name must match the regex [a-zA-Z_][a-zA-Z0-9_]* as required by
+  // prometheus. Refer to https://prometheus.io/docs/concepts/data_model/.
+  // The initial [a-zA-Z_] constraint is always satisfied by the namespace prefix.
+  return prometheusRegex().replaceAll(name, "_");
+}
+
+std::string PrometheusStatsRender::sanitizeValue(const absl::string_view value) {
+  // Removes problematic characters from Prometheus tag values to prevent
+  // text serialization issues. This matches the prometheus text formatting code:
+  // https://github.com/prometheus/common/blob/88f1636b699ae4fb949d292ffb904c205bf542c9/expfmt/text_create.go#L419-L420.
+  // The goal is to replace '\' with "\\", newline with "\n", and '"' with "\"".
+  return absl::StrReplaceAll(value, {
+                                        {R"(\)", R"(\\)"},
+                                        {"\n", R"(\n)"},
+                                        {R"(")", R"(\")"},
+                                    });
+}
+
+template <class StatType>
+void PrometheusStatsRender::outputStatType(
+    Buffer::Instance& response, const std::vector<StatType>& metrics,
+    const std::string& prefixed_tag_extracted_name,
+    const std::function<std::string(
+        const StatType& metric, const std::string& prefixed_tag_extracted_name)>& generate_output,
+    absl::string_view type) {
+  response.add(fmt::format("# TYPE {0} {1}\n", prefixed_tag_extracted_name, type));
+  for (const auto& metric : metrics) {
+    response.add(generate_output(metric, prefixed_tag_extracted_name));
+  }
+}
+
+template <class StatType>
+std::string
+PrometheusStatsRender::generateNumericOutput(const StatType& metric,
+                                             const std::string& prefixed_tag_extracted_name) {
+  const std::string tags = formattedTags(metric->tags());
+  return absl::StrCat(prefixed_tag_extracted_name, "{", tags, "} ", metric->value(), "\n");
+}
+
+std::string
+PrometheusStatsRender::generateTextReadoutOutput(const Stats::TextReadoutSharedPtr& metric,
+                                                 const std::string& prefixed_tag_extracted_name) {
+  auto tags = metric->tags();
+  tags.push_back(Stats::Tag{"text_value", metric->value()});
+  const std::string formTags = formattedTags(tags);
+  return absl::StrCat(prefixed_tag_extracted_name, "{", formTags, "} 0\n");
+}
+
+std::string
+PrometheusStatsRender::generateHistogramOutput(const Stats::HistogramSharedPtr& metric,
+                                               const std::string& prefixed_tag_extracted_name) {
+  auto parent_histogram = dynamic_cast<Stats::ParentHistogram*>(metric.get());
+  if (parent_histogram != nullptr) {
+    // TODO(rulex123): support for the 3 histogram "bucket modes" offered in other
+    // stats formats hasn't been ported to Prometheus yet (see Utility::HistogramBucketsMode in
+    // source/server/admin/utils.h).
+    const std::string tags = formattedTags(parent_histogram->tags());
+    const std::string hist_tags = parent_histogram->tags().empty() ? EMPTY_STRING : (tags + ",");
+
+    const Stats::HistogramStatistics& stats = parent_histogram->cumulativeStatistics();
+    Stats::ConstSupportedBuckets& supported_buckets = stats.supportedBuckets();
+    const std::vector<uint64_t>& computed_buckets = stats.computedBuckets();
+    std::string output;
+    for (size_t i = 0; i < supported_buckets.size(); ++i) {
+      double bucket = supported_buckets[i];
+      uint64_t value = computed_buckets[i];
+      // We want to print the bucket in a fixed point (non-scientific) format. The fmt library
+      // doesn't have a specific modifier to format as a fixed-point value only so we use the
+      // 'g' operator which prints the number in general fixed point format or scientific format
+      // with precision 50 to round the number up to 32 significant digits in fixed point format
+      // which should cover pretty much all cases
+      output.append(absl::StrCat(prefixed_tag_extracted_name, "_bucket{", hist_tags, "le=\"",
+                                 fmt::format("{0:.32g}", bucket), "\"} ", value, "\n"));
+    }
+
+    output.append(absl::StrCat(prefixed_tag_extracted_name, "_bucket{", hist_tags, "le=\"+Inf\"} ",
+                               stats.sampleCount(), "\n"));
+    output.append(absl::StrCat(prefixed_tag_extracted_name, "_sum{", tags, "} ",
+                               fmt::format("{0:.32g}", stats.sampleSum()), "\n"));
+    output.append(absl::StrCat(prefixed_tag_extracted_name, "_count{", tags, "} ",
+                               stats.sampleCount(), "\n"));
+    return output;
+  }
+  return EMPTY_STRING;
 }
 
 } // namespace Server
