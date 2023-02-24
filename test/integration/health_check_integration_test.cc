@@ -1,3 +1,4 @@
+#include <chrono>
 #include <memory>
 
 #include "envoy/config/core/v3/health_check.pb.h"
@@ -663,6 +664,7 @@ TEST_P(TcpHealthCheckIntegrationTest, DisableHCForActiveTraffic) {
                                                  {":scheme", "http"},
                                                  {":authority", "host"},
                                                  {"x-lyft-user-id", absl::StrCat(1)}};
+
   auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
 
   test_server_->waitForCounterEq("cluster.cluster_1.health_check.attempt", 2);
@@ -671,14 +673,16 @@ TEST_P(TcpHealthCheckIntegrationTest, DisableHCForActiveTraffic) {
   EXPECT_EQ(1, test_server_->counter("cluster.cluster_1.health_check.success")->value());
   EXPECT_EQ(0, test_server_->counter("cluster.cluster_1.health_check.failure")->value());
 
-  timeSystem().advanceTimeWait(std::chrono::seconds(10));
-
+  timeSystem().advanceTimeWait(std::chrono::seconds(1));
   test_server_->waitForCounterEq("cluster.cluster_1.health_check.attempt", 3);
+
 
   ASSERT_TRUE(cluster_data.host_fake_raw_connection_->waitForData(
       FakeRawConnection::waitForInexactMatch("Ping")));
   result = clusters_[cluster_idx].host_fake_raw_connection_->write("Pong");
   RELEASE_ASSERT(result, result.message());
+
+  timeSystem().advanceTimeWait(std::chrono::milliseconds(10));
 
   EXPECT_EQ(2, test_server_->counter("cluster.cluster_1.health_check.success")->value());
   EXPECT_EQ(0, test_server_->counter("cluster.cluster_1.health_check.failure")->value());
