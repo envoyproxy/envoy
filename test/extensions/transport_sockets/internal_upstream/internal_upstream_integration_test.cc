@@ -208,7 +208,7 @@ TEST_F(InternalUpstreamIntegrationTest, BasicFlow) {
 }
 
 // To verify that with the upstream binding configured in the internal_upstream cluster,
-// the socket address type of internal client connection is not overriden to be
+// the socket address type of internal client connection is not overridden to be
 // Type::Ip. It stays as Type::EnvoyInternal, and with that traffic goes through.
 TEST_F(InternalUpstreamIntegrationTest, BasicFlowLookbackClusterHasUpstreamBindConfig) {
   upstream_bind_config_ = true;
