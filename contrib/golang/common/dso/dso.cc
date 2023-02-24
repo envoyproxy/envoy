@@ -30,8 +30,9 @@ DsoInstance::DsoInstance(const std::string dso_name) : dso_name_(dso_name) {
 }
 
 DsoInstance::~DsoInstance() {
-  // TODO(doujiang24): make sure the dso file is not no other users,
-  // since the same dso file could be opened with multiple ids or types.
+  // The dl library maintains reference counts for library handles, so a dynamic library is not
+  // deallocated until dlclose() has been called on it as many times as dlopen() has succeeded on
+  // it.
   if (handler_ != nullptr) {
     dlclose(handler_);
   }

@@ -61,7 +61,6 @@ protected:
                                            GoUint64 buffer_len) = {nullptr};
 };
 
-using DsoInstancePtr = std::shared_ptr<DsoInstance>;
 using HttpFilterDsoInstancePtr = std::shared_ptr<HttpFilterDsoInstance>;
 using ClusterSpecifierDsoInstancePtr = std::shared_ptr<ClusterSpecifierDsoInstance>;
 
