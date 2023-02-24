@@ -100,3 +100,10 @@ steps:
     pathtoPublish: "$(Build.StagingDirectory)/envoy"
     artifactName: ${{ parameters.ciTarget }}${{ parameters.artifactSuffix }}
   condition: always()
+
+- task: PublishBuildArtifacts@1
+  inputs:
+    pathtoPublish: "$(Build.StagingDirectory)/tmp/lint-fixes"
+    artifactName: "${{ parameters.ciTarget }}.fixes"
+  timeoutInMinutes: 10
+  condition: failed()
