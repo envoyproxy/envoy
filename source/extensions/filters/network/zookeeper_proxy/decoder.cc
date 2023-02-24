@@ -543,6 +543,8 @@ void DecoderImpl::decodeAndBufferHelper(Buffer::Instance& data, Buffer::OwnedImp
     if (has_full_packets) {
       offset -= INT_LENGTH + len;
       // Decode full packets.
+      temp_data.reserve(offset);
+      temp_data.resize(offset);
       data.copyOut(0, offset, temp_data.data());
       Buffer::OwnedImpl full_packets;
       full_packets.add(temp_data.data(), temp_data.length());
@@ -550,10 +552,14 @@ void DecoderImpl::decodeAndBufferHelper(Buffer::Instance& data, Buffer::OwnedImp
       // Drain the ZooKeeper filter buffer.
       zk_filter_buffer.drain(zk_filter_buffer_len);
       // Copy out the rest of the data to the ZooKeeper filter buffer.
+      temp_data.reserve(data_len - offset);
+      temp_data.resize(data_len - offset);
       data.copyOut(offset, data_len - offset, temp_data.data());
       zk_filter_buffer.add(temp_data.data(), temp_data.length());
     } else {
       // Copy out all the new data to the ZooKeeper filter buffer.
+      temp_data.reserve(data_len - zk_filter_buffer_len);
+      temp_data.resize(data_len - zk_filter_buffer_len);
       data.copyOut(zk_filter_buffer_len, data_len - zk_filter_buffer_len, temp_data.data());
       zk_filter_buffer.add(temp_data.data(), temp_data.length());
     }

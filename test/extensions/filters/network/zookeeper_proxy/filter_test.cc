@@ -1079,11 +1079,11 @@ TEST_F(ZooKeeperFilterTest, MissingXid) {
 }
 
 // | REQ 1 ---------  |
-// (onData   )(onData )
+// (onData1 )(onData2 )
 TEST_F(ZooKeeperFilterTest, OneRequestWithMultipleOnDataCalls) {
   initialize();
 
-  // Request.
+  // Request (onData1).
   Buffer::OwnedImpl data =
       encodeCreateRequestWithPartialData("/foo", "bar", false, enumToSignedInt(OpCodes::Create));
   EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(data, false));
@@ -1091,6 +1091,10 @@ TEST_F(ZooKeeperFilterTest, OneRequestWithMultipleOnDataCalls) {
   EXPECT_EQ(0UL, config_->stats().request_bytes_.value());
   EXPECT_EQ(0UL, config_->stats().decoder_error_.value());
 
+  // Mock the buffer is drained by the tcp_proxy filter.
+  data.drain(data.length());
+
+  // Request (onData2).
   // Add the rest data to the buffer.
   // Acls.
   data.writeBEInt<int32_t>(0);
@@ -1108,11 +1112,11 @@ TEST_F(ZooKeeperFilterTest, OneRequestWithMultipleOnDataCalls) {
 }
 
 // | REQ 1 ---------  |  REQ 2 ---------|
-// (onData   )(onData     )(onData      )
+// (onData1  )(onData2    )(onData3     )
 TEST_F(ZooKeeperFilterTest, MultipleRequestsWithMultipleOnDataCalls) {
   initialize();
 
-  // Request.
+  // Request (onData1).
   Buffer::OwnedImpl data =
       encodeCreateRequestWithPartialData("/foo", "bar", false, enumToSignedInt(OpCodes::Create));
   EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(data, false));
@@ -1120,6 +1124,10 @@ TEST_F(ZooKeeperFilterTest, MultipleRequestsWithMultipleOnDataCalls) {
   EXPECT_EQ(0UL, config_->stats().request_bytes_.value());
   EXPECT_EQ(0UL, config_->stats().decoder_error_.value());
 
+  // Mock the buffer is drained by the tcp_proxy filter.
+  data.drain(data.length());
+
+  // Request (onData2).
   // Add the rest data of request1 to the buffer.
   // Acls.
   data.writeBEInt<int32_t>(0);
@@ -1131,10 +1139,14 @@ TEST_F(ZooKeeperFilterTest, MultipleRequestsWithMultipleOnDataCalls) {
   data.writeBEInt<int32_t>(enumToSignedInt(OpCodes::Create));
 
   EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(data, false));
-  EXPECT_EQ(0UL, config_->stats().create_rq_.value());
-  EXPECT_EQ(0UL, config_->stats().request_bytes_.value());
+  EXPECT_EQ(1UL, config_->stats().create_rq_.value());
+  EXPECT_EQ(35UL, config_->stats().request_bytes_.value());
   EXPECT_EQ(0UL, config_->stats().decoder_error_.value());
 
+  // Mock the buffer is drained by the tcp_proxy filter.
+  data.drain(data.length());
+
+  // Request (onData3).
   // Add the rest data of request2 to the buffer.
   addString(data, "/baz");
   addString(data, "abcd");
@@ -1154,7 +1166,7 @@ TEST_F(ZooKeeperFilterTest, MultipleRequestsWithMultipleOnDataCalls) {
 }
 
 // | RESP 1 --------  |
-// (onWrite )(onWrite )
+// (onWrite1)(onWrite2)
 TEST_F(ZooKeeperFilterTest, OneResponseWithMultipleOnWriteCalls) {
   initialize();
 
@@ -1165,13 +1177,17 @@ TEST_F(ZooKeeperFilterTest, OneResponseWithMultipleOnWriteCalls) {
   EXPECT_EQ(21, config_->stats().request_bytes_.value());
   EXPECT_EQ(0UL, config_->stats().decoder_error_.value());
 
-  // Response.
+  // Response (onWrite1).
   Buffer::OwnedImpl resp_data = encodeResponseWithPartialData(1000, 2000, 0);
   EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onWrite(resp_data, false));
   EXPECT_EQ(0UL, config_->stats().getdata_resp_.value());
   EXPECT_EQ(0UL, config_->stats().response_bytes_.value());
   EXPECT_EQ(0UL, config_->stats().decoder_error_.value());
 
+  // Mock the buffer is drained by the tcp_proxy filter.
+  resp_data.drain(resp_data.length());
+
+  // Response (onWrite2).
   // Add the rest data to the buffer.
   resp_data.add("abcd");
 
@@ -1182,7 +1198,7 @@ TEST_F(ZooKeeperFilterTest, OneResponseWithMultipleOnWriteCalls) {
 }
 
 // | RESP 1 --------  |  RESP 2 --------|
-// (onWrite  )(onWrite    )(onWrite     )
+// (onWrite1 )(onWrite2   )(onWrite3    )
 TEST_F(ZooKeeperFilterTest, MultipleResponsesWithMultipleOnWriteCalls) {
   initialize();
 
@@ -1195,13 +1211,17 @@ TEST_F(ZooKeeperFilterTest, MultipleResponsesWithMultipleOnWriteCalls) {
   EXPECT_EQ(42, config_->stats().request_bytes_.value());
   EXPECT_EQ(0UL, config_->stats().decoder_error_.value());
 
-  // Response.
+  // Response (onWrite1).
   Buffer::OwnedImpl resp_data = encodeResponseWithPartialData(1000, 2000, 0);
   EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onWrite(resp_data, false));
   EXPECT_EQ(0UL, config_->stats().getdata_resp_.value());
   EXPECT_EQ(0UL, config_->stats().response_bytes_.value());
   EXPECT_EQ(0UL, config_->stats().decoder_error_.value());
 
+  // Mock the buffer is drained by the tcp_proxy filter.
+  resp_data.drain(resp_data.length());
+
+  // Response (onWrite2).
   // Add the rest data of response1 to the buffer.
   resp_data.add("abcd");
   // Add partial data of response2 to the buffer.
@@ -1210,10 +1230,14 @@ TEST_F(ZooKeeperFilterTest, MultipleResponsesWithMultipleOnWriteCalls) {
   resp_data.writeBEInt<uint64_t>(2001);
 
   EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onWrite(resp_data, false));
-  EXPECT_EQ(0UL, config_->stats().getdata_resp_.value());
-  EXPECT_EQ(0UL, config_->stats().response_bytes_.value());
+  EXPECT_EQ(1UL, config_->stats().getdata_resp_.value());
+  EXPECT_EQ(24UL, config_->stats().response_bytes_.value());
   EXPECT_EQ(0UL, config_->stats().decoder_error_.value());
 
+  // Mock the buffer is drained by the tcp_proxy filter.
+  resp_data.drain(resp_data.length());
+
+  // Response (onWrite3).
   // Add the rest data of response2 to the buffer.
   resp_data.writeBEInt<uint32_t>(0);
   resp_data.add("abcdef");
