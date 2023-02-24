@@ -144,8 +144,7 @@ private:
   //       (4) removes the prepended data.
   Network::FilterStatus decodeAndBuffer(Buffer::Instance& data, Buffer::OwnedImpl& zk_filter_buffer,
                                         DecodeType dtype);
-  void decodeAndBufferHelper(Buffer::Instance& data, uint32_t data_len,
-                             Buffer::OwnedImpl& zk_filter_buffer, uint32_t zk_filter_buffer_len,
+  void decodeAndBufferHelper(Buffer::Instance& data, Buffer::OwnedImpl& zk_filter_buffer,
                              DecodeType dtype);
   void decode(Buffer::Instance& data, DecodeType dtype);
   void decodeOnData(Buffer::Instance& data, uint64_t& offset);

@@ -486,28 +486,29 @@ Network::FilterStatus DecoderImpl::onWrite(Buffer::Instance& data) {
 Network::FilterStatus DecoderImpl::decodeAndBuffer(Buffer::Instance& data,
                                                    Buffer::OwnedImpl& zk_filter_buffer,
                                                    DecodeType dtype) {
-  uint32_t zk_filter_buffer_len = zk_filter_buffer.length();
   uint32_t data_len = data.length();
+  uint32_t zk_filter_buffer_len = zk_filter_buffer.length();
 
   if (zk_filter_buffer_len > 0) {
     if (zk_filter_buffer_len + data_len > INT_LENGTH) {
       // Prepend ZooKeeper filter buffer to current buffer.
       data.prepend(zk_filter_buffer);
-      decodeAndBufferHelper(data, data_len, zk_filter_buffer, zk_filter_buffer_len, dtype);
+      decodeAndBufferHelper(data, zk_filter_buffer, dtype);
       // Drain the prepended ZooKeeper filter buffer.
       data.drain(zk_filter_buffer_len);
     } else {
       zk_filter_buffer.add(data);
     }
   } else if (zk_filter_buffer_len == 0) {
-    decodeAndBufferHelper(data, data_len, zk_filter_buffer, zk_filter_buffer_len, dtype);
+    decodeAndBufferHelper(data, zk_filter_buffer, dtype);
   }
   return Network::FilterStatus::Continue;
 }
 
-void DecoderImpl::decodeAndBufferHelper(Buffer::Instance& data, uint32_t data_len,
-                                        Buffer::OwnedImpl& zk_filter_buffer,
-                                        uint32_t zk_filter_buffer_len, DecodeType dtype) {
+void DecoderImpl::decodeAndBufferHelper(Buffer::Instance& data, Buffer::OwnedImpl& zk_filter_buffer,
+                                        DecodeType dtype) {
+  uint32_t data_len = data.length();
+  uint32_t zk_filter_buffer_len = zk_filter_buffer.length();
   uint64_t offset = 0;
   uint32_t len = 0;
   // Boolean to check whether there is at least one full packet in the buffer.
