@@ -80,7 +80,7 @@ public:
 
 class MetadataEncoderTest : public testing::TestWithParam<bool> {
 public:
-  void SetUp() {
+  void SetUp() override {
     scoped_runtime_.mergeValues({{"envoy.reloadable_features.http2_decode_metadata_with_quiche",
                                   GetParam() ? "true" : "false"}});
   }
