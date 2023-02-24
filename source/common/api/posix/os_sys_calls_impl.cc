@@ -42,24 +42,12 @@ SysCallIntResult OsSysCallsImpl::close(os_fd_t fd) {
 }
 
 SysCallSizeResult OsSysCallsImpl::writev(os_fd_t fd, const iovec* iov, int num_iov) {
-  ssize_t rc;
-  if (num_iov == 1) {
-    // Avoid paying the VFS overhead when there is only one IO buffer to work with
-    rc = ::write(fd, iov[0].iov_base, iov[0].iov_len);
-  } else {
-    rc = ::writev(fd, iov, num_iov);
-  }
+  const ssize_t rc = ::writev(fd, iov, num_iov);
   return {rc, rc != -1 ? 0 : errno};
 }
 
 SysCallSizeResult OsSysCallsImpl::readv(os_fd_t fd, const iovec* iov, int num_iov) {
-  ssize_t rc;
-  if (num_iov == 1) {
-    // Avoid paying the VFS overhead when there is only one IO buffer to work with
-    rc = ::read(fd, iov[0].iov_base, iov[0].iov_len);
-  } else {
-    rc = ::readv(fd, iov, num_iov);
-  }
+  const ssize_t rc = ::readv(fd, iov, num_iov);
   return {rc, rc != -1 ? 0 : errno};
 }
 
@@ -72,6 +60,11 @@ SysCallSizeResult OsSysCallsImpl::pwrite(os_fd_t fd, const void* buffer, size_t 
 SysCallSizeResult OsSysCallsImpl::pread(os_fd_t fd, void* buffer, size_t length,
                                         off_t offset) const {
   const ssize_t rc = ::pread(fd, buffer, length, offset);
+  return {rc, rc != -1 ? 0 : errno};
+}
+
+SysCallSizeResult OsSysCallsImpl::send(os_fd_t socket, void* buffer, size_t length, int flags) {
+  const ssize_t rc = ::send(socket, buffer, length, flags);
   return {rc, rc != -1 ? 0 : errno};
 }
 

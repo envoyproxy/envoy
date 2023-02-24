@@ -21,6 +21,7 @@ public:
   SysCallSizeResult pwrite(os_fd_t fd, const void* buffer, size_t length,
                            off_t offset) const override;
   SysCallSizeResult pread(os_fd_t fd, void* buffer, size_t length, off_t offset) const override;
+  SysCallSizeResult send(os_fd_t socket, void* buffer, size_t length, int flags) override;
   SysCallSizeResult recv(os_fd_t socket, void* buffer, size_t length, int flags) override;
   SysCallSizeResult recvmsg(os_fd_t sockfd, msghdr* msg, int flags) override;
   SysCallIntResult recvmmsg(os_fd_t sockfd, struct mmsghdr* msgvec, unsigned int vlen, int flags,
