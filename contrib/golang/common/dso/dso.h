@@ -53,7 +53,7 @@ public:
                                   GoUint64 buffer_ptr, GoUint64 buffer_len);
   GoUint64 envoyGoClusterSpecifierNewPlugin(GoUint64 config_ptr, GoUint64 config_len);
 
-protected:
+private:
   GoUint64 (*envoy_go_cluster_specifier_new_plugin_)(GoUint64 config_ptr,
                                                      GoUint64 config_len) = {nullptr};
   GoUint64 (*envoy_go_on_cluster_specify_)(GoUint64 plugin_ptr, GoUint64 header_ptr,
