@@ -89,9 +89,9 @@ func (f *filter) decodeHeaders(header api.RequestHeaderMap, endStream bool) api.
 		return f.sendLocalReply("decode-header")
 	}
 
-	origin, _ := header.Get("x-test-header-0")
+	origin, found := header.Get("x-test-header-0")
 	hdrs := header.Values("x-test-header-0")
-	if origin != "" {
+	if found {
 		if origin != hdrs[0] {
 			return f.fail("Values return incorrect data %v", hdrs)
 		}
@@ -162,9 +162,9 @@ func (f *filter) encodeHeaders(header api.ResponseHeaderMap, endStream bool) api
 	if strings.Contains(f.localreplay, "encode-header") {
 		return f.sendLocalReply("encode-header")
 	}
-	origin, _ := header.Get("x-test-header-0")
+	origin, found := header.Get("x-test-header-0")
 	hdrs := header.Values("x-test-header-0")
-	if origin != "" {
+	if found {
 		if origin != hdrs[0] {
 			return f.fail("Values return incorrect data %v", hdrs)
 		}
