@@ -455,7 +455,18 @@ elif [[ "$CI_TARGET" == "bazel.clang_tidy" ]]; then
   # clang-tidy will warn on standard library issues with libc++
   ENVOY_STDLIB="libstdc++"
   setup_clang_toolchain
-  BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS[*]}" NUM_CPUS=$NUM_CPUS "${ENVOY_SRCDIR}"/ci/run_clang_tidy.sh "$@"
+
+  export CLANG_TIDY_FIX_DIFF="${TEST_TMPDIR}/lint-fixes/clang-tidy-fixed.diff"
+  export FIX_YAML="${TEST_TMPDIR}/lint-fixes/clang-tidy-fixes.yaml"
+  export CLANG_TIDY_APPLY_FIXES=1
+  mkdir -p "${TEST_TMPDIR}/lint-fixes"
+  BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS[*]}" NUM_CPUS=$NUM_CPUS "${ENVOY_SRCDIR}"/ci/run_clang_tidy.sh "$@" || {
+      echo >&2
+      echo "Diff/yaml files with (some) fixes will be uploaded. Please check the artefacts for this PR run in the azure pipeline." >&2
+      echo >&2
+
+      exit 1
+  }
   exit 0
 elif [[ "$CI_TARGET" == "bazel.fuzz" ]]; then
   setup_clang_toolchain
