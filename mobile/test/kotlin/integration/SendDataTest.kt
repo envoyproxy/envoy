@@ -5,7 +5,10 @@ import io.envoyproxy.envoymobile.EngineBuilder
 import io.envoyproxy.envoymobile.RequestHeadersBuilder
 import io.envoyproxy.envoymobile.RequestMethod
 import io.envoyproxy.envoymobile.UpstreamHttpProtocol
+import io.envoyproxy.envoymobile.engine.testing.QuicTestServer
 import io.envoyproxy.envoymobile.engine.JniLibrary
+import io.envoyproxy.envoymobile.engine.AndroidJniLibrary;
+import io.envoyproxy.envoymobile.engine.EnvoyConfiguration.TrustChainVerification
 import java.nio.ByteBuffer
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
@@ -19,15 +22,19 @@ private const val requestStringMatch = "match_me"
 
 class SendDataTest {
   init {
-    JniLibrary.loadTestLibrary()
+    AndroidJniLibrary.loadTestLibrary();
+    JniLibrary.load()
   }
 
   @Test
   fun `successful sending data`() {
+    QuicTestServer.startTestServer();
+    val port = QuicTestServer.getServerPort();
+
     val expectation = CountDownLatch(1)
     val engine = EngineBuilder(Standard())
       .addNativeFilter("envoy.filters.http.assertion", "{'@type': $assertionFilterType, match_config: {http_request_generic_body_match: {patterns: [{string_match: $requestStringMatch}]}}}")
-      .addNativeFilter("test_remote_response", "{'@type': $testResponseFilterType}")
+      .setTrustChainVerification(TrustChainVerification.ACCEPT_UNTRUSTED)
       .setOnEngineRunning { }
       .build()
 
@@ -36,8 +43,8 @@ class SendDataTest {
     val requestHeaders = RequestHeadersBuilder(
       method = RequestMethod.GET,
       scheme = "https",
-      authority = "example.com",
-      path = "/test"
+      authority = "localhost:" + port,
+      path = "/simple.txt"
     )
       .addUpstreamHttpProtocol(UpstreamHttpProtocol.HTTP2)
       .build()
@@ -65,6 +72,7 @@ class SendDataTest {
     expectation.await(10, TimeUnit.SECONDS)
 
     engine.terminate()
+    QuicTestServer.shutdownTestServer();
 
     assertThat(expectation.count).isEqualTo(0)
     assertThat(responseStatus).isEqualTo(200)

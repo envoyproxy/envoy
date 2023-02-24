@@ -52,11 +52,6 @@ void XdsIntegrationTest::SetUp() {
   setUpstreamProtocol(Http::CodecType::HTTP2);
 }
 
-void XdsIntegrationTest::TearDown() {
-  cleanup();
-  BaseClientIntegrationTest::TearDown();
-}
-
 void XdsIntegrationTest::createEnvoy() {
   BaseClientIntegrationTest::createEnvoy();
   if (on_server_init_function_) {

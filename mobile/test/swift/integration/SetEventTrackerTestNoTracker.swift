@@ -1,4 +1,3 @@
-@_spi(YAMLValidation)
 import Envoy
 import EnvoyEngine
 import Foundation
@@ -15,7 +14,7 @@ final class SetEventTrackerTestNoTracker: XCTestCase {
   func skipped_testSetEventTracker() throws {
     let expectation = self.expectation(description: "Response headers received")
 
-    let engine = YAMLValidatingEngineBuilder()
+    let engine = EngineBuilder()
       .addLogLevel(.trace)
       .addNativeFilter(
         name: "envoy.filters.http.test_event_tracker",

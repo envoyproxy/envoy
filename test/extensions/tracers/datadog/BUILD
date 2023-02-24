@@ -14,8 +14,10 @@ envoy_package()
 envoy_extension_cc_test(
     name = "datadog_tracer_impl_test",
     srcs = [
+        "agent_http_client_test.cc",
         "datadog_tracer_impl_test.cc",
         "dict_util_test.cc",
+        "logger_test.cc",
         "span_test.cc",
         "time_util_test.cc",
         "tracer_stats_test.cc",

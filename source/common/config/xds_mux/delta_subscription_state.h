@@ -55,9 +55,9 @@ private:
     // Builds a ResourceState with a specific version
     ResourceState(absl::string_view version) : version_(version) {}
     // Self-documenting alias of default constructor.
-    static ResourceState waitingForServer() { return ResourceState(); }
+    static ResourceState waitingForServer() { return {}; }
     // Self-documenting alias of constructor with version.
-    static ResourceState withVersion(absl::string_view version) { return ResourceState(version); }
+    static ResourceState withVersion(absl::string_view version) { return {version}; }
 
     // If true, we currently have no version of this resource - we are waiting for the server to
     // provide us with one.

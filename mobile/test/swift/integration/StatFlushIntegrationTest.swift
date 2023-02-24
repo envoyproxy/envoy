@@ -1,4 +1,3 @@
-@_spi(YAMLValidation)
 import Envoy
 import Foundation
 import TestExtensions
@@ -13,7 +12,7 @@ final class StatFlushIntegrationTest: XCTestCase {
   func testLotsOfFlushesWithHistograms() throws {
     let engineExpectation = self.expectation(description: "Engine Running")
 
-    let engine = YAMLValidatingEngineBuilder()
+    let engine = EngineBuilder()
       .addLogLevel(.debug)
       .addStatsFlushSeconds(1)
       .setOnEngineRunning {
@@ -40,7 +39,7 @@ final class StatFlushIntegrationTest: XCTestCase {
   func testMultipleStatSinks() throws {
     let engineExpectation = self.expectation(description: "Engine Running")
 
-    let engine = YAMLValidatingEngineBuilder()
+    let engine = EngineBuilder()
       .addLogLevel(.debug)
       .addStatsFlushSeconds(1)
       .addGrpcStatsDomain("example.com")

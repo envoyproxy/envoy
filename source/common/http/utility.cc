@@ -1122,8 +1122,7 @@ bool shouldPercentDecodeChar(char c) { return testChar(kUrlDecodedCharTable, c);
 std::string Utility::PercentEncoding::urlEncodeQueryParameter(absl::string_view value) {
   std::string encoded;
   encoded.reserve(value.size());
-  for (size_t i = 0; i < value.size(); ++i) {
-    const char ch = value[i];
+  for (char ch : value) {
     if (shouldPercentEncodeChar(ch)) {
       // For consistency, URI producers should use uppercase hexadecimal digits for all
       // percent-encodings. https://tools.ietf.org/html/rfc3986#section-2.1.
