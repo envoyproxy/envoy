@@ -67,7 +67,7 @@ private:
 
   // Scenario 1: a cluster is instantiated but receives no requests, so its traffic-related stats
   // are never instantiated. When this cluster gets reloaded on a config update, a new lazy-init
-  // block is created, but the stats should again not be instaniated.
+  // block is created, but the stats should again not be instantiated.
 
   // Scenario 2: a cluster is instantiated and receives traffic, so its traffic-related stats are
   // instantiated. We must ensure that a new instance for the same cluster gets its lazy-stats
@@ -98,8 +98,7 @@ private:
   StatsStructType stats_;
 };
 
-// A helper class to remove the double indirections on "operator ->/&" for a lazy compatible stats
-// struct.
+// A helper class for a lazy compatible stats struct type.
 template <typename StatsStructType> class LazyCompatibleStats {
 public:
   static LazyCompatibleStats create(Stats::ScopeSharedPtr scope,

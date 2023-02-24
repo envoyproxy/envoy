@@ -690,6 +690,7 @@ emplaced
 emscripten
 emsdk
 enablement
+enable_lazyinit_stats
 encodings
 endian
 endianness
