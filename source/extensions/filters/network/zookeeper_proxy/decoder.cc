@@ -537,6 +537,11 @@ void DecoderImpl::decodeAndBufferHelper(Buffer::Instance& data, Buffer::OwnedImp
 
   if (offset == data_len) {
     decode(data, dtype);
+
+    if (zk_filter_buffer_len > 0) {
+      // Drain the ZooKeeper filter buffer.
+      zk_filter_buffer.drain(zk_filter_buffer_len);
+    }
   } else if (offset > data_len) {
     std::string temp_data;
 
@@ -549,8 +554,10 @@ void DecoderImpl::decodeAndBufferHelper(Buffer::Instance& data, Buffer::OwnedImp
       Buffer::OwnedImpl full_packets;
       full_packets.add(temp_data.data(), temp_data.length());
       decode(full_packets, dtype);
+
       // Drain the ZooKeeper filter buffer.
       zk_filter_buffer.drain(zk_filter_buffer_len);
+
       // Copy out the rest of the data to the ZooKeeper filter buffer.
       temp_data.reserve(data_len - offset);
       temp_data.resize(data_len - offset);
