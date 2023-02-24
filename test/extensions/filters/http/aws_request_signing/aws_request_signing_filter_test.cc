@@ -19,6 +19,7 @@ using Common::Aws::MockSigner;
 using ::testing::An;
 using ::testing::InSequence;
 using ::testing::NiceMock;
+using ::testing::Return;
 using ::testing::StrictMock;
 
 class MockFilterConfig : public FilterConfig {

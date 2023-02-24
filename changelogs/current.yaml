@@ -46,6 +46,9 @@ bug_fixes:
   change: |
     in JSON logs, port numbers were logged as strings and are now logged as numbers (``%DOWNSTREAM_LOCAL_PORT%``, ``%DOWNSTREAM_REMOTE_PORT%``, ``%DOWNSTREAM_DIRECT_REMOTE_PORT%``, ``%UPSTREAM_LOCAL_PORT%``, ``%UPSTREAM_REMOTE_PORT%``).
     This behavioral change can be temporarily reverted by setting runtime guard ``envoy.reloadable_features.format_ports_as_numbers`` to false.
+- area: ext_proc
+  change: |
+    Let onData always raise StopIterationAndWatermark when waiting for headers response, to avoid http errors (413 on request path, and 500 on response path) when data size goes above high watermark.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
@@ -72,12 +75,18 @@ removed_config_or_runtime:
 - area: http
   change: |
     removed ``envoy.reloadable_features.allow_concurrency_for_alpn_pool`` and legacy code path.
+- area: http
+  change: |
+    removed ``envoy.reloadable_features.lua_respond_with_send_local_reply`` and legacy code path.
 - area: http3
   change: |
     removed ``envoy.reloadable_features.conn_pool_new_stream_with_early_data_and_http3`` and legacy code paths.
 - area: http3
   change: |
     removed ``envoy.reloadable_features.http3_sends_early_data`` and legacy code paths.
+- area: dns
+  change: |
+    removed ``envoy.reloadable_features.cares_accept_nodata`` and legacy code paths.
 
 new_features:
 - area: access_log

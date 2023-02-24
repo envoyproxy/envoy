@@ -36,6 +36,7 @@
 using Envoy::Protobuf::util::MessageDifferencer;
 using testing::EndsWith;
 using testing::NiceMock;
+using testing::Return;
 using testing::ReturnRef;
 
 namespace Envoy {

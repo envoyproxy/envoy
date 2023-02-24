@@ -23,6 +23,7 @@ namespace Envoy {
 namespace Router {
 
 using ::testing::NiceMock;
+using ::testing::Return;
 
 class RouterTestFilter : public Filter {
 public:
