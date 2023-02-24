@@ -5,12 +5,10 @@
 
 using testing::_;
 using testing::AtLeast;
-using testing::HasSubstr;
 using testing::InSequence;
 using testing::Invoke;
 using testing::InvokeWithoutArgs;
 using testing::Mock;
-using testing::Property;
 using testing::Ref;
 using testing::Return;
 using testing::ReturnRef;

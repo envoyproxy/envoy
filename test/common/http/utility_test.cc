@@ -23,7 +23,6 @@
 using testing::_;
 using testing::Invoke;
 using testing::InvokeWithoutArgs;
-using testing::Return;
 
 namespace Envoy {
 namespace Http {

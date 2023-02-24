@@ -24,6 +24,8 @@ if [[ -n "$DOCKER_CI_DRYRUN" ]]; then
     AZP_SHA1="${AZP_SHA1:-MOCKSHA}"
 fi
 
+VERSION="$(cat VERSION.txt)"
+
 function is_windows() {
   [[ "$(uname -s)" == *NT* ]]
 }
@@ -128,6 +130,20 @@ push_images() {
   echo ""
 }
 
+MAIN_BRANCH="refs/heads/main"
+RELEASE_BRANCH_REGEX="^refs/heads/release/v.*"
+DEV_VERSION_REGEX="-dev$"
+
+if [[ "$VERSION" =~ $DEV_VERSION_REGEX ]]; then
+    # Dev version
+    IMAGE_POSTFIX="-dev"
+    IMAGE_NAME="${AZP_SHA1}"
+else
+    # Non-dev version
+    IMAGE_POSTFIX=""
+    IMAGE_NAME="v${VERSION}"
+fi
+
 image_tag_name () {
     # envoyproxy/envoy-dev:latest
     local build_type="$1" image_name="$2"
@@ -150,25 +166,11 @@ new_image_tag_name () {
     if [[ -z "$image_name" ]]; then
         parts+=("$IMAGE_NAME")
     elif [[ "$image_name" != "latest" ]]; then
-        parts+=("$IMAGE_NAME")
+        parts+=("$image_name")
     fi
     image_tag=$(IFS=- ; echo "${parts[*]}")
     echo -n "${DOCKER_IMAGE_PREFIX}:${image_tag}"
 }
-
-MAIN_BRANCH="refs/heads/main"
-RELEASE_BRANCH_REGEX="^refs/heads/release/v.*"
-RELEASE_TAG_REGEX="^refs/tags/v.*"
-
-# For main builds and release branch builds use the dev repo. Otherwise we assume it's a tag and
-# we push to the primary repo.
-if [[ "${AZP_BRANCH}" =~ ${RELEASE_TAG_REGEX} ]]; then
-  IMAGE_POSTFIX=""
-  IMAGE_NAME="${AZP_BRANCH/refs\/tags\//}"
-else
-  IMAGE_POSTFIX="-dev"
-  IMAGE_NAME="${AZP_SHA1}"
-fi
 
 # This prefix is altered for the private security images on setec builds.
 DOCKER_IMAGE_PREFIX="${DOCKER_IMAGE_PREFIX:-envoyproxy/envoy}"
@@ -194,16 +196,15 @@ fi
 for BUILD_TYPE in "${BUILD_TYPES[@]}"; do
   build_images "${BUILD_TYPE}" "$(image_tag_name "${BUILD_TYPE}")"
 
-  if ! is_windows && [[ "${BUILD_TYPE}" != *-google-vrp  && "${BUILD_TYPE}" != *-tools ]]; then
+  if ! is_windows; then
       build_images "${BUILD_TYPE}" "$(new_image_tag_name "${BUILD_TYPE}")"
   fi
 done
 
-# Only push images for main builds, release branch builds, and tag builds.
+# Only push images for main builds, and release branch builds
 if [[ "${AZP_BRANCH}" != "${MAIN_BRANCH}" ]] &&
-  ! [[ "${AZP_BRANCH}" =~ ${RELEASE_BRANCH_REGEX} ]] &&
-  ! [[ "${AZP_BRANCH}" =~ ${RELEASE_TAG_REGEX} ]]; then
-  echo 'Ignoring non-main branch or tag for docker push.'
+  ! [[ "${AZP_BRANCH}" =~ ${RELEASE_BRANCH_REGEX} ]]; then
+  echo 'Ignoring non-release branch for docker push.'
   exit 0
 fi
 
@@ -212,27 +213,27 @@ if [[ -z "$DOCKER_CI_DRYRUN" ]]; then
 fi
 
 for BUILD_TYPE in "${BUILD_TYPES[@]}"; do
-  push_images "${BUILD_TYPE}" "$(image_tag_name "${BUILD_TYPE}")"
-  if ! is_windows && [[ "${BUILD_TYPE}" != *-google-vrp  && "${BUILD_TYPE}" != *-tools ]]; then
-      push_images "${BUILD_TYPE}" "$(new_image_tag_name "${BUILD_TYPE}")"
-  fi
-
-  # Only push latest on main builds.
-  if [[ "${AZP_BRANCH}" == "${MAIN_BRANCH}" ]]; then
-    is_windows && docker tag "${DOCKER_IMAGE_PREFIX}${BUILD_TYPE}${IMAGE_POSTFIX}:${IMAGE_NAME}" "${DOCKER_IMAGE_PREFIX}${BUILD_TYPE}${IMAGE_POSTFIX}:latest"
-    push_images "${BUILD_TYPE}" "$(image_tag_name "${BUILD_TYPE}" latest)"
-    if ! is_windows && [[ "${BUILD_TYPE}" != *-google-vrp  && "${BUILD_TYPE}" != *-tools ]]; then
-        push_images "${BUILD_TYPE}" "$(new_image_tag_name "${BUILD_TYPE}" latest)"
+    push_images "${BUILD_TYPE}" "$(image_tag_name "${BUILD_TYPE}")"
+    if ! is_windows; then
+        push_images "${BUILD_TYPE}" "$(new_image_tag_name "${BUILD_TYPE}")"
     fi
-  fi
 
-  # Push vX.Y-latest to tag the latest image in a release line
-  if [[ "${AZP_BRANCH}" =~ ${RELEASE_TAG_REGEX} ]]; then
-    RELEASE_LINE=$(echo "$IMAGE_NAME" | sed -E 's/(v[0-9]+\.[0-9]+)\.[0-9]+/\1-latest/')
-    is_windows && docker tag "${DOCKER_IMAGE_PREFIX}${BUILD_TYPE}${IMAGE_POSTFIX}:${IMAGE_NAME}" "${DOCKER_IMAGE_PREFIX}${BUILD_TYPE}${IMAGE_POSTFIX}:${RELEASE_LINE}"
-    push_images "${BUILD_TYPE}" "$(image_tag_name "${BUILD_TYPE}" "${RELEASE_LINE}")"
-    if ! is_windows && [[ "${BUILD_TYPE}" != *-google-vrp  && "${BUILD_TYPE}" != *-tools ]]; then
-        push_images "${BUILD_TYPE}" "$(new_image_tag_name "${BUILD_TYPE}" "${RELEASE_LINE}")"
+    # Only push latest on main/dev builds.
+    if [[ "$VERSION" =~ $DEV_VERSION_REGEX ]]; then
+        if [[ "${AZP_BRANCH}" == "${MAIN_BRANCH}" ]]; then
+            is_windows && docker tag "${DOCKER_IMAGE_PREFIX}${BUILD_TYPE}${IMAGE_POSTFIX}:${IMAGE_NAME}" "${DOCKER_IMAGE_PREFIX}${BUILD_TYPE}${IMAGE_POSTFIX}:latest"
+            push_images "${BUILD_TYPE}" "$(image_tag_name "${BUILD_TYPE}" latest)"
+            if ! is_windows; then
+                push_images "${BUILD_TYPE}" "$(new_image_tag_name "${BUILD_TYPE}" latest)"
+            fi
+        fi
+    else
+        # Push vX.Y-latest to tag the latest image in a release line
+        RELEASE_LINE=$(echo "$VERSION" | sed -E 's/([0-9]+\.[0-9]+)\.[0-9]+/\1-latest/')
+        is_windows && docker tag "${DOCKER_IMAGE_PREFIX}${BUILD_TYPE}${IMAGE_POSTFIX}:${IMAGE_NAME}" "${DOCKER_IMAGE_PREFIX}${BUILD_TYPE}${IMAGE_POSTFIX}:v${RELEASE_LINE}"
+        push_images "${BUILD_TYPE}" "$(image_tag_name "${BUILD_TYPE}" "v${RELEASE_LINE}")"
+        if ! is_windows; then
+            push_images "${BUILD_TYPE}" "$(new_image_tag_name "${BUILD_TYPE}" "v${RELEASE_LINE}")"
+        fi
     fi
-  fi
 done
