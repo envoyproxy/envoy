@@ -14,8 +14,8 @@ go_binary(
     linkmode = "c-shared",
     visibility = ["//visibility:public"],
     deps = [
-        "//contrib/golang/common/go/registry",
         "//contrib/golang/http/cluster_specifier/source/go/pkg/api",
+        "//contrib/golang/http/cluster_specifier/source/go/pkg/cluster_specifier",
         "@com_github_cncf_xds_go//xds/type/v3:type",
         "@org_golang_google_protobuf//types/known/anypb",
         "@org_golang_google_protobuf//types/known/structpb",

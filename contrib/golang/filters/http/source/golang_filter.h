@@ -99,7 +99,7 @@ class Filter : public Http::StreamFilter,
                Logger::Loggable<Logger::Id::http>,
                public AccessLog::Instance {
 public:
-  explicit Filter(FilterConfigSharedPtr config, Dso::DsoInstancePtr dynamic_lib)
+  explicit Filter(FilterConfigSharedPtr config, Dso::HttpFilterDsoInstancePtr dynamic_lib)
       : config_(config), dynamic_lib_(dynamic_lib), decoding_state_(*this), encoding_state_(*this) {
   }
 
@@ -181,7 +181,7 @@ private:
                               Grpc::Status::GrpcStatus grpc_status, absl::string_view details);
 
   const FilterConfigSharedPtr config_;
-  Dso::DsoInstancePtr dynamic_lib_;
+  Dso::HttpFilterDsoInstancePtr dynamic_lib_;
 
   Http::RequestOrResponseHeaderMap* headers_ ABSL_GUARDED_BY(mutex_){nullptr};
   Http::HeaderMap* trailers_ ABSL_GUARDED_BY(mutex_){nullptr};

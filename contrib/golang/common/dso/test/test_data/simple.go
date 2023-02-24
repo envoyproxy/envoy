@@ -37,7 +37,7 @@ func envoyGoFilterOnHttpDestroy(r *C.httpRequest, reason uint64) {
 
 //export envoyGoClusterSpecifierNewPlugin
 func envoyGoClusterSpecifierNewPlugin(configPtr uint64, configLen uint64) uint64 {
-	return 0
+	return 200
 }
 
 //export envoyGoOnClusterSpecify

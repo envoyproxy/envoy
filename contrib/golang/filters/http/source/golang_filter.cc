@@ -815,7 +815,7 @@ uint64_t FilterConfig::getConfigId() {
   if (config_id_ != 0) {
     return config_id_;
   }
-  auto dlib = Dso::DsoInstanceManager::getDsoInstanceByID(so_id_);
+  auto dlib = Dso::DsoInstanceManager<Dso::HttpFilterDsoInstance>::getDsoInstanceByID(so_id_);
   ASSERT(dlib != nullptr, "load at the config parse phase, so it should not be null");
 
   std::string str;
@@ -862,7 +862,7 @@ uint64_t RoutePluginConfig::getMergedConfigId(uint64_t parent_id, std::string so
     return merged_config_id_;
   }
 
-  auto dlib = Dso::DsoInstanceManager::getDsoInstanceByID(so_id);
+  auto dlib = Dso::DsoInstanceManager<Dso::HttpFilterDsoInstance>::getDsoInstanceByID(so_id);
   ASSERT(dlib != nullptr, "load at the config parse phase, so it should not be null");
 
   if (config_id_ == 0) {

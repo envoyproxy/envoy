@@ -16,7 +16,6 @@ envoy_cc_test(
     ],
     env = {"GODEBUG": "cgocheck=0"},
     deps = [
-        "//contrib/golang/filters/http/source:config",
         "//contrib/golang/http/cluster_specifier/source:config",
         "//source/exe:main_common_lib",
         "//test/config:v2_link_hacks",
