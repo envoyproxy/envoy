@@ -18,6 +18,6 @@
 package api
 
 type HttpCAPI interface {
-	HttpGetHeader(headerPtr uint64, key *string, value *string)
+	HttpGetHeader(headerPtr uint64, key *string, value *string) bool
 	HttpLogError(pluginPtr uint64, msg *string)
 }

@@ -6,7 +6,7 @@
 extern "C" {
 #endif
 
-void envoyGoClusterSpecifierGetHeader(unsigned long long header_ptr, void* key, void* value);
+int envoyGoClusterSpecifierGetHeader(unsigned long long header_ptr, void* key, void* value);
 void envoyGoClusterSpecifierLogError(unsigned long long plugin_ptr, void* msg);
 
 #ifdef __cplusplus

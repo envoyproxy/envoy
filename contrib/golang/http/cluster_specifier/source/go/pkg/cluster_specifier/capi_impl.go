@@ -37,10 +37,13 @@ import (
 	"github.com/envoyproxy/envoy/contrib/golang/http/cluster_specifier/source/go/pkg/api"
 )
 
+const foundHeaderValue = 1
+
 type httpCApiImpl struct{}
 
-func (c *httpCApiImpl) HttpGetHeader(headerPtr uint64, key *string, value *string) {
-	C.envoyGoClusterSpecifierGetHeader(C.ulonglong(headerPtr), unsafe.Pointer(key), unsafe.Pointer(value))
+func (c *httpCApiImpl) HttpGetHeader(headerPtr uint64, key *string, value *string) bool {
+	found := C.envoyGoClusterSpecifierGetHeader(C.ulonglong(headerPtr), unsafe.Pointer(key), unsafe.Pointer(value))
+	return int(found) == foundHeaderValue
 }
 
 func (c *httpCApiImpl) HttpLogError(pluginPtr uint64, msg *string) {

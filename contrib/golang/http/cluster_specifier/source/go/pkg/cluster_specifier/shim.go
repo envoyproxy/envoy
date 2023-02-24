@@ -39,6 +39,9 @@ func envoyGoOnClusterSpecify(pluginPtr uint64, headerPtr uint64, pluginId uint64
 		headerPtr: headerPtr,
 	}
 	specifier := getClusterSpecifier(pluginId)
+	if specifier == nil {
+		panic(fmt.Sprintf("no registered cluster specifier plugin for id: %d", pluginId))
+	}
 	cluster := specifier.Cluster(header)
 	clusterLen := uint64(len(cluster))
 	if clusterLen == 0 {

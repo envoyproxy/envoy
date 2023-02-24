@@ -20,7 +20,9 @@ absl::string_view copyGoString(void* str) {
   return absl::string_view(goStr->p, goStr->n); // NOLINT(modernize-return-braced-init-list)
 }
 
+#ifdef __cplusplus
 extern "C" {
+#endif
 
 CAPIStatus envoyGoFilterHandlerWrapper(void* r,
                                        std::function<CAPIStatus(std::shared_ptr<Filter>&)> f) {
@@ -137,7 +139,10 @@ void envoyGoFilterHttpFinalize(void* r, int reason) {
   auto req = reinterpret_cast<httpRequestInternal*>(r);
   delete req;
 }
+
+#ifdef __cplusplus
 }
+#endif
 
 } // namespace Golang
 } // namespace HttpFilters

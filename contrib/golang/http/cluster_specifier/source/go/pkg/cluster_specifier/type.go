@@ -27,8 +27,8 @@ type httpHeaderMap struct {
 
 var _ api.RequestHeaderMap = (*httpHeaderMap)(nil)
 
-func (h *httpHeaderMap) Get(key string) string {
+func (h *httpHeaderMap) Get(key string) (string, bool) {
 	var value string
-	cAPI.HttpGetHeader(h.headerPtr, &key, &value)
-	return value
+	found := cAPI.HttpGetHeader(h.headerPtr, &key, &value)
+	return value, found
 }

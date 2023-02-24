@@ -34,5 +34,7 @@ type ClusterSpecifierFactory func(config interface{}) ClusterSpecifier
 type ClusterSpecifierConfigFactory func(any *anypb.Any) ClusterSpecifier
 
 type RequestHeaderMap interface {
-	Get(key string) string
+	// Get value of key
+	// If multiple values associated with this key, first one will be returned.
+	Get(key string) (string, bool)
 }

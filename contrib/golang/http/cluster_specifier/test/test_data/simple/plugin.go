@@ -13,7 +13,7 @@ type clusterSpecifier struct {
 }
 
 func (s *clusterSpecifier) Cluster(header api.RequestHeaderMap) string {
-	path := header.Get(":path")
+	path, _ := header.Get(":path")
 
 	// block the request with an unknown cluster.
 	if strings.HasPrefix(path, s.invalidPrefix) {

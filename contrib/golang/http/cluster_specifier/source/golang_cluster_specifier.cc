@@ -8,6 +8,10 @@ namespace Envoy {
 namespace Router {
 namespace Golang {
 
+// limit the max length of cluster name that could return from the Golang cluster specifier plugin,
+// to avoid memory security vulnerability since there might be a bug in Golang side.
+#define MAX_CLUSTER_LENGTH 8192
+
 ClusterConfig::ClusterConfig(const GolangClusterProto& config)
     : so_id_(config.library_id()), so_path_(config.library_path()),
       default_cluster_(config.default_cluster()), config_(config.config()) {
@@ -65,16 +69,14 @@ again:
   auto new_len =
       dlib->envoyGoOnClusterSpecify(plugin_ptr, header_ptr, plugin_id, buffer_ptr, buffer_len);
 
-  if (new_len == 0) {
-    ENVOY_LOG(info, "golang cluster specifier choose the default cluster");
-    cluster = config_->defaultCluster();
-  } else if (new_len < 0) {
-    ENVOY_LOG(error, "error happened while golang choose cluster, using the default cluster");
+  if (new_len <= 0) {
+    ENVOY_LOG(debug, "golang cluster specifier choose the default cluster");
     cluster = config_->defaultCluster();
   } else if (new_len <= buffer_len) {
     ENVOY_LOG(debug, "buffer size fit the cluster name from golang");
     cluster = std::string{buffer.data(), size_t(new_len)};
   } else {
+    RELEASE_ASSERT(new_len <= MAX_CLUSTER_LENGTH, "cluster name too long");
     ENVOY_LOG(debug, "need larger size of buffer to save the cluster name in golang, try again");
     buffer_len = new_len;
     goto again;
