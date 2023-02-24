@@ -16,14 +16,13 @@ namespace {
 class QuicheDecoderListener : public http2::HpackDecoderListener {
 public:
   explicit QuicheDecoderListener(MetadataMap& map) : map_(map) {}
-  void OnHeaderListStart() override {}
 
+  // HpackDecoderListener
+  void OnHeaderListStart() override {}
   void OnHeader(const std::string& name, const std::string& value) override {
     map_.emplace(name, value);
   }
-
   void OnHeaderListEnd() override {}
-
   void OnHeaderErrorDetected(absl::string_view error_message) override {
     ENVOY_LOG_MISC(error, "Failed to decode payload: {}", error_message);
     map_.clear();
