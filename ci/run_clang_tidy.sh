@@ -11,7 +11,9 @@ export LLVM_CONFIG=${LLVM_CONFIG:-llvm-config}
 LLVM_PREFIX=${LLVM_PREFIX:-$(${LLVM_CONFIG} --prefix)}
 CLANG_TIDY=${CLANG_TIDY:-$(${LLVM_CONFIG} --bindir)/clang-tidy}
 CLANG_APPLY_REPLACEMENTS=${CLANG_APPLY_REPLACEMENTS:-$(${LLVM_CONFIG} --bindir)/clang-apply-replacements}
-FIX_YAML=clang-tidy-fixes.yaml
+FIX_YAML="${FIX_YAML:-clang-tidy-fixes.yaml}"
+CLANG_TIDY_APPLY_FIXES="${CLANG_TIDY_APPLY_FIXES:-}"
+CLANG_TIDY_FIX_DIFF="${CLANG_TIDY_FIX_DIFF:-}"
 
 DIFF_TARGET_BRANCH="${DIFF_TARGET_BRANCH:-origin/main}"
 
@@ -91,7 +93,7 @@ function run_clang_tidy() {
   python3 "${LLVM_PREFIX}/share/clang/run-clang-tidy.py" \
     -clang-tidy-binary="${CLANG_TIDY}" \
     -clang-apply-replacements-binary="${CLANG_APPLY_REPLACEMENTS}" \
-    -export-fixes=${FIX_YAML} -j "${NUM_CPUS:-0}" -p "${SRCDIR}" -quiet \
+    -export-fixes="${FIX_YAML}" -j "${NUM_CPUS:-0}" -p "${SRCDIR}" -quiet \
     ${APPLY_CLANG_TIDY_FIXES:+-fix} "$@"
 }
 
@@ -137,7 +139,40 @@ else
 fi
 
 if [[ -s "${FIX_YAML}" ]]; then
-  echo "clang-tidy check failed, potentially fixed by clang-apply-replacements:"
-  cat "${FIX_YAML}"
+  echo >&2
+  echo "clang-tidy check failed, potentially fixed by clang-apply-replacements:" >&2
+  echo >&2
+
+  # Replace the CI path with `.` so it should work locally for devs
+  sed -i s#BuildDirectory:.*#BuildDirectory:\ .# "${FIX_YAML}"
+  cat "${FIX_YAML}" >&2
+
+  if [[ -n "${CLANG_TIDY_APPLY_FIXES}" ]]; then
+      if [[ ! -e "$CLANG_APPLY_REPLACEMENTS" ]]; then
+          echo "clang-apply-replacements MISSING: ${CLANG_APPLY_REPLACEMENTS}" >&2
+      else
+          # Copy the yaml file into repo directory if its in a different location.
+          if [[ "$(dirname "${FIX_YAML}")" != "$PWD" ]]; then
+              FIX_YAML_NAME="$(basename "${FIX_YAML}")"
+              if [[ -e "$FIX_YAML_NAME" ]]; then
+                  # remove existing file
+                  rm "$FIX_YAML_NAME"
+              fi
+              cp "${FIX_YAML}" .
+          fi
+
+          ${CLANG_APPLY_REPLACEMENTS} .
+
+          echo >&2
+          echo "Changes applied:" >&2
+          echo >&2
+
+          git --no-pager diff >&2
+
+          if [[ -n "${CLANG_TIDY_FIX_DIFF}" ]]; then
+              git diff > "${CLANG_TIDY_FIX_DIFF}"
+          fi
+      fi
+  fi
   exit 1
 fi
