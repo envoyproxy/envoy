@@ -1,4 +1,4 @@
-#include "contrib/golang/http/cluster_specifier/source/config.h"
+#include "contrib/golang/router/cluster_specifier/source/config.h"
 
 #include <chrono>
 

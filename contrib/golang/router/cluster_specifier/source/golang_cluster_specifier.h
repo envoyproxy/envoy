@@ -4,14 +4,14 @@
 
 #include "source/common/http/utility.h"
 
-#include "contrib/envoy/extensions/http/cluster_specifier/golang/v3alpha/golang.pb.h"
+#include "contrib/envoy/extensions/router/cluster_specifier/golang/v3alpha/golang.pb.h"
 #include "contrib/golang/common/dso/dso.h"
 
 namespace Envoy {
 namespace Router {
 namespace Golang {
 
-using GolangClusterProto = envoy::extensions::http::cluster_specifier::golang::v3alpha::Config;
+using GolangClusterProto = envoy::extensions::router::cluster_specifier::golang::v3alpha::Config;
 
 class ClusterConfig : Logger::Loggable<Logger::Id::http> {
 public:

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "contrib/golang/http/cluster_specifier/source/golang_cluster_specifier.h"
+#include "contrib/golang/router/cluster_specifier/source/golang_cluster_specifier.h"
 
 namespace Envoy {
 namespace Router {

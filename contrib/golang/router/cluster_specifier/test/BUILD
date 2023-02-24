@@ -12,11 +12,11 @@ envoy_cc_test(
     name = "golang_integration_test",
     srcs = ["golang_integration_test.cc"],
     data = [
-        "//contrib/golang/http/cluster_specifier/test/test_data/simple:plugin.so",
+        "//contrib/golang/router/cluster_specifier/test/test_data/simple:plugin.so",
     ],
     env = {"GODEBUG": "cgocheck=0"},
     deps = [
-        "//contrib/golang/http/cluster_specifier/source:config",
+        "//contrib/golang/router/cluster_specifier/source:config",
         "//source/exe:main_common_lib",
         "//test/config:v2_link_hacks",
         "//test/integration:http_integration_lib",

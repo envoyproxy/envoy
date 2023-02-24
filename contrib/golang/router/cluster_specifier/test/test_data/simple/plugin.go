@@ -3,7 +3,7 @@ package main
 import (
 	"strings"
 
-	"github.com/envoyproxy/envoy/contrib/golang/http/cluster_specifier/source/go/pkg/api"
+	"github.com/envoyproxy/envoy/contrib/golang/router/cluster_specifier/source/go/pkg/api"
 )
 
 type clusterSpecifier struct {

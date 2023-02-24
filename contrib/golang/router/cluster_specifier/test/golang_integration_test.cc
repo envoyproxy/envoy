@@ -4,8 +4,8 @@
 #include "test/integration/http_integration.h"
 #include "test/test_common/utility.h"
 
-#include "contrib/golang/http/cluster_specifier/source/config.h"
-#include "contrib/golang/http/cluster_specifier/source/golang_cluster_specifier.h"
+#include "contrib/golang/router/cluster_specifier/source/config.h"
+#include "contrib/golang/router/cluster_specifier/source/golang_cluster_specifier.h"
 #include "gtest/gtest.h"
 
 namespace Envoy {
@@ -41,7 +41,7 @@ routes:
       extension:
         name: golang
         typed_config:
-          "@type": type.googleapis.com/envoy.extensions.http.cluster_specifier.golang.v3alpha.Config
+          "@type": type.googleapis.com/envoy.extensions.router.cluster_specifier.golang.v3alpha.Config
           library_id: %s
           library_path: %s
           default_cluster: %s
@@ -55,7 +55,7 @@ routes:
 
 std::string genSoPath(std::string name) {
   return TestEnvironment::substitute(
-      "{{ test_rundir }}/contrib/golang/http/cluster_specifier/test/test_data/" + name +
+      "{{ test_rundir }}/contrib/golang/router/cluster_specifier/test/test_data/" + name +
       "/plugin.so");
 }
 

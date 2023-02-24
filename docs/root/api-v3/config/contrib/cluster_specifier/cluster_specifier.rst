@@ -5,4 +5,4 @@ Cluster specifier
   :glob:
   :maxdepth: 2
 
-  ../../../extensions/http/cluster_specifier/golang/v3alpha/*
+  ../../../extensions/router/cluster_specifier/golang/v3alpha/*

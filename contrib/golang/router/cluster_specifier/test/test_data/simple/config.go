@@ -2,8 +2,8 @@ package main
 
 import (
 	xds "github.com/cncf/xds/go/xds/type/v3"
-	"github.com/envoyproxy/envoy/contrib/golang/http/cluster_specifier/source/go/pkg/api"
-	"github.com/envoyproxy/envoy/contrib/golang/http/cluster_specifier/source/go/pkg/cluster_specifier"
+	"github.com/envoyproxy/envoy/contrib/golang/router/cluster_specifier/source/go/pkg/api"
+	"github.com/envoyproxy/envoy/contrib/golang/router/cluster_specifier/source/go/pkg/cluster_specifier"
 	"google.golang.org/protobuf/types/known/anypb"
 )
 

@@ -18,7 +18,7 @@
 package cluster_specifier
 
 import (
-	"github.com/envoyproxy/envoy/contrib/golang/http/cluster_specifier/source/go/pkg/api"
+	"github.com/envoyproxy/envoy/contrib/golang/router/cluster_specifier/source/go/pkg/api"
 )
 
 type httpHeaderMap struct {
