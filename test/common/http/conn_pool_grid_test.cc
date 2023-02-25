@@ -16,7 +16,6 @@
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/upstream/cluster_info.h"
 #include "test/test_common/simulated_time_system.h"
-#include "test/test_common/test_runtime.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
 #include "test/test_common/utility.h"
 
@@ -956,9 +955,6 @@ TEST_F(ConnectivityGridTest, RealGrid) {
 }
 
 TEST_F(ConnectivityGridTest, ConnectionCloseDuringCreation) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.postpone_h3_client_connect_to_next_loop", "false"}});
   initialize();
   EXPECT_CALL(*cluster_, connectTimeout()).WillRepeatedly(Return(std::chrono::seconds(10)));
 
@@ -1028,9 +1024,6 @@ TEST_F(ConnectivityGridTest, ConnectionCloseDuringCreation) {
 }
 
 TEST_F(ConnectivityGridTest, ConnectionCloseDuringAysnConnect) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.postpone_h3_client_connect_to_next_loop", "true"}});
   initialize();
   EXPECT_CALL(*cluster_, connectTimeout()).WillRepeatedly(Return(std::chrono::seconds(10)));
 
