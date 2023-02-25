@@ -566,8 +566,6 @@ TEST_P(HttpHealthCheckIntegrationTest, DisableHCForActiveTraffic) {
   EXPECT_EQ(1, test_server_->counter("cluster.cluster_1.health_check.success")->value());
   EXPECT_EQ(0, test_server_->counter("cluster.cluster_1.health_check.failure")->value());
 
-  timeSystem().advanceTimeWait(std::chrono::milliseconds(1));
-
   auto codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
   Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},
                                                  {":path", "/cluster1"},
@@ -673,7 +671,6 @@ TEST_P(TcpHealthCheckIntegrationTest, DisableHCForActiveTraffic) {
   EXPECT_EQ(1, test_server_->counter("cluster.cluster_1.health_check.success")->value());
   EXPECT_EQ(0, test_server_->counter("cluster.cluster_1.health_check.failure")->value());
 
-  timeSystem().advanceTimeWait(std::chrono::seconds(1));
   test_server_->waitForCounterEq("cluster.cluster_1.health_check.attempt", 3);
 
   ASSERT_TRUE(cluster_data.host_fake_raw_connection_->waitForData(
@@ -681,7 +678,7 @@ TEST_P(TcpHealthCheckIntegrationTest, DisableHCForActiveTraffic) {
   result = clusters_[cluster_idx].host_fake_raw_connection_->write("Pong");
   RELEASE_ASSERT(result, result.message());
 
-  timeSystem().advanceTimeWait(std::chrono::milliseconds(10));
+  test_server_->waitForCounterEq("cluster.cluster_1.health_check.success", 2);
 
   EXPECT_EQ(2, test_server_->counter("cluster.cluster_1.health_check.success")->value());
   EXPECT_EQ(0, test_server_->counter("cluster.cluster_1.health_check.failure")->value());
@@ -901,8 +898,6 @@ TEST_P(GrpcHealthCheckIntegrationTest, DisableHCForActiveTraffic) {
   test_server_->waitForCounterGe("cluster.cluster_1.health_check.success", 1);
   EXPECT_EQ(1, test_server_->counter("cluster.cluster_1.health_check.success")->value());
   EXPECT_EQ(0, test_server_->counter("cluster.cluster_1.health_check.failure")->value());
-
-  timeSystem().advanceTimeWait(std::chrono::milliseconds(1));
 
   auto codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
   auto encoder_decoder = codec_client_->startRequest(
