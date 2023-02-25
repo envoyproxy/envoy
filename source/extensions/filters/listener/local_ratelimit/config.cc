@@ -28,8 +28,8 @@ public:
         const envoy::extensions::filters::listener::local_ratelimit::v3::LocalRateLimit&>(
         message, context.messageValidationVisitor());
 
-    ConfigSharedPtr config = std::make_shared<Config>(proto_config, context.mainThreadDispatcher(),
-                                                      context.scope(), context.runtime());
+    FilterConfigSharedPtr config = std::make_shared<FilterConfig>(
+        proto_config, context.mainThreadDispatcher(), context.scope(), context.runtime());
     return
         [listener_filter_matcher, config](Network::ListenerFilterManager& filter_manager) -> void {
           filter_manager.addAcceptFilter(listener_filter_matcher, std::make_unique<Filter>(config));

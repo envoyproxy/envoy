@@ -29,7 +29,7 @@ class LocalRateLimitTest : public testing::Test, public Event::TestUsingSimulate
 public:
   class ActiveFilter {
   public:
-    ActiveFilter(const ConfigSharedPtr& config) : filter_(config) {
+    ActiveFilter(const FilterConfigSharedPtr& config) : filter_(config) {
       EXPECT_EQ(filter_.maxReadBytes(), 0);
       ON_CALL(cb_, socket()).WillByDefault(ReturnRef(socket_));
       ON_CALL(socket_, ioHandle()).WillByDefault(ReturnRef(io_handle_));
@@ -56,8 +56,8 @@ public:
       EXPECT_CALL(*fill_timer_, enableTimer(_, nullptr));
       EXPECT_CALL(*fill_timer_, disableTimer());
     }
-    config_ =
-        std::make_shared<Config>(proto_config, dispatcher_, *stats_store_.rootScope(), runtime_);
+    config_ = std::make_shared<FilterConfig>(proto_config, dispatcher_, *stats_store_.rootScope(),
+                                             runtime_);
     return proto_config.token_bucket().max_tokens();
   }
 
@@ -65,7 +65,7 @@ public:
   Stats::IsolatedStoreImpl stats_store_;
   NiceMock<Runtime::MockLoader> runtime_;
   Event::MockTimer* fill_timer_{};
-  ConfigSharedPtr config_;
+  FilterConfigSharedPtr config_;
 };
 
 // Basic no rate limit case.

@@ -35,13 +35,13 @@ using LocalRateLimiterImplSharedPtr =
 /**
  * Configuration shared across all connections. Must be thread safe.
  */
-class Config : Logger::Loggable<Logger::Id::filter> {
+class FilterConfig : Logger::Loggable<Logger::Id::filter> {
 public:
-  Config(
+  FilterConfig(
       const envoy::extensions::filters::listener::local_ratelimit::v3::LocalRateLimit& proto_config,
       Event::Dispatcher& dispatcher, Stats::Scope& scope, Runtime::Loader& runtime);
 
-  ~Config() = default;
+  ~FilterConfig() = default;
 
   bool canCreateConnection();
   bool enabled() { return enabled_.enabled(); }
@@ -50,19 +50,19 @@ public:
 private:
   static LocalRateLimitStats generateStats(const std::string& prefix, Stats::Scope& scope);
 
-  Runtime::FeatureFlag enabled_;
-  LocalRateLimitStats stats_;
+  const Runtime::FeatureFlag enabled_;
+  const LocalRateLimitStats stats_;
   LocalRateLimiterImplSharedPtr rate_limiter_;
 };
 
-using ConfigSharedPtr = std::shared_ptr<Config>;
+using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;
 
 /**
  * Local Rate Limit listener filter.
  */
 class Filter : public Network::ListenerFilter, Logger::Loggable<Logger::Id::filter> {
 public:
-  Filter(const ConfigSharedPtr& config) : config_(config) {}
+  Filter(const FilterConfigSharedPtr& config) : config_(config) {}
 
   // Network::ListenerFilter
   Network::FilterStatus onAccept(Network::ListenerFilterCallbacks& cb) override;
@@ -72,7 +72,7 @@ public:
   size_t maxReadBytes() const override { return 0; }
 
 private:
-  ConfigSharedPtr config_;
+  FilterConfigSharedPtr config_;
 };
 
 } // namespace LocalRateLimit

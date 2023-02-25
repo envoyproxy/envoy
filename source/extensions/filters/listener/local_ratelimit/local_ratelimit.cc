@@ -17,7 +17,7 @@ namespace Extensions {
 namespace ListenerFilters {
 namespace LocalRateLimit {
 
-Config::Config(
+FilterConfig::FilterConfig(
     const envoy::extensions::filters::listener::local_ratelimit::v3::LocalRateLimit& proto_config,
     Event::Dispatcher& dispatcher, Stats::Scope& scope, Runtime::Loader& runtime)
     : enabled_(proto_config.runtime_enabled(), runtime),
@@ -31,9 +31,9 @@ Config::Config(
           Protobuf::RepeatedPtrField<
               envoy::extensions::common::ratelimit::v3::LocalRateLimitDescriptor>())) {}
 
-bool Config::canCreateConnection() { return rate_limiter_->requestAllowed({}); }
+bool FilterConfig::canCreateConnection() { return rate_limiter_->requestAllowed({}); }
 
-LocalRateLimitStats Config::generateStats(const std::string& prefix, Stats::Scope& scope) {
+LocalRateLimitStats FilterConfig::generateStats(const std::string& prefix, Stats::Scope& scope) {
   const std::string final_prefix = "listener_local_ratelimit." + prefix;
   return {ALL_LOCAL_RATE_LIMIT_STATS(POOL_COUNTER_PREFIX(scope, final_prefix))};
 }
