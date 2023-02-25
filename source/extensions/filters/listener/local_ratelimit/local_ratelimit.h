@@ -29,8 +29,8 @@ struct LocalRateLimitStats {
   ALL_LOCAL_RATE_LIMIT_STATS(GENERATE_COUNTER_STRUCT)
 };
 
-using LocalRateLimiterImplSharedPtr =
-    std::shared_ptr<Filters::Common::LocalRateLimit::LocalRateLimiterImpl>;
+using LocalRateLimiterImplPtr =
+    std::unique_ptr<Filters::Common::LocalRateLimit::LocalRateLimiterImpl>;
 
 /**
  * Configuration shared across all connections. Must be thread safe.
@@ -52,7 +52,7 @@ private:
 
   const Runtime::FeatureFlag enabled_;
   const LocalRateLimitStats stats_;
-  LocalRateLimiterImplSharedPtr rate_limiter_;
+  LocalRateLimiterImplPtr rate_limiter_;
 };
 
 using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;

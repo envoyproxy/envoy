@@ -22,7 +22,7 @@ FilterConfig::FilterConfig(
     Event::Dispatcher& dispatcher, Stats::Scope& scope, Runtime::Loader& runtime)
     : enabled_(proto_config.runtime_enabled(), runtime),
       stats_(generateStats(proto_config.stat_prefix(), scope)),
-      rate_limiter_(std::make_shared<Filters::Common::LocalRateLimit::LocalRateLimiterImpl>(
+      rate_limiter_(std::make_unique<Filters::Common::LocalRateLimit::LocalRateLimiterImpl>(
           std::chrono::milliseconds(
               PROTOBUF_GET_MS_REQUIRED(proto_config.token_bucket(), fill_interval)),
           proto_config.token_bucket().max_tokens(),
