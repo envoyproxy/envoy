@@ -36,6 +36,13 @@ public:
     }
 
     Network::FilterStatus onAccept() { return filter_.onAccept(cb_); }
+    Network::FilterStatus onEmptyData() {
+      // This is for test coverage purpose only.
+      // onData shouldn't be called since maxReadBytes is zero.
+      Network::ListenerFilterBufferImpl buffer(
+          io_handle_, dispatcher_, [](bool) {}, [](Network::ListenerFilterBuffer&) {}, 1);
+      return filter_.onData(buffer);
+    }
 
     void expectIoHandleClose() {
       EXPECT_CALL(io_handle_, close()).WillOnce(Return(ByMove(Api::ioCallUint64ResultNoError())));
@@ -43,6 +50,7 @@ public:
 
   private:
     Filter filter_;
+    NiceMock<Event::MockDispatcher> dispatcher_;
     NiceMock<Network::MockListenerFilterCallbacks> cb_;
     NiceMock<Network::MockConnectionSocket> socket_;
     NiceMock<Network::MockIoHandle> io_handle_;
@@ -80,6 +88,7 @@ token_bucket:
   InSequence s;
   ActiveFilter active_filter(config_);
   EXPECT_EQ(Network::FilterStatus::Continue, active_filter.onAccept());
+  EXPECT_EQ(Network::FilterStatus::Continue, active_filter.onEmptyData());
   EXPECT_EQ(0, TestUtility::findCounter(
                    stats_store_, "listener_local_ratelimit.local_rate_limit_stats.rate_limited")
                    ->value());
