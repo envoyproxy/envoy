@@ -40,12 +40,7 @@ template <class StatType> Stats::IterateFn<StatType> UngroupedStatsRequest::save
     std::string name = stat->name();
 
     // Check if filtered.
-    if (params_.filter_ != nullptr) {
-      if (!std::regex_search(name, *params_.filter_)) {
-        return true;
-      }
-    } else if (params_.re2_filter_ != nullptr &&
-               !re2::RE2::PartialMatch(name, *params_.re2_filter_)) {
+    if (params_.re2_filter_ != nullptr && !re2::RE2::PartialMatch(name, *params_.re2_filter_)) {
       return true;
     }
 
