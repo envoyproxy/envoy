@@ -497,11 +497,10 @@ envoy_invalid_tag_values{tag1="\\",tag2="\n",tag3="\"",text_value="test"} 0
   EXPECT_EQ(expected_output, response(*makeRequest(false, true)));
 }
 
-// Test that output groups all metrics of the same name(with different tags) together,
-//     as required by the Prometheus exposition format spec.Additionally,
-//     groups of metrics should be sorted by their tags;
-// the format specifies that it is preferred that metrics are always grouped in the same order,
-// and sorting is an easy way to ensure this.
+// Test that output groups all metrics of the same name (with different tags) together,
+// as required by the Prometheus exposition format spec. Additionally, groups of metrics
+// should be sorted by their tags; the format specifies that it is preferred that metrics
+// are always grouped in the same order, and sorting is an easy way to ensure this.
 TEST_F(PrometheusStatsFormatterTest, OutputSortedByMetricName) {
   const std::vector<uint64_t> h1_values = {50, 20, 30, 70, 100, 5000, 200};
   HistogramWrapper h1_cumulative;
