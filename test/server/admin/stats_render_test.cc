@@ -1,15 +1,9 @@
-#include <memory>
-
-#include "source/common/stats/custom_stat_namespaces_impl.h"
-
 #include "test/server/admin/stats_render_test_base.h"
 
 namespace Envoy {
 namespace Server {
 
 using StatsRenderTest = StatsRenderTestBase;
-
-class PrometheusStatsRenderTest : public testing::Test {};
 
 TEST_F(StatsRenderTest, TextInt) {
   StatsTextRender renderer(params_);
@@ -299,65 +293,6 @@ TEST_F(StatsRenderTest, JsonHistogramDisjoint) {
   )EOF";
   EXPECT_THAT(render<>(renderer, "h1", populateHistogram("h1", {200, 300, 300})),
               JsonStringEq(expected));
-}
-
-TEST_F(PrometheusStatsRenderTest, MetricName) {
-  Stats::CustomStatNamespacesImpl custom_namespaces;
-  std::string raw = "vulture.eats-liver";
-  std::string expected = "envoy_vulture_eats_liver";
-  auto actual = PrometheusStatsRender::metricName(raw, custom_namespaces);
-  EXPECT_TRUE(actual.has_value());
-  EXPECT_EQ(expected, actual.value());
-}
-
-TEST_F(PrometheusStatsRenderTest, SanitizeMetricName) {
-  Stats::CustomStatNamespacesImpl custom_namespaces;
-  std::string raw = "An.artist.plays-violin@019street";
-  std::string expected = "envoy_An_artist_plays_violin_019street";
-  auto actual = PrometheusStatsRender::metricName(raw, custom_namespaces);
-  EXPECT_EQ(expected, actual.value());
-}
-
-TEST_F(PrometheusStatsRenderTest, SanitizeMetricNameDigitFirst) {
-  Stats::CustomStatNamespacesImpl custom_namespaces;
-  std::string raw = "3.artists.play-violin@019street";
-  std::string expected = "envoy_3_artists_play_violin_019street";
-  auto actual = PrometheusStatsRender::metricName(raw, custom_namespaces);
-  EXPECT_TRUE(actual.has_value());
-  EXPECT_EQ(expected, actual.value());
-}
-
-TEST_F(PrometheusStatsRenderTest, CustomNamespace) {
-  Stats::CustomStatNamespacesImpl custom_namespaces;
-  custom_namespaces.registerStatNamespace("promstattest");
-  std::string raw = "promstattest.vulture.eats-liver";
-  std::string expected = "vulture_eats_liver";
-  auto actual = PrometheusStatsRender::metricName(raw, custom_namespaces);
-  EXPECT_TRUE(actual.has_value());
-  EXPECT_EQ(expected, actual.value());
-}
-
-TEST_F(PrometheusStatsRenderTest, CustomNamespaceWithInvalidPromnamespace) {
-  Stats::CustomStatNamespacesImpl custom_namespaces;
-  custom_namespaces.registerStatNamespace("promstattest");
-  std::string raw = "promstattest.1234abcd.eats-liver";
-  auto actual = PrometheusStatsRender::metricName(raw, custom_namespaces);
-  EXPECT_FALSE(actual.has_value());
-}
-
-TEST_F(PrometheusStatsRenderTest, FormattedTags) {
-  std::vector<Stats::Tag> tags;
-  Stats::Tag tag1 = {"a.tag-name", "a.tag-value"};
-  Stats::Tag tag2 = {"another_tag_name", "another_tag-value"};
-  Stats::Tag tag3 = {"replace_problematic", R"(val"ue with\ some
- issues)"};
-  tags.push_back(tag1);
-  tags.push_back(tag2);
-  tags.push_back(tag3);
-  std::string expected = "a_tag_name=\"a.tag-value\",another_tag_name=\"another_tag-value\","
-                         "replace_problematic=\"val\\\"ue with\\\\ some\\n issues\"";
-  auto actual = PrometheusStatsRender::formattedTags(tags);
-  EXPECT_EQ(expected, actual);
 }
 
 } // namespace Server

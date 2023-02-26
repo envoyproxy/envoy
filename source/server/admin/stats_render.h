@@ -24,7 +24,7 @@ public:
   virtual void noStats(Buffer::Instance&, absl::string_view) {}
 };
 
-// Abstract class for rendering ungrouoed stats.
+// Abstract class for rendering ungrouped stats.
 // Every method is called "generate" differing only by the data type, to
 // facilitate templatized call-sites.
 //
