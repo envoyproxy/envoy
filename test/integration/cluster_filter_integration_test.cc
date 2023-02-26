@@ -17,7 +17,7 @@ public:
   Network::FilterStatus onData(Buffer::Instance& data, bool end_stream) override {
     ENVOY_CONN_LOG(debug, "polite: onData {} bytes {} end_stream", read_callbacks_->connection(),
                    data.length(), end_stream);
-    if (!read_greeted_) {
+    if (!read_greeted_ && on_new_connection_called_ == 1) {
       Buffer::OwnedImpl greeter(greeting_);
       read_callbacks_->injectReadDataToFilterChain(greeter, false);
       read_greeted_ = true;
@@ -27,7 +27,7 @@ public:
   Network::FilterStatus onWrite(Buffer::Instance& data, bool end_stream) override {
     ENVOY_CONN_LOG(debug, "polite: onWrite {} bytes {} end_stream", write_callbacks_->connection(),
                    data.length(), end_stream);
-    if (!write_greeted_) {
+    if (!write_greeted_ && on_new_connection_called_ == 1) {
       Buffer::OwnedImpl greeter("please ");
       write_callbacks_->injectWriteDataToFilterChain(greeter, false);
       write_greeted_ = true;
@@ -36,6 +36,7 @@ public:
   }
   Network::FilterStatus onNewConnection() override {
     ENVOY_CONN_LOG(debug, "polite: new connection", read_callbacks_->connection());
+    on_new_connection_called_++;
     return Network::FilterStatus::Continue;
   }
 
@@ -52,6 +53,7 @@ private:
   Network::WriteFilterCallbacks* write_callbacks_{};
   bool read_greeted_{false};
   bool write_greeted_{false};
+  int on_new_connection_called_{0};
 };
 
 class PoliteFilterConfigFactory
@@ -107,6 +109,12 @@ TEST_P(ClusterFilterIntegrationTest, TestClusterFilter) {
   auto tcp_client = makeTcpConnection(lookupPort("listener_0"));
   FakeRawConnectionPtr fake_upstream_connection;
   ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+
+  // Upstream read filters are now expected to be initialized, so that each upstream read filter's
+  // onNewConnection() is called exactly once. Otherwise "please " greeting will not be prepended to
+  // the written data and fake_upstream_connection->waitForData() fails. This is dependent on the
+  // fake_upstream_connection having not written yet, as then read filter's onNewConnection() will
+  // be called before onData(), if not called already before.
 
   std::string observed_data;
   ASSERT_TRUE(tcp_client->write("test"));

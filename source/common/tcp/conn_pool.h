@@ -216,6 +216,8 @@ public:
                    Envoy::ConnectionPool::AttachContext& context) override {
     ActiveTcpClient* tcp_client = static_cast<ActiveTcpClient*>(&client);
     tcp_client->readEnableIfNew();
+    // Initialize upstream network read filters, if any
+    tcp_client->connection_->initializeReadFilters();
     auto* callbacks = typedContext<TcpAttachContext>(context).callbacks_;
     std::unique_ptr<Envoy::Tcp::ConnectionPool::ConnectionData> connection_data =
         std::make_unique<ActiveTcpClient::TcpConnectionData>(*tcp_client, *tcp_client->connection_);
