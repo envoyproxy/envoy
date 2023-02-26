@@ -260,6 +260,13 @@ envoy.filters.http.compressor:
   type_urls:
   - envoy.extensions.filters.http.compressor.v3.Compressor
   - envoy.extensions.filters.http.compressor.v3.CompressorPerRoute
+envoy.filters.http.connect_grpc_bridge:
+  categories:
+  - envoy.filters.http
+  security_posture: unknown
+  status: alpha
+  type_urls:
+  - envoy.extensions.filters.http.connect_grpc_bridge.v3.FilterConfig
 envoy.filters.http.cors:
   categories:
   - envoy.filters.http
@@ -1246,6 +1253,13 @@ envoy.matching.inputs.response_trailers:
   status: alpha
   type_urls:
   - envoy.type.matcher.v3.HttpResponseTrailerMatchInput
+envoy.matching.inputs.query_params:
+  categories:
+  - envoy.matching.http.input
+  security_posture: unknown
+  status: alpha
+  type_urls:
+  - envoy.type.matcher.v3.HttpRequestQueryParamMatchInput
 envoy.matching.inputs.destination_ip:
   categories:
   - envoy.matching.http.input
@@ -1369,6 +1383,20 @@ envoy.load_balancing_policies.round_robin:
   status: stable
   type_urls:
   - envoy.extensions.load_balancing_policies.round_robin.v3.RoundRobin
+envoy.load_balancing_policies.ring_hash:
+  categories:
+  - envoy.load_balancing_policies
+  security_posture: robust_to_untrusted_downstream_and_upstream
+  status: stable
+  type_urls:
+  - envoy.extensions.load_balancing_policies.ring_hash.v3.RingHash
+envoy.load_balancing_policies.maglev:
+  categories:
+  - envoy.load_balancing_policies
+  security_posture: robust_to_untrusted_downstream_and_upstream
+  status: stable
+  type_urls:
+  - envoy.extensions.load_balancing_policies.maglev.v3.Maglev
 envoy.http.early_header_mutation.header_mutation:
   categories:
   - envoy.http.early_header_mutation

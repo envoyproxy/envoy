@@ -9,12 +9,14 @@
 #include <vector>
 
 #include "envoy/common/callback.h"
+#include "envoy/common/optref.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/core/v3/protocol.pb.h"
 #include "envoy/config/typed_metadata.h"
 #include "envoy/http/codec.h"
 #include "envoy/http/filter_factory.h"
+#include "envoy/http/header_validator.h"
 #include "envoy/network/connection.h"
 #include "envoy/network/transport_socket.h"
 #include "envoy/ssl/context.h"
@@ -852,7 +854,7 @@ public:
     static constexpr uint64_t HTTP3 = 0x10;
   };
 
-  virtual ~ClusterInfo() = default;
+  ~ClusterInfo() override = default;
 
   /**
    * @return bool whether the cluster was added via API (if false the cluster was present in the
@@ -967,31 +969,31 @@ public:
   /**
    * @return the type of cluster, only used for custom discovery types.
    */
-  virtual const absl::optional<envoy::config::cluster::v3::Cluster::CustomClusterType>&
+  virtual OptRef<const envoy::config::cluster::v3::Cluster::CustomClusterType>
   clusterType() const PURE;
 
   /**
    * @return configuration for round robin load balancing, only used if LB type is round robin.
    */
-  virtual const absl::optional<envoy::config::cluster::v3::Cluster::RoundRobinLbConfig>&
+  virtual OptRef<const envoy::config::cluster::v3::Cluster::RoundRobinLbConfig>
   lbRoundRobinConfig() const PURE;
 
   /**
    * @return configuration for least request load balancing, only used if LB type is least request.
    */
-  virtual const absl::optional<envoy::config::cluster::v3::Cluster::LeastRequestLbConfig>&
+  virtual OptRef<const envoy::config::cluster::v3::Cluster::LeastRequestLbConfig>
   lbLeastRequestConfig() const PURE;
 
   /**
    * @return configuration for ring hash load balancing, only used if type is set to ring_hash_lb.
    */
-  virtual const absl::optional<envoy::config::cluster::v3::Cluster::RingHashLbConfig>&
+  virtual OptRef<const envoy::config::cluster::v3::Cluster::RingHashLbConfig>
   lbRingHashConfig() const PURE;
 
   /**
    * @return configuration for maglev load balancing, only used if type is set to maglev_lb.
    */
-  virtual const absl::optional<envoy::config::cluster::v3::Cluster::MaglevLbConfig>&
+  virtual OptRef<const envoy::config::cluster::v3::Cluster::MaglevLbConfig>
   lbMaglevConfig() const PURE;
 
   /**
@@ -999,15 +1001,14 @@ public:
    * configuration for the Original Destination load balancing policy, only used if type is set to
    *         ORIGINAL_DST_LB.
    */
-  virtual const absl::optional<envoy::config::cluster::v3::Cluster::OriginalDstLbConfig>&
+  virtual OptRef<const envoy::config::cluster::v3::Cluster::OriginalDstLbConfig>
   lbOriginalDstConfig() const PURE;
 
   /**
    * @return const absl::optional<envoy::config::core::v3::TypedExtensionConfig>& the configuration
    *         for the upstream, if a custom upstream is configured.
    */
-  virtual const absl::optional<envoy::config::core::v3::TypedExtensionConfig>&
-  upstreamConfig() const PURE;
+  virtual OptRef<const envoy::config::core::v3::TypedExtensionConfig> upstreamConfig() const PURE;
 
   /**
    * @return Whether the cluster is currently in maintenance mode and should not be routed to.
@@ -1184,6 +1185,12 @@ public:
    * @return the Http3 Codec Stats.
    */
   virtual Http::Http3::CodecStats& http3CodecStats() const PURE;
+
+  /**
+   * @return create header validator based on cluster configuration. Returns nullptr if
+   * ENVOY_ENABLE_UHV is undefined.
+   */
+  virtual Http::HeaderValidatorPtr makeHeaderValidator(Http::Protocol protocol) const PURE;
 
 protected:
   /**

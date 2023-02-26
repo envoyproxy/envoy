@@ -1,6 +1,6 @@
 package test.kotlin.integration
 
-import io.envoyproxy.envoymobile.Custom
+import io.envoyproxy.envoymobile.Standard
 import io.envoyproxy.envoymobile.EngineBuilder
 import io.envoyproxy.envoymobile.EnvoyError
 import io.envoyproxy.envoymobile.FilterDataStatus
@@ -23,50 +23,8 @@ import org.assertj.core.api.Assertions.assertThat
 import org.junit.Test
 
 private val filterName = "cancel_validation_filter"
-private val config =
-"""
-static_resources:
-  listeners:
-  - name: base_api_listener
-    address:
-      socket_address: { protocol: TCP, address: 0.0.0.0, port_value: 10000 }
-    api_listener:
-      api_listener:
-        "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.EnvoyMobileHttpConnectionManager
-        config:
-          stat_prefix: api_hcm
-          route_config:
-            name: api_router
-            virtual_hosts:
-            - name: api
-              domains: ["*"]
-              routes:
-              - match: { prefix: "/" }
-                route: { cluster: fake_remote }
-          http_filters:
-          - name: envoy.filters.http.local_error
-            typed_config:
-              "@type": type.googleapis.com/envoymobile.extensions.filters.http.local_error.LocalError
-          - name: envoy.filters.http.platform_bridge
-            typed_config:
-              "@type": type.googleapis.com/envoymobile.extensions.filters.http.platform_bridge.PlatformBridge
-              platform_filter_name: $filterName
-          - name: envoy.router
-            typed_config:
-              "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
-  clusters:
-  - name: fake_remote
-    connect_timeout: 0.25s
-    type: STATIC
-    lb_policy: ROUND_ROBIN
-    load_assignment:
-      cluster_name: fake_remote
-      endpoints:
-      - lb_endpoints:
-        - endpoint:
-            address:
-              socket_address: { address: 127.0.0.1, port_value: ${(10001..11000).random()} }
-"""
+private const val pbfType = "type.googleapis.com/envoymobile.extensions.filters.http.platform_bridge.PlatformBridge"
+private const val localErrorFilterType = "type.googleapis.com/envoymobile.extensions.filters.http.local_error.LocalError"
 
 class CancelGRPCStreamTest {
 
@@ -113,11 +71,13 @@ class CancelGRPCStreamTest {
 
   @Test
   fun `cancel grpc stream calls onCancel callback`() {
-    val engine = EngineBuilder(Custom(config))
+    val engine = EngineBuilder(Standard())
       .addPlatformFilter(
         name = filterName,
         factory = { CancelValidationFilter(filterExpectation) }
       )
+      .addNativeFilter("envoy.filters.http.platform_bridge", "{'@type': $pbfType, platform_filter_name: $filterName}")
+      .addNativeFilter("envoy.filters.http.local_error", "{'@type': $localErrorFilterType}")
       .setOnEngineRunning {}
       .build()
 

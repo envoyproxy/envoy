@@ -47,18 +47,9 @@ Http::Status EnvoyQuicClientStream::encodeHeaders(const Http::RequestHeaderMap& 
   auto spdy_headers = envoyHeadersToHttp2HeaderBlock(headers);
   if (headers.Method()) {
     if (headers.Method()->value() == "CONNECT") {
-      if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.use_rfc_connect")) {
-        spdy_headers.erase(":scheme");
-        spdy_headers.erase(":path");
-        spdy_headers.erase(":protocol");
-      } else {
-        // Legacy support for abandoned
-        // https://tools.ietf.org/html/draft-kinnear-httpbis-http2-transport-02
-        spdy_headers[":protocol"] = Http::Headers::get().ProtocolValues.Bytestream;
-        if (!headers.Path()) {
-          spdy_headers[":path"] = "/";
-        }
-      }
+      spdy_headers.erase(":scheme");
+      spdy_headers.erase(":path");
+      spdy_headers.erase(":protocol");
     } else if (headers.Method()->value() == "HEAD") {
       sent_head_request_ = true;
     }
@@ -70,6 +61,9 @@ Http::Status EnvoyQuicClientStream::encodeHeaders(const Http::RequestHeaderMap& 
   }
 
   if (local_end_stream_) {
+    if (codec_callbacks_) {
+      codec_callbacks_->onCodecEncodeComplete();
+    }
     onLocalEndStream();
   }
   return Http::okStatus();
@@ -115,6 +109,9 @@ void EnvoyQuicClientStream::encodeData(Buffer::Instance& data, bool end_stream) 
     return;
   }
   if (local_end_stream_) {
+    if (codec_callbacks_) {
+      codec_callbacks_->onCodecEncodeComplete();
+    }
     onLocalEndStream();
   }
 }
@@ -135,6 +132,9 @@ void EnvoyQuicClientStream::encodeTrailers(const Http::RequestTrailerMap& traile
     ENVOY_BUG(bytes_sent != 0, "Failed to encode trailers");
   }
 
+  if (codec_callbacks_) {
+    codec_callbacks_->onCodecEncodeComplete();
+  }
   onLocalEndStream();
 }
 

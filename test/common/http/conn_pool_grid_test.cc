@@ -431,9 +431,6 @@ TEST_F(ConnectivityGridTest, Http3BrokenWithExpiredHttpServerPropertiesCacheEntr
 
 // Test that newStream() with HTTP/3 disabled.
 TEST_F(ConnectivityGridTest, NewStreamWithHttp3Disabled) {
-  if (!Runtime::runtimeFeatureEnabled(Runtime::conn_pool_new_stream_with_early_data_and_http3)) {
-    return;
-  }
   addHttp3AlternateProtocol();
   initialize();
   grid_->immediate_success_ = true;
@@ -450,9 +447,6 @@ TEST_F(ConnectivityGridTest, NewStreamWithHttp3Disabled) {
 
 // Test that newStream() with alternate protocols disabled and TCP connection also fails.
 TEST_F(ConnectivityGridTest, NewStreamWithAltSvcDisabledFail) {
-  if (!Runtime::runtimeFeatureEnabled(Runtime::conn_pool_new_stream_with_early_data_and_http3)) {
-    return;
-  }
   addHttp3AlternateProtocol();
   initialize();
   grid_->immediate_failure_ = true;

@@ -6,6 +6,7 @@ ABI
 ACK
 ACL
 AES
+AllMuxes
 ALPN
 ALS
 AMZ
@@ -28,6 +29,7 @@ BSON
 BPF
 Bdecoded
 Bencoded
+DFP
 GiB
 IPTOS
 Repick
@@ -61,6 +63,7 @@ ESC
 ETB
 ETX
 FS
+FIXME
 HEXDIG
 HEXDIGIT
 HPE
@@ -158,6 +161,7 @@ FIPS
 FIRSTHDR
 FQDN
 FREEBIND
+freeifaddrs
 FUZZER
 FUZZERS
 delims
@@ -201,6 +205,7 @@ IAM
 IANA
 IDL
 IETF
+IFADDRS
 INADDR
 INET
 INVAL
@@ -235,6 +240,7 @@ LEV
 LF
 LHS
 hls
+ingressed
 integrations
 jkl
 lang
@@ -583,6 +589,7 @@ codebase
 codec
 codecs
 codepath
+codepoints
 codings
 combinatorial
 comparator
@@ -940,6 +947,9 @@ negative
 netblock
 netblocks
 netfilter
+netlink
+netmask
+NLMSG
 nonblocking
 noncopyable
 nonresponsive
@@ -1135,6 +1145,7 @@ responder
 restarter
 resync
 ret
+retransmitted
 retransmitting
 retriable
 retriggers
@@ -1339,6 +1350,7 @@ upcasts
 upstreams
 uptime
 upvalue
+urlencoded
 urls
 userdata
 userinfo
@@ -1367,6 +1379,7 @@ vip
 virtualhost
 virtualize
 vptr
+vtable
 vtt
 wakeup
 wakeups
@@ -1382,6 +1395,7 @@ winsock
 workspace
 writev
 wrsq
+www
 xDS
 xDSes
 xdstp

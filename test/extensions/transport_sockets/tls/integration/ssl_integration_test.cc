@@ -40,6 +40,8 @@
 #include "test/extensions/common/tap/common.h"
 #endif
 
+using testing::StartsWith;
+
 namespace Envoy {
 
 using Extensions::TransportSockets::Tls::ContextImplPeer;
@@ -733,6 +735,46 @@ TEST_P(SslCertficateIntegrationTest, ServerEcdsaClientRsaOnly) {
   test_server_->waitForCounterGe(counter_name, 1);
   EXPECT_EQ(1U, counter->value());
   counter->reset();
+}
+
+// Server has only an ECDSA certificate, client is only RSA capable, leads to a connection fail.
+// Test the access log.
+TEST_P(SslCertficateIntegrationTest, ServerEcdsaClientRsaOnlyWithAccessLog) {
+  useListenerAccessLog("DOWNSTREAM_TRANSPORT_FAILURE_REASON=%DOWNSTREAM_TRANSPORT_FAILURE_REASON% "
+                       "FILTER_CHAIN_NAME=%FILTER_CHAIN_NAME%");
+  server_rsa_cert_ = false;
+  server_ecdsa_cert_ = true;
+  initialize();
+  auto codec_client =
+      makeRawHttpConnection(makeSslClientConnection(rsaOnlyClientOptions()), absl::nullopt);
+  EXPECT_FALSE(codec_client->connected());
+
+  auto log_result = waitForAccessLog(listener_access_log_name_);
+  if (tls_version_ == envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_3) {
+    EXPECT_THAT(log_result,
+                StartsWith("DOWNSTREAM_TRANSPORT_FAILURE_REASON=TLS_error:_268435709:SSL_routines:"
+                           "OPENSSL_internal:NO_COMMON_SIGNATURE_ALGORITHMS"));
+  } else {
+    EXPECT_THAT(log_result, StartsWith("DOWNSTREAM_TRANSPORT_FAILURE_REASON=TLS_error:_268435640:"
+                                       "SSL_routines:OPENSSL_internal:NO_SHARED_CIPHER"));
+  }
+}
+
+// Server with RSA/ECDSA certificates and a client with only RSA cipher suites works.
+// Test empty access log with successful connection.
+TEST_P(SslCertficateIntegrationTest, ServerRsaEcdsaClientRsaOnlyWithAccessLog) {
+  useListenerAccessLog("DOWNSTREAM_TRANSPORT_FAILURE_REASON=%DOWNSTREAM_TRANSPORT_FAILURE_REASON% "
+                       "FILTER_CHAIN_NAME=%FILTER_CHAIN_NAME%");
+  server_rsa_cert_ = true;
+  server_ecdsa_cert_ = true;
+  ConnectionCreationFunction creator = [&]() -> Network::ClientConnectionPtr {
+    return makeSslClientConnection(rsaOnlyClientOptions());
+  };
+  testRouterRequestAndResponseWithBody(1024, 512, false, false, &creator);
+  checkStats();
+  codec_client_->close();
+  auto log_result = waitForAccessLog(listener_access_log_name_);
+  EXPECT_THAT(log_result, StartsWith("DOWNSTREAM_TRANSPORT_FAILURE_REASON=- FILTER_CHAIN_NAME=-"));
 }
 
 // Server with RSA/ECDSA certificates and a client with only RSA cipher suites works.

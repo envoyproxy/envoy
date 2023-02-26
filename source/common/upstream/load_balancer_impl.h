@@ -533,8 +533,7 @@ public:
       const PrioritySet& priority_set, const PrioritySet* local_priority_set, ClusterLbStats& stats,
       Runtime::Loader& runtime, Random::RandomGenerator& random,
       const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config,
-      const absl::optional<envoy::config::cluster::v3::Cluster::RoundRobinLbConfig>
-          round_robin_config,
+      OptRef<const envoy::config::cluster::v3::Cluster::RoundRobinLbConfig> round_robin_config,
       TimeSource& time_source)
       : EdfLoadBalancerBase(
             priority_set, local_priority_set, stats, runtime, random,
@@ -542,8 +541,7 @@ public:
                                                            100, 50),
             LoadBalancerConfigHelper::localityLbConfigFromCommonLbConfig(common_config),
             round_robin_config.has_value()
-                ? LoadBalancerConfigHelper::slowStartConfigFromLegacyProto(
-                      round_robin_config.value())
+                ? LoadBalancerConfigHelper::slowStartConfigFromLegacyProto(round_robin_config.ref())
                 : absl::nullopt,
             time_source) {
     initialize();
@@ -627,8 +625,7 @@ public:
       const PrioritySet& priority_set, const PrioritySet* local_priority_set, ClusterLbStats& stats,
       Runtime::Loader& runtime, Random::RandomGenerator& random,
       const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config,
-      const absl::optional<envoy::config::cluster::v3::Cluster::LeastRequestLbConfig>
-          least_request_config,
+      OptRef<const envoy::config::cluster::v3::Cluster::LeastRequestLbConfig> least_request_config,
       TimeSource& time_source)
       : EdfLoadBalancerBase(
             priority_set, local_priority_set, stats, runtime, random,
@@ -637,12 +634,12 @@ public:
             LoadBalancerConfigHelper::localityLbConfigFromCommonLbConfig(common_config),
             least_request_config.has_value()
                 ? LoadBalancerConfigHelper::slowStartConfigFromLegacyProto(
-                      least_request_config.value())
+                      least_request_config.ref())
                 : absl::nullopt,
             time_source),
         choice_count_(
             least_request_config.has_value()
-                ? PROTOBUF_GET_WRAPPED_OR_DEFAULT(least_request_config.value(), choice_count, 2)
+                ? PROTOBUF_GET_WRAPPED_OR_DEFAULT(least_request_config.ref(), choice_count, 2)
                 : 2),
         active_request_bias_runtime_(
             least_request_config.has_value() && least_request_config->has_active_request_bias()
@@ -689,40 +686,7 @@ protected:
 
 private:
   void refreshHostSource(const HostsSource&) override {}
-  double hostWeight(const Host& host) override {
-    // This method is called to calculate the dynamic weight as following when all load balancing
-    // weights are not equal:
-    //
-    // `weight = load_balancing_weight / (active_requests + 1)^active_request_bias`
-    //
-    // `active_request_bias` can be configured via runtime and its value is cached in
-    // `active_request_bias_` to avoid having to do a runtime lookup each time a host weight is
-    // calculated.
-    //
-    // When `active_request_bias == 0.0` we behave like `RoundRobinLoadBalancer` and return the
-    // host weight without considering the number of active requests at the time we do the pick.
-    //
-    // When `active_request_bias > 0.0` we scale the host weight by the number of active
-    // requests at the time we do the pick. We always add 1 to avoid division by 0.
-    //
-    // It might be possible to do better by picking two hosts off of the schedule, and selecting the
-    // one with fewer active requests at the time of selection.
-
-    double host_weight = static_cast<double>(host.weight());
-
-    if (active_request_bias_ == 1.0) {
-      host_weight = static_cast<double>(host.weight()) / (host.stats().rq_active_.value() + 1);
-    } else if (active_request_bias_ != 0.0) {
-      host_weight = static_cast<double>(host.weight()) /
-                    std::pow(host.stats().rq_active_.value() + 1, active_request_bias_);
-    }
-
-    if (!noHostsAreInSlowStart()) {
-      return applySlowStartFactor(host_weight, host);
-    } else {
-      return host_weight;
-    }
-  }
+  double hostWeight(const Host& host) override;
   HostConstSharedPtr unweightedHostPeek(const HostVector& hosts_to_use,
                                         const HostsSource& source) override;
   HostConstSharedPtr unweightedHostPick(const HostVector& hosts_to_use,
@@ -793,10 +757,11 @@ public:
 
 private:
   const std::set<std::string> selector_keys_;
+  const std::set<std::string> fallback_keys_subset_;
+  // Keep small members (bools and enums) at the end of class, to reduce alignment overhead.
   const envoy::config::cluster::v3::Cluster::LbSubsetConfig::LbSubsetSelector::
       LbSubsetSelectorFallbackPolicy fallback_policy_;
-  const std::set<std::string> fallback_keys_subset_;
-  const bool single_host_per_subset_;
+  const bool single_host_per_subset_ : 1;
 };
 
 /**

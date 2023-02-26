@@ -106,63 +106,23 @@ void MixedConnPoolImplTest::testAlpnHandshake(absl::optional<Protocol> protocol)
   conn_pool_.reset();
 }
 
-TEST_F(MixedConnPoolImplTest, BasicNoAlpnHandshakeOld) {
-  scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.allow_concurrency_for_alpn_pool", "false"}});
-  expected_capacity_ = 1; // The old code assumes HTTP/1.1
-  testAlpnHandshake({});
-}
-
-TEST_F(MixedConnPoolImplTest, BasicNoAlpnHandshakeNew) {
-  scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.allow_concurrency_for_alpn_pool", "true"}});
-  testAlpnHandshake({});
-}
+TEST_F(MixedConnPoolImplTest, BasicNoAlpnHandshakeNew) { testAlpnHandshake({}); }
 
 TEST_F(MixedConnPoolImplTest, HandshakeWithCachedLimit) {
-  scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.allow_concurrency_for_alpn_pool", "true"}});
-
   expected_capacity_ = 5;
   EXPECT_CALL(mock_cache_, getConcurrentStreams(_)).WillOnce(Return(5));
   testAlpnHandshake({});
 }
 
 TEST_F(MixedConnPoolImplTest, HandshakeWithCachedLimitCapped) {
-  scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.allow_concurrency_for_alpn_pool", "true"}});
-
   EXPECT_CALL(mock_cache_, getConcurrentStreams(_))
       .WillOnce(Return(std::numeric_limits<uint32_t>::max()));
   testAlpnHandshake({});
 }
 
-TEST_F(MixedConnPoolImplTest, Http1AlpnHandshakeOld) {
-  scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.allow_concurrency_for_alpn_pool", "false"}});
+TEST_F(MixedConnPoolImplTest, Http1AlpnHandshake) { testAlpnHandshake(Protocol::Http11); }
 
-  expected_capacity_ = 1; // The old code assumes HTTP/1.1
-  testAlpnHandshake(Protocol::Http11);
-}
-
-TEST_F(MixedConnPoolImplTest, Http2AlpnHandshakeOld) {
-  scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.allow_concurrency_for_alpn_pool", "false"}});
-  expected_capacity_ = 1; // The old code assumes HTTP/1.1
-  testAlpnHandshake(Protocol::Http2);
-}
-
-TEST_F(MixedConnPoolImplTest, Http1AlpnHandshake) {
-  scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.allow_concurrency_for_alpn_pool", "true"}});
-  testAlpnHandshake(Protocol::Http11);
-}
-
-TEST_F(MixedConnPoolImplTest, Http2AlpnHandshake) {
-  scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.allow_concurrency_for_alpn_pool", "true"}});
-  testAlpnHandshake(Protocol::Http2);
-}
+TEST_F(MixedConnPoolImplTest, Http2AlpnHandshake) { testAlpnHandshake(Protocol::Http2); }
 
 } // namespace
 } // namespace Http

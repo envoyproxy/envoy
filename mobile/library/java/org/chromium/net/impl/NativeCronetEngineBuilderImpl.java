@@ -41,13 +41,14 @@ public class NativeCronetEngineBuilderImpl extends CronetEngineBuilderImpl {
   private int mDnsFailureRefreshSecondsMax = 10;
   private int mDnsQueryTimeoutSeconds = 25;
   private int mDnsMinRefreshSeconds = 60;
-  private String mDnsPreresolveHostnames = "[]";
+  private List<String> mDnsPreresolveHostnames = Collections.emptyList();
   private boolean mEnableDNSCache = false;
+  private int mDnsCacheSaveIntervalSeconds = 1;
   private List<String> mDnsFallbackNameservers = Collections.emptyList();
   private boolean mEnableDnsFilterUnroutableFamilies = true;
   private boolean mDnsUseSystemResolver = true;
   private boolean mEnableDrainPostDnsRefresh = false;
-  private boolean mEnableGzip = true;
+  private boolean mEnableGzipDecompression = true;
   private boolean mEnableSocketTag = true;
   private boolean mEnableHappyEyeballs = true;
   private boolean mEnableInterfaceBinding = false;
@@ -55,7 +56,6 @@ public class NativeCronetEngineBuilderImpl extends CronetEngineBuilderImpl {
   private boolean mEnableSkipDNSLookupForProxiedRequests = false;
   private int mH2ConnectionKeepaliveIdleIntervalMilliseconds = 1;
   private int mH2ConnectionKeepaliveTimeoutSeconds = 10;
-  private boolean mH2ExtendKeepaliveTimeout = false;
   private int mMaxConnectionsPerHost = 7;
   private int mStatsFlushSeconds = 60;
   private int mStreamIdleTimeoutSeconds = 15;
@@ -63,7 +63,8 @@ public class NativeCronetEngineBuilderImpl extends CronetEngineBuilderImpl {
   private String mAppVersion = "unspecified";
   private String mAppId = "unspecified";
   private TrustChainVerification mTrustChainVerification = VERIFY_TRUST_CHAIN;
-  private String mVirtualClusters = "[]";
+  private List<String> mVirtualClusters = Collections.emptyList();
+  ;
   private boolean mEnablePlatformCertificatesValidation = true;
 
   /**
@@ -119,17 +120,19 @@ public class NativeCronetEngineBuilderImpl extends CronetEngineBuilderImpl {
     Map<String, EnvoyStringAccessor> stringAccessors = Collections.emptyMap();
     Map<String, EnvoyKeyValueStore> keyValueStores = Collections.emptyMap();
     List<String> statSinks = Collections.emptyList();
+    Map<String, Boolean> runtimeGuards = Collections.emptyMap();
 
     return new EnvoyConfiguration(
         mAdminInterfaceEnabled, mGrpcStatsDomain, mConnectTimeoutSeconds, mDnsRefreshSeconds,
         mDnsFailureRefreshSecondsBase, mDnsFailureRefreshSecondsMax, mDnsQueryTimeoutSeconds,
-        mDnsMinRefreshSeconds, mDnsPreresolveHostnames, mEnableDNSCache, mEnableDrainPostDnsRefresh,
-        quicEnabled(), mEnableGzip, brotliEnabled(), mEnableSocketTag, mEnableHappyEyeballs,
+        mDnsMinRefreshSeconds, mDnsPreresolveHostnames, mEnableDNSCache,
+        mDnsCacheSaveIntervalSeconds, mEnableDrainPostDnsRefresh, quicEnabled(),
+        mEnableGzipDecompression, brotliEnabled(), mEnableSocketTag, mEnableHappyEyeballs,
         mEnableInterfaceBinding, mH2ConnectionKeepaliveIdleIntervalMilliseconds,
-        mH2ConnectionKeepaliveTimeoutSeconds, mH2ExtendKeepaliveTimeout, mMaxConnectionsPerHost,
-        mStatsFlushSeconds, mStreamIdleTimeoutSeconds, mPerTryIdleTimeoutSeconds, mAppVersion,
-        mAppId, mTrustChainVerification, mVirtualClusters, nativeFilterChain, platformFilterChain,
-        stringAccessors, keyValueStores, statSinks, mEnableSkipDNSLookupForProxiedRequests,
-        mEnablePlatformCertificatesValidation);
+        mH2ConnectionKeepaliveTimeoutSeconds, mMaxConnectionsPerHost, mStatsFlushSeconds,
+        mStreamIdleTimeoutSeconds, mPerTryIdleTimeoutSeconds, mAppVersion, mAppId,
+        mTrustChainVerification, mVirtualClusters, nativeFilterChain, platformFilterChain,
+        stringAccessors, keyValueStores, statSinks, runtimeGuards,
+        mEnableSkipDNSLookupForProxiedRequests, mEnablePlatformCertificatesValidation);
   }
 }

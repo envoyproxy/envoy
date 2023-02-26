@@ -19,14 +19,14 @@ MockConfig::MockConfig() {
 }
 MockConfig::~MockConfig() = default;
 
-MockHttpTracer::MockHttpTracer() = default;
-MockHttpTracer::~MockHttpTracer() = default;
+MockTracer::MockTracer() = default;
+MockTracer::~MockTracer() = default;
 
 MockDriver::MockDriver() = default;
 MockDriver::~MockDriver() = default;
 
-MockHttpTracerManager::MockHttpTracerManager() = default;
-MockHttpTracerManager::~MockHttpTracerManager() = default;
+MockTracerManager::MockTracerManager() = default;
+MockTracerManager::~MockTracerManager() = default;
 
 } // namespace Tracing
 } // namespace Envoy

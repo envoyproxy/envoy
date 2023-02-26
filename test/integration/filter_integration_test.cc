@@ -192,10 +192,39 @@ TEST_P(FilterIntegrationTest, MissingHeadersLocalReplyDownstreamBytesCount) {
   EXPECT_EQ("200", response->headers().getStatusValue());
 
   if (testing_downstream_filter_) {
-    expectDownstreamBytesSentAndReceived(BytesCountExpectation(90, 88, 71, 54),
-                                         BytesCountExpectation(0, 58, 0, 58),
-                                         BytesCountExpectation(7, 10, 7, 8));
+    if (Runtime::runtimeFeatureEnabled(Runtime::expand_agnostic_stream_lifetime)) {
+      expectDownstreamBytesSentAndReceived(BytesCountExpectation(90, 88, 71, 54),
+                                           BytesCountExpectation(40, 58, 40, 58),
+                                           BytesCountExpectation(7, 10, 7, 8));
+    } else {
+      expectDownstreamBytesSentAndReceived(BytesCountExpectation(90, 88, 71, 54),
+                                           BytesCountExpectation(0, 58, 0, 58),
+                                           BytesCountExpectation(7, 10, 7, 8));
+    }
   }
+}
+
+TEST_P(FilterIntegrationTest, RoundTripTimeForUpstreamConnection) {
+  config_helper_.prependFilter(R"EOF(
+  name: stream-info-to-headers-filter
+  )EOF");
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  // Send a headers only request.
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  waitForNextUpstreamRequest();
+
+  // Make sure that the body was injected to the request.
+  EXPECT_TRUE(upstream_request_->complete());
+
+  // Send a headers only response.
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  ASSERT_TRUE(response->waitForEndStream());
+
+  // Make sure that round trip time was populated
+  EXPECT_FALSE(response->headers().get(Http::LowerCaseString("round_trip_time")).empty());
 }
 
 TEST_P(FilterIntegrationTest, MissingHeadersLocalReplyUpstreamBytesCount) {

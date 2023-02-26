@@ -32,43 +32,72 @@ package http
 */
 import "C"
 import (
-    "fmt"
-    "unsafe"
+	"fmt"
+	"unsafe"
 
-    "github.com/envoyproxy/envoy/contrib/golang/filters/http/source/go/pkg/api"
+	"github.com/envoyproxy/envoy/contrib/golang/filters/http/source/go/pkg/api"
 )
 
 type httpRequest struct {
-    req        *C.httpRequest
-    httpFilter api.StreamFilter
+	req        *C.httpRequest
+	httpFilter api.StreamFilter
+	paniced    bool
+}
+
+func (r *httpRequest) safeReplyPanic() {
+	defer r.RecoverPanic()
+	r.SendLocalReply(500, "error happened in Golang filter\r\n", map[string]string{}, 0, "")
+}
+
+func (r *httpRequest) RecoverPanic() {
+	if e := recover(); e != nil {
+		// TODO: print an error message to Envoy error log.
+		switch e {
+		case errRequestFinished, errFilterDestroyed:
+			// do nothing
+
+		case errNotInGo:
+			// We can not send local reply now, since not in go now,
+			// will delay to the next time entering Go.
+			r.paniced = true
+
+		default:
+			// The following safeReplyPanic should only may get errRequestFinished,
+			// errFilterDestroyed or errNotInGo, won't hit this branch, so, won't dead loop here.
+
+			// errInvalidPhase, or other panic, not from not-ok C return status.
+			// It's safe to try send a local reply with 500 status.
+			r.safeReplyPanic()
+		}
+	}
 }
 
 func (r *httpRequest) Continue(status api.StatusType) {
-    if status == api.LocalReply {
-        fmt.Printf("warning: LocalReply status is useless after sendLocalReply, ignoring")
-        return
-    }
-    cAPI.HttpContinue(unsafe.Pointer(r.req), uint64(status))
+	if status == api.LocalReply {
+		fmt.Printf("warning: LocalReply status is useless after sendLocalReply, ignoring")
+		return
+	}
+	cAPI.HttpContinue(unsafe.Pointer(r.req), uint64(status))
 }
 
 func (r *httpRequest) SendLocalReply(responseCode int, bodyText string, headers map[string]string, grpcStatus int64, details string) {
-    cAPI.HttpSendLocalReply(unsafe.Pointer(r.req), responseCode, bodyText, headers, grpcStatus, details)
+	cAPI.HttpSendLocalReply(unsafe.Pointer(r.req), responseCode, bodyText, headers, grpcStatus, details)
 }
 
 func (r *httpRequest) StreamInfo() api.StreamInfo {
-    return &streamInfo{
-        request: r,
-    }
+	return &streamInfo{
+		request: r,
+	}
 }
 
 func (r *httpRequest) Finalize(reason int) {
-    cAPI.HttpFinalize(unsafe.Pointer(r.req), reason)
+	cAPI.HttpFinalize(unsafe.Pointer(r.req), reason)
 }
 
 type streamInfo struct {
-    request *httpRequest
+	request *httpRequest
 }
 
 func (s *streamInfo) GetRouteName() string {
-    return cAPI.HttpGetRouteName(unsafe.Pointer(s.request.req))
+	return cAPI.HttpGetRouteName(unsafe.Pointer(s.request.req))
 }

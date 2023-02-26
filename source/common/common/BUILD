@@ -456,6 +456,16 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "packed_struct_lib",
+    hdrs = ["packed_struct.h"],
+    deps = [
+        ":assert_lib",
+        ":utility_lib",
+        "//source/common/protobuf:utility_lib_header",
+    ],
+)
+
+envoy_cc_library(
     name = "callback_impl_lib",
     srcs = ["callback_impl.cc"],
     hdrs = ["callback_impl.h"],
@@ -495,6 +505,14 @@ envoy_cc_library(
 envoy_cc_library(
     name = "scalar_to_byte_vector_lib",
     hdrs = ["scalar_to_byte_vector.h"],
+)
+
+envoy_cc_library(
+    name = "bit_array_lib",
+    hdrs = ["bit_array.h"],
+    deps = [
+        ":safe_memcpy_lib",
+    ],
 )
 
 envoy_cc_library(

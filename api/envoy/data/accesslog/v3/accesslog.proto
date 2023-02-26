@@ -80,7 +80,7 @@ message ConnectionProperties {
 }
 
 // Defines fields that are shared by all Envoy access logs.
-// [#next-free-field: 28]
+// [#next-free-field: 29]
 message AccessLogCommon {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.data.accesslog.v2.AccessLogCommon";
@@ -215,6 +215,11 @@ message AccessLogCommon {
   // :ref:`stream_id <envoy_v3_api_field_data.accesslog.v3.AccessLogCommon.stream_id>` to
   // correlate all these intermediate log entries and final log entry.
   bool intermediate_log_entry = 27;
+
+  // If downstream connection in listener failed due to transport socket (e.g. TLS handshake), provides the
+  // failure reason from the transport socket. The format of this field depends on the configured downstream
+  // transport socket. Common TLS failures are in :ref:`TLS trouble shooting <arch_overview_ssl_trouble_shooting>`.
+  string downstream_transport_failure_reason = 28;
 }
 
 // Flags indicating occurrences during request/response processing.

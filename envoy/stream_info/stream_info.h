@@ -176,8 +176,8 @@ struct ResponseCodeDetailValues {
   const std::string FilterChainNotFound = "filter_chain_not_found";
   // The client disconnected unexpectedly.
   const std::string DownstreamRemoteDisconnect = "downstream_remote_disconnect";
-  // The client connection was locally closed for an unspecified reason.
-  const std::string DownstreamLocalDisconnect = "downstream_local_disconnect";
+  // The client connection was locally closed for the given reason.
+  const std::string DownstreamLocalDisconnect = "downstream_local_disconnect({})";
   // The max connection duration was exceeded.
   const std::string DurationTimeout = "duration_timeout";
   // The max request downstream header duration was exceeded.
@@ -204,6 +204,36 @@ struct ResponseCodeDetailValues {
 };
 
 using ResponseCodeDetails = ConstSingleton<ResponseCodeDetailValues>;
+
+/**
+ * Constants for the locally closing a connection. This is used in response code
+ * details field of StreamInfo for details sent by core (non-extension) code.
+ * This is incomplete as some details may be
+ *
+ * Custom extensions can define additional values provided they are appropriately
+ * scoped to avoid collisions.
+ */
+struct LocalCloseReasonValues {
+  const std::string DeferredCloseOnDrainedConnection = "deferred_close_on_drained_connection";
+  const std::string IdleTimeoutOnConnection = "on_idle_timeout";
+  const std::string CloseForConnectRequestOrTcpTunneling =
+      "close_for_connect_request_or_tcp_tunneling";
+  const std::string Http2PingTimeout = "http2_ping_timeout";
+  const std::string Http2ConnectionProtocolViolation = "http2_connection_protocol_violation";
+  const std::string TransportSocketTimeout = "transport_socket_timeout";
+  const std::string TriggeredDelayedCloseTimeout = "triggered_delayed_close_timeout";
+  const std::string TcpProxyInitializationFailure = "tcp_initializion_failure:";
+  const std::string TcpSessionIdleTimeout = "tcp_session_idle_timeout";
+  const std::string MaxConnectionDurationReached = "max_connection_duration_reached";
+  const std::string ClosingUpstreamTcpDueToDownstreamRemoteClose =
+      "closing_upstream_tcp_connection_due_to_downstream_remote_close";
+  const std::string ClosingUpstreamTcpDueToDownstreamLocalClose =
+      "closing_upstream_tcp_connection_due_to_downstream_local_close";
+  const std::string NonPooledTcpConnectionHostHealthFailure =
+      "non_pooled_tcp_connection_host_health_failure";
+};
+
+using LocalCloseReasons = ConstSingleton<LocalCloseReasonValues>;
 
 struct UpstreamTiming {
   /**
@@ -251,6 +281,10 @@ struct UpstreamTiming {
     upstream_handshake_complete_ = time_source.monotonicTime();
   }
 
+  absl::optional<MonotonicTime> upstreamHandshakeComplete() const {
+    return upstream_handshake_complete_;
+  }
+
   absl::optional<MonotonicTime> first_upstream_tx_byte_sent_;
   absl::optional<MonotonicTime> last_upstream_tx_byte_sent_;
   absl::optional<MonotonicTime> first_upstream_rx_byte_received_;
@@ -285,6 +319,9 @@ public:
   absl::optional<MonotonicTime> downstreamHandshakeComplete() const {
     return downstream_handshake_complete_;
   }
+  absl::optional<MonotonicTime> lastDownstreamAckReceived() const {
+    return last_downstream_ack_received_;
+  }
 
   void onLastDownstreamRxByteReceived(TimeSource& time_source) {
     ASSERT(!last_downstream_rx_byte_received_);
@@ -302,6 +339,10 @@ public:
     // An existing value can be overwritten, e.g. in resumption case.
     downstream_handshake_complete_ = time_source.monotonicTime();
   }
+  void onLastDownstreamAckReceived(TimeSource& time_source) {
+    ASSERT(!last_downstream_ack_received_);
+    last_downstream_ack_received_ = time_source.monotonicTime();
+  }
 
 private:
   absl::flat_hash_map<std::string, MonotonicTime> timings_;
@@ -313,6 +354,8 @@ private:
   absl::optional<MonotonicTime> last_downstream_tx_byte_sent_;
   // The time the TLS handshake completed. Set at connection level.
   absl::optional<MonotonicTime> downstream_handshake_complete_;
+  // The time the final ack was received from the client.
+  absl::optional<MonotonicTime> last_downstream_ack_received_;
 };
 
 // Measure the number of bytes sent and received for a stream.
@@ -757,6 +800,17 @@ public:
    * This function is called on Envoy fatal errors so should avoid memory allocation.
    */
   virtual void dumpState(std::ostream& os, int indent_level = 0) const PURE;
+
+  /**
+   * @return absl::string_view the downstream transport failure reason,
+   *         e.g. certificate validation failed.
+   */
+  virtual absl::string_view downstreamTransportFailureReason() const PURE;
+
+  /**
+   * @param failure_reason the downstream transport failure reason.
+   */
+  virtual void setDownstreamTransportFailureReason(absl::string_view failure_reason) PURE;
 };
 
 // An enum representation of the Proxy-Status error space.

@@ -32,61 +32,61 @@ package http
 import "C"
 
 import (
-    "fmt"
-    "sync"
-    "sync/atomic"
+	"fmt"
+	"sync"
+	"sync/atomic"
 
-    "google.golang.org/protobuf/proto"
-    "google.golang.org/protobuf/types/known/anypb"
+	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/anypb"
 
-    "github.com/envoyproxy/envoy/contrib/golang/filters/http/source/go/pkg/utils"
+	"github.com/envoyproxy/envoy/contrib/golang/filters/http/source/go/pkg/utils"
 )
 
 var (
-    configNumGenerator uint64
-    configCache        = &sync.Map{} // uint64 -> *anypb.Any
+	configNumGenerator uint64
+	configCache        = &sync.Map{} // uint64 -> *anypb.Any
 )
 
 //export envoyGoFilterNewHttpPluginConfig
 func envoyGoFilterNewHttpPluginConfig(configPtr uint64, configLen uint64) uint64 {
-    buf := utils.BytesToSlice(configPtr, configLen)
-    var any anypb.Any
-    proto.Unmarshal(buf, &any)
+	buf := utils.BytesToSlice(configPtr, configLen)
+	var any anypb.Any
+	proto.Unmarshal(buf, &any)
 
-    configNum := atomic.AddUint64(&configNumGenerator, 1)
-    if httpFilterConfigParser != nil {
-        configCache.Store(configNum, httpFilterConfigParser.Parse(&any))
-    } else {
-        configCache.Store(configNum, &any)
-    }
+	configNum := atomic.AddUint64(&configNumGenerator, 1)
+	if httpFilterConfigParser != nil {
+		configCache.Store(configNum, httpFilterConfigParser.Parse(&any))
+	} else {
+		configCache.Store(configNum, &any)
+	}
 
-    return configNum
+	return configNum
 }
 
 //export envoyGoFilterDestroyHttpPluginConfig
 func envoyGoFilterDestroyHttpPluginConfig(id uint64) {
-    configCache.Delete(id)
+	configCache.Delete(id)
 }
 
 //export envoyGoFilterMergeHttpPluginConfig
 func envoyGoFilterMergeHttpPluginConfig(parentId uint64, childId uint64) uint64 {
-    if httpFilterConfigParser != nil {
-        parent, ok := configCache.Load(parentId)
-        if !ok {
-            panic(fmt.Sprintf("merge config: get parentId: %d config failed", parentId))
-        }
-        child, ok := configCache.Load(childId)
-        if !ok {
-            panic(fmt.Sprintf("merge config: get childId: %d config failed", childId))
-        }
+	if httpFilterConfigParser != nil {
+		parent, ok := configCache.Load(parentId)
+		if !ok {
+			panic(fmt.Sprintf("merge config: get parentId: %d config failed", parentId))
+		}
+		child, ok := configCache.Load(childId)
+		if !ok {
+			panic(fmt.Sprintf("merge config: get childId: %d config failed", childId))
+		}
 
-        new := httpFilterConfigParser.Merge(parent, child)
-        configNum := atomic.AddUint64(&configNumGenerator, 1)
-        configCache.Store(configNum, new)
-        return configNum
+		new := httpFilterConfigParser.Merge(parent, child)
+		configNum := atomic.AddUint64(&configNumGenerator, 1)
+		configCache.Store(configNum, new)
+		return configNum
 
-    } else {
-        // child override parent by default
-        return childId
-    }
+	} else {
+		// child override parent by default
+		return childId
+	}
 }
