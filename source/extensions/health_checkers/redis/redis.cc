@@ -95,7 +95,7 @@ void RedisHealthChecker::RedisActiveHealthCheckSession::onResponse(
         value->asInteger() == 0) {
       handleSuccess();
     } else {
-      handleFailure(envoy::data::core::v3::ACTIVE);
+      handleFailure(envoy::data::core::v3::PASSIVE);
     }
     break;
   case Type::Ping:
