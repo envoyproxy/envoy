@@ -16,9 +16,9 @@ licenses(["notice"])  # Apache 2
 envoy_extension_package()
 
 envoy_cc_library(
-    name = "basic_server_preferred_address_config_lib",
-    srcs = ["basic_server_preferred_address_config.cc"],
-    hdrs = ["basic_server_preferred_address_config.h"],
+    name = "fixed_server_preferred_address_config_lib",
+    srcs = ["fixed_server_preferred_address_config.cc"],
+    hdrs = ["fixed_server_preferred_address_config.h"],
     tags = ["nofips"],
     deps = [
         "//envoy/registry",
@@ -29,7 +29,7 @@ envoy_cc_library(
 )
 
 envoy_cc_extension(
-    name = "basic_server_preferred_address_config_factory_config",
+    name = "fixed_server_preferred_address_config_factory_config",
     extra_visibility = [
         "//test:__subpackages__",
     ],
@@ -39,7 +39,7 @@ envoy_cc_extension(
             "//bazel:boringssl_fips": [],
             "//bazel:boringssl_disabled": [],
             "//conditions:default": [
-                ":basic_server_preferred_address_config_lib",
+                ":fixed_server_preferred_address_config_lib",
             ],
         },
     ),

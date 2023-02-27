@@ -610,9 +610,9 @@ filter_chains:
 udp_listener_config:
   quic_options:
     server_preferred_address_config:
-      name: quic.server_preferred_address.basic
+      name: quic.server_preferred_address.fixed
       typed_config:
-        "@type": type.googleapis.com/envoy.extensions.quic.server_preferred_address.v3.BasicServerPreferredAddressConfig
+        "@type": type.googleapis.com/envoy.extensions.quic.server_preferred_address.v3.FixedServerPreferredAddressConfig
         ipv4_address: "bad.v4.address"
   )EOF",
                                                  Network::Address::IpVersion::v4);
@@ -674,9 +674,9 @@ filter_chains:
 udp_listener_config:
   quic_options:
     server_preferred_address_config:
-      name: quic.server_preferred_address.basic
+      name: quic.server_preferred_address.fixed
       typed_config:
-        "@type": type.googleapis.com/envoy.extensions.quic.server_preferred_address.v3.BasicServerPreferredAddressConfig
+        "@type": type.googleapis.com/envoy.extensions.quic.server_preferred_address.v3.FixedServerPreferredAddressConfig
         ipv6_address: "bad.v6.address"
   )EOF",
                                                  Network::Address::IpVersion::v4);

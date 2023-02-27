@@ -1,21 +1,21 @@
-#include "source/extensions/quic/server_preferred_address/basic_server_preferred_address_config.h"
+#include "source/extensions/quic/server_preferred_address/fixed_server_preferred_address_config.h"
 
 namespace Envoy {
 namespace Quic {
 
 std::pair<quic::QuicSocketAddress, quic::QuicSocketAddress>
-BasicServerPreferredAddressConfig::getServerPreferredAddresses(
+FixedServerPreferredAddressConfig::getServerPreferredAddresses(
     const Network::Address::InstanceConstSharedPtr& local_address) {
   int32_t port = local_address->ip()->port();
   return {quic::QuicSocketAddress(ip_v4_, port), quic::QuicSocketAddress(ip_v6_, port)};
 }
 
 Quic::EnvoyQuicServerPreferredAddressConfigPtr
-BasicServerPreferredAddressConfigFactory::createServerPreferredAddressConfig(
+FixedServerPreferredAddressConfigFactory::createServerPreferredAddressConfig(
     const Protobuf::Message& message, ProtobufMessage::ValidationVisitor& validation_visitor) {
   auto& config =
       MessageUtil::downcastAndValidate<const envoy::extensions::quic::server_preferred_address::v3::
-                                           BasicServerPreferredAddressConfig&>(message,
+                                           FixedServerPreferredAddressConfig&>(message,
                                                                                validation_visitor);
   quic::QuicIpAddress ip_v4, ip_v6;
   if (!config.ipv4_address().empty()) {
@@ -30,10 +30,10 @@ BasicServerPreferredAddressConfigFactory::createServerPreferredAddressConfig(
           absl::StrCat("bad v6 server preferred address: ", config.ipv6_address()), message);
     }
   }
-  return std::make_unique<BasicServerPreferredAddressConfig>(ip_v4, ip_v6);
+  return std::make_unique<FixedServerPreferredAddressConfig>(ip_v4, ip_v6);
 }
 
-REGISTER_FACTORY(BasicServerPreferredAddressConfigFactory,
+REGISTER_FACTORY(FixedServerPreferredAddressConfigFactory,
                  EnvoyQuicServerPreferredAddressConfigFactory);
 
 } // namespace Quic

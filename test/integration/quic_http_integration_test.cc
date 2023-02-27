@@ -7,7 +7,7 @@
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/overload/v3/overload.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
-#include "envoy/extensions/quic/server_preferred_address/v3/basic_server_preferred_address_config.pb.h"
+#include "envoy/extensions/quic/server_preferred_address/v3/fixed_server_preferred_address_config.pb.h"
 #include "envoy/extensions/transport_sockets/quic/v3/quic_transport.pb.h"
 
 #include "source/common/quic/active_quic_listener.h"
@@ -1653,8 +1653,8 @@ TEST_P(QuicHttpIntegrationTest, UsesPreferredAddress) {
                                          ->mutable_quic_options()
                                          ->mutable_server_preferred_address_config();
     // Configure a loopback interface as the server's preferred address.
-    preferred_address_config->set_name("quic.server_preferred_address.basic");
-    envoy::extensions::quic::server_preferred_address::v3::BasicServerPreferredAddressConfig
+    preferred_address_config->set_name("quic.server_preferred_address.fixed");
+    envoy::extensions::quic::server_preferred_address::v3::FixedServerPreferredAddressConfig
         server_preferred_address;
     server_preferred_address.set_ipv4_address("127.0.0.2");
     server_preferred_address.set_ipv6_address("::2");

@@ -1995,7 +1995,7 @@ envoy_cc_test(
         "nofips",
     ],
     deps = envoy_select_enable_http3([
-        "//source/extensions/quic/server_preferred_address:basic_server_preferred_address_config_factory_config",
+        "//source/extensions/quic/server_preferred_address:fixed_server_preferred_address_config_factory_config",
         "//test/common/config:dummy_config_proto_cc_proto",
         "//test/extensions/transport_sockets/tls/cert_validator:timed_cert_validator",
         ":http_integration_lib",
