@@ -205,7 +205,7 @@ void EnvoyQuicServerSession::ProcessUdpPacket(const quic::QuicSocketAddress& sel
     maybeHandleCloseDuringInitialize();
   }
   quic::QuicServerSessionBase::ProcessUdpPacket(self_address, peer_address, packet);
-  if (self_address != connection()->self_address()) {
+  if (connection()->sent_server_preferred_address().IsInitialized() && self_address == connection()->sent_server_preferred_address()) {
     connection_stats_.num_packets_rx_on_preferred_address_.inc();
   }
 }
