@@ -20,6 +20,7 @@ set -e
 # AZP_BRANCH=refs/tags/v1.77.3
 ##
 
+
 function is_windows() {
     [[ -n "$DOCKER_FAKE_WIN" ]]  || [[ "$(uname -s)" == *NT* ]]
 }
@@ -197,6 +198,11 @@ build_and_maybe_push_image () {
     docker_image_tarball="${ENVOY_DOCKER_IMAGE_DIRECTORY}/envoy${image_type}.tar"
 
     if ! is_windows; then
+        # `--sbom` and `--provenance` args added for skopeo 1.5.0 compat,
+        # can probably be removed for later versions.
+        args+=(
+            "--sbom=false"
+            "--provenance=false")
         if [[ "${image_type}" =~ debug ]]; then
             # For linux if its the debug image then push immediately for release branches,
             # otherwise just test the build
@@ -283,12 +289,19 @@ push_image_from_tarball () {
     # dest="oci-archive:${docker_image_tarball2}"
 
     echo ">> PUSH: ${src} -> ${dest}"
-    echo "> skopeo copy --multi-arch all ${src} ${dest}"
+    echo "> skopeo copy --all ${src} ${dest}"
 
     if [[ -n "$DOCKER_CI_DRYRUN" ]]; then
         return
     fi
-    skopeo copy --multi-arch all "${src}" "${dest}"
+
+    # NB: this command works with skopeo 1.5.0, later versions may require
+    #   different flags, eg `--multi-arch all`
+    skopeo copy --all "${src}" "${dest}"
+
+    # Test specific versions using a container, eg
+    # docker run -v "${HOME}/.docker:/root/.docker" -v "${PWD}/build_images:/build_images" --rm -it \
+    #    quay.io/skopeo/stable:v1.5.0 copy --all "${src}" "${dest}"
 }
 
 tag_variants () {
