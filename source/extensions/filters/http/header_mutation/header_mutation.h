@@ -18,22 +18,23 @@ namespace Extensions {
 namespace HttpFilters {
 namespace HeaderMutation {
 
-using ProtoConfig = envoy::extensions::filters::http::header_mutation::v3::HeaderMutationConfig;
-using PerRouteProtoConfig = envoy::extensions::filters::http::header_mutation::v3::HeaderMutation;
+using ProtoConfig = envoy::extensions::filters::http::header_mutation::v3::HeaderMutation;
+using PerRouteProtoConfig =
+    envoy::extensions::filters::http::header_mutation::v3::HeaderMutationPerRoute;
 
 class PerRouteHeaderMutation : public Router::RouteSpecificFilterConfig {
 public:
   PerRouteHeaderMutation(const PerRouteProtoConfig& config);
 
-  void mutateDecoderHeaders(Http::RequestHeaderMap& request_headers,
+  void mutateRequestHeaders(Http::RequestHeaderMap& request_headers,
                             const StreamInfo::StreamInfo& stream_info) const;
-  void mutateEncoderHeaders(const Http::RequestHeaderMap& request_headers,
-                            Http::ResponseHeaderMap& response_headers,
-                            const StreamInfo::StreamInfo& stream_info) const;
+  void mutateResponseHeaders(const Http::RequestHeaderMap& request_headers,
+                             Http::ResponseHeaderMap& response_headers,
+                             const StreamInfo::StreamInfo& stream_info) const;
 
 private:
-  Http::HeaderMutations decoder_mutations_;
-  Http::HeaderMutations encoder_mutations_;
+  Http::HeaderMutations request_mutations_;
+  Http::HeaderMutations response_mutations_;
 };
 using PerRouteHeaderMutationSharedPtr = std::shared_ptr<PerRouteHeaderMutation>;
 

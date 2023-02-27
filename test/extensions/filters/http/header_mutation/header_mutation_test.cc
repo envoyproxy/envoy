@@ -15,7 +15,7 @@ using testing::NiceMock;
 
 TEST(HeaderMutationFilterTest, HeaderMutationFilterTest) {
   const std::string config_yaml = R"EOF(
-  decoder_mutations:
+  request_mutations:
   - remove: "flag-header"
   - append:
       header:
@@ -37,7 +37,7 @@ TEST(HeaderMutationFilterTest, HeaderMutationFilterTest) {
         key: "flag-header-4"
         value: "flag-header-4-value"
       append_action: "OVERWRITE_IF_EXISTS_OR_ADD"
-  encoder_mutations:
+  response_mutations:
   - remove: "flag-header"
   - append:
       header:

@@ -512,7 +512,7 @@ envoy.filters.http.header_mutation:
   status: alpha
   type_urls:
   - envoy.extensions.filters.http.header_mutation.v3.HeaderMutation
-  - envoy.extensions.filters.http.header_mutation.v3.HeaderMutationConfig
+  - envoy.extensions.filters.http.header_mutation.v3.HeaderMutationPerRoute
 envoy.filters.listener.http_inspector:
   categories:
   - envoy.filters.listener

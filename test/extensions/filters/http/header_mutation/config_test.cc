@@ -25,14 +25,14 @@ TEST(FactoryTest, FactoryTest) {
   ASSERT_NE(factory, nullptr);
 
   const std::string config = R"EOF(
-  decoder_mutations:
+  request_mutations:
   - remove: "flag-header"
   - append:
       header:
         key: "flag-header"
         value: "%REQ(ANOTHER-FLAG-HEADER)%"
       append_action: APPEND_IF_EXISTS_OR_ADD
-  encoder_mutations:
+  response_mutations:
   - remove: "flag-header"
   - append:
       header:

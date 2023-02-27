@@ -295,7 +295,7 @@ extensions/filters/http/oauth2 @derekargueta @snowp
 # Early header mutation
 /*/extensions/http/early_header_mutation/header_mutation @wbpcode @UNOWNED
 # Header mutation
-/*/extensions/filters/http/header_mutation @wbpcode @UNOWNED
+/*/extensions/filters/http/header_mutation @wbpcode @htuch @soulxu
 
 # Intentionally exempt (treated as core code)
 /*/extensions/filters/common @UNOWNED @UNOWNED
