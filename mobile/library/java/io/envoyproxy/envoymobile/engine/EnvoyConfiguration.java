@@ -79,7 +79,6 @@ public class EnvoyConfiguration {
   public final Boolean useNodeLocality;
   public final Boolean useAds;
 
-
   private static final Pattern UNRESOLVED_KEY_PATTERN = Pattern.compile("\\{\\{ (.+) \\}\\}");
 
   /**
@@ -149,18 +148,18 @@ public class EnvoyConfiguration {
    * @param adsToken                                      the token to use for authenticating with
    *                                                      the ADS server.
    * @param adsTokenLifetime                              the lifetime of the ADS token.
-   * @param adsRootCerts                                  the root certificates to use for validating
-   *     the ADS server.
+   * @param adsRootCerts                                  the root certificates to use for
+   *     validating the ADS server.
    * @param nodeId                                        the node ID to use for the ADS server.
    * @param nodeRegion                                    the node region to use for the ADS server.
    * @param nodeZone                                      the node zone to use for the ADS server.
    * @param nodeSubZone                                   the node sub-zone to use for the ADS
    *     server.
-  * @param useNodeId                                      enables node id.
-  * @param useRtds                                        enables RTDS.
-  * @param useNodeLocality                                enables node locality.
-  * @param useAds                                         enables ADS.
-  */
+   * @param useNodeId                                      enables node id.
+   * @param useRtds                                        enables RTDS.
+   * @param useNodeLocality                                enables node locality.
+   * @param useAds                                         enables ADS.
+   */
   public EnvoyConfiguration(
       boolean adminInterfaceEnabled, String grpcStatsDomain, int connectTimeoutSeconds,
       int dnsRefreshSeconds, int dnsFailureRefreshSecondsBase, int dnsFailureRefreshSecondsMax,

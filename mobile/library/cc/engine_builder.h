@@ -81,14 +81,14 @@ public:
                                 int jwt_token_lifetime_seconds = DefaultJwtTokenLifetimeSeconds,
                                 std::string ssl_root_certs = "", bool use_ads = true);
   // Adds an RTDS layer to default config. Requires that ADS be configured.
-  EngineBuilder& addRtdsLayer(std::string layer_name,
-                              const int timeout_seconds = 0, bool use_rtds = true);
+  EngineBuilder& addRtdsLayer(std::string layer_name, const int timeout_seconds = 0,
+                              bool use_rtds = true);
   // Adds a CDS layer to default config. Requires that ADS be configured via
   // setAggregatedDiscoveryService(). If `cds_resources_locator` is non-empty, the xdstp namespace
   // is used for identifying resources. If not using xdstp, then set `cds_resources_locator` to the
   // empty string.
-  EngineBuilder& addCdsLayer(std::string cds_resources_locator = "",
-                             const int timeout_seconds = 0, bool use_cds = true);
+  EngineBuilder& addCdsLayer(std::string cds_resources_locator = "", const int timeout_seconds = 0,
+                             bool use_cds = true);
   EngineBuilder& enableDnsCache(bool dns_cache_on, int save_interval_seconds = 1);
   EngineBuilder& setForceAlwaysUsev6(bool value);
   EngineBuilder& setSkipDnsLookupForProxiedRequests(bool value);
