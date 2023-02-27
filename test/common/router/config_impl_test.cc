@@ -186,7 +186,7 @@ protected:
     factory_context_.cluster_manager_.initializeClusters(
         {"www2", "root_www2", "www2_staging", "instant-server"}, {});
 
-    const std::string yaml = R"EOF(
+    const fmt::format_string<const bool&, std::string&> yaml = R"EOF(
 virtual_hosts:
   - name: www2
     domains: ["www.lyft.com"]
@@ -283,7 +283,7 @@ most_specific_header_mutations_wins: {0}
   std::string requestHeadersConfig(const bool most_specific_wins) {
     factory_context_.cluster_manager_.initializeClusters({"www2", "default"}, {});
 
-    const std::string yaml = R"EOF(
+    const fmt::format_string<const bool&> yaml = R"EOF(
 virtual_hosts:
   - name: www2
     domains: ["www.lyft.com"]
@@ -2030,7 +2030,7 @@ class HeaderTransformsDoFormattingTest : public RouteMatcherTest {
 protected:
   void runTest(bool run_request_header_test) {
     factory_context_.cluster_manager_.initializeClusters({"default"}, {});
-    const std::string yaml_template = R"EOF(
+    const fmt::format_string<const char*> yaml_template = R"EOF(
   virtual_hosts:
     - name: default
       domains: ["*"]
@@ -6162,7 +6162,7 @@ virtual_hosts:
 class WeightedClustersHeaderTransformationsTest : public RouteMatcherTest {
 protected:
   void runTest(bool run_request_header_test) {
-    const std::string yaml_template = R"EOF(
+    const fmt::format_string<const char*, const char*> yaml_template = R"EOF(
   virtual_hosts:
     - name: www2
       domains: ["www.lyft.com"]
