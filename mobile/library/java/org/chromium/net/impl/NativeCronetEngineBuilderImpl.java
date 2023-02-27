@@ -70,7 +70,7 @@ public class NativeCronetEngineBuilderImpl extends CronetEngineBuilderImpl {
   private String mAdsAddress = null;
   private int mAdsPort = 0;
   private String mAdsToken = null;
-  private long mAdsTokenLifetime = 0;
+  private int mAdsTokenLifetime = 0;
   private String mAdsRootCerts = null;
   private String mNodeId = null;
   private String mNodeRegion = null;

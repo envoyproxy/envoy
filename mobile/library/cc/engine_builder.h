@@ -78,7 +78,7 @@ public:
   // gRPC.
   EngineBuilder&
   setAggregatedDiscoveryService(std::string address, const int port, std::string jwt_token = "",
-                                int jwt_token_lifetime_seconds = DefaultJwtTokenLifetimeSeconds,
+                                int jwt_token_lifetime_seconds = 0,
                                 std::string ssl_root_certs = "", bool use_ads = true);
   // Adds an RTDS layer to default config. Requires that ADS be configured.
   EngineBuilder& addRtdsLayer(std::string layer_name, const int timeout_seconds = 0,

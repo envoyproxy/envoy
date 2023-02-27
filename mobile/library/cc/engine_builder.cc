@@ -246,7 +246,8 @@ EngineBuilder& EngineBuilder::setAggregatedDiscoveryService(std::string address,
   ads_address_ = address;
   ads_port_ = port;
   ads_jwt_token_ = std::move(jwt_token);
-  ads_jwt_token_lifetime_seconds_ = jwt_token_lifetime_seconds;
+  ads_jwt_token_lifetime_seconds_ =
+      jwt_token_lifetime_seconds == 0 ? DefaultJwtTokenLifetimeSeconds : jwt_token_lifetime_seconds;
   ads_ssl_root_certs_ = std::move(ssl_root_certs);
   use_ads_ = use_ads;
   return *this;
@@ -255,7 +256,7 @@ EngineBuilder& EngineBuilder::setAggregatedDiscoveryService(std::string address,
 EngineBuilder& EngineBuilder::addRtdsLayer(std::string layer_name, const int timeout_seconds,
                                            bool use_rtds) {
   rtds_layer_name_ = layer_name;
-  rtds_timeout_seconds_ = timeout_seconds;
+  rtds_timeout_seconds_ = timeout_seconds == 0 ? DefaultXdsTimeout : timeout_seconds;
   use_rtds_ = use_rtds;
   return *this;
 }
@@ -264,7 +265,7 @@ EngineBuilder& EngineBuilder::addCdsLayer(std::string cds_resources_locator,
                                           const int timeout_seconds, bool use_cds) {
   use_cds_ = use_cds;
   cds_resources_locator_ = std::move(cds_resources_locator);
-  cds_timeout_seconds_ = timeout_seconds;
+  cds_timeout_seconds_ = timeout_seconds == 0 ? DefaultXdsTimeout : timeout_seconds;
   return *this;
 }
 
@@ -996,8 +997,7 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
     auto* rtds_config = rtds_layer->mutable_rtds_config();
     rtds_config->mutable_ads();
     rtds_config->set_resource_api_version(envoy::config::core::v3::ApiVersion::V3);
-    rtds_config->mutable_initial_fetch_timeout()->set_seconds(
-        rtds_timeout_seconds_ == 0 ? DefaultXdsTimeout : rtds_timeout_seconds_);
+    rtds_config->mutable_initial_fetch_timeout()->set_seconds(rtds_timeout_seconds_);
   }
   if (use_ads_) {
     std::string target_uri = fmt::format(R"({}:{})", ads_address_, ads_port_);
@@ -1034,8 +1034,7 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
       cds_config->mutable_api_config_source()->set_transport_api_version(
           envoy::config::core::v3::ApiVersion::V3);
     }
-    cds_config->mutable_initial_fetch_timeout()->set_seconds(
-        cds_timeout_seconds_ == 0 ? DefaultXdsTimeout : rtds_timeout_seconds_);
+    cds_config->mutable_initial_fetch_timeout()->set_seconds(cds_timeout_seconds_);
     cds_config->set_resource_api_version(envoy::config::core::v3::ApiVersion::V3);
     bootstrap->add_node_context_params("cluster");
     // add a stat prefix we use in test

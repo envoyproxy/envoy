@@ -283,5 +283,15 @@
     return nullptr;
   }
 }
+// This is only for test purposes
+- (std::string)generateYaml {
+  try {
+    Envoy::Platform::EngineBuilder builder = [self applyToCXXBuilder];
+    return builder.generateYaml();
+  } catch (const std::exception &e) {
+    NSLog(@"[Envoy] error generating yaml: %@", @(e.what()));
+    return nullptr;
+  }
+}
 
 @end
