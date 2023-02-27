@@ -98,7 +98,7 @@ envoy_cc_test_library(
     ],
     repository = "@envoy",
     deps = [
-        "//library/cc:engine_builder_lib",
+        ":test_engine_builder_lib",
         "//library/common/http:client_lib",
         "//library/common/http:header_utility_lib",
         "//library/common/types:c_types_lib",
@@ -127,25 +127,26 @@ envoy_cc_test_library(
     ],
 )
 
-# interface libs for quic test server's jni implementation
+# interface libs for test servers` jni implementations
 envoy_cc_test_library(
-    name = "quic_test_server_interface_lib",
+    name = "test_server_interface_lib",
     srcs = [
-        "quic_test_server.cc",
-        "quic_test_server_interface.cc",
+        "test_server.cc",
+        "test_server_interface.cc",
     ],
     hdrs = [
-        "quic_test_server.h",
-        "quic_test_server_interface.h",
+        "test_server.h",
+        "test_server_interface.h",
     ],
     data = [
         "@envoy//test/config/integration/certs",
     ],
     repository = "@envoy",
     deps = [
-        ":autonomous_upstream_lib",
+        "@envoy//test/integration:autonomous_upstream_lib",
         "@envoy//source/exe:process_wide_lib",
         "@envoy//test/config:utility_lib",
+        "@envoy//test/integration:utility_lib",
         "@envoy//test/mocks/server:transport_socket_factory_context_mocks",
         "@envoy//test/test_common:environment_lib",
         "@envoy_build_config//:extension_registry",
@@ -158,15 +159,15 @@ envoy_cc_test_library(
 )
 
 envoy_cc_test_library(
-    name = "autonomous_upstream_lib",
+    name = "test_engine_builder_lib",
     srcs = [
-        "autonomous_upstream.cc",
+        "test_engine_builder.cc",
     ],
     hdrs = [
-        "autonomous_upstream.h",
+        "test_engine_builder.h",
     ],
     repository = "@envoy",
     deps = [
-        "@envoy//test/integration:fake_upstream_lib",
+        "//library/cc:engine_builder_lib",
     ],
 )

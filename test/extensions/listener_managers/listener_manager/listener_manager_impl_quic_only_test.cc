@@ -13,6 +13,8 @@ namespace Envoy {
 namespace Server {
 namespace {
 
+using ::testing::Return;
+
 class MockSupportsUdpGso : public Api::OsSysCallsImpl {
 public:
   MOCK_METHOD(bool, supportsUdpGso, (), (const));

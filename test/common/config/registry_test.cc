@@ -15,8 +15,6 @@ namespace Envoy {
 namespace Config {
 namespace {
 
-using ::testing::Optional;
-
 class InternalFactory : public Config::UntypedFactory {
 public:
   ~InternalFactory() override = default;

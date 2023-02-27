@@ -1,4 +1,3 @@
-@_spi(YAMLValidation)
 import Envoy
 import Foundation
 import SwiftUI
@@ -11,7 +10,7 @@ private struct ContentRow: Identifiable {
 }
 
 private extension EngineBuilder {
-    static let demoEngine = YAMLValidatingEngineBuilder()
+    static let demoEngine = EngineBuilder()
         .addLogLevel(.debug)
         .build()
 }

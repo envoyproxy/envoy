@@ -10,6 +10,7 @@ licenses(["notice"])  # Apache 2
 swift_library(
     name = "ios_lib",
     srcs = [
+        "CompressionAlgorithm.swift",
         "DirectResponse.swift",
         "Engine.swift",
         "EngineBuilder.swift",
@@ -45,7 +46,6 @@ swift_library(
         "TestEngineBuilder.swift",
         "Trailers.swift",
         "UpstreamHttpProtocol.swift",
-        "YAMLValidatingEngineBuilder.swift",
         "extensions/UserDefaults+KeyValueStore.swift",
         "filters/AsyncRequestFilter.swift",
         "filters/AsyncResponseFilter.swift",

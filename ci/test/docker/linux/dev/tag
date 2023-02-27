@@ -1,0 +1,32 @@
+>> BUILDX: install
+> docker run --rm --privileged tonistiigi/binfmt --install all
+> docker buildx rm multi-builder 2> /dev/null || :
+> docker buildx create --use --name multi-builder --platform linux/arm64,linux/amd64
+>> BUILDX: use multi-builder
+> docker buildx use multi-builder
+>> BUILD: envoyproxy/envoy-dev:MOCKSHA
+> docker buildx build --platform linux/arm64,linux/amd64 -f ci/Dockerfile-envoy --target envoy --sbom=false --provenance=false -o type=oci,dest=/non/existent/test/path/envoy.tar -t envoyproxy/envoy-dev:MOCKSHA .
+>> BUILDX: use multi-builder
+> docker buildx use multi-builder
+>> BUILD: envoyproxy/envoy-debug-dev:MOCKSHA
+> docker buildx build --platform linux/arm64,linux/amd64 -f ci/Dockerfile-envoy --target envoy --build-arg ENVOY_BINARY_SUFFIX= --sbom=false --provenance=false -t envoyproxy/envoy-debug-dev:MOCKSHA .
+>> BUILDX: use multi-builder
+> docker buildx use multi-builder
+>> BUILD: envoyproxy/envoy-contrib-dev:MOCKSHA
+> docker buildx build --platform linux/arm64,linux/amd64 -f ci/Dockerfile-envoy --target envoy --build-arg ENVOY_BINARY=envoy-contrib --sbom=false --provenance=false -o type=oci,dest=/non/existent/test/path/envoy-contrib.tar -t envoyproxy/envoy-contrib-dev:MOCKSHA .
+>> BUILDX: use multi-builder
+> docker buildx use multi-builder
+>> BUILD: envoyproxy/envoy-contrib-debug-dev:MOCKSHA
+> docker buildx build --platform linux/arm64,linux/amd64 -f ci/Dockerfile-envoy --target envoy --build-arg ENVOY_BINARY=envoy-contrib --build-arg ENVOY_BINARY_SUFFIX= --sbom=false --provenance=false -t envoyproxy/envoy-contrib-debug-dev:MOCKSHA .
+>> BUILDX: use multi-builder
+> docker buildx use multi-builder
+>> BUILD: envoyproxy/envoy-distroless-dev:MOCKSHA
+> docker buildx build --platform linux/arm64,linux/amd64 -f ci/Dockerfile-envoy --target envoy-distroless --sbom=false --provenance=false -o type=oci,dest=/non/existent/test/path/envoy-distroless.tar -t envoyproxy/envoy-distroless-dev:MOCKSHA .
+>> BUILDX: use multi-builder
+> docker buildx use multi-builder
+>> BUILD: envoyproxy/envoy-google-vrp-dev:MOCKSHA
+> docker buildx build --platform linux/amd64 -f ci/Dockerfile-envoy --target envoy-google-vrp --sbom=false --provenance=false -o type=oci,dest=/non/existent/test/path/envoy-google-vrp.tar -t envoyproxy/envoy-google-vrp-dev:MOCKSHA .
+>> BUILDX: use multi-builder
+> docker buildx use multi-builder
+>> BUILD: envoyproxy/envoy-tools-dev:MOCKSHA
+> docker buildx build --platform linux/arm64,linux/amd64 -f ci/Dockerfile-envoy --target envoy-tools --sbom=false --provenance=false -o type=oci,dest=/non/existent/test/path/envoy-tools.tar -t envoyproxy/envoy-tools-dev:MOCKSHA .
