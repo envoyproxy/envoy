@@ -82,11 +82,11 @@ using GrpcMetricsStreamerImplPtr = std::unique_ptr<GrpcMetricsStreamerImpl>;
 class MetricsFlusher {
 public:
   MetricsFlusher(
-      bool report_counters_as_deltas, bool emit_labels,
+      bool report_counters_as_deltas, bool emit_labels, bool only_histogram_summary,
       std::function<bool(const Stats::Metric&)> predicate =
           [](const auto& metric) { return metric.used(); })
       : report_counters_as_deltas_(report_counters_as_deltas), emit_labels_(emit_labels),
-        predicate_(predicate) {}
+        only_histogram_summary_(only_histogram_summary), predicate_(predicate) {}
 
   MetricsPtr flush(Stats::MetricSnapshot& snapshot) const;
 
@@ -108,6 +108,7 @@ private:
 
   const bool report_counters_as_deltas_;
   const bool emit_labels_;
+  const bool only_histogram_summary_;
   const std::function<bool(const Stats::Metric&)> predicate_;
 };
 
@@ -118,9 +119,9 @@ template <class RequestProto, class ResponseProto> class MetricsServiceSink : pu
 public:
   MetricsServiceSink(
       const GrpcMetricsStreamerSharedPtr<RequestProto, ResponseProto>& grpc_metrics_streamer,
-      bool report_counters_as_deltas, bool emit_labels)
+      bool report_counters_as_deltas, bool emit_labels, bool only_histogram_summary)
       : MetricsServiceSink(grpc_metrics_streamer,
-                           MetricsFlusher(report_counters_as_deltas, emit_labels)) {}
+                           MetricsFlusher(report_counters_as_deltas, emit_labels, only_histogram_summary)) {}
 
   MetricsServiceSink(
       const GrpcMetricsStreamerSharedPtr<RequestProto, ResponseProto>& grpc_metrics_streamer,

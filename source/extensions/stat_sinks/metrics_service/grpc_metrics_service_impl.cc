@@ -115,18 +115,22 @@ void MetricsFlusher::flushHistogram(io::prometheus::client::MetricFamily& summar
     quantile->set_quantile(hist_stats.supportedQuantiles()[i]);
     quantile->set_value(hist_stats.computedQuantiles()[i]);
   }
+  summary->set_sample_count(hist_stats.sampleCount());
+  summary->set_sample_sum(hist_stats.sampleSum());
 
-  // Add bucket information for histograms.
-  auto* histogram_metric =
-      populateMetricsFamily(histogram_metrics_family, io::prometheus::client::MetricType::HISTOGRAM,
-                            snapshot_time_ms, envoy_histogram);
-  auto* histogram = histogram_metric->mutable_histogram();
-  histogram->set_sample_count(hist_stats.sampleCount());
-  histogram->set_sample_sum(hist_stats.sampleSum());
-  for (size_t i = 0; i < hist_stats.supportedBuckets().size(); i++) {
-    auto* bucket = histogram->add_bucket();
-    bucket->set_upper_bound(hist_stats.supportedBuckets()[i]);
-    bucket->set_cumulative_count(hist_stats.computedBuckets()[i]);
+  if (!only_histogram_summary_) {
+    // Add bucket information for histograms.
+    auto* histogram_metric =
+        populateMetricsFamily(histogram_metrics_family, io::prometheus::client::MetricType::HISTOGRAM,
+                              snapshot_time_ms, envoy_histogram);
+    auto* histogram = histogram_metric->mutable_histogram();
+    histogram->set_sample_count(hist_stats.sampleCount());
+    histogram->set_sample_sum(hist_stats.sampleSum());
+    for (size_t i = 0; i < hist_stats.supportedBuckets().size(); i++) {
+      auto* bucket = histogram->add_bucket();
+      bucket->set_upper_bound(hist_stats.supportedBuckets()[i]);
+      bucket->set_cumulative_count(hist_stats.computedBuckets()[i]);
+    }
   }
 }
 
