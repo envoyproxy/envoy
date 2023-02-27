@@ -27,6 +27,7 @@ message SmtpProxy {
     // accept the request for TLS connection, the session is terminated.
     REQUIRE = 1;
   }
+
   // The human readable prefix to use when emitting :ref:`statistics
   // <config_network_filters_smtp_proxy_stats>`.
   string stat_prefix = 1 [(validate.rules).string = {min_len: 1}];
