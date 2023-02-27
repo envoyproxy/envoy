@@ -34,7 +34,8 @@ template <class StatType> Stats::IterateFn<StatType> GroupedStatsRequest::saveMa
     }
 
     // Check if filtered.
-    if (params_.re2_filter_ != nullptr && !re2::RE2::PartialMatch(stat->name(), *params_.re2_filter_)) {
+    if (params_.re2_filter_ != nullptr &&
+        !re2::RE2::PartialMatch(stat->name(), *params_.re2_filter_)) {
       return true;
     }
 
