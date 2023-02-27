@@ -83,6 +83,10 @@ type HeaderMap interface {
 	// If multiple values associated with this key, first one will be returned.
 	Get(key string) (string, bool)
 
+	// Values returns all values associated with the given key.
+	// The returned slice is not a copy.
+	Values(key string) []string
+
 	// Set key-value pair in header map, the previous pair will be replaced if exists
 	Set(key, value string)
 

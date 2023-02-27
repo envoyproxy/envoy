@@ -34,7 +34,7 @@ const (
 
 type httpHeaderMap struct {
 	request     *httpRequest
-	headers     map[string]string
+	headers     map[string][]string
 	headerNum   uint64
 	headerBytes uint64
 	isTrailer   bool
@@ -60,12 +60,30 @@ func (h *httpHeaderMap) Get(key string) (string, bool) {
 		}
 	}
 	value, ok := h.headers[key]
-	return value, ok
+	if !ok {
+		return "", false
+	}
+	return value[0], ok
+}
+
+func (h *httpHeaderMap) Values(key string) []string {
+	if h.headers == nil {
+		if h.isTrailer {
+			h.headers = cAPI.HttpCopyTrailers(unsafe.Pointer(h.request.req), h.headerNum, h.headerBytes)
+		} else {
+			h.headers = cAPI.HttpCopyHeaders(unsafe.Pointer(h.request.req), h.headerNum, h.headerBytes)
+		}
+	}
+	value, ok := h.headers[key]
+	if !ok {
+		return nil
+	}
+	return value
 }
 
 func (h *httpHeaderMap) Set(key, value string) {
 	if h.headers != nil {
-		h.headers[key] = value
+		h.headers[key] = []string{value}
 	}
 	if h.isTrailer {
 		cAPI.HttpSetTrailer(unsafe.Pointer(h.request.req), &key, &value)
