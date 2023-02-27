@@ -191,7 +191,7 @@ protected:
     xds_stream_->sendGrpcMessage(discovery_response);
   }
 
-  void PrintServerCounters() {
+  void printServerCounters() {
     std::cerr << "all counters" << std::endl;
     for (const auto& c : test_server_->counters()) {
       std::cerr << "counter: " << c->name() << ", value: " << c->value() << std::endl;
