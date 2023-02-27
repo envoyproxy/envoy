@@ -32,7 +32,7 @@ public:
 // #19546 an HTML version will be added to provide a hierarchical view.
 class StatsRender : public StatsRenderBase {
 public:
-  virtual ~StatsRender() = default;
+  ~StatsRender() override = default;
 
   // Writes a fragment for a numeric value, for counters and gauges.
   virtual void generate(Buffer::Instance& response, const std::string& name, uint64_t value) PURE;

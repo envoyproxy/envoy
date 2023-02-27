@@ -53,7 +53,7 @@ public:
   StatsRequest(Stats::Store& stats, const StatsParams& params,
                UrlHandlerFn url_handler_fn = nullptr);
 
-  virtual ~StatsRequest() = default;
+  ~StatsRequest() override = default;
 
   // Admin::Request
   Http::Code start(Http::ResponseHeaderMap& response_headers) override;
