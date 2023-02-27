@@ -99,17 +99,21 @@ class EnvoyConfigurationTest {
     enableSkipDNSLookupForProxiedRequests: Boolean = false,
     statSinks: MutableList<String> = mutableListOf(),
     enablePlatformCertificatesValidation: Boolean = false,
-    rtdsLayerName: String = "rtds_name",
-    rtdsTimeoutSeconds: Int = 5,
-    adsAddress: String = "fake_address",
-    adsPort: Int = 5,
-    adsJwtToken: String = "fake_token",
-    adsJwtTokenLifetimeSeconds: Int = 5,
-    adsSslRootCerts: String = "fake_root_certs",
-    nodeId: String = "fake_node_id",
-    nodeRegion: String = "fake_node_region",
-    nodeZone: String = "fake_node_zone",
-    nodeSubZone: String = "fake_node_sub_zone"
+    rtdsLayerName: String = "",
+    rtdsTimeoutSeconds: Int = 0,
+    adsAddress: String = "",
+    adsPort: Int = 0,
+    adsJwtToken: String = "",
+    adsJwtTokenLifetimeSeconds: Int = 0,
+    adsSslRootCerts: String = "",
+    nodeId: String = "",
+    nodeRegion: String = "",
+    nodeZone: String = "",
+    nodeSubZone: String = "",
+    useNodeId: Boolean = false,
+    useAds: Boolean = false,
+    useNodeLocality: Boolean = false,
+    useRtds: Boolean = false
 
   ): EnvoyConfiguration {
     return EnvoyConfiguration(
@@ -160,6 +164,10 @@ class EnvoyConfigurationTest {
       nodeRegion,
       nodeZone,
       nodeSubZone,
+      useNodeId,
+      useAds,
+      useNodeLocality,
+      useRtds,
     )
   }
 
@@ -325,7 +333,7 @@ class EnvoyConfigurationTest {
   fun `test adding RTDS and ADS`() {
     JniLibrary.loadTestLibrary()
     val envoyConfiguration = buildTestEnvoyConfiguration(
-      rtdsLayerName = "fake_rtds_layer", adsAddress = "FAKE_ADDRESS", adsPort = 0
+      rtdsLayerName = "fake_rtds_layer", adsAddress = "FAKE_ADDRESS", adsPort = 0, useAds = true, useRtds = true
     )
 
     val resolvedTemplate = envoyConfiguration.createYaml()
@@ -333,6 +341,20 @@ class EnvoyConfigurationTest {
     assertThat(resolvedTemplate).contains("fake_rtds_layer");
     assertThat(resolvedTemplate).contains("FAKE_ADDRESS");
   }
+
+  @Test
+  fun `test configuring RTDS and ADS but not enabling it`() {
+    JniLibrary.loadTestLibrary()
+    val envoyConfiguration = buildTestEnvoyConfiguration(
+      rtdsLayerName = "fake_rtds_layer", adsAddress = "FAKE_ADDRESS", adsPort = 0
+    )
+
+    val resolvedTemplate = envoyConfiguration.createYaml()
+
+    assertThat(resolvedTemplate).doesNotContain("fake_rtds_layer");
+    assertThat(resolvedTemplate).doesNotContain("FAKE_ADDRESS");
+  }
+
 
   @Test
   fun `test YAML loads with stats sinks and stats domain`() {

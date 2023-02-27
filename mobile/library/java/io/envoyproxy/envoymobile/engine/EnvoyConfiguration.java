@@ -74,6 +74,11 @@ public class EnvoyConfiguration {
   public final String nodeRegion;
   public final String nodeZone;
   public final String nodeSubZone;
+  public final Boolean useNodeId;
+  public final Boolean useRtds;
+  public final Boolean useNodeLocality;
+  public final Boolean useAds;
+
 
   private static final Pattern UNRESOLVED_KEY_PATTERN = Pattern.compile("\\{\\{ (.+) \\}\\}");
 
@@ -151,7 +156,11 @@ public class EnvoyConfiguration {
    * @param nodeZone                                      the node zone to use for the ADS server.
    * @param nodeSubZone                                   the node sub-zone to use for the ADS
    *     server.
-   */
+  * @param useNodeId                                      enables node id.
+  * @param useRtds                                        enables RTDS.
+  * @param useNodeLocality                                enables node locality.
+  * @param useAds                                         enables ADS.
+  */
   public EnvoyConfiguration(
       boolean adminInterfaceEnabled, String grpcStatsDomain, int connectTimeoutSeconds,
       int dnsRefreshSeconds, int dnsFailureRefreshSecondsBase, int dnsFailureRefreshSecondsMax,
@@ -171,7 +180,8 @@ public class EnvoyConfiguration {
       boolean enablePlatformCertificatesValidation, String rtdsLayerName,
       Integer rtdsTimeoutSeconds, String adsAddress, Integer adsPort, String adsToken,
       Integer adsTokenLifetime, String adsRootCerts, String nodeId, String nodeRegion,
-      String nodeZone, String nodeSubZone) {
+      String nodeZone, String nodeSubZone, Boolean useNodeId, Boolean useRtds,
+      Boolean useNodeLocality, Boolean useAds) {
     JniLibrary.load();
     this.adminInterfaceEnabled = adminInterfaceEnabled;
     this.grpcStatsDomain = grpcStatsDomain;
@@ -236,6 +246,10 @@ public class EnvoyConfiguration {
     this.nodeRegion = nodeRegion;
     this.nodeZone = nodeZone;
     this.nodeSubZone = nodeSubZone;
+    this.useNodeId = useNodeId;
+    this.useRtds = useRtds;
+    this.useNodeLocality = useNodeLocality;
+    this.useAds = useAds;
   }
 
   // TODO(alyssawilk) move this to the test only JNI library.
@@ -263,7 +277,7 @@ public class EnvoyConfiguration {
         filter_chain, stats_sinks, enablePlatformCertificatesValidation,
         enableSkipDNSLookupForProxiedRequests, runtime_guards, rtdsLayerName, rtdsTimeoutSeconds,
         adsAddress, adsPort, adsToken, adsTokenLifetime, adsRootCerts, nodeId, nodeRegion, nodeZone,
-        nodeSubZone);
+        nodeSubZone, useNodeId, useRtds, useNodeLocality, useAds);
   }
 
   long createBootstrap() {
@@ -289,7 +303,7 @@ public class EnvoyConfiguration {
         filter_chain, stats_sinks, enablePlatformCertificatesValidation,
         enableSkipDNSLookupForProxiedRequests, runtime_guards, rtdsLayerName, rtdsTimeoutSeconds,
         adsAddress, adsPort, adsToken, adsTokenLifetime, adsRootCerts, nodeId, nodeRegion, nodeZone,
-        nodeSubZone);
+        nodeSubZone, useNodeId, useRtds, useNodeLocality, useAds);
   }
 
   static class ConfigurationException extends RuntimeException {

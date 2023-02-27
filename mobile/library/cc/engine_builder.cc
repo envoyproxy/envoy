@@ -222,20 +222,24 @@ EngineBuilder& EngineBuilder::enforceTrustChainVerification(bool trust_chain_ver
   return *this;
 }
 
-EngineBuilder& EngineBuilder::setNodeId(std::string node_id) {
+EngineBuilder& EngineBuilder::setNodeId(std::string node_id, bool use_node_id) {
   node_id_ = std::move(node_id);
+  use_node_id_ = use_node_id;
   return *this;
 }
 
-EngineBuilder& EngineBuilder::setNodeLocality(const NodeLocality& node_locality) {
+EngineBuilder& EngineBuilder::setNodeLocality(const NodeLocality& node_locality,
+                                              bool use_node_locality) {
   node_locality_ = node_locality;
+  use_node_locality_ = use_node_locality;
   return *this;
 }
 
 EngineBuilder& EngineBuilder::setAggregatedDiscoveryService(std::string address, const int port,
                                                             std::string jwt_token,
                                                             const int jwt_token_lifetime_seconds,
-                                                            std::string ssl_root_certs) {
+                                                            std::string ssl_root_certs,
+                                                            bool use_ads) {
 #ifndef ENVOY_GOOGLE_GRPC
   throw std::runtime_error("google_grpc must be enabled in bazel to use ADS");
 #endif
@@ -244,18 +248,21 @@ EngineBuilder& EngineBuilder::setAggregatedDiscoveryService(std::string address,
   ads_jwt_token_ = std::move(jwt_token);
   ads_jwt_token_lifetime_seconds_ = jwt_token_lifetime_seconds;
   ads_ssl_root_certs_ = std::move(ssl_root_certs);
+  use_ads_ = use_ads;
   return *this;
 }
 
-EngineBuilder& EngineBuilder::addRtdsLayer(std::string layer_name, const int timeout_seconds) {
+EngineBuilder& EngineBuilder::addRtdsLayer(std::string layer_name, const int timeout_seconds,
+                                           bool use_rtds) {
   rtds_layer_name_ = layer_name;
   rtds_timeout_seconds_ = timeout_seconds;
+  use_rtds_ = use_rtds;
   return *this;
 }
 
 EngineBuilder& EngineBuilder::addCdsLayer(std::string cds_resources_locator,
-                                          const int timeout_seconds) {
-  enable_cds_ = true;
+                                          const int timeout_seconds, bool use_cds) {
+  use_cds_ = use_cds;
   cds_resources_locator_ = std::move(cds_resources_locator);
   cds_timeout_seconds_ = timeout_seconds;
   return *this;
@@ -925,9 +932,9 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
 
   // Set up node
   auto* node = bootstrap->mutable_node();
-  node->set_id(node_id_.empty() ? "envoy-mobile" : node_id_);
+  node->set_id(use_node_id_ ? node_id_ : "envoy-mobile");
   node->set_cluster("envoy-mobile");
-  if (node_locality_) {
+  if (use_node_locality_) {
     node->mutable_locality()->set_region(node_locality_->region);
     node->mutable_locality()->set_zone(node_locality_->zone);
     node->mutable_locality()->set_sub_zone(node_locality_->sub_zone);
@@ -977,10 +984,10 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
   }
 
   bootstrap->mutable_dynamic_resources();
-  if ((!rtds_layer_name_.empty() || enable_cds_) && ads_address_.empty()) {
+  if ((use_rtds_ || use_cds_) && !use_ads_) {
     throw std::runtime_error("ADS must be configured when using xDS");
   }
-  if (!rtds_layer_name_.empty()) {
+  if (use_rtds_) {
     auto* layered_runtime = bootstrap->mutable_layered_runtime();
     auto* layer = layered_runtime->add_layers();
     layer->set_name(rtds_layer_name_);
@@ -989,9 +996,10 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
     auto* rtds_config = rtds_layer->mutable_rtds_config();
     rtds_config->mutable_ads();
     rtds_config->set_resource_api_version(envoy::config::core::v3::ApiVersion::V3);
-    rtds_config->mutable_initial_fetch_timeout()->set_seconds(rtds_timeout_seconds_);
+    rtds_config->mutable_initial_fetch_timeout()->set_seconds(
+        rtds_timeout_seconds_ == 0 ? DefaultXdsTimeout : rtds_timeout_seconds_);
   }
-  if (!ads_address_.empty()) {
+  if (use_ads_) {
     std::string target_uri = fmt::format(R"({}:{})", ads_address_, ads_port_);
     auto* ads_config = bootstrap->mutable_dynamic_resources()->mutable_ads_config();
     ads_config->set_transport_api_version(envoy::config::core::v3::ApiVersion::V3);
@@ -1015,7 +1023,7 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
       jwt.set_token_lifetime_seconds(ads_jwt_token_lifetime_seconds_);
     }
   }
-  if (enable_cds_) {
+  if (use_cds_) {
     auto* cds_config = bootstrap->mutable_dynamic_resources()->mutable_cds_config();
     if (cds_resources_locator_.empty()) {
       cds_config->mutable_ads();
@@ -1026,7 +1034,8 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
       cds_config->mutable_api_config_source()->set_transport_api_version(
           envoy::config::core::v3::ApiVersion::V3);
     }
-    cds_config->mutable_initial_fetch_timeout()->set_seconds(cds_timeout_seconds_);
+    cds_config->mutable_initial_fetch_timeout()->set_seconds(
+        cds_timeout_seconds_ == 0 ? DefaultXdsTimeout : rtds_timeout_seconds_);
     cds_config->set_resource_api_version(envoy::config::core::v3::ApiVersion::V3);
     bootstrap->add_node_context_params("cluster");
     // add a stat prefix we use in test

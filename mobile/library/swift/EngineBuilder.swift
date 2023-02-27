@@ -58,17 +58,21 @@ open class EngineBuilder: NSObject {
   private var runtimeGuards: [String: String] = [:]
   private var directResponses: [DirectResponse] = []
   private var statsSinks: [String] = []
-  private var rtdsLayerName: String?
-  private var rtdsTimeoutSeconds: UInt32?
-  private var adsAddress: String?
-  private var adsPort: UInt32?
-  private var adsJwtToken: String?
-  private var adsJwtTokenLifetimeSeconds: UInt32?
-  private var adsSslRootCerts: String?
-  private var nodeId: String?
-  private var nodeRegion: String?
-  private var nodeZone: String?
-  private var nodeSubZone: String?
+  private var rtdsLayerName: String = ""
+  private var rtdsTimeoutSeconds: UInt32 = 0
+  private var adsAddress: String = ""
+  private var adsPort: UInt32 = 0
+  private var adsJwtToken: String = ""
+  private var adsJwtTokenLifetimeSeconds: UInt32 = 0
+  private var adsSslRootCerts: String = ""
+  private var nodeId: String = ""
+  private var nodeRegion: String = ""
+  private var nodeZone: String = ""
+  private var nodeSubZone: String = ""
+  private var useNodeId: Bool = false
+  private var useRtds: Bool = false
+  private var useNodeLocality: Bool = false
+  private var useAds: Bool = false
 
   // MARK: - Public
 
@@ -565,6 +569,7 @@ open class EngineBuilder: NSObject {
   @discardableResult
   public func setNodeId(_ nodeId: String) -> Self {
     self.nodeId = nodeId
+    self.useNodeLocality = true
     return self
   }
 
@@ -584,6 +589,7 @@ open class EngineBuilder: NSObject {
     self.nodeRegion = region
     self.nodeZone = zone
     self.nodeSubZone = subZone
+    self.useNodeLocality = true
     return self
   }
 
@@ -609,6 +615,7 @@ open class EngineBuilder: NSObject {
     self.adsJwtToken = jwtToken
     self.adsJwtTokenLifetimeSeconds = jwtTokenLifetimeSeconds
     self.adsSslRootCerts = sslRootCerts
+    self.useAds = true
     return self
   }
 
@@ -622,6 +629,7 @@ open class EngineBuilder: NSObject {
   public func addRtdsLayer(_ layerName: String, _ timeoutSeconds: UInt32? = nil) -> Self {
     self.rtdsLayerName = layerName
     self.rtdsTimeoutSeconds = timeoutSeconds
+    self.useRtds = true
     return self
   }
 
@@ -698,7 +706,11 @@ open class EngineBuilder: NSObject {
       nodeId: self.nodeId,
       nodeRegion: self.nodeRegion,
       nodeZone: self.nodeZone,
-      nodeSubZone: self.nodeSubZone
+      nodeSubZone: self.nodeSubZone,
+      useNodeId: self.useNodeId,
+      useAds: self.useAds,
+      useNodeLocality: self.useNodeLocality,
+      useRtds: self.useRtds,
     )
 
     switch self.base {

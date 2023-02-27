@@ -77,17 +77,21 @@ open class EngineBuilder(
   private var keyValueStores = mutableMapOf<String, EnvoyKeyValueStore>()
   private var statsSinks = listOf<String>()
   private var enablePlatformCertificatesValidation = false
-  private var rtdsLayerName: String? = null
-  private var rtdsTimeoutSeconds: Int? = null
-  private var adsAddress: String? = null
-  private var adsPort: Int? = null
-  private var adsJwtToken: String? = null
-  private var adsJwtTokenLifetimeSeconds: Int? = null
-  private var adsSslRootCerts: String? = null
-  private var nodeId: String? = null
-  private var nodeRegion: String? = null
-  private var nodeZone: String? = null
-  private var nodeSubZone: String? = null
+  private var rtdsLayerName: String = ""
+  private var rtdsTimeoutSeconds: Int = 0
+  private var adsAddress: String = ""
+  private var adsPort: Int = 0
+  private var adsJwtToken: String = ""
+  private var adsJwtTokenLifetimeSeconds: Int = 0
+  private var adsSslRootCerts: String = ""
+  private var nodeId: String = ""
+  private var nodeRegion: String = ""
+  private var nodeZone: String = ""
+  private var nodeSubZone: String = ""
+  private var useNodeId: Boolean = false
+  private var useRtds: Boolean = false
+  private var useNodeLocality: Boolean = false
+  private var useAds: Boolean = false
 
   /**
    * Add a log level to use with Envoy.
@@ -568,6 +572,7 @@ open class EngineBuilder(
  */
 fun setNodeId(nodeId: String): EngineBuilder {
   this.nodeId = nodeId
+  this.useNodeId = true
   return this
 }
 
@@ -584,6 +589,7 @@ fun setNodeLocality(region: String, zone: String, subZone: String): EngineBuilde
   this.nodeRegion = region
   this.nodeZone = zone
   this.nodeSubZone = subZone
+  this.useNodeLocality = true
   return this
 }
 
@@ -605,15 +611,16 @@ fun setNodeLocality(region: String, zone: String, subZone: String): EngineBuilde
 fun setAggregatedDiscoveryService(
   address: String,
   port: Int,
-  jwtToken: String? = null,
-  jwtTokenLifetimeSeconds: Int? = null,
-  sslRootCerts: String? = null
+  jwtToken: String = "",
+  jwtTokenLifetimeSeconds: Int = 0,
+  sslRootCerts: String = ""
 ): EngineBuilder {
   this.adsAddress = address
   this.adsPort = port
   this.adsJwtToken = jwtToken
   this.adsJwtTokenLifetimeSeconds = jwtTokenLifetimeSeconds
   this.adsSslRootCerts = sslRootCerts
+  this.useAds = true
   return this
 }
 
@@ -626,9 +633,10 @@ fun setAggregatedDiscoveryService(
 *
 * @return this builder.
 */
-fun addRtdsLayer(layerName: String, timeoutSeconds: Int? = null): EngineBuilder {
+fun addRtdsLayer(layerName: String, timeoutSeconds: Int = 0): EngineBuilder {
   this.rtdsLayerName = layerName
   this.rtdsTimeoutSeconds = timeoutSeconds
+  this.useRtds = true
   return this
 }
 
@@ -687,6 +695,10 @@ fun addRtdsLayer(layerName: String, timeoutSeconds: Int? = null): EngineBuilder 
       nodeRegion,
       nodeZone,
       nodeSubZone,
+      useNodeId,
+      useAds,
+      useNodeLocality,
+      useRtds,
     )
 
 

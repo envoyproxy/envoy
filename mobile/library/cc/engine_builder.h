@@ -71,24 +71,24 @@ public:
   EngineBuilder& enforceTrustChainVerification(bool trust_chain_verification_on);
   EngineBuilder& enablePlatformCertificatesValidation(bool platform_certificates_validation_on);
   // Sets the node.id field in the Bootstrap configuration.
-  EngineBuilder& setNodeId(std::string node_id);
+  EngineBuilder& setNodeId(std::string node_id, bool use_node_id = true);
   // Sets the node.locality field in the Bootstrap configuration.
-  EngineBuilder& setNodeLocality(const NodeLocality& node_locality);
+  EngineBuilder& setNodeLocality(const NodeLocality& node_locality, bool use_node_locality = true);
   // Adds an ADS layer. Note that only the state-of-the-world gRPC protocol is supported, not Delta
   // gRPC.
   EngineBuilder&
   setAggregatedDiscoveryService(std::string address, const int port, std::string jwt_token = "",
                                 int jwt_token_lifetime_seconds = DefaultJwtTokenLifetimeSeconds,
-                                std::string ssl_root_certs = "");
+                                std::string ssl_root_certs = "", bool use_ads = true);
   // Adds an RTDS layer to default config. Requires that ADS be configured.
   EngineBuilder& addRtdsLayer(std::string layer_name,
-                              const int timeout_seconds = DefaultXdsTimeout);
+                              const int timeout_seconds = 0, bool use_rtds = true);
   // Adds a CDS layer to default config. Requires that ADS be configured via
   // setAggregatedDiscoveryService(). If `cds_resources_locator` is non-empty, the xdstp namespace
   // is used for identifying resources. If not using xdstp, then set `cds_resources_locator` to the
   // empty string.
   EngineBuilder& addCdsLayer(std::string cds_resources_locator = "",
-                             const int timeout_seconds = DefaultXdsTimeout);
+                             const int timeout_seconds = 0, bool use_cds = true);
   EngineBuilder& enableDnsCache(bool dns_cache_on, int save_interval_seconds = 1);
   EngineBuilder& setForceAlwaysUsev6(bool value);
   EngineBuilder& setSkipDnsLookupForProxiedRequests(bool value);
@@ -167,7 +167,6 @@ private:
   std::string ads_jwt_token_;
   int ads_jwt_token_lifetime_seconds_;
   std::string ads_ssl_root_certs_;
-  bool enable_cds_ = false;
   std::string cds_resources_locator_;
   int cds_timeout_seconds_;
   bool dns_cache_on_ = false;
@@ -194,6 +193,15 @@ private:
   std::vector<std::pair<std::string, bool>> runtime_guards_;
   absl::flat_hash_map<std::string, StringAccessorSharedPtr> string_accessors_;
   bool skip_dns_lookups_for_proxied_requests_ = false;
+
+  // These are set to true if the related builder API has been called.
+  // The non-cpp builders will directly set them to false to track when
+  // functions were called as a no-op.
+  bool use_node_id_ = false;
+  bool use_rtds_ = false;
+  bool use_node_locality_ = false;
+  bool use_ads_ = false;
+  bool use_cds_ = false;
 };
 
 using EngineBuilderSharedPtr = std::shared_ptr<EngineBuilder>;

@@ -5,9 +5,6 @@
 
 @implementation NSString (CXX)
 - (std::string)toCXXString {
-  if (self == nil) {
-    return nullptr;
-  }
   return std::string([self UTF8String],
                      (int)[self lengthOfBytesUsingEncoding:NSUTF8StringEncoding]);
 }
@@ -124,7 +121,12 @@
                                            nodeId:(NSString *)nodeId
                                        nodeRegion:(NSString *)nodeRegion
                                          nodeZone:(NSString *)nodeZone
-                                      nodeSubZone:(NSString *)nodeSubZone;
+                                      nodeSubZone:(NSString *)nodeSubZone
+                                        useNodeId:(BOOL)useNodeId
+                                          useRtds:(BOOL)useRtds
+                                  useNodeLocality:(BOOL)useNodeLocality
+                                           useAds:(BOOL)useAds;
+
 {
   self = [super init];
   if (!self) {
@@ -179,6 +181,10 @@
   self.nodeRegion = nodeRegion;
   self.nodeZone = nodeZone;
   self.nodeSubZone = nodeSubZone;
+  self.useNodeId = useNodeId;
+  self.useRtds = useRtds;
+  self.useNodeLocality = useNodeLocality;
+  self.useAds = useAds;
 
   return self;
 }
@@ -253,29 +259,19 @@
     }
     builder.addStatsSinks(std::move(sinks));
   }
-  if (self.nodeRegion != nil) {
-    builder.setNodeLocality({[self.nodeRegion toCXXString],
-                             [self.nodeZone toCXXString],
-                             [self.nodeSubZone toCXXString]});
-  }
-  if (self.nodeId != nil) {
-    builder.setNodeId([self.nodeId toCXXString]);
-  }
-  if (self.rtdsLayerName != nil) {
-    builder.addRtdsLayer([self.rtdsLayerName toCXXString], self.rtdsTimeoutSeconds);
-  }
-  if (self.adsAddress != nil) {
-    builder.setAggregatedDiscoveryService(
-        [self.adsAddress toCXXString], self.adsPort, [self.adsJwtToken toCXXString],
-        self.adsJwtTokenLifetimeSeconds, [self.adsSslRootCerts toCXXString]);
-  }
-}
-
+  builder.setNodeLocality(
+      {[self.nodeRegion toCXXString], [self.nodeZone toCXXString], [self.nodeSubZone toCXXString]},
+      self.useNodeLocality);
+  builder.setNodeId([self.nodeId toCXXString], self.useNodeId);
+  builder.addRtdsLayer([self.rtdsLayerName toCXXString], self.rtdsTimeoutSeconds, self.useRtds);
+  builder.setAggregatedDiscoveryService(
+      [self.adsAddress toCXXString], self.adsPort, [self.adsJwtToken toCXXString],
+      self.adsJwtTokenLifetimeSeconds, [self.adsSslRootCerts toCXXString], self.useAds);
 #ifdef ENVOY_ADMIN_FUNCTIONALITY
-builder.enableAdminInterface(self.adminInterfaceEnabled);
+  builder.enableAdminInterface(self.adminInterfaceEnabled);
 #endif
 
-return builder;
+  return builder;
 }
 
 - (std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap>)generateBootstrap {
