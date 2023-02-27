@@ -28,10 +28,13 @@ using testing::NiceMock;
 namespace Envoy {
 namespace Http {
 
-class HttpConnectionManagerImplTest : public testing::Test, public ConnectionManagerConfig {
+// Base class for HttpConnectionManagerImpl related tests. This base class is used by tests under
+// common/http as well as test/extensions/filters/http/ext_proc/, to reuse the many mocks/default
+// impls of ConnectionManagerConfig that we need to provide to HttpConnectionManagerImpl.
+class HttpConnectionManagerImplMixin : public ConnectionManagerConfig {
 public:
-  HttpConnectionManagerImplTest();
-  ~HttpConnectionManagerImplTest() override;
+  HttpConnectionManagerImplMixin();
+  ~HttpConnectionManagerImplMixin() override;
   Tracing::CustomTagConstSharedPtr requestHeaderCustomTag(const std::string& header);
   void setup(bool ssl, const std::string& server_name, bool tracing = true, bool use_srds = false);
   void setupFilterChain(int num_decoder_filters, int num_encoder_filters, int num_requests = 1);
@@ -262,5 +265,7 @@ public:
   NiceMock<MockHeaderValidatorStats> header_validator_stats_;
 };
 
+class HttpConnectionManagerImplTest : public HttpConnectionManagerImplMixin,
+                                      public testing::Test {};
 } // namespace Http
 } // namespace Envoy

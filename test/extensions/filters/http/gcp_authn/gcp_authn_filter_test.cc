@@ -25,6 +25,7 @@ using Server::Configuration::MockFactoryContext;
 using ::testing::_;
 using ::testing::Invoke;
 using ::testing::NiceMock;
+using testing::Return;
 using Upstream::MockThreadLocalCluster;
 
 constexpr char DefaultConfig[] = R"EOF(

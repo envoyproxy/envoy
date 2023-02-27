@@ -11,9 +11,9 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  cc_build:
+  cc_test:
     if: github.repository == 'envoyproxy/envoy'
-    name: cc_build
+    name: cc_test
     runs-on: ubuntu-20.04
     timeout-minutes: 120
     container:
@@ -32,14 +32,14 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
-        cd mobile && ./bazelw build \
+        cd mobile && ./bazelw test \
             $([ -z $GITHUB_TOKEN ] || echo "--config=remote-ci-linux") \
             --remote_header="Authorization=Bearer $GITHUB_TOKEN" \
             --define=admin_html=enabled \
             --define=envoy_mobile_request_compression=disabled \
             --@envoy//bazel:http3=False \
             --@com_envoyproxy_protoc_gen_validate//bazel:template-flavor= \
-            //library/cc/...
+            //test/cc/...
   swift_build:
     if: github.repository == 'envoyproxy/envoy'
     name: swift_build

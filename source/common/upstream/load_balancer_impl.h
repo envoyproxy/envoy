@@ -412,14 +412,6 @@ private:
   // The set of local Envoy instances which are load balancing across priority_set_.
   const PrioritySet* local_priority_set_;
 
-  // If locality weight aware routing is enabled.
-  const bool locality_weighted_balancing_{};
-
-  // Config for zone aware routing.
-  const uint32_t routing_enabled_;
-  const uint64_t min_cluster_size_;
-  const bool fail_traffic_on_panic_;
-
   struct PerPriorityState {
     // The percent of requests which can be routed to the local locality.
     uint64_t local_percent_to_route_{};
@@ -435,6 +427,15 @@ private:
   std::vector<PerPriorityStatePtr> per_priority_state_;
   Common::CallbackHandlePtr priority_update_cb_;
   Common::CallbackHandlePtr local_priority_set_member_update_cb_handle_;
+
+  // Config for zone aware routing.
+  const uint64_t min_cluster_size_;
+  // Keep small members (bools and enums) at the end of class, to reduce alignment overhead.
+  const uint32_t routing_enabled_;
+  const bool fail_traffic_on_panic_ : 1;
+
+  // If locality weight aware routing is enabled.
+  const bool locality_weighted_balancing_ : 1;
 
   friend class TestZoneAwareLoadBalancer;
 };
@@ -757,10 +758,11 @@ public:
 
 private:
   const std::set<std::string> selector_keys_;
+  const std::set<std::string> fallback_keys_subset_;
+  // Keep small members (bools and enums) at the end of class, to reduce alignment overhead.
   const envoy::config::cluster::v3::Cluster::LbSubsetConfig::LbSubsetSelector::
       LbSubsetSelectorFallbackPolicy fallback_policy_;
-  const std::set<std::string> fallback_keys_subset_;
-  const bool single_host_per_subset_;
+  const bool single_host_per_subset_ : 1;
 };
 
 /**

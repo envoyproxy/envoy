@@ -33,7 +33,7 @@ using ::testing::MatchesRegex;
 
 namespace Envoy {
 namespace {
-std::vector<int> StoiAccessLogString(const std::string& access_log_entry_of_ints) {
+std::vector<int> stoiAccessLogString(const std::string& access_log_entry_of_ints) {
   std::vector<int> ret;
   const std::vector<std::string> split_string = TestUtility::split(access_log_entry_of_ints, ' ');
   ret.reserve(split_string.size());
@@ -2024,7 +2024,7 @@ TEST_P(Http2FrameIntegrationTest, AccessLogOfWireBytesIfResponseSizeGreaterThanW
   // It should have access logged since it has received the entire response.
   int hcm_logged_wire_bytes_sent, hcm_logged_wire_header_bytes_sent;
   if (!Runtime::runtimeFeatureEnabled(Runtime::expand_agnostic_stream_lifetime)) {
-    auto access_log_values = StoiAccessLogString(waitForAccessLog(access_log_name_));
+    auto access_log_values = stoiAccessLogString(waitForAccessLog(access_log_name_));
     hcm_logged_wire_bytes_sent = access_log_values[0];
     hcm_logged_wire_header_bytes_sent = access_log_values[1];
   }
@@ -2048,7 +2048,7 @@ TEST_P(Http2FrameIntegrationTest, AccessLogOfWireBytesIfResponseSizeGreaterThanW
   if (Runtime::runtimeFeatureEnabled(Runtime::expand_agnostic_stream_lifetime)) {
     // Access logs are only available now due to the expanded agnostic stream
     // lifetime.
-    auto access_log_values = StoiAccessLogString(waitForAccessLog(access_log_name_));
+    auto access_log_values = stoiAccessLogString(waitForAccessLog(access_log_name_));
     hcm_logged_wire_bytes_sent = access_log_values[0];
     hcm_logged_wire_header_bytes_sent = access_log_values[1];
   }
