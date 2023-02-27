@@ -120,15 +120,8 @@ Filter::StreamOpenState Filter::openStream() {
   ENVOY_BUG(!processing_complete_, "openStream should not have been called");
   if (!stream_) {
     ENVOY_LOG(debug, "Opening gRPC stream to external processor");
-    if (grpc_service_.target_specifier_case() ==
-        envoy::config::core::v3::GrpcService::TargetSpecifierCase::TARGET_SPECIFIER_NOT_SET) {
-      // No valid gRPC service was specified and treated as an grpc error directly.
-      ENVOY_LOG(warn, "No gRPC service specified for external processing filter");
-      onGrpcError(Grpc::Status::WellKnownGrpcStatus::Unavailable);
-    } else {
-      stream_ = client_->start(*this, grpc_service_, decoder_callbacks_->streamInfo());
-      stats_.streams_started_.inc();
-    }
+    stream_ = client_->start(*this, grpc_service_, decoder_callbacks_->streamInfo());
+    stats_.streams_started_.inc();
     if (processing_complete_) {
       // Stream failed while starting and either onGrpcError or onGrpcClose was already called
       return sent_immediate_response_ ? StreamOpenState::Error : StreamOpenState::IgnoreError;
@@ -762,16 +755,6 @@ void Filter::mergePerRouteConfig() {
   if (merged_config->grpcService()) {
     ENVOY_LOG(trace, "Setting new GrpcService from per-route configuration");
     grpc_service_ = *merged_config->grpcService();
-  }
-
-  // Disable the filter if there is no valid GrpcService configuration to avoid possible runtime
-  // panics.
-  if (grpc_service_.target_specifier_case() ==
-      envoy::config::core::v3::GrpcService::TargetSpecifierCase::TARGET_SPECIFIER_NOT_SET) {
-    ENVOY_LOG(trace, "Disabling filter due to no valid GrpcService configuration");
-    const auto all_disabled = allDisabledMode();
-    decoding_state_.setProcessingMode(all_disabled);
-    encoding_state_.setProcessingMode(all_disabled);
   }
 }
 

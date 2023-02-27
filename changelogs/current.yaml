@@ -23,6 +23,9 @@ minor_behavior_changes:
 - area: http2
   change: |
     Request authorities are now validated with a library function from QUICHE rather than nghttp2. This behavior change can be reverted by setting ``envoy.reloadable_features.http2_validate_authority_with_quiche`` to ``false``.
+- area: ext_proc
+  change: |
+    Make the :ref:`grpc service <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExternalProcessor.grpc_service>` required.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
@@ -38,7 +41,7 @@ bug_fixes:
     fixed the bug that custom tags of the route metadata type are not set for upstream spans.
 - area: ext_proc
   change: |
-    fixed the possible crash when there is no valid grpc_service configuration or processing the local reply.
+    ensure the route configuration will be used to overwrite global configuration when processing the local reply.
 - area: router
   change: |
     fixed outlier detection ejections caused by opened circuit breakers.

@@ -1,7 +1,6 @@
 #include <algorithm>
 
 #include "envoy/extensions/filters/http/ext_proc/v3/ext_proc.pb.h"
-#include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 #include "envoy/network/address.h"
 #include "envoy/service/ext_proc/v3/external_processor.pb.h"
 
@@ -1672,39 +1671,6 @@ TEST_P(ExtProcIntegrationTest, PerRouteDisable) {
     route->mutable_match()->set_path("/foo");
     ExtProcPerRoute per_route;
     per_route.set_disabled(true);
-    setPerRouteConfig(route, per_route);
-  });
-  HttpIntegrationTest::initialize();
-
-  auto response =
-      sendDownstreamRequest([](Http::RequestHeaderMap& headers) { headers.setPath("/foo"); });
-  // There should be no ext_proc processing here
-  Buffer::OwnedImpl full_response;
-  TestUtility::feedBufferWithRandomCharacters(full_response, 100);
-  handleUpstreamRequestWithResponse(full_response, 100);
-  verifyDownstreamResponse(*response, 200);
-}
-
-// Test the case where both the filter configuration and the per-route configuration have
-// no valid grpc_service. In this case, the filter should not be enabled.
-TEST_P(ExtProcIntegrationTest, NoValidGrpcService) {
-  initializeConfig();
-
-  config_helper_.addConfigModifier([this](HttpConnectionManager& cm) {
-    // Clear filter config.
-    envoy::extensions::filters::network::http_connection_manager::v3::HttpFilter ext_proc_filter;
-    ext_proc_filter.set_name("envoy.filters.http.ext_proc");
-    envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor empty_config;
-    ext_proc_filter.mutable_typed_config()->PackFrom(empty_config);
-    cm.mutable_http_filters(0)->Clear();
-    cm.mutable_http_filters(0)->MergeFrom(ext_proc_filter);
-
-    auto* vh = cm.mutable_route_config()->mutable_virtual_hosts()->Mutable(0);
-    auto* route = vh->mutable_routes()->Mutable(0);
-    route->mutable_match()->set_path("/foo");
-    ExtProcPerRoute per_route;
-    // No valid grpc_service here.
-    per_route.mutable_overrides();
     setPerRouteConfig(route, per_route);
   });
   HttpIntegrationTest::initialize();
