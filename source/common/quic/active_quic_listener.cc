@@ -288,7 +288,7 @@ ActiveQuicListenerFactory::ActiveQuicListenerFactory(
                                                  cid_generator_config_factory));
 
   if (config.has_server_preferred_address_config()) {
-    envoy::config::core::v3::TypedExtensionConfig server_preferred_address_config =
+    const envoy::config::core::v3::TypedExtensionConfig& server_preferred_address_config =
         config.server_preferred_address_config();
     auto& server_preferred_address_config_factory =
         Config::Utility::getAndCheckFactory<EnvoyQuicServerPreferredAddressConfigFactory>(
