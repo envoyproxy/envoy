@@ -4,7 +4,7 @@ Tools for opening, closing and syncing release and development branches.
 
 ## Commands
 
-### `bazel run //tools/project:release`
+### `bazel run @envoy_repo//:release`
 
 This command switches the repo to "release" mode by doing the following:
 
@@ -24,7 +24,7 @@ This command can only be run when the repo is in "dev" mode.
 
 ```console
 
-# bazel run //tools/project:release
+# bazel run @envoy_repo//:release
 ...
 ProjectRunner SUCCESS [version] 1.23.0
 ProjectRunner SUCCESS [changelog] current: May 11, 2022
@@ -55,7 +55,7 @@ Date:   Wed May 11 13:11:51 2022 +0000
 
 ```
 
-### `bazel run //tools/project:dev`
+### `bazel run @envoy_repo//:dev`
 
 This command switches the repo to "dev" mode by doing the following:
 
@@ -73,7 +73,7 @@ This command can only be run when the repo is in `release` mode.
 #### Example: open (`main`) branch to development
 
 ```console
-# bazel run //tools/project:dev
+# bazel run @envoy_repo//:dev
 ...
 ProjectRunner SUCCESS [version] 1.24.0-dev
 ProjectRunner SUCCESS [changelog] add: 1.23.0
@@ -128,7 +128,7 @@ For non-`main` release branches this command can be called with the `--patch` op
 incremented, rather than the minor version.
 
 ```console
-# bazel run //tools/project:dev -- --patch
+# bazel run @envoy_repo//:dev -- --patch
 ...
 ProjectRunner SUCCESS [version] 1.23.1-dev
 ProjectRunner SUCCESS [changelog] add: 1.23.0
@@ -176,7 +176,7 @@ index a6c2798a48..4d1e5d262c 100644
 
 ```
 
-### `bazel run //tools/project:sync`
+### `bazel run @envoy_repo//:sync`
 
 This command synchronizes older release branches by doing the following:
 
@@ -199,7 +199,7 @@ a newly available documentation inventory.
 
 ```console
 
-# bazel run //tools/project:sync
+# bazel run @envoy_repo//:sync
 ...
 ProjectRunner SUCCESS [changelog] add: 1.21.2
 ProjectRunner SUCCESS [inventory] update: 1.21 -> 1.21.2
@@ -268,7 +268,7 @@ index 21f15a5561..6e92af45d6 100644
 #### Close the branch
 
 - fork `main` branch
-- run `bazel run //tools/project:release`
+- run `bazel run @envoy_repo//:release`
 - create PR with committed changes
 - wait for PR to land on `main` and for release to be tagged
 
@@ -277,7 +277,7 @@ At this point the `main` branch is in "release" mode and should not have any add
 #### Reopen the branch
 
 - fork `main` branch
-- run `bazel run //tools/project:dev`
+- run `bazel run @envoy_repo//:dev`
 - create PR with committed changes
 - wait for PR to land on `main`
 - continue with development
@@ -289,7 +289,7 @@ At this point the `main` branch is in "release" mode and should not have any add
 For example, using the `release/v1.23` branch:
 
 - fork `release/v1.23` branch
-- run `bazel run //tools/project:release`
+- run `bazel run @envoy_repo//:release`
 - create PR to the `release/v1.23` branch with committed changes
 - wait for PR to land on `release/v1.23` and for release to be tagged
 
@@ -298,7 +298,7 @@ At this point the `release/v1.23` branch is in "release" mode and should not hav
 #### Reopen the branch
 
 - fork `release/v1.23` branch
-- run `bazel run //tools/project:dev -- --patch`
+- run `bazel run @envoy_repo//:dev -- --patch`
 - create PR with committed changes
 - wait for PR to land on `release/v1.23`
 - continue with development
@@ -320,5 +320,5 @@ As this step is done automatically when opening and closing a branch the most li
 this is to bring new releases -> `main` to update the "latest" docs.
 
 - fork `main` branch
-- run `bazel run //tools/project:sync`
+- run `bazel run @envoy_repo//:sync`
 - create a PR to the `main` branch with committed changes

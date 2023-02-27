@@ -78,12 +78,54 @@ def _envoy_repo_impl(repository_ctx):
     repository_ctx.file("path.bzl", "PATH = '%s'" % repo_version_path.dirname)
     repository_ctx.file("__init__.py", "PATH = '%s'\nVERSION = '%s'\nAPI_VERSION = '%s'" % (repo_version_path.dirname, version, api_version))
     repository_ctx.file("WORKSPACE", "")
-    repository_ctx.file("BUILD", """
+    repository_ctx.file("BUILD", '''
 load("@rules_python//python:defs.bzl", "py_library")
+load("@envoy//tools/base:envoy_python.bzl", "envoy_entry_point")
+load("//:path.bzl", "PATH")
 
 py_library(name = "envoy_repo", srcs = ["__init__.py"], visibility = ["//visibility:public"])
 
-""")
+envoy_entry_point(
+    name = "release",
+    args = [
+        "release",
+        PATH,
+    ],
+    pkg = "envoy.base.utils",
+    script = "envoy.project",
+)
+
+envoy_entry_point(
+    name = "dev",
+    args = [
+        "dev",
+        PATH,
+    ],
+    pkg = "envoy.base.utils",
+    script = "envoy.project",
+)
+
+envoy_entry_point(
+    name = "sync",
+    args = [
+        "sync",
+        PATH,
+    ],
+    pkg = "envoy.base.utils",
+    script = "envoy.project",
+)
+
+envoy_entry_point(
+    name = "publish",
+    args = [
+        "publish",
+        PATH,
+    ],
+    pkg = "envoy.base.utils",
+    script = "envoy.project",
+)
+
+''')
 
 _envoy_repo = repository_rule(
     implementation = _envoy_repo_impl,
