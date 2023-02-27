@@ -48,6 +48,13 @@ void ProcessorState::stopMessageTimer() {
   }
 }
 
+void ProcessorState::restartMessageTimer(const uint32_t message_timeout) {
+  stopMessageTimer();
+  if (message_timer_) {
+    message_timer_->enableTimer(std::chrono::milliseconds(message_timeout));
+  }
+}
+
 absl::Status ProcessorState::handleHeadersResponse(const HeadersResponse& response) {
   if (callback_state_ == CallbackState::HeadersCallback) {
     ENVOY_LOG(debug, "applying headers response. body mode = {}",

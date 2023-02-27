@@ -526,6 +526,26 @@ void Filter::sendTrailers(ProcessorState& state, const Http::HeaderMap& trailers
   stats_.stream_msgs_sent_.inc();
 }
 
+void Filter::onNewTimeout(
+    std::unique_ptr<envoy::service::ext_proc::v3::ProcessingResponse>&& response) {
+  const uint32_t message_timeout_ms =
+      PROTOBUF_GET_MS_REQUIRED(response->new_timeout(), message_timeout);
+
+  ENVOY_LOG(debug,
+            "Server need more time to process the request, start a "
+            "new timer with timeout {} ms, direction {} ",
+            message_timeout_ms, response->new_timeout().traffic_direction());
+  if (response->new_timeout().traffic_direction() ==
+      envoy::config::core::v3::TrafficDirection::INBOUND) {
+    decoding_state_.restartMessageTimer(message_timeout_ms);
+  } else if (response->new_timeout().traffic_direction() ==
+             envoy::config::core::v3::TrafficDirection::OUTBOUND) {
+    encoding_state_.restartMessageTimer(message_timeout_ms);
+  }
+
+  stats_.stream_msgs_received_.inc();
+}
+
 void Filter::onReceiveMessage(std::unique_ptr<ProcessingResponse>&& r) {
   if (processing_complete_) {
     ENVOY_LOG(debug, "Ignoring stream message received after processing complete");
@@ -534,6 +554,13 @@ void Filter::onReceiveMessage(std::unique_ptr<ProcessingResponse>&& r) {
   }
 
   auto response = std::move(r);
+
+  if (response->has_new_timeout()) {
+    // Server needs more time to process the request. Stop the original timer
+    // and start a new timer with the new timeout value.
+    onNewTimeout(std::move(response));
+    return;
+  }
 
   // Update processing mode now because filter callbacks check it
   // and the various "handle" methods below may result in callbacks

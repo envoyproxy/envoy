@@ -40,6 +40,7 @@ struct ExtProcFilterStats {
 };
 
 inline constexpr absl::string_view ExtProcLoggingInfoName = "ext-proc-logging-info";
+inline constexpr uint64_t DefaultMessageTimeoutMs = 200;
 
 class ExtProcLoggingInfo : public Envoy::StreamInfo::FilterState::Object {
 public:
@@ -178,6 +179,7 @@ public:
   void onGrpcClose() override;
 
   void onMessageTimeout();
+  void onNewTimeout(std::unique_ptr<envoy::service::ext_proc::v3::ProcessingResponse>&& response);
 
   void sendBufferedData(ProcessorState& state, ProcessorState::CallbackState new_state,
                         bool end_stream) {
