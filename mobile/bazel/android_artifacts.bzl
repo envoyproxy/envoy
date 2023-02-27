@@ -239,6 +239,8 @@ def _create_classes_jar(name, manifest, android_library):
         echo "Creating classes.jar from $(SRCS)"
         pushd $$classes_dir
         unzip $$original_directory/$(SRCS) "io/envoyproxy/*" "org/chromium/net/*" "META-INF/" > /dev/null
+        find . -name "R.class" -type f -exec rm {} \\;
+        find . -name "R\\$$*.class" -type f -exec rm {} \\;
         zip -r classes.jar * > /dev/null
         popd
         cp $$classes_dir/classes.jar $@

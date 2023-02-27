@@ -15,8 +15,10 @@ Breaking changes:
 - swift/kotlin: add `cancel` method to `GRPCStream`` type (:issue:`#24780 <24780>`).
 - all: enable HTTP/3 by default in Engine builders.
 - api: remove ``extendKeepaliveTimeout`` method from engine builders.
+- java: moved the Java builder to use the C++ builder's generated bootstrap, rather than doing YAML string manipulation (:issue: `#25392 <25392>`)
 - api: move ``addVirtualClusters`` APIs taking concatenated cluster YAML to ``addVirtualCluster`` with one cluster config at a time (:issue: `#25297 <25297>`, :issue: `#25259 <25259>`, :issue: `#25457 <25457>`)
 - api: move ``dnsPreresolveHostnames`` APIs from taking concatenated cluster YAML to taking a list of String hostnames (:issue: `#25297 <25297>`, :issue: `#25259 <25259>`, :issue: `#25457 <25457>`)
+- api: added ``setRuntimeGuard`` APIs for all languages (:issue: `#25434 <25434>`)
 
 Bugfixes:
 
@@ -26,7 +28,7 @@ Bugfixes:
 
 Features:
 
-- api: Add support for brotli and gzip request compression.  (:issue:`#25352 <25352>`)
+- api: Add support for brotli and gzip request compression.  (:issue:`#25352 <25352>`, :issue:`#25595 <25595>`)
 - api: Add a constructor which takes a URL to C++ RequestEngineBuilder.
 - api: add option to support platform provided certificates validation interfaces on iOS and Android. (:issue `#2144 <2144>`)
 - api: Add a ``setPerTryIdleTimeoutSeconds()`` method to C++ EngineBuilder.

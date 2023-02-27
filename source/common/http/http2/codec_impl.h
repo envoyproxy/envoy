@@ -306,6 +306,13 @@ protected:
     // Called from either process_buffered_data_callback_.
     void processBufferedData();
 
+    // Called when the frame with END_STREAM is sent for this stream.
+    void onEndStreamEncoded() {
+      if (codec_callbacks_) {
+        codec_callbacks_->onCodecEncodeComplete();
+      }
+    }
+
     const StreamInfo::BytesMeterSharedPtr& bytesMeter() override { return bytes_meter_; }
     ConnectionImpl& parent_;
     int32_t stream_id_{-1};
@@ -334,6 +341,7 @@ protected:
     HeaderString cookies_;
     bool local_end_stream_sent_ : 1;
     bool remote_end_stream_ : 1;
+    bool remote_rst_ : 1;
     bool data_deferred_ : 1;
     bool received_noninformational_headers_ : 1;
     bool pending_receive_buffer_high_watermark_called_ : 1;

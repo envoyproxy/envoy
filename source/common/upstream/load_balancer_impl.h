@@ -757,10 +757,11 @@ public:
 
 private:
   const std::set<std::string> selector_keys_;
+  const std::set<std::string> fallback_keys_subset_;
+  // Keep small members (bools and enums) at the end of class, to reduce alignment overhead.
   const envoy::config::cluster::v3::Cluster::LbSubsetConfig::LbSubsetSelector::
       LbSubsetSelectorFallbackPolicy fallback_policy_;
-  const std::set<std::string> fallback_keys_subset_;
-  const bool single_host_per_subset_;
+  const bool single_host_per_subset_ : 1;
 };
 
 /**
