@@ -42,6 +42,9 @@ To build this sandbox example and start the example services, run the following 
 
 The locality configuration is set in the client container via static Envoy configuration file. Please refer to the ``cluster`` section of the :download:`proxy configuration <_include/locality-load-balancing/envoy-proxy.yaml>` file.
 
+.. note::
+    The ``locality_weighted_lb_config`` must be set in ``common_lb_config`` for the ``load_balancing_weight`` to be used.
+
 Step 2: Scenario with one replica in the highest priority locality
 ******************************************************************
 

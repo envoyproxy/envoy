@@ -5,12 +5,10 @@
 
 using testing::_;
 using testing::AtLeast;
-using testing::HasSubstr;
 using testing::InSequence;
 using testing::Invoke;
 using testing::InvokeWithoutArgs;
 using testing::Mock;
-using testing::Property;
 using testing::Ref;
 using testing::Return;
 using testing::ReturnRef;
@@ -118,6 +116,9 @@ TEST_F(HttpConnectionManagerImplTest, ResponseStartBeforeRequestComplete) {
   // Since we started the response before the request was complete, we will still close the
   // connection since we already sent a connection: close header. We won't "reset" the stream
   // however.
+  EXPECT_CALL(response_encoder_, encodeData(_, true)).WillOnce(Invoke([&](Buffer::Instance&, bool) {
+    response_encoder_.stream_.codec_callbacks_->onCodecEncodeComplete();
+  }));
   EXPECT_CALL(filter_callbacks_.connection_,
               close(Network::ConnectionCloseType::FlushWriteAndDelay, _));
   Buffer::OwnedImpl fake_response("world");
@@ -304,6 +305,7 @@ TEST_F(HttpConnectionManagerImplTest, IdleTimeout) {
   ResponseHeaderMapPtr response_headers{new TestResponseHeaderMapImpl{{":status", "200"}}};
   filter->callbacks_->streamInfo().setResponseCodeDetails("");
   filter->callbacks_->encodeHeaders(std::move(response_headers), true, "details");
+  response_encoder_.stream_.codec_callbacks_->onCodecEncodeComplete();
 
   Event::MockTimer* drain_timer = setUpTimer();
   EXPECT_CALL(*drain_timer, enableTimer(_, _));
@@ -412,6 +414,7 @@ TEST_F(HttpConnectionManagerImplTest, ConnectionDuration) {
   ResponseHeaderMapPtr response_headers{new TestResponseHeaderMapImpl{{":status", "200"}}};
   filter->callbacks_->streamInfo().setResponseCodeDetails("");
   filter->callbacks_->encodeHeaders(std::move(response_headers), true, "details");
+  response_encoder_.stream_.codec_callbacks_->onCodecEncodeComplete();
 
   Event::MockTimer* drain_timer = setUpTimer();
   EXPECT_CALL(*drain_timer, enableTimer(_, _));
@@ -1129,23 +1132,21 @@ TEST_F(HttpConnectionManagerImplTest, UpstreamWatermarkCallbacks) {
   // Mimic the upstream connection backing up. The router would call
   // onDecoderFilterAboveWriteBufferHighWatermark which should readDisable the stream and increment
   // stats.
-  EXPECT_CALL(response_encoder_, getStream()).WillOnce(ReturnRef(stream_));
-  EXPECT_CALL(stream_, readDisable(true));
+  auto& stream = response_encoder_.stream_;
+  EXPECT_CALL(stream, readDisable(true));
   ASSERT(decoder_filters_[0]->callbacks_ != nullptr);
   decoder_filters_[0]->callbacks_->onDecoderFilterAboveWriteBufferHighWatermark();
   EXPECT_EQ(1U, stats_.named_.downstream_flow_control_paused_reading_total_.value());
 
   // Resume the flow of data. When the router buffer drains it calls
   // onDecoderFilterBelowWriteBufferLowWatermark which should re-enable reads on the stream.
-  EXPECT_CALL(response_encoder_, getStream()).WillOnce(ReturnRef(stream_));
-  EXPECT_CALL(stream_, readDisable(false));
+  EXPECT_CALL(stream, readDisable(false));
   ASSERT(decoder_filters_[0]->callbacks_ != nullptr);
   decoder_filters_[0]->callbacks_->onDecoderFilterBelowWriteBufferLowWatermark();
   EXPECT_EQ(1U, stats_.named_.downstream_flow_control_resumed_reading_total_.value());
 
   // Backup upstream once again.
-  EXPECT_CALL(response_encoder_, getStream()).WillRepeatedly(ReturnRef(stream_));
-  EXPECT_CALL(stream_, readDisable(true));
+  EXPECT_CALL(stream, readDisable(true));
   ASSERT(decoder_filters_[0]->callbacks_ != nullptr);
   decoder_filters_[0]->callbacks_->onDecoderFilterAboveWriteBufferHighWatermark();
   EXPECT_EQ(2U, stats_.named_.downstream_flow_control_paused_reading_total_.value());
@@ -1328,12 +1329,12 @@ TEST_F(HttpConnectionManagerImplTest, HitFilterWatermarkLimits) {
 
   // The filter is a streaming filter. Sending 4 bytes should hit the
   // watermark limit and disable reads on the stream.
-  EXPECT_CALL(stream_, readDisable(true));
+  EXPECT_CALL(response_encoder_.stream_, readDisable(true));
   sendRequestHeadersAndData();
 
   // Change the limit so the buffered data is below the new watermark. The
   // stream should be read-enabled
-  EXPECT_CALL(stream_, readDisable(false));
+  EXPECT_CALL(response_encoder_.stream_, readDisable(false));
   int buffer_len = decoder_filters_[0]->callbacks_->decodingBuffer()->length();
   decoder_filters_[0]->callbacks_->setDecoderBufferLimit((buffer_len + 1) * 2);
 
@@ -1374,7 +1375,7 @@ TEST_F(HttpConnectionManagerImplTest, HitFilterWatermarkLimits) {
       }));
 
   expectOnDestroy();
-  EXPECT_CALL(stream_, removeCallbacks(_)).Times(2);
+  EXPECT_CALL(response_encoder_.stream_, removeCallbacks(_)).Times(2);
   filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::LocalClose);
 }
 
@@ -1513,7 +1514,7 @@ TEST_F(HttpConnectionManagerImplTest, HitResponseBufferLimitsAfterHeaders) {
   InSequence s;
   EXPECT_CALL(*encoder_filters_[1], encodeData(_, false))
       .WillOnce(Return(FilterDataStatus::StopIterationAndBuffer));
-  EXPECT_CALL(stream_, resetStream(_));
+  EXPECT_CALL(response_encoder_.stream_, resetStream(_));
   EXPECT_LOG_CONTAINS(
       "debug",
       "Resetting stream due to response_payload_too_large. Prior headers have already been sent",
@@ -1521,9 +1522,9 @@ TEST_F(HttpConnectionManagerImplTest, HitResponseBufferLimitsAfterHeaders) {
   EXPECT_EQ(1U, stats_.named_.rs_too_large_.value());
 
   // Clean up connection
-  EXPECT_CALL(stream_, removeCallbacks(_));
+  EXPECT_CALL(response_encoder_.stream_, removeCallbacks(_));
   expectOnDestroy(false);
-  EXPECT_CALL(stream_, removeCallbacks(_));
+  EXPECT_CALL(response_encoder_.stream_, removeCallbacks(_));
   filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::LocalClose);
 }
 
@@ -1556,7 +1557,10 @@ TEST_F(HttpConnectionManagerImplTest, FilterHeadReply) {
         return FilterHeadersStatus::Continue;
       }));
   EXPECT_CALL(*encoder_filters_[0], encodeComplete());
-  EXPECT_CALL(response_encoder_, encodeHeaders(_, true));
+  EXPECT_CALL(response_encoder_, encodeHeaders(_, true))
+      .WillOnce(Invoke([&](const ResponseHeaderMap&, bool) {
+        response_encoder_.stream_.codec_callbacks_->onCodecEncodeComplete();
+      }));
   expectOnDestroy();
   EXPECT_CALL(*decoder_filters_[0], decodeComplete());
   // Kick off the incoming data.
@@ -2772,6 +2776,8 @@ TEST_F(HttpConnectionManagerImplTest, HeaderOnlyRequestAndResponseUsingHttp3) {
   EXPECT_EQ(1U, listener_stats_.downstream_rq_completed_.value());
   EXPECT_EQ(1U, stats_.named_.downstream_cx_http3_total_.value());
   filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();
+  response_encoder_.stream_.codec_callbacks_->onCodecEncodeComplete();
+  response_encoder_.stream_.codec_callbacks_ = nullptr;
   conn_manager_.reset();
   EXPECT_EQ(0U, stats_.named_.downstream_cx_http3_active_.value());
 }

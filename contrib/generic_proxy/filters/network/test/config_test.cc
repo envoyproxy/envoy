@@ -23,6 +23,8 @@ namespace NetworkFilters {
 namespace GenericProxy {
 namespace {
 
+using ::testing::Return;
+
 // Keep empty until merge the latest API from main.
 TEST(FactoryTest, FactoryTest) {
   const std::string yaml_config = R"EOF(

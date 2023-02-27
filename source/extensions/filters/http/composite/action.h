@@ -49,6 +49,9 @@ public:
     return std::make_unique<envoy::extensions::filters::http::composite::v3::ExecuteFilterAction>();
   }
 };
+
+DECLARE_FACTORY(ExecuteFilterActionFactory);
+
 } // namespace Composite
 } // namespace HttpFilters
 } // namespace Extensions

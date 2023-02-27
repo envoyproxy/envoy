@@ -48,6 +48,15 @@ public final class JniBridgeUtility {
     return convertedBytes.toArray(new byte[0][0]);
   }
 
+  public static byte[][] mapToJniBytes(Map<String, String> stringMap) {
+    final List<byte[]> convertedBytes = new ArrayList<byte[]>(stringMap.size() * 2);
+    for (Map.Entry<String, String> entry : stringMap.entrySet()) {
+      convertedBytes.add(entry.getKey().getBytes(StandardCharsets.UTF_8));
+      convertedBytes.add(entry.getValue().getBytes(StandardCharsets.UTF_8));
+    }
+    return convertedBytes.toArray(new byte[0][0]);
+  }
+
   public static byte[][] toJniTags(Map<String, String> tags) {
     if (tags == null) {
       return null;

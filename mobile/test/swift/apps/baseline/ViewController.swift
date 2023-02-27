@@ -1,4 +1,3 @@
-@_spi(YAMLValidation)
 import Envoy
 import UIKit
 
@@ -18,7 +17,7 @@ final class ViewController: UITableViewController {
   override func viewDidLoad() {
     super.viewDidLoad()
 
-    let engine = YAMLValidatingEngineBuilder()
+    let engine = EngineBuilder()
       .addLogLevel(.debug)
       .addPlatformFilter(DemoFilter.init)
       .addNativeFilter(

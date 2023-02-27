@@ -15,6 +15,8 @@ namespace Envoy {
 namespace Ssl {
 namespace Matching {
 
+using ::testing::Return;
+
 constexpr absl::string_view yaml = R"EOF(
 matcher_tree:
   input:

@@ -147,8 +147,9 @@ absl::Status ProcessorState::handleHeadersResponse(const HeadersResponse& respon
           filter_.sendBodyChunk(*this, all_data.data,
                                 ProcessorState::CallbackState::BufferedPartialBodyCallback, false);
         } else {
+          // Let data continue to flow, but don't resume yet -- we would like to hold
+          // the headers while we buffer the body up to the limit.
           clearWatermark();
-          continueIfNecessary();
         }
         return absl::OkStatus();
       }
@@ -163,6 +164,7 @@ absl::Status ProcessorState::handleHeadersResponse(const HeadersResponse& respon
 
     // If we got here, then the processor doesn't care about the body or is not ready for
     // trailers, so we can just continue.
+    ENVOY_LOG(trace, "Clearing stored headers");
     headers_ = nullptr;
     continueIfNecessary();
     clearWatermark();
@@ -180,14 +182,18 @@ absl::Status ProcessorState::handleBodyResponse(const BodyResponse& response) {
       callback_state_ == CallbackState::BufferedPartialBodyCallback) {
     ENVOY_LOG(debug, "Processing body response");
     if (callback_state_ == CallbackState::BufferedBodyCallback) {
-      if (common_response.has_header_mutation() && headers_ != nullptr) {
-        ENVOY_LOG(debug, "Applying header mutations to buffered body message");
-        const auto mut_status = MutationUtils::applyHeaderMutations(
-            common_response.header_mutation(), *headers_,
-            common_response.status() == CommonResponse::CONTINUE_AND_REPLACE,
-            filter_.config().mutationChecker(), filter_.stats().rejected_header_mutations_);
-        if (!mut_status.ok()) {
-          return mut_status;
+      if (common_response.has_header_mutation()) {
+        if (headers_ != nullptr) {
+          ENVOY_LOG(debug, "Applying header mutations to buffered body message");
+          const auto mut_status = MutationUtils::applyHeaderMutations(
+              common_response.header_mutation(), *headers_,
+              common_response.status() == CommonResponse::CONTINUE_AND_REPLACE,
+              filter_.config().mutationChecker(), filter_.stats().rejected_header_mutations_);
+          if (!mut_status.ok()) {
+            return mut_status;
+          }
+        } else {
+          ENVOY_LOG(debug, "Response had header mutations but headers aren't available");
         }
       }
       if (common_response.has_body_mutation()) {
@@ -240,7 +246,25 @@ absl::Status ProcessorState::handleBodyResponse(const BodyResponse& response) {
       auto queued_chunk = dequeueStreamingChunk(false);
       ENVOY_BUG(queued_chunk, "Bad partial body callback state");
       auto chunk = std::move(*queued_chunk);
+      if (common_response.has_header_mutation()) {
+        if (headers_ != nullptr) {
+          ENVOY_LOG(debug, "Applying header mutations to buffered body message");
+          const auto mut_status = MutationUtils::applyHeaderMutations(
+              common_response.header_mutation(), *headers_,
+              common_response.status() == CommonResponse::CONTINUE_AND_REPLACE,
+              filter_.config().mutationChecker(), filter_.stats().rejected_header_mutations_);
+          if (!mut_status.ok()) {
+            return mut_status;
+          }
+        } else {
+          ENVOY_LOG(debug, "Response had header mutations but headers aren't available");
+        }
+      }
       if (common_response.has_body_mutation()) {
+        if (headers_ != nullptr) {
+          // Always reset the content length here to prevent later problems.
+          headers_->removeContentLength();
+        }
         MutationUtils::applyBodyMutations(common_response.body_mutation(), chunk->data);
       }
       if (chunk->data.length() > 0) {
