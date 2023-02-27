@@ -135,3 +135,7 @@ new_features:
     authentication failure status code and message in dynamic metadata.
 
 deprecated:
+- area: ext_authz
+  change: |
+    deprecated (1.2.5.0) :ref:`allowed_headers <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.AuthorizationRequest.allowed_headers>` in favour
+    of :ref:`allowed_headers <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.allowed_headers>`.

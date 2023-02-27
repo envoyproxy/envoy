@@ -314,9 +314,3 @@ new_features:
 - area: build
   change: |
     added compile-time option ``--define=static_extension_registration=disabled`` to disable the automatic static registration of extension factories.
-
-deprecated:
-- area: ext_authz
-  change: |
-    deprecated :ref:`allowed_headers <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.AuthorizationRequest.allowed_headers>` in favour
-    of :ref:`allowed_headers <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.allowed_headers>`.
