@@ -6,9 +6,9 @@
 >> BUILDX: use multi-builder
 > docker buildx use multi-builder
 >> BUILD: envoyproxy/envoy-dev:MOCKSHA
-> docker buildx build --platform linux/arm64,linux/amd64 -f ci/Dockerfile-envoy --target envoy -o type=oci,dest=/non/existent/test/path/envoy.tar -t envoyproxy/envoy-dev:MOCKSHA .
+> docker buildx build --platform linux/arm64,linux/amd64 -f ci/Dockerfile-envoy --target envoy --sbom=false --provenance=false -o type=oci,dest=/non/existent/test/path/envoy.tar -t envoyproxy/envoy-dev:MOCKSHA .
 >> PUSH: oci-archive:/non/existent/test/path/envoy.tar -> docker://docker.io/envoyproxy/envoy-dev:MOCKSHA
-> skopeo copy --multi-arch all oci-archive:/non/existent/test/path/envoy.tar docker://docker.io/envoyproxy/envoy-dev:MOCKSHA
+> skopeo copy --all oci-archive:/non/existent/test/path/envoy.tar docker://docker.io/envoyproxy/envoy-dev:MOCKSHA
 >> TAG: envoyproxy/envoy-dev:MOCKSHA -> envoyproxy/envoy:dev-MOCKSHA
 > docker buildx imagetools create docker.io/envoyproxy/envoy-dev:MOCKSHA --tag docker.io/envoyproxy/envoy:dev-MOCKSHA
 >> TAG: envoyproxy/envoy-dev:MOCKSHA -> envoyproxy/envoy-dev:latest
@@ -18,7 +18,7 @@
 >> BUILDX: use multi-builder
 > docker buildx use multi-builder
 >> BUILD+PUSH: envoyproxy/envoy-debug-dev:MOCKSHA
-> docker buildx build --platform linux/arm64,linux/amd64 -f ci/Dockerfile-envoy --target envoy --build-arg ENVOY_BINARY_SUFFIX= --push -t envoyproxy/envoy-debug-dev:MOCKSHA .
+> docker buildx build --platform linux/arm64,linux/amd64 -f ci/Dockerfile-envoy --target envoy --build-arg ENVOY_BINARY_SUFFIX= --sbom=false --provenance=false --push -t envoyproxy/envoy-debug-dev:MOCKSHA .
 >> TAG: envoyproxy/envoy-debug-dev:MOCKSHA -> envoyproxy/envoy:debug-dev-MOCKSHA
 > docker buildx imagetools create docker.io/envoyproxy/envoy-debug-dev:MOCKSHA --tag docker.io/envoyproxy/envoy:debug-dev-MOCKSHA
 >> TAG: envoyproxy/envoy-debug-dev:MOCKSHA -> envoyproxy/envoy-debug-dev:latest
@@ -28,9 +28,9 @@
 >> BUILDX: use multi-builder
 > docker buildx use multi-builder
 >> BUILD: envoyproxy/envoy-contrib-dev:MOCKSHA
-> docker buildx build --platform linux/arm64,linux/amd64 -f ci/Dockerfile-envoy --target envoy --build-arg ENVOY_BINARY=envoy-contrib -o type=oci,dest=/non/existent/test/path/envoy-contrib.tar -t envoyproxy/envoy-contrib-dev:MOCKSHA .
+> docker buildx build --platform linux/arm64,linux/amd64 -f ci/Dockerfile-envoy --target envoy --build-arg ENVOY_BINARY=envoy-contrib --sbom=false --provenance=false -o type=oci,dest=/non/existent/test/path/envoy-contrib.tar -t envoyproxy/envoy-contrib-dev:MOCKSHA .
 >> PUSH: oci-archive:/non/existent/test/path/envoy-contrib.tar -> docker://docker.io/envoyproxy/envoy-contrib-dev:MOCKSHA
-> skopeo copy --multi-arch all oci-archive:/non/existent/test/path/envoy-contrib.tar docker://docker.io/envoyproxy/envoy-contrib-dev:MOCKSHA
+> skopeo copy --all oci-archive:/non/existent/test/path/envoy-contrib.tar docker://docker.io/envoyproxy/envoy-contrib-dev:MOCKSHA
 >> TAG: envoyproxy/envoy-contrib-dev:MOCKSHA -> envoyproxy/envoy:contrib-dev-MOCKSHA
 > docker buildx imagetools create docker.io/envoyproxy/envoy-contrib-dev:MOCKSHA --tag docker.io/envoyproxy/envoy:contrib-dev-MOCKSHA
 >> TAG: envoyproxy/envoy-contrib-dev:MOCKSHA -> envoyproxy/envoy-contrib-dev:latest
@@ -40,7 +40,7 @@
 >> BUILDX: use multi-builder
 > docker buildx use multi-builder
 >> BUILD+PUSH: envoyproxy/envoy-contrib-debug-dev:MOCKSHA
-> docker buildx build --platform linux/arm64,linux/amd64 -f ci/Dockerfile-envoy --target envoy --build-arg ENVOY_BINARY=envoy-contrib --build-arg ENVOY_BINARY_SUFFIX= --push -t envoyproxy/envoy-contrib-debug-dev:MOCKSHA .
+> docker buildx build --platform linux/arm64,linux/amd64 -f ci/Dockerfile-envoy --target envoy --build-arg ENVOY_BINARY=envoy-contrib --build-arg ENVOY_BINARY_SUFFIX= --sbom=false --provenance=false --push -t envoyproxy/envoy-contrib-debug-dev:MOCKSHA .
 >> TAG: envoyproxy/envoy-contrib-debug-dev:MOCKSHA -> envoyproxy/envoy:contrib-debug-dev-MOCKSHA
 > docker buildx imagetools create docker.io/envoyproxy/envoy-contrib-debug-dev:MOCKSHA --tag docker.io/envoyproxy/envoy:contrib-debug-dev-MOCKSHA
 >> TAG: envoyproxy/envoy-contrib-debug-dev:MOCKSHA -> envoyproxy/envoy-contrib-debug-dev:latest
@@ -50,9 +50,9 @@
 >> BUILDX: use multi-builder
 > docker buildx use multi-builder
 >> BUILD: envoyproxy/envoy-distroless-dev:MOCKSHA
-> docker buildx build --platform linux/arm64,linux/amd64 -f ci/Dockerfile-envoy --target envoy-distroless -o type=oci,dest=/non/existent/test/path/envoy-distroless.tar -t envoyproxy/envoy-distroless-dev:MOCKSHA .
+> docker buildx build --platform linux/arm64,linux/amd64 -f ci/Dockerfile-envoy --target envoy-distroless --sbom=false --provenance=false -o type=oci,dest=/non/existent/test/path/envoy-distroless.tar -t envoyproxy/envoy-distroless-dev:MOCKSHA .
 >> PUSH: oci-archive:/non/existent/test/path/envoy-distroless.tar -> docker://docker.io/envoyproxy/envoy-distroless-dev:MOCKSHA
-> skopeo copy --multi-arch all oci-archive:/non/existent/test/path/envoy-distroless.tar docker://docker.io/envoyproxy/envoy-distroless-dev:MOCKSHA
+> skopeo copy --all oci-archive:/non/existent/test/path/envoy-distroless.tar docker://docker.io/envoyproxy/envoy-distroless-dev:MOCKSHA
 >> TAG: envoyproxy/envoy-distroless-dev:MOCKSHA -> envoyproxy/envoy:distroless-dev-MOCKSHA
 > docker buildx imagetools create docker.io/envoyproxy/envoy-distroless-dev:MOCKSHA --tag docker.io/envoyproxy/envoy:distroless-dev-MOCKSHA
 >> TAG: envoyproxy/envoy-distroless-dev:MOCKSHA -> envoyproxy/envoy-distroless-dev:latest
@@ -62,9 +62,9 @@
 >> BUILDX: use multi-builder
 > docker buildx use multi-builder
 >> BUILD: envoyproxy/envoy-google-vrp-dev:MOCKSHA
-> docker buildx build --platform linux/amd64 -f ci/Dockerfile-envoy --target envoy-google-vrp -o type=oci,dest=/non/existent/test/path/envoy-google-vrp.tar -t envoyproxy/envoy-google-vrp-dev:MOCKSHA .
+> docker buildx build --platform linux/amd64 -f ci/Dockerfile-envoy --target envoy-google-vrp --sbom=false --provenance=false -o type=oci,dest=/non/existent/test/path/envoy-google-vrp.tar -t envoyproxy/envoy-google-vrp-dev:MOCKSHA .
 >> PUSH: oci-archive:/non/existent/test/path/envoy-google-vrp.tar -> docker://docker.io/envoyproxy/envoy-google-vrp-dev:MOCKSHA
-> skopeo copy --multi-arch all oci-archive:/non/existent/test/path/envoy-google-vrp.tar docker://docker.io/envoyproxy/envoy-google-vrp-dev:MOCKSHA
+> skopeo copy --all oci-archive:/non/existent/test/path/envoy-google-vrp.tar docker://docker.io/envoyproxy/envoy-google-vrp-dev:MOCKSHA
 >> TAG: envoyproxy/envoy-google-vrp-dev:MOCKSHA -> envoyproxy/envoy:google-vrp-dev-MOCKSHA
 > docker buildx imagetools create docker.io/envoyproxy/envoy-google-vrp-dev:MOCKSHA --tag docker.io/envoyproxy/envoy:google-vrp-dev-MOCKSHA
 >> TAG: envoyproxy/envoy-google-vrp-dev:MOCKSHA -> envoyproxy/envoy-google-vrp-dev:latest
@@ -74,9 +74,9 @@
 >> BUILDX: use multi-builder
 > docker buildx use multi-builder
 >> BUILD: envoyproxy/envoy-tools-dev:MOCKSHA
-> docker buildx build --platform linux/arm64,linux/amd64 -f ci/Dockerfile-envoy --target envoy-tools -o type=oci,dest=/non/existent/test/path/envoy-tools.tar -t envoyproxy/envoy-tools-dev:MOCKSHA .
+> docker buildx build --platform linux/arm64,linux/amd64 -f ci/Dockerfile-envoy --target envoy-tools --sbom=false --provenance=false -o type=oci,dest=/non/existent/test/path/envoy-tools.tar -t envoyproxy/envoy-tools-dev:MOCKSHA .
 >> PUSH: oci-archive:/non/existent/test/path/envoy-tools.tar -> docker://docker.io/envoyproxy/envoy-tools-dev:MOCKSHA
-> skopeo copy --multi-arch all oci-archive:/non/existent/test/path/envoy-tools.tar docker://docker.io/envoyproxy/envoy-tools-dev:MOCKSHA
+> skopeo copy --all oci-archive:/non/existent/test/path/envoy-tools.tar docker://docker.io/envoyproxy/envoy-tools-dev:MOCKSHA
 >> TAG: envoyproxy/envoy-tools-dev:MOCKSHA -> envoyproxy/envoy:tools-dev-MOCKSHA
 > docker buildx imagetools create docker.io/envoyproxy/envoy-tools-dev:MOCKSHA --tag docker.io/envoyproxy/envoy:tools-dev-MOCKSHA
 >> TAG: envoyproxy/envoy-tools-dev:MOCKSHA -> envoyproxy/envoy-tools-dev:latest
