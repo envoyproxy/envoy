@@ -679,7 +679,6 @@ const LowerCaseString ClusterHeader{"x-envoy-mobile-cluster"};
 const LowerCaseString ProtocolHeader{"x-envoy-mobile-upstream-protocol"};
 
 const char* BaseCluster = "base";
-const char* H2Cluster = "base_h2";
 const char* H3Cluster = "base_h3";
 const char* ClearTextCluster = "base_clear";
 
@@ -697,9 +696,9 @@ void Client::setDestinationCluster(Http::RequestHeaderMap& headers) {
   } else if (!protocol_header.empty()) {
     ASSERT(protocol_header.size() == 1);
     const auto value = protocol_header[0]->value().getStringView();
-    // NOTE: This cluster *forces* H2-Raw and does not use ALPN.
+    // Send explicit http/2 to the ALPN cluster, which will do HTTP/2 if available.
     if (value == "http2") {
-      cluster = H2Cluster;
+      cluster = BaseCluster;
       // NOTE: This cluster will attempt to negotiate H3, but defaults to ALPN over TCP.
     } else if (value == "http3") {
       cluster = H3Cluster;
