@@ -2,6 +2,8 @@
 
 #include "test/mocks/http/mocks.h"
 
+using testing::Return;
+
 namespace Envoy {
 namespace Grpc {
 

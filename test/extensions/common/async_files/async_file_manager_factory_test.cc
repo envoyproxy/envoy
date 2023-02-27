@@ -24,6 +24,7 @@ namespace Extensions {
 namespace Common {
 namespace AsyncFiles {
 
+using ::testing::Return;
 using ::testing::StrictMock;
 
 class AsyncFileManagerFactoryTest : public ::testing::Test {

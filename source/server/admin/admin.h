@@ -395,12 +395,8 @@ private:
     Stats::Scope& listenerScope() override { return *scope_; }
     uint64_t listenerTag() const override { return 0; }
     const std::string& name() const override { return name_; }
-    Network::UdpListenerConfigOptRef udpListenerConfig() override {
-      return Network::UdpListenerConfigOptRef();
-    }
-    Network::InternalListenerConfigOptRef internalListenerConfig() override {
-      return Network::InternalListenerConfigOptRef();
-    }
+    Network::UdpListenerConfigOptRef udpListenerConfig() override { return {}; }
+    Network::InternalListenerConfigOptRef internalListenerConfig() override { return {}; }
     envoy::config::core::v3::TrafficDirection direction() const override {
       return envoy::config::core::v3::UNSPECIFIED;
     }

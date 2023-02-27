@@ -38,8 +38,6 @@
 #include "absl/strings/str_join.h"
 #include "gmock/gmock.h"
 
-using testing::Return;
-
 namespace Envoy {
 namespace Http {
 

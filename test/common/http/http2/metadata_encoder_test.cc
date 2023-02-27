@@ -28,7 +28,7 @@ namespace Http2 {
 namespace {
 
 absl::string_view toStringView(uint8_t* data, size_t length) {
-  return absl::string_view(reinterpret_cast<char*>(data), length);
+  return {reinterpret_cast<char*>(data), length};
 }
 
 static const uint64_t STREAM_ID = 1;
