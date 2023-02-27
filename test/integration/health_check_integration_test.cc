@@ -680,7 +680,6 @@ TEST_P(TcpHealthCheckIntegrationTest, DisableHCForActiveTraffic) {
 
   test_server_->waitForCounterEq("cluster.cluster_1.health_check.success", 2);
 
-  EXPECT_EQ(2, test_server_->counter("cluster.cluster_1.health_check.success")->value());
   EXPECT_EQ(0, test_server_->counter("cluster.cluster_1.health_check.failure")->value());
 }
 
