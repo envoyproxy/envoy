@@ -112,11 +112,11 @@
                                            keyValueStores
                                        statsSinks:(NSArray<NSString *> *)statsSinks
                                     rtdsLayerName:(NSString *)rtdsLayerName
-                               rtdsTimeoutSeconds:(UInt32)rtdsTimeoutSeconds
+                               rtdsTimeoutSeconds:(NSNumber *)rtdsTimeoutSeconds
                                        adsAddress:(NSString *)adsAddress
-                                          adsPort:(UInt32)adsPort
+                                          adsPort:(NSNumber *)adsPort
                                       adsJwtToken:(NSString *)adsJwtToken
-                       adsJwtTokenLifetimeSeconds:(UInt32)adsJwtTokenLifetimeSeconds
+                       adsJwtTokenLifetimeSeconds:(NSNumber *)adsJwtTokenLifetimeSeconds
                                   adsSslRootCerts:(NSString *)adsSslRootCerts
                                            nodeId:(NSString *)nodeId
                                        nodeRegion:(NSString *)nodeRegion

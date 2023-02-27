@@ -405,7 +405,7 @@ final class EngineBuilderTests: XCTestCase {
 
     _ = EngineBuilder()
       .addEngineType(MockEnvoyEngine.self)
-      .addRtdsLayer(layerName: "rtds_layer_name", timeoutSeconds: 5)
+      .addRtdsLayer(name: "rtds_layer_name", timeoutSeconds: 5)
       .setAggregatedDiscoveryService(address: "FAKE_SWIFT_ADDRESS", port: 0)
       .build()
     self.waitForExpectations(timeout: 0.01)

@@ -604,12 +604,12 @@ open class EngineBuilder: NSObject {
   /// - Returns: This builder.
   @discardableResult
   public func setAggregatedDiscoveryService(
-    _ address: String,
-    _ port: UInt32,
-    _ jwtToken: String? = nil,
-    _ jwtTokenLifetimeSeconds: UInt32? = nil,
-    _ sslRootCerts: String? = nil
-  ) -> Self {
+    address: String,
+    port: UInt32,
+    jwtToken: String? = nil,
+    jwtTokenLifetimeSeconds: UInt32? = nil,
+    sslRootCerts: String? = nil
+    ) -> Self {
     self.adsAddress = address
     self.adsPort = port
     self.adsJwtToken = jwtToken
@@ -626,7 +626,7 @@ open class EngineBuilder: NSObject {
   ///
   /// - Returns: This builder.
   @discardableResult
-  public func addRtdsLayer(_ layerName: String, _ timeoutSeconds: UInt32? = nil) -> Self {
+  public func addRtdsLayer(name layerName: String, timeoutSeconds: UInt32? = nil) -> Self {
     self.rtdsLayerName = layerName
     self.rtdsTimeoutSeconds = timeoutSeconds
     self.useRtds = true
@@ -697,11 +697,11 @@ open class EngineBuilder: NSObject {
       keyValueStores: self.keyValueStores,
       statsSinks: self.statsSinks,
       rtdsLayerName: self.rtdsLayerName,
-      rtdsTimeoutSeconds: self.rtdsTimeoutSeconds,
+      rtdsTimeoutSeconds: self.rtdsTimeoutSeconds.map { UInt($0) as NSNumber },
       adsAddress: self.adsAddress,
-      adsPort: self.adsPort,
+      adsPort: self.adsPort.map { UInt($0) as NSNumber },
       adsJwtToken: self.adsJwtToken,
-      adsJwtTokenLifetimeSeconds: self.adsJwtTokenLifetimeSeconds,
+      adsJwtTokenLifetimeSeconds: self.adsJwtTokenLifetimeSeconds.map { UInt($0) as NSNumber },
       adsSslRootCerts: self.adsSslRootCerts,
       nodeId: self.nodeId,
       nodeRegion: self.nodeRegion,

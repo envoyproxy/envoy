@@ -48,11 +48,11 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic, strong) NSDictionary<NSString *, id<EnvoyKeyValueStore>> *keyValueStores;
 @property (nonatomic, strong) NSArray<NSString *> *statsSinks;
 @property (nonatomic, strong) NSString *rtdsLayerName;
-@property (nonatomic, assign) UInt32 rtdsTimeoutSeconds;
+@property (nonatomic, assign) NSNumber rtdsTimeoutSeconds;
 @property (nonatomic, strong) NSString *adsAddress;
-@property (nonatomic, assign) UInt32 adsPort;
+@property (nonatomic, assign) NSNumber adsPort;
 @property (nonatomic, strong) NSString *adsJwtToken;
-@property (nonatomic, assign) UInt32 adsJwtTokenLifetimeSeconds;
+@property (nonatomic, assign) NSNumber adsJwtTokenLifetimeSeconds;
 @property (nonatomic, strong) NSString *adsSslRootCerts;
 @property (nonatomic, strong) NSString *nodeId;
 @property (nonatomic, strong) NSString *nodeRegion;
@@ -111,11 +111,11 @@ NS_ASSUME_NONNULL_BEGIN
                                            keyValueStores
                                        statsSinks:(NSArray<NSString *> *)statsSinks
                                     rtdsLayerName:(NSString *)rtdsLayerName
-                               rtdsTimeoutSeconds:(UInt32)rtdsTimeoutSeconds
+                               rtdsTimeoutSeconds:(NSNumber *)rtdsTimeoutSeconds
                                        adsAddress:(NSString *)adsAddress
-                                          adsPort:(UInt32)adsPort
+                                          adsPort:(NSNumber *)adsPort
                                       adsJwtToken:(NSString *)adsJwtToken
-                       adsJwtTokenLifetimeSeconds:(UInt32)adsJwtTokenLifetimeSeconds
+                       adsJwtTokenLifetimeSeconds:(NSNumber *)adsJwtTokenLifetimeSeconds
                                   adsSslRootCerts:(NSString *)adsSslRootCerts
                                            nodeId:(NSString *)nodeId
                                        nodeRegion:(NSString *)nodeRegion
