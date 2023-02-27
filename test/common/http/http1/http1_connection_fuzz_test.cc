@@ -14,7 +14,6 @@
 
 using testing::_;
 using testing::Invoke;
-using testing::InvokeWithoutArgs;
 
 namespace Envoy {
 namespace Http {

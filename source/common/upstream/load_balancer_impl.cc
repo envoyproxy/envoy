@@ -1057,7 +1057,7 @@ HostConstSharedPtr LeastRequestLoadBalancer::unweightedHostPick(const HostVector
 
   for (uint32_t choice_idx = 0; choice_idx < choice_count_; ++choice_idx) {
     const int rand_idx = random_.random() % hosts_to_use.size();
-    HostSharedPtr sampled_host = hosts_to_use[rand_idx];
+    const HostSharedPtr& sampled_host = hosts_to_use[rand_idx];
 
     if (candidate_host == nullptr) {
 
@@ -1108,9 +1108,9 @@ SubsetSelectorImpl::SubsetSelectorImpl(
         LbSubsetSelectorFallbackPolicy fallback_policy,
     const Protobuf::RepeatedPtrField<std::string>& fallback_keys_subset,
     bool single_host_per_subset)
-    : selector_keys_(selector_keys.begin(), selector_keys.end()), fallback_policy_(fallback_policy),
+    : selector_keys_(selector_keys.begin(), selector_keys.end()),
       fallback_keys_subset_(fallback_keys_subset.begin(), fallback_keys_subset.end()),
-      single_host_per_subset_(single_host_per_subset) {
+      fallback_policy_(fallback_policy), single_host_per_subset_(single_host_per_subset) {
 
   if (fallback_policy_ !=
       envoy::config::cluster::v3::Cluster::LbSubsetConfig::LbSubsetSelector::KEYS_SUBSET) {

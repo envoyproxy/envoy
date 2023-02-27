@@ -37,6 +37,7 @@ using Common::AsyncFiles::MockAsyncFileManagerFactory;
 using ::envoy::extensions::filters::http::cache::v3::CacheConfig;
 using ::testing::HasSubstr;
 using ::testing::NiceMock;
+using ::testing::Return;
 using ::testing::StrictMock;
 
 absl::string_view yaml_config = R"(

@@ -16,6 +16,8 @@
 #include "gtest/gtest.h"
 #include "utility.h"
 
+using testing::Return;
+
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {

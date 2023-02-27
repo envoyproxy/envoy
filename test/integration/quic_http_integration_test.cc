@@ -1205,7 +1205,7 @@ TEST_P(QuicHttpIntegrationTest, DeferredLogging) {
 
   std::string log = waitForAccessLog(access_log_name_);
 
-  std::vector<std::string> metrics = absl::StrSplit(log, ",");
+  std::vector<std::string> metrics = absl::StrSplit(log, ',');
   ASSERT_EQ(metrics.size(), 21);
   EXPECT_EQ(/* PROTOCOL */ metrics.at(0), "HTTP/3");
   EXPECT_GT(/* ROUNDTRIP_DURATION */ std::stoi(metrics.at(1)), 0);
@@ -1238,7 +1238,7 @@ TEST_P(QuicHttpIntegrationTest, DeferredLoggingDisabled) {
 
   // Do not flush client acks.
   std::string log = waitForAccessLog(access_log_name_, 0, false, nullptr);
-  std::vector<std::string> metrics = absl::StrSplit(log, ",");
+  std::vector<std::string> metrics = absl::StrSplit(log, ',');
   ASSERT_EQ(metrics.size(), 21);
   EXPECT_EQ(/* PROTOCOL */ metrics.at(0), "HTTP/3");
   EXPECT_EQ(/* ROUNDTRIP_DURATION */ metrics.at(1), "-");
@@ -1266,7 +1266,7 @@ TEST_P(QuicHttpIntegrationTest, DeferredLoggingWithReset) {
   EXPECT_FALSE(response->complete());
 
   std::string log = waitForAccessLog(access_log_name_);
-  std::vector<std::string> metrics = absl::StrSplit(log, ",");
+  std::vector<std::string> metrics = absl::StrSplit(log, ',');
   ASSERT_EQ(metrics.size(), 21);
   EXPECT_EQ(/* PROTOCOL */ metrics.at(0), "HTTP/3");
   EXPECT_EQ(/* ROUNDTRIP_DURATION */ metrics.at(1), "-");
@@ -1299,7 +1299,7 @@ TEST_P(QuicHttpIntegrationTest, DeferredLoggingWithQuicReset) {
   ASSERT_TRUE(response->complete());
 
   std::string log = waitForAccessLog(access_log_name_);
-  std::vector<std::string> metrics = absl::StrSplit(log, ",");
+  std::vector<std::string> metrics = absl::StrSplit(log, ',');
   ASSERT_EQ(metrics.size(), 21);
   EXPECT_EQ(/* PROTOCOL */ metrics.at(0), "HTTP/3");
   EXPECT_EQ(/* ROUNDTRIP_DURATION */ metrics.at(1), "-");
@@ -1341,7 +1341,7 @@ TEST_P(QuicHttpIntegrationTest, DeferredLoggingWithInternalRedirect) {
 
   upstream_request_->encodeHeaders(redirect_response, true);
   std::string log = waitForAccessLog(access_log_name_, 0);
-  std::vector<std::string> metrics = absl::StrSplit(log, ",");
+  std::vector<std::string> metrics = absl::StrSplit(log, ',');
   ASSERT_EQ(metrics.size(), 22);
   EXPECT_EQ(/* PROTOCOL */ metrics.at(0), "HTTP/3");
   // no roundtrip duration for internal redirect.
@@ -1373,7 +1373,7 @@ TEST_P(QuicHttpIntegrationTest, DeferredLoggingWithInternalRedirect) {
   EXPECT_EQ(1, test_server_->counter("http.config_test.downstream_rq_2xx")->value());
 
   log = waitForAccessLog(access_log_name_, 1);
-  metrics = absl::StrSplit(log, ",");
+  metrics = absl::StrSplit(log, ',');
   ASSERT_EQ(metrics.size(), 22);
   EXPECT_EQ(/* PROTOCOL */ metrics.at(0), "HTTP/3");
   // roundtrip duration populated on final log.

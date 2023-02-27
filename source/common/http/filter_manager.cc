@@ -565,7 +565,7 @@ void FilterManager::decodeHeaders(ActiveStreamDecoderFilter* filter, RequestHead
           trace, "inserting an empty data frame for end_stream due metadata being added.", *this);
       // Metadata frame doesn't carry end of stream bit. We need an empty data frame to end the
       // stream.
-      addDecodedData(*((*entry).get()), empty_data, true);
+      addDecodedData(*(*entry), empty_data, true);
     }
 
     if (!continue_iteration && std::next(entry) != decoder_filters_.end()) {
