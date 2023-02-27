@@ -40,21 +40,24 @@ public:
   // StatsStructType object later.
   // Caller should make sure scope and stat_names outlive this object.
   LazyInit(const typename StatsStructType::StatNameType& stat_names, Stats::ScopeSharedPtr scope)
-      : inited_(Stats::Utility::gaugeFromElements(
-            *scope, {Stats::DynamicName(StatsStructType::typeName()), Stats::DynamicName("inited")},
-            Stats::Gauge::ImportMode::Accumulate)),
+      : initialized_([&scope]() -> Gauge& {
+          Stats::StatNamePool pool(scope->symbolTable());
+          return Stats::Utility::gaugeFromElements(
+              *scope, {pool.add(StatsStructType::typeName()), pool.add("initialized")},
+              Stats::Gauge::ImportMode::Accumulate);
+        }()),
         ctor_([scope = std::move(scope), &stat_names, this]() -> StatsStructType* {
-          inited_.inc();
+          initialized_.inc();
           return new StatsStructType(stat_names, *scope);
         }) {
-    if (inited_.value() > 0) {
+    if (initialized_.value() > 0) {
       instantiate();
       ctor_ = nullptr;
     }
   }
   ~LazyInit() {
-    if (inited_.value() > 0) {
-      inited_.dec();
+    if (initialized_.value() > 0) {
+      initialized_.dec();
     }
   }
 
@@ -73,10 +76,10 @@ private:
   // instantiated. We must ensure that a new instance for the same cluster gets its lazy-stats
   // instantiated before the previous cluster of the same name is destructed.
 
-  // To do that we keep an "inited" stat in the cluster's scope, which will be associated by name to
-  // the previous generation's cluster's lazy-init block. We use the value in this shared gauge to
-  // determine whether to instantiate the lazy block on construction.
-  Gauge& inited_;
+  // To do that we keep an "initialized" gauge in the cluster's scope, which will be associated by
+  // name to the previous generation's cluster's lazy-init block. We use the value in this shared
+  // gauge to determine whether to instantiate the lazy block on construction.
+  Gauge& initialized_;
   // TODO(stevenzzzz, jmarantz): Clean up this ctor_ by moving its ownership to AtomicPtr, and drop
   // the setter lambda when the nested object is created.
   std::function<StatsStructType*()> ctor_;
