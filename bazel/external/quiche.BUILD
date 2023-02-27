@@ -1072,6 +1072,7 @@ envoy_cc_library(
     hdrs = ["quiche/http2/hpack/decoder/hpack_decoder.h"],
     copts = quiche_copts,
     repository = "@envoy",
+    visibility = ["//visibility:public"],
     deps = [
         ":http2_decoder_decode_buffer_lib",
         ":http2_decoder_decode_status_lib",

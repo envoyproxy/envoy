@@ -789,6 +789,18 @@ TEST_P(ListenerManagerImplTest, MultipleSocketTypeSpecifiedInAddresses) {
                             "support same socket type for all the addresses.");
 }
 
+TEST_P(ListenerManagerImplTest, RejectNoAddresses) {
+  const std::string yaml = R"EOF(
+    name: "foo"
+    connection_balance_config:
+      exact_balance: {}
+  )EOF";
+
+  EXPECT_THROW_WITH_MESSAGE(manager_->addOrUpdateListener(parseListenerFromV3Yaml(yaml), "", true),
+                            EnvoyException,
+                            "error adding listener named 'foo': address is necessary");
+}
+
 TEST_P(ListenerManagerImplTest, RejectMutlipleInternalAddresses) {
   const std::string yaml = R"EOF(
     name: "foo"

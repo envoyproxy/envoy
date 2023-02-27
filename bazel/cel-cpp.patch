@@ -1,0 +1,15 @@
+#
+# Temporary patch to cel-cpp to accomodate switch from ABSL types to STL types.
+#
+# Patch will be removed once build issues in new cel-cpp are addressed.
+#
+--- a/eval/public/ast_traverse.cc	2023-01-23 17:38:48.730240356 +0000
++++ b/eval/public/ast_traverse.cc	2023-01-23 17:39:27.182207871 +0000
+@@ -17,6 +17,7 @@
+ #include <stack>
+ 
+ #include "google/api/expr/v1alpha1/syntax.pb.h"
++#include "absl/base/attributes.h"
+ #include "absl/types/variant.h"
+ #include "eval/public/ast_visitor.h"
+ #include "eval/public/source_position.h"

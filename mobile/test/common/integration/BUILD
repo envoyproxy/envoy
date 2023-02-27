@@ -98,7 +98,7 @@ envoy_cc_test_library(
     ],
     repository = "@envoy",
     deps = [
-        "//library/cc:engine_builder_lib",
+        ":test_engine_builder_lib",
         "//library/common/http:client_lib",
         "//library/common/http:header_utility_lib",
         "//library/common/types:c_types_lib",
@@ -143,7 +143,7 @@ envoy_cc_test_library(
     ],
     repository = "@envoy",
     deps = [
-        ":autonomous_upstream_lib",
+        "@envoy//test/integration:autonomous_upstream_lib",
         "@envoy//source/exe:process_wide_lib",
         "@envoy//test/config:utility_lib",
         "@envoy//test/integration:utility_lib",
@@ -159,15 +159,15 @@ envoy_cc_test_library(
 )
 
 envoy_cc_test_library(
-    name = "autonomous_upstream_lib",
+    name = "test_engine_builder_lib",
     srcs = [
-        "autonomous_upstream.cc",
+        "test_engine_builder.cc",
     ],
     hdrs = [
-        "autonomous_upstream.h",
+        "test_engine_builder.h",
     ],
     repository = "@envoy",
     deps = [
-        "@envoy//test/integration:fake_upstream_lib",
+        "//library/cc:engine_builder_lib",
     ],
 )

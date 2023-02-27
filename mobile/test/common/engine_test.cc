@@ -1,6 +1,5 @@
 #include "absl/synchronization/notification.h"
 #include "gtest/gtest.h"
-#include "library/common/config/templates.h"
 #include "library/common/engine.h"
 #include "library/common/engine_handle.h"
 #include "library/common/main_interface.h"
