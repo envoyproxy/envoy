@@ -85,7 +85,7 @@ func (c *httpCApiImpl) HttpGetHeader(r unsafe.Pointer, key *string, value *strin
 	handleCApiStatus(res)
 }
 
-func (c *httpCApiImpl) HttpCopyHeaders(r unsafe.Pointer, num uint64, bytes uint64) map[string]string {
+func (c *httpCApiImpl) HttpCopyHeaders(r unsafe.Pointer, num uint64, bytes uint64) map[string][]string {
 	// TODO: use a memory pool for better performance,
 	// since these go strings in strs, will be copied into the following map.
 	strs := make([]string, num*2)
@@ -100,11 +100,16 @@ func (c *httpCApiImpl) HttpCopyHeaders(r unsafe.Pointer, num uint64, bytes uint6
 	res := C.envoyGoFilterHttpCopyHeaders(r, unsafe.Pointer(sHeader.Data), unsafe.Pointer(bHeader.Data))
 	handleCApiStatus(res)
 
-	m := make(map[string]string, num)
+	m := make(map[string][]string, num)
 	for i := uint64(0); i < num*2; i += 2 {
 		key := strs[i]
 		value := strs[i+1]
-		m[key] = value
+
+		if v, found := m[key]; !found {
+			m[key] = []string{value}
+		} else {
+			m[key] = append(v, value)
+		}
 	}
 	runtime.KeepAlive(buf)
 	return m
@@ -145,7 +150,7 @@ func (c *httpCApiImpl) HttpSetBufferHelper(r unsafe.Pointer, bufferPtr uint64, v
 	handleCApiStatus(res)
 }
 
-func (c *httpCApiImpl) HttpCopyTrailers(r unsafe.Pointer, num uint64, bytes uint64) map[string]string {
+func (c *httpCApiImpl) HttpCopyTrailers(r unsafe.Pointer, num uint64, bytes uint64) map[string][]string {
 	// TODO: use a memory pool for better performance,
 	// but, should be very careful, since string is const in go,
 	// and we have to make sure the strings is not using before reusing,
@@ -158,11 +163,16 @@ func (c *httpCApiImpl) HttpCopyTrailers(r unsafe.Pointer, num uint64, bytes uint
 	res := C.envoyGoFilterHttpCopyTrailers(r, unsafe.Pointer(sHeader.Data), unsafe.Pointer(bHeader.Data))
 	handleCApiStatus(res)
 
-	m := make(map[string]string, num)
+	m := make(map[string][]string, num)
 	for i := uint64(0); i < num*2; i += 2 {
 		key := strs[i]
 		value := strs[i+1]
-		m[key] = value
+
+		if v, found := m[key]; !found {
+			m[key] = []string{value}
+		} else {
+			m[key] = append(v, value)
+		}
 	}
 	return m
 }

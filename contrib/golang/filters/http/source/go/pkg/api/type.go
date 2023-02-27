@@ -83,6 +83,10 @@ type HeaderMap interface {
 	// If multiple values associated with this key, first one will be returned.
 	Get(key string) (string, bool)
 
+	// Values returns all values associated with the given key.
+	// The returned slice is not a copy.
+	Values(key string) []string
+
 	// Set key-value pair in header map, the previous pair will be replaced if exists.
 	// It may not take affects immediately in the Envoy thread side when it's invoked in a Go thread.
 	Set(key, value string)
