@@ -594,7 +594,8 @@ fun setNodeLocality(region: String, zone: String, subZone: String): EngineBuilde
 }
 
 /**
-* Adds an ADS layer. Note that only the state-of-the-world gRPC protocol is supported, not Delta gRPC.
+* Adds an ADS layer.
+* Note that only the state-of-the-world gRPC protocol is supported, not Delta gRPC.
 *
 * @param address the network address of the server.
 *
