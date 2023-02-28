@@ -260,14 +260,23 @@
     }
     builder.addStatsSinks(std::move(sinks));
   }
-  builder.setNodeLocality(
-      {[self.nodeRegion toCXXString], [self.nodeZone toCXXString], [self.nodeSubZone toCXXString]},
-      self.useNodeLocality);
-  builder.setNodeId([self.nodeId toCXXString], self.useNodeId);
-  builder.addRtdsLayer([self.rtdsLayerName toCXXString], self.rtdsTimeoutSeconds, self.useRtds);
-  builder.setAggregatedDiscoveryService(
-      [self.adsAddress toCXXString], self.adsPort, [self.adsJwtToken toCXXString],
-      self.adsJwtTokenLifetimeSeconds, [self.adsSslRootCerts toCXXString], self.useAds);
+  if (self.useNodeLocality) {
+    builder.setNodeLocality({[self.nodeRegion toCXXString],
+                             [self.nodeZone toCXXString],
+                             [self.nodeSubZone toCXXString]},
+                            self.useNodeLocality);
+  }
+  if (self.useNodeId) {
+    builder.setNodeId([self.nodeId toCXXString], self.useNodeId);
+  }
+  if (self.useRtds) {
+    builder.addRtdsLayer([self.rtdsLayerName toCXXString], self.rtdsTimeoutSeconds, self.useRtds);
+  }
+  if (self.useAds) {
+    builder.setAggregatedDiscoveryService(
+        [self.adsAddress toCXXString], self.adsPort, [self.adsJwtToken toCXXString],
+        self.adsJwtTokenLifetimeSeconds, [self.adsSslRootCerts toCXXString], self.useAds);
+  }
 #ifdef ENVOY_ADMIN_FUNCTIONALITY
   builder.enableAdminInterface(self.adminInterfaceEnabled);
 #endif

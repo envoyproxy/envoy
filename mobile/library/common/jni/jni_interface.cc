@@ -1271,14 +1271,21 @@ void configureBuilder(
 
   std::vector<std::string> hostnames = javaObjectArrayToStringVector(env, dns_preresolve_hostnames);
   builder.addDnsPreresolveHostnames(hostnames);
-  builder.addRtdsLayer(getCppString(env, rtds_layer_name), rtds_timeout_seconds, use_rtds);
-  builder.setNodeId(getCppString(env, node_id), use_node_id);
-  builder.setNodeLocality({getCppString(env, node_region), getCppString(env, node_zone),
-                           getCppString(env, node_sub_zone)},
-                          use_node_locality);
-  builder.setAggregatedDiscoveryService(getCppString(env, ads_address), ads_port,
-                                        getCppString(env, ads_token), ads_token_lifetime,
-                                        getCppString(env, ads_root_certs), use_ads);
+  if (use_rtds) {
+    builder.addRtdsLayer(getCppString(env, rtds_layer_name), rtds_timeout_seconds);
+  }
+  if (use_node_id) {
+    builder.setNodeId(getCppString(env, node_id));
+  }
+  if (use_node_locality) {
+    builder.setNodeLocality({getCppString(env, node_region), getCppString(env, node_zone),
+                             getCppString(env, node_sub_zone)});
+  }
+  if (use_ads) {
+    builder.setAggregatedDiscoveryService(getCppString(env, ads_address), ads_port,
+                                          getCppString(env, ads_token), ads_token_lifetime,
+                                          getCppString(env, ads_root_certs));
+  }
 }
 
 extern "C" JNIEXPORT jstring JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibrary_createYaml(
