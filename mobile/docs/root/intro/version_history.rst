@@ -19,6 +19,7 @@ Breaking changes:
 - api: move ``addVirtualClusters`` APIs taking concatenated cluster YAML to ``addVirtualCluster`` with one cluster config at a time (:issue: `#25297 <25297>`, :issue: `#25259 <25259>`, :issue: `#25457 <25457>`)
 - api: move ``dnsPreresolveHostnames`` APIs from taking concatenated cluster YAML to taking a list of String hostnames (:issue: `#25297 <25297>`, :issue: `#25259 <25259>`, :issue: `#25457 <25457>`)
 - api: added ``setRuntimeGuard`` APIs for all languages (:issue: `#25434 <25434>`)
+- clusters: removing the base_h2 cluster. Requests with ``x-envoy-mobile-upstream-protocol`` set to ``http2`` will be sent to the base cluster and use the best available protocol (:issue `#25796 <25796>`).
 
 Bugfixes:
 
