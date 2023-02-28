@@ -58,10 +58,8 @@ class MockIoUringSocket : public IoUringSocket {
 class MockIoUringWorker : public IoUringWorker {
 public:
   MOCK_METHOD(IoUringSocket&, addAcceptSocket, (os_fd_t fd, IoUringHandler& handler));
-  MOCK_METHOD(IoUringSocket&, addServerSocket,
-              (os_fd_t fd, IoUringHandler& handler, uint32_t read_buffer_size));
-  MOCK_METHOD(IoUringSocket&, addClientSocket,
-              (os_fd_t fd, IoUringHandler& handler, uint32_t read_buffer_size));
+  MOCK_METHOD(IoUringSocket&, addServerSocket, (os_fd_t fd, IoUringHandler& handler));
+  MOCK_METHOD(IoUringSocket&, addClientSocket, (os_fd_t fd, IoUringHandler& handler));
   MOCK_METHOD(Event::Dispatcher&, dispatcher, ());
   MOCK_METHOD(Request*, submitAcceptRequest, (IoUringSocket & socket));
   MOCK_METHOD(Request*, submitConnectRequest,

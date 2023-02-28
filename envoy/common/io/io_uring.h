@@ -296,14 +296,12 @@ public:
   /**
    * Add an server socket socket to the worker.
    */
-  virtual IoUringSocket& addServerSocket(os_fd_t fd, IoUringHandler& handler,
-                                         uint32_t read_buffer_size) PURE;
+  virtual IoUringSocket& addServerSocket(os_fd_t fd, IoUringHandler& handler) PURE;
 
   /**
    * Add an client socket socket to the worker.
    */
-  virtual IoUringSocket& addClientSocket(os_fd_t fd, IoUringHandler& handler,
-                                         uint32_t read_buffer_size) PURE;
+  virtual IoUringSocket& addClientSocket(os_fd_t fd, IoUringHandler& handler) PURE;
 
   /**
    * Return the current thread's dispatcher.

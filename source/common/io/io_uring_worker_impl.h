@@ -76,17 +76,16 @@ using IoUringSocketEntryPtr = std::unique_ptr<IoUringSocketEntry>;
 
 class IoUringWorkerImpl : public IoUringWorker, private Logger::Loggable<Logger::Id::io> {
 public:
-  IoUringWorkerImpl(uint32_t io_uring_size, bool use_submission_queue_polling,
+  IoUringWorkerImpl(uint32_t io_uring_size, bool use_submission_queue_polling, uint32_t accept_size,
+                    uint32_t read_buffer_size, Event::Dispatcher& dispatcher);
+  IoUringWorkerImpl(IoUringPtr io_uring, uint32_t accept_size, uint32_t read_buffer_size,
                     Event::Dispatcher& dispatcher);
-  IoUringWorkerImpl(IoUringPtr io_uring_instance, Event::Dispatcher& dispatcher);
   ~IoUringWorkerImpl() override;
 
   // IoUringWorker
   IoUringSocket& addAcceptSocket(os_fd_t fd, IoUringHandler& handler) override;
-  IoUringSocket& addServerSocket(os_fd_t fd, IoUringHandler& handler,
-                                 uint32_t read_buffer_size) override;
-  IoUringSocket& addClientSocket(os_fd_t fd, IoUringHandler& handler,
-                                 uint32_t read_buffer_size) override;
+  IoUringSocket& addServerSocket(os_fd_t fd, IoUringHandler& handler) override;
+  IoUringSocket& addClientSocket(os_fd_t fd, IoUringHandler& handler) override;
 
   Event::Dispatcher& dispatcher() override;
 
@@ -107,20 +106,22 @@ public:
   void removeInjectedCompletion(IoUringSocket& socket);
 
 protected:
-  void onFileEvent();
-  void submit();
-
   // The io_uring instance.
-  IoUringPtr io_uring_instance_;
+  IoUringPtr io_uring_;
+  const uint32_t accept_size_;
+  const uint32_t read_buffer_size_;
+  Event::Dispatcher& dispatcher_;
   // The file event of io_uring's eventfd.
   Event::FileEventPtr file_event_{nullptr};
-  Event::Dispatcher& dispatcher_;
   // All the sockets in this worker.
   std::list<IoUringSocketEntryPtr> sockets_;
   // This is used to mark whether delay submit is enabled.
   // The IoUriingWorks delay the submit the requests which are submitted in request completion
   // callback.
   bool delay_submit_{false};
+
+  void onFileEvent();
+  void submit();
 };
 
 struct AcceptRequest : public Request {
@@ -131,20 +132,20 @@ struct AcceptRequest : public Request {
 class IoUringAcceptSocket : public IoUringSocketEntry {
 public:
   IoUringAcceptSocket(os_fd_t fd, IoUringWorkerImpl& parent, IoUringHandler& io_uring_handler,
-                      int max_requests = 5);
+                      uint32_t accept_size);
 
   void close() override;
   void disable() override;
   void enable() override;
   void onClose(int32_t result, bool injected) override;
   void onAccept(Request* req, int32_t result, bool injected) override;
-  void submitRequests();
 
 private:
-  // TODO(soulxu): making this configurable.
-  int max_requests_{0};
+  const uint32_t accept_size_;
   // This is used to track the current submitted accept requests.
   absl::flat_hash_set<Request*> requests_;
+
+  void submitRequests();
 };
 
 } // namespace Io

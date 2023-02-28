@@ -46,6 +46,7 @@ public:
 
   // TODO (soulxu): making those configurable
   static constexpr uint32_t DefaultIoUringSize = 300;
+  static constexpr uint32_t DefaultAcceptSize = 5;
   static constexpr uint32_t DefaultReadBufferSize = 8192;
   static constexpr bool UseSubmissionQueuePolling = false;
 

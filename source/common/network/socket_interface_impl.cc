@@ -165,6 +165,7 @@ Server::BootstrapExtensionPtr SocketInterfaceImpl::createBootstrapExtension(
   if (Io::isIoUringSupported()) {
     std::shared_ptr<Io::IoUringFactoryImpl> io_uring_factory =
         std::make_shared<Io::IoUringFactoryImpl>(DefaultIoUringSize, UseSubmissionQueuePolling,
+                                                 DefaultAcceptSize, DefaultReadBufferSize,
                                                  context.threadLocal());
     io_uring_factory_ = io_uring_factory;
 
