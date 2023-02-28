@@ -20,132 +20,94 @@ set -e
 # AZP_BRANCH=refs/tags/v1.77.3
 ##
 
-if [[ -n "$DOCKER_CI_DRYRUN" ]]; then
-    AZP_SHA1="${AZP_SHA1:-MOCKSHA}"
-fi
-
-VERSION="$(cat VERSION.txt)"
 
 function is_windows() {
-  [[ "$(uname -s)" == *NT* ]]
+    [[ -n "$DOCKER_FAKE_WIN" ]]  || [[ "$(uname -s)" == *NT* ]]
 }
 
-ENVOY_DOCKER_IMAGE_DIRECTORY="${ENVOY_DOCKER_IMAGE_DIRECTORY:-${BUILD_STAGINGDIRECTORY:-.}/build_images}"
+if [[ -n "$DOCKER_CI_DRYRUN" ]]; then
+    AZP_SHA1="${AZP_SHA1:-MOCKSHA}"
 
-# Setting environments for buildx tools
-config_env() {
-  # Install QEMU emulators
-  docker run --rm --privileged tonistiigi/binfmt --install all
-
-  # Remove older build instance
-  docker buildx rm multi-builder || :
-  docker buildx create --use --name multi-builder --platform linux/arm64,linux/amd64
-}
-
-build_platforms() {
-  TYPE=$1
-
-  if is_windows; then
-    echo "windows/amd64"
-  elif [[ "${TYPE}" == *-google-vrp ]]; then
-    echo "linux/amd64"
-  else
-    echo "linux/arm64,linux/amd64"
-  fi
-}
-
-build_args() {
-  TYPE=$1
-
-  if [[ "${TYPE}" == *-windows* ]]; then
-    printf ' -f ci/Dockerfile-envoy-windows --build-arg BUILD_OS=%s --build-arg BUILD_TAG=%s' "${WINDOWS_IMAGE_BASE}" "${WINDOWS_IMAGE_TAG}"
-  else
-    TARGET="${TYPE/-debug/}"
-    TARGET="${TARGET/-contrib/}"
-    printf ' -f ci/Dockerfile-envoy --target %s' "envoy${TARGET}"
-  fi
-
-  if [[ "${TYPE}" == *-contrib* ]]; then
-    printf ' --build-arg ENVOY_BINARY=envoy-contrib'
-  fi
-
-  if [[ "${TYPE}" == *-debug ]]; then
-    printf ' --build-arg ENVOY_BINARY_SUFFIX='
-  fi
-}
-
-use_builder() {
-  # BuildKit is not available for Windows images, skip this
-  if ! is_windows; then
-    docker buildx use multi-builder
-  fi
-}
-
-build_images() {
-  local _args args=()
-  TYPE=$1
-  BUILD_TAG=$2
-
-  use_builder "${TYPE}"
-  _args=$(build_args "${TYPE}")
-  read -ra args <<<"$_args"
-  PLATFORM="$(build_platforms "${TYPE}")"
-
-  if ! is_windows && ! [[ "${TYPE}" =~ debug ]]; then
-    args+=("-o" "type=oci,dest=${ENVOY_DOCKER_IMAGE_DIRECTORY}/envoy${TYPE}.tar")
-  fi
-
-  echo ">> BUILD: ${BUILD_TAG}"
-  echo "> docker ${BUILD_COMMAND[*]} --platform ${PLATFORM} ${args[*]} -t ${BUILD_TAG} ."
-  if [[ -n "$DOCKER_CI_DRYRUN" ]]; then
-      echo ""
-      return
-  fi
-  echo "..."
-  docker "${BUILD_COMMAND[@]}" --platform "${PLATFORM}" "${args[@]}" -t "${BUILD_TAG}" .
-  echo ""
-}
-
-push_images() {
-  local _args args=()
-  TYPE=$1
-  BUILD_TAG=$2
-
-  use_builder "${TYPE}"
-  _args=$(build_args "${TYPE}")
-  read -ra args <<<"$_args"
-  PLATFORM="$(build_platforms "${TYPE}")"
-
-  echo ">> PUSH: ${BUILD_TAG}"
-  echo "> docker ${BUILD_COMMAND[*]} --platform ${PLATFORM} ${args[*]} -t ${BUILD_TAG} . --push ||
-    docker push ${BUILD_TAG}"
-  if [[ -n "$DOCKER_CI_DRYRUN" ]]; then
-      echo ""
-      return
-  fi
-  echo "..."
-  # docker buildx doesn't do push with default builder
-  docker "${BUILD_COMMAND[@]}" --platform "${PLATFORM}" "${args[@]}" -t "${BUILD_TAG}" . --push ||
-    docker push "${BUILD_TAG}"
-  echo ""
-}
+    if is_windows; then
+        WINDOWS_IMAGE_BASE="${WINDOWS_IMAGE_BASE:-mcr.microsoft.com/windows/fakecore}"
+        WINDOWS_IMAGE_TAG="${WINDOWS_IMAGE_TAG:-ltsc1992}"
+        WINDOWS_BUILD_TYPE="${WINDOWS_BUILD_TYPE:-legacy}"
+    fi
+fi
 
 MAIN_BRANCH="refs/heads/main"
 RELEASE_BRANCH_REGEX="^refs/heads/release/v.*"
 DEV_VERSION_REGEX="-dev$"
+DOCKER_REGISTRY="${DOCKER_REGISTRY:-docker.io}"
+PUSH_IMAGES_TO_REGISTRY=
+if [[ -z "$ENVOY_VERSION" ]]; then
+    ENVOY_VERSION="$(cat VERSION.txt)"
+fi
 
-if [[ "$VERSION" =~ $DEV_VERSION_REGEX ]]; then
+if [[ "$ENVOY_VERSION" =~ $DEV_VERSION_REGEX ]]; then
     # Dev version
     IMAGE_POSTFIX="-dev"
     IMAGE_NAME="${AZP_SHA1}"
 else
     # Non-dev version
     IMAGE_POSTFIX=""
-    IMAGE_NAME="v${VERSION}"
+    IMAGE_NAME="v${ENVOY_VERSION}"
 fi
 
-image_tag_name () {
+# Only push images for main builds, and non-dev release branch builds
+if [[ "${AZP_BRANCH}" == "${MAIN_BRANCH}" ]]; then
+    echo "Pushing images for main."
+    PUSH_IMAGES_TO_REGISTRY=1
+elif [[ "${AZP_BRANCH}" =~ ${RELEASE_BRANCH_REGEX} ]] && ! [[ "$ENVOY_VERSION" =~ $DEV_VERSION_REGEX ]]; then
+    echo "Pushing images for release branch ${AZP_BRANCH}."
+    PUSH_IMAGES_TO_REGISTRY=1
+else
+    echo 'Ignoring non-release branch for docker push.'
+fi
+
+ENVOY_DOCKER_IMAGE_DIRECTORY="${ENVOY_DOCKER_IMAGE_DIRECTORY:-${BUILD_STAGINGDIRECTORY:-.}/build_images}"
+# This prefix is altered for the private security images on setec builds.
+DOCKER_IMAGE_PREFIX="${DOCKER_IMAGE_PREFIX:-envoyproxy/envoy}"
+if [[ -z "$DOCKER_CI_DRYRUN" ]]; then
+    mkdir -p "${ENVOY_DOCKER_IMAGE_DIRECTORY}"
+fi
+
+# Setting environments for buildx tools
+config_env() {
+    echo ">> BUILDX: install"
+    echo "> docker run --rm --privileged tonistiigi/binfmt --install all"
+    echo "> docker buildx rm multi-builder 2> /dev/null || :"
+    echo "> docker buildx create --use --name multi-builder --platform linux/arm64,linux/amd64"
+
+    if [[ -n "$DOCKER_CI_DRYRUN" ]]; then
+        return
+    fi
+
+    # Install QEMU emulators
+    docker run --rm --privileged tonistiigi/binfmt --install all
+
+    # Remove older build instance
+    docker buildx rm multi-builder 2> /dev/null || :
+    docker buildx create --use --name multi-builder --platform linux/arm64,linux/amd64
+}
+
+if is_windows; then
+    BUILD_TYPES=("-${WINDOWS_BUILD_TYPE}")
+    # BuildKit is not available for Windows images, use standard build command
+    BUILD_COMMAND=("build")
+else
+    # "-google-vrp" must come afer "" to ensure we rebuild the local base image dependency.
+    BUILD_TYPES=("" "-debug" "-contrib" "-contrib-debug" "-distroless" "-google-vrp" "-tools")
+
+    # Configure docker-buildx tools
+    BUILD_COMMAND=("buildx" "build")
+    config_env
+fi
+
+old_image_tag_name () {
     # envoyproxy/envoy-dev:latest
+    # envoyproxy/envoy-debug:v1.73.3
+    # envoyproxy/envoy-debug:v1.73-latest
     local build_type="$1" image_name="$2"
     if [[ -z "$image_name" ]]; then
         image_name="$IMAGE_NAME"
@@ -154,7 +116,10 @@ image_tag_name () {
 }
 
 new_image_tag_name () {
-    # envoyproxy/envoy:dev-latest
+    # envoyproxy/envoy:dev
+    # envoyproxy/envoy:debug-v1.73.3
+    # envoyproxy/envoy:debug-v1.73-latest
+
     local build_type="$1" image_name="$2" image_tag
     parts=()
     if [[ -n "$build_type" ]]; then
@@ -172,68 +137,235 @@ new_image_tag_name () {
     echo -n "${DOCKER_IMAGE_PREFIX}:${image_tag}"
 }
 
-# This prefix is altered for the private security images on setec builds.
-DOCKER_IMAGE_PREFIX="${DOCKER_IMAGE_PREFIX:-envoyproxy/envoy}"
-mkdir -p "${ENVOY_DOCKER_IMAGE_DIRECTORY}"
+build_platforms() {
+    local build_type=$1
 
-if is_windows; then
-  BUILD_TYPES=("-${WINDOWS_BUILD_TYPE}")
-  # BuildKit is not available for Windows images, use standard build command
-  BUILD_COMMAND=("build")
-else
-  # "-google-vrp" must come afer "" to ensure we rebuild the local base image dependency.
-  BUILD_TYPES=("" "-debug" "-contrib" "-contrib-debug" "-distroless" "-google-vrp" "-tools")
+    if is_windows; then
+        echo -n "windows/amd64"
+    elif [[ "${build_type}" == *-google-vrp ]]; then
+        echo -n "linux/amd64"
+    else
+        echo -n "linux/arm64,linux/amd64"
+    fi
+}
 
-  # Configure docker-buildx tools
-  BUILD_COMMAND=("buildx" "build")
-  if [[ -z "$DOCKER_CI_DRYRUN" ]]; then
-      config_env
-  fi
-fi
+build_args() {
+    local build_type=$1 target
 
-# Test the docker build in all cases, but use a local tag that we will overwrite before push in the
-# cases where we do push.
-for BUILD_TYPE in "${BUILD_TYPES[@]}"; do
-  build_images "${BUILD_TYPE}" "$(image_tag_name "${BUILD_TYPE}")"
+    if is_windows; then
+        printf ' -f ci/Dockerfile-envoy-windows --build-arg BUILD_OS=%s --build-arg BUILD_TAG=%s' "${WINDOWS_IMAGE_BASE}" "${WINDOWS_IMAGE_TAG}"
+    else
+        target="${build_type/-debug/}"
+        target="${target/-contrib/}"
+        printf ' -f ci/Dockerfile-envoy --target %s' "envoy${target}"
+    fi
 
-  if ! is_windows; then
-      build_images "${BUILD_TYPE}" "$(new_image_tag_name "${BUILD_TYPE}")"
-  fi
-done
+    if [[ "${build_type}" == *-contrib* ]]; then
+        printf ' --build-arg ENVOY_BINARY=envoy-contrib'
+    fi
 
-# Only push images for main builds, and release branch builds
-if [[ "${AZP_BRANCH}" != "${MAIN_BRANCH}" ]] &&
-  ! [[ "${AZP_BRANCH}" =~ ${RELEASE_BRANCH_REGEX} ]]; then
-  echo 'Ignoring non-release branch for docker push.'
-  exit 0
-fi
+    if [[ "${build_type}" == *-debug ]]; then
+        printf ' --build-arg ENVOY_BINARY_SUFFIX='
+    fi
+}
 
-if [[ -z "$DOCKER_CI_DRYRUN" ]]; then
-    docker login -u "$DOCKERHUB_USERNAME" -p "$DOCKERHUB_PASSWORD"
-fi
+use_builder() {
+    # BuildKit is not available for Windows images, skip this
+    if is_windows; then
+        return
+    fi
+    echo ">> BUILDX: use multi-builder"
+    echo "> docker buildx use multi-builder"
 
-for BUILD_TYPE in "${BUILD_TYPES[@]}"; do
-    push_images "${BUILD_TYPE}" "$(image_tag_name "${BUILD_TYPE}")"
+    if [[ -n "$DOCKER_CI_DRYRUN" ]]; then
+        return
+    fi
+    docker buildx use multi-builder
+}
+
+build_and_maybe_push_image () {
+    # If the image is not required for local testing and this is main or a release this will push immediately
+    # If it is required for testing on a main or release branch (ie non-debug) it will push to a tar archive
+    # and then push to the registry from there.
+    local image_type="$1" platform docker_build_args _args args=() docker_build_args docker_image_tarball build_tag action platform
+
+    action="BUILD"
+    use_builder "${image_type}"
+    _args=$(build_args "${image_type}")
+    read -ra args <<<"$_args"
+    platform="$(build_platforms "${image_type}")"
+    build_tag="$(old_image_tag_name "${image_type}")"
+    docker_image_tarball="${ENVOY_DOCKER_IMAGE_DIRECTORY}/envoy${image_type}.tar"
+
     if ! is_windows; then
-        push_images "${BUILD_TYPE}" "$(new_image_tag_name "${BUILD_TYPE}")"
+        # `--sbom` and `--provenance` args added for skopeo 1.5.0 compat,
+        # can probably be removed for later versions.
+        args+=(
+            "--sbom=false"
+            "--provenance=false")
+        if [[ "${image_type}" =~ debug ]]; then
+            # For linux if its the debug image then push immediately for release branches,
+            # otherwise just test the build
+            if [[ -n "$PUSH_IMAGES_TO_REGISTRY" ]]; then
+                action="BUILD+PUSH"
+                args+=("--push")
+            fi
+        else
+            # For linux non-debug builds, save it first in the tarball, we will push it
+            # with skopeo from there if needed.
+            args+=("-o" "type=oci,dest=${docker_image_tarball}")
+        fi
+    fi
+
+    docker_build_args=(
+        "${BUILD_COMMAND[@]}"
+        "--platform" "${platform}"
+        "${args[@]}"
+        -t "${build_tag}"
+        .)
+    echo ">> ${action}: ${build_tag}"
+    echo "> docker ${docker_build_args[*]}"
+
+    if [[ -z "$DOCKER_CI_DRYRUN" ]]; then
+        echo "..."
+        docker "${docker_build_args[@]}"
+    fi
+    if [[ -z "$PUSH_IMAGES_TO_REGISTRY" ]]; then
+        return
+    fi
+
+    if is_windows; then
+        echo ">> PUSH: ${build_tag}"
+        echo "> docker push ${build_tag}"
+        if [[ -z "$DOCKER_CI_DRYRUN" ]]; then
+            docker push "$build_tag"
+        fi
+    elif ! [[ "${image_type}" =~ debug ]]; then
+        push_image_from_tarball "$build_tag" "$docker_image_tarball"
+    fi
+}
+
+tag_image () {
+    local build_tag="$1" tag="$2" docker_tag_args
+
+    if [[ "$build_tag" == "$tag" ]]; then
+        return
+    fi
+
+    echo ">> TAG: ${build_tag} -> ${tag}"
+
+    if is_windows; then
+        # we cant use buildx to tag remote images on windows
+        echo "> docker tag ${build_tag} ${tag}"
+        echo ">> PUSH: ${tag}"
+        echo "> docker push ${tag}"
+        if [[ -z "$DOCKER_CI_DRYRUN" ]]; then
+            docker tag "$build_tag" "$tag"
+            docker push "$tag"
+        fi
+        return
+    fi
+
+    docker_tag_args=(
+        buildx imagetools create
+        "${DOCKER_REGISTRY}/${build_tag}"
+        "--tag" "${DOCKER_REGISTRY}/${tag}")
+
+    echo "> docker ${docker_tag_args[*]}"
+
+    if [[ -z "$DOCKER_CI_DRYRUN" ]]; then
+        echo "..."
+        docker "${docker_tag_args[@]}"
+    fi
+}
+
+push_image_from_tarball () {
+    # Use skopeo to push from the created oci archive
+
+    local build_tag="$1" docker_image_tarball="$2" src dest
+
+    src="oci-archive:${docker_image_tarball}"
+    dest="docker://${DOCKER_REGISTRY}/${build_tag}"
+    # dest="oci-archive:${docker_image_tarball2}"
+
+    echo ">> PUSH: ${src} -> ${dest}"
+    echo "> skopeo copy --all ${src} ${dest}"
+
+    if [[ -n "$DOCKER_CI_DRYRUN" ]]; then
+        return
+    fi
+
+    # NB: this command works with skopeo 1.5.0, later versions may require
+    #   different flags, eg `--multi-arch all`
+    skopeo copy --all "${src}" "${dest}"
+
+    # Test specific versions using a container, eg
+    # docker run -v "${HOME}/.docker:/root/.docker" -v "${PWD}/build_images:/build_images" --rm -it \
+    #    quay.io/skopeo/stable:v1.5.0 copy --all "${src}" "${dest}"
+}
+
+tag_variants () {
+    # Tag image variants
+    local image_type="$1" build_tag new_image_name release_line variant_type tag_name new_tag_name
+
+    if [[ -z "$PUSH_IMAGES_TO_REGISTRY" ]]; then
+        return
+    fi
+
+    build_tag="$(old_image_tag_name "${image_type}")"
+    new_image_name="$(new_image_tag_name "${image_type}")"
+
+    if ! is_windows && [[ "$build_tag" != "$new_image_name" ]]; then
+        tag_image "${build_tag}" "${new_image_name}"
     fi
 
     # Only push latest on main/dev builds.
-    if [[ "$VERSION" =~ $DEV_VERSION_REGEX ]]; then
+    if [[ "$ENVOY_VERSION" =~ $DEV_VERSION_REGEX ]]; then
         if [[ "${AZP_BRANCH}" == "${MAIN_BRANCH}" ]]; then
-            is_windows && docker tag "${DOCKER_IMAGE_PREFIX}${BUILD_TYPE}${IMAGE_POSTFIX}:${IMAGE_NAME}" "${DOCKER_IMAGE_PREFIX}${BUILD_TYPE}${IMAGE_POSTFIX}:latest"
-            push_images "${BUILD_TYPE}" "$(image_tag_name "${BUILD_TYPE}" latest)"
-            if ! is_windows; then
-                push_images "${BUILD_TYPE}" "$(new_image_tag_name "${BUILD_TYPE}" latest)"
-            fi
+            variant_type="latest"
         fi
     else
         # Push vX.Y-latest to tag the latest image in a release line
-        RELEASE_LINE=$(echo "$VERSION" | sed -E 's/([0-9]+\.[0-9]+)\.[0-9]+/\1-latest/')
-        is_windows && docker tag "${DOCKER_IMAGE_PREFIX}${BUILD_TYPE}${IMAGE_POSTFIX}:${IMAGE_NAME}" "${DOCKER_IMAGE_PREFIX}${BUILD_TYPE}${IMAGE_POSTFIX}:v${RELEASE_LINE}"
-        push_images "${BUILD_TYPE}" "$(image_tag_name "${BUILD_TYPE}" "v${RELEASE_LINE}")"
-        if ! is_windows; then
-            push_images "${BUILD_TYPE}" "$(new_image_tag_name "${BUILD_TYPE}" "v${RELEASE_LINE}")"
+        release_line="$(echo "$ENVOY_VERSION" | sed -E 's/([0-9]+\.[0-9]+)\.[0-9]+/\1-latest/')"
+        variant_type="v${release_line}"
+    fi
+    if [[ -n "$variant_type" ]]; then
+        tag_name="$(old_image_tag_name "${image_type}" "${variant_type}")"
+        new_tag_name="$(new_image_tag_name "${image_type}" "${variant_type}")"
+        tag_image "${build_tag}" "${tag_name}"
+        if ! is_windows && ! [[ "$tag_name" == "$new_tag_name" ]]; then
+            tag_image "${build_tag}" "${new_tag_name}"
         fi
     fi
-done
+}
+
+build_and_maybe_push_image_and_variants () {
+    local image_type="$1"
+
+    build_and_maybe_push_image "$image_type"
+    tag_variants "$image_type"
+
+    # Leave blank line before next build
+    echo
+}
+
+login_docker () {
+    echo ">> LOGIN"
+    if [[ -z "$DOCKER_CI_DRYRUN" ]]; then
+       docker login -u "$DOCKERHUB_USERNAME" -p "$DOCKERHUB_PASSWORD"
+    fi
+}
+
+do_docker_ci () {
+    local build_type
+
+    if [[ -n "$PUSH_IMAGES_TO_REGISTRY" ]]; then
+        login_docker
+    fi
+
+    for build_type in "${BUILD_TYPES[@]}"; do
+        build_and_maybe_push_image_and_variants "${build_type}"
+    done
+}
+
+do_docker_ci

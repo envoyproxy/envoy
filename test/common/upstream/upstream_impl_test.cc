@@ -3979,13 +3979,13 @@ TEST_F(ClusterInfoImplTest, DefaultConnectTimeout) {
 }
 
 TEST_F(ClusterInfoImplTest, MaxConnectionDurationTest) {
-  const std::string yaml_base = R"EOF(
+  constexpr absl::string_view yaml_base = R"EOF(
   name: {}
   type: STRICT_DNS
   lb_policy: ROUND_ROBIN
   )EOF";
 
-  const std::string yaml_set_max_connection_duration = yaml_base + R"EOF(
+  constexpr absl::string_view yaml_set_max_connection_duration = R"EOF(
   typed_extension_protocol_options:
     envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
       "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
@@ -3998,10 +3998,12 @@ TEST_F(ClusterInfoImplTest, MaxConnectionDurationTest) {
   auto cluster1 = makeCluster(fmt::format(yaml_base, "cluster1"));
   EXPECT_EQ(absl::nullopt, cluster1->info()->maxConnectionDuration());
 
-  auto cluster2 = makeCluster(fmt::format(yaml_set_max_connection_duration, "cluster2", "9s"));
+  auto cluster2 = makeCluster(fmt::format(yaml_base, "cluster2") +
+                              fmt::format(yaml_set_max_connection_duration, "9s"));
   EXPECT_EQ(std::chrono::seconds(9), cluster2->info()->maxConnectionDuration());
 
-  auto cluster3 = makeCluster(fmt::format(yaml_set_max_connection_duration, "cluster3", "0s"));
+  auto cluster3 = makeCluster(fmt::format(yaml_base, "cluster3") +
+                              fmt::format(yaml_set_max_connection_duration, "0s"));
   EXPECT_EQ(absl::nullopt, cluster3->info()->maxConnectionDuration());
 }
 
@@ -4097,13 +4099,13 @@ TEST_F(ClusterInfoImplTest, Timeouts) {
 }
 
 TEST_F(ClusterInfoImplTest, TcpPoolIdleTimeout) {
-  const std::string yaml_base = R"EOF(
+  constexpr absl::string_view yaml_base = R"EOF(
   name: {}
   type: STRICT_DNS
   lb_policy: ROUND_ROBIN
   )EOF";
 
-  const std::string yaml_set_tcp_pool_idle_timeout = yaml_base + R"EOF(
+  constexpr absl::string_view yaml_set_tcp_pool_idle_timeout = R"EOF(
   typed_extension_protocol_options:
     envoy.extensions.upstreams.tcp.v3.TcpProtocolOptions:
       "@type": type.googleapis.com/envoy.extensions.upstreams.tcp.v3.TcpProtocolOptions
@@ -4113,10 +4115,12 @@ TEST_F(ClusterInfoImplTest, TcpPoolIdleTimeout) {
   auto cluster1 = makeCluster(fmt::format(yaml_base, "cluster1"));
   EXPECT_EQ(std::chrono::minutes(10), cluster1->info()->tcpPoolIdleTimeout());
 
-  auto cluster2 = makeCluster(fmt::format(yaml_set_tcp_pool_idle_timeout, "cluster2", "9s"));
+  auto cluster2 = makeCluster(fmt::format(yaml_base, "cluster2") +
+                              fmt::format(yaml_set_tcp_pool_idle_timeout, "9s"));
   EXPECT_EQ(std::chrono::seconds(9), cluster2->info()->tcpPoolIdleTimeout());
 
-  auto cluster3 = makeCluster(fmt::format(yaml_set_tcp_pool_idle_timeout, "cluster3", "0s"));
+  auto cluster3 = makeCluster(fmt::format(yaml_base, "cluster3") +
+                              fmt::format(yaml_set_tcp_pool_idle_timeout, "0s"));
   EXPECT_EQ(absl::nullopt, cluster3->info()->tcpPoolIdleTimeout());
 }
 
