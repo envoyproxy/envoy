@@ -125,7 +125,7 @@ NS_ASSUME_NONNULL_BEGIN
                                           useRtds:(BOOL)useRtds
                                   useNodeLocality:(BOOL)useNodeLocality
                                            useAds:(BOOL)useAds;
-- (NSString *)generateYamlString:();
+- (NSString *)generateYamlString;
 @end
 
 NS_ASSUME_NONNULL_END

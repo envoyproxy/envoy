@@ -4,8 +4,6 @@ licenses(["notice"])  # Apache 2
 
 exports_files([
     "EnvoyEngine.h",
-    "EnvoyConfiguration.h",
-    "EnvoyConfiguration.mm",
 ])
 
 envoy_objc_library(
@@ -59,18 +57,6 @@ envoy_objc_library(
         "//library/common:envoy_main_interface_lib",
         "//library/common/api:c_types",
         "//library/common/network:apple_platform_cert_verifier",
-    ],
-)
-
-envoy_objc_library(
-    name = "envoy_engine_config_objc_lib",
-    hdrs = [
-        "EnvoyConfiguration.h",
-        "EnvoyConfiguration.mm",
-    ],
-    visibility = ["//visibility:public"],
-    deps = [
-        ":envoy_engine_objc_lib",
     ],
 )
 

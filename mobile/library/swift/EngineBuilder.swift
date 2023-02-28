@@ -565,7 +565,7 @@ open class EngineBuilder: NSObject {
   ///
   /// - parameter nodeId: The node ID.
   ///
-  /// - Returns: This builder.
+  /// - returns: This builder.
   @discardableResult
   public func setNodeId(_ nodeId: String) -> Self {
     self.nodeId = nodeId
@@ -579,7 +579,7 @@ open class EngineBuilder: NSObject {
   /// - parameter zone:    The zone.
   /// - parameter subZone: The sub-zone.
   ///
-  /// - Returns: This builder.
+  /// - returns: This builder.
   @discardableResult
   public func setNodeLocality(
     _ region: String,
@@ -601,7 +601,7 @@ open class EngineBuilder: NSObject {
   /// - parameter jwtTokenLifetimeSeconds: The JWT token lifetime in seconds.
   /// - parameter sslRootCerts:            The SSL root certificates.
   ///
-  /// - Returns: This builder.
+  /// - returns: This builder.
   @discardableResult
   public func setAggregatedDiscoveryService(
     address: String,
@@ -624,7 +624,7 @@ open class EngineBuilder: NSObject {
   /// - parameter layerName:      The layer name.
   /// - parameter timeoutSeconds: The timeout in seconds.
   ///
-  /// - Returns: This builder.
+  /// - returns: This builder.
   @discardableResult
   public func addRtdsLayer(name layerName: String, timeoutSeconds: UInt32 = 0) -> Self {
     self.rtdsLayerName = layerName
@@ -777,7 +777,7 @@ open class EngineBuilder: NSObject {
       useNodeLocality: self.useNodeLocality,
       useAds: self.useAds
     )
-    return config.generateYamlString();
+    return config.generateYamlString()
   }
 
   // MARK: - Internal

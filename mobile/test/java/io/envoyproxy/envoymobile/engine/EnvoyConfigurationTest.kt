@@ -314,6 +314,11 @@ class EnvoyConfigurationTest {
 
     // statsSinks
     assertThat(resolvedTemplate).contains("envoy.stat_sinks.statsd");
+
+    // ADS and RTDS not included by default
+    assertThat(resolvedTemplate).doesNotContain("rtds_layer:");
+    assertThat(resolvedTemplate).doesNotContain("ads_config:");
+
   }
 
   @Test

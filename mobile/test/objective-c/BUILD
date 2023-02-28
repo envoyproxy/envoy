@@ -16,19 +16,6 @@ envoy_mobile_objc_test(
 )
 
 envoy_mobile_objc_test(
-    name = "envoy_configuration_test",
-    srcs = [
-        "EnvoyConfigurationTest.m",
-    ],
-    flaky = True,  # TODO(jpsim): Fix timeouts when running these tests on CI
-    tags = ["no-remote-exec"],  # TODO(jpsim): Re-enable remote exec
-    visibility = ["//visibility:public"],
-    deps = [
-        "//library/objective-c:envoy_engine_config_objc_lib",
-    ],
-)
-
-envoy_mobile_objc_test(
     name = "envoy_key_value_store_bridge_impl_test",
     srcs = [
         "EnvoyKeyValueStoreBridgeImplTest.m",

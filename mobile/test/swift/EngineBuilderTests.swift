@@ -399,7 +399,7 @@ final class EngineBuilderTests: XCTestCase {
       expectation.fulfill()
     }
     MockEnvoyEngine.onRunWithConfig = { config, _ in
-      XCTAssertEqual("FAKE_SWIFT_ADDRESS", config.adsAddress)
+      XCTAssertTrue(config.generateYamlString().contains("FAKE_SWIFT_ADDRESS"))
       expectation.fulfill()
     }
 
@@ -407,6 +407,23 @@ final class EngineBuilderTests: XCTestCase {
       .addEngineType(MockEnvoyEngine.self)
       .addRtdsLayer(name: "rtds_layer_name", timeoutSeconds: 5)
       .setAggregatedDiscoveryService(address: "FAKE_SWIFT_ADDRESS", port: 0)
+      .build()
+    self.waitForExpectations(timeout: 0.01)
+  }
+
+  func testRtdsAdsNotInByDefault() {
+    let expectation = self.expectation(description: "Run called with expected data")
+    MockEnvoyEngine.onRunWithConfig = { config, _ in
+      XCTAssertFalse(config.generateYamlString().contains("rtds_layer:"))
+      expectation.fulfill()
+    }
+    MockEnvoyEngine.onRunWithConfig = { config, _ in
+      XCTAssertFalse(config.generateYamlString().contains("ads_config:"))
+      expectation.fulfill()
+    }
+
+    _ = EngineBuilder()
+      .addEngineType(MockEnvoyEngine.self)
       .build()
     self.waitForExpectations(timeout: 0.01)
   }
