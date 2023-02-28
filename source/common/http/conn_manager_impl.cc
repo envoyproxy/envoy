@@ -277,6 +277,10 @@ void ConnectionManagerImpl::doDeferredStreamDestroy(ActiveStream& stream) {
     stream.request_header_timer_->disableTimer();
     stream.request_header_timer_ = nullptr;
   }
+  if (stream.access_log_flush_timer_ != nullptr) {
+    stream.access_log_flush_timer_->disableTimer();
+    stream.access_log_flush_timer_ = nullptr;
+  }
 
   if (stream.expand_agnostic_stream_lifetime_) {
     // Only destroy the active stream if the underlying codec has notified us of
@@ -801,6 +805,20 @@ ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connect
             [this]() -> void { onStreamMaxDurationReached(); });
     max_stream_duration_timer_->enableTimer(connection_manager_.config_.maxStreamDuration().value(),
                                             this);
+  }
+
+  if (connection_manager_.config_.accessLogFlushInterval().has_value()) {
+    access_log_flush_timer_ =
+        connection_manager.read_callbacks_->connection().dispatcher().createTimer([this]() -> void {
+          // If the filter manager has already destroyed its filters, that means it has already done
+          // the "final" access log cycle.
+          std::cout << "pgal: timer triggered";
+          if (!filter_manager_.destroyed()) {
+            filter_manager_.log();
+          }
+          refreshAccessLogFlushTimer();
+        });
+    refreshAccessLogFlushTimer();
   }
 }
 
@@ -1864,6 +1882,13 @@ void ConnectionManagerImpl::ActiveStream::refreshIdleTimeout() {
         stream_idle_timer_ = nullptr;
       }
     }
+  }
+}
+
+void ConnectionManagerImpl::ActiveStream::refreshAccessLogFlushTimer() {
+  if (connection_manager_.config_.accessLogFlushInterval().has_value()) {
+    access_log_flush_timer_->enableTimer(
+        connection_manager_.config_.accessLogFlushInterval().value(), this);
   }
 }
 

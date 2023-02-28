@@ -213,6 +213,10 @@ public:
   virtual const std::list<AccessLog::InstanceSharedPtr>& accessLogs() PURE;
 
   /**
+   * @return const absl::optional<std::chrono::milliseconds>& the interval to flush the access logs.
+   */
+  virtual const absl::optional<std::chrono::milliseconds>& accessLogFlushInterval() PURE;
+  /**
    * Called to create a codec for the connection manager. This function will be called when the
    * first byte of application data is received. This is done to support handling of ALPN, protocol
    * detection, etc.
