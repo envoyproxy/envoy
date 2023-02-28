@@ -731,31 +731,29 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
     address->mutable_socket_address()->set_port_value(10101);
   }
 
-  // Stats cluster
-  auto* stats_cluster = static_resources->add_clusters();
-  stats_cluster->set_name("stats");
-  stats_cluster->set_type(envoy::config::cluster::v3::Cluster::LOGICAL_DNS);
-  stats_cluster->mutable_connect_timeout()->set_seconds(connect_timeout_seconds_);
-  stats_cluster->mutable_dns_refresh_rate()->set_seconds(dns_refresh_seconds_);
-  stats_cluster->mutable_transport_socket()->CopyFrom(base_tls_socket);
-  stats_cluster->mutable_load_assignment()->set_cluster_name("stats");
-  auto* address = stats_cluster->mutable_load_assignment()
-                      ->add_endpoints()
-                      ->add_lb_endpoints()
-                      ->mutable_endpoint()
-                      ->mutable_address();
-  if (stats_domain_.empty()) {
-    address->mutable_socket_address()->set_address("127.0.0.1");
-  } else {
-    address->mutable_socket_address()->set_address(stats_domain_);
-  }
-  address->mutable_socket_address()->set_port_value(443);
   envoy::extensions::upstreams::http::v3::HttpProtocolOptions h2_protocol_options;
   h2_protocol_options.mutable_explicit_http_config()->mutable_http2_protocol_options();
-  (*stats_cluster->mutable_typed_extension_protocol_options())
-      ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]
-          .PackFrom(h2_protocol_options);
-  stats_cluster->mutable_wait_for_warm_on_init();
+  if (!stats_domain_.empty()) {
+    // Stats cluster
+    auto* stats_cluster = static_resources->add_clusters();
+    stats_cluster->set_name("stats");
+    stats_cluster->set_type(envoy::config::cluster::v3::Cluster::LOGICAL_DNS);
+    stats_cluster->mutable_connect_timeout()->set_seconds(connect_timeout_seconds_);
+    stats_cluster->mutable_dns_refresh_rate()->set_seconds(dns_refresh_seconds_);
+    stats_cluster->mutable_transport_socket()->CopyFrom(base_tls_socket);
+    stats_cluster->mutable_load_assignment()->set_cluster_name("stats");
+    auto* address = stats_cluster->mutable_load_assignment()
+                        ->add_endpoints()
+                        ->add_lb_endpoints()
+                        ->mutable_endpoint()
+                        ->mutable_address();
+    address->mutable_socket_address()->set_address(stats_domain_);
+    address->mutable_socket_address()->set_port_value(443);
+    (*stats_cluster->mutable_typed_extension_protocol_options())
+        ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]
+            .PackFrom(h2_protocol_options);
+    stats_cluster->mutable_wait_for_warm_on_init();
+  }
 
   // Base cluster config (DFP cluster config)
   auto* base_cluster = static_resources->add_clusters();
