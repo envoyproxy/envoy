@@ -8,11 +8,18 @@ minor_behavior_changes:
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
+- area: dependency
+  change: |
+    update Kafka to resolve CVE-2023-25194.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
 
 new_features:
+- area: docker
+  change: |
+    unify published images as tag variants. For example, ``envoyproxy/envoy-dev`` is now available
+    as ``envoyproxy/envoy:dev``.
 
 deprecated:
 - area: ext_authz
