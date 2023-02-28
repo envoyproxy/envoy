@@ -158,34 +158,34 @@ TEST_F(FilterStateImplTest, NameConflictReadOnly) {
   // read only data cannot be overwritten (by any state type)
   filterState().setData("test_1", std::make_unique<SimpleType>(1), FilterState::StateType::ReadOnly,
                         FilterState::LifeSpan::FilterChain);
-  EXPECT_THROW_WITH_MESSAGE(
-      filterState().setData("test_1", std::make_unique<SimpleType>(2),
-                            FilterState::StateType::ReadOnly, FilterState::LifeSpan::FilterChain),
-      EnvoyException, "FilterState::setData<T> called twice on same ReadOnly state.");
-  EXPECT_THROW_WITH_MESSAGE(
-      filterState().setData("test_1", std::make_unique<SimpleType>(2),
-                            FilterState::StateType::Mutable, FilterState::LifeSpan::FilterChain),
-      EnvoyException, "FilterState::setData<T> called twice on same ReadOnly state.");
+  EXPECT_ENVOY_BUG(filterState().setData("test_1", std::make_unique<SimpleType>(2),
+                                         FilterState::StateType::ReadOnly,
+                                         FilterState::LifeSpan::FilterChain),
+                   "FilterState::setData<T> called twice on same ReadOnly state.");
+  EXPECT_ENVOY_BUG(filterState().setData("test_1", std::make_unique<SimpleType>(2),
+                                         FilterState::StateType::Mutable,
+                                         FilterState::LifeSpan::FilterChain),
+                   "FilterState::setData<T> called twice on same ReadOnly state.");
   EXPECT_EQ(1, filterState().getDataReadOnly<SimpleType>("test_1")->access());
 }
 
 TEST_F(FilterStateImplTest, NameConflictDifferentTypesReadOnly) {
   filterState().setData("test_1", std::make_unique<SimpleType>(1), FilterState::StateType::ReadOnly,
                         FilterState::LifeSpan::FilterChain);
-  EXPECT_THROW_WITH_MESSAGE(
+  EXPECT_ENVOY_BUG(
       filterState().setData("test_1", std::make_unique<TestStoredTypeTracking>(2, nullptr, nullptr),
                             FilterState::StateType::ReadOnly, FilterState::LifeSpan::FilterChain),
-      EnvoyException, "FilterState::setData<T> called twice on same ReadOnly state.");
+      "FilterState::setData<T> called twice on same ReadOnly state.");
 }
 
 TEST_F(FilterStateImplTest, NameConflictMutableAndReadOnly) {
   // Mutable data cannot be overwritten by read only data.
   filterState().setData("test_1", std::make_unique<SimpleType>(1), FilterState::StateType::Mutable,
                         FilterState::LifeSpan::FilterChain);
-  EXPECT_THROW_WITH_MESSAGE(
-      filterState().setData("test_1", std::make_unique<SimpleType>(2),
-                            FilterState::StateType::ReadOnly, FilterState::LifeSpan::FilterChain),
-      EnvoyException, "FilterState::setData<T> called twice with different state types.");
+  EXPECT_ENVOY_BUG(filterState().setData("test_1", std::make_unique<SimpleType>(2),
+                                         FilterState::StateType::ReadOnly,
+                                         FilterState::LifeSpan::FilterChain),
+                   "FilterState::setData<T> called twice with different state types.");
 }
 
 TEST_F(FilterStateImplTest, NoNameConflictMutableAndMutable) {
@@ -223,11 +223,10 @@ TEST_F(FilterStateImplTest, ErrorAccessingReadOnlyAsMutable) {
   // Accessing read only data as mutable should throw error
   filterState().setData("test_name", std::make_unique<TestStoredTypeTracking>(5, nullptr, nullptr),
                         FilterState::StateType::ReadOnly, FilterState::LifeSpan::FilterChain);
-  EXPECT_THROW_WITH_MESSAGE(filterState().getDataMutable<TestStoredTypeTracking>("test_name"),
-                            EnvoyException,
-                            "FilterState tried to access immutable data as mutable.");
-  EXPECT_THROW_WITH_MESSAGE(filterState().getDataSharedMutableGeneric("test_name"), EnvoyException,
-                            "FilterState tried to access immutable data as mutable.");
+  EXPECT_ENVOY_BUG(filterState().getDataMutable<TestStoredTypeTracking>("test_name"),
+                   "FilterState tried to access immutable data as mutable.");
+  EXPECT_ENVOY_BUG(filterState().getDataSharedMutableGeneric("test_name"),
+                   "FilterState tried to access immutable data as mutable.");
 }
 
 namespace {
@@ -286,13 +285,13 @@ TEST_F(FilterStateImplTest, LifeSpanInitFromParent) {
   EXPECT_TRUE(new_filter_state.hasDataWithName("test_4"));
   EXPECT_TRUE(new_filter_state.hasDataWithName("test_5"));
   EXPECT_TRUE(new_filter_state.hasDataWithName("test_6"));
-  EXPECT_THROW_WITH_MESSAGE(new_filter_state.getDataMutable<SimpleType>("test_3"), EnvoyException,
-                            "FilterState tried to access immutable data as mutable.");
+  EXPECT_ENVOY_BUG(new_filter_state.getDataMutable<SimpleType>("test_3"),
+                   "FilterState tried to access immutable data as mutable.");
 
   EXPECT_EQ(4, new_filter_state.getDataMutable<SimpleType>("test_4")->access());
 
-  EXPECT_THROW_WITH_MESSAGE(new_filter_state.getDataMutable<SimpleType>("test_5"), EnvoyException,
-                            "FilterState tried to access immutable data as mutable.");
+  EXPECT_ENVOY_BUG(new_filter_state.getDataMutable<SimpleType>("test_5"),
+                   "FilterState tried to access immutable data as mutable.");
 
   EXPECT_EQ(6, new_filter_state.getDataMutable<SimpleType>("test_6")->access());
 }
@@ -319,8 +318,8 @@ TEST_F(FilterStateImplTest, LifeSpanInitFromGrandparent) {
   EXPECT_FALSE(new_filter_state.hasDataWithName("test_4"));
   EXPECT_TRUE(new_filter_state.hasDataWithName("test_5"));
   EXPECT_TRUE(new_filter_state.hasDataWithName("test_6"));
-  EXPECT_THROW_WITH_MESSAGE(new_filter_state.getDataMutable<SimpleType>("test_5"), EnvoyException,
-                            "FilterState tried to access immutable data as mutable.");
+  EXPECT_ENVOY_BUG(new_filter_state.getDataMutable<SimpleType>("test_5"),
+                   "FilterState tried to access immutable data as mutable.");
   EXPECT_EQ(6, new_filter_state.getDataMutable<SimpleType>("test_6")->access());
 }
 
@@ -413,15 +412,13 @@ TEST_F(FilterStateImplTest, SetSameDataWithDifferentLifeSpan) {
   filterState().setData("test_1", std::make_unique<SimpleType>(1), FilterState::StateType::Mutable,
                         FilterState::LifeSpan::Connection);
   // Test reset on smaller LifeSpan
-  EXPECT_THROW_WITH_MESSAGE(
+  EXPECT_ENVOY_BUG(
       filterState().setData("test_1", std::make_unique<SimpleType>(2),
                             FilterState::StateType::Mutable, FilterState::LifeSpan::FilterChain),
-      EnvoyException,
       "FilterState::setData<T> called twice with conflicting life_span on the same data_name.");
-  EXPECT_THROW_WITH_MESSAGE(
+  EXPECT_ENVOY_BUG(
       filterState().setData("test_1", std::make_unique<SimpleType>(2),
                             FilterState::StateType::Mutable, FilterState::LifeSpan::Request),
-      EnvoyException,
       "FilterState::setData<T> called twice with conflicting life_span on the same data_name.");
 
   // Still mutable on the correct LifeSpan.
@@ -432,15 +429,13 @@ TEST_F(FilterStateImplTest, SetSameDataWithDifferentLifeSpan) {
   filterState().setData("test_2", std::make_unique<SimpleType>(1), FilterState::StateType::Mutable,
                         FilterState::LifeSpan::Request);
   // Test reset on smaller and greater LifeSpan
-  EXPECT_THROW_WITH_MESSAGE(
+  EXPECT_ENVOY_BUG(
       filterState().setData("test_2", std::make_unique<SimpleType>(2),
                             FilterState::StateType::Mutable, FilterState::LifeSpan::FilterChain),
-      EnvoyException,
       "FilterState::setData<T> called twice with conflicting life_span on the same data_name.");
-  EXPECT_THROW_WITH_MESSAGE(
+  EXPECT_ENVOY_BUG(
       filterState().setData("test_2", std::make_unique<SimpleType>(2),
                             FilterState::StateType::Mutable, FilterState::LifeSpan::Connection),
-      EnvoyException,
       "FilterState::setData<T> called twice with conflicting life_span on the same data_name.");
 
   // Still mutable on the correct LifeSpan.
