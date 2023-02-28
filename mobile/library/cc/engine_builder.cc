@@ -868,32 +868,24 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
       ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]
           .PackFrom(h2_protocol_options);
 
-  // Base h3 cluster set up
-  envoy::extensions::transport_sockets::quic::v3::QuicUpstreamTransport h3_inner_socket;
-  tls_socket.mutable_common_tls_context()->mutable_alpn_protocols()->Clear();
-  h3_inner_socket.mutable_upstream_tls_context()->CopyFrom(tls_socket);
-  envoy::extensions::transport_sockets::http_11_proxy::v3::Http11ProxyUpstreamTransport
-      h3_proxy_socket;
-  h3_proxy_socket.mutable_transport_socket()->mutable_typed_config()->PackFrom(h3_inner_socket);
-  h3_proxy_socket.mutable_transport_socket()->set_name("envoy.transport_sockets.quic");
-  alpn_options.mutable_auto_config()->mutable_http3_protocol_options();
-  alpn_options.mutable_auto_config()->mutable_alternate_protocols_cache_options()->set_name(
-      "default_alternate_protocols_cache");
+  // Edit base cluster to be an HTTP/3 cluster.
+  if (enable_http3_) {
+    envoy::extensions::transport_sockets::quic::v3::QuicUpstreamTransport h3_inner_socket;
+    tls_socket.mutable_common_tls_context()->mutable_alpn_protocols()->Clear();
+    h3_inner_socket.mutable_upstream_tls_context()->CopyFrom(tls_socket);
+    envoy::extensions::transport_sockets::http_11_proxy::v3::Http11ProxyUpstreamTransport
+        h3_proxy_socket;
+    h3_proxy_socket.mutable_transport_socket()->mutable_typed_config()->PackFrom(h3_inner_socket);
+    h3_proxy_socket.mutable_transport_socket()->set_name("envoy.transport_sockets.quic");
+    alpn_options.mutable_auto_config()->mutable_http3_protocol_options();
+    alpn_options.mutable_auto_config()->mutable_alternate_protocols_cache_options()->set_name(
+        "default_alternate_protocols_cache");
 
-  // Base h3 cluster
-  auto* base_h3 = static_resources->add_clusters();
-  base_h3->set_name("base_h3");
-  base_h3->mutable_connect_timeout()->set_seconds(connect_timeout_seconds_);
-  base_h3->set_lb_policy(envoy::config::cluster::v3::Cluster::CLUSTER_PROVIDED);
-  base_h3->mutable_cluster_type()->CopyFrom(base_cluster_type);
-  base_h3->mutable_transport_socket()->set_name("envoy.transport_sockets.http_11_proxy");
-  base_h3->mutable_transport_socket()->mutable_typed_config()->PackFrom(h3_proxy_socket);
-  base_h3->mutable_upstream_connection_options()->CopyFrom(
-      *base_cluster->mutable_upstream_connection_options());
-  base_h3->mutable_circuit_breakers()->CopyFrom(*base_cluster->mutable_circuit_breakers());
-  (*base_h3->mutable_typed_extension_protocol_options())
-      ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]
-          .PackFrom(alpn_options);
+    base_cluster->mutable_transport_socket()->mutable_typed_config()->PackFrom(h3_proxy_socket);
+    (*base_cluster->mutable_typed_extension_protocol_options())
+        ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]
+            .PackFrom(alpn_options);
+  }
 
   // Set up stats.
   bootstrap->mutable_stats_flush_interval()->set_seconds(stats_flush_seconds_);
