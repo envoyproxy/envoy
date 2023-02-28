@@ -262,8 +262,8 @@ public class EnvoyConfiguration {
         perTryIdleTimeoutSeconds, appVersion, appId, enforceTrustChainVerification, clusters,
         filter_chain, stats_sinks, enablePlatformCertificatesValidation,
         enableSkipDNSLookupForProxiedRequests, runtime_guards, rtdsLayerName, rtdsTimeoutSeconds,
-        adsAddress, adsPort, adsToken, adsTokenLifetime, adsRootCerts, nodeId, nodeRegion,
-        nodeZone, nodeSubZone);
+        adsAddress, adsPort, adsToken, adsTokenLifetime, adsRootCerts, nodeId, nodeRegion, nodeZone,
+        nodeSubZone);
   }
 
   long createBootstrap() {
@@ -288,8 +288,8 @@ public class EnvoyConfiguration {
         perTryIdleTimeoutSeconds, appVersion, appId, enforceTrustChainVerification, clusters,
         filter_chain, stats_sinks, enablePlatformCertificatesValidation,
         enableSkipDNSLookupForProxiedRequests, runtime_guards, rtdsLayerName, rtdsTimeoutSeconds,
-        adsAddress, adsPort, adsToken, adsTokenLifetime, adsRootCerts, nodeId, nodeRegion,
-        nodeZone, nodeSubZone);
+        adsAddress, adsPort, adsToken, adsTokenLifetime, adsRootCerts, nodeId, nodeRegion, nodeZone,
+        nodeSubZone);
   }
 
   static class ConfigurationException extends RuntimeException {

@@ -192,7 +192,6 @@ private:
   std::vector<std::pair<std::string, bool>> runtime_guards_;
   absl::flat_hash_map<std::string, StringAccessorSharedPtr> string_accessors_;
   bool skip_dns_lookups_for_proxied_requests_ = false;
-
 };
 
 using EngineBuilderSharedPtr = std::shared_ptr<EngineBuilder>;
