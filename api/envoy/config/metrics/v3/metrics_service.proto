@@ -17,7 +17,17 @@ option java_multiple_files = true;
 option go_package = "github.com/envoyproxy/go-control-plane/envoy/config/metrics/v3;metricsv3";
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
-// [#protodoc-title: Metrics service]
+// HistogramMetrics is used to configure which metric types should be emitted for histograms.
+enum HistogramMetrics {
+  // Emit Histogram and Summary metric types.
+  SUMMARY_AND_HISTOGRAM = 0;
+
+  // Emit only Summary metric types.
+  SUMMARY = 1;
+
+  // Emit only Summary metric types.
+  HISTOGRAM = 2;
+}
 
 // Metrics Service is configured as a built-in ``envoy.stat_sinks.metrics_service`` :ref:`StatsSink
 // <envoy_v3_api_msg_config.metrics.v3.StatsSink>`. This opaque configuration will be used to create
@@ -57,7 +67,6 @@ message MetricsServiceConfig {
   // extractor or additional tags added during stats creation.
   bool emit_tags_as_labels = 4;
 
-  // If true, only histogram summary metrics will be emitted to the MetricsService. This is useful
-  // to reduce the size of the metric payloads.
-  bool only_histogram_summary = 5;
+  // Specify which metrics types to emit for histograms. Defaults to SUMMARY_AND_HISTOGRAM.
+  HistogramMetrics histogram_metrics = 5 [(validate.rules).enum = {defined_only: true}];
 }

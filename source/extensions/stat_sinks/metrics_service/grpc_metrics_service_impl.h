@@ -5,6 +5,7 @@
 #include "envoy/grpc/async_client.h"
 #include "envoy/local_info/local_info.h"
 #include "envoy/network/connection.h"
+#include "envoy/config/metrics/v3/metrics_service.pb.h"
 #include "envoy/service/metrics/v3/metrics_service.pb.h"
 #include "envoy/singleton/instance.h"
 #include "envoy/stats/histogram.h"
@@ -22,6 +23,7 @@ namespace MetricsService {
 
 using MetricsPtr =
     std::unique_ptr<Envoy::Protobuf::RepeatedPtrField<io::prometheus::client::MetricFamily>>;
+using HistogramMetrics = envoy::config::metrics::v3::HistogramMetrics;
 
 /**
  * Interface for metrics streamer.
@@ -82,11 +84,15 @@ using GrpcMetricsStreamerImplPtr = std::unique_ptr<GrpcMetricsStreamerImpl>;
 class MetricsFlusher {
 public:
   MetricsFlusher(
-      bool report_counters_as_deltas, bool emit_labels, bool only_histogram_summary,
+      bool report_counters_as_deltas, bool emit_labels, HistogramMetrics histogram_metrics,
       std::function<bool(const Stats::Metric&)> predicate =
           [](const auto& metric) { return metric.used(); })
       : report_counters_as_deltas_(report_counters_as_deltas), emit_labels_(emit_labels),
-        only_histogram_summary_(only_histogram_summary), predicate_(predicate) {}
+        emit_summary_(histogram_metrics == HistogramMetrics::SUMMARY_AND_HISTOGRAM ||
+                      histogram_metrics == HistogramMetrics::SUMMARY),
+        emit_histogram_(histogram_metrics == HistogramMetrics::SUMMARY_AND_HISTOGRAM ||
+                        histogram_metrics == HistogramMetrics::HISTOGRAM),
+        predicate_(predicate) {}
 
   MetricsPtr flush(Stats::MetricSnapshot& snapshot) const;
 
@@ -96,8 +102,10 @@ private:
                     int64_t snapshot_time_ms) const;
   void flushGauge(io::prometheus::client::MetricFamily& metrics_family, const Stats::Gauge& gauge,
                   int64_t snapshot_time_ms) const;
-  void flushHistogram(io::prometheus::client::MetricFamily& summary_metrics_family,
-                      io::prometheus::client::MetricFamily& histogram_metrics_family,
+  void flushHistogram(io::prometheus::client::MetricFamily& metrics_family,
+                      const Stats::ParentHistogram& envoy_histogram,
+                      int64_t snapshot_time_ms) const;
+  void flushSummary(io::prometheus::client::MetricFamily& metrics_family,
                       const Stats::ParentHistogram& envoy_histogram,
                       int64_t snapshot_time_ms) const;
 
@@ -108,7 +116,8 @@ private:
 
   const bool report_counters_as_deltas_;
   const bool emit_labels_;
-  const bool only_histogram_summary_;
+  const bool emit_summary_;
+  const bool emit_histogram_;
   const std::function<bool(const Stats::Metric&)> predicate_;
 };
 
@@ -119,9 +128,9 @@ template <class RequestProto, class ResponseProto> class MetricsServiceSink : pu
 public:
   MetricsServiceSink(
       const GrpcMetricsStreamerSharedPtr<RequestProto, ResponseProto>& grpc_metrics_streamer,
-      bool report_counters_as_deltas, bool emit_labels, bool only_histogram_summary)
-      : MetricsServiceSink(grpc_metrics_streamer,
-                           MetricsFlusher(report_counters_as_deltas, emit_labels, only_histogram_summary)) {}
+      bool report_counters_as_deltas, bool emit_labels, HistogramMetrics histogram_metrics)
+      : MetricsServiceSink(grpc_metrics_streamer, MetricsFlusher(report_counters_as_deltas,
+                                                                 emit_labels, histogram_metrics)) {}
 
   MetricsServiceSink(
       const GrpcMetricsStreamerSharedPtr<RequestProto, ResponseProto>& grpc_metrics_streamer,

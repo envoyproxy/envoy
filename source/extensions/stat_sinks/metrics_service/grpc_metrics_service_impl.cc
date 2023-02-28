@@ -4,6 +4,7 @@
 
 #include "envoy/common/exception.h"
 #include "envoy/event/dispatcher.h"
+#include "envoy/config/metrics/v3/metrics_service.pb.h"
 #include "envoy/service/metrics/v3/metrics_service.pb.h"
 #include "envoy/stats/histogram.h"
 #include "envoy/stats/stats.h"
@@ -68,7 +69,12 @@ MetricsPtr MetricsFlusher::flush(Stats::MetricSnapshot& snapshot) const {
 
   for (const auto& histogram : snapshot.histograms()) {
     if (predicate_(histogram.get())) {
-      flushHistogram(*metrics->Add(), *metrics->Add(), histogram.get(), snapshot_time_ms);
+      if (emit_summary_) {
+        flushSummary(*metrics->Add(), histogram.get(), snapshot_time_ms);
+      }
+      if (emit_histogram_) {
+        flushHistogram(*metrics->Add(), histogram.get(), snapshot_time_ms);
+      }
     }
   }
 
@@ -96,42 +102,39 @@ void MetricsFlusher::flushGauge(io::prometheus::client::MetricFamily& metrics_fa
   gauge_metric->set_value(gauge.value());
 }
 
-void MetricsFlusher::flushHistogram(io::prometheus::client::MetricFamily& summary_metrics_family,
-                                    io::prometheus::client::MetricFamily& histogram_metrics_family,
+void MetricsFlusher::flushHistogram(io::prometheus::client::MetricFamily& metrics_family,
                                     const Stats::ParentHistogram& envoy_histogram,
                                     int64_t snapshot_time_ms) const {
-  // TODO(ramaraochavali): Currently we are sending both quantile information and bucket
-  // information. We should make this configurable if it turns out that sending both affects
-  // performance.
 
-  // Add summary information for histograms.
+  const Stats::HistogramStatistics& hist_stats = envoy_histogram.intervalStatistics();
+  auto* histogram_metric = populateMetricsFamily(metrics_family,
+                                                  io::prometheus::client::MetricType::HISTOGRAM,
+                                                  snapshot_time_ms, envoy_histogram);
+  auto* histogram = histogram_metric->mutable_histogram();
+  histogram->set_sample_count(hist_stats.sampleCount());
+  histogram->set_sample_sum(hist_stats.sampleSum());
+  for (size_t i = 0; i < hist_stats.supportedBuckets().size(); i++) {
+    auto* bucket = histogram->add_bucket();
+    bucket->set_upper_bound(hist_stats.supportedBuckets()[i]);
+    bucket->set_cumulative_count(hist_stats.computedBuckets()[i]);
+  }
+}
+
+void MetricsFlusher::flushSummary(io::prometheus::client::MetricFamily& metrics_family,
+                                    const Stats::ParentHistogram& envoy_histogram,
+                                    int64_t snapshot_time_ms) const {
+
+  const Stats::HistogramStatistics& hist_stats = envoy_histogram.intervalStatistics();
   auto* summary_metric =
-      populateMetricsFamily(summary_metrics_family, io::prometheus::client::MetricType::SUMMARY,
+      populateMetricsFamily(metrics_family, io::prometheus::client::MetricType::SUMMARY,
                             snapshot_time_ms, envoy_histogram);
   auto* summary = summary_metric->mutable_summary();
-  const Stats::HistogramStatistics& hist_stats = envoy_histogram.intervalStatistics();
   for (size_t i = 0; i < hist_stats.supportedQuantiles().size(); i++) {
     auto* quantile = summary->add_quantile();
     quantile->set_quantile(hist_stats.supportedQuantiles()[i]);
     quantile->set_value(hist_stats.computedQuantiles()[i]);
   }
   summary->set_sample_count(hist_stats.sampleCount());
-  summary->set_sample_sum(hist_stats.sampleSum());
-
-  if (!only_histogram_summary_) {
-    // Add bucket information for histograms.
-    auto* histogram_metric = populateMetricsFamily(histogram_metrics_family,
-                                                   io::prometheus::client::MetricType::HISTOGRAM,
-                                                   snapshot_time_ms, envoy_histogram);
-    auto* histogram = histogram_metric->mutable_histogram();
-    histogram->set_sample_count(hist_stats.sampleCount());
-    histogram->set_sample_sum(hist_stats.sampleSum());
-    for (size_t i = 0; i < hist_stats.supportedBuckets().size(); i++) {
-      auto* bucket = histogram->add_bucket();
-      bucket->set_upper_bound(hist_stats.supportedBuckets()[i]);
-      bucket->set_cumulative_count(hist_stats.computedBuckets()[i]);
-    }
-  }
 }
 
 io::prometheus::client::Metric*
