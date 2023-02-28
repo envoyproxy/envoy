@@ -209,13 +209,35 @@ getClusterSpecifierPluginByTheProto(const envoy::config::route::v3::ClusterSpeci
   return factory->createClusterSpecifierPlugin(*config, factory_context);
 }
 
+::Envoy::Http::Utility::RedirectConfig
+createRedirectConfig(const envoy::config::route::v3::Route& route) {
+  ::Envoy::Http::Utility::RedirectConfig redirect_config{
+      route.redirect().scheme_redirect(),
+      route.redirect().host_redirect(),
+      route.redirect().port_redirect() ? ":" + std::to_string(route.redirect().port_redirect())
+                                       : "",
+      route.redirect().path_redirect(),
+      route.redirect().prefix_rewrite(),
+      route.redirect().has_regex_rewrite() ? route.redirect().regex_rewrite().substitution() : "",
+      route.redirect().has_regex_rewrite()
+          ? Regex::Utility::parseRegex(route.redirect().regex_rewrite().pattern())
+          : nullptr,
+      route.redirect().path_redirect().find('?') != absl::string_view::npos,
+      route.redirect().https_redirect(),
+      route.redirect().strip_query()};
+  if (route.redirect().has_regex_rewrite()) {
+    ASSERT(redirect_config.prefix_rewrite_redirect_.empty());
+  }
+  return redirect_config;
+}
+
 } // namespace
 
 const std::string& OriginalConnectPort::key() {
   CONSTRUCT_ON_FIRST_USE(std::string, "envoy.router.original_connect_port");
 }
 
-std::string SslRedirector::newPath(const Http::RequestHeaderMap& headers) const {
+std::string SslRedirector::newUri(const Http::RequestHeaderMap& headers) const {
   return Http::Utility::createSslRedirectPath(headers);
 }
 
@@ -459,25 +481,6 @@ const envoy::type::v3::FractionalPercent& RouteTracingImpl::getOverallSampling()
 }
 const Tracing::CustomTagMap& RouteTracingImpl::getCustomTags() const { return custom_tags_; }
 
-RedirectConfig::RedirectConfig(const envoy::config::route::v3::Route& route)
-    : scheme_redirect_(route.redirect().scheme_redirect()),
-      host_redirect_(route.redirect().host_redirect()),
-      port_redirect_(route.redirect().port_redirect()
-                         ? ":" + std::to_string(route.redirect().port_redirect())
-                         : ""),
-      path_redirect_(route.redirect().path_redirect()),
-      prefix_rewrite_redirect_(route.redirect().prefix_rewrite()),
-      path_redirect_has_query_(path_redirect_.find('?') != absl::string_view::npos),
-      https_redirect_(route.redirect().https_redirect()),
-      strip_query_(route.redirect().strip_query()) {
-  if (route.redirect().has_regex_rewrite()) {
-    ASSERT(prefix_rewrite_redirect_.empty());
-    auto rewrite_spec = route.redirect().regex_rewrite();
-    regex_rewrite_redirect_ = Regex::Utility::parseRegex(rewrite_spec.pattern());
-    regex_rewrite_redirect_substitution_ = rewrite_spec.substitution();
-  }
-}
-
 OptionalTimeouts::OptionalTimeouts(const envoy::config::route::v3::RouteAction& route)
     : has_idle_timeout_(false), has_max_stream_duration_(false),
       has_grpc_timeout_header_max_(false), has_grpc_timeout_header_offset_(false),
@@ -540,7 +543,10 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
       timeout_(PROTOBUF_GET_MS_OR_DEFAULT(route.route(), timeout, DEFAULT_ROUTE_TIMEOUT_MS)),
       optional_timeouts_(buildOptionalTimeouts(route.route())), loader_(factory_context.runtime()),
       runtime_(loadRuntimeData(route.match())),
-      redirect_config_(route.has_redirect() ? std::make_unique<RedirectConfig>(route) : nullptr),
+      redirect_config_(route.has_redirect()
+                           ? std::make_unique<::Envoy::Http::Utility::RedirectConfig>(
+                                 createRedirectConfig(route))
+                           : nullptr),
       hedge_policy_(buildHedgePolicy(vhost.hedgePolicy(), route.route())),
       retry_policy_(
           buildRetryPolicy(vhost.retryPolicy(), route.route(), validator, factory_context)),
@@ -1053,115 +1059,12 @@ absl::optional<std::string> RouteEntryImplBase::currentUrlPathAfterRewriteWithMa
   return {};
 }
 
-absl::string_view RouteEntryImplBase::processRequestHost(const Http::RequestHeaderMap& headers,
-                                                         absl::string_view new_scheme,
-                                                         absl::string_view new_port) const {
-
-  absl::string_view request_host = headers.getHostValue();
-  size_t host_end;
-  if (request_host.empty()) {
-    return request_host;
-  }
-  // Detect if IPv6 URI
-  if (request_host[0] == '[') {
-    host_end = request_host.rfind("]:");
-    if (host_end != absl::string_view::npos) {
-      host_end += 1; // advance to :
-    }
-  } else {
-    host_end = request_host.rfind(':');
-  }
-
-  if (host_end != absl::string_view::npos) {
-    absl::string_view request_port = request_host.substr(host_end);
-    // In the rare case that X-Forwarded-Proto and scheme disagree (say http URL over an HTTPS
-    // connection), do port stripping based on X-Forwarded-Proto so http://foo.com:80 won't
-    // have the port stripped when served over TLS.
-    absl::string_view request_protocol = headers.getForwardedProtoValue();
-    bool remove_port = !new_port.empty();
-
-    if (new_scheme != request_protocol) {
-      remove_port |= (request_protocol == Http::Headers::get().SchemeValues.Https.c_str()) &&
-                     request_port == ":443";
-      remove_port |= (request_protocol == Http::Headers::get().SchemeValues.Http.c_str()) &&
-                     request_port == ":80";
-    }
-
-    if (remove_port) {
-      return request_host.substr(0, host_end);
-    }
-  }
-
-  return request_host;
-}
-
-std::string RouteEntryImplBase::newPath(const Http::RequestHeaderMap& headers) const {
+std::string RouteEntryImplBase::newUri(const Http::RequestHeaderMap& headers) const {
   ASSERT(isDirectResponse());
-
-  absl::string_view final_scheme;
-  absl::string_view final_host;
-  absl::string_view final_port;
-  absl::string_view final_path;
-
-  if (redirect_config_ != nullptr && !redirect_config_->scheme_redirect_.empty()) {
-    final_scheme = redirect_config_->scheme_redirect_.c_str();
-  } else if (redirect_config_ != nullptr && redirect_config_->https_redirect_) {
-    final_scheme = Http::Headers::get().SchemeValues.Https;
-  } else {
-    // Serve the redirect URL based on the scheme of the original URL, not the
-    // security of the underlying connection.
-    final_scheme = headers.getSchemeValue();
-  }
-
-  if (redirect_config_ != nullptr && !redirect_config_->port_redirect_.empty()) {
-    final_port = redirect_config_->port_redirect_.c_str();
-  } else {
-    final_port = "";
-  }
-
-  if (redirect_config_ != nullptr && !redirect_config_->host_redirect_.empty()) {
-    final_host = redirect_config_->host_redirect_.c_str();
-  } else {
-    ASSERT(headers.Host());
-    final_host = processRequestHost(headers, final_scheme, final_port);
-  }
-
-  std::string final_path_value;
-  if (redirect_config_ != nullptr && !redirect_config_->path_redirect_.empty()) {
-    // The path_redirect query string, if any, takes precedence over the request's query string,
-    // and it will not be stripped regardless of `strip_query`.
-    if (redirect_config_->path_redirect_has_query_) {
-      final_path = redirect_config_->path_redirect_.c_str();
-    } else {
-      const absl::string_view current_path = headers.getPathValue();
-      const size_t path_end = current_path.find('?');
-      const bool current_path_has_query = path_end != absl::string_view::npos;
-      if (current_path_has_query) {
-        final_path_value = redirect_config_->path_redirect_;
-        final_path_value.append(current_path.data() + path_end, current_path.length() - path_end);
-        final_path = final_path_value;
-      } else {
-        final_path = redirect_config_->path_redirect_.c_str();
-      }
-    }
-  } else {
-    final_path = headers.getPathValue();
-  }
-
-  if (!absl::StartsWith(final_path, "/")) {
-    final_path_value = absl::StrCat("/", final_path);
-    final_path = final_path_value;
-  }
-
-  if (redirect_config_ != nullptr && !redirect_config_->path_redirect_has_query_ &&
-      redirect_config_->strip_query_) {
-    const size_t path_end = final_path.find('?');
-    if (path_end != absl::string_view::npos) {
-      final_path = final_path.substr(0, path_end);
-    }
-  }
-
-  return fmt::format("{}://{}{}{}", final_scheme, final_host, final_port, final_path);
+  return ::Envoy::Http::Utility::newUri(
+      ::Envoy::makeOptRefFromPtr(
+          const_cast<const ::Envoy::Http::Utility::RedirectConfig*>(redirect_config_.get())),
+      headers);
 }
 
 std::multimap<std::string, std::string>
