@@ -222,24 +222,22 @@ EngineBuilder& EngineBuilder::enforceTrustChainVerification(bool trust_chain_ver
   return *this;
 }
 
-EngineBuilder& EngineBuilder::setNodeId(std::string node_id, bool use_node_id) {
+EngineBuilder& EngineBuilder::setNodeId(std::string node_id) {
   node_id_ = std::move(node_id);
-  use_node_id_ = use_node_id;
+  use_node_id_ = true;
   return *this;
 }
 
-EngineBuilder& EngineBuilder::setNodeLocality(const NodeLocality& node_locality,
-                                              bool use_node_locality) {
+EngineBuilder& EngineBuilder::setNodeLocality(const NodeLocality& node_locality) {
   node_locality_ = node_locality;
-  use_node_locality_ = use_node_locality;
+  use_node_locality_ = true;
   return *this;
 }
 
 EngineBuilder& EngineBuilder::setAggregatedDiscoveryService(std::string address, const int port,
                                                             std::string jwt_token,
                                                             const int jwt_token_lifetime_seconds,
-                                                            std::string ssl_root_certs,
-                                                            bool use_ads) {
+                                                            std::string ssl_root_certs) {
 #ifndef ENVOY_GOOGLE_GRPC
   throw std::runtime_error("google_grpc must be enabled in bazel to use ADS");
 #endif
@@ -249,21 +247,20 @@ EngineBuilder& EngineBuilder::setAggregatedDiscoveryService(std::string address,
   ads_jwt_token_lifetime_seconds_ =
       jwt_token_lifetime_seconds == 0 ? DefaultJwtTokenLifetimeSeconds : jwt_token_lifetime_seconds;
   ads_ssl_root_certs_ = std::move(ssl_root_certs);
-  use_ads_ = use_ads;
+  use_ads_ = true;
   return *this;
 }
 
-EngineBuilder& EngineBuilder::addRtdsLayer(std::string layer_name, const int timeout_seconds,
-                                           bool use_rtds) {
+EngineBuilder& EngineBuilder::addRtdsLayer(std::string layer_name, const int timeout_seconds) {
   rtds_layer_name_ = layer_name;
   rtds_timeout_seconds_ = timeout_seconds == 0 ? DefaultXdsTimeout : timeout_seconds;
-  use_rtds_ = use_rtds;
+  use_rtds_ = true;
   return *this;
 }
 
 EngineBuilder& EngineBuilder::addCdsLayer(std::string cds_resources_locator,
-                                          const int timeout_seconds, bool use_cds) {
-  use_cds_ = use_cds;
+                                          const int timeout_seconds) {
+  use_cds_ = true;
   cds_resources_locator_ = std::move(cds_resources_locator);
   cds_timeout_seconds_ = timeout_seconds == 0 ? DefaultXdsTimeout : timeout_seconds;
   return *this;
