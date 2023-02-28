@@ -146,6 +146,7 @@ envoy_cc_test(
         "//source/common/runtime:runtime_lib",
         "//test/common/http/http2:http2_frame",
         "//test/test_common:logging_lib",
+        "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
     ],
 )

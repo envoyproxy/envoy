@@ -262,7 +262,7 @@ public:
 
       secret_config_ecdsa->set_name(server_cert_ecdsa_);
       auto* config_source = secret_config_ecdsa->mutable_sds_config();
-      const std::string sds_template =
+      constexpr absl::string_view sds_template =
           R"EOF(
 ---
 version_info: "0"
@@ -294,7 +294,7 @@ resources:
 
       secret_config_rsa_2->set_name(server2_cert_rsa_);
       auto* config_source = secret_config_rsa_2->mutable_sds_config();
-      const std::string sds_template =
+      constexpr absl::string_view sds_template =
           R"EOF(
 ---
 version_info: "0"
