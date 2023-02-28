@@ -18,13 +18,13 @@ FixedServerPreferredAddressConfigFactory::createServerPreferredAddressConfig(
                                            FixedServerPreferredAddressConfig&>(message,
                                                                                validation_visitor);
   quic::QuicIpAddress ip_v4, ip_v6;
-  if (!config.ipv4_address().empty()) {
+  if (config.has_ipv4_address()) {
     if (!ip_v4.FromString(config.ipv4_address())) {
       ProtoExceptionUtil::throwProtoValidationException(
           absl::StrCat("bad v4 server preferred address: ", config.ipv4_address()), message);
     }
   }
-  if (!config.ipv6_address().empty()) {
+  if (config.has_ipv6_address()) {
     if (!ip_v6.FromString(config.ipv6_address())) {
       ProtoExceptionUtil::throwProtoValidationException(
           absl::StrCat("bad v6 server preferred address: ", config.ipv6_address()), message);
