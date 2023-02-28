@@ -694,7 +694,7 @@ void Client::setDestinationCluster(Http::RequestHeaderMap& headers) {
     cluster = BaseCluster;
   }
 
-  auto protocol_header = headers.get(ProtocolHeader);
+  auto protocol_header = headers.get(LegacyProtocolHeader);
   if (!protocol_header.empty()) {
     headers.remove(LegacyProtocolHeader);
   }
