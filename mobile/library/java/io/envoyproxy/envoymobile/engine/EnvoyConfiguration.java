@@ -27,6 +27,7 @@ public class EnvoyConfiguration {
     // Used for testing.
     ACCEPT_UNTRUSTED;
   }
+
   public final Boolean adminInterfaceEnabled;
   public final String grpcStatsDomain;
   public final Integer connectTimeoutSeconds;
@@ -84,7 +85,6 @@ public class EnvoyConfiguration {
   /**
    * Create a new instance of the configuration.
    *
-   * @param TODO
    * @param adminInterfaceEnabled                         whether admin interface should be enabled
    *     or not.
    * @param grpcStatsDomain                               the domain to flush stats to.
@@ -155,10 +155,10 @@ public class EnvoyConfiguration {
    * @param nodeZone                                      the node zone to use for the ADS server.
    * @param nodeSubZone                                   the node sub-zone to use for the ADS
    *     server.
-   * @param useNodeId                                      enables node id.
-   * @param useRtds                                        enables RTDS.
-   * @param useNodeLocality                                enables node locality.
-   * @param useAds                                         enables ADS.
+   * @param useNodeId                                     enables node id.
+   * @param useRtds                                       enables RTDS.
+   * @param useNodeLocality                               enables node locality.
+   * @param useAds                                        enables ADS.
    */
   public EnvoyConfiguration(
       boolean adminInterfaceEnabled, String grpcStatsDomain, int connectTimeoutSeconds,

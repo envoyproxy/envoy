@@ -396,6 +396,7 @@ final class EngineBuilderTests: XCTestCase {
     let expectation = self.expectation(description: "Run called with expected data")
     MockEnvoyEngine.onRunWithConfig = { config, _ in
       XCTAssertTrue(config.generateYamlString().contains("rtds_layer_name"))
+      XCTAssertTrue(config.generateYamlString().contains("initial_fetch_timeout: 14325"))
       expectation.fulfill()
     }
     MockEnvoyEngine.onRunWithConfig = { config, _ in
@@ -405,7 +406,7 @@ final class EngineBuilderTests: XCTestCase {
 
     _ = EngineBuilder()
       .addEngineType(MockEnvoyEngine.self)
-      .addRtdsLayer(name: "rtds_layer_name", timeoutSeconds: 5)
+      .addRtdsLayer(name: "rtds_layer_name", timeoutSeconds: 14325)
       .setAggregatedDiscoveryService(address: "FAKE_SWIFT_ADDRESS", port: 0)
       .build()
     self.waitForExpectations(timeout: 0.01)

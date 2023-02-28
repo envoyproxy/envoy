@@ -338,13 +338,14 @@ class EnvoyConfigurationTest {
   fun `test adding RTDS and ADS`() {
     JniLibrary.loadTestLibrary()
     val envoyConfiguration = buildTestEnvoyConfiguration(
-      rtdsLayerName = "fake_rtds_layer", adsAddress = "FAKE_ADDRESS", adsPort = 0, useAds = true, useRtds = true
+      rtdsLayerName = "fake_rtds_layer", rtdsTimeoutSeconds = 5432, adsAddress = "FAKE_ADDRESS", adsPort = 0, useAds = true, useRtds = true
     )
 
     val resolvedTemplate = envoyConfiguration.createYaml()
 
     assertThat(resolvedTemplate).contains("fake_rtds_layer");
     assertThat(resolvedTemplate).contains("FAKE_ADDRESS");
+    assertThat(resolvedTemplate).contains("seconds: 5432");
   }
 
   @Test
@@ -360,6 +361,19 @@ class EnvoyConfigurationTest {
     assertThat(resolvedTemplate).doesNotContain("FAKE_ADDRESS");
   }
 
+  @Test
+  fun `test RTDS default timeout`() {
+    JniLibrary.loadTestLibrary()
+    val envoyConfiguration = buildTestEnvoyConfiguration(
+      rtdsLayerName = "fake_rtds_layer", adsAddress = "FAKE_ADDRESS", adsPort = 0
+    )
+
+    val resolvedTemplate = envoyConfiguration.createYaml("""rtds_config:
+    initial_fetch_timeout:
+      seconds: 5""")
+
+    assertThat(resolvedTemplate).contains("")
+  }
 
   @Test
   fun `test YAML loads with stats sinks and stats domain`() {
