@@ -567,7 +567,6 @@ open class EngineBuilder: NSObject {
   @discardableResult
   public func setNodeId(_ nodeId: String) -> Self {
     self.nodeId = nodeId
-    self.useNodeLocality = true
     return self
   }
 
