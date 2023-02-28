@@ -2,6 +2,7 @@
 
 #import "library/common/main_interface.h"
 #import "library/cc/engine_builder.h"
+#include "source/common/protobuf/utility.h"
 
 @implementation NSString (CXX)
 - (std::string)toCXXString {
@@ -112,11 +113,11 @@
                                            keyValueStores
                                        statsSinks:(NSArray<NSString *> *)statsSinks
                                     rtdsLayerName:(NSString *)rtdsLayerName
-                               rtdsTimeoutSeconds:(NSNumber *)rtdsTimeoutSeconds
+                               rtdsTimeoutSeconds:(UInt32)rtdsTimeoutSeconds
                                        adsAddress:(NSString *)adsAddress
-                                          adsPort:(NSNumber *)adsPort
+                                          adsPort:(UInt32)adsPort
                                       adsJwtToken:(NSString *)adsJwtToken
-                       adsJwtTokenLifetimeSeconds:(NSNumber *)adsJwtTokenLifetimeSeconds
+                       adsJwtTokenLifetimeSeconds:(UInt32)adsJwtTokenLifetimeSeconds
                                   adsSslRootCerts:(NSString *)adsSslRootCerts
                                            nodeId:(NSString *)nodeId
                                        nodeRegion:(NSString *)nodeRegion
@@ -283,11 +284,15 @@
     return nullptr;
   }
 }
+
 // This is only for test purposes
-- (std::string)generateYaml {
+- (NSString *)generateYamlString {
   try {
     Envoy::Platform::EngineBuilder builder = [self applyToCXXBuilder];
-    return builder.generateYaml();
+    std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> bootstrap =
+        builder.generateBootstrap();
+    std::string bootstrap_str = Envoy::MessageUtil::getYamlStringFromMessage(*bootstrap);
+    return [NSString stringWithUTF8String:bootstrap_str.c_str()];
   } catch (const std::exception &e) {
     NSLog(@"[Envoy] error generating yaml: %@", @(e.what()));
     return nullptr;

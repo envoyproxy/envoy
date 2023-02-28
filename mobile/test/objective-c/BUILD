@@ -24,7 +24,7 @@ envoy_mobile_objc_test(
     tags = ["no-remote-exec"],  # TODO(jpsim): Re-enable remote exec
     visibility = ["//visibility:public"],
     deps = [
-        "//library/objective-c:envoy_engine_objc_lib",
+        "//library/objective-c:envoy_engine_config_objc_lib",
     ],
 )
 

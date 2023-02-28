@@ -606,9 +606,9 @@ open class EngineBuilder: NSObject {
   public func setAggregatedDiscoveryService(
     address: String,
     port: UInt32,
-    jwtToken: String? = nil,
-    jwtTokenLifetimeSeconds: UInt32? = nil,
-    sslRootCerts: String? = nil
+    jwtToken: String = "",
+    jwtTokenLifetimeSeconds: UInt32 = 0,
+    sslRootCerts: String = ""
     ) -> Self {
     self.adsAddress = address
     self.adsPort = port
@@ -626,7 +626,7 @@ open class EngineBuilder: NSObject {
   ///
   /// - Returns: This builder.
   @discardableResult
-  public func addRtdsLayer(name layerName: String, timeoutSeconds: UInt32? = nil) -> Self {
+  public func addRtdsLayer(name layerName: String, timeoutSeconds: UInt32 = 0) -> Self {
     self.rtdsLayerName = layerName
     self.rtdsTimeoutSeconds = timeoutSeconds
     self.useRtds = true
@@ -697,20 +697,20 @@ open class EngineBuilder: NSObject {
       keyValueStores: self.keyValueStores,
       statsSinks: self.statsSinks,
       rtdsLayerName: self.rtdsLayerName,
-      rtdsTimeoutSeconds: self.rtdsTimeoutSeconds.map { UInt($0) as NSNumber },
+      rtdsTimeoutSeconds: self.rtdsTimeoutSeconds,
       adsAddress: self.adsAddress,
-      adsPort: self.adsPort.map { UInt($0) as NSNumber },
+      adsPort: self.adsPort,
       adsJwtToken: self.adsJwtToken,
-      adsJwtTokenLifetimeSeconds: self.adsJwtTokenLifetimeSeconds.map { UInt($0) as NSNumber },
+      adsJwtTokenLifetimeSeconds: self.adsJwtTokenLifetimeSeconds,
       adsSslRootCerts: self.adsSslRootCerts,
       nodeId: self.nodeId,
       nodeRegion: self.nodeRegion,
       nodeZone: self.nodeZone,
       nodeSubZone: self.nodeSubZone,
       useNodeId: self.useNodeId,
-      useAds: self.useAds,
-      useNodeLocality: self.useNodeLocality,
       useRtds: self.useRtds,
+      useNodeLocality: self.useNodeLocality,
+      useAds: self.useAds
     )
 
     switch self.base {
@@ -719,6 +719,65 @@ open class EngineBuilder: NSObject {
     case .standard:
       return EngineImpl(config: config, logLevel: self.logLevel, engine: engine)
     }
+  }
+
+  // For test purposes only
+  public func generateYamlString() -> String {
+    let config = EnvoyConfiguration(
+      adminInterfaceEnabled: self.adminInterfaceEnabled,
+      grpcStatsDomain: self.grpcStatsDomain,
+      connectTimeoutSeconds: self.connectTimeoutSeconds,
+      dnsRefreshSeconds: self.dnsRefreshSeconds,
+      dnsFailureRefreshSecondsBase: self.dnsFailureRefreshSecondsBase,
+      dnsFailureRefreshSecondsMax: self.dnsFailureRefreshSecondsMax,
+      dnsQueryTimeoutSeconds: self.dnsQueryTimeoutSeconds,
+      dnsMinRefreshSeconds: self.dnsMinRefreshSeconds,
+      dnsPreresolveHostnames: self.dnsPreresolveHostnames,
+      enableDNSCache: self.enableDNSCache,
+      dnsCacheSaveIntervalSeconds: self.dnsCacheSaveIntervalSeconds,
+      enableHappyEyeballs: self.enableHappyEyeballs,
+      enableHttp3: self.enableHttp3,
+      enableGzipDecompression: self.enableGzipDecompression,
+      enableBrotliDecompression: self.enableBrotliDecompression,
+      enableInterfaceBinding: self.enableInterfaceBinding,
+      enableDrainPostDnsRefresh: self.enableDrainPostDnsRefresh,
+      enforceTrustChainVerification: self.enforceTrustChainVerification,
+      forceIPv6: self.forceIPv6,
+      enablePlatformCertificateValidation: self.enablePlatformCertificateValidation,
+      h2ConnectionKeepaliveIdleIntervalMilliseconds:
+        self.h2ConnectionKeepaliveIdleIntervalMilliseconds,
+      h2ConnectionKeepaliveTimeoutSeconds: self.h2ConnectionKeepaliveTimeoutSeconds,
+      maxConnectionsPerHost: self.maxConnectionsPerHost,
+      statsFlushSeconds: self.statsFlushSeconds,
+      streamIdleTimeoutSeconds: self.streamIdleTimeoutSeconds,
+      perTryIdleTimeoutSeconds: self.perTryIdleTimeoutSeconds,
+      appVersion: self.appVersion,
+      appId: self.appId,
+      virtualClusters: self.virtualClusters,
+      runtimeGuards: self.runtimeGuards,
+      typedDirectResponses: self.directResponses.map({ $0.toObjC() }),
+      nativeFilterChain: self.nativeFilterChain,
+      platformFilterChain: self.platformFilterChain,
+      stringAccessors: self.stringAccessors,
+      keyValueStores: self.keyValueStores,
+      statsSinks: self.statsSinks,
+      rtdsLayerName: self.rtdsLayerName,
+      rtdsTimeoutSeconds: self.rtdsTimeoutSeconds,
+      adsAddress: self.adsAddress,
+      adsPort: self.adsPort,
+      adsJwtToken: self.adsJwtToken,
+      adsJwtTokenLifetimeSeconds: self.adsJwtTokenLifetimeSeconds,
+      adsSslRootCerts: self.adsSslRootCerts,
+      nodeId: self.nodeId,
+      nodeRegion: self.nodeRegion,
+      nodeZone: self.nodeZone,
+      nodeSubZone: self.nodeSubZone,
+      useNodeId: self.useNodeId,
+      useRtds: self.useRtds,
+      useNodeLocality: self.useNodeLocality,
+      useAds: self.useAds
+    )
+    return config.generateYamlString();
   }
 
   // MARK: - Internal

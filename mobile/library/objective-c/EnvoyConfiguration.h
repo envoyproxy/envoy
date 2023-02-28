@@ -48,11 +48,11 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic, strong) NSDictionary<NSString *, id<EnvoyKeyValueStore>> *keyValueStores;
 @property (nonatomic, strong) NSArray<NSString *> *statsSinks;
 @property (nonatomic, strong) NSString *rtdsLayerName;
-@property (nonatomic, assign) NSNumber rtdsTimeoutSeconds;
+@property (nonatomic, assign) UInt32 rtdsTimeoutSeconds;
 @property (nonatomic, strong) NSString *adsAddress;
-@property (nonatomic, assign) NSNumber adsPort;
+@property (nonatomic, assign) UInt32 adsPort;
 @property (nonatomic, strong) NSString *adsJwtToken;
-@property (nonatomic, assign) NSNumber adsJwtTokenLifetimeSeconds;
+@property (nonatomic, assign) UInt32 adsJwtTokenLifetimeSeconds;
 @property (nonatomic, strong) NSString *adsSslRootCerts;
 @property (nonatomic, strong) NSString *nodeId;
 @property (nonatomic, strong) NSString *nodeRegion;
@@ -111,11 +111,11 @@ NS_ASSUME_NONNULL_BEGIN
                                            keyValueStores
                                        statsSinks:(NSArray<NSString *> *)statsSinks
                                     rtdsLayerName:(NSString *)rtdsLayerName
-                               rtdsTimeoutSeconds:(NSNumber *)rtdsTimeoutSeconds
+                               rtdsTimeoutSeconds:(UInt32)rtdsTimeoutSeconds
                                        adsAddress:(NSString *)adsAddress
-                                          adsPort:(NSNumber *)adsPort
+                                          adsPort:(UInt32)adsPort
                                       adsJwtToken:(NSString *)adsJwtToken
-                       adsJwtTokenLifetimeSeconds:(NSNumber *)adsJwtTokenLifetimeSeconds
+                       adsJwtTokenLifetimeSeconds:(UInt32)adsJwtTokenLifetimeSeconds
                                   adsSslRootCerts:(NSString *)adsSslRootCerts
                                            nodeId:(NSString *)nodeId
                                        nodeRegion:(NSString *)nodeRegion
@@ -125,6 +125,7 @@ NS_ASSUME_NONNULL_BEGIN
                                           useRtds:(BOOL)useRtds
                                   useNodeLocality:(BOOL)useNodeLocality
                                            useAds:(BOOL)useAds;
+- (NSString *)generateYamlString:();
 @end
 
 NS_ASSUME_NONNULL_END

@@ -395,7 +395,7 @@ final class EngineBuilderTests: XCTestCase {
   func testAddingRtdsAndAdsConfigurationWhenRunningEnvoy() {
     let expectation = self.expectation(description: "Run called with expected data")
     MockEnvoyEngine.onRunWithConfig = { config, _ in
-      XCTAssertEqual("rtds_layer_name", config.rtdsLayerName)
+      XCTAssertTrue(config.generateYamlString().contains("rtds_layer_name"))
       expectation.fulfill()
     }
     MockEnvoyEngine.onRunWithConfig = { config, _ in
