@@ -345,7 +345,7 @@ class EnvoyConfigurationTest {
 
     assertThat(resolvedTemplate).contains("fake_rtds_layer");
     assertThat(resolvedTemplate).contains("FAKE_ADDRESS");
-    assertThat(resolvedTemplate).contains("seconds: 5432");
+    assertThat(resolvedTemplate).contains("initial_fetch_timeout: 5432s");
   }
 
   @Test
@@ -365,14 +365,12 @@ class EnvoyConfigurationTest {
   fun `test RTDS default timeout`() {
     JniLibrary.loadTestLibrary()
     val envoyConfiguration = buildTestEnvoyConfiguration(
-      rtdsLayerName = "fake_rtds_layer", adsAddress = "FAKE_ADDRESS", adsPort = 0
+      rtdsLayerName = "fake_rtds_layer", adsAddress = "FAKE_ADDRESS", adsPort = 0, useAds = true, useRtds = true
     )
 
-    val resolvedTemplate = envoyConfiguration.createYaml("""rtds_config:
-    initial_fetch_timeout:
-      seconds: 5""")
+    val resolvedTemplate = envoyConfiguration.createYaml()
 
-    assertThat(resolvedTemplate).contains("")
+    assertThat(resolvedTemplate).contains("initial_fetch_timeout: 5s")
   }
 
   @Test

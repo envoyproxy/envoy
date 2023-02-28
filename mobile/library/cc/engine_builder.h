@@ -76,10 +76,11 @@ public:
   EngineBuilder& setNodeLocality(const NodeLocality& node_locality, bool use_node_locality = true);
   // Adds an ADS layer. Note that only the state-of-the-world gRPC protocol is supported, not Delta
   // gRPC.
-  EngineBuilder&
-  setAggregatedDiscoveryService(std::string address, const int port, std::string jwt_token = "",
-                                int jwt_token_lifetime_seconds = 0,
-                                std::string ssl_root_certs = "", bool use_ads = true);
+  EngineBuilder& setAggregatedDiscoveryService(std::string address, const int port,
+                                               std::string jwt_token = "",
+                                               int jwt_token_lifetime_seconds = 0,
+                                               std::string ssl_root_certs = "",
+                                               bool use_ads = true);
   // Adds an RTDS layer to default config. Requires that ADS be configured.
   EngineBuilder& addRtdsLayer(std::string layer_name, const int timeout_seconds = 0,
                               bool use_rtds = true);
