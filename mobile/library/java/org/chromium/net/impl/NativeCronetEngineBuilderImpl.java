@@ -65,21 +65,17 @@ public class NativeCronetEngineBuilderImpl extends CronetEngineBuilderImpl {
   private TrustChainVerification mTrustChainVerification = VERIFY_TRUST_CHAIN;
   private List<String> mVirtualClusters = Collections.emptyList();
   private boolean mEnablePlatformCertificatesValidation = true;
-  private String mRtdsLayerName = null;
+  private String mRtdsLayerName = "";
   private int mRtdsTimeoutSeconds = 0;
-  private String mAdsAddress = null;
+  private String mAdsAddress = "";
   private int mAdsPort = 0;
-  private String mAdsToken = null;
+  private String mAdsToken = "";
   private int mAdsTokenLifetime = 0;
-  private String mAdsRootCerts = null;
-  private String mNodeId = null;
-  private String mNodeRegion = null;
-  private String mNodeZone = null;
-  private String mNodeSubZone = null;
-  private boolean mUseNodeId = false;
-  private boolean mUseRtds = false;
-  private boolean mUseNodeLocality = false;
-  private boolean mUseAds = false;
+  private String mAdsRootCerts = "";
+  private String mNodeId = "";
+  private String mNodeRegion = "";
+  private String mNodeZone = "";
+  private String mNodeSubZone = "";
 
   /**
    * Builder for Native Cronet Engine. Default config enables SPDY, disables QUIC and HTTP cache.
@@ -149,7 +145,6 @@ public class NativeCronetEngineBuilderImpl extends CronetEngineBuilderImpl {
         stringAccessors, keyValueStores, statSinks, runtimeGuards,
         mEnableSkipDNSLookupForProxiedRequests, mEnablePlatformCertificatesValidation,
         mRtdsLayerName, mRtdsTimeoutSeconds, mAdsAddress, mAdsPort, mAdsToken, mAdsTokenLifetime,
-        mAdsRootCerts, mNodeId, mNodeRegion, mNodeZone, mNodeSubZone, mUseNodeId, mUseRtds,
-        mUseNodeLocality, mUseAds);
+        mAdsRootCerts, mNodeId, mNodeRegion, mNodeZone, mNodeSubZone);
   }
 }

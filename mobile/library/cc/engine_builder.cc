@@ -224,13 +224,11 @@ EngineBuilder& EngineBuilder::enforceTrustChainVerification(bool trust_chain_ver
 
 EngineBuilder& EngineBuilder::setNodeId(std::string node_id) {
   node_id_ = std::move(node_id);
-  use_node_id_ = true;
   return *this;
 }
 
 EngineBuilder& EngineBuilder::setNodeLocality(const NodeLocality& node_locality) {
   node_locality_ = node_locality;
-  use_node_locality_ = true;
   return *this;
 }
 
@@ -247,20 +245,18 @@ EngineBuilder& EngineBuilder::setAggregatedDiscoveryService(std::string address,
   ads_jwt_token_lifetime_seconds_ =
       jwt_token_lifetime_seconds == 0 ? DefaultJwtTokenLifetimeSeconds : jwt_token_lifetime_seconds;
   ads_ssl_root_certs_ = std::move(ssl_root_certs);
-  use_ads_ = true;
   return *this;
 }
 
 EngineBuilder& EngineBuilder::addRtdsLayer(std::string layer_name, const int timeout_seconds) {
   rtds_layer_name_ = layer_name;
   rtds_timeout_seconds_ = timeout_seconds == 0 ? DefaultXdsTimeout : timeout_seconds;
-  use_rtds_ = true;
   return *this;
 }
 
 EngineBuilder& EngineBuilder::addCdsLayer(std::string cds_resources_locator,
                                           const int timeout_seconds) {
-  use_cds_ = true;
+  enable_cds_ = true;
   cds_resources_locator_ = std::move(cds_resources_locator);
   cds_timeout_seconds_ = timeout_seconds == 0 ? DefaultXdsTimeout : timeout_seconds;
   return *this;
@@ -920,9 +916,9 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
 
   // Set up node
   auto* node = bootstrap->mutable_node();
-  node->set_id(use_node_id_ ? node_id_ : "envoy-mobile");
+  node->set_id(node_id_.empty() ? "envoy-mobile" : node_id_);
   node->set_cluster("envoy-mobile");
-  if (use_node_locality_) {
+  if (node_locality_ && !node_locality_->region.empty()) {
     node->mutable_locality()->set_region(node_locality_->region);
     node->mutable_locality()->set_zone(node_locality_->zone);
     node->mutable_locality()->set_sub_zone(node_locality_->sub_zone);
@@ -972,10 +968,10 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
   }
 
   bootstrap->mutable_dynamic_resources();
-  if ((use_rtds_ || use_cds_) && !use_ads_) {
+  if ((!rtds_layer_name_.empty() || enable_cds_) && ads_address_.empty()) {
     throw std::runtime_error("ADS must be configured when using xDS");
   }
-  if (use_rtds_) {
+  if (!rtds_layer_name_.empty()) {
     auto* layered_runtime = bootstrap->mutable_layered_runtime();
     auto* layer = layered_runtime->add_layers();
     layer->set_name(rtds_layer_name_);
@@ -986,7 +982,7 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
     rtds_config->set_resource_api_version(envoy::config::core::v3::ApiVersion::V3);
     rtds_config->mutable_initial_fetch_timeout()->set_seconds(rtds_timeout_seconds_);
   }
-  if (use_ads_) {
+  if (!ads_address_.empty()) {
     std::string target_uri = fmt::format(R"({}:{})", ads_address_, ads_port_);
     auto* ads_config = bootstrap->mutable_dynamic_resources()->mutable_ads_config();
     ads_config->set_transport_api_version(envoy::config::core::v3::ApiVersion::V3);
@@ -1010,7 +1006,7 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
       jwt.set_token_lifetime_seconds(ads_jwt_token_lifetime_seconds_);
     }
   }
-  if (use_cds_) {
+  if (enable_cds_) {
     auto* cds_config = bootstrap->mutable_dynamic_resources()->mutable_cds_config();
     if (cds_resources_locator_.empty()) {
       cds_config->mutable_ads();

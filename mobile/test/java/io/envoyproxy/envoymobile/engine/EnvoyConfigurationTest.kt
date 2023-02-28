@@ -110,10 +110,6 @@ class EnvoyConfigurationTest {
     nodeRegion: String = "",
     nodeZone: String = "",
     nodeSubZone: String = "",
-    useNodeId: Boolean = false,
-    useAds: Boolean = false,
-    useNodeLocality: Boolean = false,
-    useRtds: Boolean = false
 
   ): EnvoyConfiguration {
     return EnvoyConfiguration(
@@ -164,10 +160,6 @@ class EnvoyConfigurationTest {
       nodeRegion,
       nodeZone,
       nodeSubZone,
-      useNodeId,
-      useAds,
-      useNodeLocality,
-      useRtds,
     )
   }
 
@@ -338,7 +330,7 @@ class EnvoyConfigurationTest {
   fun `test adding RTDS and ADS`() {
     JniLibrary.loadTestLibrary()
     val envoyConfiguration = buildTestEnvoyConfiguration(
-      rtdsLayerName = "fake_rtds_layer", rtdsTimeoutSeconds = 5432, adsAddress = "FAKE_ADDRESS", adsPort = 0, useAds = true, useRtds = true
+      rtdsLayerName = "fake_rtds_layer", rtdsTimeoutSeconds = 5432, adsAddress = "FAKE_ADDRESS", adsPort = 0
     )
 
     val resolvedTemplate = envoyConfiguration.createYaml()
@@ -349,23 +341,10 @@ class EnvoyConfigurationTest {
   }
 
   @Test
-  fun `test configuring RTDS and ADS but not enabling it`() {
-    JniLibrary.loadTestLibrary()
-    val envoyConfiguration = buildTestEnvoyConfiguration(
-      rtdsLayerName = "fake_rtds_layer", adsAddress = "FAKE_ADDRESS", adsPort = 0
-    )
-
-    val resolvedTemplate = envoyConfiguration.createYaml()
-
-    assertThat(resolvedTemplate).doesNotContain("fake_rtds_layer");
-    assertThat(resolvedTemplate).doesNotContain("FAKE_ADDRESS");
-  }
-
-  @Test
   fun `test RTDS default timeout`() {
     JniLibrary.loadTestLibrary()
     val envoyConfiguration = buildTestEnvoyConfiguration(
-      rtdsLayerName = "fake_rtds_layer", adsAddress = "FAKE_ADDRESS", adsPort = 0, useAds = true, useRtds = true
+      rtdsLayerName = "fake_rtds_layer", adsAddress = "FAKE_ADDRESS", adsPort = 0
     )
 
     val resolvedTemplate = envoyConfiguration.createYaml()

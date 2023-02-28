@@ -88,10 +88,6 @@ open class EngineBuilder(
   private var nodeRegion: String = ""
   private var nodeZone: String = ""
   private var nodeSubZone: String = ""
-  private var useNodeId: Boolean = false
-  private var useRtds: Boolean = false
-  private var useNodeLocality: Boolean = false
-  private var useAds: Boolean = false
 
   /**
    * Add a log level to use with Envoy.
@@ -572,7 +568,6 @@ open class EngineBuilder(
  */
 fun setNodeId(nodeId: String): EngineBuilder {
   this.nodeId = nodeId
-  this.useNodeId = true
   return this
 }
 
@@ -589,7 +584,6 @@ fun setNodeLocality(region: String, zone: String, subZone: String): EngineBuilde
   this.nodeRegion = region
   this.nodeZone = zone
   this.nodeSubZone = subZone
-  this.useNodeLocality = true
   return this
 }
 
@@ -621,7 +615,6 @@ fun setAggregatedDiscoveryService(
   this.adsJwtToken = jwtToken
   this.adsJwtTokenLifetimeSeconds = jwtTokenLifetimeSeconds
   this.adsSslRootCerts = sslRootCerts
-  this.useAds = true
   return this
 }
 
@@ -637,7 +630,6 @@ fun setAggregatedDiscoveryService(
 fun addRtdsLayer(layerName: String, timeoutSeconds: Int = 0): EngineBuilder {
   this.rtdsLayerName = layerName
   this.rtdsTimeoutSeconds = timeoutSeconds
-  this.useRtds = true
   return this
 }
 
@@ -696,10 +688,6 @@ fun addRtdsLayer(layerName: String, timeoutSeconds: Int = 0): EngineBuilder {
       nodeRegion,
       nodeZone,
       nodeSubZone,
-      useNodeId,
-      useAds,
-      useNodeLocality,
-      useRtds,
     )
 
 

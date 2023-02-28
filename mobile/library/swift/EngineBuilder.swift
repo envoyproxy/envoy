@@ -71,10 +71,6 @@ open class EngineBuilder: NSObject {
   private var nodeRegion: String = ""
   private var nodeZone: String = ""
   private var nodeSubZone: String = ""
-  private var useNodeId: Bool = false
-  private var useRtds: Bool = false
-  private var useNodeLocality: Bool = false
-  private var useAds: Bool = false
 
   // MARK: - Public
 
@@ -591,7 +587,6 @@ open class EngineBuilder: NSObject {
     self.nodeRegion = region
     self.nodeZone = zone
     self.nodeSubZone = subZone
-    self.useNodeLocality = true
     return self
   }
 
@@ -617,7 +612,6 @@ open class EngineBuilder: NSObject {
     self.adsJwtToken = jwtToken
     self.adsJwtTokenLifetimeSeconds = jwtTokenLifetimeSeconds
     self.adsSslRootCerts = sslRootCerts
-    self.useAds = true
     return self
   }
 
@@ -631,7 +625,6 @@ open class EngineBuilder: NSObject {
   public func addRtdsLayer(name layerName: String, timeoutSeconds: UInt32 = 0) -> Self {
     self.rtdsLayerName = layerName
     self.rtdsTimeoutSeconds = timeoutSeconds
-    self.useRtds = true
     return self
   }
 
@@ -709,10 +702,6 @@ open class EngineBuilder: NSObject {
       nodeRegion: self.nodeRegion,
       nodeZone: self.nodeZone,
       nodeSubZone: self.nodeSubZone,
-      useNodeId: self.useNodeId,
-      useRtds: self.useRtds,
-      useNodeLocality: self.useNodeLocality,
-      useAds: self.useAds
     )
 
     switch self.base {
@@ -774,10 +763,6 @@ open class EngineBuilder: NSObject {
       nodeRegion: self.nodeRegion,
       nodeZone: self.nodeZone,
       nodeSubZone: self.nodeSubZone,
-      useNodeId: self.useNodeId,
-      useRtds: self.useRtds,
-      useNodeLocality: self.useNodeLocality,
-      useAds: self.useAds
     )
     return config.generateYamlString()
   }

@@ -167,6 +167,7 @@ private:
   std::string ads_ssl_root_certs_;
   std::string cds_resources_locator_;
   int cds_timeout_seconds_;
+  bool enable_cds_ = false;
   bool dns_cache_on_ = false;
   int dns_cache_save_interval_seconds_ = 1;
 
@@ -192,12 +193,6 @@ private:
   absl::flat_hash_map<std::string, StringAccessorSharedPtr> string_accessors_;
   bool skip_dns_lookups_for_proxied_requests_ = false;
 
-  // These are set to true if the related builder API has been called.
-  bool use_node_id_ = false;
-  bool use_rtds_ = false;
-  bool use_node_locality_ = false;
-  bool use_ads_ = false;
-  bool use_cds_ = false;
 };
 
 using EngineBuilderSharedPtr = std::shared_ptr<EngineBuilder>;

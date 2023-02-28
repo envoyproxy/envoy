@@ -58,10 +58,6 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic, strong) NSString *nodeRegion;
 @property (nonatomic, strong) NSString *nodeZone;
 @property (nonatomic, strong) NSString *nodeSubZone;
-@property (nonatomic, assign) BOOL useNodeId;
-@property (nonatomic, assign) BOOL useRtds;
-@property (nonatomic, assign) BOOL useNodeLocality;
-@property (nonatomic, assign) BOOL useAds;
 /**
  Create a new instance of the configuration.
  */
@@ -121,10 +117,6 @@ NS_ASSUME_NONNULL_BEGIN
                                        nodeRegion:(NSString *)nodeRegion
                                          nodeZone:(NSString *)nodeZone
                                       nodeSubZone:(NSString *)nodeSubZone
-                                        useNodeId:(BOOL)useNodeId
-                                          useRtds:(BOOL)useRtds
-                                  useNodeLocality:(BOOL)useNodeLocality
-                                           useAds:(BOOL)useAds;
 - (NSString *)generateYamlString;
 @end
 
