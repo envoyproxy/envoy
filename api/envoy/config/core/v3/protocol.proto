@@ -355,6 +355,7 @@ message Http1ProtocolOptions {
   // If set, force HTTP/1 parser: BalsaParser if true, http-parser if false.
   // If unset, HTTP/1 parser is selected based on
   // envoy.reloadable_features.http1_use_balsa_parser.
+  // See issue #21245.
   google.protobuf.BoolValue use_balsa_parser = 9;
 }
 
