@@ -86,13 +86,13 @@ CAPIStatus envoyGoFilterHttpCopyHeaders(void* r, void* strs, void* buf) {
   });
 }
 
-CAPIStatus envoyGoFilterHttpSetHeader(void* r, void* key, void* value) {
-  return envoyGoFilterHandlerWrapper(r,
-                                     [key, value](std::shared_ptr<Filter>& filter) -> CAPIStatus {
-                                       auto keyStr = referGoString(key);
-                                       auto valueStr = referGoString(value);
-                                       return filter->setHeader(keyStr, valueStr);
-                                     });
+CAPIStatus envoyGoFilterHttpSetHeaderHelper(void* r, void* key, void* value, headerAction act) {
+  return envoyGoFilterHandlerWrapper(
+      r, [key, value, act](std::shared_ptr<Filter>& filter) -> CAPIStatus {
+        auto keyStr = referGoString(key);
+        auto valueStr = referGoString(value);
+        return filter->setHeader(keyStr, valueStr, act);
+      });
 }
 
 CAPIStatus envoyGoFilterHttpRemoveHeader(void* r, void* key) {

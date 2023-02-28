@@ -80,7 +80,7 @@ func (f *filter) sendLocalReply(phase string) api.StatusType {
 	return api.LocalReply
 }
 
-// test: get, set, remove, values
+// test: get, set, remove, values, add
 func (f *filter) decodeHeaders(header api.RequestHeaderMap, endStream bool) api.StatusType {
 	if f.sleep {
 		time.Sleep(time.Millisecond * 100) // sleep 100 ms
@@ -98,6 +98,10 @@ func (f *filter) decodeHeaders(header api.RequestHeaderMap, endStream bool) api.
 	} else if hdrs != nil {
 		return f.fail("Values return unexpected data %v", hdrs)
 	}
+
+	header.Add("existed-header", "bar")
+	header.Add("newly-added-header", "foo")
+	header.Add("newly-added-header", "bar")
 
 	header.Set("test-x-set-header-0", origin)
 	header.Del("x-test-header-1")
@@ -171,6 +175,10 @@ func (f *filter) encodeHeaders(header api.ResponseHeaderMap, endStream bool) api
 	} else if hdrs != nil {
 		return f.fail("Values return unexpected data %v", hdrs)
 	}
+
+	header.Add("existed-header", "bar")
+	header.Add("newly-added-header", "foo")
+	header.Add("newly-added-header", "bar")
 
 	header.Set("test-x-set-header-0", origin)
 	header.Del("x-test-header-1")

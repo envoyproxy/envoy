@@ -169,7 +169,7 @@ TEST_F(GolangHttpFilterTest, SetHeaderAtWrongStage) {
   InSequence s;
   setup(PASSTHROUGH, genSoPath(PASSTHROUGH), PASSTHROUGH);
 
-  EXPECT_EQ(CAPINotInGo, filter_->setHeader("foo", "bar"));
+  EXPECT_EQ(CAPINotInGo, filter_->setHeader("foo", "bar", HeaderSet));
 }
 
 } // namespace

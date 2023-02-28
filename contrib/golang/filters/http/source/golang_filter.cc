@@ -624,7 +624,7 @@ CAPIStatus Filter::copyHeaders(GoString* go_strs, char* go_buf) {
   return CAPIStatus::CAPIOK;
 }
 
-CAPIStatus Filter::setHeader(absl::string_view key, absl::string_view value) {
+CAPIStatus Filter::setHeader(absl::string_view key, absl::string_view value, headerAction act) {
   Thread::LockGuard lock(mutex_);
   if (has_destroyed_) {
     ENVOY_LOG(debug, "golang filter has been destroyed");
@@ -639,7 +639,20 @@ CAPIStatus Filter::setHeader(absl::string_view key, absl::string_view value) {
     ENVOY_LOG(debug, "invoking cgo api at invalid phase: {}", __func__);
     return CAPIStatus::CAPIInvalidPhase;
   }
-  headers_->setCopy(Http::LowerCaseString(key), value);
+
+  switch (act) {
+  case HeaderAdd:
+    headers_->addCopy(Http::LowerCaseString(key), value);
+    break;
+
+  case HeaderSet:
+    headers_->setCopy(Http::LowerCaseString(key), value);
+    break;
+
+  default:
+    ENVOY_LOG(error, "unknown header action {}, ignored", act);
+  }
+
   onHeadersModified();
   return CAPIStatus::CAPIOK;
 }

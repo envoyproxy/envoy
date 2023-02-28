@@ -146,9 +146,9 @@ public:
                             std::function<void(Http::ResponseHeaderMap& headers)> modify_headers,
                             Grpc::Status::GrpcStatus grpc_status, std::string details);
 
-  CAPIStatus getHeader(absl::string_view key, GoString* goValue);
+  CAPIStatus getHeader(absl::string_view key, GoString* go_value);
   CAPIStatus copyHeaders(GoString* go_strs, char* go_buf);
-  CAPIStatus setHeader(absl::string_view key, absl::string_view value);
+  CAPIStatus setHeader(absl::string_view key, absl::string_view value, headerAction act);
   CAPIStatus removeHeader(absl::string_view key);
   CAPIStatus copyBuffer(Buffer::Instance* buffer, char* data);
   CAPIStatus setBufferHelper(Buffer::Instance* buffer, absl::string_view& value,
