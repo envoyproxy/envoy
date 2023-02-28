@@ -286,7 +286,7 @@ TEST_P(LazyInitClusterStatsTest, LazyInitTrafficStatsWithClusterCreateUpdateDele
   UpdateCluster1();
   test_server_->waitForCounterGe("cluster_manager.cds.update_success", 2);
 
-  // Now the ClusterTrafficStats 'inited_' gauge >= 1, since there is a small race window between
+  // Now the ClusterTrafficStats 'initialized' gauge >= 1, since there is a small race window between
   // the testing thread fetching the value before the old version ClusterTrafficStats gets deleted
   // from main thread and worker thread.
   EXPECT_GE(test_server_->gauge("cluster.cluster_1.ClusterTrafficStats.initialized")->value(), 1);
