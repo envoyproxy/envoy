@@ -91,6 +91,7 @@ envoy_extension_cc_test(
         "//test/test_common:utility_lib",
         "@com_google_absl//absl/status",
         "@com_google_absl//absl/status:statusor",
+        "@envoy_api//envoy/extensions/http/cache/simple_http_cache/v3:pkg_cc_proto",
     ],
 )
 
