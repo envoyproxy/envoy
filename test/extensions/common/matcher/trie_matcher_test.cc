@@ -8,6 +8,7 @@
 #include "source/common/network/address_impl.h"
 #include "source/common/network/matching/data_impl.h"
 #include "source/common/protobuf/utility.h"
+#include "source/common/stream_info/stream_info_impl.h"
 #include "source/extensions/common/matcher/trie_matcher.h"
 
 #include "test/common/matcher/test_utility.h"
@@ -15,6 +16,7 @@
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/server/factory_context.h"
 #include "test/test_common/registry.h"
+#include "test/test_common/test_time.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
@@ -624,7 +626,10 @@ matcher_tree:
   const Network::Address::InstanceConstSharedPtr address =
       std::make_shared<Network::Address::Ipv4Instance>("192.168.0.1", 8080);
   Network::ConnectionInfoSetterImpl connection_info(address, address);
-  Http::Matching::HttpMatchingDataImpl data(connection_info);
+  auto connection_info_provider =
+      std::make_shared<Network::ConnectionInfoSetterImpl>(address, address);
+  Http::Matching::HttpMatchingDataImpl data(StreamInfo::StreamInfoImpl(
+      Http::Protocol::Http2, Event::GlobalTimeSystem().timeSystem(), connection_info_provider));
 
   const auto result = match_tree()->match(data);
   EXPECT_EQ(result.match_state_, MatchState::MatchComplete);
