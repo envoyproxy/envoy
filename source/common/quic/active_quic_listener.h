@@ -10,6 +10,7 @@
 #include "source/common/quic/envoy_quic_connection_id_generator_factory.h"
 #include "source/common/quic/envoy_quic_dispatcher.h"
 #include "source/common/quic/envoy_quic_proof_source_factory_interface.h"
+#include "source/common/quic/envoy_quic_server_preferred_address_config_factory.h"
 #include "source/common/runtime/runtime_protos.h"
 #include "source/server/active_udp_listener.h"
 
@@ -117,6 +118,7 @@ private:
   absl::optional<std::reference_wrapper<EnvoyQuicProofSourceFactoryInterface>>
       proof_source_factory_;
   EnvoyQuicConnectionIdGeneratorFactoryPtr quic_cid_generator_factory_;
+  EnvoyQuicServerPreferredAddressConfigPtr server_preferred_address_config_;
   quic::QuicConfig quic_config_;
   const uint32_t concurrency_;
   envoy::config::core::v3::RuntimeFeatureFlag enabled_;
