@@ -65,21 +65,12 @@ class SetEventTrackerTest {
 
     val client = engine.streamClient()
 
-    val requestHeaders = RequestHeadersBuilder(
-      method = RequestMethod.GET,
-      scheme = "https",
-      authority = "example.com",
-      path = "/test"
-    )
-      .build()
-
     client
       .newStreamPrototype()
       .setOnResponseData { _, _, _ ->
         countDownLatch.countDown()
       }
       .start()
-      .sendHeaders(requestHeaders, true)
       .close(ByteBuffer.allocate(1))
 
     countDownLatch.await(30, TimeUnit.SECONDS)
