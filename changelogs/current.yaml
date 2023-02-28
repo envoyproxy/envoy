@@ -15,3 +15,7 @@ removed_config_or_runtime:
 new_features:
 
 deprecated:
+- area: ext_authz
+  change: |
+    deprecated (1.25.0) :ref:`ext_authz.v3.AuthorizationRequest.allowed_headers <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.AuthorizationRequest.allowed_headers>` in favour
+    of :ref:`ext_authz.v3.ExtAuthz.allowed_headers <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.allowed_headers>`.
