@@ -97,7 +97,7 @@ public:
   // From HttpCacheFactory
   std::shared_ptr<HttpCache>
   getCache(const envoy::extensions::filters::http::cache::v3::CacheConfig& filter_config,
-           Server::Configuration::FactoryContext& context) override {
+           Server::Configuration::CommonFactoryContext& context) override {
     ConfigProto config;
     MessageUtil::unpackTo(filter_config.typed_config(), config);
     std::shared_ptr<CacheSingleton> caches = context.singletonManager().getTyped<CacheSingleton>(

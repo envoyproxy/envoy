@@ -31,11 +31,14 @@ struct CacheResponseCodeDetailValues {
 
 using CacheResponseCodeDetails = ConstSingleton<CacheResponseCodeDetailValues>;
 
-CacheFilter::CacheFilter(const envoy::extensions::filters::http::cache::v3::CacheConfig& config,
-                         const std::string&, Stats::Scope&, TimeSource& time_source,
-                         HttpCache& http_cache)
-    : time_source_(time_source), cache_(http_cache),
-      vary_allow_list_(config.allowed_vary_headers()) {}
+CacheFilterConfig::CacheFilterConfig(
+    std::shared_ptr<HttpCache> http_cache,
+    const envoy::extensions::filters::http::cache::v3::CacheConfig& config)
+    : http_cache_(http_cache), vary_allow_list_(config.allowed_vary_headers()) {}
+
+CacheFilter::CacheFilter(const CacheFilterConfig& config, const std::string&, Stats::Scope&,
+                         TimeSource& time_source)
+    : time_source_(time_source), base_config_(config) {}
 
 void CacheFilter::onDestroy() {
   filter_state_ = FilterState::Destroyed;
@@ -58,6 +61,10 @@ void CacheFilter::onStreamComplete() {
 
 Http::FilterHeadersStatus CacheFilter::decodeHeaders(Http::RequestHeaderMap& headers,
                                                      bool end_stream) {
+  const auto* per_route_settings =
+      Http::Utility::resolveMostSpecificPerFilterConfig<CacheFilterConfig>(decoder_callbacks_);
+  config_.emplace(per_route_settings ? *per_route_settings : base_config_);
+
   ENVOY_STREAM_LOG(debug, "CacheFilter::decodeHeaders: {}", *decoder_callbacks_, headers);
   if (!end_stream) {
     ENVOY_STREAM_LOG(
@@ -76,10 +83,10 @@ Http::FilterHeadersStatus CacheFilter::decodeHeaders(Http::RequestHeaderMap& hea
   }
   ASSERT(decoder_callbacks_);
 
-  LookupRequest lookup_request(headers, time_source_.systemTime(), vary_allow_list_);
+  LookupRequest lookup_request(headers, time_source_.systemTime(), config_->varyAllowList());
   request_allows_inserts_ = !lookup_request.requestCacheControl().no_store_;
   is_head_request_ = headers.getMethodValue() == Http::Headers::get().MethodValues.Head;
-  lookup_ = cache_.makeLookupContext(std::move(lookup_request), *decoder_callbacks_);
+  lookup_ = config_->cache().makeLookupContext(std::move(lookup_request), *decoder_callbacks_);
 
   ASSERT(lookup_);
   getHeaders(headers);
@@ -128,9 +135,9 @@ Http::FilterHeadersStatus CacheFilter::encodeHeaders(Http::ResponseHeaderMap& he
   // Either a cache miss or a cache entry that is no longer valid.
   // Check if the new response can be cached.
   if (request_allows_inserts_ && !is_head_request_ &&
-      CacheabilityUtils::isCacheableResponse(headers, vary_allow_list_)) {
+      CacheabilityUtils::isCacheableResponse(headers, config_->varyAllowList())) {
     ENVOY_STREAM_LOG(debug, "CacheFilter::encodeHeaders inserting headers", *encoder_callbacks_);
-    insert_ = cache_.makeInsertContext(std::move(lookup_), *encoder_callbacks_);
+    insert_ = config_->cache().makeInsertContext(std::move(lookup_), *encoder_callbacks_);
     // Add metadata associated with the cached response. Right now this is only response_time;
     const ResponseMetadata metadata = {time_source_.systemTime()};
     // TODO(capoferro): Note that there is currently no way to communicate back to the CacheFilter
@@ -567,8 +574,8 @@ void CacheFilter::processSuccessfulValidation(Http::ResponseHeaderMap& response_
     // TODO(yosrym93): else the cached entry should be deleted.
     // Update metadata associated with the cached response. Right now this is only response_time;
     const ResponseMetadata metadata = {time_source_.systemTime()};
-    cache_.updateHeaders(*lookup_, response_headers, metadata,
-                         [](bool updated ABSL_ATTRIBUTE_UNUSED) {});
+    config_->cache().updateHeaders(*lookup_, response_headers, metadata,
+                                   [](bool updated ABSL_ATTRIBUTE_UNUSED) {});
     insert_status_ = InsertStatus::HeaderUpdate;
   }
 

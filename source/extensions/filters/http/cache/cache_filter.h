@@ -45,6 +45,18 @@ enum class FilterState {
   Destroyed
 };
 
+class CacheFilterConfig : public Router::RouteSpecificFilterConfig {
+public:
+  CacheFilterConfig(std::shared_ptr<HttpCache> http_cache,
+                    const envoy::extensions::filters::http::cache::v3::CacheConfig& config);
+  const VaryAllowList& varyAllowList() const { return vary_allow_list_; }
+  HttpCache& cache() const { return *http_cache_; }
+
+private:
+  std::shared_ptr<HttpCache> http_cache_;
+  const VaryAllowList vary_allow_list_;
+};
+
 /**
  * A filter that caches responses and attempts to satisfy requests from cache.
  */
@@ -52,9 +64,8 @@ class CacheFilter : public Http::PassThroughFilter,
                     public Logger::Loggable<Logger::Id::cache_filter>,
                     public std::enable_shared_from_this<CacheFilter> {
 public:
-  CacheFilter(const envoy::extensions::filters::http::cache::v3::CacheConfig& config,
-              const std::string& stats_prefix, Stats::Scope& scope, TimeSource& time_source,
-              HttpCache& http_cache);
+  CacheFilter(const CacheFilterConfig& config, const std::string&, Stats::Scope&,
+              TimeSource& time_source);
   // Http::StreamFilterBase
   void onDestroy() override;
   void onStreamComplete() override;
@@ -127,7 +138,8 @@ private:
   InsertStatus insertStatus() const;
 
   TimeSource& time_source_;
-  HttpCache& cache_;
+  const CacheFilterConfig& base_config_;
+  OptRef<const CacheFilterConfig> config_;
   LookupContextPtr lookup_;
   InsertContextPtr insert_;
   LookupResultPtr lookup_result_;
@@ -136,12 +148,6 @@ private:
   // currently only one Range, but will expand when full range support is added. Initialized by
   // onHeaders for Range Responses, otherwise initialized by encodeCachedResponse.
   std::vector<AdjustedByteRange> remaining_ranges_;
-
-  // TODO(#12901): The allow list could be constructed only once directly from the config, instead
-  // of doing it per-request. A good example of such config is found in the gzip filter:
-  // source/extensions/filters/http/gzip/gzip_filter.h.
-  // Stores the allow list rules that decide if a header can be varied upon.
-  VaryAllowList vary_allow_list_;
 
   // True if the response has trailers.
   // TODO(toddmgreer): cache trailers.

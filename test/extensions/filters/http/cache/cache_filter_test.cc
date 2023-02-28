@@ -27,9 +27,9 @@ class CacheFilterTest : public ::testing::Test {
 protected:
   // The filter has to be created as a shared_ptr to enable shared_from_this() which is used in the
   // cache callbacks.
-  CacheFilterSharedPtr makeFilter(HttpCache& cache) {
-    auto filter = std::make_shared<CacheFilter>(config_, /*stats_prefix=*/"", context_.scope(),
-                                                context_.timeSource(), cache);
+  CacheFilterSharedPtr makeFilter(const CacheFilterConfig& config) {
+    auto filter = std::make_shared<CacheFilter>(config, /*stats_prefix=*/"", context_.scope(),
+                                                context_.timeSource());
     filter_state_ = std::make_shared<StreamInfo::FilterStateImpl>(
         StreamInfo::FilterState::LifeSpan::FilterChain);
     filter->setDecoderFilterCallbacks(decoder_callbacks_);
@@ -45,6 +45,8 @@ protected:
     time_source_.setSystemTime(std::chrono::hours(1));
     // Use the initialized time source to set the response date header
     response_headers_.setDate(formatter_.now(time_source_));
+    filter_config_ =
+        std::make_unique<CacheFilterConfig>(std::make_unique<SimpleHttpCache>(), config_);
   }
 
   absl::StatusOr<const CacheFilterLoggingInfo> cacheFilterLoggingInfo() {
@@ -151,8 +153,8 @@ protected:
 
   void waitBeforeSecondRequest() { time_source_.advanceTimeWait(delay_); }
 
-  SimpleHttpCache simple_cache_;
   envoy::extensions::filters::http::cache::v3::CacheConfig config_;
+  std::unique_ptr<CacheFilterConfig> filter_config_;
   std::shared_ptr<StreamInfo::FilterState> filter_state_ =
       std::make_shared<StreamInfo::FilterStateImpl>(StreamInfo::FilterState::LifeSpan::FilterChain);
   NiceMock<Server::Configuration::MockFactoryContext> context_;
@@ -171,7 +173,7 @@ protected:
 };
 
 TEST_F(CacheFilterTest, FilterIsBeingDestroyed) {
-  CacheFilterSharedPtr filter = makeFilter(simple_cache_);
+  CacheFilterSharedPtr filter = makeFilter(*filter_config_);
   filter->onDestroy();
   // decodeHeaders should do nothing... at least make sure it doesn't crash.
   filter->decodeHeaders(request_headers_, true);
@@ -185,7 +187,7 @@ TEST_F(CacheFilterTest, UncacheableRequest) {
 
   for (int request = 1; request <= 2; request++) {
     // Create filter for the request
-    CacheFilterSharedPtr filter = makeFilter(simple_cache_);
+    CacheFilterSharedPtr filter = makeFilter(*filter_config_);
 
     // Decode request headers
     // The filter should not encode any headers or data as no cached response exists.
@@ -215,7 +217,7 @@ TEST_F(CacheFilterTest, UncacheableResponse) {
 
   for (int request = 1; request <= 2; request++) {
     // Create filter for the request.
-    CacheFilterSharedPtr filter = makeFilter(simple_cache_);
+    CacheFilterSharedPtr filter = makeFilter(*filter_config_);
 
     testDecodeRequestMiss(filter);
 
@@ -236,7 +238,7 @@ TEST_F(CacheFilterTest, CacheMiss) {
     request_headers_.setHost("CacheMiss" + std::to_string(request));
 
     // Create filter for request 1
-    CacheFilterSharedPtr filter = makeFilter(simple_cache_);
+    CacheFilterSharedPtr filter = makeFilter(*filter_config_);
 
     testDecodeRequestMiss(filter);
 
@@ -262,7 +264,7 @@ TEST_F(CacheFilterTest, CacheMissWithTrailers) {
     request_headers_.setHost("CacheMissWithTrailers" + std::to_string(request));
 
     // Create filter for request 1
-    CacheFilterSharedPtr filter = makeFilter(simple_cache_);
+    CacheFilterSharedPtr filter = makeFilter(*filter_config_);
 
     testDecodeRequestMiss(filter);
 
@@ -284,7 +286,7 @@ TEST_F(CacheFilterTest, CacheHitNoBody) {
 
   {
     // Create filter for request 1.
-    CacheFilterSharedPtr filter = makeFilter(simple_cache_);
+    CacheFilterSharedPtr filter = makeFilter(*filter_config_);
 
     testDecodeRequestMiss(filter);
 
@@ -295,7 +297,7 @@ TEST_F(CacheFilterTest, CacheHitNoBody) {
   waitBeforeSecondRequest();
   {
     // Create filter for request 2.
-    CacheFilterSharedPtr filter = makeFilter(simple_cache_);
+    CacheFilterSharedPtr filter = makeFilter(*filter_config_);
 
     testDecodeRequestHitNoBody(filter);
 
@@ -313,7 +315,7 @@ TEST_F(CacheFilterTest, CacheHitWithBody) {
 
   {
     // Create filter for request 1.
-    CacheFilterSharedPtr filter = makeFilter(simple_cache_);
+    CacheFilterSharedPtr filter = makeFilter(*filter_config_);
 
     testDecodeRequestMiss(filter);
 
@@ -332,7 +334,7 @@ TEST_F(CacheFilterTest, CacheHitWithBody) {
   waitBeforeSecondRequest();
   {
     // Create filter for request 2
-    CacheFilterSharedPtr filter = makeFilter(simple_cache_);
+    CacheFilterSharedPtr filter = makeFilter(*filter_config_);
 
     testDecodeRequestHitWithBody(filter, body);
 
@@ -351,7 +353,7 @@ TEST_F(CacheFilterTest, SuccessfulValidation) {
   const std::string last_modified_date = formatter_.now(time_source_);
   {
     // Create filter for request 1
-    CacheFilterSharedPtr filter = makeFilter(simple_cache_);
+    CacheFilterSharedPtr filter = makeFilter(*filter_config_);
 
     testDecodeRequestMiss(filter);
 
@@ -373,7 +375,7 @@ TEST_F(CacheFilterTest, SuccessfulValidation) {
   waitBeforeSecondRequest();
   {
     // Create filter for request 2
-    CacheFilterSharedPtr filter = makeFilter(simple_cache_);
+    CacheFilterSharedPtr filter = makeFilter(*filter_config_);
 
     // Make request require validation
     request_headers_.setReferenceKey(Http::CustomHeaders::get().CacheControl, "no-cache");
@@ -439,7 +441,7 @@ TEST_F(CacheFilterTest, UnsuccessfulValidation) {
   const std::string last_modified_date = formatter_.now(time_source_);
   {
     // Create filter for request 1
-    CacheFilterSharedPtr filter = makeFilter(simple_cache_);
+    CacheFilterSharedPtr filter = makeFilter(*filter_config_);
 
     testDecodeRequestMiss(filter);
 
@@ -461,7 +463,7 @@ TEST_F(CacheFilterTest, UnsuccessfulValidation) {
   waitBeforeSecondRequest();
   {
     // Create filter for request 2.
-    CacheFilterSharedPtr filter = makeFilter(simple_cache_);
+    CacheFilterSharedPtr filter = makeFilter(*filter_config_);
 
     // Make request require validation
     request_headers_.setReferenceKey(Http::CustomHeaders::get().CacheControl, "no-cache");
@@ -511,7 +513,7 @@ TEST_F(CacheFilterTest, SingleSatisfiableRange) {
 
   {
     // Create filter for request 1.
-    CacheFilterSharedPtr filter = makeFilter(simple_cache_);
+    CacheFilterSharedPtr filter = makeFilter(*filter_config_);
 
     testDecodeRequestMiss(filter);
 
@@ -536,7 +538,7 @@ TEST_F(CacheFilterTest, SingleSatisfiableRange) {
     response_headers_.setContentLength(2);
 
     // Create filter for request 2
-    CacheFilterSharedPtr filter = makeFilter(simple_cache_);
+    CacheFilterSharedPtr filter = makeFilter(*filter_config_);
 
     // Decode request 2 header
     EXPECT_CALL(
@@ -573,7 +575,7 @@ TEST_F(CacheFilterTest, MultipleSatisfiableRanges) {
 
   {
     // Create filter for request 1
-    CacheFilterSharedPtr filter = makeFilter(simple_cache_);
+    CacheFilterSharedPtr filter = makeFilter(*filter_config_);
 
     testDecodeRequestMiss(filter);
 
@@ -595,7 +597,7 @@ TEST_F(CacheFilterTest, MultipleSatisfiableRanges) {
     request_headers_.addReference(Http::Headers::get().Range, "bytes=0-1,-2");
 
     // Create filter for request 2
-    CacheFilterSharedPtr filter = makeFilter(simple_cache_);
+    CacheFilterSharedPtr filter = makeFilter(*filter_config_);
 
     // Decode request 2 header
     EXPECT_CALL(
@@ -631,7 +633,7 @@ TEST_F(CacheFilterTest, NotSatisfiableRange) {
 
   {
     // Create filter for request 1
-    CacheFilterSharedPtr filter = makeFilter(simple_cache_);
+    CacheFilterSharedPtr filter = makeFilter(*filter_config_);
 
     testDecodeRequestMiss(filter);
 
@@ -656,7 +658,7 @@ TEST_F(CacheFilterTest, NotSatisfiableRange) {
     response_headers_.setContentLength(0);
 
     // Create filter for request 2
-    CacheFilterSharedPtr filter = makeFilter(simple_cache_);
+    CacheFilterSharedPtr filter = makeFilter(*filter_config_);
 
     // Decode request 2 header
     EXPECT_CALL(
@@ -697,7 +699,7 @@ TEST_F(CacheFilterTest, GetRequestWithBodyAndTrailers) {
   Http::TestRequestTrailerMapImpl request_trailers;
 
   for (int i = 0; i < 2; ++i) {
-    CacheFilterSharedPtr filter = makeFilter(simple_cache_);
+    CacheFilterSharedPtr filter = makeFilter(*filter_config_);
 
     EXPECT_EQ(filter->decodeHeaders(request_headers_, false), Http::FilterHeadersStatus::Continue);
     EXPECT_EQ(filter->decodeData(request_buffer, false), Http::FilterDataStatus::Continue);
@@ -723,7 +725,7 @@ TEST_F(CacheFilterTest, FilterDeletedBeforePostedCallbackExecuted) {
   request_headers_.setHost("FilterDeletedBeforePostedCallbackExecuted");
   {
     // Create filter for request 1.
-    CacheFilterSharedPtr filter = makeFilter(simple_cache_);
+    CacheFilterSharedPtr filter = makeFilter(*filter_config_);
 
     testDecodeRequestMiss(filter);
 
@@ -737,7 +739,7 @@ TEST_F(CacheFilterTest, FilterDeletedBeforePostedCallbackExecuted) {
   }
   {
     // Create filter for request 2.
-    CacheFilterSharedPtr filter = makeFilter(simple_cache_);
+    CacheFilterSharedPtr filter = makeFilter(*filter_config_);
 
     // Call decode headers to start the cache lookup, which should immediately post the callback to
     // the dispatcher.
@@ -766,7 +768,7 @@ TEST_F(CacheFilterTest, LocalReplyDuringLookup) {
   request_headers_.setHost("LocalReplyDuringLookup");
   {
     // Create filter for request 1.
-    CacheFilterSharedPtr filter = makeFilter(simple_cache_);
+    CacheFilterSharedPtr filter = makeFilter(*filter_config_);
 
     testDecodeRequestMiss(filter);
 
@@ -780,7 +782,7 @@ TEST_F(CacheFilterTest, LocalReplyDuringLookup) {
   }
   {
     // Create filter for request 2.
-    CacheFilterSharedPtr filter = makeFilter(simple_cache_);
+    CacheFilterSharedPtr filter = makeFilter(*filter_config_);
 
     // Call decode headers to start the cache lookup, which should immediately post the callback to
     // the dispatcher.
@@ -815,7 +817,7 @@ TEST_F(CacheFilterDeathTest, StreamTimeoutDuringLookup) {
   request_headers_.setHost("StreamTimeoutDuringLookup");
   {
     // Create filter for request 1.
-    CacheFilterSharedPtr filter = makeFilter(simple_cache_);
+    CacheFilterSharedPtr filter = makeFilter(*filter_config_);
 
     testDecodeRequestMiss(filter);
 
@@ -832,7 +834,7 @@ TEST_F(CacheFilterDeathTest, StreamTimeoutDuringLookup) {
   EXPECT_ENVOY_BUG(
       {
         // Create filter for request 2.
-        CacheFilterSharedPtr filter = makeFilter(simple_cache_);
+        CacheFilterSharedPtr filter = makeFilter(*filter_config_);
 
         // Call decode headers to start the cache lookup, which should immediately post the
         // callback to the dispatcher.
@@ -894,7 +896,7 @@ TEST_F(ValidationHeadersTest, EtagAndLastModified) {
 
   // Make request 1 to insert the response into cache
   {
-    CacheFilterSharedPtr filter = makeFilter(simple_cache_);
+    CacheFilterSharedPtr filter = makeFilter(*filter_config_);
     testDecodeRequestMiss(filter);
 
     // Add validation headers to the response
@@ -906,7 +908,7 @@ TEST_F(ValidationHeadersTest, EtagAndLastModified) {
   }
   // Make request 2 to test for added conditional headers
   {
-    CacheFilterSharedPtr filter = makeFilter(simple_cache_);
+    CacheFilterSharedPtr filter = makeFilter(*filter_config_);
 
     // Make sure the request requires validation
     request_headers_.setReferenceKey(Http::CustomHeaders::get().CacheControl, "no-cache");
@@ -925,7 +927,7 @@ TEST_F(ValidationHeadersTest, EtagOnly) {
 
   // Make request 1 to insert the response into cache
   {
-    CacheFilterSharedPtr filter = makeFilter(simple_cache_);
+    CacheFilterSharedPtr filter = makeFilter(*filter_config_);
     testDecodeRequestMiss(filter);
 
     // Add validation headers to the response
@@ -935,7 +937,7 @@ TEST_F(ValidationHeadersTest, EtagOnly) {
   }
   // Make request 2 to test for added conditional headers
   {
-    CacheFilterSharedPtr filter = makeFilter(simple_cache_);
+    CacheFilterSharedPtr filter = makeFilter(*filter_config_);
 
     // Make sure the request requires validation
     request_headers_.setReferenceKey(Http::CustomHeaders::get().CacheControl, "no-cache");
@@ -954,7 +956,7 @@ TEST_F(ValidationHeadersTest, LastModifiedOnly) {
 
   // Make request 1 to insert the response into cache
   {
-    CacheFilterSharedPtr filter = makeFilter(simple_cache_);
+    CacheFilterSharedPtr filter = makeFilter(*filter_config_);
     testDecodeRequestMiss(filter);
 
     // Add validation headers to the response
@@ -965,7 +967,7 @@ TEST_F(ValidationHeadersTest, LastModifiedOnly) {
   }
   // Make request 2 to test for added conditional headers
   {
-    CacheFilterSharedPtr filter = makeFilter(simple_cache_);
+    CacheFilterSharedPtr filter = makeFilter(*filter_config_);
 
     // Make sure the request requires validation
     request_headers_.setReferenceKey(Http::CustomHeaders::get().CacheControl, "no-cache");
@@ -983,13 +985,13 @@ TEST_F(ValidationHeadersTest, NoEtagOrLastModified) {
 
   // Make request 1 to insert the response into cache
   {
-    CacheFilterSharedPtr filter = makeFilter(simple_cache_);
+    CacheFilterSharedPtr filter = makeFilter(*filter_config_);
     testDecodeRequestMiss(filter);
     filter->encodeHeaders(response_headers_, true);
   }
   // Make request 2 to test for added conditional headers
   {
-    CacheFilterSharedPtr filter = makeFilter(simple_cache_);
+    CacheFilterSharedPtr filter = makeFilter(*filter_config_);
 
     // Make sure the request requires validation
     request_headers_.setReferenceKey(Http::CustomHeaders::get().CacheControl, "no-cache");
@@ -1008,7 +1010,7 @@ TEST_F(ValidationHeadersTest, InvalidLastModified) {
 
   // Make request 1 to insert the response into cache
   {
-    CacheFilterSharedPtr filter = makeFilter(simple_cache_);
+    CacheFilterSharedPtr filter = makeFilter(*filter_config_);
     testDecodeRequestMiss(filter);
 
     // Add validation headers to the response
@@ -1017,7 +1019,7 @@ TEST_F(ValidationHeadersTest, InvalidLastModified) {
   }
   // Make request 2 to test for added conditional headers
   {
-    CacheFilterSharedPtr filter = makeFilter(simple_cache_);
+    CacheFilterSharedPtr filter = makeFilter(*filter_config_);
 
     // Make sure the request requires validation
     request_headers_.setReferenceKey(Http::CustomHeaders::get().CacheControl, "no-cache");
