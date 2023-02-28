@@ -120,9 +120,9 @@ void MetricsFlusher::flushHistogram(io::prometheus::client::MetricFamily& summar
 
   if (!only_histogram_summary_) {
     // Add bucket information for histograms.
-    auto* histogram_metric =
-        populateMetricsFamily(histogram_metrics_family, io::prometheus::client::MetricType::HISTOGRAM,
-                              snapshot_time_ms, envoy_histogram);
+    auto* histogram_metric = populateMetricsFamily(histogram_metrics_family,
+                                                   io::prometheus::client::MetricType::HISTOGRAM,
+                                                   snapshot_time_ms, envoy_histogram);
     auto* histogram = histogram_metric->mutable_histogram();
     histogram->set_sample_count(hist_stats.sampleCount());
     histogram->set_sample_sum(hist_stats.sampleSum());
