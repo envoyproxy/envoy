@@ -20,10 +20,10 @@ jobs:
    - name: Testing secret access
      run: |
        echo "token is"
-       echo t1 ${{ secrets.GCP_GITHUB_CI_KEY }} | sed -e 's/^\(.\{5\}\).*/\1/'
+       echo ${{ secrets.GCP_GITHUB_CI_KEY }} | sed -e 's/^\(.\{5\}\).*/\1/'
    - name: Build Fuzzers (${{ matrix.sanitizer }})
      id: build
-     uses: krajshiva/oss-fuzz/infra/cifuzz/actions/build_fuzzers@cifuzz-rbe-integration
+     uses: google/oss-fuzz/infra/cifuzz/actions/build_fuzzers@master
      env:
        CFL_EXTRA_BAZEL_REMOTE_CACHE: grpcs://remotebuildexecution.googleapis.com
        CFL_EXTRA_BAZEL_REMOTE_INSTANCE: projects/envoy-ci/instances/default_instance
@@ -33,7 +33,7 @@ jobs:
        language: c++
        sanitizer: ${{ matrix.sanitizer }}
    - name: Run Fuzzers (${{ matrix.sanitizer }})
-     uses: krajshiva/oss-fuzz/infra/cifuzz/actions/run_fuzzers@cifuzz-rbe-integration
+     uses: google/oss-fuzz/infra/cifuzz/actions/run_fuzzers@master
      with:
        oss-fuzz-project-name: 'envoy'
        language: c++
