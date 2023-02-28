@@ -233,14 +233,19 @@ IoHandlePtr IoUringSocketHandleImpl::accept(struct sockaddr* addr, socklen_t* ad
     return nullptr;
   }
 
+  if (SOCKET_INVALID(accepted_socket_param_->fd_)) {
+    ENVOY_LOG(trace, "IoUringSocketHandleImpl accept invalid socket");
+    accepted_socket_param_ = absl::nullopt;
+
+    return nullptr;
+  }
+
   ENVOY_LOG(
       trace, "IoUringSocketHandleImpl accept the socket, connect fd = {}, remote address = {}",
       accepted_socket_param_->fd_,
       Network::Address::addressFromSockAddrOrThrow(*accepted_socket_param_->remote_addr_,
                                                    accepted_socket_param_->remote_addr_len_, false)
           ->asString());
-  ASSERT(io_uring_socket_type_ == IoUringSocketType::Accept);
-
   memcpy(reinterpret_cast<void*>(addr), // NOLINT(safe-memcpy)
          reinterpret_cast<void*>(accepted_socket_param_->remote_addr_),
          accepted_socket_param_->remote_addr_len_);

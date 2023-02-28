@@ -1,5 +1,3 @@
-#include <sys/socket.h>
-
 #include "source/common/api/os_sys_calls_impl.h"
 #include "source/common/io/io_uring_worker_impl.h"
 #include "source/common/network/address_impl.h"

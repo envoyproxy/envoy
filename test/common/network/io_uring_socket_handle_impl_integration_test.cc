@@ -98,7 +98,8 @@ TEST_F(IoUringSocketHandleImplIntegrationTest, Accept) {
       [this, &accepted](uint32_t) {
         struct sockaddr addr;
         socklen_t addrlen = sizeof(addr);
-        io_handle_->accept(&addr, &addrlen);
+        auto handle = io_handle_->accept(&addr, &addrlen);
+        EXPECT_NE(handle, nullptr);
         accepted = true;
       },
       Event::PlatformDefaultTriggerType, Event::FileReadyType::Read);

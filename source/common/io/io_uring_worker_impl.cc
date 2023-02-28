@@ -289,12 +289,11 @@ void IoUringAcceptSocket::onAccept(Request* req, int32_t result, bool injected) 
     }
   }
 
-  if (result < 0 && !injected) {
-    ENVOY_LOG(trace, "accept request failed, fd = {}, result = {}", fd_, result);
+  if (result == -ECANCELED) {
     return;
   }
 
-  ENVOY_LOG(trace, "accept new socket, fd = {}, new socket = {}", fd_, result);
+  ENVOY_LOG(trace, "accept new socket, fd = {}, result = {}", fd_, result);
   AcceptedSocketParam param{result, &accept_req->remote_addr_, accept_req->remote_addr_len_};
   io_uring_handler_.onAcceptSocket(param);
   submitRequests();

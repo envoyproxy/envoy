@@ -6,6 +6,8 @@
 #include "test/test_common/threadsafe_singleton_injector.h"
 
 using testing::_;
+using testing::Return;
+using testing::ReturnRef;
 
 namespace Envoy {
 namespace Network {
@@ -55,6 +57,35 @@ TEST(IoUringSocketHandleImpl, CreateClientSocket) {
   impl.initializeFileEvent(
       dispatcher, [](uint32_t) {}, Event::PlatformDefaultTriggerType, Event::FileReadyType::Read);
   EXPECT_EQ(IoUringSocketType::Client, impl.ioUringSocketType());
+}
+
+TEST(IoUringSocketHandleImpl, AcceptError) {
+  Api::MockOsSysCalls os_sys_calls;
+  TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
+  Event::MockDispatcher dispatcher;
+
+  Io::MockIoUringFactory factory;
+  IoUringSocketHandleTestImpl impl(factory, false);
+  struct sockaddr addr;
+  socklen_t addrlen = sizeof(addr);
+  EXPECT_EQ(impl.accept(&addr, &addrlen), nullptr);
+
+  Io::MockIoUringSocket socket;
+  Io::MockIoUringWorker worker;
+  EXPECT_CALL(os_sys_calls, listen(_, _));
+  impl.listen(5);
+  EXPECT_CALL(worker, addAcceptSocket(_, _)).WillOnce(ReturnRef(socket));
+  EXPECT_CALL(factory, getIoUringWorker()).WillOnce(Return(OptRef<Io::IoUringWorker>(worker)));
+  impl.initializeFileEvent(
+      dispatcher,
+      [&](uint32_t) {
+        auto handle = impl.accept(&addr, &addrlen);
+        EXPECT_EQ(handle, nullptr);
+      },
+      Event::PlatformDefaultTriggerType, Event::FileReadyType::Read);
+  EXPECT_EQ(IoUringSocketType::Accept, impl.ioUringSocketType());
+  Io::AcceptedSocketParam param{-1, nullptr, 0};
+  impl.onAcceptSocket(param);
 }
 
 } // namespace

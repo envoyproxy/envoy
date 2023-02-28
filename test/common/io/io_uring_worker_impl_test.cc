@@ -35,7 +35,7 @@ public:
   void onWrite(WriteParam&) override {}
 };
 
-TEST(IoUringWorkerImplTest, cleanupSocket) {
+TEST(IoUringWorkerImplTest, CleanupSocket) {
   Event::MockDispatcher dispatcher;
   IoUringPtr io_uring_instance = std::make_unique<MockIoUring>();
   MockIoUring& mock_io_uring = *dynamic_cast<MockIoUring*>(io_uring_instance.get());
@@ -59,7 +59,7 @@ TEST(IoUringWorkerImplTest, cleanupSocket) {
   EXPECT_CALL(dispatcher, clearDeferredDeleteList());
 }
 
-TEST(IoUringWorkerImplTest, delaySubmit) {
+TEST(IoUringWorkerImplTest, DelaySubmit) {
   Event::MockDispatcher dispatcher;
   IoUringPtr io_uring_instance = std::make_unique<MockIoUring>();
   MockIoUring& mock_io_uring = *dynamic_cast<MockIoUring*>(io_uring_instance.get());
