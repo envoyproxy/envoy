@@ -460,10 +460,7 @@ Status RequestEncoderImpl::encodeHeaders(const RequestHeaderMap& headers, bool e
     // for upstream connections will become invalid, as Envoy will add chunk encoding to the
     // protocol stream. This will likely cause the server to disconnect, since it will be unable to
     // parse the protocol.
-    if (Runtime::runtimeFeatureEnabled(
-            "envoy.reloadable_features.http_skip_adding_content_length_to_upgrade")) {
-      disableChunkEncoding();
-    }
+    disableChunkEncoding();
   }
 
   if (connection_.sendFullyQualifiedUrl() && !is_connect) {
