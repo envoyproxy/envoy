@@ -163,6 +163,8 @@ private:
   // The status of the insert operation or header update, or decision not to insert or update.
   // If it's too early to determine the final status, this is empty.
   absl::optional<InsertStatus> insert_status_;
+
+  friend class CacheFilterTest;
 };
 
 using CacheFilterSharedPtr = std::shared_ptr<CacheFilter>;

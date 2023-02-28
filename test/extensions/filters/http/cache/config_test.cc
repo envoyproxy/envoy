@@ -22,6 +22,18 @@ protected:
   Http::MockFilterChainFactoryCallbacks filter_callback_;
 };
 
+TEST_F(CacheFilterFactoryTest, PerRoute) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  config_.mutable_typed_config()->PackFrom(
+      envoy::extensions::http::cache::simple_http_cache::v3::SimpleHttpCacheConfig());
+  auto per_route_config = factory_.createRouteSpecificFilterConfig(
+      config_, context, ProtobufMessage::getNullValidationVisitor());
+  ASSERT_THAT(per_route_config, testing::NotNull());
+  auto per_route_cache_config =
+      std::dynamic_pointer_cast<const CacheFilterConfig>(per_route_config);
+  ASSERT_THAT(per_route_cache_config, testing::NotNull());
+};
+
 TEST_F(CacheFilterFactoryTest, Basic) {
   config_.mutable_typed_config()->PackFrom(
       envoy::extensions::http::cache::simple_http_cache::v3::SimpleHttpCacheConfig());

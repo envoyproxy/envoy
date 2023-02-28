@@ -1,4 +1,5 @@
 #include "envoy/event/dispatcher.h"
+#include "envoy/extensions/http/cache/simple_http_cache/v3/config.pb.h"
 
 #include "source/common/http/headers.h"
 #include "source/extensions/filters/http/cache/cache_filter.h"
@@ -19,9 +20,9 @@ namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace Cache {
-namespace {
 
 using ::Envoy::StatusHelpers::IsOkAndHolds;
+using ::testing::Return;
 
 class CacheFilterTest : public ::testing::Test {
 protected:
@@ -35,6 +36,10 @@ protected:
     filter->setDecoderFilterCallbacks(decoder_callbacks_);
     filter->setEncoderFilterCallbacks(encoder_callbacks_);
     return filter;
+  }
+
+  const VaryAllowList& getVaryAllowList(CacheFilter& filter) {
+    return filter.config_->varyAllowList();
   }
 
   void SetUp() override {
@@ -171,6 +176,22 @@ protected:
   const Seconds delay_ = Seconds(10);
   const std::string age = std::to_string(delay_.count());
 };
+
+TEST_F(CacheFilterTest, MergesPerRouteConfig) {
+  CacheFilterSharedPtr filter = makeFilter(*filter_config_);
+  auto mock_route = std::make_shared<Router::MockRoute>();
+  envoy::extensions::filters::http::cache::v3::CacheConfig route_config_pb;
+  route_config_pb.mutable_typed_config()->PackFrom(
+      envoy::extensions::http::cache::simple_http_cache::v3::SimpleHttpCacheConfig());
+  auto allowed_header = route_config_pb.add_allowed_vary_headers();
+  allowed_header->set_exact("x-test-header");
+  auto cache = std::make_shared<SimpleHttpCache>();
+  CacheFilterConfig route_config{cache, route_config_pb};
+  EXPECT_CALL(decoder_callbacks_, route()).WillOnce(Return(mock_route));
+  EXPECT_CALL(*mock_route, mostSpecificPerFilterConfig(_)).WillOnce(Return(&route_config));
+  filter->decodeHeaders(request_headers_, true);
+  EXPECT_TRUE(getVaryAllowList(*filter).allowsValue("x-test-header"));
+}
 
 TEST_F(CacheFilterTest, FilterIsBeingDestroyed) {
   CacheFilterSharedPtr filter = makeFilter(*filter_config_);
@@ -1033,7 +1054,6 @@ TEST_F(ValidationHeadersTest, InvalidLastModified) {
   }
 }
 
-} // namespace
 } // namespace Cache
 } // namespace HttpFilters
 } // namespace Extensions
