@@ -23,7 +23,7 @@ public:
       const Network::ListenerFilterMatcherSharedPtr& listener_filter_matcher,
       Server::Configuration::ListenerFactoryContext& context) override {
 
-    // downcast it to the Local RateLimit config
+    // Downcast it to the LocalRateLimit config
     const auto& proto_config = MessageUtil::downcastAndValidate<
         const envoy::extensions::filters::listener::local_ratelimit::v3::LocalRateLimit&>(
         message, context.messageValidationVisitor());

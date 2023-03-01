@@ -1,15 +1,5 @@
 #include "source/extensions/filters/listener/local_ratelimit/local_ratelimit.h"
 
-#include <algorithm>
-#include <string>
-#include <vector>
-
-#include "envoy/common/exception.h"
-#include "envoy/common/platform.h"
-#include "envoy/event/dispatcher.h"
-#include "envoy/network/listen_socket.h"
-#include "envoy/stats/scope.h"
-
 #include "source/common/protobuf/utility.h"
 
 namespace Envoy {
@@ -22,16 +12,16 @@ FilterConfig::FilterConfig(
     Event::Dispatcher& dispatcher, Stats::Scope& scope, Runtime::Loader& runtime)
     : enabled_(proto_config.runtime_enabled(), runtime),
       stats_(generateStats(proto_config.stat_prefix(), scope)),
-      rate_limiter_(std::make_unique<Filters::Common::LocalRateLimit::LocalRateLimiterImpl>(
+      rate_limiter_(
           std::chrono::milliseconds(
               PROTOBUF_GET_MS_REQUIRED(proto_config.token_bucket(), fill_interval)),
           proto_config.token_bucket().max_tokens(),
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(proto_config.token_bucket(), tokens_per_fill, 1),
           dispatcher,
           Protobuf::RepeatedPtrField<
-              envoy::extensions::common::ratelimit::v3::LocalRateLimitDescriptor>())) {}
+              envoy::extensions::common::ratelimit::v3::LocalRateLimitDescriptor>()) {}
 
-bool FilterConfig::canCreateConnection() { return rate_limiter_->requestAllowed({}); }
+bool FilterConfig::canCreateConnection() { return rate_limiter_.requestAllowed({}); }
 
 LocalRateLimitStats FilterConfig::generateStats(const std::string& prefix, Stats::Scope& scope) {
   const std::string final_prefix = "listener_local_ratelimit." + prefix;
