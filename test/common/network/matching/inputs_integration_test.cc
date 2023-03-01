@@ -1,6 +1,7 @@
 #include "source/common/network/address_impl.h"
 #include "source/common/network/matching/data_impl.h"
 #include "source/common/network/matching/inputs.h"
+#include "source/common/router/string_accessor_impl.h"
 #include "source/common/stream_info/filter_state_impl.h"
 
 #include "test/common/matcher/test_utility.h"
@@ -30,6 +31,23 @@ matcher_tree:
             value: foo
 )EOF";
 
+constexpr absl::string_view yaml_filter_state = R"EOF(
+matcher_tree:
+  input:
+    name: input
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.matching.common_inputs.network.v3.{}
+      key: {}
+  exact_match_map:
+    map:
+      "{}":
+        action:
+          name: test_action
+          typed_config:
+            "@type": type.googleapis.com/google.protobuf.StringValue
+            value: foo
+)EOF";
+
 class InputsIntegrationTest : public ::testing::Test {
 public:
   InputsIntegrationTest()
@@ -41,6 +59,15 @@ public:
   void initialize(const std::string& input, const std::string& value) {
     xds::type::matcher::v3::Matcher matcher;
     MessageUtil::loadFromYaml(fmt::format(yaml, input, value), matcher,
+                              ProtobufMessage::getStrictValidationVisitor());
+
+    match_tree_ = matcher_factory_.create(matcher);
+  }
+
+  void initializeFilterStateCase(const std::string& input,
+    const std::string& key, const std::string& value) {
+    xds::type::matcher::v3::Matcher matcher;
+    MessageUtil::loadFromYaml(fmt::format(yaml_filter_state, input, key, value), matcher,
                               ProtobufMessage::getStrictValidationVisitor());
 
     match_tree_ = matcher_factory_.create(matcher);
@@ -175,6 +202,24 @@ TEST_F(InputsIntegrationTest, ApplicationProtocolInput) {
   MatchingDataImpl data(socket, filter_state);
   std::vector<std::string> protocols = {"http/1.1"};
   EXPECT_CALL(socket, requestedApplicationProtocols).WillOnce(testing::ReturnRef(protocols));
+
+  const auto result = match_tree_()->match(data);
+  EXPECT_EQ(result.match_state_, Matcher::MatchState::MatchComplete);
+  EXPECT_TRUE(result.on_match_.has_value());
+}
+
+TEST_F(InputsIntegrationTest, FilterStateInput) {
+  std::string key = "filter_state_key";
+  std::string value = "filter_state_value";
+  initializeFilterStateCase("FilterStateInput", key, value);
+
+  StreamInfo::FilterStateImpl filter_state(StreamInfo::FilterState::LifeSpan::FilterChain);
+  filter_state.setData(key, std::make_shared<Router::StringAccessorImpl>(value),
+    StreamInfo::FilterState::StateType::Mutable, StreamInfo::FilterState::LifeSpan::Connection,
+    StreamInfo::FilterState::StreamSharing::SharedWithUpstreamConnection);
+
+  Network::MockConnectionSocket socket;
+  MatchingDataImpl data(socket, filter_state);
 
   const auto result = match_tree_()->match(data);
   EXPECT_EQ(result.match_state_, Matcher::MatchState::MatchComplete);
