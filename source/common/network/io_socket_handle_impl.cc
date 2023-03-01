@@ -99,7 +99,7 @@ Api::IoCallUint64Result IoSocketHandleImpl::readv(uint64_t max_length, Buffer::R
   if (num_slices_to_read == 1) {
     // Avoid paying the VFS overhead when there is only one IO buffer to work with
     return sysCallResultToIoCallResult(
-      Api::OsSysCallsSingleton::get().recv(fd_, iov[0].iov_base, iov[0].iov_len, 0));
+        Api::OsSysCallsSingleton::get().recv(fd_, iov[0].iov_base, iov[0].iov_len, 0));
   }
 
   auto result = sysCallResultToIoCallResult(Api::OsSysCallsSingleton::get().readv(
@@ -140,7 +140,7 @@ Api::IoCallUint64Result IoSocketHandleImpl::writev(const Buffer::RawSlice* slice
   if (num_slices_to_write == 1) {
     // Avoid paying the VFS overhead when there is only one IO buffer to work with
     return sysCallResultToIoCallResult(
-      Api::OsSysCallsSingleton::get().send(fd_, iov[0].iov_base, iov[0].iov_len, 0));
+        Api::OsSysCallsSingleton::get().send(fd_, iov[0].iov_base, iov[0].iov_len, 0));
   }
 
   auto result = sysCallResultToIoCallResult(

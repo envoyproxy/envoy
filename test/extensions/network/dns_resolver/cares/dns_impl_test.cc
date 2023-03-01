@@ -897,8 +897,8 @@ public:
               return real_syscall.writev(fd, iov, num_iov);
             }));
     EXPECT_CALL(os_sys_calls, send(_, _, _, _))
-        .WillRepeatedly(
-            Invoke([&](os_fd_t socket, void* buffer, size_t length, int flags) -> Api::SysCallSizeResult {
+        .WillRepeatedly(Invoke(
+            [&](os_fd_t socket, void* buffer, size_t length, int flags) -> Api::SysCallSizeResult {
               return real_syscall.send(socket, buffer, length, flags);
             }));
     EXPECT_CALL(os_sys_calls, close(_))

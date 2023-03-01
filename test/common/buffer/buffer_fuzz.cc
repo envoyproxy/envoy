@@ -426,8 +426,7 @@ uint32_t bufferAction(Context& ctxt, char insert_value, uint32_t max_alloc, Buff
         FUZZ_ASSERT(return_value == 0);
       } else {
         auto buf = std::make_unique<char[]>(return_value);
-        FUZZ_ASSERT(static_cast<uint64_t>(::read(fds[0], buf.get(), return_value)) ==
-                    return_value);
+        FUZZ_ASSERT(static_cast<uint64_t>(::read(fds[0], buf.get(), return_value)) == return_value);
         FUZZ_ASSERT(::memcmp(buf.get(), previous_data.data(), return_value) == 0);
       }
     } while (return_value > 0);

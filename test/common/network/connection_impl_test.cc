@@ -1249,12 +1249,12 @@ TEST_P(ConnectionImplTest, WriteWithWatermarks) {
       }));
 
   EXPECT_CALL(os_sys_calls, recv(_, _, _, _))
-      .WillRepeatedly(Invoke([&](os_fd_t socket, void* buffer, size_t length, int flags) -> Api::SysCallSizeResult {
+      .WillRepeatedly(Invoke([&](os_fd_t, void*, size_t, int) -> Api::SysCallSizeResult {
         return {-1, SOCKET_ERROR_AGAIN};
       }));
 
   EXPECT_CALL(os_sys_calls, send(_, _, _, _))
-      .WillOnce(Invoke([&](os_fd_t socket, void* buffer, size_t length, int flags) -> Api::SysCallSizeResult {
+      .WillOnce(Invoke([&](os_fd_t, void*, size_t, int) -> Api::SysCallSizeResult {
         dispatcher_->exit();
         // Return to default os_sys_calls implementation
         os_calls.reset();
@@ -1342,14 +1342,12 @@ TEST_P(ConnectionImplTest, WatermarkFuzzing) {
     EXPECT_CALL(*client_write_buffer_, move(_))
         .WillOnce(Invoke(client_write_buffer_, &MockWatermarkBuffer::baseMove));
     EXPECT_CALL(os_sys_calls, send(_, _, _, _))
-        .WillOnce(Invoke([&](os_fd_t socket, void* buffer, size_t length,
-                             int flags) -> Api::SysCallSizeResult {
+        .WillOnce(Invoke([&](os_fd_t, void*, size_t, int) -> Api::SysCallSizeResult {
           client_write_buffer_->drain(bytes_to_flush);
           dispatcher_->exit();
           return {-1, SOCKET_ERROR_AGAIN};
         }))
-        .WillRepeatedly(Invoke([&](os_fd_t socket, void* buffer, size_t length,
-                                   int flags) -> Api::SysCallSizeResult {
+        .WillRepeatedly(Invoke([&](os_fd_t, void*, size_t, int) -> Api::SysCallSizeResult {
           return {-1, SOCKET_ERROR_AGAIN};
         }));
 
