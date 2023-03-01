@@ -3,13 +3,13 @@
 This file contains JavaScript functionality to periodically fetch JSON stats from
 the Envoy server, and display the top 50 (by default) stats in order of how often
 they've changed since the page was brought up. This can be useful to find potentially
-problematic listeners or clsuters or other high-cardinality subsystems in Envoy whose
+problematic listeners or clusters or other high-cardinality subsystems in Envoy whose
 activity can be quickly examined for potential problems. The more active a stat, the
 more likely it is to reflect behavior of note.
 
 ### Serving
 
-By default, this file is converveted by the BUILD process and stored as a C++
+By default, this file is converted by the BUILD process and stored as a C++
 absl::string_view constexpr. It is inlined into an HTML response for the stats
 page when the 'active' format is selected. generate_admin_html.sh is used to
 compile HTML and CSS constants into string_view format as well.
@@ -23,11 +23,11 @@ endpoints. This also disables active mode, which is dependent on HTML.
 
 ### Debugging
 
-To facilitate debugging and iterating on the JavaScript, a compile-time ifdef can
-be used at build time: `--cxxopt=-DENVOY_ADMIN_DEBUG`. When compiled this way,
-binaries (e.g. tests and envoy-static) will read the source files from their
-source tree locations every time they are served. So you can debug JS by editing
-the file and refreshing the admin site in your browser.
+To facilitate debugging and iterating on the JavaScript, a compile-time ifdef
+can be used at build time: `--cxxopt=-DENVOY_ADMIN_DEBUG`. When compiled this
+way, binaries (e.g. tests and envoy-static) will read the source files from
+their source tree locations every time they are served. So you can debug
+JavaScript by editing the file and refreshing the admin site in your browser.
 
 ### Testing
 
