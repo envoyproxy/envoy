@@ -847,25 +847,6 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
   tls_socket.mutable_common_tls_context()->add_alpn_protocols("h2");
   ssl_proxy_socket.mutable_transport_socket()->mutable_typed_config()->PackFrom(tls_socket);
 
-  // Base h2 cluster.
-  auto* base_h2 = static_resources->add_clusters();
-  base_h2->set_name("base_h2");
-  h2_protocol_options.mutable_explicit_http_config()->mutable_http2_protocol_options()->CopyFrom(
-      *alpn_options.mutable_auto_config()->mutable_http2_protocol_options());
-  h2_protocol_options.mutable_upstream_http_protocol_options()->set_auto_sni(true);
-  h2_protocol_options.mutable_upstream_http_protocol_options()->set_auto_san_validation(true);
-  base_h2->mutable_connect_timeout()->set_seconds(connect_timeout_seconds_);
-  base_h2->set_lb_policy(envoy::config::cluster::v3::Cluster::CLUSTER_PROVIDED);
-  base_h2->mutable_cluster_type()->CopyFrom(base_cluster_type);
-  base_h2->mutable_transport_socket()->set_name("envoy.transport_sockets.http_11_proxy");
-  base_h2->mutable_transport_socket()->mutable_typed_config()->PackFrom(ssl_proxy_socket);
-  base_h2->mutable_upstream_connection_options()->CopyFrom(
-      *base_cluster->mutable_upstream_connection_options());
-  base_h2->mutable_circuit_breakers()->CopyFrom(*base_cluster->mutable_circuit_breakers());
-  (*base_h2->mutable_typed_extension_protocol_options())
-      ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]
-          .PackFrom(h2_protocol_options);
-
   // Edit base cluster to be an HTTP/3 cluster.
   if (enable_http3_) {
     envoy::extensions::transport_sockets::quic::v3::QuicUpstreamTransport h3_inner_socket;

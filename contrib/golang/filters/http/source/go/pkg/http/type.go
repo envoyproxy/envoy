@@ -82,6 +82,12 @@ func (h *httpHeaderMap) Values(key string) []string {
 }
 
 func (h *httpHeaderMap) Set(key, value string) {
+	// Get all header values first before setting a value, since the set operation may not take affects immediately
+	// when it's invoked in a Go thread, instead, it will post a callback to run in the envoy worker thread.
+	// Otherwise, we may get outdated values in a following Get call.
+	if h.headers == nil && !h.isTrailer {
+		h.headers = cAPI.HttpCopyHeaders(unsafe.Pointer(h.request.req), h.headerNum, h.headerBytes)
+	}
 	if h.headers != nil {
 		h.headers[key] = []string{value}
 	}
@@ -97,14 +103,17 @@ func (h *httpHeaderMap) Add(key, value string) {
 }
 
 func (h *httpHeaderMap) Del(key string) {
-	if h.headers != nil {
-		delete(h.headers, key)
-	}
 	if h.isTrailer {
 		panic("unsupported yet")
-	} else {
-		cAPI.HttpRemoveHeader(unsafe.Pointer(h.request.req), &key)
 	}
+	// Get all header values first before removing a key, since the set operation may not take affects immediately
+	// when it's invoked in a Go thread, instead, it will post a callback to run in the envoy worker thread.
+	// Otherwise, we may get outdated values in a following Get call.
+	if h.headers != nil {
+		h.headers = cAPI.HttpCopyHeaders(unsafe.Pointer(h.request.req), h.headerNum, h.headerBytes)
+	}
+	delete(h.headers, key)
+	cAPI.HttpRemoveHeader(unsafe.Pointer(h.request.req), &key)
 }
 
 func (h *httpHeaderMap) Range(f func(key, value string) bool) {
