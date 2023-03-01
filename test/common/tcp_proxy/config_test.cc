@@ -6,6 +6,9 @@ namespace Envoy {
 namespace TcpProxy {
 
 namespace {
+
+using ::testing::Return;
+
 TEST(ConfigTest, DefaultTimeout) {
   const std::string yaml = R"EOF(
 stat_prefix: name

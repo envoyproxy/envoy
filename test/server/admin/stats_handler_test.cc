@@ -15,13 +15,11 @@
 #include "test/test_common/utility.h"
 
 using testing::Combine;
-using testing::EndsWith;
 using testing::HasSubstr;
 using testing::InSequence;
 using testing::Ref;
 using testing::Return;
 using testing::ReturnRef;
-using testing::StartsWith;
 using testing::Values;
 using testing::ValuesIn;
 

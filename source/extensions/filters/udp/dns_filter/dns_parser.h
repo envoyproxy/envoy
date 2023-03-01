@@ -174,13 +174,13 @@ public:
   DnsQueryContext(Network::Address::InstanceConstSharedPtr local,
                   Network::Address::InstanceConstSharedPtr peer, DnsParserCounters& counters,
                   uint64_t retry_count)
-      : local_(std::move(local)), peer_(std::move(peer)), counters_(counters), parse_status_(false),
+      : local_(std::move(local)), peer_(std::move(peer)), counters_(counters),
         response_code_(DNS_RESPONSE_CODE_NO_ERROR), retry_(retry_count) {}
 
   const Network::Address::InstanceConstSharedPtr local_;
   const Network::Address::InstanceConstSharedPtr peer_;
   DnsParserCounters& counters_;
-  bool parse_status_;
+  bool parse_status_{false};
   uint16_t response_code_;
   uint64_t retry_;
   uint16_t id_;

@@ -1249,9 +1249,9 @@ yarl==1.8.2 \
     #   aiohttp
 
 # The following packages are considered to be unsafe in a requirements file:
-setuptools==67.3.2 \
-    --hash=sha256:95f00380ef2ffa41d9bba85d95b27689d923c93dfbafed4aecd7cf988a25e012 \
-    --hash=sha256:bb6d8e508de562768f2027902929f8523932fcd1fb784e6d573d2cafac995a48
+setuptools==67.4.0 \
+    --hash=sha256:e5fd0a713141a4a105412233c63dc4e17ba0090c8e8334594ac790ec97792330 \
+    --hash=sha256:f106dee1b506dee5102cc3f3e9e68137bbad6d47b616be7991714b0c62204251
     # via
     #   -r requirements.in
     #   sphinxcontrib-jquery

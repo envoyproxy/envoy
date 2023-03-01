@@ -15,6 +15,8 @@ namespace Envoy {
 namespace Ssl {
 namespace Matching {
 
+using ::testing::Return;
+
 constexpr absl::string_view yaml = R"EOF(
 matcher_tree:
   input:
@@ -41,7 +43,7 @@ public:
 
   void initialize(const std::string& input, const std::string& value) {
     xds::type::matcher::v3::Matcher matcher;
-    MessageUtil::loadFromYaml(fmt::format(std::string(yaml), input, value), matcher,
+    MessageUtil::loadFromYaml(fmt::format(yaml, input, value), matcher,
                               ProtobufMessage::getStrictValidationVisitor());
 
     match_tree_ = matcher_factory_.create(matcher);
