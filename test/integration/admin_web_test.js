@@ -29,7 +29,7 @@ function addTest(url, name, testFunction) { // eslint-disable-line no-unused-var
 }
 
 /**
- * Provides an async version of the onload event.
+ * Provides an async version of the `onload` event.
  *
  * @param {!HTMLElement} iframe
  * @return {!Promise}
