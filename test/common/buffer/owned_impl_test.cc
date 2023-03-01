@@ -1064,7 +1064,7 @@ TEST(OverflowDetectingUInt64, Arithmetic) {
   EXPECT_DEATH(length += 1, "overflow");
 }
 
-void TestBufferMove(uint64_t buffer1_length, uint64_t buffer2_length,
+void testBufferMove(uint64_t buffer1_length, uint64_t buffer2_length,
                     uint64_t expected_slice_count) {
   Buffer::OwnedImpl buffer1;
   buffer1.add(std::string(buffer1_length, 'a'));
@@ -1206,22 +1206,22 @@ constexpr uint64_t kLargeSliceSize = 2048;
 
 TEST_F(OwnedImplTest, MoveBuffersWithLargeSlices) {
   // Large slices should not be coalesced together
-  TestBufferMove(kLargeSliceSize, kLargeSliceSize, 2);
+  testBufferMove(kLargeSliceSize, kLargeSliceSize, 2);
 }
 
 TEST_F(OwnedImplTest, MoveBuffersWithSmallSlices) {
   // Small slices should be coalesced together
-  TestBufferMove(1, 1, 1);
+  testBufferMove(1, 1, 1);
 }
 
 TEST_F(OwnedImplTest, MoveSmallSliceIntoLargeSlice) {
   // Small slices should be coalesced with a large one
-  TestBufferMove(kLargeSliceSize, 1, 1);
+  testBufferMove(kLargeSliceSize, 1, 1);
 }
 
 TEST_F(OwnedImplTest, MoveLargeSliceIntoSmallSlice) {
   // Large slice should NOT be coalesced into the small one
-  TestBufferMove(1, kLargeSliceSize, 2);
+  testBufferMove(1, kLargeSliceSize, 2);
 }
 
 TEST_F(OwnedImplTest, MoveSmallSliceIntoNotEnoughFreeSpace) {
@@ -1229,7 +1229,7 @@ TEST_F(OwnedImplTest, MoveSmallSliceIntoNotEnoughFreeSpace) {
   // Slice buffer sizes are allocated in 4Kb increments
   // Make first slice have 127 of free space (it is actually less as there is small overhead of the
   // OwnedSlice object) And second slice 128 bytes
-  TestBufferMove(4096 - 127, 128, 2);
+  testBufferMove(4096 - 127, 128, 2);
 }
 
 TEST_F(OwnedImplTest, FrontSlice) {

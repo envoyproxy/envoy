@@ -676,11 +676,11 @@ void Client::removeStream(envoy_stream_t stream_handle) {
 namespace {
 
 const LowerCaseString ClusterHeader{"x-envoy-mobile-cluster"};
+// TODO(alyssawilk) when both base_h2 and base_h3 are removed, remove this header.
 const LowerCaseString ProtocolHeader{"x-envoy-mobile-upstream-protocol"};
 
 const char* BaseCluster = "base";
 const char* H2Cluster = "base_h2";
-const char* H3Cluster = "base_h3";
 const char* ClearTextCluster = "base_clear";
 
 } // namespace
@@ -700,10 +700,9 @@ void Client::setDestinationCluster(Http::RequestHeaderMap& headers) {
     // NOTE: This cluster *forces* H2-Raw and does not use ALPN.
     if (value == "http2") {
       cluster = H2Cluster;
-      // NOTE: This cluster will attempt to negotiate H3, but defaults to ALPN over TCP.
+      // NOTE: This cluster will attempt to negotiate H3, but fails over to ALPN over TCP.
     } else if (value == "http3") {
-      cluster = H3Cluster;
-      // FIXME(goaway): No cluster actually forces H1 today except cleartext!
+      cluster = BaseCluster;
     } else if (value == "alpn" || value == "http1") {
       cluster = BaseCluster;
     } else {
