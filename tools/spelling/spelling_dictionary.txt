@@ -245,6 +245,7 @@ integrations
 jkl
 lang
 libsxg
+LCOV
 LLVM
 LPT
 LRS
