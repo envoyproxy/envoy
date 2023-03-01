@@ -109,8 +109,8 @@ public class QuicTestServerTest {
   public void setUpEngine() throws Exception {
     TestJni.startQuicTestServer();
     CountDownLatch latch = new CountDownLatch(1);
-    engine = new AndroidEngineBuilder(
-                 appContext, new Custom(String.format(CONFIG, TestJni.getServerPort())))
+    engine = new AndroidEngineBuilder(appContext,
+                                      new Custom(String.format(CONFIG, TestJni.getServerPort())))
                  .addLogLevel(LogLevel.WARN)
                  .setOnEngineRunning(() -> {
                    latch.countDown();

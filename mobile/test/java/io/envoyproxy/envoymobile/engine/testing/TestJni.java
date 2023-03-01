@@ -1,6 +1,8 @@
 package io.envoyproxy.envoymobile.engine.testing;
 
 import java.util.concurrent.atomic.AtomicBoolean;
+import io.envoyproxy.envoymobile.engine.EnvoyConfiguration;
+import io.envoyproxy.envoymobile.engine.JniLibrary;
 
 /**
  * Wrapper class for test JNI functions
@@ -65,6 +67,10 @@ public final class TestJni {
     return nativeGetServerPort();
   }
 
+  public static String createYaml(EnvoyConfiguration envoyConfiguration) {
+    return nativeCreateYaml(envoyConfiguration.createBootstrap());
+  }
+
   private static native void nativeStartQuicTestServer();
 
   private static native void nativeShutdownQuicTestServer();
@@ -74,6 +80,8 @@ public final class TestJni {
   private static native void nativeShutdownTestServer();
 
   private static native int nativeGetServerPort();
+
+  private static native String nativeCreateYaml(long bootstrap);
 
   private TestJni() {}
 }
