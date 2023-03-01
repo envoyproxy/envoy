@@ -106,8 +106,7 @@ private:
                       const Stats::ParentHistogram& envoy_histogram,
                       int64_t snapshot_time_ms) const;
   void flushSummary(io::prometheus::client::MetricFamily& metrics_family,
-                      const Stats::ParentHistogram& envoy_histogram,
-                      int64_t snapshot_time_ms) const;
+                    const Stats::ParentHistogram& envoy_histogram, int64_t snapshot_time_ms) const;
 
   io::prometheus::client::Metric*
   populateMetricsFamily(io::prometheus::client::MetricFamily& metrics_family,

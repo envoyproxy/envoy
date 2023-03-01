@@ -107,9 +107,9 @@ void MetricsFlusher::flushHistogram(io::prometheus::client::MetricFamily& metric
                                     int64_t snapshot_time_ms) const {
 
   const Stats::HistogramStatistics& hist_stats = envoy_histogram.intervalStatistics();
-  auto* histogram_metric = populateMetricsFamily(metrics_family,
-                                                  io::prometheus::client::MetricType::HISTOGRAM,
-                                                  snapshot_time_ms, envoy_histogram);
+  auto* histogram_metric =
+      populateMetricsFamily(metrics_family, io::prometheus::client::MetricType::HISTOGRAM,
+                            snapshot_time_ms, envoy_histogram);
   auto* histogram = histogram_metric->mutable_histogram();
   histogram->set_sample_count(hist_stats.sampleCount());
   histogram->set_sample_sum(hist_stats.sampleSum());
@@ -121,8 +121,8 @@ void MetricsFlusher::flushHistogram(io::prometheus::client::MetricFamily& metric
 }
 
 void MetricsFlusher::flushSummary(io::prometheus::client::MetricFamily& metrics_family,
-                                    const Stats::ParentHistogram& envoy_histogram,
-                                    int64_t snapshot_time_ms) const {
+                                  const Stats::ParentHistogram& envoy_histogram,
+                                  int64_t snapshot_time_ms) const {
 
   const Stats::HistogramStatistics& hist_stats = envoy_histogram.intervalStatistics();
   auto* summary_metric =
