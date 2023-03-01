@@ -737,6 +737,13 @@ stages:
         GITHUB_TOKEN: $(GitHubPublicRepoOnlyAccessToken)
         MAINTAINER_GPG_KEY_PASSPHRASE: $(MaintainerGPGKeyPassphrase)
 
+    - script: ./ci/run_envoy_docker.sh './ci/reopen_branch.sh'
+      displayName: "Reopen the branch for development"
+      workingDirectory: $(Build.SourcesDirectory)
+      env:
+        AZP_BRANCH: $(Build.SourceBranch)
+        GITHUB_TOKEN: $(GitHubPublicRepoOnlyAccessToken)
+
 - stage: verify
   # displayName: Verify
   dependsOn: ["env", "publish"]
