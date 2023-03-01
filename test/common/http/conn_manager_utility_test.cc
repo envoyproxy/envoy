@@ -760,6 +760,7 @@ TEST_F(ConnectionManagerUtilityTest, ExternalAddressExternalRequestUseRemote) {
                                    {"x-envoy-expected-rq-timeout-ms", "10"},
                                    {"x-envoy-ip-tags", "bar"},
                                    {"x-envoy-original-url", "my_url"},
+                                   {"x-envoy-original-path", "/my_path"},
                                    {"custom_header", "foo"}};
 
   EXPECT_EQ((MutateRequestRet{"50.0.0.1:0", false, Tracing::Reason::NotTraceable}),
@@ -778,6 +779,7 @@ TEST_F(ConnectionManagerUtilityTest, ExternalAddressExternalRequestUseRemote) {
   EXPECT_FALSE(headers.has("x-envoy-expected-rq-timeout-ms"));
   EXPECT_FALSE(headers.has("x-envoy-ip-tags"));
   EXPECT_FALSE(headers.has("x-envoy-original-url"));
+  EXPECT_FALSE(headers.has("x-envoy-original-path"));
   EXPECT_FALSE(headers.has("custom_header"));
 }
 
