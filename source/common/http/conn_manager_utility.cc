@@ -295,6 +295,9 @@ void ConnectionManagerUtility::cleanInternalHeaders(
   request_headers.removeEnvoyIpTags();
   request_headers.removeEnvoyOriginalUrl();
   request_headers.removeEnvoyHedgeOnPerTryTimeout();
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.sanitize_original_path")) {
+    request_headers.removeEnvoyOriginalPath();
+  }
 
   for (const LowerCaseString& header : internal_only_headers) {
     request_headers.remove(header);
