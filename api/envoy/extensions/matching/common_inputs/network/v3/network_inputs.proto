@@ -101,5 +101,5 @@ message ApplicationProtocolInput {
 // The value of the provided filter state key will be the raw string representation of the filter state object
 // [#extension: envoy.matching.inputs.filter_state]
 message FilterStateInput {
-    string key = 1 [(validate.rules).string.min_bytes = 1];
+  string key = 1 [(validate.rules).string.min_bytes = 1];
 }

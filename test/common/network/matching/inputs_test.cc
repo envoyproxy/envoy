@@ -327,8 +327,9 @@ TEST(MatchingData, FilterStateInput) {
   }
 
   filter_state.setData("unknown_key", std::make_shared<Router::StringAccessorImpl>("some_value"),
-    StreamInfo::FilterState::StateType::Mutable, StreamInfo::FilterState::LifeSpan::Connection,
-    StreamInfo::FilterState::StreamSharing::SharedWithUpstreamConnection);
+                       StreamInfo::FilterState::StateType::Mutable,
+                       StreamInfo::FilterState::LifeSpan::Connection,
+                       StreamInfo::FilterState::StreamSharing::SharedWithUpstreamConnection);
 
   {
     const auto result = input.get(data);
@@ -339,8 +340,9 @@ TEST(MatchingData, FilterStateInput) {
 
   std::string value = "filter_state_value";
   filter_state.setData(key, std::make_shared<Router::StringAccessorImpl>(value),
-    StreamInfo::FilterState::StateType::Mutable, StreamInfo::FilterState::LifeSpan::Connection,
-    StreamInfo::FilterState::StreamSharing::SharedWithUpstreamConnection);
+                       StreamInfo::FilterState::StateType::Mutable,
+                       StreamInfo::FilterState::LifeSpan::Connection,
+                       StreamInfo::FilterState::StreamSharing::SharedWithUpstreamConnection);
 
   {
     const auto result = input.get(data);

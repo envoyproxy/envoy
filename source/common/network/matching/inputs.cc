@@ -28,12 +28,12 @@ Matcher::DataInputGetResult ApplicationProtocolInput::get(const MatchingData& da
 }
 
 Matcher::DataInputGetResult FilterStateInput::get(const MatchingData& data) const {
-  const auto* filter_state_object = data.filterState()
-    .getDataReadOnly<StreamInfo::FilterState::Object>(filter_state_key_);
+  const auto* filter_state_object =
+      data.filterState().getDataReadOnly<StreamInfo::FilterState::Object>(filter_state_key_);
 
   if (filter_state_object) {
     return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,
-            filter_state_object->serializeAsString()};  
+            filter_state_object->serializeAsString()};
   }
 
   return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::nullopt};

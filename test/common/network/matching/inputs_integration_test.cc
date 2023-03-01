@@ -64,8 +64,8 @@ public:
     match_tree_ = matcher_factory_.create(matcher);
   }
 
-  void initializeFilterStateCase(const std::string& input,
-    const std::string& key, const std::string& value) {
+  void initializeFilterStateCase(const std::string& input, const std::string& key,
+                                 const std::string& value) {
     xds::type::matcher::v3::Matcher matcher;
     MessageUtil::loadFromYaml(fmt::format(yaml_filter_state, input, key, value), matcher,
                               ProtobufMessage::getStrictValidationVisitor());
@@ -215,8 +215,9 @@ TEST_F(InputsIntegrationTest, FilterStateInput) {
 
   StreamInfo::FilterStateImpl filter_state(StreamInfo::FilterState::LifeSpan::FilterChain);
   filter_state.setData(key, std::make_shared<Router::StringAccessorImpl>(value),
-    StreamInfo::FilterState::StateType::Mutable, StreamInfo::FilterState::LifeSpan::Connection,
-    StreamInfo::FilterState::StreamSharing::SharedWithUpstreamConnection);
+                       StreamInfo::FilterState::StateType::Mutable,
+                       StreamInfo::FilterState::LifeSpan::Connection,
+                       StreamInfo::FilterState::StreamSharing::SharedWithUpstreamConnection);
 
   Network::MockConnectionSocket socket;
   MatchingDataImpl data(socket, filter_state);
