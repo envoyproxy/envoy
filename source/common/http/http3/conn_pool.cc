@@ -171,15 +171,7 @@ allocateConnPool(Event::Dispatcher& dispatcher, Random::RandomGenerator& random_
               "Failed to create Http/3 client. Failed to create quic network connection.");
           return nullptr;
         }
-        // Store a handle to connection as it will be moved during client construction.
-        Network::Connection& connection = *data.connection_;
         auto client = std::make_unique<ActiveClient>(*pool, data);
-        if (connection.state() == Network::Connection::State::Closed) {
-          // TODO(danzh) remove this branch once
-          // "envoy.reloadable_features.postpone_h3_client_connect_to_next_loop" is deprecated.
-          ASSERT(dynamic_cast<CodecClientProd*>(client->codec_client_.get()) != nullptr);
-          return nullptr;
-        }
         return client;
       },
       [](Upstream::Host::CreateConnectionData& data, HttpConnPoolImplBase* pool) {
