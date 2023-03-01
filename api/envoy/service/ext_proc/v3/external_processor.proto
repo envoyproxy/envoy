@@ -349,7 +349,7 @@ message BodyMutation {
 // request direction. If these fields are not configured correctly,
 // the response message will be ignored by the Envoy ext_proc filter.
 message NewProcessingTimeout {
-  // Specifies the new timer duration. Has to be >=1ms.
+  // Specifies the new timer duration. Has to be >=1ms and <=10s.
   google.protobuf.Duration message_timeout = 1;
 
   // Specifies the traffic direction of the received request message.

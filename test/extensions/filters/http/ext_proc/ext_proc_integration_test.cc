@@ -320,7 +320,11 @@ protected:
     ProcessingResponse response;
     auto* new_timeout = response.mutable_new_timeout();
     if (encoding_timeout) {
-      new_timeout->mutable_message_timeout()->set_nanos(timeout_ms * 1000000);
+      if (timeout_ms < 1000) {
+        new_timeout->mutable_message_timeout()->set_nanos(timeout_ms * 1000000);
+      } else {
+        new_timeout->mutable_message_timeout()->set_seconds(timeout_ms/1000);
+      }
     }
     new_timeout->set_traffic_direction(direction);
     processor_stream_->sendGrpcMessage(response);
@@ -1836,8 +1840,11 @@ TEST_P(ExtProcIntegrationTest, RequestMessageNewTimeoutNegativeTestUnspecifiedDi
   newTimeoutWrongConfigTest(true, 500, envoy::config::core::v3::TrafficDirection::UNSPECIFIED);
 }
 
-TEST_P(ExtProcIntegrationTest, RequestMessageNewTimeoutNegativeTestValueZero) {
+TEST_P(ExtProcIntegrationTest, RequestMessageNewTimeoutNegativeTestTimeoutTooSmall) {
   newTimeoutWrongConfigTest(true, 0, envoy::config::core::v3::TrafficDirection::INBOUND);
+}
+TEST_P(ExtProcIntegrationTest, RequestMessageNewTimeoutNegativeTestTimeoutTooBig) {
+  newTimeoutWrongConfigTest(true, 20000, envoy::config::core::v3::TrafficDirection::INBOUND);
 }
 
 TEST_P(ExtProcIntegrationTest, RequestMessageNewTimeoutNegativeTestNoTimeEncoding) {

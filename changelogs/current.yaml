@@ -123,6 +123,6 @@ new_features:
     authentication failure status code and message in dynamic metadata.
 - area: ext_proc
   change: |
-    added the support :ref:`new_timeout <envoy_v3_api_msg_service.ext_proc.v3.ProcessingResponse.new_timeout>` for the ext_proc server to send back a message to Envoy to extend the ext_proc timer.
+    added the support :ref:`new_timeout <envoy_v3_api_field_service.ext_proc.v3.ProcessingResponse.new_timeout>` for the ext_proc server to send back a message to Envoy to extend the ext_proc timer.
 
 deprecated:

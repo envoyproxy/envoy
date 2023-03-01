@@ -538,7 +538,8 @@ void Filter::onNewTimeout(
   }
   const auto message_timeout_ms = message_timeout_ms_opt->count();
   const uint32_t MINIMUM_NEW_TIMEOUT_MS = 1;
-  if (message_timeout_ms < MINIMUM_NEW_TIMEOUT_MS) {
+  const uint32_t MAXIMUM_NEW_TIMEOUT_MS = 10000;
+  if (message_timeout_ms < MINIMUM_NEW_TIMEOUT_MS || message_timeout_ms > MAXIMUM_NEW_TIMEOUT_MS) {
     return;
   }
   const auto traffic_direction = new_timeout.traffic_direction();
