@@ -650,7 +650,7 @@ CAPIStatus Filter::setHeader(absl::string_view key, absl::string_view value, hea
     break;
 
   default:
-    ENVOY_LOG(error, "unknown header action {}, ignored", act);
+    RELEASE_ASSERT(false, absl::StrCat("unknown header action: ", act));
   }
 
   onHeadersModified();
