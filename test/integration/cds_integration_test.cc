@@ -315,7 +315,7 @@ TEST_P(LazyInitClusterStatsTest, LazyInitTrafficStatsWithClusterCreateDeleteRecr
   EXPECT_EQ(test_server_->counter("cluster_manager.cluster_added")->value(), 3);
   // No cluster_2 stats yet.
   EXPECT_EQ(test_server_->gauge("cluster.cluster_2.ClusterTrafficStats.initialized")->value(), 0);
-  EXPECT_EQ(test_server_->counter("cluster.cluster_2.upstream_cx_total"), null);
+  EXPECT_EQ(test_server_->counter("cluster.cluster_2.upstream_cx_total"), nullptr);
   // Now the cluster_1 stats are gone, as well as the lazy init wrapper.
   EXPECT_EQ(test_server_->gauge("cluster.cluster_1.ClusterTrafficStats.initialized"), nullptr);
   EXPECT_EQ(test_server_->counter("cluster.cluster_1.upstream_cx_total"), nullptr);
