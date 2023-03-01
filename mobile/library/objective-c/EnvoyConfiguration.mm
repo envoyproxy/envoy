@@ -276,7 +276,7 @@
   }
 }
 
-// This is only for test purposes
+// TODO(caschoener) this should be moved into a test-only library
 - (NSString *)generateYamlString {
   try {
     Envoy::Platform::EngineBuilder builder = [self applyToCXXBuilder];

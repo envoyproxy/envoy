@@ -531,7 +531,10 @@ Note that Envoy will fail to start up in debug mode if an unknown guard is speci
 ``addRtdsLayer``
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Adds an RTDS layer to envoy configuration. Requires that ADS be configured via `setAggregatedDiscoveryService()`.
+Adds an RTDS layer to the bootstrap configuration.
+Requires that ADS be configured via `setAggregatedDiscoveryService()`.
+See the following link for details:
+https://www.envoyproxy.io/docs/envoy/latest/api-v3/service/runtime/v3/rtds.proto
 
 **Example**::
 
@@ -542,18 +545,21 @@ Adds an RTDS layer to envoy configuration. Requires that ADS be configured via `
 ``setAggregatedDiscoveryService``
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Adds ADS to envoy configuration, for instance to be used with RTDS and CDS layers.
+Adds ADS to bootstrap configuration, for instance to be used with RTDS and CDS layers.
+Optional params allow configuring jwt token and ssl. See the following link for details:
+https://www.envoyproxy.io/docs/envoy/latest/configuration/overview/xds_api#config-overview-ads
 
 **Example**::
 
   // Kotlin
-  builder.setAggregatedDiscoveryService("GRPC", "192.168.1.1", 0)
+  builder.setAggregatedDiscoveryService("192.168.1.1", 0)
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 ``setNodeId``
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Sets the node.id field.
+Sets the node.id field. See the following link for details:
+https://www.envoyproxy.io/docs/envoy/latest/api-v3/config/core/v3/base.proto#envoy-v3-api-msg-config-core-v3-node
 
 **Example**::
 
@@ -564,7 +570,8 @@ Sets the node.id field.
 ``setNodeLocality``
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Sets the node.locality field.
+Sets the node.locality field. See the following link for details:
+https://www.envoyproxy.io/docs/envoy/latest/api-v3/config/core/v3/base.proto#envoy-v3-api-msg-config-core-v3-node
 
 **Example**::
 

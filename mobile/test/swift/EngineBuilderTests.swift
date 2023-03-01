@@ -412,7 +412,8 @@ final class EngineBuilderTests: XCTestCase {
     self.waitForExpectations(timeout: 0.01)
   }
 
-  func testRtdsAdsNotInByDefault() {
+  func testDefaultValues() {
+    // rtds, ads, node_id, node_locality
     let expectation = self.expectation(description: "Run called with expected data")
     MockEnvoyEngine.onRunWithConfig = { config, _ in
       XCTAssertFalse(config.generateYamlString().contains("rtds_layer:"))
@@ -422,9 +423,47 @@ final class EngineBuilderTests: XCTestCase {
       XCTAssertFalse(config.generateYamlString().contains("ads_config:"))
       expectation.fulfill()
     }
+    MockEnvoyEngine.onRunWithConfig = { config, _ in
+      XCTAssertTrue(config.generateYamlString().contains("id: envoy-mobile"))
+      expectation.fulfill()
+    }
+    MockEnvoyEngine.onRunWithConfig = { config, _ in
+      XCTAssertFalse(config.generateYamlString().contains("locality:"))
+      expectation.fulfill()
+    }
 
     _ = EngineBuilder()
       .addEngineType(MockEnvoyEngine.self)
+      .build()
+    self.waitForExpectations(timeout: 0.01)
+  }
+
+  func testCustomNodeId() {
+    let expectation = self.expectation(description: "Run called with expected data")
+    MockEnvoyEngine.onRunWithConfig = { config, _ in
+      XCTAssertTrue(config.generateYamlString().contains("id: SWIFT_TEST_NODE_ID"))
+      expectation.fulfill()
+    }
+
+    _ = EngineBuilder()
+      .addEngineType(MockEnvoyEngine.self)
+      .setNodeId("SWIFT_TEST_NODE_ID")
+      .build()
+    self.waitForExpectations(timeout: 0.01)
+  }
+
+  func testCustomNodeLocality() {
+    let expectation = self.expectation(description: "Run called with expected data")
+    MockEnvoyEngine.onRunWithConfig = { config, _ in
+      XCTAssertTrue(config.generateYamlString().contains("region: SWIFT_REGION"))
+      XCTAssertTrue(config.generateYamlString().contains("zone: SWIFT_ZONE"))
+      XCTAssertTrue(config.generateYamlString().contains("sub_zone: SWIFT_SUB"))
+      expectation.fulfill()
+    }
+
+    _ = EngineBuilder()
+      .addEngineType(MockEnvoyEngine.self)
+      .setNodeLocality("SWIFT_REGION", "SWIFT_ZONE", "SWIFT_SUB")
       .build()
     self.waitForExpectations(timeout: 0.01)
   }

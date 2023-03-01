@@ -1120,7 +1120,7 @@ void setString(JNIEnv* env, jstring java_string, EngineBuilder* builder,
     return;
   }
   const char* native_java_string = env->GetStringUTFChars(java_string, nullptr);
-  std::string java_string_str = std::string(native_java_string);
+  std::string java_string_str(native_java_string);
   if (!java_string_str.empty()) {
     (builder->*setter)(java_string_str);
     env->ReleaseStringUTFChars(java_string, native_java_string);
@@ -1133,7 +1133,7 @@ std::string getCppString(JNIEnv* env, jstring java_string) {
     return "";
   }
   const char* native_java_string = env->GetStringUTFChars(java_string, nullptr);
-  std::string cpp_string = std::string(native_java_string);
+  std::string cpp_string(native_java_string);
   env->ReleaseStringUTFChars(java_string, native_java_string);
   return cpp_string;
 }
