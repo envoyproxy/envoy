@@ -2,10 +2,10 @@
 
 #include <memory>
 
+#include "envoy/config/metrics/v3/metrics_service.pb.h"
 #include "envoy/grpc/async_client.h"
 #include "envoy/local_info/local_info.h"
 #include "envoy/network/connection.h"
-#include "envoy/config/metrics/v3/metrics_service.pb.h"
 #include "envoy/service/metrics/v3/metrics_service.pb.h"
 #include "envoy/singleton/instance.h"
 #include "envoy/stats/histogram.h"
