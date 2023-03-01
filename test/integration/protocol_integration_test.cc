@@ -2374,19 +2374,15 @@ TEST_P(ProtocolIntegrationTest, LargeRequestMethod) {
     ASSERT_TRUE(codec_client_->waitForDisconnect());
     EXPECT_TRUE(response->complete());
     EXPECT_EQ("400", response->headers().getStatusValue());
+  } else if (upstream_proto_rejects_large_method) {
+    auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
+    ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+    ASSERT_TRUE(response->waitForEndStream());
+    EXPECT_TRUE(response->complete());
+    EXPECT_EQ("400", response->headers().getStatusValue());
   } else {
-    if (upstream_proto_rejects_large_method) {
-      auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
-      ASSERT_TRUE(
-          fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
-      ASSERT_TRUE(response->waitForEndStream());
-      EXPECT_TRUE(response->complete());
-      EXPECT_EQ("400", response->headers().getStatusValue());
-    } else {
-      auto response =
-          sendRequestAndWaitForResponse(request_headers, 0, default_response_headers_, 0);
-      EXPECT_TRUE(response->complete());
-    }
+    auto response = sendRequestAndWaitForResponse(request_headers, 0, default_response_headers_, 0);
+    EXPECT_TRUE(response->complete());
   }
 }
 

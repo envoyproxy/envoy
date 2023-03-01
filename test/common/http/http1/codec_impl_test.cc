@@ -1242,7 +1242,7 @@ TEST_P(Http1ServerConnectionImplTest, CustomMethod) {
     return;
   }
 
-  EXPECT_TRUE(status.ok());
+  ASSERT_TRUE(status.ok());
 
   TestRequestHeaderMapImpl expected_headers{
       {":authority", "example.com"}, {":path", "/"}, {":method", "BAD"}, {"foo", "bar"}};
