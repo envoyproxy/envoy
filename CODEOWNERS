@@ -23,7 +23,7 @@ extensions/filters/common/original_src @snowp @klarose
 # cdn_loop extension
 /*/extensions/filters/http/cdn_loop @justin-mp @penguingao @alyssawilk
 # external processing filter
-/*/extensions/filters/http/ext_proc @gbrail @snowp @pradeepcrao @chaoqin-li1123
+/*/extensions/filters/http/ext_proc @gbrail @snowp @pradeepcrao @stevenzzzz
 /*/extensions/filters/common/mutation_rules @gbrail @snowp @pradeepcrao @chaoqin-li1123
 # jwt_authn http filter extension
 /*/extensions/filters/http/jwt_authn @qiwzhang @lizan

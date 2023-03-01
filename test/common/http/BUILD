@@ -217,18 +217,11 @@ envoy_cc_fuzz_test(
     ],
 )
 
-envoy_cc_test(
-    name = "conn_manager_impl_test",
-    srcs = [
-        # Split to avoid compiler OOM, especially on ASAN.
-        "conn_manager_impl_test.cc",
-        "conn_manager_impl_test_2.cc",
-        "conn_manager_impl_test_base.cc",
-        "conn_manager_impl_test_base.h",
-    ],
-    shard_count = 3,
+envoy_cc_test_library(
+    name = "conn_manager_impl_test_base_lib",
+    srcs = ["conn_manager_impl_test_base.cc"],
+    hdrs = ["conn_manager_impl_test_base.h"],
     deps = [
-        ":custom_header_extension_lib",
         ":xff_extension_lib",
         "//source/common/http:conn_manager_lib",
         "//source/common/http:context_lib",
@@ -250,6 +243,20 @@ envoy_cc_test(
         "//test/test_common:logging_lib",
         "//test/test_common:simulated_time_system_lib",
         "//test/test_common:test_runtime_lib",
+    ],
+)
+
+envoy_cc_test(
+    name = "conn_manager_impl_test",
+    srcs = [
+        # Split to avoid compiler OOM, especially on ASAN.
+        "conn_manager_impl_test.cc",
+        "conn_manager_impl_test_2.cc",
+    ],
+    shard_count = 3,
+    deps = [
+        ":conn_manager_impl_test_base_lib",
+        ":custom_header_extension_lib",
     ],
 )
 

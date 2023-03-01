@@ -459,9 +459,7 @@ modify different aspects of the server:
   with begin- and end-line anchors. (i.e.  ``/stats?filter=^server.concurrency$``)
 
   By default, the regular expression is evaluated using the
-  `Google RE2 <https://github.com/google/re2>`_ engine. To switch
-  to std::regex using Ecmascript syntax, POST an admin :ref:`runtime <arch_overview_runtime>` request:
-  ``/runtime_modify?envoy.reloadable_features.admin_stats_filter_use_re2=false``
+  `Google RE2 <https://github.com/google/re2>`_ engine.
 
   .. http:get:: /stats?histogram_buckets=cumulative
 

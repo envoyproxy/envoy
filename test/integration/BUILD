@@ -1995,6 +1995,7 @@ envoy_cc_test(
         "nofips",
     ],
     deps = envoy_select_enable_http3([
+        "//source/extensions/quic/server_preferred_address:fixed_server_preferred_address_config_factory_config",
         "//test/common/config:dummy_config_proto_cc_proto",
         "//test/extensions/transport_sockets/tls/cert_validator:timed_cert_validator",
         ":http_integration_lib",
@@ -2014,6 +2015,7 @@ envoy_cc_test(
         "@envoy_api//envoy/config/overload/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/transport_sockets/quic/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/quic/server_preferred_address/v3:pkg_cc_proto",
         "@com_github_google_quiche//:quic_test_tools_session_peer_lib",
     ]),
 )

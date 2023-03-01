@@ -282,7 +282,7 @@ void StreamEncoderImpl::encodeTrailersBase(const HeaderMap& trailers) {
   }
 
   flushOutput();
-  connection_.onEncodeComplete();
+  notifyEncodeComplete();
 }
 
 void StreamEncoderImpl::encodeMetadata(const MetadataMapVector&) {
@@ -295,7 +295,7 @@ void StreamEncoderImpl::endEncode() {
   }
 
   flushOutput(true);
-  connection_.onEncodeComplete();
+  notifyEncodeComplete();
   // With CONNECT or TCP tunneling, half-closing the connection is used to signal end stream so
   // don't delay that signal.
   if (connect_request_ || is_tcp_tunneling_ ||
@@ -305,6 +305,13 @@ void StreamEncoderImpl::endEncode() {
         Network::ConnectionCloseType::FlushWrite,
         StreamInfo::LocalCloseReasons::get().CloseForConnectRequestOrTcpTunneling);
   }
+}
+
+void StreamEncoderImpl::notifyEncodeComplete() {
+  if (codec_callbacks_) {
+    codec_callbacks_->onCodecEncodeComplete();
+  }
+  connection_.onEncodeComplete();
 }
 
 void ServerConnectionImpl::maybeAddSentinelBufferFragment(Buffer::Instance& output_buffer) {
@@ -343,6 +350,12 @@ uint64_t ConnectionImpl::flushOutput(bool end_encode) {
   connection().write(*output_buffer_, false);
   ASSERT(0UL == output_buffer_->length());
   return bytes_encoded;
+}
+
+CodecEventCallbacks*
+StreamEncoderImpl::registerCodecEventCallbacks(CodecEventCallbacks* codec_callbacks) {
+  std::swap(codec_callbacks, codec_callbacks_);
+  return codec_callbacks;
 }
 
 void StreamEncoderImpl::resetStream(StreamResetReason reason) {
@@ -447,10 +460,7 @@ Status RequestEncoderImpl::encodeHeaders(const RequestHeaderMap& headers, bool e
     // for upstream connections will become invalid, as Envoy will add chunk encoding to the
     // protocol stream. This will likely cause the server to disconnect, since it will be unable to
     // parse the protocol.
-    if (Runtime::runtimeFeatureEnabled(
-            "envoy.reloadable_features.http_skip_adding_content_length_to_upgrade")) {
-      disableChunkEncoding();
-    }
+    disableChunkEncoding();
   }
 
   if (connection_.sendFullyQualifiedUrl() && !is_connect) {

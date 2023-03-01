@@ -247,10 +247,10 @@ void BalsaParser::OnTrailerInput(absl::string_view /*input*/) {}
 void BalsaParser::OnHeader(absl::string_view /*key*/, absl::string_view /*value*/) {}
 
 void BalsaParser::ProcessHeaders(const BalsaHeaders& headers) {
-  ProcessHeadersOrTrailersImpl(headers);
+  processHeadersOrTrailersImpl(headers);
 }
 void BalsaParser::ProcessTrailers(const BalsaHeaders& trailer) {
-  ProcessHeadersOrTrailersImpl(trailer);
+  processHeadersOrTrailersImpl(trailer);
 }
 
 void BalsaParser::OnRequestFirstLineInput(absl::string_view /*line_input*/,
@@ -360,7 +360,7 @@ void BalsaParser::HandleWarning(BalsaFrameEnums::ErrorCode error_code) {
   }
 }
 
-void BalsaParser::ProcessHeadersOrTrailersImpl(const quiche::BalsaHeaders& headers) {
+void BalsaParser::processHeadersOrTrailersImpl(const quiche::BalsaHeaders& headers) {
   for (const std::pair<absl::string_view, absl::string_view>& key_value : headers.lines()) {
     if (status_ == ParserStatus::Error) {
       return;

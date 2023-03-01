@@ -46,7 +46,6 @@ swift_library(
         "TestEngineBuilder.swift",
         "Trailers.swift",
         "UpstreamHttpProtocol.swift",
-        "YAMLValidatingEngineBuilder.swift",
         "extensions/UserDefaults+KeyValueStore.swift",
         "filters/AsyncRequestFilter.swift",
         "filters/AsyncResponseFilter.swift",
