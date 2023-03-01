@@ -30,10 +30,17 @@ $ENVOY_BINARY \
       --admin-address-path "$admin_port_file" &
 
 echo "*** Waiting for the server to go live..."
-sleep 1
-admin_port=$(cat $admin_port_file)
+while [ ! -s "$admin_port_file" ]; do
+  sleep 1
+done
+
+echo ""
+echo ""
+echo "*** Envoy running with admin port running at $(cat $admin_port_file)"
+
 ready=""
 while [ "$ready" != "LIVE" ]; do
+  admin_port=$(cat $admin_port_file)
   ready=$(curl "$admin_port/ready");
   sleep 1
 done
