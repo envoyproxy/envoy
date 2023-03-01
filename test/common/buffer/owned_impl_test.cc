@@ -1256,39 +1256,64 @@ TYPED_TEST(OwnedImplTypedTest, Write) {
   using IoSocketHandleType = typename TestFixture::IoSocketHandleTestType;
   IoSocketHandleType io_handle;
   buffer.add("example");
+#ifdef WIN32
+  EXPECT_CALL(os_sys_calls, writev(_, _, _)).WillOnce(Return(Api::SysCallSizeResult{7, 0}));
+#else
   EXPECT_CALL(os_sys_calls, send(_, _, _, _)).WillOnce(Return(Api::SysCallSizeResult{7, 0}));
+#endif
   Api::IoCallUint64Result result = io_handle.write(buffer);
   EXPECT_TRUE(result.ok());
   EXPECT_EQ(7, result.return_value_);
   EXPECT_EQ(0, buffer.length());
 
   buffer.add("example");
+#ifdef WIN32
+  EXPECT_CALL(os_sys_calls, writev(_, _, _)).WillOnce(Return(Api::SysCallSizeResult{6, 0}));
+#else
   EXPECT_CALL(os_sys_calls, send(_, _, _, _)).WillOnce(Return(Api::SysCallSizeResult{6, 0}));
+#endif
   result = io_handle.write(buffer);
   EXPECT_TRUE(result.ok());
   EXPECT_EQ(6, result.return_value_);
   EXPECT_EQ(1, buffer.length());
 
+#ifdef WIN32
+  EXPECT_CALL(os_sys_calls, writev(_, _, _)).WillOnce(Return(Api::SysCallSizeResult{0, 0}));
+#else
   EXPECT_CALL(os_sys_calls, send(_, _, _, _)).WillOnce(Return(Api::SysCallSizeResult{0, 0}));
+#endif
   result = io_handle.write(buffer);
   EXPECT_TRUE(result.ok());
   EXPECT_EQ(0, result.return_value_);
   EXPECT_EQ(1, buffer.length());
 
+#ifdef WIN32
+  EXPECT_CALL(os_sys_calls, writev(_, _, _)).WillOnce(Return(Api::SysCallSizeResult{-1, 0}));
+#else
   EXPECT_CALL(os_sys_calls, send(_, _, _, _)).WillOnce(Return(Api::SysCallSizeResult{-1, 0}));
+#endif
   result = io_handle.write(buffer);
   EXPECT_EQ(Api::IoError::IoErrorCode::UnknownError, result.err_->getErrorCode());
   EXPECT_EQ(0, result.return_value_);
   EXPECT_EQ(1, buffer.length());
 
+#ifdef WIN32
+  EXPECT_CALL(os_sys_calls, writev(_, _, _))
+      .WillOnce(Return(Api::SysCallSizeResult{-1, SOCKET_ERROR_AGAIN}));
+#else
   EXPECT_CALL(os_sys_calls, send(_, _, _, _))
       .WillOnce(Return(Api::SysCallSizeResult{-1, SOCKET_ERROR_AGAIN}));
+#endif
   result = io_handle.write(buffer);
   EXPECT_EQ(Api::IoError::IoErrorCode::Again, result.err_->getErrorCode());
   EXPECT_EQ(0, result.return_value_);
   EXPECT_EQ(1, buffer.length());
 
+#ifdef WIN32
+  EXPECT_CALL(os_sys_calls, writev(_, _, _)).WillOnce(Return(Api::SysCallSizeResult{1, 0}));
+#else
   EXPECT_CALL(os_sys_calls, send(_, _, _, _)).WillOnce(Return(Api::SysCallSizeResult{1, 0}));
+#endif
   result = io_handle.write(buffer);
   EXPECT_TRUE(result.ok());
   EXPECT_EQ(1, result.return_value_);
@@ -1307,29 +1332,46 @@ TYPED_TEST(OwnedImplTypedTest, Read) {
   Buffer::OwnedImpl buffer;
   using IoSocketHandleType = typename TestFixture::IoSocketHandleTestType;
   IoSocketHandleType io_handle;
+#ifdef WIN32
+  EXPECT_CALL(os_sys_calls, readv(_, _, _)).WillOnce(Return(Api::SysCallSizeResult{0, 0}));
+#else
   EXPECT_CALL(os_sys_calls, recv(_, _, _, _)).WillOnce(Return(Api::SysCallSizeResult{0, 0}));
+#endif
   Api::IoCallUint64Result result = io_handle.read(buffer, 100);
   EXPECT_TRUE(result.ok());
   EXPECT_EQ(0, result.return_value_);
   EXPECT_EQ(0, buffer.length());
   EXPECT_THAT(buffer.describeSlicesForTest(), testing::IsEmpty());
 
+#ifdef WIN32
+  EXPECT_CALL(os_sys_calls, readv(_, _, _)).WillOnce(Return(Api::SysCallSizeResult{-1, 0}));
+#else
   EXPECT_CALL(os_sys_calls, recv(_, _, _, _)).WillOnce(Return(Api::SysCallSizeResult{-1, 0}));
+#endif
   result = io_handle.read(buffer, 100);
   EXPECT_EQ(Api::IoError::IoErrorCode::UnknownError, result.err_->getErrorCode());
   EXPECT_EQ(0, result.return_value_);
   EXPECT_EQ(0, buffer.length());
   EXPECT_THAT(buffer.describeSlicesForTest(), testing::IsEmpty());
 
+#ifdef WIN32
+  EXPECT_CALL(os_sys_calls, readv(_, _, _))
+      .WillOnce(Return(Api::SysCallSizeResult{-1, SOCKET_ERROR_AGAIN}));
+#else
   EXPECT_CALL(os_sys_calls, recv(_, _, _, _))
       .WillOnce(Return(Api::SysCallSizeResult{-1, SOCKET_ERROR_AGAIN}));
+#endif
   result = io_handle.read(buffer, 100);
   EXPECT_EQ(Api::IoError::IoErrorCode::Again, result.err_->getErrorCode());
   EXPECT_EQ(0, result.return_value_);
   EXPECT_EQ(0, buffer.length());
   EXPECT_THAT(buffer.describeSlicesForTest(), testing::IsEmpty());
 
+#ifdef WIN32
+  EXPECT_CALL(os_sys_calls, readv(_, _, _)).Times(0);
+#else
   EXPECT_CALL(os_sys_calls, recv(_, _, _, _)).Times(0);
+#endif
   result = io_handle.read(buffer, 0);
   EXPECT_EQ(0, result.return_value_);
   EXPECT_EQ(0, buffer.length());
