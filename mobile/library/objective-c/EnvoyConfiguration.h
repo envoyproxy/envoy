@@ -116,8 +116,8 @@ NS_ASSUME_NONNULL_BEGIN
                                            nodeId:(NSString *)nodeId
                                        nodeRegion:(NSString *)nodeRegion
                                          nodeZone:(NSString *)nodeZone
-                                      nodeSubZone:(NSString *)nodeSubZone -
-                                                  (NSString *)generateYamlString;
+                                      nodeSubZone:(NSString *)nodeSubZone;
+- (NSString *)generateYamlString;
 @end
 
 NS_ASSUME_NONNULL_END
