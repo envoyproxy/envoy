@@ -108,15 +108,18 @@ TEST_F(FileSystemImplTest, FileReadToEndDoesNotExist) {
                EnvoyException);
 }
 
-// Issue https://github.com/envoyproxy/envoy/issues/25614
-// TEST_F(FileSystemImplTest, FileReadToEndNotReadable) {
-//  const std::string data = "test string\ntest";
-//  const std::string file_path = TestEnvironment::writeStringToFileForTest("test_envoy", data);
+#ifndef WIN32
+// In Windows this method of removing the permissions does not make read fail.
+// Issue https://github.com/envoyproxy/envoy/issues/25614, disabling this test
+TEST_F(FileSystemImplTest, DISABLED_FileReadToEndNotReadable) {
+  const std::string data = "test string\ntest";
+  const std::string file_path = TestEnvironment::writeStringToFileForTest("test_envoy", data);
 
-//  std::filesystem::permissions(file_path, std::filesystem::perms::owner_all,
-//                               std::filesystem::perm_options::remove);
-//  EXPECT_THROW(file_system_.fileReadToEnd(file_path), EnvoyException);
-// }
+  std::filesystem::permissions(file_path, std::filesystem::perms::owner_all,
+                               std::filesystem::perm_options::remove);
+  EXPECT_THROW(file_system_.fileReadToEnd(file_path), EnvoyException);
+}
+#endif
 
 TEST_F(FileSystemImplTest, FileReadToEndDenylisted) {
   EXPECT_THROW(file_system_.fileReadToEnd("/dev/urandom"), EnvoyException);
