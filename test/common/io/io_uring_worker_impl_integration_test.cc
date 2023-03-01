@@ -461,21 +461,24 @@ TEST_F(IoUringWorkerIntegraionTest, MergeInjection) {
   EXPECT_EQ(socket.nr_completion_, 1);
 }
 
-TEST_F(IoUringWorkerIntegraionTest, AcceptSocketBasic) {
+TEST_F(IoUringWorkerIntegraionTest, AcceptSocketAccept) {
   initialize();
   socket(false, true);
   listen();
 
   auto& socket = io_uring_worker_->addAcceptSocket(listen_socket_, io_uring_handler_);
   EXPECT_EQ(io_uring_worker_->getSockets().size(), 1);
+
   connect();
 
-  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
-  EXPECT_TRUE(SOCKET_VALID(io_uring_handler_.server_socket_fd_));
+  while (io_uring_handler_.server_socket_fd_ == -1) {
+    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  }
 
   socket.close();
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   EXPECT_EQ(io_uring_worker_->getSockets().size(), 0);
+  cleanup();
 }
 
 TEST_F(IoUringWorkerIntegraionTest, AcceptSocketDisable) {
@@ -485,37 +488,42 @@ TEST_F(IoUringWorkerIntegraionTest, AcceptSocketDisable) {
 
   auto& socket = io_uring_worker_->addAcceptSocket(listen_socket_, io_uring_handler_);
   EXPECT_EQ(io_uring_worker_->getSockets().size(), 1);
-  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
 
   socket.disable();
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  EXPECT_EQ(io_uring_handler_.server_socket_fd_, -1);
+
+  socket.enable();
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+
+  connect();
+
+  while (io_uring_handler_.server_socket_fd_ == -1) {
+    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  }
 
   socket.close();
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   EXPECT_EQ(io_uring_worker_->getSockets().size(), 0);
+  cleanup();
 }
 
-TEST_F(IoUringWorkerIntegraionTest, AcceptSocketDisableEnable) {
+TEST_F(IoUringWorkerIntegraionTest, AcceptSocketAcceptOnClosing) {
   initialize();
   socket(false, true);
   listen();
 
   auto& socket = io_uring_worker_->addAcceptSocket(listen_socket_, io_uring_handler_);
   EXPECT_EQ(io_uring_worker_->getSockets().size(), 1);
-  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
 
-  socket.disable();
-  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
-
-  socket.enable();
-  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
-
-  connect();
-  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
-
+  // Accept when the socket is going to close.
   socket.close();
+  connect();
+
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  EXPECT_EQ(io_uring_handler_.server_socket_fd_, -1);
   EXPECT_EQ(io_uring_worker_->getSockets().size(), 0);
+  cleanup();
 }
 
 } // namespace

@@ -281,22 +281,24 @@ void IoUringAcceptSocket::onClose(int32_t result, bool injected) {
 
 void IoUringAcceptSocket::onAccept(Request* req, int32_t result, bool injected) {
   IoUringSocketEntry::onAccept(req, result, injected);
-  AcceptRequest* accept_req = static_cast<AcceptRequest*>(req);
-  if (!injected) {
-    requests_.erase(req);
-    if (requests_.empty() && status_ == CLOSING) {
-      parent_.submitCloseRequest(*this);
+  ASSERT(!injected);
+  // If there is no pending accept request and the socket is going to close, submit close request.
+  requests_.erase(req);
+  if (requests_.empty() && status_ == CLOSING) {
+    parent_.submitCloseRequest(*this);
+  }
+
+  // If the socket is not enabled, drop all following actions to all accepted fds.
+  if (status_ == ENABLED) {
+    // Submit a new accept request for the next connection.
+    submitRequests();
+    if (result != -ECANCELED) {
+      ENVOY_LOG(trace, "accept new socket, fd = {}, result = {}", fd_, result);
+      AcceptRequest* accept_req = static_cast<AcceptRequest*>(req);
+      AcceptedSocketParam param{result, &accept_req->remote_addr_, accept_req->remote_addr_len_};
+      io_uring_handler_.onAcceptSocket(param);
     }
   }
-
-  if (result == -ECANCELED) {
-    return;
-  }
-
-  ENVOY_LOG(trace, "accept new socket, fd = {}, result = {}", fd_, result);
-  AcceptedSocketParam param{result, &accept_req->remote_addr_, accept_req->remote_addr_len_};
-  io_uring_handler_.onAcceptSocket(param);
-  submitRequests();
 }
 
 void IoUringAcceptSocket::submitRequests() {
