@@ -188,6 +188,10 @@ bug_fixes:
   change: |
     reject pseudo headers violating RFC 9114. Specifically, pseudo-header fields with more than one value for the ``:method``
     (non-``CONNECT``), ``:scheme``, and ``:path``; or pseudo-header fields after regular header fields; or undefined pseudo-headers.
+- area: http
+  change: |
+    fixed a bug where ``x-envoy-original-path`` was not being sanitized when sent from untrusted users. This behavioral change can
+    be temporarily reverted by setting ``envoy.reloadable_features.sanitize_original_path`` to false.
 
 removed_config_or_runtime:
 - area: config
