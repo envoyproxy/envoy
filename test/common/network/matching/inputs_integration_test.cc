@@ -1,6 +1,7 @@
 #include "source/common/network/address_impl.h"
 #include "source/common/network/matching/data_impl.h"
 #include "source/common/network/matching/inputs.h"
+#include "source/common/stream_info/filter_state_impl.h"
 
 #include "test/common/matcher/test_utility.h"
 #include "test/mocks/matcher/mocks.h"
@@ -59,7 +60,8 @@ TEST_F(InputsIntegrationTest, DestinationIPInput) {
   initialize("DestinationIPInput", "127.0.0.1");
 
   Network::MockConnectionSocket socket;
-  MatchingDataImpl data(socket);
+  StreamInfo::FilterStateImpl filter_state(StreamInfo::FilterState::LifeSpan::FilterChain);
+  MatchingDataImpl data(socket, filter_state);
   socket.connection_info_provider_->setLocalAddress(
       std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 8080));
 
@@ -72,7 +74,8 @@ TEST_F(InputsIntegrationTest, DestinationPortInput) {
   initialize("DestinationPortInput", "8080");
 
   Network::MockConnectionSocket socket;
-  MatchingDataImpl data(socket);
+  StreamInfo::FilterStateImpl filter_state(StreamInfo::FilterState::LifeSpan::FilterChain);
+  MatchingDataImpl data(socket, filter_state);
   socket.connection_info_provider_->setLocalAddress(
       std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 8080));
 
@@ -85,7 +88,8 @@ TEST_F(InputsIntegrationTest, SourceIPInput) {
   initialize("SourceIPInput", "127.0.0.1");
 
   Network::MockConnectionSocket socket;
-  MatchingDataImpl data(socket);
+  StreamInfo::FilterStateImpl filter_state(StreamInfo::FilterState::LifeSpan::FilterChain);
+  MatchingDataImpl data(socket, filter_state);
   socket.connection_info_provider_->setRemoteAddress(
       std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 8080));
 
@@ -98,7 +102,8 @@ TEST_F(InputsIntegrationTest, SourcePortInput) {
   initialize("SourcePortInput", "8080");
 
   Network::MockConnectionSocket socket;
-  MatchingDataImpl data(socket);
+  StreamInfo::FilterStateImpl filter_state(StreamInfo::FilterState::LifeSpan::FilterChain);
+  MatchingDataImpl data(socket, filter_state);
   socket.connection_info_provider_->setRemoteAddress(
       std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 8080));
 
@@ -111,7 +116,8 @@ TEST_F(InputsIntegrationTest, DirectSourceIPInput) {
   initialize("DirectSourceIPInput", "127.0.0.1");
 
   Network::MockConnectionSocket socket;
-  MatchingDataImpl data(socket);
+  StreamInfo::FilterStateImpl filter_state(StreamInfo::FilterState::LifeSpan::FilterChain);
+  MatchingDataImpl data(socket, filter_state);
   socket.connection_info_provider_->setDirectRemoteAddressForTest(
       std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 8080));
 
@@ -124,7 +130,8 @@ TEST_F(InputsIntegrationTest, SourceTypeInput) {
   initialize("SourceTypeInput", "local");
 
   Network::MockConnectionSocket socket;
-  MatchingDataImpl data(socket);
+  StreamInfo::FilterStateImpl filter_state(StreamInfo::FilterState::LifeSpan::FilterChain);
+  MatchingDataImpl data(socket, filter_state);
   socket.connection_info_provider_->setRemoteAddress(
       std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 8080));
 
@@ -138,7 +145,8 @@ TEST_F(InputsIntegrationTest, ServerNameInput) {
   initialize("ServerNameInput", host);
 
   Network::MockConnectionSocket socket;
-  MatchingDataImpl data(socket);
+  StreamInfo::FilterStateImpl filter_state(StreamInfo::FilterState::LifeSpan::FilterChain);
+  MatchingDataImpl data(socket, filter_state);
   socket.connection_info_provider_->setRequestedServerName(host);
 
   const auto result = match_tree_()->match(data);
@@ -150,7 +158,8 @@ TEST_F(InputsIntegrationTest, TransportProtocolInput) {
   initialize("TransportProtocolInput", "tls");
 
   Network::MockConnectionSocket socket;
-  MatchingDataImpl data(socket);
+  StreamInfo::FilterStateImpl filter_state(StreamInfo::FilterState::LifeSpan::FilterChain);
+  MatchingDataImpl data(socket, filter_state);
   EXPECT_CALL(socket, detectedTransportProtocol).WillOnce(testing::Return("tls"));
 
   const auto result = match_tree_()->match(data);
@@ -162,7 +171,8 @@ TEST_F(InputsIntegrationTest, ApplicationProtocolInput) {
   initialize("ApplicationProtocolInput", "'http/1.1'");
 
   Network::MockConnectionSocket socket;
-  MatchingDataImpl data(socket);
+  StreamInfo::FilterStateImpl filter_state(StreamInfo::FilterState::LifeSpan::FilterChain);
+  MatchingDataImpl data(socket, filter_state);
   std::vector<std::string> protocols = {"http/1.1"};
   EXPECT_CALL(socket, requestedApplicationProtocols).WillOnce(testing::ReturnRef(protocols));
 
