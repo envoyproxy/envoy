@@ -652,7 +652,7 @@ TEST(HttpUtility, UseBalsaParser) {
   EXPECT_FALSE(Http1::parseHttp1Settings(http1_options, validation_visitor, hcm_value, false)
                    .use_balsa_parser_);
 
-  // Enable Balsa using Http1ProtocolOptions::use_balsa_parser.  Runtime flag is ignored.
+  // Enable Balsa using Http1ProtocolOptions::use_balsa_parser. Runtime flag is ignored.
   http1_options.mutable_use_balsa_parser()->set_value(true);
 
   scoped_runtime.mergeValues({{"envoy.reloadable_features.http1_use_balsa_parser", "true"}});
@@ -663,7 +663,7 @@ TEST(HttpUtility, UseBalsaParser) {
   EXPECT_TRUE(Http1::parseHttp1Settings(http1_options, validation_visitor, hcm_value, false)
                   .use_balsa_parser_);
 
-  // Disable Balsa using Http1ProtocolOptions::use_balsa_parser.  Runtime flag is ignored.
+  // Disable Balsa using Http1ProtocolOptions::use_balsa_parser. Runtime flag is ignored.
   http1_options.mutable_use_balsa_parser()->set_value(false);
 
   scoped_runtime.mergeValues({{"envoy.reloadable_features.http1_use_balsa_parser", "true"}});

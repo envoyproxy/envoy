@@ -494,7 +494,7 @@ struct Http1Settings {
   bool send_fully_qualified_url_{false};
 
   // If true, BalsaParser is used for HTTP/1 parsing; if false, http-parser is
-  // used.  See issue #21245.
+  // used. See issue #21245.
   bool use_balsa_parser_{false};
 };
 
