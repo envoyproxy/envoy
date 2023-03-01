@@ -12,9 +12,10 @@ and used as downstream or upstream HTTP filter. The filter can be configured to 
 
 In most cases, this filter would be a more flexible alternative to the ``request_headers_to_add``, ``request_headers_to_remove``,
 ``response_headers_to_add``, and ``response_headers_to_remove`` fields in the :ref:`route configuration <envoy_v3_api_msg_config.route.v3.RouteConfiguration>`.
-The filter provides complete control over the position and order of the header mutations. It can be used as upstream filter and
-mutate the request headers after load balancing and host selection, or as  regular downstream HTTP filter.
 
 
-But note that this still has some limitations. In some corner cases, the header mutations may not be applied because the filter chain processing
-is skipped.
+The filter provides complete control over the position and order of the header mutations. It is possible to influence the route matching
+by mutating the request headers and then clear the cached route in the later filters.
+
+
+In addition, this filter can be used as upstream filter and mutate the request headers after load balancing and host selection.
