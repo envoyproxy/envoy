@@ -1,9 +1,9 @@
 // Follow-ups:
-//   * top-n algo to limit compute overhead with high cardinality stats with user control of N.
+//   * top-n algorithm to limit compute overhead with high cardinality stats with user control of N.
 //   * alternate sorting criteria, reverse-sort controls, etc.
 //   * render histograms
 //   * detect when user is not looking at page and stop or slow down pinging the server
-//   * hieararchical display
+//   * hierarchical display
 //   * json flavor to send hierarchical names to save serialization/deserialization costs
 
 
@@ -15,7 +15,7 @@ let currentStats = new Map();
 
 /**
  * The first time this script loads, it will write PRE element at the end of body.
- * This is hooked to the DOMContentLoaded event.
+ * This is hooked to the `DOMContentLoaded` event.
  */
 let activeStatsPreElement = null;
 
@@ -26,7 +26,7 @@ let statusDiv = null;
 
 /**
  * This magic string is derived from C++ in StatsHtmlRender::urlHandler to uniquely
- * name each paramter. In the stats page there is only one parameter, so it's
+ * name each parameter. In the stats page there is only one parameter, so it's
  * always param-1. The reason params are numbered is that on the home page, "/",
  * all the admin endpoints have uniquely numbered parameters.
  */
@@ -62,7 +62,7 @@ function initHook() {
 }
 
 /**
- * Initiates an ajax request for the stats JSON based on the stats parameters.
+ * Initiates an Ajax request for the stats JSON based on the stats parameters.
  */
 async function loadStats() {
   const makeQueryParam = (name) => name + '=' + encodeURIComponent(
@@ -156,13 +156,12 @@ function renderStats(data) {
     currentStats.set(stat.name, statRecord);
     sortedStats.push(statRecord);
   }
-  prevStats = null;
 
   // Sorts all the stats. This is inefficient; we should just pick the top N
   // based on field "active-max-display-count" and sort those. The best
   // algorithms for this require a heap or priority queue. JS implementations
   // of those can be found, but that would bloat this relatively modest amount
-  // of code, and compell us to do a better job writing tests.
+  // of code, and compel us to do a better job writing tests.
   sortedStats.sort(compareStatRecords);
 
   const max = loadSettingOrUseDefault('active-max-display-count', 50);
@@ -172,8 +171,7 @@ function renderStats(data) {
     if (++index > max) {
       break;
     }
-    text += statRecord.name + ': ' + statRecord.value + ' (' +
-        statRecord.change_count + ')' + '\n';
+    text += `${statRecord.name}: ${statRecord.value} (${statRecord.change_count})\n`;
   }
   activeStatsPreElement.textContent = text;
 

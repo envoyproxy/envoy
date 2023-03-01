@@ -5,7 +5,7 @@
 // See source/server/admin/javascript.md for background info.
 
 /**
- * Utility to count the sepnumber of separated items, e.g. lines.
+ * Utility to count the number of separated items, e.g. lines.
  * A blank final line does not count.
  *
  * @param {string} text
@@ -37,7 +37,7 @@ function waitForRender(iframe) {
 }
 
 /**
- * Returns the text that hss been rendered into the 'PRE' element by the system.
+ * Returns the text that has been rendered into the 'PRE' element by the system.
  *
  * @param {!HTMLElement} iframe
  * @return {string}
