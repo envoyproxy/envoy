@@ -546,7 +546,7 @@ https://www.envoyproxy.io/docs/envoy/latest/api-v3/service/runtime/v3/rtds.proto
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Adds ADS to bootstrap configuration, for instance to be used with RTDS and CDS layers.
-Optional params allow configuring jwt token and ssl. See the following link for details:
+Optional params allow configuring a JWT token and SSL. See the following link for details:
 https://www.envoyproxy.io/docs/envoy/latest/configuration/overview/xds_api#config-overview-ads
 
 **Example**::
