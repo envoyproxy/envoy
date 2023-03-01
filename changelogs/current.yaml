@@ -1,12 +1,17 @@
-date: February 27, 2023
+date: Pending
+
+behavior_changes:
+# *Changes that are expected to cause an incompatibility if applicable; deployment changes are likely required*
+
+minor_behavior_changes:
+# *Changes that may cause incompatibilities for some users, but should not for most*
 
 bug_fixes:
-- area: dependency
-  change: |
-    update Kafka to resolve CVE-2023-25194.
+# *Changes expected to improve the state of the world and are unlikely to have negative effects*
+
+removed_config_or_runtime:
+# *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
 
 new_features:
-- area: docker
-  change: |
-    unify published images as tag variants. For example, ``envoyproxy/envoy-dev`` is now available
-    as ``envoyproxy/envoy:dev``.
+
+deprecated:
