@@ -114,6 +114,6 @@ new_features:
     authentication failure status code and message in dynamic metadata.
 - area: http filter
   change: |
-    added :ref:`header mutation http filter <config_http_filters_header_mutation>` which adds the ability to modify request and response headers on the any position of HTTP filter chain.
+    added :ref:`header mutation http filter <config_http_filters_header_mutation>` which adds the ability to modify request and response headers in any position of HTTP filter chain.
 
 deprecated:
