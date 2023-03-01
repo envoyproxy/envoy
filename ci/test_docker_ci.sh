@@ -57,6 +57,7 @@ _test () {
     export AZP_BRANCH="$branch"
     export DOCKER_CI_DRYRUN=1
     export ENVOY_DOCKER_IMAGE_DIRECTORY=/non/existent/test/path
+    export DOCKER_IMAGE_PREFIX=mocktest/repo
 
     if [[ "$platform" == "windows" ]]; then
         export DOCKER_FAKE_WIN=1
