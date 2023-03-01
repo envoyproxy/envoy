@@ -345,17 +345,14 @@ message BodyMutation {
   }
 }
 
-// This message specifies a new timer duration and the original traffic direction.
+// This message specifies a new timer duration and the original
+// request direction. If these fields are not configured correctly,
+// the response message will be ignored by the Envoy ext_proc filter.
 message NewProcessingTimeout {
-  // Specifies the new timer duration. Minimum 1 milliseconds.
-  google.protobuf.Duration message_timeout = 1 [(validate.rules).duration = {
-    required: true
-    gt {nanos: 1000000}
-  }];
+  // Specifies the new timer duration. Has to be >=1ms.
+  google.protobuf.Duration message_timeout = 1;
 
   // Specifies the traffic direction of the received request message.
-  // Envoy will take either INBOUND or OUTBOUND. Anything else will cause
-  // the message being ignored.
-  config.core.v3.TrafficDirection traffic_direction = 2
-      [(validate.rules).enum = {defined_only: true}];
+  // Has to be INBOUND or OUTBOUND.
+  config.core.v3.TrafficDirection traffic_direction = 2;
 }

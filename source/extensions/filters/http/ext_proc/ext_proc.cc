@@ -528,18 +528,32 @@ void Filter::sendTrailers(ProcessorState& state, const Http::HeaderMap& trailers
 
 void Filter::onNewTimeout(
     std::unique_ptr<envoy::service::ext_proc::v3::ProcessingResponse>&& response) {
-  const uint32_t message_timeout_ms =
-      PROTOBUF_GET_MS_REQUIRED(response->new_timeout(), message_timeout);
-
+  // In the following conditions the function just bails out and the message is ignored.
+  // 1) The message_timeout field is not set, or even it is set but < 1ms;
+  // 2) or the traffic_direction field is not set to be INBOUND or OUTBOUND.
+  auto new_timeout = response->new_timeout();
+  auto message_timeout_ms_opt = PROTOBUF_GET_OPTIONAL_MS(new_timeout, message_timeout);
+  if (!message_timeout_ms_opt) {
+    return;
+  }
+  auto message_timeout_ms = message_timeout_ms_opt->count();
+  if (message_timeout_ms < 1) {
+    return;
+  }
+  auto traffic_direction = new_timeout.traffic_direction();
+  bool inbound_traffic = (traffic_direction == envoy::config::core::v3::TrafficDirection::INBOUND);
+  bool outbound_traffic =
+      (traffic_direction == envoy::config::core::v3::TrafficDirection::OUTBOUND);
+  if (!inbound_traffic && !outbound_traffic) {
+    return;
+  }
   ENVOY_LOG(debug,
             "Server need more time to process the request, start a "
             "new timer with timeout {} ms, direction {} ",
-            message_timeout_ms, response->new_timeout().traffic_direction());
-  if (response->new_timeout().traffic_direction() ==
-      envoy::config::core::v3::TrafficDirection::INBOUND) {
+            message_timeout_ms, inbound_traffic ? "INBOUND" : "OUTBOUND");
+  if (inbound_traffic) {
     decoding_state_.restartMessageTimer(message_timeout_ms);
-  } else if (response->new_timeout().traffic_direction() ==
-             envoy::config::core::v3::TrafficDirection::OUTBOUND) {
+  } else {
     encoding_state_.restartMessageTimer(message_timeout_ms);
   }
 
@@ -555,9 +569,8 @@ void Filter::onReceiveMessage(std::unique_ptr<ProcessingResponse>&& r) {
 
   auto response = std::move(r);
 
+  // Check whether the server is asking for extend the timer.
   if (response->has_new_timeout()) {
-    // Server needs more time to process the request. Stop the original timer
-    // and start a new timer with the new timeout value.
     onNewTimeout(std::move(response));
     return;
   }

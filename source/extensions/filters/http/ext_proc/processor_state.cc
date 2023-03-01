@@ -48,6 +48,9 @@ void ProcessorState::stopMessageTimer() {
   }
 }
 
+// Server sends back response to stop the original timer and start a new timer.
+// Do not change call_start_time_ since that call has not been responded yet.
+// Do not change callback_state_ either.
 void ProcessorState::restartMessageTimer(const uint32_t message_timeout) {
   stopMessageTimer();
   if (message_timer_) {
