@@ -527,22 +527,24 @@ void Filter::sendTrailers(ProcessorState& state, const Http::HeaderMap& trailers
 }
 
 void Filter::onNewTimeout(
-    std::unique_ptr<envoy::service::ext_proc::v3::ProcessingResponse>&& response) {
+    const std::unique_ptr<envoy::service::ext_proc::v3::ProcessingResponse>&& response) {
   // In the following conditions the function just bails out and the message is ignored.
   // 1) The message_timeout field is not set, or even it is set but < 1ms;
   // 2) or the traffic_direction field is not set to be INBOUND or OUTBOUND.
-  auto new_timeout = response->new_timeout();
-  auto message_timeout_ms_opt = PROTOBUF_GET_OPTIONAL_MS(new_timeout, message_timeout);
+  const auto new_timeout = response->new_timeout();
+  const auto message_timeout_ms_opt = PROTOBUF_GET_OPTIONAL_MS(new_timeout, message_timeout);
   if (!message_timeout_ms_opt) {
     return;
   }
-  auto message_timeout_ms = message_timeout_ms_opt->count();
-  if (message_timeout_ms < 1) {
+  const auto message_timeout_ms = message_timeout_ms_opt->count();
+  const uint32_t MINIMUM_NEW_TIMEOUT_MS = 1;
+  if (message_timeout_ms < MINIMUM_NEW_TIMEOUT_MS) {
     return;
   }
-  auto traffic_direction = new_timeout.traffic_direction();
-  bool inbound_traffic = (traffic_direction == envoy::config::core::v3::TrafficDirection::INBOUND);
-  bool outbound_traffic =
+  const auto traffic_direction = new_timeout.traffic_direction();
+  const bool inbound_traffic =
+      (traffic_direction == envoy::config::core::v3::TrafficDirection::INBOUND);
+  const bool outbound_traffic =
       (traffic_direction == envoy::config::core::v3::TrafficDirection::OUTBOUND);
   if (!inbound_traffic && !outbound_traffic) {
     return;

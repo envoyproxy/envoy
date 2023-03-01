@@ -20,6 +20,8 @@ public:
   ExternalProcessingFilterConfig() : FactoryBase("envoy.filters.http.ext_proc") {}
 
 private:
+  static constexpr uint64_t DefaultMessageTimeoutMs = 200;
+
   Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
       const envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor& proto_config,
       const std::string& stats_prefix, Server::Configuration::FactoryContext& context) override;
