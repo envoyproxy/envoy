@@ -29,7 +29,7 @@ SNI dynamic forward proxy.
     :language: yaml
 
 Dynamic host and port selection
--------------------------
+-------------------------------
 
 By default, the SNI dynamic forward proxy uses the SNI as target host, but it can be
 dynamically set by other network filters on a per-connection basis by setting a per-connection
