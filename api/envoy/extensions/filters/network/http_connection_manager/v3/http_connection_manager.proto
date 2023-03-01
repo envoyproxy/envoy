@@ -544,12 +544,12 @@ message HttpConnectionManager {
   repeated config.accesslog.v3.AccessLog access_log = 13;
 
   // The interval to flush the above access logs. By default, the HCM will flush exactly one access log
-  // when the HTTP request is complete. If this field is set, the HCM will flush access logs periodically
-  // at the specified interval. This is especially useful in the case of long-lived requests, such as
-  // CONNECT and Websockets.
-  // The interval must be at least 1 second.
+  // on stream close, when the HTTP request is complete. If this field is set, the HCM will flush access
+  // logs periodically at the specified interval. This is especially useful in the case of long-lived
+  // requests, such as CONNECT and Websockets.
+  // The interval must be at least 1 millisecond.
   google.protobuf.Duration access_log_flush_interval = 53
-      [(validate.rules).duration = {gte {seconds: 1}}];
+      [(validate.rules).duration = {gte {nanos: 1000000}}];
 
   // If set to true, the connection manager will use the real remote address
   // of the client connection when determining internal versus external origin and manipulating
