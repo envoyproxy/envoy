@@ -103,6 +103,10 @@ public:
   MOCK_METHOD(uint32_t, priority, (), (const));
   MOCK_METHOD(void, priority, (uint32_t));
   MOCK_METHOD(absl::optional<MonotonicTime>, lastHcPassTime, (), (const));
+  MOCK_METHOD(MonotonicTime, lastSuccessfulTrafficTime, (envoy::data::core::v3::HealthCheckerType),
+              (const));
+  MOCK_METHOD(void, setLastSuccessfulTrafficTime,
+              (envoy::data::core::v3::HealthCheckerType, MonotonicTime), (const));
   Stats::StatName localityZoneStatName() const override {
     Stats::SymbolTable& symbol_table = *symbol_table_;
     locality_zone_stat_name_ =
@@ -215,6 +219,10 @@ public:
   MOCK_METHOD(void, priority, (uint32_t));
   MOCK_METHOD(bool, warmed, (), (const));
   MOCK_METHOD(absl::optional<MonotonicTime>, lastHcPassTime, (), (const));
+  MOCK_METHOD(MonotonicTime, lastSuccessfulTrafficTime, (envoy::data::core::v3::HealthCheckerType),
+              (const));
+  MOCK_METHOD(void, setLastSuccessfulTrafficTime,
+              (envoy::data::core::v3::HealthCheckerType, MonotonicTime), (const));
 
   testing::NiceMock<MockClusterInfo> cluster_;
   Network::UpstreamTransportSocketFactoryPtr socket_factory_;
