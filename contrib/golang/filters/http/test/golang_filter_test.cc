@@ -108,7 +108,7 @@ public:
         "{{ test_rundir }}/contrib/golang/filters/http/test/test_data/" + name + "/filter.so");
   }
 
-  void setupDso() { Dso::DsoInstanceManager::load(PASSTHROUGH, genSoPath(PASSTHROUGH)); }
+  void setupDso() { Dso::DsoManager::load(PASSTHROUGH, genSoPath(PASSTHROUGH)); }
 
   void setupConfig(
       envoy::extensions::filters::http::golang::v3alpha::Config& proto_config,
@@ -124,8 +124,7 @@ public:
     Event::SimulatedTimeSystem test_time;
     test_time.setSystemTime(std::chrono::microseconds(1583879145572237));
 
-    filter_ =
-        std::make_unique<TestFilter>(config_, Dso::DsoInstanceManager::getDsoInstanceByID(so_id));
+    filter_ = std::make_unique<TestFilter>(config_, Dso::DsoManager::getDsoByID(so_id));
     filter_->setDecoderFilterCallbacks(decoder_callbacks_);
     filter_->setEncoderFilterCallbacks(encoder_callbacks_);
   }
