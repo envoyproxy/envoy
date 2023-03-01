@@ -3,9 +3,9 @@ package io.envoyproxy.envoymobile.engine.testing;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
- * Wrapper class to start a Quic test server.
+ * Wrapper class for test JNI functions
  */
-public final class QuicTestServer {
+public final class TestJni {
 
   private static final AtomicBoolean sServerRunning = new AtomicBoolean();
 
@@ -75,5 +75,5 @@ public final class QuicTestServer {
 
   private static native int nativeGetServerPort();
 
-  private QuicTestServer() {}
+  private TestJni() {}
 }

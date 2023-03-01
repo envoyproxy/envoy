@@ -10,7 +10,7 @@ android_library(
     name = "testing",
     testonly = True,
     srcs = [
-        "QuicTestServer.java",
+        "TestJni.java",
         "RequestScenario.java",
         "Response.java",
     ],

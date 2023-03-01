@@ -11,35 +11,35 @@
 // Quic Test ServerJniLibrary
 
 extern "C" JNIEXPORT void JNICALL
-Java_io_envoyproxy_envoymobile_engine_testing_QuicTestServer_nativeStartQuicTestServer(
+Java_io_envoyproxy_envoymobile_engine_testing_TestJni_nativeStartQuicTestServer(
     JNIEnv* env, jclass clazz) {
   jni_log("[QTS]", "starting server");
   start_server(true);
 }
 
 extern "C" JNIEXPORT jint JNICALL
-Java_io_envoyproxy_envoymobile_engine_testing_QuicTestServer_nativeGetServerPort(JNIEnv* env,
+Java_io_envoyproxy_envoymobile_engine_testing_TestJni_nativeGetServerPort(JNIEnv* env,
                                                                                  jclass clazz) {
   jni_log("[QTS]", "getting server port");
   return get_server_port();
 }
 
 extern "C" JNIEXPORT void JNICALL
-Java_io_envoyproxy_envoymobile_engine_testing_QuicTestServer_nativeShutdownQuicTestServer(
+Java_io_envoyproxy_envoymobile_engine_testing_TestJni_nativeShutdownQuicTestServer(
     JNIEnv* env, jclass clazz) {
   jni_log("[QTS]", "shutting down server");
   shutdown_server();
 }
 
 extern "C" JNIEXPORT void JNICALL
-Java_io_envoyproxy_envoymobile_engine_testing_QuicTestServer_nativeStartTestServer(JNIEnv* env,
+Java_io_envoyproxy_envoymobile_engine_testing_TestJni_nativeStartTestServer(JNIEnv* env,
                                                                                    jclass clazz) {
   jni_log("[QTS]", "starting server");
   start_server(false);
 }
 
 extern "C" JNIEXPORT void JNICALL
-Java_io_envoyproxy_envoymobile_engine_testing_QuicTestServer_nativeShutdownTestServer(
+Java_io_envoyproxy_envoymobile_engine_testing_TestJni_nativeShutdownTestServer(
     JNIEnv* env, jclass clazz) {
   jni_log("[QTS]", "shutting down server");
   shutdown_server();
