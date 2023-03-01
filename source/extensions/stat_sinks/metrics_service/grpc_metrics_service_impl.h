@@ -23,7 +23,7 @@ namespace MetricsService {
 
 using MetricsPtr =
     std::unique_ptr<Envoy::Protobuf::RepeatedPtrField<io::prometheus::client::MetricFamily>>;
-using HistogramMetrics = envoy::config::metrics::v3::HistogramMetrics;
+using HistogramEmitMode = envoy::config::metrics::v3::HistogramEmitMode;
 
 /**
  * Interface for metrics streamer.
@@ -84,14 +84,14 @@ using GrpcMetricsStreamerImplPtr = std::unique_ptr<GrpcMetricsStreamerImpl>;
 class MetricsFlusher {
 public:
   MetricsFlusher(
-      bool report_counters_as_deltas, bool emit_labels, HistogramMetrics histogram_metrics,
+      bool report_counters_as_deltas, bool emit_labels, HistogramEmitMode histogram_emit_mode,
       std::function<bool(const Stats::Metric&)> predicate =
           [](const auto& metric) { return metric.used(); })
       : report_counters_as_deltas_(report_counters_as_deltas), emit_labels_(emit_labels),
-        emit_summary_(histogram_metrics == HistogramMetrics::SUMMARY_AND_HISTOGRAM ||
-                      histogram_metrics == HistogramMetrics::SUMMARY),
-        emit_histogram_(histogram_metrics == HistogramMetrics::SUMMARY_AND_HISTOGRAM ||
-                        histogram_metrics == HistogramMetrics::HISTOGRAM),
+        emit_summary_(histogram_emit_mode == HistogramEmitMode::SUMMARY_AND_HISTOGRAM ||
+                      histogram_emit_mode == HistogramEmitMode::SUMMARY),
+        emit_histogram_(histogram_emit_mode == HistogramEmitMode::SUMMARY_AND_HISTOGRAM ||
+                        histogram_emit_mode == HistogramEmitMode::HISTOGRAM),
         predicate_(predicate) {}
 
   MetricsPtr flush(Stats::MetricSnapshot& snapshot) const;
@@ -127,9 +127,9 @@ template <class RequestProto, class ResponseProto> class MetricsServiceSink : pu
 public:
   MetricsServiceSink(
       const GrpcMetricsStreamerSharedPtr<RequestProto, ResponseProto>& grpc_metrics_streamer,
-      bool report_counters_as_deltas, bool emit_labels, HistogramMetrics histogram_metrics)
+      bool report_counters_as_deltas, bool emit_labels, HistogramEmitMode histogram_emit_mode)
       : MetricsServiceSink(grpc_metrics_streamer, MetricsFlusher(report_counters_as_deltas,
-                                                                 emit_labels, histogram_metrics)) {}
+                                                                 emit_labels, histogram_emit_mode)) {}
 
   MetricsServiceSink(
       const GrpcMetricsStreamerSharedPtr<RequestProto, ResponseProto>& grpc_metrics_streamer,

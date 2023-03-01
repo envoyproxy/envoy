@@ -136,7 +136,7 @@ TEST_F(MetricsServiceSinkTest, CheckSendCall) {
   MetricsServiceSink<envoy::service::metrics::v3::StreamMetricsMessage,
                      envoy::service::metrics::v3::StreamMetricsResponse>
       sink(streamer_, false, false,
-           envoy::config::metrics::v3::HistogramMetrics::SUMMARY_AND_HISTOGRAM);
+           envoy::config::metrics::v3::HistogramEmitMode::SUMMARY_AND_HISTOGRAM);
 
   addCounterToSnapshot("test_counter", 1, 1);
   addGaugeToSnapshot("test_gauge", 1);
@@ -151,7 +151,7 @@ TEST_F(MetricsServiceSinkTest, CheckStatsCount) {
   MetricsServiceSink<envoy::service::metrics::v3::StreamMetricsMessage,
                      envoy::service::metrics::v3::StreamMetricsResponse>
       sink(streamer_, false, false,
-           envoy::config::metrics::v3::HistogramMetrics::SUMMARY_AND_HISTOGRAM);
+           envoy::config::metrics::v3::HistogramEmitMode::SUMMARY_AND_HISTOGRAM);
 
   addCounterToSnapshot("test_counter", 1, 100);
   addGaugeToSnapshot("test_gauge", 1);
@@ -174,7 +174,7 @@ TEST_F(MetricsServiceSinkTest, ReportCountersValues) {
   MetricsServiceSink<envoy::service::metrics::v3::StreamMetricsMessage,
                      envoy::service::metrics::v3::StreamMetricsResponse>
       sink(streamer_, false, false,
-           envoy::config::metrics::v3::HistogramMetrics::SUMMARY_AND_HISTOGRAM);
+           envoy::config::metrics::v3::HistogramEmitMode::SUMMARY_AND_HISTOGRAM);
 
   addCounterToSnapshot("test_counter", 1, 100);
 
@@ -196,7 +196,7 @@ TEST_F(MetricsServiceSinkTest, ReportCountersAsDeltas) {
     MetricsServiceSink<envoy::service::metrics::v3::StreamMetricsMessage,
                        envoy::service::metrics::v3::StreamMetricsResponse>
         sink(streamer_, true, false,
-             envoy::config::metrics::v3::HistogramMetrics::SUMMARY_AND_HISTOGRAM);
+             envoy::config::metrics::v3::HistogramEmitMode::SUMMARY_AND_HISTOGRAM);
 
     EXPECT_CALL(*streamer_, send(_)).WillOnce(Invoke([](MetricsPtr&& metrics) {
       ASSERT_EQ(1, metrics->size());
@@ -214,7 +214,7 @@ TEST_F(MetricsServiceSinkTest, ReportCountersAsDeltas) {
     MetricsServiceSink<envoy::service::metrics::v3::StreamMetricsMessage,
                        envoy::service::metrics::v3::StreamMetricsResponse>
         sink(streamer_, true, true,
-             envoy::config::metrics::v3::HistogramMetrics::SUMMARY_AND_HISTOGRAM);
+             envoy::config::metrics::v3::HistogramEmitMode::SUMMARY_AND_HISTOGRAM);
 
     EXPECT_CALL(*streamer_, send(_)).WillOnce(Invoke([](MetricsPtr&& metrics) {
       ASSERT_EQ(1, metrics->size());
@@ -247,7 +247,7 @@ TEST_F(MetricsServiceSinkTest, ReportMetricsWithTags) {
     MetricsServiceSink<envoy::service::metrics::v3::StreamMetricsMessage,
                        envoy::service::metrics::v3::StreamMetricsResponse>
         sink(streamer_, false, false,
-             envoy::config::metrics::v3::HistogramMetrics::SUMMARY_AND_HISTOGRAM);
+             envoy::config::metrics::v3::HistogramEmitMode::SUMMARY_AND_HISTOGRAM);
 
     EXPECT_CALL(*streamer_, send(_)).WillOnce(Invoke([](MetricsPtr&& metrics) {
       EXPECT_EQ(4, metrics->size());
@@ -275,7 +275,7 @@ TEST_F(MetricsServiceSinkTest, ReportMetricsWithTags) {
   MetricsServiceSink<envoy::service::metrics::v3::StreamMetricsMessage,
                      envoy::service::metrics::v3::StreamMetricsResponse>
       sink(streamer_, false, true,
-           envoy::config::metrics::v3::HistogramMetrics::SUMMARY_AND_HISTOGRAM);
+           envoy::config::metrics::v3::HistogramEmitMode::SUMMARY_AND_HISTOGRAM);
 
   EXPECT_CALL(*streamer_, send(_)).WillOnce(Invoke([&expected_label_pair](MetricsPtr&& metrics) {
     EXPECT_EQ(4, metrics->size());
@@ -306,7 +306,7 @@ TEST_F(MetricsServiceSinkTest, FlushPredicate) {
   // Default predicate only accepts used metrics.
   {
     MetricsFlusher flusher(true, true,
-                           envoy::config::metrics::v3::HistogramMetrics::SUMMARY_AND_HISTOGRAM);
+                           envoy::config::metrics::v3::HistogramEmitMode::SUMMARY_AND_HISTOGRAM);
     auto metrics = flusher.flush(snapshot_);
     EXPECT_EQ(1, metrics->size());
   }
@@ -314,7 +314,7 @@ TEST_F(MetricsServiceSinkTest, FlushPredicate) {
   // Using a predicate that accepts all metrics, we'd flush both metrics.
   {
     MetricsFlusher flusher(true, true,
-                           envoy::config::metrics::v3::HistogramMetrics::SUMMARY_AND_HISTOGRAM,
+                           envoy::config::metrics::v3::HistogramEmitMode::SUMMARY_AND_HISTOGRAM,
                            [](const auto&) { return true; });
     auto metrics = flusher.flush(snapshot_);
     EXPECT_EQ(2, metrics->size());
@@ -322,14 +322,14 @@ TEST_F(MetricsServiceSinkTest, FlushPredicate) {
 
   // Using a predicate that rejects all metrics, we'd flush no metrics.
   MetricsFlusher flusher(true, true,
-                         envoy::config::metrics::v3::HistogramMetrics::SUMMARY_AND_HISTOGRAM,
+                         envoy::config::metrics::v3::HistogramEmitMode::SUMMARY_AND_HISTOGRAM,
                          [](const auto&) { return false; });
   auto metrics = flusher.flush(snapshot_);
   EXPECT_EQ(0, metrics->size());
 }
 
 // Test that verifies counters are reported as the delta between flushes when configured to do so.
-TEST_F(MetricsServiceSinkTest, HistogramMetrics) {
+TEST_F(MetricsServiceSinkTest, HistogramEmitMode) {
   addHistogramToSnapshot("test_histogram");
 
   {
@@ -337,7 +337,7 @@ TEST_F(MetricsServiceSinkTest, HistogramMetrics) {
     MetricsServiceSink<envoy::service::metrics::v3::StreamMetricsMessage,
                        envoy::service::metrics::v3::StreamMetricsResponse>
         sink(streamer_, true, false,
-             envoy::config::metrics::v3::HistogramMetrics::SUMMARY_AND_HISTOGRAM);
+             envoy::config::metrics::v3::HistogramEmitMode::SUMMARY_AND_HISTOGRAM);
 
     EXPECT_CALL(*streamer_, send(_)).WillOnce(Invoke([](MetricsPtr&& metrics) {
       ASSERT_EQ(2, metrics->size());
@@ -356,7 +356,7 @@ TEST_F(MetricsServiceSinkTest, HistogramMetrics) {
     // This test will only summary.
     MetricsServiceSink<envoy::service::metrics::v3::StreamMetricsMessage,
                        envoy::service::metrics::v3::StreamMetricsResponse>
-        sink(streamer_, true, false, envoy::config::metrics::v3::HistogramMetrics::SUMMARY);
+        sink(streamer_, true, false, envoy::config::metrics::v3::HistogramEmitMode::SUMMARY);
 
     EXPECT_CALL(*streamer_, send(_)).WillOnce(Invoke([](MetricsPtr&& metrics) {
       ASSERT_EQ(1, metrics->size());
@@ -372,7 +372,7 @@ TEST_F(MetricsServiceSinkTest, HistogramMetrics) {
     // This test will only histogram.
     MetricsServiceSink<envoy::service::metrics::v3::StreamMetricsMessage,
                        envoy::service::metrics::v3::StreamMetricsResponse>
-        sink(streamer_, true, false, envoy::config::metrics::v3::HistogramMetrics::HISTOGRAM);
+        sink(streamer_, true, false, envoy::config::metrics::v3::HistogramEmitMode::HISTOGRAM);
 
     EXPECT_CALL(*streamer_, send(_)).WillOnce(Invoke([](MetricsPtr&& metrics) {
       ASSERT_EQ(1, metrics->size());

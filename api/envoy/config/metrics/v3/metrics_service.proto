@@ -19,8 +19,8 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: Metrics service]
 
-// HistogramMetrics is used to configure which metric types should be emitted for histograms.
-enum HistogramMetrics {
+// HistogramEmitMode is used to configure which metric types should be emitted for histograms.
+enum HistogramEmitMode {
   // Emit Histogram and Summary metric types.
   SUMMARY_AND_HISTOGRAM = 0;
 
@@ -70,5 +70,5 @@ message MetricsServiceConfig {
   bool emit_tags_as_labels = 4;
 
   // Specify which metrics types to emit for histograms. Defaults to SUMMARY_AND_HISTOGRAM.
-  HistogramMetrics histogram_metrics = 5 [(validate.rules).enum = {defined_only: true}];
+  HistogramEmitMode histogram_emit_mode = 5 [(validate.rules).enum = {defined_only: true}];
 }
