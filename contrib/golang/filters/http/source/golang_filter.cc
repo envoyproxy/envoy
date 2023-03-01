@@ -647,17 +647,17 @@ CAPIStatus Filter::setHeader(absl::string_view key, absl::string_view value) {
     onHeadersModified();
   } else {
     // should deep copy the string_view before post to dipatcher callback.
-    auto keyStr = std::string(key);
-    auto valueStr = std::string(value);
+    auto key_str = std::string(key);
+    auto value_str = std::string(value);
 
     auto weak_ptr = weak_from_this();
     // dispatch a callback to write header in the envoy safe thread, to make the write operation
     // safety. otherwise, there might be race between reading in the envoy worker thread and writing
     // in the Go thread.
-    state.getDispatcher().post([this, weak_ptr, keyStr, valueStr] {
+    state.getDispatcher().post([this, weak_ptr, key_str, value_str] {
       Thread::LockGuard lock(mutex_);
       if (!weak_ptr.expired() && !has_destroyed_) {
-        headers_->setCopy(Http::LowerCaseString(keyStr), valueStr);
+        headers_->setCopy(Http::LowerCaseString(key_str), value_str);
         onHeadersModified();
       } else {
         ENVOY_LOG(debug, "golang filter has gone or destroyed in setHeader");
@@ -690,16 +690,16 @@ CAPIStatus Filter::removeHeader(absl::string_view key) {
     onHeadersModified();
   } else {
     // should deep copy the string_view before post to dipatcher callback.
-    auto keyStr = std::string(key);
+    auto key_str = std::string(key);
 
     auto weak_ptr = weak_from_this();
     // dispatch a callback to write header in the envoy safe thread, to make the write operation
     // safety. otherwise, there might be race between reading in the envoy worker thread and writing
     // in the Go thread.
-    state.getDispatcher().post([this, weak_ptr, keyStr] {
+    state.getDispatcher().post([this, weak_ptr, key_str] {
       Thread::LockGuard lock(mutex_);
       if (!weak_ptr.expired() && !has_destroyed_) {
-        headers_->remove(Http::LowerCaseString(keyStr));
+        headers_->remove(Http::LowerCaseString(key_str));
         onHeadersModified();
       } else {
         ENVOY_LOG(debug, "golang filter has gone or destroyed in removeHeader");
