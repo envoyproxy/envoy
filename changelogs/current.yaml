@@ -144,7 +144,7 @@ new_features:
     authentication failure status code and message in dynamic metadata.
 - area: matching
   change: |
-    added :ref:`Filter State Input <envoy_v3_api_mgs_extensions.matching.common_inputs.network.v3.FilterStateInput>` for matching based on filter state objects.
+    added :ref:`Filter State Input <envoy_v3_api_msg_extensions.matching.common_inputs.network.v3.FilterStateInput>` for matching based on filter state objects.
 
 deprecated:
 - area: ext_authz
