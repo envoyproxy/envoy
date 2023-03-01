@@ -168,6 +168,7 @@ envoy_cc_library(
         "//source/common/json:json_sanitizer_lib",
         "//source/common/stats:histogram_lib",
     ] + envoy_select_admin_html([
+        "//envoy/filesystem:filesystem_interface",
         "//source/common/html:utility_lib",
     ]),
 )

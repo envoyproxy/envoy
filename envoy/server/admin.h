@@ -284,6 +284,15 @@ public:
    * Closes the listening socket for the admin.
    */
   virtual void closeSocket() PURE;
+
+#ifdef ENVOY_ADMIN_HTML
+  /**
+   * Provides a file-system for reading html resources, which makes debug iteration
+   * faster by not requiring a rebuild. With this set, you simply re-load the HTML
+   * and all CSS, JS, and HTML resources will be re-read from source.
+   */
+  virtual void setDebugResourceFilesystem(FileSystem::Instance& resource_files) PURE;
+#endif
 };
 
 } // namespace Server

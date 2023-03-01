@@ -67,14 +67,21 @@ StatsHtmlRender::StatsHtmlRender(Http::ResponseHeaderMap& response_headers,
   response_headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Html);
   response.add("<!DOCTYPE html>\n");
   response.add("<html lang='en'>\n");
-  response.add(absl::StrReplaceAll(AdminHtmlStart, {{"@FAVICON@", EnvoyFavicon}}));
+  response.add("<head>\n");
+  appendResource(response, "admin_head_start.html", AdminHtmlStart,
+                 [](absl::string_view str) -> std::string {
+                   return absl::StrReplaceAll(str, {{"@FAVICON@", EnvoyFavicon}});
+                 });
+  response.add("<style>\n");
+  appendResource(response, "admin.css", AdminCss);
+  response.add("</style>\n");
   if (active_) {
     response.add("<script>\n");
     appendResource(response, "active_stats.js", AdminActiveStatsJs);
-    response.add("\n</script>\n");
-  } else {
-    response.add("<body>\n");
+    response.add("</script>\n");
   }
+  response.add("</head>\n");
+  response.add("<body>\n");
 }
 
 void StatsHtmlRender::setupStatsPage(const Admin::UrlHandler& url_handler,
@@ -100,23 +107,31 @@ void StatsHtmlRender::finalize(Buffer::Instance& response) {
 }
 
 void StatsHtmlRender::appendResource(Buffer::Instance& response, absl::string_view file,
-                                     absl::string_view default_value) {
-#ifdef ENVOY_ADMIN_DEBUG
-  // Build with --cxxopt=-DENVOY_ADMIN_DEBUG to reload css, js, and html files
+                                     absl::string_view default_value,
+                                     std::function<std::string(absl::string_view)> xform) {
+  // ....to reload css, js, and html files
   // from the file-system on every admin page load, which enables fast iteration
   // when debugging the web site.
-  Filesystem::InstanceImpl file_system;
-  std::string path = absl::StrCat("source/server/admin/", file);
-  TRY_ASSERT_MAIN_THREAD { response.add(file_system.fileReadToEnd(path)); }
-  END_TRY
-  catch (EnvoyException& e) {
-    ENVOY_LOG_MISC(error, "failed to load " + path + ": " + e.what());
+  if (debug_resource_files_.has_value()) {
+    std::string path = absl::StrCat("source/server/admin/", file);
+    TRY_ASSERT_MAIN_THREAD {
+      std::string contents = debug_resource_files_->fileReadToEnd(path);
+      if (xform != nullptr) {
+        contents = xform(contents);
+      }
+      response.add(contents);
+      return;
+    }
+    END_TRY
+    catch (EnvoyException& e) {
+      ENVOY_LOG_MISC(error, "failed to load " + path + ": " + e.what());
+      response.add(default_value);
+    }
+  } else if (xform) {
+    response.add(xform(default_value));
+  } else {
     response.add(default_value);
   }
-#else
-  UNREFERENCED_PARAMETER(file);
-  response.add(default_value);
-#endif
 }
 
 void StatsHtmlRender::startPre(Buffer::Instance& response) {
