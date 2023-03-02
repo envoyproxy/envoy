@@ -489,7 +489,7 @@ Network::FilterStatus DecoderImpl::decodeAndBuffer(Buffer::Instance& data,
   uint32_t data_len = data.length();
   uint32_t zk_filter_buffer_len = zk_filter_buffer.length();
 
-  if (zk_filter_buffer.empty()) {
+  if (zk_filter_buffer_len == 0) {
     decodeAndBufferHelper(data, zk_filter_buffer, dtype);
     return Network::FilterStatus::Continue;
   }
