@@ -14,8 +14,12 @@ In most cases, this filter would be a more flexible alternative to the ``request
 ``response_headers_to_add``, and ``response_headers_to_remove`` fields in the :ref:`route configuration <envoy_v3_api_msg_config.route.v3.RouteConfiguration>`.
 
 
-The filter provides complete control over the position and order of the header mutations. It is possible to influence the route matching
-by mutating the request headers and then clear the cached route in the later filters.
+The filter provides complete control over the position and order of the header mutations. It may be used to influence later route picks if
+the route cache is cleared by a filter executing after the header mutation filter.
 
 
 In addition, this filter can be used as upstream filter and mutate the request headers after load balancing and host selection.
+
+
+Please note that as an encoder filter, this filter follows the standard rules of when it will execute in situations such as local replies - response
+headers will not be unconditionally added in cases where the filter would be bypassed.
