@@ -19,9 +19,7 @@ static const int SecondsPerDay = 86400;
 std::vector<absl::string_view> UberFilterFuzzer::filterNames() {
   // Add filters that are in the process of being or are robust against untrusted downstream
   // traffic.
-  static const std::vector<std::string> supported_filter_names = {
-    {{FILTERS}}
-  };
+  static const std::vector<std::string> supported_filter_names = {{{FILTERS}}};
   static std::vector<absl::string_view> filter_names;
   if (filter_names.empty()) {
     const auto factories = Registry::FactoryRegistry<

@@ -8,9 +8,7 @@ namespace NetworkFilters {
 std::vector<absl::string_view> UberWriteFilterFuzzer::filterNames() {
   // These filters have already been covered by this fuzzer.
   // Will extend to cover other network filters one by one.
-  static const std::vector<std::string> supported_filter_names = {
-    {{FILTERS}}
-  };
+  static const std::vector<std::string> supported_filter_names = {{{FILTERS}}};
   static std::vector<absl::string_view> filter_names;
   if (filter_names.empty()) {
     const auto factories = Registry::FactoryRegistry<

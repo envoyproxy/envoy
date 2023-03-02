@@ -1,4 +1,3 @@
-load("@bazel_skylib//lib:dicts.bzl", "dicts")
 load("@envoy_build_config//:extensions_build_config.bzl", "EXTENSIONS")
 
 def _selected_extension_target(target):
@@ -7,7 +6,7 @@ def _selected_extension_target(target):
 def fuzz_filters_targets(filters):
     all_extensions = EXTENSIONS
 
-    return [ v for k, v in all_extensions.items() if (k in filters) ]
+    return [v for k, v in all_extensions.items() if (k in filters)]
 
 def generate_from_template(**kwargs):
     _generate_from_template(
@@ -20,7 +19,7 @@ def _generate_from_template_impl(ctx):
         template = ctx.file.template_file,
         output = ctx.outputs.source_file,
         substitutions = {
-            "{{FILTERS}}": "\"" + ( "\", \"".join(ctx.attr.filters)) + "\"",
+            "{{FILTERS}}": "\"" + ("\", \"".join(ctx.attr.filters)) + "\"",
         },
     )
 
