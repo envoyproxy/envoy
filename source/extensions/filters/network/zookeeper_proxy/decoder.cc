@@ -489,40 +489,40 @@ Network::FilterStatus DecoderImpl::decodeAndBuffer(Buffer::Instance& data,
   uint32_t data_len = data.length();
   uint32_t zk_filter_buffer_len = zk_filter_buffer.length();
 
-  if (zk_filter_buffer_len > 0) {
-    if (zk_filter_buffer_len + data_len > INT_LENGTH) {
-      // Prepend ZooKeeper filter buffer to current buffer.
-      data.prepend(zk_filter_buffer);
-      decodeAndBufferHelper(data, zk_filter_buffer, dtype);
-      // Drain the prepended ZooKeeper filter buffer.
-      data.drain(zk_filter_buffer_len);
-    } else {
-      zk_filter_buffer.add(data);
-    }
-  } else if (zk_filter_buffer_len == 0) {
+  if (zk_filter_buffer.empty()) {
     decodeAndBufferHelper(data, zk_filter_buffer, dtype);
+    return Network::FilterStatus::Continue;
+  }
+
+  // The length of ZooKeeper filter buffer and network filter buffer should be bigger than 4 bytes in order to peek the packet length.
+  if (zk_filter_buffer_len + data_len > INT_LENGTH) {
+    // ZooKeeper filter buffer contains partial packet data from the previous network filter buffer. Prepending ZooKeeper filter buffer to the current network filter buffer can help to generate full packets.
+    data.prepend(zk_filter_buffer);
+    decodeAndBufferHelper(data, zk_filter_buffer, dtype);
+    // Drain the prepended ZooKeeper filter buffer.
+    data.drain(zk_filter_buffer_len);
+  } else {
+    zk_filter_buffer.add(data);
   }
   return Network::FilterStatus::Continue;
 }
 
 void DecoderImpl::decodeAndBufferHelper(Buffer::Instance& data, Buffer::OwnedImpl& zk_filter_buffer,
                                         DecodeType dtype) {
+  ASSERT(dtype == DecodeType::READ || dtype == DecodeType::WRITE);
+
   uint32_t data_len = data.length();
   uint32_t zk_filter_buffer_len = zk_filter_buffer.length();
   uint64_t offset = 0;
   uint32_t len = 0;
-  // Boolean to check whether there is at least one full packet in the buffer.
+  // Boolean to check whether there is at least one full packet in the network filter buffer (to which the ZooKeeper filter buffer is prepended).
   bool has_full_packets = false;
 
   while (offset < data_len) {
     try {
       // Peek packet length.
       len = helper_.peekInt32(data, offset);
-      if (dtype == DecodeType::READ) {
-        ensureMinLength(len, XID_LENGTH + INT_LENGTH);
-      } else if (dtype == DecodeType::WRITE) {
-        ensureMinLength(len, XID_LENGTH + ZXID_LENGTH + INT_LENGTH);
-      }
+      ensureMinLength(len, dtype == DecodeType::READ ? XID_LENGTH + INT_LENGTH : XID_LENGTH + ZXID_LENGTH + INT_LENGTH);
       ensureMaxLength(len);
       offset += len;
       if (offset <= data_len) {
@@ -539,7 +539,7 @@ void DecoderImpl::decodeAndBufferHelper(Buffer::Instance& data, Buffer::OwnedImp
     decode(data, dtype);
 
     if (zk_filter_buffer_len > 0) {
-      // Drain the ZooKeeper filter buffer.
+      // After prepending the ZooKeeper filter buffer to the network filter buffer, the network filter buffer here includes one or more full packets without any partial data, the decoder is able to decode the entire network filter buffer. So the we need to drain the ZooKeeper filter buffer here, since its data has been decoded already. Otherwise, the ZooKeeper filter will prepend the ZooKeeper filter buffer to the network filter buffer again next time, which is not what we want.
       zk_filter_buffer.drain(zk_filter_buffer_len);
     }
   } else if (offset > data_len) {
@@ -548,24 +548,20 @@ void DecoderImpl::decodeAndBufferHelper(Buffer::Instance& data, Buffer::OwnedImp
     if (has_full_packets) {
       offset -= INT_LENGTH + len;
       // Decode full packets.
-      temp_data.reserve(offset);
       temp_data.resize(offset);
       data.copyOut(0, offset, temp_data.data());
       Buffer::OwnedImpl full_packets;
       full_packets.add(temp_data.data(), temp_data.length());
       decode(full_packets, dtype);
-
-      // Drain the ZooKeeper filter buffer.
+      // After prepending the ZooKeeper filter buffer to the network filter buffer, the network filter buffer here includes one or more full packets with partial data of a packet, the decoder is able to decode all full packets. So we need to drain the ZooKeeper filter buffer here, since its data has been decoded already. Otherwise, the ZooKeeper filter will prepend the ZooKeeper filter buffer to the network filter buffer again next time, which is not what we want.
       zk_filter_buffer.drain(zk_filter_buffer_len);
 
       // Copy out the rest of the data to the ZooKeeper filter buffer.
-      temp_data.reserve(data_len - offset);
       temp_data.resize(data_len - offset);
       data.copyOut(offset, data_len - offset, temp_data.data());
       zk_filter_buffer.add(temp_data.data(), temp_data.length());
     } else {
       // Copy out all the new data to the ZooKeeper filter buffer.
-      temp_data.reserve(data_len - zk_filter_buffer_len);
       temp_data.resize(data_len - zk_filter_buffer_len);
       data.copyOut(zk_filter_buffer_len, data_len - zk_filter_buffer_len, temp_data.data());
       zk_filter_buffer.add(temp_data.data(), temp_data.length());

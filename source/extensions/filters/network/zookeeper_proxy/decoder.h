@@ -138,10 +138,10 @@ private:
   };
 
   // decodeAndBuffer
-  //       (1) prepends previous partial data to the current buffer,
-  //       (2) decodes all full packet(s),
-  //       (3) adds the rest of the data to the ZooKeeper filter buffer,
-  //       (4) removes the prepended data.
+  // (1) prepends previous partial data to the current buffer,
+  // (2) decodes all full packet(s),
+  // (3) adds the rest of the data to the ZooKeeper filter buffer,
+  // (4) removes the prepended data.
   Network::FilterStatus decodeAndBuffer(Buffer::Instance& data, Buffer::OwnedImpl& zk_filter_buffer,
                                         DecodeType dtype);
   void decodeAndBufferHelper(Buffer::Instance& data, Buffer::OwnedImpl& zk_filter_buffer,
