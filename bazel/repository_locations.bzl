@@ -423,13 +423,12 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "LuaJIT",
         project_desc = "Just-In-Time compiler for Lua",
         project_url = "https://luajit.org",
-        # The last release version, 2.1.0-beta3 has a number of CVEs filed
-        # against it. These may not impact correct non-malicious Lua code, but for prudence we bump.
+        # LuaJIT only provides rolling releases
         version = "a04480e311f93d3ceb2f92549cad3fffa38250ef",
         sha256 = "297e9c06d934753f9553fa7d1c1e43381e20094ed3289e0e145dd5f3c203a27e",
         strip_prefix = "LuaJIT-{version}",
         urls = ["https://github.com/LuaJIT/LuaJIT/archive/{version}.tar.gz"],
-        release_date = "2020-10-12",
+        release_date = "2022-12-21",
         use_category = ["dataplane_ext"],
         extensions = ["envoy.filters.http.lua"],
         cpe = "cpe:2.3:a:luajit:luajit:*",
