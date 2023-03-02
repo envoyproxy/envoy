@@ -159,7 +159,8 @@ SysCallSizeResult OsSysCallsImpl::pread(os_fd_t fd, void* buffer, size_t length,
 }
 
 SysCallSizeResult OsSysCallsImpl::send(os_fd_t socket, void* buffer, size_t length, int flags) {
-  PANIC("not implemented");
+  const ssize_t rc = ::send(socket, static_cast<char*>(buffer), length, flags);
+  return {rc, rc != -1 ? 0 : ::WSAGetLastError()};
 }
 
 SysCallSizeResult OsSysCallsImpl::recv(os_fd_t socket, void* buffer, size_t length, int flags) {

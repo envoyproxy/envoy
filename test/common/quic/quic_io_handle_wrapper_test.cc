@@ -50,18 +50,10 @@ TEST_F(QuicIoHandleWrapperTest, DelegateIoHandleCalls) {
   os_fd_t fd = socket_.ioHandle().fdDoNotUse();
   char data[5];
   Buffer::RawSlice slice{data, 5};
-#ifdef WIN32
-  EXPECT_CALL(os_sys_calls_, readv(fd, _, 1)).WillOnce(Return(Api::SysCallSizeResult{5u, 0}));
-#else
   EXPECT_CALL(os_sys_calls_, recv(fd, _, 5, 0)).WillOnce(Return(Api::SysCallSizeResult{5u, 0}));
-#endif
   wrapper_->readv(5, &slice, 1);
 
-#ifdef WIN32
-  EXPECT_CALL(os_sys_calls_, writev(fd, _, 1)).WillOnce(Return(Api::SysCallSizeResult{5u, 0}));
-#else
   EXPECT_CALL(os_sys_calls_, send(fd, _, 5, 0)).WillOnce(Return(Api::SysCallSizeResult{5u, 0}));
-#endif
   wrapper_->writev(&slice, 1);
 
   EXPECT_CALL(os_sys_calls_, socket(AF_INET6, SOCK_STREAM, 0))

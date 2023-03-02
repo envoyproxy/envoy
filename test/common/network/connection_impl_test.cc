@@ -1253,15 +1253,7 @@ TEST_P(ConnectionImplTest, WriteWithWatermarks) {
         return {-1, SOCKET_ERROR_AGAIN};
       }));
 
-#ifdef WIN32
-  EXPECT_CALL(os_sys_calls, writev(_, _, _))
-      .WillOnce(Invoke([&](os_fd_t, const iovec*, int) -> Api::SysCallSizeResult {
-        dispatcher_->exit();
-        // Return to default os_sys_calls implementation
-        os_calls.reset();
-        return {-1, SOCKET_ERROR_AGAIN};
-      }));
-#else
+
   EXPECT_CALL(os_sys_calls, send(_, _, _, _))
       .WillOnce(Invoke([&](os_fd_t, void*, size_t, int) -> Api::SysCallSizeResult {
         dispatcher_->exit();
@@ -1269,7 +1261,6 @@ TEST_P(ConnectionImplTest, WriteWithWatermarks) {
         os_calls.reset();
         return {-1, SOCKET_ERROR_AGAIN};
       }));
-#endif
 
   // The write() call on the connection will buffer enough data to bring the connection above the
   // high watermark and as the data will not flush it should not return below the watermark.
@@ -1351,17 +1342,6 @@ TEST_P(ConnectionImplTest, WatermarkFuzzing) {
     // drain |bytes_to_flush| before having writev syscall fail with EAGAIN
     EXPECT_CALL(*client_write_buffer_, move(_))
         .WillOnce(Invoke(client_write_buffer_, &MockWatermarkBuffer::baseMove));
-#ifdef WIN32
-    EXPECT_CALL(os_sys_calls, writev(_, _, _))
-        .WillOnce(Invoke([&](os_fd_t, const iovec*, int) -> Api::SysCallSizeResult {
-          client_write_buffer_->drain(bytes_to_flush);
-          dispatcher_->exit();
-          return {-1, SOCKET_ERROR_AGAIN};
-        }))
-        .WillRepeatedly(Invoke([&](os_fd_t, const iovec*, int) -> Api::SysCallSizeResult {
-          return {-1, SOCKET_ERROR_AGAIN};
-        }));
-#else
     EXPECT_CALL(os_sys_calls, send(_, _, _, _))
         .WillOnce(Invoke([&](os_fd_t, void*, size_t, int) -> Api::SysCallSizeResult {
           client_write_buffer_->drain(bytes_to_flush);
@@ -1371,7 +1351,6 @@ TEST_P(ConnectionImplTest, WatermarkFuzzing) {
         .WillRepeatedly(Invoke([&](os_fd_t, void*, size_t, int) -> Api::SysCallSizeResult {
           return {-1, SOCKET_ERROR_AGAIN};
         }));
-#endif
 
     client_connection_->write(buffer_to_write, false);
     dispatcher_->run(Event::Dispatcher::RunType::Block);
