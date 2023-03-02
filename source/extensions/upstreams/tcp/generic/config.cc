@@ -17,10 +17,12 @@ TcpProxy::GenericConnPoolPtr GenericConnPoolFactory::createGenericConnPool(
     TcpProxy::TunnelingConfigHelperOptConstRef config, Upstream::LoadBalancerContext* context,
     Envoy::Tcp::ConnectionPool::UpstreamCallbacks& upstream_callbacks,
     StreamInfo::StreamInfo& downstream_info) const {
-  const StreamInfo::BooleanAccessor* disable_tunneling = downstream_info
-      .filterState()->getDataReadOnly<StreamInfo::BooleanAccessor>("envoy.tcp_proxy.disable_tunneling");
+  const StreamInfo::BooleanAccessor* disable_tunneling =
+      downstream_info.filterState()->getDataReadOnly<StreamInfo::BooleanAccessor>(
+          "envoy.tcp_proxy.disable_tunneling");
 
-  bool should_disable_tunneling = disable_tunneling != nullptr && disable_tunneling->value() == true;
+  bool should_disable_tunneling =
+      disable_tunneling != nullptr && disable_tunneling->value() == true;
 
   if (config.has_value() && !should_disable_tunneling) {
     Http::CodecType pool_type;
