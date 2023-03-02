@@ -63,7 +63,7 @@ namespace Server {
 
 StatsHtmlRender::StatsHtmlRender(Http::ResponseHeaderMap& response_headers,
                                  Buffer::Instance& response, const StatsParams& params)
-    : StatsTextRender(params), active_(params.format_ == StatsFormat::Active) {
+    : StatsTextRender(params), active_(params.format_ == StatsFormat::ActiveHtml) {
   response_headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Html);
   response.add("<!DOCTYPE html>\n");
   response.add("<html lang='en'>\n");

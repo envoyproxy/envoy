@@ -105,7 +105,7 @@ TEST_F(StatsHtmlRenderTest, RenderUrlHandlerSubmitOnChange) {
 class StatsActiveRenderTest : public StatsRenderTestBase {
 protected:
   StatsActiveRenderTest() {
-    params_.format_ = StatsFormat::Active;
+    params_.format_ = StatsFormat::ActiveHtml;
     renderer_ = std::make_unique<StatsHtmlRender>(response_headers_, response_, params_);
   }
 

@@ -34,12 +34,12 @@ Http::Code StatsRequest::start(Http::ResponseHeaderMap& response_headers) {
     render_ = std::make_unique<StatsTextRender>(params_);
     break;
 #ifdef ENVOY_ADMIN_HTML
-  case StatsFormat::Active:
+  case StatsFormat::ActiveHtml:
   case StatsFormat::Html: {
     auto html_render = std::make_unique<StatsHtmlRender>(response_headers, response_, params_);
     html_render->setupStatsPage(url_handler_fn_(), params_, response_);
     render_ = std::move(html_render);
-    if (params_.format_ == StatsFormat::Active) {
+    if (params_.format_ == StatsFormat::ActiveHtml) {
       return Http::Code::OK;
     }
     break;
