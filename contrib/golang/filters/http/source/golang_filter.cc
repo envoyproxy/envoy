@@ -624,6 +624,8 @@ CAPIStatus Filter::copyHeaders(GoString* go_strs, char* go_buf) {
   return CAPIStatus::CAPIOK;
 }
 
+// It won't take affect immidiately while it's invoked from a Go thread, instead, it will post a
+// callback to run in the envoy worker thread.
 CAPIStatus Filter::setHeader(absl::string_view key, absl::string_view value) {
   Thread::LockGuard lock(mutex_);
   if (has_destroyed_) {
@@ -639,11 +641,34 @@ CAPIStatus Filter::setHeader(absl::string_view key, absl::string_view value) {
     ENVOY_LOG(debug, "invoking cgo api at invalid phase: {}", __func__);
     return CAPIStatus::CAPIInvalidPhase;
   }
-  headers_->setCopy(Http::LowerCaseString(key), value);
-  onHeadersModified();
+  if (state.isThreadSafe()) {
+    // it's safe to write header in the safe thread.
+    headers_->setCopy(Http::LowerCaseString(key), value);
+    onHeadersModified();
+  } else {
+    // should deep copy the string_view before post to dipatcher callback.
+    auto key_str = std::string(key);
+    auto value_str = std::string(value);
+
+    auto weak_ptr = weak_from_this();
+    // dispatch a callback to write header in the envoy safe thread, to make the write operation
+    // safety. otherwise, there might be race between reading in the envoy worker thread and writing
+    // in the Go thread.
+    state.getDispatcher().post([this, weak_ptr, key_str, value_str] {
+      Thread::LockGuard lock(mutex_);
+      if (!weak_ptr.expired() && !has_destroyed_) {
+        headers_->setCopy(Http::LowerCaseString(key_str), value_str);
+        onHeadersModified();
+      } else {
+        ENVOY_LOG(debug, "golang filter has gone or destroyed in setHeader");
+      }
+    });
+  }
   return CAPIStatus::CAPIOK;
 }
 
+// It won't take affect immidiately while it's invoked from a Go thread, instead, it will post a
+// callback to run in the envoy worker thread.
 CAPIStatus Filter::removeHeader(absl::string_view key) {
   Thread::LockGuard lock(mutex_);
   if (has_destroyed_) {
@@ -659,8 +684,28 @@ CAPIStatus Filter::removeHeader(absl::string_view key) {
     ENVOY_LOG(debug, "invoking cgo api at invalid phase: {}", __func__);
     return CAPIStatus::CAPIInvalidPhase;
   }
-  headers_->remove(Http::LowerCaseString(key));
-  onHeadersModified();
+  if (state.isThreadSafe()) {
+    // it's safe to write header in the safe thread.
+    headers_->remove(Http::LowerCaseString(key));
+    onHeadersModified();
+  } else {
+    // should deep copy the string_view before post to dipatcher callback.
+    auto key_str = std::string(key);
+
+    auto weak_ptr = weak_from_this();
+    // dispatch a callback to write header in the envoy safe thread, to make the write operation
+    // safety. otherwise, there might be race between reading in the envoy worker thread and writing
+    // in the Go thread.
+    state.getDispatcher().post([this, weak_ptr, key_str] {
+      Thread::LockGuard lock(mutex_);
+      if (!weak_ptr.expired() && !has_destroyed_) {
+        headers_->remove(Http::LowerCaseString(key_str));
+        onHeadersModified();
+      } else {
+        ENVOY_LOG(debug, "golang filter has gone or destroyed in removeHeader");
+      }
+    });
+  }
   return CAPIStatus::CAPIOK;
 }
 

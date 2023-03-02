@@ -225,6 +225,7 @@ public:
     return nullptr;
   }
   bool appendXForwardedPort() const override { return false; }
+  bool addProxyProtocolConnectionState() const override { return true; }
 
   const envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager
       config_;
