@@ -1879,24 +1879,50 @@ RouteConstSharedPtr VirtualHostImpl::getRouteFromEntries(const RouteCallback& cb
       const auto result = match.result_();
       if (result->typeUrl() == RouteMatchAction::staticTypeUrl()) {
         const RouteMatchAction& route_action = result->getTyped<RouteMatchAction>();
-
-        RouteConstSharedPtr route_entry = route_action.route()->matches(headers, stream_info, random_value);
-        if (nullptr != route_entry) {
-          return route_entry;
+        if (!headers.Path() && !route_action.route()->supportsPathlessHeaders()) {
+          return nullptr;
         }
 
-        ENVOY_LOG(debug, "route was resolved but final route did not match incoming request");
-        return nullptr;
+        RouteConstSharedPtr route_entry =
+            route_action.route()->matches(headers, stream_info, random_value);
+        if (nullptr == route_entry) {
+          ENVOY_LOG(debug, "route was resolved but final route did not match incoming request");
+          return nullptr;
+        }
+
+        if (cb) {
+          if (cb(route_entry, RouteEvalStatus::NoMoreRoutes) == RouteMatchStatus::Accept) {
+            return route_entry;
+          }
+          return nullptr;
+        }
+
+        return route_entry;
       } else if (result->typeUrl() == RouteListMatchAction::staticTypeUrl()) {
         const RouteListMatchAction& action = result->getTyped<RouteListMatchAction>();
 
-        for (const auto& route : action.routes()) {
-          RouteConstSharedPtr route_entry = route->matches(headers, stream_info, random_value);
+        for (auto route = action.routes().begin(); route != action.routes().end(); ++route) {
+          if (!headers.Path() && !(*route)->supportsPathlessHeaders()) {
+            continue;
+          }
+
+          RouteConstSharedPtr route_entry = (*route)->matches(headers, stream_info, random_value);
           if (nullptr == route_entry) {
             continue;
-          } else {
-            return route_entry;
           }
+
+          if (cb) {
+            RouteEvalStatus eval_status = (std::next(route) == action.routes().end())
+                                              ? RouteEvalStatus::NoMoreRoutes
+                                              : RouteEvalStatus::HasMoreRoutes;
+            RouteMatchStatus match_status = cb(route_entry, eval_status);
+            if (match_status == RouteMatchStatus::Accept) {
+              return route_entry;
+            }
+            continue;
+          }
+
+          return route_entry;
         }
 
         ENVOY_LOG(debug, "route was resolved but final route list did not match incoming request");
@@ -1927,10 +1953,6 @@ RouteConstSharedPtr VirtualHostImpl::getRouteFromEntries(const RouteCallback& cb
         RouteMatchStatus match_status = cb(route_entry, eval_status);
         if (match_status == RouteMatchStatus::Accept) {
           return route_entry;
-        }
-        if (match_status == RouteMatchStatus::Continue &&
-            eval_status == RouteEvalStatus::NoMoreRoutes) {
-          return nullptr;
         }
         continue;
       }

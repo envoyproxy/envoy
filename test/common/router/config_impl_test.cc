@@ -10692,6 +10692,62 @@ virtual_hosts:
   EXPECT_EQ(accepted_route->routeEntry()->clusterName(), "foo");
 }
 
+TEST_F(RouteMatchOverrideTest, RouteListVerifyRouteOverrideStops) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+- name: bar
+  domains: ["*"]
+  matcher:
+    matcher_tree:
+      input:
+        name: request-headers
+        typed_config:
+          "@type": type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput
+          header_name: :path
+      prefix_match_map:
+        map:
+          "/foo":
+            action:
+              name: route
+              typed_config:
+                "@type": type.googleapis.com/envoy.config.route.v3.RouteList
+                routes:
+                - match: { prefix: "/foo/bar/baz" }
+                  route:
+                    cluster: foo_bar_baz
+                - match: { prefix: "/foo/bar" }
+                  route:
+                    cluster: foo_bar
+                - match: { prefix: "/foo" }
+                  route:
+                    cluster: foo
+                - match: { prefix: "/foo/default" }
+                  route:
+                    cluster: default
+)EOF";
+
+  factory_context_.cluster_manager_.initializeClusters({"foo_bar_baz", "foo_bar", "foo", "default"},
+                                                       {});
+  TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true);
+  std::vector<std::string> clusters{"foo", "foo_bar"};
+
+  RouteConstSharedPtr accepted_route = config.route(
+      [&clusters](RouteConstSharedPtr route,
+                  RouteEvalStatus route_eval_status) -> RouteMatchStatus {
+        EXPECT_FALSE(clusters.empty());
+        EXPECT_EQ(clusters[clusters.size() - 1], route->routeEntry()->clusterName());
+        clusters.pop_back();
+        EXPECT_EQ(route_eval_status, RouteEvalStatus::HasMoreRoutes);
+
+        if (clusters.empty()) {
+          return RouteMatchStatus::Accept; // Do not match default route
+        }
+        return RouteMatchStatus::Continue;
+      },
+      genHeaders("bat.com", "/foo/bar", "GET"));
+  EXPECT_EQ(accepted_route->routeEntry()->clusterName(), "foo");
+}
+
 TEST_F(RouteMatchOverrideTest, StopWhenNoMoreRoutes) {
   const std::string yaml = R"EOF(
 virtual_hosts:
