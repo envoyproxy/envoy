@@ -1,16 +1,15 @@
-#include "contrib/envoy/extensions/filters/http/golang/v3alpha/golang.pb.validate.h"
-
 #include "source/common/network/address_impl.h"
-#include "contrib/golang/filters/http/source/golang_filter.h"
 
 #include "test/extensions/filters/http/common/fuzz/http_filter_fuzzer.h"
-#include "contrib/golang/filters/http/test/golang_filter_fuzz.pb.validate.h"
-#include "contrib/golang/filters/http/test/common/dso/mocks.h"
 #include "test/fuzz/fuzz_runner.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/runtime/mocks.h"
 
+#include "contrib/envoy/extensions/filters/http/golang/v3alpha/golang.pb.validate.h"
+#include "contrib/golang/filters/http/source/golang_filter.h"
+#include "contrib/golang/filters/http/test/common/dso/mocks.h"
+#include "contrib/golang/filters/http/test/golang_filter_fuzz.pb.validate.h"
 #include "gmock/gmock.h"
 
 using testing::Return;

@@ -73,8 +73,8 @@ envoy_proto_library(
     srcs = ["golang_filter_fuzz.proto"],
     deps = [
         "//test/fuzz:common_proto",
-        "@envoy_api//envoy/config/core/v3:pkg",
         "@envoy_api//contrib/envoy/extensions/filters/http/golang/v3alpha:pkg",
+        "@envoy_api//envoy/config/core/v3:pkg",
     ],
 )
 
@@ -84,9 +84,9 @@ envoy_cc_fuzz_test(
     corpus = "golang_filter_corpus",
     deps = [
         ":golang_filter_fuzz_proto_cc_proto",
-        "//source/common/network:address_lib",
         "//contrib/golang/filters/http/source:config",
         "//contrib/golang/filters/http/test/common/dso:dso_mocks",
+        "//source/common/network:address_lib",
         "//test/extensions/filters/http/common/fuzz:http_filter_fuzzer_lib",
         "//test/mocks/http:http_mocks",
         "//test/mocks/network:network_mocks",
