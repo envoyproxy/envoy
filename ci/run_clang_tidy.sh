@@ -15,7 +15,10 @@ FIX_YAML="${FIX_YAML:-clang-tidy-fixes.yaml}"
 CLANG_TIDY_APPLY_FIXES="${CLANG_TIDY_APPLY_FIXES:-}"
 CLANG_TIDY_FIX_DIFF="${CLANG_TIDY_FIX_DIFF:-}"
 
-DIFF_TARGET_BRANCH="${DIFF_TARGET_BRANCH:-origin/main}"
+DIFF_TARGET_REMOTE="${DIFF_TARGET_REMOTE:-origin}"
+DIFF_TARGET_BRANCH="${DIFF_TARGET_BRANCH:-${AZP_TARGET_BRANCH:-origin/main}}"
+# Exclude merges for finding merge base if required
+DIFF_HEAD="$(git rev-list --no-merges HEAD -n1)"
 
 # Quick syntax check of .clang-tidy.
 ${CLANG_TIDY} -dump-config > /dev/null 2> clang-tidy-config-errors.txt
@@ -124,9 +127,14 @@ else
         # Presubmit/PR
         elif [[ -n "${BUILD_REASON}" ]]; then
             # Common ancestor commit
-            git fetch origin
-            git fetch --unshallow
-            DIFF_REF="$(git merge-base HEAD "${DIFF_TARGET_BRANCH}")"
+            if "$(git rev-parse --is-shallow-repository)"; then
+                # Ideally we always want to fetch here, but this can
+                # fail depending on how the repository is checked out.
+                # If the repo is shallow (ie CI) then we have to unshallow it.
+                git fetch "${DIFF_TARGET_REMOTE}"
+                git fetch --unshallow
+            fi
+            DIFF_REF="$(git merge-base "${DIFF_HEAD}" "${DIFF_TARGET_BRANCH}")"
         else
             # TODO(phlax): this is the path used for local CI. Make this work
             #    similar to above, allow the `remote` to be configurable, and
@@ -134,7 +142,7 @@ else
             DIFF_REF=$("${ENVOY_SRCDIR}"/tools/git/last_github_commit.sh)
         fi
     fi
-    echo "Running clang-tidy-diff against ${DIFF_REF} ($(git rev-parse "${DIFF_REF}")), current HEAD ($(git rev-parse HEAD))"
+    echo "Running clang-tidy-diff against ${DIFF_REF} ($(git rev-parse "${DIFF_REF}")), current HEAD ($(git rev-parse "${DIFF_HEAD}"))"
     run_clang_tidy_diff "${DIFF_REF}"
 fi
 

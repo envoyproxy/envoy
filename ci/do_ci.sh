@@ -461,10 +461,13 @@ elif [[ "$CI_TARGET" == "bazel.clang_tidy" ]]; then
   export CLANG_TIDY_APPLY_FIXES=1
   mkdir -p "${TEST_TMPDIR}/lint-fixes"
   BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS[*]}" NUM_CPUS=$NUM_CPUS "${ENVOY_SRCDIR}"/ci/run_clang_tidy.sh "$@" || {
-      echo >&2
-      echo "Diff/yaml files with (some) fixes will be uploaded. Please check the artefacts for this PR run in the azure pipeline." >&2
-      echo >&2
-
+      if [[ -s "$FIX_YAML" ]]; then
+          echo >&2
+          echo "Diff/yaml files with (some) fixes will be uploaded. Please check the artefacts for this PR run in the azure pipeline." >&2
+          echo >&2
+      else
+          echo "Clang-tidy failed." >&2
+      fi
       exit 1
   }
   exit 0
