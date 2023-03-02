@@ -1661,6 +1661,18 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ResponseHeaderMap& heade
   // Now actually encode via the codec.
   filter_manager_.streamInfo().downstreamTiming().onFirstDownstreamTxByteSent(
       connection_manager_.time_source_);
+
+  if (header_validator_) {
+    auto result = header_validator_->validateResponseHeaderMap(headers);
+    if (!result.status.ok()) {
+      // It is possible that the header map is invalid if an filter makes invalid modifications
+      // TODO(yanavlasov): add handling for this case.
+    } else if (result.new_headers) {
+      response_encoder_->encodeHeaders(*result.new_headers, end_stream);
+      return;
+    }
+  }
+
   response_encoder_->encodeHeaders(headers, end_stream);
 }
 

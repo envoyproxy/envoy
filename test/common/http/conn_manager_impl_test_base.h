@@ -160,7 +160,7 @@ public:
     return proxy_status_config_.get();
   }
   HeaderValidatorPtr makeHeaderValidator(Protocol protocol) override {
-    return header_validator_factory_.create(protocol, header_validator_stats_);
+    return header_validator_factory_.createServerHeaderValidator(protocol, header_validator_stats_);
   }
   bool appendXForwardedPort() const override { return false; }
   bool addProxyProtocolConnectionState() const override {
@@ -186,7 +186,10 @@ public:
       callbacks.addAccessLogHandler(handler);
     };
   }
-  void expectUhvTrailerCheckFail();
+  void expectUhvTrailerCheckFail(bool expect_response);
+  void expectHeaderValidation(
+      HeaderValidator::RequestHeaderMapValidationResult request_validation_result,
+      Protocol protocol);
 
   Envoy::Event::SimulatedTimeSystem test_time_;
   NiceMock<Router::MockRouteConfigProvider> route_config_provider_;

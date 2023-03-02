@@ -15,8 +15,13 @@ public:
       const envoy::extensions::http::header_validators::envoy_default::v3::HeaderValidatorConfig&
           config);
 
-  ::Envoy::Http::HeaderValidatorPtr create(::Envoy::Http::Protocol protocol,
-                                           ::Envoy::Http::HeaderValidatorStats& stats) override;
+  ::Envoy::Http::HeaderValidatorPtr
+  createServerHeaderValidator(::Envoy::Http::Protocol protocol,
+                              ::Envoy::Http::HeaderValidatorStats& stats) override;
+
+  ::Envoy::Http::ClientHeaderValidatorPtr
+  createClientHeaderValidator(::Envoy::Http::Protocol protocol,
+                              ::Envoy::Http::HeaderValidatorStats& stats) override;
 
 private:
   const envoy::extensions::http::header_validators::envoy_default::v3::HeaderValidatorConfig

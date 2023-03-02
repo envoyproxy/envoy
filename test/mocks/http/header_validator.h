@@ -16,10 +16,23 @@ public:
               (const HeaderString& key, const HeaderString& value));
   MOCK_METHOD(RequestHeaderMapValidationResult, validateRequestHeaderMap,
               (RequestHeaderMap & header_map));
-  MOCK_METHOD(ResponseHeaderMapValidationResult, validateResponseHeaderMap,
-              (ResponseHeaderMap & header_map));
+  MOCK_METHOD(ConstResponseHeaderMapValidationResult, validateResponseHeaderMap,
+              (const ResponseHeaderMap& header_map));
   MOCK_METHOD(TrailerValidationResult, validateRequestTrailerMap,
               (RequestTrailerMap & trailer_map));
+};
+
+class MockClientHeaderValidator : public ClientHeaderValidator {
+public:
+  ~MockClientHeaderValidator() override = default;
+  MOCK_METHOD(HeaderEntryValidationResult, validateRequestHeaderEntry,
+              (const HeaderString& key, const HeaderString& value));
+  MOCK_METHOD(HeaderEntryValidationResult, validateResponseHeaderEntry,
+              (const HeaderString& key, const HeaderString& value));
+  MOCK_METHOD(ConstRequestHeaderMapValidationResult, validateRequestHeaderMap,
+              (const RequestHeaderMap& header_map));
+  MOCK_METHOD(ResponseHeaderMapValidationResult, validateResponseHeaderMap,
+              (ResponseHeaderMap & header_map));
   MOCK_METHOD(TrailerValidationResult, validateResponseTrailerMap,
               (ResponseTrailerMap & trailer_map));
 };
@@ -33,7 +46,10 @@ public:
 
 class MockHeaderValidatorFactory : public HeaderValidatorFactory {
 public:
-  MOCK_METHOD(HeaderValidatorPtr, create, (Protocol protocol, HeaderValidatorStats& stats));
+  MOCK_METHOD(HeaderValidatorPtr, createServerHeaderValidator,
+              (Protocol protocol, HeaderValidatorStats& stats));
+  MOCK_METHOD(ClientHeaderValidatorPtr, createClientHeaderValidator,
+              (Protocol protocol, HeaderValidatorStats& stats));
 };
 
 } // namespace Http

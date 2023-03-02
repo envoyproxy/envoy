@@ -15,25 +15,22 @@ public:
           config,
       ::Envoy::Http::Protocol protocol, ::Envoy::Http::HeaderValidatorStats& stats);
 
-  HeaderEntryValidationResult
-  validateRequestHeaderEntry(const ::Envoy::Http::HeaderString& key,
-                             const ::Envoy::Http::HeaderString& value) override;
+  HeaderEntryValidationResult validateRequestHeaderEntry(const ::Envoy::Http::HeaderString& key,
+                                                         const ::Envoy::Http::HeaderString& value);
 
-  HeaderEntryValidationResult
-  validateResponseHeaderEntry(const ::Envoy::Http::HeaderString& key,
-                              const ::Envoy::Http::HeaderString& value) override;
+  HeaderEntryValidationResult validateResponseHeaderEntry(const ::Envoy::Http::HeaderString& key,
+                                                          const ::Envoy::Http::HeaderString& value);
 
   RequestHeaderMapValidationResult
-  validateRequestHeaderMap(::Envoy::Http::RequestHeaderMap& header_map) override;
+  validateRequestHeaderMap(::Envoy::Http::RequestHeaderMap& header_map);
 
   ResponseHeaderMapValidationResult
-  validateResponseHeaderMap(::Envoy::Http::ResponseHeaderMap& header_map) override;
+  validateResponseHeaderMap(::Envoy::Http::ResponseHeaderMap& header_map);
+
+  TrailerValidationResult validateRequestTrailerMap(::Envoy::Http::RequestTrailerMap& trailer_map);
 
   TrailerValidationResult
-  validateRequestTrailerMap(::Envoy::Http::RequestTrailerMap& trailer_map) override;
-
-  TrailerValidationResult
-  validateResponseTrailerMap(::Envoy::Http::ResponseTrailerMap& trailer_map) override;
+  validateResponseTrailerMap(::Envoy::Http::ResponseTrailerMap& trailer_map);
 
   /*
    * Validate the TE header.
@@ -57,7 +54,74 @@ private:
   const HeaderValidatorMap request_header_validator_map_;
 };
 
-using Http2HeaderValidatorPtr = std::unique_ptr<Http2HeaderValidator>;
+class ServerHttp2HeaderValidator : public Http2HeaderValidator,
+                                   public ::Envoy::Http::HeaderValidator {
+public:
+  ServerHttp2HeaderValidator(
+      const envoy::extensions::http::header_validators::envoy_default::v3::HeaderValidatorConfig&
+          config,
+      ::Envoy::Http::Protocol protocol, ::Envoy::Http::HeaderValidatorStats& stats)
+      : Http2HeaderValidator(config, protocol, stats) {}
+
+  HeaderEntryValidationResult
+  validateRequestHeaderEntry(const ::Envoy::Http::HeaderString& key,
+                             const ::Envoy::Http::HeaderString& value) override {
+    return Http2HeaderValidator::validateRequestHeaderEntry(key, value);
+  }
+
+  HeaderEntryValidationResult
+  validateResponseHeaderEntry(const ::Envoy::Http::HeaderString& key,
+                              const ::Envoy::Http::HeaderString& value) override {
+    return Http2HeaderValidator::validateResponseHeaderEntry(key, value);
+  }
+
+  RequestHeaderMapValidationResult
+  validateRequestHeaderMap(::Envoy::Http::RequestHeaderMap& header_map) override;
+
+  ConstResponseHeaderMapValidationResult
+  validateResponseHeaderMap(const ::Envoy::Http::ResponseHeaderMap& header_map) override;
+
+  TrailerValidationResult
+  validateRequestTrailerMap(::Envoy::Http::RequestTrailerMap& trailer_map) override {
+    return Http2HeaderValidator::validateRequestTrailerMap(trailer_map);
+  }
+};
+
+class ClientHttp2HeaderValidator : public Http2HeaderValidator,
+                                   public ::Envoy::Http::ClientHeaderValidator {
+public:
+  ClientHttp2HeaderValidator(
+      const envoy::extensions::http::header_validators::envoy_default::v3::HeaderValidatorConfig&
+          config,
+      ::Envoy::Http::Protocol protocol, ::Envoy::Http::HeaderValidatorStats& stats)
+      : Http2HeaderValidator(config, protocol, stats) {}
+
+  HeaderEntryValidationResult
+  validateRequestHeaderEntry(const ::Envoy::Http::HeaderString& key,
+                             const ::Envoy::Http::HeaderString& value) override {
+    return Http2HeaderValidator::validateRequestHeaderEntry(key, value);
+  }
+
+  HeaderEntryValidationResult
+  validateResponseHeaderEntry(const ::Envoy::Http::HeaderString& key,
+                              const ::Envoy::Http::HeaderString& value) override {
+    return Http2HeaderValidator::validateResponseHeaderEntry(key, value);
+  }
+
+  ConstRequestHeaderMapValidationResult
+  validateRequestHeaderMap(const ::Envoy::Http::RequestHeaderMap& header_map) override;
+
+  ResponseHeaderMapValidationResult
+  validateResponseHeaderMap(::Envoy::Http::ResponseHeaderMap& header_map) override;
+
+  TrailerValidationResult
+  validateResponseTrailerMap(::Envoy::Http::ResponseTrailerMap& trailer_map) override {
+    return Http2HeaderValidator::validateResponseTrailerMap(trailer_map);
+  }
+
+private:
+  std::string upgrade_type_;
+};
 
 } // namespace EnvoyDefault
 } // namespace HeaderValidators

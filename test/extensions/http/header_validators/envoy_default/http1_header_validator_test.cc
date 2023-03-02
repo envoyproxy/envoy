@@ -13,17 +13,26 @@ namespace EnvoyDefault {
 namespace {
 
 using ::Envoy::Http::HeaderString;
+using ::Envoy::Http::HeaderValidatorBase;
 using ::Envoy::Http::Protocol;
 using ::Envoy::Http::UhvResponseCodeDetail;
 
 class Http1HeaderValidatorTest : public HeaderValidatorTest {
 protected:
-  Http1HeaderValidatorPtr createH1(absl::string_view config_yaml) {
+  ServerHttp1HeaderValidatorPtr createH1(absl::string_view config_yaml) {
     envoy::extensions::http::header_validators::envoy_default::v3::HeaderValidatorConfig
         typed_config;
     TestUtility::loadFromYaml(std::string(config_yaml), typed_config);
 
-    return std::make_unique<Http1HeaderValidator>(typed_config, Protocol::Http11, stats_);
+    return std::make_unique<ServerHttp1HeaderValidator>(typed_config, Protocol::Http11, stats_);
+  }
+
+  ClientHttp1HeaderValidatorPtr createH1Client(absl::string_view config_yaml) {
+    envoy::extensions::http::header_validators::envoy_default::v3::HeaderValidatorConfig
+        typed_config;
+    TestUtility::loadFromYaml(std::string(config_yaml), typed_config);
+
+    return std::make_unique<ClientHttp1HeaderValidator>(typed_config, Protocol::Http11, stats_);
   }
 };
 
@@ -130,7 +139,7 @@ TEST_F(Http1HeaderValidatorTest, ValidateRequestHeaderEntryGeneric) {
 TEST_F(Http1HeaderValidatorTest, ValidateResponseHeaderEntryEmpty) {
   HeaderString name{""};
   HeaderString valid{"chunked"};
-  auto uhv = createH1(empty_config);
+  auto uhv = createH1Client(empty_config);
   EXPECT_REJECT_WITH_DETAILS(uhv->validateResponseHeaderEntry(name, valid),
                              UhvResponseCodeDetail::get().EmptyHeaderName);
 }
@@ -139,7 +148,7 @@ TEST_F(Http1HeaderValidatorTest, ValidateResponseHeaderEntryStatus) {
   HeaderString name{":status"};
   HeaderString valid{"200"};
   HeaderString invalid{"1024"};
-  auto uhv = createH1(empty_config);
+  auto uhv = createH1Client(empty_config);
   EXPECT_ACCEPT(uhv->validateResponseHeaderEntry(name, valid));
   EXPECT_REJECT_WITH_DETAILS(uhv->validateResponseHeaderEntry(name, invalid),
                              UhvResponseCodeDetail::get().InvalidStatus);
@@ -153,7 +162,7 @@ TEST_F(Http1HeaderValidatorTest, ValidateResponseHeaderEntryGeneric) {
   HeaderString invalid_value{};
   setHeaderStringUnvalidated(invalid_value, "hello\nworld");
 
-  auto uhv = createH1(empty_config);
+  auto uhv = createH1Client(empty_config);
 
   EXPECT_ACCEPT(uhv->validateResponseHeaderEntry(valid_name, valid_value));
   EXPECT_REJECT_WITH_DETAILS(uhv->validateResponseHeaderEntry(invalid_name, valid_value),
@@ -423,14 +432,14 @@ TEST_F(Http1HeaderValidatorTest, ValidateRequestHeaderMapDropUnderscoreHeaders) 
 TEST_F(Http1HeaderValidatorTest, ValidateResponseHeaderMapValid) {
   ::Envoy::Http::TestResponseHeaderMapImpl headers{
       {":status", "200"}, {"x-foo", "bar"}, {"transfer-encoding", "chunked"}};
-  auto uhv = createH1(empty_config);
+  auto uhv = createH1Client(empty_config);
 
   EXPECT_ACCEPT(uhv->validateResponseHeaderMap(headers));
 }
 
 TEST_F(Http1HeaderValidatorTest, ValidateResponseHeaderMapMissingStatus) {
   ::Envoy::Http::TestResponseHeaderMapImpl headers{{"x-foo", "bar"}};
-  auto uhv = createH1(empty_config);
+  auto uhv = createH1Client(empty_config);
 
   EXPECT_REJECT_WITH_DETAILS(uhv->validateResponseHeaderMap(headers),
                              UhvResponseCodeDetail::get().InvalidStatus);
@@ -438,7 +447,7 @@ TEST_F(Http1HeaderValidatorTest, ValidateResponseHeaderMapMissingStatus) {
 
 TEST_F(Http1HeaderValidatorTest, ValidateResponseHeaderMapInvalidStatus) {
   ::Envoy::Http::TestResponseHeaderMapImpl headers{{":status", "bar"}, {"x-foo", "bar"}};
-  auto uhv = createH1(empty_config);
+  auto uhv = createH1Client(empty_config);
 
   EXPECT_REJECT_WITH_DETAILS(uhv->validateResponseHeaderMap(headers),
                              UhvResponseCodeDetail::get().InvalidStatus);
@@ -446,7 +455,7 @@ TEST_F(Http1HeaderValidatorTest, ValidateResponseHeaderMapInvalidStatus) {
 
 TEST_F(Http1HeaderValidatorTest, ValidateResponseHeaderMapExtraPseudoHeader) {
   ::Envoy::Http::TestResponseHeaderMapImpl headers{{":status", "200"}, {":foo", "bar"}};
-  auto uhv = createH1(empty_config);
+  auto uhv = createH1Client(empty_config);
 
   EXPECT_REJECT_WITH_DETAILS(uhv->validateResponseHeaderMap(headers),
                              UhvResponseCodeDetail::get().InvalidPseudoHeader);
@@ -454,7 +463,7 @@ TEST_F(Http1HeaderValidatorTest, ValidateResponseHeaderMapExtraPseudoHeader) {
 
 TEST_F(Http1HeaderValidatorTest, ValidateResponseHeaderMapEmptyGenericName) {
   ::Envoy::Http::TestResponseHeaderMapImpl headers{{":status", "200"}, {"", "bar"}};
-  auto uhv = createH1(empty_config);
+  auto uhv = createH1Client(empty_config);
 
   EXPECT_REJECT_WITH_DETAILS(uhv->validateResponseHeaderMap(headers),
                              UhvResponseCodeDetail::get().EmptyHeaderName);
@@ -463,7 +472,7 @@ TEST_F(Http1HeaderValidatorTest, ValidateResponseHeaderMapEmptyGenericName) {
 TEST_F(Http1HeaderValidatorTest, ValidateResponseHeaderMapInvaidTransferEncodingStatus100) {
   ::Envoy::Http::TestResponseHeaderMapImpl headers{{":status", "100"},
                                                    {"transfer-encoding", "chunked"}};
-  auto uhv = createH1(empty_config);
+  auto uhv = createH1Client(empty_config);
 
   EXPECT_REJECT_WITH_DETAILS(uhv->validateResponseHeaderMap(headers),
                              "uhv.http1.transfer_encoding_not_allowed");
@@ -472,7 +481,7 @@ TEST_F(Http1HeaderValidatorTest, ValidateResponseHeaderMapInvaidTransferEncoding
 TEST_F(Http1HeaderValidatorTest, ValidateResponseHeaderMapInvaidTransferEncodingStatus204) {
   ::Envoy::Http::TestResponseHeaderMapImpl headers{{":status", "204"},
                                                    {"transfer-encoding", "chunked"}};
-  auto uhv = createH1(empty_config);
+  auto uhv = createH1Client(empty_config);
 
   EXPECT_REJECT_WITH_DETAILS(uhv->validateResponseHeaderMap(headers),
                              "uhv.http1.transfer_encoding_not_allowed");
@@ -481,7 +490,7 @@ TEST_F(Http1HeaderValidatorTest, ValidateResponseHeaderMapInvaidTransferEncoding
 TEST_F(Http1HeaderValidatorTest, ValidateResponseHeaderMapInvaidTransferEncodingChars) {
   ::Envoy::Http::TestResponseHeaderMapImpl headers{{":status", "200"},
                                                    {"transfer-encoding", "{chunked}"}};
-  auto uhv = createH1(empty_config);
+  auto uhv = createH1Client(empty_config);
 
   EXPECT_REJECT_WITH_DETAILS(uhv->validateResponseHeaderMap(headers),
                              "uhv.http1.invalid_transfer_encoding");
@@ -489,7 +498,7 @@ TEST_F(Http1HeaderValidatorTest, ValidateResponseHeaderMapInvaidTransferEncoding
 
 TEST_F(Http1HeaderValidatorTest, ValidateResponseHeaderMapDropUnderscoreHeaders) {
   ::Envoy::Http::TestResponseHeaderMapImpl headers{{":status", "200"}, {"x_foo", "bar"}};
-  auto uhv = createH1(drop_headers_with_underscores_config);
+  auto uhv = createH1Client(drop_headers_with_underscores_config);
 
   EXPECT_ACCEPT(uhv->validateResponseHeaderMap(headers));
   EXPECT_EQ(headers, ::Envoy::Http::TestResponseHeaderMapImpl({{":status", "200"}}));
@@ -511,7 +520,7 @@ TEST_F(Http1HeaderValidatorTest, ValidateRequestHeaderMapRejectPath) {
       {":scheme", "https"}, {":method", "GET"}, {":path", "/.."}, {":authority", "envoy.com"}};
   auto uhv = createH1(empty_config);
   auto result = uhv->validateRequestHeaderMap(headers);
-  EXPECT_EQ(result.action(), HeaderValidator::RejectOrRedirectAction::Reject);
+  EXPECT_EQ(result.action(), HeaderValidatorBase::RejectOrRedirectAction::Reject);
   EXPECT_EQ(result.details(), UhvResponseCodeDetail::get().InvalidUrl);
 }
 
@@ -522,7 +531,7 @@ TEST_F(Http1HeaderValidatorTest, ValidateRequestHeaderMapRedirectPath) {
                                                   {":authority", "envoy.com"}};
   auto uhv = createH1(redirect_encoded_slash_config);
   auto result = uhv->validateRequestHeaderMap(headers);
-  EXPECT_EQ(result.action(), HeaderValidator::RejectOrRedirectAction::Redirect);
+  EXPECT_EQ(result.action(), HeaderValidatorBase::RejectOrRedirectAction::Redirect);
   EXPECT_EQ(result.details(), "uhv.path_noramlization_redirect");
   EXPECT_EQ(headers.path(), "/dir1/dir2");
 }
@@ -558,13 +567,13 @@ TEST_F(Http1HeaderValidatorTest, ValidateInvalidValueRequestTrailerMap) {
 }
 
 TEST_F(Http1HeaderValidatorTest, ValidateResponseTrailerMap) {
-  auto uhv = createH1(empty_config);
+  auto uhv = createH1Client(empty_config);
   ::Envoy::Http::TestResponseTrailerMapImpl response_trailer_map{{"trailer1", "value1"}};
   EXPECT_TRUE(uhv->validateResponseTrailerMap(response_trailer_map).ok());
 }
 
 TEST_F(Http1HeaderValidatorTest, ValidateInvalidResponseTrailerMap) {
-  auto uhv = createH1(empty_config);
+  auto uhv = createH1Client(empty_config);
   // H/2 trailers must not contain pseudo headers
   ::Envoy::Http::TestResponseTrailerMapImpl response_trailer_map{{":status", "200"},
                                                                  {"trailer1", "value1"}};
@@ -574,7 +583,7 @@ TEST_F(Http1HeaderValidatorTest, ValidateInvalidResponseTrailerMap) {
 }
 
 TEST_F(Http1HeaderValidatorTest, ValidateInvalidValueResponseTrailerMap) {
-  auto uhv = createH1(empty_config);
+  auto uhv = createH1Client(empty_config);
   // The DEL (0x7F) character is illegal in header values
   ::Envoy::Http::TestResponseTrailerMapImpl response_trailer_map{{"trailer0", "abcd\x7F\\ef"},
                                                                  {"trailer1", "value1"}};

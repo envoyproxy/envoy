@@ -309,9 +309,9 @@ void HttpConnectionManagerImplMixin::testPathNormalization(
   conn_manager_->onData(fake_input, false);
 }
 
-void HttpConnectionManagerImplMixin::expectUhvTrailerCheckFail() {
-  EXPECT_CALL(header_validator_factory_, create(codec_->protocol_, _))
-      .WillOnce(InvokeWithoutArgs([]() {
+void HttpConnectionManagerImplMixin::expectUhvTrailerCheckFail(bool expect_response) {
+  EXPECT_CALL(header_validator_factory_, createServerHeaderValidator(codec_->protocol_, _))
+      .WillOnce(InvokeWithoutArgs([expect_response]() {
         auto header_validator = std::make_unique<testing::StrictMock<MockHeaderValidator>>();
         EXPECT_CALL(*header_validator, validateRequestHeaderMap(_))
             .WillOnce(InvokeWithoutArgs(
@@ -321,6 +321,36 @@ void HttpConnectionManagerImplMixin::expectUhvTrailerCheckFail() {
             .WillOnce(InvokeWithoutArgs([]() {
               return HeaderValidator::TrailerValidationResult(
                   HeaderValidator::TrailerValidationResult::Action::Reject, "bad_trailer_map");
+            }));
+        if (expect_response) {
+          EXPECT_CALL(*header_validator, validateResponseHeaderMap(_))
+              .WillOnce(InvokeWithoutArgs([]() {
+                return HeaderValidator::ConstResponseHeaderMapValidationResult{
+                    HeaderValidator::ResponseHeaderMapValidationResult::success(), nullptr};
+              }));
+        }
+        return header_validator;
+      }));
+}
+
+void HttpConnectionManagerImplMixin::expectHeaderValidation(
+    HeaderValidator::RequestHeaderMapValidationResult request_validation_result,
+    Protocol protocol) {
+  EXPECT_CALL(header_validator_factory_, createServerHeaderValidator(protocol, _))
+      .WillOnce(InvokeWithoutArgs([request_validation_result]() {
+        auto header_validator = std::make_unique<testing::StrictMock<MockHeaderValidator>>();
+        EXPECT_CALL(*header_validator, validateRequestHeaderMap(_))
+            .WillOnce(Invoke([request_validation_result](RequestHeaderMap& header_map) {
+              if (request_validation_result.action() ==
+                  HeaderValidator::RequestHeaderMapValidationResult::Action::Redirect) {
+                header_map.setPath("/some/new/path");
+              }
+              return request_validation_result;
+            }));
+        EXPECT_CALL(*header_validator, validateResponseHeaderMap(_))
+            .WillOnce(InvokeWithoutArgs([]() {
+              return HeaderValidator::ConstResponseHeaderMapValidationResult{
+                  HeaderValidator::ResponseHeaderMapValidationResult::success(), nullptr};
             }));
         return header_validator;
       }));

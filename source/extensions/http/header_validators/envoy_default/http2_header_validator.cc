@@ -1,11 +1,14 @@
 #include "source/extensions/http/header_validators/envoy_default/http2_header_validator.h"
 
+#include <iostream>
+
 #include "envoy/http/header_validator_errors.h"
 
+#include "source/common/http/header_map_impl.h"
 #include "source/common/http/header_utility.h"
+#include "source/common/http/utility.h"
 #include "source/extensions/http/header_validators/envoy_default/character_tables.h"
 
-#include "absl/container/node_hash_map.h"
 #include "absl/container/node_hash_set.h"
 #include "absl/functional/bind_front.h"
 #include "absl/strings/match.h"
@@ -437,6 +440,87 @@ Http2HeaderValidator::validateResponseTrailerMap(::Envoy::Http::ResponseTrailerM
   if (!result.ok()) {
     stats_.incMessagingError();
   }
+  return result;
+}
+
+HeaderValidator::RequestHeaderMapValidationResult
+ServerHttp2HeaderValidator::validateRequestHeaderMap(::Envoy::Http::RequestHeaderMap& header_map) {
+  auto result = Http2HeaderValidator::validateRequestHeaderMap(header_map);
+  if (!result.ok()) {
+    return result;
+  }
+
+  // Transform H/2 extended CONNECT to H/1 UPGRADE, so that request processing always observes H/1
+  // UPGRADE requests
+  if (::Envoy::Http::Utility::isH2UpgradeRequest(header_map)) {
+    ::Envoy::Http::Utility::transformUpgradeRequestFromH2toH1(header_map);
+  }
+  return result;
+}
+
+HeaderValidator::ConstResponseHeaderMapValidationResult
+ServerHttp2HeaderValidator::validateResponseHeaderMap(
+    const ::Envoy::Http::ResponseHeaderMap& header_map) {
+  // Check if the response is for the the H/1 UPGRADE and transform it to the H/2 extended CONNECT
+  // response.
+  // Note that at this point the header map may not be valid if a buggy encoder filter
+  // removed the :status header, so we check for this case as well.
+
+  if (header_map.Status() != nullptr && ::Envoy::Http::Utility::isUpgrade(header_map)) {
+    ::Envoy::Http::ResponseHeaderMapPtr modified_headers =
+        ::Envoy::Http::createHeaderMap<::Envoy::Http::ResponseHeaderMapImpl>(header_map);
+    ::Envoy::Http::Utility::transformUpgradeResponseFromH1toH2(*modified_headers);
+    // Return new header map along with the success result
+    return {RejectResult::success(), std::move(modified_headers)};
+  }
+
+  // TODO(yanavlasov): add validation of response headers after encoder filter chain
+  return {RejectResult::success(), nullptr};
+}
+
+HeaderValidator::ConstRequestHeaderMapValidationResult
+ClientHttp2HeaderValidator::validateRequestHeaderMap(
+    const ::Envoy::Http::RequestHeaderMap& header_map) {
+  // TODO(yanavlasov): Add validation of request header before sending them upstream.
+
+  ::Envoy::Http::RequestHeaderMapPtr modified_headers;
+  if (::Envoy::Http::Utility::isUpgrade(header_map)) {
+    // Remember the fact that H/1 upgrade was transformed into H/2 extended CONNECT, so that
+    // response can be transformed from extended CONNECT to H/1 upgrade.
+    upgrade_type_ = std::string(header_map.getUpgradeValue());
+    modified_headers =
+        ::Envoy::Http::createHeaderMap<::Envoy::Http::RequestHeaderMapImpl>(header_map);
+    ::Envoy::Http::Utility::transformUpgradeRequestFromH1toH2(*modified_headers);
+  } else if (::Envoy::Http::HeaderUtility::isConnect(header_map)) {
+    // Sanitize the standard CONNECT request, as filters (and HCM) may add prohibited headers
+    // like :scheme, or :path (i.e. by a path rewrite rule)
+    modified_headers =
+        ::Envoy::Http::createHeaderMap<::Envoy::Http::RequestHeaderMapImpl>(header_map);
+    modified_headers->removeScheme();
+    modified_headers->removePath();
+    // Note that extended CONNECT is transformed to H/1 upgrade and handled above.
+    // The only case where the :protocol header would be present here is if an HTTP
+    // filter adds it. But this case is unsupported at this point.
+    modified_headers->removeProtocol();
+  }
+
+  return {RejectResult::success(), std::move(modified_headers)};
+}
+
+HeaderValidator::ResponseHeaderMapValidationResult
+ClientHttp2HeaderValidator::validateResponseHeaderMap(
+    ::Envoy::Http::ResponseHeaderMap& header_map) {
+  auto result = Http2HeaderValidator::validateResponseHeaderMap(header_map);
+  if (!result.ok()) {
+    return result;
+  }
+
+  // Check if the request was the extended CONNECT and transform response from extended CONNECT to
+  // to the H/1 upgrade response.
+  if (!upgrade_type_.empty() && header_map.Status() != nullptr) {
+    ::Envoy::Http::Utility::transformUpgradeResponseFromH2toH1(header_map, upgrade_type_);
+  }
+
   return result;
 }
 

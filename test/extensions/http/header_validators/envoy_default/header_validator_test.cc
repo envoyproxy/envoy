@@ -20,51 +20,16 @@ using ::Envoy::Http::RequestHeaderMap;
 using ::Envoy::Http::ResponseHeaderMap;
 using ::Envoy::Http::UhvResponseCodeDetail;
 
-class BaseHttpHeaderValidator : public HeaderValidator {
-public:
-  BaseHttpHeaderValidator(
-      const envoy::extensions::http::header_validators::envoy_default::v3::HeaderValidatorConfig&
-          config,
-      Protocol protocol, HeaderValidatorStats& stats)
-      : HeaderValidator(config, protocol, stats) {}
-
-  HeaderEntryValidationResult validateRequestHeaderEntry(const HeaderString&,
-                                                         const HeaderString&) override {
-    return HeaderEntryValidationResult::success();
-  }
-
-  HeaderEntryValidationResult validateResponseHeaderEntry(const HeaderString&,
-                                                          const HeaderString&) override {
-    return HeaderEntryValidationResult::success();
-  }
-
-  RequestHeaderMapValidationResult validateRequestHeaderMap(RequestHeaderMap&) override {
-    return RequestHeaderMapValidationResult::success();
-  }
-
-  ResponseHeaderMapValidationResult validateResponseHeaderMap(ResponseHeaderMap&) override {
-    return ResponseHeaderMapValidationResult::success();
-  }
-
-  TrailerValidationResult validateRequestTrailerMap(::Envoy::Http::RequestTrailerMap&) override {
-    return TrailerValidationResult::success();
-  }
-
-  TrailerValidationResult validateResponseTrailerMap(::Envoy::Http::ResponseTrailerMap&) override {
-    return TrailerValidationResult::success();
-  }
-};
-
-using BaseHttpHeaderValidatorPtr = std::unique_ptr<BaseHttpHeaderValidator>;
+using HeaderValidatorPtr = std::unique_ptr<HeaderValidator>;
 
 class BaseHeaderValidatorTest : public HeaderValidatorTest {
 protected:
-  BaseHttpHeaderValidatorPtr createBase(absl::string_view config_yaml) {
+  HeaderValidatorPtr createBase(absl::string_view config_yaml) {
     envoy::extensions::http::header_validators::envoy_default::v3::HeaderValidatorConfig
         typed_config;
     TestUtility::loadFromYaml(std::string(config_yaml), typed_config);
 
-    return std::make_unique<BaseHttpHeaderValidator>(typed_config, Protocol::Http11, stats_);
+    return std::make_unique<HeaderValidator>(typed_config, Protocol::Http11, stats_);
   }
 };
 

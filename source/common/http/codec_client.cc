@@ -182,6 +182,20 @@ void CodecClient::onData(Buffer::Instance& data) {
          absl::StrCat("extraneous bytes after response complete: ", data.length()));
 }
 
+Status CodecClient::ActiveRequest::encodeHeaders(const RequestHeaderMap& headers, bool end_stream) {
+  if (header_validator_) {
+    auto result = header_validator_->validateRequestHeaderMap(headers);
+    if (!result.status.ok()) {
+      return absl::InvalidArgumentError(
+          absl::StrCat("header validation failed: ", result.status.details()));
+    }
+    if (result.new_headers) {
+      return RequestEncoderWrapper::encodeHeaders(*result.new_headers, end_stream);
+    }
+  }
+  return RequestEncoderWrapper::encodeHeaders(headers, end_stream);
+}
+
 void CodecClient::ActiveRequest::decodeHeaders(ResponseHeaderMapPtr&& headers, bool end_stream) {
   if (header_validator_) {
     ::Envoy::Http::HeaderValidator::ResponseHeaderMapValidationResult result =

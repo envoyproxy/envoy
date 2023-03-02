@@ -260,9 +260,12 @@ void ConnectionImpl::StreamImpl::encodeHeadersBase(const HeaderMap& headers, boo
 Status ConnectionImpl::ClientStreamImpl::encodeHeaders(const RequestHeaderMap& headers,
                                                        bool end_stream) {
   parent_.updateActiveStreamsOnEncode(*this);
+
   // Required headers must be present. This can only happen by some erroneous processing after the
   // downstream codecs decode.
   RETURN_IF_ERROR(HeaderUtility::checkRequiredRequestHeaders(headers));
+#ifndef ENVOY_ENABLE_UHV
+  // Extended CONNECT to H/1 upgrade transformation has moved to UHV
   // This must exist outside of the scope of isUpgrade as the underlying memory is
   // needed until encodeHeadersBase has been called.
   Http::RequestHeaderMapPtr modified_headers;
@@ -280,6 +283,9 @@ Status ConnectionImpl::ClientStreamImpl::encodeHeaders(const RequestHeaderMap& h
   } else {
     encodeHeadersBase(headers, end_stream);
   }
+#else
+  encodeHeadersBase(headers, end_stream);
+#endif
   return okStatus();
 }
 
@@ -289,6 +295,8 @@ void ConnectionImpl::ServerStreamImpl::encodeHeaders(const ResponseHeaderMap& he
   // The contract is that client codecs must ensure that :status is present.
   ASSERT(headers.Status() != nullptr);
 
+#ifndef ENVOY_ENABLE_UHV
+  // Extended CONNECT to H/1 upgrade transformation has moved to UHV
   // This must exist outside of the scope of isUpgrade as the underlying memory is
   // needed until encodeHeadersBase has been called.
   Http::ResponseHeaderMapPtr modified_headers;
@@ -299,6 +307,9 @@ void ConnectionImpl::ServerStreamImpl::encodeHeaders(const ResponseHeaderMap& he
   } else {
     encodeHeadersBase(headers, end_stream);
   }
+#else
+  encodeHeadersBase(headers, end_stream);
+#endif
 }
 
 void ConnectionImpl::StreamImpl::encodeTrailersBase(const HeaderMap& trailers) {
@@ -514,9 +525,12 @@ void ConnectionImpl::ClientStreamImpl::decodeHeaders() {
   auto& headers = absl::get<ResponseHeaderMapPtr>(headers_or_trailers_);
   const uint64_t status = Http::Utility::getResponseStatus(*headers);
 
+#ifndef ENVOY_ENABLE_UHV
+  // Extended CONNECT to H/1 upgrade transformation has moved to UHV
   if (!upgrade_type_.empty() && headers->Status()) {
     Http::Utility::transformUpgradeResponseFromH2toH1(*headers, upgrade_type_);
   }
+#endif
 
   // Non-informational headers are non-1xx OR 101-SwitchingProtocols, since 101 implies that further
   // proxying is on an upgrade path.
@@ -562,9 +576,12 @@ void ConnectionImpl::ClientStreamImpl::decodeTrailers() {
 
 void ConnectionImpl::ServerStreamImpl::decodeHeaders() {
   auto& headers = absl::get<RequestHeaderMapSharedPtr>(headers_or_trailers_);
+#ifndef ENVOY_ENABLE_UHV
+  // Extended CONNECT to H/1 upgrade transformation has moved to UHV
   if (Http::Utility::isH2UpgradeRequest(*headers)) {
     Http::Utility::transformUpgradeRequestFromH2toH1(*headers);
   }
+#endif
   request_decoder_->decodeHeaders(std::move(headers), sendEndStream());
 }
 

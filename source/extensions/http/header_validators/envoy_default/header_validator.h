@@ -20,14 +20,25 @@ namespace EnvoyDefault {
  * Base class for all HTTP codec header validations. This class has several methods to validate
  * headers that are shared across multiple codec versions where the RFC guidance did not change.
  */
-class HeaderValidator : public ::Envoy::Http::HeaderValidator {
+class HeaderValidator {
 public:
   HeaderValidator(
       const envoy::extensions::http::header_validators::envoy_default::v3::HeaderValidatorConfig&
           config,
       ::Envoy::Http::Protocol protocol, ::Envoy::Http::HeaderValidatorStats& stats);
+  virtual ~HeaderValidator() = default;
 
-  using HeaderValueValidationResult = RejectResult;
+  using HeaderValueValidationResult = ::Envoy::Http::HeaderValidatorBase::RejectResult;
+  using HeaderEntryValidationResult =
+      ::Envoy::Http::HeaderValidatorBase::HeaderEntryValidationResult;
+  using RequestHeaderMapValidationResult =
+      ::Envoy::Http::HeaderValidatorBase::RequestHeaderMapValidationResult;
+  using ResponseHeaderMapValidationResult =
+      ::Envoy::Http::HeaderValidatorBase::ResponseHeaderMapValidationResult;
+  using ConstRequestHeaderMapValidationResult =
+      ::Envoy::Http::ClientHeaderValidator::ConstRequestHeaderMapValidationResult;
+  using ConstResponseHeaderMapValidationResult =
+      ::Envoy::Http::HeaderValidator::ConstResponseHeaderMapValidationResult;
   /*
    * Validate the :method pseudo header, honoring the restrict_http_methods configuration option.
    */
@@ -87,6 +98,7 @@ protected:
    */
   class HostHeaderValidationResult {
   public:
+    using RejectAction = ::Envoy::Http::HeaderValidatorBase::RejectAction;
     HostHeaderValidationResult(RejectAction action, absl::string_view details,
                                absl::string_view address, absl::string_view port)
         : result_(action, details, address, port) {
@@ -149,6 +161,7 @@ protected:
   /*
    * Common method for validating request or response trailers.
    */
+  using TrailerValidationResult = ::Envoy::Http::HeaderValidatorBase::TrailerValidationResult;
   TrailerValidationResult validateTrailers(::Envoy::Http::HeaderMap& trailers);
 
   const envoy::extensions::http::header_validators::envoy_default::v3::HeaderValidatorConfig
