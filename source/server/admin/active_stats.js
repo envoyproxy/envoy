@@ -137,12 +137,6 @@ function loadSettingOrUseDefault(id, defaultValue) {
  * @param {!Object} data
  */
 function renderStats(data) {
-  // Mark all stats as being invisible -- we'll re-mark visible all the
-  // stats that we received from the server.
-  for (const [, stat] of nameStatsMap) {
-    stat.visible = false;
-  }
-
   sortedStats = [];
   for (stat of data.stats) {
     if (!stat.name) {
@@ -150,13 +144,12 @@ function renderStats(data) {
     }
     let statRecord = nameStatsMap.get(stat.name);
     if (statRecord) {
-      statRecord.visible = true;
       if (statRecord.value != stat.value) {
         statRecord.value = stat.value;
         ++statRecord.change_count;
       }
     } else {
-      statRecord = {name: stat.name, value: stat.value, change_count: 0, visible: true};
+      statRecord = {name: stat.name, value: stat.value, change_count: 0};
       nameStatsMap.set(stat.name, statRecord);
     }
     sortedStats.push(statRecord);
