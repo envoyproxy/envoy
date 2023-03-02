@@ -109,7 +109,8 @@ TEST_F(FileSystemImplTest, FileReadToEndDoesNotExist) {
 
 #ifndef WIN32
 // In Windows this method of removing the permissions does not make read fail.
-TEST_F(FileSystemImplTest, FileReadToEndNotReadable) {
+// Issue https://github.com/envoyproxy/envoy/issues/25614, disabling this test
+TEST_F(FileSystemImplTest, DISABLED_FileReadToEndNotReadable) {
   const std::string data = "test string\ntest";
   const std::string file_path = TestEnvironment::writeStringToFileForTest("test_envoy", data);
 
