@@ -1,4 +1,4 @@
-load("@envoy//bazel:envoy_build_system.bzl", "envoy_package")
+load("@envoy//bazel:envoy_build_system.bzl", "envoy_package", "envoy_select_envoy_mobile_listener")
 load("//bazel:kotlin_lib.bzl", "envoy_mobile_so_to_jni_lib")
 load("//bazel:envoy_mobile_test_extensions.bzl", "TEST_EXTENSIONS")
 
@@ -52,4 +52,36 @@ envoy_mobile_so_to_jni_lib(
     name = "libenvoy_jni_with_test_extensions_jnilib",
     testonly = True,
     native_dep = "libenvoy_jni_with_test_extensions.so",
+)
+
+# Same as above but wtih listener extensions too.
+cc_library(
+    name = "envoy_jni_with_test_and_listener_extensions_lib",
+    testonly = True,
+    deps = [
+        ":server_envoy_jni_lib",
+        "//library/common/jni:envoy_jni_lib",
+        "@envoy//source/extensions/listener_managers/listener_manager:listener_manager_lib",
+    ] + TEST_EXTENSIONS + envoy_select_envoy_mobile_listener(
+        [
+            "@envoy//source/extensions/listener_managers/listener_manager:listener_manager_lib",
+        ],
+        "@envoy",
+    ),
+)
+
+cc_binary(
+    name = "libenvoy_jni_with_test_and_listener_extensions.so",
+    testonly = True,
+    linkshared = True,
+    deps = [
+        ":envoy_jni_with_test_and_listener_extensions_lib",
+        "@envoy_mobile_extra_jni_deps//:extra_jni_dep",
+    ],
+)
+
+envoy_mobile_so_to_jni_lib(
+    name = "libenvoy_jni_with_test_and_listener_extensions_jnilib",
+    testonly = True,
+    native_dep = "libenvoy_jni_with_test_and_listener_extensions.so",
 )

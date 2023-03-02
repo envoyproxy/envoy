@@ -319,6 +319,12 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
   std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> bootstrap =
       std::make_unique<envoy::config::bootstrap::v3::Bootstrap>();
 
+  // Default Envoy mobile to the lightweight API listener.
+  envoy::config::listener::v3::ApiListenerManager api;
+  auto* listener_manager = bootstrap->mutable_listener_manager();
+  listener_manager->mutable_typed_config()->PackFrom(api);
+  listener_manager->set_name("envoy.listener_manager_impl.api");
+
   // Set up the HCM
   envoy::extensions::filters::network::http_connection_manager::v3::EnvoyMobileHttpConnectionManager
       api_listener_config;
