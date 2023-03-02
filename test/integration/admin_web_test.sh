@@ -12,38 +12,44 @@
 #
 # These steps can also be performed manually rather than via the script.
 
-admin_port_file="/tmp/admin_port.$$"
+tmp="/tmp/admin_web_test.$$"
+rm -rf "$tmp"
+mkdir "$tmp"
+
+echo "Saving temp files to $tmp"
 
 ENVOY_BINARY="bazel-bin/test/integration/admin_test_server"
 if [ -e "$ENVOY_BINARY" ]; then
   echo "*** Re-using binary..."
-  ls -l "$ENVOY_BINARY"
 else
-  echo "*** Building..."
-  bazel build test/integration:admin_test_server
+  echo "*** Building: log file $tmp/build.log..."
+  bazel build test/integration:admin_test_server >& "$tmp/build.log"
 fi
+ls -l "$ENVOY_BINARY"
 
 
-echo "*** Invoking Envoy..."
+echo "*** Invoking Envoy: log file $tmp/envoy.log ..."
 $ENVOY_BINARY \
       -c test/integration/admin_web_test.yaml \
-      --admin-address-path "$admin_port_file" &
+      --admin-address-path "$tmp/admin.port" >& "$tmp/envoy.log" &
 
-echo "*** Waiting for the server to go live..."
-while [ ! -s "$admin_port_file" ]; do
+echo "*** Waiting for the Envoy server to write the admin port to $tmp/admin.port ..."
+while [ ! -s "$tmp/admin.port" ]; do
   sleep 1
 done
 
 echo ""
-echo ""
-echo "*** Envoy running with admin port running at $(cat $admin_port_file)"
+echo "*** Waiting for Envoy /ready to respond with \"LIVE\""
 
 ready=""
 while [ "$ready" != "LIVE" ]; do
-  admin_port=$(cat $admin_port_file)
-  ready=$(curl "$admin_port/ready");
+  admin_port=$(cat $tmp/admin.port)
+  ready=$(curl "$admin_port/ready")
   sleep 1
 done
+
+echo ""
+echo "*** Envoy running with admin port running at $(cat $tmp/admin.port)"
 
 # TODO(jmarantz): at some point it might be worth considering using Selenium
 # or other tools to fully automate the testing of the admin UI.
@@ -51,9 +57,9 @@ echo "*** Please ensure Browser test passes and the stats UI looks good..."
 browser="firefox"
 test_url="$admin_port/test?file=admin_web_test.html"
 active_stats_url="$admin_port/stats?format=active"
-echo $browser "$test_url" "$active_stats_url"
-$browser "$test_url" "$active_stats_url"
+echo $browser "$test_url" "$active_stats_url" ">&" "$tmp/browser.log"
+$browser "$test_url" "$active_stats_url" >& "$tmp/browser.log"
 
 curl -X POST "$admin_port/quitquitquit"
-rm -f "$admin_port_file"
+rm -rf "$tmp"
 wait
