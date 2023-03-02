@@ -282,8 +282,6 @@ private:
 
 class FilterStateInputFactory : public Matcher::DataInputFactory<MatchingData> {
 public:
-  FilterStateInputFactory() {}
-
   std::string name() const override { return "envoy.matching.inputs.filter_state"; }
 
   Matcher::DataInputFactoryCb<MatchingData> createDataInputFactoryCb(
