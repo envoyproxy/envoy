@@ -546,7 +546,8 @@ message HttpConnectionManager {
   // The interval to flush the above access logs. By default, the HCM will flush exactly one access log
   // on stream close, when the HTTP request is complete. If this field is set, the HCM will flush access
   // logs periodically at the specified interval. This is especially useful in the case of long-lived
-  // requests, such as CONNECT and Websockets.
+  // requests, such as CONNECT and Websockets. Final access logs can be detected via the
+  // `requestComplete()` method of `StreamInfo`.
   // The interval must be at least 1 millisecond.
   google.protobuf.Duration access_log_flush_interval = 53
       [(validate.rules).duration = {gte {nanos: 1000000}}];

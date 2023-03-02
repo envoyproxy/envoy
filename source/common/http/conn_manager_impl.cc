@@ -810,13 +810,12 @@ ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connect
   if (connection_manager_.config_.accessLogFlushInterval().has_value()) {
     access_log_flush_timer_ =
         connection_manager.read_callbacks_->connection().dispatcher().createTimer([this]() -> void {
-          // If the filter manager has already destroyed its filters, that means it has already done
-          // the "final" access log cycle.
-          std::cout << "pgal: timer triggered";
-          if (!filter_manager_.destroyed()) {
+          // If the request is complete, we've already done the stream-end access-log, and shouldn't
+          // do the periodic log.
+          if (!streamInfo().requestComplete().has_value()) {
             filter_manager_.log();
+            refreshAccessLogFlushTimer();
           }
-          refreshAccessLogFlushTimer();
         });
     refreshAccessLogFlushTimer();
   }
