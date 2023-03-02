@@ -36,7 +36,7 @@ matcher_tree:
   input:
     name: input
     typed_config:
-      "@type": type.googleapis.com/envoy.extensions.matching.common_inputs.network.v3.{}
+      "@type": type.googleapis.com/envoy.extensions.matching.common_inputs.network.v3.FilterStateInput
       key: {}
   exact_match_map:
     map:
@@ -64,10 +64,9 @@ public:
     match_tree_ = matcher_factory_.create(matcher);
   }
 
-  void initializeFilterStateCase(const std::string& input, const std::string& key,
-                                 const std::string& value) {
+  void initializeFilterStateCase(const std::string& key, const std::string& value) {
     xds::type::matcher::v3::Matcher matcher;
-    MessageUtil::loadFromYaml(fmt::format(yaml_filter_state, input, key, value), matcher,
+    MessageUtil::loadFromYaml(fmt::format(yaml_filter_state, key, value), matcher,
                               ProtobufMessage::getStrictValidationVisitor());
 
     match_tree_ = matcher_factory_.create(matcher);
@@ -87,7 +86,7 @@ TEST_F(InputsIntegrationTest, DestinationIPInput) {
   initialize("DestinationIPInput", "127.0.0.1");
 
   Network::MockConnectionSocket socket;
-  StreamInfo::FilterStateImpl filter_state(StreamInfo::FilterState::LifeSpan::FilterChain);
+  StreamInfo::FilterStateImpl filter_state(StreamInfo::FilterState::LifeSpan::Connection);
   MatchingDataImpl data(socket, filter_state);
   socket.connection_info_provider_->setLocalAddress(
       std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 8080));
@@ -101,7 +100,7 @@ TEST_F(InputsIntegrationTest, DestinationPortInput) {
   initialize("DestinationPortInput", "8080");
 
   Network::MockConnectionSocket socket;
-  StreamInfo::FilterStateImpl filter_state(StreamInfo::FilterState::LifeSpan::FilterChain);
+  StreamInfo::FilterStateImpl filter_state(StreamInfo::FilterState::LifeSpan::Connection);
   MatchingDataImpl data(socket, filter_state);
   socket.connection_info_provider_->setLocalAddress(
       std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 8080));
@@ -115,7 +114,7 @@ TEST_F(InputsIntegrationTest, SourceIPInput) {
   initialize("SourceIPInput", "127.0.0.1");
 
   Network::MockConnectionSocket socket;
-  StreamInfo::FilterStateImpl filter_state(StreamInfo::FilterState::LifeSpan::FilterChain);
+  StreamInfo::FilterStateImpl filter_state(StreamInfo::FilterState::LifeSpan::Connection);
   MatchingDataImpl data(socket, filter_state);
   socket.connection_info_provider_->setRemoteAddress(
       std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 8080));
@@ -129,7 +128,7 @@ TEST_F(InputsIntegrationTest, SourcePortInput) {
   initialize("SourcePortInput", "8080");
 
   Network::MockConnectionSocket socket;
-  StreamInfo::FilterStateImpl filter_state(StreamInfo::FilterState::LifeSpan::FilterChain);
+  StreamInfo::FilterStateImpl filter_state(StreamInfo::FilterState::LifeSpan::Connection);
   MatchingDataImpl data(socket, filter_state);
   socket.connection_info_provider_->setRemoteAddress(
       std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 8080));
@@ -143,7 +142,7 @@ TEST_F(InputsIntegrationTest, DirectSourceIPInput) {
   initialize("DirectSourceIPInput", "127.0.0.1");
 
   Network::MockConnectionSocket socket;
-  StreamInfo::FilterStateImpl filter_state(StreamInfo::FilterState::LifeSpan::FilterChain);
+  StreamInfo::FilterStateImpl filter_state(StreamInfo::FilterState::LifeSpan::Connection);
   MatchingDataImpl data(socket, filter_state);
   socket.connection_info_provider_->setDirectRemoteAddressForTest(
       std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 8080));
@@ -157,7 +156,7 @@ TEST_F(InputsIntegrationTest, SourceTypeInput) {
   initialize("SourceTypeInput", "local");
 
   Network::MockConnectionSocket socket;
-  StreamInfo::FilterStateImpl filter_state(StreamInfo::FilterState::LifeSpan::FilterChain);
+  StreamInfo::FilterStateImpl filter_state(StreamInfo::FilterState::LifeSpan::Connection);
   MatchingDataImpl data(socket, filter_state);
   socket.connection_info_provider_->setRemoteAddress(
       std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 8080));
@@ -172,7 +171,7 @@ TEST_F(InputsIntegrationTest, ServerNameInput) {
   initialize("ServerNameInput", host);
 
   Network::MockConnectionSocket socket;
-  StreamInfo::FilterStateImpl filter_state(StreamInfo::FilterState::LifeSpan::FilterChain);
+  StreamInfo::FilterStateImpl filter_state(StreamInfo::FilterState::LifeSpan::Connection);
   MatchingDataImpl data(socket, filter_state);
   socket.connection_info_provider_->setRequestedServerName(host);
 
@@ -185,7 +184,7 @@ TEST_F(InputsIntegrationTest, TransportProtocolInput) {
   initialize("TransportProtocolInput", "tls");
 
   Network::MockConnectionSocket socket;
-  StreamInfo::FilterStateImpl filter_state(StreamInfo::FilterState::LifeSpan::FilterChain);
+  StreamInfo::FilterStateImpl filter_state(StreamInfo::FilterState::LifeSpan::Connection);
   MatchingDataImpl data(socket, filter_state);
   EXPECT_CALL(socket, detectedTransportProtocol).WillOnce(testing::Return("tls"));
 
@@ -198,7 +197,7 @@ TEST_F(InputsIntegrationTest, ApplicationProtocolInput) {
   initialize("ApplicationProtocolInput", "'http/1.1'");
 
   Network::MockConnectionSocket socket;
-  StreamInfo::FilterStateImpl filter_state(StreamInfo::FilterState::LifeSpan::FilterChain);
+  StreamInfo::FilterStateImpl filter_state(StreamInfo::FilterState::LifeSpan::Connection);
   MatchingDataImpl data(socket, filter_state);
   std::vector<std::string> protocols = {"http/1.1"};
   EXPECT_CALL(socket, requestedApplicationProtocols).WillOnce(testing::ReturnRef(protocols));
@@ -211,13 +210,12 @@ TEST_F(InputsIntegrationTest, ApplicationProtocolInput) {
 TEST_F(InputsIntegrationTest, FilterStateInput) {
   std::string key = "filter_state_key";
   std::string value = "filter_state_value";
-  initializeFilterStateCase("FilterStateInput", key, value);
+  initializeFilterStateCase(key, value);
 
-  StreamInfo::FilterStateImpl filter_state(StreamInfo::FilterState::LifeSpan::FilterChain);
+  StreamInfo::FilterStateImpl filter_state(StreamInfo::FilterState::LifeSpan::Connection);
   filter_state.setData(key, std::make_shared<Router::StringAccessorImpl>(value),
                        StreamInfo::FilterState::StateType::Mutable,
-                       StreamInfo::FilterState::LifeSpan::Connection,
-                       StreamInfo::FilterState::StreamSharing::SharedWithUpstreamConnection);
+                       StreamInfo::FilterState::LifeSpan::Connection);
 
   Network::MockConnectionSocket socket;
   MatchingDataImpl data(socket, filter_state);
@@ -225,6 +223,39 @@ TEST_F(InputsIntegrationTest, FilterStateInput) {
   const auto result = match_tree_()->match(data);
   EXPECT_EQ(result.match_state_, Matcher::MatchState::MatchComplete);
   EXPECT_TRUE(result.on_match_.has_value());
+}
+
+TEST_F(InputsIntegrationTest, FilterStateInputFailure) {
+  std::string key = "filter_state_key";
+  std::string value = "filter_state_value";
+  initializeFilterStateCase(key, value);
+
+  StreamInfo::FilterStateImpl filter_state(StreamInfo::FilterState::LifeSpan::Connection);
+  Network::MockConnectionSocket socket;
+  MatchingDataImpl data(socket, filter_state);
+
+  // No filter state object - no match
+  const auto result_no_fs = match_tree_()->match(data);
+  EXPECT_EQ(result_no_fs.match_state_, Matcher::MatchState::MatchComplete);
+  EXPECT_FALSE(result_no_fs.on_match_.has_value());
+
+  filter_state.setData("unknown_key", std::make_shared<Router::StringAccessorImpl>(value),
+                       StreamInfo::FilterState::StateType::Mutable,
+                       StreamInfo::FilterState::LifeSpan::Connection);
+
+  // Unknown key in filter state - no match
+  const auto result_no_key = match_tree_()->match(data);
+  EXPECT_EQ(result_no_key.match_state_, Matcher::MatchState::MatchComplete);
+  EXPECT_FALSE(result_no_key.on_match_.has_value());
+
+  filter_state.setData(key, std::make_shared<Router::StringAccessorImpl>("unknown_value"),
+                       StreamInfo::FilterState::StateType::Mutable,
+                       StreamInfo::FilterState::LifeSpan::Connection);
+
+  // Known key in filter state but unknown value - no match
+  const auto result_no_value = match_tree_()->match(data);
+  EXPECT_EQ(result_no_value.match_state_, Matcher::MatchState::MatchComplete);
+  EXPECT_FALSE(result_no_value.on_match_.has_value());
 }
 
 class UdpInputsIntegrationTest : public ::testing::Test {

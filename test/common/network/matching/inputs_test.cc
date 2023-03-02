@@ -16,7 +16,7 @@ namespace Matching {
 TEST(MatchingData, DestinationIPInput) {
   DestinationIPInput<MatchingData> input;
   MockConnectionSocket socket;
-  StreamInfo::FilterStateImpl filter_state(StreamInfo::FilterState::LifeSpan::FilterChain);
+  StreamInfo::FilterStateImpl filter_state(StreamInfo::FilterState::LifeSpan::Connection);
   MatchingDataImpl data(socket, filter_state);
 
   {
@@ -104,7 +104,7 @@ TEST(MatchingData, HttpDestinationIPInput) {
 TEST(MatchingData, DestinationPortInput) {
   DestinationPortInput<MatchingData> input;
   MockConnectionSocket socket;
-  StreamInfo::FilterStateImpl filter_state(StreamInfo::FilterState::LifeSpan::FilterChain);
+  StreamInfo::FilterStateImpl filter_state(StreamInfo::FilterState::LifeSpan::Connection);
   MatchingDataImpl data(socket, filter_state);
 
   {
@@ -129,7 +129,7 @@ TEST(MatchingData, DestinationPortInput) {
 TEST(MatchingData, SourceIPInput) {
   SourceIPInput<MatchingData> input;
   MockConnectionSocket socket;
-  StreamInfo::FilterStateImpl filter_state(StreamInfo::FilterState::LifeSpan::FilterChain);
+  StreamInfo::FilterStateImpl filter_state(StreamInfo::FilterState::LifeSpan::Connection);
   MatchingDataImpl data(socket, filter_state);
 
   {
@@ -154,7 +154,7 @@ TEST(MatchingData, SourceIPInput) {
 TEST(MatchingData, SourcePortInput) {
   SourcePortInput<MatchingData> input;
   MockConnectionSocket socket;
-  StreamInfo::FilterStateImpl filter_state(StreamInfo::FilterState::LifeSpan::FilterChain);
+  StreamInfo::FilterStateImpl filter_state(StreamInfo::FilterState::LifeSpan::Connection);
   MatchingDataImpl data(socket, filter_state);
 
   {
@@ -179,7 +179,7 @@ TEST(MatchingData, SourcePortInput) {
 TEST(MatchingData, DirectSourceIPInput) {
   DirectSourceIPInput<MatchingData> input;
   MockConnectionSocket socket;
-  StreamInfo::FilterStateImpl filter_state(StreamInfo::FilterState::LifeSpan::FilterChain);
+  StreamInfo::FilterStateImpl filter_state(StreamInfo::FilterState::LifeSpan::Connection);
   MatchingDataImpl data(socket, filter_state);
 
   {
@@ -204,7 +204,7 @@ TEST(MatchingData, DirectSourceIPInput) {
 TEST(MatchingData, SourceTypeInput) {
   SourceTypeInput<MatchingData> input;
   MockConnectionSocket socket;
-  StreamInfo::FilterStateImpl filter_state(StreamInfo::FilterState::LifeSpan::FilterChain);
+  StreamInfo::FilterStateImpl filter_state(StreamInfo::FilterState::LifeSpan::Connection);
   MatchingDataImpl data(socket, filter_state);
 
   {
@@ -229,7 +229,7 @@ TEST(MatchingData, SourceTypeInput) {
 TEST(MatchingData, ServerNameInput) {
   ServerNameInput<MatchingData> input;
   MockConnectionSocket socket;
-  StreamInfo::FilterStateImpl filter_state(StreamInfo::FilterState::LifeSpan::FilterChain);
+  StreamInfo::FilterStateImpl filter_state(StreamInfo::FilterState::LifeSpan::Connection);
   MatchingDataImpl data(socket, filter_state);
 
   {
@@ -252,7 +252,7 @@ TEST(MatchingData, ServerNameInput) {
 TEST(MatchingData, TransportProtocolInput) {
   TransportProtocolInput input;
   MockConnectionSocket socket;
-  StreamInfo::FilterStateImpl filter_state(StreamInfo::FilterState::LifeSpan::FilterChain);
+  StreamInfo::FilterStateImpl filter_state(StreamInfo::FilterState::LifeSpan::Connection);
   MatchingDataImpl data(socket, filter_state);
 
   {
@@ -276,7 +276,7 @@ TEST(MatchingData, TransportProtocolInput) {
 TEST(MatchingData, ApplicationProtocolInput) {
   ApplicationProtocolInput input;
   MockConnectionSocket socket;
-  StreamInfo::FilterStateImpl filter_state(StreamInfo::FilterState::LifeSpan::FilterChain);
+  StreamInfo::FilterStateImpl filter_state(StreamInfo::FilterState::LifeSpan::Connection);
   MatchingDataImpl data(socket, filter_state);
 
   {
@@ -316,7 +316,7 @@ TEST(MatchingData, FilterStateInput) {
   FilterStateInput input(input_config);
 
   MockConnectionSocket socket;
-  StreamInfo::FilterStateImpl filter_state(StreamInfo::FilterState::LifeSpan::FilterChain);
+  StreamInfo::FilterStateImpl filter_state(StreamInfo::FilterState::LifeSpan::Connection);
   MatchingDataImpl data(socket, filter_state);
 
   {
@@ -328,8 +328,7 @@ TEST(MatchingData, FilterStateInput) {
 
   filter_state.setData("unknown_key", std::make_shared<Router::StringAccessorImpl>("some_value"),
                        StreamInfo::FilterState::StateType::Mutable,
-                       StreamInfo::FilterState::LifeSpan::Connection,
-                       StreamInfo::FilterState::StreamSharing::SharedWithUpstreamConnection);
+                       StreamInfo::FilterState::LifeSpan::Connection);
 
   {
     const auto result = input.get(data);
@@ -341,8 +340,7 @@ TEST(MatchingData, FilterStateInput) {
   std::string value = "filter_state_value";
   filter_state.setData(key, std::make_shared<Router::StringAccessorImpl>(value),
                        StreamInfo::FilterState::StateType::Mutable,
-                       StreamInfo::FilterState::LifeSpan::Connection,
-                       StreamInfo::FilterState::StreamSharing::SharedWithUpstreamConnection);
+                       StreamInfo::FilterState::LifeSpan::Connection);
 
   {
     const auto result = input.get(data);

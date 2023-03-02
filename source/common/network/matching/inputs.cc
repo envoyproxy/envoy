@@ -31,7 +31,7 @@ Matcher::DataInputGetResult FilterStateInput::get(const MatchingData& data) cons
   const auto* filter_state_object =
       data.filterState().getDataReadOnly<StreamInfo::FilterState::Object>(filter_state_key_);
 
-  if (filter_state_object) {
+  if (filter_state_object != nullptr) {
     return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,
             filter_state_object->serializeAsString()};
   }

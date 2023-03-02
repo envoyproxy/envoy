@@ -3855,7 +3855,7 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, SingleFilterChainWithFilterStateM
     return;
   }
 
-  std::string yaml = TestEnvironment::substitute(R"EOF(
+  std::string yaml = R"EOF(
     address:
       socket_address: { address: 127.0.0.1, port_value: 1234 }
     listener_filters:
@@ -3864,18 +3864,6 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, SingleFilterChainWithFilterStateM
         "@type": type.googleapis.com/test.integration.filters.TestInspectorFilterConfig
     filter_chains:
     - name: foo
-      transport_socket:
-        name: tls
-        typed_config:
-          "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.DownstreamTlsContext
-          common_tls_context:
-            tls_certificates:
-              - certificate_chain: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_cert.pem" }
-                private_key: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_key.pem" }
-  )EOF",
-                                                 Network::Address::IpVersion::v4);
-  if (use_matcher_) {
-    yaml = yaml + R"EOF(
     filter_chain_matcher:
       matcher_tree:
         input:
@@ -3885,14 +3873,13 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, SingleFilterChainWithFilterStateM
             key: filter_state_key
         exact_match_map:
           map:
-            "filter_State_value":
+            "filter_state_value":
               action:
                 name: foo
                 typed_config:
                   "@type": type.googleapis.com/google.protobuf.StringValue
                   value: foo
     )EOF";
-  }
 
   EXPECT_CALL(server_.api_.random_, uuid());
   EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0));
@@ -3900,36 +3887,33 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, SingleFilterChainWithFilterStateM
   EXPECT_EQ(1U, manager_->listeners().size());
 
   // No filter state value set - no match.
-  auto filter_chain = findFilterChain(1234, "127.0.0.1", "", "tls", {}, "8.8.8.8", 111);
+  auto filter_chain = findFilterChain(1234, "127.0.0.1", "", "", {}, "8.8.8.8", 111);
   EXPECT_EQ(filter_chain, nullptr);
 
   stream_info_.filterState()->setData(
       "unknown_key", std::make_shared<Router::StringAccessorImpl>("unknown_value"),
-      StreamInfo::FilterState::StateType::Mutable, StreamInfo::FilterState::LifeSpan::Connection,
-      StreamInfo::FilterState::StreamSharing::SharedWithUpstreamConnection);
+      StreamInfo::FilterState::StateType::Mutable, StreamInfo::FilterState::LifeSpan::Connection);
 
   // Filter state set to a non-matching key - no match.
-  filter_chain = findFilterChain(1234, "127.0.0.1", "", "tls", {}, "8.8.8.8", 111);
+  filter_chain = findFilterChain(1234, "127.0.0.1", "", "", {}, "8.8.8.8", 111);
   EXPECT_EQ(filter_chain, nullptr);
 
   stream_info_.filterState()->setData(
       "filter_state_key", std::make_shared<Router::StringAccessorImpl>("unknown_value"),
-      StreamInfo::FilterState::StateType::Mutable, StreamInfo::FilterState::LifeSpan::Connection,
-      StreamInfo::FilterState::StreamSharing::SharedWithUpstreamConnection);
+      StreamInfo::FilterState::StateType::Mutable, StreamInfo::FilterState::LifeSpan::Connection);
 
   // Filter state set to a matching key but unknown value - no match.
-  filter_chain = findFilterChain(1234, "127.0.0.1", "", "tls", {}, "8.8.8.8", 111);
+  filter_chain = findFilterChain(1234, "127.0.0.1", "", "", {}, "8.8.8.8", 111);
   EXPECT_EQ(filter_chain, nullptr);
 
   stream_info_.filterState()->setData(
-      "filter_state_key", std::make_shared<Router::StringAccessorImpl>("filter_State_value"),
-      StreamInfo::FilterState::StateType::Mutable, StreamInfo::FilterState::LifeSpan::Connection,
-      StreamInfo::FilterState::StreamSharing::SharedWithUpstreamConnection);
+      "filter_state_key", std::make_shared<Router::StringAccessorImpl>("filter_state_value"),
+      StreamInfo::FilterState::StateType::Mutable, StreamInfo::FilterState::LifeSpan::Connection);
 
   // Known filter state key and matching value - using 1st filter chain.
-  filter_chain = findFilterChain(1234, "127.0.0.1", "", "tls", {}, "8.8.8.8", 111);
+  filter_chain = findFilterChain(1234, "127.0.0.1", "", "", {}, "8.8.8.8", 111);
   ASSERT_NE(filter_chain, nullptr);
-  EXPECT_TRUE(filter_chain->transportSocketFactory().implementsSecureTransport());
+  EXPECT_EQ(filter_chain->name(), "foo");
 }
 
 TEST_P(ListenerManagerImplWithRealFiltersTest, SingleFilterChainWithApplicationProtocolMatch) {
@@ -5012,7 +4996,7 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithFilterSta
     return;
   }
 
-  std::string yaml = TestEnvironment::substitute(R"EOF(
+  std::string yaml = R"EOF(
     address:
       socket_address: { address: 127.0.0.1, port_value: 1234 }
     listener_filters:
@@ -5022,18 +5006,6 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithFilterSta
     filter_chains:
     - name: foo
     - name: bar
-      transport_socket:
-        name: tls
-        typed_config:
-          "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.DownstreamTlsContext
-          common_tls_context:
-            tls_certificates:
-              - certificate_chain: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_cert.pem" }
-                private_key: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_key.pem" }
-  )EOF",
-                                                 Network::Address::IpVersion::v4);
-  if (use_matcher_) {
-    yaml = yaml + R"EOF(
     filter_chain_matcher:
       matcher_tree:
         input:
@@ -5043,7 +5015,7 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithFilterSta
             key: filter_state_key
         exact_match_map:
           map:
-            "filter_State_value":
+            "filter_state_value":
               action:
                 name: bar
                 typed_config:
@@ -5056,7 +5028,6 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithFilterSta
             "@type": type.googleapis.com/google.protobuf.StringValue
             value: foo
     )EOF";
-  }
 
   EXPECT_CALL(server_.api_.random_, uuid());
   EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0));
@@ -5064,39 +5035,36 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithFilterSta
   EXPECT_EQ(1U, manager_->listeners().size());
 
   // No filter state value set - match foo.
-  auto filter_chain = findFilterChain(1234, "127.0.0.1", "", "tls", {}, "8.8.8.8", 111);
+  auto filter_chain = findFilterChain(1234, "127.0.0.1", "", "", {}, "8.8.8.8", 111);
   ASSERT_NE(filter_chain, nullptr);
-  EXPECT_FALSE(filter_chain->transportSocketFactory().implementsSecureTransport());
+  EXPECT_EQ(filter_chain->name(), "foo");
 
   stream_info_.filterState()->setData(
       "unknown_key", std::make_shared<Router::StringAccessorImpl>("unknown_value"),
-      StreamInfo::FilterState::StateType::Mutable, StreamInfo::FilterState::LifeSpan::Connection,
-      StreamInfo::FilterState::StreamSharing::SharedWithUpstreamConnection);
+      StreamInfo::FilterState::StateType::Mutable, StreamInfo::FilterState::LifeSpan::Connection);
 
   // Filter state set to a non-matching key - no match.
-  filter_chain = findFilterChain(1234, "127.0.0.1", "", "tls", {}, "8.8.8.8", 111);
+  filter_chain = findFilterChain(1234, "127.0.0.1", "", "", {}, "8.8.8.8", 111);
   ASSERT_NE(filter_chain, nullptr);
-  EXPECT_FALSE(filter_chain->transportSocketFactory().implementsSecureTransport());
+  EXPECT_EQ(filter_chain->name(), "foo");
 
   stream_info_.filterState()->setData(
       "filter_state_key", std::make_shared<Router::StringAccessorImpl>("unknown_value"),
-      StreamInfo::FilterState::StateType::Mutable, StreamInfo::FilterState::LifeSpan::Connection,
-      StreamInfo::FilterState::StreamSharing::SharedWithUpstreamConnection);
+      StreamInfo::FilterState::StateType::Mutable, StreamInfo::FilterState::LifeSpan::Connection);
 
   // Filter state set to a matching key but unknown value - no match.
-  filter_chain = findFilterChain(1234, "127.0.0.1", "", "tls", {}, "8.8.8.8", 111);
+  filter_chain = findFilterChain(1234, "127.0.0.1", "", "", {}, "8.8.8.8", 111);
   ASSERT_NE(filter_chain, nullptr);
-  EXPECT_FALSE(filter_chain->transportSocketFactory().implementsSecureTransport());
+  EXPECT_EQ(filter_chain->name(), "foo");
 
   stream_info_.filterState()->setData(
-      "filter_state_key", std::make_shared<Router::StringAccessorImpl>("filter_State_value"),
-      StreamInfo::FilterState::StateType::Mutable, StreamInfo::FilterState::LifeSpan::Connection,
-      StreamInfo::FilterState::StreamSharing::SharedWithUpstreamConnection);
+      "filter_state_key", std::make_shared<Router::StringAccessorImpl>("filter_state_value"),
+      StreamInfo::FilterState::StateType::Mutable, StreamInfo::FilterState::LifeSpan::Connection);
 
   // Known filter state key and matching value - using 1st filter chain.
-  filter_chain = findFilterChain(1234, "127.0.0.1", "", "tls", {}, "8.8.8.8", 111);
+  filter_chain = findFilterChain(1234, "127.0.0.1", "", "", {}, "8.8.8.8", 111);
   ASSERT_NE(filter_chain, nullptr);
-  EXPECT_TRUE(filter_chain->transportSocketFactory().implementsSecureTransport());
+  EXPECT_EQ(filter_chain->name(), "bar");
 }
 
 TEST_P(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithApplicationProtocolMatch) {
