@@ -71,3 +71,11 @@ envoy_cc_library(
         "//source/common/common:utility_lib",
     ],
 )
+
+envoy_cc_library(
+    name = "boolean_accessor_lib",
+    hdrs = ["boolean_accessor_impl.h"],
+    deps = [
+        "//envoy/stream_info:boolean_accessor_interface",
+    ],
+)
