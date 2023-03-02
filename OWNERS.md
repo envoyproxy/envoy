@@ -47,6 +47,8 @@ routing PRs, questions, etc. to the right place.
   * Bazel, CI, compilers, linkers, general build issues, etc.
 * Kuat Yessenov ([kyessenov](https://github.com/kyessenov)) (kuat@google.com)
   * Listeners, RBAC, CEL, matching, Istio.
+* Raven Black ([ravenblackx](https://github.com/ravenblackx)) (ravenblack@dropbox.com)
+  * Caches, file filters, and file I/O.
 
 # Envoy mobile maintainers
 
