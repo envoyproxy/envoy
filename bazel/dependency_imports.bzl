@@ -11,6 +11,7 @@ load("@proxy_wasm_rust_sdk//bazel:dependencies.bzl", "proxy_wasm_rust_sdk_depend
 load("@base_pip3//:requirements.bzl", pip_dependencies = "install_deps")
 load("@dev_pip3//:requirements.bzl", pip_dev_dependencies = "install_deps")
 load("@fuzzing_pip3//:requirements.bzl", pip_fuzzing_dependencies = "install_deps")
+load("@pip_deps//:requirements.bzl", protobuf_pip_dependencies = "install_deps")
 load("@emsdk//:emscripten_deps.bzl", "emscripten_deps")
 load("@com_github_aignas_rules_shellcheck//:deps.bzl", "shellcheck_dependencies")
 load("@aspect_bazel_lib//lib:repositories.bzl", "register_jq_toolchains", "register_yq_toolchains")
@@ -33,6 +34,7 @@ def envoy_dependency_imports(go_version = GO_VERSION, jq_version = JQ_VERSION, y
     pip_dependencies()
     pip_dev_dependencies()
     pip_fuzzing_dependencies()
+    protobuf_pip_dependencies()
     rules_pkg_dependencies()
     rust_repository_set(
         name = "rust_linux_s390x",

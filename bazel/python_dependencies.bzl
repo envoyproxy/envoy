@@ -22,3 +22,9 @@ def envoy_python_dependencies():
         requirements_lock = "@rules_fuzzing//fuzzing:requirements.txt",
         extra_pip_args = ["--require-hashes"],
     )
+
+    # This is required for protobuf, due to the way we load it
+    pip_parse(
+        name="pip_deps",
+        requirements = "@upb//python:requirements.txt",
+    )
