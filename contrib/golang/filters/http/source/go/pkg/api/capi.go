@@ -25,14 +25,14 @@ type HttpCAPI interface {
 
 	// experience api, memory unsafe
 	HttpGetHeader(r unsafe.Pointer, key *string, value *string)
-	HttpCopyHeaders(r unsafe.Pointer, num uint64, bytes uint64) map[string]string
+	HttpCopyHeaders(r unsafe.Pointer, num uint64, bytes uint64) map[string][]string
 	HttpSetHeader(r unsafe.Pointer, key *string, value *string)
 	HttpRemoveHeader(r unsafe.Pointer, key *string)
 
 	HttpGetBuffer(r unsafe.Pointer, bufferPtr uint64, value *string, length uint64)
 	HttpSetBufferHelper(r unsafe.Pointer, bufferPtr uint64, value string, action BufferAction)
 
-	HttpCopyTrailers(r unsafe.Pointer, num uint64, bytes uint64) map[string]string
+	HttpCopyTrailers(r unsafe.Pointer, num uint64, bytes uint64) map[string][]string
 	HttpSetTrailer(r unsafe.Pointer, key *string, value *string)
 
 	HttpGetRouteName(r unsafe.Pointer) string

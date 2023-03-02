@@ -17,7 +17,6 @@ final class DirectResponsePrefixPathMatchIntegrationTest: XCTestCase {
     ).build()
 
     let engine = TestEngineBuilder()
-      .useLegacyBuilder(true)
       .addDirectResponse(
         .init(
           matcher: RouteMatcher(pathPrefix: "/v1/foo"),

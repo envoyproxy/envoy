@@ -429,7 +429,7 @@ void HealthCheckerImplBase::ActiveHealthCheckSession::onIntervalBase() {
         host_->lastSuccessfulTrafficTime(parent_.healthCheckerType());
     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(
         time_source_.monotonicTime() - traffic_successful_time);
-    if (duration.count() < parent_.interval_.count()) {
+    if (duration.count() <= parent_.interval_.count()) {
       // During the time, there was already successful non-health check traffic for the host, no
       // need to send HC packet
       parent_.stats_.attempt_.inc();

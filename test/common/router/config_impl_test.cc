@@ -186,7 +186,7 @@ protected:
     factory_context_.cluster_manager_.initializeClusters(
         {"www2", "root_www2", "www2_staging", "instant-server"}, {});
 
-    const std::string yaml = R"EOF(
+    const fmt::format_string<const bool&, std::string&> yaml = R"EOF(
 virtual_hosts:
   - name: www2
     domains: ["www.lyft.com"]
@@ -283,7 +283,7 @@ most_specific_header_mutations_wins: {0}
   std::string requestHeadersConfig(const bool most_specific_wins) {
     factory_context_.cluster_manager_.initializeClusters({"www2", "default"}, {});
 
-    const std::string yaml = R"EOF(
+    const fmt::format_string<const bool&> yaml = R"EOF(
 virtual_hosts:
   - name: www2
     domains: ["www.lyft.com"]
@@ -446,7 +446,7 @@ virtual_hosts:
     const DirectResponseEntry* redirect = config.route(headers, 0)->directResponseEntry();
     ASSERT(redirect != nullptr);
     redirect->rewritePathHeader(headers, true);
-    EXPECT_EQ("http://bat4.com/new_path", redirect->newPath(headers));
+    EXPECT_EQ("http://bat4.com/new_path", redirect->newUri(headers));
   }
 
   stream_info.filterState()->setData(
@@ -2030,7 +2030,7 @@ class HeaderTransformsDoFormattingTest : public RouteMatcherTest {
 protected:
   void runTest(bool run_request_header_test) {
     factory_context_.cluster_manager_.initializeClusters({"default"}, {});
-    const std::string yaml_template = R"EOF(
+    const fmt::format_string<const char*> yaml_template = R"EOF(
   virtual_hosts:
     - name: default
       domains: ["*"]
@@ -5589,7 +5589,7 @@ virtual_hosts:
     Http::TestRequestHeaderMapImpl headers =
         genRedirectHeaders("www.lyft.com", "/foo", false, false);
     EXPECT_EQ("https://www.lyft.com/foo",
-              config.route(headers, 0)->directResponseEntry()->newPath(headers));
+              config.route(headers, 0)->directResponseEntry()->newUri(headers));
     EXPECT_EQ(nullptr, config.route(headers, 0)->decorator());
   }
   {
@@ -5601,37 +5601,37 @@ virtual_hosts:
     Http::TestRequestHeaderMapImpl headers =
         genRedirectHeaders("api.lyft.com", "/foo", false, false);
     EXPECT_EQ("https://api.lyft.com/foo",
-              config.route(headers, 0)->directResponseEntry()->newPath(headers));
+              config.route(headers, 0)->directResponseEntry()->newUri(headers));
   }
   {
     Http::TestRequestHeaderMapImpl headers = genRedirectHeaders(
         "api.lyft.com", "/foo", false, absl::nullopt /* no x-envoy-internal header */);
     EXPECT_EQ("https://api.lyft.com/foo",
-              config.route(headers, 0)->directResponseEntry()->newPath(headers));
+              config.route(headers, 0)->directResponseEntry()->newUri(headers));
   }
   {
     Http::TestRequestHeaderMapImpl headers =
         genRedirectHeaders("redirect.lyft.com", "/host", false, false);
     EXPECT_EQ("http://new.lyft.com/host",
-              config.route(headers, 0)->directResponseEntry()->newPath(headers));
+              config.route(headers, 0)->directResponseEntry()->newUri(headers));
   }
   {
     Http::TestRequestHeaderMapImpl headers =
         genRedirectHeaders("redirect.lyft.com", "/path", true, false);
     EXPECT_EQ("https://redirect.lyft.com/new_path",
-              config.route(headers, 0)->directResponseEntry()->newPath(headers));
+              config.route(headers, 0)->directResponseEntry()->newUri(headers));
   }
   {
     Http::TestRequestHeaderMapImpl headers =
         genRedirectHeaders("redirect.lyft.com", "/redirect_to_path_without_slash", true, false);
     EXPECT_EQ("https://redirect.lyft.com/new_path_without_slash",
-              config.route(headers, 0)->directResponseEntry()->newPath(headers));
+              config.route(headers, 0)->directResponseEntry()->newUri(headers));
   }
   {
     Http::TestRequestHeaderMapImpl headers =
         genRedirectHeaders("redirect.lyft.com", "/host_path", true, false);
     EXPECT_EQ("https://new.lyft.com/new_path",
-              config.route(headers, 0)->directResponseEntry()->newPath(headers));
+              config.route(headers, 0)->directResponseEntry()->newUri(headers));
   }
   {
     Http::TestRequestHeaderMapImpl headers =
@@ -5667,203 +5667,203 @@ virtual_hosts:
     Http::TestRequestHeaderMapImpl headers =
         genRedirectHeaders("redirect.lyft.com", "/https", false, false);
     EXPECT_EQ("https://redirect.lyft.com/https",
-              config.route(headers, 0)->directResponseEntry()->newPath(headers));
+              config.route(headers, 0)->directResponseEntry()->newUri(headers));
     EXPECT_EQ(nullptr, config.route(headers, 0)->mostSpecificPerFilterConfig("bar"));
   }
   {
     Http::TestRequestHeaderMapImpl headers =
         genRedirectHeaders("redirect.lyft.com", "/host_https", false, false);
     EXPECT_EQ("https://new.lyft.com/host_https",
-              config.route(headers, 0)->directResponseEntry()->newPath(headers));
+              config.route(headers, 0)->directResponseEntry()->newUri(headers));
   }
   {
     Http::TestRequestHeaderMapImpl headers =
         genRedirectHeaders("redirect.lyft.com", "/path_https", false, false);
     EXPECT_EQ("https://redirect.lyft.com/new_path",
-              config.route(headers, 0)->directResponseEntry()->newPath(headers));
+              config.route(headers, 0)->directResponseEntry()->newUri(headers));
   }
   {
     Http::TestRequestHeaderMapImpl headers =
         genRedirectHeaders("redirect.lyft.com", "/host_path_https", false, false);
     EXPECT_EQ("https://new.lyft.com/new_path",
-              config.route(headers, 0)->directResponseEntry()->newPath(headers));
+              config.route(headers, 0)->directResponseEntry()->newUri(headers));
   }
   {
     Http::TestRequestHeaderMapImpl headers =
         genRedirectHeaders("redirect.lyft.com", "/port", false, false);
     EXPECT_EQ("http://redirect.lyft.com:8080/port",
-              config.route(headers, 0)->directResponseEntry()->newPath(headers));
+              config.route(headers, 0)->directResponseEntry()->newUri(headers));
   }
   {
     Http::TestRequestHeaderMapImpl headers =
         genRedirectHeaders("redirect.lyft.com:8080", "/port", false, false);
     EXPECT_EQ("http://redirect.lyft.com:8181/port",
-              config.route(headers, 0)->directResponseEntry()->newPath(headers));
+              config.route(headers, 0)->directResponseEntry()->newUri(headers));
   }
   {
     Http::TestRequestHeaderMapImpl headers =
         genRedirectHeaders("redirect.lyft.com", "/host_port", false, false);
     EXPECT_EQ("http://new.lyft.com:8080/host_port",
-              config.route(headers, 0)->directResponseEntry()->newPath(headers));
+              config.route(headers, 0)->directResponseEntry()->newUri(headers));
   }
   {
     Http::TestRequestHeaderMapImpl headers =
         genRedirectHeaders("redirect.lyft.com", "/scheme_host_port", false, false);
     EXPECT_EQ("ws://new.lyft.com:8080/scheme_host_port",
-              config.route(headers, 0)->directResponseEntry()->newPath(headers));
+              config.route(headers, 0)->directResponseEntry()->newUri(headers));
   }
   {
     Http::TestRequestHeaderMapImpl headers =
         genRedirectHeaders("redirect.lyft.com:80", "/ws", true, false);
     EXPECT_EQ("ws://redirect.lyft.com:80/ws",
-              config.route(headers, 0)->directResponseEntry()->newPath(headers));
+              config.route(headers, 0)->directResponseEntry()->newUri(headers));
   }
   {
     Http::TestRequestHeaderMapImpl headers =
         genRedirectHeaders("redirect.lyft.com:80", "/host_path_https", false, false);
     EXPECT_EQ("https://new.lyft.com/new_path",
-              config.route(headers, 0)->directResponseEntry()->newPath(headers));
+              config.route(headers, 0)->directResponseEntry()->newUri(headers));
   }
   {
     Http::TestRequestHeaderMapImpl headers =
         genRedirectHeaders("redirect.lyft.com:80", "/scheme_host_port", false, false);
     EXPECT_EQ("ws://new.lyft.com:8080/scheme_host_port",
-              config.route(headers, 0)->directResponseEntry()->newPath(headers));
+              config.route(headers, 0)->directResponseEntry()->newUri(headers));
   }
   {
     Http::TestRequestHeaderMapImpl headers =
         genRedirectHeaders("redirect.lyft.com:443", "/ws", false, false);
     EXPECT_EQ("ws://redirect.lyft.com:443/ws",
-              config.route(headers, 0)->directResponseEntry()->newPath(headers));
+              config.route(headers, 0)->directResponseEntry()->newUri(headers));
   }
   {
     Http::TestRequestHeaderMapImpl headers =
         genRedirectHeaders("redirect.lyft.com:443", "/host_path_http", true, false);
     EXPECT_EQ("http://new.lyft.com/new_path",
-              config.route(headers, 0)->directResponseEntry()->newPath(headers));
+              config.route(headers, 0)->directResponseEntry()->newUri(headers));
   }
   {
     Http::TestRequestHeaderMapImpl headers =
         genRedirectHeaders("redirect.lyft.com:443", "/scheme_host_port", true, false);
     EXPECT_EQ("ws://new.lyft.com:8080/scheme_host_port",
-              config.route(headers, 0)->directResponseEntry()->newPath(headers));
+              config.route(headers, 0)->directResponseEntry()->newUri(headers));
   }
   {
     Http::TestRequestHeaderMapImpl headers = genRedirectHeaders("10.0.0.1", "/port", false, false);
     EXPECT_EQ("http://10.0.0.1:8080/port",
-              config.route(headers, 0)->directResponseEntry()->newPath(headers));
+              config.route(headers, 0)->directResponseEntry()->newUri(headers));
   }
   {
     Http::TestRequestHeaderMapImpl headers =
         genRedirectHeaders("10.0.0.1:8080", "/port", false, false);
     EXPECT_EQ("http://10.0.0.1:8181/port",
-              config.route(headers, 0)->directResponseEntry()->newPath(headers));
+              config.route(headers, 0)->directResponseEntry()->newUri(headers));
   }
   {
     Http::TestRequestHeaderMapImpl headers =
         genRedirectHeaders("10.0.0.1", "/host_port", false, false);
     EXPECT_EQ("http://20.0.0.2:8080/host_port",
-              config.route(headers, 0)->directResponseEntry()->newPath(headers));
+              config.route(headers, 0)->directResponseEntry()->newUri(headers));
   }
   {
     Http::TestRequestHeaderMapImpl headers =
         genRedirectHeaders("10.0.0.1", "/scheme_host_port", false, false);
     EXPECT_EQ("ws://20.0.0.2:8080/scheme_host_port",
-              config.route(headers, 0)->directResponseEntry()->newPath(headers));
+              config.route(headers, 0)->directResponseEntry()->newUri(headers));
   }
   {
     Http::TestRequestHeaderMapImpl headers = genRedirectHeaders("10.0.0.1:80", "/ws", true, false);
     EXPECT_EQ("ws://10.0.0.1:80/ws",
-              config.route(headers, 0)->directResponseEntry()->newPath(headers));
+              config.route(headers, 0)->directResponseEntry()->newUri(headers));
   }
   {
     Http::TestRequestHeaderMapImpl headers =
         genRedirectHeaders("10.0.0.1:80", "/host_path_https", false, false);
     EXPECT_EQ("https://20.0.0.2/new_path",
-              config.route(headers, 0)->directResponseEntry()->newPath(headers));
+              config.route(headers, 0)->directResponseEntry()->newUri(headers));
   }
   {
     Http::TestRequestHeaderMapImpl headers =
         genRedirectHeaders("10.0.0.1:80", "/scheme_host_port", false, false);
     EXPECT_EQ("ws://20.0.0.2:8080/scheme_host_port",
-              config.route(headers, 0)->directResponseEntry()->newPath(headers));
+              config.route(headers, 0)->directResponseEntry()->newUri(headers));
   }
   {
     Http::TestRequestHeaderMapImpl headers =
         genRedirectHeaders("10.0.0.1:443", "/ws", false, false);
     EXPECT_EQ("ws://10.0.0.1:443/ws",
-              config.route(headers, 0)->directResponseEntry()->newPath(headers));
+              config.route(headers, 0)->directResponseEntry()->newUri(headers));
   }
   {
     Http::TestRequestHeaderMapImpl headers =
         genRedirectHeaders("10.0.0.1:443", "/host_path_http", true, false);
     EXPECT_EQ("http://20.0.0.2/new_path",
-              config.route(headers, 0)->directResponseEntry()->newPath(headers));
+              config.route(headers, 0)->directResponseEntry()->newUri(headers));
   }
   {
     Http::TestRequestHeaderMapImpl headers =
         genRedirectHeaders("10.0.0.1:443", "/scheme_host_port", true, false);
     EXPECT_EQ("ws://20.0.0.2:8080/scheme_host_port",
-              config.route(headers, 0)->directResponseEntry()->newPath(headers));
+              config.route(headers, 0)->directResponseEntry()->newUri(headers));
   }
   {
     Http::TestRequestHeaderMapImpl headers = genRedirectHeaders("[fe80::1]", "/port", false, false);
 
     EXPECT_EQ("http://[fe80::1]:8080/port",
-              config.route(headers, 0)->directResponseEntry()->newPath(headers));
+              config.route(headers, 0)->directResponseEntry()->newUri(headers));
   }
   {
     Http::TestRequestHeaderMapImpl headers =
         genRedirectHeaders("[fe80::1]:8080", "/port", false, false);
     EXPECT_EQ("http://[fe80::1]:8181/port",
-              config.route(headers, 0)->directResponseEntry()->newPath(headers));
+              config.route(headers, 0)->directResponseEntry()->newUri(headers));
   }
   {
     Http::TestRequestHeaderMapImpl headers =
         genRedirectHeaders("[fe80::1]", "/host_port", false, false);
     EXPECT_EQ("http://[fe80::2]:8080/host_port",
-              config.route(headers, 0)->directResponseEntry()->newPath(headers));
+              config.route(headers, 0)->directResponseEntry()->newUri(headers));
   }
   {
     Http::TestRequestHeaderMapImpl headers =
         genRedirectHeaders("[fe80::1]", "/scheme_host_port", false, false);
     EXPECT_EQ("ws://[fe80::2]:8080/scheme_host_port",
-              config.route(headers, 0)->directResponseEntry()->newPath(headers));
+              config.route(headers, 0)->directResponseEntry()->newUri(headers));
   }
   {
     Http::TestRequestHeaderMapImpl headers = genRedirectHeaders("[fe80::1]:80", "/ws", true, false);
     EXPECT_EQ("ws://[fe80::1]:80/ws",
-              config.route(headers, 0)->directResponseEntry()->newPath(headers));
+              config.route(headers, 0)->directResponseEntry()->newUri(headers));
   }
   {
     Http::TestRequestHeaderMapImpl headers =
         genRedirectHeaders("[fe80::1]:80", "/host_path_https", false, false);
     EXPECT_EQ("https://[fe80::2]/new_path",
-              config.route(headers, 0)->directResponseEntry()->newPath(headers));
+              config.route(headers, 0)->directResponseEntry()->newUri(headers));
   }
   {
     Http::TestRequestHeaderMapImpl headers =
         genRedirectHeaders("[fe80::1]:80", "/scheme_host_port", false, false);
     EXPECT_EQ("ws://[fe80::2]:8080/scheme_host_port",
-              config.route(headers, 0)->directResponseEntry()->newPath(headers));
+              config.route(headers, 0)->directResponseEntry()->newUri(headers));
   }
   {
     Http::TestRequestHeaderMapImpl headers =
         genRedirectHeaders("[fe80::1]:443", "/ws", false, false);
     EXPECT_EQ("ws://[fe80::1]:443/ws",
-              config.route(headers, 0)->directResponseEntry()->newPath(headers));
+              config.route(headers, 0)->directResponseEntry()->newUri(headers));
   }
   {
     Http::TestRequestHeaderMapImpl headers =
         genRedirectHeaders("[fe80::1]:443", "/host_path_http", true, false);
     EXPECT_EQ("http://[fe80::2]/new_path",
-              config.route(headers, 0)->directResponseEntry()->newPath(headers));
+              config.route(headers, 0)->directResponseEntry()->newUri(headers));
   }
   {
     Http::TestRequestHeaderMapImpl headers =
         genRedirectHeaders("[fe80::1]:443", "/scheme_host_port", true, false);
     EXPECT_EQ("ws://[fe80::2]:8080/scheme_host_port",
-              config.route(headers, 0)->directResponseEntry()->newPath(headers));
+              config.route(headers, 0)->directResponseEntry()->newUri(headers));
   }
 }
 
@@ -5900,7 +5900,7 @@ virtual_hosts:
     Http::TestRequestHeaderMapImpl headers =
         genRedirectHeaders("redirect.lyft.com", "/foo", false, false);
     EXPECT_EQ("http://new.lyft.com/foo",
-              config.route(headers, 0)->directResponseEntry()->newPath(headers));
+              config.route(headers, 0)->directResponseEntry()->newUri(headers));
     EXPECT_EQ(nullptr, config.route(headers, 0)->routeEntry());
   }
 }
@@ -5946,7 +5946,7 @@ virtual_hosts:
     Http::TestRequestHeaderMapImpl headers =
         genRedirectHeaders("redirect.lyft.com", "/foo", false, false);
     EXPECT_EQ("http://new.lyft.com/foo",
-              config.route(headers, 0)->directResponseEntry()->newPath(headers));
+              config.route(headers, 0)->directResponseEntry()->newUri(headers));
     EXPECT_EQ(nullptr, config.route(headers, 0)->routeEntry());
   }
 }
@@ -6162,7 +6162,7 @@ virtual_hosts:
 class WeightedClustersHeaderTransformationsTest : public RouteMatcherTest {
 protected:
   void runTest(bool run_request_header_test) {
-    const std::string yaml_template = R"EOF(
+    const fmt::format_string<const char*, const char*> yaml_template = R"EOF(
   virtual_hosts:
     - name: www2
       domains: ["www.lyft.com"]
@@ -7526,7 +7526,7 @@ virtual_hosts:
     Http::TestRequestHeaderMapImpl headers =
         genRedirectHeaders("redirect.lyft.com", "/foo", false, false);
     EXPECT_EQ("http://new.lyft.com/foo",
-              config.route(headers, 0)->directResponseEntry()->newPath(headers));
+              config.route(headers, 0)->directResponseEntry()->newUri(headers));
     EXPECT_EQ(Http::Code::TemporaryRedirect,
               config.route(headers, 0)->directResponseEntry()->responseCode());
   }
@@ -7767,35 +7767,35 @@ virtual_hosts:
     const DirectResponseEntry* redirect = config.route(headers, 0)->directResponseEntry();
     redirect->rewritePathHeader(headers, true);
     EXPECT_EQ("http://redirect.lyft.com/new/prefix/some/path/?lang=eng&con=US",
-              redirect->newPath(headers));
+              redirect->newUri(headers));
   }
   {
     Http::TestRequestHeaderMapImpl headers =
         genRedirectHeaders("redirect.lyft.com", "/path/", true, false);
     const DirectResponseEntry* redirect = config.route(headers, 0)->directResponseEntry();
     redirect->rewritePathHeader(headers, true);
-    EXPECT_EQ("https://redirect.lyft.com/new/path/", redirect->newPath(headers));
+    EXPECT_EQ("https://redirect.lyft.com/new/path/", redirect->newUri(headers));
   }
   {
     Http::TestRequestHeaderMapImpl headers =
         genRedirectHeaders("redirect.lyft.com", "/host/prefix/1", true, false);
     const DirectResponseEntry* redirect = config.route(headers, 0)->directResponseEntry();
     redirect->rewritePathHeader(headers, true);
-    EXPECT_EQ("https://new.lyft.com/new/prefix/1", redirect->newPath(headers));
+    EXPECT_EQ("https://new.lyft.com/new/prefix/1", redirect->newUri(headers));
   }
   {
     Http::TestRequestHeaderMapImpl headers =
         genRedirectHeaders("redirect.lyft.com", "/regex/hello/", false, false);
     const DirectResponseEntry* redirect = config.route(headers, 0)->directResponseEntry();
     redirect->rewritePathHeader(headers, true);
-    EXPECT_EQ("http://redirect.lyft.com/new/regex-prefix/", redirect->newPath(headers));
+    EXPECT_EQ("http://redirect.lyft.com/new/regex-prefix/", redirect->newUri(headers));
   }
   {
     Http::TestRequestHeaderMapImpl headers =
         genRedirectHeaders("redirect.lyft.com", "/http/prefix/", false, false);
     const DirectResponseEntry* redirect = config.route(headers, 0)->directResponseEntry();
     redirect->rewritePathHeader(headers, true);
-    EXPECT_EQ("https://redirect.lyft.com/https/prefix/", redirect->newPath(headers));
+    EXPECT_EQ("https://redirect.lyft.com/https/prefix/", redirect->newUri(headers));
   }
   {
     // The following matches to the redirect action match value equals to `/ignore-this` instead
@@ -7805,7 +7805,7 @@ virtual_hosts:
         genRedirectHeaders("redirect.lyft.com", "/ignore-this", false, false);
     const DirectResponseEntry* redirect = config.route(headers, 0)->directResponseEntry();
     redirect->rewritePathHeader(headers, true);
-    EXPECT_EQ("http://redirect.lyft.com/", redirect->newPath(headers));
+    EXPECT_EQ("http://redirect.lyft.com/", redirect->newUri(headers));
   }
   {
     // The following matches to the redirect action match value equals to `/ignore-this/`
@@ -7815,7 +7815,7 @@ virtual_hosts:
         genRedirectHeaders("redirect.lyft.com", "/ignore-this/", false, false);
     const DirectResponseEntry* redirect = config.route(headers, 0)->directResponseEntry();
     redirect->rewritePathHeader(headers, true);
-    EXPECT_EQ("http://redirect.lyft.com/", redirect->newPath(headers));
+    EXPECT_EQ("http://redirect.lyft.com/", redirect->newUri(headers));
   }
   {
     // The same as previous test request, the following matches to the redirect action match
@@ -7825,35 +7825,35 @@ virtual_hosts:
     const DirectResponseEntry* redirect = config.route(headers, 0)->directResponseEntry();
     redirect->rewritePathHeader(headers, true);
     EXPECT_EQ("http://redirect.lyft.com/however/use/the/rest/of/this/path",
-              redirect->newPath(headers));
+              redirect->newUri(headers));
   }
   {
     Http::TestRequestHeaderMapImpl headers =
         genRedirectHeaders("redirect.lyft.com", "/ignore-this/use/", false, false);
     const DirectResponseEntry* redirect = config.route(headers, 0)->directResponseEntry();
     redirect->rewritePathHeader(headers, true);
-    EXPECT_EQ("http://redirect.lyft.com/use/", redirect->newPath(headers));
+    EXPECT_EQ("http://redirect.lyft.com/use/", redirect->newUri(headers));
   }
   {
     Http::TestRequestHeaderMapImpl headers =
         genRedirectHeaders("redirect.lyft.com", "/ignore-substringto/use/", false, false);
     const DirectResponseEntry* redirect = config.route(headers, 0)->directResponseEntry();
     redirect->rewritePathHeader(headers, true);
-    EXPECT_EQ("http://redirect.lyft.com/to/use/", redirect->newPath(headers));
+    EXPECT_EQ("http://redirect.lyft.com/to/use/", redirect->newUri(headers));
   }
   {
     Http::TestRequestHeaderMapImpl headers =
         genRedirectHeaders("redirect.lyft.com", "/ignore-substring-to/use/", false, false);
     const DirectResponseEntry* redirect = config.route(headers, 0)->directResponseEntry();
     redirect->rewritePathHeader(headers, true);
-    EXPECT_EQ("http://redirect.lyft.com/-to/use/", redirect->newPath(headers));
+    EXPECT_EQ("http://redirect.lyft.com/-to/use/", redirect->newUri(headers));
   }
   {
     Http::TestRequestHeaderMapImpl headers =
         genRedirectHeaders("redirect.lyft.com", "/service-hello/a/b/c", false, false);
     const DirectResponseEntry* redirect = config.route(headers, 0)->directResponseEntry();
     redirect->rewritePathHeader(headers, true);
-    EXPECT_EQ("http://redirect.lyft.com/a/b/c", redirect->newPath(headers));
+    EXPECT_EQ("http://redirect.lyft.com/a/b/c", redirect->newUri(headers));
   }
 }
 
@@ -7909,7 +7909,7 @@ virtual_hosts:
     const DirectResponseEntry* redirect = config.route(headers, 0)->directResponseEntry();
     redirect->rewritePathHeader(headers, true);
     EXPECT_EQ("http://redirect.lyft.com/endpoint/9000/baz?lang=eng&con=US",
-              redirect->newPath(headers));
+              redirect->newUri(headers));
   }
   // Regex rewrite without a query, no strip_query
   {
@@ -7917,7 +7917,7 @@ virtual_hosts:
         genRedirectHeaders("redirect.lyft.com", "/foo/1984/bar/anything", false, false);
     const DirectResponseEntry* redirect = config.route(headers, 0)->directResponseEntry();
     redirect->rewritePathHeader(headers, true);
-    EXPECT_EQ("http://redirect.lyft.com/bar/anything/1984/baz", redirect->newPath(headers));
+    EXPECT_EQ("http://redirect.lyft.com/bar/anything/1984/baz", redirect->newUri(headers));
   }
   // Regex rewrite with a query, with strip_query
   {
@@ -7925,7 +7925,7 @@ virtual_hosts:
         "redirect.lyft.com", "/strip-query/9000/endpoint?lang=eng&con=US", false, false);
     const DirectResponseEntry* redirect = config.route(headers, 0)->directResponseEntry();
     redirect->rewritePathHeader(headers, true);
-    EXPECT_EQ("http://redirect.lyft.com/endpoint/9000/baz", redirect->newPath(headers));
+    EXPECT_EQ("http://redirect.lyft.com/endpoint/9000/baz", redirect->newUri(headers));
   }
   // Regex rewrite without a query, with strip_query
   {
@@ -7933,7 +7933,7 @@ virtual_hosts:
         genRedirectHeaders("redirect.lyft.com", "/strip-query/1984/bar/anything", false, false);
     const DirectResponseEntry* redirect = config.route(headers, 0)->directResponseEntry();
     redirect->rewritePathHeader(headers, true);
-    EXPECT_EQ("http://redirect.lyft.com/bar/anything/1984/baz", redirect->newPath(headers));
+    EXPECT_EQ("http://redirect.lyft.com/bar/anything/1984/baz", redirect->newUri(headers));
   }
   // Regex rewrite using prefix, without query, no strip query
   {
@@ -7941,7 +7941,7 @@ virtual_hosts:
         genRedirectHeaders("redirect.lyft.com", "/prefix/foo/1984/bar/anything", false, false);
     const DirectResponseEntry* redirect = config.route(headers, 0)->directResponseEntry();
     redirect->rewritePathHeader(headers, true);
-    EXPECT_EQ("http://redirect.lyft.com/prefix/bar/anything/1984/baz", redirect->newPath(headers));
+    EXPECT_EQ("http://redirect.lyft.com/prefix/bar/anything/1984/baz", redirect->newUri(headers));
   }
   // Regex rewrite using prefix, with query, no strip query
   {
@@ -7950,7 +7950,7 @@ virtual_hosts:
     const DirectResponseEntry* redirect = config.route(headers, 0)->directResponseEntry();
     redirect->rewritePathHeader(headers, true);
     EXPECT_EQ("http://redirect.lyft.com/prefix/endpoint/9000/baz?lang=eng&con=US",
-              redirect->newPath(headers));
+              redirect->newUri(headers));
   }
   // Regex rewrite using prefix, with query, with strip query
   {
@@ -7960,7 +7960,7 @@ virtual_hosts:
     const DirectResponseEntry* redirect = config.route(headers, 0)->directResponseEntry();
     redirect->rewritePathHeader(headers, true);
     EXPECT_EQ("http://redirect.lyft.com/prefix-strip-query/endpoint/9000/baz",
-              redirect->newPath(headers));
+              redirect->newUri(headers));
   }
 }
 
@@ -7998,7 +7998,7 @@ virtual_hosts:
         genRedirectHeaders("redirect.lyft.com", "/query/true?lang=eng&con=US", false, false);
     const DirectResponseEntry* redirect = config.route(headers, 0)->directResponseEntry();
     redirect->rewritePathHeader(headers, true);
-    EXPECT_EQ("http://redirect.lyft.com/new/prefix", redirect->newPath(headers));
+    EXPECT_EQ("http://redirect.lyft.com/new/prefix", redirect->newUri(headers));
   }
   {
     Http::TestRequestHeaderMapImpl headers = genRedirectHeaders(
@@ -8006,56 +8006,56 @@ virtual_hosts:
     const DirectResponseEntry* redirect = config.route(headers, 0)->directResponseEntry();
     redirect->rewritePathHeader(headers, true);
     EXPECT_EQ("https://redirect.lyft.com/new/prefix/some/path?lang=eng&con=US",
-              redirect->newPath(headers));
+              redirect->newUri(headers));
   }
   {
     Http::TestRequestHeaderMapImpl headers =
         genRedirectHeaders("redirect.lyft.com", "/host/query-default?lang=eng&con=US", true, false);
     EXPECT_EQ("https://new.lyft.com/host/query-default?lang=eng&con=US",
-              config.route(headers, 0)->directResponseEntry()->newPath(headers));
+              config.route(headers, 0)->directResponseEntry()->newUri(headers));
   }
   {
     Http::TestRequestHeaderMapImpl headers =
         genRedirectHeaders("redirect.lyft.com", "/path/redirect/?lang=eng&con=US", true, false);
     EXPECT_EQ("https://redirect.lyft.com/new/path-redirect/?lang=eng&con=US",
-              config.route(headers, 0)->directResponseEntry()->newPath(headers));
+              config.route(headers, 0)->directResponseEntry()->newUri(headers));
   }
   {
     Http::TestRequestHeaderMapImpl headers = genRedirectHeaders(
         "redirect.lyft.com", "/path/redirect/strip-query/true?lang=eng&con=US", true, false);
     EXPECT_EQ("https://redirect.lyft.com/new/path-redirect/",
-              config.route(headers, 0)->directResponseEntry()->newPath(headers));
+              config.route(headers, 0)->directResponseEntry()->newUri(headers));
   }
   {
     Http::TestRequestHeaderMapImpl headers =
         genRedirectHeaders("redirect.lyft.com", "/path/redirect/query", true, false);
     EXPECT_EQ("https://redirect.lyft.com/new/path-redirect?foo=1",
-              config.route(headers, 0)->directResponseEntry()->newPath(headers));
+              config.route(headers, 0)->directResponseEntry()->newUri(headers));
   }
   {
     Http::TestRequestHeaderMapImpl headers =
         genRedirectHeaders("redirect.lyft.com", "/path/redirect/query?bar=1", true, false);
     EXPECT_EQ("https://redirect.lyft.com/new/path-redirect?foo=1",
-              config.route(headers, 0)->directResponseEntry()->newPath(headers));
+              config.route(headers, 0)->directResponseEntry()->newUri(headers));
   }
   {
     Http::TestRequestHeaderMapImpl headers =
         genRedirectHeaders("redirect.lyft.com", "/path/redirect/query-with-strip", true, false);
     EXPECT_EQ("https://redirect.lyft.com/new/path-redirect?foo=2",
-              config.route(headers, 0)->directResponseEntry()->newPath(headers));
+              config.route(headers, 0)->directResponseEntry()->newUri(headers));
   }
   {
     Http::TestRequestHeaderMapImpl headers = genRedirectHeaders(
         "redirect.lyft.com", "/path/redirect/query-with-strip?bar=1", true, false);
     EXPECT_EQ("https://redirect.lyft.com/new/path-redirect?foo=2",
-              config.route(headers, 0)->directResponseEntry()->newPath(headers));
+              config.route(headers, 0)->directResponseEntry()->newUri(headers));
   }
   {
     Http::TestRequestHeaderMapImpl headers = genRedirectHeaders(
         "redirect.lyft.com", "/all/combinations/here/we/go?key=value", false, false);
     const DirectResponseEntry* redirect = config.route(headers, 0)->directResponseEntry();
     redirect->rewritePathHeader(headers, true);
-    EXPECT_EQ("https://new.lyft.com/new/prefix/here/we/go", redirect->newPath(headers));
+    EXPECT_EQ("https://new.lyft.com/new/prefix/here/we/go", redirect->newUri(headers));
   }
 }
 

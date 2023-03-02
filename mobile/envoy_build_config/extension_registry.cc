@@ -3,6 +3,8 @@
 #ifdef ENVOY_MOBILE_REQUEST_COMPRESSION
 #include "source/extensions/compression/brotli/compressor/config.h"
 #include "source/extensions/compression/gzip/compressor/config.h"
+#include "source/extensions/filters/http/composite/action.h"
+#include "source/extensions/filters/http/composite/config.h"
 #include "source/extensions/filters/http/compressor/config.h"
 #endif
 
@@ -169,6 +171,8 @@ void ExtensionRegistry::registerFactories() {
 #ifdef ENVOY_MOBILE_REQUEST_COMPRESSION
   Extensions::Compression::Brotli::Compressor::forceRegisterBrotliCompressorLibraryFactory();
   Extensions::Compression::Gzip::Compressor::forceRegisterGzipCompressorLibraryFactory();
+  Extensions::HttpFilters::Composite::forceRegisterCompositeFilterFactory();
+  Extensions::HttpFilters::Composite::forceRegisterExecuteFilterActionFactory();
   Extensions::HttpFilters::Compressor::forceRegisterCompressorFilterFactory();
 #endif
 }

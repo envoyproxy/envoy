@@ -949,6 +949,28 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
                                             stream_info, body),
                 ProtoEq(ValueUtil::nullValue()));
   }
+
+  {
+    StreamInfoFormatter listener_format("DOWNSTREAM_TRANSPORT_FAILURE_REASON");
+    std::string downstream_transport_failure_reason = "TLS error";
+    stream_info.setDownstreamTransportFailureReason(downstream_transport_failure_reason);
+    EXPECT_EQ("TLS_error", listener_format.format(request_headers, response_headers,
+                                                  response_trailers, stream_info, body));
+    EXPECT_THAT(listener_format.formatValue(request_headers, response_headers, response_trailers,
+                                            stream_info, body),
+                ProtoEq(ValueUtil::stringValue("TLS_error")));
+  }
+  {
+    StreamInfoFormatter listener_format("DOWNSTREAM_TRANSPORT_FAILURE_REASON");
+    std::string downstream_transport_failure_reason;
+    stream_info.setDownstreamTransportFailureReason(downstream_transport_failure_reason);
+    EXPECT_EQ(absl::nullopt, listener_format.format(request_headers, response_headers,
+                                                    response_trailers, stream_info, body));
+    EXPECT_THAT(listener_format.formatValue(request_headers, response_headers, response_trailers,
+                                            stream_info, body),
+                ProtoEq(ValueUtil::nullValue()));
+  }
+
   {
     StreamInfoFormatter upstream_format("UPSTREAM_TRANSPORT_FAILURE_REASON");
     std::string upstream_transport_failure_reason = "SSL error";

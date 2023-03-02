@@ -13,6 +13,8 @@ namespace Envoy {
 namespace Server {
 namespace {
 
+using ::testing::Return;
+
 class MockSupportsUdpGso : public Api::OsSysCallsImpl {
 public:
   MOCK_METHOD(bool, supportsUdpGso, (), (const));
@@ -557,6 +559,134 @@ connection_balance_config:
   EXPECT_THROW_WITH_REGEX(addOrUpdateListener(listener_proto), EnvoyException,
                           "connection_balance_config is configured for QUIC listener which doesn't "
                           "work with connection balancer.");
+#else
+  EXPECT_THROW_WITH_REGEX(addOrUpdateListener(listener_proto), EnvoyException,
+                          "QUIC is configured but not enabled in the build.");
+#endif
+}
+
+TEST_P(ListenerManagerImplQuicOnlyTest, QuicListenerFactoryWithBadServerPreferredV4Address) {
+  std::string yaml = TestEnvironment::substitute(R"EOF(
+address:
+  socket_address:
+    address: 0.0.0.0
+    protocol: UDP
+    port_value: 1234
+filter_chains:
+- filter_chain_match:
+    transport_protocol: "quic"
+  name: foo
+  filters:
+  - name: envoy.filters.network.http_connection_manager
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+      codec_type: HTTP3
+      stat_prefix: hcm
+      route_config:
+        name: local_route
+      http_filters:
+        - name: envoy.filters.http.router
+          typed_config:
+            "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+  transport_socket:
+    name: envoy.transport_sockets.quic
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.transport_sockets.quic.v3.QuicDownstreamTransport
+      downstream_tls_context:
+        common_tls_context:
+          tls_certificates:
+          - certificate_chain:
+              filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_cert.pem"
+            private_key:
+              filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_key.pem"
+          validation_context:
+            trusted_ca:
+              filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
+            match_typed_subject_alt_names:
+            - matcher:
+                exact: localhost
+              san_type: URI
+            - matcher:
+                exact: 127.0.0.1
+              san_type: IP_ADDRESS
+udp_listener_config:
+  quic_options:
+    server_preferred_address_config:
+      name: quic.server_preferred_address.fixed
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.quic.server_preferred_address.v3.FixedServerPreferredAddressConfig
+        ipv4_address: "bad.v4.address"
+  )EOF",
+                                                 Network::Address::IpVersion::v4);
+  envoy::config::listener::v3::Listener listener_proto = parseListenerFromV3Yaml(yaml);
+
+#if defined(ENVOY_ENABLE_QUIC)
+  EXPECT_THROW_WITH_REGEX(addOrUpdateListener(listener_proto), EnvoyException,
+                          "bad v4 server preferred address");
+#else
+  EXPECT_THROW_WITH_REGEX(addOrUpdateListener(listener_proto), EnvoyException,
+                          "QUIC is configured but not enabled in the build.");
+#endif
+}
+
+TEST_P(ListenerManagerImplQuicOnlyTest, QuicListenerFactoryWithBadServerPreferredV6Address) {
+  std::string yaml = TestEnvironment::substitute(R"EOF(
+address:
+  socket_address:
+    address: 0.0.0.0
+    protocol: UDP
+    port_value: 1234
+filter_chains:
+- filter_chain_match:
+    transport_protocol: "quic"
+  name: foo
+  filters:
+  - name: envoy.filters.network.http_connection_manager
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+      codec_type: HTTP3
+      stat_prefix: hcm
+      route_config:
+        name: local_route
+      http_filters:
+        - name: envoy.filters.http.router
+          typed_config:
+            "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+  transport_socket:
+    name: envoy.transport_sockets.quic
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.transport_sockets.quic.v3.QuicDownstreamTransport
+      downstream_tls_context:
+        common_tls_context:
+          tls_certificates:
+          - certificate_chain:
+              filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_cert.pem"
+            private_key:
+              filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_key.pem"
+          validation_context:
+            trusted_ca:
+              filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
+            match_typed_subject_alt_names:
+            - matcher:
+                exact: localhost
+              san_type: URI
+            - matcher:
+                exact: 127.0.0.1
+              san_type: IP_ADDRESS
+udp_listener_config:
+  quic_options:
+    server_preferred_address_config:
+      name: quic.server_preferred_address.fixed
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.quic.server_preferred_address.v3.FixedServerPreferredAddressConfig
+        ipv6_address: "bad.v6.address"
+  )EOF",
+                                                 Network::Address::IpVersion::v4);
+  envoy::config::listener::v3::Listener listener_proto = parseListenerFromV3Yaml(yaml);
+
+#if defined(ENVOY_ENABLE_QUIC)
+  EXPECT_THROW_WITH_REGEX(addOrUpdateListener(listener_proto), EnvoyException,
+                          "bad v6 server preferred address");
 #else
   EXPECT_THROW_WITH_REGEX(addOrUpdateListener(listener_proto), EnvoyException,
                           "QUIC is configured but not enabled in the build.");
