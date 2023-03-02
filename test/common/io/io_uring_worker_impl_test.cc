@@ -81,13 +81,12 @@ TEST(IoUringWorkerImplTest, DelaySubmit) {
   EXPECT_CALL(mock_io_uring, submit());
   EXPECT_CALL(mock_io_uring, forEveryCompletion(_))
       .WillOnce(Invoke([&worker, &io_uring_socket, &mock_io_uring](CompletionCb) {
-        struct iovec iov;
-        EXPECT_CALL(mock_io_uring, prepareReadv(io_uring_socket.fd(), &iov, 1, 0, _));
-        auto req = worker.submitReadRequest(io_uring_socket, &iov);
+        EXPECT_CALL(mock_io_uring, prepareClose(io_uring_socket.fd(), _));
+        auto req = worker.submitCloseRequest(io_uring_socket);
         // Manually delete requests which have to be deleted in request completion callbacks.
         delete req;
-        EXPECT_CALL(mock_io_uring, prepareReadv(io_uring_socket.fd(), &iov, 1, 0, _));
-        req = worker.submitReadRequest(io_uring_socket, &iov);
+        EXPECT_CALL(mock_io_uring, prepareClose(io_uring_socket.fd(), _));
+        req = worker.submitCloseRequest(io_uring_socket);
         delete req;
       }));
   file_event_callback(Event::FileReadyType::Read);

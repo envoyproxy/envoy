@@ -137,9 +137,19 @@ class IoUringSocket;
 /**
  * Abstract for io_uring I/O Request.
  */
-struct Request {
-  uint32_t type_;
-  IoUringSocket& io_uring_socket_;
+class Request {
+public:
+  virtual ~Request() = default;
+
+  /**
+   * Return the request type.
+   */
+  virtual uint32_t type() const PURE;
+
+  /**
+   * Return on which io_uring socket the request belongs to.
+   */
+  virtual IoUringSocket& socket() const PURE;
 };
 
 /**
@@ -166,7 +176,7 @@ public:
   virtual os_fd_t fd() const PURE;
 
   /**
-   * close the socket.
+   * Close the socket.
    */
   virtual void close() PURE;
 
@@ -189,8 +199,7 @@ public:
   /**
    * Write data to the socket.
    */
-  virtual uint64_t write(Buffer::Instance& data) PURE;
-  virtual uint64_t writev(const Buffer::RawSlice* slices, uint64_t num_slice) PURE;
+  virtual void writev(const Buffer::RawSlice* slices, uint64_t num_slice) PURE;
 
   /**
    * On accept request completed.
@@ -212,10 +221,11 @@ public:
   /**
    * On read request completed.
    * TODO (soulxu): wrap the raw result into a type. It can be `IoCallUint64Result`.
+   * @param req the ReadRequest object which is as request user data.
    * @param result the result of operation in the request.
    * @param injected indicates the completion is injected or not.
    */
-  virtual void onRead(int32_t result, bool injected) PURE;
+  virtual void onRead(Request* req, int32_t result, bool injected) PURE;
 
   /**
    * On write request completed.
@@ -261,7 +271,7 @@ struct AcceptedSocketParam {
 };
 
 struct ReadParam {
-  Buffer::Instance& pending_read_buf_;
+  Buffer::Instance& buf_;
   int32_t result_;
 };
 
@@ -323,13 +333,13 @@ public:
   /**
    * Submit a read request for a socket.
    */
-  virtual Request* submitReadRequest(IoUringSocket& socket, struct iovec* iov) PURE;
+  virtual Request* submitReadRequest(IoUringSocket& socket) PURE;
 
   /**
    * Submit a write request for a socket.
    */
-  virtual Request* submitWritevRequest(IoUringSocket& socket, struct iovec* iovecs,
-                                       uint64_t num_vecs) PURE;
+  virtual Request* submitWritevRequest(IoUringSocket& socket, const Buffer::RawSlice* slices,
+                                       uint64_t num_slice) PURE;
 
   /**
    * Submit a close request for a socket.

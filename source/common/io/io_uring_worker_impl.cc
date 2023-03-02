@@ -5,6 +5,26 @@
 namespace Envoy {
 namespace Io {
 
+BaseRequest::BaseRequest(uint32_t type, IoUringSocket& socket) : type_(type), socket_(socket) {}
+
+AcceptRequest::AcceptRequest(IoUringSocket& socket) : BaseRequest(RequestType::Accept, socket) {}
+
+ReadRequest::ReadRequest(IoUringSocket& socket, uint32_t size)
+    : BaseRequest(RequestType::Read, socket), buf_(std::make_unique<uint8_t[]>(size)),
+      iov_(std::make_unique<struct iovec>()) {
+  iov_->iov_base = buf_.get();
+  iov_->iov_len = size;
+}
+
+WriteRequest::WriteRequest(IoUringSocket& socket, const Buffer::RawSlice* slices,
+                           uint64_t num_slice)
+    : BaseRequest(RequestType::Write, socket), iov_(std::make_unique<struct iovec[]>(num_slice)) {
+  for (size_t i = 0; i < num_slice; i++) {
+    iov_[i].iov_base = slices[i].mem_;
+    iov_[i].iov_len = slices[i].len_;
+  }
+}
+
 IoUringSocketEntry::IoUringSocketEntry(os_fd_t fd, IoUringWorkerImpl& parent,
                                        IoUringHandler& io_uring_handler)
     : fd_(fd), parent_(parent), io_uring_handler_(io_uring_handler) {}
@@ -59,9 +79,12 @@ IoUringSocket& IoUringWorkerImpl::addAcceptSocket(os_fd_t fd, IoUringHandler& ha
   return *sockets_.back();
 }
 
-IoUringSocket& IoUringWorkerImpl::addServerSocket(os_fd_t fd, IoUringHandler&) {
+IoUringSocket& IoUringWorkerImpl::addServerSocket(os_fd_t fd, IoUringHandler& handler) {
   ENVOY_LOG(trace, "add server socket, fd = {}", fd);
-  PANIC("not implemented");
+  std::unique_ptr<IoUringServerSocket> socket =
+      std::make_unique<IoUringServerSocket>(fd, *this, handler);
+  LinkedList::moveIntoListBack(std::move(socket), sockets_);
+  return *sockets_.back();
 }
 
 IoUringSocket& IoUringWorkerImpl::addClientSocket(os_fd_t fd, IoUringHandler&) {
@@ -72,20 +95,20 @@ IoUringSocket& IoUringWorkerImpl::addClientSocket(os_fd_t fd, IoUringHandler&) {
 Event::Dispatcher& IoUringWorkerImpl::dispatcher() { return dispatcher_; }
 
 Request* IoUringWorkerImpl::submitAcceptRequest(IoUringSocket& socket) {
-  AcceptRequest* req = new AcceptRequest{{RequestType::Accept, socket}};
+  AcceptRequest* req = new AcceptRequest(socket);
 
   ENVOY_LOG(trace, "submit accept request, fd = {}, accept req = {}", socket.fd(), fmt::ptr(req));
 
   auto res =
       io_uring_->prepareAccept(socket.fd(), reinterpret_cast<struct sockaddr*>(&req->remote_addr_),
                                &req->remote_addr_len_, req);
-  if (res == Io::IoUringResult::Failed) {
+  if (res == IoUringResult::Failed) {
     // TODO(rojkov): handle `EBUSY` in case the completion queue is never reaped.
     submit();
     res = io_uring_->prepareAccept(socket.fd(),
                                    reinterpret_cast<struct sockaddr*>(&req->remote_addr_),
                                    &req->remote_addr_len_, req);
-    RELEASE_ASSERT(res == Io::IoUringResult::Ok, "unable to prepare accept");
+    RELEASE_ASSERT(res == IoUringResult::Ok, "unable to prepare accept");
   }
   submit();
   return req;
@@ -94,82 +117,83 @@ Request* IoUringWorkerImpl::submitAcceptRequest(IoUringSocket& socket) {
 Request*
 IoUringWorkerImpl::submitConnectRequest(IoUringSocket& socket,
                                         const Network::Address::InstanceConstSharedPtr& address) {
-  Request* req = new Request{RequestType::Connect, socket};
+  Request* req = new BaseRequest(RequestType::Connect, socket);
 
   ENVOY_LOG(trace, "submit connect request, fd = {}, req = {}", socket.fd(), fmt::ptr(req));
 
   auto res = io_uring_->prepareConnect(socket.fd(), address, req);
-  if (res == Io::IoUringResult::Failed) {
+  if (res == IoUringResult::Failed) {
     // TODO(rojkov): handle `EBUSY` in case the completion queue is never reaped.
     submit();
     res = io_uring_->prepareConnect(socket.fd(), address, req);
-    RELEASE_ASSERT(res == Io::IoUringResult::Ok, "unable to prepare writev");
+    RELEASE_ASSERT(res == IoUringResult::Ok, "unable to prepare writev");
   }
   submit();
   return req;
 }
 
-Request* IoUringWorkerImpl::submitReadRequest(IoUringSocket& socket, struct iovec* iov) {
-  Request* req = new Request{RequestType::Read, socket};
+Request* IoUringWorkerImpl::submitReadRequest(IoUringSocket& socket) {
+  ReadRequest* req = new ReadRequest(socket, read_buffer_size_);
 
   ENVOY_LOG(trace, "submit read request, fd = {}, read req = {}", socket.fd(), fmt::ptr(req));
 
-  auto res = io_uring_->prepareReadv(socket.fd(), iov, 1, 0, req);
-  if (res == Io::IoUringResult::Failed) {
+  auto res = io_uring_->prepareReadv(socket.fd(), req->iov_.get(), 1, 0, req);
+  if (res == IoUringResult::Failed) {
     // TODO(rojkov): handle `EBUSY` in case the completion queue is never reaped.
     submit();
-    res = io_uring_->prepareReadv(socket.fd(), iov, 1, 0, req);
-    RELEASE_ASSERT(res == Io::IoUringResult::Ok, "unable to prepare readv");
+    res = io_uring_->prepareReadv(socket.fd(), req->iov_.get(), 1, 0, req);
+    RELEASE_ASSERT(res == IoUringResult::Ok, "unable to prepare readv");
   }
   submit();
   return req;
 }
 
-Request* IoUringWorkerImpl::submitWritevRequest(IoUringSocket& socket, struct iovec* iovecs,
-                                                uint64_t num_vecs) {
-  Request* req = new Request{RequestType::Write, socket};
+Request* IoUringWorkerImpl::submitWritevRequest(IoUringSocket& socket,
+                                                const Buffer::RawSlice* slices,
+                                                uint64_t num_slice) {
+  WriteRequest* req = new WriteRequest(socket, slices, num_slice);
 
   ENVOY_LOG(trace, "submit write request, fd = {}, req = {}", socket.fd(), fmt::ptr(req));
 
-  auto res = io_uring_->prepareWritev(socket.fd(), iovecs, num_vecs, 0, req);
-  if (res == Io::IoUringResult::Failed) {
+  auto res = io_uring_->prepareWritev(socket.fd(), req->iov_.get(), num_slice, 0, req);
+  if (res == IoUringResult::Failed) {
     // TODO(rojkov): handle `EBUSY` in case the completion queue is never reaped.
     submit();
-    res = io_uring_->prepareWritev(socket.fd(), iovecs, num_vecs, 0, req);
-    RELEASE_ASSERT(res == Io::IoUringResult::Ok, "unable to prepare writev");
+    res = io_uring_->prepareWritev(socket.fd(), req->iov_.get(), num_slice, 0, req);
+    RELEASE_ASSERT(res == IoUringResult::Ok, "unable to prepare writev");
   }
   submit();
   return req;
 }
 
 Request* IoUringWorkerImpl::submitCloseRequest(IoUringSocket& socket) {
-  Request* req = new Request{RequestType::Close, socket};
+  Request* req = new BaseRequest(RequestType::Close, socket);
 
   ENVOY_LOG(trace, "submit close request, fd = {}, close req = {}", socket.fd(), fmt::ptr(req));
 
   auto res = io_uring_->prepareClose(socket.fd(), req);
-  if (res == Io::IoUringResult::Failed) {
+  if (res == IoUringResult::Failed) {
     // TODO(rojkov): handle `EBUSY` in case the completion queue is never reaped.
     submit();
     res = io_uring_->prepareClose(socket.fd(), req);
-    RELEASE_ASSERT(res == Io::IoUringResult::Ok, "unable to prepare close");
+    RELEASE_ASSERT(res == IoUringResult::Ok, "unable to prepare close");
   }
   submit();
   return req;
 }
 
 Request* IoUringWorkerImpl::submitCancelRequest(IoUringSocket& socket, Request* request_to_cancel) {
-  Request* req = new Request{RequestType::Cancel, socket};
+  Request* req = new BaseRequest(RequestType::Cancel, socket);
 
   ENVOY_LOG(trace, "submit cancel request, fd = {}, cancel req = {}, req to cancel = {}",
             socket.fd(), fmt::ptr(req), fmt::ptr(request_to_cancel));
 
   auto res = io_uring_->prepareCancel(request_to_cancel, req);
-  if (res == Io::IoUringResult::Failed) {
+  if (res == IoUringResult::Failed) {
     // TODO(rojkov): handle `EBUSY` in case the completion queue is never reaped.
     submit();
     res = io_uring_->prepareCancel(request_to_cancel, req);
-    RELEASE_ASSERT(res == Io::IoUringResult::Ok, "unable to prepare cancel");
+    RELEASE_ASSERT(res == IoUringResult::Ok, "unable to prepare cancel");
   }
   submit();
   return req;
@@ -180,7 +204,7 @@ IoUringSocketEntryPtr IoUringWorkerImpl::removeSocket(IoUringSocketEntry& socket
 }
 
 void IoUringWorkerImpl::injectCompletion(IoUringSocket& socket, uint32_t type, int32_t result) {
-  Request* req = new Request{type, socket};
+  Request* req = new BaseRequest(type, socket);
   io_uring_->injectCompletion(socket.fd(), req, result);
   file_event_->activate(Event::FileReadyType::Read);
 }
@@ -193,38 +217,38 @@ void IoUringWorkerImpl::onFileEvent() {
   ENVOY_LOG(trace, "io uring worker, on file event");
   delay_submit_ = true;
   io_uring_->forEveryCompletion([](void* user_data, int32_t result, bool injected) {
-    auto req = static_cast<Io::Request*>(user_data);
+    auto req = static_cast<Request*>(user_data);
 
-    switch (req->type_) {
+    switch (req->type()) {
     case RequestType::Accept:
-      ENVOY_LOG(trace, "receive accept request completion, fd = {}, req = {}",
-                req->io_uring_socket_.fd(), fmt::ptr(req));
-      req->io_uring_socket_.onAccept(req, result, injected);
+      ENVOY_LOG(trace, "receive accept request completion, fd = {}, req = {}", req->socket().fd(),
+                fmt::ptr(req));
+      req->socket().onAccept(req, result, injected);
       break;
     case RequestType::Connect:
-      ENVOY_LOG(trace, "receive connect request completion, fd = {}, req = {}",
-                req->io_uring_socket_.fd(), fmt::ptr(req));
-      req->io_uring_socket_.onConnect(result, injected);
+      ENVOY_LOG(trace, "receive connect request completion, fd = {}, req = {}", req->socket().fd(),
+                fmt::ptr(req));
+      req->socket().onConnect(result, injected);
       break;
     case RequestType::Read:
-      ENVOY_LOG(trace, "receive Read request completion, fd = {}, req = {}",
-                req->io_uring_socket_.fd(), fmt::ptr(req));
-      req->io_uring_socket_.onRead(result, injected);
+      ENVOY_LOG(trace, "receive Read request completion, fd = {}, req = {}", req->socket().fd(),
+                fmt::ptr(req));
+      req->socket().onRead(req, result, injected);
       break;
     case RequestType::Write:
-      ENVOY_LOG(trace, "receive write request completion, fd = {}, req = {}",
-                req->io_uring_socket_.fd(), fmt::ptr(req));
-      req->io_uring_socket_.onWrite(result, injected);
+      ENVOY_LOG(trace, "receive write request completion, fd = {}, req = {}", req->socket().fd(),
+                fmt::ptr(req));
+      req->socket().onWrite(result, injected);
       break;
     case RequestType::Close:
-      ENVOY_LOG(trace, "receive close request completion, fd = {}, req = {}",
-                req->io_uring_socket_.fd(), fmt::ptr(req));
-      req->io_uring_socket_.onClose(result, injected);
+      ENVOY_LOG(trace, "receive close request completion, fd = {}, req = {}", req->socket().fd(),
+                fmt::ptr(req));
+      req->socket().onClose(result, injected);
       break;
     case RequestType::Cancel:
-      ENVOY_LOG(trace, "receive cancel request completion, fd = {}, req = {}",
-                req->io_uring_socket_.fd(), fmt::ptr(req));
-      req->io_uring_socket_.onCancel(result, injected);
+      ENVOY_LOG(trace, "receive cancel request completion, fd = {}, req = {}", req->socket().fd(),
+                fmt::ptr(req));
+      req->socket().onCancel(result, injected);
       break;
     }
 
@@ -260,17 +284,17 @@ void IoUringAcceptSocket::close() {
   }
 }
 
+void IoUringAcceptSocket::enable() {
+  IoUringSocketEntry::enable();
+  submitRequests();
+}
+
 void IoUringAcceptSocket::disable() {
   IoUringSocketEntry::disable();
   // TODO (soulxu): after kernel 5.19, we are able to cancel all requests for the specific fd.
   for (auto req : requests_) {
     parent_.submitCancelRequest(*this, req);
   }
-}
-
-void IoUringAcceptSocket::enable() {
-  IoUringSocketEntry::enable();
-  submitRequests();
 }
 
 void IoUringAcceptSocket::onClose(int32_t result, bool injected) {
@@ -305,6 +329,113 @@ void IoUringAcceptSocket::submitRequests() {
   for (size_t i = requests_.size(); i < accept_size_; i++) {
     auto req = parent_.submitAcceptRequest(*this);
     requests_.insert(req);
+  }
+}
+
+IoUringServerSocket::IoUringServerSocket(os_fd_t fd, IoUringWorkerImpl& parent,
+                                         IoUringHandler& io_uring_handler)
+    : IoUringSocketEntry(fd, parent, io_uring_handler) {
+  enable();
+}
+
+void IoUringServerSocket::close() {
+  IoUringSocketEntry::close();
+
+  if (!read_req_) {
+    parent_.submitCloseRequest(*this);
+    return;
+  }
+
+  parent_.submitCancelRequest(*this, read_req_);
+}
+
+void IoUringServerSocket::enable() {
+  IoUringSocketEntry::enable();
+
+  // Continue processing read buffer remained by the previous read.
+  if (buf_.length() > 0 || read_error_.has_value()) {
+    ENVOY_LOG(trace, "continue reading from socket, fd = {}, size = {}", fd_, buf_.length());
+    injectCompletion(RequestType::Read);
+    return;
+  }
+
+  submitReadRequest();
+}
+
+void IoUringServerSocket::disable() { IoUringSocketEntry::disable(); }
+
+void IoUringServerSocket::writev(const Buffer::RawSlice* slices, uint64_t num_slice) {
+  parent_.submitWritevRequest(*this, slices, num_slice);
+}
+
+void IoUringServerSocket::onClose(int32_t result, bool injected) {
+  IoUringSocketEntry::onClose(result, injected);
+  ASSERT(!injected);
+  cleanup();
+}
+
+// TODO(zhxie): concern submit multiple read requests or submit read request in advance to improve
+// performance in the next iteration.
+void IoUringServerSocket::onRead(Request* req, int32_t result, bool injected) {
+  IoUringSocketEntry::onRead(req, result, injected);
+
+  if (!injected) {
+    read_req_ = nullptr;
+    if (status_ == CLOSING) {
+      parent_.submitCloseRequest(*this);
+    }
+    // Move read data from request to buffer or store the error.
+    if (result > 0) {
+      ReadRequest* read_req = static_cast<ReadRequest*>(req);
+      Buffer::BufferFragment* fragment = new Buffer::BufferFragmentImpl(
+          read_req->buf_.release(), result,
+          [](const void* data, size_t, const Buffer::BufferFragmentImpl* this_fragment) {
+            delete[] reinterpret_cast<const uint8_t*>(data);
+            delete this_fragment;
+          });
+      buf_.addBufferFragment(*fragment);
+    } else {
+      if (result != -ECANCELED) {
+        read_error_ = result;
+      }
+    }
+  }
+
+  // If the socket is enabled, notify handler to read.
+  if (status_ == ENABLED) {
+    if (buf_.length() > 0) {
+      ENVOY_LOG(trace, "read from socket, fd = {}, result = {}", fd_, buf_.length());
+      ReadParam param{buf_, static_cast<int32_t>(buf_.length())};
+      io_uring_handler_.onRead(param);
+      ENVOY_LOG(trace, "after read from socket, fd = {}, remain = {}", fd_, buf_.length());
+    } else if (read_error_ <= 0) {
+      ENVOY_LOG(trace, "read error from socket, fd = {}, result = {}", fd_, read_error_.value());
+      ReadParam param{buf_, read_error_.value()};
+      io_uring_handler_.onRead(param);
+      read_error_.reset();
+    }
+    // The socket may be disabled during handler onRead callback, check it again here.
+    if (status_ == ENABLED && buf_.length() == 0 && !read_error_.has_value()) {
+      // Submit a read accept request for the next read.
+      submitReadRequest();
+    }
+  }
+}
+
+void IoUringServerSocket::onWrite(int32_t result, bool injected) {
+  IoUringSocketEntry::onWrite(result, injected);
+  ASSERT(!injected);
+
+  if (status_ == ENABLED) {
+    ENVOY_LOG(trace, "write to socket, fd = {}, result = {}", fd_, result);
+    WriteParam param{result};
+    io_uring_handler_.onWrite(param);
+  }
+}
+
+void IoUringServerSocket::submitReadRequest() {
+  if (!read_req_) {
+    read_req_ = parent_.submitReadRequest(*this);
   }
 }
 

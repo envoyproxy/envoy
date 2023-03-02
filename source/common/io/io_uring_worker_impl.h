@@ -13,6 +13,40 @@ namespace Io {
 
 class IoUringWorkerImpl;
 
+class BaseRequest : public Request {
+public:
+  BaseRequest(uint32_t type, IoUringSocket& socket);
+
+  // Request
+  uint32_t type() const override { return type_; }
+  IoUringSocket& socket() const override { return socket_; }
+
+  uint32_t type_;
+  IoUringSocket& socket_;
+};
+
+class AcceptRequest : public BaseRequest {
+public:
+  AcceptRequest(IoUringSocket& socket);
+
+  sockaddr_storage remote_addr_{};
+  socklen_t remote_addr_len_{sizeof(remote_addr_)};
+};
+
+class ReadRequest : public BaseRequest {
+public:
+  ReadRequest(IoUringSocket& socket, uint32_t size);
+
+  std::unique_ptr<uint8_t[]> buf_;
+  std::unique_ptr<struct iovec> iov_;
+};
+class WriteRequest : public BaseRequest {
+public:
+  WriteRequest(IoUringSocket& socket, const Buffer::RawSlice* slices, uint64_t num_slice);
+
+  std::unique_ptr<struct iovec[]> iov_;
+};
+
 class IoUringSocketEntry : public IoUringSocket,
                            public LinkedObject<IoUringSocketEntry>,
                            public Event::DeferredDeletable,
@@ -25,9 +59,8 @@ public:
   void close() override { status_ = CLOSING; }
   void enable() override { status_ = ENABLED; }
   void disable() override { status_ = DISABLED; }
-  void connect(const Network::Address::InstanceConstSharedPtr&) override {}
-  uint64_t write(Buffer::Instance&) override { PANIC("not implement"); }
-  uint64_t writev(const Buffer::RawSlice*, uint64_t) override { PANIC("not implement"); }
+  void connect(const Network::Address::InstanceConstSharedPtr&) override { PANIC("not implement"); }
+  void writev(const Buffer::RawSlice*, uint64_t) override { PANIC("not implement"); }
   // This will cleanup all the injected completions for this socket and
   // unlink itself from the worker.
   void cleanup();
@@ -41,7 +74,7 @@ public:
       injected_completions_ &= ~RequestType::Connect;
     }
   }
-  void onRead(int32_t, bool injected) override {
+  void onRead(Request*, int32_t, bool injected) override {
     if (injected && (injected_completions_ & RequestType::Read)) {
       injected_completions_ &= ~RequestType::Read;
     }
@@ -92,9 +125,9 @@ public:
   Request* submitAcceptRequest(IoUringSocket& socket) override;
   Request* submitConnectRequest(IoUringSocket& socket,
                                 const Network::Address::InstanceConstSharedPtr& address) override;
-  Request* submitReadRequest(IoUringSocket& socket, struct iovec* iov) override;
-  Request* submitWritevRequest(IoUringSocket& socket, struct iovec* iovecs,
-                               uint64_t num_vecs) override;
+  Request* submitReadRequest(IoUringSocket& socket) override;
+  Request* submitWritevRequest(IoUringSocket& socket, const Buffer::RawSlice* slices,
+                               uint64_t num_slice) override;
   Request* submitCloseRequest(IoUringSocket& socket) override;
   Request* submitCancelRequest(IoUringSocket& socket, Request* request_to_cancel) override;
 
@@ -124,19 +157,14 @@ protected:
   void submit();
 };
 
-struct AcceptRequest : public Request {
-  sockaddr_storage remote_addr_{};
-  socklen_t remote_addr_len_{sizeof(remote_addr_)};
-};
-
 class IoUringAcceptSocket : public IoUringSocketEntry {
 public:
   IoUringAcceptSocket(os_fd_t fd, IoUringWorkerImpl& parent, IoUringHandler& io_uring_handler,
                       uint32_t accept_size);
 
   void close() override;
-  void disable() override;
   void enable() override;
+  void disable() override;
   void onClose(int32_t result, bool injected) override;
   void onAccept(Request* req, int32_t result, bool injected) override;
 
@@ -146,6 +174,26 @@ private:
   absl::flat_hash_set<Request*> requests_;
 
   void submitRequests();
+};
+
+class IoUringServerSocket : public IoUringSocketEntry {
+public:
+  IoUringServerSocket(os_fd_t fd, IoUringWorkerImpl& parent, IoUringHandler& io_uring_handler);
+
+  void close() override;
+  void enable() override;
+  void disable() override;
+  void writev(const Buffer::RawSlice* slices, uint64_t num_slice) override;
+  void onClose(int32_t result, bool injected) override;
+  void onRead(Request* req, int32_t result, bool injected) override;
+  void onWrite(int32_t result, bool injected) override;
+
+private:
+  Request* read_req_{};
+  Buffer::OwnedImpl buf_;
+  absl::optional<int32_t> read_error_;
+
+  void submitReadRequest();
 };
 
 } // namespace Io
