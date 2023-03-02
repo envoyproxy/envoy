@@ -356,7 +356,8 @@ message Http1ProtocolOptions {
   // If unset, HTTP/1 parser is selected based on
   // envoy.reloadable_features.http1_use_balsa_parser.
   // See issue #21245.
-  google.protobuf.BoolValue use_balsa_parser = 9;
+  google.protobuf.BoolValue use_balsa_parser = 9
+      [(xds.annotations.v3.field_status).work_in_progress = true];
 }
 
 message KeepaliveSettings {
