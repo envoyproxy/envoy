@@ -323,7 +323,7 @@ protected:
       if (timeout_ms < 1000) {
         new_timeout->mutable_message_timeout()->set_nanos(timeout_ms * 1000000);
       } else {
-        new_timeout->mutable_message_timeout()->set_seconds(timeout_ms/1000);
+        new_timeout->mutable_message_timeout()->set_seconds(timeout_ms / 1000);
       }
     }
     new_timeout->set_traffic_direction(direction);

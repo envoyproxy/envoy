@@ -537,9 +537,8 @@ void Filter::onNewTimeout(
     return;
   }
   const auto message_timeout_ms = message_timeout_ms_opt->count();
-  const uint32_t MINIMUM_NEW_TIMEOUT_MS = 1;
-  const uint32_t MAXIMUM_NEW_TIMEOUT_MS = 10000;
-  if (message_timeout_ms < MINIMUM_NEW_TIMEOUT_MS || message_timeout_ms > MAXIMUM_NEW_TIMEOUT_MS) {
+  if (message_timeout_ms < envoy::service::ext_proc::v3::NewProcessingTimeout::MIN_TIMEOUT_MS ||
+      message_timeout_ms > envoy::service::ext_proc::v3::NewProcessingTimeout::MAX_TIMEOUT_MS) {
     return;
   }
   const auto traffic_direction = new_timeout.traffic_direction();
