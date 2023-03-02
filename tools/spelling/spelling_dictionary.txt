@@ -42,6 +42,7 @@ ar
 btree
 CAS
 CB
+COV
 cartid
 cbor
 CDN
@@ -245,7 +246,6 @@ integrations
 jkl
 lang
 libsxg
-LCOV
 LLVM
 LPT
 LRS

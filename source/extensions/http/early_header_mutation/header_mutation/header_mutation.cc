@@ -25,7 +25,7 @@ public:
 
     if (!value.empty() || add_if_empty_) {
       switch (append_action_) {
-        PANIC_ON_PROTO_ENUM_SENTINEL_VALUES; // GCOV_EXCL_LINE
+        PANIC_ON_PROTO_ENUM_SENTINEL_VALUES; // COV_NF_LINE
       case HeaderValueOption::APPEND_IF_EXISTS_OR_ADD:
         headers.addReferenceKey(header_name_, value);
         return;
@@ -73,7 +73,7 @@ HeaderMutation::HeaderMutation(const ProtoHeaderMutation& mutations) {
       mutations_.emplace_back(std::make_unique<RemoveMutation>(mutation.remove()));
       break;
     default:
-      PANIC_DUE_TO_PROTO_UNSET; // GCOV_EXCL_LINE
+      PANIC_DUE_TO_PROTO_UNSET; // COV_NF_LINE
     }
   }
 }
