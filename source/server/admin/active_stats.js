@@ -11,7 +11,7 @@
  * Maps a stat name to a record containing name, value, and a use-count. This
  * map is rebuilt every 5 seconds.
  */
-let currentStats = new Map();
+const nameStatsMap = new Map();
 
 /**
  * The first time this script loads, it will write PRE element at the end of body.
@@ -137,23 +137,28 @@ function loadSettingOrUseDefault(id, defaultValue) {
  * @param {!Object} data
  */
 function renderStats(data) {
+  // Mark all stats as being invisible -- we'll re-mark visible all the
+  // stats that we received from the server.
+  for (const [, stat] of nameStatsMap) {
+    stat.visible = false;
+  }
+
   sortedStats = [];
-  let prevStats = currentStats;
-  currentStats = new Map();
   for (stat of data.stats) {
     if (!stat.name) {
       continue; // Skip histograms for now.
     }
-    let statRecord = prevStats.get(stat.name);
+    let statRecord = nameStatsMap.get(stat.name);
     if (statRecord) {
+      statRecord.visible = true;
       if (statRecord.value != stat.value) {
         statRecord.value = stat.value;
         ++statRecord.change_count;
       }
     } else {
-      statRecord = {name: stat.name, value: stat.value, change_count: 0};
+      statRecord = {name: stat.name, value: stat.value, change_count: 0, visible: true};
+      nameStatsMap.set(stat.name, statRecord);
     }
-    currentStats.set(stat.name, statRecord);
     sortedStats.push(statRecord);
   }
 
