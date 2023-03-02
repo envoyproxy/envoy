@@ -221,6 +221,7 @@ public:
     return nullptr;
   }
   bool appendXForwardedPort() const override { return false; }
+  bool addProxyProtocolConnectionState() const override { return true; }
 
 private:
   friend class AdminTestingPeer;

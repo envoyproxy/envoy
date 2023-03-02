@@ -17,15 +17,18 @@ minor_behavior_changes:
 - area: local_ratelimit
   change: |
     Tokens from local descriptor's token buckets are burned before tokens from the default token bucket.
-- area: http stream
-  change: |
-    Extended the lifetime of the protocol agnostic stream object to correct discrepancies between what is access logged and what occurred with the protocol specific stream. This behavior change can be reverted by setting ``envoy_reloadable_features_expand_agnostic_stream_lifetime`` to ``false``.
 - area: http2
   change: |
     Request authorities are now validated with a library function from QUICHE rather than nghttp2. This behavior change can be reverted by setting ``envoy.reloadable_features.http2_validate_authority_with_quiche`` to ``false``.
+- area: ext_proc
+  change: |
+    Make the :ref:`grpc service <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExternalProcessor.grpc_service>` required.
 - area: http2
   change: |
     Metadata is parsed with the QUICHE HPACK library, rather than nghttp2. This behavior change can be reverted by setting ``envoy.reloadable_features.http2_decode_metadata_with_quiche`` to ``false``.
+- area: custom response
+  change: |
+    Changed how the uri for redirect policy is specified. It can now be specified either as a single fully qualified string, or by specifying individual components of the uri.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
@@ -39,6 +42,9 @@ bug_fixes:
 - area: router
   change: |
     fixed the bug that custom tags of the route metadata type are not set for upstream spans.
+- area: ext_proc
+  change: |
+    ensure the route configuration will be used to overwrite global configuration when processing the local reply.
 - area: router
   change: |
     fixed outlier detection ejections caused by opened circuit breakers.
@@ -139,6 +145,9 @@ new_features:
   change: |
     added :ref:`failed_status_in_metadata <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.JwtProvider.failed_status_in_metadata>` to support setting the JWT
     authentication failure status code and message in dynamic metadata.
+- area: http
+  change: |
+    make adding ProxyProtocolFilterState in the HCM optional.
 
 deprecated:
 - area: ext_authz
