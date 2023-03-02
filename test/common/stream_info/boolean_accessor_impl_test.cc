@@ -16,6 +16,11 @@ TEST(BooleanAccessorImplTest, TrueValue) {
   EXPECT_EQ(true, accessor.value());
 }
 
+TEST(BooleanAccessorImplTest, FalseValue) {
+  BooleanAccessorImpl accessor(true);
+  EXPECT_NE(nullptr, accessor.serializeAsProto());
+}
+
 } // namespace
 } // namespace StreamInfo
 } // namespace Envoy
