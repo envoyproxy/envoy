@@ -161,8 +161,8 @@ ConnectionImpl::StreamImpl::StreamImpl(ConnectionImpl& parent, uint32_t buffer_l
           [this]() -> void { this->pendingSendBufferLowWatermark(); },
           [this]() -> void { this->pendingSendBufferHighWatermark(); },
           []() -> void { /* TODO(adisuissa): Handle overflow watermark */ })),
-      local_end_stream_sent_(false), remote_end_stream_(false), remote_rst_(false),
-      data_deferred_(false), received_noninformational_headers_(false),
+      local_end_stream_sent_(false), remote_end_stream_(false), data_deferred_(false),
+      received_noninformational_headers_(false),
       pending_receive_buffer_high_watermark_called_(false),
       pending_send_buffer_high_watermark_called_(false), reset_due_to_messaging_error_(false),
       defer_processing_backedup_streams_(
@@ -675,9 +675,8 @@ void ConnectionImpl::StreamImpl::onPendingFlushTimer() {
   MultiplexedStreamImplBase::onPendingFlushTimer();
   parent_.stats_.tx_flush_timeout_.inc();
   ASSERT(local_end_stream_ && !local_end_stream_sent_);
-  // This will emit a reset frame for this stream and close the stream locally.
-  // Only the stream adapter's reset callback should run as other higher layers
-  // think the stream is already finished.
+  // This will emit a reset frame for this stream and close the stream locally. No reset callbacks
+  // will be run because higher layers think the stream is already finished.
   resetStreamWorker(StreamResetReason::LocalReset);
   if (parent_.sendPendingFramesAndHandleError()) {
     // Intended to check through coverage that this error case is tested
@@ -776,9 +775,6 @@ void ConnectionImpl::StreamImpl::resetStreamWorker(StreamResetReason reason) {
   if (stream_id_ == -1) {
     // Handle the case where client streams are reset before headers are created.
     return;
-  }
-  if (codec_callbacks_) {
-    codec_callbacks_->onCodecLowLevelReset();
   }
   parent_.adapter_->SubmitRst(stream_id_,
                               static_cast<http2::adapter::Http2ErrorCode>(reasonToReset(reason)));
@@ -1151,7 +1147,6 @@ Status ConnectionImpl::onFrameReceived(const nghttp2_frame* frame) {
   }
   case NGHTTP2_RST_STREAM: {
     ENVOY_CONN_LOG(trace, "remote reset: {}", connection_, frame->rst_stream.error_code);
-    stream->remote_rst_ = true;
     stats_.rx_reset_.inc();
     break;
   }
@@ -1203,11 +1198,7 @@ int ConnectionImpl::onFrameSend(int32_t stream_id, size_t length, uint8_t type, 
 
   case NGHTTP2_HEADERS:
   case NGHTTP2_DATA: {
-    const bool end_stream_sent = flags & NGHTTP2_FLAG_END_STREAM;
-    stream->local_end_stream_sent_ = end_stream_sent;
-    if (end_stream_sent) {
-      stream->onEndStreamEncoded();
-    }
+    stream->local_end_stream_sent_ = flags & NGHTTP2_FLAG_END_STREAM;
     break;
   }
   }
@@ -1318,10 +1309,7 @@ Status ConnectionImpl::onStreamClose(StreamImpl* stream, uint32_t error_code) {
 
     ENVOY_CONN_LOG(debug, "stream {} closed: {}", connection_, stream_id, error_code);
 
-    // Even if we have received both the remote_end_stream and the
-    // local_end_stream (e.g. we have all the data for the response), if we've
-    // received a remote reset we should reset the stream.
-    if (!stream->remote_end_stream_ || !stream->local_end_stream_ || stream->remote_rst_) {
+    if (!stream->remote_end_stream_ || !stream->local_end_stream_) {
       StreamResetReason reason;
       if (stream->reset_due_to_messaging_error_) {
         // Unfortunately, the nghttp2 API makes it incredibly difficult to clearly understand
