@@ -21,10 +21,13 @@ namespace HeaderMutation {
 using ProtoConfig = envoy::extensions::filters::http::header_mutation::v3::HeaderMutation;
 using PerRouteProtoConfig =
     envoy::extensions::filters::http::header_mutation::v3::HeaderMutationPerRoute;
+using MutationsProto = envoy::extensions::filters::http::header_mutation::v3::Mutations;
 
-class PerRouteHeaderMutation : public Router::RouteSpecificFilterConfig {
+class Mutations {
 public:
-  PerRouteHeaderMutation(const PerRouteProtoConfig& config);
+  Mutations(const MutationsProto& config)
+      : request_mutations_(config.request_mutations()),
+        response_mutations_(config.response_mutations()) {}
 
   void mutateRequestHeaders(Http::RequestHeaderMap& request_headers,
                             const StreamInfo::StreamInfo& stream_info) const;
@@ -36,11 +39,32 @@ private:
   Http::HeaderMutations request_mutations_;
   Http::HeaderMutations response_mutations_;
 };
+
+class PerRouteHeaderMutation : public Router::RouteSpecificFilterConfig {
+public:
+  PerRouteHeaderMutation(const PerRouteProtoConfig& config);
+
+  const Mutations& mutations() const { return mutations_; }
+
+private:
+  Mutations mutations_;
+};
 using PerRouteHeaderMutationSharedPtr = std::shared_ptr<PerRouteHeaderMutation>;
+
+class HeaderMutationConfig {
+public:
+  HeaderMutationConfig(const ProtoConfig& config);
+
+  const Mutations& mutations() const { return mutations_; }
+
+private:
+  Mutations mutations_;
+};
+using HeaderMutationConfigSharedPtr = std::shared_ptr<HeaderMutationConfig>;
 
 class HeaderMutation : public Http::PassThroughFilter, public Logger::Loggable<Logger::Id::filter> {
 public:
-  HeaderMutation() = default;
+  HeaderMutation(HeaderMutationConfigSharedPtr config) : config_(std::move(config)) {}
 
   // Http::StreamDecoderFilter
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers, bool) override;
@@ -49,6 +73,7 @@ public:
   Http::FilterHeadersStatus encodeHeaders(Http::ResponseHeaderMap& headers, bool) override;
 
 private:
+  HeaderMutationConfigSharedPtr config_{};
   const PerRouteHeaderMutation* route_config_{};
 };
 

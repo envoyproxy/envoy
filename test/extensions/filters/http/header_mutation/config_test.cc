@@ -25,25 +25,27 @@ TEST(FactoryTest, FactoryTest) {
   ASSERT_NE(factory, nullptr);
 
   const std::string config = R"EOF(
-  request_mutations:
-  - remove: "flag-header"
-  - append:
-      header:
-        key: "flag-header"
-        value: "%REQ(ANOTHER-FLAG-HEADER)%"
-      append_action: APPEND_IF_EXISTS_OR_ADD
-  response_mutations:
-  - remove: "flag-header"
-  - append:
-      header:
-        key: "flag-header"
-        value: "%REQ(ANOTHER-FLAG-HEADER)%"
-      append_action: APPEND_IF_EXISTS_OR_ADD
+  mutations:
+    request_mutations:
+    - remove: "flag-header"
+    - append:
+        header:
+          key: "flag-header"
+          value: "%REQ(ANOTHER-FLAG-HEADER)%"
+        append_action: APPEND_IF_EXISTS_OR_ADD
+    response_mutations:
+    - remove: "flag-header"
+    - append:
+        header:
+          key: "flag-header"
+          value: "%REQ(ANOTHER-FLAG-HEADER)%"
+        append_action: APPEND_IF_EXISTS_OR_ADD
   )EOF";
 
   PerRouteProtoConfig per_route_proto_config;
   TestUtility::loadFromYaml(config, per_route_proto_config);
   ProtoConfig proto_config;
+  TestUtility::loadFromYaml(config, proto_config);
 
   testing::NiceMock<Server::Configuration::MockFactoryContext> mock_factory_context;
 

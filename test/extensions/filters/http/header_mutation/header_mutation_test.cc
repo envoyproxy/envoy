@@ -14,64 +14,82 @@ namespace {
 using testing::NiceMock;
 
 TEST(HeaderMutationFilterTest, HeaderMutationFilterTest) {
+  const std::string route_config_yaml = R"EOF(
+  mutations:
+    request_mutations:
+    - remove: "flag-header"
+    - append:
+        header:
+          key: "flag-header"
+          value: "%REQ(ANOTHER-FLAG-HEADER)%"
+        append_action: "APPEND_IF_EXISTS_OR_ADD"
+    - append:
+        header:
+          key: "flag-header-2"
+          value: "flag-header-2-value"
+        append_action: "APPEND_IF_EXISTS_OR_ADD"
+    - append:
+        header:
+          key: "flag-header-3"
+          value: "flag-header-3-value"
+        append_action: "ADD_IF_ABSENT"
+    - append:
+        header:
+          key: "flag-header-4"
+          value: "flag-header-4-value"
+        append_action: "OVERWRITE_IF_EXISTS_OR_ADD"
+    response_mutations:
+    - remove: "flag-header"
+    - append:
+        header:
+          key: "flag-header"
+          value: "%RESP(ANOTHER-FLAG-HEADER)%"
+        append_action: "APPEND_IF_EXISTS_OR_ADD"
+    - append:
+        header:
+          key: "flag-header-2"
+          value: "flag-header-2-value"
+        append_action: "APPEND_IF_EXISTS_OR_ADD"
+    - append:
+        header:
+          key: "flag-header-3"
+          value: "flag-header-3-value"
+        append_action: "ADD_IF_ABSENT"
+    - append:
+        header:
+          key: "flag-header-4"
+          value: "flag-header-4-value"
+        append_action: "OVERWRITE_IF_EXISTS_OR_ADD"
+  )EOF";
+
   const std::string config_yaml = R"EOF(
-  request_mutations:
-  - remove: "flag-header"
-  - append:
-      header:
-        key: "flag-header"
-        value: "%REQ(ANOTHER-FLAG-HEADER)%"
-      append_action: "APPEND_IF_EXISTS_OR_ADD"
-  - append:
-      header:
-        key: "flag-header-2"
-        value: "flag-header-2-value"
-      append_action: "APPEND_IF_EXISTS_OR_ADD"
-  - append:
-      header:
-        key: "flag-header-3"
-        value: "flag-header-3-value"
-      append_action: "ADD_IF_ABSENT"
-  - append:
-      header:
-        key: "flag-header-4"
-        value: "flag-header-4-value"
-      append_action: "OVERWRITE_IF_EXISTS_OR_ADD"
-  response_mutations:
-  - remove: "flag-header"
-  - append:
-      header:
-        key: "flag-header"
-        value: "%RESP(ANOTHER-FLAG-HEADER)%"
-      append_action: "APPEND_IF_EXISTS_OR_ADD"
-  - append:
-      header:
-        key: "flag-header-2"
-        value: "flag-header-2-value"
-      append_action: "APPEND_IF_EXISTS_OR_ADD"
-  - append:
-      header:
-        key: "flag-header-3"
-        value: "flag-header-3-value"
-      append_action: "ADD_IF_ABSENT"
-  - append:
-      header:
-        key: "flag-header-4"
-        value: "flag-header-4-value"
-      append_action: "OVERWRITE_IF_EXISTS_OR_ADD"
+  mutations:
+    request_mutations:
+    - append:
+        header:
+          key: "global-flag-header"
+          value: "global-flag-header-value"
+        append_action: "ADD_IF_ABSENT"
+    response_mutations:
+    - remove: "global-flag-header"
   )EOF";
 
   PerRouteProtoConfig per_route_proto_config;
-  TestUtility::loadFromYaml(config_yaml, per_route_proto_config);
+  TestUtility::loadFromYaml(route_config_yaml, per_route_proto_config);
 
   PerRouteHeaderMutationSharedPtr config =
       std::make_shared<PerRouteHeaderMutation>(per_route_proto_config);
+
+  ProtoConfig proto_config;
+  TestUtility::loadFromYaml(config_yaml, proto_config);
+  HeaderMutationConfigSharedPtr global_config =
+      std::make_shared<HeaderMutationConfig>(proto_config);
 
   NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks;
   NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks;
 
   {
-    HeaderMutation filter{};
+    HeaderMutation filter{global_config};
     filter.setDecoderFilterCallbacks(decoder_callbacks);
     filter.setEncoderFilterCallbacks(encoder_callbacks);
 
@@ -130,7 +148,7 @@ TEST(HeaderMutationFilterTest, HeaderMutationFilterTest) {
   }
 
   {
-    HeaderMutation filter{};
+    HeaderMutation filter{global_config};
     filter.setDecoderFilterCallbacks(decoder_callbacks);
     filter.setEncoderFilterCallbacks(encoder_callbacks);
 
@@ -159,6 +177,31 @@ TEST(HeaderMutationFilterTest, HeaderMutationFilterTest) {
     // 'flag-header-4' is overwritten.
     EXPECT_EQ(1, headers.get(Envoy::Http::LowerCaseString("flag-header-4")).size());
     EXPECT_EQ("flag-header-4-value", headers.get_("flag-header-4"));
+  }
+
+  {
+    HeaderMutation filter{global_config};
+    filter.setDecoderFilterCallbacks(decoder_callbacks);
+    filter.setEncoderFilterCallbacks(encoder_callbacks);
+
+    Envoy::Http::TestRequestHeaderMapImpl request_headers = {
+        {":method", "GET"}, {":path", "/"}, {":scheme", "http"}, {":authority", "host"}};
+
+    Envoy::Http::TestResponseHeaderMapImpl response_headers = {
+        {"global-flag-header", "global-flag-header-value"},
+        {":status", "200"},
+    };
+
+    EXPECT_CALL(decoder_callbacks, mostSpecificPerFilterConfig())
+        .WillRepeatedly(testing::Return(nullptr));
+    EXPECT_CALL(encoder_callbacks, mostSpecificPerFilterConfig())
+        .WillRepeatedly(testing::Return(nullptr));
+
+    EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter.decodeHeaders(request_headers, true));
+    EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter.encodeHeaders(response_headers, true));
+
+    EXPECT_EQ("global-flag-header-value", request_headers.get_("global-flag-header"));
+    EXPECT_EQ("", response_headers.get_("global-flag-header"));
   }
 }
 
