@@ -467,7 +467,6 @@ message HTTPRequestProperties {
 
   // Number of header bytes received from the downstream by the http stream, including protocol overhead.
   uint64 downstream_header_bytes_received = 15;
-
 }
 
 // [#next-free-field: 9]

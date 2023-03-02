@@ -143,16 +143,16 @@ http_logs:
         no_route_found: true
       downstream_wire_bytes_sent: 178
       downstream_wire_bytes_received: 38
-      downstream_header_bytes_sent: 152
-      downstream_header_bytes_received: 11
     protocol_version: HTTP11
     request:
       scheme: http
       authority: host
+      downstream_header_bytes_received: 11
       path: /notfound
       request_headers_bytes: 118
       request_method: GET
     response:
+      downstream_header_bytes_sent: 152
       response_code:
         value: 404
       response_code_details: "route_not_found"
@@ -171,16 +171,16 @@ http_logs:
         no_route_found: true
       downstream_wire_bytes_sent: 178
       downstream_wire_bytes_received: 38
-      downstream_header_bytes_sent: 152
-      downstream_header_bytes_received: 11
     protocol_version: HTTP11
     request:
+      downstream_header_bytes_received: 11
       scheme: http
       authority: host
       path: /notfound
       request_headers_bytes: 118
       request_method: GET
     response:
+      downstream_header_bytes_sent: 152
       response_code:
         value: 404
       response_code_details: "route_not_found"
@@ -224,16 +224,16 @@ http_logs:
         no_route_found: true
       downstream_wire_bytes_sent: 178
       downstream_wire_bytes_received: 38
-      downstream_header_bytes_sent: 152
-      downstream_header_bytes_received: 11
     protocol_version: HTTP11
     request:
+      downstream_header_bytes_received: 11
       scheme: http
       authority: host
       path: /notfound
       request_headers_bytes: 118
       request_method: GET
     response:
+      downstream_header_bytes_sent: 152
       response_code:
         value: 404
       response_code_details: "route_not_found"
