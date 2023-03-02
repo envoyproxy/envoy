@@ -142,6 +142,9 @@ new_features:
   change: |
     added :ref:`failed_status_in_metadata <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.JwtProvider.failed_status_in_metadata>` to support setting the JWT
     authentication failure status code and message in dynamic metadata.
+- area: tcp_proxy
+  change: |
+    added an option to dynamically disable TCP tunneling even if set in the filter config, by setting a filter state object for the key ``envoy.tcp_proxy.disable_tunneling``.
 
 deprecated:
 - area: ext_authz
