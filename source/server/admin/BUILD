@@ -138,7 +138,7 @@ envoy_cc_library(
 envoy_cc_library(
     name = "stats_render_lib",
     srcs = ["stats_render.cc"] + envoy_select_admin_html([
-        "//source/server/admin/resources:generate_admin_html",
+        "//source/server/admin/html:generate_admin_html",
         "stats_html_render.cc",
     ]),
     hdrs = ["stats_render.h"] + envoy_select_admin_html([

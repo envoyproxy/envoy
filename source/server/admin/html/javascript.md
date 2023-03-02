@@ -6,7 +6,7 @@ which is used to make the admin-site more useful.
 ### Serving
 
 JavaScript, HTML, and CSS files are converted by the BUILD process and a script,
-[generate_admin_html.sh](https://github.com/envoyproxy/envoy/blob/main/source/server/admin/resources/generate_admin_html.sh). which
+[generate_admin_html.sh](https://github.com/envoyproxy/envoy/blob/main/source/server/admin/html/generate_admin_html.sh). which
 generates a .cc file with `constexpr absl::string_view` objects defined to hold
 the file contents. These are inlined into an HTML response for the admin and
 stats pages.
