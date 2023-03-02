@@ -2,11 +2,9 @@
 #include "source/common/network/address_impl.h"
 #include "source/common/network/socket_impl.h"
 #include "source/common/ssl/matching/inputs.h"
-// #include "source/common/stream_info/stream_info_impl.h"
 
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/stream_info/mocks.h"
-// #include "test/test_common/test_time.h"
 
 namespace Envoy {
 namespace Ssl {
