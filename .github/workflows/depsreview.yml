@@ -1,6 +1,8 @@
 name: 'Dependency Review'
 on: [pull_request]
 
+permissions: read-all
+
 concurrency:
   group: ${{ github.head_ref-github.workflow || github.run_id }}
   cancel-in-progress: true

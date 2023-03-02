@@ -3,6 +3,8 @@ on:
   schedule:
   - cron: '0 */4 * * *'
 
+permissions: {}
+
 jobs:
   prune_stale:
     permissions:

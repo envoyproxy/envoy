@@ -6,6 +6,8 @@ on:
     - main
   pull_request:
 
+permissions: read-all
+
 concurrency:
   group: ${{ github.head_ref-github.workflow || github.run_id }}
   cancel-in-progress: true
@@ -44,6 +46,8 @@ jobs:
     if: github.repository == 'envoyproxy/envoy'
     name: swift_build
     runs-on: macos-12
+    permissions:
+      contents: write # to upload assets to release
     timeout-minutes: 120
     steps:
     - uses: actions/checkout@v3
@@ -74,6 +78,8 @@ jobs:
     if: github.repository == 'envoyproxy/envoy'
     name: kotlin_build
     runs-on: macos-12
+    permissions:
+      contents: write # to upload assets to release
     timeout-minutes: 90
     steps:
     - uses: actions/checkout@v3
