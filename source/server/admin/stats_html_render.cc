@@ -6,7 +6,7 @@
 #include "source/common/common/assert.h"
 #include "source/common/filesystem/filesystem_impl.h"
 #include "source/common/html/utility.h"
-#include "source/server/admin/admin_html_gen.h"
+#include "source/server/admin/resources/admin_html_gen.h"
 
 #include "absl/strings/str_replace.h"
 
@@ -106,7 +106,7 @@ void StatsHtmlRender::appendResource(Buffer::Instance& response, absl::string_vi
   // from the file-system on every admin page load, which enables fast iteration
   // when debugging the web site.
   Filesystem::InstanceImpl file_system;
-  std::string path = absl::StrCat("source/server/admin/", file);
+  std::string path = absl::StrCat("source/server/admin/resources/", file);
   TRY_ASSERT_MAIN_THREAD { response.add(file_system.fileReadToEnd(path)); }
   END_TRY
   catch (EnvoyException& e) {

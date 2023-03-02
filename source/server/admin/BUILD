@@ -96,21 +96,6 @@ envoy_cc_library(
     ],
 )
 
-genrule(
-    name = "generate_admin_html",
-    srcs = [
-        "admin_head_start.html",
-        "admin.css",
-        "active_params.html",
-        "active_stats.js",
-    ],
-    outs = ["admin_html_gen.h"],
-    cmd = "./$(location :generate_admin_html.sh) \
-        $(location admin_head_start.html) $(location admin.css) $(location active_stats.js) \
-        $(location active_params.html) > $@",
-    tools = [":generate_admin_html.sh"],
-)
-
 envoy_cc_library(
     name = "handler_ctx_lib",
     hdrs = ["handler_ctx.h"],
@@ -153,7 +138,7 @@ envoy_cc_library(
 envoy_cc_library(
     name = "stats_render_lib",
     srcs = ["stats_render.cc"] + envoy_select_admin_html([
-        ":generate_admin_html",
+        "//source/server/admin/resources:generate_admin_html",
         "stats_html_render.cc",
     ]),
     hdrs = ["stats_render.h"] + envoy_select_admin_html([
