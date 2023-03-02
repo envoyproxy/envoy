@@ -12,6 +12,8 @@
 // * Idle/drain timeouts.
 // * HTTP 1.0 special cases
 // * Fuzz config settings
+#include <chrono>
+
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 
 #include "source/common/common/empty_string.h"
@@ -40,7 +42,6 @@
 #include "test/test_common/simulated_time_system.h"
 
 #include "gmock/gmock.h"
-#include <chrono>
 
 using testing::InvokeWithoutArgs;
 using testing::Return;
