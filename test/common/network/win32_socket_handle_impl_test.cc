@@ -126,7 +126,8 @@ TEST_F(Win32SocketHandleImplTest, RecvWithPeekMultipleTimes) {
         }
         EXPECT_EQ(10, size_to_read);
         return Api::SysCallSizeResult{5, 0};
-      }));
+      }))
+      .WillOnce(Return(Api::SysCallSizeResult{-1, SOCKET_ERROR_AGAIN}));
 #else
   EXPECT_CALL(os_sys_calls, recv(_, _, _, _))
       .WillOnce(Invoke([&](os_fd_t, void*, size_t length, int) {
@@ -136,6 +137,7 @@ TEST_F(Win32SocketHandleImplTest, RecvWithPeekMultipleTimes) {
       .WillOnce(Return(Api::SysCallSizeResult{-1, SOCKET_ERROR_AGAIN}));
 #endif
 
+  EXPECT_CALL(*file_event_, registerEventIfEmulatedEdge(_));
   absl::FixedArray<char> buf(10);
   auto rc = io_handle_.recv(buf.data(), buf.size(), MSG_PEEK);
   EXPECT_EQ(rc.return_value_, 5);
