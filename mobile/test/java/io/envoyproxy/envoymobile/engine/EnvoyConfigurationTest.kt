@@ -7,6 +7,7 @@ import io.envoyproxy.envoymobile.engine.JniLibrary
 import io.envoyproxy.envoymobile.engine.types.EnvoyStreamIntel
 import io.envoyproxy.envoymobile.engine.types.EnvoyFinalStreamIntel
 import io.envoyproxy.envoymobile.engine.types.EnvoyHTTPFilterCallbacks
+import io.envoyproxy.envoymobile.engine.testing.TestJni
 import java.nio.ByteBuffer
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.Assert.fail
@@ -145,7 +146,7 @@ class EnvoyConfigurationTest {
     JniLibrary.loadTestLibrary()
     val envoyConfiguration = buildTestEnvoyConfiguration()
 
-    val resolvedTemplate = envoyConfiguration.createYaml()
+    val resolvedTemplate = TestJni.createYaml(envoyConfiguration)
     assertThat(resolvedTemplate).contains("connect_timeout: 123s")
 
     assertThat(resolvedTemplate).doesNotContain("admin: *admin_interface")
@@ -209,12 +210,12 @@ class EnvoyConfigurationTest {
     // Validate ordering between filters and platform filters
     assertThat(resolvedTemplate).matches(Pattern.compile(".*name1.*name2.*buffer_filter_1.*buffer_filter_2.*", Pattern.DOTALL));
     // Validate that createYaml doesn't change filter order.
-    val resolvedTemplate2 = envoyConfiguration.createYaml()
+    val resolvedTemplate2 = TestJni.createYaml(envoyConfiguration)
     assertThat(resolvedTemplate2).matches(Pattern.compile(".*name1.*name2.*buffer_filter_1.*buffer_filter_2.*", Pattern.DOTALL));
     // Validate that createBootstrap also doesn't change filter order.
     // This may leak memory as the boostrap isn't used.
     envoyConfiguration.createBootstrap()
-    val resolvedTemplate3 = envoyConfiguration.createYaml()
+    val resolvedTemplate3 = TestJni.createYaml(envoyConfiguration)
     assertThat(resolvedTemplate3).matches(Pattern.compile(".*name1.*name2.*buffer_filter_1.*buffer_filter_2.*", Pattern.DOTALL));
   }
 
@@ -243,7 +244,7 @@ class EnvoyConfigurationTest {
       trustChainVerification = TrustChainVerification.ACCEPT_UNTRUSTED
     )
 
-    val resolvedTemplate = envoyConfiguration.createYaml()
+    val resolvedTemplate = TestJni.createYaml(envoyConfiguration)
 
     // TlS Verification
     assertThat(resolvedTemplate).contains("trust_chain_verification: ACCEPT_UNTRUSTED")
@@ -292,7 +293,7 @@ class EnvoyConfigurationTest {
       runtimeGuards = mapOf("test_feature_false" to true, "test_feature_true" to false),
     )
 
-    val resolvedTemplate = envoyConfiguration.createYaml()
+    val resolvedTemplate = TestJni.createYaml(envoyConfiguration)
 
     assertThat(resolvedTemplate).contains("test_feature_false");
     assertThat(resolvedTemplate).contains("test_feature_true");
@@ -307,7 +308,7 @@ class EnvoyConfigurationTest {
       trustChainVerification = TrustChainVerification.ACCEPT_UNTRUSTED
     )
 
-    val resolvedTemplate = envoyConfiguration.createYaml()
+    val resolvedTemplate = TestJni.createYaml(envoyConfiguration)
 
     // statsSinks
     assertThat(resolvedTemplate).contains("envoy.stat_sinks.statsd");
