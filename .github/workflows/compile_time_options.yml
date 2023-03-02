@@ -48,6 +48,7 @@ jobs:
     runs-on: macos-12
     permissions:
       contents: write # to upload assets to release
+      id-token: write
     timeout-minutes: 120
     steps:
     - uses: actions/checkout@v3
@@ -80,6 +81,7 @@ jobs:
     runs-on: macos-12
     permissions:
       contents: write # to upload assets to release
+      id-token: write
     timeout-minutes: 90
     steps:
     - uses: actions/checkout@v3
