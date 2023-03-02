@@ -62,7 +62,9 @@ Network::FilterStatus ProxyFilter::onNewConnection() {
           ->getDataReadOnly<StreamInfo::UInt32Accessor>("envoy.upstream.dynamic_port");
 
   uint32_t port;
-  if (dynamic_port_filter_state) {
+  if (dynamic_port_filter_state != nullptr
+      && dynamic_port_filter_state->value() > 0
+      && dynamic_port_filter_state->value() <= 65535) {
     port = dynamic_port_filter_state->value();
   } else {
     port = config_->port();
