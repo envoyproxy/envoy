@@ -1420,14 +1420,12 @@ virtual_hosts:
                   cluster_header: x-cluster-header
   )EOF";
 
-  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
   TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true);
 
   {
     Http::TestRequestHeaderMapImpl headers = genHeaders("lyft.com", "/new_endpoint/foo", "GET");
-    headers.setByKey("x-cluster-header", "www2");
-    const RouteEntry* route = config.route(headers, 0)->routeEntry();
-    EXPECT_EQ("www2", route->clusterName());
+    headers.addCopy("x-cluster-header", "www2");
+    EXPECT_EQ("www2", config.route(headers, 0)->routeEntry()->clusterName());
   }
 }
 
@@ -1527,7 +1525,7 @@ virtual_hosts:
   {
     Http::TestRequestHeaderMapImpl headers =
         genHeaders("lyft.com", "/new_endpoint/foo/match_header", "GET");
-    headers.setByKey("x-match-header", "matched");
+    headers.addCopy("x-match-header", "matched");
     const RouteEntry* route = config.route(headers, 0)->routeEntry();
     route->finalizeRequestHeaders(headers, stream_info, true);
     EXPECT_EQ("match_tree_1_3", headers.get_("x-route-header"));
@@ -1575,14 +1573,12 @@ virtual_hosts:
                     cluster_header: x-cluster-header
   )EOF";
 
-  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
   TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true);
 
   {
     Http::TestRequestHeaderMapImpl headers = genHeaders("lyft.com", "/new_endpoint/foo/1", "GET");
-    headers.setByKey("x-cluster-header", "www2");
-    const RouteEntry* route = config.route(headers, 0)->routeEntry();
-    EXPECT_EQ("www2", route->clusterName());
+    headers.addCopy("x-cluster-header", "www2");
+    EXPECT_EQ("www2", config.route(headers, 0)->routeEntry()->clusterName());
   }
 }
 
