@@ -65,6 +65,10 @@ steps:
     SLACK_TOKEN: $(SLACK_TOKEN)
     REPO_URI: $(Build.Repository.Uri)
     BUILD_URI: $(Build.BuildUri)
+    ${{ if eq(variables['Build.Reason'], 'PullRequest') }}:
+      AZP_TARGET_BRANCH: "origin/$(System.PullRequest.TargetBranch)"
+    ${{ if ne(variables['Build.Reason'], 'PullRequest') }}:
+      AZP_TARGET_BRANCH: "origin/$(Build.SourceBranchName)"
     ${{ if parameters.rbe }}:
       GCP_SERVICE_ACCOUNT_KEY: $(GcpServiceAccountKey)
       ENVOY_RBE: "1"
