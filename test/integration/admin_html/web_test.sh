@@ -18,7 +18,7 @@ mkdir "$tmp"
 
 echo "Saving temp files to $tmp"
 
-ENVOY_BINARY="bazel-bin/test/integration/admin_test_server"
+ENVOY_BINARY="bazel-bin/test/integration/admin_html/test_server"
 if [ -e "$ENVOY_BINARY" ]; then
   echo "*** Re-using binary..."
 else
@@ -30,7 +30,7 @@ ls -l "$ENVOY_BINARY"
 
 echo "*** Invoking Envoy: log file $tmp/envoy.log ..."
 $ENVOY_BINARY \
-      -c test/integration/admin_web_test.yaml \
+      -c test/integration/admin_html/web_test.yaml \
       --admin-address-path "$tmp/admin.port" >& "$tmp/envoy.log" &
 
 echo "*** Waiting for the Envoy server to write the admin port to $tmp/admin.port ..."
@@ -55,7 +55,7 @@ echo "*** Envoy running with admin port running at $(cat $tmp/admin.port)"
 # or other tools to fully automate the testing of the admin UI.
 echo "*** Please ensure Browser test passes and the stats UI looks good..."
 browser="firefox"
-test_url="$admin_port/test?file=admin_web_test.html"
+test_url="$admin_port/test?file=web_test.html"
 active_stats_url="$admin_port/stats?format=active"
 echo $browser "$test_url" "$active_stats_url" ">&" "$tmp/browser.log"
 $browser "$test_url" "$active_stats_url" >& "$tmp/browser.log"

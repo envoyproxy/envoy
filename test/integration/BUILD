@@ -290,21 +290,6 @@ envoy_cc_test(
 exports_files(["test_utility.sh"])
 
 envoy_cc_test_binary(
-    name = "admin_test_server",
-    srcs = ["admin_test_server.cc"],
-    external_deps = [
-        "abseil_symbolize",
-    ],
-    stamped = True,
-    deps = [
-        "//source/exe:envoy_main_common_with_core_extensions_lib",
-        "//source/exe:platform_impl_lib",
-        "//source/extensions/clusters/logical_dns:logical_dns_cluster_lib",
-        "//source/extensions/clusters/static:static_cluster_lib",
-    ],
-)
-
-envoy_cc_test_binary(
     name = "hotrestart_main",
     srcs = ["hotrestart_main.cc"],
     external_deps = [
