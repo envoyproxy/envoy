@@ -29,7 +29,7 @@ TEST(DsoManagerTest, Pub) {
   auto path = genSoPath(id);
 
   // get before load
-  auto dso = DsoManager::getDsoInstanceByID(id);
+  auto dso = DsoManager::getDsoByID(id);
   EXPECT_EQ(dso, nullptr);
 
   // first time load
@@ -37,7 +37,7 @@ TEST(DsoManagerTest, Pub) {
   EXPECT_EQ(res, true);
 
   // get after load
-  dso = DsoManager::getDsoInstanceByID(id);
+  dso = DsoManager::getDsoByID(id);
   EXPECT_NE(dso, nullptr);
 
   // second time load
