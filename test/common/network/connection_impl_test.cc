@@ -1253,7 +1253,6 @@ TEST_P(ConnectionImplTest, WriteWithWatermarks) {
         return {-1, SOCKET_ERROR_AGAIN};
       }));
 
-
   EXPECT_CALL(os_sys_calls, send(_, _, _, _))
       .WillOnce(Invoke([&](os_fd_t, void*, size_t, int) -> Api::SysCallSizeResult {
         dispatcher_->exit();
