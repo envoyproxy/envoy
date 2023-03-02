@@ -16,9 +16,10 @@ TEST(BooleanAccessorImplTest, TrueValue) {
   EXPECT_EQ(true, accessor.value());
 }
 
-TEST(BooleanAccessorImplTest, FalseValue) {
+TEST(BooleanAccessorImplTest, TestProto) {
   BooleanAccessorImpl accessor(true);
-  EXPECT_NE(nullptr, accessor.serializeAsProto());
+  auto message = accessor.serializeAsProto();
+  EXPECT_NE(nullptr, message);
 }
 
 } // namespace
