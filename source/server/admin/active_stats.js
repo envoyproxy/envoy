@@ -1,3 +1,12 @@
+/**
+ * This file contains JavaScript functionality to periodically fetch JSON stats from
+ * the Envoy server, and display the top 50 (by default) stats in order of how often
+ * they've changed since the page was brought up. This can be useful to find potentially
+ * problematic listeners or clusters or other high-cardinality subsystems in Envoy whose
+ * activity can be quickly examined for potential problems. The more active a stat, the
+ * more likely it is to reflect behavior of note.
+ */
+
 // Follow-ups:
 //   * top-n algorithm to limit compute overhead with high cardinality stats with user control of N.
 //   * alternate sorting criteria, reverse-sort controls, etc.

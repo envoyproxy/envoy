@@ -1,18 +1,14 @@
 ### Overview
 
-This file contains JavaScript functionality to periodically fetch JSON stats from
-the Envoy server, and display the top 50 (by default) stats in order of how often
-they've changed since the page was brought up. This can be useful to find potentially
-problematic listeners or clusters or other high-cardinality subsystems in Envoy whose
-activity can be quickly examined for potential problems. The more active a stat, the
-more likely it is to reflect behavior of note.
+This describes the flow used for developing, testing, and serving JavaScript,
+which is used to make the admin-site more useful.
 
 ### Serving
 
-By default, this file is converted by the BUILD process and stored as a C++
-absl::string_view constexpr. It is inlined into an HTML response for the stats
-page when the 'active' format is selected. generate_admin_html.sh is used to
-compile HTML and CSS constants into string_view format as well.
+JavaScript, HTML, and CSS files are converted by the BUILD process and a script,
+generate_admin_html.sh. which generates a .cc file with constexpr
+absl::string_view objects defined to hold the file contents. These are inlined
+into an HTML response for the admin and stats pages.
 
 ### Disabling
 
@@ -27,7 +23,8 @@ To facilitate debugging and iterating on the JavaScript, a compile-time ifdef
 can be used at build time: `--cxxopt=-DENVOY_ADMIN_DEBUG`. When compiled this
 way, binaries (e.g. tests and envoy-static) will read the source files from
 their source tree locations every time they are served. So you can debug
-JavaScript by editing the file and refreshing the admin site in your browser.
+JavaScript by editing the file and refreshing the admin site in your browser,
+without rebuilding or restarting the binary.
 
 ### Testing
 
@@ -38,22 +35,23 @@ there is significantly more JavaScript needed then migrating to that can be
 considered.
 
 The JavaScript is tested using a binary //test/integration:admin_test_server,
-which is like envoy-static, but users a post-server hook to add a /test endpoint
-to the admin port, enabling the test files to run in the same origin as the
-endpoint under test. This is needed for deep inspection of the document model
-during tests. For more details on testing mechanics, see
-test/integration/admin_web_test.sh. Note that the test is semi-automatic using a
-browser, and is not run in blaze tests or CI.
-
+which is similar to envoy-static, but uses a post-server hook to add a /test
+endpoint to the admin port, enabling the test files to run in the same origin as
+the endpoint under test. This is needed for deep inspection of the document
+model during tests, which is possible only for same-origin iframes. For more
+details on testing mechanics, see test/integration/admin_web_test.sh. Note that
+the test is semi-automatic using a browser, and is not run in blaze tests or CI.
+A human must manually inspect the test results page for pass/fail logs, and the
+UI to make sure all looks good.
 
 ### Style
 
-The style is somewhat consistent with Envoy C++ code: 2-char indent,
-100-char lines, and similar variable-naming. Doxygen style is used in
-a manner similar to that of Google JS: types specified for parameters
-and return values, "!" prefix for required (non-null), "?" prefix for
-optional. If using Closure Compiler, it would use these for strong type
-checking.
+The style is somewhat consistent with Envoy C++ code: 2-char indent, 100-char
+lines, and but with camel-case variables per Google JS convention, to be
+compatible with eslint settings. Doxygen style is used in a manner similar to
+that of Google JS: types specified for parameters and return values, "!"  prefix
+for required (non-null), "?" prefix for optional. If using Closure Compiler, it
+would use these for strong type checking.
 
 The JavaScript here is not currently compiled, but it can be linted by
 https://validatejavascript.com/, 'Google' settings with `max-len` and `indent`
