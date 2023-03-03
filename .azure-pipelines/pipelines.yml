@@ -147,6 +147,16 @@ stages:
   # displayName: Prechecks
   dependsOn: ["env"]
   jobs:
+  - job: local_cache
+    dependsOn: []
+    pool:
+      vmImage: "ubuntu-20.04"
+    steps:
+    - script: |
+        # this will probably fail, but should indicate if the server is actually there
+        docker run --network host fullstorydev/grpcurl -plaintext localhost:9092 remote.Remote/Status
+      workingDirectory: $(Build.SourcesDirectory)
+
   - job: format
     # displayName: Code format
     dependsOn: []
