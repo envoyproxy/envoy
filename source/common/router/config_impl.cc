@@ -1846,6 +1846,41 @@ RouteMatcher::RouteMatcher(const envoy::config::route::v3::RouteConfiguration& r
   }
 }
 
+RouteConstSharedPtr getRouteFromRoutes(const RouteCallback& cb,
+                                       const Http::RequestHeaderMap& headers,
+                                       const StreamInfo::StreamInfo& stream_info,
+                                       uint64_t random_value,
+                                       std::vector<RouteEntryImplBaseConstSharedPtr> routes) {
+  for (auto route = routes.begin(); route != routes.end(); ++route) {
+    if (!headers.Path() && !(*route)->supportsPathlessHeaders()) {
+      continue;
+    }
+
+    RouteConstSharedPtr route_entry = (*route)->matches(headers, stream_info, random_value);
+    if (route_entry == nullptr) {
+      continue;
+    }
+
+    if (cb == nullptr) {
+      return route_entry;
+    }
+
+    RouteEvalStatus eval_status = (std::next(route) == routes.end())
+                                      ? RouteEvalStatus::NoMoreRoutes
+                                      : RouteEvalStatus::HasMoreRoutes;
+    RouteMatchStatus match_status = cb(route_entry, eval_status);
+    if (match_status == RouteMatchStatus::Accept) {
+      return route_entry;
+    }
+    if (match_status == RouteMatchStatus::Continue &&
+        eval_status == RouteEvalStatus::NoMoreRoutes) {
+      return nullptr;
+    }
+  }
+
+  return nullptr;
+}
+
 RouteConstSharedPtr VirtualHostImpl::getRouteFromEntries(const RouteCallback& cb,
                                                          const Http::RequestHeaderMap& headers,
                                                          const StreamInfo::StreamInfo& stream_info,
@@ -1879,51 +1914,12 @@ RouteConstSharedPtr VirtualHostImpl::getRouteFromEntries(const RouteCallback& cb
       const auto result = match.result_();
       if (result->typeUrl() == RouteMatchAction::staticTypeUrl()) {
         const RouteMatchAction& route_action = result->getTyped<RouteMatchAction>();
-        if (!headers.Path() && !route_action.route()->supportsPathlessHeaders()) {
-          return nullptr;
-        }
 
-        RouteConstSharedPtr route_entry =
-            route_action.route()->matches(headers, stream_info, random_value);
-        if (route_entry == nullptr) {
-          ENVOY_LOG(debug, "route was resolved but final route did not match incoming request");
-          return nullptr;
-        }
-
-        if (!cb || cb(route_entry, RouteEvalStatus::NoMoreRoutes) == RouteMatchStatus::Accept) {
-          return route_entry;
-        } else {
-          return nullptr;
-        }
+        return getRouteFromRoutes(cb, headers, stream_info, random_value, {route_action.route()});
       } else if (result->typeUrl() == RouteListMatchAction::staticTypeUrl()) {
         const RouteListMatchAction& action = result->getTyped<RouteListMatchAction>();
 
-        for (auto route = action.routes().begin(); route != action.routes().end(); ++route) {
-          if (!headers.Path() && !(*route)->supportsPathlessHeaders()) {
-            continue;
-          }
-
-          RouteConstSharedPtr route_entry = (*route)->matches(headers, stream_info, random_value);
-          if (route_entry == nullptr) {
-            continue;
-          }
-
-          if (cb) {
-            RouteEvalStatus eval_status = (std::next(route) == action.routes().end())
-                                              ? RouteEvalStatus::NoMoreRoutes
-                                              : RouteEvalStatus::HasMoreRoutes;
-            RouteMatchStatus match_status = cb(route_entry, eval_status);
-            if (match_status == RouteMatchStatus::Accept) {
-              return route_entry;
-            }
-            continue;
-          }
-
-          return route_entry;
-        }
-
-        ENVOY_LOG(debug, "route was resolved but final route list did not match incoming request");
-        return nullptr;
+        return getRouteFromRoutes(cb, headers, stream_info, random_value, action.routes());
       }
       PANIC("Action in router matcher should be Route or RouteList");
     }
@@ -1931,34 +1927,10 @@ RouteConstSharedPtr VirtualHostImpl::getRouteFromEntries(const RouteCallback& cb
     ENVOY_LOG(debug, "failed to match incoming request: {}", static_cast<int>(match.match_state_));
 
     return nullptr;
-  } else {
-    // Check for a route that matches the request.
-    for (auto route = routes_.begin(); route != routes_.end(); ++route) {
-      if (!headers.Path() && !(*route)->supportsPathlessHeaders()) {
-        continue;
-      }
-
-      RouteConstSharedPtr route_entry = (*route)->matches(headers, stream_info, random_value);
-      if (route_entry == nullptr) {
-        continue;
-      }
-
-      if (cb) {
-        RouteEvalStatus eval_status = (std::next(route) == routes_.end())
-                                          ? RouteEvalStatus::NoMoreRoutes
-                                          : RouteEvalStatus::HasMoreRoutes;
-        RouteMatchStatus match_status = cb(route_entry, eval_status);
-        if (match_status == RouteMatchStatus::Accept) {
-          return route_entry;
-        }
-        continue;
-      }
-
-      return route_entry;
-    }
   }
 
-  return nullptr;
+  // Check for a route that matches the request.
+  return getRouteFromRoutes(cb, headers, stream_info, random_value, routes_);
 }
 
 const VirtualHostImpl* RouteMatcher::findVirtualHost(const Http::RequestHeaderMap& headers) const {
