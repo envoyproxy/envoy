@@ -41,7 +41,7 @@ bool GenericConnPoolFactory::disableTunnelingByFilterState(
   const Router::StringAccessor* disable_tunneling =
       downstream_info.filterState()->getDataReadOnly<Router::StringAccessor>(
           TcpProxy::DisableTunnelingFilterStateKey);
-  
+
   return disable_tunneling != nullptr;
 }
 
