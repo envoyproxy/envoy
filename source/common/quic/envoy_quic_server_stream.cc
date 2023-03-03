@@ -64,9 +64,6 @@ void EnvoyQuicServerStream::encodeHeaders(const Http::ResponseHeaderMap& headers
   }
 
   if (local_end_stream_) {
-    if (codec_callbacks_) {
-      codec_callbacks_->onCodecEncodeComplete();
-    }
     onLocalEndStream();
   }
 }
@@ -112,9 +109,6 @@ void EnvoyQuicServerStream::encodeData(Buffer::Instance& data, bool end_stream) 
     return;
   }
   if (local_end_stream_) {
-    if (codec_callbacks_) {
-      codec_callbacks_->onCodecEncodeComplete();
-    }
     onLocalEndStream();
   }
 }
@@ -135,9 +129,6 @@ void EnvoyQuicServerStream::encodeTrailers(const Http::ResponseTrailerMap& trail
     size_t bytes_sent = WriteTrailers(envoyHeadersToHttp2HeaderBlock(trailers), nullptr);
     ENVOY_BUG(bytes_sent != 0, "Failed to encode trailers.");
     stats_gatherer_->addBytesSent(bytes_sent, true);
-  }
-  if (codec_callbacks_) {
-    codec_callbacks_->onCodecEncodeComplete();
   }
   onLocalEndStream();
 }

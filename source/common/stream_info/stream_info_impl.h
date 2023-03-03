@@ -371,6 +371,8 @@ struct StreamInfoImpl : public StreamInfo {
     filter_chain_name_ = info.filterChainName();
     attempt_count_ = info.attemptCount();
     upstream_bytes_meter_ = info.getUpstreamBytesMeter();
+    bytes_sent_ = info.bytesSent();
+    is_shadow_ = info.isShadow();
   }
 
   void setIsShadow(bool is_shadow) { is_shadow_ = is_shadow; }
