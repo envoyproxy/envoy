@@ -254,7 +254,7 @@ TEST_F(CacheFilterTest, CacheMiss) {
 TEST_F(CacheFilterTest, Disabled) {
   request_headers_.setHost("CacheDisabled");
   CacheFilterSharedPtr filter = makeFilter(OptRef<HttpCache>{});
-  EXPECT_EQ(filter->decodeHeaders(request_headers_, false), Http::FilterHeadersStatus::Continue);
+  EXPECT_EQ(filter->decodeHeaders(request_headers_, true), Http::FilterHeadersStatus::Continue);
   filter->onDestroy();
 }
 
