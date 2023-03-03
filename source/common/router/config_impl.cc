@@ -1885,19 +1885,16 @@ RouteConstSharedPtr VirtualHostImpl::getRouteFromEntries(const RouteCallback& cb
 
         RouteConstSharedPtr route_entry =
             route_action.route()->matches(headers, stream_info, random_value);
-        if (nullptr == route_entry) {
+        if (route_entry == nullptr) {
           ENVOY_LOG(debug, "route was resolved but final route did not match incoming request");
           return nullptr;
         }
 
-        if (cb) {
-          if (cb(route_entry, RouteEvalStatus::NoMoreRoutes) == RouteMatchStatus::Accept) {
-            return route_entry;
-          }
+        if (!cb || cb(route_entry, RouteEvalStatus::NoMoreRoutes) == RouteMatchStatus::Accept) {
+          return route_entry;
+        } else {
           return nullptr;
         }
-
-        return route_entry;
       } else if (result->typeUrl() == RouteListMatchAction::staticTypeUrl()) {
         const RouteListMatchAction& action = result->getTyped<RouteListMatchAction>();
 
@@ -1907,7 +1904,7 @@ RouteConstSharedPtr VirtualHostImpl::getRouteFromEntries(const RouteCallback& cb
           }
 
           RouteConstSharedPtr route_entry = (*route)->matches(headers, stream_info, random_value);
-          if (nullptr == route_entry) {
+          if (route_entry == nullptr) {
             continue;
           }
 
@@ -1942,7 +1939,7 @@ RouteConstSharedPtr VirtualHostImpl::getRouteFromEntries(const RouteCallback& cb
       }
 
       RouteConstSharedPtr route_entry = (*route)->matches(headers, stream_info, random_value);
-      if (nullptr == route_entry) {
+      if (route_entry == nullptr) {
         continue;
       }
 

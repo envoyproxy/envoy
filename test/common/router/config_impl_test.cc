@@ -10688,6 +10688,42 @@ virtual_hosts:
   EXPECT_EQ(accepted_route->routeEntry()->clusterName(), "foo");
 }
 
+TEST_F(RouteMatchOverrideTest, MatchTreeVerifyRouteOverrideStops) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+- name: bar
+  domains: ["*"]
+  matcher:
+    matcher_tree:
+      input:
+        name: request-headers
+        typed_config:
+          "@type": type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput
+          header_name: :path
+      prefix_match_map:
+        map:
+          "/foo":
+            action:
+              name: route
+              typed_config:
+                "@type": type.googleapis.com/envoy.config.route.v3.Route
+                match: { prefix: "/foo" }
+                route:
+                  cluster: foo
+)EOF";
+
+  TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true);
+
+  RouteConstSharedPtr route = config.route(
+      [](RouteConstSharedPtr, RouteEvalStatus route_eval_status) -> RouteMatchStatus {
+        EXPECT_EQ(route_eval_status, RouteEvalStatus::NoMoreRoutes);
+
+        return RouteMatchStatus::Continue;
+      },
+      genHeaders("bat.com", "/foo/bar", "GET"));
+  EXPECT_EQ(nullptr, route);
+}
+
 TEST_F(RouteMatchOverrideTest, RouteListVerifyRouteOverrideStops) {
   const std::string yaml = R"EOF(
 virtual_hosts:
