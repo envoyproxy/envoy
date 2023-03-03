@@ -349,16 +349,8 @@ message BodyMutation {
 // request direction. If these fields are not configured correctly,
 // the response message will be ignored by the Envoy ext_proc filter.
 message NewProcessingTimeout {
-  // New timeout range in milliseconds.
-  enum NewTimeoutRange {
-    UNSPECIFIED = 0;
-    // The new timeout value can not be smaller than 1ms.
-    MIN_TIMEOUT_MS = 1;
-    // The new timeout value can not be greater than 10s (10000ms).
-    MAX_TIMEOUT_MS = 10000;
-  }
   // Specifies the new timer duration.
-  // Has to be >= MIN_TIMEOUT_MS and <= MAX_TIMEOUT_MS.
+  // Has to be >= 1ms and <= 10000ms.
   google.protobuf.Duration message_timeout = 1;
 
   // Specifies the traffic direction of the received request message.

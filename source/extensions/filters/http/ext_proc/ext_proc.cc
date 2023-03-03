@@ -534,11 +534,15 @@ void Filter::onNewTimeout(
   const auto new_timeout = response->new_timeout();
   const auto message_timeout_ms_opt = PROTOBUF_GET_OPTIONAL_MS(new_timeout, message_timeout);
   if (!message_timeout_ms_opt) {
+    ENVOY_LOG(warn, "Ext_proc server new timeout setting is missing. Ignoring the message.");
     return;
   }
   const auto message_timeout_ms = message_timeout_ms_opt->count();
-  if (message_timeout_ms < envoy::service::ext_proc::v3::NewProcessingTimeout::MIN_TIMEOUT_MS ||
-      message_timeout_ms > envoy::service::ext_proc::v3::NewProcessingTimeout::MAX_TIMEOUT_MS) {
+  const uint32_t min_timeout_ms = 1;
+  const uint32_t max_timeout_ms = 10000;
+  if (message_timeout_ms < min_timeout_ms || message_timeout_ms > max_timeout_ms) {
+    ENVOY_LOG(warn, "Ext_proc server new timeout setting is out of range. "
+                    "Ignoring the message.");
     return;
   }
   const auto traffic_direction = new_timeout.traffic_direction();
@@ -547,10 +551,12 @@ void Filter::onNewTimeout(
   const bool outbound_traffic =
       (traffic_direction == envoy::config::core::v3::TrafficDirection::OUTBOUND);
   if (!inbound_traffic && !outbound_traffic) {
+    ENVOY_LOG(warn, "Ext_proc server new timeout setting didn't specifiy the "
+                    "traffic direction it is processing. Ignoring the message.");
     return;
   }
   ENVOY_LOG(debug,
-            "Server need more time to process the request, start a "
+            "Server needs more time to process the request, start a "
             "new timer with timeout {} ms, direction {} ",
             message_timeout_ms, inbound_traffic ? "INBOUND" : "OUTBOUND");
   if (inbound_traffic) {
