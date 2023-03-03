@@ -19,6 +19,11 @@ jobs:
     runs-on: ubuntu-20.04
     permissions:
       contents: write # to upload assets to release
+      id-token: write
+      actions: write
+      checks: write
+      pull-requests: write
+      statuses: write
     timeout-minutes: 90
     container:
       image: envoyproxy/envoy-build-ubuntu:mobile-458cb49ca2013c0ccf057d00ad1d4407920c4e52
@@ -51,7 +56,12 @@ jobs:
     needs: androidbuild
     runs-on: macos-12
     permissions:
-      contents: write # to upload asserts to release
+      contents: write # to upload assets to release
+      id-token: write
+      actions: write
+      checks: write
+      pull-requests: write
+      statuses: write
     timeout-minutes: 50
     steps:
     - uses: actions/checkout@v3
@@ -101,7 +111,12 @@ jobs:
     needs: androidbuild
     runs-on: macos-12
     permissions:
-      contents: write # to upload asserts to release
+      contents: write # to upload assets to release
+      id-token: write
+      actions: write
+      checks: write
+      pull-requests: write
+      statuses: write
     timeout-minutes: 50
     steps:
     - uses: actions/checkout@v3
@@ -151,7 +166,12 @@ jobs:
     needs: androidbuild
     runs-on: macos-12
     permissions:
-      contents: write # to upload asserts to release
+      contents: write # to upload assets to release
+      id-token: write
+      actions: write
+      checks: write
+      pull-requests: write
+      statuses: write
     timeout-minutes: 50
     steps:
     - uses: actions/checkout@v3
@@ -201,7 +221,12 @@ jobs:
     needs: androidbuild
     runs-on: macos-12
     permissions:
-      contents: write # to upload asserts to release
+      contents: write # to upload assets to release
+      id-token: write
+      actions: write
+      checks: write
+      pull-requests: write
+      statuses: write
     timeout-minutes: 50
     steps:
     - uses: actions/checkout@v3
