@@ -135,26 +135,26 @@ public:
       InSequence s;
 
 #ifdef WIN32
-      EXPECT_CALL(os_sys_calls_, readv(_, _, _))
+      EXPECT_CALL(os_sys_calls_, recv(_, _, _, _))
           .WillOnce(Return(Api::SysCallSizeResult{ssize_t(-1), SOCKET_ERROR_AGAIN}));
       if (alpn == Http::Utility::AlpnNames::get().Http2c) {
         for (size_t i = 0; i < 24; i++) {
-          EXPECT_CALL(os_sys_calls_, readv(_, _, _))
+          EXPECT_CALL(os_sys_calls_, recv(_, _, _, _))
               .WillOnce(Invoke(
-                  [&data, i](os_fd_t fd, const iovec* iov, int iovcnt) -> Api::SysCallSizeResult {
-                    ASSERT(iov->iov_len >= data.size());
-                    memcpy(iov->iov_base, data.data() + i, 1);
+                  [&data, i](os_fd_t, void* buffer, size_t length, int) -> Api::SysCallSizeResult {
+                    ASSERT(length >= data.size());
+                    memcpy(buffer, data.data() + i, 1);
                     return Api::SysCallSizeResult{ssize_t(1), 0};
                   }))
               .WillOnce(Return(Api::SysCallSizeResult{ssize_t(-1), SOCKET_ERROR_AGAIN}));
         }
       } else {
         for (size_t i = 0; i < header.size(); i++) {
-          EXPECT_CALL(os_sys_calls_, readv(_, _, _))
+          EXPECT_CALL(os_sys_calls_, recv(_, _, _, _))
               .WillOnce(Invoke(
-                  [&header, i](os_fd_t fd, const iovec* iov, int iovcnt) -> Api::SysCallSizeResult {
-                    ASSERT(iov->iov_len >= header.size());
-                    memcpy(iov->iov_base, header.data() + i, 1);
+                  [&data, i](os_fd_t, void* buffer, size_t length, int) -> Api::SysCallSizeResult {
+                    ASSERT(length >= header.size());
+                    memcpy(buffer, header.data() + i, 1);
                     return Api::SysCallSizeResult{ssize_t(1), 0};
                   }))
               .WillOnce(Return(Api::SysCallSizeResult{ssize_t(-1), SOCKET_ERROR_AGAIN}));
