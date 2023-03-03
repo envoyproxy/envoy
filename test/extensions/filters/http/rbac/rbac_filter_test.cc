@@ -173,7 +173,7 @@ on_no_match:
     filter_->setDecoderFilterCallbacks(callbacks_);
   }
 
-  RoleBasedAccessControlFilterTest(){};
+  RoleBasedAccessControlFilterTest() = default;
 
   void setDestinationPort(uint16_t port) {
     address_ = Envoy::Network::Utility::parseInternetAddress("1.2.3.4", port, false);

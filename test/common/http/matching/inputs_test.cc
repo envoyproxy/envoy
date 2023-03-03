@@ -14,7 +14,7 @@ namespace Http {
 namespace Matching {
 
 // Helper function to create the stream info.
-StreamInfo::StreamInfoImpl CreateStreamInfo() {
+StreamInfo::StreamInfoImpl createStreamInfo() {
   auto connection_info_provider = std::make_shared<Network::ConnectionInfoSetterImpl>(
       std::make_shared<Network::Address::Ipv4Instance>(80),
       std::make_shared<Network::Address::Ipv4Instance>(80));
@@ -24,7 +24,7 @@ StreamInfo::StreamInfoImpl CreateStreamInfo() {
 
 TEST(MatchingData, HttpRequestHeadersDataInput) {
   HttpRequestHeadersDataInput input("header");
-  HttpMatchingDataImpl data(CreateStreamInfo());
+  HttpMatchingDataImpl data(createStreamInfo());
 
   {
     TestRequestHeaderMapImpl request_headers({{"header", "bar"}});
@@ -45,7 +45,7 @@ TEST(MatchingData, HttpRequestHeadersDataInput) {
 
 TEST(MatchingData, HttpRequestTrailersDataInput) {
   HttpRequestTrailersDataInput input("header");
-  HttpMatchingDataImpl data(CreateStreamInfo());
+  HttpMatchingDataImpl data(createStreamInfo());
 
   {
     TestRequestTrailerMapImpl request_trailers({{"header", "bar"}});
@@ -69,7 +69,7 @@ TEST(MatchingData, HttpResponseHeadersDataInput) {
   Network::ConnectionInfoSetterImpl connection_info_provider(
       std::make_shared<Network::Address::Ipv4Instance>(80),
       std::make_shared<Network::Address::Ipv4Instance>(80));
-  HttpMatchingDataImpl data(CreateStreamInfo());
+  HttpMatchingDataImpl data(createStreamInfo());
 
   {
     TestResponseHeaderMapImpl response_headers({{"header", "bar"}});
@@ -93,7 +93,7 @@ TEST(MatchingData, HttpResponseTrailersDataInput) {
   Network::ConnectionInfoSetterImpl connection_info_provider(
       std::make_shared<Network::Address::Ipv4Instance>(80),
       std::make_shared<Network::Address::Ipv4Instance>(80));
-  HttpMatchingDataImpl data(CreateStreamInfo());
+  HttpMatchingDataImpl data(createStreamInfo());
 
   {
     TestResponseTrailerMapImpl response_trailers({{"header", "bar"}});
@@ -116,7 +116,7 @@ TEST(MatchingData, HttpRequestQueryParamsDataInput) {
   Network::ConnectionInfoSetterImpl connection_info_provider(
       std::make_shared<Network::Address::Ipv4Instance>(80),
       std::make_shared<Network::Address::Ipv4Instance>(80));
-  HttpMatchingDataImpl data(CreateStreamInfo());
+  HttpMatchingDataImpl data(createStreamInfo());
 
   {
     HttpRequestQueryParamsDataInput input("arg");

@@ -14,7 +14,7 @@ namespace Http {
 namespace Matching {
 
 // Helper function to create the stream info.
-StreamInfo::StreamInfoImpl CreateStreamInfo() {
+StreamInfo::StreamInfoImpl createStreamInfo() {
   auto connection_info_provider = std::make_shared<Network::ConnectionInfoSetterImpl>(
       std::make_shared<Network::Address::Ipv4Instance>(80),
       std::make_shared<Network::Address::Ipv4Instance>(80));
@@ -27,7 +27,7 @@ TEST(MatchingData, HttpResponseStatusCodeInput) {
   Network::ConnectionInfoSetterImpl connection_info_provider(
       std::make_shared<Network::Address::Ipv4Instance>(80),
       std::make_shared<Network::Address::Ipv4Instance>(80));
-  HttpMatchingDataImpl data(CreateStreamInfo());
+  HttpMatchingDataImpl data(createStreamInfo());
 
   {
     auto result = input.get(data);
@@ -58,7 +58,7 @@ TEST(MatchingData, HttpResponseStatusCodeClassInput) {
   Network::ConnectionInfoSetterImpl connection_info_provider(
       std::make_shared<Network::Address::Ipv4Instance>(80),
       std::make_shared<Network::Address::Ipv4Instance>(80));
-  HttpMatchingDataImpl data(CreateStreamInfo());
+  HttpMatchingDataImpl data(createStreamInfo());
   {
     auto result = input.get(data);
     EXPECT_EQ(result.data_availability_,
