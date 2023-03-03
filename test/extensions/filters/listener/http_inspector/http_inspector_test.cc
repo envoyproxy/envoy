@@ -151,12 +151,12 @@ public:
       } else {
         for (size_t i = 0; i < header.size(); i++) {
           EXPECT_CALL(os_sys_calls_, recv(_, _, _, _))
-              .WillOnce(Invoke(
-                  [&data, i](os_fd_t, void* buffer, size_t length, int) -> Api::SysCallSizeResult {
-                    ASSERT(length >= header.size());
-                    memcpy(buffer, header.data() + i, 1);
-                    return Api::SysCallSizeResult{ssize_t(1), 0};
-                  }))
+              .WillOnce(Invoke([&header, i](os_fd_t, void* buffer, size_t length,
+                                            int) -> Api::SysCallSizeResult {
+                ASSERT(length >= header.size());
+                memcpy(buffer, header.data() + i, 1);
+                return Api::SysCallSizeResult{ssize_t(1), 0};
+              }))
               .WillOnce(Return(Api::SysCallSizeResult{ssize_t(-1), SOCKET_ERROR_AGAIN}));
         }
       }
