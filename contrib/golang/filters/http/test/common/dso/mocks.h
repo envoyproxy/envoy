@@ -9,7 +9,7 @@ namespace Dso {
 class MockDsoInstance : public Dso {
 public:
   MockDsoInstance();
-  ~MockDsoInstance();
+  ~MockDsoInstance() override;
 
   MOCK_METHOD(GoUint64, envoyGoFilterNewHttpPluginConfig, (GoUint64 p0, GoUint64 p1));
   MOCK_METHOD(GoUint64, envoyGoFilterMergeHttpPluginConfig, (GoUint64 p0, GoUint64 p1));

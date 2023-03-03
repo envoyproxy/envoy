@@ -57,7 +57,7 @@ DEFINE_PROTO_FUZZER(const envoy::extensions::filters::http::golang::GolangFilter
   static FuzzerMocks mocks;
 
   // Prepare filter.
-  const envoy::extensions::filters::http::golang::v3alpha::Config proto_config = input.config();
+  const envoy::extensions::filters::http::golang::v3alpha::Config& proto_config = input.config();
   FilterConfigSharedPtr config;
 
   try {
