@@ -114,7 +114,8 @@ public:
       envoy::extensions::filters::http::golang::v3alpha::Config& proto_config,
       envoy::extensions::filters::http::golang::v3alpha::ConfigsPerRoute& per_route_proto_config) {
     // Setup filter config for Golang filter.
-    config_ = std::make_shared<FilterConfig>(proto_config, Dso::DsoManager::getDsoByID(proto_config.library_id()));
+    config_ = std::make_shared<FilterConfig>(
+        proto_config, Dso::DsoManager::getDsoByID(proto_config.library_id()));
     // Setup per route config for Golang filter.
     per_route_config_ =
         std::make_shared<FilterConfigPerRoute>(per_route_proto_config, server_factory_context_);
