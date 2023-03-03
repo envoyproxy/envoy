@@ -5,6 +5,9 @@ behavior_changes:
 - area: oauth2
   change: |
     OAuth filter now URL-encodes URL in query parameters. These query parameters are decoded, leaving intact character sequences that must remain encoded in URLs. This behavioral change can be temporarily reverted by setting runtime guard ``envoy.reloadable_features.oauth_use_url_encoding`` to false.
+- area: admin
+  change: |
+    Adds a new admin stats format option 'html-active' to display a periodically list of the top most frequently changed stats.
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
