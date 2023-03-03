@@ -255,12 +255,12 @@ TEST_P(TlsInspectorTest, ClientHelloTooBig) {
 
   filter_->onAccept(cb_);
 #ifdef WIN32
-  EXPECT_CALL(os_sys_calls_, readv(_, _, _))
+  EXPECT_CALL(os_sys_calls_, recv(_, _, _, _))
       .WillOnce(Invoke(
-          [=, &client_hello](os_fd_t fd, const iovec* iov, int iovcnt) -> Api::SysCallSizeResult {
-            ASSERT(iov->iov_len >= max_size);
-            memcpy(iov->iov_base, client_hello.data(), max_size);
-            return Api::SysCallSizeResult{ssize_t(max_size), 0};
+          [=, &client_hello](os_fd_t, void* buffer, size_t length, int) -> Api::SysCallSizeResult {
+            ASSERT(length >= max_size);
+            memcpy(buffer, client_hello.data(), length);
+            return Api::SysCallSizeResult{ssize_t(length), 0};
           }));
 #else
   EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))

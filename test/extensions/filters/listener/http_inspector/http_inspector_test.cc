@@ -216,20 +216,20 @@ public:
     std::vector<uint8_t> data = Hex::decode(std::string(header));
 #ifdef WIN32
     if (alpn == Http::Utility::AlpnNames::get().Http2c) {
-      EXPECT_CALL(os_sys_calls_, readv(_, _, _))
+      EXPECT_CALL(os_sys_calls_, recv(_, _, _, _))
           .WillOnce(
-              Invoke([&data](os_fd_t fd, const iovec* iov, int iovcnt) -> Api::SysCallSizeResult {
-                ASSERT(iov->iov_len >= data.size());
-                memcpy(iov->iov_base, data.data(), data.size());
+              Invoke([&data](os_fd_t, void* buffer, size_t length, int) -> Api::SysCallSizeResult {
+                ASSERT(length >= data.size());
+                memcpy(buffer, data.data(), data.size());
                 return Api::SysCallSizeResult{ssize_t(data.size()), 0};
               }))
           .WillOnce(Return(Api::SysCallSizeResult{ssize_t(-1), SOCKET_ERROR_AGAIN}));
     } else {
-      EXPECT_CALL(os_sys_calls_, readv(_, _, _))
+      EXPECT_CALL(os_sys_calls_, recv(_, _, _, _))
           .WillOnce(
-              Invoke([&header](os_fd_t fd, const iovec* iov, int iovcnt) -> Api::SysCallSizeResult {
-                ASSERT(iov->iov_len >= header.size());
-                memcpy(iov->iov_base, header.data(), header.size());
+              Invoke([&header](os_fd_t, void* buffer, size_t length, int) -> Api::SysCallSizeResult {
+                ASSERT(length >= header.size());
+                memcpy(buffer, header.data(), header.size());
                 return Api::SysCallSizeResult{ssize_t(header.size()), 0};
               }))
           .WillOnce(Return(Api::SysCallSizeResult{ssize_t(-1), SOCKET_ERROR_AGAIN}));
@@ -286,11 +286,11 @@ public:
               }))
           .WillOnce(Return(Api::SysCallSizeResult{ssize_t(-1), SOCKET_ERROR_AGAIN}));
     } else {
-      EXPECT_CALL(os_sys_calls_, readv(_, _, _))
+      EXPECT_CALL(os_sys_calls_, recv(_, _, _, _))
           .WillOnce(
-              Invoke([&header](os_fd_t fd, const iovec* iov, int iovcnt) -> Api::SysCallSizeResult {
-                ASSERT(iov->iov_len >= header.size());
-                memcpy(iov->iov_base, header.data(), header.size());
+              Invoke([&header](os_fd_t, void* buffer, size_t length, int) -> Api::SysCallSizeResult {
+                ASSERT(length >= header.size());
+                memcpy(buffer, header.data(), header.size());
                 return Api::SysCallSizeResult{ssize_t(header.size()), 0};
               }))
           .WillOnce(Return(Api::SysCallSizeResult{ssize_t(-1), SOCKET_ERROR_AGAIN}));
@@ -447,11 +447,11 @@ TEST_F(HttpInspectorTest, InvalidConnectionPreface) {
   const std::string header = "505249202a20485454502f322e300d0a";
   std::vector<uint8_t> data = Hex::decode(std::string(header));
 #ifdef WIN32
-  EXPECT_CALL(os_sys_calls_, readv(_, _, _))
-      .WillOnce(Invoke([&data](os_fd_t fd, const iovec* iov, int iovcnt) -> Api::SysCallSizeResult {
-        ASSERT(iov->iov_len >= data.size());
-        memcpy(iov->iov_base, data.data(), data.size());
-        return Api::SysCallSizeResult{ssize_t(data.size()), 0};
+  EXPECT_CALL(os_sys_calls_, recv(_, _, _, _))
+      .WillOnce(Invoke([&data](os_fd_t, void* buffer, size_t length, int) -> Api::SysCallSizeResult {
+            ASSERT(length >= data.size());
+            memcpy(buffer, data.data(), data.size());
+            return Api::SysCallSizeResult{ssize_t(data.size()), 0};
       }))
       .WillOnce(Return(Api::SysCallSizeResult{ssize_t(-1), SOCKET_ERROR_AGAIN}));
 #else
