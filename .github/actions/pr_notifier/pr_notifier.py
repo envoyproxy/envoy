@@ -126,7 +126,8 @@ def needs_api_review(labels, repo, pr_info):
     # repokitten tags each commit as pending unless there has been an API LGTM
     # since the latest API changes. If this PR is tagged pendding it needs an
     # API review, otherwise it's set.
-    return repo.get_commit(pr_info.head.sha).get_statuses()[0].state == "pending"
+    status = repo.get_commit(pr_info.head.sha).get_statuses()
+    return status[0].state == "pending" if status.totalCount else False
 
 
 def track_prs(github_token):
