@@ -226,8 +226,8 @@ public:
           .WillOnce(Return(Api::SysCallSizeResult{ssize_t(-1), SOCKET_ERROR_AGAIN}));
     } else {
       EXPECT_CALL(os_sys_calls_, recv(_, _, _, _))
-          .WillOnce(
-              Invoke([&header](os_fd_t, void* buffer, size_t length, int) -> Api::SysCallSizeResult {
+          .WillOnce(Invoke(
+              [&header](os_fd_t, void* buffer, size_t length, int) -> Api::SysCallSizeResult {
                 ASSERT(length >= header.size());
                 memcpy(buffer, header.data(), header.size());
                 return Api::SysCallSizeResult{ssize_t(header.size()), 0};
@@ -287,8 +287,8 @@ public:
           .WillOnce(Return(Api::SysCallSizeResult{ssize_t(-1), SOCKET_ERROR_AGAIN}));
     } else {
       EXPECT_CALL(os_sys_calls_, recv(_, _, _, _))
-          .WillOnce(
-              Invoke([&header](os_fd_t, void* buffer, size_t length, int) -> Api::SysCallSizeResult {
+          .WillOnce(Invoke(
+              [&header](os_fd_t, void* buffer, size_t length, int) -> Api::SysCallSizeResult {
                 ASSERT(length >= header.size());
                 memcpy(buffer, header.data(), header.size());
                 return Api::SysCallSizeResult{ssize_t(header.size()), 0};
@@ -448,11 +448,12 @@ TEST_F(HttpInspectorTest, InvalidConnectionPreface) {
   std::vector<uint8_t> data = Hex::decode(std::string(header));
 #ifdef WIN32
   EXPECT_CALL(os_sys_calls_, recv(_, _, _, _))
-      .WillOnce(Invoke([&data](os_fd_t, void* buffer, size_t length, int) -> Api::SysCallSizeResult {
+      .WillOnce(
+          Invoke([&data](os_fd_t, void* buffer, size_t length, int) -> Api::SysCallSizeResult {
             ASSERT(length >= data.size());
             memcpy(buffer, data.data(), data.size());
             return Api::SysCallSizeResult{ssize_t(data.size()), 0};
-      }))
+          }))
       .WillOnce(Return(Api::SysCallSizeResult{ssize_t(-1), SOCKET_ERROR_AGAIN}));
 #else
   EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))
