@@ -268,6 +268,40 @@ public:
 
 DECLARE_FACTORY(ApplicationProtocolInputFactory);
 
+class FilterStateInput : public Matcher::DataInput<MatchingData> {
+public:
+  FilterStateInput(
+      const envoy::extensions::matching::common_inputs::network::v3::FilterStateInput& input_config)
+      : filter_state_key_(input_config.key()) {}
+
+  Matcher::DataInputGetResult get(const MatchingData& data) const override;
+
+private:
+  const std::string filter_state_key_;
+};
+
+class FilterStateInputFactory : public Matcher::DataInputFactory<MatchingData> {
+public:
+  std::string name() const override { return "envoy.matching.inputs.filter_state"; }
+
+  Matcher::DataInputFactoryCb<MatchingData> createDataInputFactoryCb(
+      const Protobuf::Message& message,
+      ProtobufMessage::ValidationVisitor& message_validation_visitor) override {
+    const auto& proto_config = MessageUtil::downcastAndValidate<
+        const envoy::extensions::matching::common_inputs::network::v3::FilterStateInput&>(
+        message, message_validation_visitor);
+
+    return [proto_config]() { return std::make_unique<FilterStateInput>(proto_config); };
+  };
+
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return std::make_unique<
+        envoy::extensions::matching::common_inputs::network::v3::FilterStateInput>();
+  }
+};
+
+DECLARE_FACTORY(FilterStateInputFactory);
+
 } // namespace Matching
 } // namespace Network
 } // namespace Envoy

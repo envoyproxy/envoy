@@ -26,6 +26,7 @@ variables:
 
 stages:
 - stage: env
+  displayName: Environment
   #
   # Note to use the outputs created here - this `stage` must be set as a dependency in the relevant stage
   # eg:
@@ -63,6 +64,7 @@ stages:
 
   jobs:
   - job: repo
+    displayName: Repository
     pool:
       vmImage: "ubuntu-20.04"
     steps:
@@ -109,16 +111,44 @@ stages:
       displayName: "Detect repo changes"
       workingDirectory: $(Build.SourcesDirectory)
       name: changed
+
+    - bash: |
+        set -e
+        VERSION_DEV="$(cat VERSION.txt | cut -d- -f2)"
+        if [[ $VERSION_DEV == "dev" ]]; then
+            echo "##vso[task.setvariable variable=isDev;isoutput=true]true"
+        else
+            if [[ $(Build.Reason) == "PullRequest" ]]; then
+                # Check to make sure that it was this PR that changed the version, otherwise fail
+                # as the branch needs to be reopened first.
+                # NB: this will not stop a PR that has already passed checks from being landed.
+                DIFF_TARGET_BRANCH="origin/$(System.PullRequest.TargetBranch)"
+                DIFF_REF="$(git merge-base HEAD "${DIFF_TARGET_BRANCH}")"
+                CHANGES="$(git diff "$DIFF_REF" HEAD VERSION.txt)"
+                if [[ -z "$CHANGES" ]]; then
+                    echo "VERSION.txt is not a development version. Please re-open the branch before making further changes" >&2
+                    exit 1
+                fi
+            fi
+            echo "##vso[task.setvariable variable=isDev;isoutput=true]false"
+        fi
+      displayName: Set development/release env
+      name: state
+
     - bash: |
         echo "env.outputs['changed.mobileOnly']: $(changed.mobileOnly)"
         echo "env.outputs['changed.docsOnly']: $(changed.docsOnly)"
         echo "env.outputs['changed.examplesOnly']: $(changed.examplesOnly)"
+        echo
+        echo "env.outputs['state.isDev]: $(state.isDev)"
       displayName: "Print build environment"
 
 - stage: precheck
+  # displayName: Prechecks
   dependsOn: ["env"]
   jobs:
   - job: format
+    # displayName: Code format
     dependsOn: []
     pool:
       vmImage: "ubuntu-20.04"
@@ -149,6 +179,7 @@ stages:
       condition: failed()
 
   - job: proto_format
+    # displayName: Protobuf format
     dependsOn: []
     pool:
       vmImage: "ubuntu-20.04"
@@ -178,6 +209,7 @@ stages:
       condition: failed()
 
   - job: docs
+    # displayName: Documentation
     dependsOn: []  # this removes the implicit dependency on previous stage and causes this to run in parallel.
     condition: ne(variables['PostSubmit'], true)
     pool:
@@ -211,6 +243,7 @@ stages:
         GCS_ARTIFACT_BUCKET: $(GcsArtifactBucket)
 
   - job: dependencies
+    # displayName: Dependency checks
     dependsOn: []  # this removes the implicit dependency on previous stage and causes this to run in parallel.
     pool:
       vmImage: "ubuntu-20.04"
@@ -232,6 +265,23 @@ stages:
         GCP_SERVICE_ACCOUNT_KEY: $(GcpServiceAccountKey)
         GITHUB_TOKEN: $(GitHubPublicRepoOnlyAccessToken)
       displayName: "Verify dependency information"
+
+  - job: docker_ci
+    displayName: Docker checks
+    dependsOn: []
+    pool:
+      vmImage: "ubuntu-20.04"
+    steps:
+    - script: |
+        DOCKER_CI_FIX_DIFF=$(Build.StagingDirectory)/fix_docker.diff DOCKER_CI_FIX=1 ci/test_docker_ci.sh
+      workingDirectory: $(Build.SourcesDirectory)
+      displayName: Docker build regression test
+    - task: PublishBuildArtifacts@1
+      inputs:
+        pathtoPublish: "$(Build.StagingDirectory)/fix_docker.diff"
+        artifactName: "docker_ci"
+        timeoutInMinutes: 10
+      condition: failed()
 
 - stage: sync
   condition: and(succeeded(), eq(variables['PostSubmit'], true), ne(variables['NoSync'], true))
@@ -298,11 +348,13 @@ stages:
         AZP_BRANCH: $(Build.SourceBranch)
 
 - stage: linux_x64
+  # displayName: Linux x64
   dependsOn: ["env", "precheck"]
   # For post-submit builds, continue even if precheck fails
   condition: and(not(canceled()), or(succeeded(), eq(variables['PostSubmit'], true)))
   jobs:
   - job: release
+    displayName: Build and test
     condition: and(not(canceled()), ne(stageDependencies.env.repo.outputs['changed.mobileOnly'], 'true'), ne(stageDependencies.env.repo.outputs['changed.docsOnly'], 'true'))
     timeoutInMinutes: 120
     pool:
@@ -315,6 +367,7 @@ stages:
         ciTarget: bazel.release
 
   - job: released
+    # displayName: Complete
     dependsOn: ["release"]
     pool:
       vmImage: "ubuntu-20.04"
@@ -329,11 +382,13 @@ stages:
         echo "linux_x64 released"
 
 - stage: linux_arm64
+  # displayName: Linux arm64
   dependsOn: ["env", "precheck"]
   # For post-submit builds, continue even if precheck fails
   condition: and(not(canceled()), or(succeeded(), eq(variables['PostSubmit'], true)))
   jobs:
   - job: release
+    displayName: Build and test
     condition: and(not(canceled()), ne(stageDependencies.env.repo.outputs['changed.mobileOnly'], 'true'), ne(stageDependencies.env.repo.outputs['changed.docsOnly'], 'true'))
     timeoutInMinutes: 120
     pool: "arm-large"
@@ -347,6 +402,7 @@ stages:
         bazelBuildExtraOptions: "--sandbox_base=/tmp/sandbox_base"
 
   - job: released
+    # displayName: Complete
     dependsOn: ["release"]
     pool:
       vmImage: "ubuntu-20.04"
@@ -360,100 +416,13 @@ stages:
     - bash: |
         echo "linux_arm64 released"
 
-- stage: distribution
-  dependsOn: ["env", "linux_arm64", "linux_x64"]
-  jobs:
-  - job: package_x64
-    dependsOn: []
-    condition: and(not(canceled()), succeeded(), ne(stageDependencies.env.repo.outputs['changed.mobileOnly'], 'true'), ne(stageDependencies.env.repo.outputs['changed.docsOnly'], 'true'), ne(stageDependencies.env.repo.outputs['changed.examplesOnly'], 'true'))
-    timeoutInMinutes: 120
-    pool:
-      vmImage: "ubuntu-20.04"
-    steps:
-    - template: bazel.yml
-      parameters:
-        ciTarget: bazel.distribution
-  - job: package_arm64
-    dependsOn: []
-    condition: and(not(canceled()), succeeded(), ne(stageDependencies.env.repo.outputs['changed.mobileOnly'], 'true'), ne(stageDependencies.env.repo.outputs['changed.docsOnly'], 'true'), ne(stageDependencies.env.repo.outputs['changed.examplesOnly'], 'true'))
-    timeoutInMinutes: 120
-    pool: "arm-large"
-    steps:
-    - template: bazel.yml
-      parameters:
-        managedAgent: false
-        ciTarget: bazel.distribution
-        rbe: false
-        artifactSuffix: ".arm64"
-        bazelBuildExtraOptions: "--sandbox_base=/tmp/sandbox_base"
-  - job: verify_x64
-    dependsOn: ["package_x64"]
-    condition: and(not(canceled()), succeeded(), ne(stageDependencies.env.repo.outputs['changed.mobileOnly'], 'true'), ne(stageDependencies.env.repo.outputs['changed.docsOnly'], 'true'), ne(stageDependencies.env.repo.outputs['changed.examplesOnly'], 'true'))
-    timeoutInMinutes: 120
-    pool:
-      vmImage: "ubuntu-20.04"
-    steps:
-    - task: DownloadBuildArtifacts@0
-      inputs:
-        buildType: current
-        artifactName: "bazel.distribution"
-        itemPattern: "bazel.distribution/packages.x64.tar.gz"
-        downloadType: single
-        targetPath: $(Build.StagingDirectory)
-    - script: ci/run_envoy_docker.sh 'ci/do_ci.sh verify_distro'
-      workingDirectory: $(Build.SourcesDirectory)
-      env:
-        AZP_BRANCH: $(Build.SourceBranch)
-        ENVOY_DOCKER_BUILD_DIR: $(Build.StagingDirectory)
-        BAZEL_REMOTE_CACHE: grpcs://remotebuildexecution.googleapis.com
-        BAZEL_REMOTE_INSTANCE: projects/envoy-ci/instances/default_instance
-        GCP_SERVICE_ACCOUNT_KEY: $(GcpServiceAccountKey)
-      displayName: "Verify packages"
-  - job: verify_arm64
-    dependsOn: ["package_arm64"]
-    condition: and(not(canceled()), succeeded(), ne(stageDependencies.env.repo.outputs['changed.mobileOnly'], 'true'), ne(stageDependencies.env.repo.outputs['changed.docsOnly'], 'true'), ne(stageDependencies.env.repo.outputs['changed.examplesOnly'], 'true'))
-    timeoutInMinutes: 120
-    pool: "arm-large"
-    steps:
-    - task: DownloadBuildArtifacts@0
-      inputs:
-        buildType: current
-        artifactName: "bazel.distribution.arm64"
-        itemPattern: "bazel.distribution.arm64/packages.arm64.tar.gz"
-        downloadType: single
-        targetPath: $(Build.StagingDirectory)
-    - script: ci/run_envoy_docker.sh 'ci/do_ci.sh verify_distro'
-      workingDirectory: $(Build.SourcesDirectory)
-      env:
-        AZP_BRANCH: $(Build.SourceBranch)
-        ENVOY_DOCKER_BUILD_DIR: $(Build.StagingDirectory)
-        BAZEL_REMOTE_CACHE: grpcs://remotebuildexecution.googleapis.com
-        BAZEL_REMOTE_INSTANCE: projects/envoy-ci/instances/default_instance
-        GCP_SERVICE_ACCOUNT_KEY: $(GcpServiceAccountKey)
-      displayName: "Verify packages"
-
-  - job: verified
-    dependsOn: ["verify_x64", "verify_arm64"]
-    pool:
-      vmImage: "ubuntu-20.04"
-    # This condition ensures that this (required) check passes if all of
-    # the preceding checks either pass or are skipped
-    # adapted from:
-    #   https://learn.microsoft.com/en-us/azure/devops/pipelines/process/expressions?view=azure-devops#job-to-job-dependencies-within-one-stage
-    condition: |
-      and(
-        in(dependencies.verify_x64.result, 'Succeeded', 'SucceededWithIssues', 'Skipped'),
-        in(dependencies.verify_arm64.result, 'Succeeded', 'SucceededWithIssues', 'Skipped'))
-    steps:
-    - checkout: none
-    - bash: |
-        echo "checks complete"
-
 - stage: check
+  # displayName: Checks (Linux x64)
   dependsOn: ["env", "linux_x64"]
   jobs:
   - job: bazel
-    displayName: "linux_x64"
+    displayName: linux_x64
+    # displayName: "Linux x64"
     dependsOn: []
     # Skip checks if only mobile/ or docs/ have changed.
     condition: and(not(canceled()), succeeded(), ne(stageDependencies.env.repo.outputs['changed.mobileOnly'], 'true'), ne(stageDependencies.env.repo.outputs['changed.docsOnly'], 'true'), ne(stageDependencies.env.repo.outputs['changed.examplesOnly'], 'true'))
@@ -486,7 +455,7 @@ stages:
         ciTarget: $(CI_TARGET)
 
   - job: coverage
-    displayName: "linux_x64"
+    # displayName: "Linux x64"
     dependsOn: []
     # Skip checks if only mobile/ or docs/ have changed.
     condition: and(not(canceled()), succeeded(), ne(stageDependencies.env.repo.outputs['changed.mobileOnly'], 'true'), ne(stageDependencies.env.repo.outputs['changed.docsOnly'], 'true'), ne(stageDependencies.env.repo.outputs['changed.examplesOnly'], 'true'))
@@ -517,7 +486,8 @@ stages:
       condition: always()
 
   - job: complete
-    displayName: "linux_x64"
+    displayName: linux_x64
+    # displayName: "Checks complete"
     dependsOn: ["bazel", "coverage"]
     pool:
       vmImage: "ubuntu-20.04"
@@ -534,11 +504,12 @@ stages:
     - bash: |
         echo "checks complete"
 
-- stage: docker
+- stage: publish
+  displayName: Publish
   dependsOn: ["env", "linux_x64", "linux_arm64"]
   jobs:
   - job: docker
-    displayName: "linux multiarch"
+    displayName: "Docker (Linux multi arch)"
     condition: and(not(canceled()), succeeded(), ne(stageDependencies.env.repo.outputs['changed.mobileOnly'], 'true'), ne(stageDependencies.env.repo.outputs['changed.docsOnly'], 'true'))
     timeoutInMinutes: 120
     pool:
@@ -607,25 +578,55 @@ stages:
       timeoutInMinutes: 10
       condition: always()
 
-  - job: linux
-    dependsOn: ["docker"]
+  - job: package_x64
+    displayName: Linux debs (x64)
+    dependsOn: []
+    condition: and(not(canceled()), succeeded(), ne(stageDependencies.env.repo.outputs['changed.mobileOnly'], 'true'), ne(stageDependencies.env.repo.outputs['changed.docsOnly'], 'true'), ne(stageDependencies.env.repo.outputs['changed.examplesOnly'], 'true'))
+    timeoutInMinutes: 120
     pool:
       vmImage: "ubuntu-20.04"
-    # This condition ensures that this (required) job passes if all of
-    # the preceding jobs either pass or are skipped
+    steps:
+    - template: bazel.yml
+      parameters:
+        ciTarget: bazel.distribution
+  - job: package_arm64
+    displayName: Linux debs (arm64)
+    dependsOn: []
+    condition: and(not(canceled()), succeeded(), ne(stageDependencies.env.repo.outputs['changed.mobileOnly'], 'true'), ne(stageDependencies.env.repo.outputs['changed.docsOnly'], 'true'), ne(stageDependencies.env.repo.outputs['changed.examplesOnly'], 'true'))
+    timeoutInMinutes: 120
+    pool: "arm-large"
+    steps:
+    - template: bazel.yml
+      parameters:
+        managedAgent: false
+        ciTarget: bazel.distribution
+        rbe: false
+        artifactSuffix: ".arm64"
+        bazelBuildExtraOptions: "--sandbox_base=/tmp/sandbox_base"
+
+  - job: success
+    dependsOn: ["docker", "package_x64", "package_arm64"]
+    displayName: Success (linux artefacts)
+    pool:
+      vmImage: "ubuntu-20.04"
+    # This condition ensures that this (required) check passes if all of
+    # the preceding checks either pass or are skipped
     # adapted from:
     #   https://learn.microsoft.com/en-us/azure/devops/pipelines/process/expressions?view=azure-devops#job-to-job-dependencies-within-one-stage
-    condition: in(dependencies.docker.result, 'Succeeded', 'SucceededWithIssues', 'Skipped')
+    condition: |
+      and(
+        in(dependencies.docker.result, 'Succeeded', 'SucceededWithIssues', 'Skipped'),
+        in(dependencies.package_x64.result, 'Succeeded', 'SucceededWithIssues', 'Skipped'),
+        in(dependencies.package_arm64.result, 'Succeeded', 'SucceededWithIssues', 'Skipped'))
     steps:
     - checkout: none
     - bash: |
-        echo "Docker linux built"
+        echo "building publishable assets complete"
 
-- stage: publish
-  dependsOn: ["docker"]
-  condition: and(succeeded(), eq(variables['PostSubmit'], true), ne(variables['NoSync'], true))
-  jobs:
   - job: docs
+    displayName: Publish docs to netlify
+    dependsOn: ["success"]
+    condition: and(succeeded(), eq(variables['PostSubmit'], true), ne(variables['NoSync'], true))
     pool:
       vmImage: "ubuntu-20.04"
     steps:
@@ -671,32 +672,13 @@ stages:
         NETLIFY_TRIGGER_URL: $(NetlifyTriggerURL)
 
   - job: github
+    displayName: Publish release tag
     dependsOn: ["docs"]
-    condition: eq(variables['isStableBranch'], 'true')
+    condition: and(succeeded(), eq(variables['PostSubmit'], true), ne(variables['NoSync'], true), eq(variables['isStableBranch'], 'true'), eq(stageDependencies.env.repo.outputs['state.isDev'], 'false'))
     pool:
       vmImage: "ubuntu-20.04"
     steps:
-    - bash: |
-        VERSION_DEV="$(cat VERSION.txt | cut -d- -f2)"
-        if [[ $VERSION_DEV != "dev" ]]; then
-            echo "##vso[task.setvariable variable=isDev]false"
-        fi
-      displayName: Set development/release env
 
-    - script: ./ci/run_envoy_docker.sh './ci/do_ci.sh publish'
-      displayName: "Publish release to Github"
-      workingDirectory: $(Build.SourcesDirectory)
-      condition: eq(variables['isDev'], 'false')
-      env:
-        AZP_BRANCH: $(Build.SourceBranch)
-        GITHUB_TOKEN: $(GitHubPublicRepoOnlyAccessToken)
-
-  - job: assets
-    dependsOn: []
-    condition: eq(variables['isTaggedRelease'], 'true')
-    pool:
-      vmImage: "ubuntu-20.04"
-    steps:
     - task: DownloadBuildArtifacts@0
       inputs:
         buildType: current
@@ -730,8 +712,17 @@ stages:
       name: MaintainerGPGKey
       displayName: 'Download maintainer GPG key'
       inputs:
-        secureFile: 'maintainer.gpg.key'
+        # NB: This is the path to the key and **must** be set on a per-pipeline basis
+        secureFile: '$(maintainerGPGKey)'
 
+    - script: ./ci/run_envoy_docker.sh './ci/do_ci.sh publish'
+      displayName: "Publish release to Github"
+      workingDirectory: $(Build.SourcesDirectory)
+      env:
+        AZP_BRANCH: $(Build.SourceBranch)
+        GITHUB_TOKEN: $(GitHubPublicRepoOnlyAccessToken)
+
+    # TODO(phlax): combine this with publish step
     - bash: |
         set -e
 
@@ -760,9 +751,11 @@ stages:
         MAINTAINER_GPG_KEY_PASSPHRASE: $(MaintainerGPGKeyPassphrase)
 
 - stage: verify
-  dependsOn: ["env", "docker"]
+  # displayName: Verify
+  dependsOn: ["env", "publish"]
   jobs:
   - job: examples
+    displayName: Examples (Docker/x64)
     condition: and(not(canceled()), succeeded(), ne(stageDependencies.env.repo.outputs['changed.mobileOnly'], 'true'), ne(stageDependencies.env.repo.outputs['changed.docsOnly'], 'true'))
     pool:
       vmImage: "ubuntu-20.04"
@@ -778,24 +771,77 @@ stages:
         ENVOY_DOCKER_BUILD_DIR: $(Build.StagingDirectory)
         NO_BUILD_SETUP: 1
 
-  - job: verified
-    dependsOn: ["examples"]
+  - job: packages_x64
+    displayName: Debs (x64)
+    condition: and(not(canceled()), succeeded(), ne(stageDependencies.env.repo.outputs['changed.mobileOnly'], 'true'), ne(stageDependencies.env.repo.outputs['changed.docsOnly'], 'true'), ne(stageDependencies.env.repo.outputs['changed.examplesOnly'], 'true'))
+    timeoutInMinutes: 120
     pool:
       vmImage: "ubuntu-20.04"
-    # This condition ensures that this (required) job passes if all of
-    # the preceding jobs either pass or are skipped
+    steps:
+    - task: DownloadBuildArtifacts@0
+      inputs:
+        buildType: current
+        artifactName: "bazel.distribution"
+        itemPattern: "bazel.distribution/packages.x64.tar.gz"
+        downloadType: single
+        targetPath: $(Build.StagingDirectory)
+    - script: ci/run_envoy_docker.sh 'ci/do_ci.sh verify_distro'
+      workingDirectory: $(Build.SourcesDirectory)
+      env:
+        AZP_BRANCH: $(Build.SourceBranch)
+        ENVOY_DOCKER_BUILD_DIR: $(Build.StagingDirectory)
+        BAZEL_REMOTE_CACHE: grpcs://remotebuildexecution.googleapis.com
+        BAZEL_REMOTE_INSTANCE: projects/envoy-ci/instances/default_instance
+        GCP_SERVICE_ACCOUNT_KEY: $(GcpServiceAccountKey)
+      displayName: "Verify packages"
+  - job: packages_arm64
+    displayName: Debs (arm64)
+    condition: and(not(canceled()), succeeded(), ne(stageDependencies.env.repo.outputs['changed.mobileOnly'], 'true'), ne(stageDependencies.env.repo.outputs['changed.docsOnly'], 'true'), ne(stageDependencies.env.repo.outputs['changed.examplesOnly'], 'true'))
+    timeoutInMinutes: 120
+    pool: "arm-large"
+    steps:
+    - task: DownloadBuildArtifacts@0
+      inputs:
+        buildType: current
+        artifactName: "bazel.distribution.arm64"
+        itemPattern: "bazel.distribution.arm64/packages.arm64.tar.gz"
+        downloadType: single
+        targetPath: $(Build.StagingDirectory)
+    - script: ci/run_envoy_docker.sh 'ci/do_ci.sh verify_distro'
+      workingDirectory: $(Build.SourcesDirectory)
+      env:
+        AZP_BRANCH: $(Build.SourceBranch)
+        ENVOY_DOCKER_BUILD_DIR: $(Build.StagingDirectory)
+        BAZEL_REMOTE_CACHE: grpcs://remotebuildexecution.googleapis.com
+        BAZEL_REMOTE_INSTANCE: projects/envoy-ci/instances/default_instance
+        GCP_SERVICE_ACCOUNT_KEY: $(GcpServiceAccountKey)
+      displayName: "Verify packages"
+
+  - job: verified
+    # displayName: Verification complete
+    dependsOn: ["examples", "packages_x64", "packages_arm64"]
+    pool:
+      vmImage: "ubuntu-20.04"
+    # This condition ensures that this (required) check passes if all of
+    # the preceding checks either pass or are skipped
     # adapted from:
     #   https://learn.microsoft.com/en-us/azure/devops/pipelines/process/expressions?view=azure-devops#job-to-job-dependencies-within-one-stage
-    condition: in(dependencies.examples.result, 'Succeeded', 'SucceededWithIssues', 'Skipped')
+    condition: |
+      and(
+        in(dependencies.examples.result, 'Succeeded', 'SucceededWithIssues', 'Skipped'),
+        in(dependencies.packages_x64.result, 'Succeeded', 'SucceededWithIssues', 'Skipped'),
+        in(dependencies.packages_arm64.result, 'Succeeded', 'SucceededWithIssues', 'Skipped'))
     steps:
     - checkout: none
     - bash: |
-        echo "examples verifiied"
+        echo "checks complete"
 
 - stage: macos
+  # displayName: macOS
   dependsOn: ["env", "precheck"]
   jobs:
   - job: test
+    displayName: Build and test
     condition: and(not(canceled()), succeeded(), ne(stageDependencies.env.repo.outputs['changed.mobileOnly'], 'true'), ne(stageDependencies.env.repo.outputs['changed.docsOnly'], 'true'), ne(stageDependencies.env.repo.outputs['changed.examplesOnly'], 'true'))
     timeoutInMinutes: 180
     pool:
@@ -829,6 +875,7 @@ stages:
         BUILD_URI: $(Build.BuildUri)
 
   - job: tested
+    # displayName: Complete
     dependsOn: ["test"]
     pool:
       vmImage: "ubuntu-20.04"
@@ -843,9 +890,11 @@ stages:
         echo "macos tested"
 
 - stage: windows
+  # displayName: Windows
   dependsOn: ["env", "precheck"]
   jobs:
   - job: release
+    displayName: Build and test
     condition: and(not(canceled()), succeeded(), ne(stageDependencies.env.repo.outputs['changed.mobileOnly'], 'true'), ne(stageDependencies.env.repo.outputs['changed.docsOnly'], 'true'), ne(stageDependencies.env.repo.outputs['changed.examplesOnly'], 'true'))
     timeoutInMinutes: 180
     pool:
@@ -885,6 +934,7 @@ stages:
       condition: always()
 
   - job: docker
+    displayName: Build Docker image
     condition: and(not(canceled()), succeeded(), ne(stageDependencies.env.repo.outputs['changed.mobileOnly'], 'true'), ne(stageDependencies.env.repo.outputs['changed.docsOnly'], 'true'), ne(stageDependencies.env.repo.outputs['changed.examplesOnly'], 'true'))
     strategy:
       matrix:
@@ -933,6 +983,7 @@ stages:
       condition: always()
 
   - job: released
+    # displayName: Complete
     dependsOn: ["release", "docker"]
     pool:
       vmImage: "ubuntu-20.04"

@@ -115,6 +115,13 @@ func envoyGoFilterOnHttpHeader(r *C.httpRequest, endStream, headerNum, headerByt
 			req = createRequest(r)
 		}
 	}
+	if req.paniced {
+		// goroutine panic in the previous state that could not sendLocalReply, delay terminating the request here,
+		// to prevent error from spreading.
+		req.safeReplyPanic()
+		return uint64(api.LocalReply)
+	}
+	defer req.RecoverPanic()
 	f := req.httpFilter
 
 	header := &httpHeaderMap{
@@ -141,6 +148,13 @@ func envoyGoFilterOnHttpHeader(r *C.httpRequest, endStream, headerNum, headerByt
 //export envoyGoFilterOnHttpData
 func envoyGoFilterOnHttpData(r *C.httpRequest, endStream, buffer, length uint64) uint64 {
 	req := getRequest(r)
+	if req.paniced {
+		// goroutine panic in the previous state that could not sendLocalReply, delay terminating the request here,
+		// to prevent error from spreading.
+		req.safeReplyPanic()
+		return uint64(api.LocalReply)
+	}
+	defer req.RecoverPanic()
 
 	f := req.httpFilter
 	isDecode := api.EnvoyRequestPhase(r.phase) == api.DecodeDataPhase
@@ -163,6 +177,8 @@ func envoyGoFilterOnHttpData(r *C.httpRequest, endStream, buffer, length uint64)
 //export envoyGoFilterOnHttpDestroy
 func envoyGoFilterOnHttpDestroy(r *C.httpRequest, reason uint64) {
 	req := getRequest(r)
+	// do nothing even when req.panic is true, since filter is already destroying.
+	defer req.RecoverPanic()
 
 	v := api.DestroyReason(reason)
 

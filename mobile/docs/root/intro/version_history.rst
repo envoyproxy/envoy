@@ -15,17 +15,23 @@ Breaking changes:
 - swift/kotlin: add `cancel` method to `GRPCStream`` type (:issue:`#24780 <24780>`).
 - all: enable HTTP/3 by default in Engine builders.
 - api: remove ``extendKeepaliveTimeout`` method from engine builders.
-- api: move Java and C++ addVirtualClusters taking concatenated cluster YAML to addVirtualCluster with one cluster config at a time (:issue: `#25297 <25297>`, :issue: `#25259 <25259>`)
-- api: move Java and C++ dnsPreresolveHostnames from taking concatenated cluster YAML to taking a list of String hostnames (:issue: `#25297 <25297>`, :issue: `#25259 <25259>`)
+- java: moved the Java builder to use the C++ builder's generated bootstrap, rather than doing YAML string manipulation (:issue: `#25392 <25392>`)
+- api: move ``addVirtualClusters`` APIs taking concatenated cluster YAML to ``addVirtualCluster`` with one cluster config at a time (:issue: `#25297 <25297>`, :issue: `#25259 <25259>`, :issue: `#25457 <25457>`)
+- api: move ``dnsPreresolveHostnames`` APIs from taking concatenated cluster YAML to taking a list of String hostnames (:issue: `#25297 <25297>`, :issue: `#25259 <25259>`, :issue: `#25457 <25457>`)
+- api: added ``setRuntimeGuard`` APIs for all languages (:issue: `#25434 <25434>`)
+- clusters: removing the base_h2 cluster. Requests with ``x-envoy-mobile-upstream-protocol`` set to ``http2`` will be sent to the base cluster and use the best available protocol (:issue `#25796 <25796>`).
+- clusters: only creating the stats cluster if an endpoint is configured. Previously if no domain was configured a cluster would be configured pointed at 127.0.0.1. (:issue: `#25816 <25816>`).
+- clusters: removing the base_h3 cluster. If HTTP/3 is enabled, the base cluster will use HTTP/3 instead. (:issue `#25814 <25814>`).
 
 Bugfixes:
 
 - android: fix engine startup crash for when admin interface is enabled. (:issue:`#2520 <2520>`)
 - android: respect system security policy when determining whether clear text requests are allowed. (:issue:`#2528 <2528>`)
+- android: fix JNI crashes when responses would have empty trailers. (:issue:`#25516 <25516>`)
 
 Features:
 
-- api: Add support for brotli and gzip request compression.  (:issue:`#25352 <25352>`)
+- api: Add support for brotli and gzip request compression.  (:issue:`#25352 <25352>`, :issue:`#25595 <25595>`)
 - api: Add a constructor which takes a URL to C++ RequestEngineBuilder.
 - api: add option to support platform provided certificates validation interfaces on iOS and Android. (:issue `#2144 <2144>`)
 - api: Add a ``setPerTryIdleTimeoutSeconds()`` method to C++ EngineBuilder.

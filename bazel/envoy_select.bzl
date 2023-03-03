@@ -66,6 +66,13 @@ def envoy_select_envoy_mobile_request_compression(xs, repository = ""):
         "//conditions:default": xs,
     })
 
+# Selects the given values if the Envoy Mobile listener is enabled in the current build.
+def envoy_select_envoy_mobile_listener(xs, repository = ""):
+    return select({
+        repository + "//bazel:disable_envoy_mobile_listener": [],
+        "//conditions:default": xs,
+    })
+
 # Selects the given values if http3 is enabled in the current build.
 def envoy_select_enable_http3(xs, repository = ""):
     return select({

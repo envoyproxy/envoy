@@ -29,6 +29,7 @@ BSON
 BPF
 Bdecoded
 Bencoded
+DFP
 GiB
 IPTOS
 Repick
@@ -239,6 +240,7 @@ LEV
 LF
 LHS
 hls
+ingressed
 integrations
 jkl
 lang

@@ -53,13 +53,13 @@ func handleCApiStatus(status C.CAPIStatus) {
 	case C.CAPIOK:
 		return
 	case C.CAPIFilterIsGone:
-		panic("request has been finished")
+		panic(errRequestFinished)
 	case C.CAPIFilterIsDestroy:
-		panic("golang filter has been destroyed")
+		panic(errFilterDestroyed)
 	case C.CAPINotInGo:
-		panic("not proccessing Go")
+		panic(errNotInGo)
 	case C.CAPIInvalidPhase:
-		panic("invalid phase, maybe headers/buffer already continued")
+		panic(errInvalidPhase)
 	}
 }
 
@@ -68,6 +68,8 @@ func (c *httpCApiImpl) HttpContinue(r unsafe.Pointer, status uint64) {
 	handleCApiStatus(res)
 }
 
+// Only may panic with errRequestFinished, errFilterDestroyed or errNotInGo,
+// won't panic with errInvalidPhase and others, otherwise will cause deadloop, see RecoverPanic for the details.
 func (c *httpCApiImpl) HttpSendLocalReply(r unsafe.Pointer, response_code int, body_text string, headers map[string]string, grpc_status int64, details string) {
 	hLen := len(headers)
 	strs := make([]string, 0, hLen)
@@ -83,7 +85,7 @@ func (c *httpCApiImpl) HttpGetHeader(r unsafe.Pointer, key *string, value *strin
 	handleCApiStatus(res)
 }
 
-func (c *httpCApiImpl) HttpCopyHeaders(r unsafe.Pointer, num uint64, bytes uint64) map[string]string {
+func (c *httpCApiImpl) HttpCopyHeaders(r unsafe.Pointer, num uint64, bytes uint64) map[string][]string {
 	// TODO: use a memory pool for better performance,
 	// since these go strings in strs, will be copied into the following map.
 	strs := make([]string, num*2)
@@ -98,11 +100,16 @@ func (c *httpCApiImpl) HttpCopyHeaders(r unsafe.Pointer, num uint64, bytes uint6
 	res := C.envoyGoFilterHttpCopyHeaders(r, unsafe.Pointer(sHeader.Data), unsafe.Pointer(bHeader.Data))
 	handleCApiStatus(res)
 
-	m := make(map[string]string, num)
+	m := make(map[string][]string, num)
 	for i := uint64(0); i < num*2; i += 2 {
 		key := strs[i]
 		value := strs[i+1]
-		m[key] = value
+
+		if v, found := m[key]; !found {
+			m[key] = []string{value}
+		} else {
+			m[key] = append(v, value)
+		}
 	}
 	runtime.KeepAlive(buf)
 	return m
@@ -143,7 +150,7 @@ func (c *httpCApiImpl) HttpSetBufferHelper(r unsafe.Pointer, bufferPtr uint64, v
 	handleCApiStatus(res)
 }
 
-func (c *httpCApiImpl) HttpCopyTrailers(r unsafe.Pointer, num uint64, bytes uint64) map[string]string {
+func (c *httpCApiImpl) HttpCopyTrailers(r unsafe.Pointer, num uint64, bytes uint64) map[string][]string {
 	// TODO: use a memory pool for better performance,
 	// but, should be very careful, since string is const in go,
 	// and we have to make sure the strings is not using before reusing,
@@ -156,11 +163,16 @@ func (c *httpCApiImpl) HttpCopyTrailers(r unsafe.Pointer, num uint64, bytes uint
 	res := C.envoyGoFilterHttpCopyTrailers(r, unsafe.Pointer(sHeader.Data), unsafe.Pointer(bHeader.Data))
 	handleCApiStatus(res)
 
-	m := make(map[string]string, num)
+	m := make(map[string][]string, num)
 	for i := uint64(0); i < num*2; i += 2 {
 		key := strs[i]
 		value := strs[i+1]
-		m[key] = value
+
+		if v, found := m[key]; !found {
+			m[key] = []string{value}
+		} else {
+			m[key] = append(v, value)
+		}
 	}
 	return m
 }

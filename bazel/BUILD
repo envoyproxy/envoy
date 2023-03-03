@@ -354,6 +354,11 @@ config_setting(
 )
 
 config_setting(
+    name = "disable_envoy_mobile_listener",
+    values = {"define": "envoy_mobile_listener=disabled"},
+)
+
+config_setting(
     name = "disable_logging",
     values = {"define": "enable_logging=disabled"},
 )
@@ -599,6 +604,14 @@ config_setting(
     ],
 )
 
+selects.config_setting_group(
+    name = "android_opt",
+    match_all = [
+        ":opt_build",
+        ":android",
+    ],
+)
+
 config_setting(
     name = "android_logger",
     values = {"define": "logger=android"},
@@ -652,6 +665,14 @@ selects.config_setting_group(
     match_all = [
         ":apple",
         ":dbg_build",
+    ],
+)
+
+selects.config_setting_group(
+    name = "apple_opt",
+    match_all = [
+        ":opt_build",
+        ":apple",
     ],
 )
 

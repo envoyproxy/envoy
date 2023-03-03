@@ -225,15 +225,13 @@ FilterDataStatus Filter::onData(ProcessorState& state, Buffer::Instance& data, b
     ENVOY_LOG(trace, "Header processing still in progress -- holding body data");
     // We don't know what to do with the body until the response comes back.
     // We must buffer it in case we need it when that happens.
-    if (end_stream) {
-      state.setPaused(true);
-      return FilterDataStatus::StopIterationAndBuffer;
-    } else {
-      // Raise a watermark to prevent a buffer overflow until the response comes back.
-      state.setPaused(true);
-      state.requestWatermark();
-      return FilterDataStatus::StopIterationAndWatermark;
-    }
+    // Raise a watermark to prevent a buffer overflow until the response comes back.
+    // When end_stream is true, we need to StopIterationAndWatermark as well to stop the
+    // ActiveStream from returning error when the last chunk added to stream buffer exceeds the
+    // buffer limit.
+    state.setPaused(true);
+    state.requestWatermark();
+    return FilterDataStatus::StopIterationAndWatermark;
   }
   if (state.callbackState() == ProcessorState::CallbackState::StreamedBodyCallbackFinishing) {
     // We were previously streaming the body, but there are more chunks waiting
@@ -339,6 +337,9 @@ FilterDataStatus Filter::onData(ProcessorState& state, Buffer::Instance& data, b
     if (state.partialBodyProcessed()) {
       // We already sent and received the buffer, so everything else just falls through.
       ENVOY_LOG(trace, "Partial buffer limit reached");
+      // Make sure that we do not accidentally try to modify the headers before
+      // we continue, which will result in them possibly being sent.
+      state.setHeaders(nullptr);
       result = FilterDataStatus::Continue;
     } else if (state.callbackState() ==
                ProcessorState::CallbackState::BufferedPartialBodyCallback) {
@@ -348,38 +349,19 @@ FilterDataStatus Filter::onData(ProcessorState& state, Buffer::Instance& data, b
       ENVOY_LOG(trace, "Call in progress for partial mode");
       state.setPaused(true);
       result = FilterDataStatus::StopIterationNoBuffer;
-    } else if (end_stream || state.queueOverHighLimit()) {
-      bool terminate;
-      std::tie(terminate, result) = sendStreamChunk(state, data, end_stream);
-
-      if (terminate) {
-        return result;
-      }
     } else {
-      // Keep on running and buffering
       state.enqueueStreamingChunk(data, false, false);
-
-      if (Runtime::runtimeFeatureEnabled(Runtime::defer_processing_backedup_streams) &&
-          state.queueOverHighLimit()) {
-        // When we transition to queue over high limit, we read disable the
-        // stream. With deferred processing, this means new data will buffer in
-        // the receiving codec buffer (not reaching this filter) and data
-        // already queued in this filter hasn't yet been sent externally.
-        //
-        // The filter would send the queued data if it was invoked again, or if
-        // we explicitly kick it off. The former wouldn't happen with deferred
-        // processing since we would be buffering in the receiving codec buffer,
-        // so we opt for the latter, explicitly kicking it off.
+      if (end_stream || state.queueOverHighLimit()) {
+        // At either end of stream or when the buffer is full, it's time to send what we have
+        // to the processor.
         bool terminate;
-        Buffer::OwnedImpl empty_buffer{};
-        std::tie(terminate, result) = sendStreamChunk(state, empty_buffer, false);
-
+        FilterDataStatus chunk_result;
+        std::tie(terminate, chunk_result) = sendStreamChunk(state, end_stream);
         if (terminate) {
-          return result;
+          return chunk_result;
         }
-      } else {
-        result = FilterDataStatus::Continue;
       }
+      result = FilterDataStatus::StopIterationNoBuffer;
     }
     break;
   case ProcessingMode::NONE:
@@ -405,8 +387,8 @@ FilterDataStatus Filter::onData(ProcessorState& state, Buffer::Instance& data, b
   return result;
 }
 
-std::pair<bool, Http::FilterDataStatus>
-Filter::sendStreamChunk(ProcessorState& state, Buffer::Instance& data, bool end_stream) {
+std::pair<bool, Http::FilterDataStatus> Filter::sendStreamChunk(ProcessorState& state,
+                                                                bool end_stream) {
   switch (openStream()) {
   case StreamOpenState::Error:
     return {true, FilterDataStatus::StopIterationNoBuffer};
@@ -416,7 +398,7 @@ Filter::sendStreamChunk(ProcessorState& state, Buffer::Instance& data, bool end_
     // Fall through
     break;
   }
-  state.enqueueStreamingChunk(data, false, false);
+
   // Put all buffered data so far into one big buffer
   const auto& all_data = state.consolidateStreamedChunks(true);
   ENVOY_LOG(debug, "Sending {} bytes of data in buffered partial mode. end_stream = {}",
@@ -490,6 +472,9 @@ FilterTrailersStatus Filter::decodeTrailers(RequestTrailerMap& trailers) {
 
 FilterHeadersStatus Filter::encodeHeaders(ResponseHeaderMap& headers, bool end_stream) {
   ENVOY_LOG(trace, "encodeHeaders end_stream = {}", end_stream);
+  // Try to merge the route config again in case the decodeHeaders() is not called when processing
+  // local reply.
+  mergePerRouteConfig();
   if (end_stream) {
     encoding_state_.setCompleteBodyAvailable(true);
   }
@@ -742,10 +727,15 @@ static ProcessingMode allDisabledMode() {
 }
 
 void Filter::mergePerRouteConfig() {
-  auto&& merged_config = Http::Utility::getMergedPerFilterConfig<FilterConfigPerRoute>(
+  if (route_config_merged_) {
+    return;
+  }
+  route_config_merged_ = true;
+
+  auto merged_config = Http::Utility::getMergedPerFilterConfig<FilterConfigPerRoute>(
       decoder_callbacks_,
       [](FilterConfigPerRoute& dst, const FilterConfigPerRoute& src) { dst.merge(src); });
-  if (!merged_config) {
+  if (!merged_config.has_value()) {
     return;
   }
   if (merged_config->disabled()) {
