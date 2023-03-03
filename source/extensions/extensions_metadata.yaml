@@ -842,6 +842,13 @@ envoy.quic.proof_source.filter_chain:
   status: alpha
   type_urls:
   - envoy.extensions.quic.proof_source.v3.ProofSourceConfig
+envoy.quic.server_preferred_address.fixed:
+  categories:
+  - envoy.quic.server_preferred_address
+  security_posture: robust_to_untrusted_downstream
+  status: alpha
+  type_urls:
+  - envoy.extensions.quic.server_preferred_address.v3.FixedServerPreferredAddressConfig
 envoy.udp_packet_writer.default:
   categories:
   - envoy.udp_packet_writer
@@ -1330,6 +1337,13 @@ envoy.matching.inputs.application_protocol:
   status: alpha
   type_urls:
   - envoy.extensions.matching.common_inputs.network.v3.ApplicationProtocolInput
+envoy.matching.inputs.filter_state:
+  categories:
+  - envoy.matching.network.input
+  security_posture: unknown
+  status: alpha
+  type_urls:
+  - envoy.extensions.matching.common_inputs.network.v3.FilterStateInput
 envoy.matching.inputs.uri_san:
   categories:
   - envoy.matching.http.input

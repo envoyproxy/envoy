@@ -503,15 +503,16 @@ TEST_P(GolangIntegrationTest, LuaRespondAfterGoHeaderContinue) {
 name: envoy.filters.http.lua
 typed_config:
   "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.Lua
-  inline_code: |
-    function envoy_on_request(handle)
-      local orig_header = handle:headers():get('x-test-header-0')
-      local go_header = handle:headers():get('test-x-set-header-0')
-      handle:respond({[":status"] = "403"}, "forbidden from lua, orig header: "
-        .. (orig_header or "nil")
-        .. ", go header: "
-        .. (go_header or "nil"))
-    end
+  default_source_code:
+    inline_string: |
+        function envoy_on_request(handle)
+        local orig_header = handle:headers():get('x-test-header-0')
+        local go_header = handle:headers():get('test-x-set-header-0')
+        handle:respond({[":status"] = "403"}, "forbidden from lua, orig header: "
+            .. (orig_header or "nil")
+            .. ", go header: "
+            .. (go_header or "nil"))
+        end
 )EOF";
   config_helper_.prependFilter(LUA_RESPOND);
 

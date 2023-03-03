@@ -487,6 +487,7 @@ envoy_cc_library(
         ":header_map_lib",
         ":headers_lib",
         ":message_lib",
+        "//envoy/common:regex_interface",
         "//envoy/http:codes_interface",
         "//envoy/http:filter_interface",
         "//envoy/http:header_map_interface",

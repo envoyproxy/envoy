@@ -35,7 +35,6 @@ using JsonRequestTranslatorPtr = std::unique_ptr<JsonRequestTranslator>;
 using google::grpc::transcoding::MessageStream;
 using google::grpc::transcoding::PathMatcherBuilder;
 using google::grpc::transcoding::PathMatcherUtility;
-using google::grpc::transcoding::RequestInfo;
 using google::grpc::transcoding::RequestMessageTranslator;
 using RequestMessageTranslatorPtr = std::unique_ptr<RequestMessageTranslator>;
 using google::grpc::transcoding::ResponseToJsonTranslator;
@@ -267,8 +266,7 @@ Status JsonTranscoderConfig::resolveField(const Protobuf::Descriptor* descriptor
   const ProtobufWkt::Type* message_type =
       type_helper_->Info()->GetTypeByTypeUrl(Grpc::Common::typeUrl(descriptor->full_name()));
   if (message_type == nullptr) {
-    return ProtobufUtil::Status(StatusCode::kNotFound,
-                                "Could not resolve type: " + descriptor->full_name());
+    return {StatusCode::kNotFound, "Could not resolve type: " + descriptor->full_name()};
   }
 
   Status status = type_helper_->ResolveFieldPath(
@@ -285,7 +283,7 @@ Status JsonTranscoderConfig::resolveField(const Protobuf::Descriptor* descriptor
     *is_http_body = body_type != nullptr &&
                     body_type->name() == google::api::HttpBody::descriptor()->full_name();
   }
-  return Status();
+  return {};
 }
 
 Status JsonTranscoderConfig::createMethodInfo(const Protobuf::MethodDescriptor* descriptor,
@@ -310,12 +308,12 @@ Status JsonTranscoderConfig::createMethodInfo(const Protobuf::MethodDescriptor* 
 
   if (!method_info->response_body_field_path.empty() && !method_info->response_type_is_http_body_) {
     // TODO(euroelessar): Implement https://github.com/envoyproxy/envoy/issues/11136.
-    return Status(StatusCode::kUnimplemented,
-                  "Setting \"response_body\" is not supported yet for non-HttpBody fields: " +
-                      descriptor->full_name());
+    return {StatusCode::kUnimplemented,
+            "Setting \"response_body\" is not supported yet for non-HttpBody fields: " +
+                descriptor->full_name()};
   }
 
-  return Status();
+  return {};
 }
 
 bool JsonTranscoderConfig::matchIncomingRequestInfo() const {
@@ -340,7 +338,7 @@ ProtobufUtil::Status JsonTranscoderConfig::createTranscoder(
     path = path.substr(0, pos);
   }
 
-  struct RequestInfo request_info;
+  google::grpc::transcoding::RequestInfo request_info;
   request_info.reject_binding_body_field_collisions =
       request_validation_options_.reject_binding_body_field_collisions();
   request_info.case_insensitive_enum_parsing = case_insensitive_enum_parsing_;
@@ -348,8 +346,7 @@ ProtobufUtil::Status JsonTranscoderConfig::createTranscoder(
   method_info =
       path_matcher_->Lookup(method, path, args, &variable_bindings, &request_info.body_field_path);
   if (!method_info) {
-    return ProtobufUtil::Status(StatusCode::kNotFound,
-                                "Could not resolve " + path + " to a method.");
+    return {StatusCode::kNotFound, "Could not resolve " + path + " to a method."};
   }
 
   auto status = methodToRequestInfo(method_info, &request_info);
@@ -401,7 +398,7 @@ ProtobufUtil::Status JsonTranscoderConfig::createTranscoder(
   transcoder = std::make_unique<TranscoderImpl>(std::move(request_translator),
                                                 std::move(json_request_translator),
                                                 std::move(response_translator));
-  return ProtobufUtil::Status();
+  return {};
 }
 
 ProtobufUtil::Status
@@ -412,11 +409,10 @@ JsonTranscoderConfig::methodToRequestInfo(const MethodInfoSharedPtr& method_info
   info->message_type = type_helper_->Info()->GetTypeByTypeUrl(request_type_url);
   if (info->message_type == nullptr) {
     ENVOY_LOG(debug, "Cannot resolve input-type: {}", request_type_full_name);
-    return ProtobufUtil::Status(StatusCode::kNotFound,
-                                "Could not resolve type: " + request_type_full_name);
+    return {StatusCode::kNotFound, "Could not resolve type: " + request_type_full_name};
   }
 
-  return ProtobufUtil::Status();
+  return {};
 }
 
 ProtobufUtil::Status

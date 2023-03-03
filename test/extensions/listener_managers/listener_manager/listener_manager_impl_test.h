@@ -236,10 +236,9 @@ protected:
           Network::Utility::parseInternetAddress(direct_source_address, source_port);
     }
     socket_->connection_info_provider_->setDirectRemoteAddressForTest(direct_remote_address_);
-    NiceMock<StreamInfo::MockStreamInfo> stream_info;
 
     return manager_->listeners().back().get().filterChainManager().findFilterChain(*socket_,
-                                                                                   stream_info);
+                                                                                   stream_info_);
   }
 
   /**
@@ -498,6 +497,7 @@ protected:
   Network::Address::InstanceConstSharedPtr local_address_;
   Network::Address::InstanceConstSharedPtr remote_address_;
   Network::Address::InstanceConstSharedPtr direct_remote_address_;
+  NiceMock<StreamInfo::MockStreamInfo> stream_info_;
   std::unique_ptr<Network::MockConnectionSocket> socket_;
   uint64_t listener_tag_{1};
   bool enable_dispatcher_stats_{false};
