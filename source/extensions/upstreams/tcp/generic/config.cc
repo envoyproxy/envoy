@@ -17,11 +17,7 @@ TcpProxy::GenericConnPoolPtr GenericConnPoolFactory::createGenericConnPool(
     TcpProxy::TunnelingConfigHelperOptConstRef config, Upstream::LoadBalancerContext* context,
     Envoy::Tcp::ConnectionPool::UpstreamCallbacks& upstream_callbacks,
     StreamInfo::StreamInfo& downstream_info) const {
-  const Router::StringAccessor* disable_tunneling =
-      downstream_info.filterState()->getDataReadOnly<Router::StringAccessor>(
-          TcpProxy::DisableTunnelingFilterStateKey);
-
-  if (config.has_value() && disable_tunneling == nullptr) {
+  if (config.has_value() && !disableTunnelingByFilterState(downstream_info)) {
     Http::CodecType pool_type;
     if ((thread_local_cluster.info()->features() & Upstream::ClusterInfo::Features::HTTP2) != 0) {
       pool_type = Http::CodecType::HTTP2;
@@ -38,6 +34,15 @@ TcpProxy::GenericConnPoolPtr GenericConnPoolFactory::createGenericConnPool(
   auto ret =
       std::make_unique<TcpProxy::TcpConnPool>(thread_local_cluster, context, upstream_callbacks);
   return (ret->valid() ? std::move(ret) : nullptr);
+}
+
+bool GenericConnPoolFactory::disableTunnelingByFilterState(
+    StreamInfo::StreamInfo& downstream_info) const {
+  const Router::StringAccessor* disable_tunneling =
+      downstream_info.filterState()->getDataReadOnly<Router::StringAccessor>(
+          TcpProxy::DisableTunnelingFilterStateKey);
+  
+  return disable_tunneling != nullptr;
 }
 
 REGISTER_FACTORY(GenericConnPoolFactory, TcpProxy::GenericConnPoolFactory);
