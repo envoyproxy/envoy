@@ -15,6 +15,7 @@
 #include "source/common/common/logger.h"
 #include "source/common/http/conn_pool_base.h"
 #include "source/common/network/filter_impl.h"
+#include "source/common/runtime/runtime_features.h"
 
 namespace Envoy {
 namespace Tcp {
@@ -216,8 +217,10 @@ public:
                    Envoy::ConnectionPool::AttachContext& context) override {
     ActiveTcpClient* tcp_client = static_cast<ActiveTcpClient*>(&client);
     tcp_client->readEnableIfNew();
-    // Initialize upstream network read filters, if any
-    tcp_client->connection_->initializeReadFilters();
+    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.initialize_upstream_filters")) {
+      // Initialize upstream network read filters, if any
+      tcp_client->connection_->initializeReadFilters();
+    }
     auto* callbacks = typedContext<TcpAttachContext>(context).callbacks_;
     std::unique_ptr<Envoy::Tcp::ConnectionPool::ConnectionData> connection_data =
         std::make_unique<ActiveTcpClient::TcpConnectionData>(*tcp_client, *tcp_client->connection_);

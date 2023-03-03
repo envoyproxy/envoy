@@ -84,8 +84,10 @@ HttpConnPoolImplBase::newPendingStream(Envoy::ConnectionPool::AttachContext& con
 void HttpConnPoolImplBase::onPoolReady(Envoy::ConnectionPool::ActiveClient& client,
                                        Envoy::ConnectionPool::AttachContext& context) {
   ActiveClient* http_client = static_cast<ActiveClient*>(&client);
-  // Initialize upstream network read filters, if any
-  http_client->codec_client_->initializeReadFilters();
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.initialize_upstream_filters")) {
+    // Initialize upstream network read filters, if any
+    http_client->codec_client_->initializeReadFilters();
+  }
   auto& http_context = typedContext<HttpAttachContext>(context);
   Http::ResponseDecoder& response_decoder = *http_context.decoder_;
   Http::ConnectionPool::Callbacks& callbacks = *http_context.callbacks_;
