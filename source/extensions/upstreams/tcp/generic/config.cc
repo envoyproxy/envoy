@@ -1,6 +1,6 @@
 #include "source/extensions/upstreams/tcp/generic/config.h"
 
-#include "envoy/stream_info/boolean_accessor.h"
+#include "envoy/router/string_accessor.h"
 #include "envoy/upstream/cluster_manager.h"
 
 #include "source/common/http/codec_client.h"
@@ -17,14 +17,11 @@ TcpProxy::GenericConnPoolPtr GenericConnPoolFactory::createGenericConnPool(
     TcpProxy::TunnelingConfigHelperOptConstRef config, Upstream::LoadBalancerContext* context,
     Envoy::Tcp::ConnectionPool::UpstreamCallbacks& upstream_callbacks,
     StreamInfo::StreamInfo& downstream_info) const {
-  const StreamInfo::BooleanAccessor* disable_tunneling =
-      downstream_info.filterState()->getDataReadOnly<StreamInfo::BooleanAccessor>(
-          "envoy.tcp_proxy.disable_tunneling");
+  const Router::StringAccessor* disable_tunneling =
+      downstream_info.filterState()->getDataReadOnly<Router::StringAccessor>(
+          TcpProxy::DisableTunnelingFilterStateKey);
 
-  bool should_disable_tunneling =
-      disable_tunneling != nullptr && disable_tunneling->value() == true;
-
-  if (config.has_value() && !should_disable_tunneling) {
+  if (config.has_value() && disable_tunneling == nullptr) {
     Http::CodecType pool_type;
     if ((thread_local_cluster.info()->features() & Upstream::ClusterInfo::Features::HTTP2) != 0) {
       pool_type = Http::CodecType::HTTP2;
