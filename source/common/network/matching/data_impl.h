@@ -12,11 +12,15 @@ namespace Matching {
  */
 class MatchingDataImpl : public MatchingData {
 public:
-  explicit MatchingDataImpl(const ConnectionSocket& socket) : socket_(socket) {}
+  explicit MatchingDataImpl(const ConnectionSocket& socket,
+                            const StreamInfo::FilterState& filter_state)
+      : socket_(socket), filter_state_(filter_state) {}
   const ConnectionSocket& socket() const override { return socket_; }
+  const StreamInfo::FilterState& filterState() const override { return filter_state_; }
 
 private:
   const ConnectionSocket& socket_;
+  const StreamInfo::FilterState& filter_state_;
 };
 
 /**

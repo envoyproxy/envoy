@@ -23,7 +23,9 @@ constexpr absl::string_view kColonSlashSlash = "://";
 // Response must start with "HTTP".
 constexpr char kResponseFirstByte = 'H';
 
-// TODO(#18819): Add flag to support custom methods.
+#ifndef ENVOY_ENABLE_UHV
+// When UHV is enabled, BalsaParser allows any method and defers to UHV for
+// validation. When UHV is disabled, BalsaParser behavior matches http-parser.
 bool isFirstCharacterOfValidMethod(char c) {
   static constexpr char kValidFirstCharacters[] = {'A', 'B', 'C', 'D', 'G', 'H', 'L', 'M',
                                                    'N', 'O', 'P', 'R', 'S', 'T', 'U'};
@@ -45,8 +47,9 @@ bool isMethodValid(absl::string_view method) {
   const auto* end = &kValidMethods[ABSL_ARRAYSIZE(kValidMethods) - 1] + 1;
   return std::binary_search(begin, end, method);
 }
+#endif
 
-// This method is crafted to match the URL validation behavior of the http-parser library.
+// This function is crafted to match the URL validation behavior of the http-parser library.
 bool isUrlValid(absl::string_view url, bool is_connect) {
   if (url.empty()) {
     return false;
@@ -155,11 +158,14 @@ size_t BalsaParser::execute(const char* slice, int len) {
   ASSERT(status_ != ParserStatus::Error);
 
   if (len > 0 && !first_byte_processed_) {
+#ifndef ENVOY_ENABLE_UHV
     if (message_type_ == MessageType::Request && !isFirstCharacterOfValidMethod(*slice)) {
       status_ = ParserStatus::Error;
       error_message_ = "HPE_INVALID_METHOD";
       return 0;
-    } else if (message_type_ == MessageType::Response && *slice != kResponseFirstByte) {
+    }
+#endif
+    if (message_type_ == MessageType::Response && *slice != kResponseFirstByte) {
       status_ = ParserStatus::Error;
       error_message_ = "HPE_INVALID_CONSTANT";
       return 0;
@@ -260,11 +266,13 @@ void BalsaParser::OnRequestFirstLineInput(absl::string_view /*line_input*/,
   if (status_ == ParserStatus::Error) {
     return;
   }
+#ifndef ENVOY_ENABLE_UHV
   if (!isMethodValid(method_input)) {
     status_ = ParserStatus::Error;
     error_message_ = "HPE_INVALID_METHOD";
     return;
   }
+#endif
   const bool is_connect = method_input == Headers::get().MethodValues.Connect;
   if (!isUrlValid(request_uri, is_connect)) {
     status_ = ParserStatus::Error;

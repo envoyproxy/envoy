@@ -52,6 +52,7 @@ envoy_cc_test(
         "//source/common/network:socket_option_lib",
         "//source/common/network:utility_lib",
         "//source/common/protobuf",
+        "//source/common/router:string_accessor_lib",
         "//source/extensions/filters/listener/original_dst:config",
         "//source/extensions/filters/listener/proxy_protocol:config",
         "//source/extensions/filters/listener/tls_inspector:config",
