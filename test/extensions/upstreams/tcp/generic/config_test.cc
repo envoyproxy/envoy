@@ -48,8 +48,9 @@ TEST_F(TcpConnPoolTest, TestTunnelingDisabledByFilterState) {
   const TcpProxy::TunnelingConfigHelperImpl config(config_proto, context_);
 
   downstream_stream_info_.filterState()->setData(
-    TcpProxy::DisableTunnelingFilterStateKey, std::make_shared<Router::StringAccessorImpl>("reason"),
-    StreamInfo::FilterState::StateType::Mutable, StreamInfo::FilterState::LifeSpan::Connection);
+      TcpProxy::DisableTunnelingFilterStateKey,
+      std::make_shared<Router::StringAccessorImpl>("reason"),
+      StreamInfo::FilterState::StateType::Mutable, StreamInfo::FilterState::LifeSpan::Connection);
 
   EXPECT_CALL(thread_local_cluster_, tcpConnPool(_, _)).WillOnce(Return(absl::nullopt));
   EXPECT_EQ(nullptr, factory_.createGenericConnPool(
