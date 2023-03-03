@@ -173,7 +173,8 @@ PathNormalizer::normalizePathUri(RequestHeaderMap& header_map) const {
   //
   // TODO(#23887) - potentially separate path normalization into multiple independent operations.
   const bool is_connect_method =
-      header_map.method() == ::Envoy::Http::Headers::get().MethodValues.Connect;
+      header_map.method() == ::Envoy::Http::Headers::get().MethodValues.Connect &&
+      header_map.getProtocolValue().empty();
   const bool is_options_method =
       header_map.method() == ::Envoy::Http::Headers::get().MethodValues.Options;
   const auto original_path = header_map.path();
