@@ -481,6 +481,8 @@ modify different aspects of the server:
   modify the filter, toggle used-only mode, control the types of stats displayed,
   and also toggle into another format.
 
+  This format is disabled if Envoy is compiled with `--define=admin_html=disabled`
+
   .. http:get:: /stats?format=active-html
 
   Renders stats continuously, displaying the top 50 stats ordered by frequency of
@@ -490,6 +492,8 @@ modify different aspects of the server:
 
   After using this mode, be sure to close the browser tab to avoid
   placing periodic load on the server as stats are updated regularly.
+
+  This format is disabled if Envoy is compiled with `--define=admin_html=disabled`
 
   .. http:get:: /stats?format=json
 
