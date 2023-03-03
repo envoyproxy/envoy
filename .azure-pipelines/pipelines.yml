@@ -383,7 +383,7 @@ stages:
 
 - stage: linux_arm64
   # displayName: Linux arm64
-  dependsOn: ["env", "precheck"]
+  dependsOn: ["env"]  # , "precheck"]
   # For post-submit builds, continue even if precheck fails
   condition: and(not(canceled()), or(succeeded(), eq(variables['PostSubmit'], true)))
   jobs:
