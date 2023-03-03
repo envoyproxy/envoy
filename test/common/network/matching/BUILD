@@ -16,6 +16,7 @@ envoy_cc_test(
         "//source/common/network:address_lib",
         "//source/common/network/matching:data_impl_lib",
         "//source/common/network/matching:inputs_lib",
+        "//source/common/router:string_accessor_lib",
         "//test/mocks/network:network_mocks",
     ],
 )
@@ -27,6 +28,7 @@ envoy_cc_test(
         "//source/common/network:address_lib",
         "//source/common/network/matching:data_impl_lib",
         "//source/common/network/matching:inputs_lib",
+        "//source/common/router:string_accessor_lib",
         "//test/common/matcher:test_utility_lib",
         "//test/mocks/matcher:matcher_mocks",
         "//test/mocks/network:network_mocks",

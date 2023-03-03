@@ -196,15 +196,9 @@ TEST_P(DownstreamProtocolIntegrationTest, RouterRedirectHttpRequest) {
     EXPECT_EQ("301", response->headers().getStatusValue());
     EXPECT_EQ("https://www.redirect.com/foo",
               response->headers().get(Http::Headers::get().Location)[0]->value().getStringView());
-    if (Runtime::runtimeFeatureEnabled(Runtime::expand_agnostic_stream_lifetime)) {
-      expectDownstreamBytesSentAndReceived(BytesCountExpectation(145, 45, 111, 23),
-                                           BytesCountExpectation(69, 30, 69, 30),
-                                           BytesCountExpectation(0, 30, 0, 30));
-    } else {
-      expectDownstreamBytesSentAndReceived(BytesCountExpectation(145, 45, 111, 23),
-                                           BytesCountExpectation(0, 30, 0, 30),
-                                           BytesCountExpectation(0, 30, 0, 30));
-    }
+    expectDownstreamBytesSentAndReceived(BytesCountExpectation(145, 45, 111, 23),
+                                         BytesCountExpectation(0, 30, 0, 30),
+                                         BytesCountExpectation(0, 30, 0, 30));
   } else {
     // All QUIC requests use https, and should not be redirected. (Even those sent with http scheme
     // will be overridden to https by HCM.)
@@ -646,15 +640,9 @@ TEST_P(DownstreamProtocolIntegrationTest, MissingHeadersLocalReplyDownstreamByte
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
-  if (Runtime::runtimeFeatureEnabled(Runtime::expand_agnostic_stream_lifetime)) {
-    expectDownstreamBytesSentAndReceived(BytesCountExpectation(90, 88, 71, 54),
-                                         BytesCountExpectation(40, 58, 40, 58),
-                                         BytesCountExpectation(7, 10, 7, 8));
-  } else {
-    expectDownstreamBytesSentAndReceived(BytesCountExpectation(90, 88, 71, 54),
-                                         BytesCountExpectation(0, 58, 0, 58),
-                                         BytesCountExpectation(7, 10, 7, 8));
-  }
+  expectDownstreamBytesSentAndReceived(BytesCountExpectation(90, 88, 71, 54),
+                                       BytesCountExpectation(0, 58, 0, 58),
+                                       BytesCountExpectation(7, 10, 7, 8));
 }
 
 TEST_P(DownstreamProtocolIntegrationTest, MissingHeadersLocalReplyUpstreamBytesCount) {
@@ -2328,17 +2316,33 @@ TEST_P(DownstreamProtocolIntegrationTest, ManyTrailerHeaders) {
 // :method request headers, since the case of other large headers is
 // covered in the various testLargeRequest-based integration tests here.
 //
-// The table below describes the expected behaviors (in addition we should never
-// see an ASSERT or ASAN failure trigger).
+// Tests are run with two HTTP/1 parsers: http-parser and BalsaParser.
+// http-parser rejects large method strings, because it only accepts known
+// methods from a hardcoded list. BalsaParser mimics http-parser behavior when
+// UHV is disabled, but defers method validation to UHV when it is enabled.
 //
-// Downstream    Upstream   Behavior expected
-// ------------------------------------------
-// H1            H1         Envoy will reject (HTTP/1 codec behavior)
-// H1            H2         Envoy will reject (HTTP/1 codec behavior)
-// H2, H3        H1         Envoy will forward but backend will reject (HTTP/1
-//                          codec behavior)
-// H2, H3        H2         Success
+// In addition to BalsaParser with UHV enabled, H2 and H3 codecs also accept
+// large methods. The table below describes the expected behaviors (in addition
+// we should never see an ASSERT or ASAN failure trigger).
+//
+// Downstream proto  Upstream proto  Behavior expected
+// --------------------------------------------------------
+// accepts           accepts         Success
+// accepts           rejects         Envoy will forward; backend will reject
+// rejects           accepts         Envoy will reject
+// rejects           rejects         Envoy will reject
 TEST_P(ProtocolIntegrationTest, LargeRequestMethod) {
+  bool http1_codec_rejects_large_method = true;
+#ifdef ENVOY_ENABLE_UHV
+  if (GetParam().http1_implementation == Http1ParserImpl::BalsaParser) {
+    http1_codec_rejects_large_method = false;
+  }
+#endif
+  const bool downstream_proto_rejects_large_method =
+      downstreamProtocol() == Http::CodecType::HTTP1 && http1_codec_rejects_large_method;
+  const bool upstream_proto_rejects_large_method =
+      upstreamProtocol() == Http::CodecType::HTTP1 && http1_codec_rejects_large_method;
+
   // There will be no upstream connections for HTTP/1 downstream, we need to
   // test the full mesh regardless.
   testing_upstream_intentionally_ = true;
@@ -2351,28 +2355,22 @@ TEST_P(ProtocolIntegrationTest, LargeRequestMethod) {
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
-  if (downstreamProtocol() == Http::CodecType::HTTP1) {
+  if (downstream_proto_rejects_large_method) {
     auto encoder_decoder = codec_client_->startRequest(request_headers);
     request_encoder_ = &encoder_decoder.first;
     auto response = std::move(encoder_decoder.second);
     ASSERT_TRUE(codec_client_->waitForDisconnect());
     EXPECT_TRUE(response->complete());
     EXPECT_EQ("400", response->headers().getStatusValue());
+  } else if (upstream_proto_rejects_large_method) {
+    auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
+    ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+    ASSERT_TRUE(response->waitForEndStream());
+    EXPECT_TRUE(response->complete());
+    EXPECT_EQ("400", response->headers().getStatusValue());
   } else {
-    ASSERT(downstreamProtocol() >= Http::CodecType::HTTP2);
-    if (upstreamProtocol() == Http::CodecType::HTTP1) {
-      auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
-      ASSERT_TRUE(
-          fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
-      ASSERT_TRUE(response->waitForEndStream());
-      EXPECT_TRUE(response->complete());
-      EXPECT_EQ("400", response->headers().getStatusValue());
-    } else {
-      ASSERT(upstreamProtocol() >= Http::CodecType::HTTP2);
-      auto response =
-          sendRequestAndWaitForResponse(request_headers, 0, default_response_headers_, 0);
-      EXPECT_TRUE(response->complete());
-    }
+    auto response = sendRequestAndWaitForResponse(request_headers, 0, default_response_headers_, 0);
+    EXPECT_TRUE(response->complete());
   }
 }
 

@@ -602,7 +602,7 @@ bool Utility::isUpgrade(const RequestOrResponseHeaderMap& headers) {
   // we should check if it contains the "Upgrade" token.
   return (headers.Upgrade() &&
           Envoy::StringUtil::caseFindToken(headers.getConnectionValue(), ",",
-                                           Http::Headers::get().ConnectionValues.Upgrade.c_str()));
+                                           Http::Headers::get().ConnectionValues.Upgrade));
 }
 
 bool Utility::isH2UpgradeRequest(const RequestHeaderMap& headers) {
