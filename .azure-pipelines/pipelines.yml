@@ -149,8 +149,7 @@ stages:
   jobs:
   - job: local_cache
     dependsOn: []
-    pool:
-      vmImage: "ubuntu-20.04"
+    pool: "arm-large"
     steps:
     - script: |
         # this will probably fail, but should indicate if the server is actually there
