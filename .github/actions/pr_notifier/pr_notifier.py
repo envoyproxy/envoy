@@ -126,13 +126,7 @@ def needs_api_review(labels, repo, pr_info):
     # repokitten tags each commit as pending unless there has been an API LGTM
     # since the latest API changes. If this PR is tagged pendding it needs an
     # API review, otherwise it's set.
-    headers, data = repo._requester.requestJsonAndCheck(
-        "GET",
-        ("https://api.github.com/repos/envoyproxy/envoy/statuses/" + pr_info.head.sha),
-    )
-    if (data and data[0]["state"] == 'pending'):
-        return True
-    return False
+    return pr_info.get_commits().reversed[0].get_statuses().reversed[0].state == "pending"
 
 
 def track_prs(github_token):
