@@ -32,7 +32,10 @@ envoy_cc_library(
 envoy_cc_library(
     name = "filter_state_interface",
     hdrs = ["filter_state.h"],
-    external_deps = ["abseil_optional"],
+    external_deps = [
+        "abseil_optional",
+        "abseil_status",
+    ],
     deps = [
         "//source/common/common:utility_lib",
         "//source/common/protobuf",

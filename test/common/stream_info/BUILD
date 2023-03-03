@@ -14,6 +14,7 @@ envoy_cc_test(
     srcs = ["filter_state_impl_test.cc"],
     deps = [
         "//source/common/stream_info:filter_state_lib",
+        "//test/test_common:status_utility_lib",
         "//test/test_common:utility_lib",
     ],
 )

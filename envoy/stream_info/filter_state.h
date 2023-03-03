@@ -10,6 +10,7 @@
 #include "source/common/common/utility.h"
 #include "source/common/protobuf/protobuf.h"
 
+#include "absl/status/status.h"
 #include "absl/strings/string_view.h"
 #include "absl/types/optional.h"
 
@@ -113,6 +114,8 @@ public:
 
   virtual ~FilterState() = default;
 
+  virtual std::string serializeAsString() const PURE;
+
   /**
    * @param data_name the name of the data being set.
    * @param data an owning pointer to the data to be stored.
@@ -202,6 +205,17 @@ public:
    * either the top LifeSpan or the parent is not yet created.
    */
   virtual FilterStateSharedPtr parent() const PURE;
+
+  /**
+   * @param ancestor the longer-lifetime filter state which should be added as an ancestor to this
+   * instance.
+   * @return success status.
+   *
+   * Succeeds iff:
+   * 1. ancestor.lifeSpan() > this->lifeSpan() along with all parents of this.
+   * 2. this and ancestor share no keys.
+   */
+  virtual absl::Status addAncestor(const FilterStateSharedPtr& ancestor) PURE;
 
   /**
    * @return filter objects that are shared with the upstream connection.

@@ -153,7 +153,7 @@ public:
               .WillRepeatedly(ReturnRef(connection_info1_));
           callbacks.onPoolReady(encoder,
                                 context_.cluster_manager_.thread_local_cluster_.conn_pool_.host_,
-                                stream_info_, Http::Protocol::Http10);
+                                upstream_stream_info_, Http::Protocol::Http10);
           return nullptr;
         }));
     expectResponseTimerCreate();
@@ -195,7 +195,7 @@ public:
               .WillRepeatedly(ReturnRef(connection_info1_));
           callbacks.onPoolReady(encoder1,
                                 context_.cluster_manager_.thread_local_cluster_.conn_pool_.host_,
-                                stream_info_, Http::Protocol::Http10);
+                                upstream_stream_info_, Http::Protocol::Http10);
           return nullptr;
         }));
     expectPerTryTimerCreate();
@@ -227,7 +227,7 @@ public:
               .WillRepeatedly(ReturnRef(connection_info2_));
           callbacks.onPoolReady(encoder2,
                                 context_.cluster_manager_.thread_local_cluster_.conn_pool_.host_,
-                                stream_info_, Http::Protocol::Http10);
+                                upstream_stream_info_, Http::Protocol::Http10);
           return nullptr;
         }));
     expectPerTryTimerCreate();
@@ -267,7 +267,8 @@ public:
   std::shared_ptr<FilterConfig> config_;
   std::shared_ptr<TestFilter> router_;
   std::shared_ptr<NiceMock<Upstream::MockClusterInfo>> cluster_info_;
-  NiceMock<StreamInfo::MockStreamInfo> stream_info_;
+  NiceMock<StreamInfo::MockStreamInfo> upstream_stream_info_{
+      StreamInfo::FilterState::LifeSpan::Connection};
 };
 
 TEST_F(RouterUpstreamLogTest, NoLogConfigured) {
