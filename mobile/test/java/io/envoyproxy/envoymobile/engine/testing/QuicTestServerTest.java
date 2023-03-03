@@ -107,10 +107,10 @@ public class QuicTestServerTest {
 
   @Before
   public void setUpEngine() throws Exception {
-    QuicTestServer.startQuicTestServer();
+    TestJni.startQuicTestServer();
     CountDownLatch latch = new CountDownLatch(1);
-    engine = new AndroidEngineBuilder(
-                 appContext, new Custom(String.format(CONFIG, QuicTestServer.getServerPort())))
+    engine = new AndroidEngineBuilder(appContext,
+                                      new Custom(String.format(CONFIG, TestJni.getServerPort())))
                  .addLogLevel(LogLevel.WARN)
                  .setOnEngineRunning(() -> {
                    latch.countDown();
@@ -123,7 +123,7 @@ public class QuicTestServerTest {
   @After
   public void shutdownEngine() {
     engine.terminate();
-    QuicTestServer.shutdownQuicTestServer();
+    TestJni.shutdownQuicTestServer();
   }
 
   @Test
@@ -131,7 +131,7 @@ public class QuicTestServerTest {
     RequestScenario requestScenario = new RequestScenario()
                                           .setHttpMethod(RequestMethod.GET)
                                           .addHeader("no_trailers", "true")
-                                          .setUrl(QuicTestServer.getServerURL() + "/simple.txt");
+                                          .setUrl(TestJni.getServerURL() + "/simple.txt");
 
     Response response = sendRequest(requestScenario);
 
