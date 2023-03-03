@@ -60,7 +60,7 @@ message HealthStatusSet {
       [(validate.rules).repeated = {items {enum {defined_only: true}}}];
 }
 
-// [#next-free-field: 26]
+// [#next-free-field: 25]
 message HealthCheck {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.core.HealthCheck";
 
@@ -414,13 +414,4 @@ message HealthCheck {
   // the cluster's :ref:`transport socket <envoy_v3_api_field_config.cluster.v3.Cluster.transport_socket>`
   // will be used for health check socket configuration.
   google.protobuf.Struct transport_socket_match_criteria = 23;
-
-  // When the health status of a host is healthy, if this field is enabled, when envoy wants to send an active health check packet to a target host, it will first check whether
-  // there was successful non-health check traffic that targeted the host during the previous interval. If there was successful non-health check traffic, Envoy will not send a health check packet.
-  // For HTTP, if the traffic response is 2xx, it will be considered as successful traffic.
-  // For TCP, if any TCP connections successfully connect, it will be considered as successful traffic.
-  // For gRPC, if grpc_status is not one of ( DeadlineExceeded, Unimplemented, Internal, Unavailable, Unknown, DataLoss), it will be considered as successful traffic. Refer to UpstreamEndpointStats.
-  // For Custom health check, this option can not be used.
-  // The default value is false.
-  bool disable_health_check_if_active_traffic = 25;
 }
