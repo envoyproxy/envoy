@@ -507,7 +507,6 @@ void DecoderImpl::decodeAndBufferHelper(Buffer::Instance& data, DecodeType dtype
   ASSERT(dtype == DecodeType::READ || dtype == DecodeType::WRITE);
 
   const uint32_t data_len = data.length();
-  const uint32_t original_zk_filter_buffer_len = zk_filter_buffer.length();
   uint64_t offset = 0;
   uint32_t len = 0;
   // Boolean to check whether there is at least one full packet in the network filter buffer (to
@@ -534,16 +533,6 @@ void DecoderImpl::decodeAndBufferHelper(Buffer::Instance& data, DecodeType dtype
 
   if (offset == data_len) {
     decode(data, dtype);
-
-    if (original_zk_filter_buffer_len > 0) {
-      // After prepending the ZooKeeper filter buffer to the network filter buffer, the network
-      // filter buffer here includes one or more full packets without any partial data, the decoder
-      // is able to decode the entire network filter buffer. So the we need to drain the ZooKeeper
-      // filter buffer here, since its data has been decoded already. Otherwise, the ZooKeeper
-      // filter will prepend the ZooKeeper filter buffer to the network filter buffer again next
-      // time, which is not what we want.
-      zk_filter_buffer.drain(original_zk_filter_buffer_len);
-    }
     return;
   }
 
@@ -559,23 +548,16 @@ void DecoderImpl::decodeAndBufferHelper(Buffer::Instance& data, DecodeType dtype
     Buffer::OwnedImpl full_packets;
     full_packets.add(temp_data.data(), temp_data.length());
     decode(full_packets, dtype);
-    // After prepending the ZooKeeper filter buffer to the network filter buffer, the network
-    // filter buffer here includes one or more full packets with partial data of a packet, the
-    // decoder is able to decode all full packets. So we need to drain the ZooKeeper filter buffer
-    // here, since its data has been decoded already. Otherwise, the ZooKeeper filter will prepend
-    // the ZooKeeper filter buffer to the network filter buffer again next time, which is not what
-    // we want.
-    zk_filter_buffer.drain(original_zk_filter_buffer_len);
 
     // Copy out the rest of the data to the ZooKeeper filter buffer.
     temp_data.resize(data_len - offset);
     data.copyOut(offset, data_len - offset, temp_data.data());
     zk_filter_buffer.add(temp_data.data(), temp_data.length());
   } else {
-    // Copy out all the new data to the ZooKeeper filter buffer.
-    temp_data.resize(data_len - original_zk_filter_buffer_len);
-    data.copyOut(original_zk_filter_buffer_len, data_len - original_zk_filter_buffer_len,
-                 temp_data.data());
+    // Copy out all the data to the ZooKeeper filter buffer, since after prepending the ZooKeeper
+    // filter buffer is drained by the prepend() method.
+    temp_data.resize(data_len);
+    data.copyOut(0, data_len, temp_data.data());
     zk_filter_buffer.add(temp_data.data(), temp_data.length());
   }
 }
