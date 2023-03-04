@@ -1141,7 +1141,7 @@ TEST_F(ZooKeeperFilterTest, MultipleRequestsWithOneOnDataCall) {
   EXPECT_EQ(71UL, config_->stats().request_bytes_.value());
   EXPECT_EQ(0UL, config_->stats().decoder_error_.value());
 
-  // Response.
+  // Responses.
   testResponse({{{"opname", "create_resp"}, {"zxid", "2000"}, {"error", "0"}}, {{"bytes", "20"}}},
                config_->stats().create_resp_, 1000, 2000);
   testResponse({{{"opname", "create_resp"}, {"zxid", "2001"}, {"error", "0"}}, {{"bytes", "20"}}},
@@ -1196,7 +1196,7 @@ TEST_F(ZooKeeperFilterTest, MultipleRequestsWithMultipleOnDataCalls) {
   EXPECT_EQ(71UL, config_->stats().request_bytes_.value());
   EXPECT_EQ(0UL, config_->stats().decoder_error_.value());
 
-  // Response.
+  // Responses.
   testResponse({{{"opname", "create_resp"}, {"zxid", "2000"}, {"error", "0"}}, {{"bytes", "20"}}},
                config_->stats().create_resp_, 1000, 2000);
   testResponse({{{"opname", "create_resp"}, {"zxid", "2001"}, {"error", "0"}}, {{"bytes", "20"}}},
@@ -1236,7 +1236,7 @@ TEST_F(ZooKeeperFilterTest, MultipleRequestsWithMultipleOnDataCalls2) {
   EXPECT_EQ(108UL, config_->stats().request_bytes_.value());
   EXPECT_EQ(0UL, config_->stats().decoder_error_.value());
 
-  // Response.
+  // Responses.
   testResponse({{{"opname", "create_resp"}, {"zxid", "2000"}, {"error", "0"}}, {{"bytes", "20"}}},
                config_->stats().create_resp_, 1000, 2000);
   testResponse({{{"opname", "create_resp"}, {"zxid", "2001"}, {"error", "0"}}, {{"bytes", "20"}}},
@@ -1277,7 +1277,7 @@ TEST_F(ZooKeeperFilterTest, MultipleRequestsWithMultipleOnDataCalls3) {
   EXPECT_EQ(108UL, config_->stats().request_bytes_.value());
   EXPECT_EQ(0UL, config_->stats().decoder_error_.value());
 
-  // Response.
+  // Responses.
   testResponse({{{"opname", "create_resp"}, {"zxid", "2000"}, {"error", "0"}}, {{"bytes", "20"}}},
                config_->stats().create_resp_, 1000, 2000);
   testResponse({{{"opname", "create_resp"}, {"zxid", "2001"}, {"error", "0"}}, {{"bytes", "20"}}},
@@ -1330,7 +1330,7 @@ TEST_F(ZooKeeperFilterTest, MultipleRequestsWithMultipleOnDataCalls4) {
   EXPECT_EQ(108UL, config_->stats().request_bytes_.value());
   EXPECT_EQ(0UL, config_->stats().decoder_error_.value());
 
-  // Response.
+  // Responses.
   testResponse({{{"opname", "create_resp"}, {"zxid", "2000"}, {"error", "0"}}, {{"bytes", "20"}}},
                config_->stats().create_resp_, 1000, 2000);
   testResponse({{{"opname", "create_resp"}, {"zxid", "2001"}, {"error", "0"}}, {{"bytes", "20"}}},
