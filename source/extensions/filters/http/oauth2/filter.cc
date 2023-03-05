@@ -564,22 +564,13 @@ void OAuth2Filter::finishUpdateAccessTokenFlow() {
     }
   }
 
-  Http::HeaderString newCookies;
-  for (const auto& p : cookies) {
-    if (!newCookies.empty()) {
-      newCookies.append("; ", 2);
-    }
-    std::string value = absl::StrCat(p.first, "=", p.second);
-    newCookies.append(value.c_str(), value.size());
-  }
-
-  request_headers_->addReferenceKey(Http::Headers::get().Cookie, newCookies.getStringView());
+  std::string newCookies(absl::StrJoin(cookies, "; ", absl::PairFormatter("=")));
+  request_headers_->addReferenceKey(Http::Headers::get().Cookie, newCookies);
   if (config_->forwardBearerToken() && !access_token_.empty()) {
     setBearerToken(*request_headers_, access_token_);
   }
 
   // remember cookies for response(need for set cookie)
-  response_headers_to_add_.reset();
   response_headers_to_add_ = Http::ResponseHeaderMapImpl::create();
   addResponseCookies(*response_headers_to_add_, getEncodedToken());
 
