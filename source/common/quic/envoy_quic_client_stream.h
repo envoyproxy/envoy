@@ -2,8 +2,10 @@
 
 #include "envoy/buffer/buffer.h"
 
+#include "source/common/quic/capsule_protocol_handler.h"
 #include "source/common/quic/envoy_quic_stream.h"
 
+#include "quiche/common/simple_buffer_allocator.h"
 #include "quiche/quic/core/http/quic_spdy_client_stream.h"
 
 namespace Envoy {
@@ -18,7 +20,10 @@ public:
                         quic::StreamType type, Http::Http3::CodecStats& stats,
                         const envoy::config::core::v3::Http3ProtocolOptions& http3_options);
 
-  void setResponseDecoder(Http::ResponseDecoder& decoder) { response_decoder_ = &decoder; }
+  void setResponseDecoder(Http::ResponseDecoder& decoder) {
+    response_decoder_ = &decoder;
+    capsule_protocol_handler_.setStreamDecoder(&decoder);
+  }
 
   // Http::StreamEncoder
   void encodeData(Buffer::Instance& data, bool end_stream) override;
@@ -75,8 +80,9 @@ private:
   // Deliver awaiting trailers if body has been delivered.
   void maybeDecodeTrailers();
 
+  quic::QuicSpdySession* session_;
+  CapsuleProtocolHandler capsule_protocol_handler_;
   Http::ResponseDecoder* response_decoder_{nullptr};
-
   bool decoded_1xx_{false};
 };
 

@@ -27,7 +27,8 @@ EnvoyQuicClientStream::EnvoyQuicClientStream(
           // utilize congestion control window before it reaches the high watermark.
           static_cast<uint32_t>(GetReceiveWindow().value()), *filterManagerConnection(),
           [this]() { runLowWatermarkCallbacks(); }, [this]() { runHighWatermarkCallbacks(); },
-          stats, http3_options) {
+          stats, http3_options),
+      session_(client_session), capsule_protocol_handler_(this) {
   ASSERT(static_cast<uint32_t>(GetReceiveWindow().value()) > 8 * 1024,
          "Send buffer limit should be larger than 8KB.");
 }
@@ -80,30 +81,36 @@ void EnvoyQuicClientStream::encodeData(Buffer::Instance& data, bool end_stream) 
   ASSERT(!local_end_stream_);
   local_end_stream_ = end_stream;
   SendBufferMonitor::ScopedWatermarkBufferUpdater updater(this, this);
-  Buffer::RawSliceVector raw_slices = data.getRawSlices();
-  absl::InlinedVector<quiche::QuicheMemSlice, 4> quic_slices;
-  quic_slices.reserve(raw_slices.size());
-  for (auto& slice : raw_slices) {
-    ASSERT(slice.len_ != 0);
-    // Move each slice into a stand-alone buffer.
-    // TODO(danzh): investigate the cost of allocating one buffer per slice.
-    // If it turns out to be expensive, add a new function to free data in the middle in buffer
-    // interface and re-design QuicheMemSliceImpl.
-    quic_slices.emplace_back(quiche::QuicheMemSlice::InPlace(), data, slice.len_);
-  }
-  quic::QuicConsumedData result{0, false};
-  absl::Span<quiche::QuicheMemSlice> span(quic_slices);
-  {
-    IncrementalBytesSentTracker tracker(*this, *mutableBytesMeter(), false);
-    result = WriteBodySlices(span, end_stream);
-  }
-  // QUIC stream must take all.
-  if (result.bytes_consumed == 0 && has_data) {
-    IS_ENVOY_BUG(fmt::format("Send buffer didn't take all the data. Stream is write {} with {} "
-                             "bytes in send buffer. Current write was rejected.",
-                             write_side_closed() ? "closed" : "open", BufferedDataBytes()));
+  if (capsule_protocol_handler_.usingCapsuleProtocol() &&
+      !capsule_protocol_handler_.encodeCapsule(data.toString())) {
+    // TODO(jeongseokson): Check if resetting the stream is a right way to handle the error.
     Reset(quic::QUIC_BAD_APPLICATION_PAYLOAD);
-    return;
+  } else {
+    Buffer::RawSliceVector raw_slices = data.getRawSlices();
+    absl::InlinedVector<quiche::QuicheMemSlice, 4> quic_slices;
+    quic_slices.reserve(raw_slices.size());
+    for (auto& slice : raw_slices) {
+      ASSERT(slice.len_ != 0);
+      // Move each slice into a stand-alone buffer.
+      // TODO(danzh): investigate the cost of allocating one buffer per slice.
+      // If it turns out to be expensive, add a new function to free data in the middle in buffer
+      // interface and re-design QuicheMemSliceImpl.
+      quic_slices.emplace_back(quiche::QuicheMemSlice::InPlace(), data, slice.len_);
+    }
+    quic::QuicConsumedData result{0, false};
+    absl::Span<quiche::QuicheMemSlice> span(quic_slices);
+    {
+      IncrementalBytesSentTracker tracker(*this, *mutableBytesMeter(), false);
+      result = WriteBodySlices(span, end_stream);
+    }
+    // QUIC stream must take all.
+    if (result.bytes_consumed == 0 && has_data) {
+      IS_ENVOY_BUG(fmt::format("Send buffer didn't take all the data. Stream is write {} with {} "
+                               "bytes in send buffer. Current write was rejected.",
+                               write_side_closed() ? "closed" : "open", BufferedDataBytes()));
+      Reset(quic::QUIC_BAD_APPLICATION_PAYLOAD);
+      return;
+    }
   }
   if (local_end_stream_) {
     onLocalEndStream();
@@ -193,7 +200,9 @@ void EnvoyQuicClientStream::OnInitialHeadersComplete(bool fin, size_t frame_len,
     // These are Informational 1xx headers, not the actual response headers.
     set_headers_decompressed(false);
   }
-
+  if (session_->SupportsH3Datagram()) {
+    capsule_protocol_handler_.onHeaders(headers.get());
+  }
   const bool is_special_1xx = Http::HeaderUtility::isSpecial1xx(*headers);
   if (is_special_1xx && !decoded_1xx_) {
     // This is 100 Continue, only decode it once to support Expect:100-Continue header.
@@ -356,6 +365,7 @@ void EnvoyQuicClientStream::OnConnectionClosed(quic::QuicErrorCode error,
 void EnvoyQuicClientStream::OnClose() {
   destroy();
   quic::QuicSpdyClientStream::OnClose();
+  capsule_protocol_handler_.onStreamClosed();
   if (isDoingWatermarkAccounting()) {
     // This is called in the scope of a watermark buffer updater. Clear the
     // buffer accounting afterwards so that the updater doesn't override the

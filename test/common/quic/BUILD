@@ -366,3 +366,15 @@ envoy_cc_test(
         "//test/test_common:utility_lib",
     ],
 )
+
+envoy_cc_test(
+    name = "capsule_protocol_handler_test",
+    srcs = ["capsule_protocol_handler_test.cc"],
+    tags = ["nofips"],
+    deps = [
+        "//source/common/quic:capsule_protocol_handler",
+        "//test/mocks/buffer:buffer_mocks",
+        "//test/test_common:utility_lib",
+        "@com_github_google_quiche//:quic_test_tools_test_utils_lib",
+    ],
+)

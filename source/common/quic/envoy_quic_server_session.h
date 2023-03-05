@@ -98,7 +98,6 @@ public:
                                   ConnectionMapIter position);
 
   void setHttp3Options(const envoy::config::core::v3::Http3ProtocolOptions& http3_options) override;
-
   using quic::QuicSession::PerformActionOnActiveStreams;
 
 protected:
@@ -114,6 +113,15 @@ protected:
   quic::QuicSpdyStream* CreateIncomingStream(quic::PendingStream* pending) override;
   quic::QuicSpdyStream* CreateOutgoingBidirectionalStream() override;
   quic::QuicSpdyStream* CreateOutgoingUnidirectionalStream() override;
+
+  quic::HttpDatagramSupport LocalHttpDatagramSupport() override {
+    // TODO(jeongseokson): Http3 Datagram support should be turned on by returning
+    // quic::HttpDatagramSupport::kRfc once the CONNECT-UDP support work is completed. Returning
+    // a value different from quic::HttpDatagramSupport::kNone in this method will make this
+    // session buffer data until a SETTINGS frame is received (by making
+    // "ShouldBufferRequestsUntilSettings" method return true).
+    return quic::HttpDatagramSupport::kNone;
+  }
 
   // QuicFilterManagerConnectionImpl
   bool hasDataToWrite() override;

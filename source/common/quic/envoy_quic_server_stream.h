@@ -1,5 +1,6 @@
 #pragma once
 
+#include "source/common/quic/capsule_protocol_handler.h"
 #include "source/common/quic/envoy_quic_stream.h"
 #include "source/common/quic/quic_stats_gatherer.h"
 
@@ -22,6 +23,7 @@ public:
 
   void setRequestDecoder(Http::RequestDecoder& decoder) override {
     request_decoder_ = &decoder;
+    capsule_protocol_handler_.setStreamDecoder(&decoder);
     stats_gatherer_->setAccessLogHandlers(request_decoder_->accessLogHandlers());
   }
   QuicStatsGatherer* statsGatherer() { return stats_gatherer_.get(); }
@@ -108,6 +110,8 @@ private:
   Http::RequestDecoder* request_decoder_{nullptr};
   envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
       headers_with_underscores_action_;
+  quic::QuicSpdySession* session_;
+  CapsuleProtocolHandler capsule_protocol_handler_;
 
   quiche::QuicheReferenceCountedPointer<QuicStatsGatherer> stats_gatherer_;
 };

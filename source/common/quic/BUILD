@@ -270,6 +270,7 @@ envoy_cc_library(
     ],
     tags = ["nofips"],
     deps = [
+        ":capsule_protocol_handler",
         ":envoy_quic_proof_source_lib",
         ":envoy_quic_server_connection_lib",
         ":envoy_quic_server_crypto_stream_factory_lib",
@@ -297,6 +298,7 @@ envoy_cc_library(
     ],
     tags = ["nofips"],
     deps = [
+        ":capsule_protocol_handler",
         ":envoy_quic_client_connection_lib",
         ":envoy_quic_client_crypto_stream_factory_lib",
         ":envoy_quic_proof_verifier_lib",
@@ -613,5 +615,18 @@ envoy_cc_library(
         "//envoy/access_log:access_log_interface",
         "//source/common/http:header_map_lib",
         "@com_github_google_quiche//:quic_core_ack_listener_interface_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "capsule_protocol_handler",
+    srcs = ["capsule_protocol_handler.cc"],
+    hdrs = ["capsule_protocol_handler.h"],
+    deps = [
+        "//envoy/http:codec_interface",
+        "//source/common/common:logger_lib",
+        "//source/common/http:header_map_lib",
+        "@com_github_google_quiche//:quic_core_http_spdy_session_lib",
+        "@com_github_google_quiche//:quic_core_types_lib",
     ],
 )
