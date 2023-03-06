@@ -123,7 +123,7 @@ NetworkConfigurationFilter::decodeHeaders(Http::RequestHeaderMap& request_header
 
 void NetworkConfigurationFilter::setInfo(absl::string_view authority,
                                          Network::Address::InstanceConstSharedPtr address) {
-  ENVOY_LOG(trace, "netconf_filter_set_proxy_for_request", authority, address->asString());
+  ENVOY_LOG(trace, "netconf_filter_set_proxy_for_request {} {}", authority, address->asString());
   decoder_callbacks_->streamInfo().filterState()->setData(
       Network::Http11ProxyInfoFilterState::key(),
       std::make_unique<Network::Http11ProxyInfoFilterState>(authority, address),
