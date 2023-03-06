@@ -20,7 +20,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // CORS Filter :ref:`configuration overview <config_http_filters_cors>`.
 // [#extension: envoy.filters.http.cors]
 
-// Cors filter config. Setting this in the
+// Cors filter config. Set this in
 // ref:`http_filters <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.http_filters>`
 // to enable the CORS filter.
 //
