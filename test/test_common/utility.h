@@ -90,7 +90,11 @@ namespace Envoy {
 // Expect that the statement hits an ENVOY_BUG containing the specified message.
 #if defined(NDEBUG) || defined(ENVOY_CONFIG_COVERAGE)
 // ENVOY_BUGs in release mode or in a coverage test log error.
-#define EXPECT_ENVOY_BUG(statement, message) EXPECT_LOG_CONTAINS("error", message, statement)
+// Log messages are emitted every power-of-2 occurrences. If a test triggers the same
+// ENVOY_BUG multiple times, it may not trigger correctly, so reset everytime.
+#define EXPECT_ENVOY_BUG(statement, message)                                                       \
+  Assert::resetEnvoyBugCountersForTest();                                                          \
+  EXPECT_LOG_CONTAINS("error", message, statement)
 #else
 // ENVOY_BUGs in (non-coverage) debug mode is fatal.
 #define EXPECT_ENVOY_BUG(statement, message)                                                       \
