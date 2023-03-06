@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-package envoy.extensions.filters.http.geoip.v3;
+package envoy.extensions.geoip_providers.geoip.v3;
 
 import "envoy/config/core/v3/base.proto";
 

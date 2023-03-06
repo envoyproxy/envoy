@@ -73,7 +73,7 @@ public:
 
   Event::SimulatedTimeSystem time_system_;
   InstanceImpl splitter_{std::make_unique<NiceMock<MockRouter>>(route_),
-                         *store_.rootScope(),
+                         store_,
                          "redis.foo.",
                          time_system_,
                          latency_in_micros_,

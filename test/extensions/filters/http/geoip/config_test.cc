@@ -35,59 +35,42 @@ MATCHER_P(HasXffNumTrustedHops, expected, "") {
   return GeoipFilterPeer::xffNumTrustedHops(*filter) == static_cast<uint32_t>(expected);
 }
 
-MATCHER_P(HasGeoCityHeader, expected, "") {
+MATCHER_P(HasGeoHeader, expected_header, "") {
   auto filter = std::static_pointer_cast<GeoipFilter>(arg);
-  return GeoipFilterPeer::geoCityHeader(*filter).value() == expected;
+  auto geo_headers = GeoipFilterPeer::geoHeaders(*filter);
+  bool header_found = false;
+  for (auto header : geo_headers) {
+    if (header == expected_header) {
+      header_found = true;
+    }
+  }
+  return header_found;
 }
 
-MATCHER_P(HasGeoCountryHeader, expected, "") {
+MATCHER_P(HasGeoHeadersSize, expected_size, "") {
   auto filter = std::static_pointer_cast<GeoipFilter>(arg);
-  return GeoipFilterPeer::geoCountryHeader(*filter).value() == expected;
+  auto geo_headers = GeoipFilterPeer::geoHeaders(*filter);
+  EXPECT_EQ(expected_size, geo_headers.size());
+  return true;
 }
 
-MATCHER_P(HasGeoRegionHeader, expected, "") {
+MATCHER_P(HasGeoAnonHeader, expected_header, "") {
   auto filter = std::static_pointer_cast<GeoipFilter>(arg);
-  return GeoipFilterPeer::geoRegionHeader(*filter).value() == expected;
+  auto geo_anon_headers = GeoipFilterPeer::geoAnonHeaders(*filter);
+  bool header_found = false;
+  for (auto header : geo_anon_headers) {
+    if (header == expected_header) {
+      header_found = true;
+    }
+  }
+  return header_found;
 }
 
-MATCHER(GeoCityHeaderIsNotSet, "") {
+MATCHER_P(HasAnonGeoHeadersSize, expected_size, "") {
   auto filter = std::static_pointer_cast<GeoipFilter>(arg);
-  return !GeoipFilterPeer::geoCityHeader(*filter);
-}
-
-MATCHER(GeoCountryHeaderIsNotSet, "") {
-  auto filter = std::static_pointer_cast<GeoipFilter>(arg);
-  return !GeoipFilterPeer::geoCountryHeader(*filter);
-}
-
-MATCHER(GeoRegionHeaderIsNotSet, "") {
-  auto filter = std::static_pointer_cast<GeoipFilter>(arg);
-  return !GeoipFilterPeer::geoRegionHeader(*filter);
-}
-
-MATCHER(GeoAsnHeaderIsNotSet, "") {
-  auto filter = std::static_pointer_cast<GeoipFilter>(arg);
-  return !GeoipFilterPeer::geoAsnHeader(*filter);
-}
-
-MATCHER(GeoAnonVpnHeaderIsNotSet, "") {
-  auto filter = std::static_pointer_cast<GeoipFilter>(arg);
-  return !GeoipFilterPeer::geoAnonVpnHeader(*filter);
-}
-
-MATCHER(GeoAnonHostingHeaderIsNotSet, "") {
-  auto filter = std::static_pointer_cast<GeoipFilter>(arg);
-  return !GeoipFilterPeer::geoAnonHostingHeader(*filter);
-}
-
-MATCHER(GeoAnonTorHeaderIsNotSet, "") {
-  auto filter = std::static_pointer_cast<GeoipFilter>(arg);
-  return !GeoipFilterPeer::geoAnonTorHeader(*filter);
-}
-
-MATCHER(GeoAnonProxyHeaderIsNotSet, "") {
-  auto filter = std::static_pointer_cast<GeoipFilter>(arg);
-  return !GeoipFilterPeer::geoAnonProxyHeader(*filter);
+  auto geo_headers = GeoipFilterPeer::geoAnonHeaders(*filter);
+  EXPECT_EQ(expected_size, geo_headers.size());
+  return true;
 }
 
 TEST(GeoipFilterConfigTest, GeoipFilterDefaultValues) {
@@ -109,11 +92,9 @@ TEST(GeoipFilterConfigTest, GeoipFilterDefaultValues) {
   Http::FilterFactoryCb cb = factory.createFilterFactoryFromProto(filter_config, "geoip", context);
   Http::MockFilterChainFactoryCallbacks filter_callback;
   EXPECT_CALL(filter_callback,
-              addStreamDecoderFilter(AllOf(
-                  HasUseXff(false), HasXffNumTrustedHops(0), HasGeoCityHeader("x-geo-city"),
-                  GeoCountryHeaderIsNotSet(), GeoRegionHeaderIsNotSet(), GeoAsnHeaderIsNotSet(),
-                  GeoAnonVpnHeaderIsNotSet(), GeoAnonHostingHeaderIsNotSet(),
-                  GeoAnonTorHeaderIsNotSet(), GeoAnonProxyHeaderIsNotSet())));
+              addStreamDecoderFilter(AllOf(HasUseXff(false), HasXffNumTrustedHops(0),
+                                           HasGeoHeader("x-geo-city"), HasGeoHeadersSize(1),
+                                           HasAnonGeoHeadersSize(0))));
   cb(filter_callback);
 }
 
@@ -128,6 +109,7 @@ TEST(GeoipFilterConfigTest, GeoipFilterConfigWithCorrectProto) {
     geo_headers_to_add:
       country: "x-geo-country"
       region: "x-geo-region"
+      anon_vpn: "x-anon-vpn"
     provider:
         name: "envoy.geoip_providers.dummy"
   )EOF";
@@ -138,13 +120,11 @@ TEST(GeoipFilterConfigTest, GeoipFilterConfigWithCorrectProto) {
   GeoipFilterFactory factory;
   Http::FilterFactoryCb cb = factory.createFilterFactoryFromProto(filter_config, "geoip", context);
   Http::MockFilterChainFactoryCallbacks filter_callback;
-  EXPECT_CALL(
-      filter_callback,
-      addStreamDecoderFilter(
-          AllOf(HasUseXff(true), HasXffNumTrustedHops(1), HasGeoCountryHeader("x-geo-country"),
-                HasGeoRegionHeader("x-geo-region"), GeoCityHeaderIsNotSet(), GeoAsnHeaderIsNotSet(),
-                GeoAnonVpnHeaderIsNotSet(), GeoAnonHostingHeaderIsNotSet(),
-                GeoAnonTorHeaderIsNotSet(), GeoAnonProxyHeaderIsNotSet())));
+  EXPECT_CALL(filter_callback,
+              addStreamDecoderFilter(AllOf(HasUseXff(true), HasXffNumTrustedHops(1),
+                                           HasGeoHeader("x-geo-city"), HasGeoHeader("x-geo-region"),
+                                           HasGeoHeadersSize(2), HasAnonGeoHeadersSize(1),
+                                           HasGeoAnonHeader("x-anon-vpn"))));
   cb(filter_callback);
 }
 

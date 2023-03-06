@@ -68,7 +68,7 @@ message Geoip {
     // The name of the geoip driver to instantiate. The name must match a
     // supported geoip driver. Built-in drivers:
     //
-    // - *envoy.geoip_providers.maxmind*
+    // - *envoy.extensions.geoip_providers.maxmind*
     string name = 1 [(validate.rules).string = {min_bytes: 1}];
 
     // Geoip driver specific configuration which depends on the driver being instantiated.

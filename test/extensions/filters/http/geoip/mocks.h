@@ -9,42 +9,7 @@ namespace Geoip {
 
 class MockDriver : public Driver {
 public:
-  MOCK_METHOD(void, getCity,
-              (const Network::Address::InstanceConstSharedPtr&, const LookupCallbacks&,
-               const absl::optional<std::string>&),
-              (const));
-  MOCK_METHOD(void, getCountry,
-              (const Network::Address::InstanceConstSharedPtr&, const LookupCallbacks&,
-               const absl::optional<std::string>&),
-              (const));
-  MOCK_METHOD(void, getRegion,
-              (const Network::Address::InstanceConstSharedPtr&, const LookupCallbacks&,
-               const absl::optional<std::string>&),
-              (const));
-  MOCK_METHOD(void, getAsn,
-              (const Network::Address::InstanceConstSharedPtr&, const LookupCallbacks&,
-               const absl::optional<std::string>&),
-              (const));
-  MOCK_METHOD(void, getIsAnonymous,
-              (const Network::Address::InstanceConstSharedPtr&, const LookupCallbacks&,
-               const absl::optional<std::string>&),
-              (const));
-  MOCK_METHOD(void, getIsAnonymousVpn,
-              (const Network::Address::InstanceConstSharedPtr&, const LookupCallbacks&,
-               const absl::optional<std::string>&),
-              (const));
-  MOCK_METHOD(void, getIsAnonymousHostingProvider,
-              (const Network::Address::InstanceConstSharedPtr&, const LookupCallbacks&,
-               const absl::optional<std::string>&),
-              (const));
-  MOCK_METHOD(void, getIsAnonymousPublicProxy,
-              (const Network::Address::InstanceConstSharedPtr&, const LookupCallbacks&,
-               const absl::optional<std::string>&),
-              (const));
-  MOCK_METHOD(void, getIsAnonymousTorExitNode,
-              (const Network::Address::InstanceConstSharedPtr&, const LookupCallbacks&,
-               const absl::optional<std::string>&),
-              (const));
+  MOCK_METHOD(void, lookup, (LookupRequest && request, LookupGeoHeadersCallback&&), (const));
 };
 
 using MockDriverSharedPtr = std::shared_ptr<MockDriver>;
