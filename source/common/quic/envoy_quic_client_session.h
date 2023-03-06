@@ -82,6 +82,9 @@ public:
   // Notify any registered connection pool when new streams are available.
   void OnCanCreateNewOutgoingStream(bool) override;
 
+  void OnServerPreferredAddressAvailable(
+      const quic::QuicSocketAddress& server_preferred_address) override;
+
   using quic::QuicSpdyClientSession::PerformActionOnActiveStreams;
 
 protected:

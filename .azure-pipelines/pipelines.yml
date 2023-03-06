@@ -113,10 +113,23 @@ stages:
       name: changed
 
     - bash: |
+        set -e
         VERSION_DEV="$(cat VERSION.txt | cut -d- -f2)"
         if [[ $VERSION_DEV == "dev" ]]; then
             echo "##vso[task.setvariable variable=isDev;isoutput=true]true"
         else
+            if [[ $(Build.Reason) == "PullRequest" ]]; then
+                # Check to make sure that it was this PR that changed the version, otherwise fail
+                # as the branch needs to be reopened first.
+                # NB: this will not stop a PR that has already passed checks from being landed.
+                DIFF_TARGET_BRANCH="origin/$(System.PullRequest.TargetBranch)"
+                DIFF_REF="$(git merge-base HEAD "${DIFF_TARGET_BRANCH}")"
+                CHANGES="$(git diff "$DIFF_REF" HEAD VERSION.txt)"
+                if [[ -z "$CHANGES" ]]; then
+                    echo "VERSION.txt is not a development version. Please re-open the branch before making further changes" >&2
+                    exit 1
+                fi
+            fi
             echo "##vso[task.setvariable variable=isDev;isoutput=true]false"
         fi
       displayName: Set development/release env
@@ -344,13 +357,11 @@ stages:
     displayName: Build and test
     condition: and(not(canceled()), ne(stageDependencies.env.repo.outputs['changed.mobileOnly'], 'true'), ne(stageDependencies.env.repo.outputs['changed.docsOnly'], 'true'))
     timeoutInMinutes: 120
-    pool:
-      vmImage: "ubuntu-20.04"
+    pool: x64-large
     steps:
-    - bash: .azure-pipelines/cleanup.sh
-      displayName: "Removing tools from agent"
     - template: bazel.yml
       parameters:
+        managedAgent: false
         ciTarget: bazel.release
 
   - job: released
