@@ -47,6 +47,9 @@ minor_behavior_changes:
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
+- area: http
+  change: |
+    sanitization of the referer header has been relaxed to allow relative URLs, and also tightened to remove referers containing userinfo or fragment components, as documented here :ref:`here <config_http_conn_man_headers_referer>`
 - area: stats
   change: |
     now updating upstream total connection stats as happy eyeballs connections are created.

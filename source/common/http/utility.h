@@ -665,6 +665,13 @@ convertCoreToRouteRetryPolicy(const envoy::config::core::v3::RetryPolicy& retry_
 bool isSafeRequest(const Http::RequestHeaderMap& request_headers);
 
 /**
+ * @param value: the value of the referer header field
+ * @return true if the given value conforms to RFC specifications
+ * https://www.rfc-editor.org/rfc/rfc7231#section-5.5.2
+ */
+bool isValidRefererValue(absl::string_view value);
+
+/**
  * Return the GatewayTimeout HTTP code to indicate the request is full received.
  */
 Http::Code maybeRequestTimeoutCode(bool remote_decode_complete);

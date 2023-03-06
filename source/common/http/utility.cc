@@ -1400,5 +1400,37 @@ std::string Utility::newUri(::Envoy::OptRef<const Utility::RedirectConfig> redir
   return fmt::format("{}://{}{}{}", final_scheme, final_host, final_port, final_path);
 }
 
+bool Utility::isValidRefererValue(absl::string_view value) {
+  struct http_parser_url u;
+  http_parser_url_init(&u);
+
+  int result = http_parser_parse_url(value.data(), value.length(), false, &u);
+
+  if (result == 0) {
+    goto parse_success;
+  }
+
+  http_parser_url_init(&u);
+  result = http_parser_parse_relative_url(value.data(), value.length(), &u);
+
+  if (result != 0) {
+    return false;
+  }
+
+parse_success:
+
+  // Check strict RFC requirements: no fragment and no userinfo
+  // Note: if parse_relative_url was used, userinfo is not parsed out, so the
+  //       second check here will never hit.
+  if ((u.field_set & (1 << UF_FRAGMENT)) == (1 << UF_FRAGMENT) ||
+      (u.field_set & (1 << UF_USERINFO)) == (1 << UF_USERINFO))
+  {
+    return false;
+  }
+
+  return true;
+}
+
+
 } // namespace Http
 } // namespace Envoy
