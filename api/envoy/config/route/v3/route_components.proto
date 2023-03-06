@@ -2384,4 +2384,8 @@ message FilterConfig {
   // not support the specified filter, it may ignore the map entry rather
   // than rejecting the config.
   bool is_optional = 2;
+
+  // If true, the filter is disabled in the route or virtual host and the
+  // ``config`` field is ignored.
+  bool is_disabled = 3;
 }
