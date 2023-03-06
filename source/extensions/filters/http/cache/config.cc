@@ -11,7 +11,10 @@ Http::FilterFactoryCb CacheFilterFactory::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::cache::v3::CacheConfig& config,
     const std::string& stats_prefix, Server::Configuration::FactoryContext& context) {
   std::shared_ptr<HttpCache> cache;
-  if (!config.disabled()) {
+  if (!config.disabled().value()) {
+    if (!config.has_typed_config()) {
+      throw EnvoyException("at least one of typed_config or disabled must be set");
+    }
     const std::string type{TypeUtil::typeUrlToDescriptorFullName(config.typed_config().type_url())};
     HttpCacheFactory* const http_cache_factory =
         Registry::FactoryRegistry<HttpCacheFactory>::getFactoryByType(type);

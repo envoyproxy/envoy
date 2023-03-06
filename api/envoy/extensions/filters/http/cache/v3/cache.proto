@@ -6,6 +6,7 @@ import "envoy/config/route/v3/route_components.proto";
 import "envoy/type/matcher/v3/string.proto";
 
 import "google/protobuf/any.proto";
+import "google/protobuf/wrappers.proto";
 
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
@@ -50,16 +51,13 @@ message CacheConfig {
     repeated config.route.v3.QueryParameterMatcher query_parameters_excluded = 4;
   }
 
-  oneof cache_implementation {
-    option (validate.required) = true;
+  // Config specific to the cache storage implementation. Required unless ``disabled``
+  // is true.
+  // [#extension-category: envoy.http.cache]
+  google.protobuf.Any typed_config = 1;
 
-    // Config specific to the cache storage implementation.
-    // [#extension-category: envoy.http.cache]
-    google.protobuf.Any typed_config = 1;
-
-    // When set, the cache filter is a no-op filter.
-    bool disabled = 5 [(validate.rules).bool = {const: true}];
-  }
+  // When true, the cache filter is a no-op filter.
+  google.protobuf.BoolValue disabled = 5;
 
   // List of matching rules that defines allowed ``Vary`` headers.
   //

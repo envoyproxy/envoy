@@ -34,7 +34,7 @@ TEST_F(CacheFilterFactoryTest, Basic) {
 }
 
 TEST_F(CacheFilterFactoryTest, Disabled) {
-  config_.set_disabled(true);
+  config_.mutable_disabled()->set_value(true);
   Http::FilterFactoryCb cb = factory_.createFilterFactoryFromProto(config_, "stats", context_);
   Http::StreamFilterSharedPtr filter;
   EXPECT_CALL(filter_callback_, addStreamFilter(_)).WillOnce(::testing::SaveArg<0>(&filter));
