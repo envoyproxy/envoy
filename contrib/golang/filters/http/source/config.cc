@@ -46,10 +46,9 @@ GolangFilterConfig::createRouteSpecificFilterConfigTyped(
 }
 
 /**
- * Static registration for the golang extensions filter. @see RegisterFactory.
+ * Static registration for the Golang filter. @see RegisterFactory.
  */
-LEGACY_REGISTER_FACTORY(GolangFilterConfig, Server::Configuration::NamedHttpFilterConfigFactory,
-                        "envoy.golang");
+REGISTER_FACTORY(GolangFilterConfig, Server::Configuration::NamedHttpFilterConfigFactory);
 
 } // namespace Golang
 } // namespace HttpFilters
