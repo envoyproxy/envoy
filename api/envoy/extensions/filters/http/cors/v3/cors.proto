@@ -26,6 +26,7 @@ message Cors {
       "envoy.config.filter.http.cors.v2.Cors";
 }
 
+// Per route configuration for the CORS filter.
 // [#next-free-field: 10]
 message CorsPolicy {
   // Specifies string patterns that match allowed origins. An origin is allowed if any of the
