@@ -59,6 +59,7 @@ following counters are available:
   reconfig_rq, Counter, Number of reconfig requests
   close_rq, Counter, Number of close requests
   setwatches_rq, Counter, Number of setwatches requests
+  setwatches2_rq, Counter, Number of setwatches2 requests
   checkwatches_rq, Counter, Number of checkwatches requests
   removewatches_rq, Counter, Number of removewatches requests
   check_rq, Counter, Number of check requests
@@ -87,6 +88,7 @@ following counters are available:
   close_resp, Counter, Number of close responses
   setauth_resp, Counter, Number of setauth responses
   setwatches_resp, Counter, Number of setwatches responses
+  setwatches2_resp, Counter, Number of setwatches2 responses
   checkwatches_resp, Counter, Number of checkwatches responses
   removewatches_resp, Counter, Number of removewatches responses
   check_resp, Counter, Number of check responses
@@ -128,6 +130,7 @@ Latency stats are in milliseconds:
   close_response_latency, Histogram, Opcode execution time in milliseconds
   setauth_response_latency, Histogram, Opcode execution time in milliseconds
   setwatches_response_latency, Histogram, Opcode execution time in milliseconds
+  setwatches2_response_latency, Histogram, Opcode execution time in milliseconds
   checkwatches_response_latency, Histogram, Opcode execution time in milliseconds
   removewatches_response_latency, Histogram, Opcode execution time in milliseconds
   check_response_latency, Histogram, Opcode execution time in milliseconds

@@ -50,7 +50,8 @@ enum class OpCodes {
   SetAuth = 100,
   SetWatches = 101,
   GetEphemerals = 103,
-  GetAllChildrenNumber = 104
+  GetAllChildrenNumber = 104,
+  SetWatches2 = 105
 };
 
 enum class WatcherType { Children = 1, Data = 2, Any = 3 };
@@ -94,6 +95,7 @@ public:
   virtual void onMultiRequest() PURE;
   virtual void onReconfigRequest() PURE;
   virtual void onSetWatchesRequest() PURE;
+  virtual void onSetWatches2Request() PURE;
   virtual void onCheckWatchesRequest(const std::string& path, int32_t type) PURE;
   virtual void onRemoveWatchesRequest(const std::string& path, int32_t type) PURE;
   virtual void onCloseRequest() PURE;
@@ -158,6 +160,7 @@ private:
   void parseMultiRequest(Buffer::Instance& data, uint64_t& offset, uint32_t len);
   void parseReconfigRequest(Buffer::Instance& data, uint64_t& offset, uint32_t len);
   void parseSetWatchesRequest(Buffer::Instance& data, uint64_t& offset, uint32_t len);
+  void parseSetWatches2Request(Buffer::Instance& data, uint64_t& offset, uint32_t len);
   void parseXWatchesRequest(Buffer::Instance& data, uint64_t& offset, uint32_t len, OpCodes opcode);
   void skipString(Buffer::Instance& data, uint64_t& offset);
   void skipStrings(Buffer::Instance& data, uint64_t& offset);
