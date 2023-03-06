@@ -39,3 +39,16 @@ envoy_extension_cc_test(
         "//test/test_common:utility_lib",
     ],
 )
+
+envoy_extension_cc_test(
+    name = "header_mutation_integration_test",
+    srcs = ["header_mutation_integration_test.cc"],
+    extension_names = ["envoy.filters.http.header_mutation"],
+    deps = [
+        "//source/extensions/filters/http/header_mutation:config",
+        "//test/integration:http_integration_lib",
+        "//test/mocks/server:instance_mocks",
+        "//test/test_common:registry_lib",
+        "//test/test_common:utility_lib",
+    ],
+)
