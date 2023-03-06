@@ -209,13 +209,11 @@ stages:
   jobs:
   - job: release
     timeoutInMinutes: 120
-    pool:
-      vmImage: "ubuntu-20.04"
+    pool: x64-large
     steps:
-    - bash: .azure-pipelines/cleanup.sh
-      displayName: "Removing tools from agent"
     - template: bazel.yml
       parameters:
+        managedAgent: false
         ciTarget: bazel.release
 
 - stage: linux_arm64
