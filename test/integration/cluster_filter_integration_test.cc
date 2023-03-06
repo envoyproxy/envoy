@@ -2,6 +2,7 @@
 #include "envoy/network/filter.h"
 
 #include "test/config/utility.h"
+#include "test/integration/http_integration.h"
 #include "test/integration/integration.h"
 #include "test/test_common/registry.h"
 
@@ -10,7 +11,7 @@
 namespace Envoy {
 namespace {
 
-// Helper class for passing runtime information from a test filter to the test class.
+// Helper class for passing function call order information from a test filter to the test class.
 // May only be called from one filter during a test.
 class TestParent {
 public:
@@ -29,8 +30,10 @@ public:
     ENVOY_CONN_LOG(debug, "polite: onData {} bytes {} end_stream", read_callbacks_->connection(),
                    data.length(), end_stream);
     if (!read_greeted_) {
-      Buffer::OwnedImpl greeter(greeting_);
-      read_callbacks_->injectReadDataToFilterChain(greeter, false);
+      if (greeting_.length() > 0) {
+        Buffer::OwnedImpl greeter(greeting_);
+        read_callbacks_->injectReadDataToFilterChain(greeter, false);
+      }
       read_greeted_ = true;
     }
     return Network::FilterStatus::Continue;
@@ -39,8 +42,10 @@ public:
     ENVOY_CONN_LOG(debug, "polite: onWrite {} bytes {} end_stream", write_callbacks_->connection(),
                    data.length(), end_stream);
     if (!write_greeted_) {
-      Buffer::OwnedImpl greeter("please ");
-      write_callbacks_->injectWriteDataToFilterChain(greeter, false);
+      if (greeting_.length() > 0) {
+        Buffer::OwnedImpl greeter("please ");
+        write_callbacks_->injectWriteDataToFilterChain(greeter, false);
+      }
       write_greeted_ = true;
     }
     return Network::FilterStatus::Continue;
@@ -101,14 +106,11 @@ std::string ipInitializeUpstreamFiltersTestParamsToString(
                                 : "dont_initialize_upstream_filters");
 }
 
-class ClusterFilterIntegrationTest
+class ClusterFilterIntegrationTestBase
     : public testing::TestWithParam<std::tuple<Network::Address::IpVersion, bool>>,
-      public BaseIntegrationTest,
       public TestParent {
 public:
-  ClusterFilterIntegrationTest()
-      : BaseIntegrationTest(std::get<0>(GetParam()), ConfigHelper::tcpProxyConfig()),
-        factory_(*this), registration_(factory_) {
+  ClusterFilterIntegrationTestBase() : factory_(*this), registration_(factory_) {
     Runtime::maybeSetRuntimeGuard("envoy.reloadable_features.initialize_upstream_filters",
                                   std::get<1>(GetParam()));
   }
@@ -132,6 +134,21 @@ public:
     return atomic_optional_bool.has_value() && !atomic_optional_bool.value();
   }
 
+  PoliteFilterConfigFactory factory_;
+  Registry::InjectFactory<Server::Configuration::NamedUpstreamNetworkFilterConfigFactory>
+      registration_;
+
+private:
+  // Atomic so that this may be safely accessed from multiple threads
+  std::atomic<absl::optional<bool>> on_new_connection_called_after_on_write_;
+};
+
+class ClusterFilterTcpIntegrationTest : public ClusterFilterIntegrationTestBase,
+                                        public BaseIntegrationTest {
+public:
+  ClusterFilterTcpIntegrationTest()
+      : BaseIntegrationTest(std::get<0>(GetParam()), ConfigHelper::tcpProxyConfig()) {}
+
   void initialize() override {
     enableHalfClose(true);
     config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
@@ -144,22 +161,14 @@ public:
     });
     BaseIntegrationTest::initialize();
   }
-
-  PoliteFilterConfigFactory factory_;
-  Registry::InjectFactory<Server::Configuration::NamedUpstreamNetworkFilterConfigFactory>
-      registration_;
-
-private:
-  // Atomic so that this may be safely accessed from multiple threads
-  std::atomic<absl::optional<bool>> on_new_connection_called_after_on_write_;
 };
 
 INSTANTIATE_TEST_SUITE_P(
-    IpVersionsInitializeUpstreamFilters, ClusterFilterIntegrationTest,
+    IpVersionsInitializeUpstreamFilters, ClusterFilterTcpIntegrationTest,
     testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()), testing::Bool()),
     ipInitializeUpstreamFiltersTestParamsToString);
 
-TEST_P(ClusterFilterIntegrationTest, TestClusterFilter) {
+TEST_P(ClusterFilterTcpIntegrationTest, TestClusterFilter) {
   initialize();
 
   auto tcp_client = makeTcpConnection(lookupPort("listener_0"));
@@ -208,6 +217,73 @@ TEST_P(ClusterFilterIntegrationTest, TestClusterFilter) {
   ASSERT_TRUE(fake_upstream_connection->write("", true));
   ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
   tcp_client->waitForDisconnect();
+}
+
+class ClusterFilterHttpIntegrationTest : public ClusterFilterIntegrationTestBase,
+                                         public HttpIntegrationTest {
+public:
+  ClusterFilterHttpIntegrationTest()
+      : HttpIntegrationTest(Http::CodecType::HTTP1, std::get<0>(GetParam())) {}
+
+  void initialize() override {
+    config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      auto* cluster_0 = bootstrap.mutable_static_resources()->mutable_clusters(0);
+      auto* filter = cluster_0->add_filters();
+      filter->set_name("envoy.upstream.polite");
+      ProtobufWkt::StringValue config;
+      config.set_value("");
+      filter->mutable_typed_config()->PackFrom(config);
+    });
+    HttpIntegrationTest::initialize();
+  }
+};
+
+INSTANTIATE_TEST_SUITE_P(
+    IpVersionsInitializeUpstreamFilters, ClusterFilterHttpIntegrationTest,
+    testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()), testing::Bool()),
+    ipInitializeUpstreamFiltersTestParamsToString);
+
+TEST_P(ClusterFilterHttpIntegrationTest, TestClusterFilter) {
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  Http::TestRequestHeaderMapImpl headers{
+      {":method", "POST"}, {":path", "/api"}, {":authority", "host"}, {":scheme", "http"}};
+  auto response = codec_client_->makeRequestWithBody(headers, "hello!");
+
+  waitForNextUpstreamRequest();
+
+  // Upstream read filters are expected to be initialized at this point after only the request has
+  // been sent, but only if runtime feature flag 'initialize_upstream_filters' is true.
+  if (upstreamFiltersInitializedWhenConnected()) {
+    ASSERT_TRUE(wasOnNewConnectionCalled());
+    ASSERT_TRUE(wasOnNewConnectionCalledFirst());
+  } else {
+    ASSERT_FALSE(wasOnNewConnectionCalled());
+  }
+
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_EQ("hello!", upstream_request_->body().toString());
+
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
+  Buffer::OwnedImpl response_data{"greetings"};
+  upstream_request_->encodeData(response_data, true);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  ASSERT_TRUE(response->complete());
+
+  // Finally after receiving the response onNewConnection() has been called in all cases, but
+  // onWrite was called before it if runtime feature flag 'initialize_upstream_filters' is false.
+  ASSERT_TRUE(wasOnNewConnectionCalled());
+  if (upstreamFiltersInitializedWhenConnected()) {
+    ASSERT_TRUE(wasOnNewConnectionCalledFirst());
+  } else {
+    ASSERT_FALSE(wasOnNewConnectionCalledFirst());
+  }
+
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  EXPECT_EQ("greetings", response->body());
 }
 
 } // namespace
