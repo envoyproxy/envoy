@@ -1,10 +1,9 @@
 #pragma once
 
-#include <vector>
-
 #include "envoy/event/dispatcher.h"
 #include "envoy/event/timer.h"
 
+#include "absl/container/flat_hash_set.h"
 #include "datadog/event_scheduler.h"
 
 namespace Envoy {
@@ -22,7 +21,6 @@ namespace Datadog {
 class EventScheduler : public datadog::tracing::EventScheduler {
 public:
   explicit EventScheduler(Event::Dispatcher& dispatcher);
-  ~EventScheduler() override;
 
   /**
    * Repeatedly execute the specified \p callback with approximately \p interval
@@ -41,7 +39,7 @@ public:
 
 private:
   Event::Dispatcher& dispatcher_;
-  std::vector<Event::TimerPtr> timers_;
+  absl::flat_hash_set<Event::TimerPtr> timers_;
 };
 
 } // namespace Datadog
