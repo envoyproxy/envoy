@@ -790,6 +790,7 @@ stages:
       env:
         AZP_BRANCH: $(Build.SourceBranch)
         ENVOY_DOCKER_BUILD_DIR: $(Build.StagingDirectory)
+        ENVOY_DOCKER_IN_DOCKER: 1
         BAZEL_REMOTE_CACHE: grpcs://remotebuildexecution.googleapis.com
         BAZEL_REMOTE_INSTANCE: projects/envoy-ci/instances/default_instance
         GCP_SERVICE_ACCOUNT_KEY: $(GcpServiceAccountKey)
@@ -812,6 +813,7 @@ stages:
       env:
         AZP_BRANCH: $(Build.SourceBranch)
         ENVOY_DOCKER_BUILD_DIR: $(Build.StagingDirectory)
+        ENVOY_DOCKER_IN_DOCKER: 1
         BAZEL_REMOTE_CACHE: grpcs://remotebuildexecution.googleapis.com
         BAZEL_REMOTE_INSTANCE: projects/envoy-ci/instances/default_instance
         GCP_SERVICE_ACCOUNT_KEY: $(GcpServiceAccountKey)
