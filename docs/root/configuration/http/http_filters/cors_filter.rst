@@ -9,7 +9,14 @@ For the meaning of the headers please refer to the pages below.
 * https://developer.mozilla.org/en-US/docs/Web/HTTP/Access_control_CORS
 * https://www.w3.org/TR/cors/
 * This filter should be configured with the type URL ``type.googleapis.com/envoy.extensions.filters.http.cors.v3.Cors``.
-* :ref:`v3 API reference <envoy_v3_api_msg_config.route.v3.CorsPolicy>`
+* :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.http.cors.v3.CorsPolicy>`
+
+
+.. note::
+  This filter is only used to respond the preflight OPTIONS requests. Any non-OPTIONS request or illegal OPTIONS
+  request will be ignored and passed to the next filter in the filter chain.
+  In addition, this filter will be bypassed if the direct response or route redirect is configured for the route.
+
 
 .. _cors-runtime:
 
