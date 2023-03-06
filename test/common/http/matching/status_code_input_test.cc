@@ -18,8 +18,7 @@ StreamInfo::StreamInfoImpl createStreamInfo() {
   auto connection_info_provider = std::make_shared<Network::ConnectionInfoSetterImpl>(
       std::make_shared<Network::Address::Ipv4Instance>(80),
       std::make_shared<Network::Address::Ipv4Instance>(80));
-  return StreamInfo::StreamInfoImpl(Http::Protocol::Http2, Event::GlobalTimeSystem().timeSystem(),
-                                    connection_info_provider);
+  return {Http::Protocol::Http2, Event::GlobalTimeSystem().timeSystem(), connection_info_provider};
 }
 
 TEST(MatchingData, HttpResponseStatusCodeInput) {

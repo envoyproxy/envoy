@@ -15,12 +15,6 @@ using testing::ReturnRef;
 
 TEST(Authentication, UriSanInput) {
   UriSanInput<Http::HttpMatchingData> input;
-  // auto connection_info_provider = std::make_shared<Network::ConnectionInfoSetterImpl>(
-  //     std::make_shared<Network::Address::Ipv4Instance>(80),
-  //     std::make_shared<Network::Address::Ipv4Instance>(80));
-  // StreamInfo::StreamInfoImpl stream_info(
-  //     Http::Protocol::Http2, Event::GlobalTimeSystem().timeSystem(), connection_info_provider)
-
   NiceMock<StreamInfo::MockStreamInfo> stream_info;
   Http::Matching::HttpMatchingDataImpl data(stream_info);
 
@@ -33,7 +27,6 @@ TEST(Authentication, UriSanInput) {
 
   std::shared_ptr<Ssl::MockConnectionInfo> ssl = std::make_shared<Ssl::MockConnectionInfo>();
   stream_info.downstream_connection_info_provider_->setSslConnection(ssl);
-  // connection_info_provider->setSslConnection(ssl);
 
   {
     std::vector<std::string> uri_sans;
@@ -68,11 +61,6 @@ TEST(Authentication, UriSanInput) {
 
 TEST(Authentication, DnsSanInput) {
   DnsSanInput<Http::HttpMatchingData> input;
-  // auto connection_info_provider = std::make_shared<Network::ConnectionInfoSetterImpl>(
-  //     std::make_shared<Network::Address::Ipv4Instance>(80),
-  //     std::make_shared<Network::Address::Ipv4Instance>(80));
-  // Http::Matching::HttpMatchingDataImpl data(StreamInfo::StreamInfoImpl(
-  //     Http::Protocol::Http2, Event::GlobalTimeSystem().timeSystem(), connection_info_provider));
   NiceMock<StreamInfo::MockStreamInfo> stream_info;
   Http::Matching::HttpMatchingDataImpl data(stream_info);
   {

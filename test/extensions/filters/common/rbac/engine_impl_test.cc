@@ -67,8 +67,6 @@ void checkMatcherEngine(
     StreamInfo::StreamInfo& info,
     const Envoy::Network::Connection& connection = Envoy::Network::MockConnection(),
     const Envoy::Http::RequestHeaderMap& headers = Envoy::Http::TestRequestHeaderMapImpl()) {
-  // std::cout << "before handle action: "  <<
-  // connection.streamInfo().downstreamAddressProvider().localAddress()->asString() << std::endl;
   bool engineRes = engine.handleAction(connection, headers, info, nullptr);
   EXPECT_EQ(expected, engineRes);
 
@@ -571,9 +569,6 @@ TEST(RoleBasedAccessControlMatcherEngineImpl, DeniedDenylist) {
   info.downstream_connection_info_provider_->setLocalAddress(addr);
   EXPECT_CALL(info, downstreamAddressProvider())
       .WillRepeatedly(ReturnPointee(info.downstream_connection_info_provider_));
-  // EXPECT_CALL(conn, streamInfo()).WillRepeatedly(ReturnRef(info));
-  // std::cout << "data input: "  <<
-  // conn.streamInfo().downstreamAddressProvider().localAddress()->asString() << std::endl;
   checkMatcherEngine(engine, false, LogResult::Undecided, info, conn, headers);
 
   addr = Envoy::Network::Utility::parseInternetAddress("1.2.3.4", 456, false);
@@ -651,18 +646,11 @@ TEST(RoleBasedAccessControlMatcherEngineImpl, LogIfMatched) {
   NiceMock<Envoy::Network::MockConnection> conn;
   Envoy::Http::TestRequestHeaderMapImpl headers;
   NiceMock<StreamInfo::MockStreamInfo> info;
-  // Network::ConnectionInfoSetterImpl
-  // provider(std::make_shared<Network::Address::Ipv4Instance>(80),
-  //                                            std::make_shared<Network::Address::Ipv4Instance>(80));
-  // EXPECT_CALL(conn, connectionInfoProvider()).WillRepeatedly(ReturnRef(provider));
   onMetadata(info);
 
   Envoy::Network::Address::InstanceConstSharedPtr addr =
       Envoy::Network::Utility::parseInternetAddress("1.2.3.4", 123, false);
   info.downstream_connection_info_provider_->setLocalAddress(addr);
-  // ON_CALL(info,
-  // downstreamAddressProvider()).WillByDefault(ReturnPointee(info.downstream_connection_info_provider_));
-  // ON_CALL(conn, streamInfo()).WillByDefault(ReturnRef(info));
   EXPECT_CALL(info, downstreamAddressProvider())
       .WillRepeatedly(ReturnPointee(info.downstream_connection_info_provider_));
   EXPECT_CALL(conn, streamInfo()).WillRepeatedly(ReturnRef(info));
