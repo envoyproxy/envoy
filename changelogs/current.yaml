@@ -102,6 +102,9 @@ removed_config_or_runtime:
 - area: dns
   change: |
     removed ``envoy.reloadable_features.cares_accept_nodata`` and legacy code paths.
+- area: http3
+  change: |
+    removed ``envoy.reloadable_features.postpone_h3_client_connect_to_next_loop`` and legacy code paths.
 
 new_features:
 - area: access_log
