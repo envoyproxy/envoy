@@ -9,6 +9,7 @@ load(
     "envoy_proto_library",
     "envoy_select_admin_functionality",
     "envoy_select_enable_http3",
+    "envoy_select_envoy_mobile_listener",
     "envoy_sh_test",
 )
 
@@ -860,7 +861,6 @@ envoy_cc_test_library(
     deps = [
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/protobuf:protobuf_mocks",
-        "//source/extensions/listener_managers/listener_manager:listener_manager_lib",
         "//envoy/api:api_interface",
         "//envoy/grpc:status",
         "//envoy/http:codec_interface",
@@ -900,6 +900,8 @@ envoy_cc_test_library(
         "//source/common/quic:quic_client_factory_lib",
         "//source/common/quic:quic_server_factory_lib",
         "@com_github_google_quiche//:quic_test_tools_session_peer_lib",
+    ]) + envoy_select_envoy_mobile_listener([
+        "//source/extensions/listener_managers/listener_manager:listener_manager_lib",
     ]),
 )
 
@@ -1995,6 +1997,7 @@ envoy_cc_test(
         "nofips",
     ],
     deps = envoy_select_enable_http3([
+        "//source/extensions/quic/server_preferred_address:fixed_server_preferred_address_config_factory_config",
         "//test/common/config:dummy_config_proto_cc_proto",
         "//test/extensions/transport_sockets/tls/cert_validator:timed_cert_validator",
         ":http_integration_lib",
@@ -2014,6 +2017,7 @@ envoy_cc_test(
         "@envoy_api//envoy/config/overload/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/transport_sockets/quic/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/quic/server_preferred_address/v3:pkg_cc_proto",
         "@com_github_google_quiche//:quic_test_tools_session_peer_lib",
     ]),
 )

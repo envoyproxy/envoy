@@ -20,8 +20,7 @@ public:
   /**
    * Creates a new reservoir that allows up to |traces_per_second| samples.
    */
-  explicit Reservoir(uint32_t traces_per_second)
-      : traces_per_second_(traces_per_second), used_(0) {}
+  explicit Reservoir(uint32_t traces_per_second) : traces_per_second_(traces_per_second) {}
 
   Reservoir(const Reservoir& other)
       : traces_per_second_(other.traces_per_second_), used_(other.used_),
@@ -62,7 +61,7 @@ public:
 
 private:
   uint32_t traces_per_second_;
-  uint32_t used_;
+  uint32_t used_{0};
   Envoy::MonotonicTime time_point_;
   Envoy::Thread::MutexBasicLockable sync_;
 };

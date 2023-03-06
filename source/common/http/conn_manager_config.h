@@ -510,6 +510,12 @@ public:
    * @return whether to append the x-forwarded-port header.
    */
   virtual bool appendXForwardedPort() const PURE;
+
+  /**
+   * @return whether the HCM will insert ProxyProtocolFilterState into the filter state at the
+   *         Connection Lifetime.
+   */
+  virtual bool addProxyProtocolConnectionState() const PURE;
 };
 } // namespace Http
 } // namespace Envoy

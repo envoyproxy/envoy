@@ -85,8 +85,13 @@ enum class DestroyReason {
   Terminate,
 };
 
-enum class StringValue {
+enum class EnvoyValue {
   RouteName = 1,
+  FilterChainName,
+  Protocol,
+  ResponseCode,
+  ResponseCodeDetails,
+  AttemptCount,
 };
 
 struct httpRequestInternal;
@@ -156,6 +161,7 @@ public:
   CAPIStatus copyTrailers(GoString* go_strs, char* go_buf);
   CAPIStatus setTrailer(absl::string_view key, absl::string_view value);
   CAPIStatus getStringValue(int id, GoString* value_str);
+  CAPIStatus getIntegerValue(int id, uint64_t* value);
 
 private:
   ProcessorState& getProcessorState();

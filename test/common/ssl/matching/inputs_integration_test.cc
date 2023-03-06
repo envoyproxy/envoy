@@ -43,7 +43,7 @@ public:
 
   void initialize(const std::string& input, const std::string& value) {
     xds::type::matcher::v3::Matcher matcher;
-    MessageUtil::loadFromYaml(fmt::format(std::string(yaml), input, value), matcher,
+    MessageUtil::loadFromYaml(fmt::format(yaml, input, value), matcher,
                               ProtobufMessage::getStrictValidationVisitor());
 
     match_tree_ = matcher_factory_.create(matcher);
@@ -71,7 +71,8 @@ TEST_F(NetworkInputsIntegrationTest, UriSanInput) {
   socket.connection_info_provider_->setSslConnection(ssl);
   std::vector<std::string> uri_sans{host};
   EXPECT_CALL(*ssl, uriSanPeerCertificate()).WillOnce(Return(uri_sans));
-  Network::Matching::MatchingDataImpl data(socket);
+  StreamInfo::FilterStateImpl filter_state(StreamInfo::FilterState::LifeSpan::Connection);
+  Network::Matching::MatchingDataImpl data(socket, filter_state);
 
   const auto result = match_tree_()->match(data);
   EXPECT_EQ(result.match_state_, Matcher::MatchState::MatchComplete);
@@ -88,7 +89,8 @@ TEST_F(NetworkInputsIntegrationTest, DnsSanInput) {
   socket.connection_info_provider_->setSslConnection(ssl);
   std::vector<std::string> dns_sans{host};
   EXPECT_CALL(*ssl, dnsSansPeerCertificate()).WillOnce(Return(dns_sans));
-  Network::Matching::MatchingDataImpl data(socket);
+  StreamInfo::FilterStateImpl filter_state(StreamInfo::FilterState::LifeSpan::Connection);
+  Network::Matching::MatchingDataImpl data(socket, filter_state);
 
   const auto result = match_tree_()->match(data);
   EXPECT_EQ(result.match_state_, Matcher::MatchState::MatchComplete);
@@ -104,7 +106,8 @@ TEST_F(NetworkInputsIntegrationTest, SubjectInput) {
   std::shared_ptr<Ssl::MockConnectionInfo> ssl = std::make_shared<Ssl::MockConnectionInfo>();
   socket.connection_info_provider_->setSslConnection(ssl);
   EXPECT_CALL(*ssl, subjectPeerCertificate()).WillOnce(testing::ReturnRef(host));
-  Network::Matching::MatchingDataImpl data(socket);
+  StreamInfo::FilterStateImpl filter_state(StreamInfo::FilterState::LifeSpan::Connection);
+  Network::Matching::MatchingDataImpl data(socket, filter_state);
 
   const auto result = match_tree_()->match(data);
   EXPECT_EQ(result.match_state_, Matcher::MatchState::MatchComplete);

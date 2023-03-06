@@ -249,6 +249,9 @@ public:
 #endif
   }
   bool appendXForwardedPort() const override { return append_x_forwarded_port_; }
+  bool addProxyProtocolConnectionState() const override {
+    return add_proxy_protocol_connection_state_;
+  }
 
 private:
   enum class CodecType { HTTP1, HTTP2, HTTP3, AUTO };
@@ -344,6 +347,7 @@ private:
   const std::unique_ptr<HttpConnectionManagerProto::ProxyStatusConfig> proxy_status_config_;
   const Http::HeaderValidatorFactoryPtr header_validator_factory_;
   const bool append_x_forwarded_port_;
+  const bool add_proxy_protocol_connection_state_;
 };
 
 /**

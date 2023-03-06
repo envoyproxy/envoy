@@ -472,6 +472,9 @@ FilterTrailersStatus Filter::decodeTrailers(RequestTrailerMap& trailers) {
 
 FilterHeadersStatus Filter::encodeHeaders(ResponseHeaderMap& headers, bool end_stream) {
   ENVOY_LOG(trace, "encodeHeaders end_stream = {}", end_stream);
+  // Try to merge the route config again in case the decodeHeaders() is not called when processing
+  // local reply.
+  mergePerRouteConfig();
   if (end_stream) {
     encoding_state_.setCompleteBodyAvailable(true);
   }
@@ -724,10 +727,15 @@ static ProcessingMode allDisabledMode() {
 }
 
 void Filter::mergePerRouteConfig() {
-  auto&& merged_config = Http::Utility::getMergedPerFilterConfig<FilterConfigPerRoute>(
+  if (route_config_merged_) {
+    return;
+  }
+  route_config_merged_ = true;
+
+  auto merged_config = Http::Utility::getMergedPerFilterConfig<FilterConfigPerRoute>(
       decoder_callbacks_,
       [](FilterConfigPerRoute& dst, const FilterConfigPerRoute& src) { dst.merge(src); });
-  if (!merged_config) {
+  if (!merged_config.has_value()) {
     return;
   }
   if (merged_config->disabled()) {

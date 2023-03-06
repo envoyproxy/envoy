@@ -1212,19 +1212,45 @@ TEST_P(Http1ServerConnectionImplTest, BadRequestNoStream) {
   EXPECT_TRUE(isCodecProtocolError(status));
 }
 
-// This behavior was observed during CVE-2019-18801 and helped to limit the
-// scope of affected Envoy configurations.
-TEST_P(Http1ServerConnectionImplTest, RejectInvalidMethod) {
+TEST_P(Http1ServerConnectionImplTest, CustomMethod) {
+  bool reject_custom_methods = true;
+#ifdef ENVOY_ENABLE_UHV
+  if (parser_impl_ == Http1ParserImpl::BalsaParser) {
+    // When both BalsaParser and UHV are enabled, custom methods are allowed by
+    // default.
+    reject_custom_methods = false;
+  }
+#endif
+
   initialize();
 
   MockRequestDecoder decoder;
   EXPECT_CALL(callbacks_, newStream(_, _)).WillOnce(ReturnRef(decoder));
+  if (reject_custom_methods) {
+    EXPECT_CALL(decoder, sendLocalReply(_, _, _, _, _));
+  }
 
-  Buffer::OwnedImpl buffer("BAD / HTTP/1.1\r\nHost: foo\r\n");
-  EXPECT_CALL(decoder, sendLocalReply(_, _, _, _, _));
+  Buffer::OwnedImpl buffer("BAD / HTTP/1.1\r\n");
   auto status = codec_->dispatch(buffer);
-  EXPECT_TRUE(isCodecProtocolError(status));
-  EXPECT_EQ(status.message(), "http/1.1 protocol error: HPE_INVALID_METHOD");
+
+  if (reject_custom_methods) {
+    // http-parser rejects unknown methods.
+    // This behavior was observed during CVE-2019-18801 and helped to limit the
+    // scope of affected Envoy configurations.
+    EXPECT_TRUE(isCodecProtocolError(status));
+    EXPECT_EQ(status.message(), "http/1.1 protocol error: HPE_INVALID_METHOD");
+    return;
+  }
+
+  ASSERT_TRUE(status.ok());
+
+  TestRequestHeaderMapImpl expected_headers{
+      {":authority", "example.com"}, {":path", "/"}, {":method", "BAD"}, {"foo", "bar"}};
+  EXPECT_CALL(decoder, decodeHeaders_(HeaderMapEqual(&expected_headers), true));
+
+  Buffer::OwnedImpl headers("host: example.com\r\nfoo: bar\r\n\r\n");
+  status = codec_->dispatch(headers);
+  EXPECT_TRUE(status.ok());
 }
 
 TEST_P(Http1ServerConnectionImplTest, BadRequestStartedStream) {
@@ -1358,7 +1384,7 @@ TEST_P(Http1ServerConnectionImplTest, HeaderNameWithUnderscoreAllowed) {
   EXPECT_CALL(decoder, decodeHeaders_(HeaderMapEqual(&expected_headers), true));
 #endif
 
-  Buffer::OwnedImpl buffer(absl::StrCat("GET / HTTP/1.1\r\nHOST: h.com\r\nfoo_bar: bar\r\n\r\n"));
+  Buffer::OwnedImpl buffer("GET / HTTP/1.1\r\nHOST: h.com\r\nfoo_bar: bar\r\n\r\n");
   auto status = codec_->dispatch(buffer);
   EXPECT_TRUE(status.ok());
   EXPECT_EQ(0U, buffer.length());
@@ -1391,7 +1417,7 @@ TEST_P(Http1ServerConnectionImplTest, HeaderNameWithUnderscoreAreDropped) {
   EXPECT_CALL(decoder, decodeHeaders_(HeaderMapEqual(&expected_headers), true));
 #endif
 
-  Buffer::OwnedImpl buffer(absl::StrCat("GET / HTTP/1.1\r\nHOST: h.com\r\nfoo_bar: bar\r\n\r\n"));
+  Buffer::OwnedImpl buffer("GET / HTTP/1.1\r\nHOST: h.com\r\nfoo_bar: bar\r\n\r\n");
   auto status = codec_->dispatch(buffer);
   EXPECT_TRUE(status.ok());
   EXPECT_EQ(0U, buffer.length());
@@ -1434,7 +1460,7 @@ TEST_P(Http1ServerConnectionImplTest, HeaderNameWithUnderscoreCauseRequestReject
   EXPECT_CALL(decoder, sendLocalReply(_, _, _, _, _));
 #endif
 
-  Buffer::OwnedImpl buffer(absl::StrCat("GET / HTTP/1.1\r\nHOST: h.com\r\nfoo_bar: bar\r\n\r\n"));
+  Buffer::OwnedImpl buffer("GET / HTTP/1.1\r\nHOST: h.com\r\nfoo_bar: bar\r\n\r\n");
   auto status = codec_->dispatch(buffer);
 #ifdef ENVOY_ENABLE_UHV
   // With header validator enabled, request and connection are rejected at the HCM level and
@@ -1459,7 +1485,7 @@ TEST_P(Http1ServerConnectionImplTest, HeaderInvalidAuthority) {
         response_encoder = &encoder;
         return decoder;
       }));
-  Buffer::OwnedImpl buffer(absl::StrCat("GET / HTTP/1.1\r\nHOST: h.\"com\r\n\r\n"));
+  Buffer::OwnedImpl buffer("GET / HTTP/1.1\r\nHOST: h.\"com\r\n\r\n");
   EXPECT_CALL(decoder, sendLocalReply(_, _, _, _, _));
   auto status = codec_->dispatch(buffer);
   EXPECT_TRUE(isCodecProtocolError(status));
@@ -3947,6 +3973,13 @@ TEST_P(Http1ServerConnectionImplTest, ValidMethodFirstCharacter) {
 
 // Receiving a first byte that cannot start a valid method name is an error.
 TEST_P(Http1ServerConnectionImplTest, InvalidMethodFirstCharacter) {
+#ifdef ENVOY_ENABLE_UHV
+  if (parser_impl_ == Http1ParserImpl::BalsaParser) {
+    // BalsaParser allows custom methods if UHV is enabled.
+    return;
+  }
+#endif
+
   initialize();
 
   StrictMock<MockRequestDecoder> decoder;
