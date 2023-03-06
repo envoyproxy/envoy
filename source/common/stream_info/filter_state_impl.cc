@@ -12,6 +12,7 @@ void FilterStateImpl::setData(absl::string_view data_name, std::shared_ptr<Objec
     if (hasDataWithNameInternally(data_name)) {
       IS_ENVOY_BUG(
           "FilterState::setData<T> called twice with conflicting life_span on the same data_name.");
+      return;
     }
     maybeCreateParent(ParentAccessMode::ReadWrite);
     parent_->setData(data_name, data, state_type, life_span, stream_sharing);
@@ -20,6 +21,7 @@ void FilterStateImpl::setData(absl::string_view data_name, std::shared_ptr<Objec
   if (parent_ && parent_->hasDataWithName(data_name)) {
     IS_ENVOY_BUG(
         "FilterState::setData<T> called twice with conflicting life_span on the same data_name.");
+    return;
   }
   const auto& it = data_storage_.find(data_name);
   if (it != data_storage_.end()) {
@@ -29,10 +31,12 @@ void FilterStateImpl::setData(absl::string_view data_name, std::shared_ptr<Objec
     const FilterStateImpl::FilterObject* current = it->second.get();
     if (current->state_type_ == FilterState::StateType::ReadOnly) {
       IS_ENVOY_BUG("FilterState::setData<T> called twice on same ReadOnly state.");
+      return;
     }
 
     if (current->state_type_ != state_type) {
       IS_ENVOY_BUG("FilterState::setData<T> called twice with different state types.");
+      return;
     }
   }
 
@@ -80,6 +84,8 @@ FilterStateImpl::getDataSharedMutableGeneric(absl::string_view data_name) {
   FilterStateImpl::FilterObject* current = it->second.get();
   if (current->state_type_ == FilterState::StateType::ReadOnly) {
     IS_ENVOY_BUG("FilterState tried to access immutable data as mutable.");
+    // To reduce the chances of a crash, allow the mutation in this case instead of returning a
+    // nullptr.
   }
 
   return current->data_;
