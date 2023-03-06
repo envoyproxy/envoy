@@ -515,12 +515,6 @@ TEST(RoleBasedAccessControlMatcherEngineImpl, AllowedAllowlist) {
       Envoy::Network::Utility::parseInternetAddress("1.2.3.4", 123, false);
   stream_info.downstream_connection_info_provider_->setLocalAddress(addr);
 
-  // ON_CALL(stream_info,
-  // downstreamAddressProvider()).WillByDefault(ReturnPointee(stream_info.downstream_connection_info_provider_));
-  // ON_CALL(conn, streamInfo()).WillByDefault(ReturnRef(stream_info));
-  // ON_CALL(conn.streamInfo(),
-  // downstreamAddressProvider()).WillByDefault(ReturnRef(stream_info.downstreamAddressProvider()));
-  // EXPECT_CALL(conn, streamInfo()).WillRepeatedly(ReturnRef(stream_info));
   EXPECT_CALL(stream_info, downstreamAddressProvider())
       .WillRepeatedly(ReturnRef(stream_info.downstreamAddressProvider()));
 

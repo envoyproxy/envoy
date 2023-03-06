@@ -36,13 +36,6 @@ TEST(MatchingData, DestinationIPInput) {
 }
 
 TEST(MatchingData, HttpDestinationIPInput) {
-  // ConnectionInfoSetterImpl connection_info_provider(
-  //     std::make_shared<Address::Ipv4Instance>("127.0.0.1", 8080),
-  //     std::make_shared<Address::Ipv4Instance>("10.0.0.1", 9090));
-  // connection_info_provider.setDirectRemoteAddressForTest(
-  //     std::make_shared<Network::Address::Ipv4Instance>("127.0.0.2", 8081));
-  // auto host = "example.com";
-  // connection_info_provider.setRequestedServerName(host);
   auto connection_info_provider = std::make_shared<Network::ConnectionInfoSetterImpl>(
       std::make_shared<Address::Ipv4Instance>("127.0.0.1", 8080),
       std::make_shared<Address::Ipv4Instance>("10.0.0.1", 9090));
