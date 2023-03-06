@@ -15,7 +15,8 @@ For the meaning of the headers please refer to the pages below.
 .. note::
   This filter is only used to respond the preflight OPTIONS requests. Any non-OPTIONS request or illegal OPTIONS
   request will be ignored and passed to the next filter in the filter chain.
-  In addition, this filter will be bypassed if the direct response or route redirect is configured for the route.
+
+  In addition, this filter will be bypassed if a direct response or route redirect is configured for the route.
 
 
 .. _cors-runtime:
