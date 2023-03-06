@@ -139,8 +139,15 @@ CAPIStatus envoyGoFilterHttpSetTrailer(void* r, void* key, void* value) {
 
 CAPIStatus envoyGoFilterHttpGetStringValue(void* r, int id, void* value) {
   return envoyGoFilterHandlerWrapper(r, [id, value](std::shared_ptr<Filter>& filter) -> CAPIStatus {
-    auto valueStr = reinterpret_cast<GoString*>(value);
-    return filter->getStringValue(id, valueStr);
+    auto value_str = reinterpret_cast<GoString*>(value);
+    return filter->getStringValue(id, value_str);
+  });
+}
+
+CAPIStatus envoyGoFilterHttpGetIntegerValue(void* r, int id, void* value) {
+  return envoyGoFilterHandlerWrapper(r, [id, value](std::shared_ptr<Filter>& filter) -> CAPIStatus {
+    auto value_int = reinterpret_cast<uint64_t*>(value);
+    return filter->getIntegerValue(id, value_int);
   });
 }
 

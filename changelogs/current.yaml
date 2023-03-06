@@ -145,9 +145,15 @@ new_features:
   change: |
     added :ref:`failed_status_in_metadata <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.JwtProvider.failed_status_in_metadata>` to support setting the JWT
     authentication failure status code and message in dynamic metadata.
+- area: matching
+  change: |
+    added :ref:`Filter State Input <envoy_v3_api_msg_extensions.matching.common_inputs.network.v3.FilterStateInput>` for matching based on filter state objects.
 - area: http
   change: |
     make adding ProxyProtocolFilterState in the HCM optional.
+- area: sni_dynamic_forward_proxy
+  change: |
+    added an option to dynamically set the port used by the SNI dynamic forward proxy filter, by setting a filter state object under the key ``envoy.upstream.dynamic_port``.
 - area: http
   change: |
     add :ref:`periodic access logging <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.access_log_flush_interval>`
