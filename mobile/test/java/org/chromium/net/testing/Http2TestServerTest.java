@@ -9,7 +9,7 @@ import static org.junit.Assert.assertNotNull;
 import android.content.Context;
 import androidx.test.core.app.ApplicationProvider;
 import androidx.test.ext.junit.runners.AndroidJUnit4;
-import org.chromium.net.AndroidNetworkLibrary;
+import io.envoyproxy.envoymobile.utilities.AndroidNetworkLibrary;
 import io.envoyproxy.envoymobile.AndroidEngineBuilder;
 import io.envoyproxy.envoymobile.Engine;
 import io.envoyproxy.envoymobile.EnvoyError;
@@ -41,7 +41,7 @@ import org.junit.runner.RunWith;
 import org.robolectric.RobolectricTestRunner;
 import java.nio.charset.StandardCharsets;
 import org.chromium.net.testing.CertTestUtil;
-import org.chromium.net.FakeX509Util;
+import io.envoyproxy.envoymobile.utilities.FakeX509Util;
 
 @RunWith(RobolectricTestRunner.class)
 public class Http2TestServerTest {

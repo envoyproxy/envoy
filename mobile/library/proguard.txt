@@ -11,11 +11,11 @@
     native <methods>;
 }
 
--keep, includedescriptorclasses class org.chromium.net.AndroidNetworkLibrary {
+-keep, includedescriptorclasses class io.envoyproxy.envoymobile.AndroidNetworkLibrary {
    <methods>;
 }
 
--keep, includedescriptorclasses class org.chromium.net.AndroidCertVerifyResult {
+-keep, includedescriptorclasses class io.envoyproxy.envoymobile.AndroidCertVerifyResult {
    <methods>;
 }
 
