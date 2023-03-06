@@ -2453,6 +2453,7 @@ TEST_F(HttpConnectionManagerImplTest, TestPeriodicAccessLogging) {
             EXPECT_EQ(&decoder_->streamInfo(), &stream_info);
             EXPECT_THAT(request_headers, testing::NotNull());
             EXPECT_THAT(response_headers, testing::IsNull());
+            EXPECT_EQ(stream_info.requestComplete(), absl::nullopt);
           }));
   // Pretend like some 30s has passed, and the log should be written.
   EXPECT_CALL(*periodic_log_timer, enableTimer(*access_log_flush_interval_, _)).Times(2);
@@ -2474,7 +2475,7 @@ TEST_F(HttpConnectionManagerImplTest, TestPeriodicAccessLogging) {
   filter->callbacks_->encodeHeaders(std::move(response_headers), true, "details");
 }
 
-TEST_F(HttpConnectionManagerImplTest, TestNoPeriodicAccessLoggingWithRequestComplee) {
+TEST_F(HttpConnectionManagerImplTest, TestNoPeriodicAccessLoggingWithRequestComplete) {
   access_log_flush_interval_ = std::chrono::milliseconds(30 * 1000);
   stream_idle_timeout_ = std::chrono::milliseconds(0);
   request_timeout_ = std::chrono::milliseconds(0);
