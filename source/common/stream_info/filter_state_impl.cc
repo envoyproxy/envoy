@@ -10,8 +10,8 @@ void FilterStateImpl::setData(absl::string_view data_name, std::shared_ptr<Objec
                               FilterState::StreamSharing stream_sharing) {
   if (life_span > life_span_) {
     if (hasDataWithNameInternally(data_name)) {
-      IS_ENVOY_BUG(
-          "FilterState::setData<T> called twice with conflicting life_span on the same data_name.");
+      IS_ENVOY_BUG("FilterStateAccessViolation: FilterState::setData<T> called twice with "
+                   "conflicting life_span on the same data_name.");
       return;
     }
     maybeCreateParent(ParentAccessMode::ReadWrite);
@@ -19,8 +19,8 @@ void FilterStateImpl::setData(absl::string_view data_name, std::shared_ptr<Objec
     return;
   }
   if (parent_ && parent_->hasDataWithName(data_name)) {
-    IS_ENVOY_BUG(
-        "FilterState::setData<T> called twice with conflicting life_span on the same data_name.");
+    IS_ENVOY_BUG("FilterStateAccessViolation: FilterState::setData<T> called twice with "
+                 "conflicting life_span on the same data_name.");
     return;
   }
   const auto& it = data_storage_.find(data_name);
@@ -30,12 +30,14 @@ void FilterStateImpl::setData(absl::string_view data_name, std::shared_ptr<Objec
     // cannot be overwritten by readonly data.
     const FilterStateImpl::FilterObject* current = it->second.get();
     if (current->state_type_ == FilterState::StateType::ReadOnly) {
-      IS_ENVOY_BUG("FilterState::setData<T> called twice on same ReadOnly state.");
+      IS_ENVOY_BUG("FilterStateAccessViolation: FilterState::setData<T> called twice on same "
+                   "ReadOnly state.");
       return;
     }
 
     if (current->state_type_ != state_type) {
-      IS_ENVOY_BUG("FilterState::setData<T> called twice with different state types.");
+      IS_ENVOY_BUG("FilterStateAccessViolation: FilterState::setData<T> called twice with "
+                   "different state types.");
       return;
     }
   }
@@ -83,7 +85,8 @@ FilterStateImpl::getDataSharedMutableGeneric(absl::string_view data_name) {
 
   FilterStateImpl::FilterObject* current = it->second.get();
   if (current->state_type_ == FilterState::StateType::ReadOnly) {
-    IS_ENVOY_BUG("FilterState tried to access immutable data as mutable.");
+    IS_ENVOY_BUG(
+        "FilterStateAccessViolation: FilterState tried to access immutable data as mutable.");
     // To reduce the chances of a crash, allow the mutation in this case instead of returning a
     // nullptr.
   }
