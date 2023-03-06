@@ -219,8 +219,10 @@ class IntegrationTest(unittest.TestCase):
         count1 = 20
         partition2 = TopicPartition('bbbconsumer', 0)
         count2 = 30
-        self.__put_messages_into_upstream_kafka(IntegrationTest.kafka_cluster1_address(), partition1, count1)
-        self.__put_messages_into_upstream_kafka(IntegrationTest.kafka_cluster2_address(), partition2, count2)
+        self.__put_messages_into_upstream_kafka(
+            IntegrationTest.kafka_cluster1_address(), partition1, count1)
+        self.__put_messages_into_upstream_kafka(
+            IntegrationTest.kafka_cluster2_address(), partition2, count2)
 
         # Create Kafka consumers that point at Envoy.
         consumer1 = KafkaConsumer(bootstrap_servers=IntegrationTest.kafka_envoy_address())
