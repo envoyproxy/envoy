@@ -357,13 +357,11 @@ stages:
     displayName: Build and test
     condition: and(not(canceled()), ne(stageDependencies.env.repo.outputs['changed.mobileOnly'], 'true'), ne(stageDependencies.env.repo.outputs['changed.docsOnly'], 'true'))
     timeoutInMinutes: 120
-    pool:
-      vmImage: "ubuntu-20.04"
+    pool: x64-large
     steps:
-    - bash: .azure-pipelines/cleanup.sh
-      displayName: "Removing tools from agent"
     - template: bazel.yml
       parameters:
+        managedAgent: false
         ciTarget: bazel.release
 
   - job: released
