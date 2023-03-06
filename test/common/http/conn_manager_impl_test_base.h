@@ -28,10 +28,13 @@ using testing::NiceMock;
 namespace Envoy {
 namespace Http {
 
-class HttpConnectionManagerImplTest : public testing::Test, public ConnectionManagerConfig {
+// Base class for HttpConnectionManagerImpl related tests. This base class is used by tests under
+// common/http as well as test/extensions/filters/http/ext_proc/, to reuse the many mocks/default
+// impls of ConnectionManagerConfig that we need to provide to HttpConnectionManagerImpl.
+class HttpConnectionManagerImplMixin : public ConnectionManagerConfig {
 public:
-  HttpConnectionManagerImplTest();
-  ~HttpConnectionManagerImplTest() override;
+  HttpConnectionManagerImplMixin();
+  ~HttpConnectionManagerImplMixin() override;
   Tracing::CustomTagConstSharedPtr requestHeaderCustomTag(const std::string& header);
   void setup(bool ssl, const std::string& server_name, bool tracing = true, bool use_srds = false);
   void setupFilterChain(int num_decoder_filters, int num_encoder_filters, int num_requests = 1);
@@ -156,6 +159,9 @@ public:
     return header_validator_factory_.create(protocol, header_validator_stats_);
   }
   bool appendXForwardedPort() const override { return false; }
+  bool addProxyProtocolConnectionState() const override {
+    return add_proxy_protocol_connection_state_;
+  }
 
   // Simple helper to wrapper filter to the factory function.
   FilterFactoryCb createDecoderFilterFactoryCb(StreamDecoderFilterSharedPtr filter) {
@@ -224,6 +230,7 @@ public:
       std::make_shared<NiceMock<Tracing::MockTracer>>()};
   TracingConnectionManagerConfigPtr tracing_config_;
   SlowDateProviderImpl date_provider_{test_time_.timeSystem()};
+  NiceMock<MockStream> stream_;
   Http::StreamCallbacks* stream_callbacks_{nullptr};
   NiceMock<Upstream::MockClusterManager> cluster_manager_;
   NiceMock<Server::MockOverloadManager> overload_manager_;
@@ -245,9 +252,11 @@ public:
   RequestIDExtensionSharedPtr request_id_extension_;
   std::vector<Http::OriginalIPDetectionSharedPtr> ip_detection_extensions_{};
   std::vector<Http::EarlyHeaderMutationPtr> early_header_mutations_{};
+  bool add_proxy_protocol_connection_state_ = true;
 
   const LocalReply::LocalReplyPtr local_reply_;
 
+  // TODO(mattklein123): Not all tests have been converted over to better setup. Convert the rest.
   NiceMock<MockResponseEncoder> response_encoder_;
   std::vector<MockStreamDecoderFilter*> decoder_filters_;
   std::vector<MockStreamEncoderFilter*> encoder_filters_;
@@ -262,5 +271,7 @@ public:
   NiceMock<MockHeaderValidatorStats> header_validator_stats_;
 };
 
+class HttpConnectionManagerImplTest : public HttpConnectionManagerImplMixin,
+                                      public testing::Test {};
 } // namespace Http
 } // namespace Envoy

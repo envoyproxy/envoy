@@ -146,6 +146,9 @@ void DecoderImpl::decodeOnData(Buffer::Instance& data, uint64_t& offset) {
   case OpCodes::SetWatches:
     parseSetWatchesRequest(data, offset, len);
     break;
+  case OpCodes::SetWatches2:
+    parseSetWatches2Request(data, offset, len);
+    break;
   case OpCodes::CheckWatches:
     parseXWatchesRequest(data, offset, len, OpCodes::CheckWatches);
     break;
@@ -428,7 +431,7 @@ void DecoderImpl::parseReconfigRequest(Buffer::Instance& data, uint64_t& offset,
 }
 
 void DecoderImpl::parseSetWatchesRequest(Buffer::Instance& data, uint64_t& offset, uint32_t len) {
-  ensureMinLength(len, XID_LENGTH + OPCODE_LENGTH + (3 * INT_LENGTH));
+  ensureMinLength(len, XID_LENGTH + OPCODE_LENGTH + LONG_LENGTH + (3 * INT_LENGTH));
 
   // Ignore relative Zxid.
   helper_.peekInt64(data, offset);
@@ -440,6 +443,25 @@ void DecoderImpl::parseSetWatchesRequest(Buffer::Instance& data, uint64_t& offse
   skipStrings(data, offset);
 
   callbacks_.onSetWatchesRequest();
+}
+
+void DecoderImpl::parseSetWatches2Request(Buffer::Instance& data, uint64_t& offset, uint32_t len) {
+  ensureMinLength(len, XID_LENGTH + OPCODE_LENGTH + LONG_LENGTH + (5 * INT_LENGTH));
+
+  // Ignore relative Zxid.
+  helper_.peekInt64(data, offset);
+  // Data watches.
+  skipStrings(data, offset);
+  // Exist watches.
+  skipStrings(data, offset);
+  // Child watches.
+  skipStrings(data, offset);
+  // Persistent watches.
+  skipStrings(data, offset);
+  // Persistent recursive watches.
+  skipStrings(data, offset);
+
+  callbacks_.onSetWatches2Request();
 }
 
 void DecoderImpl::parseXWatchesRequest(Buffer::Instance& data, uint64_t& offset, uint32_t len,

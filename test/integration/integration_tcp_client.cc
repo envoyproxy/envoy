@@ -80,7 +80,7 @@ void IntegrationTcpClient::waitForData(const std::string& data, bool exact_match
     return;
   }
 
-  payload_reader_->set_data_to_wait_for(data, exact_match);
+  payload_reader_->setDataToWaitFor(data, exact_match);
   connection_->dispatcher().run(Event::Dispatcher::RunType::Block);
 }
 

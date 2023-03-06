@@ -214,6 +214,22 @@ typed_config:
     // check route name in encode phase
     EXPECT_EQ("test-route-name", getHeader(response->headers(), "rsp-route-name"));
 
+    // check route name in encode phase
+    EXPECT_EQ("HTTP/1.1", getHeader(response->headers(), "rsp-protocol"));
+
+    // check filter chain name in encode phase, exists.
+    EXPECT_EQ(false,
+              response->headers().get(Http::LowerCaseString("rsp-filter-chain-name")).empty());
+
+    // check response code in encode phase, not exists.
+    EXPECT_EQ(true, response->headers().get(Http::LowerCaseString("rsp-response-code")).empty());
+
+    // check response code details in encode phase
+    EXPECT_EQ("via_upstream", getHeader(response->headers(), "rsp-response-code-details"));
+
+    // check response code details in encode phase
+    EXPECT_EQ("1", getHeader(response->headers(), "rsp-attempt-count"));
+
     // verify path
     EXPECT_EQ(path, getHeader(response->headers(), "test-path"));
 
@@ -503,15 +519,16 @@ TEST_P(GolangIntegrationTest, LuaRespondAfterGoHeaderContinue) {
 name: envoy.filters.http.lua
 typed_config:
   "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.Lua
-  inline_code: |
-    function envoy_on_request(handle)
-      local orig_header = handle:headers():get('x-test-header-0')
-      local go_header = handle:headers():get('test-x-set-header-0')
-      handle:respond({[":status"] = "403"}, "forbidden from lua, orig header: "
-        .. (orig_header or "nil")
-        .. ", go header: "
-        .. (go_header or "nil"))
-    end
+  default_source_code:
+    inline_string: |
+        function envoy_on_request(handle)
+        local orig_header = handle:headers():get('x-test-header-0')
+        local go_header = handle:headers():get('test-x-set-header-0')
+        handle:respond({[":status"] = "403"}, "forbidden from lua, orig header: "
+            .. (orig_header or "nil")
+            .. ", go header: "
+            .. (go_header or "nil"))
+        end
 )EOF";
   config_helper_.prependFilter(LUA_RESPOND);
 

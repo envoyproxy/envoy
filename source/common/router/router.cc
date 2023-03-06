@@ -423,16 +423,16 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
         direct_response->responseCode(), direct_response->responseBody(),
         [this, direct_response,
          &request_headers = headers](Http::ResponseHeaderMap& response_headers) -> void {
-          std::string new_path;
+          std::string new_uri;
           if (request_headers.Path()) {
-            new_path = direct_response->newPath(request_headers);
+            new_uri = direct_response->newUri(request_headers);
           }
           // See https://tools.ietf.org/html/rfc7231#section-7.1.2.
           const auto add_location =
               direct_response->responseCode() == Http::Code::Created ||
               Http::CodeUtility::is3xx(enumToInt(direct_response->responseCode()));
-          if (!new_path.empty() && add_location) {
-            response_headers.addReferenceKey(Http::Headers::get().Location, new_path);
+          if (!new_uri.empty() && add_location) {
+            response_headers.addReferenceKey(Http::Headers::get().Location, new_uri);
           }
           direct_response->finalizeResponseHeaders(response_headers, callbacks_->streamInfo());
         },

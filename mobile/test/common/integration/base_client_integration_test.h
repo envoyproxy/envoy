@@ -2,11 +2,11 @@
 
 #include "test/integration/integration.h"
 
-#include "library/cc/engine_builder.h"
 #include "library/cc/stream.h"
 #include "library/cc/stream_prototype.h"
 #include "library/common/http/client.h"
 #include "library/common/types/c_types.h"
+#include "test_engine_builder.h"
 
 namespace Envoy {
 
@@ -51,13 +51,7 @@ protected:
   virtual void initialize() override;
   void createEnvoy() override;
   void threadRoutine(absl::Notification& engine_running);
-  // helpers to access protected functions in the friend class
-  void setOverrideConfigForTests(Platform::EngineBuilder builder, std::string config) {
-    builder.setOverrideConfigForTests(config);
-  }
-  void setAdminAddressPathForTests(Platform::EngineBuilder& builder, std::string admin) {
-    builder.setAdminAddressPathForTests(admin);
-  }
+
   // Converts TestRequestHeaderMapImpl to Envoy::Platform::RequestHeadersSharedPtr
   Envoy::Platform::RequestHeadersSharedPtr
   envoyToMobileHeaders(const Http::TestRequestHeaderMapImpl& request_headers);
@@ -86,7 +80,7 @@ protected:
   bool override_builder_config_ = false;
   // True if data plane requests are expected in the test; false otherwise.
   bool expect_data_streams_ = true;
-  Platform::EngineBuilder builder_;
+  TestEngineBuilder builder_;
 };
 
 } // namespace Envoy

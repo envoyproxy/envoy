@@ -92,6 +92,10 @@ TEST_F(StreamInfoImplTest, TimingTest) {
   info.downstreamTiming().onDownstreamHandshakeComplete(test_time_.timeSystem());
   dur = checkDuration(dur, timing.downstreamHandshakeComplete());
 
+  EXPECT_FALSE(timing.upstreamHandshakeComplete());
+  upstream_timing.onUpstreamHandshakeComplete(test_time_.timeSystem());
+  dur = checkDuration(dur, timing.upstreamHandshakeComplete());
+
   EXPECT_FALSE(timing.lastDownstreamAckReceived());
   info.downstreamTiming().onLastDownstreamAckReceived(test_time_.timeSystem());
   dur = checkDuration(dur, timing.lastDownstreamAckReceived());
@@ -294,6 +298,8 @@ TEST_F(StreamInfoImplTest, SetFrom) {
   s1.setFilterChainName("foobar");
   s1.setAttemptCount(5);
   s1.setDownstreamTransportFailureReason("error");
+  s1.addBytesSent(1);
+  s1.setIsShadow(true);
 
 #ifdef __clang__
 #if defined(__linux__)
@@ -346,6 +352,8 @@ TEST_F(StreamInfoImplTest, SetFrom) {
   EXPECT_EQ(s1.filterChainName(), s2.filterChainName());
   EXPECT_EQ(s1.attemptCount(), s2.attemptCount());
   EXPECT_EQ(s1.getUpstreamBytesMeter(), s2.getUpstreamBytesMeter());
+  EXPECT_EQ(s1.bytesSent(), s2.bytesSent());
+  EXPECT_EQ(s1.isShadow(), s2.isShadow());
 }
 
 TEST_F(StreamInfoImplTest, DynamicMetadataTest) {
