@@ -5,7 +5,8 @@ namespace Platform {
 
 namespace {
 
-void c_on_engine_running(void* context) {
+void c_on_engine_running(void* context, int tag) {
+  (void)tag;
   auto engine_callbacks = *static_cast<EngineCallbacksSharedPtr*>(context);
   engine_callbacks->on_engine_running();
 }
@@ -22,6 +23,7 @@ envoy_engine_callbacks EngineCallbacks::asEnvoyEngineCallbacks() {
       &c_on_engine_running,
       &c_on_exit,
       new EngineCallbacksSharedPtr(shared_from_this()),
+      0,
   };
 }
 

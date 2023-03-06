@@ -55,13 +55,13 @@ envoy_status_t Engine::main(std::unique_ptr<Envoy::OptionsImpl>&& options) {
             Assert::addDebugAssertionFailureRecordAction([this](const char* location) {
               const auto event = Bridge::Utility::makeEnvoyMap(
                   {{"name", "assertion"}, {"location", std::string(location)}});
-              event_tracker_.track(event, event_tracker_.context);
+              event_tracker_.track(event, event_tracker_.context, event_tracker_.tag);
             });
         bug_handler_registration_ =
             Assert::addEnvoyBugFailureRecordAction([this](const char* location) {
               const auto event = Bridge::Utility::makeEnvoyMap(
                   {{"name", "bug"}, {"location", std::string(location)}});
-              event_tracker_.track(event, event_tracker_.context);
+              event_tracker_.track(event, event_tracker_.context, event_tracker_.tag);
             });
       }
 
@@ -116,7 +116,7 @@ envoy_status_t Engine::main(std::unique_ptr<Envoy::OptionsImpl>&& options) {
                                                         server_->api().randomGenerator());
           dispatcher_->drain(server_->dispatcher());
           if (callbacks_.on_engine_running != nullptr) {
-            callbacks_.on_engine_running(callbacks_.context);
+            callbacks_.on_engine_running(callbacks_.context, callbacks_.tag);
           }
         });
   } // mutex_

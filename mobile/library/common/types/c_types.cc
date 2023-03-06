@@ -26,7 +26,7 @@ void* safe_calloc(size_t count, size_t size) {
 
 void envoy_noop_release(void* context) { (void)context; }
 
-void envoy_noop_const_release(const void* context) { (void)context; }
+void envoy_noop_const_release(const void* context, int tag) { (void)context; (void)tag; }
 
 void release_envoy_data(envoy_data data) { data.release(data.context); }
 

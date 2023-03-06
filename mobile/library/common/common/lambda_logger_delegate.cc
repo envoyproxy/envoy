@@ -17,7 +17,7 @@ void EventTrackingDelegate::logWithStableName(absl::string_view stable_name, abs
   event_tracker_.track(Bridge::Utility::makeEnvoyMap({{"name", "event_log"},
                                                       {"log_name", std::string(stable_name)},
                                                       {"message", std::string(msg)}}),
-                       event_tracker_.context);
+                       event_tracker_.context, event_tracker_.tag);
 }
 
 LambdaDelegate::LambdaDelegate(envoy_logger logger, DelegatingLogSinkSharedPtr log_sink)
@@ -27,11 +27,11 @@ LambdaDelegate::LambdaDelegate(envoy_logger logger, DelegatingLogSinkSharedPtr l
 
 LambdaDelegate::~LambdaDelegate() {
   restoreDelegate();
-  logger_.release(logger_.context);
+  logger_.release(logger_.context, logger_.tag);
 }
 
 void LambdaDelegate::log(absl::string_view msg, const spdlog::details::log_msg&) {
-  logger_.log(Data::Utility::copyToBridgeData(msg), logger_.context);
+  logger_.log(Data::Utility::copyToBridgeData(msg), logger_.context, logger_.tag);
 }
 
 DefaultDelegate::DefaultDelegate(absl::Mutex& mutex, DelegatingLogSinkSharedPtr log_sink)

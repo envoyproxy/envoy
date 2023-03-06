@@ -20,7 +20,8 @@
 - (std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap>)generateBootstrap;
 @end
 
-static void ios_on_engine_running(void *context) {
+static void ios_on_engine_running(void *context, int tag) {
+  (void)tag;
   // This code block runs inside the Envoy event loop. Therefore, an explicit autoreleasepool block
   // is necessary to act as a breaker for any Objective-C allocation that happens.
   @autoreleasepool {
@@ -39,7 +40,8 @@ static void ios_on_exit(void *context) {
   }
 }
 
-static void ios_on_log(envoy_data data, const void *context) {
+static void ios_on_log(envoy_data data, const void *context, int tag) {
+  (void)tag;
   // This code block runs inside the Envoy event loop. Therefore, an explicit autoreleasepool block
   // is necessary to act as a breaker for any Objective-C allocation that happens.
   @autoreleasepool {
@@ -48,7 +50,10 @@ static void ios_on_log(envoy_data data, const void *context) {
   }
 }
 
-static void ios_on_logger_release(const void *context) { CFRelease(context); }
+static void ios_on_logger_release(const void *context, int tag) {
+  (void)tag;
+  CFRelease(context);
+}
 
 static const void *ios_http_filter_init(const void *context) {
   // This code block runs inside the Envoy event loop. Therefore, an explicit autoreleasepool block
@@ -389,7 +394,8 @@ static envoy_data ios_get_string(const void *context) {
   return toManagedNativeString(accessor.getEnvoyString());
 }
 
-static void ios_track_event(envoy_map map, const void *context) {
+static void ios_track_event(envoy_map map, const void *context, int tag) {
+  (void)tag;
   // This code block runs inside the Envoy event loop. Therefore, an explicit autoreleasepool block
   // is necessary to act as a breaker for any Objective-C allocation that happens.
   @autoreleasepool {

@@ -92,7 +92,7 @@ void envoy_noop_release(void* context);
 /**
  * Const version of no-op release callback.
  */
-void envoy_noop_const_release(const void* context);
+void envoy_noop_const_release(const void* context, int tag);
 
 #ifdef __cplusplus
 } // release function
@@ -413,7 +413,7 @@ typedef void (*envoy_on_exit_f)(void* context);
  * @param context, contains the necessary state to carry out platform-specific dispatch and
  * execution.
  */
-typedef void (*envoy_on_engine_running_f)(void* context);
+typedef void (*envoy_on_engine_running_f)(void* context, int tag);
 
 /**
  * Called when envoy's logger logs data.
@@ -422,7 +422,7 @@ typedef void (*envoy_on_engine_running_f)(void* context);
  * @param context, contains the necessary state to carry out platform-specific dispatch and
  * execution.
  */
-typedef void (*envoy_logger_log_f)(envoy_data data, const void* context);
+typedef void (*envoy_logger_log_f)(envoy_data data, const void* context, int tag);
 
 /**
  * Called when Envoy is done with the logger.
@@ -430,7 +430,7 @@ typedef void (*envoy_logger_log_f)(envoy_data data, const void* context);
  * @param context, contains the necessary state to carry out platform-specific dispatch and
  * execution.
  */
-typedef void (*envoy_logger_release_f)(const void* context);
+typedef void (*envoy_logger_release_f)(const void* context, int tag);
 
 /**
  * Callback signature which notify when there is buffer available for request
@@ -455,7 +455,7 @@ typedef void* (*envoy_on_send_window_available_f)(envoy_stream_intel stream_inte
  * @param context, contains the necessary state to carry out platform-specific dispatch and
  * execution.
  */
-typedef void (*envoy_event_tracker_track_f)(envoy_map event, const void* context);
+typedef void (*envoy_event_tracker_track_f)(envoy_map event, const void* context, int tag);
 
 #ifdef __cplusplus
 } // function pointers
@@ -485,6 +485,8 @@ typedef struct {
   envoy_on_exit_f on_exit;
   // Context passed through to callbacks to provide dispatch and execution state.
   void* context;
+  // Tag to disambiguate between instances of this struct.
+  int tag;
 } envoy_engine_callbacks;
 
 /**
@@ -495,6 +497,8 @@ typedef struct {
   envoy_logger_release_f release;
   // Context passed through to callbacks to provide dispatch and execution state.
   const void* context;
+  // Tag to disambiguate between instances of this struct.
+  int tag;
 } envoy_logger;
 
 /**
@@ -504,6 +508,8 @@ typedef struct {
   envoy_event_tracker_track_f track;
   // Context passed through to callbacks to provide dispatch and execution state.
   const void* context;
+  // Tag to disambiguate between instances of this struct.
+  int tag;
 } envoy_event_tracker;
 
 /**
