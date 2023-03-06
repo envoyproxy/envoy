@@ -91,7 +91,7 @@ namespace Envoy {
 #if defined(NDEBUG) || defined(ENVOY_CONFIG_COVERAGE)
 // ENVOY_BUGs in release mode or in a coverage test log error.
 // Log messages are emitted every power-of-2 occurrences. If a test triggers the same
-// ENVOY_BUG multiple times, it may not trigger correctly, so reset everytime.
+// ENVOY_BUG multiple times, it may not trigger correctly, so reset every time.
 #define EXPECT_ENVOY_BUG(statement, message)                                                       \
   Assert::resetEnvoyBugCountersForTest();                                                          \
   EXPECT_LOG_CONTAINS("error", message, statement)
