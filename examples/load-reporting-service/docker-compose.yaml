@@ -14,7 +14,7 @@ services:
       context: .
       dockerfile: Dockerfile-envoy
     ports:
-    - "${PORT_PROXY0:-80}-${PORT_PROXY0:-81}:80"
+    - "${PORT_PROXY0:-80}-${PORT_PROXY1:-81}:80"
     - "${PORT_ADMIN:-8081}:8081"
     depends_on:
       http_service:
