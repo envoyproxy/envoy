@@ -798,6 +798,43 @@ CAPIStatus Filter::setTrailer(absl::string_view key, absl::string_view value) {
   return CAPIStatus::CAPIOK;
 }
 
+CAPIStatus Filter::getIntegerValue(int id, uint64_t* value) {
+  Thread::LockGuard lock(mutex_);
+  if (has_destroyed_) {
+    ENVOY_LOG(debug, "golang filter has been destroyed");
+    return CAPIStatus::CAPIFilterIsDestroy;
+  }
+  auto& state = getProcessorState();
+  if (!state.isProcessingInGo()) {
+    ENVOY_LOG(debug, "golang filter is not processing Go");
+    return CAPIStatus::CAPINotInGo;
+  }
+
+  switch (static_cast<EnvoyValue>(id)) {
+  case EnvoyValue::Protocol:
+    if (!state.streamInfo().protocol().has_value()) {
+      return CAPIStatus::CAPIValueNotFound;
+    }
+    *value = static_cast<uint64_t>(state.streamInfo().protocol().value());
+    break;
+  case EnvoyValue::ResponseCode:
+    if (!state.streamInfo().responseCode().has_value()) {
+      return CAPIStatus::CAPIValueNotFound;
+    }
+    *value = state.streamInfo().responseCode().value();
+    break;
+  case EnvoyValue::AttemptCount:
+    if (!state.streamInfo().attemptCount().has_value()) {
+      return CAPIStatus::CAPIValueNotFound;
+    }
+    *value = state.streamInfo().attemptCount().value();
+    break;
+  default:
+    RELEASE_ASSERT(false, absl::StrCat("invalid integer value id: ", id));
+  }
+  return CAPIStatus::CAPIOK;
+}
+
 CAPIStatus Filter::getStringValue(int id, GoString* value_str) {
   Thread::LockGuard lock(mutex_);
   if (has_destroyed_) {
@@ -809,13 +846,24 @@ CAPIStatus Filter::getStringValue(int id, GoString* value_str) {
     ENVOY_LOG(debug, "golang filter is not processing Go");
     return CAPIStatus::CAPINotInGo;
   }
-  switch (static_cast<StringValue>(id)) {
-  case StringValue::RouteName:
-    // string will copy to req->strValue, but not deep copy
-    req_->strValue = state.getRouteName();
+
+  // refer the string to req_->strValue, not deep clone, make sure it won't be freed while reading
+  // it on the Go side.
+  switch (static_cast<EnvoyValue>(id)) {
+  case EnvoyValue::RouteName:
+    req_->strValue = state.streamInfo().getRouteName();
+    break;
+  case EnvoyValue::FilterChainName:
+    req_->strValue = state.streamInfo().filterChainName();
+    break;
+  case EnvoyValue::ResponseCodeDetails:
+    if (!state.streamInfo().responseCodeDetails().has_value()) {
+      return CAPIStatus::CAPIValueNotFound;
+    }
+    req_->strValue = state.streamInfo().responseCodeDetails().value();
     break;
   default:
-    ASSERT(false, "invalid string value id");
+    RELEASE_ASSERT(false, absl::StrCat("invalid string value id: ", id));
   }
 
   value_str->p = req_->strValue.data();

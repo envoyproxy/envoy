@@ -162,6 +162,17 @@ func (f *filter) encodeHeaders(header api.ResponseHeaderMap, endStream bool) api
 	if strings.Contains(f.localreplay, "encode-header") {
 		return f.sendLocalReply("encode-header")
 	}
+
+	if protocol, ok := f.callbacks.StreamInfo().Protocol(); ok {
+		header.Set("rsp-protocol", protocol)
+	}
+	if code, ok := f.callbacks.StreamInfo().ResponseCode(); ok {
+		header.Set("rsp-response-code", strconv.Itoa(int(code)))
+	}
+	if details, ok := f.callbacks.StreamInfo().ResponseCodeDetails(); ok {
+		header.Set("rsp-response-code-details", details)
+	}
+
 	origin, found := header.Get("x-test-header-0")
 	hdrs := header.Values("x-test-header-0")
 	if found {
@@ -178,6 +189,8 @@ func (f *filter) encodeHeaders(header api.ResponseHeaderMap, endStream bool) api
 	header.Set("test-query-param-foo", f.query_params.Get("foo"))
 	header.Set("test-path", f.path)
 	header.Set("rsp-route-name", f.callbacks.StreamInfo().GetRouteName())
+	header.Set("rsp-filter-chain-name", f.callbacks.StreamInfo().FilterChainName())
+	header.Set("rsp-attempt-count", strconv.Itoa(int(f.callbacks.StreamInfo().AttemptCount())))
 
 	if f.panic == "encode-header" {
 		badcode()
