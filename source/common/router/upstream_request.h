@@ -144,6 +144,13 @@ public:
   void clearRequestEncoder();
   void onStreamMaxDurationReached();
 
+  // Either disable upstream reading immediately or defer it and keep tracking
+  // of how many read disabling has happened.
+  void readDisableOrDefer(bool disable);
+  // Called upon receiving the first response headers from the upstream. And
+  // applies read disabling to it if there is any pending read disabling.
+  void maybeHandleDeferredReadDisable();
+
   struct DownstreamWatermarkManager : public Http::DownstreamWatermarkCallbacks {
     DownstreamWatermarkManager(UpstreamRequest& parent) : parent_(parent) {}
 
@@ -255,6 +262,9 @@ private:
   // TODO(alyssawilk) remove these with allow_upstream_filters_
   Buffer::InstancePtr buffered_request_body_;
   Http::MetadataMapVector downstream_metadata_map_vector_;
+
+  bool upstream_wait_for_response_headers_before_disabling_read_ : 1;
+  size_t deferred_read_disabling_count_{0};
 };
 
 class UpstreamRequestFilterManagerCallbacks : public Http::FilterManagerCallbacks,
