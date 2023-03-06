@@ -49,10 +49,9 @@ Http::FilterHeadersStatus HeaderMutation::decodeHeaders(Http::RequestHeaderMap& 
 }
 
 Http::FilterHeadersStatus HeaderMutation::encodeHeaders(Http::ResponseHeaderMap& headers, bool) {
+  ASSERT(encoder_callbacks_->streamInfo().getRequestHeaders() != nullptr);
   const Http::RequestHeaderMap& request_headers =
-      encoder_callbacks_->streamInfo().getRequestHeaders() == nullptr
-          ? *Http::StaticEmptyHeaders::get().request_headers
-          : *encoder_callbacks_->streamInfo().getRequestHeaders();
+      *encoder_callbacks_->streamInfo().getRequestHeaders();
 
   config_->mutations().mutateResponseHeaders(request_headers, headers,
                                              encoder_callbacks_->streamInfo());
