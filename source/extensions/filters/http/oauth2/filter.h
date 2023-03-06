@@ -120,7 +120,7 @@ struct CookieNames {
   const std::string id_token_;
   const std::string refresh_token_;
 
-  static constexpr absl::string_view OauthExpires = "OauthExpires"; 
+  static constexpr absl::string_view OauthExpires = "OauthExpires";
   static constexpr absl::string_view IdToken = "IdToken";
   static constexpr absl::string_view RefreshToken = "RefreshToken";
 };

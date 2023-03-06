@@ -526,9 +526,8 @@ void OAuth2Filter::addResponseCookies(Http::ResponseHeaderMap& headers,
         Http::Headers::get().SetCookie,
         absl::StrCat(cookie_names.bearer_token_, "=", access_token_, cookie_tail));
     if (id_token_ != EMPTY_STRING) {
-      headers.addReferenceKey(
-          Http::Headers::get().SetCookie,
-          absl::StrCat(cookie_names.id_token_, "=", id_token_, cookie_tail));
+      headers.addReferenceKey(Http::Headers::get().SetCookie,
+                              absl::StrCat(cookie_names.id_token_, "=", id_token_, cookie_tail));
     }
 
     if (refresh_token_ != EMPTY_STRING) {
@@ -538,6 +537,7 @@ void OAuth2Filter::addResponseCookies(Http::ResponseHeaderMap& headers,
     }
   }
 }
+
 void OAuth2Filter::sendUnauthorizedResponse() {
   config_->stats().oauth_failure_.inc();
   decoder_callbacks_->sendLocalReply(Http::Code::Unauthorized, UnauthorizedBodyMessage, nullptr,
