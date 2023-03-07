@@ -54,12 +54,14 @@ def _py_proto_mapping(dep):
 # https://github.com/bazelbuild/bazel/issues/3935 and/or
 # https://github.com/bazelbuild/bazel/issues/2626 are resolved.
 def _api_py_proto_library(name, srcs = [], deps = []):
+    mapped_deps = [_py_proto_mapping(dep) for dep in deps]
+    mapped_unique_deps = {k: True for k in mapped_deps}.keys()
     _py_proto_library(
         name = name + _PY_PROTO_SUFFIX,
         srcs = srcs,
         default_runtime = "@com_google_protobuf//:protobuf_python",
         protoc = "@com_google_protobuf//:protoc",
-        deps = [_py_proto_mapping(dep) for dep in deps] + [
+        deps = mapped_unique_deps + [
             "@com_envoyproxy_protoc_gen_validate//validate:validate_py",
             "@com_google_googleapis//google/rpc:status_py_proto",
             "@com_google_googleapis//google/api:annotations_py_proto",
@@ -84,6 +86,11 @@ def py_proto_library(name, deps = [], plugin = None):
     # checked.proto depends on syntax.proto, we have to add this dependency manually as well.
     if name == "checked_py_proto":
         proto_deps = proto_deps + [":syntax_py_proto"]
+
+    # Special handling for expr_proto target
+    if srcs[0] == ":expr_moved.proto":
+        srcs = ["checked.proto", "eval.proto", "explain.proto", "syntax.proto", "value.proto"]
+        proto_deps = proto_deps + ["@com_google_googleapis//google/rpc:status_py_proto"]
 
     # py_proto_library does not support plugin as an argument yet at gRPC v1.25.0:
     # https://github.com/grpc/grpc/blob/v1.25.0/bazel/python_rules.bzl#L72.
@@ -177,16 +184,9 @@ def api_proto_package(
     if has_services:
         compilers = ["@io_bazel_rules_go//proto:go_grpc", "@envoy_api//bazel:pgv_plugin_go"]
 
-    # Because RBAC proro depends on googleapis syntax.proto and checked.proto,
-    # which share the same go proto library, it causes duplicative dependencies.
-    # Thus, we use depset().to_list() to remove duplicated depenencies.
-    go_proto_library(
-        name = name + _GO_PROTO_SUFFIX,
-        compilers = compilers,
-        importpath = _GO_IMPORTPATH_PREFIX + native.package_name(),
-        proto = name,
-        visibility = ["//visibility:public"],
-        deps = depset([_go_proto_mapping(dep) for dep in deps] + [
+    deps = (
+        [_go_proto_mapping(dep) for dep in deps] +
+        [
             "@com_envoyproxy_protoc_gen_validate//validate:go_default_library",
             "@com_github_golang_protobuf//ptypes:go_default_library_gen",
             "@go_googleapis//google/api:annotations_go_proto",
@@ -196,5 +196,13 @@ def api_proto_package(
             "@io_bazel_rules_go//proto/wkt:struct_go_proto",
             "@io_bazel_rules_go//proto/wkt:timestamp_go_proto",
             "@io_bazel_rules_go//proto/wkt:wrappers_go_proto",
-        ]).to_list(),
+        ]
+    )
+    go_proto_library(
+        name = name + _GO_PROTO_SUFFIX,
+        compilers = compilers,
+        importpath = _GO_IMPORTPATH_PREFIX + native.package_name(),
+        proto = name,
+        visibility = ["//visibility:public"],
+        deps = {dep: True for dep in deps}.keys(),
     )

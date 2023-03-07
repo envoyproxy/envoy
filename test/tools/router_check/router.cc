@@ -429,7 +429,7 @@ bool RouterCheckTool::compareRedirectPath(
       tool_config.route_ != nullptr && tool_config.route_->directResponseEntry() != nullptr;
   std::string actual = "";
   if (has_direct_response_entry) {
-    actual = tool_config.route_->directResponseEntry()->newPath(*tool_config.request_headers_);
+    actual = tool_config.route_->directResponseEntry()->newUri(*tool_config.request_headers_);
   }
   const bool matches = compareResults(actual, expected.path_redirect().value(), "path_redirect");
   if (!matches) {

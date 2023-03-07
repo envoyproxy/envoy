@@ -9,7 +9,6 @@
 #include "source/common/singleton/const_singleton.h"
 
 #include "eval/public/cel_value.h"
-#include "eval/public/cel_value_producer.h"
 #include "eval/public/containers/container_backed_list_impl.h"
 #include "eval/public/structs/cel_proto_wrapper.h"
 
@@ -23,7 +22,6 @@ using CelValue = google::api::expr::runtime::CelValue;
 using CelProtoWrapper = google::api::expr::runtime::CelProtoWrapper;
 
 // Symbols for traversing the request properties
-// New symbols must be added to WrapperFieldValues.
 constexpr absl::string_view Request = "request";
 constexpr absl::string_view Path = "path";
 constexpr absl::string_view UrlPath = "url_path";
@@ -42,7 +40,6 @@ constexpr absl::string_view Protocol = "protocol";
 constexpr absl::string_view Query = "query";
 
 // Symbols for traversing the response properties
-// New symbols must be added to WrapperFieldValues.
 constexpr absl::string_view Response = "response";
 constexpr absl::string_view Code = "code";
 constexpr absl::string_view CodeDetails = "code_details";
@@ -51,15 +48,12 @@ constexpr absl::string_view Flags = "flags";
 constexpr absl::string_view GrpcStatus = "grpc_status";
 
 // Per-request or per-connection metadata
-// New symbols must be added to WrapperFieldValues.
 constexpr absl::string_view Metadata = "metadata";
 
 // Per-request or per-connection filter state
-// New symbols must be added to WrapperFieldValues.
 constexpr absl::string_view FilterState = "filter_state";
 
 // Connection properties
-// New symbols must be added to WrapperFieldValues.
 constexpr absl::string_view Connection = "connection";
 constexpr absl::string_view MTLS = "mtls";
 constexpr absl::string_view RequestedServerName = "requested_server_name";
@@ -74,76 +68,30 @@ constexpr absl::string_view DNSSanPeerCertificate = "dns_san_peer_certificate";
 constexpr absl::string_view SHA256PeerCertificateDigest = "sha256_peer_certificate_digest";
 
 // Source properties
-// New symbols must be added to WrapperFieldValues.
 constexpr absl::string_view Source = "source";
 constexpr absl::string_view Address = "address";
 constexpr absl::string_view Port = "port";
 
 // Destination properties
-// New symbols must be added to WrapperFieldValues.
 constexpr absl::string_view Destination = "destination";
 
 // Upstream properties
-// New symbols must be added to WrapperFieldValues.
 constexpr absl::string_view Upstream = "upstream";
 constexpr absl::string_view UpstreamLocalAddress = "local_address";
 constexpr absl::string_view UpstreamTransportFailureReason = "transport_failure_reason";
 
-// Enumeration of all properties. Any new property symbol must be added here.
+// xDS configuration context properties
+constexpr absl::string_view XDS = "xds";
+constexpr absl::string_view ClusterName = "cluster_name";
+constexpr absl::string_view ClusterMetadata = "cluster_metadata";
+constexpr absl::string_view RouteName = "route_name";
+constexpr absl::string_view RouteMetadata = "route_metadata";
+constexpr absl::string_view UpstreamHostMetadata = "upstream_host_metadata";
+constexpr absl::string_view FilterChainName = "filter_chain_name";
+
 class WrapperFieldValues {
 public:
   using ContainerBackedListImpl = google::api::expr::runtime::ContainerBackedListImpl;
-  const ContainerBackedListImpl Request{
-      {CelValue::CreateStringView(Path), CelValue::CreateStringView(UrlPath),
-       CelValue::CreateStringView(Host), CelValue::CreateStringView(Scheme),
-       CelValue::CreateStringView(Method), CelValue::CreateStringView(Referer),
-       CelValue::CreateStringView(Headers), CelValue::CreateStringView(Time),
-       CelValue::CreateStringView(ID), CelValue::CreateStringView(UserAgent),
-       CelValue::CreateStringView(Size), CelValue::CreateStringView(TotalSize),
-       CelValue::CreateStringView(Duration), CelValue::CreateStringView(Protocol),
-       CelValue::CreateStringView(Query)}};
-  const ContainerBackedListImpl Response{{
-      CelValue::CreateStringView(Code),
-      CelValue::CreateStringView(CodeDetails),
-      CelValue::CreateStringView(Headers),
-      CelValue::CreateStringView(Trailers),
-      CelValue::CreateStringView(Flags),
-      CelValue::CreateStringView(GrpcStatus),
-      CelValue::CreateStringView(Size),
-      CelValue::CreateStringView(TotalSize),
-  }};
-  const ContainerBackedListImpl Connection{{
-      CelValue::CreateStringView(MTLS),
-      CelValue::CreateStringView(RequestedServerName),
-      CelValue::CreateStringView(ID),
-      CelValue::CreateStringView(ConnectionTerminationDetails),
-      CelValue::CreateStringView(TLSVersion),
-      CelValue::CreateStringView(SubjectLocalCertificate),
-      CelValue::CreateStringView(SubjectPeerCertificate),
-      CelValue::CreateStringView(URISanLocalCertificate),
-      CelValue::CreateStringView(URISanPeerCertificate),
-      CelValue::CreateStringView(DNSSanLocalCertificate),
-      CelValue::CreateStringView(DNSSanPeerCertificate),
-      CelValue::CreateStringView(SHA256PeerCertificateDigest),
-  }};
-  const ContainerBackedListImpl Upstream{{
-      CelValue::CreateStringView(Address),
-      CelValue::CreateStringView(Port),
-      CelValue::CreateStringView(UpstreamLocalAddress),
-      CelValue::CreateStringView(UpstreamTransportFailureReason),
-      CelValue::CreateStringView(TLSVersion),
-      CelValue::CreateStringView(SubjectLocalCertificate),
-      CelValue::CreateStringView(SubjectPeerCertificate),
-      CelValue::CreateStringView(URISanLocalCertificate),
-      CelValue::CreateStringView(URISanPeerCertificate),
-      CelValue::CreateStringView(DNSSanLocalCertificate),
-      CelValue::CreateStringView(DNSSanPeerCertificate),
-      CelValue::CreateStringView(SHA256PeerCertificateDigest),
-  }};
-  const ContainerBackedListImpl Peer{{
-      CelValue::CreateStringView(Address),
-      CelValue::CreateStringView(Port),
-  }};
   const ContainerBackedListImpl Empty{{}};
 };
 
@@ -171,9 +119,9 @@ public:
     return convertHeaderEntry(
         arena_, Http::HeaderUtility::getAllOfHeaderAsString(*value_, Http::LowerCaseString(str)));
   }
-  int size() const override { return ListKeys()->size(); }
+  int size() const override { return ListKeys().value()->size(); }
   bool empty() const override { return value_ == nullptr ? true : value_->empty(); }
-  const google::api::expr::runtime::CelList* ListKeys() const override {
+  absl::StatusOr<const google::api::expr::runtime::CelList*> ListKeys() const override {
     if (value_ == nullptr) {
       return &WrapperFields::get().Empty;
     }
@@ -201,29 +149,24 @@ private:
 // Wrapper for accessing properties from internal data structures.
 // Note that CEL assumes no ownership of the underlying data, so temporary
 // data must be arena-allocated.
-class BaseWrapper : public google::api::expr::runtime::CelMap,
-                    public google::api::expr::runtime::CelValueProducer {
+class BaseWrapper : public google::api::expr::runtime::CelMap {
 public:
-  int size() const override { return ListKeys()->size(); }
-  CelValue Produce(ProtobufWkt::Arena* arena) override {
-    // Producer is unique per evaluation arena since activation is re-created.
-    arena_ = arena;
-    return CelValue::CreateMap(this);
+  BaseWrapper(Protobuf::Arena& arena) : arena_(arena) {}
+  int size() const override { return 0; }
+  absl::StatusOr<const google::api::expr::runtime::CelList*> ListKeys() const override {
+    return absl::UnimplementedError("ListKeys() is not implemented");
   }
 
 protected:
-  ProtobufWkt::Arena* arena_;
+  ProtobufWkt::Arena& arena_;
 };
 
 class RequestWrapper : public BaseWrapper {
 public:
   RequestWrapper(Protobuf::Arena& arena, const Http::RequestHeaderMap* headers,
                  const StreamInfo::StreamInfo& info)
-      : headers_(arena, headers), info_(info) {}
+      : BaseWrapper(arena), headers_(arena, headers), info_(info) {}
   absl::optional<CelValue> operator[](CelValue key) const override;
-  const google::api::expr::runtime::CelList* ListKeys() const override {
-    return &WrapperFields::get().Request;
-  }
 
 private:
   const HeadersWrapper<Http::RequestHeaderMap> headers_;
@@ -234,11 +177,8 @@ class ResponseWrapper : public BaseWrapper {
 public:
   ResponseWrapper(Protobuf::Arena& arena, const Http::ResponseHeaderMap* headers,
                   const Http::ResponseTrailerMap* trailers, const StreamInfo::StreamInfo& info)
-      : headers_(arena, headers), trailers_(arena, trailers), info_(info) {}
+      : BaseWrapper(arena), headers_(arena, headers), trailers_(arena, trailers), info_(info) {}
   absl::optional<CelValue> operator[](CelValue key) const override;
-  const google::api::expr::runtime::CelList* ListKeys() const override {
-    return &WrapperFields::get().Response;
-  }
 
 private:
   const HeadersWrapper<Http::ResponseHeaderMap> headers_;
@@ -248,11 +188,9 @@ private:
 
 class ConnectionWrapper : public BaseWrapper {
 public:
-  ConnectionWrapper(const StreamInfo::StreamInfo& info) : info_(info) {}
+  ConnectionWrapper(Protobuf::Arena& arena, const StreamInfo::StreamInfo& info)
+      : BaseWrapper(arena), info_(info) {}
   absl::optional<CelValue> operator[](CelValue key) const override;
-  const google::api::expr::runtime::CelList* ListKeys() const override {
-    return &WrapperFields::get().Connection;
-  }
 
 private:
   const StreamInfo::StreamInfo& info_;
@@ -260,11 +198,9 @@ private:
 
 class UpstreamWrapper : public BaseWrapper {
 public:
-  UpstreamWrapper(const StreamInfo::StreamInfo& info) : info_(info) {}
+  UpstreamWrapper(Protobuf::Arena& arena, const StreamInfo::StreamInfo& info)
+      : BaseWrapper(arena), info_(info) {}
   absl::optional<CelValue> operator[](CelValue key) const override;
-  const google::api::expr::runtime::CelList* ListKeys() const override {
-    return &WrapperFields::get().Upstream;
-  }
 
 private:
   const StreamInfo::StreamInfo& info_;
@@ -272,39 +208,33 @@ private:
 
 class PeerWrapper : public BaseWrapper {
 public:
-  PeerWrapper(const StreamInfo::StreamInfo& info, bool local) : info_(info), local_(local) {}
+  PeerWrapper(Protobuf::Arena& arena, const StreamInfo::StreamInfo& info, bool local)
+      : BaseWrapper(arena), info_(info), local_(local) {}
   absl::optional<CelValue> operator[](CelValue key) const override;
-  const google::api::expr::runtime::CelList* ListKeys() const override {
-    return &WrapperFields::get().Peer;
-  }
 
 private:
   const StreamInfo::StreamInfo& info_;
   const bool local_;
 };
 
-class MetadataProducer : public google::api::expr::runtime::CelValueProducer {
-public:
-  MetadataProducer(const envoy::config::core::v3::Metadata& metadata) : metadata_(metadata) {}
-  CelValue Produce(ProtobufWkt::Arena* arena) override {
-    return CelProtoWrapper::CreateMessage(&metadata_, arena);
-  }
-
-private:
-  const envoy::config::core::v3::Metadata& metadata_;
-};
-
 class FilterStateWrapper : public BaseWrapper {
 public:
-  FilterStateWrapper(const StreamInfo::FilterState& filter_state) : filter_state_(filter_state) {}
+  FilterStateWrapper(Protobuf::Arena& arena, const StreamInfo::FilterState& filter_state)
+      : BaseWrapper(arena), filter_state_(filter_state) {}
   absl::optional<CelValue> operator[](CelValue key) const override;
-  // TODO(kyessenov) FilterState should allow enumeration of keys.
-  const google::api::expr::runtime::CelList* ListKeys() const override {
-    return &WrapperFields::get().Empty;
-  }
 
 private:
   const StreamInfo::FilterState& filter_state_;
+};
+
+class XDSWrapper : public BaseWrapper {
+public:
+  XDSWrapper(Protobuf::Arena& arena, const StreamInfo::StreamInfo& info)
+      : BaseWrapper(arena), info_(info) {}
+  absl::optional<CelValue> operator[](CelValue key) const override;
+
+private:
+  const StreamInfo::StreamInfo& info_;
 };
 
 } // namespace Expr

@@ -74,9 +74,9 @@ public:
   virtual Outlier::EventLoggerSharedPtr outlierEventLogger() PURE;
 
   // Server::Configuration::FactoryContextBase
-  Stats::Scope& scope() override { return stats(); }
+  Stats::Scope& scope() override { return *stats().rootScope(); }
 
-  Stats::Scope& serverScope() override { return stats(); }
+  Stats::Scope& serverScope() override { return *stats().rootScope(); }
 };
 
 /**
@@ -96,7 +96,8 @@ public:
    *         balancer if this cluster has an integrated load balancer.
    */
   virtual std::pair<ClusterSharedPtr, ThreadAwareLoadBalancerPtr>
-  create(const envoy::config::cluster::v3::Cluster& cluster, ClusterFactoryContext& context) PURE;
+  create(Server::Configuration::ServerFactoryContext& server_context,
+         const envoy::config::cluster::v3::Cluster& cluster, ClusterFactoryContext& context) PURE;
 
   std::string category() const override { return "envoy.clusters"; }
 };

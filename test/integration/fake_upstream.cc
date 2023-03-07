@@ -17,11 +17,11 @@
 #include "source/common/network/utility.h"
 
 #ifdef ENVOY_ENABLE_QUIC
-#include "source/common/quic/codec_impl.h"
+#include "source/common/quic/server_codec_impl.h"
 #include "quiche/quic/test_tools/quic_session_peer.h"
 #endif
 
-#include "source/server/connection_handler_impl.h"
+#include "source/extensions/listener_managers/listener_manager/connection_handler_impl.h"
 
 #include "test/test_common/network_utility.h"
 #include "test/test_common/utility.h"
@@ -44,7 +44,7 @@ FakeStream::FakeStream(FakeHttpConnection& parent, Http::ResponseEncoder& encode
   encoder.getStream().addCallbacks(*this);
 }
 
-void FakeStream::decodeHeaders(Http::RequestHeaderMapPtr&& headers, bool end_stream) {
+void FakeStream::decodeHeaders(Http::RequestHeaderMapSharedPtr&& headers, bool end_stream) {
   absl::MutexLock lock(&lock_);
   headers_ = std::move(headers);
   setEndStream(end_stream);
@@ -109,7 +109,7 @@ void FakeStream::encodeHeaders(const Http::HeaderMap& headers, bool end_stream) 
   });
 }
 
-void FakeStream::encodeData(absl::string_view data, bool end_stream) {
+void FakeStream::encodeData(std::string data, bool end_stream) {
   postToConnectionThread([this, data, end_stream]() -> void {
     {
       absl::MutexLock lock(&lock_);
@@ -333,19 +333,10 @@ public:
                              headers_with_underscores_action) {}
 
   void updateConcurrentStreams(uint32_t max_streams) {
-    int rc;
-    if (use_new_codec_wrapper_) {
-      absl::InlinedVector<http2::adapter::Http2Setting, 1> settings;
-      settings.insert(settings.end(), {{http2::adapter::MAX_CONCURRENT_STREAMS, max_streams}});
-      adapter_->SubmitSettings(settings);
-      rc = adapter_->Send();
-    } else {
-      absl::InlinedVector<nghttp2_settings_entry, 1> settings;
-      settings.insert(settings.end(), {{NGHTTP2_SETTINGS_MAX_CONCURRENT_STREAMS, max_streams}});
-      rc = nghttp2_submit_settings(session_, NGHTTP2_FLAG_NONE, settings.data(), settings.size());
-      ASSERT(rc == 0);
-      rc = nghttp2_session_send(session_);
-    }
+    absl::InlinedVector<http2::adapter::Http2Setting, 1> settings;
+    settings.push_back({http2::adapter::MAX_CONCURRENT_STREAMS, max_streams});
+    adapter_->SubmitSettings(settings);
+    const int rc = adapter_->Send();
     ASSERT(rc == 0);
   }
 };
@@ -594,6 +585,11 @@ FakeUpstream::FakeUpstream(Network::DownstreamTransportSocketFactoryPtr&& transp
         ->mutable_max_rx_datagram_size()
         ->set_value(config.udp_fake_upstream_->max_rx_datagram_size_.value());
   }
+  dispatcher_->post([this]() -> void {
+    socket_factories_[0]->doFinalPreWorkerInit();
+    handler_->addListener(absl::nullopt, listener_, runtime_);
+    server_initialized_.setReady();
+  });
   thread_ = api_->threadFactory().createThread([this]() -> void { threadRoutine(); });
   server_initialized_.waitReady();
 }
@@ -644,9 +640,6 @@ void FakeUpstream::createUdpListenerFilterChain(Network::UdpListenerFilterManage
 }
 
 void FakeUpstream::threadRoutine() {
-  socket_factories_[0]->doFinalPreWorkerInit();
-  handler_->addListener(absl::nullopt, listener_, runtime_);
-  server_initialized_.setReady();
   dispatcher_->run(Event::Dispatcher::RunType::Block);
   handler_.reset();
   {
@@ -959,7 +952,10 @@ FakeHttpConnection::waitForInexactRawData(const char* data, std::string* out,
     auto result = dynamic_cast<Network::ConnectionImpl*>(&connection())
                       ->ioHandle()
                       .recv(peek_buf, 200, MSG_PEEK);
-    ASSERT(result.ok());
+    ASSERT(result.ok() || result.err_->getErrorCode() == Api::IoError::IoErrorCode::Again);
+    if (!result.ok()) {
+      return false;
+    }
     absl::string_view peek_data(peek_buf, result.return_value_);
     size_t index = peek_data.find(data);
     if (index != absl::string_view::npos) {
@@ -972,10 +968,15 @@ FakeHttpConnection::waitForInexactRawData(const char* data, std::string* out,
     }
     return false;
   };
-  if (!time_system_.waitFor(lock_, absl::Condition(&reached), timeout)) {
-    return AssertionFailure() << "timed out waiting for raw data";
+  // Because the connection must be read disabled to not auto-consume the
+  // underlying data, waitFor hangs with no events to force the time system to
+  // continue. Break it up into smaller chunks.
+  for (int i = 0; i < timeout / 10ms; ++i) {
+    if (time_system_.waitFor(lock_, absl::Condition(&reached), 10ms)) {
+      return AssertionSuccess();
+    }
   }
-  return AssertionSuccess();
+  return AssertionFailure() << "timed out waiting for raw data";
 }
 
 void FakeHttpConnection::writeRawData(absl::string_view data) {
@@ -983,6 +984,15 @@ void FakeHttpConnection::writeRawData(absl::string_view data) {
   Api::IoCallUint64Result result =
       dynamic_cast<Network::ConnectionImpl*>(&connection())->ioHandle().write(buffer);
   ASSERT(result.ok());
+}
+
+AssertionResult FakeHttpConnection::postWriteRawData(std::string data) {
+  return shared_connection_.executeOnDispatcher(
+      [data](Network::Connection& connection) {
+        Buffer::OwnedImpl to_write(data);
+        connection.write(to_write, false);
+      },
+      TestUtility::DefaultTimeout);
 }
 
 } // namespace Envoy

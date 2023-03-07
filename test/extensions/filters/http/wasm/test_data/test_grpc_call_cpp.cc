@@ -15,14 +15,23 @@ class MyGrpcCallHandler : public GrpcCallHandler<google::protobuf::Value> {
 public:
   MyGrpcCallHandler() : GrpcCallHandler<google::protobuf::Value>() {}
   void onSuccess(size_t body_size) override {
+    if (call_done_) {
+      proxy_done();
+      return;
+    }
     auto response = getBufferBytes(WasmBufferType::GrpcReceiveBuffer, 0, body_size);
     logDebug(response->proto<google::protobuf::Value>().string_value());
     cancel();
   }
   void onFailure(GrpcStatus) override {
+    if (call_done_) {
+      proxy_done();
+      return;
+    }
     auto p = getStatus();
     logDebug(std::string("failure ") + std::string(p.second->view()));
   }
+  bool call_done_{false};
 };
 
 class GrpcCallRootContext : public RootContext {
@@ -32,12 +41,20 @@ public:
   void onQueueReady(uint32_t op) override {
     if (op == 0) {
       handler_->cancel();
-    } else {
+    } else if (op == 1) {
       grpcClose(handler_->token());
+    } else if (op == 2) {
+      on_done_ = false;
+      handler_->call_done_ = true;
     }
   }
 
+  bool onDone() override {
+    return on_done_;
+  }
+
   MyGrpcCallHandler* handler_ = nullptr;
+  bool on_done_{true};
 };
 
 class GrpcCallContextProto : public Context {

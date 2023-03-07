@@ -14,7 +14,8 @@ namespace Config {
 OldDeltaSubscriptionState::OldDeltaSubscriptionState(std::string type_url,
                                                      UntypedConfigUpdateCallbacks& watch_map,
                                                      const LocalInfo::LocalInfo& local_info,
-                                                     Event::Dispatcher& dispatcher)
+                                                     Event::Dispatcher& dispatcher,
+                                                     XdsConfigTrackerOptRef xds_config_tracker)
     // TODO(snowp): Hard coding VHDS here is temporary until we can move it away from relying on
     // empty resources as updates.
     : supports_heartbeats_(type_url != "envoy.config.route.v3.VirtualHost"),
@@ -30,7 +31,7 @@ OldDeltaSubscriptionState::OldDeltaSubscriptionState(std::string type_url,
           },
           dispatcher, dispatcher.timeSource()),
       type_url_(std::move(type_url)), watch_map_(watch_map), local_info_(local_info),
-      dispatcher_(dispatcher) {}
+      dispatcher_(dispatcher), xds_config_tracker_(xds_config_tracker) {}
 
 void OldDeltaSubscriptionState::updateSubscriptionInterest(
     const absl::flat_hash_set<std::string>& cur_added,
@@ -137,6 +138,12 @@ void OldDeltaSubscriptionState::handleGoodResponse(
 
   watch_map_.onConfigUpdate(non_heartbeat_resources, message.removed_resources(),
                             message.system_version_info());
+
+  // Processing point when resources are successfully ingested.
+  if (xds_config_tracker_.has_value()) {
+    xds_config_tracker_->onConfigAccepted(message.type_url(), non_heartbeat_resources,
+                                          message.removed_resources());
+  }
 
   // If a resource is gone, there is no longer a meaningful version for it that makes sense to
   // provide to the server upon stream reconnect: either it will continue to not exist, in which

@@ -9,10 +9,10 @@
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/http/header_map.h"
 #include "envoy/http/protocol.h"
-#include "envoy/http/request_id_extension.h"
 #include "envoy/network/socket.h"
 #include "envoy/ssl/connection.h"
 #include "envoy/stream_info/filter_state.h"
+#include "envoy/stream_info/stream_id_provider.h"
 #include "envoy/tracing/trace_reason.h"
 #include "envoy/upstream/host_description.h"
 
@@ -176,8 +176,8 @@ struct ResponseCodeDetailValues {
   const std::string FilterChainNotFound = "filter_chain_not_found";
   // The client disconnected unexpectedly.
   const std::string DownstreamRemoteDisconnect = "downstream_remote_disconnect";
-  // The client connection was locally closed for an unspecified reason.
-  const std::string DownstreamLocalDisconnect = "downstream_local_disconnect";
+  // The client connection was locally closed for the given reason.
+  const std::string DownstreamLocalDisconnect = "downstream_local_disconnect({})";
   // The max connection duration was exceeded.
   const std::string DurationTimeout = "duration_timeout";
   // The max request downstream header duration was exceeded.
@@ -204,6 +204,36 @@ struct ResponseCodeDetailValues {
 };
 
 using ResponseCodeDetails = ConstSingleton<ResponseCodeDetailValues>;
+
+/**
+ * Constants for the locally closing a connection. This is used in response code
+ * details field of StreamInfo for details sent by core (non-extension) code.
+ * This is incomplete as some details may be
+ *
+ * Custom extensions can define additional values provided they are appropriately
+ * scoped to avoid collisions.
+ */
+struct LocalCloseReasonValues {
+  const std::string DeferredCloseOnDrainedConnection = "deferred_close_on_drained_connection";
+  const std::string IdleTimeoutOnConnection = "on_idle_timeout";
+  const std::string CloseForConnectRequestOrTcpTunneling =
+      "close_for_connect_request_or_tcp_tunneling";
+  const std::string Http2PingTimeout = "http2_ping_timeout";
+  const std::string Http2ConnectionProtocolViolation = "http2_connection_protocol_violation";
+  const std::string TransportSocketTimeout = "transport_socket_timeout";
+  const std::string TriggeredDelayedCloseTimeout = "triggered_delayed_close_timeout";
+  const std::string TcpProxyInitializationFailure = "tcp_initializion_failure:";
+  const std::string TcpSessionIdleTimeout = "tcp_session_idle_timeout";
+  const std::string MaxConnectionDurationReached = "max_connection_duration_reached";
+  const std::string ClosingUpstreamTcpDueToDownstreamRemoteClose =
+      "closing_upstream_tcp_connection_due_to_downstream_remote_close";
+  const std::string ClosingUpstreamTcpDueToDownstreamLocalClose =
+      "closing_upstream_tcp_connection_due_to_downstream_local_close";
+  const std::string NonPooledTcpConnectionHostHealthFailure =
+      "non_pooled_tcp_connection_host_health_failure";
+};
+
+using LocalCloseReasons = ConstSingleton<LocalCloseReasonValues>;
 
 struct UpstreamTiming {
   /**
@@ -251,6 +281,10 @@ struct UpstreamTiming {
     upstream_handshake_complete_ = time_source.monotonicTime();
   }
 
+  absl::optional<MonotonicTime> upstreamHandshakeComplete() const {
+    return upstream_handshake_complete_;
+  }
+
   absl::optional<MonotonicTime> first_upstream_tx_byte_sent_;
   absl::optional<MonotonicTime> last_upstream_tx_byte_sent_;
   absl::optional<MonotonicTime> first_upstream_rx_byte_received_;
@@ -282,6 +316,12 @@ public:
   absl::optional<MonotonicTime> lastDownstreamTxByteSent() const {
     return last_downstream_tx_byte_sent_;
   }
+  absl::optional<MonotonicTime> downstreamHandshakeComplete() const {
+    return downstream_handshake_complete_;
+  }
+  absl::optional<MonotonicTime> lastDownstreamAckReceived() const {
+    return last_downstream_ack_received_;
+  }
 
   void onLastDownstreamRxByteReceived(TimeSource& time_source) {
     ASSERT(!last_downstream_rx_byte_received_);
@@ -295,6 +335,14 @@ public:
     ASSERT(!last_downstream_tx_byte_sent_);
     last_downstream_tx_byte_sent_ = time_source.monotonicTime();
   }
+  void onDownstreamHandshakeComplete(TimeSource& time_source) {
+    // An existing value can be overwritten, e.g. in resumption case.
+    downstream_handshake_complete_ = time_source.monotonicTime();
+  }
+  void onLastDownstreamAckReceived(TimeSource& time_source) {
+    ASSERT(!last_downstream_ack_received_);
+    last_downstream_ack_received_ = time_source.monotonicTime();
+  }
 
 private:
   absl::flat_hash_map<std::string, MonotonicTime> timings_;
@@ -304,6 +352,10 @@ private:
   absl::optional<MonotonicTime> first_downstream_tx_byte_sent_;
   // The time when the last byte of the response was sent downstream.
   absl::optional<MonotonicTime> last_downstream_tx_byte_sent_;
+  // The time the TLS handshake completed. Set at connection level.
+  absl::optional<MonotonicTime> downstream_handshake_complete_;
+  // The time the final ack was received from the client.
+  absl::optional<MonotonicTime> last_downstream_ack_received_;
 };
 
 // Measure the number of bytes sent and received for a stream.
@@ -326,8 +378,6 @@ private:
 
 using BytesMeterSharedPtr = std::shared_ptr<BytesMeter>;
 
-// TODO(alyssawilk) after landing this, remove all the duplicate getters and
-// setters from StreamInfo.
 class UpstreamInfo {
 public:
   virtual ~UpstreamInfo() = default;
@@ -392,6 +442,17 @@ public:
    * @return the upstream local address.
    */
   virtual const Network::Address::InstanceConstSharedPtr& upstreamLocalAddress() const PURE;
+
+  /**
+   * @param upstream_remote_address sets the remote address of the upstream connection.
+   */
+  virtual void setUpstreamRemoteAddress(
+      const Network::Address::InstanceConstSharedPtr& upstream_remote_address) PURE;
+
+  /**
+   * @return the upstream remote address.
+   */
+  virtual const Network::Address::InstanceConstSharedPtr& upstreamRemoteAddress() const PURE;
 
   /**
    * @param failure_reason the upstream transport failure reason.
@@ -662,15 +723,14 @@ public:
   virtual absl::optional<Upstream::ClusterInfoConstSharedPtr> upstreamClusterInfo() const PURE;
 
   /**
-   * @param provider The requestID provider implementation this stream uses.
+   * @param provider The unique id implementation this stream uses.
    */
-  virtual void
-  setRequestIDProvider(const Http::RequestIdStreamInfoProviderSharedPtr& provider) PURE;
+  virtual void setStreamIdProvider(StreamIdProviderSharedPtr provider) PURE;
 
   /**
-   * @return the request ID provider for this stream if available.
+   * @return the unique id for this stream if available.
    */
-  virtual const Http::RequestIdStreamInfoProvider* getRequestIDProvider() const PURE;
+  virtual OptRef<const StreamIdProvider> getStreamIdProvider() const PURE;
 
   /**
    * Set the trace reason for the stream.
@@ -723,11 +783,34 @@ public:
    */
   virtual void setDownstreamBytesMeter(const BytesMeterSharedPtr& downstream_bytes_meter) PURE;
 
+  virtual bool isShadow() const PURE;
+
   static void syncUpstreamAndDownstreamBytesMeter(StreamInfo& downstream_info,
                                                   StreamInfo& upstream_info) {
     downstream_info.setUpstreamBytesMeter(upstream_info.getUpstreamBytesMeter());
     upstream_info.setDownstreamBytesMeter(downstream_info.getDownstreamBytesMeter());
   }
+
+  /**
+   * Dump the info to the specified ostream.
+   *
+   * @param os the ostream to dump state to
+   * @param indent_level the depth, for pretty-printing.
+   *
+   * This function is called on Envoy fatal errors so should avoid memory allocation.
+   */
+  virtual void dumpState(std::ostream& os, int indent_level = 0) const PURE;
+
+  /**
+   * @return absl::string_view the downstream transport failure reason,
+   *         e.g. certificate validation failed.
+   */
+  virtual absl::string_view downstreamTransportFailureReason() const PURE;
+
+  /**
+   * @param failure_reason the downstream transport failure reason.
+   */
+  virtual void setDownstreamTransportFailureReason(absl::string_view failure_reason) PURE;
 };
 
 // An enum representation of the Proxy-Status error space.

@@ -31,25 +31,87 @@
 #include "absl/strings/str_cat.h"
 #include "absl/strings/str_split.h"
 #include "absl/strings/string_view.h"
-#include "nghttp2/nghttp2.h"
+#include "quiche/http2/adapter/http2_protocol.h"
 
 namespace Envoy {
+namespace {
+
+// Get request host from the request header map, removing the port if the port
+// does not match the scheme, or if port is provided.
+absl::string_view processRequestHost(const Http::RequestHeaderMap& headers,
+                                     absl::string_view new_scheme, absl::string_view new_port) {
+
+  absl::string_view request_host = headers.getHostValue();
+  size_t host_end;
+  if (request_host.empty()) {
+    return request_host;
+  }
+  // Detect if IPv6 URI
+  if (request_host[0] == '[') {
+    host_end = request_host.rfind("]:");
+    if (host_end != absl::string_view::npos) {
+      host_end += 1; // advance to :
+    }
+  } else {
+    host_end = request_host.rfind(':');
+  }
+
+  if (host_end != absl::string_view::npos) {
+    absl::string_view request_port = request_host.substr(host_end);
+    // In the rare case that X-Forwarded-Proto and scheme disagree (say http URL over an HTTPS
+    // connection), do port stripping based on X-Forwarded-Proto so http://foo.com:80 won't
+    // have the port stripped when served over TLS.
+    absl::string_view request_protocol = headers.getForwardedProtoValue();
+    bool remove_port = !new_port.empty();
+
+    if (new_scheme != request_protocol) {
+      remove_port |=
+          (request_protocol == Http::Headers::get().SchemeValues.Https) && request_port == ":443";
+      remove_port |=
+          (request_protocol == Http::Headers::get().SchemeValues.Http) && request_port == ":80";
+    }
+
+    if (remove_port) {
+      return request_host.substr(0, host_end);
+    }
+  }
+
+  return request_host;
+}
+
+} // namespace
 namespace Http2 {
 namespace Utility {
 
 namespace {
 
+struct SettingsEntry {
+  uint16_t settings_id;
+  uint32_t value;
+};
+
+struct SettingsEntryHash {
+  size_t operator()(const SettingsEntry& entry) const {
+    return absl::Hash<decltype(entry.settings_id)>()(entry.settings_id);
+  }
+};
+
+struct SettingsEntryEquals {
+  bool operator()(const SettingsEntry& lhs, const SettingsEntry& rhs) const {
+    return lhs.settings_id == rhs.settings_id;
+  }
+};
+
 void validateCustomSettingsParameters(
     const envoy::config::core::v3::Http2ProtocolOptions& options) {
   std::vector<std::string> parameter_collisions, custom_parameter_collisions;
-  absl::node_hash_set<nghttp2_settings_entry, SettingsEntryHash, SettingsEntryEquals>
-      custom_parameters;
+  absl::node_hash_set<SettingsEntry, SettingsEntryHash, SettingsEntryEquals> custom_parameters;
   // User defined and named parameters with the same SETTINGS identifier can not both be set.
   for (const auto& it : options.custom_settings_parameters()) {
     ASSERT(it.identifier().value() <= std::numeric_limits<uint16_t>::max());
     // Check for custom parameter inconsistencies.
     const auto result = custom_parameters.insert(
-        {static_cast<int32_t>(it.identifier().value()), it.value().value()});
+        {static_cast<uint16_t>(it.identifier().value()), it.value().value()});
     if (!result.second) {
       if (result.first->value != it.value().value()) {
         custom_parameter_collisions.push_back(
@@ -58,28 +120,28 @@ void validateCustomSettingsParameters(
       }
     }
     switch (it.identifier().value()) {
-    case NGHTTP2_SETTINGS_ENABLE_PUSH:
+    case http2::adapter::ENABLE_PUSH:
       if (it.value().value() == 1) {
         throw EnvoyException("server push is not supported by Envoy and can not be enabled via a "
                              "SETTINGS parameter.");
       }
       break;
-    case NGHTTP2_SETTINGS_ENABLE_CONNECT_PROTOCOL:
+    case http2::adapter::ENABLE_CONNECT_PROTOCOL:
       // An exception is made for `allow_connect` which can't be checked for presence due to the
       // use of a primitive type (bool).
       throw EnvoyException("the \"allow_connect\" SETTINGS parameter must only be configured "
                            "through the named field");
-    case NGHTTP2_SETTINGS_HEADER_TABLE_SIZE:
+    case http2::adapter::HEADER_TABLE_SIZE:
       if (options.has_hpack_table_size()) {
         parameter_collisions.push_back("hpack_table_size");
       }
       break;
-    case NGHTTP2_SETTINGS_MAX_CONCURRENT_STREAMS:
+    case http2::adapter::MAX_CONCURRENT_STREAMS:
       if (options.has_max_concurrent_streams()) {
         parameter_collisions.push_back("max_concurrent_streams");
       }
       break;
-    case NGHTTP2_SETTINGS_INITIAL_WINDOW_SIZE:
+    case http2::adapter::INITIAL_WINDOW_SIZE:
       if (options.has_initial_stream_window_size()) {
         parameter_collisions.push_back("initial_stream_window_size");
       }
@@ -371,6 +433,10 @@ bool Utility::Url::initialize(absl::string_view absolute_url, bool is_connect) {
   return true;
 }
 
+std::string Utility::Url::toString() const {
+  return absl::StrCat(scheme_, "://", host_and_port_, path_and_query_params_);
+}
+
 void Utility::appendXff(RequestHeaderMap& headers,
                         const Network::Address::Instance& remote_address) {
   if (remote_address.type() != Network::Address::Type::Ip) {
@@ -445,7 +511,8 @@ Utility::QueryParams Utility::parseParameters(absl::string_view data, size_t sta
       params.emplace(decode_params ? PercentEncoding::decode(param_name) : param_name,
                      decode_params ? PercentEncoding::decode(param_value) : param_value);
     } else {
-      params.emplace(StringUtil::subspan(data, start, end), "");
+      const auto param_name = StringUtil::subspan(data, start, end);
+      params.emplace(decode_params ? PercentEncoding::decode(param_name) : param_name, "");
     }
 
     start = end + 1;
@@ -535,7 +602,7 @@ bool Utility::isUpgrade(const RequestOrResponseHeaderMap& headers) {
   // we should check if it contains the "Upgrade" token.
   return (headers.Upgrade() &&
           Envoy::StringUtil::caseFindToken(headers.getConnectionValue(), ",",
-                                           Http::Headers::get().ConnectionValues.Upgrade.c_str()));
+                                           Http::Headers::get().ConnectionValues.Upgrade));
 }
 
 bool Utility::isH2UpgradeRequest(const RequestHeaderMap& headers) {
@@ -550,31 +617,8 @@ bool Utility::isWebSocketUpgradeRequest(const RequestHeaderMap& headers) {
                                  Http::Headers::get().UpgradeValues.WebSocket));
 }
 
-void Utility::sendLocalReply(const bool& is_reset, StreamDecoderFilterCallbacks& callbacks,
-                             const LocalReplyData& local_reply_data) {
-  absl::string_view details;
-  if (callbacks.streamInfo().responseCodeDetails().has_value()) {
-    details = callbacks.streamInfo().responseCodeDetails().value();
-  };
-
-  sendLocalReply(
-      is_reset,
-      Utility::EncodeFunctions{nullptr, nullptr,
-                               [&](ResponseHeaderMapPtr&& headers, bool end_stream) -> void {
-                                 callbacks.encodeHeaders(std::move(headers), end_stream, details);
-                               },
-                               [&](Buffer::Instance& data, bool end_stream) -> void {
-                                 callbacks.encodeData(data, end_stream);
-                               }},
-      local_reply_data);
-}
-
-void Utility::sendLocalReply(const bool& is_reset, const EncodeFunctions& encode_functions,
-                             const LocalReplyData& local_reply_data) {
-  // encode_headers() may reset the stream, so the stream must not be reset before calling it.
-  ASSERT(!is_reset);
-
-  // rewrite_response will rewrite response code and body text.
+Utility::PreparedLocalReplyPtr Utility::prepareLocalReply(const EncodeFunctions& encode_functions,
+                                                          const LocalReplyData& local_reply_data) {
   Code response_code = local_reply_data.response_code_;
   std::string body_text(local_reply_data.body_text_);
   absl::string_view content_type(Headers::get().ContentTypeValues.Text);
@@ -592,7 +636,6 @@ void Utility::sendLocalReply(const bool& is_reset, const EncodeFunctions& encode
     has_custom_content_type = (content_type_value != response_headers->getContentTypeValue());
   }
 
-  // Respond with a gRPC trailers-only response if the request is gRPC
   if (local_reply_data.is_grpc_) {
     response_headers->setStatus(std::to_string(enumToInt(Code::OK)));
     response_headers->setReferenceContentType(Headers::get().ContentTypeValues.Grpc);
@@ -617,8 +660,13 @@ void Utility::sendLocalReply(const bool& is_reset, const EncodeFunctions& encode
     }
     // The `modify_headers` function may have added content-length, remove it.
     response_headers->removeContentLength();
-    encode_functions.encode_headers_(std::move(response_headers), true); // Trailers only response
-    return;
+
+    // TODO(kbaichoo): In C++20 we will be able to use make_unique with
+    // aggregate initialization.
+    // NOLINTNEXTLINE(modernize-make-unique)
+    return PreparedLocalReplyPtr(new PreparedLocalReply{
+        local_reply_data.is_grpc_, local_reply_data.is_head_request_, std::move(response_headers),
+        std::move(body_text), encode_functions.encode_headers_, encode_functions.encode_data_});
   }
 
   if (!body_text.empty()) {
@@ -626,33 +674,55 @@ void Utility::sendLocalReply(const bool& is_reset, const EncodeFunctions& encode
     // If the content-type is not set, set it.
     // Alternately if the `rewrite` function has changed body_text and the config didn't explicitly
     // set a content type header, set the content type to be based on the changed body.
-    if (Runtime::runtimeFeatureEnabled(
-            "envoy.reloadable_features.allow_adding_content_type_in_local_replies")) {
-      if (response_headers->ContentType() == nullptr ||
-          (body_text != local_reply_data.body_text_ && !has_custom_content_type)) {
-        response_headers->setReferenceContentType(content_type);
-      }
-    } else {
-      if (body_text != local_reply_data.body_text_ || response_headers->ContentType() == nullptr) {
-        response_headers->setReferenceContentType(content_type);
-      }
+    if (response_headers->ContentType() == nullptr ||
+        (body_text != local_reply_data.body_text_ && !has_custom_content_type)) {
+      response_headers->setReferenceContentType(content_type);
     }
   } else {
     response_headers->removeContentLength();
     response_headers->removeContentType();
   }
 
-  if (local_reply_data.is_head_request_) {
-    encode_functions.encode_headers_(std::move(response_headers), true);
+  // TODO(kbaichoo): In C++20 we will be able to use make_unique with
+  // aggregate initialization.
+  // NOLINTNEXTLINE(modernize-make-unique)
+  return PreparedLocalReplyPtr(new PreparedLocalReply{
+      local_reply_data.is_grpc_, local_reply_data.is_head_request_, std::move(response_headers),
+      std::move(body_text), encode_functions.encode_headers_, encode_functions.encode_data_});
+}
+
+void Utility::encodeLocalReply(const bool& is_reset, PreparedLocalReplyPtr prepared_local_reply) {
+  ASSERT(prepared_local_reply != nullptr);
+  ResponseHeaderMapPtr response_headers{std::move(prepared_local_reply->response_headers_)};
+
+  if (prepared_local_reply->is_grpc_request_) {
+    // Trailers only response
+    prepared_local_reply->encode_headers_(std::move(response_headers), true);
     return;
   }
 
-  encode_functions.encode_headers_(std::move(response_headers), body_text.empty());
-  // encode_headers() may have changed the referenced is_reset so we need to test it
-  if (!body_text.empty() && !is_reset) {
-    Buffer::OwnedImpl buffer(body_text);
-    encode_functions.encode_data_(buffer, true);
+  if (prepared_local_reply->is_head_request_) {
+    prepared_local_reply->encode_headers_(std::move(response_headers), true);
+    return;
   }
+
+  const bool bodyless_response = prepared_local_reply->response_body_.empty();
+  prepared_local_reply->encode_headers_(std::move(response_headers), bodyless_response);
+  // encode_headers() may have changed the referenced is_reset so we need to test it
+  if (!bodyless_response && !is_reset) {
+    Buffer::OwnedImpl buffer(prepared_local_reply->response_body_);
+    prepared_local_reply->encode_data_(buffer, true);
+  }
+}
+
+void Utility::sendLocalReply(const bool& is_reset, const EncodeFunctions& encode_functions,
+                             const LocalReplyData& local_reply_data) {
+  // encode_headers() may reset the stream, so the stream must not be reset before calling it.
+  ASSERT(!is_reset);
+  PreparedLocalReplyPtr prepared_local_reply =
+      prepareLocalReply(encode_functions, local_reply_data);
+
+  encodeLocalReply(is_reset, std::move(prepared_local_reply));
 }
 
 Utility::GetLastAddressFromXffInfo
@@ -1012,7 +1082,7 @@ std::string Utility::PercentEncoding::encode(absl::string_view value, const size
     if (ch < ' ' || ch >= '~' || reserved_char_set.find(ch) != reserved_char_set.end()) {
       // For consistency, URI producers should use uppercase hexadecimal digits for all
       // percent-encodings. https://tools.ietf.org/html/rfc3986#section-2.1.
-      absl::StrAppend(&encoded, fmt::format("%{:02X}", ch));
+      absl::StrAppend(&encoded, fmt::format("%{:02X}", static_cast<const unsigned char&>(ch)));
     } else {
       encoded.push_back(ch);
     }
@@ -1028,21 +1098,123 @@ std::string Utility::PercentEncoding::decode(absl::string_view encoded) {
     if (ch == '%' && i + 2 < encoded.size()) {
       const char& hi = encoded[i + 1];
       const char& lo = encoded[i + 2];
-      if (absl::ascii_isdigit(hi)) {
-        ch = hi - '0';
-      } else {
-        ch = absl::ascii_toupper(hi) - 'A' + 10;
-      }
+      if (absl::ascii_isxdigit(hi) && absl::ascii_isxdigit(lo)) {
+        if (absl::ascii_isdigit(hi)) {
+          ch = hi - '0';
+        } else {
+          ch = absl::ascii_toupper(hi) - 'A' + 10;
+        }
 
-      ch *= 16;
-      if (absl::ascii_isdigit(lo)) {
-        ch += lo - '0';
-      } else {
-        ch += absl::ascii_toupper(lo) - 'A' + 10;
+        ch *= 16;
+        if (absl::ascii_isdigit(lo)) {
+          ch += lo - '0';
+        } else {
+          ch += absl::ascii_toupper(lo) - 'A' + 10;
+        }
+        i += 2;
       }
-      i += 2;
     }
     decoded.push_back(ch);
+  }
+  return decoded;
+}
+
+namespace {
+// %-encode all ASCII character codepoints, EXCEPT:
+// ALPHA | DIGIT | * | - | . | _
+// SPACE is encoded as %20, NOT as the + character
+constexpr uint32_t kUrlEncodedCharTable[] = {
+    // control characters
+    0b11111111111111111111111111111111,
+    // !"#$%&'()*+,-./0123456789:;<=>?
+    0b11111111110110010000000000111111,
+    //@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\]^_
+    0b10000000000000000000000000011110,
+    //`abcdefghijklmnopqrstuvwxyz{|}~
+    0b10000000000000000000000000011111,
+    // extended ascii
+    0b11111111111111111111111111111111,
+    0b11111111111111111111111111111111,
+    0b11111111111111111111111111111111,
+    0b11111111111111111111111111111111,
+};
+
+constexpr uint32_t kUrlDecodedCharTable[] = {
+    // control characters
+    0b00000000000000000000000000000000,
+    // !"#$%&'()*+,-./0123456789:;<=>?
+    0b01011111111111111111111111110101,
+    //@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\]^_
+    0b11111111111111111111111111110101,
+    //`abcdefghijklmnopqrstuvwxyz{|}~
+    0b11111111111111111111111111100010,
+    // extended ascii
+    0b00000000000000000000000000000000,
+    0b00000000000000000000000000000000,
+    0b00000000000000000000000000000000,
+    0b00000000000000000000000000000000,
+};
+
+bool testChar(const uint32_t table[8], char c) {
+  uint8_t uc = static_cast<uint8_t>(c);
+  return (table[uc >> 5] & (0x80000000 >> (uc & 0x1f))) != 0;
+}
+
+bool shouldPercentEncodeChar(char c) { return testChar(kUrlEncodedCharTable, c); }
+
+bool shouldPercentDecodeChar(char c) { return testChar(kUrlDecodedCharTable, c); }
+} // namespace
+
+std::string Utility::PercentEncoding::urlEncodeQueryParameter(absl::string_view value) {
+  std::string encoded;
+  encoded.reserve(value.size());
+  for (char ch : value) {
+    if (shouldPercentEncodeChar(ch)) {
+      // For consistency, URI producers should use uppercase hexadecimal digits for all
+      // percent-encodings. https://tools.ietf.org/html/rfc3986#section-2.1.
+      absl::StrAppend(&encoded, fmt::format("%{:02X}", static_cast<const unsigned char&>(ch)));
+    } else {
+      encoded.push_back(ch);
+    }
+  }
+  return encoded;
+}
+
+std::string Utility::PercentEncoding::urlDecodeQueryParameter(absl::string_view encoded) {
+  std::string decoded;
+  decoded.reserve(encoded.size());
+  for (size_t i = 0; i < encoded.size(); ++i) {
+    char ch = encoded[i];
+    if (ch == '%' && i + 2 < encoded.size()) {
+      const char& hi = encoded[i + 1];
+      const char& lo = encoded[i + 2];
+      if (absl::ascii_isxdigit(hi) && absl::ascii_isxdigit(lo)) {
+        if (absl::ascii_isdigit(hi)) {
+          ch = hi - '0';
+        } else {
+          ch = absl::ascii_toupper(hi) - 'A' + 10;
+        }
+
+        ch *= 16;
+        if (absl::ascii_isdigit(lo)) {
+          ch += lo - '0';
+        } else {
+          ch += absl::ascii_toupper(lo) - 'A' + 10;
+        }
+        if (shouldPercentDecodeChar(ch)) {
+          // Decode the character only if it is present in the characters_to_decode
+          decoded.push_back(ch);
+        } else {
+          // Otherwise keep it as is.
+          decoded.push_back('%');
+          decoded.push_back(hi);
+          decoded.push_back(lo);
+        }
+        i += 2;
+      }
+    } else {
+      decoded.push_back(ch);
+    }
   }
   return decoded;
 }
@@ -1090,6 +1262,20 @@ Utility::AuthorityAttributes Utility::parseAuthority(absl::string_view host) {
   return {is_ip_address, host_to_resolve, port};
 }
 
+void Utility::validateCoreRetryPolicy(const envoy::config::core::v3::RetryPolicy& retry_policy) {
+  if (retry_policy.has_retry_back_off()) {
+    const auto& core_back_off = retry_policy.retry_back_off();
+
+    uint64_t base_interval_ms = PROTOBUF_GET_MS_REQUIRED(core_back_off, base_interval);
+    uint64_t max_interval_ms =
+        PROTOBUF_GET_MS_OR_DEFAULT(core_back_off, max_interval, base_interval_ms * 10);
+
+    if (max_interval_ms < base_interval_ms) {
+      throw EnvoyException("max_interval must be greater than or equal to the base_interval");
+    }
+  }
+}
+
 envoy::config::route::v3::RetryPolicy
 Utility::convertCoreToRouteRetryPolicy(const envoy::config::core::v3::RetryPolicy& retry_policy,
                                        const std::string& retry_on) {
@@ -1108,7 +1294,8 @@ Utility::convertCoreToRouteRetryPolicy(const envoy::config::core::v3::RetryPolic
         PROTOBUF_GET_MS_OR_DEFAULT(core_back_off, max_interval, base_interval_ms * 10);
 
     if (max_interval_ms < base_interval_ms) {
-      throw EnvoyException("max_interval must be greater than or equal to the base_interval");
+      ENVOY_BUG(false, "max_interval must be greater than or equal to the base_interval");
+      base_interval_ms = max_interval_ms / 2;
     }
   }
 
@@ -1139,13 +1326,78 @@ bool Utility::isSafeRequest(const Http::RequestHeaderMap& request_headers) {
 }
 
 Http::Code Utility::maybeRequestTimeoutCode(bool remote_decode_complete) {
-  return remote_decode_complete &&
-                 Runtime::runtimeFeatureEnabled(
-                     "envoy.reloadable_features.override_request_timeout_by_gateway_timeout")
-             ? Http::Code::GatewayTimeout
-             // Http::Code::RequestTimeout is more expensive because HTTP1 client cannot use the
-             // connection any more.
-             : Http::Code::RequestTimeout;
+  return remote_decode_complete ? Http::Code::GatewayTimeout
+                                // Http::Code::RequestTimeout is more expensive because HTTP1 client
+                                // cannot use the connection any more.
+                                : Http::Code::RequestTimeout;
+}
+
+std::string Utility::newUri(::Envoy::OptRef<const Utility::RedirectConfig> redirect_config,
+                            const Http::RequestHeaderMap& headers) {
+  absl::string_view final_scheme;
+  absl::string_view final_host;
+  absl::string_view final_port;
+  absl::string_view final_path;
+
+  if (redirect_config.has_value() && !redirect_config->scheme_redirect_.empty()) {
+    final_scheme = redirect_config->scheme_redirect_;
+  } else if (redirect_config.has_value() && redirect_config->https_redirect_) {
+    final_scheme = Http::Headers::get().SchemeValues.Https;
+  } else {
+    // Serve the redirect URL based on the scheme of the original URL, not the
+    // security of the underlying connection.
+    final_scheme = headers.getSchemeValue();
+  }
+
+  if (redirect_config.has_value() && !redirect_config->port_redirect_.empty()) {
+    final_port = redirect_config->port_redirect_;
+  } else {
+    final_port = "";
+  }
+
+  if (redirect_config.has_value() && !redirect_config->host_redirect_.empty()) {
+    final_host = redirect_config->host_redirect_;
+  } else {
+    ASSERT(headers.Host());
+    final_host = processRequestHost(headers, final_scheme, final_port);
+  }
+
+  std::string final_path_value;
+  if (redirect_config.has_value() && !redirect_config->path_redirect_.empty()) {
+    // The path_redirect query string, if any, takes precedence over the request's query string,
+    // and it will not be stripped regardless of `strip_query`.
+    if (redirect_config->path_redirect_has_query_) {
+      final_path = redirect_config->path_redirect_;
+    } else {
+      const absl::string_view current_path = headers.getPathValue();
+      const size_t path_end = current_path.find('?');
+      const bool current_path_has_query = path_end != absl::string_view::npos;
+      if (current_path_has_query) {
+        final_path_value = redirect_config->path_redirect_;
+        final_path_value.append(current_path.data() + path_end, current_path.length() - path_end);
+        final_path = final_path_value;
+      } else {
+        final_path = redirect_config->path_redirect_;
+      }
+    }
+  } else {
+    final_path = headers.getPathValue();
+  }
+
+  if (!absl::StartsWith(final_path, "/")) {
+    final_path_value = absl::StrCat("/", final_path);
+    final_path = final_path_value;
+  }
+
+  if (redirect_config.has_value() && !redirect_config->path_redirect_has_query_ &&
+      redirect_config->strip_query_) {
+    const size_t path_end = final_path.find('?');
+    if (path_end != absl::string_view::npos) {
+      final_path = final_path.substr(0, path_end);
+    }
+  }
+
+  return fmt::format("{}://{}{}{}", final_scheme, final_host, final_port, final_path);
 }
 
 } // namespace Http

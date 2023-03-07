@@ -31,6 +31,7 @@ enum HealthCheckerType {
   TCP = 1;
   GRPC = 2;
   REDIS = 3;
+  THRIFT = 4;
 }
 
 // [#next-free-field: 10]

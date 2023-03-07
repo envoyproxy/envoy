@@ -9,7 +9,7 @@
 # TODO(hausdorff): If compatibility becomes an issue here, come back and do this
 # "the right way". This is hard to do in general, since `realpath` is not
 # standard.
-if [ ! "$PWD" == "$(git rev-parse --show-toplevel)" ]; then
+if [ ! "$(pwd -P)" == "$(git rev-parse --show-toplevel)" ]; then
     cat >&2 <<__EOF__
 ERROR: this script must be run at the root of the envoy source tree
 __EOF__
@@ -47,12 +47,12 @@ fi
 HOOKS_DIR="${DOT_GIT_DIR}/hooks"
 HOOKS_DIR_RELPATH=$(relpath "${HOOKS_DIR}" "$(dirname "$0")")
 
-if [ ! -e "${HOOKS_DIR}/prepare-commit-msg" ]; then
+if [[ -n "$REINSTALL_HOOKS" ]] || [[ ! -e "${HOOKS_DIR}/prepare-commit-msg" ]]; then
   echo "Installing hook 'prepare-commit-msg'"
   ln -sf "${HOOKS_DIR_RELPATH}/hooks/prepare-commit-msg" "${HOOKS_DIR}/prepare-commit-msg"
 fi
 
-if [ ! -e "${HOOKS_DIR}/pre-push" ]; then
+if [[ -n "$REINSTALL_HOOKS" ]] || [[ ! -e "${HOOKS_DIR}/pre-push" ]]; then
   echo "Installing hook 'pre-push'"
   ln -sf "${HOOKS_DIR_RELPATH}/hooks/pre-push" "${HOOKS_DIR}/pre-push"
 fi

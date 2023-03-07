@@ -60,7 +60,7 @@ public:
   static T* getExisting() { return loader_; }
 
   static void initialize(T* value) {
-    RELEASE_ASSERT(value != nullptr, "InjectableSingleton initialized with non-null value.");
+    RELEASE_ASSERT(value != nullptr, "InjectableSingleton initialized with null value.");
     RELEASE_ASSERT(loader_ == nullptr, "InjectableSingleton initialized multiple times.");
     loader_ = value;
   }

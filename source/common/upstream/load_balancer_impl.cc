@@ -77,6 +77,36 @@ bool hostWeightsAreEqual(const HostVector& hosts) {
 
 } // namespace
 
+absl::optional<envoy::extensions::load_balancing_policies::common::v3::LocalityLbConfig>
+LoadBalancerConfigHelper::localityLbConfigFromCommonLbConfig(
+    const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config) {
+
+  if (common_config.has_locality_weighted_lb_config()) {
+    envoy::extensions::load_balancing_policies::common::v3::LocalityLbConfig locality_lb_config;
+    locality_lb_config.mutable_locality_weighted_lb_config();
+    return locality_lb_config;
+  } else if (common_config.has_zone_aware_lb_config()) {
+    envoy::extensions::load_balancing_policies::common::v3::LocalityLbConfig locality_lb_config;
+    auto& zone_aware_lb_config = *locality_lb_config.mutable_zone_aware_lb_config();
+
+    const auto& legacy_zone_aware_lb_config = common_config.zone_aware_lb_config();
+    if (legacy_zone_aware_lb_config.has_routing_enabled()) {
+      *zone_aware_lb_config.mutable_routing_enabled() =
+          legacy_zone_aware_lb_config.routing_enabled();
+    }
+    if (legacy_zone_aware_lb_config.has_min_cluster_size()) {
+      *zone_aware_lb_config.mutable_min_cluster_size() =
+          legacy_zone_aware_lb_config.min_cluster_size();
+    }
+    zone_aware_lb_config.set_fail_traffic_on_panic(
+        legacy_zone_aware_lb_config.fail_traffic_on_panic());
+
+    return locality_lb_config;
+  }
+
+  return {};
+}
+
 std::pair<uint32_t, LoadBalancerBase::HostAvailability>
 LoadBalancerBase::choosePriority(uint64_t hash, const HealthyLoad& healthy_per_priority_load,
                                  const DegradedLoad& degraded_per_priority_load) {
@@ -108,15 +138,11 @@ LoadBalancerBase::choosePriority(uint64_t hash, const HealthyLoad& healthy_per_p
   return {0, HostAvailability::Healthy};
 }
 
-LoadBalancerBase::LoadBalancerBase(
-    const PrioritySet& priority_set, ClusterStats& stats, Runtime::Loader& runtime,
-    Random::RandomGenerator& random,
-    const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config)
+LoadBalancerBase::LoadBalancerBase(const PrioritySet& priority_set, ClusterLbStats& stats,
+                                   Runtime::Loader& runtime, Random::RandomGenerator& random,
+                                   uint32_t healthy_panic_threshold)
     : stats_(stats), runtime_(runtime), random_(random),
-      default_healthy_panic_percent_(PROTOBUF_PERCENT_TO_ROUNDED_INTEGER_OR_DEFAULT(
-          common_config, healthy_panic_threshold, 100, 50)),
-      priority_set_(priority_set),
-      override_host_status_(LoadBalancerContextBase::createOverrideHostStatus(common_config)) {
+      default_healthy_panic_percent_(healthy_panic_threshold), priority_set_(priority_set) {
   for (auto& host_set : priority_set_.hostSetsPerPriority()) {
     recalculatePerPriorityState(host_set->priority(), priority_set_, per_priority_load_,
                                 per_priority_health_, per_priority_degraded_, total_healthy_hosts_);
@@ -352,23 +378,28 @@ LoadBalancerBase::chooseHostSet(LoadBalancerContext* context, uint64_t hash) con
 }
 
 ZoneAwareLoadBalancerBase::ZoneAwareLoadBalancerBase(
-    const PrioritySet& priority_set, const PrioritySet* local_priority_set, ClusterStats& stats,
-    Runtime::Loader& runtime, Random::RandomGenerator& random,
-    const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config)
-    : LoadBalancerBase(priority_set, stats, runtime, random, common_config),
+    const PrioritySet& priority_set, const PrioritySet* local_priority_set, ClusterLbStats& stats,
+    Runtime::Loader& runtime, Random::RandomGenerator& random, uint32_t healthy_panic_threshold,
+    const absl::optional<LocalityLbConfig> locality_config)
+    : LoadBalancerBase(priority_set, stats, runtime, random, healthy_panic_threshold),
       local_priority_set_(local_priority_set),
-      routing_enabled_(PROTOBUF_PERCENT_TO_ROUNDED_INTEGER_OR_DEFAULT(
-          common_config.zone_aware_lb_config(), routing_enabled, 100, 100)),
-      min_cluster_size_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(common_config.zone_aware_lb_config(),
-                                                        min_cluster_size, 6U)),
-      fail_traffic_on_panic_(common_config.zone_aware_lb_config().fail_traffic_on_panic()) {
+      min_cluster_size_(locality_config.has_value()
+                            ? PROTOBUF_GET_WRAPPED_OR_DEFAULT(
+                                  locality_config->zone_aware_lb_config(), min_cluster_size, 6U)
+                            : 6U),
+      routing_enabled_(locality_config.has_value()
+                           ? PROTOBUF_PERCENT_TO_ROUNDED_INTEGER_OR_DEFAULT(
+                                 locality_config->zone_aware_lb_config(), routing_enabled, 100, 100)
+                           : 100),
+      fail_traffic_on_panic_(locality_config.has_value()
+                                 ? locality_config->zone_aware_lb_config().fail_traffic_on_panic()
+                                 : false),
+      locality_weighted_balancing_(locality_config.has_value() &&
+                                   locality_config->has_locality_weighted_lb_config()) {
   ASSERT(!priority_set.hostSetsPerPriority().empty());
   resizePerPriorityState();
   priority_update_cb_ = priority_set_.addPriorityUpdateCb(
       [this](uint32_t priority, const HostVector&, const HostVector&) -> void {
-        // Update cross priority host map for fast host searching.
-        cross_priority_host_map_ = priority_set_.crossPriorityHostMap();
-
         // Make sure per_priority_state_ is as large as priority_set_.hostSetsPerPriority()
         resizePerPriorityState();
         // If P=0 changes, regenerate locality routing structures. Locality based routing is
@@ -515,75 +546,8 @@ bool ZoneAwareLoadBalancerBase::earlyExitNonLocalityRouting() {
   return false;
 }
 
-HostStatusSet LoadBalancerContextBase::createOverrideHostStatus(
-    const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config) {
-  HostStatusSet override_host_status;
-
-  if (!common_config.has_override_host_status()) {
-    // No override host status and 'Healthy' and 'Degraded' will be applied by default.
-    override_host_status.set(static_cast<size_t>(Host::Health::Healthy));
-    override_host_status.set(static_cast<size_t>(Host::Health::Degraded));
-    return override_host_status;
-  }
-
-  for (auto single_status : common_config.override_host_status().statuses()) {
-    switch (static_cast<envoy::config::core::v3::HealthStatus>(single_status)) {
-      PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
-    case envoy::config::core::v3::HealthStatus::UNKNOWN:
-    case envoy::config::core::v3::HealthStatus::HEALTHY:
-      override_host_status.set(static_cast<size_t>(Host::Health::Healthy));
-      break;
-    case envoy::config::core::v3::HealthStatus::UNHEALTHY:
-    case envoy::config::core::v3::HealthStatus::DRAINING:
-    case envoy::config::core::v3::HealthStatus::TIMEOUT:
-      override_host_status.set(static_cast<size_t>(Host::Health::Unhealthy));
-      break;
-    case envoy::config::core::v3::HealthStatus::DEGRADED:
-      override_host_status.set(static_cast<size_t>(Host::Health::Degraded));
-      break;
-    }
-  }
-  return override_host_status;
-}
-
-HostConstSharedPtr LoadBalancerContextBase::selectOverrideHost(const HostMap* host_map,
-                                                               HostStatusSet status,
-                                                               LoadBalancerContext* context) {
-  if (context == nullptr) {
-    return nullptr;
-  }
-
-  auto override_host = context->overrideHostToSelect();
-  if (!override_host.has_value()) {
-    return nullptr;
-  }
-
-  if (host_map == nullptr) {
-    return nullptr;
-  }
-
-  auto host_iter = host_map->find(override_host.value());
-
-  // The override host cannot be found in the host map.
-  if (host_iter == host_map->end()) {
-    return nullptr;
-  }
-
-  HostConstSharedPtr host = host_iter->second;
-  ASSERT(host != nullptr);
-
-  if (status[static_cast<size_t>(host->health())]) {
-    return host;
-  }
-  return nullptr;
-}
-
 HostConstSharedPtr ZoneAwareLoadBalancerBase::chooseHost(LoadBalancerContext* context) {
-  HostConstSharedPtr host = LoadBalancerContextBase::selectOverrideHost(
-      cross_priority_host_map_.get(), override_host_status_, context);
-  if (host != nullptr) {
-    return host;
-  }
+  HostConstSharedPtr host;
 
   const size_t max_attempts = context ? context->hostSelectionRetryCount() + 1 : 1;
   for (size_t i = 0; i < max_attempts; ++i) {
@@ -706,24 +670,32 @@ ZoneAwareLoadBalancerBase::hostSourceToUse(LoadBalancerContext* context, uint64_
   }
 
   // If we're doing locality weighted balancing, pick locality.
-  absl::optional<uint32_t> locality;
-  if (host_availability == HostAvailability::Degraded) {
-    locality = host_set.chooseDegradedLocality();
-  } else {
-    locality = host_set.chooseHealthyLocality();
-  }
-
-  if (locality.has_value()) {
-    auto source_type = localitySourceType(host_availability);
-    if (!source_type) {
-      return absl::nullopt;
+  //
+  // The chooseDegradedLocality or chooseHealthyLocality may return valid locality index
+  // when the locality_weighted_lb_config is set or load balancing policy extension is used.
+  // This if statement is to make sure we only do locality weighted balancing when the
+  // locality_weighted_lb_config is set explicitly even the hostSourceToUse is called in the
+  // load balancing policy extensions.
+  if (locality_weighted_balancing_) {
+    absl::optional<uint32_t> locality;
+    if (host_availability == HostAvailability::Degraded) {
+      locality = host_set.chooseDegradedLocality();
+    } else {
+      locality = host_set.chooseHealthyLocality();
     }
-    hosts_source.source_type_ = source_type.value();
-    hosts_source.locality_index_ = locality.value();
-    return hosts_source;
+
+    if (locality.has_value()) {
+      auto source_type = localitySourceType(host_availability);
+      if (!source_type) {
+        return absl::nullopt;
+      }
+      hosts_source.source_type_ = source_type.value();
+      hosts_source.locality_index_ = locality.value();
+      return hosts_source;
+    }
   }
 
-  // If we've latched that we can't do priority-based routing, return healthy or degraded hosts
+  // If we've latched that we can't do locality-based routing, return healthy or degraded hosts
   // for the selected host set.
   if (per_priority_state_[host_set.priority()]->locality_routing_state_ ==
       LocalityRoutingState::NoLocalityRouting) {
@@ -788,13 +760,12 @@ const HostVector& ZoneAwareLoadBalancerBase::hostSourceToHosts(HostsSource hosts
 }
 
 EdfLoadBalancerBase::EdfLoadBalancerBase(
-    const PrioritySet& priority_set, const PrioritySet* local_priority_set, ClusterStats& stats,
-    Runtime::Loader& runtime, Random::RandomGenerator& random,
-    const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config,
-    const absl::optional<envoy::config::cluster::v3::Cluster::SlowStartConfig> slow_start_config,
-    TimeSource& time_source)
+    const PrioritySet& priority_set, const PrioritySet* local_priority_set, ClusterLbStats& stats,
+    Runtime::Loader& runtime, Random::RandomGenerator& random, uint32_t healthy_panic_threshold,
+    const absl::optional<LocalityLbConfig> locality_config,
+    const absl::optional<SlowStartConfig> slow_start_config, TimeSource& time_source)
     : ZoneAwareLoadBalancerBase(priority_set, local_priority_set, stats, runtime, random,
-                                common_config),
+                                healthy_panic_threshold, locality_config),
       seed_(random_.random()),
       slow_start_window_(slow_start_config.has_value()
                              ? std::chrono::milliseconds(DurationUtil::durationToMilliseconds(
@@ -832,16 +803,25 @@ void EdfLoadBalancerBase::initialize() {
 }
 
 void EdfLoadBalancerBase::recalculateHostsInSlowStart(const HostVector& hosts) {
-  auto current_time = time_source_.monotonicTime();
   // TODO(nezdolik): linear scan can be improved with using flat hash set for hosts in slow start.
   for (const auto& host : hosts) {
-    auto host_create_duration =
-        std::chrono::duration_cast<std::chrono::milliseconds>(current_time - host->creationTime());
-    // Check if host existence time is within slow start window.
-    if (host->creationTime() > latest_host_added_time_ &&
-        host_create_duration <= slow_start_window_ &&
-        host->health() == Upstream::Host::Health::Healthy) {
-      latest_host_added_time_ = host->creationTime();
+    auto current_time = time_source_.monotonicTime();
+    // Host enters slow start if only it has transitioned into healthy state.
+    if (host->coarseHealth() == Upstream::Host::Health::Healthy) {
+      auto host_last_hc_pass_time =
+          host->lastHcPassTime() ? host->lastHcPassTime().value() : current_time;
+      auto in_healthy_state_duration = std::chrono::duration_cast<std::chrono::milliseconds>(
+          current_time - host_last_hc_pass_time);
+      // If there is no active HC enabled or HC has not run, start slow start window from current
+      // time.
+      if (!host->lastHcPassTime()) {
+        host->setLastHcPassTime(std::move(current_time));
+      }
+      // Check if host existence time is within slow start window.
+      if (host_last_hc_pass_time > latest_host_added_time_ &&
+          in_healthy_state_duration <= slow_start_window_) {
+        latest_host_added_time_ = host_last_hc_pass_time;
+      }
     }
   }
 }
@@ -992,23 +972,72 @@ double EdfLoadBalancerBase::applyAggressionFactor(double time_factor) {
 }
 
 double EdfLoadBalancerBase::applySlowStartFactor(double host_weight, const Host& host) {
-  auto host_create_duration = std::chrono::duration_cast<std::chrono::milliseconds>(
-      time_source_.monotonicTime() - host.creationTime());
-  if (host_create_duration < slow_start_window_ &&
-      host.health() == Upstream::Host::Health::Healthy) {
-    aggression_ = aggression_runtime_ != absl::nullopt ? aggression_runtime_.value().value() : 1.0;
-    if (aggression_ <= 0.0 || std::isnan(aggression_)) {
-      ENVOY_LOG_EVERY_POW_2(error, "Invalid runtime value provided for aggression parameter, "
-                                   "aggression cannot be less than 0.0");
-      aggression_ = 1.0;
-    }
+  // We can reliably apply slow start weight only if `last_hc_pass_time` in host has been populated
+  // either by active HC or by `member_update_cb_` in `EdfLoadBalancerBase`.
+  if (host.lastHcPassTime() && host.coarseHealth() == Upstream::Host::Health::Healthy) {
+    auto in_healthy_state_duration = std::chrono::duration_cast<std::chrono::milliseconds>(
+        time_source_.monotonicTime() - host.lastHcPassTime().value());
+    if (in_healthy_state_duration < slow_start_window_) {
+      aggression_ =
+          aggression_runtime_ != absl::nullopt ? aggression_runtime_.value().value() : 1.0;
+      if (aggression_ <= 0.0 || std::isnan(aggression_)) {
+        ENVOY_LOG_EVERY_POW_2(error, "Invalid runtime value provided for aggression parameter, "
+                                     "aggression cannot be less than 0.0");
+        aggression_ = 1.0;
+      }
 
-    ASSERT(aggression_ > 0.0);
-    auto time_factor = static_cast<double>(std::max(std::chrono::milliseconds(1).count(),
-                                                    host_create_duration.count())) /
-                       slow_start_window_.count();
-    return host_weight *
-           std::max(applyAggressionFactor(time_factor), slow_start_min_weight_percent_);
+      ASSERT(aggression_ > 0.0);
+      auto time_factor = static_cast<double>(std::max(std::chrono::milliseconds(1).count(),
+                                                      in_healthy_state_duration.count())) /
+                         slow_start_window_.count();
+      return host_weight *
+             std::max(applyAggressionFactor(time_factor), slow_start_min_weight_percent_);
+    } else {
+      return host_weight;
+    }
+  } else {
+    return host_weight;
+  }
+}
+
+double LeastRequestLoadBalancer::hostWeight(const Host& host) {
+  // This method is called to calculate the dynamic weight as following when all load balancing
+  // weights are not equal:
+  //
+  // `weight = load_balancing_weight / (active_requests + 1)^active_request_bias`
+  //
+  // `active_request_bias` can be configured via runtime and its value is cached in
+  // `active_request_bias_` to avoid having to do a runtime lookup each time a host weight is
+  // calculated.
+  //
+  // When `active_request_bias == 0.0` we behave like `RoundRobinLoadBalancer` and return the
+  // host weight without considering the number of active requests at the time we do the pick.
+  //
+  // When `active_request_bias > 0.0` we scale the host weight by the number of active
+  // requests at the time we do the pick. We always add 1 to avoid division by 0.
+  //
+  // It might be possible to do better by picking two hosts off of the schedule, and selecting the
+  // one with fewer active requests at the time of selection.
+
+  double host_weight = static_cast<double>(host.weight());
+
+  // If the value of active requests is the max value, adding +1 will overflow
+  // it and cause a divide by zero. This won't happen in normal cases but stops
+  // failing fuzz tests
+  const uint64_t active_request_value =
+      host.stats().rq_active_.value() != std::numeric_limits<uint64_t>::max()
+          ? host.stats().rq_active_.value() + 1
+          : host.stats().rq_active_.value();
+
+  if (active_request_bias_ == 1.0) {
+    host_weight = static_cast<double>(host.weight()) / active_request_value;
+  } else if (active_request_bias_ != 0.0) {
+    host_weight =
+        static_cast<double>(host.weight()) / std::pow(active_request_value, active_request_bias_);
+  }
+
+  if (!noHostsAreInSlowStart()) {
+    return applySlowStartFactor(host_weight, host);
   } else {
     return host_weight;
   }
@@ -1028,7 +1057,7 @@ HostConstSharedPtr LeastRequestLoadBalancer::unweightedHostPick(const HostVector
 
   for (uint32_t choice_idx = 0; choice_idx < choice_count_; ++choice_idx) {
     const int rand_idx = random_.random() % hosts_to_use.size();
-    HostSharedPtr sampled_host = hosts_to_use[rand_idx];
+    const HostSharedPtr& sampled_host = hosts_to_use[rand_idx];
 
     if (candidate_host == nullptr) {
 
@@ -1079,9 +1108,9 @@ SubsetSelectorImpl::SubsetSelectorImpl(
         LbSubsetSelectorFallbackPolicy fallback_policy,
     const Protobuf::RepeatedPtrField<std::string>& fallback_keys_subset,
     bool single_host_per_subset)
-    : selector_keys_(selector_keys.begin(), selector_keys.end()), fallback_policy_(fallback_policy),
+    : selector_keys_(selector_keys.begin(), selector_keys.end()),
       fallback_keys_subset_(fallback_keys_subset.begin(), fallback_keys_subset.end()),
-      single_host_per_subset_(single_host_per_subset) {
+      fallback_policy_(fallback_policy), single_host_per_subset_(single_host_per_subset) {
 
   if (fallback_policy_ !=
       envoy::config::cluster::v3::Cluster::LbSubsetConfig::LbSubsetSelector::KEYS_SUBSET) {

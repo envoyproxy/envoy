@@ -1,0 +1,8 @@
+syntax = "proto3";
+
+package envoymobile.extensions.filters.http.test_logger;
+
+import "validate/validate.proto";
+
+message TestLogger {
+}

@@ -5,6 +5,10 @@ load(
     "envoy_package",
     "envoy_select_google_grpc",
 )
+load(
+    "@envoy_build_config//:extensions_build_config.bzl",
+    "LEGACY_ALWAYSLINK",
+)
 
 licenses(["notice"])  # Apache 2
 
@@ -205,6 +209,7 @@ envoy_cc_library(
         "//source/common/config:datasource_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
+    alwayslink = LEGACY_ALWAYSLINK,
 )
 
 envoy_cc_library(

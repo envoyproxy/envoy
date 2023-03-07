@@ -55,12 +55,8 @@ static bool shouldShowMetric(const StatType& metric, const StatsParams& params) 
   if (params.used_only_ && !metric.used()) {
     return false;
   }
-  if (params.filter_ != nullptr) {
-    if (!std::regex_search(metric.name(), *params.filter_)) {
-      return false;
-    }
-  } else if (params.re2_filter_ != nullptr &&
-             !re2::RE2::PartialMatch(metric.name(), *params.re2_filter_)) {
+  if (params.re2_filter_ != nullptr &&
+      !re2::RE2::PartialMatch(metric.name(), *params.re2_filter_)) {
     return false;
   }
   return true;
@@ -158,7 +154,6 @@ uint64_t outputStatType(
     for (const auto& metric : group.second) {
       response.add(generate_output(*metric, prefixed_tag_extracted_name.value()));
     }
-    response.add("\n");
   }
   return result;
 }

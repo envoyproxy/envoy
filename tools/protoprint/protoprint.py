@@ -32,6 +32,7 @@ from google.protobuf import text_format
 from envoy.annotations import deprecation_pb2
 from udpa.annotations import migrate_pb2, status_pb2
 from xds.annotations.v3 import status_pb2 as xds_status_pb2
+from validate import validate_pb2
 
 import envoy_repo
 
@@ -240,9 +241,6 @@ def format_header_from_file(
         options.csharp_namespace = '.'.join(names) + 'NS'
         options.ruby_package = '::'.join(names) + 'NS'
 
-    if file_proto.service:
-        options.java_generic_services = True
-
     if file_proto.options.HasExtension(migrate_pb2.file_migrate):
         options.Extensions[migrate_pb2.file_migrate].CopyFrom(
             file_proto.options.Extensions[migrate_pb2.file_migrate])
@@ -342,6 +340,11 @@ def normalize_field_type_name(type_context, field_fqn):
         Normalized type name as a string.
     """
     if field_fqn.startswith('.'):
+        # If there's a [#allow-fully-qualified-name] annotation, return the FQN
+        # field type without attempting to normalize.
+        if annotations.ALLOW_FULLY_QUALIFIED_NAME_ANNOTATION in type_context.leading_comment.annotations:
+            return field_fqn
+
         # Let's say we have type context namespace a.b.c.d.e and the type we're
         # trying to normalize is a.b.d.e. We take (from the end) on package fragment
         # at a time, and apply the inner-most evaluation that protoc performs to see
@@ -694,6 +697,13 @@ class ProtoFormatVisitor(visitor.Visitor):
         fields = ''
         oneof_index = None
         for index, field in enumerate(msg_proto.field):
+            if "/v3" in type_context.source_code_info.name:
+                if field.options.Extensions[validate_pb2.rules].string.min_bytes != 0:
+                    field.options.Extensions[
+                        validate_pb2.rules].string.min_len = field.options.Extensions[
+                            validate_pb2.rules].string.min_bytes
+                    field.options.Extensions[validate_pb2.rules].string.ClearField("min_bytes")
+
             if oneof_index is not None:
                 if not field.HasField('oneof_index') or field.oneof_index != oneof_index:
                     fields += '}\n\n'

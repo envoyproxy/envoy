@@ -11,12 +11,12 @@ namespace Envoy {
 
 // `DRYs` up the creation of a simple filter config for a filter that requires no config.
 template <class T>
-class SimpleFilterConfig : public Extensions::HttpFilters::Common::EmptyHttpFilterConfig {
+class SimpleFilterConfig : public Extensions::HttpFilters::Common::EmptyHttpDualFilterConfig {
 public:
-  SimpleFilterConfig() : EmptyHttpFilterConfig(T::name) {}
+  SimpleFilterConfig() : EmptyHttpDualFilterConfig(T::name) {}
 
-  Http::FilterFactoryCb createFilter(const std::string&,
-                                     Server::Configuration::FactoryContext&) override {
+  Http::FilterFactoryCb createDualFilter(const std::string&,
+                                         Server::Configuration::ServerFactoryContext&) override {
     return [](Http::FilterChainFactoryCallbacks& callbacks) -> void {
       callbacks.addStreamFilter(std::make_shared<T>());
     };

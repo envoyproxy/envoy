@@ -17,7 +17,7 @@ namespace Tap {
 // Singleton registration via macro defined in envoy/singleton/manager.h
 SINGLETON_MANAGER_REGISTRATION(tap_admin_handler);
 
-AdminHandlerSharedPtr AdminHandler::getSingleton(Server::Admin& admin,
+AdminHandlerSharedPtr AdminHandler::getSingleton(OptRef<Server::Admin> admin,
                                                  Singleton::Manager& singleton_manager,
                                                  Event::Dispatcher& main_thread_dispatcher) {
   return singleton_manager.getTyped<AdminHandler>(
@@ -26,8 +26,8 @@ AdminHandlerSharedPtr AdminHandler::getSingleton(Server::Admin& admin,
       });
 }
 
-AdminHandler::AdminHandler(Server::Admin& admin, Event::Dispatcher& main_thread_dispatcher)
-    : admin_(admin), main_thread_dispatcher_(main_thread_dispatcher) {
+AdminHandler::AdminHandler(OptRef<Server::Admin> admin, Event::Dispatcher& main_thread_dispatcher)
+    : admin_(admin.value()), main_thread_dispatcher_(main_thread_dispatcher) {
   const bool rc =
       admin_.addHandler("/tap", "tap filter control", MAKE_ADMIN_HANDLER(handler), true, true);
   RELEASE_ASSERT(rc, "/tap admin endpoint is taken");
@@ -42,7 +42,7 @@ AdminHandler::~AdminHandler() {
   ASSERT(rc);
 }
 
-Http::Code AdminHandler::handler(absl::string_view, Http::HeaderMap&, Buffer::Instance& response,
+Http::Code AdminHandler::handler(Http::HeaderMap&, Buffer::Instance& response,
                                  Server::AdminStream& admin_stream) {
   if (attached_request_ != nullptr) {
     // TODO(mattlklein123): Consider supporting concurrent admin /tap streams. Right now we support

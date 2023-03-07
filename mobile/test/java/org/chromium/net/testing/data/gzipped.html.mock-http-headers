@@ -1,0 +1,3 @@
+HTTP/1.1 200 OK
+Content-Encoding: gzip
+foo: bar

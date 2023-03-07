@@ -1,6 +1,5 @@
 #include "source/server/admin/stats_render.h"
 
-#include "source/common/html/utility.h"
 #include "source/common/json/json_sanitizer.h"
 #include "source/common/stats/histogram_impl.h"
 
@@ -28,7 +27,7 @@ void StatsTextRender::generate(Buffer::Instance& response, const std::string& na
 
 void StatsTextRender::generate(Buffer::Instance& response, const std::string& name,
                                const std::string& value) {
-  response.addFragments({name, ": \"", Html::Utility::sanitize(value), "\"\n"});
+  response.addFragments({name, ": \"", value, "\"\n"});
 }
 
 void StatsTextRender::generate(Buffer::Instance& response, const std::string& name,

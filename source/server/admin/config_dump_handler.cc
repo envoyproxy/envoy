@@ -131,13 +131,13 @@ absl::optional<std::string> maskParam(const Http::Utility::QueryParams& params) 
 
 // Helper method to get the eds parameter.
 bool shouldIncludeEdsInDump(const Http::Utility::QueryParams& params) {
-  return Utility::queryParam(params, "include_eds") != absl::nullopt;
+  return params.find("include_eds") != params.end();
 }
 
 absl::StatusOr<Matchers::StringMatcherPtr>
 buildNameMatcher(const Http::Utility::QueryParams& params) {
   const auto name_regex = Utility::queryParam(params, "name_regex");
-  if (!name_regex.has_value()) {
+  if (!name_regex.has_value() || name_regex->empty()) {
     return std::make_unique<Matchers::UniversalStringMatcher>();
   }
   envoy::type::matcher::v3::RegexMatcher matcher;
@@ -157,10 +157,10 @@ buildNameMatcher(const Http::Utility::QueryParams& params) {
 ConfigDumpHandler::ConfigDumpHandler(ConfigTracker& config_tracker, Server::Instance& server)
     : HandlerContextBase(server), config_tracker_(config_tracker) {}
 
-Http::Code ConfigDumpHandler::handlerConfigDump(absl::string_view url,
-                                                Http::ResponseHeaderMap& response_headers,
-                                                Buffer::Instance& response, AdminStream&) const {
-  Http::Utility::QueryParams query_params = Http::Utility::parseAndDecodeQueryString(url);
+Http::Code ConfigDumpHandler::handlerConfigDump(Http::ResponseHeaderMap& response_headers,
+                                                Buffer::Instance& response,
+                                                AdminStream& admin_stream) const {
+  Http::Utility::QueryParams query_params = admin_stream.queryParams();
   const auto resource = resourceParam(query_params);
   const auto mask = maskParam(query_params);
   const bool include_eds = shouldIncludeEdsInDump(query_params);
@@ -362,7 +362,7 @@ void ConfigDumpHandler::addLbEndpoint(
   }
   lb_endpoint.mutable_load_balancing_weight()->set_value(host->weight());
 
-  switch (host->health()) {
+  switch (host->coarseHealth()) {
   case Upstream::Host::Health::Healthy:
     lb_endpoint.set_health_status(envoy::config::core::v3::HealthStatus::HEALTHY);
     break;

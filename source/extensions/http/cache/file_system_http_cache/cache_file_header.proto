@@ -1,0 +1,51 @@
+syntax = "proto3";
+
+package Envoy.Extensions.HttpFilters.Cache.FileSystemHttpCache;
+
+import "google/protobuf/timestamp.proto";
+import "source/extensions/filters/http/cache/key.proto";
+
+// The full structure of a cache file is:
+// 4 byte cache file identifier (used to ignore files that don't belong to the cache)
+// 4 byte cache version identifier (if mismatched, the cache file is invalid and is deleted)
+// 4 byte header size
+// 4 byte trailer size
+// 8 byte body size
+// serialized CacheFileHeader
+// body
+// serialized CacheFileTrailer
+//
+// The opening block is necessary to allow the sizes to be at the front of the file, but
+// (necessarily) written last - you can't easily insert things into a serialized proto, so
+// a flat layout for this block is necessary.
+//
+// One slightly special case is the cache file for an entry with 'vary' headers involved
+// - for this case at the 'hub' entry there is no trailer or body, and the only header
+// is a 'vary' header, which indicates that the actual cache key will include some headers
+// from the request.
+
+// For serializing to cache files only, the CacheFileHeader message contains the cache
+// entry key, the cache metadata, and the http response headers.
+message CacheFileHeader {
+  Key key = 1;
+  google.protobuf.Timestamp metadata_response_time = 2;
+  // Repeated Header messages are used, rather than a proto map, because there may be
+  // repeated keys, and ordering may be important.
+  message Header {
+    string key = 1;
+    string value = 2;
+  }
+  repeated Header headers = 3;
+};
+
+// For serializing to cache files only, the CacheFileTrailer message contains the http
+// response trailers.
+message CacheFileTrailer {
+  // Repeated Trailer messages are used, rather than a proto map, because there may be
+  // repeated keys, and ordering may be important.
+  message Trailer {
+    string key = 1;
+    string value = 2;
+  }
+  repeated Trailer trailers = 3;
+};

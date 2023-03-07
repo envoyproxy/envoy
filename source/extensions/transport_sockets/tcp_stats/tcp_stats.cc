@@ -79,7 +79,7 @@ absl::optional<struct tcp_info> TcpStatsSocket::querySocketInfo() {
   memset(&info, 0, sizeof(info));
   socklen_t optlen = sizeof(info);
   const auto result = callbacks_->ioHandle().getOption(IPPROTO_TCP, TCP_INFO, &info, &optlen);
-  if ((result.return_value_ != 0) || (optlen < sizeof(info))) {
+  if (result.return_value_ != 0) {
     ENVOY_LOG(debug, "Failed getsockopt(IPPROTO_TCP, TCP_INFO): rc {} errno {} optlen {}",
               result.return_value_, result.errno_, optlen);
     return absl::nullopt;
@@ -141,6 +141,10 @@ void TcpStatsSocket::recordStats() {
                  tcp_info->tcpi_data_segs_in);
   update_counter(config_->stats_.cx_tx_retransmitted_segments_, last_cx_tx_retransmitted_segments_,
                  tcp_info->tcpi_total_retrans);
+  update_counter(config_->stats_.cx_rx_bytes_received_, last_cx_rx_bytes_received_,
+                 tcp_info->tcpi_bytes_received);
+  update_counter(config_->stats_.cx_tx_bytes_sent_, last_cx_tx_bytes_sent_,
+                 tcp_info->tcpi_bytes_sent);
 
   update_gauge(config_->stats_.cx_tx_unsent_bytes_, last_cx_tx_unsent_bytes_,
                tcp_info->tcpi_notsent_bytes);

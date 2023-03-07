@@ -307,3 +307,9 @@ public:
 
 } // namespace Matcher
 } // namespace Envoy
+
+// NOLINT(namespace-envoy)
+namespace fmt {
+// Allow fmtlib to use operator << defined in DataInputGetResult
+template <> struct formatter<::Envoy::Matcher::DataInputGetResult> : ostream_formatter {};
+} // namespace fmt

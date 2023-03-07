@@ -35,6 +35,7 @@ public:
   std::string name() const { return logger_->name(); }
   void setLevel(spdlog::level::level_enum level) { logger_->set_level(level); }
   spdlog::level::level_enum level() const { return logger_->level(); }
+  spdlog::logger& getLogger() { return *logger_; }
 
   /*
    * Exposes the log method of the logger. See `spdlog::logger` log method.
@@ -53,8 +54,6 @@ protected:
 private:
   std::shared_ptr<spdlog::logger> logger_; // Use shared_ptr here to allow static construction
                                            // of vector in Registry::allLoggers().
-  // TODO(junr03): expand Logger's public API to delete this friendship.
-  friend class Registry;
 };
 
 } // namespace Logger

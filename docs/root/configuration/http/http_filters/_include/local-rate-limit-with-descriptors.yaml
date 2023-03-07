@@ -24,11 +24,11 @@ static_resources:
             - name: local_service
               domains: ["*"]
               routes:
-              - match: { prefix: "/foo" }
+              - match: {prefix: "/foo"}
                 route:
                   cluster: service_protected_by_rate_limit
                   rate_limits:
-                  - actions: # any actions in here
+                  - actions:  # any actions in here
                     - request_headers:
                         header_name: x-envoy-downstream-service-cluster
                         descriptor_key: client_cluster
@@ -54,7 +54,7 @@ static_resources:
                         numerator: 100
                         denominator: HUNDRED
                     response_headers_to_add:
-                    - append: false
+                    - append_action: OVERWRITE_IF_EXISTS_OR_ADD
                       header:
                         key: x-test-rate-limit
                         value: 'true'
@@ -77,8 +77,8 @@ static_resources:
                         max_tokens: 100
                         tokens_per_fill: 100
                         fill_interval: 60s
-              - match: { prefix: "/" }
-                route: { cluster: default_service }
+              - match: {prefix: "/"}
+                route: {cluster: default_service}
   clusters:
   - name: default_service
     load_assignment:

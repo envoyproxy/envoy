@@ -24,8 +24,8 @@ static_resources:
             - name: local_service
               domains: ["*"]
               routes:
-              - match: { prefix: "/path/with/rate/limit" }
-                route: { cluster: service_protected_by_rate_limit }
+              - match: {prefix: "/path/with/rate/limit"}
+                route: {cluster: service_protected_by_rate_limit}
                 typed_per_filter_config:
                   envoy.filters.http.local_ratelimit:
                     "@type": type.googleapis.com/envoy.extensions.filters.http.local_ratelimit.v3.LocalRateLimit
@@ -45,12 +45,12 @@ static_resources:
                         numerator: 100
                         denominator: HUNDRED
                     response_headers_to_add:
-                      - append: false
-                        header:
-                          key: x-local-rate-limit
-                          value: 'true'
-              - match: { prefix: "/" }
-                route: { cluster: default_service }
+                    - append_action: OVERWRITE_IF_EXISTS_OR_ADD
+                      header:
+                        key: x-local-rate-limit
+                        value: 'true'
+              - match: {prefix: "/"}
+                route: {cluster: default_service}
   clusters:
   - name: default_service
     load_assignment:

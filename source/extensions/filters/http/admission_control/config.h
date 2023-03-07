@@ -14,15 +14,18 @@ namespace AdmissionControl {
  * Config registration for the adaptive concurrency limit filter. @see NamedHttpFilterConfigFactory.
  */
 class AdmissionControlFilterFactory
-    : public Common::FactoryBase<
+    : public Common::DualFactoryBase<
           envoy::extensions::filters::http::admission_control::v3::AdmissionControl> {
 public:
-  AdmissionControlFilterFactory() : FactoryBase("envoy.filters.http.admission_control") {}
+  AdmissionControlFilterFactory() : DualFactoryBase("envoy.filters.http.admission_control") {}
 
   Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
       const envoy::extensions::filters::http::admission_control::v3::AdmissionControl& proto_config,
-      const std::string& stats_prefix, Server::Configuration::FactoryContext& context) override;
+      const std::string& stats_prefix, DualInfo dual_info,
+      Server::Configuration::ServerFactoryContext& context) override;
 };
+
+using UpstreamAdmissionControlFilterFactory = AdmissionControlFilterFactory;
 
 } // namespace AdmissionControl
 } // namespace HttpFilters

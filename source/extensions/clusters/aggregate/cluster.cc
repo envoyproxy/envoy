@@ -12,14 +12,16 @@ namespace Extensions {
 namespace Clusters {
 namespace Aggregate {
 
-Cluster::Cluster(const envoy::config::cluster::v3::Cluster& cluster,
+Cluster::Cluster(Server::Configuration::ServerFactoryContext& server_context,
+                 const envoy::config::cluster::v3::Cluster& cluster,
                  const envoy::extensions::clusters::aggregate::v3::ClusterConfig& config,
                  Upstream::ClusterManager& cluster_manager, Runtime::Loader& runtime,
                  Random::RandomGenerator& random,
                  Server::Configuration::TransportSocketFactoryContextImpl& factory_context,
                  Stats::ScopeSharedPtr&& stats_scope, bool added_via_api)
-    : Upstream::ClusterImplBase(cluster, runtime, factory_context, std::move(stats_scope),
-                                added_via_api, factory_context.mainThreadDispatcher().timeSource()),
+    : Upstream::ClusterImplBase(server_context, cluster, runtime, factory_context,
+                                std::move(stats_scope), added_via_api,
+                                factory_context.mainThreadDispatcher().timeSource()),
       cluster_manager_(cluster_manager), runtime_(runtime), random_(random),
       clusters_(std::make_shared<ClusterSet>(config.clusters().begin(), config.clusters().end())) {}
 
@@ -108,7 +110,7 @@ void AggregateClusterLoadBalancer::refresh(OptRef<const std::string> excluded_cl
   PriorityContextPtr priority_context = linearizePrioritySet(excluded_cluster);
   if (!priority_context->priority_set_.hostSetsPerPriority().empty()) {
     load_balancer_ = std::make_unique<LoadBalancerImpl>(
-        *priority_context, parent_info_->stats(), runtime_, random_, parent_info_->lbConfig());
+        *priority_context, parent_info_->lbStats(), runtime_, random_, parent_info_->lbConfig());
   } else {
     load_balancer_ = nullptr;
   }
@@ -208,15 +210,16 @@ AggregateClusterLoadBalancer::lifetimeCallbacks() {
 
 std::pair<Upstream::ClusterImplBaseSharedPtr, Upstream::ThreadAwareLoadBalancerPtr>
 ClusterFactory::createClusterWithConfig(
+    Server::Configuration::ServerFactoryContext& server_context,
     const envoy::config::cluster::v3::Cluster& cluster,
     const envoy::extensions::clusters::aggregate::v3::ClusterConfig& proto_config,
     Upstream::ClusterFactoryContext& context,
     Server::Configuration::TransportSocketFactoryContextImpl& socket_factory_context,
     Stats::ScopeSharedPtr&& stats_scope) {
-  auto new_cluster =
-      std::make_shared<Cluster>(cluster, proto_config, context.clusterManager(), context.runtime(),
-                                context.api().randomGenerator(), socket_factory_context,
-                                std::move(stats_scope), context.addedViaApi());
+  auto new_cluster = std::make_shared<Cluster>(
+      server_context, cluster, proto_config, context.clusterManager(), context.runtime(),
+      context.api().randomGenerator(), socket_factory_context, std::move(stats_scope),
+      context.addedViaApi());
   auto lb = std::make_unique<AggregateThreadAwareLoadBalancer>(*new_cluster);
   return std::make_pair(new_cluster, std::move(lb));
 }

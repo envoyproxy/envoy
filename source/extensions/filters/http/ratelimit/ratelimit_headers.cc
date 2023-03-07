@@ -75,6 +75,10 @@ uint32_t XRateLimitHeaderUtils::convertRateLimitUnit(
     return 60 * 60;
   case envoy::service::ratelimit::v3::RateLimitResponse::RateLimit::DAY:
     return 24 * 60 * 60;
+  case envoy::service::ratelimit::v3::RateLimitResponse::RateLimit::MONTH:
+    return 30 * 24 * 60 * 60;
+  case envoy::service::ratelimit::v3::RateLimitResponse::RateLimit::YEAR:
+    return 365 * 24 * 60 * 60;
   case envoy::service::ratelimit::v3::RateLimitResponse::RateLimit::UNKNOWN:
   default:
     return 0;

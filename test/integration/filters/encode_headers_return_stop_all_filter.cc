@@ -100,5 +100,8 @@ constexpr char EncodeHeadersReturnStopAllFilter::name[];
 static Registry::RegisterFactory<SimpleFilterConfig<EncodeHeadersReturnStopAllFilter>,
                                  Server::Configuration::NamedHttpFilterConfigFactory>
     register_;
+static Registry::RegisterFactory<SimpleFilterConfig<EncodeHeadersReturnStopAllFilter>,
+                                 Server::Configuration::UpstreamHttpFilterConfigFactory>
+    register_upstream_;
 
 } // namespace Envoy

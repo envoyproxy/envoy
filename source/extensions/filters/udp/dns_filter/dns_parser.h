@@ -125,11 +125,16 @@ struct DnsParserCounters {
   Stats::Counter& underflow_counter;
   Stats::Counter& record_name_overflow;
   Stats::Counter& query_parsing_failure;
+  Stats::Counter& queries_with_additional_rrs;
+  Stats::Counter& queries_with_ans_or_authority_rrs;
 
   DnsParserCounters(Stats::Counter& underflow, Stats::Counter& record_name,
-                    Stats::Counter& query_parsing)
+                    Stats::Counter& query_parsing, Stats::Counter& queries_with_additional_rrs,
+                    Stats::Counter& queries_with_ans_or_authority_rrs)
       : underflow_counter(underflow), record_name_overflow(record_name),
-        query_parsing_failure(query_parsing) {}
+        query_parsing_failure(query_parsing),
+        queries_with_additional_rrs(queries_with_additional_rrs),
+        queries_with_ans_or_authority_rrs(queries_with_ans_or_authority_rrs) {}
 };
 
 // The flags have been verified with dig and this structure should not be modified. The flag
@@ -169,17 +174,18 @@ public:
   DnsQueryContext(Network::Address::InstanceConstSharedPtr local,
                   Network::Address::InstanceConstSharedPtr peer, DnsParserCounters& counters,
                   uint64_t retry_count)
-      : local_(std::move(local)), peer_(std::move(peer)), counters_(counters), parse_status_(false),
+      : local_(std::move(local)), peer_(std::move(peer)), counters_(counters),
         response_code_(DNS_RESPONSE_CODE_NO_ERROR), retry_(retry_count) {}
 
   const Network::Address::InstanceConstSharedPtr local_;
   const Network::Address::InstanceConstSharedPtr peer_;
   DnsParserCounters& counters_;
-  bool parse_status_;
+  bool parse_status_{false};
   uint16_t response_code_;
   uint64_t retry_;
   uint16_t id_;
-  Network::DnsResolver::ResolutionStatus resolution_status_;
+  Network::DnsResolver::ResolutionStatus resolution_status_ =
+      Network::DnsResolver::ResolutionStatus::Success;
   DnsHeader header_;
   DnsHeader response_header_;
   DnsQueryPtrVec queries_;

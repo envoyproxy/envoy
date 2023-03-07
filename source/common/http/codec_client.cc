@@ -14,7 +14,7 @@
 #include "source/common/http/utility.h"
 
 #ifdef ENVOY_ENABLE_QUIC
-#include "source/common/quic/codec_impl.h"
+#include "source/common/quic/client_codec_impl.h"
 #endif
 
 namespace Envoy {
@@ -59,7 +59,7 @@ void CodecClient::connect() {
   }
 }
 
-void CodecClient::close() { connection_->close(Network::ConnectionCloseType::NoFlush); }
+void CodecClient::close(Network::ConnectionCloseType type) { connection_->close(type); }
 
 void CodecClient::deleteRequest(ActiveRequest& request) {
   connection_->dispatcher().deferredDelete(request.removeFromList(active_requests_));
@@ -73,15 +73,14 @@ void CodecClient::deleteRequest(ActiveRequest& request) {
 
 RequestEncoder& CodecClient::newStream(ResponseDecoder& response_decoder) {
   ActiveRequestPtr request(new ActiveRequest(*this, response_decoder));
-  request->encoder_ = &codec_->newStream(*request);
-  request->encoder_->getStream().addCallbacks(*request);
+  request->setEncoder(codec_->newStream(*request));
   LinkedList::moveIntoList(std::move(request), active_requests_);
 
   auto upstream_info = connection_->streamInfo().upstreamInfo();
   upstream_info->setUpstreamNumStreams(upstream_info->upstreamNumStreams() + 1);
 
   disableIdleTimer();
-  return *active_requests_.front()->encoder_;
+  return *active_requests_.front();
 }
 
 void CodecClient::onEvent(Network::ConnectionEvent event) {
@@ -118,7 +117,7 @@ void CodecClient::onEvent(Network::ConnectionEvent event) {
     }
     while (!active_requests_.empty()) {
       // Fake resetting all active streams so that reset() callbacks get invoked.
-      active_requests_.front()->encoder_->getStream().resetStream(reason);
+      active_requests_.front()->getStream().resetStream(reason);
     }
   }
 }
@@ -128,12 +127,29 @@ void CodecClient::responsePreDecodeComplete(ActiveRequest& request) {
   if (codec_client_callbacks_) {
     codec_client_callbacks_->onStreamPreDecodeComplete();
   }
+  request.decode_complete_ = true;
+  if (request.encode_complete_ || !request.wait_encode_complete_) {
+    completeRequest(request);
+  } else {
+    ENVOY_CONN_LOG(debug, "waiting for encode to complete", *connection_);
+  }
+}
+
+void CodecClient::requestEncodeComplete(ActiveRequest& request) {
+  ENVOY_CONN_LOG(debug, "encode complete", *connection_);
+  request.encode_complete_ = true;
+  if (request.decode_complete_) {
+    completeRequest(request);
+  }
+}
+
+void CodecClient::completeRequest(ActiveRequest& request) {
   deleteRequest(request);
 
   // HTTP/2 can send us a reset after a complete response if the request was not complete. Users
   // of CodecClient will deal with the premature response case and we should not handle any
   // further reset notification.
-  request.encoder_->getStream().removeCallbacks(request);
+  request.removeEncoderCallbacks();
 }
 
 void CodecClient::onReset(ActiveRequest& request, StreamResetReason reason) {
@@ -155,7 +171,7 @@ void CodecClient::onData(Buffer::Instance& data) {
     if (!isPrematureResponseError(status) ||
         (!active_requests_.empty() ||
          getPrematureResponseHttpCode(status) != Code::RequestTimeout)) {
-      host_->cluster().stats().upstream_cx_protocol_error_.inc();
+      host_->cluster().trafficStats()->upstream_cx_protocol_error_.inc();
       protocol_error_ = true;
     }
     close();
@@ -164,6 +180,35 @@ void CodecClient::onData(Buffer::Instance& data) {
   // All data should be consumed at this point if the connection remains open.
   ASSERT(data.length() == 0 || connection_->state() != Network::Connection::State::Open,
          absl::StrCat("extraneous bytes after response complete: ", data.length()));
+}
+
+void CodecClient::ActiveRequest::decodeHeaders(ResponseHeaderMapPtr&& headers, bool end_stream) {
+  if (header_validator_) {
+    ::Envoy::Http::HeaderValidator::ResponseHeaderMapValidationResult result =
+        header_validator_->validateResponseHeaderMap(*headers);
+    if (!result.ok()) {
+      ENVOY_CONN_LOG(debug, "Response header validation failed\n{}", *parent_.connection_,
+                     *headers);
+      if ((parent_.codec_->protocol() == Protocol::Http2 &&
+           !parent_.host_->cluster()
+                .http2Options()
+                .override_stream_error_on_invalid_http_message()
+                .value()) ||
+          (parent_.codec_->protocol() == Protocol::Http3 &&
+           !parent_.host_->cluster()
+                .http3Options()
+                .override_stream_error_on_invalid_http_message()
+                .value())) {
+        parent_.host_->cluster().trafficStats()->upstream_cx_protocol_error_.inc();
+        parent_.protocol_error_ = true;
+        parent_.close();
+      } else {
+        inner_encoder_->getStream().resetStream(StreamResetReason::ProtocolError);
+      }
+      return;
+    }
+  }
+  ResponseDecoderWrapper::decodeHeaders(std::move(headers), end_stream);
 }
 
 CodecClientProd::CodecClientProd(CodecType type, Network::ClientConnectionPtr&& connection,

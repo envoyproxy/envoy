@@ -24,8 +24,8 @@ uint32_t getMaxStreams(const Upstream::ClusterInfo& cluster) {
 
 const Envoy::Ssl::ClientContextConfig&
 getConfig(Network::UpstreamTransportSocketFactory& transport_socket_factory) {
-  return dynamic_cast<Quic::QuicClientTransportSocketFactory&>(transport_socket_factory)
-      .clientContextConfig();
+  ASSERT(transport_socket_factory.clientContextConfig().has_value());
+  return transport_socket_factory.clientContextConfig().value();
 }
 
 std::string sni(const Network::TransportSocketOptionsConstSharedPtr& options,
@@ -39,16 +39,15 @@ std::string sni(const Network::TransportSocketOptionsConstSharedPtr& options,
 
 ActiveClient::ActiveClient(Envoy::Http::HttpConnPoolImplBase& parent,
                            Upstream::Host::CreateConnectionData& data)
-    : MultiplexedActiveClientBase(parent, getMaxStreams(parent.host()->cluster()),
-                                  getMaxStreams(parent.host()->cluster()),
-                                  parent.host()->cluster().stats().upstream_cx_http3_total_, data),
+    : MultiplexedActiveClientBase(
+          parent, getMaxStreams(parent.host()->cluster()), getMaxStreams(parent.host()->cluster()),
+          parent.host()->cluster().trafficStats()->upstream_cx_http3_total_, data),
       async_connect_callback_(parent_.dispatcher().createSchedulableCallback([this]() {
         if (state() != Envoy::ConnectionPool::ActiveClient::State::Connecting) {
           return;
         }
         codec_client_->connect();
-        if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.http3_sends_early_data") &&
-            readyForStream()) {
+        if (readyForStream()) {
           // This client can send early data, so check if there are any pending streams can be sent
           // as early data.
           parent_.onUpstreamReadyForEarlyData(*this);
@@ -56,8 +55,6 @@ ActiveClient::ActiveClient(Envoy::Http::HttpConnPoolImplBase& parent,
       })) {
   ASSERT(codec_client_);
   if (dynamic_cast<CodecClientProd*>(codec_client_.get()) == nullptr) {
-    ASSERT(Runtime::runtimeFeatureEnabled(
-        "envoy.reloadable_features.postpone_h3_client_connect_to_next_loop"));
     // Hasn't called connect() yet, schedule one for the next event loop.
     async_connect_callback_->scheduleCallbackNextIteration();
   }
@@ -119,21 +116,25 @@ Http3ConnPoolImpl::createClientConnection(Quic::QuicStatNames& quic_stat_names,
                                           OptRef<Http::HttpServerPropertiesCache> rtt_cache,
                                           Stats::Scope& scope) {
   std::shared_ptr<quic::QuicCryptoClientConfig> crypto_config =
-      dynamic_cast<Quic::QuicClientTransportSocketFactory&>(host_->transportSocketFactory())
-          .getCryptoConfig();
+      host_->transportSocketFactory().getCryptoConfig();
   if (crypto_config == nullptr) {
     return nullptr; // no secrets available yet.
   }
-  auto source_address = host()->cluster().sourceAddress();
-  if (!source_address.get()) {
+
+  auto upstream_local_address_selector = host()->cluster().getUpstreamLocalAddressSelector();
+  auto upstream_local_address =
+      upstream_local_address_selector->getUpstreamLocalAddress(host()->address(), socketOptions());
+  auto source_address = upstream_local_address.address_;
+
+  if (source_address == nullptr) {
     auto host_address = host()->address();
     source_address = Network::Utility::getLocalAddress(host_address->ip()->version());
   }
-  Network::ConnectionSocket::OptionsSharedPtr socket_options =
-      Upstream::combineConnectionSocketOptions(host()->cluster(), socketOptions());
+
   return Quic::createQuicNetworkConnection(
       quic_info_, std::move(crypto_config), server_id_, dispatcher(), host()->address(),
-      source_address, quic_stat_names, rtt_cache, scope, socket_options, transportSocketOptions());
+      source_address, quic_stat_names, rtt_cache, scope, upstream_local_address.socket_options_,
+      transportSocketOptions(), connection_id_generator_);
 }
 
 std::unique_ptr<Http3ConnPoolImpl>
@@ -153,8 +154,7 @@ allocateConnPool(Event::Dispatcher& dispatcher, Random::RandomGenerator& random_
                             "Creating Http/3 client");
         // If there's no ssl context, the secrets are not loaded. Fast-fail by returning null.
         auto factory = &pool->host()->transportSocketFactory();
-        ASSERT(dynamic_cast<Quic::QuicClientTransportSocketFactory*>(factory) != nullptr);
-        if (static_cast<Quic::QuicClientTransportSocketFactory*>(factory)->sslCtx() == nullptr) {
+        if (factory->sslCtx() == nullptr) {
           ENVOY_LOG_EVERY_POW_2_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::pool),
                                           warn,
                                           "Failed to create Http/3 client. Transport socket "
@@ -171,30 +171,16 @@ allocateConnPool(Event::Dispatcher& dispatcher, Random::RandomGenerator& random_
               "Failed to create Http/3 client. Failed to create quic network connection.");
           return nullptr;
         }
-        // Store a handle to connection as it will be moved during client construction.
-        Network::Connection& connection = *data.connection_;
         auto client = std::make_unique<ActiveClient>(*pool, data);
-        if (connection.state() == Network::Connection::State::Closed) {
-          // TODO(danzh) remove this branch once
-          // "envoy.reloadable_features.postpone_h3_client_connect_to_next_loop" is deprecated.
-          ASSERT(dynamic_cast<CodecClientProd*>(client->codec_client_.get()) != nullptr);
-          return nullptr;
-        }
         return client;
       },
       [](Upstream::Host::CreateConnectionData& data, HttpConnPoolImplBase* pool) {
         // Because HTTP/3 codec client connect() can close connection inline and can raise 0-RTT
         // event inline, and both cases need to have network callbacks and http callbacks wired up
         // to propagate the event, so do not call connect() during codec client construction.
-        CodecClientPtr codec =
-            Runtime::runtimeFeatureEnabled(
-                "envoy.reloadable_features.postpone_h3_client_connect_to_next_loop")
-                ? std::make_unique<NoConnectCodecClientProd>(
-                      CodecType::HTTP3, std::move(data.connection_), data.host_description_,
-                      pool->dispatcher(), pool->randomGenerator(), pool->transportSocketOptions())
-                : std::make_unique<CodecClientProd>(
-                      CodecType::HTTP3, std::move(data.connection_), data.host_description_,
-                      pool->dispatcher(), pool->randomGenerator(), pool->transportSocketOptions());
+        CodecClientPtr codec = std::make_unique<NoConnectCodecClientProd>(
+            CodecType::HTTP3, std::move(data.connection_), data.host_description_,
+            pool->dispatcher(), pool->randomGenerator(), pool->transportSocketOptions());
         return codec;
       },
       std::vector<Protocol>{Protocol::Http3}, connect_callback, quic_info);

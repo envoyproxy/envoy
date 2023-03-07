@@ -41,5 +41,9 @@ constexpr char InvalidHeaderFilter::name[];
 static Registry::RegisterFactory<SimpleFilterConfig<InvalidHeaderFilter>,
                                  Server::Configuration::NamedHttpFilterConfigFactory>
     decoder_register_;
+constexpr char InvalidHeaderFilter::name[];
+static Registry::RegisterFactory<SimpleFilterConfig<InvalidHeaderFilter>,
+                                 Server::Configuration::UpstreamHttpFilterConfigFactory>
+    decoder_register_upstream_;
 
 } // namespace Envoy

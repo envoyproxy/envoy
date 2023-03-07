@@ -29,7 +29,6 @@ using testing::InSequence;
 using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
-using testing::WithArgs;
 
 namespace Envoy {
 namespace Network {
@@ -412,6 +411,25 @@ TEST_F(NetworkFilterManagerTest, InjectWriteDataToFilterChain) {
       .WillOnce(Return(FilterStatus::Continue));
   EXPECT_CALL(connection_, rawWrite(BufferStringEqual(" everyone!"), true));
   filter->write_callbacks_->injectWriteDataToFilterChain(injected_buffer, true);
+}
+
+TEST_F(NetworkFilterManagerTest, StartUpstreamSecureTransport) {
+  InSequence s;
+
+  MockReadFilter* read_filter_1(new MockReadFilter());
+  MockReadFilter* read_filter_2(new MockReadFilter());
+  MockFilter* filter(new MockFilter());
+
+  FilterManagerImpl manager(connection_, socket_);
+  manager.addReadFilter(ReadFilterSharedPtr{read_filter_1});
+  manager.addReadFilter(ReadFilterSharedPtr{read_filter_2});
+  manager.addFilter(FilterSharedPtr{filter});
+
+  // Verify that filter manager calls each filter's 'startUpstreamsecureTransport' method.
+  // when one filter calls startUpstreamSecureTransport.
+  EXPECT_CALL(*read_filter_1, startUpstreamSecureTransport);
+  EXPECT_CALL(*read_filter_2, startUpstreamSecureTransport);
+  filter->callbacks_->startUpstreamSecureTransport();
 }
 
 } // namespace

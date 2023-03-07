@@ -20,6 +20,14 @@ namespace TcpGrpc {
 
 AccessLog::InstanceSharedPtr TcpGrpcAccessLogFactory::createAccessLogInstance(
     const Protobuf::Message& config, AccessLog::FilterPtr&& filter,
+    Server::Configuration::ListenerAccessLogFactoryContext& context) {
+  return createAccessLogInstance(
+      config, std::move(filter),
+      static_cast<Server::Configuration::CommonFactoryContext&>(context));
+}
+
+AccessLog::InstanceSharedPtr TcpGrpcAccessLogFactory::createAccessLogInstance(
+    const Protobuf::Message& config, AccessLog::FilterPtr&& filter,
     Server::Configuration::CommonFactoryContext& context) {
   GrpcCommon::validateProtoDescriptors();
 
@@ -40,8 +48,8 @@ std::string TcpGrpcAccessLogFactory::name() const { return "envoy.access_loggers
 /**
  * Static registration for the TCP gRPC access log. @see RegisterFactory.
  */
-REGISTER_FACTORY(TcpGrpcAccessLogFactory,
-                 Server::Configuration::AccessLogInstanceFactory){"envoy.tcp_grpc_access_log"};
+LEGACY_REGISTER_FACTORY(TcpGrpcAccessLogFactory, Server::Configuration::AccessLogInstanceFactory,
+                        "envoy.tcp_grpc_access_log");
 
 } // namespace TcpGrpc
 } // namespace AccessLoggers

@@ -193,16 +193,15 @@ bool DnsMessageParser::parseDnsObject(DnsQueryContextPtr& context,
     }
   } while (!done);
 
-  // Only QR == 0 and questions without any answer RRs are expected
+  // Only QR == 0 and questions without any answer and authority RRs are expected
   if (!(context->header_.flags.qr == 0 && context->header_.answers == 0 &&
-        context->header_.authority_rrs == 0 && context->header_.additional_rrs == 0)) {
-    ENVOY_LOG(
-        debug,
-        "One or more of Answers [{}], Authority [{}], and Additional [{}] RRs present in the query."
-        "Inverse query is not supported",
-        static_cast<int>(context->header_.answers),
-        static_cast<int>(context->header_.authority_rrs),
-        static_cast<int>(context->header_.additional_rrs));
+        context->header_.authority_rrs == 0)) {
+    ENVOY_LOG(debug,
+              "One or more of Answers [{}], Authority [{}] RRs present in the query. "
+              "Inverse query is not supported",
+              static_cast<int>(context->header_.answers),
+              static_cast<int>(context->header_.authority_rrs));
+    context->counters_.queries_with_ans_or_authority_rrs.inc();
     return false;
   }
 
@@ -231,6 +230,14 @@ bool DnsMessageParser::parseDnsObject(DnsQueryContextPtr& context,
     }
     context->queries_.push_back(std::move(rec));
   }
+
+  // We could encounter additional RRs in an EDNS query, and Envoy will ignore them.
+  if (context->header_.additional_rrs) {
+    ENVOY_LOG(debug, "Ignoring additional RRs in a query because Envoy does not support. "
+                     "This could be an EDNS query.");
+    context->counters_.queries_with_additional_rrs.inc();
+  }
+
   return true;
 }
 

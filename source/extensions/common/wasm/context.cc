@@ -41,6 +41,7 @@
 #include "eval/public/containers/field_backed_list_impl.h"
 #include "eval/public/containers/field_backed_map_impl.h"
 #include "eval/public/structs/cel_proto_wrapper.h"
+#include "include/proxy-wasm/pairs_util.h"
 #include "openssl/bytestring.h"
 #include "openssl/hmac.h"
 #include "openssl/sha.h"
@@ -375,7 +376,11 @@ WasmResult serializeValue(Filters::Common::Expr::CelValue value, std::string* re
     return WasmResult::SerializationFailure;
   case CelValue::Type::kMap: {
     const auto& map = *value.MapOrDie();
-    const auto& keys = *map.ListKeys();
+    auto keys_list = map.ListKeys();
+    if (!keys_list.ok()) {
+      return WasmResult::SerializationFailure;
+    }
+    const auto& keys = *keys_list.value();
     std::vector<std::pair<std::string, std::string>> pairs(map.size(), std::make_pair("", ""));
     for (auto i = 0; i < map.size(); i++) {
       if (serializeValue(keys[i], &pairs[i].first) != WasmResult::Ok) {
@@ -385,10 +390,12 @@ WasmResult serializeValue(Filters::Common::Expr::CelValue value, std::string* re
         return WasmResult::SerializationFailure;
       }
     }
-    auto size = proxy_wasm::exports::pairsSize(pairs);
+    auto size = proxy_wasm::PairsUtil::pairsSize(pairs);
     // prevent string inlining which violates byte alignment
     result->resize(std::max(size, static_cast<size_t>(30)));
-    proxy_wasm::exports::marshalPairs(pairs, result->data());
+    if (!proxy_wasm::PairsUtil::marshalPairs(pairs, result->data(), size)) {
+      return WasmResult::SerializationFailure;
+    }
     result->resize(size);
     return WasmResult::Ok;
   }
@@ -400,13 +407,15 @@ WasmResult serializeValue(Filters::Common::Expr::CelValue value, std::string* re
         return WasmResult::SerializationFailure;
       }
     }
-    auto size = proxy_wasm::exports::pairsSize(pairs);
+    auto size = proxy_wasm::PairsUtil::pairsSize(pairs);
     // prevent string inlining which violates byte alignment
     if (size < 30) {
       result->reserve(30);
     }
     result->resize(size);
-    proxy_wasm::exports::marshalPairs(pairs, result->data());
+    if (!proxy_wasm::PairsUtil::marshalPairs(pairs, result->data(), size)) {
+      return WasmResult::SerializationFailure;
+    }
     return WasmResult::Ok;
   }
   default:
@@ -416,11 +425,9 @@ WasmResult serializeValue(Filters::Common::Expr::CelValue value, std::string* re
 }
 
 #define PROPERTY_TOKENS(_f)                                                                        \
-  _f(METADATA) _f(REQUEST) _f(RESPONSE) _f(CONNECTION) _f(UPSTREAM) _f(NODE) _f(SOURCE)            \
-      _f(DESTINATION) _f(LISTENER_DIRECTION) _f(LISTENER_METADATA) _f(CLUSTER_NAME)                \
-          _f(CLUSTER_METADATA) _f(ROUTE_NAME) _f(ROUTE_METADATA) _f(PLUGIN_NAME)                   \
-              _f(UPSTREAM_HOST_METADATA) _f(PLUGIN_ROOT_ID) _f(PLUGIN_VM_ID) _f(CONNECTION_ID)     \
-                  _f(FILTER_STATE)
+  _f(NODE) _f(LISTENER_DIRECTION) _f(LISTENER_METADATA) _f(CLUSTER_NAME) _f(CLUSTER_METADATA)      \
+      _f(ROUTE_NAME) _f(ROUTE_METADATA) _f(PLUGIN_NAME) _f(UPSTREAM_HOST_METADATA)                 \
+          _f(PLUGIN_ROOT_ID) _f(PLUGIN_VM_ID) _f(CONNECTION_ID)
 
 static inline std::string downCase(std::string s) {
   std::transform(s.begin(), s.end(), s.begin(), [](unsigned char c) { return std::tolower(c); });
@@ -436,11 +443,30 @@ static absl::flat_hash_map<std::string, PropertyToken> property_tokens = {PROPER
 #undef _PAIR
 
 absl::optional<google::api::expr::runtime::CelValue>
+Context::FindValue(absl::string_view name, Protobuf::Arena* arena) const {
+  return findValue(name, arena, false);
+}
+
+absl::optional<google::api::expr::runtime::CelValue>
 Context::findValue(absl::string_view name, Protobuf::Arena* arena, bool last) const {
   using google::api::expr::runtime::CelProtoWrapper;
   using google::api::expr::runtime::CelValue;
 
   const StreamInfo::StreamInfo* info = getConstRequestStreamInfo();
+  // In order to delegate to the StreamActivation method, we have to set the
+  // context properties to match the Wasm context properties in all callbacks
+  // (e.g. onLog or onEncodeHeaders) for the duration of the call.
+  activation_info_ = info;
+  activation_request_headers_ = request_headers_ ? request_headers_ : access_log_request_headers_;
+  activation_response_headers_ =
+      response_headers_ ? response_headers_ : access_log_response_headers_;
+  activation_response_trailers_ =
+      response_trailers_ ? response_trailers_ : access_log_response_trailers_;
+  auto value = StreamActivation::FindValue(name, arena);
+  resetActivation();
+  if (value) {
+    return value;
+  }
 
   // Convert into a dense token to enable a jump table implementation.
   auto part_token = property_tokens.find(name);
@@ -464,30 +490,6 @@ Context::findValue(absl::string_view name, Protobuf::Arena* arena, bool last) co
   }
 
   switch (part_token->second) {
-  case PropertyToken::METADATA:
-    if (info) {
-      return CelProtoWrapper::CreateMessage(&info->dynamicMetadata(), arena);
-    }
-    break;
-  case PropertyToken::REQUEST:
-    if (info) {
-      return CelValue::CreateMap(Protobuf::Arena::Create<Filters::Common::Expr::RequestWrapper>(
-          arena, *arena, request_headers_ ? request_headers_ : access_log_request_headers_, *info));
-    }
-    break;
-  case PropertyToken::RESPONSE:
-    if (info) {
-      return CelValue::CreateMap(Protobuf::Arena::Create<Filters::Common::Expr::ResponseWrapper>(
-          arena, *arena, response_headers_ ? response_headers_ : access_log_response_headers_,
-          response_trailers_ ? response_trailers_ : access_log_response_trailers_, *info));
-    }
-    break;
-  case PropertyToken::CONNECTION:
-    if (info) {
-      return CelValue::CreateMap(
-          Protobuf::Arena::Create<Filters::Common::Expr::ConnectionWrapper>(arena, *info));
-    }
-    break;
   case PropertyToken::CONNECTION_ID: {
     auto conn = getConnection();
     if (conn) {
@@ -495,29 +497,11 @@ Context::findValue(absl::string_view name, Protobuf::Arena* arena, bool last) co
     }
     break;
   }
-  case PropertyToken::UPSTREAM:
-    if (info) {
-      return CelValue::CreateMap(
-          Protobuf::Arena::Create<Filters::Common::Expr::UpstreamWrapper>(arena, *info));
-    }
-    break;
   case PropertyToken::NODE:
     if (root_local_info_) {
       return CelProtoWrapper::CreateMessage(&root_local_info_->node(), arena);
     } else if (plugin_) {
       return CelProtoWrapper::CreateMessage(&plugin()->localInfo().node(), arena);
-    }
-    break;
-  case PropertyToken::SOURCE:
-    if (info) {
-      return CelValue::CreateMap(
-          Protobuf::Arena::Create<Filters::Common::Expr::PeerWrapper>(arena, *info, false));
-    }
-    break;
-  case PropertyToken::DESTINATION:
-    if (info) {
-      return CelValue::CreateMap(
-          Protobuf::Arena::Create<Filters::Common::Expr::PeerWrapper>(arena, *info, true));
     }
     break;
   case PropertyToken::LISTENER_DIRECTION:
@@ -573,13 +557,6 @@ Context::findValue(absl::string_view name, Protobuf::Arena* arena, bool last) co
     return CelValue::CreateStringView(toAbslStringView(root_id()));
   case PropertyToken::PLUGIN_VM_ID:
     return CelValue::CreateStringView(toAbslStringView(wasm()->vm_id()));
-  case PropertyToken::FILTER_STATE:
-    if (info) {
-      return Protobuf::Arena::Create<Filters::Common::Expr::FilterStateWrapper>(arena,
-                                                                                info->filterState())
-          ->Produce(arena);
-    }
-    break;
   }
   return {};
 }
@@ -740,7 +717,7 @@ WasmResult Context::addHeaderMapValue(WasmHeaderMapType type, std::string_view k
   const Http::LowerCaseString lower_key{std::string(key)};
   map->addCopy(lower_key, std::string(value));
   if (type == WasmHeaderMapType::RequestHeaders && decoder_callbacks_) {
-    decoder_callbacks_->clearRouteCache();
+    decoder_callbacks_->downstreamCallbacks()->clearRouteCache();
   }
   return WasmResult::Ok;
 }
@@ -815,7 +792,7 @@ WasmResult Context::setHeaderMapPairs(WasmHeaderMapType type, const Pairs& pairs
     map->addCopy(lower_key, std::string(p.second));
   }
   if (type == WasmHeaderMapType::RequestHeaders && decoder_callbacks_) {
-    decoder_callbacks_->clearRouteCache();
+    decoder_callbacks_->downstreamCallbacks()->clearRouteCache();
   }
   return WasmResult::Ok;
 }
@@ -828,7 +805,7 @@ WasmResult Context::removeHeaderMapValue(WasmHeaderMapType type, std::string_vie
   const Http::LowerCaseString lower_key{std::string(key)};
   map->remove(lower_key);
   if (type == WasmHeaderMapType::RequestHeaders && decoder_callbacks_) {
-    decoder_callbacks_->clearRouteCache();
+    decoder_callbacks_->downstreamCallbacks()->clearRouteCache();
   }
   return WasmResult::Ok;
 }
@@ -842,7 +819,7 @@ WasmResult Context::replaceHeaderMapValue(WasmHeaderMapType type, std::string_vi
   const Http::LowerCaseString lower_key{std::string(key)};
   map->setCopy(lower_key, toAbslStringView(value));
   if (type == WasmHeaderMapType::RequestHeaders && decoder_callbacks_) {
-    decoder_callbacks_->clearRouteCache();
+    decoder_callbacks_->downstreamCallbacks()->clearRouteCache();
   }
   return WasmResult::Ok;
 }
@@ -970,6 +947,7 @@ WasmResult Context::httpCall(std::string_view cluster, const Pairs& request_head
   Protobuf::RepeatedPtrField<HashPolicy> hash_policy;
   hash_policy.Add()->mutable_header()->set_header_name(Http::Headers::get().Host.get());
   options.setHashPolicy(hash_policy);
+  options.setSendXff(false);
   auto http_request =
       thread_local_cluster->httpAsyncClient().send(std::move(message), handler, options);
   if (!http_request) {
@@ -1002,8 +980,7 @@ WasmResult Context::grpcCall(std::string_view grpc_service, std::string_view ser
   handler.context_ = this;
   handler.token_ = token;
   auto grpc_client = clusterManager().grpcAsyncClientManager().getOrCreateRawAsyncClient(
-      service_proto, *wasm()->scope_, true /* skip_cluster_check */,
-      Grpc::CacheOption::CacheWhenRuntimeEnabled);
+      service_proto, *wasm()->scope_, true /* skip_cluster_check */);
   grpc_initial_metadata_ = buildRequestHeaderMapFromPairs(initial_metadata);
 
   // set default hash policy to be based on :authority to enable consistent hash
@@ -1012,6 +989,7 @@ WasmResult Context::grpcCall(std::string_view grpc_service, std::string_view ser
   Protobuf::RepeatedPtrField<HashPolicy> hash_policy;
   hash_policy.Add()->mutable_header()->set_header_name(Http::Headers::get().Host.get());
   options.setHashPolicy(hash_policy);
+  options.setSendXff(false);
 
   auto grpc_request =
       grpc_client->sendRaw(toAbslStringView(service_name), toAbslStringView(method_name),
@@ -1047,8 +1025,7 @@ WasmResult Context::grpcStream(std::string_view grpc_service, std::string_view s
   handler.context_ = this;
   handler.token_ = token;
   auto grpc_client = clusterManager().grpcAsyncClientManager().getOrCreateRawAsyncClient(
-      service_proto, *wasm()->scope_, true /* skip_cluster_check */,
-      Grpc::CacheOption::CacheWhenRuntimeEnabled);
+      service_proto, *wasm()->scope_, true /* skip_cluster_check */);
   grpc_initial_metadata_ = buildRequestHeaderMapFromPairs(initial_metadata);
 
   // set default hash policy to be based on :authority to enable consistent hash
@@ -1056,6 +1033,7 @@ WasmResult Context::grpcStream(std::string_view grpc_service, std::string_view s
   Protobuf::RepeatedPtrField<HashPolicy> hash_policy;
   hash_policy.Add()->mutable_header()->set_header_name(Http::Headers::get().Host.get());
   options.setHashPolicy(hash_policy);
+  options.setSendXff(false);
 
   auto grpc_stream = grpc_client->startRaw(toAbslStringView(service_name),
                                            toAbslStringView(method_name), handler, options);
@@ -1110,9 +1088,9 @@ StreamInfo::StreamInfo* Context::getRequestStreamInfo() const {
 
 const Network::Connection* Context::getConnection() const {
   if (encoder_callbacks_) {
-    return encoder_callbacks_->connection();
+    return encoder_callbacks_->connection().ptr();
   } else if (decoder_callbacks_) {
-    return decoder_callbacks_->connection();
+    return decoder_callbacks_->connection().ptr();
   } else if (network_read_filter_callbacks_) {
     return &network_read_filter_callbacks_->connection();
   } else if (network_write_filter_callbacks_) {
@@ -1628,6 +1606,12 @@ void Context::failStream(WasmStreamType stream_type) {
 WasmResult Context::sendLocalResponse(uint32_t response_code, std::string_view body_text,
                                       Pairs additional_headers, uint32_t grpc_status,
                                       std::string_view details) {
+  // This flag is used to avoid calling sendLocalReply() twice, even if wasm code has this
+  // logic. We can't reuse "local_reply_sent_" here because it can't avoid calling nested
+  // sendLocalReply() during encodeHeaders().
+  if (local_reply_hold_) {
+    return WasmResult::BadArgument;
+  }
   // "additional_headers" is a collection of string_views. These will no longer
   // be valid when "modify_headers" is finally called below, so we must
   // make copies of all the headers.
@@ -1652,10 +1636,17 @@ WasmResult Context::sendLocalResponse(uint32_t response_code, std::string_view b
                                   modify_headers = std::move(modify_headers), grpc_status,
                                   details = StringUtil::replaceAllEmptySpace(
                                       absl::string_view(details.data(), details.size()))] {
+      // When the wasm vm fails, failStream() is called if the plugin is fail-closed, we need
+      // this flag to avoid calling sendLocalReply() twice.
+      if (local_reply_sent_) {
+        return;
+      }
       decoder_callbacks_->sendLocalReply(static_cast<Envoy::Http::Code>(response_code), body_text,
                                          modify_headers, grpc_status, details);
+      local_reply_sent_ = true;
     });
   }
+  local_reply_hold_ = true;
   return WasmResult::Ok;
 }
 
@@ -1722,8 +1713,8 @@ void Context::setDecoderFilterCallbacks(Envoy::Http::StreamDecoderFilterCallback
   decoder_callbacks_ = &callbacks;
 }
 
-Http::FilterHeadersStatus Context::encode1xxHeaders(Http::ResponseHeaderMap&) {
-  return Http::FilterHeadersStatus::Continue;
+Http::Filter1xxHeadersStatus Context::encode1xxHeaders(Http::ResponseHeaderMap&) {
+  return Http::Filter1xxHeadersStatus::Continue;
 }
 
 Http::FilterHeadersStatus Context::encodeHeaders(Http::ResponseHeaderMap& headers,
@@ -1809,10 +1800,14 @@ void Context::onHttpCallSuccess(uint32_t token, Envoy::Http::ResponseMessagePtr&
   }
   http_call_response_ = &response;
   uint32_t body_size = response->body().length();
-  onHttpCallResponse(token, response->headers().size(), body_size,
-                     headerSize(response->trailers()));
-  http_call_response_ = nullptr;
-  http_request_.erase(handler);
+  // Deferred "after VM call" actions are going to be executed upon returning from
+  // ContextBase::*, which might include deleting Context object via proxy_done().
+  wasm()->addAfterVmCallAction([this, handler] {
+    http_call_response_ = nullptr;
+    http_request_.erase(handler);
+  });
+  ContextBase::onHttpCallResponse(token, response->headers().size(), body_size,
+                                  headerSize(response->trailers()));
 }
 
 void Context::onHttpCallFailure(uint32_t token, Http::AsyncClient::FailureReason reason) {
@@ -1829,21 +1824,34 @@ void Context::onHttpCallFailure(uint32_t token, Http::AsyncClient::FailureReason
   // This is the only value currently.
   ASSERT(reason == Http::AsyncClient::FailureReason::Reset);
   status_message_ = "reset";
-  onHttpCallResponse(token, 0, 0, 0);
-  status_message_ = "";
-  http_request_.erase(handler);
+  // Deferred "after VM call" actions are going to be executed upon returning from
+  // ContextBase::*, which might include deleting Context object via proxy_done().
+  wasm()->addAfterVmCallAction([this, handler] {
+    status_message_ = "";
+    http_request_.erase(handler);
+  });
+  ContextBase::onHttpCallResponse(token, 0, 0, 0);
 }
 
 void Context::onGrpcReceiveWrapper(uint32_t token, ::Envoy::Buffer::InstancePtr response) {
   ASSERT(proxy_wasm::current_context_ == nullptr); // Non-reentrant.
+  auto cleanup = [this, token] {
+    if (wasm()->isGrpcCallId(token)) {
+      grpc_call_request_.erase(token);
+    }
+  };
   if (wasm()->on_grpc_receive_) {
     grpc_receive_buffer_ = std::move(response);
     uint32_t response_size = grpc_receive_buffer_->length();
+    // Deferred "after VM call" actions are going to be executed upon returning from
+    // ContextBase::*, which might include deleting Context object via proxy_done().
+    wasm()->addAfterVmCallAction([this, cleanup] {
+      grpc_receive_buffer_.reset();
+      cleanup();
+    });
     ContextBase::onGrpcReceive(token, response_size);
-    grpc_receive_buffer_.reset();
-  }
-  if (wasm()->isGrpcCallId(token)) {
-    grpc_call_request_.erase(token);
+  } else {
+    cleanup();
   }
 }
 
@@ -1856,21 +1864,30 @@ void Context::onGrpcCloseWrapper(uint32_t token, const Grpc::Status::GrpcStatus&
     });
     return;
   }
+  auto cleanup = [this, token] {
+    if (wasm()->isGrpcCallId(token)) {
+      grpc_call_request_.erase(token);
+    } else if (wasm()->isGrpcStreamId(token)) {
+      auto it = grpc_stream_.find(token);
+      if (it != grpc_stream_.end()) {
+        if (it->second.local_closed_) {
+          grpc_stream_.erase(token);
+        }
+      }
+    }
+  };
   if (wasm()->on_grpc_close_) {
     status_code_ = static_cast<uint32_t>(status);
     status_message_ = toAbslStringView(message);
-    onGrpcClose(token, status_code_);
-    status_message_ = "";
-  }
-  if (wasm()->isGrpcCallId(token)) {
-    grpc_call_request_.erase(token);
-  } else if (wasm()->isGrpcStreamId(token)) {
-    auto it = grpc_stream_.find(token);
-    if (it != grpc_stream_.end()) {
-      if (it->second.local_closed_) {
-        grpc_stream_.erase(token);
-      }
-    }
+    // Deferred "after VM call" actions are going to be executed upon returning from
+    // ContextBase::*, which might include deleting Context object via proxy_done().
+    wasm()->addAfterVmCallAction([this, cleanup] {
+      status_message_ = "";
+      cleanup();
+    });
+    ContextBase::onGrpcClose(token, status_code_);
+  } else {
+    cleanup();
   }
 }
 

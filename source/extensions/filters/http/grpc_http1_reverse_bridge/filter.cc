@@ -109,7 +109,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
 
     // Clear the route cache to recompute the cache. This provides additional
     // flexibility around request modification through the route table.
-    decoder_callbacks_->clearRouteCache();
+    decoder_callbacks_->downstreamCallbacks()->clearRouteCache();
   }
 
   return Http::FilterHeadersStatus::Continue;

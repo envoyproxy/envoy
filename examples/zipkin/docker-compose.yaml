@@ -1,0 +1,67 @@
+version: "3.8"
+services:
+
+  envoy-front-proxy:
+    build:
+      context: .
+      dockerfile: Dockerfile-envoy
+      args:
+        ENVOY_CONFIG: envoy-front-proxy.yaml
+    depends_on:
+      zipkin:
+        condition: service_healthy
+      envoy-1:
+        condition: service_started
+      envoy-2:
+        condition: service_started
+    ports:
+    - "${PORT_PROXY:-10000}:10000"
+
+  envoy-1:
+    build:
+      context: .
+      dockerfile: Dockerfile-envoy
+      args:
+        ENVOY_CONFIG: envoy-1.yaml
+    depends_on:
+      zipkin:
+        condition: service_healthy
+      service-1:
+        condition: service_healthy
+      envoy-2:
+        condition: service_started
+
+  envoy-2:
+    build:
+      context: .
+      dockerfile: Dockerfile-envoy
+      args:
+        ENVOY_CONFIG: envoy-2.yaml
+    depends_on:
+      zipkin:
+        condition: service_healthy
+      service-2:
+        condition: service_healthy
+
+  service-1:
+    build:
+      context: ../shared/flask
+    volumes:
+    - ./service.py:/code/service.py
+    environment:
+    - SERVICE_NAME=1
+
+  service-2:
+    build:
+      context: ../shared/flask
+    volumes:
+    - ./service.py:/code/service.py
+    environment:
+    - SERVICE_NAME=2
+
+  zipkin:
+    build:
+      context: .
+      dockerfile: Dockerfile-zipkin
+    ports:
+    - "${PORT_UI:-9411}:9411"

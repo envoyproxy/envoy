@@ -7,6 +7,7 @@
 #include "envoy/config/core/v3/protocol.pb.h"
 #include "envoy/config/route/v3/route_components.pb.h"
 #include "envoy/http/header_map.h"
+#include "envoy/http/header_validator.h"
 #include "envoy/http/protocol.h"
 #include "envoy/type/v3/range.pb.h"
 
@@ -259,8 +260,7 @@ public:
       absl::string_view header_name,
       envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
           headers_with_underscores_action,
-      Stats::Counter& dropped_headers_with_underscores,
-      Stats::Counter& requests_rejected_with_underscores_in_headers);
+      HeaderValidatorStats& stats);
 
   /**
    * Check if header_value represents a valid value for HTTP content-length header.

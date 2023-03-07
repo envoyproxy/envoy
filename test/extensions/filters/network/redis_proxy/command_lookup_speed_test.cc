@@ -30,9 +30,14 @@ public:
   ~NoOpSplitCallbacks() override = default;
 
   bool connectionAllowed() override { return true; }
+  void onQuit() override {}
   void onAuth(const std::string&) override {}
   void onAuth(const std::string&, const std::string&) override {}
   void onResponse(Common::Redis::RespValuePtr&&) override {}
+  Common::Redis::Client::Transaction& transaction() override { return transaction_; }
+
+private:
+  Common::Redis::Client::NoOpTransaction transaction_;
 };
 
 class NullRouterImpl : public Router {
@@ -73,8 +78,12 @@ public:
   NiceMock<MockFaultManager> fault_manager_;
   NiceMock<Event::MockDispatcher> dispatcher_;
   CommandSplitter::InstanceImpl splitter_{
-      RouterPtr{router_}, store_, "redis.foo.",
-      time_system_,       false,  std::make_unique<NiceMock<MockFaultManager>>(fault_manager_)};
+      RouterPtr{router_},
+      *store_.rootScope(),
+      "redis.foo.",
+      time_system_,
+      false,
+      std::make_unique<NiceMock<MockFaultManager>>(fault_manager_)};
   NoOpSplitCallbacks callbacks_;
   CommandSplitter::SplitRequestPtr handle_;
 };

@@ -13,6 +13,7 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 #include "quiche/quic/core/crypto/null_encrypter.h"
+#include "quiche/quic/core/deterministic_connection_id_generator.h"
 
 namespace Envoy {
 namespace Quic {
@@ -22,7 +23,7 @@ using testing::Invoke;
 
 class MockDelegate : public PacketsToReadDelegate {
 public:
-  MOCK_METHOD(size_t, numPacketsExpectedPerEventLoop, ());
+  MOCK_METHOD(size_t, numPacketsExpectedPerEventLoop, (), (const));
 };
 
 class EnvoyQuicClientStreamTest : public testing::Test {
@@ -39,7 +40,7 @@ public:
         quic_connection_(new EnvoyQuicClientConnection(
             quic::test::TestConnectionId(), connection_helper_, alarm_factory_, &writer_,
             /*owns_writer=*/false, {quic_version_}, *dispatcher_,
-            createConnectionSocket(peer_addr_, self_addr_, nullptr))),
+            createConnectionSocket(peer_addr_, self_addr_, nullptr), connection_id_generator_)),
         quic_session_(quic_config_, {quic_version_},
                       std::unique_ptr<EnvoyQuicClientConnection>(quic_connection_), *dispatcher_,
                       quic_config_.GetInitialStreamFlowControlWindowToSend() * 2,
@@ -69,10 +70,10 @@ public:
 
   void SetUp() override {
     quic_session_.Initialize();
-    quic_connection_->setEnvoyConnection(quic_session_);
+    quic_connection_->setEnvoyConnection(quic_session_, quic_session_);
     quic_connection_->SetEncrypter(
         quic::ENCRYPTION_FORWARD_SECURE,
-        std::make_unique<quic::NullEncrypter>(quic::Perspective::IS_CLIENT));
+        std::make_unique<quic::test::TaggingEncrypter>(quic::ENCRYPTION_FORWARD_SECURE));
     quic_connection_->SetDefaultEncryptionLevel(quic::ENCRYPTION_FORWARD_SECURE);
 
     setQuicConfigWithDefaultValues(quic_session_.config());
@@ -134,6 +135,8 @@ protected:
   Network::Address::InstanceConstSharedPtr peer_addr_;
   Network::Address::InstanceConstSharedPtr self_addr_;
   MockDelegate delegate_;
+  quic::DeterministicConnectionIdGenerator connection_id_generator_{
+      quic::kQuicDefaultConnectionIdLength};
   EnvoyQuicClientConnection* quic_connection_;
   TestQuicCryptoClientStreamFactory crypto_stream_factory_;
   MockEnvoyQuicClientSession quic_session_;
@@ -147,8 +150,8 @@ protected:
   std::string host_{"www.abc.com"};
   Http::TestRequestHeaderMapImpl request_headers_;
   Http::TestRequestTrailerMapImpl request_trailers_;
-  spdy::SpdyHeaderBlock spdy_response_headers_;
-  spdy::SpdyHeaderBlock spdy_trailers_;
+  spdy::Http2HeaderBlock spdy_response_headers_;
+  spdy::Http2HeaderBlock spdy_trailers_;
   Buffer::OwnedImpl request_body_{"Hello world"};
   std::string response_body_{"OK\n"};
 };
@@ -266,7 +269,7 @@ TEST_F(EnvoyQuicClientStreamTest, PostRequestAnd1xx) {
   // Receive several 10x headers, only the first 100 Continue header should be
   // delivered.
   for (const std::string& status : {"100", "199", "100"}) {
-    spdy::SpdyHeaderBlock continue_header;
+    spdy::Http2HeaderBlock continue_header;
     continue_header[":status"] = status;
     continue_header["i"] = absl::StrCat("", i++);
     std::string data = spdyHeaderToHttp3StreamPayload(continue_header);
@@ -285,7 +288,7 @@ TEST_F(EnvoyQuicClientStreamTest, ResetUpon101SwitchProtocol) {
   EXPECT_CALL(stream_callbacks_, onResetStream(Http::StreamResetReason::ProtocolError, _));
   // Receive several 10x headers, only the first 100 Continue header should be
   // delivered.
-  spdy::SpdyHeaderBlock continue_header;
+  spdy::Http2HeaderBlock continue_header;
   continue_header[":status"] = "101";
   std::string data = spdyHeaderToHttp3StreamPayload(continue_header);
   quic::QuicStreamFrame frame(stream_id_, false, 0u, data);
@@ -424,11 +427,20 @@ TEST_F(EnvoyQuicClientStreamTest, ResetStream) {
   EXPECT_TRUE(quic_stream_->rst_sent());
 }
 
-TEST_F(EnvoyQuicClientStreamTest, ReceiveResetStream) {
+TEST_F(EnvoyQuicClientStreamTest, ReceiveResetStreamWriteClosed) {
+  auto result = quic_stream_->encodeHeaders(request_headers_, true);
+  EXPECT_TRUE(result.ok());
   EXPECT_CALL(stream_callbacks_, onResetStream(Http::StreamResetReason::RemoteReset, _));
   quic_stream_->OnStreamReset(quic::QuicRstStreamFrame(
       quic::kInvalidControlFrameId, quic_stream_->id(), quic::QUIC_STREAM_NO_ERROR, 0));
   EXPECT_TRUE(quic_stream_->rst_received());
+}
+
+TEST_F(EnvoyQuicClientStreamTest, ReceiveResetStreamWriteOpen) {
+  quic_stream_->OnStreamReset(quic::QuicRstStreamFrame(
+      quic::kInvalidControlFrameId, quic_stream_->id(), quic::QUIC_STREAM_NO_ERROR, 0));
+  EXPECT_TRUE(quic_stream_->rst_received());
+  EXPECT_CALL(stream_callbacks_, onResetStream(_, _));
 }
 
 TEST_F(EnvoyQuicClientStreamTest, CloseConnectionDuringDecodingHeader) {

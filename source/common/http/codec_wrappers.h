@@ -73,7 +73,8 @@ class RequestEncoderWrapper : public RequestEncoder {
 public:
   // RequestEncoder
   Status encodeHeaders(const RequestHeaderMap& headers, bool end_stream) override {
-    RETURN_IF_ERROR(inner_.encodeHeaders(headers, end_stream));
+    ASSERT(inner_encoder_);
+    RETURN_IF_ERROR(inner_encoder_->encodeHeaders(headers, end_stream));
     if (end_stream) {
       onEncodeComplete();
     }
@@ -81,31 +82,41 @@ public:
   }
 
   void encodeData(Buffer::Instance& data, bool end_stream) override {
-    inner_.encodeData(data, end_stream);
+    ASSERT(inner_encoder_);
+    inner_encoder_->encodeData(data, end_stream);
     if (end_stream) {
       onEncodeComplete();
     }
   }
 
   void encodeTrailers(const RequestTrailerMap& trailers) override {
-    inner_.encodeTrailers(trailers);
+    ASSERT(inner_encoder_);
+    inner_encoder_->encodeTrailers(trailers);
     onEncodeComplete();
   }
 
-  void enableTcpTunneling() override { inner_.enableTcpTunneling(); }
-
-  void encodeMetadata(const MetadataMapVector& metadata_map_vector) override {
-    inner_.encodeMetadata(metadata_map_vector);
+  void enableTcpTunneling() override {
+    ASSERT(inner_encoder_);
+    inner_encoder_->enableTcpTunneling();
   }
 
-  Stream& getStream() override { return inner_.getStream(); }
+  void encodeMetadata(const MetadataMapVector& metadata_map_vector) override {
+    ASSERT(inner_encoder_);
+    inner_encoder_->encodeMetadata(metadata_map_vector);
+  }
+
+  Stream& getStream() override {
+    ASSERT(inner_encoder_);
+    return inner_encoder_->getStream();
+  }
 
   Http1StreamEncoderOptionsOptRef http1StreamEncoderOptions() override {
-    return inner_.http1StreamEncoderOptions();
+    ASSERT(inner_encoder_);
+    return inner_encoder_->http1StreamEncoderOptions();
   }
 
 protected:
-  RequestEncoderWrapper(RequestEncoder& inner) : inner_(inner) {}
+  RequestEncoderWrapper(RequestEncoder* inner) : inner_encoder_(inner) {}
 
   /**
    * Consumers of the wrapper generally want to know when an encode is complete. This is called at
@@ -113,7 +124,7 @@ protected:
    */
   virtual void onEncodeComplete() PURE;
 
-  RequestEncoder& inner_;
+  RequestEncoder* inner_encoder_;
 };
 
 } // namespace Http

@@ -38,8 +38,10 @@ public:
   };
 
   LoadDnsCacheEntryResult loadDnsCacheEntry(absl::string_view host, uint16_t default_port,
+                                            bool is_proxy_request,
                                             LoadDnsCacheEntryCallbacks& callbacks) override {
-    MockLoadDnsCacheEntryResult result = loadDnsCacheEntry_(host, default_port, callbacks);
+    MockLoadDnsCacheEntryResult result =
+        loadDnsCacheEntry_(host, default_port, is_proxy_request, callbacks);
     return {result.status_, LoadDnsCacheEntryHandlePtr{result.handle_}, result.host_info_};
   }
   Upstream::ResourceAutoIncDecPtr canCreateDnsRequest() override {
@@ -47,7 +49,7 @@ public:
     return std::unique_ptr<Upstream::ResourceAutoIncDec>(raii_ptr);
   }
   MOCK_METHOD(MockLoadDnsCacheEntryResult, loadDnsCacheEntry_,
-              (absl::string_view host, uint16_t default_port,
+              (absl::string_view host, uint16_t default_port, bool is_proxy_request,
                LoadDnsCacheEntryCallbacks& callbacks));
 
   AddUpdateCallbacksHandlePtr addUpdateCallbacks(UpdateCallbacks& callbacks) override {

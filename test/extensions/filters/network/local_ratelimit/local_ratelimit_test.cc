@@ -34,8 +34,8 @@ public:
       EXPECT_CALL(*fill_timer_, enableTimer(_, nullptr));
       EXPECT_CALL(*fill_timer_, disableTimer());
     }
-    config_ = std::make_shared<Config>(proto_config, dispatcher_, stats_store_, runtime_,
-                                       singleton_manager_);
+    config_ = std::make_shared<Config>(proto_config, dispatcher_, *stats_store_.rootScope(),
+                                       runtime_, singleton_manager_);
     return proto_config.token_bucket().max_tokens();
   }
 
@@ -92,6 +92,8 @@ token_bucket:
 
   // Second connection should be rate limited.
   ActiveFilter active_filter2(config_);
+  EXPECT_CALL(active_filter2.read_filter_callbacks_.connection_.stream_info_,
+              setResponseFlag(StreamInfo::ResponseFlag::UpstreamRetryLimitExceeded));
   EXPECT_CALL(active_filter2.read_filter_callbacks_.connection_, close(_));
   EXPECT_EQ(Network::FilterStatus::StopIteration, active_filter2.filter_.onNewConnection());
   EXPECT_EQ(1, TestUtility::findCounter(stats_store_,
@@ -147,8 +149,8 @@ public:
       EXPECT_CALL(*timer, enableTimer(_, nullptr));
       EXPECT_CALL(*timer, disableTimer());
     }
-    config2_ = std::make_shared<Config>(proto_config, dispatcher_, stats_store_, runtime_,
-                                        singleton_manager_);
+    config2_ = std::make_shared<Config>(proto_config, dispatcher_, *stats_store_.rootScope(),
+                                        runtime_, singleton_manager_);
 
     // This test just uses the initial tokens without ever refilling.
     if (expect_sharing) {
@@ -239,8 +241,8 @@ token_bucket:
     std::string yaml = fmt::format(yaml_template, i);
     envoy::extensions::filters::network::local_ratelimit::v3::LocalRateLimit proto_config;
     TestUtility::loadFromYamlAndValidate(yaml, proto_config);
-    configs.push_back(std::make_unique<Config>(proto_config, dispatcher_, stats_store_, runtime_,
-                                               singleton_manager_));
+    configs.push_back(std::make_unique<Config>(proto_config, dispatcher_, *stats_store_.rootScope(),
+                                               runtime_, singleton_manager_));
   }
 
   configs.clear();

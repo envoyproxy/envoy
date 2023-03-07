@@ -32,6 +32,10 @@ message GcpAuthnFilterConfig {
 
   // Token cache configuration. This field is optional.
   TokenCacheConfig cache_config = 3;
+
+  // Request header location to extract the token. By default (i.e. if this field is not specified), the token
+  // is extracted to the Authorization HTTP header, in the format "Authorization: Bearer <token>".
+  TokenHeader token_header = 4;
 }
 
 // Audience is the URL of the receiving service that performs token authentication.
@@ -45,4 +49,16 @@ message TokenCacheConfig {
   // The number of cache entries. The maximum number of entries is INT64_MAX as it is constrained by underlying cache implementation.
   // Default value 0 (i.e., proto3 defaults) disables the cache by default. Other default values will enable the cache.
   google.protobuf.UInt64Value cache_size = 1 [(validate.rules).uint64 = {lte: 9223372036854775807}];
+}
+
+message TokenHeader {
+  // The HTTP header's name.
+  string name = 1
+      [(validate.rules).string = {min_len: 1 well_known_regex: HTTP_HEADER_NAME strict: false}];
+
+  // The header's prefix. The format is "value_prefix<token>"
+  // For example, for "Authorization: Bearer <token>", value_prefix="Bearer " with a space at the
+  // end.
+  string value_prefix = 2
+      [(validate.rules).string = {well_known_regex: HTTP_HEADER_VALUE strict: false}];
 }

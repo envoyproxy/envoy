@@ -36,13 +36,12 @@ MockListenerConfig::MockListenerConfig()
     : socket_(std::make_shared<testing::NiceMock<MockListenSocket>>()) {
   socket_factories_.emplace_back(std::make_unique<MockListenSocketFactory>());
   ON_CALL(*this, filterChainFactory()).WillByDefault(ReturnRef(filter_chain_factory_));
-  ON_CALL(*this, listenSocketFactory()).WillByDefault(ReturnRef(*socket_factories_[0].get()));
   ON_CALL(*this, listenSocketFactories()).WillByDefault(ReturnRef(socket_factories_));
   ON_CALL(*static_cast<MockListenSocketFactory*>(socket_factories_[0].get()), localAddress())
       .WillByDefault(ReturnRef(socket_->connectionInfoProvider().localAddress()));
   ON_CALL(*static_cast<MockListenSocketFactory*>(socket_factories_[0].get()), getListenSocket(_))
       .WillByDefault(Return(socket_));
-  ON_CALL(*this, listenerScope()).WillByDefault(ReturnRef(scope_));
+  ON_CALL(*this, listenerScope()).WillByDefault(ReturnRef(*store_.rootScope()));
   ON_CALL(*this, name()).WillByDefault(ReturnRef(name_));
 }
 MockListenerConfig::~MockListenerConfig() = default;
@@ -114,7 +113,9 @@ MockDrainDecision::~MockDrainDecision() = default;
 
 MockListenerFilter::~MockListenerFilter() { destroy_(); }
 
-MockListenerFilterCallbacks::MockListenerFilterCallbacks() {
+MockListenerFilterCallbacks::MockListenerFilterCallbacks()
+    : filter_state_(StreamInfo::FilterStateImpl(StreamInfo::FilterState::LifeSpan::FilterChain)) {
+  ON_CALL(*this, filterState()).WillByDefault(ReturnRef(filter_state_));
   ON_CALL(*this, socket()).WillByDefault(ReturnRef(socket_));
 }
 MockListenerFilterCallbacks::~MockListenerFilterCallbacks() = default;

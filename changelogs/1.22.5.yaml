@@ -1,0 +1,12 @@
+date: August 12, 2022
+
+bug_fixes:
+- area: listener
+  change: |
+    fixed a bug that doesn't handle of an update for a listener with IPv4-mapped address correctly, and that will lead to a memory leak.
+- area: repo
+  change: |
+    fix version to resolve release issue.
+- area: transport_socket
+  change: |
+    fixed a bug that prevented the tcp stats to be retrieved when running on kernels different than the kernel where Envoy was built.

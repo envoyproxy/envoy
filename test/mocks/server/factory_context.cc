@@ -11,6 +11,7 @@ namespace Envoy {
 namespace Server {
 namespace Configuration {
 
+using ::testing::Return;
 using ::testing::ReturnRef;
 
 MockFactoryContext::MockFactoryContext()
@@ -32,8 +33,8 @@ MockFactoryContext::MockFactoryContext()
   ON_CALL(*this, serverScope()).WillByDefault(ReturnRef(scope_));
   ON_CALL(*this, singletonManager()).WillByDefault(ReturnRef(*singleton_manager_));
   ON_CALL(*this, threadLocal()).WillByDefault(ReturnRef(thread_local_));
-  ON_CALL(*this, admin()).WillByDefault(ReturnRef(admin_));
-  ON_CALL(*this, listenerScope()).WillByDefault(ReturnRef(listener_scope_));
+  ON_CALL(*this, admin()).WillByDefault(Return(OptRef<Server::Admin>{admin_}));
+  ON_CALL(*this, listenerScope()).WillByDefault(ReturnRef(*listener_store_.rootScope()));
   ON_CALL(*this, api()).WillByDefault(ReturnRef(api_));
   ON_CALL(*this, timeSource()).WillByDefault(ReturnRef(time_system_));
   ON_CALL(*this, overloadManager()).WillByDefault(ReturnRef(overload_manager_));
@@ -45,6 +46,12 @@ MockFactoryContext::MockFactoryContext()
 }
 
 MockFactoryContext::~MockFactoryContext() = default;
+
+MockUpstreamHttpFactoryContext::MockUpstreamHttpFactoryContext() {
+  ON_CALL(*this, getServerFactoryContext()).WillByDefault(ReturnRef(server_factory_context_));
+  ON_CALL(*this, initManager()).WillByDefault(ReturnRef(init_manager_));
+  ON_CALL(*this, scope()).WillByDefault(ReturnRef(scope_));
+}
 
 } // namespace Configuration
 } // namespace Server

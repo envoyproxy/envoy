@@ -20,6 +20,7 @@
  */
 #include "http_parser.h"
 #include <assert.h>
+#include <stdbool.h>
 #include <stddef.h>
 #include <ctype.h>
 #include <string.h>
@@ -427,6 +428,7 @@ enum http_host_state
 #define IS_USERINFO_CHAR(c) (IS_ALPHANUM(c) || IS_MARK(c) || (c) == '%' || \
   (c) == ';' || (c) == ':' || (c) == '&' || (c) == '=' || (c) == '+' || \
   (c) == '$' || (c) == ',')
+#define IS_SCHEMA_CHAR(c)   (IS_ALPHANUM(c) || (c) == '.' || (c) == '-' || (c) == '+')
 
 #define STRICT_TOKEN(c)     ((c == ' ') ? 0 : tokens[(unsigned char)c])
 
@@ -520,7 +522,7 @@ parse_url_char(enum state s, const char ch)
       break;
 
     case s_req_schema:
-      if (IS_ALPHA(ch)) {
+      if (IS_SCHEMA_CHAR(ch)) {
         return s;
       }
 
@@ -2477,7 +2479,7 @@ http_parser_parse_url(const char *buf, size_t buflen, int is_connect,
         break;
 
       default:
-        assert(!"Unexpected state");
+        assert(false && "Unexpected state");
         return 1;
     }
 

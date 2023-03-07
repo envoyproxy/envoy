@@ -22,7 +22,8 @@ envoy_cc_test(
     name = "matcher_test",
     srcs = ["matcher_test.cc"],
     deps = [
-        "//contrib/hyperscan/matching/input_matchers/source:config",
+        "//contrib/hyperscan/matching/input_matchers/source:matcher_lib",
+        "//source/common/thread_local:thread_local_lib",
         "//test/test_common:utility_lib",
     ],
 )
@@ -44,7 +45,7 @@ envoy_cc_benchmark_binary(
     srcs = ["matcher_speed_test.cc"],
     external_deps = ["benchmark"],
     deps = [
-        "//contrib/hyperscan/matching/input_matchers/source:hyperscan_lib",
+        "//contrib/hyperscan/matching/input_matchers/source:matcher_lib",
         "//source/common/common:assert_lib",
         "//source/common/common:regex_lib",
         "//source/common/common:utility_lib",

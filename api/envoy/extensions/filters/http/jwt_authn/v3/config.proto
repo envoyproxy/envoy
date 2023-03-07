@@ -53,7 +53,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 //       cache_duration:
 //         seconds: 300
 //
-// [#next-free-field: 15]
+// [#next-free-field: 17]
 message JwtProvider {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.http.jwt_authn.v2alpha.JwtProvider";
@@ -270,6 +270,21 @@ message JwtProvider {
   //
   string header_in_metadata = 14;
 
+  // If non empty, the failure status `::google::jwt_verify::Status` for a non verified JWT will be written to StreamInfo DynamicMetadata
+  // in the format as: ``namespace`` is the jwt_authn filter name as ````envoy.filters.http.jwt_authn````
+  // The value is the ``protobuf::Struct``. The values of this field will be ``code`` and ``message``
+  // and they will contain the JWT authentication failure status code and a message describing the failure.
+  //
+  // For example, if failed_status_in_metadata is ``my_auth_failure_status``:
+  //
+  // .. code-block:: yaml
+  //
+  //   envoy.filters.http.jwt_authn:
+  //     my_auth_failure_status:
+  //       code: 3
+  //       message: Jwt expired
+  string failed_status_in_metadata = 16;
+
   // Specify the clock skew in seconds when verifying JWT time constraint,
   // such as ``exp``, and ``nbf``. If not specified, default is 60 seconds.
   uint32 clock_skew_seconds = 10;
@@ -277,6 +292,18 @@ message JwtProvider {
   // Enables JWT cache, its size is specified by ``jwt_cache_size``.
   // Only valid JWT tokens are cached.
   JwtCacheConfig jwt_cache_config = 12;
+
+  // Add JWT claim to HTTP Header
+  // Specify the claim name you want to copy in which HTTP header. For examples, following config:
+  // The claim must be of type; string, int, double, bool. Array type claims are not supported
+  // .. code-block:: yaml
+  //
+  //   claim_to_headers:
+  //     - name: x-jwt-claim-nested-claim
+  //       claim: claim.nested.key
+  //
+  // This header is only reserved for jwt claim; any other value will be overwrite.
+  repeated JwtClaimToHeader claim_to_headers = 15;
 }
 
 // This message specifies JWT Cache configuration.
@@ -302,7 +329,7 @@ message RemoteJwks {
   config.core.v3.HttpUri http_uri = 1;
 
   // Duration after which the cached JWKS should be expired. If not specified, default cache
-  // duration is 5 minutes.
+  // duration is 10 minutes.
   google.protobuf.Duration cache_duration = 2;
 
   // Fetch Jwks asynchronously in the main thread before the listener is activated.
@@ -364,6 +391,9 @@ message JwksAsyncFetch {
   // If true, it is activated without waiting for the initial fetch to complete.
   // Default is false.
   bool fast_listener = 1;
+
+  // The duration to refetch after a failed fetch. If not specified, default is 1 second.
+  google.protobuf.Duration failed_refetch_duration = 2;
 }
 
 // This message specifies a header location to extract JWT token.
@@ -716,4 +746,17 @@ message PerRouteConfig {
     // in ``JwtAuthentication``. If no, the requests using this route will be rejected with 403.
     string requirement_name = 2 [(validate.rules).string = {min_len: 1}];
   }
+}
+
+// This message specifies a combination of header name and claim name.
+message JwtClaimToHeader {
+  // The HTTP header name to copy the claim to.
+  // The header name will be sanitized and replaced.
+  string header_name = 1
+      [(validate.rules).string = {min_len: 1 well_known_regex: HTTP_HEADER_NAME strict: false}];
+
+  // The field name for the JWT Claim : it can be a nested claim of type (eg. "claim.nested.key", "sub")
+  // String separated with "." in case of nested claims. The nested claim name must use dot "." to separate
+  // the JSON name path.
+  string claim_name = 2 [(validate.rules).string = {min_len: 1}];
 }

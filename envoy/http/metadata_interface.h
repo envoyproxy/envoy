@@ -3,9 +3,13 @@
 #include <functional>
 #include <iostream>
 #include <memory>
+#include <sstream>
 #include <vector>
 
 #include "absl/container/node_hash_map.h"
+#include "absl/strings/escaping.h"
+#include "fmt/format.h"
+#include "fmt/ostream.h"
 
 namespace Envoy {
 namespace Http {
@@ -30,7 +34,8 @@ public:
   friend std::ostream& operator<<(std::ostream& out, const MetadataMap& metadata_map) {
     out << "metadata map:";
     for (const auto& metadata : metadata_map) {
-      out << "\nkey: " << metadata.first << ", value: " << metadata.second << std::endl;
+      out << "\nkey: " << absl::CEscape(metadata.first)
+          << ", value: " << absl::CEscape(metadata.second) << std::endl;
     }
     return out;
   }
@@ -57,3 +62,27 @@ using MetadataCallback = std::function<void(MetadataMapPtr&&)>;
 
 } // namespace Http
 } // namespace Envoy
+
+// NOLINT(namespace-envoy)
+namespace fmt {
+
+// Specialize printing Envoy::Http::MetadataMap as we need to escape possible
+// invalid utf8 string contained in MetadataMap.
+template <> struct formatter<Envoy::Http::MetadataMap> {
+  template <typename ParseContext>
+  FMT_CONSTEXPR auto parse(ParseContext& ctx) -> decltype(ctx.begin()) {
+    return ctx.begin();
+  }
+
+  template <typename FormatContext>
+  auto format(const Envoy::Http::MetadataMap& map, FormatContext& ctx) -> decltype(ctx.out()) {
+    std::ostringstream out;
+    out << map;
+    auto str = out.str();
+    return fmt::formatter<std::string>().format(str, ctx);
+  }
+};
+
+template <> struct formatter<::Envoy::Http::MetadataMapVector> : fmt::ostream_formatter {};
+
+} // namespace fmt

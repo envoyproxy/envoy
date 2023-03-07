@@ -75,6 +75,12 @@ ParseState Filter::parseHttpHeader(absl::string_view data) {
     protocol_ = "HTTP/2";
     return ParseState::Done;
   } else {
+    ASSERT(!data.empty());
+    // Ensure first line (also request line for HTTP request) in the buffer is not empty.
+    if (data[0] == '\r' || data[0] == '\n') {
+      return ParseState::Error;
+    }
+
     absl::string_view new_data = data.substr(parser_.nread);
     const size_t pos = new_data.find_first_of("\r\n");
 

@@ -250,6 +250,18 @@ TEST(TagExtractorTest, DefaultTagExtractors) {
   regex_tester.testRegex("ratelimit.foo_ratelimiter.over_limit", "ratelimit.over_limit",
                          {ratelimit_prefix});
 
+  // Local Http Ratelimit
+  Tag local_ratelimit_prefix;
+  local_ratelimit_prefix.name_ = tag_names.LOCAL_HTTP_RATELIMIT_PREFIX;
+  local_ratelimit_prefix.value_ = "foo_ratelimiter";
+  regex_tester.testRegex("foo_ratelimiter.http_local_rate_limit.ok", "http_local_rate_limit.ok",
+                         {local_ratelimit_prefix});
+
+  // Local network Ratelimit
+  local_ratelimit_prefix.name_ = tag_names.LOCAL_NETWORK_RATELIMIT_PREFIX;
+  regex_tester.testRegex("local_rate_limit.foo_ratelimiter.rate_limited",
+                         "local_rate_limit.rate_limited", {local_ratelimit_prefix});
+
   // Dynamo
   Tag dynamo_http_prefix;
   dynamo_http_prefix.name_ = tag_names.HTTP_CONN_MANAGER_PREFIX;
@@ -392,19 +404,20 @@ TEST(TagExtractorTest, DefaultTagExtractors) {
   worker_id.value_ = "123";
 
   regex_tester.testRegex("listener_manager.worker_123.dispatcher.loop_duration_us",
-                         "listener_manager.dispatcher.loop_duration_us", {worker_id});
+                         "listener_manager.worker_dispatcher.loop_duration_us", {worker_id});
 
   // Listener worker id
   listener_address.value_ = "127.0.0.1_3012";
   regex_tester.testRegex("listener.127.0.0.1_3012.worker_123.downstream_cx_active",
-                         "listener.downstream_cx_active", {listener_address, worker_id});
+                         "listener.worker_downstream_cx_active", {listener_address, worker_id});
 
   listener_address.value_ = "myprefix";
   regex_tester.testRegex("listener.myprefix.worker_123.downstream_cx_active",
-                         "listener.downstream_cx_active", {listener_address, worker_id});
+                         "listener.worker_downstream_cx_active", {listener_address, worker_id});
 
   // Server worker id
-  regex_tester.testRegex("server.worker_123.watchdog_miss", "server.watchdog_miss", {worker_id});
+  regex_tester.testRegex("server.worker_123.watchdog_miss", "server.worker_watchdog_miss",
+                         {worker_id});
 
   // Thrift Proxy Prefix
   Tag thrift_prefix;
@@ -417,6 +430,29 @@ TEST(TagExtractorTest, DefaultTagExtractors) {
   redis_prefix.name_ = tag_names.REDIS_PREFIX;
   redis_prefix.value_ = "my_redis_prefix";
   regex_tester.testRegex("redis.my_redis_prefix.response", "redis.response", {redis_prefix});
+}
+
+TEST(TagExtractorTest, ExtAuthzTagExtractors) {
+  const auto& tag_names = Config::TagNames::get();
+
+  Tag listener_http_prefix;
+  listener_http_prefix.name_ = tag_names.HTTP_CONN_MANAGER_PREFIX;
+  listener_http_prefix.value_ = "http_prefix";
+
+  Tag grpc_cluster;
+  grpc_cluster.name_ = tag_names.CLUSTER_NAME;
+  grpc_cluster.value_ = "grpc_cluster";
+
+  DefaultTagRegexTester regex_tester;
+
+  // ExtAuthz Prefix
+  Tag ext_authz_prefix;
+  ext_authz_prefix.name_ = tag_names.EXT_AUTHZ_PREFIX;
+  ext_authz_prefix.value_ = "authpfx";
+  regex_tester.testRegex("http.http_prefix.ext_authz.authpfx.denied", "http.ext_authz.denied",
+                         {listener_http_prefix, ext_authz_prefix});
+  regex_tester.testRegex("cluster.grpc_cluster.ext_authz.authpfx.ok", "cluster.ext_authz.ok",
+                         {grpc_cluster, ext_authz_prefix});
 }
 
 TEST(TagExtractorTest, ExtractRegexPrefix) {

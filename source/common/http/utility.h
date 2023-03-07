@@ -2,8 +2,10 @@
 
 #include <chrono>
 #include <cstdint>
+#include <memory>
 #include <string>
 
+#include "envoy/common/regex.h"
 #include "envoy/config/core/v3/http_uri.pb.h"
 #include "envoy/config/core/v3/protocol.pb.h"
 #include "envoy/config/route/v3/route_components.pb.h"
@@ -19,7 +21,6 @@
 
 #include "absl/strings/string_view.h"
 #include "absl/types/optional.h"
-#include "nghttp2/nghttp2.h"
 
 namespace Envoy {
 namespace Http {
@@ -44,18 +45,6 @@ using AlpnNames = ConstSingleton<AlpnNameValues>;
 
 namespace Http2 {
 namespace Utility {
-
-struct SettingsEntryHash {
-  size_t operator()(const nghttp2_settings_entry& entry) const {
-    return absl::Hash<decltype(entry.settings_id)>()(entry.settings_id);
-  }
-};
-
-struct SettingsEntryEquals {
-  bool operator()(const nghttp2_settings_entry& lhs, const nghttp2_settings_entry& rhs) const {
-    return lhs.settings_id == rhs.settings_id;
-  }
-};
 
 // Limits and defaults for `envoy::config::core::v3::Http2ProtocolOptions` protos.
 struct OptionsLimits {
@@ -145,9 +134,16 @@ namespace Utility {
 class Url {
 public:
   bool initialize(absl::string_view absolute_url, bool is_connect_request);
-  absl::string_view scheme() { return scheme_; }
-  absl::string_view hostAndPort() { return host_and_port_; }
-  absl::string_view pathAndQueryParams() { return path_and_query_params_; }
+  absl::string_view scheme() const { return scheme_; }
+  absl::string_view hostAndPort() const { return host_and_port_; }
+  absl::string_view pathAndQueryParams() const { return path_and_query_params_; }
+
+  void setPathAndQueryParams(absl::string_view path_and_query_params) {
+    path_and_query_params_ = path_and_query_params;
+  }
+
+  /** Returns the fully qualified URL as a string. */
+  std::string toString() const;
 
 private:
   absl::string_view scheme_;
@@ -173,7 +169,43 @@ public:
    * @param encoded supplies string to be decoded.
    * @return std::string decoded string https://tools.ietf.org/html/rfc3986#section-2.1.
    */
-  static std::string decode(absl::string_view value);
+  static std::string decode(absl::string_view encoded);
+
+  /**
+   * Encodes string view for storing it as a query parameter according to the
+   * x-www-form-urlencoded spec:
+   * https://www.w3.org/TR/html5/forms.html#application/x-www-form-urlencoded-encoding-algorithm
+   * @param value supplies string to be encoded.
+   * @return std::string encoded string according to
+   * https://www.w3.org/TR/html5/forms.html#application/x-www-form-urlencoded-encoding-algorithm
+   *
+   * Summary:
+   * The x-www-form-urlencoded spec mandates that all ASCII codepoints are %-encoded except the
+   * following: ALPHA | DIGIT | * | - | . | _
+   *
+   * NOTE: the space character is encoded as %20, NOT as the + character
+   */
+  static std::string urlEncodeQueryParameter(absl::string_view value);
+
+  /**
+   * Decodes string view that represents URL in x-www-form-urlencoded query parameter.
+   * @param encoded supplies string to be decoded.
+   * @return std::string decoded string compliant with https://datatracker.ietf.org/doc/html/rfc3986
+   *
+   * This function decodes a query parameter assuming it is a URL. It only decodes characters
+   * permitted in the URL - the unreserved and reserved character sets.
+   * unreserved-set := ALPHA | DIGIT | - | . | _ | ~
+   * reserved-set := sub-delims | gen-delims
+   * sub-delims := ! | $ | & | ` | ( | ) | * | + | , | ; | =
+   * gen-delims := : | / | ? | # | [ | ] | @
+   *
+   * The following characters are not decoded:
+   * ASCII controls <= 0x1F, space, DEL (0x7F), extended ASCII > 0x7F
+   * As well as the following characters without defined meaning in URL
+   * " | < | > | \ | ^ | { | }
+   * and the "pipe" `|` character
+   */
+  static std::string urlDecodeQueryParameter(absl::string_view encoded);
 
 private:
   // Encodes string view to its percent encoded representation, with start index.
@@ -379,16 +411,19 @@ struct LocalReplyData {
   bool is_head_request_ = false;
 };
 
-/**
- * Create a locally generated response using filter callbacks.
- * @param is_reset boolean reference that indicates whether a stream has been reset. It is the
- *        responsibility of the caller to ensure that this is set to false if onDestroy()
- *        is invoked in the context of sendLocalReply().
- * @param callbacks supplies the filter callbacks to use.
- * @param local_reply_data struct which keeps data related to generate reply.
- */
-void sendLocalReply(const bool& is_reset, StreamDecoderFilterCallbacks& callbacks,
-                    const LocalReplyData& local_reply_data);
+// Prepared local reply after modifying headers and rewriting body.
+struct PreparedLocalReply {
+  bool is_grpc_request_ = false;
+  bool is_head_request_ = false;
+  ResponseHeaderMapPtr response_headers_;
+  std::string response_body_;
+  // Function to encode response headers.
+  std::function<void(ResponseHeaderMapPtr&& headers, bool end_stream)> encode_headers_;
+  // Function to encode the response body.
+  std::function<void(Buffer::Instance& data, bool end_stream)> encode_data_;
+};
+
+using PreparedLocalReplyPtr = std::unique_ptr<PreparedLocalReply>;
 
 /**
  * Create a locally generated response using the provided lambdas.
@@ -401,6 +436,23 @@ void sendLocalReply(const bool& is_reset, StreamDecoderFilterCallbacks& callback
  */
 void sendLocalReply(const bool& is_reset, const EncodeFunctions& encode_functions,
                     const LocalReplyData& local_reply_data);
+
+/**
+ * Prepares a locally generated response.
+ *
+ * @param encode_functions supplies the functions to encode response body and headers.
+ * @param local_reply_data struct which keeps data related to generate reply.
+ */
+PreparedLocalReplyPtr prepareLocalReply(const EncodeFunctions& encode_functions,
+                                        const LocalReplyData& local_reply_data);
+/**
+ * Encodes a prepared local reply.
+ * @param is_reset boolean reference that indicates whether a stream has been reset. It is the
+ *                 responsibility of the caller to ensure that this is set to false if onDestroy()
+ *                 is invoked in the context of sendLocalReply().
+ * @param prepared_local_reply supplies the local reply to encode.
+ */
+void encodeLocalReply(const bool& is_reset, PreparedLocalReplyPtr prepared_local_reply);
 
 struct GetLastAddressFromXffInfo {
   // Last valid address pulled from the XFF header.
@@ -589,6 +641,13 @@ struct AuthorityAttributes {
 AuthorityAttributes parseAuthority(absl::string_view host);
 
 /**
+ * It validates RetryPolicy defined in core api. It should be called at the main thread as
+ * it may throw exception.
+ * @param retry_policy core retry policy
+ */
+void validateCoreRetryPolicy(const envoy::config::core::v3::RetryPolicy& retry_policy);
+
+/**
  * It returns RetryPolicy defined in core api to route api.
  * @param retry_policy core retry policy
  * @param retry_on this specifies when retry should be invoked.
@@ -609,6 +668,29 @@ bool isSafeRequest(const Http::RequestHeaderMap& request_headers);
  * Return the GatewayTimeout HTTP code to indicate the request is full received.
  */
 Http::Code maybeRequestTimeoutCode(bool remote_decode_complete);
+
+/**
+ * Container for route config elements that pertain to a redirect.
+ */
+struct RedirectConfig {
+  const std::string scheme_redirect_;
+  const std::string host_redirect_;
+  const std::string port_redirect_;
+  const std::string path_redirect_;
+  const std::string prefix_rewrite_redirect_;
+  const std::string regex_rewrite_redirect_substitution_;
+  Regex::CompiledMatcherPtr regex_rewrite_redirect_;
+  // Keep small members (bools and enums) at the end of class, to reduce alignment overhead.
+  const bool path_redirect_has_query_;
+  const bool https_redirect_;
+  const bool strip_query_;
+};
+
+/*
+ * Compute new path based on RedirectConfig.
+ */
+std::string newUri(::Envoy::OptRef<const RedirectConfig> redirect_config,
+                   const Http::RequestHeaderMap& headers);
 
 } // namespace Utility
 } // namespace Http

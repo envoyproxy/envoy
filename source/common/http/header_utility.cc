@@ -12,6 +12,7 @@
 
 #include "absl/strings/match.h"
 #include "nghttp2/nghttp2.h"
+#include "quiche/http2/adapter/header_validator.h"
 
 namespace Envoy {
 namespace Http {
@@ -190,8 +191,8 @@ bool HeaderUtility::schemeIsValid(const absl::string_view scheme) {
 }
 
 bool HeaderUtility::headerValueIsValid(const absl::string_view header_value) {
-  return nghttp2_check_header_value(reinterpret_cast<const uint8_t*>(header_value.data()),
-                                    header_value.size()) != 0;
+  return http2::adapter::HeaderValidator::IsValidHeaderValue(header_value,
+                                                             http2::adapter::ObsTextOption::kAllow);
 }
 
 bool HeaderUtility::headerNameContainsUnderscore(const absl::string_view header_name) {
@@ -199,17 +200,18 @@ bool HeaderUtility::headerNameContainsUnderscore(const absl::string_view header_
 }
 
 bool HeaderUtility::authorityIsValid(const absl::string_view header_value) {
-  return nghttp2_check_authority(reinterpret_cast<const uint8_t*>(header_value.data()),
-                                 header_value.size()) != 0;
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.http2_validate_authority_with_quiche")) {
+    return http2::adapter::HeaderValidator::IsValidAuthority(header_value);
+  } else {
+    return nghttp2_check_authority(reinterpret_cast<const uint8_t*>(header_value.data()),
+                                   header_value.size()) != 0;
+  }
 }
 
 bool HeaderUtility::isSpecial1xx(const ResponseHeaderMap& response_headers) {
-  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.proxy_102_103") &&
-      (response_headers.Status()->value() == "102" ||
-       response_headers.Status()->value() == "103")) {
-    return true;
-  }
-  return response_headers.Status()->value() == "100";
+  return response_headers.Status()->value() == "100" ||
+         response_headers.Status()->value() == "102" || response_headers.Status()->value() == "103";
 }
 
 bool HeaderUtility::isConnect(const RequestHeaderMap& headers) {
@@ -387,8 +389,7 @@ HeaderUtility::HeaderValidationResult HeaderUtility::checkHeaderNameForUnderscor
     absl::string_view header_name,
     envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
         headers_with_underscores_action,
-    Stats::Counter& dropped_headers_with_underscores,
-    Stats::Counter& requests_rejected_with_underscores_in_headers) {
+    HeaderValidatorStats& stats) {
   if (headers_with_underscores_action == envoy::config::core::v3::HttpProtocolOptions::ALLOW ||
       !HeaderUtility::headerNameContainsUnderscore(header_name)) {
     return HeaderValidationResult::ACCEPT;
@@ -396,11 +397,11 @@ HeaderUtility::HeaderValidationResult HeaderUtility::checkHeaderNameForUnderscor
   if (headers_with_underscores_action ==
       envoy::config::core::v3::HttpProtocolOptions::DROP_HEADER) {
     ENVOY_LOG_MISC(debug, "Dropping header with invalid characters in its name: {}", header_name);
-    dropped_headers_with_underscores.inc();
+    stats.incDroppedHeadersWithUnderscores();
     return HeaderValidationResult::DROP;
   }
   ENVOY_LOG_MISC(debug, "Rejecting request due to header name with underscores: {}", header_name);
-  requests_rejected_with_underscores_in_headers.inc();
+  stats.incRequestsRejectedWithUnderscoresInHeaders();
   return HeaderUtility::HeaderValidationResult::REJECT;
 }
 

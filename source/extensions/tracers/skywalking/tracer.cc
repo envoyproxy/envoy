@@ -49,7 +49,7 @@ void Span::finishSpan() {
 void Span::injectContext(Tracing::TraceContext& trace_context,
                          const Upstream::HostDescriptionConstSharedPtr& upstream) {
   absl::string_view remote_address =
-      upstream != nullptr ? upstream->address()->asStringView() : trace_context.authority();
+      upstream != nullptr ? upstream->address()->asStringView() : trace_context.host();
 
   auto sw8_header =
       tracing_context_->createSW8HeaderValue({remote_address.data(), remote_address.size()});
@@ -64,8 +64,8 @@ void Span::injectContext(Tracing::TraceContext& trace_context,
 
 Tracing::SpanPtr Span::spawnChild(const Tracing::Config&, const std::string&, SystemTime) {
   // Reuse operation name of parent span by default.
-  return std::make_unique<Span>(span_entity_->operationName(), *this, tracing_context_,
-                                parent_tracer_);
+  return std::make_unique<Span>(span_entity_->operationName(), span_entity_->spanLayer(), *this,
+                                tracing_context_, parent_tracer_);
 }
 
 Tracer::Tracer(TraceSegmentReporterPtr reporter) : reporter_(std::move(reporter)) {}
@@ -77,8 +77,9 @@ void Tracer::sendSegment(TracingContextPtr segment_context) {
   }
 }
 
-Tracing::SpanPtr Tracer::startSpan(absl::string_view name, TracingContextPtr tracing_context) {
-  return std::make_unique<Span>(name, tracing_context, *this);
+Tracing::SpanPtr Tracer::startSpan(absl::string_view name, absl::string_view protocol,
+                                   TracingContextPtr tracing_context) {
+  return std::make_unique<Span>(name, protocol, tracing_context, *this);
 }
 } // namespace SkyWalking
 } // namespace Tracers

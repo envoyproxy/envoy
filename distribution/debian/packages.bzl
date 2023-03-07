@@ -10,7 +10,7 @@ def envoy_pkg_deb(
         description = "Envoy built for Debian/Ubuntu",
         preinst = "//distribution/debian:preinst",
         postinst = "//distribution/debian:postinst",
-        supported_distributions = "buster bullseye bionic focal impish",
+        supported_distributions = "bullseye focal jammy",
         architecture = select({
             "//bazel:x86": "amd64",
             "//conditions:default": "arm64",

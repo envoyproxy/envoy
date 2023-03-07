@@ -181,7 +181,7 @@ changes:
     added initial support for :ref:`UDP proxy <config_udp_listener_filters_udp_proxy>`.
 
 deprecated:
-- area:  tracing
+- area: tracing
   change: |
     The ``request_headers_for_tags`` field in :ref:`HTTP connection manager
     <envoy_api_msg_config.filter.network.http_connection_manager.v2.HttpConnectionManager.Tracing>`

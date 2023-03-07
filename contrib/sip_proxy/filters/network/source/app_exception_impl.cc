@@ -1,7 +1,5 @@
 #include "contrib/sip_proxy/filters/network/source/app_exception_impl.h"
 
-#include <sstream>
-
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {

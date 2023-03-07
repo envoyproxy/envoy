@@ -1,0 +1,79 @@
+static_resources:
+  listeners:
+  - address:
+      socket_address:
+        address: 0.0.0.0
+        port_value: 10000
+    filter_chains:
+    - filters:
+      - name: envoy.filters.network.http_connection_manager
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+          stat_prefix: ingress_http
+          route_config:
+            name: local_route
+            virtual_hosts:
+            - name: service
+              domains:
+              - "*"
+              routes:
+              - match:
+                  prefix: "/"
+                route:
+                  cluster: local_service
+          http_filters:
+          - name: envoy.filters.http.rbac
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.http.rbac.v3.RBAC
+              matcher:
+                matcher_list:
+                  matchers:
+                  - predicate:
+                      not_matcher:
+                        single_predicate:
+                          input:
+                            name: envoy.matching.inputs.request_headers
+                            typed_config:
+                              "@type": type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput
+                              header_name: referer
+                          value_match:
+                            safe_regex:
+                              google_re2: {}
+                              regex: https?://(www.)?envoyproxy.io/docs/envoy.*
+                    on_match:
+                      action:
+                        name: action
+                        typed_config:
+                          "@type": type.googleapis.com/envoy.config.rbac.v3.Action
+                          name: illegal-referer
+                          action: DENY
+                on_no_match:
+                  action:
+                    name: action
+                    typed_config:
+                      "@type": type.googleapis.com/envoy.config.rbac.v3.Action
+                      name: all-pass
+                      action: ALLOW
+          - name: envoy.filters.http.router
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+
+  clusters:
+  - name: local_service
+    type: STRICT_DNS
+    lb_policy: ROUND_ROBIN
+    load_assignment:
+      cluster_name: local_service
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: backend
+                port_value: 8080
+
+admin:
+  address:
+    socket_address:
+      address: 0.0.0.0
+      port_value: 10001

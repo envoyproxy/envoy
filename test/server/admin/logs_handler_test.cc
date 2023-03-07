@@ -60,6 +60,14 @@ TEST_P(AdminInstanceTest, LogLevelSetting) {
   FINE_GRAIN_LOG(trace, "After post 4: level for this file is trace now!");
   EXPECT_EQ(getFineGrainLogContext().getFineGrainLogEntry(__FILE__)->level(), spdlog::level::trace);
   EXPECT_EQ(getFineGrainLogContext().getFineGrainLogEntry(file)->level(), spdlog::level::trace);
+
+  // You can't set the overall level and multiple levels at once at the same time.
+  EXPECT_EQ(Http::Code::BadRequest, postCallback(query + "&level=info", header_map, response));
+
+  // It's OK to set a path with a blank level -- that happens with HTML forms.
+  EXPECT_EQ(Http::Code::OK, postCallback(query + "&level=", header_map, response));
+  // Likewise it's OK to set the level even if there's a blank path.
+  EXPECT_EQ(Http::Code::OK, postCallback("/logging?level=warning&paths=", header_map, response));
 }
 
 } // namespace Server

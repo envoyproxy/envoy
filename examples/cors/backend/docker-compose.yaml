@@ -13,8 +13,11 @@ services:
     build:
       context: .
       dockerfile: Dockerfile-frontenvoy
+    depends_on:
+      backend-service:
+        condition: service_healthy
     ports:
-    - "${PORT_BACKEND:-8002}:8000"
+    - "${PORT_BACKEND:-8002}:10000"
     - "${PORT_STATS:-8003}:8001"
 
   backend-service:

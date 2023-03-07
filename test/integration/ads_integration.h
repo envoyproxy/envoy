@@ -12,6 +12,7 @@
 #include "test/common/grpc/grpc_client_integration.h"
 #include "test/config/utility.h"
 #include "test/integration/http_integration.h"
+#include "test/test_common/utility.h"
 
 namespace Envoy {
 
@@ -30,7 +31,7 @@ public:
       const ::testing::TestParamInfo<std::tuple<Network::Address::IpVersion, Grpc::ClientType,
                                                 Grpc::SotwOrDelta, OldDssOrNewDss>>& p) {
     return fmt::format(
-        "{}_{}_{}_{}", std::get<0>(p.param) == Network::Address::IpVersion::v4 ? "IPv4" : "IPv6",
+        "{}_{}_{}_{}", TestUtility::ipVersionToString(std::get<0>(p.param)),
         std::get<1>(p.param) == Grpc::ClientType::GoogleGrpc ? "GoogleGrpc" : "EnvoyGrpc",
         std::get<2>(p.param) == Grpc::SotwOrDelta::Delta ? "Delta" : "StateOfTheWorld",
         std::get<3>(p.param) == OldDssOrNewDss::Old ? "OldDSS" : "NewDSS");

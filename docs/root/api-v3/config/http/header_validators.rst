@@ -1,5 +1,5 @@
-Header Validators
-=================
+HTTP header validators
+======================
 
 .. toctree::
   :glob:

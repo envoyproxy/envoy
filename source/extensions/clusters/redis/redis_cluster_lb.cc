@@ -147,7 +147,7 @@ Upstream::HostConstSharedPtr RedisClusterLoadBalancerFactory::RedisClusterLoadBa
     case NetworkFilters::Common::Redis::Client::ReadPolicy::Primary:
       return shard->primary();
     case NetworkFilters::Common::Redis::Client::ReadPolicy::PreferPrimary:
-      if (shard->primary()->health() == Upstream::Host::Health::Healthy) {
+      if (shard->primary()->coarseHealth() == Upstream::Host::Health::Healthy) {
         return shard->primary();
       } else {
         return chooseRandomHost(shard->allHosts(), random_);

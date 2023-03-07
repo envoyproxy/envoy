@@ -51,8 +51,7 @@ TEST(HealthCheckFilterConfig, BadHealthCheckFilterConfig) {
   )EOF";
 
   envoy::extensions::filters::http::health_check::v3::HealthCheck proto_config;
-  EXPECT_THROW_WITH_REGEX(TestUtility::loadFromYaml(yaml_string, proto_config), EnvoyException,
-                          "status: Cannot find field");
+  EXPECT_THROW(TestUtility::loadFromYaml(yaml_string, proto_config), EnvoyException);
 }
 
 TEST(HealthCheckFilterConfig, FailsWhenNotPassThroughButTimeoutSetYaml) {

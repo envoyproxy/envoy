@@ -21,7 +21,7 @@ struct InitData {
 InitData& processWideInitData() { MUTABLE_CONSTRUCT_ON_FIRST_USE(InitData); };
 } // namespace
 
-ProcessWide::ProcessWide() {
+ProcessWide::ProcessWide(bool validate_proto_descriptors) {
   // Note that the following lock has the dual use of making sure that initialization is complete
   // before a second caller can enter and leave this function.
   auto& init_data = processWideInitData();
@@ -31,7 +31,9 @@ ProcessWide::ProcessWide() {
     // TODO(mattklein123): Audit the following as not all of these have to be re-initialized in the
     // edge case where something does init/destroy/init/destroy.
     Event::Libevent::Global::initialize();
-    Envoy::Server::validateProtoDescriptors();
+    if (validate_proto_descriptors) {
+      Envoy::Server::validateProtoDescriptors();
+    }
     Http::Http2::initializeNghttp2Logging();
 
     // We do not initialize Google gRPC here -- we instead instantiate

@@ -160,7 +160,8 @@ private:
                               public RequestDecoder,
                               public Tracing::Config,
                               public ScopeTrackedObject,
-                              public FilterManagerCallbacks {
+                              public FilterManagerCallbacks,
+                              public DownstreamStreamFilterCallbacks {
     ActiveStream(ConnectionManagerImpl& connection_manager, uint32_t buffer_limit,
                  Buffer::BufferMemoryAccountSharedPtr account);
     void completeRequest();
@@ -187,8 +188,11 @@ private:
     void decodeData(Buffer::Instance& data, bool end_stream) override;
     void decodeMetadata(MetadataMapPtr&&) override;
 
+    // Mark that the last downstream byte is received, and the downstream stream is complete.
+    void maybeEndDecode(bool end_stream);
+
     // Http::RequestDecoder
-    void decodeHeaders(RequestHeaderMapPtr&& headers, bool end_stream) override;
+    void decodeHeaders(RequestHeaderMapSharedPtr&& headers, bool end_stream) override;
     void decodeTrailers(RequestTrailerMapPtr&& trailers) override;
     StreamInfo::StreamInfo& streamInfo() override { return filter_manager_.streamInfo(); }
     void sendLocalReply(Code code, absl::string_view body,
@@ -197,12 +201,20 @@ private:
                         absl::string_view details) override {
       return filter_manager_.sendLocalReply(code, body, modify_headers, grpc_status, details);
     }
-
-    // Tracing::TracingConfig
-    Tracing::OperationName operationName() const override;
-    const Tracing::CustomTagMap* customTags() const override;
-    bool verbose() const override;
-    uint32_t maxPathTagLength() const override;
+    std::list<AccessLog::InstanceSharedPtr> accessLogHandlers() override {
+      return filter_manager_.accessLogHandlers();
+    }
+    // Hand off headers/trailers and stream info to the codec's response encoder, for logging later
+    // (i.e. possibly after this stream has been destroyed).
+    //
+    // TODO(paulsohn): Investigate whether we can move the headers/trailers and stream info required
+    // for logging instead of copying them (as is currently done in the HTTP/3 implementation) or
+    // using a shared pointer. See
+    // https://github.com/envoyproxy/envoy/pull/23648#discussion_r1066095564 for more details.
+    void deferHeadersAndTrailers() {
+      response_encoder_->setDeferredLoggingHeadersAndTrailers(request_headers_, response_headers_,
+                                                              response_trailers_, streamInfo());
+    }
 
     // ScopeTrackedObject
     void dumpState(std::ostream& os, int indent_level = 0) const override {
@@ -217,7 +229,7 @@ private:
     void encode1xxHeaders(ResponseHeaderMap& response_headers) override;
     void encodeData(Buffer::Instance& data, bool end_stream) override;
     void encodeTrailers(ResponseTrailerMap& trailers) override;
-    void encodeMetadata(MetadataMapVector& metadata) override;
+    void encodeMetadata(MetadataMapPtr&& metadata) override;
     void setRequestTrailers(Http::RequestTrailerMapPtr&& request_trailers) override {
       ASSERT(!request_trailers_);
       request_trailers_ = std::move(request_trailers);
@@ -270,21 +282,27 @@ private:
     void disarmRequestTimeout() override;
     void resetIdleTimer() override;
     void recreateStream(StreamInfo::FilterStateSharedPtr filter_state) override;
-    void resetStream() override;
+    void resetStream(Http::StreamResetReason reset_reason = Http::StreamResetReason::LocalReset,
+                     absl::string_view transport_failure_reason = "") override;
     const Router::RouteEntry::UpgradeMap* upgradeMap() override;
     Upstream::ClusterInfoConstSharedPtr clusterInfo() override;
-    Router::RouteConstSharedPtr route(const Router::RouteCallback& cb) override;
-    void setRoute(Router::RouteConstSharedPtr route) override;
-    void clearRouteCache() override;
-    absl::optional<Router::ConfigConstSharedPtr> routeConfig() override;
     Tracing::Span& activeSpan() override;
     void onResponseDataTooLarge() override;
     void onRequestDataTooLarge() override;
     Http1StreamEncoderOptionsOptRef http1StreamEncoderOptions() override;
     void onLocalReply(Code code) override;
-    Tracing::Config& tracingConfig() override;
+    OptRef<const Tracing::Config> tracingConfig() const override;
     const ScopeTrackedObject& scope() override;
+    OptRef<DownstreamStreamFilterCallbacks> downstreamCallbacks() override { return *this; }
 
+    // DownstreamStreamFilterCallbacks
+    void setRoute(Router::RouteConstSharedPtr route) override;
+    Router::RouteConstSharedPtr route(const Router::RouteCallback& cb) override;
+    void clearRouteCache() override;
+    void requestRouteConfigUpdate(
+        Http::RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb) override;
+
+    absl::optional<Router::ConfigConstSharedPtr> routeConfig();
     void traceRequest();
 
     // Updates the snapped_route_config_ (by reselecting scoped route configuration), if a scope is
@@ -293,11 +311,10 @@ private:
 
     void refreshCachedRoute();
     void refreshCachedRoute(const Router::RouteCallback& cb);
-    void requestRouteConfigUpdate(
-        Http::RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb) override;
 
     void refreshCachedTracingCustomTags();
     void refreshDurationTimeout();
+    void refreshIdleTimeout();
 
     // All state for the stream. Put here for readability.
     struct State {
@@ -347,21 +364,37 @@ private:
       return *tracing_custom_tags_;
     }
 
+    // Note: this method is a noop unless ENVOY_ENABLE_UHV is defined
+    // Call header validator extension to validate request header map after it was deserialized.
+    // If header map failed validation, it sends an error response and returns false.
+    bool validateHeaders();
+
+    // Note: this method is a noop unless ENVOY_ENABLE_UHV is defined
+    // Call header validator extension to validate the request trailer map after it was
+    // deserialized. If the trailer map failed validation, this method does the following:
+    // 1. For H/1 it sends 400 response and returns false.
+    // 2. For H/2 and H/3 it resets the stream (without error response). Issue #24735 is filed to
+    //    harmonize this behavior with H/1.
+    // 3. If the `stream_error_on_invalid_http_message` is set to `false` (it is by default) in the
+    // HTTP connection manager configuration, then the entire connection is closed.
+    bool validateTrailers();
+
     ConnectionManagerImpl& connection_manager_;
+    OptRef<const TracingConnectionManagerConfig> connection_manager_tracing_config_;
     // TODO(snowp): It might make sense to move this to the FilterManager to avoid storing it in
     // both locations, then refer to the FM when doing stream logs.
     const uint64_t stream_id_;
 
-    RequestHeaderMapPtr request_headers_;
+    RequestHeaderMapSharedPtr request_headers_;
     RequestTrailerMapPtr request_trailers_;
 
     ResponseHeaderMapPtr informational_headers_;
-    ResponseHeaderMapPtr response_headers_;
-    ResponseTrailerMapPtr response_trailers_;
+    ResponseHeaderMapSharedPtr response_headers_;
+    ResponseTrailerMapSharedPtr response_trailers_;
 
     // Note: The FM must outlive the above headers, as they are possibly accessed during filter
     // destruction.
-    FilterManager filter_manager_;
+    DownstreamFilterManager filter_manager_;
 
     Router::ConfigConstSharedPtr snapped_route_config_;
     Router::ScopedConfigConstSharedPtr snapped_scoped_routes_config_;
@@ -388,11 +421,32 @@ private:
     const std::string* decorated_operation_{nullptr};
     std::unique_ptr<RdsRouteConfigUpdateRequester> route_config_update_requester_;
     std::unique_ptr<Tracing::CustomTagMap> tracing_custom_tags_{nullptr};
+    Http::HeaderValidatorPtr header_validator_;
 
     friend FilterManager;
+
+  private:
+    // Keep these methods private to ensure that these methods are only called by the reference
+    // returned by the public tracingConfig() method.
+    // Tracing::TracingConfig
+    Tracing::OperationName operationName() const override;
+    const Tracing::CustomTagMap* customTags() const override;
+    bool verbose() const override;
+    uint32_t maxPathTagLength() const override;
   };
 
   using ActiveStreamPtr = std::unique_ptr<ActiveStream>;
+
+  class HttpStreamIdProviderImpl : public StreamInfo::StreamIdProvider {
+  public:
+    HttpStreamIdProviderImpl(ActiveStream& parent) : parent_(parent) {}
+
+    // StreamInfo::StreamIdProvider
+    absl::optional<absl::string_view> toStringView() const override;
+    absl::optional<uint64_t> toInteger() const override;
+
+    ActiveStream& parent_;
+  };
 
   /**
    * Check to see if the connection can be closed after gracefully waiting to send pending codec
@@ -408,8 +462,10 @@ private:
 
   /**
    * Process a stream that is ending due to upstream response or reset.
+   * If check_for_deferred_close is true, the ConnectionManager will check to
+   * see if the connection was drained and should be closed if no streams remain.
    */
-  void doEndStream(ActiveStream& stream);
+  void doEndStream(ActiveStream& stream, bool check_for_deferred_close = true);
 
   void resetAllStreams(absl::optional<StreamInfo::ResponseFlag> response_flag,
                        absl::string_view details);

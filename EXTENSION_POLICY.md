@@ -147,6 +147,16 @@ included by default in the main image builds. Consumers need to pull directly fr
 images described in the installation guide. Please read the linked document in detail to determine
 whether contrib extensions are the right choice for a newly proposed extension.
 
+**NOTE:** Contrib extensions **require** an end-user sponsor. The sponsor is someone who will run
+the extension at sufficient scale as to make the build maintenance and other overhead worthwhile.
+The definition of "sufficient scale" is up to the maintainers and can change at any time. The
+end-user sponsor *does not* have to author the extension, but the end-user sponsor will need to make
+an "on the record" attestation of their planned usage of the extension. This attestation should
+occur in a GitHub issue opened to discuss the new extension. In this context "end user" has the
+same definition as the one specified in the [security policy](SECURITY.md#membership-criteria)
+membership criteria (point 1.3.5).
+
 **NOTE:** Contrib extensions are not eligible for Envoy security team coverage.
+
 **NOTE:** As per the linked Google Doc, contrib extensions generally should use `v3alpha` to avoid
 requiring API shepherd reviews.

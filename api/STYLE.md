@@ -34,6 +34,9 @@ In addition, the following conventions should be followed:
   implementation. These indicate that the entity is not implemented in Envoy and the entity
   should be hidden from the Envoy documentation.
 
+* For extensions that are a work-in-progress or the config proto documentation is hidden with
+  `[#not-implemented-hide:]`, set its `status` field to `wip` in `extensions_metadata.yaml`.
+
 * Use a `(xds.annotations.v3.file_status).work_in_progress`,
   `(xds.annotations.v3.message_status).work_in_progress`, or
   `(xds.annotations.v3.field_status).work_in_progress` option annotation for files,
@@ -181,7 +184,7 @@ metadata. We describe these annotations below by category.
   the field will be promoted to a given `oneof` in the next API major version.
 * `[(udpa.annotations.sensitive) = true]` to denote sensitive fields that
   should be redacted in output such as logging or configuration dumps.
-* [PGV annotations](https://github.com/envoyproxy/protoc-gen-validate) to denote field
+* [PGV annotations](https://github.com/bufbuild/protoc-gen-validate) to denote field
   value constraints.
 
 ### Enum value level

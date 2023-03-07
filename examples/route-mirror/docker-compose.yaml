@@ -1,0 +1,50 @@
+version: "3.8"
+services:
+
+  envoy-front-proxy:
+    build:
+      context: .
+      dockerfile: Dockerfile-envoy
+    ports:
+    - "${PORT_PROXY:-10000}:10000"
+    depends_on:
+      service1:
+        condition: service_healthy
+      service1-mirror:
+        condition: service_healthy
+      service2:
+        condition: service_healthy
+      service2-mirror:
+        condition: service_healthy
+
+  service1:
+    build:
+      context: ../shared/flask
+    volumes:
+    - ./service.py:/code/service.py
+    environment:
+    - SERVICE_NAME=1
+
+  service1-mirror:
+    build:
+      context: ../shared/flask
+    volumes:
+    - ./service.py:/code/service.py
+    environment:
+    - SERVICE_NAME=1
+
+  service2:
+    build:
+      context: ../shared/flask
+    volumes:
+    - ./service.py:/code/service.py
+    environment:
+    - SERVICE_NAME=2
+
+  service2-mirror:
+    build:
+      context: ../shared/flask
+    volumes:
+    - ./service.py:/code/service.py
+    environment:
+    - SERVICE_NAME=2

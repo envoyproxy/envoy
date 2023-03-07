@@ -26,6 +26,16 @@ SDS server
 A SDS server needs to implement the gRPC service :repo:`SecretDiscoveryService <api/envoy/service/secret/v3/sds.proto>`.
 It follows the same protocol as other :ref:`xDS <xds_protocol>`.
 
+.. note::
+
+    `SPIRE <https://spiffe.io/docs/latest/spire-about/>`_,
+    an open-source reference implementation of the
+    `SPIFFE specification for production identity <https://spiffe.io/>`_,
+    can act as an SDS server for Envoy. See the
+    `SPIRE documentation <https://spiffe.io/docs/latest/microservices/envoy/>`_
+    for how to configure Envoy with SPIFFE and SPIRE.
+
+
 SDS Configuration
 -----------------
 
@@ -46,7 +56,7 @@ refer to filesystem paths. This currently is supported for the following secret 
 * :ref:`CertificateValidationContext <envoy_v3_api_msg_extensions.transport_sockets.tls.v3.CertificateValidationContext>`
 
 By default, directories containing secrets are watched for filesystem move events. For example, a
-key or trusted CA certificates at ``/foo/bar/baz/cert.pem`` will be watched at `/foo/bar/baz`.
+key or trusted CA certificates at ``/foo/bar/baz/cert.pem`` will be watched at ``/foo/bar/baz``.
 Explicit control over the watched directory is possible by specifying a *watched_directory* path in
 :ref:`TlsCertificate
 <envoy_v3_api_field_extensions.transport_sockets.tls.v3.TlsCertificate.watched_directory>` and

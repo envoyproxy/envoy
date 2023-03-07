@@ -20,6 +20,8 @@
 #include "envoy/http/hash_policy.h"
 #include "envoy/rds/config.h"
 #include "envoy/router/internal_redirect.h"
+#include "envoy/router/path_matcher.h"
+#include "envoy/router/path_rewriter.h"
 #include "envoy/tcp/conn_pool.h"
 #include "envoy/tracing/http_tracer.h"
 #include "envoy/type/v3/percent.pb.h"
@@ -85,12 +87,12 @@ public:
   virtual Http::Code responseCode() const PURE;
 
   /**
-   * Returns the redirect path based on the request headers.
+   * Returns the redirect URI based on the request headers.
    * @param headers supplies the request headers.
    * @return std::string the redirect URL if this DirectResponseEntry is a redirect,
    *         or an empty string otherwise.
    */
-  virtual std::string newPath(const Http::RequestHeaderMap& headers) const PURE;
+  virtual std::string newUri(const Http::RequestHeaderMap& headers) const PURE;
 
   /**
    * Returns the response body to send with direct responses.
@@ -116,12 +118,21 @@ public:
 };
 
 /**
+ * All route specific config returned by the method at
+ *   NamedHttpFilterConfigFactory::createRouteSpecificFilterConfig
+ * should be derived from this class.
+ */
+class RouteSpecificFilterConfig {
+public:
+  virtual ~RouteSpecificFilterConfig() = default;
+};
+using RouteSpecificFilterConfigConstSharedPtr = std::shared_ptr<const RouteSpecificFilterConfig>;
+
+/**
  * CorsPolicy for Route and VirtualHost.
  */
-class CorsPolicy {
+class CorsPolicy : public RouteSpecificFilterConfig {
 public:
-  virtual ~CorsPolicy() = default;
-
   /**
    * @return std::vector<StringMatcherPtr>& access-control-allow-origin matchers.
    */
@@ -151,6 +162,11 @@ public:
    * @return const absl::optional<bool>& Whether access-control-allow-credentials should be true.
    */
   virtual const absl::optional<bool>& allowCredentials() const PURE;
+
+  /**
+   * @return const absl::optional<bool>& How to handle access-control-request-private-network.
+   */
+  virtual const absl::optional<bool>& allowPrivateNetworkAccess() const PURE;
 
   /**
    * @return bool Whether CORS is enabled for the route or virtual host.
@@ -596,17 +612,6 @@ class RateLimitPolicy;
 class Config;
 
 /**
- * All route specific config returned by the method at
- *   NamedHttpFilterConfigFactory::createRouteSpecificFilterConfig
- * should be derived from this class.
- */
-class RouteSpecificFilterConfig {
-public:
-  virtual ~RouteSpecificFilterConfig() = default;
-};
-using RouteSpecificFilterConfigConstSharedPtr = std::shared_ptr<const RouteSpecificFilterConfig>;
-
-/**
  * Virtual host definition.
  */
 class VirtualHost {
@@ -644,6 +649,12 @@ public:
   virtual bool includeAttemptCountInResponse() const PURE;
 
   /**
+   * @return bool whether to include the header in the upstream request to indicate it is a retry
+   * initiated by a timeout.
+   */
+  virtual bool includeIsTimeoutRetryHeader() const PURE;
+
+  /**
    * @return uint32_t any route cap on bytes which should be buffered for shadowing or retries.
    *         This is an upper bound so does not necessarily reflect the bytes which will be buffered
    *         as other limits may apply.
@@ -652,6 +663,24 @@ public:
    *         rather than no limit applies.
    */
   virtual uint32_t retryShadowBufferLimit() const PURE;
+
+  /**
+   * This is a helper to get the route's per-filter config if it exists, up along the config
+   * hierarchy (Route --> VirtualHost --> RouteConfiguration). Or nullptr if none of them exist.
+   */
+  virtual const RouteSpecificFilterConfig*
+  mostSpecificPerFilterConfig(const std::string& name) const PURE;
+
+  /**
+   * Find all the available per route filter configs, invoking the callback with
+   * each config (if it is present). Iteration of the configs is in order of
+   * specificity. That means that the callback will be called first for a config on
+   * a route configuration, virtual host, route, and finally a route entry (weighted cluster). If
+   * a config is not present, the callback will not be invoked.
+   */
+  virtual void traversePerFilterConfig(
+      const std::string& filter_name,
+      std::function<void(const Router::RouteSpecificFilterConfig&)> cb) const PURE;
 };
 
 /**
@@ -763,7 +792,7 @@ enum class PathMatchType {
   Exact,
   Regex,
   PathSeparatedPrefix,
-  Pattern,
+  Template,
 };
 
 /**
@@ -916,6 +945,16 @@ public:
   virtual const InternalRedirectPolicy& internalRedirectPolicy() const PURE;
 
   /**
+   * @return const PathMatcherSharedPtr& the path match policy for the route.
+   */
+  virtual const PathMatcherSharedPtr& pathMatcher() const PURE;
+
+  /**
+   * @return const PathRewriterSharedPtr& the path match rewrite for the route.
+   */
+  virtual const PathRewriterSharedPtr& pathRewriter() const PURE;
+
+  /**
    * @return uint32_t any route cap on bytes which should be buffered for shadowing or retries.
    *         This is an upper bound so does not necessarily reflect the bytes which will be buffered
    *         as other limits may apply.
@@ -1047,10 +1086,11 @@ public:
   virtual const UpgradeMap& upgradeMap() const PURE;
 
   using ConnectConfig = envoy::config::route::v3::RouteAction::UpgradeConfig::ConnectConfig;
+  using ConnectConfigOptRef = OptRef<ConnectConfig>;
   /**
    * If present, informs how to handle proxying CONNECT requests on this route.
    */
-  virtual const absl::optional<ConnectConfig>& connectConfig() const PURE;
+  virtual const ConnectConfigOptRef connectConfig() const PURE;
 
   /**
    * @return std::string& the name of the route.
@@ -1159,14 +1199,14 @@ public:
   virtual const RouteTracing* tracingConfig() const PURE;
 
   /**
-   * This is a helper to get the route's per-filter config if it exists, otherwise the virtual
-   * host's. Or nullptr if none of them exist.
+   * This is a helper to get the route's per-filter config if it exists, up along the config
+   * hierarchy(Route --> VirtualHost --> RouteConfiguration). Or nullptr if none of them exist.
    */
   virtual const RouteSpecificFilterConfig*
   mostSpecificPerFilterConfig(const std::string& name) const PURE;
 
   /**
-   * Fold all the available per route filter configs, invoking the callback with each config (if
+   * Find all the available per route filter configs, invoking the callback with each config (if
    * it is present). Iteration of the configs is in order of specificity. That means that the
    * callback will be called first for a config on a Virtual host, then a route, and finally a route
    * entry (weighted cluster). If a config is not present, the callback will not be invoked.
@@ -1189,6 +1229,8 @@ public:
 };
 
 using RouteConstSharedPtr = std::shared_ptr<const Route>;
+
+class RouteEntryAndRoute : public RouteEntry, public Route {};
 
 /**
  * RouteCallback, returns one of these enums to the route matcher to indicate
@@ -1346,9 +1388,9 @@ public:
    */
   virtual const Route& route() const PURE;
   /**
-   * @return return the connection for the downstream stream.
+   * @return return the connection for the downstream stream if it exists.
    */
-  virtual const Network::Connection& connection() const PURE;
+  virtual OptRef<const Network::Connection> connection() const PURE;
   /**
    * @return returns the options to be consulted with for upstream stream creation.
    */
@@ -1383,13 +1425,13 @@ public:
    * @param upstream supplies the generic upstream for the stream.
    * @param host supplies the description of the host that will carry the request. For logical
    *             connection pools the description may be different each time this is called.
-   * @param upstream_local_address supplies the local address of the upstream connection.
+   * @param connection_info_provider, supplies the address provider of the upstream connection.
    * @param info supplies the stream info object associated with the upstream connection.
    * @param protocol supplies the protocol associated with the upstream connection.
    */
   virtual void onPoolReady(std::unique_ptr<GenericUpstream>&& upstream,
                            Upstream::HostDescriptionConstSharedPtr host,
-                           const Network::Address::InstanceConstSharedPtr& upstream_local_address,
+                           const Network::ConnectionInfoProvider& connection_info_provider,
                            StreamInfo::StreamInfo& info,
                            absl::optional<Http::Protocol> protocol) PURE;
 

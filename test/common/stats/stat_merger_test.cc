@@ -318,7 +318,7 @@ TEST_F(StatMergerThreadLocalTest, FilterOutUninitializedGauges) {
 
   // We don't get "newgauge1" in the aggregated list, but we *do* get it if we try to
   // find it by name.
-  GaugeOptConstRef find = store_.findGauge(g1.statName());
+  GaugeOptConstRef find = store_.rootScope()->findGauge(g1.statName());
   ASSERT_TRUE(find);
   EXPECT_EQ(&g1, &(find->get()));
 }

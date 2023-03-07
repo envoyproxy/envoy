@@ -4,6 +4,9 @@
 
 #include "source/common/common/logger.h"
 
+#include "absl/debugging/stacktrace.h"
+#include "absl/debugging/symbolize.h"
+
 namespace Envoy {
 namespace Assert {
 
@@ -12,6 +15,43 @@ public:
   virtual ~ActionRegistration() = default;
 };
 using ActionRegistrationPtr = std::unique_ptr<ActionRegistration>;
+
+/*
+ * EnvoyBugStackTrace captures and writes the stack trace to Envoy Bug
+ * to assist with getting additional context for reports.
+ */
+class EnvoyBugStackTrace : private Logger::Loggable<Logger::Id::envoy_bug> {
+public:
+  EnvoyBugStackTrace() = default;
+  /*
+   * Capture the stack trace.
+   * Skip count is one as to skip the last call which is capture().
+   */
+  void capture() {
+    stack_depth_ = absl::GetStackTrace(stack_trace_, kMaxStackDepth, /* skip_count = */ 1);
+  }
+
+  /*
+   * Logs each row of the captured stack into the envoy_bug log.
+   */
+  void logStackTrace() {
+    ENVOY_LOG(error, "stacktrace for envoy bug");
+    char out[1024];
+    for (int i = 0; i < stack_depth_; ++i) {
+      const bool success = absl::Symbolize(stack_trace_[i], out, sizeof(out));
+      if (success) {
+        ENVOY_LOG(error, "#{} {} [{}]", i, out, stack_trace_[i]);
+      } else {
+        ENVOY_LOG(error, "#{} {} [{}]", i, "UNKNOWN", stack_trace_[i]);
+      }
+    }
+  }
+
+private:
+  static const int kMaxStackDepth = 16;
+  void* stack_trace_[kMaxStackDepth];
+  int stack_depth_{0};
+};
 
 /**
  * Sets an action to be invoked when a debug assertion failure is detected
@@ -225,6 +265,9 @@ void resetEnvoyBugCountersForTest();
       ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::envoy_bug), error,    \
                           "envoy bug failure: {}.{}{}", CONDITION_STR,                             \
                           details.empty() ? "" : " Details: ", details);                           \
+      Envoy::Assert::EnvoyBugStackTrace st;                                                        \
+      st.capture();                                                                                \
+      st.logStackTrace();                                                                          \
       ACTION;                                                                                      \
     }                                                                                              \
   } while (false)

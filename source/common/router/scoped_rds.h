@@ -268,7 +268,8 @@ public:
 class ScopedRoutesConfigProviderManager : public Envoy::Config::ConfigProviderManagerImplBase {
 public:
   ScopedRoutesConfigProviderManager(
-      Server::Admin& admin, Router::RouteConfigProviderManager& route_config_provider_manager)
+      OptRef<Server::Admin> admin,
+      Router::RouteConfigProviderManager& route_config_provider_manager)
       : Envoy::Config::ConfigProviderManagerImplBase(admin, "route_scopes"),
         route_config_provider_manager_(route_config_provider_manager) {}
 

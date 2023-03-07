@@ -3,7 +3,6 @@
 #include <memory>
 
 #include "envoy/event/dispatcher.h"
-#include "envoy/event/timer.h"
 #include "envoy/upstream/upstream.h"
 
 #include "source/common/stats/timespan_impl.h"
@@ -14,10 +13,11 @@ namespace Tcp {
 
 ActiveTcpClient::ActiveTcpClient(Envoy::ConnectionPool::ConnPoolImplBase& parent,
                                  const Upstream::HostConstSharedPtr& host,
-                                 uint64_t concurrent_stream_limit)
+                                 uint64_t concurrent_stream_limit,
+                                 absl::optional<std::chrono::milliseconds> idle_timeout)
     : Envoy::ConnectionPool::ActiveClient(parent, host->cluster().maxRequestsPerConnection(),
                                           concurrent_stream_limit),
-      parent_(parent) {
+      parent_(parent), idle_timeout_(idle_timeout) {
   Upstream::Host::CreateConnectionData data = host->createConnection(
       parent_.dispatcher(), parent_.socketOptions(), parent_.transportSocketOptions());
   real_host_description_ = data.host_description_;
@@ -25,13 +25,20 @@ ActiveTcpClient::ActiveTcpClient(Envoy::ConnectionPool::ConnPoolImplBase& parent
   connection_->addConnectionCallbacks(*this);
   read_filter_handle_ = std::make_shared<ConnReadFilter>(*this);
   connection_->addReadFilter(read_filter_handle_);
-  connection_->setConnectionStats({host->cluster().stats().upstream_cx_rx_bytes_total_,
-                                   host->cluster().stats().upstream_cx_rx_bytes_buffered_,
-                                   host->cluster().stats().upstream_cx_tx_bytes_total_,
-                                   host->cluster().stats().upstream_cx_tx_bytes_buffered_,
-                                   &host->cluster().stats().bind_errors_, nullptr});
+  Upstream::ClusterTrafficStats& cluster_traffic_stats = *host->cluster().trafficStats();
+  connection_->setConnectionStats({cluster_traffic_stats.upstream_cx_rx_bytes_total_,
+                                   cluster_traffic_stats.upstream_cx_rx_bytes_buffered_,
+                                   cluster_traffic_stats.upstream_cx_tx_bytes_total_,
+                                   cluster_traffic_stats.upstream_cx_tx_bytes_buffered_,
+                                   &cluster_traffic_stats.bind_errors_, nullptr});
   connection_->noDelay(true);
   connection_->connect();
+
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.tcp_pool_idle_timeout") &&
+      idle_timeout_.has_value()) {
+    idle_timer_ = connection_->dispatcher().createTimer([this]() -> void { onIdleTimeout(); });
+    setIdleTimer();
+  }
 }
 
 ActiveTcpClient::~ActiveTcpClient() {
@@ -46,6 +53,8 @@ ActiveTcpClient::~ActiveTcpClient() {
   }
 }
 
+void ActiveTcpClient::close() { connection_->close(Network::ConnectionCloseType::NoFlush); }
+
 void ActiveTcpClient::clearCallbacks() {
   if (state() == Envoy::ConnectionPool::ActiveClient::State::Busy && parent_.hasPendingStreams()) {
     auto* pool = &parent_;
@@ -54,6 +63,7 @@ void ActiveTcpClient::clearCallbacks() {
   callbacks_ = nullptr;
   tcp_connection_data_ = nullptr;
   parent_.onStreamClosed(*this, true);
+  setIdleTimer();
   parent_.checkForIdleAndCloseIdleConnsIfDraining();
 }
 
@@ -68,12 +78,15 @@ void ActiveTcpClient::onEvent(Network::ConnectionEvent event) {
   ENVOY_BUG(event != Network::ConnectionEvent::ConnectedZeroRtt,
             "Unexpected 0-RTT event from the underlying TCP connection.");
   parent_.onConnectionEvent(*this, connection_->transportFailureReason(), event);
-  if (callbacks_) {
+
+  if (event == Network::ConnectionEvent::LocalClose ||
+      event == Network::ConnectionEvent::RemoteClose) {
+    disableIdleTimer();
+
     // Do not pass the Connected event to any session which registered during onEvent above.
     // Consumers of connection pool connections assume they are receiving already connected
     // connections.
-    if (event == Network::ConnectionEvent::LocalClose ||
-        event == Network::ConnectionEvent::RemoteClose) {
+    if (callbacks_) {
       if (tcp_connection_data_) {
         Envoy::Upstream::reportUpstreamCxDestroyActiveRequest(parent_.host(), event);
       }
@@ -82,6 +95,26 @@ void ActiveTcpClient::onEvent(Network::ConnectionEvent event) {
       // Clear the pointer to avoid using it again.
       callbacks_ = nullptr;
     }
+  }
+}
+
+void ActiveTcpClient::onIdleTimeout() {
+  ENVOY_CONN_LOG(debug, "per client idle timeout", *connection_);
+  parent_.host()->cluster().trafficStats()->upstream_cx_idle_timeout_.inc();
+  close();
+}
+
+void ActiveTcpClient::disableIdleTimer() {
+  if (idle_timer_ != nullptr) {
+    idle_timer_->disableTimer();
+  }
+}
+
+void ActiveTcpClient::setIdleTimer() {
+  if (idle_timer_ != nullptr) {
+    ASSERT(idle_timeout_.has_value());
+
+    idle_timer_->enableTimer(idle_timeout_.value());
   }
 }
 

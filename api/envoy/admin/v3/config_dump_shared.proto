@@ -370,3 +370,43 @@ message EndpointsConfigDump {
   // The dynamically loaded endpoint configs.
   repeated DynamicEndpointConfig dynamic_endpoint_configs = 3;
 }
+
+// Envoy's ECDS service fills this message with all currently extension
+// configuration. Extension configuration information can be used to recreate
+// an Envoy ECDS listener and HTTP filters as static filters or by returning
+// them in ECDS response.
+message EcdsConfigDump {
+  option (udpa.annotations.versioning).previous_message_type = "envoy.admin.v2alpha.EcdsConfigDump";
+
+  // [#next-free-field: 6]
+  message EcdsFilterConfig {
+    option (udpa.annotations.versioning).previous_message_type =
+        "envoy.admin.v2alpha.EcdsConfigDump.EcdsFilterConfig";
+
+    // This is the per-resource version information. This version is currently
+    // taken from the :ref:`version_info
+    // <envoy_v3_api_field_service.discovery.v3.DiscoveryResponse.version_info>`
+    // field at the time that the ECDS filter was loaded.
+    string version_info = 1;
+
+    // The ECDS filter config.
+    google.protobuf.Any ecds_filter = 2;
+
+    // The timestamp when the ECDS filter was last updated.
+    google.protobuf.Timestamp last_updated = 3;
+
+    // Set if the last update failed, cleared after the next successful update.
+    // The ``error_state`` field contains the rejected version of this
+    // particular resource along with the reason and timestamp. For successfully
+    // updated or acknowledged resource, this field should be empty.
+    // [#not-implemented-hide:]
+    UpdateFailureState error_state = 4;
+
+    // The client status of this resource.
+    // [#not-implemented-hide:]
+    ClientResourceStatus client_status = 5;
+  }
+
+  // The ECDS filter configs.
+  repeated EcdsFilterConfig ecds_filters = 1;
+}

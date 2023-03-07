@@ -11,7 +11,7 @@ following general architecture:
 
 * The two active processes communicate with each other over unix domain sockets using a basic RPC
   protocol. All counters are sent from the old process to the new process over the unix domain, and
-  gauges are transported except those marked with `NeverImport`. After hot restart is finished, the
+  gauges are transported except those marked with ``NeverImport``. After hot restart is finished, the
   gauges transported from the old process will be cleanup, but special gauge like
   :ref:`server.hot_restart_generation statistic <server_statistics>` is retained.
 * The new process fully initializes itself (loads the configuration, does an initial service
@@ -34,6 +34,11 @@ a given host: an active Envoy server process and, potentially, a draining Envoy 
 will exit as described above. The :option:`--base-id` or :option:`--use-dynamic-base-id` options
 may be used to allow multiple, distinctly configured Envoys to run on the same host and hot restart
 independently.
+
+.. note::
+
+ Currently, updating a listener's :ref:`socket_options <envoy_v3_api_field_config.listener.v3.Listener.socket_options>` during a hot restart isn't supported.
+ The old process socket options will be used. If it is required to update socket options either do a full restart or perform an LDS based listener updated.
 
 .. note::
 

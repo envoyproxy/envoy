@@ -25,7 +25,6 @@ struct ManagedResourceImpl : public BasicResourceLimitImpl {
   }
 
   // BasicResourceLimitImpl
-  bool canCreate() override { return current_ < max(); }
   void inc() override {
     BasicResourceLimitImpl::inc();
     updateRemaining();
