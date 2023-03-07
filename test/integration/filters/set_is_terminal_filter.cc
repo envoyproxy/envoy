@@ -33,7 +33,7 @@ private:
   }
   bool isTerminalFilterByProtoTyped(
       const test::integration::filters::SetIsTerminalFilterConfig& proto_config,
-      Server::Configuration::FactoryContext&) override {
+      Server::Configuration::ServerFactoryContext&) override {
     return proto_config.is_terminal_filter();
   }
 };

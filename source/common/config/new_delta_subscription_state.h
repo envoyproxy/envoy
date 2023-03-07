@@ -1,6 +1,7 @@
 #pragma once
 
 #include "envoy/config/subscription.h"
+#include "envoy/config/xds_config_tracker.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/grpc/status.h"
 #include "envoy/local_info/local_info.h"
@@ -77,7 +78,8 @@ namespace Config {
 class NewDeltaSubscriptionState : public Logger::Loggable<Logger::Id::config> {
 public:
   NewDeltaSubscriptionState(std::string type_url, UntypedConfigUpdateCallbacks& watch_map,
-                            const LocalInfo::LocalInfo& local_info, Event::Dispatcher& dispatcher);
+                            const LocalInfo::LocalInfo& local_info, Event::Dispatcher& dispatcher,
+                            XdsConfigTrackerOptRef xds_config_tracker);
 
   // Update which resources we're interested in subscribing to.
   void updateSubscriptionInterest(const absl::flat_hash_set<std::string>& cur_added,
@@ -115,9 +117,9 @@ private:
     // Builds a ResourceState with a specific version
     ResourceState(absl::string_view version) : version_(version) {}
     // Self-documenting alias of default constructor.
-    static ResourceState waitingForServer() { return ResourceState(); }
+    static ResourceState waitingForServer() { return {}; }
     // Self-documenting alias of constructor with version.
-    static ResourceState withVersion(absl::string_view version) { return ResourceState(version); }
+    static ResourceState withVersion(absl::string_view version) { return {version}; }
 
     // If true, we currently have no version of this resource - we are waiting for the server to
     // provide us with one.
@@ -163,6 +165,7 @@ private:
   const std::string type_url_;
   UntypedConfigUpdateCallbacks& watch_map_;
   const LocalInfo::LocalInfo& local_info_;
+  XdsConfigTrackerOptRef xds_config_tracker_;
 
   bool in_initial_legacy_wildcard_{true};
   bool any_request_sent_yet_in_current_stream_{};

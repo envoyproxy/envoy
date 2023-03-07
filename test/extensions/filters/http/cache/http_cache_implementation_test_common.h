@@ -77,7 +77,7 @@ protected:
 
   Http::TestResponseTrailerMapImpl getTrailers(LookupContext& context);
 
-  void updateHeaders(absl::string_view request_path,
+  bool updateHeaders(absl::string_view request_path,
                      const Http::TestResponseHeaderMapImpl& response_headers,
                      const ResponseMetadata& metadata);
 

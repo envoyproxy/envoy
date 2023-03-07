@@ -61,9 +61,11 @@ protected:
   ConfigurationImplTest()
       : api_(Api::createApiForTest()),
         cluster_manager_factory_(
-            server_.admin(), server_.runtime(), server_.stats(), server_.threadLocal(),
-            server_.dnsResolver(), server_.sslContextManager(), server_.dispatcher(),
-            server_.localInfo(), server_.secretManager(), server_.messageValidationContext(), *api_,
+            server_context_, server_.admin(), server_.runtime(), server_.stats(),
+            server_.threadLocal(),
+            [this]() -> Network::DnsResolverSharedPtr { return this->server_.dnsResolver(); },
+            server_.sslContextManager(), server_.dispatcher(), server_.localInfo(),
+            server_.secretManager(), server_.messageValidationContext(), *api_,
             server_.httpContext(), server_.grpcContext(), server_.routerContext(),
             server_.accessLogManager(), server_.singletonManager(), server_.options(),
             server_.quic_stat_names_, server_) {}
@@ -75,6 +77,7 @@ protected:
   }
 
   Api::ApiPtr api_;
+  NiceMock<Server::Configuration::MockServerFactoryContext> server_context_;
   NiceMock<Server::MockInstance> server_;
   Upstream::ProdClusterManagerFactory cluster_manager_factory_;
 };

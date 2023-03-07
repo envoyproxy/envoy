@@ -21,6 +21,14 @@ namespace File {
 
 AccessLog::InstanceSharedPtr FileAccessLogFactory::createAccessLogInstance(
     const Protobuf::Message& config, AccessLog::FilterPtr&& filter,
+    Server::Configuration::ListenerAccessLogFactoryContext& context) {
+  return createAccessLogInstance(
+      config, std::move(filter),
+      static_cast<Server::Configuration::CommonFactoryContext&>(context));
+}
+
+AccessLog::InstanceSharedPtr FileAccessLogFactory::createAccessLogInstance(
+    const Protobuf::Message& config, AccessLog::FilterPtr&& filter,
     Server::Configuration::CommonFactoryContext& context) {
   const auto& fal_config = MessageUtil::downcastAndValidate<
       const envoy::extensions::access_loggers::file::v3::FileAccessLog&>(
@@ -73,8 +81,8 @@ std::string FileAccessLogFactory::name() const { return "envoy.access_loggers.fi
 /**
  * Static registration for the file access log. @see RegisterFactory.
  */
-REGISTER_FACTORY(FileAccessLogFactory,
-                 Server::Configuration::AccessLogInstanceFactory){"envoy.file_access_log"};
+LEGACY_REGISTER_FACTORY(FileAccessLogFactory, Server::Configuration::AccessLogInstanceFactory,
+                        "envoy.file_access_log");
 
 } // namespace File
 } // namespace AccessLoggers

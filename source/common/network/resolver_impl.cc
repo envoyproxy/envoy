@@ -56,7 +56,8 @@ InstanceConstSharedPtr resolveProtoAddress(const envoy::config::core::v3::Addres
     case envoy::config::core::v3::EnvoyInternalAddress::AddressNameSpecifierCase::
         kServerListenerName:
       return std::make_shared<EnvoyInternalInstance>(
-          address.envoy_internal_address().server_listener_name());
+          address.envoy_internal_address().server_listener_name(),
+          address.envoy_internal_address().endpoint_id());
     case envoy::config::core::v3::EnvoyInternalAddress::AddressNameSpecifierCase::
         ADDRESS_NAME_SPECIFIER_NOT_SET:
       break;

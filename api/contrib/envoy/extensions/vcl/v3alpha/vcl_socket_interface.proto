@@ -11,7 +11,7 @@ option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/vcl
 option (udpa.annotations.file_status).work_in_progress = true;
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
-// [#protodoc-title: Vcl Socket Interface configuration]
+// [#protodoc-title: VCL socket interface configuration]
 // VCL :ref:`configuration overview <config_sock_interface_vcl>`.
 // [#extension: envoy.bootstrap.vcl]
 

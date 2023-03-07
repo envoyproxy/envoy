@@ -1,0 +1,8 @@
+version: 2.1
+
+jobs:
+  build:
+    docker:
+    - image: debian:bullseye-slim
+    steps:
+    - run: echo "no circle on this branch"

@@ -2,7 +2,9 @@
 
 #include "envoy/config/config_provider.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
+#include "envoy/http/early_header_mutation.h"
 #include "envoy/http/filter.h"
+#include "envoy/http/header_validator.h"
 #include "envoy/http/original_ip_detection.h"
 #include "envoy/http/request_id_extension.h"
 #include "envoy/router/rds.h"
@@ -14,6 +16,7 @@
 #include "source/common/local_reply/local_reply.h"
 #include "source/common/network/utility.h"
 #include "source/common/stats/symbol_table.h"
+#include "source/common/tracing/tracer_config_impl.h"
 
 namespace Envoy {
 namespace Http {
@@ -120,21 +123,7 @@ struct ConnectionManagerTracingStats {
   CONN_MAN_TRACING_STATS(GENERATE_COUNTER_STRUCT)
 };
 
-/**
- * Configuration for tracing which is set on the connection manager level.
- * Http Tracing can be enabled/disabled on a per connection manager basis.
- * Here we specify some specific for connection manager settings.
- */
-struct TracingConnectionManagerConfig {
-  Tracing::OperationName operation_name_;
-  Tracing::CustomTagMap custom_tags_;
-  envoy::type::v3::FractionalPercent client_sampling_;
-  envoy::type::v3::FractionalPercent random_sampling_;
-  envoy::type::v3::FractionalPercent overall_sampling_;
-  bool verbose_;
-  uint32_t max_path_tag_length_;
-};
-
+using TracingConnectionManagerConfig = Tracing::ConnectionManagerTracingConfigImpl;
 using TracingConnectionManagerConfigPtr = std::unique_ptr<TracingConnectionManagerConfig>;
 
 /**
@@ -491,6 +480,8 @@ public:
   virtual const std::vector<OriginalIPDetectionSharedPtr>&
   originalIpDetectionExtensions() const PURE;
 
+  virtual const std::vector<EarlyHeaderMutationPtr>& earlyHeaderMutationExtensions() const PURE;
+
   /**
    * @return if the HttpConnectionManager should remove trailing host dot from host/authority
    * header.
@@ -505,6 +496,26 @@ public:
    * If nullptr, don't write the Proxy-Status HTTP response header.
    */
   virtual const HttpConnectionManagerProto::ProxyStatusConfig* proxyStatusConfig() const PURE;
+
+  /**
+   * Creates new header validator. This method always returns nullptr unless the `ENVOY_ENABLE_UHV`
+   * pre-processor variable is defined.
+   * @param protocol HTTP protocol version that is to be validated.
+   * @return pointer to the header validator.
+   *         If nullptr, header validation will not be done.
+   */
+  virtual HeaderValidatorPtr makeHeaderValidator(Protocol protocol) PURE;
+
+  /**
+   * @return whether to append the x-forwarded-port header.
+   */
+  virtual bool appendXForwardedPort() const PURE;
+
+  /**
+   * @return whether the HCM will insert ProxyProtocolFilterState into the filter state at the
+   *         Connection Lifetime.
+   */
+  virtual bool addProxyProtocolConnectionState() const PURE;
 };
 } // namespace Http
 } // namespace Envoy

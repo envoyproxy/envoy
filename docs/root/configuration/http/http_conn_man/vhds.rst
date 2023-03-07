@@ -34,7 +34,7 @@ Subscribing to Resources
 VHDS allows resources to be :ref:`subscribed <xds_protocol_delta_subscribe>` to using a
 :ref:`DeltaDiscoveryRequest <envoy_v3_api_msg_service.discovery.v3.DeltaDiscoveryRequest>` with the
 :ref:`type_url <envoy_v3_api_field_service.discovery.v3.DeltaDiscoveryRequest.type_url>` set to
-`type.googleapis.com/envoy.config.route.v3.VirtualHost`
+``type.googleapis.com/envoy.config.route.v3.VirtualHost``
 and :ref:`resource_names_subscribe <envoy_v3_api_field_service.discovery.v3.DeltaDiscoveryRequest.resource_names_subscribe>`
 set to a list of virtual host resource names for which it would like configuration.
 

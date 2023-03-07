@@ -25,7 +25,7 @@ public:
   FilterStats& stats() override { return stats_; }
 
   Stats::IsolatedStoreImpl stats_store_;
-  FilterStats stats_{Filter::generateStats("foo", stats_store_)};
+  FilterStats stats_{Filter::generateStats("foo", *stats_store_.rootScope())};
 };
 
 class MockHttpPerRequestTapper : public HttpPerRequestTapper {
@@ -80,7 +80,7 @@ TEST_F(TapFilterTest, NoConfig) {
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers));
 
   Http::TestResponseHeaderMapImpl response_headers;
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encode1xxHeaders(response_headers));
+  EXPECT_EQ(Http::Filter1xxHeadersStatus::Continue, filter_->encode1xxHeaders(response_headers));
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers, false));
   Buffer::OwnedImpl response_body;
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(response_body, false));
@@ -108,7 +108,7 @@ TEST_F(TapFilterTest, Config) {
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers));
 
   Http::TestResponseHeaderMapImpl response_headers;
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encode1xxHeaders(response_headers));
+  EXPECT_EQ(Http::Filter1xxHeadersStatus::Continue, filter_->encode1xxHeaders(response_headers));
   EXPECT_CALL(*http_per_request_tapper_, onResponseHeaders(_));
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers, false));
   Buffer::OwnedImpl response_body("hello");

@@ -111,6 +111,7 @@ public:
   bool initializeReadFilters();
   void onRead();
   FilterStatus onWrite();
+  bool startUpstreamSecureTransport();
 
 private:
   struct ActiveReadFilter : public ReadFilterCallbacks, LinkedObject<ActiveReadFilter> {
@@ -130,6 +131,7 @@ private:
     void upstreamHost(Upstream::HostDescriptionConstSharedPtr host) override {
       parent_.host_description_ = host;
     }
+    bool startUpstreamSecureTransport() override { return parent_.startUpstreamSecureTransport(); }
 
     FilterManagerImpl& parent_;
     ReadFilterSharedPtr filter_;

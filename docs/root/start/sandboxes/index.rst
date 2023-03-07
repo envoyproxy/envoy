@@ -55,18 +55,23 @@ The following sandboxes are available:
     ext_authz
     fault_injection
     front_proxy
+    golang
     grpc_bridge
     gzip
     jaeger_native_tracing
     jaeger_tracing
+    kafka
     load_reporting_service
     locality_load_balancing
     local_ratelimit
     lua
     mysql
+    opentelemetry
     postgres
+    rbac
     redis
-    skywalking_tracing
+    route-mirror
+    skywalking
     tls-inspector
     tls-sni
     tls
@@ -74,5 +79,5 @@ The following sandboxes are available:
     wasm-cc
     websocket
     win32_front_proxy
-    zipkin_tracing
+    zipkin
     zstd

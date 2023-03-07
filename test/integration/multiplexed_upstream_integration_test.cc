@@ -84,6 +84,19 @@ TEST_P(MultiplexedUpstreamIntegrationTest, GrpcRetry) { testGrpcRetry(); }
 
 TEST_P(MultiplexedUpstreamIntegrationTest, Trailers) { testTrailers(1024, 2048, true, true); }
 
+TEST_P(MultiplexedUpstreamIntegrationTest, RouterRequestAndResponseWithTcpKeepalive) {
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    auto keepalive = bootstrap.mutable_static_resources()
+                         ->mutable_clusters(0)
+                         ->mutable_upstream_connection_options()
+                         ->mutable_tcp_keepalive();
+    keepalive->mutable_keepalive_probes()->set_value(4);
+    keepalive->mutable_keepalive_time()->set_value(7);
+    keepalive->mutable_keepalive_interval()->set_value(1);
+  });
+  testRouterRequestAndResponseWithBody(1024, 512, false);
+}
+
 TEST_P(MultiplexedUpstreamIntegrationTest, TestSchemeAndXFP) {
   autonomous_upstream_ = true;
   initialize();
@@ -161,6 +174,9 @@ void MultiplexedUpstreamIntegrationTest::bidirectionalStreaming(uint32_t bytes) 
   EXPECT_EQ(
       "1",
       response->headers().get(Http::LowerCaseString("num_streams"))[0]->value().getStringView());
+  EXPECT_EQ(
+      fake_upstreams_[0]->localAddress()->asString(),
+      response->headers().get(Http::LowerCaseString("remote_address"))[0]->value().getStringView());
 }
 
 TEST_P(MultiplexedUpstreamIntegrationTest, BidirectionalStreaming) { bidirectionalStreaming(1024); }
@@ -650,10 +666,6 @@ TEST_P(MultiplexedUpstreamIntegrationTest, UpstreamGoaway) {
 }
 
 TEST_P(MultiplexedUpstreamIntegrationTest, AutoRetrySafeRequestUponTooEarlyResponse) {
-  if (!Runtime::runtimeFeatureEnabled(Runtime::conn_pool_new_stream_with_early_data_and_http3)) {
-    return;
-  }
-
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
@@ -782,9 +794,7 @@ TEST_P(MultiplexedUpstreamIntegrationTest, UpstreamEarlyDataRejected) {
   // TODO: debug why waiting on the 0-rtt upstream connection times out on Windows.
   GTEST_SKIP() << "Skipping on Windows";
 #endif
-  if (upstreamProtocol() != Http::CodecType::HTTP3 ||
-      !(Runtime::runtimeFeatureEnabled(Runtime::conn_pool_new_stream_with_early_data_and_http3) &&
-        Runtime::runtimeFeatureEnabled("envoy.reloadable_features.http3_sends_early_data"))) {
+  if (upstreamProtocol() != Http::CodecType::HTTP3) {
     return;
   }
   initialize();
@@ -874,9 +884,7 @@ TEST_P(MultiplexedUpstreamIntegrationTest, UpstreamDisconnectDuringEarlyData) {
   // TODO: debug why waiting on the 0-rtt upstream connection times out on Windows.
   GTEST_SKIP() << "Skipping on Windows";
 #endif
-  if (upstreamProtocol() != Http::CodecType::HTTP3 ||
-      !(Runtime::runtimeFeatureEnabled(Runtime::conn_pool_new_stream_with_early_data_and_http3) &&
-        Runtime::runtimeFeatureEnabled("envoy.reloadable_features.http3_sends_early_data"))) {
+  if (upstreamProtocol() != Http::CodecType::HTTP3) {
     return;
   }
   Runtime::maybeSetRuntimeGuard("envoy.reloadable_features.no_extension_lookup_by_name", false);
@@ -933,9 +941,7 @@ TEST_P(MultiplexedUpstreamIntegrationTest, DownstreamDisconnectDuringEarlyData) 
   // TODO: debug why waiting on the 0-rtt upstream connection times out on Windows.
   GTEST_SKIP() << "Skipping on Windows";
 #endif
-  if (upstreamProtocol() != Http::CodecType::HTTP3 ||
-      !(Runtime::runtimeFeatureEnabled(Runtime::conn_pool_new_stream_with_early_data_and_http3) &&
-        Runtime::runtimeFeatureEnabled("envoy.reloadable_features.http3_sends_early_data"))) {
+  if (upstreamProtocol() != Http::CodecType::HTTP3) {
     return;
   }
   initialize();
@@ -985,9 +991,7 @@ TEST_P(MultiplexedUpstreamIntegrationTest, ConnPoolQueuingNonSafeRequest) {
   // TODO: debug why waiting on the 0-rtt upstream connection times out on Windows.
   GTEST_SKIP() << "Skipping on Windows";
 #endif
-  if (upstreamProtocol() != Http::CodecType::HTTP3 ||
-      !(Runtime::runtimeFeatureEnabled(Runtime::conn_pool_new_stream_with_early_data_and_http3) &&
-        Runtime::runtimeFeatureEnabled("envoy.reloadable_features.http3_sends_early_data"))) {
+  if (upstreamProtocol() != Http::CodecType::HTTP3) {
     return;
   }
   initialize();

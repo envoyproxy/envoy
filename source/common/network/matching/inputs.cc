@@ -27,6 +27,18 @@ Matcher::DataInputGetResult ApplicationProtocolInput::get(const MatchingData& da
   return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::nullopt};
 }
 
+Matcher::DataInputGetResult FilterStateInput::get(const MatchingData& data) const {
+  const auto* filter_state_object =
+      data.filterState().getDataReadOnly<StreamInfo::FilterState::Object>(filter_state_key_);
+
+  if (filter_state_object != nullptr) {
+    return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,
+            filter_state_object->serializeAsString()};
+  }
+
+  return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::nullopt};
+}
+
 class DestinationIPInputFactory : public DestinationIPInputBaseFactory<MatchingData> {};
 class UdpDestinationIPInputFactory : public DestinationIPInputBaseFactory<UdpMatchingData> {};
 class HttpDestinationIPInputFactory : public DestinationIPInputBaseFactory<Http::HttpMatchingData> {
@@ -76,6 +88,7 @@ REGISTER_FACTORY(HttpSourceTypeInputFactory, Matcher::DataInputFactory<Http::Htt
 
 REGISTER_FACTORY(TransportProtocolInputFactory, Matcher::DataInputFactory<MatchingData>);
 REGISTER_FACTORY(ApplicationProtocolInputFactory, Matcher::DataInputFactory<MatchingData>);
+REGISTER_FACTORY(FilterStateInputFactory, Matcher::DataInputFactory<MatchingData>);
 
 } // namespace Matching
 } // namespace Network

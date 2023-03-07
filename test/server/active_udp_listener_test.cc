@@ -66,8 +66,10 @@ public:
     ASSERT_TRUE(Network::Socket::applyOptions(listen_socket_->options(), *listen_socket_,
                                               envoy::config::core::v3::SocketOption::STATE_BOUND));
 
-    ON_CALL(socket_factory_, getListenSocket(_)).WillByDefault(Return(listen_socket_));
-    EXPECT_CALL(listener_config_, listenSocketFactory()).WillRepeatedly(ReturnRef(socket_factory_));
+    ON_CALL(*static_cast<Network::MockListenSocketFactory*>(
+                listener_config_.socket_factories_[0].get()),
+            getListenSocket(_))
+        .WillByDefault(Return(listen_socket_));
 
     // Use UdpGsoBatchWriter to perform non-batched writes for the purpose of this test, if it is
     // supported.
@@ -101,7 +103,8 @@ public:
   Network::Address::InstanceConstSharedPtr local_address_;
   Network::SocketSharedPtr listen_socket_;
   NiceMock<Network::MockListenSocketFactory> socket_factory_;
-  Stats::IsolatedStoreImpl scope_;
+  Stats::IsolatedStoreImpl store_;
+  Stats::Scope& scope_{*store_.rootScope()};
   std::unique_ptr<NiceMock<Network::MockUdpListenerConfig>> udp_listener_config_;
   NiceMock<Network::MockUdpPacketWriterFactory> udp_packet_writer_factory_;
   Network::MockListenerConfig listener_config_;

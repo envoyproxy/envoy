@@ -20,7 +20,7 @@ class DeltaSubscriptionState
                                    envoy::service::discovery::v3::DeltaDiscoveryRequest> {
 public:
   DeltaSubscriptionState(std::string type_url, UntypedConfigUpdateCallbacks& watch_map,
-                         Event::Dispatcher& dispatcher);
+                         Event::Dispatcher& dispatcher, XdsConfigTrackerOptRef xds_config_tracker);
 
   ~DeltaSubscriptionState() override;
 
@@ -55,9 +55,9 @@ private:
     // Builds a ResourceState with a specific version
     ResourceState(absl::string_view version) : version_(version) {}
     // Self-documenting alias of default constructor.
-    static ResourceState waitingForServer() { return ResourceState(); }
+    static ResourceState waitingForServer() { return {}; }
     // Self-documenting alias of constructor with version.
-    static ResourceState withVersion(absl::string_view version) { return ResourceState(version); }
+    static ResourceState withVersion(absl::string_view version) { return {version}; }
 
     // If true, we currently have no version of this resource - we are waiting for the server to
     // provide us with one.
@@ -114,8 +114,11 @@ public:
   ~DeltaSubscriptionStateFactory() override = default;
   std::unique_ptr<DeltaSubscriptionState>
   makeSubscriptionState(const std::string& type_url, UntypedConfigUpdateCallbacks& callbacks,
-                        OpaqueResourceDecoder&) override {
-    return std::make_unique<DeltaSubscriptionState>(type_url, callbacks, dispatcher_);
+                        OpaqueResourceDecoderSharedPtr, XdsConfigTrackerOptRef xds_config_tracker,
+                        XdsResourcesDelegateOptRef /*xds_resources_delegate*/,
+                        const std::string& /*target_xds_authority*/) override {
+    return std::make_unique<DeltaSubscriptionState>(type_url, callbacks, dispatcher_,
+                                                    xds_config_tracker);
   }
 
 private:

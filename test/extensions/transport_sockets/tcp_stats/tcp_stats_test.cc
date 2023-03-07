@@ -35,7 +35,7 @@ public:
       proto_config.mutable_update_period()->MergeFrom(
           ProtobufUtil::TimeUtil::MillisecondsToDuration(1000));
     }
-    config_ = std::make_shared<Config>(proto_config, store_);
+    config_ = std::make_shared<Config>(proto_config, *store_.rootScope());
     ON_CALL(transport_callbacks_, ioHandle()).WillByDefault(ReturnRef(io_handle_));
     ON_CALL(io_handle_, getOption(IPPROTO_TCP, TCP_INFO, _, _))
         .WillByDefault(Invoke([this](int, int, void* optval, socklen_t* optlen) {
@@ -120,25 +120,6 @@ TEST_F(TcpStatsTest, CloseSocket) {
   EXPECT_EQ(42, counterValue("cx_tx_segments"));
   EXPECT_EQ(0, gaugeValue("cx_tx_unsent_bytes"));
   EXPECT_EQ(0, gaugeValue("cx_tx_unacked_segments"));
-}
-
-TEST_F(TcpStatsTest, SyscallFailureShortRead) {
-  initialize(true);
-  tcp_info_.tcpi_notsent_bytes = 42;
-  EXPECT_CALL(io_handle_, getOption(IPPROTO_TCP, TCP_INFO, _, _))
-      .WillOnce(Invoke([this](int, int, void* optval, socklen_t* optlen) {
-        *optlen = *optlen - 1;
-        memcpy(optval, &tcp_info_, sizeof(*optlen));
-        return Api::SysCallIntResult{0, 0};
-      }));
-  EXPECT_LOG_CONTAINS(
-      "debug",
-      fmt::format("Failed getsockopt(IPPROTO_TCP, TCP_INFO): rc 0 errno 0 optlen {}",
-                  sizeof(tcp_info_) - 1),
-      timer_->callback_());
-
-  // Not updated on failed syscall.
-  EXPECT_EQ(0, gaugeValue("cx_tx_unsent_bytes"));
 }
 
 TEST_F(TcpStatsTest, SyscallFailureReturnCode) {

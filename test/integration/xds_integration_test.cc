@@ -1,13 +1,18 @@
+#include "envoy/admin/v3/config_dump.pb.h"
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
+#include "envoy/service/runtime/v3/rtds.pb.h"
+#include "envoy/service/secret/v3/sds.pb.h"
 
 #include "source/common/buffer/buffer_impl.h"
 
+#include "test/common/grpc/grpc_client_integration.h"
 #include "test/integration/filters/test_listener_filter.h"
 #include "test/integration/http_integration.h"
 #include "test/integration/http_protocol_integration.h"
 #include "test/integration/ssl_utility.h"
 #include "test/test_common/environment.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
@@ -662,6 +667,11 @@ INSTANTIATE_TEST_SUITE_P(Protocols, LdsIntegrationTest,
 
 // Sample test making sure our config framework correctly reloads listeners.
 TEST_P(LdsIntegrationTest, ReloadConfig) {
+#ifdef ENVOY_ENABLE_UHV
+  // TODO(#23287) - Determine HTTP/0.9 and HTTP/1.0 support within UHV
+  return;
+#endif
+
   config_helper_.disableDelayClose();
   autonomous_upstream_ = true;
   initialize();
@@ -711,10 +721,12 @@ TEST_P(LdsIntegrationTest, NewListenerWithBadPostListenSocketOption) {
       version_, *api_, MessageUtil::getJsonStringFromMessageOrDie(config_helper_.bootstrap()));
   new_config_helper.addConfigModifier(
       [&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
-        auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
-        listener->mutable_address()->mutable_socket_address()->set_port_value(
+        auto* new_listener = bootstrap.mutable_static_resources()->add_listeners();
+        new_listener->MergeFrom(bootstrap.static_resources().listeners(0));
+        new_listener->set_name("new_listener");
+        new_listener->mutable_address()->mutable_socket_address()->set_port_value(
             addr_socket.second->connectionInfoProvider().localAddress()->ip()->port());
-        auto socket_option = listener->add_socket_options();
+        auto socket_option = new_listener->add_socket_options();
         socket_option->set_state(envoy::config::core::v3::SocketOption::STATE_LISTENING);
         socket_option->set_level(10000);     // Invalid level.
         socket_option->set_int_value(10000); // Invalid value.
@@ -796,5 +808,215 @@ TEST_P(LdsStsIntegrationTest, TcpListenerRemoveFilterChainCalledAfterListenerIsR
   // removal at the worker is completed. This is the end of the in place update.
   test_server_->waitForGaugeEq("listener_manager.total_filter_chains_draining", 0);
 }
+
+constexpr char XDS_CLUSTER_NAME_1[] = "xds_cluster_1.lyft.com";
+constexpr char XDS_CLUSTER_NAME_2[] = "xds_cluster_2.lyft.com";
+constexpr char CLIENT_CERT_NAME[] = "client_cert";
+
+class XdsSotwMultipleAuthoritiesTest : public HttpIntegrationTest,
+                                       public Grpc::GrpcClientIntegrationParamTest {
+public:
+  XdsSotwMultipleAuthoritiesTest()
+      : HttpIntegrationTest(Http::CodecType::HTTP2, ipVersion(),
+                            ConfigHelper::baseConfigNoListeners()) {
+    use_lds_ = false;
+    sotw_or_delta_ = Grpc::SotwOrDelta::Sotw;
+    skip_tag_extraction_rule_check_ = true;
+
+    // Make the default cluster HTTP2.
+    config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      ConfigHelper::setHttp2(*bootstrap.mutable_static_resources()->mutable_clusters(0));
+    });
+
+    // Add a second cluster.
+    config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      auto* cluster = bootstrap.mutable_static_resources()->add_clusters();
+      *cluster = bootstrap.mutable_static_resources()->clusters(0);
+      cluster->set_name("cluster_1");
+      cluster->mutable_load_assignment()->set_cluster_name("cluster_1");
+    });
+
+    // Add two xDS clusters.
+    config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      addXdsCluster(bootstrap, std::string(XDS_CLUSTER_NAME_1));
+      addXdsCluster(bootstrap, std::string(XDS_CLUSTER_NAME_2));
+    });
+
+    // Set up the two static clusters with SSL using SDS.
+    config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      setUpClusterSsl(*bootstrap.mutable_static_resources()->mutable_clusters(0),
+                      std::string(XDS_CLUSTER_NAME_1), getXdsUpstream1());
+      setUpClusterSsl(*bootstrap.mutable_static_resources()->mutable_clusters(1),
+                      std::string(XDS_CLUSTER_NAME_2), getXdsUpstream2());
+    });
+  }
+
+  void initialize() override {
+    HttpIntegrationTest::initialize();
+    registerTestServerPorts({});
+  }
+
+  void TearDown() override {
+    closeConnection(xds_connection_1_);
+    closeConnection(xds_connection_2_);
+    cleanupUpstreamAndDownstream();
+    codec_client_.reset();
+    test_server_.reset();
+    fake_upstreams_.clear();
+  }
+
+  void createUpstreams() override {
+    // Static cluster.
+    addFakeUpstream(Http::CodecType::HTTP2);
+    // Static cluster.
+    addFakeUpstream(Http::CodecType::HTTP2);
+    // XDS Cluster.
+    addFakeUpstream(Http::CodecType::HTTP2);
+    // XDS Cluster.
+    addFakeUpstream(Http::CodecType::HTTP2);
+  }
+
+protected:
+  FakeUpstream& getXdsUpstream1() { return *fake_upstreams_[2]; }
+  FakeUpstream& getXdsUpstream2() { return *fake_upstreams_[3]; }
+
+  void addXdsCluster(envoy::config::bootstrap::v3::Bootstrap& bootstrap,
+                     const std::string& cluster_name) {
+    auto* xds_cluster = bootstrap.mutable_static_resources()->add_clusters();
+    xds_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
+    xds_cluster->set_name(cluster_name);
+    xds_cluster->mutable_load_assignment()->set_cluster_name(cluster_name);
+    ConfigHelper::setHttp2(*xds_cluster);
+  }
+
+  void setUpClusterSsl(envoy::config::cluster::v3::Cluster& cluster,
+                       const std::string& cluster_name, FakeUpstream& cluster_upstream) {
+    auto* transport_socket = cluster.mutable_transport_socket();
+    envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls_context;
+    tls_context.set_sni("lyft.com");
+    auto* secret_config =
+        tls_context.mutable_common_tls_context()->add_tls_certificate_sds_secret_configs();
+    setUpSdsConfig(secret_config, CLIENT_CERT_NAME, cluster_name, cluster_upstream);
+    transport_socket->set_name("envoy.transport_sockets.tls");
+    transport_socket->mutable_typed_config()->PackFrom(tls_context);
+  }
+
+  void initXdsStream(FakeUpstream& upstream, FakeHttpConnectionPtr& connection,
+                     FakeStreamPtr& stream) {
+    AssertionResult result = upstream.waitForHttpConnection(*dispatcher_, connection);
+    RELEASE_ASSERT(result, result.message());
+    result = connection->waitForNewStream(*dispatcher_, stream);
+    RELEASE_ASSERT(result, result.message());
+    stream->startGrpcStream();
+  }
+
+  void closeConnection(FakeHttpConnectionPtr& connection) {
+    AssertionResult result = connection->close();
+    RELEASE_ASSERT(result, result.message());
+    result = connection->waitForDisconnect();
+    RELEASE_ASSERT(result, result.message());
+    connection.reset();
+  }
+
+  void setUpSdsConfig(envoy::extensions::transport_sockets::tls::v3::SdsSecretConfig* secret_config,
+                      const std::string& secret_name, const std::string& cluster_name,
+                      FakeUpstream& cluster_upstream) {
+    secret_config->set_name(secret_name);
+    auto* config_source = secret_config->mutable_sds_config();
+    config_source->set_resource_api_version(envoy::config::core::v3::ApiVersion::V3);
+    auto* api_config_source = config_source->mutable_api_config_source();
+    api_config_source->set_api_type(envoy::config::core::v3::ApiConfigSource::GRPC);
+    api_config_source->set_transport_api_version(envoy::config::core::v3::V3);
+    auto* grpc_service = api_config_source->add_grpc_services();
+    setGrpcService(*grpc_service, cluster_name, cluster_upstream.localAddress());
+  }
+
+  envoy::extensions::transport_sockets::tls::v3::Secret
+  getClientSecret(const std::string& secret_name) {
+    envoy::extensions::transport_sockets::tls::v3::Secret secret;
+    secret.set_name(secret_name);
+    auto* tls_certificate = secret.mutable_tls_certificate();
+    tls_certificate->mutable_certificate_chain()->set_filename(
+        TestEnvironment::runfilesPath("test/config/integration/certs/clientcert.pem"));
+    tls_certificate->mutable_private_key()->set_filename(
+        TestEnvironment::runfilesPath("test/config/integration/certs/clientkey.pem"));
+    return secret;
+  }
+
+  envoy::admin::v3::ConfigDump getSecretsFromConfigDump() {
+    auto response = IntegrationUtil::makeSingleRequest(
+        lookupPort("admin"), "GET", "/config_dump?resource=dynamic_active_secrets", "",
+        downstreamProtocol(), version_);
+    EXPECT_TRUE(response->complete());
+    EXPECT_EQ("200", response->headers().getStatusValue());
+    Json::ObjectSharedPtr loader = TestEnvironment::jsonLoadFromString(response->body());
+    envoy::admin::v3::ConfigDump config_dump;
+    TestUtility::loadFromJson(loader->asJsonString(), config_dump);
+    return config_dump;
+  }
+
+  FakeHttpConnectionPtr xds_connection_1_;
+  FakeStreamPtr xds_stream_1_;
+  FakeHttpConnectionPtr xds_connection_2_;
+  FakeStreamPtr xds_stream_2_;
+};
+
+INSTANTIATE_TEST_SUITE_P(IpVersions, XdsSotwMultipleAuthoritiesTest,
+                         GRPC_CLIENT_INTEGRATION_PARAMS);
+
+// Verifies that if two different xDS servers send resources of the same name and same type, Envoy
+// still treats them as two separate resources.
+TEST_P(XdsSotwMultipleAuthoritiesTest, SameResourceNameAndTypeFromMultipleAuthorities) {
+  const std::string cert_name{CLIENT_CERT_NAME};
+
+  on_server_init_function_ = [this, &cert_name]() {
+    {
+      // SDS for the first cluster.
+      initXdsStream(getXdsUpstream1(), xds_connection_1_, xds_stream_1_);
+      EXPECT_TRUE(compareSotwDiscoveryRequest(
+          /*expected_type_url=*/Config::TypeUrl::get().Secret,
+          /*expected_version=*/"",
+          /*expected_resource_names=*/{cert_name}, /*expect_node=*/true,
+          Grpc::Status::WellKnownGrpcStatus::Ok,
+          /*expected_error_message=*/"", xds_stream_1_.get()));
+      auto sds_resource = getClientSecret(cert_name);
+      sendSotwDiscoveryResponse<envoy::extensions::transport_sockets::tls::v3::Secret>(
+          Config::TypeUrl::get().Secret, {sds_resource}, "1", xds_stream_1_.get());
+    }
+    {
+      // SDS for the second cluster.
+      initXdsStream(getXdsUpstream2(), xds_connection_2_, xds_stream_2_);
+      EXPECT_TRUE(compareSotwDiscoveryRequest(
+          /*expected_type_url=*/Config::TypeUrl::get().Secret,
+          /*expected_version=*/"",
+          /*expected_resource_names=*/{cert_name}, /*expect_node=*/true,
+          Grpc::Status::WellKnownGrpcStatus::Ok,
+          /*expected_error_message=*/"", xds_stream_2_.get()));
+      auto sds_resource = getClientSecret(cert_name);
+      sendSotwDiscoveryResponse<envoy::extensions::transport_sockets::tls::v3::Secret>(
+          Config::TypeUrl::get().Secret, {sds_resource}, "1", xds_stream_2_.get());
+    }
+  };
+
+  initialize();
+
+  // Wait until the discovery responses have been processed.
+  test_server_->waitForCounterGe(
+      "cluster.cluster_0.client_ssl_socket_factory.ssl_context_update_by_sds", 1);
+  test_server_->waitForCounterGe(
+      "cluster.cluster_1.client_ssl_socket_factory.ssl_context_update_by_sds", 1);
+
+  auto config_dump = getSecretsFromConfigDump();
+  // Two xDS resources with the same name and same type.
+  ASSERT_EQ(config_dump.configs_size(), 2);
+  envoy::admin::v3::SecretsConfigDump::DynamicSecret dynamic_secret;
+  ASSERT_OK(MessageUtil::unpackToNoThrow(config_dump.configs(0), dynamic_secret));
+  EXPECT_EQ(cert_name, dynamic_secret.name());
+  EXPECT_EQ("1", dynamic_secret.version_info());
+  ASSERT_OK(MessageUtil::unpackToNoThrow(config_dump.configs(1), dynamic_secret));
+  EXPECT_EQ(cert_name, dynamic_secret.name());
+  EXPECT_EQ("1", dynamic_secret.version_info());
+}
+
 } // namespace
 } // namespace Envoy

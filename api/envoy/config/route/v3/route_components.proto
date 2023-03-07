@@ -41,7 +41,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // host header. This allows a single listener to service multiple top level domain path trees. Once
 // a virtual host is selected based on the domain, the routes are processed in order to see which
 // upstream cluster to route to or whether to perform a redirect.
-// [#next-free-field: 23]
+// [#next-free-field: 24]
 message VirtualHost {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.route.VirtualHost";
 
@@ -142,8 +142,16 @@ message VirtualHost {
     items {string {min_len: 1 well_known_regex: HTTP_HEADER_NAME strict: false}}
   }];
 
-  // Indicates that the virtual host has a CORS policy.
-  CorsPolicy cors = 8;
+  // Indicates that the virtual host has a CORS policy. This field is ignored if related cors policy is
+  // found in the
+  // :ref:`VirtualHost.typed_per_filter_config<envoy_v3_api_field_config.route.v3.VirtualHost.typed_per_filter_config>`.
+  //
+  // .. attention::
+  //
+  //   This option has been deprecated. Please use
+  //   :ref:`VirtualHost.typed_per_filter_config<envoy_v3_api_field_config.route.v3.VirtualHost.typed_per_filter_config>`
+  //   to configure the CORS HTTP filter.
+  CorsPolicy cors = 8 [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 
   // The per_filter_config field can be used to provide virtual host-specific configurations for filters.
   // The key should match the :ref:`filter config name
@@ -198,6 +206,10 @@ message VirtualHost {
   // independently (e.g.: values are not inherited).
   HedgePolicy hedge_policy = 17;
 
+  // Decides whether to include the :ref:`x-envoy-is-timeout-retry <config_http_filters_router_x-envoy-is-timeout-retry>`
+  // request header in retries initiated by per try timeouts.
+  bool include_is_timeout_retry_header = 23;
+
   // The maximum bytes which will be buffered for retries and shadowing.
   // If set and a route-specific limit is not set, the bytes actually buffered will be the minimum
   // value of this and the listener per_connection_buffer_limit_bytes.
@@ -214,6 +226,13 @@ message FilterAction {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.route.FilterAction";
 
   google.protobuf.Any action = 1;
+}
+
+// This can be used in route matcher :ref:`VirtualHost.matcher <envoy_v3_api_field_config.route.v3.VirtualHost.matcher>`.
+// When the matcher matches, routes will be matched and run.
+message RouteList {
+  // The list of routes that will be matched and run, in order. The first route that matches will be used.
+  repeated Route routes = 1;
 }
 
 // A route is both a specification of how to match a request as well as an indication of what to do
@@ -386,10 +405,11 @@ message WeightedCluster {
       (udpa.annotations.field_migrate).oneof_promotion = "cluster_specifier"
     ];
 
-    // An integer between 0 and :ref:`total_weight
-    // <envoy_v3_api_field_config.route.v3.WeightedCluster.total_weight>`. When a request matches the route,
-    // the choice of an upstream cluster is determined by its weight. The sum of weights across all
-    // entries in the clusters array must add up to the total_weight, if total_weight is greater than 0.
+    // The weight of the cluster. This value is relative to the other clusters'
+    // weights. When a request matches the route, the choice of an upstream cluster
+    // is determined by its weight. The sum of weights across all
+    // entries in the clusters array must be greater than 0, and must not exceed
+    // uint32_t maximal value (4294967295).
     google.protobuf.UInt32Value weight = 2;
 
     // Optional endpoint metadata match criteria used by the subset load balancer. Only endpoints in
@@ -459,7 +479,10 @@ message WeightedCluster {
 
   // Specifies the total weight across all clusters. The sum of all cluster weights must equal this
   // value, if this is greater than 0.
-  google.protobuf.UInt32Value total_weight = 3;
+  // This field is now deprecated, and the client will use the sum of all
+  // cluster weights. It is up to the management server to supply the correct weights.
+  google.protobuf.UInt32Value total_weight = 3
+      [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 
   // Specifies the runtime key prefix that should be used to construct the
   // runtime keys associated with each cluster. When the ``runtime_key_prefix`` is
@@ -572,34 +595,8 @@ message RouteMatch {
     // Expect the value to not contain ``?`` or ``#`` and not to end in ``/``
     string path_separated_prefix = 14 [(validate.rules).string = {pattern: "^[^?#]+[^?#/]$"}];
 
-    // If specified, the route is a template match rule meaning that the
-    // ``:path`` header (without the query string) must match the given
-    // ``path_template`` pattern.
-    //
-    // Path template matching types:
-    //
-    // * ``*`` : Matches a single path component, up to the next path separator: /
-    //
-    // * ``**`` : Matches zero or more path segments. If present, must be the last operator.
-    //
-    // * ``{name} or {name=*}`` :  A named variable matching one path segment up to the next path separator: /.
-    //
-    // * ``{name=videos/*}`` : A named variable matching more than one path segment.
-    //      The path component matching videos/* is captured as the named variable.
-    //
-    // * ``{name=**}`` : A named variable matching zero or more path segments.
-    //
-    //
-    // For example:
-    //
-    // * ``/videos/*/*/*.m4s`` would match ``videos/123414/hls/1080p5000_00001.m4s``
-    //
-    // * ``/videos/{file}`` would match ``/videos/1080p5000_00001.m4s``
-    //
-    // * ``/**.mpd`` would match ``/content/123/india/dash/55/manifest.mpd``
-    // [#not-implemented-hide:]
-    string path_template = 15
-        [(validate.rules).string = {min_len: 1 max_len: 256 ignore_empty: true}];
+    // [#extension-category: envoy.path.match]
+    core.v3.TypedExtensionConfig path_match_policy = 15;
   }
 
   // Indicates that prefix/path matching should be case sensitive. The default
@@ -664,7 +661,15 @@ message RouteMatch {
   repeated type.matcher.v3.MetadataMatcher dynamic_metadata = 13;
 }
 
-// [#next-free-field: 12]
+// Cors policy configuration.
+//
+// .. attention::
+//
+//   This message has been deprecated. Please use
+//   :ref:`CorsPolicy in filter extension <envoy_v3_api_msg_extensions.filters.http.cors.v3.CorsPolicy>`
+//   as as alternative.
+//
+// [#next-free-field: 13]
 message CorsPolicy {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.route.CorsPolicy";
 
@@ -712,6 +717,12 @@ message CorsPolicy {
   // Envoy will lookup the runtime key to get the percentage of requests for which it will evaluate
   // and track the request's ``Origin`` to determine if it's valid but will not enforce any policies.
   core.v3.RuntimeFractionalPercent shadow_enabled = 10;
+
+  // Specify whether allow requests whose target server's IP address is more private than that from
+  // which the request initiator was fetched.
+  //
+  // More details refer to https://developer.chrome.com/blog/private-network-access-preflight.
+  google.protobuf.BoolValue allow_private_network_access = 12;
 }
 
 // [#next-free-field: 42]
@@ -749,6 +760,10 @@ message RouteAction {
   // .. note::
   //
   //   Shadowing will not be triggered if the primary cluster does not exist.
+  //
+  // .. note::
+  //
+  //   Shadowing doesn't support Http CONNECT and upgrades.
   // [#next-free-field: 6]
   message RequestMirrorPolicy {
     option (udpa.annotations.versioning).previous_message_type =
@@ -1046,8 +1061,8 @@ message RouteAction {
   // <config_http_filters_router_x-envoy-original-path>` header.
   //
   // Only one of :ref:`regex_rewrite <envoy_v3_api_field_config.route.v3.RouteAction.regex_rewrite>`
-  // [#comment:TODO(silverstar194) add the following once path_template_rewrite is implemented: :ref:`path_template_rewrite <envoy_v3_api_field_config.route.v3.RouteAction.path_template_rewrite>`]
-  // or ``prefix_rewrite`` may be specified.
+  // :ref:`path_rewrite_policy <envoy_v3_api_field_config.route.v3.RouteAction.path_rewrite_policy>`,
+  // or :ref:`prefix_rewrite <envoy_v3_api_field_config.route.v3.RouteAction.prefix_rewrite>` may be specified.
   //
   // .. attention::
   //
@@ -1082,9 +1097,10 @@ message RouteAction {
   // before the rewrite into the :ref:`x-envoy-original-path
   // <config_http_filters_router_x-envoy-original-path>` header.
   //
-  // Only one of :ref:`prefix_rewrite <envoy_v3_api_field_config.route.v3.RouteAction.prefix_rewrite>`
-  // [#comment:TODO(silverstar194) add the following once path_template_rewrite is implemented: :ref:`path_template_rewrite <envoy_v3_api_field_config.route.v3.RouteAction.path_template_rewrite>`,]
-  // or ``regex_rewrite`` may be specified.
+  // Only one of :ref:`regex_rewrite <envoy_v3_api_field_config.route.v3.RouteAction.regex_rewrite>`,
+  // :ref:`prefix_rewrite <envoy_v3_api_field_config.route.v3.RouteAction.prefix_rewrite>`, or
+  // :ref:`path_rewrite_policy <envoy_v3_api_field_config.route.v3.RouteAction.path_rewrite_policy>`]
+  // may be specified.
   //
   // Examples using Google's `RE2 <https://github.com/google/re2>`_ engine:
   //
@@ -1104,48 +1120,8 @@ message RouteAction {
   //   ``/aaa/yyy/bbb``.
   type.matcher.v3.RegexMatchAndSubstitute regex_rewrite = 32;
 
-  // Indicates that during forwarding, portions of the path that match the
-  // pattern should be rewritten, even allowing the substitution of variables
-  // from the match pattern into the new path as specified by the rewrite template.
-  // This is useful to allow application paths to be
-  // rewritten in a way that is aware of segments with variable content like
-  // identifiers. The router filter will place the original path as it was
-  // before the rewrite into the :ref:`x-envoy-original-path
-  // <config_http_filters_router_x-envoy-original-path>` header.
-  //
-  // Only one of :ref:`prefix_rewrite <envoy_v3_api_field_config.route.v3.RouteAction.prefix_rewrite>`,
-  // :ref:`regex_rewrite <envoy_v3_api_field_config.route.v3.RouteAction.regex_rewrite>`,
-  // or ``path_template_rewrite`` may be specified.
-  //
-  // Template pattern matching types:
-  //
-  // * ``*`` : Matches a single path component, up to the next path separator: /
-  //
-  // * ``**`` : Matches zero or more path segments. If present, must be the last operator.
-  //
-  // * ``{name} or {name=*}`` :  A named variable matching one path segment up to the next path separator: /.
-  //
-  // * ``{name=videos/*}`` : A named variable matching more than one path segment.
-  //      The path component matching videos/* is captured as the named variable.
-  //
-  // * ``{name=**}`` : A named variable matching zero or more path segments.
-  //
-  // Only named matches can be used to perform rewrites.
-  //
-  // Examples using path_template_rewrite:
-  //
-  // * The pattern ``/{one}/{two}`` paired with a substitution string of ``/{two}/{one}`` would
-  //   transform ``/cat/dog`` into ``/dog/cat``.
-  //
-  // * The pattern ``/videos/{language=lang/*}/*`` paired with a substitution string of
-  //   ``/{language}`` would transform ``/videos/lang/en/video.m4s`` into ``lang/en``.
-  //
-  // * The path pattern ``/content/{format}/{lang}/{id}/{file}.vtt`` paired with a substitution
-  //   string of ``/{lang}/{format}/{file}.vtt`` would transform ``/content/hls/en-us/12345/en_193913.vtt``
-  //   into ``/en-us/hls/en_193913.vtt``.
-  // [#not-implemented-hide:]
-  string path_template_rewrite = 41
-      [(validate.rules).string = {min_len: 1 max_len: 256 ignore_empty: true}];
+  // [#extension-category: envoy.path.rewrite]
+  core.v3.TypedExtensionConfig path_rewrite_policy = 41;
 
   oneof host_rewrite_specifier {
     // Indicates that during forwarding, the host header will be swapped with
@@ -1304,8 +1280,17 @@ message RouteAction {
   // ignoring the rest of the hash policy list.
   repeated HashPolicy hash_policy = 15;
 
-  // Indicates that the route has a CORS policy.
-  CorsPolicy cors = 17;
+  // Indicates that the route has a CORS policy. This field is ignored if related cors policy is
+  // found in the :ref:`Route.typed_per_filter_config<envoy_v3_api_field_config.route.v3.Route.typed_per_filter_config>` or
+  // :ref:`WeightedCluster.ClusterWeight.typed_per_filter_config<envoy_v3_api_field_config.route.v3.WeightedCluster.ClusterWeight.typed_per_filter_config>`.
+  //
+  // .. attention::
+  //
+  //   This option has been deprecated. Please use
+  //   :ref:`Route.typed_per_filter_config<envoy_v3_api_field_config.route.v3.Route.typed_per_filter_config>` or
+  //   :ref:`WeightedCluster.ClusterWeight.typed_per_filter_config<envoy_v3_api_field_config.route.v3.WeightedCluster.ClusterWeight.typed_per_filter_config>`
+  //   to configure the CORS HTTP filter.
+  CorsPolicy cors = 17 [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 
   // Deprecated by :ref:`grpc_timeout_header_max <envoy_v3_api_field_config.route.v3.RouteAction.MaxStreamDuration.grpc_timeout_header_max>`
   // If present, and the request is a gRPC request, use the
@@ -1858,7 +1843,7 @@ message VirtualCluster {
 message RateLimit {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.route.RateLimit";
 
-  // [#next-free-field: 11]
+  // [#next-free-field: 12]
   message Action {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.api.v2.route.RateLimit.Action";
@@ -2027,6 +2012,7 @@ message RateLimit {
     // .. code-block:: cpp
     //
     //   ("<descriptor_key>", "<value_queried_from_metadata>")
+    // [#next-free-field: 6]
     message MetaData {
       enum Source {
         // Query :ref:`dynamic metadata <well_known_dynamic_metadata>`
@@ -2044,11 +2030,44 @@ message RateLimit {
       type.metadata.v3.MetadataKey metadata_key = 2 [(validate.rules).message = {required: true}];
 
       // An optional value to use if ``metadata_key`` is empty. If not set and
-      // no value is present under the metadata_key then no descriptor is generated.
+      // no value is present under the metadata_key then ``skip_if_absent`` is followed to
+      // skip calling the rate limiting service or skip the descriptor.
       string default_value = 3;
 
       // Source of metadata
       Source source = 4 [(validate.rules).enum = {defined_only: true}];
+
+      // If set to true, Envoy skips the descriptor while calling rate limiting service
+      // when ``metadata_key`` is empty and ``default_value`` is not set. By default it skips calling the
+      // rate limiting service in that case.
+      bool skip_if_absent = 5;
+    }
+
+    // The following descriptor entry is appended to the descriptor:
+    //
+    // .. code-block:: cpp
+    //
+    //   ("query_match", "<descriptor_value>")
+    message QueryParameterValueMatch {
+      // The key to use in the descriptor entry. Defaults to ``query_match``.
+      string descriptor_key = 4;
+
+      // The value to use in the descriptor entry.
+      string descriptor_value = 1 [(validate.rules).string = {min_len: 1}];
+
+      // If set to true, the action will append a descriptor entry when the
+      // request matches the headers. If set to false, the action will append a
+      // descriptor entry when the request does not match the headers. The
+      // default value is true.
+      google.protobuf.BoolValue expect_match = 2;
+
+      // Specifies a set of query parameters that the rate limit action should match
+      // on. The action will check the request’s query parameters against all the
+      // specified query parameters in the config. A match will happen if all the
+      // query parameters in the config are present in the request with the same values
+      // (or based on presence if the value field is not in the config).
+      repeated QueryParameterMatcher query_parameters = 3
+          [(validate.rules).repeated = {min_items: 1}];
     }
 
     oneof action_specifier {
@@ -2097,6 +2116,9 @@ message RateLimit {
 
       // Rate limit on masked remote address.
       MaskedRemoteAddress masked_remote_address = 10;
+
+      // Rate limit on the existence of query parameters.
+      QueryParameterValueMatch query_parameter_value_match = 11;
     }
   }
 
@@ -2159,7 +2181,9 @@ message RateLimit {
 //
 //     {
 //       "name": ":method",
-//       "exact_match": "POST"
+//       "string_match": {
+//         "exact": "POST"
+//       }
 //     }
 //
 // .. attention::

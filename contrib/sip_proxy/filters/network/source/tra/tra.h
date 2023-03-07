@@ -1,10 +1,5 @@
 #pragma once
 
-#include <chrono>
-#include <memory>
-#include <string>
-#include <vector>
-
 #include "envoy/common/pure.h"
 #include "envoy/singleton/manager.h"
 #include "envoy/stream_info/stream_info.h"

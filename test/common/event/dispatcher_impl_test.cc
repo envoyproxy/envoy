@@ -371,7 +371,8 @@ protected:
     }
   }
 
-  NiceMock<Stats::MockStore> scope_; // Used in InitializeStats, must outlive dispatcher_->exit().
+  NiceMock<Stats::MockStore> store_; // Used in InitializeStats, must outlive dispatcher_->exit().
+  Stats::Scope& scope_{*store_.rootScope()};
   Api::ApiPtr api_;
   Thread::ThreadPtr dispatcher_thread_;
   DispatcherPtr dispatcher_;
@@ -385,9 +386,9 @@ protected:
 // TODO(mergeconflict): We also need integration testing to validate that the expected histograms
 // are written when `enable_dispatcher_stats` is true. See issue #6582.
 TEST_F(DispatcherImplTest, InitializeStats) {
-  EXPECT_CALL(scope_,
+  EXPECT_CALL(store_,
               histogram("test.dispatcher.loop_duration_us", Stats::Histogram::Unit::Microseconds));
-  EXPECT_CALL(scope_,
+  EXPECT_CALL(store_,
               histogram("test.dispatcher.poll_delay_us", Stats::Histogram::Unit::Microseconds));
   dispatcher_->initializeStats(scope_, "test.");
 }

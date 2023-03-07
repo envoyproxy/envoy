@@ -55,6 +55,14 @@ public:
    * absl::nullopt.
    */
   virtual Http::Http1StreamEncoderOptionsOptRef http1StreamEncoderOptions() PURE;
+
+  /**
+   * Construct query-param map for the stream, using the URL-specified params,
+   * or the request data if that is url-form-encoded.
+   *
+   * @param The query name/value map.
+   */
+  virtual Http::Utility::QueryParams queryParams() const PURE;
 };
 
 /**
@@ -64,9 +72,9 @@ public:
  * done in the RouteConfigProviderManagerImpl constructor in source/common/router/rds_impl.cc.
  */
 #define MAKE_ADMIN_HANDLER(X)                                                                      \
-  [this](absl::string_view path_and_query, Http::ResponseHeaderMap& response_headers,              \
-         Buffer::Instance& data, Server::AdminStream& admin_stream) -> Http::Code {                \
-    return X(path_and_query, response_headers, data, admin_stream);                                \
+  [this](Http::ResponseHeaderMap& response_headers, Buffer::Instance& data,                        \
+         Server::AdminStream& admin_stream) -> Http::Code {                                        \
+    return X(response_headers, data, admin_stream);                                                \
   }
 
 /**
@@ -92,6 +100,20 @@ public:
 class Admin {
 public:
   virtual ~Admin() = default;
+
+  // Describes a parameter for an endpoint. This structure is used when
+  // admin-html has not been disabled to populate an HTML form to enable a
+  // visitor to the admin console to intuitively specify query-parameters for
+  // each endpoint. The parameter descriptions also appear in the /help
+  // endpoint, independent of how Envoy is compiled.
+  struct ParamDescriptor {
+    enum class Type { Boolean, String, Enum };
+    const Type type_;
+    const std::string id_;   // HTML form ID and query-param name (JS var name rules).
+    const std::string help_; // Rendered into home-page HTML and /help text.
+    std::vector<absl::string_view> enum_choices_{};
+  };
+  using ParamDescriptorVec = std::vector<ParamDescriptor>;
 
   // Represents a request for admin endpoints, enabling streamed responses.
   class Request {
@@ -128,6 +150,23 @@ public:
   using RequestPtr = std::unique_ptr<Request>;
 
   /**
+   * Lambda to generate a Request.
+   */
+  using GenRequestFn = std::function<RequestPtr(AdminStream&)>;
+
+  /**
+   * Individual admin handler including prefix, help text, and callback.
+   */
+  struct UrlHandler {
+    const std::string prefix_;
+    const std::string help_text_;
+    const GenRequestFn handler_;
+    const bool removable_;
+    const bool mutates_server_state_;
+    const ParamDescriptorVec params_{};
+  };
+
+  /**
    * Callback for admin URL handlers.
    * @param path_and_query supplies the path and query of the request URL.
    * @param response_headers enables setting of http headers (e.g., content-type, cache-control) in
@@ -137,14 +176,9 @@ public:
    * its data.
    * @return Http::Code the response code.
    */
-  using HandlerCb = std::function<Http::Code(
-      absl::string_view path_and_query, Http::ResponseHeaderMap& response_headers,
-      Buffer::Instance& response, AdminStream& admin_stream)>;
-
-  /**
-   * Lambda to generate a Request.
-   */
-  using GenRequestFn = std::function<RequestPtr(absl::string_view path, AdminStream&)>;
+  using HandlerCb =
+      std::function<Http::Code(Http::ResponseHeaderMap& response_headers,
+                               Buffer::Instance& response, AdminStream& admin_stream)>;
 
   /**
    * Add a legacy admin handler where the entire response is written in
@@ -155,10 +189,12 @@ public:
    * @param callback supplies the callback to invoke when the prefix matches.
    * @param removable if true allows the handler to be removed via removeHandler.
    * @param mutates_server_state indicates whether callback will mutate server state.
+   * @param params command parameter descriptors.
    * @return bool true if the handler was added, false if it was not added.
    */
   virtual bool addHandler(const std::string& prefix, const std::string& help_text,
-                          HandlerCb callback, bool removable, bool mutates_server_state) PURE;
+                          HandlerCb callback, bool removable, bool mutates_server_state,
+                          const ParamDescriptorVec& params = {}) PURE;
 
   /**
    * Adds a an chunked admin handler.
@@ -168,11 +204,13 @@ public:
    * @param gen_request supplies the callback to generate a Request.
    * @param removable if true allows the handler to be removed via removeHandler.
    * @param mutates_server_state indicates whether callback will mutate server state.
+   * @param params command parameter descriptors.
    * @return bool true if the handler was added, false if it was not added.
    */
   virtual bool addStreamingHandler(const std::string& prefix, const std::string& help_text,
                                    GenRequestFn gen_request, bool removable,
-                                   bool mutates_server_state) PURE;
+                                   bool mutates_server_state,
+                                   const ParamDescriptorVec& params = {}) PURE;
 
   /**
    * Remove an admin handler if it is removable.
@@ -241,6 +279,11 @@ public:
    */
   static RequestPtr makeStaticTextRequest(absl::string_view response_text, Http::Code code);
   static RequestPtr makeStaticTextRequest(Buffer::Instance& response_text, Http::Code code);
+
+  /**
+   * Closes the listening socket for the admin.
+   */
+  virtual void closeSocket() PURE;
 };
 
 } // namespace Server

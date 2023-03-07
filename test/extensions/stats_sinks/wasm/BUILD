@@ -42,6 +42,7 @@ envoy_extension_cc_test(
     deps = [
         "//source/common/stats:stats_lib",
         "//source/extensions/common/wasm:wasm_lib",
+        "//source/extensions/wasm_runtime/null:config",
         "//test/extensions/common/wasm:wasm_runtime",
         "//test/extensions/stats_sinks/wasm/test_data:test_context_cpp_plugin",
         "//test/mocks/stats:stats_mocks",

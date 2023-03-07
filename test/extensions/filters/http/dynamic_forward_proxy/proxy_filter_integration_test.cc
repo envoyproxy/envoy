@@ -62,7 +62,7 @@ name: stream-info-to-headers-filter
       bootstrap.mutable_dynamic_resources()
           ->mutable_cds_config()
           ->mutable_path_config_source()
-          ->set_path(cds_helper_.cds_path());
+          ->set_path(cds_helper_.cdsPath());
       bootstrap.mutable_static_resources()->clear_clusters();
     });
 
@@ -449,14 +449,23 @@ TEST_P(ProxyFilterIntegrationTest, UpstreamTlsWithAltHeaderSni) {
   upstream_tls_ = true;
   initializeWithArgs(1024, 1024, "x-host");
   codec_client_ = makeHttpConnection(lookupPort("http"));
-  const Http::TestRequestHeaderMapImpl request_headers{
-      {":method", "POST"},
-      {":path", "/test/long/url"},
-      {":scheme", "http"},
-      {":authority",
-       fmt::format("{}:{}", fake_upstreams_[0]->localAddress()->ip()->addressAsString().c_str(),
-                   fake_upstreams_[0]->localAddress()->ip()->port())},
-      {"x-host", "localhost"}};
+
+  std::string authority;
+  if (GetParam() == Network::Address::IpVersion::v6) {
+    authority =
+        fmt::format("[{}]:{}", fake_upstreams_[0]->localAddress()->ip()->addressAsString().c_str(),
+                    fake_upstreams_[0]->localAddress()->ip()->port());
+  } else {
+    authority =
+        fmt::format("{}:{}", fake_upstreams_[0]->localAddress()->ip()->addressAsString().c_str(),
+                    fake_upstreams_[0]->localAddress()->ip()->port());
+  }
+
+  const Http::TestRequestHeaderMapImpl request_headers{{":method", "POST"},
+                                                       {":path", "/test/long/url"},
+                                                       {":scheme", "http"},
+                                                       {":authority", authority},
+                                                       {"x-host", "localhost"}};
 
   auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
   waitForNextUpstreamRequest();
@@ -577,6 +586,7 @@ TEST_P(ProxyFilterIntegrationTest, UseCacheFileAndTestHappyEyeballs) {
 
   // Wait for the request to be received.
   test_server_->waitForCounterEq("cluster.cluster_0.upstream_rq_total", 1);
+  EXPECT_EQ(2, test_server_->counter("cluster.cluster_0.upstream_cx_total")->value());
   EXPECT_TRUE(response->waitForEndStream());
   EXPECT_EQ(1, test_server_->counter("dns_cache.foo.cache_load")->value());
   EXPECT_EQ(1, test_server_->counter("dns_cache.foo.host_added")->value());

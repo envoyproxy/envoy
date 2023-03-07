@@ -88,6 +88,7 @@ public:
               (absl::string_view service_full_name, absl::string_view method_name,
                RawAsyncStreamCallbacks& callbacks,
                const Http::AsyncClient::StreamOptions& options));
+  MOCK_METHOD(absl::string_view, destination, ());
 
   std::unique_ptr<testing::NiceMock<Grpc::MockAsyncRequest>> async_request_;
   // Keep track of the number of requests to detect potential race condition.
@@ -113,7 +114,7 @@ public:
 
   MOCK_METHOD(RawAsyncClientSharedPtr, getOrCreateRawAsyncClient,
               (const envoy::config::core::v3::GrpcService& grpc_service, Stats::Scope& scope,
-               bool skip_cluster_check, Grpc::CacheOption cache_option));
+               bool skip_cluster_check));
 };
 
 MATCHER_P(ProtoBufferEq, expected, "") {

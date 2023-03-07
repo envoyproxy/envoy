@@ -18,12 +18,6 @@ namespace Envoy {
 // Fuzz the header map implementation.
 DEFINE_PROTO_FUZZER(const test::common::http::HeaderMapImplFuzzTestCase& input) {
   TestScopedRuntime scoped_runtime;
-  // Set the lazy header-map threshold if found.
-  if (input.has_config()) {
-    scoped_runtime.mergeValues({{"envoy.reloadable_features.deprecate_global_ints", "false"},
-                                {"envoy.http.headermap.lazy_map_min_size",
-                                 absl::StrCat(input.config().lazy_map_min_size())}});
-  }
 
   auto header_map = Http::RequestHeaderMapImpl::create();
   std::vector<std::unique_ptr<Http::LowerCaseString>> lower_case_strings;

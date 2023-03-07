@@ -332,7 +332,7 @@ message DynamicParameterConstraints {
   }
 }
 
-// [#next-free-field: 9]
+// [#next-free-field: 10]
 message Resource {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.Resource";
 
@@ -383,4 +383,8 @@ message Resource {
   // Cache control properties for the resource.
   // [#not-implemented-hide:]
   CacheControl cache_control = 7;
+
+  // The Metadata field can be used to provide additional information for the resource.
+  // E.g. the trace data for debugging.
+  config.core.v3.Metadata metadata = 9;
 }

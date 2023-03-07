@@ -1,6 +1,6 @@
 load(
     "//bazel:envoy_build_system.bzl",
-    "envoy_cc_library",
+    "envoy_cc_test_library",
     "envoy_package",
 )
 load("//bazel:envoy_select.bzl", "envoy_select_wasm_v8_bool")
@@ -17,7 +17,7 @@ wasm_rust_binary(
     precompile = envoy_select_wasm_v8_bool(),
 )
 
-envoy_cc_library(
+envoy_cc_test_library(
     name = "test_cpp_plugin",
     srcs = [
         "test_cpp.cc",
@@ -33,7 +33,7 @@ envoy_cc_library(
     ],
 )
 
-envoy_cc_library(
+envoy_cc_test_library(
     name = "test_context_cpp_plugin",
     srcs = [
         "test_context_cpp.cc",
@@ -50,7 +50,7 @@ envoy_cc_library(
     ],
 )
 
-envoy_cc_library(
+envoy_cc_test_library(
     name = "test_restriction_cpp_plugin",
     srcs = [
         "test_restriction_cpp.cc",

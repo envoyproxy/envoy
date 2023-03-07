@@ -10,7 +10,6 @@ virtual_hosts:
         clusters:
         - name: www2
           weight: 100
-        total_weight: 100
 - name: redirect
   domains:
   - redirect.lyft.com

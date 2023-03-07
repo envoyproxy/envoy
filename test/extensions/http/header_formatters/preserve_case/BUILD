@@ -35,6 +35,7 @@ envoy_extension_cc_test(
         "//source/extensions/http/header_formatters/preserve_case:config",
         "//source/extensions/http/header_formatters/preserve_case:preserve_case_formatter",
         "//test/integration:http_integration_lib",
+        "//test/test_common:utility_lib",
         "@envoy_api//envoy/extensions/http/header_formatters/preserve_case/v3:pkg_cc_proto",
     ],
 )
@@ -50,6 +51,8 @@ envoy_extension_cc_test(
         "//source/extensions/http/header_formatters/preserve_case:preserve_case_formatter",
         "//test/integration:http_integration_lib",
         "//test/integration:http_protocol_integration_lib",
+        "//test/test_common:test_runtime_lib",
+        "//test/test_common:utility_lib",
         "@envoy_api//envoy/extensions/http/header_formatters/preserve_case/v3:pkg_cc_proto",
     ],
 )

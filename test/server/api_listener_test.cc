@@ -3,7 +3,6 @@
 #include "envoy/config/listener/v3/listener.pb.h"
 
 #include "source/server/api_listener_impl.h"
-#include "source/server/listener_manager_impl.h"
 
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/server/instance.h"
@@ -21,14 +20,10 @@ namespace Server {
 
 class ApiListenerTest : public testing::Test {
 protected:
-  ApiListenerTest()
-      : listener_manager_(std::make_unique<ListenerManagerImpl>(
-            server_, listener_factory_, worker_factory_, false, server_.quic_stat_names_)) {}
+  ApiListenerTest() = default;
 
   NiceMock<MockInstance> server_;
-  NiceMock<MockListenerComponentFactory> listener_factory_;
   NiceMock<MockWorkerFactory> worker_factory_;
-  std::unique_ptr<ListenerManagerImpl> listener_manager_;
 };
 
 TEST_F(ApiListenerTest, HttpApiListener) {
@@ -58,7 +53,7 @@ api_listener:
   const envoy::config::listener::v3::Listener config = parseListenerFromV3Yaml(yaml);
   server_.server_factory_context_->cluster_manager_.initializeClusters(
       {"dynamic_forward_proxy_cluster"}, {});
-  auto http_api_listener = HttpApiListener(config, *listener_manager_, config.name());
+  auto http_api_listener = HttpApiListener(config, server_, config.name());
 
   ASSERT_EQ("test_api_listener", http_api_listener.name());
   ASSERT_EQ(ApiListener::Type::HttpApiListener, http_api_listener.type());
@@ -93,7 +88,7 @@ api_listener:
   const envoy::config::listener::v3::Listener config = parseListenerFromV3Yaml(yaml);
   server_.server_factory_context_->cluster_manager_.initializeClusters(
       {"dynamic_forward_proxy_cluster"}, {});
-  auto http_api_listener = HttpApiListener(config, *listener_manager_, config.name());
+  auto http_api_listener = HttpApiListener(config, server_, config.name());
 
   ASSERT_EQ("test_api_listener", http_api_listener.name());
   ASSERT_EQ(ApiListener::Type::HttpApiListener, http_api_listener.type());
@@ -130,7 +125,7 @@ api_listener:
       ->set_path("eds path");
   expected_any_proto.PackFrom(expected_cluster_proto);
   EXPECT_THROW_WITH_MESSAGE(
-      HttpApiListener(config, *listener_manager_, config.name()), EnvoyException,
+      HttpApiListener(config, server_, config.name()), EnvoyException,
       fmt::format("Unable to unpack as "
                   "envoy.extensions.filters.network.http_connection_manager.v3."
                   "HttpConnectionManager: {}",
@@ -164,7 +159,7 @@ api_listener:
   const envoy::config::listener::v3::Listener config = parseListenerFromV3Yaml(yaml);
   server_.server_factory_context_->cluster_manager_.initializeClusters(
       {"dynamic_forward_proxy_cluster"}, {});
-  auto http_api_listener = HttpApiListener(config, *listener_manager_, config.name());
+  auto http_api_listener = HttpApiListener(config, server_, config.name());
 
   ASSERT_EQ("test_api_listener", http_api_listener.name());
   ASSERT_EQ(ApiListener::Type::HttpApiListener, http_api_listener.type());

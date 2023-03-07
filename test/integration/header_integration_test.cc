@@ -35,7 +35,7 @@ std::string ipSuppressEnvoyHeadersTestParamsToString(
 void disableHeaderValueOptionAppend(
     Protobuf::RepeatedPtrField<envoy::config::core::v3::HeaderValueOption>& header_value_options) {
   for (auto& i : header_value_options) {
-    i.mutable_append()->set_value(false);
+    i.set_append_action(envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD);
   }
 }
 
@@ -206,7 +206,9 @@ public:
     auto* mutable_header = header_value_option->mutable_header();
     mutable_header->set_key(key);
     mutable_header->set_value(value);
-    header_value_option->mutable_append()->set_value(append);
+    header_value_option->set_append_action(
+        append ? envoy::config::core::v3::HeaderValueOption::APPEND_IF_EXISTS_OR_ADD
+               : envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD);
   }
 
   void prepareEDS() {
@@ -467,6 +469,76 @@ INSTANTIATE_TEST_SUITE_P(
     testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()), testing::Bool()),
     ipSuppressEnvoyHeadersTestParamsToString);
 
+TEST_P(HeaderIntegrationTest, WeightedClusterWithClusterHeader) {
+  config_helper_.addConfigModifier(
+      [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) {
+        // Overwrite default config with our own.
+        TestUtility::loadFromYaml(R"EOF(
+http_filters:
+  - name: envoy.filters.http.router
+codec_type: HTTP1
+use_remote_address: false
+xff_num_trusted_hops: 1
+stat_prefix: header_test
+route_config:
+  name: route-config-1
+  virtual_hosts:
+    - name: vhost-headers
+      domains: ["vhost-headers.com"]
+      routes:
+        - match: { prefix: "/vhost-route-and-weighted-clusters" }
+          name: route-0
+          route:
+            weighted_clusters:
+              clusters:
+                - cluster_header: x-route-to-this-cluster
+                  weight: 100
+                  request_headers_to_add:
+                    - header:
+                        key: "x-weighted-cluster-request"
+                        value: "weighted-cluster-1"
+                  request_headers_to_remove: ["x-weighted-cluster-request-remove"]
+                  response_headers_to_add:
+                    - header:
+                        key: "x-weighted-cluster-response"
+                        value: "weighted-cluster-1"
+                  response_headers_to_remove: ["x-weighted-cluster-response-remove"]
+)EOF",
+                                  hcm);
+        envoy::extensions::filters::http::router::v3::Router router_config;
+        router_config.set_suppress_envoy_headers(routerSuppressEnvoyHeaders());
+        hcm.mutable_http_filters(0)->mutable_typed_config()->PackFrom(router_config);
+      });
+  initialize();
+  performRequest(
+      Http::TestRequestHeaderMapImpl{
+          {":method", "GET"},
+          {":path", "/vhost-route-and-weighted-clusters"},
+          {":scheme", "http"},
+          {":authority", "vhost-headers.com"},
+          {"x-weighted-cluster-request-remove", "to-remove"},
+          {"x-route-to-this-cluster", "cluster_0"},
+      },
+      Http::TestRequestHeaderMapImpl{
+          {":authority", "vhost-headers.com"},
+          {"x-route-to-this-cluster", "cluster_0"},
+          {":path", "/vhost-route-and-weighted-clusters"},
+          {":method", "GET"},
+          {"x-weighted-cluster-request", "weighted-cluster-1"},
+      },
+      Http::TestResponseHeaderMapImpl{
+          {"server", "envoy"},
+          {"content-length", "0"},
+          {":status", "200"},
+          {"x-weighted-cluster-response-remove", "to-remove"},
+      },
+      Http::TestResponseHeaderMapImpl{
+          {"server", "envoy"},
+          {":status", "200"},
+          {"x-weighted-cluster-response", "weighted-cluster-1"},
+      });
+}
 // Validate that downstream request headers are passed upstream and upstream response headers are
 // passed downstream.
 TEST_P(HeaderIntegrationTest, TestRequestAndResponseHeaderPassThrough) {
@@ -1109,10 +1181,18 @@ TEST_P(HeaderIntegrationTest, PathWithEscapedSlashesByDefaultUnchanghed) {
           {":scheme", "http"},
           {":authority", "path-sanitization.com"},
       },
+#ifdef ENVOY_ENABLE_UHV
+      // UHV normalizes percent encodings to UPPERCASE
+      Http::TestRequestHeaderMapImpl{{":authority", "path-sanitization.com"},
+                                     {":path", "/private/..%2Fpublic%5C"},
+                                     {":method", "GET"},
+                                     {"x-site", "private"}},
+#else
       Http::TestRequestHeaderMapImpl{{":authority", "path-sanitization.com"},
                                      {":path", "/private/..%2Fpublic%5c"},
                                      {":method", "GET"},
                                      {"x-site", "private"}},
+#endif
       Http::TestResponseHeaderMapImpl{
           {"server", "envoy"},
           {"content-length", "0"},
@@ -1187,10 +1267,18 @@ TEST_P(HeaderIntegrationTest, PathWithEscapedSlashesUnmodified) {
           {":scheme", "http"},
           {":authority", "path-sanitization.com"},
       },
+#ifdef ENVOY_ENABLE_UHV
+      // UHV normalizes percent encodings to UPPERCASE
+      Http::TestRequestHeaderMapImpl{{":authority", "path-sanitization.com"},
+                                     {":path", "/private/..%2Fpublic%5C"},
+                                     {":method", "GET"},
+                                     {"x-site", "private"}},
+#else
       Http::TestRequestHeaderMapImpl{{":authority", "path-sanitization.com"},
                                      {":path", "/private/..%2Fpublic%5c"},
                                      {":method", "GET"},
                                      {"x-site", "private"}},
+#endif
       Http::TestResponseHeaderMapImpl{
           {"server", "envoy"},
           {"content-length", "0"},

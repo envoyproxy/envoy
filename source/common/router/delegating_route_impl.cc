@@ -76,6 +76,14 @@ const RetryPolicy& DelegatingRouteEntry::retryPolicy() const {
   return base_route_->routeEntry()->retryPolicy();
 }
 
+const PathMatcherSharedPtr& DelegatingRouteEntry::pathMatcher() const {
+  return base_route_->routeEntry()->pathMatcher();
+}
+
+const PathRewriterSharedPtr& DelegatingRouteEntry::pathRewriter() const {
+  return base_route_->routeEntry()->pathRewriter();
+}
+
 const InternalRedirectPolicy& DelegatingRouteEntry::internalRedirectPolicy() const {
   return base_route_->routeEntry()->internalRedirectPolicy();
 }
@@ -168,7 +176,8 @@ const UpgradeMap& DelegatingRouteEntry::upgradeMap() const {
 }
 
 using ConnectConfig = envoy::config::route::v3::RouteAction::UpgradeConfig::ConnectConfig;
-const absl::optional<ConnectConfig>& DelegatingRouteEntry::connectConfig() const {
+using ConnectConfigOptRef = OptRef<ConnectConfig>;
+const ConnectConfigOptRef DelegatingRouteEntry::connectConfig() const {
   return base_route_->routeEntry()->connectConfig();
 }
 

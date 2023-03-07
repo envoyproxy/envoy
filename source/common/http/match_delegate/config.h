@@ -72,7 +72,7 @@ public:
   void setDecoderFilterCallbacks(Envoy::Http::StreamDecoderFilterCallbacks& callbacks) override;
 
   // Envoy::Http::StreamEncoderFilter
-  Envoy::Http::FilterHeadersStatus
+  Envoy::Http::Filter1xxHeadersStatus
   encode1xxHeaders(Envoy::Http::ResponseHeaderMap& headers) override;
   Envoy::Http::FilterHeadersStatus encodeHeaders(Envoy::Http::ResponseHeaderMap& headers,
                                                  bool end_stream) override;
@@ -102,6 +102,12 @@ private:
       const envoy::extensions::common::matching::v3::ExtensionWithMatcher& proto_config,
       const std::string&, Server::Configuration::FactoryContext& context) override;
 };
+
+DECLARE_FACTORY(MatchDelegateConfig);
+
+namespace Factory {
+DECLARE_FACTORY(SkipActionFactory);
+} // namespace Factory
 
 } // namespace MatchDelegate
 } // namespace Http

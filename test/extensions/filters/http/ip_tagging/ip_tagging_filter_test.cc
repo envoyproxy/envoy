@@ -43,7 +43,8 @@ ip_tags:
   void initializeFilter(const std::string& yaml) {
     envoy::extensions::filters::http::ip_tagging::v3::IPTagging config;
     TestUtility::loadFromYaml(yaml, config);
-    config_ = std::make_shared<IpTaggingFilterConfig>(config, "prefix.", stats_, runtime_);
+    config_ =
+        std::make_shared<IpTaggingFilterConfig>(config, "prefix.", *stats_.rootScope(), runtime_);
     filter_ = std::make_unique<IpTaggingFilter>(config_);
     filter_->setDecoderFilterCallbacks(filter_callbacks_);
   }
@@ -275,12 +276,12 @@ TEST_F(IpTaggingFilterTest, ClearRouteCache) {
   filter_callbacks_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
       remote_address);
 
-  EXPECT_CALL(filter_callbacks_, clearRouteCache());
+  EXPECT_CALL(filter_callbacks_.downstream_callbacks_, clearRouteCache());
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
   EXPECT_EQ("internal_request", request_headers.get_(Http::Headers::get().EnvoyIpTags));
 
   // no tags, no call
-  EXPECT_CALL(filter_callbacks_, clearRouteCache()).Times(0);
+  EXPECT_CALL(filter_callbacks_.downstream_callbacks_, clearRouteCache()).Times(0);
   request_headers = Http::TestRequestHeaderMapImpl{};
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
   EXPECT_FALSE(request_headers.has(Http::Headers::get().EnvoyIpTags));

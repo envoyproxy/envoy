@@ -541,10 +541,11 @@ using HttpStreamPtr = std::unique_ptr<HttpStream>;
 
 namespace {
 
-enum class HttpVersion { Http1, Http2Nghttp2, Http2WrappedNghttp2, Http2Oghttp2 };
+enum class HttpVersion { Http1, Http2Nghttp2, Http2Oghttp2 };
 
 void codecFuzz(const test::common::http::CodecImplFuzzTestCase& input, HttpVersion http_version) {
   Stats::IsolatedStoreImpl stats_store;
+  Stats::Scope& scope = *stats_store.rootScope();
   NiceMock<Network::MockConnection> client_connection;
   const envoy::config::core::v3::Http2ProtocolOptions client_http2_options{
       fromHttp2Settings(input.h2_settings().client())};
@@ -575,29 +576,22 @@ void codecFuzz(const test::common::http::CodecImplFuzzTestCase& input, HttpVersi
     break;
   case HttpVersion::Http2Nghttp2:
     http2 = true;
-    scoped_runtime.mergeValues({{"envoy.reloadable_features.http2_new_codec_wrapper", "false"}});
-    scoped_runtime.mergeValues({{"envoy.reloadable_features.http2_use_oghttp2", "false"}});
-    break;
-  case HttpVersion::Http2WrappedNghttp2:
-    http2 = true;
-    scoped_runtime.mergeValues({{"envoy.reloadable_features.http2_new_codec_wrapper", "true"}});
     scoped_runtime.mergeValues({{"envoy.reloadable_features.http2_use_oghttp2", "false"}});
     break;
   case HttpVersion::Http2Oghttp2:
     http2 = true;
-    scoped_runtime.mergeValues({{"envoy.reloadable_features.http2_new_codec_wrapper", "true"}});
     scoped_runtime.mergeValues({{"envoy.reloadable_features.http2_use_oghttp2", "true"}});
     break;
   }
 
   if (http2) {
     client = std::make_unique<Http2::ClientConnectionImpl>(
-        client_connection, client_callbacks, Http2::CodecStats::atomicGet(http2_stats, stats_store),
+        client_connection, client_callbacks, Http2::CodecStats::atomicGet(http2_stats, scope),
         random, client_http2_options, max_request_headers_kb, max_response_headers_count,
         Http2::ProdNghttp2SessionFactory::get());
   } else {
     client = std::make_unique<Http1::ClientConnectionImpl>(
-        client_connection, Http1::CodecStats::atomicGet(http1_stats, stats_store), client_callbacks,
+        client_connection, Http1::CodecStats::atomicGet(http1_stats, scope), client_callbacks,
         client_http1settings, max_response_headers_count);
   }
 
@@ -605,13 +599,13 @@ void codecFuzz(const test::common::http::CodecImplFuzzTestCase& input, HttpVersi
     const envoy::config::core::v3::Http2ProtocolOptions server_http2_options{
         fromHttp2Settings(input.h2_settings().server())};
     server = std::make_unique<Http2::ServerConnectionImpl>(
-        server_connection, server_callbacks, Http2::CodecStats::atomicGet(http2_stats, stats_store),
+        server_connection, server_callbacks, Http2::CodecStats::atomicGet(http2_stats, scope),
         random, server_http2_options, max_request_headers_kb, max_request_headers_count,
         headers_with_underscores_action);
   } else {
     const Http1Settings server_http1settings{fromHttp1Settings(input.h1_settings().server())};
     server = std::make_unique<Http1::ServerConnectionImpl>(
-        server_connection, Http1::CodecStats::atomicGet(http1_stats, stats_store), server_callbacks,
+        server_connection, Http1::CodecStats::atomicGet(http1_stats, scope), server_callbacks,
         server_http1settings, max_request_headers_kb, max_request_headers_count,
         headers_with_underscores_action);
   }
@@ -791,10 +785,6 @@ void codecFuzzHttp2Nghttp2(const test::common::http::CodecImplFuzzTestCase& inpu
   codecFuzz(input, HttpVersion::Http2Nghttp2);
 }
 
-void codecFuzzHttp2WrappedNghttp2(const test::common::http::CodecImplFuzzTestCase& input) {
-  codecFuzz(input, HttpVersion::Http2WrappedNghttp2);
-}
-
 void codecFuzzHttp2Oghttp2(const test::common::http::CodecImplFuzzTestCase& input) {
   codecFuzz(input, HttpVersion::Http2Oghttp2);
 }
@@ -814,7 +804,6 @@ DEFINE_PROTO_FUZZER(const test::common::http::CodecImplFuzzTestCase& input) {
     // We wrap the calls to *codecFuzz* through these functions in order for
     // the codec name to explicitly be in any stacktrace.
     codecFuzzHttp2Nghttp2(input);
-    codecFuzzHttp2WrappedNghttp2(input);
     // Prevent oghttp2 from aborting the program.
     // If when disabling the FATAL log abort the fuzzer will create a test that reaches an
     // inconsistent state (and crashes/accesses inconsistent memory), then it will be a bug we'll

@@ -75,7 +75,7 @@ ConfigConstSharedPtr StaticRouteConfigProviderImpl::configCast() const {
 // TODO(htuch): If support for multiple clusters is added per #1170 cluster_name_
 RdsRouteConfigSubscription::RdsRouteConfigSubscription(
     RouteConfigUpdatePtr&& config_update,
-    std::unique_ptr<Envoy::Config::OpaqueResourceDecoder>&& resource_decoder,
+    Envoy::Config::OpaqueResourceDecoderSharedPtr&& resource_decoder,
     const envoy::extensions::filters::network::http_connection_manager::v3::Rds& rds,
     const uint64_t manager_identifier, Server::Configuration::ServerFactoryContext& factory_context,
     const std::string& stat_prefix, Rds::RouteConfigProviderManager& route_config_provider_manager)
@@ -98,8 +98,8 @@ void RdsRouteConfigSubscription::beforeProviderUpdate(
     ASSERT(config_update_info_->configInfo().has_value());
     maybeCreateInitManager(routeConfigUpdate()->configInfo().value().version_, noop_init_manager,
                            resume_rds);
-    vhds_subscription_ = std::make_unique<VhdsSubscription>(
-        config_update_info_, factory_context_, stat_prefix_, route_config_provider_opt_);
+    vhds_subscription_ = std::make_unique<VhdsSubscription>(config_update_info_, factory_context_,
+                                                            stat_prefix_, route_config_provider_);
     vhds_subscription_->registerInitTargetWithInitManager(
         noop_init_manager == nullptr ? local_init_manager_ : *noop_init_manager);
   }
@@ -150,7 +150,7 @@ RdsRouteConfigProviderImpl::RdsRouteConfigProviderImpl(
   // The subscription referenced by the 'base_' and by 'this' is the same.
   // In it the provider is already set by the 'base_' so it points to that.
   // Need to set again to point to 'this'.
-  base_.subscription().routeConfigProvider().emplace(this);
+  base_.subscription().routeConfigProvider() = this;
 }
 
 RdsRouteConfigSubscription& RdsRouteConfigProviderImpl::subscription() {
@@ -219,7 +219,7 @@ void RdsRouteConfigProviderImpl::requestVirtualHostsUpdate(
   });
 }
 
-RouteConfigProviderManagerImpl::RouteConfigProviderManagerImpl(Server::Admin& admin)
+RouteConfigProviderManagerImpl::RouteConfigProviderManagerImpl(OptRef<Server::Admin> admin)
     : manager_(admin, "routes", proto_traits_) {}
 
 Router::RouteConfigProviderSharedPtr RouteConfigProviderManagerImpl::createRdsRouteConfigProvider(
@@ -233,7 +233,7 @@ Router::RouteConfigProviderSharedPtr RouteConfigProviderManagerImpl::createRdsRo
        this](uint64_t manager_identifier) {
         auto config_update = std::make_unique<RouteConfigUpdateReceiverImpl>(
             proto_traits_, factory_context, optional_http_filters);
-        auto resource_decoder = std::make_unique<
+        auto resource_decoder = std::make_shared<
             Envoy::Config::OpaqueResourceDecoderImpl<envoy::config::route::v3::RouteConfiguration>>(
             factory_context.messageValidationContext().dynamicValidationVisitor(), "name");
         auto subscription = std::make_shared<RdsRouteConfigSubscription>(

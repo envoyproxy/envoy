@@ -214,8 +214,8 @@ Http::FilterTrailersStatus FileSystemBufferFilter::decodeTrailers(Http::RequestT
   return receiveTrailers(request_state_.config_->behavior(), request_state_);
 }
 
-Http::FilterHeadersStatus FileSystemBufferFilter::encode1xxHeaders(Http::ResponseHeaderMap&) {
-  return Http::FilterHeadersStatus::Continue;
+Http::Filter1xxHeadersStatus FileSystemBufferFilter::encode1xxHeaders(Http::ResponseHeaderMap&) {
+  return Http::Filter1xxHeadersStatus::Continue;
 }
 
 Http::FilterMetadataStatus FileSystemBufferFilter::encodeMetadata(Http::MetadataMap&) {
@@ -399,9 +399,10 @@ bool FileSystemBufferFilter::maybeStorage(BufferedStreamState& state,
       // We can't use getSafeDispatcher here because we need to close the file if the filter
       // was deleted before the callback, not just do nothing.
       cancel_in_flight_async_action_ = config_->asyncFileManager().createAnonymousFile(
-          config_->storageBufferPath(), [this, me = std::weak_ptr(shared_from_this()),
-                                         dispatcher = &request_callbacks_->dispatcher(),
-                                         &state](absl::StatusOr<AsyncFileHandle> file_handle) {
+          config_->storageBufferPath(),
+          [this, me = std::weak_ptr<FileSystemBufferFilter>(shared_from_this()),
+           dispatcher = &request_callbacks_->dispatcher(),
+           &state](absl::StatusOr<AsyncFileHandle> file_handle) {
             dispatcher->post([this, me = std::move(me), &state, file_handle]() {
               if (!me.lock()) {
                 // If we opened a file but the filter went away in the meantime, close the file

@@ -151,6 +151,16 @@ public:
 using LoadBalancerPtr = std::unique_ptr<LoadBalancer>;
 
 /**
+ * Necessary parameters for creating a worker local load balancer.
+ */
+struct LoadBalancerParams {
+  // The worker local priority set of the target cluster.
+  const PrioritySet& priority_set;
+  // The worker local priority set of the local cluster.
+  const PrioritySet* local_priority_set{};
+};
+
+/**
  * Factory for load balancers.
  */
 class LoadBalancerFactory {
@@ -158,9 +168,15 @@ public:
   virtual ~LoadBalancerFactory() = default;
 
   /**
-   * @return LoadBalancerPtr a new load balancer.
+   * @return LoadBalancerPtr a new worker local load balancer.
+   * TODO(wbpcode): remove this method in the future and used the new method below.
    */
   virtual LoadBalancerPtr create() PURE;
+
+  /**
+   * @return LoadBalancerPtr a new worker local load balancer.
+   */
+  virtual LoadBalancerPtr create(LoadBalancerParams params) PURE;
 };
 
 using LoadBalancerFactorySharedPtr = std::shared_ptr<LoadBalancerFactory>;
@@ -213,24 +229,29 @@ public:
 using ThreadAwareLoadBalancerPtr = std::unique_ptr<ThreadAwareLoadBalancer>;
 
 /**
- * Factory for (thread-aware) load balancers. To support a load balancing policy of
+ * Factory config for load balancers. To support a load balancing policy of
  * LOAD_BALANCING_POLICY_CONFIG, at least one load balancer factory corresponding to a policy in
  * load_balancing_policy must be registered with Envoy. Envoy will use the first policy for which
  * it has a registered factory.
  */
-class TypedLoadBalancerFactory : public Config::UntypedFactory {
+class TypedLoadBalancerFactory : public Config::TypedFactory {
 public:
   ~TypedLoadBalancerFactory() override = default;
 
   /**
    * @return ThreadAwareLoadBalancerPtr a new thread-aware load balancer.
+   *
+   * @param cluster_info supplies the cluster info.
+   * @param priority_set supplies the priority set.
+   * @param runtime supplies the runtime loader.
+   * @param random supplies the random generator.
+   * @param time_source supplies the time source.
    */
   virtual ThreadAwareLoadBalancerPtr
-  create(const PrioritySet& priority_set, ClusterStats& stats, Stats::Scope& stats_scope,
-         Runtime::Loader& runtime, Random::RandomGenerator& random,
-         const ::envoy::config::cluster::v3::LoadBalancingPolicy_Policy& lb_policy) PURE;
+  create(const ClusterInfo& cluster_info, const PrioritySet& priority_set, Runtime::Loader& runtime,
+         Random::RandomGenerator& random, TimeSource& time_source) PURE;
 
-  std::string category() const override { return "envoy.load_balancers"; }
+  std::string category() const override { return "envoy.load_balancing_policies"; }
 };
 
 } // namespace Upstream

@@ -17,9 +17,9 @@ namespace EnvoyDefault {
  */
 class HeaderValidatorFactoryConfig : public ::Envoy::Http::HeaderValidatorFactoryConfig {
 public:
-  ::Envoy::Http::HeaderValidatorFactorySharedPtr
+  ::Envoy::Http::HeaderValidatorFactoryPtr
   createFromProto(const Protobuf::Message& config,
-                  Server::Configuration::FactoryContext& context) override;
+                  ProtobufMessage::ValidationVisitor& validation_visitor) override;
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override;
 

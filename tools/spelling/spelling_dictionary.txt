@@ -6,6 +6,7 @@ ABI
 ACK
 ACL
 AES
+AllMuxes
 ALPN
 ALS
 AMZ
@@ -28,21 +29,31 @@ BSON
 BPF
 Bdecoded
 Bencoded
+DFP
 GiB
+IPTOS
 Repick
+SION
 TRA
+abc
+abcd
+abd
+ar
 btree
 CAS
 CB
+cartid
 cbor
 CDN
 CDS
 CEL
 CWND
 DLE
+DPE
 DSR
 DSS
 EBADF
+ECH
 ENDIF
 ENOTCONN
 ENQ
@@ -52,8 +63,10 @@ ESC
 ETB
 ETX
 FS
+FIXME
 HEXDIG
 HEXDIGIT
+HPE
 LRU
 NAK
 OWS
@@ -148,11 +161,17 @@ FIPS
 FIRSTHDR
 FQDN
 FREEBIND
+freeifaddrs
 FUZZER
 FUZZERS
+delims
 dereferencing
 differentially
 dnsresolvers
+endpos
+fo
+ghi
+golang
 guarddog
 GC
 GCC
@@ -186,6 +205,7 @@ IAM
 IANA
 IDL
 IETF
+IFADDRS
 INADDR
 INET
 INVAL
@@ -219,6 +239,11 @@ LEDS
 LEV
 LF
 LHS
+hls
+ingressed
+integrations
+jkl
+lang
 libsxg
 LLVM
 LPT
@@ -262,11 +287,14 @@ Oauth
 OCSP
 OD
 ODCDS
+middlewildcard
+mpd
 oghttp
 OID
 OK
 OOM
 OOMs
+ORCA
 OS
 OSI
 OSS
@@ -346,6 +374,7 @@ SIGINT
 SIGPIPE
 SIGSEGV
 SIGTERM
+SIMD
 SIO
 SMTP
 SNI
@@ -560,6 +589,7 @@ codebase
 codec
 codecs
 codepath
+codepoints
 codings
 combinatorial
 comparator
@@ -631,6 +661,7 @@ deserialize
 deserialized
 deserializer
 deserializers
+deserializes
 deserializing
 dest
 destructor
@@ -783,6 +814,8 @@ initializers
 inlined
 inlining
 inobservability
+inode
+inodes
 inotify
 inserter
 instantiation
@@ -806,6 +839,7 @@ iteratively
 javascript
 jitter
 jittered
+js
 kafka
 keepalive
 keepalives
@@ -913,6 +947,9 @@ negative
 netblock
 netblocks
 netfilter
+netlink
+netmask
+NLMSG
 nonblocking
 noncopyable
 nonresponsive
@@ -934,6 +971,7 @@ ocagent
 offsetof
 oneof
 oneway
+oob
 opcode
 opencensus
 openssl
@@ -965,10 +1003,12 @@ parsers
 passphrase
 passthrough
 pathname
+patt
 pausable
 pausedness
 pcall
 pcap
+pchar
 pclose
 performant
 pfctl
@@ -1037,6 +1077,7 @@ qdtext
 qps
 quantile
 quantiles
+querydetails
 quiesce
 quitquitquit
 qvalue
@@ -1104,11 +1145,13 @@ responder
 restarter
 resync
 ret
+retransmitted
 retransmitting
 retriable
 retriggers
 revalidated
 revalidation
+reverify
 rfield
 rmdir
 rocketmq
@@ -1174,6 +1217,7 @@ srtt
 ssize
 stackdriver
 stacktrace
+startpos
 starttls
 startup
 stateful
@@ -1196,6 +1240,7 @@ struct
 structs
 subclassed
 subclasses
+subcomponent
 subdirectories
 subdirectory
 subdirs
@@ -1220,6 +1265,7 @@ subtrees
 subtype
 subtypes
 subzone
+suf
 superclass
 superset
 svc
@@ -1304,6 +1350,7 @@ upcasts
 upstreams
 uptime
 upvalue
+urlencoded
 urls
 userdata
 userinfo
@@ -1311,6 +1358,7 @@ username
 usr
 util
 utils
+va
 valgrind
 validator
 validators
@@ -1320,6 +1368,7 @@ variadic
 varint
 vec
 vectorize
+ver
 verifier
 verifiers
 versa
@@ -1330,6 +1379,8 @@ vip
 virtualhost
 virtualize
 vptr
+vtable
+vtt
 wakeup
 wakeups
 wamr
@@ -1344,6 +1395,7 @@ winsock
 workspace
 writev
 wrsq
+www
 xDS
 xDSes
 xdstp
@@ -1354,6 +1406,8 @@ xid
 xmodem
 xxhash
 xxs
+xyz
+xyzwebservices
 zag
 zig
 zipkin
@@ -1378,3 +1432,4 @@ NSS
 SSLKEYLOGFILE
 DLB
 PCIE
+EDNS

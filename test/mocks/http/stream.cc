@@ -7,7 +7,7 @@ using testing::ReturnRef;
 namespace Envoy {
 namespace Http {
 
-MockStream::MockStream() {
+MockStream::MockStream() : connection_info_provider_(nullptr, nullptr) {
   ON_CALL(*this, addCallbacks(_)).WillByDefault(Invoke([this](StreamCallbacks& callbacks) -> void {
     callbacks_.push_back(&callbacks);
   }));
@@ -31,7 +31,7 @@ MockStream::MockStream() {
     }
   }));
 
-  ON_CALL(*this, connectionLocalAddress()).WillByDefault(ReturnRef(connection_local_address_));
+  ON_CALL(*this, connectionInfoProvider()).WillByDefault(ReturnRef(connection_info_provider_));
 
   ON_CALL(*this, setAccount(_))
       .WillByDefault(Invoke(

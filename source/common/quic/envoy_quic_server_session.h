@@ -3,8 +3,8 @@
 #include <memory>
 #include <ostream>
 
-#include "source/common/quic/envoy_quic_crypto_stream_factory.h"
 #include "source/common/quic/envoy_quic_server_connection.h"
+#include "source/common/quic/envoy_quic_server_crypto_stream_factory.h"
 #include "source/common/quic/envoy_quic_server_stream.h"
 #include "source/common/quic/quic_filter_manager_connection_impl.h"
 #include "source/common/quic/quic_stat_names.h"
@@ -16,6 +16,14 @@
 
 namespace Envoy {
 namespace Quic {
+
+#define QUIC_CONNECTION_STATS(COUNTER)                                                             \
+  COUNTER(num_server_migration_detected)                                                           \
+  COUNTER(num_packets_rx_on_preferred_address)
+
+struct QuicConnectionStats {
+  QUIC_CONNECTION_STATS(GENERATE_COUNTER_STRUCT)
+};
 
 using FilterChainToConnectionMap =
     absl::flat_hash_map<const Network::FilterChain*,
@@ -43,16 +51,15 @@ struct ConnectionMapPosition {
 class EnvoyQuicServerSession : public quic::QuicServerSessionBase,
                                public QuicFilterManagerConnectionImpl {
 public:
-  EnvoyQuicServerSession(const quic::QuicConfig& config,
-                         const quic::ParsedQuicVersionVector& supported_versions,
-                         std::unique_ptr<EnvoyQuicServerConnection> connection,
-                         quic::QuicSession::Visitor* visitor,
-                         quic::QuicCryptoServerStreamBase::Helper* helper,
-                         const quic::QuicCryptoServerConfig* crypto_config,
-                         quic::QuicCompressedCertsCache* compressed_certs_cache,
-                         Event::Dispatcher& dispatcher, uint32_t send_buffer_limit,
-                         QuicStatNames& quic_stat_names, Stats::Scope& listener_scope,
-                         EnvoyQuicCryptoServerStreamFactoryInterface& crypto_server_stream_factory);
+  EnvoyQuicServerSession(
+      const quic::QuicConfig& config, const quic::ParsedQuicVersionVector& supported_versions,
+      std::unique_ptr<EnvoyQuicServerConnection> connection, quic::QuicSession::Visitor* visitor,
+      quic::QuicCryptoServerStreamBase::Helper* helper,
+      const quic::QuicCryptoServerConfig* crypto_config,
+      quic::QuicCompressedCertsCache* compressed_certs_cache, Event::Dispatcher& dispatcher,
+      uint32_t send_buffer_limit, QuicStatNames& quic_stat_names, Stats::Scope& listener_scope,
+      EnvoyQuicCryptoServerStreamFactoryInterface& crypto_server_stream_factory,
+      std::unique_ptr<StreamInfo::StreamInfo>&& stream_info, QuicConnectionStats& connection_stats);
 
   ~EnvoyQuicServerSession() override;
 
@@ -76,6 +83,9 @@ public:
   void MaybeSendRstStreamFrame(quic::QuicStreamId id, quic::QuicResetStreamError error,
                                quic::QuicStreamOffset bytes_written) override;
   void OnRstStream(const quic::QuicRstStreamFrame& frame) override;
+  void ProcessUdpPacket(const quic::QuicSocketAddress& self_address,
+                        const quic::QuicSocketAddress& peer_address,
+                        const quic::QuicReceivedPacket& packet) override;
 
   void setHeadersWithUnderscoreAction(
       envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
@@ -127,6 +137,7 @@ private:
 
   EnvoyQuicCryptoServerStreamFactoryInterface& crypto_server_stream_factory_;
   absl::optional<ConnectionMapPosition> position_;
+  QuicConnectionStats& connection_stats_;
 };
 
 } // namespace Quic

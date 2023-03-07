@@ -20,6 +20,7 @@
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/ssl/mocks.h"
+#include "test/mocks/stream_info/mocks.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
@@ -50,9 +51,12 @@ public:
                               const Http::RequestHeaderMap& request_headers) {
           return real_->setInResponse(response_headers, request_headers);
         });
-    ON_CALL(*this, toInteger(_))
+    ON_CALL(*this, get(_)).WillByDefault([this](const Http::RequestHeaderMap& request_headers) {
+      return real_->get(request_headers);
+    });
+    ON_CALL(*this, getInteger(_))
         .WillByDefault([this](const Http::RequestHeaderMap& request_headers) {
-          return real_->toInteger(request_headers);
+          return real_->getInteger(request_headers);
         });
     ON_CALL(*this, getTraceReason(_))
         .WillByDefault([this](const Http::RequestHeaderMap& request_headers) {
@@ -68,7 +72,8 @@ public:
 
   MOCK_METHOD(void, set, (Http::RequestHeaderMap&, bool));
   MOCK_METHOD(void, setInResponse, (Http::ResponseHeaderMap&, const Http::RequestHeaderMap&));
-  MOCK_METHOD(absl::optional<uint64_t>, toInteger, (const Http::RequestHeaderMap&), (const));
+  MOCK_METHOD(absl::optional<absl::string_view>, get, (const Http::RequestHeaderMap&), (const));
+  MOCK_METHOD(absl::optional<uint64_t>, getInteger, (const Http::RequestHeaderMap&), (const));
   MOCK_METHOD(Tracing::Reason, getTraceReason, (const Http::RequestHeaderMap&));
   MOCK_METHOD(void, setTraceReason, (Http::RequestHeaderMap&, Tracing::Reason));
   MOCK_METHOD(bool, useRequestIdForTraceSampling, (), (const));
@@ -139,8 +144,9 @@ public:
   // the request is internal/external, given the importance of these two pieces of data.
   MutateRequestRet callMutateRequestHeaders(RequestHeaderMap& headers, Protocol) {
     MutateRequestRet ret;
+    NiceMock<StreamInfo::MockStreamInfo> mock_stream_info;
     const auto result = ConnectionManagerUtility::mutateRequestHeaders(
-        headers, connection_, config_, route_config_, local_info_);
+        headers, connection_, config_, route_config_, local_info_, mock_stream_info);
     ret.downstream_address_ = result.final_remote_address->asString();
     ret.reject_request_ = result.reject_request;
     ret.trace_reason_ =
@@ -239,9 +245,6 @@ TEST_F(ConnectionManagerUtilityTest, UseRemoteAddressWhenNotLocalHostRemoteAddre
 }
 
 TEST_F(ConnectionManagerUtilityTest, RemoveRefererIfUrlInvalid) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.sanitize_http_header_referer", "true"}});
-
   connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
       std::make_shared<Network::Address::Ipv4Instance>("10.0.0.1"));
   ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
@@ -252,9 +255,6 @@ TEST_F(ConnectionManagerUtilityTest, RemoveRefererIfUrlInvalid) {
 }
 
 TEST_F(ConnectionManagerUtilityTest, RemoveRefererIfMultipleEntriesAreFound) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.sanitize_http_header_referer", "true"}});
-
   connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
       std::make_shared<Network::Address::Ipv4Instance>("10.0.0.1"));
   ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
@@ -266,9 +266,6 @@ TEST_F(ConnectionManagerUtilityTest, RemoveRefererIfMultipleEntriesAreFound) {
 }
 
 TEST_F(ConnectionManagerUtilityTest, ValidRefererPassesSanitization) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.sanitize_http_header_referer", "true"}});
-
   connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
       std::make_shared<Network::Address::Ipv4Instance>("10.0.0.1"));
   ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
@@ -276,6 +273,17 @@ TEST_F(ConnectionManagerUtilityTest, ValidRefererPassesSanitization) {
   EXPECT_EQ((MutateRequestRet{"10.0.0.1:0", true, Tracing::Reason::NotTraceable}),
             callMutateRequestHeaders(headers, Protocol::Http2));
   EXPECT_EQ("https://example.com/",
+            headers.get(Http::CustomHeaders::get().Referer)[0]->value().getStringView());
+}
+
+TEST_F(ConnectionManagerUtilityTest, AlphaNumCharRefererPassesSanitization) {
+  connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
+      std::make_shared<Network::Address::Ipv4Instance>("10.0.0.1"));
+  ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
+  TestRequestHeaderMapImpl headers{{"referer", "android-app+1.0://example.com/"}};
+  EXPECT_EQ((MutateRequestRet{"10.0.0.1:0", true, Tracing::Reason::NotTraceable}),
+            callMutateRequestHeaders(headers, Protocol::Http2));
+  EXPECT_EQ("android-app+1.0://example.com/",
             headers.get(Http::CustomHeaders::get().Referer)[0]->value().getStringView());
 }
 
@@ -846,6 +854,8 @@ TEST_F(ConnectionManagerUtilityTest, DoNotRemoveConnectionUpgradeForWebSocketReq
             callMutateRequestHeaders(headers, Protocol::Http11));
   EXPECT_EQ("upgrade", headers.get_("connection"));
   EXPECT_EQ("websocket", headers.get_("upgrade"));
+  // Content-Length header should not be added
+  EXPECT_FALSE(headers.has("content-length"));
 }
 
 // Make sure we do remove connection headers for non-WS requests.
@@ -2035,6 +2045,83 @@ TEST_F(ConnectionManagerUtilityTest, KeepFragmentFromPathWithBothOverrides) {
   EXPECT_EQ(ConnectionManagerUtility::NormalizePathAction::Continue,
             ConnectionManagerUtility::maybeNormalizePath(header_map_with_fragment2, config_));
   EXPECT_EQ(header_map_with_fragment2.getPathValue(), "/baz/%23fragment");
+}
+
+// Verify when append_x_forwarded_port is turned on, the x-forwarded-port header should be appended.
+TEST_F(ConnectionManagerUtilityTest, AppendXForwardedPort) {
+  ON_CALL(config_, appendXForwardedPort()).WillByDefault(Return(true));
+  connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(
+      std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 8080));
+  TestRequestHeaderMapImpl headers;
+
+  callMutateRequestHeaders(headers, Protocol::Http2);
+  EXPECT_EQ("8080", headers.getForwardedPortValue());
+}
+
+// Verify when append_x_forwarded_port is not turned on, the x-forwarded-port header should not be
+// appended.
+TEST_F(ConnectionManagerUtilityTest, DoNotAppendXForwardedPort) {
+  ON_CALL(config_, appendXForwardedPort()).WillByDefault(Return(false));
+  connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(
+      std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 8080));
+  TestRequestHeaderMapImpl headers;
+
+  callMutateRequestHeaders(headers, Protocol::Http2);
+  EXPECT_EQ("", headers.getForwardedPortValue());
+}
+
+// Verify when the x-forwarded-port header has been set, the x-forwarded-port header should not be
+// appended.
+TEST_F(ConnectionManagerUtilityTest, IgnoreAppendingXForwardedPortIfHasBeenSet) {
+  ON_CALL(config_, appendXForwardedPort()).WillByDefault(Return(true));
+  connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(
+      std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 8080));
+  TestRequestHeaderMapImpl headers{{"x-forwarded-port", "8081"}};
+
+  callMutateRequestHeaders(headers, Protocol::Http2);
+  EXPECT_EQ("8081", headers.getForwardedPortValue());
+}
+
+// Verify when append_x_forwarded_port is turned on, the x-forwarded-port header from trusted hop
+// will be preserved.
+TEST_F(ConnectionManagerUtilityTest, PreserveXForwardedPortFromTrustedHop) {
+  ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
+  ON_CALL(config_, xffNumTrustedHops()).WillByDefault(Return(1));
+  ON_CALL(config_, appendXForwardedPort()).WillByDefault(Return(true));
+  connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(
+      std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 8080));
+  TestRequestHeaderMapImpl headers{{"x-forwarded-port", "80"}};
+
+  callMutateRequestHeaders(headers, Protocol::Http2);
+  EXPECT_EQ("80", headers.getForwardedPortValue());
+}
+
+// Verify when append_x_forwarded_port is turned on, the x-forwarded-port header from untrusted hop
+// will be overwritten.
+TEST_F(ConnectionManagerUtilityTest, OverwriteXForwardedPortFromUntrustedHop) {
+  ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
+  ON_CALL(config_, xffNumTrustedHops()).WillByDefault(Return(0));
+  ON_CALL(config_, appendXForwardedPort()).WillByDefault(Return(true));
+  connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(
+      std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 8080));
+  TestRequestHeaderMapImpl headers{{"x-forwarded-port", "80"}};
+
+  callMutateRequestHeaders(headers, Protocol::Http2);
+  EXPECT_EQ("8080", headers.getForwardedPortValue());
+}
+
+// Verify when append_x_forwarded_port is not turned on, the x-forwarded-port header from untrusted
+// hop will not be overwritten.
+TEST_F(ConnectionManagerUtilityTest, DoNotOverwriteXForwardedPortFromUntrustedHop) {
+  ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
+  ON_CALL(config_, xffNumTrustedHops()).WillByDefault(Return(0));
+  ON_CALL(config_, appendXForwardedPort()).WillByDefault(Return(false));
+  connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(
+      std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 8080));
+  TestRequestHeaderMapImpl headers{{"x-forwarded-port", "80"}};
+
+  callMutateRequestHeaders(headers, Protocol::Http2);
+  EXPECT_EQ("80", headers.getForwardedPortValue());
 }
 
 } // namespace Http

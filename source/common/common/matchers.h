@@ -6,6 +6,7 @@
 #include "envoy/common/matchers.h"
 #include "envoy/common/regex.h"
 #include "envoy/config/core/v3/base.pb.h"
+#include "envoy/type/matcher/v3/filter_state.pb.h"
 #include "envoy/type/matcher/v3/metadata.pb.h"
 #include "envoy/type/matcher/v3/number.pb.h"
 #include "envoy/type/matcher/v3/path.pb.h"
@@ -189,6 +190,22 @@ private:
   ValueMatcherConstSharedPtr value_matcher_;
 };
 
+class FilterStateMatcher {
+public:
+  FilterStateMatcher(const envoy::type::matcher::v3::FilterStateMatcher& matcher);
+
+  /**
+   * Check whether the filter state object is matched to the matcher.
+   * @param filter state to check.
+   * @return true if it's matched otherwise false.
+   */
+  bool match(const StreamInfo::FilterState& filter_state) const;
+
+private:
+  const std::string key_;
+  const StringMatcherPtr value_matcher_;
+};
+
 class PathMatcher : public StringMatcher {
 public:
   PathMatcher(const envoy::type::matcher::v3::PathMatcher& path) : matcher_(path.path()) {}
@@ -201,6 +218,9 @@ public:
   createSafeRegex(const envoy::type::matcher::v3::RegexMatcher& regex_matcher);
 
   bool match(const absl::string_view path) const override;
+  const StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>& matcher() const {
+    return matcher_;
+  }
 
 private:
   const StringMatcherImpl<envoy::type::matcher::v3::StringMatcher> matcher_;

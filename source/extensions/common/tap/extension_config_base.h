@@ -25,7 +25,7 @@ public:
 
 protected:
   ExtensionConfigBase(const envoy::extensions::common::tap::v3::CommonExtensionConfig proto_config,
-                      TapConfigFactoryPtr&& config_factory, Server::Admin& admin,
+                      TapConfigFactoryPtr&& config_factory, OptRef<Server::Admin> admin,
                       Singleton::Manager& singleton_manager, ThreadLocal::SlotAllocator& tls,
                       Event::Dispatcher& main_thread_dispatcher);
   ~ExtensionConfigBase() override;

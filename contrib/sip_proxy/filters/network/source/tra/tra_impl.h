@@ -1,10 +1,5 @@
 #pragma once
 
-#include <chrono>
-#include <cstdint>
-#include <string>
-#include <vector>
-
 #include "envoy/config/core/v3/grpc_service.pb.h"
 #include "envoy/grpc/async_client.h"
 #include "envoy/grpc/async_client_manager.h"
@@ -93,6 +88,12 @@ public:
     UNREFERENCED_PARAMETER(status);
     UNREFERENCED_PARAMETER(message);
   };
+
+private:
+  void sendRequest(
+      const std::string& method,
+      envoy::extensions::filters::network::sip_proxy::tra::v3alpha::TraServiceRequest& request,
+      Tracing::Span& parent_span, const StreamInfo::StreamInfo& stream_info);
 
 private:
   class AsyncRequestCallbacks

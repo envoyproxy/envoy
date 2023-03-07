@@ -21,7 +21,6 @@ using testing::Invoke;
 using testing::InvokeWithoutArgs;
 using testing::NiceMock;
 using testing::Return;
-using testing::Throw;
 
 namespace Envoy {
 namespace Server {
@@ -83,7 +82,7 @@ TEST_F(WorkerImplTest, BasicFlow) {
 
   NiceMock<Stats::MockStore> store;
   worker_.start(guard_dog_, emptyCallback);
-  worker_.initializeStats(store);
+  worker_.initializeStats(*store.rootScope());
   ci.waitReady();
 
   // After a worker is started adding/stopping/removing a listener happens on the worker thread.

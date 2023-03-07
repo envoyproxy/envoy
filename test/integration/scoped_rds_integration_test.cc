@@ -181,7 +181,7 @@ INSTANTIATE_TEST_SUITE_P(IpVersionsAndGrpcTypes, ScopedRdsIntegrationTest,
 // Test that a SRDS DiscoveryResponse is successfully processed.
 
 TEST_P(ScopedRdsIntegrationTest, BasicSuccess) {
-  const std::string scope_tmpl = R"EOF(
+  constexpr absl::string_view scope_tmpl = R"EOF(
 name: {}
 route_configuration_name: {}
 key:
@@ -191,7 +191,7 @@ key:
   const std::string scope_route1 = fmt::format(scope_tmpl, "foo_scope1", "foo_route1", "foo-route");
   const std::string scope_route2 = fmt::format(scope_tmpl, "foo_scope2", "foo_route1", "bar-route");
 
-  const std::string route_config_tmpl = R"EOF(
+  constexpr absl::string_view route_config_tmpl = R"EOF(
       name: {}
       virtual_hosts:
       - name: integration
@@ -366,7 +366,7 @@ key:
   sendSrdsResponse({scope_route2}, {scope_route2}, {}, "1");
   test_server_->waitForCounterGe("http.config_test.rds.foo_route1.update_attempt", 1);
   createRdsStream("foo_route1");
-  const std::string route_config_tmpl = R"EOF(
+  constexpr absl::string_view route_config_tmpl = R"EOF(
       name: {}
       virtual_hosts:
       - name: integration
@@ -389,7 +389,7 @@ key:
 }
 
 TEST_P(ScopedRdsIntegrationTest, RejectUnknownHttpFilterInPerFilterTypedConfig) {
-  const std::string scope_tmpl = R"EOF(
+  constexpr absl::string_view scope_tmpl = R"EOF(
 name: {}
 route_configuration_name: {}
 key:
@@ -398,7 +398,7 @@ key:
 )EOF";
   const std::string scope_route = fmt::format(scope_tmpl, "foo_scope1", "foo_route", "foo-route");
 
-  const std::string route_config_tmpl = R"EOF(
+  constexpr absl::string_view route_config_tmpl = R"EOF(
       name: {}
       virtual_hosts:
       - name: integration
@@ -435,7 +435,7 @@ key:
 }
 
 TEST_P(ScopedRdsIntegrationTest, IgnoreUnknownOptionalHttpFilterInPerFilterTypedConfig) {
-  const std::string scope_tmpl = R"EOF(
+  constexpr absl::string_view scope_tmpl = R"EOF(
 name: {}
 route_configuration_name: {}
 key:
@@ -444,7 +444,7 @@ key:
 )EOF";
   const std::string scope_route = fmt::format(scope_tmpl, "foo_scope1", "foo_route", "foo-route");
 
-  const std::string route_config_tmpl = R"EOF(
+  constexpr absl::string_view route_config_tmpl = R"EOF(
       name: {}
       virtual_hosts:
       - name: integration
@@ -533,7 +533,7 @@ key:
   fragments:
     - string_key: foo
 )EOF";
-  const std::string route_config_tmpl = R"EOF(
+  constexpr absl::string_view route_config_tmpl = R"EOF(
       name: {}
       virtual_hosts:
       - name: integration

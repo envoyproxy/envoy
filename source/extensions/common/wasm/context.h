@@ -109,7 +109,7 @@ class Context : public proxy_wasm::ContextBase,
                 public Http::StreamFilter,
                 public Network::ConnectionCallbacks,
                 public Network::Filter,
-                public google::api::expr::runtime::BaseActivation,
+                public Filters::Common::Expr::StreamActivation,
                 public std::enable_shared_from_this<Context> {
 public:
   Context();                                          // Testing.
@@ -185,7 +185,7 @@ public:
   void setDecoderFilterCallbacks(Envoy::Http::StreamDecoderFilterCallbacks& callbacks) override;
 
   // Http::StreamEncoderFilter
-  Http::FilterHeadersStatus encode1xxHeaders(Http::ResponseHeaderMap&) override;
+  Http::Filter1xxHeadersStatus encode1xxHeaders(Http::ResponseHeaderMap&) override;
   Http::FilterHeadersStatus encodeHeaders(Http::ResponseHeaderMap& headers,
                                           bool end_stream) override;
   Http::FilterDataStatus encodeData(::Envoy::Buffer::Instance& data, bool end_stream) override;
@@ -218,7 +218,7 @@ public:
                                std::string_view details) override;
   void clearRouteCache() override {
     if (decoder_callbacks_) {
-      decoder_callbacks_->clearRouteCache();
+      decoder_callbacks_->downstreamCallbacks()->clearRouteCache();
     }
   }
 
@@ -272,25 +272,10 @@ public:
   void onStatsUpdate(Envoy::Stats::MetricSnapshot& snapshot);
 
   // CEL evaluation
-  std::vector<const google::api::expr::runtime::CelFunction*>
-  FindFunctionOverloads(absl::string_view) const override {
-    return {};
-  }
   absl::optional<google::api::expr::runtime::CelValue>
   findValue(absl::string_view name, Protobuf::Arena* arena, bool last) const;
   absl::optional<google::api::expr::runtime::CelValue>
-  FindValue(absl::string_view name, Protobuf::Arena* arena) const override {
-    return findValue(name, arena, false);
-  }
-  bool IsPathUnknown(absl::string_view) const override { return false; }
-  const std::vector<google::api::expr::runtime::CelAttributePattern>&
-  unknown_attribute_patterns() const override {
-    static const std::vector<google::api::expr::runtime::CelAttributePattern> empty;
-    return empty;
-  }
-  const Protobuf::FieldMask& unknown_paths() const override {
-    return Protobuf::FieldMask::default_instance();
-  }
+  FindValue(absl::string_view name, Protobuf::Arena* arena) const override;
 
   // Foreign function state
   virtual void setForeignData(absl::string_view data_name, std::unique_ptr<StorageObject> data) {
@@ -446,6 +431,7 @@ protected:
   bool buffering_response_body_ = false;
   bool end_of_stream_ = false;
   bool local_reply_sent_ = false;
+  bool local_reply_hold_ = false;
   ProtobufWkt::Struct temporary_metadata_;
 
   // MB: must be a node-type map as we take persistent references to the entries.

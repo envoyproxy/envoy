@@ -6,6 +6,7 @@
 
 #include "source/common/network/address_impl.h"
 #include "source/common/network/utility.h"
+#include "source/common/stream_info/filter_state_impl.h"
 #include "source/extensions/filters/common/expr/evaluator.h"
 #include "source/extensions/filters/common/rbac/matchers.h"
 
@@ -515,6 +516,28 @@ TEST(PathMatcher, ValidPathInHeader) {
   checkMatcher(PathMatcher(matcher), true, Envoy::Network::MockConnection(), headers);
   headers.setPath("/exacz");
   checkMatcher(PathMatcher(matcher), false, Envoy::Network::MockConnection(), headers);
+}
+
+class TestObject : public StreamInfo::FilterState::Object {
+public:
+  absl::optional<std::string> serializeAsString() const override { return "test.value"; }
+};
+
+TEST(FilterStateMatcher, FilterStateMatcher) {
+  Envoy::Network::MockConnection conn;
+  Envoy::Http::TestRequestHeaderMapImpl header;
+  NiceMock<StreamInfo::MockStreamInfo> info;
+  StreamInfo::FilterStateImpl filter_state(StreamInfo::FilterState::LifeSpan::Connection);
+  EXPECT_CALL(Const(info), filterState()).WillRepeatedly(ReturnRef(filter_state));
+
+  envoy::type::matcher::v3::FilterStateMatcher matcher;
+  matcher.set_key("test.key");
+  matcher.mutable_string_match()->set_prefix("test");
+
+  checkMatcher(FilterStateMatcher(matcher), false, conn, header, info);
+  filter_state.setData("test.key", std::make_shared<TestObject>(),
+                       StreamInfo::FilterState::StateType::ReadOnly);
+  checkMatcher(FilterStateMatcher(matcher), true, conn, header, info);
 }
 
 } // namespace

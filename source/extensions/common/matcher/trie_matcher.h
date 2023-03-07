@@ -82,7 +82,7 @@ public:
     // sort them by the prefix length first (longest first), and the order of declaration second.
     std::sort(values.begin(), values.end(), TrieNodeComparator<DataType>());
     bool first = true;
-    for (const auto node : values) {
+    for (const auto& node : values) {
       if (!first && node.exclusive_) {
         continue;
       }
@@ -155,6 +155,7 @@ public:
 
 class NetworkTrieMatcherFactory : public TrieMatcherFactoryBase<Network::MatchingData> {};
 class UdpNetworkTrieMatcherFactory : public TrieMatcherFactoryBase<Network::UdpMatchingData> {};
+class HttpTrieMatcherFactory : public TrieMatcherFactoryBase<Http::HttpMatchingData> {};
 
 } // namespace Matcher
 } // namespace Common

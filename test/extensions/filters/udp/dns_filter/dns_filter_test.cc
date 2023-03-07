@@ -44,8 +44,8 @@ public:
   DnsFilterTest()
       : listener_address_(Network::Utility::parseInternetAddressAndPort("127.0.2.1:5353")),
         api_(Api::createApiForTest(random_)),
-        counters_(mock_query_buffer_underflow_, mock_record_name_overflow_,
-                  query_parsing_failure_) {
+        counters_(mock_query_buffer_underflow_, mock_record_name_overflow_, query_parsing_failure_,
+                  queries_with_additional_rrs_, queries_with_ans_or_authority_rrs_) {
     udp_response_.addresses_.local_ = listener_address_;
     udp_response_.addresses_.peer_ = listener_address_;
     udp_response_.buffer_ = std::make_unique<Buffer::OwnedImpl>();
@@ -116,6 +116,8 @@ public:
   NiceMock<Stats::MockCounter> mock_query_buffer_underflow_;
   NiceMock<Stats::MockCounter> mock_record_name_overflow_;
   NiceMock<Stats::MockCounter> query_parsing_failure_;
+  NiceMock<Stats::MockCounter> queries_with_additional_rrs_;
+  NiceMock<Stats::MockCounter> queries_with_ans_or_authority_rrs_;
   DnsParserCounters counters_;
   DnsQueryContextPtr response_ctx_;
   NiceMock<Event::MockDispatcher> dispatcher_;
@@ -217,7 +219,7 @@ server_config:
             - "10.0.0.1"
 )EOF";
 
-  const std::string external_dns_table_config = R"EOF(
+  static constexpr absl::string_view external_dns_table_config = R"EOF(
 stat_prefix: "my_prefix"
 client_config:
   resolver_timeout: 1s
@@ -235,7 +237,7 @@ server_config:
     filename: {}
 )EOF";
 
-  const std::string dns_resolver_options_config_not_set = R"EOF(
+  static constexpr absl::string_view dns_resolver_options_config_not_set = R"EOF(
 stat_prefix: "my_prefix"
 client_config:
   resolver_timeout: 1s
@@ -253,7 +255,7 @@ server_config:
     filename: {}
 )EOF";
 
-  const std::string dns_resolver_options_config_set_false = R"EOF(
+  static constexpr absl::string_view dns_resolver_options_config_set_false = R"EOF(
 stat_prefix: "my_prefix"
 client_config:
   resolver_timeout: 1s
@@ -274,7 +276,7 @@ server_config:
     filename: {}
 )EOF";
 
-  const std::string dns_resolver_options_config_set_true = R"EOF(
+  static constexpr absl::string_view dns_resolver_options_config_set_true = R"EOF(
 stat_prefix: "my_prefix"
 client_config:
   resolver_timeout: 1s
@@ -1231,6 +1233,8 @@ TEST_F(DnsFilterTest, InvalidAnswersInQueryTest) {
   EXPECT_FALSE(response_ctx_->parse_status_);
   EXPECT_EQ(DNS_RESPONSE_CODE_FORMAT_ERROR, response_ctx_->getQueryResponseCode());
   EXPECT_EQ(0, response_ctx_->answers_.size());
+  EXPECT_EQ(0, config_->stats().queries_with_additional_rrs_.value());
+  EXPECT_EQ(1, config_->stats().queries_with_ans_or_authority_rrs_.value());
 }
 
 TEST_F(DnsFilterTest, InvalidAuthorityRRsInQueryTest) {
@@ -1262,9 +1266,11 @@ TEST_F(DnsFilterTest, InvalidAuthorityRRsInQueryTest) {
   EXPECT_FALSE(response_ctx_->parse_status_);
   EXPECT_EQ(DNS_RESPONSE_CODE_FORMAT_ERROR, response_ctx_->getQueryResponseCode());
   EXPECT_EQ(0, response_ctx_->answers_.size());
+  EXPECT_EQ(0, config_->stats().queries_with_additional_rrs_.value());
+  EXPECT_EQ(1, config_->stats().queries_with_ans_or_authority_rrs_.value());
 }
 
-TEST_F(DnsFilterTest, InvalidAdditionalRRsInQueryTest) {
+TEST_F(DnsFilterTest, IgnoreAdditionalRRsInQueryTest) {
   InSequence s;
 
   setup(forward_query_off_config);
@@ -1290,8 +1296,9 @@ TEST_F(DnsFilterTest, InvalidAdditionalRRsInQueryTest) {
   sendQueryFromClient("10.0.0.1:1000", query);
 
   response_ctx_ = ResponseValidator::createResponseContext(udp_response_, counters_);
-  EXPECT_FALSE(response_ctx_->parse_status_);
-  EXPECT_EQ(DNS_RESPONSE_CODE_FORMAT_ERROR, response_ctx_->getQueryResponseCode());
+  EXPECT_TRUE(response_ctx_->parse_status_);
+  EXPECT_EQ(1, config_->stats().queries_with_additional_rrs_.value());
+  EXPECT_EQ(0, config_->stats().queries_with_ans_or_authority_rrs_.value());
 }
 
 TEST_F(DnsFilterTest, InvalidQueryNameTest) {
@@ -2226,7 +2233,7 @@ TEST_F(DnsFilterTest, DnsResolverOptionsSetFalse) {
 }
 
 TEST_F(DnsFilterTest, DEPRECATED_FEATURE_TEST(DnsResolutionConfigExist)) {
-  const std::string dns_resolution_config_exist = R"EOF(
+  constexpr absl::string_view dns_resolution_config_exist = R"EOF(
 stat_prefix: "my_prefix"
 client_config:
   resolver_timeout: 1s
@@ -2264,7 +2271,7 @@ server_config:
 
 // test typed_dns_resolver_config exits which overrides dns_resolution_config.
 TEST_F(DnsFilterTest, DEPRECATED_FEATURE_TEST(TypedDnsResolverConfigOverrideDnsResolutionConfig)) {
-  const std::string typed_dns_resolver_config_exist = R"EOF(
+  const absl::string_view typed_dns_resolver_config_exist = R"EOF(
 stat_prefix: "my_prefix"
 client_config:
   resolver_timeout: 1s
@@ -2312,7 +2319,7 @@ server_config:
 
 // test typed_dns_resolver_config exits.
 TEST_F(DnsFilterTest, TypedDnsResolverConfigExist) {
-  const std::string typed_dns_resolver_config_exist = R"EOF(
+  constexpr absl::string_view typed_dns_resolver_config_exist = R"EOF(
 stat_prefix: "my_prefix"
 client_config:
   resolver_timeout: 1s
@@ -2352,7 +2359,7 @@ server_config:
 
 // test when no DNS related config exists, an empty typed_dns_resolver_config is the parameter.
 TEST_F(DnsFilterTest, NoDnsConfigExist) {
-  const std::string no_dns_config_exist = R"EOF(
+  constexpr absl::string_view no_dns_config_exist = R"EOF(
 stat_prefix: "my_prefix"
 client_config:
   resolver_timeout: 1s

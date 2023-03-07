@@ -126,7 +126,7 @@ ClientPtr rateLimitClient(Server::Configuration::FactoryContext& context,
   // requests.
   return std::make_unique<Filters::Common::RateLimit::GrpcClientImpl>(
       context.clusterManager().grpcAsyncClientManager().getOrCreateRawAsyncClient(
-          grpc_service, context.scope(), true, Grpc::CacheOption::CacheWhenRuntimeEnabled),
+          grpc_service, context.scope(), true),
       timeout);
 }
 

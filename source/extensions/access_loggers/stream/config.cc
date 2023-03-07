@@ -22,6 +22,14 @@ namespace File {
 
 AccessLog::InstanceSharedPtr StdoutAccessLogFactory::createAccessLogInstance(
     const Protobuf::Message& config, AccessLog::FilterPtr&& filter,
+    Server::Configuration::ListenerAccessLogFactoryContext& context) {
+  return createAccessLogInstance(
+      config, std::move(filter),
+      static_cast<Server::Configuration::CommonFactoryContext&>(context));
+}
+
+AccessLog::InstanceSharedPtr StdoutAccessLogFactory::createAccessLogInstance(
+    const Protobuf::Message& config, AccessLog::FilterPtr&& filter,
     Server::Configuration::CommonFactoryContext& context) {
   return AccessLoggers::createStreamAccessLogInstance<
       envoy::extensions::access_loggers::stream::v3::StdoutAccessLog,
@@ -38,8 +46,16 @@ std::string StdoutAccessLogFactory::name() const { return "envoy.access_loggers.
 /**
  * Static registration for the file access log. @see RegisterFactory.
  */
-REGISTER_FACTORY(StdoutAccessLogFactory,
-                 Server::Configuration::AccessLogInstanceFactory){"envoy.stdout_access_log"};
+LEGACY_REGISTER_FACTORY(StdoutAccessLogFactory, Server::Configuration::AccessLogInstanceFactory,
+                        "envoy.stdout_access_log");
+
+AccessLog::InstanceSharedPtr StderrAccessLogFactory::createAccessLogInstance(
+    const Protobuf::Message& config, AccessLog::FilterPtr&& filter,
+    Server::Configuration::ListenerAccessLogFactoryContext& context) {
+  return createAccessLogInstance(
+      config, std::move(filter),
+      static_cast<Server::Configuration::CommonFactoryContext&>(context));
+}
 
 AccessLog::InstanceSharedPtr StderrAccessLogFactory::createAccessLogInstance(
     const Protobuf::Message& config, AccessLog::FilterPtr&& filter,
@@ -59,8 +75,8 @@ std::string StderrAccessLogFactory::name() const { return "envoy.access_loggers.
 /**
  * Static registration for the `stderr` access log. @see RegisterFactory.
  */
-REGISTER_FACTORY(StderrAccessLogFactory,
-                 Server::Configuration::AccessLogInstanceFactory){"envoy.stderr_access_log"};
+LEGACY_REGISTER_FACTORY(StderrAccessLogFactory, Server::Configuration::AccessLogInstanceFactory,
+                        "envoy.stderr_access_log");
 
 } // namespace File
 } // namespace AccessLoggers

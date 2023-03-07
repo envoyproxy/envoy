@@ -10,7 +10,7 @@
 #include "source/common/network/raw_buffer_socket.h"
 #include "source/extensions/bootstrap/internal_listener/active_internal_listener.h"
 #include "source/extensions/bootstrap/internal_listener/thread_local_registry.h"
-#include "source/server/connection_handler_impl.h"
+#include "source/extensions/listener_managers/listener_manager/connection_handler_impl.h"
 
 #include "test/mocks/access_log/mocks.h"
 #include "test/mocks/common.h"
@@ -107,7 +107,7 @@ TEST_F(ActiveInternalListenerTest, AcceptSocketAndCreateListenerFilter) {
         return Network::FilterStatus::Continue;
       }));
   EXPECT_CALL(*test_listener_filter, destroy_());
-  EXPECT_CALL(manager_, findFilterChain(_)).WillOnce(Return(nullptr));
+  EXPECT_CALL(manager_, findFilterChain(_, _)).WillOnce(Return(nullptr));
   internal_listener_->onAccept(Network::ConnectionSocketPtr{accepted_socket});
   EXPECT_CALL(*generic_listener_, onDestroy());
 }
@@ -167,7 +167,7 @@ TEST_F(ActiveInternalListenerTest, AcceptSocketAndCreateNetworkFilter) {
   filter_chain_ = std::make_shared<NiceMock<Network::MockFilterChain>>();
   auto transport_socket_factory = Network::Test::createRawBufferDownstreamSocketFactory();
 
-  EXPECT_CALL(manager_, findFilterChain(_)).WillOnce(Return(filter_chain_.get()));
+  EXPECT_CALL(manager_, findFilterChain(_, _)).WillOnce(Return(filter_chain_.get()));
   EXPECT_CALL(*filter_chain_, transportSocketFactory)
       .WillOnce(testing::ReturnRef(*transport_socket_factory));
   EXPECT_CALL(*filter_chain_, networkFilterFactories).WillOnce(ReturnRef(*filter_factory_callback));
@@ -198,7 +198,7 @@ TEST_F(ActiveInternalListenerTest, PausedListenerAcceptNewSocket) {
 
   EXPECT_CALL(filter_chain_factory_, createListenerFilterChain(_))
       .WillRepeatedly(Invoke([&](Network::ListenerFilterManager&) -> bool { return true; }));
-  EXPECT_CALL(manager_, findFilterChain(_)).WillOnce(Return(nullptr));
+  EXPECT_CALL(manager_, findFilterChain(_, _)).WillOnce(Return(nullptr));
   internal_listener_->onAccept(Network::ConnectionSocketPtr{accepted_socket});
 }
 
@@ -215,7 +215,7 @@ TEST_F(ActiveInternalListenerTest, DestroyListenerCloseAllConnections) {
 
   EXPECT_CALL(filter_chain_factory_, createListenerFilterChain(_))
       .WillRepeatedly(Invoke([&](Network::ListenerFilterManager&) -> bool { return true; }));
-  EXPECT_CALL(manager_, findFilterChain(_)).WillOnce(Return(filter_chain_.get()));
+  EXPECT_CALL(manager_, findFilterChain(_, _)).WillOnce(Return(filter_chain_.get()));
   EXPECT_CALL(*filter_chain_, transportSocketFactory)
       .WillOnce(testing::ReturnRef(*transport_socket_factory));
   EXPECT_CALL(*filter_chain_, networkFilterFactories).WillOnce(ReturnRef(*filter_factory_callback));
@@ -227,6 +227,11 @@ TEST_F(ActiveInternalListenerTest, DestroyListenerCloseAllConnections) {
   internal_listener_->onAccept(Network::ConnectionSocketPtr{accepted_socket});
 
   EXPECT_CALL(conn_handler_, decNumConnections());
+  EXPECT_CALL(*connection, close(_, _))
+      .WillOnce(Invoke([&connection](Network::ConnectionCloseType, absl::string_view details) {
+        EXPECT_EQ(details, "Active Internal Listener destructor");
+        connection->raiseEvent(Network::ConnectionEvent::LocalClose);
+      }));
   internal_listener_.reset();
 }
 
@@ -293,7 +298,6 @@ public:
                                                      : *inline_filter_chain_manager_;
     }
     Network::FilterChainFactory& filterChainFactory() override { return parent_.factory_; }
-    Network::ListenSocketFactory& listenSocketFactory() override { return *socket_factories_[0]; }
     std::vector<Network::ListenSocketFactoryPtr>& listenSocketFactories() override {
       return socket_factories_;
     }
@@ -308,7 +312,7 @@ public:
     bool continueOnListenerFiltersTimeout() const override {
       return continue_on_listener_filters_timeout_;
     }
-    Stats::Scope& listenerScope() override { return parent_.stats_store_; }
+    Stats::Scope& listenerScope() override { return *parent_.stats_store_.rootScope(); }
     uint64_t listenerTag() const override { return tag_; }
     const std::string& name() const override { return name_; }
     Network::UdpListenerConfigOptRef udpListenerConfig() override { return {}; }
@@ -447,8 +451,8 @@ TEST_F(ConnectionHandlerTest, InternalListenerInplaceUpdate) {
 
   auto internal_listener_cb = handler_->findByAddress(local_address);
 
-  EXPECT_CALL(manager_, findFilterChain(_)).Times(0);
-  EXPECT_CALL(*overridden_filter_chain_manager, findFilterChain(_)).WillOnce(Return(nullptr));
+  EXPECT_CALL(manager_, findFilterChain(_, _)).Times(0);
+  EXPECT_CALL(*overridden_filter_chain_manager, findFilterChain(_, _)).WillOnce(Return(nullptr));
   EXPECT_CALL(*access_log_, log(_, _, _, _));
   internal_listener_cb.value().get().onAccept(Network::ConnectionSocketPtr{connection});
   EXPECT_EQ(0UL, handler_->numConnections());

@@ -38,6 +38,12 @@ public:
    * unset.
    */
   virtual Network::TransportSocketCallbacks* transportSocketCallbacks() PURE;
+
+  /**
+   * A callback to be called upon certificate validation completion if the validation is
+   * asynchronous.
+   */
+  virtual void onAsynchronousCertValidationComplete() PURE;
 };
 
 /**

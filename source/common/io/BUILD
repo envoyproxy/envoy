@@ -27,6 +27,7 @@ envoy_cc_library(
         "io_uring_impl.h",
     ],
     external_deps = ["uring"],
+    tags = ["nocompdb"],
     deps = [
         ":io_uring_interface",
     ],

@@ -2,6 +2,8 @@
 
 #include <string>
 
+#include "absl/status/statusor.h"
+
 // Profiling support is provided in the release tcmalloc of `gperftools`, but not in the library
 // that supplies the debug tcmalloc. So all the profiling code must be ifdef'd
 // on PROFILER_AVAILABLE which is dependent on those two settings.
@@ -60,6 +62,16 @@ public:
    * @return bool whether the file is dumped
    */
   static bool stopProfiler();
+};
+
+/**
+ * Default profiler which will be enabled when tcmalloc (not `gperftools`) is used.
+ */
+class TcmallocProfiler {
+public:
+  TcmallocProfiler() = default;
+
+  static absl::StatusOr<std::string> tcmallocHeapProfile();
 };
 
 } // namespace Profiler

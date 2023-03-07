@@ -11,29 +11,29 @@ namespace Envoy {
 namespace Http {
 
 /**
- * Request ID functionality available via stream info.
+ * Abstract request id utilities for getting/setting the request IDs and tracing status of requests
  */
-class RequestIdStreamInfoProvider {
+class RequestIDExtension {
 public:
-  virtual ~RequestIdStreamInfoProvider() = default;
+  virtual ~RequestIDExtension() = default;
 
   /**
-   * Convert the request ID to a 64-bit integer representation for using in modulo, etc.
+   *  Get the request ID from the request headers.
+   * @param request_headers supplies the incoming request headers for retrieving the request ID.
+   * @return the string view or nullopt if the request ID is invalid.
+   */
+  virtual absl::optional<absl::string_view>
+  get(const Http::RequestHeaderMap& request_headers) const PURE;
+
+  /**
+   * Get and convert the request ID to a 64-bit integer representation for using in modulo, etc.
    * calculations.
    * @param request_headers supplies the incoming request headers for retrieving the request ID.
    * @return the integer or nullopt if the request ID is invalid.
    */
   virtual absl::optional<uint64_t>
-  toInteger(const Http::RequestHeaderMap& request_headers) const PURE;
-};
+  getInteger(const Http::RequestHeaderMap& request_headers) const PURE;
 
-using RequestIdStreamInfoProviderSharedPtr = std::shared_ptr<RequestIdStreamInfoProvider>;
-
-/**
- * Abstract request id utilities for getting/setting the request IDs and tracing status of requests
- */
-class RequestIDExtension : public RequestIdStreamInfoProvider {
-public:
   /**
    * Directly set a request ID into the provided request headers. Override any previous request ID
    * if any.

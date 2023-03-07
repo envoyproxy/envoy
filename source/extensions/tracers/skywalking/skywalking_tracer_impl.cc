@@ -24,12 +24,12 @@ constexpr absl::string_view DEFAULT_SERVICE_AND_INSTANCE = "EnvoyProxy";
 
 using cpp2sky::createSpanContext;
 using cpp2sky::SpanContextPtr;
-using cpp2sky::TracerException;
 
 Driver::Driver(const envoy::config::trace::v3::SkyWalkingConfig& proto_config,
                Server::Configuration::TracerFactoryContext& context)
-    : tracing_stats_{SKYWALKING_TRACER_STATS(
-          POOL_COUNTER_PREFIX(context.serverFactoryContext().scope(), "tracing.skywalking."))},
+    : tracing_stats_(std::make_shared<SkyWalkingTracerStats>(
+          SkyWalkingTracerStats{SKYWALKING_TRACER_STATS(POOL_COUNTER_PREFIX(
+              context.serverFactoryContext().scope(), "tracing.skywalking."))})),
       tls_slot_ptr_(context.serverFactoryContext().threadLocal().allocateSlot()) {
   loadConfig(proto_config.client_config(), context.serverFactoryContext());
   tracing_context_factory_ = std::make_unique<TracingContextFactory>(config_);
@@ -62,17 +62,22 @@ Tracing::SpanPtr Driver::startSpan(const Tracing::Config&, Tracing::TraceContext
     tracing_context = tracing_context_factory_->create();
   } else {
     auto header_value_string = propagation_header.value();
+
+    // TODO(wbpcode): catching all exceptions is not a good practice. But the cpp2sky library may
+    // throw exception that not be wrapped by TracerException. See
+    // https://github.com/SkyAPM/cpp2sky/issues/117. So, we need to catch all exceptions here to
+    // avoid Envoy crash in the runtime.
     try {
       SpanContextPtr span_context =
           createSpanContext(toStdStringView(header_value_string)); // NOLINT(std::string_view)
       tracing_context = tracing_context_factory_->create(span_context);
-    } catch (TracerException& e) {
+    } catch (std::exception& e) {
       ENVOY_LOG(warn, "New SkyWalking Span/Segment cannot be created for error: {}", e.what());
       return std::make_unique<Tracing::NullSpan>();
     }
   }
 
-  return tracer.startSpan(trace_context.path(), tracing_context);
+  return tracer.startSpan(trace_context.path(), trace_context.protocol(), tracing_context);
 }
 
 void Driver::loadConfig(const envoy::config::trace::v3::ClientConfig& client_config,

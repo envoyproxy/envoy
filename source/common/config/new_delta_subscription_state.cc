@@ -14,7 +14,8 @@ namespace Config {
 NewDeltaSubscriptionState::NewDeltaSubscriptionState(std::string type_url,
                                                      UntypedConfigUpdateCallbacks& watch_map,
                                                      const LocalInfo::LocalInfo& local_info,
-                                                     Event::Dispatcher& dispatcher)
+                                                     Event::Dispatcher& dispatcher,
+                                                     XdsConfigTrackerOptRef xds_config_tracker)
     // TODO(snowp): Hard coding VHDS here is temporary until we can move it away from relying on
     // empty resources as updates.
     : supports_heartbeats_(type_url != "envoy.config.route.v3.VirtualHost"),
@@ -36,7 +37,8 @@ NewDeltaSubscriptionState::NewDeltaSubscriptionState(std::string type_url,
             watch_map_.onConfigUpdate({}, removed_resources, "");
           },
           dispatcher, dispatcher.timeSource()),
-      type_url_(std::move(type_url)), watch_map_(watch_map), local_info_(local_info) {}
+      type_url_(std::move(type_url)), watch_map_(watch_map), local_info_(local_info),
+      xds_config_tracker_(xds_config_tracker) {}
 
 void NewDeltaSubscriptionState::updateSubscriptionInterest(
     const absl::flat_hash_set<std::string>& cur_added,
@@ -170,7 +172,7 @@ bool NewDeltaSubscriptionState::isHeartbeatResponse(
   }
 
   if (const auto itr = ambiguous_resource_state_.find(resource.name());
-      itr != wildcard_resource_state_.end()) {
+      itr != ambiguous_resource_state_.end()) {
     // In theory we should move the ambiguous resource to wildcard, because probably we shouldn't be
     // getting heartbeat responses about resources that we are not interested in, but the server
     // could have sent this heartbeat before it learned about our lack of interest in the resource.
@@ -211,7 +213,8 @@ void NewDeltaSubscriptionState::handleGoodResponse(
     }
   }
 
-  {
+  if (!Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.delta_xds_subscription_state_tracking_fix")) {
     const auto scoped_update = ttl_.scopedTtlUpdate();
     if (requested_resource_state_.contains(Wildcard)) {
       for (const auto& resource : message.resources()) {
@@ -230,6 +233,30 @@ void NewDeltaSubscriptionState::handleGoodResponse(
 
   watch_map_.onConfigUpdate(non_heartbeat_resources, message.removed_resources(),
                             message.system_version_info());
+
+  // Processing point when resources are successfully ingested.
+  if (xds_config_tracker_.has_value()) {
+    xds_config_tracker_->onConfigAccepted(message.type_url(), non_heartbeat_resources,
+                                          message.removed_resources());
+  }
+
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.delta_xds_subscription_state_tracking_fix")) {
+    const auto scoped_update = ttl_.scopedTtlUpdate();
+    if (requested_resource_state_.contains(Wildcard)) {
+      for (const auto& resource : message.resources()) {
+        addResourceStateFromServer(resource);
+      }
+    } else {
+      // We are not subscribed to wildcard, so we only take resources that we explicitly requested
+      // and ignore the others.
+      for (const auto& resource : message.resources()) {
+        if (requested_resource_state_.contains(resource.name())) {
+          addResourceStateFromServer(resource);
+        }
+      }
+    }
+  }
 
   // If a resource is gone, there is no longer a meaningful version for it that makes sense to
   // provide to the server upon stream reconnect: either it will continue to not exist, in which

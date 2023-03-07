@@ -1,7 +1,5 @@
 #pragma once
 
-#include <datadog/opentracing.h>
-
 #include "envoy/config/trace/v3/datadog.pb.h"
 #include "envoy/local_info/local_info.h"
 #include "envoy/runtime/runtime.h"
@@ -13,6 +11,9 @@
 #include "source/common/json/json_loader.h"
 #include "source/common/upstream/cluster_update_tracker.h"
 #include "source/extensions/tracers/common/ot/opentracing_driver_impl.h"
+
+#include "datadog/opentracing.h"
+#include "fmt/ostream.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -50,6 +51,7 @@ public:
   // Getters to return the DatadogDriver's key members.
   Upstream::ClusterManager& clusterManager() { return cm_; }
   const std::string& cluster() { return cluster_; }
+  const std::string& hostname() { return hostname_; }
   DatadogTracerStats& tracerStats() { return tracer_stats_; }
   const datadog::opentracing::TracerOptions& tracerOptions() { return tracer_options_; }
 
@@ -74,6 +76,7 @@ private:
 
   Upstream::ClusterManager& cm_;
   std::string cluster_;
+  std::string hostname_;
   DatadogTracerStats tracer_stats_;
   datadog::opentracing::TracerOptions tracer_options_;
   ThreadLocal::SlotPtr tls_;
@@ -136,3 +139,9 @@ private:
 } // namespace Tracers
 } // namespace Extensions
 } // namespace Envoy
+
+// NOLINT(namespace-envoy)
+namespace fmt {
+// Allow fmtlib to format opentracing::string_view
+template <> struct formatter<opentracing::string_view> : ostream_formatter {};
+} // namespace fmt

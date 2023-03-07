@@ -8,6 +8,7 @@
 #include "envoy/event/deferred_deletable.h"
 #include "envoy/event/timer.h"
 #include "envoy/http/codec.h"
+#include "envoy/http/header_validator.h"
 #include "envoy/network/connection.h"
 #include "envoy/network/filter.h"
 #include "envoy/upstream/upstream.h"
@@ -17,6 +18,7 @@
 #include "source/common/common/logger.h"
 #include "source/common/http/codec_wrappers.h"
 #include "source/common/network/filter_impl.h"
+#include "source/common/runtime/runtime_features.h"
 
 namespace Envoy {
 namespace Http {
@@ -74,7 +76,7 @@ public:
    * Close the underlying network connection. This is immediate and will not attempt to flush any
    * pending write data.
    */
-  void close();
+  void close(Network::ConnectionCloseType type = Network::ConnectionCloseType::NoFlush);
 
   /**
    * Send a codec level go away indication to the peer.
@@ -163,7 +165,7 @@ protected:
   }
 
   void onIdleTimeout() {
-    host_->cluster().stats().upstream_cx_idle_timeout_.inc();
+    host_->cluster().trafficStats()->upstream_cx_idle_timeout_.inc();
     close();
   }
 
@@ -219,9 +221,27 @@ private:
   struct ActiveRequest : LinkedObject<ActiveRequest>,
                          public Event::DeferredDeletable,
                          public StreamCallbacks,
-                         public ResponseDecoderWrapper {
+                         public ResponseDecoderWrapper,
+                         public RequestEncoderWrapper {
     ActiveRequest(CodecClient& parent, ResponseDecoder& inner)
-        : ResponseDecoderWrapper(inner), parent_(parent) {}
+        : ResponseDecoderWrapper(inner), RequestEncoderWrapper(nullptr), parent_(parent),
+          header_validator_(
+              parent.host_->cluster().makeHeaderValidator(parent.codec_->protocol())) {
+      switch (parent.protocol()) {
+      case Protocol::Http10:
+      case Protocol::Http11:
+        // HTTP/1.1 codec does not support half-close on the response completion.
+        wait_encode_complete_ = false;
+        break;
+      case Protocol::Http2:
+      case Protocol::Http3:
+        wait_encode_complete_ =
+            Runtime::runtimeFeatureEnabled("envoy.reloadable_features.http_response_half_close");
+        break;
+      }
+    }
+
+    void decodeHeaders(ResponseHeaderMapPtr&& headers, bool end_stream) override;
 
     // StreamCallbacks
     void onResetStream(StreamResetReason reason, absl::string_view) override {
@@ -234,8 +254,21 @@ private:
     void onPreDecodeComplete() override { parent_.responsePreDecodeComplete(*this); }
     void onDecodeComplete() override {}
 
-    RequestEncoder* encoder_{};
+    // RequestEncoderWrapper
+    void onEncodeComplete() override { parent_.requestEncodeComplete(*this); }
+
+    void setEncoder(RequestEncoder& encoder) {
+      inner_encoder_ = &encoder;
+      inner_encoder_->getStream().addCallbacks(*this);
+    }
+
+    void removeEncoderCallbacks() { inner_encoder_->getStream().removeCallbacks(*this); }
+
     CodecClient& parent_;
+    Http::HeaderValidatorPtr header_validator_;
+    bool wait_encode_complete_{true};
+    bool encode_complete_{false};
+    bool decode_complete_{false};
   };
 
   using ActiveRequestPtr = std::unique_ptr<ActiveRequest>;
@@ -245,6 +278,8 @@ private:
    * wrapped decoder.
    */
   void responsePreDecodeComplete(ActiveRequest& request);
+  void requestEncodeComplete(ActiveRequest& request);
+  void completeRequest(ActiveRequest& request);
 
   void deleteRequest(ActiveRequest& request);
   void onReset(ActiveRequest& request, StreamResetReason reason);

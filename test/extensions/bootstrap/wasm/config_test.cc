@@ -105,11 +105,12 @@ TEST_P(WasmFactoryTest, MissingImport) {
 }
 
 TEST_P(WasmFactoryTest, UnspecifiedRuntime) {
+  if (std::get<0>(GetParam()) == "null") {
+    return;
+  }
   config_.mutable_config()->mutable_vm_config()->set_runtime("");
 
-  EXPECT_THROW_WITH_REGEX(
-      initializeWithConfig(config_), EnvoyException,
-      "Proto constraint validation failed \\(WasmServiceValidationError\\.Config");
+  EXPECT_NO_THROW(initializeWithConfig(config_));
 }
 
 TEST_P(WasmFactoryTest, UnknownRuntime) {

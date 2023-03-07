@@ -74,16 +74,6 @@
           typed_config:
             "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
         add_user_agent: true
-        {% if tracing %}
-        tracing:
-          provider:
-            name: envoy.tracers.lightstep
-            typed_config:
-              "@type": type.googleapis.com/envoy.config.trace.v3.LightstepConfig
-              collector_cluster: lightstep_saas
-              access_token:
-                filename: "/etc/envoy/lightstep_access_token"
-        {% endif %}
         common_http_protocol_options:
           idle_timeout: 840s
         access_log:
@@ -149,25 +139,6 @@ static_resources:
                 address: 127.0.0.1
                 port_value: 8125
                 protocol: TCP
-  - name: lightstep_saas
-    type: LOGICAL_DNS
-    connect_timeout: 1s
-    lb_policy: ROUND_ROBIN
-    load_assignment:
-      cluster_name: lightstep_saas
-      endpoints:
-      - lb_endpoints:
-        - endpoint:
-            address:
-              socket_address:
-                address: collector-grpc.lightstep.com
-                port_value: 443
-                protocol: TCP
-    typed_extension_protocol_options:
-      envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
-        "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
-        explicit_http_config:
-          http2_protocol_options: {}
   {% for service, options in clusters.items() -%}
   - {{ helper.internal_cluster_definition(service, options)|indent(2) }}
   {% endfor %}

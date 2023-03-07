@@ -26,7 +26,8 @@ public:
   FilesystemSubscriptionImpl(Event::Dispatcher& dispatcher,
                              const envoy::config::core::v3::PathConfigSource& path_config_source,
                              SubscriptionCallbacks& callbacks,
-                             OpaqueResourceDecoder& resource_decoder, SubscriptionStats stats,
+                             OpaqueResourceDecoderSharedPtr resource_decoder,
+                             SubscriptionStats stats,
                              ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api);
 
   // Config::Subscription
@@ -48,7 +49,7 @@ protected:
   std::unique_ptr<Filesystem::Watcher> file_watcher_;
   WatchedDirectoryPtr directory_watcher_;
   SubscriptionCallbacks& callbacks_;
-  OpaqueResourceDecoder& resource_decoder_;
+  OpaqueResourceDecoderSharedPtr resource_decoder_;
   SubscriptionStats stats_;
   Api::Api& api_;
   ProtobufMessage::ValidationVisitor& validation_visitor_;
@@ -61,7 +62,7 @@ public:
   FilesystemCollectionSubscriptionImpl(
       Event::Dispatcher& dispatcher,
       const envoy::config::core::v3::PathConfigSource& path_config_source,
-      SubscriptionCallbacks& callbacks, OpaqueResourceDecoder& resource_decoder,
+      SubscriptionCallbacks& callbacks, OpaqueResourceDecoderSharedPtr resource_decoder,
       SubscriptionStats stats, ProtobufMessage::ValidationVisitor& validation_visitor,
       Api::Api& api);
 

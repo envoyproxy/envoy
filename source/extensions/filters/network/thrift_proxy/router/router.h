@@ -147,7 +147,11 @@ public:
         upstream_rq_size_(stat_name_set_->add("thrift.upstream_rq_size")),
         upstream_resp_size_(stat_name_set_->add("thrift.upstream_resp_size")),
         zone_(stat_name_set_->add("zone")), local_zone_name_(local_info.zoneStatName()),
-        upstream_cx_drain_close_(stat_name_set_->add("thrift.upstream_cx_drain_close")) {}
+        upstream_cx_drain_close_(stat_name_set_->add("thrift.upstream_cx_drain_close")),
+        downstream_cx_partial_response_close_(
+            stat_name_set_->add("thrift.downstream_cx_partial_response_close")),
+        downstream_cx_underflow_response_close_(
+            stat_name_set_->add("thrift.downstream_cx_underflow_response_close")) {}
 
   /**
    * Increment counter for request calls.
@@ -179,6 +183,22 @@ public:
    */
   void incCloseDrain(const Upstream::ClusterInfo& cluster) const {
     incClusterScopeCounter(cluster, nullptr, upstream_cx_drain_close_);
+  }
+
+  /**
+   * Increment counter for downstream connections that were closed due to partial responses.
+   * @param cluster Upstream::ClusterInfo& describing the upstream cluster
+   */
+  void incClosePartialResponse(const Upstream::ClusterInfo& cluster) const {
+    incClusterScopeCounter(cluster, nullptr, downstream_cx_partial_response_close_);
+  }
+
+  /**
+   * Increment counter for downstream connections that were closed due to underflow responses.
+   * @param cluster Upstream::ClusterInfo& describing the upstream cluster
+   */
+  void incCloseUnderflowResponse(const Upstream::ClusterInfo& cluster) const {
+    incClusterScopeCounter(cluster, nullptr, downstream_cx_underflow_response_close_);
   }
 
   /**
@@ -354,6 +374,8 @@ private:
   const Stats::StatName zone_;
   const Stats::StatName local_zone_name_;
   const Stats::StatName upstream_cx_drain_close_;
+  const Stats::StatName downstream_cx_partial_response_close_;
+  const Stats::StatName downstream_cx_underflow_response_close_;
 };
 
 /**

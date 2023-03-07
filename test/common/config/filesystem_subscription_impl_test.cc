@@ -46,12 +46,13 @@ TEST(MiscFilesystemSubscriptionImplTest, BadWatch) {
   Stats::MockIsolatedStatsStore stats_store;
   NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor;
   Api::ApiPtr api = Api::createApiForTest(stats_store);
-  SubscriptionStats stats{Utility::generateStats(stats_store)};
+  SubscriptionStats stats{Utility::generateStats(*stats_store.rootScope())};
   auto* watcher = new Filesystem::MockWatcher();
   EXPECT_CALL(dispatcher, createFilesystemWatcher_()).WillOnce(Return(watcher));
   EXPECT_CALL(*watcher, addWatch(_, _, _)).WillOnce(Throw(EnvoyException("bad path")));
   NiceMock<Config::MockSubscriptionCallbacks> callbacks;
-  NiceMock<Config::MockOpaqueResourceDecoder> resource_decoder;
+  OpaqueResourceDecoderSharedPtr resource_decoder(
+      std::make_shared<NiceMock<Config::MockOpaqueResourceDecoder>>());
   EXPECT_THROW_WITH_MESSAGE(
       FilesystemSubscriptionImpl(dispatcher, makePathConfigSource("##!@/dev/null"), callbacks,
                                  resource_decoder, stats, validation_visitor, *api),
@@ -89,8 +90,12 @@ class FilesystemCollectionSubscriptionImplTest : public testing::Test,
 public:
   FilesystemCollectionSubscriptionImplTest()
       : path_(makePathConfigSource(TestEnvironment::temporaryPath("lds.yaml"))),
-        stats_(Utility::generateStats(stats_store_)),
+        stats_(Utility::generateStats(*stats_store_.rootScope())),
         api_(Api::createApiForTest(stats_store_, simTime())), dispatcher_(setupDispatcher()),
+        resource_decoder_(
+            std::make_shared<
+                TestUtility::TestOpaqueResourceDecoderImpl<envoy::config::listener::v3::Listener>>(
+                "name")),
         subscription_(*dispatcher_, path_, callbacks_, resource_decoder_, stats_,
                       ProtobufMessage::getStrictValidationVisitor(), *api_) {}
   ~FilesystemCollectionSubscriptionImplTest() override {
@@ -153,8 +158,7 @@ public:
   Event::DispatcherPtr dispatcher_;
   Filesystem::Watcher::OnChangedCb on_changed_cb_;
   NiceMock<Config::MockSubscriptionCallbacks> callbacks_;
-  TestUtility::TestOpaqueResourceDecoderImpl<envoy::config::listener::v3::Listener>
-      resource_decoder_{"name"};
+  OpaqueResourceDecoderSharedPtr resource_decoder_;
   FilesystemCollectionSubscriptionImpl subscription_;
 };
 

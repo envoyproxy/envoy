@@ -5,6 +5,7 @@
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/endpoint/v3/endpoint.pb.h"
 #include "envoy/config/endpoint/v3/endpoint.pb.validate.h"
+#include "envoy/config/xds_config_tracker.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
 #include "source/common/config/grpc_subscription_impl.h"
@@ -41,6 +42,8 @@ public:
       : method_descriptor_(Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
             "envoy.service.endpoint.v3.EndpointDiscoveryService.StreamEndpoints")),
         async_client_(new Grpc::MockAsyncClient()),
+        resource_decoder_(std::make_shared<TestUtility::TestOpaqueResourceDecoderImpl<
+                              envoy::config::endpoint::v3::ClusterLoadAssignment>>("cluster_name")),
         should_use_unified_(legacy_or_unified == Envoy::Config::LegacyOrUnified::Unified) {
     node_.set_id("fo0");
     EXPECT_CALL(local_info_, node()).WillRepeatedly(testing::ReturnRef(node_));
@@ -48,13 +51,15 @@ public:
     if (should_use_unified_) {
       xds_context_ = std::make_shared<Config::XdsMux::GrpcMuxDelta>(
           std::unique_ptr<Grpc::MockAsyncClient>(async_client_), dispatcher_, *method_descriptor_,
-          random_, stats_store_, rate_limit_settings_, local_info_, false,
-          std::make_unique<NiceMock<MockCustomConfigValidators>>());
+          random_, *stats_store_.rootScope(), rate_limit_settings_, local_info_, false,
+          std::make_unique<NiceMock<MockCustomConfigValidators>>(),
+          /*xds_config_tracker=*/XdsConfigTrackerOptRef());
     } else {
       xds_context_ = std::make_shared<NewGrpcMuxImpl>(
           std::unique_ptr<Grpc::MockAsyncClient>(async_client_), dispatcher_, *method_descriptor_,
-          random_, stats_store_, rate_limit_settings_, local_info_,
-          std::make_unique<NiceMock<MockCustomConfigValidators>>());
+          random_, *stats_store_.rootScope(), rate_limit_settings_, local_info_,
+          std::make_unique<NiceMock<MockCustomConfigValidators>>(),
+          /*xds_config_tracker=*/XdsConfigTrackerOptRef());
     }
     subscription_ = std::make_unique<GrpcSubscriptionImpl>(
         xds_context_, callbacks_, resource_decoder_, stats_,
@@ -227,8 +232,7 @@ public:
   Event::MockTimer* init_timeout_timer_;
   envoy::config::core::v3::Node node_;
   NiceMock<Config::MockSubscriptionCallbacks> callbacks_;
-  TestUtility::TestOpaqueResourceDecoderImpl<envoy::config::endpoint::v3::ClusterLoadAssignment>
-      resource_decoder_{"cluster_name"};
+  OpaqueResourceDecoderSharedPtr resource_decoder_;
   std::queue<std::string> nonce_acks_required_;
   std::queue<std::string> nonce_acks_sent_;
   bool subscription_started_{};

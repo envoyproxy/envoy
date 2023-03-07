@@ -19,7 +19,7 @@ virtual_hosts:
     - header:
         key: "content-type"
         value: "application/json"
-      append: false
+      append_action: OVERWRITE_IF_EXISTS_OR_ADD
   - match:
       path: /ping-json2
     direct_response:
@@ -27,7 +27,7 @@ virtual_hosts:
       body:
         inline_string: "{ 'message': 'Success!' }"
     response_headers_to_add:
-    # This is bad, don't do it! Use append: false!
+    # This is bad, don't do it! Use append_action: OVERWRITE_IF_EXISTS_OR_ADD!
     - header:
         key: "content-type"
         value: "application/json"

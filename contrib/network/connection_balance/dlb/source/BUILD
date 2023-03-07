@@ -38,12 +38,13 @@ envoy_cc_contrib_extension(
     }),
     deps = [
         "//envoy/registry",
+        "//envoy/api:api_interface",
         "//envoy/server:factory_context_interface",
         "//envoy/server:filter_config_interface",
         "//source/common/common:logger_lib",
         "//source/common/network:connection_balancer_lib",
         "//source/common/protobuf:utility_lib",
-        "//source/server:active_tcp_listener",
+        "//source/extensions/listener_managers/listener_manager:active_tcp_listener",
         "@envoy_api//contrib/envoy/extensions/network/connection_balance/dlb/v3alpha:pkg_cc_proto",
     ] + select({
         "//bazel:linux_x86_64": [

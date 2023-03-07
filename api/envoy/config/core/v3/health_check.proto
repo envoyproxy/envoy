@@ -75,12 +75,12 @@ message HealthCheck {
       // Hex encoded payload. E.g., "000000FF".
       string text = 1 [(validate.rules).string = {min_len: 1}];
 
-      // [#not-implemented-hide:] Binary payload.
+      // Binary payload.
       bytes binary = 2;
     }
   }
 
-  // [#next-free-field: 13]
+  // [#next-free-field: 15]
   message HttpHealthCheck {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.api.v2.core.HealthCheck.HttpHealthCheck";
@@ -103,8 +103,20 @@ message HealthCheck {
     // [#not-implemented-hide:] HTTP specific payload.
     Payload send = 3;
 
-    // [#not-implemented-hide:] HTTP specific response.
-    Payload receive = 4;
+    // Specifies a list of HTTP expected responses to match in the first ``response_buffer_size`` bytes of the response body.
+    // If it is set, both the expected response check and status code determine the health check.
+    // When checking the response, “fuzzy” matching is performed such that each payload block must be found,
+    // and in the order specified, but not necessarily contiguous.
+    //
+    // .. note::
+    //
+    //   It is recommended to set ``response_buffer_size`` based on the total Payload size for efficiency.
+    //   The default buffer size is 1024 bytes when it is not set.
+    repeated Payload receive = 4;
+
+    // Specifies the size of response buffer in bytes that is used to Payload match.
+    // The default value is 1024. Setting to 0 implies that the Payload will be matched against the entire response.
+    google.protobuf.UInt64Value response_buffer_size = 14 [(validate.rules).uint64 = {gte: 0}];
 
     // Specifies a list of HTTP headers that should be added to each request that is sent to the
     // health checked cluster. For more information, including details on header value syntax, see
@@ -145,6 +157,12 @@ message HealthCheck {
     // <envoy_v3_api_msg_type.matcher.v3.StringMatcher>`. See the :ref:`architecture overview
     // <arch_overview_health_checking_identity>` for more information.
     type.matcher.v3.StringMatcher service_name_matcher = 11;
+
+    // HTTP Method that will be used for health checking, default is "GET".
+    // GET, HEAD, POST, PUT, DELETE, OPTIONS, TRACE, PATCH methods are supported, but making request body is not supported.
+    // CONNECT method is disallowed because it is not appropriate for health check request.
+    // If a non-200 response is expected by the method, it needs to be set in :ref:`expected_statuses <envoy_v3_api_field_config.core.v3.HealthCheck.HttpHealthCheck.expected_statuses>`.
+    RequestMethod method = 13 [(validate.rules).enum = {defined_only: true not_in: 6}];
   }
 
   message TcpHealthCheck {
@@ -155,7 +173,7 @@ message HealthCheck {
     Payload send = 1;
 
     // When checking the response, “fuzzy” matching is performed such that each
-    // binary block must be found, and in the order specified, but not
+    // payload block must be found, and in the order specified, but not
     // necessarily contiguous.
     repeated Payload receive = 2;
   }

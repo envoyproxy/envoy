@@ -1,0 +1,15 @@
+expression {
+  call_expr {
+    function: "_==_"
+    args {
+      ident_expr {
+        name: "response"
+      }
+    }
+    args {
+      ident_expr {
+        name: "response"
+      }
+    }
+  }
+}

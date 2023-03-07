@@ -3,14 +3,14 @@
 Command line options
 ====================
 
-Envoy is driven both by a JSON configuration file as well as a set of command line options. The
+Envoy is driven both by a configuration file as well as a set of command line options. The
 following are the command line options that Envoy supports.
 
 .. option:: -c <path string>, --config-path <path string>
 
-  *(optional)* The path to the v2 :ref:`JSON/YAML/proto3 configuration
+  *(optional)* The path to the :ref:`JSON/YAML/proto3 configuration
   file <config>`. If this flag is missing, :option:`--config-yaml` is required.
-  This will be parsed as a :ref:`v2 bootstrap configuration file
+  This will be parsed as a :ref:`bootstrap configuration file
   <config_overview_bootstrap>`.
   Valid extensions are ``.json``, ``.yaml``, ``.pb`` and ``.pb_text``, which indicate
   JSON, YAML, `binary proto3

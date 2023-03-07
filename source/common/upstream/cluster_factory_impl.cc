@@ -25,14 +25,11 @@ Stats::ScopeSharedPtr generateStatsScope(const envoy::config::cluster::v3::Clust
 } // namespace
 
 std::pair<ClusterSharedPtr, ThreadAwareLoadBalancerPtr> ClusterFactoryImplBase::create(
+    Server::Configuration::ServerFactoryContext& server_context,
     const envoy::config::cluster::v3::Cluster& cluster, ClusterManager& cluster_manager,
-    Stats::Store& stats, ThreadLocal::Instance& tls, Network::DnsResolverSharedPtr dns_resolver,
-    Ssl::ContextManager& ssl_context_manager, Runtime::Loader& runtime,
-    Event::Dispatcher& dispatcher, AccessLog::AccessLogManager& log_manager,
-    const LocalInfo::LocalInfo& local_info, Server::Admin& admin,
-    Singleton::Manager& singleton_manager, Outlier::EventLoggerSharedPtr outlier_event_logger,
-    bool added_via_api, ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api,
-    const Server::Options& options) {
+    Stats::Store& stats, LazyCreateDnsResolver dns_resolver_fn,
+    Ssl::ContextManager& ssl_context_manager, Outlier::EventLoggerSharedPtr outlier_event_logger,
+    bool added_via_api, ProtobufMessage::ValidationVisitor& validation_visitor) {
   std::string cluster_type;
 
   if (!cluster.has_cluster_type()) {
@@ -72,11 +69,10 @@ std::pair<ClusterSharedPtr, ThreadAwareLoadBalancerPtr> ClusterFactoryImplBase::
         "Didn't find a registered cluster factory implementation for name: '{}'", cluster_type));
   }
 
-  ClusterFactoryContextImpl context(
-      cluster_manager, stats, tls, std::move(dns_resolver), ssl_context_manager, runtime,
-      dispatcher, log_manager, local_info, admin, singleton_manager,
-      std::move(outlier_event_logger), added_via_api, validation_visitor, api, options);
-  return factory->create(cluster, context);
+  ClusterFactoryContextImpl context(server_context, cluster_manager, stats, dns_resolver_fn,
+                                    ssl_context_manager, std::move(outlier_event_logger),
+                                    added_via_api, validation_visitor);
+  return factory->create(server_context, cluster, context);
 }
 
 Network::DnsResolverSharedPtr
@@ -105,19 +101,19 @@ ClusterFactoryImplBase::selectDnsResolver(const envoy::config::cluster::v3::Clus
 }
 
 std::pair<ClusterSharedPtr, ThreadAwareLoadBalancerPtr>
-ClusterFactoryImplBase::create(const envoy::config::cluster::v3::Cluster& cluster,
+ClusterFactoryImplBase::create(Server::Configuration::ServerFactoryContext& server_context,
+                               const envoy::config::cluster::v3::Cluster& cluster,
                                ClusterFactoryContext& context) {
   auto stats_scope = generateStatsScope(cluster, context.stats());
   std::unique_ptr<Server::Configuration::TransportSocketFactoryContextImpl>
       transport_factory_context =
           std::make_unique<Server::Configuration::TransportSocketFactoryContextImpl>(
-              context.admin(), context.sslContextManager(), *stats_scope, context.clusterManager(),
-              context.localInfo(), context.mainThreadDispatcher(), context.stats(),
-              context.singletonManager(), context.threadLocal(), context.messageValidationVisitor(),
-              context.api(), context.options(), context.logManager());
+              server_context, context.sslContextManager(), *stats_scope, context.clusterManager(),
+              context.stats(), context.messageValidationVisitor());
 
   std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr> new_cluster_pair =
-      createClusterImpl(cluster, context, *transport_factory_context, std::move(stats_scope));
+      createClusterImpl(server_context, cluster, context, *transport_factory_context,
+                        std::move(stats_scope));
 
   if (!cluster.health_checks().empty()) {
     // TODO(htuch): Need to support multiple health checks in v2.

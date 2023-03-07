@@ -1,0 +1,37 @@
+# https://github.com/protocolbuffers/protobuf/pull/6720
+diff --git a/third_party/BUILD b/third_party/BUILD
+new file mode 100644
+index 0000000000..b66101a39a
+--- /dev/null
++++ b/third_party/BUILD
+@@ -0,0 +1 @@
++exports_files(["six.BUILD", "zlib.BUILD"])
+
+# patching for zlib binding
+diff --git a/BUILD b/BUILD
+index efc3d8e7f..746ad4851 100644
+--- a/BUILD
++++ b/BUILD
+@@ -24,7 +24,7 @@ config_setting(
+ # ZLIB configuration
+ ################################################################################
+
+-ZLIB_DEPS = ["@zlib//:zlib"]
++ZLIB_DEPS = ["//external:zlib"]
+
+ ################################################################################
+ # Protobuf Runtime Library
+diff --git a/python/google/protobuf/__init__.py b/python/google/protobuf/__init__.py
+index 97ac28028..8b7585d9d 100644
+--- a/python/google/protobuf/__init__.py
++++ b/python/google/protobuf/__init__.py
+@@ -31,3 +31,9 @@
+ # Copyright 2007 Google Inc. All Rights Reserved.
+
+ __version__ = '3.16.0'
++
++if __name__ != '__main__':
++  try:
++    __import__('pkg_resources').declare_namespace(__name__)
++  except ImportError:
++    __path__ = __import__('pkgutil').extend_path(__path__, __name__)

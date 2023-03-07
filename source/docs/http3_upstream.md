@@ -32,8 +32,8 @@ DNS RR. Currently only advertisements which specify the same hostname and port a
 #### Connectivity Grid
 The `ConnectivityGrid` is a `ConnectionPool` which wraps a `Http3ConnPoolImpl` connection pool
 (QUIC) and a `HttpConnPoolImplMixed` connection pool (TCP). If HTTP/3 is currently broken, stream
-requets will be sent directly to the mixed connection pool. If HTTP/3 is not advertised in the
-alternate protocols cache, stream requets will be sent directly to the mixed connection pool.
+requests will be sent directly to the mixed connection pool. If HTTP/3 is not advertised in the
+alternate protocols cache, stream requests will be sent directly to the mixed connection pool.
 If, however, HTTP/3 is advertised and working then the request will be sent to the HTTP/3
 connection pool. After 300ms, if this request has not succeeded, then the request will also be
 sent to the mixed pool, and whichever succeeds first will be passed back up to the caller.

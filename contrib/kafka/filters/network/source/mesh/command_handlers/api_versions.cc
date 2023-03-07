@@ -15,6 +15,10 @@ namespace Mesh {
 // going to handle only produce requests with versions higher than 5.
 constexpr int16_t MIN_PRODUCE_SUPPORTED = 5;
 constexpr int16_t MAX_PRODUCE_SUPPORTED = PRODUCE_REQUEST_MAX_VERSION; /* Generated value. */
+// List-offsets version 0 uses old-style offsets.
+constexpr int16_t MIN_LIST_OFFSETS_SUPPORTED = 1;
+constexpr int16_t MAX_LIST_OFFSETS_SUPPORTED =
+    LIST_OFFSETS_REQUEST_MAX_VERSION; /* Generated value. */
 // Right now we do not want to handle old version 0 request, as it expects us to enumerate all
 // topics if list of requested topics is empty.
 // Impl note: if filter gains knowledge of upstream cluster topics (e.g. thru admin clients), we
@@ -40,9 +44,12 @@ AbstractResponseSharedPtr ApiVersionsRequestHolder::computeAnswer() const {
   const int16_t error_code = 0;
   const ApiVersion produce_entry = {PRODUCE_REQUEST_API_KEY, MIN_PRODUCE_SUPPORTED,
                                     MAX_PRODUCE_SUPPORTED};
+  const ApiVersion list_offsets_entry = {LIST_OFFSETS_REQUEST_API_KEY, MIN_LIST_OFFSETS_SUPPORTED,
+                                         MAX_LIST_OFFSETS_SUPPORTED};
   const ApiVersion metadata_entry = {METADATA_REQUEST_API_KEY, MIN_METADATA_SUPPORTED,
                                      MAX_METADATA_SUPPORTED};
-  const ApiVersionsResponse real_response = {error_code, {produce_entry, metadata_entry}};
+  const ApiVersionsResponse real_response = {error_code,
+                                             {produce_entry, list_offsets_entry, metadata_entry}};
 
   return std::make_shared<Response<ApiVersionsResponse>>(metadata, real_response);
 }

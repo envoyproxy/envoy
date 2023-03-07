@@ -48,10 +48,7 @@ TEST(PreserveCaseFormatterFactoryConfigTest, InvalidfFormatterTypeOnEnvoyHeaders
         forward_reason_phrase: true
         formatter_type_on_envoy_headers: INVALID
 )EOF";
-  EXPECT_THROW_WITH_REGEX(
-      TestUtility::loadFromYaml(yaml, typed_config);
-      , EnvoyException,
-      "Unable to parse JSON as proto \\(INVALID_ARGUMENT:\\(formatter_type_on_envoy_headers\\):.*");
+  EXPECT_THROW(TestUtility::loadFromYaml(yaml, typed_config);, EnvoyException);
 }
 
 TEST(PreserveCaseFormatterFactoryConfigTest, PreserveCaseFormatterFactoryConfig_DEFAULT) {

@@ -36,6 +36,7 @@ public:
 };
 
 using FormatterPtr = std::unique_ptr<Formatter>;
+using FormatterConstSharedPtr = std::shared_ptr<const Formatter>;
 
 /**
  * Interface for substitution provider.

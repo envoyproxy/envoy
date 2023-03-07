@@ -177,6 +177,11 @@ void WebsocketIntegrationTest::sendBidirectionalData() {
 }
 
 TEST_P(WebsocketIntegrationTest, WebSocketConnectionDownstreamDisconnect) {
+#ifdef ENVOY_ENABLE_UHV
+  // TODO(#23286) - add web socket support for H2 UHV
+  return;
+#endif
+
   config_helper_.addConfigModifier(setRouteUsingWebsocket());
   initialize();
 
@@ -198,6 +203,11 @@ TEST_P(WebsocketIntegrationTest, PortStrippingForHttp2) {
   if (downstreamProtocol() != Http::CodecType::HTTP2) {
     return;
   }
+
+#ifdef ENVOY_ENABLE_UHV
+  // TODO(#23286) - add web socket support for H2 UHV
+  return;
+#endif
 
   config_helper_.addConfigModifier(
       [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
@@ -264,6 +274,11 @@ TEST_P(WebsocketIntegrationTest, EarlyData) {
 }
 
 TEST_P(WebsocketIntegrationTest, WebSocketConnectionIdleTimeout) {
+#ifdef ENVOY_ENABLE_UHV
+  // TODO(#23286) - add web socket support for H2 UHV
+  return;
+#endif
+
   config_helper_.addConfigModifier(setRouteUsingWebsocket());
   config_helper_.addConfigModifier(
       [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
@@ -288,6 +303,11 @@ TEST_P(WebsocketIntegrationTest, WebSocketConnectionIdleTimeout) {
 // Technically not a websocket tests, but verifies normal upgrades have parity
 // with websocket upgrades
 TEST_P(WebsocketIntegrationTest, NonWebsocketUpgrade) {
+#ifdef ENVOY_ENABLE_UHV
+  // TODO(#23286) - add web socket support for H2 UHV
+  return;
+#endif
+
   config_helper_.addConfigModifier(
       [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
               hcm) -> void {
@@ -316,6 +336,11 @@ TEST_P(WebsocketIntegrationTest, NonWebsocketUpgrade) {
 }
 
 TEST_P(WebsocketIntegrationTest, RouteSpecificUpgrade) {
+#ifdef ENVOY_ENABLE_UHV
+  // TODO(#23286) - add web socket support for H2 UHV
+  return;
+#endif
+
   config_helper_.addConfigModifier(
       [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
               hcm) -> void {
@@ -346,6 +371,11 @@ TEST_P(WebsocketIntegrationTest, RouteSpecificUpgrade) {
 }
 
 TEST_P(WebsocketIntegrationTest, WebsocketCustomFilterChain) {
+#ifdef ENVOY_ENABLE_UHV
+  // TODO(#23286) - add web socket support for H2 UHV
+  return;
+#endif
+
   config_helper_.addConfigModifier(setRouteUsingWebsocket());
 
   // Add a small buffer filter to the standard HTTP filter chain. Websocket
@@ -406,48 +436,199 @@ TEST_P(WebsocketIntegrationTest, WebsocketCustomFilterChain) {
   }
 }
 
-TEST_P(WebsocketIntegrationTest, BidirectionalChunkedData) {
-  if (downstreamProtocol() == Http::CodecType::HTTP2 ||
-      upstreamProtocol() == Http::CodecType::HTTP2) {
+TEST_P(WebsocketIntegrationTest, BidirectionalNoContentLengthNoTransferEncoding) {
+  if (downstreamProtocol() != Http::CodecType::HTTP1 ||
+      upstreamProtocol() != Http::CodecType::HTTP1) {
     return;
   }
 
   config_helper_.addConfigModifier(setRouteUsingWebsocket());
   initialize();
 
-  auto request_headers = upgradeRequestHeaders();
-  request_headers.removeContentLength();
-  auto response_headers = upgradeResponseHeaders();
-  response_headers.removeContentLength();
-  performUpgrade(request_headers, response_headers);
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("http"));
 
-  // With content-length not present, the HTTP codec will send the request with
-  // transfer-encoding: chunked.
-  if (upstreamProtocol() == Http::CodecType::HTTP1) {
-    ASSERT_TRUE(upstream_request_->headers().TransferEncoding() != nullptr);
+  // Send upgrade request without CL and TE headers
+  ASSERT_TRUE(tcp_client->write(
+      "GET / HTTP/1.1\r\nHost: host\r\nconnection: upgrade\r\nupgrade: websocket\r\n\r\n", false,
+      false));
+
+  FakeRawConnectionPtr fake_upstream_connection;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+  ASSERT(fake_upstream_connection != nullptr);
+  std::string received_data;
+  ASSERT_TRUE(fake_upstream_connection->waitForData(
+      FakeRawConnection::waitForInexactMatch("\r\n\r\n"), &received_data));
+  // Make sure Envoy did not add TE or CL headers
+  ASSERT_FALSE(absl::StrContains(received_data, "content-length"));
+  ASSERT_FALSE(absl::StrContains(received_data, "transfer-encoding"));
+  ASSERT_TRUE(fake_upstream_connection->write(
+      "HTTP/1.1 101 Switching Protocols\r\nconnection: upgrade\r\nupgrade: websocket\r\n\r\n",
+      false));
+
+  tcp_client->waitForData("\r\n\r\n", false);
+  // Make sure Envoy did not add TE or CL on the response path
+  ASSERT_FALSE(absl::StrContains(tcp_client->data(), "content-length"));
+  ASSERT_FALSE(absl::StrContains(tcp_client->data(), "transfer-encoding"));
+
+  fake_upstream_connection->clearData();
+  // Send data and make sure Envoy did not add chunk framing
+  ASSERT_TRUE(tcp_client->write("foo bar", false, false));
+  ASSERT_TRUE(fake_upstream_connection->waitForData(FakeRawConnection::waitForMatch("foo bar")));
+
+  tcp_client->clearData();
+  // Send response data and make sure Envoy did not add chunk framing on the response path
+  ASSERT_TRUE(fake_upstream_connection->write("bar foo", false));
+  tcp_client->waitForData("bar foo");
+  tcp_client->close();
+  ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
+}
+
+TEST_P(WebsocketIntegrationTest, BidirectionalUpgradeWithTransferEncoding) {
+  if (downstreamProtocol() != Http::CodecType::HTTP1 ||
+      upstreamProtocol() != Http::CodecType::HTTP1) {
+    return;
   }
 
-  // Send both a chunked request body and "websocket" payload.
-  std::string request_payload = "3\r\n123\r\n0\r\n\r\nSomeWebsocketRequestPayload";
-  codec_client_->sendData(*request_encoder_, request_payload, false);
-  ASSERT_TRUE(upstream_request_->waitForData(*dispatcher_, request_payload));
+  config_helper_.addConfigModifier(setRouteUsingWebsocket());
+  initialize();
 
-  // Send both a chunked response body and "websocket" payload.
-  std::string response_payload = "4\r\nabcd\r\n0\r\n\r\nSomeWebsocketResponsePayload";
-  upstream_request_->encodeData(response_payload, false);
-  response_->waitForBodyData(response_payload.size());
-  EXPECT_EQ(response_payload, response_->body());
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("http"));
 
-  // Verify follow-up bidirectional data still works.
-  codec_client_->sendData(*request_encoder_, "FinalClientPayload", false);
-  ASSERT_TRUE(upstream_request_->waitForData(*dispatcher_, request_payload + "FinalClientPayload"));
-  upstream_request_->encodeData("FinalServerPayload", false);
-  response_->waitForBodyData(response_->body().size() + 5);
-  EXPECT_EQ(response_payload + "FinalServerPayload", response_->body());
+  // Send upgrade request with TE: chunked header
+  ASSERT_TRUE(tcp_client->write("GET / HTTP/1.1\r\nHost: host\r\nconnection: upgrade\r\nupgrade: "
+                                "websocket\r\ntransfer-encoding: chunked\r\n\r\n",
+                                false, false));
 
-  // Clean up.
-  codec_client_->close();
-  ASSERT_TRUE(waitForUpstreamDisconnectOrReset());
+  FakeRawConnectionPtr fake_upstream_connection;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+  ASSERT(fake_upstream_connection != nullptr);
+  std::string received_data;
+  ASSERT_TRUE(fake_upstream_connection->waitForData(
+      FakeRawConnection::waitForInexactMatch("\r\n\r\n"), &received_data));
+  // Presently Envoy assumes upstream switches protocol and strips TE: chunked before proxying
+  // upgrade request to upstream.
+  ASSERT_FALSE(absl::StrContains(received_data, "transfer-encoding: chunked"));
+  ASSERT_FALSE(absl::StrContains(received_data, "content-length"));
+  ASSERT_TRUE(fake_upstream_connection->write(
+      "HTTP/1.1 101 Switching Protocols\r\nconnection: upgrade\r\nupgrade: websocket\r\n\r\n",
+      false));
+
+  tcp_client->waitForData("\r\n\r\n", false);
+  ASSERT_FALSE(absl::StrContains(tcp_client->data(), "content-length"));
+  ASSERT_FALSE(absl::StrContains(tcp_client->data(), "transfer-encoding"));
+
+  fake_upstream_connection->clearData();
+  // Send data and make sure Envoy did not add chunk framing
+  ASSERT_TRUE(tcp_client->write("7\r\nfoo bar\r\n0\r\n\r\n", false, false));
+  ASSERT_TRUE(fake_upstream_connection->waitForData(
+      FakeRawConnection::waitForMatch("7\r\nfoo bar\r\n0\r\n\r\n")));
+
+  tcp_client->clearData();
+  // Send response data and make sure Envoy did not add chunk framing on the response path
+  ASSERT_TRUE(fake_upstream_connection->write("bar foo", false));
+  tcp_client->waitForData("bar foo");
+  tcp_client->close();
+  ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
+}
+
+TEST_P(WebsocketIntegrationTest, BidirectionalUpgradeWithContentLength) {
+  if (downstreamProtocol() != Http::CodecType::HTTP1 ||
+      upstreamProtocol() != Http::CodecType::HTTP1) {
+    return;
+  }
+
+  config_helper_.addConfigModifier(setRouteUsingWebsocket());
+  initialize();
+
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("http"));
+
+  // Send upgrade request with TE: chunked header
+  ASSERT_TRUE(tcp_client->write("GET / HTTP/1.1\r\nHost: host\r\nconnection: upgrade\r\nupgrade: "
+                                "websocket\r\ncontent-length: 7\r\n\r\n",
+                                false, false));
+
+  FakeRawConnectionPtr fake_upstream_connection;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+  ASSERT(fake_upstream_connection != nullptr);
+  std::string received_data;
+  ASSERT_TRUE(fake_upstream_connection->waitForData(
+      FakeRawConnection::waitForInexactMatch("\r\n\r\n"), &received_data));
+  // Presently Envoy assumes upstream switches protocol however still proxies CL to upstream.
+  ASSERT_TRUE(absl::StrContains(received_data, "content-length: 7"));
+  ASSERT_FALSE(absl::StrContains(received_data, "transfer-encoding"));
+  ASSERT_TRUE(fake_upstream_connection->write(
+      "HTTP/1.1 101 Switching Protocols\r\nconnection: upgrade\r\nupgrade: websocket\r\n\r\n",
+      false));
+
+  tcp_client->waitForData("\r\n\r\n", false);
+  ASSERT_FALSE(absl::StrContains(tcp_client->data(), "content-length"));
+  ASSERT_FALSE(absl::StrContains(tcp_client->data(), "transfer-encoding"));
+
+  fake_upstream_connection->clearData();
+  // Send data and make sure Envoy did not add chunk framing
+  ASSERT_TRUE(tcp_client->write("foo bar", false, false));
+  ASSERT_TRUE(fake_upstream_connection->waitForData(FakeRawConnection::waitForMatch("foo bar")));
+
+  tcp_client->clearData();
+  // Send response data and make sure Envoy did not add chunk framing on the response path
+  ASSERT_TRUE(fake_upstream_connection->write("bar foo", false));
+  tcp_client->waitForData("bar foo");
+  tcp_client->close();
+  ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
+}
+
+// Verify that CONNECT requests are treated the same way as upgrades by H/1 codec.
+TEST_P(WebsocketIntegrationTest, BidirectionalConnectNoContentLengthNoTransferEncoding) {
+  if (downstreamProtocol() != Http::CodecType::HTTP1 ||
+      upstreamProtocol() != Http::CodecType::HTTP1) {
+    return;
+  }
+
+  config_helper_.addConfigModifier(
+      [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) -> void {
+        hcm.mutable_http2_protocol_options()->set_allow_connect(true);
+        hcm.mutable_route_config()
+            ->mutable_virtual_hosts(0)
+            ->mutable_routes(0)
+            ->mutable_match()
+            ->mutable_connect_matcher();
+        hcm.add_upgrade_configs()->set_upgrade_type("CONNECT");
+      });
+  initialize();
+
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("http"));
+
+  // Send upgrade request without CL and TE headers
+  ASSERT_TRUE(tcp_client->write("CONNECT www.somewhere.com:80 HTTP/1.1\r\n\r\n", false, false));
+
+  FakeRawConnectionPtr fake_upstream_connection;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+  ASSERT(fake_upstream_connection != nullptr);
+  std::string received_data;
+  ASSERT_TRUE(fake_upstream_connection->waitForData(
+      FakeRawConnection::waitForInexactMatch("\r\n\r\n"), &received_data));
+  // Make sure Envoy did not add TE or CL headers
+  ASSERT_FALSE(absl::StrContains(received_data, "content-length"));
+  ASSERT_FALSE(absl::StrContains(received_data, "transfer-encoding"));
+  ASSERT_TRUE(fake_upstream_connection->write("HTTP/1.1 200 OK\r\n\r\n", false));
+
+  tcp_client->waitForData("\r\n\r\n", false);
+  // Make sure Envoy did not add TE or CL on the response path
+  ASSERT_FALSE(absl::StrContains(tcp_client->data(), "content-length"));
+  ASSERT_FALSE(absl::StrContains(tcp_client->data(), "transfer-encoding"));
+
+  fake_upstream_connection->clearData();
+  // Send data and make sure Envoy did not add chunk framing
+  ASSERT_TRUE(tcp_client->write("foo bar", false, false));
+  ASSERT_TRUE(fake_upstream_connection->waitForData(FakeRawConnection::waitForMatch("foo bar")));
+
+  tcp_client->clearData();
+  // Send response data and make sure Envoy did not add chunk framing on the response path
+  ASSERT_TRUE(fake_upstream_connection->write("bar foo", false));
+  tcp_client->waitForData("bar foo");
+  tcp_client->close();
+  ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
 }
 
 } // namespace Envoy

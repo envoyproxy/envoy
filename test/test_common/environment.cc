@@ -251,6 +251,15 @@ std::vector<Network::Address::IpVersion> TestEnvironment::getIpVersionsForTest()
   return parameters;
 }
 
+std::vector<spdlog::logger*> TestEnvironment::getSpdLoggersForTest() {
+  std::vector<spdlog::logger*> logger_parameters;
+  logger_parameters.push_back(&Logger::Registry::loggers()[0].getLogger());
+  std::atomic<spdlog::logger*> flogger{nullptr};
+  getFineGrainLogContext().initFineGrainLogger(__FILE__, flogger);
+  logger_parameters.push_back(flogger.load(std::memory_order_relaxed));
+  return logger_parameters;
+}
+
 Server::Options& TestEnvironment::getOptions() {
   static OptionsImpl* options = new OptionsImpl(
       argc_, argv_, [](bool) { return "1"; }, spdlog::level::err);

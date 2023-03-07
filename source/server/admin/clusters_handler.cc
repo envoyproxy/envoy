@@ -42,11 +42,9 @@ void addCircuitBreakerSettingsAsJson(const envoy::config::core::v3::RoutingPrior
 
 ClustersHandler::ClustersHandler(Server::Instance& server) : HandlerContextBase(server) {}
 
-Http::Code ClustersHandler::handlerClusters(absl::string_view url,
-                                            Http::ResponseHeaderMap& response_headers,
-                                            Buffer::Instance& response, AdminStream&) {
-  Http::Utility::QueryParams query_params = Http::Utility::parseAndDecodeQueryString(url);
-  const auto format_value = Utility::formatParam(query_params);
+Http::Code ClustersHandler::handlerClusters(Http::ResponseHeaderMap& response_headers,
+                                            Buffer::Instance& response, AdminStream& admin_stream) {
+  const auto format_value = Utility::formatParam(admin_stream.queryParams());
 
   if (format_value.has_value() && format_value.value() == "json") {
     writeClustersAsJson(response);
@@ -117,6 +115,10 @@ void ClustersHandler::writeClustersAsJson(Buffer::Instance& response) {
     envoy::admin::v3::ClusterStatus& cluster_status = *clusters.add_cluster_statuses();
     cluster_status.set_name(cluster_info->name());
     cluster_status.set_observability_name(cluster_info->observabilityName());
+    const auto& eds_service_name = cluster_info->edsServiceName();
+    if (eds_service_name.has_value()) {
+      cluster_status.set_eds_service_name(*eds_service_name);
+    }
 
     addCircuitBreakerSettingsAsJson(
         envoy::config::core::v3::RoutingPriority::DEFAULT,
@@ -214,6 +216,10 @@ void ClustersHandler::writeClustersAsText(Buffer::Instance& response) {
 
     response.add(
         fmt::format("{}::added_via_api::{}\n", cluster_name, cluster.info()->addedViaApi()));
+    const auto& eds_service_name = cluster.info()->edsServiceName();
+    if (eds_service_name.has_value()) {
+      response.add(fmt::format("{}::eds_service_name::{}\n", cluster_name, *eds_service_name));
+    }
     for (auto& host_set : cluster.prioritySet().hostSetsPerPriority()) {
       for (auto& host : host_set->hosts()) {
         const std::string& host_address = host->address()->asString();

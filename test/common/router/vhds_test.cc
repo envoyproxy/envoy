@@ -11,8 +11,10 @@
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/router/rds_impl.h"
 #include "source/common/router/route_config_update_receiver_impl.h"
-#include "source/server/admin/admin.h"
 
+#ifdef ENVOY_ADMIN_FUNCTIONALITY
+#include "source/server/admin/admin.h"
+#endif
 #include "test/mocks/config/mocks.h"
 #include "test/mocks/init/mocks.h"
 #include "test/mocks/server/instance.h"
@@ -86,7 +88,7 @@ vhds:
   Init::ExpectableWatcherImpl init_watcher_;
   Init::TargetHandlePtr init_target_handle_;
   const std::string context_ = "vhds_test";
-  absl::optional<Envoy::Rds::RouteConfigProvider*> provider_;
+  Envoy::Rds::RouteConfigProvider* provider_ = nullptr;
   Protobuf::util::MessageDifferencer messageDifferencer_;
   std::string default_vhds_config_;
   NiceMock<Envoy::Config::MockSubscriptionFactory> subscription_factory_;

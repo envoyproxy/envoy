@@ -39,7 +39,7 @@ public:
   virtual SubscriptionPtr subscriptionFromConfigSource(
       const envoy::config::core::v3::ConfigSource& config, absl::string_view type_url,
       Stats::Scope& scope, SubscriptionCallbacks& callbacks,
-      OpaqueResourceDecoder& resource_decoder, const SubscriptionOptions& options) PURE;
+      OpaqueResourceDecoderSharedPtr resource_decoder, const SubscriptionOptions& options) PURE;
 
   /**
    * Collection subscription factory interface for xDS-TP URLs.
@@ -60,7 +60,7 @@ public:
                                 const envoy::config::core::v3::ConfigSource& config,
                                 absl::string_view type_url, Stats::Scope& scope,
                                 SubscriptionCallbacks& callbacks,
-                                OpaqueResourceDecoder& resource_decoder) PURE;
+                                OpaqueResourceDecoderSharedPtr resource_decoder) PURE;
 };
 
 } // namespace Config

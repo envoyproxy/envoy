@@ -43,7 +43,7 @@ trap trap_errors ERR
 trap exit 1 INT
 
 CURRENT=check
-time bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/code:check -- --fix -v warn
+time bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/code:check -- --fix -v warn -x mobile/dist/envoy-pom.xml
 
 CURRENT=configs
 bazel run "${BAZEL_BUILD_OPTIONS[@]}" //configs:example_configs_validation
@@ -57,14 +57,11 @@ if [[ -n "$AZP_BRANCH" ]]; then
     "${ENVOY_SRCDIR}"/tools/code_format/check_format_test_helper.sh --log=WARN
 fi
 
-fix_format () {
-    echo "Fixing format..."
-    "${ENVOY_SRCDIR}"/tools/code_format/check_format.py fix
-    return 1
-}
-
 CURRENT=check_format
-"${ENVOY_SRCDIR}"/tools/code_format/check_format.py check || fix_format
+"${ENVOY_SRCDIR}"/tools/code_format/check_format.py fix --fail_on_diff
+
+CURRENT=check_format_go_code
+"${ENVOY_SRCDIR}"/tools/code_format/check_format_go_code.sh
 
 if [[ "${#FAILED[@]}" -ne "0" ]]; then
     echo "${BASH_ERR_PREFIX}TESTS FAILED:" >&2

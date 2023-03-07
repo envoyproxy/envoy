@@ -41,11 +41,12 @@ public:
   TestStaticClusterFactory() : ClusterFactoryImplBase("envoy.clusters.test_static") {}
 
   std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr> createClusterImpl(
+      Server::Configuration::ServerFactoryContext& server_context,
       const envoy::config::cluster::v3::Cluster& cluster, ClusterFactoryContext& context,
       Server::Configuration::TransportSocketFactoryContextImpl& socket_factory_context,
       Stats::ScopeSharedPtr&& stats_scope) override {
     return std::make_pair(std::make_shared<CustomStaticCluster>(
-                              cluster, context.runtime(), socket_factory_context,
+                              server_context, cluster, context.runtime(), socket_factory_context,
                               std::move(stats_scope), context.addedViaApi(), 1, "127.0.0.1", 80),
                           nullptr);
   }
@@ -53,26 +54,21 @@ public:
 
 class ClusterFactoryTestBase {
 protected:
-  ClusterFactoryTestBase() : api_(Api::createApiForTest(stats_)) {
+  ClusterFactoryTestBase() {
     outlier_event_logger_ = std::make_shared<Outlier::MockEventLogger>();
     dns_resolver_ = std::make_shared<Network::MockDnsResolver>();
   }
 
-  NiceMock<Server::MockAdmin> admin_;
+  NiceMock<Server::Configuration::MockServerFactoryContext> server_context_;
   Ssl::MockContextManager ssl_context_manager_;
   NiceMock<MockClusterManager> cm_;
-  const NiceMock<LocalInfo::MockLocalInfo> local_info_;
-  NiceMock<Event::MockDispatcher> dispatcher_;
-  NiceMock<Runtime::MockLoader> runtime_;
   Stats::TestUtil::TestStore stats_;
-  Singleton::ManagerImpl singleton_manager_{Thread::threadFactoryForTest()};
-  NiceMock<ThreadLocal::MockInstance> tls_;
   NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor_;
-  Api::ApiPtr api_;
   Network::DnsResolverSharedPtr dns_resolver_;
+  std::function<Network::DnsResolverSharedPtr()> dns_resolver_fn_ =
+      [this]() -> Network::DnsResolverSharedPtr { return this->dns_resolver_; };
   AccessLog::MockAccessLogManager log_manager_;
   Outlier::EventLoggerSharedPtr outlier_event_logger_;
-  Server::MockOptions options_;
 };
 
 class TestStaticClusterImplTest : public testing::Test, public ClusterFactoryTestBase {};
@@ -99,9 +95,8 @@ TEST_F(TestStaticClusterImplTest, CreateWithoutConfig) {
 
   const envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
   auto create_result = ClusterFactoryImplBase::create(
-      cluster_config, cm_, stats_, tls_, dns_resolver_, ssl_context_manager_, runtime_, dispatcher_,
-      log_manager_, local_info_, admin_, singleton_manager_, std::move(outlier_event_logger_),
-      false, validation_visitor_, *api_, options_);
+      server_context_, cluster_config, cm_, stats_, dns_resolver_fn_, ssl_context_manager_,
+      std::move(outlier_event_logger_), false, validation_visitor_);
   auto cluster = create_result.first;
   cluster->initialize([] {});
 
@@ -144,9 +139,8 @@ TEST_F(TestStaticClusterImplTest, CreateWithStructConfig) {
 
   const envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
   auto create_result = ClusterFactoryImplBase::create(
-      cluster_config, cm_, stats_, tls_, dns_resolver_, ssl_context_manager_, runtime_, dispatcher_,
-      log_manager_, local_info_, admin_, singleton_manager_, std::move(outlier_event_logger_),
-      false, validation_visitor_, *api_, options_);
+      server_context_, cluster_config, cm_, stats_, dns_resolver_fn_, ssl_context_manager_,
+      std::move(outlier_event_logger_), false, validation_visitor_);
   auto cluster = create_result.first;
   cluster->initialize([] {});
 
@@ -187,9 +181,8 @@ TEST_F(TestStaticClusterImplTest, CreateWithTypedConfig) {
 
   const envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
   auto create_result = ClusterFactoryImplBase::create(
-      cluster_config, cm_, stats_, tls_, dns_resolver_, ssl_context_manager_, runtime_, dispatcher_,
-      log_manager_, local_info_, admin_, singleton_manager_, std::move(outlier_event_logger_),
-      false, validation_visitor_, *api_, options_);
+      server_context_, cluster_config, cm_, stats_, dns_resolver_fn_, ssl_context_manager_,
+      std::move(outlier_event_logger_), false, validation_visitor_);
   auto cluster = create_result.first;
   cluster->initialize([] {});
 
@@ -230,9 +223,8 @@ TEST_F(TestStaticClusterImplTest, UnsupportedClusterType) {
       {
         const envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
         ClusterFactoryImplBase::create(
-            cluster_config, cm_, stats_, tls_, dns_resolver_, ssl_context_manager_, runtime_,
-            dispatcher_, log_manager_, local_info_, admin_, singleton_manager_,
-            std::move(outlier_event_logger_), false, validation_visitor_, *api_, options_);
+            server_context_, cluster_config, cm_, stats_, dns_resolver_fn_, ssl_context_manager_,
+            std::move(outlier_event_logger_), false, validation_visitor_);
       },
       EnvoyException,
       "Didn't find a registered cluster factory implementation for name: "
@@ -263,9 +255,8 @@ TEST_F(TestStaticClusterImplTest, HostnameWithoutDNS) {
       {
         const envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
         ClusterFactoryImplBase::create(
-            cluster_config, cm_, stats_, tls_, dns_resolver_, ssl_context_manager_, runtime_,
-            dispatcher_, log_manager_, local_info_, admin_, singleton_manager_,
-            std::move(outlier_event_logger_), false, validation_visitor_, *api_, options_);
+            server_context_, cluster_config, cm_, stats_, dns_resolver_fn_, ssl_context_manager_,
+            std::move(outlier_event_logger_), false, validation_visitor_);
       },
       EnvoyException,
       "Cannot use hostname for consistent hashing loadbalancing for cluster of type: "

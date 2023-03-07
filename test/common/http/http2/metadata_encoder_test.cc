@@ -7,13 +7,14 @@
 #include "source/common/http/http2/metadata_encoder.h"
 
 #include "test/test_common/logging.h"
+#include "test/test_common/test_runtime.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 #include "http2_frame.h"
-#include "nghttp2/nghttp2.h"
 #include "quiche/http2/adapter/callback_visitor.h"
 #include "quiche/http2/adapter/data_source.h"
+#include "quiche/http2/adapter/mock_http2_visitor.h"
 #include "quiche/http2/adapter/nghttp2_adapter.h"
 
 // A global variable in nghttp2 to disable preface and initial settings for tests.
@@ -28,7 +29,7 @@ namespace Http2 {
 namespace {
 
 absl::string_view toStringView(uint8_t* data, size_t length) {
-  return absl::string_view(reinterpret_cast<char*>(data), length);
+  return {reinterpret_cast<char*>(data), length};
 }
 
 static const uint64_t STREAM_ID = 1;
@@ -39,50 +40,51 @@ struct TestBuffer {
   size_t length = 0;
 };
 
-// The application data structure passes to nghttp2 session.
-struct UserData {
-  NewMetadataEncoder* encoder;
-  MetadataDecoder* decoder;
-  // Stores data sent by encoder and received by the decoder.
-  TestBuffer* output_buffer;
+class MetadataUnpackingVisitor : public http2::adapter::test::MockHttp2Visitor {
+public:
+  MetadataUnpackingVisitor(MetadataDecoder* decoder, TestBuffer* output_buffer)
+      : decoder_(decoder), buffer_(output_buffer) {
+    // These calls are not important to intercept for these tests.
+    EXPECT_CALL(*this, OnBeforeFrameSent).Times(testing::AnyNumber());
+    EXPECT_CALL(*this, OnFrameSent).Times(testing::AnyNumber());
+    EXPECT_CALL(*this, OnFrameHeader).Times(testing::AnyNumber());
+  }
+
+  void OnBeginMetadataForStream(http2::adapter::Http2StreamId /*stream_id*/,
+                                size_t payload_length) override {
+    remaining_payload_ = payload_length;
+  }
+
+  bool OnMetadataForStream(http2::adapter::Http2StreamId /*stream_id*/,
+                           absl::string_view metadata) override {
+    return decoder_->receiveMetadata(reinterpret_cast<const uint8_t*>(metadata.data()),
+                                     metadata.size());
+  }
+
+  bool OnMetadataEndForStream(http2::adapter::Http2StreamId /*stream_id*/) override {
+    return decoder_->onMetadataFrameComplete(true);
+  }
+
+  int64_t OnReadyToSend(absl::string_view serialized) override {
+    memcpy(buffer_->buf + buffer_->length, serialized.data(), serialized.size());
+    buffer_->length += serialized.size();
+    return serialized.size();
+  }
+
+  MetadataDecoder* decoder_;
+  TestBuffer* buffer_;
+  size_t remaining_payload_ = 0;
 };
-
-// Nghttp2 callback function for receiving extension frame.
-static int onExtensionChunkRecvCallback(nghttp2_session* /*session*/, const nghttp2_frame_hd* hd,
-                                        const uint8_t* data, size_t len, void* user_data) {
-  EXPECT_GE(hd->length, len);
-
-  MetadataDecoder* decoder = reinterpret_cast<UserData*>(user_data)->decoder;
-  bool success = decoder->receiveMetadata(data, len);
-  return success ? 0 : NGHTTP2_ERR_CALLBACK_FAILURE;
-}
-
-// Nghttp2 callback function for unpack extension frames.
-static int unpackExtensionCallback(nghttp2_session* /*session*/, void** payload,
-                                   const nghttp2_frame_hd* hd, void* user_data) {
-  EXPECT_NE(nullptr, hd);
-  EXPECT_NE(nullptr, payload);
-
-  MetadataDecoder* decoder = reinterpret_cast<UserData*>(user_data)->decoder;
-  bool result = decoder->onMetadataFrameComplete((hd->flags == END_METADATA_FLAG) ? true : false);
-  return result ? 0 : NGHTTP2_ERR_CALLBACK_FAILURE;
-}
-
-// Nghttp2 callback function for sending data to peer.
-static ssize_t sendCallback(nghttp2_session* /*session*/, const uint8_t* buf, size_t len, int flags,
-                            void* user_data) {
-  EXPECT_LE(0, flags);
-
-  TestBuffer* buffer = (reinterpret_cast<UserData*>(user_data))->output_buffer;
-  memcpy(buffer->buf + buffer->length, buf, len);
-  buffer->length += len;
-  return len;
-}
 
 } // namespace
 
-class MetadataEncoderTest : public testing::Test {
+class MetadataEncoderTest : public testing::TestWithParam<bool> {
 public:
+  void SetUp() override {
+    scoped_runtime_.mergeValues({{"envoy.reloadable_features.http2_decode_metadata_with_quiche",
+                                  GetParam() ? "true" : "false"}});
+  }
+
   void initialize(MetadataCallback cb) {
     decoder_ = std::make_unique<MetadataDecoder>(cb);
 
@@ -91,27 +93,13 @@ public:
     nghttp2_option_new(&option);
     nghttp2_option_set_user_recv_extension_type(option, METADATA_FRAME_TYPE);
 
-    // Sets callback functions.
-    nghttp2_session_callbacks* callbacks;
-    nghttp2_session_callbacks_new(&callbacks);
-    nghttp2_session_callbacks_set_send_callback(callbacks, sendCallback);
-    nghttp2_session_callbacks_set_on_extension_chunk_recv_callback(callbacks,
-                                                                   onExtensionChunkRecvCallback);
-    nghttp2_session_callbacks_set_unpack_extension_callback(callbacks, unpackExtensionCallback);
-
-    // Sets application data to pass to nghttp2 session.
-    user_data_.encoder = &encoder_;
-    user_data_.decoder = decoder_.get();
-    user_data_.output_buffer = &output_buffer_;
-
     // Creates new nghttp2 session.
     nghttp2_enable_strict_preface = 0;
-    visitor_ = std::make_unique<http2::adapter::CallbackVisitor>(
-        http2::adapter::Perspective::kClient, *callbacks, &user_data_);
+    visitor_ = std::make_unique<MetadataUnpackingVisitor>(decoder_.get(), &output_buffer_);
+
     session_ = http2::adapter::NgHttp2Adapter::CreateClientAdapter(*visitor_, option);
     nghttp2_enable_strict_preface = 1;
     nghttp2_option_del(option);
-    nghttp2_session_callbacks_del(callbacks);
   }
 
   void verifyMetadataMapVector(MetadataMapVector& expect, MetadataMapPtr&& metadata_map_ptr) {
@@ -133,7 +121,7 @@ public:
   }
 
   std::unique_ptr<http2::adapter::NgHttp2Adapter> session_;
-  std::unique_ptr<http2::adapter::CallbackVisitor> visitor_;
+  std::unique_ptr<MetadataUnpackingVisitor> visitor_;
   NewMetadataEncoder encoder_;
   std::unique_ptr<MetadataDecoder> decoder_;
   int count_ = 0;
@@ -141,13 +129,13 @@ public:
   // Stores data received by peer.
   TestBuffer output_buffer_;
 
-  // Application data passed to nghttp2.
-  UserData user_data_;
-
   Random::RandomGeneratorImpl random_generator_;
+  TestScopedRuntime scoped_runtime_;
 };
 
-TEST_F(MetadataEncoderTest, TestTotalPayloadSize) {
+INSTANTIATE_TEST_SUITE_P(BothBoolValues, MetadataEncoderTest, ::testing::Bool());
+
+TEST_P(MetadataEncoderTest, TestTotalPayloadSize) {
   initialize([](MetadataMapPtr&&) {});
 
   const std::string payload = std::string(1024, 'a');
@@ -160,7 +148,7 @@ TEST_F(MetadataEncoderTest, TestTotalPayloadSize) {
   EXPECT_EQ(2 * payload.size(), decoder_->totalPayloadSize());
 }
 
-TEST_F(MetadataEncoderTest, TestDecodeBadData) {
+TEST_P(MetadataEncoderTest, TestDecodeBadData) {
   MetadataMap metadata_map = {
       {"header_key1", "header_value1"},
   };
@@ -181,13 +169,14 @@ TEST_F(MetadataEncoderTest, TestDecodeBadData) {
 }
 
 // Checks if accumulated metadata size reaches size limit, returns failure.
-TEST_F(MetadataEncoderTest, VerifyEncoderDecoderMultipleMetadataReachSizeLimit) {
+TEST_P(MetadataEncoderTest, VerifyEncoderDecoderMultipleMetadataReachSizeLimit) {
   MetadataMap metadata_map_empty = {};
   MetadataCallback cb = [](std::unique_ptr<MetadataMap>) -> void {};
   initialize(cb);
 
   ssize_t result = 0;
 
+  EXPECT_CALL(*visitor_, OnConnectionError);
   for (int i = 0; i < 100; i++) {
     // Cleans up the output buffer.
     memset(output_buffer_.buf, 0, output_buffer_.length);
@@ -218,7 +207,7 @@ TEST_F(MetadataEncoderTest, VerifyEncoderDecoderMultipleMetadataReachSizeLimit) 
 }
 
 // Tests encoding an empty map.
-TEST_F(MetadataEncoderTest, EncodeMetadataMapEmpty) {
+TEST_P(MetadataEncoderTest, EncodeMetadataMapEmpty) {
   MetadataMap empty = {};
   MetadataMapPtr metadata_map_ptr = std::make_unique<MetadataMap>(empty);
 
@@ -236,7 +225,7 @@ TEST_F(MetadataEncoderTest, EncodeMetadataMapEmpty) {
 }
 
 // Tests encoding/decoding small metadata map vectors.
-TEST_F(MetadataEncoderTest, EncodeMetadataMapVectorSmall) {
+TEST_P(MetadataEncoderTest, EncodeMetadataMapVectorSmall) {
   MetadataMap metadata_map = {
       {"header_key1", std::string(5, 'a')},
       {"header_key2", std::string(5, 'b')},
@@ -272,7 +261,7 @@ TEST_F(MetadataEncoderTest, EncodeMetadataMapVectorSmall) {
 }
 
 // Tests encoding/decoding large metadata map vectors.
-TEST_F(MetadataEncoderTest, EncodeMetadataMapVectorLarge) {
+TEST_P(MetadataEncoderTest, EncodeMetadataMapVectorLarge) {
   MetadataMapVector metadata_map_vector;
   for (int i = 0; i < 10; i++) {
     MetadataMap metadata_map = {
@@ -295,7 +284,7 @@ TEST_F(MetadataEncoderTest, EncodeMetadataMapVectorLarge) {
 }
 
 // Tests encoding/decoding with fuzzed metadata size.
-TEST_F(MetadataEncoderTest, EncodeFuzzedMetadata) {
+TEST_P(MetadataEncoderTest, EncodeFuzzedMetadata) {
   MetadataMapVector metadata_map_vector;
   for (int i = 0; i < 10; i++) {
     Random::RandomGeneratorImpl random;
@@ -319,7 +308,7 @@ TEST_F(MetadataEncoderTest, EncodeFuzzedMetadata) {
   session_->ProcessBytes(toStringView(output_buffer_.buf, output_buffer_.length));
 }
 
-TEST_F(MetadataEncoderTest, EncodeDecodeFrameTest) {
+TEST_P(MetadataEncoderTest, EncodeDecodeFrameTest) {
   MetadataMap metadataMap = {
       {"Connections", "15"},
       {"Timeout Seconds", "10"},

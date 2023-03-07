@@ -784,7 +784,7 @@ TEST_F(FileSystemBufferFilterTest, MergesRouteConfig) {
 
 TEST_F(FileSystemBufferFilterTest, PassesThrough1xxHeaders) {
   createFilterFromYaml(minimal_config);
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encode1xxHeaders(response_headers_));
+  EXPECT_EQ(Http::Filter1xxHeadersStatus::Continue, filter_->encode1xxHeaders(response_headers_));
 }
 
 TEST_F(FileSystemBufferFilterTest, PassesThroughMetadata) {

@@ -4,6 +4,7 @@
 #include <limits>
 #include <memory>
 
+#include "envoy/access_log/access_log.h"
 #include "envoy/buffer/buffer.h"
 #include "envoy/common/pure.h"
 #include "envoy/grpc/status.h"
@@ -45,6 +46,7 @@ const char MaxResponseHeadersCountOverrideKey[] =
     "envoy.reloadable_features.max_response_headers_count";
 
 class Stream;
+class RequestDecoder;
 
 /**
  * Error codes used to convey the reason for a GOAWAY.
@@ -165,6 +167,30 @@ public:
    * error.
    */
   virtual bool streamErrorOnInvalidHttpMessage() const PURE;
+
+  /**
+   * Set a new request decoder for this ResponseEncoder. This is helpful in the case of an internal
+   * redirect, in which a new request decoder is created in the context of the same downstream
+   * request.
+   * @param decoder new request decoder.
+   */
+  virtual void setRequestDecoder(RequestDecoder& decoder) PURE;
+
+  /**
+   * Set headers, trailers, and stream info for deferred logging. This allows HCM to hand off
+   * stream-level details to the codec for logging after the stream may be destroyed (e.g. on
+   * receiving the final ack packet from the client). Note that headers and trailers are const
+   * as they will not be modified after this point.
+   * @param request_header_map Request headers for this stream.
+   * @param response_header_map Response headers for this stream.
+   * @param response_trailer_map Response trailers for this stream.
+   * @param stream_info Stream info for this stream.
+   */
+  virtual void
+  setDeferredLoggingHeadersAndTrailers(Http::RequestHeaderMapConstSharedPtr request_header_map,
+                                       Http::ResponseHeaderMapConstSharedPtr response_header_map,
+                                       Http::ResponseTrailerMapConstSharedPtr response_trailer_map,
+                                       StreamInfo::StreamInfo& stream_info) PURE;
 };
 
 /**
@@ -202,7 +228,7 @@ public:
    * @param headers supplies the decoded headers map.
    * @param end_stream supplies whether this is a header only request.
    */
-  virtual void decodeHeaders(RequestHeaderMapPtr&& headers, bool end_stream) PURE;
+  virtual void decodeHeaders(RequestHeaderMapSharedPtr&& headers, bool end_stream) PURE;
 
   /**
    * Called with a decoded trailers frame. This implicitly ends the stream.
@@ -227,6 +253,11 @@ public:
    * @return StreamInfo::StreamInfo& the stream_info for this stream.
    */
   virtual StreamInfo::StreamInfo& streamInfo() PURE;
+
+  /**
+   * @return List of shared pointers to access loggers for this stream.
+   */
+  virtual std::list<AccessLog::InstanceSharedPtr> accessLogHandlers() PURE;
 };
 
 /**
@@ -341,10 +372,10 @@ public:
   virtual absl::string_view responseDetails() { return ""; }
 
   /**
-   * @return const Address::InstanceConstSharedPtr& the local address of the connection associated
-   * with the stream.
+   * @return const Network::ConnectionInfoProvider& the adderess provider  of the connection
+   * associated with the stream.
    */
-  virtual const Network::Address::InstanceConstSharedPtr& connectionLocalAddress() PURE;
+  virtual const Network::ConnectionInfoProvider& connectionInfoProvider() PURE;
 
   /**
    * Set the flush timeout for the stream. At the codec level this is used to bound the amount of
@@ -352,6 +383,11 @@ public:
    * small window updates as satisfying the idle timeout as this is a potential DoS vector.
    */
   virtual void setFlushTimeout(std::chrono::milliseconds timeout) PURE;
+
+  /**
+   * @return the account, if any, used by this stream.
+   */
+  virtual Buffer::BufferMemoryAccountSharedPtr account() const PURE;
 
   /**
    * Sets the account for this stream, propagating it to all of its buffers.

@@ -67,15 +67,15 @@ private:
   const std::shared_ptr<CrashFilterConfig> config_;
 };
 
-class CrashFilterFactory : public Extensions::HttpFilters::Common::FactoryBase<
+class CrashFilterFactory : public Extensions::HttpFilters::Common::DualFactoryBase<
                                test::integration::filters::CrashFilterConfig> {
 public:
-  CrashFilterFactory() : FactoryBase("crash-filter") {}
+  CrashFilterFactory() : DualFactoryBase("crash-filter") {}
 
 private:
   Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
       const test::integration::filters::CrashFilterConfig& proto_config, const std::string&,
-      Server::Configuration::FactoryContext&) override {
+      DualInfo, Server::Configuration::ServerFactoryContext&) override {
     auto filter_config = std::make_shared<CrashFilterConfig>(
         proto_config.crash_in_encode_headers(), proto_config.crash_in_encode_data(),
         proto_config.crash_in_decode_headers(), proto_config.crash_in_decode_data(),
@@ -86,5 +86,9 @@ private:
   }
 };
 
+using UpstreamCrashFilterFactory = CrashFilterFactory;
+
 REGISTER_FACTORY(CrashFilterFactory, Server::Configuration::NamedHttpFilterConfigFactory);
+REGISTER_FACTORY(UpstreamCrashFilterFactory,
+                 Server::Configuration::UpstreamHttpFilterConfigFactory);
 } // namespace Envoy

@@ -83,8 +83,8 @@ public:
       std::make_shared<NiceMock<Envoy::Ssl::MockConnectionInfo>>()};
 };
 
-// Test injects CONNECT  only once
-TEST_P(Http11ConnectTest, InjectesHeaderOnlyOnce) {
+// Test injects CONNECT only once
+TEST_P(Http11ConnectTest, InjectsHeaderOnlyOnce) {
   initialize();
 
   EXPECT_CALL(io_handle_, write(BufferStringEqual(connect_data_.toString())))
@@ -219,7 +219,7 @@ TEST_P(Http11ConnectTest, StipsHeaderOnce) {
 
   std::string connect("HTTP/1.1 200 OK\r\n\r\n");
   std::string initial_data(connect + "follow up data");
-  EXPECT_CALL(io_handle_, recv(_, 200, MSG_PEEK))
+  EXPECT_CALL(io_handle_, recv(_, 2000, MSG_PEEK))
       .WillOnce(Invoke([&initial_data](void* buffer, size_t, int) {
         memcpy(buffer, initial_data.data(), initial_data.length());
         return Api::IoCallUint64Result(initial_data.length(),
@@ -227,8 +227,11 @@ TEST_P(Http11ConnectTest, StipsHeaderOnce) {
       }));
   absl::optional<uint64_t> expected_bytes(connect.length());
   EXPECT_CALL(io_handle_, read(_, expected_bytes))
-      .WillOnce(Return(ByMove(Api::IoCallUint64Result(
-          connect.length(), Api::IoErrorPtr(nullptr, [](Api::IoError*) {})))));
+      .WillOnce(Invoke([&](Buffer::Instance& buffer, absl::optional<uint64_t>) {
+        buffer.add(connect);
+        return Api::IoCallUint64Result(connect.length(),
+                                       Api::IoErrorPtr(nullptr, [](Api::IoError*) {}));
+      }));
   EXPECT_CALL(*inner_socket_, doRead(_))
       .WillOnce(Return(Network::IoResult{Network::PostIoAction::KeepOpen, 1, false}));
   Buffer::OwnedImpl buffer("");
@@ -241,7 +244,7 @@ TEST_P(Http11ConnectTest, InsufficientData) {
 
   std::string connect("HTTP/1.1 200 OK\r\n\r");
   std::string initial_data(connect + "follow up data");
-  EXPECT_CALL(io_handle_, recv(_, 200, MSG_PEEK))
+  EXPECT_CALL(io_handle_, recv(_, 2000, MSG_PEEK))
       .WillOnce(Invoke([&initial_data](void* buffer, size_t, int) {
         memcpy(buffer, initial_data.data(), initial_data.length());
         return Api::IoCallUint64Result(initial_data.length(),
@@ -258,7 +261,7 @@ TEST_P(Http11ConnectTest, PeekFail) {
 
   std::string connect("HTTP/1.1 200 OK\r\n\r\n");
   std::string initial_data(connect + "follow up data");
-  EXPECT_CALL(io_handle_, recv(_, 200, MSG_PEEK))
+  EXPECT_CALL(io_handle_, recv(_, 2000, MSG_PEEK))
       .WillOnce(Return(ByMove(
           Api::IoCallUint64Result({}, Api::IoErrorPtr(new Network::IoSocketError(EADDRNOTAVAIL),
                                                       Network::IoSocketError::deleteIoError)))));
@@ -276,7 +279,7 @@ TEST_P(Http11ConnectTest, ReadFail) {
 
   std::string connect("HTTP/1.1 200 OK\r\n\r\n");
   std::string initial_data(connect + "follow up data");
-  EXPECT_CALL(io_handle_, recv(_, 200, MSG_PEEK))
+  EXPECT_CALL(io_handle_, recv(_, 2000, MSG_PEEK))
       .WillOnce(Invoke([&initial_data](void* buffer, size_t, int) {
         memcpy(buffer, initial_data.data(), initial_data.length());
         return Api::IoCallUint64Result(initial_data.length(),
@@ -300,7 +303,7 @@ TEST_P(Http11ConnectTest, ShortRead) {
 
   std::string connect("HTTP/1.1 200 OK\r\n\r\n");
   std::string initial_data(connect + "follow up data");
-  EXPECT_CALL(io_handle_, recv(_, 200, MSG_PEEK))
+  EXPECT_CALL(io_handle_, recv(_, 2000, MSG_PEEK))
       .WillOnce(Invoke([&initial_data](void* buffer, size_t, int) {
         memcpy(buffer, initial_data.data(), initial_data.length());
         return Api::IoCallUint64Result(initial_data.length(),
@@ -317,20 +320,22 @@ TEST_P(Http11ConnectTest, ShortRead) {
   EXPECT_EQ(Network::PostIoAction::Close, result.action_);
 }
 
-// If headers exceed 200 bytes, read fails.
+// If headers exceed 2000 bytes, read fails.
 TEST_P(Http11ConnectTest, LongHeaders) {
   initialize();
 
-  EXPECT_CALL(io_handle_, recv(_, 200, MSG_PEEK)).WillOnce(Invoke([](void* buffer, size_t, int) {
-    memset(buffer, 0, 200);
-    return Api::IoCallUint64Result(200, Api::IoErrorPtr(nullptr, [](Api::IoError*) {}));
+  EXPECT_CALL(io_handle_, recv(_, 2000, MSG_PEEK)).WillOnce(Invoke([](void* buffer, size_t, int) {
+    memset(buffer, 0, 2000);
+    return Api::IoCallUint64Result(2000, Api::IoErrorPtr(nullptr, [](Api::IoError*) {}));
   }));
   EXPECT_CALL(io_handle_, read(_, _)).Times(0);
   EXPECT_CALL(*inner_socket_, doRead(_)).Times(0);
 
   Buffer::OwnedImpl buffer("");
-  auto result = connect_socket_->doRead(buffer);
-  EXPECT_EQ(Network::PostIoAction::Close, result.action_);
+  EXPECT_LOG_CONTAINS("trace", "failed to receive CONNECT headers within 2000 bytes", {
+    auto result = connect_socket_->doRead(buffer);
+    EXPECT_EQ(Network::PostIoAction::Close, result.action_);
+  });
 }
 
 // If response is not 200 OK, read fails.
@@ -339,21 +344,17 @@ TEST_P(Http11ConnectTest, InvalidResponse) {
 
   std::string connect("HTTP/1.1 404 Not Found\r\n\r\n");
   std::string initial_data(connect + "follow up data");
-  EXPECT_CALL(io_handle_, recv(_, 200, MSG_PEEK))
+  EXPECT_CALL(io_handle_, recv(_, 2000, MSG_PEEK))
       .WillOnce(Invoke([&initial_data](void* buffer, size_t, int) {
         memcpy(buffer, initial_data.data(), initial_data.length());
         return Api::IoCallUint64Result(initial_data.length(),
                                        Api::IoErrorPtr(nullptr, [](Api::IoError*) {}));
       }));
-  absl::optional<uint64_t> expected_bytes(connect.length());
-  EXPECT_CALL(io_handle_, read(_, expected_bytes))
-      .WillOnce(Return(ByMove(Api::IoCallUint64Result(
-          connect.length(), Api::IoErrorPtr(nullptr, [](Api::IoError*) {})))));
 
   EXPECT_CALL(*inner_socket_, doRead(_)).Times(0);
 
   Buffer::OwnedImpl buffer("");
-  EXPECT_LOG_CONTAINS("trace", "Response does not match strict connect checks", {
+  EXPECT_LOG_CONTAINS("trace", "Response does not appear to be a successful CONNECT upgrade", {
     auto result = connect_socket_->doRead(buffer);
     EXPECT_EQ(Network::PostIoAction::Close, result.action_);
   });
@@ -380,6 +381,74 @@ TEST_F(SocketFactoryTest, CreateSocketReturnsNullWhenInnerFactoryReturnsNull) {
   initialize();
   EXPECT_CALL(*inner_factory_, createTransportSocket(_, _)).WillOnce(testing::ReturnNull());
   ASSERT_EQ(nullptr, factory_->createTransportSocket(nullptr, nullptr));
+}
+
+TEST(ParseTest, TestValidResponse) {
+  size_t bytes_processed;
+  bool headers_complete;
+  {
+    std::string response("HTTP/1.0 200 OK\r\n\r\n");
+    ASSERT_TRUE(UpstreamHttp11ConnectSocket::isValidConnectResponse(response, headers_complete,
+                                                                    bytes_processed));
+    EXPECT_EQ(response.length(), bytes_processed);
+  }
+  {
+    std::string response("HTTP/1.0 200 OK\n\r\n");
+    ASSERT_TRUE(UpstreamHttp11ConnectSocket::isValidConnectResponse(response, headers_complete,
+                                                                    bytes_processed));
+    EXPECT_EQ(response.length(), bytes_processed);
+  }
+  {
+    std::string response("HTTP/1.0 200 OK\n\n");
+    ASSERT_TRUE(UpstreamHttp11ConnectSocket::isValidConnectResponse(response, headers_complete,
+                                                                    bytes_processed));
+    EXPECT_EQ(response.length(), bytes_processed);
+  }
+  {
+    std::string response("HTTP/1.0 200 OK\r\n\n");
+    ASSERT_TRUE(UpstreamHttp11ConnectSocket::isValidConnectResponse(response, headers_complete,
+                                                                    bytes_processed));
+    EXPECT_EQ(response.length(), bytes_processed);
+  }
+  {
+    // Extra headers are OK.
+    std::string response("HTTP/1.0 200 OK\r\nFoo: Bar\r\n\r\n");
+    ASSERT_TRUE(UpstreamHttp11ConnectSocket::isValidConnectResponse(response, headers_complete,
+                                                                    bytes_processed));
+    EXPECT_EQ(response.length(), bytes_processed);
+  }
+  {
+    // Extra whitespace and extra payload are OK.
+    std::string response("HTTP/1.1   200  OK \r\n\r\nasdf");
+    ASSERT_TRUE(UpstreamHttp11ConnectSocket::isValidConnectResponse(response, headers_complete,
+                                                                    bytes_processed));
+    EXPECT_EQ(response.length(), bytes_processed + 4);
+  }
+  {
+    // 300 is not OK.
+    std::string response("HTTP/1.0 300 OK\r\n\r\n");
+    ASSERT_FALSE(UpstreamHttp11ConnectSocket::isValidConnectResponse(response, headers_complete,
+                                                                     bytes_processed));
+    EXPECT_TRUE(headers_complete);
+  }
+  {
+    // Only one CRLF: incomplete headers.
+    std::string response("HTTP/1.0 200 OK\r\n");
+    ASSERT_FALSE(UpstreamHttp11ConnectSocket::isValidConnectResponse(response, headers_complete,
+                                                                     bytes_processed));
+    EXPECT_FALSE(headers_complete);
+  }
+}
+
+// The SelfContainedParser is only intended for header parsing but for coverage,
+// test a request with a body.
+TEST(ParseTest, CoverResponseBody) {
+  std::string headers = "HTTP/1.0 200 OK\r\ncontent-length: 2\r\n\r\n";
+  std::string body = "ab";
+
+  SelfContainedParser parser;
+  parser.parser().execute(headers.c_str(), headers.length());
+  parser.parser().execute(body.c_str(), body.length());
 }
 
 } // namespace

@@ -185,6 +185,11 @@ public:
                                    RawAsyncStreamCallbacks& callbacks,
                                    const Http::AsyncClient::StreamOptions& options) PURE;
 
+  /**
+   * Returns the name of the cluster, or other destination/target, of the client.
+   */
+  virtual absl::string_view destination() PURE;
+
 protected:
   // The lifetime of RawAsyncClient must be in the same thread.
   bool isThreadSafe() { return thread_id_ == std::this_thread::get_id(); }

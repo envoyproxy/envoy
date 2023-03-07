@@ -119,9 +119,13 @@ to each upstream cluster.
                    weight: 34
 
 
-By default, the weights must sum to exactly 100. In the V2 API, the
+The sum of the weights needs to be greater than 0. In the V2 API, the
 :ref:`total weight <envoy_v3_api_field_config.route.v3.WeightedCluster.total_weight>` defaults to 100, but can
-be modified to allow finer granularity.
+be modified to allow finer granularity. The
+:ref:`total weight <envoy_v3_api_field_config.route.v3.WeightedCluster.total_weight>` is now deprecated,
+and the relative value of each
+:ref:`cluster weight <envoy_v3_api_field_config.route.v3.WeightedCluster.ClusterWeight.weight>` compared to
+the sum of all cluster weights will be used.
 
 The weights assigned to each cluster can be dynamically adjusted using the
 following runtime variables: ``routing.traffic_split.helloworld.helloworld_v1``,

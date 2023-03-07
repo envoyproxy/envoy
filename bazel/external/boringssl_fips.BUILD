@@ -1,5 +1,3 @@
-load(":genrule_cmd.bzl", "genrule_cmd")
-
 licenses(["notice"])  # Apache 2
 
 cc_library(
@@ -31,5 +29,6 @@ genrule(
         "crypto/libcrypto.a",
         "ssl/libssl.a",
     ],
-    cmd = genrule_cmd("@envoy//bazel/external:boringssl_fips.genrule_cmd"),
+    cmd = "$(location {}) $(location crypto/libcrypto.a) $(location ssl/libssl.a)".format("@envoy//bazel/external:boringssl_fips.genrule_cmd"),
+    exec_tools = ["@envoy//bazel/external:boringssl_fips.genrule_cmd"],
 )

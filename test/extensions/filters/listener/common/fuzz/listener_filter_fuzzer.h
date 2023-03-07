@@ -3,7 +3,7 @@
 #include "envoy/network/filter.h"
 
 #include "source/common/network/connection_balancer_impl.h"
-#include "source/server/connection_handler_impl.h"
+#include "source/extensions/listener_managers/listener_manager/connection_handler_impl.h"
 
 #include "test/extensions/filters/listener/common/fuzz/listener_filter_fakes.h"
 #include "test/extensions/filters/listener/common/fuzz/listener_filter_fuzzer.pb.validate.h"
@@ -48,7 +48,6 @@ public:
   // Network::ListenerConfig
   Network::FilterChainManager& filterChainManager() override { return *this; }
   Network::FilterChainFactory& filterChainFactory() override { return factory_; }
-  Network::ListenSocketFactory& listenSocketFactory() override { return *socket_factories_[0]; }
   std::vector<Network::ListenSocketFactoryPtr>& listenSocketFactories() override {
     return socket_factories_;
   }
@@ -57,7 +56,7 @@ public:
   uint32_t perConnectionBufferLimitBytes() const override { return 0; }
   std::chrono::milliseconds listenerFiltersTimeout() const override { return {}; }
   bool continueOnListenerFiltersTimeout() const override { return false; }
-  Stats::Scope& listenerScope() override { return stats_store_; }
+  Stats::Scope& listenerScope() override { return *stats_store_.rootScope(); }
   uint64_t listenerTag() const override { return 1; }
   ResourceLimit& openConnections() override { return open_connections_; }
   const std::string& name() const override { return name_; }
@@ -81,22 +80,23 @@ public:
   bool ignoreGlobalConnLimit() const override { return false; }
 
   // Network::FilterChainManager
-  const Network::FilterChain* findFilterChain(const Network::ConnectionSocket&) const override {
+  const Network::FilterChain* findFilterChain(const Network::ConnectionSocket&,
+                                              const StreamInfo::StreamInfo&) const override {
     return filter_chain_.get();
   }
-
-  void write(const std::string& s) {
-    Buffer::OwnedImpl buf(s);
-    conn_->write(buf, false);
-  }
-
-  void connect(Network::ListenerFilterPtr filter);
-  void disconnect();
 
   void fuzz(Network::ListenerFilterPtr filter,
             const test::extensions::filters::listener::FilterFuzzWithDataTestCase& input);
 
 private:
+  void write(const std::string& s) {
+    Buffer::OwnedImpl buf(s);
+    conn_->write(buf, false);
+  }
+
+  void connect();
+  void disconnect();
+
   testing::NiceMock<Runtime::MockLoader> runtime_;
   Stats::TestUtil::TestStore stats_store_;
   Api::ApiPtr api_;
@@ -106,6 +106,7 @@ private:
   std::vector<Network::ListenSocketFactoryPtr> socket_factories_;
   Network::NopConnectionBalancerImpl connection_balancer_;
   Network::ConnectionHandlerPtr connection_handler_;
+  Network::ListenerFilterPtr filter_{nullptr};
   Network::MockFilterChainFactory factory_;
   Network::ClientConnectionPtr conn_;
   NiceMock<Network::MockConnectionCallbacks> connection_callbacks_;

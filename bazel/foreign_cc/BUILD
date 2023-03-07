@@ -11,7 +11,10 @@ configure_make(
     name = "liburing",
     configure_in_place = True,
     lib_source = "@com_github_axboe_liburing//:all",
-    tags = ["skip_on_windows"],
+    tags = [
+        "nocompdb",
+        "skip_on_windows",
+    ],
 )
 
 # autotools packages are unusable on Windows as-is
@@ -95,24 +98,37 @@ configure_make(
 )
 
 configure_make(
-    name = "moonjit",
-    configure_command = "build.py",
-    env = select({
-        # This shouldn't be needed! See
-        # https://github.com/envoyproxy/envoy/issues/6084
-        # TODO(htuch): Remove when #6084 is fixed
-        "//bazel:asan_build": {"ENVOY_CONFIG_ASAN": "1"},
-        "//bazel:msan_build": {"ENVOY_CONFIG_MSAN": "1"},
-        "//conditions:default": {},
-    }),
-    lib_source = "@com_github_moonjit_moonjit//:all",
-    out_include_dir = "include/moonjit-2.2",
-    out_static_libs = ["libluajit-5.1.a"],
+    name = "colm",
+    autogen = True,
+    configure_in_place = True,
+    configure_options = [
+        "AUTOMAKE=automake",
+        "ACLOCAL=aclocal",
+        "--disable-shared",
+        "--enable-static",
+    ],
+    # Workaround for the issue with statically linked libstdc++
+    # using -l:libstdc++.a.
+    env = {
+        "CXXFLAGS": "-lstdc++ -Wno-unused-command-line-argument",
+    },
+    lib_source = "@net_colm_open_source_colm//:all",
+    out_binaries = ["colm"],
     tags = ["skip_on_windows"],
 )
 
 configure_make(
     name = "ragel",
+    autogen = True,
+    configure_in_place = True,
+    configure_options = [
+        "AUTOMAKE=automake",
+        "ACLOCAL=aclocal",
+        "--disable-manual",
+        "--disable-shared",
+        "--enable-static",
+        "--with-colm=$EXT_BUILD_DEPS/colm",
+    ],
     # Workaround for the issue with statically linked libstdc++
     # using -l:libstdc++.a.
     env = {
@@ -121,6 +137,7 @@ configure_make(
     lib_source = "@net_colm_open_source_ragel//:all",
     out_binaries = ["ragel"],
     tags = ["skip_on_windows"],
+    deps = [":colm"],
 )
 
 # ICU used by the language detection filter (i18n).
@@ -230,6 +247,7 @@ envoy_cmake(
         "BUILD_SHARED_LIBS": "off",
         "CURL_HIDDEN_SYMBOLS": "off",
         "CURL_USE_LIBSSH2": "off",
+        "CURL_USE_LIBPSL": "off",
         "CURL_BROTLI": "off",
         "CURL_USE_GSSAPI": "off",
         "HTTP_ONLY": "on",
@@ -462,15 +480,17 @@ envoy_cmake(
 envoy_cmake(
     name = "wamr",
     cache_entries = {
-        "WAMR_BUILD_INTERP": "1",
-        "WAMR_BUILD_FAST_INTERP": "1",
-        "WAMR_BUILD_JIT": "0",
-        "WAMR_BUILD_LAZY_JIT": "0",
         "WAMR_BUILD_AOT": "0",
-        "WAMR_BUILD_SIMD": "0",
-        "WAMR_BUILD_MULTI_MODULE": "1",
+        "WAMR_BUILD_FAST_INTERP": "1",
+        "WAMR_BUILD_INTERP": "1",
+        "WAMR_BUILD_JIT": "0",
         "WAMR_BUILD_LIBC_WASI": "0",
+        "WAMR_BUILD_MULTI_MODULE": "0",
+        "WAMR_BUILD_SIMD": "0",
         "WAMR_BUILD_TAIL_CALL": "1",
+        "WAMR_BUILD_WASM_CACHE": "0",
+        "WAMR_DISABLE_HW_BOUND_CHECK": "0",
+        "WAMR_DISABLE_STACK_HW_BOUND_CHECK": "1",
     },
     lib_source = "@com_github_wamr//:all",
     out_static_libs = ["libvmlib.a"],

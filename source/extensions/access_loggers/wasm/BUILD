@@ -19,6 +19,7 @@ envoy_cc_library(
         "//source/common/http:header_map_lib",
         "//source/extensions/common/wasm:wasm_lib",
     ],
+    alwayslink = 1,
 )
 
 envoy_cc_extension(

@@ -36,6 +36,7 @@ envoy_cc_test(
     srcs = ["delta_subscription_impl_test.cc"],
     deps = [
         ":delta_subscription_test_harness",
+        "//envoy/config:xds_config_tracker_interface",
         "//source/common/config:api_version_lib",
         "//source/common/config:grpc_subscription_lib",
         "//source/common/config:new_grpc_mux_lib",
@@ -99,6 +100,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "sotw_subscription_state_test",
     srcs = ["sotw_subscription_state_test.cc"],
+    external_deps = ["abseil_flat_hash_set"],
     deps = [
         "//source/common/config:resource_name_lib",
         "//source/common/config/xds_mux:sotw_subscription_state_lib",
@@ -153,6 +155,8 @@ envoy_cc_test(
     name = "grpc_mux_impl_test",
     srcs = ["grpc_mux_impl_test.cc"],
     deps = [
+        "//envoy/config:xds_config_tracker_interface",
+        "//envoy/config:xds_resources_delegate_interface",
         "//source/common/config:api_version_lib",
         "//source/common/config:grpc_mux_lib",
         "//source/common/config:protobuf_link_hacks",
@@ -261,6 +265,8 @@ envoy_cc_test_library(
     hdrs = ["grpc_subscription_test_harness.h"],
     deps = [
         ":subscription_test_harness",
+        "//envoy/config:xds_config_tracker_interface",
+        "//envoy/config:xds_resources_delegate_interface",
         "//source/common/common:hash_lib",
         "//source/common/config:api_version_lib",
         "//source/common/config:grpc_mux_lib",
@@ -285,6 +291,7 @@ envoy_cc_test_library(
     hdrs = ["delta_subscription_test_harness.h"],
     deps = [
         ":subscription_test_harness",
+        "//envoy/config:xds_config_tracker_interface",
         "//source/common/common:utility_lib",
         "//source/common/config:new_grpc_mux_lib",
         "//source/common/config/xds_mux:grpc_mux_lib",
@@ -347,6 +354,8 @@ envoy_cc_test(
     name = "subscription_factory_impl_test",
     srcs = ["subscription_factory_impl_test.cc"],
     deps = [
+        "//envoy/config:xds_config_tracker_interface",
+        "//envoy/config:xds_resources_delegate_interface",
         "//source/common/config:subscription_factory_lib",
         "//source/common/config:xds_resource_lib",
         "//test/config:v2_link_hacks",
@@ -436,6 +445,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "utility_test",
     srcs = ["utility_test.cc"],
+    external_deps = ["abseil_optional"],
     deps = [
         "//source/common/config:api_version_lib",
         "//source/common/config:utility_lib",
@@ -474,6 +484,7 @@ envoy_cc_test(
     name = "watch_map_test",
     srcs = ["watch_map_test.cc"],
     deps = [
+        "//envoy/config:xds_config_tracker_interface",
         "//source/common/config:watch_map_lib",
         "//test/mocks/config:config_mocks",
         "//test/mocks/config:custom_config_validators_mocks",
@@ -574,5 +585,13 @@ envoy_cc_test(
         "//test/mocks/server:instance_mocks",
         "//test/test_common:registry_lib",
         "//test/test_common:test_runtime_lib",
+    ],
+)
+
+envoy_cc_test(
+    name = "xds_source_id_test",
+    srcs = ["xds_source_id_test.cc"],
+    deps = [
+        "//source/common/config:xds_source_id_lib",
     ],
 )

@@ -18,12 +18,17 @@ load(
 load(":envoy_pch.bzl", _envoy_pch_library = "envoy_pch_library")
 load(
     ":envoy_select.bzl",
+    _envoy_select_admin_functionality = "envoy_select_admin_functionality",
     _envoy_select_admin_html = "envoy_select_admin_html",
     _envoy_select_admin_no_html = "envoy_select_admin_no_html",
     _envoy_select_boringssl = "envoy_select_boringssl",
+    _envoy_select_disable_logging = "envoy_select_disable_logging",
     _envoy_select_enable_http3 = "envoy_select_enable_http3",
+    _envoy_select_envoy_mobile_listener = "envoy_select_envoy_mobile_listener",
+    _envoy_select_envoy_mobile_request_compression = "envoy_select_envoy_mobile_request_compression",
     _envoy_select_google_grpc = "envoy_select_google_grpc",
     _envoy_select_hot_restart = "envoy_select_hot_restart",
+    _envoy_select_static_extension_registration = "envoy_select_static_extension_registration",
     _envoy_select_wasm_cpp_tests = "envoy_select_wasm_cpp_tests",
     _envoy_select_wasm_rust_tests = "envoy_select_wasm_rust_tests",
     _envoy_select_wasm_v8 = "envoy_select_wasm_v8",
@@ -45,14 +50,19 @@ load(
     _envoy_sh_test = "envoy_sh_test",
 )
 load(
+    ":envoy_mobile_copts.bzl",
+    _envoy_mobile_copts = "envoy_mobile_copts",
+)
+load(
     "@envoy_build_config//:extensions_build_config.bzl",
     "CONTRIB_EXTENSION_PACKAGE_VISIBILITY",
     "EXTENSION_PACKAGE_VISIBILITY",
+    "MOBILE_PACKAGE_VISIBILITY",
 )
 load("@bazel_skylib//rules:common_settings.bzl", "bool_flag")
 
-def envoy_package():
-    native.package(default_visibility = ["//visibility:public"])
+def envoy_package(default_visibility = ["//visibility:public"]):
+    native.package(default_visibility = default_visibility)
 
 def envoy_extension_package(enabled_default = True, default_visibility = EXTENSION_PACKAGE_VISIBILITY):
     native.package(default_visibility = default_visibility)
@@ -66,6 +76,11 @@ def envoy_extension_package(enabled_default = True, default_visibility = EXTENSI
         name = "is_enabled",
         flag_values = {":enabled": "True"},
     )
+
+def envoy_mobile_package():
+    # Mobile packages should only be visible to other mobile packages, not any other
+    # parts of the Envoy codebase.
+    envoy_extension_package(default_visibility = MOBILE_PACKAGE_VISIBILITY)
 
 def envoy_contrib_package():
     envoy_extension_package(default_visibility = CONTRIB_EXTENSION_PACKAGE_VISIBILITY)
@@ -210,7 +225,12 @@ def envoy_google_grpc_external_deps():
 # Select wrappers (from envoy_select.bzl)
 envoy_select_admin_html = _envoy_select_admin_html
 envoy_select_admin_no_html = _envoy_select_admin_no_html
+envoy_select_admin_functionality = _envoy_select_admin_functionality
+envoy_select_static_extension_registration = _envoy_select_static_extension_registration
+envoy_select_envoy_mobile_request_compression = _envoy_select_envoy_mobile_request_compression
+envoy_select_envoy_mobile_listener = _envoy_select_envoy_mobile_listener
 envoy_select_boringssl = _envoy_select_boringssl
+envoy_select_disable_logging = _envoy_select_disable_logging
 envoy_select_google_grpc = _envoy_select_google_grpc
 envoy_select_enable_http3 = _envoy_select_enable_http3
 envoy_select_hot_restart = _envoy_select_hot_restart
@@ -247,3 +267,6 @@ envoy_benchmark_test = _envoy_benchmark_test
 envoy_py_test = _envoy_py_test
 envoy_py_test_binary = _envoy_py_test_binary
 envoy_sh_test = _envoy_sh_test
+
+# Envoy Mobile copts (from envoy_mobile_copts.bz)
+envoy_mobile_copts = _envoy_mobile_copts

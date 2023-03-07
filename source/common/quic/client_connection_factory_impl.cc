@@ -17,7 +17,12 @@ createPersistentQuicInfoForCluster(Event::Dispatcher& dispatcher,
   Quic::convertQuicConfig(cluster.http3Options().quic_protocol_options(), quic_info->quic_config_);
   quic::QuicTime::Delta crypto_timeout =
       quic::QuicTime::Delta::FromMilliseconds(cluster.connectTimeout().count());
+
   quic_info->quic_config_.set_max_time_before_crypto_handshake(crypto_timeout);
+  if (quic_info->quic_config_.max_time_before_crypto_handshake() <
+      quic_info->quic_config_.max_idle_time_before_crypto_handshake()) {
+    quic_info->quic_config_.set_max_idle_time_before_crypto_handshake(crypto_timeout);
+  }
   // Default enable RVCM connection option so that port migration is enabled.
   quic::QuicTagVector connection_options;
   if (quic_info->quic_config_.HasSendConnectionOptions()) {
@@ -35,7 +40,8 @@ std::unique_ptr<Network::ClientConnection> createQuicNetworkConnection(
     Network::Address::InstanceConstSharedPtr local_addr, QuicStatNames& quic_stat_names,
     OptRef<Http::HttpServerPropertiesCache> rtt_cache, Stats::Scope& scope,
     const Network::ConnectionSocket::OptionsSharedPtr& options,
-    const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options) {
+    const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options,
+    quic::ConnectionIdGeneratorInterface& generator) {
   // TODO: Quic should take into account the set_local_interface_name_on_upstream_connections config
   // and call maybeSetInterfaceName based on that upon acquiring a local socket.
   // Similar to what is done in ClientConnectionImpl::onConnected().
@@ -45,7 +51,7 @@ std::unique_ptr<Network::ClientConnection> createQuicNetworkConnection(
   ASSERT(!quic_versions.empty());
   auto connection = std::make_unique<EnvoyQuicClientConnection>(
       quic::QuicUtils::CreateRandomConnectionId(), server_addr, info_impl->conn_helper_,
-      info_impl->alarm_factory_, quic_versions, local_addr, dispatcher, options);
+      info_impl->alarm_factory_, quic_versions, local_addr, dispatcher, options, generator);
 
   // TODO (danzh) move this temporary config and initial RTT configuration to h3 pool.
   quic::QuicConfig config = info_impl->quic_config_;

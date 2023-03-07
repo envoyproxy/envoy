@@ -41,10 +41,10 @@ static_resources:
                   numerator: 100
                   denominator: HUNDRED
               response_headers_to_add:
-                - append: false
-                  header:
-                    key: x-local-rate-limit
-                    value: 'true'
+              - append_action: OVERWRITE_IF_EXISTS_OR_ADD
+                header:
+                  key: x-local-rate-limit
+                  value: 'true'
               local_rate_limit_per_downstream_connection: false
           - name: envoy.filters.http.router
             typed_config:
@@ -90,10 +90,10 @@ static_resources:
                   numerator: 100
                   denominator: HUNDRED
               response_headers_to_add:
-                - append: false
-                  header:
-                    key: x-local-rate-limit
-                    value: 'true'
+              - append_action: OVERWRITE_IF_EXISTS_OR_ADD
+                header:
+                  key: x-local-rate-limit
+                  value: 'true'
               local_rate_limit_per_downstream_connection: false
           - name: envoy.filters.http.router
             typed_config:
