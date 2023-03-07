@@ -31,7 +31,7 @@ message Cors {
       "envoy.config.filter.http.cors.v2.Cors";
 }
 
-// Per route configuration for the CORS filter. This configuration should be configured in any level ``typed_per_filter_config`` to
+// Per route configuration for the CORS filter. This configuration should be configured in the ``RouteConfiguration`` as ``typed_per_filter_config`` at some level to
 // make the filter work.
 // [#next-free-field: 10]
 message CorsPolicy {
