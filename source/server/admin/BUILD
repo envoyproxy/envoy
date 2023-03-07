@@ -1,5 +1,6 @@
 load(
     "//bazel:envoy_build_system.bzl",
+    "envoy_cc_extension",
     "envoy_cc_library",
     "envoy_package",
     "envoy_select_admin_functionality",
@@ -19,13 +20,29 @@ envoy_cc_library(
     deps = [] + envoy_select_admin_functionality(["//source/server/admin:admin_lib_internal"]),
 )
 
-envoy_cc_library(
-    name = "admin_lib_internal",
-    srcs = ["admin.cc"] + envoy_select_admin_html([
+envoy_cc_extension(
+    name = "admin_html",
+    srcs = envoy_select_admin_html([
         "admin_html.cc",
     ]) + envoy_select_admin_no_html([
         "admin_no_html.cc",
     ]),
+    deps = [
+        ":admin_lib_internal",
+        "//envoy/server:admin_handler_factory",
+    ],
+)
+
+envoy_cc_library(
+    name = "admin_extensions",
+    deps = [
+        ":admin_html",
+    ],
+)
+
+envoy_cc_library(
+    name = "admin_lib_internal",
+    srcs = ["admin.cc"],
     hdrs = ["admin.h"],
     deps = [
         ":admin_filter_lib",
@@ -45,6 +62,7 @@ envoy_cc_library(
         "//envoy/http:filter_interface",
         "//envoy/network:filter_interface",
         "//envoy/network:listen_socket_interface",
+        "//envoy/server:admin_handler_factory",
         "//envoy/server:admin_interface",
         "//envoy/server:hot_restart_interface",
         "//envoy/server:instance_interface",

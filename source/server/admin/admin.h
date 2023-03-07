@@ -12,6 +12,7 @@
 #include "envoy/network/filter.h"
 #include "envoy/network/listen_socket.h"
 #include "envoy/server/admin.h"
+#include "envoy/server/admin_handler_factory.h"
 #include "envoy/server/instance.h"
 #include "envoy/server/listener_manager.h"
 #include "envoy/server/overload/overload_manager.h"
@@ -84,6 +85,7 @@ public:
   bool addHandler(const std::string& prefix, const std::string& help_text, HandlerCb callback,
                   bool removable, bool mutates_server_state,
                   const ParamDescriptorVec& params = {}) override;
+  std::vector<const UrlHandler*> sortedHandlers() const;
   bool addStreamingHandler(const std::string& prefix, const std::string& help_text,
                            GenRequestFn callback, bool removable, bool mutates_server_state,
                            const ParamDescriptorVec& params = {}) override;
@@ -338,15 +340,15 @@ private:
     ThreadLocal::SlotPtr tls_;
   };
 
-  std::vector<const UrlHandler*> sortedHandlers() const;
   envoy::admin::v3::ServerInfo::State serverState();
+  bool addHandler(AdminHandler& handler) {
+    return addHandler(handler.prefix(), handler.helpText(), handler.callback(), handler.removable(),
+                      handler.mutatesServerState(), handler.params());
+  }
 
   /**
    * URL handlers.
    */
-  Http::Code handlerAdminHome(Http::ResponseHeaderMap& response_headers, Buffer::Instance& response,
-                              AdminStream&);
-
   Http::Code handlerHelp(Http::ResponseHeaderMap& response_headers, Buffer::Instance& response,
                          AdminStream&);
   void getHelp(Buffer::Instance& response) const;
@@ -475,6 +477,7 @@ private:
   Server::ListenersHandler listeners_handler_;
   Server::ServerCmdHandler server_cmd_handler_;
   Server::ServerInfoHandler server_info_handler_;
+  std::list<std::unique_ptr<AdminHandler>> factory_generated_handlers_;
   std::list<UrlHandler> handlers_;
   const uint32_t max_request_headers_kb_{Http::DEFAULT_MAX_REQUEST_HEADERS_KB};
   const uint32_t max_request_headers_count_{Http::DEFAULT_MAX_HEADERS_COUNT};

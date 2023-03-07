@@ -103,7 +103,6 @@ AdminImpl::AdminImpl(const std::string& profile_path, Server::Instance& server,
       server_info_handler_(server),
       // TODO(jsedgwick) add /runtime_reset endpoint that removes all admin-set values
       handlers_{
-          makeHandler("/", "Admin home page", MAKE_ADMIN_HANDLER(handlerAdminHome), false, false),
           makeHandler("/certs", "print certs on machine",
                       MAKE_ADMIN_HANDLER(server_info_handler_.handlerCerts), false, false),
           makeHandler("/clusters", "upstream cluster status",
@@ -230,6 +229,12 @@ AdminImpl::AdminImpl(const std::string& profile_path, Server::Instance& server,
       admin_filter_chain_(std::make_shared<AdminFilterChain>()),
       local_reply_(LocalReply::Factory::createDefault()),
       ignore_global_conn_limit_(ignore_global_conn_limit) {
+  for (const auto& factory : Registry::FactoryRegistry<AdminHandlerFactory>::factories()) {
+    auto handler = factory.second->createHandler(*this, server);
+    bool added = addHandler(*handler);
+    ASSERT(added, factory.first);
+    factory_generated_handlers_.emplace_back(std::move(handler));
+  }
 #ifndef NDEBUG
   // Verify that no duplicate handlers exist.
   absl::flat_hash_set<absl::string_view> handlers;
@@ -424,7 +429,7 @@ AdminImpl::UrlHandler AdminImpl::makeHandler(const std::string& prefix,
 bool AdminImpl::addStreamingHandler(const std::string& prefix, const std::string& help_text,
                                     GenRequestFn callback, bool removable, bool mutates_state,
                                     const ParamDescriptorVec& params) {
-  ASSERT(prefix.size() > 1);
+  ASSERT(!prefix.empty());
   ASSERT(prefix[0] == '/');
 
   // Sanitize prefix and help_text to ensure no XSS can be injected, as

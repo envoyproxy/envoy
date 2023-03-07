@@ -38,6 +38,7 @@ envoy_cc_test(
         "//source/common/protobuf",
         "//source/common/protobuf:utility_lib",
         "//source/common/stats:thread_local_store_lib",
+        "//source/server/admin:admin_extensions",
         "//source/server/admin:admin_lib",
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/server:server_mocks",
@@ -63,6 +64,7 @@ envoy_cc_test(
     srcs = envoy_select_admin_html(["admin_html_test.cc"]),
     deps = [
         ":admin_instance_lib",
+        "//source/server/admin:admin_extensions",
         "//source/server/admin:admin_lib",
     ],
 )

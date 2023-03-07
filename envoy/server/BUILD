@@ -20,7 +20,9 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "admin_interface",
-    hdrs = ["admin.h"],
+    hdrs = [
+        "admin.h",
+    ],
     deps = [
         ":config_tracker_interface",
         "//envoy/buffer:buffer_interface",
@@ -28,6 +30,17 @@ envoy_cc_library(
         "//envoy/http:header_map_interface",
         "//envoy/http:query_params_interface",
         "//envoy/network:listen_socket_interface",
+    ],
+)
+
+envoy_cc_library(
+    name = "admin_handler_factory",
+    hdrs = [
+        "admin_handler_factory.h",
+    ],
+    deps = [
+        ":admin_interface",
+        ":instance_interface",
     ],
 )
 
