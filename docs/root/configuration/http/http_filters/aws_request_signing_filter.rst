@@ -48,22 +48,7 @@ Example filter configuration:
     - exact: x-amzn-trace-id
 
 
-Credentials
------------
-
-The filter attempts to fetch credentials from a few different places, in the following order:
-
-1. Environment variables. The environment variables AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, and AWS_SESSION_TOKEN must be set
-   for this method to succeed.
-
-2. The AWS credentials file. The environment variables AWS_SHARED_CREDENTIALS_FILE and AWS_PROFILE are respected if they are set,
-   else the file '~/.aws/credentials' and profile 'default' will be used. The fields 'aws_access_key_id', 'aws_secret_access_key',
-   and 'aws_session_token' must be defined for the profile in the credentials file for this method to succeed. These credentials
-   are cached for 1 hour.
-
-3. EC2 instance metadata. These credentials are cached for 1 hour.
-
-4. ECS task metadata. These credentials are cached for 1 hour or until they expire.
+.. include:: _include/aws_credentials.rst
 
 Statistics
 ----------

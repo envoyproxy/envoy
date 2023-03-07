@@ -40,7 +40,7 @@ minor_behavior_changes:
     Moved all of the network input matchers to extensions. If you use network matchers and override extensions_build_config.bzl you will now need to include them explicitly.
 - area: aws
   change: |
-    Added support for fetching credentials from the AWS credentials file. The order of credential fetching methods is now: 1) environment variables, 2) the credentials file, 3) instance metadata, 4) task metadata.
+    Added support for fetching credentials from the AWS credentials file, which only happens if credentials cannot be fetched from environment variables. This behavioral change can be reverted by setting runtime guard ``envoy.reloadable_features.enable_aws_credentials_file`` to ``false``.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
