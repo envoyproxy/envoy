@@ -53,6 +53,12 @@ DEFINE_PROTO_FUZZER(const envoy::extensions::filters::http::golang::GolangFilter
       .WillByDefault(Return(static_cast<uint64_t>(GolangStatus::Continue)));
   ON_CALL(*dso_lib.get(), envoyGoFilterOnHttpData(_, _, _, _))
       .WillByDefault(Return(static_cast<uint64_t>(GolangStatus::Continue)));
+  ON_CALL(*dso_lib.get(), envoyGoFilterOnHttpDestroy(_, _))
+      .WillByDefault(Invoke([&](httpRequest* p0, int) -> void {
+        // delete the filter->req_, make LeakSanitizer happy.
+        auto req = reinterpret_cast<httpRequestInternal*>(p0);
+        delete req;
+      }));
 
   static FuzzerMocks mocks;
 
@@ -74,6 +80,7 @@ DEFINE_PROTO_FUZZER(const envoy::extensions::filters::http::golang::GolangFilter
   Envoy::Extensions::HttpFilters::HttpFilterFuzzer fuzzer;
   fuzzer.runData(static_cast<Envoy::Http::StreamDecoderFilter*>(filter.get()),
                  input.request_data());
+  filter->onDestroy();
 }
 
 } // namespace
