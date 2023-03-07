@@ -62,17 +62,19 @@ DEFINE_PROTO_FUZZER(const envoy::extensions::filters::http::golang::GolangFilter
 
   static FuzzerMocks mocks;
 
+  // Filter config is typically considered trusted (coming from a trusted domain), use a const
+  // config is good enough.
+  const auto yaml = R"EOF(
+    library_id: test
+    library_path: test
+    plugin_name: test
+    )EOF";
+
+  envoy::extensions::filters::http::golang::v3alpha::Config proto_config;
+  TestUtility::loadFromYaml(yaml, proto_config);
+
   // Prepare filter.
-  const envoy::extensions::filters::http::golang::v3alpha::Config& proto_config = input.config();
-  FilterConfigSharedPtr config;
-
-  try {
-    config = std::make_shared<FilterConfig>(proto_config, dso_lib);
-  } catch (const EnvoyException& e) {
-    ENVOY_LOG_MISC(debug, "EnvoyException during filter config validation: {}", e.what());
-    return;
-  }
-
+  FilterConfigSharedPtr config = std::make_shared<FilterConfig>(proto_config, dso_lib);
   std::unique_ptr<Filter> filter = std::make_unique<Filter>(config, dso_lib);
   filter->setDecoderFilterCallbacks(mocks.decoder_callbacks_);
   filter->setEncoderFilterCallbacks(mocks.encoder_callbacks_);

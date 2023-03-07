@@ -8,8 +8,6 @@ import "validate/validate.proto";
 
 // We only fuzz a single request per iteration.
 message GolangFilterTestCase {
-  envoy.extensions.filters.http.golang.v3alpha.Config config = 1
-      [(validate.rules).message = {required: true}];
   // HTTP request data.
-  test.fuzz.HttpData request_data = 2 [(validate.rules).message = {required: true}];
+  test.fuzz.HttpData request_data = 1 [(validate.rules).message = {required: true}];
 }
