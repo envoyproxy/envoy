@@ -1846,11 +1846,11 @@ RouteMatcher::RouteMatcher(const envoy::config::route::v3::RouteConfiguration& r
   }
 }
 
-RouteConstSharedPtr getRouteFromRoutes(const RouteCallback& cb,
-                                       const Http::RequestHeaderMap& headers,
-                                       const StreamInfo::StreamInfo& stream_info,
-                                       uint64_t random_value,
-                                       std::vector<RouteEntryImplBaseConstSharedPtr> routes) {
+RouteConstSharedPtr
+VirtualHostImpl::getRouteFromRoutes(const RouteCallback& cb, const Http::RequestHeaderMap& headers,
+                                    const StreamInfo::StreamInfo& stream_info,
+                                    uint64_t random_value,
+                                    std::vector<RouteEntryImplBaseConstSharedPtr> routes) const {
   for (auto route = routes.begin(); route != routes.end(); ++route) {
     if (!headers.Path() && !(*route)->supportsPathlessHeaders()) {
       continue;
@@ -1874,10 +1874,13 @@ RouteConstSharedPtr getRouteFromRoutes(const RouteCallback& cb,
     }
     if (match_status == RouteMatchStatus::Continue &&
         eval_status == RouteEvalStatus::NoMoreRoutes) {
+      ENVOY_LOG(debug,
+                "return null when route match status is Continue but there is no more routes");
       return nullptr;
     }
   }
 
+  ENVOY_LOG(debug, "route was resolved but final route list did not match incoming request");
   return nullptr;
 }
 
