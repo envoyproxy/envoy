@@ -162,6 +162,7 @@ typed_config:
         {":method", "POST"},        {":path", path},
         {":scheme", "http"},        {":authority", "test.com"},
         {"x-test-header-0", "foo"}, {"x-test-header-1", "bar"},
+        {"existed-header", "foo"},
     };
 
     auto encoder_decoder = codec_client_->startRequest(request_headers);
@@ -181,6 +182,18 @@ typed_config:
     EXPECT_EQ(true,
               upstream_request_->headers().get(Http::LowerCaseString("x-test-header-1")).empty());
 
+    // check header value which is appended in golang: existed-header
+    auto entries = upstream_request_->headers().get(Http::LowerCaseString("existed-header"));
+    EXPECT_EQ(2, entries.size());
+    EXPECT_EQ("foo", entries[0]->value().getStringView());
+    EXPECT_EQ("bar", entries[1]->value().getStringView());
+
+    // check header value which added in golang: newly-added-header
+    entries = upstream_request_->headers().get(Http::LowerCaseString("newly-added-header"));
+    EXPECT_EQ(2, entries.size());
+    EXPECT_EQ("foo", entries[0]->value().getStringView());
+    EXPECT_EQ("bar", entries[1]->value().getStringView());
+
     // "prepend_" + upper("helloworld") + "_append"
     std::string expected = "prepend_HELLOWORLD_append";
     // only match the prefix since data buffer may be combined into a single.
@@ -190,6 +203,7 @@ typed_config:
         {":status", "200"},
         {"x-test-header-0", "foo"},
         {"x-test-header-1", "bar"},
+        {"existed-header", "foo"},
     };
     upstream_request_->encodeHeaders(response_headers, false);
     Buffer::OwnedImpl response_data1("good");
@@ -207,6 +221,18 @@ typed_config:
 
     // check resp header exists which removed in golang side: x-test-header-1
     EXPECT_EQ(true, response->headers().get(Http::LowerCaseString("x-test-header-1")).empty());
+
+    // check header value which is appended in golang: existed-header
+    entries = response->headers().get(Http::LowerCaseString("existed-header"));
+    EXPECT_EQ(2, entries.size());
+    EXPECT_EQ("foo", entries[0]->value().getStringView());
+    EXPECT_EQ("bar", entries[1]->value().getStringView());
+
+    // check header value which added in golang: newly-added-header
+    entries = response->headers().get(Http::LowerCaseString("newly-added-header"));
+    EXPECT_EQ(2, entries.size());
+    EXPECT_EQ("foo", entries[0]->value().getStringView());
+    EXPECT_EQ("bar", entries[1]->value().getStringView());
 
     // length("helloworld") = 10
     EXPECT_EQ("10", getHeader(response->headers(), "test-req-body-length"));

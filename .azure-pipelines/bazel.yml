@@ -21,7 +21,7 @@ parameters:
 steps:
 - task: Cache@2
   inputs:
-    key: '"${{ parameters.ciTarget }}" | "${{ parameters.artifactSuffix }}" | ./WORKSPACE | **/*.bzl'
+    key: '"${{ parameters.ciTarget }}" | "${{ parameters.artifactSuffix }}" | ./WORKSPACE | **/*.bzl, !mobile/**, !envoy-docs/**'
     path: $(Build.StagingDirectory)/repository_cache
   continueOnError: true
 

@@ -871,13 +871,10 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
   bootstrap->mutable_stats_sinks();
   auto* list = bootstrap->mutable_stats_config()->mutable_stats_matcher()->mutable_inclusion_list();
   list->add_patterns()->set_prefix("cluster.base.upstream_rq_");
-  list->add_patterns()->set_prefix("cluster.base_h2.upstream_rq_");
   list->add_patterns()->set_prefix("cluster.stats.upstream_rq_");
   list->add_patterns()->set_prefix("cluster.base.upstream_cx_");
-  list->add_patterns()->set_prefix("cluster.base_h2.upstream_cx_");
   list->add_patterns()->set_prefix("cluster.stats.upstream_cx_");
   list->add_patterns()->set_exact("cluster.base.http2.keepalive_timeout");
-  list->add_patterns()->set_exact("cluster.base_h2.http2.keepalive_timeout");
   list->add_patterns()->set_exact("cluster.stats.http2.keepalive_timeout");
   list->add_patterns()->set_prefix("http.hcm.downstream_rq_");
   list->add_patterns()->set_prefix("http.hcm.decompressor.");
