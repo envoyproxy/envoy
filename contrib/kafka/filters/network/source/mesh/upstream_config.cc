@@ -15,6 +15,8 @@ namespace Mesh {
 using KafkaClusterDefinition =
     envoy::extensions::filters::network::kafka_mesh::v3alpha::KafkaClusterDefinition;
 using ForwardingRule = envoy::extensions::filters::network::kafka_mesh::v3alpha::ForwardingRule;
+using KafkaMesh = envoy::extensions::filters::network::kafka_mesh::v3alpha::KafkaMesh;
+using ConsumerProxyMode = KafkaMesh::ConsumerProxyMode;
 
 const std::string DEFAULT_CONSUMER_GROUP_ID = "envoy";
 
@@ -80,6 +82,9 @@ UpstreamKafkaConfigurationImpl::UpstreamKafkaConfigurationImpl(const KafkaMeshPr
     topic_prefix_to_cluster_config_[rule.topic_prefix()] =
         cluster_name_to_cluster_config[target_cluster];
   }
+
+  // The only mode we support right now - embedded librdkafka consumers.
+  ASSERT(config.consumer_proxy_mode() == KafkaMesh::StatefulConsumerProxy);
 }
 
 absl::optional<ClusterConfig>
