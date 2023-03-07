@@ -23,6 +23,11 @@ typedef enum { // NOLINT(modernize-use-using)
   Prepend,
 } bufferAction;
 
+typedef enum { // NOLINT(modernize-use-using)
+  HeaderSet,
+  HeaderAdd,
+} headerAction;
+
 // The return value of C Api that invoking from Go.
 typedef enum { // NOLINT(modernize-use-using)
   CAPIOK = 0,
@@ -39,7 +44,7 @@ CAPIStatus envoyGoFilterHttpSendLocalReply(void* r, int response_code, void* bod
 
 CAPIStatus envoyGoFilterHttpGetHeader(void* r, void* key, void* value);
 CAPIStatus envoyGoFilterHttpCopyHeaders(void* r, void* strs, void* buf);
-CAPIStatus envoyGoFilterHttpSetHeader(void* r, void* key, void* value);
+CAPIStatus envoyGoFilterHttpSetHeaderHelper(void* r, void* key, void* value, headerAction action);
 CAPIStatus envoyGoFilterHttpRemoveHeader(void* r, void* key);
 
 CAPIStatus envoyGoFilterHttpGetBuffer(void* r, unsigned long long int buffer, void* value);

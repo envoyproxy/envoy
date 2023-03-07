@@ -626,7 +626,7 @@ CAPIStatus Filter::copyHeaders(GoString* go_strs, char* go_buf) {
 
 // It won't take affect immidiately while it's invoked from a Go thread, instead, it will post a
 // callback to run in the envoy worker thread.
-CAPIStatus Filter::setHeader(absl::string_view key, absl::string_view value) {
+CAPIStatus Filter::setHeader(absl::string_view key, absl::string_view value, headerAction act) {
   Thread::LockGuard lock(mutex_);
   if (has_destroyed_) {
     ENVOY_LOG(debug, "golang filter has been destroyed");
@@ -641,9 +641,22 @@ CAPIStatus Filter::setHeader(absl::string_view key, absl::string_view value) {
     ENVOY_LOG(debug, "invoking cgo api at invalid phase: {}", __func__);
     return CAPIStatus::CAPIInvalidPhase;
   }
+
   if (state.isThreadSafe()) {
     // it's safe to write header in the safe thread.
-    headers_->setCopy(Http::LowerCaseString(key), value);
+    switch (act) {
+    case HeaderAdd:
+      headers_->addCopy(Http::LowerCaseString(key), value);
+      break;
+
+    case HeaderSet:
+      headers_->setCopy(Http::LowerCaseString(key), value);
+      break;
+
+    default:
+      RELEASE_ASSERT(false, absl::StrCat("unknown header action: ", act));
+    }
+
     onHeadersModified();
   } else {
     // should deep copy the string_view before post to dipatcher callback.
@@ -654,16 +667,29 @@ CAPIStatus Filter::setHeader(absl::string_view key, absl::string_view value) {
     // dispatch a callback to write header in the envoy safe thread, to make the write operation
     // safety. otherwise, there might be race between reading in the envoy worker thread and writing
     // in the Go thread.
-    state.getDispatcher().post([this, weak_ptr, key_str, value_str] {
+    state.getDispatcher().post([this, weak_ptr, key_str, value_str, act] {
       Thread::LockGuard lock(mutex_);
       if (!weak_ptr.expired() && !has_destroyed_) {
-        headers_->setCopy(Http::LowerCaseString(key_str), value_str);
+        switch (act) {
+        case HeaderAdd:
+          headers_->addCopy(Http::LowerCaseString(key_str), value_str);
+          break;
+
+        case HeaderSet:
+          headers_->setCopy(Http::LowerCaseString(key_str), value_str);
+          break;
+
+        default:
+          RELEASE_ASSERT(false, absl::StrCat("unknown header action: ", act));
+        }
+
         onHeadersModified();
       } else {
         ENVOY_LOG(debug, "golang filter has gone or destroyed in setHeader");
       }
     });
   }
+
   return CAPIStatus::CAPIOK;
 }
 
