@@ -55,7 +55,7 @@ open class EngineBuilder: NSObject {
   private var platformFilterChain: [EnvoyHTTPFilterFactory] = []
   private var stringAccessors: [String: EnvoyStringAccessor] = [:]
   private var keyValueStores: [String: EnvoyKeyValueStore] = [:]
-  private var runtimeGuards: [String: String] = [:]
+  private var runtimeGuards: [String: Bool] = [:]
   private var directResponses: [DirectResponse] = []
   private var statsSinks: [String] = []
 
@@ -453,7 +453,7 @@ open class EngineBuilder: NSObject {
   /// - returns: This builder.
   @discardableResult
   public func setRuntimeGuard(_ name: String, _ value: Bool) -> Self {
-    self.runtimeGuards[name] = "\(value)"
+    self.runtimeGuards[name] = value
     return self
   }
 
@@ -602,7 +602,7 @@ open class EngineBuilder: NSObject {
       appVersion: self.appVersion,
       appId: self.appId,
       virtualClusters: self.virtualClusters,
-      runtimeGuards: self.runtimeGuards,
+      runtimeGuards: self.runtimeGuards.mapValues({ "\($0)" }),
       typedDirectResponses: self.directResponses.map({ $0.toObjC() }),
       nativeFilterChain: self.nativeFilterChain,
       platformFilterChain: self.platformFilterChain,

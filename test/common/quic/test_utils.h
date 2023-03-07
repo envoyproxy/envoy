@@ -222,7 +222,7 @@ Buffer::OwnedImpl generateChloPacketToSend(quic::ParsedQuicVersion quic_version,
                                            quic::QuicConnectionId connection_id) {
   std::unique_ptr<quic::QuicReceivedPacket> packet =
       std::move(quic::test::GetFirstFlightOfPackets(quic_version, quic_config, connection_id)[0]);
-  return Buffer::OwnedImpl(packet->data(), packet->length());
+  return {packet->data(), packet->length()};
 }
 
 void setQuicConfigWithDefaultValues(quic::QuicConfig* config) {

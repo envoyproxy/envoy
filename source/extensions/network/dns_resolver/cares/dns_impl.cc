@@ -133,7 +133,7 @@ void DnsResolverImpl::initializeChannel(ares_options* options, int optmask) {
 // Treat responses with `ARES_ENODATA` or `ARES_ENOTFOUND` status as DNS response with no records.
 // @see DnsResolverImpl::PendingResolution::onAresGetAddrInfoCallback for details.
 bool DnsResolverImpl::AddrInfoPendingResolution::isResponseWithNoRecords(int status) {
-  return accept_nodata_ && (status == ARES_ENODATA || status == ARES_ENOTFOUND);
+  return status == ARES_ENODATA || status == ARES_ENOTFOUND;
 }
 
 void DnsResolverImpl::AddrInfoPendingResolution::onAresGetAddrInfoCallback(
@@ -402,9 +402,7 @@ DnsResolverImpl::AddrInfoPendingResolution::AddrInfoPendingResolution(
     DnsResolverImpl& parent, ResolveCb callback, Event::Dispatcher& dispatcher,
     ares_channel channel, const std::string& dns_name, DnsLookupFamily dns_lookup_family)
     : PendingResolution(parent, callback, dispatcher, channel, dns_name),
-      dns_lookup_family_(dns_lookup_family), available_interfaces_(availableInterfaces()),
-      accept_nodata_(
-          Runtime::runtimeFeatureEnabled("envoy.reloadable_features.cares_accept_nodata")) {
+      dns_lookup_family_(dns_lookup_family), available_interfaces_(availableInterfaces()) {
   if (dns_lookup_family == DnsLookupFamily::Auto ||
       dns_lookup_family == DnsLookupFamily::V4Preferred) {
     dual_resolution_ = true;

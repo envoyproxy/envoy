@@ -378,7 +378,9 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
                                : nullptr),
       header_validator_factory_(
           createHeaderValidatorFactory(config, context.messageValidationVisitor())),
-      append_x_forwarded_port_(config.append_x_forwarded_port()) {
+      append_x_forwarded_port_(config.append_x_forwarded_port()),
+      add_proxy_protocol_connection_state_(
+          PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, add_proxy_protocol_connection_state, true)) {
   if (!idle_timeout_) {
     idle_timeout_ = std::chrono::hours(1);
   } else if (idle_timeout_.value().count() == 0) {
@@ -737,7 +739,6 @@ HttpConnectionManagerFactory::createHttpConnectionManagerFactoryFromProto(
         proto_config,
     Server::Configuration::FactoryContext& context, Network::ReadFilterCallbacks& read_callbacks,
     bool clear_hop_by_hop_headers) {
-
   Utility::Singletons singletons = Utility::createSingletons(context);
 
   auto filter_config = Utility::createConfig(

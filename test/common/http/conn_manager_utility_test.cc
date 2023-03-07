@@ -858,21 +858,6 @@ TEST_F(ConnectionManagerUtilityTest, DoNotRemoveConnectionUpgradeForWebSocketReq
   EXPECT_FALSE(headers.has("content-length"));
 }
 
-// Verify that Content-Length: 0 is added with runtime override
-TEST_F(ConnectionManagerUtilityTest, LegacyAddContentLength) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.http_skip_adding_content_length_to_upgrade", "false"}});
-
-  TestRequestHeaderMapImpl headers{{"connection", "upgrade"}, {"upgrade", "websocket"}};
-
-  EXPECT_EQ((MutateRequestRet{"10.0.0.3:50000", false, Tracing::Reason::NotTraceable}),
-            callMutateRequestHeaders(headers, Protocol::Http11));
-  EXPECT_EQ("upgrade", headers.get_("connection"));
-  EXPECT_EQ("websocket", headers.get_("upgrade"));
-  EXPECT_EQ("0", headers.get_("content-length"));
-}
-
 // Make sure we do remove connection headers for non-WS requests.
 TEST_F(ConnectionManagerUtilityTest, RemoveConnectionUpgradeForNonWebSocketRequests) {
   TestRequestHeaderMapImpl headers{{"connection", "close"}, {"upgrade", "websocket"}};

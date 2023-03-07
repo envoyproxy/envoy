@@ -24,7 +24,6 @@ constexpr absl::string_view DEFAULT_SERVICE_AND_INSTANCE = "EnvoyProxy";
 
 using cpp2sky::createSpanContext;
 using cpp2sky::SpanContextPtr;
-using cpp2sky::TracerException;
 
 Driver::Driver(const envoy::config::trace::v3::SkyWalkingConfig& proto_config,
                Server::Configuration::TracerFactoryContext& context)

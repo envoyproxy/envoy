@@ -98,7 +98,7 @@ envoy_cc_test_library(
     ],
     repository = "@envoy",
     deps = [
-        "//library/cc:engine_builder_lib",
+        ":test_engine_builder_lib",
         "//library/common/http:client_lib",
         "//library/common/http:header_utility_lib",
         "//library/common/types:c_types_lib",
@@ -156,4 +156,18 @@ envoy_cc_test_library(
             "@envoy//source/common/signal:sigaction_lib",
         ],
     }),
+)
+
+envoy_cc_test_library(
+    name = "test_engine_builder_lib",
+    srcs = [
+        "test_engine_builder.cc",
+    ],
+    hdrs = [
+        "test_engine_builder.h",
+    ],
+    repository = "@envoy",
+    deps = [
+        "//library/cc:engine_builder_lib",
+    ],
 )

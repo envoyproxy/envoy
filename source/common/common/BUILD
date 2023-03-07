@@ -508,6 +508,14 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "bit_array_lib",
+    hdrs = ["bit_array.h"],
+    deps = [
+        ":safe_memcpy_lib",
+    ],
+)
+
+envoy_cc_library(
     name = "token_bucket_impl_lib",
     srcs = ["token_bucket_impl.cc"],
     hdrs = ["token_bucket_impl.h"],
