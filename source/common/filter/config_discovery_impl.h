@@ -292,7 +292,8 @@ struct ExtensionConfigDiscoveryStats {
  */
 class FilterConfigSubscription
     : Config::SubscriptionBase<envoy::config::core::v3::TypedExtensionConfig>,
-      Logger::Loggable<Logger::Id::filter> {
+      Logger::Loggable<Logger::Id::filter>,
+      public std::enable_shared_from_this<FilterConfigSubscription> {
 public:
   FilterConfigSubscription(const envoy::config::core::v3::ConfigSource& config_source,
                            const std::string& filter_config_name,
@@ -305,15 +306,28 @@ public:
 
   const Init::SharedTargetImpl& initTarget() { return init_target_; }
   const std::string& name() { return filter_config_name_; }
-  const Protobuf::Message* lastConfig() { return last_config_.get(); }
-  const std::string& lastTypeUrl() { return last_type_url_; }
-  const std::string& lastVersionInfo() { return last_version_info_; }
-  const std::string& lastFactoryName() { return last_factory_name_; }
-  const SystemTime& lastUpdated() { return last_updated_; }
+  const Protobuf::Message* lastConfig() { return last_->config_.get(); }
+  const std::string& lastTypeUrl() { return last_->type_url_; }
+  const std::string& lastVersionInfo() { return last_->version_info_; }
+  const std::string& lastFactoryName() { return last_->factory_name_; }
+  const SystemTime& lastUpdated() { return last_->updated_; }
 
   void incrementConflictCounter();
 
 private:
+  struct ConfigVersion {
+    ConfigVersion(const std::string& version_info, SystemTime updated) : 
+      version_info_(version_info), updated_(updated) {}
+    ProtobufTypes::MessagePtr config_;
+    std::string type_url_;
+    const std::string version_info_;
+    std::string factory_name_;
+    uint64_t config_hash_{0ul};
+    const SystemTime updated_;
+  };
+  // Using a heap allocated record because updates are completed by all workers asynchronously.
+  using ConfigVersionSharedPtr = std::shared_ptr<ConfigVersion>;
+
   void start();
 
   // Config::SubscriptionCallbacks
@@ -324,14 +338,10 @@ private:
                       const std::string&) override;
   void onConfigUpdateFailed(Config::ConfigUpdateFailureReason reason,
                             const EnvoyException*) override;
+  void updateComplete(const ConfigVersionSharedPtr& next);
 
   const std::string filter_config_name_;
-  uint64_t last_config_hash_{0ul};
-  ProtobufTypes::MessagePtr last_config_;
-  std::string last_type_url_;
-  std::string last_version_info_;
-  std::string last_factory_name_;
-  SystemTime last_updated_;
+  ConfigVersionSharedPtr last_;
   Server::Configuration::ServerFactoryContext& factory_context_;
 
   Init::SharedTargetImpl init_target_;

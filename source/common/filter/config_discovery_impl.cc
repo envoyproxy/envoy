@@ -64,7 +64,9 @@ FilterConfigSubscription::FilterConfigSubscription(
     const std::string& subscription_id)
     : Config::SubscriptionBase<envoy::config::core::v3::TypedExtensionConfig>(
           factory_context.messageValidationContext().dynamicValidationVisitor(), "name"),
-      filter_config_name_(filter_config_name), factory_context_(factory_context),
+      filter_config_name_(filter_config_name),
+      last_(std::make_shared<ConfigVersion>("", factory_context.timeSource().systemTime())),
+      factory_context_(factory_context),
       init_target_(fmt::format("FilterConfigSubscription init {}", filter_config_name_),
                    [this]() { start(); }),
       scope_(factory_context.scope().createScope(stat_prefix)),
@@ -87,51 +89,53 @@ void FilterConfigSubscription::start() {
 
 void FilterConfigSubscription::onConfigUpdate(
     const std::vector<Config::DecodedResourceRef>& resources, const std::string& version_info) {
-  // Make sure to make progress in case the control plane is temporarily inconsistent.
-  init_target_.ready();
-
-  if (resources.size() != 1) {
-    throw EnvoyException(fmt::format(
-        "Unexpected number of resources in ExtensionConfigDS response: {}", resources.size()));
+  ConfigVersionSharedPtr next = std::make_shared<ConfigVersion>(version_info, factory_context_.timeSource().systemTime());
+  TRY_ASSERT_MAIN_THREAD {
+    if (resources.size() != 1) {
+      throw EnvoyException(fmt::format(
+          "Unexpected number of resources in ExtensionConfigDS response: {}", resources.size()));
+    }
+    const auto& filter_config = dynamic_cast<const envoy::config::core::v3::TypedExtensionConfig&>(
+        resources[0].get().resource());
+    if (filter_config.name() != filter_config_name_) {
+      throw EnvoyException(fmt::format("Unexpected resource name in ExtensionConfigDS response: {}",
+                                       filter_config.name()));
+    }
+    // Skip update if hash matches
+    next->config_hash_ = MessageUtil::hash(filter_config.typed_config());
+    if (next->config_hash_ == last_->config_hash_) {
+      // Initial hash is 0, so this branch happens only after a config was already applied, and
+      // there is no need to mark the init target ready.
+      return;
+    }
+    // Ensure that the filter config is valid in the filter chain context once the proto is processed.
+    // Validation happens before updating to prevent a partial update application. It might be
+    // possible that the providers have distinct type URL constraints.
+    next->type_url_ = Config::Utility::getFactoryType(filter_config.typed_config());
+    for (auto* provider : filter_config_providers_) {
+      provider->validateTypeUrl(next->type_url_);
+    }
+    std::tie(next->config_, next->factory_name_) =
+        filter_config_provider_manager_.getMessage(filter_config, factory_context_);
+    for (auto* provider : filter_config_providers_) {
+      provider->validateMessage(filter_config_name_, *next->config_, next->factory_name_);
+    }
   }
-  const auto& filter_config = dynamic_cast<const envoy::config::core::v3::TypedExtensionConfig&>(
-      resources[0].get().resource());
-  if (filter_config.name() != filter_config_name_) {
-    throw EnvoyException(fmt::format("Unexpected resource name in ExtensionConfigDS response: {}",
-                                     filter_config.name()));
-  }
-  // Skip update if hash matches
-  const uint64_t new_hash = MessageUtil::hash(filter_config.typed_config());
-  if (new_hash == last_config_hash_) {
-    return;
-  }
-  // Ensure that the filter config is valid in the filter chain context once the proto is processed.
-  // Validation happens before updating to prevent a partial update application. It might be
-  // possible that the providers have distinct type URL constraints.
-  const auto type_url = Config::Utility::getFactoryType(filter_config.typed_config());
-  for (auto* provider : filter_config_providers_) {
-    provider->validateTypeUrl(type_url);
-  }
-  auto [message, factory_name] =
-      filter_config_provider_manager_.getMessage(filter_config, factory_context_);
-  for (auto* provider : filter_config_providers_) {
-    provider->validateMessage(filter_config_name_, *message, factory_name);
+  END_TRY catch (const EnvoyException& e) {
+    // Make sure to make progress in case the control plane is temporarily inconsistent.
+    init_target_.ready();
+    throw e;
   }
   ENVOY_LOG(debug, "Updating filter config {}", filter_config_name_);
-
   Common::applyToAllWithCleanup<DynamicFilterConfigProviderImplBase*>(
       filter_config_providers_,
-      [&message = message, &version_info](DynamicFilterConfigProviderImplBase* provider,
+      [&message = next->config_, &version_info = next->version_info_](DynamicFilterConfigProviderImplBase* provider,
                                           std::shared_ptr<Cleanup> cleanup) {
         provider->onConfigUpdate(*message, version_info, [cleanup] {});
       },
-      [this]() { stats_.config_reload_.inc(); });
-  last_config_hash_ = new_hash;
-  last_config_ = std::move(message);
-  last_type_url_ = type_url;
-  last_version_info_ = version_info;
-  last_factory_name_ = factory_name;
-  last_updated_ = factory_context_.timeSource().systemTime();
+      [me = shared_from_this(), next]() mutable {
+        me->updateComplete(next);
+      });
 }
 
 void FilterConfigSubscription::onConfigUpdate(
@@ -140,20 +144,17 @@ void FilterConfigSubscription::onConfigUpdate(
   if (!removed_resources.empty()) {
     ASSERT(removed_resources.size() == 1);
     ENVOY_LOG(debug, "Removing filter config {}", filter_config_name_);
+    ConfigVersionSharedPtr next = std::make_shared<ConfigVersion>("", factory_context_.timeSource().systemTime());
     Common::applyToAllWithCleanup<DynamicFilterConfigProviderImplBase*>(
         filter_config_providers_,
         [](DynamicFilterConfigProviderImplBase* provider, std::shared_ptr<Cleanup> cleanup) {
           provider->onConfigRemoved([cleanup] {});
         },
-        [this]() { stats_.config_reload_.inc(); });
-
-    last_config_hash_ = 0;
-    last_config_ = nullptr;
-    last_type_url_ = "";
-    last_version_info_ = "";
-    last_factory_name_ = "";
-    last_updated_ = factory_context_.timeSource().systemTime();
+        [me = shared_from_this(), next]() mutable {
+          me->updateComplete(next);
+        });
   } else if (!added_resources.empty()) {
+    ASSERT(added_resources.size() == 1);
     onConfigUpdate(added_resources, added_resources[0].get().version());
   }
 }
@@ -164,6 +165,13 @@ void FilterConfigSubscription::onConfigUpdateFailed(Config::ConfigUpdateFailureR
             static_cast<int>(reason));
   stats_.config_fail_.inc();
   // Make sure to make progress in case the control plane is temporarily failing.
+  init_target_.ready();
+}
+
+void FilterConfigSubscription::updateComplete(const ConfigVersionSharedPtr& next) {
+  ENVOY_LOG(debug, "Filter config {} update complete", filter_config_name_);
+  stats_.config_reload_.inc();
+  last_ = std::move(next);
   init_target_.ready();
 }
 
