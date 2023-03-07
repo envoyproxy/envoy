@@ -46,7 +46,10 @@ private:
 
 class FilterStateImplTest : public testing::Test {
 public:
-  FilterStateImplTest() { resetFilterState(); }
+  FilterStateImplTest() {
+    resetFilterState();
+    Assert::resetEnvoyBugCountersForTest();
+  }
 
   void resetFilterState() {
     filter_state_ = std::make_unique<FilterStateImpl>(FilterState::LifeSpan::FilterChain);
@@ -423,6 +426,7 @@ TEST_F(FilterStateImplTest, SetSameDataWithDifferentLifeSpan) {
                                          FilterState::LifeSpan::FilterChain),
                    "FilterStateAccessViolation: FilterState::setData<T> called twice with "
                    "conflicting life_span on the same data_name.");
+  Assert::resetEnvoyBugCountersForTest();
   EXPECT_ENVOY_BUG(filterState().setData("test_1", std::make_unique<SimpleType>(2),
                                          FilterState::StateType::Mutable,
                                          FilterState::LifeSpan::Request),
@@ -442,6 +446,7 @@ TEST_F(FilterStateImplTest, SetSameDataWithDifferentLifeSpan) {
                                          FilterState::LifeSpan::FilterChain),
                    "FilterStateAccessViolation: FilterState::setData<T> called twice with "
                    "conflicting life_span on the same data_name.");
+  Assert::resetEnvoyBugCountersForTest();
   EXPECT_ENVOY_BUG(filterState().setData("test_2", std::make_unique<SimpleType>(2),
                                          FilterState::StateType::Mutable,
                                          FilterState::LifeSpan::Connection),
