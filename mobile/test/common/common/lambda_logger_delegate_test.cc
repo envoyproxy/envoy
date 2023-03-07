@@ -25,7 +25,7 @@ TEST_F(LambdaDelegateTest, LogCb) {
   std::string expected_msg = "Hello LambdaDelegate";
   std::string actual_msg;
 
-  LambdaDelegate delegate({[](envoy_data data, const void* context) -> void {
+  LambdaDelegate delegate({[](envoy_data data, const void* context, int) -> void {
                              auto* actual_msg =
                                  static_cast<std::string*>(const_cast<void*>(context));
                              *actual_msg = Data::Utility::copyToString(data);
