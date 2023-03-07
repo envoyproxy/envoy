@@ -39,8 +39,8 @@ NS_ASSUME_NONNULL_BEGIN
  * @param trailers the trailers received.
  * @param streamIntel internal HTTP stream metrics, context, and other details.
  */
-@property (nonatomic, copy, nullable) void (^onTrailers)(EnvoyHeaders *trailers, EnvoyStreamIntel streamIntel)
-    ;
+@property (nonatomic, copy, nullable) void (^onTrailers)
+    (EnvoyHeaders *trailers, EnvoyStreamIntel streamIntel);
 
 /**
  * Called to signal there is buffer space available for continued request body upload.
