@@ -1,4 +1,4 @@
-name: CIFuzz
+name: CIFuzzTest
 on:
   pull_request_target:
     branches:
