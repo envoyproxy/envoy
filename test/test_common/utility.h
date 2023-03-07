@@ -16,6 +16,7 @@
 #include "envoy/type/v3/percent.pb.h"
 
 #include "source/common/buffer/buffer_impl.h"
+#include "source/common/common/assert.h"
 #include "source/common/common/c_smart_ptr.h"
 #include "source/common/common/empty_string.h"
 #include "source/common/common/thread.h"
@@ -93,7 +94,7 @@ namespace Envoy {
 // Log messages are emitted every power-of-2 occurrences. If a test triggers the same
 // ENVOY_BUG multiple times, it may not trigger correctly, so reset every time.
 #define EXPECT_ENVOY_BUG(statement, message)                                                       \
-  Assert::resetEnvoyBugCountersForTest();                                                          \
+  ::Envoy::Assert::resetEnvoyBugCountersForTest();                                                 \
   EXPECT_LOG_CONTAINS("error", message, statement)
 #else
 // ENVOY_BUGs in (non-coverage) debug mode is fatal.
