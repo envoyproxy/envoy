@@ -13,8 +13,10 @@ For the meaning of the headers please refer to the pages below.
 
 
 .. note::
-  This filter is only used to respond to preflight ``OPTIONS`` requests. Any non-``OPTIONS`` requests or illegal ``OPTIONS``
-  requests will be ignored and passed to the next filter in the filter chain.
+  This filter will be used to respond to preflight ``OPTIONS`` requests. Any legal ``OPTIONS`` requests will be
+  responded directly by the filter and will not be passed to the next filter in the filter chain. Other requests
+  will not be responded directly but if they are accepted cors requests, the filter will add the related headers
+  to the response.
 
   In addition, this filter will be bypassed if a direct response or route redirect is configured for the route.
 
