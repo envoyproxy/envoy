@@ -67,6 +67,7 @@ jobs:
             --remote_header="Authorization=Bearer $GITHUB_TOKEN" \
             --define=admin_html=enabled \
             --define=envoy_mobile_request_compression=disabled \
+            --define=envoy_mobile_swift_cxx_interop=disabled \
             --@envoy//bazel:http3=False \
             --@com_envoyproxy_protoc_gen_validate//bazel:template-flavor= \
             //library/swift:ios_framework

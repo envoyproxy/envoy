@@ -77,6 +77,10 @@ swift_library(
         "stats/Tags.swift",
         "stats/TagsBuilder.swift",
     ] + ["@envoy_mobile_extra_swift_sources//:extra_swift_srcs"],
+    copts = select({
+        "//bazel:envoy_mobile_swift_cxx_interop": ["-enable-experimental-cxx-interop"],
+        "//conditions:default": [],
+    }),
     defines = envoy_mobile_defines("@envoy"),
     features = [
         "swift.emit_symbol_graph",
