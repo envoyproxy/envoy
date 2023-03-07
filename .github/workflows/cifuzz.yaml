@@ -18,7 +18,7 @@ jobs:
    steps:
    - name: Testing secret access
      run: |
-       echo "token is"
+       echo "token is:"
        echo ${{ secrets.GCP_GITHUB_CI_KEY }} | sed -e 's/^\(.\{5\}\).*/\1/'
    - name: Build Fuzzers (${{ matrix.sanitizer }})
      id: build
