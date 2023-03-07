@@ -140,11 +140,13 @@ TEST(TestConfig, SetSocketTag) {
   EXPECT_THAT(bootstrap->DebugString(), HasSubstr("http.socket_tag.SocketTag"));
 }
 
+#ifdef ENVOY_ENABLE_QUIC
 TEST(TestConfig, SetAltSvcCache) {
   EngineBuilder engine_builder;
   std::unique_ptr<Bootstrap> bootstrap = engine_builder.generateBootstrap();
   EXPECT_THAT(bootstrap->DebugString(), HasSubstr("alternate_protocols_cache"));
 }
+#endif
 
 TEST(TestConfig, StreamIdleTimeout) {
   EngineBuilder engine_builder;

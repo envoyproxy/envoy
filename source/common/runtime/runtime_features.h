@@ -26,8 +26,6 @@ void maybeSetRuntimeGuard(absl::string_view name, bool value);
 void maybeSetDeprecatedInts(absl::string_view name, uint32_t value);
 constexpr absl::string_view defer_processing_backedup_streams =
     "envoy.reloadable_features.defer_processing_backedup_streams";
-constexpr absl::string_view expand_agnostic_stream_lifetime =
-    "envoy.reloadable_features.expand_agnostic_stream_lifetime";
 
 } // namespace Runtime
 } // namespace Envoy
