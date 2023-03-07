@@ -31,7 +31,7 @@ minor_behavior_changes:
     Metadata is parsed with the QUICHE HPACK library, rather than nghttp2. This behavior change can be reverted by setting ``envoy.reloadable_features.http2_decode_metadata_with_quiche`` to ``false``.
 - area: upstream
   change: |
-    Upstream stream does not disable reading (in case where downstream buffer reaches high watermark) till the full response headers have been received. This behavior change can be reverted by setting ``envoy.reloadable_features.upstream_wait_for_response_headers_before_disabling_read`` to ``false``.
+    Changed HTTP/1 and HTTP/3 upstream streams not to disable reading (in case where downstream buffer reaches high watermark) till the full response headers have been received. This fixes a bug where Envoy upstream timeouts were not correctly adjusting to the fact that the response headers have already been sent from upstream. This behavior change can be reverted by setting ``envoy.reloadable_features.upstream_wait_for_response_headers_before_disabling_read`` to ``false``.
 - area: custom response
   change: |
     Changed how the uri for redirect policy is specified. It can now be specified either as a single fully qualified string, or by specifying individual components of the uri.

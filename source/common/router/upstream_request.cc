@@ -798,7 +798,19 @@ void UpstreamRequest::clearRequestEncoder() {
 }
 
 void UpstreamRequest::readDisableOrDefer(bool disable) {
+  if (!upstream_wait_for_response_headers_before_disabling_read_) {
+    if (disable) {
+      parent_.cluster()->trafficStats()->upstream_flow_control_paused_reading_total_.inc();
+      upstream_->readDisable(true);
+    } else {
+      parent_.cluster()->trafficStats()->upstream_flow_control_resumed_reading_total_.inc();
+      upstream_->readDisable(false);
+    }
+    return;
+  }
+
   if (disable) {
+    // See comments on deferred_read_disabling_count_ for when we do and don't defer.
     if (parent_.downstreamResponseStarted()) {
       // The downstream connection is overrun. Pause reads from upstream.
       // If there are multiple calls to readDisable either the codec (H2) or the
@@ -813,6 +825,7 @@ void UpstreamRequest::readDisableOrDefer(bool disable) {
 
   // One source of connection blockage has buffer available.
   if (deferred_read_disabling_count_ > 0) {
+    ASSERT(!parent_.downstreamResponseStarted());
     // Cancel out an existing deferred read disabling.
     --deferred_read_disabling_count_;
     return;
@@ -834,28 +847,12 @@ void UpstreamRequest::DownstreamWatermarkManager::onAboveWriteBufferHighWatermar
   // can disable reads from upstream.
   ASSERT(!parent_.parent_.finalUpstreamRequest() ||
          &parent_ == parent_.parent_.finalUpstreamRequest());
-  // The downstream connection is overrun. Pause reads from upstream.
-  // If there are multiple calls to readDisable either the codec (H2) or the underlying
-  // Network::Connection (H1) will handle reference counting.
-  if (!parent_.upstream_wait_for_response_headers_before_disabling_read_) {
-    parent_.parent_.cluster()->trafficStats()->upstream_flow_control_paused_reading_total_.inc();
-    parent_.upstream_->readDisable(true);
-  } else {
-    parent_.readDisableOrDefer(true);
-  }
+  parent_.readDisableOrDefer(true);
 }
 
 void UpstreamRequest::DownstreamWatermarkManager::onBelowWriteBufferLowWatermark() {
   ASSERT(parent_.upstream_);
-
-  // One source of connection blockage has buffer available. Pass this on to the stream, which
-  // will resume reads if this was the last remaining high watermark.
-  if (!parent_.upstream_wait_for_response_headers_before_disabling_read_) {
-    parent_.parent_.cluster()->trafficStats()->upstream_flow_control_resumed_reading_total_.inc();
-    parent_.upstream_->readDisable(false);
-  } else {
-    parent_.readDisableOrDefer(false);
-  }
+  parent_.readDisableOrDefer(false);
 }
 
 void UpstreamRequest::disableDataFromDownstreamForFlowControl() {
