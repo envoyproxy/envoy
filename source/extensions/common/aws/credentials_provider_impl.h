@@ -76,9 +76,6 @@ public:
 protected:
   Api::Api& api_;
   MetadataFetcher metadata_fetcher_;
-
-  virtual bool needsRefresh() PURE;
-  virtual void refresh() PURE;
 };
 
 /**
@@ -168,12 +165,13 @@ class DefaultCredentialsProviderChain : public CredentialsProviderChain,
                                         public CredentialsProviderChainFactories {
 public:
   DefaultCredentialsProviderChain(
-      Api::Api& api, const MetadataCredentialsProviderBase::MetadataFetcher& metadata_fetcher)
-      : DefaultCredentialsProviderChain(api, metadata_fetcher, *this) {}
+      Api::Api& api, const MetadataCredentialsProviderBase::MetadataFetcher& metadata_fetcher,
+      const bool enable_credentials_file)
+      : DefaultCredentialsProviderChain(api, metadata_fetcher, *this, enable_credentials_file) {}
 
   DefaultCredentialsProviderChain(
       Api::Api& api, const MetadataCredentialsProviderBase::MetadataFetcher& metadata_fetcher,
-      const CredentialsProviderChainFactories& factories);
+      const CredentialsProviderChainFactories& factories, const bool enable_credentials_file);
 
 private:
   CredentialsProviderSharedPtr createEnvironmentCredentialsProvider() const override {

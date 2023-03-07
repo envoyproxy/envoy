@@ -25,8 +25,10 @@ aws_access_key_id=default_access_key
 aws_secret_access_key=default_secret
 aws_session_token=default_token
 
-[profile1]
-aws_access_key_id=profile1_access=_key
+# This profile has leading spaces that should get trimmed.
+  [profile1]
+# The "=" in the value should not interfere with how this line is parsed.
+aws_access_key_id=profile1_acc=ess_key
 aws_secret_access_key=profile1_secret
 foo=bar
 aws_session_token=profile1_token
@@ -90,7 +92,7 @@ public:
     TestEnvironment::unsetEnvVar("AWS_PROFILE");
   }
 
-  void SetUpTest(std::string file_contents, std::string profile) {
+  void setUpTest(std::string file_contents, std::string profile) {
     auto file_path = TestEnvironment::writeStringToFileForTest(CREDENTIALS_FILE, file_contents);
     TestEnvironment::setEnvVar("AWS_SHARED_CREDENTIALS_FILE", file_path, 1);
     TestEnvironment::setEnvVar("AWS_PROFILE", profile, 1);
@@ -111,7 +113,7 @@ TEST_F(CredentialsFileCredentialsProviderTest, FileDoesNotExist) {
 }
 
 TEST_F(CredentialsFileCredentialsProviderTest, ProfileDoesNotExist) {
-  SetUpTest(CREDENTIALS_FILE_CONTENTS, "invalid_profile");
+  setUpTest(CREDENTIALS_FILE_CONTENTS, "invalid_profile");
 
   const auto credentials = provider_.getCredentials();
   EXPECT_FALSE(credentials.accessKeyId().has_value());
@@ -120,7 +122,7 @@ TEST_F(CredentialsFileCredentialsProviderTest, ProfileDoesNotExist) {
 }
 
 TEST_F(CredentialsFileCredentialsProviderTest, IncompleteProfile) {
-  SetUpTest(CREDENTIALS_FILE_CONTENTS, "profile2");
+  setUpTest(CREDENTIALS_FILE_CONTENTS, "profile2");
 
   const auto credentials = provider_.getCredentials();
   EXPECT_EQ("profile2_access_key", credentials.accessKeyId().value());
@@ -129,7 +131,7 @@ TEST_F(CredentialsFileCredentialsProviderTest, IncompleteProfile) {
 }
 
 TEST_F(CredentialsFileCredentialsProviderTest, DefaultProfile) {
-  SetUpTest(CREDENTIALS_FILE_CONTENTS, "");
+  setUpTest(CREDENTIALS_FILE_CONTENTS, "");
 
   const auto credentials = provider_.getCredentials();
   EXPECT_EQ("default_access_key", credentials.accessKeyId().value());
@@ -138,12 +140,29 @@ TEST_F(CredentialsFileCredentialsProviderTest, DefaultProfile) {
 }
 
 TEST_F(CredentialsFileCredentialsProviderTest, CompleteProfile) {
-  SetUpTest(CREDENTIALS_FILE_CONTENTS, "profile1");
+  setUpTest(CREDENTIALS_FILE_CONTENTS, "profile1");
 
   const auto credentials = provider_.getCredentials();
-  EXPECT_EQ("profile1_access=_key", credentials.accessKeyId().value());
+  EXPECT_EQ("profile1_acc=ess_key", credentials.accessKeyId().value());
   EXPECT_EQ("profile1_secret", credentials.secretAccessKey().value());
   EXPECT_EQ("profile1_token", credentials.sessionToken().value());
+}
+
+TEST_F(CredentialsFileCredentialsProviderTest, EmptyCredsCached) {
+  TestEnvironment::setEnvVar("AWS_SHARED_CREDENTIALS_FILE", "/file/does/not/exist", 1);
+
+  auto credentials = provider_.getCredentials();
+  EXPECT_FALSE(credentials.accessKeyId().has_value());
+  EXPECT_FALSE(credentials.secretAccessKey().has_value());
+  EXPECT_FALSE(credentials.sessionToken().has_value());
+
+  // Confirm that the empty credentials are cached even after we switch
+  // to a legitimate profile with valid credentials.
+  setUpTest(CREDENTIALS_FILE_CONTENTS, "profile1");
+  credentials = provider_.getCredentials();
+  EXPECT_FALSE(credentials.accessKeyId().has_value());
+  EXPECT_FALSE(credentials.secretAccessKey().has_value());
+  EXPECT_FALSE(credentials.sessionToken().has_value());
 }
 
 class MessageMatcher : public testing::MatcherInterface<Http::RequestMessage&> {
@@ -589,7 +608,6 @@ class DefaultCredentialsProviderChainTest : public testing::Test {
 public:
   DefaultCredentialsProviderChainTest() : api_(Api::createApiForTest(time_system_)) {
     EXPECT_CALL(factories_, createEnvironmentCredentialsProvider());
-    EXPECT_CALL(factories_, createCredentialsFileCredentialsProvider(Ref(*api_)));
   }
 
   ~DefaultCredentialsProviderChainTest() override {
@@ -619,42 +637,54 @@ public:
 };
 
 TEST_F(DefaultCredentialsProviderChainTest, NoEnvironmentVars) {
+  EXPECT_CALL(factories_, createCredentialsFileCredentialsProvider(Ref(*api_)));
   EXPECT_CALL(factories_, createInstanceProfileCredentialsProvider(Ref(*api_), _));
-  DefaultCredentialsProviderChain chain(*api_, DummyMetadataFetcher(), factories_);
+  DefaultCredentialsProviderChain chain(*api_, DummyMetadataFetcher(), factories_, true);
+}
+
+TEST_F(DefaultCredentialsProviderChainTest, CredentialsFileDisabled) {
+  EXPECT_CALL(factories_, createCredentialsFileCredentialsProvider(Ref(*api_))).Times(0);
+  EXPECT_CALL(factories_, createInstanceProfileCredentialsProvider(Ref(*api_), _));
+  DefaultCredentialsProviderChain chain(*api_, DummyMetadataFetcher(), factories_, false);
 }
 
 TEST_F(DefaultCredentialsProviderChainTest, MetadataDisabled) {
   TestEnvironment::setEnvVar("AWS_EC2_METADATA_DISABLED", "true", 1);
+  EXPECT_CALL(factories_, createCredentialsFileCredentialsProvider(Ref(*api_)));
   EXPECT_CALL(factories_, createInstanceProfileCredentialsProvider(Ref(*api_), _)).Times(0);
-  DefaultCredentialsProviderChain chain(*api_, DummyMetadataFetcher(), factories_);
+  DefaultCredentialsProviderChain chain(*api_, DummyMetadataFetcher(), factories_, true);
 }
 
 TEST_F(DefaultCredentialsProviderChainTest, MetadataNotDisabled) {
   TestEnvironment::setEnvVar("AWS_EC2_METADATA_DISABLED", "false", 1);
+  EXPECT_CALL(factories_, createCredentialsFileCredentialsProvider(Ref(*api_)));
   EXPECT_CALL(factories_, createInstanceProfileCredentialsProvider(Ref(*api_), _));
-  DefaultCredentialsProviderChain chain(*api_, DummyMetadataFetcher(), factories_);
+  DefaultCredentialsProviderChain chain(*api_, DummyMetadataFetcher(), factories_, true);
 }
 
 TEST_F(DefaultCredentialsProviderChainTest, RelativeUri) {
   TestEnvironment::setEnvVar("AWS_CONTAINER_CREDENTIALS_RELATIVE_URI", "/path/to/creds", 1);
+  EXPECT_CALL(factories_, createCredentialsFileCredentialsProvider(Ref(*api_)));
   EXPECT_CALL(factories_, createTaskRoleCredentialsProvider(Ref(*api_), _,
                                                             "169.254.170.2:80/path/to/creds", ""));
-  DefaultCredentialsProviderChain chain(*api_, DummyMetadataFetcher(), factories_);
+  DefaultCredentialsProviderChain chain(*api_, DummyMetadataFetcher(), factories_, true);
 }
 
 TEST_F(DefaultCredentialsProviderChainTest, FullUriNoAuthorizationToken) {
   TestEnvironment::setEnvVar("AWS_CONTAINER_CREDENTIALS_FULL_URI", "http://host/path/to/creds", 1);
+  EXPECT_CALL(factories_, createCredentialsFileCredentialsProvider(Ref(*api_)));
   EXPECT_CALL(factories_,
               createTaskRoleCredentialsProvider(Ref(*api_), _, "http://host/path/to/creds", ""));
-  DefaultCredentialsProviderChain chain(*api_, DummyMetadataFetcher(), factories_);
+  DefaultCredentialsProviderChain chain(*api_, DummyMetadataFetcher(), factories_, true);
 }
 
 TEST_F(DefaultCredentialsProviderChainTest, FullUriWithAuthorizationToken) {
   TestEnvironment::setEnvVar("AWS_CONTAINER_CREDENTIALS_FULL_URI", "http://host/path/to/creds", 1);
   TestEnvironment::setEnvVar("AWS_CONTAINER_AUTHORIZATION_TOKEN", "auth_token", 1);
+  EXPECT_CALL(factories_, createCredentialsFileCredentialsProvider(Ref(*api_)));
   EXPECT_CALL(factories_, createTaskRoleCredentialsProvider(
                               Ref(*api_), _, "http://host/path/to/creds", "auth_token"));
-  DefaultCredentialsProviderChain chain(*api_, DummyMetadataFetcher(), factories_);
+  DefaultCredentialsProviderChain chain(*api_, DummyMetadataFetcher(), factories_, true);
 }
 
 TEST(CredentialsProviderChainTest, getCredentials_noCredentials) {

@@ -117,7 +117,7 @@ minor_behavior_changes:
     are rejected. This setting is only applicable when the Unversal Header Validator is enabled and has no effect otherwise.
 - area: aws
   change: |
-    Added support for fetching credentials from the AWS credentials file. The order of credential fetching methods is now: 1) environment variables, 2) the credentials file, 3) instance metadata, 4) task metadata.
+    Added support for fetching credentials from the AWS credentials file, which only happens if credentials cannot be fetched from environment variables. This behavioral change can be reverted by setting runtime guard ``envoy.reloadable_features.enable_aws_credentials_file`` to ``false``.
 
 bug_fixes:
 - area: http

@@ -11,6 +11,7 @@
 #include "source/common/grpc/google_grpc_creds_impl.h"
 #include "source/common/http/utility.h"
 #include "source/common/protobuf/message_validator_impl.h"
+#include "source/common/runtime/runtime_features.h"
 #include "source/extensions/common/aws/credentials_provider_impl.h"
 #include "source/extensions/common/aws/region_provider_impl.h"
 #include "source/extensions/common/aws/signer_impl.h"
@@ -44,8 +45,10 @@ std::shared_ptr<grpc::ChannelCredentials> AwsIamGrpcCredentialsFactory::getChann
         const auto& config = Envoy::MessageUtil::downcastAndValidate<
             const envoy::config::grpc_credential::v3::AwsIamConfig&>(
             *config_message, ProtobufMessage::getNullValidationVisitor());
+        const bool enable_credentials_file =
+            Runtime::runtimeFeatureEnabled("envoy.reloadable_features.enable_aws_credentials_file");
         auto credentials_provider = std::make_shared<Common::Aws::DefaultCredentialsProviderChain>(
-            api, Common::Aws::Utility::fetchMetadata);
+            api, Common::Aws::Utility::fetchMetadata, enable_credentials_file);
         auto signer = std::make_unique<Common::Aws::SignerImpl>(
             config.service_name(), getRegion(config), credentials_provider, api.timeSource(),
             // TODO: extend API to allow specifying header exclusion. ref:

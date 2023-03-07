@@ -11,6 +11,7 @@
 #include "source/common/json/json_loader.h"
 #include "source/extensions/common/aws/utility.h"
 
+#include "absl/strings/match.h"
 #include "absl/strings/str_split.h"
 
 namespace Envoy {
@@ -83,27 +84,29 @@ bool CredentialsFileCredentialsProvider::needsRefresh() {
   return api_.timeSource().systemTime() - last_updated_ > REFRESH_INTERVAL;
 }
 
-std::string GetEnvironmentVariableOrDefault(const std::string& variable_name,
+std::string getEnvironmentVariableOrDefault(const std::string& variable_name,
                                             const std::string& default_value) {
   const char* value = getenv(variable_name.c_str());
-  return (value != NULL) && (value[0] != '\0') ? value : default_value;
+  return (value != nullptr) && (value[0] != '\0') ? value : default_value;
 }
 
 void CredentialsFileCredentialsProvider::refresh() {
   ENVOY_LOG(debug, "Getting AWS credentials from the credentials file");
 
-  const auto credentials_file = GetEnvironmentVariableOrDefault(
+  const auto credentials_file = getEnvironmentVariableOrDefault(
       AWS_SHARED_CREDENTIALS_FILE, DEFAULT_AWS_SHARED_CREDENTIALS_FILE);
-  const auto profile = GetEnvironmentVariableOrDefault(AWS_PROFILE, DEFAULT_AWS_PROFILE);
+  const auto profile = getEnvironmentVariableOrDefault(AWS_PROFILE, DEFAULT_AWS_PROFILE);
 
   extractCredentials(credentials_file, profile);
 }
 
 void CredentialsFileCredentialsProvider::extractCredentials(const std::string& credentials_file,
                                                             const std::string& profile) {
-  if (credentials_file.empty() || profile.empty()) {
-    return;
-  }
+  // Update last_updated_ now so that even if this function returns before successfully
+  // extracting credentials, we'll cache an empty set of credentials. This prevents envoy
+  // from attempting and failing to read the credentials file on every request if there are
+  // errors extracting credentials from it (e.g. if the credentials file doesn't exist).
+  last_updated_ = api_.timeSource().systemTime();
 
   std::ifstream file(credentials_file);
   if (!file) {
@@ -117,6 +120,11 @@ void CredentialsFileCredentialsProvider::extractCredentials(const std::string& c
   bool found_profile = false;
   std::string line;
   while (std::getline(file, line)) {
+    line = std::string(StringUtil::trim(line));
+    if (line.empty()) {
+      continue;
+    }
+
     if (line == profile_start) {
       found_profile = true;
       continue;
@@ -124,7 +132,7 @@ void CredentialsFileCredentialsProvider::extractCredentials(const std::string& c
 
     if (found_profile) {
       // Stop reading once we find the start of the next profile.
-      if (line.rfind("[", 0) == 0) {
+      if (absl::StartsWith(line, "[")) {
         break;
       }
 
@@ -331,12 +339,16 @@ Credentials CredentialsProviderChain::getCredentials() {
 
 DefaultCredentialsProviderChain::DefaultCredentialsProviderChain(
     Api::Api& api, const MetadataCredentialsProviderBase::MetadataFetcher& metadata_fetcher,
-    const CredentialsProviderChainFactories& factories) {
+    const CredentialsProviderChainFactories& factories, const bool enable_credentials_file) {
   ENVOY_LOG(debug, "Using environment credentials provider");
   add(factories.createEnvironmentCredentialsProvider());
 
-  ENVOY_LOG(debug, "Using credentials file credentials provider");
-  add(factories.createCredentialsFileCredentialsProvider(api));
+  if (enable_credentials_file) {
+    ENVOY_LOG(debug, "Using credentials file credentials provider");
+    add(factories.createCredentialsFileCredentialsProvider(api));
+  } else {
+    ENVOY_LOG(debug, "Not using credential file credentials provider because it is not enabled");
+  }
 
   const auto relative_uri =
       absl::NullSafeStringView(std::getenv(AWS_CONTAINER_CREDENTIALS_RELATIVE_URI));
