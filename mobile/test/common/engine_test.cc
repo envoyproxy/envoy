@@ -98,13 +98,12 @@ TEST_F(EngineTest, AccessEngineAfterInitialization) {
   const std::string level = "debug";
 
   engine_test_context test_context{};
-  envoy_engine_callbacks callbacks{[](void* context, int) -> void {
-                                     auto* engine_running =
-                                         static_cast<engine_test_context*>(context);
-                                     engine_running->on_engine_running.Notify();
-                                   } /*on_engine_running*/,
-                                   [](void*) -> void {} /*on_exit*/, &test_context /*context*/,
-                                   0 /*tag*/};
+  envoy_engine_callbacks callbacks{
+      [](void* context, int) -> void {
+        auto* engine_running = static_cast<engine_test_context*>(context);
+        engine_running->on_engine_running.Notify();
+      } /*on_engine_running*/,
+      [](void*) -> void {} /*on_exit*/, &test_context /*context*/, 0 /*tag*/};
 
   engine_ = std::make_unique<TestEngineHandle>(callbacks, level);
   envoy_engine_t handle = engine_->handle_;
