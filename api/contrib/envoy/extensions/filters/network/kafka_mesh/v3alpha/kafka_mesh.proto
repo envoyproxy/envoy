@@ -44,10 +44,14 @@ message KafkaClusterDefinition {
 
   // Default number of partitions present in this cluster.
   // This is especially important for clients that do not specify partition in their payloads and depend on this value for hashing.
+  // The same number of partitions is going to be used by upstream-pointing Kafka consumers for consumer proxying scenarios.
   int32 partition_count = 3 [(validate.rules).int32 = {gt: 0}];
 
   // Custom configuration passed to Kafka producer.
   map<string, string> producer_config = 4;
+
+  // Custom configuration passed to Kafka consumer.
+  map<string, string> consumer_config = 5;
 }
 
 message ForwardingRule {

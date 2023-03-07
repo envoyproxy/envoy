@@ -39,18 +39,21 @@ UpstreamKafkaConfigurationImpl::UpstreamKafkaConfigurationImpl(const KafkaMeshPr
                        cluster_name));
     }
 
-    // Upstream client configuration - use all the optional custom configs provided, and then use
-    // the target IPs.
+    // Upstream producer configuration.
     std::map<std::string, std::string> producer_configs = {
         upstream_cluster_definition.producer_config().begin(),
         upstream_cluster_definition.producer_config().end()};
     producer_configs["bootstrap.servers"] = upstream_cluster_definition.bootstrap_servers();
 
-    // TODO (adam.kotwasinski) This needs to read configs just like producer does.
-    std::map<std::string, std::string> consumer_configs = {};
+    // Upstream consumer configuration.
+    std::map<std::string, std::string> consumer_configs = {
+        upstream_cluster_definition.consumer_config().begin(),
+        upstream_cluster_definition.consumer_config().end()};
+    if (consumer_configs.end() == consumer_configs.find("group.id")) {
+      // librdkafka consumer needs a group id, let's use a default one if nothing was provided.
+      consumer_configs["group.id"] = DEFAULT_CONSUMER_GROUP_ID;
+    }
     consumer_configs["bootstrap.servers"] = upstream_cluster_definition.bootstrap_servers();
-    // TODO (adam.kotwasinski) When configs are read, use this only if absent.
-    consumer_configs["group.id"] = DEFAULT_CONSUMER_GROUP_ID;
 
     ClusterConfig cluster_config = {cluster_name, upstream_cluster_definition.partition_count(),
                                     producer_configs, consumer_configs};
