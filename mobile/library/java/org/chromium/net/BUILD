@@ -27,6 +27,7 @@ android_binary(
     visibility = ["//visibility:public"],
     deps = [
         ":net",
+        "//library/java/io/envoyproxy/envoymobile/utilities",
         "//library/java/org/chromium/net/impl:cronvoy",
     ],
 )
