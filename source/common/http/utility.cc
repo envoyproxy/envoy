@@ -188,7 +188,7 @@ const uint32_t OptionsLimits::DEFAULT_MAX_INBOUND_WINDOW_UPDATE_FRAMES_PER_DATA_
 envoy::config::core::v3::Http2ProtocolOptions
 initializeAndValidateOptions(const envoy::config::core::v3::Http2ProtocolOptions& options,
                              bool hcm_stream_error_set,
-                             const Protobuf::BoolValue& hcm_stream_error) {
+                             const ProtobufWkt::BoolValue& hcm_stream_error) {
   auto ret = initializeAndValidateOptions(options);
   if (!options.has_override_stream_error_on_invalid_http_message() && hcm_stream_error_set) {
     ret.mutable_override_stream_error_on_invalid_http_message()->set_value(
@@ -271,7 +271,7 @@ const uint32_t OptionsLimits::DEFAULT_INITIAL_CONNECTION_WINDOW_SIZE;
 envoy::config::core::v3::Http3ProtocolOptions
 initializeAndValidateOptions(const envoy::config::core::v3::Http3ProtocolOptions& options,
                              bool hcm_stream_error_set,
-                             const Protobuf::BoolValue& hcm_stream_error) {
+                             const ProtobufWkt::BoolValue& hcm_stream_error) {
   if (options.has_override_stream_error_on_invalid_http_message()) {
     return options;
   }
