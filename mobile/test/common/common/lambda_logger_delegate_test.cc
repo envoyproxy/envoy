@@ -42,7 +42,7 @@ TEST_F(LambdaDelegateTest, ReleaseCb) {
   bool released = false;
 
   {
-    LambdaDelegate({[](envoy_data data, const void*) -> void { release_envoy_data(data); },
+    LambdaDelegate({[](envoy_data data, const void*, int) -> void { release_envoy_data(data); },
                     [](const void* context) -> void {
                       bool* released = static_cast<bool*>(const_cast<void*>(context));
                       *released = true;
