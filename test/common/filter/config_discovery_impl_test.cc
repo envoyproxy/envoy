@@ -84,7 +84,8 @@ template <class FactoryCb, class FactoryCtx, class CfgProviderMgrImpl, class Pro
 class FilterConfigDiscoveryImplTest : public FilterConfigDiscoveryTestBase {
 public:
   FilterConfigDiscoveryImplTest() {
-    filter_config_provider_manager_ = std::make_unique<CfgProviderMgrImpl>();
+    filter_config_provider_manager_ =
+        std::make_unique<CfgProviderMgrImpl>(factory_context_.getServerFactoryContext());
   }
   ~FilterConfigDiscoveryImplTest() override { factory_context_.thread_local_.shutdownThread(); }
 

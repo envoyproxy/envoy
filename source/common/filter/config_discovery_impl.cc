@@ -65,7 +65,7 @@ FilterConfigSubscription::FilterConfigSubscription(
     : Config::SubscriptionBase<envoy::config::core::v3::TypedExtensionConfig>(
           factory_context.messageValidationContext().dynamicValidationVisitor(), "name"),
       filter_config_name_(filter_config_name),
-      last_(std::make_shared<ConfigVersion>("", factory_context.timeSource().systemTime())),
+      last_(std::make_unique<ConfigVersion>("", factory_context.timeSource().systemTime())),
       factory_context_(factory_context),
       init_target_(fmt::format("FilterConfigSubscription init {}", filter_config_name_),
                    [this]() { start(); }),
@@ -89,7 +89,13 @@ void FilterConfigSubscription::start() {
 
 void FilterConfigSubscription::onConfigUpdate(
     const std::vector<Config::DecodedResourceRef>& resources, const std::string& version_info) {
-  ConfigVersionSharedPtr next = std::make_shared<ConfigVersion>(version_info, factory_context_.timeSource().systemTime());
+  ConfigVersionPtr next =
+      std::make_unique<ConfigVersion>(version_info, factory_context_.timeSource().systemTime());
+  // During startup, workers await for the filter config subscriptions to initialize, so we cannot
+  // rely on the thread locals and the workers to mark the update completion.
+  if (!filter_config_provider_manager_.workersStarted()) {
+    init_target_.ready();
+  }
   TRY_ASSERT_MAIN_THREAD {
     if (resources.size() != 1) {
       throw EnvoyException(fmt::format(
@@ -108,9 +114,9 @@ void FilterConfigSubscription::onConfigUpdate(
       // there is no need to mark the init target ready.
       return;
     }
-    // Ensure that the filter config is valid in the filter chain context once the proto is processed.
-    // Validation happens before updating to prevent a partial update application. It might be
-    // possible that the providers have distinct type URL constraints.
+    // Ensure that the filter config is valid in the filter chain context once the proto is
+    // processed. Validation happens before updating to prevent a partial update application. It
+    // might be possible that the providers have distinct type URL constraints.
     next->type_url_ = Config::Utility::getFactoryType(filter_config.typed_config());
     for (auto* provider : filter_config_providers_) {
       provider->validateTypeUrl(next->type_url_);
@@ -129,12 +135,12 @@ void FilterConfigSubscription::onConfigUpdate(
   ENVOY_LOG(debug, "Updating filter config {}", filter_config_name_);
   Common::applyToAllWithCleanup<DynamicFilterConfigProviderImplBase*>(
       filter_config_providers_,
-      [&message = next->config_, &version_info = next->version_info_](DynamicFilterConfigProviderImplBase* provider,
-                                          std::shared_ptr<Cleanup> cleanup) {
+      [&message = next->config_, &version_info = next->version_info_](
+          DynamicFilterConfigProviderImplBase* provider, std::shared_ptr<Cleanup> cleanup) {
         provider->onConfigUpdate(*message, version_info, [cleanup] {});
       },
-      [me = shared_from_this(), next]() mutable {
-        me->updateComplete(next);
+      [me = shared_from_this(), next = std::move(next)]() mutable {
+        me->updateComplete(std::move(next));
       });
 }
 
@@ -144,14 +150,15 @@ void FilterConfigSubscription::onConfigUpdate(
   if (!removed_resources.empty()) {
     ASSERT(removed_resources.size() == 1);
     ENVOY_LOG(debug, "Removing filter config {}", filter_config_name_);
-    ConfigVersionSharedPtr next = std::make_shared<ConfigVersion>("", factory_context_.timeSource().systemTime());
+    ConfigVersionPtr next =
+        std::make_unique<ConfigVersion>("", factory_context_.timeSource().systemTime());
     Common::applyToAllWithCleanup<DynamicFilterConfigProviderImplBase*>(
         filter_config_providers_,
         [](DynamicFilterConfigProviderImplBase* provider, std::shared_ptr<Cleanup> cleanup) {
           provider->onConfigRemoved([cleanup] {});
         },
-        [me = shared_from_this(), next]() mutable {
-          me->updateComplete(next);
+        [me = shared_from_this(), next = std::move(next)]() mutable {
+          me->updateComplete(std::move(next));
         });
   } else if (!added_resources.empty()) {
     ASSERT(added_resources.size() == 1);
@@ -168,7 +175,7 @@ void FilterConfigSubscription::onConfigUpdateFailed(Config::ConfigUpdateFailureR
   init_target_.ready();
 }
 
-void FilterConfigSubscription::updateComplete(const ConfigVersionSharedPtr& next) {
+void FilterConfigSubscription::updateComplete(ConfigVersionPtr next) {
   ENVOY_LOG(debug, "Filter config {} update complete", filter_config_name_);
   stats_.config_reload_.inc();
   last_ = std::move(next);

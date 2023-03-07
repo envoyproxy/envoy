@@ -65,8 +65,9 @@ FilterChainUtility::createSingletonUpstreamFilterConfigProviderManager(
     Server::Configuration::ServerFactoryContext& context) {
   std::shared_ptr<UpstreamFilterConfigProviderManager> upstream_filter_config_provider_manager =
       context.singletonManager().getTyped<Http::UpstreamFilterConfigProviderManager>(
-          SINGLETON_MANAGER_REGISTERED_NAME(upstream_filter_config_provider_manager),
-          [] { return std::make_shared<Filter::UpstreamHttpFilterConfigProviderManagerImpl>(); });
+          SINGLETON_MANAGER_REGISTERED_NAME(upstream_filter_config_provider_manager), [&context] {
+            return std::make_shared<Filter::UpstreamHttpFilterConfigProviderManagerImpl>(context);
+          });
   return upstream_filter_config_provider_manager;
 }
 
@@ -77,7 +78,9 @@ FilterChainUtility::createSingletonDownstreamFilterConfigProviderManager(
       downstream_filter_config_provider_manager =
           context.singletonManager().getTyped<Http::DownstreamFilterConfigProviderManager>(
               SINGLETON_MANAGER_REGISTERED_NAME(downstream_filter_config_provider_manager),
-              [] { return std::make_shared<Filter::HttpFilterConfigProviderManagerImpl>(); });
+              [&context] {
+                return std::make_shared<Filter::HttpFilterConfigProviderManagerImpl>(context);
+              });
   return downstream_filter_config_provider_manager;
 }
 

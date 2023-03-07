@@ -5,13 +5,15 @@
 
 #include "source/common/common/assert.h"
 
+#include "absl/functional/any_invocable.h"
+
 namespace Envoy {
 
 // RAII cleanup via functor.
 class Cleanup {
 public:
-  Cleanup(std::function<void()> f) : f_(std::move(f)) {}
-  ~Cleanup() { f_(); }
+  Cleanup(absl::AnyInvocable<void() &&> f) : f_(std::move(f)) {}
+  ~Cleanup() { std::move(f_)(); }
 
   void cancel() {
     cancelled_ = true;
@@ -21,7 +23,7 @@ public:
   bool cancelled() { return cancelled_; }
 
 private:
-  std::function<void()> f_;
+  absl::AnyInvocable<void() &&> f_;
   bool cancelled_{false};
 };
 

@@ -81,6 +81,7 @@ envoy_cc_library(
     hdrs = ["cleanup.h"],
     deps = [
         ":assert_lib",
+        "@com_google_absl//absl/functional:any_invocable",
     ],
 )
 

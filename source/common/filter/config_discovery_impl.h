@@ -316,8 +316,8 @@ public:
 
 private:
   struct ConfigVersion {
-    ConfigVersion(const std::string& version_info, SystemTime updated) : 
-      version_info_(version_info), updated_(updated) {}
+    ConfigVersion(const std::string& version_info, SystemTime updated)
+        : version_info_(version_info), updated_(updated) {}
     ProtobufTypes::MessagePtr config_;
     std::string type_url_;
     const std::string version_info_;
@@ -326,7 +326,7 @@ private:
     const SystemTime updated_;
   };
   // Using a heap allocated record because updates are completed by all workers asynchronously.
-  using ConfigVersionSharedPtr = std::shared_ptr<ConfigVersion>;
+  using ConfigVersionPtr = std::unique_ptr<ConfigVersion>;
 
   void start();
 
@@ -338,10 +338,10 @@ private:
                       const std::string&) override;
   void onConfigUpdateFailed(Config::ConfigUpdateFailureReason reason,
                             const EnvoyException*) override;
-  void updateComplete(const ConfigVersionSharedPtr& next);
+  void updateComplete(ConfigVersionPtr next);
 
   const std::string filter_config_name_;
-  ConfigVersionSharedPtr last_;
+  ConfigVersionPtr last_;
   Server::Configuration::ServerFactoryContext& factory_context_;
 
   Init::SharedTargetImpl init_target_;
@@ -389,6 +389,8 @@ public:
   virtual std::tuple<ProtobufTypes::MessagePtr, std::string>
   getMessage(const envoy::config::core::v3::TypedExtensionConfig& filter_config,
              Server::Configuration::ServerFactoryContext& factory_context) const PURE;
+
+  virtual bool workersStarted() const PURE;
 
 protected:
   std::shared_ptr<FilterConfigSubscription> getSubscription(
@@ -451,6 +453,13 @@ class FilterConfigProviderManagerImpl : public FilterConfigProviderManagerImplBa
                                         public FilterConfigProviderManager<FactoryCb, FactoryCtx>,
                                         public Singleton::Instance {
 public:
+  FilterConfigProviderManagerImpl(Server::Configuration::ServerFactoryContext& server_context)
+      : start_handle_(server_context.lifecycleNotifier().registerCallback(
+            Server::ServerLifecycleNotifier::Stage::PostInit,
+            [this]() { workers_started_ = true; })) {}
+
+  bool workersStarted() const override { return workers_started_; }
+
   DynamicFilterConfigProviderPtr<FactoryCb> createDynamicFilterConfigProvider(
       const envoy::config::core::v3::ExtensionConfigSource& config_source,
       const std::string& filter_config_name,
@@ -540,6 +549,10 @@ protected:
                     last_filter_in_filter_chain);
     return message;
   }
+
+private:
+  Server::ServerLifecycleNotifier::HandlePtr start_handle_;
+  bool workers_started_{false};
 };
 
 // HTTP filter
@@ -551,6 +564,8 @@ class HttpFilterConfigProviderManagerImpl
               Server::Configuration::FactoryContext,
               Server::Configuration::NamedHttpFilterConfigFactory>> {
 public:
+  HttpFilterConfigProviderManagerImpl(Server::Configuration::ServerFactoryContext& server_context)
+      : FilterConfigProviderManagerImpl(server_context) {}
   absl::string_view statPrefix() const override { return "http_filter."; }
 
 protected:
@@ -578,6 +593,9 @@ class UpstreamHttpFilterConfigProviderManagerImpl
               Server::Configuration::UpstreamHttpFactoryContext,
               Server::Configuration::UpstreamHttpFilterConfigFactory>> {
 public:
+  UpstreamHttpFilterConfigProviderManagerImpl(
+      Server::Configuration::ServerFactoryContext& server_context)
+      : FilterConfigProviderManagerImpl(server_context) {}
   absl::string_view statPrefix() const override { return "http_filter."; }
 
 protected:
@@ -603,6 +621,9 @@ class TcpListenerFilterConfigProviderManagerImpl
           Server::Configuration::ListenerFactoryContext,
           TcpListenerDynamicFilterConfigProviderImpl> {
 public:
+  TcpListenerFilterConfigProviderManagerImpl(
+      Server::Configuration::ServerFactoryContext& server_context)
+      : FilterConfigProviderManagerImpl(server_context) {}
   absl::string_view statPrefix() const override { return "tcp_listener_filter."; }
 
 protected:
@@ -616,6 +637,9 @@ class UdpListenerFilterConfigProviderManagerImpl
           Network::UdpListenerFilterFactoryCb, Server::Configuration::ListenerFactoryContext,
           UdpListenerDynamicFilterConfigProviderImpl> {
 public:
+  UdpListenerFilterConfigProviderManagerImpl(
+      Server::Configuration::ServerFactoryContext& server_context)
+      : FilterConfigProviderManagerImpl(server_context) {}
   absl::string_view statPrefix() const override { return "udp_listener_filter."; }
 
 protected:
