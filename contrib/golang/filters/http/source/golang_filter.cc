@@ -672,15 +672,15 @@ CAPIStatus Filter::setHeader(absl::string_view key, absl::string_view value, hea
       if (!weak_ptr.expired() && !has_destroyed_) {
         switch (act) {
         case HeaderAdd:
-            headers_->addCopy(Http::LowerCaseString(key_str), value_str);
-            break;
+          headers_->addCopy(Http::LowerCaseString(key_str), value_str);
+          break;
 
         case HeaderSet:
-            headers_->setCopy(Http::LowerCaseString(key_str), value_str);
-            break;
+          headers_->setCopy(Http::LowerCaseString(key_str), value_str);
+          break;
 
         default:
-            RELEASE_ASSERT(false, absl::StrCat("unknown header action: ", act));
+          RELEASE_ASSERT(false, absl::StrCat("unknown header action: ", act));
         }
 
         onHeadersModified();
