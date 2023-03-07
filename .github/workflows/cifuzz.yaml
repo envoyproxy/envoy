@@ -2,6 +2,7 @@ name: CIFuzzTest
 on:
   pull_request_target:
     branches:
+      - main
       - cifuzz-workflow
     paths:
       - '**.c'
