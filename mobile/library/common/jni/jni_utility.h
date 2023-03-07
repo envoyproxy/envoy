@@ -44,6 +44,8 @@ void jni_delete_global_ref(void* context);
 
 void jni_delete_const_global_ref(const void* context);
 
+void jni_delete_const_global_ref_tag(const void* context, int tag);
+
 /**
  * Clears any pending exceptions that may have been rides in result to a call into Java code.
  *

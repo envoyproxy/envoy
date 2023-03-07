@@ -31,7 +31,7 @@ TEST_F(LambdaDelegateTest, LogCb) {
                              *actual_msg = Data::Utility::copyToString(data);
                              release_envoy_data(data);
                            },
-                           [](const void*) -> void {}, &actual_msg},
+                           [](const void*, int) -> void {}, &actual_msg, 0 /*tag*/},
                           Registry::getSink());
 
   ENVOY_LOG_MISC(error, expected_msg);
@@ -43,11 +43,11 @@ TEST_F(LambdaDelegateTest, ReleaseCb) {
 
   {
     LambdaDelegate({[](envoy_data data, const void*, int) -> void { release_envoy_data(data); },
-                    [](const void* context) -> void {
+                    [](const void* context, int) -> void {
                       bool* released = static_cast<bool*>(const_cast<void*>(context));
                       *released = true;
                     },
-                    &released},
+                    &released, 0 /*tag*/},
                    Registry::getSink());
   }
 

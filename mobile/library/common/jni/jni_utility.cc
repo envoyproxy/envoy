@@ -66,6 +66,10 @@ void jni_delete_const_global_ref(const void* context) {
   jni_delete_global_ref(const_cast<void*>(context));
 }
 
+void jni_delete_const_global_ref_tag(const void* context, int) {
+  jni_delete_global_ref(const_cast<void*>(context));
+}
+
 bool clear_pending_exceptions(JNIEnv* env) {
   if (env->ExceptionCheck() == JNI_TRUE) {
     env->ExceptionClear();

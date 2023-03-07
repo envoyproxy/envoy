@@ -126,7 +126,7 @@ Http::ResponseHeaderMapPtr toResponseHeaders(envoy_headers headers) {
 TEST(MainInterfaceTest, BasicStream) {
   const std::string level = "debug";
   engine_test_context engine_cbs_context{};
-  envoy_engine_callbacks engine_cbs{[](void* context) -> void {
+  envoy_engine_callbacks engine_cbs{[](void* context, int) -> void {
                                       auto* engine_running =
                                           static_cast<engine_test_context*>(context);
                                       engine_running->on_engine_running.Notify();
@@ -135,7 +135,7 @@ TEST(MainInterfaceTest, BasicStream) {
                                       auto* exit = static_cast<engine_test_context*>(context);
                                       exit->on_exit.Notify();
                                     } /*on_exit*/,
-                                    &engine_cbs_context /*context*/};
+                                    &engine_cbs_context /*context*/, 0 /*tag*/};
   envoy_engine_t engine_handle = init_engine(engine_cbs, {}, {});
   run_engine(engine_handle, BUFFERED_TEST_CONFIG.c_str(), level.c_str(), "");
 
@@ -189,7 +189,7 @@ TEST(MainInterfaceTest, BasicStream) {
 
 TEST(MainInterfaceTest, SendMetadata) {
   engine_test_context engine_cbs_context{};
-  envoy_engine_callbacks engine_cbs{[](void* context) -> void {
+  envoy_engine_callbacks engine_cbs{[](void* context, int) -> void {
                                       auto* engine_running =
                                           static_cast<engine_test_context*>(context);
                                       engine_running->on_engine_running.Notify();
@@ -198,7 +198,7 @@ TEST(MainInterfaceTest, SendMetadata) {
                                       auto* exit = static_cast<engine_test_context*>(context);
                                       exit->on_exit.Notify();
                                     } /*on_exit*/,
-                                    &engine_cbs_context /*context*/};
+                                    &engine_cbs_context /*context*/, 0 /*tag*/};
 
   // There is nothing functional about the config used to run the engine, as the created stream is
   // only used for send_metadata.
@@ -229,7 +229,7 @@ TEST(MainInterfaceTest, SendMetadata) {
 
 TEST(MainInterfaceTest, ResetStream) {
   engine_test_context engine_cbs_context{};
-  envoy_engine_callbacks engine_cbs{[](void* context) -> void {
+  envoy_engine_callbacks engine_cbs{[](void* context, int) -> void {
                                       auto* engine_running =
                                           static_cast<engine_test_context*>(context);
                                       engine_running->on_engine_running.Notify();
@@ -238,7 +238,7 @@ TEST(MainInterfaceTest, ResetStream) {
                                       auto* exit = static_cast<engine_test_context*>(context);
                                       exit->on_exit.Notify();
                                     } /*on_exit*/,
-                                    &engine_cbs_context /*context*/};
+                                    &engine_cbs_context /*context*/, 0 /*tag*/};
 
   // There is nothing functional about the config used to run the engine, as the created stream is
   // immediately reset.
@@ -301,7 +301,7 @@ TEST(MainInterfaceTest, UsingMainInterfaceWithoutARunningEngine) {
 
 TEST(MainInterfaceTest, RegisterPlatformApi) {
   engine_test_context engine_cbs_context{};
-  envoy_engine_callbacks engine_cbs{[](void* context) -> void {
+  envoy_engine_callbacks engine_cbs{[](void* context, int) -> void {
                                       auto* engine_running =
                                           static_cast<engine_test_context*>(context);
                                       engine_running->on_engine_running.Notify();
@@ -310,7 +310,7 @@ TEST(MainInterfaceTest, RegisterPlatformApi) {
                                       auto* exit = static_cast<engine_test_context*>(context);
                                       exit->on_exit.Notify();
                                     } /*on_exit*/,
-                                    &engine_cbs_context /*context*/};
+                                    &engine_cbs_context /*context*/, 0 /*tag*/};
 
   // Using the minimal envoy mobile config that allows for running the engine.
   envoy_engine_t engine_handle = init_engine(engine_cbs, {}, {});
@@ -333,7 +333,7 @@ TEST(MainInterfaceTest, PreferredNetwork) {
 
 TEST(EngineTest, RecordCounter) {
   engine_test_context test_context{};
-  envoy_engine_callbacks engine_cbs{[](void* context) -> void {
+  envoy_engine_callbacks engine_cbs{[](void* context, int) -> void {
                                       auto* engine_running =
                                           static_cast<engine_test_context*>(context);
                                       engine_running->on_engine_running.Notify();
@@ -342,7 +342,7 @@ TEST(EngineTest, RecordCounter) {
                                       auto* exit = static_cast<engine_test_context*>(context);
                                       exit->on_exit.Notify();
                                     } /*on_exit*/,
-                                    &test_context /*context*/};
+                                    &test_context /*context*/, 0 /*tag*/};
   EXPECT_EQ(ENVOY_FAILURE, record_counter_inc(0, "counter", envoy_stats_notags, 1));
   envoy_engine_t engine_handle = init_engine(engine_cbs, {}, {});
   run_engine(engine_handle, MINIMAL_TEST_CONFIG.c_str(), LEVEL_DEBUG.c_str(), "");
@@ -355,7 +355,7 @@ TEST(EngineTest, RecordCounter) {
 
 TEST(EngineTest, Logger) {
   engine_test_context test_context{};
-  envoy_engine_callbacks engine_cbs{[](void* context) -> void {
+  envoy_engine_callbacks engine_cbs{[](void* context, int) -> void {
                                       auto* test_context =
                                           static_cast<engine_test_context*>(context);
                                       test_context->on_engine_running.Notify();
@@ -365,9 +365,9 @@ TEST(EngineTest, Logger) {
                                           static_cast<engine_test_context*>(context);
                                       test_context->on_exit.Notify();
                                     } /*on_exit*/,
-                                    &test_context /*context*/};
+                                    &test_context /*context*/, 0 /*tag*/};
 
-  envoy_logger logger{[](envoy_data data, const void* context) -> void {
+  envoy_logger logger{[](envoy_data data, const void* context, int) -> void {
                         auto* test_context =
                             static_cast<engine_test_context*>(const_cast<void*>(context));
                         release_envoy_data(data);
@@ -375,12 +375,12 @@ TEST(EngineTest, Logger) {
                           test_context->on_log.Notify();
                         }
                       } /* log */,
-                      [](const void* context) -> void {
+                      [](const void* context, int) -> void {
                         auto* test_context =
                             static_cast<engine_test_context*>(const_cast<void*>(context));
                         test_context->on_logger_release.Notify();
                       } /* release */,
-                      &test_context};
+                      &test_context, 0 /*tag*/};
 
   envoy_engine_t engine_handle = init_engine(engine_cbs, logger, {});
   run_engine(engine_handle, MINIMAL_TEST_CONFIG.c_str(), LEVEL_DEBUG.c_str(), "");
@@ -395,7 +395,7 @@ TEST(EngineTest, Logger) {
 
 TEST(EngineTest, EventTrackerRegistersDefaultAPI) {
   engine_test_context test_context{};
-  envoy_engine_callbacks engine_cbs{[](void* context) -> void {
+  envoy_engine_callbacks engine_cbs{[](void* context, int) -> void {
                                       auto* test_context =
                                           static_cast<engine_test_context*>(context);
                                       test_context->on_engine_running.Notify();
@@ -405,7 +405,7 @@ TEST(EngineTest, EventTrackerRegistersDefaultAPI) {
                                           static_cast<engine_test_context*>(context);
                                       test_context->on_exit.Notify();
                                     } /*on_exit*/,
-                                    &test_context /*context*/};
+                                    &test_context /*context*/, 0 /*tag*/};
 
   envoy_engine_t engine_handle = init_engine(engine_cbs, {}, {});
   run_engine(engine_handle, MINIMAL_TEST_CONFIG.c_str(), LEVEL_DEBUG.c_str(), "");
@@ -430,7 +430,7 @@ TEST(EngineTest, EventTrackerRegistersDefaultAPI) {
 
 TEST(EngineTest, EventTrackerRegistersAPI) {
   engine_test_context test_context{};
-  envoy_engine_callbacks engine_cbs{[](void* context) -> void {
+  envoy_engine_callbacks engine_cbs{[](void* context, int) -> void {
                                       auto* test_context =
                                           static_cast<engine_test_context*>(context);
                                       test_context->on_engine_running.Notify();
@@ -440,8 +440,8 @@ TEST(EngineTest, EventTrackerRegistersAPI) {
                                           static_cast<engine_test_context*>(context);
                                       test_context->on_exit.Notify();
                                     } /*on_exit*/,
-                                    &test_context /*context*/};
-  envoy_event_tracker event_tracker{[](envoy_map map, const void* context) -> void {
+                                    &test_context /*context*/, 0 /*tag*/};
+  envoy_event_tracker event_tracker{[](envoy_map map, const void* context, int) -> void {
                                       const auto new_map = toMap(map);
                                       if (new_map.count("foo") && new_map.at("foo") == "bar") {
                                         auto* test_context = static_cast<engine_test_context*>(
@@ -449,7 +449,7 @@ TEST(EngineTest, EventTrackerRegistersAPI) {
                                         test_context->on_event.Notify();
                                       }
                                     } /*track*/,
-                                    &test_context /*context*/};
+                                    &test_context /*context*/, 0 /*tag*/};
 
   envoy_engine_t engine_handle = init_engine(engine_cbs, {}, event_tracker);
   run_engine(engine_handle, MINIMAL_TEST_CONFIG.c_str(), LEVEL_DEBUG.c_str(), "");
@@ -462,7 +462,7 @@ TEST(EngineTest, EventTrackerRegistersAPI) {
   EXPECT_EQ(event_tracker.context, registered_event_tracker->context);
 
   event_tracker.track(Bridge::Utility::makeEnvoyMap({{"foo", "bar"}}),
-                      registered_event_tracker->context);
+                      registered_event_tracker->context, registered_event_tracker->tag);
 
   ASSERT_TRUE(test_context.on_event.WaitForNotificationWithTimeout(absl::Seconds(3)));
   terminate_engine(engine_handle, /* release */ true);
@@ -471,7 +471,7 @@ TEST(EngineTest, EventTrackerRegistersAPI) {
 
 TEST(EngineTest, EventTrackerRegistersAssertionFailureRecordAction) {
   engine_test_context test_context{};
-  envoy_engine_callbacks engine_cbs{[](void* context) -> void {
+  envoy_engine_callbacks engine_cbs{[](void* context, int) -> void {
                                       auto* test_context =
                                           static_cast<engine_test_context*>(context);
                                       test_context->on_engine_running.Notify();
@@ -481,10 +481,10 @@ TEST(EngineTest, EventTrackerRegistersAssertionFailureRecordAction) {
                                           static_cast<engine_test_context*>(context);
                                       test_context->on_exit.Notify();
                                     } /*on_exit*/,
-                                    &test_context /*context*/};
+                                    &test_context /*context*/, 0 /*tag*/};
 
   envoy_event_tracker event_tracker{
-      [](envoy_map map, const void* context) -> void {
+      [](envoy_map map, const void* context, int) -> void {
         const auto new_map = toMap(map);
         if (new_map.count("name") && new_map.at("name") == "assertion") {
           EXPECT_EQ(new_map.at("location"), "foo_location");
@@ -492,7 +492,7 @@ TEST(EngineTest, EventTrackerRegistersAssertionFailureRecordAction) {
           test_context->on_event.Notify();
         }
       } /*track*/,
-      &test_context /*context*/};
+      &test_context /*context*/, 0 /*tag*/};
 
   envoy_engine_t engine_handle = init_engine(engine_cbs, {}, event_tracker);
   run_engine(engine_handle, MINIMAL_TEST_CONFIG.c_str(), LEVEL_DEBUG.c_str(), "");
@@ -511,7 +511,7 @@ TEST(EngineTest, EventTrackerRegistersAssertionFailureRecordAction) {
 
 TEST(EngineTest, EventTrackerRegistersEnvoyBugRecordAction) {
   engine_test_context test_context{};
-  envoy_engine_callbacks engine_cbs{[](void* context) -> void {
+  envoy_engine_callbacks engine_cbs{[](void* context, int) -> void {
                                       auto* test_context =
                                           static_cast<engine_test_context*>(context);
                                       test_context->on_engine_running.Notify();
@@ -521,9 +521,9 @@ TEST(EngineTest, EventTrackerRegistersEnvoyBugRecordAction) {
                                           static_cast<engine_test_context*>(context);
                                       test_context->on_exit.Notify();
                                     } /*on_exit*/,
-                                    &test_context /*context*/};
+                                    &test_context /*context*/, 0 /*tag*/};
 
-  envoy_event_tracker event_tracker{[](envoy_map map, const void* context) -> void {
+  envoy_event_tracker event_tracker{[](envoy_map map, const void* context, int) -> void {
                                       const auto new_map = toMap(map);
                                       if (new_map.count("name") && new_map.at("name") == "bug") {
                                         EXPECT_EQ(new_map.at("location"), "foo_location");
@@ -532,7 +532,7 @@ TEST(EngineTest, EventTrackerRegistersEnvoyBugRecordAction) {
                                         test_context->on_event.Notify();
                                       }
                                     } /*track*/,
-                                    &test_context /*context*/};
+                                    &test_context /*context*/, 0 /*tag*/};
 
   envoy_engine_t engine_handle = init_engine(engine_cbs, {}, event_tracker);
   run_engine(engine_handle, MINIMAL_TEST_CONFIG.c_str(), LEVEL_DEBUG.c_str(), "");
@@ -551,7 +551,7 @@ TEST(EngineTest, EventTrackerRegistersEnvoyBugRecordAction) {
 
 TEST(MainInterfaceTest, ResetConnectivityState) {
   engine_test_context test_context{};
-  envoy_engine_callbacks engine_cbs{[](void* context) -> void {
+  envoy_engine_callbacks engine_cbs{[](void* context, int) -> void {
                                       auto* engine_running =
                                           static_cast<engine_test_context*>(context);
                                       engine_running->on_engine_running.Notify();
@@ -560,7 +560,7 @@ TEST(MainInterfaceTest, ResetConnectivityState) {
                                       auto* exit = static_cast<engine_test_context*>(context);
                                       exit->on_exit.Notify();
                                     } /*on_exit*/,
-                                    &test_context /*context*/};
+                                    &test_context /*context*/, 0 /*tag*/};
   envoy_engine_t engine_handle = init_engine(engine_cbs, {}, {});
   run_engine(engine_handle, MINIMAL_TEST_CONFIG.c_str(), LEVEL_DEBUG.c_str(), "");
   ASSERT_TRUE(test_context.on_engine_running.WaitForNotificationWithTimeout(absl::Seconds(3)));

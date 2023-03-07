@@ -28,7 +28,7 @@ JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM* vm, void* reserved) {
 
 // JniLibrary
 
-static void jvm_on_engine_running(void* context) {
+static void jvm_on_engine_running(void* context, int) {
   if (context == nullptr) {
     return;
   }
@@ -47,7 +47,7 @@ static void jvm_on_engine_running(void* context) {
   env->DeleteGlobalRef(j_context);
 }
 
-static void jvm_on_log(envoy_data data, const void* context) {
+static void jvm_on_log(envoy_data data, const void* context, int) {
   if (context == nullptr) {
     return;
   }
@@ -74,7 +74,7 @@ static void jvm_on_exit(void*) {
   jvm_detach_thread();
 }
 
-static void jvm_on_track(envoy_map events, const void* context) {
+static void jvm_on_track(envoy_map events, const void* context, int) {
   jni_log("[Envoy]", "jvm_on_track");
   if (context == nullptr) {
     return;
@@ -104,7 +104,7 @@ extern "C" JNIEXPORT jlong JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibr
   const jobject retained_logger_context = env->NewGlobalRef(envoy_logger_context);
   envoy_logger logger = {nullptr, nullptr, nullptr};
   if (envoy_logger_context != nullptr) {
-    logger = envoy_logger{jvm_on_log, jni_delete_const_global_ref, retained_logger_context};
+    logger = envoy_logger{jvm_on_log, jni_delete_const_global_ref_tag, retained_logger_context};
   }
 
   envoy_event_tracker event_tracker = {nullptr, nullptr};
