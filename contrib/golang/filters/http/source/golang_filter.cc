@@ -646,15 +646,15 @@ CAPIStatus Filter::setHeader(absl::string_view key, absl::string_view value, hea
     // it's safe to write header in the safe thread.
     switch (act) {
     case HeaderAdd:
-        headers_->addCopy(Http::LowerCaseString(key), value);
-        break;
+      headers_->addCopy(Http::LowerCaseString(key), value);
+      break;
 
     case HeaderSet:
-        headers_->setCopy(Http::LowerCaseString(key), value);
-        break;
+      headers_->setCopy(Http::LowerCaseString(key), value);
+      break;
 
     default:
-        RELEASE_ASSERT(false, absl::StrCat("unknown header action: ", act));
+      RELEASE_ASSERT(false, absl::StrCat("unknown header action: ", act));
     }
 
     onHeadersModified();
