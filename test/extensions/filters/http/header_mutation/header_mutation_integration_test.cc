@@ -46,6 +46,15 @@ typed_config:
           "upstream-global-flag-header-value");
       response_mutation->mutable_append()->set_append_action(
           envoy::config::core::v3::HeaderValueOption::APPEND_IF_EXISTS_OR_ADD);
+      // Add a second response mutation to test the request headers could be obtained in the
+      // upstream filter.
+      response_mutation = header_mutation.mutable_mutations()->mutable_response_mutations()->Add();
+      response_mutation->mutable_append()->mutable_header()->set_key(
+          "request-method-in-upstream-filter");
+      response_mutation->mutable_append()->mutable_header()->set_value("%REQ(:METHOD)%");
+      response_mutation->mutable_append()->set_append_action(
+          envoy::config::core::v3::HeaderValueOption::APPEND_IF_EXISTS_OR_ADD);
+
       filter_0->mutable_typed_config()->PackFrom(header_mutation);
 
       // Upstream codec filter.
@@ -143,6 +152,10 @@ TEST_P(HeaderMutationIntegrationTest, TestHeaderMutation) {
                 .get(Http::LowerCaseString("upstream-per-route-flag-header"))[0]
                 ->value()
                 .getStringView());
+  EXPECT_EQ("GET", response->headers()
+                       .get(Http::LowerCaseString("request-method-in-upstream-filter"))[0]
+                       ->value()
+                       .getStringView());
   codec_client_->close();
 }
 

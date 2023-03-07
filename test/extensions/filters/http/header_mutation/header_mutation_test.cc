@@ -88,6 +88,9 @@ TEST(HeaderMutationFilterTest, HeaderMutationFilterTest) {
   NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks;
   NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks;
 
+  ON_CALL(encoder_callbacks.stream_info_, getRequestHeaders())
+      .WillByDefault(testing::Return(&Http::StaticEmptyHeaders::get().request_headers));
+
   {
     HeaderMutation filter{global_config};
     filter.setDecoderFilterCallbacks(decoder_callbacks);
