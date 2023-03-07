@@ -33,12 +33,7 @@ TEST(IoUringSocketHandleImpl, CreateAcceptSocket) {
 }
 
 TEST(IoUringSocketHandleImpl, CreateServerSocket) {
-  Api::MockOsSysCalls os_sys_calls;
-  TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
-
   Io::MockIoUringFactory factory;
-  // Removed when io uring server socket implemented.
-  EXPECT_CALL(os_sys_calls, setsocketblocking(_, false));
   IoUringSocketHandleTestImpl impl(factory, true);
   EXPECT_EQ(IoUringSocketType::Server, impl.ioUringSocketType());
 }

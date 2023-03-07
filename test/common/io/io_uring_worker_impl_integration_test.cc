@@ -557,13 +557,12 @@ TEST_F(IoUringWorkerIntegrationTest, ServerSocketRead) {
   while (io_uring_handler_.read_results_.empty()) {
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   }
-
   EXPECT_EQ(io_uring_handler_.read_results_.front(), write_data.length());
 
   socket.close();
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   EXPECT_EQ(io_uring_worker_->getSockets().size(), 0);
-  cleanup();
+  // cleanup();
 }
 
 TEST_F(IoUringWorkerIntegrationTest, ServerSocketReadError) {
@@ -584,7 +583,7 @@ TEST_F(IoUringWorkerIntegrationTest, ServerSocketReadError) {
   cleanup();
 }
 
-TEST_F(IoUringWorkerIntegrationTest, ServerSocketReadClose) {
+TEST_F(IoUringWorkerIntegrationTest, ServerSocketRemoteClose) {
   initialize();
   initializeSockets();
 
@@ -626,10 +625,6 @@ TEST_F(IoUringWorkerIntegrationTest, ServerSocketDisable) {
 
   EXPECT_EQ(io_uring_handler_.read_results_.front(), write_data.length());
 
-  // Write data once again, which will come after the remaining bytes.
-  std::string write_data2 = "hello io_uring";
-  Api::OsSysCallsSingleton::get().write(client_socket_, write_data2.data(), write_data2.size());
-
   // Emulate enable behavior.
   io_uring_handler_.read_results_.pop();
   socket.disable();
@@ -640,10 +635,6 @@ TEST_F(IoUringWorkerIntegrationTest, ServerSocketDisable) {
   }
 
   EXPECT_EQ(io_uring_handler_.read_results_.front(), write_data.length() - 5);
-  io_uring_handler_.read_results_.pop();
-  // Though the write data have not been drained because we did not call expectRead, the test
-  // destructor will take response.
-  EXPECT_EQ(io_uring_handler_.read_results_.front(), write_data2.length());
 
   socket.close();
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);

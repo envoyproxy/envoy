@@ -191,7 +191,9 @@ public:
 
 private:
   Request* read_req_{};
+  // TODO (soulxu): Add water mark here.
   Buffer::OwnedImpl buf_;
+  // TODO (soulxu): using queue for completion.
   absl::optional<int32_t> read_error_;
 
   void submitReadRequest();

@@ -85,7 +85,32 @@ IoUringSocketHandleImpl::readv(uint64_t max_length, Buffer::RawSlice* slices, ui
     return shadow_io_handle_->readv(max_length, slices, num_slice);
   }
 
-  return Api::ioCallUint64ResultNoError();
+  if (read_param_ == absl::nullopt) {
+    return {0, Api::IoErrorPtr(IoSocketError::getIoSocketEagainInstance(),
+                               IoSocketError::deleteIoError)};
+  }
+
+  ASSERT(io_uring_socket_.has_value());
+  ENVOY_LOG(trace, "readv available, result = {}, fd = {}, type = {}", read_param_->result_, fd_,
+            ioUringSocketTypeStr());
+
+  if (read_param_->result_ == 0) {
+    ENVOY_LOG(trace, "readv remote close");
+    return Api::ioCallUint64ResultNoError();
+  }
+
+  if (read_param_->result_ < 0) {
+    ASSERT(read_param_->buf_.length() == 0);
+    return {
+        0, Api::IoErrorPtr(new IoSocketError(-read_param_->result_), IoSocketError::deleteIoError)};
+  }
+
+  const uint64_t max_read_length =
+      std::min(max_length, static_cast<uint64_t>(read_param_->result_));
+  uint64_t num_bytes_to_read =
+      read_param_->buf_.copyOutToSlices(max_read_length, slices, num_slice);
+  read_param_->buf_.drain(num_bytes_to_read);
+  return {num_bytes_to_read, Api::IoErrorPtr(nullptr, IoSocketError::deleteIoError)};
 }
 
 Api::IoCallUint64Result IoUringSocketHandleImpl::read(Buffer::Instance& buffer,
@@ -102,7 +127,32 @@ Api::IoCallUint64Result IoUringSocketHandleImpl::read(Buffer::Instance& buffer,
     return shadow_io_handle_->read(buffer, max_length_opt);
   }
 
-  return Api::ioCallUint64ResultNoError();
+  // It means there is no iouring request is done, the read is invoked directly.
+  if (read_param_ == absl::nullopt) {
+    return {0, Api::IoErrorPtr(IoSocketError::getIoSocketEagainInstance(),
+                               IoSocketError::deleteIoError)};
+  }
+
+  ASSERT(io_uring_socket_.has_value());
+
+  if (read_param_->result_ == 0) {
+    ENVOY_LOG(trace, "readv remote close");
+    return Api::ioCallUint64ResultNoError();
+  }
+
+  if (read_param_->result_ < 0) {
+    ASSERT(read_param_->buf_.length() == 0);
+    ENVOY_LOG(trace, "readv got error");
+    return {
+        0, Api::IoErrorPtr(new IoSocketError(-read_param_->result_), IoSocketError::deleteIoError)};
+  }
+
+  ASSERT(read_param_->buf_.length() > 0);
+
+  uint64_t max_read_length =
+      std::min(max_length_opt.value_or(UINT64_MAX), read_param_->buf_.length());
+  buffer.move(read_param_->buf_, max_read_length);
+  return {max_read_length, Api::IoErrorPtr(nullptr, IoSocketError::deleteIoError)};
 }
 
 Api::IoCallUint64Result IoUringSocketHandleImpl::writev(const Buffer::RawSlice* slices,
@@ -274,6 +324,19 @@ void IoUringSocketHandleImpl::initializeFileEvent(Event::Dispatcher& dispatcher,
                                                   Event::FileTriggerType trigger, uint32_t events) {
   ENVOY_LOG(trace, "initialize file event fd = {}", fd_);
 
+  // The io_uring_socket_ already created. This happened after resetFileEvent;
+  if (io_uring_socket_ != absl::nullopt) {
+    if ((io_uring_socket_type_ == IoUringSocketType::Client && !enable_client_socket_) ||
+        (io_uring_socket_type_ == IoUringSocketType::Server && !enable_server_socket_) ||
+        (io_uring_socket_type_ == IoUringSocketType::Accept && !enable_accept_socket_)) {
+      shadow_io_handle_->initializeFileEvent(dispatcher, std::move(cb), trigger, events);
+      return;
+    }
+    io_uring_socket_->enable();
+    cb_ = std::move(cb);
+    return;
+  }
+
   switch (io_uring_socket_type_) {
   case IoUringSocketType::Server: {
     ENVOY_LOG(trace, "initialize file event for server socket, fd = {}", fd_);
@@ -282,6 +345,7 @@ void IoUringSocketHandleImpl::initializeFileEvent(Event::Dispatcher& dispatcher,
       shadow_io_handle_->initializeFileEvent(dispatcher, std::move(cb), trigger, events);
       return;
     }
+    io_uring_socket_ = io_uring_factory_.getIoUringWorker()->addServerSocket(fd_, *this);
     break;
   }
   case IoUringSocketType::Accept: {
@@ -384,7 +448,15 @@ void IoUringSocketHandleImpl::onAcceptSocket(Io::AcceptedSocketParam& param) {
   ASSERT(accepted_socket_param_ == absl::nullopt);
 }
 
-void IoUringSocketHandleImpl::onRead(Io::ReadParam&) {}
+void IoUringSocketHandleImpl::onRead(Io::ReadParam& param) {
+  read_param_ = param;
+  ENVOY_LOG(trace,
+            "calling event callback since pending read buf has {} size data, data = {}, "
+            "io_uring_socket_type = {}, fd = {}",
+            read_param_->buf_.length(), read_param_->buf_.toString(), ioUringSocketTypeStr(), fd_);
+  cb_(Event::FileReadyType::Read);
+  read_param_ = absl::nullopt;
+}
 
 void IoUringSocketHandleImpl::onWrite(Io::WriteParam&) {}
 

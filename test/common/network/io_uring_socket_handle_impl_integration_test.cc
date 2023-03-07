@@ -119,6 +119,223 @@ TEST_F(IoUringSocketHandleImplIntegrationTest, Accept) {
   }
 }
 
+TEST_F(IoUringSocketHandleImplIntegrationTest, Read) {
+  initialize();
+
+  // io_uring handle starts listening.
+  bool accepted = false;
+  auto local_addr = std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 0);
+  io_handle_->bind(local_addr);
+  io_handle_->listen(5);
+
+  IoHandlePtr server_io_handler;
+  io_handle_->initializeFileEvent(
+      *dispatcher_,
+      [this, &accepted, &server_io_handler](uint32_t) {
+        struct sockaddr addr;
+        socklen_t addrlen = sizeof(addr);
+        server_io_handler = io_handle_->accept(&addr, &addrlen);
+        EXPECT_NE(server_io_handler, nullptr);
+        accepted = true;
+      },
+      Event::PlatformDefaultTriggerType, Event::FileReadyType::Read);
+
+  // Connect from peer handle.
+  peer_io_handle_->connect(io_handle_->localAddress());
+
+  while (!accepted) {
+    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  }
+  EXPECT_TRUE(accepted);
+
+  std::string data = "Hello world";
+  Buffer::OwnedImpl write_buffer(data);
+  Buffer::OwnedImpl read_buffer;
+
+  server_io_handler->initializeFileEvent(
+      *dispatcher_,
+      [&server_io_handler, &read_buffer, &data](uint32_t event) {
+        EXPECT_EQ(event, Event::FileReadyType::Read);
+        auto ret = server_io_handler->read(read_buffer, absl::nullopt);
+        EXPECT_EQ(ret.return_value_, data.size());
+      },
+      Event::PlatformDefaultTriggerType, Event::FileReadyType::Read);
+
+  peer_io_handle_->write(write_buffer);
+
+  while (read_buffer.length() == 0) {
+    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  }
+
+  EXPECT_EQ(read_buffer.toString(), data);
+
+  server_io_handler->resetFileEvents();
+  read_buffer.drain(read_buffer.length());
+  EXPECT_EQ(read_buffer.length(), 0);
+
+  bool first_read = true;
+
+  server_io_handler->initializeFileEvent(
+      *dispatcher_,
+      [&server_io_handler, &read_buffer, &first_read](uint32_t event) {
+        if (first_read) {
+          EXPECT_EQ(event, Event::FileReadyType::Read);
+          auto ret = server_io_handler->read(read_buffer, 5);
+          EXPECT_EQ(ret.return_value_, 5);
+        } else {
+          EXPECT_EQ(event, Event::FileReadyType::Read);
+          auto ret = server_io_handler->read(read_buffer, absl::nullopt);
+        }
+      },
+      Event::PlatformDefaultTriggerType, Event::FileReadyType::Read);
+
+  EXPECT_EQ(write_buffer.length(), 0);
+  std::string data2 = "Hello world again";
+  write_buffer.add(data2);
+  peer_io_handle_->write(write_buffer);
+
+  while (read_buffer.length() == 0) {
+    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  }
+
+  EXPECT_EQ(read_buffer.toString(), data2.substr(0, 5));
+
+  // Cleanup previous read
+  first_read = false;
+  read_buffer.drain(read_buffer.length());
+  EXPECT_EQ(write_buffer.length(), 0);
+
+  // Write again to trigger the read event again.
+  std::string data3 = " again";
+  write_buffer.add(data3);
+  peer_io_handle_->write(write_buffer);
+
+  while (read_buffer.length() == 0) {
+    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  }
+
+  // Ensure we get the previous read and the new read
+  EXPECT_EQ(read_buffer.toString(), data2.substr(5) + data3);
+
+  // Close safely.
+  server_io_handler->close();
+  io_handle_->close();
+  while (fcntl(fd_, F_GETFD, 0) >= 0) {
+    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  }
+}
+
+TEST_F(IoUringSocketHandleImplIntegrationTest, Readv) {
+  initialize();
+
+  // io_uring handle starts listening.
+  bool accepted = false;
+  auto local_addr = std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 0);
+  io_handle_->bind(local_addr);
+  io_handle_->listen(5);
+
+  IoHandlePtr server_io_handler;
+  io_handle_->initializeFileEvent(
+      *dispatcher_,
+      [this, &accepted, &server_io_handler](uint32_t) {
+        struct sockaddr addr;
+        socklen_t addrlen = sizeof(addr);
+        server_io_handler = io_handle_->accept(&addr, &addrlen);
+        EXPECT_NE(server_io_handler, nullptr);
+        accepted = true;
+      },
+      Event::PlatformDefaultTriggerType, Event::FileReadyType::Read);
+
+  // Connect from peer handle.
+  peer_io_handle_->connect(io_handle_->localAddress());
+
+  while (!accepted) {
+    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  }
+  EXPECT_TRUE(accepted);
+
+  std::string data = "Hello world";
+  Buffer::OwnedImpl write_buffer(data);
+  Buffer::OwnedImpl read_buffer;
+
+  server_io_handler->initializeFileEvent(
+      *dispatcher_,
+      [&server_io_handler, &read_buffer, &data](uint32_t event) {
+        EXPECT_EQ(event, Event::FileReadyType::Read);
+        Buffer::Reservation reservation = read_buffer.reserveForRead();
+        auto ret = server_io_handler->readv(11, reservation.slices(), reservation.numSlices());
+        EXPECT_EQ(ret.return_value_, data.size());
+        reservation.commit(ret.return_value_);
+      },
+      Event::PlatformDefaultTriggerType, Event::FileReadyType::Read);
+
+  peer_io_handle_->write(write_buffer);
+
+  while (read_buffer.length() == 0) {
+    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  }
+
+  EXPECT_EQ(read_buffer.toString(), data);
+
+  server_io_handler->resetFileEvents();
+  read_buffer.drain(read_buffer.length());
+  EXPECT_EQ(read_buffer.length(), 0);
+
+  bool first_read = true;
+
+  server_io_handler->initializeFileEvent(
+      *dispatcher_,
+      [&server_io_handler, &read_buffer, &first_read](uint32_t event) {
+        if (first_read) {
+          Buffer::Reservation reservation = read_buffer.reserveForRead();
+          auto ret = server_io_handler->readv(5, reservation.slices(), reservation.numSlices());
+          EXPECT_EQ(ret.return_value_, 5);
+          reservation.commit(ret.return_value_);
+        } else {
+          EXPECT_EQ(event, Event::FileReadyType::Read);
+          Buffer::Reservation reservation = read_buffer.reserveForRead();
+          auto ret = server_io_handler->readv(1024, reservation.slices(), reservation.numSlices());
+          reservation.commit(ret.return_value_);
+        }
+      },
+      Event::PlatformDefaultTriggerType, Event::FileReadyType::Read);
+
+  EXPECT_EQ(write_buffer.length(), 0);
+  std::string data2 = "Hello world again";
+  write_buffer.add(data2);
+  peer_io_handle_->write(write_buffer);
+
+  while (read_buffer.length() == 0) {
+    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  }
+
+  EXPECT_EQ(read_buffer.toString(), data2.substr(0, 5));
+
+  // Cleanup previous read
+  first_read = false;
+  read_buffer.drain(read_buffer.length());
+  EXPECT_EQ(write_buffer.length(), 0);
+
+  // Write again to trigger the read event again.
+  std::string data3 = " again";
+  write_buffer.add(data3);
+  peer_io_handle_->write(write_buffer);
+
+  while (read_buffer.length() == 0) {
+    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  }
+
+  // Ensure we get the previous read and the new read
+  EXPECT_EQ(read_buffer.toString(), data2.substr(5) + data3);
+
+  // Close safely.
+  server_io_handler->close();
+  io_handle_->close();
+  while (fcntl(fd_, F_GETFD, 0) >= 0) {
+    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  }
+}
+
 } // namespace
 } // namespace Network
 } // namespace Envoy
