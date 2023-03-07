@@ -25,7 +25,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // to enable the CORS filter.
 //
 // Please note that the :ref:`CorsPolicy <envoy_v3_api_msg_extensions.filters.http.cors.v3.CorsPolicy>`
-// must be configured in any level ``typed_per_filter_config`` to make the filter work.
+// must be configured in the ``RouteConfiguration`` as ``typed_per_filter_config`` at some level to make the filter work.
 message Cors {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.http.cors.v2.Cors";
