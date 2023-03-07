@@ -1,8 +1,8 @@
 name: CIFuzz
 on:
-  pull_request:
+  pull_request_target:
     branches:
-      - main
+      - cifuzz-workflow
     paths:
       - '**.c'
       - '**.cc'
@@ -11,7 +11,6 @@ on:
 jobs:
  Fuzzing:
    runs-on: ubuntu-latest
-   environment: test
    strategy:
      fail-fast: false
      matrix:
