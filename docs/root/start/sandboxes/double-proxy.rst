@@ -159,9 +159,9 @@ This will load the required keys and certificates into the frontend and backend 
 
    $ pwd
    envoy/examples/double-proxy
-   $ docker-compose pull
-   $ docker-compose up --build -d
-   $ docker-compose ps
+   $ docker compose pull
+   $ docker compose up --build -d
+   $ docker compose ps
 
           Name                                      Command                State              Ports
    -------------------------------------------------------------------------------------------------------------

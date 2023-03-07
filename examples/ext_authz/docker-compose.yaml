@@ -1,14 +1,6 @@
 version: "3.8"
 services:
 
-  flask_service:
-    build:
-      context: ../shared/flask
-    image: flask_service:python-3.10-slim-bullseye
-    restart: "no"
-    deploy:
-      replicas: 0
-
   front-envoy:
     build:
       context: .
@@ -53,6 +45,6 @@ services:
 
   upstream-service:
     build:
-      context: ../shared/service
+      context: ../shared/flask
     volumes:
     - ./upstream/service/service.py:/code/service.py
