@@ -844,7 +844,7 @@ TEST_F(EnvoyQuicServerStreamTest, EncodeCapsule) {
   Buffer::OwnedImpl buffer(capsule_fragment_);
   EXPECT_CALL(quic_connection_, SendMessage(_, _, _))
       .WillOnce([this](quic::QuicMessageId, absl::Span<quiche::QuicheMemSlice> message, bool) {
-        EXPECT_EQ(message.data()->data(), datagram_fragment_);
+        EXPECT_EQ(message.data()->AsStringView(), datagram_fragment_);
         return quic::MESSAGE_STATUS_SUCCESS;
       });
   quic_stream_->encodeData(buffer, /*end_stream=*/true);

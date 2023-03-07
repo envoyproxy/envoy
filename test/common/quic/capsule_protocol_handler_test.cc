@@ -27,7 +27,7 @@ public:
 
 class MockStreamDecoder : public Http::StreamDecoder {
 public:
-  MockStreamDecoder() {}
+  MockStreamDecoder() = default;
 
   MOCK_METHOD(void, decodeMetadata, (std::unique_ptr<Http::MetadataMap> && metadata_map),
               (override));
