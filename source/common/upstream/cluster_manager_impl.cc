@@ -388,7 +388,7 @@ ClusterManagerImpl::ClusterManagerImpl(
     auto& grpc_services = dyn_resources.ads_config().grpc_services();
     if (!grpc_services.empty() && grpc_services[0].has_envoy_grpc()) {
       backoff_strategy = Config::Utility::prepareJitteredExponentialBackOffStrategy(
-          grpc_services[0].envoy_grpc(), random_);
+          grpc_services[0].envoy_grpc(), random_, absl::nullopt, absl::nullopt);
     }
 
     if (dyn_resources.ads_config().api_type() ==

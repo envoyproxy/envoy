@@ -536,17 +536,30 @@ public:
    * Prepares Jittered Exponential BackOff Strategy from config containing the Retry Policy
    * @param config config containing RetryPolicy <envoy_v3_api_msg_config.core.v3.RetryPolicy>
    * @param random random generator
-   * @return JitteredExponentialBackOffStrategyPtr if retryPolicy containing backoff values is found
-   * in config else nullptr
+   * @param default_base_interval_ms (optional) Default base interval
+   * @param default_max_interval_ms (optional) Default maximum interval
+   * @return JitteredExponentialBackOffStrategyPtr if 1. RetryPolicy containing backoff values is
+   * found in config or 2. Default base interval and Default maximum interval is specified, else
+   * nullptr
    */
   template <typename T>
-  static JitteredExponentialBackOffStrategyPtr
-  prepareJitteredExponentialBackOffStrategy(const T& config, Random::RandomGenerator& random) {
-    if (!config.has_retry_policy() || !config.retry_policy().has_retry_back_off()) {
-      return nullptr;
+  static JitteredExponentialBackOffStrategyPtr prepareJitteredExponentialBackOffStrategy(
+      const T& config, Random::RandomGenerator& random,
+      absl::optional<const uint32_t> default_base_interval_ms,
+      absl::optional<const uint32_t> default_max_interval_ms) {
+    // 1. RetryPolicy containing backoff values is found in config
+    if (config.has_retry_policy() && config.retry_policy().has_retry_back_off()) {
+      return prepareJitteredExponentialBackOffStrategy(config.retry_policy().retry_back_off(),
+                                                       random);
     }
-    return prepareJitteredExponentialBackOffStrategy(config.retry_policy().retry_back_off(),
-                                                     random);
+
+    // 2. Default base interval and Default maximum interval is specified
+    if (default_base_interval_ms != absl::nullopt && default_max_interval_ms != absl::nullopt) {
+      return std::make_unique<JitteredExponentialBackOffStrategy>(
+          default_base_interval_ms.value(), default_max_interval_ms.value(), random);
+    }
+
+    return nullptr;
   }
 
 private:

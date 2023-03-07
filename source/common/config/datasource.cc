@@ -66,11 +66,8 @@ RemoteAsyncDataProvider::RemoteAsyncDataProvider(
       retries_remaining_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(source.retry_policy(), num_retries, RetryCount)) {
 
-  backoff_strategy_ = Utility::prepareJitteredExponentialBackOffStrategy(source, random);
-  if (backoff_strategy_ == nullptr) {
-    backoff_strategy_ = std::make_unique<JitteredExponentialBackOffStrategy>(
-        RetryInitialDelayMilliseconds, RetryMaxDelayMilliseconds, random);
-  }
+  backoff_strategy_ = Utility::prepareJitteredExponentialBackOffStrategy(
+      source, random, RetryInitialDelayMilliseconds, RetryMaxDelayMilliseconds);
 
   retry_timer_ = dispatcher.createTimer([this]() -> void { start(); });
 

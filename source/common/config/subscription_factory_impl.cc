@@ -82,7 +82,7 @@ SubscriptionPtr SubscriptionFactoryImpl::subscriptionFromConfigSource(
       auto& grpc_services = api_config_source.grpc_services();
       if (!grpc_services.empty() && grpc_services[0].has_envoy_grpc()) {
         backoff_strategy = Utility::prepareJitteredExponentialBackOffStrategy(
-            grpc_services[0].envoy_grpc(), api_.randomGenerator());
+            grpc_services[0].envoy_grpc(), api_.randomGenerator(), absl::nullopt, absl::nullopt);
       }
 
       const std::string control_plane_id =
@@ -125,7 +125,7 @@ SubscriptionPtr SubscriptionFactoryImpl::subscriptionFromConfigSource(
       auto& grpc_services = api_config_source.grpc_services();
       if (!grpc_services.empty() && grpc_services[0].has_envoy_grpc()) {
         backoff_strategy = Utility::prepareJitteredExponentialBackOffStrategy(
-            grpc_services[0].envoy_grpc(), api_.randomGenerator());
+            grpc_services[0].envoy_grpc(), api_.randomGenerator(), absl::nullopt, absl::nullopt);
       }
 
       if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.unified_mux")) {
@@ -199,7 +199,7 @@ SubscriptionPtr SubscriptionFactoryImpl::collectionSubscriptionFromUrl(
       auto& grpc_services = api_config_source.grpc_services();
       if (!grpc_services.empty() && grpc_services[0].has_envoy_grpc()) {
         backoff_strategy = Utility::prepareJitteredExponentialBackOffStrategy(
-            grpc_services[0].envoy_grpc(), api_.randomGenerator());
+            grpc_services[0].envoy_grpc(), api_.randomGenerator(), absl::nullopt, absl::nullopt);
       }
 
       SubscriptionOptions options;

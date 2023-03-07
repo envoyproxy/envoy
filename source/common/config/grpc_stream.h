@@ -40,7 +40,11 @@ public:
       : callbacks_(callbacks), async_client_(std::move(async_client)),
         service_method_(service_method),
         control_plane_stats_(Utility::generateControlPlaneStats(scope)), random_(random),
-        time_source_(dispatcher.timeSource()), backoff_strategy_(std::move(backoff_strategy)),
+        time_source_(dispatcher.timeSource()),
+        backoff_strategy_((backoff_strategy != nullptr)
+                              ? std::move(backoff_strategy)
+                              : std::make_unique<JitteredExponentialBackOffStrategy>(
+                                    RetryInitialDelayMs, RetryMaxDelayMs, random_)),
         rate_limiting_enabled_(rate_limit_settings.enabled_) {
     retry_timer_ = dispatcher.createTimer([this]() -> void { establishNewStream(); });
     if (rate_limiting_enabled_) {
@@ -52,11 +56,6 @@ public:
           callbacks_->onWriteable();
         }
       });
-    }
-
-    if (backoff_strategy_ == nullptr) {
-      backoff_strategy_ = std::make_unique<JitteredExponentialBackOffStrategy>(
-          RetryInitialDelayMs, RetryMaxDelayMs, random_);
     }
   }
 
