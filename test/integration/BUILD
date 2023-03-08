@@ -1625,6 +1625,7 @@ envoy_cc_test(
         ":http_integration_lib",
         ":http_protocol_integration_lib",
         "//source/extensions/filters/network/tcp_proxy:config",
+        "//source/extensions/matching/network/application_protocol:config",
         "//source/extensions/transport_sockets/tls:config",
         "//source/extensions/transport_sockets/tls:context_config_lib",
         "//source/extensions/transport_sockets/tls:context_lib",

@@ -59,6 +59,7 @@ envoy_cc_test(
         "//source/extensions/filters/network/http_connection_manager:config",
         "//source/extensions/filters/network/tcp_proxy:config",
         "//source/extensions/listener_managers/listener_manager:active_raw_udp_listener_config",
+        "//source/extensions/matching/network/application_protocol:config",
         "//source/extensions/request_id/uuid:config",
         "//source/extensions/transport_sockets/raw_buffer:config",
         "//source/extensions/transport_sockets/tls:config",
