@@ -131,6 +131,9 @@ new_features:
 - area: lua
   change: |
     added an new option to the options of lua ``httpCall``. This allows to skip adding ``x-forwarded-for`` by setting ``{["send_xff"] = false}`` as the ``options``.
+- area: ratelimit
+  change: |
+    added local rate limit listener filter to enable rate limit before TLS handshake and filter matching.
 - area: proxy_protocol
   change: |
     added the support :ref:`pass_through_tlvs for listener <envoy_v3_api_field_extensions.filters.listener.proxy_protocol.v3.ProxyProtocol.pass_through_tlvs>`

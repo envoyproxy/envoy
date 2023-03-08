@@ -511,6 +511,13 @@ envoy.filters.listener.http_inspector:
   status: stable
   type_urls:
   - envoy.extensions.filters.listener.http_inspector.v3.HttpInspector
+envoy.filters.listener.local_ratelimit:
+  categories:
+  - envoy.filters.listener
+  security_posture: robust_to_untrusted_downstream
+  status: stable
+  type_urls:
+  - envoy.extensions.filters.listener.local_ratelimit.v3.LocalRateLimit
 envoy.filters.listener.original_dst:
   categories:
   - envoy.filters.listener
