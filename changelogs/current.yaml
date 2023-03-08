@@ -37,7 +37,7 @@ minor_behavior_changes:
     Changed how the uri for redirect policy is specified. It can now be specified either as a single fully qualified string, or by specifying individual components of the uri.
 - area: matchers
   change: |
-    Moved the application protocol input matcher to extensions. If you use this matcher and override extensions_build_config.bzl you will now need to include it explicitly.
+    Moved all of the network input matchers to extensions. If you use network matchers and override extensions_build_config.bzl you will now need to include them explicitly.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*

@@ -1,9 +1,9 @@
 #include "source/common/network/address_impl.h"
 #include "source/common/network/matching/data_impl.h"
-#include "source/common/network/matching/inputs.h"
 #include "source/common/router/string_accessor_impl.h"
 #include "source/common/stream_info/filter_state_impl.h"
 #include "source/extensions/matching/network/application_protocol/config.h"
+#include "source/extensions/matching/network/common/inputs.h"
 
 #include "test/common/matcher/test_utility.h"
 #include "test/mocks/matcher/mocks.h"

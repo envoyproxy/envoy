@@ -61,6 +61,7 @@ envoy_cc_test(
         "//source/extensions/filters/network/tcp_proxy:config",
         "//source/extensions/listener_managers/listener_manager:active_raw_udp_listener_config",
         "//source/extensions/matching/network/application_protocol:config",
+        "//source/extensions/matching/network/common:inputs_lib",
         "//source/extensions/request_id/uuid:config",
         "//source/extensions/transport_sockets/raw_buffer:config",
         "//source/extensions/transport_sockets/tls:config",
@@ -84,6 +85,7 @@ envoy_cc_test(
     deps = [
         ":listener_manager_impl_test_lib",
         "//source/extensions/filters/http/router:config",
+        "//source/extensions/matching/network/common:inputs_lib",
         "//source/extensions/quic/server_preferred_address:fixed_server_preferred_address_config_factory_config",
         "//source/extensions/request_id/uuid:config",
         "//source/extensions/transport_sockets/raw_buffer:config",
@@ -111,6 +113,7 @@ envoy_cc_test(
         "//source/extensions/filters/network/http_connection_manager:config",
         "//source/extensions/listener_managers/listener_manager:filter_chain_manager_lib",
         "//source/extensions/listener_managers/listener_manager:listener_manager_lib",
+        "//source/extensions/matching/network/common:inputs_lib",
         "//source/extensions/transport_sockets/raw_buffer:config",
         "//source/extensions/transport_sockets/tls:config",
         "//source/extensions/transport_sockets/tls:ssl_socket_lib",

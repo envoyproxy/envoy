@@ -4,8 +4,8 @@
 #include "envoy/network/filter.h"
 #include "envoy/registry/registry.h"
 
-#include "source/common/network/matching/inputs.h"
 #include "source/common/network/utility.h"
+#include "source/extensions/matching/network/common/inputs.h"
 
 namespace Envoy {
 namespace Network {
