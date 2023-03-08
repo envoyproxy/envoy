@@ -1914,6 +1914,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "health_check_integration_test",
     srcs = ["health_check_integration_test.cc"],
+    args = ["--gtest_repeat=1000 --gtest_filter=IpVersions/TcpHealthCheckIntegrationTest.DisableHCForActiveTraffic/IPv4"],
     deps = [
         ":http_integration_lib",
         ":integration_lib",

@@ -280,6 +280,7 @@ void HealthCheckerImplBase::ActiveHealthCheckSession::onDeferredDeleteBase() {
 }
 
 void HealthCheckerImplBase::ActiveHealthCheckSession::handleSuccess(bool degraded) {
+  std::cout << "handleSuccess" << std::endl;
   // If we are healthy, reset the # of unhealthy to zero.
   num_unhealthy_ = 0;
   HealthTransition changed_state = HealthTransition::Unchanged;
@@ -384,6 +385,7 @@ HealthTransition HealthCheckerImplBase::ActiveHealthCheckSession::setUnhealthy(
   }
 
   parent_.stats_.failure_.inc();
+  std::cout << "setUnhealthy: failure inc" << std::endl;
   if (networkHealthCheckFailureType(type)) {
     parent_.stats_.network_failure_.inc();
   } else if (type == envoy::data::core::v3::PASSIVE) {
@@ -397,6 +399,7 @@ HealthTransition HealthCheckerImplBase::ActiveHealthCheckSession::setUnhealthy(
 
 void HealthCheckerImplBase::ActiveHealthCheckSession::handleFailure(
     envoy::data::core::v3::HealthCheckFailureType type, bool retriable) {
+  std::cout << "handleFailure: type:" << type << std::endl;
   HealthTransition changed_state = setUnhealthy(type, retriable);
   // It's possible that the previous call caused this session to be deferred deleted.
   if (timeout_timer_ != nullptr) {
@@ -423,6 +426,8 @@ HealthCheckerImplBase::ActiveHealthCheckSession::clearPendingFlag(HealthTransiti
 void HealthCheckerImplBase::ActiveHealthCheckSession::onIntervalBase() {
   // Only if host is healthy, check whether need disable HC if there was already successful
   // non-health check traffic
+  std::cout << "onIntervalBase, time:" << time_source_.monotonicTime().time_since_epoch().count()
+            << std::endl;
   if (parent_.disable_health_check_if_active_traffic_ &&
       !host_->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC)) {
     MonotonicTime traffic_successful_time =
@@ -432,6 +437,7 @@ void HealthCheckerImplBase::ActiveHealthCheckSession::onIntervalBase() {
     if (duration.count() <= parent_.interval_.count()) {
       // During the time, there was already successful non-health check traffic for the host, no
       // need to send HC packet
+      std::cout << "No need to send HC" << std::endl;
       parent_.stats_.attempt_.inc();
       interval_timer_->enableTimer(parent_.interval_);
       return;
@@ -443,6 +449,8 @@ void HealthCheckerImplBase::ActiveHealthCheckSession::onIntervalBase() {
 }
 
 void HealthCheckerImplBase::ActiveHealthCheckSession::onTimeoutBase() {
+  std::cout << "onTimeoutBase, time:" << time_source_.monotonicTime().time_since_epoch().count()
+            << std::endl;
   onTimeout();
   handleFailure(envoy::data::core::v3::NETWORK_TIMEOUT);
 }
