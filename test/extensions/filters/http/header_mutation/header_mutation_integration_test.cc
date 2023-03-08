@@ -18,6 +18,8 @@ public:
       : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam()) {}
 
   void initializeFilter() {
+    setUpstreamProtocol(FakeHttpConnection::Type::HTTP1);
+
     config_helper_.prependFilter(R"EOF(
 name: donwstream-header-mutation
 typed_config:
