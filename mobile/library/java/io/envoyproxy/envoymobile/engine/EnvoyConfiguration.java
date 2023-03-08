@@ -199,33 +199,7 @@ public class EnvoyConfiguration {
     this.enableSkipDNSLookupForProxiedRequests = enableSkipDNSLookupForProxiedRequests;
   }
 
-  // TODO(alyssawilk) move this to the test only JNI library.
-  String createYaml() {
-    Boolean enforceTrustChainVerification =
-        trustChainVerification == EnvoyConfiguration.TrustChainVerification.VERIFY_TRUST_CHAIN;
-    List<EnvoyNativeFilterConfig> reverseFilterChain = new ArrayList<>(nativeFilterChain);
-    Collections.reverse(reverseFilterChain);
-
-    byte[][] filter_chain = JniBridgeUtility.toJniBytes(reverseFilterChain);
-    byte[][] clusters = JniBridgeUtility.stringsToJniBytes(virtualClusters);
-    byte[][] stats_sinks = JniBridgeUtility.stringsToJniBytes(statSinks);
-    byte[][] dns_preresolve = JniBridgeUtility.stringsToJniBytes(dnsPreresolveHostnames);
-    byte[][] runtime_guards = JniBridgeUtility.mapToJniBytes(runtimeGuards);
-
-    return JniLibrary.createYaml(
-        grpcStatsDomain, adminInterfaceEnabled, connectTimeoutSeconds, dnsRefreshSeconds,
-        dnsFailureRefreshSecondsBase, dnsFailureRefreshSecondsMax, dnsQueryTimeoutSeconds,
-        dnsMinRefreshSeconds, dns_preresolve, enableDNSCache, dnsCacheSaveIntervalSeconds,
-        enableDrainPostDnsRefresh, enableHttp3, enableGzipDecompression, enableBrotliDecompression,
-        enableSocketTagging, enableHappyEyeballs, enableInterfaceBinding,
-        h2ConnectionKeepaliveIdleIntervalMilliseconds, h2ConnectionKeepaliveTimeoutSeconds,
-        maxConnectionsPerHost, statsFlushSeconds, streamIdleTimeoutSeconds,
-        perTryIdleTimeoutSeconds, appVersion, appId, enforceTrustChainVerification, clusters,
-        filter_chain, stats_sinks, enablePlatformCertificatesValidation,
-        enableSkipDNSLookupForProxiedRequests, runtime_guards);
-  }
-
-  long createBootstrap() {
+  public long createBootstrap() {
     Boolean enforceTrustChainVerification =
         trustChainVerification == EnvoyConfiguration.TrustChainVerification.VERIFY_TRUST_CHAIN;
     List<EnvoyNativeFilterConfig> reverseFilterChain = new ArrayList<>(nativeFilterChain);

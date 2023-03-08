@@ -4,10 +4,17 @@
 
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/assert.h"
+#include "source/common/filesystem/filesystem_impl.h"
 #include "source/common/html/utility.h"
-#include "source/server/admin/admin_html_gen.h"
+#include "source/server/admin/html/admin_html_gen.h"
 
 #include "absl/strings/str_replace.h"
+
+// Note: if you change this file, it's advisable to manually run
+// test/integration/admin_web_test.sh to semi-automatically validate
+// the web interface, in addition to updating and running unit tests.
+//
+// The admin web test does not yet run automatically.
 
 namespace {
 
@@ -56,12 +63,30 @@ namespace Server {
 
 StatsHtmlRender::StatsHtmlRender(Http::ResponseHeaderMap& response_headers,
                                  Buffer::Instance& response, const StatsParams& params)
-    : StatsTextRender(params) {
+    : StatsTextRender(params), active_(params.format_ == StatsFormat::ActiveHtml) {
   response_headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Html);
   response.add("<!DOCTYPE html>\n");
   response.add("<html lang='en'>\n");
   response.add(absl::StrReplaceAll(AdminHtmlStart, {{"@FAVICON@", EnvoyFavicon}}));
-  response.add("<body>\n");
+  if (active_) {
+    response.add("<script>\n");
+    appendResource(response, "active_stats.js", AdminActiveStatsJs);
+    response.add("\n</script>\n");
+  } else {
+    response.add("<body>\n");
+  }
+}
+
+void StatsHtmlRender::setupStatsPage(const Admin::UrlHandler& url_handler,
+                                     const StatsParams& params, Buffer::Instance& response) {
+  setSubmitOnChange(true);
+  tableBegin(response);
+  urlHandler(response, url_handler, params.query_);
+  if (active_) {
+    appendResource(response, "active_params.html", AdminActiveParamsHtml);
+  }
+  tableEnd(response);
+  startPre(response);
 }
 
 void StatsHtmlRender::finalize(Buffer::Instance& response) {
@@ -74,9 +99,31 @@ void StatsHtmlRender::finalize(Buffer::Instance& response) {
   response.add("</html>");
 }
 
+void StatsHtmlRender::appendResource(Buffer::Instance& response, absl::string_view file,
+                                     absl::string_view default_value) {
+#ifdef ENVOY_ADMIN_DEBUG
+  // Build with --cxxopt=-DENVOY_ADMIN_DEBUG to reload css, js, and html files
+  // from the file-system on every admin page load, which enables fast iteration
+  // when debugging the web site.
+  Filesystem::InstanceImpl file_system;
+  std::string path = absl::StrCat("source/server/admin/html/", file);
+  TRY_ASSERT_MAIN_THREAD { response.add(file_system.fileReadToEnd(path)); }
+  END_TRY
+  catch (EnvoyException& e) {
+    ENVOY_LOG_MISC(error, "failed to load " + path + ": " + e.what());
+    response.add(default_value);
+  }
+#else
+  UNREFERENCED_PARAMETER(file);
+  response.add(default_value);
+#endif
+}
+
 void StatsHtmlRender::startPre(Buffer::Instance& response) {
-  has_pre_ = true;
-  response.add("<pre>\n");
+  if (!active_) {
+    has_pre_ = true;
+    response.add("<pre>\n");
+  }
 }
 
 void StatsHtmlRender::generate(Buffer::Instance& response, const std::string& name,
@@ -85,7 +132,9 @@ void StatsHtmlRender::generate(Buffer::Instance& response, const std::string& na
 }
 
 void StatsHtmlRender::noStats(Buffer::Instance& response, absl::string_view types) {
-  response.addFragments({"</pre>\n<br/><i>No ", types, " found</i><br/>\n<pre>\n"});
+  if (!active_) {
+    response.addFragments({"</pre>\n<br/><i>No ", types, " found</i><br/>\n<pre>\n"});
+  }
 }
 
 void StatsHtmlRender::tableBegin(Buffer::Instance& response) { response.add(AdminHtmlTableBegin); }
@@ -147,6 +196,9 @@ void StatsHtmlRender::urlHandler(Buffer::Instance& response, const Admin::UrlHan
   }
 
   for (const Admin::ParamDescriptor& param : handler.params_) {
+    // Give each parameter a unique number. Note that this naming is also referenced in
+    // active_stats.js which looks directly at the parameter widgets to find the
+    // current values during JavaScript-driven active updates.
     std::string id = absl::StrCat("param-", index_, "-", absl::StrReplaceAll(path, {{"/", "-"}}),
                                   "-", param.id_);
     response.addFragments({"<tr", row_class, ">\n  <td class='option'>"});
@@ -170,7 +222,7 @@ void StatsHtmlRender::input(Buffer::Instance& response, absl::string_view id,
   }
 
   std::string on_change;
-  if (submit_on_change_) {
+  if (submit_on_change_ && (!active_ || name == "format")) {
     on_change = absl::StrCat(" onchange='", path, ".submit()'");
   }
 
@@ -182,7 +234,7 @@ void StatsHtmlRender::input(Buffer::Instance& response, absl::string_view id,
   case Admin::ParamDescriptor::Type::String: {
     std::string sanitized;
     if (!value.empty()) {
-      sanitized = absl::StrCat(" value=", Html::Utility::sanitize(value));
+      sanitized = absl::StrCat(" value='", Html::Utility::sanitize(value), "'");
     }
     response.addFragments({"<input type='text' name='", name, "' id='", id, "' form='", path, "'",
                            on_change, sanitized, " />"});

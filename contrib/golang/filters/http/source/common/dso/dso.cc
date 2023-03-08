@@ -5,15 +5,15 @@
 namespace Envoy {
 namespace Dso {
 
-bool DsoInstanceManager::load(std::string dso_id, std::string dso_name) {
+bool DsoManager::load(std::string dso_id, std::string dso_name) {
   ENVOY_LOG_MISC(debug, "load {} {} dso instance.", dso_id, dso_name);
-  if (getDsoInstanceByID(dso_id) != nullptr) {
+  if (getDsoByID(dso_id) != nullptr) {
     return true;
   }
 
-  DsoStoreType& dsoStore = DsoInstanceManager::getDsoStore();
+  DsoStoreType& dsoStore = DsoManager::getDsoStore();
   absl::WriterMutexLock lock(&dsoStore.mutex_);
-  DsoInstancePtr dso(new DsoInstance(dso_name));
+  std::shared_ptr<DsoInstance> dso(new DsoInstance(dso_name));
   if (!dso->loaded()) {
     return false;
   }
@@ -21,8 +21,8 @@ bool DsoInstanceManager::load(std::string dso_id, std::string dso_name) {
   return true;
 }
 
-DsoInstancePtr DsoInstanceManager::getDsoInstanceByID(std::string dso_id) {
-  DsoStoreType& dsoStore = DsoInstanceManager::getDsoStore();
+DsoPtr DsoManager::getDsoByID(std::string dso_id) {
+  DsoStoreType& dsoStore = DsoManager::getDsoStore();
   absl::ReaderMutexLock lock(&dsoStore.mutex_);
   auto it = dsoStore.map_.find(dso_id);
   if (it != dsoStore.map_.end()) {

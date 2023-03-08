@@ -111,10 +111,36 @@ stages:
       displayName: "Detect repo changes"
       workingDirectory: $(Build.SourcesDirectory)
       name: changed
+
+    - bash: |
+        set -e
+        VERSION_DEV="$(cat VERSION.txt | cut -d- -f2)"
+        if [[ $VERSION_DEV == "dev" ]]; then
+            echo "##vso[task.setvariable variable=isDev;isoutput=true]true"
+        else
+            if [[ $(Build.Reason) == "PullRequest" ]]; then
+                # Check to make sure that it was this PR that changed the version, otherwise fail
+                # as the branch needs to be reopened first.
+                # NB: this will not stop a PR that has already passed checks from being landed.
+                DIFF_TARGET_BRANCH="origin/$(System.PullRequest.TargetBranch)"
+                DIFF_REF="$(git merge-base HEAD "${DIFF_TARGET_BRANCH}")"
+                CHANGES="$(git diff "$DIFF_REF" HEAD VERSION.txt)"
+                if [[ -z "$CHANGES" ]]; then
+                    echo "VERSION.txt is not a development version. Please re-open the branch before making further changes" >&2
+                    exit 1
+                fi
+            fi
+            echo "##vso[task.setvariable variable=isDev;isoutput=true]false"
+        fi
+      displayName: Set development/release env
+      name: state
+
     - bash: |
         echo "env.outputs['changed.mobileOnly']: $(changed.mobileOnly)"
         echo "env.outputs['changed.docsOnly']: $(changed.docsOnly)"
         echo "env.outputs['changed.examplesOnly']: $(changed.examplesOnly)"
+        echo
+        echo "env.outputs['state.isDev]: $(state.isDev)"
       displayName: "Print build environment"
 
 - stage: precheck
@@ -240,6 +266,23 @@ stages:
         GITHUB_TOKEN: $(GitHubPublicRepoOnlyAccessToken)
       displayName: "Verify dependency information"
 
+  - job: docker_ci
+    displayName: Docker checks
+    dependsOn: []
+    pool:
+      vmImage: "ubuntu-20.04"
+    steps:
+    - script: |
+        DOCKER_CI_FIX_DIFF=$(Build.StagingDirectory)/fix_docker.diff DOCKER_CI_FIX=1 ci/test_docker_ci.sh
+      workingDirectory: $(Build.SourcesDirectory)
+      displayName: Docker build regression test
+    - task: PublishBuildArtifacts@1
+      inputs:
+        pathtoPublish: "$(Build.StagingDirectory)/fix_docker.diff"
+        artifactName: "docker_ci"
+        timeoutInMinutes: 10
+      condition: failed()
+
 - stage: sync
   condition: and(succeeded(), eq(variables['PostSubmit'], true), ne(variables['NoSync'], true))
   dependsOn: []
@@ -314,13 +357,11 @@ stages:
     displayName: Build and test
     condition: and(not(canceled()), ne(stageDependencies.env.repo.outputs['changed.mobileOnly'], 'true'), ne(stageDependencies.env.repo.outputs['changed.docsOnly'], 'true'))
     timeoutInMinutes: 120
-    pool:
-      vmImage: "ubuntu-20.04"
+    pool: x64-large
     steps:
-    - bash: .azure-pipelines/cleanup.sh
-      displayName: "Removing tools from agent"
     - template: bazel.yml
       parameters:
+        managedAgent: false
         ciTarget: bazel.release
 
   - job: released
@@ -631,32 +672,11 @@ stages:
   - job: github
     displayName: Publish release tag
     dependsOn: ["docs"]
-    condition: and(succeeded(), eq(variables['PostSubmit'], true), ne(variables['NoSync'], true), eq(variables['isStableBranch'], 'true'))
+    condition: and(succeeded(), eq(variables['PostSubmit'], true), ne(variables['NoSync'], true), eq(variables['isStableBranch'], 'true'), eq(stageDependencies.env.repo.outputs['state.isDev'], 'false'))
     pool:
       vmImage: "ubuntu-20.04"
     steps:
-    - bash: |
-        VERSION_DEV="$(cat VERSION.txt | cut -d- -f2)"
-        if [[ $VERSION_DEV != "dev" ]]; then
-            echo "##vso[task.setvariable variable=isDev]false"
-        fi
-      displayName: Set development/release env
 
-    - script: ./ci/run_envoy_docker.sh './ci/do_ci.sh publish'
-      displayName: "Publish release to Github"
-      workingDirectory: $(Build.SourcesDirectory)
-      condition: eq(variables['isDev'], 'false')
-      env:
-        AZP_BRANCH: $(Build.SourceBranch)
-        GITHUB_TOKEN: $(GitHubPublicRepoOnlyAccessToken)
-
-  - job: assets
-    displayName: Publish release assets
-    condition: and(succeeded(), eq(variables['PostSubmit'], true), ne(variables['NoSync'], true), eq(variables['isTaggedRelease'], 'true'))
-    dependsOn: ["success"]
-    pool:
-      vmImage: "ubuntu-20.04"
-    steps:
     - task: DownloadBuildArtifacts@0
       inputs:
         buildType: current
@@ -693,6 +713,14 @@ stages:
         # NB: This is the path to the key and **must** be set on a per-pipeline basis
         secureFile: '$(maintainerGPGKey)'
 
+    - script: ./ci/run_envoy_docker.sh './ci/do_ci.sh publish'
+      displayName: "Publish release to Github"
+      workingDirectory: $(Build.SourcesDirectory)
+      env:
+        AZP_BRANCH: $(Build.SourceBranch)
+        GITHUB_TOKEN: $(GitHubPublicRepoOnlyAccessToken)
+
+    # TODO(phlax): combine this with publish step
     - bash: |
         set -e
 
@@ -760,6 +788,7 @@ stages:
       env:
         AZP_BRANCH: $(Build.SourceBranch)
         ENVOY_DOCKER_BUILD_DIR: $(Build.StagingDirectory)
+        ENVOY_DOCKER_IN_DOCKER: 1
         BAZEL_REMOTE_CACHE: grpcs://remotebuildexecution.googleapis.com
         BAZEL_REMOTE_INSTANCE: projects/envoy-ci/instances/default_instance
         GCP_SERVICE_ACCOUNT_KEY: $(GcpServiceAccountKey)
@@ -782,6 +811,7 @@ stages:
       env:
         AZP_BRANCH: $(Build.SourceBranch)
         ENVOY_DOCKER_BUILD_DIR: $(Build.StagingDirectory)
+        ENVOY_DOCKER_IN_DOCKER: 1
         BAZEL_REMOTE_CACHE: grpcs://remotebuildexecution.googleapis.com
         BAZEL_REMOTE_INSTANCE: projects/envoy-ci/instances/default_instance
         GCP_SERVICE_ACCOUNT_KEY: $(GcpServiceAccountKey)

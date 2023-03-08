@@ -289,7 +289,7 @@ CounterSharedPtr AllocatorImpl::makeCounter(StatName name, StatName tag_extracte
   ASSERT(text_readouts_.find(name) == text_readouts_.end());
   auto iter = counters_.find(name);
   if (iter != counters_.end()) {
-    return CounterSharedPtr(*iter);
+    return {*iter};
   }
   auto counter = CounterSharedPtr(makeCounterInternal(name, tag_extracted_name, stat_name_tags));
   counters_.insert(counter.get());
@@ -309,7 +309,7 @@ GaugeSharedPtr AllocatorImpl::makeGauge(StatName name, StatName tag_extracted_na
   ASSERT(text_readouts_.find(name) == text_readouts_.end());
   auto iter = gauges_.find(name);
   if (iter != gauges_.end()) {
-    return GaugeSharedPtr(*iter);
+    return {*iter};
   }
   auto gauge =
       GaugeSharedPtr(new GaugeImpl(name, *this, tag_extracted_name, stat_name_tags, import_mode));
@@ -329,7 +329,7 @@ TextReadoutSharedPtr AllocatorImpl::makeTextReadout(StatName name, StatName tag_
   ASSERT(gauges_.find(name) == gauges_.end());
   auto iter = text_readouts_.find(name);
   if (iter != text_readouts_.end()) {
-    return TextReadoutSharedPtr(*iter);
+    return {*iter};
   }
   auto text_readout =
       TextReadoutSharedPtr(new TextReadoutImpl(name, *this, tag_extracted_name, stat_name_tags));

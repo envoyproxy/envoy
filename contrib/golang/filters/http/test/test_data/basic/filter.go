@@ -80,7 +80,7 @@ func (f *filter) sendLocalReply(phase string) api.StatusType {
 	return api.LocalReply
 }
 
-// test: get, set, remove, values
+// test: get, set, remove, values, add
 func (f *filter) decodeHeaders(header api.RequestHeaderMap, endStream bool) api.StatusType {
 	if f.sleep {
 		time.Sleep(time.Millisecond * 100) // sleep 100 ms
@@ -89,7 +89,20 @@ func (f *filter) decodeHeaders(header api.RequestHeaderMap, endStream bool) api.
 		return f.sendLocalReply("decode-header")
 	}
 
-	origin, _ := header.Get("x-test-header-0")
+	origin, found := header.Get("x-test-header-0")
+	hdrs := header.Values("x-test-header-0")
+	if found {
+		if origin != hdrs[0] {
+			return f.fail("Values return incorrect data %v", hdrs)
+		}
+	} else if hdrs != nil {
+		return f.fail("Values return unexpected data %v", hdrs)
+	}
+
+	header.Add("existed-header", "bar")
+	header.Add("newly-added-header", "foo")
+	header.Add("newly-added-header", "bar")
+
 	header.Set("test-x-set-header-0", origin)
 	header.Del("x-test-header-1")
 	header.Set("req-route-name", f.callbacks.StreamInfo().GetRouteName())
@@ -153,13 +166,39 @@ func (f *filter) encodeHeaders(header api.ResponseHeaderMap, endStream bool) api
 	if strings.Contains(f.localreplay, "encode-header") {
 		return f.sendLocalReply("encode-header")
 	}
-	origin, _ := header.Get("x-test-header-0")
+
+	if protocol, ok := f.callbacks.StreamInfo().Protocol(); ok {
+		header.Set("rsp-protocol", protocol)
+	}
+	if code, ok := f.callbacks.StreamInfo().ResponseCode(); ok {
+		header.Set("rsp-response-code", strconv.Itoa(int(code)))
+	}
+	if details, ok := f.callbacks.StreamInfo().ResponseCodeDetails(); ok {
+		header.Set("rsp-response-code-details", details)
+	}
+
+	origin, found := header.Get("x-test-header-0")
+	hdrs := header.Values("x-test-header-0")
+	if found {
+		if origin != hdrs[0] {
+			return f.fail("Values return incorrect data %v", hdrs)
+		}
+	} else if hdrs != nil {
+		return f.fail("Values return unexpected data %v", hdrs)
+	}
+
+	header.Add("existed-header", "bar")
+	header.Add("newly-added-header", "foo")
+	header.Add("newly-added-header", "bar")
+
 	header.Set("test-x-set-header-0", origin)
 	header.Del("x-test-header-1")
 	header.Set("test-req-body-length", strconv.Itoa(int(f.req_body_length)))
 	header.Set("test-query-param-foo", f.query_params.Get("foo"))
 	header.Set("test-path", f.path)
 	header.Set("rsp-route-name", f.callbacks.StreamInfo().GetRouteName())
+	header.Set("rsp-filter-chain-name", f.callbacks.StreamInfo().FilterChainName())
+	header.Set("rsp-attempt-count", strconv.Itoa(int(f.callbacks.StreamInfo().AttemptCount())))
 
 	if f.panic == "encode-header" {
 		badcode()

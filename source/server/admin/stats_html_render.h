@@ -10,12 +10,21 @@ public:
   StatsHtmlRender(Http::ResponseHeaderMap& response_headers, Buffer::Instance& response,
                   const StatsParams& params);
 
+  void setupStatsPage(const Admin::UrlHandler& url_handler, const StatsParams& params,
+                      Buffer::Instance& response);
+
+  // StatsTextRender
   void noStats(Buffer::Instance&, absl::string_view types) override;
   void generate(Buffer::Instance& response, const std::string& name,
                 const std::string& value) override;
+
+  // This matches the superclass impl exactly, but is needed to allow gcc to compile, which
+  // warns about hidden overrides if we omit it.
   void generate(Buffer::Instance& response, const std::string& name, uint64_t value) override {
     StatsTextRender::generate(response, name, value);
   }
+
+  // Needed to allow gcc t compile, otherwise it warns about hidden overrides.
   void generate(Buffer::Instance& response, const std::string& name,
                 const Stats::ParentHistogram& histogram) override {
     StatsTextRender::generate(response, name, histogram);
@@ -68,10 +77,14 @@ public:
   void setSubmitOnChange(bool submit_on_change) { submit_on_change_ = submit_on_change; }
 
 private:
+  void appendResource(Buffer::Instance& response, absl::string_view file,
+                      absl::string_view default_value);
+
   int index_{0}; // Used to alternate row-group background color
   bool submit_on_change_{false};
   bool has_pre_{false};
   bool finalized_{false};
+  const bool active_{false};
 };
 
 } // namespace Server
