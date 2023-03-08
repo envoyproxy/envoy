@@ -71,7 +71,8 @@ protected:
   ListenerManagerImplTest()
       : listener_factory_ptr_(std::make_unique<NiceMock<MockListenerComponentFactory>>()),
         listener_factory_(*listener_factory_ptr_),
-        api_(Api::createApiForTest(server_.api_.random_)), use_matcher_(GetParam()) {}
+        api_(Api::createApiForTest(server_.api_.random_)), use_matcher_(GetParam()),
+        tcp_listener_config_provider_manager_(*server_.server_factory_context_) {}
 
   void SetUp() override {
     ON_CALL(server_, api()).WillByDefault(ReturnRef(*api_));
