@@ -860,7 +860,6 @@ class QuicHarness {
 
       QuicPacketizer packetizer(quic_version_, connection_helper_);
       packetizer.serializePackets(input);
-      fflush(stdout);
       for(size_t i = 0; i < kMaxNumPackets; i++) {
         dispatchPacket(quic_packets[i], quic_packet_sizes[i]);
       }
@@ -868,7 +867,6 @@ class QuicHarness {
       pconnection->CloseConnection(quic::QUIC_NO_ERROR,
           quic::NO_IETF_QUIC_ERROR, "fuzzer done",
           quic::ConnectionCloseBehavior::SILENT_CLOSE);
-      fflush(stdout);
     }
 
   private:
