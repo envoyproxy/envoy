@@ -328,6 +328,9 @@ protected:
   void newTimeoutWrongConfigTest(const uint32_t timeout_ms) {
     // Set envoy filter timeout to be 200ms.
     proto_config_.mutable_message_timeout()->set_nanos(200000000);
+    if (max_message_timeout_ms_) {
+      proto_config_.mutable_max_message_timeout()->set_nanos(max_message_timeout_ms_ * 1000000);
+    }
     initializeConfig();
     HttpIntegrationTest::initialize();
     auto response = sendDownstreamRequest(absl::nullopt);
@@ -346,6 +349,7 @@ protected:
   }
 
   envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor proto_config_{};
+  uint32_t max_message_timeout_ms_{0};
   std::vector<FakeUpstream*> grpc_upstreams_;
   FakeHttpConnectionPtr processor_connection_;
   FakeStreamPtr processor_stream_;
@@ -1868,6 +1872,12 @@ TEST_P(ExtProcIntegrationTest, RequestMessageNewTimeoutNegativeTestTimeoutTooSma
 }
 TEST_P(ExtProcIntegrationTest, RequestMessageNewTimeoutNegativeTestTimeoutTooBig) {
   newTimeoutWrongConfigTest(20000);
+}
+TEST_P(ExtProcIntegrationTest, RequestMessageNewTimeoutNegativeTestTimeoutTooBigWithSmallMax) {
+  max_message_timeout_ms_ = 100;
+  // With max_message_timeout set to be 100ms, the 500ms new_timeout is not accepted any more.
+  // So, with the original 200ms timer, and 300ms delay, timeout happens.
+  newTimeoutWrongConfigTest(500);
 }
 
 } // namespace Envoy

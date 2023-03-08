@@ -115,7 +115,6 @@ public:
   void onFinishProcessorCall(Grpc::Status::GrpcStatus call_status,
                              CallbackState next_state = CallbackState::Idle);
   void stopMessageTimer();
-  bool messageTimerEnabled() { return (message_timer_ && message_timer_->enabled()); };
   void restartMessageTimer(const uint32_t message_timeout_ms);
 
   // Idempotent methods for watermarking the body

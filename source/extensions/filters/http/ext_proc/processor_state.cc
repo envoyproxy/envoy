@@ -45,7 +45,7 @@ void ProcessorState::onFinishProcessorCall(Grpc::Status::GrpcStatus call_status,
 }
 
 void ProcessorState::stopMessageTimer() {
-  if (messageTimerEnabled()) {
+  if (message_timer_) {
     message_timer_->disableTimer();
   }
 }
@@ -54,7 +54,7 @@ void ProcessorState::stopMessageTimer() {
 // Do not change call_start_time_ since that call has not been responded yet.
 // Do not change callback_state_ either.
 void ProcessorState::restartMessageTimer(const uint32_t message_timeout_ms) {
-  if (messageTimerEnabled() && !new_timeout_received_) {
+  if (message_timer_ && message_timer_->enabled() && !new_timeout_received_) {
     ENVOY_LOG(debug,
               "Server needs more time to process the request, start a "
               "new timer with timeout {} ms",
