@@ -179,9 +179,11 @@ message ProcessingResponse {
   // which has the timeout value specified in
   // :ref:`message_timeout
   // <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExternalProcessor.message_timeout>`
-  // and start a new timer with this ``new_timeout`` value and keep the Envoy ext_proc
-  // filter state machine intact.
-  NewProcessingTimeout new_timeout = 10;
+  // and start a new timer with this ``new_message_timeout`` value and keep the
+  // Envoy ext_proc filter state machine intact.
+  // Has to be >= 1ms and <=
+  // :ref:`max_message_timeout <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExternalProcessor.max_message_timeout>`
+  google.protobuf.Duration new_message_timeout = 10;
 }
 
 // The following are messages that are sent to the server.
@@ -343,17 +345,4 @@ message BodyMutation {
     // Clear the corresponding body chunk
     bool clear_body = 2;
   }
-}
-
-// This message specifies a new timer duration and the original
-// request direction. If these fields are not configured correctly,
-// the response message will be ignored by the Envoy ext_proc filter.
-message NewProcessingTimeout {
-  // Specifies the new timer duration.
-  // Has to be >= 1ms and <= 10000ms.
-  google.protobuf.Duration message_timeout = 1;
-
-  // Specifies the traffic direction of the received request message.
-  // Has to be INBOUND or OUTBOUND.
-  config.core.v3.TrafficDirection traffic_direction = 2;
 }

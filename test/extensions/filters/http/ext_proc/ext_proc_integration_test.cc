@@ -315,23 +315,17 @@ protected:
 
   // ext_proc server sends back a response to tell Envoy to stop the
   // original timer and start a new timer.
-  void serverSendNewTimeout(bool encoding_timeout, uint32_t timeout_ms,
-                            envoy::config::core::v3::TrafficDirection direction) {
+  void serverSendNewTimeout(const uint32_t timeout_ms) {
     ProcessingResponse response;
-    auto* new_timeout = response.mutable_new_timeout();
-    if (encoding_timeout) {
-      if (timeout_ms < 1000) {
-        new_timeout->mutable_message_timeout()->set_nanos(timeout_ms * 1000000);
-      } else {
-        new_timeout->mutable_message_timeout()->set_seconds(timeout_ms / 1000);
-      }
+    if (timeout_ms < 1000) {
+      response.mutable_new_message_timeout()->set_nanos(timeout_ms * 1000000);
+    } else {
+      response.mutable_new_message_timeout()->set_seconds(timeout_ms / 1000);
     }
-    new_timeout->set_traffic_direction(direction);
     processor_stream_->sendGrpcMessage(response);
   }
 
-  void newTimeoutWrongConfigTest(bool encoding_timeout, uint32_t timeout_ms,
-                                 envoy::config::core::v3::TrafficDirection direction) {
+  void newTimeoutWrongConfigTest(const uint32_t timeout_ms) {
     // Set envoy filter timeout to be 200ms.
     proto_config_.mutable_message_timeout()->set_nanos(200000000);
     initializeConfig();
@@ -340,7 +334,7 @@ protected:
 
     processRequestHeadersMessage(*grpc_upstreams_[0], true,
                                  [&](const HttpHeaders&, HeadersResponse&) {
-                                   serverSendNewTimeout(encoding_timeout, timeout_ms, direction);
+                                   serverSendNewTimeout(timeout_ms);
                                    // ext_proc server stays idle for 300ms before sending back the
                                    // response.
                                    timeSystem().advanceTimeWaitImpl(300ms);
@@ -1775,7 +1769,7 @@ TEST_P(ExtProcIntegrationTest, RequestAndResponseMessageNewTimeoutWithHeaderMuta
             {":path", "/"},      {"x-remove-this", "yes"}, {"x-forwarded-proto", "http"}};
         EXPECT_THAT(headers.headers(), HeaderProtosEqual(expected_request_headers));
 
-        serverSendNewTimeout(true, 500, envoy::config::core::v3::TrafficDirection::INBOUND);
+        serverSendNewTimeout(500);
         // ext_proc server stays idle for 300ms.
         timeSystem().advanceTimeWaitImpl(300ms);
         // Server sends back response with the header mutation instructions.
@@ -1800,7 +1794,7 @@ TEST_P(ExtProcIntegrationTest, RequestAndResponseMessageNewTimeoutWithHeaderMuta
       *grpc_upstreams_[0], false, [this](const HttpHeaders& headers, HeadersResponse&) {
         Http::TestRequestHeaderMapImpl expected_response_headers{{":status", "200"}};
         EXPECT_THAT(headers.headers(), HeaderProtosEqual(expected_response_headers));
-        serverSendNewTimeout(true, 500, envoy::config::core::v3::TrafficDirection::OUTBOUND);
+        serverSendNewTimeout(500);
         // ext_proc server stays idle for 300ms.
         timeSystem().advanceTimeWaitImpl(300ms);
         return true;
@@ -1817,13 +1811,14 @@ TEST_P(ExtProcIntegrationTest, RequestMessageNewTimeoutNoMutation) {
   HttpIntegrationTest::initialize();
   auto response = sendDownstreamRequest(absl::nullopt);
 
-  processRequestHeadersMessage(
-      *grpc_upstreams_[0], true, [this](const HttpHeaders&, HeadersResponse&) {
-        serverSendNewTimeout(true, 500, envoy::config::core::v3::TrafficDirection::INBOUND);
-        // ext_proc server stays idle for 300ms before sending back the response.
-        timeSystem().advanceTimeWaitImpl(300ms);
-        return true;
-      });
+  processRequestHeadersMessage(*grpc_upstreams_[0], true,
+                               [this](const HttpHeaders&, HeadersResponse&) {
+                                 serverSendNewTimeout(500);
+                                 // ext_proc server stays idle for 300ms before sending back the
+                                 // response.
+                                 timeSystem().advanceTimeWaitImpl(300ms);
+                                 return true;
+                               });
 
   ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
   ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
@@ -1836,19 +1831,43 @@ TEST_P(ExtProcIntegrationTest, RequestMessageNewTimeoutNoMutation) {
   verifyDownstreamResponse(*response, 200);
 }
 
-TEST_P(ExtProcIntegrationTest, RequestMessageNewTimeoutNegativeTestUnspecifiedDirection) {
-  newTimeoutWrongConfigTest(true, 500, envoy::config::core::v3::TrafficDirection::UNSPECIFIED);
+// Test only the first new timeout message in one state is accepted.
+TEST_P(ExtProcIntegrationTest, RequestMessageNoMutationMultipleNewTimeout) {
+  // Set envoy filter timeout to be 200ms.
+  proto_config_.mutable_message_timeout()->set_nanos(200000000);
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+  auto response = sendDownstreamRequest(absl::nullopt);
+
+  processRequestHeadersMessage(*grpc_upstreams_[0], true,
+                               [this](const HttpHeaders&, HeadersResponse&) {
+                                 // Send a 500ms new timeout update first.
+                                 serverSendNewTimeout(500);
+                                 // After wait for 100ms, send another 50ms new timeout update
+                                 // then waiting for another 300ms and verify no timeout happened,
+                                 // and traffic went through fine. This proves the 2nd new timeout
+                                 // update is ignored.
+                                 timeSystem().advanceTimeWaitImpl(100ms);
+                                 serverSendNewTimeout(10);
+                                 timeSystem().advanceTimeWaitImpl(300ms);
+                                 return true;
+                               });
+
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
+  upstream_request_->encodeData(100, true);
+  processResponseHeadersMessage(*grpc_upstreams_[0], false,
+                                [](const HttpHeaders&, HeadersResponse&) { return true; });
+  verifyDownstreamResponse(*response, 200);
 }
 
 TEST_P(ExtProcIntegrationTest, RequestMessageNewTimeoutNegativeTestTimeoutTooSmall) {
-  newTimeoutWrongConfigTest(true, 0, envoy::config::core::v3::TrafficDirection::INBOUND);
+  newTimeoutWrongConfigTest(0);
 }
 TEST_P(ExtProcIntegrationTest, RequestMessageNewTimeoutNegativeTestTimeoutTooBig) {
-  newTimeoutWrongConfigTest(true, 20000, envoy::config::core::v3::TrafficDirection::INBOUND);
-}
-
-TEST_P(ExtProcIntegrationTest, RequestMessageNewTimeoutNegativeTestNoTimeEncoding) {
-  newTimeoutWrongConfigTest(false, 500, envoy::config::core::v3::TrafficDirection::INBOUND);
+  newTimeoutWrongConfigTest(20000);
 }
 
 } // namespace Envoy

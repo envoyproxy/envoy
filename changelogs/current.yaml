@@ -156,7 +156,8 @@ new_features:
     added an option to dynamically set the port used by the SNI dynamic forward proxy filter, by setting a filter state object under the key ``envoy.upstream.dynamic_port``.
 - area: ext_proc
   change: |
-    added the support :ref:`new_timeout <envoy_v3_api_field_service.ext_proc.v3.ProcessingResponse.new_timeout>` for the ext_proc server to send back a message to Envoy to extend the ext_proc timer.
+    added the support :ref:`new_message_timeout <envoy_v3_api_field_service.ext_proc.v3.ProcessingResponse.new_message_timeout>` for the ext_proc server to send back a message to Envoy to extend the ext_proc timer.
+    added the field :ref:`max_message_timeout <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExternalProcessor.max_message_timeout>` for specifying the max new_message_timeout could be sent back by the ext_proc server.
 
 deprecated:
 - area: ext_authz

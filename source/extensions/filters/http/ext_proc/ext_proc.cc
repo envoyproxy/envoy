@@ -527,44 +527,19 @@ void Filter::sendTrailers(ProcessorState& state, const Http::HeaderMap& trailers
   stats_.stream_msgs_sent_.inc();
 }
 
-void Filter::onNewTimeout(
-    const std::unique_ptr<envoy::service::ext_proc::v3::ProcessingResponse>&& response) {
-  // In the following conditions the function just bails out and the message is ignored.
-  // 1) The message_timeout field is not set, or even it is set but < 1ms;
-  // 2) or the traffic_direction field is not set to be INBOUND or OUTBOUND.
-  const auto new_timeout = response->new_timeout();
-  const auto message_timeout_ms_opt = PROTOBUF_GET_OPTIONAL_MS(new_timeout, message_timeout);
-  if (!message_timeout_ms_opt) {
-    ENVOY_LOG(warn, "Ext_proc server new timeout setting is missing. Ignoring the message.");
-    return;
-  }
-  const auto message_timeout_ms = message_timeout_ms_opt->count();
+void Filter::onNewTimeout(const uint32_t message_timeout_ms) {
+  // The new timeout has to be >=1ms and <= max_message_timeout configured in filter.
   const uint32_t min_timeout_ms = 1;
-  const uint32_t max_timeout_ms = 10000;
+  const uint32_t max_timeout_ms = config_->maxMessageTimeout();
   if (message_timeout_ms < min_timeout_ms || message_timeout_ms > max_timeout_ms) {
     ENVOY_LOG(warn, "Ext_proc server new timeout setting is out of range. "
                     "Ignoring the message.");
     return;
   }
-  const auto traffic_direction = new_timeout.traffic_direction();
-  const bool inbound_traffic =
-      (traffic_direction == envoy::config::core::v3::TrafficDirection::INBOUND);
-  const bool outbound_traffic =
-      (traffic_direction == envoy::config::core::v3::TrafficDirection::OUTBOUND);
-  if (!inbound_traffic && !outbound_traffic) {
-    ENVOY_LOG(warn, "Ext_proc server new timeout setting didn't specifiy the "
-                    "traffic direction it is processing. Ignoring the message.");
-    return;
-  }
-  ENVOY_LOG(debug,
-            "Server needs more time to process the request, start a "
-            "new timer with timeout {} ms, direction {} ",
-            message_timeout_ms, inbound_traffic ? "INBOUND" : "OUTBOUND");
-  if (inbound_traffic) {
-    decoding_state_.restartMessageTimer(message_timeout_ms);
-  } else {
-    encoding_state_.restartMessageTimer(message_timeout_ms);
-  }
+  // One of the below function call is non-op since the ext_proc filter can
+  // only be in one of the below state, and just one timer is enabled.
+  decoding_state_.restartMessageTimer(message_timeout_ms);
+  encoding_state_.restartMessageTimer(message_timeout_ms);
 
   stats_.stream_msgs_received_.inc();
 }
@@ -578,9 +553,9 @@ void Filter::onReceiveMessage(std::unique_ptr<ProcessingResponse>&& r) {
 
   auto response = std::move(r);
 
-  // Check whether the server is asking for extend the timer.
-  if (response->has_new_timeout()) {
-    onNewTimeout(std::move(response));
+  // Check whether the server is asking to extend the timer.
+  if (response->has_new_message_timeout()) {
+    onNewTimeout(DurationUtil::durationToMilliseconds(response->new_message_timeout()));
     return;
   }
 

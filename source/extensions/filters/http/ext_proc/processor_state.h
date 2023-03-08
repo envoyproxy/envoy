@@ -115,7 +115,8 @@ public:
   void onFinishProcessorCall(Grpc::Status::GrpcStatus call_status,
                              CallbackState next_state = CallbackState::Idle);
   void stopMessageTimer();
-  void restartMessageTimer(const uint32_t message_timeout);
+  bool messageTimerEnabled() { return (message_timer_ && message_timer_->enabled()); };
+  void restartMessageTimer(const uint32_t message_timeout_ms);
 
   // Idempotent methods for watermarking the body
   virtual void requestWatermark() PURE;
@@ -196,6 +197,9 @@ protected:
   Http::RequestOrResponseHeaderMap* headers_ = nullptr;
   Http::HeaderMap* trailers_ = nullptr;
   Event::TimerPtr message_timer_;
+  // Flag to track whether Envoy already received the new timeout message.
+  // Envoy should receive at most one such message in one particular state.
+  bool new_timeout_received_{false};
   ChunkQueue chunk_queue_;
   absl::optional<MonotonicTime> call_start_time_ = absl::nullopt;
   const envoy::config::core::v3::TrafficDirection traffic_direction_;
