@@ -67,7 +67,8 @@ void ProcessorState::restartMessageTimer(const uint32_t message_timeout_ms) {
   } else {
     ENVOY_LOG(debug,
               "Ignoring server new timeout message {} ms due to timer not "
-              "enabled or not the 1st such message", message_timeout_ms);
+              "enabled or not the 1st such message",
+              message_timeout_ms);
   }
 }
 
