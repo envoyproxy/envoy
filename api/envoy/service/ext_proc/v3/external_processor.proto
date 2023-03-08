@@ -183,6 +183,8 @@ message ProcessingResponse {
   // Envoy ext_proc filter state machine intact.
   // Has to be >= 1ms and <=
   // :ref:`max_message_timeout <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExternalProcessor.max_message_timeout>`
+  // Such message can be sent at most one in a particular Envoy ext_proc filter processing state.
+  // To enable this API, one has to set ``max_message_timeout`` to a number >1ms.
   google.protobuf.Duration new_message_timeout = 10;
 }
 
