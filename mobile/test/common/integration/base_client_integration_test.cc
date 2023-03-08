@@ -19,6 +19,7 @@ namespace {
 
 void validateStreamIntel(const envoy_final_stream_intel& final_intel, bool expect_dns,
                          bool upstream_tls, bool is_first_request) {
+  std::cerr << "no-op change";
   if (expect_dns) {
     EXPECT_NE(-1, final_intel.dns_start_ms);
     EXPECT_NE(-1, final_intel.dns_end_ms);
