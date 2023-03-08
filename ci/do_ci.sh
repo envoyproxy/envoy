@@ -188,8 +188,8 @@ function run_ci_verify () {
   rm -rf "${OCI_TEMP_DIR:?}"
 
   docker images
-  sudo apt-get update -y
-  sudo apt-get install -y -qq --no-install-recommends expect redis-tools
+  sudo apt-get -qq update -y
+  sudo apt-get -qq install -y --no-install-recommends expect
   export DOCKER_NO_PULL=1
   export DOCKER_RMI_CLEANUP=1
   umask 027

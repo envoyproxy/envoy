@@ -5,20 +5,11 @@ services:
     build:
       context: .
       dockerfile: Dockerfile-proxy
-    networks:
-    - envoymesh
     ports:
-    - "1999:1999"
+    - "${PORT_PROXY:-1999}:1999"
     - "${PORT_ADMIN:-8001}:8001"
 
   redis:
     build:
       context: .
       dockerfile: Dockerfile-redis
-    networks:
-      envoymesh:
-        aliases:
-        - redis_server
-
-networks:
-  envoymesh: {}

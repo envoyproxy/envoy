@@ -28,9 +28,9 @@ Start the Docker composition:
 
   $ pwd
   envoy/examples/udp
-  $ docker-compose pull
-  $ docker-compose up --build -d
-  $ docker-compose ps
+  $ docker compose pull
+  $ docker compose up --build -d
+  $ docker compose ps
 
       Name                 Command                   State      Ports
   -----------------------------------------------------------------------------------------------------------------------
@@ -58,7 +58,7 @@ Checking the logs of the upstream server you should see the packets that you sen
 
 .. code-block:: console
 
-   $ docker-compose logs service-udp
+   $ docker compose logs service-udp
    Attaching to udp_service-udp_1
    service-udp_1  | Listening on UDP port 5005
    service-udp_1  | HELO

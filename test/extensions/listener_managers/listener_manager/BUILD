@@ -43,6 +43,7 @@ envoy_cc_test_library(
 envoy_cc_test(
     name = "listener_manager_impl_test",
     srcs = ["listener_manager_impl_test.cc"],
+    shard_count = 4,
     deps = [
         ":listener_manager_impl_test_lib",
         "//source/common/api:os_sys_calls_lib",
@@ -52,6 +53,7 @@ envoy_cc_test(
         "//source/common/network:socket_option_lib",
         "//source/common/network:utility_lib",
         "//source/common/protobuf",
+        "//source/common/router:string_accessor_lib",
         "//source/extensions/filters/listener/original_dst:config",
         "//source/extensions/filters/listener/proxy_protocol:config",
         "//source/extensions/filters/listener/tls_inspector:config",

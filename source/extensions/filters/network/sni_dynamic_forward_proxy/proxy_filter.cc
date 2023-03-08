@@ -3,6 +3,7 @@
 #include "envoy/network/connection.h"
 #include "envoy/network/filter.h"
 #include "envoy/router/string_accessor.h"
+#include "envoy/stream_info/uint32_accessor.h"
 #include "envoy/upstream/thread_local_cluster.h"
 
 #include "source/common/common/assert.h"
@@ -54,9 +55,21 @@ Network::FilterStatus ProxyFilter::onNewConnection() {
     return Network::FilterStatus::StopIteration;
   }
 
-  uint32_t default_port = config_->port();
+  const StreamInfo::UInt32Accessor* dynamic_port_filter_state =
+      read_callbacks_->connection()
+          .streamInfo()
+          .filterState()
+          ->getDataReadOnly<StreamInfo::UInt32Accessor>("envoy.upstream.dynamic_port");
 
-  auto result = config_->cache().loadDnsCacheEntry(host, default_port, false, *this);
+  uint32_t port;
+  if (dynamic_port_filter_state != nullptr && dynamic_port_filter_state->value() > 0 &&
+      dynamic_port_filter_state->value() <= 65535) {
+    port = dynamic_port_filter_state->value();
+  } else {
+    port = config_->port();
+  }
+
+  auto result = config_->cache().loadDnsCacheEntry(host, port, false, *this);
 
   cache_load_handle_ = std::move(result.handle_);
   if (cache_load_handle_ == nullptr) {
