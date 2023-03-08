@@ -2395,5 +2395,7 @@ message FilterConfig {
   //   And if the request is mutated later and re-match to another route, the disabled filter by the
   //   initial route will not be added back to the filter chain because the filter chain is already
   //   created and it is too late to change the chain.
+  //
+  //   This field only make sense for the downstream HTTP filters for now.
   bool is_disabled = 3;
 }
