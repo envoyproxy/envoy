@@ -199,7 +199,12 @@ public:
   /**
    * Write data to the socket.
    */
-  virtual void writev(const Buffer::RawSlice* slices, uint64_t num_slice) PURE;
+  virtual void write(Buffer::Instance& data) PURE;
+
+  /**
+   * Write data to the socket.
+   */
+  virtual void write(const Buffer::RawSlice* slices, uint64_t num_slice) PURE;
 
   /**
    * On accept request completed.
@@ -338,8 +343,8 @@ public:
   /**
    * Submit a write request for a socket.
    */
-  virtual Request* submitWritevRequest(IoUringSocket& socket, const Buffer::RawSlice* slices,
-                                       uint64_t num_slice) PURE;
+  virtual Request* submitWriteRequest(IoUringSocket& socket,
+                                      const Buffer::RawSliceVector& slices) PURE;
 
   /**
    * Submit a close request for a socket.

@@ -316,10 +316,9 @@ TEST_F(IoUringWorkerIntegrationTest, Write) {
 
   // Waiting for the server socket sending the data.
   std::string write_data = "hello world";
-  struct Buffer::RawSlice slice;
-  slice.mem_ = write_data.data();
-  slice.len_ = write_data.length();
-  io_uring_worker_->submitWritevRequest(socket, &slice, 1);
+  Buffer::OwnedImpl buffer;
+  buffer.add(write_data);
+  io_uring_worker_->submitWriteRequest(socket, buffer.getRawSlices());
   while (socket.write_result_ == -1) {
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   }
@@ -665,10 +664,8 @@ TEST_F(IoUringWorkerIntegrationTest, ServerSocketWrite) {
   struct Buffer::RawSlice slice;
   slice.mem_ = write_data.data();
   slice.len_ = write_data.length();
-  socket.writev(&slice, 1);
-  while (io_uring_handler_.write_result_ == 0) {
-    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
-  }
+  socket.write(&slice, 1);
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
 
   // Read data from client socket.
   struct iovec read_iov;
@@ -676,9 +673,40 @@ TEST_F(IoUringWorkerIntegrationTest, ServerSocketWrite) {
   read_iov.iov_base = read_buf.get();
   read_iov.iov_len = 20;
   auto size = Api::OsSysCallsSingleton::get().readv(client_socket_, &read_iov, 1).return_value_;
+  EXPECT_EQ(write_data.size(), size);
 
-  EXPECT_EQ(io_uring_handler_.write_result_, size);
+  // Test another write interface.
+  Buffer::OwnedImpl buffer;
+  buffer.add(write_data);
+  socket.write(buffer);
+  EXPECT_EQ(buffer.length(), 0);
 
+  size = Api::OsSysCallsSingleton::get().readv(client_socket_, &read_iov, 1).return_value_;
+  EXPECT_EQ(write_data.size(), size);
+
+  socket.close();
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  EXPECT_EQ(io_uring_worker_->getSockets().size(), 0);
+  cleanup();
+}
+
+TEST_F(IoUringWorkerIntegrationTest, ServerSocketCloseWithAnyRequest) {
+  initialize();
+  initializeSockets();
+
+  auto& socket = io_uring_worker_->addServerSocket(server_socket_, io_uring_handler_);
+  EXPECT_EQ(io_uring_worker_->getSockets().size(), 1);
+
+  // Disable the socket, then it won't submit any new request.
+  socket.disable();
+  // Write data through client socket, then it will consume the existing request.
+  std::string write_data = "hello world";
+  Api::OsSysCallsSingleton::get().write(client_socket_, write_data.data(), write_data.size());
+
+  // Running the event loop, to let the IoUring worker process the read request.
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+
+  // Close the socket now, it expected the socket will be close directly without cancel.
   socket.close();
   runToClose(server_socket_);
   EXPECT_EQ(io_uring_worker_->getSockets().size(), 0);

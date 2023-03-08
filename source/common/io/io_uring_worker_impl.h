@@ -43,7 +43,7 @@ public:
 };
 class WriteRequest : public BaseRequest {
 public:
-  WriteRequest(IoUringSocket& socket, const Buffer::RawSlice* slices, uint64_t num_slice);
+  WriteRequest(IoUringSocket& socket, const Buffer::RawSliceVector& slices);
 
   std::unique_ptr<struct iovec[]> iov_;
 };
@@ -61,7 +61,8 @@ public:
   void enable() override { status_ = ENABLED; }
   void disable() override { status_ = DISABLED; }
   void connect(const Network::Address::InstanceConstSharedPtr&) override { PANIC("not implement"); }
-  void writev(const Buffer::RawSlice*, uint64_t) override { PANIC("not implement"); }
+  void write(Buffer::Instance&) override { PANIC("not implement"); }
+  void write(const Buffer::RawSlice*, uint64_t) override { PANIC("not implement"); }
   // This will cleanup all the injected completions for this socket and
   // unlink itself from the worker.
   void cleanup();
@@ -127,8 +128,7 @@ public:
   Request* submitConnectRequest(IoUringSocket& socket,
                                 const Network::Address::InstanceConstSharedPtr& address) override;
   Request* submitReadRequest(IoUringSocket& socket) override;
-  Request* submitWritevRequest(IoUringSocket& socket, const Buffer::RawSlice* slices,
-                               uint64_t num_slice) override;
+  Request* submitWriteRequest(IoUringSocket& socket, const Buffer::RawSliceVector& slices) override;
   Request* submitCloseRequest(IoUringSocket& socket) override;
   Request* submitCancelRequest(IoUringSocket& socket, Request* request_to_cancel) override;
 
@@ -185,19 +185,28 @@ public:
   void close() override;
   void enable() override;
   void disable() override;
-  void writev(const Buffer::RawSlice* slices, uint64_t num_slice) override;
+  void write(Buffer::Instance& data) override;
+  void write(const Buffer::RawSlice* slices, uint64_t num_slice) override;
   void onClose(int32_t result, bool injected) override;
   void onRead(Request* req, int32_t result, bool injected) override;
   void onWrite(int32_t result, bool injected) override;
+  void onCancel(int32_t, bool injected) override;
 
 private:
+  // For read.
   Request* read_req_{};
   // TODO (soulxu): Add water mark here.
   Buffer::OwnedImpl buf_;
   // TODO (soulxu): using queue for completion.
   absl::optional<int32_t> read_error_;
 
+  // For write.
+  Buffer::OwnedImpl write_buf_;
+  struct iovec* iovecs_{nullptr};
+  Request* write_req_{nullptr};
+
   void submitReadRequest();
+  void submitWriteRequest();
 };
 
 } // namespace Io

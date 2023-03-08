@@ -16,10 +16,10 @@ ReadRequest::ReadRequest(IoUringSocket& socket, uint32_t size)
   iov_->iov_len = size;
 }
 
-WriteRequest::WriteRequest(IoUringSocket& socket, const Buffer::RawSlice* slices,
-                           uint64_t num_slice)
-    : BaseRequest(RequestType::Write, socket), iov_(std::make_unique<struct iovec[]>(num_slice)) {
-  for (size_t i = 0; i < num_slice; i++) {
+WriteRequest::WriteRequest(IoUringSocket& socket, const Buffer::RawSliceVector& slices)
+    : BaseRequest(RequestType::Write, socket),
+      iov_(std::make_unique<struct iovec[]>(slices.size())) {
+  for (size_t i = 0; i < slices.size(); i++) {
     iov_[i].iov_base = slices[i].mem_;
     iov_[i].iov_len = slices[i].len_;
   }
@@ -148,18 +148,17 @@ Request* IoUringWorkerImpl::submitReadRequest(IoUringSocket& socket) {
   return req;
 }
 
-Request* IoUringWorkerImpl::submitWritevRequest(IoUringSocket& socket,
-                                                const Buffer::RawSlice* slices,
-                                                uint64_t num_slice) {
-  WriteRequest* req = new WriteRequest(socket, slices, num_slice);
+Request* IoUringWorkerImpl::submitWriteRequest(IoUringSocket& socket,
+                                               const Buffer::RawSliceVector& slices) {
+  WriteRequest* req = new WriteRequest(socket, slices);
 
   ENVOY_LOG(trace, "submit write request, fd = {}, req = {}", socket.fd(), fmt::ptr(req));
 
-  auto res = io_uring_->prepareWritev(socket.fd(), req->iov_.get(), num_slice, 0, req);
+  auto res = io_uring_->prepareWritev(socket.fd(), req->iov_.get(), slices.size(), 0, req);
   if (res == IoUringResult::Failed) {
     // TODO(rojkov): handle `EBUSY` in case the completion queue is never reaped.
     submit();
-    res = io_uring_->prepareWritev(socket.fd(), req->iov_.get(), num_slice, 0, req);
+    res = io_uring_->prepareWritev(socket.fd(), req->iov_.get(), slices.size(), 0, req);
     RELEASE_ASSERT(res == IoUringResult::Ok, "unable to prepare writev");
   }
   submit();
@@ -379,8 +378,32 @@ void IoUringServerSocket::enable() {
 
 void IoUringServerSocket::disable() { IoUringSocketEntry::disable(); }
 
-void IoUringServerSocket::writev(const Buffer::RawSlice* slices, uint64_t num_slice) {
-  parent_.submitWritevRequest(*this, slices, num_slice);
+void IoUringServerSocket::write(Buffer::Instance& data) {
+  ENVOY_LOG(trace, "write, buffer size = {}, fd = {}", data.length(), fd_);
+
+  write_buf_.move(data);
+
+  if (write_req_ != nullptr) {
+    ENVOY_LOG(trace, "write already submited, fd = {}", fd_);
+  }
+
+  ENVOY_LOG(trace, "write buf, size = {}, slices = {}", write_buf_.length(),
+            write_buf_.getRawSlices().size());
+  submitWriteRequest();
+}
+
+void IoUringServerSocket::write(const Buffer::RawSlice* slices, uint64_t num_slice) {
+  ENVOY_LOG(trace, "write, num_slices = {}, fd = {}", num_slice, fd_);
+
+  for (uint64_t i = 0; i < num_slice; i++) {
+    write_buf_.add(slices[i].mem_, slices[i].len_);
+  }
+
+  if (write_req_ != nullptr) {
+    ENVOY_LOG(trace, "write already submited, fd = {}", fd_);
+  }
+
+  submitWriteRequest();
 }
 
 void IoUringServerSocket::onClose(int32_t result, bool injected) {
@@ -396,7 +419,8 @@ void IoUringServerSocket::onRead(Request* req, int32_t result, bool injected) {
 
   if (!injected) {
     read_req_ = nullptr;
-    if (status_ == CLOSING) {
+    // Close if it is in closing status and no write request.
+    if (status_ == CLOSING && write_req_ == nullptr) {
       parent_.submitCloseRequest(*this);
     }
     // Move read data from request to buffer or store the error.
@@ -442,12 +466,52 @@ void IoUringServerSocket::onRead(Request* req, int32_t result, bool injected) {
 
 void IoUringServerSocket::onWrite(int32_t result, bool injected) {
   IoUringSocketEntry::onWrite(result, injected);
-  ASSERT(!injected);
 
-  if (status_ == ENABLED) {
-    ENVOY_LOG(trace, "write to socket, fd = {}, result = {}", fd_, result);
+  ENVOY_LOG(trace, "onWrite with result {}, fd = {}", result, fd_);
+
+  // Cleanup request and write buffer.
+  write_req_ = nullptr;
+
+  if (status_ == CLOSING) {
+    // Close if it is in closing status and no read request.
+    if (read_req_ == nullptr) {
+      parent_.submitCloseRequest(*this);
+    }
+    return;
+  }
+
+  // If this is injected request, then notify the handler directly.
+  if (injected) {
+    ENVOY_LOG(trace,
+              "there is a inject event, and same time we have regular write request, fd = {}", fd_);
     WriteParam param{result};
     io_uring_handler_.onWrite(param);
+    return;
+  }
+
+  // If result is EAGAIN, the request should be submitted again.
+  if (result <= 0 && result != -EAGAIN) {
+    WriteParam param{result};
+    io_uring_handler_.onWrite(param);
+    return;
+  }
+
+  if (result > 0) {
+    write_buf_.drain(result);
+  }
+
+  ENVOY_LOG(trace, "drain write buf, drain size = {}, fd = {}", result, fd_);
+  if (write_buf_.length() > 0) {
+    ENVOY_LOG(trace, "continue write buf since still have data, size = {}, fd = {}",
+              write_buf_.length(), fd_);
+    submitWriteRequest();
+    return;
+  }
+}
+
+void IoUringServerSocket::onCancel(int32_t, bool) {
+  if (status_ == CLOSING && read_req_ == nullptr && write_req_ == nullptr) {
+    parent_.submitCloseRequest(*this);
   }
 }
 
@@ -455,6 +519,18 @@ void IoUringServerSocket::submitReadRequest() {
   if (!read_req_) {
     read_req_ = parent_.submitReadRequest(*this);
   }
+}
+
+void IoUringServerSocket::submitWriteRequest() {
+  ASSERT(write_req_ == nullptr);
+  ASSERT(iovecs_ == nullptr);
+
+  Buffer::RawSliceVector slices = write_buf_.getRawSlices();
+
+  ENVOY_LOG(trace, "submit write request, write_buf size = {}, num_iovecs = {}, fd = {}",
+            write_buf_.length(), slices.size(), fd_);
+
+  write_req_ = parent_.submitWriteRequest(*this, slices);
 }
 
 } // namespace Io
