@@ -18,7 +18,7 @@ public:
   ClusterConfig(const GolangClusterProto& config);
   uint64_t getPluginId() { return plugin_id_; };
   const std::string& defaultCluster() { return default_cluster_; }
-  Dso::ClusterSpecifierDsoInstancePtr getDsoLib() { return dynamic_lib_; }
+  Dso::ClusterSpecifierDsoPtr getDsoLib() { return dynamic_lib_; }
 
 private:
   const std::string so_id_;
@@ -26,7 +26,7 @@ private:
   const std::string default_cluster_;
   const ProtobufWkt::Any config_;
   uint64_t plugin_id_{0};
-  Dso::ClusterSpecifierDsoInstancePtr dynamic_lib_;
+  Dso::ClusterSpecifierDsoPtr dynamic_lib_;
 };
 
 using ClusterConfigSharedPtr = std::shared_ptr<ClusterConfig>;

@@ -109,16 +109,16 @@ public:
   }
 
   void setupDso() {
-    Dso::DsoManager<Dso::HttpFilterDso>::load(PASSTHROUGH, genSoPath(PASSTHROUGH));
+    Dso::DsoManager<Dso::HttpFilterDsoInstance>::load(PASSTHROUGH, genSoPath(PASSTHROUGH));
   }
-  void setupDso() { Dso::DsoManager::load(PASSTHROUGH, genSoPath(PASSTHROUGH)); }
 
   void setupConfig(
       envoy::extensions::filters::http::golang::v3alpha::Config& proto_config,
       envoy::extensions::filters::http::golang::v3alpha::ConfigsPerRoute& per_route_proto_config) {
     // Setup filter config for Golang filter.
     config_ = std::make_shared<FilterConfig>(
-        proto_config, Dso::DsoManager::getDsoByID(proto_config.library_id()));
+        proto_config,
+        Dso::DsoManager<Dso::HttpFilterDsoInstance>::getDsoByID(proto_config.library_id()));
     // Setup per route config for Golang filter.
     per_route_config_ =
         std::make_shared<FilterConfigPerRoute>(per_route_proto_config, server_factory_context_);
@@ -128,8 +128,8 @@ public:
     Event::SimulatedTimeSystem test_time;
     test_time.setSystemTime(std::chrono::microseconds(1583879145572237));
 
-    filter_ = std::make_unique<TestFilter>(config_,
-                                           Dso::DsoManager<Dso::HttpFilterDso>::getDsoByID(so_id));
+    filter_ = std::make_unique<TestFilter>(
+        config_, Dso::DsoManager<Dso::HttpFilterDsoInstance>::getDsoByID(so_id));
     filter_->setDecoderFilterCallbacks(decoder_callbacks_);
     filter_->setEncoderFilterCallbacks(encoder_callbacks_);
   }

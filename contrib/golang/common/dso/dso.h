@@ -42,7 +42,7 @@ public:
 class HttpFilterDsoInstance : public HttpFilterDso {
 public:
   HttpFilterDsoInstance(const std::string dso_name);
-  ~HttpFilterDsoInstance() override;
+  ~HttpFilterDsoInstance() override = default;
 
   GoUint64 envoyGoFilterNewHttpPluginConfig(GoUint64 p0, GoUint64 p1) override;
   GoUint64 envoyGoFilterMergeHttpPluginConfig(GoUint64 p0, GoUint64 p1) override;
@@ -75,7 +75,7 @@ public:
 class ClusterSpecifierDsoInstance : public ClusterSpecifierDso {
 public:
   ClusterSpecifierDsoInstance(const std::string dso_name);
-  ~ClusterSpecifierDsoInstance() override;
+  ~ClusterSpecifierDsoInstance() override = default;
 
   GoInt64 envoyGoOnClusterSpecify(GoUint64 plugin_ptr, GoUint64 header_ptr, GoUint64 plugin_id,
                                   GoUint64 buffer_ptr, GoUint64 buffer_len) override;
@@ -91,7 +91,6 @@ private:
 
 using HttpFilterDsoPtr = std::shared_ptr<HttpFilterDso>;
 using ClusterSpecifierDsoPtr = std::shared_ptr<ClusterSpecifierDso>;
-using DsoPtr = std::shared_ptr<Dso>;
 
 template <class T> class DsoManager {
 

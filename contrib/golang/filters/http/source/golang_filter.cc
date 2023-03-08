@@ -924,7 +924,7 @@ uint64_t Filter::getMergedConfigId(ProcessorState& state) {
 
 FilterConfig::FilterConfig(
     const envoy::extensions::filters::http::golang::v3alpha::Config& proto_config,
-    Dso::DsoPtr dso_lib)
+    Dso::HttpFilterDsoPtr dso_lib)
     : plugin_name_(proto_config.plugin_name()), so_id_(proto_config.library_id()),
       so_path_(proto_config.library_path()), plugin_config_(proto_config.plugin_config()),
       dso_lib_(dso_lib) {

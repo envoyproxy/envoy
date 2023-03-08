@@ -27,7 +27,7 @@ namespace Golang {
 class FilterConfig : Logger::Loggable<Logger::Id::http> {
 public:
   FilterConfig(const envoy::extensions::filters::http::golang::v3alpha::Config& proto_config,
-               Dso::DsoPtr dso_lib);
+               Dso::HttpFilterDsoPtr dso_lib);
   // TODO: delete config in Go
   virtual ~FilterConfig() = default;
 
@@ -41,7 +41,7 @@ private:
   const std::string so_id_;
   const std::string so_path_;
   const ProtobufWkt::Any plugin_config_;
-  Dso::DsoPtr dso_lib_;
+  Dso::HttpFilterDsoPtr dso_lib_;
   uint64_t config_id_{0};
 };
 
