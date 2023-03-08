@@ -59,7 +59,7 @@ IoHandlePtr SocketInterfaceImpl::makeSocket(int socket_fd, bool socket_v6only,
 }
 
 bool SocketInterfaceImpl::isBlockingSocket() const {
-  // Use blocking socket for IOUring.
+  // Use blocking socket for io_uring.
   return hasIoUringFactory(io_uring_factory_.lock().get());
 }
 

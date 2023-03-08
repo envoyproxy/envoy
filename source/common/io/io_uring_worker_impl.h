@@ -29,6 +29,7 @@ class AcceptRequest : public BaseRequest {
 public:
   AcceptRequest(IoUringSocket& socket);
 
+  size_t i_{};
   sockaddr_storage remote_addr_{};
   socklen_t remote_addr_len_{sizeof(remote_addr_)};
 };
@@ -170,8 +171,9 @@ public:
 
 private:
   const uint32_t accept_size_;
-  // This is used to track the current submitted accept requests.
-  absl::flat_hash_set<Request*> requests_;
+  // These are used to track the current submitted accept requests.
+  size_t request_count_{};
+  std::vector<Request*> requests_;
 
   void submitRequests();
 };

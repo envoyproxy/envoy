@@ -127,7 +127,7 @@ Api::IoCallUint64Result IoUringSocketHandleImpl::read(Buffer::Instance& buffer,
     return shadow_io_handle_->read(buffer, max_length_opt);
   }
 
-  // It means there is no iouring request is done, the read is invoked directly.
+  // It means there is no io_uring request is done, the read is invoked directly.
   if (read_param_ == absl::nullopt) {
     return {0, Api::IoErrorPtr(IoSocketError::getIoSocketEagainInstance(),
                                IoSocketError::deleteIoError)};

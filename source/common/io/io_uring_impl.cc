@@ -29,7 +29,7 @@ bool isIoUringSupported() {
   struct io_uring_probe* probe = io_uring_get_probe();
 
   if (probe == nullptr) {
-    ENVOY_LOG_MISC(warn, "the kernel version is too old to support probe iouring capabilities");
+    ENVOY_LOG_MISC(warn, "the kernel version is too old to support probe io_uring capabilities");
     return false;
   }
 

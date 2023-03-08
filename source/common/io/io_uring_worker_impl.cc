@@ -266,21 +266,28 @@ void IoUringWorkerImpl::submit() {
 
 IoUringAcceptSocket::IoUringAcceptSocket(os_fd_t fd, IoUringWorkerImpl& parent,
                                          IoUringHandler& io_uring_handler, uint32_t accept_size)
-    : IoUringSocketEntry(fd, parent, io_uring_handler), accept_size_(accept_size) {
+    : IoUringSocketEntry(fd, parent, io_uring_handler), accept_size_(accept_size),
+      requests_(std::vector<Request*>(accept_size_, nullptr)) {
   enable();
 }
 
 void IoUringAcceptSocket::close() {
   IoUringSocketEntry::close();
 
-  if (requests_.empty()) {
+  if (!request_count_) {
     parent_.submitCloseRequest(*this);
     return;
   }
 
   // TODO (soulxu): after kernel 5.19, we are able to cancel all requests for the specific fd.
+  // TODO(zhxie): there may be races between main thread and worker thread in request_count_ and
+  // requests_ in close(). When there is a listener draining, all server sockets in the listener
+  // will be closed by the main thread. Though there may be races, it is still safe to
+  // submitCancelRequest since io_uring can accept cancelling an invalid user_data.
   for (auto req : requests_) {
-    parent_.submitCancelRequest(*this, req);
+    if (req != nullptr) {
+      parent_.submitCancelRequest(*this, req);
+    }
   }
 }
 
@@ -293,7 +300,9 @@ void IoUringAcceptSocket::disable() {
   IoUringSocketEntry::disable();
   // TODO (soulxu): after kernel 5.19, we are able to cancel all requests for the specific fd.
   for (auto req : requests_) {
-    parent_.submitCancelRequest(*this, req);
+    if (req != nullptr) {
+      parent_.submitCancelRequest(*this, req);
+    }
   }
 }
 
@@ -307,9 +316,13 @@ void IoUringAcceptSocket::onAccept(Request* req, int32_t result, bool injected) 
   IoUringSocketEntry::onAccept(req, result, injected);
   ASSERT(!injected);
   // If there is no pending accept request and the socket is going to close, submit close request.
-  requests_.erase(req);
-  if (requests_.empty() && status_ == CLOSING) {
-    parent_.submitCloseRequest(*this);
+  AcceptRequest* accept_req = static_cast<AcceptRequest*>(req);
+  requests_[accept_req->i_] = nullptr;
+  request_count_--;
+  if (status_ == CLOSING) {
+    if (!request_count_) {
+      parent_.submitCloseRequest(*this);
+    }
   }
 
   // If the socket is not enabled, drop all following actions to all accepted fds.
@@ -318,7 +331,6 @@ void IoUringAcceptSocket::onAccept(Request* req, int32_t result, bool injected) 
     submitRequests();
     if (result != -ECANCELED) {
       ENVOY_LOG(trace, "accept new socket, fd = {}, result = {}", fd_, result);
-      AcceptRequest* accept_req = static_cast<AcceptRequest*>(req);
       AcceptedSocketParam param{result, &accept_req->remote_addr_, accept_req->remote_addr_len_};
       io_uring_handler_.onAcceptSocket(param);
     }
@@ -326,9 +338,12 @@ void IoUringAcceptSocket::onAccept(Request* req, int32_t result, bool injected) 
 }
 
 void IoUringAcceptSocket::submitRequests() {
-  for (size_t i = requests_.size(); i < accept_size_; i++) {
-    auto req = parent_.submitAcceptRequest(*this);
-    requests_.insert(req);
+  for (size_t i = 0; i < requests_.size(); i++) {
+    if (requests_[i] == nullptr) {
+      requests_[i] = parent_.submitAcceptRequest(*this);
+      static_cast<AcceptRequest*>(requests_[i])->i_ = i;
+      request_count_++;
+    }
   }
 }
 
