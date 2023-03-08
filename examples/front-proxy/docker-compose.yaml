@@ -1,20 +1,16 @@
 version: "3.8"
 services:
 
-  # base images
-  flask_service:
-    build:
-      context: ../shared/flask
-    image: flask_service:python-3.10-slim-bullseye
-    restart: "no"
-    deploy:
-      replicas: 0
-
   # front-proxy
   front-envoy:
     build:
       context: .
       dockerfile: Dockerfile-frontenvoy
+    depends_on:
+      service1:
+        condition: service_healthy
+      service2:
+        condition: service_healthy
     ports:
     - "${PORT_PROXY:-8080}:8080"
     - "${PORT_HTTPS:-8443}:8443"
@@ -22,7 +18,8 @@ services:
 
   service1:
     build:
-      context: ../shared/tracing
+      context: ../shared/flask
+      target: tracing-flask
     volumes:
     - ./service-envoy.yaml:/etc/service-envoy.yaml
     environment:
@@ -30,7 +27,8 @@ services:
 
   service2:
     build:
-      context: ../shared/tracing
+      context: ../shared/flask
+      target: tracing-flask
     volumes:
     - ./service-envoy.yaml:/etc/service-envoy.yaml
     environment:
