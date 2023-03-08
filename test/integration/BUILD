@@ -421,7 +421,7 @@ envoy_cc_test(
     srcs = [
         "multiplexed_integration_test.cc",
     ],
-    shard_count = 8,
+    shard_count = 16,
     deps = [
         ":http_protocol_integration_lib",
         ":socket_interface_swap_lib",
@@ -591,7 +591,7 @@ envoy_cc_test(
     srcs = envoy_select_admin_functionality([
         "filter_integration_test.cc",
     ]),
-    shard_count = 12,
+    shard_count = 16,
     deps = [
         ":http_protocol_integration_lib",
         ":socket_interface_swap_lib",
@@ -662,7 +662,7 @@ envoy_cc_test(
     ],
     # As this test has many H1/H2/v4/v6 tests it takes a while to run.
     # Shard it enough to bring the run time in line with other integration tests.
-    shard_count = 32,
+    shard_count = 48,
     deps = [
         ":protocol_integration_test_lib",
     ],
@@ -1142,7 +1142,7 @@ envoy_cc_test(
     srcs = [
         "redirect_integration_test.cc",
     ],
-    shard_count = 4,
+    shard_count = 8,
     tags = ["nofips"],
     deps = [
         ":http_protocol_integration_lib",
@@ -1507,7 +1507,7 @@ envoy_cc_test(
     data = [
         "//test/config/integration/certs",
     ],
-    shard_count = 7,
+    shard_count = 16,
     deps = [
         ":http_integration_lib",
         ":http_protocol_integration_lib",
