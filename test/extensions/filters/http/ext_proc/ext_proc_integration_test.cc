@@ -329,7 +329,11 @@ protected:
     // Set envoy filter timeout to be 200ms.
     proto_config_.mutable_message_timeout()->set_nanos(200000000);
     if (max_message_timeout_ms_) {
-      proto_config_.mutable_max_message_timeout()->set_nanos(max_message_timeout_ms_ * 1000000);
+      if (max_message_timeout_ms_ < 1000) {
+        proto_config_.mutable_max_message_timeout()->set_nanos(max_message_timeout_ms_ * 1000000);
+      } else {
+        proto_config_.mutable_max_message_timeout()->set_seconds(max_message_timeout_ms_ / 1000);
+      }
     }
     initializeConfig();
     HttpIntegrationTest::initialize();
@@ -1760,6 +1764,8 @@ TEST_P(ExtProcIntegrationTest, PerRouteGrpcService) {
 TEST_P(ExtProcIntegrationTest, RequestAndResponseMessageNewTimeoutWithHeaderMutation) {
   // Set envoy filter timeout to be 200ms.
   proto_config_.mutable_message_timeout()->set_nanos(200000000);
+  proto_config_.mutable_max_message_timeout()->set_seconds(10);
+
   initializeConfig();
   HttpIntegrationTest::initialize();
   auto response = sendDownstreamRequest(
@@ -1811,6 +1817,8 @@ TEST_P(ExtProcIntegrationTest, RequestAndResponseMessageNewTimeoutWithHeaderMuta
 TEST_P(ExtProcIntegrationTest, RequestMessageNewTimeoutNoMutation) {
   // Set envoy filter timeout to be 200ms.
   proto_config_.mutable_message_timeout()->set_nanos(200000000);
+  proto_config_.mutable_max_message_timeout()->set_seconds(10);
+
   initializeConfig();
   HttpIntegrationTest::initialize();
   auto response = sendDownstreamRequest(absl::nullopt);
@@ -1839,6 +1847,7 @@ TEST_P(ExtProcIntegrationTest, RequestMessageNewTimeoutNoMutation) {
 TEST_P(ExtProcIntegrationTest, RequestMessageNoMutationMultipleNewTimeout) {
   // Set envoy filter timeout to be 200ms.
   proto_config_.mutable_message_timeout()->set_nanos(200000000);
+  proto_config_.mutable_max_message_timeout()->set_seconds(10);
   initializeConfig();
   HttpIntegrationTest::initialize();
   auto response = sendDownstreamRequest(absl::nullopt);
@@ -1868,14 +1877,25 @@ TEST_P(ExtProcIntegrationTest, RequestMessageNoMutationMultipleNewTimeout) {
 }
 
 TEST_P(ExtProcIntegrationTest, RequestMessageNewTimeoutNegativeTestTimeoutTooSmall) {
+  max_message_timeout_ms_ = 10000;
   newTimeoutWrongConfigTest(0);
 }
+
 TEST_P(ExtProcIntegrationTest, RequestMessageNewTimeoutNegativeTestTimeoutTooBig) {
+  max_message_timeout_ms_ = 10000;
   newTimeoutWrongConfigTest(20000);
 }
+
 TEST_P(ExtProcIntegrationTest, RequestMessageNewTimeoutNegativeTestTimeoutTooBigWithSmallMax) {
   max_message_timeout_ms_ = 100;
   // With max_message_timeout set to be 100ms, the 500ms new_timeout is not accepted any more.
+  // So, with the original 200ms timer, and 300ms delay, timeout happens.
+  newTimeoutWrongConfigTest(500);
+}
+
+TEST_P(ExtProcIntegrationTest, RequestMessageNewTimeoutNegativeTestTimeoutNotAcceptedDefaultMax) {
+  // With max_message_timeout is not set, and Envoy take the default value zero,
+  // the 500ms new_timeout is not accepted any more.
   // So, with the original 200ms timer, and 300ms delay, timeout happens.
   newTimeoutWrongConfigTest(500);
 }
