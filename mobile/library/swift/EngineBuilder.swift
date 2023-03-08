@@ -1,3 +1,6 @@
+#if canImport(EnvoyCxxSwiftInterop)
+@_implementationOnly import EnvoyCxxSwiftInterop
+#endif
 @_implementationOnly import EnvoyEngine
 import Foundation
 
@@ -6,7 +9,11 @@ import Foundation
 open class EngineBuilder: NSObject {
   // swiftlint:disable:previous type_body_length
   private let base: BaseConfiguration
+#if canImport(EnvoyCxxSwiftInterop)
+  private var engineType: EnvoyEngine.Type = SwiftEnvoyEngineImpl.self
+#else
   private var engineType: EnvoyEngine.Type = EnvoyEngineImpl.self
+#endif
   private var logLevel: LogLevel = .info
 
   private enum BaseConfiguration {
@@ -58,6 +65,11 @@ open class EngineBuilder: NSObject {
   private var runtimeGuards: [String: Bool] = [:]
   private var directResponses: [DirectResponse] = []
   private var statsSinks: [String] = []
+#if canImport(EnvoyCxxSwiftInterop)
+  private(set) var useSwiftCxxInterop = true
+#else
+  private(set) var useSwiftCxxInterop = false
+#endif
 
   // MARK: - Public
 
@@ -562,12 +574,31 @@ open class EngineBuilder: NSObject {
   }
 #endif
 
+#if canImport(EnvoyCxxSwiftInterop)
+  /// Use Swift's experimental C++ interop support to interact with Envoy directly
+  /// instead of going through the Objective-C layer.
+  ///
+  /// - parameter useSwiftCxxInterop: Whether or not to use the Swift / C++ interop
+  ///                                 code paths.
+  ///
+  /// - returns: This builder.
+  @discardableResult
+  public func useSwiftCxxInterop(_ useSwiftCxxInterop: Bool) -> Self {
+    self.useSwiftCxxInterop = useSwiftCxxInterop
+    return self
+  }
+#endif
+
   /// Builds and runs a new `Engine` instance with the provided configuration.
   ///
   /// - note: Must be strongly retained in order for network requests to be performed correctly.
   ///
   /// - returns: The built `Engine`.
   public func build() -> Engine {
+    if !self.useSwiftCxxInterop && self.engineType == SwiftEnvoyEngineImpl.self {
+      self.engineType = EnvoyEngineImpl.self
+    }
+
     let engine = self.engineType.init(runningCallback: self.onEngineRunning, logger: self.logger,
                                       eventTracker: self.eventTracker,
                                       networkMonitoringMode: Int32(self.monitoringMode.rawValue))
@@ -615,6 +646,16 @@ open class EngineBuilder: NSObject {
     case .custom(let yaml):
       return EngineImpl(yaml: yaml, config: config, logLevel: self.logLevel, engine: engine)
     case .standard:
+#if canImport(EnvoyCxxSwiftInterop)
+      if self.useSwiftCxxInterop && self.engineType == SwiftEnvoyEngineImpl.self {
+        return EngineImpl(
+          config: config,
+          bootstrap: self.generateBootstrap(),
+          logLevel: self.logLevel,
+          engine: engine
+        )
+      }
+#endif
       return EngineImpl(config: config, logLevel: self.logLevel, engine: engine)
     }
   }
@@ -632,6 +673,9 @@ open class EngineBuilder: NSObject {
   /// - returns: This builder.
   @discardableResult
   func addEngineType(_ engineType: EnvoyEngine.Type) -> Self {
+    if self.useSwiftCxxInterop && engineType != SwiftEnvoyEngineImpl.self {
+      self.useSwiftCxxInterop = false
+    }
     self.engineType = engineType
     return self
   }
@@ -645,3 +689,73 @@ open class EngineBuilder: NSObject {
     self.directResponses.append(directResponse)
   }
 }
+
+#if canImport(EnvoyCxxSwiftInterop)
+private extension EngineBuilder {
+  func generateBootstrap() -> Bootstrap {
+    var cxxBuilder = Envoy.Platform.EngineBuilder()
+    cxxBuilder.addLogLevel(Envoy.Platform.logLevelFromString(self.logLevel.stringValue.toCXX()))
+#if ENVOY_ADMIN_FUNCTIONALITY
+    cxxBuilder.enableAdminInterface(self.adminInterfaceEnabled)
+#endif
+    if let grpcStatsDomain = self.grpcStatsDomain {
+      cxxBuilder.addGrpcStatsDomain(grpcStatsDomain.toCXX())
+    }
+
+    cxxBuilder.addConnectTimeoutSeconds(Int32(self.connectTimeoutSeconds))
+    cxxBuilder.addDnsRefreshSeconds(Int32(self.dnsRefreshSeconds))
+    cxxBuilder.addDnsFailureRefreshSeconds(Int32(self.dnsFailureRefreshSecondsBase),
+                                           Int32(self.dnsFailureRefreshSecondsMax))
+    cxxBuilder.addDnsQueryTimeoutSeconds(Int32(self.dnsQueryTimeoutSeconds))
+    cxxBuilder.addDnsMinRefreshSeconds(Int32(self.dnsMinRefreshSeconds))
+    cxxBuilder.addDnsPreresolveHostnames(self.dnsPreresolveHostnames.toCXX())
+    cxxBuilder.enableDnsCache(self.enableDNSCache, Int32(self.dnsCacheSaveIntervalSeconds))
+    cxxBuilder.enableHappyEyeballs(self.enableHappyEyeballs)
+#if ENVOY_ENABLE_QUIC
+    cxxBuilder.enableHttp3(self.enableHttp3)
+#endif
+    cxxBuilder.enableGzipDecompression(self.enableGzipDecompression)
+    cxxBuilder.enableBrotliDecompression(self.enableBrotliDecompression)
+    cxxBuilder.enableInterfaceBinding(self.enableInterfaceBinding)
+    cxxBuilder.enableDrainPostDnsRefresh(self.enableDrainPostDnsRefresh)
+    cxxBuilder.enforceTrustChainVerification(self.enforceTrustChainVerification)
+    cxxBuilder.setForceAlwaysUsev6(self.forceIPv6)
+    cxxBuilder.enablePlatformCertificatesValidation(self.enablePlatformCertificateValidation)
+    cxxBuilder.addH2ConnectionKeepaliveIdleIntervalMilliseconds(
+      Int32(self.h2ConnectionKeepaliveIdleIntervalMilliseconds)
+    )
+    cxxBuilder.addH2ConnectionKeepaliveTimeoutSeconds(
+      Int32(self.h2ConnectionKeepaliveTimeoutSeconds)
+    )
+    cxxBuilder.addMaxConnectionsPerHost(Int32(self.maxConnectionsPerHost))
+    cxxBuilder.addStatsFlushSeconds(Int32(self.statsFlushSeconds))
+    cxxBuilder.setStreamIdleTimeoutSeconds(Int32(self.streamIdleTimeoutSeconds))
+    cxxBuilder.setPerTryIdleTimeoutSeconds(Int32(self.perTryIdleTimeoutSeconds))
+    cxxBuilder.setAppVersion(self.appVersion.toCXX())
+    cxxBuilder.setAppId(self.appId.toCXX())
+    cxxBuilder.setDeviceOs("iOS".toCXX())
+    for cluster in self.virtualClusters {
+      cxxBuilder.addVirtualCluster(cluster.toCXX())
+    }
+
+    for (runtimeGuard, value) in self.runtimeGuards {
+      cxxBuilder.setRuntimeGuard(runtimeGuard.toCXX(), value)
+    }
+
+    for directResponse in self.directResponses {
+      cxxBuilder.addDirectResponse(directResponse.toCXX())
+    }
+
+    for filter in self.nativeFilterChain.reversed() {
+      cxxBuilder.addNativeFilter(filter.name.toCXX(), filter.typedConfig.toCXX())
+    }
+
+    for filter in self.platformFilterChain.reversed() {
+      cxxBuilder.addPlatformFilter(filter.filterName.toCXX())
+    }
+
+    cxxBuilder.addStatsSinks(self.statsSinks.toCXX())
+    return cxxBuilder.generateBootstrap()
+  }
+}
+#endif

@@ -15,6 +15,7 @@ final class SetEventTrackerTest: XCTestCase {
       self.expectation(description: "Passed event tracker receives an event")
 
     let engine = EngineBuilder()
+      .setNetworkMonitoringMode(.disabled)
       .setEventTracker { event in
         XCTAssertEqual("bar", event["foo"])
         eventExpectation.fulfill()

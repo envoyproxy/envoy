@@ -1,3 +1,6 @@
+#if canImport(EnvoyCxxSwiftInterop)
+@_implementationOnly import EnvoyCxxSwiftInterop
+#endif
 @_implementationOnly import EnvoyEngine
 import Foundation
 
@@ -11,6 +14,9 @@ final class EngineImpl: NSObject {
   private enum ConfigurationType {
     case custom(yaml: String, config: EnvoyConfiguration)
     case standard(config: EnvoyConfiguration)
+#if canImport(EnvoyCxxSwiftInterop)
+    case swiftCxx(bootstrap: Bootstrap, config: EnvoyConfiguration)
+#endif
   }
 
   private init(configType: ConfigurationType, logLevel: LogLevel, engine: EnvoyEngine) {
@@ -24,6 +30,11 @@ final class EngineImpl: NSObject {
       self.engine.run(withYAML: yaml, config: config, logLevel: logLevel.stringValue)
     case .standard(let config):
       self.engine.run(withConfig: config, logLevel: logLevel.stringValue)
+#if canImport(EnvoyCxxSwiftInterop)
+    case .swiftCxx(let bootstrap, let config):
+      let engineImpl = self.engine as! SwiftEnvoyEngineImpl
+      engineImpl.run(withConfig: config, bootstrap: bootstrap, logLevel: logLevel)
+#endif
     }
   }
 
@@ -47,6 +58,15 @@ final class EngineImpl: NSObject {
   {
     self.init(configType: .custom(yaml: yaml, config: config), logLevel: logLevel, engine: engine)
   }
+
+#if canImport(EnvoyCxxSwiftInterop)
+  convenience init(config: EnvoyConfiguration, bootstrap: Bootstrap, logLevel: LogLevel = .info,
+                   engine: EnvoyEngine)
+  {
+    self.init(configType: .swiftCxx(bootstrap: bootstrap, config: config), logLevel: logLevel,
+              engine: engine)
+  }
+#endif
 }
 
 extension EngineImpl: Engine {
