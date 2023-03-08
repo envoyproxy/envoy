@@ -583,7 +583,7 @@ TEST(HttpUtility, ValidateStreamErrorsWithHcm) {
                   .value());
 
   // If the HCM value is present it will take precedence over the old value.
-  Protobuf::BoolValue hcm_value;
+  ProtobufWkt::BoolValue hcm_value;
   hcm_value.set_value(false);
   EXPECT_FALSE(Envoy::Http2::Utility::initializeAndValidateOptions(http2_options, true, hcm_value)
                    .override_stream_error_on_invalid_http_message()
@@ -603,7 +603,7 @@ TEST(HttpUtility, ValidateStreamErrorsWithHcm) {
 
 TEST(HttpUtility, ValidateStreamErrorConfigurationForHttp1) {
   envoy::config::core::v3::Http1ProtocolOptions http1_options;
-  Protobuf::BoolValue hcm_value;
+  ProtobufWkt::BoolValue hcm_value;
   NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor;
 
   // nothing explicitly configured, default to false (i.e. default stream error behavior for HCM)
