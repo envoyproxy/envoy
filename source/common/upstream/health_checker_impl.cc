@@ -658,7 +658,6 @@ void TcpHealthCheckerImpl::TcpActiveHealthCheckSession::onInterval() {
     for (const std::vector<uint8_t>& segment : parent_.send_bytes_) {
       data.add(segment.data(), segment.size());
     }
-    std::cout << "write data " << std::endl;
     client_->write(data, false);
   }
 }
