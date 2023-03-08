@@ -355,12 +355,15 @@ IoUringServerSocket::IoUringServerSocket(os_fd_t fd, IoUringWorkerImpl& parent,
 void IoUringServerSocket::close() {
   IoUringSocketEntry::close();
 
-  if (read_req_ == nullptr) {
-    parent_.submitCloseRequest(*this);
+  ENVOY_LOG(trace, "close the socket, fd = {}", fd_);
+  if (read_req_ == nullptr && write_req_ == nullptr && cancel_req_ == nullptr) {
+    ENVOY_LOG(trace, "ready to close, fd = {}", fd_);
+    close_req_ = parent_.submitCloseRequest(*this);
     return;
   }
 
   if (cancel_req_ == nullptr) {
+    ENVOY_LOG(trace, "cancel the read request, fd = {}", fd_);
     cancel_req_ = parent_.submitCancelRequest(*this, read_req_);
   }
 }
