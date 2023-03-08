@@ -76,7 +76,29 @@ swift_library(
         "stats/Element.swift",
         "stats/Tags.swift",
         "stats/TagsBuilder.swift",
-    ] + ["@envoy_mobile_extra_swift_sources//:extra_swift_srcs"],
+    ] + [
+        "@envoy_mobile_extra_swift_sources//:extra_swift_srcs",
+    ] + select({
+        "//bazel:envoy_mobile_swift_cxx_interop": [
+            "cxx/Bootstrap.swift",
+            "cxx/DirectResponse+Cxx.swift",
+            "cxx/EnvoyEngineCallbacksFactory.swift",
+            "cxx/EnvoyEventTrackerFactory.swift",
+            "cxx/EnvoyHeaders.swift",
+            "cxx/EnvoyHTTPFilterCallbacksImpl.swift",
+            "cxx/EnvoyHTTPFilterFactory+Cxx.swift",
+            "cxx/EnvoyLoggerFactory.swift",
+            "cxx/EnvoyStringAccessor+Cxx.swift",
+            "cxx/KeyValueStore+Cxx.swift",
+            "cxx/LogLevel+Cxx.swift",
+            "cxx/NetworkMonitor.swift",
+            "cxx/PointerBox.swift",
+            "cxx/Swift+Cxx.swift",
+            "cxx/SwiftEnvoyEngineImpl.swift",
+            "cxx/SwiftEnvoyHTTPStreamImpl.swift",
+        ],
+        "//conditions:default": [],
+    }),
     copts = select({
         "//bazel:envoy_mobile_swift_cxx_interop": envoy_mobile_swift_copts(True),
         "//conditions:default": [],
@@ -91,7 +113,12 @@ swift_library(
     private_deps = [
         "//library/objective-c:envoy_engine_objc_lib",
         "@envoy_mobile_extra_swift_sources//:extra_private_dep",
-    ],
+    ] + select({
+        "//bazel:envoy_mobile_swift_cxx_interop": [
+            "//library/swift/EnvoyCxxSwiftInterop:EnvoyCxxSwiftInterop",
+        ],
+        "//conditions:default": [],
+    }),
     visibility = ["//visibility:public"],
 )
 

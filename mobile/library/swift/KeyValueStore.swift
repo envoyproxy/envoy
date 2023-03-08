@@ -25,7 +25,7 @@ public protocol KeyValueStore {
 }
 
 /// KeyValueStoreImpl is an internal type used for mapping calls from the common library layer.
-internal class KeyValueStoreImpl: EnvoyKeyValueStore {
+internal class KeyValueStoreImpl: EnvoyKeyValueStore, KeyValueStore {
   internal let implementation: KeyValueStore
 
   init(implementation: KeyValueStore) {
