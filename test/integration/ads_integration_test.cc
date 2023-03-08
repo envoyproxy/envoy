@@ -450,16 +450,27 @@ TEST_P(AdsIntegrationTest, ResourceNamesOnStreamReset) {
   // A second CDS request should be sent so that the node is cleared in the cached request.
   EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "1", {}, {}, {}));
 
+  // The LDS request, which returns no resources in the DiscoveryResponse.
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Listener, "", {}, {}, {}));
+  sendDiscoveryResponse<envoy::config::listener::v3::Listener>(Config::TypeUrl::get().Listener, {},
+                                                               {}, {}, "1");
+
   xds_stream_->finishGrpcStream(Grpc::Status::Internal);
   AssertionResult result = xds_connection_->waitForNewStream(*dispatcher_, xds_stream_);
   RELEASE_ASSERT(result, result.message());
   xds_stream_->startGrpcStream();
+
+  // Each of these DiscoveryRequests after the stream reset should include the last version number
+  // received from the DiscoveryResponses.
 
   // In SotW cluster_0 will be in the resource_names, but in delta-xDS
   // resource_names_subscribe and resource_names_unsubscribe must be empty for
   // a wildcard request (cluster_0 will appear in initial_resource_versions).
   EXPECT_TRUE(
       compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "1", {"cluster_0"}, {}, {}, true));
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().ClusterLoadAssignment, "1",
+                                      {"cluster_0"}, {"cluster_0"}, {}));
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Listener, "1", {}, {}, {}));
 }
 
 // Validate that the request with duplicate listeners is rejected.

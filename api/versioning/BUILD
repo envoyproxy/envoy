@@ -138,6 +138,7 @@ proto_library(
         "//envoy/extensions/filters/http/upstream_codec/v3:pkg",
         "//envoy/extensions/filters/http/wasm/v3:pkg",
         "//envoy/extensions/filters/listener/http_inspector/v3:pkg",
+        "//envoy/extensions/filters/listener/local_ratelimit/v3:pkg",
         "//envoy/extensions/filters/listener/original_dst/v3:pkg",
         "//envoy/extensions/filters/listener/original_src/v3:pkg",
         "//envoy/extensions/filters/listener/proxy_protocol/v3:pkg",

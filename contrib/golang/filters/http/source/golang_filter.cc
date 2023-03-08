@@ -626,7 +626,7 @@ CAPIStatus Filter::copyHeaders(GoString* go_strs, char* go_buf) {
 
 // It won't take affect immidiately while it's invoked from a Go thread, instead, it will post a
 // callback to run in the envoy worker thread.
-CAPIStatus Filter::setHeader(absl::string_view key, absl::string_view value) {
+CAPIStatus Filter::setHeader(absl::string_view key, absl::string_view value, headerAction act) {
   Thread::LockGuard lock(mutex_);
   if (has_destroyed_) {
     ENVOY_LOG(debug, "golang filter has been destroyed");
@@ -641,9 +641,22 @@ CAPIStatus Filter::setHeader(absl::string_view key, absl::string_view value) {
     ENVOY_LOG(debug, "invoking cgo api at invalid phase: {}", __func__);
     return CAPIStatus::CAPIInvalidPhase;
   }
+
   if (state.isThreadSafe()) {
     // it's safe to write header in the safe thread.
-    headers_->setCopy(Http::LowerCaseString(key), value);
+    switch (act) {
+    case HeaderAdd:
+      headers_->addCopy(Http::LowerCaseString(key), value);
+      break;
+
+    case HeaderSet:
+      headers_->setCopy(Http::LowerCaseString(key), value);
+      break;
+
+    default:
+      RELEASE_ASSERT(false, absl::StrCat("unknown header action: ", act));
+    }
+
     onHeadersModified();
   } else {
     // should deep copy the string_view before post to dipatcher callback.
@@ -654,16 +667,29 @@ CAPIStatus Filter::setHeader(absl::string_view key, absl::string_view value) {
     // dispatch a callback to write header in the envoy safe thread, to make the write operation
     // safety. otherwise, there might be race between reading in the envoy worker thread and writing
     // in the Go thread.
-    state.getDispatcher().post([this, weak_ptr, key_str, value_str] {
+    state.getDispatcher().post([this, weak_ptr, key_str, value_str, act] {
       Thread::LockGuard lock(mutex_);
       if (!weak_ptr.expired() && !has_destroyed_) {
-        headers_->setCopy(Http::LowerCaseString(key_str), value_str);
+        switch (act) {
+        case HeaderAdd:
+          headers_->addCopy(Http::LowerCaseString(key_str), value_str);
+          break;
+
+        case HeaderSet:
+          headers_->setCopy(Http::LowerCaseString(key_str), value_str);
+          break;
+
+        default:
+          RELEASE_ASSERT(false, absl::StrCat("unknown header action: ", act));
+        }
+
         onHeadersModified();
       } else {
         ENVOY_LOG(debug, "golang filter has gone or destroyed in setHeader");
       }
     });
   }
+
   return CAPIStatus::CAPIOK;
 }
 
@@ -897,9 +923,11 @@ uint64_t Filter::getMergedConfigId(ProcessorState& state) {
 /*** FilterConfig ***/
 
 FilterConfig::FilterConfig(
-    const envoy::extensions::filters::http::golang::v3alpha::Config& proto_config)
+    const envoy::extensions::filters::http::golang::v3alpha::Config& proto_config,
+    Dso::DsoPtr dso_lib)
     : plugin_name_(proto_config.plugin_name()), so_id_(proto_config.library_id()),
-      so_path_(proto_config.library_path()), plugin_config_(proto_config.plugin_config()) {
+      so_path_(proto_config.library_path()), plugin_config_(proto_config.plugin_config()),
+      dso_lib_(dso_lib) {
   ENVOY_LOG(debug, "initilizing golang filter config");
   // NP: dso may not loaded yet, can not invoke envoyGoFilterNewHttpPluginConfig yet.
 };
@@ -908,15 +936,12 @@ uint64_t FilterConfig::getConfigId() {
   if (config_id_ != 0) {
     return config_id_;
   }
-  auto dlib = Dso::DsoInstanceManager::getDsoInstanceByID(so_id_);
-  ASSERT(dlib != nullptr, "load at the config parse phase, so it should not be null");
-
   std::string str;
   auto res = plugin_config_.SerializeToString(&str);
   ASSERT(res, "SerializeToString is always successful");
   auto ptr = reinterpret_cast<unsigned long long>(str.data());
   auto len = str.length();
-  config_id_ = dlib->envoyGoFilterNewHttpPluginConfig(ptr, len);
+  config_id_ = dso_lib_->envoyGoFilterNewHttpPluginConfig(ptr, len);
   ASSERT(config_id_, "config id is always grows");
   ENVOY_LOG(debug, "golang filter new plugin config, id: {}", config_id_);
 
@@ -955,7 +980,7 @@ uint64_t RoutePluginConfig::getMergedConfigId(uint64_t parent_id, std::string so
     return merged_config_id_;
   }
 
-  auto dlib = Dso::DsoInstanceManager::getDsoInstanceByID(so_id);
+  auto dlib = Dso::DsoManager::getDsoByID(so_id);
   ASSERT(dlib != nullptr, "load at the config parse phase, so it should not be null");
 
   if (config_id_ == 0) {

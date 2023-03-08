@@ -8,7 +8,7 @@
 NSString *_CELL_ID = @"cell-id";
 NSString *_REQUEST_AUTHORITY = @"api.lyft.com";
 NSString *_REQUEST_PATH = @"/ping";
-NSString *_REQUEST_SCHEME = @"https";
+NSString *_REQUEST_SCHEME = @"http";
 
 #pragma mark - ViewController
 
@@ -75,14 +75,13 @@ NSString *_REQUEST_SCHEME = @"https";
 - (void)performRequest {
   NSLog(@"starting request to '%@'", _REQUEST_PATH);
 
-  // Note: this request will use an http/1.1 stream for the upstream request.
-  // The Swift example uses h2. This is done on purpose to test both paths in end-to-end tests
-  // in CI.
+  // Note: this request will use an http/1.1 stream for the upstream request due to http scheme.
+  // The Swift example uses h2 over tls. This is done on purpose to test both paths in end-to-end
+  // tests in CI.
   RequestHeadersBuilder *builder = [[RequestHeadersBuilder alloc] initWithMethod:RequestMethodGet
                                                                           scheme:_REQUEST_SCHEME
                                                                        authority:_REQUEST_AUTHORITY
                                                                             path:_REQUEST_PATH];
-  [builder addUpstreamHttpProtocol:UpstreamHttpProtocolHttp1];
   RequestHeaders *headers = [builder build];
 
   __weak ViewController *weakSelf = self;
