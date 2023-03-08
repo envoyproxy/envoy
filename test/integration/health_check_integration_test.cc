@@ -679,33 +679,10 @@ TEST_P(TcpHealthCheckIntegrationTest, DisableHCForActiveTraffic) {
   result = clusters_[cluster_idx].host_fake_raw_connection_->write("Pong");
   RELEASE_ASSERT(result, result.message());
 
-  std::cout << "current time:" << timeSystem().monotonicTime().time_since_epoch().count()
-            << std::endl;
-  std::cout << "success: "
-            << test_server_->counter("cluster.cluster_1.health_check.success")->value()
-            << std::endl;
-  std::cout << "failure: "
-            << test_server_->counter("cluster.cluster_1.health_check.failure")->value()
-            << std::endl;
   // test_server_->waitForCounterEq("cluster.cluster_1.health_check.success", 2,
   //                              std::chrono::milliseconds(1));
   test_server_->waitForCounterEq("cluster.cluster_1.health_check.success", 2);
 
-  std::cout << "current time:" << timeSystem().monotonicTime().time_since_epoch().count()
-            << std::endl;
-  //  timeSystem().advanceTimeWait(std::chrono::seconds(30));
-  std::cout << "current time:" << timeSystem().monotonicTime().time_since_epoch().count()
-            << std::endl;
-  std::cout << "after wait" << std::endl;
-  std::cout << "attempt: "
-            << test_server_->counter("cluster.cluster_1.health_check.attempt")->value()
-            << std::endl;
-  std::cout << "success: "
-            << test_server_->counter("cluster.cluster_1.health_check.success")->value()
-            << std::endl;
-  std::cout << "failure: "
-            << test_server_->counter("cluster.cluster_1.health_check.failure")->value()
-            << std::endl;
   EXPECT_EQ(0, test_server_->counter("cluster.cluster_1.health_check.failure")->value());
 }
 
@@ -737,7 +714,7 @@ TEST_P(TcpHealthCheckIntegrationTest, SingleEndpointTimeoutTcp) {
   // Increase time until timeout (30s).
   timeSystem().advanceTimeWait(std::chrono::seconds(30));
 
-  // test_server_->waitForCounterGe("cluster.cluster_1.health_check.failure", 1);
+  test_server_->waitForCounterGe("cluster.cluster_1.health_check.failure", 1);
   EXPECT_EQ(0, test_server_->counter("cluster.cluster_1.health_check.success")->value());
   EXPECT_EQ(1, test_server_->counter("cluster.cluster_1.health_check.failure")->value());
 }
