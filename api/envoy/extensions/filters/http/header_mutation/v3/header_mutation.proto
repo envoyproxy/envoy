@@ -30,7 +30,7 @@ message HeaderMutationPerRoute {
 }
 
 // Configuration for the header mutation filter. The mutation rules in the filter configuration will
-// always be applied first.
+// always be applied first and then the per-route mutation rules, if both are specified.
 message HeaderMutation {
   Mutations mutations = 1;
 }
