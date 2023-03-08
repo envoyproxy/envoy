@@ -289,18 +289,14 @@ TEST_P(ClientIntegrationTest, TimeoutOnResponsePath) {
   ASSERT_EQ(cc_.on_error_calls, 1);
 }
 
-// TODO(alyssawilk) get this working in a follow-up.
-TEST_P(ClientIntegrationTest, DISABLED_Proxying) {
+TEST_P(ClientIntegrationTest, Proxying) {
   builder_.addLogLevel(Platform::LogLevel::trace);
   initialize();
-  if (version_ == Network::Address::IpVersion::v6) {
-    // Localhost only resolves to an ipv4 address - alas no kernel happy eyeballs.
-    return;
-  }
 
-  set_proxy_settings(rawEngine(), "localhost", fake_upstreams_[0]->localAddress()->ip()->port());
+  set_proxy_settings(rawEngine(), fake_upstreams_[0]->localAddress()->asString().c_str(),
+                     fake_upstreams_[0]->localAddress()->ip()->port());
 
-  // The initial request will do the DNS lookup and resolve localhost to 127.0.0.1
+  // The initial request will do the DNS lookup.
   stream_->sendHeaders(envoyToMobileHeaders(default_request_headers_), true);
   terminal_callback_.waitReady();
   ASSERT_EQ(cc_.status, "200");

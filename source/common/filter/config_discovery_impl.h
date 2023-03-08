@@ -474,10 +474,11 @@ public:
                            last_filter_in_filter_chain, filter_chain_type, require_type_urls);
     }
 
-    auto provider = createFilterConfigProviderImpl(subscription, require_type_urls, server_context,
-                                                   factory_context, std::move(default_config),
-                                                   last_filter_in_filter_chain, filter_chain_type,
-                                                   provider_stat_prefix, listener_filter_matcher);
+    std::unique_ptr<DynamicFilterConfigProviderImpl<FactoryCb>> provider =
+        std::make_unique<DynamicFilterConfigImpl>(subscription, require_type_urls, server_context,
+                                                  factory_context, std::move(default_config),
+                                                  last_filter_in_filter_chain, filter_chain_type,
+                                                  provider_stat_prefix, listener_filter_matcher);
 
     // Ensure the subscription starts if it has not already.
     if (config_source.apply_default_config_without_warming()) {
@@ -528,19 +529,6 @@ protected:
                     isTerminalFilter(default_factory, *message, server_context),
                     last_filter_in_filter_chain);
     return message;
-  }
-
-private:
-  std::unique_ptr<DynamicFilterConfigProviderImpl<FactoryCb>> createFilterConfigProviderImpl(
-      FilterConfigSubscriptionSharedPtr& subscription,
-      const absl::flat_hash_set<std::string>& require_type_urls,
-      Server::Configuration::ServerFactoryContext& server_context, FactoryCtx& factory_context,
-      ProtobufTypes::MessagePtr&& default_config, bool last_filter_in_filter_chain,
-      const std::string& filter_chain_type, absl::string_view stat_prefix,
-      const Network::ListenerFilterMatcherSharedPtr& listener_filter_matcher) {
-    return std::make_unique<DynamicFilterConfigImpl>(
-        subscription, require_type_urls, server_context, factory_context, std::move(default_config),
-        last_filter_in_filter_chain, filter_chain_type, stat_prefix, listener_filter_matcher);
   }
 };
 

@@ -5,6 +5,9 @@ behavior_changes:
 - area: oauth2
   change: |
     OAuth filter now URL-encodes URL in query parameters. These query parameters are decoded, leaving intact character sequences that must remain encoded in URLs. This behavioral change can be temporarily reverted by setting runtime guard ``envoy.reloadable_features.oauth_use_url_encoding`` to false.
+- area: admin
+  change: |
+    Adds a new admin stats format option 'html-active' to display a periodically updated list of the top most frequently changed stats.
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
@@ -20,6 +23,12 @@ minor_behavior_changes:
 - area: http2
   change: |
     Request authorities are now validated with a library function from QUICHE rather than nghttp2. This behavior change can be reverted by setting ``envoy.reloadable_features.http2_validate_authority_with_quiche`` to ``false``.
+- area: lua
+  change: |
+    dropped moonjit support.
+- area: ext_proc
+  change: |
+    Make the :ref:`grpc service <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExternalProcessor.grpc_service>` required.
 - area: http2
   change: |
     Metadata is parsed with the QUICHE HPACK library, rather than nghttp2. This behavior change can be reverted by setting ``envoy.reloadable_features.http2_decode_metadata_with_quiche`` to ``false``.
@@ -39,6 +48,9 @@ bug_fixes:
 - area: router
   change: |
     fixed the bug that custom tags of the route metadata type are not set for upstream spans.
+- area: ext_proc
+  change: |
+    ensure the route configuration will be used to overwrite global configuration when processing the local reply.
 - area: router
   change: |
     fixed outlier detection ejections caused by opened circuit breakers.
@@ -93,6 +105,9 @@ removed_config_or_runtime:
 - area: dns
   change: |
     removed ``envoy.reloadable_features.cares_accept_nodata`` and legacy code paths.
+- area: http3
+  change: |
+    removed ``envoy.reloadable_features.postpone_h3_client_connect_to_next_loop`` and legacy code paths.
 
 new_features:
 - area: access_log
@@ -139,6 +154,15 @@ new_features:
   change: |
     added :ref:`failed_status_in_metadata <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.JwtProvider.failed_status_in_metadata>` to support setting the JWT
     authentication failure status code and message in dynamic metadata.
+- area: matching
+  change: |
+    added :ref:`Filter State Input <envoy_v3_api_msg_extensions.matching.common_inputs.network.v3.FilterStateInput>` for matching based on filter state objects.
+- area: http
+  change: |
+    make adding ProxyProtocolFilterState in the HCM optional.
+- area: sni_dynamic_forward_proxy
+  change: |
+    added an option to dynamically set the port used by the SNI dynamic forward proxy filter, by setting a filter state object under the key ``envoy.upstream.dynamic_port``.
 
 deprecated:
 - area: ext_authz

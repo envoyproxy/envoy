@@ -21,7 +21,7 @@ using ::testing::AssertionSuccess;
 XdsIntegrationTest::XdsIntegrationTest() : BaseClientIntegrationTest(ipVersion()) {
   Grpc::forceRegisterDefaultGoogleGrpcCredentialsFactory();
   override_builder_config_ = false;
-  expect_dns_ = false; // TODO(alyssawilk) debug.
+  expect_dns_ = false; // doesn't use DFP.
   create_xds_upstream_ = true;
   sotw_or_delta_ = sotwOrDelta();
 

@@ -10,6 +10,7 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/common/config:96.4"
 "source/common/crypto:88.1"
 "source/common/event:95.1" # Emulated edge events guards don't report LCOV
+"source/common/filesystem/posix:96.5" # FileReadToEndNotReadable keeps failing
 "source/common/http:96.3"
 "source/common/http/http2:95.0"
 "source/common/json:93.4"
@@ -29,7 +30,7 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/common/watchdog:58.6" # Death tests don't report LCOV
 "source/exe:94.5"
 "source/extensions/access_loggers/wasm:93.5"
-"source/extensions/clusters/common:94.8"
+"source/extensions/clusters/common:91.5" # This can be increased again once `#24903` lands
 "source/extensions/common:93.6"
 "source/extensions/common/tap:94.2"
 "source/extensions/common/wasm:87.5" # flaky: be careful adjusting

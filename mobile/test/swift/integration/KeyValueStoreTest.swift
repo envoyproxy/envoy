@@ -96,7 +96,6 @@ static_resources:
       method: .get, scheme: "https",
       authority: "example.com", path: "/test"
     )
-    .addUpstreamHttpProtocol(.http2)
     .build()
 
     client

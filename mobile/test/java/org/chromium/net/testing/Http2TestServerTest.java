@@ -18,7 +18,6 @@ import io.envoyproxy.envoymobile.RequestHeadersBuilder;
 import io.envoyproxy.envoymobile.RequestMethod;
 import io.envoyproxy.envoymobile.ResponseHeaders;
 import io.envoyproxy.envoymobile.ResponseTrailers;
-import io.envoyproxy.envoymobile.UpstreamHttpProtocol;
 import io.envoyproxy.envoymobile.engine.AndroidJniLibrary;
 import io.envoyproxy.envoymobile.engine.JniLibrary;
 import java.net.MalformedURLException;
@@ -235,7 +234,7 @@ public class Http2TestServerTest {
     RequestHeaders getHeaders() {
       RequestHeadersBuilder requestHeadersBuilder =
           new RequestHeadersBuilder(method, url.getProtocol(), url.getAuthority(), url.getPath());
-      return requestHeadersBuilder.addUpstreamHttpProtocol(UpstreamHttpProtocol.HTTP2).build();
+      return requestHeadersBuilder.build();
     }
 
     RequestScenario setHttpMethod(RequestMethod requestMethod) {

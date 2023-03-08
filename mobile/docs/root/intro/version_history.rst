@@ -23,6 +23,7 @@ Breaking changes:
 - clusters: only creating the stats cluster if an endpoint is configured. Previously if no domain was configured a cluster would be configured pointed at 127.0.0.1. (:issue: `#25816 <25816>`).
 - clusters: removing the base_h3 cluster. If HTTP/3 is enabled, the base cluster will use HTTP/3 instead. (:issue: `#25814 <25814>`).
 - listeners: switched the default listener from Envoy's TCP listener to a lightweight API listener by default. (:issue: `#25899 <25899>`).
+- headers: removed the APIs for protocol based routing, as best available protocol is now automatically selected (:issue:`#25893 <25893>`).
 
 Bugfixes:
 

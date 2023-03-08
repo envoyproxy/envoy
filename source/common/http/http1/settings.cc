@@ -3,6 +3,7 @@
 #include "envoy/http/header_formatter.h"
 
 #include "source/common/config/utility.h"
+#include "source/common/runtime/runtime_features.h"
 
 namespace Envoy {
 namespace Http {
@@ -29,6 +30,13 @@ Http1Settings parseHttp1Settings(const envoy::config::core::v3::Http1ProtocolOpt
         factory);
     ret.header_key_format_ = Http1Settings::HeaderKeyFormat::StatefulFormatter;
     ret.stateful_header_key_formatter_ = factory.createFromProto(*header_formatter_config);
+  }
+
+  if (config.has_use_balsa_parser()) {
+    ret.use_balsa_parser_ = config.use_balsa_parser().value();
+  } else {
+    ret.use_balsa_parser_ =
+        Runtime::runtimeFeatureEnabled("envoy.reloadable_features.http1_use_balsa_parser");
   }
 
   return ret;
