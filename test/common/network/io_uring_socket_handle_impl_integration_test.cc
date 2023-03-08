@@ -408,6 +408,7 @@ TEST_F(IoUringSocketHandleImplIntegrationTest, Write) {
   EXPECT_EQ(read_buffer.toString(), data);
   peer_io_handle_->resetFileEvents();
 
+  peer_io_handle_->close();
   server_io_handler->close();
   io_handle_->close();
   while (fcntl(fd_, F_GETFD, 0) >= 0) {

@@ -205,6 +205,10 @@ private:
   struct iovec* iovecs_{nullptr};
   Request* write_req_{nullptr};
 
+  // This is used for avoid duplicated close or cancel
+  Request* close_req_{nullptr};
+  Request* cancel_req_{nullptr};
+
   void submitReadRequest();
   void submitWriteRequest();
 };
