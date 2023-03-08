@@ -53,7 +53,7 @@ void QuicFilterManagerConnectionImpl::enableHalfClose(bool enabled) {
   RELEASE_ASSERT(!enabled, "Quic connection doesn't support half close.");
 }
 
-bool QuicFilterManagerConnectionImpl::isHalfCloseEnabled() const {
+bool QuicFilterManagerConnectionImpl::isHalfCloseEnabled() {
   // Quic doesn't support half close.
   return false;
 }
