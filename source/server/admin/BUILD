@@ -41,7 +41,6 @@ envoy_cc_library(
         ":server_info_handler_lib",
         ":stats_handler_lib",
         ":utils_lib",
-        "//envoy/filesystem:filesystem_interface",
         "//envoy/http:filter_interface",
         "//envoy/network:filter_interface",
         "//envoy/network:listen_socket_interface",
@@ -97,18 +96,6 @@ envoy_cc_library(
     ],
 )
 
-genrule(
-    name = "generate_admin_html",
-    srcs = [
-        "admin_head_start.html",
-        "admin.css",
-    ],
-    outs = ["admin_html_gen.h"],
-    cmd = "./$(location :generate_admin_html.sh) \
-        $(location admin_head_start.html) $(location admin.css) > $@",
-    tools = [":generate_admin_html.sh"],
-)
-
 envoy_cc_library(
     name = "handler_ctx_lib",
     hdrs = ["handler_ctx.h"],
@@ -151,7 +138,7 @@ envoy_cc_library(
 envoy_cc_library(
     name = "stats_render_lib",
     srcs = ["stats_render.cc"] + envoy_select_admin_html([
-        ":generate_admin_html",
+        "//source/server/admin/html:generate_admin_html",
         "stats_html_render.cc",
     ]),
     hdrs = ["stats_render.h"] + envoy_select_admin_html([
@@ -162,6 +149,7 @@ envoy_cc_library(
         ":utils_lib",
         "//envoy/server:admin_interface",
         "//source/common/buffer:buffer_lib",
+        "//source/common/filesystem:filesystem_lib",
         "//source/common/json:json_sanitizer_lib",
         "//source/common/stats:histogram_lib",
     ] + envoy_select_admin_html([

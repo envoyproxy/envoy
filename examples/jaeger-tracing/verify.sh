@@ -7,6 +7,7 @@ export PORT_UI="${JAEGER_PORT_UI:-11011}"
 # shellcheck source=examples/verify-common.sh
 . "$(dirname "${BASH_SOURCE[0]}")/../verify-common.sh"
 
+wait_for 10 bash -c "responds_with Hello http://localhost:${PORT_PROXY}/trace/1"
 
 run_log "Test services"
 responds_with \
