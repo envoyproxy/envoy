@@ -273,7 +273,6 @@ IoUringAcceptSocket::IoUringAcceptSocket(os_fd_t fd, IoUringWorkerImpl& parent,
 void IoUringAcceptSocket::close() {
   IoUringSocketEntry::close();
 
-  absl::MutexLock lock(&mutex_);
   if (requests_.empty()) {
     parent_.submitCloseRequest(*this);
     return;
@@ -292,7 +291,6 @@ void IoUringAcceptSocket::enable() {
 
 void IoUringAcceptSocket::disable() {
   IoUringSocketEntry::disable();
-  absl::MutexLock lock(&mutex_);
   // TODO (soulxu): after kernel 5.19, we are able to cancel all requests for the specific fd.
   for (auto req : requests_) {
     parent_.submitCancelRequest(*this, req);
@@ -308,13 +306,10 @@ void IoUringAcceptSocket::onClose(int32_t result, bool injected) {
 void IoUringAcceptSocket::onAccept(Request* req, int32_t result, bool injected) {
   IoUringSocketEntry::onAccept(req, result, injected);
   ASSERT(!injected);
-  {
-    absl::MutexLock lock(&mutex_);
-    // If there is no pending accept request and the socket is going to close, submit close request.
-    requests_.erase(req);
-    if (requests_.empty() && status_ == CLOSING) {
-      parent_.submitCloseRequest(*this);
-    }
+  // If there is no pending accept request and the socket is going to close, submit close request.
+  requests_.erase(req);
+  if (requests_.empty() && status_ == CLOSING) {
+    parent_.submitCloseRequest(*this);
   }
 
   // If the socket is not enabled, drop all following actions to all accepted fds.
@@ -331,7 +326,6 @@ void IoUringAcceptSocket::onAccept(Request* req, int32_t result, bool injected) 
 }
 
 void IoUringAcceptSocket::submitRequests() {
-  absl::MutexLock lock(&mutex_);
   for (size_t i = requests_.size(); i < accept_size_; i++) {
     auto req = parent_.submitAcceptRequest(*this);
     requests_.insert(req);

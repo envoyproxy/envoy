@@ -170,9 +170,8 @@ public:
 
 private:
   const uint32_t accept_size_;
-  mutable absl::Mutex mutex_;
   // This is used to track the current submitted accept requests.
-  absl::flat_hash_set<Request*> requests_ ABSL_GUARDED_BY(mutex_);
+  absl::flat_hash_set<Request*> requests_;
 
   void submitRequests();
 };
