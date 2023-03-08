@@ -39,6 +39,8 @@ static_resources:
   - name: backend
     type: STRICT_DNS
     lb_policy: ROUND_ROBIN
+    common_lb_config:
+      locality_weighted_lb_config: {}
     health_checks:
     - interval: 2s
       timeout: 3s

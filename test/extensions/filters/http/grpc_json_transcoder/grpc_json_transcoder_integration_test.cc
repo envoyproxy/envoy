@@ -51,7 +51,7 @@ public:
   }
 
 protected:
-  static std::string baseFilter() {
+  static constexpr absl::string_view baseFilter() {
     return R"EOF(
 name: grpc_json_transcoder
 typed_config:
@@ -242,11 +242,12 @@ typed_config:
 class GrpcJsonTranscoderIntegrationTestWithSizeLimit : public GrpcJsonTranscoderIntegrationTest {
 protected:
   std::string filter() override {
-    return fmt::format(baseFilter() + R"(
+    return fmt::format(baseFilter(),
+                       TestEnvironment::runfilesPath("test/proto/bookstore.descriptor")) +
+           fmt::format(+R"(
   max_request_body_size: {}
   max_response_body_size: {}
 )",
-                       TestEnvironment::runfilesPath("test/proto/bookstore.descriptor"),
                        maxBodySize(), maxBodySize());
   }
   virtual uint32_t maxBodySize() const PURE;
@@ -304,7 +305,7 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, UnaryPost) {
 }
 
 TEST_P(GrpcJsonTranscoderIntegrationTest, TestParamUnescapePlus) {
-  const std::string filter =
+  constexpr absl::string_view filter =
       R"EOF(
             name: grpc_json_transcoder
             typed_config:
@@ -530,7 +531,7 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, TestEnumValueCaseMatch) {
 TEST_P(GrpcJsonTranscoderIntegrationTest, TestEnumValueIgnoreCase) {
 
   // Enable case_insensitive_enum_parsing flag
-  const std::string filter =
+  constexpr absl::string_view filter =
       R"EOF(
             name: grpc_json_transcoder
             typed_config:
@@ -573,7 +574,7 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, TestEnumValueIgnoreCase) {
 // Newline-delimited streams return each message with a newline termination instead.
 TEST_P(GrpcJsonTranscoderIntegrationTest, ServerStreamingNewlineDelimitedGet) {
   // Enable stream_newline_delimited flag
-  const std::string filter =
+  constexpr absl::string_view filter =
       R"EOF(
             name: grpc_json_transcoder
             typed_config:
@@ -770,7 +771,7 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, UnaryGetError) {
 }
 
 TEST_P(GrpcJsonTranscoderIntegrationTest, UnaryGetError1) {
-  const std::string filter =
+  constexpr absl::string_view filter =
       R"EOF(
             name: grpc_json_transcoder
             typed_config:
@@ -794,7 +795,7 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, UnaryGetError1) {
 
 // Test an upstream that returns an error in a trailer-only response.
 TEST_P(GrpcJsonTranscoderIntegrationTest, UnaryErrorConvertedToJson) {
-  const std::string filter =
+  constexpr absl::string_view filter =
       R"EOF(
             name: grpc_json_transcoder
             typed_config:
@@ -819,7 +820,7 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, UnaryErrorConvertedToJson) {
 
 // Upstream sends headers (e.g. sends metadata), and then sends trailer with an error.
 TEST_P(GrpcJsonTranscoderIntegrationTest, UnaryErrorInTrailerConvertedToJson) {
-  const std::string filter =
+  constexpr absl::string_view filter =
       R"EOF(
             name: grpc_json_transcoder
             typed_config:
@@ -844,7 +845,7 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, UnaryErrorInTrailerConvertedToJson) {
 
 // Streaming backend returns an error in a trailer-only response.
 TEST_P(GrpcJsonTranscoderIntegrationTest, StreamingErrorConvertedToJson) {
-  const std::string filter =
+  constexpr absl::string_view filter =
       R"EOF(
             name: grpc_json_transcoder
             typed_config:
@@ -1268,7 +1269,7 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, DisableRequestValidation) {
 }
 
 TEST_P(GrpcJsonTranscoderIntegrationTest, RejectUnknownMethod) {
-  const std::string filter =
+  constexpr absl::string_view filter =
       R"EOF(
             name: grpc_json_transcoder
             typed_config:
@@ -1321,7 +1322,7 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, RejectUnknownMethod) {
 }
 
 TEST_P(GrpcJsonTranscoderIntegrationTest, RejectUnknownQueryParam) {
-  const std::string filter =
+  constexpr absl::string_view filter =
       R"EOF(
             name: grpc_json_transcoder
             typed_config:
@@ -1375,7 +1376,7 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, RejectUnknownQueryParam) {
 }
 
 TEST_P(GrpcJsonTranscoderIntegrationTest, EnableRequestValidationIgnoreQueryParam) {
-  const std::string filter =
+  constexpr absl::string_view filter =
       R"EOF(
             name: grpc_json_transcoder
             typed_config:
@@ -1669,7 +1670,7 @@ INSTANTIATE_TEST_SUITE_P(
 
 TEST_P(OverrideConfigGrpcJsonTranscoderIntegrationTest, RouteOverride) {
   // add bookstore per-route override
-  const std::string filter =
+  constexpr absl::string_view filter =
       R"EOF({{
               "services": ["bookstore.Bookstore"],
               "proto_descriptor": "{}"

@@ -20,11 +20,6 @@ public class RequestHeaders: Headers {
   /// Retry policy to use for this request.
   public private(set) lazy var retryPolicy: RetryPolicy? = .from(headers: self)
 
-  /// The protocol version to use for upstream requests.
-  public private(set) lazy var upstreamHttpProtocol: UpstreamHttpProtocol? =
-    self.value(forName: "x-envoy-mobile-upstream-protocol")?.first
-      .flatMap(UpstreamHttpProtocol.init)
-
   /// Convert the headers back to a builder for mutation.
   ///
   /// - returns: The new builder.

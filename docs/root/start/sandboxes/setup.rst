@@ -137,15 +137,3 @@ and in most if not all flavours of Linux.
 Windows users can either use an `unofficial binary <https://wiki.openssl.org/index.php/Binaries>`_ or compile from source.
 
 Check for installation instructions specific to your operating system.
-
-.. _start_sandboxes_setup_redis:
-
-redis
-~~~~~
-
-Binary distributions of `Redis <https://redis.io/>`_ are available for Mac OS with `brew <https://brew.sh>`_
-and in most flavours of Linux.
-
-Windows users should check out the `Windows port of Redis <https://github.com/microsoftarchive/redis>`_.
-
-Check for installation instructions specific to your operating system.

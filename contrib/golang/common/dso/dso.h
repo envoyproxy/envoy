@@ -13,10 +13,10 @@
 namespace Envoy {
 namespace Dso {
 
-class DsoInstance {
+class Dso {
 public:
-  DsoInstance(const std::string dso_name);
-  ~DsoInstance();
+  Dso(const std::string dso_name);
+  ~Dso();
   bool loaded() { return loaded_; }
 
 protected:
@@ -25,15 +25,31 @@ protected:
   bool loaded_{false};
 };
 
-class HttpFilterDsoInstance : public DsoInstance {
+class HttpFilterDso : public Dso {
+public:
+  HttpFilterDso(const std::string dso_name) : Dso(dso_name){};
+  virtual ~HttpFilterDso() = default;
+
+  virtual GoUint64 envoyGoFilterNewHttpPluginConfig(GoUint64 p0, GoUint64 p1) PURE;
+  virtual GoUint64 envoyGoFilterMergeHttpPluginConfig(GoUint64 p0, GoUint64 p1) PURE;
+  virtual GoUint64 envoyGoFilterOnHttpHeader(httpRequest* p0, GoUint64 p1, GoUint64 p2,
+                                             GoUint64 p3) PURE;
+  virtual GoUint64 envoyGoFilterOnHttpData(httpRequest* p0, GoUint64 p1, GoUint64 p2,
+                                           GoUint64 p3) PURE;
+  virtual void envoyGoFilterOnHttpDestroy(httpRequest* p0, int p1) PURE;
+};
+
+class HttpFilterDsoInstance : public HttpFilterDso {
 public:
   HttpFilterDsoInstance(const std::string dso_name);
+  ~HttpFilterDsoInstance() override;
 
-  GoUint64 envoyGoFilterNewHttpPluginConfig(GoUint64 p0, GoUint64 p1);
-  GoUint64 envoyGoFilterMergeHttpPluginConfig(GoUint64 p0, GoUint64 p1);
-  GoUint64 envoyGoFilterOnHttpHeader(httpRequest* p0, GoUint64 p1, GoUint64 p2, GoUint64 p3);
-  GoUint64 envoyGoFilterOnHttpData(httpRequest* p0, GoUint64 p1, GoUint64 p2, GoUint64 p3);
-  void envoyGoFilterOnHttpDestroy(httpRequest* p0, int p1);
+  GoUint64 envoyGoFilterNewHttpPluginConfig(GoUint64 p0, GoUint64 p1) override;
+  GoUint64 envoyGoFilterMergeHttpPluginConfig(GoUint64 p0, GoUint64 p1) override;
+  GoUint64 envoyGoFilterOnHttpHeader(httpRequest* p0, GoUint64 p1, GoUint64 p2,
+                                     GoUint64 p3) override;
+  GoUint64 envoyGoFilterOnHttpData(httpRequest* p0, GoUint64 p1, GoUint64 p2, GoUint64 p3) override;
+  void envoyGoFilterOnHttpDestroy(httpRequest* p0, int p1) override;
 
 private:
   GoUint64 (*envoy_go_filter_new_http_plugin_config_)(GoUint64 p0, GoUint64 p1) = {nullptr};
@@ -45,13 +61,25 @@ private:
   void (*envoy_go_filter_on_http_destroy_)(httpRequest* p0, GoUint64 p1) = {nullptr};
 };
 
-class ClusterSpecifierDsoInstance : public DsoInstance {
+class ClusterSpecifierDso : public Dso {
+public:
+  ClusterSpecifierDso(const std::string dso_name) : Dso(dso_name){};
+  virtual ~ClusterSpecifierDso() = default;
+
+  virtual GoInt64 envoyGoOnClusterSpecify(GoUint64 plugin_ptr, GoUint64 header_ptr,
+                                          GoUint64 plugin_id, GoUint64 buffer_ptr,
+                                          GoUint64 buffer_len) PURE;
+  virtual GoUint64 envoyGoClusterSpecifierNewPlugin(GoUint64 config_ptr, GoUint64 config_len) PURE;
+};
+
+class ClusterSpecifierDsoInstance : public ClusterSpecifierDso {
 public:
   ClusterSpecifierDsoInstance(const std::string dso_name);
+  ~ClusterSpecifierDsoInstance() override;
 
   GoInt64 envoyGoOnClusterSpecify(GoUint64 plugin_ptr, GoUint64 header_ptr, GoUint64 plugin_id,
-                                  GoUint64 buffer_ptr, GoUint64 buffer_len);
-  GoUint64 envoyGoClusterSpecifierNewPlugin(GoUint64 config_ptr, GoUint64 config_len);
+                                  GoUint64 buffer_ptr, GoUint64 buffer_len) override;
+  GoUint64 envoyGoClusterSpecifierNewPlugin(GoUint64 config_ptr, GoUint64 config_len) override;
 
 private:
   GoUint64 (*envoy_go_cluster_specifier_new_plugin_)(GoUint64 config_ptr,
@@ -61,10 +89,12 @@ private:
                                            GoUint64 buffer_len) = {nullptr};
 };
 
-using HttpFilterDsoInstancePtr = std::shared_ptr<HttpFilterDsoInstance>;
-using ClusterSpecifierDsoInstancePtr = std::shared_ptr<ClusterSpecifierDsoInstance>;
+using HttpFilterDsoPtr = std::shared_ptr<HttpFilterDso>;
+using ClusterSpecifierDsoPtr = std::shared_ptr<ClusterSpecifierDso>;
+using DsoPtr = std::shared_ptr<Dso>;
 
-template <class Instance> class DsoInstanceManager {
+template <class T> class DsoManager {
+
 public:
   /**
    * Load the go plugin dynamic library.
@@ -74,12 +104,12 @@ public:
    */
   static bool load(std::string dso_id, std::string dso_name) {
     ENVOY_LOG_MISC(debug, "load {} {} dso instance.", dso_id, dso_name);
-    if (getDsoInstanceByID(dso_id) != nullptr) {
+    if (getDsoByID(dso_id) != nullptr) {
       return true;
     }
     DsoStoreType& dsoStore = getDsoStore();
     absl::WriterMutexLock lock(&dsoStore.mutex_);
-    auto dso = std::make_shared<Instance>(dso_name);
+    auto dso = std::make_shared<T>(dso_name);
     if (!dso->loaded()) {
       return false;
     }
@@ -92,7 +122,7 @@ public:
    * @param dso_id is unique ID for dynamic library.
    * @return nullptr if get failed. Otherwise, return the DSO instance.
    */
-  static std::shared_ptr<Instance> getDsoInstanceByID(std::string dso_id) {
+  static std::shared_ptr<T> getDsoByID(std::string dso_id) {
     DsoStoreType& dsoStore = getDsoStore();
     absl::ReaderMutexLock lock(&dsoStore.mutex_);
     auto it = dsoStore.map_.find(dso_id);
@@ -103,7 +133,7 @@ public:
   };
 
 private:
-  using DsoMapType = std::map<std::string, std::shared_ptr<Instance>>;
+  using DsoMapType = std::map<std::string, std::shared_ptr<T>>;
   struct DsoStoreType {
     DsoMapType map_ ABSL_GUARDED_BY(mutex_){{
         {"", nullptr},

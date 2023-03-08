@@ -3,7 +3,7 @@
 namespace Envoy {
 namespace {
 
-void HeaderToInt(const char header_name[], int32_t& return_int,
+void headerToInt(const char header_name[], int32_t& return_int,
                  Http::TestResponseHeaderMapImpl& headers) {
   const std::string header_value(headers.get_(header_name));
   if (!header_value.empty()) {
@@ -50,7 +50,7 @@ void AutonomousStream::sendResponse() {
   upstream_.setLastRequestHeaders(*headers_);
 
   int32_t request_body_length = -1;
-  HeaderToInt(EXPECT_REQUEST_SIZE_BYTES, request_body_length, headers);
+  headerToInt(EXPECT_REQUEST_SIZE_BYTES, request_body_length, headers);
   if (request_body_length >= 0) {
     EXPECT_EQ(request_body_length, body_.length());
   }
@@ -61,10 +61,10 @@ void AutonomousStream::sendResponse() {
   }
 
   int32_t response_body_length = 10;
-  HeaderToInt(RESPONSE_SIZE_BYTES, response_body_length, headers);
+  headerToInt(RESPONSE_SIZE_BYTES, response_body_length, headers);
 
   int32_t response_data_blocks = 1;
-  HeaderToInt(RESPONSE_DATA_BLOCKS, response_data_blocks, headers);
+  headerToInt(RESPONSE_DATA_BLOCKS, response_data_blocks, headers);
 
   const bool end_stream = headers.get_(NO_END_STREAM).empty();
   const bool send_trailers = end_stream && headers.get_(NO_TRAILERS).empty();

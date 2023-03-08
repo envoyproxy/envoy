@@ -96,6 +96,7 @@ def _envoy_repo_impl(repository_ctx):
     repository_ctx.file("BUILD", '''
 load("@rules_python//python:defs.bzl", "py_library")
 load("@envoy//tools/base:envoy_python.bzl", "envoy_entry_point")
+load("//:path.bzl", "PATH")
 
 py_library(
     name = "envoy_repo",
@@ -121,6 +122,46 @@ genrule(
         "@envoy//changelogs",
     ],
     visibility = ["//visibility:public"],
+)
+
+envoy_entry_point(
+    name = "release",
+    args = [
+        "release",
+        PATH,
+    ],
+    pkg = "envoy.base.utils",
+    script = "envoy.project",
+)
+
+envoy_entry_point(
+    name = "dev",
+    args = [
+        "dev",
+        PATH,
+    ],
+    pkg = "envoy.base.utils",
+    script = "envoy.project",
+)
+
+envoy_entry_point(
+    name = "sync",
+    args = [
+        "sync",
+        PATH,
+    ],
+    pkg = "envoy.base.utils",
+    script = "envoy.project",
+)
+
+envoy_entry_point(
+    name = "publish",
+    args = [
+        "publish",
+        PATH,
+    ],
+    pkg = "envoy.base.utils",
+    script = "envoy.project",
 )
 
 ''')
@@ -222,7 +263,6 @@ def envoy_dependencies(skip_targets = []):
     _com_github_jbeder_yaml_cpp()
     _com_github_libevent_libevent()
     _com_github_luajit_luajit()
-    _com_github_moonjit_moonjit()
     _com_github_nghttp2_nghttp2()
     _com_github_skyapm_cpp2sky()
     _com_github_nodejs_http_parser()
@@ -972,6 +1012,10 @@ def _com_github_google_quiche():
         name = "quiche_spdy_hpack",
         actual = "@com_github_google_quiche//:spdy_core_hpack_hpack_lib",
     )
+    native.bind(
+        name = "quiche_http2_hpack_decoder",
+        actual = "@com_github_google_quiche//:http2_hpack_decoder_hpack_decoder_lib",
+    )
 
 def _com_googlesource_googleurl():
     external_http_archive(
@@ -1121,20 +1165,6 @@ def _com_github_luajit_luajit():
     native.bind(
         name = "luajit",
         actual = "@envoy//bazel/foreign_cc:luajit",
-    )
-
-def _com_github_moonjit_moonjit():
-    external_http_archive(
-        name = "com_github_moonjit_moonjit",
-        build_file_content = BUILD_ALL_CONTENT,
-        patches = ["@envoy//bazel/foreign_cc:moonjit.patch"],
-        patch_args = ["-p1"],
-        patch_cmds = ["chmod u+x build.py"],
-    )
-
-    native.bind(
-        name = "moonjit",
-        actual = "@envoy//bazel/foreign_cc:moonjit",
     )
 
 def _com_github_google_tcmalloc():

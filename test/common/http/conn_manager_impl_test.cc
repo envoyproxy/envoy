@@ -395,7 +395,7 @@ TEST_F(HttpConnectionManagerImplTest, PopulateStreamInfo) {
   Buffer::OwnedImpl fake_input("input");
   conn_manager_->createCodec(fake_input);
 
-  startRequest(true);
+  startRequest(false);
 
   EXPECT_NE(absl::nullopt, decoder_->streamInfo().getStreamIdProvider());
   EXPECT_NE(absl::nullopt, decoder_->streamInfo().getStreamIdProvider()->toInteger());
@@ -404,6 +404,8 @@ TEST_F(HttpConnectionManagerImplTest, PopulateStreamInfo) {
   EXPECT_EQ(filter_callbacks_.connection_.id_,
             decoder_->streamInfo().downstreamAddressProvider().connectionID().value());
   EXPECT_EQ(server_name_, decoder_->streamInfo().downstreamAddressProvider().requestedServerName());
+  EXPECT_TRUE(decoder_->streamInfo().filterState()->hasDataWithName(
+      Network::ProxyProtocolFilterState::key()));
 
   // Clean up.
   filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);

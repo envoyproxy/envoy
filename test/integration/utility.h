@@ -242,7 +242,7 @@ public:
   // Network::ReadFilter
   Network::FilterStatus onData(Buffer::Instance& data, bool end_stream) override;
 
-  void set_data_to_wait_for(const std::string& data, bool exact_match = true) {
+  void setDataToWaitFor(const std::string& data, bool exact_match = true) {
     data_to_wait_for_ = data;
     exact_match_ = exact_match;
   }

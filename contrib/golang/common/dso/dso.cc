@@ -20,7 +20,7 @@ bool dlsymInternal(T& fn, void* handler, const std::string name, const std::stri
   return true;
 }
 
-DsoInstance::DsoInstance(const std::string dso_name) : dso_name_(dso_name) {
+Dso::Dso(const std::string dso_name) : dso_name_(dso_name) {
   ENVOY_LOG_MISC(debug, "loading symbols from so file: {}", dso_name);
 
   handler_ = dlopen(dso_name.c_str(), RTLD_LAZY);
@@ -29,7 +29,7 @@ DsoInstance::DsoInstance(const std::string dso_name) : dso_name_(dso_name) {
   }
 }
 
-DsoInstance::~DsoInstance() {
+Dso::~Dso() {
   // The dl library maintains reference counts for library handles, so a dynamic library is not
   // deallocated until dlclose() has been called on it as many times as dlopen() has succeeded on
   // it.
@@ -38,7 +38,7 @@ DsoInstance::~DsoInstance() {
   }
 }
 
-HttpFilterDsoInstance::HttpFilterDsoInstance(const std::string dso_name) : DsoInstance(dso_name) {
+HttpFilterDsoInstance::HttpFilterDsoInstance(const std::string dso_name) : HttpFilterDso(dso_name) {
   loaded_ = dlsymInternal<decltype(envoy_go_filter_new_http_plugin_config_)>(
       envoy_go_filter_new_http_plugin_config_, handler_, dso_name,
       "envoyGoFilterNewHttpPluginConfig");
@@ -81,7 +81,7 @@ void HttpFilterDsoInstance::envoyGoFilterOnHttpDestroy(httpRequest* p0, int p1) 
 }
 
 ClusterSpecifierDsoInstance::ClusterSpecifierDsoInstance(const std::string dso_name)
-    : DsoInstance(dso_name) {
+    : ClusterSpecifierDso(dso_name) {
   loaded_ = dlsymInternal<decltype(envoy_go_cluster_specifier_new_plugin_)>(
       envoy_go_cluster_specifier_new_plugin_, handler_, dso_name,
       "envoyGoClusterSpecifierNewPlugin");

@@ -31,7 +31,7 @@ public:
       ASSERT(cluster_0->name() == "cluster_0");
       auto* endpoint = cluster_0->mutable_load_assignment()->mutable_endpoints()->Mutable(0);
 
-      const std::string endpoints_yaml = R"EOF(
+      constexpr absl::string_view endpoints_yaml = R"EOF(
         lb_endpoints:
         - endpoint:
             address:
