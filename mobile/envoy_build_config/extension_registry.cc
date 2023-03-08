@@ -122,7 +122,6 @@ void ExtensionRegistry::registerFactories() {
   Network::forceRegisterGetAddrInfoDnsResolverFactory();
   Network::forceRegisterSocketInterfaceImpl();
   Network::forceRegisterUdpDefaultWriterFactoryFactory();
-  Network::Matching::forceRegisterApplicationProtocolInputFactory();
   Network::Matching::forceRegisterDestinationPortInputFactory();
   Network::Matching::forceRegisterDirectSourceIPInputFactory();
   Network::Matching::forceRegisterHttpDestinationIPInputFactory();

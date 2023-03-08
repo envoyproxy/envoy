@@ -252,22 +252,6 @@ public:
 
 DECLARE_FACTORY(TransportProtocolInputFactory);
 
-class ApplicationProtocolInput : public Matcher::DataInput<MatchingData> {
-public:
-  Matcher::DataInputGetResult get(const MatchingData& data) const override;
-};
-
-class ApplicationProtocolInputFactory
-    : public BaseFactory<
-          ApplicationProtocolInput,
-          envoy::extensions::matching::common_inputs::network::v3::ApplicationProtocolInput,
-          MatchingData> {
-public:
-  ApplicationProtocolInputFactory() : BaseFactory("application_protocol") {}
-};
-
-DECLARE_FACTORY(ApplicationProtocolInputFactory);
-
 class FilterStateInput : public Matcher::DataInput<MatchingData> {
 public:
   FilterStateInput(

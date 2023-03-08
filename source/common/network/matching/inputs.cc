@@ -18,15 +18,6 @@ Matcher::DataInputGetResult TransportProtocolInput::get(const MatchingData& data
   return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::nullopt};
 }
 
-Matcher::DataInputGetResult ApplicationProtocolInput::get(const MatchingData& data) const {
-  const auto& protocols = data.socket().requestedApplicationProtocols();
-  if (!protocols.empty()) {
-    return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,
-            absl::StrCat("'", absl::StrJoin(protocols, "','"), "'")};
-  }
-  return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::nullopt};
-}
-
 Matcher::DataInputGetResult FilterStateInput::get(const MatchingData& data) const {
   const auto* filter_state_object =
       data.filterState().getDataReadOnly<StreamInfo::FilterState::Object>(filter_state_key_);
@@ -87,7 +78,6 @@ REGISTER_FACTORY(SourceTypeInputFactory, Matcher::DataInputFactory<MatchingData>
 REGISTER_FACTORY(HttpSourceTypeInputFactory, Matcher::DataInputFactory<Http::HttpMatchingData>);
 
 REGISTER_FACTORY(TransportProtocolInputFactory, Matcher::DataInputFactory<MatchingData>);
-REGISTER_FACTORY(ApplicationProtocolInputFactory, Matcher::DataInputFactory<MatchingData>);
 REGISTER_FACTORY(FilterStateInputFactory, Matcher::DataInputFactory<MatchingData>);
 
 } // namespace Matching

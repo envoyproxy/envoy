@@ -71,6 +71,11 @@ EXTENSIONS = {
     "envoy.matching.matchers.ip":                       "//source/extensions/matching/input_matchers/ip:config",
 
     #
+    # Network Matchers
+    #
+    "envoy.matching.inputs.application_protocol":       "//source/extensions/matching/network/application_protocol:config",
+
+    #
     # Generic Inputs
     #
 

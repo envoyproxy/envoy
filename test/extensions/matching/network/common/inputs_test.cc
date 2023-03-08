@@ -6,6 +6,7 @@
 #include "source/common/network/matching/inputs.h"
 #include "source/common/router/string_accessor_impl.h"
 #include "source/common/stream_info/filter_state_impl.h"
+#include "source/extensions/matching/network/application_protocol/config.h"
 
 #include "test/mocks/network/mocks.h"
 
