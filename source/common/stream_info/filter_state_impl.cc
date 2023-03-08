@@ -85,8 +85,7 @@ FilterStateImpl::getDataSharedMutableGeneric(absl::string_view data_name) {
 
   FilterStateImpl::FilterObject* current = it->second.get();
   if (current->state_type_ == FilterState::StateType::ReadOnly) {
-    IS_ENVOY_BUG(
-        "FilterStateAccessViolation: FilterState tried to access immutable data as mutable.");
+    IS_ENVOY_BUG("FilterStateAccessViolation: FilterState accessed immutable data as mutable.");
     // To reduce the chances of a crash, allow the mutation in this case instead of returning a
     // nullptr.
   }
