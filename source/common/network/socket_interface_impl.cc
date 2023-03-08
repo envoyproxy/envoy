@@ -31,30 +31,32 @@ bool SocketInterfaceImpl::hasIoUringFactory(Io::IoUringFactory* io_uring_factory
 }
 
 IoHandlePtr SocketInterfaceImpl::makePlatformSpecificSocket(
-    int socket_fd, bool socket_v6only, absl::optional<int> domain,
+    int socket_fd, bool socket_v6only, Socket::Type socket_type, absl::optional<int> domain,
     [[maybe_unused]] Io::IoUringFactory* io_uring_factory) {
   if constexpr (Event::PlatformDefaultTriggerType == Event::FileTriggerType::EmulatedEdge) {
-    return std::make_unique<Win32SocketHandleImpl>(socket_fd, socket_v6only, domain);
+    return std::make_unique<Win32SocketHandleImpl>(socket_type, socket_fd, socket_v6only, domain);
   }
 
 #ifdef __linux__
   // Only create IoUringSocketHandleImpl when the IoUringFactory is created, and
   // it is registered in the TLS, and initialized. There are cases the test may create thread
   // before IoUringFactory add to the TLS and initialized.
-  if (hasIoUringFactory(io_uring_factory)) {
-    return std::make_unique<IoUringSocketHandleImpl>(*io_uring_factory, socket_fd, socket_v6only,
-                                                     domain);
+  // Only support TCP for now.
+  if (hasIoUringFactory(io_uring_factory) && socket_type == Socket::Type::Stream) {
+    return std::make_unique<IoUringSocketHandleImpl>(*io_uring_factory, socket_type, socket_fd,
+                                                     socket_v6only, domain);
   } else {
-    return std::make_unique<IoSocketHandleImpl>(socket_fd, socket_v6only, domain);
+    return std::make_unique<IoSocketHandleImpl>(socket_type, socket_fd, socket_v6only, domain);
   }
 #else
-  return std::make_unique<IoSocketHandleImpl>(socket_fd, socket_v6only, domain);
+  return std::make_unique<IoSocketHandleImpl>(socket_type, socket_fd, socket_v6only, domain);
 #endif
 }
 
 IoHandlePtr SocketInterfaceImpl::makeSocket(int socket_fd, bool socket_v6only,
+                                            Socket::Type socket_type,
                                             absl::optional<int> domain) const {
-  return makePlatformSpecificSocket(socket_fd, socket_v6only, domain,
+  return makePlatformSpecificSocket(socket_fd, socket_v6only, socket_type, domain,
                                     io_uring_factory_.lock().get());
 }
 
@@ -111,7 +113,7 @@ IoHandlePtr SocketInterfaceImpl::socket(Socket::Type socket_type, Address::Type 
       Api::OsSysCallsSingleton::get().socket(domain, flags, protocol);
   RELEASE_ASSERT(SOCKET_VALID(result.return_value_),
                  fmt::format("socket(2) failed, got error: {}", errorDetails(result.errno_)));
-  IoHandlePtr io_handle = makeSocket(result.return_value_, socket_v6only, domain);
+  IoHandlePtr io_handle = makeSocket(result.return_value_, socket_v6only, socket_type, domain);
 
 #if defined(__APPLE__) || defined(WIN32)
   // Cannot set SOCK_NONBLOCK as a ::socket flag.

@@ -204,7 +204,7 @@ public:
   /**
    * Write data to the socket.
    */
-  virtual void write(const Buffer::RawSlice* slices, uint64_t num_slice) PURE;
+  virtual uint64_t write(const Buffer::RawSlice* slices, uint64_t num_slice) PURE;
 
   /**
    * On accept request completed.

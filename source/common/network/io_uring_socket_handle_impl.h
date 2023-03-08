@@ -3,6 +3,7 @@
 #include "envoy/buffer/buffer.h"
 #include "envoy/common/io/io_uring.h"
 #include "envoy/network/io_handle.h"
+#include "envoy/network/socket.h"
 
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/logger.h"
@@ -29,8 +30,9 @@ enum class IoUringSocketType {
  */
 class IoUringSocketHandleImpl : public IoSocketHandleBaseImpl, public Io::IoUringHandler {
 public:
-  IoUringSocketHandleImpl(Io::IoUringFactory& io_uring_factory, os_fd_t fd = INVALID_SOCKET,
-                          bool socket_v6only = false, absl::optional<int> domain = absl::nullopt,
+  IoUringSocketHandleImpl(Io::IoUringFactory& io_uring_factory, Socket::Type socket_type,
+                          os_fd_t fd = INVALID_SOCKET, bool socket_v6only = false,
+                          absl::optional<int> domain = absl::nullopt,
                           bool is_server_socket = false);
   ~IoUringSocketHandleImpl() override;
 
@@ -89,11 +91,12 @@ protected:
 
   OptRef<Io::AcceptedSocketParam> accepted_socket_param_{absl::nullopt};
   OptRef<Io::ReadParam> read_param_{absl::nullopt};
+  OptRef<Io::WriteParam> write_param_{absl::nullopt};
 
   // TODO(soulxu): This is for debug, it will be deleted after the
   // io_uring implemented.
   std::unique_ptr<IoHandle> shadow_io_handle_;
-  bool enable_server_socket_{false};
+  bool enable_server_socket_{true};
   bool enable_client_socket_{false};
   bool enable_accept_socket_{true};
 };

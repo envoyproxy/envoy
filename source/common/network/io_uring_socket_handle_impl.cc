@@ -15,16 +15,19 @@
 namespace Envoy {
 namespace Network {
 
-IoUringSocketHandleImpl::IoUringSocketHandleImpl(Io::IoUringFactory& io_uring_factory, os_fd_t fd,
+IoUringSocketHandleImpl::IoUringSocketHandleImpl(Io::IoUringFactory& io_uring_factory,
+                                                 Socket::Type socket_type, os_fd_t fd,
                                                  bool socket_v6only, absl::optional<int> domain,
                                                  bool is_server_socket)
-    : IoSocketHandleBaseImpl(fd, socket_v6only, domain), io_uring_factory_(io_uring_factory) {
+    : IoSocketHandleBaseImpl(socket_type, fd, socket_v6only, domain),
+      io_uring_factory_(io_uring_factory) {
   ENVOY_LOG(trace, "construct io uring socket handle, fd = {}, is_server_socket = {}", fd_,
             is_server_socket);
   if (is_server_socket) {
     io_uring_socket_type_ = IoUringSocketType::Server;
     if (!enable_server_socket_) {
-      shadow_io_handle_ = std::make_unique<IoSocketHandleImpl>(fd_, socket_v6only_, domain_);
+      shadow_io_handle_ =
+          std::make_unique<IoSocketHandleImpl>(socket_type_, fd_, socket_v6only_, domain_);
       shadow_io_handle_->setBlocking(false);
     }
   }
@@ -147,7 +150,12 @@ Api::IoCallUint64Result IoUringSocketHandleImpl::read(Buffer::Instance& buffer,
         0, Api::IoErrorPtr(new IoSocketError(-read_param_->result_), IoSocketError::deleteIoError)};
   }
 
-  ASSERT(read_param_->buf_.length() > 0);
+  // This mean the buffer ready read by previous call, return EAGAIN to tell the
+  // caller waiting for next read event.
+  if (read_param_->buf_.length() == 0) {
+    return {0, Api::IoErrorPtr(IoSocketError::getIoSocketEagainInstance(),
+                               IoSocketError::deleteIoError)};
+  }
 
   uint64_t max_read_length =
       std::min(max_length_opt.value_or(UINT64_MAX), read_param_->buf_.length());
@@ -167,7 +175,18 @@ Api::IoCallUint64Result IoUringSocketHandleImpl::writev(const Buffer::RawSlice* 
     return shadow_io_handle_->writev(slices, num_slice);
   }
 
-  return Api::ioCallUint64ResultNoError();
+  if (write_param_ != absl::nullopt) {
+    // EAGAIN means an injected event, then just submit new write.
+    if (write_param_->result_ < 0 && write_param_->result_ != -EAGAIN) {
+      return {0, Api::IoErrorPtr(new IoSocketError(write_param_->result_),
+                                 IoSocketError::deleteIoError)};
+    }
+    ENVOY_LOG(trace, "an inject event, result = {}, fd = {}", write_param_->result_, fd_);
+  }
+
+  ASSERT(io_uring_socket_.has_value());
+  auto ret = io_uring_socket_->write(slices, num_slice);
+  return {ret, Api::IoErrorPtr(nullptr, IoSocketError::deleteIoError)};
 }
 
 Api::IoCallUint64Result IoUringSocketHandleImpl::write(Buffer::Instance& buffer) {
@@ -181,7 +200,18 @@ Api::IoCallUint64Result IoUringSocketHandleImpl::write(Buffer::Instance& buffer)
     return shadow_io_handle_->write(buffer);
   }
 
-  return Api::ioCallUint64ResultNoError();
+  if (write_param_ != absl::nullopt) {
+    // EAGAIN means an injected event, then just submit new write.
+    if (write_param_->result_ < 0 && write_param_->result_ != -EAGAIN) {
+      return {0, Api::IoErrorPtr(new IoSocketError(write_param_->result_),
+                                 IoSocketError::deleteIoError)};
+    }
+    ENVOY_LOG(trace, "an inject event, result = {}, fd = {}", write_param_->result_, fd_);
+  }
+
+  ASSERT(io_uring_socket_.has_value());
+  io_uring_socket_->write(buffer);
+  return {buffer.length(), Api::IoErrorPtr(nullptr, IoSocketError::deleteIoError)};
 }
 
 Api::IoCallUint64Result IoUringSocketHandleImpl::sendmsg(const Buffer::RawSlice* slices,
@@ -257,7 +287,8 @@ Api::SysCallIntResult IoUringSocketHandleImpl::listen(int backlog) {
   if (!enable_accept_socket_) {
     ENVOY_LOG(trace, "fallback to create IoSocketHandle, fd = {}, io_uring_socket_type = {}", fd_,
               ioUringSocketTypeStr());
-    shadow_io_handle_ = std::make_unique<IoSocketHandleImpl>(fd_, socket_v6only_, domain_);
+    shadow_io_handle_ =
+        std::make_unique<IoSocketHandleImpl>(socket_type_, fd_, socket_v6only_, domain_);
     shadow_io_handle_->setBlocking(false);
     return shadow_io_handle_->listen(backlog);
   }
@@ -275,8 +306,8 @@ IoHandlePtr IoUringSocketHandleImpl::accept(struct sockaddr* addr, socklen_t* ad
       ENVOY_LOG(trace, "accept return invalid socket");
       return nullptr;
     }
-    return std::make_unique<IoUringSocketHandleImpl>(io_uring_factory_, result.return_value_,
-                                                     socket_v6only_, domain_, true);
+    return std::make_unique<IoUringSocketHandleImpl>(
+        io_uring_factory_, socket_type_, result.return_value_, socket_v6only_, domain_, true);
   }
 
   if (!accepted_socket_param_.has_value()) {
@@ -301,7 +332,7 @@ IoHandlePtr IoUringSocketHandleImpl::accept(struct sockaddr* addr, socklen_t* ad
          accepted_socket_param_->remote_addr_len_);
   *addrlen = accepted_socket_param_->remote_addr_len_;
   auto io_handle = std::make_unique<IoUringSocketHandleImpl>(
-      io_uring_factory_, accepted_socket_param_->fd_, socket_v6only_, domain_, true);
+      io_uring_factory_, socket_type_, accepted_socket_param_->fd_, socket_v6only_, domain_, true);
   accepted_socket_param_ = absl::nullopt;
 
   return io_handle;
@@ -365,7 +396,8 @@ void IoUringSocketHandleImpl::initializeFileEvent(Event::Dispatcher& dispatcher,
     io_uring_socket_type_ = IoUringSocketType::Client;
     if (!enable_client_socket_) {
       ENVOY_LOG(trace, "fallback to IoSocketHandle for client socket");
-      shadow_io_handle_ = std::make_unique<IoSocketHandleImpl>(fd_, socket_v6only_, domain_);
+      shadow_io_handle_ =
+          std::make_unique<IoSocketHandleImpl>(socket_type_, fd_, socket_v6only_, domain_);
       shadow_io_handle_->setBlocking(false);
       shadow_io_handle_->initializeFileEvent(dispatcher, std::move(cb), trigger, events);
       return;
@@ -435,7 +467,7 @@ IoHandlePtr IoUringSocketHandleImpl::duplicate() {
                  fmt::format("duplicate failed for '{}': ({}) {}", fd_, result.errno_,
                              errorDetails(result.errno_)));
   return SocketInterfaceImpl::makePlatformSpecificSocket(result.return_value_, socket_v6only_,
-                                                         domain_, &io_uring_factory_);
+                                                         socket_type_, domain_, &io_uring_factory_);
 }
 
 void IoUringSocketHandleImpl::onAcceptSocket(Io::AcceptedSocketParam& param) {
@@ -458,7 +490,12 @@ void IoUringSocketHandleImpl::onRead(Io::ReadParam& param) {
   read_param_ = absl::nullopt;
 }
 
-void IoUringSocketHandleImpl::onWrite(Io::WriteParam&) {}
+void IoUringSocketHandleImpl::onWrite(Io::WriteParam& param) {
+  write_param_ = param;
+  ENVOY_LOG(trace, "call event callback for write since result = {}", write_param_->result_);
+  cb_(Event::FileReadyType::Write);
+  write_param_ = absl::nullopt;
+}
 
 } // namespace Network
 } // namespace Envoy

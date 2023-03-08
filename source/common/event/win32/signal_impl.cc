@@ -23,10 +23,12 @@ SignalEventImpl::SignalEventImpl(DispatcherImpl& dispatcher, signal_t signal_num
       Api::OsSysCallsSingleton::get().socketpair(AF_INET, SOCK_STREAM, IPPROTO_TCP, socks);
   ASSERT(result.return_value_ == 0);
 
-  read_handle_ = std::make_unique<Network::IoSocketHandleImpl>(socks[0], false, AF_INET);
+  read_handle_ =
+      std::make_unique<Network::IoSocketHandleImpl>(Socket::Type::Stream, socks[0], false, AF_INET);
   result = read_handle_->setBlocking(false);
   ASSERT(result.return_value_ == 0);
-  auto write_handle = std::make_shared<Network::IoSocketHandleImpl>(socks[1], false, AF_INET);
+  auto write_handle =
+      std::make_shared<Network::IoSocketHandleImpl>(Socket::Type::Stream, socks[1], false, AF_INET);
   result = write_handle->setBlocking(false);
   ASSERT(result.return_value_ == 0);
 

@@ -16,7 +16,8 @@ static constexpr int kFakeSocketFd = 42;
 class FakeConnectionSocket : public Network::MockConnectionSocket {
 public:
   FakeConnectionSocket()
-      : io_handle_(std::make_unique<Network::IoSocketHandleImpl>(kFakeSocketFd)) {}
+      : io_handle_(
+            std::make_unique<Network::IoSocketHandleImpl>(Socket::Type::Stream, kFakeSocketFd)) {}
 
   ~FakeConnectionSocket() override { io_handle_->close(); }
 

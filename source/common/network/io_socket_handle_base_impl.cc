@@ -34,9 +34,9 @@ constexpr socklen_t udsAddressLength() {
 
 } // namespace
 
-IoSocketHandleBaseImpl::IoSocketHandleBaseImpl(os_fd_t fd, bool socket_v6only,
-                                               absl::optional<int> domain)
-    : fd_(fd), socket_v6only_(socket_v6only), domain_(domain) {}
+IoSocketHandleBaseImpl::IoSocketHandleBaseImpl(Socket::Type socket_type, os_fd_t fd,
+                                               bool socket_v6only, absl::optional<int> domain)
+    : socket_type_(socket_type), fd_(fd), socket_v6only_(socket_v6only), domain_(domain) {}
 
 IoSocketHandleBaseImpl::~IoSocketHandleBaseImpl() {
   if (SOCKET_VALID(fd_)) {
@@ -126,7 +126,7 @@ IoHandlePtr IoSocketHandleBaseImpl::duplicate() {
                  fmt::format("duplicate failed for '{}': ({}) {}", fd_, result.errno_,
                              errorDetails(result.errno_)));
   return SocketInterfaceImpl::makePlatformSpecificSocket(result.return_value_, socket_v6only_,
-                                                         domain_);
+                                                         socket_type_, domain_);
 }
 
 Api::SysCallIntResult IoSocketHandleBaseImpl::shutdown(int how) {

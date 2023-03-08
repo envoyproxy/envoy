@@ -5,6 +5,7 @@
 #include "envoy/common/platform.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/network/io_handle.h"
+#include "envoy/network/socket.h"
 
 #include "source/common/common/logger.h"
 #include "source/common/network/io_socket_error_impl.h"
@@ -18,9 +19,10 @@ namespace Network {
  */
 class IoSocketHandleImpl : public IoSocketHandleBaseImpl {
 public:
-  explicit IoSocketHandleImpl(os_fd_t fd = INVALID_SOCKET, bool socket_v6only = false,
+  explicit IoSocketHandleImpl(Socket::Type socket_type, os_fd_t fd = INVALID_SOCKET,
+                              bool socket_v6only = false,
                               absl::optional<int> domain = absl::nullopt)
-      : IoSocketHandleBaseImpl(fd, socket_v6only, domain) {}
+      : IoSocketHandleBaseImpl(socket_type, fd, socket_v6only, domain) {}
 
   // Close underlying socket if close() hasn't been call yet.
   ~IoSocketHandleImpl() override;

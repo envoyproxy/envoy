@@ -25,7 +25,7 @@ namespace Quic {
 class QuicIoHandleWrapperTest : public testing::Test {
 public:
   QuicIoHandleWrapperTest() {
-    real_io_handle_ = std::make_unique<Network::IoSocketHandleImpl>();
+    real_io_handle_ = std::make_unique<Network::IoSocketHandleImpl>(Socket::Type::Datagram);
     ON_CALL(socket_, ioHandle()).WillByDefault(ReturnRef(*real_io_handle_));
     wrapper_ = std::make_unique<QuicIoHandleWrapper>(socket_.ioHandle());
     EXPECT_TRUE(wrapper_->isOpen());

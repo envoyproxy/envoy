@@ -1,6 +1,7 @@
 #pragma once
 
 #include "envoy/network/io_handle.h"
+#include "envoy/network/socket.h"
 
 #include "source/common/common/logger.h"
 
@@ -12,8 +13,8 @@ namespace Network {
  */
 class IoSocketHandleBaseImpl : public IoHandle, protected Logger::Loggable<Logger::Id::io> {
 public:
-  IoSocketHandleBaseImpl(os_fd_t fd = INVALID_SOCKET, bool socket_v6only = false,
-                         absl::optional<int> domain = absl::nullopt);
+  IoSocketHandleBaseImpl(Socket::Type socket_type, os_fd_t fd = INVALID_SOCKET,
+                         bool socket_v6only = false, absl::optional<int> domain = absl::nullopt);
   ~IoSocketHandleBaseImpl() override;
 
   os_fd_t fdDoNotUse() const override { return fd_; }
@@ -36,6 +37,7 @@ public:
   absl::optional<std::string> interfaceName() override;
 
 protected:
+  Socket::Type socket_type_;
   os_fd_t fd_;
   int socket_v6only_;
   const absl::optional<int> domain_;

@@ -355,7 +355,7 @@ IoUringServerSocket::IoUringServerSocket(os_fd_t fd, IoUringWorkerImpl& parent,
 void IoUringServerSocket::close() {
   IoUringSocketEntry::close();
 
-  if (!read_req_) {
+  if (read_req_ == nullptr) {
     parent_.submitCloseRequest(*this);
     return;
   }
@@ -392,11 +392,13 @@ void IoUringServerSocket::write(Buffer::Instance& data) {
   submitWriteRequest();
 }
 
-void IoUringServerSocket::write(const Buffer::RawSlice* slices, uint64_t num_slice) {
+uint64_t IoUringServerSocket::write(const Buffer::RawSlice* slices, uint64_t num_slice) {
   ENVOY_LOG(trace, "write, num_slices = {}, fd = {}", num_slice, fd_);
 
+  uint64_t bytes_written = 0;
   for (uint64_t i = 0; i < num_slice; i++) {
     write_buf_.add(slices[i].mem_, slices[i].len_);
+    bytes_written += slices[i].len_;
   }
 
   if (write_req_ != nullptr) {
@@ -404,6 +406,7 @@ void IoUringServerSocket::write(const Buffer::RawSlice* slices, uint64_t num_sli
   }
 
   submitWriteRequest();
+  return bytes_written;
 }
 
 void IoUringServerSocket::onClose(int32_t result, bool injected) {
@@ -417,11 +420,14 @@ void IoUringServerSocket::onClose(int32_t result, bool injected) {
 void IoUringServerSocket::onRead(Request* req, int32_t result, bool injected) {
   IoUringSocketEntry::onRead(req, result, injected);
 
+  ENVOY_LOG(trace, "onRead with result {}, fd = {}, injected = {}", result, fd_, injected);
   if (!injected) {
     read_req_ = nullptr;
     // Close if it is in closing status and no write request.
     if (status_ == CLOSING && write_req_ == nullptr) {
+      ENVOY_LOG(trace, "ready to close, fd = {}", fd_);
       parent_.submitCloseRequest(*this);
+      return;
     }
     // Move read data from request to buffer or store the error.
     if (result > 0) {
@@ -447,7 +453,7 @@ void IoUringServerSocket::onRead(Request* req, int32_t result, bool injected) {
       ReadParam param{buf_, static_cast<int32_t>(buf_.length())};
       io_uring_handler_.onRead(param);
       ENVOY_LOG(trace, "after read from socket, fd = {}, remain = {}", fd_, buf_.length());
-    } else if (read_error_ <= 0) {
+    } else if (read_error_.has_value() && read_error_ <= 0) {
       ENVOY_LOG(trace, "read error from socket, fd = {}, result = {}", fd_, read_error_.value());
       ReadParam param{buf_, read_error_.value()};
       io_uring_handler_.onRead(param);
@@ -467,7 +473,7 @@ void IoUringServerSocket::onRead(Request* req, int32_t result, bool injected) {
 void IoUringServerSocket::onWrite(int32_t result, bool injected) {
   IoUringSocketEntry::onWrite(result, injected);
 
-  ENVOY_LOG(trace, "onWrite with result {}, fd = {}", result, fd_);
+  ENVOY_LOG(trace, "onWrite with result {}, fd = {}, injected = {}", result, fd_, injected);
 
   // Cleanup request and write buffer.
   write_req_ = nullptr;
@@ -498,9 +504,9 @@ void IoUringServerSocket::onWrite(int32_t result, bool injected) {
 
   if (result > 0) {
     write_buf_.drain(result);
+    ENVOY_LOG(trace, "drain write buf, drain size = {}, fd = {}", result, fd_);
   }
 
-  ENVOY_LOG(trace, "drain write buf, drain size = {}, fd = {}", result, fd_);
   if (write_buf_.length() > 0) {
     ENVOY_LOG(trace, "continue write buf since still have data, size = {}, fd = {}",
               write_buf_.length(), fd_);

@@ -438,7 +438,7 @@ IoHandlePtr IoSocketHandleImpl::accept(struct sockaddr* addr, socklen_t* addrlen
     return nullptr;
   }
   return SocketInterfaceImpl::makePlatformSpecificSocket(result.return_value_, socket_v6only_,
-                                                         domain_);
+                                                         socket_type_, domain_);
 }
 
 Api::SysCallIntResult IoSocketHandleImpl::connect(Address::InstanceConstSharedPtr address) {

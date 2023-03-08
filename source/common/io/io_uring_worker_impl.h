@@ -62,7 +62,7 @@ public:
   void disable() override { status_ = DISABLED; }
   void connect(const Network::Address::InstanceConstSharedPtr&) override { PANIC("not implement"); }
   void write(Buffer::Instance&) override { PANIC("not implement"); }
-  void write(const Buffer::RawSlice*, uint64_t) override { PANIC("not implement"); }
+  uint64_t write(const Buffer::RawSlice*, uint64_t) override { PANIC("not implement"); }
   // This will cleanup all the injected completions for this socket and
   // unlink itself from the worker.
   void cleanup();
@@ -186,7 +186,7 @@ public:
   void enable() override;
   void disable() override;
   void write(Buffer::Instance& data) override;
-  void write(const Buffer::RawSlice* slices, uint64_t num_slice) override;
+  uint64_t write(const Buffer::RawSlice* slices, uint64_t num_slice) override;
   void onClose(int32_t result, bool injected) override;
   void onRead(Request* req, int32_t result, bool injected) override;
   void onWrite(int32_t result, bool injected) override;

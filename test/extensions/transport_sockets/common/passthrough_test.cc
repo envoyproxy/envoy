@@ -48,7 +48,7 @@ TEST_F(PassthroughTest, FailureReasonDefersToInnerSocket) {
 
 // Test connect method defers to inner socket
 TEST_F(PassthroughTest, ConnectDefersToInnerSocket) {
-  auto io_handle = std::make_unique<Network::IoSocketHandleImpl>();
+  auto io_handle = std::make_unique<Network::IoSocketHandleImpl>(Socket::Type::Stream);
   Network::ConnectionSocketImpl socket(std::move(io_handle), nullptr, nullptr);
   ON_CALL(*inner_socket_, connect(_)).WillByDefault(testing::Return(Api::SysCallIntResult{0, 0}));
 
