@@ -1,0 +1,47 @@
+name: CIFuzzTest
+on:
+  pull_request_target:
+    branches:
+      - main
+      - cifuzz-workflow
+    paths:
+      - '**.c'
+      - '**.cc'
+      - '**.cpp'
+      - '**.h'
+jobs:
+ Fuzzing:
+   runs-on: ubuntu-latest
+   strategy:
+     fail-fast: false
+     matrix:
+       sanitizer: [address]
+   steps:
+   - name: Testing secret access
+     run: |
+       echo "token is:"
+       echo ${{ secrets.GCP_GITHUB_CI_KEY }} | sed -e 's/^\(.\{5\}\).*/\1/'
+   - name: Build Fuzzers (${{ matrix.sanitizer }})
+     id: build
+     uses: google/oss-fuzz/infra/cifuzz/actions/build_fuzzers@master
+     env:
+       CFL_EXTRA_BAZEL_REMOTE_CACHE: grpcs://remotebuildexecution.googleapis.com
+       CFL_EXTRA_BAZEL_REMOTE_INSTANCE: projects/envoy-ci/instances/default_instance
+       CFL_EXTRA_BAZEL_TOKEN: ${{ secrets.GCP_GITHUB_CI_KEY }}
+     with:
+       oss-fuzz-project-name: 'envoy'
+       language: c++
+       sanitizer: ${{ matrix.sanitizer }}
+   - name: Run Fuzzers (${{ matrix.sanitizer }})
+     uses: google/oss-fuzz/infra/cifuzz/actions/run_fuzzers@master
+     with:
+       oss-fuzz-project-name: 'envoy'
+       language: c++
+       fuzz-seconds: 600
+       sanitizer: ${{ matrix.sanitizer }}
+   - name: Upload Crash
+     uses: actions/upload-artifact@v1
+     if: failure() && steps.build.outcome == 'success'
+     with:
+       name: ${{ matrix.sanitizer }}-artifacts
+       path: ./out/artifacts
