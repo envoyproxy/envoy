@@ -18,60 +18,50 @@ public:
       : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam()) {}
 
   void initializeFilter() {
-    config_helper_.addFilter(R"EOF(
+    config_helper_.prependFilter(R"EOF(
 name: donwstream-header-mutation
 typed_config:
   "@type": type.googleapis.com/envoy.extensions.filters.http.header_mutation.v3.HeaderMutation
   mutations:
+    request_mutations:
+    - append:
+        header:
+          key: "downstream-request-global-flag-header"
+          value: "downstream-request-global-flag-header-value"
+        append_action: APPEND_IF_EXISTS_OR_ADD
     response_mutations:
     - append:
         header:
           key: "downstream-global-flag-header"
           value: "downstream-global-flag-header-value"
         append_action: APPEND_IF_EXISTS_OR_ADD
-)EOF");
+)EOF",
+                                 true);
 
-    config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
-      envoy::extensions::upstreams::http::v3::HttpProtocolOptions http_protocol_options;
-      http_protocol_options.mutable_use_downstream_protocol_config();
-
-      // Upstream header mutation filter.
-      auto filter_0 = http_protocol_options.mutable_http_filters()->Add();
-      filter_0->set_name("upstream-header-mutation");
-      ProtoConfig header_mutation;
-      auto response_mutation =
-          header_mutation.mutable_mutations()->mutable_response_mutations()->Add();
-      response_mutation->mutable_append()->mutable_header()->set_key("upstream-global-flag-header");
-      response_mutation->mutable_append()->mutable_header()->set_value(
-          "upstream-global-flag-header-value");
-      response_mutation->mutable_append()->set_append_action(
-          envoy::config::core::v3::HeaderValueOption::APPEND_IF_EXISTS_OR_ADD);
-      // Add a second response mutation to test the request headers could be obtained in the
-      // upstream filter.
-      response_mutation = header_mutation.mutable_mutations()->mutable_response_mutations()->Add();
-      response_mutation->mutable_append()->mutable_header()->set_key(
-          "request-method-in-upstream-filter");
-      response_mutation->mutable_append()->mutable_header()->set_value("%REQ(:METHOD)%");
-      response_mutation->mutable_append()->set_append_action(
-          envoy::config::core::v3::HeaderValueOption::APPEND_IF_EXISTS_OR_ADD);
-
-      filter_0->mutable_typed_config()->PackFrom(header_mutation);
-
-      // Upstream codec filter.
-      auto* codec_filter = http_protocol_options.mutable_http_filters()->Add();
-      codec_filter->set_name("envoy.filters.http.upstream_codec");
-      codec_filter->mutable_typed_config()->PackFrom(
-          envoy::extensions::filters::http::upstream_codec::v3::UpstreamCodec::default_instance());
-
-      ProtobufWkt::Any any_protocol_options;
-      any_protocol_options.PackFrom(http_protocol_options);
-
-      bootstrap.mutable_static_resources()
-          ->mutable_clusters(0)
-          ->mutable_typed_extension_protocol_options()
-          ->insert(
-              {"envoy.extensions.upstreams.http.v3.HttpProtocolOptions", any_protocol_options});
-    });
+    config_helper_.prependFilter(R"EOF(
+name: upstream-header-mutation
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.http.header_mutation.v3.HeaderMutation
+  mutations:
+    request_mutations:
+    - append:
+        header:
+          key: "upstream-request-global-flag-header"
+          value: "upstream-request-global-flag-header-value"
+        append_action: APPEND_IF_EXISTS_OR_ADD
+    response_mutations:
+    - append:
+        header:
+          key: "upstream-global-flag-header"
+          value: "upstream-global-flag-header-value"
+        append_action: APPEND_IF_EXISTS_OR_ADD
+    - append:
+        header:
+          key: "request-method-in-upstream-filter"
+          value: "%REQ(:METHOD)%"
+        append_action: APPEND_IF_EXISTS_OR_ADD
+)EOF",
+                                 false);
 
     config_helper_.addConfigModifier(
         [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
@@ -127,6 +117,18 @@ TEST_P(HeaderMutationIntegrationTest, TestHeaderMutation) {
 
   auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
   waitForNextUpstreamRequest();
+
+  EXPECT_EQ("downstream-request-global-flag-header-value",
+            upstream_request_->headers()
+                .get(Http::LowerCaseString("downstream-request-global-flag-header"))[0]
+                ->value()
+                .getStringView());
+  EXPECT_EQ("upstream-request-global-flag-header-value",
+            upstream_request_->headers()
+                .get(Http::LowerCaseString("upstream-request-global-flag-header"))[0]
+                ->value()
+                .getStringView());
+
   upstream_request_->encodeHeaders(default_response_headers_, true);
 
   ASSERT_TRUE(response->waitForEndStream());
