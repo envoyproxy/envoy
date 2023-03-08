@@ -3,11 +3,14 @@
 Kafka Mesh filter
 ===================
 
-The Apache Kafka mesh filter provides a facade for `Apache Kafka <https://kafka.apache.org/>`_ clusters.
+The Apache Kafka mesh filter provides a facade for `Apache Kafka <https://kafka.apache.org/>`_
+clusters.
 
-It allows for processing of Produce (producer) and Fetch (consumer) requests sent by downstream clients.
+It allows for processing of Produce (producer) and Fetch (consumer) requests sent by downstream
+clients.
 
-The requests received by this filter instance can be forwarded to one of multiple clusters, depending on the configured forwarding rules.
+The requests received by this filter instance can be forwarded to one of multiple clusters,
+depending on the configured forwarding rules.
 
 Corresponding message versions from Kafka 3.4.0 are supported.
 
@@ -81,10 +84,13 @@ chain to capture the request processing metrics.
 Notes
 -----
 
-#. The records are being sent/received using embedded `librdkafka <https://github.com/confluentinc/librdkafka>`_ producers/consumers.
-#. librdkafka was compiled without ssl, lz4, gssapi, so related custom config options are not supported.
-#. Invalid custom configs are not found at startup (only when appropriate producers or consumers are being initialised).
-   Requests that would have referenced these clusters are going to close connection and fail.
+#. The records are being sent/received using embedded
+   `librdkafka <https://github.com/confluentinc/librdkafka>`_ producers/consumers.
+#. librdkafka was compiled without ssl, lz4, gssapi, so related custom config options are
+   not supported.
+#. Invalid custom configs are not found at startup (only when appropriate producers or consumers
+   are being initialised). Requests that would have referenced these clusters are going to close
+   connection and fail.
 #. Requests that reference to topics that do not match any of the rules are going to close
    connection and fail. This usually should not happen (clients request metadata first, and they
    should then fail with 'no broker available' first), but is possible if someone tailors binary
@@ -93,9 +99,13 @@ Notes
 Producer proxy
 --------------
 
-#. The embedded librdkafka producers that are pointing at upstream Kafka clusters are created per Envoy worker thread (so the throughput can be increased with `--concurrency` option, allowing for requests to be processed by a larger number of producers).
-#. Only ProduceRequests with version 2 are supported (what means very old producers like 0.8 are not going to be supported).
-#. Python producers need to set API version of at least 1.0.0, so that the produce requests they send are going to have records with magic equal to 2.
+#. The embedded librdkafka producers that are pointing at upstream Kafka clusters are created
+   per Envoy worker thread (so the throughput can be increased with `--concurrency` option,
+   allowing for requests to be processed by a larger number of producers).
+#. Only ProduceRequests with version 2 are supported (what means very old producers like 0.8
+   are not going to be supported).
+#. Python producers need to set API version of at least 1.0.0, so that the produce requests
+   they send are going to have records with magic equal to 2.
 #. Downstream handling of Kafka producer 'acks' property is delegated to upstream client.
    E.g. if upstream client is configured to use acks=0 then the response is going to be sent
    to downstream client as soon as possible (even if they had non-zero acks!).
@@ -109,10 +119,22 @@ Producer proxy
 Consumer proxy
 --------------
 
-#. Currently the consumer proxy supports only stateful proxying - Envoy uses upstream-pointing librdkafka consumers to receive the records, and does that only when more data is requested.
-#. Users might want to take a look consumers' config property *group.id* to manage the consumers' offset committing behaviour (what is meaningful across Envoy restarts).
-#. When requesting consumer position, the response always contains offset = 0 (see *list_offsets.cc*).
-#. Record offset information is provided, but record batch offset delta is not - it has been observed that the Apache Kafka Java client is not going to update its position despite receiving records (see *fetch_record_converter.cc*).
+#. Currently the consumer proxy supports only stateful proxying - Envoy uses upstream-pointing
+   librdkafka consumers to receive the records, and does that only when more data is requested.
+#. Users might want to take a look consumers' config property *group.id* to manage the consumers'
+   offset committing behaviour (what is meaningful across Envoy restarts).
+#. When requesting consumer position, the response always contains offset = 0
+   (see *list_offsets.cc*).
+#. Record offset information is provided, but record batch offset delta is not -
+   it has been observed that the Apache Kafka Java client is not going to update its position
+   despite receiving records (see *fetch_record_converter.cc*).
 #. The Fetch response is sent downstream if it has collected at least 3 records (see *fetch.cc*).
-#. As of now, the Fetch response is sent after it is considered to be fulfilled or the hardcoded timeout of 5 seconds passes (see *fetch.cc*).
-#. The consumers are going to poll records from topics as long as there are incoming requests for these topics, without considering partitions. Users are encouraged to make sure all partitions are being consumed from to avoid a situation when e.g. we are only fetching records from partition 0, but the proxy receives records for partition 0 (which are sent downstream) and partition 1 (which are kept in memory until someone shows interest in them).
+   The data about requested bytes etc. in the request is ignored by the current implementation.
+#. The Fetch response is sent after it is considered to be fulfilled (see above) or the hardcoded
+   timeout of 5 seconds passes (see *fetch.cc*). Timeout specified by request is ignored.
+#. The consumers are going to poll records from topics as long as there are incoming requests for
+   these topics, without considering partitions.
+   Users are encouraged to make sure all partitions are being consumed from to avoid a situation
+   when e.g. we are only fetching records from partition 0, but the proxy receives records
+   for partition 0 (which are sent downstream) and partition 1 (which are kept in memory until
+   someone shows interest in them).
