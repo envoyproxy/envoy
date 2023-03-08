@@ -13,14 +13,19 @@ namespace Envoy {
 namespace Http {
 namespace Matching {
 
-// Helper function to create the stream info.
-StreamInfo::StreamInfoImpl createStreamInfo() {
-  auto connection_info_provider = std::make_shared<Network::ConnectionInfoSetterImpl>(
-      std::make_shared<Network::Address::Ipv4Instance>(80),
-      std::make_shared<Network::Address::Ipv4Instance>(80));
-  return {Http::Protocol::Http2, Event::GlobalTimeSystem().timeSystem(), connection_info_provider};
+std::shared_ptr<Network::ConnectionInfoSetterImpl> connectionInfoProvider() {
+  CONSTRUCT_ON_FIRST_USE(std::shared_ptr<Network::ConnectionInfoSetterImpl>,
+                         std::make_shared<Network::ConnectionInfoSetterImpl>(
+                             std::make_shared<Network::Address::Ipv4Instance>(80),
+                             std::make_shared<Network::Address::Ipv4Instance>(80)));
 }
 
+StreamInfo::StreamInfoImpl createStreamInfo() {
+  CONSTRUCT_ON_FIRST_USE(StreamInfo::StreamInfoImpl,
+                         StreamInfo::StreamInfoImpl(Http::Protocol::Http2,
+                                                    Event::GlobalTimeSystem().timeSystem(),
+                                                    connectionInfoProvider()));
+}
 TEST(MatchingData, HttpResponseStatusCodeInput) {
   HttpResponseStatusCodeInput input;
   Network::ConnectionInfoSetterImpl connection_info_provider(
