@@ -1,3 +1,5 @@
+#include <memory>
+
 #include "envoy/http/filter.h"
 
 #include "source/common/http/matching/data_impl.h"
@@ -8,7 +10,6 @@
 
 #include "test/test_common/test_time.h"
 #include "test/test_common/utility.h"
-#include <memory>
 
 namespace Envoy {
 namespace Http {
@@ -22,10 +23,10 @@ std::shared_ptr<Network::ConnectionInfoSetterImpl> connectionInfoProvider() {
 }
 
 StreamInfo::StreamInfoImpl createStreamInfo() {
-  CONSTRUCT_ON_FIRST_USE(
-      StreamInfo::StreamInfoImpl,
-      StreamInfo::StreamInfoImpl(Http::Protocol::Http2, Event::GlobalTimeSystem().timeSystem(),
-                                     connectionInfoProvider()));
+  CONSTRUCT_ON_FIRST_USE(StreamInfo::StreamInfoImpl,
+                         StreamInfo::StreamInfoImpl(Http::Protocol::Http2,
+                                                    Event::GlobalTimeSystem().timeSystem(),
+                                                    connectionInfoProvider()));
 }
 
 TEST(MatchingData, HttpRequestHeadersDataInput) {
