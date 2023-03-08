@@ -11,11 +11,11 @@
     native <methods>;
 }
 
--keep, includedescriptorclasses class io.envoyproxy.envoymobile.AndroidNetworkLibrary {
+-keep, includedescriptorclasses class io.envoyproxy.envoymobile.utilities.AndroidNetworkLibrary {
    <methods>;
 }
 
--keep, includedescriptorclasses class io.envoyproxy.envoymobile.AndroidCertVerifyResult {
+-keep, includedescriptorclasses class io.envoyproxy.envoymobile.utilities.AndroidCertVerifyResult {
    <methods>;
 }
 
