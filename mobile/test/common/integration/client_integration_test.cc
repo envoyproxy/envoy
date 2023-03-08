@@ -350,5 +350,12 @@ TEST_P(ClientIntegrationTest, TestRuntimeSet) {
   EXPECT_FALSE(Runtime::runtimeFeatureEnabled("envoy.reloadable_features.test_feature_true"));
 }
 
+#ifdef ENVOY_ADMIN_FUNCTIONALITY
+TEST_P(ClientIntegrationTest, TestAdmin) {
+  builder_.enableAdminInterface(true);
+  initialize();
+}
+#endif
+
 } // namespace
 } // namespace Envoy
