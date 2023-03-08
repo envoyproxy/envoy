@@ -21,21 +21,23 @@ static_resources:
             - name: www
               domains:
               - "*"
-              cors:
-                allow_origin_string_match:
-                - safe_regex:
-                    regex: \*
-                allow_methods: "GET"
-                filter_enabled:
-                  default_value:
-                    numerator: 100
-                    denominator: HUNDRED
-                  runtime_key: cors.www.enabled
-                shadow_enabled:
-                  default_value:
-                    numerator: 0
-                    denominator: HUNDRED
-                  runtime_key: cors.www.shadow_enabled
+              typed_per_filter_config:
+                envoy.filters.http.cors:
+                  "@type": type.googleapis.com/envoy.extensions.filters.http.cors.v3.CorsPolicy
+                  allow_origin_string_match:
+                  - safe_regex:
+                      regex: \*
+                  allow_methods: "GET"
+                  filter_enabled:
+                    default_value:
+                      numerator: 100
+                      denominator: HUNDRED
+                    runtime_key: cors.www.enabled
+                  shadow_enabled:
+                    default_value:
+                      numerator: 0
+                      denominator: HUNDRED
+                    runtime_key: cors.www.shadow_enabled
               routes:
               - match:
                   prefix: "/cors/open"
@@ -45,7 +47,9 @@ static_resources:
                   prefix: "/cors/disabled"
                 route:
                   cluster: backend_service
-                  cors:
+                typed_per_filter_config:
+                  envoy.filters.http.cors:
+                    "@type": type.googleapis.com/envoy.extensions.filters.http.cors.v3.CorsPolicy
                     filter_enabled:
                       default_value:
                         numerator: 0
@@ -54,7 +58,9 @@ static_resources:
                   prefix: "/cors/restricted"
                 route:
                   cluster: backend_service
-                  cors:
+                typed_per_filter_config:
+                  envoy.filters.http.cors:
+                    "@type": type.googleapis.com/envoy.extensions.filters.http.cors.v3.CorsPolicy
                     allow_origin_string_match:
                     - safe_regex:
                         regex: .*\.envoyproxy\.io

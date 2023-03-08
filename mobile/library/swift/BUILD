@@ -45,7 +45,6 @@ swift_library(
         "StreamPrototype.swift",
         "TestEngineBuilder.swift",
         "Trailers.swift",
-        "UpstreamHttpProtocol.swift",
         "extensions/UserDefaults+KeyValueStore.swift",
         "filters/AsyncRequestFilter.swift",
         "filters/AsyncResponseFilter.swift",

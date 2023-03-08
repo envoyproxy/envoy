@@ -5,6 +5,9 @@ behavior_changes:
 - area: oauth2
   change: |
     OAuth filter now URL-encodes URL in query parameters. These query parameters are decoded, leaving intact character sequences that must remain encoded in URLs. This behavioral change can be temporarily reverted by setting runtime guard ``envoy.reloadable_features.oauth_use_url_encoding`` to false.
+- area: admin
+  change: |
+    Adds a new admin stats format option 'html-active' to display a periodically updated list of the top most frequently changed stats.
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
@@ -128,6 +131,9 @@ new_features:
 - area: lua
   change: |
     added an new option to the options of lua ``httpCall``. This allows to skip adding ``x-forwarded-for`` by setting ``{["send_xff"] = false}`` as the ``options``.
+- area: ratelimit
+  change: |
+    added local rate limit listener filter to enable rate limit before TLS handshake and filter matching.
 - area: proxy_protocol
   change: |
     added the support :ref:`pass_through_tlvs for listener <envoy_v3_api_field_extensions.filters.listener.proxy_protocol.v3.ProxyProtocol.pass_through_tlvs>`

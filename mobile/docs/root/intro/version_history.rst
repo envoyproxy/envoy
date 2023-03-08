@@ -21,7 +21,8 @@ Breaking changes:
 - api: added ``setRuntimeGuard`` APIs for all languages (:issue: `#25434 <25434>`)
 - clusters: removing the base_h2 cluster. Requests with ``x-envoy-mobile-upstream-protocol`` set to ``http2`` will be sent to the base cluster and use the best available protocol (:issue `#25796 <25796>`).
 - clusters: only creating the stats cluster if an endpoint is configured. Previously if no domain was configured a cluster would be configured pointed at 127.0.0.1. (:issue: `#25816 <25816>`).
-- clusters: removing the base_h3 cluster. If HTTP/3 is enabled, the base cluster will use HTTP/3 instead. (:issue `#25814 <25814>`).
+- clusters: removing the base_h3 cluster. If HTTP/3 is enabled, the base cluster will use HTTP/3 instead. (:issue: `#25814 <25814>`).
+- headers: removed the APIs for protocol based routing, as best available protocol is now automatically selected (:issue:`#25893 <25893>`).
 
 Bugfixes:
 
