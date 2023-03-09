@@ -227,7 +227,7 @@ Api::IoCallUint64Result IoUringSocketHandleImpl::sendmsg(const Buffer::RawSlice*
       (io_uring_socket_type_ == IoUringSocketType::Accept && !enable_accept_socket_)) {
     return shadow_io_handle_->sendmsg(slices, num_slice, flags, self_ip, peer_address);
   }
-  PANIC("not implement");
+  PANIC("IoUringSocketHandleImpl::sendmsg not implement");
 }
 
 Api::IoCallUint64Result IoUringSocketHandleImpl::recvmsg(Buffer::RawSlice* slices,
@@ -243,7 +243,7 @@ Api::IoCallUint64Result IoUringSocketHandleImpl::recvmsg(Buffer::RawSlice* slice
       (io_uring_socket_type_ == IoUringSocketType::Accept && !enable_accept_socket_)) {
     return shadow_io_handle_->recvmsg(slices, num_slice, self_port, output);
   }
-  PANIC("not implemented");
+  PANIC("IoUringSocketHandleImpl::recvmsg not implemented");
 }
 
 Api::IoCallUint64Result IoUringSocketHandleImpl::recvmmsg(RawSliceArrays& slices,
@@ -258,7 +258,7 @@ Api::IoCallUint64Result IoUringSocketHandleImpl::recvmmsg(RawSliceArrays& slices
       (io_uring_socket_type_ == IoUringSocketType::Accept && !enable_accept_socket_)) {
     return shadow_io_handle_->recvmmsg(slices, self_port, output);
   }
-  PANIC("not implemented");
+  PANIC("IoUringSocketHandleImpl::recvmmsg not implemented");
 }
 
 Api::IoCallUint64Result IoUringSocketHandleImpl::recv(void* buffer, size_t length, int flags) {
@@ -271,7 +271,7 @@ Api::IoCallUint64Result IoUringSocketHandleImpl::recv(void* buffer, size_t lengt
       (io_uring_socket_type_ == IoUringSocketType::Accept && !enable_accept_socket_)) {
     return shadow_io_handle_->recv(buffer, length, flags);
   }
-  PANIC("not implemented");
+  PANIC("IoUringSocketHandleImpl::recv not implemented");
 }
 
 Api::SysCallIntResult IoUringSocketHandleImpl::bind(Address::InstanceConstSharedPtr address) {
