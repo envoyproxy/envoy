@@ -4,6 +4,7 @@ on:
   push:
     branches:
     - *
+  pull_request:
   workflow_dispatch:
   schedule:
     # Mondays at 1pm UTC (8am EST)
