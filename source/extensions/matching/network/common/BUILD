@@ -9,14 +9,6 @@ licenses(["notice"])  # Apache 2
 
 envoy_extension_package()
 
-envoy_cc_library(
-    name = "data_impl_lib",
-    hdrs = ["data_impl.h"],
-    deps = [
-        "//envoy/network:filter_interface",
-    ],
-)
-
 envoy_cc_extension(
     name = "inputs_lib",
     srcs = ["inputs.cc"],
