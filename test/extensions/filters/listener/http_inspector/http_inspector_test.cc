@@ -60,7 +60,7 @@ public:
       InSequence s;
 
 #ifdef WIN32
-      EXPECT_CALL(os_sys_calls_, readv(_, _, _))
+      EXPECT_CALL(os_sys_calls_, recv(_, _, _, _))
           .WillOnce(Return(Api::SysCallSizeResult{ssize_t(-1), SOCKET_ERROR_AGAIN}));
       if (http2) {
         for (size_t i = 0; i < data.size(); i++) {
@@ -277,11 +277,12 @@ public:
     std::vector<uint8_t> data = Hex::decode(std::string(header));
 #ifdef WIN32
     if (http2) {
-      EXPECT_CALL(os_sys_calls_, readv(_, _, _))
+      EXPECT_CALL(os_sys_calls_, recv(_, _, _, _))
           .WillOnce(
-              Invoke([&data](os_fd_t fd, const iovec* iov, int iovcnt) -> Api::SysCallSizeResult {
-                ASSERT(iov->iov_len >= data.size());
-                memcpy(iov->iov_base, data.data(), data.size());
+              Invoke(
+              [&header](os_fd_t, void* buffer, size_t length, int) -> Api::SysCallSizeResult {
+                ASSERT(length >= data.size());
+                memcpy(buffer, data.data(), data.size());
                 return Api::SysCallSizeResult{ssize_t(data.size()), 0};
               }))
           .WillOnce(Return(Api::SysCallSizeResult{ssize_t(-1), SOCKET_ERROR_AGAIN}));
