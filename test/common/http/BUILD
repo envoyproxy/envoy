@@ -561,3 +561,13 @@ envoy_cc_test(
         "//source/common/http:dependency_manager",
     ],
 )
+
+envoy_cc_test(
+    name = "header_mutation_test",
+    srcs = ["header_mutation_test.cc"],
+    deps = [
+        "//source/common/http:header_mutation_lib",
+        "//test/mocks/stream_info:stream_info_mocks",
+        "//test/test_common:utility_lib",
+    ],
+)
