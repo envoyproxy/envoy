@@ -5,6 +5,8 @@
 #include "envoy/stats/scope.h"
 
 #ifndef WIN32
+#include "contrib/kafka/filters/network/source/mesh/shared_consumer_manager.h"
+#include "contrib/kafka/filters/network/source/mesh/shared_consumer_manager_impl.h"
 #include "contrib/kafka/filters/network/source/mesh/upstream_config.h"
 #include "contrib/kafka/filters/network/source/mesh/upstream_kafka_facade.h"
 #include "contrib/kafka/filters/network/source/mesh/filter.h"
@@ -35,9 +37,15 @@ Network::FilterFactoryCb KafkaMeshConfigFactory::createFilterFactoryFromProtoTyp
       std::make_shared<UpstreamKafkaFacadeImpl>(*configuration, context.threadLocal(),
                                                 context.api().threadFactory());
 
-  return [configuration, upstream_kafka_facade](Network::FilterManager& filter_manager) -> void {
-    Network::ReadFilterSharedPtr filter =
-        std::make_shared<KafkaMeshFilter>(*configuration, *upstream_kafka_facade);
+  // Manager for consumers shared across downstream connections
+  // (connects us to upstream Kafka clusters).
+  const RecordCallbackProcessorSharedPtr shared_consumer_manager =
+      std::make_shared<SharedConsumerManagerImpl>(*configuration, context.api().threadFactory());
+
+  return [configuration, upstream_kafka_facade,
+          shared_consumer_manager](Network::FilterManager& filter_manager) -> void {
+    Network::ReadFilterSharedPtr filter = std::make_shared<KafkaMeshFilter>(
+        *configuration, *upstream_kafka_facade, *shared_consumer_manager);
     filter_manager.addReadFilter(filter);
   };
 #endif

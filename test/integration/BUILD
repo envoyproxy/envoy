@@ -421,7 +421,7 @@ envoy_cc_test(
     srcs = [
         "multiplexed_integration_test.cc",
     ],
-    shard_count = 8,
+    shard_count = 16,
     deps = [
         ":http_protocol_integration_lib",
         ":socket_interface_swap_lib",
@@ -591,7 +591,7 @@ envoy_cc_test(
     srcs = envoy_select_admin_functionality([
         "filter_integration_test.cc",
     ]),
-    shard_count = 12,
+    shard_count = 16,
     deps = [
         ":http_protocol_integration_lib",
         ":socket_interface_swap_lib",
@@ -662,7 +662,7 @@ envoy_cc_test(
     ],
     # As this test has many H1/H2/v4/v6 tests it takes a while to run.
     # Shard it enough to bring the run time in line with other integration tests.
-    shard_count = 32,
+    shard_count = 48,
     deps = [
         ":protocol_integration_test_lib",
     ],
@@ -874,19 +874,20 @@ envoy_cc_test_library(
         "//source/common/common:callback_impl_lib",
         "//source/common/common:linked_object",
         "//source/common/common:lock_guard_lib",
-        "//source/common/http/http3:codec_stats_lib",
         "//source/common/common:thread_lib",
         "//source/common/config:utility_lib",
         "//source/common/grpc:codec_lib",
         "//source/common/grpc:common_lib",
         "//source/common/http/http1:codec_lib",
         "//source/common/http/http2:codec_lib",
+        "//source/common/http/http3:codec_stats_lib",
         "//source/common/network:connection_balancer_lib",
         "//source/common/network:filter_lib",
         "//source/common/network:listen_socket_lib",
         "//source/common/network:socket_option_factory_lib",
         "//source/common/network:udp_packet_writer_handler_lib",
         "//source/common/network:utility_lib",
+        "//source/common/runtime:runtime_features_lib",
         "//source/common/stats:isolated_store_lib",
         "//source/extensions/listener_managers/listener_manager:active_raw_udp_listener_config",
         "//source/extensions/listener_managers/listener_manager:connection_handler_lib",
@@ -1141,7 +1142,7 @@ envoy_cc_test(
     srcs = [
         "redirect_integration_test.cc",
     ],
-    shard_count = 4,
+    shard_count = 8,
     tags = ["nofips"],
     deps = [
         ":http_protocol_integration_lib",
@@ -1506,7 +1507,7 @@ envoy_cc_test(
     data = [
         "//test/config/integration/certs",
     ],
-    shard_count = 7,
+    shard_count = 16,
     deps = [
         ":http_integration_lib",
         ":http_protocol_integration_lib",
@@ -1625,6 +1626,7 @@ envoy_cc_test(
         ":http_integration_lib",
         ":http_protocol_integration_lib",
         "//source/extensions/filters/network/tcp_proxy:config",
+        "//source/extensions/matching/network/application_protocol:config",
         "//source/extensions/transport_sockets/tls:config",
         "//source/extensions/transport_sockets/tls:context_config_lib",
         "//source/extensions/transport_sockets/tls:context_lib",

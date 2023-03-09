@@ -76,7 +76,6 @@ envoy_cc_library(
         "stream_client.cc",
         "stream_prototype.cc",
         "string_accessor.cc",
-        "upstream_http_protocol.cc",
     ],
     hdrs = [
         "bridge_utility.h",
@@ -105,7 +104,6 @@ envoy_cc_library(
         "stream_prototype.h",
         "string_accessor.h",
         "trailers.h",
-        "upstream_http_protocol.h",
     ],
     external_deps = ["abseil_optional"],
     repository = "@envoy",

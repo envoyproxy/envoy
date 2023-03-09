@@ -73,9 +73,9 @@ Change to the ``examples/route-mirror`` directory.
 
     $ pwd
     envoy/examples/route-mirror
-    $ docker-compose build
-    $ docker-compose up -d
-    $ docker-compose ps
+    $ docker compose build
+    $ docker compose up -d
+    $ docker compose ps
     NAME                               COMMAND                  SERVICE             STATUS              PORTS
     route-mirror-envoy-front-proxy-1   "/docker-entrypoint.…"   envoy-front-proxy   running             0.0.0.0:10000->10000/tcp, :::10000->10000/tcp
     route-mirror-service1-1            "python3 /code/servi…"   service1            running (healthy)
@@ -107,12 +107,12 @@ in the hostname.
 
 .. code-block:: console
 
-   $ docker-compose logs service1
+   $ docker compose logs service1
    ...
    Host: localhost:10000
    192.168.80.6 - - [06/Oct/2022 03:56:22] "GET /service/1 HTTP/1.1" 200 -
 
-   $ docker-compose logs service1-mirror
+   $ docker compose logs service1-mirror
    ...
    Host: localhost-shadow:10000
    192.168.80.6 - - [06/Oct/2022 03:56:22] "GET /service/1 HTTP/1.1" 200 -
@@ -141,12 +141,12 @@ got the request.
 
 .. code-block:: console
 
-   $ docker-compose logs service2
+   $ docker compose logs service2
    ...
    Host: localhost:10000
    192.168.80.6 - - [06/Oct/2022 03:56:22] "GET /service/2 HTTP/1.1" 200 -
 
-   $ docker-compose logs service2-mirror
+   $ docker compose logs service2-mirror
    ...
    Host: localhost-shadow:10000
    192.168.80.6 - - [06/Oct/2022 03:56:22] "GET /service/2 HTTP/1.1" 200 -
@@ -174,12 +174,12 @@ View the logs for ``service2`` and ``service2-mirror`` services.
 
 .. code-block:: console
 
-   $ docker-compose logs service2
+   $ docker compose logs service2
    ...
    Host: localhost:10000
    192.168.80.6 - - [06/Oct/2022 03:56:22] "GET /service/2 HTTP/1.1" 200 -
 
-   $ docker-compose logs service2-mirror
+   $ docker compose logs service2-mirror
    # No new logs
 
 .. seealso::

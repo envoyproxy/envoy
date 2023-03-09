@@ -1327,7 +1327,8 @@ extern "C" JNIEXPORT jint JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibra
 static void jvm_add_test_root_certificate(const uint8_t* cert, size_t len) {
   jni_log("[Envoy]", "jvm_add_test_root_certificate");
   JNIEnv* env = get_env();
-  jclass jcls_AndroidNetworkLibrary = find_class("org.chromium.net.AndroidNetworkLibrary");
+  jclass jcls_AndroidNetworkLibrary =
+      find_class("io.envoyproxy.envoymobile.utilities.AndroidNetworkLibrary");
   jmethodID jmid_addTestRootCertificate =
       env->GetStaticMethodID(jcls_AndroidNetworkLibrary, "addTestRootCertificate", "([B)V");
 
@@ -1340,7 +1341,8 @@ static void jvm_add_test_root_certificate(const uint8_t* cert, size_t len) {
 static void jvm_clear_test_root_certificate() {
   jni_log("[Envoy]", "jvm_clear_test_root_certificate");
   JNIEnv* env = get_env();
-  jclass jcls_AndroidNetworkLibrary = find_class("org.chromium.net.AndroidNetworkLibrary");
+  jclass jcls_AndroidNetworkLibrary =
+      find_class("io.envoyproxy.envoymobile.utilities.AndroidNetworkLibrary");
   jmethodID jmid_clearTestRootCertificates =
       env->GetStaticMethodID(jcls_AndroidNetworkLibrary, "clearTestRootCertificates", "()V");
 
