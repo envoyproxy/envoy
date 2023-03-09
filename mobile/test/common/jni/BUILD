@@ -54,7 +54,9 @@ envoy_mobile_so_to_jni_lib(
     native_dep = "libenvoy_jni_with_test_extensions.so",
 )
 
-# Same as above but wtih listener extensions too.
+# Same as above but with listener extensions too.
+# This hard-codes the listener manager lib rather than doing a select, so that the kotlin
+# proxy tests can run in builds which select out the listener for E-M.
 cc_library(
     name = "envoy_jni_with_test_and_listener_extensions_lib",
     testonly = True,
@@ -62,12 +64,7 @@ cc_library(
         ":server_envoy_jni_lib",
         "//library/common/jni:envoy_jni_lib",
         "@envoy//source/extensions/listener_managers/listener_manager:listener_manager_lib",
-    ] + TEST_EXTENSIONS + envoy_select_envoy_mobile_listener(
-        [
-            "@envoy//source/extensions/listener_managers/listener_manager:listener_manager_lib",
-        ],
-        "@envoy",
-    ),
+    ]
 )
 
 cc_binary(
