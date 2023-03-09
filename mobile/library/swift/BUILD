@@ -1,3 +1,4 @@
+load("//bazel:apple.bzl", "envoy_mobile_swift_copts")
 load("//bazel:config.bzl", "MINIMUM_IOS_VERSION")
 load("//bazel:swift_header_collector.bzl", "swift_header_collector")
 load("@build_bazel_rules_apple//apple:apple.bzl", "apple_static_xcframework")
@@ -77,11 +78,7 @@ swift_library(
         "stats/TagsBuilder.swift",
     ] + ["@envoy_mobile_extra_swift_sources//:extra_swift_srcs"],
     copts = select({
-        "//bazel:envoy_mobile_swift_cxx_interop": [
-            "-enable-experimental-cxx-interop",
-            "-Xcc",
-            "-std=c++17",
-        ],
+        "//bazel:envoy_mobile_swift_cxx_interop": envoy_mobile_swift_copts(True),
         "//conditions:default": [],
     }),
     defines = envoy_mobile_defines("@envoy"),

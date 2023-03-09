@@ -33,12 +33,13 @@ def envoy_objc_library(name, hdrs = [], visibility = [], data = [], deps = [], m
 #     ],
 # )
 #
-def envoy_mobile_swift_test(name, srcs, data = [], deps = [], tags = [], repository = "", visibility = [], flaky = False):
+def envoy_mobile_swift_test(name, srcs, data = [], deps = [], tags = [], repository = "", visibility = [], flaky = False, enable_cxx_interop = False):
     test_lib_name = name + "_lib"
     swift_library(
         name = test_lib_name,
         srcs = srcs,
         data = data,
+        copts = envoy_mobile_swift_copts(enable_cxx_interop),
         deps = [
             repository + "//library/swift:ios_lib",
         ] + deps,
@@ -76,3 +77,13 @@ def envoy_mobile_objc_test(name, srcs, data = [], deps = [], tags = [], visibili
         visibility = visibility,
         flaky = flaky,
     )
+
+def envoy_mobile_swift_copts(enable_cxx_interop):
+    if enable_cxx_interop:
+        return [
+            "-enable-experimental-cxx-interop",
+            "-Xcc",
+            "-std=c++17",
+        ]
+    else:
+        return []
