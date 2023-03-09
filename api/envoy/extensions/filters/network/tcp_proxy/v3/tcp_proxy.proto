@@ -202,6 +202,8 @@ message TcpProxy {
 
   // If set, this configures tunneling, e.g. configuration options to tunnel TCP payload over
   // HTTP CONNECT. If this message is absent, the payload will be proxied upstream as per usual.
+  // It is possible to dynamically override this configuration and disable tunneling per connection,
+  // by setting a per-connection filter state object for the key ``envoy.tcp_proxy.disable_tunneling``.
   TunnelingConfig tunneling_config = 12;
 
   // The maximum duration of a connection. The duration is defined as the period since a connection
