@@ -36,7 +36,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // HTTP connection manager :ref:`configuration overview <config_http_conn_man>`.
 // [#extension: envoy.filters.network.http_connection_manager]
 
-// [#next-free-field: 53]
+// [#next-free-field: 54]
 message HttpConnectionManager {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.network.http_connection_manager.v2.HttpConnectionManager";
@@ -815,6 +815,11 @@ message HttpConnectionManager {
   // Append the `x-forwarded-port` header with the port value client used to connect to Envoy. It
   // will be ignored if the `x-forwarded-port` header has been set by any trusted proxy in front of Envoy.
   bool append_x_forwarded_port = 51;
+
+  // Whether the HCM will add ProxyProtocolFilterState to the Connection lifetime filter state. Defaults to `true`.
+  // This should be set to `false` in cases where Envoy's view of the downstream address may not correspond to the
+  // actual client address, for example, if there's another proxy in front of the Envoy.
+  google.protobuf.BoolValue add_proxy_protocol_connection_state = 53;
 }
 
 // The configuration to customize local reply returned by Envoy.

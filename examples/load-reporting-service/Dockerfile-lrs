@@ -1,4 +1,4 @@
-FROM golang@sha256:a452d6273ad03a47c2f29b898d6bb57630e77baf839651ef77d03e4e049c5bf3
+FROM golang:1.20.1-bullseye@sha256:63ed3bc6b428713c2bb1980e534d70e8ab82a4484ec044183df9caca6e9d82cb as builder
 
 COPY ./server /go/src/github.com/envoyproxy/envoy/example/load-reporting-service/server
 COPY *.go /go/src/github.com/envoyproxy/envoy/example/load-reporting-service/
@@ -6,7 +6,11 @@ COPY go.sum /go/src/github.com/envoyproxy/envoy/example/load-reporting-service
 COPY go.mod /go/src/github.com/envoyproxy/envoy/example/load-reporting-service
 
 WORKDIR /go/src/github.com/envoyproxy/envoy/example/load-reporting-service
-RUN go mod download
-RUN go install /go/src/github.com/envoyproxy/envoy/example/load-reporting-service
+RUN go mod download \
+    && go install /go/src/github.com/envoyproxy/envoy/example/load-reporting-service
 
-CMD ["go","run","main.go"]
+FROM debian:bullseye-slim
+
+COPY --from=builder /go/bin/load-reporting-service /usr/local/bin/load-reporting-service
+
+CMD ["load-reporting-service"]

@@ -203,6 +203,11 @@
   builder.enableGzipDecompression(self.enableGzipDecompression);
   builder.enableBrotliDecompression(self.enableBrotliDecompression);
 
+  for (NSString *key in self.runtimeGuards) {
+    BOOL value = [[self.runtimeGuards objectForKey:key] isEqualToString:@"true"];
+    builder.setRuntimeGuard([key toCXXString], value);
+  }
+
   for (EMODirectResponse *directResponse in self.typedDirectResponses) {
     builder.addDirectResponse([directResponse toCXX]);
   }
@@ -276,18 +281,9 @@
   }
 }
 
-// TODO(caschoener) this should be moved into a test-only library
-- (NSString *)generateYamlString {
-  try {
-    Envoy::Platform::EngineBuilder builder = [self applyToCXXBuilder];
-    std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> bootstrap =
-        builder.generateBootstrap();
-    std::string bootstrap_str = Envoy::MessageUtil::getYamlStringFromMessage(*bootstrap);
-    return [NSString stringWithUTF8String:bootstrap_str.c_str()];
-  } catch (const std::exception &e) {
-    NSLog(@"[Envoy] error generating yaml: %@", @(e.what()));
-    return nullptr;
-  }
+- (NSString *)bootstrapDebugDescription {
+  std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> bootstrap = [self generateBootstrap];
+  return @(bootstrap->ShortDebugString().c_str());
 }
 
 @end

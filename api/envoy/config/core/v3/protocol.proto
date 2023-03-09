@@ -177,7 +177,7 @@ message AlternateProtocolsCacheOptions {
   // this list contained the value ``.c.example.com``, then an Alt-Svc entry for ``foo.c.example.com``
   // could be shared with ``bar.c.example.com`` but would not be shared with ``baz.example.com``. On
   // the other hand, if the list contained the value ``.example.com`` then all three hosts could share
-  // Alt-Svc entries. Each entry must start with ``.``.  If a hostname matches multiple suffixes, the
+  // Alt-Svc entries. Each entry must start with ``.``. If a hostname matches multiple suffixes, the
   // first listed suffix will be used.
   //
   // Since lookup in this list is O(n), it is recommended that the number of suffixes be limited.
@@ -259,7 +259,7 @@ message HttpProtocolOptions {
   google.protobuf.UInt32Value max_requests_per_connection = 6;
 }
 
-// [#next-free-field: 9]
+// [#next-free-field: 10]
 message Http1ProtocolOptions {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.api.v2.core.Http1ProtocolOptions";
@@ -350,6 +350,14 @@ message Http1ProtocolOptions {
   // (inferred if not present), host (from the host/:authority header) and path
   // (from first line or :path header).
   bool send_fully_qualified_url = 8;
+
+  // [#not-implemented-hide:] Hiding so that field can be removed after BalsaParser is rolled out.
+  // If set, force HTTP/1 parser: BalsaParser if true, http-parser if false.
+  // If unset, HTTP/1 parser is selected based on
+  // envoy.reloadable_features.http1_use_balsa_parser.
+  // See issue #21245.
+  google.protobuf.BoolValue use_balsa_parser = 9
+      [(xds.annotations.v3.field_status).work_in_progress = true];
 }
 
 message KeepaliveSettings {

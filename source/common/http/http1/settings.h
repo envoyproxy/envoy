@@ -17,7 +17,8 @@ Http1Settings parseHttp1Settings(const envoy::config::core::v3::Http1ProtocolOpt
 
 Http1Settings parseHttp1Settings(const envoy::config::core::v3::Http1ProtocolOptions& config,
                                  ProtobufMessage::ValidationVisitor& validation_visitor,
-                                 const Protobuf::BoolValue& hcm_stream_error, bool validate_scheme);
+                                 const ProtobufWkt::BoolValue& hcm_stream_error,
+                                 bool validate_scheme);
 
 } // namespace Http1
 } // namespace Http

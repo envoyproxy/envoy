@@ -1,5 +1,5 @@
 load("//bazel:android_debug_info.bzl", "android_debug_info")
-load("@envoy//bazel:envoy_build_system.bzl", "envoy_mobile_copts", "envoy_package")
+load("@envoy//bazel:envoy_build_system.bzl", "envoy_mobile_defines", "envoy_package")
 
 licenses(["notice"])  # Apache 2
 
@@ -55,7 +55,7 @@ cc_library(
     srcs = [
         "jni_interface.cc",
     ],
-    copts = envoy_mobile_copts("@envoy"),
+    defines = envoy_mobile_defines("@envoy"),
     deps = [
         ":android_network_utility_lib",
         ":jni_utility_lib",

@@ -14,6 +14,19 @@ final class EngineBuilderTests: XCTestCase {
     MockEnvoyEngine.onRunWithYAML = nil
   }
 
+  func testSetRuntimeGuard() {
+    let bootstrapDebugDescription = EngineBuilder()
+      .setRuntimeGuard("test_feature_false", true)
+      .setRuntimeGuard("test_feature_true", false)
+      .bootstrapDebugDescription()
+    XCTAssertTrue(
+      bootstrapDebugDescription.contains(#""test_feature_false" value { bool_value: true }"#)
+    )
+    XCTAssertTrue(
+      bootstrapDebugDescription.contains(#""test_feature_true" value { bool_value: false }"#)
+    )
+  }
+
   func testMonitoringModeDefaultsToPathMonitor() {
     let builder = EngineBuilder()
     XCTAssertEqual(builder.monitoringMode, .pathMonitor)

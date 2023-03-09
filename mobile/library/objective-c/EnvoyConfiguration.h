@@ -117,7 +117,13 @@ NS_ASSUME_NONNULL_BEGIN
                                        nodeRegion:(NSString *)nodeRegion
                                          nodeZone:(NSString *)nodeZone
                                       nodeSubZone:(NSString *)nodeSubZone;
-- (NSString *)generateYamlString;
+
+/**
+ Generate a string description of the C++ Envoy bootstrap from this configuration.
+ For testing purposes only.
+ */
+- (NSString *)bootstrapDebugDescription;
+
 @end
 
 NS_ASSUME_NONNULL_END

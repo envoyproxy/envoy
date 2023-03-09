@@ -226,6 +226,9 @@ private:
   // Set to true when an "immediate response" has been delivered. This helps us
   // know what response to return from certain failures.
   bool sent_immediate_response_ = false;
+
+  // Set to true then the mergePerRouteConfig() method has been called.
+  bool route_config_merged_ = false;
 };
 
 extern std::string responseCaseToString(

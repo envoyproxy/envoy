@@ -50,8 +50,8 @@ load(
     _envoy_sh_test = "envoy_sh_test",
 )
 load(
-    ":envoy_mobile_copts.bzl",
-    _envoy_mobile_copts = "envoy_mobile_copts",
+    ":envoy_mobile_defines.bzl",
+    _envoy_mobile_defines = "envoy_mobile_defines",
 )
 load(
     "@envoy_build_config//:extensions_build_config.bzl",
@@ -268,5 +268,5 @@ envoy_py_test = _envoy_py_test
 envoy_py_test_binary = _envoy_py_test_binary
 envoy_sh_test = _envoy_sh_test
 
-# Envoy Mobile copts (from envoy_mobile_copts.bz)
-envoy_mobile_copts = _envoy_mobile_copts
+# Envoy Mobile defines (from envoy_mobile_defines.bz)
+envoy_mobile_defines = _envoy_mobile_defines
