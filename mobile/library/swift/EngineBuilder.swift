@@ -595,9 +595,11 @@ open class EngineBuilder: NSObject {
   ///
   /// - returns: The built `Engine`.
   public func build() -> Engine {
+#if canImport(EnvoyCxxSwiftInterop)
     if !self.useSwiftCxxInterop && self.engineType == SwiftEnvoyEngineImpl.self {
       self.engineType = EnvoyEngineImpl.self
     }
+#endif
 
     let engine = self.engineType.init(runningCallback: self.onEngineRunning, logger: self.logger,
                                       eventTracker: self.eventTracker,
@@ -673,9 +675,11 @@ open class EngineBuilder: NSObject {
   /// - returns: This builder.
   @discardableResult
   func addEngineType(_ engineType: EnvoyEngine.Type) -> Self {
+#if canImport(EnvoyCxxSwiftInterop)
     if self.useSwiftCxxInterop && engineType != SwiftEnvoyEngineImpl.self {
       self.useSwiftCxxInterop = false
     }
+#endif
     self.engineType = engineType
     return self
   }
