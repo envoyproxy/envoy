@@ -23,6 +23,9 @@ if [[ -z "$NO_BUILD_SETUP" ]]; then
     . "$(dirname "$0")"/setup_cache.sh
     # shellcheck source=ci/build_setup.sh
     . "$(dirname "$0")"/build_setup.sh $build_setup_args
+
+    echo "building using ${NUM_CPUS} CPUs"
+    echo "building for ${ENVOY_BUILD_ARCH}"
 fi
 cd "${SRCDIR}"
 
@@ -34,9 +37,6 @@ else
   # Fall back to use the ENVOY_BUILD_ARCH itself.
   BUILD_ARCH_DIR="/linux/${ENVOY_BUILD_ARCH}"
 fi
-
-echo "building using ${NUM_CPUS} CPUs"
-echo "building for ${ENVOY_BUILD_ARCH}"
 
 function collect_build_profile() {
   declare -g build_profile_count=${build_profile_count:-1}
@@ -173,28 +173,38 @@ function run_process_test_result() {
 }
 
 function run_ci_verify () {
-  echo "verify examples..."
-  OCI_TEMP_DIR="${ENVOY_DOCKER_BUILD_DIR}/image"
-  mkdir -p "${OCI_TEMP_DIR}"
+    local images image oci_archive
+    echo "verify examples..."
 
-  IMAGES=("envoy" "envoy-contrib" "envoy-google-vrp")
+    images=("" "contrib" "google-vrp")
 
-  for IMAGE in "${IMAGES[@]}"; do
-    tar xvf "${ENVOY_DOCKER_BUILD_DIR}/docker/${IMAGE}.tar" -C "${OCI_TEMP_DIR}"
-    skopeo copy "oci:${OCI_TEMP_DIR}" "docker-daemon:envoyproxy/${IMAGE}-dev:latest"
-    rm -rf "${OCI_TEMP_DIR:?}/*"
-  done
+    for image in "${images[@]}"; do
+        if [[ -n "$image" ]]; then
+            variant="${image}-dev"
+            filename="envoy-${image}.tar"
+        else
+            variant=dev
+            filename="envoy.tar"
+        fi
+        oci_archive="${ENVOY_DOCKER_BUILD_DIR}/docker/${filename}"
 
-  rm -rf "${OCI_TEMP_DIR:?}"
+        echo "Copy oci image: oci-archive:${oci_archive} docker-daemon:envoyproxy/envoy:${variant}"
+        skopeo copy -q "oci-archive:${oci_archive}" "docker-daemon:envoyproxy/envoy:${variant}"
+        rm "$oci_archive"
+    done
 
-  docker images
-  sudo apt-get -qq update -y
-  sudo apt-get -qq install -y --no-install-recommends expect
-  export DOCKER_NO_PULL=1
-  export DOCKER_RMI_CLEANUP=1
-  umask 027
-  chmod -R o-rwx examples/
-  "${ENVOY_SRCDIR}"/ci/verify_examples.sh "${@}" || exit
+    docker images | grep envoy
+
+    export DEBIAN_FRONTEND=noninteractive
+    sudo apt-get -qq update -y
+    sudo apt-get -qq install -y --no-install-recommends expect
+    export DOCKER_NO_PULL=1
+    export DOCKER_RMI_CLEANUP=1
+    # This is set to simulate an environment where users have shared home drives protected
+    # by a strong umask (ie only group readable by default).
+    umask 027
+    chmod -R o-rwx examples/
+    "${ENVOY_SRCDIR}/ci/verify_examples.sh" "${@}" || exit
 }
 
 CI_TARGET=$1

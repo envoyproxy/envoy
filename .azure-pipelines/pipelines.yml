@@ -770,6 +770,7 @@ stages:
       env:
         ENVOY_DOCKER_BUILD_DIR: $(Build.StagingDirectory)
         NO_BUILD_SETUP: 1
+        # ENVOY_EXAMPLES_DEBUG: 1
 
   - job: packages_x64
     displayName: Debs (x64)

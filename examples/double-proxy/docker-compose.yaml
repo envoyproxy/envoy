@@ -15,8 +15,8 @@ services:
 
   app:
     build:
-      context: ../shared/flask
-      target: postgres-flask
+      context: ../shared/python
+      target: aiohttp-postgres-service
     networks:
       edge:
       postgres-frontend:

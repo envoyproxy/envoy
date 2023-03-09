@@ -1,4 +1,4 @@
-FROM envoyproxy/envoy-dev:latest
+FROM envoyproxy/envoy:dev
 
 COPY ./envoy.yaml /etc/envoy.yaml
 COPY ./certs /certs
