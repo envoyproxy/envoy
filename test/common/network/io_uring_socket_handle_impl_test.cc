@@ -63,7 +63,6 @@ TEST(IoUringSocketHandleImpl, AcceptError) {
   IoUringSocketHandleTestImpl impl(factory, false);
   struct sockaddr addr;
   socklen_t addrlen = sizeof(addr);
-  EXPECT_EQ(impl.accept(&addr, &addrlen), nullptr);
 
   Io::MockIoUringSocket socket;
   Io::MockIoUringWorker worker;
@@ -81,6 +80,9 @@ TEST(IoUringSocketHandleImpl, AcceptError) {
   EXPECT_EQ(IoUringSocketType::Accept, impl.ioUringSocketType());
   Io::AcceptedSocketParam param{-1, nullptr, 0};
   impl.onAcceptSocket(param);
+
+  // Accept without AcceptedSocketParam returns nullptr.
+  EXPECT_EQ(impl.accept(&addr, &addrlen), nullptr);
 }
 
 } // namespace

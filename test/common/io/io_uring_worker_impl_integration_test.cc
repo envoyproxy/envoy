@@ -208,6 +208,12 @@ public:
     file_event.reset();
   }
 
+  void runToClose(os_fd_t fd) {
+    do {
+      dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+    } while (fcntl(fd, F_GETFD) == 0);
+  }
+
   bool should_skip_{false};
   os_fd_t listen_socket_{INVALID_SOCKET};
   os_fd_t server_socket_{INVALID_SOCKET};
@@ -488,7 +494,7 @@ TEST_F(IoUringWorkerIntegrationTest, AcceptSocketAccept) {
   }
 
   socket.close();
-  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  runToClose(listen_socket_);
   EXPECT_EQ(io_uring_worker_->getSockets().size(), 0);
   cleanup();
 }
@@ -502,6 +508,9 @@ TEST_F(IoUringWorkerIntegrationTest, AcceptSocketDisable) {
   EXPECT_EQ(io_uring_worker_->getSockets().size(), 1);
 
   socket.disable();
+  // TODO(zhxie): in fact, we cannot assure that the socket is disabled or enabled after their
+  // one shot dispatcher run, but we can assure that the socket has been disabled and enabled in
+  // the while-loop run after connect().
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   EXPECT_EQ(io_uring_handler_.accept_result_, -1);
 
@@ -518,7 +527,7 @@ TEST_F(IoUringWorkerIntegrationTest, AcceptSocketDisable) {
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
 
   socket.close();
-  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  runToClose(listen_socket_);
   EXPECT_EQ(io_uring_worker_->getSockets().size(), 0);
   cleanup();
 }
@@ -535,7 +544,7 @@ TEST_F(IoUringWorkerIntegrationTest, AcceptSocketAcceptOnClosing) {
   socket.close();
   connect();
 
-  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  runToClose(listen_socket_);
   EXPECT_EQ(io_uring_handler_.accept_result_, -1);
   EXPECT_EQ(io_uring_worker_->getSockets().size(), 0);
   cleanup();
@@ -560,9 +569,9 @@ TEST_F(IoUringWorkerIntegrationTest, ServerSocketRead) {
   EXPECT_EQ(io_uring_handler_.read_results_.front(), write_data.length());
 
   socket.close();
-  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  runToClose(server_socket_);
   EXPECT_EQ(io_uring_worker_->getSockets().size(), 0);
-  // cleanup();
+  cleanup();
 }
 
 TEST_F(IoUringWorkerIntegrationTest, ServerSocketReadError) {
@@ -579,6 +588,7 @@ TEST_F(IoUringWorkerIntegrationTest, ServerSocketReadError) {
 
   EXPECT_EQ(io_uring_handler_.read_results_.front(), -EBADF);
 
+  runToClose(server_socket_);
   EXPECT_EQ(io_uring_worker_->getSockets().size(), 0);
   cleanup();
 }
@@ -601,6 +611,7 @@ TEST_F(IoUringWorkerIntegrationTest, ServerSocketRemoteClose) {
 
   EXPECT_EQ(io_uring_handler_.read_results_.front(), 0);
 
+  runToClose(server_socket_);
   EXPECT_EQ(io_uring_worker_->getSockets().size(), 0);
   cleanup();
 }
@@ -637,7 +648,7 @@ TEST_F(IoUringWorkerIntegrationTest, ServerSocketDisable) {
   EXPECT_EQ(io_uring_handler_.read_results_.front(), write_data.length() - 5);
 
   socket.close();
-  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  runToClose(server_socket_);
   EXPECT_EQ(io_uring_worker_->getSockets().size(), 0);
   cleanup();
 }
@@ -669,7 +680,7 @@ TEST_F(IoUringWorkerIntegrationTest, ServerSocketWrite) {
   EXPECT_EQ(io_uring_handler_.write_result_, size);
 
   socket.close();
-  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  runToClose(server_socket_);
   EXPECT_EQ(io_uring_worker_->getSockets().size(), 0);
   cleanup();
 }
