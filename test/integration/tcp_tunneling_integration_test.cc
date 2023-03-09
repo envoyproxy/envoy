@@ -45,7 +45,7 @@ public:
 
   void setUpConnection() {
     codec_client_ = makeHttpConnection(lookupPort("http"));
-    auto encoder_decoder = codec_client_->startRequest(connect_headers_);
+    auto encoder_decoder = codec_client_->startRequest(getRequestHeaderMap());
     request_encoder_ = &encoder_decoder.first;
     response_ = std::move(encoder_decoder.second);
     ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_raw_upstream_connection_));
@@ -67,14 +67,26 @@ public:
     EXPECT_EQ(downstream_received_data, response_->body());
   }
 
-  Http::TestRequestHeaderMapImpl connect_headers_{{":method", "CONNECT"},
-                                                  {":path", "/"},
-                                                  {":protocol", "bytestream"},
-                                                  {":scheme", "https"},
-                                                  {":authority", "foo.lyft.com:80"}};
+  Http::TestRequestHeaderMapImpl connect_headers_h1_{{":method", "CONNECT"},
+                                                     {":authority", "foo.lyft.com:80"}};
+
+  // The client H/2 codec expects the request header map to be in the form of H/1
+  // upgrade to issue an extended CONNECT request
+  Http::TestRequestHeaderMapImpl extended_connect_headers_h2_{
+      {":method", "GET"},        {":path", "/"},       {"upgrade", "bytestream"},
+      {"connection", "upgrade"}, {":scheme", "https"}, {":authority", "foo.lyft.com:80"}};
+
   void clearExtendedConnectHeaders() {
-    connect_headers_.removeProtocol();
-    connect_headers_.removePath();
+    extended_connect_headers_h2_.setMethod("CONNECT");
+    extended_connect_headers_h2_.removeConnection();
+    extended_connect_headers_h2_.removePath();
+    extended_connect_headers_h2_.removeUpgrade();
+  }
+
+  Http::RequestHeaderMap& getRequestHeaderMap() {
+    // TODO(#25290): QUICHE does not support extended CONNECT
+    return downstreamProtocol() == Http::CodecType::HTTP2 ? extended_connect_headers_h2_
+                                                          : connect_headers_h1_;
   }
 
   void sendBidirectionalDataAndCleanShutdown() {
@@ -165,8 +177,12 @@ TEST_P(ConnectTerminationIntegrationTest, BasicAllowPost) {
   initialize();
 
   // Use POST request.
-  connect_headers_.setMethod("POST");
-  connect_headers_.removeProtocol();
+  connect_headers_h1_.setMethod("POST");
+  connect_headers_h1_.setPath("/");
+  connect_headers_h1_.setScheme("https");
+  extended_connect_headers_h2_.setMethod("POST");
+  extended_connect_headers_h2_.removeUpgrade();
+  extended_connect_headers_h2_.removeConnection();
 
   setUpConnection();
   sendBidirectionalDataAndCleanShutdown();
@@ -176,8 +192,7 @@ TEST_P(ConnectTerminationIntegrationTest, UsingHostMatch) {
   exact_match_ = true;
   initialize();
 
-  connect_headers_.removePath();
-  connect_headers_.removeProtocol();
+  clearExtendedConnectHeaders();
 
   setUpConnection();
   sendBidirectionalDataAndCleanShutdown();
@@ -271,12 +286,7 @@ TEST_P(ConnectTerminationIntegrationTest, BuggyHeaders) {
   // Sending a header-only request is probably buggy, but rather than having a
   // special corner case it is treated as a regular half close.
   codec_client_ = makeHttpConnection(lookupPort("http"));
-  response_ = codec_client_->makeHeaderOnlyRequest(
-      Http::TestRequestHeaderMapImpl{{":method", "CONNECT"},
-                                     {":path", "/"},
-                                     {":protocol", "bytestream"},
-                                     {":scheme", "https"},
-                                     {":authority", "foo.lyft.com:80"}});
+  response_ = codec_client_->makeHeaderOnlyRequest(getRequestHeaderMap());
   // If the connection is established (created, set to half close, and then the
   // FIN arrives), make sure the FIN arrives, and send a FIN from upstream.
   if (fake_upstreams_[0]->waitForRawConnection(fake_raw_upstream_connection_) &&
@@ -438,6 +448,15 @@ public:
                 hcm) -> void {
           ConfigHelper::setConnectConfig(hcm, false, false,
                                          downstream_protocol_ == Http::CodecType::HTTP3);
+
+          if (add_upgrade_config_) {
+            auto* route_config = hcm.mutable_route_config();
+            ASSERT_EQ(1, route_config->virtual_hosts_size());
+            auto* route = route_config->mutable_virtual_hosts(0)->add_routes();
+            route->mutable_match()->set_prefix("/");
+            route->mutable_route()->set_cluster("cluster_0");
+            hcm.add_upgrade_configs()->set_upgrade_type("websocket");
+          }
         });
 
     HttpProtocolIntegrationTest::initialize();
@@ -445,7 +464,14 @@ public:
 
   Http::TestRequestHeaderMapImpl connect_headers_{{":method", "CONNECT"},
                                                   {":authority", "foo.lyft.com:80"}};
+  // The client H/2 codec expects the request header map to be in the form of H/1
+  // upgrade to issue an extended CONNECT request
+  Http::TestRequestHeaderMapImpl extended_connect_headers_h2_{
+      {":method", "GET"},        {":path", "/"},       {"upgrade", "websocket"},
+      {"connection", "upgrade"}, {":scheme", "https"}, {":authority", "foo.lyft.com:80"}};
+
   IntegrationStreamDecoderPtr response_;
+  bool add_upgrade_config_{false};
 };
 
 INSTANTIATE_TEST_SUITE_P(
@@ -486,6 +512,64 @@ TEST_P(ProxyingConnectIntegrationTest, ProxyConnect) {
   // Wait for them to arrive downstream.
   response_->waitForHeaders();
   EXPECT_EQ("200", response_->headers().getStatusValue());
+
+  // Make sure that even once the response has started, that data can continue to go upstream.
+  codec_client_->sendData(*request_encoder_, "hello", false);
+  ASSERT_TRUE(upstream_request_->waitForData(*dispatcher_, 5));
+
+  // Also test upstream to downstream data.
+  upstream_request_->encodeData(12, false);
+  response_->waitForBodyData(12);
+
+  cleanupUpstreamAndDownstream();
+}
+
+TEST_P(ProxyingConnectIntegrationTest, ProxyExtendedConnect) {
+  // TODO(#25290): QUICHE does not yet support extended CONNECT
+  if (downstreamProtocol() == Http::CodecType::HTTP3 ||
+      upstreamProtocol() == Http::CodecType::HTTP3) {
+    return;
+  }
+  add_upgrade_config_ = true;
+  initialize();
+
+  // Send request headers.
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto encoder_decoder = codec_client_->startRequest(extended_connect_headers_h2_);
+  request_encoder_ = &encoder_decoder.first;
+  response_ = std::move(encoder_decoder.second);
+
+  // Wait for them to arrive upstream.
+  AssertionResult result =
+      fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_);
+  RELEASE_ASSERT(result, result.message());
+  result = fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_);
+  RELEASE_ASSERT(result, result.message());
+  ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
+  EXPECT_EQ("/", upstream_request_->headers().getPathValue());
+  EXPECT_EQ("foo.lyft.com:80", upstream_request_->headers().getHostValue());
+
+  // The fake upstream server codec will transform extended CONNECT to upgrade headers
+  EXPECT_EQ("GET", upstream_request_->headers().getMethodValue());
+  EXPECT_TRUE(upstream_request_->headers().getProtocolValue().empty());
+  EXPECT_EQ("websocket", upstream_request_->headers().getUpgradeValue());
+  EXPECT_EQ("upgrade", upstream_request_->headers().getConnectionValue());
+
+  Http::TestResponseHeaderMapImpl h1_upgrade_response{
+      {":status", "101"}, {"upgrade", "websocket"}, {"connection", "upgrade"}};
+
+  // Send response headers
+  // The HTTP/1 upstream will observe the upgrade headers and needs to respond with 101
+  // HTTP/2 and HTTP/3 upstreams need to respond to extended CONNECT with 200
+  upstream_request_->encodeHeaders(upstreamProtocol() == Http::CodecType::HTTP1
+                                       ? h1_upgrade_response
+                                       : default_response_headers_,
+                                   false);
+
+  // Wait for them to arrive downstream.
+  response_->waitForHeaders();
+  // The test client codec will transform 200 extended CONNECT response to 101
+  EXPECT_EQ("101", response_->headers().getStatusValue());
 
   // Make sure that even once the response has started, that data can continue to go upstream.
   codec_client_->sendData(*request_encoder_, "hello", false);
