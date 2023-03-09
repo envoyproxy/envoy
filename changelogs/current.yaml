@@ -172,6 +172,12 @@ new_features:
 - area: sni_dynamic_forward_proxy
   change: |
     added an option to dynamically set the port used by the SNI dynamic forward proxy filter, by setting a filter state object under the key ``envoy.upstream.dynamic_port``.
+- area: route
+  change: |
+    support dynamic clusters for :ref:`VirtualHost.matcher <envoy_v3_api_field_config.route.v3.VirtualHost.matcher>`.
+- area: route
+  change: |
+    support route callback after route matches for :ref:`VirtualHost.matcher <envoy_v3_api_field_config.route.v3.VirtualHost.matcher>`.
 
 deprecated:
 - area: ext_authz
