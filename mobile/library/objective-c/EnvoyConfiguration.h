@@ -101,7 +101,7 @@ NS_ASSUME_NONNULL_BEGIN
  Generate a string description of the C++ Envoy bootstrap from this configuration.
  For testing purposes only.
  */
-- (NSString *)bootstrapDebugString;
+- (NSString *)bootstrapDebugDescription;
 
 @end
 

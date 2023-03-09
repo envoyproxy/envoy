@@ -649,7 +649,7 @@ open class EngineBuilder: NSObject {
     )
   }
 
-  func bootstrapDebugString() -> String {
-    self.makeConfig().bootstrapDebugString()
+  func bootstrapDebugDescription() -> String {
+    self.makeConfig().bootstrapDebugDescription()
   }
 }

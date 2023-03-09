@@ -249,7 +249,7 @@
   }
 }
 
-- (NSString *)bootstrapDebugString {
+- (NSString *)bootstrapDebugDescription {
   std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> bootstrap = [self generateBootstrap];
   return @(bootstrap->ShortDebugString().c_str());
 }
