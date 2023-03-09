@@ -144,6 +144,13 @@ public:
   void clearRequestEncoder();
   void onStreamMaxDurationReached();
 
+  // Either disable upstream reading immediately or defer it and keep tracking
+  // of how many read disabling has happened.
+  void readDisableOrDefer(bool disable);
+  // Called upon receiving the first response headers from the upstream. And
+  // applies read disabling to it if there is any pending read disabling.
+  void maybeHandleDeferredReadDisable();
+
   struct DownstreamWatermarkManager : public Http::DownstreamWatermarkCallbacks {
     DownstreamWatermarkManager(UpstreamRequest& parent) : parent_(parent) {}
 
@@ -255,6 +262,18 @@ private:
   // TODO(alyssawilk) remove these with allow_upstream_filters_
   Buffer::InstancePtr buffered_request_body_;
   Http::MetadataMapVector downstream_metadata_map_vector_;
+
+  bool upstream_wait_for_response_headers_before_disabling_read_ : 1;
+  // The number of outstanding readDisable to be called with parameter value true.
+  // When downstream send buffers get above high watermark before response headers arrive, we
+  // increment this counter instead of immediately calling readDisable on upstream stream. This is
+  // to avoid the upstream request from being spuriously retried or reset because of upstream
+  // timeouts while upstream stream is readDisabled by downstream but the response has actually
+  // arrived from upstream. See https://github.com/envoyproxy/envoy/issues/25901. During the
+  // deferring period, if the downstream buffer gets below low watermark, this counter gets
+  // decremented. Once the response headers arrive, call readDisable the number of times as the
+  // remaining value of this counter.
+  size_t deferred_read_disabling_count_{0};
 };
 
 class UpstreamRequestFilterManagerCallbacks : public Http::FilterManagerCallbacks,

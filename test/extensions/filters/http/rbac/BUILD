@@ -32,6 +32,7 @@ envoy_extension_cc_test(
     deps = [
         "//source/extensions/filters/common/rbac:utility_lib",
         "//source/extensions/filters/http/rbac:rbac_filter_lib",
+        "//source/extensions/matching/network/common:inputs_lib",
         "//test/extensions/filters/common/rbac:engine_mocks",
         "//test/extensions/filters/http/rbac:route_config_mocks",
         "//test/mocks/http:http_mocks",
