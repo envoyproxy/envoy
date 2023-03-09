@@ -830,6 +830,13 @@ message HttpConnectionManager {
   // This should be set to `false` in cases where Envoy's view of the downstream address may not correspond to the
   // actual client address, for example, if there's another proxy in front of the Envoy.
   google.protobuf.BoolValue add_proxy_protocol_connection_state = 53;
+
+  // Configurations for RBAC-based authorization audit loggers.
+  // Any RBAC filter in the HTTP filter chain will invoke all the audit loggers configured here if the audit
+  // condition specified in the RBAC is met.
+  //
+  // [#not-implemented-hide:]
+  repeated config.core.v3.TypedExtensionConfig audit_log = 54;
 }
 
 // The configuration to customize local reply returned by Envoy.
