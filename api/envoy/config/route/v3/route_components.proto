@@ -2397,5 +2397,5 @@ message FilterConfig {
   //   created and it is too late to change the chain.
   //
   //   This field only make sense for the downstream HTTP filters for now.
-  bool is_disabled = 3;
+  bool disabled = 3;
 }
