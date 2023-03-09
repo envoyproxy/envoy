@@ -95,6 +95,21 @@ message RBAC {
     LOG = 2;
   }
 
+  // Deny and allow here refer to RBAC decisions, not actions.
+  enum AuditCondition {
+    // Never audit.
+    NONE = 0;
+
+    // Audit when RBAC denies the request.
+    ON_DENY = 1;
+
+    // Audit when RBAC allows the request.
+    ON_ALLOW = 2;
+
+    // Audit whether RBAC allows or denies the request.
+    ON_DENY_AND_ALLOW = 3;
+  }
+
   // The action to take if a policy matches. Every action either allows or denies a request,
   // and can also carry out action-specific operations.
   //
@@ -114,21 +129,6 @@ message RBAC {
   // Maps from policy name to policy. A match occurs when at least one policy matches the request.
   // The policies are evaluated in lexicographic order of the policy name.
   map<string, Policy> policies = 2;
-
-  // Deny and allow here refer to RBAC decisions, not actions.
-  enum AuditCondition {
-    // Never audit.
-    NONE = 0;
-
-    // Audit when RBAC denies the request.
-    ON_DENY = 1;
-
-    // Audit when RBAC allows the request.
-    ON_ALLOW = 2;
-
-    // Audit whether RBAC allows or denies the request.
-    ON_DENY_AND_ALLOW = 3;
-  }
 
   // Condition for the audit logging to be happen, specific to HTTP filters.
   // If condition is met, all the audit loggers configured in the HCM will be invoked.
