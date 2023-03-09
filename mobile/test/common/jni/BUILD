@@ -1,4 +1,4 @@
-load("@envoy//bazel:envoy_build_system.bzl", "envoy_package", "envoy_select_envoy_mobile_listener")
+load("@envoy//bazel:envoy_build_system.bzl", "envoy_package")
 load("//bazel:kotlin_lib.bzl", "envoy_mobile_so_to_jni_lib")
 load("//bazel:envoy_mobile_test_extensions.bzl", "TEST_EXTENSIONS")
 
@@ -64,7 +64,7 @@ cc_library(
         ":server_envoy_jni_lib",
         "//library/common/jni:envoy_jni_lib",
         "@envoy//source/extensions/listener_managers/listener_manager:listener_manager_lib",
-    ]
+    ],
 )
 
 cc_binary(
