@@ -406,79 +406,43 @@ final class EngineBuilderTests: XCTestCase {
   }
 
   func testAddingRtdsAndAdsConfigurationWhenRunningEnvoy() {
-    let expectation = self.expectation(description: "Run called with expected data")
-    MockEnvoyEngine.onRunWithConfig = { config, _ in
-      XCTAssertTrue(config.bootstrapDebugDescription().contains("rtds_layer_name"))
-      XCTAssertTrue(config.bootstrapDebugDescription().contains("initial_fetch_timeout: 14325"))
-      expectation.fulfill()
-    }
-    MockEnvoyEngine.onRunWithConfig = { config, _ in
-      XCTAssertTrue(config.bootstrapDebugDescription().contains("FAKE_SWIFT_ADDRESS"))
-      expectation.fulfill()
-    }
-
-    _ = EngineBuilder()
+    let bootstrapDebugDescription = EngineBuilder()
       .addEngineType(MockEnvoyEngine.self)
       .addRtdsLayer(name: "rtds_layer_name", timeoutSeconds: 14325)
       .setAggregatedDiscoveryService(address: "FAKE_SWIFT_ADDRESS", port: 0)
-      .build()
-    self.waitForExpectations(timeout: 0.01)
+      .bootstrapDebugDescription()
+    print(bootstrapDebugDescription)
+    XCTAssertTrue(bootstrapDebugDescription.contains("rtds_layer_name"))
+    XCTAssertTrue(bootstrapDebugDescription.contains(#"initial_fetch_timeout { seconds: 14325 }"#))
+    XCTAssertTrue(bootstrapDebugDescription.contains("FAKE_SWIFT_ADDRESS"))
   }
 
   func testDefaultValues() {
     // rtds, ads, node_id, node_locality
-    let expectation = self.expectation(description: "Run called with expected data")
-    MockEnvoyEngine.onRunWithConfig = { config, _ in
-      XCTAssertFalse(config.bootstrapDebugDescription().contains("rtds_layer:"))
-      expectation.fulfill()
-    }
-    MockEnvoyEngine.onRunWithConfig = { config, _ in
-      XCTAssertFalse(config.bootstrapDebugDescription().contains("ads_config:"))
-      expectation.fulfill()
-    }
-    MockEnvoyEngine.onRunWithConfig = { config, _ in
-      XCTAssertTrue(config.bootstrapDebugDescription().contains("id: envoy-mobile"))
-      expectation.fulfill()
-    }
-    MockEnvoyEngine.onRunWithConfig = { config, _ in
-      XCTAssertFalse(config.bootstrapDebugDescription().contains("locality:"))
-      expectation.fulfill()
-    }
-
-    _ = EngineBuilder()
+    let bootstrapDebugDescription = EngineBuilder()
       .addEngineType(MockEnvoyEngine.self)
-      .build()
-    self.waitForExpectations(timeout: 0.01)
+      .bootstrapDebugDescription()
+    XCTAssertFalse(bootstrapDebugDescription.contains("rtds_layer:"))
+    XCTAssertFalse(bootstrapDebugDescription.contains("ads_config:"))
+    XCTAssertTrue(bootstrapDebugDescription.contains(#"id: "envoy-mobile""#))
+    XCTAssertFalse(bootstrapDebugDescription.contains("locality:"))
   }
 
   func testCustomNodeId() {
-    let expectation = self.expectation(description: "Run called with expected data")
-    MockEnvoyEngine.onRunWithConfig = { config, _ in
-      XCTAssertTrue(config.bootstrapDebugDescription().contains("id: SWIFT_TEST_NODE_ID"))
-      expectation.fulfill()
-    }
-
-    _ = EngineBuilder()
+    let bootstrapDebugDescription = EngineBuilder()
       .addEngineType(MockEnvoyEngine.self)
       .setNodeId("SWIFT_TEST_NODE_ID")
-      .build()
-    self.waitForExpectations(timeout: 0.01)
+      .bootstrapDebugDescription()
+    XCTAssertTrue(bootstrapDebugDescription.contains(#"id: "SWIFT_TEST_NODE_ID""#))
   }
 
   func testCustomNodeLocality() {
-    let expectation = self.expectation(description: "Run called with expected data")
-    MockEnvoyEngine.onRunWithConfig = { config, _ in
-      XCTAssertTrue(config.bootstrapDebugDescription().contains("region: SWIFT_REGION"))
-      XCTAssertTrue(config.bootstrapDebugDescription().contains("zone: SWIFT_ZONE"))
-      XCTAssertTrue(config.bootstrapDebugDescription().contains("sub_zone: SWIFT_SUB"))
-      expectation.fulfill()
-    }
-
-    _ = EngineBuilder()
-      .addEngineType(MockEnvoyEngine.self)
+    let bootstrapDebugDescription = EngineBuilder()
       .setNodeLocality("SWIFT_REGION", "SWIFT_ZONE", "SWIFT_SUB")
-      .build()
-    self.waitForExpectations(timeout: 0.01)
+      .bootstrapDebugDescription()
+    XCTAssertTrue(bootstrapDebugDescription.contains(#"region: "SWIFT_REGION""#))
+    XCTAssertTrue(bootstrapDebugDescription.contains(#"zone: "SWIFT_ZONE""#))
+    XCTAssertTrue(bootstrapDebugDescription.contains(#"sub_zone: "SWIFT_SUB""#))
   }
 
   func testAddingKeyValueStoreToConfigurationWhenRunningEnvoy() {
