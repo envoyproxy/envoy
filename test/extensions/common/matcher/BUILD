@@ -27,6 +27,7 @@ envoy_cc_test(
         "//source/common/network/matching:data_impl_lib",
         "//source/common/network/matching:inputs_lib",
         "//source/extensions/common/matcher:trie_matcher_lib",
+        "//source/extensions/matching/network/application_protocol:config",
         "//test/common/matcher:test_utility_lib",
         "//test/mocks/http:http_mocks",
         "//test/mocks/matcher:matcher_mocks",

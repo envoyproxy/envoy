@@ -15,6 +15,8 @@
 namespace Envoy {
 namespace TcpProxy {
 
+constexpr absl::string_view DisableTunnelingFilterStateKey = "envoy.tcp_proxy.disable_tunneling";
+
 class TcpConnPool : public GenericConnPool, public Tcp::ConnectionPool::Callbacks {
 public:
   TcpConnPool(Upstream::ThreadLocalCluster& thread_local_cluster,

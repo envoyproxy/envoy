@@ -15,7 +15,6 @@ public final class GRPCRequestHeadersBuilder: HeadersBuilder {
       ":path": [path],
       ":scheme": [scheme],
       "content-type": ["application/grpc"],
-      "x-envoy-mobile-upstream-protocol": [UpstreamHttpProtocol.http2.stringValue],
     ])
   }
 
