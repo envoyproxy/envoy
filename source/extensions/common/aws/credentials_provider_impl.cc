@@ -4,14 +4,13 @@
 
 #include "envoy/common/exception.h"
 
-#include "source/common/common/fmt.h"
 #include "source/common/common/lock_guard.h"
 #include "source/common/http/message_impl.h"
 #include "source/common/http/utility.h"
 #include "source/common/json/json_loader.h"
 #include "source/extensions/common/aws/utility.h"
 
-#include "absl/strings/match.h"
+#include "absl/strings/str_format.h"
 #include "absl/strings/str_split.h"
 
 namespace Envoy {
@@ -115,7 +114,7 @@ void CredentialsFileCredentialsProvider::extractCredentials(const std::string& c
   }
 
   std::string access_key_id, secret_access_key, session_token;
-  std::string profile_start = fmt::format("[{}]", profile);
+  const auto profile_start = absl::StrFormat("[%s]", profile);
 
   bool found_profile = false;
   std::string line;
@@ -138,19 +137,20 @@ void CredentialsFileCredentialsProvider::extractCredentials(const std::string& c
 
       std::vector<std::string> parts = absl::StrSplit(line, absl::MaxSplits('=', 1));
       if (parts.size() == 2) {
-        auto upper = StringUtil::toUpper(parts[0]);
-        if (upper == AWS_ACCESS_KEY_ID) {
-          access_key_id = parts[1];
-        } else if (upper == AWS_SECRET_ACCESS_KEY) {
-          secret_access_key = parts[1];
-        } else if (upper == AWS_SESSION_TOKEN) {
-          session_token = parts[1];
+        const auto key = StringUtil::toUpper(StringUtil::trim(parts[0]));
+        const auto val = StringUtil::trim(parts[1]);
+        if (key == AWS_ACCESS_KEY_ID) {
+          access_key_id = val;
+        } else if (key == AWS_SECRET_ACCESS_KEY) {
+          secret_access_key = val;
+        } else if (key == AWS_SESSION_TOKEN) {
+          session_token = val;
         }
       }
     }
   }
 
-  ENVOY_LOG(debug, "Found following AWS credentials for profile '{}' in {}: {}={}, {}={}, {}={}",
+  ENVOY_LOG(error, "Found following AWS credentials for profile '{}' in {}: {}={}, {}={}, {}={}",
             profile, credentials_file, AWS_ACCESS_KEY_ID, access_key_id, AWS_SECRET_ACCESS_KEY,
             secret_access_key.empty() ? "" : "*****", AWS_SESSION_TOKEN,
             session_token.empty() ? "" : "*****");

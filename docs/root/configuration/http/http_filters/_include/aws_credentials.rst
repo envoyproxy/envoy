@@ -1,9 +1,9 @@
 Credentials
 -----------
 
-The filter uses a few different methods to obtain an AWS access key ID, AWS secret access key, and AWS session token. It moves through
-the methods in the order described below, stopping when one of the methods returns an access key ID and a secret access key (the session
-token is optional).
+The filter uses a few different credentials providers to obtain an AWS access key ID, AWS secret access key, and AWS session token.
+It moves through the credentials providers in the order described below, stopping when one of them returns an access key ID and a
+secret access key (the session token is optional).
 
 1. Environment variables. The environment variables AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, and AWS_SESSION_TOKEN are used.
 
@@ -12,5 +12,5 @@ token is optional).
    'aws_session_token' defined for the profile in the credentials file are used. These credentials are cached for 1 hour.
 
 3. Either EC2 instance metadata or ECS task metadata. For EC2 instance metadata, the fields 'AccessKeyId', 'SecretAccessKey', and
-   'Token' are used, and credentials are cached for 1 hour. For ECS task meatadata, the fields AccessKeyId', 'SecretAccessKey', and
+   'Token' are used, and credentials are cached for 1 hour. For ECS task metadata, the fields AccessKeyId', 'SecretAccessKey', and
    'Token' are used, and credentials are cached for 1 hour or until they expire (according to the field 'Expiration').

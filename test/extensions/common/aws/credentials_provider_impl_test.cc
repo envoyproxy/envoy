@@ -35,6 +35,15 @@ aws_session_token=profile1_token
 
 [profile2]
 aws_access_key_id=profile2_access_key
+
+[profile3]
+aws_access_key_id=profile3_access_key
+aws_secret_access_key=
+
+[profile4]
+aws_access_key_id = profile4_access_key
+aws_secret_access_key = profile4_secret
+aws_session_token = profile4_token
 )";
 
 class EvironmentCredentialsProviderTest : public testing::Test {
@@ -148,7 +157,26 @@ TEST_F(CredentialsFileCredentialsProviderTest, CompleteProfile) {
   EXPECT_EQ("profile1_token", credentials.sessionToken().value());
 }
 
+TEST_F(CredentialsFileCredentialsProviderTest, EmptySecret) {
+  setUpTest(CREDENTIALS_FILE_CONTENTS, "profile3");
+
+  const auto credentials = provider_.getCredentials();
+  EXPECT_EQ("profile3_access_key", credentials.accessKeyId().value());
+  EXPECT_FALSE(credentials.secretAccessKey().has_value());
+  EXPECT_FALSE(credentials.sessionToken().has_value());
+}
+
+TEST_F(CredentialsFileCredentialsProviderTest, SpacesBetweenParts) {
+  setUpTest(CREDENTIALS_FILE_CONTENTS, "profile4");
+
+  const auto credentials = provider_.getCredentials();
+  EXPECT_EQ("profile4_access_key", credentials.accessKeyId().value());
+  EXPECT_EQ("profile4_secret", credentials.secretAccessKey().value());
+  EXPECT_EQ("profile4_token", credentials.sessionToken().value());
+}
+
 TEST_F(CredentialsFileCredentialsProviderTest, EmptyCredsCached) {
+  InSequence sequence;
   TestEnvironment::setEnvVar("AWS_SHARED_CREDENTIALS_FILE", "/file/does/not/exist", 1);
 
   auto credentials = provider_.getCredentials();
@@ -163,6 +191,12 @@ TEST_F(CredentialsFileCredentialsProviderTest, EmptyCredsCached) {
   EXPECT_FALSE(credentials.accessKeyId().has_value());
   EXPECT_FALSE(credentials.secretAccessKey().has_value());
   EXPECT_FALSE(credentials.sessionToken().has_value());
+
+  time_system_.advanceTimeWait(std::chrono::hours(2));
+  credentials = provider_.getCredentials();
+  EXPECT_EQ("profile1_acc=ess_key", credentials.accessKeyId().value());
+  EXPECT_EQ("profile1_secret", credentials.secretAccessKey().value());
+  EXPECT_EQ("profile1_token", credentials.sessionToken().value());
 }
 
 class MessageMatcher : public testing::MatcherInterface<Http::RequestMessage&> {
