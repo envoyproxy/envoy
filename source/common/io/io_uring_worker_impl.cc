@@ -390,6 +390,7 @@ void IoUringServerSocket::write(Buffer::Instance& data) {
 
   if (write_req_ != nullptr) {
     ENVOY_LOG(trace, "write already submited, fd = {}", fd_);
+    return;
   }
 
   ENVOY_LOG(trace, "write buf, size = {}, slices = {}", write_buf_.length(),
@@ -408,6 +409,7 @@ uint64_t IoUringServerSocket::write(const Buffer::RawSlice* slices, uint64_t num
 
   if (write_req_ != nullptr) {
     ENVOY_LOG(trace, "write already submited, fd = {}", fd_);
+    return bytes_written;
   }
 
   submitWriteRequest();
