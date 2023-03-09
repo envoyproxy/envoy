@@ -183,6 +183,7 @@ jobs:
             $([ -z $GITHUB_TOKEN ] || echo "--config=remote-ci-macos") \
             --remote_header="Authorization=Bearer $GITHUB_TOKEN" \
             --define=admin_functionality=enabled \
+            --define envoy_mobile_listener=enabled \
             //test/swift/apps/experimental:app &> /tmp/envoy.log &
     - run: sed '/received headers with status 200/q' <(touch /tmp/envoy.log && tail -F /tmp/envoy.log)
       if: steps.should_run.outputs.run_ci_job == 'true'
