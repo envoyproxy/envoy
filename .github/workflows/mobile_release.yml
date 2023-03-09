@@ -1,9 +1,6 @@
 name: mobile_release
 
 on:
-  push:
-    branches:
-    - *
   pull_request:
   workflow_dispatch:
   schedule:
