@@ -14,10 +14,13 @@ envoy_cc_library(
     srcs = ["header_mutation.cc"],
     hdrs = ["header_mutation.h"],
     deps = [
-        "//envoy/http:early_header_mutation_interface",
+        "//envoy/server:filter_config_interface",
+        "//source/common/config:utility_lib",
+        "//source/common/http:header_map_lib",
         "//source/common/http:header_mutation_lib",
-        "@envoy_api//envoy/config/common/mutation_rules/v3:pkg_cc_proto",
-        "@envoy_api//envoy/extensions/http/early_header_mutation/header_mutation/v3:pkg_cc_proto",
+        "//source/common/protobuf:utility_lib",
+        "//source/extensions/filters/http/common:pass_through_filter_lib",
+        "@envoy_api//envoy/extensions/filters/http/header_mutation/v3:pkg_cc_proto",
     ],
 )
 
@@ -27,9 +30,9 @@ envoy_cc_extension(
     hdrs = ["config.h"],
     deps = [
         ":header_mutation_lib",
-        "//envoy/http:early_header_mutation_interface",
         "//envoy/registry",
-        "//source/common/config:utility_lib",
-        "@envoy_api//envoy/extensions/http/early_header_mutation/header_mutation/v3:pkg_cc_proto",
+        "//source/common/protobuf:utility_lib",
+        "//source/extensions/filters/http/common:factory_base_lib",
+        "@envoy_api//envoy/extensions/filters/http/header_mutation/v3:pkg_cc_proto",
     ],
 )

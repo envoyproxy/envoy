@@ -157,6 +157,9 @@ new_features:
   change: |
     added :ref:`failed_status_in_metadata <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.JwtProvider.failed_status_in_metadata>` to support setting the JWT
     authentication failure status code and message in dynamic metadata.
+- area: http filter
+  change: |
+    added :ref:`header mutation http filter <config_http_filters_header_mutation>` which adds the ability to modify request and response headers in any position of HTTP filter chain.
 - area: matching
   change: |
     added :ref:`Filter State Input <envoy_v3_api_msg_extensions.matching.common_inputs.network.v3.FilterStateInput>` for matching based on filter state objects.
