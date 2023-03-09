@@ -270,6 +270,12 @@ TEST_F(IoUringSocketHandleImplIntegrationTest, Readv) {
         auto ret = server_io_handler->readv(11, reservation.slices(), reservation.numSlices());
         EXPECT_EQ(ret.return_value_, data.size());
         reservation.commit(ret.return_value_);
+
+        // Read again would expect the EAGAIN returned.
+        Buffer::Reservation reservation2 = read_buffer.reserveForRead();
+        ret = server_io_handler->readv(11, reservation2.slices(), reservation2.numSlices());
+        EXPECT_TRUE(ret.wouldBlock());
+        reservation2.commit(0);
       },
       Event::PlatformDefaultTriggerType, Event::FileReadyType::Read);
 

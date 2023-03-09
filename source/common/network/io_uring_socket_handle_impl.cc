@@ -108,6 +108,13 @@ IoUringSocketHandleImpl::readv(uint64_t max_length, Buffer::RawSlice* slices, ui
         0, Api::IoErrorPtr(new IoSocketError(-read_param_->result_), IoSocketError::deleteIoError)};
   }
 
+  // This mean the buffer ready read by previous call, return EAGAIN to tell the
+  // caller waiting for next read event.
+  if (read_param_->buf_.length() == 0) {
+    return {0, Api::IoErrorPtr(IoSocketError::getIoSocketEagainInstance(),
+                               IoSocketError::deleteIoError)};
+  }
+
   const uint64_t max_read_length =
       std::min(max_length, static_cast<uint64_t>(read_param_->result_));
   uint64_t num_bytes_to_read =
