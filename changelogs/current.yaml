@@ -32,9 +32,15 @@ minor_behavior_changes:
 - area: http2
   change: |
     Metadata is parsed with the QUICHE HPACK library, rather than nghttp2. This behavior change can be reverted by setting ``envoy.reloadable_features.http2_decode_metadata_with_quiche`` to ``false``.
+- area: upstream
+  change: |
+    Changed HTTP/1 and HTTP/3 upstream streams not to disable reading (in case where downstream buffer reaches high watermark) till the full response headers have been received. This fixes a bug where Envoy upstream timeouts were not correctly adjusting to the fact that the response headers have already been sent from upstream. This behavior change can be reverted by setting ``envoy.reloadable_features.upstream_wait_for_response_headers_before_disabling_read`` to ``false``.
 - area: custom response
   change: |
     Changed how the uri for redirect policy is specified. It can now be specified either as a single fully qualified string, or by specifying individual components of the uri.
+- area: matchers
+  change: |
+    Moved all of the network input matchers to extensions. If you use network matchers and override extensions_build_config.bzl you will now need to include them explicitly.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
@@ -169,6 +175,15 @@ new_features:
 - area: sni_dynamic_forward_proxy
   change: |
     added an option to dynamically set the port used by the SNI dynamic forward proxy filter, by setting a filter state object under the key ``envoy.upstream.dynamic_port``.
+- area: route
+  change: |
+    support dynamic clusters for :ref:`VirtualHost.matcher <envoy_v3_api_field_config.route.v3.VirtualHost.matcher>`.
+- area: route
+  change: |
+    support route callback after route matches for :ref:`VirtualHost.matcher <envoy_v3_api_field_config.route.v3.VirtualHost.matcher>`.
+- area: tcp_proxy
+  change: |
+    added an option to dynamically disable TCP tunneling even if set in the filter config, by setting a filter state object for the key ``envoy.tcp_proxy.disable_tunneling``.
 
 deprecated:
 - area: ext_authz

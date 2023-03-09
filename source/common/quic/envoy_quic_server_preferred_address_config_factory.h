@@ -3,6 +3,7 @@
 #include "envoy/config/typed_config.h"
 #include "envoy/network/address.h"
 #include "envoy/protobuf/message_validator.h"
+#include "envoy/server/process_context.h"
 
 #include "quiche/quic/platform/api/quic_socket_address.h"
 
@@ -38,7 +39,8 @@ public:
    */
   virtual EnvoyQuicServerPreferredAddressConfigPtr
   createServerPreferredAddressConfig(const Protobuf::Message& config,
-                                     ProtobufMessage::ValidationVisitor& validation_visitor) PURE;
+                                     ProtobufMessage::ValidationVisitor& validation_visitor,
+                                     ProcessContextOptRef context) PURE;
 };
 
 } // namespace Quic
