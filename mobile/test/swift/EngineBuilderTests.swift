@@ -408,12 +408,12 @@ final class EngineBuilderTests: XCTestCase {
   func testAddingRtdsAndAdsConfigurationWhenRunningEnvoy() {
     let expectation = self.expectation(description: "Run called with expected data")
     MockEnvoyEngine.onRunWithConfig = { config, _ in
-      XCTAssertTrue(config.generateYamlString().contains("rtds_layer_name"))
-      XCTAssertTrue(config.generateYamlString().contains("initial_fetch_timeout: 14325"))
+      XCTAssertTrue(config.bootstrapDebugDescription().contains("rtds_layer_name"))
+      XCTAssertTrue(config.bootstrapDebugDescription().contains("initial_fetch_timeout: 14325"))
       expectation.fulfill()
     }
     MockEnvoyEngine.onRunWithConfig = { config, _ in
-      XCTAssertTrue(config.generateYamlString().contains("FAKE_SWIFT_ADDRESS"))
+      XCTAssertTrue(config.bootstrapDebugDescription().contains("FAKE_SWIFT_ADDRESS"))
       expectation.fulfill()
     }
 
@@ -429,19 +429,19 @@ final class EngineBuilderTests: XCTestCase {
     // rtds, ads, node_id, node_locality
     let expectation = self.expectation(description: "Run called with expected data")
     MockEnvoyEngine.onRunWithConfig = { config, _ in
-      XCTAssertFalse(config.generateYamlString().contains("rtds_layer:"))
+      XCTAssertFalse(config.bootstrapDebugDescription().contains("rtds_layer:"))
       expectation.fulfill()
     }
     MockEnvoyEngine.onRunWithConfig = { config, _ in
-      XCTAssertFalse(config.generateYamlString().contains("ads_config:"))
+      XCTAssertFalse(config.bootstrapDebugDescription().contains("ads_config:"))
       expectation.fulfill()
     }
     MockEnvoyEngine.onRunWithConfig = { config, _ in
-      XCTAssertTrue(config.generateYamlString().contains("id: envoy-mobile"))
+      XCTAssertTrue(config.bootstrapDebugDescription().contains("id: envoy-mobile"))
       expectation.fulfill()
     }
     MockEnvoyEngine.onRunWithConfig = { config, _ in
-      XCTAssertFalse(config.generateYamlString().contains("locality:"))
+      XCTAssertFalse(config.bootstrapDebugDescription().contains("locality:"))
       expectation.fulfill()
     }
 
@@ -454,7 +454,7 @@ final class EngineBuilderTests: XCTestCase {
   func testCustomNodeId() {
     let expectation = self.expectation(description: "Run called with expected data")
     MockEnvoyEngine.onRunWithConfig = { config, _ in
-      XCTAssertTrue(config.generateYamlString().contains("id: SWIFT_TEST_NODE_ID"))
+      XCTAssertTrue(config.bootstrapDebugDescription().contains("id: SWIFT_TEST_NODE_ID"))
       expectation.fulfill()
     }
 
@@ -468,9 +468,9 @@ final class EngineBuilderTests: XCTestCase {
   func testCustomNodeLocality() {
     let expectation = self.expectation(description: "Run called with expected data")
     MockEnvoyEngine.onRunWithConfig = { config, _ in
-      XCTAssertTrue(config.generateYamlString().contains("region: SWIFT_REGION"))
-      XCTAssertTrue(config.generateYamlString().contains("zone: SWIFT_ZONE"))
-      XCTAssertTrue(config.generateYamlString().contains("sub_zone: SWIFT_SUB"))
+      XCTAssertTrue(config.bootstrapDebugDescription().contains("region: SWIFT_REGION"))
+      XCTAssertTrue(config.bootstrapDebugDescription().contains("zone: SWIFT_ZONE"))
+      XCTAssertTrue(config.bootstrapDebugDescription().contains("sub_zone: SWIFT_SUB"))
       expectation.fulfill()
     }
 
