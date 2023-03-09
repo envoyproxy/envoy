@@ -325,9 +325,12 @@ protected:
     processor_stream_->sendGrpcMessage(response);
   }
 
+  // The new timeout message is ignored by Envoy due to different reasons, like
+  // new_timeout setting is out-of-range, or max_message_timeout is not configured.
   void newTimeoutWrongConfigTest(const uint32_t timeout_ms) {
     // Set envoy filter timeout to be 200ms.
     proto_config_.mutable_message_timeout()->set_nanos(200000000);
+    // Config max_message_timeout proto to enable the new timeout API.
     if (max_message_timeout_ms_) {
       if (max_message_timeout_ms_ < 1000) {
         proto_config_.mutable_max_message_timeout()->set_nanos(max_message_timeout_ms_ * 1000000);
@@ -347,7 +350,7 @@ protected:
                                    timeSystem().advanceTimeWaitImpl(300ms);
                                    return true;
                                  });
-    // Verify the new timer is not started with direction unspecified,
+    // Verify the new timer is not started and the original timer timeouts,
     // and downstream receives 500.
     verifyDownstreamResponse(*response, 500);
   }
@@ -1760,10 +1763,12 @@ TEST_P(ExtProcIntegrationTest, PerRouteGrpcService) {
   EXPECT_THAT(response->headers(), SingleHeaderValueIs("x-response-processed", "1"));
 }
 
-// Extending timeout in both downstream request and upstream response handling path.
+// Sending new timeout API in both downstream request and upstream response
+// handling path with header mutation.
 TEST_P(ExtProcIntegrationTest, RequestAndResponseMessageNewTimeoutWithHeaderMutation) {
   // Set envoy filter timeout to be 200ms.
   proto_config_.mutable_message_timeout()->set_nanos(200000000);
+  // Config max_message_timeout proto to 10s to enable the new timeout API.
   proto_config_.mutable_max_message_timeout()->set_seconds(10);
 
   initializeConfig();
@@ -1779,6 +1784,7 @@ TEST_P(ExtProcIntegrationTest, RequestAndResponseMessageNewTimeoutWithHeaderMuta
             {":path", "/"},      {"x-remove-this", "yes"}, {"x-forwarded-proto", "http"}};
         EXPECT_THAT(headers.headers(), HeaderProtosEqual(expected_request_headers));
 
+        // Sending the new timeout API to extend the timeout.
         serverSendNewTimeout(500);
         // ext_proc server stays idle for 300ms.
         timeSystem().advanceTimeWaitImpl(300ms);
@@ -1804,6 +1810,7 @@ TEST_P(ExtProcIntegrationTest, RequestAndResponseMessageNewTimeoutWithHeaderMuta
       *grpc_upstreams_[0], false, [this](const HttpHeaders& headers, HeadersResponse&) {
         Http::TestRequestHeaderMapImpl expected_response_headers{{":status", "200"}};
         EXPECT_THAT(headers.headers(), HeaderProtosEqual(expected_response_headers));
+        // Sending the new timeout API to extend the timeout.
         serverSendNewTimeout(500);
         // ext_proc server stays idle for 300ms.
         timeSystem().advanceTimeWaitImpl(300ms);
@@ -1817,6 +1824,7 @@ TEST_P(ExtProcIntegrationTest, RequestAndResponseMessageNewTimeoutWithHeaderMuta
 TEST_P(ExtProcIntegrationTest, RequestMessageNewTimeoutNoMutation) {
   // Set envoy filter timeout to be 200ms.
   proto_config_.mutable_message_timeout()->set_nanos(200000000);
+  // Config max_message_timeout proto to 10s to enable the new timeout API.
   proto_config_.mutable_max_message_timeout()->set_seconds(10);
 
   initializeConfig();
@@ -1825,6 +1833,7 @@ TEST_P(ExtProcIntegrationTest, RequestMessageNewTimeoutNoMutation) {
 
   processRequestHeadersMessage(*grpc_upstreams_[0], true,
                                [this](const HttpHeaders&, HeadersResponse&) {
+                                 // Sending the new timeout API to extend the timeout.
                                  serverSendNewTimeout(500);
                                  // ext_proc server stays idle for 300ms before sending back the
                                  // response.
@@ -1847,6 +1856,7 @@ TEST_P(ExtProcIntegrationTest, RequestMessageNewTimeoutNoMutation) {
 TEST_P(ExtProcIntegrationTest, RequestMessageNoMutationMultipleNewTimeout) {
   // Set envoy filter timeout to be 200ms.
   proto_config_.mutable_message_timeout()->set_nanos(200000000);
+  // Config max_message_timeout proto to 10s to enable the new timeout API.
   proto_config_.mutable_max_message_timeout()->set_seconds(10);
   initializeConfig();
   HttpIntegrationTest::initialize();
@@ -1856,12 +1866,13 @@ TEST_P(ExtProcIntegrationTest, RequestMessageNoMutationMultipleNewTimeout) {
                                [this](const HttpHeaders&, HeadersResponse&) {
                                  // Send a 500ms new timeout update first.
                                  serverSendNewTimeout(500);
-                                 // After wait for 100ms, send another 50ms new timeout update
-                                 // then waiting for another 300ms and verify no timeout happened,
-                                 // and traffic went through fine. This proves the 2nd new timeout
-                                 // update is ignored.
+                                 // Server wait for 100ms.
                                  timeSystem().advanceTimeWaitImpl(100ms);
+                                 // Send the 2nd 10ms new timeout update.
+                                 // The update is ignored by Envoy. No timeout event
+                                 // happened and the traffic went through fine.
                                  serverSendNewTimeout(10);
+                                 // Server wait for 300ms
                                  timeSystem().advanceTimeWaitImpl(300ms);
                                  return true;
                                });
@@ -1876,27 +1887,23 @@ TEST_P(ExtProcIntegrationTest, RequestMessageNoMutationMultipleNewTimeout) {
   verifyDownstreamResponse(*response, 200);
 }
 
+// Setting new timeout 0ms which is < 1ms. The message is ignored.
 TEST_P(ExtProcIntegrationTest, RequestMessageNewTimeoutNegativeTestTimeoutTooSmall) {
+  // Config max_message_timeout proto to 10s to enable the new timeout API.
   max_message_timeout_ms_ = 10000;
   newTimeoutWrongConfigTest(0);
 }
 
-TEST_P(ExtProcIntegrationTest, RequestMessageNewTimeoutNegativeTestTimeoutTooBig) {
-  max_message_timeout_ms_ = 10000;
-  newTimeoutWrongConfigTest(20000);
-}
-
+// Setting max_message_timeout proto to be 100ms. And send the new timeout 500ms
+// which is > max_message_timeout(100ms). The message is ignored.
 TEST_P(ExtProcIntegrationTest, RequestMessageNewTimeoutNegativeTestTimeoutTooBigWithSmallMax) {
+  // Config max_message_timeout proto to 100ms to enable the new timeout API.
   max_message_timeout_ms_ = 100;
-  // With max_message_timeout set to be 100ms, the 500ms new_timeout is not accepted any more.
-  // So, with the original 200ms timer, and 300ms delay, timeout happens.
   newTimeoutWrongConfigTest(500);
 }
 
+// Not setting the max_message_timeout effectively disabled the new timeout API.
 TEST_P(ExtProcIntegrationTest, RequestMessageNewTimeoutNegativeTestTimeoutNotAcceptedDefaultMax) {
-  // With max_message_timeout is not set, and Envoy take the default value zero,
-  // the 500ms new_timeout is not accepted any more.
-  // So, with the original 200ms timer, and 300ms delay, timeout happens.
   newTimeoutWrongConfigTest(500);
 }
 
