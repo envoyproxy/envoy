@@ -334,7 +334,7 @@ class EnvoyConfigurationTest {
       rtdsLayerName = "fake_rtds_layer", rtdsTimeoutSeconds = 5432, adsAddress = "FAKE_ADDRESS", adsPort = 0
     )
 
-    val resolvedTemplate = envoyConfiguration.createYaml()
+    val resolvedTemplate = TestJni.createYaml(envoyConfiguration)
 
     assertThat(resolvedTemplate).contains("fake_rtds_layer");
     assertThat(resolvedTemplate).contains("FAKE_ADDRESS");
@@ -348,7 +348,7 @@ class EnvoyConfigurationTest {
       rtdsLayerName = "fake_rtds_layer", adsAddress = "FAKE_ADDRESS", adsPort = 0
     )
 
-    val resolvedTemplate = envoyConfiguration.createYaml()
+    val resolvedTemplate = TestJni.createYaml(envoyConfiguration)
 
     assertThat(resolvedTemplate).contains("initial_fetch_timeout: 5s")
   }
