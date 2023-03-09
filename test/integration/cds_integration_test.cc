@@ -223,7 +223,6 @@ TEST_P(CdsIntegrationTest, CdsClusterTeardownWhileConnecting) {
 }
 
 class LazyInitClusterStatsTest : public CdsIntegrationTest {
-
 public:
   void initialize() {
     use_real_stats_ = true;
@@ -248,6 +247,14 @@ public:
 
     sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(
         Config::TypeUrl::get().Cluster, {cluster1_updated}, {cluster1_updated}, {}, "42");
+  }
+
+  void removeClusters(const std::vector<std::string>& removed) {
+    auto cluster_removed = test_server_->counter("cluster_manager.cluster_removed")->value();
+    sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(Config::TypeUrl::get().Cluster, {},
+                                                               {}, removed, "42");
+    test_server_->waitForCounterGe("cluster_manager.cluster_removed",
+                                   cluster_removed + removed.size());
   }
 };
 
@@ -276,9 +283,7 @@ TEST_P(LazyInitClusterStatsTest, LazyInitTrafficStatsWithClusterCreateUpdateDele
   // cluster_1 traffic stats not lost.
   EXPECT_EQ(test_server_->counter("cluster.cluster_1.upstream_cx_total")->value(), 1);
   // Remove "cluster_1".
-  sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(Config::TypeUrl::get().Cluster, {}, {},
-                                                             {ClusterName1}, "42");
-  test_server_->waitForCounterGe("cluster_manager.cluster_removed", 1);
+  removeClusters({ClusterName1});
   // update_success is 3: initialize(), update cluster1. and remove cluster1.
   test_server_->waitForCounterGe("cluster_manager.cds.update_success", 3);
   sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(Config::TypeUrl::get().Cluster,
@@ -289,7 +294,7 @@ TEST_P(LazyInitClusterStatsTest, LazyInitTrafficStatsWithClusterCreateUpdateDele
   EXPECT_EQ(test_server_->gauge("cluster.cluster_1.ClusterTrafficStats.initialized"), nullptr);
   EXPECT_EQ(test_server_->counter("cluster.cluster_1.upstream_cx_total"), nullptr);
 
-  // No cluster_2 stats yet.
+  // No cluster_2 traffic stats.
   EXPECT_EQ(test_server_->gauge("cluster.cluster_2.ClusterTrafficStats.initialized")->value(), 0);
   EXPECT_EQ(test_server_->counter("cluster.cluster_2.upstream_cx_total"), nullptr);
 }
@@ -305,15 +310,13 @@ TEST_P(LazyInitClusterStatsTest, LazyInitTrafficStatsWithClusterCreateDeleteRecr
   EXPECT_EQ(test_server_->gauge("cluster.cluster_1.ClusterTrafficStats.initialized")->value(), 1);
   EXPECT_EQ(test_server_->counter("cluster.cluster_1.upstream_cx_total")->value(), 1);
   // Remove "cluster_1".
-  sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(Config::TypeUrl::get().Cluster, {}, {},
-                                                             {ClusterName1}, "49");
-  test_server_->waitForCounterGe("cluster_manager.cluster_removed", 1);
+  removeClusters({ClusterName1});
   test_server_->waitForCounterGe("cluster_manager.cds.update_success", 2);
   sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(Config::TypeUrl::get().Cluster,
                                                              {cluster2_}, {cluster2_}, {}, "43");
   test_server_->waitForCounterGe("cluster_manager.cds.update_success", 3);
   EXPECT_EQ(test_server_->counter("cluster_manager.cluster_added")->value(), 3);
-  // No cluster_2 stats yet.
+  // No cluster_2 traffic stats.
   EXPECT_EQ(test_server_->gauge("cluster.cluster_2.ClusterTrafficStats.initialized")->value(), 0);
   EXPECT_EQ(test_server_->counter("cluster.cluster_2.upstream_cx_total"), nullptr);
   // Now the cluster_1 stats are gone, as well as the lazy init wrapper.

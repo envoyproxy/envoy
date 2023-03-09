@@ -79,6 +79,9 @@ private:
   // To do that we keep an "initialized" gauge in the cluster's scope, which will be associated by
   // name to the previous generation's cluster's lazy-init block. We use the value in this shared
   // gauge to determine whether to instantiate the lazy block on construction.
+  // TODO(stevenzzzz,jmarantz): See #14610. The initialized_ gauge could be disabled in a corner
+  // case where a user disables stats with suffix "initialized".
+  // In which case, the initialized_ will be a NullGauge, which breaks the above scenaio 2.
   Gauge& initialized_;
   // TODO(stevenzzzz, jmarantz): Clean up this ctor_ by moving its ownership to AtomicPtr, and drop
   // the setter lambda when the nested object is created.
