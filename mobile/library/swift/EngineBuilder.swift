@@ -693,7 +693,7 @@ open class EngineBuilder: NSObject {
       appVersion: self.appVersion,
       appId: self.appId,
       virtualClusters: self.virtualClusters,
-      runtimeGuards: self.runtimeGuards,
+      runtimeGuards: self.runtimeGuards.mapValues({ "\($0)" }),
       typedDirectResponses: self.directResponses.map({ $0.toObjC() }),
       nativeFilterChain: self.nativeFilterChain,
       platformFilterChain: self.platformFilterChain,
