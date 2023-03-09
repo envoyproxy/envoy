@@ -836,6 +836,7 @@ message HttpConnectionManager {
   // condition specified in the RBAC is met.
   //
   // [#not-implemented-hide:]
+  // [#extension-category: envoy.audit_loggers]
   repeated config.core.v3.TypedExtensionConfig audit_log = 54;
 }
 
