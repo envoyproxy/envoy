@@ -71,6 +71,21 @@ EXTENSIONS = {
     "envoy.matching.matchers.ip":                       "//source/extensions/matching/input_matchers/ip:config",
 
     #
+    # Network Matchers
+    #
+
+    "envoy.matching.inputs.application_protocol":       "//source/extensions/matching/network/application_protocol:config",
+    # Ideally these would be split up. We'll do so if anyone cares.
+    "envoy.matching.inputs.destination_ip":             "//source/extensions/matching/network/common:inputs_lib",
+    "envoy.matching.inputs.destination_port":           "//source/extensions/matching/network/common:inputs_lib",
+    "envoy.matching.inputs.source_ip":                  "//source/extensions/matching/network/common:inputs_lib",
+    "envoy.matching.inputs.source_port":                "//source/extensions/matching/network/common:inputs_lib",
+    "envoy.matching.inputs.direct_source_ip":           "//source/extensions/matching/network/common:inputs_lib",
+    "envoy.matching.inputs.source_type":                "//source/extensions/matching/network/common:inputs_lib",
+    "envoy.matching.inputs.server_name":                "//source/extensions/matching/network/common:inputs_lib",
+    "envoy.matching.inputs.transport_protocol":         "//source/extensions/matching/network/common:inputs_lib",
+
+    #
     # Generic Inputs
     #
 

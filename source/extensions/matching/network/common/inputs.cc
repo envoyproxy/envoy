@@ -1,4 +1,4 @@
-#include "source/common/network/matching/inputs.h"
+#include "source/extensions/matching/network/common/inputs.h"
 
 #include "envoy/http/filter.h"
 #include "envoy/registry/registry.h"
@@ -14,15 +14,6 @@ Matcher::DataInputGetResult TransportProtocolInput::get(const MatchingData& data
   if (!transport_protocol.empty()) {
     return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,
             std::string(transport_protocol)};
-  }
-  return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::nullopt};
-}
-
-Matcher::DataInputGetResult ApplicationProtocolInput::get(const MatchingData& data) const {
-  const auto& protocols = data.socket().requestedApplicationProtocols();
-  if (!protocols.empty()) {
-    return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,
-            absl::StrCat("'", absl::StrJoin(protocols, "','"), "'")};
   }
   return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::nullopt};
 }
@@ -87,7 +78,6 @@ REGISTER_FACTORY(SourceTypeInputFactory, Matcher::DataInputFactory<MatchingData>
 REGISTER_FACTORY(HttpSourceTypeInputFactory, Matcher::DataInputFactory<Http::HttpMatchingData>);
 
 REGISTER_FACTORY(TransportProtocolInputFactory, Matcher::DataInputFactory<MatchingData>);
-REGISTER_FACTORY(ApplicationProtocolInputFactory, Matcher::DataInputFactory<MatchingData>);
 REGISTER_FACTORY(FilterStateInputFactory, Matcher::DataInputFactory<MatchingData>);
 
 } // namespace Matching
