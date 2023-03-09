@@ -1,34 +1,26 @@
 version: "3.8"
 services:
 
-  # base images
-  flask_service:
-    build:
-      context: ../shared/flask
-    image: flask_service:python-3.10-slim-bullseye
-    restart: "no"
-    deploy:
-      replicas: 0
-
-  tracing:
-    build:
-      context: ../shared/tracing
-    image: envoyproxy:tracing
-    restart: "no"
-    deploy:
-      replicas: 0
-
   # jaeger
   front-envoy:
     build:
       context: .
       dockerfile: Dockerfile-frontenvoy
+    depends_on:
+      service1:
+        condition: service_healthy
+      service2:
+        condition: service_healthy
     ports:
     - "${PORT_PROXY:-10000}:8000"
 
   service1:
     build:
-      context: ../shared/tracing
+      context: ../shared/flask
+      target: tracing-flask
+    depends_on:
+      jaeger:
+        condition: service_started
     volumes:
     - ./service1-envoy-jaeger.yaml:/etc/service-envoy.yaml
     environment:
@@ -36,7 +28,11 @@ services:
 
   service2:
     build:
-      context: ../shared/tracing
+      context: ../shared/flask
+      target: tracing-flask
+    depends_on:
+      jaeger:
+        condition: service_started
     volumes:
     - ./service2-envoy-jaeger.yaml:/etc/service-envoy.yaml
     environment:

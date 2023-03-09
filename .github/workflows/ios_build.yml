@@ -283,7 +283,7 @@ jobs:
             $([ -z $GITHUB_TOKEN ] || echo "--config=remote-ci-macos") \
             --remote_header="Authorization=Bearer $GITHUB_TOKEN" \
             //examples/objective-c/hello_world:app &> /tmp/envoy.log &
-    - run: sed '/received headers with status 200/q' <(touch /tmp/envoy.log && tail -F /tmp/envoy.log)
+    - run: sed '/received headers with status 301/q' <(touch /tmp/envoy.log && tail -F /tmp/envoy.log)
       if: steps.should_run.outputs.run_ci_job == 'true'
       name: 'Check connectivity'
     - run: cat /tmp/envoy.log

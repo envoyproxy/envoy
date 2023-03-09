@@ -1,23 +1,6 @@
 version: "3.8"
 services:
 
-  # base images
-  flask_service:
-    build:
-      context: ../shared/flask
-    image: flask_service:python-3.10-slim-bullseye
-    restart: "no"
-    deploy:
-      replicas: 0
-
-  tracing:
-    build:
-      context: ../shared/tracing
-    image: envoyproxy:tracing
-    restart: "no"
-    deploy:
-      replicas: 0
-
   # jaeger
   front-envoy:
     build:
@@ -31,8 +14,8 @@ services:
 
   service1:
     build:
-      context: .
-      dockerfile: Dockerfile-jaeger-service
+      context: ../shared/flask
+      target: jaeger-flask
     volumes:
     - ./service1-envoy-jaeger.yaml:/etc/service-envoy.yaml
     environment:
@@ -43,8 +26,8 @@ services:
 
   service2:
     build:
-      context: .
-      dockerfile: Dockerfile-jaeger-service
+      context: ../shared/flask
+      target: jaeger-flask
     volumes:
     - ./service2-envoy-jaeger.yaml:/etc/service-envoy.yaml
     environment:

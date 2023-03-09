@@ -55,7 +55,7 @@ open class EngineBuilder: NSObject {
   private var platformFilterChain: [EnvoyHTTPFilterFactory] = []
   private var stringAccessors: [String: EnvoyStringAccessor] = [:]
   private var keyValueStores: [String: EnvoyKeyValueStore] = [:]
-  private var runtimeGuards: [String: String] = [:]
+  private var runtimeGuards: [String: Bool] = [:]
   private var directResponses: [DirectResponse] = []
   private var statsSinks: [String] = []
 
@@ -453,7 +453,7 @@ open class EngineBuilder: NSObject {
   /// - returns: This builder.
   @discardableResult
   public func setRuntimeGuard(_ name: String, _ value: Bool) -> Self {
-    self.runtimeGuards[name] = "\(value)"
+    self.runtimeGuards[name] = value
     return self
   }
 
@@ -571,45 +571,7 @@ open class EngineBuilder: NSObject {
     let engine = self.engineType.init(runningCallback: self.onEngineRunning, logger: self.logger,
                                       eventTracker: self.eventTracker,
                                       networkMonitoringMode: Int32(self.monitoringMode.rawValue))
-    let config = EnvoyConfiguration(
-      adminInterfaceEnabled: self.adminInterfaceEnabled,
-      grpcStatsDomain: self.grpcStatsDomain,
-      connectTimeoutSeconds: self.connectTimeoutSeconds,
-      dnsRefreshSeconds: self.dnsRefreshSeconds,
-      dnsFailureRefreshSecondsBase: self.dnsFailureRefreshSecondsBase,
-      dnsFailureRefreshSecondsMax: self.dnsFailureRefreshSecondsMax,
-      dnsQueryTimeoutSeconds: self.dnsQueryTimeoutSeconds,
-      dnsMinRefreshSeconds: self.dnsMinRefreshSeconds,
-      dnsPreresolveHostnames: self.dnsPreresolveHostnames,
-      enableDNSCache: self.enableDNSCache,
-      dnsCacheSaveIntervalSeconds: self.dnsCacheSaveIntervalSeconds,
-      enableHappyEyeballs: self.enableHappyEyeballs,
-      enableHttp3: self.enableHttp3,
-      enableGzipDecompression: self.enableGzipDecompression,
-      enableBrotliDecompression: self.enableBrotliDecompression,
-      enableInterfaceBinding: self.enableInterfaceBinding,
-      enableDrainPostDnsRefresh: self.enableDrainPostDnsRefresh,
-      enforceTrustChainVerification: self.enforceTrustChainVerification,
-      forceIPv6: self.forceIPv6,
-      enablePlatformCertificateValidation: self.enablePlatformCertificateValidation,
-      h2ConnectionKeepaliveIdleIntervalMilliseconds:
-        self.h2ConnectionKeepaliveIdleIntervalMilliseconds,
-      h2ConnectionKeepaliveTimeoutSeconds: self.h2ConnectionKeepaliveTimeoutSeconds,
-      maxConnectionsPerHost: self.maxConnectionsPerHost,
-      statsFlushSeconds: self.statsFlushSeconds,
-      streamIdleTimeoutSeconds: self.streamIdleTimeoutSeconds,
-      perTryIdleTimeoutSeconds: self.perTryIdleTimeoutSeconds,
-      appVersion: self.appVersion,
-      appId: self.appId,
-      virtualClusters: self.virtualClusters,
-      runtimeGuards: self.runtimeGuards,
-      typedDirectResponses: self.directResponses.map({ $0.toObjC() }),
-      nativeFilterChain: self.nativeFilterChain,
-      platformFilterChain: self.platformFilterChain,
-      stringAccessors: self.stringAccessors,
-      keyValueStores: self.keyValueStores,
-      statsSinks: self.statsSinks
-    )
+    let config = self.makeConfig()
 
     switch self.base {
     case .custom(let yaml):
@@ -643,5 +605,51 @@ open class EngineBuilder: NSObject {
   /// - parameter directResponse: The response configuration to add.
   func addDirectResponseInternal(_ directResponse: DirectResponse) {
     self.directResponses.append(directResponse)
+  }
+
+  func makeConfig() -> EnvoyConfiguration {
+    EnvoyConfiguration(
+      adminInterfaceEnabled: self.adminInterfaceEnabled,
+      grpcStatsDomain: self.grpcStatsDomain,
+      connectTimeoutSeconds: self.connectTimeoutSeconds,
+      dnsRefreshSeconds: self.dnsRefreshSeconds,
+      dnsFailureRefreshSecondsBase: self.dnsFailureRefreshSecondsBase,
+      dnsFailureRefreshSecondsMax: self.dnsFailureRefreshSecondsMax,
+      dnsQueryTimeoutSeconds: self.dnsQueryTimeoutSeconds,
+      dnsMinRefreshSeconds: self.dnsMinRefreshSeconds,
+      dnsPreresolveHostnames: self.dnsPreresolveHostnames,
+      enableDNSCache: self.enableDNSCache,
+      dnsCacheSaveIntervalSeconds: self.dnsCacheSaveIntervalSeconds,
+      enableHappyEyeballs: self.enableHappyEyeballs,
+      enableHttp3: self.enableHttp3,
+      enableGzipDecompression: self.enableGzipDecompression,
+      enableBrotliDecompression: self.enableBrotliDecompression,
+      enableInterfaceBinding: self.enableInterfaceBinding,
+      enableDrainPostDnsRefresh: self.enableDrainPostDnsRefresh,
+      enforceTrustChainVerification: self.enforceTrustChainVerification,
+      forceIPv6: self.forceIPv6,
+      enablePlatformCertificateValidation: self.enablePlatformCertificateValidation,
+      h2ConnectionKeepaliveIdleIntervalMilliseconds:
+        self.h2ConnectionKeepaliveIdleIntervalMilliseconds,
+      h2ConnectionKeepaliveTimeoutSeconds: self.h2ConnectionKeepaliveTimeoutSeconds,
+      maxConnectionsPerHost: self.maxConnectionsPerHost,
+      statsFlushSeconds: self.statsFlushSeconds,
+      streamIdleTimeoutSeconds: self.streamIdleTimeoutSeconds,
+      perTryIdleTimeoutSeconds: self.perTryIdleTimeoutSeconds,
+      appVersion: self.appVersion,
+      appId: self.appId,
+      virtualClusters: self.virtualClusters,
+      runtimeGuards: self.runtimeGuards.mapValues({ "\($0)" }),
+      typedDirectResponses: self.directResponses.map({ $0.toObjC() }),
+      nativeFilterChain: self.nativeFilterChain,
+      platformFilterChain: self.platformFilterChain,
+      stringAccessors: self.stringAccessors,
+      keyValueStores: self.keyValueStores,
+      statsSinks: self.statsSinks
+    )
+  }
+
+  func bootstrapDebugDescription() -> String {
+    self.makeConfig().bootstrapDebugDescription()
   }
 }

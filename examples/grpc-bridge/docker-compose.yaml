@@ -4,7 +4,6 @@ services:
 
   # Requires the build of the stubs first
   grpc-server:
-    image: envoyproxy/example-kv-server
     build:
       context: server
     ports:
@@ -27,7 +26,6 @@ services:
 
   # Requires the build of the stubs first
   grpc-client:
-    image: envoyproxy/example-kv-client
     build:
       context: client
     environment:
