@@ -660,61 +660,6 @@ open class EngineBuilder: NSObject {
     }
   }
 
-  // For test purposes only
-  public func generateYamlString() -> String {
-    let config = EnvoyConfiguration(
-      adminInterfaceEnabled: self.adminInterfaceEnabled,
-      grpcStatsDomain: self.grpcStatsDomain,
-      connectTimeoutSeconds: self.connectTimeoutSeconds,
-      dnsRefreshSeconds: self.dnsRefreshSeconds,
-      dnsFailureRefreshSecondsBase: self.dnsFailureRefreshSecondsBase,
-      dnsFailureRefreshSecondsMax: self.dnsFailureRefreshSecondsMax,
-      dnsQueryTimeoutSeconds: self.dnsQueryTimeoutSeconds,
-      dnsMinRefreshSeconds: self.dnsMinRefreshSeconds,
-      dnsPreresolveHostnames: self.dnsPreresolveHostnames,
-      enableDNSCache: self.enableDNSCache,
-      dnsCacheSaveIntervalSeconds: self.dnsCacheSaveIntervalSeconds,
-      enableHappyEyeballs: self.enableHappyEyeballs,
-      enableHttp3: self.enableHttp3,
-      enableGzipDecompression: self.enableGzipDecompression,
-      enableBrotliDecompression: self.enableBrotliDecompression,
-      enableInterfaceBinding: self.enableInterfaceBinding,
-      enableDrainPostDnsRefresh: self.enableDrainPostDnsRefresh,
-      enforceTrustChainVerification: self.enforceTrustChainVerification,
-      forceIPv6: self.forceIPv6,
-      enablePlatformCertificateValidation: self.enablePlatformCertificateValidation,
-      h2ConnectionKeepaliveIdleIntervalMilliseconds:
-        self.h2ConnectionKeepaliveIdleIntervalMilliseconds,
-      h2ConnectionKeepaliveTimeoutSeconds: self.h2ConnectionKeepaliveTimeoutSeconds,
-      maxConnectionsPerHost: self.maxConnectionsPerHost,
-      statsFlushSeconds: self.statsFlushSeconds,
-      streamIdleTimeoutSeconds: self.streamIdleTimeoutSeconds,
-      perTryIdleTimeoutSeconds: self.perTryIdleTimeoutSeconds,
-      appVersion: self.appVersion,
-      appId: self.appId,
-      virtualClusters: self.virtualClusters,
-      runtimeGuards: self.runtimeGuards.mapValues({ "\($0)" }),
-      typedDirectResponses: self.directResponses.map({ $0.toObjC() }),
-      nativeFilterChain: self.nativeFilterChain,
-      platformFilterChain: self.platformFilterChain,
-      stringAccessors: self.stringAccessors,
-      keyValueStores: self.keyValueStores,
-      statsSinks: self.statsSinks,
-      rtdsLayerName: self.rtdsLayerName,
-      rtdsTimeoutSeconds: self.rtdsTimeoutSeconds,
-      adsAddress: self.adsAddress,
-      adsPort: self.adsPort,
-      adsJwtToken: self.adsJwtToken,
-      adsJwtTokenLifetimeSeconds: self.adsJwtTokenLifetimeSeconds,
-      adsSslRootCerts: self.adsSslRootCerts,
-      nodeId: self.nodeId,
-      nodeRegion: self.nodeRegion,
-      nodeZone: self.nodeZone,
-      nodeSubZone: self.nodeSubZone
-    )
-    return config.generateYamlString()
-  }
-
   // MARK: - Internal
 
   /// Add a specific implementation of `EnvoyEngine` to use for starting Envoy.
