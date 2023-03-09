@@ -571,7 +571,44 @@ open class EngineBuilder: NSObject {
     let engine = self.engineType.init(runningCallback: self.onEngineRunning, logger: self.logger,
                                       eventTracker: self.eventTracker,
                                       networkMonitoringMode: Int32(self.monitoringMode.rawValue))
-    let config = EnvoyConfiguration(
+    let config = self.makeConfig()
+
+    switch self.base {
+    case .custom(let yaml):
+      return EngineImpl(yaml: yaml, config: config, logLevel: self.logLevel, engine: engine)
+    case .standard:
+      return EngineImpl(config: config, logLevel: self.logLevel, engine: engine)
+    }
+  }
+
+  // MARK: - Internal
+
+  /// Add a specific implementation of `EnvoyEngine` to use for starting Envoy.
+  /// A new instance of this engine will be created when `build()` is called.
+  /// Used for testing, as initializing with `EnvoyEngine.Type` results in a
+  /// segfault: https://github.com/envoyproxy/envoy-mobile/issues/334
+  ///
+  /// - parameter engineType: The specific implementation of `EnvoyEngine` to use for starting
+  ///                         Envoy.
+  ///
+  /// - returns: This builder.
+  @discardableResult
+  func addEngineType(_ engineType: EnvoyEngine.Type) -> Self {
+    self.engineType = engineType
+    return self
+  }
+
+  /// Add a direct response to be used when configuring the engine.
+  /// This function is internal so it is not publicly exposed to production builders,
+  /// but is available for use by the `TestEngineBuilder`.
+  ///
+  /// - parameter directResponse: The response configuration to add.
+  func addDirectResponseInternal(_ directResponse: DirectResponse) {
+    self.directResponses.append(directResponse)
+  }
+
+  func makeConfig() -> EnvoyConfiguration {
+    EnvoyConfiguration(
       adminInterfaceEnabled: self.adminInterfaceEnabled,
       grpcStatsDomain: self.grpcStatsDomain,
       connectTimeoutSeconds: self.connectTimeoutSeconds,
@@ -610,38 +647,9 @@ open class EngineBuilder: NSObject {
       keyValueStores: self.keyValueStores,
       statsSinks: self.statsSinks
     )
-
-    switch self.base {
-    case .custom(let yaml):
-      return EngineImpl(yaml: yaml, config: config, logLevel: self.logLevel, engine: engine)
-    case .standard:
-      return EngineImpl(config: config, logLevel: self.logLevel, engine: engine)
-    }
   }
 
-  // MARK: - Internal
-
-  /// Add a specific implementation of `EnvoyEngine` to use for starting Envoy.
-  /// A new instance of this engine will be created when `build()` is called.
-  /// Used for testing, as initializing with `EnvoyEngine.Type` results in a
-  /// segfault: https://github.com/envoyproxy/envoy-mobile/issues/334
-  ///
-  /// - parameter engineType: The specific implementation of `EnvoyEngine` to use for starting
-  ///                         Envoy.
-  ///
-  /// - returns: This builder.
-  @discardableResult
-  func addEngineType(_ engineType: EnvoyEngine.Type) -> Self {
-    self.engineType = engineType
-    return self
-  }
-
-  /// Add a direct response to be used when configuring the engine.
-  /// This function is internal so it is not publicly exposed to production builders,
-  /// but is available for use by the `TestEngineBuilder`.
-  ///
-  /// - parameter directResponse: The response configuration to add.
-  func addDirectResponseInternal(_ directResponse: DirectResponse) {
-    self.directResponses.append(directResponse)
+  func bootstrapDebugString() -> String {
+    self.makeConfig().bootstrapDebugString()
   }
 }

@@ -177,6 +177,11 @@
   builder.enableGzipDecompression(self.enableGzipDecompression);
   builder.enableBrotliDecompression(self.enableBrotliDecompression);
 
+  for (NSString *key in self.runtimeGuards) {
+    BOOL value = [[self.runtimeGuards objectForKey:key] isEqualToString:@"true"];
+    builder.setRuntimeGuard([key toCXXString], value);
+  }
+
   for (EMODirectResponse *directResponse in self.typedDirectResponses) {
     builder.addDirectResponse([directResponse toCXX]);
   }
@@ -242,6 +247,11 @@
     NSLog(@"[Envoy] error generating bootstrap: %@", @(e.what()));
     return nullptr;
   }
+}
+
+- (NSString *)bootstrapDebugString {
+  std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> bootstrap = [self generateBootstrap];
+  return @(bootstrap->ShortDebugString().c_str());
 }
 
 @end

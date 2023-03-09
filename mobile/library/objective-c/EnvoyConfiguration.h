@@ -96,6 +96,13 @@ NS_ASSUME_NONNULL_BEGIN
                                        (NSDictionary<NSString *, id<EnvoyKeyValueStore>> *)
                                            keyValueStores
                                        statsSinks:(NSArray<NSString *> *)statsSinks;
+
+/**
+ Generate a string description of the C++ Envoy bootstrap from this configuration.
+ For testing purposes only.
+ */
+- (NSString *)bootstrapDebugString;
+
 @end
 
 NS_ASSUME_NONNULL_END
