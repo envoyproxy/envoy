@@ -85,7 +85,6 @@
                         enableDrainPostDnsRefresh:(BOOL)enableDrainPostDnsRefresh
                     enforceTrustChainVerification:(BOOL)enforceTrustChainVerification
                                         forceIPv6:(BOOL)forceIPv6
-              enablePlatformCertificateValidation:(BOOL)enablePlatformCertificateValidation
     h2ConnectionKeepaliveIdleIntervalMilliseconds:
         (UInt32)h2ConnectionKeepaliveIdleIntervalMilliseconds
               h2ConnectionKeepaliveTimeoutSeconds:(UInt32)h2ConnectionKeepaliveTimeoutSeconds
@@ -135,7 +134,6 @@
   self.enableDrainPostDnsRefresh = enableDrainPostDnsRefresh;
   self.enforceTrustChainVerification = enforceTrustChainVerification;
   self.forceIPv6 = forceIPv6;
-  self.enablePlatformCertificateValidation = enablePlatformCertificateValidation;
   self.h2ConnectionKeepaliveIdleIntervalMilliseconds =
       h2ConnectionKeepaliveIdleIntervalMilliseconds;
   self.h2ConnectionKeepaliveTimeoutSeconds = h2ConnectionKeepaliveTimeoutSeconds;
@@ -220,7 +218,7 @@
     builder.addVirtualCluster([cluster toCXXString]);
   }
   builder.addStatsFlushSeconds(self.statsFlushSeconds);
-  builder.enablePlatformCertificatesValidation(self.enablePlatformCertificateValidation);
+  builder.enablePlatformCertificatesValidation(true);
   builder.enableDnsCache(self.enableDNSCache, self.dnsCacheSaveIntervalSeconds);
   builder.addGrpcStatsDomain([self.grpcStatsDomain toCXXString]);
   if (self.statsSinks.count > 0) {
