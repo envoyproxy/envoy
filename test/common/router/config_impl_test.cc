@@ -1525,7 +1525,7 @@ virtual_hosts:
   {
     Http::TestRequestHeaderMapImpl headers =
         genHeaders("lyft.com", "/new_endpoint/foo/match_header", "GET");
-    headers.addCopy("x-match-header", "matched");
+    headers.setCopy(Http::LowerCaseString("x-match-header"), "matched");
     const RouteEntry* route = config.route(headers, 0)->routeEntry();
     route->finalizeRequestHeaders(headers, stream_info, true);
     EXPECT_EQ("match_tree_1_3", headers.get_("x-route-header"));

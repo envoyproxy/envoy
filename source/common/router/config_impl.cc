@@ -1846,11 +1846,10 @@ RouteMatcher::RouteMatcher(const envoy::config::route::v3::RouteConfiguration& r
   }
 }
 
-RouteConstSharedPtr
-VirtualHostImpl::getRouteFromRoutes(const RouteCallback& cb, const Http::RequestHeaderMap& headers,
-                                    const StreamInfo::StreamInfo& stream_info,
-                                    uint64_t random_value,
-                                    std::vector<RouteEntryImplBaseConstSharedPtr> routes) const {
+RouteConstSharedPtr VirtualHostImpl::getRouteFromRoutes(
+    const RouteCallback& cb, const Http::RequestHeaderMap& headers,
+    const StreamInfo::StreamInfo& stream_info, uint64_t random_value,
+    absl::Span<const RouteEntryImplBaseConstSharedPtr> routes) const {
   for (auto route = routes.begin(); route != routes.end(); ++route) {
     if (!headers.Path() && !(*route)->supportsPathlessHeaders()) {
       continue;

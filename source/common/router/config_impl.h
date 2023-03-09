@@ -324,7 +324,7 @@ private:
   RouteConstSharedPtr
   getRouteFromRoutes(const RouteCallback& cb, const Http::RequestHeaderMap& headers,
                      const StreamInfo::StreamInfo& stream_info, uint64_t random_value,
-                     std::vector<RouteEntryImplBaseConstSharedPtr> routes) const;
+                     absl::Span<const RouteEntryImplBaseConstSharedPtr> routes) const;
 
   static const std::shared_ptr<const SslRedirectRoute> SSL_REDIRECT_ROUTE;
 
