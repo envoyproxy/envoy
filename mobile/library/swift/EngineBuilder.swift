@@ -779,7 +779,18 @@ open class EngineBuilder: NSObject {
       platformFilterChain: self.platformFilterChain,
       stringAccessors: self.stringAccessors,
       keyValueStores: self.keyValueStores,
-      statsSinks: self.statsSinks
+      statsSinks: self.statsSinks,
+      rtdsLayerName: self.rtdsLayerName,
+      rtdsTimeoutSeconds: self.rtdsTimeoutSeconds,
+      adsAddress: self.adsAddress,
+      adsPort: self.adsPort,
+      adsJwtToken: self.adsJwtToken,
+      adsJwtTokenLifetimeSeconds: self.adsJwtTokenLifetimeSeconds,
+      adsSslRootCerts: self.adsSslRootCerts,
+      nodeId: self.nodeId,
+      nodeRegion: self.nodeRegion,
+      nodeZone: self.nodeZone,
+      nodeSubZone: self.nodeSubZone
     )
   }
 
