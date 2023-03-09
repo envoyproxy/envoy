@@ -169,6 +169,9 @@ build:libc++ --action_env=BAZEL_LINKLIBS=-l%:libc++.a:-l%:libc++abi.a
 build:libc++ --action_env=BAZEL_LINKOPTS=-lm:-pthread
 build:libc++ --define force_libcpp=enabled
 
+build:libc++20 --config=libc++
+build:libc++20 --cxxopt=-std=c++20
+
 # Optimize build for binary size reduction.
 build:sizeopt -c opt --copt -Os
 
