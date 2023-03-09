@@ -92,7 +92,6 @@ public final class AndroidNetworkLibrary {
    */
   public static void addTestRootCertificate(byte[] rootCert)
       throws CertificateException, KeyStoreException, NoSuchAlgorithmException {
-    System.err.println("HERE MADE THE FUNCTION");
     if (mUseFakeCertificateVerification) {
       FakeX509Util.addTestRootCertificate(rootCert);
     } else {
