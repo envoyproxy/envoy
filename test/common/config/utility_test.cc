@@ -307,9 +307,11 @@ TEST(UtilityTest, prepareJitteredExponentialBackOffStrategyStrategyNoConfig) {
     EXPECT_FALSE(config.has_retry_policy());
 
     JitteredExponentialBackOffStrategyPtr strategy =
-        Utility::prepareJitteredExponentialBackOffStrategy(config, random, absl::nullopt,
-                                                           absl::nullopt);
-    EXPECT_EQ(nullptr, dynamic_cast<JitteredExponentialBackOffStrategy*>(strategy.get()));
+        Utility::prepareJitteredExponentialBackOffStrategy(config, random, 500, absl::nullopt);
+
+    EXPECT_NE(nullptr, dynamic_cast<JitteredExponentialBackOffStrategy*>(strategy.get()));
+    EXPECT_EQ(true, dynamic_cast<JitteredExponentialBackOffStrategy*>(strategy.get())
+                        ->isOverTimeLimit(500 * 10 + 1));
   }
 }
 
@@ -332,8 +334,7 @@ TEST(UtilityTest, prepareJitteredExponentialBackOffStrategyStrategyConfigFileVal
       EXPECT_TRUE(config.has_retry_policy());
 
       JitteredExponentialBackOffStrategyPtr strategy =
-          Utility::prepareJitteredExponentialBackOffStrategy(config, random, absl::nullopt,
-                                                             absl::nullopt);
+          Utility::prepareJitteredExponentialBackOffStrategy(config, random, 500, absl::nullopt);
 
       EXPECT_NE(nullptr, dynamic_cast<JitteredExponentialBackOffStrategy*>(strategy.get()));
 
@@ -367,8 +368,7 @@ TEST(UtilityTest, prepareJitteredExponentialBackOffStrategyStrategyCustomValues)
           test_max_interval_ms / 1000);
 
       JitteredExponentialBackOffStrategyPtr strategy =
-          Utility::prepareJitteredExponentialBackOffStrategy(config, random, absl::nullopt,
-                                                             absl::nullopt);
+          Utility::prepareJitteredExponentialBackOffStrategy(config, random, 500, absl::nullopt);
 
       // provided time limit is equal to max time limit
       EXPECT_EQ(false, dynamic_cast<JitteredExponentialBackOffStrategy*>(strategy.get())
@@ -394,8 +394,7 @@ TEST(UtilityTest, prepareJitteredExponentialBackOffStrategyStrategyCustomValues)
           test_base_interval_ms / 1000);
 
       JitteredExponentialBackOffStrategyPtr strategy =
-          Utility::prepareJitteredExponentialBackOffStrategy(config, random, absl::nullopt,
-                                                             absl::nullopt);
+          Utility::prepareJitteredExponentialBackOffStrategy(config, random, 500, absl::nullopt);
 
       // max_interval should be less than or equal test_base_interval * 10
       EXPECT_EQ(false, dynamic_cast<JitteredExponentialBackOffStrategy*>(strategy.get())
@@ -421,8 +420,8 @@ TEST(UtilityTest, prepareJitteredExponentialBackOffStrategyStrategyCustomValues)
       config.mutable_retry_policy()->mutable_retry_back_off()->mutable_max_interval()->set_seconds(
           test_max_interval_ms);
 
-      EXPECT_ANY_THROW(Utility::prepareJitteredExponentialBackOffStrategy(
-          config, random, absl::nullopt, absl::nullopt));
+      EXPECT_ANY_THROW(
+          Utility::prepareJitteredExponentialBackOffStrategy(config, random, 500, absl::nullopt));
     }
   }
 }

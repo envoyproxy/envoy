@@ -384,12 +384,11 @@ ClusterManagerImpl::ClusterManagerImpl(
             validation_context.dynamicValidationVisitor(), server,
             dyn_resources.ads_config().config_validators());
 
-    JitteredExponentialBackOffStrategyPtr backoff_strategy;
-    auto& grpc_services = dyn_resources.ads_config().grpc_services();
-    if (!grpc_services.empty() && grpc_services[0].has_envoy_grpc()) {
-      backoff_strategy = Config::Utility::prepareJitteredExponentialBackOffStrategy(
-          grpc_services[0].envoy_grpc(), random_, absl::nullopt, absl::nullopt);
-    }
+    JitteredExponentialBackOffStrategyPtr backoff_strategy =
+        Config::Utility::prepareJitteredExponentialBackOffStrategy(
+            dyn_resources.ads_config(), random_,
+            Envoy::Config::SubscriptionFactory::RetryInitialDelayMs,
+            Envoy::Config::SubscriptionFactory::RetryMaxDelayMs);
 
     if (dyn_resources.ads_config().api_type() ==
         envoy::config::core::v3::ApiConfigSource::DELTA_GRPC) {

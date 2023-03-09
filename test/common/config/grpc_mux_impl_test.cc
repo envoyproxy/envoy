@@ -65,7 +65,9 @@ public:
         *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
             "envoy.service.discovery.v3.AggregatedDiscoveryService.StreamAggregatedResources"),
         random_, *stats_.rootScope(), rate_limit_settings_, true, std::move(config_validators_),
-        nullptr,
+        std::make_unique<JitteredExponentialBackOffStrategy>(
+            SubscriptionFactory::RetryInitialDelayMs, SubscriptionFactory::RetryMaxDelayMs,
+            random_),
         /*xds_config_tracker=*/XdsConfigTrackerOptRef(),
         /*xds_resources_delegate=*/XdsResourcesDelegateOptRef(), /*target_xds_authority=*/"");
   }
@@ -76,7 +78,10 @@ public:
         *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
             "envoy.service.discovery.v3.AggregatedDiscoveryService.StreamAggregatedResources"),
         random_, *stats_.rootScope(), custom_rate_limit_settings, true,
-        std::move(config_validators_), nullptr,
+        std::move(config_validators_),
+        std::make_unique<JitteredExponentialBackOffStrategy>(
+            SubscriptionFactory::RetryInitialDelayMs, SubscriptionFactory::RetryMaxDelayMs,
+            random_),
         /*xds_config_tracker=*/XdsConfigTrackerOptRef(),
         /*xds_resources_delegate=*/XdsResourcesDelegateOptRef(), /*target_xds_authority=*/"");
   }
@@ -897,7 +902,10 @@ TEST_F(GrpcMuxImplTest, BadLocalInfoEmptyClusterName) {
           *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
               "envoy.service.discovery.v3.AggregatedDiscoveryService.StreamAggregatedResources"),
           random_, *stats_.rootScope(), rate_limit_settings_, true,
-          std::make_unique<NiceMock<MockCustomConfigValidators>>(), nullptr,
+          std::make_unique<NiceMock<MockCustomConfigValidators>>(),
+          std::make_unique<JitteredExponentialBackOffStrategy>(
+              SubscriptionFactory::RetryInitialDelayMs, SubscriptionFactory::RetryMaxDelayMs,
+              random_),
           /*xds_config_tracker=*/XdsConfigTrackerOptRef(),
           /*xds_resources_delegate=*/XdsResourcesDelegateOptRef(),
           /*target_xds_authority=*/""),
@@ -914,7 +922,10 @@ TEST_F(GrpcMuxImplTest, BadLocalInfoEmptyNodeName) {
           *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
               "envoy.service.discovery.v3.AggregatedDiscoveryService.StreamAggregatedResources"),
           random_, *stats_.rootScope(), rate_limit_settings_, true,
-          std::make_unique<NiceMock<MockCustomConfigValidators>>(), nullptr,
+          std::make_unique<NiceMock<MockCustomConfigValidators>>(),
+          std::make_unique<JitteredExponentialBackOffStrategy>(
+              SubscriptionFactory::RetryInitialDelayMs, SubscriptionFactory::RetryMaxDelayMs,
+              random_),
           /*xds_config_tracker=*/XdsConfigTrackerOptRef(),
           /*xds_resources_delegate=*/XdsResourcesDelegateOptRef(), /*target_xds_authority=*/""),
       EnvoyException,

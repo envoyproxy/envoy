@@ -78,12 +78,9 @@ SubscriptionPtr SubscriptionFactoryImpl::subscriptionFromConfigSource(
           std::make_unique<CustomConfigValidatorsImpl>(validation_visitor_, server_,
                                                        api_config_source.config_validators());
 
-      JitteredExponentialBackOffStrategyPtr backoff_strategy;
-      auto& grpc_services = api_config_source.grpc_services();
-      if (!grpc_services.empty() && grpc_services[0].has_envoy_grpc()) {
-        backoff_strategy = Utility::prepareJitteredExponentialBackOffStrategy(
-            grpc_services[0].envoy_grpc(), api_.randomGenerator(), absl::nullopt, absl::nullopt);
-      }
+      JitteredExponentialBackOffStrategyPtr backoff_strategy =
+          Utility::prepareJitteredExponentialBackOffStrategy(
+              api_config_source, api_.randomGenerator(), RetryInitialDelayMs, RetryMaxDelayMs);
 
       const std::string control_plane_id =
           Utility::getGrpcControlPlane(api_config_source).value_or("");
@@ -121,12 +118,9 @@ SubscriptionPtr SubscriptionFactoryImpl::subscriptionFromConfigSource(
           std::make_unique<CustomConfigValidatorsImpl>(validation_visitor_, server_,
                                                        api_config_source.config_validators());
 
-      JitteredExponentialBackOffStrategyPtr backoff_strategy;
-      auto& grpc_services = api_config_source.grpc_services();
-      if (!grpc_services.empty() && grpc_services[0].has_envoy_grpc()) {
-        backoff_strategy = Utility::prepareJitteredExponentialBackOffStrategy(
-            grpc_services[0].envoy_grpc(), api_.randomGenerator(), absl::nullopt, absl::nullopt);
-      }
+      JitteredExponentialBackOffStrategyPtr backoff_strategy =
+          Utility::prepareJitteredExponentialBackOffStrategy(
+              api_config_source, api_.randomGenerator(), RetryInitialDelayMs, RetryMaxDelayMs);
 
       if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.unified_mux")) {
         mux = std::make_shared<Config::XdsMux::GrpcMuxDelta>(
@@ -195,12 +189,9 @@ SubscriptionPtr SubscriptionFactoryImpl::collectionSubscriptionFromUrl(
           std::make_unique<CustomConfigValidatorsImpl>(validation_visitor_, server_,
                                                        api_config_source.config_validators());
 
-      JitteredExponentialBackOffStrategyPtr backoff_strategy;
-      auto& grpc_services = api_config_source.grpc_services();
-      if (!grpc_services.empty() && grpc_services[0].has_envoy_grpc()) {
-        backoff_strategy = Utility::prepareJitteredExponentialBackOffStrategy(
-            grpc_services[0].envoy_grpc(), api_.randomGenerator(), absl::nullopt, absl::nullopt);
-      }
+      JitteredExponentialBackOffStrategyPtr backoff_strategy =
+          Utility::prepareJitteredExponentialBackOffStrategy(
+              api_config_source, api_.randomGenerator(), RetryInitialDelayMs, RetryMaxDelayMs);
 
       SubscriptionOptions options;
       // All Envoy collections currently are xDS resource graph roots and require node context

@@ -56,17 +56,20 @@ public:
 
     timer_ = new Event::MockTimer(&dispatcher_);
 
+    auto backoff_strategy = std::make_unique<JitteredExponentialBackOffStrategy>(
+        SubscriptionFactory::RetryInitialDelayMs, SubscriptionFactory::RetryMaxDelayMs, random_);
+
     if (should_use_unified_) {
       mux_ = std::make_shared<Config::XdsMux::GrpcMuxSotw>(
           std::unique_ptr<Grpc::MockAsyncClient>(async_client_), dispatcher_, *method_descriptor_,
           random_, *stats_store_.rootScope(), rate_limit_settings_, local_info_, true,
-          std::move(config_validators_), nullptr,
+          std::move(config_validators_), std::move(backoff_strategy),
           /*xds_config_tracker=*/XdsConfigTrackerOptRef());
     } else {
       mux_ = std::make_shared<Config::GrpcMuxImpl>(
           local_info_, std::unique_ptr<Grpc::MockAsyncClient>(async_client_), dispatcher_,
           *method_descriptor_, random_, *stats_store_.rootScope(), rate_limit_settings_, true,
-          std::move(config_validators_), nullptr,
+          std::move(config_validators_), std::move(backoff_strategy),
           /*xds_config_tracker=*/XdsConfigTrackerOptRef(),
           /*xds_resources_delegate=*/
           XdsResourcesDelegateOptRef(),

@@ -15,14 +15,6 @@
 namespace Envoy {
 namespace Config {
 
-namespace {
-
-// Default Parameters of the jittered backoff strategy.
-constexpr uint32_t RetryInitialDelayMs = 500;
-constexpr uint32_t RetryMaxDelayMs = 30000; // Do not cross more than 30s
-
-} // namespace
-
 template <class ResponseProto> using ResponseProtoPtr = std::unique_ptr<ResponseProto>;
 
 // Oversees communication for gRPC xDS implementations (parent to both regular xDS and delta
@@ -40,11 +32,7 @@ public:
       : callbacks_(callbacks), async_client_(std::move(async_client)),
         service_method_(service_method),
         control_plane_stats_(Utility::generateControlPlaneStats(scope)), random_(random),
-        time_source_(dispatcher.timeSource()),
-        backoff_strategy_((backoff_strategy != nullptr)
-                              ? std::move(backoff_strategy)
-                              : std::make_unique<JitteredExponentialBackOffStrategy>(
-                                    RetryInitialDelayMs, RetryMaxDelayMs, random_)),
+        time_source_(dispatcher.timeSource()), backoff_strategy_(std::move(backoff_strategy)),
         rate_limiting_enabled_(rate_limit_settings.enabled_) {
     retry_timer_ = dispatcher.createTimer([this]() -> void { establishNewStream(); });
     if (rate_limiting_enabled_) {

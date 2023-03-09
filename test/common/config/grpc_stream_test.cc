@@ -27,6 +27,9 @@ protected:
   GrpcStreamTest()
       : async_client_owner_(std::make_unique<Grpc::MockAsyncClient>()),
         async_client_(async_client_owner_.get()),
+        backoff_strategy_(std::make_unique<JitteredExponentialBackOffStrategy>(
+            SubscriptionFactory::RetryInitialDelayMs, SubscriptionFactory::RetryMaxDelayMs,
+            random_)),
         grpc_stream_(&callbacks_, std::move(async_client_owner_),
                      *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
                          "envoy.service.endpoint.v3.EndpointDiscoveryService.StreamEndpoints"),
