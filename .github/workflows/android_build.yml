@@ -68,7 +68,7 @@ jobs:
       if: steps.should_run.outputs.run_ci_job == 'true'
       name: 'Start emulator'
       with:
-        timeout_minutes: 6
+        timeout_minutes: 10
         max_attempts: 3
         command: ./mobile/ci/start_android_emulator.sh
     # Return to using:
@@ -116,7 +116,7 @@ jobs:
       if: steps.should_run.outputs.run_ci_job == 'true'
       name: 'Start emulator'
       with:
-        timeout_minutes: 6
+        timeout_minutes: 10
         max_attempts: 3
         command: ./mobile/ci/start_android_emulator.sh
     # Return to using:
@@ -164,7 +164,7 @@ jobs:
       if: steps.should_run.outputs.run_ci_job == 'true'
       name: 'Start emulator'
       with:
-        timeout_minutes: 6
+        timeout_minutes: 10
         max_attempts: 3
         command: ./mobile/ci/start_android_emulator.sh
     # Return to using:
@@ -212,7 +212,7 @@ jobs:
       if: steps.should_run.outputs.run_ci_job == 'true'
       name: 'Start emulator'
       with:
-        timeout_minutes: 6
+        timeout_minutes: 10
         max_attempts: 3
         command: ./mobile/ci/start_android_emulator.sh
     # Return to using:
