@@ -119,16 +119,16 @@ Http2HeaderValidator::validateRequestHeaderMap(::Envoy::Http::RequestHeaderMap& 
   // https://datatracker.ietf.org/doc/html/rfc8441#section-4
   // For the purposes of header validation the extended CONNECT is treated as generic (non CONNECT)
   // HTTP/2 requests.
-  auto is_connect_method = header_map.method() == header_values_.MethodValues.Connect &&
-                           header_map.getProtocolValue().empty();
-  auto is_extended_connect_method = header_map.method() == header_values_.MethodValues.Connect &&
-                                    !header_map.getProtocolValue().empty();
-  auto is_options_method = header_map.method() == header_values_.MethodValues.Options;
+  auto is_standard_connect_request = header_map.method() == header_values_.MethodValues.Connect &&
+                                     header_map.getProtocolValue().empty();
+  auto is_extended_connect_request = header_map.method() == header_values_.MethodValues.Connect &&
+                                     !header_map.getProtocolValue().empty();
+  auto is_options_request = header_map.method() == header_values_.MethodValues.Options;
   bool path_is_empty = path.empty();
   bool path_is_asterisk = path == "*";
   bool path_is_absolute = !path_is_empty && path.at(0) == '/';
 
-  if (!is_connect_method && (header_map.getSchemeValue().empty() || path_is_empty)) {
+  if (!is_standard_connect_request && (header_map.getSchemeValue().empty() || path_is_empty)) {
     // If this is not a connect request, then we also need the scheme and path pseudo headers.
     // This is based on RFC 9113, https://www.rfc-editor.org/rfc/rfc9113#section-8.3.1:
     //
@@ -138,7 +138,7 @@ Http2HeaderValidator::validateRequestHeaderMap(::Envoy::Http::RequestHeaderMap& 
     auto details = path_is_empty ? UhvResponseCodeDetail::get().InvalidUrl
                                  : UhvResponseCodeDetail::get().InvalidScheme;
     return {RequestHeaderMapValidationResult::Action::Reject, details};
-  } else if (is_connect_method) {
+  } else if (is_standard_connect_request) {
     // If this is a CONNECT request, :path and :scheme must be empty and :authority must be
     // provided. This is based on RFC 9113,
     // https://www.rfc-editor.org/rfc/rfc9113#section-8.5:
@@ -163,7 +163,8 @@ Http2HeaderValidator::validateRequestHeaderMap(::Envoy::Http::RequestHeaderMap& 
   }
 
   // Step 2: Validate and normalize the :path pseudo header
-  if (!path_is_absolute && !is_connect_method && (!is_options_method || !path_is_asterisk)) {
+  if (!path_is_absolute && !is_standard_connect_request &&
+      (!is_options_request || !path_is_asterisk)) {
     // The :path must be in absolute-form or, for an OPTIONS request, in asterisk-form. This is
     // based on RFC 9113, https://www.rfc-editor.org/rfc/rfc9113#section-8.3.1:
     //
@@ -195,9 +196,10 @@ Http2HeaderValidator::validateRequestHeaderMap(::Envoy::Http::RequestHeaderMap& 
 
   // Step 3: Verify each request header
   const auto& allowed_headers =
-      is_connect_method ? kAllowedPseudoHeadersForConnect
-                        : (is_extended_connect_method ? kAllowedPseudoHeadersForExtendedConnect
-                                                      : kAllowedPseudoHeaders);
+      is_standard_connect_request
+          ? kAllowedPseudoHeadersForConnect
+          : (is_extended_connect_request ? kAllowedPseudoHeadersForExtendedConnect
+                                         : kAllowedPseudoHeaders);
   std::string reject_details;
   std::vector<absl::string_view> drop_headers;
 

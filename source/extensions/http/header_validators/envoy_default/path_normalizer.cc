@@ -172,18 +172,18 @@ PathNormalizer::normalizePathUri(RequestHeaderMap& header_map) const {
   // asterisk-form  = "*"
   //
   // TODO(#23887) - potentially separate path normalization into multiple independent operations.
-  const bool is_connect_method =
+  const bool is_connect_request =
       header_map.method() == ::Envoy::Http::Headers::get().MethodValues.Connect &&
       header_map.getProtocolValue().empty();
-  const bool is_options_method =
+  const bool is_options_request =
       header_map.method() == ::Envoy::Http::Headers::get().MethodValues.Options;
   const auto original_path = header_map.path();
-  if (original_path == "*" && is_options_method) {
+  if (original_path == "*" && is_options_request) {
     // asterisk-form, only valid for OPTIONS request
     return PathNormalizationResult::success();
   }
 
-  if (is_connect_method) {
+  if (is_connect_request) {
     // The :path can only be empty for CONNECT methods, where the request-target is in
     // authority-form, which Envoy will have already moved :path to :authority.
     if (original_path.empty()) {
