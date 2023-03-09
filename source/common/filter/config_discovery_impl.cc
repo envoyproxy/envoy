@@ -65,7 +65,7 @@ FilterConfigSubscription::FilterConfigSubscription(
     : Config::SubscriptionBase<envoy::config::core::v3::TypedExtensionConfig>(
           factory_context.messageValidationContext().dynamicValidationVisitor(), "name"),
       filter_config_name_(filter_config_name),
-      last_(std::make_unique<ConfigVersion>("", factory_context.timeSource().systemTime())),
+      last_(std::make_shared<ConfigVersion>("", factory_context.timeSource().systemTime())),
       factory_context_(factory_context),
       init_target_(fmt::format("FilterConfigSubscription init {}", filter_config_name_),
                    [this]() { start(); }),
@@ -89,8 +89,8 @@ void FilterConfigSubscription::start() {
 
 void FilterConfigSubscription::onConfigUpdate(
     const std::vector<Config::DecodedResourceRef>& resources, const std::string& version_info) {
-  ConfigVersionPtr next =
-      std::make_unique<ConfigVersion>(version_info, factory_context_.timeSource().systemTime());
+  ConfigVersionSharedPtr next =
+      std::make_shared<ConfigVersion>(version_info, factory_context_.timeSource().systemTime());
   // During startup, workers await for the filter config subscriptions to initialize, so we cannot
   // rely on the thread locals and the workers to mark the update completion.
   if (!filter_config_provider_manager_.workersStarted()) {
@@ -133,15 +133,16 @@ void FilterConfigSubscription::onConfigUpdate(
     throw e;
   }
   ENVOY_LOG(debug, "Updating filter config {}", filter_config_name_);
+  // Update subscription config first, to prevent a race with new providers missing
+  // the latest config.
+  last_ = next;
   Common::applyToAllWithCleanup<DynamicFilterConfigProviderImplBase*>(
       filter_config_providers_,
-      [&message = next->config_, &version_info = next->version_info_](
-          DynamicFilterConfigProviderImplBase* provider, std::shared_ptr<Cleanup> cleanup) {
-        provider->onConfigUpdate(*message, version_info, [cleanup] {});
+      [last = last_](DynamicFilterConfigProviderImplBase* provider,
+                     std::shared_ptr<Cleanup> cleanup) {
+        provider->onConfigUpdate(*last->config_, last->version_info_, [cleanup] {});
       },
-      [me = shared_from_this(), next = std::move(next)]() mutable {
-        me->updateComplete(std::move(next));
-      });
+      [me = shared_from_this()]() { me->updateComplete(); });
 }
 
 void FilterConfigSubscription::onConfigUpdate(
@@ -150,16 +151,14 @@ void FilterConfigSubscription::onConfigUpdate(
   if (!removed_resources.empty()) {
     ASSERT(removed_resources.size() == 1);
     ENVOY_LOG(debug, "Removing filter config {}", filter_config_name_);
-    ConfigVersionPtr next =
-        std::make_unique<ConfigVersion>("", factory_context_.timeSource().systemTime());
+    ConfigVersionSharedPtr next =
+        std::make_shared<ConfigVersion>("", factory_context_.timeSource().systemTime());
     Common::applyToAllWithCleanup<DynamicFilterConfigProviderImplBase*>(
         filter_config_providers_,
         [](DynamicFilterConfigProviderImplBase* provider, std::shared_ptr<Cleanup> cleanup) {
           provider->onConfigRemoved([cleanup] {});
         },
-        [me = shared_from_this(), next = std::move(next)]() mutable {
-          me->updateComplete(std::move(next));
-        });
+        [me = shared_from_this()]() { me->updateComplete(); });
   } else if (!added_resources.empty()) {
     ASSERT(added_resources.size() == 1);
     onConfigUpdate(added_resources, added_resources[0].get().version());
@@ -175,10 +174,9 @@ void FilterConfigSubscription::onConfigUpdateFailed(Config::ConfigUpdateFailureR
   init_target_.ready();
 }
 
-void FilterConfigSubscription::updateComplete(ConfigVersionPtr next) {
+void FilterConfigSubscription::updateComplete() {
   ENVOY_LOG(debug, "Filter config {} update complete", filter_config_name_);
   stats_.config_reload_.inc();
-  last_ = std::move(next);
   init_target_.ready();
 }
 

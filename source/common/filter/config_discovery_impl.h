@@ -326,7 +326,7 @@ private:
     const SystemTime updated_;
   };
   // Using a heap allocated record because updates are completed by all workers asynchronously.
-  using ConfigVersionPtr = std::unique_ptr<ConfigVersion>;
+  using ConfigVersionSharedPtr = std::shared_ptr<ConfigVersion>;
 
   void start();
 
@@ -338,10 +338,10 @@ private:
                       const std::string&) override;
   void onConfigUpdateFailed(Config::ConfigUpdateFailureReason reason,
                             const EnvoyException*) override;
-  void updateComplete(ConfigVersionPtr next);
+  void updateComplete();
 
   const std::string filter_config_name_;
-  ConfigVersionPtr last_;
+  ConfigVersionSharedPtr last_;
   Server::Configuration::ServerFactoryContext& factory_context_;
 
   Init::SharedTargetImpl init_target_;

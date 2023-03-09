@@ -18,7 +18,7 @@ namespace Common {
 template <class ElementT, class ContainerT>
 void applyToAllWithCleanup(const ContainerT& container,
                            std::function<void(ElementT, std::shared_ptr<Cleanup>)> update_cb,
-                           absl::AnyInvocable<void() &&> done_cb) {
+                           std::function<void()> done_cb) {
   // The Cleanup object is provided to allow each update callback to delay cleanup until some
   // arbitrary time the completion callback will be invoked once no more references to the provided
   // shared pointer exists.
