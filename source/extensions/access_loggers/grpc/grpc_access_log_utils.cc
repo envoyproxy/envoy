@@ -326,17 +326,13 @@ void Utility::extractCommonAccessLogProperties(
     common_access_log.set_stream_id(std::string(provider->toStringView().value_or("")));
   }
 
-  if (stream_info.getDownstreamBytesMeter() != nullptr) {
-    common_access_log.set_downstream_wire_bytes_sent(
-        stream_info.getDownstreamBytesMeter()->wireBytesSent());
-    common_access_log.set_downstream_wire_bytes_received(
-        stream_info.getDownstreamBytesMeter()->wireBytesReceived());
+  if (const auto& bytes_meter = stream_info.getDownstreamBytesMeter(); bytes_meter != nullptr) {
+    common_access_log.set_downstream_wire_bytes_sent(bytes_meter->wireBytesSent());
+    common_access_log.set_downstream_wire_bytes_received(bytes_meter->wireBytesReceived());
   }
-  if (stream_info.getUpstreamBytesMeter() != nullptr) {
-    common_access_log.set_upstream_wire_bytes_sent(
-        stream_info.getUpstreamBytesMeter()->wireBytesSent());
-    common_access_log.set_upstream_wire_bytes_received(
-        stream_info.getUpstreamBytesMeter()->wireBytesReceived());
+  if (const auto& bytes_meter = stream_info.getUpstreamBytesMeter(); bytes_meter != nullptr) {
+    common_access_log.set_upstream_wire_bytes_sent(bytes_meter->wireBytesSent());
+    common_access_log.set_upstream_wire_bytes_received(bytes_meter->wireBytesReceived());
   }
 }
 

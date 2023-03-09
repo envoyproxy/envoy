@@ -108,14 +108,7 @@ void HttpGrpcAccessLog::emitLog(const Http::RequestHeaderMap& request_headers,
   }
   request_properties->set_request_headers_bytes(request_headers.byteSize());
   request_properties->set_request_body_bytes(stream_info.bytesReceived());
-  if (stream_info.getDownstreamBytesMeter() != nullptr) {
-    request_properties->set_downstream_header_bytes_received(
-        stream_info.getDownstreamBytesMeter()->headerBytesReceived());
-  }
-  if (stream_info.getUpstreamBytesMeter() != nullptr) {
-    request_properties->set_upstream_header_bytes_sent(
-        stream_info.getUpstreamBytesMeter()->headerBytesSent());
-  }
+
   if (request_headers.Method() != nullptr) {
     envoy::config::core::v3::RequestMethod method = envoy::config::core::v3::METHOD_UNSPECIFIED;
     envoy::config::core::v3::RequestMethod_Parse(std::string(request_headers.getMethodValue()),
@@ -143,14 +136,6 @@ void HttpGrpcAccessLog::emitLog(const Http::RequestHeaderMap& request_headers,
   }
   response_properties->set_response_headers_bytes(response_headers.byteSize());
   response_properties->set_response_body_bytes(stream_info.bytesSent());
-  if (stream_info.getDownstreamBytesMeter() != nullptr) {
-    response_properties->set_downstream_header_bytes_sent(
-        stream_info.getDownstreamBytesMeter()->headerBytesSent());
-  }
-  if (stream_info.getUpstreamBytesMeter() != nullptr) {
-    response_properties->set_upstream_header_bytes_received(
-        stream_info.getUpstreamBytesMeter()->headerBytesReceived());
-  }
   if (!response_headers_to_log_.empty()) {
     auto* logged_headers = response_properties->mutable_response_headers();
 
@@ -172,6 +157,15 @@ void HttpGrpcAccessLog::emitLog(const Http::RequestHeaderMap& request_headers,
         logged_headers->insert({header.get(), std::string(all_values.result().value())});
       }
     }
+  }
+
+  if (const auto& bytes_meter = stream_info.getDownstreamBytesMeter(); bytes_meter != nullptr) {
+    request_properties->set_downstream_header_bytes_received(bytes_meter->headerBytesReceived());
+    response_properties->set_downstream_header_bytes_sent(bytes_meter->headerBytesSent());
+  }
+  if (const auto& bytes_meter = stream_info.getUpstreamBytesMeter(); bytes_meter != nullptr) {
+    request_properties->set_upstream_header_bytes_sent(bytes_meter->headerBytesSent());
+    response_properties->set_upstream_header_bytes_received(bytes_meter->headerBytesReceived());
   }
 
   tls_slot_->getTyped<ThreadLocalLogger>().logger_->log(std::move(log_entry));
