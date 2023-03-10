@@ -112,6 +112,7 @@ public:
     }
   }
 
+  bool initializeReadFilters() override { return connection_->initializeReadFilters(); }
   absl::optional<Http::Protocol> protocol() const override { return {}; }
   void close() override;
   uint32_t numActiveStreams() const override { return callbacks_ ? 1 : 0; }
@@ -217,10 +218,6 @@ public:
                    Envoy::ConnectionPool::AttachContext& context) override {
     ActiveTcpClient* tcp_client = static_cast<ActiveTcpClient*>(&client);
     tcp_client->readEnableIfNew();
-    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.initialize_upstream_filters")) {
-      // Initialize upstream network read filters, if any
-      tcp_client->connection_->initializeReadFilters();
-    }
     auto* callbacks = typedContext<TcpAttachContext>(context).callbacks_;
     std::unique_ptr<Envoy::Tcp::ConnectionPool::ConnectionData> connection_data =
         std::make_unique<ActiveTcpClient::TcpConnectionData>(*tcp_client, *tcp_client->connection_);

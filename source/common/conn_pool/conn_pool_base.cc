@@ -585,6 +585,10 @@ void ConnPoolImplBase::onConnectionEvent(ActiveClient& client, absl::string_view
     // At this point, for the mixed ALPN pool, the client may be deleted. Do not
     // refer to client after this point.
     onConnected(client);
+    // Initialize client read filters
+    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.initialize_upstream_filters")) {
+      client.initializeReadFilters();
+    }
     if (client.readyForStream()) {
       onUpstreamReady();
     }
