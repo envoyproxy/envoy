@@ -73,7 +73,7 @@ public:
   // Sets the node.id field in the Bootstrap configuration.
   EngineBuilder& setNodeId(std::string node_id);
   // Sets the node.locality field in the Bootstrap configuration.
-  EngineBuilder& setNodeLocality(const NodeLocality& node_locality);
+  EngineBuilder& setNodeLocality(std::string region, std::string zone, std::string sub_zone);
   // Adds an ADS layer. Note that only the state-of-the-world gRPC protocol is supported, not Delta
   // gRPC.
   EngineBuilder& setAggregatedDiscoveryService(std::string address, const int port,

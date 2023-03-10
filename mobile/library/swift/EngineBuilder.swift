@@ -65,7 +65,7 @@ open class EngineBuilder: NSObject {
   private var adsJwtToken: String = ""
   private var adsJwtTokenLifetimeSeconds: UInt32 = 0
   private var adsSslRootCerts: String = ""
-  private var nodeId: String = ""
+  private var nodeID: String = ""
   private var nodeRegion: String = ""
   private var nodeZone: String = ""
   private var nodeSubZone: String = ""
@@ -559,12 +559,12 @@ open class EngineBuilder: NSObject {
 
   /// Sets the node.id field in the Bootstrap configuration.
   ///
-  /// - parameter nodeId: The node ID.
+  /// - parameter nodeID: The node ID.
   ///
   /// - returns: This builder.
   @discardableResult
-  public func setNodeId(_ nodeId: String) -> Self {
-    self.nodeId = nodeId
+  public func setNodeID(nodeID: String) -> Self {
+    self.nodeID = nodeID
     return self
   }
 
@@ -577,9 +577,9 @@ open class EngineBuilder: NSObject {
   /// - returns: This builder.
   @discardableResult
   public func setNodeLocality(
-    _ region: String,
-    _ zone: String,
-    _ subZone: String
+    region: String,
+    zone: String,
+    subZone: String
     ) -> Self {
     self.nodeRegion = region
     self.nodeZone = zone
@@ -619,7 +619,7 @@ open class EngineBuilder: NSObject {
   ///
   /// - returns: This builder.
   @discardableResult
-  public func addRtdsLayer(name layerName: String, timeoutSeconds: UInt32 = 0) -> Self {
+  public func addRTDSLayer(name layerName: String, timeoutSeconds: UInt32 = 0) -> Self {
     self.rtdsLayerName = layerName
     self.rtdsTimeoutSeconds = timeoutSeconds
     return self
@@ -732,7 +732,7 @@ open class EngineBuilder: NSObject {
       adsJwtToken: self.adsJwtToken,
       adsJwtTokenLifetimeSeconds: self.adsJwtTokenLifetimeSeconds,
       adsSslRootCerts: self.adsSslRootCerts,
-      nodeId: self.nodeId,
+      nodeId: self.nodeID,
       nodeRegion: self.nodeRegion,
       nodeZone: self.nodeZone,
       nodeSubZone: self.nodeSubZone

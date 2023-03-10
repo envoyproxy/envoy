@@ -1274,8 +1274,8 @@ void configureBuilder(JNIEnv* env, jstring grpc_stats_domain, jboolean admin_int
   builder.addDnsPreresolveHostnames(hostnames);
   builder.addRtdsLayer(getCppString(env, rtds_layer_name), rtds_timeout_seconds);
   builder.setNodeId(getCppString(env, node_id));
-  builder.setNodeLocality({getCppString(env, node_region), getCppString(env, node_zone),
-                           getCppString(env, node_sub_zone)});
+  builder.setNodeLocality(getCppString(env, node_region), getCppString(env, node_zone),
+                           getCppString(env, node_sub_zone));
   builder.setAggregatedDiscoveryService(getCppString(env, ads_address), ads_port,
                                         getCppString(env, ads_token), ads_token_lifetime,
                                         getCppString(env, ads_root_certs));

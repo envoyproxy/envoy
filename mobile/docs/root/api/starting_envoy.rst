@@ -539,6 +539,12 @@ https://www.envoyproxy.io/docs/envoy/latest/api-v3/service/runtime/v3/rtds.proto
 **Example**::
 
   // Kotlin
+  builder.addRtdsLayer(layerName = "rtds_layer_name", timeoutSeconds = 10)
+
+  // Swift
+  builder.addRtdsLayer("rtds_layer_name", 10)
+
+  // C++
   builder.addRtdsLayer("rtds_layer_name", 10)
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -549,9 +555,18 @@ Adds ADS to bootstrap configuration, for instance to be used with RTDS and CDS l
 Optional params allow configuring a JWT token and SSL. See the following link for details:
 https://www.envoyproxy.io/docs/envoy/latest/configuration/overview/xds_api#config-overview-ads
 
+Parameters:
+address, port, (optional) jwt_token, (optional) jwt_token_lifetime_seconds, (optional) ssl_root_certs
+
 **Example**::
 
   // Kotlin
+  builder.setAggregatedDiscoveryService(address = "192.168.1.1", port = 0)
+
+  // Swift
+  builder.setAggregatedDiscoveryService("192.168.1.1", 0)
+
+  // C++
   builder.setAggregatedDiscoveryService("192.168.1.1", 0)
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -564,6 +579,12 @@ https://www.envoyproxy.io/docs/envoy/latest/api-v3/config/core/v3/base.proto#env
 **Example**::
 
   // Kotlin
+  builder.setNodeId(nodeId = "my_test_node")
+
+  // Swift
+  builder.setNodeId("my_test_node")
+
+  // C++
   builder.setNodeId("my_test_node")
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -576,10 +597,13 @@ https://www.envoyproxy.io/docs/envoy/latest/api-v3/config/core/v3/base.proto#env
 **Example**::
 
   // Kotlin
+  builder.setNodeLocality(region = "us-west-1", zone = "some_zone", subZone = "some_sub_zone")
+
+  // Swift
   builder.setNodeLocality("us-west-1", "some_zone", "some_sub_zone")
 
   // C++
-  builder.setNodeLocality({"us-west-1", "some_zone", "some_sub_zone"});
+  builder.setNodeLocality("us-west-1", "some_zone", "some_sub_zone");
 
 ----------------------
 Advanced configuration

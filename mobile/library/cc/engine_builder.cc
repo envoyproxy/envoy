@@ -227,8 +227,9 @@ EngineBuilder& EngineBuilder::setNodeId(std::string node_id) {
   return *this;
 }
 
-EngineBuilder& EngineBuilder::setNodeLocality(const NodeLocality& node_locality) {
-  node_locality_ = node_locality;
+EngineBuilder& EngineBuilder::setNodeLocality(std::string region, std::string zone,
+                                              std::string sub_zone) {
+  node_locality_ = {region, zone, sub_zone};
   return *this;
 }
 

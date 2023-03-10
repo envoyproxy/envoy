@@ -408,12 +408,11 @@ final class EngineBuilderTests: XCTestCase {
   func testAddingRtdsAndAdsConfigurationWhenRunningEnvoy() {
     let bootstrapDebugDescription = EngineBuilder()
       .addEngineType(MockEnvoyEngine.self)
-      .addRtdsLayer(name: "rtds_layer_name", timeoutSeconds: 14325)
+      .addRTDSLayer(name: "rtds_layer_name", timeoutSeconds: 14325)
       .setAggregatedDiscoveryService(address: "FAKE_SWIFT_ADDRESS", port: 0)
       .bootstrapDebugDescription()
-    print(bootstrapDebugDescription)
     XCTAssertTrue(bootstrapDebugDescription.contains("rtds_layer_name"))
-    XCTAssertTrue(bootstrapDebugDescription.contains(#"initial_fetch_timeout { seconds: 14325 }"#))
+    XCTAssertTrue(bootstrapDebugDescription.contains("initial_fetch_timeout { seconds: 14325 }"))
     XCTAssertTrue(bootstrapDebugDescription.contains("FAKE_SWIFT_ADDRESS"))
   }
 
@@ -428,17 +427,17 @@ final class EngineBuilderTests: XCTestCase {
     XCTAssertFalse(bootstrapDebugDescription.contains("locality:"))
   }
 
-  func testCustomNodeId() {
+  func testCustomnodeID() {
     let bootstrapDebugDescription = EngineBuilder()
       .addEngineType(MockEnvoyEngine.self)
-      .setNodeId("SWIFT_TEST_NODE_ID")
+      .setNodeID(nodeID: "SWIFT_TEST_NODE_ID")
       .bootstrapDebugDescription()
     XCTAssertTrue(bootstrapDebugDescription.contains(#"id: "SWIFT_TEST_NODE_ID""#))
   }
 
   func testCustomNodeLocality() {
     let bootstrapDebugDescription = EngineBuilder()
-      .setNodeLocality("SWIFT_REGION", "SWIFT_ZONE", "SWIFT_SUB")
+      .setNodeLocality(region: "SWIFT_REGION", zone: "SWIFT_ZONE", subZone: "SWIFT_SUB")
       .bootstrapDebugDescription()
     XCTAssertTrue(bootstrapDebugDescription.contains(#"region: "SWIFT_REGION""#))
     XCTAssertTrue(bootstrapDebugDescription.contains(#"zone: "SWIFT_ZONE""#))
