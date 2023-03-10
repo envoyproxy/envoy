@@ -48,7 +48,7 @@ jobs:
   android_release_deploy:
     name: android_release_deploy
     needs: android_release_artifacts
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     timeout-minutes: 20
     steps:
     - uses: actions/checkout@v3
@@ -70,18 +70,20 @@ jobs:
         GPG_KEY_NAME: ${{ secrets.EM_GPG_KEY_NAME }}
         GPG_PASSPHRASE: ${{ secrets.EM_GPG_PASSPHRASE }}
       run: |
-        sudo apt-get update
-        sudo apt-get install -y ca-certificates
         # https://github.com/keybase/keybase-issues/issues/2798
         export GPG_TTY=$(tty)
         # Import gpg keys and warm the passphrase to avoid the gpg
         # passphrase prompt when initating a deploy
         # `--pinentry-mode=loopback` could be needed to ensure we
         # suppress the gpg prompt
+        echo "Generate signing key"
         echo $GPG_KEY | base64 --decode > signing-key
+        echo "Import signing key"
         gpg --passphrase $GPG_PASSPHRASE --batch --import signing-key
+        echo "Shred signing key"
         shred signing-key
 
+        echo "Sign files"
         gpg --pinentry-mode=loopback --passphrase $GPG_PASSPHRASE -ab envoy.aar
         gpg --pinentry-mode=loopback --passphrase $GPG_PASSPHRASE -ab envoy-pom.xml
         gpg --pinentry-mode=loopback --passphrase $GPG_PASSPHRASE -ab envoy-javadoc.jar
