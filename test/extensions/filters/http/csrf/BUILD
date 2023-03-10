@@ -33,7 +33,7 @@ envoy_extension_cc_test(
     extension_names = ["envoy.filters.http.csrf"],
     # TODO(kbaichoo): remove when deferred processing is enabled by default and the
     # test is no longer parameterized by it.
-    shard_count = 2,
+    shard_count = 4,
     deps = [
         "//source/extensions/filters/http/csrf:config",
         "//test/config:utility_lib",

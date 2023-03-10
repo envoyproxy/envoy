@@ -5,6 +5,7 @@
 #include "envoy/network/listener.h"
 #include "envoy/network/socket.h"
 #include "envoy/runtime/runtime.h"
+#include "envoy/server/process_context.h"
 
 #include "source/common/protobuf/utility.h"
 #include "source/common/quic/envoy_quic_connection_id_generator_factory.h"
@@ -95,7 +96,8 @@ class ActiveQuicListenerFactory : public Network::ActiveUdpListenerFactory,
 public:
   ActiveQuicListenerFactory(const envoy::config::listener::v3::QuicProtocolOptions& config,
                             uint32_t concurrency, QuicStatNames& quic_stat_names,
-                            ProtobufMessage::ValidationVisitor& validation_visitor);
+                            ProtobufMessage::ValidationVisitor& validation_visitor,
+                            ProcessContextOptRef context);
 
   // Network::ActiveUdpListenerFactory.
   Network::ConnectionHandler::ActiveUdpListenerPtr
@@ -126,6 +128,7 @@ private:
   const uint32_t packets_to_read_to_connection_count_ratio_;
   const Network::Socket::OptionsSharedPtr options_{std::make_shared<Network::Socket::Options>()};
   bool kernel_worker_routing_{};
+  ProcessContextOptRef context_;
 
   static bool disable_kernel_bpf_packet_routing_for_test_;
 };

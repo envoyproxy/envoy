@@ -17,6 +17,7 @@
 
 using testing::NiceMock;
 using testing::Return;
+using testing::ReturnPointee;
 using testing::ReturnRef;
 
 namespace Envoy {
@@ -167,9 +168,7 @@ on_no_match:
     filter_->initializeReadFilterCallbacks(callbacks_);
   }
 
-  RoleBasedAccessControlNetworkFilterTest()
-      : provider_(std::make_shared<Network::Address::Ipv4Instance>(80),
-                  std::make_shared<Network::Address::Ipv4Instance>(80)) {
+  RoleBasedAccessControlNetworkFilterTest() {
     EXPECT_CALL(callbacks_, connection()).WillRepeatedly(ReturnRef(callbacks_.connection_));
     EXPECT_CALL(callbacks_.connection_, streamInfo()).WillRepeatedly(ReturnRef(stream_info_));
 
@@ -179,10 +178,10 @@ on_no_match:
 
   void setDestinationPort(uint16_t port) {
     address_ = Envoy::Network::Utility::parseInternetAddress("1.2.3.4", port, false);
-    stream_info_.downstream_connection_info_provider_->setLocalAddress(address_);
 
-    provider_.setLocalAddress(address_);
-    ON_CALL(callbacks_.connection_, connectionInfoProvider()).WillByDefault(ReturnRef(provider_));
+    stream_info_.downstream_connection_info_provider_->setLocalAddress(address_);
+    ON_CALL(callbacks_.connection_.stream_info_, downstreamAddressProvider())
+        .WillByDefault(ReturnPointee(stream_info_.downstream_connection_info_provider_));
   }
 
   void setRequestedServerName(std::string server_name) {
@@ -190,8 +189,10 @@ on_no_match:
     ON_CALL(callbacks_.connection_, requestedServerName())
         .WillByDefault(Return(requested_server_name_));
 
-    provider_.setRequestedServerName(requested_server_name_);
-    ON_CALL(callbacks_.connection_, connectionInfoProvider()).WillByDefault(ReturnRef(provider_));
+    stream_info_.downstream_connection_info_provider_->setRequestedServerName(
+        requested_server_name_);
+    ON_CALL(callbacks_.connection_.stream_info_, downstreamAddressProvider())
+        .WillByDefault(ReturnPointee(stream_info_.downstream_connection_info_provider_));
   }
 
   void checkAccessLogMetadata(bool expected) {
@@ -230,7 +231,6 @@ on_no_match:
 
   std::unique_ptr<RoleBasedAccessControlFilter> filter_;
   Network::Address::InstanceConstSharedPtr address_;
-  Network::ConnectionInfoSetterImpl provider_;
   std::string requested_server_name_;
 };
 
