@@ -551,8 +551,8 @@ protected:
   }
 
 private:
-  Server::ServerLifecycleNotifier::HandlePtr start_handle_;
   bool workers_started_{false};
+  Server::ServerLifecycleNotifier::HandlePtr start_handle_;
 };
 
 // HTTP filter
