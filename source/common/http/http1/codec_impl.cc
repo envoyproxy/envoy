@@ -510,7 +510,7 @@ ConnectionImpl::ConnectionImpl(Network::Connection& connection, CodecStats& stat
       processing_trailers_(false), handling_upgrade_(false), reset_stream_called_(false),
       deferred_end_stream_headers_(false), dispatching_(false), max_headers_kb_(max_headers_kb),
       max_headers_count_(max_headers_count) {
-  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.http1_use_balsa_parser")) {
+  if (codec_settings_.use_balsa_parser_) {
     parser_ = std::make_unique<BalsaParser>(type, this, max_headers_kb_ * 1024, enableTrailers());
   } else {
     parser_ = std::make_unique<LegacyHttpParserImpl>(type, this);
@@ -689,7 +689,7 @@ Envoy::StatusOr<size_t> ConnectionImpl::dispatchSlice(const char* slice, size_t 
   const ParserStatus status = parser_->getStatus();
   if (status != ParserStatus::Ok && status != ParserStatus::Paused) {
     absl::string_view error = Http1ResponseCodeDetails::get().HttpCodecError;
-    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.http1_use_balsa_parser")) {
+    if (codec_settings_.use_balsa_parser_) {
       if (parser_->errorMessage() == "headers size exceeds limit" ||
           parser_->errorMessage() == "trailers size exceeds limit") {
         error_code_ = Http::Code::RequestHeaderFieldsTooLarge;

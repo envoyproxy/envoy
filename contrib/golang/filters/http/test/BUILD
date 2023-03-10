@@ -1,7 +1,9 @@
 load(
     "//bazel:envoy_build_system.bzl",
+    "envoy_cc_fuzz_test",
     "envoy_cc_test",
     "envoy_contrib_package",
+    "envoy_proto_library",
 )
 
 licenses(["notice"])  # Apache 2
@@ -63,5 +65,32 @@ envoy_cc_test(
         "//test/integration:http_integration_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_proto_library(
+    name = "golang_filter_fuzz_proto",
+    srcs = ["golang_filter_fuzz.proto"],
+    deps = [
+        "//test/fuzz:common_proto",
+        "@envoy_api//contrib/envoy/extensions/filters/http/golang/v3alpha:pkg",
+        "@envoy_api//envoy/config/core/v3:pkg",
+    ],
+)
+
+envoy_cc_fuzz_test(
+    name = "golang_filter_fuzz_test",
+    srcs = ["golang_filter_fuzz_test.cc"],
+    corpus = "golang_filter_corpus",
+    deps = [
+        ":golang_filter_fuzz_proto_cc_proto",
+        "//contrib/golang/filters/http/source:config",
+        "//contrib/golang/filters/http/test/common/dso:dso_mocks",
+        "//source/common/network:address_lib",
+        "//test/extensions/filters/http/common/fuzz:http_filter_fuzzer_lib",
+        "//test/mocks/http:http_mocks",
+        "//test/mocks/network:network_mocks",
+        "//test/mocks/runtime:runtime_mocks",
+        "@envoy_api//contrib/envoy/extensions/filters/http/golang/v3alpha:pkg_cc_proto",
     ],
 )

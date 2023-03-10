@@ -7,11 +7,11 @@ export DELAY=5
 . "$(dirname "${BASH_SOURCE[0]}")/../verify-common.sh"
 
 check_health() {
-    "$DOCKER_COMPOSE" exec -T client-envoy curl -s "localhost:8001/clusters" | grep health_flags
+    "${DOCKER_COMPOSE[@]}" exec -T client-envoy curl -s "localhost:8001/clusters" | grep health_flags
 }
 
 check_backend() {
-    output=$("$DOCKER_COMPOSE" exec -T client-envoy python3 client.py http://localhost:3000/ 100)
+    output=$("${DOCKER_COMPOSE[@]}" exec -T client-envoy python3 client.py http://localhost:3000/ 100)
     echo "$output"
     for expected in "$@"
     do
@@ -27,14 +27,14 @@ bring_up_backend() {
     local server
     server="$1"
 
-    "$DOCKER_COMPOSE" exec -T client-envoy curl -s "$server":8080/healthy
+    "${DOCKER_COMPOSE[@]}" exec -T client-envoy curl -s "${server}:8080/healthy"
 }
 
 bring_down_backend() {
     local server
     server="$1"
 
-    "$DOCKER_COMPOSE" exec -T client-envoy curl -s "$server":8080/unhealthy
+    "${DOCKER_COMPOSE[@]}" exec -T client-envoy curl -s "${server}:8080/unhealthy"
 }
 
 run_log "=== Demo setup
@@ -51,7 +51,7 @@ check_health
 check_backend backend-local-1
 
 run_log "Bring down backend-local-1 then snooze for ${DELAY}s. Priority 0 locality is 0% healthy."
-bring_down_backend "${NAME}"_backend-local-1_1
+bring_down_backend "${NAME}-backend-local-1-1"
 sleep ${DELAY}
 
 run_log "Send requests to backend."
@@ -59,7 +59,7 @@ check_health
 check_backend backend-local-2 backend-remote-1
 
 run_log "Bring down backend-local-2 then snooze for ${DELAY}s. Priority 1 locality is 50% healthy."
-bring_down_backend "${NAME}"_backend-local-2_1
+bring_down_backend "${NAME}"-backend-local-2-1
 sleep ${DELAY}
 
 run_log "Traffic is load balanced goes to remote only."
@@ -69,19 +69,19 @@ check_backend backend-remote-1 backend-remote-2
 run_log "=== Scenario 2: multiple replica in the highest priority locality"
 
 run_log "Recover local-1 and local-2 then snooze for ${DELAY}s"
-bring_up_backend "${NAME}"_backend-local-1_1
-bring_up_backend "${NAME}"_backend-local-2_1
+bring_up_backend "${NAME}-backend-local-1-1"
+bring_up_backend "${NAME}-backend-local-2-1"
 sleep ${DELAY}
 
 run_log "Scale backend-local-1 to 5 replicas then snooze for ${DELAY}s"
-"$DOCKER_COMPOSE" -p ${NAME} up --scale backend-local-1=5 -d --build
+"${DOCKER_COMPOSE[@]}" -p ${NAME} up --scale backend-local-1=5 -d --build
 sleep ${DELAY}
 
 run_log "Bring down 4 replicas in backend-local-1 then snooze for ${DELAY}s. Priority 0 locality is 20% healthy."
-bring_down_backend "${NAME}"_backend-local-1_2
-bring_down_backend "${NAME}"_backend-local-1_3
-bring_down_backend "${NAME}"_backend-local-1_4
-bring_down_backend "${NAME}"_backend-local-1_5
+bring_down_backend "${NAME}-backend-local-1-2"
+bring_down_backend "${NAME}-backend-local-1-3"
+bring_down_backend "${NAME}-backend-local-1-4"
+bring_down_backend "${NAME}-backend-local-1-5"
 sleep ${DELAY}
 
 run_log "Send requests to backend."
@@ -89,8 +89,8 @@ check_health
 check_backend backend-local-1 backend-local-2 backend-remote-1
 
 run_log "Bring down all endpoints of priority 1. Priority 1 locality is 0% healthy."
-bring_down_backend "${NAME}"_backend-local-2_1
-bring_down_backend "${NAME}"_backend-remote-1_1
+bring_down_backend "${NAME}-backend-local-2-1"
+bring_down_backend "${NAME}-backend-remote-1-1"
 sleep ${DELAY}
 
 run_log "Send requests to backend."

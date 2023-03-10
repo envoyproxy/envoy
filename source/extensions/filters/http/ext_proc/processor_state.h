@@ -89,6 +89,12 @@ public:
   ProcessorState& operator=(const ProcessorState&) = delete;
 
   envoy::config::core::v3::TrafficDirection trafficDirection() const { return traffic_direction_; }
+  const std::string trafficDirectionDebugStr() const {
+    if (trafficDirection() == envoy::config::core::v3::TrafficDirection::INBOUND) {
+      return "INBOUND";
+    }
+    return "OUTBOUND";
+  }
   CallbackState callbackState() const { return callback_state_; }
   void setPaused(bool paused) { paused_ = paused; }
 

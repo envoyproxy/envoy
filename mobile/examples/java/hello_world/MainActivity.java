@@ -35,7 +35,7 @@ public class MainActivity extends Activity {
   private static final String ENVOY_SERVER_HEADER = "server";
   private static final String REQUEST_AUTHORITY = "api.lyft.com";
   private static final String REQUEST_PATH = "/ping";
-  private static final String REQUEST_SCHEME = "https";
+  private static final String REQUEST_SCHEME = "http";
   private static final Set<String> FILTERED_HEADERS = new HashSet<String>() {
     {
       add("server");
@@ -115,7 +115,7 @@ public class MainActivity extends Activity {
           String headerText = sb.toString();
 
           Log.d("MainActivity", message);
-          if (status == 200) {
+          if (status == 301) {
             String serverHeaderField = responseHeaders.value(ENVOY_SERVER_HEADER).get(0);
             recyclerView.post(() -> viewAdapter.add(new Success(message, headerText)));
           } else {
