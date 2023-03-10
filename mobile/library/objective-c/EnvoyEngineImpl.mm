@@ -511,9 +511,7 @@ static void ios_track_event(envoy_map map, const void *context) {
     [self registerKeyValueStore:name keyValueStore:config.keyValueStores[name]];
   }
 
-  if (config.enablePlatformCertificateValidation) {
-    register_apple_platform_cert_verifier();
-  }
+  register_apple_platform_cert_verifier();
 }
 
 - (int)runWithConfig:(EnvoyConfiguration *)config logLevel:(NSString *)logLevel {
