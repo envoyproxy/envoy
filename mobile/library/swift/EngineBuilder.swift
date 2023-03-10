@@ -706,7 +706,7 @@ open class EngineBuilder: NSObject {
 private extension EngineBuilder {
   func generateBootstrap() -> Bootstrap {
     var cxxBuilder = Envoy.Platform.EngineBuilder()
-    cxxBuilder.addLogLevel(Envoy.Platform.logLevelFromString(self.logLevel.stringValue.toCXX()))
+    cxxBuilder.addLogLevel(self.logLevel.toCXX())
 #if ENVOY_ADMIN_FUNCTIONALITY
     cxxBuilder.enableAdminInterface(self.adminInterfaceEnabled)
 #endif
