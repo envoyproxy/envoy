@@ -250,7 +250,7 @@ EngineBuilder& EngineBuilder::setAggregatedDiscoveryService(std::string address,
 }
 
 EngineBuilder& EngineBuilder::addRtdsLayer(std::string layer_name, const int timeout_seconds) {
-  rtds_layer_name_ = layer_name;
+  rtds_layer_name_ = std::move(layer_name);
   rtds_timeout_seconds_ = timeout_seconds == 0 ? DefaultXdsTimeout : timeout_seconds;
   return *this;
 }
