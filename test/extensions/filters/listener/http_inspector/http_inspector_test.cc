@@ -279,7 +279,7 @@ public:
     if (http2) {
       EXPECT_CALL(os_sys_calls_, recv(_, _, _, _))
           .WillOnce(Invoke(
-              [&header](os_fd_t, void* buffer, size_t length, int) -> Api::SysCallSizeResult {
+              [&data](os_fd_t, void* buffer, size_t length, int) -> Api::SysCallSizeResult {
                 ASSERT(length >= data.size());
                 memcpy(buffer, data.data(), data.size());
                 return Api::SysCallSizeResult{ssize_t(data.size()), 0};
