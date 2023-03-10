@@ -48,15 +48,6 @@ inline const LogLevel LogLevelError = LogLevel::err;
 inline const LogLevel LogLevelCritical = LogLevel::critical;
 inline const LogLevel LogLevelOff = LogLevel::off;
 
-inline const DirectResponseTesting::MatchMode DirectResponseMatchModeContains =
-    DirectResponseTesting::contains;
-inline const DirectResponseTesting::MatchMode DirectResponseMatchModeExact =
-    DirectResponseTesting::exact;
-inline const DirectResponseTesting::MatchMode DirectResponseMatchModePrefix =
-    DirectResponseTesting::prefix;
-inline const DirectResponseTesting::MatchMode DirectResponseMatchModeSuffix =
-    DirectResponseTesting::suffix;
-
 // Smart pointers aren't currently supported by Swift / C++ interop, so we "erase"
 // it into a `BootstrapPtr` / `intptr_t`, which we can import from Swift.
 inline BootstrapPtr generateBootstrapPtr(Platform::EngineBuilder builder) {

@@ -352,16 +352,16 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
       auto* direct_response_headers = direct_response_route_match->add_headers();
       direct_response_headers->set_name(header.name);
       switch (header.mode) {
-      case DirectResponseTesting::contains:
+      case DirectResponseTesting::MatchMode::Contains:
         direct_response_headers->set_contains_match(header.value);
         break;
-      case DirectResponseTesting::exact:
+      case DirectResponseTesting::MatchMode::Exact:
         direct_response_headers->set_exact_match(header.value);
         break;
-      case DirectResponseTesting::prefix:
+      case DirectResponseTesting::MatchMode::Prefix:
         direct_response_headers->set_prefix_match(header.value);
         break;
-      case DirectResponseTesting::suffix:
+      case DirectResponseTesting::MatchMode::Suffix:
         direct_response_headers->set_suffix_match(header.value);
         break;
       }
@@ -407,16 +407,16 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
       auto* direct_response_headers = direct_response_route_match->add_headers();
       direct_response_headers->set_name(header.name);
       switch (header.mode) {
-      case DirectResponseTesting::contains:
+      case DirectResponseTesting::MatchMode::Contains:
         direct_response_headers->set_contains_match(header.value);
         break;
-      case DirectResponseTesting::exact:
+      case DirectResponseTesting::MatchMode::Exact:
         direct_response_headers->set_exact_match(header.value);
         break;
-      case DirectResponseTesting::prefix:
+      case DirectResponseTesting::MatchMode::Prefix:
         direct_response_headers->set_prefix_match(header.value);
         break;
-      case DirectResponseTesting::suffix:
+      case DirectResponseTesting::MatchMode::Suffix:
         direct_response_headers->set_suffix_match(header.value);
         break;
       }
