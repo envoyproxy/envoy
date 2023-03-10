@@ -257,8 +257,8 @@
     }
     builder.addStatsSinks(std::move(sinks));
   }
-  builder.setNodeLocality(
-      [self.nodeRegion toCXXString], [self.nodeZone toCXXString], [self.nodeSubZone toCXXString]);
+  builder.setNodeLocality([self.nodeRegion toCXXString], [self.nodeZone toCXXString],
+                          [self.nodeSubZone toCXXString]);
   builder.setNodeId([self.nodeId toCXXString]);
   builder.addRtdsLayer([self.rtdsLayerName toCXXString], self.rtdsTimeoutSeconds);
   builder.setAggregatedDiscoveryService(
