@@ -582,7 +582,7 @@ https://www.envoyproxy.io/docs/envoy/latest/api-v3/config/core/v3/base.proto#env
   builder.setNodeId(nodeId = "my_test_node")
 
   // Swift
-  builder.setNodeID(nodeID: "my_test_node")
+  builder.setNodeID("my_test_node")
 
   // C++
   builder.setNodeId("my_test_node")
