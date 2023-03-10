@@ -163,6 +163,9 @@ new_features:
 - area: sni_dynamic_forward_proxy
   change: |
     added an option to dynamically set the port used by the SNI dynamic forward proxy filter, by setting a filter state object under the key ``envoy.upstream.dynamic_port``.
+- area: redis
+  change: |
+    added :ref:`wait_for_warm_on_init <envoy_v3_api_field_config.cluster.v3.Cluster.wait_for_warm_on_init>` support for :ref:`Redis Cluster<arch_overview_redis>`.
 
 deprecated:
 - area: ext_authz
