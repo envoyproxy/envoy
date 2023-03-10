@@ -25,13 +25,14 @@ public:
   }
 
   SmtpFilterConfigSharedPtr config_;
+  std::string stat_prefix_{"test."};
+
   SmtpFilterConfig::SmtpFilterConfigOptions config_options_{
       stat_prefix_, envoy::extensions::filters::network::smtp_proxy::v3alpha::SmtpProxy::DISABLE};
 
   std::unique_ptr<SmtpFilter> filter_;
   Stats::IsolatedStoreImpl store_;
   Stats::Scope& scope_{*store_.rootScope()};
-  std::string stat_prefix_{"test."};
   NiceMock<Network::MockReadFilterCallbacks> filter_callbacks_;
   NiceMock<Network::MockConnection> connection_;
   Buffer::OwnedImpl data_;

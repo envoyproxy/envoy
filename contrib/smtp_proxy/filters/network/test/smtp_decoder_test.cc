@@ -217,14 +217,14 @@ TEST_F(DecoderImplTest, TestSmtpTransactionCommands) {
             SmtpTransaction::State::RCPT_COMMAND);
 
   // Test case 3: TRANSACTION_IN_PROGRESS state and smtpDataCommand
-  command = SmtpTestUtils::smtpDataCommand;
+  command = SmtpUtils::smtpDataCommand;
   decoder_impl_->getSession().SetTransactionState(SmtpTransaction::State::TRANSACTION_IN_PROGRESS);
   decoder_impl_->decodeSmtpTransactionCommands(command);
   EXPECT_EQ(decoder_impl_->getSession().getTransactionState(),
             SmtpTransaction::State::MAIL_DATA_TRANSFER_REQUEST);
 
   // Transaction abort/reset
-  command = SmtpTestUtils::smtpRsetCommand;
+  command = SmtpUtils::smtpRsetCommand;
   decoder_impl_->getSession().SetTransactionState(SmtpTransaction::State::TRANSACTION_IN_PROGRESS);
   decoder_impl_->decodeSmtpTransactionCommands(command);
   EXPECT_EQ(decoder_impl_->getSession().getTransactionState(),
