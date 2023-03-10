@@ -45,12 +45,20 @@ public:
 
   bool created_{false};
 };
+
 class TestHttpFilterFactory : public TestFilterFactory,
-                              public Server::Configuration::NamedHttpFilterConfigFactory {
+                              public Server::Configuration::NamedHttpFilterConfigFactory,
+                              public Server::Configuration::UpstreamHttpFilterConfigFactory {
 public:
   Http::FilterFactoryCb
   createFilterFactoryFromProto(const Protobuf::Message&, const std::string&,
                                Server::Configuration::FactoryContext&) override {
+    created_ = true;
+    return [](Http::FilterChainFactoryCallbacks&) -> void {};
+  }
+  Http::FilterFactoryCb
+  createFilterFactoryFromProto(const Protobuf::Message&, const std::string&,
+                               Server::Configuration::UpstreamHttpFactoryContext&) override {
     created_ = true;
     return [](Http::FilterChainFactoryCallbacks&) -> void {};
   }
@@ -248,6 +256,22 @@ public:
   }
 };
 
+// HTTP upstream filter test
+class HttpUpstreamFilterConfigDiscoveryImplTest
+    : public FilterConfigDiscoveryImplTest<
+          NamedHttpFilterFactoryCb, Server::Configuration::FactoryContext,
+          UpstreamHttpFilterConfigProviderManagerImpl, TestHttpFilterFactory,
+          Server::Configuration::UpstreamHttpFilterConfigFactory> {
+public:
+  const std::string getFilterType() const override { return "http"; }
+  const std::string getConfigReloadCounter() const override {
+    return "extension_config_discovery.http_filter.foo.config_reload";
+  }
+  const std::string getConfigFailCounter() const override {
+    return "extension_config_discovery.http_filter.foo.config_fail";
+  }
+};
+
 // TCP listener filter test
 class TcpListenerFilterConfigDiscoveryImplTest
     : public FilterConfigDiscoveryImplTest<
@@ -290,7 +314,8 @@ class FilterConfigDiscoveryImplTestParameter : public testing::Test {};
 
 // The test filter types.
 using FilterConfigDiscoveryTestTypes =
-    ::testing::Types<HttpFilterConfigDiscoveryImplTest, TcpListenerFilterConfigDiscoveryImplTest,
+    ::testing::Types<HttpFilterConfigDiscoveryImplTest, HttpUpstreamFilterConfigDiscoveryImplTest,
+                     TcpListenerFilterConfigDiscoveryImplTest,
                      UdpListenerFilterConfigDiscoveryImplTest>;
 
 TYPED_TEST_SUITE(FilterConfigDiscoveryImplTestParameter, FilterConfigDiscoveryTestTypes);
