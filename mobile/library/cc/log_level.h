@@ -2,7 +2,7 @@
 
 #include <string>
 
-#include "source/common/common/base_logger.h" // IWYU pragma: export
+#include "source/common/common/base_logger.h"
 
 namespace Envoy {
 namespace Platform {
