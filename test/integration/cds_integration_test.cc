@@ -250,7 +250,7 @@ public:
   }
 
   void removeClusters(const std::vector<std::string>& removed) {
-    auto cluster_removed = test_server_->counter("cluster_manager.cluster_removed")->value();
+    uint64_t cluster_removed = test_server_->counter("cluster_manager.cluster_removed")->value();
     sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(Config::TypeUrl::get().Cluster, {},
                                                                {}, removed, "42");
     test_server_->waitForCounterGe("cluster_manager.cluster_removed",
@@ -282,7 +282,6 @@ TEST_P(LazyInitClusterStatsTest, LazyInitTrafficStatsWithClusterCreateUpdateDele
   EXPECT_GE(test_server_->gauge("cluster.cluster_1.ClusterTrafficStats.initialized")->value(), 1);
   // cluster_1 traffic stats not lost.
   EXPECT_EQ(test_server_->counter("cluster.cluster_1.upstream_cx_total")->value(), 1);
-  // Remove "cluster_1".
   removeClusters({ClusterName1});
   // update_success is 3: initialize(), update cluster1. and remove cluster1.
   test_server_->waitForCounterGe("cluster_manager.cds.update_success", 3);
@@ -309,7 +308,6 @@ TEST_P(LazyInitClusterStatsTest, LazyInitTrafficStatsWithClusterCreateDeleteRecr
   // Cluster_1 trafficStats updated.
   EXPECT_EQ(test_server_->gauge("cluster.cluster_1.ClusterTrafficStats.initialized")->value(), 1);
   EXPECT_EQ(test_server_->counter("cluster.cluster_1.upstream_cx_total")->value(), 1);
-  // Remove "cluster_1".
   removeClusters({ClusterName1});
   test_server_->waitForCounterGe("cluster_manager.cds.update_success", 2);
   sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(Config::TypeUrl::get().Cluster,
