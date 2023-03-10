@@ -430,7 +430,7 @@ final class EngineBuilderTests: XCTestCase {
   func testCustomnodeID() {
     let bootstrapDebugDescription = EngineBuilder()
       .addEngineType(MockEnvoyEngine.self)
-      .setNodeID(nodeID: "SWIFT_TEST_NODE_ID")
+      .setNodeID("SWIFT_TEST_NODE_ID")
       .bootstrapDebugDescription()
     XCTAssertTrue(bootstrapDebugDescription.contains(#"id: "SWIFT_TEST_NODE_ID""#))
   }
