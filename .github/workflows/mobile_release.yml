@@ -70,8 +70,8 @@ jobs:
         GPG_KEY_NAME: ${{ secrets.EM_GPG_KEY_NAME }}
         GPG_PASSPHRASE: ${{ secrets.EM_GPG_PASSPHRASE }}
       run: |
-        apt-get update
-        apt-get install -y ca-certificates
+        sudo apt-get update
+        sudo apt-get install -y ca-certificates
         # https://github.com/keybase/keybase-issues/issues/2798
         export GPG_TTY=$(tty)
         # Import gpg keys and warm the passphrase to avoid the gpg
