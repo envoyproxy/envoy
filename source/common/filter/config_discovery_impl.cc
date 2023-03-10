@@ -151,8 +151,7 @@ void FilterConfigSubscription::onConfigUpdate(
   if (!removed_resources.empty()) {
     ASSERT(removed_resources.size() == 1);
     ENVOY_LOG(debug, "Removing filter config {}", filter_config_name_);
-    ConfigVersionSharedPtr next =
-        std::make_shared<ConfigVersion>("", factory_context_.timeSource().systemTime());
+    last_ = std::make_shared<ConfigVersion>("", factory_context_.timeSource().systemTime());
     Common::applyToAllWithCleanup<DynamicFilterConfigProviderImplBase*>(
         filter_config_providers_,
         [](DynamicFilterConfigProviderImplBase* provider, std::shared_ptr<Cleanup> cleanup) {
