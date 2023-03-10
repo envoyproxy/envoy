@@ -112,6 +112,7 @@ void ActiveTcpConnection::onEvent(Network::ConnectionEvent event) {
   // Any event leads to destruction of the connection.
   if (event == Network::ConnectionEvent::LocalClose ||
       event == Network::ConnectionEvent::RemoteClose) {
+    stream_info_->setDownstreamTransportFailureReason(connection_->transportFailureReason());
     active_connections_.listener_.removeConnection(*this);
   }
 }
@@ -121,7 +122,7 @@ void OwnedActiveStreamListenerBase::removeConnection(ActiveTcpConnection& connec
   ActiveConnections& active_connections = connection.active_connections_;
   ActiveConnectionPtr removed = connection.removeFromList(active_connections.connections_);
   dispatcher().deferredDelete(std::move(removed));
-  // Delete map entry only iff connections becomes empty.
+  // Delete map entry if and only if connections_ becomes empty.
   if (active_connections.connections_.empty()) {
     auto iter = connections_by_context_.find(&active_connections.filter_chain_);
     ASSERT(iter != connections_by_context_.end());

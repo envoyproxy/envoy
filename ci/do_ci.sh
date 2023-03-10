@@ -57,6 +57,7 @@ function bazel_with_collection() {
       cp --parents -f "$f" "${ENVOY_FAILED_TEST_LOGS}"
     done <<< "$failed_logs"
     popd
+    run_process_test_result
     exit "${BAZEL_STATUS}"
   fi
   collect_build_profile "$1"
@@ -163,7 +164,7 @@ function bazel_contrib_binary_build() {
 }
 
 function run_process_test_result() {
-  if [[ -z "$CI_SKIP_PROCESS_TEST_RESULTS" ]] && [[ $(find "$TEST_TMPDIR" -name "*_attempt.xml" 2> /dev/null) ]]; then
+  if [[ -z "$CI_SKIP_PROCESS_TEST_RESULTS" ]] && [[ $(find "$TEST_TMPDIR" -name "*_attempt_*.xml" 2> /dev/null) ]]; then
       echo "running flaky test reporting script"
       bazel run "${BAZEL_BUILD_OPTIONS[@]}" //ci/flaky_test:process_xml "$CI_TARGET"
   else
@@ -187,9 +188,10 @@ function run_ci_verify () {
   rm -rf "${OCI_TEMP_DIR:?}"
 
   docker images
-  sudo apt-get update -y
-  sudo apt-get install -y -qq --no-install-recommends expect redis-tools
+  sudo apt-get -qq update -y
+  sudo apt-get -qq install -y --no-install-recommends expect
   export DOCKER_NO_PULL=1
+  export DOCKER_RMI_CLEANUP=1
   umask 027
   chmod -R o-rwx examples/
   "${ENVOY_SRCDIR}"/ci/verify_examples.sh "${@}" || exit
@@ -453,7 +455,21 @@ elif [[ "$CI_TARGET" == "bazel.clang_tidy" ]]; then
   # clang-tidy will warn on standard library issues with libc++
   ENVOY_STDLIB="libstdc++"
   setup_clang_toolchain
-  BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS[*]}" NUM_CPUS=$NUM_CPUS "${ENVOY_SRCDIR}"/ci/run_clang_tidy.sh "$@"
+
+  export CLANG_TIDY_FIX_DIFF="${TEST_TMPDIR}/lint-fixes/clang-tidy-fixed.diff"
+  export FIX_YAML="${TEST_TMPDIR}/lint-fixes/clang-tidy-fixes.yaml"
+  export CLANG_TIDY_APPLY_FIXES=1
+  mkdir -p "${TEST_TMPDIR}/lint-fixes"
+  BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS[*]}" NUM_CPUS=$NUM_CPUS "${ENVOY_SRCDIR}"/ci/run_clang_tidy.sh "$@" || {
+      if [[ -s "$FIX_YAML" ]]; then
+          echo >&2
+          echo "Diff/yaml files with (some) fixes will be uploaded. Please check the artefacts for this PR run in the azure pipeline." >&2
+          echo >&2
+      else
+          echo "Clang-tidy failed." >&2
+      fi
+      exit 1
+  }
   exit 0
 elif [[ "$CI_TARGET" == "bazel.fuzz" ]]; then
   setup_clang_toolchain
@@ -527,7 +543,19 @@ elif [[ "$CI_TARGET" == "verify_distro" ]]; then
     bazel run "${BAZEL_BUILD_OPTIONS[@]}" //distribution:verify_packages "$PACKAGE_BUILD"
     exit 0
 elif [[ "$CI_TARGET" == "publish" ]]; then
-    bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/project:publish
+    # If we are on a non-main release branch but the patch version is 0 - then this branch
+    # has just been created, and the tag/release was cut from `main` - there is no need to
+    # create the tag/release from here
+    version="$(cat VERSION.txt)"
+    patch_version="$(echo "$version" | rev | cut -d. -f1)"
+    if [[ "$AZP_BRANCH" != "main" && "$patch_version" -eq 0 ]]; then
+        echo "Not creating a tag/release for ${version}"
+        exit 0
+    fi
+    # It can take some time to get here in CI so the branch may have changed - create the release
+    # from the current commit (as this only happens on non-PRs we are safe from merges)
+    BUILD_SHA="$(git rev-parse HEAD)"
+    bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/project:publish -- --publish-commitish="$BUILD_SHA"
     exit 0
 else
   echo "Invalid do_ci.sh target, see ci/README.md for valid targets."

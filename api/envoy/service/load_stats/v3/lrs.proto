@@ -14,7 +14,6 @@ option java_package = "io.envoyproxy.envoy.service.load_stats.v3";
 option java_outer_classname = "LrsProto";
 option java_multiple_files = true;
 option go_package = "github.com/envoyproxy/go-control-plane/envoy/service/load_stats/v3;load_statsv3";
-option java_generic_services = true;
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: Load reporting service (LRS)]

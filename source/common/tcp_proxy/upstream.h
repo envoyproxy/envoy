@@ -15,6 +15,8 @@
 namespace Envoy {
 namespace TcpProxy {
 
+constexpr absl::string_view DisableTunnelingFilterStateKey = "envoy.tcp_proxy.disable_tunneling";
+
 class TcpConnPool : public GenericConnPool, public Tcp::ConnectionPool::Callbacks {
 public:
   TcpConnPool(Upstream::ThreadLocalCluster& thread_local_cluster,
@@ -187,7 +189,9 @@ private:
         parent_.doneReading();
       }
     }
-    void decodeTrailers(Http::ResponseTrailerMapPtr&&) override {
+    void decodeTrailers(Http::ResponseTrailerMapPtr&& trailers) override {
+      parent_.config_.propagateResponseTrailers(std::move(trailers),
+                                                parent_.downstream_info_.filterState());
       if (Runtime::runtimeFeatureEnabled(
               "envoy.reloadable_features.finish_reading_on_decode_trailers")) {
         parent_.doneReading();

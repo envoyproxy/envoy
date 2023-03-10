@@ -29,21 +29,21 @@ Terminal 1 ::
 
     $ pwd
     envoy/examples/load-reporting-service
-    $ docker-compose pull
-    $ docker-compose up --scale http_service=2
+    $ docker compose pull
+    $ docker compose up --scale http_service=2
 
 
 Terminal 2 ::
 
     $ pwd
     envoy/examples/load_reporting_service
-    $ docker-compose ps
+    $ docker compose ps
 
-                  Name                               Command               State            Ports
-    ------------------------------------------------------------------------------------------------------------
-    load-reporting-service_http_service_1   /bin/sh -c /usr/local/bin/ ... Up      10000/tcp, 0.0.0.0:81->80/tcp
-    load-reporting-service_http_service_2   /bin/sh -c /usr/local/bin/ ... Up      10000/tcp, 0.0.0.0:80->80/tcp
-    load-reporting-service_lrs_server_1     go run main.go                 Up      18000/tcp
+                  Name                               Command               State                Ports
+    -----------------------------------------------------------------------------------------------------------------
+    load-reporting-service_http_service_1   /docker-entrypoint.sh /usr ... Up           10000/tcp, 0.0.0.0:81->80/tcp
+    load-reporting-service_http_service_2   python3 /code/service.py   ... Up (healthy)
+    load-reporting-service_lrs_server_1     go run main.go                 Up
 
 Step 2: Start sending stream of HTTP requests
 *********************************************

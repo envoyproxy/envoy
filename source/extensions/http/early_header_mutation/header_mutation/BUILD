@@ -15,7 +15,7 @@ envoy_cc_library(
     hdrs = ["header_mutation.h"],
     deps = [
         "//envoy/http:early_header_mutation_interface",
-        "//source/common/router:header_parser_lib",
+        "//source/common/http:header_mutation_lib",
         "@envoy_api//envoy/config/common/mutation_rules/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/http/early_header_mutation/header_mutation/v3:pkg_cc_proto",
     ],

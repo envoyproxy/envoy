@@ -79,22 +79,6 @@ class RequestHeadersBuilder : HeadersBuilder {
   }
 
   /**
-   * Add an upstream HTTP protocol to use when executing this request.
-   *
-   * @param upstreamHttpProtocol: The protocol to use for this request.
-   *
-   * @return RequestHeadersBuilder, This builder.
-   */
-  fun addUpstreamHttpProtocol(upstreamHttpProtocol: UpstreamHttpProtocol):
-    RequestHeadersBuilder {
-      internalSet(
-        "x-envoy-mobile-upstream-protocol",
-        mutableListOf(upstreamHttpProtocol.stringValue)
-      )
-      return this
-    }
-
-  /**
    * Add a socket tag to be applied to the socket.
    *
    * @param uid: Traffic stats UID to be applied.

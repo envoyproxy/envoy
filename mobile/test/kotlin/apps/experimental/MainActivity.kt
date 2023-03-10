@@ -11,12 +11,14 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import io.envoyproxy.envoymobile.android.SharedPreferencesStore
 import io.envoyproxy.envoymobile.AndroidEngineBuilder
+import io.envoyproxy.envoymobile.CompressionAlgorithm
+import io.envoyproxy.envoymobile.EngineBuilderAdminUtil.enableAdminInterface
 import io.envoyproxy.envoymobile.Element
 import io.envoyproxy.envoymobile.Engine
 import io.envoyproxy.envoymobile.LogLevel
 import io.envoyproxy.envoymobile.RequestHeadersBuilder
+import io.envoyproxy.envoymobile.RequestHeadersBuilderCompressionUtil.enableRequestCompression
 import io.envoyproxy.envoymobile.RequestMethod
-import io.envoyproxy.envoymobile.UpstreamHttpProtocol
 import io.envoyproxy.envoymobile.shared.Failure
 import io.envoyproxy.envoymobile.shared.ResponseRecyclerViewAdapter
 import io.envoyproxy.envoymobile.shared.Success
@@ -119,7 +121,7 @@ class MainActivity : Activity() {
     val requestHeaders = RequestHeadersBuilder(
       RequestMethod.GET, REQUEST_SCHEME, REQUEST_AUTHORITY, REQUEST_PATH
     )
-      .addUpstreamHttpProtocol(UpstreamHttpProtocol.HTTP2)
+      .enableRequestCompression(CompressionAlgorithm.GZIP)
       .addSocketTag(1,2)
       .build()
     engine

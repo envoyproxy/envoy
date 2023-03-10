@@ -289,12 +289,12 @@ const char inject_data_inside_callback_filter[] = "inject-data-inside-filter-cal
 const char no_inject_data[] = "no-inject-data";
 
 // List of auxiliary filters to test against
-const std::vector<std::string> auxiliary_filters() {
+const std::vector<std::string> auxiliaryFilters() {
   return {inject_data_outside_callback_filter, inject_data_inside_callback_filter, no_inject_data};
 }
 
 // Used to pretty print test parameters
-const std::regex invalid_param_name_regex() { return std::regex{"[^a-zA-Z0-9_]"}; }
+const std::regex invalidParamNameRegex() { return std::regex{"[^a-zA-Z0-9_]"}; }
 
 /**
  * Integration test with one of auxiliary filters (listed above)
@@ -402,7 +402,7 @@ public:
         "{}_{}",
         TestUtility::ipTestParamsToString(testing::TestParamInfo<Network::Address::IpVersion>(
             std::get<0>(params.param), params.index)),
-        std::regex_replace(std::get<1>(params.param), invalid_param_name_regex(), "_"));
+        std::regex_replace(std::get<1>(params.param), invalidParamNameRegex(), "_"));
   }
 
   explicit InjectDataToFilterChainIntegrationTest(const std::string& config)
@@ -444,7 +444,7 @@ public:
 INSTANTIATE_TEST_SUITE_P(
     Params, InjectDataWithEchoFilterIntegrationTest,
     testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                     testing::ValuesIn(auxiliary_filters())),
+                     testing::ValuesIn(auxiliaryFilters())),
     InjectDataToFilterChainIntegrationTest::testParamsToString);
 
 TEST_P(InjectDataWithEchoFilterIntegrationTest, UsageOfInjectDataMethodsShouldBeUnnoticeable) {
@@ -490,7 +490,7 @@ public:
 INSTANTIATE_TEST_SUITE_P(
     Params, InjectDataWithTcpProxyFilterIntegrationTest,
     testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                     testing::ValuesIn(auxiliary_filters())),
+                     testing::ValuesIn(auxiliaryFilters())),
     InjectDataToFilterChainIntegrationTest::testParamsToString);
 
 TEST_P(InjectDataWithTcpProxyFilterIntegrationTest, UsageOfInjectDataMethodsShouldBeUnnoticeable) {
@@ -595,7 +595,7 @@ public:
         TestUtility::ipTestParamsToString(testing::TestParamInfo<Network::Address::IpVersion>(
             std::get<0>(params.param), params.index)),
         (std::get<1>(params.param) == Http::CodecType::HTTP2 ? "Http2" : "Http"),
-        std::regex_replace(std::get<2>(params.param), invalid_param_name_regex(), "_"));
+        std::regex_replace(std::get<2>(params.param), invalidParamNameRegex(), "_"));
   }
 
   InjectDataWithHttpConnectionManagerIntegrationTest()
@@ -625,7 +625,7 @@ INSTANTIATE_TEST_SUITE_P(
     Params, InjectDataWithHttpConnectionManagerIntegrationTest,
     testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                      testing::Values(Http::CodecType::HTTP1, Http::CodecType::HTTP2),
-                     testing::ValuesIn(auxiliary_filters())),
+                     testing::ValuesIn(auxiliaryFilters())),
     InjectDataWithHttpConnectionManagerIntegrationTest::testParamsToString);
 
 TEST_P(InjectDataWithHttpConnectionManagerIntegrationTest,

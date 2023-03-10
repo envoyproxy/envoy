@@ -127,7 +127,7 @@ private:
 template <class ConfigType>
 class FakeResourceMonitorFactory : public Server::Configuration::ResourceMonitorFactory {
 public:
-  FakeResourceMonitorFactory(const std::string& name) : monitor_(nullptr), name_(name) {}
+  FakeResourceMonitorFactory(const std::string& name) : name_(name) {}
 
   Server::ResourceMonitorPtr
   createResourceMonitor(const Protobuf::Message&,
@@ -143,7 +143,7 @@ public:
 
   std::string name() const override { return name_; }
 
-  FakeResourceMonitor* monitor_; // not owned
+  FakeResourceMonitor* monitor_{nullptr}; // not owned
   const std::string name_;
 };
 
@@ -151,7 +151,7 @@ template <class ConfigType>
 class FakeProactiveResourceMonitorFactory
     : public Server::Configuration::ProactiveResourceMonitorFactory {
 public:
-  FakeProactiveResourceMonitorFactory(const std::string& name) : monitor_(nullptr), name_(name) {}
+  FakeProactiveResourceMonitorFactory(const std::string& name) : name_(name) {}
 
   Server::ProactiveResourceMonitorPtr
   createProactiveResourceMonitor(const Protobuf::Message&,
@@ -167,7 +167,7 @@ public:
 
   std::string name() const override { return name_; }
 
-  FakeProactiveResourceMonitor* monitor_; // not owned
+  FakeProactiveResourceMonitor* monitor_{nullptr}; // not owned
   const std::string name_;
 };
 

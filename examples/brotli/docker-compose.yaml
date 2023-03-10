@@ -1,18 +1,13 @@
 version: "3.8"
 services:
 
-  flask_service:
-    build:
-      context: ../shared/flask
-    image: flask_service:python-3.10-slim-bullseye
-    restart: "no"
-    deploy:
-      replicas: 0
-
   envoy-stats:
     build:
       context: .
       dockerfile: Dockerfile-brotli
+    depends_on:
+      service:
+        condition: service_healthy
     ports:
     - "${PORT_PROXY:-10000}:10000"
     - "${PORT_STATS0:-9901}:9901"
@@ -20,7 +15,7 @@ services:
 
   service:
     build:
-      context: .
-      dockerfile: Dockerfile-service
+      context: ../shared/flask
+      target: data-flask
     volumes:
     - ./service.py:/code/service.py

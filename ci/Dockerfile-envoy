@@ -19,9 +19,11 @@ COPY ci/docker-entrypoint.sh /
 # STAGE: envoy
 FROM ${BUILD_OS}:${BUILD_TAG} AS envoy
 
-RUN apt-get update && apt-get upgrade -y \
-    && apt-get install --no-install-recommends -y ca-certificates \
-    && apt-get autoremove -y && apt-get clean \
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN apt-get -qq update && apt-get -qq upgrade -y \
+    && apt-get -qq install --no-install-recommends -y ca-certificates \
+    && apt-get -qq autoremove -y && apt-get clean \
     && rm -rf /tmp/* /var/tmp/* \
     && rm -rf /var/lib/apt/lists/*
 
@@ -42,7 +44,7 @@ CMD ["envoy", "-c", "/etc/envoy/envoy.yaml"]
 
 # STAGE: envoy-distroless
 # gcr.io/distroless/base-nossl-debian11:nonroot
-FROM gcr.io/distroless/base-nossl-debian11:nonroot@sha256:bf6159657aa6ac2c0d52e78a616991ac523adafd0718d17c6a013958a6770e1d AS envoy-distroless
+FROM gcr.io/distroless/base-nossl-debian11:nonroot@sha256:78d2ac043ae89e4ecdf969959ec299d0f7dc0d28f149441032c5da87d6996401 AS envoy-distroless
 
 COPY --from=binary /usr/local/bin/envoy* /usr/local/bin/
 COPY --from=binary /etc/envoy/envoy.yaml /etc/envoy/envoy.yaml
@@ -56,9 +58,11 @@ CMD ["-c", "/etc/envoy/envoy.yaml"]
 # STAGE: envoy-google-vrp
 FROM ${ENVOY_VRP_BASE_IMAGE} AS envoy-google-vrp
 
-RUN apt-get update \
-    && apt-get upgrade -y \
-    && apt-get install -y libc++1 supervisor gdb strace tshark \
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN apt-get -qq update \
+    && apt-get -qq upgrade -y \
+    && apt-get -qq install -y libc++1 supervisor gdb strace tshark \
     && apt-get autoremove -y \
     && apt-get clean \
     && rm -rf /tmp/* /var/tmp/* \

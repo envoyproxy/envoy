@@ -83,6 +83,7 @@ static_resources:
         name: "envoy.key_value.platform_test",
         keyValueStore: testStore
       )
+      .setRuntimeGuard("test_feature_false", true)
       .build()
 
     let client = engine.streamClient()
@@ -91,7 +92,6 @@ static_resources:
       method: .get, scheme: "https",
       authority: "example.com", path: "/test"
     )
-    .addUpstreamHttpProtocol(.http2)
     .build()
 
     client

@@ -4350,6 +4350,60 @@ TEST_P(Http2CodecImplTest, CheckHeaderValueValidation) {
   }
 }
 
+TEST_P(Http2CodecImplTest, BadResponseHeader) {
+  initialize();
+#ifdef ENVOY_ENABLE_UHV
+  // UHV mode makes no effect on nghttp2
+  if (http2_implementation_ != Http2Impl::Oghttp2) {
+    return;
+  }
+#endif
+
+  InSequence s;
+  TestRequestHeaderMapImpl request_headers;
+  HttpTestUtility::addDefaultHeaders(request_headers);
+  request_headers.setMethod("POST");
+
+  // Encode request headers.
+  EXPECT_CALL(request_decoder_, decodeHeaders_(_, true));
+  EXPECT_TRUE(request_encoder_->encodeHeaders(request_headers, true).ok());
+  driveToCompletion();
+
+  // { is illegal in header name
+  TestResponseHeaderMapImpl response_headers{{":status", "200"}, {"foo{bar", "baz"}};
+
+  // Encode response headers.
+#ifdef ENVOY_ENABLE_UHV
+  // Header validation is done by the CodecClient after header map is fully parsed.
+  EXPECT_CALL(response_decoder_, decodeHeaders_(_, _))
+      .WillOnce(Invoke([this](ResponseHeaderMapPtr& headers, bool) -> void {
+        auto result = header_validator_->validateResponseHeaderMap(*headers);
+        ASSERT_FALSE(result.ok());
+      }));
+#else
+  // The decodeHeaders on the client side will not be called due to protocol error
+  EXPECT_CALL(response_decoder_, decodeHeaders_(_, _)).Times(0);
+  // Since the client coded will trigger a protocol error, its buffer
+  // will not be fully drained
+  expect_buffered_data_on_teardown_ = true;
+#endif
+  response_encoder_->encodeHeaders(response_headers, true);
+
+  driveToCompletion();
+
+#ifdef ENVOY_ENABLE_UHV
+  // In case of UHV dispatching frames will be successful and connection is closed
+  // by the codec client.
+  EXPECT_TRUE(client_wrapper_->status_.ok());
+  EXPECT_EQ(1, server_stats_store_.counter("http2.rx_messaging_error").value());
+#else
+  EXPECT_FALSE(client_wrapper_->status_.ok());
+  EXPECT_TRUE(isCodecProtocolError(client_wrapper_->status_));
+  EXPECT_EQ(1, client_stats_store_.counter("http2.rx_messaging_error").value());
+#endif
+  EXPECT_TRUE(server_wrapper_->status_.ok());
+}
+
 class TestNghttp2SessionFactory;
 
 // Test client for H/2 METADATA frame edge cases.

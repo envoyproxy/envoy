@@ -48,7 +48,7 @@ static_resources:
             address:
               socket_address:
                 address: service1
-                port_value: 8000
+                port_value: 8080
   - name: service2
     type: STRICT_DNS
     lb_policy: ROUND_ROBIN
@@ -60,4 +60,4 @@ static_resources:
             address:
               socket_address:
                 address: service2
-                port_value: 8000
+                port_value: 8080

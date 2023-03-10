@@ -23,6 +23,11 @@ typedef enum { // NOLINT(modernize-use-using)
   Prepend,
 } bufferAction;
 
+typedef enum { // NOLINT(modernize-use-using)
+  HeaderSet,
+  HeaderAdd,
+} headerAction;
+
 // The return value of C Api that invoking from Go.
 typedef enum { // NOLINT(modernize-use-using)
   CAPIOK = 0,
@@ -30,6 +35,7 @@ typedef enum { // NOLINT(modernize-use-using)
   CAPIFilterIsDestroy = -2,
   CAPINotInGo = -3,
   CAPIInvalidPhase = -4,
+  CAPIValueNotFound = -5,
 } CAPIStatus;
 
 CAPIStatus envoyGoFilterHttpContinue(void* r, int status);
@@ -38,7 +44,7 @@ CAPIStatus envoyGoFilterHttpSendLocalReply(void* r, int response_code, void* bod
 
 CAPIStatus envoyGoFilterHttpGetHeader(void* r, void* key, void* value);
 CAPIStatus envoyGoFilterHttpCopyHeaders(void* r, void* strs, void* buf);
-CAPIStatus envoyGoFilterHttpSetHeader(void* r, void* key, void* value);
+CAPIStatus envoyGoFilterHttpSetHeaderHelper(void* r, void* key, void* value, headerAction action);
 CAPIStatus envoyGoFilterHttpRemoveHeader(void* r, void* key);
 
 CAPIStatus envoyGoFilterHttpGetBuffer(void* r, unsigned long long int buffer, void* value);
@@ -49,6 +55,7 @@ CAPIStatus envoyGoFilterHttpCopyTrailers(void* r, void* strs, void* buf);
 CAPIStatus envoyGoFilterHttpSetTrailer(void* r, void* key, void* value);
 
 CAPIStatus envoyGoFilterHttpGetStringValue(void* r, int id, void* value);
+CAPIStatus envoyGoFilterHttpGetIntegerValue(void* r, int id, void* value);
 
 void envoyGoFilterHttpFinalize(void* r, int reason);
 

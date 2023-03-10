@@ -1,4 +1,4 @@
-load("@envoy//bazel:envoy_build_system.bzl", "envoy_cc_library", "envoy_package", "envoy_select_enable_http3")
+load("@envoy//bazel:envoy_build_system.bzl", "envoy_cc_library", "envoy_package", "envoy_select_enable_http3", "envoy_select_envoy_mobile_listener", "envoy_select_envoy_mobile_request_compression")
 
 licenses(["notice"])  # Apache 2
 
@@ -12,7 +12,6 @@ envoy_cc_library(
     hdrs = ["extension_registry.h"],
     repository = "@envoy",
     deps = [
-        "@envoy//source/extensions/listener_managers/listener_manager:listener_manager_lib",  #TODO(2711) remove
         "extension_registry_platform_additions",
         "@envoy//source/common/http/matching:inputs_lib",
         "@envoy//source/common/network:socket_lib",
@@ -30,7 +29,6 @@ envoy_cc_library(
         "@envoy//source/extensions/filters/http/router:config",
         "@envoy//source/extensions/filters/network/http_connection_manager:config",
         "@envoy//source/extensions/http/header_formatters/preserve_case:config",
-        "@envoy//source/extensions/listener_managers/listener_manager:connection_handler_lib",
         "@envoy//source/extensions/network/dns_resolver/getaddrinfo:config",
         "@envoy//source/extensions/path/match/uri_template:config",
         "@envoy//source/extensions/path/rewrite/uri_template:config",
@@ -56,6 +54,20 @@ envoy_cc_library(
     ] + envoy_select_enable_http3(
         [
             "@envoy//source/common/quic:quic_transport_socket_factory_lib",
+        ],
+        "@envoy",
+    ) + envoy_select_envoy_mobile_request_compression(
+        [
+            "@envoy//source/extensions/compression/brotli/compressor:config",
+            "@envoy//source/extensions/compression/gzip/compressor:config",
+            "@envoy//source/extensions/filters/http/compressor:config",
+            "@envoy//source/extensions/filters/http/composite:config",
+        ],
+        "@envoy",
+    ) + envoy_select_envoy_mobile_listener(
+        [
+            "@envoy//source/extensions/listener_managers/listener_manager:listener_manager_lib",
+            "@envoy//source/extensions/listener_managers/listener_manager:connection_handler_lib",
         ],
         "@envoy",
     ),

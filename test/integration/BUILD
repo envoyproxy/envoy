@@ -9,6 +9,7 @@ load(
     "envoy_proto_library",
     "envoy_select_admin_functionality",
     "envoy_select_enable_http3",
+    "envoy_select_envoy_mobile_listener",
     "envoy_sh_test",
 )
 
@@ -381,6 +382,16 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "circuit_breakers_integration_test",
+    srcs = ["circuit_breakers_integration_test.cc"],
+    deps = [
+        ":http_protocol_integration_lib",
+        "//test/test_common:test_time_lib",
+        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_test(
     name = "http2_flood_integration_test",
     srcs = [
         "http2_flood_integration_test.cc",
@@ -410,7 +421,7 @@ envoy_cc_test(
     srcs = [
         "multiplexed_integration_test.cc",
     ],
-    shard_count = 8,
+    shard_count = 16,
     deps = [
         ":http_protocol_integration_lib",
         ":socket_interface_swap_lib",
@@ -580,7 +591,7 @@ envoy_cc_test(
     srcs = envoy_select_admin_functionality([
         "filter_integration_test.cc",
     ]),
-    shard_count = 12,
+    shard_count = 16,
     deps = [
         ":http_protocol_integration_lib",
         ":socket_interface_swap_lib",
@@ -651,7 +662,7 @@ envoy_cc_test(
     ],
     # As this test has many H1/H2/v4/v6 tests it takes a while to run.
     # Shard it enough to bring the run time in line with other integration tests.
-    shard_count = 32,
+    shard_count = 48,
     deps = [
         ":protocol_integration_test_lib",
     ],
@@ -850,7 +861,6 @@ envoy_cc_test_library(
     deps = [
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/protobuf:protobuf_mocks",
-        "//source/extensions/listener_managers/listener_manager:listener_manager_lib",
         "//envoy/api:api_interface",
         "//envoy/grpc:status",
         "//envoy/http:codec_interface",
@@ -864,19 +874,20 @@ envoy_cc_test_library(
         "//source/common/common:callback_impl_lib",
         "//source/common/common:linked_object",
         "//source/common/common:lock_guard_lib",
-        "//source/common/http/http3:codec_stats_lib",
         "//source/common/common:thread_lib",
         "//source/common/config:utility_lib",
         "//source/common/grpc:codec_lib",
         "//source/common/grpc:common_lib",
         "//source/common/http/http1:codec_lib",
         "//source/common/http/http2:codec_lib",
+        "//source/common/http/http3:codec_stats_lib",
         "//source/common/network:connection_balancer_lib",
         "//source/common/network:filter_lib",
         "//source/common/network:listen_socket_lib",
         "//source/common/network:socket_option_factory_lib",
         "//source/common/network:udp_packet_writer_handler_lib",
         "//source/common/network:utility_lib",
+        "//source/common/runtime:runtime_features_lib",
         "//source/common/stats:isolated_store_lib",
         "//source/extensions/listener_managers/listener_manager:active_raw_udp_listener_config",
         "//source/extensions/listener_managers/listener_manager:connection_handler_lib",
@@ -890,6 +901,8 @@ envoy_cc_test_library(
         "//source/common/quic:quic_client_factory_lib",
         "//source/common/quic:quic_server_factory_lib",
         "@com_github_google_quiche//:quic_test_tools_session_peer_lib",
+    ]) + envoy_select_envoy_mobile_listener([
+        "//source/extensions/listener_managers/listener_manager:listener_manager_lib",
     ]),
 )
 
@@ -1129,7 +1142,7 @@ envoy_cc_test(
     srcs = [
         "redirect_integration_test.cc",
     ],
-    shard_count = 4,
+    shard_count = 8,
     tags = ["nofips"],
     deps = [
         ":http_protocol_integration_lib",
@@ -1494,7 +1507,7 @@ envoy_cc_test(
     data = [
         "//test/config/integration/certs",
     ],
-    shard_count = 7,
+    shard_count = 16,
     deps = [
         ":http_integration_lib",
         ":http_protocol_integration_lib",
@@ -1520,6 +1533,17 @@ envoy_cc_test(
         "//test/server:utility_lib",
         "//test/test_common:registry_lib",
         "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_test(
+    name = "tcp_async_client_integration_test",
+    srcs = [
+        "tcp_async_client_integration_test.cc",
+    ],
+    deps = [
+        ":integration_lib",
+        "//test/integration/filters:test_network_async_tcp_filter_lib",
     ],
 )
 
@@ -1602,6 +1626,7 @@ envoy_cc_test(
         ":http_integration_lib",
         ":http_protocol_integration_lib",
         "//source/extensions/filters/network/tcp_proxy:config",
+        "//source/extensions/matching/network/application_protocol:config",
         "//source/extensions/transport_sockets/tls:config",
         "//source/extensions/transport_sockets/tls:context_config_lib",
         "//source/extensions/transport_sockets/tls:context_lib",
@@ -1974,6 +1999,7 @@ envoy_cc_test(
         "nofips",
     ],
     deps = envoy_select_enable_http3([
+        "//source/extensions/quic/server_preferred_address:fixed_server_preferred_address_config_factory_config",
         "//test/common/config:dummy_config_proto_cc_proto",
         "//test/extensions/transport_sockets/tls/cert_validator:timed_cert_validator",
         ":http_integration_lib",
@@ -1993,6 +2019,7 @@ envoy_cc_test(
         "@envoy_api//envoy/config/overload/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/transport_sockets/quic/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/quic/server_preferred_address/v3:pkg_cc_proto",
         "@com_github_google_quiche//:quic_test_tools_session_peer_lib",
     ]),
 )

@@ -260,6 +260,13 @@ envoy.filters.http.compressor:
   type_urls:
   - envoy.extensions.filters.http.compressor.v3.Compressor
   - envoy.extensions.filters.http.compressor.v3.CompressorPerRoute
+envoy.filters.http.connect_grpc_bridge:
+  categories:
+  - envoy.filters.http
+  security_posture: unknown
+  status: alpha
+  type_urls:
+  - envoy.extensions.filters.http.connect_grpc_bridge.v3.FilterConfig
 envoy.filters.http.cors:
   categories:
   - envoy.filters.http
@@ -497,6 +504,15 @@ envoy.filters.http.stateful_session:
   type_urls:
   - envoy.extensions.filters.http.stateful_session.v3.StatefulSession
   - envoy.extensions.filters.http.stateful_session.v3.StatefulSessionPerRoute
+envoy.filters.http.header_mutation:
+  categories:
+  - envoy.filters.http
+  - envoy.filters.http.upstream
+  security_posture: unknown
+  status: alpha
+  type_urls:
+  - envoy.extensions.filters.http.header_mutation.v3.HeaderMutation
+  - envoy.extensions.filters.http.header_mutation.v3.HeaderMutationPerRoute
 envoy.filters.listener.http_inspector:
   categories:
   - envoy.filters.listener
@@ -504,6 +520,13 @@ envoy.filters.listener.http_inspector:
   status: stable
   type_urls:
   - envoy.extensions.filters.listener.http_inspector.v3.HttpInspector
+envoy.filters.listener.local_ratelimit:
+  categories:
+  - envoy.filters.listener
+  security_posture: robust_to_untrusted_downstream
+  status: stable
+  type_urls:
+  - envoy.extensions.filters.listener.local_ratelimit.v3.LocalRateLimit
 envoy.filters.listener.original_dst:
   categories:
   - envoy.filters.listener
@@ -835,6 +858,13 @@ envoy.quic.proof_source.filter_chain:
   status: alpha
   type_urls:
   - envoy.extensions.quic.proof_source.v3.ProofSourceConfig
+envoy.quic.server_preferred_address.fixed:
+  categories:
+  - envoy.quic.server_preferred_address
+  security_posture: robust_to_untrusted_downstream
+  status: alpha
+  type_urls:
+  - envoy.extensions.quic.server_preferred_address.v3.FixedServerPreferredAddressConfig
 envoy.udp_packet_writer.default:
   categories:
   - envoy.udp_packet_writer
@@ -1246,6 +1276,13 @@ envoy.matching.inputs.response_trailers:
   status: alpha
   type_urls:
   - envoy.type.matcher.v3.HttpResponseTrailerMatchInput
+envoy.matching.inputs.query_params:
+  categories:
+  - envoy.matching.http.input
+  security_posture: unknown
+  status: alpha
+  type_urls:
+  - envoy.type.matcher.v3.HttpRequestQueryParamMatchInput
 envoy.matching.inputs.destination_ip:
   categories:
   - envoy.matching.http.input
@@ -1316,6 +1353,13 @@ envoy.matching.inputs.application_protocol:
   status: alpha
   type_urls:
   - envoy.extensions.matching.common_inputs.network.v3.ApplicationProtocolInput
+envoy.matching.inputs.filter_state:
+  categories:
+  - envoy.matching.network.input
+  security_posture: unknown
+  status: alpha
+  type_urls:
+  - envoy.extensions.matching.common_inputs.network.v3.FilterStateInput
 envoy.matching.inputs.uri_san:
   categories:
   - envoy.matching.http.input

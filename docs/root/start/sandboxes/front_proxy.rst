@@ -43,15 +43,15 @@ Change to the ``examples/front-proxy`` directory.
 
     $ pwd
     envoy/examples/front-proxy
-    $ docker-compose pull
-    $ docker-compose up --build -d
-    $ docker-compose ps
+    $ docker compose pull
+    $ docker compose up --build -d
+    $ docker compose ps
 
-              Name                         Command               State                                         Ports
-    ----------------------------------------------------------------------------------------------------------------------------------------------------
-    front-proxy_front-envoy_1   /docker-entrypoint.sh /bin ... Up      10000/tcp, 0.0.0.0:8080->8080/tcp, 0.0.0.0:8001->8001/tcp, 0.0.0.0:8443->8443/tcp
-    front-proxy_service1_1      /bin/sh -c /usr/local/bin/ ... Up      10000/tcp
-    front-proxy_service2_1      /bin/sh -c /usr/local/bin/ ... Up      10000/tcp
+              Name                         Command               State                                           Ports
+    ---------------------------------------------------------------------------------------------------------------------------------------------------------
+    front-proxy_front-envoy_1   /docker-entrypoint.sh /bin ... Up           10000/tcp, 0.0.0.0:8080->8080/tcp, 0.0.0.0:8001->8001/tcp, 0.0.0.0:8443->8443/tcp
+    front-proxy_service1_1      python3 /code/service.py   ... Up (healthy)
+    front-proxy_service2_1      python3 /code/service.py   ... Up (healthy)
 
 Step 2: Test Envoy's routing capabilities
 *****************************************
@@ -157,7 +157,7 @@ Now let's scale up our ``service1`` nodes to demonstrate the load balancing abil
 
 .. code-block:: console
 
-    $ docker-compose scale service1=3
+    $ docker compose scale service1=3
     Creating and starting example_service1_2 ... done
     Creating and starting example_service1_3 ... done
 
@@ -224,12 +224,12 @@ Step 4: Enter containers and curl services
 
 In addition of using ``curl`` from your host machine, you can also enter the
 containers themselves and ``curl`` from inside them. To enter a container you
-can use ``docker-compose exec <container_name> /bin/bash``. For example we can
+can use ``docker compose exec <container_name> /bin/bash``. For example we can
 enter the ``front-envoy`` container, and ``curl`` for services locally:
 
 .. code-block:: console
 
-    $ docker-compose exec front-envoy /bin/bash
+    $ docker compose exec front-envoy /bin/bash
     root@81288499f9d7:/# curl localhost:8080/service/1
     Hello from behind Envoy (service 1)! hostname: 85ac151715c6 resolvedhostname: 172.19.0.3
     root@81288499f9d7:/# curl localhost:8080/service/1
@@ -255,7 +255,7 @@ In the example we can enter the ``front-envoy`` container to query admin:
 
 .. code-block:: console
 
-    $ docker-compose exec front-envoy /bin/bash
+    $ docker compose exec front-envoy /bin/bash
     root@e654c2c83277:/# curl localhost:8001/server_info
 
 .. code-block:: json

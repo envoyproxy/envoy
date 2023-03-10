@@ -1,8 +1,10 @@
 package io.envoyproxy.envoymobile.engine;
 
+import java.util.Collections;
 import java.util.List;
 import java.util.ArrayList;
 import java.util.Map;
+import java.util.HashMap;
 import java.util.regex.Pattern;
 import java.util.regex.Matcher;
 import java.lang.StringBuilder;
@@ -34,12 +36,13 @@ public class EnvoyConfiguration {
   public final Integer dnsFailureRefreshSecondsMax;
   public final Integer dnsQueryTimeoutSeconds;
   public final Integer dnsMinRefreshSeconds;
-  public final String dnsPreresolveHostnames;
+  public final List<String> dnsPreresolveHostnames;
   public final Boolean enableDNSCache;
+  public final Integer dnsCacheSaveIntervalSeconds;
   public final Boolean enableDrainPostDnsRefresh;
   public final Boolean enableHttp3;
-  public final Boolean enableGzip;
-  public final Boolean enableBrotli;
+  public final Boolean enableGzipDecompression;
+  public final Boolean enableBrotliDecompression;
   public final Boolean enableSocketTagging;
   public final Boolean enableHappyEyeballs;
   public final Boolean enableInterfaceBinding;
@@ -53,11 +56,12 @@ public class EnvoyConfiguration {
   public final String appVersion;
   public final String appId;
   public final TrustChainVerification trustChainVerification;
-  public final String virtualClusters;
+  public final List<String> virtualClusters;
   public final List<EnvoyNativeFilterConfig> nativeFilterChain;
   public final Map<String, EnvoyStringAccessor> stringAccessors;
   public final Map<String, EnvoyKeyValueStore> keyValueStores;
   public final List<String> statSinks;
+  Map<String, String> runtimeGuards;
   public final Boolean enablePlatformCertificatesValidation;
   public final Boolean enableSkipDNSLookupForProxiedRequests;
 
@@ -84,14 +88,18 @@ public class EnvoyConfiguration {
    * @param dnsPreresolveHostnames                        hostnames to preresolve on Envoy Client
    *     construction.
    * @param enableDNSCache                                whether to enable DNS cache.
+   * @param dnsCacheSaveIntervalSeconds                   the interval at which to save results to
+   *     the configured key value store.
    * @param enableDrainPostDnsRefresh                     whether to drain connections after soft
    *     DNS refresh.
    * @param enableHttp3                                   whether to enable experimental support for
    *     HTTP/3 (QUIC).
-   * @param enableGzip                                    whether to enable response gzip
+   * @param enableGzipDecompression                       whether to enable response gzip
    *     decompression.
-   * @param enableBrotli                                  whether to enable response brotli
+   *     compression.
+   * @param enableBrotliDecompression                     whether to enable response brotli
    *     decompression.
+   *     compression.
    * @param enableSocketTagging                           whether to enable socket tagging.
    * @param enableHappyEyeballs                           whether to enable RFC 6555 handling for
    *     IPv4/IPv6.
@@ -117,23 +125,25 @@ public class EnvoyConfiguration {
    * @param keyValueStores                                platform key-value store implementations.
    * @param enableSkipDNSLookupForProxiedRequests         whether to skip waiting on DNS response
    *     for proxied requests.
+   * @param enablePlatformCertificatesValidation          whether to use the platform verifier.
    */
   public EnvoyConfiguration(
       boolean adminInterfaceEnabled, String grpcStatsDomain, int connectTimeoutSeconds,
       int dnsRefreshSeconds, int dnsFailureRefreshSecondsBase, int dnsFailureRefreshSecondsMax,
-      int dnsQueryTimeoutSeconds, int dnsMinRefreshSeconds, String dnsPreresolveHostnames,
-      boolean enableDNSCache, boolean enableDrainPostDnsRefresh, boolean enableHttp3,
-      boolean enableGzip, boolean enableBrotli, boolean enableSocketTagging,
-      boolean enableHappyEyeballs, boolean enableInterfaceBinding,
+      int dnsQueryTimeoutSeconds, int dnsMinRefreshSeconds, List<String> dnsPreresolveHostnames,
+      boolean enableDNSCache, int dnsCacheSaveIntervalSeconds, boolean enableDrainPostDnsRefresh,
+      boolean enableHttp3, boolean enableGzipDecompression, boolean enableBrotliDecompression,
+      boolean enableSocketTagging, boolean enableHappyEyeballs, boolean enableInterfaceBinding,
       int h2ConnectionKeepaliveIdleIntervalMilliseconds, int h2ConnectionKeepaliveTimeoutSeconds,
       int maxConnectionsPerHost, int statsFlushSeconds, int streamIdleTimeoutSeconds,
       int perTryIdleTimeoutSeconds, String appVersion, String appId,
-      TrustChainVerification trustChainVerification, String virtualClusters,
+      TrustChainVerification trustChainVerification, List<String> virtualClusters,
       List<EnvoyNativeFilterConfig> nativeFilterChain,
       List<EnvoyHTTPFilterFactory> httpPlatformFilterFactories,
       Map<String, EnvoyStringAccessor> stringAccessors,
       Map<String, EnvoyKeyValueStore> keyValueStores, List<String> statSinks,
-      Boolean enableSkipDNSLookupForProxiedRequests, boolean enablePlatformCertificatesValidation) {
+      Map<String, Boolean> runtimeGuards, Boolean enableSkipDNSLookupForProxiedRequests,
+      boolean enablePlatformCertificatesValidation) {
     JniLibrary.load();
     this.adminInterfaceEnabled = adminInterfaceEnabled;
     this.grpcStatsDomain = grpcStatsDomain;
@@ -145,10 +155,11 @@ public class EnvoyConfiguration {
     this.dnsMinRefreshSeconds = dnsMinRefreshSeconds;
     this.dnsPreresolveHostnames = dnsPreresolveHostnames;
     this.enableDNSCache = enableDNSCache;
+    this.dnsCacheSaveIntervalSeconds = dnsCacheSaveIntervalSeconds;
     this.enableDrainPostDnsRefresh = enableDrainPostDnsRefresh;
     this.enableHttp3 = enableHttp3;
-    this.enableGzip = enableGzip;
-    this.enableBrotli = enableBrotli;
+    this.enableGzipDecompression = enableGzipDecompression;
+    this.enableBrotliDecompression = enableBrotliDecompression;
     this.enableSocketTagging = enableSocketTagging;
     this.enableHappyEyeballs = enableHappyEyeballs;
     this.enableInterfaceBinding = enableInterfaceBinding;
@@ -163,133 +174,53 @@ public class EnvoyConfiguration {
     this.appId = appId;
     this.trustChainVerification = trustChainVerification;
     this.virtualClusters = virtualClusters;
+    int index = 0;
+    // Insert in this order to preserve prior ordering constraints.
+    for (EnvoyHTTPFilterFactory filterFactory : httpPlatformFilterFactories) {
+      String config =
+          "{'@type': type.googleapis.com/envoymobile.extensions.filters.http.platform_bridge.PlatformBridge, platform_filter_name: " +
+          filterFactory.getFilterName() + "}";
+      EnvoyNativeFilterConfig ins =
+          new EnvoyNativeFilterConfig("envoy.filters.http.platform_bridge", config);
+      nativeFilterChain.add(index++, ins);
+    }
     this.nativeFilterChain = nativeFilterChain;
+
     this.httpPlatformFilterFactories = httpPlatformFilterFactories;
     this.stringAccessors = stringAccessors;
     this.keyValueStores = keyValueStores;
     this.statSinks = statSinks;
+
+    this.runtimeGuards = new HashMap<String, String>();
+    for (Map.Entry<String, Boolean> guardAndValue : runtimeGuards.entrySet()) {
+      this.runtimeGuards.put(guardAndValue.getKey(), String.valueOf(guardAndValue.getValue()));
+    }
     this.enablePlatformCertificatesValidation = enablePlatformCertificatesValidation;
     this.enableSkipDNSLookupForProxiedRequests = enableSkipDNSLookupForProxiedRequests;
   }
-  /**
-   * Creates configuration YAML based on the configuration of the class
-   *
-   * @return String, the resolved yaml.
-   * @throws ConfigurationException, when the yaml provided is not fully
-   *                                 resolved.
-   */
-  String createYaml() {
-    final String configTemplate = JniLibrary.configTemplate();
-    final String certValidationTemplate =
-        JniLibrary.certValidationTemplate(enablePlatformCertificatesValidation);
-    final String platformFilterTemplate = JniLibrary.platformFilterTemplate();
-    final String nativeFilterTemplate = JniLibrary.nativeFilterTemplate();
 
-    final StringBuilder customFiltersBuilder = new StringBuilder();
+  public long createBootstrap() {
+    Boolean enforceTrustChainVerification =
+        trustChainVerification == EnvoyConfiguration.TrustChainVerification.VERIFY_TRUST_CHAIN;
+    List<EnvoyNativeFilterConfig> reverseFilterChain = new ArrayList<>(nativeFilterChain);
+    Collections.reverse(reverseFilterChain);
 
-    for (EnvoyHTTPFilterFactory filterFactory : httpPlatformFilterFactories) {
-      String filterConfig = platformFilterTemplate.replace("{{ platform_filter_name }}",
-                                                           filterFactory.getFilterName());
-      customFiltersBuilder.append(filterConfig);
-    }
-
-    for (EnvoyNativeFilterConfig filter : nativeFilterChain) {
-      String filterConfig = nativeFilterTemplate.replace("{{ native_filter_name }}", filter.name)
-                                .replace("{{ native_filter_typed_config }}", filter.typedConfig);
-      customFiltersBuilder.append(filterConfig);
-    }
-
-    if (enableHttp3) {
-      final String altProtocolCacheFilterInsert = JniLibrary.altProtocolCacheFilterInsert();
-      customFiltersBuilder.append(altProtocolCacheFilterInsert);
-    }
-
-    if (enableGzip) {
-      final String gzipFilterInsert = JniLibrary.gzipConfigInsert();
-      customFiltersBuilder.append(gzipFilterInsert);
-    }
-
-    if (enableBrotli) {
-      final String brotliFilterInsert = JniLibrary.brotliConfigInsert();
-      customFiltersBuilder.append(brotliFilterInsert);
-    }
-    if (enableSocketTagging) {
-      final String socketTagFilterInsert = JniLibrary.socketTagConfigInsert();
-      customFiltersBuilder.append(socketTagFilterInsert);
-    }
-
-    String processedTemplate =
-        configTemplate.replace("#{custom_filters}", customFiltersBuilder.toString());
-
-    StringBuilder configBuilder = new StringBuilder("!ignore platform_defs:\n");
-    configBuilder.append(String.format("- &connect_timeout %ss\n", connectTimeoutSeconds))
-        .append(String.format("- &dns_fail_base_interval %ss\n", dnsFailureRefreshSecondsBase))
-        .append(String.format("- &dns_fail_max_interval %ss\n", dnsFailureRefreshSecondsMax))
-        .append(String.format("- &dns_query_timeout %ss\n", dnsQueryTimeoutSeconds))
-        .append(String.format("- &dns_min_refresh_rate %ss\n", dnsMinRefreshSeconds))
-        .append(String.format("- &dns_preresolve_hostnames %s\n", dnsPreresolveHostnames))
-        .append(String.format("- &dns_lookup_family %s\n",
-                              enableHappyEyeballs ? "ALL" : "V4_PREFERRED"))
-        .append(String.format("- &dns_refresh_rate %ss\n", dnsRefreshSeconds))
-        .append(String.format("- &enable_drain_post_dns_refresh %s\n",
-                              enableDrainPostDnsRefresh ? "true" : "false"))
-        .append(String.format("- &enable_interface_binding %s\n",
-                              enableInterfaceBinding ? "true" : "false"))
-        .append("- &force_ipv6 true\n")
-        .append(String.format("- &h2_connection_keepalive_idle_interval %ss\n",
-                              h2ConnectionKeepaliveIdleIntervalMilliseconds / 1000.0))
-        .append(String.format("- &h2_connection_keepalive_timeout %ss\n",
-                              h2ConnectionKeepaliveTimeoutSeconds))
-        .append(String.format("- &max_connections_per_host %s\n", maxConnectionsPerHost))
-        .append(String.format("- &stream_idle_timeout %ss\n", streamIdleTimeoutSeconds))
-        .append(String.format("- &per_try_idle_timeout %ss\n", perTryIdleTimeoutSeconds))
-        .append(String.format("- &metadata { device_os: %s, app_version: %s, app_id: %s }\n",
-                              "Android", appVersion, appId))
-        .append(String.format("- &trust_chain_verification %s\n", trustChainVerification.name()))
-        .append(String.format("- &skip_dns_lookup_for_proxied_requests %s\n",
-                              enableSkipDNSLookupForProxiedRequests ? "true" : "false"))
-        .append("- &virtual_clusters ")
-        .append(virtualClusters)
-        .append("\n");
-
-    if (enableDNSCache) {
-      final String persistentDNSCacheConfigInsert = JniLibrary.persistentDNSCacheConfigInsert();
-      configBuilder.append(
-          String.format("- &persistent_dns_cache_config %s\n", persistentDNSCacheConfigInsert));
-    }
-
-    configBuilder.append(String.format("- &stats_flush_interval %ss\n", statsFlushSeconds));
-
-    List<String> stat_sinks_config = new ArrayList<>(statSinks);
-    if (grpcStatsDomain != null) {
-      stat_sinks_config.add("*base_metrics_service");
-      configBuilder.append("- &stats_domain ").append(grpcStatsDomain).append("\n");
-    }
-
-    if (!stat_sinks_config.isEmpty()) {
-      configBuilder.append("- &stats_sinks [");
-      configBuilder.append(stat_sinks_config.get(0));
-      for (int i = 1; i < stat_sinks_config.size(); i++) {
-        configBuilder.append(',').append(stat_sinks_config.get(i));
-      }
-      configBuilder.append("] \n");
-    }
-
-    // Add a new anchor to override the default anchors in config header.
-    configBuilder.append(certValidationTemplate).append("\n");
-
-    if (adminInterfaceEnabled) {
-      configBuilder.append("admin: *admin_interface\n");
-    }
-
-    configBuilder.append(processedTemplate);
-    String resolvedConfiguration = configBuilder.toString();
-
-    final Matcher unresolvedKeys = UNRESOLVED_KEY_PATTERN.matcher(resolvedConfiguration);
-    if (unresolvedKeys.find()) {
-      throw new ConfigurationException(unresolvedKeys.group(1));
-    }
-    return resolvedConfiguration;
+    byte[][] filter_chain = JniBridgeUtility.toJniBytes(reverseFilterChain);
+    byte[][] clusters = JniBridgeUtility.stringsToJniBytes(virtualClusters);
+    byte[][] stats_sinks = JniBridgeUtility.stringsToJniBytes(statSinks);
+    byte[][] dns_preresolve = JniBridgeUtility.stringsToJniBytes(dnsPreresolveHostnames);
+    byte[][] runtime_guards = JniBridgeUtility.mapToJniBytes(runtimeGuards);
+    return JniLibrary.createBootstrap(
+        grpcStatsDomain, adminInterfaceEnabled, connectTimeoutSeconds, dnsRefreshSeconds,
+        dnsFailureRefreshSecondsBase, dnsFailureRefreshSecondsMax, dnsQueryTimeoutSeconds,
+        dnsMinRefreshSeconds, dns_preresolve, enableDNSCache, dnsCacheSaveIntervalSeconds,
+        enableDrainPostDnsRefresh, enableHttp3, enableGzipDecompression, enableBrotliDecompression,
+        enableSocketTagging, enableHappyEyeballs, enableInterfaceBinding,
+        h2ConnectionKeepaliveIdleIntervalMilliseconds, h2ConnectionKeepaliveTimeoutSeconds,
+        maxConnectionsPerHost, statsFlushSeconds, streamIdleTimeoutSeconds,
+        perTryIdleTimeoutSeconds, appVersion, appId, enforceTrustChainVerification, clusters,
+        filter_chain, stats_sinks, enablePlatformCertificatesValidation,
+        enableSkipDNSLookupForProxiedRequests, runtime_guards);
   }
 
   static class ConfigurationException extends RuntimeException {
