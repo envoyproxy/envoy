@@ -1,7 +1,7 @@
 @_implementationOnly import EnvoyCxxSwiftInterop
 
 extension LogLevel {
-  func toCXX() -> Envoy.CxxSwift.LogLevel {
+  func toCXX() -> Envoy.Platform.LogLevel {
     switch self {
     case .trace:
       return Envoy.CxxSwift.LogLevelTrace
@@ -25,6 +25,6 @@ extension LogLevel {
 
 extension LogLevel {
   func toCXXDescription() -> String {
-    String(cString: spdlog.level.to_short_c_str(self.toCXX()))
+    String(cString: Envoy.Platform.logLevelToString(self.toCXX()).c_str())
   }
 }
