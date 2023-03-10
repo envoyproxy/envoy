@@ -226,6 +226,18 @@ envoy_cc_benchmark_binary(
     ],
 )
 
+envoy_cc_test(
+    name = "lazyinit_stats_test",
+    srcs = ["lazyinit_stats_test.cc"],
+    deps = [
+        "//envoy/stats:stats_interface",
+        "//source/common/memory:stats_lib",
+        "//source/common/stats:lazy_init",
+        "//source/common/stats:thread_local_store_lib",
+        "//test/test_common:utility_lib",
+    ],
+)
+
 envoy_cc_benchmark_binary(
     name = "lazyinit_stats_benchmark",
     srcs = ["lazyinit_stats_speed_test.cc"],

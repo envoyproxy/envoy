@@ -48,15 +48,15 @@ public:
         }()),
         ctor_([scope = std::move(scope), &stat_names, this]() -> StatsStructType* {
           initialized_.inc();
+          ctor_ = nullptr;
           return new StatsStructType(stat_names, *scope);
         }) {
     if (initialized_.value() > 0) {
       instantiate();
-      ctor_ = nullptr;
     }
   }
   ~LazyInit() {
-    if (initialized_.value() > 0) {
+    if (ctor_ == nullptr) {
       initialized_.dec();
     }
   }
