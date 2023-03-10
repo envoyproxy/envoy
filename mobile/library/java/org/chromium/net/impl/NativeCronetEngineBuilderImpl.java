@@ -147,6 +147,7 @@ public class NativeCronetEngineBuilderImpl extends CronetEngineBuilderImpl {
         stringAccessors, keyValueStores, statSinks, runtimeGuards,
         mEnableSkipDNSLookupForProxiedRequests, mEnablePlatformCertificatesValidation,
         mRtdsLayerName, mRtdsTimeoutSeconds, mAdsAddress, mAdsPort, mAdsToken, mAdsTokenLifetime,
-        mAdsRootCerts, mNodeId, mNodeRegion, mNodeZone, mNodeSubZone, mCdsResourcesLocator, mCdsTimeoutSeconds);
+        mAdsRootCerts, mNodeId, mNodeRegion, mNodeZone, mNodeSubZone, mCdsResourcesLocator,
+        mCdsTimeoutSeconds);
   }
 }
