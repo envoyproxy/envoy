@@ -542,7 +542,7 @@ https://www.envoyproxy.io/docs/envoy/latest/api-v3/service/runtime/v3/rtds.proto
   builder.addRtdsLayer(layerName = "rtds_layer_name", timeoutSeconds = 10)
 
   // Swift
-  builder.addRtdsLayer("rtds_layer_name", 10)
+  builder.addRTDSLayer(layerName: "rtds_layer_name", timeoutSeconds: 10)
 
   // C++
   builder.addRtdsLayer("rtds_layer_name", 10)
@@ -564,7 +564,7 @@ address, port, (optional) jwt_token, (optional) jwt_token_lifetime_seconds, (opt
   builder.setAggregatedDiscoveryService(address = "192.168.1.1", port = 0)
 
   // Swift
-  builder.setAggregatedDiscoveryService("192.168.1.1", 0)
+  builder.setAggregatedDiscoveryService(address: "192.168.1.1", port: 0)
 
   // C++
   builder.setAggregatedDiscoveryService("192.168.1.1", 0)
@@ -582,7 +582,7 @@ https://www.envoyproxy.io/docs/envoy/latest/api-v3/config/core/v3/base.proto#env
   builder.setNodeId(nodeId = "my_test_node")
 
   // Swift
-  builder.setNodeId("my_test_node")
+  builder.setNodeID(nodeID: "my_test_node")
 
   // C++
   builder.setNodeId("my_test_node")
@@ -600,7 +600,7 @@ https://www.envoyproxy.io/docs/envoy/latest/api-v3/config/core/v3/base.proto#env
   builder.setNodeLocality(region = "us-west-1", zone = "some_zone", subZone = "some_sub_zone")
 
   // Swift
-  builder.setNodeLocality("us-west-1", "some_zone", "some_sub_zone")
+  builder.setNodeLocality(region: "us-west-1", zone: "some_zone", subZone: "some_sub_zone")
 
   // C++
   builder.setNodeLocality("us-west-1", "some_zone", "some_sub_zone");
