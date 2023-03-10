@@ -17,16 +17,16 @@
   result.value = [self.value toCXXString];
   switch (self.mode) {
   case EMOMatchModeContains:
-    result.mode = Envoy::DirectResponseTesting::contains;
+    result.mode = Envoy::DirectResponseTesting::MatchMode::contains;
     break;
   case EMOMatchModeExact:
-    result.mode = Envoy::DirectResponseTesting::exact;
+    result.mode = Envoy::DirectResponseTesting::MatchMode::exact;
     break;
   case EMOMatchModePrefix:
-    result.mode = Envoy::DirectResponseTesting::prefix;
+    result.mode = Envoy::DirectResponseTesting::MatchMode::prefix;
     break;
   case EMOMatchModeSuffix:
-    result.mode = Envoy::DirectResponseTesting::suffix;
+    result.mode = Envoy::DirectResponseTesting::MatchMode::suffix;
     break;
   }
   return result;
