@@ -36,18 +36,6 @@ inline void raw_header_map_set(Platform::RawHeaderMap& map, std::string key,
   map[std::move(key)] = std::move(value);
 }
 
-// TODO(jpsim): Replace `inline const` uses with `constexpr` when
-// https://github.com/apple/swift/issues/64217 is fixed.
-
-inline const DirectResponseTesting::MatchMode DirectResponseMatchModeContains =
-    DirectResponseTesting::contains;
-inline const DirectResponseTesting::MatchMode DirectResponseMatchModeExact =
-    DirectResponseTesting::exact;
-inline const DirectResponseTesting::MatchMode DirectResponseMatchModePrefix =
-    DirectResponseTesting::prefix;
-inline const DirectResponseTesting::MatchMode DirectResponseMatchModeSuffix =
-    DirectResponseTesting::suffix;
-
 // Smart pointers aren't currently supported by Swift / C++ interop, so we "erase"
 // it into a `BootstrapPtr` / `intptr_t`, which we can import from Swift.
 inline BootstrapPtr generateBootstrapPtr(Platform::EngineBuilder builder) {

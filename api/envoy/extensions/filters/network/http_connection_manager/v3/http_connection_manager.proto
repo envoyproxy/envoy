@@ -36,7 +36,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // HTTP connection manager :ref:`configuration overview <config_http_conn_man>`.
 // [#extension: envoy.filters.network.http_connection_manager]
 
-// [#next-free-field: 54]
+// [#next-free-field: 55]
 message HttpConnectionManager {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.network.http_connection_manager.v2.HttpConnectionManager";
@@ -542,6 +542,16 @@ message HttpConnectionManager {
   // Configuration for :ref:`HTTP access logs <arch_overview_access_logs>`
   // emitted by the connection manager.
   repeated config.accesslog.v3.AccessLog access_log = 13;
+
+  // The interval to flush the above access logs. By default, the HCM will flush exactly one access log
+  // on stream close, when the HTTP request is complete. If this field is set, the HCM will flush access
+  // logs periodically at the specified interval. This is especially useful in the case of long-lived
+  // requests, such as CONNECT and Websockets. Final access logs can be detected via the
+  // `requestComplete()` method of `StreamInfo` in access log filters, or thru the `%DURATION%` substitution
+  // string.
+  // The interval must be at least 1 millisecond.
+  google.protobuf.Duration access_log_flush_interval = 54
+      [(validate.rules).duration = {gte {nanos: 1000000}}];
 
   // If set to true, the connection manager will use the real remote address
   // of the client connection when determining internal versus external origin and manipulating
