@@ -127,10 +127,22 @@ initializeAndValidateOptions(const envoy::config::core::v3::Http3ProtocolOptions
 namespace Http {
 namespace Utility {
 
+enum url_components
+  { UC_SCHEMA           = 0
+  , UC_HOST             = 1
+  , UC_PORT             = 2
+  , UC_PATH             = 3
+  , UC_QUERY            = 4
+  , UC_FRAGMENT         = 5
+  , UC_USERINFO         = 6
+  , UC_MAX              = 7
+  };
+
 /**
  * Given a fully qualified URL, splits the string_view provided into scheme,
  * host and path with query parameters components.
  */
+
 class Url {
 public:
   bool initialize(absl::string_view absolute_url, bool is_connect_request);
@@ -145,10 +157,14 @@ public:
   /** Returns the fully qualified URL as a string. */
   std::string toString() const;
 
+  bool containsFragment();
+  bool containsUserinfo();
+
 private:
   absl::string_view scheme_;
   absl::string_view host_and_port_;
   absl::string_view path_and_query_params_;
+  uint8_t component_bitmap_;
 };
 
 class PercentEncoding {

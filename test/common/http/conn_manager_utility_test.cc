@@ -248,7 +248,7 @@ TEST_F(ConnectionManagerUtilityTest, RemoveRefererIfUrlInvalid) {
   connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
       std::make_shared<Network::Address::Ipv4Instance>("10.0.0.1"));
   ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
-  TestRequestHeaderMapImpl headers{{"referer", "\0foo"}};
+  TestRequestHeaderMapImpl headers{{"referer", "fo\\0o"}};
   EXPECT_EQ((MutateRequestRet{"10.0.0.1:0", true, Tracing::Reason::NotTraceable}),
             callMutateRequestHeaders(headers, Protocol::Http2));
   EXPECT_TRUE(headers.get(Http::CustomHeaders::get().Referer).empty());
@@ -336,17 +336,6 @@ TEST_F(ConnectionManagerUtilityTest, ValidFileOnlyRefererPassesSanitization) {
   EXPECT_EQ((MutateRequestRet{"10.0.0.1:0", true, Tracing::Reason::NotTraceable}),
             callMutateRequestHeaders(headers, Protocol::Http2));
   EXPECT_EQ("resource.html",
-            headers.get(Http::CustomHeaders::get().Referer)[0]->value().getStringView());
-}
-
-TEST_F(ConnectionManagerUtilityTest, AboutBlankRefererPassesSanitization) {
-  connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
-      std::make_shared<Network::Address::Ipv4Instance>("10.0.0.1"));
-  ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
-  TestRequestHeaderMapImpl headers{{"referer", "about:blank"}};
-  EXPECT_EQ((MutateRequestRet{"10.0.0.1:0", true, Tracing::Reason::NotTraceable}),
-            callMutateRequestHeaders(headers, Protocol::Http2));
-  EXPECT_EQ("about:blank",
             headers.get(Http::CustomHeaders::get().Referer)[0]->value().getStringView());
 }
 

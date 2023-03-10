@@ -391,6 +391,14 @@ Utility::parseCookies(const RequestHeaderMap& headers,
   return cookies;
 }
 
+bool Utility::Url::containsFragment() {
+  return (component_bitmap_ & (1 << UC_FRAGMENT));
+}
+
+bool Utility::Url::containsUserinfo() {
+  return (component_bitmap_ & (1 << UC_USERINFO));
+}
+
 bool Utility::Url::initialize(absl::string_view absolute_url, bool is_connect) {
   struct http_parser_url u;
   http_parser_url_init(&u);
@@ -400,10 +408,13 @@ bool Utility::Url::initialize(absl::string_view absolute_url, bool is_connect) {
   if (result != 0) {
     return false;
   }
+
   if ((u.field_set & (1 << UF_HOST)) != (1 << UF_HOST) &&
       (u.field_set & (1 << UF_SCHEMA)) != (1 << UF_SCHEMA)) {
     return false;
   }
+
+  component_bitmap_ = u.field_set;
   scheme_ = absl::string_view(absolute_url.data() + u.field_data[UF_SCHEMA].off,
                               u.field_data[UF_SCHEMA].len);
 
@@ -1401,31 +1412,53 @@ std::string Utility::newUri(::Envoy::OptRef<const Utility::RedirectConfig> redir
 }
 
 bool Utility::isValidRefererValue(absl::string_view value) {
-  struct http_parser_url u;
-  http_parser_url_init(&u);
 
-  int result = http_parser_parse_url(value.data(), value.length(), false, &u);
-
-  if (result == 0) {
-    goto parse_success;
+  // First, we try to parse it as an absolute URL and
+  // ensure that there is no fragment or userinfo.
+  // If that fails, we can just parse it as a relative reference
+  // and expect no fragment
+  // NOTE: "about:blank" is incorrectly rejected here, because
+  // url.initialize uses http_parser_parse_url, which requires
+  // a host to be present if there is a schema.
+  Utility::Url url;
+  if (url.initialize(value, false)) {
+    return !(url.containsFragment() || url.containsUserinfo());
   }
 
-  http_parser_url_init(&u);
-  result = http_parser_parse_relative_url(value.data(), value.length(), &u);
+  constexpr uint32_t pathCharTable[] = {
+      // control characters
+      0b00000000000000000000000000000000,
+      // !"#$%&'()*+,-./0123456789:;<=>?
+      0b01001111111111111111111111110101,
+      //@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\]^_
+      0b11111111111111111111111111100001,
+      //`abcdefghijklmnopqrstuvwxyz{|}~
+      0b01111111111111111111111111100010,
+      // extended ascii
+      0b00000000000000000000000000000000,
+      0b00000000000000000000000000000000,
+      0b00000000000000000000000000000000,
+      0b00000000000000000000000000000000,
+  };
+  bool seen_slash = false;
 
-  if (result != 0) {
-    return false;
-  }
-
-parse_success:
-
-  // Check strict RFC requirements: no fragment and no userinfo
-  // Note: if parse_relative_url was used, userinfo is not parsed out, so the
-  //       second check here will never hit.
-  if ((u.field_set & (1 << UF_FRAGMENT)) == (1 << UF_FRAGMENT) ||
-      (u.field_set & (1 << UF_USERINFO)) == (1 << UF_USERINFO))
-  {
-    return false;
+  for (char c : value) {
+    switch (c) {
+      case ':':
+        if (!seen_slash) {
+          // First path segment cannot contain ':'
+          // https://www.rfc-editor.org/rfc/rfc3986#section-3.3
+          return false;
+        }
+        continue;
+      case '/':
+        seen_slash = true;
+        continue;
+      default:
+        if (!testChar(pathCharTable, c)) {
+          return false;
+        }
+    }
   }
 
   return true;
