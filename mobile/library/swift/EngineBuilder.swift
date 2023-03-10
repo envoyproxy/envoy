@@ -563,7 +563,7 @@ open class EngineBuilder: NSObject {
   ///
   /// - returns: This builder.
   @discardableResult
-  public func setNodeID(nodeID: String) -> Self {
+  public func setNodeID(_ nodeID: String) -> Self {
     self.nodeID = nodeID
     return self
   }
@@ -580,7 +580,7 @@ open class EngineBuilder: NSObject {
     region: String,
     zone: String,
     subZone: String
-    ) -> Self {
+  ) -> Self {
     self.nodeRegion = region
     self.nodeZone = zone
     self.nodeSubZone = subZone
@@ -603,7 +603,7 @@ open class EngineBuilder: NSObject {
     jwtToken: String = "",
     jwtTokenLifetimeSeconds: UInt32 = 0,
     sslRootCerts: String = ""
-    ) -> Self {
+  ) -> Self {
     self.adsAddress = address
     self.adsPort = port
     self.adsJwtToken = jwtToken
