@@ -2,6 +2,7 @@
 
 #import "library/common/main_interface.h"
 #import "library/cc/engine_builder.h"
+#include "source/common/protobuf/utility.h"
 
 @implementation NSString (CXX)
 - (std::string)toCXXString {
@@ -109,7 +110,20 @@
                                    keyValueStores:
                                        (NSDictionary<NSString *, id<EnvoyKeyValueStore>> *)
                                            keyValueStores
-                                       statsSinks:(NSArray<NSString *> *)statsSinks {
+                                       statsSinks:(NSArray<NSString *> *)statsSinks
+                                    rtdsLayerName:(NSString *)rtdsLayerName
+                               rtdsTimeoutSeconds:(UInt32)rtdsTimeoutSeconds
+                                       adsAddress:(NSString *)adsAddress
+                                          adsPort:(UInt32)adsPort
+                                      adsJwtToken:(NSString *)adsJwtToken
+                       adsJwtTokenLifetimeSeconds:(UInt32)adsJwtTokenLifetimeSeconds
+                                  adsSslRootCerts:(NSString *)adsSslRootCerts
+                                           nodeId:(NSString *)nodeId
+                                       nodeRegion:(NSString *)nodeRegion
+                                         nodeZone:(NSString *)nodeZone
+                                      nodeSubZone:(NSString *)nodeSubZone
+
+{
   self = [super init];
   if (!self) {
     return nil;
@@ -151,6 +165,18 @@
   self.stringAccessors = stringAccessors;
   self.keyValueStores = keyValueStores;
   self.statsSinks = statsSinks;
+  self.rtdsLayerName = rtdsLayerName;
+  self.rtdsTimeoutSeconds = rtdsTimeoutSeconds;
+  self.adsAddress = adsAddress;
+  self.adsPort = adsPort;
+  self.adsJwtToken = adsJwtToken;
+  self.adsJwtTokenLifetimeSeconds = adsJwtTokenLifetimeSeconds;
+  self.adsSslRootCerts = adsSslRootCerts;
+  self.nodeId = nodeId;
+  self.nodeRegion = nodeRegion;
+  self.nodeZone = nodeZone;
+  self.nodeSubZone = nodeSubZone;
+
   return self;
 }
 
@@ -229,7 +255,13 @@
     }
     builder.addStatsSinks(std::move(sinks));
   }
-
+  builder.setNodeLocality([self.nodeRegion toCXXString], [self.nodeZone toCXXString],
+                          [self.nodeSubZone toCXXString]);
+  builder.setNodeId([self.nodeId toCXXString]);
+  builder.addRtdsLayer([self.rtdsLayerName toCXXString], self.rtdsTimeoutSeconds);
+  builder.setAggregatedDiscoveryService(
+      [self.adsAddress toCXXString], self.adsPort, [self.adsJwtToken toCXXString],
+      self.adsJwtTokenLifetimeSeconds, [self.adsSslRootCerts toCXXString]);
 #ifdef ENVOY_ADMIN_FUNCTIONALITY
   builder.enableAdminInterface(self.adminInterfaceEnabled);
 #endif

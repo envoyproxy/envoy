@@ -19,6 +19,7 @@ Breaking changes:
 - api: move ``addVirtualClusters`` APIs taking concatenated cluster YAML to ``addVirtualCluster`` with one cluster config at a time (:issue: `#25297 <25297>`, :issue: `#25259 <25259>`, :issue: `#25457 <25457>`)
 - api: move ``dnsPreresolveHostnames`` APIs from taking concatenated cluster YAML to taking a list of String hostnames (:issue: `#25297 <25297>`, :issue: `#25259 <25259>`, :issue: `#25457 <25457>`)
 - api: added ``setRuntimeGuard`` APIs for all languages (:issue: `#25434 <25434>`)
+- api: added ``setRtdsLayer``, ``addAggregatedDiscoveryService``, ``setNodeId``, ``setNodeLocality`` APIs for all languages
 - clusters: removing the base_h2 cluster. Requests with ``x-envoy-mobile-upstream-protocol`` set to ``http2`` will be sent to the base cluster and use the best available protocol (:issue `#25796 <25796>`).
 - clusters: only creating the stats cluster if an endpoint is configured. Previously if no domain was configured a cluster would be configured pointed at 127.0.0.1. (:issue: `#25816 <25816>`).
 - clusters: removing the base_h3 cluster. If HTTP/3 is enabled, the base cluster will use HTTP/3 instead. (:issue: `#25814 <25814>`).

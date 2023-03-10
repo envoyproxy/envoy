@@ -57,6 +57,17 @@ open class EngineBuilder: NSObject {
   private var runtimeGuards: [String: Bool] = [:]
   private var directResponses: [DirectResponse] = []
   private var statsSinks: [String] = []
+  private var rtdsLayerName: String = ""
+  private var rtdsTimeoutSeconds: UInt32 = 0
+  private var adsAddress: String = ""
+  private var adsPort: UInt32 = 0
+  private var adsJwtToken: String = ""
+  private var adsJwtTokenLifetimeSeconds: UInt32 = 0
+  private var adsSslRootCerts: String = ""
+  private var nodeID: String = ""
+  private var nodeRegion: String = ""
+  private var nodeZone: String = ""
+  private var nodeSubZone: String = ""
 
   // MARK: - Public
 
@@ -533,6 +544,74 @@ open class EngineBuilder: NSObject {
     return self
   }
 
+  /// Sets the node.id field in the Bootstrap configuration.
+  ///
+  /// - parameter nodeID: The node ID.
+  ///
+  /// - returns: This builder.
+  @discardableResult
+  public func setNodeID(_ nodeID: String) -> Self {
+    self.nodeID = nodeID
+    return self
+  }
+
+  /// Sets the node locality in the Bootstrap configuration.
+  ///
+  /// - parameter region:  The region.
+  /// - parameter zone:    The zone.
+  /// - parameter subZone: The sub-zone.
+  ///
+  /// - returns: This builder.
+  @discardableResult
+  public func setNodeLocality(
+    region: String,
+    zone: String,
+    subZone: String
+  ) -> Self {
+    self.nodeRegion = region
+    self.nodeZone = zone
+    self.nodeSubZone = subZone
+    return self
+  }
+
+  /// Adds an aggregated discovery service layer to the configuration.
+  ///
+  /// - parameter address:                 The network address of the server.
+  /// - parameter port:                    The port of the server.
+  /// - parameter jwtToken:                The JWT token.
+  /// - parameter jwtTokenLifetimeSeconds: The JWT token lifetime in seconds.
+  /// - parameter sslRootCerts:            The SSL root certificates.
+  ///
+  /// - returns: This builder.
+  @discardableResult
+  public func setAggregatedDiscoveryService(
+    address: String,
+    port: UInt32,
+    jwtToken: String = "",
+    jwtTokenLifetimeSeconds: UInt32 = 0,
+    sslRootCerts: String = ""
+  ) -> Self {
+    self.adsAddress = address
+    self.adsPort = port
+    self.adsJwtToken = jwtToken
+    self.adsJwtTokenLifetimeSeconds = jwtTokenLifetimeSeconds
+    self.adsSslRootCerts = sslRootCerts
+    return self
+  }
+
+  /// Adds an RTDS layer to the configuration.
+  ///
+  /// - parameter layerName:      The layer name.
+  /// - parameter timeoutSeconds: The timeout in seconds.
+  ///
+  /// - returns: This builder.
+  @discardableResult
+  public func addRTDSLayer(name layerName: String, timeoutSeconds: UInt32 = 0) -> Self {
+    self.rtdsLayerName = layerName
+    self.rtdsTimeoutSeconds = timeoutSeconds
+    return self
+  }
+
 #if ENVOY_ADMIN_FUNCTIONALITY
   /// Enable admin interface on 127.0.0.1:9901 address. Admin interface is intended to be
   /// used for development/debugging purposes only. Enabling it in production may open
@@ -631,7 +710,18 @@ open class EngineBuilder: NSObject {
       platformFilterChain: self.platformFilterChain,
       stringAccessors: self.stringAccessors,
       keyValueStores: self.keyValueStores,
-      statsSinks: self.statsSinks
+      statsSinks: self.statsSinks,
+      rtdsLayerName: self.rtdsLayerName,
+      rtdsTimeoutSeconds: self.rtdsTimeoutSeconds,
+      adsAddress: self.adsAddress,
+      adsPort: self.adsPort,
+      adsJwtToken: self.adsJwtToken,
+      adsJwtTokenLifetimeSeconds: self.adsJwtTokenLifetimeSeconds,
+      adsSslRootCerts: self.adsSslRootCerts,
+      nodeId: self.nodeID,
+      nodeRegion: self.nodeRegion,
+      nodeZone: self.nodeZone,
+      nodeSubZone: self.nodeSubZone
     )
   }
 
