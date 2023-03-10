@@ -111,6 +111,8 @@ class EnvoyConfigurationTest {
     nodeRegion: String = "",
     nodeZone: String = "",
     nodeSubZone: String = "",
+    cdsResourcesLocator: String = "",
+    cdsTimeoutSeconds: Int = 0,
 
   ): EnvoyConfiguration {
     return EnvoyConfiguration(
@@ -161,6 +163,8 @@ class EnvoyConfigurationTest {
       nodeRegion,
       nodeZone,
       nodeSubZone,
+      cdsResourcesLocator,
+      cdsTimeoutSeconds
     )
   }
 
@@ -311,7 +315,7 @@ class EnvoyConfigurationTest {
     // ADS and RTDS not included by default
     assertThat(resolvedTemplate).doesNotContain("rtds_layer:");
     assertThat(resolvedTemplate).doesNotContain("ads_config:");
-
+    assertThat(resolvedTemplate).doesNotContain("cds_config:");
   }
 
   @Test
@@ -339,6 +343,20 @@ class EnvoyConfigurationTest {
     assertThat(resolvedTemplate).contains("fake_rtds_layer");
     assertThat(resolvedTemplate).contains("FAKE_ADDRESS");
     assertThat(resolvedTemplate).contains("initial_fetch_timeout: 5432s");
+  }
+
+  @Test
+  fun `test adding RTDS and CDS`() {
+    JniLibrary.loadTestLibrary()
+    val envoyConfiguration = buildTestEnvoyConfiguration(
+      cdsResourcesLocator = "FAKE_CDS_LOCATOR", cdsTimeoutSeconds = 356, adsAddress = "FAKE_ADDRESS", adsPort = 0
+    )
+
+    val resolvedTemplate = TestJni.createYaml(envoyConfiguration)
+
+    assertThat(resolvedTemplate).contains("FAKE_CDS_LOCATOR");
+    assertThat(resolvedTemplate).contains("FAKE_ADDRESS");
+    assertThat(resolvedTemplate).contains("initial_fetch_timeout: 356s");
   }
 
   @Test

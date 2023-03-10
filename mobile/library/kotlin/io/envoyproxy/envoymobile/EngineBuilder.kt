@@ -88,6 +88,8 @@ open class EngineBuilder(
   private var nodeRegion: String = ""
   private var nodeZone: String = ""
   private var nodeSubZone: String = ""
+  private var cdsResourcesLocator: String = ""
+  private var cdsTimeoutSeconds: Int = 0
 
   /**
    * Add a log level to use with Envoy.
@@ -619,6 +621,25 @@ fun setAggregatedDiscoveryService(
 }
 
 /**
+* Adds a CDS layer.
+*
+* @param cdsResourcesLocator the locator for CDS resources.
+*
+* @param cdsTimeoutSeconds the connection timeout.
+*
+* @return this builder.
+*/
+fun addCdsLayer(
+  cdsResourcesLocator: String,
+  cdsTimeoutSeconds: Int = 0,
+): EngineBuilder {
+  this.cdsResourcesLocator = cdsResourcesLocator
+  this.cdsTimeoutSeconds = cdsTimeoutSeconds
+  return this
+}
+
+
+/**
 * Adds an RTDS layer to default config. Requires that ADS be configured.
 *
 * @param layerName the layer name.
@@ -701,6 +722,8 @@ fun addRtdsLayer(layerName: String, timeoutSeconds: Int = 0): EngineBuilder {
       nodeRegion,
       nodeZone,
       nodeSubZone,
+      cdsResourcesLocator,
+      cdsTimeoutSeconds,
     )
 
 

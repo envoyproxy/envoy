@@ -68,6 +68,8 @@ open class EngineBuilder: NSObject {
   private var nodeRegion: String = ""
   private var nodeZone: String = ""
   private var nodeSubZone: String = ""
+  private var cdsResourcesLocator: String = ""
+  private var cdsTimeoutSeconds: UInt32 = 0
 
   // MARK: - Public
 
@@ -612,6 +614,19 @@ open class EngineBuilder: NSObject {
     return self
   }
 
+  /// Adds a CDS layer to the configuration.
+  ///
+  /// - parameter cdsResourcesLocator: The layer name.
+  /// - parameter timeoutSeconds:      The timeout in seconds.
+  ///
+  /// - returns: This builder.
+  @discardableResult
+  public func addCDSLayer(cdsResourcesLocator: String, timeoutSeconds: UInt32 = 0) -> Self {
+    self.cdsResourcesLocator = cdsResourcesLocator
+    self.cdsTimeoutSeconds = timeoutSeconds
+    return self
+  }
+
 #if ENVOY_ADMIN_FUNCTIONALITY
   /// Enable admin interface on 127.0.0.1:9901 address. Admin interface is intended to be
   /// used for development/debugging purposes only. Enabling it in production may open
@@ -722,6 +737,8 @@ open class EngineBuilder: NSObject {
       nodeRegion: self.nodeRegion,
       nodeZone: self.nodeZone,
       nodeSubZone: self.nodeSubZone
+      cdsResourcesLocator: self.cdsResourcesLocator,
+      cdsTimeoutSeconds: self.cdsTimeoutSeconds
     )
   }
 
