@@ -434,10 +434,6 @@ int http_parser_parse_url(const char *buf, size_t buflen,
                           int is_connect,
                           struct http_parser_url *u);
 
-/* Parse a relative URL; return nonzero on failure */
-int http_parser_parse_relative_url(const char *buf, size_t buflen,
-                          struct http_parser_url *u);
-
 /* Pause or un-pause the parser; a nonzero value pauses */
 void http_parser_pause(http_parser *parser, int paused);
 
