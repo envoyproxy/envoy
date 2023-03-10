@@ -30,6 +30,7 @@ BPF
 Bdecoded
 Bencoded
 DFP
+DOM
 GiB
 IPTOS
 Repick
@@ -162,6 +163,7 @@ FIPS
 FIRSTHDR
 FQDN
 FREEBIND
+eslint
 freeifaddrs
 FUZZER
 FUZZERS
@@ -170,6 +172,7 @@ dereferencing
 differentially
 dnsresolvers
 endpos
+eps
 fo
 ghi
 golang
@@ -241,6 +244,7 @@ LEV
 LF
 LHS
 hls
+iframe
 ingressed
 integrations
 jkl

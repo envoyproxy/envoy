@@ -283,6 +283,9 @@ ProtobufWkt::Value StructFormatter::structFormatMapCallback(
     }
     (*fields)[pair.first] = value;
   }
+  if (omit_empty_values_ && output.fields().empty()) {
+    return ValueUtil::nullValue();
+  }
   return ValueUtil::structValue(output);
 }
 

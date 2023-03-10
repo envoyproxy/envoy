@@ -13,18 +13,32 @@
 namespace Envoy {
 namespace Dso {
 
-class DsoInstance {
+class Dso {
+public:
+  virtual ~Dso() = default;
+
+  virtual GoUint64 envoyGoFilterNewHttpPluginConfig(GoUint64 p0, GoUint64 p1) PURE;
+  virtual GoUint64 envoyGoFilterMergeHttpPluginConfig(GoUint64 p0, GoUint64 p1) PURE;
+  virtual GoUint64 envoyGoFilterOnHttpHeader(httpRequest* p0, GoUint64 p1, GoUint64 p2,
+                                             GoUint64 p3) PURE;
+  virtual GoUint64 envoyGoFilterOnHttpData(httpRequest* p0, GoUint64 p1, GoUint64 p2,
+                                           GoUint64 p3) PURE;
+  virtual void envoyGoFilterOnHttpDestroy(httpRequest* p0, int p1) PURE;
+};
+
+class DsoInstance : public Dso {
 public:
   DsoInstance(const std::string dso_name);
-  ~DsoInstance();
+  ~DsoInstance() override;
 
-  GoUint64 envoyGoFilterNewHttpPluginConfig(GoUint64 p0, GoUint64 p1);
-  GoUint64 envoyGoFilterMergeHttpPluginConfig(GoUint64 p0, GoUint64 p1);
+  GoUint64 envoyGoFilterNewHttpPluginConfig(GoUint64 p0, GoUint64 p1) override;
+  GoUint64 envoyGoFilterMergeHttpPluginConfig(GoUint64 p0, GoUint64 p1) override;
 
-  GoUint64 envoyGoFilterOnHttpHeader(httpRequest* p0, GoUint64 p1, GoUint64 p2, GoUint64 p3);
-  GoUint64 envoyGoFilterOnHttpData(httpRequest* p0, GoUint64 p1, GoUint64 p2, GoUint64 p3);
+  GoUint64 envoyGoFilterOnHttpHeader(httpRequest* p0, GoUint64 p1, GoUint64 p2,
+                                     GoUint64 p3) override;
+  GoUint64 envoyGoFilterOnHttpData(httpRequest* p0, GoUint64 p1, GoUint64 p2, GoUint64 p3) override;
 
-  void envoyGoFilterOnHttpDestroy(httpRequest* p0, int p1);
+  void envoyGoFilterOnHttpDestroy(httpRequest* p0, int p1) override;
 
   bool loaded() { return loaded_; }
 
@@ -44,9 +58,9 @@ private:
   void (*envoy_go_filter_on_http_destroy_)(httpRequest* p0, GoUint64 p1) = {nullptr};
 };
 
-using DsoInstancePtr = std::shared_ptr<DsoInstance>;
+using DsoPtr = std::shared_ptr<Dso>;
 
-class DsoInstanceManager {
+class DsoManager {
 public:
   /**
    * Load the go plugin dynamic library.
@@ -61,10 +75,10 @@ public:
    * @param dso_id is unique ID for dynamic library.
    * @return nullptr if get failed. Otherwise, return the DSO instance.
    */
-  static DsoInstancePtr getDsoInstanceByID(std::string dso_id);
+  static DsoPtr getDsoByID(std::string dso_id);
 
 private:
-  using DsoMapType = std::map<std::string, DsoInstancePtr>;
+  using DsoMapType = std::map<std::string, DsoPtr>;
   struct DsoStoreType {
     DsoMapType map_ ABSL_GUARDED_BY(mutex_){{
         {"", nullptr},

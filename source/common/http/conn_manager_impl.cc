@@ -507,8 +507,9 @@ void ConnectionManagerImpl::onEvent(Network::ConnectionEvent event) {
     } else {
       absl::string_view local_close_reason = read_callbacks_->connection().localCloseReason();
       ENVOY_BUG(!local_close_reason.empty(), "Local Close Reason was not set!");
-      details = fmt::format(StreamInfo::ResponseCodeDetails::get().DownstreamLocalDisconnect,
-                            StringUtil::replaceAllEmptySpace(local_close_reason));
+      details = fmt::format(
+          fmt::runtime(StreamInfo::ResponseCodeDetails::get().DownstreamLocalDisconnect),
+          StringUtil::replaceAllEmptySpace(local_close_reason));
     }
 
     // TODO(mattklein123): It is technically possible that something outside of the filter causes

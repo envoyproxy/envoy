@@ -35,15 +35,19 @@ else
   # in useradd below, which is need for correct Python execution in the Docker
   # environment.
   ENVOY_DOCKER_OPTIONS+=(-u root:root)
-  ENVOY_DOCKER_OPTIONS+=(-v /var/run/docker.sock:/var/run/docker.sock)
-  ENVOY_DOCKER_OPTIONS+=(--cap-add SYS_PTRACE --cap-add NET_RAW --cap-add NET_ADMIN)
+  DOCKER_USER_ARGS=()
+  DOCKER_GROUP_ARGS=()
   DEFAULT_ENVOY_DOCKER_BUILD_DIR=/tmp/envoy-docker-build
+  if [[ -n "$ENVOY_DOCKER_IN_DOCKER" ]]; then
+      ENVOY_DOCKER_OPTIONS+=(-v /var/run/docker.sock:/var/run/docker.sock)
+      DOCKER_GID="$(stat -c %g /var/run/docker.sock 2>/dev/null || stat -f %g /var/run/docker.sock)"
+      DOCKER_USER_ARGS=(--gid "${DOCKER_GID}")
+      DOCKER_GROUP_ARGS=(--gid "${DOCKER_GID}")
+  fi
   BUILD_DIR_MOUNT_DEST=/build
   SOURCE_DIR="${PWD}"
   SOURCE_DIR_MOUNT_DEST=/source
-  DOCKER_GID="$(stat -c %g /var/run/docker.sock 2>/dev/null || stat -f %g /var/run/docker.sock)"
-  START_COMMAND=("/bin/bash" "-lc" "groupadd --gid ${DOCKER_GID} -f envoygroup \
-    && useradd -o --uid $(id -u) --gid ${DOCKER_GID} --no-create-home --home-dir /build envoybuild \
+  START_COMMAND=("/bin/bash" "-lc" "groupadd ${DOCKER_GROUP_ARGS[*]} -f envoygroup && useradd -o --uid $(id -u) ${DOCKER_USER_ARGS[*]} --no-create-home --home-dir /build envoybuild \
     && usermod -a -G pcap envoybuild \
     && chown envoybuild:envoygroup /build \
     && chown envoybuild /proc/self/fd/2 \
@@ -68,7 +72,7 @@ VOLUMES=(
     -v "${ENVOY_DOCKER_BUILD_DIR}":"${BUILD_DIR_MOUNT_DEST}"
     -v "${SOURCE_DIR}":"${SOURCE_DIR_MOUNT_DEST}")
 
-if ! is_windows; then
+if ! is_windows && [[ -n "$ENVOY_DOCKER_IN_DOCKER" ]]; then
     # Create a "shared" directory that has the same path in/outside the container
     # This allows the host docker engine to see artefacts using a temporary path created inside the container,
     # at the same path.

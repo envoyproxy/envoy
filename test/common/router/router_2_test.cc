@@ -198,6 +198,109 @@ TEST_F(WatermarkTest, UpstreamWatermarks) {
   response_decoder_->decodeData(data, true);
 }
 
+// Tests that readDisabled are delayed till upstream response headers arrive.
+TEST_F(WatermarkTest, DelayUpstreamReadDisableBeforeResponse1) {
+  sendRequest(false);
+
+  ASSERT(callbacks_.callbacks_.begin() != callbacks_.callbacks_.end());
+  Envoy::Http::DownstreamWatermarkCallbacks* watermark_callbacks = *callbacks_.callbacks_.begin();
+  EXPECT_CALL(encoder_, getStream()).WillRepeatedly(ReturnRef(stream_));
+
+  // Call watermark callbacks multiple times, but readDisable should be delayed.
+  EXPECT_CALL(stream_, readDisable(_)).Times(0u);
+  watermark_callbacks->onAboveWriteBufferHighWatermark();
+  watermark_callbacks->onAboveWriteBufferHighWatermark();
+  EXPECT_EQ(0u, cm_.thread_local_cluster_.cluster_.info_->stats_store_
+                    .counter("upstream_flow_control_paused_reading_total")
+                    .value());
+
+  // The remaining readDisable should be called upon receiving response headers.
+  EXPECT_CALL(stream_, readDisable(true)).Times(2u);
+  EXPECT_CALL(callbacks_, encodeHeaders_(_, false));
+  response_decoder_->decodeHeaders(
+      Http::ResponseHeaderMapPtr{new Http::TestResponseHeaderMapImpl{{":status", "200"}}}, false);
+  EXPECT_EQ(2u, cm_.thread_local_cluster_.cluster_.info_->stats_store_
+                    .counter("upstream_flow_control_paused_reading_total")
+                    .value());
+  EXPECT_EQ(0u, cm_.thread_local_cluster_.cluster_.info_->stats_store_
+                    .counter("upstream_flow_control_resumed_reading_total")
+                    .value());
+
+  // Following watermark callbacks shouldn't delay readDisable.
+  EXPECT_CALL(stream_, readDisable(false));
+  watermark_callbacks->onBelowWriteBufferLowWatermark();
+  EXPECT_EQ(1u, cm_.thread_local_cluster_.cluster_.info_->stats_store_
+                    .counter("upstream_flow_control_resumed_reading_total")
+                    .value());
+
+  EXPECT_CALL(stream_, readDisable(true));
+  watermark_callbacks->onAboveWriteBufferHighWatermark();
+  EXPECT_EQ(3u, cm_.thread_local_cluster_.cluster_.info_->stats_store_
+                    .counter("upstream_flow_control_paused_reading_total")
+                    .value());
+
+  EXPECT_CALL(stream_, readDisable(false)).Times(2u);
+  watermark_callbacks->onBelowWriteBufferLowWatermark();
+  watermark_callbacks->onBelowWriteBufferLowWatermark();
+  EXPECT_EQ(3u, cm_.thread_local_cluster_.cluster_.info_->stats_store_
+                    .counter("upstream_flow_control_resumed_reading_total")
+                    .value());
+
+  Buffer::OwnedImpl data;
+  EXPECT_CALL(callbacks_, encodeData(_, true));
+  response_decoder_->decodeData(data, true);
+}
+
+// Tests that delayed readDisable is triggered only once if there is 1xx response followed by
+// non-1xx response.
+TEST_F(WatermarkTest, DelayUpstreamReadDisableBeforeResponse2) {
+  sendRequest(false);
+
+  ASSERT(callbacks_.callbacks_.begin() != callbacks_.callbacks_.end());
+  Envoy::Http::DownstreamWatermarkCallbacks* watermark_callbacks = *callbacks_.callbacks_.begin();
+  EXPECT_CALL(encoder_, getStream()).WillRepeatedly(ReturnRef(stream_));
+
+  // Call watermark callbacks multiple times, but readDisable should be delayed.
+  EXPECT_CALL(stream_, readDisable(_)).Times(0u);
+  watermark_callbacks->onAboveWriteBufferHighWatermark();
+  watermark_callbacks->onAboveWriteBufferHighWatermark();
+  EXPECT_EQ(0u, cm_.thread_local_cluster_.cluster_.info_->stats_store_
+                    .counter("upstream_flow_control_paused_reading_total")
+                    .value());
+
+  // This should cancel 1 deferred readDisable.
+  watermark_callbacks->onBelowWriteBufferLowWatermark();
+  EXPECT_EQ(0u, cm_.thread_local_cluster_.cluster_.info_->stats_store_
+                    .counter("upstream_flow_control_resumed_reading_total")
+                    .value());
+
+  // The remaining readDisable should be called upon receiving 1xx response headers.
+  EXPECT_CALL(stream_, readDisable(true));
+  EXPECT_CALL(callbacks_, encode1xxHeaders_(_));
+  response_decoder_->decode1xxHeaders(
+      Http::ResponseHeaderMapPtr{new Http::TestResponseHeaderMapImpl{{":status", "100"}}});
+  EXPECT_EQ(1u, cm_.thread_local_cluster_.cluster_.info_->stats_store_
+                    .counter("upstream_flow_control_paused_reading_total")
+                    .value());
+  // Receiving 200 response header shouldn't disable reading again.
+  EXPECT_CALL(callbacks_, encodeHeaders_(_, false));
+  response_decoder_->decodeHeaders(
+      Http::ResponseHeaderMapPtr{new Http::TestResponseHeaderMapImpl{{":status", "200"}}}, false);
+  EXPECT_EQ(1u, cm_.thread_local_cluster_.cluster_.info_->stats_store_
+                    .counter("upstream_flow_control_paused_reading_total")
+                    .value());
+
+  EXPECT_CALL(stream_, readDisable(false));
+  watermark_callbacks->onBelowWriteBufferLowWatermark();
+  EXPECT_EQ(1u, cm_.thread_local_cluster_.cluster_.info_->stats_store_
+                    .counter("upstream_flow_control_resumed_reading_total")
+                    .value());
+
+  Buffer::OwnedImpl data;
+  EXPECT_CALL(callbacks_, encodeData(_, true));
+  response_decoder_->decodeData(data, true);
+}
+
 TEST_F(WatermarkTest, FilterWatermarks) {
   EXPECT_CALL(callbacks_, decoderBufferLimit()).Times(AtLeast(3)).WillRepeatedly(Return(10));
   router_->setDecoderFilterCallbacks(callbacks_);

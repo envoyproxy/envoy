@@ -1,7 +1,14 @@
 #!/bin/bash -e
 
 export NAME=vrp-local
-export DELAY=10
+export MANUAL=true
+
+# This sandbox is not really a sandbox and is only here for testing purposes.
+# It is also not really structured in the same way and tends to be the hardest to fix
+# when things change.
+#
+# It does not currently working with buildkit.
+export DOCKER_BUILDKIT=0
 
 # Grab an Envoy binary to use from latest dev.
 CONTAINER_ID=$(docker create envoyproxy/envoy-google-vrp-dev:latest)
@@ -17,6 +24,10 @@ popd
 
 # shellcheck source=examples/verify-common.sh
 . "$(dirname "${BASH_SOURCE[0]}")/../verify-common.sh"
+
+bring_up_example
+
+wait_for 10 bash -c "responds_with 'normal' https://localhost:10000/content -k"
 
 run_log "Test proxy"
 responds_with \
