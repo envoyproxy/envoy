@@ -1,4 +1,5 @@
 #include "envoy/thread/thread.h"
+
 #include "source/server/guarddog_impl.h"
 
 #pragma once
@@ -6,6 +7,10 @@
 namespace Envoy {
 namespace Server {
 
+// Helps make tests using the GuardDog more robust by providing a way of
+// blocking in the test on GuardDog loop completion when
+// GuardDogImpl::forceCheckForTest() is called. If this interlock is not
+// provided, the default interlock is a no-op.
 class GuardDogTestInterlock : public GuardDogImpl::TestInterlockHook {
 public:
   // GuardDogImpl::TestInterlockHook
@@ -30,4 +35,3 @@ private:
 
 } // namespace Server
 } // namespace Envoy
-
