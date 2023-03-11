@@ -50,6 +50,11 @@ TEST(DatadogTracerLoggerTest, Logger) {
   spdlog::logger spdlogger{"test", sink};
   Logger logger{spdlogger};
 
+  const auto reset = [&]() {
+    sink->reset();
+    spdlogger.set_level(spdlog::level::info);
+  };
+
   // callback-style error
   logger.log_error([](std::ostream& log) { log << "Beware the ides of March."; });
   EXPECT_EQ("Beware the ides of March.", sink->payload_);
@@ -57,7 +62,7 @@ TEST(DatadogTracerLoggerTest, Logger) {
   EXPECT_EQ(nullptr, sink->formatter_);
   EXPECT_FALSE(sink->flush_);
 
-  sink->reset();
+  reset();
   // callback-style startup banner
   logger.log_startup([](std::ostream& log) {
     log << "It's my stapler, the Swingline. It's been mine for a very long time.";
@@ -67,7 +72,7 @@ TEST(DatadogTracerLoggerTest, Logger) {
   EXPECT_EQ(nullptr, sink->formatter_);
   EXPECT_FALSE(sink->flush_);
 
-  sink->reset();
+  reset();
   // Error-style error
   logger.log_error(datadog::tracing::Error{datadog::tracing::Error::OTHER,
                                            "I'm sorry, Dave, I'm afraid I can't do that."});
@@ -76,7 +81,7 @@ TEST(DatadogTracerLoggerTest, Logger) {
   EXPECT_EQ(nullptr, sink->formatter_);
   EXPECT_FALSE(sink->flush_);
 
-  sink->reset();
+  reset();
   // string-style error
   logger.log_error("I must make my witness. I must lead the people from the waters. I must stay "
                    "their stampede to the sea.");
@@ -93,18 +98,18 @@ TEST(DatadogTracerLoggerTest, Logger) {
   // so if we set the level to `critical`, our `error` messages will not be
   // logged.
 
-  sink->reset();
+  reset();
   // callback-style error
-  sink->set_level(spdlog::level::critical);
+  spdlogger.set_level(spdlog::level::critical);
   logger.log_error([](std::ostream& log) { log << "Beware the ides of March."; });
   EXPECT_EQ(absl::nullopt, sink->payload_);
   EXPECT_EQ(absl::nullopt, sink->pattern_);
   EXPECT_EQ(nullptr, sink->formatter_);
   EXPECT_FALSE(sink->flush_);
 
-  sink->reset();
+  reset();
   // Error-style error
-  sink->set_level(spdlog::level::critical);
+  spdlogger.set_level(spdlog::level::critical);
   logger.log_error(datadog::tracing::Error{datadog::tracing::Error::OTHER,
                                            "I'm sorry, Dave, I'm afraid I can't do that."});
   EXPECT_EQ(absl::nullopt, sink->payload_);
@@ -112,9 +117,9 @@ TEST(DatadogTracerLoggerTest, Logger) {
   EXPECT_EQ(nullptr, sink->formatter_);
   EXPECT_FALSE(sink->flush_);
 
-  sink->reset();
+  reset();
   // string-style error
-  sink->set_level(spdlog::level::critical);
+  spdlogger.set_level(spdlog::level::critical);
   logger.log_error("I must make my witness. I must lead the people from the waters. I must stay "
                    "their stampede to the sea.");
   EXPECT_EQ(absl::nullopt, sink->payload_);
@@ -125,7 +130,7 @@ TEST(DatadogTracerLoggerTest, Logger) {
   // The startup banner is printed at "info" level, and so if the logger's level
   // threshold is more severe than that, the startup banner will not be logged.
 
-  sink->reset();
+  reset();
   // The default level is `info`, so the startup banner will be logged.
   logger.log_startup([](std::ostream& log) { log << "ג  וַיֹּאמֶר אֱלֹהִים, יְהִי אוֹר; וַיְהִי-אוֹר."; });
   EXPECT_EQ("ג  וַיֹּאמֶר אֱלֹהִים, יְהִי אוֹר; וַיְהִי-אוֹר.", sink->payload_);
@@ -133,10 +138,10 @@ TEST(DatadogTracerLoggerTest, Logger) {
   EXPECT_EQ(nullptr, sink->formatter_);
   EXPECT_FALSE(sink->flush_);
 
-  sink->reset();
+  reset();
   // Any level more severe than `info` (`warn`, `error`, `critical`) will
   // suppress the startup banner. `warn` suffices.
-  sink->set_level(spdlog::level::warn);
+  spdlogger.set_level(spdlog::level::warn);
   logger.log_startup([](std::ostream& log) { log << "R - ½ R g + Λ g  =  κ T"; });
   EXPECT_EQ(absl::nullopt, sink->payload_);
   EXPECT_EQ(absl::nullopt, sink->pattern_);

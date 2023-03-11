@@ -56,13 +56,13 @@ private extension RouteMatcher.HeaderMatcher.MatchMode {
   func toCXX() -> Envoy.DirectResponseTesting.MatchMode {
     switch self {
     case .contains:
-      return Envoy.CxxSwift.DirectResponseMatchModeContains
+      return .Contains
     case .exact:
-      return Envoy.CxxSwift.DirectResponseMatchModeExact
+      return .Exact
     case .prefix:
-      return Envoy.CxxSwift.DirectResponseMatchModePrefix
+      return .Prefix
     case .suffix:
-      return Envoy.CxxSwift.DirectResponseMatchModeSuffix
+      return .Suffix
     }
   }
 }

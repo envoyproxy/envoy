@@ -4,19 +4,19 @@ extension LogLevel {
   func toCXX() -> Envoy.Platform.LogLevel {
     switch self {
     case .trace:
-      return Envoy.CxxSwift.LogLevelTrace
+      return .trace
     case .debug:
-      return Envoy.CxxSwift.LogLevelDebug
+      return .debug
     case .info:
-      return Envoy.CxxSwift.LogLevelInfo
+      return .info
     case .warn:
-      return Envoy.CxxSwift.LogLevelWarn
+      return .warn
     case .error:
-      return Envoy.CxxSwift.LogLevelError
+      return .error
     case .critical:
-      return Envoy.CxxSwift.LogLevelCritical
+      return .critical
     case .off:
-      return Envoy.CxxSwift.LogLevelOff
+      return .off
     }
   }
 }

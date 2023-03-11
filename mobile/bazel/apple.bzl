@@ -84,6 +84,8 @@ def envoy_mobile_swift_copts(enable_cxx_interop):
             "-enable-experimental-cxx-interop",
             "-Xcc",
             "-std=c++17",
+            "-Xcc",
+            "-Wno-deprecated-declarations",
         ]
     else:
         return []
