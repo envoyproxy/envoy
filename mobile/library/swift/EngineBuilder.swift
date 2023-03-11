@@ -4,6 +4,8 @@
 @_implementationOnly import EnvoyEngine
 import Foundation
 
+// swiftlint:disable file_length
+
 /// Builder used for creating and running a new Engine instance.
 @objcMembers
 open class EngineBuilder: NSObject {
