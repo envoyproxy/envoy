@@ -75,9 +75,8 @@ public:
   /**
    * Initialize all of the installed read filters on the underlying connection.
    * This effectively calls onNewConnection() on each of them.
-   * @return true if read filters were initialized successfully, otherwise false.
    */
-  bool initializeReadFilters() { return connection_->initializeReadFilters(); }
+  void initializeReadFilters() { connection_->initializeReadFilters(); }
 
   /**
    * Close the underlying network connection. This is immediate and will not attempt to flush any

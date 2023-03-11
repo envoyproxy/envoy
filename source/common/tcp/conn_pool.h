@@ -112,7 +112,7 @@ public:
     }
   }
 
-  bool initializeReadFilters() override { return connection_->initializeReadFilters(); }
+  void initializeReadFilters() override { connection_->initializeReadFilters(); }
   absl::optional<Http::Protocol> protocol() const override { return {}; }
   void close() override;
   uint32_t numActiveStreams() const override { return callbacks_ ? 1 : 0; }

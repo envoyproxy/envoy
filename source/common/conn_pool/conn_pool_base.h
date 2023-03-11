@@ -68,7 +68,7 @@ public:
   }
 
   // Initialize upstream read filters. Called when connected.
-  virtual bool initializeReadFilters() PURE;
+  virtual void initializeReadFilters() PURE;
 
   // Closes the underlying connection.
   virtual void close() PURE;
