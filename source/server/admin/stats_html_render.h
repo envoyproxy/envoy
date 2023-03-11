@@ -80,15 +80,13 @@ public:
 
 private:
   void appendResource(Buffer::Instance& response, absl::string_view file,
-                      absl::string_view default_value,
-                      std::function<std::string(absl::string_view)> xform = nullptr);
+                      absl::string_view default_value);
 
   int index_{0}; // Used to alternate row-group background color
   bool submit_on_change_{false};
   bool has_pre_{false};
   bool finalized_{false};
   const bool active_{false};
-  OptRef<FileSystem::Instance> debug_resource_files_; // Loads resources at runtim eduring debug
 };
 
 } // namespace Server

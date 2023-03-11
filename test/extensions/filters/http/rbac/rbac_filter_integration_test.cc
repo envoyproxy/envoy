@@ -1088,7 +1088,7 @@ typed_config:
       bootstrap.mutable_dynamic_resources()
           ->mutable_cds_config()
           ->mutable_path_config_source()
-          ->set_path(cds_helper_.cds_path());
+          ->set_path(cds_helper_.cdsPath());
       bootstrap.mutable_static_resources()->clear_clusters();
     });
 

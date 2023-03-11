@@ -1389,7 +1389,7 @@ void TcpProxySslIntegrationTest::sendAndReceiveTlsData(const std::string& data_t
 
   // Now send data downstream and make sure it arrives.
   ASSERT_TRUE(fake_upstream_connection_->write(data_to_send_downstream));
-  payload_reader_->set_data_to_wait_for(data_to_send_downstream);
+  payload_reader_->setDataToWaitFor(data_to_send_downstream);
   ssl_client_->dispatcher().run(Event::Dispatcher::RunType::Block);
 
   // Clean up.
@@ -1426,7 +1426,7 @@ TEST_P(TcpProxySslIntegrationTest, DownstreamHalfClose) {
 
   const std::string data("data");
   ASSERT_TRUE(fake_upstream_connection_->write(data, false));
-  payload_reader_->set_data_to_wait_for(data);
+  payload_reader_->setDataToWaitFor(data);
   ssl_client_->dispatcher().run(Event::Dispatcher::RunType::Block);
   EXPECT_FALSE(payload_reader_->readLastByte());
 

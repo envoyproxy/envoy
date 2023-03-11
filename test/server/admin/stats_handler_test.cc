@@ -15,13 +15,11 @@
 #include "test/test_common/utility.h"
 
 using testing::Combine;
-using testing::EndsWith;
 using testing::HasSubstr;
 using testing::InSequence;
 using testing::Ref;
 using testing::Return;
 using testing::ReturnRef;
-using testing::StartsWith;
 using testing::Values;
 using testing::ValuesIn;
 
@@ -138,7 +136,8 @@ TEST_F(AdminStatsTest, HandlerStatsInvalidFormat) {
   const std::string url = "/stats?format=blergh";
   const CodeResponse code_response(handlerStats(url));
   EXPECT_EQ(Http::Code::BadRequest, code_response.first);
-  EXPECT_EQ("usage: /stats?format=(html|active|json|prometheus|text)\n\n", code_response.second);
+  EXPECT_EQ("usage: /stats?format=(html|active-html|json|prometheus|text)\n\n",
+            code_response.second);
 }
 
 TEST_F(AdminStatsTest, HandlerStatsPlainText) {

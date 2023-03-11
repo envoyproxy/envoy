@@ -24,7 +24,7 @@ constexpr absl::string_view TextReadouts = "TextReadouts";
 enum class StatsFormat {
 #ifdef ENVOY_ADMIN_HTML
   Html,
-  Active,
+  ActiveHtml,
 #endif
   Json,
   Prometheus,

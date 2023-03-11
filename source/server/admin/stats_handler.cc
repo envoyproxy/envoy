@@ -97,7 +97,7 @@ Admin::RequestPtr StatsHandler::makeRequest(AdminStream& admin_stream) {
   }
 
 #ifdef ENVOY_ADMIN_HTML
-  const bool active_mode = params.format_ == StatsFormat::Active;
+  const bool active_mode = params.format_ == StatsFormat::ActiveHtml;
   return makeRequest(server_.stats(), params, [this, active_mode]() -> Admin::UrlHandler {
     return statsHandler(active_mode);
   });
@@ -177,7 +177,7 @@ Admin::UrlHandler StatsHandler::statsHandler(bool active_mode) {
       {Admin::ParamDescriptor::Type::Enum,
        "format",
        "Format to use",
-       {"html", "active", "text", "json"}},
+       {"html", "active-html", "text", "json"}},
       {Admin::ParamDescriptor::Type::Enum,
        "type",
        "Stat types to include.",

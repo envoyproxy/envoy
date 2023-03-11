@@ -11,7 +11,14 @@ export LLVM_CONFIG=${LLVM_CONFIG:-llvm-config}
 LLVM_PREFIX=${LLVM_PREFIX:-$(${LLVM_CONFIG} --prefix)}
 CLANG_TIDY=${CLANG_TIDY:-$(${LLVM_CONFIG} --bindir)/clang-tidy}
 CLANG_APPLY_REPLACEMENTS=${CLANG_APPLY_REPLACEMENTS:-$(${LLVM_CONFIG} --bindir)/clang-apply-replacements}
-FIX_YAML=clang-tidy-fixes.yaml
+FIX_YAML="${FIX_YAML:-clang-tidy-fixes.yaml}"
+CLANG_TIDY_APPLY_FIXES="${CLANG_TIDY_APPLY_FIXES:-}"
+CLANG_TIDY_FIX_DIFF="${CLANG_TIDY_FIX_DIFF:-}"
+
+DIFF_TARGET_REMOTE="${DIFF_TARGET_REMOTE:-origin}"
+DIFF_TARGET_BRANCH="${DIFF_TARGET_BRANCH:-${AZP_TARGET_BRANCH:-origin/main}}"
+# Exclude merges for finding merge base if required
+DIFF_HEAD="$(git rev-list --no-merges HEAD -n1)"
 
 # Quick syntax check of .clang-tidy.
 ${CLANG_TIDY} -dump-config > /dev/null 2> clang-tidy-config-errors.txt
@@ -89,7 +96,7 @@ function run_clang_tidy() {
   python3 "${LLVM_PREFIX}/share/clang/run-clang-tidy.py" \
     -clang-tidy-binary="${CLANG_TIDY}" \
     -clang-apply-replacements-binary="${CLANG_APPLY_REPLACEMENTS}" \
-    -export-fixes=${FIX_YAML} -j "${NUM_CPUS:-0}" -p "${SRCDIR}" -quiet \
+    -export-fixes="${FIX_YAML}" -j "${NUM_CPUS:-0}" -p "${SRCDIR}" -quiet \
     ${APPLY_CLANG_TIDY_FIXES:+-fix} "$@"
 }
 
@@ -113,19 +120,67 @@ elif [[ "${RUN_FULL_CLANG_TIDY}" == 1 ]]; then
   echo "Running a full clang-tidy"
   run_clang_tidy
 else
-  if [[ -z "${DIFF_REF}" ]]; then
-    if [[ "${BUILD_REASON}" == *CI ]]; then
-      DIFF_REF="HEAD^"
-    else
-      DIFF_REF=$("${ENVOY_SRCDIR}"/tools/git/last_github_commit.sh)
+    if [[ -z "${DIFF_REF}" ]]; then
+        # Postsubmit
+        if [[ "${BUILD_REASON}" == *CI ]]; then
+            DIFF_REF="HEAD^"
+        # Presubmit/PR
+        elif [[ -n "${BUILD_REASON}" ]]; then
+            # Common ancestor commit
+            if "$(git rev-parse --is-shallow-repository)"; then
+                # Ideally we always want to fetch here, but this can
+                # fail depending on how the repository is checked out.
+                # If the repo is shallow (ie CI) then we have to unshallow it.
+                git fetch "${DIFF_TARGET_REMOTE}"
+                git fetch --unshallow
+            fi
+            DIFF_REF="$(git merge-base "${DIFF_HEAD}" "${DIFF_TARGET_BRANCH}")"
+        else
+            # TODO(phlax): this is the path used for local CI. Make this work
+            #    similar to above, allow the `remote` to be configurable, and
+            #    document the workflow for devs
+            DIFF_REF=$("${ENVOY_SRCDIR}"/tools/git/last_github_commit.sh)
+        fi
     fi
-  fi
-  echo "Running clang-tidy-diff against ${DIFF_REF} ($(git rev-parse "${DIFF_REF}")), current HEAD ($(git rev-parse HEAD))"
-  run_clang_tidy_diff "${DIFF_REF}"
+    echo "Running clang-tidy-diff against ${DIFF_REF} ($(git rev-parse "${DIFF_REF}")), current HEAD ($(git rev-parse "${DIFF_HEAD}"))"
+    run_clang_tidy_diff "${DIFF_REF}"
 fi
 
 if [[ -s "${FIX_YAML}" ]]; then
-  echo "clang-tidy check failed, potentially fixed by clang-apply-replacements:"
-  cat "${FIX_YAML}"
+  echo >&2
+  echo "clang-tidy check failed, potentially fixed by clang-apply-replacements:" >&2
+  echo >&2
+
+  # Replace the CI path with `.` so it should work locally for devs
+  sed -i s#BuildDirectory:.*#BuildDirectory:\ .# "${FIX_YAML}"
+  cat "${FIX_YAML}" >&2
+
+  if [[ -n "${CLANG_TIDY_APPLY_FIXES}" ]]; then
+      if [[ ! -e "$CLANG_APPLY_REPLACEMENTS" ]]; then
+          echo "clang-apply-replacements MISSING: ${CLANG_APPLY_REPLACEMENTS}" >&2
+      else
+          # Copy the yaml file into repo directory if its in a different location.
+          if [[ "$(dirname "${FIX_YAML}")" != "$PWD" ]]; then
+              FIX_YAML_NAME="$(basename "${FIX_YAML}")"
+              if [[ -e "$FIX_YAML_NAME" ]]; then
+                  # remove existing file
+                  rm "$FIX_YAML_NAME"
+              fi
+              cp "${FIX_YAML}" .
+          fi
+
+          ${CLANG_APPLY_REPLACEMENTS} .
+
+          echo >&2
+          echo "Changes applied:" >&2
+          echo >&2
+
+          git --no-pager diff >&2
+
+          if [[ -n "${CLANG_TIDY_FIX_DIFF}" ]]; then
+              git diff > "${CLANG_TIDY_FIX_DIFF}"
+          fi
+      fi
+  fi
   exit 1
 fi

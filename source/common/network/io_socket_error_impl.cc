@@ -38,8 +38,7 @@ void IoSocketError::deleteIoError(Api::IoError* err) {
 }
 
 Api::IoCallUint64Result IoSocketError::ioResultSocketInvalidAddress() {
-  return Api::IoCallUint64Result(
-      0, Api::IoErrorPtr(getIoSocketInvalidAddressInstance(), [](IoError*) {}));
+  return {0, Api::IoErrorPtr(getIoSocketInvalidAddressInstance(), [](IoError*) {})};
 }
 
 Api::IoError::IoErrorCode IoSocketError::errorCodeFromErrno(int sys_errno) {

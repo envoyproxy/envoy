@@ -34,6 +34,7 @@ using testing::_;
 using testing::Eq;
 using testing::InSequence;
 using testing::Invoke;
+using testing::Return;
 using testing::ReturnRef;
 using testing::SaveArg;
 

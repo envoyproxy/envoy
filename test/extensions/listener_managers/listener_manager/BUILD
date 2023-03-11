@@ -52,6 +52,7 @@ envoy_cc_test(
         "//source/common/network:socket_option_lib",
         "//source/common/network:utility_lib",
         "//source/common/protobuf",
+        "//source/common/router:string_accessor_lib",
         "//source/extensions/filters/listener/original_dst:config",
         "//source/extensions/filters/listener/proxy_protocol:config",
         "//source/extensions/filters/listener/tls_inspector:config",
@@ -81,6 +82,7 @@ envoy_cc_test(
     deps = [
         ":listener_manager_impl_test_lib",
         "//source/extensions/filters/http/router:config",
+        "//source/extensions/quic/server_preferred_address:fixed_server_preferred_address_config_factory_config",
         "//source/extensions/request_id/uuid:config",
         "//source/extensions/transport_sockets/raw_buffer:config",
         "//source/extensions/transport_sockets/tls:config",

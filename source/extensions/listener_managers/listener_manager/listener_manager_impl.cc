@@ -409,6 +409,12 @@ bool ListenerManagerImpl::addOrUpdateListener(const envoy::config::listener::v3:
     }
   }
 
+  // Address field is not required for internal listeners.
+  if (!config.has_internal_listener() && !config.has_address()) {
+    throw EnvoyException(
+        fmt::format("error adding listener named '{}': address is necessary", name));
+  }
+
   auto it = error_state_tracker_.find(name);
   TRY_ASSERT_MAIN_THREAD {
     return addOrUpdateListenerInternal(config, version_info, added_via_api, name);
