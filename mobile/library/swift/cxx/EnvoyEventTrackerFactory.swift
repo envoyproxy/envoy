@@ -7,8 +7,12 @@ private typealias BoxType = PointerBox<Tracker>
 
 enum EnvoyEventTrackerFactory {
   static func create(track: (([String: String]) -> Void)?) -> envoy_event_tracker {
+    guard let track else {
+      return envoy_event_tracker(track: nil, context: nil)
+    }
+
     // TODO(jpsim): Add `release` field
-    envoy_event_tracker(
+    return envoy_event_tracker(
       track: { map, context in
         let mutablePointer = UnsafeMutableRawPointer(mutating: context!)
         let track = BoxType.unretained(from: mutablePointer)

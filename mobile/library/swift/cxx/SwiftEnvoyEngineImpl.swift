@@ -61,9 +61,7 @@ final class SwiftEnvoyEngineImpl: EnvoyEngine {
       (store as! KeyValueStore).register(withName: name)
     }
 
-    if config.enablePlatformCertificateValidation {
-      register_apple_platform_cert_verifier()
-    }
+    register_apple_platform_cert_verifier()
 
     let engineHandle = self.handle
 #if canImport(UIKit)

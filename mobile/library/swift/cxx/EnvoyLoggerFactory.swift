@@ -7,7 +7,11 @@ private typealias BoxType = PointerBox<Logger>
 
 enum EnvoyLoggerFactory {
   static func create(log: ((String) -> Void)?) -> envoy_logger {
-    envoy_logger(
+    guard let log else {
+      return envoy_logger(log: nil, release: nil, context: nil)
+    }
+
+    return envoy_logger(
       log: { stringData, context in
         guard let string = String.fromEnvoyData(stringData) else {
           return
