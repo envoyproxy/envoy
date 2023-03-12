@@ -119,9 +119,7 @@ public:
   // connection has been established
   bool upstreamFiltersInitializedWhenConnected() const { return std::get<1>(GetParam()); }
 
-  void initialize() {
-    on_new_connection_called_after_on_write_.store(absl::optional<bool>{});
-  }
+  void initialize() { on_new_connection_called_after_on_write_.store(absl::optional<bool>{}); }
 
   // TestParent
   void onNewConnectionCalled(bool on_write_called) override {
