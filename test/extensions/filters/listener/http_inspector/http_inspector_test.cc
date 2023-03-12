@@ -591,14 +591,14 @@ TEST_F(HttpInspectorTest, Http1WithLargeHeader) {
   {
     InSequence s;
 #ifdef WIN32
-    EXPECT_CALL(os_sys_calls_, readv(_, _, _))
+    EXPECT_CALL(os_sys_calls_, recv(_, _, _, _))
         .WillOnce(Return(Api::SysCallSizeResult{ssize_t(-1), SOCKET_ERROR_AGAIN}));
     for (size_t i = 0; i < 20; i++) {
-      EXPECT_CALL(os_sys_calls_, readv(_, _, _))
+      EXPECT_CALL(os_sys_calls_, recv(_, _, _, _))
           .WillOnce(Invoke(
-              [&data, i](os_fd_t fd, const iovec* iov, int iovcnt) -> Api::SysCallSizeResult {
-                ASSERT(iov->iov_len >= 20);
-                memcpy(iov->iov_base, data.data() + i, 1);
+              [&data, i](os_fd_t, void* buffer, size_t length, int) -> Api::SysCallSizeResult {
+                ASSERT(length >= 20);
+                memcpy(buffer, data.data() + i, 1);
                 return Api::SysCallSizeResult{ssize_t(1), 0};
               }))
           .WillOnce(Return(Api::SysCallSizeResult{ssize_t(-1), SOCKET_ERROR_AGAIN}));
