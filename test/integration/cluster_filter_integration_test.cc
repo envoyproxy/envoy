@@ -175,24 +175,22 @@ TEST_P(ClusterFilterTcpIntegrationTest, TestClusterFilter) {
   FakeRawConnectionPtr fake_upstream_connection;
   ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
 
-  // Upstream read filters are expected to be initialized at this point after connection has been
-  // established but nothing has been written on the connection yet, but only if runtime feature
-  // flag 'initialize_upstream_filters' is true.
-  if (upstreamFiltersInitializedWhenConnected()) {
-    ASSERT_TRUE(wasOnNewConnectionCalled());
-    ASSERT_TRUE(wasOnNewConnectionCalledFirst());
-  } else {
-    ASSERT_FALSE(wasOnNewConnectionCalled());
-  }
-
   std::string observed_data;
   ASSERT_TRUE(tcp_client->write("test"));
   ASSERT_TRUE(fake_upstream_connection->waitForData(11, &observed_data));
   EXPECT_EQ("please test", observed_data);
 
-  // If runtime feature flag 'initialize_upstream_filters' is false, onNewConnection() has not been
-  // called yet, as there has been no data to be read from the upstream connection yet.
-  if (!upstreamFiltersInitializedWhenConnected()) {
+  // Upstream read filters are expected to be initialized at this point after connection has been
+  // established but nothing has been read from the connection yet, but only if runtime feature
+  // flag 'initialize_upstream_filters' is true.
+  if (upstreamFiltersInitializedWhenConnected()) {
+    // Note that we need to have written on the connection and waited for the written data to be
+    // received so that we know the upstream connection has had chance to schedule the
+    // onNewConnection() callbacks. This test will be flaky if we expect onNewConnection() having
+    // been called before the waitForData() above.
+    ASSERT_TRUE(wasOnNewConnectionCalled());
+    ASSERT_TRUE(wasOnNewConnectionCalledFirst());
+  } else {
     ASSERT_FALSE(wasOnNewConnectionCalled());
   }
 
