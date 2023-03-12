@@ -25,6 +25,18 @@ steps:
     path: $(Build.StagingDirectory)/repository_cache
   continueOnError: true
 
+- script: sudo .azure-pipelines/prepare_docker_cache.sh /mnt/docker_cache
+  displayName: Prepare Docker build cache
+- task: Cache@2
+  displayName: Fetch Docker build cache
+  env:
+    VSO_DEDUP_REDIRECT_TIMEOUT_IN_SEC: 5
+  inputs:
+    key: 'envoy_build_image | 8 | "${{ parameters.artifactSuffix }}" | .devcontainer/Dockerfile'
+    path: /mnt/docker_cache
+- script: sudo .azure-pipelines/load_docker_cache.sh /mnt/docker_cache /mnt/docker
+  displayName: Restore Docker build cache
+
 - bash: |
     echo "disk space at beginning of build:"
     df -h
