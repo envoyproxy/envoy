@@ -305,12 +305,13 @@ private:
     absl::optional<Router::ConfigConstSharedPtr> routeConfig();
     void traceRequest();
 
-    // Updates the snapped_route_config_ (by reselecting scoped route configuration), if a scope is
-    // not found, snapped_route_config_ is set to Router::NullConfigImpl.
-    void snapScopedRouteConfig();
+    Router::ConfigConstSharedPtr
+    getRouteConfigFromScopedRouteConfig(Router::ScopedConfigConstSharedPtr& scoped_route_config);
+    std::pair<Router::ConfigConstSharedPtr, Router::ScopedConfigConstSharedPtr> getRouteConfig();
 
-    void refreshCachedRoute();
-    void refreshCachedRoute(const Router::RouteCallback& cb);
+    void refreshCachedRoute(const Router::ConfigConstSharedPtr& config);
+    void refreshCachedRoute(const Router::ConfigConstSharedPtr& config,
+                            const Router::RouteCallback& cb);
 
     void refreshCachedTracingCustomTags();
     void refreshDurationTimeout();
