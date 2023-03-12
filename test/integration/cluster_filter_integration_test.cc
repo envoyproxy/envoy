@@ -119,6 +119,10 @@ public:
   // connection has been established
   bool upstreamFiltersInitializedWhenConnected() const { return std::get<1>(GetParam()); }
 
+  void initialize() {
+    on_new_connection_called_after_on_write_.store(absl::optional<bool>{});
+  }
+
   // TestParent
   void onNewConnectionCalled(bool on_write_called) override {
     on_new_connection_called_after_on_write_.store(on_write_called);
@@ -140,14 +144,15 @@ public:
 
 private:
   // Atomic so that this may be safely accessed from multiple threads
-  std::atomic<absl::optional<bool>> on_new_connection_called_after_on_write_;
+  std::atomic<absl::optional<bool>> on_new_connection_called_after_on_write_{};
 };
 
 class ClusterFilterTcpIntegrationTest : public ClusterFilterIntegrationTestBase,
                                         public BaseIntegrationTest {
 public:
   ClusterFilterTcpIntegrationTest()
-      : BaseIntegrationTest(std::get<0>(GetParam()), ConfigHelper::tcpProxyConfig()) {}
+      : ClusterFilterIntegrationTestBase(),
+        BaseIntegrationTest(std::get<0>(GetParam()), ConfigHelper::tcpProxyConfig()) {}
 
   void initialize() override {
     enableHalfClose(true);
@@ -159,6 +164,7 @@ public:
       config.set_value("surely ");
       filter->mutable_typed_config()->PackFrom(config);
     });
+    ClusterFilterIntegrationTestBase::initialize();
     BaseIntegrationTest::initialize();
   }
 };
@@ -221,7 +227,8 @@ class ClusterFilterHttpIntegrationTest : public ClusterFilterIntegrationTestBase
                                          public HttpIntegrationTest {
 public:
   ClusterFilterHttpIntegrationTest()
-      : HttpIntegrationTest(Http::CodecType::HTTP1, std::get<0>(GetParam())) {}
+      : ClusterFilterIntegrationTestBase(),
+        HttpIntegrationTest(Http::CodecType::HTTP1, std::get<0>(GetParam())) {}
 
   void initialize() override {
     config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
@@ -232,6 +239,7 @@ public:
       config.set_value("");
       filter->mutable_typed_config()->PackFrom(config);
     });
+    ClusterFilterIntegrationTestBase::initialize();
     HttpIntegrationTest::initialize();
   }
 };
