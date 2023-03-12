@@ -1180,7 +1180,7 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapSharedPt
 
   ASSERT(!cached_route_);
 
-  // The request headers may be modified by the early header mutations, so we need to reslect the
+  // The request headers may be modified by the early header mutations, so we need to reselect the
   // route config if the route config provider is a scoped route config provider.
   if (route_config_pair.second != nullptr) {
     route_config_pair.first = getRouteConfigFromScopedRouteConfig(route_config_pair.second);
