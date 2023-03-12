@@ -23,6 +23,10 @@ variables:
 - name: isStableBranch
   # A release branch can be either `main` or a `release/v1.x` stable branch
   value: $[or(eq(variables['isMain'], 'true'), eq(variables['isReleaseBranch'], 'true'))]
+- name: buildImageCacheVersion
+  value: 10
+- name: dockerCICacheVersion
+  value: 10
 
 stages:
 - stage: env
@@ -75,7 +79,7 @@ stages:
         VSO_DEDUP_REDIRECT_TIMEOUT_IN_SEC: 5
       displayName: Fetch Docker build cache
       inputs:
-        key: 'envoy_build_image | 8 | "" | .devcontainer/Dockerfile'
+        key: envoy_build_image | "${{ variables['buildImageCacheVersion'] }}" | "" | .devcontainer/Dockerfile
         path: /mnt/docker_cache
         cacheHitVar: CACHE_RESTORED
     - script: NO_INSTALL_ZSTD=1 && sudo .azure-pipelines/prime_docker_cache.sh /mnt/docker_cache
@@ -94,7 +98,7 @@ stages:
         VSO_DEDUP_REDIRECT_TIMEOUT_IN_SEC: 5
       displayName: Fetch Docker build cache
       inputs:
-        key: 'envoy_build_image | 8 | ".arm64" | .devcontainer/Dockerfile'
+        key: envoy_build_image | "${{ variables['buildImageCacheVersion'] }}" | ".arm64" | .devcontainer/Dockerfile
         path: /mnt/docker_cache
         cacheHitVar: CACHE_RESTORED
     - script: sudo .azure-pipelines/prime_docker_cache.sh /mnt/docker_cache
@@ -206,7 +210,7 @@ stages:
         VSO_DEDUP_REDIRECT_TIMEOUT_IN_SEC: 5
       displayName: Fetch Docker build cache
       inputs:
-        key: 'envoy_build_image | 8 | "" | .devcontainer/Dockerfile'
+        key: envoy_build_image | "${{ variables['buildImageCacheVersion'] }}" | "" | .devcontainer/Dockerfile
         path: /mnt/docker_cache
     - script: sudo .azure-pipelines/load_docker_cache.sh /mnt/docker_cache /mnt/docker
       displayName: Restore Docker build cache
@@ -250,7 +254,7 @@ stages:
       env:
         VSO_DEDUP_REDIRECT_TIMEOUT_IN_SEC: 5
       inputs:
-        key: 'envoy_build_image | 8 | "" | .devcontainer/Dockerfile'
+        key: envoy_build_image | "${{ variables['buildImageCacheVersion'] }}" | "" | .devcontainer/Dockerfile
         path: /mnt/docker_cache
     - script: sudo .azure-pipelines/load_docker_cache.sh /mnt/docker_cache /mnt/docker
       displayName: Restore Docker build cache
@@ -294,7 +298,7 @@ stages:
       env:
         VSO_DEDUP_REDIRECT_TIMEOUT_IN_SEC: 5
       inputs:
-        key: 'envoy_build_image | 8 | "" | .devcontainer/Dockerfile'
+        key: envoy_build_image | "${{ variables['buildImageCacheVersion'] }}" | "" | .devcontainer/Dockerfile
         path: /mnt/docker_cache
     - script: sudo .azure-pipelines/load_docker_cache.sh /mnt/docker_cache /mnt/docker
       displayName: Restore Docker build cache
@@ -340,7 +344,7 @@ stages:
       env:
         VSO_DEDUP_REDIRECT_TIMEOUT_IN_SEC: 5
       inputs:
-        key: 'envoy_build_image | 8 | "" | .devcontainer/Dockerfile'
+        key: envoy_build_image | "${{ variables['buildImageCacheVersion'] }}" | "" | .devcontainer/Dockerfile
         path: /mnt/docker_cache
     - script: sudo .azure-pipelines/load_docker_cache.sh /mnt/docker_cache /mnt/docker
       displayName: Restore Docker build cache
@@ -440,7 +444,7 @@ stages:
 
 - stage: linux_x64
   # displayName: Linux x64
-  dependsOn: ["env", "precheck"]
+  dependsOn: ["env"]  # , "precheck"]
   # For post-submit builds, continue even if precheck fails
   condition: and(not(canceled()), or(succeeded(), eq(variables['PostSubmit'], true)))
   jobs:
@@ -454,6 +458,7 @@ stages:
       parameters:
         managedAgent: false
         ciTarget: bazel.release
+        buildImageCacheVersion: "${{ variables['buildImageCacheVersion'] }}"
 
   - job: released
     # displayName: Complete
@@ -472,7 +477,7 @@ stages:
 
 - stage: linux_arm64
   # displayName: Linux arm64
-  dependsOn: ["env", "precheck"]
+  dependsOn: ["env"]  # , "precheck"]
   # For post-submit builds, continue even if precheck fails
   condition: and(not(canceled()), or(succeeded(), eq(variables['PostSubmit'], true)))
   jobs:
@@ -488,6 +493,7 @@ stages:
         ciTarget: bazel.release
         rbe: false
         artifactSuffix: ".arm64"
+        buildImageCacheVersion: "${{ variables['buildImageCacheVersion'] }}"
         bazelBuildExtraOptions: "--sandbox_base=/tmp/sandbox_base"
 
   - job: released
@@ -609,6 +615,37 @@ stages:
         echo "disk space at beginning of build:"
         df -h
       displayName: "Check disk space at beginning"
+    - script: sudo .azure-pipelines/prepare_docker_cache.sh /mnt/docker_cache
+      displayName: Prepare Docker build cache
+    - task: Cache@2
+      displayName: Cache task
+      inputs:
+        key: docker_ci | "${{ variables['dockerCICacheVersion'] }}" | ci/Dockerfile-envoy
+        path: /mnt/docker_cache
+        cacheHitVar: CACHE_RESTORED
+    - script: sudo .azure-pipelines/load_docker_cache.sh /mnt/docker_cache /mnt/docker
+      displayName: Restore Docker build cache
+
+    - script: |
+        sudo systemctl stop docker
+        sudo mv /var/lib/docker /var/lib/docker.old
+        sudo mkdir /var/lib/docker
+        sudo systemctl start docker
+        sudo rm -rf /var/lib/docker.old &
+      displayName: Docker initialize
+      condition: and(not(canceled()), ne(variables.CACHE_RESTORED, 'true'))
+    - script: |
+        sudo systemctl stop docker
+        sudo mv /var/lib/docker /var/lib/docker.old
+        sudo mkdir /var/lib/docker
+        sudo systemctl start docker
+        sudo tar -I "zstd -d -T0 " -axf "$(Build.StagingDirectory)/docker_cache/docker.tar.zst" -C /var/lib/docker
+        ls -alh /var/lib/docker
+        sudo systemctl start docker
+        docker images
+        sudo rm -rf /var/lib/docker.old &
+      displayName: Docker restore
+      condition: and(not(canceled()), eq(variables.CACHE_RESTORED, 'true'))
     - task: DownloadBuildArtifacts@0
       inputs:
         buildType: current
@@ -650,6 +687,8 @@ stages:
         rm $(Build.StagingDirectory)/bazel.release.arm64/envoy_binary.tar.gz
         rm $(Build.StagingDirectory)/bazel.release.arm64/envoy-contrib_binary.tar.gz
         ci/docker_ci.sh
+
+        docker images
       workingDirectory: $(Build.SourcesDirectory)
       env:
         AZP_BRANCH: $(Build.SourceBranch)
@@ -667,6 +706,13 @@ stages:
         artifactName: docker
       timeoutInMinutes: 10
       condition: always()
+      displayName: Docker save
+    - script: |
+        sudo systemctl stop docker
+        sudo mkdir -p "$(Build.StagingDirectory)/docker_cache"
+        sudo tar -I "zstd -T0 --fast " -acf "$(Build.StagingDirectory)/docker_cache/docker.tar.zst" -C /var/lib/docker .
+      displayName: Docker restore
+      condition: and(not(canceled()), ne(variables.CACHE_RESTORED, 'true'))
 
   - job: package_x64
     displayName: Linux debs (x64)
@@ -734,7 +780,7 @@ stages:
         VSO_DEDUP_REDIRECT_TIMEOUT_IN_SEC: 5
       displayName: Fetch Docker build cache
       inputs:
-        key: 'envoy_build_image | 8 | "" | .devcontainer/Dockerfile'
+        key: envoy_build_image | "${{ variables['buildImageCacheVersion'] }}" | "" | .devcontainer/Dockerfile
         path: /mnt/docker_cache
     - script: sudo .azure-pipelines/load_docker_cache.sh /mnt/docker_cache /mnt/docker
       displayName: Restore Docker build cache
@@ -796,7 +842,7 @@ stages:
         VSO_DEDUP_REDIRECT_TIMEOUT_IN_SEC: 5
       displayName: Fetch Docker build cache
       inputs:
-        key: 'envoy_build_image | 8 | "" | .devcontainer/Dockerfile'
+        key: envoy_build_image | "${{ variables['buildImageCacheVersion'] }}" | "" | .devcontainer/Dockerfile
         path: /mnt/docker_cache
     - script: sudo .azure-pipelines/load_docker_cache.sh /mnt/docker_cache /mnt/docker
       displayName: Restore Docker build cache
@@ -884,6 +930,41 @@ stages:
     steps:
     - bash: .azure-pipelines/cleanup.sh
       displayName: "Removing tools from agent"
+
+    - task: Cache@2
+      displayName: Cache task
+      inputs:
+        key: 'verify_examples | docker_cache | 1 | examples/**/Dockerfile*'
+        path: "$(Build.StagingDirectory)/docker_cache"
+        cacheHitVar: CACHE_RESTORED
+    - script: |
+        sudo systemctl stop docker
+        sudo mv /var/lib/docker /var/lib/docker.old
+        sudo mkdir /var/lib/docker
+        sudo systemctl start docker
+        sudo rm -rf /var/lib/docker.old &
+      displayName: Docker initialize
+      condition: and(not(canceled()), ne(variables.CACHE_RESTORED, 'true'))
+    - script: |
+        sudo systemctl stop docker
+        sudo mv /var/lib/docker /var/lib/docker.old
+        sudo mkdir /var/lib/docker
+        sudo tar -I "zstd -d -T0 " -axf "$(Build.StagingDirectory)/docker_cache/docker.tar.zst" -C /var/lib/docker
+        sudo systemctl start docker
+        sudo rm -rf /var/lib/docker.old &
+      displayName: Docker restore
+      condition: and(not(canceled()), eq(variables.CACHE_RESTORED, 'true'))
+
+    - task: Cache@2
+      displayName: repository_cache
+      inputs:
+        key: 'verify_examples | repository_cache | 1 | examples/shared/build/Dockerfile | examples/golang/docker-compose-go.yaml | examples/golang/**/*.go | examples/wasm-cc/docker-compose-wasm.yaml | examples/wasm-cc/*.cc'
+        path: "$(Build.StagingDirectory)/repository_cache"
+    - task: Cache@2
+      displayName: disk_cache
+      inputs:
+        key: 'verify_examples | disk_cache | 1 | examples/shared/build/Dockerfile | examples/golang/docker-compose-go.yaml | examples/golang/**/*.go | examples/wasm-cc/docker-compose-wasm.yaml | examples/wasm-cc/*.cc'
+        path: "$(Build.StagingDirectory)/disk_cache"
     - task: DownloadBuildArtifacts@0
       inputs:
         buildType: current
@@ -895,6 +976,12 @@ stages:
         ENVOY_DOCKER_BUILD_DIR: $(Build.StagingDirectory)
         NO_BUILD_SETUP: 1
         # ENVOY_EXAMPLES_DEBUG: 1
+    - script: |
+        sudo systemctl stop docker
+        sudo mkdir -p "$(Build.StagingDirectory)/docker_cache"
+        sudo tar -I "zstd -T0 --fast " -acf "$(Build.StagingDirectory)/docker_cache/docker.tar.zst" -C /var/lib/docker .
+      displayName: Docker restore
+      condition: and(not(canceled()), ne(variables.CACHE_RESTORED, 'true'))
 
   - job: packages_x64
     displayName: Debs (x64)
@@ -910,7 +997,7 @@ stages:
         VSO_DEDUP_REDIRECT_TIMEOUT_IN_SEC: 5
       displayName: Fetch Docker build cache
       inputs:
-        key: 'envoy_build_image | 8 | "" | .devcontainer/Dockerfile'
+        key: envoy_build_image | "${{ variables['buildImageCacheVersion'] }}" | "" | .devcontainer/Dockerfile
         path: /mnt/docker_cache
     - script: sudo .azure-pipelines/load_docker_cache.sh /mnt/docker_cache /mnt/docker
       displayName: Restore Docker build cache
@@ -952,7 +1039,7 @@ stages:
         VSO_DEDUP_REDIRECT_TIMEOUT_IN_SEC: 5
       displayName: Fetch Docker build cache
       inputs:
-        key: 'envoy_build_image | 8 | ".arm64" | .devcontainer/Dockerfile'
+        key: envoy_build_image | "${{ variables['buildImageCacheVersion'] }}" | ".arm64" | .devcontainer/Dockerfile
         path: /mnt/docker_cache
     - script: sudo .azure-pipelines/load_docker_cache.sh /mnt/docker_cache /mnt/docker
       displayName: Restore Docker build cache

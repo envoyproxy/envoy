@@ -19,9 +19,6 @@
 
 set -e
 
-# Don't use the local envoy:dev, but pull from Docker Hub instead, this avoids having to rebuild
-# this local dep which is fairly stable.
-BASE_DOCKER_IMAGE="envoyproxy/envoy:dev"
 declare -r DOCKER_BUILD_FILE="ci/Dockerfile-envoy"
 
 DOCKER_CONTEXT=.
@@ -33,6 +30,9 @@ DOCKER_BUILD_ARGS=(
 # In CI we specifically do _not_ test against the published images, so prevent
 # Docker from pulling unless required.
 if [[ -z "$DOCKER_NO_PULL" ]]; then
+    # Don't use the local envoy:dev, but pull from Docker Hub instead, this avoids having to rebuild
+    # this local dep which is fairly stable.
+    BASE_DOCKER_IMAGE="envoyproxy/envoy:dev"
     DOCKER_BUILD_ARGS+=(--pull)
 fi
 

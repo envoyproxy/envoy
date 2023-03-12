@@ -15,6 +15,7 @@ mkdir /var/lib/docker
 systemctl start docker
 BUILD_IMAGE=$(head -n1 .devcontainer/Dockerfile  | cut -d: -f2)
 docker pull "envoyproxy/envoy-build-ubuntu:${BUILD_IMAGE}"
+docker images
 systemctl stop docker
 mkdir -p "$DOCKER_CACHE_PATH"
 tar -I "zstd -T0 --fast " -acf "$DOCKER_CACHE_TARBALL" -C /var/lib/docker .

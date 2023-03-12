@@ -37,7 +37,8 @@ bring_up_example_stack () {
         echo "----------------------------------------------"
         docker system df -v
         echo
-        sudo du -ch / | grep "[0-9]G"
+        sudo du -ch /home/vsts/work/1/a/ | grep -E "[0-9]{3,}M|[0-9]G"
+        sudo du -ch /var/lib/docker | grep -E "[0-9]G"
         echo
         df -h
         echo

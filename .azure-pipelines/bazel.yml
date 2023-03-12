@@ -17,6 +17,9 @@ parameters:
 - name: bazelBuildExtraOptions
   type: string
   default: ""
+- name: buildImageCacheVersion
+  type: string
+  default: ""
 
 steps:
 - task: Cache@2
@@ -34,7 +37,7 @@ steps:
   env:
     VSO_DEDUP_REDIRECT_TIMEOUT_IN_SEC: 5
   inputs:
-    key: 'envoy_build_image | 8 | "${{ parameters.artifactSuffix }}" | .devcontainer/Dockerfile'
+    key: envoy_build_image | "${{ parameters.buildImageCacheVersion }}" | "${{ parameters.artifactSuffix }}" | .devcontainer/Dockerfile
     path: /mnt/docker_cache
 - script: sudo .azure-pipelines/load_docker_cache.sh /mnt/docker_cache /mnt/docker
   displayName: Restore Docker build cache
