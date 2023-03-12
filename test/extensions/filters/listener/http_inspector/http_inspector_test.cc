@@ -521,7 +521,7 @@ TEST_F(HttpInspectorTest, Http1WithLargeRequestLine) {
   {
     InSequence s;
 #ifdef WIN32
-    EXPECT_CALL(os_sys_calls_, readv(_, _, _))
+    EXPECT_CALL(os_sys_calls_, recv(_, _, _, _))
         .WillOnce(Return(Api::SysCallSizeResult{ssize_t(-1), SOCKET_ERROR_AGAIN}));
 #else
     EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK)).WillOnce(InvokeWithoutArgs([]() {
@@ -538,16 +538,15 @@ TEST_F(HttpInspectorTest, Http1WithLargeRequestLine) {
 #ifdef WIN32
     auto ctr = std::make_shared<size_t>(0);
     auto copy_len = std::make_shared<size_t>(1);
-    EXPECT_CALL(os_sys_calls_, readv(_, _, _))
+    EXPECT_CALL(os_sys_calls_, recv(_, _, _, _))
         .Times(num_loops)
-        .WillRepeatedly(
-            Invoke([&data, ctr, copy_len, num_loops](os_fd_t fd, const iovec* iov,
-                                                     int iovcnt) -> Api::SysCallSizeResult {
-              ASSERT(iov->iov_len >= 1);
-              memcpy(iov->iov_base, data.data() + *ctr, 1);
-              *ctr += 1;
-              return Api::SysCallSizeResult{ssize_t(1), 0};
-            }));
+        .WillRepeatedly(Invoke([&data, ctr, num_loops](os_fd_t, void* buffer, size_t length,
+                                                       int) -> Api::SysCallSizeResult {
+          ASSERT(length >= 1);
+          memcpy(buffer, data.data() + *ctr, 1);
+          *ctr += 1;
+          return Api::SysCallSizeResult{ssize_t(1), 0};
+        }));
 #else
     auto ctr = std::make_shared<size_t>(1);
     EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))
