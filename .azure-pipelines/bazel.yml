@@ -20,10 +20,17 @@ parameters:
 
 steps:
 - task: Cache@2
+  env:
+    VSO_DEDUP_REDIRECT_TIMEOUT_IN_SEC: 5
   inputs:
     key: '"${{ parameters.ciTarget }}" | "${{ parameters.artifactSuffix }}" | ./WORKSPACE | **/*.bzl, !mobile/**, !envoy-docs/**'
     path: $(Build.StagingDirectory)/repository_cache
   continueOnError: true
+
+- template: cached.yml
+  parameters:
+    version: "$(buildImageCacheVersion)"
+    arch: "${{ parameters.artifactSuffix }}"
 
 - bash: |
     echo "disk space at beginning of build:"
