@@ -1,6 +1,3 @@
-node:
-  cluster: test-cluster
-  id: test-id
 admin:
   address:
     socket_address:
