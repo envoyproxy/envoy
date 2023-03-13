@@ -141,6 +141,7 @@ void ExtensionRegistry::registerFactories() {
   Extensions::TransportSockets::Tls::forceRegisterUpstreamSslSocketFactory();
   // This transport socket handles doing CONNECT requests to any configured system proxies.
   Extensions::TransportSockets::Http11Connect::
+      forceRegisterUpstreamHttp11ConnectSocketConfigFactory();
   Extensions::Upstreams::Http::forceRegisterProtocolOptionsConfigFactory();
   // This transport socket handles plaintext (http) traffic.
   Extensions::TransportSockets::RawBuffer::forceRegisterUpstreamRawBufferSocketFactory();
@@ -186,7 +187,6 @@ void ExtensionRegistry::registerFactories() {
   Upstream::forceRegisterStaticClusterFactory();
   Extensions::StatSinks::MetricsService::forceRegisterMetricsServiceSinkFactory();
   Extensions::StatSinks::Statsd::forceRegisterStatsdSinkFactory();
-      forceRegisterUpstreamHttp11ConnectSocketConfigFactory();
 
 #ifdef ENVOY_MOBILE_ENABLE_LISTENER
   // These are downstream factories required if Envoy Mobile is compiled with
