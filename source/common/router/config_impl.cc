@@ -183,7 +183,7 @@ getHeaderParsers(const HeaderParser* global_route_config_header_parser,
 // plugin is set to optional, then this null plugin will be used as a placeholder.
 class NullClusterSpecifierPlugin : public ClusterSpecifierPlugin {
 public:
-  RouteConstSharedPtr route(const RouteEntry&, const Http::RequestHeaderMap&) const override {
+  RouteConstSharedPtr route(RouteConstSharedPtr, const Http::RequestHeaderMap&) const override {
     return nullptr;
   }
 };
@@ -1266,7 +1266,7 @@ RouteConstSharedPtr RouteEntryImplBase::clusterEntry(const Http::RequestHeaderMa
       // TODO(wbpcode): make the cluster header or weighted clusters an implementation of the
       // cluster specifier plugin.
       ASSERT(cluster_specifier_plugin_ != nullptr);
-      return cluster_specifier_plugin_->route(*this, headers);
+      return cluster_specifier_plugin_->route(shared_from_this(), headers);
     }
   }
   return pickWeightedCluster(headers, random_value, true);
