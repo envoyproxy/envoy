@@ -23,7 +23,7 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/common/secret:95.0"
 "source/common/signal:87.2" # Death tests don't report LCOV
 "source/common/singleton:95.7"
-"source/common/tcp:91.1"
+"source/common/tcp:93.0"
 "source/common/thread:0.0" # Death tests don't report LCOV
 "source/common/tracing:97.1"
 "source/common/upstream:96.4"
@@ -58,12 +58,12 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/extensions/rate_limit_descriptors/expr:95.5"
 "source/extensions/stat_sinks/graphite_statsd:82.1"
 "source/extensions/stat_sinks/statsd:84.6"
-"source/extensions/tracers:95.4"
+"source/extensions/tracers:95.8"
 "source/extensions/tracers/common:73.8"
 "source/extensions/tracers/common/ot:71.7"
 "source/extensions/tracers/opencensus:93.2"
 "source/extensions/tracers/zipkin:95.8"
-"source/extensions/transport_sockets:95.3"
+"source/extensions/transport_sockets:95.6"
 "source/extensions/transport_sockets/tls:94.8"
 "source/extensions/transport_sockets/tls/cert_validator:95.1"
 "source/extensions/transport_sockets/tls/private_key:88.9"
