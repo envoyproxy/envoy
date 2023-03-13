@@ -77,7 +77,7 @@ public class NativeCronetEngineBuilderImpl extends CronetEngineBuilderImpl {
   private String mNodeZone = "";
   private String mNodeSubZone = "";
   private String mCdsResourcesLocator = "";
-  private String mCdsTimeoutSeconds = "";
+  private int mCdsTimeoutSeconds = 0;
   private boolean mEnableCds = false;
 
   /**
