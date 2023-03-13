@@ -836,8 +836,9 @@ public:
 
   class DynamicRouteEntry : public RouteEntryAndRoute {
   public:
-    DynamicRouteEntry(const RouteEntryImplBase* parent, const std::string& name)
-        : parent_(parent->shared_from_this()), cluster_name_(name) {}
+    DynamicRouteEntry(const RouteEntryAndRoute* parent, RouteEntryImplBaseConstSharedPtr owner,
+                      const std::string& name)
+        : parent_(parent), owner_(std::move(owner)), cluster_name_(name) {}
 
     const std::string& routeName() const override { return parent_->routeName(); }
     // Router::RouteEntry
@@ -963,9 +964,11 @@ public:
     };
 
   private:
+    const RouteEntryAndRoute* parent_;
+
     // Keep an copy of the shared pointer to the parent RouteEntryImplBase entry. This is needed
     // to ensure that the parent entry is not destroyed before this entry.
-    const RouteEntryImplBaseConstSharedPtr parent_;
+    const RouteEntryImplBaseConstSharedPtr owner_;
     const std::string cluster_name_;
   };
 

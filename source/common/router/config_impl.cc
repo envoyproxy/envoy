@@ -1246,13 +1246,10 @@ RouteConstSharedPtr RouteEntryImplBase::pickClusterViaClusterHeader(
     final_cluster_name = std::string(entry[0]->value().getStringView());
   }
 
-  // NOTE: Though we return a shared_ptr here, the current ownership model
-  // assumes that the route table sticks around. See snapped_route_config_ in
-  // ConnectionManagerImpl::ActiveStream.
   return std::make_shared<DynamicRouteEntry>(route_selector_override
                                                  ? route_selector_override
                                                  : static_cast<const RouteEntryAndRoute*>(this),
-                                             final_cluster_name);
+                                             shared_from_this(), final_cluster_name);
 }
 
 RouteConstSharedPtr RouteEntryImplBase::clusterEntry(const Http::RequestHeaderMap& headers,
@@ -1330,7 +1327,12 @@ RouteConstSharedPtr RouteEntryImplBase::pickWeightedCluster(const Http::HeaderMa
         return pickClusterViaClusterHeader(cluster->clusterHeaderName(), headers,
                                            static_cast<RouteEntryAndRoute*>(cluster.get()));
       }
-      return cluster;
+      // The WeightedClusterEntry does not contain reference to the RouteEntryImplBase to
+      // avoid circular reference. To ensure that the RouteEntryImplBase is not destructed
+      // before the WeightedClusterEntry, additional wrapper is used to hold the reference
+      // to the RouteEntryImplBase.
+      return std::make_shared<DynamicRouteEntry>(cluster.get(), shared_from_this(),
+                                                 cluster->clusterName());
     }
     begin = end;
   }
@@ -1390,7 +1392,7 @@ RouteEntryImplBase::WeightedClusterEntry::WeightedClusterEntry(
     ProtobufMessage::ValidationVisitor& validator,
     const envoy::config::route::v3::WeightedCluster::ClusterWeight& cluster,
     const OptionalHttpFilters& optional_http_filters)
-    : DynamicRouteEntry(parent, validateWeightedClusterSpecifier(cluster).name()),
+    : DynamicRouteEntry(parent, nullptr, validateWeightedClusterSpecifier(cluster).name()),
       runtime_key_(runtime_key), loader_(factory_context.runtime()),
       cluster_weight_(PROTOBUF_GET_WRAPPED_REQUIRED(cluster, weight)),
       per_filter_configs_(cluster.typed_per_filter_config(), optional_http_filters, factory_context,

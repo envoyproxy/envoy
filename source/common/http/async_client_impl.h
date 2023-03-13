@@ -175,17 +175,7 @@ private:
         rate_limit_policy_entry_;
   };
 
-  struct NullConfig : public Router::Config {
-    Router::RouteConstSharedPtr route(const Http::RequestHeaderMap&, const StreamInfo::StreamInfo&,
-                                      uint64_t) const override {
-      return nullptr;
-    }
-
-    Router::RouteConstSharedPtr route(const Router::RouteCallback&, const Http::RequestHeaderMap&,
-                                      const StreamInfo::StreamInfo&, uint64_t) const override {
-      return nullptr;
-    }
-
+  struct NullSharedConfig : public Router::SharedConfig {
     const std::list<LowerCaseString>& internalOnlyHeaders() const override {
       return internal_only_headers_;
     }
@@ -203,7 +193,7 @@ private:
     Stats::StatName statName() const override { return {}; }
     const Router::RateLimitPolicy& rateLimitPolicy() const override { return rate_limit_policy_; }
     const Router::CorsPolicy* corsPolicy() const override { return nullptr; }
-    const Router::Config& routeConfig() const override { return route_configuration_; }
+    const Router::SharedConfig& routeConfig() const override { return route_configuration_; }
     bool includeAttemptCountInRequest() const override { return false; }
     bool includeAttemptCountInResponse() const override { return false; }
     bool includeIsTimeoutRetryHeader() const override { return false; }
@@ -218,7 +208,7 @@ private:
         const std::string&,
         std::function<void(const Router::RouteSpecificFilterConfig&)>) const override {}
     static const NullRateLimitPolicy rate_limit_policy_;
-    static const NullConfig route_configuration_;
+    static const NullSharedConfig route_configuration_;
   };
 
   struct NullPathMatchCriterion : public Router::PathMatchCriterion {
