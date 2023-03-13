@@ -39,7 +39,6 @@ public:
 
   EngineBuilder& addLogLevel(LogLevel log_level);
   EngineBuilder& setOnEngineRunning(std::function<void()> closure);
-
   EngineBuilder& addGrpcStatsDomain(std::string stats_domain);
   EngineBuilder& addConnectTimeoutSeconds(int connect_timeout_seconds);
   EngineBuilder& addDnsRefreshSeconds(int dns_refresh_seconds);
@@ -74,23 +73,20 @@ public:
   // Sets the node.id field in the Bootstrap configuration.
   EngineBuilder& setNodeId(std::string node_id);
   // Sets the node.locality field in the Bootstrap configuration.
-  EngineBuilder& setNodeLocality(const NodeLocality& node_locality);
+  EngineBuilder& setNodeLocality(std::string region, std::string zone, std::string sub_zone);
   // Adds an ADS layer. Note that only the state-of-the-world gRPC protocol is supported, not Delta
   // gRPC.
-  EngineBuilder&
-  setAggregatedDiscoveryService(const std::string& address, const int port,
-                                std::string jwt_token = "",
-                                int jwt_token_lifetime_seconds = DefaultJwtTokenLifetimeSeconds,
-                                std::string ssl_root_certs = "");
+  EngineBuilder& setAggregatedDiscoveryService(std::string address, const int port,
+                                               std::string jwt_token = "",
+                                               int jwt_token_lifetime_seconds = 0,
+                                               std::string ssl_root_certs = "");
   // Adds an RTDS layer to default config. Requires that ADS be configured.
-  EngineBuilder& addRtdsLayer(const std::string& layer_name,
-                              const int timeout_seconds = DefaultXdsTimeout);
+  EngineBuilder& addRtdsLayer(std::string layer_name, const int timeout_seconds = 0);
   // Adds a CDS layer to default config. Requires that ADS be configured via
   // setAggregatedDiscoveryService(). If `cds_resources_locator` is non-empty, the xdstp namespace
   // is used for identifying resources. If not using xdstp, then set `cds_resources_locator` to the
   // empty string.
-  EngineBuilder& addCdsLayer(std::string cds_resources_locator = "",
-                             const int timeout_seconds = DefaultXdsTimeout);
+  EngineBuilder& addCdsLayer(std::string cds_resources_locator = "", const int timeout_seconds = 0);
   EngineBuilder& enableDnsCache(bool dns_cache_on, int save_interval_seconds = 1);
   EngineBuilder& setForceAlwaysUsev6(bool value);
   EngineBuilder& setSkipDnsLookupForProxiedRequests(bool value);
@@ -164,14 +160,14 @@ private:
   int rtds_timeout_seconds_;
   std::string node_id_;
   absl::optional<NodeLocality> node_locality_ = absl::nullopt;
-  std::string ads_address_ = "";
+  std::string ads_address_ = ""; // make absl:optional?
   int ads_port_;
   std::string ads_jwt_token_;
   int ads_jwt_token_lifetime_seconds_;
   std::string ads_ssl_root_certs_;
-  bool enable_cds_ = false;
   std::string cds_resources_locator_;
   int cds_timeout_seconds_;
+  bool enable_cds_ = false;
   bool dns_cache_on_ = false;
   int dns_cache_save_interval_seconds_ = 1;
 

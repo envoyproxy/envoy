@@ -140,11 +140,13 @@ TEST(TestConfig, SetSocketTag) {
   EXPECT_THAT(bootstrap->DebugString(), HasSubstr("http.socket_tag.SocketTag"));
 }
 
+#ifdef ENVOY_ENABLE_QUIC
 TEST(TestConfig, SetAltSvcCache) {
   EngineBuilder engine_builder;
   std::unique_ptr<Bootstrap> bootstrap = engine_builder.generateBootstrap();
   EXPECT_THAT(bootstrap->DebugString(), HasSubstr("alternate_protocols_cache"));
 }
+#endif
 
 TEST(TestConfig, StreamIdleTimeout) {
   EngineBuilder engine_builder;
@@ -462,7 +464,7 @@ TEST(TestConfig, SetNodeLocality) {
   const std::string region = "us-west-1";
   const std::string zone = "some_zone";
   const std::string sub_zone = "some_sub_zone";
-  engine_builder.setNodeLocality({region, zone, sub_zone});
+  engine_builder.setNodeLocality(region, zone, sub_zone);
   std::unique_ptr<Bootstrap> bootstrap = engine_builder.generateBootstrap();
   EXPECT_EQ(bootstrap->node().locality().region(), region);
   EXPECT_EQ(bootstrap->node().locality().zone(), zone);

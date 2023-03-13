@@ -371,13 +371,14 @@ protected:
   struct ThreadLocalClusterUpdateParams {
     struct PerPriority {
       PerPriority(uint32_t priority, const HostVector& hosts_added, const HostVector& hosts_removed)
-          : priority_(priority), hosts_added_(hosts_added), hosts_removed_(hosts_removed) {}
+          : hosts_added_(hosts_added), hosts_removed_(hosts_removed), priority_(priority) {}
 
-      const uint32_t priority_;
       const HostVector hosts_added_;
       const HostVector hosts_removed_;
       PrioritySet::UpdateHostsParams update_hosts_params_;
       LocalityWeightsConstSharedPtr locality_weights_;
+      // Keep small members (bools and enums) at the end of class, to reduce alignment overhead.
+      const uint32_t priority_;
       uint32_t overprovisioning_factor_;
     };
 

@@ -18,6 +18,7 @@ envoy_cc_extension(
     ],
     visibility = ["//visibility:public"],
     deps = [
+        "//envoy/stream_info:bool_accessor_interface",
         "//source/common/http:codec_client_lib",
         "//source/common/tcp_proxy:upstream_lib",
         "@envoy_api//envoy/extensions/upstreams/tcp/generic/v3:pkg_cc_proto",

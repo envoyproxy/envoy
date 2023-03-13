@@ -13,7 +13,6 @@ envoy_cc_library(
     repository = "@envoy",
     deps = [
         "extension_registry_platform_additions",
-        "@envoy//source/common/network/matching:inputs_lib",
         "@envoy//source/common/http/matching:inputs_lib",
         "@envoy//source/common/network:socket_lib",
         "@envoy//source/common/router:upstream_codec_filter_lib",

@@ -50,6 +50,7 @@ use(
     },
   ],
 )
+use("github.com/envoyproxy/envoy/ci/repokitteh/modules/versionchange.star")
 
 alias('retest', 'retry-azp')
 

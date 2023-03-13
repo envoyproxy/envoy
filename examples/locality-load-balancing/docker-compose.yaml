@@ -1,14 +1,6 @@
 version: "3.8"
 services:
 
-  flask_service:
-    build:
-      context: ../shared/flask
-    image: flask_service:python-3.10-slim-bullseye
-    restart: "no"
-    deploy:
-      replicas: 0
-
   client-envoy:
     build:
       context: .
@@ -25,7 +17,7 @@ services:
 
   backend-local-1:
     build:
-      context: ../shared/service
+      context: ../shared/flask
     volumes:
     - ./service.py:/code/service.py
     environment:
@@ -33,7 +25,7 @@ services:
 
   backend-local-2:
     build:
-      context: ../shared/service
+      context: ../shared/flask
     volumes:
     - ./service.py:/code/service.py
     environment:
@@ -41,7 +33,7 @@ services:
 
   backend-remote-1:
     build:
-      context: ../shared/service
+      context: ../shared/flask
     volumes:
     - ./service.py:/code/service.py
     environment:
@@ -49,7 +41,7 @@ services:
 
   backend-remote-2:
     build:
-      context: ../shared/service
+      context: ../shared/flask
     volumes:
     - ./service.py:/code/service.py
     environment:

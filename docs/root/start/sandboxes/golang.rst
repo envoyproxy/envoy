@@ -26,7 +26,7 @@ Change to the ``examples/golang`` directory and build the go plugin library.
 
    $ pwd
    envoy/examples/golang
-   $ docker-compose -f docker-compose-go.yaml run --rm go_plugin_compile
+   $ docker compose -f docker-compose-go.yaml run --rm go_plugin_compile
 
 The compiled library should now be in the ``lib`` folder.
 
@@ -42,9 +42,9 @@ Start all the containers.
 
 .. code-block:: console
 
-  $ docker-compose pull
-  $ docker-compose up --build -d
-  $ docker-compose ps
+  $ docker compose pull
+  $ docker compose up --build -d
+  $ docker compose ps
 
         Name                      Command               State                          Ports
   -----------------------------------------------------------------------------------------------------------------------
