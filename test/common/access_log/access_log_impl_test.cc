@@ -704,6 +704,11 @@ duration_filter:
   stream_info.end_time_ = stream_info.startTimeMonotonic() + std::chrono::microseconds(10000);
   EXPECT_CALL(runtime.snapshot_, getInteger("key", 1000000)).WillOnce(Return(100000000));
   EXPECT_FALSE(filter.evaluate(stream_info, request_headers, response_headers, response_trailers));
+
+  StreamInfo::MockStreamInfo mock_stream_info;
+  EXPECT_CALL(mock_stream_info, requestComplete()).WillOnce(testing::Return(std::nullopt));
+  EXPECT_FALSE(
+      filter.evaluate(mock_stream_info, request_headers, response_headers, response_trailers));
 }
 
 TEST(AccessLogFilterTest, StatusCodeWithRuntimeKey) {

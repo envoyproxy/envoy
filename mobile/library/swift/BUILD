@@ -81,6 +81,8 @@ swift_library(
             "-enable-experimental-cxx-interop",
             "-Xcc",
             "-std=c++17",
+            "-Xcc",
+            "-Wno-deprecated-declarations",
         ],
         "//conditions:default": [],
     }),
