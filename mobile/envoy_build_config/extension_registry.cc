@@ -74,41 +74,79 @@ namespace Envoy {
 void ExtensionRegistry::registerFactories() {
   Common::Http::MatchDelegate::Factory::forceRegisterSkipActionFactory();
   Common::Http::MatchDelegate::forceRegisterMatchDelegateConfig();
+
   ExtensionRegistryPlatformAdditions::registerFactories();
+
+  // The uuid extension is required for E-M for server mode. Ideally E-M could skip it.
+  Extensions::RequestId::forceRegisterUUIDRequestIDExtensionFactory();
+  // This is the original IP detection code which ideally E-M could skip.
+  Extensions::Http::OriginalIPDetection::Xff::forceRegisterXffIPDetectionFactory();
+
+  // TODO(alyssar) verify with Lyft that we can move this to be a test-only filter.
+  Extensions::HttpFilters::Assertion::forceRegisterAssertionFilterFactory();
+  // TODO(alyssar) verify with Lyft that we can move this to be a test-only filter.
+  Extensions::HttpFilters::BufferFilter::forceRegisterBufferFilterFactory();
+  // TODO(alyssawilk) verify with Lyft we can move this to be a test-only filter.
+  Extensions::HttpFilters::RouteCacheReset::forceRegisterRouteCacheResetFilterFactory();
+
+  // This is the default cluster used by Envoy mobile to establish connections upstream.
   Extensions::Clusters::DynamicForwardProxy::forceRegisterClusterFactory();
+  // This allows decompression of brotli-compresssed responses.
   Extensions::Compression::Brotli::Decompressor::forceRegisterBrotliDecompressorLibraryFactory();
+  // This allows decompression of gzip-decompressed responses.
   Extensions::Compression::Gzip::Decompressor::forceRegisterGzipDecompressorLibraryFactory();
+  // This is the base decompressor filter used for both gzip and brotli.
+  Extensions::HttpFilters::Decompressor::forceRegisterDecompressorFilterFactory();
+  // This allows HTTP/1.1 requests to preserve their case, as many servers for example do not
+  // correctly content-length headers and instead expect Content-Length.
   Extensions::Http::HeaderFormatters::PreserveCase::
       forceRegisterPreserveCaseFormatterFactoryConfig();
+  // This is for UHV-based header validation.
   Extensions::Http::HeaderValidators::EnvoyDefault::forceRegisterHeaderValidatorFactoryConfig();
-  Extensions::Http::OriginalIPDetection::Xff::forceRegisterXffIPDetectionFactory();
+
+  // This caches upstream protocol capabilities to maximize latency for H2 and H3 endpoints.
   Extensions::HttpFilters::AlternateProtocolsCache::
       forceRegisterAlternateProtocolsCacheFilterFactory();
-  Extensions::HttpFilters::Assertion::forceRegisterAssertionFilterFactory();
-  Extensions::HttpFilters::BufferFilter::forceRegisterBufferFilterFactory();
-  Extensions::HttpFilters::Decompressor::forceRegisterDecompressorFilterFactory();
+  // This handles DNS lookup for all upstream requests.
   Extensions::HttpFilters::DynamicForwardProxy::forceRegisterDynamicForwardProxyFilterFactory();
+  // This converts Envoy "local reply" errors to not look like remote replies to the app.
   Extensions::HttpFilters::LocalError::forceRegisterLocalErrorFilterFactory();
+  // This filter handles mobile-specific network config like interface binding and system proxies.
   Extensions::HttpFilters::NetworkConfiguration::forceRegisterNetworkConfigurationFilterFactory();
+  // This filter, if configured, allows platform-specific filters e.g. swift or kotlin.
   Extensions::HttpFilters::PlatformBridge::forceRegisterPlatformBridgeFilterFactory();
-  Extensions::HttpFilters::RouteCacheReset::forceRegisterRouteCacheResetFilterFactory();
+  // This is Envoy's router filter, required for a functional L7 data plane.
   Extensions::HttpFilters::RouterFilter::forceRegisterRouterFilterConfig();
+
+  // This filter applies socket tagging based on the x-envoy-mobile-socket-tag header.
   Extensions::HttpFilters::SocketTag::forceRegisterSocketTagFilterFactory();
+  // The k-v store allows caching things like DNS and prefered protocol across application restarts.
   Extensions::KeyValue::forceRegisterPlatformKeyValueStoreFactory();
+  // This is Envoy's HCM filter, currently required for a functional L7 data plane.
   Extensions::NetworkFilters::HttpConnectionManager::
       forceRegisterHttpConnectionManagerFilterConfigFactory();
-  Extensions::RequestId::forceRegisterUUIDRequestIDExtensionFactory();
+  // This works with the connectivity manager to allow retries across network interfaces.
   Extensions::Retry::Options::forceRegisterNetworkConfigurationRetryOptionsPredicateFactory();
+  // TODO(alyssawilk) stats reporting should be optional
   Extensions::StatSinks::MetricsService::forceRegisterMetricsServiceSinkFactory();
   Extensions::StatSinks::Statsd::forceRegisterStatsdSinkFactory();
-  Extensions::TransportSockets::Http11Connect::
       forceRegisterUpstreamHttp11ConnectSocketConfigFactory();
+  // TODO(alyssawilk) move to the listener build.
   Extensions::TransportSockets::RawBuffer::forceRegisterDownstreamRawBufferSocketFactory();
-  Extensions::TransportSockets::RawBuffer::forceRegisterUpstreamRawBufferSocketFactory();
+  // This is the default certificate validator, still compiled by default but hopefully soon to be
+  // deprecated in production by iOS and Android platform validators.
   Extensions::TransportSockets::Tls::forceRegisterDefaultCertValidatorFactory();
+  // This is the base for the still-being-validated platform validators.
   Extensions::TransportSockets::Tls::forceRegisterPlatformBridgeCertValidatorFactory();
+
+  // This transport socket handles upstream TLS connections.
   Extensions::TransportSockets::Tls::forceRegisterUpstreamSslSocketFactory();
+  // This transport socket handles doing CONNECT requests to any configured system proxies.
+  Extensions::TransportSockets::Http11Connect::
   Extensions::Upstreams::Http::forceRegisterProtocolOptionsConfigFactory();
+  // This transport socket handles plaintext (http) traffic.
+  Extensions::TransportSockets::RawBuffer::forceRegisterUpstreamRawBufferSocketFactory();
+
   Extensions::Upstreams::Http::Generic::forceRegisterGenericGenericConnPoolFactory();
   Extensions::UriTemplate::Match::forceRegisterUriTemplateMatcherFactory();
   Extensions::UriTemplate::Rewrite::forceRegisterUriTemplateRewriterFactory();
