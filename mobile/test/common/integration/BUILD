@@ -25,7 +25,10 @@ envoy_cc_test(
 
 envoy_cc_test(
     name = "rtds_integration_test",
-    srcs = envoy_select_google_grpc(["rtds_integration_test.cc"], "@envoy"),
+    srcs = envoy_select_google_grpc(
+        ["rtds_integration_test.cc"],
+        "@envoy",
+    ),
     exec_properties = {
         # TODO(willengflow): Remove this once the sandboxNetwork=off works for ipv4 localhost addresses.
         "sandboxNetwork": "standard",
@@ -44,7 +47,10 @@ envoy_cc_test(
 
 envoy_cc_test(
     name = "cds_integration_test",
-    srcs = envoy_select_google_grpc(["cds_integration_test.cc"], "@envoy"),
+    srcs = envoy_select_google_grpc(
+        ["cds_integration_test.cc"],
+        "@envoy",
+    ),
     exec_properties = {
         # TODO(willengflow): Remove this once the sandboxNetwork=off works for ipv4 localhost addresses.
         "sandboxNetwork": "standard",
