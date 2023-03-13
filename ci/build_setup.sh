@@ -86,7 +86,13 @@ trap cleanup EXIT
 
 "$(dirname "$0")"/../bazel/setup_clang.sh "${LLVM_ROOT}"
 
-[[ "${BUILD_REASON}" != "PullRequest" ]] && BAZEL_EXTRA_TEST_OPTIONS+=("--nocache_test_results")
+if [[ "${BUILD_REASON}" != "PullRequest" ]]; then
+    VERSION_DEV="$(cut -d- -f2 "${ENVOY_SRCDIR}/VERSION.txt")"
+    # Use uncached test results for non-release commits to a branch.
+    if [[ $VERSION_DEV == "dev" ]]; then
+        BAZEL_EXTRA_TEST_OPTIONS+=("--nocache_test_results")
+    fi
+fi
 
 # Use https://docs.bazel.build/versions/master/command-line-reference.html#flag--experimental_repository_cache_hardlinks
 # to save disk space.
