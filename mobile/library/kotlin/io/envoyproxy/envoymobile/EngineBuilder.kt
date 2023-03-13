@@ -620,23 +620,23 @@ fun setAggregatedDiscoveryService(
   return this
 }
 
-/**
-* Adds a CDS layer.
-*
-* @param cdsResourcesLocator the locator for CDS resources.
-*
-* @param cdsTimeoutSeconds the connection timeout.
-*
-* @return this builder.
-*/
-fun addCdsLayer(
-  cdsResourcesLocator: String,
-  cdsTimeoutSeconds: Int = 0,
-): EngineBuilder {
-  this.cdsResourcesLocator = cdsResourcesLocator
-  this.cdsTimeoutSeconds = cdsTimeoutSeconds
-  return this
-}
+  /**
+  * Adds a CDS layer.
+  *
+  * @param cdsResourcesLocator the locator for CDS resources.
+  *
+  * @param cdsTimeoutSeconds the connection timeout.
+  *
+  * @return this builder.
+  */
+  fun addCdsLayer(
+    cdsResourcesLocator: String,
+    cdsTimeoutSeconds: Int = 0,
+  ): EngineBuilder {
+    this.cdsResourcesLocator = cdsResourcesLocator
+    this.cdsTimeoutSeconds = cdsTimeoutSeconds
+    return this
+  }
 
 
 /**

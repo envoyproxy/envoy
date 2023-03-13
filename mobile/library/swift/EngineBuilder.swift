@@ -736,7 +736,7 @@ open class EngineBuilder: NSObject {
       nodeId: self.nodeID,
       nodeRegion: self.nodeRegion,
       nodeZone: self.nodeZone,
-      nodeSubZone: self.nodeSubZone
+      nodeSubZone: self.nodeSubZone,
       cdsResourcesLocator: self.cdsResourcesLocator,
       cdsTimeoutSeconds: self.cdsTimeoutSeconds
     )
