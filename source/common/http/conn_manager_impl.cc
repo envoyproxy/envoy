@@ -634,9 +634,9 @@ void ConnectionManagerImpl::RdsRouteConfigUpdateRequester::requestRouteConfigUpd
     const auto& host_header = absl::AsciiStrToLower(parent_.request_headers_->getHostValue());
     requestVhdsUpdate(host_header, thread_local_dispatcher, std::move(route_config_updated_cb));
     return;
-  } else if (parent_.snapped_scoped_routes_config_ != nullptr) {
+  } else if (auto scoped_config = parent_.scopedRouteConfig(); scoped_config.has_value()) {
     Router::ScopeKeyPtr scope_key =
-        parent_.snapped_scoped_routes_config_->computeScopeKey(*parent_.request_headers_);
+        scoped_config.value()->computeScopeKey(*parent_.request_headers_);
     // If scope_key is not null, the scope exists but RouteConfiguration is not initialized.
     if (scope_key != nullptr) {
       requestSrdsUpdate(std::move(scope_key), thread_local_dispatcher,
@@ -1458,7 +1458,7 @@ void ConnectionManagerImpl::ActiveStream::refreshDurationTimeout() {
 void ConnectionManagerImpl::ActiveStream::refreshCachedRoute(
     const Router::ConfigConstSharedPtr& config, const Router::RouteCallback& cb) {
   Router::RouteConstSharedPtr route;
-  if (config != nullptr) {
+  if (config != nullptr && request_headers_ != nullptr) {
     route = config->route(cb, *request_headers_, filter_manager_.streamInfo(), stream_id_);
   }
   setRoute(std::move(route));
@@ -1495,8 +1495,19 @@ void ConnectionManagerImpl::ActiveStream::requestRouteConfigUpdate(
 
 absl::optional<Router::ConfigConstSharedPtr> ConnectionManagerImpl::ActiveStream::routeConfig() {
   if (connection_manager_.config_.routeConfigProvider() != nullptr) {
-    return absl::optional<Router::ConfigConstSharedPtr>(
-        connection_manager_.config_.routeConfigProvider()->configCast());
+    return {connection_manager_.config_.routeConfigProvider()->configCast()};
+  }
+  return {};
+}
+
+absl::optional<Router::ScopedConfigConstSharedPtr>
+ConnectionManagerImpl::ActiveStream::scopedRouteConfig() {
+  if (connection_manager_.config_.isRoutable() &&
+      connection_manager_.config_.scopedRouteConfigProvider() != nullptr) {
+    auto config =
+        connection_manager_.config_.scopedRouteConfigProvider()->config<Router::ScopedConfig>();
+    ASSERT(config != nullptr);
+    return {std::move(config)};
   }
   return {};
 }
@@ -1808,10 +1819,6 @@ ConnectionManagerImpl::ActiveStream::route(const Router::RouteCallback& cb) {
  * functions as a helper to refreshCachedRoute(const Router::RouteCallback& cb).
  */
 void ConnectionManagerImpl::ActiveStream::setRoute(Router::RouteConstSharedPtr route) {
-  if (hasCachedRoute()) {
-    cleared_cached_routes_.emplace_back(std::move(cached_route_.value()));
-  }
-
   filter_manager_.streamInfo().route_ = route;
   cached_route_ = std::move(route);
   if (nullptr == filter_manager_.streamInfo().route() ||
@@ -1862,8 +1869,14 @@ void ConnectionManagerImpl::ActiveStream::refreshAccessLogFlushTimer() {
 }
 
 void ConnectionManagerImpl::ActiveStream::clearRouteCache() {
-  cached_route_ = absl::optional<Router::RouteConstSharedPtr>();
-  cached_cluster_info_ = absl::optional<Upstream::ClusterInfoConstSharedPtr>();
+  if (hasCachedRoute()) {
+    // The configuration of the route may be referenced by some filters.
+    // Cache the route to avoid it's destroyed before the stream is destroyed.
+    cleared_cached_routes_.emplace_back(std::move(cached_route_.value()));
+  }
+
+  cached_route_ = {};
+  cached_cluster_info_ = {};
   if (tracing_custom_tags_) {
     tracing_custom_tags_->clear();
   }

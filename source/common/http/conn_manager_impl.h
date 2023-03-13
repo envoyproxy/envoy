@@ -302,8 +302,10 @@ private:
     void requestRouteConfigUpdate(
         Http::RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb) override;
 
-    absl::optional<Router::ConfigConstSharedPtr> routeConfig();
     void traceRequest();
+
+    absl::optional<Router::ConfigConstSharedPtr> routeConfig();
+    absl::optional<Router::ScopedConfigConstSharedPtr> scopedRouteConfig();
 
     Router::ConfigConstSharedPtr
     getRouteConfigFromScopedRouteConfig(Router::ScopedConfigConstSharedPtr& scoped_route_config);
@@ -398,8 +400,6 @@ private:
     // destruction.
     DownstreamFilterManager filter_manager_;
 
-    Router::ConfigConstSharedPtr snapped_route_config_;
-    Router::ScopedConfigConstSharedPtr snapped_scoped_routes_config_;
     Tracing::SpanPtr active_span_;
     ResponseEncoder* response_encoder_{};
     Stats::TimespanPtr request_response_timespan_;
@@ -429,7 +429,7 @@ private:
     // For example, if a filter stored a per-route config in the decoding phase and may try to
     // use it in the encoding phase, but the route is cleared and refreshed by another decoder
     // filter, we must keep the per-route config alive to avoid use-after-free.
-    absl::InlinedVector<Router::RouteConstSharedPtr, 2> cleared_cached_routes_;
+    absl::InlinedVector<Router::RouteConstSharedPtr, 3> cleared_cached_routes_;
     absl::optional<Upstream::ClusterInfoConstSharedPtr> cached_cluster_info_;
     const std::string* decorated_operation_{nullptr};
     std::unique_ptr<RdsRouteConfigUpdateRequester> route_config_update_requester_;
