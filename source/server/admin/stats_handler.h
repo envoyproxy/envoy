@@ -58,7 +58,7 @@ public:
   makePrometheusRequest(Stats::Store& stats, const StatsParams& params,
                         Stats::CustomStatNamespaces& custom_namespaces,
                         GroupedStatsRequest::UrlHandlerFn url_handler_fn = nullptr);
-  Admin::RequestPtr makeRequest(AdminStream&, bool is_prometheus_path);
+  Admin::RequestPtr makeRequest(AdminStream& admin_stream, StatsParams& params);
 };
 
 } // namespace Server

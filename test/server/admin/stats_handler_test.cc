@@ -87,7 +87,8 @@ public:
     EXPECT_CALL(api_, customStatNamespaces()).WillRepeatedly(ReturnRef(custom_namespaces_));
     StatsHandler handler(instance);
     request_headers_.setPath(url);
-    Admin::RequestPtr request = handler.makeRequest(admin_stream_, false);
+    StatsParams params;
+    Admin::RequestPtr request = handler.makeRequest(admin_stream_, params);
     Http::TestResponseHeaderMapImpl response_headers;
     Http::Code code = request->start(response_headers);
     Buffer::OwnedImpl data;

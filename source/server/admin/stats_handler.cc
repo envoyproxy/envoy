@@ -72,8 +72,7 @@ Http::Code StatsHandler::handlerStatsRecentLookupsEnable(Http::ResponseHeaderMap
   return Http::Code::OK;
 }
 
-Admin::RequestPtr StatsHandler::makeRequest(AdminStream& admin_stream, bool is_prometheus_path) {
-  StatsParams params;
+Admin::RequestPtr StatsHandler::makeRequest(AdminStream& admin_stream, StatsParams& params) {
   Buffer::OwnedImpl response;
   Http::Code code = params.parse(admin_stream.getRequestHeaders().getPathValue(), response);
   if (code != Http::Code::OK) {
@@ -84,8 +83,7 @@ Admin::RequestPtr StatsHandler::makeRequest(AdminStream& admin_stream, bool is_p
     server_.flushStats();
   }
 
-  if (params.format_ == StatsFormat::Prometheus || is_prometheus_path) {
-    params.format_ = StatsFormat::Prometheus;
+  if (params.format_ == StatsFormat::Prometheus) {
     return makePrometheusRequest(
         server_.stats(), params, server_.api().customStatNamespaces(),
         [this]() -> Admin::UrlHandler { return prometheusStatsHandler(); });
@@ -130,7 +128,8 @@ Admin::UrlHandler StatsHandler::statsHandler() {
       "/stats",
       "print server stats",
       [this](AdminStream& admin_stream) -> Admin::RequestPtr {
-        return makeRequest(admin_stream, false);
+        StatsParams params;
+        return makeRequest(admin_stream, params);
       },
       false,
       false,
@@ -154,7 +153,9 @@ Admin::UrlHandler StatsHandler::prometheusStatsHandler() {
   return {"/stats/prometheus",
           "print server stats in prometheus format",
           [this](AdminStream& admin_stream) -> Admin::RequestPtr {
-            return makeRequest(admin_stream, true);
+            StatsParams params;
+            params.format_ = StatsFormat::Prometheus;
+            return makeRequest(admin_stream, params);
           },
           false,
           false,

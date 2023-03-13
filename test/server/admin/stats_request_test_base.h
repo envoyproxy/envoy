@@ -68,7 +68,6 @@ public:
   std::vector<Stats::CounterSharedPtr> counters_;
   std::vector<Stats::GaugeSharedPtr> gauges_;
   std::vector<Stats::TextReadoutSharedPtr> text_readouts_;
-  ;
 };
 
 class MockStore : public Stats::MockStore {
