@@ -1272,13 +1272,25 @@ void configureBuilder(JNIEnv* env, jstring grpc_stats_domain, jboolean admin_int
 
   std::vector<std::string> hostnames = javaObjectArrayToStringVector(env, dns_preresolve_hostnames);
   builder.addDnsPreresolveHostnames(hostnames);
-  builder.addRtdsLayer(getCppString(env, rtds_layer_name), rtds_timeout_seconds);
-  builder.setNodeId(getCppString(env, node_id));
-  builder.setNodeLocality(getCppString(env, node_region), getCppString(env, node_zone),
-                          getCppString(env, node_sub_zone));
-  builder.setAggregatedDiscoveryService(getCppString(env, ads_address), ads_port,
-                                        getCppString(env, ads_token), ads_token_lifetime,
-                                        getCppString(env, ads_root_certs));
+  std::string native_rtds_layer_name = getCppString(env, rtds_layer_name);
+  if (!native_rtds_layer_name.empty()) {
+    builder.addRtdsLayer(native_rtds_layer_name, rtds_timeout_seconds);    
+  }
+  std::string native_node_id = getCppString(env, node_id);
+  if (!native_node_id.empty()) {
+    builder.setNodeId(native_node_id);
+  }
+  std::string native_node_region = getCppString(env, node_region);
+  if (!native_node_region.empty()) {
+    builder.setNodeLocality(native_node_region, getCppString(env, node_zone),
+                            getCppString(env, node_sub_zone));
+  }
+  std::string native_ads_address = getCppString(env, ads_address);
+  if (!native_ads_address.empty()) {
+    builder.setAggregatedDiscoveryService(native_ads_address, ads_port,
+                                          getCppString(env, ads_token), ads_token_lifetime,
+                                          getCppString(env, ads_root_certs));
+  }
 }
 
 extern "C" JNIEXPORT jlong JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibrary_createBootstrap(
