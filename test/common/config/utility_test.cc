@@ -313,6 +313,12 @@ TEST(UtilityTest, prepareJitteredExponentialBackOffStrategyStrategyNoConfig) {
     EXPECT_NE(nullptr, dynamic_cast<JitteredExponentialBackOffStrategy*>(strategy.get()));
     EXPECT_EQ(true, dynamic_cast<JitteredExponentialBackOffStrategy*>(strategy.get())
                         ->isOverTimeLimit(500 * 10 + 1));
+
+    // test an invalid default base interval
+    EXPECT_THROW_WITH_MESSAGE(
+        JitteredExponentialBackOffStrategyPtr strategy =
+            Utility::prepareJitteredExponentialBackOffStrategy(config, random, 1001, absl::nullopt),
+        EnvoyException, "default_base_interval_ms must be less than 1000 ms");
   }
 }
 

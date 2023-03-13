@@ -324,6 +324,11 @@ JitteredExponentialBackOffStrategyPtr Utility::buildJitteredExponentialBackOffSt
     return std::make_unique<JitteredExponentialBackOffStrategy>(base_interval_ms, max_interval_ms,
                                                                 random);
   }
+
+  if (default_base_interval_ms >= 1000) {
+    throw EnvoyException("default_base_interval_ms must be less than 1000 ms");
+  }
+
   // default maximum interval is specified
   if (default_max_interval_ms != absl::nullopt) {
     if (default_max_interval_ms.value() < default_base_interval_ms) {
