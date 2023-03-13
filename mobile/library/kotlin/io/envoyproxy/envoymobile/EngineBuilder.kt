@@ -37,7 +37,7 @@ open class EngineBuilder(
   protected var logger: ((String) -> Unit)? = null
   protected var eventTracker: ((Map<String, String>) -> Unit)? = null
   protected var enableProxying = false
-  private var runtimeGuards = mapOf<String, Boolean>()
+  private var runtimeGuards = mutableMapOf<String, Boolean>()
   private var enableSkipDNSLookupForProxiedRequests = false
   private var engineType: () -> EnvoyEngine = {
     EnvoyEngineImpl(onEngineRunning, logger, eventTracker)
@@ -632,6 +632,19 @@ fun addRtdsLayer(layerName: String, timeoutSeconds: Int = 0): EngineBuilder {
   this.rtdsTimeoutSeconds = timeoutSeconds
   return this
 }
+
+  /**
+   * Set a runtime guard with the provided value.
+   *
+   * @param name the name of the runtime guard, e.g. test_feature_false.
+   * @param value the value for the runtime guard.
+   *
+   * @return This builder.
+   */
+  fun setRuntimeGuard(name: String, value: Boolean): EngineBuilder {
+    this.runtimeGuards.put(name, value)
+    return this
+  }
 
   /**
    * Builds and runs a new Engine instance with the provided configuration.
