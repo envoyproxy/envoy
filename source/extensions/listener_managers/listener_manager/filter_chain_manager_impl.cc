@@ -213,24 +213,26 @@ void FilterChainManagerImpl::removeFilterChains(
       // filter chain
       if (filter_chain->has_filter_chain_match()) {
           const auto& filter_chain_match = filter_chain->filter_chain_match();
-          std::string tenant_id = absl::AsciiStrToLower(filter_chain_match.tenant_id());
-          const auto tenant_id_match = tenant_ids_map_.find(tenant_id);
-          if (tenant_id_match != tenant_ids_map_.end()) {
-            tenant_ids_map_.erase(tenant_id_match);
+          uint16_t destination_port = PROTOBUF_GET_WRAPPED_OR_DEFAULT(
+			  filter_chain_match, destination_port, 0);
+	  const auto destination_port_match = destination_ports_map_.find(destination_port);
+          if (destination_port_match != destination_ports_map_.end()) {
+            destination_ports_map_.erase(destination_port_match);
           }
       }
 
-      // Clean up the fc_context
-      auto iter1 = fc_contexts_.find(*filter_chain);
-      if(iter1 != fc_contexts_.end()) {
-        fc_contexts_[*filter_chain] = nullptr;
-        fc_contexts_.erase(iter1);
-      }
+      // Find if a filter chain with the given name exists.
+      // If yes, erase the corresponding fc object and the filter chain message
+      auto iter1 = filter_chains_message_by_name_.find(filter_chain->name());
+      if(iter1 != filter_chains_message_by_name_.end()) {
+        // Clean up the fc_context
+        auto iter2 = fc_contexts_.find(iter1->second);
+        if(iter2 != fc_contexts_.end()) {
+          fc_contexts_[iter1->second] = nullptr;
+          fc_contexts_.erase(iter2);
+        }
 
-      // Clean up filter chain name to message map
-      auto iter2 = filter_chains_message_by_name_.find(filter_chain->name());
-      if(iter2 != filter_chains_message_by_name_.end()) {
-        filter_chains_message_by_name_.erase(iter2);
+        filter_chains_message_by_name_.erase(iter1);
       }
 
       // Clean up filter chain name to protobuf hash value map
@@ -240,7 +242,7 @@ void FilterChainManagerImpl::removeFilterChains(
       }
       ++count;
     }
-    ENVOY_LOG(debug, "FCDS: new fc_contexts has {} filter chains, with {} just deleted",fc_contexts_.size(), count);
+    ENVOY_LOG(debug, "fcds: new fc_contexts has {} filter chains, with {} just deleted",fc_contexts_.size(), count);
   }
 }
 
@@ -920,14 +922,16 @@ FcdsApiPtr FilterChainManagerImpl::createFcdsApi(
      std::string listener_name) {
   listener_manager_ = listener_mgr;
   listener_name_ = listener_name;
-  return std::make_shared<FcdsApi>(fcds_config, parent_context_, init_manager_, *this, fc_builder);
+  return std::make_shared<FcdsApi>(fcds_config, parent_context_, init_manager_, *this, fc_builder,parent_context_.listenerScope());
 }
 
 void FilterChainManagerImpl::addFcToDrainingList(Network::DrainableFilterChainSharedPtr fc) {
   this->draining_fc_list_.push_back(fc);
 }
 
-
+void FilterChainManagerImpl::clearDrainingList() {
+  this->draining_fc_list_.clear();
+}
 void FilterChainManagerImpl::startDrainingSequenceForListenerFilterChains() {
   if (this->draining_fc_list_.size()) {
     ENVOY_LOG(debug, "fcds: {} filter chains to be drained", this->draining_fc_list_.size());

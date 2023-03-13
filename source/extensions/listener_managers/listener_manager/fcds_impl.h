@@ -31,13 +31,13 @@
 #include "source/common/config/subscription_base.h"
 #include "absl/container/node_hash_map.h"
 #include "absl/container/node_hash_set.h"
-//#include "envoy/server/listener_manager.h"
 
 namespace Envoy {
 namespace Server {
 class FilterChainManagerImpl;
 class FilterChainFactoryBuilder;
 
+using FilterChainPtr  = const envoy::config::listener::v3::FilterChain*;
 /**
  * A class that fetches the filter chain configuration dynamically using the FCDS API and updates them to
  * FCDS config providers.
@@ -52,7 +52,8 @@ FcdsApi(
     Configuration::FactoryContext& parent_context,
     Init::Manager& init_manager,
     FilterChainManagerImpl& filter_chain_manager,
-    FilterChainFactoryBuilder* fc_builder);
+    FilterChainFactoryBuilder* fc_builder,
+    Stats::Scope& scope);
 
 ~FcdsApi();
 std::string versionInfo() const { return system_version_info_; }
@@ -61,12 +62,14 @@ bool validateUpdateSize(int num_resources);
 const Init::Target& initTarget() { return parent_init_target_; }
 void initialize();
 void processDeletedFilterChains(const Protobuf::RepeatedPtrField<std::string>& removed_resources,
-            std::vector<const envoy::config::listener::v3::FilterChain*>& fc_to_del_vector);
+            std::vector<FilterChainPtr>& fc_to_del_vector);
 void processAddedOrUpdatedFilterChains(const std::vector<Envoy::Config::DecodedResourceRef>& added_resources,
-            std::vector<const envoy::config::listener::v3::FilterChain*>& fc_to_del_vector,
-      std::vector<const envoy::config::listener::v3::FilterChain*>& fc_to_add_vector);
-void markFilterChainForDeletion(std::string filter_chain_name,
-            std::vector<const envoy::config::listener::v3::FilterChain*>& updated_filter_chains);
+            std::vector<FilterChainPtr>& fc_to_del_vector,
+            std::vector<FilterChainPtr>& fc_to_add_vector);
+void markFilterChainForDeletionIfExists(std::string filter_chain_name,
+            std::vector<FilterChainPtr>& updated_filter_chains);
+std::vector<FilterChainPtr> getExistingFilterChainMessageList();
+
 private:
 const std::string fcds_cfg_name_;
 Envoy::Config::SubscriptionPtr fcds_subscription_;
@@ -83,7 +86,7 @@ Init::ManagerImpl local_init_manager_;
 Init::Manager& init_manager_;
 
 Upstream::ClusterManager&  cluster_manager_;
-Stats::ScopePtr scope_;
+Stats::ScopeSharedPtr scope_;
 Common::CallbackManager<> update_callback_manager_;
 
 FilterChainManagerImpl& filter_chain_manager_;

@@ -22,6 +22,7 @@ import "envoy/annotations/deprecation.proto";
 import "udpa/annotations/security.proto";
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
+import "udpa/annotations/migrate.proto";
 import "validate/validate.proto";
 import "envoy/config/core/v3/config_source.proto";
 
@@ -150,7 +151,9 @@ message Listener {
 
   // Listener FCDS: Listener Filter Chain Discovery Service config block. filter_chains and fcds are mutually exclusive
   // TBD: filter_chains and fcds_config to be made oneof in future major release
-  ListenerFcds fcds_config = 34;
+  //[#not-implemented-hide:]
+  ListenerFcds fcds_config = 34
+        [(udpa.annotations.field_migrate).oneof_promotion = "filter_chain_list"];
 
   // :ref:`Matcher API <arch_overview_matching_listener>` resolving the filter chain name from the
   // network properties. This matcher is used as a replacement for the filter chain match condition
@@ -398,7 +401,12 @@ message ApiListenerManager {
 
 // Listener FCDS: In case of inotify/file-system based xDS, collection_name should not be provided
 // This name is only necessary when we are using grpc/REST based xDS, like ADS.
+//[not-implemented-hide:]
 message ListenerFcds{
+  // collection_name indicates the name of the set of filter chains that a listener would subscribe to.
+  // For GRPC based FCDS, this name is mandatory. This name is used to construct a glob collection of filter chains.
+  // For file based FCDS, all the filter chains for a listener are inside the same file.
+  // Hence, there is no need of any group name
   string collection_name = 1 [(validate.rules).string.min_len = 1];
   envoy.config.core.v3.ConfigSource config_source = 2 [(validate.rules).message.required = true];
 }

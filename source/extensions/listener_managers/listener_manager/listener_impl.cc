@@ -722,7 +722,7 @@ void ListenerImpl::validateFilterChains() {
                     absl::StrJoin(addresses_, ",", Network::AddressStrFormatter())));
   } else if (!config_.filter_chains().empty() && config_.has_fcds_config()) {
     throw EnvoyException(fmt::format("error adding listener '{}': filter chains and fcds config are mutually exclusive",
-                                     address_->asString()));
+                    absl::StrJoin(addresses_, ",", Network::AddressStrFormatter())));
   } else if (udp_listener_config_ != nullptr &&
              !udp_listener_config_->listener_factory_->isTransportConnectionless()) {
     // Early fail if any filter chain doesn't have transport socket configured.
@@ -757,15 +757,16 @@ void ListenerImpl::buildFilterChains() {
   } else if (config_.has_fcds_config()) {
      ENVOY_LOG(debug, "buildFilterChains: processing fcds_config inside listener = {}", this->name());
      ListenerFilterChainFactoryBuilder* fcds_builder = new ListenerFilterChainFactoryBuilder(*this, *transport_factory_context_);
-     fcds_api_ = filter_chain_manager_.createFcdsApi(config_.fcds_config(), fcds_builder, &parent_, this->name());
+     fcds_api_ = filter_chain_manager_->createFcdsApi(config_.fcds_config(), fcds_builder, &parent_, this->name());
 
      if (config_.has_default_filter_chain()) {
        absl::Span<const envoy::config::listener::v3::FilterChain* const> empty_filter_chain_span;
-       filter_chain_manager_.addFilterChains(
+       filter_chain_manager_->addFilterChains(
+		       nullptr,
 		       empty_filter_chain_span,
 		       &config_.default_filter_chain(),
 		       builder,
-		       filter_chain_manager_);
+		       *filter_chain_manager_);
      }
   }
 }

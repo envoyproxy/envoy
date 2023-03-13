@@ -25,7 +25,7 @@
 
 #include "absl/container/flat_hash_map.h"
 #include "absl/container/node_hash_map.h"
-#include "source/server/fcds_impl.h"
+#include "source/extensions/listener_managers/listener_manager/fcds_impl.h"
 
 namespace Envoy {
 namespace Server {
@@ -191,8 +191,18 @@ public:
   void removeFilterChains(
       absl::Span<const envoy::config::listener::v3::FilterChain* const> filter_chain_span);
   
-  const FilterChainsMessageByName& getExistingFilterChainMessages() {return filter_chains_message_by_name_;}
-  const uint64_t getFilterChainMessageHash(std::string fc_name) {
+  //FilterChainsMessageByName* getExistingFilterChainMessages() {
+  const FilterChainsMessageByName& getExistingFilterChainMessages() {
+      ENVOY_LOG(debug, "RAKESH: reached here 0.0.1");
+      //if (filter_chains_message_by_name_.size() != 0) {
+        //ENVOY_LOG(debug, "RAKESH: reached here 0.0.2");
+        //return &filter_chains_message_by_name_;
+        return filter_chains_message_by_name_;
+      //}
+      //ENVOY_LOG(debug, "RAKESH: reached here 0.0.3");
+      //return nullptr;
+  }
+  uint64_t getFilterChainMessageHash(std::string fc_name) {
       auto iter = filter_chains_message_hash_by_name_.find(fc_name);
       if (iter != filter_chains_message_hash_by_name_.end()) {
      	  return iter->second;
@@ -222,6 +232,8 @@ public:
 
   void addFcToDrainingList(Network::DrainableFilterChainSharedPtr);
   void startDrainingSequenceForListenerFilterChains();
+  void clearDrainingList();
+  bool test;
 private:
   void convertIPsToTries();
   const Network::FilterChain* findFilterChainUsingMatcher(const Network::ConnectionSocket& socket,
@@ -410,6 +422,8 @@ private:
   // Parent(Listener) that holds this FCM
   std::string listener_name_;
 };
+
+using FilterChainPtr  = const envoy::config::listener::v3::FilterChain*;
 
 namespace FilterChain {
 DECLARE_FACTORY(FilterChainNameActionFactory);
