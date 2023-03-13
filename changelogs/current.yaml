@@ -5,6 +5,9 @@ behavior_changes:
 - area: oauth2
   change: |
     OAuth filter now URL-encodes URL in query parameters. These query parameters are decoded, leaving intact character sequences that must remain encoded in URLs. This behavioral change can be temporarily reverted by setting runtime guard ``envoy.reloadable_features.oauth_use_url_encoding`` to false.
+- area: admin
+  change: |
+    Adds a new admin stats format option 'html-active' to display a periodically updated list of the top most frequently changed stats.
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
@@ -17,18 +20,27 @@ minor_behavior_changes:
 - area: local_ratelimit
   change: |
     Tokens from local descriptor's token buckets are burned before tokens from the default token bucket.
-- area: http stream
-  change: |
-    Extended the lifetime of the protocol agnostic stream object to correct discrepancies between what is access logged and what occurred with the protocol specific stream. This behavior change can be reverted by setting ``envoy_reloadable_features_expand_agnostic_stream_lifetime`` to ``false``.
 - area: http2
   change: |
     Request authorities are now validated with a library function from QUICHE rather than nghttp2. This behavior change can be reverted by setting ``envoy.reloadable_features.http2_validate_authority_with_quiche`` to ``false``.
+- area: lua
+  change: |
+    dropped moonjit support.
+- area: ext_proc
+  change: |
+    Make the :ref:`grpc service <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExternalProcessor.grpc_service>` required.
 - area: http2
   change: |
     Metadata is parsed with the QUICHE HPACK library, rather than nghttp2. This behavior change can be reverted by setting ``envoy.reloadable_features.http2_decode_metadata_with_quiche`` to ``false``.
+- area: upstream
+  change: |
+    Changed HTTP/1 and HTTP/3 upstream streams not to disable reading (in case where downstream buffer reaches high watermark) till the full response headers have been received. This fixes a bug where Envoy upstream timeouts were not correctly adjusting to the fact that the response headers have already been sent from upstream. This behavior change can be reverted by setting ``envoy.reloadable_features.upstream_wait_for_response_headers_before_disabling_read`` to ``false``.
 - area: custom response
   change: |
     Changed how the uri for redirect policy is specified. It can now be specified either as a single fully qualified string, or by specifying individual components of the uri.
+- area: matchers
+  change: |
+    Moved all of the network input matchers to extensions. If you use network matchers and override extensions_build_config.bzl you will now need to include them explicitly.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
@@ -42,6 +54,9 @@ bug_fixes:
 - area: router
   change: |
     fixed the bug that custom tags of the route metadata type are not set for upstream spans.
+- area: ext_proc
+  change: |
+    ensure the route configuration will be used to overwrite global configuration when processing the local reply.
 - area: router
   change: |
     fixed outlier detection ejections caused by opened circuit breakers.
@@ -96,6 +111,9 @@ removed_config_or_runtime:
 - area: dns
   change: |
     removed ``envoy.reloadable_features.cares_accept_nodata`` and legacy code paths.
+- area: http3
+  change: |
+    removed ``envoy.reloadable_features.postpone_h3_client_connect_to_next_loop`` and legacy code paths.
 
 new_features:
 - area: access_log
@@ -119,6 +137,9 @@ new_features:
 - area: lua
   change: |
     added an new option to the options of lua ``httpCall``. This allows to skip adding ``x-forwarded-for`` by setting ``{["send_xff"] = false}`` as the ``options``.
+- area: ratelimit
+  change: |
+    added local rate limit listener filter to enable rate limit before TLS handshake and filter matching.
 - area: proxy_protocol
   change: |
     added the support :ref:`pass_through_tlvs for listener <envoy_v3_api_field_extensions.filters.listener.proxy_protocol.v3.ProxyProtocol.pass_through_tlvs>`
@@ -142,6 +163,32 @@ new_features:
   change: |
     added :ref:`failed_status_in_metadata <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.JwtProvider.failed_status_in_metadata>` to support setting the JWT
     authentication failure status code and message in dynamic metadata.
+- area: http filter
+  change: |
+    added :ref:`header mutation http filter <config_http_filters_header_mutation>` which adds the ability to modify request and response headers in any position of HTTP filter chain.
+- area: matching
+  change: |
+    added :ref:`Filter State Input <envoy_v3_api_msg_extensions.matching.common_inputs.network.v3.FilterStateInput>` for matching based on filter state objects.
+- area: http
+  change: |
+    make adding ProxyProtocolFilterState in the HCM optional.
+- area: sni_dynamic_forward_proxy
+  change: |
+    added an option to dynamically set the port used by the SNI dynamic forward proxy filter, by setting a filter state object under the key ``envoy.upstream.dynamic_port``.
+- area: route
+  change: |
+    support dynamic clusters for :ref:`VirtualHost.matcher <envoy_v3_api_field_config.route.v3.VirtualHost.matcher>`.
+- area: route
+  change: |
+    support route callback after route matches for :ref:`VirtualHost.matcher <envoy_v3_api_field_config.route.v3.VirtualHost.matcher>`.
+- area: tcp_proxy
+  change: |
+    added an option to dynamically disable TCP tunneling even if set in the filter config, by setting a filter state object for the key ``envoy.tcp_proxy.disable_tunneling``.
+- area: http
+  change: |
+    add :ref:`periodic access logging <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.access_log_flush_interval>`
+    to http access logs for long-lived requests (Websockets, CONNECT, etc). :ref:`%DURATION% <config_access_log_format_duration>` will
+    be empty for mid-request logs. Enabling this may affect access loggers and filters that register as access loggers that expect to be called only once.
 
 deprecated:
 - area: ext_authz

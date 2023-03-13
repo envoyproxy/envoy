@@ -1,3 +1,5 @@
+#include <cstddef>
+
 #include "library/cc/engine_builder.h"
 #include "library/common/api/c_types.h"
 #include "library/common/data/utility.h"
@@ -1118,11 +1120,22 @@ void setString(JNIEnv* env, jstring java_string, EngineBuilder* builder,
     return;
   }
   const char* native_java_string = env->GetStringUTFChars(java_string, nullptr);
-  std::string java_string_str = std::string(native_java_string);
+  std::string java_string_str(native_java_string);
   if (!java_string_str.empty()) {
     (builder->*setter)(java_string_str);
     env->ReleaseStringUTFChars(java_string, native_java_string);
   }
+}
+
+// Convert jstring to std::string
+std::string getCppString(JNIEnv* env, jstring java_string) {
+  if (!java_string) {
+    return "";
+  }
+  const char* native_java_string = env->GetStringUTFChars(java_string, nullptr);
+  std::string cpp_string(native_java_string);
+  env->ReleaseStringUTFChars(java_string, native_java_string);
+  return cpp_string;
 }
 
 // Converts a java byte array to a C++ string.
@@ -1198,7 +1211,11 @@ void configureBuilder(JNIEnv* env, jstring grpc_stats_domain, jboolean admin_int
                       jobjectArray filter_chain, jobjectArray stat_sinks,
                       jboolean enable_platform_certificates_validation,
                       jboolean enable_skip_dns_lookup_for_proxied_requests,
-                      jobjectArray runtime_guards, Envoy::Platform::EngineBuilder& builder) {
+                      jobjectArray runtime_guards, jstring rtds_layer_name,
+                      jlong rtds_timeout_seconds, jstring ads_address, jlong ads_port,
+                      jstring ads_token, jlong ads_token_lifetime, jstring ads_root_certs,
+                      jstring node_id, jstring node_region, jstring node_zone,
+                      jstring node_sub_zone, Envoy::Platform::EngineBuilder& builder) {
   setString(env, grpc_stats_domain, &builder, &EngineBuilder::addGrpcStatsDomain);
   builder.addConnectTimeoutSeconds((connect_timeout_seconds));
   builder.addDnsRefreshSeconds((dns_refresh_seconds));
@@ -1255,42 +1272,13 @@ void configureBuilder(JNIEnv* env, jstring grpc_stats_domain, jboolean admin_int
 
   std::vector<std::string> hostnames = javaObjectArrayToStringVector(env, dns_preresolve_hostnames);
   builder.addDnsPreresolveHostnames(hostnames);
-}
-
-extern "C" JNIEXPORT jstring JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibrary_createYaml(
-    JNIEnv* env, jclass, jstring grpc_stats_domain, jboolean admin_interface_enabled,
-    jlong connect_timeout_seconds, jlong dns_refresh_seconds,
-    jlong dns_failure_refresh_seconds_base, jlong dns_failure_refresh_seconds_max,
-    jlong dns_query_timeout_seconds, jlong dns_min_refresh_seconds,
-    jobjectArray dns_preresolve_hostnames, jboolean enable_dns_cache,
-    jlong dns_cache_save_interval_seconds, jboolean enable_drain_post_dns_refresh,
-    jboolean enable_http3, jboolean enable_gzip_decompression, jboolean enable_brotli_decompression,
-    jboolean enable_socket_tagging, jboolean enable_happy_eyeballs,
-    jboolean enable_interface_binding, jlong h2_connection_keepalive_idle_interval_milliseconds,
-    jlong h2_connection_keepalive_timeout_seconds, jlong max_connections_per_host,
-    jlong stats_flush_seconds, jlong stream_idle_timeout_seconds,
-    jlong per_try_idle_timeout_seconds, jstring app_version, jstring app_id,
-    jboolean trust_chain_verification, jobjectArray virtual_clusters, jobjectArray filter_chain,
-    jobjectArray stat_sinks, jboolean enable_platform_certificates_validation,
-    jboolean enable_skip_dns_lookup_for_proxied_requests, jobjectArray runtime_guards) {
-  Envoy::Thread::SkipAsserts skip_asserts;
-  Envoy::Platform::EngineBuilder builder;
-  configureBuilder(
-      env, grpc_stats_domain, admin_interface_enabled, connect_timeout_seconds, dns_refresh_seconds,
-      dns_failure_refresh_seconds_base, dns_failure_refresh_seconds_max, dns_query_timeout_seconds,
-      dns_min_refresh_seconds, dns_preresolve_hostnames, enable_dns_cache,
-      dns_cache_save_interval_seconds, enable_drain_post_dns_refresh, enable_http3,
-      enable_gzip_decompression, enable_brotli_decompression, enable_socket_tagging,
-      enable_happy_eyeballs, enable_interface_binding,
-      h2_connection_keepalive_idle_interval_milliseconds, h2_connection_keepalive_timeout_seconds,
-      max_connections_per_host, stats_flush_seconds, stream_idle_timeout_seconds,
-      per_try_idle_timeout_seconds, app_version, app_id, trust_chain_verification, virtual_clusters,
-      filter_chain, stat_sinks, enable_platform_certificates_validation,
-      enable_skip_dns_lookup_for_proxied_requests, runtime_guards, builder);
-
-  auto bootstrap = builder.generateBootstrap();
-  std::string yaml = Envoy::MessageUtil::getYamlStringFromMessage(*bootstrap);
-  return env->NewStringUTF(yaml.c_str());
+  builder.addRtdsLayer(getCppString(env, rtds_layer_name), rtds_timeout_seconds);
+  builder.setNodeId(getCppString(env, node_id));
+  builder.setNodeLocality(getCppString(env, node_region), getCppString(env, node_zone),
+                          getCppString(env, node_sub_zone));
+  builder.setAggregatedDiscoveryService(getCppString(env, ads_address), ads_port,
+                                        getCppString(env, ads_token), ads_token_lifetime,
+                                        getCppString(env, ads_root_certs));
 }
 
 extern "C" JNIEXPORT jlong JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibrary_createBootstrap(
@@ -1308,7 +1296,10 @@ extern "C" JNIEXPORT jlong JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibr
     jlong per_try_idle_timeout_seconds, jstring app_version, jstring app_id,
     jboolean trust_chain_verification, jobjectArray virtual_clusters, jobjectArray filter_chain,
     jobjectArray stat_sinks, jboolean enable_platform_certificates_validation,
-    jboolean enable_skip_dns_lookup_for_proxied_requests, jobjectArray runtime_guards) {
+    jboolean enable_skip_dns_lookup_for_proxied_requests, jobjectArray runtime_guards,
+    jstring rtds_layer_name, jlong rtds_timeout_seconds, jstring ads_address, jlong ads_port,
+    jstring ads_token, jlong ads_token_lifetime, jstring ads_root_certs, jstring node_id,
+    jstring node_region, jstring node_zone, jstring node_sub_zone) {
   Envoy::Platform::EngineBuilder builder;
 
   configureBuilder(
@@ -1322,7 +1313,9 @@ extern "C" JNIEXPORT jlong JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibr
       max_connections_per_host, stats_flush_seconds, stream_idle_timeout_seconds,
       per_try_idle_timeout_seconds, app_version, app_id, trust_chain_verification, virtual_clusters,
       filter_chain, stat_sinks, enable_platform_certificates_validation,
-      enable_skip_dns_lookup_for_proxied_requests, runtime_guards, builder);
+      enable_skip_dns_lookup_for_proxied_requests, runtime_guards, rtds_layer_name,
+      rtds_timeout_seconds, ads_address, ads_port, ads_token, ads_token_lifetime, ads_root_certs,
+      node_id, node_region, node_zone, node_sub_zone, builder);
 
   return reinterpret_cast<intptr_t>(builder.generateBootstrap().release());
 }
@@ -1363,7 +1356,8 @@ extern "C" JNIEXPORT jint JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibra
 static void jvm_add_test_root_certificate(const uint8_t* cert, size_t len) {
   jni_log("[Envoy]", "jvm_add_test_root_certificate");
   JNIEnv* env = get_env();
-  jclass jcls_AndroidNetworkLibrary = find_class("org.chromium.net.AndroidNetworkLibrary");
+  jclass jcls_AndroidNetworkLibrary =
+      find_class("io.envoyproxy.envoymobile.utilities.AndroidNetworkLibrary");
   jmethodID jmid_addTestRootCertificate =
       env->GetStaticMethodID(jcls_AndroidNetworkLibrary, "addTestRootCertificate", "([B)V");
 
@@ -1376,7 +1370,8 @@ static void jvm_add_test_root_certificate(const uint8_t* cert, size_t len) {
 static void jvm_clear_test_root_certificate() {
   jni_log("[Envoy]", "jvm_clear_test_root_certificate");
   JNIEnv* env = get_env();
-  jclass jcls_AndroidNetworkLibrary = find_class("org.chromium.net.AndroidNetworkLibrary");
+  jclass jcls_AndroidNetworkLibrary =
+      find_class("io.envoyproxy.envoymobile.utilities.AndroidNetworkLibrary");
   jmethodID jmid_clearTestRootCertificates =
       env->GetStaticMethodID(jcls_AndroidNetworkLibrary, "clearTestRootCertificates", "()V");
 

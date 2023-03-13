@@ -213,6 +213,10 @@ public:
   virtual const std::list<AccessLog::InstanceSharedPtr>& accessLogs() PURE;
 
   /**
+   * @return const absl::optional<std::chrono::milliseconds>& the interval to flush the access logs.
+   */
+  virtual const absl::optional<std::chrono::milliseconds>& accessLogFlushInterval() PURE;
+  /**
    * Called to create a codec for the connection manager. This function will be called when the
    * first byte of application data is received. This is done to support handling of ALPN, protocol
    * detection, etc.
@@ -510,6 +514,12 @@ public:
    * @return whether to append the x-forwarded-port header.
    */
   virtual bool appendXForwardedPort() const PURE;
+
+  /**
+   * @return whether the HCM will insert ProxyProtocolFilterState into the filter state at the
+   *         Connection Lifetime.
+   */
+  virtual bool addProxyProtocolConnectionState() const PURE;
 };
 } // namespace Http
 } // namespace Envoy

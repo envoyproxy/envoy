@@ -17,6 +17,7 @@ envoy_cc_library(
         "//envoy/network:connection_interface",
         "//envoy/network:filter_interface",
         "//envoy/router:string_accessor_interface",
+        "//envoy/stream_info:uint32_accessor_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:minimal_logger_lib",
         "//source/common/tcp_proxy",

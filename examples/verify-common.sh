@@ -7,7 +7,11 @@ NAME="${NAME:-}"
 PATHS="${PATHS:-.}"
 UPARGS="${UPARGS:-}"
 
-DOCKER_COMPOSE="${DOCKER_COMPOSE:-docker-compose}"
+if [[ -n "$DOCKER_COMPOSE" ]]; then
+    read -ra DOCKER_COMPOSE <<< "$DOCKER_COMPOSE"
+else
+    DOCKER_COMPOSE=(docker compose)
+fi
 
 run_log () {
     echo -e "\n> [${NAME}] ${*}"
@@ -17,15 +21,15 @@ bring_up_example_stack () {
     local args path up_args
     args=("${UPARGS[@]}")
     path="$1"
-    read -ra up_args <<< "up --quiet-pull --build -d ${args[*]}"
+    read -ra up_args <<< "up --quiet-pull --pull missing --build --wait -d ${args[*]}"
 
     if [[ -z "$DOCKER_NO_PULL" ]]; then
         run_log "Pull the images ($path)"
-        "$DOCKER_COMPOSE" pull -q
+        "${DOCKER_COMPOSE[@]}" pull -q
         echo
     fi
     run_log "Bring up services ($path)"
-    "$DOCKER_COMPOSE" "${up_args[@]}" || return 1
+    "${DOCKER_COMPOSE[@]}" "${up_args[@]}" || return 1
     echo
 }
 
@@ -47,8 +51,8 @@ bring_up_example () {
     fi
     for path in "${paths[@]}"; do
         pushd "$path" > /dev/null || return 1
-        "$DOCKER_COMPOSE" ps
-        "$DOCKER_COMPOSE" logs
+        "${DOCKER_COMPOSE[@]}" ps
+        "${DOCKER_COMPOSE[@]}" logs
         popd > /dev/null || return 1
     done
 }
@@ -57,7 +61,7 @@ cleanup_stack () {
     local path
     path="$1"
     run_log "Cleanup ($path)"
-    "$DOCKER_COMPOSE" down --remove-orphans
+    "${DOCKER_COMPOSE[@]}" down --remove-orphans
 }
 
 debug_failure () {
@@ -65,9 +69,9 @@ debug_failure () {
     >&2 echo "DISK SPACE"
     df -h
     >&2 echo "DOCKER COMPOSE LOGS"
-    "$DOCKER_COMPOSE" logs
+    "${DOCKER_COMPOSE[@]}" logs
     >&2 echo "DOCKER COMPOSE PS"
-    "$DOCKER_COMPOSE" ps
+    "${DOCKER_COMPOSE[@]}" ps
 }
 
 cleanup () {

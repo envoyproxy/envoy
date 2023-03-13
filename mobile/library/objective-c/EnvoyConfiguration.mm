@@ -2,6 +2,7 @@
 
 #import "library/common/main_interface.h"
 #import "library/cc/engine_builder.h"
+#include "source/common/protobuf/utility.h"
 
 @implementation NSString (CXX)
 - (std::string)toCXXString {
@@ -17,16 +18,16 @@
   result.value = [self.value toCXXString];
   switch (self.mode) {
   case EMOMatchModeContains:
-    result.mode = Envoy::DirectResponseTesting::contains;
+    result.mode = Envoy::DirectResponseTesting::MatchMode::Contains;
     break;
   case EMOMatchModeExact:
-    result.mode = Envoy::DirectResponseTesting::exact;
+    result.mode = Envoy::DirectResponseTesting::MatchMode::Exact;
     break;
   case EMOMatchModePrefix:
-    result.mode = Envoy::DirectResponseTesting::prefix;
+    result.mode = Envoy::DirectResponseTesting::MatchMode::Prefix;
     break;
   case EMOMatchModeSuffix:
-    result.mode = Envoy::DirectResponseTesting::suffix;
+    result.mode = Envoy::DirectResponseTesting::MatchMode::Suffix;
     break;
   }
   return result;
@@ -85,7 +86,6 @@
                         enableDrainPostDnsRefresh:(BOOL)enableDrainPostDnsRefresh
                     enforceTrustChainVerification:(BOOL)enforceTrustChainVerification
                                         forceIPv6:(BOOL)forceIPv6
-              enablePlatformCertificateValidation:(BOOL)enablePlatformCertificateValidation
     h2ConnectionKeepaliveIdleIntervalMilliseconds:
         (UInt32)h2ConnectionKeepaliveIdleIntervalMilliseconds
               h2ConnectionKeepaliveTimeoutSeconds:(UInt32)h2ConnectionKeepaliveTimeoutSeconds
@@ -110,7 +110,20 @@
                                    keyValueStores:
                                        (NSDictionary<NSString *, id<EnvoyKeyValueStore>> *)
                                            keyValueStores
-                                       statsSinks:(NSArray<NSString *> *)statsSinks {
+                                       statsSinks:(NSArray<NSString *> *)statsSinks
+                                    rtdsLayerName:(NSString *)rtdsLayerName
+                               rtdsTimeoutSeconds:(UInt32)rtdsTimeoutSeconds
+                                       adsAddress:(NSString *)adsAddress
+                                          adsPort:(UInt32)adsPort
+                                      adsJwtToken:(NSString *)adsJwtToken
+                       adsJwtTokenLifetimeSeconds:(UInt32)adsJwtTokenLifetimeSeconds
+                                  adsSslRootCerts:(NSString *)adsSslRootCerts
+                                           nodeId:(NSString *)nodeId
+                                       nodeRegion:(NSString *)nodeRegion
+                                         nodeZone:(NSString *)nodeZone
+                                      nodeSubZone:(NSString *)nodeSubZone
+
+{
   self = [super init];
   if (!self) {
     return nil;
@@ -135,7 +148,6 @@
   self.enableDrainPostDnsRefresh = enableDrainPostDnsRefresh;
   self.enforceTrustChainVerification = enforceTrustChainVerification;
   self.forceIPv6 = forceIPv6;
-  self.enablePlatformCertificateValidation = enablePlatformCertificateValidation;
   self.h2ConnectionKeepaliveIdleIntervalMilliseconds =
       h2ConnectionKeepaliveIdleIntervalMilliseconds;
   self.h2ConnectionKeepaliveTimeoutSeconds = h2ConnectionKeepaliveTimeoutSeconds;
@@ -153,6 +165,18 @@
   self.stringAccessors = stringAccessors;
   self.keyValueStores = keyValueStores;
   self.statsSinks = statsSinks;
+  self.rtdsLayerName = rtdsLayerName;
+  self.rtdsTimeoutSeconds = rtdsTimeoutSeconds;
+  self.adsAddress = adsAddress;
+  self.adsPort = adsPort;
+  self.adsJwtToken = adsJwtToken;
+  self.adsJwtTokenLifetimeSeconds = adsJwtTokenLifetimeSeconds;
+  self.adsSslRootCerts = adsSslRootCerts;
+  self.nodeId = nodeId;
+  self.nodeRegion = nodeRegion;
+  self.nodeZone = nodeZone;
+  self.nodeSubZone = nodeSubZone;
+
   return self;
 }
 
@@ -176,6 +200,11 @@
 
   builder.enableGzipDecompression(self.enableGzipDecompression);
   builder.enableBrotliDecompression(self.enableBrotliDecompression);
+
+  for (NSString *key in self.runtimeGuards) {
+    BOOL value = [[self.runtimeGuards objectForKey:key] isEqualToString:@"true"];
+    builder.setRuntimeGuard([key toCXXString], value);
+  }
 
   for (EMODirectResponse *directResponse in self.typedDirectResponses) {
     builder.addDirectResponse([directResponse toCXX]);
@@ -215,7 +244,7 @@
     builder.addVirtualCluster([cluster toCXXString]);
   }
   builder.addStatsFlushSeconds(self.statsFlushSeconds);
-  builder.enablePlatformCertificatesValidation(self.enablePlatformCertificateValidation);
+  builder.enablePlatformCertificatesValidation(true);
   builder.enableDnsCache(self.enableDNSCache, self.dnsCacheSaveIntervalSeconds);
   builder.addGrpcStatsDomain([self.grpcStatsDomain toCXXString]);
   if (self.statsSinks.count > 0) {
@@ -226,7 +255,13 @@
     }
     builder.addStatsSinks(std::move(sinks));
   }
-
+  builder.setNodeLocality([self.nodeRegion toCXXString], [self.nodeZone toCXXString],
+                          [self.nodeSubZone toCXXString]);
+  builder.setNodeId([self.nodeId toCXXString]);
+  builder.addRtdsLayer([self.rtdsLayerName toCXXString], self.rtdsTimeoutSeconds);
+  builder.setAggregatedDiscoveryService(
+      [self.adsAddress toCXXString], self.adsPort, [self.adsJwtToken toCXXString],
+      self.adsJwtTokenLifetimeSeconds, [self.adsSslRootCerts toCXXString]);
 #ifdef ENVOY_ADMIN_FUNCTIONALITY
   builder.enableAdminInterface(self.adminInterfaceEnabled);
 #endif
@@ -242,6 +277,11 @@
     NSLog(@"[Envoy] error generating bootstrap: %@", @(e.what()));
     return nullptr;
   }
+}
+
+- (NSString *)bootstrapDebugDescription {
+  std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> bootstrap = [self generateBootstrap];
+  return @(bootstrap->ShortDebugString().c_str());
 }
 
 @end

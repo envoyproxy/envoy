@@ -30,7 +30,6 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic, assign) BOOL enableDrainPostDnsRefresh;
 @property (nonatomic, assign) BOOL enforceTrustChainVerification;
 @property (nonatomic, assign) BOOL forceIPv6;
-@property (nonatomic, assign) BOOL enablePlatformCertificateValidation;
 @property (nonatomic, assign) UInt32 h2ConnectionKeepaliveIdleIntervalMilliseconds;
 @property (nonatomic, assign) UInt32 h2ConnectionKeepaliveTimeoutSeconds;
 @property (nonatomic, assign) UInt32 maxConnectionsPerHost;
@@ -47,7 +46,17 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic, strong) NSDictionary<NSString *, EnvoyStringAccessor *> *stringAccessors;
 @property (nonatomic, strong) NSDictionary<NSString *, id<EnvoyKeyValueStore>> *keyValueStores;
 @property (nonatomic, strong) NSArray<NSString *> *statsSinks;
-
+@property (nonatomic, strong) NSString *rtdsLayerName;
+@property (nonatomic, assign) UInt32 rtdsTimeoutSeconds;
+@property (nonatomic, strong) NSString *adsAddress;
+@property (nonatomic, assign) UInt32 adsPort;
+@property (nonatomic, strong) NSString *adsJwtToken;
+@property (nonatomic, assign) UInt32 adsJwtTokenLifetimeSeconds;
+@property (nonatomic, strong) NSString *adsSslRootCerts;
+@property (nonatomic, strong) NSString *nodeId;
+@property (nonatomic, strong) NSString *nodeRegion;
+@property (nonatomic, strong) NSString *nodeZone;
+@property (nonatomic, strong) NSString *nodeSubZone;
 /**
  Create a new instance of the configuration.
  */
@@ -70,7 +79,6 @@ NS_ASSUME_NONNULL_BEGIN
                         enableDrainPostDnsRefresh:(BOOL)enableDrainPostDnsRefresh
                     enforceTrustChainVerification:(BOOL)enforceTrustChainVerification
                                         forceIPv6:(BOOL)forceIPv6
-              enablePlatformCertificateValidation:(BOOL)enablePlatformCertificateValidation
     h2ConnectionKeepaliveIdleIntervalMilliseconds:
         (UInt32)h2ConnectionKeepaliveIdleIntervalMilliseconds
               h2ConnectionKeepaliveTimeoutSeconds:(UInt32)h2ConnectionKeepaliveTimeoutSeconds
@@ -95,7 +103,25 @@ NS_ASSUME_NONNULL_BEGIN
                                    keyValueStores:
                                        (NSDictionary<NSString *, id<EnvoyKeyValueStore>> *)
                                            keyValueStores
-                                       statsSinks:(NSArray<NSString *> *)statsSinks;
+                                       statsSinks:(NSArray<NSString *> *)statsSinks
+                                    rtdsLayerName:(NSString *)rtdsLayerName
+                               rtdsTimeoutSeconds:(UInt32)rtdsTimeoutSeconds
+                                       adsAddress:(NSString *)adsAddress
+                                          adsPort:(UInt32)adsPort
+                                      adsJwtToken:(NSString *)adsJwtToken
+                       adsJwtTokenLifetimeSeconds:(UInt32)adsJwtTokenLifetimeSeconds
+                                  adsSslRootCerts:(NSString *)adsSslRootCerts
+                                           nodeId:(NSString *)nodeId
+                                       nodeRegion:(NSString *)nodeRegion
+                                         nodeZone:(NSString *)nodeZone
+                                      nodeSubZone:(NSString *)nodeSubZone;
+
+/**
+ Generate a string description of the C++ Envoy bootstrap from this configuration.
+ For testing purposes only.
+ */
+- (NSString *)bootstrapDebugDescription;
+
 @end
 
 NS_ASSUME_NONNULL_END

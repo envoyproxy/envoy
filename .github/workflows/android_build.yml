@@ -68,7 +68,7 @@ jobs:
       if: steps.should_run.outputs.run_ci_job == 'true'
       name: 'Start emulator'
       with:
-        timeout_minutes: 6
+        timeout_minutes: 10
         max_attempts: 3
         command: ./mobile/ci/start_android_emulator.sh
     # Return to using:
@@ -88,7 +88,7 @@ jobs:
           adb shell am start -n io.envoyproxy.envoymobile.helloenvoy/.MainActivity
     - name: 'Check connectivity'
       if: steps.should_run.outputs.run_ci_job == 'true'
-      run: adb logcat -e "received headers with status 200" -m 1
+      run: adb logcat -e "received headers with status 301" -m 1
   kotlinhelloworld:
     if: github.repository == 'envoyproxy/envoy'
     name: kotlin_helloworld
@@ -116,7 +116,7 @@ jobs:
       if: steps.should_run.outputs.run_ci_job == 'true'
       name: 'Start emulator'
       with:
-        timeout_minutes: 6
+        timeout_minutes: 10
         max_attempts: 3
         command: ./mobile/ci/start_android_emulator.sh
     # Return to using:
@@ -164,7 +164,7 @@ jobs:
       if: steps.should_run.outputs.run_ci_job == 'true'
       name: 'Start emulator'
       with:
-        timeout_minutes: 6
+        timeout_minutes: 10
         max_attempts: 3
         command: ./mobile/ci/start_android_emulator.sh
     # Return to using:
@@ -212,7 +212,7 @@ jobs:
       if: steps.should_run.outputs.run_ci_job == 'true'
       name: 'Start emulator'
       with:
-        timeout_minutes: 6
+        timeout_minutes: 10
         max_attempts: 3
         command: ./mobile/ci/start_android_emulator.sh
     # Return to using:

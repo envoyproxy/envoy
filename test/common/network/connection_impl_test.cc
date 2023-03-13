@@ -137,12 +137,12 @@ public:
   Buffer::Instance& readBuffer() { return *read_buffer_; }
 };
 
-class ConnectionImplTest : public testing::TestWithParam<Address::IpVersion> {
+class ConnectionImplTestBase {
 protected:
-  ConnectionImplTest()
+  ConnectionImplTestBase()
       : api_(Api::createApiForTest(time_system_)), stream_info_(time_system_, nullptr) {}
 
-  ~ConnectionImplTest() override {
+  virtual ~ConnectionImplTestBase() {
     EXPECT_TRUE(timer_destroyed_ || timer_ == nullptr);
     if (!timer_destroyed_) {
       delete timer_;
@@ -153,12 +153,11 @@ protected:
     return Network::Test::createRawBufferSocket();
   }
 
-  void setUpBasicConnection() {
+  void setUpBasicConnectionWithAddress(const Address::InstanceConstSharedPtr& address) {
     if (dispatcher_ == nullptr) {
       dispatcher_ = api_->allocateDispatcher("test_thread");
     }
-    socket_ = std::make_shared<Network::Test::TcpListenSocketImmediateListen>(
-        Network::Test::getCanonicalLoopbackAddress(GetParam()));
+    socket_ = std::make_shared<Network::Test::TcpListenSocketImmediateListen>(address);
     listener_ = dispatcher_->createListener(socket_, listener_callbacks_, runtime_, true, false);
     client_connection_ = std::make_unique<Network::TestClientConnectionImpl>(
         *dispatcher_, socket_->connectionInfoProvider().localAddress(), source_address_,
@@ -295,6 +294,14 @@ protected:
   Socket::OptionsSharedPtr socket_options_;
   StreamInfo::StreamInfoImpl stream_info_;
   Network::TransportSocketOptionsConstSharedPtr transport_socket_options_ = nullptr;
+};
+
+class ConnectionImplTest : public ConnectionImplTestBase,
+                           public testing::TestWithParam<Address::IpVersion> {
+protected:
+  void setUpBasicConnection() {
+    setUpBasicConnectionWithAddress(Network::Test::getCanonicalLoopbackAddress(GetParam()));
+  }
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, ConnectionImplTest,
@@ -3092,8 +3099,23 @@ TEST_F(InternalClientConnectionImplTest,
       "");
 }
 
-class ClientConnectionWithCustomRawBufferSocketTest : public ConnectionImplTest {
+class ClientConnectionWithCustomRawBufferSocketTest : public ConnectionImplTestBase,
+                                                      public testing::TestWithParam<Address::Type> {
 protected:
+  void setUpBasicConnection() {
+    Address::InstanceConstSharedPtr address;
+    switch (GetParam()) {
+    case Address::Type::Pipe:
+      address = Utility::resolveUrl("unix://" + path_);
+      break;
+    case Address::Type::Ip:
+    default:
+      address = Network::Test::getCanonicalLoopbackAddress(Address::IpVersion::v4);
+      break;
+    }
+    setUpBasicConnectionWithAddress(address);
+  }
+
   class TestRawBufferSocket : public RawBufferSocket {
   public:
     bool compareCallbacks(TransportSocketCallbacks* callback) const {
@@ -3109,11 +3131,13 @@ protected:
     Network::TestClientConnectionImpl* client_conn_impl = testClientConnection();
     return dynamic_cast<TestRawBufferSocket*>(client_conn_impl->transportSocket().get());
   }
+
+private:
+  const std::string path_{TestEnvironment::unixDomainSocketPath("foo")};
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, ClientConnectionWithCustomRawBufferSocketTest,
-                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                         TestUtility::ipTestParamsToString);
+                         testing::ValuesIn({Address::Type::Ip, Address::Type::Pipe}));
 
 class TestObject : public StreamInfo::FilterState::Object {};
 

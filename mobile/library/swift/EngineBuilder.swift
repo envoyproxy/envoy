@@ -35,7 +35,6 @@ open class EngineBuilder: NSObject {
 #endif
   private var enableInterfaceBinding: Bool = false
   private var enforceTrustChainVerification: Bool = true
-  private var enablePlatformCertificateValidation: Bool = false
   private var enableDrainPostDnsRefresh: Bool = false
   private var forceIPv6: Bool = false
   private var h2ConnectionKeepaliveIdleIntervalMilliseconds: UInt32 = 1
@@ -55,9 +54,20 @@ open class EngineBuilder: NSObject {
   private var platformFilterChain: [EnvoyHTTPFilterFactory] = []
   private var stringAccessors: [String: EnvoyStringAccessor] = [:]
   private var keyValueStores: [String: EnvoyKeyValueStore] = [:]
-  private var runtimeGuards: [String: String] = [:]
+  private var runtimeGuards: [String: Bool] = [:]
   private var directResponses: [DirectResponse] = []
   private var statsSinks: [String] = []
+  private var rtdsLayerName: String = ""
+  private var rtdsTimeoutSeconds: UInt32 = 0
+  private var adsAddress: String = ""
+  private var adsPort: UInt32 = 0
+  private var adsJwtToken: String = ""
+  private var adsJwtTokenLifetimeSeconds: UInt32 = 0
+  private var adsSslRootCerts: String = ""
+  private var nodeID: String = ""
+  private var nodeRegion: String = ""
+  private var nodeZone: String = ""
+  private var nodeSubZone: String = ""
 
   // MARK: - Public
 
@@ -281,18 +291,6 @@ open class EngineBuilder: NSObject {
     return self
   }
 
-  /// Specify whether to use the platform certificate verifier.
-  ///
-  /// - parameter enablePlatformCertificateValidation: whether to use the platform verifier.
-  ///
-  /// - returns: This builder.
-  @discardableResult
-  public func enablePlatformCertificateValidation(
-    _ enablePlatformCertificateValidation: Bool) -> Self {
-    self.enablePlatformCertificateValidation = enablePlatformCertificateValidation
-    return self
-  }
-
   /// Specify whether to remap IPv4 addresses to the IPv6 space and always force connections
   /// to use IPv6. Note this is an experimental option and should be enabled with caution.
   ///
@@ -453,7 +451,7 @@ open class EngineBuilder: NSObject {
   /// - returns: This builder.
   @discardableResult
   public func setRuntimeGuard(_ name: String, _ value: Bool) -> Self {
-    self.runtimeGuards[name] = "\(value)"
+    self.runtimeGuards[name] = value
     return self
   }
 
@@ -546,6 +544,74 @@ open class EngineBuilder: NSObject {
     return self
   }
 
+  /// Sets the node.id field in the Bootstrap configuration.
+  ///
+  /// - parameter nodeID: The node ID.
+  ///
+  /// - returns: This builder.
+  @discardableResult
+  public func setNodeID(_ nodeID: String) -> Self {
+    self.nodeID = nodeID
+    return self
+  }
+
+  /// Sets the node locality in the Bootstrap configuration.
+  ///
+  /// - parameter region:  The region.
+  /// - parameter zone:    The zone.
+  /// - parameter subZone: The sub-zone.
+  ///
+  /// - returns: This builder.
+  @discardableResult
+  public func setNodeLocality(
+    region: String,
+    zone: String,
+    subZone: String
+  ) -> Self {
+    self.nodeRegion = region
+    self.nodeZone = zone
+    self.nodeSubZone = subZone
+    return self
+  }
+
+  /// Adds an aggregated discovery service layer to the configuration.
+  ///
+  /// - parameter address:                 The network address of the server.
+  /// - parameter port:                    The port of the server.
+  /// - parameter jwtToken:                The JWT token.
+  /// - parameter jwtTokenLifetimeSeconds: The JWT token lifetime in seconds.
+  /// - parameter sslRootCerts:            The SSL root certificates.
+  ///
+  /// - returns: This builder.
+  @discardableResult
+  public func setAggregatedDiscoveryService(
+    address: String,
+    port: UInt32,
+    jwtToken: String = "",
+    jwtTokenLifetimeSeconds: UInt32 = 0,
+    sslRootCerts: String = ""
+  ) -> Self {
+    self.adsAddress = address
+    self.adsPort = port
+    self.adsJwtToken = jwtToken
+    self.adsJwtTokenLifetimeSeconds = jwtTokenLifetimeSeconds
+    self.adsSslRootCerts = sslRootCerts
+    return self
+  }
+
+  /// Adds an RTDS layer to the configuration.
+  ///
+  /// - parameter layerName:      The layer name.
+  /// - parameter timeoutSeconds: The timeout in seconds.
+  ///
+  /// - returns: This builder.
+  @discardableResult
+  public func addRTDSLayer(name layerName: String, timeoutSeconds: UInt32 = 0) -> Self {
+    self.rtdsLayerName = layerName
+    self.rtdsTimeoutSeconds = timeoutSeconds
+    return self
+  }
+
 #if ENVOY_ADMIN_FUNCTIONALITY
   /// Enable admin interface on 127.0.0.1:9901 address. Admin interface is intended to be
   /// used for development/debugging purposes only. Enabling it in production may open
@@ -571,45 +637,7 @@ open class EngineBuilder: NSObject {
     let engine = self.engineType.init(runningCallback: self.onEngineRunning, logger: self.logger,
                                       eventTracker: self.eventTracker,
                                       networkMonitoringMode: Int32(self.monitoringMode.rawValue))
-    let config = EnvoyConfiguration(
-      adminInterfaceEnabled: self.adminInterfaceEnabled,
-      grpcStatsDomain: self.grpcStatsDomain,
-      connectTimeoutSeconds: self.connectTimeoutSeconds,
-      dnsRefreshSeconds: self.dnsRefreshSeconds,
-      dnsFailureRefreshSecondsBase: self.dnsFailureRefreshSecondsBase,
-      dnsFailureRefreshSecondsMax: self.dnsFailureRefreshSecondsMax,
-      dnsQueryTimeoutSeconds: self.dnsQueryTimeoutSeconds,
-      dnsMinRefreshSeconds: self.dnsMinRefreshSeconds,
-      dnsPreresolveHostnames: self.dnsPreresolveHostnames,
-      enableDNSCache: self.enableDNSCache,
-      dnsCacheSaveIntervalSeconds: self.dnsCacheSaveIntervalSeconds,
-      enableHappyEyeballs: self.enableHappyEyeballs,
-      enableHttp3: self.enableHttp3,
-      enableGzipDecompression: self.enableGzipDecompression,
-      enableBrotliDecompression: self.enableBrotliDecompression,
-      enableInterfaceBinding: self.enableInterfaceBinding,
-      enableDrainPostDnsRefresh: self.enableDrainPostDnsRefresh,
-      enforceTrustChainVerification: self.enforceTrustChainVerification,
-      forceIPv6: self.forceIPv6,
-      enablePlatformCertificateValidation: self.enablePlatformCertificateValidation,
-      h2ConnectionKeepaliveIdleIntervalMilliseconds:
-        self.h2ConnectionKeepaliveIdleIntervalMilliseconds,
-      h2ConnectionKeepaliveTimeoutSeconds: self.h2ConnectionKeepaliveTimeoutSeconds,
-      maxConnectionsPerHost: self.maxConnectionsPerHost,
-      statsFlushSeconds: self.statsFlushSeconds,
-      streamIdleTimeoutSeconds: self.streamIdleTimeoutSeconds,
-      perTryIdleTimeoutSeconds: self.perTryIdleTimeoutSeconds,
-      appVersion: self.appVersion,
-      appId: self.appId,
-      virtualClusters: self.virtualClusters,
-      runtimeGuards: self.runtimeGuards,
-      typedDirectResponses: self.directResponses.map({ $0.toObjC() }),
-      nativeFilterChain: self.nativeFilterChain,
-      platformFilterChain: self.platformFilterChain,
-      stringAccessors: self.stringAccessors,
-      keyValueStores: self.keyValueStores,
-      statsSinks: self.statsSinks
-    )
+    let config = self.makeConfig()
 
     switch self.base {
     case .custom(let yaml):
@@ -643,5 +671,61 @@ open class EngineBuilder: NSObject {
   /// - parameter directResponse: The response configuration to add.
   func addDirectResponseInternal(_ directResponse: DirectResponse) {
     self.directResponses.append(directResponse)
+  }
+
+  func makeConfig() -> EnvoyConfiguration {
+    EnvoyConfiguration(
+      adminInterfaceEnabled: self.adminInterfaceEnabled,
+      grpcStatsDomain: self.grpcStatsDomain,
+      connectTimeoutSeconds: self.connectTimeoutSeconds,
+      dnsRefreshSeconds: self.dnsRefreshSeconds,
+      dnsFailureRefreshSecondsBase: self.dnsFailureRefreshSecondsBase,
+      dnsFailureRefreshSecondsMax: self.dnsFailureRefreshSecondsMax,
+      dnsQueryTimeoutSeconds: self.dnsQueryTimeoutSeconds,
+      dnsMinRefreshSeconds: self.dnsMinRefreshSeconds,
+      dnsPreresolveHostnames: self.dnsPreresolveHostnames,
+      enableDNSCache: self.enableDNSCache,
+      dnsCacheSaveIntervalSeconds: self.dnsCacheSaveIntervalSeconds,
+      enableHappyEyeballs: self.enableHappyEyeballs,
+      enableHttp3: self.enableHttp3,
+      enableGzipDecompression: self.enableGzipDecompression,
+      enableBrotliDecompression: self.enableBrotliDecompression,
+      enableInterfaceBinding: self.enableInterfaceBinding,
+      enableDrainPostDnsRefresh: self.enableDrainPostDnsRefresh,
+      enforceTrustChainVerification: self.enforceTrustChainVerification,
+      forceIPv6: self.forceIPv6,
+      h2ConnectionKeepaliveIdleIntervalMilliseconds:
+        self.h2ConnectionKeepaliveIdleIntervalMilliseconds,
+      h2ConnectionKeepaliveTimeoutSeconds: self.h2ConnectionKeepaliveTimeoutSeconds,
+      maxConnectionsPerHost: self.maxConnectionsPerHost,
+      statsFlushSeconds: self.statsFlushSeconds,
+      streamIdleTimeoutSeconds: self.streamIdleTimeoutSeconds,
+      perTryIdleTimeoutSeconds: self.perTryIdleTimeoutSeconds,
+      appVersion: self.appVersion,
+      appId: self.appId,
+      virtualClusters: self.virtualClusters,
+      runtimeGuards: self.runtimeGuards.mapValues({ "\($0)" }),
+      typedDirectResponses: self.directResponses.map({ $0.toObjC() }),
+      nativeFilterChain: self.nativeFilterChain,
+      platformFilterChain: self.platformFilterChain,
+      stringAccessors: self.stringAccessors,
+      keyValueStores: self.keyValueStores,
+      statsSinks: self.statsSinks,
+      rtdsLayerName: self.rtdsLayerName,
+      rtdsTimeoutSeconds: self.rtdsTimeoutSeconds,
+      adsAddress: self.adsAddress,
+      adsPort: self.adsPort,
+      adsJwtToken: self.adsJwtToken,
+      adsJwtTokenLifetimeSeconds: self.adsJwtTokenLifetimeSeconds,
+      adsSslRootCerts: self.adsSslRootCerts,
+      nodeId: self.nodeID,
+      nodeRegion: self.nodeRegion,
+      nodeZone: self.nodeZone,
+      nodeSubZone: self.nodeSubZone
+    )
+  }
+
+  func bootstrapDebugDescription() -> String {
+    self.makeConfig().bootstrapDebugDescription()
   }
 }

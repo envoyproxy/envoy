@@ -5,22 +5,6 @@ import XCTest
 
 // swiftlint:disable type_body_length
 
-private let kMockTemplate =
-"""
-fixture_template:
-- name: mock
-  clusters:
-#{custom_clusters}
-  listeners:
-#{custom_listeners}
-  filters:
-#{custom_filters}
-  runtime:
-#{custom_runtime}
-  routes:
-#{custom_routes}
-"""
-
 private struct TestFilter: Filter {}
 
 final class EngineBuilderTests: XCTestCase {
@@ -28,6 +12,28 @@ final class EngineBuilderTests: XCTestCase {
     super.tearDown()
     MockEnvoyEngine.onRunWithConfig = nil
     MockEnvoyEngine.onRunWithYAML = nil
+  }
+
+  func testSetRuntimeGuard() {
+    let bootstrapDebugDescription = EngineBuilder()
+      .setRuntimeGuard("test_feature_false", true)
+      .setRuntimeGuard("test_feature_true", false)
+      .bootstrapDebugDescription()
+    XCTAssertTrue(
+      bootstrapDebugDescription.contains(#""test_feature_false" value { bool_value: true }"#)
+    )
+    XCTAssertTrue(
+      bootstrapDebugDescription.contains(#""test_feature_true" value { bool_value: false }"#)
+    )
+  }
+
+  func testPlatformCertificateValidationAlwaysEnabled() {
+    let bootstrapDebugDescription = EngineBuilder()
+      .bootstrapDebugDescription()
+    XCTAssertTrue(
+      bootstrapDebugDescription
+        .contains("envoy_mobile.cert_validator.platform_bridge_cert_validator")
+    )
   }
 
   func testMonitoringModeDefaultsToPathMonitor() {
@@ -406,6 +412,45 @@ final class EngineBuilderTests: XCTestCase {
       .addStringAccessor(name: "name", accessor: { "hello" })
       .build()
     self.waitForExpectations(timeout: 0.01)
+  }
+
+  func testAddingRtdsAndAdsConfigurationWhenRunningEnvoy() {
+    let bootstrapDebugDescription = EngineBuilder()
+      .addEngineType(MockEnvoyEngine.self)
+      .addRTDSLayer(name: "rtds_layer_name", timeoutSeconds: 14325)
+      .setAggregatedDiscoveryService(address: "FAKE_SWIFT_ADDRESS", port: 0)
+      .bootstrapDebugDescription()
+    XCTAssertTrue(bootstrapDebugDescription.contains("rtds_layer_name"))
+    XCTAssertTrue(bootstrapDebugDescription.contains("initial_fetch_timeout { seconds: 14325 }"))
+    XCTAssertTrue(bootstrapDebugDescription.contains("FAKE_SWIFT_ADDRESS"))
+  }
+
+  func testDefaultValues() {
+    // rtds, ads, node_id, node_locality
+    let bootstrapDebugDescription = EngineBuilder()
+      .addEngineType(MockEnvoyEngine.self)
+      .bootstrapDebugDescription()
+    XCTAssertFalse(bootstrapDebugDescription.contains("rtds_layer:"))
+    XCTAssertFalse(bootstrapDebugDescription.contains("ads_config:"))
+    XCTAssertTrue(bootstrapDebugDescription.contains(#"id: "envoy-mobile""#))
+    XCTAssertFalse(bootstrapDebugDescription.contains("locality:"))
+  }
+
+  func testCustomnodeID() {
+    let bootstrapDebugDescription = EngineBuilder()
+      .addEngineType(MockEnvoyEngine.self)
+      .setNodeID("SWIFT_TEST_NODE_ID")
+      .bootstrapDebugDescription()
+    XCTAssertTrue(bootstrapDebugDescription.contains(#"id: "SWIFT_TEST_NODE_ID""#))
+  }
+
+  func testCustomNodeLocality() {
+    let bootstrapDebugDescription = EngineBuilder()
+      .setNodeLocality(region: "SWIFT_REGION", zone: "SWIFT_ZONE", subZone: "SWIFT_SUB")
+      .bootstrapDebugDescription()
+    XCTAssertTrue(bootstrapDebugDescription.contains(#"region: "SWIFT_REGION""#))
+    XCTAssertTrue(bootstrapDebugDescription.contains(#"zone: "SWIFT_ZONE""#))
+    XCTAssertTrue(bootstrapDebugDescription.contains(#"sub_zone: "SWIFT_SUB""#))
   }
 
   func testAddingKeyValueStoreToConfigurationWhenRunningEnvoy() {
