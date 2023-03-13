@@ -544,6 +544,7 @@ open class EngineBuilder: NSObject {
     return self
   }
 
+#if ENVOY_GOOGLE_GRPC
   /// Sets the node.id field in the Bootstrap configuration.
   ///
   /// - parameter nodeID: The node ID.
@@ -611,6 +612,7 @@ open class EngineBuilder: NSObject {
     self.rtdsTimeoutSeconds = timeoutSeconds
     return self
   }
+#endif
 
 #if ENVOY_ADMIN_FUNCTIONALITY
   /// Enable admin interface on 127.0.0.1:9901 address. Admin interface is intended to be

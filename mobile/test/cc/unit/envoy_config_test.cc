@@ -297,6 +297,7 @@ TEST(TestConfig, RtdsWithoutAds) {
   }
 }
 
+#ifdef ENVOY_GOOGLE_GRPC
 TEST(TestConfig, AdsConfig) {
   EngineBuilder engine_builder;
   engine_builder.setAggregatedDiscoveryService(/*target_uri=*/"fake-td.googleapis.com",
@@ -346,6 +347,7 @@ TEST(TestConfig, AdsConfig) {
                 .token_lifetime_seconds(),
             500);
 }
+#endif
 
 TEST(TestConfig, EnablePlatformCertificatesValidation) {
   EngineBuilder engine_builder;
@@ -471,6 +473,7 @@ TEST(TestConfig, SetNodeLocality) {
   EXPECT_EQ(bootstrap->node().locality().sub_zone(), sub_zone);
 }
 
+#ifdef ENVOY_GOOGLE_GRPC
 TEST(TestConfig, AddCdsLayer) {
   EngineBuilder engine_builder;
   engine_builder.setAggregatedDiscoveryService(/*address=*/"fake-xds-server", /*port=*/12345);
@@ -494,6 +497,7 @@ TEST(TestConfig, AddCdsLayer) {
   EXPECT_EQ(bootstrap->dynamic_resources().cds_config().api_config_source().transport_api_version(),
             envoy::config::core::v3::ApiVersion::V3);
 }
+#endif
 
 } // namespace
 } // namespace Envoy

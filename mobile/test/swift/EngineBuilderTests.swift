@@ -414,6 +414,7 @@ final class EngineBuilderTests: XCTestCase {
     self.waitForExpectations(timeout: 0.01)
   }
 
+#if ENVOY_GOOGLE_GRPC
   func testAddingRtdsAndAdsConfigurationWhenRunningEnvoy() {
     let bootstrapDebugDescription = EngineBuilder()
       .addEngineType(MockEnvoyEngine.self)
@@ -425,7 +426,7 @@ final class EngineBuilderTests: XCTestCase {
     XCTAssertTrue(bootstrapDebugDescription.contains("FAKE_SWIFT_ADDRESS"))
   }
 
-  func testDefaultValues() {
+  func testXDSDefaultValues() {
     // rtds, ads, node_id, node_locality
     let bootstrapDebugDescription = EngineBuilder()
       .addEngineType(MockEnvoyEngine.self)
@@ -436,7 +437,7 @@ final class EngineBuilderTests: XCTestCase {
     XCTAssertFalse(bootstrapDebugDescription.contains("locality:"))
   }
 
-  func testCustomnodeID() {
+  func testCustomNodeID() {
     let bootstrapDebugDescription = EngineBuilder()
       .addEngineType(MockEnvoyEngine.self)
       .setNodeID("SWIFT_TEST_NODE_ID")
@@ -452,6 +453,7 @@ final class EngineBuilderTests: XCTestCase {
     XCTAssertTrue(bootstrapDebugDescription.contains(#"zone: "SWIFT_ZONE""#))
     XCTAssertTrue(bootstrapDebugDescription.contains(#"sub_zone: "SWIFT_SUB""#))
   }
+#endif
 
   func testAddingKeyValueStoreToConfigurationWhenRunningEnvoy() {
     let expectation = self.expectation(description: "Run called with expected data")
