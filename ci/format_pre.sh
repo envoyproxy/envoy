@@ -63,6 +63,14 @@ CURRENT=check_format
 CURRENT=check_format_go_code
 "${ENVOY_SRCDIR}"/tools/code_format/check_format_go_code.sh
 
+CURRENT=proto_format
+bazel run "${BAZEL_BUILD_OPTIONS[@]}" \
+      --//tools/api_proto_plugin:default_type_db_target=//tools/testdata/protoxform:fix_protos \
+      --//tools/api_proto_plugin:extra_args=api_version:3.7 \
+      //tools/protoprint:protoprint_test
+BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS[*]}" "${ENVOY_SRCDIR}"/tools/proto_format/proto_format.sh fix
+
+
 if [[ "${#FAILED[@]}" -ne "0" ]]; then
     echo "${BASH_ERR_PREFIX}TESTS FAILED:" >&2
     for failed in "${FAILED[@]}"; do

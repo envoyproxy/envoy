@@ -481,20 +481,6 @@ elif [[ "$CI_TARGET" == "bazel.fuzz" ]]; then
 elif [[ "$CI_TARGET" == "format" ]]; then
   setup_clang_toolchain
   BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS[*]}" "${ENVOY_SRCDIR}"/ci/format_pre.sh
-elif [[ "$CI_TARGET" == "fix_proto_format" ]]; then
-  # proto_format.sh needs to build protobuf.
-  setup_clang_toolchain
-  BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS[*]}" "${ENVOY_SRCDIR}"/tools/proto_format/proto_format.sh fix
-  exit 0
-elif [[ "$CI_TARGET" == "check_proto_format" ]]; then
-  # proto_format.sh needs to build protobuf.
-  setup_clang_toolchain
-  echo "Run protoxform test"
-  bazel run "${BAZEL_BUILD_OPTIONS[@]}" \
-        --//tools/api_proto_plugin:default_type_db_target=//tools/testdata/protoxform:fix_protos \
-        --//tools/api_proto_plugin:extra_args=api_version:3.7 \
-        //tools/protoprint:protoprint_test
-  BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS[*]}" "${ENVOY_SRCDIR}"/tools/proto_format/proto_format.sh check
   exit 0
 elif [[ "$CI_TARGET" == "docs" ]]; then
   setup_clang_toolchain

@@ -155,7 +155,7 @@ stages:
     steps:
     - task: Cache@2
       inputs:
-        key: "format | ./WORKSPACE | **/*.bzl"
+        key: "format | 0 | ./WORKSPACE | **/*.bzl"
         path: $(Build.StagingDirectory)/repository_cache
       continueOnError: true
 
@@ -176,36 +176,6 @@ stages:
         artifactName: format
       timeoutInMinutes: 10
       # not all have fixes so improve condition/handling
-      condition: failed()
-
-  - job: proto_format
-    # displayName: Protobuf format
-    dependsOn: []
-    pool:
-      vmImage: "ubuntu-20.04"
-    steps:
-    - task: Cache@2
-      inputs:
-        key: "proto_format | ./WORKSPACE | **/*.bzl"
-        path: $(Build.StagingDirectory)/repository_cache
-      continueOnError: true
-
-    - script: ci/run_envoy_docker.sh 'ci/check_and_fix_format.sh'
-      workingDirectory: $(Build.SourcesDirectory)
-      env:
-        ENVOY_RBE: "true"
-        BAZEL_BUILD_EXTRA_OPTIONS: "--config=remote-ci --jobs=$(RbeJobs)"
-        ENVOY_DOCKER_BUILD_DIR: $(Build.StagingDirectory)
-        BAZEL_REMOTE_CACHE: grpcs://remotebuildexecution.googleapis.com
-        BAZEL_REMOTE_INSTANCE: projects/envoy-ci/instances/default_instance
-        GCP_SERVICE_ACCOUNT_KEY: $(GcpServiceAccountKey)
-      displayName: "Run check format scripts"
-
-    - task: PublishBuildArtifacts@1
-      inputs:
-        pathtoPublish: "$(Build.StagingDirectory)/fix_proto_format.diff"
-        artifactName: format
-      timeoutInMinutes: 10
       condition: failed()
 
   - job: docs
