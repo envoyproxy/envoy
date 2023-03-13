@@ -1,4 +1,4 @@
-FROM envoyproxy/envoy-contrib-dev:latest
+FROM envoyproxy/envoy:contrib-dev
 COPY ./lib/simple.so /lib/simple.so
 COPY ./envoy.yaml /etc/envoy.yaml
 RUN chmod go+r /etc/envoy.yaml /lib/simple.so

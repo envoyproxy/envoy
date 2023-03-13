@@ -16,8 +16,8 @@ services:
 
   service1:
     build:
-      context: ../shared/flask
-      target: tracing-flask
+      context: ../shared/python
+      target: aiohttp-tracing-service3
     depends_on:
       jaeger:
         condition: service_started
@@ -28,8 +28,8 @@ services:
 
   service2:
     build:
-      context: ../shared/flask
-      target: tracing-flask
+      context: ../shared/python
+      target: aiohttp-tracing-service3
     depends_on:
       jaeger:
         condition: service_started
