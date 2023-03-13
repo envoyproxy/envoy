@@ -19,6 +19,7 @@ build --host_force_python=PY3
 build --java_runtime_version=remotejdk_11
 build --tool_java_runtime_version=remotejdk_11
 build --platform_mappings=bazel/platform_mappings
+build --experimental_repository_downloader_retries=2
 
 build --enable_platform_specific_config
 
