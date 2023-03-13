@@ -34,8 +34,7 @@ EnvoyQuicServerStream::EnvoyQuicServerStream(
           static_cast<uint32_t>(GetReceiveWindow().value()), *filterManagerConnection(),
           [this]() { runLowWatermarkCallbacks(); }, [this]() { runHighWatermarkCallbacks(); },
           stats, http3_options),
-      headers_with_underscores_action_(headers_with_underscores_action), session_(session),
-      capsule_protocol_handler_(this) {
+      headers_with_underscores_action_(headers_with_underscores_action) {
   ASSERT(static_cast<uint32_t>(GetReceiveWindow().value()) > 8 * 1024,
          "Send buffer limit should be larger than 8KB.");
 
@@ -83,10 +82,11 @@ void EnvoyQuicServerStream::encodeData(Buffer::Instance& data, bool end_stream) 
   ASSERT(!local_end_stream_);
   local_end_stream_ = end_stream;
   SendBufferMonitor::ScopedWatermarkBufferUpdater updater(this, this);
-  if (capsule_protocol_handler_.usingCapsuleProtocol() &&
-      !capsule_protocol_handler_.encodeCapsule(data.toString())) {
-    // TODO(jeongseokson): Check if resetting the stream is a right way to handle the error.
-    Reset(quic::QUIC_BAD_APPLICATION_PAYLOAD);
+  if (capsule_protocol_handler_) {
+    if (!capsule_protocol_handler_->encodeCapsule(data.toString(), end_stream)) {
+      Reset(quic::QUIC_BAD_APPLICATION_PAYLOAD);
+      return;
+    }
   } else {
     Buffer::RawSliceVector raw_slices = data.getRawSlices();
     absl::InlinedVector<quiche::QuicheMemSlice, 4> quic_slices;
@@ -208,9 +208,6 @@ void EnvoyQuicServerStream::OnInitialHeadersComplete(bool fin, size_t frame_len,
     details_ = Http3ResponseCodeDetailValues::invalid_http_header;
     onStreamError(absl::nullopt);
     return;
-  }
-  if (session_->SupportsH3Datagram()) {
-    capsule_protocol_handler_.onHeaders(headers.get());
   }
   request_decoder_->decodeHeaders(std::move(headers), /*end_stream=*/fin);
   ConsumeHeaderList();
@@ -393,7 +390,6 @@ void EnvoyQuicServerStream::CloseWriteSide() {
 void EnvoyQuicServerStream::OnClose() {
   destroy();
   quic::QuicSpdyServerStreamBase::OnClose();
-  capsule_protocol_handler_.onStreamClosed();
   if (isDoingWatermarkAccounting()) {
     return;
   }
@@ -476,6 +472,11 @@ bool EnvoyQuicServerStream::hasPendingData() {
   // Quic stream sends headers and trailers on the same stream, and buffers them in the same sending
   // buffer if needed. So checking this buffer is sufficient.
   return (!write_side_closed()) && BufferedDataBytes() > 0;
+}
+
+void EnvoyQuicServerStream::enableCapsuleProtocol() {
+  capsule_protocol_handler_ = std::make_unique<CapsuleProtocolHandler>(this);
+  capsule_protocol_handler_->setStreamDecoder(request_decoder_);
 }
 
 } // namespace Quic

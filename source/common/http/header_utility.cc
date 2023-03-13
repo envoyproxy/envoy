@@ -12,6 +12,7 @@
 
 #include "absl/strings/match.h"
 #include "nghttp2/nghttp2.h"
+#include "quiche/common/structured_headers.h"
 #include "quiche/http2/adapter/header_validator.h"
 
 namespace Envoy {
@@ -223,6 +224,18 @@ bool HeaderUtility::isConnectResponse(const RequestHeaderMap* request_headers,
   return request_headers && isConnect(*request_headers) &&
          static_cast<Http::Code>(Http::Utility::getResponseStatus(response_headers)) ==
              Http::Code::OK;
+}
+
+bool HeaderUtility::isCapsuleProtocol(const RequestOrResponseHeaderMap& headers) {
+  Http::HeaderMap::GetResult capsule_protocol =
+      headers.get(Envoy::Http::LowerCaseString("Capsule-Protocol"));
+  if (capsule_protocol.empty()) {
+    return false;
+  }
+  // Parses the header value and extracts the boolean value ignoring parameters.
+  absl::optional<quiche::structured_headers::ParameterizedItem> header_item =
+      quiche::structured_headers::ParseItem(capsule_protocol[0]->value().getStringView());
+  return header_item && header_item->item.is_boolean() && header_item->item.GetBoolean();
 }
 
 bool HeaderUtility::requestShouldHaveNoBody(const RequestHeaderMap& headers) {

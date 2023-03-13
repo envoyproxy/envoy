@@ -20,10 +20,7 @@ public:
                         quic::StreamType type, Http::Http3::CodecStats& stats,
                         const envoy::config::core::v3::Http3ProtocolOptions& http3_options);
 
-  void setResponseDecoder(Http::ResponseDecoder& decoder) {
-    response_decoder_ = &decoder;
-    capsule_protocol_handler_.setStreamDecoder(&decoder);
-  }
+  void setResponseDecoder(Http::ResponseDecoder& decoder) { response_decoder_ = &decoder; }
 
   // Http::StreamEncoder
   void encodeData(Buffer::Instance& data, bool end_stream) override;
@@ -54,6 +51,7 @@ public:
   void OnConnectionClosed(quic::QuicErrorCode error, quic::ConnectionCloseSource source) override;
 
   void clearWatermarkBuffer();
+  void enableCapsuleProtocol();
 
 protected:
   // EnvoyQuicStream
@@ -80,8 +78,7 @@ private:
   // Deliver awaiting trailers if body has been delivered.
   void maybeDecodeTrailers();
 
-  quic::QuicSpdySession* session_;
-  CapsuleProtocolHandler capsule_protocol_handler_;
+  std::unique_ptr<CapsuleProtocolHandler> capsule_protocol_handler_;
   Http::ResponseDecoder* response_decoder_{nullptr};
   bool decoded_1xx_{false};
 };

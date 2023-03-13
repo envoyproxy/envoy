@@ -132,6 +132,7 @@ public:
 
   void setUpCapsuleProtocol(bool close_send_stream, bool close_recv_stream) {
     EXPECT_TRUE(quic_session_.OnSetting(quic::SETTINGS_H3_DATAGRAM, 1));
+    quic_stream_->enableCapsuleProtocol();
 
     // Encodes a CONNECT-UDP request.
     Http::TestRequestHeaderMapImpl request_headers = {
@@ -684,18 +685,7 @@ TEST_F(EnvoyQuicClientStreamTest, EncodeCapsule) {
         return quic::MESSAGE_STATUS_SUCCESS;
       });
   quic_stream_->encodeData(buffer, /*end_stream=*/true);
-}
-
-TEST_F(EnvoyQuicClientStreamTest, EncodeInvalidCapsule) {
-  setUpCapsuleProtocol(false, true);
-  std::string invalid_capsule_fragment =
-      absl::HexStringToBytes("aaaaaaaa"         // invalid capsule type
-                             "08"               // capsule length
-                             "a1a2a3a4a5a6a7a8" // HTTP Datagram payload
-      );
-  Buffer::OwnedImpl invalid_capsule_buffer(invalid_capsule_fragment);
   EXPECT_CALL(stream_callbacks_, onResetStream(_, _));
-  quic_stream_->encodeData(invalid_capsule_buffer, /*end_stream=*/true);
 }
 
 TEST_F(EnvoyQuicClientStreamTest, DecodeHttp3Datagram) {

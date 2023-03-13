@@ -10,6 +10,17 @@
 namespace Envoy {
 namespace Quic {
 
+CapsuleProtocolHandler::CapsuleProtocolHandler(quic::QuicSpdyStream* stream) : stream_(stream) {
+  ASSERT(stream != nullptr);
+  stream_->RegisterHttp3DatagramVisitor(this);
+}
+
+CapsuleProtocolHandler::~CapsuleProtocolHandler() {
+  if (stream_ != nullptr) {
+    stream_->UnregisterHttp3DatagramVisitor();
+  }
+}
+
 void CapsuleProtocolHandler::OnHttp3Datagram(quic::QuicStreamId stream_id,
                                              absl::string_view payload) {
   ASSERT(stream_id == stream_->id());
@@ -21,17 +32,18 @@ void CapsuleProtocolHandler::OnHttp3Datagram(quic::QuicStreamId stream_id,
   Buffer::InstancePtr buffer = std::make_unique<Buffer::OwnedImpl>();
   buffer->add(serialized_capsule.AsStringView());
 
-  ASSERT(stream_decoder_);
+  if (!stream_decoder_) {
+    IS_ENVOY_BUG("HTTP/3 Datagram received before a stream decoder is set.");
+  }
   stream_decoder_->decodeData(*buffer, stream_->IsDoneReading());
 }
 
 bool CapsuleProtocolHandler::OnCapsule(const quiche::Capsule& capsule) {
   quiche::CapsuleType capsule_type = capsule.capsule_type();
-  // TODO(jeongseokson): Check if we should support legacy Datagram types.
   if (capsule_type != quiche::CapsuleType::DATAGRAM) {
-    ENVOY_LOG(error, fmt::format("Capsule type is invalid: capsule_type = {}",
-                                 static_cast<uint64_t>(capsule_type)));
-    return false;
+    // Forward other types of Capsules without modifications.
+    stream_->WriteCapsule(capsule, fin_set_);
+    return true;
   }
   quic::MessageStatus status =
       stream_->SendHttp3Datagram(capsule.datagram_capsule().http_datagram_payload);
@@ -47,32 +59,16 @@ void CapsuleProtocolHandler::OnCapsuleParseFailure(absl::string_view error_messa
   ENVOY_LOG(error, fmt::format("Capsule parsing failed: error_message = {}", error_message));
 }
 
-bool CapsuleProtocolHandler::encodeCapsule(absl::string_view capsule_data) {
-  // If a CapsuleParser object fails to parse a capsule fragment, it cannot be used again. Thus, a
-  // new one is created for parsing every time.
-  quiche::CapsuleParser capsule_parser{this};
-  if (!capsule_parser.IngestCapsuleFragment(capsule_data)) {
+bool CapsuleProtocolHandler::encodeCapsule(absl::string_view capsule_data, bool end_stream) {
+  fin_set_ = end_stream;
+  // If a CapsuleParser object fails to parse a capsule fragment, the corresponding stream should
+  // be reset. Returning false in this method resets the stream.
+  if (!capsule_parser_.IngestCapsuleFragment(capsule_data)) {
     ENVOY_LOG(error,
               fmt::format("Capsule parsing error occured: capsule_fragment = {}", capsule_data));
     return false;
   }
   return true;
-}
-
-void CapsuleProtocolHandler::onHeaders(Http::HeaderMapImpl* const headers) {
-  Http::HeaderMap::GetResult capsule_protocol =
-      headers->get(Envoy::Http::LowerCaseString("Capsule-Protocol"));
-  if (!capsule_protocol.empty() && capsule_protocol[0]->value().getStringView() == "?1") {
-    stream_->RegisterHttp3DatagramVisitor(this);
-    using_capsule_protocol_ = true;
-  }
-}
-
-void CapsuleProtocolHandler::onStreamClosed() {
-  if (using_capsule_protocol_) {
-    stream_->UnregisterHttp3DatagramVisitor();
-    using_capsule_protocol_ = false;
-  }
 }
 
 } // namespace Quic

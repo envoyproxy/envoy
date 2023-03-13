@@ -41,6 +41,7 @@ public:
 
   MOCK_METHOD(void, OnBodyAvailable, (), (override));
   MOCK_METHOD(quic::MessageStatus, SendHttp3Datagram, (absl::string_view data), (override));
+  MOCK_METHOD(void, WriteOrBufferBody, (absl::string_view data, bool fin), (override));
 };
 
 class CapsuleProtocolHandlerTest : public ::testing::Test {
@@ -72,36 +73,25 @@ TEST_F(CapsuleProtocolHandlerTest, Http3DatagramToCapsule) {
 TEST_F(CapsuleProtocolHandlerTest, CapsuleToHttp3Datagram) {
   EXPECT_CALL(stream_, SendHttp3Datagram(testing::Eq(datagram_payload_)))
       .WillOnce(testing::Return(quic::MessageStatus::MESSAGE_STATUS_SUCCESS));
-  EXPECT_TRUE(capsule_protocol_handler_.encodeCapsule(capsule_fragment_));
+  EXPECT_TRUE(capsule_protocol_handler_.encodeCapsule(capsule_fragment_, /*end_stream=*/false));
 }
 
-TEST_F(CapsuleProtocolHandlerTest, IncorrectCapsuleTypes) {
-  std::string invalid_capsule_fragment =
-      absl::HexStringToBytes("aaaaaaaa"         // invalid capsule type
+TEST_F(CapsuleProtocolHandlerTest, SendCapsulesWithUnknownType) {
+  std::string unknown_capsule_fragment =
+      absl::HexStringToBytes("17"               // DATAGRAM capsule type
                              "08"               // capsule length
                              "a1a2a3a4a5a6a7a8" // HTTP Datagram payload
       );
-  std::string legacy_capsule_fragment =
-      absl::HexStringToBytes("80ff37a0"         // LEGACY_DATAGRAM capsule type
-                             "08"               // capsule length
-                             "a1a2a3a4a5a6a7a8" // HTTP Datagram payload
-      );
-  std::string legacy_without_context_capsule_fragment =
-      absl::HexStringToBytes("80ff37a5"         // LEGACY_DATAGRAM_WITHOUT_CONTEXT capsule type
-                             "08"               // capsule length
-                             "a1a2a3a4a5a6a7a8" // HTTP Datagram payload
-      );
-
-  // EXPECT never call SendHttp3Datagram (stream_ is a StrictMock object).
-  EXPECT_FALSE(capsule_protocol_handler_.encodeCapsule(invalid_capsule_fragment));
-  EXPECT_FALSE(capsule_protocol_handler_.encodeCapsule(legacy_capsule_fragment));
-  EXPECT_FALSE(capsule_protocol_handler_.encodeCapsule(legacy_without_context_capsule_fragment));
+  EXPECT_CALL(stream_,
+              WriteOrBufferBody(testing::Eq(unknown_capsule_fragment), /*end_stream=*/false));
+  EXPECT_TRUE(
+      capsule_protocol_handler_.encodeCapsule(unknown_capsule_fragment, /*end_stream=*/false));
 }
 
 TEST_F(CapsuleProtocolHandlerTest, SendHttp3DatagramError) {
   EXPECT_CALL(stream_, SendHttp3Datagram(_))
       .WillOnce(testing::Return(quic::MessageStatus::MESSAGE_STATUS_INTERNAL_ERROR));
-  EXPECT_FALSE(capsule_protocol_handler_.encodeCapsule(capsule_fragment_));
+  EXPECT_FALSE(capsule_protocol_handler_.encodeCapsule(capsule_fragment_, /*end_stream*/ false));
 }
 
 } // namespace Quic

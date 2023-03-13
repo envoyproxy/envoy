@@ -170,6 +170,11 @@ public:
   static bool isConnectResponse(const RequestHeaderMap* request_headers,
                                 const ResponseHeaderMap& response_headers);
 
+  /**
+   * @brief return if the Capsule-Protocol header field (RFC 9297) is set to true.
+   */
+  static bool isCapsuleProtocol(const RequestOrResponseHeaderMap& headers);
+
   static bool requestShouldHaveNoBody(const RequestHeaderMap& headers);
 
   /**

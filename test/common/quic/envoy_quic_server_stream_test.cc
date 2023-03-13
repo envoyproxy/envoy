@@ -116,6 +116,8 @@ public:
   }
 
   void setUpCapsuleProtocol(bool close_send_stream, bool close_recv_stream) {
+    quic_stream_->enableCapsuleProtocol();
+
     // Decodes a CONNECT-UDP request.
     EXPECT_CALL(stream_decoder_, decodeHeaders_(_, _))
         .WillOnce(Invoke([](const Http::RequestHeaderMapSharedPtr& headers, bool) {
@@ -848,19 +850,6 @@ TEST_F(EnvoyQuicServerStreamTest, EncodeCapsule) {
         return quic::MESSAGE_STATUS_SUCCESS;
       });
   quic_stream_->encodeData(buffer, /*end_stream=*/true);
-}
-
-TEST_F(EnvoyQuicServerStreamTest, EncodeInvalidCapsule) {
-  setUpCapsuleProtocol(false, true);
-  std::string invalid_capsule_fragment =
-      absl::HexStringToBytes("aaaaaaaa"         // invalid capsule type
-                             "08"               // capsule length
-                             "a1a2a3a4a5a6a7a8" // HTTP Datagram payload
-      );
-  Buffer::OwnedImpl invalid_capsule_buffer(invalid_capsule_fragment);
-  EXPECT_CALL(quic_session_, MaybeSendStopSendingFrame(_, _));
-  EXPECT_CALL(quic_session_, MaybeSendRstStreamFrame(_, _, _));
-  quic_stream_->encodeData(invalid_capsule_buffer, /*end_stream=*/true);
 }
 
 TEST_F(EnvoyQuicServerStreamTest, DecodeHttp3Datagram) {

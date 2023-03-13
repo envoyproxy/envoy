@@ -27,8 +27,7 @@ EnvoyQuicClientStream::EnvoyQuicClientStream(
           // utilize congestion control window before it reaches the high watermark.
           static_cast<uint32_t>(GetReceiveWindow().value()), *filterManagerConnection(),
           [this]() { runLowWatermarkCallbacks(); }, [this]() { runHighWatermarkCallbacks(); },
-          stats, http3_options),
-      session_(client_session), capsule_protocol_handler_(this) {
+          stats, http3_options) {
   ASSERT(static_cast<uint32_t>(GetReceiveWindow().value()) > 8 * 1024,
          "Send buffer limit should be larger than 8KB.");
 }
@@ -81,10 +80,11 @@ void EnvoyQuicClientStream::encodeData(Buffer::Instance& data, bool end_stream) 
   ASSERT(!local_end_stream_);
   local_end_stream_ = end_stream;
   SendBufferMonitor::ScopedWatermarkBufferUpdater updater(this, this);
-  if (capsule_protocol_handler_.usingCapsuleProtocol() &&
-      !capsule_protocol_handler_.encodeCapsule(data.toString())) {
-    // TODO(jeongseokson): Check if resetting the stream is a right way to handle the error.
-    Reset(quic::QUIC_BAD_APPLICATION_PAYLOAD);
+  if (capsule_protocol_handler_) {
+    if (!capsule_protocol_handler_->encodeCapsule(data.toString(), end_stream)) {
+      Reset(quic::QUIC_BAD_APPLICATION_PAYLOAD);
+      return;
+    }
   } else {
     Buffer::RawSliceVector raw_slices = data.getRawSlices();
     absl::InlinedVector<quiche::QuicheMemSlice, 4> quic_slices;
@@ -199,9 +199,6 @@ void EnvoyQuicClientStream::OnInitialHeadersComplete(bool fin, size_t frame_len,
   if (Http::CodeUtility::is1xx(status)) {
     // These are Informational 1xx headers, not the actual response headers.
     set_headers_decompressed(false);
-  }
-  if (session_->SupportsH3Datagram()) {
-    capsule_protocol_handler_.onHeaders(headers.get());
   }
   const bool is_special_1xx = Http::HeaderUtility::isSpecial1xx(*headers);
   if (is_special_1xx && !decoded_1xx_) {
@@ -365,7 +362,6 @@ void EnvoyQuicClientStream::OnConnectionClosed(quic::QuicErrorCode error,
 void EnvoyQuicClientStream::OnClose() {
   destroy();
   quic::QuicSpdyClientStream::OnClose();
-  capsule_protocol_handler_.onStreamClosed();
   if (isDoingWatermarkAccounting()) {
     // This is called in the scope of a watermark buffer updater. Clear the
     // buffer accounting afterwards so that the updater doesn't override the
@@ -416,6 +412,12 @@ void EnvoyQuicClientStream::onStreamError(absl::optional<bool> should_close_conn
 }
 
 bool EnvoyQuicClientStream::hasPendingData() { return BufferedDataBytes() > 0; }
+
+void EnvoyQuicClientStream::enableCapsuleProtocol() {
+  capsule_protocol_handler_ = std::make_unique<CapsuleProtocolHandler>(this);
+  ASSERT(response_decoder_ != nullptr);
+  capsule_protocol_handler_->setStreamDecoder(response_decoder_);
+}
 
 } // namespace Quic
 } // namespace Envoy

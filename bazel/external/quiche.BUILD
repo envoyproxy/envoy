@@ -5469,6 +5469,7 @@ envoy_cc_library(
     hdrs = ["quiche/common/structured_headers.h"],
     repository = "@envoy",
     tags = ["nofips"],
+    visibility = ["//visibility:public"],
     deps = [
         ":quiche_common_platform_export",
         ":quiche_common_platform_logging",
