@@ -41,7 +41,6 @@ public:
   };
 
   static IoHandlePtr makePlatformSpecificSocket(int socket_fd, bool socket_v6only,
-                                                Socket::Type socket_type,
                                                 absl::optional<int> domain,
                                                 Io::IoUringFactory* io_uring_factory = nullptr);
 

@@ -31,32 +31,34 @@ bool SocketInterfaceImpl::hasIoUringFactory(Io::IoUringFactory* io_uring_factory
 }
 
 IoHandlePtr SocketInterfaceImpl::makePlatformSpecificSocket(
-    int socket_fd, bool socket_v6only, Socket::Type socket_type, absl::optional<int> domain,
+    int socket_fd, bool socket_v6only, absl::optional<int> domain,
     [[maybe_unused]] Io::IoUringFactory* io_uring_factory) {
   if constexpr (Event::PlatformDefaultTriggerType == Event::FileTriggerType::EmulatedEdge) {
-    return std::make_unique<Win32SocketHandleImpl>(socket_type, socket_fd, socket_v6only, domain);
+    return std::make_unique<Win32SocketHandleImpl>(socket_fd, socket_v6only, domain);
   }
 
 #ifdef __linux__
   // Only create IoUringSocketHandleImpl when the IoUringFactory is created, and
   // it is registered in the TLS, and initialized. There are cases the test may create thread
   // before IoUringFactory add to the TLS and initialized.
-  // Only support TCP for now.
-  if (hasIoUringFactory(io_uring_factory) && socket_type == Socket::Type::Stream) {
-    return std::make_unique<IoUringSocketHandleImpl>(*io_uring_factory, socket_type, socket_fd,
-                                                     socket_v6only, domain);
+  if (hasIoUringFactory(io_uring_factory)) {
+    return std::make_unique<IoUringSocketHandleImpl>(*io_uring_factory, socket_fd, socket_v6only,
+                                                     domain);
   } else {
-    return std::make_unique<IoSocketHandleImpl>(socket_type, socket_fd, socket_v6only, domain);
+    return std::make_unique<IoSocketHandleImpl>(socket_fd, socket_v6only, domain);
   }
 #else
-  return std::make_unique<IoSocketHandleImpl>(socket_type, socket_fd, socket_v6only, domain);
+  return std::make_unique<IoSocketHandleImpl>(socket_fd, socket_v6only, domain);
 #endif
 }
 
 IoHandlePtr SocketInterfaceImpl::makeSocket(int socket_fd, bool socket_v6only,
                                             Socket::Type socket_type,
                                             absl::optional<int> domain) const {
-  return makePlatformSpecificSocket(socket_fd, socket_v6only, socket_type, domain,
+  if (socket_type == Socket::Type::Datagram) {
+    return makePlatformSpecificSocket(socket_fd, socket_v6only, domain, nullptr);
+  }
+  return makePlatformSpecificSocket(socket_fd, socket_v6only, domain,
                                     io_uring_factory_.lock().get());
 }
 

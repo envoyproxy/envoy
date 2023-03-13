@@ -16,8 +16,7 @@ namespace {
 class TestTransportSocketCallbacks : public Network::TransportSocketCallbacks {
 public:
   explicit TestTransportSocketCallbacks(Network::Connection& connection)
-      : io_handle_(std::make_unique<Network::IoSocketHandleImpl>(Socket::Type::Stream)),
-        connection_(connection) {}
+      : io_handle_(std::make_unique<Network::IoSocketHandleImpl>()), connection_(connection) {}
 
   ~TestTransportSocketCallbacks() override = default;
   Network::IoHandle& ioHandle() override { return *io_handle_; }

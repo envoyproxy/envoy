@@ -27,10 +27,9 @@ public:
                                                                     uint64_t num_slice);
   using WriteOverrideProc = std::function<WriteOverrideType>;
 
-  TestIoSocketHandle(Socket::Type socket_type, WriteOverrideProc write_override_proc,
-                     os_fd_t fd = INVALID_SOCKET, bool socket_v6only = false,
-                     absl::optional<int> domain = absl::nullopt)
-      : Test::IoSocketHandlePlatformImpl(socket_type, fd, socket_v6only, domain),
+  TestIoSocketHandle(WriteOverrideProc write_override_proc, os_fd_t fd = INVALID_SOCKET,
+                     bool socket_v6only = false, absl::optional<int> domain = absl::nullopt)
+      : Test::IoSocketHandlePlatformImpl(fd, socket_v6only, domain),
         write_override_(write_override_proc) {}
 
   void initializeFileEvent(Event::Dispatcher& dispatcher, Event::FileReadyCb cb,

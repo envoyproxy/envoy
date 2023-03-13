@@ -5729,12 +5729,11 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, OriginalDstFilter) {
   EXPECT_CALL(os_sys_calls_, getsockopt_(_, _, _, _, _)).WillRepeatedly(Return(-1));
 
   NiceMock<Network::MockListenerFilterCallbacks> callbacks;
-  Network::AcceptedSocketImpl socket(
-      std::make_unique<Network::IoSocketHandleImpl>(Socket::Type::Stream),
-      Network::Address::InstanceConstSharedPtr{
-          new Network::Address::Ipv4Instance("127.0.0.1", 1234)},
-      Network::Address::InstanceConstSharedPtr{
-          new Network::Address::Ipv4Instance("127.0.0.1", 5678)});
+  Network::AcceptedSocketImpl socket(std::make_unique<Network::IoSocketHandleImpl>(),
+                                     Network::Address::InstanceConstSharedPtr{
+                                         new Network::Address::Ipv4Instance("127.0.0.1", 1234)},
+                                     Network::Address::InstanceConstSharedPtr{
+                                         new Network::Address::Ipv4Instance("127.0.0.1", 5678)});
 
   EXPECT_CALL(callbacks, socket()).WillOnce(Invoke([&]() -> Network::ConnectionSocket& {
     return socket;
@@ -5817,7 +5816,7 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, OriginalDstTestFilterOutbound) {
 
   NiceMock<Network::MockListenerFilterCallbacks> callbacks;
   Network::AcceptedSocketImpl socket(
-      std::make_unique<Network::IoSocketHandleImpl>(Socket::Type::Stream),
+      std::make_unique<Network::IoSocketHandleImpl>(),
       std::make_unique<Network::Address::Ipv4Instance>("127.0.0.1", 1234),
       std::make_unique<Network::Address::Ipv4Instance>("127.0.0.1", 5678));
 
@@ -5883,7 +5882,7 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, OriginalDstFilterStopsIteration) 
       .WillRepeatedly(testing::Return(Api::SysCallIntResult{-1, SOCKET_ERROR_NOT_SUP}));
 #endif
   Network::AcceptedSocketImpl socket(
-      std::make_unique<Network::IoSocketHandleImpl>(Socket::Type::Stream),
+      std::make_unique<Network::IoSocketHandleImpl>(),
       std::make_unique<Network::Address::Ipv4Instance>("127.0.0.1", 1234),
       std::make_unique<Network::Address::Ipv4Instance>("127.0.0.1", 5678));
 
@@ -6017,7 +6016,7 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, OriginalDstTestFilterIPv6) {
 
   NiceMock<Network::MockListenerFilterCallbacks> callbacks;
   Network::AcceptedSocketImpl socket(
-      std::make_unique<Network::IoSocketHandleImpl>(Socket::Type::Stream),
+      std::make_unique<Network::IoSocketHandleImpl>(),
       std::make_unique<Network::Address::Ipv6Instance>("::0001", 1234),
       std::make_unique<Network::Address::Ipv6Instance>("::0001", 5678));
 

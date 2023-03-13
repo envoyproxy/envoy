@@ -44,8 +44,8 @@ IoHandlePtr TestIoSocketHandle::accept(struct sockaddr* addr, socklen_t* addrlen
     return nullptr;
   }
 
-  return std::make_unique<TestIoSocketHandle>(socket_type_, write_override_, result.return_value_,
-                                              socket_v6only_, domain_);
+  return std::make_unique<TestIoSocketHandle>(write_override_, result.return_value_, socket_v6only_,
+                                              domain_);
 }
 
 IoHandlePtr TestIoSocketHandle::duplicate() {
@@ -54,15 +54,14 @@ IoHandlePtr TestIoSocketHandle::duplicate() {
     throw EnvoyException(fmt::format("duplicate failed for '{}': ({}) {}", fd_, result.errno_,
                                      errorDetails(result.errno_)));
   }
-  return std::make_unique<TestIoSocketHandle>(socket_type_, write_override_, result.return_value_,
-                                              socket_v6only_, domain_);
+  return std::make_unique<TestIoSocketHandle>(write_override_, result.return_value_, socket_v6only_,
+                                              domain_);
 }
 
-IoHandlePtr TestSocketInterface::makeSocket(int socket_fd, bool socket_v6only,
-                                            Socket::Type socket_type,
+IoHandlePtr TestSocketInterface::makeSocket(int socket_fd, bool socket_v6only, Socket::Type,
                                             absl::optional<int> domain) const {
-  return std::make_unique<TestIoSocketHandle>(socket_type, write_override_proc_, socket_fd,
-                                              socket_v6only, domain);
+  return std::make_unique<TestIoSocketHandle>(write_override_proc_, socket_fd, socket_v6only,
+                                              domain);
 }
 
 bool TestSocketInterface::isBlockingSocket() const { return false; }

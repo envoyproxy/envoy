@@ -159,7 +159,7 @@ MockSocketOption::MockSocketOption() {
 MockSocketOption::~MockSocketOption() = default;
 
 MockConnectionSocket::MockConnectionSocket()
-    : io_handle_(std::make_unique<IoSocketHandleImpl>(Socket::Type::Stream)),
+    : io_handle_(std::make_unique<IoSocketHandleImpl>()),
       connection_info_provider_(
           std::make_shared<ConnectionInfoSetterImpl>(std::make_shared<Address::Ipv4Instance>(80),
                                                      std::make_shared<Address::Ipv4Instance>(80))) {

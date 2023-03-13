@@ -39,14 +39,13 @@ public:
     io_uring_factory_->onServerInitialized();
     fd_ = Api::OsSysCallsSingleton::get().socket(AF_INET, SOCK_STREAM, IPPROTO_TCP).return_value_;
     EXPECT_GE(fd_, 0);
-    io_handle_ =
-        std::make_unique<IoUringSocketHandleImpl>(*io_uring_factory_, Socket::Type::Stream, fd_);
+    io_handle_ = std::make_unique<IoUringSocketHandleImpl>(*io_uring_factory_, fd_);
 
     os_fd_t fd = Api::OsSysCallsSingleton::get()
                      .socket(AF_INET, SOCK_STREAM | SOCK_NONBLOCK, IPPROTO_TCP)
                      .return_value_;
     EXPECT_GE(fd, 0);
-    peer_io_handle_ = std::make_unique<IoSocketHandleImpl>(Socket::Type::Stream, fd);
+    peer_io_handle_ = std::make_unique<IoSocketHandleImpl>(fd);
   }
 
   bool should_skip_{false};
