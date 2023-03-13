@@ -428,7 +428,7 @@ final class EngineBuilderTests: XCTestCase {
   func testAddingCdsAndAdsConfigurationWhenRunningEnvoy() {
     let bootstrapDebugDescription = EngineBuilder()
       .addEngineType(MockEnvoyEngine.self)
-      .addCdsLayer(cdsResourcesLocator: "FAKE_CDS_LOCATOR", timeoutSeconds: 2543)
+      .addCDSLayer(cdsResourcesLocator: "FAKE_CDS_LOCATOR", timeoutSeconds: 2543)
       .setAggregatedDiscoveryService(address: "FAKE_SWIFT_ADDRESS", port: 0)
       .bootstrapDebugDescription()
     XCTAssertTrue(bootstrapDebugDescription.contains("FAKE_CDS_LOCATOR"))
