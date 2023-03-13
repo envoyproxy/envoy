@@ -124,6 +124,7 @@
                                       nodeSubZone:(NSString *)nodeSubZone
                               cdsResourcesLocator:(NSString *)cdsResourcesLocator
                                 cdsTimeoutSeconds:(UInt32)cdsTimeoutSeconds
+                                        enableCds:(BOOL)enableCds
 
 {
   self = [super init];
@@ -180,6 +181,7 @@
   self.nodeSubZone = nodeSubZone;
   self.cdsResourcesLocator = cdsResourcesLocator;
   self.cdsTimeoutSeconds = cdsTimeoutSeconds;
+  self.enableCds = enableCds;
 
   return self;
 }
@@ -266,7 +268,7 @@
   builder.setAggregatedDiscoveryService(
       [self.adsAddress toCXXString], self.adsPort, [self.adsJwtToken toCXXString],
       self.adsJwtTokenLifetimeSeconds, [self.adsSslRootCerts toCXXString]);
-  if (self.cdsResourcesLocator.length > 0) {
+  if (self.enableCds) {
     builder.addCdsLayer([self.cdsResourcesLocator toCXXString], self.cdsTimeoutSeconds);
   }
 #ifdef ENVOY_ADMIN_FUNCTIONALITY

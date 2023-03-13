@@ -90,6 +90,7 @@ open class EngineBuilder(
   private var nodeSubZone: String = ""
   private var cdsResourcesLocator: String = ""
   private var cdsTimeoutSeconds: Int = 0
+  private var enableCds: Boolean = false
 
   /**
    * Add a log level to use with Envoy.
@@ -635,6 +636,7 @@ fun setAggregatedDiscoveryService(
   ): EngineBuilder {
     this.cdsResourcesLocator = cdsResourcesLocator
     this.cdsTimeoutSeconds = cdsTimeoutSeconds
+    this.enableCds = true
     return this
   }
 
@@ -724,6 +726,7 @@ fun addRtdsLayer(layerName: String, timeoutSeconds: Int = 0): EngineBuilder {
       nodeSubZone,
       cdsResourcesLocator,
       cdsTimeoutSeconds,
+      enableCds,
     )
 
 

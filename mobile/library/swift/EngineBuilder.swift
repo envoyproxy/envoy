@@ -70,6 +70,7 @@ open class EngineBuilder: NSObject {
   private var nodeSubZone: String = ""
   private var cdsResourcesLocator: String = ""
   private var cdsTimeoutSeconds: UInt32 = 0
+  private var enableCds: Bool = false
 
   // MARK: - Public
 
@@ -624,6 +625,7 @@ open class EngineBuilder: NSObject {
   public func addCDSLayer(cdsResourcesLocator: String, timeoutSeconds: UInt32 = 0) -> Self {
     self.cdsResourcesLocator = cdsResourcesLocator
     self.cdsTimeoutSeconds = timeoutSeconds
+    self.enableCds = true
     return self
   }
 
@@ -738,7 +740,8 @@ open class EngineBuilder: NSObject {
       nodeZone: self.nodeZone,
       nodeSubZone: self.nodeSubZone,
       cdsResourcesLocator: self.cdsResourcesLocator,
-      cdsTimeoutSeconds: self.cdsTimeoutSeconds
+      cdsTimeoutSeconds: self.cdsTimeoutSeconds,
+      enableCds: self.enableCds
     )
   }
 

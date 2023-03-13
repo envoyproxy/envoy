@@ -113,6 +113,7 @@ class EnvoyConfigurationTest {
     nodeSubZone: String = "",
     cdsResourcesLocator: String = "",
     cdsTimeoutSeconds: Int = 0,
+    enableCds: Boolean = false,
 
   ): EnvoyConfiguration {
     return EnvoyConfiguration(
@@ -164,7 +165,8 @@ class EnvoyConfigurationTest {
       nodeZone,
       nodeSubZone,
       cdsResourcesLocator,
-      cdsTimeoutSeconds
+      cdsTimeoutSeconds,
+      enableCds
     )
   }
 
@@ -349,7 +351,7 @@ class EnvoyConfigurationTest {
   fun `test adding RTDS and CDS`() {
     JniLibrary.loadTestLibrary()
     val envoyConfiguration = buildTestEnvoyConfiguration(
-      cdsResourcesLocator = "FAKE_CDS_LOCATOR", cdsTimeoutSeconds = 356, adsAddress = "FAKE_ADDRESS", adsPort = 0
+      cdsResourcesLocator = "FAKE_CDS_LOCATOR", cdsTimeoutSeconds = 356, adsAddress = "FAKE_ADDRESS", adsPort = 0, enableCds = true
     )
 
     val resolvedTemplate = TestJni.createYaml(envoyConfiguration)
@@ -357,6 +359,19 @@ class EnvoyConfigurationTest {
     assertThat(resolvedTemplate).contains("FAKE_CDS_LOCATOR");
     assertThat(resolvedTemplate).contains("FAKE_ADDRESS");
     assertThat(resolvedTemplate).contains("initial_fetch_timeout: 356s");
+  }
+
+  @Test
+  fun `test not using enableCds`() {
+    JniLibrary.loadTestLibrary()
+    val envoyConfiguration = buildTestEnvoyConfiguration(
+      cdsResourcesLocator = "FAKE_CDS_LOCATOR", cdsTimeoutSeconds = 356, adsAddress = "FAKE_ADDRESS", adsPort = 0
+    )
+
+    val resolvedTemplate = TestJni.createYaml(envoyConfiguration)
+
+    assertThat(resolvedTemplate).doesNotContain("FAKE_CDS_LOCATOR");
+    assertThat(resolvedTemplate).doesNotContain("initial_fetch_timeout: 356s");
   }
 
   @Test

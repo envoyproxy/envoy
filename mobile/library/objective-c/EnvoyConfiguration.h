@@ -57,8 +57,9 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic, strong) NSString *nodeRegion;
 @property (nonatomic, strong) NSString *nodeZone;
 @property (nonatomic, strong) NSString *nodeSubZone;
-@property (nonatomic, strong) NSString *CdsResourcesLocator;
+@property (nonatomic, strong) NSString *cdsResourcesLocator;
 @property (nonatomic, strong) Uint32 cdsTimeoutSeconds;
+@property (nonatomic, assign) BOOL enableCds;
 /**
  Create a new instance of the configuration.
  */
@@ -117,8 +118,9 @@ NS_ASSUME_NONNULL_BEGIN
                                        nodeRegion:(NSString *)nodeRegion
                                          nodeZone:(NSString *)nodeZone
                                       nodeSubZone:(NSString *)nodeSubZone
-                              CdsResourcesLocator:(NSString *)CdsResourcesLocator
-                                cdsTimeoutSeconds:(UInt32)cdsTimeoutSeconds;
+                              cdsResourcesLocator:(NSString *)cdsResourcesLocator
+                                cdsTimeoutSeconds:(UInt32)cdsTimeoutSeconds
+                                        enableCds:(BOOL)enableCds;
 
 /**
  Generate a string description of the C++ Envoy bootstrap from this configuration.

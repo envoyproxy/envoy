@@ -78,6 +78,7 @@ public class NativeCronetEngineBuilderImpl extends CronetEngineBuilderImpl {
   private String mNodeSubZone = "";
   private String mCdsResourcesLocator = "";
   private String mCdsTimeoutSeconds = "";
+  private boolean mEnableCds = false;
 
   /**
    * Builder for Native Cronet Engine. Default config enables SPDY, disables QUIC and HTTP cache.
@@ -148,6 +149,6 @@ public class NativeCronetEngineBuilderImpl extends CronetEngineBuilderImpl {
         mEnableSkipDNSLookupForProxiedRequests, mEnablePlatformCertificatesValidation,
         mRtdsLayerName, mRtdsTimeoutSeconds, mAdsAddress, mAdsPort, mAdsToken, mAdsTokenLifetime,
         mAdsRootCerts, mNodeId, mNodeRegion, mNodeZone, mNodeSubZone, mCdsResourcesLocator,
-        mCdsTimeoutSeconds);
+        mCdsTimeoutSeconds, mEnableCds);
   }
 }

@@ -1213,7 +1213,7 @@ void configureBuilder(
     jstring rtds_layer_name, jlong rtds_timeout_seconds, jstring ads_address, jlong ads_port,
     jstring ads_token, jlong ads_token_lifetime, jstring ads_root_certs, jstring node_id,
     jstring node_region, jstring node_zone, jstring node_sub_zone, jstring cds_resources_locator,
-    jlong cds_timeout_seconds, Envoy::Platform::EngineBuilder& builder) {
+    jlong cds_timeout_seconds, jboolean enable_cds, Envoy::Platform::EngineBuilder& builder) {
   setString(env, grpc_stats_domain, &builder, &EngineBuilder::addGrpcStatsDomain);
   builder.addConnectTimeoutSeconds((connect_timeout_seconds));
   builder.addDnsRefreshSeconds((dns_refresh_seconds));
@@ -1271,7 +1271,7 @@ void configureBuilder(
   std::vector<std::string> hostnames = javaObjectArrayToStringVector(env, dns_preresolve_hostnames);
   builder.addDnsPreresolveHostnames(hostnames);
   builder.addRtdsLayer(getCppString(env, rtds_layer_name), rtds_timeout_seconds);
-  if (getCppString(env, cds_resources_locator) != "") {
+  if (enable_cds) {
     builder.addCdsLayer(getCppString(env, cds_resources_locator), cds_timeout_seconds);
   }
   builder.setNodeId(getCppString(env, node_id));
@@ -1301,7 +1301,7 @@ extern "C" JNIEXPORT jlong JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibr
     jstring rtds_layer_name, jlong rtds_timeout_seconds, jstring ads_address, jlong ads_port,
     jstring ads_token, jlong ads_token_lifetime, jstring ads_root_certs, jstring node_id,
     jstring node_region, jstring node_zone, jstring node_sub_zone, jstring cds_resources_locator,
-    jlong cds_timeout_seconds) {
+    jlong cds_timeout_seconds, jboolean enable_cds) {
   Envoy::Platform::EngineBuilder builder;
 
   configureBuilder(
@@ -1318,7 +1318,7 @@ extern "C" JNIEXPORT jlong JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibr
       enable_skip_dns_lookup_for_proxied_requests, runtime_guards, rtds_layer_name,
       rtds_timeout_seconds, ads_address, ads_port, ads_token, ads_token_lifetime, ads_root_certs,
       node_id, node_region, node_zone, node_sub_zone, cds_resources_locator, cds_timeout_seconds,
-      builder);
+      enable_cds, builder);
 
   return reinterpret_cast<intptr_t>(builder.generateBootstrap().release());
 }
