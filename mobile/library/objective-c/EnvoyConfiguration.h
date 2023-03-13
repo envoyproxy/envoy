@@ -58,7 +58,7 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic, strong) NSString *nodeZone;
 @property (nonatomic, strong) NSString *nodeSubZone;
 @property (nonatomic, strong) NSString *cdsResourcesLocator;
-@property (nonatomic, strong) Uint32 cdsTimeoutSeconds;
+@property (nonatomic, assign) UInt32 cdsTimeoutSeconds;
 @property (nonatomic, assign) BOOL enableCds;
 /**
  Create a new instance of the configuration.
