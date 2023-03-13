@@ -1216,7 +1216,6 @@ void configureBuilder(JNIEnv* env, jstring grpc_stats_domain, jboolean admin_int
                       jstring ads_token, jlong ads_token_lifetime, jstring ads_root_certs,
                       jstring node_id, jstring node_region, jstring node_zone,
                       jstring node_sub_zone, Envoy::Platform::EngineBuilder& builder) {
-  setString(env, grpc_stats_domain, &builder, &EngineBuilder::addGrpcStatsDomain);
   builder.addConnectTimeoutSeconds((connect_timeout_seconds));
   builder.addDnsRefreshSeconds((dns_refresh_seconds));
   builder.addDnsFailureRefreshSeconds((dns_failure_refresh_seconds_base),
@@ -1228,7 +1227,6 @@ void configureBuilder(JNIEnv* env, jstring grpc_stats_domain, jboolean admin_int
   builder.addH2ConnectionKeepaliveIdleIntervalMilliseconds(
       (h2_connection_keepalive_idle_interval_milliseconds));
   builder.addH2ConnectionKeepaliveTimeoutSeconds((h2_connection_keepalive_timeout_seconds));
-  builder.addStatsFlushSeconds((stats_flush_seconds));
 
   setString(env, app_version, &builder, &EngineBuilder::setAppVersion);
   setString(env, app_id, &builder, &EngineBuilder::setAppId);
@@ -1268,7 +1266,12 @@ void configureBuilder(JNIEnv* env, jstring grpc_stats_domain, jboolean admin_int
     builder.addVirtualCluster(cluster);
   }
   std::vector<std::string> sinks = javaObjectArrayToStringVector(env, stat_sinks);
+
+#ifdef ENVOY_MOBILE_STATS_REPORTING
   builder.addStatsSinks(std::move(sinks));
+  builder.addStatsFlushSeconds((stats_flush_seconds));
+  setString(env, grpc_stats_domain, &builder, &EngineBuilder::addGrpcStatsDomain);
+#endif
 
   std::vector<std::string> hostnames = javaObjectArrayToStringVector(env, dns_preresolve_hostnames);
   builder.addDnsPreresolveHostnames(hostnames);

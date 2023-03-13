@@ -84,6 +84,7 @@ open class EngineBuilder: NSObject {
     self.base = .custom(yaml)
   }
 
+#if ENVOY_MOBILE_STATS_REPORTING
   /// Add a stats domain for Envoy to flush stats to.
   /// Passing nil disables stats emission.
   ///
@@ -108,6 +109,7 @@ open class EngineBuilder: NSObject {
     self.statsSinks = statsSinks
     return self
   }
+#endif
 
   /// Add a log level to use with Envoy.
   ///
@@ -252,6 +254,17 @@ open class EngineBuilder: NSObject {
     self.enableHttp3 = enableHttp3
     return self
   }
+
+  /// Add an interval at which to flush Envoy stats.
+  ///
+  /// - parameter statsFlushSeconds: Interval at which to flush Envoy stats.
+  ///
+  /// - returns: This builder.
+  @discardableResult
+  public func addStatsFlushSeconds(_ statsFlushSeconds: UInt32) -> Self {
+    self.statsFlushSeconds = statsFlushSeconds
+    return self
+  }
 #endif
 
   /// Specify whether sockets may attempt to bind to a specific interface, based on network
@@ -339,17 +352,6 @@ open class EngineBuilder: NSObject {
   @discardableResult
   public func setMaxConnectionsPerHost(_ maxConnectionsPerHost: UInt32) -> Self {
     self.maxConnectionsPerHost = maxConnectionsPerHost
-    return self
-  }
-
-  /// Add an interval at which to flush Envoy stats.
-  ///
-  /// - parameter statsFlushSeconds: Interval at which to flush Envoy stats.
-  ///
-  /// - returns: This builder.
-  @discardableResult
-  public func addStatsFlushSeconds(_ statsFlushSeconds: UInt32) -> Self {
-    self.statsFlushSeconds = statsFlushSeconds
     return self
   }
 
