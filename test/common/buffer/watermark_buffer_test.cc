@@ -245,11 +245,7 @@ TEST_F(WatermarkBufferTest, MoveOneByte) {
 TEST_F(WatermarkBufferTest, WatermarkFdFunctions) {
   os_fd_t fds[2] = {0, 0};
   auto& os_sys_calls = Api::OsSysCallsSingleton::get();
-#ifdef WIN32
-  ASSERT_EQ(0, os_sys_calls.socketpair(AF_INET, SOCK_STREAM, 0, fds).return_value_);
-#else
-  ASSERT_EQ(0, os_sys_calls.socketpair(AF_UNIX, SOCK_STREAM, 0, fds).return_value_);
-#endif
+  ASSERT_EQ(os_sys_calls.socketpair(ENVOY_DEFAULT_PIPE_TYPE, SOCK_STREAM, 0, fds).return_value_, 0);
 
   buffer_.add(TEN_BYTES, 10);
   buffer_.add(TEN_BYTES, 10);

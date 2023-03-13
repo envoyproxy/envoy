@@ -1350,11 +1350,7 @@ TYPED_TEST(OwnedImplTypedTest, ReserveZeroCommit) {
   OwnedImplTest::expectSlices({{5, 0, 4096}}, buf);
   os_fd_t fds[2] = {0, 0};
   auto& os_sys_calls = Api::OsSysCallsSingleton::get();
-#ifdef WIN32
-  ASSERT_EQ(os_sys_calls.socketpair(AF_INET, SOCK_STREAM, 0, fds).return_value_, 0);
-#else
-  ASSERT_EQ(os_sys_calls.socketpair(AF_UNIX, SOCK_STREAM, 0, fds).return_value_, 0);
-#endif
+  ASSERT_EQ(os_sys_calls.socketpair(ENVOY_DEFAULT_PIPE_TYPE, SOCK_STREAM, 0, fds).return_value_, 0);
   using IoSocketHandleType = typename TestFixture::IoSocketHandleTestType;
   IoSocketHandleType io_handle(fds[0]);
   ASSERT_EQ(os_sys_calls.setsocketblocking(fds[0], false).return_value_, 0);
@@ -1379,11 +1375,7 @@ TYPED_TEST(OwnedImplTypedTest, ReadReserveAndCommit) {
 
   os_fd_t fds[2] = {0, 0};
   auto& os_sys_calls = Api::OsSysCallsSingleton::get();
-#ifdef WIN32
-  ASSERT_EQ(os_sys_calls.socketpair(AF_INET, SOCK_STREAM, 0, fds).return_value_, 0);
-#else
-  ASSERT_EQ(os_sys_calls.socketpair(AF_UNIX, SOCK_STREAM, 0, fds).return_value_, 0);
-#endif
+  ASSERT_EQ(os_sys_calls.socketpair(ENVOY_DEFAULT_PIPE_TYPE, SOCK_STREAM, 0, fds).return_value_, 0);
   using IoSocketHandleType = typename TestFixture::IoSocketHandleTestType;
   IoSocketHandleType io_handle(fds[0]);
   ASSERT_EQ(os_sys_calls.setsocketblocking(fds[0], false).return_value_, 0);

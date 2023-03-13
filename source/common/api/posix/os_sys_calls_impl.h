@@ -6,6 +6,8 @@
 
 #include "source/common/singleton/threadsafe_singleton.h"
 
+#define ENVOY_DEFAULT_PIPE_TYPE AF_UNIX
+
 namespace Envoy {
 namespace Api {
 
