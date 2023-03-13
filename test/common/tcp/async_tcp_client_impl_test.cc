@@ -6,6 +6,7 @@
 #include "test/mocks/upstream/cluster_info.h"
 #include "test/mocks/upstream/cluster_manager.h"
 #include "test/mocks/upstream/host.h"
+// #include "envoy/network/connection.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -96,6 +97,15 @@ TEST_F(AsyncTcpClientImplTest, TestReadDisable) {
   EXPECT_CALL(callbacks_, onEvent(Network::ConnectionEvent::LocalClose));
   EXPECT_CALL(dispatcher_, deferredDelete_(_));
   client_->close();
+  ASSERT_FALSE(client_->connected());
+}
+
+TEST_F(AsyncTcpClientImplTest, TestCloseType) {
+  expectCreateConnection();
+  EXPECT_CALL(callbacks_, onEvent(Network::ConnectionEvent::LocalClose));
+  EXPECT_CALL(*connection_, close(Network::ConnectionCloseType::Abort));
+  EXPECT_CALL(dispatcher_, deferredDelete_(_));
+  client_->close(Network::ConnectionCloseType::Abort);
   ASSERT_FALSE(client_->connected());
 }
 

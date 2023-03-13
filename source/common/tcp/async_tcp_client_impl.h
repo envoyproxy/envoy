@@ -27,6 +27,8 @@ public:
 
   void close() override;
 
+  void close(Network::ConnectionCloseType type) override;
+
   /**
    * @return true means a host is successfully picked from a Cluster.
    * This doesn't mean the connection is established.

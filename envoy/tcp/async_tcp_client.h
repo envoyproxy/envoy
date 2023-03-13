@@ -51,6 +51,12 @@ public:
   virtual void close() PURE;
 
   /**
+   * Close the client. It closes the connection based on close type.
+   * @param type the connection close type.
+   */
+  virtual void close(Network::ConnectionCloseType type) PURE;
+
+  /**
    * Write data through the client.
    * @param data the bufferred data.
    * @param end_stream indicates if this is the end of the stream, half close

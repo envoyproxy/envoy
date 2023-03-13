@@ -42,6 +42,12 @@ void AsyncTcpClientImpl::close() {
   }
 }
 
+void AsyncTcpClientImpl::close(Network::ConnectionCloseType type) {
+  if (connection_) {
+    connection_->close(type);
+  }
+}
+
 void AsyncTcpClientImpl::setAsyncTcpClientCallbacks(AsyncTcpClientCallbacks& callbacks) {
   callbacks_ = &callbacks;
 }
