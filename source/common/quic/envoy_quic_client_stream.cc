@@ -236,8 +236,10 @@ bool EnvoyQuicClientStream::OnStopSending(quic::QuicResetStreamError error) {
   if (!quic::QuicSpdyClientStream::OnStopSending(error)) {
     return false;
   }
+
+  stats_.rx_reset_.inc();
+
   if (read_side_closed() && !end_stream_encoded) {
-    stats_.rx_reset_.inc();
     // If both directions are closed but end stream hasn't been encoded yet, notify reset callbacks.
     // Treat this as a remote reset, since the stream will be closed in both directions.
     runResetCallbacks(quicRstErrorToEnvoyRemoteResetReason(error.internal_code()));
