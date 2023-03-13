@@ -154,6 +154,8 @@ stages:
       vmImage: "ubuntu-20.04"
     steps:
     - task: Cache@2
+      env:
+        VSO_DEDUP_REDIRECT_TIMEOUT_IN_SEC: 5
       inputs:
         key: "format | ./WORKSPACE | **/*.bzl"
         path: $(Build.StagingDirectory)/repository_cache
@@ -185,6 +187,8 @@ stages:
       vmImage: "ubuntu-20.04"
     steps:
     - task: Cache@2
+      env:
+        VSO_DEDUP_REDIRECT_TIMEOUT_IN_SEC: 5
       inputs:
         key: "proto_format | ./WORKSPACE | **/*.bzl"
         path: $(Build.StagingDirectory)/repository_cache
@@ -216,6 +220,8 @@ stages:
       vmImage: "ubuntu-20.04"
     steps:
     - task: Cache@2
+      env:
+        VSO_DEDUP_REDIRECT_TIMEOUT_IN_SEC: 5
       inputs:
         key: "docs | ./WORKSPACE | **/*.bzl"
         path: $(Build.StagingDirectory)/repository_cache
@@ -249,6 +255,8 @@ stages:
       vmImage: "ubuntu-20.04"
     steps:
     - task: Cache@2
+      env:
+        VSO_DEDUP_REDIRECT_TIMEOUT_IN_SEC: 5
       inputs:
         key: "dependencies | ./WORKSPACE | **/*.bzl"
         path: $(Build.StagingDirectory)/repository_cache
@@ -629,6 +637,8 @@ stages:
       vmImage: "ubuntu-20.04"
     steps:
     - task: Cache@2
+      env:
+        VSO_DEDUP_REDIRECT_TIMEOUT_IN_SEC: 5
       inputs:
         key: "docs | ./WORKSPACE | **/*.bzl"
         path: $(Build.StagingDirectory)/repository_cache
@@ -903,6 +913,8 @@ stages:
       vmImage: "windows-2019"
     steps:
     - task: Cache@2
+      env:
+        VSO_DEDUP_REDIRECT_TIMEOUT_IN_SEC: 5
       inputs:
         key: '"windows.release" | ./WORKSPACE | **/*.bzl'
         path: $(Build.StagingDirectory)/repository_cache
