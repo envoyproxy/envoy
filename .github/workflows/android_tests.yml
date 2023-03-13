@@ -82,6 +82,7 @@ jobs:
             $([ -z $GITHUB_TOKEN ] || echo "--config=remote-ci-macos") \
             --remote_header="Authorization=Bearer $GITHUB_TOKEN" \
             --define=signal_trace=disabled \
+            --define=google_grpc=enable \
             //test/java/...
   kotlintestslinux:
     if: github.repository == 'envoyproxy/envoy'
