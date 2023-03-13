@@ -117,6 +117,8 @@ void ExtensionRegistry::registerFactories() {
   Extensions::HttpFilters::PlatformBridge::forceRegisterPlatformBridgeFilterFactory();
   // This is Envoy's router filter, required for a functional L7 data plane.
   Extensions::HttpFilters::RouterFilter::forceRegisterRouterFilterConfig();
+  // This is Envoy's codec filter, required for a functional L7 data plane.
+  Router::forceRegisterUpstreamCodecFilterFactory();
 
   // This filter applies socket tagging based on the x-envoy-mobile-socket-tag header.
   Extensions::HttpFilters::SocketTag::forceRegisterSocketTagFilterFactory();
@@ -127,10 +129,6 @@ void ExtensionRegistry::registerFactories() {
       forceRegisterHttpConnectionManagerFilterConfigFactory();
   // This works with the connectivity manager to allow retries across network interfaces.
   Extensions::Retry::Options::forceRegisterNetworkConfigurationRetryOptionsPredicateFactory();
-  // TODO(alyssawilk) stats reporting should be optional
-  Extensions::StatSinks::MetricsService::forceRegisterMetricsServiceSinkFactory();
-  Extensions::StatSinks::Statsd::forceRegisterStatsdSinkFactory();
-      forceRegisterUpstreamHttp11ConnectSocketConfigFactory();
   // TODO(alyssawilk) move to the listener build.
   Extensions::TransportSockets::RawBuffer::forceRegisterDownstreamRawBufferSocketFactory();
   // This is the default certificate validator, still compiled by default but hopefully soon to be
@@ -147,29 +145,52 @@ void ExtensionRegistry::registerFactories() {
   // This transport socket handles plaintext (http) traffic.
   Extensions::TransportSockets::RawBuffer::forceRegisterUpstreamRawBufferSocketFactory();
 
+  // This is the default HTTP connection pool factory required for L7 upstream traffic.
   Extensions::Upstreams::Http::Generic::forceRegisterGenericGenericConnPoolFactory();
+  // This is the default TCP client connection factory required for L7 upstream traffic.
+  Network::forceRegisterDefaultClientConnectionFactory();
+  // This is the default socket factory required for L7 traffic.
+  Network::forceRegisterSocketInterfaceImpl();
+  // This is the RE factory, required at least if any config uses regex, which stats do.
+  Regex::forceRegisterGoogleReEngineFactory();
+
+  // These are required to support specific route configs, if they are on.
+  // It's likely no current users of E-M require them so we could optionally compile out by default.
+  Router::forceRegisterDefaultEarlyDataPolicyFactory();
+  Router::forceRegisterRouteListMatchActionFactory();
+  Router::forceRegisterRouteMatchActionFactory();
   Extensions::UriTemplate::Match::forceRegisterUriTemplateMatcherFactory();
   Extensions::UriTemplate::Rewrite::forceRegisterUriTemplateRewriterFactory();
   Http::Matching::forceRegisterHttpRequestHeadersDataInputFactory();
   Http::Matching::forceRegisterHttpRequestTrailersDataInputFactory();
   Http::Matching::forceRegisterHttpResponseHeadersDataInputFactory();
   Http::Matching::forceRegisterHttpResponseTrailersDataInputFactory();
-  Network::Address::forceRegisterIpResolver();
-  Network::forceRegisterDefaultClientConnectionFactory();
+
+  // Envoy Mobile uses the GetAddrInfo resolver for DNS lookups by default.
   Network::forceRegisterGetAddrInfoDnsResolverFactory();
-  Network::forceRegisterSocketInterfaceImpl();
+
+  // TODO(alyssawilk) looks like this is only needed for H3 downstream. Test and remove.
   Network::forceRegisterUdpDefaultWriterFactoryFactory();
-  Regex::forceRegisterGoogleReEngineFactory();
-  Router::forceRegisterDefaultEarlyDataPolicyFactory();
-  Router::forceRegisterRouteListMatchActionFactory();
-  Router::forceRegisterRouteMatchActionFactory();
-  Router::forceRegisterUpstreamCodecFilterFactory();
+
+  // This is Envoy's lightweight listener manager which lets E-M avoid the 1M
+  // hit of compiling in downstream code.
   Server::forceRegisterApiListenerManagerFactoryImpl();
-  Upstream::forceRegisterLogicalDnsClusterFactory();
-  Upstream::forceRegisterStaticClusterFactory();
+
+  // This is required code for certain watchdog config, required until Envoy
+  // Mobile compiles out watchdog support.
   Watchdog::forceRegisterAbortActionFactory();
 
+  // These are facties required for stats reporting.  TODO(alyssawilk) allow compile out.
+  Network::Address::forceRegisterIpResolver();
+  Upstream::forceRegisterLogicalDnsClusterFactory();
+  Upstream::forceRegisterStaticClusterFactory();
+  Extensions::StatSinks::MetricsService::forceRegisterMetricsServiceSinkFactory();
+  Extensions::StatSinks::Statsd::forceRegisterStatsdSinkFactory();
+      forceRegisterUpstreamHttp11ConnectSocketConfigFactory();
+
 #ifdef ENVOY_MOBILE_ENABLE_LISTENER
+  // These are downstream factories required if Envoy Mobile is compiled with
+  // proxy functionality.
   Server::forceRegisterConnectionHandlerFactoryImpl();
   Server::forceRegisterDefaultListenerManagerFactoryImpl();
   Server::FilterChain::forceRegisterFilterChainNameActionFactory();
@@ -178,6 +199,9 @@ void ExtensionRegistry::registerFactories() {
 #ifdef ENVOY_ENABLE_QUIC
 
 #ifdef ENVOY_MOBILE_ENABLE_LISTENER
+  // These are QUIC downstream factories required if Envoy Mobile is compiled with
+  // proxy functionality and QUIC support.
+  Server::forceRegisterConnectionHandlerFactoryImpl();
   Quic::forceRegisterQuicHttpServerConnectionFactoryImpl();
   Quic::forceRegisterQuicServerTransportSocketConfigFactory();
   Quic::forceRegisterEnvoyQuicProofSourceFactoryImpl();
@@ -187,6 +211,7 @@ void ExtensionRegistry::registerFactories() {
 #endif
 
 #ifdef ENVOY_MOBILE_REQUEST_COMPRESSION
+  // These are factories required for request decompression.
   Extensions::Compression::Brotli::Compressor::forceRegisterBrotliCompressorLibraryFactory();
   Extensions::Compression::Gzip::Compressor::forceRegisterGzipCompressorLibraryFactory();
   Extensions::HttpFilters::Composite::forceRegisterCompositeFilterFactory();
