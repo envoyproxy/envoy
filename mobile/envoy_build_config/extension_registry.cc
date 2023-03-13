@@ -181,7 +181,7 @@ void ExtensionRegistry::registerFactories() {
   // Mobile compiles out watchdog support.
   Watchdog::forceRegisterAbortActionFactory();
 
-  // These are facties required for stats reporting.  TODO(alyssawilk) allow compile out.
+  // These are facties required for stats reporting. TODO(alyssawilk) allow compile out.
   Network::Address::forceRegisterIpResolver();
   Upstream::forceRegisterLogicalDnsClusterFactory();
   Upstream::forceRegisterStaticClusterFactory();
