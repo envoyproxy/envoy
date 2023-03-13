@@ -23,7 +23,7 @@ public:
   // Does not take ownership of the QuicSpdyStream. "stream" must refer to a valid object
   // that outlives CapsuleProtocolHandler.
   explicit CapsuleProtocolHandler(quic::QuicSpdyStream* stream);
-  ~CapsuleProtocolHandler();
+  ~CapsuleProtocolHandler() override;
 
   // quic::QuicSpdyStream::Http3DatagramVisitor
   // Normalizes HTTP/3 Datagrams to Capsules for Envoy to do subsequent processing.

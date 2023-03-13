@@ -78,9 +78,9 @@ private:
   // Deliver awaiting trailers if body has been delivered.
   void maybeDecodeTrailers();
 
-  std::unique_ptr<CapsuleProtocolHandler> capsule_protocol_handler_;
   Http::ResponseDecoder* response_decoder_{nullptr};
   bool decoded_1xx_{false};
+  std::unique_ptr<CapsuleProtocolHandler> capsule_protocol_handler_;
 };
 
 } // namespace Quic

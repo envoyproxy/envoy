@@ -179,7 +179,6 @@ protected:
   Buffer::BufferMemoryAccountSharedPtr buffer_memory_account_ = nullptr;
   bool got_304_response_{false};
   bool sent_head_request_{false};
-  std::unique_ptr<CapsuleProtocolHandler> capsule_protocol_handler_;
 
 private:
   // Keeps track of bytes buffered in the stream send buffer in QUICHE and reacts

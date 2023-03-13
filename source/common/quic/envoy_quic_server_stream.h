@@ -113,6 +113,7 @@ private:
       headers_with_underscores_action_;
 
   quiche::QuicheReferenceCountedPointer<QuicStatsGatherer> stats_gatherer_;
+  std::unique_ptr<CapsuleProtocolHandler> capsule_protocol_handler_;
 };
 
 } // namespace Quic
