@@ -6,7 +6,6 @@
 #include "test/mocks/upstream/cluster_info.h"
 #include "test/mocks/upstream/cluster_manager.h"
 #include "test/mocks/upstream/host.h"
-// #include "envoy/network/connection.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
