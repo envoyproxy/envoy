@@ -427,23 +427,24 @@ stages:
     strategy:
       maxParallel: 3
       matrix:
-        api:
-          CI_TARGET: "bazel.api"
+        # These are ordered by most time-consuming first.
+        compile_time_options:
+          CI_TARGET: "bazel.compile_time_options"
+        tsan:
+          CI_TARGET: "bazel.tsan"
+        asan:
+          CI_TARGET: "bazel.asan"
         # Disabled due to https://github.com/envoyproxy/envoy/pull/18218
         # api_compat:
         #  CI_TARGET: "bazel.api_compat"
         gcc:
           CI_TARGET: "bazel.gcc"
-        clang_tidy:
-          CI_TARGET: "bazel.clang_tidy"
-        asan:
-          CI_TARGET: "bazel.asan"
         msan:
           CI_TARGET: "bazel.msan"
-        tsan:
-          CI_TARGET: "bazel.tsan"
-        compile_time_options:
-          CI_TARGET: "bazel.compile_time_options"
+        clang_tidy:
+          CI_TARGET: "bazel.clang_tidy"
+        api:
+          CI_TARGET: "bazel.api"
     timeoutInMinutes: 120
     pool:
       vmImage: "ubuntu-20.04"
