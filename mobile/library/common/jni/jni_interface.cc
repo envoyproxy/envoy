@@ -1274,7 +1274,7 @@ void configureBuilder(JNIEnv* env, jstring grpc_stats_domain, jboolean admin_int
   builder.addDnsPreresolveHostnames(hostnames);
   std::string native_rtds_layer_name = getCppString(env, rtds_layer_name);
   if (!native_rtds_layer_name.empty()) {
-    builder.addRtdsLayer(native_rtds_layer_name, rtds_timeout_seconds);    
+    builder.addRtdsLayer(native_rtds_layer_name, rtds_timeout_seconds);
   }
   std::string native_node_id = getCppString(env, node_id);
   if (!native_node_id.empty()) {

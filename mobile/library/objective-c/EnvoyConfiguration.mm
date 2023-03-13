@@ -267,9 +267,8 @@
   }
   if (self.adsAddress != nil) {
     builder.setAggregatedDiscoveryService(
-      [self.adsAddress toCXXString], self.adsPort, [self.adsJwtToken toCXXString],
-      self.adsJwtTokenLifetimeSeconds, [self.adsSslRootCerts toCXXString]
-    );
+        [self.adsAddress toCXXString], self.adsPort, [self.adsJwtToken toCXXString],
+        self.adsJwtTokenLifetimeSeconds, [self.adsSslRootCerts toCXXString]);
   }
 #ifdef ENVOY_ADMIN_FUNCTIONALITY
   builder.enableAdminInterface(self.adminInterfaceEnabled);
