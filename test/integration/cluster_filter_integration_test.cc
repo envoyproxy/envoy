@@ -149,8 +149,7 @@ class ClusterFilterTcpIntegrationTest : public ClusterFilterIntegrationTestBase,
                                         public BaseIntegrationTest {
 public:
   ClusterFilterTcpIntegrationTest()
-      : ClusterFilterIntegrationTestBase(),
-        BaseIntegrationTest(std::get<0>(GetParam()), ConfigHelper::tcpProxyConfig()) {}
+      : BaseIntegrationTest(std::get<0>(GetParam()), ConfigHelper::tcpProxyConfig()) {}
 
   void initialize() override {
     enableHalfClose(true);
@@ -225,8 +224,7 @@ class ClusterFilterHttpIntegrationTest : public ClusterFilterIntegrationTestBase
                                          public HttpIntegrationTest {
 public:
   ClusterFilterHttpIntegrationTest()
-      : ClusterFilterIntegrationTestBase(),
-        HttpIntegrationTest(Http::CodecType::HTTP1, std::get<0>(GetParam())) {}
+      : HttpIntegrationTest(Http::CodecType::HTTP1, std::get<0>(GetParam())) {}
 
   void initialize() override {
     config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
