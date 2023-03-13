@@ -326,6 +326,10 @@ JitteredExponentialBackOffStrategyPtr Utility::buildJitteredExponentialBackOffSt
   }
   // default maximum interval is specified
   if (default_max_interval_ms != absl::nullopt) {
+    if (default_max_interval_ms.value() < default_base_interval_ms) {
+      throw EnvoyException(
+          "default_max_interval_ms must be greater than or equal to the default_base_interval_ms");
+    }
     return std::make_unique<JitteredExponentialBackOffStrategy>(
         default_base_interval_ms, default_max_interval_ms.value(), random);
   }
