@@ -6,6 +6,8 @@
 
 #include "source/common/common/logger.h"
 
+extern "C" void __gcov_dump();
+
 namespace Envoy {
 namespace Thread {
 namespace {
@@ -17,6 +19,15 @@ uint64_t toPlatformTid(int64_t tid) { return static_cast<uint64_t>(tid); }
 } // namespace
 
 bool terminateThread(const ThreadId& tid) {
+#if defined(ENVOY_CONFIG_COVERAGE)
+#if __ELF__
+  // Flush coverage if we are in coverage mode.
+  if (&__gcov_dump != nullptr) {
+    __gcov_dump();
+  }
+#endif
+#endif
+
 #ifndef WIN32
   // Assume POSIX-compatible system and signal to the thread.
   return kill(toPlatformTid(tid.getId()), SIGABRT) == 0;
