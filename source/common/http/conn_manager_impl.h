@@ -423,6 +423,13 @@ private:
     std::chrono::milliseconds idle_timeout_ms_{};
     State state_;
     absl::optional<Router::RouteConstSharedPtr> cached_route_;
+    // This is used to track routes that have been cleared from the request. By this way, all the
+    // configurations that have been used in the processing of the request will be alive until the
+    // request is finished.
+    // For example, if a filter stored a per-route config in the decoding phase and may try to
+    // use it in the encoding phase, but the route is cleared and refreshed by another decoder
+    // filter, we must keep the per-route config alive to avoid use-after-free.
+    absl::InlinedVector<Router::RouteConstSharedPtr, 2> cleared_cached_routes_;
     absl::optional<Upstream::ClusterInfoConstSharedPtr> cached_cluster_info_;
     const std::string* decorated_operation_{nullptr};
     std::unique_ptr<RdsRouteConfigUpdateRequester> route_config_update_requester_;
