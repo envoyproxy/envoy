@@ -788,7 +788,6 @@ open class EngineBuilder: NSObject {
 #if canImport(EnvoyCxxSwiftInterop)
 private extension EngineBuilder {
   func generateBootstrap() -> Bootstrap {
-    // TODO(jpsim): Incorporate https://github.com/envoyproxy/envoy/pull/25638
     var cxxBuilder = Envoy.Platform.EngineBuilder()
     cxxBuilder.addLogLevel(self.logLevel.toCXX())
 #if ENVOY_ADMIN_FUNCTIONALITY
@@ -851,6 +850,37 @@ private extension EngineBuilder {
     }
 
     cxxBuilder.addStatsSinks(self.statsSinks.toCXX())
+
+    if
+      let nodeRegion = self.nodeRegion,
+      let nodeZone = self.nodeZone,
+      let nodeSubZone = self.nodeSubZone
+    {
+      cxxBuilder.setNodeLocality(nodeRegion.toCXX(), nodeZone.toCXX(), nodeSubZone.toCXX())
+    }
+
+    if let nodeID = self.nodeID {
+      cxxBuilder.setNodeId(nodeID.toCXX())
+    }
+
+    if let rtdsLayerName = self.rtdsLayerName {
+      cxxBuilder.addRtdsLayer(rtdsLayerName.toCXX(), Int32(self.rtdsTimeoutSeconds))
+    }
+
+    if
+      let adsAddress = self.adsAddress,
+      let adsJwtToken = self.adsJwtToken,
+      let adsSslRootCerts = self.adsSslRootCerts
+    {
+      cxxBuilder.setAggregatedDiscoveryService(
+        adsAddress.toCXX(),
+        Int32(self.adsPort),
+        adsJwtToken.toCXX(),
+        Int32(self.adsJwtTokenLifetimeSeconds),
+        adsSslRootCerts.toCXX()
+      )
+    }
+
     return cxxBuilder.generateBootstrap()
   }
 }
