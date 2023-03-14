@@ -100,7 +100,6 @@ public:
   createDataInput(const envoy::config::core::v3::TypedExtensionConfig& config) {
     return createDataInputBase<envoy::config::core::v3::TypedExtensionConfig, ResultDataType>(
         config);
-    ;
   }
 
 private:
@@ -124,7 +123,6 @@ private:
   DataInputFactoryCb<DataType> createDataInputBase(const TypedExtensionConfigType& config) {
     auto* factory = Config::Utility::getFactory<DataInputFactory<DataType, ResultDataType>>(config);
     if (factory != nullptr) {
-      // TODO(tyxia) It seems fixed
       validation_visitor_.validateDataInput(*factory, config.typed_config().type_url());
 
       ProtobufTypes::MessagePtr message =

@@ -228,7 +228,7 @@ template <class ResultDataType = std::string> struct DataInputGetResult {
 
 // Template deduction guide for DataInputGetResult.
 template <class ResultDataType>
-DataInputGetResult(DataAvailability data_availability_, ResultDataType data_)
+DataInputGetResult(DataAvailability data_availability, ResultDataType data)
     -> DataInputGetResult<std::string>;
 
 /**
