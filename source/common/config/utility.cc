@@ -325,8 +325,9 @@ JitteredExponentialBackOffStrategyPtr Utility::buildJitteredExponentialBackOffSt
                                                                 random);
   }
 
-  if (default_base_interval_ms >= 1000) {
-    throw EnvoyException("default_base_interval_ms must be less than 1000 ms");
+  // default_base_interval_ms must be greater than zero
+  if ((default_base_interval_ms > 0) == false) {
+    throw EnvoyException("default_base_interval_ms must be greater than zero");
   }
 
   // default maximum interval is specified

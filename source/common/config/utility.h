@@ -537,7 +537,7 @@ public:
    * provided default timer values
    * @param api_config_source config
    * @param random random generator
-   * @param default_base_interval_ms  Default base interval, must be < 1000 ms
+   * @param default_base_interval_ms  Default base interval, must be > 0
    * @param default_max_interval_ms (optional) Default maximum interval
    * @return JitteredExponentialBackOffStrategyPtr if 1. Backoff Strategy is
    * found in the config or 2. default base interval and default maximum interval is specified or 3.
@@ -561,7 +561,7 @@ public:
    * Prepares Jittered Exponential BackOff Strategy from config containing the Retry Policy
    * @param config config containing RetryPolicy <envoy_v3_api_msg_config.core.v3.RetryPolicy>
    * @param random random generator
-   * @param default_base_interval_ms  Default base interval, must be < 1000 ms
+   * @param default_base_interval_ms  Default base interval, must be > 0
    * @param default_max_interval_ms (optional) Default maximum interval
    * @return JitteredExponentialBackOffStrategyPtr if 1. RetryPolicy containing backoff values is
    * found in config or 2. default base interval and default maximum interval is specified or 3.
@@ -587,7 +587,7 @@ private:
    * values
    * @param config (optional) BackoffStrategy config
    * @param random random generator
-   * @param default_base_interval_ms  Default base interval, must be < 1000 ms
+   * @param default_base_interval_ms  Default base interval, must be > 0
    * @param default_max_interval_ms (optional) Default maximum interval
    * @return JitteredExponentialBackOffStrategyPtr if 1. Backoff Strategy is
    * specified or 2. default base interval and default maximum interval is specified or 3.
