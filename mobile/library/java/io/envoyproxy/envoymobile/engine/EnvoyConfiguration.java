@@ -61,7 +61,7 @@ public class EnvoyConfiguration {
   public final Map<String, EnvoyStringAccessor> stringAccessors;
   public final Map<String, EnvoyKeyValueStore> keyValueStores;
   public final List<String> statSinks;
-  Map<String, String> runtimeGuards;
+  public final Map<String, String> runtimeGuards;
   public final Boolean enablePlatformCertificatesValidation;
   public final Boolean enableSkipDNSLookupForProxiedRequests;
   public final String rtdsLayerName;

@@ -14,8 +14,8 @@ services:
 
   service1:
     build:
-      context: ../shared/flask
-      target: jaeger-flask
+      context: ../shared/python
+      target: aiohttp-jaeger-service
     volumes:
     - ./service1-envoy-jaeger.yaml:/etc/service-envoy.yaml
     environment:
@@ -26,8 +26,8 @@ services:
 
   service2:
     build:
-      context: ../shared/flask
-      target: jaeger-flask
+      context: ../shared/python
+      target: aiohttp-jaeger-service
     volumes:
     - ./service2-envoy-jaeger.yaml:/etc/service-envoy.yaml
     environment:

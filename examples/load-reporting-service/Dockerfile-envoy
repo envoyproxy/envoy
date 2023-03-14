@@ -1,4 +1,4 @@
-FROM envoyproxy/envoy-dev:latest
+FROM envoyproxy/envoy:dev
 
 COPY ./service-envoy-w-lrs.yaml /etc/service-envoy-w-lrs.yaml
 RUN chmod go+r /etc/service-envoy-w-lrs.yaml

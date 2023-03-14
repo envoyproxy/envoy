@@ -188,6 +188,7 @@ envoy_cc_test(
     size = "small",
     srcs = ["guarddog_impl_test.cc"],
     deps = [
+        ":guarddog_test_interlock",
         "//envoy/common:time_interface",
         "//source/common/api:api_lib",
         "//source/common/common:macros",
@@ -201,6 +202,14 @@ envoy_cc_test(
         "//test/test_common:registry_lib",
         "//test/test_common:simulated_time_system_lib",
         "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_test_library(
+    name = "guarddog_test_interlock",
+    hdrs = ["guarddog_test_interlock.h"],
+    deps = [
+        "//source/server:guarddog_lib",
     ],
 )
 

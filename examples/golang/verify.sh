@@ -10,7 +10,7 @@ export PORT_PROXY="${GOLANG_PORT_PROXY:-10710}"
 . "$(dirname "${BASH_SOURCE[0]}")/../verify-common.sh"
 
 run_log "Compile the go plugin library"
-"${DOCKER_COMPOSE[@]}" -f docker-compose-go.yaml up --remove-orphans go_plugin_compile
+"${DOCKER_COMPOSE[@]}" -f docker-compose-go.yaml up --quiet-pull --remove-orphans go_plugin_compile
 
 run_log "Start all of our containers"
 bring_up_example

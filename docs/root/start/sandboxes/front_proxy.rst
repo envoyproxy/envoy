@@ -12,7 +12,7 @@ Front proxy
 
 To get a flavor of what Envoy has to offer as a front proxy, we are releasing a
 `docker compose <https://docs.docker.com/compose/>`_ sandbox that deploys a front Envoy and a
-couple of services (simple Flask apps) colocated with a running service Envoy.
+couple of services (simple ``aiohttp`` apps) colocated with a running service Envoy.
 
 The three containers will be deployed inside a virtual network called ``envoymesh``.
 
@@ -29,7 +29,7 @@ compose (see :download:`docker-compose.yaml <_include/front-proxy/docker-compose
 Moreover, notice that all traffic routed by the front Envoy to the service containers is actually
 routed to the service Envoys (routes setup in :download:`front-envoy.yaml <_include/front-proxy/front-envoy.yaml>`).
 
-In turn the service Envoys route the request to the Flask app via the loopback
+In turn the service Envoys route the request to the ``aiohttp`` app via the loopback
 address (routes setup in :download:`service-envoy.yaml <_include/front-proxy/service-envoy.yaml>`). This
 setup illustrates the advantage of running service Envoys collocated with your services: all
 requests are handled by the service Envoy, and efficiently routed to your services.
