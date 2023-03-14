@@ -776,7 +776,12 @@ open class EngineBuilder: NSObject {
   }
 
   func bootstrapDebugDescription() -> String {
-    self.makeConfig().bootstrapDebugDescription()
+    let objcDescription = self.makeConfig().bootstrapDebugDescription()
+    assert(
+      self.generateBootstrap().debugDescription == objcDescription,
+      "Swift bootstrap is different from ObjC bootstrap"
+    )
+    return objcDescription
   }
 }
 
