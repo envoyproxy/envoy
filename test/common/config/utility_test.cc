@@ -297,8 +297,18 @@ TEST(UtilityTest, PrepareDnsRefreshStrategy) {
 // test that default values are used when no retry configuration is provided
 TEST(UtilityTest, prepareJitteredExponentialBackOffStrategyStrategyNoConfig) {
   NiceMock<Random::MockRandomGenerator> random;
+  // test prepareJitteredExponentialBackOffStrategy method with only default values
+  {
+    envoy::config::core::v3::GrpcService::EnvoyGrpc config;
+    JitteredExponentialBackOffStrategyPtr strategy =
+        Utility::prepareJitteredExponentialBackOffStrategy(config, random, 500, 1000);
 
-  // provide Envoy Grpc Config
+    EXPECT_NE(nullptr, dynamic_cast<JitteredExponentialBackOffStrategy*>(strategy.get()));
+    EXPECT_EQ(true, dynamic_cast<JitteredExponentialBackOffStrategy*>(strategy.get())
+                        ->isOverTimeLimit(1000 + 1));
+  }
+
+  // provide Envoy Grpc Config without any configured retry values
   {
     envoy::config::core::v3::GrpcService::EnvoyGrpc config;
     const std::string config_yaml = R"EOF(
@@ -323,7 +333,7 @@ TEST(UtilityTest, prepareJitteredExponentialBackOffStrategyStrategyNoConfig) {
         EnvoyException, "default_base_interval_ms must be greater than zero");
   }
 
-  // provide ApiConfigSource config
+  // provide ApiConfigSource config without any configured retry values
   {
     envoy::config::core::v3::ApiConfigSource api_config_source;
     const std::string config_yaml = R"EOF(
