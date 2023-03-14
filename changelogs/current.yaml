@@ -191,7 +191,7 @@ new_features:
     be empty for mid-request logs. Enabling this may affect access loggers and filters that register as access loggers that expect to be called only once.
 - area: redis_health_check
   change: |
-    added :ref:`exists_failure <_config_health_checkers_redis>` stat to indicate health check failures caused by EXISTS check failure.
+    added :ref:`exists_failure <config_health_checkers_redis>` stat to indicate health check failures caused by EXISTS check failure.
 
 deprecated:
 - area: ext_authz
