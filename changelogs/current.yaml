@@ -163,6 +163,10 @@ new_features:
   change: |
     added :ref:`failed_status_in_metadata <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.JwtProvider.failed_status_in_metadata>` to support setting the JWT
     authentication failure status code and message in dynamic metadata.
+ area: ext_proc
+  change: |
+    added the support :ref:`new_message_timeout <envoy_v3_api_field_service.ext_proc.v3.ProcessingResponse.new_message_timeout>` for the ext_proc server to send back a message to Envoy to extend the ext_proc timer.
+    added the field :ref:`max_message_timeout <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExternalProcessor.max_message_timeout>` for specifying the max new_message_timeout could be sent back by the ext_proc server.
 - area: http filter
   change: |
     added :ref:`header mutation http filter <config_http_filters_header_mutation>` which adds the ability to modify request and response headers in any position of HTTP filter chain.
@@ -184,10 +188,11 @@ new_features:
 - area: tcp_proxy
   change: |
     added an option to dynamically disable TCP tunneling even if set in the filter config, by setting a filter state object for the key ``envoy.tcp_proxy.disable_tunneling``.
- area: ext_proc                                                                                                                                       
-  change: |                                                                                                                                            
-    added the support :ref:`new_message_timeout <envoy_v3_api_field_service.ext_proc.v3.ProcessingResponse.new_message_timeout>` for the ext_proc server to send back a message to Envoy to extend the ext_proc timer.                                                                                       
-    added the field :ref:`max_message_timeout <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExternalProcessor.max_message_timeout>` for specifying the max new_message_timeout could be sent back by the ext_proc server.  
+- area: http
+  change: |
+    add :ref:`periodic access logging <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.access_log_flush_interval>`
+    to http access logs for long-lived requests (Websockets, CONNECT, etc). :ref:`%DURATION% <config_access_log_format_duration>` will
+    be empty for mid-request logs. Enabling this may affect access loggers and filters that register as access loggers that expect to be called only once.
 
 deprecated:
 - area: ext_authz

@@ -1,3 +1,5 @@
+#include <chrono>
+
 #include "test/common/http/conn_manager_impl_test_base.h"
 #include "test/mocks/http/early_header_mutation.h"
 #include "test/test_common/logging.h"
@@ -2401,6 +2403,76 @@ TEST_F(HttpConnectionManagerImplTest, TestAccessLogWithInvalidRequest) {
 
   Buffer::OwnedImpl fake_input;
   conn_manager_->onData(fake_input, false);
+}
+
+TEST_F(HttpConnectionManagerImplTest, TestPeriodicAccessLogging) {
+  access_log_flush_interval_ = std::chrono::milliseconds(30 * 1000);
+  stream_idle_timeout_ = std::chrono::milliseconds(0);
+  request_timeout_ = std::chrono::milliseconds(0);
+  request_headers_timeout_ = std::chrono::milliseconds(0);
+  max_stream_duration_ = std::nullopt;
+  setup(false, "server_name");
+
+  std::shared_ptr<MockStreamDecoderFilter> filter(new NiceMock<MockStreamDecoderFilter>());
+  std::shared_ptr<AccessLog::MockInstance> handler(new NiceMock<AccessLog::MockInstance>());
+
+  EXPECT_CALL(filter_factory_, createFilterChain(_))
+      .WillOnce(Invoke([&](FilterChainManager& manager) -> bool {
+        FilterFactoryCb filter_factory = createDecoderFilterFactoryCb(filter);
+        FilterFactoryCb handler_factory = createLogHandlerFactoryCb(handler);
+
+        manager.applyFilterFactoryCb({}, filter_factory);
+        manager.applyFilterFactoryCb({}, handler_factory);
+        return true;
+      }));
+  Event::MockTimer* periodic_log_timer;
+  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance& data) -> Http::Status {
+    periodic_log_timer = setUpTimer();
+    EXPECT_CALL(*periodic_log_timer, enableTimer(*access_log_flush_interval_, _));
+    decoder_ = &conn_manager_->newStream(response_encoder_);
+
+    RequestHeaderMapPtr headers{
+        new TestRequestHeaderMapImpl{{":method", "GET"},
+                                     {":authority", "host"},
+                                     {":path", "/"},
+                                     {"x-request-id", "125a4afb-6f55-a4ba-ad80-413f09f48a28"}}};
+    decoder_->decodeHeaders(std::move(headers), true);
+
+    data.drain(4);
+    return Http::okStatus();
+  }));
+
+  Buffer::OwnedImpl fake_input("1234");
+  conn_manager_->onData(fake_input, false);
+
+  EXPECT_CALL(*handler, log(_, _, _, _))
+      .Times(2)
+      .WillRepeatedly(
+          Invoke([&](const HeaderMap* request_headers, const HeaderMap* response_headers,
+                     const HeaderMap*, const StreamInfo::StreamInfo& stream_info) {
+            EXPECT_EQ(&decoder_->streamInfo(), &stream_info);
+            EXPECT_THAT(request_headers, testing::NotNull());
+            EXPECT_THAT(response_headers, testing::IsNull());
+            EXPECT_EQ(stream_info.requestComplete(), absl::nullopt);
+          }));
+  // Pretend like some 30s has passed, and the log should be written.
+  EXPECT_CALL(*periodic_log_timer, enableTimer(*access_log_flush_interval_, _)).Times(2);
+  periodic_log_timer->invokeCallback();
+  periodic_log_timer->invokeCallback();
+  EXPECT_CALL(*handler, log(_, _, _, _))
+      .WillOnce(Invoke([&](const HeaderMap* request_headers, const HeaderMap* response_headers,
+                           const HeaderMap*, const StreamInfo::StreamInfo& stream_info) {
+        EXPECT_EQ(&decoder_->streamInfo(), &stream_info);
+        EXPECT_THAT(request_headers, testing::NotNull());
+        EXPECT_THAT(response_headers, testing::NotNull());
+        EXPECT_THAT(stream_info.responseCodeDetails(),
+                    testing::Optional(testing::StrEq("details")));
+        EXPECT_THAT(stream_info.responseCode(), testing::Optional(200));
+      }));
+  filter->callbacks_->streamInfo().setResponseCodeDetails("");
+  ResponseHeaderMapPtr response_headers{new TestResponseHeaderMapImpl{{":status", "200"}}};
+  EXPECT_CALL(*periodic_log_timer, disableTimer);
+  filter->callbacks_->encodeHeaders(std::move(response_headers), true, "details");
 }
 
 class StreamErrorOnInvalidHttpMessageTest : public HttpConnectionManagerImplTest {

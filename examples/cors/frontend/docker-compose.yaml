@@ -13,7 +13,8 @@ services:
 
   frontend-service:
     build:
-      context: ../../shared/flask
+      context: ../../shared/python
+      target: aiohttp-service
     volumes:
     - ./service.py:/code/service.py
     - ./index.html:/code/index.html

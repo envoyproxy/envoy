@@ -1457,6 +1457,11 @@ void Context::log(const Http::RequestHeaderMap* request_headers,
                   const Http::ResponseHeaderMap* response_headers,
                   const Http::ResponseTrailerMap* response_trailers,
                   const StreamInfo::StreamInfo& stream_info) {
+  // `log` may be called multiple times due to mid-request logging -- we only want to run on the
+  // last call.
+  if (!stream_info.requestComplete().has_value()) {
+    return;
+  }
   if (!in_vm_context_created_) {
     // If the request is invalid then onRequestHeaders() will not be called and neither will
     // onCreate() in cases like sendLocalReply who short-circuits envoy

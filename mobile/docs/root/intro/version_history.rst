@@ -19,6 +19,7 @@ Breaking changes:
 - api: move ``addVirtualClusters`` APIs taking concatenated cluster YAML to ``addVirtualCluster`` with one cluster config at a time (:issue: `#25297 <25297>`, :issue: `#25259 <25259>`, :issue: `#25457 <25457>`)
 - api: move ``dnsPreresolveHostnames`` APIs from taking concatenated cluster YAML to taking a list of String hostnames (:issue: `#25297 <25297>`, :issue: `#25259 <25259>`, :issue: `#25457 <25457>`)
 - api: added ``setRuntimeGuard`` APIs for all languages (:issue: `#25434 <25434>`)
+- api: added ``setRtdsLayer``, ``addAggregatedDiscoveryService``, ``setNodeId``, ``setNodeLocality`` APIs for all languages
 - clusters: removing the base_h2 cluster. Requests with ``x-envoy-mobile-upstream-protocol`` set to ``http2`` will be sent to the base cluster and use the best available protocol (:issue `#25796 <25796>`).
 - clusters: only creating the stats cluster if an endpoint is configured. Previously if no domain was configured a cluster would be configured pointed at 127.0.0.1. (:issue: `#25816 <25816>`).
 - clusters: removing the base_h3 cluster. If HTTP/3 is enabled, the base cluster will use HTTP/3 instead. (:issue: `#25814 <25814>`).
@@ -34,7 +35,7 @@ Features:
 
 - api: Add support for brotli and gzip request compression.  (:issue:`#25352 <25352>`, :issue:`#25595 <25595>`)
 - api: Add a constructor which takes a URL to C++ RequestEngineBuilder.
-- api: add option to support platform provided certificates validation interfaces on iOS and Android. (:issue `#2144 <2144>`)
+- api: add option to support platform provided certificates validation interfaces on iOS (always enabled) and Android. (:issue `#2144 <2144>`)
 - api: Add a ``setPerTryIdleTimeoutSeconds()`` method to C++ EngineBuilder.
 - swift/kotlin: add an option to enable DNS cache by calling ``enableDNSCache(_:)`` method.
 - kotlin: add a way to tell Envoy Mobile to respect system proxy settings by calling an ``enableProxying(true)`` method on the engine builder. (:issue:`#2416 <2416>`)
