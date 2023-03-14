@@ -259,8 +259,8 @@ TEST_P(TlsInspectorTest, ClientHelloTooBig) {
       .WillOnce(Invoke(
           [=, &client_hello](os_fd_t, void* buffer, size_t length, int) -> Api::SysCallSizeResult {
             ASSERT(length >= max_size);
-            memcpy(buffer, client_hello.data(), length);
-            return Api::SysCallSizeResult{ssize_t(length), 0};
+            memcpy(buffer, client_hello.data(), max_size);
+            return Api::SysCallSizeResult{ssize_t(max_size), 0};
           }));
 #else
   EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))
