@@ -498,14 +498,6 @@ static void ios_track_event(envoy_map map, const void *context) {
   return register_platform_api(name.UTF8String, api);
 }
 
-- (int)runWithConfig:(EnvoyConfiguration *)config logLevel:(NSString *)logLevel {
-  if (config.useLegacyBuilder) {
-    return [self runWithTemplate:@(config_template) config:config logLevel:logLevel];
-  }
-
-  return [self runWithBootstrapConfig:config logLevel:logLevel];
-}
-
 - (void)performRegistrationsForConfig:(EnvoyConfiguration *)config {
   for (EnvoyHTTPFilterFactory *filterFactory in config.httpPlatformFilterFactories) {
     [self registerFilterFactory:filterFactory];
@@ -519,12 +511,10 @@ static void ios_track_event(envoy_map map, const void *context) {
     [self registerKeyValueStore:name keyValueStore:config.keyValueStores[name]];
   }
 
-  if (config.enablePlatformCertificateValidation) {
-    register_apple_platform_cert_verifier();
-  }
+  register_apple_platform_cert_verifier();
 }
 
-- (int)runWithBootstrapConfig:(EnvoyConfiguration *)config logLevel:(NSString *)logLevel {
+- (int)runWithConfig:(EnvoyConfiguration *)config logLevel:(NSString *)logLevel {
   auto bootstrap = [config generateBootstrap];
   if (bootstrap == nullptr) {
     return kEnvoyFailure;
@@ -546,19 +536,14 @@ static void ios_track_event(envoy_map map, const void *context) {
   }
 }
 
-- (int)runWithTemplate:(NSString *)yaml
-                config:(EnvoyConfiguration *)config
-              logLevel:(NSString *)logLevel {
-  NSString *resolvedYAML = [config resolveTemplate:yaml];
-  if (resolvedYAML == nil) {
-    return kEnvoyFailure;
-  }
-
+- (int)runWithYAML:(NSString *)yaml
+            config:(EnvoyConfiguration *)config
+          logLevel:(NSString *)logLevel {
   [self performRegistrationsForConfig:config];
   [self startObservingLifecycleNotifications];
 
   @try {
-    return (int)run_engine(_engineHandle, resolvedYAML.UTF8String, logLevel.UTF8String, "");
+    return (int)run_engine(_engineHandle, yaml.UTF8String, logLevel.UTF8String, "");
   } @catch (NSException *exception) {
     NSLog(@"[Envoy] exception caught: %@", exception);
     [NSNotificationCenter.defaultCenter postNotificationName:@"EnvoyError" object:self];

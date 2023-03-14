@@ -1,5 +1,9 @@
 #include "source/extensions/http/custom_response/redirect_policy/redirect_policy.h"
 
+#include <string>
+#include <variant>
+
+#include "envoy/config/route/v3/route_components.pb.h"
 #include "envoy/stream_info/filter_state.h"
 
 #include "source/common/common/enum_to_int.h"
@@ -19,6 +23,29 @@ bool schemeIsHttp(const ::Envoy::Http::RequestHeaderMap& downstream_headers,
   }
   return false;
 }
+
+::Envoy::Http::Utility::RedirectConfig
+createRedirectConfig(const envoy::config::route::v3::RedirectAction& redirect_action) {
+  ::Envoy::Http::Utility::RedirectConfig redirect_config{
+      redirect_action.scheme_redirect(),
+      redirect_action.host_redirect(),
+      redirect_action.port_redirect() ? ":" + std::to_string(redirect_action.port_redirect()) : "",
+      redirect_action.path_redirect(),
+      "",      // prefix_rewrite
+      "",      // regex_rewrite_redirect_substitution
+      nullptr, // regex_rewrite_redirect
+      redirect_action.path_redirect().find('?') != absl::string_view::npos,
+      redirect_action.https_redirect(),
+      redirect_action.strip_query()};
+  if (redirect_action.has_regex_rewrite()) {
+    throw Envoy::EnvoyException("regex_rewrite is not supported for Custom Response");
+  }
+  if (redirect_action.has_prefix_rewrite()) {
+    throw Envoy::EnvoyException("prefix_rewrite is not supported for Custom Response");
+  }
+  return redirect_config;
+}
+
 } // namespace
 
 namespace Envoy {
@@ -30,22 +57,39 @@ RedirectPolicy::RedirectPolicy(
     const envoy::extensions::http::custom_response::redirect_policy::v3::RedirectPolicy& config,
     Stats::StatName stats_prefix, Envoy::Server::Configuration::ServerFactoryContext& context)
     : stat_names_(context.scope().symbolTable()),
-      stats_(stat_names_, context.scope(), stats_prefix), host_(config.host()),
-      path_(config.path()), status_code_{config.has_status_code()
-                                             ? absl::optional<::Envoy::Http::Code>(
-                                                   static_cast<::Envoy::Http::Code>(
-                                                       config.status_code().value()))
-                                             : absl::optional<::Envoy::Http::Code>{}},
+      stats_(stat_names_, context.scope(), stats_prefix),
+      uri_{config.has_uri() ? std::make_unique<std::string>(config.uri()) : nullptr},
+      redirect_action_{config.has_redirect_action()
+                           ? std::make_unique<::Envoy::Http::Utility::RedirectConfig>(
+                                 createRedirectConfig(config.redirect_action()))
+                           : nullptr},
+      status_code_{config.has_status_code()
+                       ? absl::optional<::Envoy::Http::Code>(
+                             static_cast<::Envoy::Http::Code>(config.status_code().value()))
+                       : absl::optional<::Envoy::Http::Code>{}},
       response_header_parser_(
           Envoy::Router::HeaderParser::configure(config.response_headers_to_add())),
       request_header_parser_(
           Envoy::Router::HeaderParser::configure(config.request_headers_to_add())),
       modify_request_headers_action_(createModifyRequestHeadersAction(config, context)) {
-  ::Envoy::Http::Utility::Url absolute_url;
-  const std::string uri(absl::StrCat(host_, path_));
-  if (!absolute_url.initialize(uri, false)) {
+  // Ensure that exactly one of uri_ or redirect_action_ is specified.
+  ASSERT((uri_ || redirect_action_) && !(uri_ && redirect_action_));
+
+  if (uri_) {
+    ::Envoy::Http::Utility::Url absolute_url;
+    if (!absolute_url.initialize(*uri_, false)) {
+      throw EnvoyException(
+          absl::StrCat("Invalid uri specified for redirection for custom response: ", *uri_));
+    }
+  }
+  if (redirect_action_ && redirect_action_->path_redirect_.find('#') != std::string::npos) {
     throw EnvoyException(
-        absl::StrCat("Invalid uri specified for redirection for custom response: ", uri));
+        absl::StrCat("#fragment is not supported for custom response. Specified path_redirect is ",
+                     redirect_action_->path_redirect_));
+  }
+  if (redirect_action_ && redirect_action_->host_redirect_.empty() &&
+      redirect_action_->path_redirect_.empty()) {
+    throw EnvoyException("At least one of host_redirect and path_redirect needs to be specified");
   }
 }
 
@@ -59,7 +103,7 @@ std::unique_ptr<ModifyRequestHeadersAction> RedirectPolicy::createModifyRequestH
     const auto action_config = Envoy::Config::Utility::translateAnyToFactoryConfig(
         config.modify_request_headers_action().typed_config(), context.messageValidationVisitor(),
         factory);
-    action = factory.createAction(*action_config, context);
+    action = factory.createAction(*action_config, config, context);
   }
   return action;
 }
@@ -92,21 +136,15 @@ std::unique_ptr<ModifyRequestHeadersAction> RedirectPolicy::createModifyRequestH
     return ::Envoy::Http::FilterHeadersStatus::Continue;
   }
 
+  auto downstream_headers = custom_response_filter.downstreamHeaders();
   // Modify the request headers & recreate stream.
-  if (custom_response_filter.onLocalReplyCalled()) {
+  if (custom_response_filter.onLocalReplyCalled() && downstream_headers == nullptr) {
     // This condition is true if send local reply is called at any point before
-    // the encode call for the custom response filter.
-    // TODO(pradeepcrao): Currently redirect policy is not compatible with send local reply as we
-    // cannot call recreateStream once sendLocalReply has been called.
+    // the decodeHeaders call for the custom response filter.
     return ::Envoy::Http::FilterHeadersStatus::Continue;
   }
-  auto downstream_headers = custom_response_filter.downstreamHeaders();
   RELEASE_ASSERT(downstream_headers != nullptr, "downstream_headers cannot be nullptr");
 
-  ::Envoy::Http::Utility::Url absolute_url;
-  const std::string uri(absl::StrCat(host_, path_));
-  RELEASE_ASSERT(absolute_url.initialize(uri, false),
-                 "uri should not be invalid as this was already validated during config load");
   // Don't change the scheme from the original request
   const bool scheme_is_http = schemeIsHttp(*downstream_headers, decoder_callbacks->connection());
 
@@ -126,18 +164,28 @@ std::unique_ptr<ModifyRequestHeadersAction> RedirectPolicy::createModifyRequestH
         }
       });
 
+  ::Envoy::Http::Utility::Url absolute_url;
+  std::string uri(uri_ ? *uri_
+                       : ::Envoy::Http::Utility::newUri(*redirect_action_, *downstream_headers));
+  if (!absolute_url.initialize(uri, false)) {
+    stats_.custom_response_invalid_uri_.inc();
+    // We could potentially get an invalid url only if redirect_action_ was specified instead
+    // of uri_. Hence, assert that uri_ is not set.
+    ENVOY_BUG(!static_cast<bool>(uri_),
+              "uri should not be invalid as this was already validated during config load");
+    return ::Envoy::Http::FilterHeadersStatus::Continue;
+  }
   downstream_headers->setScheme(absolute_url.scheme());
   downstream_headers->setHost(absolute_url.hostAndPort());
 
-  auto path_and_query = path_;
+  auto path_and_query = absolute_url.pathAndQueryParams();
   // Strip the #fragment from Location URI if it is present. Envoy treats
   // internal redirect as a new request and will reject it if the URI path
   // contains #fragment.
-  const auto fragment_pos = path_.find('#');
-  path_and_query = path_.substr(0, fragment_pos);
+  const auto fragment_pos = path_and_query.find('#');
+  path_and_query = path_and_query.substr(0, fragment_pos);
 
-  downstream_headers->setPath(path_);
-
+  downstream_headers->setPath(path_and_query);
   if (decoder_callbacks->downstreamCallbacks()) {
     decoder_callbacks->downstreamCallbacks()->clearRouteCache();
   }

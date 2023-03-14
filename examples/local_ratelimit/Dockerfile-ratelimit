@@ -1,4 +1,4 @@
-FROM envoyproxy/envoy-dev:latest
+FROM envoyproxy/envoy:dev
 
 COPY ./ratelimit-envoy.yaml /etc/ratelimit-envoy.yaml
 RUN chmod go+r /etc/ratelimit-envoy.yaml

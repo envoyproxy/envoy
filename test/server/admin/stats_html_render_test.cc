@@ -12,15 +12,22 @@ using testing::Not;
 namespace Envoy {
 namespace Server {
 
+static Admin::RequestPtr handlerCallback(AdminStream&) {
+  return Admin::makeStaticTextRequest("", Http::Code::OK);
+}
+
+const Admin::UrlHandler handler() {
+  return Admin::UrlHandler{"/prefix",
+                           "help text",
+                           handlerCallback,
+                           false,
+                           false,
+                           {{Admin::ParamDescriptor::Type::Boolean, "boolparam", "bool param help"},
+                            {Admin::ParamDescriptor::Type::String, "strparam", "str param help"}}};
+}
+
 class StatsHtmlRenderTest : public StatsRenderTestBase {
 protected:
-  static Admin::RequestPtr handlerCallback(AdminStream&) {
-    return Admin::makeStaticTextRequest("", Http::Code::OK);
-  }
-
-  const Admin::UrlHandler handler_{
-      "/prefix", "help text", handlerCallback,
-      false,     false,       {{Admin::ParamDescriptor::Type::Boolean, "param", "param help"}}};
   StatsHtmlRender renderer_{response_headers_, response_, params_};
   Http::Utility::QueryParams query_params_;
 };
@@ -56,11 +63,10 @@ TEST_F(StatsHtmlRenderTest, RenderTableEnd) {
 }
 
 TEST_F(StatsHtmlRenderTest, RenderUrlHandlerNoQuery) {
-  renderer_.urlHandler(response_, handler_, query_params_);
+  renderer_.urlHandler(response_, handler(), query_params_);
   std::string out = response_.toString();
-  EXPECT_THAT(
-      out,
-      HasSubstr("<input type='checkbox' name='param' id='param-1-prefix-param' form='prefix'"));
+  EXPECT_THAT(out, HasSubstr("<input type='checkbox' name='boolparam' "
+                             "id='param-1-prefix-boolparam' form='prefix'"));
   EXPECT_THAT(out, Not(HasSubstr(" checked/>")));
   EXPECT_THAT(out, HasSubstr("help text"));
   EXPECT_THAT(out, HasSubstr("param help"));
@@ -70,12 +76,15 @@ TEST_F(StatsHtmlRenderTest, RenderUrlHandlerNoQuery) {
 }
 
 TEST_F(StatsHtmlRenderTest, RenderUrlHandlerWithQuery) {
-  query_params_["param"] = "on";
-  renderer_.urlHandler(response_, handler_, query_params_);
+  query_params_["boolparam"] = "on";
+  query_params_["strparam"] = "str value";
+  renderer_.urlHandler(response_, handler(), query_params_);
   std::string out = response_.toString();
-  EXPECT_THAT(
-      out,
-      HasSubstr("<input type='checkbox' name='param' id='param-1-prefix-param' form='prefix'"));
+  EXPECT_THAT(out,
+              HasSubstr("<input type='checkbox' name='boolparam' id='param-1-prefix-boolparam' "
+                        "form='prefix'"));
+  EXPECT_THAT(out, HasSubstr("<input type='text' name='strparam' id='param-1-prefix-strparam' "
+                             "form='prefix' value='str value'"));
   EXPECT_THAT(out, HasSubstr(" checked/>"));
   EXPECT_THAT(out, HasSubstr("help text"));
   EXPECT_THAT(out, HasSubstr("param help"));
@@ -86,11 +95,26 @@ TEST_F(StatsHtmlRenderTest, RenderUrlHandlerWithQuery) {
 
 TEST_F(StatsHtmlRenderTest, RenderUrlHandlerSubmitOnChange) {
   renderer_.setSubmitOnChange(true);
-  renderer_.urlHandler(response_, handler_, query_params_);
+  renderer_.urlHandler(response_, handler(), query_params_);
   std::string out = response_.toString();
   EXPECT_THAT(out, HasSubstr(" onchange='prefix.submit()"));
   EXPECT_THAT(out, Not(HasSubstr("<button class='button-as-link'>prefix</button>")));
   EXPECT_THAT(out, Not(HasSubstr(" type='hidden' ")));
+}
+
+class StatsActiveRenderTest : public StatsRenderTestBase {
+protected:
+  StatsActiveRenderTest() {
+    params_.format_ = StatsFormat::ActiveHtml;
+    renderer_ = std::make_unique<StatsHtmlRender>(response_headers_, response_, params_);
+  }
+
+  std::unique_ptr<StatsHtmlRender> renderer_;
+};
+
+TEST_F(StatsActiveRenderTest, RenderActive) {
+  renderer_->setupStatsPage(handler(), params_, response_);
+  EXPECT_THAT(response_.toString(), HasSubstr("<script>"));
 }
 
 } // namespace Server

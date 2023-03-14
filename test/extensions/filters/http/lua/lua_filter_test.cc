@@ -18,7 +18,6 @@
 #include "test/mocks/upstream/cluster_manager.h"
 #include "test/test_common/logging.h"
 #include "test/test_common/printers.h"
-#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -1287,9 +1286,6 @@ TEST_F(LuaHttpFilterTest, HttpCallNoBody) {
 
 // HTTP call followed by immediate response.
 TEST_F(LuaHttpFilterTest, HttpCallImmediateResponse) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.lua_respond_with_send_local_reply", "false"}});
   const std::string SCRIPT{R"EOF(
     function envoy_on_request(request_handle)
       local headers, body = request_handle:httpCall(
@@ -1315,30 +1311,11 @@ TEST_F(LuaHttpFilterTest, HttpCallImmediateResponse) {
 
   Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
   Http::MockAsyncClientRequest request(&cluster_manager_.thread_local_cluster_.async_client_);
-  Http::AsyncClient::Callbacks* callbacks;
   EXPECT_CALL(cluster_manager_, getThreadLocalCluster(Eq("cluster")));
   EXPECT_CALL(cluster_manager_.thread_local_cluster_, httpAsyncClient());
-  EXPECT_CALL(cluster_manager_.thread_local_cluster_.async_client_, send_(_, _, _))
-      .WillOnce(
-          Invoke([&](Http::RequestMessagePtr& message, Http::AsyncClient::Callbacks& cb,
-                     const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
-            const Http::TestRequestHeaderMapImpl expected_headers{
-                {":path", "/"}, {":method", "GET"}, {":authority", "foo"}};
-            EXPECT_THAT(&message->headers(), HeaderMapEqualIgnoreOrder(&expected_headers));
-            callbacks = &cb;
-            return &request;
-          }));
-
+  EXPECT_CALL(decoder_callbacks_, sendLocalReply(_, _, _, _, _));
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(request_headers, false));
-
-  Http::ResponseMessagePtr response_message(new Http::ResponseMessageImpl(
-      Http::ResponseHeaderMapPtr{new Http::TestResponseHeaderMapImpl{{":status", "200"}}}));
-  Http::TestResponseHeaderMapImpl expected_headers{{":status", "403"},
-                                                   {"set-cookie", "flavor=chocolate; Path=/"},
-                                                   {"set-cookie", "variant=chewy; Path=/"}};
-  EXPECT_CALL(decoder_callbacks_, encodeHeaders_(HeaderMapEqualRef(&expected_headers), true));
-  callbacks->onSuccess(request, std::move(response_message));
   EXPECT_EQ(0, stats_store_.counter("test.lua.errors").value());
 }
 
@@ -1739,9 +1716,6 @@ TEST_F(LuaHttpFilterTest, HttpCallAsyncInvalidAsynchronousFlag) {
 // This is also a regression test for https://github.com/envoyproxy/envoy/issues/3570 which runs
 // the request flow 2000 times and does a GC at the end to make sure we don't leak memory.
 TEST_F(LuaHttpFilterTest, ImmediateResponse) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.lua_respond_with_send_local_reply", "false"}});
   const std::string SCRIPT{R"EOF(
     function envoy_on_request(request_handle)
       request_handle:respond(
@@ -1771,9 +1745,19 @@ TEST_F(LuaHttpFilterTest, ImmediateResponse) {
 
   for (uint64_t i = 0; i < num_loops; i++) {
     Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
-    Http::TestResponseHeaderMapImpl expected_headers{{":status", "503"}, {"content-length", "4"}};
-    EXPECT_CALL(decoder_callbacks_, encodeHeaders_(HeaderMapEqualRef(&expected_headers), false));
-    EXPECT_CALL(decoder_callbacks_, encodeData(_, true));
+    Http::TestResponseHeaderMapImpl immediate_response_headers;
+    EXPECT_CALL(decoder_callbacks_, sendLocalReply(_, _, _, _, _))
+        .WillOnce(Invoke([&immediate_response_headers](
+                             Http::Code code, absl::string_view body,
+                             std::function<void(Http::ResponseHeaderMap & headers)> modify_headers,
+                             const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
+                             absl::string_view details) {
+          EXPECT_EQ(Http::Code::ServiceUnavailable, code);
+          EXPECT_EQ("nope", body);
+          EXPECT_EQ(grpc_status, absl::nullopt);
+          EXPECT_EQ(details, "lua_response");
+          modify_headers(immediate_response_headers);
+        }));
     EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
               filter_->decodeHeaders(request_headers, false));
     filter_->onDestroy();

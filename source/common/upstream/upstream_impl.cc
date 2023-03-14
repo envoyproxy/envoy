@@ -505,9 +505,10 @@ Host::CreateConnectionData HostImpl::createConnection(
   // redirected to a proxy, create the TCP connection to the proxy's address not
   // the host's address.
   if (transport_socket_options && transport_socket_options->http11ProxyInfo().has_value()) {
-    ENVOY_LOG(debug, "Connecting to configured HTTP/1.1 proxy");
     auto upstream_local_address =
         source_address_selector->getUpstreamLocalAddress(address, options);
+    ENVOY_LOG(debug, "Connecting to configured HTTP/1.1 proxy at {}",
+              transport_socket_options->http11ProxyInfo()->proxy_address->asString());
     connection = dispatcher.createClientConnection(
         transport_socket_options->http11ProxyInfo()->proxy_address, upstream_local_address.address_,
         socket_factory.createTransportSocket(transport_socket_options, host),

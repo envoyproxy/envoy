@@ -8,6 +8,8 @@ namespace Envoy {
 namespace Config {
 namespace {
 
+using ::testing::Return;
+
 class HttpSubscriptionImplTest : public testing::Test, public HttpSubscriptionTestHarness {};
 
 // Validate that we start the retry timer when there is no cluster.

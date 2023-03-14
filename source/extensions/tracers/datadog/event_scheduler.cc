@@ -14,12 +14,6 @@ namespace Datadog {
 
 EventScheduler::EventScheduler(Event::Dispatcher& dispatcher) : dispatcher_(dispatcher) {}
 
-EventScheduler::~EventScheduler() {
-  for (const auto& timer : timers_) {
-    timer->disableTimer();
-  }
-}
-
 EventScheduler::Cancel
 EventScheduler::schedule_recurring_event(std::chrono::steady_clock::duration interval,
                                          std::function<void()> callback) {
@@ -52,7 +46,7 @@ EventScheduler::schedule_recurring_event(std::chrono::steady_clock::duration int
   Event::Timer* timer_raw = timer.get();
   *self = timer_raw;
 
-  timers_.emplace_back(std::move(timer));
+  timers_.insert(std::move(timer));
 
   timer_raw->enableTimer(std::chrono::duration_cast<std::chrono::milliseconds>(interval));
 
@@ -62,8 +56,7 @@ EventScheduler::schedule_recurring_event(std::chrono::steady_clock::duration int
     }
 
     timer->disableTimer();
-    auto found = std::find_if(timers_.begin(), timers_.end(),
-                              [&](const auto& element) { return element.get() == timer; });
+    auto found = timers_.find(timer);
     RELEASE_ASSERT(found != timers_.end(),
                    "timer not found in registry of timers in Datadog::EventScheduler");
     timers_.erase(found);

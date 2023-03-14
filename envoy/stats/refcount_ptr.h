@@ -83,7 +83,12 @@ public:
   T& operator*() const { return *ptr_; }
   operator bool() const { return ptr_ != nullptr; }
   bool operator==(const T* ptr) const { return ptr_ == ptr; }
+// In C++20, operator!= can be defaulted and returns !(x == y) or !(y == x).
+// Defining it prevents the compiler from considering the reversed-operand
+// versions of equality comparisons, so leave it to be defaulted.
+#if __cplusplus < 202002L
   bool operator!=(const T* ptr) const { return ptr_ != ptr; }
+#endif
   bool operator==(const RefcountPtr& a) const { return ptr_ == a.ptr_; }
   bool operator!=(const RefcountPtr& a) const { return ptr_ != a.ptr_; }
   uint32_t use_count() const { return ptr_->use_count(); }

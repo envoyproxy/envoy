@@ -52,7 +52,6 @@ class GRPCRequestHeadersBuilder : HeadersBuilder {
       ":path" to mutableListOf<String>(path),
       ":scheme" to mutableListOf<String>(scheme),
       "content-type" to mutableListOf<String>("application/grpc"),
-      "x-envoy-mobile-upstream-protocol" to mutableListOf<String>(UpstreamHttpProtocol.HTTP2.stringValue)
     )
   )
   )
