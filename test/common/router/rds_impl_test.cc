@@ -421,6 +421,79 @@ http_filters:
   rds_callbacks_->onConfigUpdate(decoded_resources.refvec_, response1.version_info());
 }
 
+// Test the case where different HTTP filter chain is used in the HCM.
+TEST_F(RdsImplTest, DifferentHttpFiltersDifferentProviders) {
+  std::string config_yaml_1 = R"EOF(
+rds:
+  config_source:
+    api_config_source:
+      api_type: REST
+      cluster_names:
+      - foo_cluster
+      refresh_delay: 1s
+  route_config_name: foo_route_config
+codec_type: auto
+stat_prefix: foo
+http_filters:
+- name: http_dynamo_filter
+  typed_config: {}
+    )EOF";
+
+  std::string config_yaml_2 = R"EOF(
+rds:
+  config_source:
+    api_config_source:
+      api_type: REST
+      cluster_names:
+      - foo_cluster
+      refresh_delay: 1s
+  route_config_name: foo_route_config
+codec_type: auto
+stat_prefix: foo
+http_filters:
+- name: another_filter
+  typed_config: {}
+    )EOF";
+
+  std::string config_yaml_3 = R"EOF(
+rds:
+  config_source:
+    api_config_source:
+      api_type: REST
+      cluster_names:
+      - foo_cluster
+      refresh_delay: 1s
+  route_config_name: another_foo_route_config
+codec_type: auto
+stat_prefix: foo
+http_filters:
+- name: another_filter
+  typed_config: {}
+    )EOF";
+
+  auto provider_1 = RouteConfigProviderUtil::create(
+      parseHttpConnectionManagerFromYaml(config_yaml_1), server_factory_context_,
+      validation_visitor_, outer_init_manager_, "foo.", *route_config_provider_manager_);
+  auto provider_2 = RouteConfigProviderUtil::create(
+      parseHttpConnectionManagerFromYaml(config_yaml_1), server_factory_context_,
+      validation_visitor_, outer_init_manager_, "foo.", *route_config_provider_manager_);
+
+  auto provider_3 = RouteConfigProviderUtil::create(
+      parseHttpConnectionManagerFromYaml(config_yaml_2), server_factory_context_,
+      validation_visitor_, outer_init_manager_, "foo.", *route_config_provider_manager_);
+
+  auto provider_4 = RouteConfigProviderUtil::create(
+      parseHttpConnectionManagerFromYaml(config_yaml_3), server_factory_context_,
+      validation_visitor_, outer_init_manager_, "foo.", *route_config_provider_manager_);
+
+  // Provider or subscription will be shared if the rds config and HTTP filters is the same
+  EXPECT_EQ(provider_1.get(), provider_2.get());
+  // Provider or subscription will not be shared if the HTTP filters config is different.
+  EXPECT_NE(provider_1.get(), provider_3.get());
+  // Provider or subscription will not be shared if the rds config is different.
+  EXPECT_NE(provider_1.get(), provider_4.get());
+}
+
 // validate there will be exception throw when unknown factory found for per route typed config.
 TEST_F(RdsImplTest, UnknownFacotryForPerRouteTypedConfig) {
   InSequence s;

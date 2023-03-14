@@ -392,7 +392,8 @@ scope_key_builder:
         scoped_routes_config.scoped_rds(), server_factory_context_, context_init_manager_, "foo.",
         ScopedRoutesConfigProviderManagerOptArg(
             scoped_routes_config.name(), scoped_routes_config.rds_config_source(),
-            scoped_routes_config.scope_key_builder(), optional_http_filters));
+            scoped_routes_config.scope_key_builder(), optional_http_filters,
+            MessageUtil::hash(scoped_routes_config.scoped_rds())));
     srds_subscription_ = server_factory_context_.cluster_manager_.subscription_factory_.callbacks_;
   }
 
@@ -460,6 +461,49 @@ scope_key_builder:
   Envoy::Stats::Gauge& on_demand_scopes_{server_factory_context_.store_.gauge(
       "foo.scoped_rds.foo_scoped_routes.on_demand_scopes", Stats::Gauge::ImportMode::Accumulate)};
 };
+
+TEST_F(ScopedRdsTest, DifferentHttpFiltersDifferentProviders) {
+  server_factory_context_.cluster_manager_.initializeClusters({"baz"}, {});
+  const std::string hcm_config = absl::StrCat(hcm_config_base, R"EOF(
+scoped_routes:
+  name: $0
+  scope_key_builder:
+    fragments:
+      - header_value_extractor:
+          name: addr
+          element_separator: ","
+          index: 0
+  scoped_rds: {}
+)EOF");
+
+  auto hcm_config_proto_1 =
+      parseHttpConnectionManagerFromYaml(absl::Substitute(hcm_config, "foo-scoped-routes"));
+
+  Envoy::Config::ConfigProviderPtr provider_1 = ScopedRoutesConfigProviderUtil::create(
+      hcm_config_proto_1, server_factory_context_, context_init_manager_, "foo.",
+      *config_provider_manager_);
+  auto* typed_provider_1 = dynamic_cast<ScopedRdsConfigProvider*>(provider_1.get());
+  EXPECT_NE(nullptr, typed_provider_1);
+
+  Envoy::Config::ConfigProviderPtr provider_2 = ScopedRoutesConfigProviderUtil::create(
+      hcm_config_proto_1, server_factory_context_, context_init_manager_, "foo.",
+      *config_provider_manager_);
+  auto* typed_provider_2 = dynamic_cast<ScopedRdsConfigProvider*>(provider_2.get());
+  EXPECT_NE(nullptr, typed_provider_2);
+
+  auto hcm_config_proto_2 =
+      parseHttpConnectionManagerFromYaml(absl::Substitute(hcm_config, "foo-scoped-routes"));
+  hcm_config_proto_2.mutable_http_filters(0)->set_name("another_filter");
+
+  Envoy::Config::ConfigProviderPtr provider_3 = ScopedRoutesConfigProviderUtil::create(
+      hcm_config_proto_2, server_factory_context_, context_init_manager_, "foo.",
+      *config_provider_manager_);
+  auto* typed_provider_3 = dynamic_cast<ScopedRdsConfigProvider*>(provider_3.get());
+  EXPECT_NE(nullptr, typed_provider_3);
+
+  EXPECT_EQ(&typed_provider_1->subscription(), &typed_provider_2->subscription());
+  EXPECT_NE(&typed_provider_1->subscription(), &typed_provider_3->subscription());
+}
 
 TEST_F(ScopedRdsTest, EmptyRouteConfigurationNameFailsConfigUpdate) {
   setup();
