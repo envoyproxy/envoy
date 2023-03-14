@@ -306,8 +306,8 @@ Api::IoCallUint64Result IoSocketHandleImpl::recvmsg(Buffer::RawSlice* slices,
                  fmt::format("Incorrectly set control message length: {}", hdr.msg_controllen));
   RELEASE_ASSERT(hdr.msg_namelen > 0,
                  fmt::format("Unable to get remote address from recvmsg() for fd: {}", fd_));
-  output.msg_[0].peer_address_ =
-      Address::addressFromSockAddrOrDie(peer_addr, hdr.msg_namelen, fd_, socket_v6only_);
+  output.msg_[0].peer_address_ = Address::addressFromSockAddrOrDie(
+      peer_addr, hdr.msg_namelen, fd_, socket_v6only_ || !udp_read_normalize_addresses_);
   output.msg_[0].gso_size_ = 0;
 
   if (hdr.msg_controllen > 0) {
@@ -316,8 +316,8 @@ Api::IoCallUint64Result IoSocketHandleImpl::recvmsg(Buffer::RawSlice* slices,
          cmsg = CMSG_NXTHDR(&hdr, cmsg)) {
 
       if (output.msg_[0].local_address_ == nullptr) {
-        Address::InstanceConstSharedPtr addr =
-            maybeGetDstAddressFromHeader(*cmsg, self_port, fd_, socket_v6only_);
+        Address::InstanceConstSharedPtr addr = maybeGetDstAddressFromHeader(
+            *cmsg, self_port, fd_, socket_v6only_ || !udp_read_normalize_addresses_);
         if (addr != nullptr) {
           // This is a IP packet info message.
           output.msg_[0].local_address_ = std::move(addr);
@@ -406,13 +406,13 @@ Api::IoCallUint64Result IoSocketHandleImpl::recvmmsg(RawSliceArrays& slices, uin
 
     output.msg_[i].msg_len_ = mmsg_hdr[i].msg_len;
     // Get local and peer addresses for each packet.
-    output.msg_[i].peer_address_ =
-        Address::addressFromSockAddrOrDie(raw_addresses[i], hdr.msg_namelen, fd_, socket_v6only_);
+    output.msg_[i].peer_address_ = Address::addressFromSockAddrOrDie(
+        raw_addresses[i], hdr.msg_namelen, fd_, socket_v6only_ || !udp_read_normalize_addresses_);
     if (hdr.msg_controllen > 0) {
       struct cmsghdr* cmsg;
       for (cmsg = CMSG_FIRSTHDR(&hdr); cmsg != nullptr; cmsg = CMSG_NXTHDR(&hdr, cmsg)) {
-        Address::InstanceConstSharedPtr addr =
-            maybeGetDstAddressFromHeader(*cmsg, self_port, fd_, socket_v6only_);
+        Address::InstanceConstSharedPtr addr = maybeGetDstAddressFromHeader(
+            *cmsg, self_port, fd_, socket_v6only_ || !udp_read_normalize_addresses_);
         if (addr != nullptr) {
           // This is a IP packet info message.
           output.msg_[i].local_address_ = std::move(addr);

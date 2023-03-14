@@ -1700,6 +1700,7 @@ TEST_P(QuicHttpIntegrationTest, UsesPreferredAddressDualStack) {
         version_ == Network::Address::IpVersion::v4)) {
     return;
   }
+  config_helper_.addRuntimeOverride("envoy.restart_features.udp_read_normalize_addresses", "true");
   // Only run this test with a v4 client if the test environment supports dual stack socket.
   autonomous_upstream_ = true;
   config_helper_.addConfigModifier([=](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
