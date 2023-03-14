@@ -1959,7 +1959,7 @@ MetadataFormatter::formatMetadata(const envoy::config::core::v3::Metadata& metad
     str = value.string_value();
   } else {
 #ifdef ENVOY_ENABLE_YAML
-    ProtobufUtil::StatusOr<std::string> json_or_error =
+    absl::StatusOr<std::string> json_or_error =
         MessageUtil::getJsonStringFromMessage(value, false, true);
     ENVOY_BUG(json_or_error.ok(), "Failed to parse json");
     if (json_or_error.ok()) {

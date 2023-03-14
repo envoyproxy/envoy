@@ -348,8 +348,8 @@ ProtobufWkt::Struct MessageUtil::keyValueStruct(const std::map<std::string, std:
   return struct_obj;
 }
 
-std::string MessageUtil::codeEnumToString(ProtobufUtil::StatusCode code) {
-  return ProtobufUtil::Status(code, "").ToString();
+std::string MessageUtil::codeEnumToString(absl::StatusCode code) {
+  return absl::Status(code, "").ToString();
 }
 
 namespace {

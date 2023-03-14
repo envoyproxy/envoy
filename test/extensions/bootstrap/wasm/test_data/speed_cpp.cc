@@ -242,19 +242,19 @@ void modify_metadata1000_test() {
 
 void json_serialize_test() {
   google::protobuf::Struct proto;
-  google::protobuf::util::JsonStringToMessage(test_json, &proto);
+  google::protobuf::util::JsonStringToMessage(test_json, &proto).IgnoreError();
 }
 
 void json_deserialize_test() {
   std::string json;
-  google::protobuf::util::MessageToJsonString(test_proto, &json);
+  google::protobuf::util::MessageToJsonString(test_proto, &json).IgnoreError();
   xDoNotRemove += json.size();
 }
 
 void json_deserialize_empty_test() {
   std::string json;
   google::protobuf::Struct empty;
-  google::protobuf::util::MessageToJsonString(empty, &json);
+  google::protobuf::util::MessageToJsonString(empty, &json).IgnoreError();
   xDoNotRemove = json.size();
 }
 
@@ -266,7 +266,7 @@ void convert_to_filter_state_test() {
   base64Decode(encoded_json, &decoded);
   std::string decoded_json(decoded.begin(), decoded.end());
   google::protobuf::Struct proto;
-  google::protobuf::util::JsonStringToMessage(decoded_json, &proto);
+  google::protobuf::util::JsonStringToMessage(decoded_json, &proto).IgnoreError();
   auto bytes = proto.SerializeAsString();
   setFilterStateStringValue("wasm_request_set_key", bytes);
 }
@@ -306,7 +306,7 @@ WASM_EXPORT(uint32_t, proxy_on_vm_start, (uint32_t, uint32_t configuration_size)
   } else if (configuration == "json_serialize") {
     test_fn = &json_serialize_test;
   } else if (configuration == "json_deserialize") {
-    google::protobuf::util::JsonStringToMessage(test_json, &test_proto);
+    google::protobuf::util::JsonStringToMessage(test_json, &test_proto).IgnoreError();
     test_fn = &json_deserialize_test;
   } else if (configuration == "json_deserialize_empty") {
     test_fn = &json_deserialize_empty_test;

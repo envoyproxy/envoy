@@ -873,3 +873,8 @@ platform(
         "@build_bazel_apple_support//constraints:device",
     ],
 )
+
+cc_library(
+    name = "python_headers",
+    visibility = ["//visibility:public"],
+)

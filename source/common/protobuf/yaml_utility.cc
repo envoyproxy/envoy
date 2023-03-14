@@ -17,6 +17,7 @@
 #include "absl/strings/match.h"
 #include "udpa/annotations/sensitive.pb.h"
 #include "udpa/annotations/status.pb.h"
+#include "utf8_validity.h"
 #include "validate/validate.h"
 #include "xds/annotations/v3/status.pb.h"
 #include "yaml-cpp/yaml.h"
@@ -131,9 +132,8 @@ void MessageUtil::loadFromJson(const std::string& json, Protobuf::Message& messa
   }
 }
 
-Protobuf::util::Status MessageUtil::loadFromJsonNoThrow(const std::string& json,
-                                                        Protobuf::Message& message,
-                                                        bool& has_unknown_fileld) {
+absl::Status MessageUtil::loadFromJsonNoThrow(const std::string& json, Protobuf::Message& message,
+                                              bool& has_unknown_fileld) {
   has_unknown_fileld = false;
   Protobuf::util::JsonParseOptions options;
   options.case_insensitive_enum_parsing = true;
@@ -238,7 +238,7 @@ std::string MessageUtil::getYamlStringFromMessage(const Protobuf::Message& messa
   return out.c_str();
 }
 
-ProtobufUtil::StatusOr<std::string>
+absl::StatusOr<std::string>
 MessageUtil::getJsonStringFromMessage(const Protobuf::Message& message, const bool pretty_print,
                                       const bool always_print_primitive_fields) {
   Protobuf::util::JsonPrintOptions json_options;
@@ -323,6 +323,28 @@ ProtobufWkt::Value ValueUtil::loadFromYaml(const std::string& yaml) {
   }
 }
 
+namespace {
+
+char* UTF8CoerceToStructurallyValid(absl::string_view str, char* dst, const char replace_char) {
+  // Copy the whole string (unless src == dst).
+  if (str.data() != dst) {
+    memmove(dst, str.data(), str.size());
+  }
+  char* const initial_dst = dst;
+  while (!str.empty()) {
+    int n_valid_bytes = static_cast<int>(utf8_range::SpanStructurallyValid(str));
+    if (n_valid_bytes == static_cast<int>(str.size())) {
+      break;
+    }
+    dst += n_valid_bytes;
+    *dst++ = replace_char; // replace one bad byte
+    str.remove_prefix(n_valid_bytes + 1);
+  }
+  return initial_dst;
+}
+
+} // namespace
+
 std::string MessageUtil::sanitizeUtf8String(absl::string_view input) {
   if (!Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.service_sanitize_non_utf8_strings")) {
@@ -340,8 +362,7 @@ std::string MessageUtil::sanitizeUtf8String(absl::string_view input) {
   // The choice of '!' is somewhat arbitrary, but we wanted to avoid any character that has
   // special semantic meaning in URLs or similar.
   std::string result(input);
-  const char* sanitized = google::protobuf::internal::UTF8CoerceToStructurallyValid(
-      google::protobuf::StringPiece(input.data(), input.length()), result.data(), '!');
+  const char* sanitized = UTF8CoerceToStructurallyValid(input, result.data(), '!');
   ASSERT(sanitized == result.data() || sanitized == input.data());
 
   // Validate requirement that if the input string is returned from
