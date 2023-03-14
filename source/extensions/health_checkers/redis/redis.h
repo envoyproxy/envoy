@@ -22,9 +22,8 @@ namespace RedisHealthChecker {
 /**
  * All redis health checker stats. @see stats_macros.h
  */
-#define ALL_REDIS_HEALTH_CHECKER_STATS(COUNTER)                                                    \
-  COUNTER(exists_failure)                                                                          
- 
+#define ALL_REDIS_HEALTH_CHECKER_STATS(COUNTER) COUNTER(exists_failure)
+
 /**
  * Definition of all redis health checker stats. @see stats_macros.h
  */
@@ -63,7 +62,6 @@ protected:
 private:
   friend class RedisHealthCheckerTest;
   RedisHealthCheckerStats generateRedisStats(Stats::Scope& scope);
-
 
   struct RedisActiveHealthCheckSession
       : public ActiveHealthCheckSession,
