@@ -6291,7 +6291,9 @@ protected:
     TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true);
 
     Http::TestRequestHeaderMapImpl req_headers = genHeaders("www.lyft.com", "/", "GET");
-    const RouteEntry* route = config.route(req_headers, 0)->routeEntry();
+    RouteConstSharedPtr owned_route = config.route(req_headers, 0);
+    const RouteEntry* route = owned_route->routeEntry();
+
     auto transforms = run_request_header_test ? route->requestHeaderTransforms(stream_info)
                                               : route->responseHeaderTransforms(stream_info);
     EXPECT_THAT(transforms.headers_to_append_or_add,
