@@ -10,7 +10,7 @@ def envoy_copts(repository, test = False):
         "-Werror",
         "-Wnon-virtual-dtor",
         "-Woverloaded-virtual",
-        "-Wold-style-cast",
+        #        "-Wold-style-cast", TODO(yanavlasov): re-enable after next protobuf upgrade
         "-Wformat",
         "-Wformat-security",
         "-Wvla",
