@@ -43,8 +43,13 @@ ConfigProviderPtr create(
          envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
              RouteSpecifierCase::kScopedRoutes);
   OptionalHttpFilters optional_http_filters;
+  std::vector<const Protobuf::Message*> identifier_messages;
+
   auto& filters = config.http_filters();
+  identifier_messages.reserve(filters.size() + 1);
+
   for (const auto& filter : filters) {
+    identifier_messages.push_back(&filter);
     if (filter.is_optional()) {
       optional_http_filters.insert(filter.name());
     }
@@ -62,15 +67,17 @@ ConfigProviderPtr create(
         factory_context,
         ScopedRoutesConfigProviderManagerOptArg(
             config.scoped_routes().name(), config.scoped_routes().rds_config_source(),
-            config.scoped_routes().scope_key_builder(), optional_http_filters));
+            config.scoped_routes().scope_key_builder(), optional_http_filters, 0));
   }
   case envoy::extensions::filters::network::http_connection_manager::v3::ScopedRoutes::
       ConfigSpecifierCase::kScopedRds:
+    identifier_messages.push_back(&config.scoped_routes().scoped_rds());
     return scoped_routes_config_provider_manager.createXdsConfigProvider(
         config.scoped_routes().scoped_rds(), factory_context, init_manager, stat_prefix,
         ScopedRoutesConfigProviderManagerOptArg(
             config.scoped_routes().name(), config.scoped_routes().rds_config_source(),
-            config.scoped_routes().scope_key_builder(), optional_http_filters));
+            config.scoped_routes().scope_key_builder(), optional_http_filters,
+            MessageUtil::hash({identifier_messages.data(), identifier_messages.size()})));
   case envoy::extensions::filters::network::http_connection_manager::v3::ScopedRoutes::
       ConfigSpecifierCase::CONFIG_SPECIFIER_NOT_SET:
     PANIC("not implemented");
@@ -131,6 +138,8 @@ InlineScopedRoutesConfigProvider::InlineScopedRoutesConfigProvider(
 
 ScopedRdsConfigSubscription::ScopedRdsConfigSubscription(
     const envoy::extensions::filters::network::http_connection_manager::v3::ScopedRds& scoped_rds,
+    const Protobuf::RepeatedPtrField<
+        envoy::extensions::filters::network::http_connection_manager::v3::HttpFilter>& http_filters,
     const OptionalHttpFilters& optional_http_filters, const uint64_t manager_identifier,
     const std::string& name,
     const envoy::extensions::filters::network::http_connection_manager::v3::ScopedRoutes::
@@ -148,7 +157,7 @@ ScopedRdsConfigSubscription::ScopedRdsConfigSubscription(
       stats_({ALL_SCOPED_RDS_STATS(POOL_COUNTER(*scope_), POOL_GAUGE(*scope_))}),
       scope_key_builder_(scope_key_builder), rds_config_source_(std::move(rds_config_source)),
       stat_prefix_(stat_prefix), route_config_provider_manager_(route_config_provider_manager),
-      optional_http_filters_(optional_http_filters) {
+      optional_http_filters_(optional_http_filters), http_filters_(http_filters) {
   const auto resource_name = getResourceName();
   if (scoped_rds.srds_resources_locator().empty()) {
     subscription_ =
@@ -224,10 +233,19 @@ void ScopedRdsConfigSubscription::RdsRouteConfigProviderHelper::runOnDemandUpdat
 void ScopedRdsConfigSubscription::RdsRouteConfigProviderHelper::initRdsConfigProvider(
     envoy::extensions::filters::network::http_connection_manager::v3::Rds& rds,
     Init::Manager& init_manager) {
+
+  std::vector<const Protobuf::Message*> identifier_messages;
+  identifier_messages.reserve(parent_.http_filters_.size() + 1);
+  for (const auto& http_filter : parent_.http_filters_) {
+    identifier_messages.push_back(&http_filter);
+  }
+  identifier_messages.push_back(&rds);
+
   route_provider_ = std::dynamic_pointer_cast<RdsRouteConfigProviderImpl>(
       parent_.route_config_provider_manager_.createRdsRouteConfigProvider(
           rds, parent_.optional_http_filters_, parent_.factory_context_, parent_.stat_prefix_,
-          init_manager));
+          init_manager,
+          MessageUtil::hash({identifier_messages.data(), identifier_messages.size()})));
 
   rds_update_callback_handle_ = route_provider_->subscription().addUpdateCallback([this]() {
     // Subscribe to RDS update.
@@ -622,7 +640,8 @@ ConfigProviderPtr ScopedRoutesConfigProviderManager::createXdsConfigProvider(
                 static_cast<ScopedRoutesConfigProviderManager&>(config_provider_manager)
                     .routeConfigProviderManager(),
                 static_cast<ScopedRoutesConfigProviderManager&>(config_provider_manager));
-          });
+          },
+          typed_optarg.identifier_);
 
   return std::make_unique<ScopedRdsConfigProvider>(std::move(subscription));
 }

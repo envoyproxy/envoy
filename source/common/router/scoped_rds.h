@@ -112,6 +112,9 @@ public:
 
   ScopedRdsConfigSubscription(
       const envoy::extensions::filters::network::http_connection_manager::v3::ScopedRds& scoped_rds,
+      const Protobuf::RepeatedPtrField<
+          envoy::extensions::filters::network::http_connection_manager::v3::HttpFilter>&
+          http_filters,
       const OptionalHttpFilters& optional_http_filters, const uint64_t manager_identifier,
       const std::string& name,
       const envoy::extensions::filters::network::http_connection_manager::v3::ScopedRoutes::
@@ -241,6 +244,9 @@ private:
   // A map of (hash, scope-name), used to detect the key conflict between scopes.
   absl::flat_hash_map<uint64_t, std::string> scope_name_by_hash_;
   const OptionalHttpFilters optional_http_filters_;
+  const Protobuf::RepeatedPtrField<
+      envoy::extensions::filters::network::http_connection_manager::v3::HttpFilter>
+      http_filters_;
 };
 
 using ScopedRdsConfigSubscriptionSharedPtr = std::shared_ptr<ScopedRdsConfigSubscription>;
@@ -316,15 +322,17 @@ public:
       const envoy::config::core::v3::ConfigSource& rds_config_source,
       const envoy::extensions::filters::network::http_connection_manager::v3::ScopedRoutes::
           ScopeKeyBuilder& scope_key_builder,
-      const OptionalHttpFilters& optional_http_filters)
+      const OptionalHttpFilters& optional_http_filters, uint64_t identifier)
       : scoped_routes_name_(std::move(scoped_routes_name)), rds_config_source_(rds_config_source),
-        scope_key_builder_(scope_key_builder), optional_http_filters_(optional_http_filters) {}
+        scope_key_builder_(scope_key_builder), optional_http_filters_(optional_http_filters),
+        identifier_(identifier) {}
 
   const std::string scoped_routes_name_;
   const envoy::config::core::v3::ConfigSource& rds_config_source_;
   const envoy::extensions::filters::network::http_connection_manager::v3::ScopedRoutes::
       ScopeKeyBuilder& scope_key_builder_;
   const OptionalHttpFilters& optional_http_filters_;
+  const uint64_t identifier_{};
 };
 
 } // namespace Router

@@ -75,18 +75,18 @@ RouteConfigProviderPtr RouteConfigProviderManager::addStaticProvider(
 
 RouteConfigProviderSharedPtr RouteConfigProviderManager::addDynamicProvider(
     const Protobuf::Message& rds, const std::string& route_config_name, Init::Manager& init_manager,
-    std::function<
-        std::pair<RouteConfigProviderSharedPtr, const Init::Target*>(uint64_t manager_identifier)>
-        create_dynamic_provider) {
+    RouteConfigProviderCb provider_cb, absl::optional<uint64_t> identifier) {
   // RdsRouteConfigSubscriptions are unique based on their serialized RDS config.
-  const uint64_t manager_identifier = MessageUtil::hash(rds);
+  const uint64_t manager_identifier =
+      identifier.has_value() ? identifier.value() : MessageUtil::hash(rds);
+
   auto existing_provider =
       reuseDynamicProvider(manager_identifier, init_manager, route_config_name);
 
   if (existing_provider) {
     return existing_provider;
   }
-  auto new_provider = create_dynamic_provider(manager_identifier);
+  auto new_provider = provider_cb(manager_identifier);
   init_manager.add(*new_provider.second);
   dynamic_route_config_providers_.insert({manager_identifier, new_provider});
   return new_provider.first;

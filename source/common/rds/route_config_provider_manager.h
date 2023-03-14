@@ -34,12 +34,25 @@ public:
 
   RouteConfigProviderPtr
   addStaticProvider(std::function<RouteConfigProviderPtr()> create_static_provider);
-  RouteConfigProviderSharedPtr
-  addDynamicProvider(const Protobuf::Message& rds, const std::string& route_config_name,
-                     Init::Manager& init_manager,
-                     std::function<std::pair<RouteConfigProviderSharedPtr, const Init::Target*>(
-                         uint64_t manager_identifier)>
-                         create_dynamic_provider);
+
+  using RouteConfigProviderCb =
+      std::function<std::pair<RouteConfigProviderSharedPtr, const Init::Target*>(uint64_t)>;
+
+  /**
+   * @param rds RDS config.
+   * @param route_config_name the name of the route config.
+   * @param init_manager the init manager to register the init target with.
+   * @param provider_cb a function that creates a RouteConfigProviderSharedPtr and Init::Target*.
+   * The RouteConfigProviderSharedPtr is the provider that will be returned by this function.
+   * The Init::Target* is the init target that will be registered with the init manager.
+   * @param identifier an optional identifier for the provider. If not provided, the hash of the
+   * RDS config will be used.
+   */
+  RouteConfigProviderSharedPtr addDynamicProvider(const Protobuf::Message& rds,
+                                                  const std::string& route_config_name,
+                                                  Init::Manager& init_manager,
+                                                  RouteConfigProviderCb provider_cb,
+                                                  absl::optional<uint64_t> identifier);
 
 private:
   // TODO(jsedgwick) These two members are prime candidates for the owned-entry list/map

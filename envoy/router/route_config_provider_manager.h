@@ -39,12 +39,15 @@ public:
    * @param stat_prefix supplies the stat_prefix to use for the provider stats.
    * @param init_manager the Init::Manager used to coordinate initialization of a the underlying RDS
    * subscription.
+   * @param identifier an identifier for the created provider. The identifier is used to share the
+   * provider with other HttpConnectionManagers. If the identifier refers to an existing provider,
+   * the existing provider will be returned directly.
    */
   virtual RouteConfigProviderSharedPtr createRdsRouteConfigProvider(
       const envoy::extensions::filters::network::http_connection_manager::v3::Rds& rds,
       const OptionalHttpFilters& optional_http_filters,
       Server::Configuration::ServerFactoryContext& factory_context, const std::string& stat_prefix,
-      Init::Manager& init_manager) PURE;
+      Init::Manager& init_manager, uint64_t identifier) PURE;
 
   /**
    * Get a RouteConfigSharedPtr for a statically defined route. Ownership is as described for

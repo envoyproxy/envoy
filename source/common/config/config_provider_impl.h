@@ -418,12 +418,15 @@ protected:
   std::shared_ptr<T>
   getSubscription(const Protobuf::Message& config_source_proto, Init::Manager& init_manager,
                   const std::function<ConfigSubscriptionCommonBaseSharedPtr(
-                      const uint64_t, ConfigProviderManagerImplBase&)>& subscription_factory_fn) {
+                      const uint64_t, ConfigProviderManagerImplBase&)>& subscription_factory_fn,
+                  absl::optional<uint64_t> override_identifier = {}) {
     static_assert(std::is_base_of<ConfigSubscriptionCommonBase, T>::value,
                   "T must be a subclass of ConfigSubscriptionCommonBase");
 
     ConfigSubscriptionCommonBaseSharedPtr subscription;
-    const uint64_t manager_identifier = MessageUtil::hash(config_source_proto);
+    const uint64_t manager_identifier = override_identifier.has_value()
+                                            ? override_identifier.value()
+                                            : MessageUtil::hash(config_source_proto);
 
     auto it = config_subscriptions_.find(manager_identifier);
     if (it == config_subscriptions_.end()) {

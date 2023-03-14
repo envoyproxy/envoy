@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include <numeric>
 
 #include "envoy/api/api.h"
@@ -250,6 +251,12 @@ public:
    * https://github.com/envoyproxy/envoy/issues/8301.
    */
   static std::size_t hash(const Protobuf::Message& message);
+
+  /**
+   * A hash function uses Protobuf::TextFormat to force deterministic serialization recursively
+   * including known types in google.protobuf.Any.
+   */
+  static uint64_t hash(absl::Span<const Protobuf::Message*> messages);
 
   static void loadFromJson(const std::string& json, Protobuf::Message& message,
                            ProtobufMessage::ValidationVisitor& validation_visitor);

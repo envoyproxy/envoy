@@ -1,5 +1,6 @@
 #include "source/common/protobuf/utility.h"
 
+#include <cstdint>
 #include <limits>
 #include <numeric>
 
@@ -233,6 +234,25 @@ size_t MessageUtil::hash(const Protobuf::Message& message) {
     printer.SetSingleLineMode(true);
     printer.SetHideUnknownFields(true);
     printer.PrintToString(message, &text_format);
+  }
+
+  return HashUtil::xxHash64(text_format);
+}
+
+uint64_t MessageUtil::hash(absl::Span<const Protobuf::Message*> messages) {
+  std::string text_format;
+  Protobuf::io::StringOutputStream stream(&text_format);
+
+  {
+    Protobuf::TextFormat::Printer printer;
+    printer.SetExpandAny(true);
+    printer.SetUseFieldNumber(true);
+    printer.SetSingleLineMode(true);
+    printer.SetHideUnknownFields(true);
+
+    for (const auto message : messages) {
+      printer.Print(*message, &stream);
+    }
   }
 
   return HashUtil::xxHash64(text_format);

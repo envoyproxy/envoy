@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstddef>
 #include <cstdint>
 #include <functional>
 #include <memory>
@@ -191,7 +192,7 @@ public:
       const envoy::extensions::filters::network::http_connection_manager::v3::Rds& rds,
       const OptionalHttpFilters& optional_http_filters,
       Server::Configuration::ServerFactoryContext& factory_context, const std::string& stat_prefix,
-      Init::Manager& init_manager) override;
+      Init::Manager& init_manager, uint64_t identifier) override;
 
   RouteConfigProviderPtr
   createStaticRouteConfigProvider(const envoy::config::route::v3::RouteConfiguration& route_config,

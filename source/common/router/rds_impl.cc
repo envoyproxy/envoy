@@ -22,6 +22,35 @@
 namespace Envoy {
 namespace Router {
 
+namespace {
+
+using namespace envoy::extensions::filters::network::http_connection_manager;
+
+/**
+ * Utility function to create a identifier for a RdsRouteConfigProvider. Both the http filters and
+ * the RDS config are used to create the identifier.
+ */
+uint64_t identifier(const Protobuf::RepeatedPtrField<v3::HttpFilter>& filters, const v3::Rds& rds) {
+  std::string string_content;
+  google::protobuf::io::StringOutputStream stream_content(&string_content);
+
+  {
+    Protobuf::TextFormat::Printer printer;
+    printer.SetExpandAny(true);
+    printer.SetUseFieldNumber(true);
+    printer.SetSingleLineMode(true);
+    printer.SetHideUnknownFields(true);
+    for (const auto& f : filters) {
+      printer.Print(f, &stream_content);
+    }
+    printer.Print(rds, &stream_content);
+  }
+
+  return HashUtil::xxHash64(string_content);
+}
+
+} // namespace
+
 RouteConfigProviderSharedPtr RouteConfigProviderUtil::create(
     const envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
         config,
@@ -29,8 +58,13 @@ RouteConfigProviderSharedPtr RouteConfigProviderUtil::create(
     ProtobufMessage::ValidationVisitor& validator, Init::Manager& init_manager,
     const std::string& stat_prefix, RouteConfigProviderManager& route_config_provider_manager) {
   OptionalHttpFilters optional_http_filters;
+  std::vector<const Protobuf::Message*> identifier_messages;
+
   auto& filters = config.http_filters();
+  identifier_messages.reserve(filters.size() + 1);
+
   for (const auto& filter : filters) {
+    identifier_messages.push_back(&filter);
     if (filter.is_optional()) {
       optional_http_filters.insert(filter.name());
     }
@@ -42,10 +76,12 @@ RouteConfigProviderSharedPtr RouteConfigProviderUtil::create(
         config.route_config(), optional_http_filters, factory_context, validator);
   case envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
       RouteSpecifierCase::kRds:
+    identifier_messages.push_back(&config.rds());
     return route_config_provider_manager.createRdsRouteConfigProvider(
         // At the creation of a RDS route config provider, the factory_context's initManager is
         // always valid, though the init manager may go away later when the listener goes away.
-        config.rds(), optional_http_filters, factory_context, stat_prefix, init_manager);
+        config.rds(), optional_http_filters, factory_context, stat_prefix, init_manager,
+        MessageUtil::hash({identifier_messages.data(), identifier_messages.size()}));
   case envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
       RouteSpecifierCase::kScopedRoutes:
     FALLTHRU; // PANIC
@@ -226,23 +262,24 @@ Router::RouteConfigProviderSharedPtr RouteConfigProviderManagerImpl::createRdsRo
     const envoy::extensions::filters::network::http_connection_manager::v3::Rds& rds,
     const OptionalHttpFilters& optional_http_filters,
     Server::Configuration::ServerFactoryContext& factory_context, const std::string& stat_prefix,
-    Init::Manager& init_manager) {
+    Init::Manager& init_manager, uint64_t identifier) {
   auto provider = manager_.addDynamicProvider(
       rds, rds.route_config_name(), init_manager,
       [&optional_http_filters, &factory_context, &rds, &stat_prefix,
-       this](uint64_t manager_identifier) {
+       this](uint64_t provider_identifier) {
         auto config_update = std::make_unique<RouteConfigUpdateReceiverImpl>(
             proto_traits_, factory_context, optional_http_filters);
         auto resource_decoder = std::make_shared<
             Envoy::Config::OpaqueResourceDecoderImpl<envoy::config::route::v3::RouteConfiguration>>(
             factory_context.messageValidationContext().dynamicValidationVisitor(), "name");
         auto subscription = std::make_shared<RdsRouteConfigSubscription>(
-            std::move(config_update), std::move(resource_decoder), rds, manager_identifier,
+            std::move(config_update), std::move(resource_decoder), rds, provider_identifier,
             factory_context, stat_prefix, manager_);
         auto provider =
             std::make_shared<RdsRouteConfigProviderImpl>(std::move(subscription), factory_context);
         return std::make_pair(provider, &provider->subscription().initTarget());
-      });
+      },
+      identifier);
   ASSERT(dynamic_cast<RouteConfigProvider*>(provider.get()));
   return std::static_pointer_cast<RouteConfigProvider>(provider);
 }
