@@ -217,6 +217,30 @@ TEST_F(Http2HeaderValidatorTest, RequestExtendedConnectNoPath) {
                              UhvResponseCodeDetail::get().InvalidUrl);
 }
 
+TEST_F(Http2HeaderValidatorTest, RequestExtendedConnectInvalidPath) {
+  // Character with value 0x7F is invalid in URI path
+  ::Envoy::Http::TestRequestHeaderMapImpl headers{{":scheme", "https"},
+                                                  {":method", "CONNECT"},
+                                                  {":protocol", "websocket"},
+                                                  {":path", "/fo\x7fo/bar"},
+                                                  {":authority", "envoy.com"}};
+  auto uhv = createH2(empty_config);
+  EXPECT_REJECT_WITH_DETAILS(uhv->validateRequestHeaderMap(headers),
+                             UhvResponseCodeDetail::get().InvalidUrl);
+}
+
+TEST_F(Http2HeaderValidatorTest, RequestExtendedConnectPathNormalization) {
+  ::Envoy::Http::TestRequestHeaderMapImpl headers{{":scheme", "https"},
+                                                  {":method", "CONNECT"},
+                                                  {":protocol", "websocket"},
+                                                  {":path", "/./dir1/../dir2"},
+                                                  {":authority", "envoy.com"}};
+  auto uhv = createH2(empty_config);
+
+  EXPECT_TRUE(uhv->validateRequestHeaderMap(headers).ok());
+  EXPECT_EQ(headers.path(), "/dir2");
+}
+
 TEST_F(Http2HeaderValidatorTest, RequestExtendedConnectNoAuthorityIsOk) {
   ::Envoy::Http::TestRequestHeaderMapImpl headers{{":scheme", "https"},
                                                   {":method", "CONNECT"},

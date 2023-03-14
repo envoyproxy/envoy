@@ -2,6 +2,7 @@
 
 #include "envoy/http/header_validator_errors.h"
 
+#include "source/common/http/header_utility.h"
 #include "source/extensions/http/header_validators/envoy_default/character_tables.h"
 
 #include "absl/container/node_hash_map.h"
@@ -18,6 +19,7 @@ namespace EnvoyDefault {
 
 using ::envoy::extensions::http::header_validators::envoy_default::v3::HeaderValidatorConfig;
 using ::Envoy::Http::HeaderString;
+using ::Envoy::Http::HeaderUtility;
 using ::Envoy::Http::LowerCaseString;
 using ::Envoy::Http::Protocol;
 using ::Envoy::Http::UhvResponseCodeDetail;
@@ -119,10 +121,8 @@ Http2HeaderValidator::validateRequestHeaderMap(::Envoy::Http::RequestHeaderMap& 
   // https://datatracker.ietf.org/doc/html/rfc8441#section-4
   // For the purposes of header validation the extended CONNECT is treated as generic (non CONNECT)
   // HTTP/2 requests.
-  auto is_standard_connect_request = header_map.method() == header_values_.MethodValues.Connect &&
-                                     header_map.getProtocolValue().empty();
-  auto is_extended_connect_request = header_map.method() == header_values_.MethodValues.Connect &&
-                                     !header_map.getProtocolValue().empty();
+  const bool is_standard_connect_request = HeaderUtility::isStandardConnectRequest(header_map);
+  const bool is_extended_connect_request = HeaderUtility::isExtendedH2ConnectRequest(header_map);
   auto is_options_request = header_map.method() == header_values_.MethodValues.Options;
   bool path_is_empty = path.empty();
   bool path_is_asterisk = path == "*";
