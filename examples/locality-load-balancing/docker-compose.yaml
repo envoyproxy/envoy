@@ -17,7 +17,8 @@ services:
 
   backend-local-1:
     build:
-      context: ../shared/flask
+      context: ../shared/python
+      target: aiohttp-service
     volumes:
     - ./service.py:/code/service.py
     environment:
@@ -25,7 +26,8 @@ services:
 
   backend-local-2:
     build:
-      context: ../shared/flask
+      context: ../shared/python
+      target: aiohttp-service
     volumes:
     - ./service.py:/code/service.py
     environment:
@@ -33,7 +35,8 @@ services:
 
   backend-remote-1:
     build:
-      context: ../shared/flask
+      context: ../shared/python
+      target: aiohttp-service
     volumes:
     - ./service.py:/code/service.py
     environment:
@@ -41,7 +44,8 @@ services:
 
   backend-remote-2:
     build:
-      context: ../shared/flask
+      context: ../shared/python
+      target: aiohttp-service
     volumes:
     - ./service.py:/code/service.py
     environment:

@@ -89,6 +89,14 @@ func (f *filter) decodeHeaders(header api.RequestHeaderMap, endStream bool) api.
 		return f.sendLocalReply("decode-header")
 	}
 
+	header.Range(func(key, value string) bool {
+		if key == ":path" && value != f.path {
+			f.fail("path not match in Range")
+			return false
+		}
+		return true
+	})
+
 	origin, found := header.Get("x-test-header-0")
 	hdrs := header.Values("x-test-header-0")
 	if found {

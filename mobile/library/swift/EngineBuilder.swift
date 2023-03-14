@@ -66,17 +66,17 @@ open class EngineBuilder: NSObject {
   private var runtimeGuards: [String: Bool] = [:]
   private var directResponses: [DirectResponse] = []
   private var statsSinks: [String] = []
-  private var rtdsLayerName: String = ""
+  private var rtdsLayerName: String?
   private var rtdsTimeoutSeconds: UInt32 = 0
-  private var adsAddress: String = ""
+  private var adsAddress: String?
   private var adsPort: UInt32 = 0
-  private var adsJwtToken: String = ""
+  private var adsJwtToken: String?
   private var adsJwtTokenLifetimeSeconds: UInt32 = 0
-  private var adsSslRootCerts: String = ""
-  private var nodeID: String = ""
-  private var nodeRegion: String = ""
-  private var nodeZone: String = ""
-  private var nodeSubZone: String = ""
+  private var adsSslRootCerts: String?
+  private var nodeID: String?
+  private var nodeRegion: String?
+  private var nodeZone: String?
+  private var nodeSubZone: String?
 #if canImport(EnvoyCxxSwiftInterop)
   private(set) var useSwiftCxxInterop = true
 #else

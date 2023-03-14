@@ -15,7 +15,5 @@ services:
 
   service:
     build:
-      context: ../shared/flask
-      target: data-flask
-    volumes:
-    - ./service.py:/code/service.py
+      context: ../shared/python
+      target: aiohttp-data-service
