@@ -294,18 +294,42 @@ TEST(UtilityTest, PrepareDnsRefreshStrategy) {
   }
 }
 
-// test that default values are used when no retry configuration is provided
+// test that default values are used correctly when no retry configuration is provided
 TEST(UtilityTest, prepareJitteredExponentialBackOffStrategyStrategyNoConfig) {
   NiceMock<Random::MockRandomGenerator> random;
   // test prepareJitteredExponentialBackOffStrategy method with only default values
   {
     envoy::config::core::v3::GrpcService::EnvoyGrpc config;
-    JitteredExponentialBackOffStrategyPtr strategy =
-        Utility::prepareJitteredExponentialBackOffStrategy(config, random, 500, 1000);
+
+    // valid default base and max interval values
+    JitteredExponentialBackOffStrategyPtr strategy;
+    strategy = Utility::prepareJitteredExponentialBackOffStrategy(config, random, 500, 1000);
 
     EXPECT_NE(nullptr, dynamic_cast<JitteredExponentialBackOffStrategy*>(strategy.get()));
     EXPECT_EQ(true, dynamic_cast<JitteredExponentialBackOffStrategy*>(strategy.get())
                         ->isOverTimeLimit(1000 + 1));
+
+    // only valid base interval value
+    strategy =
+        Utility::prepareJitteredExponentialBackOffStrategy(config, random, 500, absl::nullopt);
+
+    EXPECT_NE(nullptr, dynamic_cast<JitteredExponentialBackOffStrategy*>(strategy.get()));
+    // time limit will be 10 * provided default base interval
+    EXPECT_EQ(true, dynamic_cast<JitteredExponentialBackOffStrategy*>(strategy.get())
+                        ->isOverTimeLimit(500 * 10 + 1));
+
+    // invalid base interval value
+    EXPECT_THROW_WITH_MESSAGE(
+        JitteredExponentialBackOffStrategyPtr strategy =
+            Utility::prepareJitteredExponentialBackOffStrategy(config, random, 0, absl::nullopt),
+        EnvoyException, "default_base_interval_ms must be greater than zero");
+
+    // invalid max interval value < base interval value
+    EXPECT_THROW_WITH_MESSAGE(
+        JitteredExponentialBackOffStrategyPtr strategy =
+            Utility::prepareJitteredExponentialBackOffStrategy(config, random, 1000, 500),
+        EnvoyException,
+        "default_max_interval_ms must be greater than or equal to the default_base_interval_ms");
   }
 
   // provide Envoy Grpc Config without any configured retry values
@@ -316,13 +340,13 @@ TEST(UtilityTest, prepareJitteredExponentialBackOffStrategyStrategyNoConfig) {
     )EOF";
 
     TestUtility::loadFromYaml(config_yaml, config);
-
     EXPECT_FALSE(config.has_retry_policy());
 
     JitteredExponentialBackOffStrategyPtr strategy =
         Utility::prepareJitteredExponentialBackOffStrategy(config, random, 500, absl::nullopt);
 
     EXPECT_NE(nullptr, dynamic_cast<JitteredExponentialBackOffStrategy*>(strategy.get()));
+    // time limit will be 10 * provided default base interval
     EXPECT_EQ(true, dynamic_cast<JitteredExponentialBackOffStrategy*>(strategy.get())
                         ->isOverTimeLimit(500 * 10 + 1));
 
@@ -347,6 +371,7 @@ TEST(UtilityTest, prepareJitteredExponentialBackOffStrategyStrategyNoConfig) {
                                                            absl::nullopt);
 
     EXPECT_NE(nullptr, dynamic_cast<JitteredExponentialBackOffStrategy*>(strategy.get()));
+    // time limit will be 10 * provided default base interval
     EXPECT_EQ(true, dynamic_cast<JitteredExponentialBackOffStrategy*>(strategy.get())
                         ->isOverTimeLimit(500 * 10 + 1));
 
