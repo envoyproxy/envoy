@@ -7429,7 +7429,8 @@ TEST_F(RouteEntryMetadataMatchTest, ParsesMetadata) {
         genRedirectHeaders("www.lyft.com", "/both", true, true);
     EXPECT_EQ(nullptr, config.route(headers, 0)->directResponseEntry());
 
-    auto* route_entry = config.route(headers, 0)->routeEntry();
+    auto route = config.route(headers, 0);
+    auto* route_entry = route->routeEntry();
     EXPECT_EQ("www1", route_entry->clusterName());
     auto* matches = route_entry->metadataMatchCriteria();
     EXPECT_NE(matches, nullptr);
@@ -7443,7 +7444,8 @@ TEST_F(RouteEntryMetadataMatchTest, ParsesMetadata) {
         genRedirectHeaders("www.lyft.com", "/cluster-only", true, true);
     EXPECT_EQ(nullptr, config.route(headers, 0)->directResponseEntry());
 
-    auto* route_entry = config.route(headers, 0)->routeEntry();
+    auto route = config.route(headers, 0);
+    auto* route_entry = route->routeEntry();
     EXPECT_EQ("www2", route_entry->clusterName());
     auto* matches = route_entry->metadataMatchCriteria();
     EXPECT_NE(matches, nullptr);
@@ -7456,7 +7458,8 @@ TEST_F(RouteEntryMetadataMatchTest, ParsesMetadata) {
         genRedirectHeaders("www.lyft.com", "/route-only", true, true);
     EXPECT_EQ(nullptr, config.route(headers, 0)->directResponseEntry());
 
-    auto* route_entry = config.route(headers, 0)->routeEntry();
+    auto route = config.route(headers, 0);
+    auto* route_entry = route->routeEntry();
     EXPECT_EQ("www3", route_entry->clusterName());
     auto* matches = route_entry->metadataMatchCriteria();
     EXPECT_NE(matches, nullptr);
@@ -7469,7 +7472,8 @@ TEST_F(RouteEntryMetadataMatchTest, ParsesMetadata) {
         genRedirectHeaders("www.lyft.com", "/cluster-passthrough", true, true);
     EXPECT_EQ(nullptr, config.route(headers, 0)->directResponseEntry());
 
-    auto* route_entry = config.route(headers, 0)->routeEntry();
+    auto route = config.route(headers, 0);
+    auto* route_entry = route->routeEntry();
     EXPECT_EQ("www4", route_entry->clusterName());
     auto* matches = route_entry->metadataMatchCriteria();
     EXPECT_NE(matches, nullptr);
