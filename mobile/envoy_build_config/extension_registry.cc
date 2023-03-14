@@ -15,12 +15,10 @@
 #include "source/common/router/upstream_codec_filter.h"
 #include "source/common/watchdog/abort_action_config.h"
 #include "source/extensions/clusters/dynamic_forward_proxy/cluster.h"
-#include "source/extensions/clusters/static/static_cluster.h"
 #include "source/extensions/compression/brotli/decompressor/config.h"
 #include "source/extensions/compression/gzip/decompressor/config.h"
 #include "source/extensions/early_data/default_early_data_policy.h"
 #include "source/extensions/filters/http/alternate_protocols_cache/config.h"
-#include "source/extensions/filters/http/buffer/config.h"
 #include "source/extensions/filters/http/decompressor/config.h"
 #include "source/extensions/filters/http/dynamic_forward_proxy/config.h"
 #include "source/extensions/filters/http/router/config.h"
@@ -62,11 +60,9 @@
 
 #include "extension_registry_platform_additions.h"
 #include "library/common/extensions/cert_validator/platform_bridge/config.h"
-#include "library/common/extensions/filters/http/assertion/config.h"
 #include "library/common/extensions/filters/http/local_error/config.h"
 #include "library/common/extensions/filters/http/network_configuration/config.h"
 #include "library/common/extensions/filters/http/platform_bridge/config.h"
-#include "library/common/extensions/filters/http/route_cache_reset/config.h"
 #include "library/common/extensions/filters/http/socket_tag/config.h"
 #include "library/common/extensions/key_value/platform/config.h"
 #include "library/common/extensions/listener_managers/api_listener_manager/api_listener_manager.h"
@@ -84,15 +80,6 @@ void ExtensionRegistry::registerFactories() {
   Extensions::RequestId::forceRegisterUUIDRequestIDExtensionFactory();
   // This is the original IP detection code which ideally E-M could skip.
   Extensions::Http::OriginalIPDetection::Xff::forceRegisterXffIPDetectionFactory();
-
-  // TODO(alyssar) verify with Lyft that we can move this to be a test-only filter.
-  Extensions::HttpFilters::Assertion::forceRegisterAssertionFilterFactory();
-  // TODO(alyssar) verify with Lyft that we can move this to be a test-only filter.
-  Extensions::HttpFilters::BufferFilter::forceRegisterBufferFilterFactory();
-  // TODO(alyssawilk) verify with Lyft we can move this to be a test-only filter.
-  Extensions::HttpFilters::RouteCacheReset::forceRegisterRouteCacheResetFilterFactory();
-  // TODO(alyssawilk) verify with Lyft we can move this to be a test-only filter.
-  Upstream::forceRegisterStaticClusterFactory();
 
   // This is the default cluster used by Envoy mobile to establish connections upstream.
   Extensions::Clusters::DynamicForwardProxy::forceRegisterClusterFactory();
@@ -172,7 +159,8 @@ void ExtensionRegistry::registerFactories() {
   Http::Matching::forceRegisterHttpResponseHeadersDataInputFactory();
   Http::Matching::forceRegisterHttpResponseTrailersDataInputFactory();
 
-  // Envoy Mobile uses the GetAddrInfo resolver for DNS lookups by default.
+  // Envoy Mobile uses the GetAddrInfo resolver for DNS lookups on android by default.
+  // This could be compiled out for iOS.
   Network::forceRegisterGetAddrInfoDnsResolverFactory();
 
   // TODO(alyssawilk) looks like this is only needed for H3 downstream. Test and remove.

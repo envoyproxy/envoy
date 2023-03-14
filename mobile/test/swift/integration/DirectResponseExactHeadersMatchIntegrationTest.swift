@@ -19,6 +19,10 @@ final class DirectResponseExactHeadersMatchIntegrationTest: XCTestCase {
     .build()
 
     let engine = TestEngineBuilder()
+      .addNativeFilter(
+              name: "envoy.filters.http.route_cache_reset",
+              // swiftlint:disable:next line_length
+              typedConfig: "{\"@type\":\"type.googleapis.com/envoymobile.extensions.filters.http.route_cache_reset.RouteCacheReset\"}")
       .addDirectResponse(
         .init(
           matcher: RouteMatcher(

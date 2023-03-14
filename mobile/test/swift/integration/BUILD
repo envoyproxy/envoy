@@ -1,6 +1,4 @@
 load("@envoy_mobile//bazel:apple.bzl", "envoy_mobile_swift_test")
-load("@envoy_mobile//bazel:envoy_mobile_test_extensions.bzl", "TEST_EXTENSIONS")
-load("@envoy//bazel:envoy_build_system.bzl", "envoy_cc_library")
 
 licenses(["notice"])  # Apache 2
 
@@ -53,20 +51,9 @@ envoy_mobile_swift_test(
     ],
     visibility = ["//visibility:public"],
     deps = [
+        ":test_extensions",
         "//library/objective-c:envoy_engine_objc_lib",
     ],
-)
-
-envoy_cc_library(
-    name = "test_extensions_cc",
-    srcs = [
-        "test_extensions.cc",
-    ],
-    hdrs = [
-        "test_extensions.h",
-    ],
-    repository = "@envoy",
-    deps = TEST_EXTENSIONS,
 )
 
 objc_library(
@@ -76,6 +63,6 @@ objc_library(
     ],
     module_name = "TestExtensions",
     deps = [
-        ":test_extensions_cc",
+        "@envoy_build_config//:test_extensions_no_autoregister",
     ],
 )

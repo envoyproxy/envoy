@@ -53,6 +53,10 @@ final class DirectResponseFilterMutationIntegrationTest: XCTestCase {
     // match any configurations). This behavior is provided by the C++ `RouteCacheResetFilter`.
     let engine = TestEngineBuilder()
       .addPlatformFilter { MockHeaderMutationFilter(headersToAdd: ["x-foo": "123"]) }
+      .addNativeFilter(
+              name: "envoy.filters.http.route_cache_reset",
+              // swiftlint:disable:next line_length
+              typedConfig: "{\"@type\":\"type.googleapis.com/envoymobile.extensions.filters.http.route_cache_reset.RouteCacheReset\"}")
       .addDirectResponse(
         .init(
           matcher: RouteMatcher(
