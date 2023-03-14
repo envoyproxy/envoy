@@ -602,7 +602,7 @@ TEST_F(RedisHealthCheckerTest, Exists) {
   EXPECT_EQ(3UL, cluster_->info_->stats_store_.counter("health_check.attempt").value());
   EXPECT_EQ(1UL, cluster_->info_->stats_store_.counter("health_check.success").value());
   EXPECT_EQ(2UL, cluster_->info_->stats_store_.counter("health_check.failure").value());
-  EXPECT_EQ(2UL, cluster_->info_->stats_store_.counter("health_check.passive_failure").value());
+  EXPECT_EQ(2UL, cluster_->info_->stats_store_.counter("health_check.redis.exists_failure").value());
 }
 
 TEST_F(RedisHealthCheckerTest, ExistsRedirected) {

@@ -95,5 +95,9 @@ new_features:
 - area: sni_dynamic_forward_proxy
   change: |
     added an option to dynamically set the host used by the SNI dynamic forward proxy filter, by setting a filter state object under the key ``envoy.upstream.dynamic_host``.
+- area: redis_health_check
+  change: |
+    added :ref:`exists_failure <_config_health_checkers_redis>` stat to indicate health check failures caused by EXISTS check failure.
+
 
 deprecated:
