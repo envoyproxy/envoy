@@ -58,7 +58,7 @@ message CacheConfig {
   // When true, the cache filter is a no-op filter.
   //
   // Possible use-cases for this include:
-  // - Turning a filter on and off with [ECDS](https://www.envoyproxy.io/docs/envoy/latest/api-v3/service/extension/v3/config_discovery.proto).
+  // - Turning a filter on and off with :ref:`ECDS <envoy_v3_api_file_envoy/service/extension/v3/config_discovery.proto>`.
   // [#comment: once route-specific overrides are implemented, they are the more likely use-case.]
   google.protobuf.BoolValue disabled = 5;
 
