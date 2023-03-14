@@ -11,5 +11,5 @@ services:
 
   service:
     build:
-      context: .
-      dockerfile: Dockerfile-service
+      context: ../shared/python
+      target: aiohttp-data-service

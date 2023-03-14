@@ -9,6 +9,7 @@ build --define=admin_html=disabled
 build --define=static_extension_registration=disabled
 build --define=admin_functionality=disabled
 build --define=library_autolink=disabled
+build --define=envoy_mobile_swift_cxx_interop=enabled
 build --experimental_inmemory_dotd_files
 build --experimental_inmemory_jdeps_files
 build --features=debug_prefix_map_pwd_is_dot
@@ -262,5 +263,5 @@ common:remote-ci-debug --action_env=VERBOSE_COVERAGE=true
 common:remote-ci-debug --test_env=VERBOSE_COVERAGE=true
 common:remote-ci-debug --test_env=DISPLAY_LCOV_CMD=true
 #############################################################################
-# Experimental EngFlow Remote Execution Configs
+# Experimental EngFlow Remote Execution Configs.
 #############################################################################

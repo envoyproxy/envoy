@@ -38,8 +38,11 @@ struct TestFactory : public Envoy::Server::Configuration::NamedHttpFilterConfigF
     auto requirements = std::make_unique<
         envoy::extensions::filters::common::dependency::v3::MatchingRequirements>();
 
-    requirements->mutable_data_input_allow_list()->add_type_url(
+    auto* data_input_allow_list = requirements->mutable_data_input_allow_list();
+    data_input_allow_list->add_type_url(
         "type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput");
+    data_input_allow_list->add_type_url(
+        "type.googleapis.com/envoy.type.matcher.v3.HttpRequestQueryParamMatchInput");
 
     return requirements;
   }
@@ -147,6 +150,40 @@ matcher:
       }));
   EXPECT_CALL(factory_callbacks, addAccessLogHandler(testing::IsNull()));
   cb(factory_callbacks);
+}
+
+TEST(MatchWrapper, QueryParamMatcherYaml) {
+  TestFactory test_factory;
+  Envoy::Registry::InjectFactory<Envoy::Server::Configuration::NamedHttpFilterConfigFactory>
+      inject_factory(test_factory);
+
+  NiceMock<Envoy::Server::Configuration::MockFactoryContext> factory_context;
+
+  const auto config =
+      TestUtility::parseYaml<envoy::extensions::common::matching::v3::ExtensionWithMatcher>(R"EOF(
+extension_config:
+  name: test
+  typed_config:
+    "@type": type.googleapis.com/google.protobuf.StringValue
+xds_matcher:
+  matcher_tree:
+    input:
+      name: request-query-param
+      typed_config:
+        "@type": type.googleapis.com/envoy.type.matcher.v3.HttpRequestQueryParamMatchInput
+        query_param: arg
+    exact_match_map:
+        map:
+            match:
+                action:
+                    name: skip
+                    typed_config:
+                      "@type": type.googleapis.com/envoy.extensions.filters.common.matcher.action.v3.SkipFilter
+)EOF");
+
+  MatchDelegateConfig match_delegate_config;
+  auto cb = match_delegate_config.createFilterFactoryFromProto(config, "", factory_context);
+  EXPECT_TRUE(cb);
 }
 
 TEST(MatchWrapper, WithNoMatcher) {
@@ -262,6 +299,43 @@ TEST(DelegatingFilterTest, MatchTreeSkipActionDecodingHeaders) {
                                                 {":method", "GET"},
                                                 {"match-header", "match"},
                                                 {"content-type", "application/grpc"}}};
+  Envoy::Http::RequestTrailerMapPtr request_trailers{
+      new Envoy::Http::TestRequestTrailerMapImpl{{"test", "test"}}};
+  Envoy::Http::MetadataMap metadata_map;
+  Buffer::OwnedImpl buffer;
+
+  delegating_filter->setDecoderFilterCallbacks(callbacks);
+  EXPECT_EQ(Envoy::Http::FilterHeadersStatus::Continue,
+            delegating_filter->decodeHeaders(*request_headers, false));
+  EXPECT_EQ(Envoy::Http::FilterDataStatus::Continue, delegating_filter->decodeData(buffer, false));
+  EXPECT_EQ(Envoy::Http::FilterMetadataStatus::Continue,
+            delegating_filter->decodeMetadata(metadata_map));
+  EXPECT_EQ(Envoy::Http::FilterTrailersStatus::Continue,
+            delegating_filter->decodeTrailers(*request_trailers));
+  delegating_filter->decodeComplete();
+}
+
+TEST(DelegatingFilterTest, MatchTreeQueryParamsSkipActionDecodingHeaders) {
+  // The filter is added, but since we match on the request header we skip the filter.
+  std::shared_ptr<Envoy::Http::MockStreamDecoderFilter> decoder_filter(
+      new Envoy::Http::MockStreamDecoderFilter());
+  NiceMock<Envoy::Http::MockStreamDecoderFilterCallbacks> callbacks;
+
+  EXPECT_CALL(*decoder_filter, setDecoderFilterCallbacks(_));
+  EXPECT_CALL(*decoder_filter, decodeHeaders(_, _)).Times(0);
+  EXPECT_CALL(*decoder_filter, decodeData(_, _)).Times(0);
+  EXPECT_CALL(*decoder_filter, decodeMetadata(_)).Times(0);
+  EXPECT_CALL(*decoder_filter, decodeTrailers(_)).Times(0);
+  EXPECT_CALL(*decoder_filter, decodeComplete()).Times(0);
+
+  auto match_tree =
+      createMatchingTree<Envoy::Http::Matching::HttpRequestQueryParamsDataInput, SkipAction>(
+          "match_query", "match");
+  auto delegating_filter =
+      std::make_shared<DelegatingStreamFilter>(match_tree, decoder_filter, nullptr);
+
+  Envoy::Http::RequestHeaderMapPtr request_headers{new Envoy::Http::TestRequestHeaderMapImpl{
+      {":authority", "host"}, {":path", "/?match_query=match"}, {":method", "GET"}}};
   Envoy::Http::RequestTrailerMapPtr request_trailers{
       new Envoy::Http::TestRequestTrailerMapImpl{{"test", "test"}}};
   Envoy::Http::MetadataMap metadata_map;

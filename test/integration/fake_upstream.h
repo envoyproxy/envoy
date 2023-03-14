@@ -88,7 +88,7 @@ public:
   void encodeHeaders(const Http::HeaderMap& headers, bool end_stream);
   void encodeData(uint64_t size, bool end_stream);
   void encodeData(Buffer::Instance& data, bool end_stream);
-  void encodeData(absl::string_view data, bool end_stream);
+  void encodeData(std::string data, bool end_stream);
   void encodeTrailers(const Http::HeaderMap& trailers);
   void encodeResetStream();
   void encodeMetadata(const Http::MetadataMapVector& metadata_map_vector);
@@ -815,7 +815,8 @@ private:
       if (is_quic) {
 #if defined(ENVOY_ENABLE_QUIC)
         udp_listener_config_.listener_factory_ = std::make_unique<Quic::ActiveQuicListenerFactory>(
-            parent_.quic_options_, 1, parent_.quic_stat_names_, parent_.validation_visitor_);
+            parent_.quic_options_, 1, parent_.quic_stat_names_, parent_.validation_visitor_,
+            absl::nullopt);
         // Initialize QUICHE flags.
         quiche::FlagRegistry::getInstance();
 #else

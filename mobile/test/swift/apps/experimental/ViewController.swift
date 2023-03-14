@@ -29,7 +29,6 @@ final class ViewController: UITableViewController {
       // required by DNS cache
       .addKeyValueStore(name: "reserved.platform_store", keyValueStore: UserDefaults.standard)
       .enableInterfaceBinding(true)
-      .enablePlatformCertificateValidation(true)
       .addNativeFilter(
         name: "envoy.filters.http.buffer",
         typedConfig: """
@@ -44,13 +43,6 @@ final class ViewController: UITableViewController {
       .addKeyValueStore(name: "demo-kv-store", keyValueStore: UserDefaults.standard)
       .setEventTracker { NSLog("Envoy event emitted: \($0)") }
       .forceIPv6(true)
-      .setExperimentalValidateYAMLCallback { success in
-        if success {
-          print("YAML comparison succeeded!")
-        } else {
-          print("YAML comparison failed!")
-        }
-      }
       .build()
     self.streamClient = engine.streamClient()
     self.pulseClient = engine.pulseClient()
@@ -80,12 +72,8 @@ final class ViewController: UITableViewController {
 
     NSLog("starting request to '\(kRequestPath)'")
 
-    // Note: this request will use an h2 stream for the upstream request.
-    // The Objective-C example uses http/1.1. This is done on purpose to test both paths in
-    // end-to-end tests in CI.
     let headers = RequestHeadersBuilder(method: .get, scheme: kRequestScheme,
                                         authority: kRequestAuthority, path: kRequestPath)
-      .addUpstreamHttpProtocol(.http2)
       .build()
 
     streamClient

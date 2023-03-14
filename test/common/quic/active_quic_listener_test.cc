@@ -147,7 +147,7 @@ protected:
     envoy::config::listener::v3::QuicProtocolOptions options;
     TestUtility::loadFromYamlAndValidate(yaml, options);
     return std::make_unique<ActiveQuicListenerFactory>(options, /*concurrency=*/1, quic_stat_names_,
-                                                       validation_visitor_);
+                                                       validation_visitor_, absl::nullopt);
   }
 
   void maybeConfigureMocks(int connection_count) {

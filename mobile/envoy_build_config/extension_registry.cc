@@ -3,13 +3,14 @@
 #ifdef ENVOY_MOBILE_REQUEST_COMPRESSION
 #include "source/extensions/compression/brotli/compressor/config.h"
 #include "source/extensions/compression/gzip/compressor/config.h"
+#include "source/extensions/filters/http/composite/action.h"
+#include "source/extensions/filters/http/composite/config.h"
 #include "source/extensions/filters/http/compressor/config.h"
 #endif
 
 #include "source/common/http/match_delegate/config.h"
 #include "source/common/http/matching/inputs.h"
 #include "source/common/network/default_client_connection_factory.h"
-#include "source/common/network/matching/inputs.h"
 #include "source/common/network/socket_interface_impl.h"
 #include "source/common/router/upstream_codec_filter.h"
 #include "source/common/watchdog/abort_action_config.h"
@@ -120,25 +121,6 @@ void ExtensionRegistry::registerFactories() {
   Network::forceRegisterGetAddrInfoDnsResolverFactory();
   Network::forceRegisterSocketInterfaceImpl();
   Network::forceRegisterUdpDefaultWriterFactoryFactory();
-  Network::Matching::forceRegisterApplicationProtocolInputFactory();
-  Network::Matching::forceRegisterDestinationPortInputFactory();
-  Network::Matching::forceRegisterDirectSourceIPInputFactory();
-  Network::Matching::forceRegisterHttpDestinationIPInputFactory();
-  Network::Matching::forceRegisterHttpDestinationPortInputFactory();
-  Network::Matching::forceRegisterHttpDirectSourceIPInputFactory();
-  Network::Matching::forceRegisterHttpServerNameInputFactory();
-  Network::Matching::forceRegisterHttpSourceIPInputFactory();
-  Network::Matching::forceRegisterHttpSourcePortInputFactory();
-  Network::Matching::forceRegisterHttpSourceTypeInputFactory();
-  Network::Matching::forceRegisterServerNameInputFactory();
-  Network::Matching::forceRegisterSourceIPInputFactory();
-  Network::Matching::forceRegisterSourcePortInputFactory();
-  Network::Matching::forceRegisterSourceTypeInputFactory();
-  Network::Matching::forceRegisterTransportProtocolInputFactory();
-  Network::Matching::forceRegisterUdpDestinationIPInputFactory();
-  Network::Matching::forceRegisterUdpDestinationPortInputFactory();
-  Network::Matching::forceRegisterUdpSourceIPInputFactory();
-  Network::Matching::forceRegisterUdpSourcePortInputFactory();
   Regex::forceRegisterGoogleReEngineFactory();
   Router::forceRegisterDefaultEarlyDataPolicyFactory();
   Router::forceRegisterRouteListMatchActionFactory();
@@ -169,6 +151,8 @@ void ExtensionRegistry::registerFactories() {
 #ifdef ENVOY_MOBILE_REQUEST_COMPRESSION
   Extensions::Compression::Brotli::Compressor::forceRegisterBrotliCompressorLibraryFactory();
   Extensions::Compression::Gzip::Compressor::forceRegisterGzipCompressorLibraryFactory();
+  Extensions::HttpFilters::Composite::forceRegisterCompositeFilterFactory();
+  Extensions::HttpFilters::Composite::forceRegisterExecuteFilterActionFactory();
   Extensions::HttpFilters::Compressor::forceRegisterCompressorFilterFactory();
 #endif
 }

@@ -108,9 +108,9 @@ public:
   // endpoint, independent of how Envoy is compiled.
   struct ParamDescriptor {
     enum class Type { Boolean, String, Enum };
-    const Type type_;
-    const std::string id_;   // HTML form ID and query-param name (JS var name rules).
-    const std::string help_; // Rendered into home-page HTML and /help text.
+    Type type_;
+    std::string id_;   // HTML form ID and query-param name (JS var name rules).
+    std::string help_; // Rendered into home-page HTML and /help text.
     std::vector<absl::string_view> enum_choices_{};
   };
   using ParamDescriptorVec = std::vector<ParamDescriptor>;

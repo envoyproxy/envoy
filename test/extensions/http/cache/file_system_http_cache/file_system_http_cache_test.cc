@@ -37,6 +37,7 @@ using Common::AsyncFiles::MockAsyncFileManagerFactory;
 using ::envoy::extensions::filters::http::cache::v3::CacheConfig;
 using ::testing::HasSubstr;
 using ::testing::NiceMock;
+using ::testing::Return;
 using ::testing::StrictMock;
 
 absl::string_view yaml_config = R"(
@@ -191,6 +192,29 @@ TEST_F(FileSystemHttpCacheTestWithNoDefaultCache, EvictsOldestFilesUntilUnderSiz
 class FileSystemHttpCacheTest : public FileSystemCacheTestContext, public ::testing::Test {
   void SetUp() override { initCache(); }
 };
+
+MATCHER_P2(IsStatTag, name, value, "") {
+  if (!ExplainMatchResult(name, arg.name_, result_listener) ||
+      !ExplainMatchResult(value, arg.value_, result_listener)) {
+    *result_listener << "\nexpected {name: \"" << name << "\", value: \"" << value
+                     << "\"},\n but got {name: \"" << arg.name_ << "\", value: \"" << arg.value_
+                     << "\"}\n";
+    return false;
+  }
+  return true;
+}
+
+TEST_F(FileSystemHttpCacheTest, StatsAreConstructedCorrectly) {
+  std::string cache_path_no_periods = absl::StrReplaceAll(cache_path_, {{".", "_"}});
+  // Validate that a gauge has appropriate name and tags.
+  EXPECT_EQ(cache_->stats().size_bytes_.tagExtractedName(), "cache.size_bytes");
+  EXPECT_THAT(cache_->stats().size_bytes_.tags(),
+              ::testing::ElementsAre(IsStatTag("cache_path", cache_path_no_periods)));
+  // Validate that a counter has appropriate name and tags.
+  EXPECT_EQ(cache_->stats().eviction_runs_.tagExtractedName(), "cache.eviction_runs");
+  EXPECT_THAT(cache_->stats().eviction_runs_.tags(),
+              ::testing::ElementsAre(IsStatTag("cache_path", cache_path_no_periods)));
+}
 
 TEST_F(FileSystemHttpCacheTest, TrackFileRemovedClampsAtZero) {
   cache_->trackFileAdded(1);

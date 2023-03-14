@@ -1,5 +1,7 @@
 #include "contrib/generic_proxy/filters/network/source/config.h"
 
+#include "source/common/tracing/tracer_manager_impl.h"
+
 #include "contrib/generic_proxy/filters/network/source/rds.h"
 #include "contrib/generic_proxy/filters/network/source/rds_impl.h"
 
@@ -89,16 +91,28 @@ Factory::createFilterFactoryFromProtoTyped(const ProxyConfig& proto_config,
           SINGLETON_MANAGER_REGISTERED_NAME(generic_route_config_provider_manager),
           [&context] { return std::make_shared<RouteConfigProviderManagerImpl>(context.admin()); });
 
+  auto tracer_manager = Tracing::TracerManagerImpl::singleton(context);
+
   auto factories = factoriesFromProto(proto_config.codec_config(), context);
   std::shared_ptr<ProxyFactory> custom_proxy_factory = std::move(factories.second);
+
+  Tracing::TracerSharedPtr tracer;
+  Tracing::ConnectionManagerTracingConfigPtr tracing_config;
+  if (proto_config.has_tracing()) {
+    if (proto_config.tracing().has_provider()) {
+      tracer = tracer_manager->getOrCreateTracer(&proto_config.tracing().provider());
+    }
+    tracing_config = std::make_unique<Tracing::ConnectionManagerTracingConfigImpl>(
+        context.direction(), proto_config.tracing());
+  }
 
   const FilterConfigSharedPtr config = std::make_shared<FilterConfigImpl>(
       proto_config.stat_prefix(), std::move(factories.first),
       routeConfigProviderFromProto(proto_config, context, *route_config_provider_manager),
       filtersFactoryFromProto(proto_config.filters(), proto_config.stat_prefix(), context),
-      context);
+      std::move(tracer), std::move(tracing_config), context);
 
-  return [route_config_provider_manager, config,
+  return [route_config_provider_manager, tracer_manager, config, &context,
           custom_proxy_factory](Envoy::Network::FilterManager& filter_manager) -> void {
     // Create filter by the custom filter factory if the custom filter factory is not null.
     if (custom_proxy_factory != nullptr) {
@@ -106,7 +120,8 @@ Factory::createFilterFactoryFromProtoTyped(const ProxyConfig& proto_config,
       return;
     }
 
-    filter_manager.addReadFilter(std::make_shared<Filter>(config));
+    filter_manager.addReadFilter(std::make_shared<Filter>(
+        config, context.mainThreadDispatcher().timeSource(), context.runtime()));
   };
 }
 

@@ -17,7 +17,9 @@ jobs:
     runs-on: macos-12
     timeout-minutes: 120
     steps:
-    - uses: actions/checkout@v1
+    - uses: actions/checkout@v3
+      with:
+        fetch-depth: 0
     - id: should_run
       name: 'Check whether to run'
       run: ./mobile/tools/should_run_ci.sh
@@ -42,7 +44,9 @@ jobs:
     runs-on: macos-12
     timeout-minutes: 50
     steps:
-    - uses: actions/checkout@v1
+    - uses: actions/checkout@v3
+      with:
+        fetch-depth: 0
     - id: should_run
       name: 'Check whether to run'
       run: ./mobile/tools/should_run_ci.sh
@@ -90,7 +94,9 @@ jobs:
     runs-on: macos-12
     timeout-minutes: 50
     steps:
-    - uses: actions/checkout@v1
+    - uses: actions/checkout@v3
+      with:
+        fetch-depth: 0
     - id: should_run
       name: 'Check whether to run'
       run: ./mobile/tools/should_run_ci.sh
@@ -138,7 +144,9 @@ jobs:
     runs-on: macos-12
     timeout-minutes: 50
     steps:
-    - uses: actions/checkout@v1
+    - uses: actions/checkout@v3
+      with:
+        fetch-depth: 0
     - id: should_run
       name: 'Check whether to run'
       run: ./mobile/tools/should_run_ci.sh
@@ -188,7 +196,9 @@ jobs:
     runs-on: macos-12
     timeout-minutes: 50
     steps:
-    - uses: actions/checkout@v1
+    - uses: actions/checkout@v3
+      with:
+        fetch-depth: 0
     - id: should_run
       name: 'Check whether to run'
       run: ./mobile/tools/should_run_ci.sh
@@ -236,7 +246,9 @@ jobs:
     runs-on: macos-12
     timeout-minutes: 50
     steps:
-    - uses: actions/checkout@v1
+    - uses: actions/checkout@v3
+      with:
+        fetch-depth: 0
     - id: should_run
       name: 'Check whether to run'
       run: ./mobile/tools/should_run_ci.sh
@@ -271,7 +283,7 @@ jobs:
             $([ -z $GITHUB_TOKEN ] || echo "--config=remote-ci-macos") \
             --remote_header="Authorization=Bearer $GITHUB_TOKEN" \
             //examples/objective-c/hello_world:app &> /tmp/envoy.log &
-    - run: sed '/received headers with status 200/q' <(touch /tmp/envoy.log && tail -F /tmp/envoy.log)
+    - run: sed '/received headers with status 301/q' <(touch /tmp/envoy.log && tail -F /tmp/envoy.log)
       if: steps.should_run.outputs.run_ci_job == 'true'
       name: 'Check connectivity'
     - run: cat /tmp/envoy.log

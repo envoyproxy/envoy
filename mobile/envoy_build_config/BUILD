@@ -13,7 +13,6 @@ envoy_cc_library(
     repository = "@envoy",
     deps = [
         "extension_registry_platform_additions",
-        "@envoy//source/common/network/matching:inputs_lib",
         "@envoy//source/common/http/matching:inputs_lib",
         "@envoy//source/common/network:socket_lib",
         "@envoy//source/common/router:upstream_codec_filter_lib",
@@ -62,6 +61,7 @@ envoy_cc_library(
             "@envoy//source/extensions/compression/brotli/compressor:config",
             "@envoy//source/extensions/compression/gzip/compressor:config",
             "@envoy//source/extensions/filters/http/compressor:config",
+            "@envoy//source/extensions/filters/http/composite:config",
         ],
         "@envoy",
     ) + envoy_select_envoy_mobile_listener(

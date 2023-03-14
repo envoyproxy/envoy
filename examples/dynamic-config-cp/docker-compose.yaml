@@ -25,7 +25,8 @@ services:
   go-control-plane:
     build:
       context: .
-      dockerfile: Dockerfile-control-plane
-    command: bin/example
+      dockerfile: ../shared/golang/Dockerfile
+      target: golang-control-plane
+    command: /usr/local/bin/example
     healthcheck:
       test: nc -zv localhost 18000

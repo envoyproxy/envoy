@@ -1,5 +1,6 @@
 #import <Foundation/Foundation.h>
 
+@class EMODirectResponse;
 @class EnvoyHTTPFilterFactory;
 @class EnvoyNativeFilterConfig;
 @class EnvoyStringAccessor;
@@ -24,14 +25,11 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic, assign) BOOL enableHappyEyeballs;
 @property (nonatomic, assign) BOOL enableHttp3;
 @property (nonatomic, assign) BOOL enableGzipDecompression;
-@property (nonatomic, assign) BOOL enableGzipCompression;
 @property (nonatomic, assign) BOOL enableBrotliDecompression;
-@property (nonatomic, assign) BOOL enableBrotliCompression;
 @property (nonatomic, assign) BOOL enableInterfaceBinding;
 @property (nonatomic, assign) BOOL enableDrainPostDnsRefresh;
 @property (nonatomic, assign) BOOL enforceTrustChainVerification;
 @property (nonatomic, assign) BOOL forceIPv6;
-@property (nonatomic, assign) BOOL enablePlatformCertificateValidation;
 @property (nonatomic, assign) UInt32 h2ConnectionKeepaliveIdleIntervalMilliseconds;
 @property (nonatomic, assign) UInt32 h2ConnectionKeepaliveTimeoutSeconds;
 @property (nonatomic, assign) UInt32 maxConnectionsPerHost;
@@ -41,15 +39,24 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic, strong) NSString *appVersion;
 @property (nonatomic, strong) NSString *appId;
 @property (nonatomic, strong) NSArray<NSString *> *virtualClusters;
-@property (nonatomic, strong) NSString *directResponseMatchers;
-@property (nonatomic, strong) NSString *directResponses;
+@property (nonatomic, strong) NSDictionary<NSString *, NSString *> *runtimeGuards;
+@property (nonatomic, strong) NSArray<EMODirectResponse *> *typedDirectResponses;
 @property (nonatomic, strong) NSArray<EnvoyNativeFilterConfig *> *nativeFilterChain;
 @property (nonatomic, strong) NSArray<EnvoyHTTPFilterFactory *> *httpPlatformFilterFactories;
 @property (nonatomic, strong) NSDictionary<NSString *, EnvoyStringAccessor *> *stringAccessors;
 @property (nonatomic, strong) NSDictionary<NSString *, id<EnvoyKeyValueStore>> *keyValueStores;
 @property (nonatomic, strong) NSArray<NSString *> *statsSinks;
-@property (nonatomic, copy, nullable) void (^experimentalValidateYAMLCallback)(BOOL);
-
+@property (nonatomic, strong) NSString *rtdsLayerName;
+@property (nonatomic, assign) UInt32 rtdsTimeoutSeconds;
+@property (nonatomic, strong) NSString *adsAddress;
+@property (nonatomic, assign) UInt32 adsPort;
+@property (nonatomic, strong) NSString *adsJwtToken;
+@property (nonatomic, assign) UInt32 adsJwtTokenLifetimeSeconds;
+@property (nonatomic, strong) NSString *adsSslRootCerts;
+@property (nonatomic, strong) NSString *nodeId;
+@property (nonatomic, strong) NSString *nodeRegion;
+@property (nonatomic, strong) NSString *nodeZone;
+@property (nonatomic, strong) NSString *nodeSubZone;
 /**
  Create a new instance of the configuration.
  */
@@ -67,14 +74,11 @@ NS_ASSUME_NONNULL_BEGIN
                               enableHappyEyeballs:(BOOL)enableHappyEyeballs
                                       enableHttp3:(BOOL)enableHttp3
                           enableGzipDecompression:(BOOL)enableGzipDecompression
-                            enableGzipCompression:(BOOL)enableGzipCompression
                         enableBrotliDecompression:(BOOL)enableBrotliDecompression
-                          enableBrotliCompression:(BOOL)enableBrotliCompression
                            enableInterfaceBinding:(BOOL)enableInterfaceBinding
                         enableDrainPostDnsRefresh:(BOOL)enableDrainPostDnsRefresh
                     enforceTrustChainVerification:(BOOL)enforceTrustChainVerification
                                         forceIPv6:(BOOL)forceIPv6
-              enablePlatformCertificateValidation:(BOOL)enablePlatformCertificateValidation
     h2ConnectionKeepaliveIdleIntervalMilliseconds:
         (UInt32)h2ConnectionKeepaliveIdleIntervalMilliseconds
               h2ConnectionKeepaliveTimeoutSeconds:(UInt32)h2ConnectionKeepaliveTimeoutSeconds
@@ -85,8 +89,10 @@ NS_ASSUME_NONNULL_BEGIN
                                        appVersion:(NSString *)appVersion
                                             appId:(NSString *)appId
                                   virtualClusters:(NSArray<NSString *> *)virtualClusters
-                           directResponseMatchers:(NSString *)directResponseMatchers
-                                  directResponses:(NSString *)directResponses
+                                    runtimeGuards:
+                                        (NSDictionary<NSString *, NSString *> *)runtimeGuards
+                             typedDirectResponses:
+                                 (NSArray<EMODirectResponse *> *)typedDirectResponses
                                 nativeFilterChain:
                                     (NSArray<EnvoyNativeFilterConfig *> *)nativeFilterChain
                               platformFilterChain:
@@ -98,27 +104,23 @@ NS_ASSUME_NONNULL_BEGIN
                                        (NSDictionary<NSString *, id<EnvoyKeyValueStore>> *)
                                            keyValueStores
                                        statsSinks:(NSArray<NSString *> *)statsSinks
-                 experimentalValidateYAMLCallback:
-                     (nullable void (^)(BOOL))experimentalValidateYAMLCallback;
+                                    rtdsLayerName:(NSString *)rtdsLayerName
+                               rtdsTimeoutSeconds:(UInt32)rtdsTimeoutSeconds
+                                       adsAddress:(NSString *)adsAddress
+                                          adsPort:(UInt32)adsPort
+                                      adsJwtToken:(NSString *)adsJwtToken
+                       adsJwtTokenLifetimeSeconds:(UInt32)adsJwtTokenLifetimeSeconds
+                                  adsSslRootCerts:(NSString *)adsSslRootCerts
+                                           nodeId:(NSString *)nodeId
+                                       nodeRegion:(NSString *)nodeRegion
+                                         nodeZone:(NSString *)nodeZone
+                                      nodeSubZone:(NSString *)nodeSubZone;
 
 /**
- Resolves the provided configuration template using properties on this configuration.
-
- @param templateYAML The template configuration to resolve.
- @return The resolved template. Nil if the template fails to fully resolve.
+ Generate a string description of the C++ Envoy bootstrap from this configuration.
+ For testing purposes only.
  */
-- (nullable NSString *)resolveTemplate:(NSString *)templateYAML;
-
-/**
- * Takes the various fields from EnvoyConfiguration, and the YAML it generates
- * and compares the YAML generated by the C++ builder to the YAML generated by this
- * `EnvoyConfiguration`.
- *
- * @param yaml The yaml generated by this `EnvoyConfiguration`
- *
- * @return True if the YAML matched, false if a difference was found.
- */
-- (BOOL)compareYAMLWithProtoBuilder:(NSString *)yaml;
+- (NSString *)bootstrapDebugDescription;
 
 @end
 

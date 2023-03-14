@@ -19,6 +19,7 @@
 #include "gtest/gtest.h"
 
 using testing::_;
+using testing::Return;
 using testing::ReturnRef;
 
 namespace Envoy {
@@ -36,6 +37,8 @@ protected:
     ON_CALL(context_, initManager()).WillByDefault(ReturnRef(init_manager_));
     ON_CALL(context_, clusterManager()).WillByDefault(ReturnRef(cluster_manager_));
     ON_CALL(context_, mainThreadDispatcher()).WillByDefault(ReturnRef(dispatcher_));
+    ON_CALL(log_stream_info_, requestComplete())
+        .WillByDefault(Return(std::chrono::milliseconds(30)));
   }
 
   void SetUp() override { Envoy::Extensions::Common::Wasm::clearCodeCacheForTesting(); }
@@ -58,6 +61,7 @@ protected:
   NiceMock<Upstream::MockClusterManager> cluster_manager_;
   Init::ExpectableWatcherImpl init_watcher_;
   NiceMock<Event::MockDispatcher> dispatcher_;
+  NiceMock<StreamInfo::MockStreamInfo> log_stream_info_;
   Event::MockTimer* retry_timer_;
   Event::TimerCb retry_timer_cb_;
 };
@@ -117,13 +121,12 @@ TEST_P(WasmAccessLogConfigTest, CreateWasmFromWASM) {
   Http::TestRequestHeaderMapImpl request_header;
   Http::TestResponseHeaderMapImpl response_header;
   Http::TestResponseTrailerMapImpl response_trailer;
-  StreamInfo::MockStreamInfo log_stream_info;
-  instance->log(&request_header, &response_header, &response_trailer, log_stream_info);
+  instance->log(&request_header, &response_header, &response_trailer, log_stream_info_);
 
   filter = std::make_unique<NiceMock<AccessLog::MockFilter>>();
   AccessLog::InstanceSharedPtr filter_instance =
       factory->createAccessLogInstance(config, std::move(filter), context_);
-  filter_instance->log(&request_header, &response_header, &response_trailer, log_stream_info);
+  filter_instance->log(&request_header, &response_header, &response_trailer, log_stream_info_);
 }
 
 TEST_P(WasmAccessLogConfigTest, YamlLoadFromFileWasmInvalidConfig) {
@@ -176,9 +179,8 @@ TEST_P(WasmAccessLogConfigTest, YamlLoadFromFileWasmInvalidConfig) {
   TestUtility::loadFromYaml(valid_yaml, proto_config);
   AccessLog::InstanceSharedPtr filter_instance =
       factory->createAccessLogInstance(proto_config, nullptr, context_);
-  StreamInfo::MockStreamInfo log_stream_info;
   filter_instance = factory->createAccessLogInstance(proto_config, nullptr, context_);
-  filter_instance->log(nullptr, nullptr, nullptr, log_stream_info);
+  filter_instance->log(nullptr, nullptr, nullptr, log_stream_info_);
 }
 
 TEST_P(WasmAccessLogConfigTest, YamlLoadFromRemoteWasmCreateFilter) {
@@ -221,10 +223,9 @@ TEST_P(WasmAccessLogConfigTest, YamlLoadFromRemoteWasmCreateFilter) {
             }
             return &request;
           }));
-  StreamInfo::MockStreamInfo log_stream_info;
   AccessLog::InstanceSharedPtr filter_instance =
       factory.createAccessLogInstance(proto_config, nullptr, context_);
-  filter_instance->log(nullptr, nullptr, nullptr, log_stream_info);
+  filter_instance->log(nullptr, nullptr, nullptr, log_stream_info_);
   EXPECT_CALL(init_watcher_, ready());
   context_.initManager().initialize(init_watcher_);
   auto response = Http::ResponseMessagePtr{new Http::ResponseMessageImpl(
@@ -232,7 +233,7 @@ TEST_P(WasmAccessLogConfigTest, YamlLoadFromRemoteWasmCreateFilter) {
   response->body().add(code);
   async_callbacks->onSuccess(request, std::move(response));
   EXPECT_EQ(context_.initManager().state(), Init::Manager::State::Initialized);
-  filter_instance->log(nullptr, nullptr, nullptr, log_stream_info);
+  filter_instance->log(nullptr, nullptr, nullptr, log_stream_info_);
 }
 
 TEST_P(WasmAccessLogConfigTest, FailedToGetThreadLocalPlugin) {
@@ -272,13 +273,12 @@ TEST_P(WasmAccessLogConfigTest, FailedToGetThreadLocalPlugin) {
   Http::TestRequestHeaderMapImpl request_header;
   Http::TestResponseHeaderMapImpl response_header;
   Http::TestResponseTrailerMapImpl response_trailer;
-  StreamInfo::MockStreamInfo log_stream_info;
 
-  filter_instance->log(&request_header, &response_header, &response_trailer, log_stream_info);
+  filter_instance->log(&request_header, &response_header, &response_trailer, log_stream_info_);
   // Even if the thread local plugin handle returns nullptr, `log` should not raise error or
   // exception.
   threadlocal.data_[0] = std::make_shared<PluginHandleSharedPtrThreadLocal>(nullptr);
-  filter_instance->log(&request_header, &response_header, &response_trailer, log_stream_info);
+  filter_instance->log(&request_header, &response_header, &response_trailer, log_stream_info_);
 }
 
 } // namespace Wasm
