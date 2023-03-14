@@ -83,6 +83,7 @@ void EnvoyQuicServerStream::encodeData(Buffer::Instance& data, bool end_stream) 
   local_end_stream_ = end_stream;
   SendBufferMonitor::ScopedWatermarkBufferUpdater updater(this, this);
   if (capsule_protocol_handler_) {
+    IncrementalBytesSentTracker tracker(*this, *mutableBytesMeter(), false);
     if (!capsule_protocol_handler_->encodeCapsule(data.toString(), end_stream)) {
       Reset(quic::QUIC_BAD_APPLICATION_PAYLOAD);
       return;
