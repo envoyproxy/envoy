@@ -54,7 +54,7 @@ jobs:
     - id: should_run
       name: 'Check whether to run'
       run: ./mobile/tools/should_run_ci.sh
-    - uses: actions/setup-java@c3ac5dd0ed8db40fedb61c32fbe677e6b355e94c
+    - uses: actions/setup-java@3f07048e3d294f56e9b90ac5ea2c6f74e9ad0f98
       if: steps.should_run.outputs.run_ci_job == 'true'
       with:
         java-version: '8'
@@ -102,7 +102,7 @@ jobs:
     - id: should_run
       name: 'Check whether to run'
       run: ./mobile/tools/should_run_ci.sh
-    - uses: actions/setup-java@c3ac5dd0ed8db40fedb61c32fbe677e6b355e94c
+    - uses: actions/setup-java@3f07048e3d294f56e9b90ac5ea2c6f74e9ad0f98
       if: steps.should_run.outputs.run_ci_job == 'true'
       with:
         java-version: '8'
@@ -150,7 +150,7 @@ jobs:
     - id: should_run
       name: 'Check whether to run'
       run: ./mobile/tools/should_run_ci.sh
-    - uses: actions/setup-java@c3ac5dd0ed8db40fedb61c32fbe677e6b355e94c
+    - uses: actions/setup-java@3f07048e3d294f56e9b90ac5ea2c6f74e9ad0f98
       if: steps.should_run.outputs.run_ci_job == 'true'
       with:
         java-version: '8'
@@ -198,7 +198,7 @@ jobs:
     - id: should_run
       name: 'Check whether to run'
       run: ./mobile/tools/should_run_ci.sh
-    - uses: actions/setup-java@c3ac5dd0ed8db40fedb61c32fbe677e6b355e94c
+    - uses: actions/setup-java@3f07048e3d294f56e9b90ac5ea2c6f74e9ad0f98
       if: steps.should_run.outputs.run_ci_job == 'true'
       with:
         java-version: '8'
