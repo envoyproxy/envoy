@@ -446,8 +446,6 @@ final class EngineBuilderTests: XCTestCase {
     XCTAssertTrue(bootstrapDebugDescription.contains("initial_fetch_timeout { seconds: 5s }"))
   }
 
-  func testDefaultValues() {
-    // rtds, cds, ads, node_id, node_locality
   func testXDSDefaultValues() {
     // rtds, ads, node_id, node_locality
     let bootstrapDebugDescription = EngineBuilder()
