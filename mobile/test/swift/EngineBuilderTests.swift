@@ -448,6 +448,8 @@ final class EngineBuilderTests: XCTestCase {
 
   func testDefaultValues() {
     // rtds, cds, ads, node_id, node_locality
+  func testXDSDefaultValues() {
+    // rtds, ads, node_id, node_locality
     let bootstrapDebugDescription = EngineBuilder()
       .addEngineType(MockEnvoyEngine.self)
       .bootstrapDebugDescription()
