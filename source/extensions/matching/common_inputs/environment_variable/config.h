@@ -14,9 +14,9 @@ namespace Matching {
 namespace CommonInputs {
 namespace EnvironmentVariable {
 
-class Config : public Envoy::Matcher::CommonProtocolInputFactory {
+class Config : public Envoy::Matcher::CommonProtocolInputFactory<std::string> {
 public:
-  Envoy::Matcher::CommonProtocolInputFactoryCb createCommonProtocolInputFactoryCb(
+  Envoy::Matcher::CommonProtocolInputFactoryCb<std::string> createCommonProtocolInputFactoryCb(
       const Protobuf::Message& config,
       ProtobufMessage::ValidationVisitor& validation_visitor) override;
 

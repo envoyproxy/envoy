@@ -8,7 +8,7 @@ namespace Matching {
 namespace CommonInputs {
 namespace EnvironmentVariable {
 
-class Input : public Matcher::CommonProtocolInput {
+class Input : public Matcher::CommonProtocolInput<std::string> {
 public:
   explicit Input(absl::optional<std::string>&& value) : storage_(std::move(value)) {}
 

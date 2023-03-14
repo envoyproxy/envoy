@@ -10,7 +10,7 @@ namespace Matching {
 namespace CommonInputs {
 namespace EnvironmentVariable {
 
-Envoy::Matcher::CommonProtocolInputFactoryCb
+Envoy::Matcher::CommonProtocolInputFactoryCb<std::string>
 Config::createCommonProtocolInputFactoryCb(const Protobuf::Message& config,
                                            ProtobufMessage::ValidationVisitor& validation_visitor) {
   const auto& environment_config = MessageUtil::downcastAndValidate<
@@ -30,7 +30,7 @@ Config::createCommonProtocolInputFactoryCb(const Protobuf::Message& config,
 /**
  * Static registration for the environment data input. @see RegisterFactory.
  */
-REGISTER_FACTORY(Config, Envoy::Matcher::CommonProtocolInputFactory);
+REGISTER_FACTORY(Config, Envoy::Matcher::CommonProtocolInputFactory<std::string>);
 
 } // namespace EnvironmentVariable
 } // namespace CommonInputs
