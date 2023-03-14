@@ -1289,7 +1289,7 @@ void configureBuilder(
                                           getCppString(env, ads_token), ads_token_lifetime,
                                           getCppString(env, ads_root_certs));
   }
-  if (enable_cds) {
+  if (enable_cds == JNI_TRUE) {
     builder.addCdsLayer(getCppString(env, cds_resources_locator), cds_timeout_seconds);
   }
 }
