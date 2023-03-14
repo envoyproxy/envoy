@@ -111,11 +111,12 @@ public:
   LBPolicyConfig(const envoy::config::cluster::v3::Cluster& config);
 
   template <typename T> OptRef<const T> getConfig() const {
-    if (const auto lbPtr = absl::get_if<std::unique_ptr<const T>>(&lbPolicy_); lbPtr) {
-      if (*lbPtr != nullptr)
+    if (const auto lbPtr = absl::get_if<std::unique_ptr<const T>>(&lb_policy_); lbPtr) {
+      if (*lbPtr != nullptr) {
         return *(*lbPtr);
-      else
+      } else {
         return absl::nullopt;
+      }
     } else {
       return absl::nullopt;
     }
@@ -149,7 +150,7 @@ private:
                 std::unique_ptr<const envoy::config::cluster::v3::Cluster::RingHashLbConfig>,
                 std::unique_ptr<const envoy::config::cluster::v3::Cluster::MaglevLbConfig>,
                 std::unique_ptr<const envoy::config::cluster::v3::Cluster::OriginalDstLbConfig>>
-      lbPolicy_;
+      lb_policy_;
 };
 
 /**

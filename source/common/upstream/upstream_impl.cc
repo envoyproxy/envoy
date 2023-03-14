@@ -963,23 +963,23 @@ createOptions(const envoy::config::cluster::v3::Cluster& config,
 LBPolicyConfig::LBPolicyConfig(const envoy::config::cluster::v3::Cluster& config) {
   switch (config.lb_config_case()) {
   case envoy::config::cluster::v3::Cluster::kRoundRobinLbConfig:
-    lbPolicy_ = std::make_unique<const envoy::config::cluster::v3::Cluster::RoundRobinLbConfig>(
+    lb_policy_ = std::make_unique<const envoy::config::cluster::v3::Cluster::RoundRobinLbConfig>(
         config.round_robin_lb_config());
     break;
   case envoy::config::cluster::v3::Cluster::kLeastRequestLbConfig:
-    lbPolicy_ = std::make_unique<envoy::config::cluster::v3::Cluster::LeastRequestLbConfig>(
+    lb_policy_ = std::make_unique<envoy::config::cluster::v3::Cluster::LeastRequestLbConfig>(
         config.least_request_lb_config());
     break;
   case envoy::config::cluster::v3::Cluster::kRingHashLbConfig:
-    lbPolicy_ = std::make_unique<envoy::config::cluster::v3::Cluster::RingHashLbConfig>(
+    lb_policy_ = std::make_unique<envoy::config::cluster::v3::Cluster::RingHashLbConfig>(
         config.ring_hash_lb_config());
     break;
   case envoy::config::cluster::v3::Cluster::kMaglevLbConfig:
-    lbPolicy_ = std::make_unique<envoy::config::cluster::v3::Cluster::MaglevLbConfig>(
+    lb_policy_ = std::make_unique<envoy::config::cluster::v3::Cluster::MaglevLbConfig>(
         config.maglev_lb_config());
     break;
   case envoy::config::cluster::v3::Cluster::kOriginalDstLbConfig:
-    lbPolicy_ = std::make_unique<envoy::config::cluster::v3::Cluster::OriginalDstLbConfig>(
+    lb_policy_ = std::make_unique<envoy::config::cluster::v3::Cluster::OriginalDstLbConfig>(
         config.original_dst_lb_config());
     break;
   case envoy::config::cluster::v3::Cluster::LB_CONFIG_NOT_SET:
