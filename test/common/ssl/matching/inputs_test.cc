@@ -20,8 +20,7 @@ TEST(Authentication, UriSanInput) {
 
   {
     const auto result = input.get(data);
-    EXPECT_EQ(result.data_availability_,
-              Matcher::DataInputGetResult::DataAvailability::NotAvailable);
+    EXPECT_EQ(result.data_availability_, Matcher::DataAvailability::NotAvailable);
     EXPECT_EQ(result.data_, absl::nullopt);
   }
 
@@ -33,8 +32,7 @@ TEST(Authentication, UriSanInput) {
     EXPECT_CALL(*ssl, uriSanPeerCertificate()).WillRepeatedly(Return(uri_sans));
 
     const auto result = input.get(data);
-    EXPECT_EQ(result.data_availability_,
-              Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
+    EXPECT_EQ(result.data_availability_, Matcher::DataAvailability::AllDataAvailable);
     EXPECT_EQ(result.data_, absl::nullopt);
   }
 
@@ -43,8 +41,7 @@ TEST(Authentication, UriSanInput) {
     EXPECT_CALL(*ssl, uriSanPeerCertificate()).WillRepeatedly(Return(uri_sans));
 
     const auto result = input.get(data);
-    EXPECT_EQ(result.data_availability_,
-              Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
+    EXPECT_EQ(result.data_availability_, Matcher::DataAvailability::AllDataAvailable);
     EXPECT_EQ(result.data_, "foo");
   }
 
@@ -53,8 +50,7 @@ TEST(Authentication, UriSanInput) {
     EXPECT_CALL(*ssl, uriSanPeerCertificate()).WillRepeatedly(Return(uri_sans));
 
     const auto result = input.get(data);
-    EXPECT_EQ(result.data_availability_,
-              Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
+    EXPECT_EQ(result.data_availability_, Matcher::DataAvailability::AllDataAvailable);
     EXPECT_EQ(result.data_, "foo,bar");
   }
 }
@@ -65,8 +61,7 @@ TEST(Authentication, DnsSanInput) {
   Http::Matching::HttpMatchingDataImpl data(stream_info);
   {
     const auto result = input.get(data);
-    EXPECT_EQ(result.data_availability_,
-              Matcher::DataInputGetResult::DataAvailability::NotAvailable);
+    EXPECT_EQ(result.data_availability_, Matcher::DataAvailability::NotAvailable);
     EXPECT_EQ(result.data_, absl::nullopt);
   }
 
@@ -77,8 +72,7 @@ TEST(Authentication, DnsSanInput) {
     EXPECT_CALL(*ssl, dnsSansPeerCertificate()).WillRepeatedly(Return(dns_sans));
 
     const auto result = input.get(data);
-    EXPECT_EQ(result.data_availability_,
-              Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
+    EXPECT_EQ(result.data_availability_, Matcher::DataAvailability::AllDataAvailable);
     EXPECT_EQ(result.data_, absl::nullopt);
   }
 
@@ -87,8 +81,7 @@ TEST(Authentication, DnsSanInput) {
     EXPECT_CALL(*ssl, dnsSansPeerCertificate()).WillRepeatedly(Return(dns_sans));
 
     const auto result = input.get(data);
-    EXPECT_EQ(result.data_availability_,
-              Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
+    EXPECT_EQ(result.data_availability_, Matcher::DataAvailability::AllDataAvailable);
     EXPECT_EQ(result.data_, "foo");
   }
 
@@ -97,8 +90,7 @@ TEST(Authentication, DnsSanInput) {
     EXPECT_CALL(*ssl, dnsSansPeerCertificate()).WillRepeatedly(Return(dns_sans));
 
     const auto result = input.get(data);
-    EXPECT_EQ(result.data_availability_,
-              Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
+    EXPECT_EQ(result.data_availability_, Matcher::DataAvailability::AllDataAvailable);
     EXPECT_EQ(result.data_, "foo,bar");
   }
 }
@@ -111,8 +103,7 @@ TEST(Authentication, SubjectInput) {
 
   {
     const auto result = input.get(data);
-    EXPECT_EQ(result.data_availability_,
-              Matcher::DataInputGetResult::DataAvailability::NotAvailable);
+    EXPECT_EQ(result.data_availability_, Matcher::DataAvailability::NotAvailable);
     EXPECT_EQ(result.data_, absl::nullopt);
   }
 
@@ -124,16 +115,14 @@ TEST(Authentication, SubjectInput) {
 
   {
     const auto result = input.get(data);
-    EXPECT_EQ(result.data_availability_,
-              Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
+    EXPECT_EQ(result.data_availability_, Matcher::DataAvailability::AllDataAvailable);
     EXPECT_EQ(result.data_, absl::nullopt);
   }
 
   {
     subject = "foo";
     const auto result = input.get(data);
-    EXPECT_EQ(result.data_availability_,
-              Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
+    EXPECT_EQ(result.data_availability_, Matcher::DataAvailability::AllDataAvailable);
     EXPECT_EQ(result.data_, "foo");
   }
 }

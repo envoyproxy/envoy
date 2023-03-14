@@ -16,6 +16,7 @@ namespace Extensions {
 namespace Common {
 namespace Matcher {
 
+using ::Envoy::Matcher::DataAvailability;
 using ::Envoy::Matcher::DataInputFactoryCb;
 using ::Envoy::Matcher::DataInputGetResult;
 using ::Envoy::Matcher::DataInputPtr;
@@ -66,7 +67,7 @@ public:
 
   typename MatchTree<DataType>::MatchResult match(const DataType& data) override {
     const auto input = data_input_->get(data);
-    if (input.data_availability_ != DataInputGetResult::DataAvailability::AllDataAvailable) {
+    if (input.data_availability_ != DataAvailability::AllDataAvailable) {
       return {MatchState::UnableToMatch, absl::nullopt};
     }
     if (!input.data_) {

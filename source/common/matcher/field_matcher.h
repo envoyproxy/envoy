@@ -140,23 +140,23 @@ private:
  * A consequence of this is that if a match result is desired, care should be taken so that matching
  * is done with all the data available at some point.
  */
-template <class DataType>
+template <class DataType, class ResultDataType = std::string>
 class SingleFieldMatcher : public FieldMatcher<DataType>, Logger::Loggable<Logger::Id::matcher> {
 public:
-  SingleFieldMatcher(DataInputPtr<DataType>&& data_input, InputMatcherPtr&& input_matcher)
+  SingleFieldMatcher(DataInputPtr<DataType, ResultDataType>&& data_input,
+                     InputMatcherPtr&& input_matcher)
       : data_input_(std::move(data_input)), input_matcher_(std::move(input_matcher)) {}
 
   FieldMatchResult match(const DataType& data) override {
     const auto input = data_input_->get(data);
 
     ENVOY_LOG(trace, "Attempting to match {}", input);
-    if (input.data_availability_ == DataInputGetResult::DataAvailability::NotAvailable) {
+    if (input.data_availability_ == DataAvailability::NotAvailable) {
       return {MatchState::UnableToMatch, absl::nullopt};
     }
 
     const auto current_match = input_matcher_->match(input.data_);
-    if (!current_match && input.data_availability_ ==
-                              DataInputGetResult::DataAvailability::MoreDataMightBeAvailable) {
+    if (!current_match && input.data_availability_ == DataAvailability::MoreDataMightBeAvailable) {
       ENVOY_LOG(trace, "No match yet; delaying result as more data might be available.");
       return {MatchState::UnableToMatch, absl::nullopt};
     }
@@ -167,11 +167,11 @@ public:
   }
 
 private:
-  const DataInputPtr<DataType> data_input_;
+  const DataInputPtr<DataType, ResultDataType> data_input_;
   const InputMatcherPtr input_matcher_;
 };
 
-template <class DataType>
-using SingleFieldMatcherPtr = std::unique_ptr<SingleFieldMatcher<DataType>>;
+template <class DataType, class ResultDataType = std::string>
+using SingleFieldMatcherPtr = std::unique_ptr<SingleFieldMatcher<DataType, ResultDataType>>;
 } // namespace Matcher
 } // namespace Envoy

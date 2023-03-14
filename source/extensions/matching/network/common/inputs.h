@@ -12,7 +12,8 @@ namespace Envoy {
 namespace Network {
 namespace Matching {
 
-template <class InputType, class ProtoType, class MatchingDataType>
+template <class InputType, class ProtoType, class MatchingDataType,
+          class ResultDataType = std::string>
 class BaseFactory : public Matcher::DataInputFactory<MatchingDataType> {
 protected:
   explicit BaseFactory(const std::string& name) : name_(name) {}
@@ -35,14 +36,13 @@ private:
 template <class MatchingDataType>
 class DestinationIPInput : public Matcher::DataInput<MatchingDataType> {
 public:
-  Matcher::DataInputGetResult get(const MatchingDataType& data) const override {
+  Matcher::DataInputGetResult<std::string> get(const MatchingDataType& data) const override {
     const auto& address = data.localAddress();
 
     if (address.type() != Network::Address::Type::Ip) {
-      return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::nullopt};
+      return {Matcher::DataAvailability::AllDataAvailable, absl::nullopt};
     }
-    return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,
-            address.ip()->addressAsString()};
+    return {Matcher::DataAvailability::AllDataAvailable, address.ip()->addressAsString()};
   }
 };
 
@@ -63,16 +63,16 @@ DECLARE_FACTORY(DestinationIPInputFactory);
 DECLARE_FACTORY(UdpDestinationIPInputFactory);
 DECLARE_FACTORY(HttpDestinationIPInputFactory);
 
+// TODO(tyxia) This can be flexible template to return int
 template <class MatchingDataType>
 class DestinationPortInput : public Matcher::DataInput<MatchingDataType> {
 public:
-  Matcher::DataInputGetResult get(const MatchingDataType& data) const override {
+  Matcher::DataInputGetResult<std::string> get(const MatchingDataType& data) const override {
     const auto& address = data.localAddress();
     if (address.type() != Network::Address::Type::Ip) {
-      return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::nullopt};
+      return {Matcher::DataAvailability::AllDataAvailable, absl::nullopt};
     }
-    return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,
-            absl::StrCat(address.ip()->port())};
+    return {Matcher::DataAvailability::AllDataAvailable, absl::StrCat(address.ip()->port())};
   }
 };
 
@@ -96,13 +96,12 @@ DECLARE_FACTORY(HttpDestinationPortInputFactory);
 template <class MatchingDataType>
 class SourceIPInput : public Matcher::DataInput<MatchingDataType> {
 public:
-  Matcher::DataInputGetResult get(const MatchingDataType& data) const override {
+  Matcher::DataInputGetResult<std::string> get(const MatchingDataType& data) const override {
     const auto& address = data.remoteAddress();
     if (address.type() != Network::Address::Type::Ip) {
-      return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::nullopt};
+      return {Matcher::DataAvailability::AllDataAvailable, absl::nullopt};
     }
-    return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,
-            address.ip()->addressAsString()};
+    return {Matcher::DataAvailability::AllDataAvailable, address.ip()->addressAsString()};
   }
 };
 
@@ -125,13 +124,12 @@ DECLARE_FACTORY(HttpSourceIPInputFactory);
 template <class MatchingDataType>
 class SourcePortInput : public Matcher::DataInput<MatchingDataType> {
 public:
-  Matcher::DataInputGetResult get(const MatchingDataType& data) const override {
+  Matcher::DataInputGetResult<std::string> get(const MatchingDataType& data) const override {
     const auto& address = data.remoteAddress();
     if (address.type() != Network::Address::Type::Ip) {
-      return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::nullopt};
+      return {Matcher::DataAvailability::AllDataAvailable, absl::nullopt};
     }
-    return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,
-            absl::StrCat(address.ip()->port())};
+    return {Matcher::DataAvailability::AllDataAvailable, absl::StrCat(address.ip()->port())};
   }
 };
 
@@ -154,13 +152,12 @@ DECLARE_FACTORY(HttpSourcePortInputFactory);
 template <class MatchingDataType>
 class DirectSourceIPInput : public Matcher::DataInput<MatchingDataType> {
 public:
-  Matcher::DataInputGetResult get(const MatchingDataType& data) const override {
+  Matcher::DataInputGetResult<std::string> get(const MatchingDataType& data) const override {
     const auto& address = data.connectionInfoProvider().directRemoteAddress();
     if (address->type() != Network::Address::Type::Ip) {
-      return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::nullopt};
+      return {Matcher::DataAvailability::AllDataAvailable, absl::nullopt};
     }
-    return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,
-            address->ip()->addressAsString()};
+    return {Matcher::DataAvailability::AllDataAvailable, address->ip()->addressAsString()};
   }
 };
 
@@ -183,13 +180,13 @@ DECLARE_FACTORY(HttpDirectSourceIPInputFactory);
 template <class MatchingDataType>
 class SourceTypeInput : public Matcher::DataInput<MatchingDataType> {
 public:
-  Matcher::DataInputGetResult get(const MatchingDataType& data) const override {
+  Matcher::DataInputGetResult<std::string> get(const MatchingDataType& data) const override {
     const bool is_local_connection =
         Network::Utility::isSameIpOrLoopback(data.connectionInfoProvider());
     if (is_local_connection) {
-      return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, "local"};
+      return {Matcher::DataAvailability::AllDataAvailable, "local"};
     }
-    return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::nullopt};
+    return {Matcher::DataAvailability::AllDataAvailable, absl::nullopt};
   }
 };
 
@@ -211,13 +208,12 @@ DECLARE_FACTORY(HttpSourceTypeInputFactory);
 template <class MatchingDataType>
 class ServerNameInput : public Matcher::DataInput<MatchingDataType> {
 public:
-  Matcher::DataInputGetResult get(const MatchingDataType& data) const override {
+  Matcher::DataInputGetResult<std::string> get(const MatchingDataType& data) const override {
     const auto server_name = data.connectionInfoProvider().requestedServerName();
     if (!server_name.empty()) {
-      return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,
-              std::string(server_name)};
+      return {Matcher::DataAvailability::AllDataAvailable, std::string(server_name)};
     }
-    return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::nullopt};
+    return {Matcher::DataAvailability::AllDataAvailable, absl::nullopt};
   }
 };
 
@@ -238,7 +234,7 @@ DECLARE_FACTORY(HttpServerNameInputFactory);
 
 class TransportProtocolInput : public Matcher::DataInput<MatchingData> {
 public:
-  Matcher::DataInputGetResult get(const MatchingData& data) const override;
+  Matcher::DataInputGetResult<std::string> get(const MatchingData& data) const override;
 };
 
 class TransportProtocolInputFactory
@@ -258,7 +254,7 @@ public:
       const envoy::extensions::matching::common_inputs::network::v3::FilterStateInput& input_config)
       : filter_state_key_(input_config.key()) {}
 
-  Matcher::DataInputGetResult get(const MatchingData& data) const override;
+  Matcher::DataInputGetResult<std::string> get(const MatchingData& data) const override;
 
 private:
   const std::string filter_state_key_;

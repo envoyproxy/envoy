@@ -23,7 +23,7 @@ public:
   typename MatchTree<DataType>::MatchResult match(const DataType& data) override {
     const auto input = data_input_->get(data);
     ENVOY_LOG(trace, "Attempting to match {}", input);
-    if (input.data_availability_ == DataInputGetResult::DataAvailability::NotAvailable) {
+    if (input.data_availability_ == DataAvailability::NotAvailable) {
       return {MatchState::UnableToMatch, absl::nullopt};
     }
 
@@ -38,8 +38,7 @@ public:
       } else {
         return {MatchState::MatchComplete, OnMatch<DataType>{result->action_cb_, nullptr}};
       }
-    } else if (input.data_availability_ ==
-               DataInputGetResult::DataAvailability::MoreDataMightBeAvailable) {
+    } else if (input.data_availability_ == DataAvailability::MoreDataMightBeAvailable) {
       // It's possible that we were attempting a lookup with a partial value, so delay matching
       // until we know that we actually failed.
       return {MatchState::UnableToMatch, absl::nullopt};

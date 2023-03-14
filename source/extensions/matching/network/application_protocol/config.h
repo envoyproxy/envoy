@@ -13,7 +13,7 @@ namespace Matching {
 
 class ApplicationProtocolInput : public Matcher::DataInput<MatchingData> {
 public:
-  Matcher::DataInputGetResult get(const MatchingData& data) const override;
+  Matcher::DataInputGetResult<std::string> get(const MatchingData& data) const override;
 };
 
 class ApplicationProtocolInputFactory

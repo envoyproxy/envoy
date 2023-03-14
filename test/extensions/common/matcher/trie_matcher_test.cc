@@ -181,8 +181,7 @@ on_no_match:
   }
   {
     // Input is nullopt.
-    auto input = TestDataInputStringFactory(
-        {DataInputGetResult::DataAvailability::AllDataAvailable, absl::nullopt});
+    auto input = TestDataInputStringFactory({DataAvailability::AllDataAvailable, absl::nullopt});
     validateMatch("bar");
   }
 }
@@ -472,27 +471,23 @@ matcher_tree:
   loadConfig(yaml);
 
   {
-    auto input = TestDataInputStringFactory(
-        {DataInputGetResult::DataAvailability::AllDataAvailable, absl::nullopt});
+    auto input = TestDataInputStringFactory({DataAvailability::AllDataAvailable, absl::nullopt});
     auto nested = TestDataInputBoolFactory("");
     validateNoMatch();
   }
   {
     auto input = TestDataInputStringFactory("127.0.0.1");
-    auto nested = TestDataInputBoolFactory(
-        {DataInputGetResult::DataAvailability::AllDataAvailable, absl::nullopt});
+    auto nested = TestDataInputBoolFactory({DataAvailability::AllDataAvailable, absl::nullopt});
     validateNoMatch();
   }
   {
-    auto input = TestDataInputStringFactory(
-        {DataInputGetResult::DataAvailability::NotAvailable, absl::nullopt});
+    auto input = TestDataInputStringFactory({DataAvailability::NotAvailable, absl::nullopt});
     auto nested = TestDataInputBoolFactory("");
     validateUnableToMatch();
   }
   {
     auto input = TestDataInputStringFactory("127.0.0.1");
-    auto nested = TestDataInputBoolFactory(
-        {DataInputGetResult::DataAvailability::NotAvailable, absl::nullopt});
+    auto nested = TestDataInputBoolFactory({DataAvailability::NotAvailable, absl::nullopt});
     validateUnableToMatch();
   }
 }

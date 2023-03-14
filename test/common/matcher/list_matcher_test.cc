@@ -23,10 +23,9 @@ TEST(ListMatcherTest, BasicUsage) {
 TEST(ListMatcherTest, MissingData) {
   ListMatcher<TestData> matcher(absl::nullopt);
 
-  matcher.addMatcher(
-      createSingleMatcher(
-          "string", [](auto) { return true; }, DataInputGetResult::DataAvailability::NotAvailable),
-      stringOnMatch<TestData>("match"));
+  matcher.addMatcher(createSingleMatcher(
+                         "string", [](auto) { return true; }, DataAvailability::NotAvailable),
+                     stringOnMatch<TestData>("match"));
 
   EXPECT_FALSE(matcher.match(TestData()).on_match_.has_value());
   EXPECT_EQ(matcher.match(TestData()).match_state_, MatchState::UnableToMatch);

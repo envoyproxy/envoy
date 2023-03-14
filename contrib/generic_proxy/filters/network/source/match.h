@@ -25,7 +25,7 @@ class ServiceMatchDataInput : public Matcher::DataInput<Request> {
 public:
   Matcher::DataInputGetResult get(const Request& data) const override {
     Matcher::DataInputGetResult result;
-    result.data_availability_ = Matcher::DataInputGetResult::DataAvailability::AllDataAvailable;
+    result.data_availability_ = Matcher::DataAvailability::AllDataAvailable;
     result.data_.emplace(data.host());
     return result;
   }
@@ -51,7 +51,7 @@ class MethodMatchDataInput : public Matcher::DataInput<Request> {
 public:
   Matcher::DataInputGetResult get(const Request& data) const override {
     Matcher::DataInputGetResult result;
-    result.data_availability_ = Matcher::DataInputGetResult::DataAvailability::AllDataAvailable;
+    result.data_availability_ = Matcher::DataAvailability::AllDataAvailable;
     result.data_.emplace(data.method());
     return result;
   }
@@ -79,7 +79,7 @@ public:
 
   Matcher::DataInputGetResult get(const Request& data) const override {
     Matcher::DataInputGetResult result;
-    result.data_availability_ = Matcher::DataInputGetResult::DataAvailability::AllDataAvailable;
+    result.data_availability_ = Matcher::DataAvailability::AllDataAvailable;
 
     const auto value = data.getByKey(name_);
 

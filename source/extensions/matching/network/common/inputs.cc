@@ -9,25 +9,24 @@ namespace Envoy {
 namespace Network {
 namespace Matching {
 
-Matcher::DataInputGetResult TransportProtocolInput::get(const MatchingData& data) const {
+Matcher::DataInputGetResult<std::string>
+TransportProtocolInput::get(const MatchingData& data) const {
   const auto transport_protocol = data.socket().detectedTransportProtocol();
   if (!transport_protocol.empty()) {
-    return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,
-            std::string(transport_protocol)};
+    return {Matcher::DataAvailability::AllDataAvailable, std::string(transport_protocol)};
   }
-  return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::nullopt};
+  return {Matcher::DataAvailability::AllDataAvailable, absl::nullopt};
 }
 
-Matcher::DataInputGetResult FilterStateInput::get(const MatchingData& data) const {
+Matcher::DataInputGetResult<std::string> FilterStateInput::get(const MatchingData& data) const {
   const auto* filter_state_object =
       data.filterState().getDataReadOnly<StreamInfo::FilterState::Object>(filter_state_key_);
 
   if (filter_state_object != nullptr) {
-    return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,
-            filter_state_object->serializeAsString()};
+    return {Matcher::DataAvailability::AllDataAvailable, filter_state_object->serializeAsString()};
   }
 
-  return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::nullopt};
+  return {Matcher::DataAvailability::AllDataAvailable, absl::nullopt};
 }
 
 class DestinationIPInputFactory : public DestinationIPInputBaseFactory<MatchingData> {};

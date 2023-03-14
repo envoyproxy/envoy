@@ -73,6 +73,7 @@ matcher_tree:
   auto outer_factory = TestDataInputStringFactory("value");
   auto inner_factory = TestDataInputBoolFactory("foo");
 
+  // TODO(tyxia) Re-enable
   EXPECT_CALL(validation_visitor_,
               performDataInputValidation(_, "type.googleapis.com/google.protobuf.StringValue"));
   EXPECT_CALL(validation_visitor_,
@@ -461,8 +462,7 @@ TEST_F(MatcherTest, RecursiveMatcherCannotMatch) {
   ListMatcher<TestData> matcher(absl::nullopt);
 
   matcher.addMatcher(createSingleMatcher(
-                         absl::nullopt, [](auto) { return false; },
-                         DataInputGetResult::DataAvailability::NotAvailable),
+                         absl::nullopt, [](auto) { return false; }, DataAvailability::NotAvailable),
                      stringOnMatch<TestData>("match"));
 
   const auto recursive_result = evaluateMatch(matcher, TestData());

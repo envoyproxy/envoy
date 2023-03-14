@@ -35,8 +35,7 @@ TEST(MatchingData, HttpResponseStatusCodeInput) {
 
   {
     auto result = input.get(data);
-    EXPECT_EQ(result.data_availability_,
-              Matcher::DataInputGetResult::DataAvailability::NotAvailable);
+    EXPECT_EQ(result.data_availability_, Matcher::DataAvailability::NotAvailable);
     EXPECT_EQ(result.data_, absl::nullopt);
   }
   {
@@ -51,8 +50,7 @@ TEST(MatchingData, HttpResponseStatusCodeInput) {
     TestResponseHeaderMapImpl response_headers({{"not-header", "baz"}});
     data.onResponseHeaders(response_headers);
     auto result = input.get(data);
-    EXPECT_EQ(result.data_availability_,
-              Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
+    EXPECT_EQ(result.data_availability_, Matcher::DataAvailability::AllDataAvailable);
     EXPECT_EQ(result.data_, absl::nullopt);
   }
 }
@@ -65,8 +63,7 @@ TEST(MatchingData, HttpResponseStatusCodeClassInput) {
   HttpMatchingDataImpl data(createStreamInfo());
   {
     auto result = input.get(data);
-    EXPECT_EQ(result.data_availability_,
-              Matcher::DataInputGetResult::DataAvailability::NotAvailable);
+    EXPECT_EQ(result.data_availability_, Matcher::DataAvailability::NotAvailable);
     EXPECT_EQ(result.data_, absl::nullopt);
   }
   {
@@ -110,8 +107,7 @@ TEST(MatchingData, HttpResponseStatusCodeClassInput) {
     TestResponseHeaderMapImpl response_headers({{"not-header", "baz"}});
     data.onResponseHeaders(response_headers);
     auto result = input.get(data);
-    EXPECT_EQ(result.data_availability_,
-              Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
+    EXPECT_EQ(result.data_availability_, Matcher::DataAvailability::AllDataAvailable);
     EXPECT_EQ(result.data_, absl::nullopt);
   }
   {
@@ -119,8 +115,7 @@ TEST(MatchingData, HttpResponseStatusCodeClassInput) {
     response_headers.setStatus(600);
     data.onResponseHeaders(response_headers);
     auto result = input.get(data);
-    EXPECT_EQ(result.data_availability_,
-              Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
+    EXPECT_EQ(result.data_availability_, Matcher::DataAvailability::AllDataAvailable);
     EXPECT_EQ(result.data_, absl::nullopt);
   }
   {
@@ -128,8 +123,7 @@ TEST(MatchingData, HttpResponseStatusCodeClassInput) {
     response_headers.setStatus(99);
     data.onResponseHeaders(response_headers);
     auto result = input.get(data);
-    EXPECT_EQ(result.data_availability_,
-              Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
+    EXPECT_EQ(result.data_availability_, Matcher::DataAvailability::AllDataAvailable);
     EXPECT_EQ(result.data_, absl::nullopt);
   }
 }

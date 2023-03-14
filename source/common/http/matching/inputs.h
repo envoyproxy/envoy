@@ -15,6 +15,7 @@ namespace Matching {
 /**
  * Common base class for all the header/trailer DataInputs.
  */
+// TODO(tyxia) provide the std::string template directly
 template <class HeaderType>
 class HttpHeadersDataInputBase : public Matcher::DataInput<HttpMatchingData> {
 public:
@@ -22,21 +23,21 @@ public:
 
   virtual OptRef<const HeaderType> headerMap(const HttpMatchingData& data) const PURE;
 
-  Matcher::DataInputGetResult get(const HttpMatchingData& data) const override {
+  Matcher::DataInputGetResult<std::string> get(const HttpMatchingData& data) const override {
     const OptRef<const HeaderType> maybe_headers = headerMap(data);
 
     if (!maybe_headers) {
-      return {Matcher::DataInputGetResult::DataAvailability::NotAvailable, absl::nullopt};
+      return {Matcher::DataAvailability::NotAvailable, absl::nullopt};
     }
 
     auto header_string = HeaderUtility::getAllOfHeaderAsString(*maybe_headers, name_, ",");
 
     if (header_string.result()) {
-      return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,
+      return {Matcher::DataAvailability::AllDataAvailable,
               std::string(header_string.result().value())};
     }
 
-    return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::nullopt};
+    return {Matcher::DataAvailability::AllDataAvailable, absl::nullopt};
   }
 
 private:
@@ -149,16 +150,16 @@ public:
   explicit HttpRequestQueryParamsDataInput(const std::string& query_param)
       : query_param_(query_param) {}
 
-  Matcher::DataInputGetResult get(const HttpMatchingData& data) const override {
+  Matcher::DataInputGetResult<std::string> get(const HttpMatchingData& data) const override {
     const auto maybe_headers = data.requestHeaders();
 
     if (!maybe_headers) {
-      return {Matcher::DataInputGetResult::DataAvailability::NotAvailable, absl::nullopt};
+      return {Matcher::DataAvailability::NotAvailable, absl::nullopt};
     }
 
     const auto ret = maybe_headers->Path();
     if (!ret) {
-      return {Matcher::DataInputGetResult::DataAvailability::NotAvailable, absl::nullopt};
+      return {Matcher::DataAvailability::NotAvailable, absl::nullopt};
     }
 
     Utility::QueryParams params =
@@ -166,10 +167,9 @@ public:
 
     auto ItParam = params.find(query_param_);
     if (ItParam == params.end()) {
-      return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::nullopt};
+      return {Matcher::DataAvailability::AllDataAvailable, absl::nullopt};
     }
-    return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,
-            std::move(ItParam->second)};
+    return {Matcher::DataAvailability::AllDataAvailable, std::move(ItParam->second)};
   }
 
 private:

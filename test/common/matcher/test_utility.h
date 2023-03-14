@@ -17,18 +17,18 @@ struct TestData {
 };
 
 // A CommonProtocolInput that returns the configured value every time.
-struct CommonProtocolTestInput : public CommonProtocolInput {
+struct CommonProtocolTestInput : public CommonProtocolInput<std::string> {
   explicit CommonProtocolTestInput(const std::string& data) : data_(data) {}
   absl::optional<std::string> get() override { return data_; }
 
   const std::string data_;
 };
-class TestCommonProtocolInputFactory : public CommonProtocolInputFactory {
+class TestCommonProtocolInputFactory : public CommonProtocolInputFactory<std::string> {
 public:
   TestCommonProtocolInputFactory(absl::string_view factory_name, absl::string_view data)
       : factory_name_(std::string(factory_name)), value_(std::string(data)), injection_(*this) {}
 
-  CommonProtocolInputFactoryCb
+  CommonProtocolInputFactoryCb<std::string>
   createCommonProtocolInputFactoryCb(const Protobuf::Message&,
                                      ProtobufMessage::ValidationVisitor&) override {
     return [&]() { return std::make_unique<CommonProtocolTestInput>(value_); };
@@ -47,19 +47,19 @@ private:
 
 // A DataInput that returns the configured value every time.
 struct TestInput : public DataInput<TestData> {
-  explicit TestInput(DataInputGetResult result) : result_(result) {}
-  DataInputGetResult get(const TestData&) const override { return result_; }
+  explicit TestInput(DataInputGetResult<std::string> result) : result_(result) {}
+  DataInputGetResult<std::string> get(const TestData&) const override { return result_; }
 
-  DataInputGetResult result_;
+  DataInputGetResult<std::string> result_;
 };
 
 // Self-injecting factory for TestInput.
 class TestDataInputStringFactory : public DataInputFactory<TestData> {
 public:
-  TestDataInputStringFactory(DataInputGetResult result) : result_(result), injection_(*this) {}
+  TestDataInputStringFactory(DataInputGetResult<std::string> result)
+      : result_(result), injection_(*this) {}
   TestDataInputStringFactory(absl::string_view data)
-      : TestDataInputStringFactory(
-            {DataInputGetResult::DataAvailability::AllDataAvailable, std::string(data)}) {}
+      : TestDataInputStringFactory({DataAvailability::AllDataAvailable, std::string(data)}) {}
   DataInputFactoryCb<TestData>
   createDataInputFactoryCb(const Protobuf::Message&, ProtobufMessage::ValidationVisitor&) override {
     return [&]() { return std::make_unique<TestInput>(result_); };
@@ -71,17 +71,17 @@ public:
   std::string name() const override { return "string"; }
 
 private:
-  const DataInputGetResult result_;
+  const DataInputGetResult<std::string> result_;
   Registry::InjectFactory<DataInputFactory<TestData>> injection_;
 };
 
 // Secondary data input to avoid duplicate type registration.
 class TestDataInputBoolFactory : public DataInputFactory<TestData> {
 public:
-  TestDataInputBoolFactory(DataInputGetResult result) : result_(result), injection_(*this) {}
+  TestDataInputBoolFactory(DataInputGetResult<std::string> result)
+      : result_(result), injection_(*this) {}
   TestDataInputBoolFactory(absl::string_view data)
-      : TestDataInputBoolFactory(
-            {DataInputGetResult::DataAvailability::AllDataAvailable, std::string(data)}) {}
+      : TestDataInputBoolFactory({DataAvailability::AllDataAvailable, std::string(data)}) {}
   DataInputFactoryCb<TestData>
   createDataInputFactoryCb(const Protobuf::Message&, ProtobufMessage::ValidationVisitor&) override {
     return [&]() { return std::make_unique<TestInput>(result_); };
@@ -93,7 +93,7 @@ public:
   std::string name() const override { return "bool"; }
 
 private:
-  const DataInputGetResult result_;
+  const DataInputGetResult<std::string> result_;
   Registry::InjectFactory<DataInputFactory<TestData>> injection_;
 };
 
@@ -210,10 +210,9 @@ public:
 SingleFieldMatcherPtr<TestData>
 createSingleMatcher(absl::optional<absl::string_view> input,
                     std::function<bool(absl::optional<absl::string_view>)> predicate,
-                    DataInputGetResult::DataAvailability availability =
-                        DataInputGetResult::DataAvailability::AllDataAvailable) {
+                    DataAvailability availability = DataAvailability::AllDataAvailable) {
   return std::make_unique<SingleFieldMatcher<TestData>>(
-      std::make_unique<TestInput>(DataInputGetResult{
+      std::make_unique<TestInput>(DataInputGetResult<std::string>{
           availability, input ? absl::make_optional(std::string(*input)) : absl::nullopt}),
       std::make_unique<TestMatcher>(predicate));
 }

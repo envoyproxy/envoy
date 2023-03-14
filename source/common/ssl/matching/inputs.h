@@ -1,5 +1,7 @@
 #pragma once
 
+#include <string>
+
 #include "envoy/extensions/matching/common_inputs/ssl/v3/ssl_inputs.pb.h"
 #include "envoy/extensions/matching/common_inputs/ssl/v3/ssl_inputs.pb.validate.h"
 #include "envoy/matcher/matcher.h"
@@ -10,8 +12,9 @@ namespace Envoy {
 namespace Ssl {
 namespace Matching {
 
-template <class InputType, class ProtoType, class MatchingDataType>
-class BaseFactory : public Matcher::DataInputFactory<MatchingDataType> {
+template <class InputType, class ProtoType, class MatchingDataType,
+          class ResultDataType = std::string>
+class BaseFactory : public Matcher::DataInputFactory<MatchingDataType, ResultDataType> {
 protected:
   explicit BaseFactory(const std::string& name) : name_(name) {}
 
@@ -32,17 +35,16 @@ private:
 
 template <class MatchingDataType> class UriSanInput : public Matcher::DataInput<MatchingDataType> {
 public:
-  Matcher::DataInputGetResult get(const MatchingDataType& data) const override {
+  Matcher::DataInputGetResult<std::string> get(const MatchingDataType& data) const override {
     const auto& ssl = data.ssl();
     if (!ssl) {
-      return {Matcher::DataInputGetResult::DataAvailability::NotAvailable, absl::nullopt};
+      return {Matcher::DataAvailability::NotAvailable, absl::nullopt};
     }
     const auto& uri = ssl->uriSanPeerCertificate();
     if (!uri.empty()) {
-      return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,
-              absl::StrJoin(uri, ",")};
+      return {Matcher::DataAvailability::AllDataAvailable, absl::StrJoin(uri, ",")};
     }
-    return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::nullopt};
+    return {Matcher::DataAvailability::AllDataAvailable, absl::nullopt};
   }
 };
 
@@ -60,17 +62,16 @@ public:
 
 template <class MatchingDataType> class DnsSanInput : public Matcher::DataInput<MatchingDataType> {
 public:
-  Matcher::DataInputGetResult get(const MatchingDataType& data) const override {
+  Matcher::DataInputGetResult<std::string> get(const MatchingDataType& data) const override {
     const auto& ssl = data.ssl();
     if (!ssl) {
-      return {Matcher::DataInputGetResult::DataAvailability::NotAvailable, absl::nullopt};
+      return {Matcher::DataAvailability::NotAvailable, absl::nullopt};
     }
     const auto& dns = ssl->dnsSansPeerCertificate();
     if (!dns.empty()) {
-      return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,
-              absl::StrJoin(dns, ",")};
+      return {Matcher::DataAvailability::AllDataAvailable, absl::StrJoin(dns, ",")};
     }
-    return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::nullopt};
+    return {Matcher::DataAvailability::AllDataAvailable, absl::nullopt};
   }
 };
 
@@ -88,17 +89,16 @@ public:
 
 template <class MatchingDataType> class SubjectInput : public Matcher::DataInput<MatchingDataType> {
 public:
-  Matcher::DataInputGetResult get(const MatchingDataType& data) const override {
+  Matcher::DataInputGetResult<std::string> get(const MatchingDataType& data) const override {
     const auto& ssl = data.ssl();
     if (!ssl) {
-      return {Matcher::DataInputGetResult::DataAvailability::NotAvailable, absl::nullopt};
+      return {Matcher::DataAvailability::NotAvailable, absl::nullopt};
     }
     const auto& subject = ssl->subjectPeerCertificate();
     if (!subject.empty()) {
-      return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,
-              std::string(subject)};
+      return {Matcher::DataAvailability::AllDataAvailable, std::string(subject)};
     }
-    return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::nullopt};
+    return {Matcher::DataAvailability::AllDataAvailable, absl::nullopt};
   }
 };
 

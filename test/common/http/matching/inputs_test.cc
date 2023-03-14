@@ -44,8 +44,7 @@ TEST(MatchingData, HttpRequestHeadersDataInput) {
     TestRequestHeaderMapImpl request_headers({{"not-header", "baz"}});
     data.onRequestHeaders(request_headers);
     auto result = input.get(data);
-    EXPECT_EQ(result.data_availability_,
-              Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
+    EXPECT_EQ(result.data_availability_, Matcher::DataAvailability::AllDataAvailable);
     EXPECT_EQ(result.data_, absl::nullopt);
   }
 }
@@ -65,8 +64,7 @@ TEST(MatchingData, HttpRequestTrailersDataInput) {
     TestRequestTrailerMapImpl request_trailers({{"not-header", "baz"}});
     data.onRequestTrailers(request_trailers);
     auto result = input.get(data);
-    EXPECT_EQ(result.data_availability_,
-              Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
+    EXPECT_EQ(result.data_availability_, Matcher::DataAvailability::AllDataAvailable);
     EXPECT_EQ(result.data_, absl::nullopt);
   }
 }
@@ -89,8 +87,7 @@ TEST(MatchingData, HttpResponseHeadersDataInput) {
     TestResponseHeaderMapImpl response_headers({{"not-header", "baz"}});
     data.onResponseHeaders(response_headers);
     auto result = input.get(data);
-    EXPECT_EQ(result.data_availability_,
-              Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
+    EXPECT_EQ(result.data_availability_, Matcher::DataAvailability::AllDataAvailable);
     EXPECT_EQ(result.data_, absl::nullopt);
   }
 }
@@ -113,8 +110,7 @@ TEST(MatchingData, HttpResponseTrailersDataInput) {
     TestResponseTrailerMapImpl response_trailers({{"not-header", "baz"}});
     data.onResponseTrailers(response_trailers);
     auto result = input.get(data);
-    EXPECT_EQ(result.data_availability_,
-              Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
+    EXPECT_EQ(result.data_availability_, Matcher::DataAvailability::AllDataAvailable);
     EXPECT_EQ(result.data_, absl::nullopt);
   }
 }
@@ -128,8 +124,7 @@ TEST(MatchingData, HttpRequestQueryParamsDataInput) {
   {
     HttpRequestQueryParamsDataInput input("arg");
     auto result = input.get(data);
-    EXPECT_EQ(result.data_availability_,
-              Matcher::DataInputGetResult::DataAvailability::NotAvailable);
+    EXPECT_EQ(result.data_availability_, Matcher::DataAvailability::NotAvailable);
     EXPECT_EQ(result.data_, absl::nullopt);
   }
 
@@ -156,8 +151,7 @@ TEST(MatchingData, HttpRequestQueryParamsDataInput) {
 
     const auto result = input.get(data);
 
-    EXPECT_EQ(result.data_availability_,
-              Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
+    EXPECT_EQ(result.data_availability_, Matcher::DataAvailability::AllDataAvailable);
     EXPECT_EQ(result.data_, absl::nullopt);
   }
 
@@ -168,8 +162,7 @@ TEST(MatchingData, HttpRequestQueryParamsDataInput) {
 
     const auto result = input.get(data);
 
-    EXPECT_EQ(result.data_availability_,
-              Matcher::DataInputGetResult::DataAvailability::NotAvailable);
+    EXPECT_EQ(result.data_availability_, Matcher::DataAvailability::NotAvailable);
     EXPECT_EQ(result.data_, absl::nullopt);
   }
 }

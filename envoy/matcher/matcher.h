@@ -179,6 +179,15 @@ public:
   std::string category() const override { return "envoy.matching.input_matchers"; }
 };
 
+enum class DataAvailability {
+  // The data is not yet available.
+  NotAvailable,
+  // Some data is available, but more might arrive.
+  MoreDataMightBeAvailable,
+  // All the data is available.
+  AllDataAvailable
+};
+
 // The result of retrieving data from a DataInput. As the data is generally made available
 // over time (e.g. as more of the stream reaches the proxy), data might become increasingly
 // available. This return type allows the DataInput to indicate this, as this might influence
@@ -187,63 +196,67 @@ public:
 // Conceptually the data availability should start at being NotAvailable, transition to
 // MoreDataMightBeAvailable (optional, this doesn't make sense for all data) and finally
 // AllDataAvailable as the data becomes available.
-struct DataInputGetResult {
-  enum class DataAvailability {
-    // The data is not yet available.
-    NotAvailable,
-    // Some data is available, but more might arrive.
-    MoreDataMightBeAvailable,
-    // All the data is available.
-    AllDataAvailable
-  };
-
+template <class ResultDataType = std::string> struct DataInputGetResult {
   DataAvailability data_availability_;
   // The resulting data. This will be absl::nullopt if we don't have sufficient data available (as
   // per data_availability_) or because no value was extracted. For example, consider a DataInput
   // which attempts to look a key up in the map: if we don't have access to the map yet, we return
   // absl::nullopt with NotAvailable. If we have the entire map, but the key doesn't exist in the
   // map, we return absl::nullopt with AllDataAvailable.
-  absl::optional<std::string> data_;
+  absl::optional<ResultDataType> data_;
 
   // For pretty printing.
   friend std::ostream& operator<<(std::ostream& out, const DataInputGetResult& result) {
-    out << "data input: " << (result.data_ ? result.data_.value() : "n/a");
+    if (result.data_.has_value()) {
+      out << "data input: " << result.data_.value();
+    } else {
+      out << "n/a";
+    }
+    // out << "data input: " << (result.data_ ? result.data_.value() : "n/a");
     switch (result.data_availability_) {
-    case DataInputGetResult::DataAvailability::NotAvailable:
+    case DataAvailability::NotAvailable:
       out << " (not available)";
       break;
-    case DataInputGetResult::DataAvailability::MoreDataMightBeAvailable:
+    case DataAvailability::MoreDataMightBeAvailable:
       out << " (more data available)";
       break;
-    case DataInputGetResult::DataAvailability::AllDataAvailable:;
+    case DataAvailability::AllDataAvailable:;
     }
     return out;
   }
 };
 
+// Template deduction guide for DataInputGetResult.
+template <class ResultDataType>
+DataInputGetResult(DataAvailability data_availability_, ResultDataType data_)
+    -> DataInputGetResult<std::string>;
+
 /**
  * Interface for types providing a way to extract a string from the DataType to perform matching
  * on.
  */
-template <class DataType> class DataInput {
+template <class DataType, class ResultDataType = std::string> class DataInput {
 public:
   virtual ~DataInput() = default;
 
-  virtual DataInputGetResult get(const DataType& data) const PURE;
+  virtual DataInputGetResult<ResultDataType> get(const DataType& data) const PURE;
 };
 
-template <class DataType> using DataInputPtr = std::unique_ptr<DataInput<DataType>>;
-template <class DataType> using DataInputFactoryCb = std::function<DataInputPtr<DataType>()>;
+template <class DataType, class ResultDataType = std::string>
+using DataInputPtr = std::unique_ptr<DataInput<DataType, ResultDataType>>;
+template <class DataType, class ResultDataType = std::string>
+using DataInputFactoryCb = std::function<DataInputPtr<DataType, ResultDataType>()>;
 
 /**
  * Factory for data inputs.
  */
-template <class DataType> class DataInputFactory : public Config::TypedFactory {
+template <class DataType, class ResultDataType = std::string>
+class DataInputFactory : public Config::TypedFactory {
 public:
   /**
    * Creates a DataInput from the provided config.
    */
-  virtual DataInputFactoryCb<DataType>
+  virtual DataInputFactoryCb<DataType, ResultDataType>
   createDataInputFactoryCb(const Protobuf::Message& config,
                            ProtobufMessage::ValidationVisitor& validation_visitor) PURE;
 
@@ -263,23 +276,30 @@ public:
  * Interface for types providing a way to use a string for matching without depending on protocol
  * data. As a result, these can be used for all protocols.
  */
-class CommonProtocolInput {
+// TODO(tyxia) Maybe no need to change here
+template <class ResultDataType = std::string> class CommonProtocolInput {
 public:
   virtual ~CommonProtocolInput() = default;
-  virtual absl::optional<std::string> get() PURE;
+  virtual absl::optional<ResultDataType> get() PURE;
 };
-using CommonProtocolInputPtr = std::unique_ptr<CommonProtocolInput>;
-using CommonProtocolInputFactoryCb = std::function<CommonProtocolInputPtr()>;
+// using CommonProtocolInputPtr = std::unique_ptr<CommonProtocolInput>;
+// using CommonProtocolInputFactoryCb = std::function<CommonProtocolInputPtr()>;
+
+template <class ResultDataType = std::string>
+using CommonProtocolInputPtr = std::unique_ptr<CommonProtocolInput<ResultDataType>>;
+template <class ResultDataType = std::string>
+using CommonProtocolInputFactoryCb = std::function<CommonProtocolInputPtr<ResultDataType>()>;
 
 /**
  * Factory for CommonProtocolInput.
  */
+template <class ResultDataType = std::string>
 class CommonProtocolInputFactory : public Config::TypedFactory {
 public:
   /**
    * Creates a CommonProtocolInput from the provided config.
    */
-  virtual CommonProtocolInputFactoryCb
+  virtual CommonProtocolInputFactoryCb<ResultDataType>
   createCommonProtocolInputFactoryCb(const Protobuf::Message& config,
                                      ProtobufMessage::ValidationVisitor& validation_visitor) PURE;
 
@@ -311,5 +331,6 @@ public:
 // NOLINT(namespace-envoy)
 namespace fmt {
 // Allow fmtlib to use operator << defined in DataInputGetResult
-template <> struct formatter<::Envoy::Matcher::DataInputGetResult> : ostream_formatter {};
+// TODO(tyxia) Different from g3
+template <> struct formatter<::Envoy::Matcher::DataInputGetResult<>> : ostream_formatter {};
 } // namespace fmt

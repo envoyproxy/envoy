@@ -89,35 +89,42 @@ public:
                     MatchTreeValidationVisitor<DataType>& validation_visitor)
       : validator_(validator), validation_visitor_(validation_visitor) {}
 
+  template <class ResultDataType = std::string>
   DataInputFactoryCb<DataType> createDataInput(const xds::core::v3::TypedExtensionConfig& config) {
-    return createDataInputBase(config);
+    // TODO(tyxia) I want to pass down the ResultDataType
+    return createDataInputBase<xds::core::v3::TypedExtensionConfig, ResultDataType>(config);
   }
 
+  template <class ResultDataType = std::string>
   DataInputFactoryCb<DataType>
   createDataInput(const envoy::config::core::v3::TypedExtensionConfig& config) {
-    return createDataInputBase(config);
+    return createDataInputBase<envoy::config::core::v3::TypedExtensionConfig, ResultDataType>(
+        config);
+    ;
   }
 
 private:
   // Wrapper around a CommonProtocolInput that allows it to be used as a DataInput<DataType>.
-  class CommonProtocolInputWrapper : public DataInput<DataType> {
+  template <class ResultDataType = std::string>
+  class CommonProtocolInputWrapper : public DataInput<DataType, ResultDataType> {
   public:
-    explicit CommonProtocolInputWrapper(CommonProtocolInputPtr&& common_protocol_input)
+    explicit CommonProtocolInputWrapper(
+        CommonProtocolInputPtr<ResultDataType>&& common_protocol_input)
         : common_protocol_input_(std::move(common_protocol_input)) {}
 
-    DataInputGetResult get(const DataType&) const override {
-      return DataInputGetResult{DataInputGetResult::DataAvailability::AllDataAvailable,
-                                common_protocol_input_->get()};
+    DataInputGetResult<ResultDataType> get(const DataType&) const override {
+      return {DataAvailability::AllDataAvailable, common_protocol_input_->get()};
     }
 
   private:
-    const CommonProtocolInputPtr common_protocol_input_;
+    const CommonProtocolInputPtr<ResultDataType> common_protocol_input_;
   };
 
-  template <class TypedExtensionConfigType>
+  template <class TypedExtensionConfigType, class ResultDataType = std::string>
   DataInputFactoryCb<DataType> createDataInputBase(const TypedExtensionConfigType& config) {
-    auto* factory = Config::Utility::getFactory<DataInputFactory<DataType>>(config);
+    auto* factory = Config::Utility::getFactory<DataInputFactory<DataType, ResultDataType>>(config);
     if (factory != nullptr) {
+      // TODO(tyxia) It seems fixed
       validation_visitor_.validateDataInput(*factory, config.typed_config().type_url());
 
       ProtobufTypes::MessagePtr message =
@@ -129,13 +136,14 @@ private:
     // If the provided config doesn't match a typed input, assume that this is one of the common
     // inputs.
     auto& common_input_factory =
-        Config::Utility::getAndCheckFactory<CommonProtocolInputFactory>(config);
+        Config::Utility::getAndCheckFactory<CommonProtocolInputFactory<ResultDataType>>(config);
     ProtobufTypes::MessagePtr message = Config::Utility::translateAnyToFactoryConfig(
         config.typed_config(), validator_, common_input_factory);
     auto common_input =
         common_input_factory.createCommonProtocolInputFactoryCb(*message, validator_);
-    return
-        [common_input]() { return std::make_unique<CommonProtocolInputWrapper>(common_input()); };
+    return [common_input]() {
+      return std::make_unique<CommonProtocolInputWrapper<ResultDataType>>(common_input());
+    };
   }
 
   ProtobufMessage::ValidationVisitor& validator_;
@@ -147,7 +155,7 @@ private:
  * @param DataType the type used as a source for DataInputs
  * @param ActionFactoryContext the context provided to Action factories
  */
-template <class DataType, class ActionFactoryContext>
+template <class DataType, class ActionFactoryContext, class ResultDataType = std::string>
 class MatchTreeFactory : public OnMatchFactory<DataType> {
 public:
   MatchTreeFactory(ActionFactoryContext& context,
@@ -237,12 +245,13 @@ private:
   FieldMatcherFactoryCb<DataType> createFieldMatcher(const FieldMatcherType& field_predicate) {
     switch (field_predicate.match_type_case()) {
     case (PredicateType::kSinglePredicate): {
-      auto data_input =
-          match_input_factory_.createDataInput(field_predicate.single_predicate().input());
+      auto data_input = match_input_factory_.template createDataInput<ResultDataType>(
+          field_predicate.single_predicate().input());
       auto input_matcher = createInputMatcher(field_predicate.single_predicate());
 
       return [data_input, input_matcher]() {
-        return std::make_unique<SingleFieldMatcher<DataType>>(data_input(), input_matcher());
+        return std::make_unique<SingleFieldMatcher<DataType, ResultDataType>>(data_input(),
+                                                                              input_matcher());
       };
     }
     case (PredicateType::kOrMatcher):

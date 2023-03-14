@@ -9,13 +9,14 @@ namespace Envoy {
 namespace Network {
 namespace Matching {
 
-Matcher::DataInputGetResult ApplicationProtocolInput::get(const MatchingData& data) const {
+Matcher::DataInputGetResult<std::string>
+ApplicationProtocolInput::get(const MatchingData& data) const {
   const auto& protocols = data.socket().requestedApplicationProtocols();
   if (!protocols.empty()) {
-    return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,
+    return {Matcher::DataAvailability::AllDataAvailable,
             absl::StrCat("'", absl::StrJoin(protocols, "','"), "'")};
   }
-  return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::nullopt};
+  return {Matcher::DataAvailability::AllDataAvailable, absl::nullopt};
 }
 
 REGISTER_FACTORY(ApplicationProtocolInputFactory, Matcher::DataInputFactory<MatchingData>);
