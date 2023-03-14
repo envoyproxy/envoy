@@ -622,7 +622,7 @@ open class EngineBuilder: NSObject {
   ///
   /// - returns: This builder.
   @discardableResult
-  public func addCDSLayer(cdsResourcesLocator: String, timeoutSeconds: UInt32 = 0) -> Self {
+  public func addCDSLayer(cdsResourcesLocator: String = "", timeoutSeconds: UInt32 = 0) -> Self {
     self.cdsResourcesLocator = cdsResourcesLocator
     self.cdsTimeoutSeconds = timeoutSeconds
     self.enableCds = true

@@ -631,7 +631,7 @@ open class EngineBuilder(
   * @return this builder.
   */
   fun addCdsLayer(
-    cdsResourcesLocator: String,
+    cdsResourcesLocator: String = "",
     cdsTimeoutSeconds: Int = 0,
   ): EngineBuilder {
     this.cdsResourcesLocator = cdsResourcesLocator

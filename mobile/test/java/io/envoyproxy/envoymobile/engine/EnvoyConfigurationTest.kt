@@ -375,6 +375,19 @@ class EnvoyConfigurationTest {
   }
 
   @Test
+  fun `test enableCds with default string`() {
+    JniLibrary.loadTestLibrary()
+    val envoyConfiguration = buildTestEnvoyConfiguration(
+      enableCds = true, adsAddress = "FAKE_ADDRESS", adsPort = 0
+    )
+
+    val resolvedTemplate = TestJni.createYaml(envoyConfiguration)
+
+    assertThat(resolvedTemplate).contains("cds_config:");
+    assertThat(resolvedTemplate).contains("initial_fetch_timeout: 5s");
+  }
+
+  @Test
   fun `test RTDS default timeout`() {
     JniLibrary.loadTestLibrary()
     val envoyConfiguration = buildTestEnvoyConfiguration(
