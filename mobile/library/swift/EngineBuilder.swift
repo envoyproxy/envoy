@@ -777,10 +777,12 @@ open class EngineBuilder: NSObject {
 
   func bootstrapDebugDescription() -> String {
     let objcDescription = self.makeConfig().bootstrapDebugDescription()
+#if canImport(EnvoyCxxSwiftInterop)
     assert(
       self.generateBootstrap().debugDescription == objcDescription,
       "Swift bootstrap is different from ObjC bootstrap"
     )
+#endif
     return objcDescription
   }
 }
