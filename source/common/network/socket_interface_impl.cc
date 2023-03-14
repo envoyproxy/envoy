@@ -77,7 +77,8 @@ IoHandlePtr SocketInterfaceImpl::socket(Socket::Type socket_type, Address::Type 
 #else
   int flags = SOCK_NONBLOCK;
 
-  if (isBlockingSocket()) {
+  // We only set TCP sockets blocking to suit io_uring.
+  if (isBlockingSocket() && socket_type == Socket::Type::Stream) {
     flags = 0;
   }
 
