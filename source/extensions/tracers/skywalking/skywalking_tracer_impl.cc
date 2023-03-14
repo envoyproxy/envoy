@@ -76,6 +76,9 @@ Tracing::SpanPtr Driver::startSpan(const Tracing::Config&, Tracing::TraceContext
           warn,
           "New SkyWalking Span/Segment with previous span context cannot be created for error: {}",
           e.what());
+      if (!decision.traced) {
+        return std::make_unique<Tracing::NullSpan>();
+      }
       tracing_context = tracing_context_factory_->create();
     }
   }
