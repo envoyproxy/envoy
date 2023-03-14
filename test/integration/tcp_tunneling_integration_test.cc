@@ -45,7 +45,7 @@ public:
 
   void setUpConnection() {
     codec_client_ = makeHttpConnection(lookupPort("http"));
-    auto encoder_decoder = codec_client_->startRequest(getRequestHeaderMap());
+    auto encoder_decoder = codec_client_->startRequest(connect_headers_);
     request_encoder_ = &encoder_decoder.first;
     response_ = std::move(encoder_decoder.second);
     ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_raw_upstream_connection_));
@@ -67,27 +67,8 @@ public:
     EXPECT_EQ(downstream_received_data, response_->body());
   }
 
-  Http::TestRequestHeaderMapImpl connect_headers_h1_{{":method", "CONNECT"},
-                                                     {":authority", "foo.lyft.com:80"}};
-
-  // The client H/2 codec expects the request header map to be in the form of H/1
-  // upgrade to issue an extended CONNECT request
-  Http::TestRequestHeaderMapImpl extended_connect_headers_h2_{
-      {":method", "GET"},        {":path", "/"},       {"upgrade", "bytestream"},
-      {"connection", "upgrade"}, {":scheme", "https"}, {":authority", "foo.lyft.com:80"}};
-
-  void clearExtendedConnectHeaders() {
-    extended_connect_headers_h2_.setMethod("CONNECT");
-    extended_connect_headers_h2_.removeConnection();
-    extended_connect_headers_h2_.removePath();
-    extended_connect_headers_h2_.removeUpgrade();
-  }
-
-  Http::RequestHeaderMap& getRequestHeaderMap() {
-    // TODO(#25290): QUICHE does not support extended CONNECT
-    return downstreamProtocol() == Http::CodecType::HTTP2 ? extended_connect_headers_h2_
-                                                          : connect_headers_h1_;
-  }
+  Http::TestRequestHeaderMapImpl connect_headers_{{":method", "CONNECT"},
+                                                  {":authority", "foo.lyft.com:80"}};
 
   void sendBidirectionalDataAndCleanShutdown() {
     sendBidirectionalData("hello", "hello", "there!", "there!");
@@ -140,9 +121,25 @@ public:
   bool allow_post_{};
 };
 
-TEST_P(ConnectTerminationIntegrationTest, OriginalStyle) {
+// Verify that H/2 extended CONNECT with bytestream protocol is treated like
+// standard CONNECT request
+TEST_P(ConnectTerminationIntegrationTest, ExtendedConnectWithBytestreamProtocol) {
+  if (downstream_protocol_ != Http::CodecType::HTTP2) {
+    // Extended CONNECT is applicable to H/2 and H/3 protocols only
+    // However H/3 codec does not support it yet
+    return;
+  }
   initialize();
-  clearExtendedConnectHeaders();
+
+  connect_headers_.clear();
+  // The client H/2 codec expects the request header map to be in the form of H/1
+  // upgrade to issue an extended CONNECT request
+  connect_headers_.copyFrom(Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                                           {":path", "/"},
+                                                           {"upgrade", "bytestream"},
+                                                           {"connection", "upgrade"},
+                                                           {":scheme", "https"},
+                                                           {":authority", "foo.lyft.com:80"}});
 
   setUpConnection();
   sendBidirectionalDataAndCleanShutdown();
@@ -177,12 +174,9 @@ TEST_P(ConnectTerminationIntegrationTest, BasicAllowPost) {
   initialize();
 
   // Use POST request.
-  connect_headers_h1_.setMethod("POST");
-  connect_headers_h1_.setPath("/");
-  connect_headers_h1_.setScheme("https");
-  extended_connect_headers_h2_.setMethod("POST");
-  extended_connect_headers_h2_.removeUpgrade();
-  extended_connect_headers_h2_.removeConnection();
+  connect_headers_.setMethod("POST");
+  connect_headers_.setPath("/");
+  connect_headers_.setScheme("https");
 
   setUpConnection();
   sendBidirectionalDataAndCleanShutdown();
@@ -191,8 +185,6 @@ TEST_P(ConnectTerminationIntegrationTest, BasicAllowPost) {
 TEST_P(ConnectTerminationIntegrationTest, UsingHostMatch) {
   exact_match_ = true;
   initialize();
-
-  clearExtendedConnectHeaders();
 
   setUpConnection();
   sendBidirectionalDataAndCleanShutdown();
@@ -286,7 +278,7 @@ TEST_P(ConnectTerminationIntegrationTest, BuggyHeaders) {
   // Sending a header-only request is probably buggy, but rather than having a
   // special corner case it is treated as a regular half close.
   codec_client_ = makeHttpConnection(lookupPort("http"));
-  response_ = codec_client_->makeHeaderOnlyRequest(getRequestHeaderMap());
+  response_ = codec_client_->makeHeaderOnlyRequest(connect_headers_);
   // If the connection is established (created, set to half close, and then the
   // FIN arrives), make sure the FIN arrives, and send a FIN from upstream.
   if (fake_upstreams_[0]->waitForRawConnection(fake_raw_upstream_connection_) &&
@@ -417,7 +409,6 @@ protected:
 
 TEST_P(ProxyProtocolConnectTerminationIntegrationTest, SendsProxyProtoHeadersv1) {
   initialize();
-  clearExtendedConnectHeaders();
 
   setUpConnection();
   sendBidirectionalDataAndCleanShutdownWithProxyProtocol();
@@ -426,7 +417,6 @@ TEST_P(ProxyProtocolConnectTerminationIntegrationTest, SendsProxyProtoHeadersv1)
 TEST_P(ProxyProtocolConnectTerminationIntegrationTest, SendsProxyProtoHeadersv2) {
   proxy_protocol_version_ = envoy::config::core::v3::ProxyProtocolConfig::V2;
   initialize();
-  clearExtendedConnectHeaders();
 
   setUpConnection();
   sendBidirectionalDataAndCleanShutdownWithProxyProtocol();
