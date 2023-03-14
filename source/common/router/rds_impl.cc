@@ -22,35 +22,6 @@
 namespace Envoy {
 namespace Router {
 
-namespace {
-
-using namespace envoy::extensions::filters::network::http_connection_manager;
-
-/**
- * Utility function to create a identifier for a RdsRouteConfigProvider. Both the http filters and
- * the RDS config are used to create the identifier.
- */
-uint64_t identifier(const Protobuf::RepeatedPtrField<v3::HttpFilter>& filters, const v3::Rds& rds) {
-  std::string string_content;
-  google::protobuf::io::StringOutputStream stream_content(&string_content);
-
-  {
-    Protobuf::TextFormat::Printer printer;
-    printer.SetExpandAny(true);
-    printer.SetUseFieldNumber(true);
-    printer.SetSingleLineMode(true);
-    printer.SetHideUnknownFields(true);
-    for (const auto& f : filters) {
-      printer.Print(f, &stream_content);
-    }
-    printer.Print(rds, &stream_content);
-  }
-
-  return HashUtil::xxHash64(string_content);
-}
-
-} // namespace
-
 RouteConfigProviderSharedPtr RouteConfigProviderUtil::create(
     const envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
         config,
@@ -262,7 +233,7 @@ Router::RouteConfigProviderSharedPtr RouteConfigProviderManagerImpl::createRdsRo
     const envoy::extensions::filters::network::http_connection_manager::v3::Rds& rds,
     const OptionalHttpFilters& optional_http_filters,
     Server::Configuration::ServerFactoryContext& factory_context, const std::string& stat_prefix,
-    Init::Manager& init_manager, uint64_t identifier) {
+    Init::Manager& init_manager, absl::optional<uint64_t> identifier) {
   auto provider = manager_.addDynamicProvider(
       rds, rds.route_config_name(), init_manager,
       [&optional_http_filters, &factory_context, &rds, &stat_prefix,

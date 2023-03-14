@@ -393,6 +393,8 @@ scope_key_builder:
         ScopedRoutesConfigProviderManagerOptArg(
             scoped_routes_config.name(), scoped_routes_config.rds_config_source(),
             scoped_routes_config.scope_key_builder(), optional_http_filters,
+            Protobuf::RepeatedPtrField<
+                envoy::extensions::filters::network::http_connection_manager::v3::HttpFilter>{},
             MessageUtil::hash(scoped_routes_config.scoped_rds())));
     srds_subscription_ = server_factory_context_.cluster_manager_.subscription_factory_.callbacks_;
   }

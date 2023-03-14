@@ -567,7 +567,8 @@ public:
               (const envoy::extensions::filters::network::http_connection_manager::v3::Rds& rds,
                const OptionalHttpFilters& optional_http_filters,
                Server::Configuration::ServerFactoryContext& factory_context,
-               const std::string& stat_prefix, Init::Manager& init_manager));
+               const std::string& stat_prefix, Init::Manager& init_manager,
+               absl::optional<uint64_t> identifier));
   MOCK_METHOD(RouteConfigProviderPtr, createStaticRouteConfigProvider,
               (const envoy::config::route::v3::RouteConfiguration& route_config,
                const OptionalHttpFilters& optional_http_filters,

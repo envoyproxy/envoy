@@ -65,9 +65,10 @@ ConfigProviderPtr create(
             envoy::config::route::v3::ScopedRouteConfiguration,
             ProtobufTypes::ConstMessagePtrVector>(scoped_route_list.scoped_route_configurations()),
         factory_context,
-        ScopedRoutesConfigProviderManagerOptArg(
-            config.scoped_routes().name(), config.scoped_routes().rds_config_source(),
-            config.scoped_routes().scope_key_builder(), optional_http_filters, 0));
+        ScopedRoutesConfigProviderManagerOptArg(config.scoped_routes().name(),
+                                                config.scoped_routes().rds_config_source(),
+                                                config.scoped_routes().scope_key_builder(),
+                                                optional_http_filters, config.http_filters(), 0));
   }
   case envoy::extensions::filters::network::http_connection_manager::v3::ScopedRoutes::
       ConfigSpecifierCase::kScopedRds:
@@ -77,6 +78,7 @@ ConfigProviderPtr create(
         ScopedRoutesConfigProviderManagerOptArg(
             config.scoped_routes().name(), config.scoped_routes().rds_config_source(),
             config.scoped_routes().scope_key_builder(), optional_http_filters,
+            config.http_filters(),
             MessageUtil::hash({identifier_messages.data(), identifier_messages.size()})));
   case envoy::extensions::filters::network::http_connection_manager::v3::ScopedRoutes::
       ConfigSpecifierCase::CONFIG_SPECIFIER_NOT_SET:
@@ -634,7 +636,8 @@ ConfigProviderPtr ScopedRoutesConfigProviderManager::createXdsConfigProvider(
                 const envoy::extensions::filters::network::http_connection_manager::v3::ScopedRds&>(
                 config_source_proto);
             return std::make_shared<ScopedRdsConfigSubscription>(
-                scoped_rds_config_source, typed_optarg.optional_http_filters_, manager_identifier,
+                scoped_rds_config_source, typed_optarg.http_filters_,
+                typed_optarg.optional_http_filters_, manager_identifier,
                 typed_optarg.scoped_routes_name_, typed_optarg.scope_key_builder_, factory_context,
                 stat_prefix, typed_optarg.rds_config_source_,
                 static_cast<ScopedRoutesConfigProviderManager&>(config_provider_manager)
