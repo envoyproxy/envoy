@@ -112,8 +112,8 @@ build:release-common --config=sizeopt
 # Set default symbols visibility to hidden to reduce .dynstr and the symbol table size
 build:release-common --copt=-fvisibility=hidden
 
-# Disable google_grpc by default
-build --define=google_grpc=disabled
+# Disable google_grpc in production by default
+build:release-common --define=google_grpc=disabled
 
 # Enable automatic extension factory registration for release builds
 build:release-common --define=static_extension_registration=enabled

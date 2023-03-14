@@ -3,7 +3,6 @@ load(
     "envoy_cc_test",
     "envoy_cc_test_library",
     "envoy_package",
-    "envoy_select_google_grpc",
 )
 
 licenses(["notice"])  # Apache 2
@@ -25,10 +24,7 @@ envoy_cc_test(
 
 envoy_cc_test(
     name = "rtds_integration_test",
-    srcs = envoy_select_google_grpc(
-        ["rtds_integration_test.cc"],
-        "@envoy",
-    ),
+    srcs = ["rtds_integration_test.cc"],
     exec_properties = {
         # TODO(willengflow): Remove this once the sandboxNetwork=off works for ipv4 localhost addresses.
         "sandboxNetwork": "standard",
@@ -47,10 +43,7 @@ envoy_cc_test(
 
 envoy_cc_test(
     name = "cds_integration_test",
-    srcs = envoy_select_google_grpc(
-        ["cds_integration_test.cc"],
-        "@envoy",
-    ),
+    srcs = ["cds_integration_test.cc"],
     exec_properties = {
         # TODO(willengflow): Remove this once the sandboxNetwork=off works for ipv4 localhost addresses.
         "sandboxNetwork": "standard",
