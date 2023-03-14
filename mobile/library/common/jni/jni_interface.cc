@@ -1276,7 +1276,7 @@ void configureBuilder(
   }
   std::string native_node_id = getCppString(env, node_id);
   if (!native_node_id.empty()) {
-  builder.setNodeId(native_node_id);
+    builder.setNodeId(native_node_id);
   }
   std::string native_node_region = getCppString(env, node_region);
   if (!native_node_region.empty()) {
