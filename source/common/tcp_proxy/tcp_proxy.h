@@ -242,6 +242,9 @@ public:
         return {};
       }
     }
+    const bool& flushAccessLogOnConnected() const {
+      return flush_access_log_on_connected_;
+    }
 
   private:
     static TcpProxyStats generateStats(Stats::Scope& scope);
@@ -251,6 +254,7 @@ public:
     const Stats::ScopeSharedPtr stats_scope_;
 
     const TcpProxyStats stats_;
+    const bool flush_access_log_on_connected_;
     absl::optional<std::chrono::milliseconds> idle_timeout_;
     absl::optional<std::chrono::milliseconds> max_downstream_connection_duration_;
     absl::optional<std::chrono::milliseconds> access_log_flush_interval_;
@@ -308,6 +312,9 @@ public:
   // This function must not be called if on demand is disabled.
   const OnDemandStats& onDemandStats() const { return shared_config_->onDemandConfig()->stats(); }
   Random::RandomGenerator& randomGenerator() { return random_generator_; }
+  const bool& flushAccessLogOnConnected() const {
+    return shared_config_->flushAccessLogOnConnected();
+  }
 
 private:
   struct SimpleRouteImpl : public Route {

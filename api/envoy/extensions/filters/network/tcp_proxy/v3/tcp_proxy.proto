@@ -218,4 +218,7 @@ message TcpProxy {
   // The interval must be at least 1ms.
   google.protobuf.Duration access_log_flush_interval = 15
       [(validate.rules).duration = {gte {nanos: 1000000}}];
+
+  // If set to true, access log will be flushed when the TCP proxy has established connection with the upstream.
+  bool flush_access_log_on_connected = 16;
 }
