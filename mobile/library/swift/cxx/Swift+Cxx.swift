@@ -5,6 +5,10 @@ import Foundation
 // MARK: - String
 
 extension String {
+  static func fromCXX(_ cxxString: std.string) -> String {
+    return String(cString: cxxString.c_str())
+  }
+
   func toCXX() -> std.string {
     return self.utf8.reduce(into: std.string()) { result, codeUnit in
       result.push_back(Int8(codeUnit))

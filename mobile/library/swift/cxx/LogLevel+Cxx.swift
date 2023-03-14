@@ -25,6 +25,6 @@ extension LogLevel {
 
 extension LogLevel {
   func toCXXDescription() -> String {
-    String(cString: Envoy.Platform.logLevelToString(self.toCXX()).c_str())
+    .fromCXX(Envoy.Platform.logLevelToString(self.toCXX()))
   }
 }

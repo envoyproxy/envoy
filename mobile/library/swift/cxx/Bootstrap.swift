@@ -6,6 +6,10 @@ final class Bootstrap {
   init(ptr: Envoy.CxxSwift.BootstrapPtr) {
     self.ptr = ptr
   }
+
+  var debugDescription: String {
+    .fromCXX(Envoy.CxxSwift.bootstrapDebugDescription(self.ptr))
+  }
 }
 
 extension Envoy.Platform.EngineBuilder {
