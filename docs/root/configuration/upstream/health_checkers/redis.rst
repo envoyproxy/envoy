@@ -34,3 +34,4 @@ The Redis health checker emits some statistics in the *health_check.redis.* name
      :widths: 1, 2
 
      exists_failure, Total number of health check failures caused by EXISTS check failure.
+     
