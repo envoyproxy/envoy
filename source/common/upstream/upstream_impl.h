@@ -111,9 +111,9 @@ public:
   LBPolicyConfig(const envoy::config::cluster::v3::Cluster& config);
 
   template <typename T> OptRef<const T> getConfig() const {
-    if (absl::holds_alternative<std::unique_ptr<const T>>(lbPolicy_)) {
-      if (absl::get<std::unique_ptr<const T>>(lbPolicy_) != nullptr)
-        return *(absl::get<std::unique_ptr<const T>>(lbPolicy_));
+    if (const auto lbPtr = absl::get_if<std::unique_ptr<const T>>(&lbPolicy_); lbPtr) {
+      if (*lbPtr != nullptr)
+        return *(*lbPtr);
       else
         return absl::nullopt;
     } else {
