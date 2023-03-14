@@ -261,6 +261,7 @@
     }
     builder.addStatsSinks(std::move(sinks));
   }
+#ifdef ENVOY_GOOGLE_GRPC
   if (self.nodeRegion != nil) {
     builder.setNodeLocality([self.nodeRegion toCXXString], [self.nodeZone toCXXString],
                             [self.nodeSubZone toCXXString]);
@@ -279,6 +280,7 @@
   if (self.enableCds) {
     builder.addCdsLayer([self.cdsResourcesLocator toCXXString], self.cdsTimeoutSeconds);
   }
+#endif
 #ifdef ENVOY_ADMIN_FUNCTIONALITY
   builder.enableAdminInterface(self.adminInterfaceEnabled);
 #endif

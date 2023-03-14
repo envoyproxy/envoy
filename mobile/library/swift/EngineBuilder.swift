@@ -546,6 +546,7 @@ open class EngineBuilder: NSObject {
     self.virtualClusters.append(contentsOf: virtualClusters)
     return self
   }
+#if ENVOY_GOOGLE_GRPC
 
   /// Sets the node.id field in the Bootstrap configuration.
   ///
@@ -628,6 +629,7 @@ open class EngineBuilder: NSObject {
     self.enableCds = true
     return self
   }
+#endif
 
 #if ENVOY_ADMIN_FUNCTIONALITY
   /// Enable admin interface on 127.0.0.1:9901 address. Admin interface is intended to be

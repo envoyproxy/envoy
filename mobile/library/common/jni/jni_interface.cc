@@ -1270,6 +1270,7 @@ void configureBuilder(
 
   std::vector<std::string> hostnames = javaObjectArrayToStringVector(env, dns_preresolve_hostnames);
   builder.addDnsPreresolveHostnames(hostnames);
+#ifdef ENVOY_GOOGLE_GRPC
   std::string native_rtds_layer_name = getCppString(env, rtds_layer_name);
   if (!native_rtds_layer_name.empty()) {
     builder.addRtdsLayer(native_rtds_layer_name, rtds_timeout_seconds);
@@ -1292,6 +1293,7 @@ void configureBuilder(
   if (enable_cds == JNI_TRUE) {
     builder.addCdsLayer(getCppString(env, cds_resources_locator), cds_timeout_seconds);
   }
+#endif
 }
 
 extern "C" JNIEXPORT jlong JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibrary_createBootstrap(
