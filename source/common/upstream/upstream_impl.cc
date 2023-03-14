@@ -961,8 +961,6 @@ createOptions(const envoy::config::cluster::v3::Cluster& config,
 }
 
 LBPolicyConfig::LBPolicyConfig(const envoy::config::cluster::v3::Cluster& config) {
-  // TODO: Need to verify that lb type and the config for the policy are forced to match in
-  // a 1-1 relationship. If they are, change this to a switch case using config.lb_policy()
   switch (config.lb_config_case()) {
   case envoy::config::cluster::v3::Cluster::kRoundRobinLbConfig:
     lbPolicy_ = std::make_unique<const envoy::config::cluster::v3::Cluster::RoundRobinLbConfig>(
