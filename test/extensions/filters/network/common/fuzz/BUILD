@@ -46,17 +46,11 @@ _readfilter_fuzz_filters = [
     # "envoy.filters.network.tcp_proxy",
 ]
 
-generate_from_template(
-    name = "uber_per_readfilter",
-    filters = _readfilter_fuzz_filters,
-    template_file = "uber_per_readfilter.tmpl.cc",
-)
-
 envoy_cc_test_library(
     name = "uber_readfilter_lib",
     srcs = [
+        "uber_per_readfilter.cc",
         "uber_readfilter.cc",
-        ":uber_per_readfilter.cc",
     ],
     hdrs = ["uber_readfilter.h"],
     deps = [
@@ -106,8 +100,8 @@ generate_from_template(
 envoy_cc_test_library(
     name = "uber_writefilter_lib",
     srcs = [
+        "uber_per_writefilter.cc",
         "uber_writefilter.cc",
-        ":uber_per_writefilter.cc",
     ],
     hdrs = ["uber_writefilter.h"],
     deps = [

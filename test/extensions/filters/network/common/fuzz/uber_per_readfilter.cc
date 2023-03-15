@@ -19,21 +19,12 @@ static const int SecondsPerDay = 86400;
 std::vector<absl::string_view> UberFilterFuzzer::filterNames() {
   // Add filters that are in the process of being or are robust against untrusted downstream
   // traffic.
-  static const std::vector<std::string> supported_filter_names = {{{FILTERS}}};
   static std::vector<absl::string_view> filter_names;
   if (filter_names.empty()) {
-    const auto factories = Registry::FactoryRegistry<
-        Server::Configuration::NamedNetworkFilterConfigFactory>::factories();
-    // Check whether each filter is loaded into Envoy.
-    // Some customers build Envoy without some filters. When they run fuzzing, the use of a filter
-    // that does not exist will cause fatal errors.
-    for (auto& filter_name : supported_filter_names) {
-      if (factories.contains(filter_name)) {
-        filter_names.push_back(filter_name);
-      } else {
-        ENVOY_LOG_MISC(debug, "Filter name not found in the factory: {}", filter_name);
-      }
-    }
+    // Only use the names of the filters that are compiled into envoy. The build system takes care
+    // about reducing these to the allowed set.
+    filter_names = Registry::FactoryRegistry<
+        Server::Configuration::NamedNetworkFilterConfigFactory>::registeredNames();
   }
   return filter_names;
 }
