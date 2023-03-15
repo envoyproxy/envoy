@@ -33,7 +33,7 @@ TCP Proxy
 * Access log after upstream connection can be enabled using :ref:`flush access log on connected <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.flush_access_log_on_connected>`
 
 HTTP Connection Manager
-*********
+***********************
 
 * Periodic access logs can be anbled using :ref:`access log flush interval <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.access_log_flush_interval>`
 
