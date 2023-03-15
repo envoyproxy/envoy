@@ -144,11 +144,12 @@ build:coverage --instrumentation_filter="//library/common[/:]"
 # GITHUB_TOKEN auth) so we have to override it to 'false' here.
 build:remote-ci-common --config=remote
 build:remote-ci-common --auth_enabled=false
+build:remote-ci-common --remote_cache=grpcs://envoy.cluster.engflow.com
 build:remote-ci-common --remote_executor=grpcs://envoy.cluster.engflow.com
 build:remote-ci-common --bes_backend=grpcs://envoy.cluster.engflow.com/
 build:remote-ci-common --bes_results_url=https://envoy.cluster.engflow.com/invocation/
+build:remote-ci-common --experimental_credential_helper=%workspace%/bazel/engflow-bazel-credential-helper.sh
 build:remote-ci-common --bes_lifecycle_events
-build:remote-ci-common --bes_upload_mode=fully_async
 build:remote-ci-common --jobs=40
 build:remote-ci-common --verbose_failures
 build:remote-ci-common --spawn_strategy=remote,sandboxed,local
