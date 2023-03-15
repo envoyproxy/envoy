@@ -52,7 +52,7 @@ public:
                                                   const std::string& route_config_name,
                                                   Init::Manager& init_manager,
                                                   RouteConfigProviderCb provider_cb,
-                                                  absl::optional<uint64_t> identifier);
+                                                  absl::optional<uint64_t> identifier = {});
 
 private:
   // TODO(jsedgwick) These two members are prime candidates for the owned-entry list/map
