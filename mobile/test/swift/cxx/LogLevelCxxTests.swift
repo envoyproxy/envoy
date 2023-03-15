@@ -1,5 +1,4 @@
 @testable import Envoy
-@_implementationOnly import EnvoyCxxSwiftInterop
 import XCTest
 
 final class LogLevelCxxTests: XCTestCase {
