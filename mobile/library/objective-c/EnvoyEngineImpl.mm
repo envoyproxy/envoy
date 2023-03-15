@@ -610,11 +610,10 @@ static void ios_track_event(envoy_map map, const void *context) {
 - (void)logException:(NSException *)exception {
   NSLog(@"[Envoy] exception caught: %@", exception);
 
-  NSString *message = [NSString stringWithFormat:@"%@;%@;%@",
-                       exception.name, exception.reason, exception.callStackSymbols.description];
-  ENVOY_LOG_EVENT_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::misc),
-                            error, "handled_cxx_exception",
-                            [message UTF8String]);
+  NSString *message = [NSString stringWithFormat:@"%@;%@;%@", exception.name, exception.reason,
+                                                 exception.callStackSymbols.description];
+  ENVOY_LOG_EVENT_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::misc), error,
+                            "handled_cxx_exception", [message UTF8String]);
 
   [NSNotificationCenter.defaultCenter postNotificationName:@"EnvoyError" object:exception];
 }
