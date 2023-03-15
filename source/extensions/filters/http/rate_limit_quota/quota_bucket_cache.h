@@ -62,7 +62,6 @@ struct Bucket {
   // TODO(tyxia) Consider remove them!!!
   // UsageReport usage;
   // TODO(tyxia) Also stores bucketId in its element.
-  BucketId id;
   BucketQuotaUsage quota_usage;
 };
 

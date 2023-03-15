@@ -61,13 +61,9 @@ Http::FilterHeadersStatus RateLimitQuotaFilter::decodeHeaders(Http::RequestHeade
     // Create the gRPC client.
     new_bucket.rate_limit_client_ = createRateLimitClient(
         factory_context_, config_->rlqs_server(), *this, quota_buckets_, quota_usage_reports_);
-    std::cout << "hahaha1" << std::endl;
-    if (new_bucket.rate_limit_client_ == nullptr) {
-      std::cout << "nullptr" << std::endl;
-    }
+    // TODO(tyxia) nullptr check.
     // Start the streaming on the first request.
     auto status = new_bucket.rate_limit_client_->startStream(callbacks_->streamInfo());
-    std::cout << "hahaha2" << std::endl;
     if (!status.ok()) {
       ENVOY_LOG(error, "Failed to start the gRPC stream: ", status.message());
       return Envoy::Http::FilterHeadersStatus::Continue;
@@ -102,8 +98,45 @@ Http::FilterHeadersStatus RateLimitQuotaFilter::decodeHeaders(Http::RequestHeade
     // filters following.
     return Http::FilterHeadersStatus::StopAllIterationAndWatermark;
   } else {
+    // TODO(tyxia) consider move to a new function. reduce the function length multiple places.
     // Found the cached bucket entry.
+    // First, get the cached bucket action from the RLQS server.
+    if (quota_buckets_[bucket_id].bucket_action.has_quota_assignment_action()) {
+      auto rate_limit_strategy =
+          quota_buckets_[bucket_id].bucket_action.quota_assignment_action().rate_limit_strategy();
+      switch (rate_limit_strategy.strategy_case()) {
+      case RateLimitStrategy::StrategyCase::kBlanketRule: {
+      }
+      case RateLimitStrategy::StrategyCase::kRequestsPerTimeUnit: {
+        if (quota_buckets_[bucket_id].quota_usage.num_requests_allowed() <
+            rate_limit_strategy.requests_per_time_unit().requests_per_time_unit()) {
+
+            }
+      }
+
+      case RateLimitStrategy::StrategyCase::kTokenBucket: {
+        // // TODO(tyxia) Look into token bucket algortihm.
+        // // Token bucket ratelimiter 1)google3/third_party/envoy/src/source/extensions/filters/common/local_ratelimit/local_ratelimit_impl.cc
+        // // 2)google3/dos/quotas/bouncer/client/internal/rate_limiter/token_bucket_rate_limiter.cc
+
+        // // Maybe have token_bucket_rate_limiter class
+        // auto token_bucket = rate_limit_strategy.token_bucket();
+        // uint32_t max_tokens = token_bucket.max_tokens();
+        // uint32_t tokens_per_fill = token_bucket.tokens_per_fill().value();
+        // // TODO(tyxia) Need to implement requestAllowedHelper
+        // // https://source.corp.google.com/piper///depot/google3/third_party/envoy/src/source/extensions/filters/common/local_ratelimit/local_ratelimit_impl.cc;rcl=508241966;l=168
+      }
+      case RateLimitStrategy::StrategyCase::STRATEGY_NOT_SET: {
+        PANIC_DUE_TO_PROTO_UNSET;
+      }
+        PANIC_DUE_TO_CORRUPT_ENUM;
+      }
+    } else {
+
+    }
   }
+  // Get the quota usage info.
+  // quota_buckets_[bucket_id].quota_usage;
   return Envoy::Http::FilterHeadersStatus::Continue;
 }
 
