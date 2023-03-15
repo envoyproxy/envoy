@@ -222,6 +222,7 @@ public:
                  Server::Configuration::FactoryContext& context);
     const TcpProxyStats& stats() { return stats_; }
     const absl::optional<std::chrono::milliseconds>& idleTimeout() { return idle_timeout_; }
+    const bool& flushAccessLogOnConnected() const { return flush_access_log_on_connected_; }
     const absl::optional<std::chrono::milliseconds>& maxDownstreamConnectionDuration() const {
       return max_downstream_connection_duration_;
     }
@@ -241,9 +242,6 @@ public:
       } else {
         return {};
       }
-    }
-    const bool& flushAccessLogOnConnected() const {
-      return flush_access_log_on_connected_;
     }
 
   private:
