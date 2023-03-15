@@ -616,7 +616,7 @@ static void ios_track_event(envoy_map map, const void *context) {
                             error, "handled_cxx_exception",
                             [message UTF8String]);
 
-  [NSNotificationCenter.defaultCenter postNotificationName:@"EnvoyError" object:self];
+  [NSNotificationCenter.defaultCenter postNotificationName:@"EnvoyError" object:exception];
 }
 
 @end
