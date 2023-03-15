@@ -18,7 +18,6 @@ namespace Matcher {
 
 using ::Envoy::Matcher::DataAvailability;
 using ::Envoy::Matcher::DataInputFactoryCb;
-using ::Envoy::Matcher::DataInputGetResult;
 using ::Envoy::Matcher::DataInputPtr;
 using ::Envoy::Matcher::evaluateMatch;
 using ::Envoy::Matcher::MatchState;
