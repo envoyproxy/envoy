@@ -184,6 +184,10 @@ new_features:
 - area: tcp_proxy
   change: |
     added an option to dynamically disable TCP tunneling even if set in the filter config, by setting a filter state object for the key ``envoy.tcp_proxy.disable_tunneling``.
+- area: tcp_proxy
+  change: |
+    add :ref:`flush access log on connected <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.flush_access_log_on_connected>` to allow flushing access log state
+    after a connection has established with the upstream.
 - area: http
   change: |
     add :ref:`periodic access logging <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.access_log_flush_interval>`

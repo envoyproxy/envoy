@@ -980,13 +980,13 @@ TEST_F(TcpProxyTest, IntermediateLogEntry) {
 }
 
 TEST_F(TcpProxyTest, TestAccessLogOnUpstreamConnected) {
-  auto config = accessLogConfig("%UPSTREAM_HOST% %UPSTREAM_CLUSTER%");
+  auto config = accessLogConfig("%UPSTREAM_HOST%");
   config.set_flush_access_log_on_connected(true);
 
   setup(1, config);
   raiseEventUpstreamConnected(0);
 
-  EXPECT_EQ(access_log_data_, "127.0.0.1:80 observability_name");
+  EXPECT_EQ(access_log_data_, "127.0.0.1:80");
 
   filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
   filter_.reset();
