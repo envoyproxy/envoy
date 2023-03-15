@@ -84,7 +84,7 @@ void EnvoyQuicServerStream::encodeData(Buffer::Instance& data, bool end_stream) 
   SendBufferMonitor::ScopedWatermarkBufferUpdater updater(this, this);
   if (capsule_protocol_handler_) {
     IncrementalBytesSentTracker tracker(*this, *mutableBytesMeter(), false);
-    if (!capsule_protocol_handler_->encodeCapsule(data.toString(), end_stream)) {
+    if (!capsule_protocol_handler_->encodeCapsuleFragment(data.toString(), end_stream)) {
       Reset(quic::QUIC_BAD_APPLICATION_PAYLOAD);
       return;
     }
@@ -477,6 +477,7 @@ bool EnvoyQuicServerStream::hasPendingData() {
 
 void EnvoyQuicServerStream::enableCapsuleProtocol() {
   capsule_protocol_handler_ = std::make_unique<CapsuleProtocolHandler>(this);
+  ASSERT(request_decoder_ != nullptr);
   capsule_protocol_handler_->setStreamDecoder(request_decoder_);
 }
 

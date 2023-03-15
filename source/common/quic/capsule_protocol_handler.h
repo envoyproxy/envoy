@@ -28,22 +28,25 @@ public:
   // quic::QuicSpdyStream::Http3DatagramVisitor
   // Normalizes HTTP/3 Datagrams to Capsules for Envoy to do subsequent processing.
   void OnHttp3Datagram(quic::QuicStreamId stream_id, absl::string_view payload) override;
-  // TODO(jeongseokson): Add a handler function to forward Capsules with an unknown type once the
-  // QUICHE library gets updated.
+  void OnUnknownCapsule(quic::QuicStreamId stream_id,
+                        const quiche::UnknownCapsule& capsule) override;
 
   // quiche::CapsuleParser::Visitor
   // Converts a given Capsule to a HTTP/3 Datagrams and send it.
   bool OnCapsule(const quiche::Capsule& capsule) override;
   void OnCapsuleParseFailure(absl::string_view error_message) override;
 
-  // Re-encodes given Capsule data into an HTTP/3 Datagram. Returns true if an HTTP/3 Datagram is
-  // encoded and sent successfully. Returns false if the CapsuleParser fails to parse the
-  // |capsule_data| or the corresponding stream fails to send the Datagram.
-  bool encodeCapsule(absl::string_view capsule_data, bool end_stream);
+  // Re-encodes given Capsule fragment into an HTTP/3 Datagram. Returns true if an HTTP/3 Datagram
+  // created and sent successfully. Returns false if the CapsuleParser fails to parse the
+  // |capsule_fragment| or the corresponding stream fails to send the Datagram.
+  bool encodeCapsuleFragment(absl::string_view capsule_fragment, bool end_stream);
   // Does not take ownership of the StreamDecoder. "decoder" must outlive CapsuleProtocolHandler.
   void setStreamDecoder(Http::StreamDecoder* decoder) { stream_decoder_ = decoder; }
 
 private:
+  // Serializes and decodes a given Capsule.
+  void decodeCapsule(const quiche::Capsule& capsule);
+
   quic::QuicSpdyStream* const stream_; // not owned, can't be null.
   quiche::CapsuleParser capsule_parser_{this};
   quiche::SimpleBufferAllocator capsule_buffer_allocator_;
