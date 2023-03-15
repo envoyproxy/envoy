@@ -29,13 +29,13 @@ at the beginning of a TCP stream.
 TCP Proxy
 *********
 
-* Periodic access logs can be anbled using :ref:`access log flush interval <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.access_log_flush_interval>`
+* Periodic access logs can be enabled using :ref:`access log flush interval <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.access_log_flush_interval>`
 * Access log after upstream connection can be enabled using :ref:`flush access log on connected <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.flush_access_log_on_connected>`
 
 HTTP Connection Manager
 ***********************
 
-* Periodic access logs can be anbled using :ref:`access log flush interval <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.access_log_flush_interval>`
+* Periodic access logs can be enabled using :ref:`access log flush interval <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.access_log_flush_interval>`
 
 .. _arch_overview_access_log_filters:
 
