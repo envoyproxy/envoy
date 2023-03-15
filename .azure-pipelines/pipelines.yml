@@ -159,6 +159,7 @@ stages:
         path: $(Build.StagingDirectory)/repository_cache
       continueOnError: true
 
+    - script: .azure-pipelines/load-local-docker.sh
     - script: ci/run_envoy_docker.sh 'ci/do_ci.sh format'
       workingDirectory: $(Build.SourcesDirectory)
       env:
@@ -190,6 +191,7 @@ stages:
         path: $(Build.StagingDirectory)/repository_cache
       continueOnError: true
 
+    - script: .azure-pipelines/load-local-docker.sh
     - script: ci/run_envoy_docker.sh 'ci/check_and_fix_format.sh'
       workingDirectory: $(Build.SourcesDirectory)
       env:
@@ -221,6 +223,7 @@ stages:
         path: $(Build.StagingDirectory)/repository_cache
       continueOnError: true
 
+    - script: .azure-pipelines/load-local-docker.sh
     - script: ci/run_envoy_docker.sh 'ci/do_ci.sh docs'
       workingDirectory: $(Build.SourcesDirectory)
       env:
@@ -242,6 +245,7 @@ stages:
         GCP_SERVICE_ACCOUNT_KEY: $(GcpServiceAccountKey)
         GCS_ARTIFACT_BUCKET: $(GcsArtifactBucket)
 
+  - script: .azure-pipelines/load-local-docker.sh
   - job: dependencies
     # displayName: Dependency checks
     dependsOn: []  # this removes the implicit dependency on previous stage and causes this to run in parallel.
