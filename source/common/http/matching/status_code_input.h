@@ -108,7 +108,7 @@ class HttpResponseStatusCodeClassInputFactory
           envoy::type::matcher::v3::HttpResponseStatusCodeClassMatchInput> {
 public:
   explicit HttpResponseStatusCodeClassInputFactory()
-      : HttpResponseStatusCodeInputFactoryBase("status_code_class_input") = default;
+      : HttpResponseStatusCodeInputFactoryBase("status_code_class_input") {}
 };
 
 } // namespace Matching
