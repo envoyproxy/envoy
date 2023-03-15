@@ -79,6 +79,7 @@ jobs:
             --test_output=all \
             --build_tests_only \
             --config test-android \
+            --define envoy_mobile_listener=enabled \
             $([ -z $GITHUB_TOKEN ] || echo "--config=remote-ci-macos") \
             --remote_header="Authorization=Bearer $GITHUB_TOKEN" \
             --define=signal_trace=disabled \
