@@ -29,6 +29,7 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
         cd mobile && ./bazelw test \
+            --build_tests_only \
             --action_env=LD_LIBRARY_PATH \
             --test_env=ENVOY_IP_TEST_VERSIONS=v4only \
             --test_output=all \

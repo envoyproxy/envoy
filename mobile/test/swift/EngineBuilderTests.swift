@@ -425,7 +425,7 @@ final class EngineBuilderTests: XCTestCase {
     XCTAssertTrue(bootstrapDebugDescription.contains("FAKE_SWIFT_ADDRESS"))
   }
 
-  func testDefaultValues() {
+  func testXDSDefaultValues() {
     // rtds, ads, node_id, node_locality
     let bootstrapDebugDescription = EngineBuilder()
       .addEngineType(MockEnvoyEngine.self)
@@ -436,7 +436,7 @@ final class EngineBuilderTests: XCTestCase {
     XCTAssertFalse(bootstrapDebugDescription.contains("locality:"))
   }
 
-  func testCustomnodeID() {
+  func testCustomNodeID() {
     let bootstrapDebugDescription = EngineBuilder()
       .addEngineType(MockEnvoyEngine.self)
       .setNodeID("SWIFT_TEST_NODE_ID")
