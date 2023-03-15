@@ -1,5 +1,6 @@
 load(
     "//bazel:envoy_build_system.bzl",
+    "envoy_cc_mock",
     "envoy_cc_test",
     "envoy_contrib_package",
 )
@@ -17,5 +18,14 @@ envoy_cc_test(
     deps = [
         "//contrib/golang/filters/http/source/common/dso:dso_lib",
         "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_mock(
+    name = "dso_mocks",
+    srcs = ["mocks.cc"],
+    hdrs = ["mocks.h"],
+    deps = [
+        "//contrib/golang/filters/http/source/common/dso:dso_lib",
     ],
 )

@@ -504,6 +504,15 @@ envoy.filters.http.stateful_session:
   type_urls:
   - envoy.extensions.filters.http.stateful_session.v3.StatefulSession
   - envoy.extensions.filters.http.stateful_session.v3.StatefulSessionPerRoute
+envoy.filters.http.header_mutation:
+  categories:
+  - envoy.filters.http
+  - envoy.filters.http.upstream
+  security_posture: unknown
+  status: alpha
+  type_urls:
+  - envoy.extensions.filters.http.header_mutation.v3.HeaderMutation
+  - envoy.extensions.filters.http.header_mutation.v3.HeaderMutationPerRoute
 envoy.filters.listener.http_inspector:
   categories:
   - envoy.filters.listener
@@ -511,6 +520,13 @@ envoy.filters.listener.http_inspector:
   status: stable
   type_urls:
   - envoy.extensions.filters.listener.http_inspector.v3.HttpInspector
+envoy.filters.listener.local_ratelimit:
+  categories:
+  - envoy.filters.listener
+  security_posture: robust_to_untrusted_downstream
+  status: stable
+  type_urls:
+  - envoy.extensions.filters.listener.local_ratelimit.v3.LocalRateLimit
 envoy.filters.listener.original_dst:
   categories:
   - envoy.filters.listener

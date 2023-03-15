@@ -58,7 +58,15 @@ type StreamEncoderFilter interface {
 // refer https://github.com/envoyproxy/envoy/blob/main/envoy/stream_info/stream_info.h
 type StreamInfo interface {
 	GetRouteName() string
-	// TODO add more for stream info
+	FilterChainName() string
+	// Protocol return the request's protocol.
+	Protocol() (string, bool)
+	// ResponseCode return the response code.
+	ResponseCode() (uint32, bool)
+	// ResponseCodeDetails return the response code details.
+	ResponseCodeDetails() (string, bool)
+	// AttemptCount return the number of times the request was attempted upstream.
+	AttemptCount() uint32
 }
 
 type StreamFilterCallbacks interface {

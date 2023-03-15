@@ -12,7 +12,6 @@ import io.envoyproxy.envoymobile.ResponseHeaders;
 import io.envoyproxy.envoymobile.ResponseTrailers;
 import io.envoyproxy.envoymobile.Stream;
 import io.envoyproxy.envoymobile.StreamIntel;
-import io.envoyproxy.envoymobile.UpstreamHttpProtocol;
 import io.envoyproxy.envoymobile.engine.AndroidJniLibrary;
 import java.net.MalformedURLException;
 import java.net.URL;
@@ -53,11 +52,10 @@ public final class RequestScenario {
     RequestHeadersBuilder requestHeadersBuilder =
         new RequestHeadersBuilder(method, url.getProtocol(), url.getAuthority(), url.getPath());
     headers.forEach(entry -> requestHeadersBuilder.add(entry.getKey(), entry.getValue()));
-    // HTTP1 is the only way to send HTTP requests (not HTTPS)
     if (trafficStatsUid != 0) {
       requestHeadersBuilder.addSocketTag(trafficStatsUid, trafficStatsTag);
     }
-    return requestHeadersBuilder.addUpstreamHttpProtocol(UpstreamHttpProtocol.HTTP1).build();
+    return requestHeadersBuilder.build();
   }
 
   public List<ByteBuffer> getBodyChunks() {

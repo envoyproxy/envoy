@@ -94,12 +94,23 @@ func (h *httpHeaderMap) Set(key, value string) {
 	if h.isTrailer {
 		cAPI.HttpSetTrailer(unsafe.Pointer(h.request.req), &key, &value)
 	} else {
-		cAPI.HttpSetHeader(unsafe.Pointer(h.request.req), &key, &value)
+		cAPI.HttpSetHeader(unsafe.Pointer(h.request.req), &key, &value, false)
 	}
 }
 
 func (h *httpHeaderMap) Add(key, value string) {
-	panic("unsupported yet")
+	if h.headers != nil {
+		if hdrs, found := h.headers[key]; found {
+			h.headers[key] = append(hdrs, value)
+		} else {
+			h.headers[key] = []string{value}
+		}
+	}
+	if h.isTrailer {
+		panic("unsupported yet")
+	} else {
+		cAPI.HttpSetHeader(unsafe.Pointer(h.request.req), &key, &value, true)
+	}
 }
 
 func (h *httpHeaderMap) Del(key string) {
@@ -117,7 +128,13 @@ func (h *httpHeaderMap) Del(key string) {
 }
 
 func (h *httpHeaderMap) Range(f func(key, value string) bool) {
-	panic("unsupported yet")
+	for key, values := range h.headers {
+		for _, value := range values {
+			if !f(key, value) {
+				return
+			}
+		}
+	}
 }
 
 // ByteSize return size of HeaderMap

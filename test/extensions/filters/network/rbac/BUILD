@@ -31,6 +31,7 @@ envoy_extension_cc_test(
         "//source/extensions/filters/common/rbac:utility_lib",
         "//source/extensions/filters/network:well_known_names",
         "//source/extensions/filters/network/rbac:rbac_filter",
+        "//source/extensions/matching/network/common:inputs_lib",
         "//test/mocks/network:network_mocks",
         "//test/mocks/server:factory_context_mocks",
         "@envoy_api//envoy/config/rbac/v3:pkg_cc_proto",

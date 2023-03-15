@@ -32,8 +32,8 @@ needed to correlate the span with other related spans (e.g., the trace ID).
 One of the most important benefits of tracing from Envoy is that it will take care of
 propagating the traces to the Jaeger service cluster. However, in order to fully take advantage
 of tracing, the application has to propagate trace headers that Envoy generates, while making
-calls to other services. In the sandbox we have provided, the simple flask app
-(see trace function in :download:`examples/shared/tracing/service.py <_include/shared/tracing/service.py>`) acting as service1 propagates
+calls to other services. In the sandbox we have provided, the simple ``aiohttp`` app
+(see trace function in :download:`examples/shared/python/tracing/service.py <_include/shared/python/tracing/service.py>`) acting as service1 propagates
 the trace headers while making an outbound call to service2.
 
 Step 1: Build the sandbox
@@ -45,9 +45,9 @@ To build this sandbox example, and start the example apps run the following comm
 
     $ pwd
     envoy/examples/jaeger-tracing
-    $ docker-compose pull
-    $ docker-compose up --build -d
-    $ docker-compose ps
+    $ docker compose pull
+    $ docker compose up --build -d
+    $ docker compose ps
 
                 Name                          Command             State                                    Ports
     ----------------------------------------------------------------------------------------------------------------------------------------------------------------------

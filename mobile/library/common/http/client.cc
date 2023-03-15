@@ -673,7 +673,6 @@ void Client::removeStream(envoy_stream_t stream_handle) {
 namespace {
 
 const LowerCaseString ClusterHeader{"x-envoy-mobile-cluster"};
-const LowerCaseString LegacyProtocolHeader{"x-envoy-mobile-upstream-protocol"};
 
 const char* BaseCluster = "base";
 const char* ClearTextCluster = "base_clear";
@@ -689,11 +688,6 @@ void Client::setDestinationCluster(Http::RequestHeaderMap& headers) {
     cluster = ClearTextCluster;
   } else {
     cluster = BaseCluster;
-  }
-
-  auto protocol_header = headers.get(LegacyProtocolHeader);
-  if (!protocol_header.empty()) {
-    headers.remove(LegacyProtocolHeader);
   }
 
   headers.addCopy(ClusterHeader, std::string{cluster});
