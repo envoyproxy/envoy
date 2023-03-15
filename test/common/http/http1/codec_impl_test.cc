@@ -88,19 +88,15 @@ protected:
   Http1CodecTestBase() : parser_impl_(GetParam()) {}
 
   void SetUp() override {
-    if (parser_impl_ == Http1ParserImpl::BalsaParser) {
-      scoped_runtime_.mergeValues({{"envoy.reloadable_features.http1_use_balsa_parser", "true"}});
-    } else {
-      scoped_runtime_.mergeValues({{"envoy.reloadable_features.http1_use_balsa_parser", "false"}});
-    }
+    codec_settings_.use_balsa_parser_ = (parser_impl_ == Http1ParserImpl::BalsaParser);
   }
 
   Http::Http1::CodecStats& http1CodecStats() {
     return Http::Http1::CodecStats::atomicGet(http1_codec_stats_, *store_.rootScope());
   }
 
-  TestScopedRuntime scoped_runtime_;
   const Http1ParserImpl parser_impl_;
+  NiceMock<Http1Settings> codec_settings_;
   Stats::TestUtil::TestStore store_;
   Http::Http1::CodecStats::AtomicPtr http1_codec_stats_;
 };
@@ -122,7 +118,6 @@ public:
 
   NiceMock<Network::MockConnection> connection_;
   NiceMock<Http::MockServerConnectionCallbacks> callbacks_;
-  NiceMock<Http1Settings> codec_settings_;
   Http::ServerConnectionPtr codec_;
 
   void expectHeadersTest(Protocol p, bool allow_absolute_url, Buffer::OwnedImpl& buffer,
@@ -1345,11 +1340,10 @@ TEST_P(Http1ServerConnectionImplTest, HeaderInvalidCharsRejection) {
         response_encoder = &encoder;
         return decoder;
       }));
-  Buffer::OwnedImpl buffer(absl::StrCat(
-      "GET / HTTP/1.1\r\nHOST: h.com\r\nfoo: ", std::string(1, 3), "\r\n",
-      // TODO(#21245): Fix BalsaParser to process headers before final "\r\n".
-      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.http1_use_balsa_parser") ? "\r\n"
-                                                                                         : ""));
+  Buffer::OwnedImpl buffer(
+      absl::StrCat("GET / HTTP/1.1\r\nHOST: h.com\r\nfoo: ", std::string(1, 3), "\r\n",
+                   // TODO(#21245): Fix BalsaParser to process headers before final "\r\n".
+                   parser_impl_ == Http1ParserImpl::BalsaParser ? "\r\n" : ""));
   EXPECT_CALL(decoder, sendLocalReply(_, _, _, _, _));
   auto status = codec_->dispatch(buffer);
   EXPECT_TRUE(isCodecProtocolError(status));
@@ -1510,8 +1504,7 @@ TEST_P(Http1ServerConnectionImplTest, HeaderMutateEmbeddedNul) {
     Buffer::OwnedImpl buffer(absl::StrCat(
         example_input.substr(0, n), absl::string_view("\0", 1), example_input.substr(n),
         // TODO(#21245): Fix BalsaParser to process headers before final "\r\n".
-        Runtime::runtimeFeatureEnabled("envoy.reloadable_features.http1_use_balsa_parser") ? "\r\n"
-                                                                                           : ""));
+        parser_impl_ == Http1ParserImpl::BalsaParser ? "\r\n" : ""));
     EXPECT_CALL(decoder, sendLocalReply(_, _, _, _, _));
     auto status = codec_->dispatch(buffer);
     EXPECT_FALSE(status.ok()) << n;
@@ -2442,7 +2435,6 @@ public:
 
   NiceMock<Network::MockConnection> connection_;
   NiceMock<Http::MockConnectionCallbacks> callbacks_;
-  NiceMock<Http1Settings> codec_settings_;
   Http::ClientConnectionPtr codec_;
 
   void testClientAllowChunkedContentLength(uint32_t content_length, bool allow_chunked_length);

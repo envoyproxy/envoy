@@ -9,8 +9,7 @@ export MANUAL=true
 
 
 run_log "Generate protocol stubs"
-"$DOCKER_COMPOSE" -f docker-compose-protos.yaml up
-docker rm grpc-bridge_stubs_go_1 grpc-bridge_stubs_python_1
+"${DOCKER_COMPOSE[@]}" -f docker-compose-protos.yaml up --quiet-pull --build
 
 ls client/kv/kv_pb2.py
 ls server/kv/kv.pb.go
@@ -18,7 +17,7 @@ ls server/kv/kv.pb.go
 bring_up_example
 
 run_log "Set key value foo=bar"
-"$DOCKER_COMPOSE" exec -T grpc-client /client/grpc-kv-client.py set foo bar | grep setf
+"${DOCKER_COMPOSE[@]}" exec -T grpc-client /client/grpc-kv-client.py set foo bar | grep setf
 
 run_log "Get key foo"
-"$DOCKER_COMPOSE" exec -T grpc-client /client/grpc-kv-client.py get foo | grep bar
+"${DOCKER_COMPOSE[@]}" exec -T grpc-client /client/grpc-kv-client.py get foo | grep bar

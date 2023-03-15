@@ -225,11 +225,13 @@ void ActiveQuicListener::closeConnectionsWithFilterChain(const Network::FilterCh
 
 ActiveQuicListenerFactory::ActiveQuicListenerFactory(
     const envoy::config::listener::v3::QuicProtocolOptions& config, uint32_t concurrency,
-    QuicStatNames& quic_stat_names, ProtobufMessage::ValidationVisitor& validation_visitor)
+    QuicStatNames& quic_stat_names, ProtobufMessage::ValidationVisitor& validation_visitor,
+    ProcessContextOptRef context)
     : concurrency_(concurrency), enabled_(config.enabled()), quic_stat_names_(quic_stat_names),
       packets_to_read_to_connection_count_ratio_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, packets_to_read_to_connection_count_ratio,
-                                          DEFAULT_PACKETS_TO_READ_PER_CONNECTION)) {
+                                          DEFAULT_PACKETS_TO_READ_PER_CONNECTION)),
+      context_(context) {
   const int64_t idle_network_timeout_ms =
       config.has_idle_timeout() ? DurationUtil::durationToMilliseconds(config.idle_timeout())
                                 : 300000;
@@ -298,7 +300,7 @@ ActiveQuicListenerFactory::ActiveQuicListenerFactory(
             *Config::Utility::translateToFactoryConfig(config.server_preferred_address_config(),
                                                        validation_visitor,
                                                        server_preferred_address_config_factory),
-            validation_visitor);
+            validation_visitor, context_);
   }
 
 #if defined(SO_ATTACH_REUSEPORT_CBPF) && defined(__linux__)

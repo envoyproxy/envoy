@@ -227,13 +227,14 @@ EngineBuilder& EngineBuilder::setNodeId(std::string node_id) {
   return *this;
 }
 
-EngineBuilder& EngineBuilder::setNodeLocality(const NodeLocality& node_locality) {
-  node_locality_ = node_locality;
+EngineBuilder& EngineBuilder::setNodeLocality(std::string region, std::string zone,
+                                              std::string sub_zone) {
+  node_locality_ = {region, zone, sub_zone};
   return *this;
 }
 
-EngineBuilder& EngineBuilder::setAggregatedDiscoveryService(const std::string& address,
-                                                            const int port, std::string jwt_token,
+EngineBuilder& EngineBuilder::setAggregatedDiscoveryService(std::string address, const int port,
+                                                            std::string jwt_token,
                                                             const int jwt_token_lifetime_seconds,
                                                             std::string ssl_root_certs) {
 #ifndef ENVOY_GOOGLE_GRPC
@@ -242,15 +243,15 @@ EngineBuilder& EngineBuilder::setAggregatedDiscoveryService(const std::string& a
   ads_address_ = address;
   ads_port_ = port;
   ads_jwt_token_ = std::move(jwt_token);
-  ads_jwt_token_lifetime_seconds_ = jwt_token_lifetime_seconds;
+  ads_jwt_token_lifetime_seconds_ =
+      jwt_token_lifetime_seconds == 0 ? DefaultJwtTokenLifetimeSeconds : jwt_token_lifetime_seconds;
   ads_ssl_root_certs_ = std::move(ssl_root_certs);
   return *this;
 }
 
-EngineBuilder& EngineBuilder::addRtdsLayer(const std::string& layer_name,
-                                           const int timeout_seconds) {
-  rtds_layer_name_ = layer_name;
-  rtds_timeout_seconds_ = timeout_seconds;
+EngineBuilder& EngineBuilder::addRtdsLayer(std::string layer_name, const int timeout_seconds) {
+  rtds_layer_name_ = std::move(layer_name);
+  rtds_timeout_seconds_ = timeout_seconds == 0 ? DefaultXdsTimeout : timeout_seconds;
   return *this;
 }
 
@@ -258,7 +259,7 @@ EngineBuilder& EngineBuilder::addCdsLayer(std::string cds_resources_locator,
                                           const int timeout_seconds) {
   enable_cds_ = true;
   cds_resources_locator_ = std::move(cds_resources_locator);
-  cds_timeout_seconds_ = timeout_seconds;
+  cds_timeout_seconds_ = timeout_seconds == 0 ? DefaultXdsTimeout : timeout_seconds;
   return *this;
 }
 
@@ -351,16 +352,16 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
       auto* direct_response_headers = direct_response_route_match->add_headers();
       direct_response_headers->set_name(header.name);
       switch (header.mode) {
-      case DirectResponseTesting::contains:
+      case DirectResponseTesting::MatchMode::Contains:
         direct_response_headers->set_contains_match(header.value);
         break;
-      case DirectResponseTesting::exact:
+      case DirectResponseTesting::MatchMode::Exact:
         direct_response_headers->set_exact_match(header.value);
         break;
-      case DirectResponseTesting::prefix:
+      case DirectResponseTesting::MatchMode::Prefix:
         direct_response_headers->set_prefix_match(header.value);
         break;
-      case DirectResponseTesting::suffix:
+      case DirectResponseTesting::MatchMode::Suffix:
         direct_response_headers->set_suffix_match(header.value);
         break;
       }
@@ -406,16 +407,16 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
       auto* direct_response_headers = direct_response_route_match->add_headers();
       direct_response_headers->set_name(header.name);
       switch (header.mode) {
-      case DirectResponseTesting::contains:
+      case DirectResponseTesting::MatchMode::Contains:
         direct_response_headers->set_contains_match(header.value);
         break;
-      case DirectResponseTesting::exact:
+      case DirectResponseTesting::MatchMode::Exact:
         direct_response_headers->set_exact_match(header.value);
         break;
-      case DirectResponseTesting::prefix:
+      case DirectResponseTesting::MatchMode::Prefix:
         direct_response_headers->set_prefix_match(header.value);
         break;
-      case DirectResponseTesting::suffix:
+      case DirectResponseTesting::MatchMode::Suffix:
         direct_response_headers->set_suffix_match(header.value);
         break;
       }
@@ -896,7 +897,7 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
   auto* node = bootstrap->mutable_node();
   node->set_id(node_id_.empty() ? "envoy-mobile" : node_id_);
   node->set_cluster("envoy-mobile");
-  if (node_locality_) {
+  if (node_locality_ && !node_locality_->region.empty()) {
     node->mutable_locality()->set_region(node_locality_->region);
     node->mutable_locality()->set_zone(node_locality_->zone);
     node->mutable_locality()->set_sub_zone(node_locality_->sub_zone);

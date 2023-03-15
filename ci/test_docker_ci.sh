@@ -55,6 +55,9 @@ _test () {
 
     export ENVOY_VERSION="${version}"
     export AZP_BRANCH="$branch"
+    # this should be ignored if the non-push
+    export DOCKERHUB_USERNAME=DHUSER
+    export DOCKERHUB_PASSWORD=DHPASSWORD
     export DOCKER_CI_DRYRUN=1
     export ENVOY_DOCKER_IMAGE_DIRECTORY=/non/existent/test/path
     export DOCKER_IMAGE_PREFIX=mocktest/repo

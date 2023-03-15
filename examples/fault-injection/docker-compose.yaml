@@ -14,4 +14,4 @@ services:
       context: .
       dockerfile: Dockerfile-backend
     ports:
-    - 8080:80
+    - ${PORT_PROXY:-8080}:80
