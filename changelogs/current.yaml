@@ -189,6 +189,9 @@ new_features:
     add :ref:`periodic access logging <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.access_log_flush_interval>`
     to http access logs for long-lived requests (Websockets, CONNECT, etc). :ref:`%DURATION% <config_access_log_format_duration>` will
     be empty for mid-request logs. Enabling this may affect access loggers and filters that register as access loggers that expect to be called only once.
+- area: redis_health_check
+  change: |
+    added :ref:`exists_failure <config_health_checkers_redis>` stat to indicate health check failures caused by EXISTS check failure.
 
 deprecated:
 - area: ext_authz
