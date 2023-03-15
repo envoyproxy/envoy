@@ -44,8 +44,16 @@ Http::Status EnvoyQuicClientStream::encodeHeaders(const Http::RequestHeaderMap& 
 
   local_end_stream_ = end_stream;
   SendBufferMonitor::ScopedWatermarkBufferUpdater updater(this, this);
-  auto spdy_headers = envoyHeadersToHttp2HeaderBlock(headers);
-  if (headers.Method()) {
+  spdy::Http2HeaderBlock spdy_headers;
+  if (Http::Utility::isUpgrade(headers)) {
+    // transform Upgrade from H1 to H3
+    upgrade_type_ = std::string(headers.getUpgradeValue());
+    Http::RequestHeaderMapPtr modified_headers =
+        Http::createHeaderMap<Http::RequestHeaderMapImpl>(headers);
+    Http::Utility::transformUpgradeRequestFromH1toH3(*modified_headers);
+    spdy_headers = envoyHeadersToHttp2HeaderBlock(*modified_headers);
+  } else if (headers.Method()) {
+    spdy_headers = envoyHeadersToHttp2HeaderBlock(headers);
     if (headers.Method()->value() == "CONNECT") {
       spdy_headers.erase(":scheme");
       spdy_headers.erase(":path");
@@ -201,6 +209,11 @@ void EnvoyQuicClientStream::OnInitialHeadersComplete(bool fin, size_t frame_len,
   if (Http::CodeUtility::is1xx(status)) {
     // These are Informational 1xx headers, not the actual response headers.
     set_headers_decompressed(false);
+  }
+
+  // Transform Response from H3 to H1
+  if (!upgrade_type_.empty() && headers->Status()) {
+    Http::Utility::transformUpgradeResponseFromH3toH1(*headers, upgrade_type_);
   }
 
   const bool is_special_1xx = Http::HeaderUtility::isSpecial1xx(*headers);

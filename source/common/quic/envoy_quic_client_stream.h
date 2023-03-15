@@ -78,6 +78,8 @@ private:
   Http::ResponseDecoder* response_decoder_{nullptr};
 
   bool decoded_1xx_{false};
+
+  std::string upgrade_type_;
 };
 
 } // namespace Quic
