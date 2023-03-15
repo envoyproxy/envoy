@@ -26,6 +26,7 @@ public:
   const std::string& alpnProtocols() const override { return alpn_protocols_; }
   const std::string& cipherSuites() const override { return cipher_suites_; }
   const std::string& ecdhCurves() const override { return ecdh_curves_; }
+  const std::string& signatureAlgorithms() const override { return signature_algorithms_; }
   // TODO(htuch): This needs to be made const again and/or zero copy and/or callers fixed.
   std::vector<std::reference_wrapper<const Envoy::Ssl::TlsCertificateConfig>>
   tlsCertificates() const override {
@@ -72,6 +73,7 @@ protected:
                     const unsigned default_min_protocol_version,
                     const unsigned default_max_protocol_version,
                     const std::string& default_cipher_suites, const std::string& default_curves,
+                    const std::string& default_signature_algorithms,
                     Server::Configuration::TransportSocketFactoryContext& factory_context);
   Api::Api& api_;
   const Server::Options& options_;
@@ -85,6 +87,7 @@ private:
   const std::string alpn_protocols_;
   const std::string cipher_suites_;
   const std::string ecdh_curves_;
+  const std::string signature_algorithms_;
 
   std::vector<Ssl::TlsCertificateConfigImpl> tls_certificate_configs_;
   Ssl::CertificateValidationContextConfigPtr validation_context_config_;
@@ -117,21 +120,16 @@ class ClientContextConfigImpl : public ContextConfigImpl, public Envoy::Ssl::Cli
 public:
   static const std::string DEFAULT_CIPHER_SUITES;
   static const std::string DEFAULT_CURVES;
+  static const std::string DEFAULT_SIGNATURE_ALGORITHMS;
 
   ClientContextConfigImpl(
       const envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext& config,
-      absl::string_view sigalgs,
       Server::Configuration::TransportSocketFactoryContext& secret_provider_context);
-  ClientContextConfigImpl(
-      const envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext& config,
-      Server::Configuration::TransportSocketFactoryContext& secret_provider_context)
-      : ClientContextConfigImpl(config, "", secret_provider_context) {}
 
   // Ssl::ClientContextConfig
   const std::string& serverNameIndication() const override { return server_name_indication_; }
   bool allowRenegotiation() const override { return allow_renegotiation_; }
   size_t maxSessionKeys() const override { return max_session_keys_; }
-  const std::string& signingAlgorithmsForTest() const override { return sigalgs_; }
 
 private:
   static const unsigned DEFAULT_MIN_VERSION;
@@ -140,7 +138,6 @@ private:
   const std::string server_name_indication_;
   const bool allow_renegotiation_;
   const size_t max_session_keys_;
-  const std::string sigalgs_;
 };
 
 class ServerContextConfigImpl : public ContextConfigImpl, public Envoy::Ssl::ServerContextConfig {
@@ -176,6 +173,7 @@ private:
   static const unsigned DEFAULT_MAX_VERSION;
   static const std::string DEFAULT_CIPHER_SUITES;
   static const std::string DEFAULT_CURVES;
+  static const std::string DEFAULT_SIGNATURE_ALGORITHMS;
 
   const bool require_client_certificate_;
   const OcspStaplePolicy ocsp_staple_policy_;

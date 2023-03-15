@@ -172,6 +172,7 @@ ContextConfigImpl::ContextConfigImpl(
     const envoy::extensions::transport_sockets::tls::v3::CommonTlsContext& config,
     const unsigned default_min_protocol_version, const unsigned default_max_protocol_version,
     const std::string& default_cipher_suites, const std::string& default_curves,
+    const std::string& default_signature_algorithms,
     Server::Configuration::TransportSocketFactoryContext& factory_context)
     : api_(factory_context.api()), options_(factory_context.options()),
       singleton_manager_(factory_context.singletonManager()),
@@ -180,6 +181,9 @@ ContextConfigImpl::ContextConfigImpl(
           RepeatedPtrUtil::join(config.tls_params().cipher_suites(), ":"), default_cipher_suites)),
       ecdh_curves_(StringUtil::nonEmptyStringOrDefault(
           RepeatedPtrUtil::join(config.tls_params().ecdh_curves(), ":"), default_curves)),
+      signature_algorithms_(StringUtil::nonEmptyStringOrDefault(
+          RepeatedPtrUtil::join(config.tls_params().signature_algorithms(), ":"),
+          default_signature_algorithms)),
       tls_certificate_providers_(getTlsCertificateConfigProviders(config, factory_context)),
       certificate_validation_context_provider_(
           getCertificateValidationContextConfigProvider(config, factory_context, &default_cvc_)),
@@ -342,15 +346,27 @@ const std::string ClientContextConfigImpl::DEFAULT_CURVES =
 #endif
     "P-256";
 
+const std::string ClientContextConfigImpl::DEFAULT_SIGNATURE_ALGORITHMS = "ecdsa_secp256r1_sha256:"
+                                                                          "rsa_pss_rsae_sha256:"
+                                                                          "rsa_pkcs1_sha256:"
+
+                                                                          "ecdsa_secp384r1_sha384:"
+                                                                          "rsa_pss_rsae_sha384:"
+                                                                          "rsa_pkcs1_sha384:"
+
+                                                                          "rsa_pss_rsae_sha512:"
+                                                                          "rsa_pkcs1_sha512:"
+
+                                                                          "rsa_pkcs1_sha1";
+
 ClientContextConfigImpl::ClientContextConfigImpl(
     const envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext& config,
-    absl::string_view sigalgs,
     Server::Configuration::TransportSocketFactoryContext& factory_context)
     : ContextConfigImpl(config.common_tls_context(), DEFAULT_MIN_VERSION, DEFAULT_MAX_VERSION,
-                        DEFAULT_CIPHER_SUITES, DEFAULT_CURVES, factory_context),
+                        DEFAULT_CIPHER_SUITES, DEFAULT_CURVES, DEFAULT_SIGNATURE_ALGORITHMS,
+                        factory_context),
       server_name_indication_(config.sni()), allow_renegotiation_(config.allow_renegotiation()),
-      max_session_keys_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, max_session_keys, 1)),
-      sigalgs_(sigalgs) {
+      max_session_keys_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, max_session_keys, 1)) {
   // BoringSSL treats this as a C string, so embedded NULL characters will not
   // be handled correctly.
   if (server_name_indication_.find('\0') != std::string::npos) {
@@ -383,11 +399,25 @@ const std::string ServerContextConfigImpl::DEFAULT_CURVES =
 #endif
     "P-256";
 
+const std::string ServerContextConfigImpl::DEFAULT_SIGNATURE_ALGORITHMS = "ecdsa_secp256r1_sha256:"
+                                                                          "rsa_pss_rsae_sha256:"
+                                                                          "rsa_pkcs1_sha256:"
+
+                                                                          "ecdsa_secp384r1_sha384:"
+                                                                          "rsa_pss_rsae_sha384:"
+                                                                          "rsa_pkcs1_sha384:"
+
+                                                                          "rsa_pss_rsae_sha512:"
+                                                                          "rsa_pkcs1_sha512:"
+
+                                                                          "rsa_pkcs1_sha1";
+
 ServerContextConfigImpl::ServerContextConfigImpl(
     const envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext& config,
     Server::Configuration::TransportSocketFactoryContext& factory_context)
     : ContextConfigImpl(config.common_tls_context(), DEFAULT_MIN_VERSION, DEFAULT_MAX_VERSION,
-                        DEFAULT_CIPHER_SUITES, DEFAULT_CURVES, factory_context),
+                        DEFAULT_CIPHER_SUITES, DEFAULT_CURVES, DEFAULT_SIGNATURE_ALGORITHMS,
+                        factory_context),
       require_client_certificate_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, require_client_certificate, false)),
       ocsp_staple_policy_(ocspStaplePolicyFromProto(config.ocsp_staple_policy())),

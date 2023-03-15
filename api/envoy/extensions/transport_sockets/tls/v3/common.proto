@@ -24,6 +24,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: Common TLS configuration]
 
+// [#next-free-field: 6]
 message TlsParameters {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.auth.TlsParameters";
 
@@ -120,6 +121,23 @@ message TlsParameters {
   //
   //   P-256
   repeated string ecdh_curves = 4;
+
+  // If specified, the TLS connection will only support the specified signature algorithms.
+  // If not specified, the default signature algorithms will be used:
+  //
+  // .. code-block:: none
+  //
+  //   ecdsa_secp256r1_sha256
+  //   rsa_pss_rsae_sha256
+  //   rsa_pkcs1_sha256
+  //   ecdsa_secp384r1_sha384
+  //   rsa_pss_rsae_sha384
+  //   rsa_pkcs1_sha384
+  //   rsa_pss_rsae_sha512
+  //   rsa_pkcs1_sha512
+  //   rsa_pkcs1_sha1
+  //
+  repeated string signature_algorithms = 5;
 }
 
 // BoringSSL private key method configuration. The private key methods are used for external
