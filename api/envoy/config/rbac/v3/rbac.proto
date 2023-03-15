@@ -77,7 +77,6 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 //       principals:
 //         - any: true
 //
-// [#next-free-field: 5]
 message RBAC {
   option (udpa.annotations.versioning).previous_message_type = "envoy.config.rbac.v2.RBAC";
 
