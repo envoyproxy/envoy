@@ -615,7 +615,8 @@ static void ios_track_event(envoy_map map, const void *context) {
   ENVOY_LOG_EVENT_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::misc), error,
                             "handled_cxx_exception", [message UTF8String]);
 
-  [NSNotificationCenter.defaultCenter postNotificationName:@"EnvoyError" object:exception];
+  [NSNotificationCenter.defaultCenter postNotificationName:@"EnvoyHandledCXXException"
+                                                    object:exception];
 }
 
 @end
