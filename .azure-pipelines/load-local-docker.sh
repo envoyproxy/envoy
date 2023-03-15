@@ -21,4 +21,5 @@ pull_build_image () {
 
 create_config
 start_local_registry
+sleep 5
 pull_build_image
