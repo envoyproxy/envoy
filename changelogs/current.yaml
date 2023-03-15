@@ -163,7 +163,7 @@ new_features:
   change: |
     added :ref:`failed_status_in_metadata <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.JwtProvider.failed_status_in_metadata>` to support setting the JWT
     authentication failure status code and message in dynamic metadata.
- area: ext_proc
+- area: ext_proc
   change: |
     added the support :ref:`new_message_timeout <envoy_v3_api_field_service.ext_proc.v3.ProcessingResponse.new_message_timeout>` for the ext_proc server to send back a message to Envoy to extend the ext_proc timer.
     added the field :ref:`max_message_timeout <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExternalProcessor.max_message_timeout>` for specifying the max new_message_timeout could be sent back by the ext_proc server.
