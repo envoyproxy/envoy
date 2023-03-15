@@ -77,6 +77,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 //       principals:
 //         - any: true
 //
+// [#next-free-field: 5]
 message RBAC {
   option (udpa.annotations.versioning).previous_message_type = "envoy.config.rbac.v2.RBAC";
 
@@ -131,18 +132,16 @@ message RBAC {
   map<string, Policy> policies = 2;
 
   // Condition for the audit logging to be happen. Specific to HTTP filters.
-  // If condition is met, all the audit loggers configured in the HCM will be invoked.
+  // If condition is met, all the audit loggers configured here will be invoked.
   //
   // [#not-implemented-hide:]
   AuditCondition audit_condition = 3;
 
   // Configurations for RBAC-based authorization audit loggers. Specific to HTTP filters.
-  // Any RBAC filter in the HTTP filter chain will invoke all the audit loggers configured
-  // here if the audit condition specified in the RBAC is met.
   //
   // [#not-implemented-hide:]
   // [#extension-category: envoy.rbac.audit_loggers]
-  repeated config.core.v3.TypedExtensionConfig audit_log = 54;
+  repeated core.v3.TypedExtensionConfig audit_log = 4;
 }
 
 // Policy specifies a role and the principals that are assigned/denied the role.
