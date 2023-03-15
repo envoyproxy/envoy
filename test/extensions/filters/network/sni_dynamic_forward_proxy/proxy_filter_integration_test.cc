@@ -40,7 +40,7 @@ public:
 
       const std::string filter =
           fmt::format(R"EOF(
-name: envoy.filters.http.dynamic_forward_proxy
+name: envoy.filters.network.sni_dynamic_forward_proxy
 typed_config:
   "@type": type.googleapis.com/envoy.extensions.filters.network.sni_dynamic_forward_proxy.v3.FilterConfig
   dns_cache_config:

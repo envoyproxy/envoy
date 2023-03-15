@@ -29,7 +29,6 @@ final class ViewController: UITableViewController {
       // required by DNS cache
       .addKeyValueStore(name: "reserved.platform_store", keyValueStore: UserDefaults.standard)
       .enableInterfaceBinding(true)
-      .enablePlatformCertificateValidation(true)
       .addNativeFilter(
         name: "envoy.filters.http.buffer",
         typedConfig: """

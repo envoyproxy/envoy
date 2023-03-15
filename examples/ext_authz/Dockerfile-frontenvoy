@@ -1,4 +1,4 @@
-FROM envoyproxy/envoy-dev:latest
+FROM envoyproxy/envoy:dev
 
 COPY ./config /etc/envoy-config
 COPY ./run_envoy.sh /run_envoy.sh

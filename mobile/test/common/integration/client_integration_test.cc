@@ -334,25 +334,6 @@ TEST_P(ClientIntegrationTest, DirectResponse) {
   ASSERT_EQ(cc_.status, "404");
   ASSERT_EQ(cc_.on_headers_calls, 1);
   stream_.reset();
-}
-
-TEST_P(ClientIntegrationTest, ForceAdmin) {
-  override_builder_config_ = true;
-  config_helper_.addRuntimeOverride("envoy.reloadable_features.use_api_listener", "true");
-  basicTest();
-}
-
-TEST_P(ClientIntegrationTest, ForceAdminViaBootstrap) {
-  override_builder_config_ = true;
-
-  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
-    envoy::config::listener::v3::ApiListenerManager api;
-    auto* listener_manager = bootstrap.mutable_listener_manager();
-    listener_manager->mutable_typed_config()->PackFrom(api);
-    listener_manager->set_name("envoy.listener_manager_impl.api");
-  });
-
-  basicTest();
 
   // Verify the default runtime values.
   EXPECT_FALSE(Runtime::runtimeFeatureEnabled("envoy.reloadable_features.test_feature_false"));
@@ -368,6 +349,13 @@ TEST_P(ClientIntegrationTest, TestRuntimeSet) {
   EXPECT_TRUE(Runtime::runtimeFeatureEnabled("envoy.reloadable_features.test_feature_false"));
   EXPECT_FALSE(Runtime::runtimeFeatureEnabled("envoy.reloadable_features.test_feature_true"));
 }
+
+#ifdef ENVOY_ADMIN_FUNCTIONALITY
+TEST_P(ClientIntegrationTest, TestAdmin) {
+  builder_.enableAdminInterface(true);
+  initialize();
+}
+#endif
 
 } // namespace
 } // namespace Envoy

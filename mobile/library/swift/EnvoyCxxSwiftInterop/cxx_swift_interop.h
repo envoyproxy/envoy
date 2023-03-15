@@ -18,7 +18,6 @@
 namespace Envoy {
 namespace CxxSwift {
 
-using LogLevel = spdlog::level::level_enum;
 using StringVector = std::vector<std::string>;
 using StringPair = std::pair<std::string, std::string>;
 using StringPairVector = std::vector<StringPair>;
@@ -37,26 +36,6 @@ inline void raw_header_map_set(Platform::RawHeaderMap& map, std::string key,
   map[std::move(key)] = std::move(value);
 }
 
-// TODO(jpsim): Replace `inline const` uses with `constexpr` when
-// https://github.com/apple/swift/issues/64217 is fixed.
-
-inline const LogLevel LogLevelTrace = LogLevel::trace;
-inline const LogLevel LogLevelDebug = LogLevel::debug;
-inline const LogLevel LogLevelInfo = LogLevel::info;
-inline const LogLevel LogLevelWarn = LogLevel::warn;
-inline const LogLevel LogLevelError = LogLevel::err;
-inline const LogLevel LogLevelCritical = LogLevel::critical;
-inline const LogLevel LogLevelOff = LogLevel::off;
-
-inline const DirectResponseTesting::MatchMode DirectResponseMatchModeContains =
-    DirectResponseTesting::contains;
-inline const DirectResponseTesting::MatchMode DirectResponseMatchModeExact =
-    DirectResponseTesting::exact;
-inline const DirectResponseTesting::MatchMode DirectResponseMatchModePrefix =
-    DirectResponseTesting::prefix;
-inline const DirectResponseTesting::MatchMode DirectResponseMatchModeSuffix =
-    DirectResponseTesting::suffix;
-
 // Smart pointers aren't currently supported by Swift / C++ interop, so we "erase"
 // it into a `BootstrapPtr` / `intptr_t`, which we can import from Swift.
 inline BootstrapPtr generateBootstrapPtr(Platform::EngineBuilder builder) {
@@ -69,7 +48,7 @@ inline BootstrapPtr generateBootstrapPtr(Platform::EngineBuilder builder) {
  * @param log_level, the log level.
  * @param engine_handle, the handle to an Envoy engine instance.
  */
-void run(BootstrapPtr bootstrap_ptr, LogLevel log_level, envoy_engine_t engine_handle);
+void run(BootstrapPtr bootstrap_ptr, Platform::LogLevel log_level, envoy_engine_t engine_handle);
 
 } // namespace CxxSwift
 } // namespace Envoy
