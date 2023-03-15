@@ -14,7 +14,6 @@ namespace Envoy {
 namespace Http {
 namespace Matching {
 
-// TODO(tyxia) This could be int
 template <class ResultDataType = std::string>
 class HttpResponseStatusCodeInput : public Matcher::DataInput<HttpMatchingData, ResultDataType> {
 public:
@@ -94,7 +93,6 @@ private:
   const std::string name_;
 };
 
-// TODO(tyxia) Add support to register as templated type factory.
 class HttpResponseStatusCodeInputFactory
     : public HttpResponseStatusCodeInputFactoryBase<
           HttpResponseStatusCodeInput<std::string>,
@@ -110,7 +108,7 @@ class HttpResponseStatusCodeClassInputFactory
           envoy::type::matcher::v3::HttpResponseStatusCodeClassMatchInput> {
 public:
   explicit HttpResponseStatusCodeClassInputFactory()
-      : HttpResponseStatusCodeInputFactoryBase("status_code_class_input") {}
+      : HttpResponseStatusCodeInputFactoryBase("status_code_class_input") = default;
 };
 
 } // namespace Matching

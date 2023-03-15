@@ -15,7 +15,6 @@ namespace Matching {
 /**
  * Common base class for all the header/trailer DataInputs.
  */
-// TODO(tyxia) provide the std::string template directly
 template <class HeaderType>
 class HttpHeadersDataInputBase : public Matcher::DataInput<HttpMatchingData> {
 public:

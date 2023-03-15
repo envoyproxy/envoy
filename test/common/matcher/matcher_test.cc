@@ -73,7 +73,6 @@ matcher_tree:
   auto outer_factory = TestDataInputStringFactory("value");
   auto inner_factory = TestDataInputBoolFactory("foo");
 
-  // TODO(tyxia) Re-enable
   EXPECT_CALL(validation_visitor_,
               performDataInputValidation(_, "type.googleapis.com/google.protobuf.StringValue"));
   EXPECT_CALL(validation_visitor_,

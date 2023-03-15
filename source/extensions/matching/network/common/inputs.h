@@ -63,7 +63,6 @@ DECLARE_FACTORY(DestinationIPInputFactory);
 DECLARE_FACTORY(UdpDestinationIPInputFactory);
 DECLARE_FACTORY(HttpDestinationIPInputFactory);
 
-// TODO(tyxia) This can be flexible template to return int
 template <class MatchingDataType>
 class DestinationPortInput : public Matcher::DataInput<MatchingDataType> {
 public:

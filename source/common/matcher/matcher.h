@@ -91,7 +91,6 @@ public:
 
   template <class ResultDataType = std::string>
   DataInputFactoryCb<DataType> createDataInput(const xds::core::v3::TypedExtensionConfig& config) {
-    // TODO(tyxia) I want to pass down the ResultDataType
     return createDataInputBase<xds::core::v3::TypedExtensionConfig, ResultDataType>(config);
   }
 

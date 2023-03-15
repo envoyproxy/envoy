@@ -212,7 +212,7 @@ template <class ResultDataType = std::string> struct DataInputGetResult {
     } else {
       out << "n/a";
     }
-    // out << "data input: " << (result.data_ ? result.data_.value() : "n/a");
+
     switch (result.data_availability_) {
     case DataAvailability::NotAvailable:
       out << " (not available)";
@@ -276,7 +276,6 @@ public:
  * Interface for types providing a way to use a string for matching without depending on protocol
  * data. As a result, these can be used for all protocols.
  */
-// TODO(tyxia) Maybe no need to change here
 template <class ResultDataType = std::string> class CommonProtocolInput {
 public:
   virtual ~CommonProtocolInput() = default;
@@ -331,6 +330,5 @@ public:
 // NOLINT(namespace-envoy)
 namespace fmt {
 // Allow fmtlib to use operator << defined in DataInputGetResult
-// TODO(tyxia) Different from g3
 template <> struct formatter<::Envoy::Matcher::DataInputGetResult<>> : ostream_formatter {};
 } // namespace fmt
