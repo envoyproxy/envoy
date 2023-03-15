@@ -142,6 +142,7 @@ envoy_cc_library(
         "stats_html_render.cc",
     ]),
     hdrs = ["stats_render.h"] + envoy_select_admin_html([
+        "admin_html.h",
         "stats_html_render.h",
     ]),
     deps = [

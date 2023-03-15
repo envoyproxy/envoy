@@ -1,5 +1,6 @@
 #pragma once
 
+#include "source/server/admin/admin_html.h"
 #include "source/server/admin/stats_render.h"
 
 #include "envoy/filesystem/filesystem.h"
@@ -80,7 +81,8 @@ public:
 
 private:
   void appendResource(Buffer::Instance& response, absl::string_view file,
-                      absl::string_view default_value);
+                      absl::string_view default_value,
+                      std::function<std::string(absl::string_view)> xform = nullptr);
 
   int index_{0}; // Used to alternate row-group background color
   bool submit_on_change_{false};

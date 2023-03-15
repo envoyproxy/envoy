@@ -4,8 +4,18 @@
 #include "absl/strings/match.h"
 
 namespace Envoy {
+namespace {
 
-static Http::Code testCallback(Http::ResponseHeaderMap& response_headers,
+std::string readFileOrDie(absl::string_view prefix, absl::string_view filename) {
+  std::string path = absl::StrCat(prefix, iter->second);
+  TRY_ASSERT_MAIN_THREAD { return file_system.fileReadToEnd(path); }
+  END_TRY
+  catch (EnvoyException& e) {
+    ENVOY_LOG_MISC(FATAL, "Error reading file {}", e.what());
+  }
+}
+
+Http::Code testCallback(Http::ResponseHeaderMap& response_headers,
                                Buffer::Instance& response, Server::AdminStream& admin_stream) {
   Http::Utility::QueryParams query_params = admin_stream.queryParams();
   auto iter = query_params.find("file");
@@ -30,6 +40,20 @@ static Http::Code testCallback(Http::ResponseHeaderMap& response_headers,
   return Http::Code::OK;
 }
 
+class DebugHtmlResourceProvider : public HtmlResourceProvider {
+ public:
+  absl::string_view getResource(absl::string_view resource_name, std::string& buf) override {
+    std::string path = absl::StrCat("source/server/admin/html/", resource_name);
+    TRY_ASSERT_MAIN_THREAD { buf = file_system.fileReadToEnd(path); }
+    END_TRY
+    catch (EnvoyException& e) {
+      ENVOY_LOG_MISC(FATAL, "Error reading file {}", e.what());
+    }
+    return buf;
+  }
+};
+
+} // namespace
 } // namespace Envoy
 
 /**
@@ -37,9 +61,19 @@ static Http::Code testCallback(Http::ResponseHeaderMap& response_headers,
  * files.
  */
 int main(int argc, char** argv) {
-  return Envoy::MainCommon::main(argc, argv, [](Envoy::Server::Instance& server) {
+  if (argc > 1 && absl::string_view("-debug") == argv[1]) {
+    AdminHtml::setHtmlResourceProvider(std::make_unique<DebugHtmlResourceProvider>());
+    argv[1] = argv[0];
+    --argc;
+    ++argv;
+  }
+
+  return Envoy::MainCommon::main(argc, argv, [debug](Envoy::Server::Instance& server) {
     Envoy::OptRef<Envoy::Server::Admin> admin = server.admin();
     if (admin.has_value()) {
+      if (debug) {
+        AdminHtml::setHtmlResourceProvider(std::make_unique<DebugHtmlResourceProvider>());
+      }
       admin->addHandler("/test", "test file-serving endpoint", Envoy::testCallback, false, false);
     }
   });

@@ -6,7 +6,7 @@
 #include "source/common/common/assert.h"
 #include "source/common/filesystem/filesystem_impl.h"
 #include "source/common/html/utility.h"
-#include "source/server/admin/html/admin_html_gen.h"
+#include "source/server/admin/admin_html.h"
 
 #include "absl/strings/str_replace.h"
 
@@ -65,16 +65,27 @@ StatsHtmlRender::StatsHtmlRender(Http::ResponseHeaderMap& response_headers,
                                  Buffer::Instance& response, const StatsParams& params)
     : StatsTextRender(params), active_(params.format_ == StatsFormat::ActiveHtml) {
   response_headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Html);
-  response.add("<!DOCTYPE html>\n");
-  response.add("<html lang='en'>\n");
-  response.add(absl::StrReplaceAll(AdminHtmlStart, {{"@FAVICON@", EnvoyFavicon}}));
+  std::string buf1, buf2, buf3;
+  response.addFragments({
+      "<!DOCTYPE html>\n"
+      "<html lang='en'>\n"
+      "<head>\n",
+      absl::StrReplaceAll(
+          AdminHtml::getResource("admin_head_start.html", buf1),
+          {{"@FAVICON@", EnvoyFavicon}}),
+      "<style>\n",
+      AdminHtml::getResource("admin.css", buf2),
+      "</style>\n"
+  });
   if (active_) {
-    response.add("<script>\n");
-    appendResource(response, "active_stats.js", AdminActiveStatsJs);
-    response.add("\n</script>\n");
-  } else {
-    response.add("<body>\n");
+    response.addFragments({
+        "<script>\n",
+        AdminHtml::getResource("active_stats.js", buf3),
+        "</script>\n"
+    });
   }
+  response.add("</head>\n"
+               "<body>\n");
 }
 
 void StatsHtmlRender::setupStatsPage(const Admin::UrlHandler& url_handler,
@@ -83,19 +94,8 @@ void StatsHtmlRender::setupStatsPage(const Admin::UrlHandler& url_handler,
   tableBegin(response);
   urlHandler(response, url_handler, params.query_);
   if (active_) {
-    appendResource(response, "active_params.html", AdminActiveParamsHtml);
-  }
-  tableEnd(response);
-  startPre(response);
-}
-
-void StatsHtmlRender::setupStatsPage(const Admin::UrlHandler& url_handler,
-                                     const StatsParams& params, Buffer::Instance& response) {
-  setSubmitOnChange(true);
-  tableBegin(response);
-  urlHandler(response, url_handler, params.query_);
-  if (active_) {
-    appendResource(response, "active_params.html", AdminActiveParamsHtml);
+    std::string buf;
+    response.add(AdminHtml::getResource("active_params.html", buf));
   }
   tableEnd(response);
   startPre(response);
@@ -107,28 +107,8 @@ void StatsHtmlRender::finalize(Buffer::Instance& response) {
   if (has_pre_) {
     response.add("</pre>\n");
   }
-  response.add("</body>\n");
-  response.add("</html>");
-}
-
-void StatsHtmlRender::appendResource(Buffer::Instance& response, absl::string_view file,
-                                     absl::string_view default_value) {
-#ifdef ENVOY_ADMIN_DEBUG
-  // Build with --cxxopt=-DENVOY_ADMIN_DEBUG to reload css, js, and html files
-  // from the file-system on every admin page load, which enables fast iteration
-  // when debugging the web site.
-  Filesystem::InstanceImpl file_system;
-  std::string path = absl::StrCat("source/server/admin/html/", file);
-  TRY_ASSERT_MAIN_THREAD { response.add(file_system.fileReadToEnd(path)); }
-  END_TRY
-  catch (EnvoyException& e) {
-    ENVOY_LOG_MISC(error, "failed to load " + path + ": " + e.what());
-    response.add(default_value);
-  }
-#else
-  UNREFERENCED_PARAMETER(file);
-  response.add(default_value);
-#endif
+  response.add("</body>\n"
+               "</html>");
 }
 
 void StatsHtmlRender::startPre(Buffer::Instance& response) {
