@@ -61,9 +61,20 @@ public class EnvoyConfiguration {
   public final Map<String, EnvoyStringAccessor> stringAccessors;
   public final Map<String, EnvoyKeyValueStore> keyValueStores;
   public final List<String> statSinks;
-  Map<String, String> runtimeGuards;
+  public final Map<String, String> runtimeGuards;
   public final Boolean enablePlatformCertificatesValidation;
   public final Boolean enableSkipDNSLookupForProxiedRequests;
+  public final String rtdsLayerName;
+  public final Integer rtdsTimeoutSeconds;
+  public final String adsAddress;
+  public final Integer adsPort;
+  public final String adsToken;
+  public final Integer adsTokenLifetime;
+  public final String adsRootCerts;
+  public final String nodeId;
+  public final String nodeRegion;
+  public final String nodeZone;
+  public final String nodeSubZone;
 
   private static final Pattern UNRESOLVED_KEY_PATTERN = Pattern.compile("\\{\\{ (.+) \\}\\}");
 
@@ -126,6 +137,20 @@ public class EnvoyConfiguration {
    * @param enableSkipDNSLookupForProxiedRequests         whether to skip waiting on DNS response
    *     for proxied requests.
    * @param enablePlatformCertificatesValidation          whether to use the platform verifier.
+   * @param rtdsLayerName                                 the RTDS layer name for this client.
+   * @param rtdsTimeoutSeconds                            the timeout for RTDS fetches.
+   * @param adsAddress                                    the address for the ADS server.
+   * @param adsPort                                       the port for the ADS server.
+   * @param adsToken                                      the token to use for authenticating with
+   *                                                      the ADS server.
+   * @param adsTokenLifetime                              the lifetime of the ADS token.
+   * @param adsRootCerts                                  the root certificates to use for
+   *     validating the ADS server.
+   * @param nodeId                                        the node ID to use for the ADS server.
+   * @param nodeRegion                                    the node region to use for the ADS server.
+   * @param nodeZone                                      the node zone to use for the ADS server.
+   * @param nodeSubZone                                   the node sub-zone to use for the ADS
+   *     server.
    */
   public EnvoyConfiguration(
       boolean adminInterfaceEnabled, String grpcStatsDomain, int connectTimeoutSeconds,
@@ -143,7 +168,10 @@ public class EnvoyConfiguration {
       Map<String, EnvoyStringAccessor> stringAccessors,
       Map<String, EnvoyKeyValueStore> keyValueStores, List<String> statSinks,
       Map<String, Boolean> runtimeGuards, Boolean enableSkipDNSLookupForProxiedRequests,
-      boolean enablePlatformCertificatesValidation) {
+      boolean enablePlatformCertificatesValidation, String rtdsLayerName,
+      Integer rtdsTimeoutSeconds, String adsAddress, Integer adsPort, String adsToken,
+      Integer adsTokenLifetime, String adsRootCerts, String nodeId, String nodeRegion,
+      String nodeZone, String nodeSubZone) {
     JniLibrary.load();
     this.adminInterfaceEnabled = adminInterfaceEnabled;
     this.grpcStatsDomain = grpcStatsDomain;
@@ -197,35 +225,20 @@ public class EnvoyConfiguration {
     }
     this.enablePlatformCertificatesValidation = enablePlatformCertificatesValidation;
     this.enableSkipDNSLookupForProxiedRequests = enableSkipDNSLookupForProxiedRequests;
+    this.rtdsLayerName = rtdsLayerName;
+    this.rtdsTimeoutSeconds = rtdsTimeoutSeconds;
+    this.adsAddress = adsAddress;
+    this.adsPort = adsPort;
+    this.adsToken = adsToken;
+    this.adsTokenLifetime = adsTokenLifetime;
+    this.adsRootCerts = adsRootCerts;
+    this.nodeId = nodeId;
+    this.nodeRegion = nodeRegion;
+    this.nodeZone = nodeZone;
+    this.nodeSubZone = nodeSubZone;
   }
 
-  // TODO(alyssawilk) move this to the test only JNI library.
-  String createYaml() {
-    Boolean enforceTrustChainVerification =
-        trustChainVerification == EnvoyConfiguration.TrustChainVerification.VERIFY_TRUST_CHAIN;
-    List<EnvoyNativeFilterConfig> reverseFilterChain = new ArrayList<>(nativeFilterChain);
-    Collections.reverse(reverseFilterChain);
-
-    byte[][] filter_chain = JniBridgeUtility.toJniBytes(reverseFilterChain);
-    byte[][] clusters = JniBridgeUtility.stringsToJniBytes(virtualClusters);
-    byte[][] stats_sinks = JniBridgeUtility.stringsToJniBytes(statSinks);
-    byte[][] dns_preresolve = JniBridgeUtility.stringsToJniBytes(dnsPreresolveHostnames);
-    byte[][] runtime_guards = JniBridgeUtility.mapToJniBytes(runtimeGuards);
-
-    return JniLibrary.createYaml(
-        grpcStatsDomain, adminInterfaceEnabled, connectTimeoutSeconds, dnsRefreshSeconds,
-        dnsFailureRefreshSecondsBase, dnsFailureRefreshSecondsMax, dnsQueryTimeoutSeconds,
-        dnsMinRefreshSeconds, dns_preresolve, enableDNSCache, dnsCacheSaveIntervalSeconds,
-        enableDrainPostDnsRefresh, enableHttp3, enableGzipDecompression, enableBrotliDecompression,
-        enableSocketTagging, enableHappyEyeballs, enableInterfaceBinding,
-        h2ConnectionKeepaliveIdleIntervalMilliseconds, h2ConnectionKeepaliveTimeoutSeconds,
-        maxConnectionsPerHost, statsFlushSeconds, streamIdleTimeoutSeconds,
-        perTryIdleTimeoutSeconds, appVersion, appId, enforceTrustChainVerification, clusters,
-        filter_chain, stats_sinks, enablePlatformCertificatesValidation,
-        enableSkipDNSLookupForProxiedRequests, runtime_guards);
-  }
-
-  long createBootstrap() {
+  public long createBootstrap() {
     Boolean enforceTrustChainVerification =
         trustChainVerification == EnvoyConfiguration.TrustChainVerification.VERIFY_TRUST_CHAIN;
     List<EnvoyNativeFilterConfig> reverseFilterChain = new ArrayList<>(nativeFilterChain);
@@ -246,7 +259,9 @@ public class EnvoyConfiguration {
         maxConnectionsPerHost, statsFlushSeconds, streamIdleTimeoutSeconds,
         perTryIdleTimeoutSeconds, appVersion, appId, enforceTrustChainVerification, clusters,
         filter_chain, stats_sinks, enablePlatformCertificatesValidation,
-        enableSkipDNSLookupForProxiedRequests, runtime_guards);
+        enableSkipDNSLookupForProxiedRequests, runtime_guards, rtdsLayerName, rtdsTimeoutSeconds,
+        adsAddress, adsPort, adsToken, adsTokenLifetime, adsRootCerts, nodeId, nodeRegion, nodeZone,
+        nodeSubZone);
   }
 
   static class ConfigurationException extends RuntimeException {

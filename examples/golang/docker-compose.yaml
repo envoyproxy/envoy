@@ -13,6 +13,5 @@ services:
 
   helloworld_service:
     build:
-      context: ../shared/flask
-    volumes:
-    - ./service.py:/code/service.py
+      context: ../shared/python
+      target: aiohttp-hello-service

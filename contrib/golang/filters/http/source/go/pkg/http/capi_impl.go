@@ -41,7 +41,12 @@ import (
 )
 
 const (
-	ValueRouteName = 1
+	ValueRouteName           = 1
+	ValueFilterChainName     = 2
+	ValueProtocol            = 3
+	ValueResponseCode        = 4
+	ValueResponseCodeDetails = 5
+	ValueAttemptCount        = 6
 )
 
 type httpCApiImpl struct{}
@@ -115,8 +120,14 @@ func (c *httpCApiImpl) HttpCopyHeaders(r unsafe.Pointer, num uint64, bytes uint6
 	return m
 }
 
-func (c *httpCApiImpl) HttpSetHeader(r unsafe.Pointer, key *string, value *string) {
-	res := C.envoyGoFilterHttpSetHeader(r, unsafe.Pointer(key), unsafe.Pointer(value))
+func (c *httpCApiImpl) HttpSetHeader(r unsafe.Pointer, key *string, value *string, add bool) {
+	var act C.headerAction
+	if add {
+		act = C.HeaderAdd
+	} else {
+		act = C.HeaderSet
+	}
+	res := C.envoyGoFilterHttpSetHeaderHelper(r, unsafe.Pointer(key), unsafe.Pointer(value), act)
 	handleCApiStatus(res)
 }
 
@@ -182,12 +193,27 @@ func (c *httpCApiImpl) HttpSetTrailer(r unsafe.Pointer, key *string, value *stri
 	handleCApiStatus(res)
 }
 
-func (c *httpCApiImpl) HttpGetRouteName(r unsafe.Pointer) string {
+func (c *httpCApiImpl) HttpGetStringValue(r unsafe.Pointer, id int) (string, bool) {
 	var value string
-	res := C.envoyGoFilterHttpGetStringValue(r, ValueRouteName, unsafe.Pointer(&value))
+	// TODO: add a lock to protect filter->req_->strValue field in the Envoy side, from being writing concurrency,
+	// since there might be multiple concurrency goroutines invoking this API on the Go side.
+	res := C.envoyGoFilterHttpGetStringValue(r, C.int(id), unsafe.Pointer(&value))
+	if res == C.CAPIValueNotFound {
+		return "", false
+	}
 	handleCApiStatus(res)
 	// copy the memory from c to Go.
-	return strings.Clone(value)
+	return strings.Clone(value), true
+}
+
+func (c *httpCApiImpl) HttpGetIntegerValue(r unsafe.Pointer, id int) (uint64, bool) {
+	var value uint64
+	res := C.envoyGoFilterHttpGetIntegerValue(r, C.int(id), unsafe.Pointer(&value))
+	if res == C.CAPIValueNotFound {
+		return 0, false
+	}
+	handleCApiStatus(res)
+	return value, true
 }
 
 func (c *httpCApiImpl) HttpFinalize(r unsafe.Pointer, reason int) {

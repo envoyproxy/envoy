@@ -5,6 +5,7 @@
 #include <memory>
 #include <string>
 
+#include "envoy/common/regex.h"
 #include "envoy/config/core/v3/http_uri.pb.h"
 #include "envoy/config/core/v3/protocol.pb.h"
 #include "envoy/config/route/v3/route_components.pb.h"
@@ -102,7 +103,7 @@ initializeAndValidateOptions(const envoy::config::core::v3::Http2ProtocolOptions
 envoy::config::core::v3::Http2ProtocolOptions
 initializeAndValidateOptions(const envoy::config::core::v3::Http2ProtocolOptions& options,
                              bool hcm_stream_error_set,
-                             const Protobuf::BoolValue& hcm_stream_error);
+                             const ProtobufWkt::BoolValue& hcm_stream_error);
 } // namespace Utility
 } // namespace Http2
 namespace Http3 {
@@ -119,7 +120,7 @@ struct OptionsLimits {
 envoy::config::core::v3::Http3ProtocolOptions
 initializeAndValidateOptions(const envoy::config::core::v3::Http3ProtocolOptions& options,
                              bool hcm_stream_error_set,
-                             const Protobuf::BoolValue& hcm_stream_error);
+                             const ProtobufWkt::BoolValue& hcm_stream_error);
 
 } // namespace Utility
 } // namespace Http3
@@ -702,6 +703,29 @@ bool isSafeRequest(const Http::RequestHeaderMap& request_headers);
  * Return the GatewayTimeout HTTP code to indicate the request is full received.
  */
 Http::Code maybeRequestTimeoutCode(bool remote_decode_complete);
+
+/**
+ * Container for route config elements that pertain to a redirect.
+ */
+struct RedirectConfig {
+  const std::string scheme_redirect_;
+  const std::string host_redirect_;
+  const std::string port_redirect_;
+  const std::string path_redirect_;
+  const std::string prefix_rewrite_redirect_;
+  const std::string regex_rewrite_redirect_substitution_;
+  Regex::CompiledMatcherPtr regex_rewrite_redirect_;
+  // Keep small members (bools and enums) at the end of class, to reduce alignment overhead.
+  const bool path_redirect_has_query_;
+  const bool https_redirect_;
+  const bool strip_query_;
+};
+
+/*
+ * Compute new path based on RedirectConfig.
+ */
+std::string newUri(::Envoy::OptRef<const RedirectConfig> redirect_config,
+                   const Http::RequestHeaderMap& headers);
 
 } // namespace Utility
 } // namespace Http

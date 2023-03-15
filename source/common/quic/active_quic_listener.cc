@@ -225,11 +225,13 @@ void ActiveQuicListener::closeConnectionsWithFilterChain(const Network::FilterCh
 
 ActiveQuicListenerFactory::ActiveQuicListenerFactory(
     const envoy::config::listener::v3::QuicProtocolOptions& config, uint32_t concurrency,
-    QuicStatNames& quic_stat_names, ProtobufMessage::ValidationVisitor& validation_visitor)
+    QuicStatNames& quic_stat_names, ProtobufMessage::ValidationVisitor& validation_visitor,
+    ProcessContextOptRef context)
     : concurrency_(concurrency), enabled_(config.enabled()), quic_stat_names_(quic_stat_names),
       packets_to_read_to_connection_count_ratio_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, packets_to_read_to_connection_count_ratio,
-                                          DEFAULT_PACKETS_TO_READ_PER_CONNECTION)) {
+                                          DEFAULT_PACKETS_TO_READ_PER_CONNECTION)),
+      context_(context) {
   const int64_t idle_network_timeout_ms =
       config.has_idle_timeout() ? DurationUtil::durationToMilliseconds(config.idle_timeout())
                                 : 300000;
@@ -287,6 +289,20 @@ ActiveQuicListenerFactory::ActiveQuicListenerFactory(
       *Config::Utility::translateToFactoryConfig(cid_generator_config, validation_visitor,
                                                  cid_generator_config_factory));
 
+  if (config.has_server_preferred_address_config()) {
+    const envoy::config::core::v3::TypedExtensionConfig& server_preferred_address_config =
+        config.server_preferred_address_config();
+    auto& server_preferred_address_config_factory =
+        Config::Utility::getAndCheckFactory<EnvoyQuicServerPreferredAddressConfigFactory>(
+            server_preferred_address_config);
+    server_preferred_address_config_ =
+        server_preferred_address_config_factory.createServerPreferredAddressConfig(
+            *Config::Utility::translateToFactoryConfig(config.server_preferred_address_config(),
+                                                       validation_visitor,
+                                                       server_preferred_address_config_factory),
+            validation_visitor, context_);
+  }
+
 #if defined(SO_ATTACH_REUSEPORT_CBPF) && defined(__linux__)
   if (!disable_kernel_bpf_packet_routing_for_test_) {
     if (concurrency_ > 1) {
@@ -312,6 +328,26 @@ Network::ConnectionHandler::ActiveUdpListenerPtr ActiveQuicListenerFactory::crea
     Network::SocketSharedPtr&& listen_socket_ptr, Event::Dispatcher& disptacher,
     Network::ListenerConfig& config) {
   ASSERT(crypto_server_stream_factory_.has_value());
+  if (server_preferred_address_config_ != nullptr) {
+    std::pair<quic::QuicSocketAddress, quic::QuicSocketAddress> addresses =
+        server_preferred_address_config_->getServerPreferredAddresses(
+            listen_socket_ptr->connectionInfoProvider().localAddress());
+    quic::QuicSocketAddress v4_address = addresses.first;
+    if (v4_address.IsInitialized()) {
+      ENVOY_BUG(v4_address.host().address_family() == quiche::IpAddressFamily::IP_V4,
+                absl::StrCat("Configured IPv4 server's preferred address isn't a v4 address:",
+                             v4_address.ToString()));
+      quic_config_.SetIPv4AlternateServerAddressToSend(v4_address);
+    }
+    quic::QuicSocketAddress v6_address = addresses.second;
+    if (v6_address.IsInitialized()) {
+      ENVOY_BUG(v6_address.host().address_family() == quiche::IpAddressFamily::IP_V6,
+                absl::StrCat("Configured IPv6 server's preferred address isn't a v6 address:",
+                             v4_address.ToString()));
+      quic_config_.SetIPv6AlternateServerAddressToSend(v6_address);
+    }
+  }
+
   return std::make_unique<ActiveQuicListener>(
       runtime, worker_index, concurrency_, disptacher, parent, std::move(listen_socket_ptr), config,
       quic_config_, kernel_worker_routing_, enabled_, quic_stat_names_,
