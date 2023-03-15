@@ -10999,7 +10999,6 @@ virtual_hosts:
       - match: { prefix: "/" }
         route:
           cluster: default
-    require_tls: EXTERNAL_ONLY
 )EOF";
 
   factory_context_.cluster_manager_.initializeClusters({"foo_bar_baz", "foo_bar", "default"}, {});
