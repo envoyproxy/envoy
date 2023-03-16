@@ -33,6 +33,8 @@ jobs:
     - name: 'Run coverage'
       if: steps.should_run.outputs.run_ci_job == 'true'
       continue-on-error: true
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
         cd mobile && BAZEL_BUILD_OPTIONS="--config=remote-ci-linux-coverage" \
             PATH=/opt/llvm/bin:${PATH} \
