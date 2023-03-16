@@ -618,7 +618,7 @@ open class EngineBuilder: NSObject {
 
   /// Adds a CDS layer to the configuration.
   ///
-  /// - parameter cdsResourcesLocator: The layer name.
+  /// - parameter cdsResourcesLocator: The url for the CDS resources.
   /// - parameter timeoutSeconds:      The timeout in seconds.
   ///
   /// - returns: This builder.

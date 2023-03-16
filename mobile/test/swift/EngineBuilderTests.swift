@@ -414,7 +414,7 @@ final class EngineBuilderTests: XCTestCase {
     self.waitForExpectations(timeout: 0.01)
   }
 
-#if ENVOY_ADMIN_FUNCTIONALITY
+#if ENVOY_GOOGLE_GRPC
   func testAddingRtdsAndAdsConfigurationWhenRunningEnvoy() {
     let bootstrapDebugDescription = EngineBuilder()
       .addEngineType(MockEnvoyEngine.self)
