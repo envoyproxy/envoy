@@ -222,7 +222,7 @@ public:
                  Server::Configuration::FactoryContext& context);
     const TcpProxyStats& stats() { return stats_; }
     const absl::optional<std::chrono::milliseconds>& idleTimeout() { return idle_timeout_; }
-    const bool& flushAccessLogOnConnected() const { return flush_access_log_on_connected_; }
+    const bool flushAccessLogOnConnected() const { return flush_access_log_on_connected_; }
     const absl::optional<std::chrono::milliseconds>& maxDownstreamConnectionDuration() const {
       return max_downstream_connection_duration_;
     }
@@ -310,7 +310,7 @@ public:
   // This function must not be called if on demand is disabled.
   const OnDemandStats& onDemandStats() const { return shared_config_->onDemandConfig()->stats(); }
   Random::RandomGenerator& randomGenerator() { return random_generator_; }
-  const bool& flushAccessLogOnConnected() const {
+  const bool flushAccessLogOnConnected() const {
     return shared_config_->flushAccessLogOnConnected();
   }
 
