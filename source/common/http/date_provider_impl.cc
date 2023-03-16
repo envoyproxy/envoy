@@ -6,7 +6,7 @@
 namespace Envoy {
 namespace Http {
 
-DateFormatter DateProviderImplBase::date_formatter_("%a, %d %b %Y %H:%M:%S GMT");
+static DateFormatter* date_formatter_ = new DateFormatter("%a, %d %b %Y %H:%M:%S GMT");
 
 TlsCachingDateProviderImpl::TlsCachingDateProviderImpl(Event::Dispatcher& dispatcher,
                                                        ThreadLocal::SlotAllocator& tls)
@@ -17,7 +17,7 @@ TlsCachingDateProviderImpl::TlsCachingDateProviderImpl(Event::Dispatcher& dispat
 }
 
 void TlsCachingDateProviderImpl::onRefreshDate() {
-  std::string new_date_string = date_formatter_.now(time_source_);
+  std::string new_date_string = date_formatter_->now(time_source_);
   tls_->set([new_date_string](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr {
     return std::make_shared<ThreadLocalCachedDate>(new_date_string);
   });
@@ -30,7 +30,7 @@ void TlsCachingDateProviderImpl::setDateHeader(ResponseHeaderMap& headers) {
 }
 
 void SlowDateProviderImpl::setDateHeader(ResponseHeaderMap& headers) {
-  headers.setDate(date_formatter_.now(time_source_));
+  headers.setDate(date_formatter_->now(time_source_));
 }
 
 } // namespace Http
