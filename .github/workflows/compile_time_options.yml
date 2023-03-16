@@ -5,6 +5,9 @@ on:
     branches:
     - main
   pull_request_target:
+  # TODO(yannic): Remove when #26109 is merged and the required checks migrated
+  # to `pull_request_target`.
+  pull_request:
 
 concurrency:
   group: ${{ github.head_ref-github.workflow || github.run_id }}
