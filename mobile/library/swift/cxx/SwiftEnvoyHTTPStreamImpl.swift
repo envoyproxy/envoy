@@ -18,65 +18,93 @@ final class SwiftEnvoyHTTPStreamImpl: EnvoyHTTPStream {
     self.streamAndCallbacksPointer = context
     var cppCallbacks = envoy_http_callbacks()
     cppCallbacks.on_headers = { headers, end_stream, stream_intel, context in
-      let callbacks = PointerBox<StreamAndCallbacks>.unretained(from: context!).callbacks
-      callbacks.dispatchQueue.async {
-        callbacks.onHeaders?(toSwiftHeaders(headers), end_stream, stream_intel)
+      // This closure runs inside the Envoy event loop. Therefore, an explicit autoreleasepool block
+      // is necessary to act as a breaker for any Objective-C/Swift allocations that happen.
+      autoreleasepool {
+        let callbacks = PointerBox<StreamAndCallbacks>.unretained(from: context!).callbacks
+        callbacks.dispatchQueue.async {
+          callbacks.onHeaders?(toSwiftHeaders(headers), end_stream, stream_intel)
+        }
       }
       return nil
     }
 
     cppCallbacks.on_data = { data, end_stream, stream_intel, context in
-      let callbacks = PointerBox<StreamAndCallbacks>.unretained(from: context!).callbacks
-      callbacks.dispatchQueue.async {
-        callbacks.onData?(Data(data), end_stream, stream_intel)
+      // This closure runs inside the Envoy event loop. Therefore, an explicit autoreleasepool block
+      // is necessary to act as a breaker for any Objective-C/Swift allocations that happen.
+      autoreleasepool {
+        let callbacks = PointerBox<StreamAndCallbacks>.unretained(from: context!).callbacks
+        callbacks.dispatchQueue.async {
+          callbacks.onData?(Data(data), end_stream, stream_intel)
+        }
       }
       return nil
     }
 
     cppCallbacks.on_trailers = { trailers, stream_intel, context in
-      let callbacks = PointerBox<StreamAndCallbacks>.unretained(from: context!).callbacks
-      callbacks.dispatchQueue.async {
-        callbacks.onTrailers?(toSwiftHeaders(trailers), stream_intel)
+      // This closure runs inside the Envoy event loop. Therefore, an explicit autoreleasepool block
+      // is necessary to act as a breaker for any Objective-C/Swift allocations that happen.
+      autoreleasepool {
+        let callbacks = PointerBox<StreamAndCallbacks>.unretained(from: context!).callbacks
+        callbacks.dispatchQueue.async {
+          callbacks.onTrailers?(toSwiftHeaders(trailers), stream_intel)
+        }
       }
       return nil
     }
 
     cppCallbacks.on_error = { error, stream_intel, final_stream_intel, context in
-      let callbacks = PointerBox<StreamAndCallbacks>.unretained(from: context!).callbacks
-      callbacks.dispatchQueue.async {
-        let message = String.fromEnvoyData(error.message)!
-        callbacks.onError?(
-          UInt64(error.error_code.rawValue),
-          message,
-          error.attempt_count,
-          stream_intel,
-          final_stream_intel
-        )
-        release_envoy_error(error)
+      // This closure runs inside the Envoy event loop. Therefore, an explicit autoreleasepool block
+      // is necessary to act as a breaker for any Objective-C/Swift allocations that happen.
+      autoreleasepool {
+        let callbacks = PointerBox<StreamAndCallbacks>.unretained(from: context!).callbacks
+        callbacks.dispatchQueue.async {
+          let message = String.fromEnvoyData(error.message)!
+          callbacks.onError?(
+            UInt64(error.error_code.rawValue),
+            message,
+            error.attempt_count,
+            stream_intel,
+            final_stream_intel
+          )
+          release_envoy_error(error)
+        }
       }
       return nil
     }
 
     cppCallbacks.on_complete = { stream_intel, final_stream_intel, context in
-      let callbacks = PointerBox<StreamAndCallbacks>.unretained(from: context!).callbacks
-      callbacks.dispatchQueue.async {
-        callbacks.onComplete?(stream_intel, final_stream_intel)
+      // This closure runs inside the Envoy event loop. Therefore, an explicit autoreleasepool block
+      // is necessary to act as a breaker for any Objective-C/Swift allocations that happen.
+      autoreleasepool {
+        let callbacks = PointerBox<StreamAndCallbacks>.unretained(from: context!).callbacks
+        callbacks.dispatchQueue.async {
+          callbacks.onComplete?(stream_intel, final_stream_intel)
+        }
       }
       return nil
     }
 
     cppCallbacks.on_cancel = { stream_intel, final_stream_intel, context in
-      let callbacks = PointerBox<StreamAndCallbacks>.unretained(from: context!).callbacks
-      callbacks.dispatchQueue.async {
-        callbacks.onCancel?(stream_intel, final_stream_intel)
+      // This closure runs inside the Envoy event loop. Therefore, an explicit autoreleasepool block
+      // is necessary to act as a breaker for any Objective-C/Swift allocations that happen.
+      autoreleasepool {
+        let callbacks = PointerBox<StreamAndCallbacks>.unretained(from: context!).callbacks
+        callbacks.dispatchQueue.async {
+          callbacks.onCancel?(stream_intel, final_stream_intel)
+        }
       }
       return nil
     }
 
     cppCallbacks.on_send_window_available = { stream_intel, context in
-      let callbacks = PointerBox<StreamAndCallbacks>.unretained(from: context!).callbacks
-      callbacks.dispatchQueue.async {
-        callbacks.onSendWindowAvailable?(stream_intel)
+      // This closure runs inside the Envoy event loop. Therefore, an explicit autoreleasepool block
+      // is necessary to act as a breaker for any Objective-C/Swift allocations that happen.
+      autoreleasepool {
+        let callbacks = PointerBox<StreamAndCallbacks>.unretained(from: context!).callbacks
+        callbacks.dispatchQueue.async {
+          callbacks.onSendWindowAvailable?(stream_intel)
+        }
       }
       return nil
     }

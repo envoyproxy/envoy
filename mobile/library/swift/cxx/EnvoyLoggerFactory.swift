@@ -1,4 +1,5 @@
 @_implementationOnly import EnvoyCxxSwiftInterop
+import Foundation
 
 // swiftlint:disable force_unwrapping
 
@@ -13,12 +14,16 @@ enum EnvoyLoggerFactory {
 
     return envoy_logger(
       log: { stringData, context in
-        guard let string = String.fromEnvoyData(stringData) else {
-          return
-        }
+        // This closure runs inside the Envoy event loop. Therefore, an explicit autoreleasepool
+        // block is necessary to act as a breaker for any Objective-C/Swift allocations that happen.
+        autoreleasepool {
+          guard let string = String.fromEnvoyData(stringData) else {
+            return
+          }
 
-        let log = BoxType.unretained(from: context!)
-        log?(string)
+          let log = BoxType.unretained(from: context!)
+          log?(string)
+        }
       },
       release: { context in
         BoxType.unmanaged(from: context!).release()
