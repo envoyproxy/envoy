@@ -609,6 +609,7 @@ open class EngineBuilder: NSObject {
   /// - parameter layerName:      The layer name.
   /// - parameter timeoutSeconds: The timeout in seconds. If zero, a default value is set in
   ///                             engine_builder.h.
+  ///
   /// - returns: This builder.
   @discardableResult
   public func addRTDSLayer(name layerName: String, timeoutSeconds: UInt32 = 0) -> Self {
@@ -619,10 +620,10 @@ open class EngineBuilder: NSObject {
 
   /// Adds a CDS layer to the configuration.
   ///
-  /// - parameter cdsResourcesLocator: The xdstp resource URI for fetching clusters.
-  ///                                  If empty, xdstp is not used and a wildcard is inferred.
-  /// - parameter timeoutSeconds:      The timeout in seconds. If zero, a default value is set in
-  ///                                  engine_builder.h.
+  /// - parameter resourcesLocator: The xdstp resource URI for fetching clusters.
+  ///                               If empty, xdstp is not used and a wildcard is inferred.
+  /// - parameter timeoutSeconds:   The timeout in seconds. If zero, a default value is set in
+  ///                               engine_builder.h.
   ///
   /// - returns: This builder.
   @discardableResult
