@@ -310,9 +310,7 @@ public:
   // This function must not be called if on demand is disabled.
   const OnDemandStats& onDemandStats() const { return shared_config_->onDemandConfig()->stats(); }
   Random::RandomGenerator& randomGenerator() { return random_generator_; }
-  bool flushAccessLogOnConnected() const {
-    return shared_config_->flushAccessLogOnConnected();
-  }
+  bool flushAccessLogOnConnected() const { return shared_config_->flushAccessLogOnConnected(); }
 
 private:
   struct SimpleRouteImpl : public Route {
