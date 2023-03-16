@@ -87,12 +87,12 @@ public:
   virtual Http::Code responseCode() const PURE;
 
   /**
-   * Returns the redirect path based on the request headers.
+   * Returns the redirect URI based on the request headers.
    * @param headers supplies the request headers.
    * @return std::string the redirect URL if this DirectResponseEntry is a redirect,
    *         or an empty string otherwise.
    */
-  virtual std::string newPath(const Http::RequestHeaderMap& headers) const PURE;
+  virtual std::string newUri(const Http::RequestHeaderMap& headers) const PURE;
 
   /**
    * Returns the response body to send with direct responses.

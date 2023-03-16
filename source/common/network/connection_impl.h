@@ -65,7 +65,7 @@ public:
   // Network::Connection
   void addBytesSentCallback(BytesSentCb cb) override;
   void enableHalfClose(bool enabled) override;
-  bool isHalfCloseEnabled() override { return enable_half_close_; }
+  bool isHalfCloseEnabled() const override { return enable_half_close_; }
   void close(ConnectionCloseType type) final;
   void close(ConnectionCloseType type, absl::string_view details) override {
     if (!details.empty()) {

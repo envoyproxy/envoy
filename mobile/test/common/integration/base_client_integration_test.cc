@@ -9,7 +9,6 @@
 #include "gtest/gtest.h"
 #include "library/cc/bridge_utility.h"
 #include "library/cc/log_level.h"
-#include "library/common/config/internal.h"
 #include "library/common/engine.h"
 #include "library/common/engine_handle.h"
 #include "library/common/http/header_utility.h"
@@ -82,8 +81,8 @@ Platform::LogLevel getPlatformLogLevelFromOptions() {
 // Note: This function is only used to build the Engine if `override_builder_config_` is true.
 std::string defaultConfig() {
   Platform::EngineBuilder builder;
-  std::string config_str = absl::StrCat(config_header, builder.generateConfigStr());
-  return config_str;
+  std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> bootstrap = builder.generateBootstrap();
+  return MessageUtil::getYamlStringFromMessage(*bootstrap);
 }
 
 BaseClientIntegrationTest::BaseClientIntegrationTest(Network::Address::IpVersion ip_version,
@@ -150,9 +149,6 @@ std::shared_ptr<Platform::RequestHeaders> BaseClientIntegrationTest::envoyToMobi
       std::string(default_request_headers_.Scheme()->value().getStringView()),
       std::string(default_request_headers_.Host()->value().getStringView()),
       std::string(default_request_headers_.Path()->value().getStringView()));
-  if (upstreamProtocol() == Http::CodecType::HTTP2) {
-    builder.addUpstreamHttpProtocol(Platform::UpstreamHttpProtocol::HTTP2);
-  }
 
   request_headers.iterate(
       [&request_headers, &builder](const Http::HeaderEntry& header) -> Http::HeaderMap::Iterate {
@@ -178,6 +174,9 @@ void BaseClientIntegrationTest::threadRoutine(absl::Notification& engine_running
 }
 
 void BaseClientIntegrationTest::TearDown() {
+  if (xds_connection_ != nullptr) {
+    cleanUpXdsConnection();
+  }
   test_server_.reset();
   fake_upstreams_.clear();
   if (engine_) {
@@ -201,13 +200,11 @@ void BaseClientIntegrationTest::createEnvoy() {
     }
   }
 
-  finalizeConfigWithPorts(config_helper_, ports, use_lds_);
-
   if (override_builder_config_) {
+    finalizeConfigWithPorts(config_helper_, ports, use_lds_);
     ASSERT_FALSE(config_helper_.bootstrap().has_admin())
         << "Bootstrap config should not have `admin` configured in Envoy Mobile";
-    builder_.setOverrideConfigForTests(
-        MessageUtil::getYamlStringFromMessage(config_helper_.bootstrap()));
+    builder_.setOverrideConfig(MessageUtil::getYamlStringFromMessage(config_helper_.bootstrap()));
   } else {
     ENVOY_LOG_MISC(warn, "Using builder config and ignoring config modifiers");
   }
@@ -250,12 +247,35 @@ testing::AssertionResult BaseClientIntegrationTest::waitForCounterGe(const std::
   return testing::AssertionSuccess();
 }
 
-void BaseClientIntegrationTest::cleanup() {
-  if (xds_connection_ != nullptr) {
-    cleanUpXdsConnection();
-  }
-  test_server_.reset();
-  fake_upstreams_.clear();
+uint64_t BaseClientIntegrationTest::getGaugeValue(const std::string& name) {
+  uint64_t gauge_value = 0UL;
+  uint64_t* gauge_value_ptr = &gauge_value;
+  absl::Notification gauge_value_set;
+  EXPECT_EQ(ENVOY_SUCCESS,
+            EngineHandle::runOnEngineDispatcher(
+                rawEngine(), [gauge_value_ptr, &name, &gauge_value_set](Envoy::Engine& engine) {
+                  Stats::GaugeSharedPtr gauge =
+                      TestUtility::findGauge(engine.getStatsStore(), name);
+                  if (gauge != nullptr) {
+                    *gauge_value_ptr = gauge->value();
+                  }
+                  gauge_value_set.Notify();
+                }));
+  EXPECT_TRUE(gauge_value_set.WaitForNotificationWithTimeout(absl::Seconds(5)));
+  return gauge_value;
 }
 
+testing::AssertionResult BaseClientIntegrationTest::waitForGaugeGe(const std::string& name,
+                                                                   uint64_t value) {
+  constexpr std::chrono::milliseconds timeout = TestUtility::DefaultTimeout;
+  Event::TestTimeSystem::RealTimeBound bound(timeout);
+  while (getGaugeValue(name) < value) {
+    timeSystem().advanceTimeWait(std::chrono::milliseconds(10));
+    if (timeout != std::chrono::milliseconds::zero() && !bound.withinBound()) {
+      return testing::AssertionFailure()
+             << fmt::format("timed out waiting for {} to be {}", name, value);
+    }
+  }
+  return testing::AssertionSuccess();
+}
 } // namespace Envoy

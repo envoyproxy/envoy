@@ -535,7 +535,8 @@ matcher_tree:
   Network::MockConnectionSocket socket;
   socket.connection_info_provider_->setLocalAddress(
       std::make_shared<Network::Address::Ipv4Instance>("192.168.0.1", 8080));
-  Network::Matching::MatchingDataImpl data(socket);
+  StreamInfo::FilterStateImpl filter_state(StreamInfo::FilterState::LifeSpan::Connection);
+  Network::Matching::MatchingDataImpl data(socket, filter_state);
 
   const auto result = match_tree()->match(data);
   EXPECT_EQ(result.match_state_, MatchState::MatchComplete);
@@ -621,10 +622,13 @@ matcher_tree:
       context, factory_context, validation_visitor);
   auto match_tree = matcher_factory.create(matcher);
 
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
   const Network::Address::InstanceConstSharedPtr address =
       std::make_shared<Network::Address::Ipv4Instance>("192.168.0.1", 8080);
-  Network::ConnectionInfoSetterImpl connection_info(address, address);
-  Http::Matching::HttpMatchingDataImpl data(connection_info);
+  stream_info.downstream_connection_info_provider_->setLocalAddress(address);
+  stream_info.downstream_connection_info_provider_->setRemoteAddress(address);
+
+  Http::Matching::HttpMatchingDataImpl data(stream_info);
 
   const auto result = match_tree()->match(data);
   EXPECT_EQ(result.match_state_, MatchState::MatchComplete);

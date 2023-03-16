@@ -15,12 +15,13 @@ run --color=yes
 build --color=yes
 build --workspace_status_command="bash bazel/get_workspace_status"
 build --incompatible_strict_action_env
-build --host_force_python=PY3
 build --java_runtime_version=remotejdk_11
 build --tool_java_runtime_version=remotejdk_11
 build --platform_mappings=bazel/platform_mappings
 # silence absl logspam.
 build --copt=-DABSL_MIN_LOG_LEVEL=4
+build --define envoy_mobile_listener=enabled
+build --experimental_repository_downloader_retries=2
 
 # Pass PATH, CC, CXX and LLVM_CONFIG variables from the environment.
 build --action_env=CC --host_action_env=CC
@@ -295,7 +296,7 @@ build:remote-clang-cl --config=rbe-toolchain-clang-cl
 
 # Docker sandbox
 # NOTE: Update this from https://github.com/envoyproxy/envoy-build-tools/blob/main/toolchains/rbe_toolchains_config.bzl#L8
-build:docker-sandbox --experimental_docker_image=envoyproxy/envoy-build-ubuntu:7304f974de2724617b7492ccb4c9c58cd420353a
+build:docker-sandbox --experimental_docker_image=envoyproxy/envoy-build-ubuntu:458cb49ca2013c0ccf057d00ad1d4407920c4e52
 build:docker-sandbox --spawn_strategy=docker
 build:docker-sandbox --strategy=Javac=docker
 build:docker-sandbox --strategy=Closure=docker

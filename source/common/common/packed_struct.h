@@ -148,7 +148,7 @@ public:
 
   // Move constructor and assignment operator.
   PackedStruct(PackedStruct&& other) noexcept = default;
-  PackedStruct& operator=(PackedStruct&& other) = default;
+  PackedStruct& operator=(PackedStruct&& other) noexcept = default;
 
   friend class PackedStructTest;
 

@@ -103,8 +103,7 @@ private:
                  RouteStatsContextOptRef route_stats_context, Runtime::Loader& runtime,
                  Random::RandomGenerator& random, Event::Dispatcher& dispatcher,
                  TimeSource& time_source, Upstream::ResourcePriority priority,
-                 bool auto_configured_for_http3,
-                 bool conn_pool_new_stream_with_early_data_and_http3);
+                 bool auto_configured_for_http3);
 
   void enableBackoffTimer();
   void resetRetry();
@@ -139,7 +138,6 @@ private:
   std::vector<ResetHeaderParserSharedPtr> reset_headers_{};
   std::chrono::milliseconds reset_max_interval_{};
   const bool auto_configured_for_http3_{};
-  const bool conn_pool_new_stream_with_early_data_and_http3_{};
 };
 
 } // namespace Router

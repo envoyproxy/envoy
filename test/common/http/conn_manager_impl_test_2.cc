@@ -5,12 +5,10 @@
 
 using testing::_;
 using testing::AtLeast;
-using testing::HasSubstr;
 using testing::InSequence;
 using testing::Invoke;
 using testing::InvokeWithoutArgs;
 using testing::Mock;
-using testing::Property;
 using testing::Ref;
 using testing::Return;
 using testing::ReturnRef;
@@ -3503,5 +3501,18 @@ TEST_F(HttpConnectionManagerImplTest, HeaderValidatorAccept) {
   EXPECT_EQ(1U, listener_stats_.downstream_rq_completed_.value());
 }
 
+TEST_F(HttpConnectionManagerImplTest, NoProxyProtocolAdded) {
+  add_proxy_protocol_connection_state_ = false;
+  setup(false, "server_name");
+  Buffer::OwnedImpl fake_input("input");
+  conn_manager_->createCodec(fake_input);
+
+  startRequest(false);
+
+  EXPECT_FALSE(decoder_->streamInfo().filterState()->hasDataWithName(
+      Network::ProxyProtocolFilterState::key()));
+  // Clean up.
+  filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
+}
 } // namespace Http
 } // namespace Envoy
