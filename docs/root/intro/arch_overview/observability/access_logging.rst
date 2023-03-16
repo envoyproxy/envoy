@@ -22,9 +22,10 @@ filter access logs.
 Periodic access logs
 --------------------
 
-If access log is enabled, then by default it will be flushed to the configured sinks at the end of a TCP
-stream, or HTTP request. It is possible to extend this behavior and flush access logs periodically, and
-at the beginning of a TCP stream.
+If access log is enabled, then by default it will be reported to the configured sinks at the end of a TCP
+stream, or HTTP request. It is possible to extend this behavior and report  access logs periodically, and
+right after the TCP Proxy has successfully established a connection with the upstream. Reporting access logs
+right after upstream connection establishment does not depend on periodic reporting, and and the other way around.
 
 TCP Proxy
 *********
