@@ -549,6 +549,7 @@ stages:
     - template: bazel.yml
       parameters:
         ciTarget: $(CI_TARGET)
+        buildImageCacheVersion: "${{ variables['buildImageCacheVersion'] }}"
 
   - job: coverage
     # displayName: "Linux x64"
@@ -572,6 +573,7 @@ stages:
         rbe: false
         # /tmp/sandbox_base is a tmpfs in CI environment to optimize large I/O for coverage traces
         bazelBuildExtraOptions: "--define=no_debug_info=1 --linkopt=-Wl,-s --test_env=ENVOY_IP_TEST_VERSIONS=v4only --sandbox_base=/tmp/sandbox_base"
+        buildImageCacheVersion: "${{ variables['buildImageCacheVersion'] }}"
 
     - script: ci/run_envoy_docker.sh 'ci/upload_gcs_artifact.sh /source/generated/$(CI_TARGET) $(CI_TARGET)'
       displayName: "Upload $(CI_TARGET) Report to GCS"
@@ -625,27 +627,8 @@ stages:
         cacheHitVar: CACHE_RESTORED
     - script: sudo .azure-pipelines/load_docker_cache.sh /mnt/docker_cache /mnt/docker
       displayName: Restore Docker build cache
-
-    - script: |
-        sudo systemctl stop docker
-        sudo mv /var/lib/docker /var/lib/docker.old
-        sudo mkdir /var/lib/docker
-        sudo systemctl start docker
-        sudo rm -rf /var/lib/docker.old &
-      displayName: Docker initialize
-      condition: and(not(canceled()), ne(variables.CACHE_RESTORED, 'true'))
-    - script: |
-        sudo systemctl stop docker
-        sudo mv /var/lib/docker /var/lib/docker.old
-        sudo mkdir /var/lib/docker
-        sudo systemctl start docker
-        sudo tar -I "zstd -d -T0 " -axf "$(Build.StagingDirectory)/docker_cache/docker.tar.zst" -C /var/lib/docker
-        ls -alh /var/lib/docker
-        sudo systemctl start docker
-        docker images
-        sudo rm -rf /var/lib/docker.old &
-      displayName: Docker restore
       condition: and(not(canceled()), eq(variables.CACHE_RESTORED, 'true'))
+
     - task: DownloadBuildArtifacts@0
       inputs:
         buildType: current
@@ -707,6 +690,29 @@ stages:
       timeoutInMinutes: 10
       condition: always()
       displayName: Docker save
+
+    - script: |
+        sudo systemctl stop docker
+        sudo mv /var/lib/docker /var/lib/docker.old
+        sudo mkdir /var/lib/docker
+        sudo systemctl start docker
+        sudo rm -rf /var/lib/docker.old &
+      displayName: Docker initialize
+      condition: and(not(canceled()), ne(variables.CACHE_RESTORED, 'true'))
+    - script: |
+        sudo systemctl stop docker
+        sudo mv /var/lib/docker /var/lib/docker.old
+        sudo mkdir /var/lib/docker
+        sudo systemctl start docker
+        sudo tar -I "zstd -d -T0 " -axf "$(Build.StagingDirectory)/docker_cache/docker.tar.zst" -C /var/lib/docker
+        ls -alh /var/lib/docker
+        sudo systemctl start docker
+        docker images
+        sudo rm -rf /var/lib/docker.old &
+      displayName: Docker restore
+      condition: and(not(canceled()), eq(variables.CACHE_RESTORED, 'true'))
+
+
     - script: |
         sudo systemctl stop docker
         sudo mkdir -p "$(Build.StagingDirectory)/docker_cache"
@@ -917,6 +923,11 @@ stages:
       env:
         GITHUB_TOKEN: $(GitHubPublicRepoOnlyAccessToken)
         MAINTAINER_GPG_KEY_PASSPHRASE: $(MaintainerGPGKeyPassphrase)
+
+    - script: NO_INSTALL_ZSTD=1 && sudo .azure-pipelines/save_docker_cache.sh /mnt/docker_cache
+      displayName: Create Docker build cache
+      # TODO(phlax): figure if there is a way to test cache without downloading it
+      condition: and(not(canceled()), or(failed(), ne(variables.CACHE_RESTORED, 'true')))
 
 - stage: verify
   # displayName: Verify
