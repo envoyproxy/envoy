@@ -21,7 +21,7 @@ if id -u vsts &> /dev/null && [[ -n "$DOCKER_BIND_PATH" ]]; then
     mount -o bind "$DOCKER_BIND_PATH" /var/lib/docker
 else
     # Use a ramdisk to load docker (avoids Docker slow start on big disk)
-    mount -o tmpfs none /var/lib/docker
+    mount -t tmpfs none /var/lib/docker
 fi
 
 echo "Extracting docker cache ${DOCKER_CACHE_TARBALL} ..."
