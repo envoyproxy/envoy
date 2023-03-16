@@ -260,6 +260,25 @@ TEST(HttpUtility, H1H2H1Request) {
   ASSERT_EQ(converted_headers, original_headers);
 }
 
+// Start with H1 style websocket request headers. Transform to H3 and back.
+TEST(HttpUtility, H1H3H1Request) {
+  TestRequestHeaderMapImpl converted_headers = {
+      {":method", "GET"}, {"Upgrade", "foo"}, {"Connection", "upgrade"}};
+  const TestRequestHeaderMapImpl original_headers(converted_headers);
+
+  ASSERT_TRUE(Utility::isUpgrade(converted_headers));
+  ASSERT_FALSE(Utility::isH3UpgradeRequest(converted_headers));
+  Utility::transformUpgradeRequestFromH1toH3(converted_headers);
+
+  ASSERT_FALSE(Utility::isUpgrade(converted_headers));
+  ASSERT_TRUE(Utility::isH2UpgradeRequest(converted_headers));
+  Utility::transformUpgradeRequestFromH3toH1(converted_headers);
+
+  ASSERT_TRUE(Utility::isUpgrade(converted_headers));
+  ASSERT_FALSE(Utility::isH3UpgradeRequest(converted_headers));
+  ASSERT_EQ(converted_headers, original_headers);
+}
+
 // Start with H2 style websocket request headers. Transform to H1 and back.
 TEST(HttpUtility, H2H1H2Request) {
   TestRequestHeaderMapImpl converted_headers = {{":method", "CONNECT"}, {":protocol", "websocket"}};
@@ -279,9 +298,29 @@ TEST(HttpUtility, H2H1H2Request) {
   ASSERT_EQ(converted_headers, original_headers);
 }
 
+// Start with H3 style websocket request headers. Transform to H1 and back.
+TEST(HttpUtility, H2H1H3Request) {
+  TestRequestHeaderMapImpl converted_headers = {{":method", "CONNECT"}, {":protocol", "websocket"}};
+  const TestRequestHeaderMapImpl original_headers(converted_headers);
+
+  ASSERT_FALSE(Utility::isUpgrade(converted_headers));
+  ASSERT_TRUE(Utility::isH3UpgradeRequest(converted_headers));
+  Utility::transformUpgradeRequestFromH3toH1(converted_headers);
+
+  ASSERT_TRUE(Utility::isUpgrade(converted_headers));
+  ASSERT_FALSE(Utility::isH3UpgradeRequest(converted_headers));
+  Utility::transformUpgradeRequestFromH1toH3(converted_headers);
+
+  ASSERT_FALSE(Utility::isUpgrade(converted_headers));
+  ASSERT_TRUE(Utility::isH3UpgradeRequest(converted_headers));
+  converted_headers.removeContentLength();
+  ASSERT_EQ(converted_headers, original_headers);
+}
+
 TEST(HttpUtility, ConnectBytestreamSpecialCased) {
   TestRequestHeaderMapImpl headers = {{":method", "CONNECT"}, {":protocol", "bytestream"}};
   ASSERT_FALSE(Utility::isH2UpgradeRequest(headers));
+  ASSERT_FALSE(Utility::isH3UpgradeRequest(headers));
 }
 
 // Start with H1 style websocket response headers. Transform to H2 and back.
@@ -300,6 +339,22 @@ TEST(HttpUtility, H1H2H1Response) {
   ASSERT_EQ(converted_headers, original_headers);
 }
 
+// Start with H1 style websocket response headers. Transform to H3 and back.
+TEST(HttpUtility, H1H3H1Response) {
+  TestResponseHeaderMapImpl converted_headers = {
+      {":status", "101"}, {"upgrade", "websocket"}, {"connection", "upgrade"}};
+  const TestResponseHeaderMapImpl original_headers(converted_headers);
+
+  ASSERT_TRUE(Utility::isUpgrade(converted_headers));
+  Utility::transformUpgradeResponseFromH1toH3(converted_headers);
+
+  ASSERT_FALSE(Utility::isUpgrade(converted_headers));
+  Utility::transformUpgradeResponseFromH3toH1(converted_headers, "websocket");
+
+  ASSERT_TRUE(Utility::isUpgrade(converted_headers));
+  ASSERT_EQ(converted_headers, original_headers);
+}
+
 // Users of the transformation functions should not expect the results to be
 // identical. Because the headers are always added in a set order, the original
 // header order may not be preserved.
@@ -312,6 +367,10 @@ TEST(HttpUtility, OrderNotPreserved) {
 
   Utility::transformUpgradeRequestFromH1toH2(converted_headers);
   Utility::transformUpgradeRequestFromH2toH1(converted_headers);
+  EXPECT_EQ(converted_headers, expected_headers);
+
+  Utility::transformUpgradeRequestFromH1toH3(converted_headers);
+  Utility::transformUpgradeRequestFromH3toH1(converted_headers);
   EXPECT_EQ(converted_headers, expected_headers);
 }
 
@@ -329,6 +388,13 @@ TEST(HttpUtility, MethodNotPreserved) {
   Utility::transformUpgradeRequestFromH1toH2(converted_headers);
   Utility::transformUpgradeRequestFromH2toH1(converted_headers);
   EXPECT_EQ(converted_headers, expected_headers);
+
+  converted_headers = {
+      {":method", "POST"}, {"Upgrade", "foo"}, {"Connection", "upgrade"}};
+
+  Utility::transformUpgradeRequestFromH1toH3(converted_headers);
+  Utility::transformUpgradeRequestFromH3toH1(converted_headers);
+  EXPECT_EQ(converted_headers, expected_headers);
 }
 
 TEST(HttpUtility, ContentLengthMangling) {
@@ -336,16 +402,23 @@ TEST(HttpUtility, ContentLengthMangling) {
   {
     TestRequestHeaderMapImpl request_headers = {
         {":method", "GET"}, {"Upgrade", "foo"}, {"Connection", "upgrade"}, {"content-length", "0"}};
+    TestRequestHeaderMapImpl request_headers_h3 = request_headers;
+
     Utility::transformUpgradeRequestFromH1toH2(request_headers);
     EXPECT_TRUE(request_headers.ContentLength() == nullptr);
+    Utility::transformUpgradeRequestFromH1toH3(request_headers_h3);
+    EXPECT_TRUE(request_headers_h3.ContentLength() == nullptr);
   }
 
   // Non-zero Content-Length is not removed on the request path.
   {
     TestRequestHeaderMapImpl request_headers = {
         {":method", "GET"}, {"Upgrade", "foo"}, {"Connection", "upgrade"}, {"content-length", "1"}};
+    TestRequestHeaderMapImpl request_headers_h3 = request_headers;
     Utility::transformUpgradeRequestFromH1toH2(request_headers);
     EXPECT_FALSE(request_headers.ContentLength() == nullptr);
+    Utility::transformUpgradeRequestFromH1toH3(request_headers_h3);
+    EXPECT_FALSE(request_headers_h3.ContentLength() == nullptr);
   }
 
   // Content-Length of 0 is removed on the response path.
@@ -354,8 +427,11 @@ TEST(HttpUtility, ContentLengthMangling) {
                                                   {"upgrade", "websocket"},
                                                   {"connection", "upgrade"},
                                                   {"content-length", "0"}};
+    TestResponseHeaderMapImpl response_headers_h3 = response_headers;
     Utility::transformUpgradeResponseFromH1toH2(response_headers);
     EXPECT_TRUE(response_headers.ContentLength() == nullptr);
+    Utility::transformUpgradeResponseFromH1toH3(response_headers_h3);
+    EXPECT_TRUE(response_headers_h3.ContentLength() == nullptr);
   }
 
   // Non-zero Content-Length is not removed on the response path.
@@ -364,8 +440,11 @@ TEST(HttpUtility, ContentLengthMangling) {
                                                   {"upgrade", "websocket"},
                                                   {"connection", "upgrade"},
                                                   {"content-length", "1"}};
+    TestResponseHeaderMapImpl response_headers_h3 = response_headers;
     Utility::transformUpgradeResponseFromH1toH2(response_headers);
     EXPECT_FALSE(response_headers.ContentLength() == nullptr);
+    Utility::transformUpgradeResponseFromH1toH3(response_headers_h3);
+    EXPECT_FALSE(response_headers_h3.ContentLength() == nullptr);
   }
 }
 
