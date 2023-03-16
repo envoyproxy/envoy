@@ -628,8 +628,8 @@ open class EngineBuilder(
   * @param resourcesLocator The xdstp resource URI for fetching clusters.
   *                         If empty, xdstp is not used and a wildcard is inferred.
   *
-  * @param cdsTimeoutSeconds The timeout in seconds. If zero, a default value is
-  *                          set in engine_builder.h.
+  * @param timeoutSeconds The timeout in seconds. If zero, a default value is
+  *                       set in engine_builder.h.
   *
   * @return this builder.
   */
