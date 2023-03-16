@@ -19,6 +19,9 @@ if id -u vsts &> /dev/null && [[ -n "$DOCKER_BIND_PATH" ]]; then
     # use separate disk on windows hosted
     mkdir -p "$DOCKER_BIND_PATH"
     mount -o bind "$DOCKER_BIND_PATH" /var/lib/docker
+else
+    # Use a ramdisk to load docker (avoids Docker slow start on big disk)
+    mount -o tmpfs none /var/lib/docker
 fi
 
 echo "Extracting docker cache ${DOCKER_CACHE_TARBALL} ..."
@@ -26,8 +29,6 @@ tar -I "zstd -d -T0 " -axf "$DOCKER_CACHE_TARBALL" -C /var/lib/docker
 df -h
 umount "${DOCKER_CACHE_PATH}"
 
-
-du -ch /var/lib/docker
 
 echo "Starting Docker daemon ..."
 time systemctl start docker
