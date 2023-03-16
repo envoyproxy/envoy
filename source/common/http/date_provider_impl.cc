@@ -6,6 +6,9 @@
 namespace Envoy {
 namespace Http {
 
+// This uses the same memory model as ConstSingleton (which can't be used as it doesn't take
+// constructor arguments.) This will leak on program exit instead of causing shutdown
+// crashes (https://github.com/envoyproxy/envoy/issues/26091)
 static DateFormatter* date_formatter_ = new DateFormatter("%a, %d %b %Y %H:%M:%S GMT");
 
 TlsCachingDateProviderImpl::TlsCachingDateProviderImpl(Event::Dispatcher& dispatcher,
