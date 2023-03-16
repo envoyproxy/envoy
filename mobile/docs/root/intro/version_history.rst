@@ -46,6 +46,8 @@ Features:
 - api: Add support for Native Filters and Platform Filters to the C++ EngineBuilder. (:issue:`#2498 <2498>`)
 - api: added upstream protocol to final stream intel. (:issue:`#2613 <2613>`)
 - build: Add a build feature ``exclude_certificates`` to disable inclusion of the Envoy Mobile certificate list, for use when using platform certificate validation.
+- swift: Add a new Swift implementation of generating the Envoy bootstrap that replaces the previous Objective-C implementation.
+  This can be enabled by setting ``useSwiftBootstrap(true)`` and requires building with ``--define=envoy_mobile_swift_cxx_interop=enabled``. (:issue:`#26111 <26111>`)
 
 0.5.0 (September 2, 2022)
 ===========================

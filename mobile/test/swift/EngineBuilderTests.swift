@@ -375,13 +375,21 @@ final class EngineBuilderTests: XCTestCase {
   func testAddingVirtualClustersAddsToConfigurationWhenRunningEnvoy() {
     let expectation = self.expectation(description: "Run called with expected data")
     MockEnvoyEngine.onRunWithConfig = { config, _ in
-      XCTAssertEqual(["test"], config.virtualClusters)
+      XCTAssertEqual([
+        """
+        {"name":"test","headers":[{"name":":authority","string_match":{"exact":"envoymobile.io"}}]}
+        """,
+      ], config.virtualClusters)
       expectation.fulfill()
     }
 
     _ = EngineBuilder()
       .addEngineType(MockEnvoyEngine.self)
-      .addVirtualClusters(["test"])
+      .addVirtualClusters([
+        """
+        {"name":"test","headers":[{"name":":authority","string_match":{"exact":"envoymobile.io"}}]}
+        """,
+      ])
       .build()
     self.waitForExpectations(timeout: 0.01)
   }
@@ -395,7 +403,15 @@ final class EngineBuilderTests: XCTestCase {
 
     _ = EngineBuilder()
       .addEngineType(MockEnvoyEngine.self)
-      .addNativeFilter(name: "test_name", typedConfig: "config")
+      .addNativeFilter(
+        name: "envoy.filters.http.buffer",
+        typedConfig: """
+          {
+            "@type": "type.googleapis.com/envoy.extensions.filters.http.buffer.v3.Buffer",
+            "max_request_bytes": 5242880
+          }
+          """
+      )
       .build()
     self.waitForExpectations(timeout: 0.01)
   }
