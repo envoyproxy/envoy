@@ -26,11 +26,15 @@ tar -I "zstd -d -T0 " -axf "$DOCKER_CACHE_TARBALL" -C /var/lib/docker
 df -h
 umount "${DOCKER_CACHE_PATH}"
 
+
+du -ch /var/lib/docker
+
 echo "Starting Docker daemon ..."
 time systemctl start docker
 
 journalctl --no-pager -n500 -xu docker
-dmesg
+
+journalctl --no-pager -xe
 
 docker images
 df -h
