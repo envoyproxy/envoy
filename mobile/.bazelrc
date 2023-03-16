@@ -8,6 +8,7 @@ build --define=tcmalloc=disabled
 build --define=admin_html=disabled
 build --define=static_extension_registration=disabled
 build --define=admin_functionality=disabled
+build --define envoy_mobile_listener=disabled
 build --define=library_autolink=disabled
 build --define=envoy_mobile_swift_cxx_interop=enabled
 build --experimental_inmemory_dotd_files

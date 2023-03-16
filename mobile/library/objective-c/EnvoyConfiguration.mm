@@ -176,6 +176,7 @@
   self.nodeRegion = nodeRegion;
   self.nodeZone = nodeZone;
   self.nodeSubZone = nodeSubZone;
+  self.bootstrapPointer = 0;
 
   return self;
 }
