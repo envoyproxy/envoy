@@ -770,9 +770,6 @@ private:
  */
 class LoadBalancerSubsetInfoImpl : public LoadBalancerSubsetInfo {
 public:
-  LoadBalancerSubsetInfoImpl()
-      : LoadBalancerSubsetInfoImpl(
-            envoy::config::cluster::v3::Cluster::LbSubsetConfig::default_instance) {}
   LoadBalancerSubsetInfoImpl(
       const envoy::config::cluster::v3::Cluster::LbSubsetConfig& subset_config)
       : default_subset_(subset_config.default_subset()),
@@ -790,6 +787,9 @@ public:
       }
     }
   }
+  LoadBalancerSubsetInfoImpl()
+      : LoadBalancerSubsetInfoImpl(
+            envoy::config::cluster::v3::Cluster::LbSubsetConfig::default_instance) {}
 
   // Upstream::LoadBalancerSubsetInfo
   bool isEnabled() const override { return enabled_; }
