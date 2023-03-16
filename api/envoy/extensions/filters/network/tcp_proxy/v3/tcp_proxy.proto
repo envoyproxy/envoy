@@ -219,6 +219,7 @@ message TcpProxy {
   google.protobuf.Duration access_log_flush_interval = 15
       [(validate.rules).duration = {gte {nanos: 1000000}}];
 
-  // If set to true, access log will be flushed when the TCP proxy has established connection with the upstream.
+  // If set to true, access log will be flushed when the TCP proxy has successfully established a
+  // connection with the upstream. If the connection failed, the access log will not be flushed.
   bool flush_access_log_on_connected = 16;
 }
