@@ -583,7 +583,8 @@ open class EngineBuilder: NSObject {
   /// - parameter address:                 The network address of the server.
   /// - parameter port:                    The port of the server.
   /// - parameter jwtToken:                The JWT token.
-  /// - parameter jwtTokenLifetimeSeconds: The JWT token lifetime in seconds.
+  /// - parameter jwtTokenLifetimeSeconds: The JWT token lifetime in seconds. If zero, a
+  ///                                      default value is set in engine_builder.h.
   /// - parameter sslRootCerts:            The SSL root certificates.
   ///
   /// - returns: This builder.
@@ -606,8 +607,8 @@ open class EngineBuilder: NSObject {
   /// Adds an RTDS layer to the configuration.
   ///
   /// - parameter layerName:      The layer name.
-  /// - parameter timeoutSeconds: The timeout in seconds.
-  ///
+  /// - parameter timeoutSeconds: The timeout in seconds. If zero, a default value is set in
+  ///                             engine_builder.h.
   /// - returns: This builder.
   @discardableResult
   public func addRTDSLayer(name layerName: String, timeoutSeconds: UInt32 = 0) -> Self {
@@ -619,12 +620,14 @@ open class EngineBuilder: NSObject {
   /// Adds a CDS layer to the configuration.
   ///
   /// - parameter cdsResourcesLocator: The xdstp resource URI for fetching clusters.
-  /// - parameter timeoutSeconds:      The timeout in seconds.
+  ///                                  If empty, xdstp is not used and a wildcard is inferred.
+  /// - parameter timeoutSeconds:      The timeout in seconds. If zero, a default value is set in
+  ///                                  engine_builder.h.
   ///
   /// - returns: This builder.
   @discardableResult
-  public func addCDSLayer(cdsResourcesLocator: String = "", timeoutSeconds: UInt32 = 0) -> Self {
-    self.cdsResourcesLocator = cdsResourcesLocator
+  public func addCDSLayer(resourcesLocator: String = "", timeoutSeconds: UInt32 = 0) -> Self {
+    self.cdsResourcesLocator = resourcesLocator
     self.cdsTimeoutSeconds = timeoutSeconds
     self.enableCds = true
     return self

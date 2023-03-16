@@ -559,10 +559,10 @@ https://www.envoyproxy.io/docs/envoy/latest/configuration/upstream/cluster_manag
 **Example**::
 
   // Kotlin
-  builder.addCdsLayer(cdsResourcesLocator = "xdstp://td-location.com/cluster_location", timeoutSeconds = 10)
+  builder.addCdsLayer(resourcesLocator = "xdstp://td-location.com/cluster_location", timeoutSeconds = 10)
 
   // Swift
-  builder.addCDSLayer(cdsResourcesLocator: "xdstp://td-location.com/cluster_location", timeoutSeconds: 10)
+  builder.addCDSLayer(resourcesLocator: "xdstp://td-location.com/cluster_location", timeoutSeconds: 10)
 
   // C++
   builder.addCdsLayer("xdstp://td-location.com/cluster_location", 10)

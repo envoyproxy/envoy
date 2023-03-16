@@ -600,7 +600,8 @@ open class EngineBuilder(
   *
   * @param jwtToken the JWT token.
   *
-  * @param jwtTokenLifetimeSeconds the lifetime of the JWT token in seconds.
+  * @param jwtTokenLifetimeSeconds the lifetime of the JWT token. If zero,
+  *                                a default value is set in engine_builder.h.
   *
   * @param sslRootCerts the SSL root certificates.
   *
@@ -622,20 +623,22 @@ open class EngineBuilder(
   }
 
   /**
-  * Adds a CDS layer.
+  * Adds a CDS layer.🖥️
   *
-  * @param cdsResourcesLocator the locator for CDS resources.
+  * @param cdsResourcesLocator The xdstp resource URI for fetching clusters.
+  *                            If empty, xdstp is not used and a wildcard is inferred.
   *
-  * @param cdsTimeoutSeconds the connection timeout.
+  * @param cdsTimeoutSeconds The timeout in seconds. If zero, a default value is
+  *                          set in engine_builder.h.
   *
   * @return this builder.
   */
   fun addCdsLayer(
-    cdsResourcesLocator: String = "",
-    cdsTimeoutSeconds: Int = 0,
+    resourcesLocator: String = "",
+    timeoutSeconds: Int = 0,
   ): EngineBuilder {
-    this.cdsResourcesLocator = cdsResourcesLocator
-    this.cdsTimeoutSeconds = cdsTimeoutSeconds
+    this.cdsResourcesLocator = resourcesLocator
+    this.cdsTimeoutSeconds = timeoutSeconds
     this.enableCds = true
     return this
   }
@@ -646,7 +649,8 @@ open class EngineBuilder(
   *
   * @param layerName the layer name.
   *
-  * @param timeoutSeconds the timeout.
+  * @param timeoutSeconds The timeout in seconds. If zero, a default value is
+  *                       set in engine_builder.h.
   *
   * @return this builder.
   */
