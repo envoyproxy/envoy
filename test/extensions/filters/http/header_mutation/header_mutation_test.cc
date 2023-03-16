@@ -85,13 +85,18 @@ TEST(HeaderMutationFilterTest, HeaderMutationFilterTest) {
   HeaderMutationConfigSharedPtr global_config =
       std::make_shared<HeaderMutationConfig>(proto_config);
 
-  NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks;
-  NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks;
-
   {
+    NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks;
+    NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks;
+
     HeaderMutation filter{global_config};
     filter.setDecoderFilterCallbacks(decoder_callbacks);
     filter.setEncoderFilterCallbacks(encoder_callbacks);
+
+    ON_CALL(decoder_callbacks, mostSpecificPerFilterConfig())
+        .WillByDefault(testing::Return(config.get()));
+    ON_CALL(decoder_callbacks, mostSpecificPerFilterConfig())
+        .WillByDefault(testing::Return(config.get()));
 
     {
       Envoy::Http::TestRequestHeaderMapImpl headers = {
@@ -104,9 +109,6 @@ TEST(HeaderMutationFilterTest, HeaderMutationFilterTest) {
           {":path", "/"},
           {":scheme", "http"},
           {":authority", "host"}};
-
-      EXPECT_CALL(decoder_callbacks, mostSpecificPerFilterConfig())
-          .WillRepeatedly(testing::Return(config.get()));
 
       EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter.decodeHeaders(headers, true));
 
@@ -182,6 +184,9 @@ TEST(HeaderMutationFilterTest, HeaderMutationFilterTest) {
   }
 
   {
+    NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks;
+    NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks;
+
     HeaderMutation filter{global_config};
     filter.setDecoderFilterCallbacks(decoder_callbacks);
     filter.setEncoderFilterCallbacks(encoder_callbacks);
@@ -214,6 +219,9 @@ TEST(HeaderMutationFilterTest, HeaderMutationFilterTest) {
   }
 
   {
+    NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks;
+    NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks;
+
     HeaderMutation filter{global_config};
     filter.setDecoderFilterCallbacks(decoder_callbacks);
     filter.setEncoderFilterCallbacks(encoder_callbacks);
