@@ -789,7 +789,7 @@ public:
   }
   LoadBalancerSubsetInfoImpl()
       : LoadBalancerSubsetInfoImpl(
-            envoy::config::cluster::v3::Cluster::LbSubsetConfig::default_instance) {}
+            envoy::config::cluster::v3::Cluster::LbSubsetConfig::default_instance()) {}
 
   // Upstream::LoadBalancerSubsetInfo
   bool isEnabled() const override { return enabled_; }
