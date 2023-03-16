@@ -42,10 +42,6 @@ build:rules_xcodeproj --define=apple.experimental.tree_artifact_outputs=0
 # Disable global index store to work around https://github.com/buildbuddy-io/rules_xcodeproj/issues/1878
 build:rules_xcodeproj --features=-swift.use_global_index_store
 
-# The defaults are JDK 11 on newer versions of Bazel
-build --java_runtime_version=remotejdk_11
-build --java_language_version=8
-
 # Override PGV validation with NOP functions
 build --@com_envoyproxy_protoc_gen_validate//bazel:template-flavor=nop
 
@@ -141,11 +137,8 @@ build:coverage --instrumentation_filter="//library/common[/:]"
 # to add platform-specific options. Avoid using this config directly and
 # instead use a platform-specific config
 #############################################################################
-# --config=remote sets --auth_enabled=true to enable GCP authentication,
-# however, the remote execution cluster doesn't use GCP auth (it uses
-# GITHUB_TOKEN auth) so we have to override it to 'false' here.
 build:remote-ci-common --config=remote
-build:remote-ci-common --auth_enabled=false
+build:remote-ci-common --google_default_credentials=false
 build:remote-ci-common --remote_executor=grpcs://envoy.cluster.engflow.com
 build:remote-ci-common --bes_backend=grpcs://envoy.cluster.engflow.com/
 build:remote-ci-common --bes_results_url=https://envoy.cluster.engflow.com/invocation/
@@ -233,8 +226,6 @@ build:remote-ci-linux-coverage --extra_execution_platforms=//third_party/rbe_con
 build:remote-ci-linux-coverage --extra_toolchains=//third_party/rbe_configs/config:cc-toolchain
 build:remote-ci-linux-coverage --host_platform=//third_party/rbe_configs/config:platform
 build:remote-ci-linux-coverage --platforms=//third_party/rbe_configs/config:platform
-build:remote-ci-linux-coverage --host_java_toolchain=@bazel_tools//tools/jdk:toolchain_java11
-build:remote-ci-linux-coverage --java_toolchain=@bazel_tools//tools/jdk:toolchain_java11
 # Flags to run tests locally which are necessary since Bazel C++ LLVM coverage isn't fully supported for remote builds
 # TODO(lfpino): Reference upstream Bazel issue here on the incompatibility of remote test execution and LLVM coverage.
 build:remote-ci-linux-coverage --remote_download_outputs=all
