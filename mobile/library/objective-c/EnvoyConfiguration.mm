@@ -182,6 +182,7 @@
   self.cdsResourcesLocator = cdsResourcesLocator;
   self.cdsTimeoutSeconds = cdsTimeoutSeconds;
   self.enableCds = enableCds;
+  self.bootstrapPointer = 0;
 
   return self;
 }

@@ -1011,6 +1011,13 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
 #else
     throw std::runtime_error("Admin functionality was not compiled in this build of Envoy Mobile");
 #endif
+  } else {
+    // Default Envoy mobile to the lightweight API listener. This is not
+    // supported if the admin interface is enabled.
+    envoy::config::listener::v3::ApiListenerManager api;
+    auto* listener_manager = bootstrap->mutable_listener_manager();
+    listener_manager->mutable_typed_config()->PackFrom(api);
+    listener_manager->set_name("envoy.listener_manager_impl.api");
   }
 
   return bootstrap;

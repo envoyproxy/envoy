@@ -20,9 +20,9 @@ All incoming requests are routed via the front Envoy, which is acting as a rever
 sitting on the edge of the ``envoymesh`` network. Port ``8000`` is exposed
 by docker compose (see :download:`docker-compose.yaml <_include/jaeger-tracing/docker-compose.yaml>`). Notice that
 all Envoys are configured to collect request traces (e.g., http_connection_manager/config/tracing setup in
-:download:`front-envoy-jaeger.yaml <_include/jaeger-tracing/front-envoy-jaeger.yaml>`) and setup to propagate the spans generated
+:download:`envoy.yaml <_include/jaeger-tracing/envoy.yaml>`) and setup to propagate the spans generated
 by the Jaeger tracer to a Jaeger cluster (trace driver setup
-in :download:`front-envoy-jaeger.yaml <_include/jaeger-tracing/front-envoy-jaeger.yaml>`).
+in :download:`envoy.yaml <_include/jaeger-tracing/envoy.yaml>`).
 
 Before routing a request to the appropriate service Envoy or the application, Envoy will take
 care of generating the appropriate spans for tracing (parent/child context spans).

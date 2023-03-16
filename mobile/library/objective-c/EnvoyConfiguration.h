@@ -60,6 +60,8 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic, strong) NSString *cdsResourcesLocator;
 @property (nonatomic, assign) UInt32 cdsTimeoutSeconds;
 @property (nonatomic, assign) BOOL enableCds;
+@property (nonatomic, assign) intptr_t bootstrapPointer;
+
 /**
  Create a new instance of the configuration.
  */
