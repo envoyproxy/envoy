@@ -39,6 +39,8 @@ build --copt -Wno-deprecated-declarations
 
 build:rules_xcodeproj --config=ios
 build:rules_xcodeproj --define=apple.experimental.tree_artifact_outputs=0
+# Disable global index store to work around https://github.com/buildbuddy-io/rules_xcodeproj/issues/1878
+build:rules_xcodeproj --features=-swift.use_global_index_store
 
 # The defaults are JDK 11 on newer versions of Bazel
 build --java_runtime_version=remotejdk_11
