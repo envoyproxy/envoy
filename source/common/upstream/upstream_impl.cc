@@ -1023,10 +1023,8 @@ ClusterInfoImpl::ClusterInfoImpl(
                            ? absl::make_optional<envoy::config::core::v3::TypedExtensionConfig>(
                                  config.upstream_config())
                            : absl::nullopt),
-      added_via_api_(added_via_api),
-      lb_subset_(LoadBalancerSubsetInfoImpl(config.lb_subset_config())),
-      metadata_(config.metadata()), typed_metadata_(config.metadata()),
-      common_lb_config_(config.common_lb_config()),
+      added_via_api_(added_via_api), metadata_(config.metadata()),
+      typed_metadata_(config.metadata()), common_lb_config_(config.common_lb_config()),
       drain_connections_on_host_removal_(config.ignore_health_on_host_removal()),
       connection_pool_per_downstream_connection_(
           config.connection_pool_per_downstream_connection()),
@@ -1048,6 +1046,9 @@ ClusterInfoImpl::ClusterInfoImpl(
                          "on Windows platforms");
   }
 #endif
+  if (config.has_lb_subset_config()) {
+    lb_subset_ = std::make_unique<LoadBalancerSubsetInfoImpl>(config.lb_subset_config());
+  }
 
   if (config.has_max_requests_per_connection() &&
       http_protocol_options_->common_http_protocol_options_.has_max_requests_per_connection()) {
