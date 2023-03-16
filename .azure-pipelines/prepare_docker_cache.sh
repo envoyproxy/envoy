@@ -13,13 +13,6 @@ if ! id -u vsts &> /dev/null; then
     DOCKER_CACHE_OWNERSHIP=azure-pipelines
 fi
 
-# TODO(phlax): remove once https://github.com/envoyproxy/ci-infra/issues/19 is resolved
-if ! command -v zstd > /dev/null && [[ -z "$NO_INSTALL_ZSTD" ]]; then
-    echo "Installing zstd ..."
-    sudo apt-get -qq update
-    sudo apt-get -qq install -y zstd
-fi
-
 echo "Creating cache directory (${DOCKER_CACHE_PATH}) ..."
 mkdir -p "${DOCKER_CACHE_PATH}"
 mount -t tmpfs none "${DOCKER_CACHE_PATH}"
