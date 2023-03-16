@@ -43,7 +43,8 @@ class MockIoUringSocket : public IoUringSocket {
   MOCK_METHOD(void, enable, ());
   MOCK_METHOD(void, disable, ());
   MOCK_METHOD(void, connect, (const Network::Address::InstanceConstSharedPtr& address));
-  MOCK_METHOD(void, writev, (const Buffer::RawSlice* slices, uint64_t num_slice));
+  MOCK_METHOD(void, write, (Buffer::Instance & data));
+  MOCK_METHOD(uint64_t, write, (const Buffer::RawSlice* slices, uint64_t num_slice));
   MOCK_METHOD(void, onAccept, (Request * req, int32_t result, bool injected));
   MOCK_METHOD(void, onConnect, (int32_t result, bool injected));
   MOCK_METHOD(void, onRead, (Request * req, int32_t result, bool injected));
@@ -64,8 +65,8 @@ public:
   MOCK_METHOD(Request*, submitConnectRequest,
               (IoUringSocket & socket, const Network::Address::InstanceConstSharedPtr& address));
   MOCK_METHOD(Request*, submitReadRequest, (IoUringSocket & socket));
-  MOCK_METHOD(Request*, submitWritevRequest,
-              (IoUringSocket & socket, const Buffer::RawSlice* slices, uint64_t num_slice));
+  MOCK_METHOD(Request*, submitWriteRequest,
+              (IoUringSocket & socket, const Buffer::RawSliceVector& slices));
   MOCK_METHOD(Request*, submitCloseRequest, (IoUringSocket & socket));
   MOCK_METHOD(Request*, submitCancelRequest, (IoUringSocket & socket, Request* request_to_cancel));
 };

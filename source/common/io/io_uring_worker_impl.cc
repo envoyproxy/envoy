@@ -484,7 +484,9 @@ void IoUringServerSocket::onWrite(int32_t result, bool injected) {
   ENVOY_LOG(trace, "onWrite with result {}, fd = {}, injected = {}", result, fd_, injected);
 
   // Cleanup request and write buffer.
-  write_req_ = nullptr;
+  if (!injected) {
+    write_req_ = nullptr;
+  }
 
   if (status_ == CLOSING) {
     // Close if it is in closing status and no read request.
