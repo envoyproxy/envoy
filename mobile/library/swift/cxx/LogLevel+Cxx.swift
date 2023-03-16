@@ -24,7 +24,7 @@ extension LogLevel {
 // MARK: - Test Helpers
 
 extension LogLevel {
-  func toCXXDescription() -> String {
+  var cxxDescription: String {
     .fromCXX(Envoy.Platform.logLevelToString(self.toCXX()))
   }
 }
