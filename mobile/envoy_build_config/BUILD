@@ -18,6 +18,7 @@ envoy_cc_library(
         "@envoy//source/common/router:upstream_codec_filter_lib",
         "@envoy//source/common/watchdog:abort_action_config",
         "@envoy//source/extensions/clusters/dynamic_forward_proxy:cluster",
+        "@envoy//source/extensions/clusters/static:static_cluster_lib",
         "@envoy//source/extensions/compression/brotli/decompressor:config",
         "@envoy//source/extensions/compression/gzip/decompressor:config",
         "@envoy//source/extensions/filters/http/alternate_protocols_cache:config",
@@ -57,7 +58,6 @@ envoy_cc_library(
             "@envoy//source/extensions/stat_sinks/metrics_service:config",
             "@envoy//source/extensions/stat_sinks/statsd:config",
             "@envoy//source/extensions/clusters/logical_dns:logical_dns_cluster_lib",
-            "@envoy//source/extensions/clusters/static:static_cluster_lib",
         ],
         "@envoy",
     ) + envoy_select_envoy_mobile_request_compression(

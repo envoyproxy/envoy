@@ -45,6 +45,7 @@ Features:
 - api: Add support for Native Filters and Platform Filters to the C++ EngineBuilder. (:issue:`#2498 <2498>`)
 - api: added upstream protocol to final stream intel. (:issue:`#2613 <2613>`)
 - build: Add a build feature ``exclude_certificates`` to disable inclusion of the Envoy Mobile certificate list, for use when using platform certificate validation.
+- build: Add a build feature ``envoy_mobile_stats_reporting`` to allow disabling stats reporting. (:issue:`26086 <26086>`)
 
 0.5.0 (September 2, 2022)
 ===========================
