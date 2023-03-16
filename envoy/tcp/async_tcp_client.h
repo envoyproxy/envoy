@@ -45,13 +45,8 @@ public:
   virtual bool connect() PURE;
 
   /**
-   * Close the client. It abortively closes the connection discarding any unsent data.
-   * The underlying connection will be defer deleted when a Close event is received.
-   */
-  virtual void close() PURE;
-
-  /**
    * Close the client. It closes the connection based on close type.
+   * The underlying connection will be defer deleted when a Close event is received.
    * @param type the connection close type.
    */
   virtual void close(Network::ConnectionCloseType type) PURE;

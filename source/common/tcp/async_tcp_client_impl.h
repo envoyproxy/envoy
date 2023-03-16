@@ -25,8 +25,6 @@ public:
 
   ~AsyncTcpClientImpl() override;
 
-  void close() override;
-
   void close(Network::ConnectionCloseType type) override;
 
   /**
