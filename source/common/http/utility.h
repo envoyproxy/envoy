@@ -127,16 +127,16 @@ initializeAndValidateOptions(const envoy::config::core::v3::Http3ProtocolOptions
 namespace Http {
 namespace Utility {
 
-enum url_components
-  { UC_SCHEMA           = 0
-  , UC_HOST             = 1
-  , UC_PORT             = 2
-  , UC_PATH             = 3
-  , UC_QUERY            = 4
-  , UC_FRAGMENT         = 5
-  , UC_USERINFO         = 6
-  , UC_MAX              = 7
-  };
+enum url_components {
+  UC_SCHEMA = 0,
+  UC_HOST = 1,
+  UC_PORT = 2,
+  UC_PATH = 3,
+  UC_QUERY = 4,
+  UC_FRAGMENT = 5,
+  UC_USERINFO = 6,
+  UC_MAX = 7
+};
 
 /**
  * Given a fully qualified URL, splits the string_view provided into scheme,

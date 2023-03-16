@@ -391,13 +391,9 @@ Utility::parseCookies(const RequestHeaderMap& headers,
   return cookies;
 }
 
-bool Utility::Url::containsFragment() {
-  return (component_bitmap_ & (1 << UC_FRAGMENT));
-}
+bool Utility::Url::containsFragment() { return (component_bitmap_ & (1 << UC_FRAGMENT)); }
 
-bool Utility::Url::containsUserinfo() {
-  return (component_bitmap_ & (1 << UC_USERINFO));
-}
+bool Utility::Url::containsUserinfo() { return (component_bitmap_ & (1 << UC_USERINFO)); }
 
 bool Utility::Url::initialize(absl::string_view absolute_url, bool is_connect) {
   struct http_parser_url u;
@@ -1444,26 +1440,25 @@ bool Utility::isValidRefererValue(absl::string_view value) {
 
   for (char c : value) {
     switch (c) {
-      case ':':
-        if (!seen_slash) {
-          // First path segment cannot contain ':'
-          // https://www.rfc-editor.org/rfc/rfc3986#section-3.3
-          return false;
-        }
-        continue;
-      case '/':
-        seen_slash = true;
-        continue;
-      default:
-        if (!testChar(pathCharTable, c)) {
-          return false;
-        }
+    case ':':
+      if (!seen_slash) {
+        // First path segment cannot contain ':'
+        // https://www.rfc-editor.org/rfc/rfc3986#section-3.3
+        return false;
+      }
+      continue;
+    case '/':
+      seen_slash = true;
+      continue;
+    default:
+      if (!testChar(pathCharTable, c)) {
+        return false;
+      }
     }
   }
 
   return true;
 }
-
 
 } // namespace Http
 } // namespace Envoy
