@@ -46,8 +46,11 @@ TEST_P(BufferIntegrationTest, RouterRequestPopulateContentLength) {
   initialize();
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
-  auto encoder_decoder = codec_client_->startRequest(Http::TestRequestHeaderMapImpl{
-      {":method", "POST"}, {":scheme", "http"}, {":path", "/shelf"}, {":authority", "sni.lyft.com"}});
+  auto encoder_decoder =
+      codec_client_->startRequest(Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                                                 {":scheme", "http"},
+                                                                 {":path", "/shelf"},
+                                                                 {":authority", "sni.lyft.com"}});
   request_encoder_ = &encoder_decoder.first;
   IntegrationStreamDecoderPtr response = std::move(encoder_decoder.second);
   codec_client_->sendData(*request_encoder_, "123", false);
@@ -74,8 +77,11 @@ TEST_P(BufferIntegrationTest, RouterRequestPopulateContentLengthOnTrailers) {
   initialize();
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
-  auto encoder_decoder = codec_client_->startRequest(Http::TestRequestHeaderMapImpl{
-      {":method", "POST"}, {":scheme", "http"}, {":path", "/shelf"}, {":authority", "sni.lyft.com"}});
+  auto encoder_decoder =
+      codec_client_->startRequest(Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                                                 {":scheme", "http"},
+                                                                 {":path", "/shelf"},
+                                                                 {":authority", "sni.lyft.com"}});
   request_encoder_ = &encoder_decoder.first;
   IntegrationStreamDecoderPtr response = std::move(encoder_decoder.second);
   codec_client_->sendData(*request_encoder_, "0123", false);

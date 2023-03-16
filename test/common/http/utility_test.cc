@@ -389,8 +389,7 @@ TEST(HttpUtility, MethodNotPreserved) {
   Utility::transformUpgradeRequestFromH2toH1(converted_headers);
   EXPECT_EQ(converted_headers, expected_headers);
 
-  converted_headers = {
-      {":method", "POST"}, {"Upgrade", "foo"}, {"Connection", "upgrade"}};
+  converted_headers = {{":method", "POST"}, {"Upgrade", "foo"}, {"Connection", "upgrade"}};
 
   Utility::transformUpgradeRequestFromH1toH3(converted_headers);
   Utility::transformUpgradeRequestFromH3toH1(converted_headers);
