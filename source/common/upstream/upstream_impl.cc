@@ -962,7 +962,6 @@ createOptions(const envoy::config::cluster::v3::Cluster& config,
 
 LBPolicyConfig::LBPolicyConfig(const envoy::config::cluster::v3::Cluster& config) {
   switch (config.lb_config_case()) {
-    PANIC_DUE_TO_CORRUPT_ENUM;
   case envoy::config::cluster::v3::Cluster::kRoundRobinLbConfig:
     lb_policy_ = std::make_unique<const envoy::config::cluster::v3::Cluster::RoundRobinLbConfig>(
         config.round_robin_lb_config());
@@ -985,6 +984,7 @@ LBPolicyConfig::LBPolicyConfig(const envoy::config::cluster::v3::Cluster& config
     break;
   case envoy::config::cluster::v3::Cluster::LB_CONFIG_NOT_SET:
     break;
+    PANIC_DUE_TO_CORRUPT_ENUM;
   }
 }
 
