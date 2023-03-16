@@ -6,10 +6,12 @@
 namespace Envoy {
 namespace Http {
 
-// This uses the same memory model as ConstSingleton (which can't be used as it doesn't take
-// constructor arguments.) This will leak on program exit instead of causing shutdown
-// crashes (https://github.com/envoyproxy/envoy/issues/26091)
-static DateFormatter* date_formatter_ = new DateFormatter("%a, %d %b %Y %H:%M:%S GMT");
+class TlsCachingDateFormatter : public DateFormatter {
+ public:
+  TlsCachingDateFormatter() : DateFormatter("%a, %d %b %Y %H:%M:%S GMT") {}
+};
+
+using GlobalTlsCachingDateFormatter = ConstSingleton<TlsCachingDateFormatter>;
 
 TlsCachingDateProviderImpl::TlsCachingDateProviderImpl(Event::Dispatcher& dispatcher,
                                                        ThreadLocal::SlotAllocator& tls)
@@ -20,7 +22,7 @@ TlsCachingDateProviderImpl::TlsCachingDateProviderImpl(Event::Dispatcher& dispat
 }
 
 void TlsCachingDateProviderImpl::onRefreshDate() {
-  std::string new_date_string = date_formatter_->now(time_source_);
+  std::string new_date_string = GlobalTlsCachingDateFormatter::get().now(time_source_);
   tls_->set([new_date_string](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr {
     return std::make_shared<ThreadLocalCachedDate>(new_date_string);
   });
@@ -33,7 +35,7 @@ void TlsCachingDateProviderImpl::setDateHeader(ResponseHeaderMap& headers) {
 }
 
 void SlowDateProviderImpl::setDateHeader(ResponseHeaderMap& headers) {
-  headers.setDate(date_formatter_->now(time_source_));
+  headers.setDate(GlobalTlsCachingDateFormatter::get().now(time_source_));
 }
 
 } // namespace Http
