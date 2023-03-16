@@ -116,7 +116,7 @@ public:
   }
 
   void setUpCapsuleProtocol(bool close_send_stream, bool close_recv_stream) {
-    quic_stream_->enableCapsuleProtocol();
+    quic_stream_->enableHttpDatagramSupport();
 
     // Decodes a CONNECT-UDP request.
     EXPECT_CALL(stream_decoder_, decodeHeaders_(_, _))

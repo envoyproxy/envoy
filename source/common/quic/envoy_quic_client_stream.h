@@ -2,8 +2,8 @@
 
 #include "envoy/buffer/buffer.h"
 
-#include "source/common/quic/capsule_protocol_handler.h"
 #include "source/common/quic/envoy_quic_stream.h"
+#include "source/common/quic/http_datagram_handler.h"
 
 #include "quiche/common/simple_buffer_allocator.h"
 #include "quiche/quic/core/http/quic_spdy_client_stream.h"
@@ -51,7 +51,7 @@ public:
   void OnConnectionClosed(quic::QuicErrorCode error, quic::ConnectionCloseSource source) override;
 
   void clearWatermarkBuffer();
-  void enableCapsuleProtocol();
+  void enableHttpDatagramSupport();
 
 protected:
   // EnvoyQuicStream
@@ -80,7 +80,7 @@ private:
 
   Http::ResponseDecoder* response_decoder_{nullptr};
   bool decoded_1xx_{false};
-  std::unique_ptr<CapsuleProtocolHandler> capsule_protocol_handler_;
+  std::unique_ptr<HttpDatagramHandler> http_datagram_handler_;
 };
 
 } // namespace Quic

@@ -1,7 +1,7 @@
 #pragma once
 
-#include "source/common/quic/capsule_protocol_handler.h"
 #include "source/common/quic/envoy_quic_stream.h"
+#include "source/common/quic/http_datagram_handler.h"
 #include "source/common/quic/quic_stats_gatherer.h"
 
 #include "quiche/common/platform/api/quiche_reference_counted.h"
@@ -79,7 +79,7 @@ public:
   Http::HeaderUtility::HeaderValidationResult
   validateHeader(absl::string_view header_name, absl::string_view header_value) override;
 
-  void enableCapsuleProtocol();
+  void enableHttpDatagramSupport();
 
 protected:
   // EnvoyQuicStream
@@ -113,7 +113,7 @@ private:
       headers_with_underscores_action_;
 
   quiche::QuicheReferenceCountedPointer<QuicStatsGatherer> stats_gatherer_;
-  std::unique_ptr<CapsuleProtocolHandler> capsule_protocol_handler_;
+  std::unique_ptr<HttpDatagramHandler> http_datagram_handler_;
 };
 
 } // namespace Quic

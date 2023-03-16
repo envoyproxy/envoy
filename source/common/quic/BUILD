@@ -270,12 +270,12 @@ envoy_cc_library(
     ],
     tags = ["nofips"],
     deps = [
-        ":capsule_protocol_handler",
         ":envoy_quic_proof_source_lib",
         ":envoy_quic_server_connection_lib",
         ":envoy_quic_server_crypto_stream_factory_lib",
         ":envoy_quic_stream_lib",
         ":envoy_quic_utils_lib",
+        ":http_datagram_handler",
         ":quic_filter_manager_connection_lib",
         ":quic_stat_names_lib",
         ":quic_stats_gatherer",
@@ -298,12 +298,12 @@ envoy_cc_library(
     ],
     tags = ["nofips"],
     deps = [
-        ":capsule_protocol_handler",
         ":envoy_quic_client_connection_lib",
         ":envoy_quic_client_crypto_stream_factory_lib",
         ":envoy_quic_proof_verifier_lib",
         ":envoy_quic_stream_lib",
         ":envoy_quic_utils_lib",
+        ":http_datagram_handler",
         ":quic_filter_manager_connection_lib",
         ":quic_stat_names_lib",
         ":quic_transport_socket_factory_lib",
@@ -619,9 +619,9 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "capsule_protocol_handler",
-    srcs = ["capsule_protocol_handler.cc"],
-    hdrs = ["capsule_protocol_handler.h"],
+    name = "http_datagram_handler",
+    srcs = ["http_datagram_handler.cc"],
+    hdrs = ["http_datagram_handler.h"],
     deps = [
         "//envoy/http:codec_interface",
         "//source/common/common:logger_lib",
