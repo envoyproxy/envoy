@@ -66,6 +66,8 @@ fi
 # Output unusually long logs due to trace logging.
 BAZEL_BUILD_OPTIONS+=("--experimental_ui_max_stdouterr_bytes=80000000")
 
+echo "${BAZEL_BUILD_OPTIONS[@]}"
+
 bazel coverage "${BAZEL_BUILD_OPTIONS[@]}" "${COVERAGE_TARGETS[@]}"
 
 # Collecting profile and testlogs
