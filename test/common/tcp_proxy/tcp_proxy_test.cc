@@ -986,6 +986,9 @@ TEST_F(TcpProxyTest, TestAccessLogOnUpstreamConnected) {
   setup(1, config);
   raiseEventUpstreamConnected(0);
 
+  // Default access log will only be flushed after the stream is closed.
+  // Passing the following check makes sure that the access log was flushed
+  // before the stream was closed.
   EXPECT_EQ(access_log_data_, "127.0.0.1:80");
 
   filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
