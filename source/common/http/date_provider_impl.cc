@@ -7,7 +7,7 @@ namespace Envoy {
 namespace Http {
 
 class TlsCachingDateFormatter : public DateFormatter {
- public:
+public:
   TlsCachingDateFormatter() : DateFormatter("%a, %d %b %Y %H:%M:%S GMT") {}
 };
 
