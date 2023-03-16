@@ -70,6 +70,9 @@ bug_fixes:
 - area: ext_proc
   change: |
     Let onData always raise StopIterationAndWatermark when waiting for headers response, to avoid http errors (413 on request path, and 500 on response path) when data size goes above high watermark.
+- area: http filter
+  change: |
+    Fix possible illegal memory access in the header_mutaion filter when the request is aborted before the request headers are received completely.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
