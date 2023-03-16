@@ -1,5 +1,10 @@
+#if canImport(EnvoyCxxSwiftInterop)
+@_implementationOnly import EnvoyCxxSwiftInterop
+#endif
 @_implementationOnly import EnvoyEngine
 import Foundation
+
+// swiftlint:disable file_length
 
 /// Builder used for creating and running a new Engine instance.
 @objcMembers
@@ -68,6 +73,7 @@ open class EngineBuilder: NSObject {
   private var nodeRegion: String?
   private var nodeZone: String?
   private var nodeSubZone: String?
+  private var enableSwiftBootstrap = false
 
   // MARK: - Public
 
@@ -628,6 +634,21 @@ open class EngineBuilder: NSObject {
   }
 #endif
 
+#if canImport(EnvoyCxxSwiftInterop)
+  /// Use Swift's experimental C++ interop support to generate the bootstrap object
+  /// instead of going through the Objective-C layer.
+  ///
+  /// - parameter enableSwiftBootstrap: Whether or not to use the Swift / C++ interop
+  ///                                   to generate the bootstrap object.
+  ///
+  /// - returns: This builder.
+  @discardableResult
+  public func enableSwiftBootstrap(_ enableSwiftBootstrap: Bool) -> Self {
+    self.enableSwiftBootstrap = enableSwiftBootstrap
+    return self
+  }
+#endif
+
   /// Builds and runs a new `Engine` instance with the provided configuration.
   ///
   /// - note: Must be strongly retained in order for network requests to be performed correctly.
@@ -638,6 +659,11 @@ open class EngineBuilder: NSObject {
                                       eventTracker: self.eventTracker,
                                       networkMonitoringMode: Int32(self.monitoringMode.rawValue))
     let config = self.makeConfig()
+#if canImport(EnvoyCxxSwiftInterop)
+    if self.enableSwiftBootstrap {
+      config.bootstrapPointer = self.generateBootstrap().pointer
+    }
+#endif
 
     switch self.base {
     case .custom(let yaml):
@@ -726,6 +752,114 @@ open class EngineBuilder: NSObject {
   }
 
   func bootstrapDebugDescription() -> String {
-    self.makeConfig().bootstrapDebugDescription()
+    let objcDescription = self.makeConfig().bootstrapDebugDescription()
+#if canImport(EnvoyCxxSwiftInterop)
+    assert(
+      self.generateBootstrap().debugDescription == objcDescription,
+      "Swift bootstrap is different from ObjC bootstrap"
+    )
+#endif
+    return objcDescription
   }
 }
+
+#if canImport(EnvoyCxxSwiftInterop)
+private extension EngineBuilder {
+  func generateBootstrap() -> Bootstrap {
+    var cxxBuilder = Envoy.Platform.EngineBuilder()
+    cxxBuilder.addLogLevel(self.logLevel.toCXX())
+#if ENVOY_ADMIN_FUNCTIONALITY
+    cxxBuilder.enableAdminInterface(self.adminInterfaceEnabled)
+#endif
+    if let grpcStatsDomain = self.grpcStatsDomain {
+      cxxBuilder.addGrpcStatsDomain(grpcStatsDomain.toCXX())
+    }
+
+    cxxBuilder.addConnectTimeoutSeconds(Int32(self.connectTimeoutSeconds))
+    cxxBuilder.addDnsRefreshSeconds(Int32(self.dnsRefreshSeconds))
+    cxxBuilder.addDnsFailureRefreshSeconds(Int32(self.dnsFailureRefreshSecondsBase),
+                                           Int32(self.dnsFailureRefreshSecondsMax))
+    cxxBuilder.addDnsQueryTimeoutSeconds(Int32(self.dnsQueryTimeoutSeconds))
+    cxxBuilder.addDnsMinRefreshSeconds(Int32(self.dnsMinRefreshSeconds))
+    cxxBuilder.addDnsPreresolveHostnames(self.dnsPreresolveHostnames.toCXX())
+    cxxBuilder.enableDnsCache(self.enableDNSCache, Int32(self.dnsCacheSaveIntervalSeconds))
+    cxxBuilder.enableHappyEyeballs(self.enableHappyEyeballs)
+#if ENVOY_ENABLE_QUIC
+    cxxBuilder.enableHttp3(self.enableHttp3)
+#endif
+    cxxBuilder.enableGzipDecompression(self.enableGzipDecompression)
+    cxxBuilder.enableBrotliDecompression(self.enableBrotliDecompression)
+    cxxBuilder.enableInterfaceBinding(self.enableInterfaceBinding)
+    cxxBuilder.enableDrainPostDnsRefresh(self.enableDrainPostDnsRefresh)
+    cxxBuilder.enforceTrustChainVerification(self.enforceTrustChainVerification)
+    cxxBuilder.setForceAlwaysUsev6(self.forceIPv6)
+    cxxBuilder.enablePlatformCertificatesValidation(true)
+    cxxBuilder.addH2ConnectionKeepaliveIdleIntervalMilliseconds(
+      Int32(self.h2ConnectionKeepaliveIdleIntervalMilliseconds)
+    )
+    cxxBuilder.addH2ConnectionKeepaliveTimeoutSeconds(
+      Int32(self.h2ConnectionKeepaliveTimeoutSeconds)
+    )
+    cxxBuilder.addMaxConnectionsPerHost(Int32(self.maxConnectionsPerHost))
+    cxxBuilder.addStatsFlushSeconds(Int32(self.statsFlushSeconds))
+    cxxBuilder.setStreamIdleTimeoutSeconds(Int32(self.streamIdleTimeoutSeconds))
+    cxxBuilder.setPerTryIdleTimeoutSeconds(Int32(self.perTryIdleTimeoutSeconds))
+    cxxBuilder.setAppVersion(self.appVersion.toCXX())
+    cxxBuilder.setAppId(self.appId.toCXX())
+    cxxBuilder.setDeviceOs("iOS".toCXX())
+    for cluster in self.virtualClusters {
+      cxxBuilder.addVirtualCluster(cluster.toCXX())
+    }
+
+    for (runtimeGuard, value) in self.runtimeGuards {
+      cxxBuilder.setRuntimeGuard(runtimeGuard.toCXX(), value)
+    }
+
+    for directResponse in self.directResponses {
+      cxxBuilder.addDirectResponse(directResponse.toCXX())
+    }
+
+    for filter in self.nativeFilterChain.reversed() {
+      cxxBuilder.addNativeFilter(filter.name.toCXX(), filter.typedConfig.toCXX())
+    }
+
+    for filter in self.platformFilterChain.reversed() {
+      cxxBuilder.addPlatformFilter(filter.filterName.toCXX())
+    }
+
+    cxxBuilder.addStatsSinks(self.statsSinks.toCXX())
+
+    if
+      let nodeRegion = self.nodeRegion,
+      let nodeZone = self.nodeZone,
+      let nodeSubZone = self.nodeSubZone
+    {
+      cxxBuilder.setNodeLocality(nodeRegion.toCXX(), nodeZone.toCXX(), nodeSubZone.toCXX())
+    }
+
+    if let nodeID = self.nodeID {
+      cxxBuilder.setNodeId(nodeID.toCXX())
+    }
+
+    if let rtdsLayerName = self.rtdsLayerName {
+      cxxBuilder.addRtdsLayer(rtdsLayerName.toCXX(), Int32(self.rtdsTimeoutSeconds))
+    }
+
+    if
+      let adsAddress = self.adsAddress,
+      let adsJwtToken = self.adsJwtToken,
+      let adsSslRootCerts = self.adsSslRootCerts
+    {
+      cxxBuilder.setAggregatedDiscoveryService(
+        adsAddress.toCXX(),
+        Int32(self.adsPort),
+        adsJwtToken.toCXX(),
+        Int32(self.adsJwtTokenLifetimeSeconds),
+        adsSslRootCerts.toCXX()
+      )
+    }
+
+    return cxxBuilder.generateBootstrap()
+  }
+}
+#endif
