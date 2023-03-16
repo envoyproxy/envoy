@@ -6,10 +6,10 @@
 namespace Envoy {
 namespace Dso {
 
-class MockHttpFilterDsoInstance : public HttpFilterDso {
+class MockHttpFilterDsoImpl : public HttpFilterDso {
 public:
-  MockHttpFilterDsoInstance();
-  ~MockHttpFilterDsoInstance() override;
+  MockHttpFilterDsoImpl();
+  ~MockHttpFilterDsoImpl() override;
 
   MOCK_METHOD(GoUint64, envoyGoFilterNewHttpPluginConfig, (GoUint64 p0, GoUint64 p1));
   MOCK_METHOD(GoUint64, envoyGoFilterMergeHttpPluginConfig, (GoUint64 p0, GoUint64 p1));

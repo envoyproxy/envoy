@@ -981,7 +981,7 @@ uint64_t RoutePluginConfig::getMergedConfigId(uint64_t parent_id, std::string so
     return merged_config_id_;
   }
 
-  auto dlib = Dso::DsoManager<Dso::HttpFilterDsoInstance>::getDsoByID(so_id);
+  auto dlib = Dso::DsoManager<Dso::HttpFilterDsoImpl>::getDsoByID(so_id);
   ASSERT(dlib != nullptr, "load at the config parse phase, so it should not be null");
 
   if (config_id_ == 0) {

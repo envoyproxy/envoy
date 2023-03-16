@@ -22,14 +22,14 @@ Http::FilterFactoryCb GolangFilterConfig::createFilterFactoryFromProtoTyped(
   // loads DSO store a static map and a open handles leak will occur when the filter gets loaded and
   // unloaded.
   // TODO: unload DSO when filter updated.
-  auto res = Dso::DsoManager<Dso::HttpFilterDsoInstance>::load(proto_config.library_id(),
+  auto res = Dso::DsoManager<Dso::HttpFilterDsoImpl>::load(proto_config.library_id(),
                                                                proto_config.library_path());
   if (!res) {
     throw EnvoyException(fmt::format("golang_filter: load library failed: {} {}",
                                      proto_config.library_id(), proto_config.library_path()));
   }
 
-  auto dso_lib = Dso::DsoManager<Dso::HttpFilterDsoInstance>::getDsoByID(proto_config.library_id());
+  auto dso_lib = Dso::DsoManager<Dso::HttpFilterDsoImpl>::getDsoByID(proto_config.library_id());
   FilterConfigSharedPtr config = std::make_shared<FilterConfig>(proto_config, dso_lib);
 
   return [config, dso_lib](Http::FilterChainFactoryCallbacks& callbacks) {

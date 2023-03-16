@@ -3,8 +3,8 @@
 namespace Envoy {
 namespace Dso {
 
-MockHttpFilterDsoInstance::MockHttpFilterDsoInstance() : HttpFilterDso("mock") {}
-MockHttpFilterDsoInstance::~MockHttpFilterDsoInstance() = default;
+MockHttpFilterDsoImpl::MockHttpFilterDsoImpl() : HttpFilterDso("mock") {}
+MockHttpFilterDsoImpl::~MockHttpFilterDsoImpl() = default;
 
 } // namespace Dso
 } // namespace Envoy

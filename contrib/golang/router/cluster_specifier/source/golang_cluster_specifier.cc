@@ -21,13 +21,13 @@ ClusterConfig::ClusterConfig(const GolangClusterProto& config)
   // loads DSO store a static map and a open handles leak will occur when the filter gets loaded and
   // unloaded.
   // TODO: unload DSO when filter updated.
-  auto res = Envoy::Dso::DsoManager<Dso::ClusterSpecifierDsoInstance>::load(so_id_, so_path_);
+  auto res = Envoy::Dso::DsoManager<Dso::ClusterSpecifierDsoImpl>::load(so_id_, so_path_);
   if (!res) {
     throw EnvoyException(fmt::format("golang_cluster_specifier_plugin: load library failed: {} {}",
                                      so_id_, so_path_));
   }
 
-  dynamic_lib_ = Dso::DsoManager<Dso::ClusterSpecifierDsoInstance>::getDsoByID(so_id_);
+  dynamic_lib_ = Dso::DsoManager<Dso::ClusterSpecifierDsoImpl>::getDsoByID(so_id_);
   if (dynamic_lib_ == nullptr) {
     throw EnvoyException(fmt::format("golang_cluster_specifier_plugin: get library failed: {} {}",
                                      so_id_, so_path_));
@@ -60,26 +60,28 @@ GolangClusterSpecifierPlugin::route(const RouteEntry& parent,
   auto dlib = config_->getDsoLib();
   ASSERT(dlib != nullptr);
 
-again:
-  buffer.reserve(buffer_len);
-  auto plugin_id = config_->getPluginId();
-  auto header_ptr = reinterpret_cast<uint64_t>(&header);
-  auto plugin_ptr = reinterpret_cast<uint64_t>(this);
-  auto buffer_ptr = reinterpret_cast<uint64_t>(buffer.data());
-  auto new_len =
-      dlib->envoyGoOnClusterSpecify(plugin_ptr, header_ptr, plugin_id, buffer_ptr, buffer_len);
+  while (true) {
+    buffer.reserve(buffer_len);
+    auto plugin_id = config_->getPluginId();
+    auto header_ptr = reinterpret_cast<uint64_t>(&header);
+    auto plugin_ptr = reinterpret_cast<uint64_t>(this);
+    auto buffer_ptr = reinterpret_cast<uint64_t>(buffer.data());
+    auto new_len =
+        dlib->envoyGoOnClusterSpecify(plugin_ptr, header_ptr, plugin_id, buffer_ptr, buffer_len);
 
-  if (new_len <= 0) {
-    ENVOY_LOG(debug, "golang cluster specifier choose the default cluster");
-    cluster = config_->defaultCluster();
-  } else if (new_len <= buffer_len) {
-    ENVOY_LOG(debug, "buffer size fit the cluster name from golang");
-    cluster = std::string{buffer.data(), size_t(new_len)};
-  } else {
-    RELEASE_ASSERT(new_len <= MAX_CLUSTER_LENGTH, "cluster name too long");
-    ENVOY_LOG(debug, "need larger size of buffer to save the cluster name in golang, try again");
-    buffer_len = new_len;
-    goto again;
+    if (new_len <= 0) {
+      ENVOY_LOG(debug, "golang cluster specifier choose the default cluster");
+      cluster = config_->defaultCluster();
+      break;
+    } else if (new_len <= buffer_len) {
+      ENVOY_LOG(debug, "buffer size fit the cluster name from golang");
+      cluster = std::string{buffer.data(), size_t(new_len)};
+      break;
+    } else {
+      RELEASE_ASSERT(new_len <= MAX_CLUSTER_LENGTH, "cluster name too long");
+      ENVOY_LOG(debug, "need larger size of buffer to save the cluster name in golang, try again");
+      buffer_len = new_len;
+    }
   }
 
   return std::make_shared<RouteEntryImplBase::DynamicRouteEntry>(

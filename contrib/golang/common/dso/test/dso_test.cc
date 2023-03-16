@@ -20,7 +20,7 @@ std::string genSoPath(std::string name) {
 
 TEST(DsoInstanceTest, SimpleAPI) {
   auto path = genSoPath("simple.so");
-  HttpFilterDsoPtr dso(new HttpFilterDsoInstance(path));
+  HttpFilterDsoPtr dso(new HttpFilterDsoImpl(path));
   EXPECT_EQ(dso->envoyGoFilterNewHttpPluginConfig(0, 0), 100);
 }
 
@@ -29,28 +29,28 @@ TEST(DsoManagerTest, Pub) {
   auto path = genSoPath(id);
 
   // get before load http filter dso
-  auto dso = DsoManager<HttpFilterDsoInstance>::getDsoByID(id);
+  auto dso = DsoManager<HttpFilterDsoImpl>::getDsoByID(id);
   EXPECT_EQ(dso, nullptr);
 
   // first time load http filter dso
-  auto res = DsoManager<HttpFilterDsoInstance>::load(id, path);
+  auto res = DsoManager<HttpFilterDsoImpl>::load(id, path);
   EXPECT_EQ(res, true);
 
   // get after load http filter dso
-  dso = DsoManager<HttpFilterDsoInstance>::getDsoByID(id);
+  dso = DsoManager<HttpFilterDsoImpl>::getDsoByID(id);
   EXPECT_NE(dso, nullptr);
   EXPECT_EQ(dso->envoyGoFilterNewHttpPluginConfig(0, 0), 100);
 
   // second time load http filter dso
-  res = DsoManager<HttpFilterDsoInstance>::load(id, path);
+  res = DsoManager<HttpFilterDsoImpl>::load(id, path);
   EXPECT_EQ(res, true);
 
   // first time load cluster specifier dso
-  res = DsoManager<ClusterSpecifierDsoInstance>::load(id, path);
+  res = DsoManager<ClusterSpecifierDsoImpl>::load(id, path);
   EXPECT_EQ(res, true);
 
   // get after load cluster specifier dso
-  auto cluster_dso = DsoManager<ClusterSpecifierDsoInstance>::getDsoByID(id);
+  auto cluster_dso = DsoManager<ClusterSpecifierDsoImpl>::getDsoByID(id);
   EXPECT_NE(cluster_dso, nullptr);
 
   EXPECT_EQ(cluster_dso->envoyGoClusterSpecifierNewPlugin(0, 0), 200);

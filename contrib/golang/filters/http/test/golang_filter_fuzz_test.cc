@@ -45,7 +45,7 @@ DEFINE_PROTO_FUZZER(const envoy::extensions::filters::http::golang::GolangFilter
     return;
   }
 
-  auto dso_lib = std::make_shared<Dso::MockHttpFilterDsoInstance>();
+  auto dso_lib = std::make_shared<Dso::MockHttpFilterDsoImpl>();
 
   // hard code the return config_id to 1 since the default 0 is invalid.
   ON_CALL(*dso_lib.get(), envoyGoFilterNewHttpPluginConfig(_, _)).WillByDefault(Return(1));

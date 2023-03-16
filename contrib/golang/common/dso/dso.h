@@ -39,10 +39,10 @@ public:
   virtual void envoyGoFilterOnHttpDestroy(httpRequest* p0, int p1) PURE;
 };
 
-class HttpFilterDsoInstance : public HttpFilterDso {
+class HttpFilterDsoImpl : public HttpFilterDso {
 public:
-  HttpFilterDsoInstance(const std::string dso_name);
-  ~HttpFilterDsoInstance() override = default;
+  HttpFilterDsoImpl(const std::string dso_name);
+  ~HttpFilterDsoImpl() override = default;
 
   GoUint64 envoyGoFilterNewHttpPluginConfig(GoUint64 p0, GoUint64 p1) override;
   GoUint64 envoyGoFilterMergeHttpPluginConfig(GoUint64 p0, GoUint64 p1) override;
@@ -72,10 +72,10 @@ public:
   virtual GoUint64 envoyGoClusterSpecifierNewPlugin(GoUint64 config_ptr, GoUint64 config_len) PURE;
 };
 
-class ClusterSpecifierDsoInstance : public ClusterSpecifierDso {
+class ClusterSpecifierDsoImpl : public ClusterSpecifierDso {
 public:
-  ClusterSpecifierDsoInstance(const std::string dso_name);
-  ~ClusterSpecifierDsoInstance() override = default;
+  ClusterSpecifierDsoImpl(const std::string dso_name);
+  ~ClusterSpecifierDsoImpl() override = default;
 
   GoInt64 envoyGoOnClusterSpecify(GoUint64 plugin_ptr, GoUint64 header_ptr, GoUint64 plugin_id,
                                   GoUint64 buffer_ptr, GoUint64 buffer_len) override;
@@ -132,7 +132,7 @@ public:
   };
 
 private:
-  using DsoMapType = std::map<std::string, std::shared_ptr<T>>;
+  using DsoMapType = absl::flat_hash_map<std::string, std::shared_ptr<T>>;
   struct DsoStoreType {
     DsoMapType map_ ABSL_GUARDED_BY(mutex_){{
         {"", nullptr},
