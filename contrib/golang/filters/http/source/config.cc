@@ -23,7 +23,7 @@ Http::FilterFactoryCb GolangFilterConfig::createFilterFactoryFromProtoTyped(
   // unloaded.
   // TODO: unload DSO when filter updated.
   auto res = Dso::DsoManager<Dso::HttpFilterDsoImpl>::load(proto_config.library_id(),
-                                                               proto_config.library_path());
+                                                           proto_config.library_path());
   if (!res) {
     throw EnvoyException(fmt::format("golang_filter: load library failed: {} {}",
                                      proto_config.library_id(), proto_config.library_path()));

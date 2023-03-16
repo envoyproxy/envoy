@@ -64,13 +64,13 @@ GoUint64 HttpFilterDsoImpl::envoyGoFilterMergeHttpPluginConfig(GoUint64 p0, GoUi
 }
 
 GoUint64 HttpFilterDsoImpl::envoyGoFilterOnHttpHeader(httpRequest* p0, GoUint64 p1, GoUint64 p2,
-                                                          GoUint64 p3) {
+                                                      GoUint64 p3) {
   ASSERT(envoy_go_filter_on_http_header_ != nullptr);
   return envoy_go_filter_on_http_header_(p0, p1, p2, p3);
 }
 
 GoUint64 HttpFilterDsoImpl::envoyGoFilterOnHttpData(httpRequest* p0, GoUint64 p1, GoUint64 p2,
-                                                        GoUint64 p3) {
+                                                    GoUint64 p3) {
   ASSERT(envoy_go_filter_on_http_data_ != nullptr);
   return envoy_go_filter_on_http_data_(p0, p1, p2, p3);
 }
@@ -90,16 +90,14 @@ ClusterSpecifierDsoImpl::ClusterSpecifierDsoImpl(const std::string dso_name)
 }
 
 GoUint64 ClusterSpecifierDsoImpl::envoyGoClusterSpecifierNewPlugin(GoUint64 config_ptr,
-                                                                       GoUint64 config_len) {
+                                                                   GoUint64 config_len) {
   ASSERT(envoy_go_cluster_specifier_new_plugin_ != nullptr);
   return envoy_go_cluster_specifier_new_plugin_(config_ptr, config_len);
 }
 
-GoInt64 ClusterSpecifierDsoImpl::envoyGoOnClusterSpecify(GoUint64 plugin_ptr,
-                                                             GoUint64 header_ptr,
-                                                             GoUint64 plugin_id,
-                                                             GoUint64 buffer_ptr,
-                                                             GoUint64 buffer_len) {
+GoInt64 ClusterSpecifierDsoImpl::envoyGoOnClusterSpecify(GoUint64 plugin_ptr, GoUint64 header_ptr,
+                                                         GoUint64 plugin_id, GoUint64 buffer_ptr,
+                                                         GoUint64 buffer_len) {
   ASSERT(envoy_go_on_cluster_specify_ != nullptr);
   return envoy_go_on_cluster_specify_(plugin_ptr, header_ptr, plugin_id, buffer_ptr, buffer_len);
 }
