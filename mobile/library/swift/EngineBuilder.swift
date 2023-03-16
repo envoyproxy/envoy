@@ -884,6 +884,10 @@ private extension EngineBuilder {
         adsSslRootCerts.toCXX()
       )
     }
+    if self.enableCds {
+      cxxBuilder.addCdsLayer(self.cdsResourcesLocator.toCXX(), Int32(self.cdsTimeoutSeconds))
+    }
+
 
     return cxxBuilder.generateBootstrap()
   }
