@@ -178,7 +178,7 @@ public:
                                std::make_shared<quic::QuicCryptoClientConfig>(
                                    quic::test::crypto_test_utils::ProofVerifierForTesting()),
                                nullptr, dispatcher, send_buffer_limit, crypto_stream_factory,
-                               quic_stat_names_, {}, stats_store_, nullptr) {}
+                               quic_stat_names_, {}, *stats_store_.rootScope(), nullptr) {}
 
   void Initialize() override {
     EnvoyQuicClientSession::Initialize();
@@ -222,7 +222,7 @@ Buffer::OwnedImpl generateChloPacketToSend(quic::ParsedQuicVersion quic_version,
                                            quic::QuicConnectionId connection_id) {
   std::unique_ptr<quic::QuicReceivedPacket> packet =
       std::move(quic::test::GetFirstFlightOfPackets(quic_version, quic_config, connection_id)[0]);
-  return Buffer::OwnedImpl(packet->data(), packet->length());
+  return {packet->data(), packet->length()};
 }
 
 void setQuicConfigWithDefaultValues(quic::QuicConfig* config) {

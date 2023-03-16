@@ -6,6 +6,7 @@
 
 #include "absl/container/node_hash_map.h"
 #include "absl/container/node_hash_set.h"
+#include "absl/functional/bind_front.h"
 #include "absl/strings/match.h"
 #include "absl/strings/string_view.h"
 
@@ -20,7 +21,7 @@ using ::Envoy::Http::HeaderString;
 using ::Envoy::Http::LowerCaseString;
 using ::Envoy::Http::Protocol;
 using ::Envoy::Http::UhvResponseCodeDetail;
-using HeaderValidatorFunction =
+using HeaderValidatorFunction1 =
     HeaderValidator::HeaderValueValidationResult (Http2HeaderValidator::*)(const HeaderString&);
 
 struct Http2ResponseCodeDetailValues {
@@ -42,50 +43,24 @@ using Http2ResponseCodeDetail = ConstSingleton<Http2ResponseCodeDetailValues>;
  */
 Http2HeaderValidator::Http2HeaderValidator(const HeaderValidatorConfig& config, Protocol protocol,
                                            ::Envoy::Http::HeaderValidatorStats& stats)
-    : HeaderValidator(config, protocol, stats) {}
+    : HeaderValidator(config, protocol, stats),
+      request_header_validator_map_{
+          {":method", absl::bind_front(&HeaderValidator::validateMethodHeader, this)},
+          {":authority", absl::bind_front(&Http2HeaderValidator::validateAuthorityHeader, this)},
+          {":scheme", absl::bind_front(&HeaderValidator::validateSchemeHeader, this)},
+          {":path", absl::bind_front(&HeaderValidator::validatePathHeaderCharacters, this)},
+          {"te", absl::bind_front(&Http2HeaderValidator::validateTEHeader, this)},
+          {"content-length",
+           absl::bind_front(&Http2HeaderValidator::validateContentLengthHeader, this)},
+      } {}
 
 ::Envoy::Http::HeaderValidator::HeaderEntryValidationResult
 Http2HeaderValidator::validateRequestHeaderEntry(const HeaderString& key,
                                                  const HeaderString& value) {
-  static const absl::node_hash_map<absl::string_view, HeaderValidatorFunction> kHeaderValidatorMap{
-      {":method", &Http2HeaderValidator::validateMethodHeader},
-      {":authority", &Http2HeaderValidator::validateAuthorityHeader},
-      {":scheme", &Http2HeaderValidator::validateSchemeHeader},
-      {":path", &Http2HeaderValidator::validatePathHeaderCharacters},
-      {"te", &Http2HeaderValidator::validateTEHeader},
-      {"content-length", &Http2HeaderValidator::validateContentLengthHeader},
-  };
   // TODO(#23286) - Add support for validating the :protocol pseudo header for extended CONNECT
   // requests.
 
-  const auto& key_string_view = key.getStringView();
-  if (key_string_view.empty()) {
-    // reject empty header names
-    return {HeaderEntryValidationResult::Action::Reject,
-            UhvResponseCodeDetail::get().EmptyHeaderName};
-  }
-
-  auto validator_it = kHeaderValidatorMap.find(key_string_view);
-  if (validator_it != kHeaderValidatorMap.end()) {
-    const auto& validator = validator_it->second;
-    return (*this.*validator)(value);
-  }
-
-  if (key_string_view.at(0) != ':') {
-    // Validate the (non-pseudo) header name
-    auto name_result = validateGenericHeaderName(key);
-    if (!name_result) {
-      return name_result;
-    }
-  } else {
-    // kHeaderValidatorMap contains every known pseudo header. If the header name starts with ":"
-    // and we don't have a validator registered in the map, then the header name is an unknown
-    // pseudo header.
-    return {HeaderEntryValidationResult::Action::Reject,
-            UhvResponseCodeDetail::get().InvalidPseudoHeader};
-  }
-
-  return validateGenericHeaderValue(value);
+  return validateGenericRequestHeaderEntry(key, value, request_header_validator_map_);
 }
 
 ::Envoy::Http::HeaderValidator::HeaderEntryValidationResult
@@ -136,6 +111,7 @@ Http2HeaderValidator::validateRequestHeaderMap(::Envoy::Http::RequestHeaderMap& 
   //
   // The method pseudo header is always mandatory.
   if (header_map.getMethodValue().empty()) {
+    stats_.incMessagingError();
     return {RequestHeaderMapValidationResult::Action::Reject,
             UhvResponseCodeDetail::get().InvalidMethod};
   }
@@ -171,7 +147,7 @@ Http2HeaderValidator::validateRequestHeaderMap(::Envoy::Http::RequestHeaderMap& 
       details = UhvResponseCodeDetail::get().InvalidUrl;
     } else if (!header_map.getSchemeValue().empty()) {
       details = UhvResponseCodeDetail::get().InvalidScheme;
-    } else if (header_map.authority().empty()) {
+    } else if (header_map.getHostValue().empty()) {
       details = UhvResponseCodeDetail::get().InvalidHost;
     }
 
@@ -254,6 +230,7 @@ Http2HeaderValidator::validateRequestHeaderMap(::Envoy::Http::RequestHeaderMap& 
       });
 
   if (!reject_details.empty()) {
+    stats_.incMessagingError();
     return {RequestHeaderMapValidationResult::Action::Reject, reject_details};
   }
 
@@ -276,6 +253,7 @@ Http2HeaderValidator::validateResponseHeaderMap(::Envoy::Http::ResponseHeaderMap
   // status code field (see Section 15 of [HTTP]). This pseudo-header field MUST be included in all
   // responses, including interim responses; otherwise, the response is malformed (Section 8.1.1).
   if (header_map.getStatusValue().empty()) {
+    stats_.incMessagingError();
     return {ResponseHeaderMapValidationResult::Action::Reject,
             UhvResponseCodeDetail::get().InvalidStatus};
   }
@@ -303,6 +281,7 @@ Http2HeaderValidator::validateResponseHeaderMap(::Envoy::Http::ResponseHeaderMap
       });
 
   if (!reject_details.empty()) {
+    stats_.incMessagingError();
     return {ResponseHeaderMapValidationResult::Action::Reject, reject_details};
   }
 
@@ -420,6 +399,24 @@ Http2HeaderValidator::validateGenericHeaderName(const HeaderString& name) {
   }
 
   return HeaderEntryValidationResult::success();
+}
+
+HeaderValidator::TrailerValidationResult
+Http2HeaderValidator::validateRequestTrailerMap(::Envoy::Http::RequestTrailerMap& trailer_map) {
+  TrailerValidationResult result = validateTrailers(trailer_map);
+  if (!result.ok()) {
+    stats_.incMessagingError();
+  }
+  return result;
+}
+
+HeaderValidator::TrailerValidationResult
+Http2HeaderValidator::validateResponseTrailerMap(::Envoy::Http::ResponseTrailerMap& trailer_map) {
+  TrailerValidationResult result = validateTrailers(trailer_map);
+  if (!result.ok()) {
+    stats_.incMessagingError();
+  }
+  return result;
 }
 
 } // namespace EnvoyDefault

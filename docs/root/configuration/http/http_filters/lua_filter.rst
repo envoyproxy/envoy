@@ -11,12 +11,6 @@ and response flows. `LuaJIT <https://luajit.org/>`_ is used as the runtime. Beca
 supported Lua version is mostly 5.1 with some 5.2 features. See the `LuaJIT documentation
 <https://luajit.org/extensions.html>`_ for more details.
 
-.. note::
-
-  `moonjit <https://github.com/moonjit/moonjit/>`_ is a continuation of LuaJIT development, which
-  supports more 5.2 features and additional architectures. Envoy can be built with moonjit support
-  by using the following bazel option: ``--//source/extensions/filters/common/lua:moonjit=1``.
-
 The design of the filter and Lua support at a high level is as follows:
 
 * All Lua environments are :ref:`per worker thread <arch_overview_threading>`. This means that
@@ -423,6 +417,8 @@ the supported keys are:
   If the *return_duplicate_headers* is set to false (default), the returned *headers* is table with value type of string.
   If the *return_duplicate_headers* is set to true, the returned *headers* is table with value type of string or value type
   of table.
+- *send_xff* is a boolean flag that decides whether the *x-forwarded-for* header is sent to target server.
+  The default value is true.
 
   For example, the following upstream response headers have repeated headers.
 
@@ -631,7 +627,8 @@ get()
   headers:get(key)
 
 Gets a header. *key* is a string that supplies the header key. Returns a string that is the header
-value or nil if there is no such header.
+value or nil if there is no such header. If there are multiple headers in the same case-insensitive
+key, their values will be combined with a *,* separator and returned as a string.
 
 getAtIndex()
 ^^^^^^^^^^^^

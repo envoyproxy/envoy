@@ -11,6 +11,13 @@
 #include "envoy/common/callback.h"
 #include "envoy/common/random_generator.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
+#include "envoy/extensions/load_balancing_policies/common/v3/common.pb.h"
+#include "envoy/extensions/load_balancing_policies/least_request/v3/least_request.pb.h"
+#include "envoy/extensions/load_balancing_policies/least_request/v3/least_request.pb.validate.h"
+#include "envoy/extensions/load_balancing_policies/random/v3/random.pb.h"
+#include "envoy/extensions/load_balancing_policies/random/v3/random.pb.validate.h"
+#include "envoy/extensions/load_balancing_policies/round_robin/v3/round_robin.pb.h"
+#include "envoy/extensions/load_balancing_policies/round_robin/v3/round_robin.pb.validate.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/upstream/load_balancer.h"
 #include "envoy/upstream/upstream.h"
@@ -24,6 +31,53 @@ namespace Upstream {
 
 // Priority levels and localities are considered overprovisioned with this factor.
 static constexpr uint32_t kDefaultOverProvisioningFactor = 140;
+
+class LoadBalancerConfigHelper {
+public:
+  template <class LegacyProto>
+  static absl::optional<envoy::extensions::load_balancing_policies::common::v3::SlowStartConfig>
+  slowStartConfigFromLegacyProto(const LegacyProto& proto_config) {
+    if (!proto_config.has_slow_start_config()) {
+      return {};
+    }
+
+    envoy::extensions::load_balancing_policies::common::v3::SlowStartConfig slow_start_config;
+    const auto& legacy_slow_start_config = proto_config.slow_start_config();
+    if (legacy_slow_start_config.has_slow_start_window()) {
+      *slow_start_config.mutable_slow_start_window() = legacy_slow_start_config.slow_start_window();
+    }
+    if (legacy_slow_start_config.has_aggression()) {
+      *slow_start_config.mutable_aggression() = legacy_slow_start_config.aggression();
+    }
+    if (legacy_slow_start_config.has_min_weight_percent()) {
+      *slow_start_config.mutable_min_weight_percent() =
+          legacy_slow_start_config.min_weight_percent();
+    }
+    return slow_start_config;
+  }
+
+  template <class Proto>
+  static absl::optional<envoy::extensions::load_balancing_policies::common::v3::SlowStartConfig>
+  slowStartConfigFromProto(const Proto& proto_config) {
+    if (!proto_config.has_slow_start_config()) {
+      return {};
+    }
+    return proto_config.slow_start_config();
+  }
+
+  static absl::optional<envoy::extensions::load_balancing_policies::common::v3::LocalityLbConfig>
+  localityLbConfigFromCommonLbConfig(
+      const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config);
+
+  template <class Proto>
+  static absl::optional<envoy::extensions::load_balancing_policies::common::v3::LocalityLbConfig>
+  localityLbConfigFromProto(const Proto& proto_config) {
+    if (!proto_config.has_locality_lb_config()) {
+      return {};
+    }
+    return proto_config.locality_lb_config();
+  }
+};
 
 /**
  * Base class for all LB implementations.
@@ -69,8 +123,7 @@ protected:
   void recalculateLoadInTotalPanic();
 
   LoadBalancerBase(const PrioritySet& priority_set, ClusterLbStats& stats, Runtime::Loader& runtime,
-                   Random::RandomGenerator& random,
-                   const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config);
+                   Random::RandomGenerator& random, uint32_t healthy_panic_threshold);
 
   // Choose host set randomly, based on the healthy_per_priority_load_ and
   // degraded_per_priority_load_. per_priority_load_ is consulted first, spilling over to
@@ -194,14 +247,16 @@ public:
  */
 class ZoneAwareLoadBalancerBase : public LoadBalancerBase {
 public:
+  using LocalityLbConfig = envoy::extensions::load_balancing_policies::common::v3::LocalityLbConfig;
+
   HostConstSharedPtr chooseHost(LoadBalancerContext* context) override;
 
 protected:
   // Both priority_set and local_priority_set if non-null must have at least one host set.
-  ZoneAwareLoadBalancerBase(
-      const PrioritySet& priority_set, const PrioritySet* local_priority_set, ClusterLbStats& stats,
-      Runtime::Loader& runtime, Random::RandomGenerator& random,
-      const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config);
+  ZoneAwareLoadBalancerBase(const PrioritySet& priority_set, const PrioritySet* local_priority_set,
+                            ClusterLbStats& stats, Runtime::Loader& runtime,
+                            Random::RandomGenerator& random, uint32_t healthy_panic_threshold,
+                            const absl::optional<LocalityLbConfig> locality_config);
 
   // When deciding which hosts to use on an LB decision, we need to know how to index into the
   // priority_set. This priority_set cursor is used by ZoneAwareLoadBalancerBase subclasses, e.g.
@@ -357,14 +412,6 @@ private:
   // The set of local Envoy instances which are load balancing across priority_set_.
   const PrioritySet* local_priority_set_;
 
-  // If locality weight aware routing is enabled.
-  const bool locality_weighted_balancing_{};
-
-  // Config for zone aware routing.
-  const uint32_t routing_enabled_;
-  const uint64_t min_cluster_size_;
-  const bool fail_traffic_on_panic_;
-
   struct PerPriorityState {
     // The percent of requests which can be routed to the local locality.
     uint64_t local_percent_to_route_{};
@@ -380,6 +427,15 @@ private:
   std::vector<PerPriorityStatePtr> per_priority_state_;
   Common::CallbackHandlePtr priority_update_cb_;
   Common::CallbackHandlePtr local_priority_set_member_update_cb_handle_;
+
+  // Config for zone aware routing.
+  const uint64_t min_cluster_size_;
+  // Keep small members (bools and enums) at the end of class, to reduce alignment overhead.
+  const uint32_t routing_enabled_;
+  const bool fail_traffic_on_panic_ : 1;
+
+  // If locality weight aware routing is enabled.
+  const bool locality_weighted_balancing_ : 1;
 
   friend class TestZoneAwareLoadBalancer;
 };
@@ -404,12 +460,14 @@ private:
 class EdfLoadBalancerBase : public ZoneAwareLoadBalancerBase,
                             Logger::Loggable<Logger::Id::upstream> {
 public:
-  EdfLoadBalancerBase(
-      const PrioritySet& priority_set, const PrioritySet* local_priority_set, ClusterLbStats& stats,
-      Runtime::Loader& runtime, Random::RandomGenerator& random,
-      const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config,
-      const absl::optional<envoy::config::cluster::v3::Cluster::SlowStartConfig> slow_start_cofig,
-      TimeSource& time_source);
+  using SlowStartConfig = envoy::extensions::load_balancing_policies::common::v3::SlowStartConfig;
+
+  EdfLoadBalancerBase(const PrioritySet& priority_set, const PrioritySet* local_priority_set,
+                      ClusterLbStats& stats, Runtime::Loader& runtime,
+                      Random::RandomGenerator& random, uint32_t healthy_panic_threshold,
+                      const absl::optional<LocalityLbConfig> locality_config,
+                      const absl::optional<SlowStartConfig> slow_start_config,
+                      TimeSource& time_source);
 
   // Upstream::ZoneAwareLoadBalancerBase
   HostConstSharedPtr peekAnotherHost(LoadBalancerContext* context) override;
@@ -476,16 +534,30 @@ public:
       const PrioritySet& priority_set, const PrioritySet* local_priority_set, ClusterLbStats& stats,
       Runtime::Loader& runtime, Random::RandomGenerator& random,
       const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config,
-      const absl::optional<envoy::config::cluster::v3::Cluster::RoundRobinLbConfig>
+      OptRef<const envoy::config::cluster::v3::Cluster::RoundRobinLbConfig> round_robin_config,
+      TimeSource& time_source)
+      : EdfLoadBalancerBase(
+            priority_set, local_priority_set, stats, runtime, random,
+            PROTOBUF_PERCENT_TO_ROUNDED_INTEGER_OR_DEFAULT(common_config, healthy_panic_threshold,
+                                                           100, 50),
+            LoadBalancerConfigHelper::localityLbConfigFromCommonLbConfig(common_config),
+            round_robin_config.has_value()
+                ? LoadBalancerConfigHelper::slowStartConfigFromLegacyProto(round_robin_config.ref())
+                : absl::nullopt,
+            time_source) {
+    initialize();
+  }
+
+  RoundRobinLoadBalancer(
+      const PrioritySet& priority_set, const PrioritySet* local_priority_set, ClusterLbStats& stats,
+      Runtime::Loader& runtime, Random::RandomGenerator& random, uint32_t healthy_panic_threshold,
+      const envoy::extensions::load_balancing_policies::round_robin::v3::RoundRobin&
           round_robin_config,
       TimeSource& time_source)
       : EdfLoadBalancerBase(
-            priority_set, local_priority_set, stats, runtime, random, common_config,
-            (round_robin_config.has_value() && round_robin_config.value().has_slow_start_config())
-                ? absl::optional<envoy::config::cluster::v3::Cluster::SlowStartConfig>(
-                      round_robin_config.value().slow_start_config())
-                : absl::nullopt,
-            time_source) {
+            priority_set, local_priority_set, stats, runtime, random, healthy_panic_threshold,
+            LoadBalancerConfigHelper::localityLbConfigFromProto(round_robin_config),
+            LoadBalancerConfigHelper::slowStartConfigFromProto(round_robin_config), time_source) {
     initialize();
   }
 
@@ -554,25 +626,45 @@ public:
       const PrioritySet& priority_set, const PrioritySet* local_priority_set, ClusterLbStats& stats,
       Runtime::Loader& runtime, Random::RandomGenerator& random,
       const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config,
-      const absl::optional<envoy::config::cluster::v3::Cluster::LeastRequestLbConfig>
-          least_request_config,
+      OptRef<const envoy::config::cluster::v3::Cluster::LeastRequestLbConfig> least_request_config,
       TimeSource& time_source)
       : EdfLoadBalancerBase(
-            priority_set, local_priority_set, stats, runtime, random, common_config,
-            (least_request_config.has_value() &&
-             least_request_config.value().has_slow_start_config())
-                ? absl::optional<envoy::config::cluster::v3::Cluster::SlowStartConfig>(
-                      least_request_config.value().slow_start_config())
+            priority_set, local_priority_set, stats, runtime, random,
+            PROTOBUF_PERCENT_TO_ROUNDED_INTEGER_OR_DEFAULT(common_config, healthy_panic_threshold,
+                                                           100, 50),
+            LoadBalancerConfigHelper::localityLbConfigFromCommonLbConfig(common_config),
+            least_request_config.has_value()
+                ? LoadBalancerConfigHelper::slowStartConfigFromLegacyProto(
+                      least_request_config.ref())
                 : absl::nullopt,
             time_source),
         choice_count_(
             least_request_config.has_value()
-                ? PROTOBUF_GET_WRAPPED_OR_DEFAULT(least_request_config.value(), choice_count, 2)
+                ? PROTOBUF_GET_WRAPPED_OR_DEFAULT(least_request_config.ref(), choice_count, 2)
                 : 2),
         active_request_bias_runtime_(
             least_request_config.has_value() && least_request_config->has_active_request_bias()
                 ? absl::optional<Runtime::Double>(
                       {least_request_config->active_request_bias(), runtime})
+                : absl::nullopt) {
+    initialize();
+  }
+
+  LeastRequestLoadBalancer(
+      const PrioritySet& priority_set, const PrioritySet* local_priority_set, ClusterLbStats& stats,
+      Runtime::Loader& runtime, Random::RandomGenerator& random, uint32_t healthy_panic_threshold,
+      const envoy::extensions::load_balancing_policies::least_request::v3::LeastRequest&
+          least_request_config,
+      TimeSource& time_source)
+      : EdfLoadBalancerBase(
+            priority_set, local_priority_set, stats, runtime, random, healthy_panic_threshold,
+            LoadBalancerConfigHelper::localityLbConfigFromProto(least_request_config),
+            LoadBalancerConfigHelper::slowStartConfigFromProto(least_request_config), time_source),
+        choice_count_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(least_request_config, choice_count, 2)),
+        active_request_bias_runtime_(
+            least_request_config.has_active_request_bias()
+                ? absl::optional<Runtime::Double>(
+                      {least_request_config.active_request_bias(), runtime})
                 : absl::nullopt) {
     initialize();
   }
@@ -595,40 +687,7 @@ protected:
 
 private:
   void refreshHostSource(const HostsSource&) override {}
-  double hostWeight(const Host& host) override {
-    // This method is called to calculate the dynamic weight as following when all load balancing
-    // weights are not equal:
-    //
-    // `weight = load_balancing_weight / (active_requests + 1)^active_request_bias`
-    //
-    // `active_request_bias` can be configured via runtime and its value is cached in
-    // `active_request_bias_` to avoid having to do a runtime lookup each time a host weight is
-    // calculated.
-    //
-    // When `active_request_bias == 0.0` we behave like `RoundRobinLoadBalancer` and return the
-    // host weight without considering the number of active requests at the time we do the pick.
-    //
-    // When `active_request_bias > 0.0` we scale the host weight by the number of active
-    // requests at the time we do the pick. We always add 1 to avoid division by 0.
-    //
-    // It might be possible to do better by picking two hosts off of the schedule, and selecting the
-    // one with fewer active requests at the time of selection.
-
-    double host_weight = static_cast<double>(host.weight());
-
-    if (active_request_bias_ == 1.0) {
-      host_weight = static_cast<double>(host.weight()) / (host.stats().rq_active_.value() + 1);
-    } else if (active_request_bias_ != 0.0) {
-      host_weight = static_cast<double>(host.weight()) /
-                    std::pow(host.stats().rq_active_.value() + 1, active_request_bias_);
-    }
-
-    if (!noHostsAreInSlowStart()) {
-      return applySlowStartFactor(host_weight, host);
-    } else {
-      return host_weight;
-    }
-  }
+  double hostWeight(const Host& host) override;
   HostConstSharedPtr unweightedHostPeek(const HostVector& hosts_to_use,
                                         const HostsSource& source) override;
   HostConstSharedPtr unweightedHostPick(const HostVector& hosts_to_use,
@@ -654,8 +713,19 @@ public:
                      ClusterLbStats& stats, Runtime::Loader& runtime,
                      Random::RandomGenerator& random,
                      const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config)
-      : ZoneAwareLoadBalancerBase(priority_set, local_priority_set, stats, runtime, random,
-                                  common_config) {}
+      : ZoneAwareLoadBalancerBase(
+            priority_set, local_priority_set, stats, runtime, random,
+            PROTOBUF_PERCENT_TO_ROUNDED_INTEGER_OR_DEFAULT(common_config, healthy_panic_threshold,
+                                                           100, 50),
+            LoadBalancerConfigHelper::localityLbConfigFromCommonLbConfig(common_config)) {}
+
+  RandomLoadBalancer(
+      const PrioritySet& priority_set, const PrioritySet* local_priority_set, ClusterLbStats& stats,
+      Runtime::Loader& runtime, Random::RandomGenerator& random, uint32_t healthy_panic_threshold,
+      const envoy::extensions::load_balancing_policies::random::v3::Random& random_config)
+      : ZoneAwareLoadBalancerBase(
+            priority_set, local_priority_set, stats, runtime, random, healthy_panic_threshold,
+            LoadBalancerConfigHelper::localityLbConfigFromProto(random_config)) {}
 
   // Upstream::ZoneAwareLoadBalancerBase
   HostConstSharedPtr chooseHostOnce(LoadBalancerContext* context) override;
@@ -688,10 +758,11 @@ public:
 
 private:
   const std::set<std::string> selector_keys_;
+  const std::set<std::string> fallback_keys_subset_;
+  // Keep small members (bools and enums) at the end of class, to reduce alignment overhead.
   const envoy::config::cluster::v3::Cluster::LbSubsetConfig::LbSubsetSelector::
       LbSubsetSelectorFallbackPolicy fallback_policy_;
-  const std::set<std::string> fallback_keys_subset_;
-  const bool single_host_per_subset_;
+  const bool single_host_per_subset_ : 1;
 };
 
 /**
@@ -702,10 +773,10 @@ public:
   LoadBalancerSubsetInfoImpl() : enabled_(false) {}
   LoadBalancerSubsetInfoImpl(
       const envoy::config::cluster::v3::Cluster::LbSubsetConfig& subset_config)
-      : enabled_(!subset_config.subset_selectors().empty()),
+      : default_subset_(subset_config.default_subset()),
         fallback_policy_(subset_config.fallback_policy()),
         metadata_fallback_policy_(subset_config.metadata_fallback_policy()),
-        default_subset_(subset_config.default_subset()),
+        enabled_(!subset_config.subset_selectors().empty()),
         locality_weight_aware_(subset_config.locality_weight_aware()),
         scale_locality_weight_(subset_config.scale_locality_weight()),
         panic_mode_any_(subset_config.panic_mode_any()), list_as_any_(subset_config.list_as_any()) {
@@ -738,12 +809,12 @@ public:
   bool listAsAny() const override { return list_as_any_; }
 
 private:
+  const ProtobufWkt::Struct default_subset_;
+  std::vector<SubsetSelectorPtr> subset_selectors_;
   const envoy::config::cluster::v3::Cluster::LbSubsetConfig::LbSubsetFallbackPolicy
       fallback_policy_;
   const envoy::config::cluster::v3::Cluster::LbSubsetConfig::LbSubsetMetadataFallbackPolicy
       metadata_fallback_policy_;
-  const ProtobufWkt::Struct default_subset_;
-  std::vector<SubsetSelectorPtr> subset_selectors_;
   // Keep small members (bools and enums) at the end of class, to reduce alignment overhead.
   const bool enabled_ : 1;
   const bool locality_weight_aware_ : 1;

@@ -53,8 +53,8 @@ public:
     envoy::extensions::filters::http::ratelimit::v3::RateLimit proto_config{};
     TestUtility::loadFromYaml(yaml, proto_config);
 
-    config_ = std::make_shared<FilterConfig>(proto_config, local_info_, stats_store_, runtime_,
-                                             http_context_);
+    config_ = std::make_shared<FilterConfig>(proto_config, local_info_, *stats_store_.rootScope(),
+                                             runtime_, http_context_);
 
     client_ = new Filters::Common::RateLimit::MockClient();
     filter_ = std::make_unique<Filter>(config_, Filters::Common::RateLimit::ClientPtr{client_});

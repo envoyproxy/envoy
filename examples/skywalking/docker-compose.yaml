@@ -1,10 +1,8 @@
-version: "3.8"
 services:
 
   envoy-front-proxy:
     build:
-      context: .
-      dockerfile: Dockerfile-envoy
+      dockerfile: ../shared/envoy/Dockerfile
       args:
         ENVOY_CONFIG: envoy-front-proxy.yaml
     depends_on:
@@ -19,8 +17,7 @@ services:
 
   envoy-1:
     build:
-      context: .
-      dockerfile: Dockerfile-envoy
+      dockerfile: ../shared/envoy/Dockerfile
       args:
         ENVOY_CONFIG: envoy-1.yaml
     depends_on:
@@ -33,8 +30,7 @@ services:
 
   envoy-2:
     build:
-      context: .
-      dockerfile: Dockerfile-envoy
+      dockerfile: ../shared/envoy/Dockerfile
       args:
         ENVOY_CONFIG: envoy-2.yaml
     depends_on:
@@ -45,28 +41,21 @@ services:
 
   service-1:
     build:
-      context: ../shared/flask
-    volumes:
-    - ./service.py:/code/service.py
+      context: ../shared/python
+      target: aiohttp-tracing-service
     environment:
     - SERVICE_NAME=1
-    healthcheck:
-      test: ["CMD", "nc", "-zv", "localhost", "8000"]
 
   service-2:
     build:
-      context: ../shared/flask
-    volumes:
-    - ./service.py:/code/service.py
+      context: ../shared/python
+      target: aiohttp-tracing-service
     environment:
     - SERVICE_NAME=2
-    healthcheck:
-      test: ["CMD", "nc", "-zv", "localhost", "8000"]
 
   # Skywalking components.
   elasticsearch:
     build:
-      context: .
       dockerfile: Dockerfile-elasticsearch
     healthcheck:
       test: ["CMD-SHELL", "curl -sf http://localhost:9200/_cluster/health || exit 1"]
@@ -77,6 +66,13 @@ services:
     environment:
       discovery.type: single-node
       ingest.geoip.downloader.enabled: "false"
+
+      cluster.routing.allocation.disk.watermark.low: "${ES_WATERMARK_LOW:-85%}"
+      cluster.routing.allocation.disk.watermark.high: "${ES_WATERMARK_HIGH:-90%}"
+      cluster.routing.allocation.disk.watermark.flood_stage: "${ES_WATERMARK_FLOOD:-95%}"
+      cluster.routing.allocation.disk.watermark.flood_stage.frozen: "${ES_WATERMARK_FLOOD_FROZEN:-95%}"
+      cluster.routing.allocation.disk.watermark.flood_stage.frozen.max_headroom: "${ES_MAX_HEADROOM:-20GB}"
+
       # NB: This setting is for demo purposes only, you are strongly advised to configure
       #   Elasticsearch with security enabled
       xpack.security.enabled: "false"
@@ -87,7 +83,6 @@ services:
 
   skywalking-oap:
     build:
-      context: .
       dockerfile: Dockerfile-skywalking-oap
     depends_on:
       elasticsearch:
@@ -106,7 +101,6 @@ services:
 
   skywalking-ui:
     build:
-      context: .
       dockerfile: Dockerfile-skywalking-ui
     healthcheck:
       test: ["CMD-SHELL", 'curl --silent --fail http://localhost:8080/graphql -X POST -H "Content-Type:application/json" -d "{ \"query\": \"query version { version }\"}" || exit 1']

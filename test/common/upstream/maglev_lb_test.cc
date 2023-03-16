@@ -12,6 +12,9 @@
 #include "test/mocks/upstream/load_balancer_context.h"
 #include "test/mocks/upstream/priority_set.h"
 #include "test/test_common/simulated_time_system.h"
+#include "test/test_common/test_runtime.h"
+
+#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Upstream {
@@ -42,19 +45,31 @@ public:
 
 // Note: ThreadAwareLoadBalancer base is heavily tested by RingHashLoadBalancerTest. Only basic
 //       functionality is covered here.
-class MaglevLoadBalancerTest : public Event::TestUsingSimulatedTime, public testing::Test {
+class MaglevLoadBalancerTest : public Event::TestUsingSimulatedTime,
+                               public testing::TestWithParam<bool> {
 public:
   MaglevLoadBalancerTest()
-      : stat_names_(stats_store_.symbolTable()), stats_(stat_names_, stats_store_) {}
-
-  void createLb() {
-    lb_ = std::make_unique<MaglevLoadBalancer>(priority_set_, stats_, stats_store_, runtime_,
-                                               random_, config_, common_config_);
+      : stat_names_(stats_store_.symbolTable()), stats_(stat_names_, *stats_store_.rootScope()) {
+    scoped_runtime_.mergeValues(
+        {{"envoy.reloadable_features.allow_compact_maglev", GetParam() ? "true" : "false"}});
   }
 
-  void init(uint64_t table_size) {
+  void createLb() {
+    lb_ = std::make_unique<MaglevLoadBalancer>(
+        priority_set_, stats_, *stats_store_.rootScope(), runtime_, random_,
+        config_.has_value()
+            ? makeOptRef<const envoy::config::cluster::v3::Cluster::MaglevLbConfig>(config_.value())
+            : absl::nullopt,
+        common_config_);
+  }
+
+  void init(uint64_t table_size, bool locality_weighted_balancing = false) {
     config_ = envoy::config::cluster::v3::Cluster::MaglevLbConfig();
     config_.value().mutable_table_size()->set_value(table_size);
+
+    if (locality_weighted_balancing) {
+      common_config_.mutable_locality_weighted_lb_config();
+    }
 
     createLb();
     lb_->initialize();
@@ -71,10 +86,13 @@ public:
   NiceMock<Runtime::MockLoader> runtime_;
   NiceMock<Random::MockRandomGenerator> random_;
   std::unique_ptr<MaglevLoadBalancer> lb_;
+  TestScopedRuntime scoped_runtime_;
 };
 
+INSTANTIATE_TEST_SUITE_P(MaglevTests, MaglevLoadBalancerTest, ::testing::Bool());
+
 // Works correctly without any hosts.
-TEST_F(MaglevLoadBalancerTest, NoHost) {
+TEST_P(MaglevLoadBalancerTest, NoHost) {
   init(7);
   EXPECT_EQ(nullptr, lb_->factory()->create()->chooseHost(nullptr));
 };
@@ -83,7 +101,7 @@ TEST_F(MaglevLoadBalancerTest, NoHost) {
 // cluster, the operation does not immediately reach the worker thread. There may be cases where the
 // thread aware load balancer is destructed, but the load balancer factory is still used in the
 // worker thread.
-TEST_F(MaglevLoadBalancerTest, LbDestructedBeforeFactory) {
+TEST_P(MaglevLoadBalancerTest, LbDestructedBeforeFactory) {
   init(7);
 
   auto factory = lb_->factory();
@@ -93,13 +111,13 @@ TEST_F(MaglevLoadBalancerTest, LbDestructedBeforeFactory) {
 }
 
 // Throws an exception if table size is not a prime number.
-TEST_F(MaglevLoadBalancerTest, NoPrimeNumber) {
+TEST_P(MaglevLoadBalancerTest, NoPrimeNumber) {
   EXPECT_THROW_WITH_MESSAGE(init(8), EnvoyException,
                             "The table size of maglev must be prime number");
 };
 
 // Check it has default table size if config is null or table size has invalid value.
-TEST_F(MaglevLoadBalancerTest, DefaultMaglevTableSize) {
+TEST_P(MaglevLoadBalancerTest, DefaultMaglevTableSize) {
   const uint64_t defaultValue = MaglevTable::DefaultTableSize;
 
   config_ = envoy::config::cluster::v3::Cluster::MaglevLbConfig();
@@ -112,7 +130,7 @@ TEST_F(MaglevLoadBalancerTest, DefaultMaglevTableSize) {
 };
 
 // Basic sanity tests.
-TEST_F(MaglevLoadBalancerTest, Basic) {
+TEST_P(MaglevLoadBalancerTest, Basic) {
   host_set_.hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:90", simTime()),
                       makeTestHost(info_, "tcp://127.0.0.1:91", simTime()),
                       makeTestHost(info_, "tcp://127.0.0.1:92", simTime()),
@@ -145,7 +163,7 @@ TEST_F(MaglevLoadBalancerTest, Basic) {
 }
 
 // Basic with hostname.
-TEST_F(MaglevLoadBalancerTest, BasicWithHostName) {
+TEST_P(MaglevLoadBalancerTest, BasicWithHostName) {
   host_set_.hosts_ = {makeTestHost(info_, "90", "tcp://127.0.0.1:90", simTime()),
                       makeTestHost(info_, "91", "tcp://127.0.0.1:91", simTime()),
                       makeTestHost(info_, "92", "tcp://127.0.0.1:92", simTime()),
@@ -180,7 +198,7 @@ TEST_F(MaglevLoadBalancerTest, BasicWithHostName) {
 }
 
 // Basic with metadata hash_key.
-TEST_F(MaglevLoadBalancerTest, BasicWithMetadataHashKey) {
+TEST_P(MaglevLoadBalancerTest, BasicWithMetadataHashKey) {
   host_set_.hosts_ = {makeTestHostWithHashKey(info_, "90", "tcp://127.0.0.1:90", simTime()),
                       makeTestHostWithHashKey(info_, "91", "tcp://127.0.0.1:91", simTime()),
                       makeTestHostWithHashKey(info_, "92", "tcp://127.0.0.1:92", simTime()),
@@ -215,7 +233,7 @@ TEST_F(MaglevLoadBalancerTest, BasicWithMetadataHashKey) {
 }
 
 // Same ring as the Basic test, but exercise retry host predicate behavior.
-TEST_F(MaglevLoadBalancerTest, BasicWithRetryHostPredicate) {
+TEST_P(MaglevLoadBalancerTest, BasicWithRetryHostPredicate) {
   host_set_.hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:90", simTime()),
                       makeTestHost(info_, "tcp://127.0.0.1:91", simTime()),
                       makeTestHost(info_, "tcp://127.0.0.1:92", simTime()),
@@ -263,7 +281,7 @@ TEST_F(MaglevLoadBalancerTest, BasicWithRetryHostPredicate) {
 }
 
 // Weighted sanity test.
-TEST_F(MaglevLoadBalancerTest, Weighted) {
+TEST_P(MaglevLoadBalancerTest, Weighted) {
   host_set_.hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:90", simTime(), 1),
                       makeTestHost(info_, "tcp://127.0.0.1:91", simTime(), 2)};
   host_set_.healthy_hosts_ = host_set_.hosts_;
@@ -301,7 +319,7 @@ TEST_F(MaglevLoadBalancerTest, Weighted) {
 
 // Locality weighted sanity test when localities have the same weights. Host weights for hosts in
 // different localities shouldn't matter.
-TEST_F(MaglevLoadBalancerTest, LocalityWeightedSameLocalityWeights) {
+TEST_P(MaglevLoadBalancerTest, LocalityWeightedSameLocalityWeights) {
   host_set_.hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:90", simTime(), 1),
                       makeTestHost(info_, "tcp://127.0.0.1:91", simTime(), 2)};
   host_set_.healthy_hosts_ = host_set_.hosts_;
@@ -311,7 +329,7 @@ TEST_F(MaglevLoadBalancerTest, LocalityWeightedSameLocalityWeights) {
   LocalityWeightsConstSharedPtr locality_weights{new LocalityWeights{1, 1}};
   host_set_.locality_weights_ = locality_weights;
   host_set_.runCallbacks({}, {});
-  init(17);
+  init(17, true);
   EXPECT_EQ(8, lb_->stats().min_entries_per_host_.value());
   EXPECT_EQ(9, lb_->stats().max_entries_per_host_.value());
 
@@ -344,7 +362,7 @@ TEST_F(MaglevLoadBalancerTest, LocalityWeightedSameLocalityWeights) {
 
 // Locality weighted sanity test when localities have different weights. Host weights for hosts in
 // different localities shouldn't matter.
-TEST_F(MaglevLoadBalancerTest, LocalityWeightedDifferentLocalityWeights) {
+TEST_P(MaglevLoadBalancerTest, LocalityWeightedDifferentLocalityWeights) {
   host_set_.hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:90", simTime(), 1),
                       makeTestHost(info_, "tcp://127.0.0.1:91", simTime(), 2),
                       makeTestHost(info_, "tcp://127.0.0.1:92", simTime(), 3)};
@@ -355,7 +373,7 @@ TEST_F(MaglevLoadBalancerTest, LocalityWeightedDifferentLocalityWeights) {
   LocalityWeightsConstSharedPtr locality_weights{new LocalityWeights{8, 0, 2}};
   host_set_.locality_weights_ = locality_weights;
   host_set_.runCallbacks({}, {});
-  init(17);
+  init(17, true);
   EXPECT_EQ(4, lb_->stats().min_entries_per_host_.value());
   EXPECT_EQ(13, lb_->stats().max_entries_per_host_.value());
 
@@ -387,7 +405,7 @@ TEST_F(MaglevLoadBalancerTest, LocalityWeightedDifferentLocalityWeights) {
 }
 
 // Locality weighted with all localities zero weighted.
-TEST_F(MaglevLoadBalancerTest, LocalityWeightedAllZeroLocalityWeights) {
+TEST_P(MaglevLoadBalancerTest, LocalityWeightedAllZeroLocalityWeights) {
   host_set_.hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:90", simTime(), 1)};
   host_set_.healthy_hosts_ = host_set_.hosts_;
   host_set_.hosts_per_locality_ = makeHostsPerLocality({{host_set_.hosts_[0]}});
@@ -395,7 +413,7 @@ TEST_F(MaglevLoadBalancerTest, LocalityWeightedAllZeroLocalityWeights) {
   LocalityWeightsConstSharedPtr locality_weights{new LocalityWeights{0}};
   host_set_.locality_weights_ = locality_weights;
   host_set_.runCallbacks({}, {});
-  init(17);
+  init(17, true);
   LoadBalancerPtr lb = lb_->factory()->create();
   TestLoadBalancerContext context(0);
   EXPECT_EQ(nullptr, lb->chooseHost(&context));
@@ -403,7 +421,7 @@ TEST_F(MaglevLoadBalancerTest, LocalityWeightedAllZeroLocalityWeights) {
 
 // Validate that when we are in global panic and have localities, we get sane
 // results (fall back to non-healthy hosts).
-TEST_F(MaglevLoadBalancerTest, LocalityWeightedGlobalPanic) {
+TEST_P(MaglevLoadBalancerTest, LocalityWeightedGlobalPanic) {
   host_set_.hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:90", simTime(), 1),
                       makeTestHost(info_, "tcp://127.0.0.1:91", simTime(), 2)};
   host_set_.healthy_hosts_ = {};
@@ -413,7 +431,7 @@ TEST_F(MaglevLoadBalancerTest, LocalityWeightedGlobalPanic) {
   LocalityWeightsConstSharedPtr locality_weights{new LocalityWeights{1, 1}};
   host_set_.locality_weights_ = locality_weights;
   host_set_.runCallbacks({}, {});
-  init(17);
+  init(17, true);
   EXPECT_EQ(8, lb_->stats().min_entries_per_host_.value());
   EXPECT_EQ(9, lb_->stats().max_entries_per_host_.value());
 
@@ -446,7 +464,7 @@ TEST_F(MaglevLoadBalancerTest, LocalityWeightedGlobalPanic) {
 
 // Given extremely lopsided locality weights, and a table that isn't large enough to fit all hosts,
 // expect that the least-weighted hosts appear once, and the most-weighted host fills the remainder.
-TEST_F(MaglevLoadBalancerTest, LocalityWeightedLopsided) {
+TEST_P(MaglevLoadBalancerTest, LocalityWeightedLopsided) {
   host_set_.hosts_.clear();
   HostVector heavy_but_sparse, light_but_dense;
   for (uint32_t i = 0; i < 1024; ++i) {
@@ -459,7 +477,7 @@ TEST_F(MaglevLoadBalancerTest, LocalityWeightedLopsided) {
   host_set_.healthy_hosts_per_locality_ = host_set_.hosts_per_locality_;
   host_set_.locality_weights_ = makeLocalityWeights({127, 1});
   host_set_.runCallbacks({}, {});
-  init(MaglevTable::DefaultTableSize);
+  init(MaglevTable::DefaultTableSize, true);
   EXPECT_EQ(1, lb_->stats().min_entries_per_host_.value());
   EXPECT_EQ(MaglevTable::DefaultTableSize - 1023, lb_->stats().max_entries_per_host_.value());
 

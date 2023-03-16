@@ -9,6 +9,7 @@
 #include "envoy/matcher/matcher.h"
 #include "envoy/network/drain_decision.h"
 #include "envoy/network/filter.h"
+#include "envoy/registry/registry.h"
 #include "envoy/server/filter_config.h"
 #include "envoy/server/instance.h"
 #include "envoy/server/options.h"
@@ -352,5 +353,10 @@ private:
   // Index filter chains by name, used by the matcher actions.
   FilterChainsByName filter_chains_by_name_;
 };
+
+namespace FilterChain {
+DECLARE_FACTORY(FilterChainNameActionFactory);
+}
+
 } // namespace Server
 } // namespace Envoy

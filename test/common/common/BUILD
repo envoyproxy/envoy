@@ -280,6 +280,17 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "packed_struct_test",
+    srcs = ["packed_struct_test.cc"],
+    deps = [
+        "//source/common/common:packed_struct_lib",
+        "//test/common/stats:stat_test_utility_lib",
+        "//test/test_common:utility_lib",
+        "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_test(
     name = "regex_test",
     srcs = ["regex_test.cc"],
     deps = [
@@ -470,5 +481,14 @@ envoy_cc_test(
     srcs = ["union_string_test.cc"],
     deps = [
         "//envoy/common:union_string",
+    ],
+)
+
+envoy_cc_test(
+    name = "bit_array_test",
+    srcs = ["bit_array_test.cc"],
+    deps = [
+        "//source/common/common:bit_array_lib",
+        "//source/common/common:random_generator_lib",
     ],
 )

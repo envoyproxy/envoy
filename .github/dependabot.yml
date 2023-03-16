@@ -17,27 +17,17 @@ updates:
     interval: "daily"
 
 - package-ecosystem: "pip"
-  directory: "/examples/double-proxy"
+  directory: "/examples/shared/python"
   schedule:
     interval: "daily"
 
 - package-ecosystem: "pip"
-  directory: "/examples/shared/flask"
-  schedule:
-    interval: "daily"
-
-- package-ecosystem: "pip"
-  directory: "/examples/shared/tracing"
+  directory: "/examples/shared/python/postgres"
   schedule:
     interval: "daily"
 
 - package-ecosystem: "pip"
   directory: "/mobile/docs"
-  schedule:
-    interval: "daily"
-
-- package-ecosystem: "pip"
-  directory: "/mobile/third_party/python"
   schedule:
     interval: "daily"
 
@@ -48,11 +38,6 @@ updates:
 
 - package-ecosystem: "pip"
   directory: "/tools/code_format"
-  schedule:
-    interval: "daily"
-
-- package-ecosystem: "pip"
-  directory: "/tools/dependency"
   schedule:
     interval: "daily"
 

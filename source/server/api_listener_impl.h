@@ -115,11 +115,12 @@ protected:
         IS_ENVOY_BUG("Unexpected function call");
       }
       void enableHalfClose(bool) override { IS_ENVOY_BUG("Unexpected function call"); }
-      bool isHalfCloseEnabled() override {
+      bool isHalfCloseEnabled() const override {
         IS_ENVOY_BUG("Unexpected function call");
         return false;
       }
       void close(Network::ConnectionCloseType) override {}
+      void close(Network::ConnectionCloseType, absl::string_view) override {}
       Event::Dispatcher& dispatcher() override {
         return parent_.parent_.factory_context_.mainThreadDispatcher();
       }
@@ -161,6 +162,7 @@ protected:
       const StreamInfo::StreamInfo& streamInfo() const override { return stream_info_; }
       void setDelayedCloseTimeout(std::chrono::milliseconds) override {}
       absl::string_view transportFailureReason() const override { return EMPTY_STRING; }
+      absl::string_view localCloseReason() const override { return EMPTY_STRING; }
       bool startSecureTransport() override {
         IS_ENVOY_BUG("Unexpected function call");
         return false;

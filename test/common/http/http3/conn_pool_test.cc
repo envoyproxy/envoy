@@ -63,10 +63,10 @@ public:
           return Upstream::UpstreamLocalAddress({nullptr, socket_options});
         }));
     Network::TransportSocketOptionsConstSharedPtr transport_options;
-    pool_ = allocateConnPool(dispatcher_, random_, host_, Upstream::ResourcePriority::Default,
-                             options, transport_options, state_, quic_stat_names_, {}, store_,
-                             makeOptRef<PoolConnectResultCallback>(connect_result_callback_),
-                             quic_info_);
+    pool_ = allocateConnPool(
+        dispatcher_, random_, host_, Upstream::ResourcePriority::Default, options,
+        transport_options, state_, quic_stat_names_, {}, *store_.rootScope(),
+        makeOptRef<PoolConnectResultCallback>(connect_result_callback_), quic_info_);
     EXPECT_EQ(3000, Http3ConnPoolImplPeer::getServerId(*pool_).port());
   }
 
@@ -115,7 +115,7 @@ TEST_F(Http3ConnPoolImplTest, FastFailWithoutSecretsLoaded) {
   Network::TransportSocketOptionsConstSharedPtr transport_options;
   ConnectionPool::InstancePtr pool =
       allocateConnPool(dispatcher_, random_, host_, Upstream::ResourcePriority::Default, options,
-                       transport_options, state_, quic_stat_names_, {}, store_,
+                       transport_options, state_, quic_stat_names_, {}, *store_.rootScope(),
                        makeOptRef<PoolConnectResultCallback>(connect_result_callback_), quic_info_);
 
   EXPECT_EQ(static_cast<Http3ConnPoolImpl*>(pool.get())->instantiateActiveClient(), nullptr);
@@ -139,7 +139,7 @@ TEST_F(Http3ConnPoolImplTest, FailWithSecretsBecomeEmpty) {
   Network::TransportSocketOptionsConstSharedPtr transport_options;
   ConnectionPool::InstancePtr pool =
       allocateConnPool(dispatcher_, random_, host_, Upstream::ResourcePriority::Default, options,
-                       transport_options, state_, quic_stat_names_, {}, store_,
+                       transport_options, state_, quic_stat_names_, {}, *store_.rootScope(),
                        makeOptRef<PoolConnectResultCallback>(connect_result_callback_), quic_info_);
 
   MockResponseDecoder decoder;
@@ -177,13 +177,7 @@ TEST_F(Http3ConnPoolImplTest, CreationAndNewStream) {
                                                               {/*can_send_early_data_=*/false,
                                                                /*can_use_http3_=*/true});
   EXPECT_NE(nullptr, cancellable);
-  if (Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.postpone_h3_client_connect_to_next_loop")) {
-    async_connect_callback->invokeCallback();
-  } else {
-    EXPECT_FALSE(async_connect_callback->enabled());
-    delete async_connect_callback;
-  }
+  async_connect_callback->invokeCallback();
 
   std::list<Envoy::ConnectionPool::ActiveClientPtr>& clients =
       Http3ConnPoolImplPeer::connectingClients(*pool_);
@@ -195,11 +189,6 @@ TEST_F(Http3ConnPoolImplTest, CreationAndNewStream) {
 }
 
 TEST_F(Http3ConnPoolImplTest, NewAndCancelStreamBeforeConnect) {
-  if (!Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.postpone_h3_client_connect_to_next_loop")) {
-    return;
-  }
-
   initialize();
 
   MockResponseDecoder decoder;
@@ -227,10 +216,6 @@ TEST_F(Http3ConnPoolImplTest, NewAndCancelStreamBeforeConnect) {
 }
 
 TEST_F(Http3ConnPoolImplTest, NewAndDrainClientBeforeConnect) {
-  if (!Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.postpone_h3_client_connect_to_next_loop")) {
-    return;
-  }
   initialize();
 
   MockResponseDecoder decoder;

@@ -58,7 +58,7 @@ public:
     if (!yaml.empty()) {
       TestUtility::loadFromYaml(yaml, proto_config);
     }
-    config_.reset(new FilterConfig(proto_config, stats_store_, runtime_, http_context_,
+    config_.reset(new FilterConfig(proto_config, *stats_store_.rootScope(), runtime_, http_context_,
                                    "ext_authz_prefix", bootstrap_));
     client_ = new Filters::Common::ExtAuthz::MockClient();
     filter_ = std::make_unique<Filter>(config_, Filters::Common::ExtAuthz::ClientPtr{client_});
@@ -118,6 +118,7 @@ public:
   }
 
   NiceMock<Stats::MockIsolatedStatsStore> stats_store_;
+  Stats::Scope& stats_scope_{*stats_store_.rootScope()};
   envoy::config::bootstrap::v3::Bootstrap bootstrap_;
   FilterConfigSharedPtr config_;
   Filters::Common::ExtAuthz::MockClient* client_;

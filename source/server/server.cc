@@ -219,7 +219,7 @@ MetricSnapshotImpl::MetricSnapshotImpl(Stats::Store& store, TimeSource& time_sou
         gauges_.push_back(gauge);
       });
 
-  store.forEachHistogram(
+  store.forEachSinkedHistogram(
       [this](std::size_t size) {
         snapped_histograms_.reserve(size);
         histograms_.reserve(size);
@@ -377,7 +377,7 @@ void InstanceUtil::loadBootstrapConfig(envoy::config::bootstrap::v3::Bootstrap& 
   const std::string& config_yaml = options.configYaml();
   const envoy::config::bootstrap::v3::Bootstrap& config_proto = options.configProto();
 
-  // Exactly one of config_path and config_yaml should be specified.
+  // One of config_path and config_yaml or bootstrap should be specified.
   if (config_path.empty() && config_yaml.empty() && config_proto.ByteSizeLong() == 0) {
     throw EnvoyException("At least one of --config-path or --config-yaml or Options::configProto() "
                          "should be non-empty");
@@ -575,11 +575,11 @@ void InstanceImpl::initialize(Network::Address::InstanceConstSharedPtr local_add
 
   // Initialize the overload manager early so other modules can register for actions.
   overload_manager_ = std::make_unique<OverloadManagerImpl>(
-      *dispatcher_, stats_store_, thread_local_, bootstrap_.overload_manager(),
+      *dispatcher_, *stats_store_.rootScope(), thread_local_, bootstrap_.overload_manager(),
       messageValidationContext().staticValidationVisitor(), *api_, options_);
 
-  heap_shrinker_ =
-      std::make_unique<Memory::HeapShrinker>(*dispatcher_, *overload_manager_, stats_store_);
+  heap_shrinker_ = std::make_unique<Memory::HeapShrinker>(*dispatcher_, *overload_manager_,
+                                                          *stats_store_.rootScope());
 
   for (const auto& bootstrap_extension : bootstrap_.bootstrap_extensions()) {
     auto& factory = Config::Utility::getAndCheckFactory<Configuration::BootstrapExtensionFactory>(
@@ -619,11 +619,19 @@ void InstanceImpl::initialize(Network::Address::InstanceConstSharedPtr local_add
       Network::SocketInterfaceSingleton::initialize(sock);
     }
   }
+
+  ListenerManagerFactory* listener_manager_factory_ = nullptr;
+  if (bootstrap_.has_listener_manager()) {
+    listener_manager_factory_ = Config::Utility::getAndCheckFactory<ListenerManagerFactory>(
+        bootstrap_.listener_manager(), false);
+  } else {
+    listener_manager_factory_ = &Config::Utility::getAndCheckFactoryByName<ListenerManagerFactory>(
+        options_.listenerManager());
+  }
+
   // Workers get created first so they register for thread local updates.
-  listener_manager_ =
-      Config::Utility::getAndCheckFactoryByName<ListenerManagerFactory>(options_.listenerManager())
-          .createListenerManager(*this, nullptr, worker_factory_,
-                                 bootstrap_.enable_dispatcher_stats(), quic_stat_names_);
+  listener_manager_ = listener_manager_factory_->createListenerManager(
+      *this, nullptr, worker_factory_, bootstrap_.enable_dispatcher_stats(), quic_stat_names_);
 
   // The main thread is also registered for thread local updates so that code that does not care
   // whether it runs on the main thread or on workers can still use TLS.
@@ -634,7 +642,7 @@ void InstanceImpl::initialize(Network::Address::InstanceConstSharedPtr local_add
 
   // It's now safe to start writing stats from the main thread's dispatcher.
   if (bootstrap_.enable_dispatcher_stats()) {
-    dispatcher_->initializeStats(stats_store_, "server.");
+    dispatcher_->initializeStats(*stats_store_.rootScope(), "server.");
   }
 
   // The broad order of initialization from this point on is the following:
@@ -745,9 +753,9 @@ void InstanceImpl::initialize(Network::Address::InstanceConstSharedPtr local_add
   // GuardDog (deadlock detection) object and thread setup before workers are
   // started and before our own run() loop runs.
   main_thread_guard_dog_ = std::make_unique<Server::GuardDogImpl>(
-      stats_store_, config_.mainThreadWatchdogConfig(), *api_, "main_thread");
+      *stats_store_.rootScope(), config_.mainThreadWatchdogConfig(), *api_, "main_thread");
   worker_guard_dog_ = std::make_unique<Server::GuardDogImpl>(
-      stats_store_, config_.workerWatchdogConfig(), *api_, "workers");
+      *stats_store_.rootScope(), config_.workerWatchdogConfig(), *api_, "workers");
 }
 
 void InstanceImpl::onClusterManagerPrimaryInitializationComplete() {
@@ -772,9 +780,9 @@ void InstanceImpl::onRuntimeReady() {
     TRY_ASSERT_MAIN_THREAD {
       Config::Utility::checkTransportVersion(hds_config);
       hds_delegate_ = std::make_unique<Upstream::HdsDelegate>(
-          serverFactoryContext(), stats_store_,
+          serverFactoryContext(), *stats_store_.rootScope(),
           Config::Utility::factoryForGrpcApiConfigSource(*async_client_manager_, hds_config,
-                                                         stats_store_, false)
+                                                         *stats_store_.rootScope(), false)
               ->createUncachedRawAsyncClient(),
           stats_store_, *ssl_context_manager_, info_factory_);
     }

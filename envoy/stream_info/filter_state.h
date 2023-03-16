@@ -3,7 +3,6 @@
 #include <memory>
 #include <vector>
 
-#include "envoy/common/exception.h"
 #include "envoy/common/pure.h"
 
 #include "source/common/common/fmt.h"
@@ -60,7 +59,7 @@ public:
   enum LifeSpan { FilterChain, Request, Connection, TopSpan = Connection };
 
   // Objects stored in the filter state can optionally be shared between the
-  // upstrean and downstream filter state.
+  // upstream and downstream filter state.
   enum class StreamSharing {
     // None implies the object is exclusive to the stream.
     None,
@@ -75,6 +74,11 @@ public:
     // upstream connections. Note that this affects connection pooling,
     // preventing any re-use of the upstream connections in the worst case.
     SharedWithUpstreamConnection,
+
+    // Same as SharedWithUpstreamConnection, except that the filter state is
+    // not transitively shared. The filter state is imported into the upstream
+    // connection filter state as exclusive to the upstream connection.
+    SharedWithUpstreamConnectionOnce,
   };
 
   class Object {
@@ -153,14 +157,12 @@ public:
   /**
    * @param data_name the name of the data being looked up (mutable/readonly).
    * @return a pointer to the stored data or nullptr if the data does not exist.
-   * An exception will be thrown if the data is not mutable.
    */
   virtual Object* getDataMutableGeneric(absl::string_view data_name) PURE;
 
   /**
    * @param data_name the name of the data being looked up (mutable/readonly).
    * @return a shared pointer to the stored data or nullptr if the data does not exist.
-   * An exception will be thrown if the data is not mutable.
    */
   virtual std::shared_ptr<Object> getDataSharedMutableGeneric(absl::string_view data_name) PURE;
 

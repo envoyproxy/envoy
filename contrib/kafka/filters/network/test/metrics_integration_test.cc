@@ -13,7 +13,8 @@ namespace MetricsIntegrationTest {
 
 class MetricsIntegrationTest : public testing::Test {
 protected:
-  Stats::TestUtil::TestStore scope_;
+  Stats::TestUtil::TestStore store_;
+  Stats::Scope& scope_{*store_.rootScope()};
   RichRequestMetricsImpl request_metrics_{scope_, "prefix"};
   RichResponseMetricsImpl response_metrics_{scope_, "prefix"};
 };
@@ -29,7 +30,7 @@ TEST_F(MetricsIntegrationTest, ShouldUpdateRequestMetrics) {
     }
 
     // then
-    Stats::Counter& counter = scope_.counter(MessageUtilities::requestMetric(api_key));
+    Stats::Counter& counter = store_.counter(MessageUtilities::requestMetric(api_key));
     ASSERT_EQ(counter.value(), UPDATE_COUNT);
   };
 }
@@ -42,7 +43,7 @@ TEST_F(MetricsIntegrationTest, ShouldHandleUnparseableRequest) {
   }
 
   // then
-  ASSERT_EQ(scope_.counter("kafka.prefix.request.unknown").value(), UPDATE_COUNT);
+  ASSERT_EQ(store_.counter("kafka.prefix.request.unknown").value(), UPDATE_COUNT);
 }
 
 TEST_F(MetricsIntegrationTest, ShouldUpdateResponseMetrics) {
@@ -54,7 +55,7 @@ TEST_F(MetricsIntegrationTest, ShouldUpdateResponseMetrics) {
     }
 
     // then
-    Stats::Counter& counter = scope_.counter(MessageUtilities::responseMetric(api_key));
+    Stats::Counter& counter = store_.counter(MessageUtilities::responseMetric(api_key));
     ASSERT_EQ(counter.value(), UPDATE_COUNT);
   };
 }
@@ -67,7 +68,7 @@ TEST_F(MetricsIntegrationTest, ShouldHandleUnparseableResponse) {
   }
 
   // then
-  ASSERT_EQ(scope_.counter("kafka.prefix.response.unknown").value(), UPDATE_COUNT);
+  ASSERT_EQ(store_.counter("kafka.prefix.response.unknown").value(), UPDATE_COUNT);
 }
 
 } // namespace MetricsIntegrationTest

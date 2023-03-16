@@ -3,6 +3,7 @@ syntax = "proto3";
 package envoy.extensions.matching.common_inputs.network.v3;
 
 import "udpa/annotations/status.proto";
+import "validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.matching.common_inputs.network.v3";
 option java_outer_classname = "NetworkInputsProto";
@@ -94,4 +95,11 @@ message TransportProtocolInput {
 //   unless all connecting clients are known to use ALPN.
 // [#extension: envoy.matching.inputs.application_protocol]
 message ApplicationProtocolInput {
+}
+
+// Input that matches by a specific filter state key.
+// The value of the provided filter state key will be the raw string representation of the filter state object
+// [#extension: envoy.matching.inputs.filter_state]
+message FilterStateInput {
+  string key = 1 [(validate.rules).string = {min_len: 1}];
 }

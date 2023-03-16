@@ -38,6 +38,10 @@ public:
       headers.addCopy(Http::LowerCaseString("dns_end"),
                       toUsec(stream_info.downstreamTiming().getValue(dns_end).value()));
     }
+    if (stream_info.downstreamAddressProvider().roundTripTime().has_value()) {
+      headers.addCopy(Http::LowerCaseString("round_trip_time"),
+                      stream_info.downstreamAddressProvider().roundTripTime().value().count());
+    }
     if (conn_stream_info.downstreamTiming().has_value() &&
         conn_stream_info.downstreamTiming()->downstreamHandshakeComplete().has_value()) {
       headers.addCopy(

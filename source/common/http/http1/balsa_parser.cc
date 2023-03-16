@@ -5,6 +5,7 @@
 #include <cstdint>
 
 #include "source/common/common/assert.h"
+#include "source/common/common/regex.h"
 #include "source/common/http/headers.h"
 
 #include "absl/strings/match.h"
@@ -22,7 +23,9 @@ constexpr absl::string_view kColonSlashSlash = "://";
 // Response must start with "HTTP".
 constexpr char kResponseFirstByte = 'H';
 
-// TODO(#18819): Add flag to support custom methods.
+#ifndef ENVOY_ENABLE_UHV
+// When UHV is enabled, BalsaParser allows any method and defers to UHV for
+// validation. When UHV is disabled, BalsaParser behavior matches http-parser.
 bool isFirstCharacterOfValidMethod(char c) {
   static constexpr char kValidFirstCharacters[] = {'A', 'B', 'C', 'D', 'G', 'H', 'L', 'M',
                                                    'N', 'O', 'P', 'R', 'S', 'T', 'U'};
@@ -44,8 +47,9 @@ bool isMethodValid(absl::string_view method) {
   const auto* end = &kValidMethods[ABSL_ARRAYSIZE(kValidMethods) - 1] + 1;
   return std::binary_search(begin, end, method);
 }
+#endif
 
-// This method is crafted to match the URL validation behavior of the http-parser library.
+// This function is crafted to match the URL validation behavior of the http-parser library.
 bool isUrlValid(absl::string_view url, bool is_connect) {
   if (url.empty()) {
     return false;
@@ -103,12 +107,34 @@ bool isUrlValid(absl::string_view url, bool is_connect) {
          std::all_of(path_query.begin(), path_query.end(), is_valid_path_query_char);
 }
 
+bool isVersionValid(absl::string_view version_input) {
+  // HTTP-version is defined at
+  // https://www.rfc-editor.org/rfc/rfc9112.html#section-2.3. HTTP/0.9 requests
+  // have no http-version, so empty `version_input` is also accepted.
+
+  static const auto regex = [] {
+    envoy::type::matcher::v3::RegexMatcher matcher;
+    *matcher.mutable_google_re2() = envoy::type::matcher::v3::RegexMatcher::GoogleRE2();
+    matcher.set_regex("|HTTP/[0-9]\\.[0-9]");
+    return Regex::Utility::parseRegex(matcher);
+  }();
+
+  return regex->match(version_input);
+}
+
 } // anonymous namespace
 
 BalsaParser::BalsaParser(MessageType type, ParserCallbacks* connection, size_t max_header_length,
                          bool enable_trailers)
     : message_type_(type), connection_(connection) {
   ASSERT(connection_ != nullptr);
+
+  quiche::HttpValidationPolicy http_validation_policy;
+  http_validation_policy.disallow_header_continuation_lines = true;
+  http_validation_policy.require_header_colon = true;
+  http_validation_policy.disallow_multiple_content_length = false;
+  http_validation_policy.disallow_transfer_encoding_with_content_length = false;
+  framer_.set_http_validation_policy(http_validation_policy);
 
   framer_.set_balsa_headers(&headers_);
   if (enable_trailers) {
@@ -132,11 +158,14 @@ size_t BalsaParser::execute(const char* slice, int len) {
   ASSERT(status_ != ParserStatus::Error);
 
   if (len > 0 && !first_byte_processed_) {
+#ifndef ENVOY_ENABLE_UHV
     if (message_type_ == MessageType::Request && !isFirstCharacterOfValidMethod(*slice)) {
       status_ = ParserStatus::Error;
       error_message_ = "HPE_INVALID_METHOD";
       return 0;
-    } else if (message_type_ == MessageType::Response && *slice != kResponseFirstByte) {
+    }
+#endif
+    if (message_type_ == MessageType::Response && *slice != kResponseFirstByte) {
       status_ = ParserStatus::Error;
       error_message_ = "HPE_INVALID_CONSTANT";
       return 0;
@@ -221,51 +250,53 @@ void BalsaParser::OnBodyChunkInput(absl::string_view input) {
 
 void BalsaParser::OnHeaderInput(absl::string_view /*input*/) {}
 void BalsaParser::OnTrailerInput(absl::string_view /*input*/) {}
+void BalsaParser::OnHeader(absl::string_view /*key*/, absl::string_view /*value*/) {}
 
-void BalsaParser::OnHeader(absl::string_view key, absl::string_view value) {
-  if (status_ == ParserStatus::Error) {
-    return;
-  }
-
-  status_ = convertResult(connection_->onHeaderField(key.data(), key.length()));
-
-  if (status_ == ParserStatus::Error) {
-    return;
-  }
-
-  status_ = convertResult(connection_->onHeaderValue(value.data(), value.length()));
+void BalsaParser::ProcessHeaders(const BalsaHeaders& headers) {
+  processHeadersOrTrailersImpl(headers);
 }
-
-void BalsaParser::ProcessHeaders(const BalsaHeaders& /*headers*/) {}
-void BalsaParser::ProcessTrailers(const BalsaHeaders& /*trailer*/) {}
+void BalsaParser::ProcessTrailers(const BalsaHeaders& trailer) {
+  processHeadersOrTrailersImpl(trailer);
+}
 
 void BalsaParser::OnRequestFirstLineInput(absl::string_view /*line_input*/,
                                           absl::string_view method_input,
                                           absl::string_view request_uri,
-                                          absl::string_view /*version_input*/) {
+                                          absl::string_view version_input) {
   if (status_ == ParserStatus::Error) {
     return;
   }
+#ifndef ENVOY_ENABLE_UHV
   if (!isMethodValid(method_input)) {
     status_ = ParserStatus::Error;
     error_message_ = "HPE_INVALID_METHOD";
     return;
   }
+#endif
   const bool is_connect = method_input == Headers::get().MethodValues.Connect;
   if (!isUrlValid(request_uri, is_connect)) {
     status_ = ParserStatus::Error;
-    // Error message matching that of http-parser.
     error_message_ = "HPE_INVALID_URL";
+    return;
+  }
+  if (!isVersionValid(version_input)) {
+    status_ = ParserStatus::Error;
+    error_message_ = "HPE_INVALID_VERSION";
     return;
   }
   status_ = convertResult(connection_->onUrl(request_uri.data(), request_uri.size()));
 }
 
 void BalsaParser::OnResponseFirstLineInput(absl::string_view /*line_input*/,
-                                           absl::string_view /*version_input*/,
+                                           absl::string_view version_input,
                                            absl::string_view /*status_input*/,
                                            absl::string_view reason_input) {
   if (status_ == ParserStatus::Error) {
+    return;
+  }
+  if (!isVersionValid(version_input)) {
+    status_ = ParserStatus::Error;
+    error_message_ = "HPE_INVALID_VERSION";
     return;
   }
   status_ = convertResult(connection_->onStatus(reason_input.data(), reason_input.size()));
@@ -307,7 +338,6 @@ void BalsaParser::MessageDone() {
 
 void BalsaParser::HandleError(BalsaFrameEnums::ErrorCode error_code) {
   status_ = ParserStatus::Error;
-  // Specific error messages to match http-parser behavior.
   switch (error_code) {
   case BalsaFrameEnums::UNKNOWN_TRANSFER_ENCODING:
     error_message_ = "unsupported transfer encoding";
@@ -335,6 +365,24 @@ void BalsaParser::HandleError(BalsaFrameEnums::ErrorCode error_code) {
 void BalsaParser::HandleWarning(BalsaFrameEnums::ErrorCode error_code) {
   if (error_code == BalsaFrameEnums::TRAILER_MISSING_COLON) {
     HandleError(error_code);
+  }
+}
+
+void BalsaParser::processHeadersOrTrailersImpl(const quiche::BalsaHeaders& headers) {
+  for (const std::pair<absl::string_view, absl::string_view>& key_value : headers.lines()) {
+    if (status_ == ParserStatus::Error) {
+      return;
+    }
+
+    absl::string_view key = key_value.first;
+    status_ = convertResult(connection_->onHeaderField(key.data(), key.length()));
+
+    if (status_ == ParserStatus::Error) {
+      return;
+    }
+
+    absl::string_view value = key_value.second;
+    status_ = convertResult(connection_->onHeaderValue(value.data(), value.length()));
   }
 }
 

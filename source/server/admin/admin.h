@@ -123,6 +123,9 @@ public:
     return request_id_extension_;
   }
   const std::list<AccessLog::InstanceSharedPtr>& accessLogs() override { return access_logs_; }
+  const absl::optional<std::chrono::milliseconds>& accessLogFlushInterval() override {
+    return null_access_log_flush_interval_;
+  }
   Http::ServerConnectionPtr createCodec(Network::Connection& connection,
                                         const Buffer::Instance& data,
                                         Http::ServerConnectionCallbacks& callbacks) override;
@@ -218,6 +221,7 @@ public:
     return nullptr;
   }
   bool appendXForwardedPort() const override { return false; }
+  bool addProxyProtocolConnectionState() const override { return true; }
 
 private:
   friend class AdminTestingPeer;
@@ -395,12 +399,8 @@ private:
     Stats::Scope& listenerScope() override { return *scope_; }
     uint64_t listenerTag() const override { return 0; }
     const std::string& name() const override { return name_; }
-    Network::UdpListenerConfigOptRef udpListenerConfig() override {
-      return Network::UdpListenerConfigOptRef();
-    }
-    Network::InternalListenerConfigOptRef internalListenerConfig() override {
-      return Network::InternalListenerConfigOptRef();
-    }
+    Network::UdpListenerConfigOptRef udpListenerConfig() override { return {}; }
+    Network::InternalListenerConfigOptRef internalListenerConfig() override { return {}; }
     envoy::config::core::v3::TrafficDirection direction() const override {
       return envoy::config::core::v3::UNSPECIFIED;
     }
@@ -458,6 +458,7 @@ private:
   Server::Instance& server_;
   Http::RequestIDExtensionSharedPtr request_id_extension_;
   std::list<AccessLog::InstanceSharedPtr> access_logs_;
+  const absl::optional<std::chrono::milliseconds> null_access_log_flush_interval_;
   const std::string profile_path_;
   Http::ConnectionManagerStats stats_;
   NullOverloadManager null_overload_manager_;

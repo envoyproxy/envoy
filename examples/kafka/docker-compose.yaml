@@ -1,9 +1,7 @@
-version: "3.8"
 services:
 
   kafka-client:
     build:
-      context: .
       dockerfile: Dockerfile-kafka
     restart: "no"
     deploy:
@@ -11,15 +9,15 @@ services:
 
   proxy:
     build:
-      context: .
-      dockerfile: Dockerfile-proxy
+      dockerfile: ../shared/envoy/Dockerfile
+      args:
+        ENVOY_VARIANT: contrib-dev
     ports:
     - "${PORT_PROXY:-10000}:10000"
     - "${PORT_ADMIN:-8001}:8001"
 
   kafka-server:
     build:
-      context: .
       dockerfile: Dockerfile-kafka
     depends_on:
       zookeeper:
@@ -40,7 +38,6 @@ services:
 
   zookeeper:
     build:
-      context: .
       dockerfile: Dockerfile-zookeeper
     healthcheck:
       test: ["CMD", "sh", "-c", "echo ruok | nc 127.0.0.1 2181 || exit -1"]

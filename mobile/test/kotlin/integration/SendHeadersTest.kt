@@ -1,11 +1,10 @@
 package test.kotlin.integration
 
-import io.envoyproxy.envoymobile.Custom
+import io.envoyproxy.envoymobile.Standard
 import io.envoyproxy.envoymobile.EngineBuilder
 import io.envoyproxy.envoymobile.RequestHeadersBuilder
 import io.envoyproxy.envoymobile.RequestMethod
 import io.envoyproxy.envoymobile.ResponseHeaders
-import io.envoyproxy.envoymobile.UpstreamHttpProtocol
 import io.envoyproxy.envoymobile.engine.JniLibrary
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
@@ -13,47 +12,7 @@ import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.fail
 import org.junit.Test
 
-private val apiListenerType = "type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.EnvoyMobileHttpConnectionManager"
-private val assertionFilterType = "type.googleapis.com/envoymobile.extensions.filters.http.assertion.Assertion"
-private val config =
-"""
-static_resources:
-  listeners:
-  - name: base_api_listener
-    address:
-      socket_address:
-        protocol: TCP
-        address: 0.0.0.0
-        port_value: 10000
-    api_listener:
-      api_listener:
-        "@type": $apiListenerType
-        config:
-          stat_prefix: hcm
-          route_config:
-            name: api_router
-            virtual_hosts:
-              - name: api
-                domains:
-                  - "*"
-                routes:
-                  - match:
-                      prefix: "/"
-                    direct_response:
-                      status: 200
-          http_filters:
-            - name: envoy.filters.http.assertion
-              typed_config:
-                "@type": $assertionFilterType
-                match_config:
-                  http_request_headers_match:
-                    headers:
-                      - name: ":authority"
-                        exact_match: example.com
-            - name: envoy.router
-              typed_config:
-                "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
-"""
+private const val testResponseFilterType = "type.googleapis.com/envoymobile.extensions.filters.http.test_remote_response.TestRemoteResponse"
 
 class SendHeadersTest {
 
@@ -65,7 +24,9 @@ class SendHeadersTest {
   fun `successful sending of request headers`() {
     val headersExpectation = CountDownLatch(1)
 
-    val engine = EngineBuilder(Custom(config)).build()
+    val engine = EngineBuilder(Standard())
+    .addNativeFilter("test_remote_response", "{'@type': $testResponseFilterType}")
+    .build()
     val client = engine.streamClient()
 
     val requestHeaders = RequestHeadersBuilder(
@@ -74,7 +35,6 @@ class SendHeadersTest {
       authority = "example.com",
       path = "/test"
     )
-      .addUpstreamHttpProtocol(UpstreamHttpProtocol.HTTP2)
       .build()
 
     var resultHeaders: ResponseHeaders? = null
@@ -84,6 +44,9 @@ class SendHeadersTest {
         resultHeaders = responseHeaders
         resultEndStream = endStream
         headersExpectation.countDown()
+      }
+      .setOnResponseData { _, endStream, _ ->
+        resultEndStream = endStream
       }
       .setOnError { _, _ -> fail("Unexpected error") }
       .start()

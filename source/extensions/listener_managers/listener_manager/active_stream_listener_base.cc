@@ -55,7 +55,7 @@ void ActiveStreamListenerBase::newConnection(Network::ConnectionSocketPtr&& sock
   if (empty_filter_chain) {
     ENVOY_CONN_LOG(debug, "closing connection from {}: no filters", *server_conn_ptr,
                    server_conn_ptr->connectionInfoProvider().remoteAddress()->asString());
-    server_conn_ptr->close(Network::ConnectionCloseType::NoFlush);
+    server_conn_ptr->close(Network::ConnectionCloseType::NoFlush, "no_filters");
   }
   newActiveConnection(*filter_chain, std::move(server_conn_ptr), std::move(stream_info));
 }
@@ -112,6 +112,7 @@ void ActiveTcpConnection::onEvent(Network::ConnectionEvent event) {
   // Any event leads to destruction of the connection.
   if (event == Network::ConnectionEvent::LocalClose ||
       event == Network::ConnectionEvent::RemoteClose) {
+    stream_info_->setDownstreamTransportFailureReason(connection_->transportFailureReason());
     active_connections_.listener_.removeConnection(*this);
   }
 }
@@ -121,7 +122,7 @@ void OwnedActiveStreamListenerBase::removeConnection(ActiveTcpConnection& connec
   ActiveConnections& active_connections = connection.active_connections_;
   ActiveConnectionPtr removed = connection.removeFromList(active_connections.connections_);
   dispatcher().deferredDelete(std::move(removed));
-  // Delete map entry only iff connections becomes empty.
+  // Delete map entry if and only if connections_ becomes empty.
   if (active_connections.connections_.empty()) {
     auto iter = connections_by_context_.find(&active_connections.filter_chain_);
     ASSERT(iter != connections_by_context_.end());
@@ -151,7 +152,8 @@ void OwnedActiveStreamListenerBase::removeFilterChain(const Network::FilterChain
   } else {
     auto& connections = iter->second->connections_;
     while (!connections.empty()) {
-      connections.front()->connection_->close(Network::ConnectionCloseType::NoFlush);
+      connections.front()->connection_->close(Network::ConnectionCloseType::NoFlush,
+                                              "filter_chain_is_being_removed");
     }
     // Since is_deleting_ is on, we need to manually remove the map value and drive the
     // iterator. Defer delete connection container to avoid race condition in destroying

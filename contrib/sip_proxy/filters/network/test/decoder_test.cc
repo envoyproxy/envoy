@@ -48,7 +48,7 @@ public:
 class SipDecoderTest : public testing::Test {
 public:
   SipDecoderTest()
-      : stats_(SipFilterStats::generateStats("test.", store_)),
+      : stats_(SipFilterStats::generateStats("test.", *store_.rootScope())),
         transaction_infos_(std::make_shared<Router::TransactionInfos>()) {}
   ~SipDecoderTest() override {
     filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();

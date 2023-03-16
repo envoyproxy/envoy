@@ -43,7 +43,7 @@ public:
     const auto& add_regex_origin = policy.mutable_additional_origins()->Add();
     add_regex_origin->MergeFrom(TestUtility::createRegexMatcher(R"(www\-[0-9]\.allow\.com)"));
 
-    return std::make_shared<CsrfFilterConfig>(policy, "test", stats_, runtime_);
+    return std::make_shared<CsrfFilterConfig>(policy, "test", *stats_.rootScope(), runtime_);
   }
 
   CsrfFilterTest() : config_(setupConfig()), filter_(config_) {}

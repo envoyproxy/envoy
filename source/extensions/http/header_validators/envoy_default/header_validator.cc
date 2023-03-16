@@ -15,6 +15,15 @@ namespace Http {
 namespace HeaderValidators {
 namespace EnvoyDefault {
 
+namespace {
+
+template <typename IntType>
+std::from_chars_result fromChars(const absl::string_view string_value, IntType& value) {
+  return std::from_chars(string_value.data(), string_value.data() + string_value.size(), value);
+}
+
+} // namespace
+
 using ::envoy::extensions::http::header_validators::envoy_default::v3::HeaderValidatorConfig;
 using ::Envoy::Http::HeaderString;
 using ::Envoy::Http::Protocol;
@@ -140,8 +149,9 @@ HeaderValidator::validateStatusHeader(const HeaderString& value) {
 
   // Convert the status to an integer.
   std::uint32_t status_value{};
-  auto result = std::from_chars(value_string_view.begin(), value_string_view.end(), status_value);
-  if (result.ec != std::errc() || result.ptr != value_string_view.end()) {
+  auto result = fromChars(value_string_view, status_value);
+  if (result.ec != std::errc() ||
+      result.ptr != (value_string_view.data() + value_string_view.size())) {
     return {HeaderValueValidationResult::Action::Reject,
             UhvResponseCodeDetail::get().InvalidStatus};
   }
@@ -246,7 +256,7 @@ HeaderValidator::validateContentLengthHeader(const HeaderString& value) {
   //
   // Content-Length = 1*DIGIT
   // TODO(#23315) - Validate multiple Content-Length values
-  const auto& value_string_view = value.getStringView();
+  const auto value_string_view = value.getStringView();
 
   if (value_string_view.empty()) {
     return {HeaderValueValidationResult::Action::Reject,
@@ -254,8 +264,9 @@ HeaderValidator::validateContentLengthHeader(const HeaderString& value) {
   }
 
   std::uint64_t int_value{};
-  auto result = std::from_chars(value_string_view.begin(), value_string_view.end(), int_value);
-  if (result.ec != std::errc() || result.ptr != value_string_view.end()) {
+  auto result = fromChars(value_string_view, int_value);
+  if (result.ec != std::errc() ||
+      result.ptr != (value_string_view.data() + value_string_view.size())) {
     return {HeaderValueValidationResult::Action::Reject,
             UhvResponseCodeDetail::get().InvalidContentLength};
   }
@@ -306,9 +317,9 @@ HeaderValidator::validateHostHeader(const HeaderString& value) {
     } else {
       // parse the port number
       std::uint16_t port_int{};
-      auto result = std::from_chars(std::next(port_string.begin()), port_string.end(), port_int);
-
-      if (result.ec != std::errc() || result.ptr != port_string.end() || port_int == 0) {
+      auto result = fromChars(port_string.substr(1), port_int);
+      if (result.ec != std::errc() || result.ptr != (port_string.data() + port_string.size()) ||
+          port_int == 0) {
         is_valid = false;
       }
     }
@@ -432,6 +443,92 @@ bool HeaderValidator::hasChunkedTransferEncoding(const HeaderString& value) {
   }
 
   return false;
+}
+
+::Envoy::Http::HeaderValidator::HeaderEntryValidationResult
+HeaderValidator::validateGenericRequestHeaderEntry(
+    const ::Envoy::Http::HeaderString& key, const ::Envoy::Http::HeaderString& value,
+    const HeaderValidatorMap& protocol_specific_header_validators) {
+  const auto& key_string_view = key.getStringView();
+  if (key_string_view.empty()) {
+    // reject empty header names
+    return {HeaderEntryValidationResult::Action::Reject,
+            UhvResponseCodeDetail::get().EmptyHeaderName};
+  }
+
+  // Protocol specific header validators use this map to check protocol specific headers. For
+  // example the transfer-encoding header checks are different for H/1 and H/2 or H/3.
+  // This map also contains validation methods for headers that have additional restrictions other
+  // than the generic character set (such as :method). The headers that are not part of this map,
+  // just need the character set validation.
+  auto validator_it = protocol_specific_header_validators.find(key_string_view);
+  if (validator_it != protocol_specific_header_validators.end()) {
+    const auto& validator = validator_it->second;
+    return validator(value);
+  }
+
+  if (key_string_view.at(0) != ':') {
+    // Validate the (non-pseudo) header name
+    auto name_result = validateGenericHeaderName(key);
+    if (!name_result) {
+      return name_result;
+    }
+  } else {
+    // header_validator_map contains every known pseudo header. If the header name starts with ":"
+    // and we don't have a validator registered in the map, then the header name is an unknown
+    // pseudo header.
+    return {HeaderEntryValidationResult::Action::Reject,
+            UhvResponseCodeDetail::get().InvalidPseudoHeader};
+  }
+
+  return validateGenericHeaderValue(value);
+}
+
+// For all (H/1, H/2 and H/3) protocols, trailers should only contain generic headers. As such a
+// common validation method can be used.
+// More in depth explanation for using common function:
+// For H/2 (and so H/3), per
+// https://www.rfc-editor.org/rfc/rfc9113#section-8.1 trailers MUST NOT contain pseudo header
+// fields.
+// For H/1 the codec will never produce H/2 pseudo headers and per
+// https://www.rfc-editor.org/rfc/rfc9110#section-6.5 there are no other prohibitions.
+// As a result this common function can cover trailer validation for all protocols.
+HeaderValidator::TrailerValidationResult
+HeaderValidator::validateTrailers(::Envoy::Http::HeaderMap& trailers) {
+  std::string reject_details;
+  std::vector<absl::string_view> drop_headers;
+  trailers.iterate(
+      [this, &reject_details, &drop_headers](
+          const ::Envoy::Http::HeaderEntry& header_entry) -> ::Envoy::Http::HeaderMap::Iterate {
+        const auto& header_name = header_entry.key();
+        const auto& header_value = header_entry.value();
+
+        auto entry_name_result = validateGenericHeaderName(header_name);
+        if (entry_name_result.action() == HeaderEntryValidationResult::Action::DropHeader) {
+          // drop the header, continue processing the request
+          drop_headers.push_back(header_name.getStringView());
+        } else if (!entry_name_result) {
+          reject_details = static_cast<std::string>(entry_name_result.details());
+        } else {
+          auto entry_value_result = validateGenericHeaderValue(header_value);
+          if (!entry_value_result) {
+            reject_details = static_cast<std::string>(entry_value_result.details());
+          }
+        }
+
+        return reject_details.empty() ? ::Envoy::Http::HeaderMap::Iterate::Continue
+                                      : ::Envoy::Http::HeaderMap::Iterate::Break;
+      });
+
+  if (!reject_details.empty()) {
+    return {TrailerValidationResult::Action::Reject, reject_details};
+  }
+
+  for (auto& name : drop_headers) {
+    trailers.remove(::Envoy::Http::LowerCaseString(name));
+  }
+
+  return TrailerValidationResult::success();
 }
 
 } // namespace EnvoyDefault

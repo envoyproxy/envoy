@@ -5,9 +5,11 @@ load("@build_bazel_rules_apple//apple:repositories.bzl", "apple_rules_dependenci
 load("@rules_fuzzing//fuzzing:repositories.bzl", "rules_fuzzing_dependencies")
 load("@upb//bazel:workspace_deps.bzl", "upb_deps")
 load("@rules_pkg//:deps.bzl", "rules_pkg_dependencies")
-load("@rules_rust//rust:repositories.bzl", "rules_rust_dependencies", "rust_register_toolchains")
+load("@rules_rust//rust:repositories.bzl", "rules_rust_dependencies", "rust_register_toolchains", "rust_repository_set")
+load("@rules_rust//rust:defs.bzl", "rust_common")
 load("@proxy_wasm_rust_sdk//bazel:dependencies.bzl", "proxy_wasm_rust_sdk_dependencies")
 load("@base_pip3//:requirements.bzl", pip_dependencies = "install_deps")
+load("@dev_pip3//:requirements.bzl", pip_dev_dependencies = "install_deps")
 load("@fuzzing_pip3//:requirements.bzl", pip_fuzzing_dependencies = "install_deps")
 load("@emsdk//:emscripten_deps.bzl", "emscripten_deps")
 load("@com_github_aignas_rules_shellcheck//:deps.bzl", "shellcheck_dependencies")
@@ -15,7 +17,7 @@ load("@aspect_bazel_lib//lib:repositories.bzl", "register_jq_toolchains", "regis
 load("@com_google_cel_cpp//bazel:deps.bzl", "parser_deps")
 
 # go version for rules_go
-GO_VERSION = "1.17.5"
+GO_VERSION = "1.18"
 
 JQ_VERSION = "1.6"
 YQ_VERSION = "4.24.4"
@@ -29,8 +31,18 @@ def envoy_dependency_imports(go_version = GO_VERSION, jq_version = JQ_VERSION, y
     gazelle_dependencies(go_sdk = "go_sdk")
     apple_rules_dependencies()
     pip_dependencies()
+    pip_dev_dependencies()
     pip_fuzzing_dependencies()
     rules_pkg_dependencies()
+    rust_repository_set(
+        name = "rust_linux_s390x",
+        exec_triple = "s390x-unknown-linux-gnu",
+        extra_target_triples = [
+            "wasm32-unknown-unknown",
+            "wasm32-wasi",
+        ],
+        versions = [rust_common.default_version],
+    )
     rules_rust_dependencies()
     rust_register_toolchains(
         extra_target_triples = [
@@ -86,6 +98,20 @@ def envoy_dependency_imports(go_version = GO_VERSION, jq_version = JQ_VERSION, y
         # last_update = "2021-06-16"
         # use_category = ["api"],
         # source = "https://github.com/bufbuild/protoc-gen-validate/blob/v0.6.1/dependencies.bzl#L148-L153"
+    )
+    go_repository(
+        name = "org_golang_google_protobuf",
+        importpath = "google.golang.org/protobuf",
+        sum = "h1:d0NfwRgPtno5B1Wa6L2DAG+KivqkdutMf1UhdNx175w=",
+        version = "v1.28.1",
+        build_external = "external",
+    )
+    go_repository(
+        name = "com_github_cncf_xds_go",
+        importpath = "github.com/cncf/xds/go",
+        sum = "h1:B/lvg4tQ5hfFZd4V2hcSfFVfUvAK6GSFKxIIzwnkv8g=",
+        version = "v0.0.0-20220520190051-1e77728a1eaa",
+        build_external = "external",
     )
     go_repository(
         name = "com_github_spf13_afero",

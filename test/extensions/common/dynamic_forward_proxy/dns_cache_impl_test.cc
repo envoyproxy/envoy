@@ -52,20 +52,21 @@ public:
 
     EXPECT_CALL(context_.dispatcher_, isThreadSafe).WillRepeatedly(Return(true));
 
-    EXPECT_CALL(dns_resolver_factory_, createDnsResolver(_, _, _)).WillOnce(Return(resolver_));
+    EXPECT_CALL(dns_resolver_factory_, createDnsResolver(_, _, _))
+        .WillRepeatedly(Return(resolver_));
     dns_cache_ = std::make_unique<DnsCacheImpl>(context_, config_);
     update_callbacks_handle_ = dns_cache_->addUpdateCallbacks(update_callbacks_);
   }
 
   ~DnsCacheImplTest() override {
     dns_cache_.reset();
-    EXPECT_EQ(0, TestUtility::findGauge(context_.scope_, "dns_cache.foo.num_hosts")->value());
+    EXPECT_EQ(0, TestUtility::findGauge(context_.store_, "dns_cache.foo.num_hosts")->value());
   }
 
   void checkStats(uint64_t query_attempt, uint64_t query_success, uint64_t query_failure,
                   uint64_t address_changed, uint64_t added, uint64_t removed, uint64_t num_hosts) {
     const auto counter_value = [this](const std::string& name) {
-      return TestUtility::findCounter(context_.scope_, "dns_cache.foo." + name)->value();
+      return TestUtility::findCounter(context_.store_, "dns_cache.foo." + name)->value();
     };
 
     EXPECT_EQ(query_attempt, counter_value("dns_query_attempt"));
@@ -75,7 +76,7 @@ public:
     EXPECT_EQ(added, counter_value("host_added"));
     EXPECT_EQ(removed, counter_value("host_removed"));
     EXPECT_EQ(num_hosts,
-              TestUtility::findGauge(context_.scope_, "dns_cache.foo.num_hosts")->value());
+              TestUtility::findGauge(context_.store_, "dns_cache.foo.num_hosts")->value());
   }
 
   NiceMock<Server::Configuration::MockFactoryContext> context_;
@@ -625,7 +626,7 @@ TEST_F(DnsCacheImplTest, ResolveTimeout) {
   checkStats(1 /* attempt */, 0 /* success */, 1 /* failure */, 0 /* address changed */,
              1 /* added */, 0 /* removed */, 1 /* num hosts */);
   EXPECT_EQ(1,
-            TestUtility::findCounter(context_.scope_, "dns_cache.foo.dns_query_timeout")->value());
+            TestUtility::findCounter(context_.store_, "dns_cache.foo.dns_query_timeout")->value());
 }
 
 // Resolve failure that returns no addresses.
@@ -929,6 +930,60 @@ TEST_F(DnsCacheImplTest, CacheHit) {
   EXPECT_THAT(*result.host_info_, DnsHostInfoEquals("10.0.0.1:80", "foo.com", false));
 }
 
+// A successful resolve followed by a cache hit with different default port.
+TEST_F(DnsCacheImplTest, CacheHitWithDifferentDefaultPort) {
+  initialize();
+  InSequence s;
+
+  MockLoadDnsCacheEntryCallbacks callbacks;
+  Network::DnsResolver::ResolveCb resolve_cb;
+  EXPECT_CALL(*resolver_, resolve("foo.com", _, _))
+      .WillOnce(DoAll(SaveArg<2>(&resolve_cb), Return(&resolver_->active_query_)));
+  auto result = dns_cache_->loadDnsCacheEntry("foo.com", 80, false, callbacks);
+  EXPECT_EQ(DnsCache::LoadDnsCacheEntryStatus::Loading, result.status_);
+  EXPECT_NE(result.handle_, nullptr);
+  EXPECT_EQ(absl::nullopt, result.host_info_);
+
+  EXPECT_CALL(update_callbacks_,
+              onDnsHostAddOrUpdate("foo.com", DnsHostInfoEquals("10.0.0.1:80", "foo.com", false)));
+  EXPECT_CALL(callbacks,
+              onLoadDnsCacheComplete(DnsHostInfoEquals("10.0.0.1:80", "foo.com", false)));
+  EXPECT_CALL(update_callbacks_,
+              onDnsResolutionComplete("foo.com", DnsHostInfoEquals("10.0.0.1:80", "foo.com", false),
+                                      Network::DnsResolver::ResolutionStatus::Success));
+  resolve_cb(Network::DnsResolver::ResolutionStatus::Success,
+             TestUtility::makeDnsResponse({"10.0.0.1"}));
+
+  // Using the same DNS cache, resolve the same host but different default port 443,
+  // Envoy returns LoadDnsCacheEntryStatus::InCache since the DNS cache
+  // key is the host string, which does not include the port number.
+  // This means if HTTP and HTTPS traffic are destined to DFP clusters using same DNS
+  // cache table, it will cause traffic forwarding issues.
+  result = dns_cache_->loadDnsCacheEntry("foo.com", 443, false, callbacks);
+  EXPECT_EQ(DnsCache::LoadDnsCacheEntryStatus::InCache, result.status_);
+
+  // The way to resolve this is to config a different dns_cache_config name for HTTP and
+  // HTTPS DFP clusters. Then they will not conflict.
+  envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheConfig config_https;
+  // Set the dns_cache_config name to "bar" to make the HTTPS cache entries
+  // stored and looked up in a separate DNS cache table.
+  config_https.set_name("bar");
+  config_https.set_dns_lookup_family(envoy::config::cluster::v3::Cluster::V4_ONLY);
+  std::unique_ptr<DnsCache> dns_cache_https;
+  dns_cache_https = std::make_unique<DnsCacheImpl>(context_, config_https);
+  MockUpdateCallbacks update_callbacks_https;
+  DnsCache::AddUpdateCallbacksHandlePtr update_callbacks_handle_https;
+  update_callbacks_handle_https = dns_cache_https->addUpdateCallbacks(update_callbacks_https);
+  MockLoadDnsCacheEntryCallbacks callbacks_https;
+  Network::DnsResolver::ResolveCb resolve_cb_https;
+  EXPECT_CALL(*resolver_, resolve("foo.com", _, _))
+      .WillOnce(DoAll(SaveArg<2>(&resolve_cb_https), Return(&resolver_->active_query_)));
+  // So, now to resolve the same host and port 443 in DNS cache table "bar", it doesn't find
+  // an existing entry and returns LoadDnsCacheEntryStatus::Loading as expected.
+  auto result_https = dns_cache_https->loadDnsCacheEntry("foo.com", 80, false, callbacks_https);
+  EXPECT_EQ(DnsCache::LoadDnsCacheEntryStatus::Loading, result_https.status_);
+}
+
 // Make sure we destroy active queries if the cache goes away.
 TEST_F(DnsCacheImplTest, CancelActiveQueriesOnDestroy) {
   initialize();
@@ -980,7 +1035,7 @@ TEST_F(DnsCacheImplTest, MaxHostOverflow) {
   EXPECT_EQ(DnsCache::LoadDnsCacheEntryStatus::Overflow, result.status_);
   EXPECT_EQ(result.handle_, nullptr);
   EXPECT_EQ(absl::nullopt, result.host_info_);
-  EXPECT_EQ(1, TestUtility::findCounter(context_.scope_, "dns_cache.foo.host_overflow")->value());
+  EXPECT_EQ(1, TestUtility::findCounter(context_.store_, "dns_cache.foo.host_overflow")->value());
 }
 
 TEST_F(DnsCacheImplTest, CircuitBreakersNotInvoked) {
@@ -998,7 +1053,7 @@ TEST_F(DnsCacheImplTest, DnsCacheCircuitBreakersOverflow) {
   EXPECT_EQ(raii_ptr.get(), nullptr);
   EXPECT_EQ(
       1,
-      TestUtility::findCounter(context_.scope_, "dns_cache.foo.dns_rq_pending_overflow")->value());
+      TestUtility::findCounter(context_.store_, "dns_cache.foo.dns_rq_pending_overflow")->value());
 }
 
 TEST_F(DnsCacheImplTest, UseTcpForDnsLookupsOptionSetDeprecatedField) {
@@ -1278,8 +1333,7 @@ TEST(UtilityTest, PrepareDnsRefreshStrategy) {
 
 TEST_F(DnsCacheImplTest, ResolveSuccessWithCaching) {
   TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.allow_multiple_dns_addresses", "true"},
-                              {"envoy.reloadable_features.no_extension_lookup_by_name", "false"}});
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.no_extension_lookup_by_name", "false"}});
 
   auto* time_source = new NiceMock<MockTimeSystem>();
   context_.dispatcher_.time_system_.reset(time_source);
@@ -1407,8 +1461,7 @@ TEST_F(DnsCacheImplTest, ResolveSuccessWithCaching) {
 
 TEST_F(DnsCacheImplTest, CacheLoad) {
   TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.allow_multiple_dns_addresses", "true"},
-                              {"envoy.reloadable_features.no_extension_lookup_by_name", "false"}});
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.no_extension_lookup_by_name", "false"}});
 
   auto* time_source = new NiceMock<MockTimeSystem>();
   context_.dispatcher_.time_system_.reset(time_source);
@@ -1441,7 +1494,7 @@ TEST_F(DnsCacheImplTest, CacheLoad) {
 
   initialize();
   ASSERT(store != nullptr);
-  EXPECT_EQ(2, TestUtility::findCounter(context_.scope_, "dns_cache.foo.cache_load")->value());
+  EXPECT_EQ(2, TestUtility::findCounter(context_.store_, "dns_cache.foo.cache_load")->value());
 
   {
     MockLoadDnsCacheEntryCallbacks callbacks;

@@ -80,8 +80,8 @@ message ExtAuthz {
   //
   bool clear_route_cache = 6;
 
-  // Sets the HTTP status that is returned to the client when there is a network error between the
-  // filter and the authorization server. The default status is HTTP 403 Forbidden.
+  // Sets the HTTP status that is returned to the client when the authorization server returns an error
+  // or cannot be reached. The default status is HTTP 403 Forbidden.
   type.v3.HttpStatus status_on_error = 7;
 
   // Specifies a list of metadata namespaces whose values, if present, will be passed to the
@@ -125,6 +125,10 @@ message ExtAuthz {
   // typed_per_filter_config for the path, requests will not be denied.
   //
   // If this field is not specified, all requests will be allowed when disabled.
+  //
+  // If a request is denied due to this setting, the response code in :ref:`status_on_error
+  // <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.status_on_error>` will
+  // be returned.
   config.core.v3.RuntimeFeatureFlag deny_at_disable = 11;
 
   // Specifies if the peer certificate is sent to the external service.
@@ -254,6 +258,8 @@ message AuthorizationRequest {
 
   // Authorization request includes the client request headers that have a correspondent match
   // in the :ref:`list <envoy_v3_api_msg_type.matcher.v3.ListStringMatcher>`.
+  // This field has been deprecated in favor of :ref:`allowed_headers
+  // <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.allowed_headers>`.
   //
   // .. note::
   //
@@ -268,8 +274,6 @@ message AuthorizationRequest {
   //   <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.with_request_body>`
   //   setting) hence the value of its ``Content-Length`` reflects the size of its payload size.
   //
-  //   This field has been deprecated in favor of :ref:`allowed_headers
-  //   <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.allowed_headers>`.
   type.matcher.v3.ListStringMatcher allowed_headers = 1
       [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 
