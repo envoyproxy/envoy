@@ -771,8 +771,8 @@ private:
 class LoadBalancerSubsetInfoImpl : public LoadBalancerSubsetInfo {
 public:
   LoadBalancerSubsetInfoImpl()
-      : enabled_(false), locality_weight_aware_(false), scale_locality_weight_(false),
-        panic_mode_any_(false) {}
+      : LoadBalancerSubsetInfoImpl(
+            envoy::config::cluster::v3::Cluster::LbSubsetConfig::default_instance) {}
   LoadBalancerSubsetInfoImpl(
       const envoy::config::cluster::v3::Cluster::LbSubsetConfig& subset_config)
       : default_subset_(subset_config.default_subset()),
