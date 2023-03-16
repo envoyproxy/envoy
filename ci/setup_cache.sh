@@ -42,3 +42,10 @@ if [[ -n "${BAZEL_REMOTE_CACHE}" ]]; then
 else
   echo "No remote cache is set, skipping setup remote cache."
 fi
+
+if [[ -n "${BAZEL_DISK_CACHE}" ]]; then
+  export BAZEL_BUILD_EXTRA_OPTIONS+=" --disk_cache=${BAZEL_DISK_CACHE}"
+  echo "Set up bazel disk read/write cache at ${BAZEL_DISK_CACHE}."
+else
+  echo "No remote cache is set, skipping setup remote cache."
+fi

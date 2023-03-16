@@ -102,6 +102,7 @@ docker run --rm \
        -e GOPROXY \
        -e BAZEL_STARTUP_OPTIONS \
        -e BAZEL_BUILD_EXTRA_OPTIONS \
+       -e BAZEL_DISK_CACHE \
        -e BAZEL_EXTRA_TEST_OPTIONS \
        -e BAZEL_REMOTE_CACHE \
        -e ENVOY_STDLIB \

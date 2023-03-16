@@ -244,6 +244,13 @@ if [[ "$CI_TARGET" == "bazel.release" ]]; then
   echo "bazel contrib release build..."
   bazel_contrib_binary_build release
 
+  if [[ -n "${BAZEL_DISK_CACHE}" ]] && [[ -e "${BAZEL_DISK_CACHE}" ]]; then
+      echo "Disk cache: ${BAZEL_DISK_CACHE}"
+      du -ch "${BAZEL_DISK_CACHE}" | grep total
+  else
+      echo "No disk cache here!"
+  fi
+
   exit 0
 elif [[ "$CI_TARGET" == "bazel.distribution" ]]; then
   echo "Building distro packages..."

@@ -7,6 +7,10 @@ parameters:
   displayName: "Suffix of artifact"
   type: string
   default: ""
+- name: diskCache
+  displayName: "Path to a disk cache"
+  type: string
+  default: ""
 - name: rbe
   displayName: "Enable RBE"
   type: boolean
@@ -64,6 +68,8 @@ steps:
         BAZEL_REMOTE_INSTANCE: "instances/$(System.PullRequest.TargetBranch)"
       ${{ if ne(variables['Build.Reason'], 'PullRequest') }}:
         BAZEL_REMOTE_INSTANCE: "instances/$(Build.SourceBranchName)"
+    ${{ if eq(parameters.diskCache, '') }}:
+      BAZEL_DISK_CACHE: "${{ parameters.diskCache }}"
   displayName: "Run CI script ${{ parameters.ciTarget }}"
 
 - bash: |
