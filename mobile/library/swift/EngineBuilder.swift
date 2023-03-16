@@ -73,11 +73,7 @@ open class EngineBuilder: NSObject {
   private var nodeRegion: String?
   private var nodeZone: String?
   private var nodeSubZone: String?
-#if canImport(EnvoyCxxSwiftInterop)
-  private(set) var useSwiftBootstrap = true
-#else
-  private(set) var useSwiftBootstrap = false
-#endif
+  private var enableSwiftBootstrap = false
 
   // MARK: - Public
 
@@ -642,13 +638,13 @@ open class EngineBuilder: NSObject {
   /// Use Swift's experimental C++ interop support to generate the bootstrap object
   /// instead of going through the Objective-C layer.
   ///
-  /// - parameter useSwiftBootstrap: Whether or not to use the Swift / C++ interop
-  ///                                to generate the bootstrap object.
+  /// - parameter enableSwiftBootstrap: Whether or not to use the Swift / C++ interop
+  ///                                   to generate the bootstrap object.
   ///
   /// - returns: This builder.
   @discardableResult
-  public func useSwiftBootstrap(_ useSwiftBootstrap: Bool) -> Self {
-    self.useSwiftBootstrap = useSwiftBootstrap
+  public func enableSwiftBootstrap(_ enableSwiftBootstrap: Bool) -> Self {
+    self.enableSwiftBootstrap = enableSwiftBootstrap
     return self
   }
 #endif
@@ -664,7 +660,7 @@ open class EngineBuilder: NSObject {
                                       networkMonitoringMode: Int32(self.monitoringMode.rawValue))
     let config = self.makeConfig()
 #if canImport(EnvoyCxxSwiftInterop)
-    if self.useSwiftBootstrap {
+    if self.enableSwiftBootstrap {
       config.bootstrapPointer = self.generateBootstrap().pointer
     }
 #endif
