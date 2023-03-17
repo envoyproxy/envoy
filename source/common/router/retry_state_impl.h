@@ -134,7 +134,7 @@ private:
   std::vector<ResetHeaderParserSharedPtr> reset_headers_{};
   std::chrono::milliseconds reset_max_interval_{};
 
-  // Keep small members (bools and enums) at the end of class, to reduce alignment overhead.
+  // Keep small members (bools, enums and int32s) at the end of class, to reduce alignment overhead.
   uint32_t retry_on_{};
   uint32_t retries_remaining_{};
   uint32_t host_selection_max_attempts_;
