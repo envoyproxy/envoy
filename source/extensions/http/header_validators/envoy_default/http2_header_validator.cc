@@ -2,6 +2,7 @@
 
 #include "envoy/http/header_validator_errors.h"
 
+#include "source/common/http/header_utility.h"
 #include "source/extensions/http/header_validators/envoy_default/character_tables.h"
 
 #include "absl/container/node_hash_map.h"
@@ -18,6 +19,7 @@ namespace EnvoyDefault {
 
 using ::envoy::extensions::http::header_validators::envoy_default::v3::HeaderValidatorConfig;
 using ::Envoy::Http::HeaderString;
+using ::Envoy::Http::HeaderUtility;
 using ::Envoy::Http::LowerCaseString;
 using ::Envoy::Http::Protocol;
 using ::Envoy::Http::UhvResponseCodeDetail;
@@ -49,6 +51,7 @@ Http2HeaderValidator::Http2HeaderValidator(const HeaderValidatorConfig& config, 
           {":authority", absl::bind_front(&Http2HeaderValidator::validateAuthorityHeader, this)},
           {":scheme", absl::bind_front(&HeaderValidator::validateSchemeHeader, this)},
           {":path", absl::bind_front(&HeaderValidator::validatePathHeaderCharacters, this)},
+          {":protocol", absl::bind_front(&Http2HeaderValidator::validateProtocolHeader, this)},
           {"te", absl::bind_front(&Http2HeaderValidator::validateTEHeader, this)},
           {"content-length",
            absl::bind_front(&Http2HeaderValidator::validateContentLengthHeader, this)},
@@ -57,9 +60,6 @@ Http2HeaderValidator::Http2HeaderValidator(const HeaderValidatorConfig& config, 
 ::Envoy::Http::HeaderValidator::HeaderEntryValidationResult
 Http2HeaderValidator::validateRequestHeaderEntry(const HeaderString& key,
                                                  const HeaderString& value) {
-  // TODO(#23286) - Add support for validating the :protocol pseudo header for extended CONNECT
-  // requests.
-
   return validateGenericRequestHeaderEntry(key, value, request_header_validator_map_);
 }
 
@@ -98,9 +98,10 @@ Http2HeaderValidator::validateResponseHeaderEntry(const HeaderString& key,
 ::Envoy::Http::HeaderValidator::RequestHeaderMapValidationResult
 Http2HeaderValidator::validateRequestHeaderMap(::Envoy::Http::RequestHeaderMap& header_map) {
   static const absl::node_hash_set<absl::string_view> kAllowedPseudoHeadersForConnect = {
-      ":method",
-      ":authority",
-  };
+      ":method", ":authority"};
+
+  static const absl::node_hash_set<absl::string_view> kAllowedPseudoHeadersForExtendedConnect = {
+      ":method", ":scheme", ":authority", ":path", ":protocol"};
 
   static const absl::node_hash_set<absl::string_view> kAllowedPseudoHeaders = {
       ":method", ":scheme", ":authority", ":path"};
@@ -116,13 +117,18 @@ Http2HeaderValidator::validateRequestHeaderMap(::Envoy::Http::RequestHeaderMap& 
             UhvResponseCodeDetail::get().InvalidMethod};
   }
 
-  auto is_connect_method = header_map.method() == header_values_.MethodValues.Connect;
-  auto is_options_method = header_map.method() == header_values_.MethodValues.Options;
+  // The CONNECT method with the ":protocol" header is called the extended CONNECT and covered in
+  // https://datatracker.ietf.org/doc/html/rfc8441#section-4
+  // For the purposes of header validation the extended CONNECT is treated as generic (non CONNECT)
+  // HTTP/2 requests.
+  const bool is_standard_connect_request = HeaderUtility::isStandardConnectRequest(header_map);
+  const bool is_extended_connect_request = HeaderUtility::isExtendedH2ConnectRequest(header_map);
+  auto is_options_request = header_map.method() == header_values_.MethodValues.Options;
   bool path_is_empty = path.empty();
   bool path_is_asterisk = path == "*";
   bool path_is_absolute = !path_is_empty && path.at(0) == '/';
 
-  if (!is_connect_method && (header_map.getSchemeValue().empty() || path_is_empty)) {
+  if (!is_standard_connect_request && (header_map.getSchemeValue().empty() || path_is_empty)) {
     // If this is not a connect request, then we also need the scheme and path pseudo headers.
     // This is based on RFC 9113, https://www.rfc-editor.org/rfc/rfc9113#section-8.3.1:
     //
@@ -132,7 +138,7 @@ Http2HeaderValidator::validateRequestHeaderMap(::Envoy::Http::RequestHeaderMap& 
     auto details = path_is_empty ? UhvResponseCodeDetail::get().InvalidUrl
                                  : UhvResponseCodeDetail::get().InvalidScheme;
     return {RequestHeaderMapValidationResult::Action::Reject, details};
-  } else if (is_connect_method) {
+  } else if (is_standard_connect_request) {
     // If this is a CONNECT request, :path and :scheme must be empty and :authority must be
     // provided. This is based on RFC 9113,
     // https://www.rfc-editor.org/rfc/rfc9113#section-8.5:
@@ -157,7 +163,8 @@ Http2HeaderValidator::validateRequestHeaderMap(::Envoy::Http::RequestHeaderMap& 
   }
 
   // Step 2: Validate and normalize the :path pseudo header
-  if (!path_is_absolute && !is_connect_method && (!is_options_method || !path_is_asterisk)) {
+  if (!path_is_absolute && !is_standard_connect_request &&
+      (!is_options_request || !path_is_asterisk)) {
     // The :path must be in absolute-form or, for an OPTIONS request, in asterisk-form. This is
     // based on RFC 9113, https://www.rfc-editor.org/rfc/rfc9113#section-8.3.1:
     //
@@ -189,7 +196,10 @@ Http2HeaderValidator::validateRequestHeaderMap(::Envoy::Http::RequestHeaderMap& 
 
   // Step 3: Verify each request header
   const auto& allowed_headers =
-      is_connect_method ? kAllowedPseudoHeadersForConnect : kAllowedPseudoHeaders;
+      is_standard_connect_request
+          ? kAllowedPseudoHeadersForConnect
+          : (is_extended_connect_request ? kAllowedPseudoHeadersForExtendedConnect
+                                         : kAllowedPseudoHeaders);
   std::string reject_details;
   std::vector<absl::string_view> drop_headers;
 
@@ -322,6 +332,17 @@ Http2HeaderValidator::validateAuthorityHeader(const ::Envoy::Http::HeaderString&
   // The host portion can be any valid URI host, which this function does not
   // validate. The port, if present, is validated as a valid uint16_t port.
   return validateHostHeader(value);
+}
+
+HeaderValidator::HeaderValueValidationResult
+Http2HeaderValidator::validateProtocolHeader(const ::Envoy::Http::HeaderString& value) {
+  // Extended CONNECT RFC https://datatracker.ietf.org/doc/html/rfc8441#section-4
+  // specifies that the :protocol value is one of the registered values from:
+  // https://www.iana.org/assignments/http-upgrade-tokens/
+  // However it does not say it MUST be so. As such the :protocol value is checked
+  // to be a valid generic header value.
+
+  return validateGenericHeaderValue(value);
 }
 
 ::Envoy::Http::HeaderValidator::HeaderEntryValidationResult

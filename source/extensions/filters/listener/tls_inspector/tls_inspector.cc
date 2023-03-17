@@ -83,7 +83,7 @@ Filter::Filter(const ConfigSharedPtr& config) : config_(config), ssl_(config_->n
 }
 
 Network::FilterStatus Filter::onAccept(Network::ListenerFilterCallbacks& cb) {
-  ENVOY_LOG(debug, "tls inspector: new connection accepted");
+  ENVOY_LOG(trace, "tls inspector: new connection accepted");
   cb_ = &cb;
 
   return Network::FilterStatus::StopIteration;

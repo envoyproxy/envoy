@@ -9,9 +9,7 @@ namespace CxxSwift {
 
 void run(BootstrapPtr bootstrap_ptr, Platform::LogLevel log_level, envoy_engine_t engine_handle) {
   auto options = std::make_unique<Envoy::OptionsImpl>();
-  auto bootstrap =
-      absl::WrapUnique(reinterpret_cast<envoy::config::bootstrap::v3::Bootstrap*>(bootstrap_ptr));
-  options->setConfigProto(std::move(bootstrap));
+  options->setConfigProto(bootstrapFromPtr(bootstrap_ptr));
   options->setLogLevel(static_cast<spdlog::level::level_enum>(log_level));
   options->setConcurrency(1);
   reinterpret_cast<Envoy::Engine*>(engine_handle)->run(std::move(options));

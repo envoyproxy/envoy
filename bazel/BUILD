@@ -354,6 +354,11 @@ config_setting(
 )
 
 config_setting(
+    name = "disable_envoy_mobile_stats_reporting",
+    values = {"define": "envoy_mobile_stats_reporting=disabled"},
+)
+
+config_setting(
     name = "disable_envoy_mobile_listener",
     values = {"define": "envoy_mobile_listener=disabled"},
 )
