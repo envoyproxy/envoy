@@ -1,7 +1,6 @@
 name: mobile_release
 
 on:
-  pull_request:
   workflow_dispatch:
   schedule:
     # Mondays at 1pm UTC (8am EST)
@@ -29,7 +28,7 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       working-directory: mobile
       run: |
-        version="0.5.0.$(date '+%Y%m%d')-preview-1"
+        version="0.5.0.$(date '+%Y%m%d')"
         ./bazelw build \
           $([ -z $GITHUB_TOKEN ] || echo "--config=remote-ci-linux-clang") \
           --remote_header="Authorization=Bearer $GITHUB_TOKEN" \
@@ -76,14 +75,10 @@ jobs:
         # passphrase prompt when initating a deploy
         # `--pinentry-mode=loopback` could be needed to ensure we
         # suppress the gpg prompt
-        echo "Generate signing key"
         echo $GPG_KEY | base64 --decode > signing-key
-        echo "Import signing key"
         gpg --passphrase $GPG_PASSPHRASE --batch --import signing-key
-        echo "Shred signing key"
         shred signing-key
 
-        echo "Sign files"
         gpg --pinentry-mode=loopback --passphrase $GPG_PASSPHRASE -ab envoy.aar
         gpg --pinentry-mode=loopback --passphrase $GPG_PASSPHRASE -ab envoy-pom.xml
         gpg --pinentry-mode=loopback --passphrase $GPG_PASSPHRASE -ab envoy-javadoc.jar
@@ -94,7 +89,7 @@ jobs:
         READWRITE_API_KEY: ${{ secrets.EM_SONATYPE_PASSWORD }}
         SONATYPE_PROFILE_ID: ${{ secrets.EM_SONATYPE_PROFILE_ID }}
       run: |
-        version="0.5.0.$(date '+%Y%m%d')-preview-1"
+        version="0.5.0.$(date '+%Y%m%d')"
         python mobile/ci/sonatype_nexus_upload.py \
           --profile_id=$SONATYPE_PROFILE_ID \
           --version=$version \
