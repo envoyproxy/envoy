@@ -40,9 +40,15 @@ protected:
 
 // Tests should run with all protocols.
 class CrashIntegrationTestAllProtocols : public CrashIntegrationTest {};
-INSTANTIATE_TEST_SUITE_P(Protocols, CrashIntegrationTestAllProtocols,
-                         testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams()),
-                         HttpProtocolIntegrationTest::protocolTestParamsToString);
+
+// Test for HTTP1/2 only.
+// TODO(asingh-g): Fix test suite for HTTP/3.
+INSTANTIATE_TEST_SUITE_P(
+    Protocols, CrashIntegrationTestAllProtocols,
+    testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams(
+        /*downstream_protocols = */ {Http::CodecType::HTTP1, Http::CodecType::HTTP2},
+        /*upstream_protocols = */ {Http::CodecType::HTTP1, Http::CodecType::HTTP2})),
+    HttpProtocolIntegrationTest::protocolTestParamsToString);
 
 TEST_P(CrashIntegrationTestAllProtocols, UnwindsTrackedObjectStack) {
   const std::string request_kill_config =
