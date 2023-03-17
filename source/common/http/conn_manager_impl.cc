@@ -629,14 +629,6 @@ void ConnectionManagerImpl::RdsRouteConfigUpdateRequester::requestRouteConfigUpd
   absl::optional<Router::ConfigConstSharedPtr> route_config = parent_.routeConfig();
   Event::Dispatcher& thread_local_dispatcher =
       parent_.connection_manager_.read_callbacks_->connection().dispatcher();
-
-  if (parent_.cached_route_blocked_) {
-    // If route is frozen, continue the filter chain directly and no on demand update will be
-    // requested.
-    (*route_config_updated_cb)(false);
-    return;
-  }
-
   if (route_config.has_value() && route_config.value()->usesVhds()) {
     ASSERT(!parent_.request_headers_->Host()->value().empty());
     const auto& host_header = absl::AsciiStrToLower(parent_.request_headers_->getHostValue());
@@ -1604,6 +1596,8 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ResponseHeaderMap& heade
       HeaderUtility::isConnectResponse(request_headers_.get(), *responseHeaders())) {
     state_.is_tunneling_ = true;
   }
+
+  blockRouteCache();
 
   if (connection_manager_.drain_state_ != DrainState::NotDraining &&
       connection_manager_.codec_->protocol() < Protocol::Http2) {

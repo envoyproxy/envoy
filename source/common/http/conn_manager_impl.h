@@ -299,9 +299,14 @@ private:
     void setRoute(Router::RouteConstSharedPtr route) override;
     Router::RouteConstSharedPtr route(const Router::RouteCallback& cb) override;
     void clearRouteCache() override;
-    void blockRouteCache() override;
     void requestRouteConfigUpdate(
         Http::RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb) override;
+
+    // Block the route cache and clear the snapped route config. By doing this the route cache will
+    // not be updated. And if the route config is updated by the RDS, the snapped route config may
+    // be freed before the stream is destroyed.
+    // This will be called automatically at the end of handle response headers.
+    void blockRouteCache();
 
     absl::optional<Router::ConfigConstSharedPtr> routeConfig();
     void traceRequest();
