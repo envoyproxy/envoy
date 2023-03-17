@@ -13,6 +13,7 @@
 #include "engine.h"
 #include "engine_callbacks.h"
 #include "key_value_store.h"
+#include "library/common/types/matcher_data.h"
 #include "log_level.h"
 #include "string_accessor.h"
 
@@ -102,16 +103,6 @@ public:
   EngineBuilder& addPlatformFilter(std::string name);
   // TODO(alyssawilk) remove the legacy APIs and update docs once Lyft is moved over.
   EngineBuilder& addVirtualCluster(std::string virtual_cluster);
-
-  struct MatcherData {
-    std::string name;
-    enum Type {
-      EXACT = 0,
-      SAFE_REGEX = 1,
-    };
-    Type type;
-    std::string value;
-  };
 
   EngineBuilder& addVirtualCluster(std::string name, std::vector<MatcherData> matchers);
   EngineBuilder& setRuntimeGuard(std::string guard, bool value);

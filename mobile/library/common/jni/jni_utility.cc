@@ -366,3 +366,48 @@ void JavaArrayOfByteToBytesVector(JNIEnv* env, jbyteArray array, std::vector<uin
   // There is nothing to write back, it is always safe to JNI_ABORT.
   env->ReleaseByteArrayElements(array, jbytes, JNI_ABORT);
 }
+
+MatcherData::Type stringToType(std::string type_as_string) {
+  if (type_as_string.length() != 4) {
+    ASSERT("conversion failure failure");
+    return MatcherData::EXACT;
+  }
+  // grab the lowest bit.
+  switch (type_as_string[3]) {
+  case 0:
+    return MatcherData::EXACT;
+  case 1:
+    return MatcherData::SAFE_REGEX;
+  }
+  ASSERT("enum failure");
+  return MatcherData::EXACT;
+}
+
+std::vector<MatcherData> javaObjectArrayToMatcherData(JNIEnv* env, jobjectArray array,
+                                                      std::string& cluster_out) {
+  const size_t len = env->GetArrayLength(array);
+  std::vector<MatcherData> ret;
+  if (len == 0) {
+    return ret;
+  }
+  ASSERT((len - 1) % 3 == 0);
+  if ((len - 1) % 3 != 0) {
+    return ret;
+  }
+
+  JavaArrayOfByteToString(env, static_cast<jbyteArray>(env->GetObjectArrayElement(array, 0)),
+                          &cluster_out);
+  for (int i = 1; i < len; i += 3) {
+    std::string name;
+    std::string type_as_string;
+    std::string value;
+    JavaArrayOfByteToString(env, static_cast<jbyteArray>(env->GetObjectArrayElement(array, i)),
+                            &name);
+    JavaArrayOfByteToString(env, static_cast<jbyteArray>(env->GetObjectArrayElement(array, i + 1)),
+                            &type_as_string);
+    JavaArrayOfByteToString(env, static_cast<jbyteArray>(env->GetObjectArrayElement(array, i + 2)),
+                            &value);
+    ret.emplace_back(MatcherData(name, stringToType(type_as_string), value));
+  }
+  return ret;
+}

@@ -5,6 +5,7 @@ import io.envoyproxy.envoymobile.engine.EnvoyConfiguration.TrustChainVerificatio
 import io.envoyproxy.envoymobile.engine.EnvoyEngine
 import io.envoyproxy.envoymobile.engine.EnvoyEngineImpl
 import io.envoyproxy.envoymobile.engine.EnvoyNativeFilterConfig
+import io.envoyproxy.envoymobile.engine.VirtualClusterConfig
 import io.envoyproxy.envoymobile.engine.types.EnvoyHTTPFilterFactory
 import io.envoyproxy.envoymobile.engine.types.EnvoyKeyValueStore
 import io.envoyproxy.envoymobile.engine.types.EnvoyStringAccessor
@@ -71,6 +72,7 @@ open class EngineBuilder(
   private var appId = "unspecified"
   private var trustChainVerification = TrustChainVerification.VERIFY_TRUST_CHAIN
   private var virtualClusters = mutableListOf<String>()
+  private var virtualClusterConfig = mutableListOf<VirtualClusterConfig>()
   private var platformFilterChain = mutableListOf<EnvoyHTTPFilterFactory>()
   private var nativeFilterChain = mutableListOf<EnvoyNativeFilterConfig>()
   private var stringAccessors = mutableMapOf<String, EnvoyStringAccessor>()
@@ -560,6 +562,18 @@ open class EngineBuilder(
   }
 
   /**
+   * Add virtual cluster configuration.
+   *
+   * @param cluster the structured configuration for a virtual cluster.
+   *
+   * @return this builder.
+   */
+  fun addVirutlaClusterConfig(config: VirtualClusterConfig): EngineBuilder {
+    this.virtualClusterConfig.add(config)
+    return this
+  }
+
+  /**
    * Sets the node.id field in the Bootstrap configuration.
    *
    * @param nodeId the node ID.
@@ -682,6 +696,7 @@ open class EngineBuilder(
       appId,
       trustChainVerification,
       virtualClusters,
+      virtualClusterConfig,
       nativeFilterChain,
       platformFilterChain,
       stringAccessors,

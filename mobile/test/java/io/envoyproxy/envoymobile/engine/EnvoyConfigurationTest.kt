@@ -4,6 +4,7 @@ import io.envoyproxy.envoymobile.engine.types.EnvoyHTTPFilter
 import io.envoyproxy.envoymobile.engine.types.EnvoyHTTPFilterFactory
 import io.envoyproxy.envoymobile.engine.EnvoyConfiguration.TrustChainVerification
 import io.envoyproxy.envoymobile.engine.JniLibrary
+import io.envoyproxy.envoymobile.engine.VirtualClusterConfig
 import io.envoyproxy.envoymobile.engine.types.EnvoyStreamIntel
 import io.envoyproxy.envoymobile.engine.types.EnvoyFinalStreamIntel
 import io.envoyproxy.envoymobile.engine.types.EnvoyHTTPFilterCallbacks
@@ -94,6 +95,7 @@ class EnvoyConfigurationTest {
     appId: String = "com.example.myapp",
     trustChainVerification: TrustChainVerification = TrustChainVerification.VERIFY_TRUST_CHAIN,
     virtualClusters: MutableList<String> = mutableListOf("{name: test1}", "{name: test2}"),
+    virtualClusterConfig: List<VirtualClusterConfig> = emptyList(),
     filterChain: MutableList<EnvoyNativeFilterConfig> = mutableListOf(EnvoyNativeFilterConfig("buffer_filter_1", "{'@type': 'type.googleapis.com/envoy.extensions.filters.http.buffer.v3.Buffer'}"), EnvoyNativeFilterConfig("buffer_filter_2", "{'@type': 'type.googleapis.com/envoy.extensions.filters.http.buffer.v3.Buffer'}")),
     platformFilterFactories: MutableList<EnvoyHTTPFilterFactory> = mutableListOf(TestEnvoyHTTPFilterFactory("name1"), TestEnvoyHTTPFilterFactory("name2")),
     runtimeGuards: Map<String,Boolean> = emptyMap(),
@@ -142,6 +144,7 @@ class EnvoyConfigurationTest {
       appId,
       trustChainVerification,
       virtualClusters,
+      virtualClusterConfig,
       filterChain,
       platformFilterFactories,
       emptyMap(),
@@ -319,12 +322,16 @@ class EnvoyConfigurationTest {
     JniLibrary.loadTestLibrary()
     val envoyConfiguration = buildTestEnvoyConfiguration(
       runtimeGuards = mapOf("test_feature_false" to true, "test_feature_true" to false),
+      virtualClusterConfig = listOf(VirtualClusterConfig("cluster1", listOf(HeaderMatchConfig(":method", 0, "POST"),
+            HeaderMatchConfig(":authority", 1, "foo")))),
     )
 
     val resolvedTemplate = TestJni.createYaml(envoyConfiguration)
 
     assertThat(resolvedTemplate).contains("test_feature_false");
     assertThat(resolvedTemplate).contains("test_feature_true");
+    assertThat(resolvedTemplate).matches(Pattern.compile(".*name: :method\n *exact_match: POST.*", Pattern.DOTALL));
+    assertThat(resolvedTemplate).matches(Pattern.compile(".*name: :authority\n *safe_regex_match:\n *regex: foo.*", Pattern.DOTALL));
   }
 
   @Test
