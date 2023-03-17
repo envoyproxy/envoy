@@ -581,7 +581,10 @@ void ConnPoolImplBase::onConnectionEvent(ActiveClient& client, absl::string_view
           [&client]() { client.onConnectionDurationTimeout(); });
       client.connection_duration_timer_->enableTimer(max_connection_duration.value());
     }
-
+    // Initialize client read filters
+    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.initialize_upstream_filters")) {
+      client.initializeReadFilters();
+    }
     // At this point, for the mixed ALPN pool, the client may be deleted. Do not
     // refer to client after this point.
     onConnected(client);

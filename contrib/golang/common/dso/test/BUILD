@@ -13,10 +13,10 @@ envoy_cc_test(
     name = "dso_test",
     srcs = ["dso_test.cc"],
     data = [
-        "//contrib/golang/filters/http/test/common/dso/test_data:simple.so",
+        "//contrib/golang/common/dso/test/test_data:simple.so",
     ],
     deps = [
-        "//contrib/golang/filters/http/source/common/dso:dso_lib",
+        "//contrib/golang/common/dso:dso_lib",
         "//test/test_common:utility_lib",
     ],
 )
@@ -26,6 +26,6 @@ envoy_cc_mock(
     srcs = ["mocks.cc"],
     hdrs = ["mocks.h"],
     deps = [
-        "//contrib/golang/filters/http/source/common/dso:dso_lib",
+        "//contrib/golang/common/dso:dso_lib",
     ],
 )

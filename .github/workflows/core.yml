@@ -35,5 +35,4 @@ jobs:
             --test_output=all \
             --define envoy_mobile_listener=disabled \
             $([ -z $GITHUB_TOKEN ] || echo "--config=remote-ci-linux") \
-            --remote_header="Authorization=Bearer $GITHUB_TOKEN" \
             //test/common/...
