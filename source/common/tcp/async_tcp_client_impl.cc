@@ -21,8 +21,6 @@ AsyncTcpClientImpl::AsyncTcpClientImpl(Event::Dispatcher& dispatcher,
     : dispatcher_(dispatcher), thread_local_cluster_(thread_local_cluster), context_(context),
       enable_half_close_(enable_half_close) {}
 
-AsyncTcpClientImpl::~AsyncTcpClientImpl() { close(Network::ConnectionCloseType::NoFlush); }
-
 bool AsyncTcpClientImpl::connect() {
   connection_ = std::move(thread_local_cluster_.tcpConn(context_).connection_);
   if (!connection_) {

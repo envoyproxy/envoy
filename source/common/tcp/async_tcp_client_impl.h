@@ -23,8 +23,6 @@ public:
                      Upstream::ThreadLocalCluster& thread_local_cluster,
                      Upstream::LoadBalancerContext* context, bool enable_half_close);
 
-  ~AsyncTcpClientImpl() override;
-
   void close(Network::ConnectionCloseType type) override;
 
   /**
