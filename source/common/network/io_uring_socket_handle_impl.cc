@@ -101,6 +101,10 @@ IoUringSocketHandleImpl::readv(uint64_t max_length, Buffer::RawSlice* slices, ui
 
   if (read_param_->result_ < 0) {
     ASSERT(read_param_->buf_.length() == 0);
+    if (read_param_->result_ == -EAGAIN) {
+      return {0, Api::IoErrorPtr(IoSocketError::getIoSocketEagainInstance(),
+                                 IoSocketError::deleteIoError)};
+    }
     return {
         0, Api::IoErrorPtr(new IoSocketError(-read_param_->result_), IoSocketError::deleteIoError)};
   }
@@ -150,6 +154,10 @@ Api::IoCallUint64Result IoUringSocketHandleImpl::read(Buffer::Instance& buffer,
   if (read_param_->result_ < 0) {
     ASSERT(read_param_->buf_.length() == 0);
     ENVOY_LOG(trace, "readv got error");
+    if (read_param_->result_ == -EAGAIN) {
+      return {0, Api::IoErrorPtr(IoSocketError::getIoSocketEagainInstance(),
+                                 IoSocketError::deleteIoError)};
+    }
     return {
         0, Api::IoErrorPtr(new IoSocketError(-read_param_->result_), IoSocketError::deleteIoError)};
   }

@@ -437,20 +437,21 @@ void IoUringServerSocket::onRead(Request* req, int32_t result, bool injected) {
       close_req_ = parent_.submitCloseRequest(*this);
       return;
     }
-    // Move read data from request to buffer or store the error.
-    if (result > 0) {
-      ReadRequest* read_req = static_cast<ReadRequest*>(req);
-      Buffer::BufferFragment* fragment = new Buffer::BufferFragmentImpl(
-          read_req->buf_.release(), result,
-          [](const void* data, size_t, const Buffer::BufferFragmentImpl* this_fragment) {
-            delete[] reinterpret_cast<const uint8_t*>(data);
-            delete this_fragment;
-          });
-      buf_.addBufferFragment(*fragment);
-    } else {
-      if (result != -ECANCELED) {
-        read_error_ = result;
-      }
+  }
+
+  // Move read data from request to buffer or store the error.
+  if (result > 0) {
+    ReadRequest* read_req = static_cast<ReadRequest*>(req);
+    Buffer::BufferFragment* fragment = new Buffer::BufferFragmentImpl(
+        read_req->buf_.release(), result,
+        [](const void* data, size_t, const Buffer::BufferFragmentImpl* this_fragment) {
+          delete[] reinterpret_cast<const uint8_t*>(data);
+          delete this_fragment;
+        });
+    buf_.addBufferFragment(*fragment);
+  } else {
+    if (result != -ECANCELED) {
+      read_error_ = result;
     }
   }
 
