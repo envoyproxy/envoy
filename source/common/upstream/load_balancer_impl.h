@@ -813,11 +813,11 @@ public:
 private:
   const ProtobufWkt::Struct default_subset_;
   std::vector<SubsetSelectorPtr> subset_selectors_;
+  // Keep small members (bools and enums) at the end of class, to reduce alignment overhead.
   const envoy::config::cluster::v3::Cluster::LbSubsetConfig::LbSubsetFallbackPolicy
       fallback_policy_;
   const envoy::config::cluster::v3::Cluster::LbSubsetConfig::LbSubsetMetadataFallbackPolicy
       metadata_fallback_policy_;
-  // Keep small members (bools and enums) at the end of class, to reduce alignment overhead.
   const bool enabled_ : 1;
   const bool locality_weight_aware_ : 1;
   const bool scale_locality_weight_ : 1;
