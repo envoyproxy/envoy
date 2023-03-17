@@ -515,7 +515,14 @@ static void ios_track_event(envoy_map map, const void *context) {
 }
 
 - (int)runWithConfig:(EnvoyConfiguration *)config logLevel:(NSString *)logLevel {
-  auto bootstrap = [config generateBootstrap];
+  std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> bootstrap;
+  if (config.bootstrapPointer > 0) {
+    bootstrap = absl::WrapUnique(
+        reinterpret_cast<envoy::config::bootstrap::v3::Bootstrap *>(config.bootstrapPointer));
+  } else {
+    bootstrap = [config generateBootstrap];
+  }
+
   if (bootstrap == nullptr) {
     return kEnvoyFailure;
   }
