@@ -95,7 +95,7 @@ message RBAC {
     LOG = 2;
   }
 
-  message AuditOptions {
+  message AuditLoggingOptions {
     // Deny and allow here refer to RBAC decisions, not actions.
     enum AuditCondition {
       // Never audit.
@@ -121,7 +121,7 @@ message RBAC {
     //
     // [#not-implemented-hide:]
     // [#extension-category: envoy.rbac.audit_loggers]
-    repeated core.v3.TypedExtensionConfig audit_log = 2
+    repeated core.v3.TypedExtensionConfig audit_logger = 2
         [(validate.rules).repeated = {min_items: 1}];
   }
 
@@ -145,9 +145,11 @@ message RBAC {
   // The policies are evaluated in lexicographic order of the policy name.
   map<string, Policy> policies = 2;
 
-  // Audit options that includes the condition for audit logging to happen and
-  // audit logger configurations.
-  AuditOptions audit_options = 3;
+  // Audit logging options that includes the condition for audit logging to happen
+  // and audit logger configurations.
+  //
+  // [#not-implemented-hide:]
+  AuditLoggingOptions audit_logging_options = 3;
 }
 
 // Policy specifies a role and the principals that are assigned/denied the role.
