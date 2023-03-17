@@ -247,8 +247,8 @@ TEST_P(WebsocketIntegrationTest, PortStrippingForHttp2) {
 }
 
 TEST_P(WebsocketIntegrationTest, EarlyData) {
-  if (downstreamProtocol() >= Http::CodecType::HTTP2 ||
-      upstreamProtocol() >= Http::CodecType::HTTP2) {
+  if (downstreamProtocol() != Http::CodecType::HTTP1 ||
+      upstreamProtocol() != Http::CodecType::HTTP1) {
     return;
   }
   config_helper_.addConfigModifier(setRouteUsingWebsocket());

@@ -490,7 +490,7 @@ TEST_P(IdleTimeoutIntegrationTest, RequestTimeoutUnconfiguredDoesNotTriggerOnBod
 
 TEST_P(IdleTimeoutIntegrationTest, RequestTimeoutTriggersOnRawIncompleteRequestWithHeaders) {
   // Omitting \r\n\r\n does not indicate incomplete request in HTTP2/3
-  if (downstreamProtocol() >= Envoy::Http::CodecType::HTTP2) {
+  if (downstreamProtocol() != Envoy::Http::CodecType::HTTP1) {
     return;
   }
   enable_request_timeout_ = true;
@@ -503,7 +503,7 @@ TEST_P(IdleTimeoutIntegrationTest, RequestTimeoutTriggersOnRawIncompleteRequestW
 }
 
 TEST_P(IdleTimeoutIntegrationTest, RequestTimeoutDoesNotTriggerOnRawCompleteRequestWithHeaders) {
-  if (downstreamProtocol() >= Envoy::Http::CodecType::HTTP2) {
+  if (downstreamProtocol() != Envoy::Http::CodecType::HTTP1) {
     return;
   }
   enable_request_timeout_ = true;

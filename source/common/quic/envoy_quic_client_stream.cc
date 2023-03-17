@@ -47,8 +47,10 @@ Http::Status EnvoyQuicClientStream::encodeHeaders(const Http::RequestHeaderMap& 
   spdy::Http2HeaderBlock spdy_headers;
   if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.use_http3_header_normalisation") &&
       Http::Utility::isUpgrade(headers)) {
-    // transform Upgrade from H1 to H3
-    upgrade_type_ = std::string(headers.getUpgradeValue());
+    // Upgrade requests are transformed to their HTTP/1 forms, regardless of the request's protocol
+    // type So, we must transform them into their HTTP/3 form if applicable, before sending them to
+    // a peer
+    upgrade_protocol_ = std::string(headers.getUpgradeValue());
     Http::RequestHeaderMapPtr modified_headers =
         Http::createHeaderMap<Http::RequestHeaderMapImpl>(headers);
     Http::Utility::transformUpgradeRequestFromH1toH3(*modified_headers);
@@ -203,9 +205,11 @@ void EnvoyQuicClientStream::OnInitialHeadersComplete(bool fin, size_t frame_len,
     set_headers_decompressed(false);
   }
 
-  // Transform Response from H3 to H1
-  if (!upgrade_type_.empty() && headers->Status()) {
-    Http::Utility::transformUpgradeResponseFromH3toH1(*headers, upgrade_type_);
+  // Internally, we process all requests and responses in HTTP/1 form
+  // Therefore, here convert any HTTP/3 responses to H1
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.use_http3_header_normalisation") &&
+      !upgrade_protocol_.empty() && headers->Status()) {
+    Http::Utility::transformUpgradeResponseFromH3toH1(*headers, upgrade_protocol_);
   }
 
   const bool is_special_1xx = Http::HeaderUtility::isSpecial1xx(*headers);

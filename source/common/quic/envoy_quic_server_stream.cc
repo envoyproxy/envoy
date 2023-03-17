@@ -55,7 +55,9 @@ void EnvoyQuicServerStream::encodeHeaders(const Http::ResponseHeaderMap& headers
     return;
   }
   auto modified_headers = Http::createHeaderMap<Http::ResponseHeaderMapImpl>(headers);
-  // Transform Response from H1 to H3
+  // Internally, responses are handled in HTTP/1 form, regardless of the format of the original
+  // request Therefore, before forwarding the response to a peer, we must convert it back to HTTP/3
+  // form
   if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.use_http3_header_normalisation") &&
       Http::Utility::isUpgrade(headers)) {
     Http::Utility::transformUpgradeResponseFromH1toH3(*modified_headers);
