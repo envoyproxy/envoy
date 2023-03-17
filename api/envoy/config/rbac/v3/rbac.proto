@@ -115,7 +115,7 @@ message RBAC {
   // The policies are evaluated in lexicographic order of the policy name.
   map<string, Policy> policies = 2;
 
-  message AuditLog {
+  message AuditOptions {
     // Deny and allow here refer to RBAC decisions, not actions.
     enum AuditCondition {
       // Never audit.
@@ -160,7 +160,7 @@ message RBAC {
     repeated core.v3.TypedExtensionConfig audit_log = 2 [(validate.rules).repeated = {min_items: 1}];
   }
 
-  AuditLog audit_log = 3;
+  AuditOptions audit_options = 3;
 }
 
 // Policy specifies a role and the principals that are assigned/denied the role.
