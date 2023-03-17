@@ -210,7 +210,7 @@ template <class ResultDataType = std::string> struct DataInputGetResult {
     if (result.data_.has_value()) {
       out << "data input: " << result.data_.value();
     } else {
-      out << "n/a";
+      out << "data input: n/a";
     }
 
     switch (result.data_availability_) {
@@ -281,8 +281,6 @@ public:
   virtual ~CommonProtocolInput() = default;
   virtual absl::optional<ResultDataType> get() PURE;
 };
-// using CommonProtocolInputPtr = std::unique_ptr<CommonProtocolInput>;
-// using CommonProtocolInputFactoryCb = std::function<CommonProtocolInputPtr()>;
 
 template <class ResultDataType = std::string>
 using CommonProtocolInputPtr = std::unique_ptr<CommonProtocolInput<ResultDataType>>;
