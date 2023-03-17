@@ -789,6 +789,7 @@ open class EngineBuilder: NSObject {
   }
 }
 
+// swiftlint:disable cyclomatic_complexity
 #if canImport(EnvoyCxxSwiftInterop)
 private extension EngineBuilder {
   func generateBootstrap() -> Bootstrap {
@@ -887,9 +888,8 @@ private extension EngineBuilder {
     if self.enableCds {
       cxxBuilder.addCdsLayer(self.cdsResourcesLocator.toCXX(), Int32(self.cdsTimeoutSeconds))
     }
-
-
     return cxxBuilder.generateBootstrap()
   }
+  // swiftlint:enable cyclomatic_complexity
 }
 #endif
