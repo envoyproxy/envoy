@@ -79,8 +79,8 @@ private:
 
   bool decoded_1xx_{false};
 
-  // When an http upgrade is requested, this contains the protocol upgrade type, e.g. "websocket".
-  // it will be empty, when no such request is active
+  // When an Http Upgrade is requested, this contains the protocol upgrade type, e.g. "websocket".
+  // It will be empty, when no such request is active.
   std::string upgrade_type_;
 };
 
