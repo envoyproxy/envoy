@@ -14,7 +14,7 @@ namespace Envoy {
 namespace Quic {
 
 // Enables HTTP Datagrams and the Capsule Protocol support based on RFC 9297. This class is used
-// both on the receive side (HTTP/3 codec -> Envoy) and the send side (Envoy -> HTTP/3 codec) of
+// both on the decode path (HTTP/3 codec -> Envoy) and the encode path (Envoy -> HTTP/3 codec) of
 // the QUIC client and server streams in Envoy.
 class HttpDatagramHandler : public quic::QuicSpdyStream::Http3DatagramVisitor,
                             public quiche::CapsuleParser::Visitor,
@@ -22,11 +22,10 @@ class HttpDatagramHandler : public quic::QuicSpdyStream::Http3DatagramVisitor,
 public:
   // Does not take ownership of the QuicSpdyStream. "stream" must refer to a valid object
   // that outlives HttpDatagramHandler.
-  explicit HttpDatagramHandler(quic::QuicSpdyStream* stream);
+  explicit HttpDatagramHandler(quic::QuicSpdyStream& stream);
   ~HttpDatagramHandler() override;
 
   // quic::QuicSpdyStream::Http3DatagramVisitor
-  // Normalizes HTTP/3 Datagrams to Capsules for Envoy to do subsequent processing.
   void OnHttp3Datagram(quic::QuicStreamId stream_id, absl::string_view payload) override;
   void OnUnknownCapsule(quic::QuicStreamId stream_id,
                         const quiche::UnknownCapsule& capsule) override;
@@ -47,7 +46,7 @@ private:
   // Serializes and decodes a given Capsule.
   void decodeCapsule(const quiche::Capsule& capsule);
 
-  quic::QuicSpdyStream* const stream_; // not owned, can't be null.
+  quic::QuicSpdyStream& stream_;
   quiche::CapsuleParser capsule_parser_{this};
   quiche::SimpleBufferAllocator capsule_buffer_allocator_;
   Http::StreamDecoder* stream_decoder_ = nullptr; // not owned.

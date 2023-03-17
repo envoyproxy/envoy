@@ -229,7 +229,7 @@ bool HeaderUtility::isConnectResponse(const RequestHeaderMap* request_headers,
 bool HeaderUtility::isCapsuleProtocol(const RequestOrResponseHeaderMap& headers) {
   Http::HeaderMap::GetResult capsule_protocol =
       headers.get(Envoy::Http::LowerCaseString("Capsule-Protocol"));
-  if (capsule_protocol.empty()) {
+  if (capsule_protocol.size() != 1) {
     return false;
   }
   // Parses the header value and extracts the boolean value ignoring parameters.

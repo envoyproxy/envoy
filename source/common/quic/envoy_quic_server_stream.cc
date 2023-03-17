@@ -475,8 +475,10 @@ bool EnvoyQuicServerStream::hasPendingData() {
   return (!write_side_closed()) && BufferedDataBytes() > 0;
 }
 
+// TODO(https://github.com/envoyproxy/envoy/issues/23564): enable HTTP Datagram support by looking
+// at the request/response headers for CONNECT-UDP support.
 void EnvoyQuicServerStream::enableHttpDatagramSupport() {
-  http_datagram_handler_ = std::make_unique<HttpDatagramHandler>(this);
+  http_datagram_handler_ = std::make_unique<HttpDatagramHandler>(*this);
   ASSERT(request_decoder_ != nullptr);
   http_datagram_handler_->setStreamDecoder(request_decoder_);
 }

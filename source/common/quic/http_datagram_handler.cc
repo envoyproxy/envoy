@@ -10,16 +10,11 @@
 namespace Envoy {
 namespace Quic {
 
-HttpDatagramHandler::HttpDatagramHandler(quic::QuicSpdyStream* stream) : stream_(stream) {
-  ASSERT(stream != nullptr);
-  stream_->RegisterHttp3DatagramVisitor(this);
+HttpDatagramHandler::HttpDatagramHandler(quic::QuicSpdyStream& stream) : stream_(stream) {
+  stream_.RegisterHttp3DatagramVisitor(this);
 }
 
-HttpDatagramHandler::~HttpDatagramHandler() {
-  if (stream_ != nullptr) {
-    stream_->UnregisterHttp3DatagramVisitor();
-  }
-}
+HttpDatagramHandler::~HttpDatagramHandler() { stream_.UnregisterHttp3DatagramVisitor(); }
 
 void HttpDatagramHandler::decodeCapsule(const quiche::Capsule& capsule) {
   quiche::QuicheBuffer serialized_capsule = SerializeCapsule(capsule, &capsule_buffer_allocator_);
@@ -28,18 +23,18 @@ void HttpDatagramHandler::decodeCapsule(const quiche::Capsule& capsule) {
   if (!stream_decoder_) {
     IS_ENVOY_BUG("HTTP/3 Datagram received before a stream decoder is set.");
   }
-  stream_decoder_->decodeData(*buffer, stream_->IsDoneReading());
+  stream_decoder_->decodeData(*buffer, stream_.IsDoneReading());
 }
 
 void HttpDatagramHandler::OnHttp3Datagram(quic::QuicStreamId stream_id, absl::string_view payload) {
-  ASSERT(stream_id == stream_->id());
+  ASSERT(stream_id == stream_.id());
   ENVOY_LOG(debug, "received a HTTP/3 Datagram with stream id={}", stream_id);
   decodeCapsule(quiche::Capsule::Datagram(payload));
 }
 
 void HttpDatagramHandler::OnUnknownCapsule(quic::QuicStreamId stream_id,
                                            const quiche::UnknownCapsule& capsule) {
-  ASSERT(stream_id == stream_->id());
+  ASSERT(stream_id == stream_.id());
   ENVOY_LOG(debug, "received an Unknown Capsule with stream id={}", stream_id);
   decodeCapsule(quiche::Capsule(capsule));
 }
@@ -48,11 +43,11 @@ bool HttpDatagramHandler::OnCapsule(const quiche::Capsule& capsule) {
   quiche::CapsuleType capsule_type = capsule.capsule_type();
   if (capsule_type != quiche::CapsuleType::DATAGRAM) {
     // Forward other types of Capsules without modifications.
-    stream_->WriteCapsule(capsule, fin_set_);
+    stream_.WriteCapsule(capsule, fin_set_);
     return true;
   }
   quic::MessageStatus status =
-      stream_->SendHttp3Datagram(capsule.datagram_capsule().http_datagram_payload);
+      stream_.SendHttp3Datagram(capsule.datagram_capsule().http_datagram_payload);
   // Returns false and thus resets the corresponding stream in the following statuses. Otherwise,
   // drops the Datagram and move on without reporting a failure.
   if (status == quic::MessageStatus::MESSAGE_STATUS_ENCRYPTION_NOT_ESTABLISHED ||

@@ -51,6 +51,8 @@ public:
   void OnConnectionClosed(quic::QuicErrorCode error, quic::ConnectionCloseSource source) override;
 
   void clearWatermarkBuffer();
+  // Enables the QUIC stream to decode HTTP/3 Datagrams and makes it encode DATA frames into HTTP/3
+  // Datagrams or Capsules.
   void enableHttpDatagramSupport();
 
 protected:
@@ -80,6 +82,7 @@ private:
 
   Http::ResponseDecoder* response_decoder_{nullptr};
   bool decoded_1xx_{false};
+  // Setting |http_datagram_handler_| enables HTTP Datagram support.
   std::unique_ptr<HttpDatagramHandler> http_datagram_handler_;
 };
 

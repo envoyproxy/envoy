@@ -55,7 +55,7 @@ protected:
       &connection_helper_, &alarm_factory_, quic::Perspective::IS_SERVER)};
   testing::StrictMock<MockStreamDecoder> stream_decoder_;
   testing::StrictMock<MockStream> stream_{&session_};
-  HttpDatagramHandler http_datagram_handler_{&stream_};
+  HttpDatagramHandler http_datagram_handler_{stream_};
 
   std::string datagram_payload_ = absl::HexStringToBytes("a1a2a3a4a5a6a7a8");
   std::string capsule_fragment_ = absl::HexStringToBytes("00"               // DATAGRAM capsule type

@@ -171,7 +171,7 @@ public:
                                 const ResponseHeaderMap& response_headers);
 
   /**
-   * @brief return if the Capsule-Protocol header field (RFC 9297) is set to true.
+   * @brief Returns true if the Capsule-Protocol header field (RFC 9297) is set to true.
    */
   static bool isCapsuleProtocol(const RequestOrResponseHeaderMap& headers);
 
