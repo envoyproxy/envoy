@@ -32,5 +32,4 @@ jobs:
             --test_output=all \
             --copt=-DUSE_API_LISTENER \
             $([ -z $GITHUB_TOKEN ] || echo "--config=remote-ci-linux") \
-            --remote_header="Authorization=Bearer $GITHUB_TOKEN" \
             //test/cc/...

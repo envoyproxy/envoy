@@ -34,7 +34,6 @@ jobs:
       run: |
         cd mobile && ./bazelw test \
             $([ -z $GITHUB_TOKEN ] || echo "--config=remote-ci-linux") \
-            --remote_header="Authorization=Bearer $GITHUB_TOKEN" \
             --define=admin_html=enabled \
             --define=envoy_mobile_request_compression=disabled \
             --@envoy//bazel:http3=False \
@@ -64,7 +63,6 @@ jobs:
           ./bazelw build \
             --config=ios \
             $([ -z $GITHUB_TOKEN ] || echo "--config=remote-ci-macos") \
-            --remote_header="Authorization=Bearer $GITHUB_TOKEN" \
             --define=admin_html=enabled \
             --define=envoy_mobile_request_compression=disabled \
             --define=envoy_mobile_stats_reporting=disabled \
@@ -101,7 +99,6 @@ jobs:
       run: |
         cd mobile && ./bazelw build \
         $([ -z $GITHUB_TOKEN ] || echo "--config=remote-ci-macos") \
-          --remote_header="Authorization=Bearer $GITHUB_TOKEN" \
           --fat_apk_cpu=x86_64 \
           --define=admin_html=enabled \
           --define=envoy_mobile_request_compression=disabled \
