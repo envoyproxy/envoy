@@ -357,7 +357,7 @@ TEST_P(RBACIntegrationTest, Allowed) {
           {":method", "GET"},
           {":path", "/"},
           {":scheme", "http"},
-          {":authority", "host"},
+          {":authority", "sni.lyft.com"},
           {"x-forwarded-for", "10.0.0.1"},
       },
       1024);
@@ -382,7 +382,7 @@ TEST_P(RBACIntegrationTest, Denied) {
           {":method", "POST"},
           {":path", "/"},
           {":scheme", "http"},
-          {":authority", "host"},
+          {":authority", "sni.lyft.com"},
           {"x-forwarded-for", "10.0.0.1"},
       },
       1024);
@@ -405,7 +405,7 @@ TEST_P(RBACIntegrationTest, DeniedWithDenyAction) {
           {":method", "GET"},
           {":path", "/"},
           {":scheme", "http"},
-          {":authority", "host"},
+          {":authority", "sni.lyft.com"},
           {"x-forwarded-for", "10.0.0.1"},
       },
       1024);
@@ -431,7 +431,7 @@ TEST_P(RBACIntegrationTest, DeniedWithPrefixRule) {
           {":method", "POST"},
           {":path", "/foo/../bar"},
           {":scheme", "http"},
-          {":authority", "host"},
+          {":authority", "sni.lyft.com"},
           {"x-forwarded-for", "10.0.0.1"},
       },
       1024);
@@ -457,7 +457,7 @@ TEST_P(RBACIntegrationTest, RbacPrefixRuleUseNormalizePath) {
           {":method", "POST"},
           {":path", "/foo/../bar"},
           {":scheme", "http"},
-          {":authority", "host"},
+          {":authority", "sni.lyft.com"},
           {"x-forwarded-for", "10.0.0.1"},
       },
       1024);
@@ -478,7 +478,7 @@ TEST_P(RBACIntegrationTest, DeniedHeadReply) {
           {":method", "HEAD"},
           {":path", "/"},
           {":scheme", "http"},
-          {":authority", "host"},
+          {":authority", "sni.lyft.com"},
           {"x-forwarded-for", "10.0.0.1"},
       },
       1024);
@@ -514,7 +514,7 @@ TEST_P(RBACIntegrationTest, RouteOverride) {
           {":method", "POST"},
           {":path", "/"},
           {":scheme", "http"},
-          {":authority", "host"},
+          {":authority", "sni.lyft.com"},
           {"x-forwarded-for", "10.0.0.1"},
       },
       1024);
@@ -543,7 +543,7 @@ TEST_P(RBACIntegrationTest, PathWithQueryAndFragmentWithOverride) {
             {":method", "POST"},
             {":path", path},
             {":scheme", "http"},
-            {":authority", "host"},
+            {":authority", "sni.lyft.com"},
             {"x-forwarded-for", "10.0.0.1"},
         },
         1024);
@@ -567,7 +567,7 @@ TEST_P(RBACIntegrationTest, PathWithFragmentRejectedByDefault) {
           {":method", "POST"},
           {":path", "/allow?p1=v1#seg"},
           {":scheme", "http"},
-          {":authority", "host"},
+          {":authority", "sni.lyft.com"},
           {"x-forwarded-for", "10.0.0.1"},
       },
       1024);
@@ -597,7 +597,7 @@ TEST_P(RBACIntegrationTest, DenyExactMatchIgnoresQueryAndFragment) {
             {":method", "POST"},
             {":path", path},
             {":scheme", "http"},
-            {":authority", "host"},
+            {":authority", "sni.lyft.com"},
             {"x-forwarded-for", "10.0.0.1"},
         },
         1024);
@@ -626,7 +626,7 @@ TEST_P(RBACIntegrationTest, PathIgnoreCase) {
             {":method", "POST"},
             {":path", path},
             {":scheme", "http"},
-            {":authority", "host"},
+            {":authority", "sni.lyft.com"},
             {"x-forwarded-for", "10.0.0.1"},
         },
         1024);
@@ -650,7 +650,7 @@ TEST_P(RBACIntegrationTest, LogConnectionAllow) {
           {":method", "POST"},
           {":path", "/"},
           {":scheme", "http"},
-          {":authority", "host"},
+          {":authority", "sni.lyft.com"},
           {"x-forwarded-for", "10.0.0.1"},
       },
       1024);
@@ -674,7 +674,7 @@ TEST_P(RBACIntegrationTest, HeaderMatchCondition) {
           {":method", "POST"},
           {":path", "/path"},
           {":scheme", "http"},
-          {":authority", "host"},
+          {":authority", "sni.lyft.com"},
           {"xxx", "yyy"},
       },
       1024);
@@ -699,7 +699,7 @@ TEST_P(RBACIntegrationTest, HeaderMatchConditionDuplicateHeaderNoMatch) {
           {":method", "POST"},
           {":path", "/path"},
           {":scheme", "http"},
-          {":authority", "host"},
+          {":authority", "sni.lyft.com"},
           {"xxx", "yyy"},
           {"xxx", "zzz"},
       },
@@ -722,7 +722,7 @@ TEST_P(RBACIntegrationTest, HeaderMatchConditionDuplicateHeaderMatch) {
           {":method", "POST"},
           {":path", "/path"},
           {":scheme", "http"},
-          {":authority", "host"},
+          {":authority", "sni.lyft.com"},
           {"xxx", "yyy"},
           {"xxx", "zzz"},
       },
@@ -747,7 +747,7 @@ TEST_P(RBACIntegrationTest, MatcherAllowed) {
           {":method", "GET"},
           {":path", "/"},
           {":scheme", "http"},
-          {":authority", "host"},
+          {":authority", "sni.lyft.com"},
           {"x-forwarded-for", "10.0.0.1"},
       },
       1024);
@@ -772,7 +772,7 @@ TEST_P(RBACIntegrationTest, MatcherDenied) {
           {":method", "POST"},
           {":path", "/"},
           {":scheme", "http"},
-          {":authority", "host"},
+          {":authority", "sni.lyft.com"},
           {"x-forwarded-for", "10.0.0.1"},
       },
       1024);
@@ -795,7 +795,7 @@ TEST_P(RBACIntegrationTest, MatcherDeniedWithDenyAction) {
           {":method", "GET"},
           {":path", "/"},
           {":scheme", "http"},
-          {":authority", "host"},
+          {":authority", "sni.lyft.com"},
           {"x-forwarded-for", "10.0.0.1"},
       },
       1024);
@@ -821,7 +821,7 @@ TEST_P(RBACIntegrationTest, MatcherDeniedWithPrefixRule) {
           {":method", "POST"},
           {":path", "/foo/../bar"},
           {":scheme", "http"},
-          {":authority", "host"},
+          {":authority", "sni.lyft.com"},
           {"x-forwarded-for", "10.0.0.1"},
       },
       1024);
@@ -847,7 +847,7 @@ TEST_P(RBACIntegrationTest, RbacPrefixRuleUseNormalizePathMatcher) {
           {":method", "POST"},
           {":path", "/foo/../bar"},
           {":scheme", "http"},
-          {":authority", "host"},
+          {":authority", "sni.lyft.com"},
           {"x-forwarded-for", "10.0.0.1"},
       },
       1024);
@@ -868,7 +868,7 @@ TEST_P(RBACIntegrationTest, MatcherDeniedHeadReply) {
           {":method", "HEAD"},
           {":path", "/"},
           {":scheme", "http"},
-          {":authority", "host"},
+          {":authority", "sni.lyft.com"},
           {"x-forwarded-for", "10.0.0.1"},
       },
       1024);
@@ -904,7 +904,7 @@ TEST_P(RBACIntegrationTest, MatcherRouteOverride) {
           {":method", "POST"},
           {":path", "/"},
           {":scheme", "http"},
-          {":authority", "host"},
+          {":authority", "sni.lyft.com"},
           {"x-forwarded-for", "10.0.0.1"},
       },
       1024);
@@ -933,7 +933,7 @@ TEST_P(RBACIntegrationTest, PathMatcherWithQueryAndFragmentWithOverride) {
             {":method", "POST"},
             {":path", path},
             {":scheme", "http"},
-            {":authority", "host"},
+            {":authority", "sni.lyft.com"},
             {"x-forwarded-for", "10.0.0.1"},
         },
         1024);
@@ -957,7 +957,7 @@ TEST_P(RBACIntegrationTest, PathMatcherWithFragmentRejectedByDefault) {
           {":method", "POST"},
           {":path", "/allow?p1=v1#seg"},
           {":scheme", "http"},
-          {":authority", "host"},
+          {":authority", "sni.lyft.com"},
           {"x-forwarded-for", "10.0.0.1"},
       },
       1024);
@@ -987,7 +987,7 @@ TEST_P(RBACIntegrationTest, MatcherDenyExactMatchIgnoresQueryAndFragment) {
             {":method", "POST"},
             {":path", path},
             {":scheme", "http"},
-            {":authority", "host"},
+            {":authority", "sni.lyft.com"},
             {"x-forwarded-for", "10.0.0.1"},
         },
         1024);
@@ -1016,7 +1016,7 @@ TEST_P(RBACIntegrationTest, PathIgnoreCaseMatcher) {
             {":method", "POST"},
             {":path", path},
             {":scheme", "http"},
-            {":authority", "host"},
+            {":authority", "sni.lyft.com"},
             {"x-forwarded-for", "10.0.0.1"},
         },
         1024);
@@ -1040,7 +1040,7 @@ TEST_P(RBACIntegrationTest, MatcherLogConnectionAllow) {
           {":method", "POST"},
           {":path", "/"},
           {":scheme", "http"},
-          {":authority", "host"},
+          {":authority", "sni.lyft.com"},
           {"x-forwarded-for", "10.0.0.1"},
       },
       1024);
