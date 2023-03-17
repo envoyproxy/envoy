@@ -315,7 +315,7 @@ private:
   const std::string log_format_;
   Thread::BasicLockable& lock_;
   bool should_escape_;
-  bool enable_fine_grain_logging_;
+  std::atomic<bool> enable_fine_grain_logging_;
   Context* const save_context_;
 
   std::string fine_grain_log_format_;
