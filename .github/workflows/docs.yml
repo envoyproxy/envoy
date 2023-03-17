@@ -10,17 +10,7 @@ on:
   pull_request:
 
 # TODO(yannic): Set to `permissions: {}` after migrating away from GitHub token for RE.
-permissions:
-  actions: read
-  checks: read
-  contents: read
-  deployments: read
-  issues: read
-  packages: read
-  pull-requests: read
-  repository-projects: read
-  security-events: read
-  statuses: read
+permissions: read-all
 
 concurrency:
   group: ${{ github.head_ref-github.workflow || github.run_id }}
