@@ -62,7 +62,7 @@ public:
   };
 
   struct HedgingParams {
-    bool hedge_on_per_try_timeout_;
+    bool hedge_on_per_try_timeout_ : 1;
   };
 
   class StrictHeaderChecker {
@@ -364,10 +364,11 @@ class Filter : Logger::Loggable<Logger::Id::router>,
                public RouterFilterInterface {
 public:
   Filter(FilterConfig& config, FilterStats& stats)
-      : config_(config), stats_(stats), downstream_1xx_headers_encoded_(false),
-        downstream_response_started_(false), downstream_end_stream_(false), is_retry_(false),
-        request_buffer_overflowed_(false), streaming_shadows_(Runtime::runtimeFeatureEnabled(
-                                               "envoy.reloadable_features.streaming_shadow")) {}
+      : config_(config), stats_(stats), grpc_request_{}, exclude_http_code_stats_(false),
+        downstream_1xx_headers_encoded_(false), downstream_response_started_(false),
+        downstream_end_stream_(false), is_retry_(false), request_buffer_overflowed_(false),
+        streaming_shadows_(
+            Runtime::runtimeFeatureEnabled("envoy.reloadable_features.streaming_shadow")) {}
 
   ~Filter() override;
 
@@ -654,8 +655,8 @@ private:
   uint32_t pending_retries_{0};
   Http::Code timeout_response_code_ = Http::Code::GatewayTimeout;
   FilterUtility::HedgingParams hedging_params_;
-  bool grpc_request_{};
-  bool exclude_http_code_stats_ = false;
+  bool grpc_request_ : 1;
+  bool exclude_http_code_stats_ : 1;
   bool downstream_1xx_headers_encoded_ : 1;
   bool downstream_response_started_ : 1;
   bool downstream_end_stream_ : 1;
@@ -663,7 +664,7 @@ private:
   bool include_attempt_count_in_request_ : 1;
   bool include_timeout_retry_header_in_request_ : 1;
   bool request_buffer_overflowed_ : 1;
-  const bool streaming_shadows_;
+  const bool streaming_shadows_ : 1;
 };
 
 class ProdFilter : public Filter {
