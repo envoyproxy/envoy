@@ -364,7 +364,7 @@ class Filter : Logger::Loggable<Logger::Id::router>,
                public RouterFilterInterface {
 public:
   Filter(FilterConfig& config, FilterStats& stats)
-      : config_(config), stats_(stats), grpc_request_{}, exclude_http_code_stats_(false),
+      : config_(config), stats_(stats), grpc_request_(false), exclude_http_code_stats_(false),
         downstream_1xx_headers_encoded_(false), downstream_response_started_(false),
         downstream_end_stream_(false), is_retry_(false), request_buffer_overflowed_(false),
         streaming_shadows_(
