@@ -1598,15 +1598,14 @@ TEST_P(ListenerFilterIntegrationTest,
       {
         sendLdsResponse({MessageUtil::getYamlStringFromMessage(listener_config_)}, "2");
         test_server_->waitForCounterGe("listener_manager.lds.update_rejected", 1);
+        IntegrationTcpClientPtr tcp_client2 = makeTcpConnection(lookupPort("test_listener"));
+        ASSERT_TRUE(tcp_client2->write(data));
+        FakeRawConnectionPtr fake_upstream_connection2;
+        ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection2));
+        ASSERT_TRUE(fake_upstream_connection2->waitForData(data.size(), &data));
+        tcp_client2->close();
+        ASSERT_TRUE(fake_upstream_connection2->waitForDisconnect());
       });
-
-  IntegrationTcpClientPtr tcp_client2 = makeTcpConnection(lookupPort("test_listener"));
-  ASSERT_TRUE(tcp_client2->write(data));
-  FakeRawConnectionPtr fake_upstream_connection2;
-  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection2));
-  ASSERT_TRUE(fake_upstream_connection2->waitForData(data.size(), &data));
-  tcp_client2->close();
-  ASSERT_TRUE(fake_upstream_connection2->waitForDisconnect());
 }
 
 INSTANTIATE_TEST_SUITE_P(IpVersionsAndGrpcTypes, ListenerFilterIntegrationTest,
