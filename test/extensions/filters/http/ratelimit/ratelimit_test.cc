@@ -982,6 +982,29 @@ TEST_F(HttpRateLimitFilterTest, LimitResponseWithInvalidRateLimitedStatus) {
   EXPECT_EQ("request_rate_limited", filter_callbacks_.details());
 }
 
+TEST_F(HttpRateLimitFilterTest, BehavesCorrectlyWhenAsyncOperationsAreOnASeparateThread) {
+  SetUpTest(filter_config_);
+  Thread::ThreadPtr thread;
+  EXPECT_CALL(route_rate_limit_, populateDescriptors(_, _, _, _))
+      .WillOnce(SetArgReferee<0>(descriptor_));
+  EXPECT_CALL(filter_callbacks_, sendLocalReply(_, _, _, _, "request_rate_limited"));
+  EXPECT_CALL(*client_, limit(_, _, _, _, _))
+      .WillOnce(
+          WithArgs<0>(Invoke([&](Filters::Common::RateLimit::RequestCallbacks& callbacks) -> void {
+            request_callbacks_ = &callbacks;
+            thread = Thread::threadFactoryForTest().createThread([&]() {
+              filter_->complete(
+                  Filters::Common::RateLimit::LimitStatus::OverLimit,
+                  std::make_unique<Filters::Common::RateLimit::DescriptorStatusList>(),
+                  Http::ResponseHeaderMapImpl::create(), Http::RequestHeaderMapImpl::create(), "",
+                  nullptr);
+            });
+          })));
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(request_headers_, false));
+  thread->join();
+}
+
 TEST_F(HttpRateLimitFilterTest, ResetDuringCall) {
   SetUpTest(filter_config_);
   InSequence s;
