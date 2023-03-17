@@ -17,12 +17,12 @@ Requests for the path ``/service/1`` are statically mirrored.
 Each request is handled by the ``service1`` cluster, and in addition, forwarded to
 the ``service1-mirror`` cluster:
 
-.. literalinclude:: _include/route-mirror/front-envoy.yaml
+.. literalinclude:: _include/route-mirror/envoy.yaml
    :language: yaml
    :lines: 16-34
    :linenos:
    :emphasize-lines: 6-11
-   :caption: Envoy configuration with static route mirror policy :download:`front-envoy.yaml <_include/route-mirror/front-envoy.yaml>`
+   :caption: Envoy configuration with static route mirror policy :download:`envoy.yaml <_include/route-mirror/envoy.yaml>`
 
 Requests for the path ``/service/2`` are dynamically mirrored according to the presence and value of
 the ``x-mirror-cluster`` header.
@@ -33,12 +33,12 @@ to the cluster named in the header.
 For example, if we send a request with the header ``x-mirror-cluster: service2-mirror``,
 the request will be forwarded to the ``service2-mirror`` cluster.
 
-.. literalinclude:: _include/route-mirror/front-envoy.yaml
+.. literalinclude:: _include/route-mirror/envoy.yaml
    :language: yaml
    :lines: 16-34
    :linenos:
    :emphasize-lines: 12-17
-   :caption: Envoy configuration with header based route mirror policy :download:`front-envoy.yaml <_include/route-mirror/front-envoy.yaml>`
+   :caption: Envoy configuration with header based route mirror policy :download:`envoy.yaml <_include/route-mirror/envoy.yaml>`
 
 
 .. warning::

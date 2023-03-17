@@ -223,11 +223,13 @@ envoy_cc_test(
     name = "cluster_filter_integration_test",
     srcs = ["cluster_filter_integration_test.cc"],
     deps = [
+        ":http_integration_lib",
         ":integration_lib",
         "//envoy/network:filter_interface",
         "//source/extensions/filters/network/tcp_proxy:config",
         "//test/config:utility_lib",
         "//test/test_common:registry_lib",
+        "//test/test_common:test_runtime_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
     ],
 )

@@ -67,6 +67,9 @@ public:
     return std::min<int64_t>(remaining_streams_, remaining_concurrent_streams);
   }
 
+  // Initialize upstream read filters. Called when connected.
+  virtual void initializeReadFilters() PURE;
+
   // Closes the underlying connection.
   virtual void close() PURE;
   // Returns the ID of the underlying connection.

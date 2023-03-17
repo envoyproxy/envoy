@@ -58,6 +58,7 @@ EngineBuilder& EngineBuilder::setOnEngineRunning(std::function<void()> closure) 
   return *this;
 }
 
+#ifdef ENVOY_MOBILE_STATS_REPORTING
 EngineBuilder& EngineBuilder::addStatsSinks(std::vector<std::string> stats_sinks) {
   stats_sinks_ = std::move(stats_sinks);
   return *this;
@@ -67,6 +68,12 @@ EngineBuilder& EngineBuilder::addGrpcStatsDomain(std::string stats_domain) {
   stats_domain_ = std::move(stats_domain);
   return *this;
 }
+
+EngineBuilder& EngineBuilder::addStatsFlushSeconds(int stats_flush_seconds) {
+  stats_flush_seconds_ = stats_flush_seconds;
+  return *this;
+}
+#endif
 
 EngineBuilder& EngineBuilder::addConnectTimeoutSeconds(int connect_timeout_seconds) {
   connect_timeout_seconds_ = connect_timeout_seconds;
@@ -119,11 +126,6 @@ EngineBuilder& EngineBuilder::addH2ConnectionKeepaliveIdleIntervalMilliseconds(
 EngineBuilder&
 EngineBuilder::addH2ConnectionKeepaliveTimeoutSeconds(int h2_connection_keepalive_timeout_seconds) {
   h2_connection_keepalive_timeout_seconds_ = h2_connection_keepalive_timeout_seconds;
-  return *this;
-}
-
-EngineBuilder& EngineBuilder::addStatsFlushSeconds(int stats_flush_seconds) {
-  stats_flush_seconds_ = stats_flush_seconds;
   return *this;
 }
 
@@ -1013,6 +1015,13 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
 #else
     throw std::runtime_error("Admin functionality was not compiled in this build of Envoy Mobile");
 #endif
+  } else {
+    // Default Envoy mobile to the lightweight API listener. This is not
+    // supported if the admin interface is enabled.
+    envoy::config::listener::v3::ApiListenerManager api;
+    auto* listener_manager = bootstrap->mutable_listener_manager();
+    listener_manager->mutable_typed_config()->PackFrom(api);
+    listener_manager->set_name("envoy.listener_manager_impl.api");
   }
 
   return bootstrap;

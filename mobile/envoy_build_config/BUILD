@@ -1,4 +1,4 @@
-load("@envoy//bazel:envoy_build_system.bzl", "envoy_cc_library", "envoy_package", "envoy_select_enable_http3", "envoy_select_envoy_mobile_listener", "envoy_select_envoy_mobile_request_compression")
+load("@envoy//bazel:envoy_build_system.bzl", "envoy_cc_library", "envoy_package", "envoy_select_enable_http3", "envoy_select_envoy_mobile_listener", "envoy_select_envoy_mobile_request_compression", "envoy_select_envoy_mobile_stats_reporting")
 
 licenses(["notice"])  # Apache 2
 
@@ -18,7 +18,6 @@ envoy_cc_library(
         "@envoy//source/common/router:upstream_codec_filter_lib",
         "@envoy//source/common/watchdog:abort_action_config",
         "@envoy//source/extensions/clusters/dynamic_forward_proxy:cluster",
-        "@envoy//source/extensions/clusters/logical_dns:logical_dns_cluster_lib",
         "@envoy//source/extensions/clusters/static:static_cluster_lib",
         "@envoy//source/extensions/compression/brotli/decompressor:config",
         "@envoy//source/extensions/compression/gzip/decompressor:config",
@@ -34,8 +33,6 @@ envoy_cc_library(
         "@envoy//source/extensions/path/rewrite/uri_template:config",
         "@envoy//source/extensions/request_id/uuid:config",
         "@envoy//source/extensions/udp_packet_writer/default:config",
-        "@envoy//source/extensions/stat_sinks/metrics_service:config",
-        "@envoy//source/extensions/stat_sinks/statsd:config",
         "@envoy//source/extensions/transport_sockets/http_11_proxy:upstream_config",
         "@envoy//source/extensions/transport_sockets/raw_buffer:config",
         "@envoy//source/extensions/transport_sockets/tls/cert_validator:cert_validator_lib",
@@ -54,6 +51,13 @@ envoy_cc_library(
     ] + envoy_select_enable_http3(
         [
             "@envoy//source/common/quic:quic_transport_socket_factory_lib",
+        ],
+        "@envoy",
+    ) + envoy_select_envoy_mobile_stats_reporting(
+        [
+            "@envoy//source/extensions/stat_sinks/metrics_service:config",
+            "@envoy//source/extensions/stat_sinks/statsd:config",
+            "@envoy//source/extensions/clusters/logical_dns:logical_dns_cluster_lib",
         ],
         "@envoy",
     ) + envoy_select_envoy_mobile_request_compression(
