@@ -9,55 +9,32 @@
 namespace Envoy {
 namespace {
 
-envoy::config::bootstrap::v3::LayeredRuntime layeredRuntimeConfig(const std::string& api_type) {
-  const std::string yaml = fmt::format(R"EOF(
-    layers:
-    - name: some_static_layer
-      static_layer:
-        envoy.reloadable_features.test_feature_false: True
-    - name: some_rtds_layer
-      rtds_layer:
-        name: some_rtds_layer
-        rtds_config:
-          initial_fetch_timeout:
-            seconds: 1
-          resource_api_version: V3
-          api_config_source:
-            api_type: {}
-            transport_api_version: V3
-            grpc_services:
-              envoy_grpc:
-                cluster_name: {}
-            set_node_on_first_message_only: true
-  )EOF",
-                                       api_type, XDS_CLUSTER);
-
-  envoy::config::bootstrap::v3::LayeredRuntime config;
-  TestUtility::loadFromYaml(yaml, config);
-  return config;
-}
-
 class RtdsIntegrationTest : public XdsIntegrationTest {
 public:
-  RtdsIntegrationTest() {
-    config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
-      // Add the layered runtime config, which includes the RTDS layer.
-      const std::string api_type = sotw_or_delta_ == Grpc::SotwOrDelta::Sotw ||
-                                           sotw_or_delta_ == Grpc::SotwOrDelta::UnifiedSotw
-                                       ? "GRPC"
-                                       : "DELTA_GRPC";
-      bootstrap.mutable_layered_runtime()->MergeFrom(layeredRuntimeConfig(api_type));
-    });
-  }
-
   void initialize() override {
     XdsIntegrationTest::initialize();
+
+    default_request_headers_.setScheme("http");
     initializeXdsStream();
   }
+  void createEnvoy() override {
+    builder_.setAggregatedDiscoveryService(Network::Test::getLoopbackAddressUrlString(ipVersion()),
+                                           fake_upstreams_[1]->localAddress()->ip()->port());
+    // Add the layered runtime config, which includes the RTDS layer.
+    builder_.addRtdsLayer("some_rtds_layer", 1);
+    XdsIntegrationTest::createEnvoy();
+  }
+
+  // using http1 because the h1 cluster has a plaintext socket
+  void SetUp() override { setUpstreamProtocol(Http::CodecType::HTTP1); }
 };
 
-INSTANTIATE_TEST_SUITE_P(IpVersionsClientTypeDelta, RtdsIntegrationTest,
-                         DELTA_SOTW_GRPC_CLIENT_INTEGRATION_PARAMS);
+INSTANTIATE_TEST_SUITE_P(
+    IpVersionsClientTypeDelta, RtdsIntegrationTest,
+    testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                     testing::ValuesIn(TestEnvironment::getsGrpcVersionsForTest()),
+                     // Envoy Mobile's xDS APIs only support state-of-the-world, not delta.
+                     testing::Values(Grpc::SotwOrDelta::Sotw, Grpc::SotwOrDelta::UnifiedSotw)));
 
 TEST_P(RtdsIntegrationTest, RtdsReload) {
   initialize();
@@ -72,10 +49,11 @@ TEST_P(RtdsIntegrationTest, RtdsReload) {
   EXPECT_EQ(cc_.on_complete_calls, 1);
   EXPECT_EQ(cc_.on_cancel_calls, 0);
   EXPECT_EQ(cc_.on_error_calls, 0);
-  EXPECT_EQ(cc_.on_header_consumed_bytes_from_response, 13);
-  EXPECT_EQ(cc_.on_complete_received_byte_count, 41);
+  EXPECT_EQ(cc_.on_header_consumed_bytes_from_response, 27);
+  EXPECT_EQ(cc_.on_complete_received_byte_count, 67);
   // Check that the Runtime config is from the static layer.
-  EXPECT_TRUE(Runtime::runtimeFeatureEnabled("envoy.reloadable_features.test_feature_false"));
+  EXPECT_FALSE(Runtime::runtimeFeatureEnabled(
+      "envoy.reloadable_features.skip_dns_lookup_for_proxied_requests"));
 
   const std::string load_success_counter = "runtime.load_success";
   uint64_t load_success_value = getCounterValue(load_success_counter);
@@ -85,8 +63,7 @@ TEST_P(RtdsIntegrationTest, RtdsReload) {
   auto some_rtds_layer = TestUtility::parseYaml<envoy::service::runtime::v3::Runtime>(R"EOF(
     name: some_rtds_layer
     layer:
-      envoy.reloadable_features.test_feature_false: False
-      envoy.reloadable_features.test_feature_true: False
+      envoy.reloadable_features.skip_dns_lookup_for_proxied_requests: True
   )EOF");
   sendDiscoveryResponse<envoy::service::runtime::v3::Runtime>(
       Config::TypeUrl::get().Runtime, {some_rtds_layer}, {some_rtds_layer}, {}, "1");
@@ -94,8 +71,8 @@ TEST_P(RtdsIntegrationTest, RtdsReload) {
   ASSERT_TRUE(waitForCounterGe(load_success_counter, load_success_value + 1));
 
   // Verify that the Runtime config values are from the RTDS response.
-  EXPECT_FALSE(Runtime::runtimeFeatureEnabled("envoy.reloadable_features.test_feature_false"));
-  EXPECT_FALSE(Runtime::runtimeFeatureEnabled("envoy.reloadable_features.test_feature_true"));
+  EXPECT_TRUE(Runtime::runtimeFeatureEnabled(
+      "envoy.reloadable_features.skip_dns_lookup_for_proxied_requests"));
 }
 
 } // namespace

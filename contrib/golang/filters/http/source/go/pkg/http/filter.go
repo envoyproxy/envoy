@@ -38,9 +38,52 @@ import (
 	"github.com/envoyproxy/envoy/contrib/golang/filters/http/source/go/pkg/api"
 )
 
+const (
+	HTTP10 = "HTTP/1.0"
+	HTTP11 = "HTTP/1.1"
+	HTTP20 = "HTTP/2.0"
+	HTTP30 = "HTTP/3.0"
+)
+
+var protocolsIdToName = map[uint64]string{
+	0: HTTP10,
+	1: HTTP11,
+	2: HTTP20,
+	3: HTTP30,
+}
+
 type httpRequest struct {
 	req        *C.httpRequest
 	httpFilter api.StreamFilter
+	paniced    bool
+}
+
+func (r *httpRequest) safeReplyPanic() {
+	defer r.RecoverPanic()
+	r.SendLocalReply(500, "error happened in Golang filter\r\n", map[string]string{}, 0, "")
+}
+
+func (r *httpRequest) RecoverPanic() {
+	if e := recover(); e != nil {
+		// TODO: print an error message to Envoy error log.
+		switch e {
+		case errRequestFinished, errFilterDestroyed:
+			// do nothing
+
+		case errNotInGo:
+			// We can not send local reply now, since not in go now,
+			// will delay to the next time entering Go.
+			r.paniced = true
+
+		default:
+			// The following safeReplyPanic should only may get errRequestFinished,
+			// errFilterDestroyed or errNotInGo, won't hit this branch, so, won't dead loop here.
+
+			// errInvalidPhase, or other panic, not from not-ok C return status.
+			// It's safe to try send a local reply with 500 status.
+			r.safeReplyPanic()
+		}
+	}
 }
 
 func (r *httpRequest) Continue(status api.StatusType) {
@@ -70,5 +113,37 @@ type streamInfo struct {
 }
 
 func (s *streamInfo) GetRouteName() string {
-	return cAPI.HttpGetRouteName(unsafe.Pointer(s.request.req))
+	name, _ := cAPI.HttpGetStringValue(unsafe.Pointer(s.request.req), ValueRouteName)
+	return name
+}
+
+func (s *streamInfo) FilterChainName() string {
+	name, _ := cAPI.HttpGetStringValue(unsafe.Pointer(s.request.req), ValueFilterChainName)
+	return name
+}
+
+func (s *streamInfo) Protocol() (string, bool) {
+	if protocol, ok := cAPI.HttpGetIntegerValue(unsafe.Pointer(s.request.req), ValueProtocol); ok {
+		if name, ok := protocolsIdToName[protocol]; ok {
+			return name, true
+		}
+		panic(fmt.Sprintf("invalid protocol id: %d", protocol))
+	}
+	return "", false
+}
+
+func (s *streamInfo) ResponseCode() (uint32, bool) {
+	if code, ok := cAPI.HttpGetIntegerValue(unsafe.Pointer(s.request.req), ValueResponseCode); ok {
+		return uint32(code), true
+	}
+	return 0, false
+}
+
+func (s *streamInfo) ResponseCodeDetails() (string, bool) {
+	return cAPI.HttpGetStringValue(unsafe.Pointer(s.request.req), ValueResponseCodeDetails)
+}
+
+func (s *streamInfo) AttemptCount() uint32 {
+	count, _ := cAPI.HttpGetIntegerValue(unsafe.Pointer(s.request.req), ValueAttemptCount)
+	return uint32(count)
 }

@@ -1,4 +1,3 @@
-/changelogs/*.yaml merge=union
 /generated_api_shadow/envoy/** linguist-generated=true
 /generated_api_shadow/bazel/** linguist-generated=true
 *.svg binary

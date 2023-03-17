@@ -5,6 +5,7 @@
 #include <memory>
 #include <string>
 
+#include "envoy/common/regex.h"
 #include "envoy/config/core/v3/http_uri.pb.h"
 #include "envoy/config/core/v3/protocol.pb.h"
 #include "envoy/config/route/v3/route_components.pb.h"
@@ -102,7 +103,7 @@ initializeAndValidateOptions(const envoy::config::core::v3::Http2ProtocolOptions
 envoy::config::core::v3::Http2ProtocolOptions
 initializeAndValidateOptions(const envoy::config::core::v3::Http2ProtocolOptions& options,
                              bool hcm_stream_error_set,
-                             const Protobuf::BoolValue& hcm_stream_error);
+                             const ProtobufWkt::BoolValue& hcm_stream_error);
 } // namespace Utility
 } // namespace Http2
 namespace Http3 {
@@ -119,7 +120,7 @@ struct OptionsLimits {
 envoy::config::core::v3::Http3ProtocolOptions
 initializeAndValidateOptions(const envoy::config::core::v3::Http3ProtocolOptions& options,
                              bool hcm_stream_error_set,
-                             const Protobuf::BoolValue& hcm_stream_error);
+                             const ProtobufWkt::BoolValue& hcm_stream_error);
 
 } // namespace Utility
 } // namespace Http3
@@ -168,7 +169,43 @@ public:
    * @param encoded supplies string to be decoded.
    * @return std::string decoded string https://tools.ietf.org/html/rfc3986#section-2.1.
    */
-  static std::string decode(absl::string_view value);
+  static std::string decode(absl::string_view encoded);
+
+  /**
+   * Encodes string view for storing it as a query parameter according to the
+   * x-www-form-urlencoded spec:
+   * https://www.w3.org/TR/html5/forms.html#application/x-www-form-urlencoded-encoding-algorithm
+   * @param value supplies string to be encoded.
+   * @return std::string encoded string according to
+   * https://www.w3.org/TR/html5/forms.html#application/x-www-form-urlencoded-encoding-algorithm
+   *
+   * Summary:
+   * The x-www-form-urlencoded spec mandates that all ASCII codepoints are %-encoded except the
+   * following: ALPHA | DIGIT | * | - | . | _
+   *
+   * NOTE: the space character is encoded as %20, NOT as the + character
+   */
+  static std::string urlEncodeQueryParameter(absl::string_view value);
+
+  /**
+   * Decodes string view that represents URL in x-www-form-urlencoded query parameter.
+   * @param encoded supplies string to be decoded.
+   * @return std::string decoded string compliant with https://datatracker.ietf.org/doc/html/rfc3986
+   *
+   * This function decodes a query parameter assuming it is a URL. It only decodes characters
+   * permitted in the URL - the unreserved and reserved character sets.
+   * unreserved-set := ALPHA | DIGIT | - | . | _ | ~
+   * reserved-set := sub-delims | gen-delims
+   * sub-delims := ! | $ | & | ` | ( | ) | * | + | , | ; | =
+   * gen-delims := : | / | ? | # | [ | ] | @
+   *
+   * The following characters are not decoded:
+   * ASCII controls <= 0x1F, space, DEL (0x7F), extended ASCII > 0x7F
+   * As well as the following characters without defined meaning in URL
+   * " | < | > | \ | ^ | { | }
+   * and the "pipe" `|` character
+   */
+  static std::string urlDecodeQueryParameter(absl::string_view encoded);
 
 private:
   // Encodes string view to its percent encoded representation, with start index.
@@ -631,6 +668,29 @@ bool isSafeRequest(const Http::RequestHeaderMap& request_headers);
  * Return the GatewayTimeout HTTP code to indicate the request is full received.
  */
 Http::Code maybeRequestTimeoutCode(bool remote_decode_complete);
+
+/**
+ * Container for route config elements that pertain to a redirect.
+ */
+struct RedirectConfig {
+  const std::string scheme_redirect_;
+  const std::string host_redirect_;
+  const std::string port_redirect_;
+  const std::string path_redirect_;
+  const std::string prefix_rewrite_redirect_;
+  const std::string regex_rewrite_redirect_substitution_;
+  Regex::CompiledMatcherPtr regex_rewrite_redirect_;
+  // Keep small members (bools and enums) at the end of class, to reduce alignment overhead.
+  const bool path_redirect_has_query_;
+  const bool https_redirect_;
+  const bool strip_query_;
+};
+
+/*
+ * Compute new path based on RedirectConfig.
+ */
+std::string newUri(::Envoy::OptRef<const RedirectConfig> redirect_config,
+                   const Http::RequestHeaderMap& headers);
 
 } // namespace Utility
 } // namespace Http

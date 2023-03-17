@@ -112,7 +112,7 @@ public:
                                                   bool) const override {
     return {};
   }
-  std::string newPath(const Http::RequestHeaderMap& headers) const override;
+  std::string newUri(const Http::RequestHeaderMap& headers) const override;
   void rewritePathHeader(Http::RequestHeaderMap&, bool) const override {}
   Http::Code responseCode() const override { return Http::Code::MovedPermanently; }
   const std::string& responseBody() const override { return EMPTY_STRING; }
@@ -320,6 +320,11 @@ private:
         : VirtualClusterBase(absl::nullopt, stat_names.other_,
                              scope.scopeFromStatName(stat_names.other_), stat_names) {}
   };
+
+  RouteConstSharedPtr
+  getRouteFromRoutes(const RouteCallback& cb, const Http::RequestHeaderMap& headers,
+                     const StreamInfo::StreamInfo& stream_info, uint64_t random_value,
+                     absl::Span<const RouteEntryImplBaseConstSharedPtr> routes) const;
 
   static const std::shared_ptr<const SslRedirectRoute> SSL_REDIRECT_ROUTE;
 
@@ -605,27 +610,6 @@ private:
 };
 
 /**
- * Container for route config elements that pertain to a redirect.
- *
- * We keep them in a separate data structure to avoid memory overhead for the routes that do not use
- * redirect.
- */
-struct RedirectConfig {
-  RedirectConfig(const envoy::config::route::v3::Route& route);
-  const std::string scheme_redirect_;
-  const std::string host_redirect_;
-  const std::string port_redirect_;
-  const std::string path_redirect_;
-  const std::string prefix_rewrite_redirect_;
-  std::string regex_rewrite_redirect_substitution_;
-  Regex::CompiledMatcherPtr regex_rewrite_redirect_;
-  // Keep small members (bools and enums) at the end of class, to reduce alignment overhead.
-  const bool path_redirect_has_query_;
-  const bool https_redirect_;
-  const bool strip_query_;
-};
-
-/**
  * Base implementation for all route entries.q
  */
 class RouteEntryImplBase : public RouteEntryAndRoute,
@@ -800,10 +784,7 @@ public:
   const EarlyDataPolicy& earlyDataPolicy() const override { return *early_data_policy_; }
 
   // Router::DirectResponseEntry
-  std::string newPath(const Http::RequestHeaderMap& headers) const override;
-  absl::string_view processRequestHost(const Http::RequestHeaderMap& headers,
-                                       absl::string_view new_scheme,
-                                       absl::string_view new_port) const;
+  std::string newUri(const Http::RequestHeaderMap& headers) const override;
   void rewritePathHeader(Http::RequestHeaderMap&, bool) const override {}
   Http::Code responseCode() const override { return direct_response_code_.value(); }
   const std::string& responseBody() const override { return direct_response_body_; }
@@ -1179,7 +1160,7 @@ private:
   std::unique_ptr<const OptionalTimeouts> optional_timeouts_;
   Runtime::Loader& loader_;
   std::unique_ptr<const RuntimeData> runtime_;
-  std::unique_ptr<const RedirectConfig> redirect_config_;
+  std::unique_ptr<const ::Envoy::Http::Utility::RedirectConfig> redirect_config_;
   std::unique_ptr<const HedgePolicyImpl> hedge_policy_;
   std::unique_ptr<const RetryPolicyImpl> retry_policy_;
   std::unique_ptr<const InternalRedirectPolicyImpl> internal_redirect_policy_;

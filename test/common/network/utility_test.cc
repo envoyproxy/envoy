@@ -318,6 +318,9 @@ TEST_P(NetworkUtilityGetLocalAddress, GetLocalAddress) {
   auto local_address = Utility::getLocalAddress(ip_version);
   EXPECT_NE(nullptr, local_address);
   EXPECT_EQ(ip_version, local_address->ip()->version());
+  if (ip_version == Address::IpVersion::v6) {
+    EXPECT_EQ(0u, local_address->ip()->ipv6()->scopeId());
+  }
 }
 
 TEST(NetworkUtility, GetOriginalDst) {

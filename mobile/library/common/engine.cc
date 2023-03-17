@@ -4,9 +4,7 @@
 #include "source/common/common/lock_guard.h"
 
 #include "library/common/bridge/utility.h"
-#include "library/common/config/internal.h"
 #include "library/common/data/utility.h"
-#include "library/common/network/android.h"
 #include "library/common/stats/utility.h"
 
 namespace Envoy {
@@ -30,7 +28,7 @@ envoy_status_t Engine::run(const std::string config, const std::string log_level
   // that of the temporary. The temporary object's state becomes the default state, which does
   // nothing.
   auto options = std::make_unique<Envoy::OptionsImpl>();
-  options->setConfigYaml(absl::StrCat(config_header, config));
+  options->setConfigYaml(config);
   if (!log_level.empty()) {
     options->setLogLevel(options->parseAndValidateLogLevel(log_level.c_str()));
   }
@@ -102,9 +100,6 @@ envoy_status_t Engine::main(std::unique_ptr<Envoy::OptionsImpl>&& options) {
 
           connectivity_manager_ =
               Network::ConnectivityManagerFactory{server_->serverFactoryContext()}.get();
-          if (Api::OsSysCallsSingleton::get().supportsGetifaddrs()) {
-            Envoy::Network::Android::Utility::setAlternateGetifaddrs();
-          }
           auto v4_interfaces = connectivity_manager_->enumerateV4Interfaces();
           auto v6_interfaces = connectivity_manager_->enumerateV6Interfaces();
           logInterfaces("netconf_get_v4_interfaces", v4_interfaces);

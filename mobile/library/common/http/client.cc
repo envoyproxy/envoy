@@ -673,45 +673,21 @@ void Client::removeStream(envoy_stream_t stream_handle) {
 namespace {
 
 const LowerCaseString ClusterHeader{"x-envoy-mobile-cluster"};
-const LowerCaseString ProtocolHeader{"x-envoy-mobile-upstream-protocol"};
 
 const char* BaseCluster = "base";
-const char* H2Cluster = "base_h2";
-const char* H3Cluster = "base_h3";
 const char* ClearTextCluster = "base_clear";
 
 } // namespace
 
 void Client::setDestinationCluster(Http::RequestHeaderMap& headers) {
   // Determine upstream cluster:
-  // - Use TLS with ALPN by default.
-  // - Use http/2 or ALPN if requested explicitly via x-envoy-mobile-upstream-protocol.
   // - Force http/1.1 if request scheme is http (cleartext).
+  // - Base cluster (best available protocol) for all secure traffic.
   const char* cluster{};
-  auto protocol_header = headers.get(ProtocolHeader);
   if (headers.getSchemeValue() == Headers::get().SchemeValues.Http) {
     cluster = ClearTextCluster;
-  } else if (!protocol_header.empty()) {
-    ASSERT(protocol_header.size() == 1);
-    const auto value = protocol_header[0]->value().getStringView();
-    // NOTE: This cluster *forces* H2-Raw and does not use ALPN.
-    if (value == "http2") {
-      cluster = H2Cluster;
-      // NOTE: This cluster will attempt to negotiate H3, but defaults to ALPN over TCP.
-    } else if (value == "http3") {
-      cluster = H3Cluster;
-      // FIXME(goaway): No cluster actually forces H1 today except cleartext!
-    } else if (value == "alpn" || value == "http1") {
-      cluster = BaseCluster;
-    } else {
-      PANIC(fmt::format("using unsupported protocol version {}", value));
-    }
   } else {
     cluster = BaseCluster;
-  }
-
-  if (!protocol_header.empty()) {
-    headers.remove(ProtocolHeader);
   }
 
   headers.addCopy(ClusterHeader, std::string{cluster});

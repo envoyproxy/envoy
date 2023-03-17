@@ -51,6 +51,7 @@ ZooKeeperFilterConfig::ZooKeeperFilterConfig(const std::string& stat_prefix,
   initOpCode(OpCodes::Multi, stats_.multi_resp_, "multi_resp");
   initOpCode(OpCodes::Reconfig, stats_.reconfig_resp_, "reconfig_resp");
   initOpCode(OpCodes::SetWatches, stats_.setwatches_resp_, "setwatches_resp");
+  initOpCode(OpCodes::SetWatches2, stats_.setwatches2_resp_, "setwatches2_resp");
   initOpCode(OpCodes::CheckWatches, stats_.checkwatches_resp_, "checkwatches_resp");
   initOpCode(OpCodes::RemoveWatches, stats_.removewatches_resp_, "removewatches_resp");
   initOpCode(OpCodes::GetEphemerals, stats_.getephemerals_resp_, "getephemerals_resp");
@@ -76,14 +77,12 @@ void ZooKeeperFilter::initializeReadFilterCallbacks(Network::ReadFilterCallbacks
 
 Network::FilterStatus ZooKeeperFilter::onData(Buffer::Instance& data, bool) {
   clearDynamicMetadata();
-  decoder_->onData(data);
-  return Network::FilterStatus::Continue;
+  return decoder_->onData(data);
 }
 
 Network::FilterStatus ZooKeeperFilter::onWrite(Buffer::Instance& data, bool) {
   clearDynamicMetadata();
-  decoder_->onWrite(data);
-  return Network::FilterStatus::Continue;
+  return decoder_->onWrite(data);
 }
 
 Network::FilterStatus ZooKeeperFilter::onNewConnection() { return Network::FilterStatus::Continue; }
@@ -267,6 +266,11 @@ void ZooKeeperFilter::onReconfigRequest() {
 void ZooKeeperFilter::onSetWatchesRequest() {
   config_->stats_.setwatches_rq_.inc();
   setDynamicMetadata("opname", "setwatches");
+}
+
+void ZooKeeperFilter::onSetWatches2Request() {
+  config_->stats_.setwatches2_rq_.inc();
+  setDynamicMetadata("opname", "setwatches2");
 }
 
 void ZooKeeperFilter::onGetEphemeralsRequest(const std::string& path) {

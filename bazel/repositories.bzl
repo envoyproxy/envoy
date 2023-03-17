@@ -69,6 +69,21 @@ def _envoy_repo_impl(repository_ctx):
     within the constraints of a `genquery`, or that otherwise need access to the repository
     files.
 
+    Project and repo data can be accessed in JSON format using `@envoy_repo//:project`, eg:
+
+    ```starlark
+    load("@aspect_bazel_lib//lib:jq.bzl", "jq")
+
+    jq(
+        name = "project_version",
+        srcs = ["@envoy_repo//:data"],
+        out = "version.txt",
+        args = ["-r"],
+        filter = ".version",
+    )
+
+    ```
+
     """
     repo_version_path = repository_ctx.path(repository_ctx.attr.envoy_version)
     api_version_path = repository_ctx.path(repository_ctx.attr.envoy_api_version)
@@ -78,12 +93,78 @@ def _envoy_repo_impl(repository_ctx):
     repository_ctx.file("path.bzl", "PATH = '%s'" % repo_version_path.dirname)
     repository_ctx.file("__init__.py", "PATH = '%s'\nVERSION = '%s'\nAPI_VERSION = '%s'" % (repo_version_path.dirname, version, api_version))
     repository_ctx.file("WORKSPACE", "")
-    repository_ctx.file("BUILD", """
+    repository_ctx.file("BUILD", '''
 load("@rules_python//python:defs.bzl", "py_library")
+load("@envoy//tools/base:envoy_python.bzl", "envoy_entry_point")
+load("//:path.bzl", "PATH")
 
-py_library(name = "envoy_repo", srcs = ["__init__.py"], visibility = ["//visibility:public"])
+py_library(
+    name = "envoy_repo",
+    srcs = ["__init__.py"],
+    visibility = ["//visibility:public"],
+)
 
-""")
+envoy_entry_point(
+    name = "get_project_json",
+    pkg = "envoy.base.utils",
+    script = "envoy.project_data",
+)
+
+genrule(
+    name = "project",
+    outs = ["project.json"],
+    cmd = """
+    $(location :get_project_json) . > $@
+    """,
+    tools = [
+        ":get_project_json",
+        "@envoy//:VERSION.txt",
+        "@envoy//changelogs",
+    ],
+    visibility = ["//visibility:public"],
+)
+
+envoy_entry_point(
+    name = "release",
+    args = [
+        "release",
+        PATH,
+    ],
+    pkg = "envoy.base.utils",
+    script = "envoy.project",
+)
+
+envoy_entry_point(
+    name = "dev",
+    args = [
+        "dev",
+        PATH,
+    ],
+    pkg = "envoy.base.utils",
+    script = "envoy.project",
+)
+
+envoy_entry_point(
+    name = "sync",
+    args = [
+        "sync",
+        PATH,
+    ],
+    pkg = "envoy.base.utils",
+    script = "envoy.project",
+)
+
+envoy_entry_point(
+    name = "publish",
+    args = [
+        "publish",
+        PATH,
+    ],
+    pkg = "envoy.base.utils",
+    script = "envoy.project",
+)
+
+''')
 
 _envoy_repo = repository_rule(
     implementation = _envoy_repo_impl,
@@ -182,7 +263,6 @@ def envoy_dependencies(skip_targets = []):
     _com_github_jbeder_yaml_cpp()
     _com_github_libevent_libevent()
     _com_github_luajit_luajit()
-    _com_github_moonjit_moonjit()
     _com_github_nghttp2_nghttp2()
     _com_github_skyapm_cpp2sky()
     _com_github_nodejs_http_parser()
@@ -265,7 +345,10 @@ def _boringssl():
     external_http_archive(
         name = "boringssl",
         patch_args = ["-p1"],
-        patches = ["@envoy//bazel:boringssl_static.patch"],
+        patches = [
+            "@envoy//bazel:boringssl_static.patch",
+            "@envoy//bazel:boringssl_CVE-2023-0286.patch",
+        ],
     )
 
 def _boringssl_fips():
@@ -514,7 +597,11 @@ def _com_github_facebook_zstd():
     )
 
 def _com_google_cel_cpp():
-    external_http_archive("com_google_cel_cpp")
+    external_http_archive(
+        "com_google_cel_cpp",
+        patches = ["@envoy//bazel:cel-cpp.patch"],
+        patch_args = ["-p1"],
+    )
 
 def _com_github_google_perfetto():
     external_http_archive(
@@ -925,6 +1012,10 @@ def _com_github_google_quiche():
         name = "quiche_spdy_hpack",
         actual = "@com_github_google_quiche//:spdy_core_hpack_hpack_lib",
     )
+    native.bind(
+        name = "quiche_http2_hpack_decoder",
+        actual = "@com_github_google_quiche//:http2_hpack_decoder_hpack_decoder_lib",
+    )
 
 def _com_googlesource_googleurl():
     external_http_archive(
@@ -1074,20 +1165,6 @@ def _com_github_luajit_luajit():
     native.bind(
         name = "luajit",
         actual = "@envoy//bazel/foreign_cc:luajit",
-    )
-
-def _com_github_moonjit_moonjit():
-    external_http_archive(
-        name = "com_github_moonjit_moonjit",
-        build_file_content = BUILD_ALL_CONTENT,
-        patches = ["@envoy//bazel/foreign_cc:moonjit.patch"],
-        patch_args = ["-p1"],
-        patch_cmds = ["chmod u+x build.py"],
-    )
-
-    native.bind(
-        name = "moonjit",
-        actual = "@envoy//bazel/foreign_cc:moonjit",
     )
 
 def _com_github_google_tcmalloc():

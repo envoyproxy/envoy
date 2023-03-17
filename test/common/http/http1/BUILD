@@ -72,9 +72,9 @@ envoy_cc_test(
 )
 
 envoy_cc_fuzz_test(
-    name = "http1_codec_impl_fuzz_test",
-    srcs = ["http1_codec_impl_fuzz_test.cc"],
-    corpus = "http1_codec_impl_corpus",
+    name = "http1_connection_fuzz_test",
+    srcs = ["http1_connection_fuzz_test.cc"],
+    corpus = "http1_connection_corpus",
     deps = [
         "//source/common/http:conn_manager_lib",
         "//source/common/http:header_map_lib",

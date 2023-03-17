@@ -38,14 +38,6 @@ final class GRPCRequestHeadersBuilderTests: XCTestCase {
     XCTAssertEqual(["application/grpc"], headers.value(forName: "content-type"))
   }
 
-  func testAddsH2UpstreamHeader() {
-    let headers = GRPCRequestHeadersBuilder(scheme: "https",
-                                            authority: "envoyproxy.io",
-                                            path: "/pb.api.v1.Foo/GetBar")
-      .build()
-    XCTAssertEqual(["http2"], headers.value(forName: "x-envoy-mobile-upstream-protocol"))
-  }
-
   func testUsesHTTPPOST() {
     let headers = GRPCRequestHeadersBuilder(scheme: "https",
                                             authority: "envoyproxy.io",

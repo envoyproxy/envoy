@@ -25,6 +25,9 @@ public:
   Http::FilterTrailersStatus decodeTrailers(Http::RequestTrailerMap&) override;
 
   void sendResponse();
+
+private:
+  Http::RequestHeaderMap* headers_{};
 };
 
 } // namespace TestRemoteResponse
