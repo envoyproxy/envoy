@@ -1,15 +1,15 @@
-version: "3.8"
 services:
 
   # jaeger
   front-envoy:
     build:
-      context: .
-      dockerfile: Dockerfile-frontenvoy
+      dockerfile: ../shared/envoy/Dockerfile
     depends_on:
       service1:
         condition: service_healthy
       service2:
+        condition: service_healthy
+      jaeger:
         condition: service_healthy
     ports:
     - "${PORT_PROXY:-10000}:8000"
@@ -18,9 +18,6 @@ services:
     build:
       context: ../shared/python
       target: aiohttp-tracing-service3
-    depends_on:
-      jaeger:
-        condition: service_started
     volumes:
     - ./service1-envoy-jaeger.yaml:/etc/service-envoy.yaml
     environment:
@@ -30,9 +27,6 @@ services:
     build:
       context: ../shared/python
       target: aiohttp-tracing-service3
-    depends_on:
-      jaeger:
-        condition: service_started
     volumes:
     - ./service2-envoy-jaeger.yaml:/etc/service-envoy.yaml
     environment:
@@ -40,8 +34,7 @@ services:
 
   jaeger:
     build:
-      context: .
-      dockerfile: Dockerfile-jaeger
+      dockerfile: ../shared/jaeger/Dockerfile
     environment:
     - COLLECTOR_ZIPKIN_HOST_PORT=9411
     ports:

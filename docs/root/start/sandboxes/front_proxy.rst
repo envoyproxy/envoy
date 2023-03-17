@@ -27,7 +27,7 @@ compose (see :download:`docker-compose.yaml <_include/front-proxy/docker-compose
 ``HTTP``, ``HTTPS`` calls to the services and requests to ``/admin`` respectively.
 
 Moreover, notice that all traffic routed by the front Envoy to the service containers is actually
-routed to the service Envoys (routes setup in :download:`front-envoy.yaml <_include/front-proxy/front-envoy.yaml>`).
+routed to the service Envoys (routes setup in :download:`envoy.yaml <_include/front-proxy/envoy.yaml>`).
 
 In turn the service Envoys route the request to the ``aiohttp`` app via the loopback
 address (routes setup in :download:`service-envoy.yaml <_include/front-proxy/service-envoy.yaml>`). This
@@ -269,7 +269,7 @@ In the example we can enter the ``front-envoy`` container to query admin:
       "use_dynamic_base_id": false,
       "base_id_path": "",
       "concurrency": 8,
-      "config_path": "/etc/front-envoy.yaml",
+      "config_path": "/etc/envoy.yaml",
       "config_yaml": "",
       "allow_unknown_static_fields": false,
       "reject_unknown_dynamic_fields": false,
