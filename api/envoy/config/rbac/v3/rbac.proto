@@ -145,7 +145,7 @@ message RBAC {
   // The policies are evaluated in lexicographic order of the policy name.
   map<string, Policy> policies = 2;
 
-  // Audit logging options that includes the condition for audit logging to happen
+  // Audit logging options that include the condition for audit logging to happen
   // and audit logger configurations.
   //
   // [#not-implemented-hide:]
