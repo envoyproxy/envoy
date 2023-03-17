@@ -629,14 +629,22 @@ void ConnectionManagerImpl::RdsRouteConfigUpdateRequester::requestRouteConfigUpd
   absl::optional<Router::ConfigConstSharedPtr> route_config = parent_.routeConfig();
   Event::Dispatcher& thread_local_dispatcher =
       parent_.connection_manager_.read_callbacks_->connection().dispatcher();
+
+  if (parent_.cached_route_blocked_) {
+    // If route is frozen, continue the filter chain directly and no on demand update will be
+    // requested.
+    (*route_config_updated_cb)(false);
+    return;
+  }
+
   if (route_config.has_value() && route_config.value()->usesVhds()) {
     ASSERT(!parent_.request_headers_->Host()->value().empty());
     const auto& host_header = absl::AsciiStrToLower(parent_.request_headers_->getHostValue());
     requestVhdsUpdate(host_header, thread_local_dispatcher, std::move(route_config_updated_cb));
     return;
-  } else if (auto scoped_config = parent_.scopedRouteConfig(); scoped_config.has_value()) {
+  } else if (parent_.snapped_scoped_routes_config_ != nullptr) {
     Router::ScopeKeyPtr scope_key =
-        scoped_config.value()->computeScopeKey(*parent_.request_headers_);
+        parent_.snapped_scoped_routes_config_->computeScopeKey(*parent_.request_headers_);
     // If scope_key is not null, the scope exists but RouteConfiguration is not initialized.
     if (scope_key != nullptr) {
       requestSrdsUpdate(std::move(scope_key), thread_local_dispatcher,
@@ -669,8 +677,7 @@ void ConnectionManagerImpl::RdsRouteConfigUpdateRequester::requestSrdsUpdate(
             if (auto cb = weak_route_config_updated_cb.lock()) {
               // Refresh the route before continue the filter chain.
               if (scope_exist) {
-                const auto route_config = parent_.getRouteConfig();
-                parent_.refreshCachedRoute(route_config.first);
+                parent_.refreshCachedRoute();
               }
               (*cb)(scope_exist && parent_.hasCachedRoute());
             }
@@ -1040,6 +1047,19 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapSharedPt
     return;
   }
 
+  // We need to snap snapped_route_config_ here as it's used in mutateRequestHeaders later.
+  if (connection_manager_.config_.isRoutable()) {
+    if (connection_manager_.config_.routeConfigProvider() != nullptr) {
+      snapped_route_config_ = connection_manager_.config_.routeConfigProvider()->configCast();
+    } else if (connection_manager_.config_.scopedRouteConfigProvider() != nullptr) {
+      snapped_scoped_routes_config_ =
+          connection_manager_.config_.scopedRouteConfigProvider()->config<Router::ScopedConfig>();
+      snapScopedRouteConfig();
+    }
+  } else {
+    snapped_route_config_ = connection_manager_.config_.routeConfigProvider()->configCast();
+  }
+
   // Drop new requests when overloaded as soon as we have decoded the headers.
   if (connection_manager_.random_generator_.bernoulli(
           connection_manager_.overload_stop_accepting_requests_ref_.value())) {
@@ -1155,13 +1175,11 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapSharedPt
         StreamInfo::FilterState::StateType::ReadOnly, StreamInfo::FilterState::LifeSpan::Request);
   }
 
-  auto route_config_pair = getRouteConfig();
-
   if (!state_.is_internally_created_) { // Only sanitize headers on first pass.
     // Modify the downstream remote address depending on configuration and headers.
     const auto mutate_result = ConnectionManagerUtility::mutateRequestHeaders(
         *request_headers_, connection_manager_.read_callbacks_->connection(),
-        connection_manager_.config_, *route_config_pair.first, connection_manager_.local_info_,
+        connection_manager_.config_, *snapped_route_config_, connection_manager_.local_info_,
         filter_manager_.streamInfo());
 
     // IP detection failed, reject the request.
@@ -1179,13 +1197,7 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapSharedPt
   ASSERT(filter_manager_.streamInfo().downstreamAddressProvider().remoteAddress() != nullptr);
 
   ASSERT(!cached_route_);
-
-  // The request headers may be modified by the early header mutations, so we need to re-select the
-  // route config if the route config provider is a scoped route config provider.
-  if (route_config_pair.second != nullptr) {
-    route_config_pair.first = getRouteConfigFromScopedRouteConfig(route_config_pair.second);
-  }
-  refreshCachedRoute(route_config_pair.first);
+  refreshCachedRoute();
 
   if (!state_.is_internally_created_) { // Only mutate tracing headers on first pass.
     filter_manager_.streamInfo().setTraceReason(
@@ -1331,41 +1343,19 @@ void ConnectionManagerImpl::startDrainSequence() {
   drain_timer_->enableTimer(config_.drainTimeout());
 }
 
-Router::ConfigConstSharedPtr
-ConnectionManagerImpl::ActiveStream::getRouteConfigFromScopedRouteConfig(
-    Router::ScopedConfigConstSharedPtr& scoped_route_config) {
+void ConnectionManagerImpl::ActiveStream::snapScopedRouteConfig() {
   // NOTE: if a RDS subscription hasn't got a RouteConfiguration back, a Router::NullConfigImpl is
   // returned, in that case we let it pass.
-  Router::ConfigConstSharedPtr route_config =
-      scoped_route_config->getRouteConfig(*request_headers_);
-  if (route_config == nullptr) {
+  snapped_route_config_ = snapped_scoped_routes_config_->getRouteConfig(*request_headers_);
+  if (snapped_route_config_ == nullptr) {
     ENVOY_STREAM_LOG(trace, "can't find SRDS scope.", *this);
     // TODO(stevenzzzz): Consider to pass an error message to router filter, so that it can
     // send back 404 with some more details.
-    route_config = std::make_shared<Router::NullConfigImpl>();
+    snapped_route_config_ = std::make_shared<Router::NullConfigImpl>();
   }
-  return route_config;
 }
 
-std::pair<Router::ConfigConstSharedPtr, Router::ScopedConfigConstSharedPtr>
-ConnectionManagerImpl::ActiveStream::getRouteConfig() {
-  if (connection_manager_.config_.isRoutable() &&
-      connection_manager_.config_.scopedRouteConfigProvider() != nullptr) {
-    auto scoped_route_config =
-        connection_manager_.config_.scopedRouteConfigProvider()->config<Router::ScopedConfig>();
-    ASSERT(scoped_route_config != nullptr);
-    auto route_config = getRouteConfigFromScopedRouteConfig(scoped_route_config);
-
-    return {std::move(route_config), std::move(scoped_route_config)};
-  }
-
-  return {connection_manager_.config_.routeConfigProvider()->configCast(), nullptr};
-}
-
-void ConnectionManagerImpl::ActiveStream::refreshCachedRoute(
-    const Router::ConfigConstSharedPtr& config) {
-  refreshCachedRoute(config, nullptr);
-}
+void ConnectionManagerImpl::ActiveStream::refreshCachedRoute() { refreshCachedRoute(nullptr); }
 
 void ConnectionManagerImpl::ActiveStream::refreshDurationTimeout() {
   if (!filter_manager_.streamInfo().route() ||
@@ -1455,13 +1445,25 @@ void ConnectionManagerImpl::ActiveStream::refreshDurationTimeout() {
   max_stream_duration_timer_->enableTimer(timeout);
 }
 
-void ConnectionManagerImpl::ActiveStream::refreshCachedRoute(
-    const Router::ConfigConstSharedPtr& config, const Router::RouteCallback& cb) {
-  Router::RouteConstSharedPtr route;
-  if (config != nullptr && request_headers_ != nullptr) {
-    route = config->route(cb, *request_headers_, filter_manager_.streamInfo(), stream_id_);
+void ConnectionManagerImpl::ActiveStream::refreshCachedRoute(const Router::RouteCallback& cb) {
+  if (cached_route_blocked_) {
+    return;
   }
-  setRoute(std::move(route));
+
+  Router::RouteConstSharedPtr route;
+  if (request_headers_ != nullptr) {
+    if (connection_manager_.config_.isRoutable() &&
+        connection_manager_.config_.scopedRouteConfigProvider() != nullptr) {
+      // NOTE: re-select scope as well in case the scope key header has been changed by a filter.
+      snapScopedRouteConfig();
+    }
+    if (snapped_route_config_ != nullptr) {
+      route = snapped_route_config_->route(cb, *request_headers_, filter_manager_.streamInfo(),
+                                           stream_id_);
+    }
+  }
+
+  setRoute(route);
 }
 
 void ConnectionManagerImpl::ActiveStream::refreshCachedTracingCustomTags() {
@@ -1496,18 +1498,6 @@ void ConnectionManagerImpl::ActiveStream::requestRouteConfigUpdate(
 absl::optional<Router::ConfigConstSharedPtr> ConnectionManagerImpl::ActiveStream::routeConfig() {
   if (connection_manager_.config_.routeConfigProvider() != nullptr) {
     return {connection_manager_.config_.routeConfigProvider()->configCast()};
-  }
-  return {};
-}
-
-absl::optional<Router::ScopedConfigConstSharedPtr>
-ConnectionManagerImpl::ActiveStream::scopedRouteConfig() {
-  if (connection_manager_.config_.isRoutable() &&
-      connection_manager_.config_.scopedRouteConfigProvider() != nullptr) {
-    auto config =
-        connection_manager_.config_.scopedRouteConfigProvider()->config<Router::ScopedConfig>();
-    ASSERT(config != nullptr);
-    return {std::move(config)};
   }
   return {};
 }
@@ -1791,8 +1781,7 @@ const ScopeTrackedObject& ConnectionManagerImpl::ActiveStream::scope() { return 
 Upstream::ClusterInfoConstSharedPtr ConnectionManagerImpl::ActiveStream::clusterInfo() {
   // NOTE: Refreshing route caches clusterInfo as well.
   if (!cached_route_.has_value()) {
-    const auto route_config = getRouteConfig();
-    refreshCachedRoute(route_config.first);
+    refreshCachedRoute();
   }
 
   return cached_cluster_info_.value();
@@ -1803,10 +1792,7 @@ ConnectionManagerImpl::ActiveStream::route(const Router::RouteCallback& cb) {
   if (cached_route_.has_value()) {
     return cached_route_.value();
   }
-
-  const auto route_config = getRouteConfig();
-  refreshCachedRoute(route_config.first, cb);
-
+  refreshCachedRoute(cb);
   return cached_route_.value();
 }
 
@@ -1869,6 +1855,10 @@ void ConnectionManagerImpl::ActiveStream::refreshAccessLogFlushTimer() {
 }
 
 void ConnectionManagerImpl::ActiveStream::clearRouteCache() {
+  if (cached_route_blocked_) {
+    return;
+  }
+
   if (hasCachedRoute()) {
     // The configuration of the route may be referenced by some filters.
     // Cache the route to avoid it's destroyed before the stream is destroyed.
@@ -1880,6 +1870,13 @@ void ConnectionManagerImpl::ActiveStream::clearRouteCache() {
   if (tracing_custom_tags_) {
     tracing_custom_tags_->clear();
   }
+}
+
+void ConnectionManagerImpl::ActiveStream::blockRouteCache() {
+  cached_route_blocked_ = true;
+  // Clear the snapped route configuration because it is unnecessary to keep it.
+  snapped_route_config_.reset();
+  snapped_scoped_routes_config_.reset();
 }
 
 void ConnectionManagerImpl::ActiveStream::onRequestDataTooLarge() {

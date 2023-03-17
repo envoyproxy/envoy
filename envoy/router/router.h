@@ -1272,7 +1272,10 @@ enum class RouteEvalStatus {
 using RouteCallback = std::function<RouteMatchStatus(RouteConstSharedPtr, RouteEvalStatus)>;
 
 /**
- * Shared part of the route configuration.
+ * Shared part of the route configuration. This class contains interfaces that needn't depend on
+ * router matcher. Then every virtualhost could keep a reference to the SharedConfig. When the
+ * entire route config is destroyed, the part of SharedConfig will still alive until all
+ * virtualhosts are destroyed.
  */
 class SharedConfig {
 public:

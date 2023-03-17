@@ -304,6 +304,14 @@ public:
   virtual void clearRouteCache() PURE;
 
   /**
+   * Block the route cache for the current request. After this call, the route cache will not be
+   * cleared or refreshed.
+   * This will be called automatically by the terminal HTTP filter because after that the route
+   * cache should never be cleared or refreshed.
+   */
+  virtual void blockRouteCache() PURE;
+
+  /**
    * Schedules a request for a RouteConfiguration update from the management server.
    * @param route_config_updated_cb callback to be called when the configuration update has been
    * propagated to the worker thread.

@@ -299,21 +299,19 @@ private:
     void setRoute(Router::RouteConstSharedPtr route) override;
     Router::RouteConstSharedPtr route(const Router::RouteCallback& cb) override;
     void clearRouteCache() override;
+    void blockRouteCache() override;
     void requestRouteConfigUpdate(
         Http::RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb) override;
 
+    absl::optional<Router::ConfigConstSharedPtr> routeConfig();
     void traceRequest();
 
-    absl::optional<Router::ConfigConstSharedPtr> routeConfig();
-    absl::optional<Router::ScopedConfigConstSharedPtr> scopedRouteConfig();
+    // Updates the snapped_route_config_ (by reselecting scoped route configuration), if a scope is
+    // not found, snapped_route_config_ is set to Router::NullConfigImpl.
+    void snapScopedRouteConfig();
 
-    Router::ConfigConstSharedPtr
-    getRouteConfigFromScopedRouteConfig(Router::ScopedConfigConstSharedPtr& scoped_route_config);
-    std::pair<Router::ConfigConstSharedPtr, Router::ScopedConfigConstSharedPtr> getRouteConfig();
-
-    void refreshCachedRoute(const Router::ConfigConstSharedPtr& config);
-    void refreshCachedRoute(const Router::ConfigConstSharedPtr& config,
-                            const Router::RouteCallback& cb);
+    void refreshCachedRoute();
+    void refreshCachedRoute(const Router::RouteCallback& cb);
 
     void refreshCachedTracingCustomTags();
     void refreshDurationTimeout();
@@ -422,14 +420,31 @@ private:
 
     std::chrono::milliseconds idle_timeout_ms_{};
     State state_;
+
+    // Snapshot of the route configuration at the time of request is started. This is used to ensure
+    // that the same route configuration is used throughout the lifetime of the request. This
+    // snapshot will be cleared when the cached route is blocked. Because after that we will not
+    // refresh the cached route and release this snapshot can help to release the memory when the
+    // route configuration is updated frequently and the request is long-lived.
+    Router::ConfigConstSharedPtr snapped_route_config_;
+    Router::ScopedConfigConstSharedPtr snapped_scoped_routes_config_;
+    // This is used to track the route that has been cached in the request. And we will keep this
+    // route alive until the request is finished.
     absl::optional<Router::RouteConstSharedPtr> cached_route_;
+    // This is used to track whether the route has been blocked. If the route is blocked, we can not
+    // clear it or refresh it.
+    bool cached_route_blocked_{false};
     // This is used to track routes that have been cleared from the request. By this way, all the
     // configurations that have been used in the processing of the request will be alive until the
     // request is finished.
     // For example, if a filter stored a per-route config in the decoding phase and may try to
     // use it in the encoding phase, but the route is cleared and refreshed by another decoder
     // filter, we must keep the per-route config alive to avoid use-after-free.
+    // Note that we assume that the number of routes that have been cleared is small. So we use
+    // inline vector to avoid heap allocation. If this assumption is wrong, we should consider using
+    // a list or other data structures.
     absl::InlinedVector<Router::RouteConstSharedPtr, 3> cleared_cached_routes_;
+
     absl::optional<Upstream::ClusterInfoConstSharedPtr> cached_cluster_info_;
     const std::string* decorated_operation_{nullptr};
     std::unique_ptr<RdsRouteConfigUpdateRequester> route_config_update_requester_;
