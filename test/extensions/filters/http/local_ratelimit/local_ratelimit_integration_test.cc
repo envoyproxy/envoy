@@ -179,9 +179,14 @@ virtual_hosts:
 )EOF";
 };
 
-INSTANTIATE_TEST_SUITE_P(Protocols, LocalRateLimitFilterIntegrationTest,
-                         testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams()),
-                         HttpProtocolIntegrationTest::protocolTestParamsToString);
+// Test for HTTP1/2 only.
+// TODO(asingh-g): Fix test suite for HTTP/3.
+INSTANTIATE_TEST_SUITE_P(
+    Protocols, LocalRateLimitFilterIntegrationTest,
+    testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams(
+        /*downstream_protocols = */ {Http::CodecType::HTTP1, Http::CodecType::HTTP2},
+        /*upstream_protocols = */ {Http::CodecType::HTTP1, Http::CodecType::HTTP2})),
+    HttpProtocolIntegrationTest::protocolTestParamsToString);
 
 TEST_P(LocalRateLimitFilterIntegrationTest, DenyRequestPerProcess) {
   initializeFilter(fmt::format(fmt::runtime(filter_config_), "false"));

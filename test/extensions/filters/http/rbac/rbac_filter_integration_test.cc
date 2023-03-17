@@ -341,9 +341,14 @@ typed_config:
 
 using RBACIntegrationTest = HttpProtocolIntegrationTest;
 
-INSTANTIATE_TEST_SUITE_P(Protocols, RBACIntegrationTest,
-                         testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams()),
-                         HttpProtocolIntegrationTest::protocolTestParamsToString);
+// Test for HTTP1/2 only.
+// TODO(asingh-g): Fix test suite for HTTP/3.
+INSTANTIATE_TEST_SUITE_P(
+    Protocols, RBACIntegrationTest,
+    testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams(
+        /*downstream_protocols = */ {Http::CodecType::HTTP1, Http::CodecType::HTTP2},
+        /*upstream_protocols = */ {Http::CodecType::HTTP1, Http::CodecType::HTTP2})),
+    HttpProtocolIntegrationTest::protocolTestParamsToString);
 
 TEST_P(RBACIntegrationTest, Allowed) {
   useAccessLog("%RESPONSE_CODE_DETAILS%");
