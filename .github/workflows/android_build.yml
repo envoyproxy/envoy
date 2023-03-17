@@ -12,49 +12,45 @@ concurrency:
 
 jobs:
   androidbuild:
-    if: github.repository == 'envoyproxy/envoy'
     name: android_build
-    runs-on: ubuntu-20.04
+    runs-on: macos-12
     timeout-minutes: 90
-    container:
-      image: envoyproxy/envoy-build-ubuntu:mobile-458cb49ca2013c0ccf057d00ad1d4407920c4e52
-      env:
-        CC: /opt/llvm/bin/clang
-        CXX: /opt/llvm/bin/clang++
     steps:
-    - uses: actions/checkout@v3
-      with:
-        fetch-depth: 0
-    - name: Add safe directory
-      run: git config --global --add safe.directory /__w/envoy/envoy
+    - uses: actions/checkout@v1
     - id: should_run
       name: 'Check whether to run'
       run: ./mobile/tools/should_run_ci.sh
+    - uses: actions/setup-java@c3ac5dd0ed8db40fedb61c32fbe677e6b355e94c
+      if: steps.should_run.outputs.run_ci_job == 'true'
+      with:
+        java-version: '8'
+        java-package: jdk
+        architecture: x64
+        distribution: zulu
+    - name: 'Install dependencies'
+      if: steps.should_run.outputs.run_ci_job == 'true'
+      run: cd mobile && ./ci/mac_ci_setup.sh --android
     - name: 'Build envoy.aar distributable'
       if: steps.should_run.outputs.run_ci_job == 'true'
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
         cd mobile && ./bazelw build \
-          $([ -z $GITHUB_TOKEN ] || echo "--config=remote-ci-linux-clang") \
+        $([ -z $GITHUB_TOKEN ] || echo "--config=remote-ci-macos") \
           --remote_header="Authorization=Bearer $GITHUB_TOKEN" \
           --fat_apk_cpu=x86_64 \
-          --linkopt=-fuse-ld=lld \
           //:android_dist
   javahelloworld:
-    if: github.repository == 'envoyproxy/envoy'
     name: java_helloworld
     needs: androidbuild
     runs-on: macos-12
     timeout-minutes: 50
     steps:
-    - uses: actions/checkout@v3
-      with:
-        fetch-depth: 0
+    - uses: actions/checkout@v1
     - id: should_run
       name: 'Check whether to run'
       run: ./mobile/tools/should_run_ci.sh
-    - uses: actions/setup-java@3f07048e3d294f56e9b90ac5ea2c6f74e9ad0f98
+    - uses: actions/setup-java@c3ac5dd0ed8db40fedb61c32fbe677e6b355e94c
       if: steps.should_run.outputs.run_ci_job == 'true'
       with:
         java-version: '8'
@@ -68,9 +64,9 @@ jobs:
       if: steps.should_run.outputs.run_ci_job == 'true'
       name: 'Start emulator'
       with:
-        timeout_minutes: 10
+        timeout_minutes: 6
         max_attempts: 3
-        command: ./mobile/ci/start_android_emulator.sh
+        command: cd mobile && ./ci/mac_start_emulator.sh
     # Return to using:
     #   cd mobile && ./bazelw mobile-install --fat_apk_cpu=x86_64 --start_app //examples/java/hello_world:hello_envoy
     # When https://github.com/envoyproxy/envoy-mobile/issues/853 is fixed.
@@ -88,21 +84,18 @@ jobs:
           adb shell am start -n io.envoyproxy.envoymobile.helloenvoy/.MainActivity
     - name: 'Check connectivity'
       if: steps.should_run.outputs.run_ci_job == 'true'
-      run: adb logcat -e "received headers with status 301" -m 1
+      run: adb logcat -e "received headers with status 200" -m 1
   kotlinhelloworld:
-    if: github.repository == 'envoyproxy/envoy'
     name: kotlin_helloworld
     needs: androidbuild
     runs-on: macos-12
     timeout-minutes: 50
     steps:
-    - uses: actions/checkout@v3
-      with:
-        fetch-depth: 0
+    - uses: actions/checkout@v1
     - id: should_run
       name: 'Check whether to run'
       run: ./mobile/tools/should_run_ci.sh
-    - uses: actions/setup-java@3f07048e3d294f56e9b90ac5ea2c6f74e9ad0f98
+    - uses: actions/setup-java@c3ac5dd0ed8db40fedb61c32fbe677e6b355e94c
       if: steps.should_run.outputs.run_ci_job == 'true'
       with:
         java-version: '8'
@@ -116,9 +109,9 @@ jobs:
       if: steps.should_run.outputs.run_ci_job == 'true'
       name: 'Start emulator'
       with:
-        timeout_minutes: 10
+        timeout_minutes: 6
         max_attempts: 3
-        command: ./mobile/ci/start_android_emulator.sh
+        command: cd mobile && ./ci/mac_start_emulator.sh
     # Return to using:
     #   ./bazelw mobile-install --fat_apk_cpu=x86_64 --start_app //examples/kotlin/hello_world:hello_envoy_kt
     # When https://github.com/envoyproxy/envoy-mobile/issues/853 is fixed.
@@ -138,19 +131,16 @@ jobs:
       if: steps.should_run.outputs.run_ci_job == 'true'
       run: adb logcat -e "received headers with status 200" -m 1
   kotlinbaselineapp:
-    if: github.repository == 'envoyproxy/envoy'
     name: kotlin_baseline_app
     needs: androidbuild
     runs-on: macos-12
     timeout-minutes: 50
     steps:
-    - uses: actions/checkout@v3
-      with:
-        fetch-depth: 0
+    - uses: actions/checkout@v1
     - id: should_run
       name: 'Check whether to run'
       run: ./mobile/tools/should_run_ci.sh
-    - uses: actions/setup-java@3f07048e3d294f56e9b90ac5ea2c6f74e9ad0f98
+    - uses: actions/setup-java@c3ac5dd0ed8db40fedb61c32fbe677e6b355e94c
       if: steps.should_run.outputs.run_ci_job == 'true'
       with:
         java-version: '8'
@@ -164,9 +154,9 @@ jobs:
       if: steps.should_run.outputs.run_ci_job == 'true'
       name: 'Start emulator'
       with:
-        timeout_minutes: 10
+        timeout_minutes: 6
         max_attempts: 3
-        command: ./mobile/ci/start_android_emulator.sh
+        command: cd mobile && ./ci/mac_start_emulator.sh
     # Return to using:
     #   ./bazelw mobile-install --fat_apk_cpu=x86_64 --start_app //examples/kotlin/hello_world:hello_envoy_kt
     # When https://github.com/envoyproxy/envoy-mobile/issues/853 is fixed.
@@ -186,19 +176,16 @@ jobs:
       if: steps.should_run.outputs.run_ci_job == 'true'
       run: adb logcat -e "received headers with status 301" -m 1
   kotlinexperimentalapp:
-    if: github.repository == 'envoyproxy/envoy'
     name: kotlin_experimental_app
     needs: androidbuild
     runs-on: macos-12
     timeout-minutes: 50
     steps:
-    - uses: actions/checkout@v3
-      with:
-        fetch-depth: 0
+    - uses: actions/checkout@v1
     - id: should_run
       name: 'Check whether to run'
       run: ./mobile/tools/should_run_ci.sh
-    - uses: actions/setup-java@3f07048e3d294f56e9b90ac5ea2c6f74e9ad0f98
+    - uses: actions/setup-java@c3ac5dd0ed8db40fedb61c32fbe677e6b355e94c
       if: steps.should_run.outputs.run_ci_job == 'true'
       with:
         java-version: '8'
@@ -212,9 +199,9 @@ jobs:
       if: steps.should_run.outputs.run_ci_job == 'true'
       name: 'Start emulator'
       with:
-        timeout_minutes: 10
+        timeout_minutes: 6
         max_attempts: 3
-        command: ./mobile/ci/start_android_emulator.sh
+        command: cd mobile && ./ci/mac_start_emulator.sh
     # Return to using:
     #   ./bazelw mobile-install --fat_apk_cpu=x86_64 --start_app //examples/kotlin/hello_world:hello_envoy_kt
     # When https://github.com/envoyproxy/envoy-mobile/issues/853 is fixed.
@@ -227,8 +214,6 @@ jobs:
             $([ -z $GITHUB_TOKEN ] || echo "--config=remote-ci-macos") \
             --remote_header="Authorization=Bearer $GITHUB_TOKEN" \
             --fat_apk_cpu=x86_64 \
-            --define=admin_functionality=enabled \
-            --define envoy_mobile_listener=enabled \
             //test/kotlin/apps/experimental:hello_envoy_kt
           adb install -r --no-incremental bazel-bin/test/kotlin/apps/experimental/hello_envoy_kt.apk
           adb shell am start -n io.envoyproxy.envoymobile.helloenvoyexperimentaltest/.MainActivity

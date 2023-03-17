@@ -14,7 +14,6 @@ envoy_cc_library(
     deps = [
         "//envoy/api:io_error_interface",
         "//envoy/api:os_sys_calls_interface",
-        "//envoy/common:time_interface",
     ],
 )
 

@@ -131,7 +131,7 @@ public:
   /**
    * @return true if half-close semantics are enabled, false otherwise.
    */
-  virtual bool isHalfCloseEnabled() const PURE;
+  virtual bool isHalfCloseEnabled() PURE;
 
   /**
    * Close the connection.

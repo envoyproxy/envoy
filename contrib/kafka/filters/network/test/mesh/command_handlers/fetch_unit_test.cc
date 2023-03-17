@@ -97,9 +97,7 @@ TEST_F(FetchUnitTest, ShouldCleanupAfterTimer) {
 }
 
 // Helper method to generate records.
-InboundRecordSharedPtr makeRecord() {
-  return std::make_shared<InboundRecord>("aaa", 0, 0, absl::nullopt, absl::nullopt);
-}
+InboundRecordSharedPtr makeRecord() { return std::make_shared<InboundRecord>("aaa", 0, 0); }
 
 TEST_F(FetchUnitTest, ShouldReceiveRecords) {
   // given

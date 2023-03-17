@@ -1,6 +1,6 @@
 #pragma once
 
-#include "absl/strings/string_view.h"
+#include <string>
 
 namespace Envoy {
 namespace Platform {
@@ -16,8 +16,8 @@ enum RequestMethod {
   TRACE,
 };
 
-absl::string_view requestMethodToString(RequestMethod method);
-RequestMethod requestMethodFromString(absl::string_view str);
+std::string requestMethodToString(RequestMethod method);
+RequestMethod requestMethodFromString(const std::string& str);
 
 } // namespace Platform
 } // namespace Envoy

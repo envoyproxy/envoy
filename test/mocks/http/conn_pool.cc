@@ -1,7 +1,6 @@
 #include "test/mocks/http/conn_pool.h"
 
 using testing::_;
-using testing::Return;
 using testing::SaveArg;
 
 namespace Envoy {

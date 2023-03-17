@@ -24,7 +24,6 @@ namespace {
 using envoy::extensions::filters::http::jwt_authn::JwtAuthnFuzzInput;
 using envoy::extensions::filters::http::jwt_authn::v3::PerRouteConfig;
 using testing::NiceMock;
-using testing::Return;
 
 class MockJwksUpstream {
 public:

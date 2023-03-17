@@ -121,7 +121,6 @@ envoy_cc_library(
         "//source/common/router:shadow_writer_lib",
         "//source/common/shared_pool:shared_pool_lib",
         "//source/common/tcp:conn_pool_lib",
-        "//source/common/tcp:async_tcp_client_lib",
         "//source/common/upstream:priority_conn_pool_map_impl_lib",
         "//source/common/upstream:upstream_lib",
         "//source/common/quic:quic_stat_names_lib",
@@ -390,7 +389,6 @@ envoy_cc_library(
     deps = [
         ":thread_aware_lb_lib",
         ":upstream_lib",
-        "//source/common/common:bit_array_lib",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/load_balancing_policies/maglev/v3:pkg_cc_proto",
     ],

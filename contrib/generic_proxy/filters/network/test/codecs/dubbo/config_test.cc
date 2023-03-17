@@ -269,8 +269,8 @@ TEST(ResponseDecoderTest, ResponseDecoderTest) {
   auto codec = std::make_unique<DubboCodec>();
   codec->initilize(std::make_unique<MockSerializer>());
 
-  MockResponseDecoderCallback callback;
-  DubboResponseDecoder decoder(std::move(codec));
+  MockRequestDecoderCallback callback;
+  DubboRequestDecoder decoder(std::move(codec));
   decoder.setDecoderCallback(callback);
 
   auto raw_serializer = const_cast<MockSerializer*>(
@@ -306,7 +306,7 @@ TEST(ResponseDecoderTest, ResponseDecoderTest) {
     decoder.decode(buffer);
   }
 
-  // Decode response.
+  // Decode request.
   {
     Buffer::OwnedImpl buffer;
     buffer.add(std::string({'\xda', '\xbb', '\x02', 20}));
@@ -314,11 +314,8 @@ TEST(ResponseDecoderTest, ResponseDecoderTest) {
     buffer.writeBEInt<int32_t>(8);
     buffer.add("anything");
 
-    auto response = std::make_unique<RpcResponseImpl>();
-    response->setResponseType(RpcResponseType::ResponseWithValue);
-
     EXPECT_CALL(*raw_serializer, deserializeRpcResponse(_, _))
-        .WillOnce(Return(ByMove(std::move(response))));
+        .WillOnce(Return(ByMove(std::make_unique<RpcResponseImpl>())));
 
     EXPECT_CALL(callback, onDecodingSuccess(_));
     decoder.decode(buffer);

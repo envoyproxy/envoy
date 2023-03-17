@@ -113,9 +113,7 @@ MockDrainDecision::~MockDrainDecision() = default;
 
 MockListenerFilter::~MockListenerFilter() { destroy_(); }
 
-MockListenerFilterCallbacks::MockListenerFilterCallbacks()
-    : filter_state_(StreamInfo::FilterStateImpl(StreamInfo::FilterState::LifeSpan::FilterChain)) {
-  ON_CALL(*this, filterState()).WillByDefault(ReturnRef(filter_state_));
+MockListenerFilterCallbacks::MockListenerFilterCallbacks() {
   ON_CALL(*this, socket()).WillByDefault(ReturnRef(socket_));
 }
 MockListenerFilterCallbacks::~MockListenerFilterCallbacks() = default;

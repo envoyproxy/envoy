@@ -17,7 +17,6 @@ envoy_cc_test(
         "//source/common/network:socket_lib",
         "//source/common/ssl/matching:inputs_lib",
         "//test/mocks/ssl:ssl_mocks",
-        "//test/mocks/stream_info:stream_info_mocks",
     ],
 )
 
@@ -31,6 +30,5 @@ envoy_cc_test(
         "//test/common/matcher:test_utility_lib",
         "//test/mocks/matcher:matcher_mocks",
         "//test/mocks/server:factory_context_mocks",
-        "//test/test_common:test_time_lib",
     ],
 )

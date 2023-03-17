@@ -12,17 +12,16 @@ concurrency:
 
 jobs:
   sizecurrent:
-    if: github.repository == 'envoyproxy/envoy'
     name: size_current
     runs-on: ubuntu-20.04
     timeout-minutes: 120
     container:
-      image: envoyproxy/envoy-build-ubuntu:458cb49ca2013c0ccf057d00ad1d4407920c4e52
+      image: envoyproxy/envoy-build-ubuntu:7304f974de2724617b7492ccb4c9c58cd420353a
       env:
         CC: /opt/llvm/bin/clang
         CXX: /opt/llvm/bin/clang++
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v1
     - name: Add safe directory
       run: git config --global --add safe.directory /__w/envoy/envoy
     - name: 'Build test binary'
@@ -32,7 +31,6 @@ jobs:
         cd mobile && ./bazelw build \
             --config=sizeopt \
             --config=release-common \
-            --config=remote-ci-linux-clang \
             --remote_header="Authorization=Bearer $GITHUB_TOKEN" \
             //test/performance:test_binary_size
     - uses: actions/upload-artifact@v3
@@ -40,17 +38,16 @@ jobs:
         name: sizecurrent
         path: mobile/bazel-bin/test/performance/test_binary_size
   sizemain:
-    if: github.repository == 'envoyproxy/envoy'
     name: size_main
     runs-on: ubuntu-20.04
     timeout-minutes: 90
     container:
-      image: envoyproxy/envoy-build-ubuntu:458cb49ca2013c0ccf057d00ad1d4407920c4e52
+      image: envoyproxy/envoy-build-ubuntu:7304f974de2724617b7492ccb4c9c58cd420353a
       env:
         CC: /opt/llvm/bin/clang
         CXX: /opt/llvm/bin/clang++
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v1
     - name: Add safe directory
       run: |
         git config --global --add safe.directory /__w/envoy/envoy
@@ -62,7 +59,6 @@ jobs:
           cd mobile && ./bazelw build \
             --config=sizeopt \
             --config=release-common \
-            --config=remote-ci-linux-clang \
             --remote_header="Authorization=Bearer $GITHUB_TOKEN" \
             //test/performance:test_binary_size
     - uses: actions/upload-artifact@v3
@@ -70,15 +66,14 @@ jobs:
         name: sizemain
         path: mobile/bazel-bin/test/performance/test_binary_size
   sizecompare:
-    if: github.repository == 'envoyproxy/envoy'
     name: size_compare
     needs: [sizecurrent, sizemain]
     runs-on: ubuntu-20.04
     timeout-minutes: 30
     container:
-      image: envoyproxy/envoy-build-ubuntu:458cb49ca2013c0ccf057d00ad1d4407920c4e52
+      image: envoyproxy/envoy-build-ubuntu:7304f974de2724617b7492ccb4c9c58cd420353a
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v1
     - uses: actions/download-artifact@v3
       with:
         name: sizecurrent

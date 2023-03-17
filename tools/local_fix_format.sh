@@ -31,7 +31,7 @@ fi
 
 # Runs the formatting functions on the specified args, echoing commands
 # if -vergbose was supplied to the script.
-function format_one() {
+function format() {
   (
     if [[ "$verbose" == "1" ]]; then
       set -x
@@ -41,19 +41,9 @@ function format_one() {
   )
 }
 
-function format_all() {
-  (
-    if [[ "$verbose" == "1" ]]; then
-      set -x
-    fi
-    ./tools/code_format/check_format.py fix
-    ./tools/spelling/check_spelling_pedantic.py fix
-  )
-}
-
 if [[ $# -gt 0 && "$1" == "-all" ]]; then
   echo "Checking all files in the repo...this may take a while."
-  format_all
+  format
 else
   if [[ $# -gt 0 && "$1" == "-main" ]]; then
     shift
@@ -71,6 +61,6 @@ else
     exit 0
   fi
   for arg in $args; do
-    format_one "$arg"
+    format "$arg"
   done
 fi

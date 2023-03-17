@@ -45,6 +45,8 @@
 #include "absl/synchronization/notification.h"
 #include "gtest/gtest.h"
 
+using testing::GTEST_FLAG(random_seed);
+
 namespace Envoy {
 
 bool TestUtility::headerMapEqualIgnoreOrder(const Http::HeaderMap& lhs,

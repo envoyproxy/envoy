@@ -2,18 +2,37 @@
 
 set -e
 
-echo "Disk space before cruft removal"
+echo "Disk space before package removal"
 df -h
 
-TO_REMOVE=(
-    /opt/hostedtoolcache
-    /usr/local/lib/android
-    /usr/local/.ghcup)
+# Temporary script to remove tools from Azure pipelines agent to create more disk space room.
 
-for removal in "${TO_REMOVE[@]}"; do
-    echo "Removing: ${removal} ..."
-    sudo rm -rf "$removal"
-done
+PURGE_PACKAGES=(
+    "adoptopenjdk-*"
+    "ant"
+    azure-cli
+    "dotnet-*"
+    firefox
+    "ghc-*"
+    google-chrome-stable
+    hhvm
+    libgl1
+    "libllvm*"
+    "nginx*"
+    "mongodb*"
+    "mono*"
+    "mssql*"
+    "mysql-*"
+    "podman"
+    "powershell"
+    "php*"
+    "temurin-*-jdk"
+    "zulu-*-azure-jdk")
 
-echo "Disk space after cruft removal"
+sudo apt-get update -y || true
+sudo apt-get purge -y --no-upgrade "${PURGE_PACKAGES[@]}"
+
+dpkg-query -Wf '${Installed-Size}\t${Package}\n' | sort -rn
+
+echo "Disk space after package removal"
 df -h

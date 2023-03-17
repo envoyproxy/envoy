@@ -29,9 +29,9 @@ Install Docker
 
 Ensure that you have a recent versions of ``docker`` installed.
 
-You will need a minimum version of ``19.03.0+``.
+You will need a minimum version of ``18.06.0+``.
 
-Version ``20.10`` is well tested, and has the benefit of included ``compose``.
+Version ``19.03`` is well tested.
 
 The user account running the examples will need to have permission to use Docker on your system.
 
@@ -42,25 +42,19 @@ If you want to use the Windows based Envoy images make sure that you
 
 .. _start_sandboxes_setup_docker_compose:
 
-Install ``docker compose``
---------------------------
+Install Docker Compose
+----------------------
 
 The examples use
-`Docker compose configuration version 3.8 <https://docs.docker.com/compose/compose-file/compose-versioning/#version-38>`_.
+`Docker compose configuration version 3.7 <https://docs.docker.com/compose/compose-file/compose-versioning/#version-37>`_.
 
-You will need to a fairly recent version of `Docker Compose <https://docs.docker.com/compose/>`_.
+You will need to install a fairly recent version of `Docker Compose <https://docs.docker.com/compose/>`_.
 
-.. note::
-   Any ``20.0+`` version of Docker provides a builtin ``docker compose`` command.
+Version ``1.27.4`` is well tested.
 
-   The sandboxes are tested using ``compose`` in this way, so this is preferable over using the python version.
-
-   See `Docker compose installation documenation <https://docs.docker.com/compose/install/>`_ for more information.
-
-Docker Compose (``docker-compose``) can also be installed as a `python application <https://pypi.org/project/docker-compose/>`_ and can be
-installed through a variety of methods including `pip <https://pip.pypa.io/en/stable/>`_ and native operating system installation.
-
-Most of the sandboxes should also work using ``docker-compose``.
+Docker Compose is a `python application <https://pypi.org/project/docker-compose/>`_ and can be
+installed through a variety of methods including `pip <https://pip.pypa.io/en/stable/>`_ and
+`native operating system installation <https://docs.docker.com/compose/install/>`_.
 
 .. _start_sandboxes_setup_git:
 
@@ -141,5 +135,17 @@ Binary distributions of `OpenSSL <https://www.openssl.org/>`_ are available for 
 and in most if not all flavours of Linux.
 
 Windows users can either use an `unofficial binary <https://wiki.openssl.org/index.php/Binaries>`_ or compile from source.
+
+Check for installation instructions specific to your operating system.
+
+.. _start_sandboxes_setup_redis:
+
+redis
+~~~~~
+
+Binary distributions of `Redis <https://redis.io/>`_ are available for Mac OS with `brew <https://brew.sh>`_
+and in most flavours of Linux.
+
+Windows users should check out the `Windows port of Redis <https://github.com/microsoftarchive/redis>`_.
 
 Check for installation instructions specific to your operating system.

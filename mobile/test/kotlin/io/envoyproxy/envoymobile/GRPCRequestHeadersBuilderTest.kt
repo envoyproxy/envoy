@@ -36,6 +36,13 @@ class GRPCRequestHeadersBuilderTest {
   }
 
   @Test
+  fun `adds h2 upstream header`() {
+    val headers = GRPCRequestHeadersBuilder("https", "envoyproxy.io", "/pb.api.v1.Foo/GetBar")
+      .build()
+    assertThat(headers.value("x-envoy-mobile-upstream-protocol")).containsExactly("http2")
+  }
+
+  @Test
   fun `uses http post`() {
     val headers = GRPCRequestHeadersBuilder("https", "envoyproxy.io", "/pb.api.v1.Foo/GetBar")
       .build()

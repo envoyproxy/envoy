@@ -135,7 +135,8 @@ public:
     }
     const bool expect_disable_early_data = response_status == "425";
 
-    if (expect_disable_early_data) {
+    if (Runtime::runtimeFeatureEnabled(Runtime::conn_pool_new_stream_with_early_data_and_http3) &&
+        expect_disable_early_data) {
       expectSchedulableCallback();
     } else {
       expectTimerCreateAndEnable();
@@ -225,6 +226,10 @@ TEST_F(RouterRetryStateImplTest, PolicyRefusedStream) {
 }
 
 TEST_F(RouterRetryStateImplTest, PolicyAltProtocolPostHandshakeFailure) {
+  if (!Runtime::runtimeFeatureEnabled(Runtime::conn_pool_new_stream_with_early_data_and_http3)) {
+    return;
+  }
+
   Http::TestRequestHeaderMapImpl request_headers{
       {"x-envoy-retry-on", "refused-stream,http3-post-connect-failure"}};
   setup(request_headers);
@@ -257,6 +262,10 @@ TEST_F(RouterRetryStateImplTest, PolicyAltProtocolPostHandshakeFailure) {
 }
 
 TEST_F(RouterRetryStateImplTest, PolicyAltProtocolPostHandshakeFailureWithoutTcpFallback) {
+  if (!Runtime::runtimeFeatureEnabled(Runtime::conn_pool_new_stream_with_early_data_and_http3)) {
+    return;
+  }
+
   Http::TestRequestHeaderMapImpl request_headers{
       {"x-envoy-retry-on", "http3-post-connect-failure"}};
   setup(request_headers);
@@ -497,6 +506,9 @@ TEST_F(RouterRetryStateImplTest, RetriableStatusCodes) {
 }
 
 TEST_F(RouterRetryStateImplTest, Http3AutoConfigRetryOnTooEarlyRetriableStatusCode) {
+  if (!Runtime::runtimeFeatureEnabled(Runtime::conn_pool_new_stream_with_early_data_and_http3)) {
+    return;
+  }
   // Retry upon 425 should be automatically configured for H3 upstream.
   EXPECT_CALL(cluster_, features()).WillRepeatedly(Return(Upstream::ClusterInfo::Features::HTTP3));
   Http::TestRequestHeaderMapImpl request;
@@ -505,6 +517,9 @@ TEST_F(RouterRetryStateImplTest, Http3AutoConfigRetryOnTooEarlyRetriableStatusCo
 }
 
 TEST_F(RouterRetryStateImplTest, NoRetryUponTooEarlyStatusCodeWithDownstreamEarlyData) {
+  if (!Runtime::runtimeFeatureEnabled(Runtime::conn_pool_new_stream_with_early_data_and_http3)) {
+    return;
+  }
   EXPECT_CALL(cluster_, features()).WillRepeatedly(Return(Upstream::ClusterInfo::Features::HTTP3));
   // A request with "EarlyData" header won't be retried upon 425.
   Http::TestRequestHeaderMapImpl request_headers{{"early-data", "1"}};
@@ -1025,9 +1040,11 @@ TEST_F(RouterRetryStateImplTest, Backoff) {
   expectSchedulableCallback();
   EXPECT_EQ(RetryStatus::Yes, state_->shouldRetryReset(connect_failure_, RetryState::Http3Used::Yes,
                                                        reset_callback_));
-  EXPECT_CALL(callback_ready_, ready());
-  retry_schedulable_callback_->invokeCallback();
-  EXPECT_FALSE(retry_disable_http3_);
+  if (Runtime::runtimeFeatureEnabled(Runtime::conn_pool_new_stream_with_early_data_and_http3)) {
+    EXPECT_CALL(callback_ready_, ready());
+    retry_schedulable_callback_->invokeCallback();
+    EXPECT_FALSE(retry_disable_http3_);
+  }
 
   // Connect failure over HTTP/3 should be retried only with timed backoff if the cluster is
   // configured with explicit h3 pool.

@@ -9,8 +9,8 @@ final class MockEnvoyEngine: NSObject {
   /// Closure called when `run(withConfig:)` is called.
   static var onRunWithConfig: ((_ config: EnvoyConfiguration, _ logLevel: String?) -> Void)?
   /// Closure called when `run(withConfigYAML:)` is called.
-  static var onRunWithYAML: ((
-    _ yaml: String,
+  static var onRunWithTemplate: ((
+    _ template: String,
     _ config: EnvoyConfiguration,
     _ logLevel: String?
   ) -> Void)?
@@ -27,8 +27,8 @@ extension MockEnvoyEngine: EnvoyEngine {
     return kEnvoySuccess
   }
 
-  func run(withYAML yaml: String, config: EnvoyConfiguration, logLevel: String) -> Int32 {
-    MockEnvoyEngine.onRunWithYAML?(yaml, config, logLevel)
+  func run(withTemplate template: String, config: EnvoyConfiguration, logLevel: String) -> Int32 {
+    MockEnvoyEngine.onRunWithTemplate?(template, config, logLevel)
     return kEnvoySuccess
   }
 

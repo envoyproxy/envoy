@@ -65,6 +65,14 @@ class SetEventTrackerTest {
 
     val client = engine.streamClient()
 
+    val requestHeaders = RequestHeadersBuilder(
+      method = RequestMethod.GET,
+      scheme = "https",
+      authority = "example.com",
+      path = "/test"
+    )
+      .build()
+
     client
       .newStreamPrototype()
       .setOnResponseData { _, _, _ ->

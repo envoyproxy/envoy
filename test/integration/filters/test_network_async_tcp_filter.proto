@@ -1,7 +1,0 @@
-syntax = "proto3";
-
-package test.integration.filters;
-
-message TestNetworkAsyncTcpFilterConfig {
-  string cluster_name = 1;
-}

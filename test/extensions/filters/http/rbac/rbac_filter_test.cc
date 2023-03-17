@@ -22,7 +22,6 @@
 using testing::_;
 using testing::NiceMock;
 using testing::Return;
-using testing::ReturnPointee;
 using testing::ReturnRef;
 
 namespace Envoy {
@@ -173,23 +172,24 @@ on_no_match:
     filter_->setDecoderFilterCallbacks(callbacks_);
   }
 
-  RoleBasedAccessControlFilterTest() = default;
+  RoleBasedAccessControlFilterTest()
+      : provider_(std::make_shared<Network::Address::Ipv4Instance>(80),
+                  std::make_shared<Network::Address::Ipv4Instance>(80)){};
 
   void setDestinationPort(uint16_t port) {
     address_ = Envoy::Network::Utility::parseInternetAddress("1.2.3.4", port, false);
     req_info_.downstream_connection_info_provider_->setLocalAddress(address_);
 
-    ON_CALL(connection_.stream_info_, downstreamAddressProvider())
-        .WillByDefault(ReturnPointee(req_info_.downstream_connection_info_provider_));
+    provider_.setLocalAddress(address_);
+    ON_CALL(connection_, connectionInfoProvider()).WillByDefault(ReturnRef(provider_));
   }
 
   void setRequestedServerName(std::string server_name) {
     requested_server_name_ = server_name;
     ON_CALL(connection_, requestedServerName()).WillByDefault(Return(requested_server_name_));
 
-    req_info_.downstream_connection_info_provider_->setRequestedServerName(server_name);
-    ON_CALL(connection_.stream_info_, downstreamAddressProvider())
-        .WillByDefault(ReturnPointee(req_info_.downstream_connection_info_provider_));
+    provider_.setRequestedServerName(server_name);
+    ON_CALL(connection_, connectionInfoProvider()).WillByDefault(ReturnRef(provider_));
   }
 
   void checkAccessLogMetadata(LogResult expected) {
@@ -233,6 +233,7 @@ on_no_match:
   std::unique_ptr<RoleBasedAccessControlFilter> filter_;
 
   Network::Address::InstanceConstSharedPtr address_;
+  Network::ConnectionInfoSetterImpl provider_;
   std::string requested_server_name_;
   Http::TestRequestHeaderMapImpl headers_;
   Http::TestRequestTrailerMapImpl trailers_;

@@ -20,7 +20,9 @@ struct AppExceptionBase : public EnvoyException,
                           public DubboFilters::DirectResponse,
                           Logger::Loggable<Logger::Id::dubbo> {
   AppExceptionBase(const AppExceptionBase& ex) = default;
-  AppExceptionBase(T status, const std::string& what) : EnvoyException(what), status_(status) {}
+  AppExceptionBase(T status, const std::string& what)
+      : EnvoyException(what), status_(status),
+        response_type_(RpcResponseType::ResponseWithException) {}
 
   ResponseType encode(MessageMetadata& metadata, DubboProxy::Protocol& protocol,
                       Buffer::Instance& buffer) const override {
@@ -38,7 +40,7 @@ struct AppExceptionBase : public EnvoyException,
   }
 
   const T status_;
-  const RpcResponseType response_type_{RpcResponseType::ResponseWithException};
+  const RpcResponseType response_type_;
 };
 
 using AppException = AppExceptionBase<>;

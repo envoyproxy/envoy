@@ -20,8 +20,6 @@
 #include "test/test_common/threadsafe_singleton_injector.h"
 #include "test/test_common/utility.h"
 
-using testing::Return;
-
 namespace Envoy {
 namespace {
 

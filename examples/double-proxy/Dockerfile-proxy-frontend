@@ -1,0 +1,9 @@
+FROM envoyproxy/envoy-dev:latest
+
+COPY ./envoy-frontend.yaml /etc/envoy.yaml
+COPY ./certs/ca.crt /certs/cacert.pem
+COPY ./certs/postgres-frontend.example.com.crt /certs/clientcert.pem
+COPY ./certs/example.com.key /certs/clientkey.pem
+
+RUN chmod go+r /etc/envoy.yaml /certs/cacert.pem /certs/clientkey.pem /certs/clientcert.pem
+CMD ["/usr/local/bin/envoy", "-c /etc/envoy.yaml"]

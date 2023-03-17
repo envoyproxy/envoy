@@ -1,8 +1,9 @@
+#include <datadog/clock.h>
+
 #include "envoy/common/time.h"
 
 #include "source/extensions/tracers/datadog/time_util.h"
 
-#include "datadog/clock.h"
 #include "gtest/gtest.h"
 
 namespace Envoy {

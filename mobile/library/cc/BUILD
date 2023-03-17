@@ -1,4 +1,4 @@
-load("@envoy//bazel:envoy_build_system.bzl", "envoy_cc_library", "envoy_package", "envoy_select_envoy_mobile_request_compression")
+load("@envoy//bazel:envoy_build_system.bzl", "envoy_cc_library", "envoy_package")
 
 licenses(["notice"])  # Apache 2
 
@@ -16,7 +16,6 @@ envoy_cc_library(
         "//bazel:exclude_certificates": ["-DEXCLUDE_CERTIFICATES"],
         "//conditions:default": [],
     }),
-    external_deps = ["abseil_optional"],
     repository = "@envoy",
     visibility = ["//visibility:public"],
     deps = [
@@ -35,20 +34,12 @@ envoy_cc_library(
         "@envoy_api//envoy/extensions/transport_sockets/http_11_proxy/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/transport_sockets/quic/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/transport_sockets/raw_buffer/v3:pkg_cc_proto",
-        "@envoy_mobile//library/common/config:certificates_lib",
+        "@envoy_mobile//library/common/config:config_lib",
         "@envoy_mobile//library/common/extensions/cert_validator/platform_bridge:platform_bridge_cc_proto",
         "@envoy_mobile//library/common/extensions/filters/http/local_error:filter_cc_proto",
         "@envoy_mobile//library/common/extensions/filters/http/network_configuration:filter_cc_proto",
         "@envoy_mobile//library/common/extensions/filters/http/socket_tag:filter_cc_proto",
-    ] + envoy_select_envoy_mobile_request_compression(
-        [
-            "@envoy_api//envoy/extensions/compression/brotli/compressor/v3:pkg_cc_proto",
-            "@envoy_api//envoy/extensions/compression/gzip/compressor/v3:pkg_cc_proto",
-            "@envoy_api//envoy/extensions/filters/http/composite/v3:pkg_cc_proto",
-            "@envoy_api//envoy/extensions/filters/http/compressor/v3:pkg_cc_proto",
-        ],
-        "@envoy",
-    ),
+    ],
 )
 
 envoy_cc_library(
@@ -76,10 +67,10 @@ envoy_cc_library(
         "stream_client.cc",
         "stream_prototype.cc",
         "string_accessor.cc",
+        "upstream_http_protocol.cc",
     ],
     hdrs = [
         "bridge_utility.h",
-        "direct_response_testing.h",
         "engine.h",
         "engine_callbacks.h",
         "envoy_error.h",
@@ -104,6 +95,7 @@ envoy_cc_library(
         "stream_prototype.h",
         "string_accessor.h",
         "trailers.h",
+        "upstream_http_protocol.h",
     ],
     external_deps = ["abseil_optional"],
     repository = "@envoy",

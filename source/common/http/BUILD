@@ -57,7 +57,6 @@ envoy_cc_library(
         ":utility_lib",
         "//envoy/event:deferred_deletable",
         "//envoy/http:codec_interface",
-        "//envoy/http:header_validator_interface",
         "//envoy/network:connection_interface",
         "//envoy/network:filter_interface",
         "//source/common/common:assert_lib",
@@ -249,7 +248,6 @@ envoy_cc_library(
         "//source/common/local_reply:local_reply_lib",
         "//source/common/network:utility_lib",
         "//source/common/stats:symbol_table_lib",
-        "//source/common/tracing:tracer_config_lib",
         "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
         "@envoy_api//envoy/type/v3:pkg_cc_proto",
     ],
@@ -487,7 +485,6 @@ envoy_cc_library(
         ":header_map_lib",
         ":headers_lib",
         ":message_lib",
-        "//envoy/common:regex_interface",
         "//envoy/http:codes_interface",
         "//envoy/http:filter_interface",
         "//envoy/http:header_map_interface",
@@ -512,7 +509,6 @@ envoy_cc_library(
     hdrs = ["header_utility.h"],
     external_deps = [
         "nghttp2",
-        "quiche_http2_adapter",
     ],
     deps = [
         ":header_map_lib",
@@ -574,18 +570,5 @@ envoy_cc_library(
     deps = [
         "//envoy/http:codes_interface",
         "//source/common/common:assert_lib",
-    ],
-)
-
-envoy_cc_library(
-    name = "header_mutation_lib",
-    srcs = ["header_mutation.cc"],
-    hdrs = ["header_mutation.h"],
-    deps = [
-        ":header_map_lib",
-        ":utility_lib",
-        "//envoy/http:header_evaluator",
-        "//source/common/router:header_parser_lib",
-        "@envoy_api//envoy/config/common/mutation_rules/v3:pkg_cc_proto",
     ],
 )

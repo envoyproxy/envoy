@@ -12,7 +12,6 @@
 
 #include "absl/strings/match.h"
 #include "nghttp2/nghttp2.h"
-#include "quiche/http2/adapter/header_validator.h"
 
 namespace Envoy {
 namespace Http {
@@ -191,8 +190,8 @@ bool HeaderUtility::schemeIsValid(const absl::string_view scheme) {
 }
 
 bool HeaderUtility::headerValueIsValid(const absl::string_view header_value) {
-  return http2::adapter::HeaderValidator::IsValidHeaderValue(header_value,
-                                                             http2::adapter::ObsTextOption::kAllow);
+  return nghttp2_check_header_value(reinterpret_cast<const uint8_t*>(header_value.data()),
+                                    header_value.size()) != 0;
 }
 
 bool HeaderUtility::headerNameContainsUnderscore(const absl::string_view header_name) {
@@ -200,13 +199,8 @@ bool HeaderUtility::headerNameContainsUnderscore(const absl::string_view header_
 }
 
 bool HeaderUtility::authorityIsValid(const absl::string_view header_value) {
-  if (Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.http2_validate_authority_with_quiche")) {
-    return http2::adapter::HeaderValidator::IsValidAuthority(header_value);
-  } else {
-    return nghttp2_check_authority(reinterpret_cast<const uint8_t*>(header_value.data()),
-                                   header_value.size()) != 0;
-  }
+  return nghttp2_check_authority(reinterpret_cast<const uint8_t*>(header_value.data()),
+                                 header_value.size()) != 0;
 }
 
 bool HeaderUtility::isSpecial1xx(const ResponseHeaderMap& response_headers) {

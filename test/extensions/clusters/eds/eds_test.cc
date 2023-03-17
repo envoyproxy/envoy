@@ -204,7 +204,7 @@ protected:
   }
 
   void resetCluster(const bool ignore_health_on_host_removal) {
-    constexpr absl::string_view config = R"EOF(
+    const std::string config = R"EOF(
       name: name
       connect_timeout: 0.25s
       type: EDS

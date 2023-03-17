@@ -94,11 +94,7 @@ public class QuicTestServerTest {
       + "     typed_config:\n"
       + "       \"@type\": " + QUIC_UPSTREAM_TYPE + "\n"
       + "       upstream_tls_context:\n"
-      + "         sni: www.lyft.com\n"
-      + "listener_manager:\n"
-      + "  name: envoy.listener_manager_impl.api\n"
-      + "  typed_config:\n"
-      + "    \"@type\": type.googleapis.com/envoy.config.listener.v3.ApiListenerManager\n";
+      + "         sni: www.lyft.com";
 
   private final Context appContext = ApplicationProvider.getApplicationContext();
   private Engine engine;
@@ -111,10 +107,10 @@ public class QuicTestServerTest {
 
   @Before
   public void setUpEngine() throws Exception {
-    TestJni.startQuicTestServer();
+    QuicTestServer.startQuicTestServer();
     CountDownLatch latch = new CountDownLatch(1);
-    engine = new AndroidEngineBuilder(appContext,
-                                      new Custom(String.format(CONFIG, TestJni.getServerPort())))
+    engine = new AndroidEngineBuilder(
+                 appContext, new Custom(String.format(CONFIG, QuicTestServer.getServerPort())))
                  .addLogLevel(LogLevel.WARN)
                  .setOnEngineRunning(() -> {
                    latch.countDown();
@@ -127,15 +123,14 @@ public class QuicTestServerTest {
   @After
   public void shutdownEngine() {
     engine.terminate();
-    TestJni.shutdownQuicTestServer();
+    QuicTestServer.shutdownQuicTestServer();
   }
 
   @Test
   public void get_simpleTxt() throws Exception {
     RequestScenario requestScenario = new RequestScenario()
                                           .setHttpMethod(RequestMethod.GET)
-                                          .addHeader("no_trailers", "true")
-                                          .setUrl(TestJni.getServerURL() + "/simple.txt");
+                                          .setUrl(QuicTestServer.getServerURL() + "/simple.txt");
 
     Response response = sendRequest(requestScenario);
 

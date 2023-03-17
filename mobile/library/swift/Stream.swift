@@ -37,7 +37,7 @@ public class Stream: NSObject {
   ///                        callback.
   ///
   /// - returns: This stream, for chaining syntax.
-  public func readData(_ byteCount: Int) -> Stream {
+  public func readData(_ byteCount: size_t) -> Stream {
     self.underlyingStream.readData(byteCount)
     return self
   }

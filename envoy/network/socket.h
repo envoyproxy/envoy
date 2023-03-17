@@ -177,7 +177,7 @@ public:
   /**
    * @param  milliseconds of round trip time of previous connection
    */
-  virtual void setRoundTripTime(std::chrono::milliseconds round_trip_time) PURE;
+  virtual void setRoundTripTime(std::chrono::milliseconds roundTripTime) PURE;
 };
 
 using ConnectionInfoSetterSharedPtr = std::shared_ptr<ConnectionInfoSetter>;

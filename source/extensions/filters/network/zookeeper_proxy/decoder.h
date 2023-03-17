@@ -4,7 +4,6 @@
 #include <string>
 
 #include "envoy/common/platform.h"
-#include "envoy/network/filter.h"
 
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/logger.h"
@@ -50,8 +49,7 @@ enum class OpCodes {
   SetAuth = 100,
   SetWatches = 101,
   GetEphemerals = 103,
-  GetAllChildrenNumber = 104,
-  SetWatches2 = 105
+  GetAllChildrenNumber = 104
 };
 
 enum class WatcherType { Children = 1, Data = 2, Any = 3 };
@@ -95,7 +93,6 @@ public:
   virtual void onMultiRequest() PURE;
   virtual void onReconfigRequest() PURE;
   virtual void onSetWatchesRequest() PURE;
-  virtual void onSetWatches2Request() PURE;
   virtual void onCheckWatchesRequest(const std::string& path, int32_t type) PURE;
   virtual void onRemoveWatchesRequest(const std::string& path, int32_t type) PURE;
   virtual void onCloseRequest() PURE;
@@ -115,8 +112,8 @@ class Decoder {
 public:
   virtual ~Decoder() = default;
 
-  virtual Network::FilterStatus onData(Buffer::Instance& data) PURE;
-  virtual Network::FilterStatus onWrite(Buffer::Instance& data) PURE;
+  virtual void onData(Buffer::Instance& data) PURE;
+  virtual void onWrite(Buffer::Instance& data) PURE;
 };
 
 using DecoderPtr = std::unique_ptr<Decoder>;
@@ -129,8 +126,8 @@ public:
         time_source_(time_source) {}
 
   // ZooKeeperProxy::Decoder
-  Network::FilterStatus onData(Buffer::Instance& data) override;
-  Network::FilterStatus onWrite(Buffer::Instance& data) override;
+  void onData(Buffer::Instance& data) override;
+  void onWrite(Buffer::Instance& data) override;
 
 private:
   enum class DecodeType { READ, WRITE };
@@ -139,15 +136,6 @@ private:
     MonotonicTime start_time;
   };
 
-  // decodeAndBuffer
-  // (1) prepends previous partial data to the current buffer,
-  // (2) decodes all full packet(s),
-  // (3) adds the rest of the data to the ZooKeeper filter buffer,
-  // (4) removes the prepended data.
-  Network::FilterStatus decodeAndBuffer(Buffer::Instance& data, DecodeType dtype,
-                                        Buffer::OwnedImpl& zk_filter_buffer);
-  void decodeAndBufferHelper(Buffer::Instance& data, DecodeType dtype,
-                             Buffer::OwnedImpl& zk_filter_buffer);
   void decode(Buffer::Instance& data, DecodeType dtype);
   void decodeOnData(Buffer::Instance& data, uint64_t& offset);
   void decodeOnWrite(Buffer::Instance& data, uint64_t& offset);
@@ -166,7 +154,6 @@ private:
   void parseMultiRequest(Buffer::Instance& data, uint64_t& offset, uint32_t len);
   void parseReconfigRequest(Buffer::Instance& data, uint64_t& offset, uint32_t len);
   void parseSetWatchesRequest(Buffer::Instance& data, uint64_t& offset, uint32_t len);
-  void parseSetWatches2Request(Buffer::Instance& data, uint64_t& offset, uint32_t len);
   void parseXWatchesRequest(Buffer::Instance& data, uint64_t& offset, uint32_t len, OpCodes opcode);
   void skipString(Buffer::Instance& data, uint64_t& offset);
   void skipStrings(Buffer::Instance& data, uint64_t& offset);
@@ -184,8 +171,6 @@ private:
   BufferHelper helper_;
   TimeSource& time_source_;
   absl::node_hash_map<int32_t, RequestBegin> requests_by_xid_;
-  Buffer::OwnedImpl zk_filter_read_buffer_;
-  Buffer::OwnedImpl zk_filter_write_buffer_;
 };
 
 } // namespace ZooKeeperProxy

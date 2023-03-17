@@ -15,7 +15,8 @@ const ConstSupportedBuckets default_buckets{};
 }
 
 HistogramStatisticsImpl::HistogramStatisticsImpl()
-    : supported_buckets_(default_buckets), computed_quantiles_(supportedQuantiles().size(), 0.0) {}
+    : supported_buckets_(default_buckets), computed_quantiles_(supportedQuantiles().size(), 0.0),
+      unit_(Histogram::Unit::Unspecified) {}
 
 HistogramStatisticsImpl::HistogramStatisticsImpl(const histogram_t* histogram_ptr,
                                                  Histogram::Unit unit,

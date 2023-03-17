@@ -570,7 +570,6 @@ public:
   virtual ~MatchingData() = default;
 
   virtual const ConnectionSocket& socket() const PURE;
-  virtual const StreamInfo::FilterState& filterState() const PURE;
 
   const ConnectionInfoProvider& connectionInfoProvider() const {
     return socket().connectionInfoProvider();

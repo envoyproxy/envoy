@@ -5,7 +5,6 @@
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/extensions/clusters/dynamic_forward_proxy/v3/cluster.pb.h"
 #include "envoy/extensions/clusters/dynamic_forward_proxy/v3/cluster.pb.validate.h"
-#include "envoy/router/string_accessor.h"
 
 #include "source/common/http/utility.h"
 #include "source/common/network/transport_socket_options_impl.h"
@@ -154,19 +153,8 @@ Cluster::LoadBalancer::chooseHost(Upstream::LoadBalancerContext* context) {
     return nullptr;
   }
 
-  const Router::StringAccessor* dynamic_host_filter_state = nullptr;
-  if (context->downstreamConnection()) {
-    dynamic_host_filter_state =
-        context->downstreamConnection()
-            ->streamInfo()
-            .filterState()
-            .getDataReadOnly<Router::StringAccessor>("envoy.upstream.dynamic_host");
-  }
-
   absl::string_view host;
-  if (dynamic_host_filter_state) {
-    host = dynamic_host_filter_state->asString();
-  } else if (context->downstreamHeaders()) {
+  if (context->downstreamHeaders()) {
     host = context->downstreamHeaders()->getHostValue();
   } else if (context->downstreamConnection()) {
     host = context->downstreamConnection()->requestedServerName();

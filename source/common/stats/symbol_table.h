@@ -396,10 +396,10 @@ private:
   void incRefCount(const StatName& stat_name);
 
   struct SharedSymbol {
-    SharedSymbol(Symbol symbol) : symbol_(symbol) {}
+    SharedSymbol(Symbol symbol) : symbol_(symbol), ref_count_(1) {}
 
     Symbol symbol_;
-    uint32_t ref_count_{1};
+    uint32_t ref_count_;
   };
 
   // This must be held during both encode() and free().

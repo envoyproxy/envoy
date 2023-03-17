@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"runtime"
 
 	"github.com/envoyproxy/envoy/contrib/golang/filters/http/source/go/pkg/api"
 	"google.golang.org/protobuf/types/known/structpb"
@@ -22,14 +21,8 @@ func (f *filter) sendLocalReply() api.StatusType {
 		echoBody = v.(string)
 	}
 
-	{
-		body := fmt.Sprintf("%s, path: %s\r\n", echoBody, f.path)
-		f.callbacks.SendLocalReply(403, body, headers, -1, "test-from-go")
-	}
-	// Force GC to free the body string.
-	// For the case that C++ shouldn't touch the memory of the body string,
-	// after the sendLocalReply function returns.
-	runtime.GC()
+	body := fmt.Sprintf("%s, path: %s\r\n", echoBody, f.path)
+	f.callbacks.SendLocalReply(403, body, headers, -1, "test-from-go")
 	return api.LocalReply
 }
 
@@ -67,4 +60,8 @@ func (f *filter) EncodeTrailers(trailers api.ResponseTrailerMap) api.StatusType 
 }
 
 func (f *filter) OnDestroy(reason api.DestroyReason) {
+}
+
+func (f *filter) Callbacks() api.FilterCallbacks {
+	return f.callbacks
 }

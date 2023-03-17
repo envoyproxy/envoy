@@ -17,7 +17,7 @@ public:
   static RequestIDExtensionSharedPtr fromProto(
       const envoy::extensions::filters::network::http_connection_manager::v3::RequestIDExtension&
           config,
-      Server::Configuration::CommonFactoryContext& context);
+      Server::Configuration::FactoryContext& context);
 };
 
 } // namespace Http

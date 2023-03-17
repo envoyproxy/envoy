@@ -16,23 +16,23 @@ Http::FilterFactoryCb GolangFilterConfig::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::golang::v3alpha::Config& proto_config,
     const std::string&, Server::Configuration::FactoryContext&) {
 
-  ENVOY_LOG_MISC(debug, "load golang library at parse config: {} {}", proto_config.library_id(),
-                 proto_config.library_path());
+  FilterConfigSharedPtr config = std::make_shared<FilterConfig>(proto_config);
+
+  ENVOY_LOG_MISC(debug, "load golang library at parse config: {} {}", config->soId(),
+                 config->soPath());
 
   // loads DSO store a static map and a open handles leak will occur when the filter gets loaded and
   // unloaded.
   // TODO: unload DSO when filter updated.
-  auto res = Envoy::Dso::DsoManager::load(proto_config.library_id(), proto_config.library_path());
+  auto res = Envoy::Dso::DsoInstanceManager::load(config->soId(), config->soPath());
   if (!res) {
-    throw EnvoyException(fmt::format("golang_filter: load library failed: {} {}",
-                                     proto_config.library_id(), proto_config.library_path()));
+    throw EnvoyException(
+        fmt::format("golang_filter: load library failed: {} {}", config->soId(), config->soPath()));
   }
 
-  auto dso_lib = Dso::DsoManager::getDsoByID(proto_config.library_id());
-  FilterConfigSharedPtr config = std::make_shared<FilterConfig>(proto_config, dso_lib);
-
-  return [config, dso_lib](Http::FilterChainFactoryCallbacks& callbacks) {
-    auto filter = std::make_shared<Filter>(config, dso_lib);
+  return [config](Http::FilterChainFactoryCallbacks& callbacks) {
+    auto filter = std::make_shared<Filter>(
+        config, Dso::DsoInstanceManager::getDsoInstanceByID(config->soId()));
     callbacks.addStreamFilter(filter);
     callbacks.addAccessLogHandler(filter);
   };
@@ -46,9 +46,10 @@ GolangFilterConfig::createRouteSpecificFilterConfigTyped(
 }
 
 /**
- * Static registration for the Golang filter. @see RegisterFactory.
+ * Static registration for the golang extensions filter. @see RegisterFactory.
  */
-REGISTER_FACTORY(GolangFilterConfig, Server::Configuration::NamedHttpFilterConfigFactory);
+LEGACY_REGISTER_FACTORY(GolangFilterConfig, Server::Configuration::NamedHttpFilterConfigFactory,
+                        "envoy.golang");
 
 } // namespace Golang
 } // namespace HttpFilters

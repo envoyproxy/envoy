@@ -42,25 +42,6 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
-    name = "cds_integration_test",
-    srcs = ["cds_integration_test.cc"],
-    exec_properties = {
-        # TODO(willengflow): Remove this once the sandboxNetwork=off works for ipv4 localhost addresses.
-        "sandboxNetwork": "standard",
-    },
-    external_deps = [
-        "abseil_strings",
-    ],
-    repository = "@envoy",
-    deps = [
-        ":xds_integration_test_lib",
-        "@envoy//test/test_common:utility_lib",
-        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
-        "@envoy_api//envoy/service/runtime/v3:pkg_cc_proto",
-    ],
-)
-
-envoy_cc_test(
     name = "sds_integration_test",
     srcs = [
         "sds_integration_test.cc",
@@ -98,7 +79,7 @@ envoy_cc_test_library(
     ],
     repository = "@envoy",
     deps = [
-        ":test_engine_builder_lib",
+        "//library/cc:engine_builder_lib",
         "//library/common/http:client_lib",
         "//library/common/http:header_utility_lib",
         "//library/common/types:c_types_lib",
@@ -120,33 +101,31 @@ envoy_cc_test_library(
     deps = [
         ":base_client_integration_test_lib",
         "@envoy//source/common/config:api_version_lib",
-        "@envoy//source/common/grpc:google_grpc_creds_lib",
         "@envoy//test/common/grpc:grpc_client_integration_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
     ],
 )
 
-# interface libs for test servers` jni implementations
+# interface libs for quic test server's jni implementation
 envoy_cc_test_library(
-    name = "test_server_interface_lib",
+    name = "quic_test_server_interface_lib",
     srcs = [
-        "test_server.cc",
-        "test_server_interface.cc",
+        "quic_test_server.cc",
+        "quic_test_server_interface.cc",
     ],
     hdrs = [
-        "test_server.h",
-        "test_server_interface.h",
+        "quic_test_server.h",
+        "quic_test_server_interface.h",
     ],
     data = [
         "@envoy//test/config/integration/certs",
     ],
     repository = "@envoy",
     deps = [
-        "@envoy//test/integration:autonomous_upstream_lib",
+        ":autonomous_upstream_lib",
         "@envoy//source/exe:process_wide_lib",
         "@envoy//test/config:utility_lib",
-        "@envoy//test/integration:utility_lib",
         "@envoy//test/mocks/server:transport_socket_factory_context_mocks",
         "@envoy//test/test_common:environment_lib",
         "@envoy_build_config//:extension_registry",
@@ -159,15 +138,15 @@ envoy_cc_test_library(
 )
 
 envoy_cc_test_library(
-    name = "test_engine_builder_lib",
+    name = "autonomous_upstream_lib",
     srcs = [
-        "test_engine_builder.cc",
+        "autonomous_upstream.cc",
     ],
     hdrs = [
-        "test_engine_builder.h",
+        "autonomous_upstream.h",
     ],
     repository = "@envoy",
     deps = [
-        "//library/cc:engine_builder_lib",
+        "@envoy//test/integration:fake_upstream_lib",
     ],
 )

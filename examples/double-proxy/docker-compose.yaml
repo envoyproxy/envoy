@@ -1,23 +1,27 @@
+version: "3.8"
 services:
+
+  flask_service:
+    build:
+      context: ../shared/flask
+    image: flask_service:python-3.10-slim-bullseye
+    restart: "no"
+    deploy:
+      replicas: 0
 
   proxy-frontend:
     build:
-      dockerfile: ../shared/envoy/Dockerfile
+      context: .
+      dockerfile: Dockerfile-proxy
     networks:
       edge:
-    depends_on:
-      app:
-        condition: service_healthy
     ports:
     - "10000:10000"
 
   app:
     build:
-      context: ../shared/python
-      target: aiohttp-postgres-service
-    depends_on:
-      proxy-postgres-frontend:
-        condition: service_started
+      context: .
+      dockerfile: Dockerfile-app
     networks:
       edge:
       postgres-frontend:
@@ -26,13 +30,8 @@ services:
 
   proxy-postgres-frontend:
     build:
-      dockerfile: ../shared/envoy/Dockerfile
-      target: envoy-double-proxy-frontend
-      args:
-        ENVOY_CONFIG: envoy-frontend.yaml
-    depends_on:
-      proxy-postgres-backend:
-        condition: service_started
+      context: .
+      dockerfile: Dockerfile-proxy-frontend
     networks:
       postgres-frontend:
         aliases:
@@ -41,13 +40,8 @@ services:
 
   proxy-postgres-backend:
     build:
-      dockerfile: ../shared/envoy/Dockerfile
-      target: envoy-double-proxy-backend
-      args:
-        ENVOY_CONFIG: envoy-backend.yaml
-    depends_on:
-      postgres:
-        condition: service_healthy
+      context: .
+      dockerfile: Dockerfile-proxy-backend
     networks:
       postgres-backend:
       postgres-in-between:

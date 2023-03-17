@@ -9,7 +9,6 @@ envoy_cc_test(
     srcs = ["engine_common_test.cc"],
     repository = "@envoy",
     deps = [
-        "//library/cc:engine_builder_lib",
         "//library/common:engine_common_lib",
         "@envoy_build_config//:extension_registry",
     ],
@@ -20,7 +19,6 @@ envoy_cc_test(
     srcs = ["engine_test.cc"],
     repository = "@envoy",
     deps = [
-        "//library/cc:engine_builder_lib",
         "//library/common:envoy_main_interface_lib_no_stamp",
         "//library/common/types:c_types_lib",
         "@envoy//test/common/http:common_lib",

@@ -2,8 +2,6 @@
 
 #include "envoy/network/connection.h"
 #include "envoy/network/filter.h"
-#include "envoy/router/string_accessor.h"
-#include "envoy/stream_info/uint32_accessor.h"
 #include "envoy/upstream/thread_local_cluster.h"
 
 #include "source/common/common/assert.h"
@@ -27,23 +25,11 @@ ProxyFilter::ProxyFilter(ProxyFilterConfigSharedPtr config) : config_(std::move(
 using LoadDnsCacheEntryStatus = Common::DynamicForwardProxy::DnsCache::LoadDnsCacheEntryStatus;
 
 Network::FilterStatus ProxyFilter::onNewConnection() {
-  const Router::StringAccessor* dynamic_host_filter_state =
-      read_callbacks_->connection()
-          .streamInfo()
-          .filterState()
-          ->getDataReadOnly<Router::StringAccessor>("envoy.upstream.dynamic_host");
-
-  absl::string_view host;
-  if (dynamic_host_filter_state) {
-    host = dynamic_host_filter_state->asString();
-  } else {
-    host = read_callbacks_->connection().requestedServerName();
-  }
-
+  absl::string_view sni = read_callbacks_->connection().requestedServerName();
   ENVOY_CONN_LOG(trace, "sni_dynamic_forward_proxy: new connection with server name '{}'",
-                 read_callbacks_->connection(), host);
+                 read_callbacks_->connection(), sni);
 
-  if (host.empty()) {
+  if (sni.empty()) {
     return Network::FilterStatus::Continue;
   }
 
@@ -55,21 +41,9 @@ Network::FilterStatus ProxyFilter::onNewConnection() {
     return Network::FilterStatus::StopIteration;
   }
 
-  const StreamInfo::UInt32Accessor* dynamic_port_filter_state =
-      read_callbacks_->connection()
-          .streamInfo()
-          .filterState()
-          ->getDataReadOnly<StreamInfo::UInt32Accessor>("envoy.upstream.dynamic_port");
+  uint32_t default_port = config_->port();
 
-  uint32_t port;
-  if (dynamic_port_filter_state != nullptr && dynamic_port_filter_state->value() > 0 &&
-      dynamic_port_filter_state->value() <= 65535) {
-    port = dynamic_port_filter_state->value();
-  } else {
-    port = config_->port();
-  }
-
-  auto result = config_->cache().loadDnsCacheEntry(host, port, false, *this);
+  auto result = config_->cache().loadDnsCacheEntry(sni, default_port, false, *this);
 
   cache_load_handle_ = std::move(result.handle_);
   if (cache_load_handle_ == nullptr) {

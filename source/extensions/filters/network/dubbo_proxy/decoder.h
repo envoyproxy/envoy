@@ -71,7 +71,7 @@ public:
   };
 
   DecoderStateMachine(Protocol& protocol, Delegate& delegate)
-      : protocol_(protocol), delegate_(delegate) {}
+      : protocol_(protocol), delegate_(delegate), state_(ProtocolState::OnDecodeStreamHeader) {}
 
   /**
    * Consumes as much data from the configured Buffer as possible and executes the decoding state
@@ -112,7 +112,7 @@ private:
   Protocol& protocol_;
   Delegate& delegate_;
 
-  ProtocolState state_{ProtocolState::OnDecodeStreamHeader};
+  ProtocolState state_;
   ActiveStream* active_stream_{nullptr};
 };
 

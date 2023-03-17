@@ -2,7 +2,8 @@ version: "3.7"
 services:
   envoy-stats:
     build:
-      dockerfile: ../shared/envoy/Dockerfile
+      context: .
+      dockerfile: Dockerfile-zstd
     ports:
     - "${PORT_PROXY:-10000}:10000"
     - "${PORT_ADMIN0:-9901}:9901"
@@ -10,5 +11,5 @@ services:
 
   service:
     build:
-      context: ../shared/python
-      target: aiohttp-data-service
+      context: .
+      dockerfile: Dockerfile-service

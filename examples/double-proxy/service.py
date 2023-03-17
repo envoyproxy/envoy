@@ -1,22 +1,21 @@
-from aiohttp import web
+import sys
 
-# TODO(phlax): shift to aiopg
+from flask import Flask
+
 import psycopg2
 
-routes = web.RouteTableDef()
+app = Flask(__name__)
 
 
-@routes.get("/")
-async def get(request):
+@app.route('/')
+def hello():
     conn = psycopg2.connect("host=postgres user=postgres")
     cur = conn.cursor()
     cur.execute('SELECT version()')
     msg = 'Connected to Postgres, version: %s' % cur.fetchone()
     cur.close()
-    return web.Response(text=msg)
+    return msg
 
 
 if __name__ == "__main__":
-    app = web.Application()
-    app.add_routes(routes)
-    web.run_app(app, host='0.0.0.0', port=8080)
+    app.run(host='0.0.0.0', port=8000)

@@ -7,7 +7,6 @@ import io.envoyproxy.envoymobile.engine.types.EnvoyLogger;
 import io.envoyproxy.envoymobile.engine.types.EnvoyNetworkType;
 import io.envoyproxy.envoymobile.engine.types.EnvoyOnEngineRunning;
 import io.envoyproxy.envoymobile.engine.types.EnvoyStringAccessor;
-import io.envoyproxy.envoymobile.engine.types.EnvoyStatus;
 
 import java.util.Map;
 
@@ -40,12 +39,12 @@ public class AndroidEngineImpl implements EnvoyEngine {
   }
 
   @Override
-  public EnvoyStatus runWithYaml(String configurationYAML, String logLevel) {
+  public int runWithYaml(String configurationYAML, String logLevel) {
     return envoyEngine.runWithYaml(configurationYAML, logLevel);
   }
 
   @Override
-  public EnvoyStatus runWithConfig(EnvoyConfiguration envoyConfiguration, String logLevel) {
+  public int runWithConfig(EnvoyConfiguration envoyConfiguration, String logLevel) {
     return envoyEngine.runWithConfig(envoyConfiguration, logLevel);
   }
 

@@ -19,10 +19,6 @@ final class SendTrailersTests: XCTestCase {
     let matcherTrailerValue = "test.code"
     let config =
 """
-listener_manager:
-    name: envoy.listener_manager_impl.api
-    typed_config:
-      "@type": type.googleapis.com/envoy.config.listener.v3.ApiListenerManager
 static_resources:
   listeners:
   - name: base_api_listener
@@ -73,6 +69,7 @@ static_resources:
 
     let requestHeaders = RequestHeadersBuilder(method: .get, scheme: "https",
                                                authority: "example.com", path: "/test")
+      .addUpstreamHttpProtocol(.http2)
       .build()
     let body = try XCTUnwrap("match_me".data(using: .utf8))
     let requestTrailers = RequestTrailersBuilder()

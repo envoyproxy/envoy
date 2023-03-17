@@ -297,8 +297,7 @@ typed_config:
     codec_client_->close();
   }
 
-  const CookieNames default_cookie_names_{"BearerToken", "OauthHMAC", "OauthExpires", "IdToken",
-                                          "RefreshToken"};
+  const CookieNames default_cookie_names_{"BearerToken", "OauthHMAC", "OauthExpires"};
   envoy::config::listener::v3::Listener listener_config_;
   std::string listener_name_{"http"};
   FakeHttpConnectionPtr lds_connection_;

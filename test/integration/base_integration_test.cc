@@ -571,13 +571,11 @@ void BaseIntegrationTest::createXdsConnection() {
 }
 
 void BaseIntegrationTest::cleanUpXdsConnection() {
-  if (xds_connection_ != nullptr) {
-    AssertionResult result = xds_connection_->close();
-    RELEASE_ASSERT(result, result.message());
-    result = xds_connection_->waitForDisconnect();
-    RELEASE_ASSERT(result, result.message());
-    xds_connection_.reset();
-  }
+  AssertionResult result = xds_connection_->close();
+  RELEASE_ASSERT(result, result.message());
+  result = xds_connection_->waitForDisconnect();
+  RELEASE_ASSERT(result, result.message());
+  xds_connection_.reset();
 }
 
 AssertionResult BaseIntegrationTest::compareDiscoveryRequest(
@@ -665,10 +663,9 @@ AssertionResult BaseIntegrationTest::waitForPortAvailable(uint32_t port,
   Event::TestTimeSystem::RealTimeBound bound(timeout);
   while (bound.withinBound()) {
     try {
-      Network::TcpListenSocket give_me_a_name(
-          Network::Utility::getAddressWithPort(
-              *Network::Test::getCanonicalLoopbackAddress(version_), port),
-          nullptr, true);
+      Network::TcpListenSocket(Network::Utility::getAddressWithPort(
+                                   *Network::Test::getCanonicalLoopbackAddress(version_), port),
+                               nullptr, true);
       return AssertionSuccess();
     } catch (const EnvoyException&) {
       // The nature of this function requires using a real sleep here.

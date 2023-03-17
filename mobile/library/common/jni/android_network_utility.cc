@@ -11,8 +11,7 @@
 // because AndroidNetworkLibray can be called in non-Android platform with mock interfaces.
 
 bool jvm_cert_is_issued_by_known_root(JNIEnv* env, jobject result) {
-  jclass jcls_AndroidCertVerifyResult =
-      find_class("io.envoyproxy.envoymobile.utilities.AndroidCertVerifyResult");
+  jclass jcls_AndroidCertVerifyResult = find_class("org.chromium.net.AndroidCertVerifyResult");
   jmethodID jmid_isIssuedByKnownRoot =
       env->GetMethodID(jcls_AndroidCertVerifyResult, "isIssuedByKnownRoot", "()Z");
   ASSERT(jmid_isIssuedByKnownRoot);
@@ -22,8 +21,7 @@ bool jvm_cert_is_issued_by_known_root(JNIEnv* env, jobject result) {
 }
 
 envoy_cert_verify_status_t jvm_cert_get_status(JNIEnv* env, jobject j_result) {
-  jclass jcls_AndroidCertVerifyResult =
-      find_class("io.envoyproxy.envoymobile.utilities.AndroidCertVerifyResult");
+  jclass jcls_AndroidCertVerifyResult = find_class("org.chromium.net.AndroidCertVerifyResult");
   jmethodID jmid_getStatus = env->GetMethodID(jcls_AndroidCertVerifyResult, "getStatus", "()I");
   ASSERT(jmid_getStatus);
   envoy_cert_verify_status_t result = CERT_VERIFY_STATUS_FAILED;
@@ -34,8 +32,7 @@ envoy_cert_verify_status_t jvm_cert_get_status(JNIEnv* env, jobject j_result) {
 }
 
 jobjectArray jvm_cert_get_certificate_chain_encoded(JNIEnv* env, jobject result) {
-  jclass jcls_AndroidCertVerifyResult =
-      find_class("io.envoyproxy.envoymobile.utilities.AndroidCertVerifyResult");
+  jclass jcls_AndroidCertVerifyResult = find_class("org.chromium.net.AndroidCertVerifyResult");
   jmethodID jmid_getCertificateChainEncoded =
       env->GetMethodID(jcls_AndroidCertVerifyResult, "getCertificateChainEncoded", "()[[B");
   jobjectArray certificate_chain =
@@ -61,11 +58,10 @@ static void ExtractCertVerifyResult(JNIEnv* env, jobject result, envoy_cert_veri
 jobject call_jvm_verify_x509_cert_chain(JNIEnv* env, const std::vector<std::string>& cert_chain,
                                         std::string auth_type, std::string host) {
   jni_log("[Envoy]", "jvm_verify_x509_cert_chain");
-  jclass jcls_AndroidNetworkLibrary =
-      find_class("io.envoyproxy.envoymobile.utilities.AndroidNetworkLibrary");
-  jmethodID jmid_verifyServerCertificates = env->GetStaticMethodID(
-      jcls_AndroidNetworkLibrary, "verifyServerCertificates",
-      "([[B[B[B)Lio/envoyproxy/envoymobile/utilities/AndroidCertVerifyResult;");
+  jclass jcls_AndroidNetworkLibrary = find_class("org.chromium.net.AndroidNetworkLibrary");
+  jmethodID jmid_verifyServerCertificates =
+      env->GetStaticMethodID(jcls_AndroidNetworkLibrary, "verifyServerCertificates",
+                             "([[B[B[B)Lorg/chromium/net/AndroidCertVerifyResult;");
   jobjectArray chain_byte_array = ToJavaArrayOfByteArray(env, cert_chain);
   jbyteArray auth_string = ToJavaByteArray(env, auth_type);
   jbyteArray host_string = ToJavaByteArray(env, host);

@@ -70,8 +70,13 @@ public:
     setUpstreamProtocol(GetParam().upstream_protocol);
   }
 
-  void setDownstreamOverrideStreamErrorOnInvalidHttpMessage();
-  void setUpstreamOverrideStreamErrorOnInvalidHttpMessage();
+  bool skipForH2Uhv() {
+#ifdef ENVOY_ENABLE_UHV
+    // Validation of upstream responses is not wired up yet
+    return GetParam().http2_implementation == Http2Impl::Oghttp2;
+#endif
+    return false;
+  }
 };
 
 class UpstreamDownstreamIntegrationTest

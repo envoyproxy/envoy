@@ -17,11 +17,12 @@ MockBufferBase<Buffer::WatermarkBuffer>::MockBufferBase()
 }
 template <>
 MockBufferBase<Buffer::OwnedImpl>::MockBufferBase(std::function<void()>, std::function<void()>,
-                                                  std::function<void()>) {
+                                                  std::function<void()>)
+    : Buffer::OwnedImpl() {
   ASSERT(0); // This constructor is not supported for OwnedImpl.
 }
 
-template <> MockBufferBase<Buffer::OwnedImpl>::MockBufferBase() {}
+template <> MockBufferBase<Buffer::OwnedImpl>::MockBufferBase() : Buffer::OwnedImpl() {}
 
 MockBufferFactory::MockBufferFactory() = default;
 MockBufferFactory::~MockBufferFactory() = default;

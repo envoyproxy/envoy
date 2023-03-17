@@ -23,9 +23,6 @@ if [[ -z "$NO_BUILD_SETUP" ]]; then
     . "$(dirname "$0")"/setup_cache.sh
     # shellcheck source=ci/build_setup.sh
     . "$(dirname "$0")"/build_setup.sh $build_setup_args
-
-    echo "building using ${NUM_CPUS} CPUs"
-    echo "building for ${ENVOY_BUILD_ARCH}"
 fi
 cd "${SRCDIR}"
 
@@ -37,6 +34,9 @@ else
   # Fall back to use the ENVOY_BUILD_ARCH itself.
   BUILD_ARCH_DIR="/linux/${ENVOY_BUILD_ARCH}"
 fi
+
+echo "building using ${NUM_CPUS} CPUs"
+echo "building for ${ENVOY_BUILD_ARCH}"
 
 function collect_build_profile() {
   declare -g build_profile_count=${build_profile_count:-1}
@@ -57,7 +57,6 @@ function bazel_with_collection() {
       cp --parents -f "$f" "${ENVOY_FAILED_TEST_LOGS}"
     done <<< "$failed_logs"
     popd
-    run_process_test_result
     exit "${BAZEL_STATUS}"
   fi
   collect_build_profile "$1"
@@ -164,7 +163,7 @@ function bazel_contrib_binary_build() {
 }
 
 function run_process_test_result() {
-  if [[ -z "$CI_SKIP_PROCESS_TEST_RESULTS" ]] && [[ $(find "$TEST_TMPDIR" -name "*_attempt_*.xml" 2> /dev/null) ]]; then
+  if [[ -z "$CI_SKIP_PROCESS_TEST_RESULTS" ]] && [[ $(find "$TEST_TMPDIR" -name "*_attempt.xml" 2> /dev/null) ]]; then
       echo "running flaky test reporting script"
       bazel run "${BAZEL_BUILD_OPTIONS[@]}" //ci/flaky_test:process_xml "$CI_TARGET"
   else
@@ -173,38 +172,27 @@ function run_process_test_result() {
 }
 
 function run_ci_verify () {
-    local images image oci_archive
-    echo "verify examples..."
+  echo "verify examples..."
+  OCI_TEMP_DIR="${ENVOY_DOCKER_BUILD_DIR}/image"
+  mkdir -p "${OCI_TEMP_DIR}"
 
-    images=("" "contrib" "google-vrp")
+  IMAGES=("envoy" "envoy-contrib" "envoy-google-vrp")
 
-    for image in "${images[@]}"; do
-        if [[ -n "$image" ]]; then
-            variant="${image}-dev"
-            filename="envoy-${image}.tar"
-        else
-            variant=dev
-            filename="envoy.tar"
-        fi
-        oci_archive="${ENVOY_DOCKER_BUILD_DIR}/docker/${filename}"
+  for IMAGE in "${IMAGES[@]}"; do
+    tar xvf "${ENVOY_DOCKER_BUILD_DIR}/docker/${IMAGE}.tar" -C "${OCI_TEMP_DIR}"
+    skopeo copy "oci:${OCI_TEMP_DIR}" "docker-daemon:envoyproxy/${IMAGE}-dev:latest"
+    rm -rf "${OCI_TEMP_DIR:?}/*"
+  done
 
-        echo "Copy oci image: oci-archive:${oci_archive} docker-daemon:envoyproxy/envoy:${variant}"
-        skopeo copy -q "oci-archive:${oci_archive}" "docker-daemon:envoyproxy/envoy:${variant}"
-        rm "$oci_archive"
-    done
+  rm -rf "${OCI_TEMP_DIR:?}"
 
-    docker images | grep envoy
-
-    export DEBIAN_FRONTEND=noninteractive
-    sudo apt-get -qq update -y
-    sudo apt-get -qq install -y --no-install-recommends expect
-    export DOCKER_NO_PULL=1
-    export DOCKER_RMI_CLEANUP=1
-    # This is set to simulate an environment where users have shared home drives protected
-    # by a strong umask (ie only group readable by default).
-    umask 027
-    chmod -R o-rwx examples/
-    "${ENVOY_SRCDIR}/ci/verify_examples.sh" "${@}" || exit
+  docker images
+  sudo apt-get update -y
+  sudo apt-get install -y -qq --no-install-recommends expect redis-tools
+  export DOCKER_NO_PULL=1
+  umask 027
+  chmod -R o-rwx examples/
+  "${ENVOY_SRCDIR}"/ci/verify_examples.sh "${@}" || exit
 }
 
 CI_TARGET=$1
@@ -465,21 +453,7 @@ elif [[ "$CI_TARGET" == "bazel.clang_tidy" ]]; then
   # clang-tidy will warn on standard library issues with libc++
   ENVOY_STDLIB="libstdc++"
   setup_clang_toolchain
-
-  export CLANG_TIDY_FIX_DIFF="${TEST_TMPDIR}/lint-fixes/clang-tidy-fixed.diff"
-  export FIX_YAML="${TEST_TMPDIR}/lint-fixes/clang-tidy-fixes.yaml"
-  export CLANG_TIDY_APPLY_FIXES=1
-  mkdir -p "${TEST_TMPDIR}/lint-fixes"
-  BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS[*]}" NUM_CPUS=$NUM_CPUS "${ENVOY_SRCDIR}"/ci/run_clang_tidy.sh "$@" || {
-      if [[ -s "$FIX_YAML" ]]; then
-          echo >&2
-          echo "Diff/yaml files with (some) fixes will be uploaded. Please check the artefacts for this PR run in the azure pipeline." >&2
-          echo >&2
-      else
-          echo "Clang-tidy failed." >&2
-      fi
-      exit 1
-  }
+  BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS[*]}" NUM_CPUS=$NUM_CPUS "${ENVOY_SRCDIR}"/ci/run_clang_tidy.sh "$@"
   exit 0
 elif [[ "$CI_TARGET" == "bazel.fuzz" ]]; then
   setup_clang_toolchain
@@ -553,19 +527,7 @@ elif [[ "$CI_TARGET" == "verify_distro" ]]; then
     bazel run "${BAZEL_BUILD_OPTIONS[@]}" //distribution:verify_packages "$PACKAGE_BUILD"
     exit 0
 elif [[ "$CI_TARGET" == "publish" ]]; then
-    # If we are on a non-main release branch but the patch version is 0 - then this branch
-    # has just been created, and the tag/release was cut from `main` - there is no need to
-    # create the tag/release from here
-    version="$(cat VERSION.txt)"
-    patch_version="$(echo "$version" | rev | cut -d. -f1)"
-    if [[ "$AZP_BRANCH" != "main" && "$patch_version" -eq 0 ]]; then
-        echo "Not creating a tag/release for ${version}"
-        exit 0
-    fi
-    # It can take some time to get here in CI so the branch may have changed - create the release
-    # from the current commit (as this only happens on non-PRs we are safe from merges)
-    BUILD_SHA="$(git rev-parse HEAD)"
-    bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/project:publish -- --publish-commitish="$BUILD_SHA"
+    bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/project:publish
     exit 0
 else
   echo "Invalid do_ci.sh target, see ci/README.md for valid targets."

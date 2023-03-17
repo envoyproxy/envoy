@@ -385,6 +385,7 @@ private:
     return absl::nullopt;
   }
 
+  const LoadBalancerType lb_type_;
   const std::unique_ptr<const envoy::config::cluster::v3::Cluster::RingHashLbConfig>
       lb_ring_hash_config_;
   const std::unique_ptr<const envoy::config::cluster::v3::Cluster::MaglevLbConfig>
@@ -425,13 +426,11 @@ private:
 
   Stats::Gauge* single_duplicate_stat_{};
 
-  TimeSource& time_source_;
+  const bool locality_weight_aware_;
+  const bool scale_locality_weight_;
+  const bool list_as_any_;
 
-  // Keep small members (bools and enums) at the end of class, to reduce alignment overhead.
-  const LoadBalancerType lb_type_;
-  const bool locality_weight_aware_ : 1;
-  const bool scale_locality_weight_ : 1;
-  const bool list_as_any_ : 1;
+  TimeSource& time_source_;
 
   friend class SubsetLoadBalancerInternalStateTester;
 };

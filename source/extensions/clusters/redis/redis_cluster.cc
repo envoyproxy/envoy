@@ -14,6 +14,10 @@ namespace Extensions {
 namespace Clusters {
 namespace Redis {
 
+namespace {
+Extensions::NetworkFilters::Common::Redis::Client::DoNothingPoolCallbacks null_pool_callbacks;
+} // namespace
+
 RedisCluster::RedisCluster(
     Server::Configuration::ServerFactoryContext& server_context,
     const envoy::config::cluster::v3::Cluster& cluster,
@@ -69,9 +73,6 @@ RedisCluster::RedisCluster(
 void RedisCluster::startPreInit() {
   for (const DnsDiscoveryResolveTargetPtr& target : dns_discovery_resolve_targets_) {
     target->startResolveDns();
-  }
-  if (!wait_for_warm_on_init_) {
-    onPreInitComplete();
   }
 }
 

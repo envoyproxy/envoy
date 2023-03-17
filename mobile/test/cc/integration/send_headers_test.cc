@@ -1,8 +1,7 @@
-#include "test/common/integration/test_engine_builder.h"
-
 #include "absl/synchronization/notification.h"
 #include "gtest/gtest.h"
 #include "library/cc/engine.h"
+#include "library/cc/engine_builder.h"
 #include "library/cc/envoy_error.h"
 #include "library/cc/log_level.h"
 #include "library/cc/request_headers_builder.h"
@@ -12,11 +11,7 @@
 namespace Envoy {
 namespace {
 
-const static std::string CONFIG = R"(
-listener_manager:
-    name: envoy.listener_manager_impl.api
-    typed_config:
-      "@type": type.googleapis.com/envoy.config.listener.v3.ApiListenerManager
+const static std::string CONFIG_TEMPLATE = R"(
 static_resources:
   listeners:
   - name: base_api_listener
@@ -60,9 +55,14 @@ struct Status {
   bool end_stream;
 };
 
-TEST(SendHeadersTest, CanSendHeaders) {
-  TestEngineBuilder engine_builder;
-  Platform::EngineSharedPtr engine = engine_builder.createEngine(CONFIG);
+TEST(TestSendHeaders, CanSendHeaders) {
+  Platform::EngineSharedPtr engine;
+  absl::Notification engine_running;
+  auto engine_builder = Platform::EngineBuilder(CONFIG_TEMPLATE);
+  engine = engine_builder.addLogLevel(Platform::LogLevel::debug)
+               .setOnEngineRunning([&]() { engine_running.Notify(); })
+               .build();
+  engine_running.WaitForNotification();
 
   Status status;
   absl::Notification stream_complete;

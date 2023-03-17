@@ -22,7 +22,7 @@ RequestHeadersBuilder::RequestHeadersBuilder(RequestMethod request_method, absl:
 
 void RequestHeadersBuilder::initialize(RequestMethod request_method, std::string scheme,
                                        std::string authority, std::string path) {
-  internalSet(":method", {std::string(requestMethodToString(request_method))});
+  internalSet(":method", {requestMethodToString(request_method)});
   internalSet(":scheme", {std::move(scheme)});
   internalSet(":authority", {std::move(authority)});
   internalSet(":path", {std::move(path)});
@@ -37,15 +37,9 @@ RequestHeadersBuilder& RequestHeadersBuilder::addRetryPolicy(const RetryPolicy& 
 }
 
 RequestHeadersBuilder&
-RequestHeadersBuilder::enableRequestCompression(CompressionAlgorithm algorithm) {
-  std::string value;
-  switch (algorithm) {
-  case CompressionAlgorithm::Gzip:
-    value = "gzip";
-  case CompressionAlgorithm::Brotli:
-    value = "brotli";
-  }
-  internalSet("x-envoy-mobile-compression", std::vector<std::string>{value});
+RequestHeadersBuilder::addUpstreamHttpProtocol(UpstreamHttpProtocol upstream_http_protocol) {
+  internalSet("x-envoy-mobile-upstream-protocol",
+              std::vector<std::string>{upstreamHttpProtocolToString(upstream_http_protocol)});
   return *this;
 }
 

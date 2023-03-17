@@ -24,9 +24,6 @@ load(
     _envoy_select_boringssl = "envoy_select_boringssl",
     _envoy_select_disable_logging = "envoy_select_disable_logging",
     _envoy_select_enable_http3 = "envoy_select_enable_http3",
-    _envoy_select_envoy_mobile_listener = "envoy_select_envoy_mobile_listener",
-    _envoy_select_envoy_mobile_request_compression = "envoy_select_envoy_mobile_request_compression",
-    _envoy_select_envoy_mobile_stats_reporting = "envoy_select_envoy_mobile_stats_reporting",
     _envoy_select_google_grpc = "envoy_select_google_grpc",
     _envoy_select_hot_restart = "envoy_select_hot_restart",
     _envoy_select_static_extension_registration = "envoy_select_static_extension_registration",
@@ -49,10 +46,6 @@ load(
     _envoy_py_test = "envoy_py_test",
     _envoy_py_test_binary = "envoy_py_test_binary",
     _envoy_sh_test = "envoy_sh_test",
-)
-load(
-    ":envoy_mobile_defines.bzl",
-    _envoy_mobile_defines = "envoy_mobile_defines",
 )
 load(
     "@envoy_build_config//:extensions_build_config.bzl",
@@ -228,9 +221,6 @@ envoy_select_admin_html = _envoy_select_admin_html
 envoy_select_admin_no_html = _envoy_select_admin_no_html
 envoy_select_admin_functionality = _envoy_select_admin_functionality
 envoy_select_static_extension_registration = _envoy_select_static_extension_registration
-envoy_select_envoy_mobile_request_compression = _envoy_select_envoy_mobile_request_compression
-envoy_select_envoy_mobile_stats_reporting = _envoy_select_envoy_mobile_stats_reporting
-envoy_select_envoy_mobile_listener = _envoy_select_envoy_mobile_listener
 envoy_select_boringssl = _envoy_select_boringssl
 envoy_select_disable_logging = _envoy_select_disable_logging
 envoy_select_google_grpc = _envoy_select_google_grpc
@@ -269,6 +259,3 @@ envoy_benchmark_test = _envoy_benchmark_test
 envoy_py_test = _envoy_py_test
 envoy_py_test_binary = _envoy_py_test_binary
 envoy_sh_test = _envoy_sh_test
-
-# Envoy Mobile defines (from envoy_mobile_defines.bz)
-envoy_mobile_defines = _envoy_mobile_defines

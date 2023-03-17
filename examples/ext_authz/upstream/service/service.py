@@ -1,14 +1,12 @@
-from aiohttp import web
+from flask import Flask, request
 
-routes = web.RouteTableDef()
+app = Flask(__name__)
 
 
-@routes.get("/service")
-async def get(request):
-    return web.Response(text=f"Hello {request.headers.get('x-current-user')} from behind Envoy!")
+@app.route('/service')
+def hello():
+    return 'Hello ' + request.headers.get('x-current-user') + ' from behind Envoy!'
 
 
 if __name__ == "__main__":
-    app = web.Application()
-    app.add_routes(routes)
-    web.run_app(app, host='0.0.0.0', port=8080)
+    app.run(host='0.0.0.0', port=8080)

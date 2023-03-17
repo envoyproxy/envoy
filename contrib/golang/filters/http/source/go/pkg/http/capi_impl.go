@@ -41,12 +41,7 @@ import (
 )
 
 const (
-	ValueRouteName           = 1
-	ValueFilterChainName     = 2
-	ValueProtocol            = 3
-	ValueResponseCode        = 4
-	ValueResponseCodeDetails = 5
-	ValueAttemptCount        = 6
+	ValueRouteName = 1
 )
 
 type httpCApiImpl struct{}
@@ -58,13 +53,13 @@ func handleCApiStatus(status C.CAPIStatus) {
 	case C.CAPIOK:
 		return
 	case C.CAPIFilterIsGone:
-		panic(errRequestFinished)
+		panic("request has been finished")
 	case C.CAPIFilterIsDestroy:
-		panic(errFilterDestroyed)
+		panic("golang filter has been destroyed")
 	case C.CAPINotInGo:
-		panic(errNotInGo)
+		panic("not proccessing Go")
 	case C.CAPIInvalidPhase:
-		panic(errInvalidPhase)
+		panic("invalid phase, maybe headers/buffer already continued")
 	}
 }
 
@@ -73,8 +68,6 @@ func (c *httpCApiImpl) HttpContinue(r unsafe.Pointer, status uint64) {
 	handleCApiStatus(res)
 }
 
-// Only may panic with errRequestFinished, errFilterDestroyed or errNotInGo,
-// won't panic with errInvalidPhase and others, otherwise will cause deadloop, see RecoverPanic for the details.
 func (c *httpCApiImpl) HttpSendLocalReply(r unsafe.Pointer, response_code int, body_text string, headers map[string]string, grpc_status int64, details string) {
 	hLen := len(headers)
 	strs := make([]string, 0, hLen)
@@ -90,7 +83,7 @@ func (c *httpCApiImpl) HttpGetHeader(r unsafe.Pointer, key *string, value *strin
 	handleCApiStatus(res)
 }
 
-func (c *httpCApiImpl) HttpCopyHeaders(r unsafe.Pointer, num uint64, bytes uint64) map[string][]string {
+func (c *httpCApiImpl) HttpCopyHeaders(r unsafe.Pointer, num uint64, bytes uint64) map[string]string {
 	// TODO: use a memory pool for better performance,
 	// since these go strings in strs, will be copied into the following map.
 	strs := make([]string, num*2)
@@ -105,29 +98,18 @@ func (c *httpCApiImpl) HttpCopyHeaders(r unsafe.Pointer, num uint64, bytes uint6
 	res := C.envoyGoFilterHttpCopyHeaders(r, unsafe.Pointer(sHeader.Data), unsafe.Pointer(bHeader.Data))
 	handleCApiStatus(res)
 
-	m := make(map[string][]string, num)
+	m := make(map[string]string, num)
 	for i := uint64(0); i < num*2; i += 2 {
 		key := strs[i]
 		value := strs[i+1]
-
-		if v, found := m[key]; !found {
-			m[key] = []string{value}
-		} else {
-			m[key] = append(v, value)
-		}
+		m[key] = value
 	}
 	runtime.KeepAlive(buf)
 	return m
 }
 
-func (c *httpCApiImpl) HttpSetHeader(r unsafe.Pointer, key *string, value *string, add bool) {
-	var act C.headerAction
-	if add {
-		act = C.HeaderAdd
-	} else {
-		act = C.HeaderSet
-	}
-	res := C.envoyGoFilterHttpSetHeaderHelper(r, unsafe.Pointer(key), unsafe.Pointer(value), act)
+func (c *httpCApiImpl) HttpSetHeader(r unsafe.Pointer, key *string, value *string) {
+	res := C.envoyGoFilterHttpSetHeader(r, unsafe.Pointer(key), unsafe.Pointer(value))
 	handleCApiStatus(res)
 }
 
@@ -161,7 +143,7 @@ func (c *httpCApiImpl) HttpSetBufferHelper(r unsafe.Pointer, bufferPtr uint64, v
 	handleCApiStatus(res)
 }
 
-func (c *httpCApiImpl) HttpCopyTrailers(r unsafe.Pointer, num uint64, bytes uint64) map[string][]string {
+func (c *httpCApiImpl) HttpCopyTrailers(r unsafe.Pointer, num uint64, bytes uint64) map[string]string {
 	// TODO: use a memory pool for better performance,
 	// but, should be very careful, since string is const in go,
 	// and we have to make sure the strings is not using before reusing,
@@ -174,16 +156,11 @@ func (c *httpCApiImpl) HttpCopyTrailers(r unsafe.Pointer, num uint64, bytes uint
 	res := C.envoyGoFilterHttpCopyTrailers(r, unsafe.Pointer(sHeader.Data), unsafe.Pointer(bHeader.Data))
 	handleCApiStatus(res)
 
-	m := make(map[string][]string, num)
+	m := make(map[string]string, num)
 	for i := uint64(0); i < num*2; i += 2 {
 		key := strs[i]
 		value := strs[i+1]
-
-		if v, found := m[key]; !found {
-			m[key] = []string{value}
-		} else {
-			m[key] = append(v, value)
-		}
+		m[key] = value
 	}
 	return m
 }
@@ -193,27 +170,12 @@ func (c *httpCApiImpl) HttpSetTrailer(r unsafe.Pointer, key *string, value *stri
 	handleCApiStatus(res)
 }
 
-func (c *httpCApiImpl) HttpGetStringValue(r unsafe.Pointer, id int) (string, bool) {
+func (c *httpCApiImpl) HttpGetRouteName(r unsafe.Pointer) string {
 	var value string
-	// TODO: add a lock to protect filter->req_->strValue field in the Envoy side, from being writing concurrency,
-	// since there might be multiple concurrency goroutines invoking this API on the Go side.
-	res := C.envoyGoFilterHttpGetStringValue(r, C.int(id), unsafe.Pointer(&value))
-	if res == C.CAPIValueNotFound {
-		return "", false
-	}
+	res := C.envoyGoFilterHttpGetStringValue(r, ValueRouteName, unsafe.Pointer(&value))
 	handleCApiStatus(res)
 	// copy the memory from c to Go.
-	return strings.Clone(value), true
-}
-
-func (c *httpCApiImpl) HttpGetIntegerValue(r unsafe.Pointer, id int) (uint64, bool) {
-	var value uint64
-	res := C.envoyGoFilterHttpGetIntegerValue(r, C.int(id), unsafe.Pointer(&value))
-	if res == C.CAPIValueNotFound {
-		return 0, false
-	}
-	handleCApiStatus(res)
-	return value, true
+	return strings.Clone(value)
 }
 
 func (c *httpCApiImpl) HttpFinalize(r unsafe.Pointer, reason int) {

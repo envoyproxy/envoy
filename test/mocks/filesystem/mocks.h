@@ -27,7 +27,6 @@ public:
   bool isOpen() const override { return is_open_; };
   MOCK_METHOD(std::string, path, (), (const));
   MOCK_METHOD(DestinationType, destinationType, (), (const));
-  MOCK_METHOD(Api::IoCallResult<FileInfo>, info, ());
 
   // The first parameter here must be `const FlagSet&` otherwise it doesn't compile with libstdc++
   MOCK_METHOD(Api::IoCallBoolResult, open_, (const FlagSet& flag));
@@ -66,7 +65,6 @@ public:
   MOCK_METHOD(std::string, fileReadToEnd, (const std::string&));
   MOCK_METHOD(PathSplitResult, splitPathFromFilename, (absl::string_view));
   MOCK_METHOD(bool, illegalPath, (const std::string&));
-  MOCK_METHOD(Api::IoCallResult<FileInfo>, stat, (absl::string_view));
 };
 
 class MockWatcher : public Watcher {

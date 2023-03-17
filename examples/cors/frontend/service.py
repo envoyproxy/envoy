@@ -1,18 +1,14 @@
+from flask import Flask, send_from_directory
 import os
 
-from aiohttp import web
-
-routes = web.RouteTableDef()
+app = Flask(__name__)
 
 
-@routes.get("/")
-async def get(request):
+@app.route('/')
+def index():
     file_dir = os.path.dirname(os.path.realpath(__file__))
-    with open(f"{file_dir}/index.html") as f:
-        return web.Response(text=f.read())
+    return send_from_directory(file_dir, 'index.html')
 
 
 if __name__ == "__main__":
-    app = web.Application()
-    app.add_routes(routes)
-    web.run_app(app, host='0.0.0.0', port=8080)
+    app.run(host='0.0.0.0', port=8000)

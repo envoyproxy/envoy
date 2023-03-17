@@ -206,12 +206,11 @@ private:
     Http::ResponseHeaderMapPtr response_headers_;
     Buffer::InstancePtr response_body_;
     const std::string& hostname_;
-    Network::ConnectionInfoProviderSharedPtr local_connection_info_provider_;
-    // Keep small members (bools and enums) at the end of class, to reduce alignment overhead.
     const Http::Protocol protocol_;
-    bool expect_reset_ : 1;
-    bool reuse_connection_ : 1;
-    bool request_in_flight_ : 1;
+    Network::ConnectionInfoProviderSharedPtr local_connection_info_provider_;
+    bool expect_reset_{};
+    bool reuse_connection_ = false;
+    bool request_in_flight_ = false;
   };
 
   using HttpActiveHealthCheckSessionPtr = std::unique_ptr<HttpActiveHealthCheckSession>;

@@ -27,7 +27,6 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-using testing::Return;
 using testing::ReturnRef;
 using testing::StrictMock;
 

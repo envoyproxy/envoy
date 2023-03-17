@@ -73,7 +73,7 @@ public:
   }
   Envoy::Http::RequestIDExtensionSharedPtr
   createExtensionInstance(const Protobuf::Message& config,
-                          Server::Configuration::CommonFactoryContext& context) override {
+                          Server::Configuration::FactoryContext& context) override {
     return std::make_shared<UUIDRequestIDExtension>(
         MessageUtil::downcastAndValidate<
             const envoy::extensions::request_id::uuid::v3::UuidRequestIdConfig&>(

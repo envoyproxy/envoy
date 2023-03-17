@@ -17,8 +17,6 @@ namespace Extensions {
 namespace HttpFilters {
 namespace {
 
-using ::testing::Return;
-
 // Limit the number of threads for the FileSystemBufferFilterConfig.manager_config.thread_count to
 // 8 to ensure test stays responsive.
 static const uint32_t kMaxAsyncFileManagerThreadCount = 8;

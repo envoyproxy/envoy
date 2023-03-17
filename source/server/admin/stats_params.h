@@ -1,6 +1,7 @@
 #pragma once
 
 #include <memory>
+#include <regex>
 #include <string>
 
 #include "envoy/buffer/buffer.h"
@@ -24,7 +25,6 @@ constexpr absl::string_view TextReadouts = "TextReadouts";
 enum class StatsFormat {
 #ifdef ENVOY_ADMIN_HTML
   Html,
-  ActiveHtml,
 #endif
   Json,
   Prometheus,
@@ -60,6 +60,7 @@ struct StatsParams {
   bool pretty_{false};
   StatsFormat format_{StatsFormat::Text};
   std::string filter_string_;
+  std::shared_ptr<std::regex> filter_;
   std::shared_ptr<re2::RE2> re2_filter_;
   Utility::HistogramBucketsMode histogram_buckets_mode_{Utility::HistogramBucketsMode::NoBuckets};
   Http::Utility::QueryParams query_;

@@ -12,6 +12,7 @@ import io.envoyproxy.envoymobile.ResponseHeaders;
 import io.envoyproxy.envoymobile.ResponseTrailers;
 import io.envoyproxy.envoymobile.Stream;
 import io.envoyproxy.envoymobile.StreamIntel;
+import io.envoyproxy.envoymobile.UpstreamHttpProtocol;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;

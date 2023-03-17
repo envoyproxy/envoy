@@ -18,7 +18,7 @@ android_library(
     deps = [
         "//library/java/io/envoyproxy/envoymobile/engine:envoy_base_engine_lib",
         "//library/java/io/envoyproxy/envoymobile/engine/types:envoy_c_types_lib",
-        "//library/java/io/envoyproxy/envoymobile/utilities",
+        "//library/java/org/chromium/net",
         "@maven//:androidx_annotation_annotation",
         "@maven//:androidx_core_core",
     ],

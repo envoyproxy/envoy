@@ -10,6 +10,7 @@
 using testing::_;
 using testing::Const;
 using testing::Invoke;
+using testing::Return;
 using testing::ReturnPointee;
 using testing::ReturnRef;
 
@@ -183,12 +184,6 @@ MockStreamInfo::MockStreamInfo()
       .WillByDefault(Invoke([this](const BytesMeterSharedPtr& downstream_bytes_meter) {
         downstream_bytes_meter_ = downstream_bytes_meter;
       }));
-  ON_CALL(*this, setDownstreamTransportFailureReason(_))
-      .WillByDefault(Invoke([this](absl::string_view failure_reason) {
-        downstream_transport_failure_reason_ = std::string(failure_reason);
-      }));
-  ON_CALL(*this, downstreamTransportFailureReason())
-      .WillByDefault(ReturnPointee(&downstream_transport_failure_reason_));
 }
 
 MockStreamInfo::~MockStreamInfo() = default;

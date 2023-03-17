@@ -1,12 +1,13 @@
+version: "3.8"
 services:
 
   proxy:
     build:
-      dockerfile: ../shared/envoy/Dockerfile
-      args:
-        ENVOY_VARIANT: contrib-dev
+      context: .
+      dockerfile: Dockerfile-proxy
     ports:
     - "${PORT_ADMIN:-8001}:8001"
+    command: "/usr/local/bin/envoy -c /etc/envoy.yaml"
 
   postgres:
     build:

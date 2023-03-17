@@ -71,8 +71,7 @@ Config::SharedConfig::SharedConfig(
     const envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy& config,
     Server::Configuration::FactoryContext& context)
     : stats_scope_(context.scope().createScope(fmt::format("tcp.{}", config.stat_prefix()))),
-      stats_(generateStats(*stats_scope_)),
-      flush_access_log_on_connected_(config.flush_access_log_on_connected()) {
+      stats_(generateStats(*stats_scope_)) {
   if (config.has_idle_timeout()) {
     const uint64_t timeout = DurationUtil::durationToMilliseconds(config.idle_timeout());
     if (timeout > 0) {
@@ -563,9 +562,9 @@ const Router::MetadataMatchCriteria* Filter::metadataMatchCriteria() {
   }
 }
 
-ProtobufTypes::MessagePtr TunnelResponseHeadersOrTrailers::serializeAsProto() const {
+ProtobufTypes::MessagePtr TunnelResponseHeaders::serializeAsProto() const {
   auto proto_out = std::make_unique<envoy::config::core::v3::HeaderMap>();
-  value().iterate([&proto_out](const Http::HeaderEntry& e) -> Http::HeaderMap::Iterate {
+  response_headers_->iterate([&proto_out](const Http::HeaderEntry& e) -> Http::HeaderMap::Iterate {
     auto* new_header = proto_out->add_headers();
     new_header->set_key(std::string(e.key().getStringView()));
     new_header->set_value(std::string(e.value().getStringView()));
@@ -578,10 +577,6 @@ const std::string& TunnelResponseHeaders::key() {
   CONSTRUCT_ON_FIRST_USE(std::string, "envoy.tcp_proxy.propagate_response_headers");
 }
 
-const std::string& TunnelResponseTrailers::key() {
-  CONSTRUCT_ON_FIRST_USE(std::string, "envoy.tcp_proxy.propagate_response_trailers");
-}
-
 TunnelingConfigHelperImpl::TunnelingConfigHelperImpl(
     const envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy_TunnelingConfig&
         config_message,
@@ -589,7 +584,6 @@ TunnelingConfigHelperImpl::TunnelingConfigHelperImpl(
     : use_post_(config_message.use_post()),
       header_parser_(Envoy::Router::HeaderParser::configure(config_message.headers_to_add())),
       propagate_response_headers_(config_message.propagate_response_headers()),
-      propagate_response_trailers_(config_message.propagate_response_trailers()),
       post_path_(config_message.post_path()) {
   if (!post_path_.empty() && !use_post_) {
     throw EnvoyException("Can't set a post path when POST method isn't used");
@@ -618,17 +612,6 @@ void TunnelingConfigHelperImpl::propagateResponseHeaders(
   }
   filter_state->setData(
       TunnelResponseHeaders::key(), std::make_shared<TunnelResponseHeaders>(std::move(headers)),
-      StreamInfo::FilterState::StateType::ReadOnly, StreamInfo::FilterState::LifeSpan::Connection);
-}
-
-void TunnelingConfigHelperImpl::propagateResponseTrailers(
-    Http::ResponseTrailerMapPtr&& trailers,
-    const StreamInfo::FilterStateSharedPtr& filter_state) const {
-  if (!propagate_response_trailers_) {
-    return;
-  }
-  filter_state->setData(
-      TunnelResponseTrailers::key(), std::make_shared<TunnelResponseTrailers>(std::move(trailers)),
       StreamInfo::FilterState::StateType::ReadOnly, StreamInfo::FilterState::LifeSpan::Connection);
 }
 
@@ -787,12 +770,6 @@ void Filter::onUpstreamConnection() {
         upstream_callbacks->onBytesSent();
         return true;
       });
-    }
-  }
-
-  if (config_->flushAccessLogOnConnected()) {
-    for (const auto& access_log : config_->accessLogs()) {
-      access_log->log(nullptr, nullptr, nullptr, getStreamInfo());
     }
   }
 }

@@ -34,22 +34,19 @@ public final class RequestHeadersBuilder: HeadersBuilder {
     return self
   }
 
-#if ENVOY_MOBILE_REQUEST_COMPRESSION
-  /// Compress this request's body using the specified algorithm.
+  /// Add an upstream HTTP protocol to use when executing this request.
   ///
-  /// - note: Will only apply if the content length exceeds 30 bytes.
-  ///
-  /// - parameter algorithm: The compression algorithm to use to compress this request.
+  /// - parameter upstreamHttpProtocol: The protocol to use for this request.
   ///
   /// - returns: This builder.
   @discardableResult
-  public func enableRequestCompression(using algorithm: CompressionAlgorithm)
+  public func addUpstreamHttpProtocol(_ upstreamHttpProtocol: UpstreamHttpProtocol)
     -> RequestHeadersBuilder
   {
-    self.internalSet(name: "x-envoy-mobile-compression", value: [algorithm.rawValue])
+    self.internalSet(name: "x-envoy-mobile-upstream-protocol",
+                     value: [upstreamHttpProtocol.stringValue])
     return self
   }
-#endif
 
   /// Build the request headers using the current builder.
   ///

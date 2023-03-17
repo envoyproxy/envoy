@@ -1,7 +1,5 @@
 #include "source/extensions/filters/http/rate_limit_quota/config.h"
 
-#include <memory>
-
 #include "envoy/registry/registry.h"
 
 #include "source/extensions/filters/http/rate_limit_quota/client_impl.h"

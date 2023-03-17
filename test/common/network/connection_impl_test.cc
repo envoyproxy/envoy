@@ -137,12 +137,12 @@ public:
   Buffer::Instance& readBuffer() { return *read_buffer_; }
 };
 
-class ConnectionImplTestBase {
+class ConnectionImplTest : public testing::TestWithParam<Address::IpVersion> {
 protected:
-  ConnectionImplTestBase()
+  ConnectionImplTest()
       : api_(Api::createApiForTest(time_system_)), stream_info_(time_system_, nullptr) {}
 
-  virtual ~ConnectionImplTestBase() {
+  ~ConnectionImplTest() override {
     EXPECT_TRUE(timer_destroyed_ || timer_ == nullptr);
     if (!timer_destroyed_) {
       delete timer_;
@@ -153,11 +153,12 @@ protected:
     return Network::Test::createRawBufferSocket();
   }
 
-  void setUpBasicConnectionWithAddress(const Address::InstanceConstSharedPtr& address) {
+  void setUpBasicConnection() {
     if (dispatcher_ == nullptr) {
       dispatcher_ = api_->allocateDispatcher("test_thread");
     }
-    socket_ = std::make_shared<Network::Test::TcpListenSocketImmediateListen>(address);
+    socket_ = std::make_shared<Network::Test::TcpListenSocketImmediateListen>(
+        Network::Test::getCanonicalLoopbackAddress(GetParam()));
     listener_ = dispatcher_->createListener(socket_, listener_callbacks_, runtime_, true, false);
     client_connection_ = std::make_unique<Network::TestClientConnectionImpl>(
         *dispatcher_, socket_->connectionInfoProvider().localAddress(), source_address_,
@@ -294,14 +295,6 @@ protected:
   Socket::OptionsSharedPtr socket_options_;
   StreamInfo::StreamInfoImpl stream_info_;
   Network::TransportSocketOptionsConstSharedPtr transport_socket_options_ = nullptr;
-};
-
-class ConnectionImplTest : public ConnectionImplTestBase,
-                           public testing::TestWithParam<Address::IpVersion> {
-protected:
-  void setUpBasicConnection() {
-    setUpBasicConnectionWithAddress(Network::Test::getCanonicalLoopbackAddress(GetParam()));
-  }
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, ConnectionImplTest,
@@ -1255,19 +1248,13 @@ TEST_P(ConnectionImplTest, WriteWithWatermarks) {
         return {-1, SOCKET_ERROR_AGAIN};
       }));
 
-  EXPECT_CALL(os_sys_calls, recv(_, _, _, _))
-      .WillRepeatedly(Invoke([&](os_fd_t, void*, size_t, int) -> Api::SysCallSizeResult {
-        return {-1, SOCKET_ERROR_AGAIN};
-      }));
-
-  EXPECT_CALL(os_sys_calls, send(_, _, _, _))
-      .WillOnce(Invoke([&](os_fd_t, void*, size_t, int) -> Api::SysCallSizeResult {
+  EXPECT_CALL(os_sys_calls, writev(_, _, _))
+      .WillOnce(Invoke([&](os_fd_t, const iovec*, int) -> Api::SysCallSizeResult {
         dispatcher_->exit();
         // Return to default os_sys_calls implementation
         os_calls.reset();
         return {-1, SOCKET_ERROR_AGAIN};
       }));
-
   // The write() call on the connection will buffer enough data to bring the connection above the
   // high watermark and as the data will not flush it should not return below the watermark.
   EXPECT_CALL(client_callbacks_, onAboveWriteBufferHighWatermark());
@@ -1348,13 +1335,13 @@ TEST_P(ConnectionImplTest, WatermarkFuzzing) {
     // drain |bytes_to_flush| before having writev syscall fail with EAGAIN
     EXPECT_CALL(*client_write_buffer_, move(_))
         .WillOnce(Invoke(client_write_buffer_, &MockWatermarkBuffer::baseMove));
-    EXPECT_CALL(os_sys_calls, send(_, _, _, _))
-        .WillOnce(Invoke([&](os_fd_t, void*, size_t, int) -> Api::SysCallSizeResult {
+    EXPECT_CALL(os_sys_calls, writev(_, _, _))
+        .WillOnce(Invoke([&](os_fd_t, const iovec*, int) -> Api::SysCallSizeResult {
           client_write_buffer_->drain(bytes_to_flush);
           dispatcher_->exit();
           return {-1, SOCKET_ERROR_AGAIN};
         }))
-        .WillRepeatedly(Invoke([&](os_fd_t, void*, size_t, int) -> Api::SysCallSizeResult {
+        .WillRepeatedly(Invoke([&](os_fd_t, const iovec*, int) -> Api::SysCallSizeResult {
           return {-1, SOCKET_ERROR_AGAIN};
         }));
 
@@ -2096,7 +2083,7 @@ public:
 
   // This may be invoked for doWrite() on the transport to simulate all the data
   // being written.
-  static IoResult simulateSuccessfulWrite(Buffer::Instance& buffer, bool) {
+  static IoResult SimulateSuccessfulWrite(Buffer::Instance& buffer, bool) {
     uint64_t size = buffer.length();
     buffer.drain(size);
     return {PostIoAction::KeepOpen, size, false};
@@ -2500,7 +2487,7 @@ TEST_F(MockTransportConnectionImplTest, FullCloseWrite) {
   Buffer::OwnedImpl buffer(val);
   EXPECT_CALL(*file_event_, activate(Event::FileReadyType::Write)).WillOnce(Invoke(file_ready_cb_));
   EXPECT_CALL(*transport_socket_, doWrite(BufferStringEqual(val), false))
-      .WillOnce(Invoke(simulateSuccessfulWrite));
+      .WillOnce(Invoke(SimulateSuccessfulWrite));
   connection_->write(buffer, false);
 }
 
@@ -2513,10 +2500,10 @@ TEST_F(MockTransportConnectionImplTest, HalfCloseWrite) {
   const std::string val("some data");
   Buffer::OwnedImpl buffer(val);
   EXPECT_CALL(*transport_socket_, doWrite(BufferStringEqual(val), false))
-      .WillOnce(Invoke(simulateSuccessfulWrite));
+      .WillOnce(Invoke(SimulateSuccessfulWrite));
   connection_->write(buffer, false);
 
-  EXPECT_CALL(*transport_socket_, doWrite(_, true)).WillOnce(Invoke(simulateSuccessfulWrite));
+  EXPECT_CALL(*transport_socket_, doWrite(_, true)).WillOnce(Invoke(SimulateSuccessfulWrite));
   connection_->write(buffer, true);
 }
 
@@ -2589,7 +2576,7 @@ TEST_F(MockTransportConnectionImplTest, BothHalfCloseWritesNotFlushedWriteFirst)
   file_ready_cb_(Event::FileReadyType::Read);
 
   EXPECT_CALL(callbacks_, onEvent(ConnectionEvent::LocalClose));
-  EXPECT_CALL(*transport_socket_, doWrite(_, true)).WillOnce(Invoke(simulateSuccessfulWrite));
+  EXPECT_CALL(*transport_socket_, doWrite(_, true)).WillOnce(Invoke(SimulateSuccessfulWrite));
   file_ready_cb_(Event::FileReadyType::Write);
 }
 
@@ -3099,23 +3086,8 @@ TEST_F(InternalClientConnectionImplTest,
       "");
 }
 
-class ClientConnectionWithCustomRawBufferSocketTest : public ConnectionImplTestBase,
-                                                      public testing::TestWithParam<Address::Type> {
+class ClientConnectionWithCustomRawBufferSocketTest : public ConnectionImplTest {
 protected:
-  void setUpBasicConnection() {
-    Address::InstanceConstSharedPtr address;
-    switch (GetParam()) {
-    case Address::Type::Pipe:
-      address = Utility::resolveUrl("unix://" + path_);
-      break;
-    case Address::Type::Ip:
-    default:
-      address = Network::Test::getCanonicalLoopbackAddress(Address::IpVersion::v4);
-      break;
-    }
-    setUpBasicConnectionWithAddress(address);
-  }
-
   class TestRawBufferSocket : public RawBufferSocket {
   public:
     bool compareCallbacks(TransportSocketCallbacks* callback) const {
@@ -3131,13 +3103,11 @@ protected:
     Network::TestClientConnectionImpl* client_conn_impl = testClientConnection();
     return dynamic_cast<TestRawBufferSocket*>(client_conn_impl->transportSocket().get());
   }
-
-private:
-  const std::string path_{TestEnvironment::unixDomainSocketPath("foo")};
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, ClientConnectionWithCustomRawBufferSocketTest,
-                         testing::ValuesIn({Address::Type::Ip, Address::Type::Pipe}));
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
 
 class TestObject : public StreamInfo::FilterState::Object {};
 

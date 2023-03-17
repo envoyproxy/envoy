@@ -1,24 +1,19 @@
 #include "request_method.h"
 
 #include <stdexcept>
-
-#include "absl/strings/string_view.h"
+#include <vector>
 
 namespace Envoy {
 namespace Platform {
 
-namespace {
-
-const std::pair<RequestMethod, absl::string_view> REQUEST_METHOD_LOOKUP[]{
+static const std::pair<RequestMethod, std::string> REQUEST_METHOD_LOOKUP[]{
     {RequestMethod::DELETE, "DELETE"}, {RequestMethod::GET, "GET"},
     {RequestMethod::HEAD, "HEAD"},     {RequestMethod::OPTIONS, "OPTIONS"},
     {RequestMethod::PATCH, "PATCH"},   {RequestMethod::POST, "POST"},
     {RequestMethod::PUT, "PUT"},       {RequestMethod::TRACE, "TRACE"},
 };
 
-} // namespace
-
-absl::string_view requestMethodToString(RequestMethod method) {
+std::string requestMethodToString(RequestMethod method) {
   for (const auto& pair : REQUEST_METHOD_LOOKUP) {
     if (pair.first == method) {
       return pair.second;
@@ -28,7 +23,7 @@ absl::string_view requestMethodToString(RequestMethod method) {
   throw std::out_of_range("unknown request method type");
 }
 
-RequestMethod requestMethodFromString(absl::string_view str) {
+RequestMethod requestMethodFromString(const std::string& str) {
   for (const auto& pair : REQUEST_METHOD_LOOKUP) {
     if (pair.second == str) {
       return pair.first;

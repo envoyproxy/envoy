@@ -193,8 +193,10 @@ void WebsocketWithCompressorIntegrationTest::sendBidirectionalData() {
 // with websocket upgrades
 TEST_P(WebsocketWithCompressorIntegrationTest, NonWebsocketUpgrade) {
 #ifdef ENVOY_ENABLE_UHV
-  // TODO(#23286) - add web socket support for H2 UHV
-  return;
+  if (downstreamProtocol() == Http::CodecType::HTTP2) {
+    // TODO(#23286) - add web socket support for H2 UHV
+    return;
+  }
 #endif
 
   config_helper_.addConfigModifier(

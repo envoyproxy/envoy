@@ -96,15 +96,8 @@ Admin::RequestPtr StatsHandler::makeRequest(AdminStream& admin_stream) {
     server_.flushStats();
   }
 
-#ifdef ENVOY_ADMIN_HTML
-  const bool active_mode = params.format_ == StatsFormat::ActiveHtml;
-  return makeRequest(server_.stats(), params, [this, active_mode]() -> Admin::UrlHandler {
-    return statsHandler(active_mode);
-  });
-#else
   return makeRequest(server_.stats(), params,
-                     [this]() -> Admin::UrlHandler { return statsHandler(false); });
-#endif
+                     [this]() -> Admin::UrlHandler { return statsHandler(); });
 }
 
 Admin::RequestPtr StatsHandler::makeRequest(Stats::Store& stats, const StatsParams& params,
@@ -170,38 +163,27 @@ Http::Code StatsHandler::handlerContention(Http::ResponseHeaderMap& response_hea
   return Http::Code::OK;
 }
 
-Admin::UrlHandler StatsHandler::statsHandler(bool active_mode) {
-  const Admin::ParamDescriptorVec common_params{
-      {Admin::ParamDescriptor::Type::String, "filter",
-       "Regular expression (Google re2) for filtering stats"},
-      {Admin::ParamDescriptor::Type::Enum,
-       "format",
-       "Format to use",
-       {"html", "active-html", "text", "json"}},
-      {Admin::ParamDescriptor::Type::Enum,
-       "type",
-       "Stat types to include.",
-       {StatLabels::All, StatLabels::Counters, StatLabels::Histograms, StatLabels::Gauges,
-        StatLabels::TextReadouts}},
-      {Admin::ParamDescriptor::Type::Enum,
-       "histogram_buckets",
-       "Histogram bucket display mode",
-       {"cumulative", "disjoint", "none"}}};
-
-  Admin::ParamDescriptorVec params;
-  if (!active_mode) {
-    params.push_back({Admin::ParamDescriptor::Type::Boolean, "usedonly",
-                      "Only include stats that have been written by system since restart"});
-  }
-  params.insert(params.end(), common_params.begin(), common_params.end());
-
+Admin::UrlHandler StatsHandler::statsHandler() {
   return {
       "/stats",
       "print server stats",
       [this](AdminStream& admin_stream) -> Admin::RequestPtr { return makeRequest(admin_stream); },
       false,
       false,
-      params};
+      {{Admin::ParamDescriptor::Type::Boolean, "usedonly",
+        "Only include stats that have been written by system since restart"},
+       {Admin::ParamDescriptor::Type::String, "filter",
+        "Regular expression (Google re2) for filtering stats"},
+       {Admin::ParamDescriptor::Type::Enum, "format", "Format to use", {"html", "text", "json"}},
+       {Admin::ParamDescriptor::Type::Enum,
+        "type",
+        "Stat types to include.",
+        {StatLabels::All, StatLabels::Counters, StatLabels::Histograms, StatLabels::Gauges,
+         StatLabels::TextReadouts}},
+       {Admin::ParamDescriptor::Type::Enum,
+        "histogram_buckets",
+        "Histogram bucket display mode",
+        {"cumulative", "disjoint", "none"}}}};
 }
 
 } // namespace Server

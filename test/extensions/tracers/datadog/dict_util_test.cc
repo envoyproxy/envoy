@@ -1,3 +1,5 @@
+#include <datadog/optional.h>
+
 #include <utility>
 #include <vector>
 
@@ -8,7 +10,6 @@
 #include "test/mocks/http/mocks.h"
 #include "test/test_common/utility.h"
 
-#include "datadog/optional.h"
 #include "gtest/gtest.h"
 
 namespace Envoy {

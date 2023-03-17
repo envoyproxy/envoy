@@ -15,6 +15,7 @@ import io.envoyproxy.envoymobile.RequestHeaders;
 import io.envoyproxy.envoymobile.RequestHeadersBuilder;
 import io.envoyproxy.envoymobile.RequestMethod;
 import io.envoyproxy.envoymobile.Stream;
+import io.envoyproxy.envoymobile.UpstreamHttpProtocol;
 import io.envoyproxy.envoymobile.engine.AndroidJniLibrary;
 import java.net.URL;
 import java.nio.ByteBuffer;
@@ -64,7 +65,8 @@ public class AndroidEnvoyExplicitH2FlowTest {
     URL url = new URL(Http2TestServer.getEchoAllHeadersUrl());
     RequestHeadersBuilder requestHeadersBuilder = new RequestHeadersBuilder(
         RequestMethod.POST, url.getProtocol(), url.getAuthority(), url.getPath());
-    RequestHeaders requestHeaders = requestHeadersBuilder.build();
+    RequestHeaders requestHeaders =
+        requestHeadersBuilder.addUpstreamHttpProtocol(UpstreamHttpProtocol.HTTP2).build();
 
     final CountDownLatch latch = new CountDownLatch(1);
     final AtomicReference<Stream> stream = new AtomicReference<>();

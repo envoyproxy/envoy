@@ -1,17 +1,14 @@
-load("//bazel:apple.bzl", "envoy_mobile_swift_copts")
 load("//bazel:config.bzl", "MINIMUM_IOS_VERSION")
-load("//bazel:swift_header_collector.bzl", "swift_header_collector")
 load("@build_bazel_rules_apple//apple:apple.bzl", "apple_static_xcframework")
 load("@build_bazel_rules_apple//apple:ios.bzl", "ios_static_framework")
 load("@build_bazel_rules_swift//swift:swift.bzl", "swift_library")
-load("@envoy//bazel:envoy_build_system.bzl", "envoy_mobile_defines")
+load("//bazel:swift_header_collector.bzl", "swift_header_collector")
 
 licenses(["notice"])  # Apache 2
 
 swift_library(
     name = "ios_lib",
     srcs = [
-        "CompressionAlgorithm.swift",
         "DirectResponse.swift",
         "Engine.swift",
         "EngineBuilder.swift",
@@ -46,6 +43,7 @@ swift_library(
         "StreamPrototype.swift",
         "TestEngineBuilder.swift",
         "Trailers.swift",
+        "UpstreamHttpProtocol.swift",
         "extensions/UserDefaults+KeyValueStore.swift",
         "filters/AsyncRequestFilter.swift",
         "filters/AsyncResponseFilter.swift",
@@ -76,22 +74,7 @@ swift_library(
         "stats/Element.swift",
         "stats/Tags.swift",
         "stats/TagsBuilder.swift",
-    ] + [
-        "@envoy_mobile_extra_swift_sources//:extra_swift_srcs",
-    ] + select({
-        "//bazel:envoy_mobile_swift_cxx_interop": [
-            "cxx/Bootstrap.swift",
-            "cxx/DirectResponse+Cxx.swift",
-            "cxx/LogLevel+Cxx.swift",
-            "cxx/Swift+Cxx.swift",
-        ],
-        "//conditions:default": [],
-    }),
-    copts = select({
-        "//bazel:envoy_mobile_swift_cxx_interop": envoy_mobile_swift_copts(True),
-        "//conditions:default": [],
-    }),
-    defines = envoy_mobile_defines("@envoy"),
+    ] + ["@envoy_mobile_extra_swift_sources//:extra_swift_srcs"],
     features = [
         "swift.emit_symbol_graph",
         "swift.enable_library_evolution",
@@ -101,12 +84,7 @@ swift_library(
     private_deps = [
         "//library/objective-c:envoy_engine_objc_lib",
         "@envoy_mobile_extra_swift_sources//:extra_private_dep",
-    ] + select({
-        "//bazel:envoy_mobile_swift_cxx_interop": [
-            "//library/swift/EnvoyCxxSwiftInterop:EnvoyCxxSwiftInterop",
-        ],
-        "//conditions:default": [],
-    }),
+    ],
     visibility = ["//visibility:public"],
 )
 

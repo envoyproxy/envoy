@@ -28,7 +28,6 @@ class MockHeaderValidatorStats : public HeaderValidatorStats {
 public:
   MOCK_METHOD(void, incDroppedHeadersWithUnderscores, ());
   MOCK_METHOD(void, incRequestsRejectedWithUnderscoresInHeaders, ());
-  MOCK_METHOD(void, incMessagingError, ());
 };
 
 class MockHeaderValidatorFactory : public HeaderValidatorFactory {

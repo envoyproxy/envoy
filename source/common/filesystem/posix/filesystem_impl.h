@@ -26,10 +26,7 @@ protected:
   Api::IoCallBoolResult close() override;
   Api::IoCallSizeResult pread(void* buf, uint64_t count, uint64_t offset) override;
   Api::IoCallSizeResult pwrite(const void* buf, uint64_t count, uint64_t offset) override;
-  Api::IoCallResult<FileInfo> info() override;
   FlagsAndMode translateFlag(FlagSet in);
-
-private:
   friend class FileSystemImplTest;
 };
 
@@ -61,7 +58,6 @@ public:
   std::string fileReadToEnd(const std::string& path) override;
   PathSplitResult splitPathFromFilename(absl::string_view path) override;
   bool illegalPath(const std::string& path) override;
-  Api::IoCallResult<FileInfo> stat(absl::string_view path) override;
 
 private:
   Api::SysCallStringResult canonicalPath(const std::string& path);

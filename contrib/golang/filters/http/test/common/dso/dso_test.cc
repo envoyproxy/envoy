@@ -20,28 +20,28 @@ std::string genSoPath(std::string name) {
 
 TEST(DsoInstanceTest, SimpleAPI) {
   auto path = genSoPath("simple.so");
-  DsoPtr dso(new DsoInstance(path));
+  DsoInstancePtr dso(new DsoInstance(path));
   EXPECT_EQ(dso->envoyGoFilterNewHttpPluginConfig(0, 0), 100);
 }
 
-TEST(DsoManagerTest, Pub) {
+TEST(DsoInstanceManagerTest, Pub) {
   auto id = "simple.so";
   auto path = genSoPath(id);
 
   // get before load
-  auto dso = DsoManager::getDsoByID(id);
+  auto dso = DsoInstanceManager::getDsoInstanceByID(id);
   EXPECT_EQ(dso, nullptr);
 
   // first time load
-  auto res = DsoManager::load(id, path);
+  auto res = DsoInstanceManager::load(id, path);
   EXPECT_EQ(res, true);
 
   // get after load
-  dso = DsoManager::getDsoByID(id);
+  dso = DsoInstanceManager::getDsoInstanceByID(id);
   EXPECT_NE(dso, nullptr);
 
   // second time load
-  res = DsoManager::load(id, path);
+  res = DsoInstanceManager::load(id, path);
   EXPECT_EQ(res, true);
 }
 

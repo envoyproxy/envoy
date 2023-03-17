@@ -1,8 +1,10 @@
+version: "3.8"
 services:
 
   proxy:
     build:
-      dockerfile: ../shared/envoy/Dockerfile
+      context: .
+      dockerfile: Dockerfile-proxy
     depends_on:
     - service1
     - service2
@@ -22,8 +24,8 @@ services:
 
   go-control-plane:
     build:
-      dockerfile: ../shared/golang/Dockerfile
-      target: golang-control-plane
-    command: /usr/local/bin/example
+      context: .
+      dockerfile: Dockerfile-control-plane
+    command: bin/example
     healthcheck:
       test: nc -zv localhost 18000

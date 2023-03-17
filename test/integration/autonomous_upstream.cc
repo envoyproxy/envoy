@@ -3,7 +3,7 @@
 namespace Envoy {
 namespace {
 
-void headerToInt(const char header_name[], int32_t& return_int,
+void HeaderToInt(const char header_name[], int32_t& return_int,
                  Http::TestResponseHeaderMapImpl& headers) {
   const std::string header_value(headers.get_(header_name));
   if (!header_value.empty()) {
@@ -50,7 +50,7 @@ void AutonomousStream::sendResponse() {
   upstream_.setLastRequestHeaders(*headers_);
 
   int32_t request_body_length = -1;
-  headerToInt(EXPECT_REQUEST_SIZE_BYTES, request_body_length, headers);
+  HeaderToInt(EXPECT_REQUEST_SIZE_BYTES, request_body_length, headers);
   if (request_body_length >= 0) {
     EXPECT_EQ(request_body_length, body_.length());
   }
@@ -61,10 +61,10 @@ void AutonomousStream::sendResponse() {
   }
 
   int32_t response_body_length = 10;
-  headerToInt(RESPONSE_SIZE_BYTES, response_body_length, headers);
+  HeaderToInt(RESPONSE_SIZE_BYTES, response_body_length, headers);
 
   int32_t response_data_blocks = 1;
-  headerToInt(RESPONSE_DATA_BLOCKS, response_data_blocks, headers);
+  HeaderToInt(RESPONSE_DATA_BLOCKS, response_data_blocks, headers);
 
   const bool end_stream = headers.get_(NO_END_STREAM).empty();
   const bool send_trailers = end_stream && headers.get_(NO_TRAILERS).empty();
@@ -77,13 +77,9 @@ void AutonomousStream::sendResponse() {
 
   encodeHeaders(upstream_.responseHeaders(), headers_only_response);
   if (!headers_only_response) {
-    if (upstream_.responseBody().has_value()) {
-      encodeData(*upstream_.responseBody(), !send_trailers);
-    } else {
-      for (int32_t i = 0; i < response_data_blocks; ++i) {
-        encodeData(response_body_length,
-                   i == (response_data_blocks - 1) && !send_trailers && end_stream);
-      }
+    for (int32_t i = 0; i < response_data_blocks; ++i) {
+      encodeData(response_body_length,
+                 i == (response_data_blocks - 1) && !send_trailers && end_stream);
     }
     if (send_trailers) {
       encodeTrailers(upstream_.responseTrailers());
@@ -150,11 +146,6 @@ void AutonomousUpstream::setResponseTrailers(
   response_trailers_ = std::move(response_trailers);
 }
 
-void AutonomousUpstream::setResponseBody(std::string body) {
-  Thread::LockGuard lock(headers_lock_);
-  response_body_ = body;
-}
-
 void AutonomousUpstream::setResponseHeaders(
     std::unique_ptr<Http::TestResponseHeaderMapImpl>&& response_headers) {
   Thread::LockGuard lock(headers_lock_);
@@ -171,11 +162,6 @@ Http::TestResponseTrailerMapImpl AutonomousUpstream::responseTrailers() {
   Thread::LockGuard lock(headers_lock_);
   Http::TestResponseTrailerMapImpl return_trailers = *response_trailers_;
   return return_trailers;
-}
-
-absl::optional<std::string> AutonomousUpstream::responseBody() {
-  Thread::LockGuard lock(headers_lock_);
-  return response_body_;
 }
 
 Http::TestResponseHeaderMapImpl AutonomousUpstream::responseHeaders() {

@@ -5,7 +5,6 @@ on:
 
 jobs:
   retest:
-    if: github.repository == 'envoyproxy/envoy'
     name: Retest
     runs-on: ubuntu-latest
     steps:

@@ -69,7 +69,7 @@ class Filter : public Network::ReadFilter,
                public Network::ConnectionCallbacks,
                Logger::Loggable<Logger::Id::filter> {
 public:
-  Filter(const ConfigSharedPtr& config) : config_(config) {}
+  Filter(const ConfigSharedPtr& config) : config_(config), is_rejected_(false) {}
 
   // Network::ReadFilter
   Network::FilterStatus onData(Buffer::Instance&, bool) override;
@@ -90,7 +90,7 @@ private:
   const ConfigSharedPtr config_;
   Network::ReadFilterCallbacks* read_callbacks_{};
   Event::TimerPtr delay_timer_ = nullptr;
-  bool is_rejected_{false};
+  bool is_rejected_;
 };
 
 } // namespace ConnectionLimitFilter

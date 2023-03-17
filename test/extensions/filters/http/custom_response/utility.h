@@ -75,7 +75,8 @@ constexpr absl::string_view kDefaultConfig = R"EOF(
             typed_config:
               "@type": type.googleapis.com/envoy.extensions.http.custom_response.redirect_policy.v3.RedirectPolicy
               status_code: 299
-              uri: "https://foo.example/gateway_error"
+              host: "https://foo.example"
+              path: "/gateway_error"
               response_headers_to_add:
               - header:
                   key: "foo2"
@@ -94,7 +95,8 @@ constexpr absl::string_view kDefaultConfig = R"EOF(
             typed_config:
               "@type": type.googleapis.com/envoy.extensions.http.custom_response.redirect_policy.v3.RedirectPolicy
               status_code: 292
-              uri: "https://host.with.route.with.header.matcher/internal_server_error"
+              host: "https://host.with.route.with.header.matcher"
+              path: "/internal_server_error"
               response_headers_to_add:
               - header:
                   key: "foo3"
@@ -116,7 +118,8 @@ constexpr absl::string_view kDefaultConfig = R"EOF(
             name: 520_action
             typed_config:
               "@type": type.googleapis.com/envoy.extensions.http.custom_response.redirect_policy.v3.RedirectPolicy
-              uri: "https://global.storage/internal_server_error"
+              host: "https://global/storage"
+              path: "/internal_server_error"
               response_headers_to_add:
               - header:
                   key: "foo3"
@@ -215,19 +218,11 @@ class TestModifyRequestHeadersAction
 public:
   ~TestModifyRequestHeadersAction() override = default;
 
-  TestModifyRequestHeadersAction(
-      const envoy::extensions::http::custom_response::redirect_policy::v3::RedirectPolicy&
-          redirect_policy) {
-    if (!redirect_policy.has_redirect_action()) {
-      throw EnvoyException("Expected redirect_action.");
-    }
-  }
-
   void modifyRequestHeaders(
       ::Envoy::Http::RequestHeaderMap& headers, Envoy::StreamInfo::StreamInfo&,
       const Extensions::Http::CustomResponse::RedirectPolicy& redirect_policy) override {
     headers.setCopy(::Envoy::Http::LowerCaseString("x-envoy-cer-backend"),
-                    redirect_policy.redirectAction()->host_redirect_);
+                    redirect_policy.host().substr(8));
   };
 };
 
@@ -245,10 +240,8 @@ public:
 
   std::unique_ptr<Extensions::Http::CustomResponse::ModifyRequestHeadersAction>
   createAction(const Protobuf::Message&,
-               const envoy::extensions::http::custom_response::redirect_policy::v3::RedirectPolicy&
-                   redirect_policy,
                Envoy::Server::Configuration::ServerFactoryContext&) override {
-    return std::make_unique<TestModifyRequestHeadersAction>(redirect_policy);
+    return std::make_unique<TestModifyRequestHeadersAction>();
   }
 };
 

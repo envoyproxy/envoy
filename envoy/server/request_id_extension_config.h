@@ -24,8 +24,8 @@ public:
    * @param config the custom configuration for this request id extension type.
    * @param context general filter context through which persistent resources can be accessed.
    */
-  virtual Http::RequestIDExtensionSharedPtr
-  createExtensionInstance(const Protobuf::Message& config, CommonFactoryContext& context) PURE;
+  virtual Http::RequestIDExtensionSharedPtr createExtensionInstance(const Protobuf::Message& config,
+                                                                    FactoryContext& context) PURE;
 
   std::string category() const override { return "envoy.request_id"; }
 };

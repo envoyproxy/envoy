@@ -26,8 +26,6 @@ public:
   virtual void removeCallback(const RecordCbSharedPtr& callback) PURE;
 };
 
-using RecordCallbackProcessorSharedPtr = std::shared_ptr<RecordCallbackProcessor>;
-
 /**
  * Manages (raw) Kafka consumers pointing to upstream Kafka clusters.
  * It is expected to have only one instance of this object per mesh-filter type.

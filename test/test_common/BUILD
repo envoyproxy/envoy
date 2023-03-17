@@ -197,7 +197,7 @@ envoy_cc_test_library(
     srcs = ["file_system_for_test.cc"],
     hdrs = ["file_system_for_test.h"],
     deps = [
-        ":test_time_lib",
+        ":simulated_time_system_lib",
         "//source/common/common:utility_lib",
         "//source/common/filesystem:filesystem_lib",
     ],

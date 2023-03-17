@@ -6,20 +6,19 @@ import io.envoyproxy.envoymobile.engine.EnvoyHTTPStream
 import io.envoyproxy.envoymobile.engine.types.EnvoyHTTPCallbacks
 import io.envoyproxy.envoymobile.engine.types.EnvoyNetworkType
 import io.envoyproxy.envoymobile.engine.types.EnvoyStringAccessor
-import io.envoyproxy.envoymobile.engine.types.EnvoyStatus
 
 /**
  * Mock implementation of `EnvoyEngine`. Used internally for testing the bridging layer & mocking.
  */
 internal class MockEnvoyEngine : EnvoyEngine {
-  override fun runWithConfig(envoyConfiguration: EnvoyConfiguration?, logLevel: String?): EnvoyStatus = EnvoyStatus.ENVOY_SUCCESS
+  override fun runWithConfig(envoyConfiguration: EnvoyConfiguration?, logLevel: String?): Int = 0
 
   override fun performRegistration(envoyConfiguration: EnvoyConfiguration) = Unit
 
   override fun runWithYaml(
     configurationYAML: String,
     logLevel: String
-  ): EnvoyStatus = EnvoyStatus.ENVOY_SUCCESS
+  ): Int = 0
 
   override fun startStream(
     callbacks: EnvoyHTTPCallbacks?,

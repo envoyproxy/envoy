@@ -2,7 +2,6 @@
 
 #include "envoy/common/pure.h"
 #include "envoy/http/async_client.h"
-#include "envoy/tcp/async_tcp_client.h"
 #include "envoy/upstream/load_balancer.h"
 #include "envoy/upstream/upstream.h"
 
@@ -142,15 +141,6 @@ public:
    * owns the client.
    */
   virtual Http::AsyncClient& httpAsyncClient() PURE;
-
-  /**
-   * @param context the optional load balancer context.
-   * @param options the tcp client creation config options.
-   * @return a client that can be used to make async Tcp calls against the given cluster.
-   */
-  virtual Tcp::AsyncTcpClientPtr
-  tcpAsyncClient(LoadBalancerContext* context,
-                 Tcp::AsyncTcpClientOptionsConstSharedPtr options) PURE;
 };
 
 using ThreadLocalClusterOptRef = absl::optional<std::reference_wrapper<ThreadLocalCluster>>;

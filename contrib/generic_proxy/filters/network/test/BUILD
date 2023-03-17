@@ -68,7 +68,6 @@ envoy_cc_test(
         "//contrib/generic_proxy/filters/network/test/mocks:filter_mocks",
         "//contrib/generic_proxy/filters/network/test/mocks:route_mocks",
         "//source/common/buffer:buffer_lib",
-        "//source/extensions/tracers/zipkin:config",
         "//test/mocks/network:network_mocks",
         "//test/mocks/server:factory_context_mocks",
         "//test/test_common:registry_lib",

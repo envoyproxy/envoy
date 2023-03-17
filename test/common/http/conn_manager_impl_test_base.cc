@@ -8,11 +8,12 @@ using testing::AtLeast;
 using testing::InSequence;
 using testing::InvokeWithoutArgs;
 using testing::Return;
+using testing::ReturnRef;
 
 namespace Envoy {
 namespace Http {
 
-HttpConnectionManagerImplMixin::HttpConnectionManagerImplMixin()
+HttpConnectionManagerImplTest::HttpConnectionManagerImplTest()
     : http_context_(fake_stats_.symbolTable()), access_log_path_("dummy_path"),
       access_logs_{AccessLog::InstanceSharedPtr{new Extensions::AccessLoggers::File::FileAccessLog(
           Filesystem::FilePathAndType{Filesystem::DestinationType::File, access_log_path_}, {},
@@ -39,19 +40,19 @@ HttpConnectionManagerImplMixin::HttpConnectionManagerImplMixin()
   ip_detection_extensions_.push_back(getXFFExtension(0));
 }
 
-HttpConnectionManagerImplMixin::~HttpConnectionManagerImplMixin() {
+HttpConnectionManagerImplTest::~HttpConnectionManagerImplTest() {
   filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();
 }
 
 Tracing::CustomTagConstSharedPtr
-HttpConnectionManagerImplMixin::requestHeaderCustomTag(const std::string& header) {
+HttpConnectionManagerImplTest::requestHeaderCustomTag(const std::string& header) {
   envoy::type::tracing::v3::CustomTag::Header headerTag;
   headerTag.set_name(header);
   return std::make_shared<Tracing::RequestHeaderCustomTag>(header, headerTag);
 }
 
-void HttpConnectionManagerImplMixin::setup(bool ssl, const std::string& server_name, bool tracing,
-                                           bool use_srds) {
+void HttpConnectionManagerImplTest::setup(bool ssl, const std::string& server_name, bool tracing,
+                                          bool use_srds) {
   use_srds_ = use_srds;
   if (ssl) {
     ssl_connection_ = std::make_shared<Ssl::MockConnectionInfo>();
@@ -96,8 +97,8 @@ void HttpConnectionManagerImplMixin::setup(bool ssl, const std::string& server_n
   }
 }
 
-void HttpConnectionManagerImplMixin::setupFilterChain(int num_decoder_filters,
-                                                      int num_encoder_filters, int num_requests) {
+void HttpConnectionManagerImplTest::setupFilterChain(int num_decoder_filters,
+                                                     int num_encoder_filters, int num_requests) {
   // NOTE: The length/repetition in this routine allows InSequence to work correctly in an outer
   // scope.
   for (int i = 0; i < num_decoder_filters * num_requests; i++) {
@@ -145,7 +146,7 @@ void HttpConnectionManagerImplMixin::setupFilterChain(int num_decoder_filters,
   }
 }
 
-void HttpConnectionManagerImplMixin::setUpBufferLimits() {
+void HttpConnectionManagerImplTest::setUpBufferLimits() {
   ON_CALL(response_encoder_, getStream()).WillByDefault(ReturnRef(stream_));
   EXPECT_CALL(stream_, bufferLimit()).WillOnce(Return(initial_buffer_limit_));
   EXPECT_CALL(stream_, addCallbacks(_))
@@ -154,8 +155,8 @@ void HttpConnectionManagerImplMixin::setUpBufferLimits() {
   EXPECT_CALL(stream_, setFlushTimeout(_));
 }
 
-void HttpConnectionManagerImplMixin::setUpEncoderAndDecoder(bool request_with_data_and_trailers,
-                                                            bool decode_headers_stop_all) {
+void HttpConnectionManagerImplTest::setUpEncoderAndDecoder(bool request_with_data_and_trailers,
+                                                           bool decode_headers_stop_all) {
   setUpBufferLimits();
   EXPECT_CALL(*codec_, dispatch(_))
       .WillOnce(Invoke([&, request_with_data_and_trailers](Buffer::Instance&) -> Http::Status {
@@ -191,8 +192,8 @@ void HttpConnectionManagerImplMixin::setUpEncoderAndDecoder(bool request_with_da
   EXPECT_CALL(*decoder_filters_[0], decodeComplete());
 }
 
-void HttpConnectionManagerImplMixin::startRequest(bool end_stream,
-                                                  absl::optional<std::string> body) {
+void HttpConnectionManagerImplTest::startRequest(bool end_stream,
+                                                 absl::optional<std::string> body) {
   EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> Http::Status {
     decoder_ = &conn_manager_->newStream(response_encoder_);
     RequestHeaderMapPtr headers{
@@ -208,13 +209,13 @@ void HttpConnectionManagerImplMixin::startRequest(bool end_stream,
   conn_manager_->onData(fake_input, false);
 }
 
-Event::MockTimer* HttpConnectionManagerImplMixin::setUpTimer() {
+Event::MockTimer* HttpConnectionManagerImplTest::setUpTimer() {
   // this timer belongs to whatever by whatever next creates a timer.
   // See Envoy::Event::MockTimer for details.
   return new Event::MockTimer(&filter_callbacks_.connection_.dispatcher_);
 }
 
-void HttpConnectionManagerImplMixin::sendRequestHeadersAndData() {
+void HttpConnectionManagerImplTest::sendRequestHeadersAndData() {
   EXPECT_CALL(*decoder_filters_[1], decodeHeaders(_, false))
       .WillOnce(Return(FilterHeadersStatus::StopIteration));
   auto status = streaming_filter_ ? FilterDataStatus::StopIterationAndWatermark
@@ -228,7 +229,7 @@ void HttpConnectionManagerImplMixin::sendRequestHeadersAndData() {
   conn_manager_->onData(fake_input, false);
 }
 
-ResponseHeaderMap* HttpConnectionManagerImplMixin::sendResponseHeaders(
+ResponseHeaderMap* HttpConnectionManagerImplTest::sendResponseHeaders(
     ResponseHeaderMapPtr&& response_headers, absl::optional<StreamInfo::ResponseFlag> response_flag,
     std::string response_code_details) {
   ResponseHeaderMap* altered_response_headers = nullptr;
@@ -250,7 +251,7 @@ ResponseHeaderMap* HttpConnectionManagerImplMixin::sendResponseHeaders(
   return altered_response_headers;
 }
 
-void HttpConnectionManagerImplMixin::expectOnDestroy(bool deferred) {
+void HttpConnectionManagerImplTest::expectOnDestroy(bool deferred) {
   for (auto filter : decoder_filters_) {
     EXPECT_CALL(*filter, onStreamComplete());
   }
@@ -276,7 +277,7 @@ void HttpConnectionManagerImplMixin::expectOnDestroy(bool deferred) {
   }
 }
 
-void HttpConnectionManagerImplMixin::doRemoteClose(bool deferred) {
+void HttpConnectionManagerImplTest::doRemoteClose(bool deferred) {
   // We will call removeCallbacks twice.
   // Once in resetAllStreams, and once in doDeferredStreamDestroy.
   EXPECT_CALL(stream_, removeCallbacks(_)).Times(2);
@@ -284,7 +285,7 @@ void HttpConnectionManagerImplMixin::doRemoteClose(bool deferred) {
   filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
 }
 
-void HttpConnectionManagerImplMixin::testPathNormalization(
+void HttpConnectionManagerImplTest::testPathNormalization(
     const RequestHeaderMap& request_headers, const ResponseHeaderMap& expected_response) {
   InSequence s;
   setup(false, "");
@@ -309,7 +310,7 @@ void HttpConnectionManagerImplMixin::testPathNormalization(
   conn_manager_->onData(fake_input, false);
 }
 
-void HttpConnectionManagerImplMixin::expectUhvTrailerCheckFail() {
+void HttpConnectionManagerImplTest::expectUhvTrailerCheckFail() {
   EXPECT_CALL(header_validator_factory_, create(codec_->protocol_, _))
       .WillOnce(InvokeWithoutArgs([]() {
         auto header_validator = std::make_unique<testing::StrictMock<MockHeaderValidator>>();

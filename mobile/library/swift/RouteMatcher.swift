@@ -1,34 +1,37 @@
-@_implementationOnly import EnvoyEngine
+import Foundation
 
 /// Typed representation of a route matcher that may be specified when starting the engine.
 /// https://www.envoyproxy.io/docs/envoy/latest/api-v3/config/route/
 /// v3/route_components.proto#envoy-v3-api-msg-config-route-v3-routematch
-public struct RouteMatcher {
+@objcMembers
+public final class RouteMatcher: NSObject {
   public let fullPath: String?
   public let pathPrefix: String?
   public let headers: [HeaderMatcher]
 
-  public struct HeaderMatcher {
+  @objcMembers
+  public final class HeaderMatcher: NSObject {
     public let name: String
     public let value: String
     public let mode: MatchMode
 
+    @objc
     public enum MatchMode: Int {
       case contains
       case exact
       case prefix
       case suffix
 
-      fileprivate var objcValue: EMOMatchMode {
+      func resolvedYAML(value: String) -> String {
         switch self {
         case .contains:
-          return .contains
+          return "contains_match: \"\(value)\""
         case .exact:
-          return .exact
+          return "exact_match: \"\(value)\""
         case .prefix:
-          return .prefix
+          return "prefix_match: \"\(value)\""
         case .suffix:
-          return .suffix
+          return "suffix_match: \"\(value)\""
         }
       }
     }
@@ -37,6 +40,7 @@ public struct RouteMatcher {
       self.name = name
       self.value = value
       self.mode = mode
+      super.init()
     }
   }
 
@@ -54,6 +58,7 @@ public struct RouteMatcher {
     self.fullPath = nil
     self.pathPrefix = pathPrefix
     self.headers = headers
+    super.init()
   }
 
   /// Initialize a matcher with a full path.
@@ -71,25 +76,6 @@ public struct RouteMatcher {
     self.fullPath = fullPath
     self.pathPrefix = nil
     self.headers = headers
-  }
-}
-
-extension RouteMatcher {
-  func toObjC() -> EMORouteMatcher {
-    let result = EMORouteMatcher()
-    result.fullPath = fullPath
-    result.pathPrefix = pathPrefix
-    result.headers = headers.map { $0.toObjC() }
-    return result
-  }
-}
-
-private extension RouteMatcher.HeaderMatcher {
-  func toObjC() -> EMOHeaderMatcher {
-    let result = EMOHeaderMatcher()
-    result.name = name
-    result.value = value
-    result.mode = mode.objcValue
-    return result
+    super.init()
   }
 }

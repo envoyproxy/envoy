@@ -1,6 +1,0 @@
-syntax = "proto3";
-
-package test.upstreams.http;
-
-message CustomHeaderValidator {
-}

@@ -55,7 +55,7 @@ PolicySharedPtr FilterConfig::getPolicy(::Envoy::Http::ResponseHeaderMap& header
     return PolicySharedPtr{};
   }
 
-  ::Envoy::Http::Matching::HttpMatchingDataImpl data(stream_info);
+  ::Envoy::Http::Matching::HttpMatchingDataImpl data(stream_info.downstreamAddressProvider());
   data.onResponseHeaders(headers);
   auto match = Matcher::evaluateMatch<::Envoy::Http::HttpMatchingData>(*matcher_, data);
   if (!match.result_) {

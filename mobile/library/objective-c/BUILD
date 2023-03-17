@@ -1,18 +1,15 @@
-load("//bazel:apple.bzl", "envoy_objc_library")
-
 licenses(["notice"])  # Apache 2
 
 exports_files([
     "EnvoyEngine.h",
 ])
 
-envoy_objc_library(
+objc_library(
     name = "envoy_engine_objc_lib",
     srcs = [
-        "EMODirectResponse.h",
         "EnvoyConfiguration.h",
-        "EnvoyConfiguration.mm",
-        "EnvoyEngineImpl.mm",
+        "EnvoyConfiguration.m",
+        "EnvoyEngineImpl.m",
         "EnvoyEventTracker.h",
         "EnvoyEventTracker.m",
         "EnvoyHTTPCallbacks.h",
@@ -53,14 +50,13 @@ envoy_objc_library(
         ":envoy_key_value_store_bridge_impl_lib",
         ":envoy_key_value_store_lib",
         ":envoy_objc_bridge_lib",
-        "//library/cc:engine_builder_lib",
         "//library/common:envoy_main_interface_lib",
         "//library/common/api:c_types",
         "//library/common/network:apple_platform_cert_verifier",
     ],
 )
 
-envoy_objc_library(
+objc_library(
     name = "envoy_objc_bridge_lib",
     hdrs = ["EnvoyBridgeUtility.h"],
     visibility = ["//visibility:public"],
@@ -70,13 +66,13 @@ envoy_objc_library(
     ],
 )
 
-envoy_objc_library(
+objc_library(
     name = "envoy_aliases_lib",
     hdrs = ["EnvoyAliases.h"],
     visibility = ["//visibility:public"],
 )
 
-envoy_objc_library(
+objc_library(
     name = "envoy_key_value_store_bridge_impl_lib",
     srcs = ["EnvoyKeyValueStoreBridgeImpl.m"],
     hdrs = ["EnvoyKeyValueStoreBridgeImpl.h"],
@@ -87,7 +83,7 @@ envoy_objc_library(
     ],
 )
 
-envoy_objc_library(
+objc_library(
     name = "envoy_key_value_store_lib",
     hdrs = ["EnvoyKeyValueStore.h"],
     visibility = ["//visibility:public"],

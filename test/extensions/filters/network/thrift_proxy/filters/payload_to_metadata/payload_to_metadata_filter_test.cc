@@ -17,8 +17,6 @@ namespace PayloadToMetadataFilter {
 
 namespace {
 
-using ::testing::Return;
-
 MATCHER_P(MapEq, rhs, "") {
   const ProtobufWkt::Struct& obj = arg;
   EXPECT_TRUE(!rhs.empty());

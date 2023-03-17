@@ -1,14 +1,18 @@
+version: "3.8"
 services:
+
+  flask_service:
+    build:
+      context: ../shared/flask
+    image: flask_service:python-3.10-slim-bullseye
+    restart: "no"
+    deploy:
+      replicas: 0
 
   front-envoy:
     build:
-      dockerfile: ../shared/envoy/Dockerfile
-      target: envoy-ext_authz
-      args:
-        ENVOY_CONFIG: config/http-service.yaml
-    depends_on:
-      upstream-service:
-        condition: service_healthy
+      context: .
+      dockerfile: Dockerfile-frontenvoy
     environment:
     - FRONT_ENVOY_YAML
     ports:
@@ -17,8 +21,7 @@ services:
   ext_authz-http-service:
     build:
       context: ./auth
-      dockerfile: ../../shared/node/Dockerfile
-      target: node-http-auth
+      dockerfile: http-service/Dockerfile
     volumes:
     - ./users.json:/etc/users.json
     environment:
@@ -26,14 +29,14 @@ services:
 
   ext_authz-grpc-service:
     build:
-      context: auth
-      dockerfile: ../../shared/golang/Dockerfile
-      target: golang-grpc-auth
+      context: ./auth
+      dockerfile: grpc-service/Dockerfile
     volumes:
     - ./users.json:/etc/users.json
 
   ext_authz-opa-service:
     build:
+      context: .
       dockerfile: Dockerfile-opa
     volumes:
     - ./config/opa-service/policy.rego:/etc/policy.rego
@@ -47,7 +50,6 @@ services:
 
   upstream-service:
     build:
-      context: ../shared/python
-      target: aiohttp-service
+      context: ../shared/service
     volumes:
     - ./upstream/service/service.py:/code/service.py

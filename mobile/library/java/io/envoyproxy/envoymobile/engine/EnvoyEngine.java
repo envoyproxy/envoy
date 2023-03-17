@@ -3,7 +3,6 @@ package io.envoyproxy.envoymobile.engine;
 import io.envoyproxy.envoymobile.engine.types.EnvoyHTTPCallbacks;
 import io.envoyproxy.envoymobile.engine.types.EnvoyNetworkType;
 import io.envoyproxy.envoymobile.engine.types.EnvoyStringAccessor;
-import io.envoyproxy.envoymobile.engine.types.EnvoyStatus;
 
 import java.util.Map;
 
@@ -41,7 +40,7 @@ public interface EnvoyEngine {
    * @param logLevel          The log level to use when starting Envoy.
    * @return A status indicating if the action was successful.
    */
-  EnvoyStatus runWithYaml(String configurationYAML, String logLevel);
+  int runWithYaml(String configurationYAML, String logLevel);
 
   /**
    * Run the Envoy engine with the provided EnvoyConfiguration and log level.
@@ -52,7 +51,7 @@ public interface EnvoyEngine {
    * @param logLevel           The log level to use when starting Envoy.
    * @return A status indicating if the action was successful.
    */
-  EnvoyStatus runWithConfig(EnvoyConfiguration envoyConfiguration, String logLevel);
+  int runWithConfig(EnvoyConfiguration envoyConfiguration, String logLevel);
 
   /**
    * Increments a counter with the given count.

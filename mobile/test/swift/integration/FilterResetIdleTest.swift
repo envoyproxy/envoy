@@ -24,10 +24,6 @@ final class FilterResetIdleTests: XCTestCase {
     let filterName = "reset_idle_test_filter"
     let config =
 """
-listener_manager:
-    name: envoy.listener_manager_impl.api
-    typed_config:
-      "@type": type.googleapis.com/envoy.config.listener.v3.ApiListenerManager
 static_resources:
   listeners:
   - name: fake_remote_listener
@@ -210,6 +206,7 @@ static_resources:
       method: .get, scheme: "https",
       authority: "example.com", path: "/test"
     )
+    .addUpstreamHttpProtocol(.http2)
     .build()
 
     client

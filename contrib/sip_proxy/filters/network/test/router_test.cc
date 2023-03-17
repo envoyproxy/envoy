@@ -456,7 +456,7 @@ TEST_F(SipRouterTest, QueryStop) {
   initializeTrans();
   initializeRouter();
   initializeTransaction();
-  initializeMetadata(MsgType::Request, MethodType::Invite, false);
+  initializeMetadata(MsgType::Request);
   metadata_->affinity().clear();
   metadata_->affinity().emplace_back("Route", "lskpmc", "S1F1", false, false);
   metadata_->resetAffinityIteration();
@@ -464,7 +464,7 @@ TEST_F(SipRouterTest, QueryStop) {
       .WillRepeatedly(
           Invoke([&](const std::string&, const std::string&, const absl::optional<TraContextMap>,
                      SipFilters::DecoderFilterCallbacks&, std::string& host) -> QueryStatus {
-            host = "";
+            host = "10.0.0.11";
             return QueryStatus::Stop;
           }));
   startRequest(FilterStatus::Continue);
@@ -560,7 +560,7 @@ TEST_F(SipRouterTest, DestNotEqualToHost) {
   initializeTrans();
   initializeRouter();
   initializeTransaction();
-  initializeMetadata(MsgType::Request, MethodType::Invite, false);
+  initializeMetadata(MsgType::Request);
 
   EXPECT_CALL(callbacks_, route()).WillOnce(Return(route_ptr_));
   EXPECT_CALL(*route_, routeEntry()).WillOnce(Return(&route_entry_));
