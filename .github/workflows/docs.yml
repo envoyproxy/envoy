@@ -9,6 +9,10 @@ on:
   # to `pull_request_target`.
   pull_request:
 
+# TODO(yannic): Set to `permissions: {}` after migrating away from GitHub token for RE.
+permissions:
+  packages: none
+
 concurrency:
   group: ${{ github.head_ref-github.workflow || github.run_id }}
   cancel-in-progress: true
