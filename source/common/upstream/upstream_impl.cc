@@ -983,8 +983,9 @@ LBPolicyConfig::LBPolicyConfig(const envoy::config::cluster::v3::Cluster& config
         config.original_dst_lb_config());
     break;
   case envoy::config::cluster::v3::Cluster::LB_CONFIG_NOT_SET:
+    // The default value of the variant if there is no config would be nullptr
+    // Which is set when the class is initialized. No action needed if config isn't set
     break;
-    PANIC_DUE_TO_CORRUPT_ENUM;
   }
 }
 

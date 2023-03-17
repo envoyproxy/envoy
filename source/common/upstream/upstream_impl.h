@@ -110,14 +110,6 @@ class LBPolicyConfig {
 public:
   LBPolicyConfig(const envoy::config::cluster::v3::Cluster& config);
 
-  template <typename T> OptRef<const T> getConfig() const {
-    if (const auto lbPtr = absl::get_if<std::unique_ptr<const T>>(&lb_policy_); lbPtr && *lbPtr) {
-      return *(*lbPtr);
-    } else {
-      return absl::nullopt;
-    }
-  }
-
   OptRef<const envoy::config::cluster::v3::Cluster::RoundRobinLbConfig> lbRoundRobinConfig() const {
     return getConfig<envoy::config::cluster::v3::Cluster::RoundRobinLbConfig>();
   }
@@ -141,6 +133,16 @@ public:
   }
 
 private:
+  template <typename T> OptRef<const T> getConfig() const {
+    // Condition checks for the type of LbConfig, it also checks that the value is not nullptr
+    // The Round Robin config being set to nullptr is the default value of the variant
+    if (const auto lbPtr = absl::get_if<std::unique_ptr<const T>>(&lb_policy_); lbPtr && *lbPtr) {
+      return *(*lbPtr);
+    } else {
+      return absl::nullopt;
+    }
+  }
+
   absl::variant<std::unique_ptr<const envoy::config::cluster::v3::Cluster::RoundRobinLbConfig>,
                 std::unique_ptr<const envoy::config::cluster::v3::Cluster::LeastRequestLbConfig>,
                 std::unique_ptr<const envoy::config::cluster::v3::Cluster::RingHashLbConfig>,
