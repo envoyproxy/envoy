@@ -176,6 +176,7 @@
   self.nodeRegion = nodeRegion;
   self.nodeZone = nodeZone;
   self.nodeSubZone = nodeSubZone;
+  self.bootstrapPointer = 0;
 
   return self;
 }
@@ -243,10 +244,10 @@
   for (NSString *cluster in self.virtualClusters) {
     builder.addVirtualCluster([cluster toCXXString]);
   }
-  builder.addStatsFlushSeconds(self.statsFlushSeconds);
   builder.enablePlatformCertificatesValidation(true);
   builder.enableDnsCache(self.enableDNSCache, self.dnsCacheSaveIntervalSeconds);
-  builder.addGrpcStatsDomain([self.grpcStatsDomain toCXXString]);
+
+#ifdef ENVOY_MOBILE_STATS_REPORTING
   if (self.statsSinks.count > 0) {
     std::vector<std::string> sinks;
     sinks.reserve(self.statsSinks.count);
@@ -255,6 +256,9 @@
     }
     builder.addStatsSinks(std::move(sinks));
   }
+  builder.addGrpcStatsDomain([self.grpcStatsDomain toCXXString]);
+  builder.addStatsFlushSeconds(self.statsFlushSeconds);
+#endif
   if (self.nodeRegion != nil) {
     builder.setNodeLocality([self.nodeRegion toCXXString], [self.nodeZone toCXXString],
                             [self.nodeSubZone toCXXString]);

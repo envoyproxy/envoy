@@ -1,3 +1,6 @@
+node:
+  cluster: front-proxy
+
 static_resources:
   listeners:
   - address:
@@ -13,25 +16,14 @@ static_resources:
           generate_request_id: true
           tracing:
             provider:
-              name: envoy.tracers.dynamic_ot
+              name: envoy.tracers.zipkin
               typed_config:
-                "@type": type.googleapis.com/envoy.config.trace.v3.DynamicOtConfig
-                library: /usr/local/lib/libjaegertracing_plugin.so
-                config:
-                  service_name: front-proxy
-                  sampler:
-                    type: const
-                    param: 1
-                  reporter:
-                    localAgentHostPort: jaeger:6831
-                  headers:
-                    jaegerDebugHeader: jaeger-debug-id
-                    jaegerBaggageHeader: jaeger-baggage
-                    traceBaggageHeaderPrefix: uberctx-
-                  baggage_restrictions:
-                    denyBaggageOnInitializationFailure: false
-                    hostPort: ""
-          codec_type: auto
+                "@type": type.googleapis.com/envoy.config.trace.v3.ZipkinConfig
+                collector_cluster: jaeger
+                collector_endpoint: "/api/v2/spans"
+                shared_span_context: false
+                collector_endpoint_version: HTTP_JSON
+          codec_type: AUTO
           stat_prefix: ingress_http
           route_config:
             name: local_route
@@ -53,8 +45,8 @@ static_resources:
           use_remote_address: true
   clusters:
   - name: service1
-    type: strict_dns
-    lb_policy: round_robin
+    type: STRICT_DNS
+    lb_policy: ROUND_ROBIN
     load_assignment:
       cluster_name: service1
       endpoints:
@@ -64,3 +56,15 @@ static_resources:
               socket_address:
                 address: service1
                 port_value: 8000
+  - name: jaeger
+    type: STRICT_DNS
+    lb_policy: ROUND_ROBIN
+    load_assignment:
+      cluster_name: jaeger
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: jaeger
+                port_value: 9411
