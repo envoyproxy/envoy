@@ -2,6 +2,7 @@ load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_library",
     "envoy_package",
+    "envoy_select_enable_http_datagram",
 )
 load(
     "@envoy_build_config//:extensions_build_config.bzl",
@@ -275,7 +276,6 @@ envoy_cc_library(
         ":envoy_quic_server_crypto_stream_factory_lib",
         ":envoy_quic_stream_lib",
         ":envoy_quic_utils_lib",
-        ":http_datagram_handler",
         ":quic_filter_manager_connection_lib",
         ":quic_stat_names_lib",
         ":quic_stats_gatherer",
@@ -283,7 +283,9 @@ envoy_cc_library(
         "//source/common/common:assert_lib",
         "//source/common/http:header_map_lib",
         "@com_github_google_quiche//:quic_server_http_spdy_session_lib",
-    ],
+    ] + envoy_select_enable_http_datagram([
+        ":http_datagram_handler",
+    ]),
 )
 
 envoy_cc_library(
@@ -303,7 +305,6 @@ envoy_cc_library(
         ":envoy_quic_proof_verifier_lib",
         ":envoy_quic_stream_lib",
         ":envoy_quic_utils_lib",
-        ":http_datagram_handler",
         ":quic_filter_manager_connection_lib",
         ":quic_stat_names_lib",
         ":quic_transport_socket_factory_lib",
@@ -314,7 +315,9 @@ envoy_cc_library(
         "//source/common/http:header_map_lib",
         "//source/common/http:header_utility_lib",
         "@com_github_google_quiche//:quic_core_http_client_lib",
-    ],
+    ] + envoy_select_enable_http_datagram([
+        ":http_datagram_handler",
+    ]),
 )
 
 envoy_cc_library(

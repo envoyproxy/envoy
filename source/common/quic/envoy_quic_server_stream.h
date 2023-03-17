@@ -79,9 +79,11 @@ public:
   Http::HeaderUtility::HeaderValidationResult
   validateHeader(absl::string_view header_name, absl::string_view header_value) override;
 
+#ifdef ENVOY_ENABLE_HTTP_DATAGRAM
   // Enables the QUIC stream to decode HTTP/3 Datagrams and makes it encode DATA frames into HTTP/3
   // Datagrams or Capsules.
   void enableHttpDatagramSupport();
+#endif
 
 protected:
   // EnvoyQuicStream
@@ -115,8 +117,10 @@ private:
       headers_with_underscores_action_;
 
   quiche::QuicheReferenceCountedPointer<QuicStatsGatherer> stats_gatherer_;
+#ifdef ENVOY_ENABLE_HTTP_DATAGRAM
   // Setting |http_datagram_handler_| enables HTTP Datagram support.
   std::unique_ptr<HttpDatagramHandler> http_datagram_handler_;
+#endif
 };
 
 } // namespace Quic

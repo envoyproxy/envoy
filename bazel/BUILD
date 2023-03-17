@@ -359,6 +359,11 @@ config_setting(
 )
 
 config_setting(
+    name = "disable_http_datagram",
+    values = {"define": "enable_http_datagram=disabled"},
+)
+
+config_setting(
     name = "disable_logging",
     values = {"define": "enable_logging=disabled"},
 )

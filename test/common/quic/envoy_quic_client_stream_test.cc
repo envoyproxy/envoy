@@ -130,6 +130,7 @@ public:
     return data.length();
   }
 
+#ifdef ENVOY_ENABLE_HTTP_DATAGRAM
   void setUpCapsuleProtocol(bool close_send_stream, bool close_recv_stream) {
     EXPECT_TRUE(quic_session_.OnSetting(quic::SETTINGS_H3_DATAGRAM, 1));
     quic_stream_->enableHttpDatagramSupport();
@@ -159,6 +160,7 @@ public:
     quic_stream_->OnStreamFrame(frame);
     EXPECT_TRUE(quic_stream_->FinishedReadingHeaders());
   }
+#endif
 
 protected:
   Api::ApiPtr api_;
@@ -190,6 +192,7 @@ protected:
   spdy::Http2HeaderBlock spdy_trailers_;
   Buffer::OwnedImpl request_body_{"Hello world"};
   std::string response_body_{"OK\n"};
+#ifdef ENVOY_ENABLE_HTTP_DATAGRAM
   std::string capsule_fragment_ = absl::HexStringToBytes("00"               // DATAGRAM capsule type
                                                          "08"               // capsule length
                                                          "a1a2a3a4a5a6a7a8" // HTTP Datagram payload
@@ -199,6 +202,7 @@ protected:
                                                     absl::kZeroPad2), // Quarter Stream ID
                                           "a1a2a3a4a5a6a7a8")         // HTTP Datagram Payload
       );
+#endif
 };
 
 TEST_F(EnvoyQuicClientStreamTest, GetRequestAndHeaderOnlyResponse) {
@@ -676,6 +680,7 @@ TEST_F(EnvoyQuicClientStreamTest, EncodeTrailersOnClosedStream) {
   EXPECT_EQ(0u, quic_session_.bytesToSend());
 }
 
+#ifdef ENVOY_ENABLE_HTTP_DATAGRAM
 TEST_F(EnvoyQuicClientStreamTest, EncodeCapsule) {
   setUpCapsuleProtocol(false, true);
   Buffer::OwnedImpl buffer(capsule_fragment_);
@@ -694,6 +699,7 @@ TEST_F(EnvoyQuicClientStreamTest, DecodeHttp3Datagram) {
   quic_session_.OnMessageReceived(datagram_fragment_);
   EXPECT_CALL(stream_callbacks_, onResetStream(_, _));
 }
+#endif
 
 } // namespace Quic
 } // namespace Envoy

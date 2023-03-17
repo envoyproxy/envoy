@@ -226,6 +226,7 @@ bool HeaderUtility::isConnectResponse(const RequestHeaderMap* request_headers,
              Http::Code::OK;
 }
 
+#ifdef ENVOY_ENABLE_HTTP_DATAGRAM
 bool HeaderUtility::isCapsuleProtocol(const RequestOrResponseHeaderMap& headers) {
   Http::HeaderMap::GetResult capsule_protocol =
       headers.get(Envoy::Http::LowerCaseString("Capsule-Protocol"));
@@ -237,6 +238,7 @@ bool HeaderUtility::isCapsuleProtocol(const RequestOrResponseHeaderMap& headers)
       quiche::structured_headers::ParseItem(capsule_protocol[0]->value().getStringView());
   return header_item && header_item->item.is_boolean() && header_item->item.GetBoolean();
 }
+#endif
 
 bool HeaderUtility::requestShouldHaveNoBody(const RequestHeaderMap& headers) {
   return (headers.Method() &&

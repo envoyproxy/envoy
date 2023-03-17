@@ -115,6 +115,7 @@ public:
     }
   }
 
+#ifdef ENVOY_ENABLE_HTTP_DATAGRAM
   void setUpCapsuleProtocol(bool close_send_stream, bool close_recv_stream) {
     quic_stream_->enableHttpDatagramSupport();
 
@@ -143,6 +144,7 @@ public:
                                                         {"capsule-protocol", "?1"}};
     quic_stream_->encodeHeaders(response_headers, close_send_stream);
   }
+#endif
 
   size_t receiveRequest(const std::string& payload, bool fin,
                         size_t decoder_buffer_high_watermark) {
@@ -222,7 +224,7 @@ protected:
       quic::kQuicDefaultConnectionIdLength};
   testing::NiceMock<MockEnvoyQuicServerConnection> quic_connection_;
   MockEnvoyQuicSession quic_session_;
-  quic::QuicStreamId stream_id_{4u};
+  quic::QuicStreamId stream_id_{kStreamId};
   Http::Http3::CodecStats stats_;
   envoy::config::core::v3::Http3ProtocolOptions http3_options_;
   EnvoyQuicServerStream* quic_stream_;
@@ -234,6 +236,7 @@ protected:
   spdy::Http2HeaderBlock spdy_trailers_;
   std::string host_{"www.abc.com"};
   std::string request_body_{"Hello world"};
+#ifdef ENVOY_ENABLE_HTTP_DATAGRAM
   std::string capsule_fragment_ = absl::HexStringToBytes("00"               // DATAGRAM capsule type
                                                          "08"               // capsule length
                                                          "a1a2a3a4a5a6a7a8" // HTTP Datagram payload
@@ -243,6 +246,7 @@ protected:
                                                     absl::kZeroPad2), // Quarter Stream ID
                                           "a1a2a3a4a5a6a7a8")         // HTTP Datagram Payload
       );
+#endif
 };
 
 TEST_F(EnvoyQuicServerStreamTest, GetRequestAndResponse) {
@@ -841,6 +845,7 @@ TEST_F(EnvoyQuicServerStreamTest, MetadataNotSupported) {
   EXPECT_CALL(stream_callbacks_, onResetStream(_, _));
 }
 
+#ifdef ENVOY_ENABLE_HTTP_DATAGRAM
 TEST_F(EnvoyQuicServerStreamTest, EncodeCapsule) {
   setUpCapsuleProtocol(false, true);
   Buffer::OwnedImpl buffer(capsule_fragment_);
@@ -857,6 +862,7 @@ TEST_F(EnvoyQuicServerStreamTest, DecodeHttp3Datagram) {
   EXPECT_CALL(stream_decoder_, decodeData(BufferStringEqual(capsule_fragment_), _));
   quic_session_.OnMessageReceived(datagram_fragment_);
 }
+#endif
 
 } // namespace Quic
 } // namespace Envoy

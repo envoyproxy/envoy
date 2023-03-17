@@ -82,6 +82,7 @@ void EnvoyQuicServerStream::encodeData(Buffer::Instance& data, bool end_stream) 
   ASSERT(!local_end_stream_);
   local_end_stream_ = end_stream;
   SendBufferMonitor::ScopedWatermarkBufferUpdater updater(this, this);
+#ifdef ENVOY_ENABLE_HTTP_DATAGRAM
   if (http_datagram_handler_) {
     IncrementalBytesSentTracker tracker(*this, *mutableBytesMeter(), false);
     if (!http_datagram_handler_->encodeCapsuleFragment(data.toString(), end_stream)) {
@@ -89,6 +90,7 @@ void EnvoyQuicServerStream::encodeData(Buffer::Instance& data, bool end_stream) 
       return;
     }
   } else {
+#endif
     Buffer::RawSliceVector raw_slices = data.getRawSlices();
     absl::InlinedVector<quiche::QuicheMemSlice, 4> quic_slices;
     quic_slices.reserve(raw_slices.size());
@@ -115,7 +117,9 @@ void EnvoyQuicServerStream::encodeData(Buffer::Instance& data, bool end_stream) 
       Reset(quic::QUIC_BAD_APPLICATION_PAYLOAD);
       return;
     }
+#ifdef ENVOY_ENABLE_HTTP_DATAGRAM
   }
+#endif
   if (local_end_stream_) {
     onLocalEndStream();
   }
@@ -475,6 +479,7 @@ bool EnvoyQuicServerStream::hasPendingData() {
   return (!write_side_closed()) && BufferedDataBytes() > 0;
 }
 
+#ifdef ENVOY_ENABLE_HTTP_DATAGRAM
 // TODO(https://github.com/envoyproxy/envoy/issues/23564): enable HTTP Datagram support by looking
 // at the request/response headers for CONNECT-UDP support.
 void EnvoyQuicServerStream::enableHttpDatagramSupport() {
@@ -482,6 +487,7 @@ void EnvoyQuicServerStream::enableHttpDatagramSupport() {
   ASSERT(request_decoder_ != nullptr);
   http_datagram_handler_->setStreamDecoder(request_decoder_);
 }
+#endif
 
 } // namespace Quic
 } // namespace Envoy

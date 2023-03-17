@@ -1140,6 +1140,7 @@ TEST(HeaderIsValidTest, IsConnectResponse) {
   EXPECT_FALSE(HeaderUtility::isConnectResponse(get_request.get(), success_response));
 }
 
+#ifdef ENVOY_ENABLE_HTTP_DATAGRAM
 TEST(HeaderIsValidTest, IsCapsuleProtocol) {
   EXPECT_TRUE(
       HeaderUtility::isCapsuleProtocol(TestRequestHeaderMapImpl{{"Capsule-Protocol", "?1"}}));
@@ -1152,6 +1153,7 @@ TEST(HeaderIsValidTest, IsCapsuleProtocol) {
       TestResponseHeaderMapImpl{{":status", "200"}, {"Capsule-Protocol", "?1"}}));
   EXPECT_FALSE(HeaderUtility::isCapsuleProtocol(TestResponseHeaderMapImpl{{":status", "200"}}));
 }
+#endif
 
 TEST(HeaderIsValidTest, ShouldHaveNoBody) {
   const std::vector<std::string> methods{{"CONNECT"}, {"GET"}, {"DELETE"}, {"TRACE"}, {"HEAD"}};
