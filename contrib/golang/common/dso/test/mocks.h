@@ -1,15 +1,15 @@
 #include <string>
 
-#include "contrib/golang/filters/http/source/common/dso/dso.h"
+#include "contrib/golang/common/dso/dso.h"
 #include "gmock/gmock.h"
 
 namespace Envoy {
 namespace Dso {
 
-class MockDsoInstance : public Dso {
+class MockHttpFilterDsoImpl : public HttpFilterDso {
 public:
-  MockDsoInstance();
-  ~MockDsoInstance() override;
+  MockHttpFilterDsoImpl();
+  ~MockHttpFilterDsoImpl() override;
 
   MOCK_METHOD(GoUint64, envoyGoFilterNewHttpPluginConfig, (GoUint64 p0, GoUint64 p1));
   MOCK_METHOD(GoUint64, envoyGoFilterMergeHttpPluginConfig, (GoUint64 p0, GoUint64 p1));

@@ -924,7 +924,7 @@ uint64_t Filter::getMergedConfigId(ProcessorState& state) {
 
 FilterConfig::FilterConfig(
     const envoy::extensions::filters::http::golang::v3alpha::Config& proto_config,
-    Dso::DsoPtr dso_lib)
+    Dso::HttpFilterDsoPtr dso_lib)
     : plugin_name_(proto_config.plugin_name()), so_id_(proto_config.library_id()),
       so_path_(proto_config.library_path()), plugin_config_(proto_config.plugin_config()),
       dso_lib_(dso_lib) {
@@ -980,7 +980,7 @@ uint64_t RoutePluginConfig::getMergedConfigId(uint64_t parent_id, std::string so
     return merged_config_id_;
   }
 
-  auto dlib = Dso::DsoManager::getDsoByID(so_id);
+  auto dlib = Dso::DsoManager<Dso::HttpFilterDsoImpl>::getDsoByID(so_id);
   ASSERT(dlib != nullptr, "load at the config parse phase, so it should not be null");
 
   if (config_id_ == 0) {
