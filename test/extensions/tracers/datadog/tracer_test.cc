@@ -1,6 +1,7 @@
 #include "envoy/tracing/trace_reason.h"
 
 #include "source/common/tracing/null_span_impl.h"
+#include "source/extensions/tracers/datadog/span.h"
 #include "source/extensions/tracers/datadog/tracer.h"
 
 #include "test/mocks/thread_local/mocks.h"
@@ -10,6 +11,8 @@
 
 #include "datadog/error.h"
 #include "datadog/expected.h"
+#include "datadog/sampling_priority.h"
+#include "datadog/trace_segment.h"
 #include "datadog/tracer_config.h"
 #include "gtest/gtest.h"
 
@@ -68,11 +71,123 @@ TEST_F(DatadogTracerTest, NoOpMode) {
   decision.reason = Tracing::Reason::Sampling;
   decision.traced = true;
 
-  const Tracing::SpanPtr span = tracer.startSpan(Tracing::MockConfig{}, context, "do.thing",
-                                                 time_.timeSystem().systemTime(), decision);
+  const std::string operation_name = "do.thing";
+  const SystemTime start = time_.timeSystem().systemTime();
+
+  const Tracing::SpanPtr span =
+      tracer.startSpan(Tracing::MockConfig{}, context, operation_name, start, decision);
   ASSERT_TRUE(span);
   const auto as_null_span = dynamic_cast<Tracing::NullSpan*>(span.get());
   EXPECT_NE(nullptr, as_null_span);
+}
+
+TEST_F(DatadogTracerTest, SpanProperties) {
+  // Verify that span-affecting parameters to `startSpan` are reflected in the
+  // resulting span.
+  datadog::tracing::TracerConfig config;
+  config.defaults.service = "envoy";
+
+  Tracer tracer("fake_cluster", "test_host", config, cluster_manager_, *store_.rootScope(),
+                thread_local_slot_allocator_);
+
+  Tracing::TestTraceContextImpl context{};
+  // A sampling decision of "false" forces the created trace to be dropped,
+  // which we will be able to verify by inspecting the span.
+  Tracing::Decision decision;
+  decision.reason = Tracing::Reason::Sampling;
+  decision.traced = false;
+
+  const std::string operation_name = "do.thing";
+  const SystemTime start = time_.timeSystem().systemTime();
+
+  const Tracing::SpanPtr span =
+      tracer.startSpan(Tracing::MockConfig{}, context, operation_name, start, decision);
+  ASSERT_TRUE(span);
+  const auto as_dd_span_wrapper = dynamic_cast<Span*>(span.get());
+  EXPECT_NE(nullptr, as_dd_span_wrapper);
+
+  const datadog::tracing::Optional<datadog::tracing::Span>& maybe_dd_span =
+      as_dd_span_wrapper->impl();
+  ASSERT_TRUE(maybe_dd_span);
+  const datadog::tracing::Span& dd_span = *maybe_dd_span;
+
+  // Verify that the span has the expected service name, operation name, start
+  // time, and sampling decision.
+  EXPECT_EQ("do.thing", dd_span.name());
+  EXPECT_EQ("envoy", dd_span.service_name());
+  ASSERT_TRUE(dd_span.trace_segment().sampling_decision());
+  EXPECT_EQ(int(datadog::tracing::SamplingPriority::USER_DROP),
+            dd_span.trace_segment().sampling_decision()->priority);
+  EXPECT_EQ(start, dd_span.start_time().wall);
+}
+
+TEST_F(DatadogTracerTest, ExtractionSuccess) {
+  // Verify that if there is trace information to extract from the
+  // `TraceContext` supplied to `startSpan`, that the resulting span is part of
+  // the extracted trace.
+  datadog::tracing::TracerConfig config;
+  config.defaults.service = "envoy";
+
+  Tracer tracer("fake_cluster", "test_host", config, cluster_manager_, *store_.rootScope(),
+                thread_local_slot_allocator_);
+
+  // Any values will do for the sake of this test.
+  Tracing::Decision decision;
+  decision.reason = Tracing::Reason::Sampling;
+  decision.traced = true;
+
+  const std::string operation_name = "do.thing";
+  const SystemTime start = time_.timeSystem().systemTime();
+  // trace context in the Datadog style
+  Tracing::TestTraceContextImpl context{{"x-datadog-trace-id", "1234"},
+                                        {"x-datadog-parent-id", "5678"}};
+
+  const Tracing::SpanPtr span =
+      tracer.startSpan(Tracing::MockConfig{}, context, operation_name, start, decision);
+  ASSERT_TRUE(span);
+  const auto as_dd_span_wrapper = dynamic_cast<Span*>(span.get());
+  EXPECT_NE(nullptr, as_dd_span_wrapper);
+
+  const datadog::tracing::Optional<datadog::tracing::Span>& maybe_dd_span =
+      as_dd_span_wrapper->impl();
+  ASSERT_TRUE(maybe_dd_span);
+  const datadog::tracing::Span& dd_span = *maybe_dd_span;
+
+  EXPECT_EQ(1234, dd_span.trace_id().low);
+  ASSERT_TRUE(dd_span.parent_id());
+  EXPECT_EQ(5678, *dd_span.parent_id());
+}
+
+TEST_F(DatadogTracerTest, ExtractionFailure) {
+  // Verify that if there is invalid trace information in the `TraceContext`
+  // supplied to `startSpan`, that the resulting span is nonetheless valid (it
+  // will be the start of a new trace).
+  datadog::tracing::TracerConfig config;
+  config.defaults.service = "envoy";
+
+  Tracer tracer("fake_cluster", "test_host", config, cluster_manager_, *store_.rootScope(),
+                thread_local_slot_allocator_);
+
+  // Any values will do for the sake of this test.
+  Tracing::Decision decision;
+  decision.reason = Tracing::Reason::Sampling;
+  decision.traced = true;
+
+  const std::string operation_name = "do.thing";
+  const SystemTime start = time_.timeSystem().systemTime();
+  // invalid trace context in the Datadog style
+  Tracing::TestTraceContextImpl context{{"x-datadog-trace-id", "nope"},
+                                        {"x-datadog-parent-id", "nice try"}};
+
+  const Tracing::SpanPtr span =
+      tracer.startSpan(Tracing::MockConfig{}, context, operation_name, start, decision);
+  ASSERT_TRUE(span);
+  const auto as_dd_span_wrapper = dynamic_cast<Span*>(span.get());
+  EXPECT_NE(nullptr, as_dd_span_wrapper);
+
+  const datadog::tracing::Optional<datadog::tracing::Span>& maybe_dd_span =
+      as_dd_span_wrapper->impl();
+  ASSERT_TRUE(maybe_dd_span);
 }
 
 } // namespace
