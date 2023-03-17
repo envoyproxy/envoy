@@ -45,7 +45,8 @@ Http::Status EnvoyQuicClientStream::encodeHeaders(const Http::RequestHeaderMap& 
   local_end_stream_ = end_stream;
   SendBufferMonitor::ScopedWatermarkBufferUpdater updater(this, this);
   spdy::Http2HeaderBlock spdy_headers;
-  if (Http::Utility::isUpgrade(headers)) {
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.use_http3_header_normalisation") &&
+      Http::Utility::isUpgrade(headers)) {
     // transform Upgrade from H1 to H3
     upgrade_type_ = std::string(headers.getUpgradeValue());
     Http::RequestHeaderMapPtr modified_headers =

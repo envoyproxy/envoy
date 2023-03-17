@@ -56,7 +56,8 @@ void EnvoyQuicServerStream::encodeHeaders(const Http::ResponseHeaderMap& headers
   }
   auto modified_headers = Http::createHeaderMap<Http::ResponseHeaderMapImpl>(headers);
   // Transform Response from H1 to H3
-  if (Http::Utility::isUpgrade(headers)) {
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.use_http3_header_normalisation") &&
+      Http::Utility::isUpgrade(headers)) {
     Http::Utility::transformUpgradeResponseFromH1toH3(*modified_headers);
   }
   // This is counting not serialized bytes in the send buffer.
@@ -210,7 +211,8 @@ void EnvoyQuicServerStream::OnInitialHeadersComplete(bool fin, size_t frame_len,
     return;
   }
 
-  if (Http::Utility::isH3UpgradeRequest(*headers)) {
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.use_http3_header_normalisation") &&
+      Http::Utility::isH3UpgradeRequest(*headers)) {
     // Transform Request from H3 to H1
     Http::Utility::transformUpgradeRequestFromH3toH1(*headers);
   }
