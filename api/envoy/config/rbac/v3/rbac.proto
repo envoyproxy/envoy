@@ -121,7 +121,7 @@ message RBAC {
     //
     // [#not-implemented-hide:]
     // [#extension-category: envoy.rbac.audit_loggers]
-    repeated core.v3.TypedExtensionConfig audit_logger = 2
+    repeated core.v3.TypedExtensionConfig audit_loggers = 2
         [(validate.rules).repeated = {min_items: 1}];
   }
 
