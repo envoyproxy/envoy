@@ -1489,7 +1489,8 @@ void ConnectionManagerImpl::ActiveStream::requestRouteConfigUpdate(
 
 absl::optional<Router::ConfigConstSharedPtr> ConnectionManagerImpl::ActiveStream::routeConfig() {
   if (connection_manager_.config_.routeConfigProvider() != nullptr) {
-    return {connection_manager_.config_.routeConfigProvider()->configCast()};
+    return absl::optional<Router::ConfigConstSharedPtr>(
+        connection_manager_.config_.routeConfigProvider()->configCast());
   }
   return {};
 }
@@ -1859,8 +1860,8 @@ void ConnectionManagerImpl::ActiveStream::clearRouteCache() {
     cleared_cached_routes_.emplace_back(std::move(cached_route_.value()));
   }
 
-  cached_route_ = {};
-  cached_cluster_info_ = {};
+  cached_route_ = absl::optional<Router::RouteConstSharedPtr>();
+  cached_cluster_info_ = absl::optional<Upstream::ClusterInfoConstSharedPtr>();
   if (tracing_custom_tags_) {
     tracing_custom_tags_->clear();
   }
