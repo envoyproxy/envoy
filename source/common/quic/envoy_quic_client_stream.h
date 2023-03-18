@@ -52,9 +52,10 @@ public:
 
   void clearWatermarkBuffer();
 #ifdef ENVOY_ENABLE_HTTP_DATAGRAM
-  // Enables the QUIC stream to decode HTTP/3 Datagrams and makes it encode DATA frames into HTTP/3
-  // Datagrams or Capsules.
-  void enableHttpDatagramSupport();
+  // Makes the QUIC stream use Capsule Protocol. Once this method is called, any calls to encodeData
+  // are expected to contain capsules which will be sent along as HTTP Datagrams. Also, the stream
+  // starts to receive HTTP/3 Datagrams and decode into Capsules.
+  void useCapsuleProtocol();
 #endif
 
 protected:

@@ -419,9 +419,10 @@ void EnvoyQuicClientStream::onStreamError(absl::optional<bool> should_close_conn
 bool EnvoyQuicClientStream::hasPendingData() { return BufferedDataBytes() > 0; }
 
 #ifdef ENVOY_ENABLE_HTTP_DATAGRAM
-// TODO(https://github.com/envoyproxy/envoy/issues/23564): enable HTTP Datagram support by looking
-// at the request/response headers for CONNECT-UDP support.
-void EnvoyQuicClientStream::enableHttpDatagramSupport() {
+// TODO(https://github.com/envoyproxy/envoy/issues/23564): Make the stream use Capsule Protocol
+// for CONNECT-UDP support when the headers contain "Capsule-Protocol: ?1" or "Upgrade:
+// connect-udp".
+void EnvoyQuicClientStream::useCapsuleProtocol() {
   http_datagram_handler_ = std::make_unique<HttpDatagramHandler>(*this);
   http_datagram_handler_->setStreamDecoder(response_decoder_);
 }

@@ -133,7 +133,7 @@ public:
 #ifdef ENVOY_ENABLE_HTTP_DATAGRAM
   void setUpCapsuleProtocol(bool close_send_stream, bool close_recv_stream) {
     EXPECT_TRUE(quic_session_.OnSetting(quic::SETTINGS_H3_DATAGRAM, 1));
-    quic_stream_->enableHttpDatagramSupport();
+    quic_stream_->useCapsuleProtocol();
 
     // Encodes a CONNECT-UDP request.
     Http::TestRequestHeaderMapImpl request_headers = {

@@ -1148,6 +1148,8 @@ TEST(HeaderIsValidTest, IsCapsuleProtocol) {
       TestRequestHeaderMapImpl{{"Capsule-Protocol", "?1;a=1;b=2;c;d=?0"}}));
   EXPECT_FALSE(
       HeaderUtility::isCapsuleProtocol(TestRequestHeaderMapImpl{{"Capsule-Protocol", "?0"}}));
+  EXPECT_FALSE(HeaderUtility::isCapsuleProtocol(
+      TestRequestHeaderMapImpl{{"Capsule-Protocol", "?1"}, {"Capsule-Protocol", "?1"}}));
   EXPECT_FALSE(HeaderUtility::isCapsuleProtocol(TestRequestHeaderMapImpl{{":method", "CONNECT"}}));
   EXPECT_TRUE(HeaderUtility::isCapsuleProtocol(
       TestResponseHeaderMapImpl{{":status", "200"}, {"Capsule-Protocol", "?1"}}));
