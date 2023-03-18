@@ -30,6 +30,7 @@ public:
   MOCK_METHOD(void, onUpstreamReset,
               (Envoy::Http::StreamResetReason reset_reason, absl::string_view transport_failure,
                UpstreamRequest& upstream_request));
+  MOCK_METHOD(void, onUpstreamConnectionEstablished, ());             
   MOCK_METHOD(void, onUpstreamHostSelected, (Upstream::HostDescriptionConstSharedPtr host));
   MOCK_METHOD(void, onPerTryTimeout, (UpstreamRequest & upstream_request));
   MOCK_METHOD(void, onPerTryIdleTimeout, (UpstreamRequest & upstream_request));

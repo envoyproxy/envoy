@@ -109,6 +109,7 @@ public:
   MOCK_METHOD(OptRef<const Tracing::Config>, tracingConfig, (), (const));
   MOCK_METHOD(const ScopeTrackedObject&, scope, ());
   MOCK_METHOD(void, restoreContextOnContinue, (ScopeTrackedObjectStack&));
+  MOCK_METHOD(void, onUpstreamConnectionEstablished, ());
 
   ResponseHeaderMapPtr informational_headers_;
   ResponseHeaderMapPtr response_headers_;
@@ -315,6 +316,7 @@ public:
   MOCK_METHOD(Buffer::BufferMemoryAccountSharedPtr, account, (), (const));
   MOCK_METHOD(void, setUpstreamOverrideHost, (absl::string_view host));
   MOCK_METHOD(absl::optional<absl::string_view>, upstreamOverrideHost, (), (const));
+  MOCK_METHOD(void, onUpstreamConnectionEstablished, ());
 
   Buffer::InstancePtr buffer_;
   std::list<DownstreamWatermarkCallbacks*> callbacks_{};
