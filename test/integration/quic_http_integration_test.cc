@@ -1700,7 +1700,6 @@ TEST_P(QuicHttpIntegrationTest, UsesPreferredAddressDualStack) {
         version_ == Network::Address::IpVersion::v4)) {
     return;
   }
-  config_helper_.addRuntimeOverride("envoy.restart_features.udp_read_normalize_addresses", "true");
   // Only run this test with a v4 client if the test environment supports dual stack socket.
   autonomous_upstream_ = true;
   config_helper_.addConfigModifier([=](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
@@ -1749,8 +1748,15 @@ TEST_P(QuicHttpIntegrationTest, UsesPreferredAddressDualStack) {
   ASSERT_TRUE(response->complete());
 
   EXPECT_EQ("127.0.0.2", quic_connection_->peer_address().host().ToString());
-  test_server_->waitForCounterGe(
-      "listener.[__]_0.quic.connection.num_packets_rx_on_preferred_address", 2u);
+  if (Runtime::runtimeFeatureEnabled("envoy.restart_features.udp_read_normalize_addresses")) {
+    test_server_->waitForCounterGe(
+        "listener.[__]_0.quic.connection.num_packets_rx_on_preferred_address", 2u);
+  } else {
+    EXPECT_EQ(
+        0u,
+        test_server_->counter("listener.[__]_0.quic.connection.num_packets_rx_on_preferred_address")
+            ->value());
+  }
 }
 
 } // namespace Quic
