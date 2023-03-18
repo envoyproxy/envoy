@@ -2426,7 +2426,7 @@ TEST_F(HttpConnectionManagerImplTest, TestAccessLogOnUpstreamConnected) {
       .Times(2) // flush_access_log_on_connected_ enabled.
       .WillOnce(Invoke([](const HeaderMap*, const HeaderMap*, const HeaderMap*,
                           const StreamInfo::StreamInfo& stream_info) {
-        // First call to log() is made when upstream connection in stablished
+        // First call to log() is made when upstream connection is established
         // On the first call it is expected that there is no response code.
         EXPECT_FALSE(stream_info.responseCode());
       }))
