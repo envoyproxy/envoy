@@ -739,7 +739,7 @@ public:
   virtual absl::optional<absl::string_view> upstreamOverrideHost() const PURE;
 
   /**
-   * A callback to call by the router filter once an upstream connection has successfuly
+   * A callback to call by the router filter once an upstream connection has successfully
    * established.
    */
   virtual void onUpstreamConnectionEstablished() PURE;

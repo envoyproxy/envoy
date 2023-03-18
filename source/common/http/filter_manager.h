@@ -520,7 +520,7 @@ public:
   virtual OptRef<DownstreamStreamFilterCallbacks> downstreamCallbacks() { return {}; }
 
   /**
-   * A callback to be used once an upstream connection has successfuly established.
+   * A callback to be used once an upstream connection has successfully established.
    */
   virtual void onUpstreamConnectionEstablished() PURE;
 };
