@@ -554,6 +554,13 @@ stages:
     pool:
       vmImage: "ubuntu-20.04"
     steps:
+    - template: cached.yml
+      parameters:
+        name: publish_docker
+        # VERSION.txt is included to refresh Docker images for release
+        key: "ci/Dockerfile-envoy | VERSION.txt"
+        version: "$(dockerBuildCacheVersion)"
+        path: ""
     - bash: |
         echo "disk space at beginning of build:"
         df -h
@@ -600,6 +607,8 @@ stages:
         artifactName: docker
       timeoutInMinutes: 10
       condition: always()
+    - script: sudo .azure-pipelines/docker/save_cache.sh /mnt/docker_cache
+      displayName: "Cache/save (publish_docker)"
 
   - job: package_x64
     displayName: Linux debs (x64)
