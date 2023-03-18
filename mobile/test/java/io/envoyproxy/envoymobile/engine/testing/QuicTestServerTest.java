@@ -94,7 +94,11 @@ public class QuicTestServerTest {
       + "     typed_config:\n"
       + "       \"@type\": " + QUIC_UPSTREAM_TYPE + "\n"
       + "       upstream_tls_context:\n"
-      + "         sni: www.lyft.com";
+      + "         sni: www.lyft.com\n"
+      + "listener_manager:\n"
+      + "  name: envoy.listener_manager_impl.api\n"
+      + "  typed_config:\n"
+      + "    \"@type\": type.googleapis.com/envoy.config.listener.v3.ApiListenerManager\n";
 
   private final Context appContext = ApplicationProvider.getApplicationContext();
   private Engine engine;

@@ -99,7 +99,19 @@ class EnvoyConfigurationTest {
     runtimeGuards: Map<String,Boolean> = emptyMap(),
     enableSkipDNSLookupForProxiedRequests: Boolean = false,
     statSinks: MutableList<String> = mutableListOf(),
-    enablePlatformCertificatesValidation: Boolean = false
+    enablePlatformCertificatesValidation: Boolean = false,
+    rtdsLayerName: String = "",
+    rtdsTimeoutSeconds: Int = 0,
+    adsAddress: String = "",
+    adsPort: Int = 0,
+    adsJwtToken: String = "",
+    adsJwtTokenLifetimeSeconds: Int = 0,
+    adsSslRootCerts: String = "",
+    nodeId: String = "",
+    nodeRegion: String = "",
+    nodeZone: String = "",
+    nodeSubZone: String = "",
+
   ): EnvoyConfiguration {
     return EnvoyConfiguration(
       adminInterfaceEnabled,
@@ -138,6 +150,17 @@ class EnvoyConfigurationTest {
       runtimeGuards,
       enableSkipDNSLookupForProxiedRequests,
       enablePlatformCertificatesValidation,
+      rtdsLayerName,
+      rtdsTimeoutSeconds,
+      adsAddress,
+      adsPort,
+      adsJwtToken,
+      adsJwtTokenLifetimeSeconds,
+      adsSslRootCerts,
+      nodeId,
+      nodeRegion,
+      nodeZone,
+      nodeSubZone,
     )
   }
 
@@ -284,6 +307,11 @@ class EnvoyConfigurationTest {
 
     // statsSinks
     assertThat(resolvedTemplate).contains("envoy.stat_sinks.statsd");
+
+    // ADS and RTDS not included by default
+    assertThat(resolvedTemplate).doesNotContain("rtds_layer:");
+    assertThat(resolvedTemplate).doesNotContain("ads_config:");
+
   }
 
   @Test
@@ -297,6 +325,32 @@ class EnvoyConfigurationTest {
 
     assertThat(resolvedTemplate).contains("test_feature_false");
     assertThat(resolvedTemplate).contains("test_feature_true");
+  }
+
+  @Test
+  fun `test adding RTDS and ADS`() {
+    JniLibrary.loadTestLibrary()
+    val envoyConfiguration = buildTestEnvoyConfiguration(
+      rtdsLayerName = "fake_rtds_layer", rtdsTimeoutSeconds = 5432, adsAddress = "FAKE_ADDRESS", adsPort = 0
+    )
+
+    val resolvedTemplate = TestJni.createYaml(envoyConfiguration)
+
+    assertThat(resolvedTemplate).contains("fake_rtds_layer");
+    assertThat(resolvedTemplate).contains("FAKE_ADDRESS");
+    assertThat(resolvedTemplate).contains("initial_fetch_timeout: 5432s");
+  }
+
+  @Test
+  fun `test RTDS default timeout`() {
+    JniLibrary.loadTestLibrary()
+    val envoyConfiguration = buildTestEnvoyConfiguration(
+      rtdsLayerName = "fake_rtds_layer", adsAddress = "FAKE_ADDRESS", adsPort = 0
+    )
+
+    val resolvedTemplate = TestJni.createYaml(envoyConfiguration)
+
+    assertThat(resolvedTemplate).contains("initial_fetch_timeout: 5s")
   }
 
   @Test

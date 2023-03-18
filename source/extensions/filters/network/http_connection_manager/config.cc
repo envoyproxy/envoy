@@ -547,6 +547,11 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
     access_logs_.push_back(current_access_log);
   }
 
+  if (config.has_access_log_flush_interval()) {
+    access_log_flush_interval_ = std::chrono::milliseconds(
+        DurationUtil::durationToMilliseconds(config.access_log_flush_interval()));
+  }
+
   server_transformation_ = config.server_header_transformation();
 
   if (!config.scheme_header_transformation().scheme_to_overwrite().empty()) {

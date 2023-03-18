@@ -1,18 +1,8 @@
-version: '3.8'
 services:
-
-  flask_service:
-    build:
-      context: ../shared/flask
-    image: flask_service:python-3.10-slim-bullseye
-    restart: "no"
-    deploy:
-      replicas: 0
 
   envoy:
     build:
-      context: .
-      dockerfile: Dockerfile-envoy
+      dockerfile: ../shared/envoy/Dockerfile
     ports:
     - "${PORT_PROXY0:-80}-${PORT_PROXY1:-81}:80"
     - "${PORT_ADMIN:-8081}:8081"
@@ -24,13 +14,12 @@ services:
 
   http_service:
     build:
-      context: ../shared/service
-    volumes:
-    - ./service.py:/code/service.py
+      context: ../shared/python
+      target: aiohttp-tracing-service
 
   lrs_server:
     build:
-      context: .
-      dockerfile: Dockerfile-lrs
+      dockerfile: ../shared/golang/Dockerfile
+      target: golang-lrs
     volumes:
     - /go/src/github.com/envoyproxy/envoy/examples/load-reporting-service

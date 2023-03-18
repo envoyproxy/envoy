@@ -17,6 +17,7 @@
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/random_generator.h"
 #include "source/common/http/header_map_impl.h"
+#include "source/common/network/socket_option_impl.h"
 
 #include "test/integration/filters/stop_and_continue_filter_config.pb.h"
 #include "test/integration/http_protocol_integration.h"
@@ -2161,6 +2162,97 @@ TEST_P(MultiplexedIntegrationTest, Reset101SwitchProtocolResponse) {
   ASSERT_TRUE(response->waitForReset());
   codec_client_->close();
   EXPECT_FALSE(response->complete());
+}
+
+TEST_P(MultiplexedIntegrationTest, PerTryTimeoutWhileDownstreamStopsReading) {
+  if (downstreamProtocol() != Http::CodecType::HTTP2) {
+    return;
+  }
+  config_helper_.addRuntimeOverride(
+      "envoy.reloadable_features.upstream_wait_for_response_headers_before_disabling_read", "true");
+
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+    RELEASE_ASSERT(bootstrap.mutable_static_resources()->listeners_size() >= 1, "");
+    auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
+    // Config a smaller connection send buffer size.
+    listener->mutable_per_connection_buffer_limit_bytes()->set_value(512 * 1024);
+  });
+
+  config_helper_.addConfigModifier(
+      [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) -> void {
+        auto* route_config = hcm.mutable_route_config();
+        auto* virtual_host = route_config->mutable_virtual_hosts(0);
+        auto* route = virtual_host->mutable_routes(0)->mutable_route();
+        auto* retry_policy = route->mutable_retry_policy();
+        // Config an aggressive per try timeout and no retry.
+        retry_policy->mutable_num_retries()->set_value(0);
+        retry_policy->mutable_per_try_timeout()->set_seconds(1);
+        // Make sure other timeouts won't interfere.
+        route->mutable_timeout()->set_seconds(15);
+      });
+  autonomous_upstream_ = false;
+  initialize();
+
+  auto options = std::make_shared<Network::Socket::Options>();
+  options->emplace_back(std::make_shared<Network::SocketOptionImpl>(
+      envoy::config::core::v3::SocketOption::STATE_PREBIND,
+      ENVOY_MAKE_SOCKET_OPTION_NAME(SOL_SOCKET, SO_RCVBUF), 1024));
+
+  codec_client_ = makeHttpConnection(makeClientConnectionWithOptions(lookupPort("http"), options));
+
+  Envoy::IntegrationStreamDecoderPtr response1 = codec_client_->makeHeaderOnlyRequest(
+      Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                     {":path", "/test/long/url1"},
+                                     {":scheme", "http"},
+                                     {":authority", "host"}});
+
+  // Wait for the request headers to be received upstream.
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
+  upstream_request_->encodeData(5 * 1024 * 1024, true);
+
+  // Downstream stops reading so that the Envoy's connection send buffer builds up by response1.
+  codec_client_->connection()->readDisable(true);
+
+  Envoy::IntegrationStreamDecoderPtr response2 = codec_client_->makeHeaderOnlyRequest(
+      Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                     {":path", "/test/long/url2"},
+                                     {":scheme", "http"},
+                                     {":authority", "host"}});
+  FakeHttpConnectionPtr fake_upstream_connection2;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection2));
+  FakeStreamPtr upstream_request2;
+  ASSERT_TRUE(fake_upstream_connection2->waitForNewStream(*dispatcher_, upstream_request2));
+
+  Stats::CounterSharedPtr upstream_read_disabled_counter;
+  while (!response1->reset() && !response2->reset() && !response1->complete()) {
+    // Check upstream flow control condition every 10ms and exit the loop if upstream paused
+    // reading.
+    if (upstream_read_disabled_counter == nullptr) {
+      upstream_read_disabled_counter = Envoy::TestUtility::findCounter(
+          test_server_->statStore(),
+          "cluster.cluster_0.upstream_flow_control_paused_reading_total");
+    }
+    if (upstream_read_disabled_counter != nullptr && upstream_read_disabled_counter->value() >= 1) {
+      upstream_request2->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
+      upstream_request2->encodeData(1024 * 1024, true);
+      break;
+    }
+    dispatcher_->run(Envoy::Event::Dispatcher::RunType::NonBlock);
+    absl::SleepFor(absl::Milliseconds(10));
+  }
+  EXPECT_FALSE(response1->complete() || response1->reset());
+  EXPECT_FALSE(response2->reset());
+  // Wait for 2s to make sure pre try timeout doesn't reset the 2nd request.
+  absl::SleepFor(absl::Seconds(2));
+  codec_client_->connection()->readDisable(false);
+  ASSERT_TRUE(response2->waitForEndStream());
+  EXPECT_EQ(response2->headers().Status()->value().getStringView(), "200");
+  if (!response1->complete()) {
+    ASSERT_TRUE(response1->waitForEndStream());
+  }
 }
 
 // Ordering of inheritance is important here, SocketInterfaceSwap must be

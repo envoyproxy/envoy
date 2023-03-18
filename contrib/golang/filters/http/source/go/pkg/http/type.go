@@ -128,7 +128,13 @@ func (h *httpHeaderMap) Del(key string) {
 }
 
 func (h *httpHeaderMap) Range(f func(key, value string) bool) {
-	panic("unsupported yet")
+	for key, values := range h.headers {
+		for _, value := range values {
+			if !f(key, value) {
+				return
+			}
+		}
+	}
 }
 
 // ByteSize return size of HeaderMap

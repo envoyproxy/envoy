@@ -147,7 +147,7 @@ protected:
     envoy::config::listener::v3::QuicProtocolOptions options;
     TestUtility::loadFromYamlAndValidate(yaml, options);
     return std::make_unique<ActiveQuicListenerFactory>(options, /*concurrency=*/1, quic_stat_names_,
-                                                       validation_visitor_);
+                                                       validation_visitor_, absl::nullopt);
   }
 
   void maybeConfigureMocks(int connection_count) {
@@ -425,7 +425,14 @@ TEST_P(ActiveQuicListenerTest, ProcessBufferedChlos) {
   maybeConfigureMocks(count + 1);
   // Create 1 session to increase number of packet to read in the next read event.
   sendCHLO(quic::test::TestConnectionId());
-  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  // Allow a few dispatcher runs for the packet to be sent and processed to avoid a rare flake.
+  // (https://github.com/envoyproxy/envoy/issues/26089)
+  for (int i = 0; i < 10; ++i) {
+    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+    if (quic_dispatcher_->NumSessions() != 0) {
+      break;
+    }
+  }
   EXPECT_NE(0u, quic_dispatcher_->NumSessions());
 
   // Generate one more CHLO than can be processed immediately.

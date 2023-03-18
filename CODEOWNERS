@@ -232,6 +232,7 @@ extensions/filters/http/oauth2 @derekargueta @snowp
 /*/extensions/transport_sockets/tap @mattklein123 @daixiang0
 # local rate limit
 /*/extensions/filters/network/local_ratelimit @mattklein123 @wbpcode
+/*/extensions/filters/listener/local_ratelimit @mattklein123 @JuniorHsu
 # proxy protocol
 /*/extensions/filters/listener/proxy_protocol @ggreenway @soulxu
 # access loggers
@@ -294,6 +295,10 @@ extensions/filters/http/oauth2 @derekargueta @snowp
 /*/extensions/load_balancing_policies/maglev @wbpcode @UNOWNED
 # Early header mutation
 /*/extensions/http/early_header_mutation/header_mutation @wbpcode @UNOWNED
+# Network matching extensions
+/*/extensions/matching/network/ @kyessenov @snowp
+# Header mutation
+/*/extensions/filters/http/header_mutation @wbpcode @htuch @soulxu
 
 # Intentionally exempt (treated as core code)
 /*/extensions/filters/common @UNOWNED @UNOWNED
