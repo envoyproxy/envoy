@@ -303,7 +303,8 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
     Config::ConfigProviderManager& scoped_routes_config_provider_manager,
     Tracing::TracerManager& tracer_manager,
     FilterConfigProviderManager& filter_config_provider_manager)
-    : context_(context), stats_prefix_(fmt::format("http.{}.", config.stat_prefix())),
+    : context_(context), flush_access_log_on_connected_(config.flush_access_log_on_connected()),
+      stats_prefix_(fmt::format("http.{}.", config.stat_prefix())),
       stats_(Http::ConnectionManagerImpl::generateStats(stats_prefix_, context_.scope())),
       tracing_stats_(
           Http::ConnectionManagerImpl::generateTracingStats(stats_prefix_, context_.scope())),
@@ -380,8 +381,7 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
           createHeaderValidatorFactory(config, context.messageValidationVisitor())),
       append_x_forwarded_port_(config.append_x_forwarded_port()),
       add_proxy_protocol_connection_state_(
-          PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, add_proxy_protocol_connection_state, true)),
-      flush_access_log_on_connected_(config.flush_access_log_on_connected()) {
+          PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, add_proxy_protocol_connection_state, true)) {
   if (!idle_timeout_) {
     idle_timeout_ = std::chrono::hours(1);
   } else if (idle_timeout_.value().count() == 0) {

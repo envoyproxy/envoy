@@ -332,6 +332,7 @@ public:
   virtual void onUpstreamReset(Http::StreamResetReason reset_reason,
                                absl::string_view transport_failure,
                                UpstreamRequest& upstream_request) PURE;
+  virtual void onUpstreamConnectionEstablished() PURE;
   virtual void onUpstreamHostSelected(Upstream::HostDescriptionConstSharedPtr host) PURE;
   virtual void onPerTryTimeout(UpstreamRequest& upstream_request) PURE;
   virtual void onPerTryIdleTimeout(UpstreamRequest& upstream_request) PURE;
@@ -514,6 +515,7 @@ public:
   void onUpstreamMetadata(Http::MetadataMapPtr&& metadata_map) override;
   void onUpstreamReset(Http::StreamResetReason reset_reason, absl::string_view transport_failure,
                        UpstreamRequest& upstream_request) override;
+  void onUpstreamConnectionEstablished() override;
   void onUpstreamHostSelected(Upstream::HostDescriptionConstSharedPtr host) override;
   void onPerTryTimeout(UpstreamRequest& upstream_request) override;
   void onPerTryIdleTimeout(UpstreamRequest& upstream_request) override;

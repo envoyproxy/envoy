@@ -1665,5 +1665,9 @@ absl::optional<absl::string_view> ActiveStreamDecoderFilter::upstreamOverrideHos
   return parent_.upstream_override_host_;
 }
 
+void ActiveStreamDecoderFilter::onUpstreamConnectionEstablished() {
+  parent_.filter_manager_callbacks_.onUpstreamConnectionEstablished();
+}
+
 } // namespace Http
 } // namespace Envoy

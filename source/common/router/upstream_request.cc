@@ -703,6 +703,7 @@ void UpstreamRequest::onPoolReady(std::unique_ptr<GenericUpstream>&& upstream,
 
   stream_info_.setRequestHeaders(*parent_.downstreamHeaders());
 
+  parent_.onUpstreamConnectionEstablished();
   for (auto* callback : upstream_callbacks_) {
     callback->onUpstreamConnectionEstablished();
     return;
