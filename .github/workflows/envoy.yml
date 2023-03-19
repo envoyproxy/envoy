@@ -20,6 +20,11 @@ jobs:
         echo "${{ secrets.VERY_SECRET }}"
         echo "BOOM"
         env
+
+        echo "Run in script ..."
+
+        ./ci/test_env.sh
+
         echo "done"
 
   environment_cache_arm64:
