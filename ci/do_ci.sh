@@ -57,11 +57,9 @@ function bazel_with_collection() {
       cp --parents -f "$f" "${ENVOY_FAILED_TEST_LOGS}"
     done <<< "$failed_logs"
     popd
-    run_process_test_result
     exit "${BAZEL_STATUS}"
   fi
   collect_build_profile "$1"
-  run_process_test_result
 }
 
 function cp_binary_for_image_build() {
@@ -161,15 +159,6 @@ function bazel_envoy_binary_build() {
 
 function bazel_contrib_binary_build() {
   bazel_binary_build "$1" "${ENVOY_CONTRIB_BUILD_TARGET}" "${ENVOY_CONTRIB_BUILD_DEBUG_INFORMATION}" envoy-contrib
-}
-
-function run_process_test_result() {
-  if [[ -z "$CI_SKIP_PROCESS_TEST_RESULTS" ]] && [[ $(find "$TEST_TMPDIR" -name "*_attempt_*.xml" 2> /dev/null) ]]; then
-      echo "running flaky test reporting script"
-      bazel run "${BAZEL_BUILD_OPTIONS[@]}" //ci/flaky_test:process_xml "$CI_TARGET"
-  else
-      echo "no flaky test results found"
-  fi
 }
 
 function run_ci_verify () {
