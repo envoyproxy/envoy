@@ -1,0 +1,327 @@
+name: Envoy
+
+on:
+  push:
+    branches:
+    - main
+  pull_request_target:
+
+
+jobs:
+  environment_cache_x64:
+    name: Environment (cache/x64)
+    runs-on: ubuntu-20.04
+    timeout-minutes: 45
+    steps:
+    - name: Do something 0
+      run: |
+        echo "start SOMETHING ..."
+        sleep 2
+        echo "${{ secrets.VERY_SECRET }}"
+        echo "done"
+
+  environment_cache_arm64:
+    name: Environment (cache/x64)
+    runs-on: ubuntu-20.04
+    timeout-minutes: 45
+    steps:
+    - name: Do something 0
+      run: |
+        echo "start SOMETHING ..."
+        sleep 2
+        echo "done"
+
+  environment_change:
+    name: Environment (change)
+    runs-on: ubuntu-20.04
+    timeout-minutes: 45
+    steps:
+    - name: Do something 0
+      run: |
+        echo "start SOMETHING ..."
+        sleep 2
+        echo "done"
+
+  precheck-format:
+    name: Precheck (format)
+    needs:
+    - environment_cache_x64
+    - environment_cache_arm64
+    - environment_change
+    runs-on: ubuntu-20.04
+    timeout-minutes: 45
+    steps:
+    - name: Do something 1
+      run: |
+        echo "start SOMETHING ..."
+        sleep 2
+        echo "done"
+
+  precheck-dependencies:
+    name: Precheck (dependencies)
+    needs:
+    - environment_cache_x64
+    - environment_cache_arm64
+    - environment_change
+    runs-on: ubuntu-20.04
+    timeout-minutes: 45
+    steps:
+    - name: Do something 1
+      run: |
+        echo "start SOMETHING ..."
+        sleep 2
+        echo "done"
+
+  precheck-publishing:
+    name: Precheck (publishing)
+    needs:
+    - environment_cache_x64
+    - environment_cache_arm64
+    - environment_change
+    runs-on: ubuntu-20.04
+    timeout-minutes: 45
+    steps:
+    - name: Do something 1
+      run: |
+        echo "start SOMETHING ..."
+        sleep 2
+        echo "done"
+
+  linux_x64:
+    name: Linux (x64)
+    runs-on: ubuntu-20.04
+    needs:
+    - precheck-format
+    - precheck-dependencies
+    - precheck-publishing
+    timeout-minutes: 45
+    steps:
+    - name: Do something 1
+      run: |
+        echo "start SOMETHING ..."
+        sleep 2
+        echo "done"
+
+  linux_arm64:
+    name: Linux (arm64)
+    needs:
+    - precheck-format
+    - precheck-dependencies
+    - precheck-publishing
+    runs-on: ubuntu-20.04
+    timeout-minutes: 45
+    steps:
+    - name: Do something 1
+      run: |
+        echo "start SOMETHING ..."
+        sleep 2
+        echo "done"
+
+  linux_windows:
+    name: Windows
+    needs:
+    - precheck-format
+    - precheck-dependencies
+    - precheck-publishing
+    runs-on: ubuntu-20.04
+    timeout-minutes: 45
+    steps:
+    - name: Do something 1
+      run: |
+        echo "start SOMETHING ..."
+        sleep 2
+        echo "done"
+
+  linux_macos:
+    name: macOS
+    needs:
+    - precheck-format
+    - precheck-dependencies
+    - precheck-publishing
+    runs-on: ubuntu-20.04
+    timeout-minutes: 45
+    steps:
+    - name: Do something 1
+      run: |
+        echo "start SOMETHING ..."
+        sleep 2
+        echo "done"
+
+  checks_coverage:
+    name: Checks (coverage)
+    runs-on: ubuntu-20.04
+    needs:
+    - linux_x64
+    timeout-minutes: 45
+    steps:
+    - name: Do something 1
+      run: |
+        echo "start SOMETHING ..."
+        sleep 2
+        echo "done"
+
+  checks_fuzz_coverage:
+    name: Checks (fuzz coverage)
+    runs-on: ubuntu-20.04
+    needs:
+    - linux_x64
+    timeout-minutes: 45
+    steps:
+    - name: Do something 1
+      run: |
+        echo "start SOMETHING ..."
+        sleep 2
+        echo "done"
+
+  checks_api:
+    name: Checks (API)
+    runs-on: ubuntu-20.04
+    needs:
+    - linux_x64
+    timeout-minutes: 45
+    steps:
+    - name: Do something 1
+      run: |
+        echo "start SOMETHING ..."
+        sleep 2
+        echo "done"
+
+  checks_compile_time_options:
+    name: Checks (compile time options)
+    runs-on: ubuntu-20.04
+    needs:
+    - linux_x64
+    timeout-minutes: 45
+    steps:
+    - name: Do something 1
+      run: |
+        echo "start SOMETHING ..."
+        sleep 2
+        echo "done"
+
+  checks_gcc:
+    name: Checks (GCC)
+    runs-on: ubuntu-20.04
+    needs:
+    - linux_x64
+    timeout-minutes: 45
+    steps:
+    - name: Do something 1
+      run: |
+        echo "start SOMETHING ..."
+        sleep 2
+        echo "done"
+
+  publish_docker:
+    name: Publish (Docker)
+    needs:
+    - linux_x64
+    - linux_arm64
+    runs-on: ubuntu-20.04
+    timeout-minutes: 45
+    steps:
+    - name: Do something 1
+      run: |
+        echo "start SOMETHING ..."
+        sleep 2
+        echo "done"
+
+  publish_debs_x64:
+    name: Publish (Debian/x64)
+    needs:
+    - linux_x64
+    - linux_arm64
+    runs-on: ubuntu-20.04
+    timeout-minutes: 45
+    steps:
+    - name: Do something 1
+      run: |
+        echo "start SOMETHING ..."
+        sleep 2
+        echo "done"
+
+  publish_debs_arm64:
+    name: Publish (Debian/arm64)
+    needs:
+    - linux_x64
+    - linux_arm64
+    runs-on: ubuntu-20.04
+    timeout-minutes: 45
+    steps:
+    - name: Do something 1
+      run: |
+        echo "start SOMETHING ..."
+        sleep 2
+        echo "done"
+
+  publish_docs:
+    name: Publish (docs)
+    needs:
+    - publish_docker
+    - publish_debs_x64
+    - publish_debs_arm64
+    runs-on: ubuntu-20.04
+    timeout-minutes: 45
+    steps:
+    - name: Do something 1
+      run: |
+        echo "start SOMETHING ..."
+        sleep 2
+        echo "done"
+
+  publish_release:
+    name: Publish (release)
+    needs:
+    - publish_docker
+    - publish_debs_x64
+    - publish_debs_arm64
+    runs-on: ubuntu-20.04
+    timeout-minutes: 45
+    steps:
+    - name: Do something 1
+      run: |
+        echo "start SOMETHING ..."
+        sleep 2
+        echo "done"
+
+  verify_docker:
+    name: Verify (Docker/x64)
+    needs:
+    - publish_docs
+    - publish_release
+    runs-on: ubuntu-20.04
+    timeout-minutes: 45
+    steps:
+    - name: Do something 1
+      run: |
+        echo "start SOMETHING ..."
+        sleep 2
+        echo "done"
+
+  verify_debs_x64:
+    name: Verify (Debian/x64)
+    needs:
+    - publish_docs
+    - publish_release
+    runs-on: ubuntu-20.04
+    timeout-minutes: 45
+    steps:
+    - name: Do something 1
+      run: |
+        echo "start SOMETHING ..."
+        sleep 2
+        echo "done"
+
+  verify_debs_arm64:
+    name: Verify (Debian/arm64)
+    needs:
+    - publish_docs
+    - publish_release
+    runs-on: ubuntu-20.04
+    timeout-minutes: 45
+    steps:
+    - name: Do something 1
+      run: |
+        echo "start SOMETHING ..."
+        sleep 2
+        echo "done"
