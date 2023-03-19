@@ -4,8 +4,8 @@
 
 #include "envoy/buffer/buffer.h"
 #include "envoy/common/pure.h"
-#include "envoy/server/admin.h"
 #include "envoy/http/header_map.h"
+#include "envoy/server/admin.h"
 
 #include "absl/strings/string_view.h"
 
@@ -43,12 +43,12 @@ void urlHandler(Buffer::Instance& response, const Admin::UrlHandler& handler,
 // This is used to facilitate interactive debugging by dynamically reading
 // resource contents from the file system.
 //
-// Note: rather than creating a new interace here, we could have re-used
-// Filesystem::Instance, however the current implementation of MemFileSystem
-// is intended for tests, and it's simpler to create a much leaner new API
-// rather than productionize the full memory-based filesystem implementation.
+// Note: rather than creating a new interface here, we could have re-used
+// Filesystem::Instance, however the current implementation of MemFileSystem is
+// intended for tests, and it's simpler to create a much leaner new API rather
+// than make a production-ready version of the full memory-based filesystem.
 class HtmlResourceProvider {
- public:
+public:
   virtual ~HtmlResourceProvider() = default;
 
   /**
@@ -60,6 +60,6 @@ class HtmlResourceProvider {
 
 void setHtmlResourceProvider(std::unique_ptr<HtmlResourceProvider> resource_provider);
 
-} // namespace AdminHtml
+} // namespace AdminHtmlUtil
 } // namespace Server
 } // namespace Envoy

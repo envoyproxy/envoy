@@ -1,6 +1,6 @@
 #include "source/common/filesystem/filesystem_impl.h"
 #include "source/exe/main_common.h"
-#include "source/server/admin/admin_html.h"
+#include "source/server/admin/admin_html_util.h"
 
 #include "absl/strings/match.h"
 
@@ -43,7 +43,7 @@ Http::Code testCallback(Http::ResponseHeaderMap& response_headers, Buffer::Insta
   return Http::Code::OK;
 }
 
-class DebugHtmlResourceProvider : public Server::AdminHtml::HtmlResourceProvider {
+class DebugHtmlResourceProvider : public Server::AdminHtmlUtil::HtmlResourceProvider {
 public:
   absl::string_view getResource(absl::string_view resource_name, std::string& buf) override {
     std::string path = absl::StrCat("source/server/admin/html/", resource_name);
@@ -67,7 +67,7 @@ public:
  */
 int main(int argc, char** argv) {
   if (argc > 1 && absl::string_view("-debug") == argv[1]) {
-    Envoy::Server::AdminHtml::setHtmlResourceProvider(
+    Envoy::Server::AdminHtmlUtil::setHtmlResourceProvider(
         std::make_unique<Envoy::DebugHtmlResourceProvider>());
     argv[1] = argv[0];
     --argc;
