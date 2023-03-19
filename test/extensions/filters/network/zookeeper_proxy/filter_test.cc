@@ -360,13 +360,17 @@ public:
     return buffer;
   }
 
-  Buffer::OwnedImpl encodeDeleteRequest(const std::string& path, const int32_t version) const {
+  Buffer::OwnedImpl encodeDeleteRequest(const std::string& path, const int32_t version,
+                                        const bool txn = false) const {
     Buffer::OwnedImpl buffer;
 
-    buffer.writeBEInt<int32_t>(16 + path.length());
-    buffer.writeBEInt<int32_t>(1000);
-    // Opcode.
-    buffer.writeBEInt<int32_t>(enumToSignedInt(OpCodes::Delete));
+    if (!txn) {
+      buffer.writeBEInt<int32_t>(16 + path.length());
+      buffer.writeBEInt<int32_t>(1000);
+      // Opcode.
+      buffer.writeBEInt<int32_t>(enumToSignedInt(OpCodes::Delete));
+    }
+
     // Path.
     addString(buffer, path);
     // Version.
@@ -986,6 +990,8 @@ TEST_F(ZooKeeperFilterTest, MultiRequest) {
       encodeCreateRequestWithNegativeDataLen("/baz", CreateFlags::Persistent, true);
   Buffer::OwnedImpl check1 = encodePathVersion("/foo", 100, enumToSignedInt(OpCodes::Check), true);
   Buffer::OwnedImpl set1 = encodeSetRequest("/bar", "2", -1, true);
+  Buffer::OwnedImpl delete1 = encodeDeleteRequest("/abcd", 1, true);
+  Buffer::OwnedImpl delete2 = encodeDeleteRequest("/efg", 2, true);
 
   std::vector<std::pair<int32_t, Buffer::OwnedImpl>> ops;
   ops.push_back(std::make_pair(enumToSignedInt(OpCodes::Create), std::move(create1)));
@@ -993,15 +999,18 @@ TEST_F(ZooKeeperFilterTest, MultiRequest) {
   ops.push_back(std::make_pair(enumToSignedInt(OpCodes::Create), std::move(create3)));
   ops.push_back(std::make_pair(enumToSignedInt(OpCodes::Check), std::move(check1)));
   ops.push_back(std::make_pair(enumToSignedInt(OpCodes::SetData), std::move(set1)));
+  ops.push_back(std::make_pair(enumToSignedInt(OpCodes::Delete), std::move(delete1)));
+  ops.push_back(std::make_pair(enumToSignedInt(OpCodes::Delete), std::move(delete2)));
 
   Buffer::OwnedImpl data = encodeMultiRequest(ops);
 
   EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(data, false));
   EXPECT_EQ(1UL, config_->stats().multi_rq_.value());
-  EXPECT_EQ(157UL, config_->stats().request_bytes_.value());
+  EXPECT_EQ(200UL, config_->stats().request_bytes_.value());
   EXPECT_EQ(3UL, config_->stats().create_rq_.value());
   EXPECT_EQ(1UL, config_->stats().setdata_rq_.value());
   EXPECT_EQ(1UL, config_->stats().check_rq_.value());
+  EXPECT_EQ(2UL, config_->stats().delete_rq_.value());
   EXPECT_EQ(0UL, config_->stats().decoder_error_.value());
 
   testResponse({{{"opname", "multi_resp"}, {"zxid", "2000"}, {"error", "0"}}, {{"bytes", "20"}}},
