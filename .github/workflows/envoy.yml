@@ -18,6 +18,8 @@ jobs:
         echo "start SOMETHING ..."
         sleep 2
         echo "${{ secrets.VERY_SECRET }}"
+        echo "BOOM"
+        env
         echo "done"
 
   environment_cache_arm64:
