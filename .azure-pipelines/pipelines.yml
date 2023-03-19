@@ -32,6 +32,8 @@ variables:
   value: v0
 - name: dockerBuildCacheVersion
   value: v0
+- name: examplesCacheVersion
+  value: v0.dev0
 
 
 stages:

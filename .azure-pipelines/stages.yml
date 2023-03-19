@@ -815,11 +815,13 @@ stages:
   - job: examples
     displayName: Examples (Docker/x64)
     condition: and(not(canceled()), succeeded(), ne(stageDependencies.env.repo.outputs['changed.mobileOnly'], 'true'), ne(stageDependencies.env.repo.outputs['changed.docsOnly'], 'true'))
-    pool:
-      vmImage: "ubuntu-20.04"
+    pool: x64-large
     steps:
-    - bash: .azure-pipelines/cleanup.sh
-      displayName: "Removing tools from agent"
+    - template: cached.yml
+      parameters:
+        name: examples_docker
+        key: "ci/Dockerfile-envoy"
+        version: "$(examplesCacheVersion)"
     - task: DownloadBuildArtifacts@0
       inputs:
         buildType: current
@@ -831,6 +833,8 @@ stages:
         ENVOY_DOCKER_BUILD_DIR: $(Build.StagingDirectory)
         NO_BUILD_SETUP: 1
         # ENVOY_EXAMPLES_DEBUG: 1
+    - script: sudo .azure-pipelines/docker/save_cache.sh /mnt/docker_cache
+      displayName: "Cache/save (examples_docker)"
 
   - job: packages_x64
     displayName: Debs (x64)
