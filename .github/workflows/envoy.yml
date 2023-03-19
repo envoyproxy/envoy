@@ -13,6 +13,7 @@ jobs:
     runs-on: ubuntu-20.04
     timeout-minutes: 45
     steps:
+    - uses: actions/checkout@v3
     - name: Do something 0
       run: |
         echo "start SOMETHING ..."
