@@ -39,7 +39,8 @@ public:
 
   static constexpr uint64_t DefaultChunkSize = 2 * 1000 * 1000;
 
-  StatsRequest(Stats::Store& stats, const StatsParams& params, UrlHandlerFn url_handler_fn);
+  StatsRequest(Stats::Store& stats, const StatsParams& params,
+               UrlHandlerFn url_handler_fn = nullptr);
 
   // Admin::Request
   Http::Code start(Http::ResponseHeaderMap& response_headers) override;

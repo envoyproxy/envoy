@@ -1,9 +1,9 @@
 #pragma once
 
-#include "source/server/admin/admin_html.h"
-#include "source/server/admin/stats_render.h"
-
 #include "envoy/filesystem/filesystem.h"
+
+#include "source/server/admin/admin_html_util.h"
+#include "source/server/admin/stats_render.h"
 
 namespace Envoy {
 namespace Server {
@@ -35,18 +35,6 @@ public:
   void finalize(Buffer::Instance&) override;
 
   /**
-   * Renders the beginning of the help-table into the response buffer provided
-   * in the constructor.
-   */
-  void tableBegin(Buffer::Instance&);
-
-  /**
-   * Renders the end of the help-table into the response buffer provided in the
-   * constructor.
-   */
-  void tableEnd(Buffer::Instance&);
-
-  /**
    * Initiates an HTML PRE section. The PRE will be auto-closed when the render
    * object is finalized.
    */
@@ -61,13 +49,13 @@ public:
    *
    * @param handler the URL handler.
    */
-  void urlHandler(Buffer::Instance&, const Admin::UrlHandler& handler,
-                  OptRef<const Http::Utility::QueryParams> query);
+  // void urlHandler(Buffer::Instance&, const Admin::UrlHandler& handler,
+  //                 OptRef<const Http::Utility::QueryParams> query);
 
-  void input(Buffer::Instance&, absl::string_view id, absl::string_view name,
-             absl::string_view path, Admin::ParamDescriptor::Type type,
-             OptRef<const Http::Utility::QueryParams> query,
-             const std::vector<absl::string_view>& enum_choices);
+  // void input(Buffer::Instance&, absl::string_view id, absl::string_view name,
+  //            absl::string_view path, Admin::ParamDescriptor::Type type,
+  //            OptRef<const Http::Utility::QueryParams> query,
+  //            const std::vector<absl::string_view>& enum_choices);
 
   // By default, editing parameters does not cause a form-submit -- you have
   // to click on the link or button first. This is useful for the admin home
@@ -77,17 +65,17 @@ public:
   // parameters change, and does not have its own explicit submit button. This
   // is used to enable the user to adjust query-parameters while visiting an
   // html-rendered endpoint.
-  void setSubmitOnChange(bool submit_on_change) { submit_on_change_ = submit_on_change; }
+  // void setSubmitOnChange(bool submit_on_change) { submit_on_change_ = submit_on_change; }
 
 private:
   void appendResource(Buffer::Instance& response, absl::string_view file,
                       absl::string_view default_value,
                       std::function<std::string(absl::string_view)> xform = nullptr);
 
-  int index_{0}; // Used to alternate row-group background color
-  bool submit_on_change_{false};
-  bool has_pre_{false};
-  bool finalized_{false};
+  // int index_{0}; // Used to alternate row-group background color
+  // bool submit_on_change_{false};
+  // bool has_pre_{false};
+  // bool finalized_{false};
   const bool active_{false};
 };
 

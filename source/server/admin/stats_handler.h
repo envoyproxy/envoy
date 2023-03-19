@@ -86,8 +86,8 @@ public:
    */
   Admin::UrlHandler statsHandler(bool active_mode);
 
-  Admin::RequestPtr makeRequest(Stats::Store& stats, const StatsParams& params,
-                                StatsRequest::UrlHandlerFn url_handler_fn = nullptr);
+  static Admin::RequestPtr makeRequest(Stats::Store& stats, const StatsParams& params,
+                                       StatsRequest::UrlHandlerFn url_handler_fn = nullptr);
   Admin::RequestPtr makeRequest(AdminStream&);
 
 private:

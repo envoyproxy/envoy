@@ -1,12 +1,25 @@
 #include "source/common/filesystem/filesystem_impl.h"
 #include "source/exe/main_common.h"
+#include "source/server/admin/admin_html.h"
 
 #include "absl/strings/match.h"
 
 namespace Envoy {
+namespace {
 
-static Http::Code testCallback(Http::ResponseHeaderMap& response_headers,
-                               Buffer::Instance& response, Server::AdminStream& admin_stream) {
+/*std::string readFileOrDie(absl::string_view prefix, absl::string_view filename) {
+  Filesystem::InstanceImpl file_system;
+  std::string path = absl::StrCat(prefix, filename);
+  TRY_ASSERT_MAIN_THREAD { return file_system.fileReadToEnd(path); }
+  END_TRY
+  catch (EnvoyException& e) {
+    ENVOY_LOG_MISC(error, "Error reading file {}", e.what());
+    return e.what();
+  }
+  }*/
+
+Http::Code testCallback(Http::ResponseHeaderMap& response_headers, Buffer::Instance& response,
+                        Server::AdminStream& admin_stream) {
   Http::Utility::QueryParams query_params = admin_stream.queryParams();
   auto iter = query_params.find("file");
   if (iter == query_params.end()) {
@@ -15,7 +28,7 @@ static Http::Code testCallback(Http::ResponseHeaderMap& response_headers,
   }
 
   Filesystem::InstanceImpl file_system;
-  std::string path = absl::StrCat("test/integration/admin_html/", iter->second);
+  std::string path = absl::StrCat("test/integration/", iter->second);
   TRY_ASSERT_MAIN_THREAD { response.add(file_system.fileReadToEnd(path)); }
   END_TRY
   catch (EnvoyException& e) {
@@ -30,6 +43,22 @@ static Http::Code testCallback(Http::ResponseHeaderMap& response_headers,
   return Http::Code::OK;
 }
 
+class DebugHtmlResourceProvider : public Server::AdminHtml::HtmlResourceProvider {
+public:
+  absl::string_view getResource(absl::string_view resource_name, std::string& buf) override {
+    std::string path = absl::StrCat("source/server/admin/html/", resource_name);
+    Filesystem::InstanceImpl file_system;
+    TRY_ASSERT_MAIN_THREAD { buf = file_system.fileReadToEnd(path); }
+    END_TRY
+    catch (EnvoyException& e) {
+      ENVOY_LOG_MISC(error, "Error reading file {}", e.what());
+      buf = e.what();
+    }
+    return buf;
+  }
+};
+
+} // namespace
 } // namespace Envoy
 
 /**
@@ -37,6 +66,14 @@ static Http::Code testCallback(Http::ResponseHeaderMap& response_headers,
  * files.
  */
 int main(int argc, char** argv) {
+  if (argc > 1 && absl::string_view("-debug") == argv[1]) {
+    Envoy::Server::AdminHtml::setHtmlResourceProvider(
+        std::make_unique<Envoy::DebugHtmlResourceProvider>());
+    argv[1] = argv[0];
+    --argc;
+    ++argv;
+  }
+
   return Envoy::MainCommon::main(argc, argv, [](Envoy::Server::Instance& server) {
     Envoy::OptRef<Envoy::Server::Admin> admin = server.admin();
     if (admin.has_value()) {
