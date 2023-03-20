@@ -21,39 +21,9 @@ namespace Server {
 // is represented, catering for different exposition formats (e.g. grouped, ungrouped).
 template <class TextReadoutType, class CounterType, class GaugeType, class HistogramType>
 class StatsRequest : public Admin::Request {
-protected:
-  // Ordered to match the StatsOrScopes variant.
-  enum class StatOrScopesIndex { Scopes, TextReadout, Counter, Gauge, Histogram };
-
-  // In order to keep the output consistent with the fully buffered behavior
-  // prior to the chunked implementation that buffered each type, we iterate
-  // over all scopes for each type. This enables the complex chunking
-  // implementation to pass the tests that capture the buffered behavior. There
-  // is not a significant cost to this, but in a future PR we may choose to
-  // co-mingle the types. Note that histograms are grouped together in the data
-  // JSON data model, so we won't be able to fully co-mingle.
-  enum class Phase {
-    TextReadouts,
-    CountersAndGauges,
-    Counters,
-    Gauges,
-    Histograms,
-  };
 
 public:
-  using ScopeVec = std::vector<Stats::ConstScopeSharedPtr>;
-
-  using StatOrScopes =
-      absl::variant<ScopeVec, TextReadoutType, CounterType, GaugeType, HistogramType>;
-
   using UrlHandlerFn = std::function<Admin::UrlHandler()>;
-
-  static constexpr uint64_t DefaultChunkSize = 2 * 1000 * 1000;
-
-  StatsRequest(Stats::Store& stats, const StatsParams& params,
-               UrlHandlerFn url_handler_fn = nullptr);
-
-  ~StatsRequest() override = default;
 
   // Admin::Request
   Http::Code start(Http::ResponseHeaderMap& response_headers) override;
@@ -104,6 +74,40 @@ public:
   // to reason about if the tests don't change their expectations.
   void startPhase();
 
+  // Sets the chunk size.
+  void setChunkSize(uint64_t chunk_size) { chunk_size_ = chunk_size; }
+
+protected:
+  // Ordered to match the StatsOrScopes variant.
+  enum class StatOrScopesIndex { Scopes, TextReadout, Counter, Gauge, Histogram };
+
+  // In order to keep the output consistent with the fully buffered behavior
+  // prior to the chunked implementation that buffered each type, we iterate
+  // over all scopes for each type. This enables the complex chunking
+  // implementation to pass the tests that capture the buffered behavior. There
+  // is not a significant cost to this, but in a future PR we may choose to
+  // co-mingle the types. Note that histograms are grouped together in the data
+  // JSON data model, so we won't be able to fully co-mingle.
+  enum class Phase {
+    TextReadouts,
+    CountersAndGauges,
+    Counters,
+    Gauges,
+    Histograms,
+  };
+
+  using ScopeVec = std::vector<Stats::ConstScopeSharedPtr>;
+
+  using StatOrScopes =
+      absl::variant<ScopeVec, TextReadoutType, CounterType, GaugeType, HistogramType>;
+
+  static constexpr uint64_t DefaultChunkSize = 2 * 1000 * 1000;
+
+  StatsRequest(Stats::Store& stats, const StatsParams& params,
+               UrlHandlerFn url_handler_fn = nullptr);
+
+  ~StatsRequest() override = default;
+
   // Iterates over scope_vec and populates the metric types associated with the
   // current phase.
   void populateStatsForCurrentPhase(const ScopeVec& scope_vec);
@@ -122,23 +126,23 @@ public:
   virtual void processHistogram(const std::string& name, Buffer::Instance& response,
                                 const StatOrScopes& variant) PURE;
 
-  // Sets the chunk size.
-  void setChunkSize(uint64_t chunk_size) { chunk_size_ = chunk_size; }
+  virtual void setRenderPtr(Http::ResponseHeaderMap& response_headers) PURE;
+  virtual StatsRenderBase& getRender() PURE;
 
-protected:
   StatsParams params_;
-  Stats::Store& stats_;
-  ScopeVec scopes_;
   absl::btree_map<std::string, StatOrScopes> stat_map_;
-  std::unique_ptr<StatsRenderBase> render_;
   Buffer::OwnedImpl response_;
   UrlHandlerFn url_handler_fn_;
-  uint64_t chunk_size_{DefaultChunkSize};
 
   // Phase-related state.
   uint64_t phase_stat_count_{0};
   uint32_t phase_index_{0};
   std::vector<Phase> phases_;
+
+private:
+  Stats::Store& stats_;
+  ScopeVec scopes_;
+  uint64_t chunk_size_{DefaultChunkSize};
   std::map<Phase, std::string> phase_labels_{{Phase::TextReadouts, "Text Readouts"},
                                              {Phase::CountersAndGauges, "Counters and Gauges"},
                                              {Phase::Histograms, "Histograms"},

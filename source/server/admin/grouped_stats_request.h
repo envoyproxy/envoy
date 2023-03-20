@@ -30,6 +30,7 @@ public:
                       Stats::CustomStatNamespaces& custom_namespaces,
                       UrlHandlerFn url_handler_fn = nullptr);
 
+protected:
   Stats::IterateFn<Stats::TextReadout> saveMatchingStatForTextReadout() override;
   Stats::IterateFn<Stats::Gauge> saveMatchingStatForGauge() override;
   Stats::IterateFn<Stats::Counter> saveMatchingStatForCounter() override;
@@ -52,9 +53,16 @@ public:
   template <class SharedStatType>
   void renderStat(const std::string& name, Buffer::Instance& response, const StatOrScopes& variant);
 
+  void setRenderPtr(Http::ResponseHeaderMap& response_headers) override;
+  StatsRenderBase& getRender() override {
+    ASSERT(render_ != nullptr);
+    return *render_;
+  }
+
 private:
   Stats::CustomStatNamespaces& custom_namespaces_;
   const Stats::SymbolTable& global_symbol_table_;
+  std::unique_ptr<PrometheusStatsRender> render_;
 };
 
 } // namespace Server

@@ -69,8 +69,6 @@ void GroupedStatsRequest::renderStat(const std::string& name, Buffer::Instance& 
                                      const StatOrScopes& variant) {
   auto prefixed_tag_extracted_name = prefixedTagExtractedName<SharedStatType>(name);
   if (prefixed_tag_extracted_name.has_value()) {
-    PrometheusStatsRender* const prometheus_render =
-        dynamic_cast<PrometheusStatsRender*>(render_.get());
     ++phase_stat_count_;
 
     // Sort group.
@@ -80,7 +78,7 @@ void GroupedStatsRequest::renderStat(const std::string& name, Buffer::Instance& 
         [](const SharedStatType& stat_ptr) -> Stats::StatName { return stat_ptr->statName(); });
 
     // Render group.
-    prometheus_render->generate(response, prefixed_tag_extracted_name.value(), group);
+    render_->generate(response, prefixed_tag_extracted_name.value(), group);
   }
 }
 
@@ -91,6 +89,7 @@ void GroupedStatsRequest::processTextReadout(const std::string& name, Buffer::In
 
 void GroupedStatsRequest::processCounter(const std::string& name, Buffer::Instance& response,
                                          const StatOrScopes& variant) {
+
   renderStat<Stats::CounterSharedPtr>(name, response, variant);
 }
 
@@ -108,6 +107,11 @@ template <class SharedStatType>
 absl::optional<std::string>
 GroupedStatsRequest::prefixedTagExtractedName(const std::string& tag_extracted_name) {
   return Envoy::Server::PrometheusStatsRender::metricName(tag_extracted_name, custom_namespaces_);
+}
+
+void GroupedStatsRequest::setRenderPtr(Http::ResponseHeaderMap&) {
+  ASSERT(params_.format_ == StatsFormat::Prometheus);
+  render_ = std::make_unique<PrometheusStatsRender>();
 }
 
 } // namespace Server

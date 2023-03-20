@@ -87,17 +87,16 @@ Admin::RequestPtr StatsHandler::makeRequest(AdminStream& admin_stream, StatsPara
     return makePrometheusRequest(
         server_.stats(), params, server_.api().customStatNamespaces(),
         [this]() -> Admin::UrlHandler { return prometheusStatsHandler(); });
-  } else {
-#ifdef ENVOY_ADMIN_HTML
-    const bool active_mode = params.format_ == StatsFormat::ActiveHtml;
-    return makeRequest(server_.stats(), params, [this, active_mode]() -> Admin::UrlHandler {
-      return statsHandler(active_mode);
-    });
-#else
-    return makeRequest(server_.stats(), params,
-                       [this]() -> Admin::UrlHandler { return statsHandler(false); });
-#endif
   }
+#ifdef ENVOY_ADMIN_HTML
+  const bool active_mode = params.format_ == StatsFormat::ActiveHtml;
+  return makeRequest(server_.stats(), params, [this, active_mode]() -> Admin::UrlHandler {
+    return statsHandler(active_mode);
+  });
+#else
+  return makeRequest(server_.stats(), params,
+                     [this]() -> Admin::UrlHandler { return statsHandler(false); });
+#endif
 }
 
 Admin::RequestPtr StatsHandler::makeRequest(Stats::Store& stats, const StatsParams& params,

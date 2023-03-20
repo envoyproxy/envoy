@@ -12,7 +12,12 @@
 namespace Envoy {
 namespace Server {
 
-// Abstract base class for rendering stats.
+// Abstract base class for rendering stats, which captures logic
+// that is shared across all formats (e.g. finalizing rendering of stats).
+// The APIs for generating stats output vary between formats (e.g.
+// JSON vs. Prometheus) and are defined in derived classes: having a base
+// render class avoids code duplication while affording the flexibility to
+// capture any differences in how we generate stats output.
 class StatsRenderBase {
 public:
   virtual ~StatsRenderBase() = default;
@@ -27,9 +32,6 @@ public:
 // Abstract class for rendering ungrouped stats.
 // Every method is called "generate" differing only by the data type, to
 // facilitate templatized call-sites.
-//
-// There are currently Json and Text implementations of this interface, and in
-// #19546 an HTML version will be added to provide a hierarchical view.
 class StatsRender : public StatsRenderBase {
 public:
   ~StatsRender() override = default;

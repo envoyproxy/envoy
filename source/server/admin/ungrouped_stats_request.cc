@@ -1,5 +1,11 @@
 #include "source/server/admin/ungrouped_stats_request.h"
 
+#include "stats_params.h"
+
+#ifdef ENVOY_ADMIN_HTML
+#include "source/server/admin/stats_html_render.h"
+#endif
+
 namespace Envoy {
 namespace Server {
 
@@ -69,7 +75,7 @@ template <class SharedStatType>
 void UngroupedStatsRequest::renderStat(const std::string& name, Buffer::Instance& response,
                                        const StatOrScopes& variant) {
   auto stat = absl::get<SharedStatType>(variant);
-  dynamic_cast<StatsRender*>(render_.get())->generate(response, name, stat->value());
+  render_.get()->generate(response, name, stat->value());
   phase_stat_count_++;
 }
 
@@ -95,6 +101,29 @@ void UngroupedStatsRequest::processHistogram(const std::string& name, Buffer::In
   if (parent_histogram != nullptr) {
     dynamic_cast<StatsRender*>(render_.get())->generate(response, name, *parent_histogram);
     ++phase_stat_count_;
+  }
+}
+
+void UngroupedStatsRequest::setRenderPtr(Http::ResponseHeaderMap& response_headers) {
+  switch (params_.format_) {
+  case StatsFormat::Json:
+    render_ = std::make_unique<StatsJsonRender>(response_headers, response_, params_);
+    break;
+  case StatsFormat::Text:
+    render_ = std::make_unique<StatsTextRender>(params_);
+    break;
+#ifdef ENVOY_ADMIN_HTML
+  case StatsFormat::ActiveHtml:
+  case StatsFormat::Html: {
+    auto html_render = std::make_unique<StatsHtmlRender>(response_headers, response_, params_);
+    html_render->setupStatsPage(url_handler_fn_(), params_, response_);
+    render_ = std::move(html_render);
+    break;
+  }
+#endif
+  case StatsFormat::Prometheus:
+    IS_ENVOY_BUG("reached Prometheus case in switch unexpectedly");
+    break;
   }
 }
 

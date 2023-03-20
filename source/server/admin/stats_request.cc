@@ -5,43 +5,20 @@
 
 #include "source/server/admin/stats_params.h"
 
-#ifdef ENVOY_ADMIN_HTML
-#include "source/server/admin/stats_html_render.h"
-#endif
-
 namespace Envoy {
 namespace Server {
 
 template <class TextReadoutType, class CounterType, class GaugeType, class HistogramType>
 StatsRequest<TextReadoutType, CounterType, GaugeType, HistogramType>::StatsRequest(
     Stats::Store& stats, const StatsParams& params, UrlHandlerFn url_handler_fn)
-    : params_(params), stats_(stats), url_handler_fn_(url_handler_fn) {}
+    : params_(params), url_handler_fn_(url_handler_fn), stats_(stats) {}
 
 template <class TextReadoutTyoe, class CounterType, class GaugeType, class HistogramType>
 Http::Code StatsRequest<TextReadoutTyoe, CounterType, GaugeType, HistogramType>::start(
     Http::ResponseHeaderMap& response_headers) {
-  switch (params_.format_) {
-  case StatsFormat::Json:
-    render_ = std::make_unique<StatsJsonRender>(response_headers, response_, params_);
-    break;
-  case StatsFormat::Text:
-    render_ = std::make_unique<StatsTextRender>(params_);
-    break;
-#ifdef ENVOY_ADMIN_HTML
-  case StatsFormat::ActiveHtml:
-  case StatsFormat::Html: {
-    auto html_render = std::make_unique<StatsHtmlRender>(response_headers, response_, params_);
-    html_render->setupStatsPage(url_handler_fn_(), params_, response_);
-    render_ = std::move(html_render);
-    if (params_.format_ == StatsFormat::ActiveHtml) {
-      return Http::Code::OK;
-    }
-    break;
-  }
-#endif
-  case StatsFormat::Prometheus:
-    render_ = std::make_unique<PrometheusStatsRender>();
-    break;
+  setRenderPtr(response_headers);
+  if (params_.format_ == StatsFormat::ActiveHtml) {
+    return Http::Code::OK;
   }
 
   // Populate the top-level scopes and the stats underneath any scopes with an empty name.
@@ -72,19 +49,19 @@ bool StatsRequest<TextReadoutTyoe, CounterType, GaugeType, HistogramType>::nextC
   while (response.length() - starting_response_length < chunk_size_) {
     while (stat_map_.empty()) {
       if (phase_stat_count_ == 0) {
-        render_->noStats(response, phase_labels_[phases_.at(phase_index_)]);
+        getRender().noStats(response, phase_labels_[phases_.at(phase_index_)]);
       } else {
         phase_stat_count_ = 0;
       }
       if (params_.type_ != StatsType::All) {
-        render_->finalize(response);
+        getRender().finalize(response);
         return false;
       }
 
       // Check if we are at the last phase: in that case, we are done;
       // if not, increment phase index and start next phase.
       if (phase_index_ == phases_.size() - 1) {
-        render_->finalize(response);
+        getRender().finalize(response);
         return false;
       } else {
         phase_index_++;
