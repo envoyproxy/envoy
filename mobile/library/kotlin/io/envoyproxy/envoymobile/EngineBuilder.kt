@@ -623,7 +623,7 @@ open class EngineBuilder(
   }
 
   /**
-  * Adds a CDS layer.🖥️
+  * Adds a CDS layer.
   *
   * @param resourcesLocator The xdstp resource URI for fetching clusters.
   *                         If empty, xdstp is not used and a wildcard is inferred.
