@@ -864,9 +864,9 @@ pyflakes==3.0.1 \
     --hash=sha256:ec55bf7fe21fff7f1ad2f7da62363d749e2a470500eab1b555334b67aa1ef8cf \
     --hash=sha256:ec8b276a6b60bd80defed25add7e439881c19e64850afd9b346283d4165fd0fd
     # via flake8
-pygithub==1.58.0 \
-    --hash=sha256:b7bac601492a2b6c876ef326e4ffa3c1923e32707e415da76bfb8307ee8ffb7e \
-    --hash=sha256:e325f5ca2c111d19dea2796c8f1e7ae11da77287007736582196341390d31d35
+pygithub==1.58.1 \
+    --hash=sha256:4e7fe9c3ec30d5fde5b4fbb97f18821c9dbf372bf6df337fe66f6689a65e0a83 \
+    --hash=sha256:7d528b4ad92bc13122129fafd444ce3d04c47d2d801f6446b6e6ee2d410235b3
     # via -r requirements.in
 pygments==2.14.0 \
     --hash=sha256:b3ed06a9e8ac9a9aae5a6f5dbe78a8a58655d17b43b93c078f094ddc476ae297 \
