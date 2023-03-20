@@ -29,6 +29,7 @@ envoy_extension_cc_test(
 
 envoy_extension_cc_test(
     name = "csrf_filter_integration_test",
+    size = "large",
     srcs = ["csrf_filter_integration_test.cc"],
     extension_names = ["envoy.filters.http.csrf"],
     # TODO(kbaichoo): remove when deferred processing is enabled by default and the
