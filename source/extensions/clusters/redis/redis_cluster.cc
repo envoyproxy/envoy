@@ -70,6 +70,9 @@ void RedisCluster::startPreInit() {
   for (const DnsDiscoveryResolveTargetPtr& target : dns_discovery_resolve_targets_) {
     target->startResolveDns();
   }
+  if (!wait_for_warm_on_init_) {
+    onPreInitComplete();
+  }
 }
 
 void RedisCluster::updateAllHosts(const Upstream::HostVector& hosts_added,

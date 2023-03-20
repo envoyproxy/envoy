@@ -346,6 +346,8 @@ The following command operators are supported:
 
   Renders a numeric value in typed JSON logs.
 
+.. _config_access_log_format_duration:
+
 %DURATION%
   HTTP/THRIFT
     Total duration in milliseconds of the request from the start time to the last byte out.

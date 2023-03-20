@@ -2808,6 +2808,11 @@ TEST_P(DownstreamProtocolIntegrationTest, BasicMaxStreamTimeout) {
   ASSERT_TRUE(response->waitForEndStream());
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("408", response->headers().getStatusValue());
+
+  // We only wait for end stream, which means for example the QUIC STOP_SENDING
+  // frame may be in-flight. Close the connection before response, which
+  // receives callbacks, gets out of scope.
+  codec_client_->close();
 }
 
 // Test that when request timeout and the request is completed, the gateway timeout (504) is
