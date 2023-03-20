@@ -50,6 +50,7 @@ bug_fixes:
 - area: http
   change: |
     sanitization of the referer header has been relaxed to allow relative URLs, and also tightened to remove referers containing userinfo or fragment components, as documented here :ref:`here <config_http_conn_man_headers_referer>`.
+    This behavioral change can be temporarily reverted by setting runtime guard ``envoy.reloadable_features.http_allow_partial_urls_in_referer`` to false.
 - area: stats
   change: |
     now updating upstream total connection stats as happy eyeballs connections are created.
