@@ -1,7 +1,8 @@
-#include "source/common/html/utility.h"
 #include "source/server/admin/admin_html_util.h"
-#include "source/server/admin/html/admin_html_gen.h"
+
+#include "source/common/html/utility.h"
 #include "source/common/http/headers.h"
+#include "source/server/admin/html/admin_html_gen.h"
 
 #include "absl/strings/str_replace.h"
 
@@ -45,14 +46,14 @@ const char EnvoyFavicon[] =
     "sCqx5Buj7FYH0LvDyHiqd+3otpsr4/fa5+xbEVQPfrYnntylQG5VGeMLBhgEfyE7o6e6qYzwHIjwl0QwXSvvTmrVAY4D5"
     "ddvT64wV0jRrr7FekO/XEjwuwwhuw7Ef7NY+dlfXpLb06EtHUJdVbsxvNUqBrwj/QGeEUSfwBAkmWHn5Bb/gAAAABJRU5";
 
-}
+} // namespace
 
 namespace Envoy {
 namespace Server {
 namespace AdminHtmlUtil {
 
 class BuiltinHtmlResourceProvider : public HtmlResourceProvider {
- public:
+public:
   BuiltinHtmlResourceProvider() {
     map_["admin_head_start.html"] = AdminHtmlStart;
     map_["admin.css"] = AdminCss;
@@ -64,7 +65,7 @@ class BuiltinHtmlResourceProvider : public HtmlResourceProvider {
     return map_[resource_name];
   }
 
- private:
+private:
   absl::flat_hash_map<absl::string_view, absl::string_view> map_;
 };
 
@@ -72,9 +73,7 @@ struct ProviderContainer {
   std::unique_ptr<HtmlResourceProvider> provider_{std::make_unique<BuiltinHtmlResourceProvider>()};
 };
 
-ProviderContainer& getProviderContainer() {
-  MUTABLE_CONSTRUCT_ON_FIRST_USE(ProviderContainer);
-}
+ProviderContainer& getProviderContainer() { MUTABLE_CONSTRUCT_ON_FIRST_USE(ProviderContainer); }
 
 absl::string_view getResource(absl::string_view resource_name, std::string& buf) {
   return getProviderContainer().provider_->getResource(resource_name, buf);
@@ -87,17 +86,12 @@ void setHtmlResourceProvider(std::unique_ptr<HtmlResourceProvider> resource_prov
 void renderHead(Http::ResponseHeaderMap& response_headers, Buffer::Instance& response) {
   response_headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Html);
   std::string buf1, buf2, buf3;
-  response.addFragments({
-      "<!DOCTYPE html>\n"
-      "<html lang='en'>\n"
-      "<head>\n",
-      absl::StrReplaceAll(
-          getResource("admin_head_start.html", buf1),
-          {{"@FAVICON@", EnvoyFavicon}}),
-      "<style>\n",
-      getResource("admin.css", buf2),
-      "</style>\n"
-    });
+  response.addFragments({"<!DOCTYPE html>\n"
+                         "<html lang='en'>\n"
+                         "<head>\n",
+                         absl::StrReplaceAll(getResource("admin_head_start.html", buf1),
+                                             {{"@FAVICON@", EnvoyFavicon}}),
+                         "<style>\n", getResource("admin.css", buf2), "</style>\n"});
   response.add("</head>\n<body>\n");
 }
 
@@ -107,12 +101,10 @@ void tableEnd(Buffer::Instance& response) { response.add(AdminHtmlTableEnd); }
 
 void finalize(Buffer::Instance& response) { response.add("</body>\n</html>\n"); }
 
-void input(Buffer::Instance& response, absl::string_view id,
-           absl::string_view name, absl::string_view path,
-           Admin::ParamDescriptor::Type type,
+void input(Buffer::Instance& response, absl::string_view id, absl::string_view name,
+           absl::string_view path, Admin::ParamDescriptor::Type type,
            OptRef<const Http::Utility::QueryParams> query,
-           const std::vector<absl::string_view>& enum_choices,
-           bool submit_on_change) {
+           const std::vector<absl::string_view>& enum_choices, bool submit_on_change) {
   std::string value;
   if (query.has_value()) {
     auto iter = query->find(std::string(name));
@@ -156,8 +148,8 @@ void input(Buffer::Instance& response, absl::string_view id,
 }
 
 void urlHandler(Buffer::Instance& response, const Admin::UrlHandler& handler,
-                OptRef<const Http::Utility::QueryParams> query,
-                int index, bool submit_on_change, bool active) {
+                OptRef<const Http::Utility::QueryParams> query, int index, bool submit_on_change,
+                bool active) {
   absl::string_view path = handler.prefix_;
 
   if (path == "/") {
@@ -214,8 +206,8 @@ void urlHandler(Buffer::Instance& response, const Admin::UrlHandler& handler,
     // Give each parameter a unique number. Note that this naming is also referenced in
     // active_stats.js which looks directly at the parameter widgets to find the
     // current values during JavaScript-driven active updates.
-    std::string id = absl::StrCat("param-", index, "-", absl::StrReplaceAll(path, {{"/", "-"}}),
-                                  "-", param.id_);
+    std::string id =
+        absl::StrCat("param-", index, "-", absl::StrReplaceAll(path, {{"/", "-"}}), "-", param.id_);
     response.addFragments({"<tr", row_class, ">\n  <td class='option'>"});
     input(response, id, param.id_, path, param.type_, query, param.enum_choices_,
           submit_on_change && (!active || param.id_ == "format"));

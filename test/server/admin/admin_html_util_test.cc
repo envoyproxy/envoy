@@ -1,8 +1,8 @@
 #include <string>
 
+#include "source/common/buffer/buffer_impl.h"
 #include "source/server/admin/admin_html_util.h"
 
-#include "source/common/buffer/buffer_impl.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -25,7 +25,7 @@ const Admin::UrlHandler handler() {
 }
 
 class AdminHtmlUtilTest : public testing::Test {
- protected:
+protected:
   Buffer::OwnedImpl response_;
   Http::Utility::QueryParams query_params_;
 };
@@ -70,7 +70,6 @@ TEST_F(AdminHtmlUtilTest, RenderUrlHandlerWithQuery) {
   EXPECT_THAT(out, Not(HasSubstr(" onchange='prefix.submit()")));
   EXPECT_THAT(out, Not(HasSubstr(" type='hidden' ")));
 }
-
 
 TEST_F(AdminHtmlUtilTest, RenderHead) {
   // The "<head>...</head>" is rendered by the constructor.
