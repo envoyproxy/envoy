@@ -203,7 +203,6 @@ bool Context::useFineGrainLogger() {
 
 void Context::enableFineGrainLogger() {
   if (current_context) {
-    current_context->enable_fine_grain_logging_ = true;
     current_context->fine_grain_default_level_ = current_context->log_level_;
     current_context->fine_grain_log_format_ = current_context->log_format_;
     if (current_context->log_format_ == Logger::Logger::DEFAULT_LOG_FORMAT) {
@@ -211,6 +210,7 @@ void Context::enableFineGrainLogger() {
     }
     getFineGrainLogContext().setDefaultFineGrainLogLevelFormat(
         current_context->fine_grain_default_level_, current_context->fine_grain_log_format_);
+    current_context->enable_fine_grain_logging_ = true;
   }
 }
 
