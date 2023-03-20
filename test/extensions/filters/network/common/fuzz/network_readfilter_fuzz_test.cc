@@ -17,6 +17,23 @@ namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
 
+namespace {
+// Copied from visitor.cc. Remove ones the GenerateValidMessage visitor has
+// been moved there.
+std::unique_ptr<Protobuf::Message> typeUrlToMessage(absl::string_view type_url) {
+  const absl::string_view inner_type_name = TypeUtil::typeUrlToDescriptorFullName(type_url);
+  const Protobuf::Descriptor* inner_descriptor =
+      Protobuf::DescriptorPool::generated_pool()->FindMessageTypeByName(
+          std::string(inner_type_name));
+  if (inner_descriptor == nullptr) {
+    return nullptr;
+  }
+  auto* inner_message_prototype =
+      Protobuf::MessageFactory::generated_factory()->GetPrototype(inner_descriptor);
+  return std::unique_ptr<Protobuf::Message>(inner_message_prototype->New());
+}
+} // namespace
+
 class GenerateValidMessage : public ProtobufMessage::ProtoVisitor, private pgv::BaseValidator {
 #define MYLOGLEV error
 public:
@@ -165,9 +182,18 @@ public:
   }
 
   static void handle_any_rules(Protobuf::Message* msg, const validate::AnyRules& any_rules) {
-    ProtobufWkt::Any* any = dynamic_cast<ProtobufWkt::Any*>(msg);
-    if (any_rules.required()) {
-      ASSERT(any);
+    if (any_rules.has_required() && any_rules.required()) {
+      const Protobuf::Descriptor* descriptor = msg->GetDescriptor();
+      std::unique_ptr<Protobuf::Message> inner_message;
+      if (descriptor->full_name() == "google.protobuf.Any") {
+        auto* any_message = Protobuf::DynamicCastToGenerated<ProtobufWkt::Any>(msg);
+        inner_message = typeUrlToMessage(any_message->type_url());
+        // inner_message must be valid as parsing would have already failed to load if there was an
+        // invalid type_url.
+        if (!inner_message || !any_message->UnpackTo(inner_message.get())) {
+          any_message->clear_value();
+        }
+      }
     }
     if (any_rules.in_size() > 0 || any_rules.not_in_size() > 0) {
       ENVOY_LOG_MISC(MYLOGLEV, "pgv::AnyRules::in|not_in rule found, not handling yet");
@@ -176,7 +202,7 @@ public:
 
   void handle_message_typed_field(Protobuf::Message& msg, const Protobuf::FieldDescriptor& field,
                                   const Protobuf::Reflection* reflection,
-                                  const validate::FieldRules& rules, const bool force) {
+                                  const validate::FieldRules& rules, const bool force_create) {
 
     if (field.is_repeated()) {
       const validate::RepeatedRules& repeated_rules = rules.repeated();
@@ -202,7 +228,7 @@ public:
       // The visitor will traverse over all repeated entries anyway. Therefore no
       // need to traverse here.
     } else {
-      if (force || reflection->HasField(msg, &field) ||
+      if (force_create || reflection->HasField(msg, &field) ||
           (rules.message().has_required() && rules.message().required()) ||
           (rules.message().IsInitialized())) {
         // Enforce that the msg for the given field follows the validation rules, if
@@ -285,10 +311,11 @@ public:
     onField(msg, field, false);
   }
 
-  void onField(Protobuf::Message& msg, const Protobuf::FieldDescriptor& field, const bool force) {
+  void onField(Protobuf::Message& msg, const Protobuf::FieldDescriptor& field,
+               const bool force_create) {
     const Protobuf::Reflection* reflection = msg.GetReflection();
 
-    if (!field.options().HasExtension(validate::rules) && !force) {
+    if (!field.options().HasExtension(validate::rules) && !force_create) {
       return;
     }
     const validate::FieldRules& rules = field.options().GetExtension(validate::rules);
@@ -302,7 +329,7 @@ public:
           std::int32_t, &Protobuf::Reflection::GetInt32, &Protobuf::Reflection::SetInt32,
           &Protobuf::Reflection::GetRepeatedInt32, &Protobuf::Reflection::SetRepeatedInt32,
           &Protobuf::Reflection::AddInt32, &validate::FieldRules::int32>(msg, field, reflection,
-                                                                         rules, force);
+                                                                         rules, force_create);
       break;
     }
     case Protobuf::FieldDescriptor::CPPTYPE_INT64: {
@@ -310,7 +337,7 @@ public:
           std::int64_t, &Protobuf::Reflection::GetInt64, &Protobuf::Reflection::SetInt64,
           &Protobuf::Reflection::GetRepeatedInt64, &Protobuf::Reflection::SetRepeatedInt64,
           &Protobuf::Reflection::AddInt64, &validate::FieldRules::int64>(msg, field, reflection,
-                                                                         rules, force);
+                                                                         rules, force_create);
       break;
     }
     case Protobuf::FieldDescriptor::CPPTYPE_UINT32: {
@@ -318,7 +345,7 @@ public:
           std::uint32_t, &Protobuf::Reflection::GetUInt32, &Protobuf::Reflection::SetUInt32,
           &Protobuf::Reflection::GetRepeatedUInt32, &Protobuf::Reflection::SetRepeatedUInt32,
           &Protobuf::Reflection::AddUInt32, &validate::FieldRules::uint32>(msg, field, reflection,
-                                                                           rules, force);
+                                                                           rules, force_create);
       break;
     }
     case Protobuf::FieldDescriptor::CPPTYPE_UINT64: {
@@ -326,7 +353,7 @@ public:
           std::uint64_t, &Protobuf::Reflection::GetUInt64, &Protobuf::Reflection::SetUInt64,
           &Protobuf::Reflection::GetRepeatedUInt64, &Protobuf::Reflection::SetRepeatedUInt64,
           &Protobuf::Reflection::AddUInt64, &validate::FieldRules::uint64>(msg, field, reflection,
-                                                                           rules, force);
+                                                                           rules, force_create);
       break;
     }
     case Protobuf::FieldDescriptor::CPPTYPE_DOUBLE: {
@@ -334,7 +361,7 @@ public:
           double, &Protobuf::Reflection::GetDouble, &Protobuf::Reflection::SetDouble,
           &Protobuf::Reflection::GetRepeatedDouble, &Protobuf::Reflection::SetRepeatedDouble,
           &Protobuf::Reflection::AddDouble, &validate::FieldRules::double_>(msg, field, reflection,
-                                                                            rules, force);
+                                                                            rules, force_create);
       break;
     }
     case Protobuf::FieldDescriptor::CPPTYPE_FLOAT: {
@@ -342,7 +369,7 @@ public:
           float, &Protobuf::Reflection::GetFloat, &Protobuf::Reflection::SetFloat,
           &Protobuf::Reflection::GetRepeatedFloat, &Protobuf::Reflection::SetRepeatedFloat,
           &Protobuf::Reflection::AddFloat, &validate::FieldRules::float_>(msg, field, reflection,
-                                                                          rules, force);
+                                                                          rules, force_create);
       break;
     }
     case Protobuf::FieldDescriptor::CPPTYPE_BOOL:
@@ -354,11 +381,11 @@ public:
           std::string, &Protobuf::Reflection::GetString, &Protobuf::Reflection::SetString,
           &Protobuf::Reflection::GetRepeatedString, &Protobuf::Reflection::SetRepeatedString,
           &Protobuf::Reflection::AddString, &validate::FieldRules::string, &handle_string_rules>(
-          msg, field, reflection, rules, force);
+          msg, field, reflection, rules, force_create);
       break;
     }
     case Protobuf::FieldDescriptor::CPPTYPE_MESSAGE: {
-      handle_message_typed_field(msg, field, reflection, rules, force);
+      handle_message_typed_field(msg, field, reflection, rules, force_create);
       break;
     }
     default:
@@ -393,7 +420,7 @@ private:
 };
 
 DEFINE_PROTO_FUZZER(const test::extensions::filters::network::FilterFuzzTestCase& input) {
-  TestDeprecatedV2Api _deprecated_v2_api;
+  //  TestDeprecatedV2Api _deprecated_v2_api;
   ABSL_ATTRIBUTE_UNUSED static PostProcessorRegistration reg = {
       [](test::extensions::filters::network::FilterFuzzTestCase* input, unsigned int seed) {
         // This post-processor mutation is applied only when libprotobuf-mutator
@@ -412,6 +439,7 @@ DEFINE_PROTO_FUZZER(const test::extensions::filters::network::FilterFuzzTestCase
         if (std::find(filter_names.begin(), filter_names.end(), input->config().name()) ==
             std::end(filter_names)) {
           absl::string_view filter_name = filter_names[seed % filter_names.size()];
+          input->mutable_config()->clear_typed_config();
           input->mutable_config()->set_name(std::string(filter_name));
         }
         // Set the corresponding type_url for Any.
