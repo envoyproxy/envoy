@@ -82,7 +82,7 @@ public:
 UpstreamRequest::UpstreamRequest(RouterFilterInterface& parent,
                                  std::unique_ptr<GenericConnPool>&& conn_pool,
                                  bool can_send_early_data, bool can_use_http3)
-    : parent_(parent), conn_pool_(std::move(conn_pool)), grpc_rq_success_deferred_(false),
+    : parent_(parent), conn_pool_(std::move(conn_pool)),
       stream_info_(parent_.callbacks()->dispatcher().timeSource(), nullptr),
       start_time_(parent_.callbacks()->dispatcher().timeSource().monotonicTime()),
       calling_encode_headers_(false), upstream_canary_(false), router_sent_end_stream_(false),
@@ -94,7 +94,7 @@ UpstreamRequest::UpstreamRequest(RouterFilterInterface& parent,
       cleaned_up_(false), had_upstream_(false),
       allow_upstream_filters_(
           Runtime::runtimeFeatureEnabled("envoy.reloadable_features.allow_upstream_filters")),
-      stream_options_({can_send_early_data, can_use_http3}),
+      stream_options_({can_send_early_data, can_use_http3}), grpc_rq_success_deferred_(false),
       upstream_wait_for_response_headers_before_disabling_read_(Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.upstream_wait_for_response_headers_before_disabling_read")) {
   if (parent_.config().start_child_span_) {
