@@ -35,7 +35,7 @@ if [[ -n "${BAZEL_REMOTE_CACHE}" ]]; then
   fi
 
   if [[ -z "${ENVOY_RBE}" ]]; then
-    export BAZEL_BUILD_EXTRA_OPTIONS+=" --jobs=HOST_CPUS*.9 --remote_timeout=600"
+    export BAZEL_BUILD_EXTRA_OPTIONS+=" --jobs=HOST_CPUS*.99 --remote_timeout=600"
     echo "using local build cache."
   fi
 

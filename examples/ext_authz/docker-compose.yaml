@@ -1,10 +1,11 @@
-version: "3.8"
 services:
 
   front-envoy:
     build:
-      context: .
-      dockerfile: Dockerfile-frontenvoy
+      dockerfile: ../shared/envoy/Dockerfile
+      target: envoy-ext_authz
+      args:
+        ENVOY_CONFIG: config/http-service.yaml
     depends_on:
       upstream-service:
         condition: service_healthy
@@ -33,7 +34,6 @@ services:
 
   ext_authz-opa-service:
     build:
-      context: .
       dockerfile: Dockerfile-opa
     volumes:
     - ./config/opa-service/policy.rego:/etc/policy.rego

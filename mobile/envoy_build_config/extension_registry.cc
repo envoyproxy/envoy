@@ -15,7 +15,6 @@
 #include "source/common/router/upstream_codec_filter.h"
 #include "source/common/watchdog/abort_action_config.h"
 #include "source/extensions/clusters/dynamic_forward_proxy/cluster.h"
-#include "source/extensions/clusters/logical_dns/logical_dns_cluster.h"
 #include "source/extensions/clusters/static/static_cluster.h"
 #include "source/extensions/compression/brotli/decompressor/config.h"
 #include "source/extensions/compression/gzip/decompressor/config.h"
@@ -33,8 +32,6 @@
 #include "source/extensions/path/match/uri_template/config.h"
 #include "source/extensions/path/rewrite/uri_template/config.h"
 #include "source/extensions/request_id/uuid/config.h"
-#include "source/extensions/stat_sinks/metrics_service/config.h"
-#include "source/extensions/stat_sinks/statsd/config.h"
 #include "source/extensions/transport_sockets/http_11_proxy/config.h"
 #include "source/extensions/transport_sockets/raw_buffer/config.h"
 #include "source/extensions/transport_sockets/tls/cert_validator/default_validator.h"
@@ -55,6 +52,12 @@
 #include "source/extensions/quic/proof_source/envoy_quic_proof_source_factory_impl.h"
 #endif
 #include "source/common/quic/quic_transport_socket_factory.h"
+#endif
+
+#ifdef ENVOY_MOBILE_STATS_REPORTING
+#include "source/extensions/clusters/logical_dns/logical_dns_cluster.h"
+#include "source/extensions/stat_sinks/metrics_service/config.h"
+#include "source/extensions/stat_sinks/statsd/config.h"
 #endif
 
 #include "extension_registry_platform_additions.h"
@@ -88,6 +91,8 @@ void ExtensionRegistry::registerFactories() {
   Extensions::HttpFilters::BufferFilter::forceRegisterBufferFilterFactory();
   // TODO(alyssawilk) verify with Lyft we can move this to be a test-only filter.
   Extensions::HttpFilters::RouteCacheReset::forceRegisterRouteCacheResetFilterFactory();
+  // TODO(alyssawilk) verify with Lyft we can move this to be a test-only filter.
+  Upstream::forceRegisterStaticClusterFactory();
 
   // This is the default cluster used by Envoy mobile to establish connections upstream.
   Extensions::Clusters::DynamicForwardProxy::forceRegisterClusterFactory();
@@ -181,12 +186,12 @@ void ExtensionRegistry::registerFactories() {
   // Mobile compiles out watchdog support.
   Watchdog::forceRegisterAbortActionFactory();
 
-  // These are facties required for stats reporting. TODO(alyssawilk) allow compile out.
+#ifdef ENVOY_MOBILE_STATS_REPORTING
   Network::Address::forceRegisterIpResolver();
   Upstream::forceRegisterLogicalDnsClusterFactory();
-  Upstream::forceRegisterStaticClusterFactory();
   Extensions::StatSinks::MetricsService::forceRegisterMetricsServiceSinkFactory();
   Extensions::StatSinks::Statsd::forceRegisterStatsdSinkFactory();
+#endif
 
 #ifdef ENVOY_MOBILE_ENABLE_LISTENER
   // These are downstream factories required if Envoy Mobile is compiled with

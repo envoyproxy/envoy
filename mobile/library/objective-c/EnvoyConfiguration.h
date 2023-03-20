@@ -57,6 +57,8 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic, strong, nullable) NSString *nodeRegion;
 @property (nonatomic, strong, nullable) NSString *nodeZone;
 @property (nonatomic, strong, nullable) NSString *nodeSubZone;
+@property (nonatomic, assign) intptr_t bootstrapPointer;
+
 /**
  Create a new instance of the configuration.
  */

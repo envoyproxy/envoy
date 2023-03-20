@@ -64,6 +64,7 @@ envoy_extension_cc_test(
 
 envoy_extension_cc_test(
     name = "udp_proxy_integration_test",
+    size = "large",
     srcs = ["udp_proxy_integration_test.cc"],
     extension_names = ["envoy.filters.udp_listener.udp_proxy"],
     deps = [
