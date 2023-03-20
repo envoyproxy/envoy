@@ -441,7 +441,7 @@ TEST_F(IoUringSocketHandleImplIntegrationTest, WriteAndWritev) {
       },
       Event::PlatformDefaultTriggerType, Event::FileReadyType::Read);
 
-  server_io_handler->write(write_buffer);
+  EXPECT_EQ(data.size(), server_io_handler->write(write_buffer).return_value_);
 
   while (read_buffer.length() == 0) {
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
@@ -454,7 +454,7 @@ TEST_F(IoUringSocketHandleImplIntegrationTest, WriteAndWritev) {
   // Test another write interface
   write_buffer.add(data);
   auto slices = write_buffer.getRawSlices();
-  server_io_handler->writev(&slices[0], 1);
+  EXPECT_EQ(data.size(), server_io_handler->writev(&slices[0], 1).return_value_);
 
   while (read_buffer.length() == 0) {
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);

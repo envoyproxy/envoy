@@ -222,8 +222,9 @@ Api::IoCallUint64Result IoUringSocketHandleImpl::write(Buffer::Instance& buffer)
   }
 
   ASSERT(io_uring_socket_.has_value());
+  auto buffer_size = buffer.length();
   io_uring_socket_->write(buffer);
-  return {buffer.length(), Api::IoErrorPtr(nullptr, IoSocketError::deleteIoError)};
+  return {buffer_size, Api::IoErrorPtr(nullptr, IoSocketError::deleteIoError)};
 }
 
 Api::IoCallUint64Result IoUringSocketHandleImpl::sendmsg(const Buffer::RawSlice* slices,
