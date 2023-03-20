@@ -119,6 +119,56 @@ TEST_F(IoUringSocketHandleImplIntegrationTest, Accept) {
   }
 }
 
+TEST_F(IoUringSocketHandleImplIntegrationTest, ActivateReadEvent) {
+  initialize();
+
+  // io_uring handle starts listening.
+  bool accepted = false;
+  auto local_addr = std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 0);
+  io_handle_->bind(local_addr);
+  io_handle_->listen(5);
+
+  IoHandlePtr server_io_handler;
+  io_handle_->initializeFileEvent(
+      *dispatcher_,
+      [this, &accepted, &server_io_handler](uint32_t) {
+        struct sockaddr addr;
+        socklen_t addrlen = sizeof(addr);
+        server_io_handler = io_handle_->accept(&addr, &addrlen);
+        EXPECT_NE(server_io_handler, nullptr);
+        accepted = true;
+      },
+      Event::PlatformDefaultTriggerType, Event::FileReadyType::Read);
+
+  // Connect from peer handle.
+  peer_io_handle_->connect(io_handle_->localAddress());
+
+  while (!accepted) {
+    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  }
+  EXPECT_TRUE(accepted);
+
+  Buffer::OwnedImpl read_buffer;
+
+  server_io_handler->initializeFileEvent(
+      *dispatcher_,
+      [&server_io_handler, &read_buffer](uint32_t event) {
+        EXPECT_EQ(event, Event::FileReadyType::Read);
+        auto ret = server_io_handler->read(read_buffer, absl::nullopt);
+        EXPECT_TRUE(ret.wouldBlock());
+      },
+      Event::PlatformDefaultTriggerType, Event::FileReadyType::Read);
+
+  server_io_handler->activateFileEvents(Event::FileReadyType::Read);
+
+  // Close safely.
+  server_io_handler->close();
+  io_handle_->close();
+  while (fcntl(fd_, F_GETFD, 0) >= 0) {
+    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  }
+}
+
 TEST_F(IoUringSocketHandleImplIntegrationTest, Read) {
   initialize();
 
@@ -345,7 +395,7 @@ TEST_F(IoUringSocketHandleImplIntegrationTest, Readv) {
   }
 }
 
-TEST_F(IoUringSocketHandleImplIntegrationTest, Write) {
+TEST_F(IoUringSocketHandleImplIntegrationTest, WriteAndWritev) {
   initialize();
 
   // io_uring handle starts listening.
@@ -414,6 +464,56 @@ TEST_F(IoUringSocketHandleImplIntegrationTest, Write) {
   peer_io_handle_->resetFileEvents();
 
   peer_io_handle_->close();
+  server_io_handler->close();
+  io_handle_->close();
+  while (fcntl(fd_, F_GETFD, 0) >= 0) {
+    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  }
+}
+
+TEST_F(IoUringSocketHandleImplIntegrationTest, ActivateWriteEvent) {
+  initialize();
+
+  // io_uring handle starts listening.
+  bool accepted = false;
+  auto local_addr = std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 0);
+  io_handle_->bind(local_addr);
+  io_handle_->listen(5);
+
+  IoHandlePtr server_io_handler;
+  io_handle_->initializeFileEvent(
+      *dispatcher_,
+      [this, &accepted, &server_io_handler](uint32_t) {
+        struct sockaddr addr;
+        socklen_t addrlen = sizeof(addr);
+        server_io_handler = io_handle_->accept(&addr, &addrlen);
+        EXPECT_NE(server_io_handler, nullptr);
+        accepted = true;
+      },
+      Event::PlatformDefaultTriggerType, Event::FileReadyType::Read);
+
+  // Connect from peer handle.
+  peer_io_handle_->connect(io_handle_->localAddress());
+
+  while (!accepted) {
+    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  }
+  EXPECT_TRUE(accepted);
+
+  Buffer::OwnedImpl write_buffer;
+
+  server_io_handler->initializeFileEvent(
+      *dispatcher_,
+      [&server_io_handler, &write_buffer](uint32_t event) {
+        EXPECT_EQ(event, Event::FileReadyType::Write);
+        auto ret = server_io_handler->write(write_buffer);
+        EXPECT_TRUE(ret.wouldBlock());
+      },
+      Event::PlatformDefaultTriggerType, Event::FileReadyType::Write);
+
+  server_io_handler->activateFileEvents(Event::FileReadyType::Write);
+
+  // Close safely.
   server_io_handler->close();
   io_handle_->close();
   while (fcntl(fd_, F_GETFD, 0) >= 0) {
