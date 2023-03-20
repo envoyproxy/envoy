@@ -114,7 +114,7 @@ connection pools are also allocated for each of the following features:
 * :ref:`Routing priority <arch_overview_http_routing_priority>`
 * :ref:`Socket options <envoy_v3_api_field_config.core.v3.BindConfig.socket_options>`
 * :ref:`Transport socket (e.g. TLS) options <envoy_v3_api_msg_config.core.v3.TransportSocket>`
-* Downstream :ref:`filter state objects <arch_overview_advanced_filter_state` that are hashable
+* Downstream :ref:`filter state objects <arch_overview_advanced_filter_state>` that are hashable
   and marked as shared with the upstream connection.
 
 Each worker thread maintains its own connection pools for each cluster, so if an Envoy has two
