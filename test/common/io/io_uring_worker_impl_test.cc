@@ -154,6 +154,51 @@ TEST(IoUringWorkerImplTest, ServerSocketInjectAfterWrite) {
   EXPECT_CALL(dispatcher, clearDeferredDeleteList());
 }
 
+// This tests ensure the read request won't be override by an injected completion.
+TEST(IoUringWorkerImplTest, ServerSocketInjectAfterRead) {
+  Event::MockDispatcher dispatcher;
+  IoUringPtr io_uring_instance = std::make_unique<MockIoUring>();
+  MockIoUring& mock_io_uring = *dynamic_cast<MockIoUring*>(io_uring_instance.get());
+  Event::FileReadyCb file_event_callback;
+
+  EXPECT_CALL(mock_io_uring, registerEventfd());
+  EXPECT_CALL(dispatcher,
+              createFileEvent_(_, _, Event::PlatformDefaultTriggerType, Event::FileReadyType::Read))
+      .WillOnce(
+          DoAll(SaveArg<1>(&file_event_callback), ReturnNew<NiceMock<Event::MockFileEvent>>()));
+  IoUringWorkerTestImpl worker(std::move(io_uring_instance), dispatcher);
+
+  os_fd_t fd = 11;
+  TestIoUringHandler handler;
+  SET_SOCKET_INVALID(fd);
+
+  // The read request added by server socket constructor.
+  EXPECT_CALL(mock_io_uring, prepareReadv(fd, _, _, _, _));
+  EXPECT_CALL(mock_io_uring, submit()).Times(1).RetiresOnSaturation();
+  auto& io_uring_socket = worker.addServerSocket(fd, handler);
+
+  // Fake an injected completion.
+  EXPECT_CALL(mock_io_uring, forEveryCompletion(_))
+      .WillOnce(Invoke([&io_uring_socket](const CompletionCb& cb) {
+        auto* req = new BaseRequest(RequestType::Write, io_uring_socket);
+        cb(reinterpret_cast<void*>(req), -EAGAIN, true);
+      }));
+  EXPECT_CALL(mock_io_uring, submit()).Times(1).RetiresOnSaturation();
+  file_event_callback(Event::FileReadyType::Read);
+
+  // When close the socket, expect there still have a incompelete read
+  // request, so it has to cancel the request first.
+  EXPECT_CALL(mock_io_uring, prepareCancel(_, _));
+  EXPECT_CALL(mock_io_uring, submit()).Times(1).RetiresOnSaturation();
+  io_uring_socket.close();
+
+  EXPECT_CALL(mock_io_uring, removeInjectedCompletion(fd));
+  EXPECT_CALL(dispatcher, deferredDelete_);
+  worker.getSockets().front()->cleanup();
+  EXPECT_EQ(0, worker.getSockets().size());
+  EXPECT_CALL(dispatcher, clearDeferredDeleteList());
+}
+
 } // namespace
 } // namespace Io
 } // namespace Envoy
