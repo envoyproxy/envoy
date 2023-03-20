@@ -277,7 +277,8 @@ TEST_F(ConnectionManagerUtilityTest, RemoveRefererIfFragmentIsFound) {
 
 TEST_F(ConnectionManagerUtilityTest, AllowRefererIfFragmentIsFoundWithoutGuard) {
   TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.http_allow_partial_urls_in_referer", "false"}});
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.http_allow_partial_urls_in_referer", "false"}});
   connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
       std::make_shared<Network::Address::Ipv4Instance>("10.0.0.1"));
   ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
@@ -310,7 +311,8 @@ TEST_F(ConnectionManagerUtilityTest, RemoveRefererIfUserinfoIncluded) {
 
 TEST_F(ConnectionManagerUtilityTest, AllowRefererIfUserinfoIncludedWithoutGuard) {
   TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.http_allow_partial_urls_in_referer", "false"}});
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.http_allow_partial_urls_in_referer", "false"}});
   connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
       std::make_shared<Network::Address::Ipv4Instance>("10.0.0.1"));
   ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
@@ -334,7 +336,8 @@ TEST_F(ConnectionManagerUtilityTest, ValidRefererPassesSanitization) {
 
 TEST_F(ConnectionManagerUtilityTest, ValidRefererPassesSanitizationWithoutGuard) {
   TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.http_allow_partial_urls_in_referer", "false"}});
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.http_allow_partial_urls_in_referer", "false"}});
   connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
       std::make_shared<Network::Address::Ipv4Instance>("10.0.0.1"));
   ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
@@ -369,7 +372,8 @@ TEST_F(ConnectionManagerUtilityTest, ValidPathOnlyRefererPassesSanitization) {
 
 TEST_F(ConnectionManagerUtilityTest, RemovePathOnlyRefererWithoutGuard) {
   TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.http_allow_partial_urls_in_referer", "false"}});
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.http_allow_partial_urls_in_referer", "false"}});
   connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
       std::make_shared<Network::Address::Ipv4Instance>("10.0.0.1"));
   ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
