@@ -96,43 +96,36 @@ void FilterConfigSubscription::onConfigUpdate(
   if (!filter_config_provider_manager_.workersStarted()) {
     init_target_.ready();
   }
-  TRY_ASSERT_MAIN_THREAD {
-    if (resources.size() != 1) {
-      throw EnvoyException(fmt::format(
-          "Unexpected number of resources in ExtensionConfigDS response: {}", resources.size()));
-    }
-    const auto& filter_config = dynamic_cast<const envoy::config::core::v3::TypedExtensionConfig&>(
-        resources[0].get().resource());
-    if (filter_config.name() != filter_config_name_) {
-      throw EnvoyException(fmt::format("Unexpected resource name in ExtensionConfigDS response: {}",
-                                       filter_config.name()));
-    }
-    // Skip update if hash matches
-    next->config_hash_ = MessageUtil::hash(filter_config.typed_config());
-    if (next->config_hash_ == last_->config_hash_) {
-      // Initial hash is 0, so this branch happens only after a config was already applied, and
-      // there is no need to mark the init target ready.
-      return;
-    }
-    // Ensure that the filter config is valid in the filter chain context once the proto is
-    // processed. Validation happens before updating to prevent a partial update application. It
-    // might be possible that the providers have distinct type URL constraints.
-    next->type_url_ = Config::Utility::getFactoryType(filter_config.typed_config());
-    for (auto* provider : filter_config_providers_) {
-      provider->validateTypeUrl(next->type_url_);
-    }
-    std::tie(next->config_, next->factory_name_) =
-        filter_config_provider_manager_.getMessage(filter_config, factory_context_);
-    for (auto* provider : filter_config_providers_) {
-      provider->validateMessage(filter_config_name_, *next->config_, next->factory_name_);
-    }
+  if (resources.size() != 1) {
+    throw EnvoyException(fmt::format(
+        "Unexpected number of resources in ExtensionConfigDS response: {}", resources.size()));
   }
-  END_TRY catch (const EnvoyException& e) {
-    // Make sure to make progress in case the control plane is temporarily inconsistent.
-    init_target_.ready();
-    throw e;
+  const auto& filter_config = dynamic_cast<const envoy::config::core::v3::TypedExtensionConfig&>(
+      resources[0].get().resource());
+  if (filter_config.name() != filter_config_name_) {
+    throw EnvoyException(fmt::format("Unexpected resource name in ExtensionConfigDS response: {}",
+                                     filter_config.name()));
   }
-  ENVOY_LOG(debug, "Updating filter config {}", filter_config_name_);
+  // Skip update if hash matches
+  next->config_hash_ = MessageUtil::hash(filter_config.typed_config());
+  if (next->config_hash_ == last_->config_hash_) {
+    // Initial hash is 0, so this branch happens only after a config was already applied, and
+    // there is no need to mark the init target ready.
+    return;
+  }
+  // Ensure that the filter config is valid in the filter chain context once the proto is
+  // processed. Validation happens before updating to prevent a partial update application. It
+  // might be possible that the providers have distinct type URL constraints.
+  next->type_url_ = Config::Utility::getFactoryType(filter_config.typed_config());
+  for (auto* provider : filter_config_providers_) {
+    provider->validateTypeUrl(next->type_url_);
+  }
+  std::tie(next->config_, next->factory_name_) =
+      filter_config_provider_manager_.getMessage(filter_config, factory_context_);
+  for (auto* provider : filter_config_providers_) {
+    provider->validateMessage(filter_config_name_, *next->config_, next->factory_name_);
+  }
+  ENVOY_LOG(debug, "Updated filter config {} accepted, posting to workers", filter_config_name_);
   // Update subscription config first, to prevent a race with new providers missing
   // the latest config.
   last_ = next;
