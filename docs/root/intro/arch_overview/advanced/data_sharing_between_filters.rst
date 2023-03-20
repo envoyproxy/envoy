@@ -73,6 +73,9 @@ convert it into a typed class object that’s stored with the route
 itself. HTTP filters can then query the route-specific filter config during
 request processing.
 
+
+.. _arch_overview_advanced_dynamic_state:
+
 Dynamic State
 ^^^^^^^^^^^^^
 
@@ -88,3 +91,13 @@ the class definition (e.g., HTTP protocol, requested server name, etc.). In
 addition, it provides a facility to store typed objects in a map
 (``map<string, FilterState::Object>``). The state stored per filter can be
 either write-once (immutable), or write-many (mutable).
+
+Filter state objects are bound to the lifespan of the associated stream.
+However, by marking a downstream object as shared with the upstream connection
+during creation, the object is shared with the upstream connection filter
+state, and its lifespan is extended beyond the original stream. These marked
+objects also affect the connection pooling decisions if they implement a
+hashing interface. Whenever a shared hashable object is added, an upstream
+connection is created for each distinct hash value, which ensures that these
+objects are not overwritten by subsequent downstream requests to the same
+upstream connection.
