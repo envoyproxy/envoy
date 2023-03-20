@@ -369,4 +369,20 @@ TEST(FineGrainLog, ContextDisableFineGrainLogger) {
   ENVOY_LOG_MISC(warn, "Fine Grain log is disabled now");
 }
 
+TEST(FineGrainLog, ContextEnableFineGrainLogger) {
+  FINE_GRAIN_LOG(info, "Info: testing enable and disable fine grain logger.");
+  bool enable_fine_grain_logging = Logger::Context::useFineGrainLogger();
+  printf(" --> If use fine-grain logger: %d\n", enable_fine_grain_logging);
+  if (enable_fine_grain_logging) {
+    FINE_GRAIN_LOG(critical, "Cmd option set: all previous Envoy Log should be converted now!");
+  }
+
+  Logger::Context::disableFineGrainLogger() EXPECT_EQ(Logger::Context::useFineGrainLogger(), false);
+  std::thread thread = std::thread([] { Logger::Context::enableFineGrainLogger(); });
+  thread.join();
+  EXPECT_EQ(Logger::Context::useFineGrainLogger(), true);
+  EXPECT_EQ(Logger::Context::getFineGrainLogFormat(), "[%Y-%m-%d %T.%e][%t][%l] [%g:%#] %v");
+  ENVOY_LOG_MISC(warn, "Fine Grain log is enabled now");
+}
+
 } // namespace Envoy
