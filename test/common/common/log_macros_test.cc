@@ -363,9 +363,7 @@ TEST(FineGrainLog, ContextDisableFineGrainLogger) {
 
   Logger::Context::enableFineGrainLogger();
   EXPECT_EQ(Logger::Context::useFineGrainLogger(), true);
-  std::thread thread = std::thread([] {
-    Logger::Context::disableFineGrainLogger();
-  });
+  std::thread thread = std::thread([] { Logger::Context::disableFineGrainLogger(); });
   thread.join();
   EXPECT_EQ(Logger::Context::useFineGrainLogger(), false);
   ENVOY_LOG_MISC(warn, "Fine Grain log is disabled now");
