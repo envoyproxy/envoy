@@ -484,7 +484,7 @@ void IoUringServerSocket::onWrite(int32_t result, bool injected) {
 
   ENVOY_LOG(trace, "onWrite with result {}, fd = {}, injected = {}", result, fd_, injected);
 
-  // Cleanup request and write buffer.
+  // Only cleanup request for non-injected write request.
   if (!injected) {
     write_req_ = nullptr;
   }
