@@ -67,7 +67,19 @@ IoUringWorkerImpl::IoUringWorkerImpl(std::unique_ptr<IoUring> io_uring, uint32_t
 }
 
 IoUringWorkerImpl::~IoUringWorkerImpl() {
-  ENVOY_LOG(trace, "destruct io uring worker");
+  ENVOY_LOG(trace, "destruct io uring worker, existed sockets = {}", sockets_.size());
+
+  for (auto& socket : sockets_) {
+    if (socket->getStatus() != IoUringSocketStatus::CLOSING) {
+      socket->close();
+    }
+  }
+
+  while (sockets_.size() != 0) {
+    ENVOY_LOG(trace, "still left {} sockets are not closed", sockets_.size());
+    dispatcher_.run(Event::Dispatcher::RunType::NonBlock);
+  }
+
   dispatcher_.clearDeferredDeleteList();
 }
 
