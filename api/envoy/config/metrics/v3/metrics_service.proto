@@ -27,7 +27,7 @@ enum HistogramEmitMode {
   // Emit only Summary metric types.
   SUMMARY = 1;
 
-  // Emit only Summary metric types.
+  // Emit only Histogram metric types.
   HISTOGRAM = 2;
 }
 
