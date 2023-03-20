@@ -9,7 +9,7 @@ go_binary(
     ],
     out = "simple.so",
     cgo = True,
-    importpath = "github.com/envoyproxy/envoy/contrib/golang/filters/http/test/common/dso/test_data",
+    importpath = "github.com/envoyproxy/envoy/contrib/golang/common/dso/test/test_data",
     linkmode = "c-shared",
     visibility = ["//visibility:public"],
 )

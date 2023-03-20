@@ -39,7 +39,6 @@ public:
 
   EngineBuilder& addLogLevel(LogLevel log_level);
   EngineBuilder& setOnEngineRunning(std::function<void()> closure);
-  EngineBuilder& addGrpcStatsDomain(std::string stats_domain);
   EngineBuilder& addConnectTimeoutSeconds(int connect_timeout_seconds);
   EngineBuilder& addDnsRefreshSeconds(int dns_refresh_seconds);
   EngineBuilder& addDnsFailureRefreshSeconds(int base, int max);
@@ -51,7 +50,6 @@ public:
       int h2_connection_keepalive_idle_interval_milliseconds);
   EngineBuilder&
   addH2ConnectionKeepaliveTimeoutSeconds(int h2_connection_keepalive_timeout_seconds);
-  EngineBuilder& addStatsFlushSeconds(int stats_flush_seconds);
   // Configures Envoy to use the PlatformBridge filter named `name`. An instance of
   // envoy_http_filter must be registered as a platform API with the same name.
   EngineBuilder& setAppVersion(std::string app_version);
@@ -95,7 +93,12 @@ public:
 #ifdef ENVOY_ADMIN_FUNCTIONALITY
   EngineBuilder& enableAdminInterface(bool admin_interface_on);
 #endif
+
+#ifdef ENVOY_MOBILE_STATS_REPORTING
   EngineBuilder& addStatsSinks(std::vector<std::string> stat_sinks);
+  EngineBuilder& addGrpcStatsDomain(std::string stats_domain);
+  EngineBuilder& addStatsFlushSeconds(int stats_flush_seconds);
+#endif
   EngineBuilder& addPlatformFilter(std::string name);
   EngineBuilder& addVirtualCluster(std::string virtual_cluster);
   EngineBuilder& setRuntimeGuard(std::string guard, bool value);

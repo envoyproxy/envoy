@@ -35,7 +35,6 @@ jobs:
           ./bazelw build \
             --config=ios \
             $([ -z $GITHUB_TOKEN ] || echo "--config=remote-ci-macos") \
-            --remote_header="Authorization=Bearer $GITHUB_TOKEN" \
             //library/swift:ios_framework
   swifthelloworld:
     if: github.repository == 'envoyproxy/envoy'
@@ -61,7 +60,6 @@ jobs:
         cd mobile && ./bazelw build \
             --config=ios \
             $([ -z $GITHUB_TOKEN ] || echo "--config=remote-ci-macos") \
-            --remote_header="Authorization=Bearer $GITHUB_TOKEN" \
             //examples/swift/hello_world:app
     - uses: nick-fields/retry@943e742917ac94714d2f408a0e8320f2d1fcafcd
       if: steps.should_run.outputs.run_ci_job == 'true'
@@ -79,7 +77,6 @@ jobs:
         cd mobile && ./bazelw run \
             --config=ios \
             $([ -z $GITHUB_TOKEN ] || echo "--config=remote-ci-macos") \
-            --remote_header="Authorization=Bearer $GITHUB_TOKEN" \
             //examples/swift/hello_world:app &> /tmp/envoy.log &
     - run: sed '/received headers with status 200/q' <(touch /tmp/envoy.log && tail -F /tmp/envoy.log)
       if: steps.should_run.outputs.run_ci_job == 'true'
@@ -111,7 +108,6 @@ jobs:
         cd mobile && ./bazelw build \
             --config=ios \
             $([ -z $GITHUB_TOKEN ] || echo "--config=remote-ci-macos") \
-            --remote_header="Authorization=Bearer $GITHUB_TOKEN" \
             //test/swift/apps/baseline:app
     - uses: nick-fields/retry@943e742917ac94714d2f408a0e8320f2d1fcafcd
       if: steps.should_run.outputs.run_ci_job == 'true'
@@ -129,7 +125,6 @@ jobs:
         cd mobile && ./bazelw run \
             --config=ios \
             $([ -z $GITHUB_TOKEN ] || echo "--config=remote-ci-macos") \
-            --remote_header="Authorization=Bearer $GITHUB_TOKEN" \
             //test/swift/apps/baseline:app &> /tmp/envoy.log &
     - run: sed '/received headers with status 301/q' <(touch /tmp/envoy.log && tail -F /tmp/envoy.log)
       if: steps.should_run.outputs.run_ci_job == 'true'
@@ -161,7 +156,6 @@ jobs:
         cd mobile && ./bazelw build \
             --config=ios \
             $([ -z $GITHUB_TOKEN ] || echo "--config=remote-ci-macos") \
-            --remote_header="Authorization=Bearer $GITHUB_TOKEN" \
             --define=admin_functionality=enabled \
             --define envoy_mobile_listener=enabled \
             //test/swift/apps/experimental:app
@@ -181,7 +175,6 @@ jobs:
         cd mobile && ./bazelw run \
             --config=ios \
             $([ -z $GITHUB_TOKEN ] || echo "--config=remote-ci-macos") \
-            --remote_header="Authorization=Bearer $GITHUB_TOKEN" \
             --define=admin_functionality=enabled \
             --define envoy_mobile_listener=enabled \
             //test/swift/apps/experimental:app &> /tmp/envoy.log &
@@ -215,7 +208,6 @@ jobs:
         cd mobile && ./bazelw build \
             --config=ios \
             $([ -z $GITHUB_TOKEN ] || echo "--config=remote-ci-macos") \
-            --remote_header="Authorization=Bearer $GITHUB_TOKEN" \
             //examples/swift/async_await:app
     - uses: nick-fields/retry@943e742917ac94714d2f408a0e8320f2d1fcafcd
       if: steps.should_run.outputs.run_ci_job == 'true'
@@ -233,7 +225,6 @@ jobs:
         cd mobile && ./bazelw run \
             --config=ios \
             $([ -z $GITHUB_TOKEN ] || echo "--config=remote-ci-macos") \
-            --remote_header="Authorization=Bearer $GITHUB_TOKEN" \
             //examples/swift/async_await:app &> /tmp/envoy.log &
     - run: sed '/\[2\] Uploaded 7 MB of data/q' <(touch /tmp/envoy.log && tail -F /tmp/envoy.log)
       if: steps.should_run.outputs.run_ci_job == 'true'
@@ -265,7 +256,6 @@ jobs:
         cd mobile && ./bazelw build \
             --config=ios \
             $([ -z $GITHUB_TOKEN ] || echo "--config=remote-ci-macos") \
-            --remote_header="Authorization=Bearer $GITHUB_TOKEN" \
             //examples/objective-c/hello_world:app
     - uses: nick-fields/retry@943e742917ac94714d2f408a0e8320f2d1fcafcd
       if: steps.should_run.outputs.run_ci_job == 'true'
@@ -283,7 +273,6 @@ jobs:
         cd mobile && ./bazelw run \
             --config=ios \
             $([ -z $GITHUB_TOKEN ] || echo "--config=remote-ci-macos") \
-            --remote_header="Authorization=Bearer $GITHUB_TOKEN" \
             //examples/objective-c/hello_world:app &> /tmp/envoy.log &
     - run: sed '/received headers with status 301/q' <(touch /tmp/envoy.log && tail -F /tmp/envoy.log)
       if: steps.should_run.outputs.run_ci_job == 'true'

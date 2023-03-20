@@ -38,5 +38,4 @@ jobs:
         cd mobile && ./bazelw test --test_output=all \
             --test_env=ENVOY_IP_TEST_VERSIONS=v4only \
             $([ -z $GITHUB_TOKEN ] || echo "--config=remote-ci-linux-asan") \
-            --remote_header="Authorization=Bearer $GITHUB_TOKEN" \
             //test/common/...
