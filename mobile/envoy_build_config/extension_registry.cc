@@ -19,6 +19,7 @@
 #include "source/extensions/compression/gzip/decompressor/config.h"
 #include "source/extensions/early_data/default_early_data_policy.h"
 #include "source/extensions/filters/http/alternate_protocols_cache/config.h"
+#include "source/extensions/filters/http/buffer/config.h"
 #include "source/extensions/filters/http/decompressor/config.h"
 #include "source/extensions/filters/http/dynamic_forward_proxy/config.h"
 #include "source/extensions/filters/http/router/config.h"
@@ -81,7 +82,11 @@ void ExtensionRegistry::registerFactories() {
   // This is the original IP detection code which ideally E-M could skip.
   Extensions::Http::OriginalIPDetection::Xff::forceRegisterXffIPDetectionFactory();
 
-  // This is the default cluster used by Envoy mobile to establish connections upstream.
+  // TODO(alyssar) verify with Lyft that we can move this to be a test-only and
+  // figure out how to build into test apps.
+  Extensions::HttpFilters::BufferFilter::forceRegisterBufferFilterFactory();
+
+  // Thi is the default cluster used by Envoy mobile to establish connections upstream.
   Extensions::Clusters::DynamicForwardProxy::forceRegisterClusterFactory();
   // This allows decompression of brotli-compresssed responses.
   Extensions::Compression::Brotli::Decompressor::forceRegisterBrotliDecompressorLibraryFactory();
