@@ -1,5 +1,5 @@
 # DO NOT LOAD THIS FILE. Load envoy_build_system.bzl instead.
-load(":envoy_select.bzl", "envoy_select_admin_functionality", "envoy_select_enable_http3", "envoy_select_envoy_mobile_listener", "envoy_select_envoy_mobile_request_compression", "envoy_select_google_grpc", "envoy_select_envoy_mobile_stats_reporting")
+load(":envoy_select.bzl", "envoy_select_admin_functionality", "envoy_select_enable_http3", "envoy_select_envoy_mobile_listener", "envoy_select_envoy_mobile_request_compression", "envoy_select_envoy_mobile_stats_reporting", "envoy_select_google_grpc")
 
 # Compute the defines needed for Envoy Mobile libraries that don't use Envoy's main library wrappers.
 def envoy_mobile_defines(repository):
