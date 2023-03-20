@@ -189,6 +189,42 @@ TEST_F(SkyWalkingDriverTest, SkyWalkingDriverStartSpanTestWithClientConfig) {
     auto& null_span = *org_null_span;
     EXPECT_EQ(typeid(null_span).name(), typeid(Tracing::NullSpan).name());
   }
+
+  {
+    // Create new span segment with error propagation header and disabled tracing.
+    decision.traced = false;
+    Http::TestRequestHeaderMapImpl error_request_headers{
+        {":path", "/path"},
+        {":method", "GET"},
+        {":authority", "test.com"},
+        {"sw8", "xxxxxx-error-propagation-header"}};
+    Tracing::SpanPtr org_null_span =
+        driver_->startSpan(mock_tracing_config_, error_request_headers, "TEST_OP",
+                           time_system_.systemTime(), decision);
+
+    EXPECT_EQ(nullptr, dynamic_cast<Span*>(org_null_span.get()));
+
+    auto& null_span = *org_null_span;
+    EXPECT_EQ(typeid(null_span).name(), typeid(Tracing::NullSpan).name());
+  }
+
+  {
+    // Create new span segment with error propagation header and disabled tracing.
+    decision.traced = false;
+    Http::TestRequestHeaderMapImpl error_request_headers{
+        {":path", "/path"},
+        {":method", "GET"},
+        {":authority", "test.com"},
+        {"sw8", "1-x-x-x-x-x-x-x"}}; // The first field is legal and fourth field is illegal.
+    Tracing::SpanPtr org_null_span =
+        driver_->startSpan(mock_tracing_config_, error_request_headers, "TEST_OP",
+                           time_system_.systemTime(), decision);
+
+    EXPECT_EQ(nullptr, dynamic_cast<Span*>(org_null_span.get()));
+
+    auto& null_span = *org_null_span;
+    EXPECT_EQ(typeid(null_span).name(), typeid(Tracing::NullSpan).name());
+  }
 }
 
 TEST_F(SkyWalkingDriverTest, SkyWalkingDriverStartSpanTestNoClientConfig) {
