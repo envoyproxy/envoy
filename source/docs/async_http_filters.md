@@ -10,7 +10,7 @@ If you send a callback and your filter needs the response before it can complete
 
 When your callback is completed, if flow control is paused, it should execute either `sendLocalReply` or `continueDecoding`/`continueEncoding` when the filter is ready to resume normal operation.
 
-If the filter is performing changes to the body of the request or response, it will need to call [`addDecodedData`](https://github.com/envoyproxy/envoy/blob/2d82c10a467cbb933ed5cb9bdb7eaae4ffa160de/envoy/http/filter.h#L514) or [`injectDecodedDataToFilterChain`](https://github.com/envoyproxy/envoy/blob/2d82c10a467cbb933ed5cb9bdb7eaae4ffa160de/envoy/http/filter.h#L538) as part of that operation - see linked function comments for more details.
+If the filter is performing changes to the body of the request or response, it will need to call [`addDecodedData`](https://github.com/envoyproxy/envoy/blob/2d82c10a467cbb933ed5cb9bdb7eaae4ffa160de/envoy/http/filter.h#L514)/`addEncodedData` or [`injectDecodedDataToFilterChain`](https://github.com/envoyproxy/envoy/blob/2d82c10a467cbb933ed5cb9bdb7eaae4ffa160de/envoy/http/filter.h#L538)/`injectEncodedDataToFilterChain` as part of that operation - see linked function comments for more details.
 
 ### How to make a callback thread-safe
 
