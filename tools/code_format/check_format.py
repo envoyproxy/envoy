@@ -723,19 +723,6 @@ class FormatChecker:
                         "Don't introduce throws into exception-free files, use error "
                         + "statuses instead.")
 
-        if "lua_pushlightuserdata" in line:
-            report_error(
-                "Don't use lua_pushlightuserdata, since it can cause unprotected error in call to"
-                + "Lua API (bad light userdata pointer) on ARM64 architecture. See "
-                + "https://github.com/LuaJIT/LuaJIT/issues/450#issuecomment-433659873 for details.")
-
-        if file_path.endswith(self.config.suffixes["proto"]):
-            exclude_path = ['v1', 'v2']
-            result = self.config.re["proto_validation_string"].search(line)
-            if result is not None:
-                if not any(x in file_path for x in exclude_path):
-                    report_error("min_bytes is DEPRECATED, Use min_len.")
-
     def check_build_line(self, line, file_path, report_error):
         if "@bazel_tools" in line and not (self.is_starlark_file(file_path)
                                            or file_path.startswith("./bazel/")
@@ -1065,13 +1052,6 @@ if __name__ == "__main__":
     ct_error_messages = format_checker.check_tools()
     if format_checker.check_error_messages(ct_error_messages):
         sys.exit(1)
-
-    if not os.environ.get("CI"):
-        # TODO(phlax): Remove this after a month or so
-        logger.warning(
-            "Please note: `tools/code_format/check_format.py` no longer checks API `.proto` files, "
-            "please use `tools/proto_format/proto_format.sh` if you are making changes to the API files"
-        )
 
     def check_visibility(error_messages):
         command = (

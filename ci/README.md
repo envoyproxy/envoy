@@ -9,8 +9,8 @@ The Ubuntu based Envoy Docker image at [`envoyproxy/envoy-build:<hash>`](https:/
 where `<hash>` is specified in [`envoy_build_sha.sh`](https://github.com/envoyproxy/envoy/blob/main/ci/envoy_build_sha.sh). Developers
 may work with the latest build image SHA in [envoy-build-tools](https://github.com/envoyproxy/envoy-build-tools/blob/main/toolchains/rbe_toolchains_config.bzl#L8)
 repo to provide a self-contained environment for building Envoy binaries and running tests that reflects the latest built Ubuntu Envoy image.
-Moreover, the Docker image at [`envoyproxy/envoy-dev:<hash>`](https://hub.docker.com/r/envoyproxy/envoy-dev/) is an image that has an Envoy binary at `/usr/local/bin/envoy`.
-The `<hash>` corresponds to the main commit at which the binary was compiled. Lastly, `envoyproxy/envoy-dev:latest` contains an Envoy
+Moreover, the Docker image at [`envoyproxy/envoy:dev-<hash>`](https://hub.docker.com/r/envoyproxy/envoy/tags?name=dev) is an image that has an Envoy binary at `/usr/local/bin/envoy`.
+The `<hash>` corresponds to the main commit at which the binary was compiled. Lastly, `envoyproxy/envoy:dev` contains an Envoy
 binary built from the latest tip of main that passed tests.
 
 ## Alpine Envoy image
@@ -68,6 +68,12 @@ Besides `http_proxy` and `https_proxy`, maybe you need to set `go_proxy` to repl
 
 ```bash
 IMAGE_NAME=envoyproxy/envoy-build-ubuntu go_proxy=https://goproxy.cn,direct http_proxy=http://proxy.foo.com:8080 https_proxy=http://proxy.bar.com:8080 ./ci/run_envoy_docker.sh <build_script_args>
+```
+
+To force the Envoy build image to be refreshed by Docker you can set `ENVOY_DOCKER_PULL=true`.
+
+```bash
+ENVOY_DOCKER_PULL=true ./ci/run_envoy_docker.sh <build_script_args>
 ```
 
 ## On Linux

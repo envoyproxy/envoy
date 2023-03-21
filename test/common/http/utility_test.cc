@@ -16,6 +16,7 @@
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/protobuf/mocks.h"
 #include "test/test_common/printers.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
@@ -23,7 +24,6 @@
 using testing::_;
 using testing::Invoke;
 using testing::InvokeWithoutArgs;
-using testing::Return;
 
 namespace Envoy {
 namespace Http {
@@ -583,7 +583,7 @@ TEST(HttpUtility, ValidateStreamErrorsWithHcm) {
                   .value());
 
   // If the HCM value is present it will take precedence over the old value.
-  Protobuf::BoolValue hcm_value;
+  ProtobufWkt::BoolValue hcm_value;
   hcm_value.set_value(false);
   EXPECT_FALSE(Envoy::Http2::Utility::initializeAndValidateOptions(http2_options, true, hcm_value)
                    .override_stream_error_on_invalid_http_message()
@@ -603,7 +603,7 @@ TEST(HttpUtility, ValidateStreamErrorsWithHcm) {
 
 TEST(HttpUtility, ValidateStreamErrorConfigurationForHttp1) {
   envoy::config::core::v3::Http1ProtocolOptions http1_options;
-  Protobuf::BoolValue hcm_value;
+  ProtobufWkt::BoolValue hcm_value;
   NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor;
 
   // nothing explicitly configured, default to false (i.e. default stream error behavior for HCM)
@@ -633,6 +633,45 @@ TEST(HttpUtility, ValidateStreamErrorConfigurationForHttp1) {
   hcm_value.set_value(false);
   EXPECT_FALSE(Http1::parseHttp1Settings(http1_options, validation_visitor, hcm_value, false)
                    .stream_error_on_invalid_http_message_);
+}
+
+TEST(HttpUtility, UseBalsaParser) {
+  envoy::config::core::v3::Http1ProtocolOptions http1_options;
+  ProtobufWkt::BoolValue hcm_value;
+  NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor;
+
+  // If Http1ProtocolOptions::use_balsa_parser has no value set, then behavior is controlled by the
+  // runtime flag.
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.http1_use_balsa_parser", "true"}});
+  EXPECT_TRUE(Http1::parseHttp1Settings(http1_options, validation_visitor, hcm_value, false)
+                  .use_balsa_parser_);
+
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.http1_use_balsa_parser", "false"}});
+  EXPECT_FALSE(Http1::parseHttp1Settings(http1_options, validation_visitor, hcm_value, false)
+                   .use_balsa_parser_);
+
+  // Enable Balsa using Http1ProtocolOptions::use_balsa_parser. Runtime flag is ignored.
+  http1_options.mutable_use_balsa_parser()->set_value(true);
+
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.http1_use_balsa_parser", "true"}});
+  EXPECT_TRUE(Http1::parseHttp1Settings(http1_options, validation_visitor, hcm_value, false)
+                  .use_balsa_parser_);
+
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.http1_use_balsa_parser", "false"}});
+  EXPECT_TRUE(Http1::parseHttp1Settings(http1_options, validation_visitor, hcm_value, false)
+                  .use_balsa_parser_);
+
+  // Disable Balsa using Http1ProtocolOptions::use_balsa_parser. Runtime flag is ignored.
+  http1_options.mutable_use_balsa_parser()->set_value(false);
+
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.http1_use_balsa_parser", "true"}});
+  EXPECT_FALSE(Http1::parseHttp1Settings(http1_options, validation_visitor, hcm_value, false)
+                   .use_balsa_parser_);
+
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.http1_use_balsa_parser", "false"}});
+  EXPECT_FALSE(Http1::parseHttp1Settings(http1_options, validation_visitor, hcm_value, false)
+                   .use_balsa_parser_);
 }
 
 TEST(HttpUtility, getLastAddressFromXFF) {
@@ -1648,6 +1687,94 @@ TEST(PercentEncoding, DecodingWithTrailingInput) {
   EXPECT_EQ(Utility::PercentEncoding::decode("too%20lar%20"), "too lar ");
   EXPECT_EQ(Utility::PercentEncoding::decode("too%20larg%e"), "too larg%e");
   EXPECT_EQ(Utility::PercentEncoding::decode("too%20large%"), "too large%");
+}
+
+TEST(PercentEncoding, DecodingUrlEncodedQueryParameter) {
+  EXPECT_EQ(Utility::PercentEncoding::urlDecodeQueryParameter("a%26b"), "a&b");
+  EXPECT_EQ(Utility::PercentEncoding::urlDecodeQueryParameter("a%3Db"), "a=b");
+  EXPECT_EQ(Utility::PercentEncoding::urlDecodeQueryParameter("a%23b"), "a#b");
+  EXPECT_EQ(Utility::PercentEncoding::urlDecodeQueryParameter("hello%20world"), "hello%20world");
+  EXPECT_EQ(Utility::PercentEncoding::urlDecodeQueryParameter("upstream%7cdownstream"),
+            "upstream%7cdownstream");
+  EXPECT_EQ(
+      Utility::PercentEncoding::urlDecodeQueryParameter(
+          "filter=%28cluster.upstream_%28rq_total%7Crq_time_sum%7Crq_time_count%7Crq_time_bucket%"
+          "7Crq_xx%7Crq_complete%7Crq_active%7ccx_active%29%29%7C%28server.version%29"),
+      "filter=(cluster.upstream_(rq_total%7Crq_time_sum%7Crq_time_count%7Crq_time_bucket%7Crq_xx%"
+      "7Crq_"
+      "complete%7Crq_active%7ccx_active))%7C(server.version)");
+  EXPECT_EQ(Utility::PercentEncoding::urlDecodeQueryParameter("too%20lar%20"), "too%20lar%20");
+  EXPECT_EQ(Utility::PercentEncoding::urlDecodeQueryParameter("too%20larg%e"), "too%20larg%e");
+  EXPECT_EQ(Utility::PercentEncoding::urlDecodeQueryParameter("too%20large%"), "too%20large%");
+  EXPECT_EQ(Utility::PercentEncoding::urlDecodeQueryParameter(
+                "%00%01%02%03%04%05%06%07%08%09%0A%0B%0C%0D%0E%0F"
+                "%10%11%12%13%14%15%16%17%18%19%1A%1B%1C%1D%1E%1F"
+                "%20%21%22%23%24%25%26%27%28%29%2A%2B%2C%2D%2E%2F"
+                "%30%31%32%33%34%35%36%37%38%39%3A%3B%3C%3D%3E%3F"
+                "%40%41%42%43%44%45%46%47%48%49%4A%4B%4C%4D%4E%4F"
+                "%50%51%52%53%54%55%56%57%58%59%5A%5B%5C%5D%5E%5F"
+                "%60%61%62%63%64%65%66%67%68%69%6A%6B%6C%6D%6E%6F"
+                "%70%71%72%73%74%75%76%77%78%79%7A%7B%7C%7D%7E%7F"
+                "%80%81%82%83%84%85%86%87%88%89%8A%8B%8C%8D%8E%8F"
+                "%90%91%92%93%94%95%96%97%98%99%9A%9B%9C%9D%9E%9F"
+                "%A0%A1%A2%A3%A4%A5%A6%A7%A8%A9%AA%AB%AC%AD%AE%AF"
+                "%B0%B1%B2%B3%B4%B5%B6%B7%B8%B9%BA%BB%BC%BD%BE%BF"
+                "%C0%C1%C2%C3%C4%C5%C6%C7%C8%C9%CA%CB%CC%CD%CE%CF"
+                "%D0%D1%D2%D3%D4%D5%D6%D7%D8%D9%DA%DB%DC%DD%DE%DF"
+                "%E0%E1%E2%E3%E4%E5%E6%E7%E8%E9%EA%EB%EC%ED%EE%EF"
+                "%F0%F1%F2%F3%F4%F5%F6%F7%F8%F9%FA%FB%FC%FD%FE%FF"),
+
+            "%00%01%02%03%04%05%06%07%08%09%0A%0B%0C%0D%0E%0F"
+            "%10%11%12%13%14%15%16%17%18%19%1A%1B%1C%1D%1E%1F"
+            "%20!%22#$%&'()*+,-./0123456789:;%3C=%3E?"
+            "@ABCDEFGHIJKLMNOPQRSTUVWXYZ[%5C]%5E_"
+            "`abcdefghijklmnopqrstuvwxyz%7B%7C%7D~%7F"
+            "%80%81%82%83%84%85%86%87%88%89%8A%8B%8C%8D%8E%8F"
+            "%90%91%92%93%94%95%96%97%98%99%9A%9B%9C%9D%9E%9F"
+            "%A0%A1%A2%A3%A4%A5%A6%A7%A8%A9%AA%AB%AC%AD%AE%AF"
+            "%B0%B1%B2%B3%B4%B5%B6%B7%B8%B9%BA%BB%BC%BD%BE%BF"
+            "%C0%C1%C2%C3%C4%C5%C6%C7%C8%C9%CA%CB%CC%CD%CE%CF"
+            "%D0%D1%D2%D3%D4%D5%D6%D7%D8%D9%DA%DB%DC%DD%DE%DF"
+            "%E0%E1%E2%E3%E4%E5%E6%E7%E8%E9%EA%EB%EC%ED%EE%EF"
+            "%F0%F1%F2%F3%F4%F5%F6%F7%F8%F9%FA%FB%FC%FD%FE%FF");
+}
+
+TEST(PercentEncoding, UrlEncodingQueryParameter) {
+  EXPECT_EQ(Utility::PercentEncoding::urlEncodeQueryParameter(absl::string_view(
+                "\x00\x01\x02\x03\x04\x05\x06\x07\x08\x09\x0A\x0B\x0C\x0D\x0E\x0F"
+                "\x10\x11\x12\x13\x14\x15\x16\x17\x18\x19\x1A\x1B\x1C\x1D\x1E\x1F"
+                "\x20\x21\x22\x23\x24\x25\x26\x27\x28\x29\x2A\x2B\x2C\x2D\x2E\x2F"
+                "\x30\x31\x32\x33\x34\x35\x36\x37\x38\x39\x3A\x3B\x3C\x3D\x3E\x3F"
+                "\x40\x41\x42\x43\x44\x45\x46\x47\x48\x49\x4A\x4B\x4C\x4D\x4E\x4F"
+                "\x50\x51\x52\x53\x54\x55\x56\x57\x58\x59\x5A\x5B\x5C\x5D\x5E\x5F"
+                "\x60\x61\x62\x63\x64\x65\x66\x67\x68\x69\x6A\x6B\x6C\x6D\x6E\x6F"
+                "\x70\x71\x72\x73\x74\x75\x76\x77\x78\x79\x7A\x7B\x7C\x7D\x7E\x7F"
+                "\x80\x81\x82\x83\x84\x85\x86\x87\x88\x89\x8A\x8B\x8C\x8D\x8E\x8F"
+                "\x90\x91\x92\x93\x94\x95\x96\x97\x98\x99\x9A\x9B\x9C\x9D\x9E\x9F"
+                "\xA0\xA1\xA2\xA3\xA4\xA5\xA6\xA7\xA8\xA9\xAA\xAB\xAC\xAD\xAE\xAF"
+                "\xB0\xB1\xB2\xB3\xB4\xB5\xB6\xB7\xB8\xB9\xBA\xBB\xBC\xBD\xBE\xBF"
+                "\xC0\xC1\xC2\xC3\xC4\xC5\xC6\xC7\xC8\xC9\xCA\xCB\xCC\xCD\xCE\xCF"
+                "\xD0\xD1\xD2\xD3\xD4\xD5\xD6\xD7\xD8\xD9\xDA\xDB\xDC\xDD\xDE\xDF"
+                "\xE0\xE1\xE2\xE3\xE4\xE5\xE6\xE7\xE8\xE9\xEA\xEB\xEC\xED\xEE\xEF"
+                "\xF0\xF1\xF2\xF3\xF4\xF5\xF6\xF7\xF8\xF9\xFA\xFB\xFC\xFD\xFE\xFF",
+                256)),
+
+            "%00%01%02%03%04%05%06%07%08%09%0A%0B%0C%0D%0E%0F"
+            "%10%11%12%13%14%15%16%17%18%19%1A%1B%1C%1D%1E%1F"
+            "%20%21%22%23%24%25%26%27%28%29*%2B%2C-.%2F"
+            "0123456789%3A%3B%3C%3D%3E%3F"
+            "%40ABCDEFGHIJKLMNOP"
+            "QRSTUVWXYZ%5B%5C%5D%5E_"
+            "%60abcdefghijklmnop"
+            "qrstuvwxyz%7B%7C%7D%7E%7F"
+            "%80%81%82%83%84%85%86%87%88%89%8A%8B%8C%8D%8E%8F"
+            "%90%91%92%93%94%95%96%97%98%99%9A%9B%9C%9D%9E%9F"
+            "%A0%A1%A2%A3%A4%A5%A6%A7%A8%A9%AA%AB%AC%AD%AE%AF"
+            "%B0%B1%B2%B3%B4%B5%B6%B7%B8%B9%BA%BB%BC%BD%BE%BF"
+            "%C0%C1%C2%C3%C4%C5%C6%C7%C8%C9%CA%CB%CC%CD%CE%CF"
+            "%D0%D1%D2%D3%D4%D5%D6%D7%D8%D9%DA%DB%DC%DD%DE%DF"
+            "%E0%E1%E2%E3%E4%E5%E6%E7%E8%E9%EA%EB%EC%ED%EE%EF"
+            "%F0%F1%F2%F3%F4%F5%F6%F7%F8%F9%FA%FB%FC%FD%FE%FF");
 }
 
 TEST(PercentEncoding, Encoding) {

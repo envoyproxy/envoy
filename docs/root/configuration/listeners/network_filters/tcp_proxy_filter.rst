@@ -37,6 +37,18 @@ To define metadata that a suitable upstream host must match, use one of the foll
 In addition, dynamic metadata can be set by earlier network filters on the ``StreamInfo``. Setting the dynamic metadata
 must happen before ``onNewConnection()`` is called on the ``TcpProxy`` filter to affect load balancing.
 
+.. _config_network_filters_tcp_proxy_tunneling_over_http:
+
+Tunneling TCP over HTTP
+-----------------------
+
+The TCP proxy filter can be used to tunnel raw TCP over HTTP ``CONNECT`` or HTTP ``POST`` requests. Refer to :ref:`HTTP upgrades <tunneling-tcp-over-http>` for more information.
+
+TCP tunneling configuration can be used by setting :ref:`Tunneling Config <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.tunneling_config>`
+
+Additionally, if tunneling was enabled for a TCP session by configuration, it can be dynamically disabled per connection,
+by setting a per-connection filter state object under the key ``envoy.tcp_proxy.disable_tunneling``. Refer to the implementation for more details.
+
 .. _config_network_filters_tcp_proxy_stats:
 
 Statistics

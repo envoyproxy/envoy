@@ -301,7 +301,9 @@ void StreamEncoderImpl::endEncode() {
   if (connect_request_ || is_tcp_tunneling_ ||
       (is_response_to_connect_request_ &&
        Runtime::runtimeFeatureEnabled("envoy.reloadable_features.no_delay_close_for_upgrades"))) {
-    connection_.connection().close(Network::ConnectionCloseType::FlushWrite);
+    connection_.connection().close(
+        Network::ConnectionCloseType::FlushWrite,
+        StreamInfo::LocalCloseReasons::get().CloseForConnectRequestOrTcpTunneling);
   }
 }
 
@@ -445,10 +447,7 @@ Status RequestEncoderImpl::encodeHeaders(const RequestHeaderMap& headers, bool e
     // for upstream connections will become invalid, as Envoy will add chunk encoding to the
     // protocol stream. This will likely cause the server to disconnect, since it will be unable to
     // parse the protocol.
-    if (Runtime::runtimeFeatureEnabled(
-            "envoy.reloadable_features.http_skip_adding_content_length_to_upgrade")) {
-      disableChunkEncoding();
-    }
+    disableChunkEncoding();
   }
 
   if (connection_.sendFullyQualifiedUrl() && !is_connect) {
@@ -511,7 +510,7 @@ ConnectionImpl::ConnectionImpl(Network::Connection& connection, CodecStats& stat
       processing_trailers_(false), handling_upgrade_(false), reset_stream_called_(false),
       deferred_end_stream_headers_(false), dispatching_(false), max_headers_kb_(max_headers_kb),
       max_headers_count_(max_headers_count) {
-  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.http1_use_balsa_parser")) {
+  if (codec_settings_.use_balsa_parser_) {
     parser_ = std::make_unique<BalsaParser>(type, this, max_headers_kb_ * 1024, enableTrailers());
   } else {
     parser_ = std::make_unique<LegacyHttpParserImpl>(type, this);
@@ -690,7 +689,7 @@ Envoy::StatusOr<size_t> ConnectionImpl::dispatchSlice(const char* slice, size_t 
   const ParserStatus status = parser_->getStatus();
   if (status != ParserStatus::Ok && status != ParserStatus::Paused) {
     absl::string_view error = Http1ResponseCodeDetails::get().HttpCodecError;
-    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.http1_use_balsa_parser")) {
+    if (codec_settings_.use_balsa_parser_) {
       if (parser_->errorMessage() == "headers size exceeds limit" ||
           parser_->errorMessage() == "trailers size exceeds limit") {
         error_code_ = Http::Code::RequestHeaderFieldsTooLarge;

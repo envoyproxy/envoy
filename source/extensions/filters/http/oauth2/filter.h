@@ -102,17 +102,27 @@ struct CookieNames {
   CookieNames(const envoy::extensions::filters::http::oauth2::v3::OAuth2Credentials::CookieNames&
                   cookie_names)
       : CookieNames(cookie_names.bearer_token(), cookie_names.oauth_hmac(),
-                    cookie_names.oauth_expires()) {}
+                    cookie_names.oauth_expires(), cookie_names.id_token(),
+                    cookie_names.refresh_token()) {}
 
   CookieNames(const std::string& bearer_token, const std::string& oauth_hmac,
-              const std::string& oauth_expires)
+              const std::string& oauth_expires, const std::string& id_token,
+              const std::string& refresh_token)
       : bearer_token_(bearer_token.empty() ? "BearerToken" : bearer_token),
         oauth_hmac_(oauth_hmac.empty() ? "OauthHMAC" : oauth_hmac),
-        oauth_expires_(oauth_expires.empty() ? "OauthExpires" : oauth_expires) {}
+        oauth_expires_(oauth_expires.empty() ? OauthExpires : oauth_expires),
+        id_token_(id_token.empty() ? IdToken : id_token),
+        refresh_token_(refresh_token.empty() ? RefreshToken : refresh_token) {}
 
   const std::string bearer_token_;
   const std::string oauth_hmac_;
   const std::string oauth_expires_;
+  const std::string id_token_;
+  const std::string refresh_token_;
+
+  static constexpr absl::string_view OauthExpires = "OauthExpires";
+  static constexpr absl::string_view IdToken = "IdToken";
+  static constexpr absl::string_view RefreshToken = "RefreshToken";
 };
 
 /**
@@ -188,6 +198,7 @@ class CookieValidator {
 public:
   virtual ~CookieValidator() = default;
   virtual const std::string& token() const PURE;
+  virtual const std::string& refreshToken() const PURE;
   virtual void setParams(const Http::RequestHeaderMap& headers, const std::string& secret) PURE;
   virtual bool isValid() const PURE;
 };
@@ -198,6 +209,8 @@ public:
       : time_source_(time_source), cookie_names_(cookie_names) {}
 
   const std::string& token() const override { return token_; }
+  const std::string& refreshToken() const override { return refresh_token_; }
+
   void setParams(const Http::RequestHeaderMap& headers, const std::string& secret) override;
   bool isValid() const override;
   bool hmacIsValid() const;
@@ -236,7 +249,7 @@ public:
   // the page in the case of a network blip.
   void sendUnauthorizedResponse() override;
 
-  void finishFlow();
+  void finishGetAccessTokenFlow();
 
 private:
   friend class OAuth2Test;
@@ -260,9 +273,14 @@ private:
   // Determines whether or not the current request can skip the entire OAuth flow (HMAC is valid,
   // connection is mTLS, etc.)
   bool canSkipOAuth(Http::RequestHeaderMap& headers) const;
+  void redirectToOAuthServer(Http::RequestHeaderMap& headers) const;
+  void updateTokens(const std::string& access_token, const std::string& id_token,
+                    const std::string& refresh_token, std::chrono::seconds expires_in);
 
   Http::FilterHeadersStatus signOutUser(const Http::RequestHeaderMap& headers);
 
+  std::string getEncodedToken() const;
+  void addResponseCookies(Http::ResponseHeaderMap& headers, const std::string& encoded_token) const;
   const std::string& bearerPrefix() const;
 };
 

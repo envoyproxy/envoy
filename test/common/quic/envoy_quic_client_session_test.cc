@@ -28,7 +28,6 @@
 
 using testing::_;
 using testing::Invoke;
-using testing::Return;
 
 namespace Envoy {
 namespace Quic {
@@ -47,7 +46,7 @@ public:
                                   supported_versions, dispatcher, std::move(connection_socket),
                                   generator) {
     SetEncrypter(quic::ENCRYPTION_FORWARD_SECURE,
-                 std::make_unique<quic::NullEncrypter>(quic::Perspective::IS_CLIENT));
+                 std::make_unique<quic::test::TaggingEncrypter>(quic::ENCRYPTION_FORWARD_SECURE));
     SetDefaultEncryptionLevel(quic::ENCRYPTION_FORWARD_SECURE);
   }
 
@@ -162,6 +161,8 @@ protected:
 
 INSTANTIATE_TEST_SUITE_P(EnvoyQuicClientSessionTests, EnvoyQuicClientSessionTest,
                          testing::ValuesIn(quic::CurrentSupportedHttp3Versions()));
+
+TEST_P(EnvoyQuicClientSessionTest, ShutdownNoOp) { http_connection_.shutdownNotice(); }
 
 TEST_P(EnvoyQuicClientSessionTest, NewStream) {
   Http::MockResponseDecoder response_decoder;

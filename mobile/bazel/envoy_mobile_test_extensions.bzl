@@ -7,4 +7,6 @@ TEST_EXTENSIONS = [
     "//library/common/extensions/filters/http/test_kv_store:config",
     "//library/common/extensions/filters/http/test_logger:config",
     "//library/common/extensions/filters/http/test_read:config",
+    "//library/common/extensions/filters/http/test_remote_response:config",
+    "@envoy//source/extensions/clusters/static:static_cluster_lib",
 ]

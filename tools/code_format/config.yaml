@@ -147,10 +147,10 @@ paths:
     - test/integration/integration.h
     - test/test_common/simulated_time_system.cc
     - test/test_common/simulated_time_system.h
+    - test/test_common/test_random_generator.cc
     - test/test_common/test_time.cc
     - test/test_common/test_time.h
     - test/test_common/utility.cc
-    - test/test_common/utility.h
     - test/tools/wee8_compile/wee8_compile.cc
 
   # Tests in these paths may make use of the Registry::RegisterFactory constructor or the
@@ -245,7 +245,6 @@ re:
   mangled_protobuf_name: envoy::[a-z0-9_:]+::[A-Z][a-z]\w*_\w*_[A-Z]{2}
   maintainers: .*github.com.(.*)\)\)
   old_mock_method: MOCK_METHOD\d
-  proto_validation_string: \bmin_bytes\b
   owner: "@\\S+"
   runtime_guard_flag: RUNTIME_GUARD\((.*)\);
   test_name_starting_lc: TEST(_.\(.*,\s|\()[a-z].*\)\s\{
@@ -310,5 +309,6 @@ visibility_excludes:
 - source/extensions/path/match/uri_template/BUILD
 - source/extensions/path/rewrite/uri_template/BUILD
 - source/extensions/quic/connection_id_generator/BUILD
+- source/extensions/quic/server_preferred_address/BUILD
 - source/extensions/listener_managers/listener_manager/BUILD
 - source/extensions/upstreams/tcp/BUILD

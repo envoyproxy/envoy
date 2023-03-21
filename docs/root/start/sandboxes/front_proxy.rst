@@ -12,7 +12,7 @@ Front proxy
 
 To get a flavor of what Envoy has to offer as a front proxy, we are releasing a
 `docker compose <https://docs.docker.com/compose/>`_ sandbox that deploys a front Envoy and a
-couple of services (simple Flask apps) colocated with a running service Envoy.
+couple of services (simple ``aiohttp`` apps) colocated with a running service Envoy.
 
 The three containers will be deployed inside a virtual network called ``envoymesh``.
 
@@ -27,9 +27,9 @@ compose (see :download:`docker-compose.yaml <_include/front-proxy/docker-compose
 ``HTTP``, ``HTTPS`` calls to the services and requests to ``/admin`` respectively.
 
 Moreover, notice that all traffic routed by the front Envoy to the service containers is actually
-routed to the service Envoys (routes setup in :download:`front-envoy.yaml <_include/front-proxy/front-envoy.yaml>`).
+routed to the service Envoys (routes setup in :download:`envoy.yaml <_include/front-proxy/envoy.yaml>`).
 
-In turn the service Envoys route the request to the Flask app via the loopback
+In turn the service Envoys route the request to the ``aiohttp`` app via the loopback
 address (routes setup in :download:`service-envoy.yaml <_include/front-proxy/service-envoy.yaml>`). This
 setup illustrates the advantage of running service Envoys collocated with your services: all
 requests are handled by the service Envoy, and efficiently routed to your services.
@@ -43,15 +43,15 @@ Change to the ``examples/front-proxy`` directory.
 
     $ pwd
     envoy/examples/front-proxy
-    $ docker-compose pull
-    $ docker-compose up --build -d
-    $ docker-compose ps
+    $ docker compose pull
+    $ docker compose up --build -d
+    $ docker compose ps
 
-              Name                         Command               State                                         Ports
-    ----------------------------------------------------------------------------------------------------------------------------------------------------
-    front-proxy_front-envoy_1   /docker-entrypoint.sh /bin ... Up      10000/tcp, 0.0.0.0:8080->8080/tcp, 0.0.0.0:8001->8001/tcp, 0.0.0.0:8443->8443/tcp
-    front-proxy_service1_1      /bin/sh -c /usr/local/bin/ ... Up      10000/tcp
-    front-proxy_service2_1      /bin/sh -c /usr/local/bin/ ... Up      10000/tcp
+              Name                         Command               State                                           Ports
+    ---------------------------------------------------------------------------------------------------------------------------------------------------------
+    front-proxy_front-envoy_1   /docker-entrypoint.sh /bin ... Up           10000/tcp, 0.0.0.0:8080->8080/tcp, 0.0.0.0:8001->8001/tcp, 0.0.0.0:8443->8443/tcp
+    front-proxy_service1_1      python3 /code/service.py   ... Up (healthy)
+    front-proxy_service2_1      python3 /code/service.py   ... Up (healthy)
 
 Step 2: Test Envoy's routing capabilities
 *****************************************
@@ -157,7 +157,7 @@ Now let's scale up our ``service1`` nodes to demonstrate the load balancing abil
 
 .. code-block:: console
 
-    $ docker-compose scale service1=3
+    $ docker compose scale service1=3
     Creating and starting example_service1_2 ... done
     Creating and starting example_service1_3 ... done
 
@@ -224,12 +224,12 @@ Step 4: Enter containers and curl services
 
 In addition of using ``curl`` from your host machine, you can also enter the
 containers themselves and ``curl`` from inside them. To enter a container you
-can use ``docker-compose exec <container_name> /bin/bash``. For example we can
+can use ``docker compose exec <container_name> /bin/bash``. For example we can
 enter the ``front-envoy`` container, and ``curl`` for services locally:
 
 .. code-block:: console
 
-    $ docker-compose exec front-envoy /bin/bash
+    $ docker compose exec front-envoy /bin/bash
     root@81288499f9d7:/# curl localhost:8080/service/1
     Hello from behind Envoy (service 1)! hostname: 85ac151715c6 resolvedhostname: 172.19.0.3
     root@81288499f9d7:/# curl localhost:8080/service/1
@@ -255,7 +255,7 @@ In the example we can enter the ``front-envoy`` container to query admin:
 
 .. code-block:: console
 
-    $ docker-compose exec front-envoy /bin/bash
+    $ docker compose exec front-envoy /bin/bash
     root@e654c2c83277:/# curl localhost:8001/server_info
 
 .. code-block:: json
@@ -269,7 +269,7 @@ In the example we can enter the ``front-envoy`` container to query admin:
       "use_dynamic_base_id": false,
       "base_id_path": "",
       "concurrency": 8,
-      "config_path": "/etc/front-envoy.yaml",
+      "config_path": "/etc/envoy.yaml",
       "config_yaml": "",
       "allow_unknown_static_fields": false,
       "reject_unknown_dynamic_fields": false,

@@ -13,7 +13,7 @@
 #include "source/common/http/utility.h"
 
 #include "contrib/envoy/extensions/filters/http/golang/v3alpha/golang.pb.h"
-#include "contrib/golang/filters/http/source/common/dso/dso.h"
+#include "contrib/golang/common/dso/dso.h"
 #include "contrib/golang/filters/http/source/processor_state.h"
 
 namespace Envoy {
@@ -26,7 +26,8 @@ namespace Golang {
  */
 class FilterConfig : Logger::Loggable<Logger::Id::http> {
 public:
-  FilterConfig(const envoy::extensions::filters::http::golang::v3alpha::Config& proto_config);
+  FilterConfig(const envoy::extensions::filters::http::golang::v3alpha::Config& proto_config,
+               Dso::HttpFilterDsoPtr dso_lib);
   // TODO: delete config in Go
   virtual ~FilterConfig() = default;
 
@@ -40,6 +41,7 @@ private:
   const std::string so_id_;
   const std::string so_path_;
   const ProtobufWkt::Any plugin_config_;
+  Dso::HttpFilterDsoPtr dso_lib_;
   uint64_t config_id_{0};
 };
 
@@ -85,8 +87,13 @@ enum class DestroyReason {
   Terminate,
 };
 
-enum class StringValue {
+enum class EnvoyValue {
   RouteName = 1,
+  FilterChainName,
+  Protocol,
+  ResponseCode,
+  ResponseCodeDetails,
+  AttemptCount,
 };
 
 struct httpRequestInternal;
@@ -99,7 +106,7 @@ class Filter : public Http::StreamFilter,
                Logger::Loggable<Logger::Id::http>,
                public AccessLog::Instance {
 public:
-  explicit Filter(FilterConfigSharedPtr config, Dso::DsoInstancePtr dynamic_lib)
+  explicit Filter(FilterConfigSharedPtr config, Dso::HttpFilterDsoPtr dynamic_lib)
       : config_(config), dynamic_lib_(dynamic_lib), decoding_state_(*this), encoding_state_(*this) {
   }
 
@@ -140,21 +147,23 @@ public:
 
   void onStreamComplete() override {}
 
-  void continueStatus(GolangStatus status);
+  CAPIStatus continueStatus(GolangStatus status);
 
-  void sendLocalReply(Http::Code response_code, absl::string_view body_text,
-                      std::function<void(Http::ResponseHeaderMap& headers)> modify_headers,
-                      Grpc::Status::GrpcStatus grpc_status, absl::string_view details);
+  CAPIStatus sendLocalReply(Http::Code response_code, std::string body_text,
+                            std::function<void(Http::ResponseHeaderMap& headers)> modify_headers,
+                            Grpc::Status::GrpcStatus grpc_status, std::string details);
 
-  absl::optional<absl::string_view> getHeader(absl::string_view key);
-  void copyHeaders(GoString* go_strs, char* go_buf);
-  void setHeader(absl::string_view key, absl::string_view value);
-  void removeHeader(absl::string_view key);
-  void copyBuffer(Buffer::Instance* buffer, char* data);
-  void setBufferHelper(Buffer::Instance* buffer, absl::string_view& value, bufferAction action);
-  void copyTrailers(GoString* go_strs, char* go_buf);
-  void setTrailer(absl::string_view key, absl::string_view value);
-  void getStringValue(int id, GoString* value_str);
+  CAPIStatus getHeader(absl::string_view key, GoString* go_value);
+  CAPIStatus copyHeaders(GoString* go_strs, char* go_buf);
+  CAPIStatus setHeader(absl::string_view key, absl::string_view value, headerAction act);
+  CAPIStatus removeHeader(absl::string_view key);
+  CAPIStatus copyBuffer(Buffer::Instance* buffer, char* data);
+  CAPIStatus setBufferHelper(Buffer::Instance* buffer, absl::string_view& value,
+                             bufferAction action);
+  CAPIStatus copyTrailers(GoString* go_strs, char* go_buf);
+  CAPIStatus setTrailer(absl::string_view key, absl::string_view value);
+  CAPIStatus getStringValue(int id, GoString* value_str);
+  CAPIStatus getIntegerValue(int id, uint64_t* value);
 
 private:
   ProcessorState& getProcessorState();
@@ -180,7 +189,7 @@ private:
                               Grpc::Status::GrpcStatus grpc_status, absl::string_view details);
 
   const FilterConfigSharedPtr config_;
-  Dso::DsoInstancePtr dynamic_lib_;
+  Dso::HttpFilterDsoPtr dynamic_lib_;
 
   Http::RequestOrResponseHeaderMap* headers_ ABSL_GUARDED_BY(mutex_){nullptr};
   Http::HeaderMap* trailers_ ABSL_GUARDED_BY(mutex_){nullptr};

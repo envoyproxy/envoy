@@ -20,31 +20,14 @@
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats.h"
 #include "envoy/upstream/outlier_detection.h"
-#include "envoy/upstream/upstream.h"
+
+#include "source/common/upstream/upstream_impl.h"
 
 #include "absl/container/node_hash_map.h"
 
 namespace Envoy {
 namespace Upstream {
 namespace Outlier {
-
-/**
- * Null host monitor implementation.
- */
-class DetectorHostMonitorNullImpl : public DetectorHostMonitor {
-public:
-  // Upstream::Outlier::DetectorHostMonitor
-  uint32_t numEjections() override { return 0; }
-  void putHttpResponseCode(uint64_t) override {}
-  void putResult(Result, absl::optional<uint64_t>) override {}
-  void putResponseTime(std::chrono::milliseconds) override {}
-  const absl::optional<MonotonicTime>& lastEjectionTime() override { return time_; }
-  const absl::optional<MonotonicTime>& lastUnejectionTime() override { return time_; }
-  double successRate(SuccessRateMonitorType) const override { return -1; }
-
-private:
-  const absl::optional<MonotonicTime> time_{};
-};
 
 /**
  * Factory for creating a detector from a proto configuration.
@@ -107,7 +90,7 @@ private:
 class SuccessRateMonitor {
 public:
   SuccessRateMonitor(envoy::data::cluster::v3::OutlierEjectionType ejection_type)
-      : ejection_type_(ejection_type), success_rate_(-1) {
+      : ejection_type_(ejection_type) {
     // Point the success_rate_accumulator_bucket_ pointer to a bucket.
     updateCurrentSuccessRateBucket();
   }
@@ -128,7 +111,7 @@ private:
   SuccessRateAccumulator success_rate_accumulator_;
   std::atomic<SuccessRateAccumulatorBucket*> success_rate_accumulator_bucket_;
   envoy::data::cluster::v3::OutlierEjectionType ejection_type_;
-  double success_rate_;
+  double success_rate_{-1};
 };
 
 class DetectorImpl;
@@ -386,7 +369,7 @@ private:
 class DetectorImpl : public Detector, public std::enable_shared_from_this<DetectorImpl> {
 public:
   static std::shared_ptr<DetectorImpl>
-  create(const Cluster& cluster, const envoy::config::cluster::v3::OutlierDetection& config,
+  create(Cluster& cluster, const envoy::config::cluster::v3::OutlierDetection& config,
          Event::Dispatcher& dispatcher, Runtime::Loader& runtime, TimeSource& time_source,
          EventLoggerSharedPtr event_logger, Random::RandomGenerator& random);
   ~DetectorImpl() override;
@@ -396,6 +379,7 @@ public:
   void onConsecutiveLocalOriginFailure(HostSharedPtr host);
   Runtime::Loader& runtime() { return runtime_; }
   DetectorConfig& config() { return config_; }
+  void unejectHost(HostSharedPtr host);
 
   // Upstream::Outlier::Detector
   void addChangedStateCb(ChangeStateCb cb) override { callbacks_.push_back(cb); }
@@ -440,7 +424,7 @@ private:
   void checkHostForUneject(HostSharedPtr host, DetectorHostMonitorImpl* monitor, MonotonicTime now);
   void ejectHost(HostSharedPtr host, envoy::data::cluster::v3::OutlierEjectionType type);
   static DetectionStats generateStats(Stats::Scope& scope);
-  void initialize(const Cluster& cluster);
+  void initialize(Cluster& cluster);
   void onConsecutiveErrorWorker(HostSharedPtr host,
                                 envoy::data::cluster::v3::OutlierEjectionType type);
   void notifyMainThreadConsecutiveError(HostSharedPtr host,

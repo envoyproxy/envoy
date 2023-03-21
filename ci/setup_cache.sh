@@ -32,8 +32,10 @@ if [[ -n "${BAZEL_REMOTE_CACHE}" ]]; then
   if [[ -n "${BAZEL_REMOTE_INSTANCE}" ]]; then
     export BAZEL_BUILD_EXTRA_OPTIONS+=" --remote_instance_name=${BAZEL_REMOTE_INSTANCE}"
     echo "instance_name: ${BAZEL_REMOTE_INSTANCE}."
-  elif [[ -z "${ENVOY_RBE}" ]]; then
-    export BAZEL_BUILD_EXTRA_OPTIONS+=" --jobs=HOST_CPUS*.9 --remote_timeout=600"
+  fi
+
+  if [[ -z "${ENVOY_RBE}" ]]; then
+    export BAZEL_BUILD_EXTRA_OPTIONS+=" --jobs=HOST_CPUS*.99 --remote_timeout=600"
     echo "using local build cache."
   fi
 

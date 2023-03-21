@@ -37,13 +37,6 @@ use(
       "auto_assign": True,
     },
     {
-      "owner": "envoyproxy/mobile-maintainers",
-      "path": "(mobile/)",
-      "label": "mobile",
-      "github_status_label": "changes to Envoy Mobile",
-      "auto_assign": True,
-    },
-    {
       "owner": "envoyproxy/api-watchers",
       "path": "(api/envoy/|docs/root/api-docs/)",
     },
@@ -57,6 +50,7 @@ use(
     },
   ],
 )
+use("github.com/envoyproxy/envoy/ci/repokitteh/modules/versionchange.star")
 
 alias('retest', 'retry-azp')
 
@@ -64,3 +58,8 @@ def _backport():
   github.issue_label('backport/review')
 
 handlers.command(name='backport', func=_backport)
+
+def _milestone():
+  github.issue_label('milestone/review')
+
+handlers.command(name='milestone', func=_milestone)

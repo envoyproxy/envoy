@@ -53,7 +53,7 @@ public:
               (const));
   MOCK_METHOD(Http::HeaderTransforms, responseHeaderTransforms,
               (const StreamInfo::StreamInfo& stream_info, bool do_formatting), (const));
-  MOCK_METHOD(std::string, newPath, (const Http::RequestHeaderMap& headers), (const));
+  MOCK_METHOD(std::string, newUri, (const Http::RequestHeaderMap& headers), (const));
   MOCK_METHOD(void, rewritePathHeader,
               (Http::RequestHeaderMap & headers, bool insert_envoy_original_path), (const));
   MOCK_METHOD(Http::Code, responseCode, (), (const));
@@ -266,6 +266,15 @@ public:
 
   MOCK_METHOD(void, shadow_,
               (const std::string& cluster, Http::RequestMessagePtr& request,
+               const Http::AsyncClient::RequestOptions& options));
+
+  Http::AsyncClient::OngoingRequest*
+  streamingShadow(const std::string& cluster, Http::RequestHeaderMapPtr&& request,
+                  const Http::AsyncClient::RequestOptions& options) override {
+    return streamingShadow_(cluster, request, options);
+  }
+  MOCK_METHOD(Http::AsyncClient::OngoingRequest*, streamingShadow_,
+              (const std::string& cluster, Http::RequestHeaderMapPtr& request,
                const Http::AsyncClient::RequestOptions& options));
 };
 

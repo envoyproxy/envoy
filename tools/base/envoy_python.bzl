@@ -333,3 +333,97 @@ def envoy_py_data(name, src, format = None, entry_point = base_entry_point):
         data = [name_pickle],
         deps = [name_entry_point, requirement("envoy.base.utils")],
     )
+
+def envoy_gencontent(
+        name,
+        template,
+        output,
+        srcs = [],
+        yaml_srcs = [],
+        json_kwargs = {},
+        template_name = None,
+        template_filters = {},
+        template_kwargs = {
+            "trim_blocks": True,
+            "lstrip_blocks": True,
+        },
+        template_deps = [],
+        entry_point = base_entry_point):
+    '''Generate templated output from a Jinja template and JSON/Yaml sources.
+
+    `srcs`, `yaml_srcs` and `**json_kwargs` are passed to `envoy_genjson`.
+
+    Args prefixed with `template_` are passed to `envoy_jinja_env`.
+
+    Simple example which builds a readme from a yaml file and template:
+
+    ```console
+
+    envoy_gencontent(
+        name = "readme",
+        template = ":readme.md.tpl",
+        output = "readme.md",
+        yaml_srcs = [":readme.yaml"],
+    )
+    ```
+
+    '''
+    if not srcs and not yaml_srcs:
+        fail("At least one of `srcs`, `yaml_srcs` must be provided")
+
+    if not template_name:
+        template_name = "$$(basename $(location %s))" % template
+
+    name_data = "%s_data" % name
+    name_tpl = "%s_jinja" % name
+    name_template_bin = ":%s_generate_content" % name
+
+    envoy_genjson(
+        name = "%s_json" % name,
+        srcs = srcs,
+        yaml_srcs = yaml_srcs,
+        **json_kwargs
+    )
+    envoy_py_data(
+        name = "%s_data" % name,
+        src = ":%s_json" % name,
+        entry_point = entry_point,
+    )
+    envoy_jinja_env(
+        name = name_tpl,
+        env_kwargs = template_kwargs,
+        templates = [template],
+        filters = template_filters,
+        entry_point = entry_point,
+    )
+    native.genrule(
+        name = "%s_generate_content_py" % name,
+        cmd = """
+        echo "import pathlib" > $@ \
+        && echo "import sys" >> $@ \
+        && echo "sys.path.append(pathlib.Path(\\"$(location :%s)\\").parent)" >> $@ \
+        && echo "from %s import data" >> $@ \
+        && echo "sys.path.append(pathlib.Path(\\"$(location :%s)\\").parent)" >> $@ \
+        && echo "from %s import env" >> $@ \
+        && echo "print(env.get_template(\\"%s\\").render(**data))" >> $@
+        """ % (name_data, name_data, name_tpl, name_tpl, template_name),
+        outs = ["%s_generate_content.py" % name],
+        tools = [":%s" % name_data, name_tpl, template],
+    )
+    py_binary(
+        name = "%s_generate_content" % name,
+        main = ":%s_generate_content.py" % name,
+        srcs = [":%s_generate_content.py" % name],
+        deps = [
+            ":%s" % name_data,
+            name_tpl,
+        ],
+    )
+    native.genrule(
+        name = name,
+        cmd = """
+        $(location %s) > $@
+        """ % name_template_bin,
+        outs = [output],
+        tools = [name_template_bin],
+    )

@@ -5,29 +5,44 @@
 
 set -e
 
+
 if [[ ! $(command -v bazel) ]]; then
     # shellcheck disable=SC2016
     echo 'ERROR: bazel must be installed and available in "$PATH" to build docs' >&2
     exit 1
 fi
 
+VERSION="$(cat VERSION.txt)"
 MAIN_BRANCH="refs/heads/main"
+DEV_VERSION_REGEX="-dev$"
 
 # default is to build html only
 BUILD_TYPE=html
 
-if [[ "${AZP_BRANCH}" == "${MAIN_BRANCH}" ]]; then
-    # no need to build html, just rst
-    BUILD_TYPE=rst
+if [[ "$VERSION" =~ $DEV_VERSION_REGEX ]]; then
+   if [[ "$AZP_BRANCH" == "$MAIN_BRANCH" ]]; then
+       # no need to build html, just rst
+       BUILD_TYPE=rst
+   fi
+else
+    export BUILD_DOCS_TAG="v${VERSION}"
+    echo "BUILD AZP RELEASE BRANCH ${BUILD_DOCS_TAG}"
+    BAZEL_BUILD_OPTIONS+=("--action_env=BUILD_DOCS_TAG")
 fi
 
 # This is for local RBE setup, should be no-op for builds without RBE setting in bazelrc files.
 IFS=" " read -ra BAZEL_BUILD_OPTIONS <<< "${BAZEL_BUILD_OPTIONS:-}"
 
-if [[ "${AZP_BRANCH}" =~ ^refs/tags/v.* ]]; then
-    export BUILD_DOCS_TAG="${AZP_BRANCH/refs\/tags\//}"
-    echo "BUILD AZP RELEASE BRANCH ${BUILD_DOCS_TAG}"
-    BAZEL_BUILD_OPTIONS+=("--action_env=BUILD_DOCS_TAG")
+# We want the binary at the end
+BAZEL_BUILD_OPTIONS+=(--remote_download_toplevel)
+
+if [[ "${AZP_BRANCH}" =~ ^refs/pull ]]; then
+    # For PRs use the unmerged PR commit in the version string.
+    #
+    # Staged/built docs still use the merged sha in the URL to distinguish builds
+    #
+    export BUILD_DOCS_SHA="${AZP_COMMIT_SHA}"
+    BAZEL_BUILD_OPTIONS+=("--action_env=BUILD_DOCS_SHA")
 fi
 
 if [[ -n "${AZP_BRANCH}" ]] || [[ -n "${SPHINX_QUIET}" ]]; then

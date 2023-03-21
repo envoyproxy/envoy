@@ -5,12 +5,10 @@
 
 using testing::_;
 using testing::AtLeast;
-using testing::HasSubstr;
 using testing::InSequence;
 using testing::Invoke;
 using testing::InvokeWithoutArgs;
 using testing::Mock;
-using testing::Property;
 using testing::Ref;
 using testing::Return;
 using testing::ReturnRef;
@@ -34,7 +32,7 @@ TEST_F(HttpConnectionManagerImplTest, ResponseBeforeRequestComplete) {
   EXPECT_CALL(*decoder_filters_[0], onStreamComplete());
   EXPECT_CALL(*decoder_filters_[0], onDestroy());
   EXPECT_CALL(filter_callbacks_.connection_,
-              close(Network::ConnectionCloseType::FlushWriteAndDelay));
+              close(Network::ConnectionCloseType::FlushWriteAndDelay, _));
 
   ResponseHeaderMapPtr response_headers{new TestResponseHeaderMapImpl{{":status", "200"}}};
   decoder_filters_[0]->callbacks_->streamInfo().setResponseCodeDetails("");
@@ -60,7 +58,7 @@ TEST_F(HttpConnectionManagerImplTest, DisconnectOnProxyConnectionDisconnect) {
   EXPECT_CALL(*decoder_filters_[0], onStreamComplete());
   EXPECT_CALL(*decoder_filters_[0], onDestroy());
   EXPECT_CALL(filter_callbacks_.connection_,
-              close(Network::ConnectionCloseType::FlushWriteAndDelay));
+              close(Network::ConnectionCloseType::FlushWriteAndDelay, _));
 
   ResponseHeaderMapPtr response_headers{new TestResponseHeaderMapImpl{{":status", "200"}}};
   decoder_filters_[0]->callbacks_->streamInfo().setResponseCodeDetails("");
@@ -119,7 +117,7 @@ TEST_F(HttpConnectionManagerImplTest, ResponseStartBeforeRequestComplete) {
   // connection since we already sent a connection: close header. We won't "reset" the stream
   // however.
   EXPECT_CALL(filter_callbacks_.connection_,
-              close(Network::ConnectionCloseType::FlushWriteAndDelay));
+              close(Network::ConnectionCloseType::FlushWriteAndDelay, _));
   Buffer::OwnedImpl fake_response("world");
   filter->callbacks_->encodeData(fake_response, true);
 }
@@ -160,7 +158,7 @@ TEST_F(HttpConnectionManagerImplTest, DownstreamProtocolError) {
   // depending on whether the downstream client closes the connection prior to the delayed close
   // timer firing.
   EXPECT_CALL(filter_callbacks_.connection_,
-              close(Network::ConnectionCloseType::FlushWriteAndDelay));
+              close(Network::ConnectionCloseType::FlushWriteAndDelay, _));
 
   // Kick off the incoming data.
   Buffer::OwnedImpl fake_input("1234");
@@ -244,7 +242,7 @@ TEST_F(HttpConnectionManagerImplTest, FrameFloodError) {
 
   // FrameFloodException should result in reset of the streams followed by abortive close.
   EXPECT_CALL(filter_callbacks_.connection_,
-              close(Network::ConnectionCloseType::FlushWriteAndDelay));
+              close(Network::ConnectionCloseType::FlushWriteAndDelay, _));
 
   EXPECT_CALL(*log_handler, log(_, _, _, _))
       .WillOnce(Invoke([](const HeaderMap*, const HeaderMap*, const HeaderMap*,
@@ -271,7 +269,7 @@ TEST_F(HttpConnectionManagerImplTest, IdleTimeoutNoCodec) {
   EXPECT_CALL(*idle_timer, enableTimer(_, _));
   setup(false, "");
 
-  EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::FlushWrite));
+  EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::FlushWrite, _));
   EXPECT_CALL(*idle_timer, disableTimer());
   idle_timer->invokeCallback();
 
@@ -311,7 +309,7 @@ TEST_F(HttpConnectionManagerImplTest, IdleTimeout) {
 
   EXPECT_CALL(*codec_, goAway());
   EXPECT_CALL(filter_callbacks_.connection_,
-              close(Network::ConnectionCloseType::FlushWriteAndDelay));
+              close(Network::ConnectionCloseType::FlushWriteAndDelay, _));
   EXPECT_CALL(*idle_timer, disableTimer());
   EXPECT_CALL(*drain_timer, disableTimer());
   drain_timer->invokeCallback();
@@ -328,7 +326,7 @@ TEST_F(HttpConnectionManagerImplTest, ConnectionDurationResponseFlag) {
   EXPECT_CALL(*connection_duration_timer, enableTimer(_, _));
   setup(false, "");
 
-  EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::FlushWrite));
+  EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::FlushWrite, _));
   filter_callbacks_.connection_.streamInfo().setResponseFlag(
       StreamInfo::ResponseFlag::DurationTimeout);
   EXPECT_CALL(*connection_duration_timer, disableTimer());
@@ -350,7 +348,7 @@ TEST_F(HttpConnectionManagerImplTest, ConnectionDurationNoCodec) {
   EXPECT_CALL(*connection_duration_timer, enableTimer(_, _));
   setup(false, "");
 
-  EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::FlushWrite));
+  EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::FlushWrite, _));
   EXPECT_CALL(*connection_duration_timer, disableTimer());
 
   connection_duration_timer->invokeCallback();
@@ -419,7 +417,7 @@ TEST_F(HttpConnectionManagerImplTest, ConnectionDuration) {
 
   EXPECT_CALL(*codec_, goAway());
   EXPECT_CALL(filter_callbacks_.connection_,
-              close(Network::ConnectionCloseType::FlushWriteAndDelay));
+              close(Network::ConnectionCloseType::FlushWriteAndDelay, _));
   EXPECT_CALL(*connection_duration_timer, disableTimer());
   EXPECT_CALL(*drain_timer, disableTimer());
   drain_timer->invokeCallback();
@@ -3503,5 +3501,18 @@ TEST_F(HttpConnectionManagerImplTest, HeaderValidatorAccept) {
   EXPECT_EQ(1U, listener_stats_.downstream_rq_completed_.value());
 }
 
+TEST_F(HttpConnectionManagerImplTest, NoProxyProtocolAdded) {
+  add_proxy_protocol_connection_state_ = false;
+  setup(false, "server_name");
+  Buffer::OwnedImpl fake_input("input");
+  conn_manager_->createCodec(fake_input);
+
+  startRequest(false);
+
+  EXPECT_FALSE(decoder_->streamInfo().filterState()->hasDataWithName(
+      Network::ProxyProtocolFilterState::key()));
+  // Clean up.
+  filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
+}
 } // namespace Http
 } // namespace Envoy

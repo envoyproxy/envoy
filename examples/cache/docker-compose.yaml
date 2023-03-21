@@ -1,24 +1,20 @@
-version: "3.8"
 services:
-
-  flask_service:
-    build:
-      context: ../shared/flask
-    image: flask_service:python-3.10-slim-bullseye
-    restart: "no"
-    deploy:
-      replicas: 0
 
   front-envoy:
     build:
-      context: .
-      dockerfile: Dockerfile-frontenvoy
+      dockerfile: ../shared/envoy/Dockerfile
+    depends_on:
+      service1:
+        condition: service_healthy
+      service2:
+        condition: service_healthy
     ports:
     - "${PORT_PROXY:-8000}:8000"
 
   service1:
     build:
-      context: ../shared/service
+      context: ../shared/python
+      target: aiohttp-service
     volumes:
     - ./responses.yaml:/etc/responses.yaml
     - ./service.py:/code/service.py
@@ -27,7 +23,8 @@ services:
 
   service2:
     build:
-      context: ../shared/service
+      context: ../shared/python
+      target: aiohttp-service
     volumes:
     - ./responses.yaml:/etc/responses.yaml
     - ./service.py:/code/service.py

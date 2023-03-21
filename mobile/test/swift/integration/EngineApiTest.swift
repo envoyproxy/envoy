@@ -1,8 +1,14 @@
 import Envoy
 import Foundation
+import TestExtensions
 import XCTest
 
 final class EngineApiTest: XCTestCase {
+  override static func setUp() {
+    super.setUp()
+    register_test_extensions()
+  }
+
   func testEngineApis() throws {
     let engineExpectation = self.expectation(description: "Engine Running")
 

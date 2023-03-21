@@ -34,6 +34,52 @@
 #include "quiche/http2/adapter/http2_protocol.h"
 
 namespace Envoy {
+namespace {
+
+// Get request host from the request header map, removing the port if the port
+// does not match the scheme, or if port is provided.
+absl::string_view processRequestHost(const Http::RequestHeaderMap& headers,
+                                     absl::string_view new_scheme, absl::string_view new_port) {
+
+  absl::string_view request_host = headers.getHostValue();
+  size_t host_end;
+  if (request_host.empty()) {
+    return request_host;
+  }
+  // Detect if IPv6 URI
+  if (request_host[0] == '[') {
+    host_end = request_host.rfind("]:");
+    if (host_end != absl::string_view::npos) {
+      host_end += 1; // advance to :
+    }
+  } else {
+    host_end = request_host.rfind(':');
+  }
+
+  if (host_end != absl::string_view::npos) {
+    absl::string_view request_port = request_host.substr(host_end);
+    // In the rare case that X-Forwarded-Proto and scheme disagree (say http URL over an HTTPS
+    // connection), do port stripping based on X-Forwarded-Proto so http://foo.com:80 won't
+    // have the port stripped when served over TLS.
+    absl::string_view request_protocol = headers.getForwardedProtoValue();
+    bool remove_port = !new_port.empty();
+
+    if (new_scheme != request_protocol) {
+      remove_port |=
+          (request_protocol == Http::Headers::get().SchemeValues.Https) && request_port == ":443";
+      remove_port |=
+          (request_protocol == Http::Headers::get().SchemeValues.Http) && request_port == ":80";
+    }
+
+    if (remove_port) {
+      return request_host.substr(0, host_end);
+    }
+  }
+
+  return request_host;
+}
+
+} // namespace
 namespace Http2 {
 namespace Utility {
 
@@ -142,7 +188,7 @@ const uint32_t OptionsLimits::DEFAULT_MAX_INBOUND_WINDOW_UPDATE_FRAMES_PER_DATA_
 envoy::config::core::v3::Http2ProtocolOptions
 initializeAndValidateOptions(const envoy::config::core::v3::Http2ProtocolOptions& options,
                              bool hcm_stream_error_set,
-                             const Protobuf::BoolValue& hcm_stream_error) {
+                             const ProtobufWkt::BoolValue& hcm_stream_error) {
   auto ret = initializeAndValidateOptions(options);
   if (!options.has_override_stream_error_on_invalid_http_message() && hcm_stream_error_set) {
     ret.mutable_override_stream_error_on_invalid_http_message()->set_value(
@@ -225,7 +271,7 @@ const uint32_t OptionsLimits::DEFAULT_INITIAL_CONNECTION_WINDOW_SIZE;
 envoy::config::core::v3::Http3ProtocolOptions
 initializeAndValidateOptions(const envoy::config::core::v3::Http3ProtocolOptions& options,
                              bool hcm_stream_error_set,
-                             const Protobuf::BoolValue& hcm_stream_error) {
+                             const ProtobufWkt::BoolValue& hcm_stream_error) {
   if (options.has_override_stream_error_on_invalid_http_message()) {
     return options;
   }
@@ -556,7 +602,7 @@ bool Utility::isUpgrade(const RequestOrResponseHeaderMap& headers) {
   // we should check if it contains the "Upgrade" token.
   return (headers.Upgrade() &&
           Envoy::StringUtil::caseFindToken(headers.getConnectionValue(), ",",
-                                           Http::Headers::get().ConnectionValues.Upgrade.c_str()));
+                                           Http::Headers::get().ConnectionValues.Upgrade));
 }
 
 bool Utility::isH2UpgradeRequest(const RequestHeaderMap& headers) {
@@ -1073,6 +1119,106 @@ std::string Utility::PercentEncoding::decode(absl::string_view encoded) {
   return decoded;
 }
 
+namespace {
+// %-encode all ASCII character codepoints, EXCEPT:
+// ALPHA | DIGIT | * | - | . | _
+// SPACE is encoded as %20, NOT as the + character
+constexpr uint32_t kUrlEncodedCharTable[] = {
+    // control characters
+    0b11111111111111111111111111111111,
+    // !"#$%&'()*+,-./0123456789:;<=>?
+    0b11111111110110010000000000111111,
+    //@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\]^_
+    0b10000000000000000000000000011110,
+    //`abcdefghijklmnopqrstuvwxyz{|}~
+    0b10000000000000000000000000011111,
+    // extended ascii
+    0b11111111111111111111111111111111,
+    0b11111111111111111111111111111111,
+    0b11111111111111111111111111111111,
+    0b11111111111111111111111111111111,
+};
+
+constexpr uint32_t kUrlDecodedCharTable[] = {
+    // control characters
+    0b00000000000000000000000000000000,
+    // !"#$%&'()*+,-./0123456789:;<=>?
+    0b01011111111111111111111111110101,
+    //@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\]^_
+    0b11111111111111111111111111110101,
+    //`abcdefghijklmnopqrstuvwxyz{|}~
+    0b11111111111111111111111111100010,
+    // extended ascii
+    0b00000000000000000000000000000000,
+    0b00000000000000000000000000000000,
+    0b00000000000000000000000000000000,
+    0b00000000000000000000000000000000,
+};
+
+bool testChar(const uint32_t table[8], char c) {
+  uint8_t uc = static_cast<uint8_t>(c);
+  return (table[uc >> 5] & (0x80000000 >> (uc & 0x1f))) != 0;
+}
+
+bool shouldPercentEncodeChar(char c) { return testChar(kUrlEncodedCharTable, c); }
+
+bool shouldPercentDecodeChar(char c) { return testChar(kUrlDecodedCharTable, c); }
+} // namespace
+
+std::string Utility::PercentEncoding::urlEncodeQueryParameter(absl::string_view value) {
+  std::string encoded;
+  encoded.reserve(value.size());
+  for (char ch : value) {
+    if (shouldPercentEncodeChar(ch)) {
+      // For consistency, URI producers should use uppercase hexadecimal digits for all
+      // percent-encodings. https://tools.ietf.org/html/rfc3986#section-2.1.
+      absl::StrAppend(&encoded, fmt::format("%{:02X}", static_cast<const unsigned char&>(ch)));
+    } else {
+      encoded.push_back(ch);
+    }
+  }
+  return encoded;
+}
+
+std::string Utility::PercentEncoding::urlDecodeQueryParameter(absl::string_view encoded) {
+  std::string decoded;
+  decoded.reserve(encoded.size());
+  for (size_t i = 0; i < encoded.size(); ++i) {
+    char ch = encoded[i];
+    if (ch == '%' && i + 2 < encoded.size()) {
+      const char& hi = encoded[i + 1];
+      const char& lo = encoded[i + 2];
+      if (absl::ascii_isxdigit(hi) && absl::ascii_isxdigit(lo)) {
+        if (absl::ascii_isdigit(hi)) {
+          ch = hi - '0';
+        } else {
+          ch = absl::ascii_toupper(hi) - 'A' + 10;
+        }
+
+        ch *= 16;
+        if (absl::ascii_isdigit(lo)) {
+          ch += lo - '0';
+        } else {
+          ch += absl::ascii_toupper(lo) - 'A' + 10;
+        }
+        if (shouldPercentDecodeChar(ch)) {
+          // Decode the character only if it is present in the characters_to_decode
+          decoded.push_back(ch);
+        } else {
+          // Otherwise keep it as is.
+          decoded.push_back('%');
+          decoded.push_back(hi);
+          decoded.push_back(lo);
+        }
+        i += 2;
+      }
+    } else {
+      decoded.push_back(ch);
+    }
+  }
+  return decoded;
+}
+
 Utility::AuthorityAttributes Utility::parseAuthority(absl::string_view host) {
   // First try to see if there is a port included. This also checks to see that there is not a ']'
   // as the last character which is indicative of an IPv6 address without a port. This is a best
@@ -1184,6 +1330,74 @@ Http::Code Utility::maybeRequestTimeoutCode(bool remote_decode_complete) {
                                 // Http::Code::RequestTimeout is more expensive because HTTP1 client
                                 // cannot use the connection any more.
                                 : Http::Code::RequestTimeout;
+}
+
+std::string Utility::newUri(::Envoy::OptRef<const Utility::RedirectConfig> redirect_config,
+                            const Http::RequestHeaderMap& headers) {
+  absl::string_view final_scheme;
+  absl::string_view final_host;
+  absl::string_view final_port;
+  absl::string_view final_path;
+
+  if (redirect_config.has_value() && !redirect_config->scheme_redirect_.empty()) {
+    final_scheme = redirect_config->scheme_redirect_;
+  } else if (redirect_config.has_value() && redirect_config->https_redirect_) {
+    final_scheme = Http::Headers::get().SchemeValues.Https;
+  } else {
+    // Serve the redirect URL based on the scheme of the original URL, not the
+    // security of the underlying connection.
+    final_scheme = headers.getSchemeValue();
+  }
+
+  if (redirect_config.has_value() && !redirect_config->port_redirect_.empty()) {
+    final_port = redirect_config->port_redirect_;
+  } else {
+    final_port = "";
+  }
+
+  if (redirect_config.has_value() && !redirect_config->host_redirect_.empty()) {
+    final_host = redirect_config->host_redirect_;
+  } else {
+    ASSERT(headers.Host());
+    final_host = processRequestHost(headers, final_scheme, final_port);
+  }
+
+  std::string final_path_value;
+  if (redirect_config.has_value() && !redirect_config->path_redirect_.empty()) {
+    // The path_redirect query string, if any, takes precedence over the request's query string,
+    // and it will not be stripped regardless of `strip_query`.
+    if (redirect_config->path_redirect_has_query_) {
+      final_path = redirect_config->path_redirect_;
+    } else {
+      const absl::string_view current_path = headers.getPathValue();
+      const size_t path_end = current_path.find('?');
+      const bool current_path_has_query = path_end != absl::string_view::npos;
+      if (current_path_has_query) {
+        final_path_value = redirect_config->path_redirect_;
+        final_path_value.append(current_path.data() + path_end, current_path.length() - path_end);
+        final_path = final_path_value;
+      } else {
+        final_path = redirect_config->path_redirect_;
+      }
+    }
+  } else {
+    final_path = headers.getPathValue();
+  }
+
+  if (!absl::StartsWith(final_path, "/")) {
+    final_path_value = absl::StrCat("/", final_path);
+    final_path = final_path_value;
+  }
+
+  if (redirect_config.has_value() && !redirect_config->path_redirect_has_query_ &&
+      redirect_config->strip_query_) {
+    const size_t path_end = final_path.find('?');
+    if (path_end != absl::string_view::npos) {
+      final_path = final_path.substr(0, path_end);
+    }
+  }
+
+  return fmt::format("{}://{}{}{}", final_scheme, final_host, final_port, final_path);
 }
 
 } // namespace Http

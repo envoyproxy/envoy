@@ -64,6 +64,12 @@ public:
    * if the Ipv6 address isn't Ipv4 mapped.
    */
   virtual InstanceConstSharedPtr v4CompatibleAddress() const PURE;
+
+  /**
+   * @return Ipv6 address that has no scope/zone identifier. Return `nullptr`
+   * if the conversion failed.
+   */
+  virtual InstanceConstSharedPtr addressWithoutScopeId() const PURE;
 };
 
 enum class IpVersion { v4, v6 }; // NOLINT(readability-identifier-naming)

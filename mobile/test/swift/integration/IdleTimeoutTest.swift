@@ -1,9 +1,15 @@
 import Envoy
 import EnvoyEngine
 import Foundation
+import TestExtensions
 import XCTest
 
 final class IdleTimeoutTests: XCTestCase {
+  override static func setUp() {
+    super.setUp()
+    register_test_extensions()
+  }
+
   func testIdleTimeout() {
     let idleTimeout = "0.5s"
     let remotePort = Int.random(in: 10001...11000)
@@ -153,7 +159,6 @@ static_resources:
 
     let requestHeaders = RequestHeadersBuilder(method: .get, scheme: "https",
                                                authority: "example.com", path: "/test")
-      .addUpstreamHttpProtocol(.http2)
       .build()
 
     client
