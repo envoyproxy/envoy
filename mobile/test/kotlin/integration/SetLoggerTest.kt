@@ -55,7 +55,7 @@ class SetLoggerTest {
     val logEventLatch = CountDownLatch(1)
     val engine = EngineBuilder(Standard())
       .setEventTracker { event ->
-        if (event["name"] == "event_log" && event["log_name"] == "jni_exception") {
+        if (event["log_name"] == "event_name") {
           logEventLatch.countDown()
         }
       }
