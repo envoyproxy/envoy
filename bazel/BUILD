@@ -364,8 +364,8 @@ config_setting(
 )
 
 config_setting(
-    name = "disable_http_datagram",
-    values = {"define": "enable_http_datagram=disabled"},
+    name = "disable_http_datagrams",
+    values = {"define": "enable_http_datagrams=disabled"},
 )
 
 config_setting(

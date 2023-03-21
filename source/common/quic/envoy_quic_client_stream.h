@@ -51,7 +51,7 @@ public:
   void OnConnectionClosed(quic::QuicErrorCode error, quic::ConnectionCloseSource source) override;
 
   void clearWatermarkBuffer();
-#ifdef ENVOY_ENABLE_HTTP_DATAGRAM
+#ifdef ENVOY_ENABLE_HTTP_DATAGRAMS
   // Makes the QUIC stream use Capsule Protocol. Once this method is called, any calls to encodeData
   // are expected to contain capsules which will be sent along as HTTP Datagrams. Also, the stream
   // starts to receive HTTP/3 Datagrams and decode into Capsules.
@@ -85,7 +85,7 @@ private:
 
   Http::ResponseDecoder* response_decoder_{nullptr};
   bool decoded_1xx_{false};
-#ifdef ENVOY_ENABLE_HTTP_DATAGRAM
+#ifdef ENVOY_ENABLE_HTTP_DATAGRAMS
   // Setting |http_datagram_handler_| enables HTTP Datagram support.
   std::unique_ptr<HttpDatagramHandler> http_datagram_handler_;
 #endif

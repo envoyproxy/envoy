@@ -87,10 +87,10 @@ def envoy_select_enable_http3(xs, repository = ""):
         "//conditions:default": xs,
     })
 
-# Selects the given values if http datagram is enabled in the current build.
-def envoy_select_enable_http_datagram(xs, repository = ""):
+# Selects the given values if HTTP datagram support is enabled in the current build.
+def envoy_select_enable_http_datagrams(xs, repository = ""):
     return select({
-        repository + "//bazel:disable_http_datagram": [],
+        repository + "//bazel:disable_http_datagrams": [],
         "//conditions:default": xs,
     })
 

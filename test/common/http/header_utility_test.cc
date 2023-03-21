@@ -1140,7 +1140,7 @@ TEST(HeaderIsValidTest, IsConnectResponse) {
   EXPECT_FALSE(HeaderUtility::isConnectResponse(get_request.get(), success_response));
 }
 
-#ifdef ENVOY_ENABLE_HTTP_DATAGRAM
+#ifdef ENVOY_ENABLE_HTTP_DATAGRAMS
 TEST(HeaderIsValidTest, IsCapsuleProtocol) {
   EXPECT_TRUE(
       HeaderUtility::isCapsuleProtocol(TestRequestHeaderMapImpl{{"Capsule-Protocol", "?1"}}));

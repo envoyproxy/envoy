@@ -2,7 +2,7 @@ load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_library",
     "envoy_package",
-    "envoy_select_enable_http_datagram",
+    "envoy_select_enable_http_datagrams",
 )
 load(
     "@envoy_build_config//:extensions_build_config.bzl",
@@ -283,7 +283,7 @@ envoy_cc_library(
         "//source/common/common:assert_lib",
         "//source/common/http:header_map_lib",
         "@com_github_google_quiche//:quic_server_http_spdy_session_lib",
-    ] + envoy_select_enable_http_datagram([
+    ] + envoy_select_enable_http_datagrams([
         ":http_datagram_handler",
     ]),
 )
@@ -315,7 +315,7 @@ envoy_cc_library(
         "//source/common/http:header_map_lib",
         "//source/common/http:header_utility_lib",
         "@com_github_google_quiche//:quic_core_http_client_lib",
-    ] + envoy_select_enable_http_datagram([
+    ] + envoy_select_enable_http_datagrams([
         ":http_datagram_handler",
     ]),
 )

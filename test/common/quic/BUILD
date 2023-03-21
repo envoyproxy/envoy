@@ -3,7 +3,7 @@ load(
     "envoy_cc_test",
     "envoy_cc_test_library",
     "envoy_package",
-    "envoy_select_enable_http_datagram",
+    "envoy_select_enable_http_datagrams",
 )
 
 licenses(["notice"])  # Apache 2
@@ -370,9 +370,9 @@ envoy_cc_test(
 
 envoy_cc_test(
     name = "http_datagram_handler_test",
-    srcs = envoy_select_enable_http_datagram(["http_datagram_handler_test.cc"]),
+    srcs = envoy_select_enable_http_datagrams(["http_datagram_handler_test.cc"]),
     tags = ["nofips"],
-    deps = envoy_select_enable_http_datagram([
+    deps = envoy_select_enable_http_datagrams([
         "//source/common/quic:http_datagram_handler",
         "//test/mocks/buffer:buffer_mocks",
         "//test/test_common:utility_lib",

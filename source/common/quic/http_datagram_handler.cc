@@ -48,16 +48,20 @@ bool HttpDatagramHandler::OnCapsule(const quiche::Capsule& capsule) {
   }
   quic::MessageStatus status =
       stream_.SendHttp3Datagram(capsule.datagram_capsule().http_datagram_payload);
-  // Returns false and thus resets the corresponding stream in the following statuses. Otherwise,
-  // drops the Datagram and move on without reporting a failure.
-  if (status == quic::MessageStatus::MESSAGE_STATUS_ENCRYPTION_NOT_ESTABLISHED ||
-      status == quic::MessageStatus::MESSAGE_STATUS_UNSUPPORTED ||
-      status == quic::MessageStatus::MESSAGE_STATUS_INTERNAL_ERROR) {
-    ENVOY_LOG(error, fmt::format("SendHttpH3Datagram failed: status = {}",
-                                 quic::MessageStatusToString(status)));
-    return false;
+  if (status == quic::MessageStatus::MESSAGE_STATUS_SUCCESS) {
+    return true;
   }
-  return true;
+  // Drops the Datagram and move on without reporting a failure in the following statuses.
+  if (status == quic::MessageStatus::MESSAGE_STATUS_BLOCKE ||
+      status == quic::MessageStatus::MESSAGE_STATUS_TOO_LARGE) {
+    ENVOY_LOG(warning, fmt::format("SendHttpH3Datagram failed: status = {}, drops the Datagram.",
+                                   quic::MessageStatusToString(status)));
+    return true;
+  }
+  // Otherwise, returns false and thus resets the corresponding stream.
+  ENVOY_LOG(error, fmt::format("SendHttpH3Datagram failed: status = {}, resets the stream.",
+                               quic::MessageStatusToString(status)));
+  return false;
 }
 
 void HttpDatagramHandler::OnCapsuleParseFailure(absl::string_view error_message) {

@@ -115,7 +115,7 @@ public:
     }
   }
 
-#ifdef ENVOY_ENABLE_HTTP_DATAGRAM
+#ifdef ENVOY_ENABLE_HTTP_DATAGRAMS
   void setUpCapsuleProtocol(bool close_send_stream, bool close_recv_stream) {
     quic_stream_->useCapsuleProtocol();
 
@@ -236,7 +236,7 @@ protected:
   spdy::Http2HeaderBlock spdy_trailers_;
   std::string host_{"www.abc.com"};
   std::string request_body_{"Hello world"};
-#ifdef ENVOY_ENABLE_HTTP_DATAGRAM
+#ifdef ENVOY_ENABLE_HTTP_DATAGRAMS
   std::string capsule_fragment_ = absl::HexStringToBytes("00"               // DATAGRAM capsule type
                                                          "08"               // capsule length
                                                          "a1a2a3a4a5a6a7a8" // HTTP Datagram payload
@@ -845,7 +845,7 @@ TEST_F(EnvoyQuicServerStreamTest, MetadataNotSupported) {
   EXPECT_CALL(stream_callbacks_, onResetStream(_, _));
 }
 
-#ifdef ENVOY_ENABLE_HTTP_DATAGRAM
+#ifdef ENVOY_ENABLE_HTTP_DATAGRAMS
 TEST_F(EnvoyQuicServerStreamTest, EncodeCapsule) {
   setUpCapsuleProtocol(false, true);
   Buffer::OwnedImpl buffer(capsule_fragment_);

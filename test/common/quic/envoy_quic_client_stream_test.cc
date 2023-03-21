@@ -130,7 +130,7 @@ public:
     return data.length();
   }
 
-#ifdef ENVOY_ENABLE_HTTP_DATAGRAM
+#ifdef ENVOY_ENABLE_HTTP_DATAGRAMS
   void setUpCapsuleProtocol(bool close_send_stream, bool close_recv_stream) {
     EXPECT_TRUE(quic_session_.OnSetting(quic::SETTINGS_H3_DATAGRAM, 1));
     quic_stream_->useCapsuleProtocol();
@@ -192,7 +192,7 @@ protected:
   spdy::Http2HeaderBlock spdy_trailers_;
   Buffer::OwnedImpl request_body_{"Hello world"};
   std::string response_body_{"OK\n"};
-#ifdef ENVOY_ENABLE_HTTP_DATAGRAM
+#ifdef ENVOY_ENABLE_HTTP_DATAGRAMS
   std::string capsule_fragment_ = absl::HexStringToBytes("00"               // DATAGRAM capsule type
                                                          "08"               // capsule length
                                                          "a1a2a3a4a5a6a7a8" // HTTP Datagram payload
@@ -680,7 +680,7 @@ TEST_F(EnvoyQuicClientStreamTest, EncodeTrailersOnClosedStream) {
   EXPECT_EQ(0u, quic_session_.bytesToSend());
 }
 
-#ifdef ENVOY_ENABLE_HTTP_DATAGRAM
+#ifdef ENVOY_ENABLE_HTTP_DATAGRAMS
 TEST_F(EnvoyQuicClientStreamTest, EncodeCapsule) {
   setUpCapsuleProtocol(false, true);
   Buffer::OwnedImpl buffer(capsule_fragment_);

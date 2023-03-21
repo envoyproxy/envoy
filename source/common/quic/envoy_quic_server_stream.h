@@ -79,7 +79,7 @@ public:
   Http::HeaderUtility::HeaderValidationResult
   validateHeader(absl::string_view header_name, absl::string_view header_value) override;
 
-#ifdef ENVOY_ENABLE_HTTP_DATAGRAM
+#ifdef ENVOY_ENABLE_HTTP_DATAGRAMS
   // Makes the QUIC stream use Capsule Protocol. Once this method is called, any calls to encodeData
   // are expected to contain capsules which will be sent along as HTTP Datagrams. Also, the stream
   // starts to receive HTTP/3 Datagrams and decode into Capsules.
@@ -118,7 +118,7 @@ private:
       headers_with_underscores_action_;
 
   quiche::QuicheReferenceCountedPointer<QuicStatsGatherer> stats_gatherer_;
-#ifdef ENVOY_ENABLE_HTTP_DATAGRAM
+#ifdef ENVOY_ENABLE_HTTP_DATAGRAMS
   // Setting |http_datagram_handler_| enables HTTP Datagram support.
   std::unique_ptr<HttpDatagramHandler> http_datagram_handler_;
 #endif

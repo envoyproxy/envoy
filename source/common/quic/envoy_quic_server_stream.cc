@@ -82,7 +82,7 @@ void EnvoyQuicServerStream::encodeData(Buffer::Instance& data, bool end_stream) 
   ASSERT(!local_end_stream_);
   local_end_stream_ = end_stream;
   SendBufferMonitor::ScopedWatermarkBufferUpdater updater(this, this);
-#ifdef ENVOY_ENABLE_HTTP_DATAGRAM
+#ifdef ENVOY_ENABLE_HTTP_DATAGRAMS
   if (http_datagram_handler_) {
     IncrementalBytesSentTracker tracker(*this, *mutableBytesMeter(), false);
     if (!http_datagram_handler_->encodeCapsuleFragment(data.toString(), end_stream)) {
@@ -117,7 +117,7 @@ void EnvoyQuicServerStream::encodeData(Buffer::Instance& data, bool end_stream) 
       Reset(quic::QUIC_BAD_APPLICATION_PAYLOAD);
       return;
     }
-#ifdef ENVOY_ENABLE_HTTP_DATAGRAM
+#ifdef ENVOY_ENABLE_HTTP_DATAGRAMS
   }
 #endif
   if (local_end_stream_) {
@@ -479,7 +479,7 @@ bool EnvoyQuicServerStream::hasPendingData() {
   return (!write_side_closed()) && BufferedDataBytes() > 0;
 }
 
-#ifdef ENVOY_ENABLE_HTTP_DATAGRAM
+#ifdef ENVOY_ENABLE_HTTP_DATAGRAMS
 // TODO(https://github.com/envoyproxy/envoy/issues/23564): Make the stream use Capsule Protocol
 // for CONNECT-UDP support when the headers contain "Capsule-Protocol: ?1" or "Upgrade:
 // connect-udp".

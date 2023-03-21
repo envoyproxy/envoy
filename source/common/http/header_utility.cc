@@ -226,10 +226,13 @@ bool HeaderUtility::isConnectResponse(const RequestHeaderMap* request_headers,
              Http::Code::OK;
 }
 
-#ifdef ENVOY_ENABLE_HTTP_DATAGRAM
+#ifdef ENVOY_ENABLE_HTTP_DATAGRAMS
 bool HeaderUtility::isCapsuleProtocol(const RequestOrResponseHeaderMap& headers) {
   Http::HeaderMap::GetResult capsule_protocol =
       headers.get(Envoy::Http::LowerCaseString("Capsule-Protocol"));
+  // When there are multiple Capsule-Protocol header entries, it returns false. RFC 9297 specifies
+  // that non-boolean value types must be ignored. If there are multiple header entries, the value
+  // type becomes a List so the header field must be ignored.
   if (capsule_protocol.size() != 1) {
     return false;
   }
