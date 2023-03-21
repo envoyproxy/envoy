@@ -23,6 +23,7 @@ android_library(
     manifest = "URLConnectionManifest.xml",
     visibility = ["//visibility:public"],
     deps = [
+        "//library/java/io/envoyproxy/envoymobile/utilities",
         "//library/java/org/chromium/net",
         artifact("androidx.annotation:annotation"),
     ],

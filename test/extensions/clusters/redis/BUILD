@@ -90,7 +90,7 @@ envoy_extension_cc_test(
 
 envoy_extension_cc_test(
     name = "redis_cluster_integration_test",
-    size = "small",
+    size = "large",
     srcs = ["redis_cluster_integration_test.cc"],
     extension_names = ["envoy.clusters.redis"],
     # This test takes a while to run specially under tsan.

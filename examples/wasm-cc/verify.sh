@@ -26,7 +26,7 @@ run_log "Bring down the proxy"
 "${DOCKER_COMPOSE[@]}" stop proxy
 
 run_log "Compile updated Wasm filter"
-"${DOCKER_COMPOSE[@]}" -f docker-compose-wasm.yaml up --remove-orphans wasm_compile_update
+"${DOCKER_COMPOSE[@]}" -f docker-compose-wasm.yaml up --quiet-pull --remove-orphans wasm_compile_update
 
 run_log "Check for the compiled update"
 ls -l lib/*updated*wasm
@@ -55,3 +55,6 @@ run_log "Test updated Wasm header"
 responds_with_header \
     "x-wasm-custom: BAR" \
     http://localhost:8000
+
+# Restore original Dockerfile
+mv Dockerfile-proxy.bak Dockerfile-proxy

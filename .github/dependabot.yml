@@ -17,17 +17,12 @@ updates:
     interval: "daily"
 
 - package-ecosystem: "pip"
-  directory: "/examples/shared/flask"
+  directory: "/examples/shared/python"
   schedule:
     interval: "daily"
 
 - package-ecosystem: "pip"
-  directory: "/examples/shared/flask/postgres"
-  schedule:
-    interval: "daily"
-
-- package-ecosystem: "pip"
-  directory: "/examples/shared/flask/tracing"
+  directory: "/examples/shared/python/postgres"
   schedule:
     interval: "daily"
 

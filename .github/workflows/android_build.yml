@@ -37,7 +37,6 @@ jobs:
       run: |
         cd mobile && ./bazelw build \
           $([ -z $GITHUB_TOKEN ] || echo "--config=remote-ci-linux-clang") \
-          --remote_header="Authorization=Bearer $GITHUB_TOKEN" \
           --fat_apk_cpu=x86_64 \
           --linkopt=-fuse-ld=lld \
           //:android_dist
@@ -54,7 +53,7 @@ jobs:
     - id: should_run
       name: 'Check whether to run'
       run: ./mobile/tools/should_run_ci.sh
-    - uses: actions/setup-java@c3ac5dd0ed8db40fedb61c32fbe677e6b355e94c
+    - uses: actions/setup-java@3f07048e3d294f56e9b90ac5ea2c6f74e9ad0f98
       if: steps.should_run.outputs.run_ci_job == 'true'
       with:
         java-version: '8'
@@ -68,7 +67,7 @@ jobs:
       if: steps.should_run.outputs.run_ci_job == 'true'
       name: 'Start emulator'
       with:
-        timeout_minutes: 6
+        timeout_minutes: 10
         max_attempts: 3
         command: ./mobile/ci/start_android_emulator.sh
     # Return to using:
@@ -81,7 +80,6 @@ jobs:
       run: |
         cd mobile && ./bazelw build \
             $([ -z $GITHUB_TOKEN ] || echo "--config=remote-ci-macos") \
-            --remote_header="Authorization=Bearer $GITHUB_TOKEN" \
             --fat_apk_cpu=x86_64 \
             //examples/java/hello_world:hello_envoy
           adb install -r --no-incremental bazel-bin/examples/java/hello_world/hello_envoy.apk
@@ -102,7 +100,7 @@ jobs:
     - id: should_run
       name: 'Check whether to run'
       run: ./mobile/tools/should_run_ci.sh
-    - uses: actions/setup-java@c3ac5dd0ed8db40fedb61c32fbe677e6b355e94c
+    - uses: actions/setup-java@3f07048e3d294f56e9b90ac5ea2c6f74e9ad0f98
       if: steps.should_run.outputs.run_ci_job == 'true'
       with:
         java-version: '8'
@@ -116,7 +114,7 @@ jobs:
       if: steps.should_run.outputs.run_ci_job == 'true'
       name: 'Start emulator'
       with:
-        timeout_minutes: 6
+        timeout_minutes: 10
         max_attempts: 3
         command: ./mobile/ci/start_android_emulator.sh
     # Return to using:
@@ -129,7 +127,6 @@ jobs:
       run: |
         cd mobile && ./bazelw build \
             $([ -z $GITHUB_TOKEN ] || echo "--config=remote-ci-macos") \
-            --remote_header="Authorization=Bearer $GITHUB_TOKEN" \
             --fat_apk_cpu=x86_64 \
             //examples/kotlin/hello_world:hello_envoy_kt
           adb install -r --no-incremental bazel-bin/examples/kotlin/hello_world/hello_envoy_kt.apk
@@ -150,7 +147,7 @@ jobs:
     - id: should_run
       name: 'Check whether to run'
       run: ./mobile/tools/should_run_ci.sh
-    - uses: actions/setup-java@c3ac5dd0ed8db40fedb61c32fbe677e6b355e94c
+    - uses: actions/setup-java@3f07048e3d294f56e9b90ac5ea2c6f74e9ad0f98
       if: steps.should_run.outputs.run_ci_job == 'true'
       with:
         java-version: '8'
@@ -164,7 +161,7 @@ jobs:
       if: steps.should_run.outputs.run_ci_job == 'true'
       name: 'Start emulator'
       with:
-        timeout_minutes: 6
+        timeout_minutes: 10
         max_attempts: 3
         command: ./mobile/ci/start_android_emulator.sh
     # Return to using:
@@ -177,7 +174,6 @@ jobs:
       run: |
         cd mobile && ./bazelw build \
             $([ -z $GITHUB_TOKEN ] || echo "--config=remote-ci-macos") \
-            --remote_header="Authorization=Bearer $GITHUB_TOKEN" \
             --fat_apk_cpu=x86_64 \
             //test/kotlin/apps/baseline:hello_envoy_kt
           adb install -r --no-incremental bazel-bin/test/kotlin/apps/baseline/hello_envoy_kt.apk
@@ -198,7 +194,7 @@ jobs:
     - id: should_run
       name: 'Check whether to run'
       run: ./mobile/tools/should_run_ci.sh
-    - uses: actions/setup-java@c3ac5dd0ed8db40fedb61c32fbe677e6b355e94c
+    - uses: actions/setup-java@3f07048e3d294f56e9b90ac5ea2c6f74e9ad0f98
       if: steps.should_run.outputs.run_ci_job == 'true'
       with:
         java-version: '8'
@@ -212,7 +208,7 @@ jobs:
       if: steps.should_run.outputs.run_ci_job == 'true'
       name: 'Start emulator'
       with:
-        timeout_minutes: 6
+        timeout_minutes: 10
         max_attempts: 3
         command: ./mobile/ci/start_android_emulator.sh
     # Return to using:
@@ -225,9 +221,9 @@ jobs:
       run: |
         cd mobile && ./bazelw build \
             $([ -z $GITHUB_TOKEN ] || echo "--config=remote-ci-macos") \
-            --remote_header="Authorization=Bearer $GITHUB_TOKEN" \
             --fat_apk_cpu=x86_64 \
             --define=admin_functionality=enabled \
+            --define envoy_mobile_listener=enabled \
             //test/kotlin/apps/experimental:hello_envoy_kt
           adb install -r --no-incremental bazel-bin/test/kotlin/apps/experimental/hello_envoy_kt.apk
           adb shell am start -n io.envoyproxy.envoymobile.helloenvoyexperimentaltest/.MainActivity

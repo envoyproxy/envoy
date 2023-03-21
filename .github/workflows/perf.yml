@@ -33,7 +33,6 @@ jobs:
             --config=sizeopt \
             --config=release-common \
             --config=remote-ci-linux-clang \
-            --remote_header="Authorization=Bearer $GITHUB_TOKEN" \
             //test/performance:test_binary_size
     - uses: actions/upload-artifact@v3
       with:
@@ -63,7 +62,6 @@ jobs:
             --config=sizeopt \
             --config=release-common \
             --config=remote-ci-linux-clang \
-            --remote_header="Authorization=Bearer $GITHUB_TOKEN" \
             //test/performance:test_binary_size
     - uses: actions/upload-artifact@v3
       with:

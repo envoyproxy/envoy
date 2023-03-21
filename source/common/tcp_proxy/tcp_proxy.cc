@@ -71,7 +71,8 @@ Config::SharedConfig::SharedConfig(
     const envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy& config,
     Server::Configuration::FactoryContext& context)
     : stats_scope_(context.scope().createScope(fmt::format("tcp.{}", config.stat_prefix()))),
-      stats_(generateStats(*stats_scope_)) {
+      stats_(generateStats(*stats_scope_)),
+      flush_access_log_on_connected_(config.flush_access_log_on_connected()) {
   if (config.has_idle_timeout()) {
     const uint64_t timeout = DurationUtil::durationToMilliseconds(config.idle_timeout());
     if (timeout > 0) {
@@ -786,6 +787,12 @@ void Filter::onUpstreamConnection() {
         upstream_callbacks->onBytesSent();
         return true;
       });
+    }
+  }
+
+  if (config_->flushAccessLogOnConnected()) {
+    for (const auto& access_log : config_->accessLogs()) {
+      access_log->log(nullptr, nullptr, nullptr, getStreamInfo());
     }
   }
 }

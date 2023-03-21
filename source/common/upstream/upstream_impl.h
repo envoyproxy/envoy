@@ -863,7 +863,12 @@ public:
   std::shared_ptr<UpstreamLocalAddressSelector> getUpstreamLocalAddressSelector() const override {
     return upstream_local_address_selector_;
   }
-  const LoadBalancerSubsetInfo& lbSubsetInfo() const override { return lb_subset_; }
+  const LoadBalancerSubsetInfo& lbSubsetInfo() const override {
+    if (lb_subset_ != nullptr) {
+      return *lb_subset_;
+    }
+    return DefaultLoadBalancerSubsetInfoImpl::get();
+  }
   const envoy::config::core::v3::Metadata& metadata() const override { return metadata_; }
   const Envoy::Config::TypedMetadata& typedMetadata() const override { return typed_metadata_; }
 
@@ -982,7 +987,7 @@ private:
   const std::unique_ptr<const envoy::config::cluster::v3::Cluster::OriginalDstLbConfig>
       lb_original_dst_config_;
   std::unique_ptr<envoy::config::core::v3::TypedExtensionConfig> upstream_config_;
-  LoadBalancerSubsetInfoImpl lb_subset_;
+  std::unique_ptr<LoadBalancerSubsetInfoImpl> lb_subset_;
   const envoy::config::core::v3::Metadata metadata_;
   Envoy::Config::TypedMetadataImpl<ClusterTypedMetadataFactory> typed_metadata_;
   ProtobufTypes::MessagePtr load_balancing_policy_;

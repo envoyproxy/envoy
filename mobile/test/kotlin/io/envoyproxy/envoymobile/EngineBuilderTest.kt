@@ -223,4 +223,26 @@ class EngineBuilderTest {
     val engine = engineBuilder.build() as EngineImpl
     assertThat(engine.envoyConfiguration.nativeFilterChain.size).isEqualTo(1)
   }
+
+  @Test
+  fun `specifying RTDS and ADS works`() {
+    engineBuilder = EngineBuilder(Standard())
+    engineBuilder.addEngineType { envoyEngine }
+    engineBuilder.addRtdsLayer("rtds_layer_name")
+    engineBuilder.setAggregatedDiscoveryService("fake_test_address", 0)
+    val engine = engineBuilder.build() as EngineImpl
+    assertThat(engine.envoyConfiguration.rtdsLayerName).isEqualTo("rtds_layer_name")
+    assertThat(engine.envoyConfiguration.adsAddress).isEqualTo("fake_test_address")
+  }
+
+  @Test
+  fun `specifying runtime guards work`() {
+    engineBuilder = EngineBuilder(Standard())
+    engineBuilder
+      .setRuntimeGuard("test_feature_false", true)
+      .setRuntimeGuard("test_feature_true", false)
+    val engine = engineBuilder.build() as EngineImpl
+    assertThat(engine.envoyConfiguration.runtimeGuards["test_feature_false"]).isEqualTo("true")
+    assertThat(engine.envoyConfiguration.runtimeGuards["test_feature_true"]).isEqualTo("false")
+  }
 }

@@ -31,6 +31,7 @@ envoy_extension_cc_test(
 
 envoy_extension_cc_test(
     name = "tcp_stats_integration_test",
+    size = "large",
     srcs = ["tcp_stats_integration_test.cc"],
     extension_names = ["envoy.transport_sockets.tcp_stats"],
     deps = [

@@ -9,7 +9,7 @@ export PORT_ADMIN="${MYSQL_PORT_ADMIN:-11300}"
 
 _mysql () {
     local mysql_client
-    mysql_client=(docker run --network mysql_default mysql:latest mysql -h proxy -P 1999 -u root)
+    mysql_client=(docker run --rm --network mysql_default mysql:latest mysql -h proxy -P 1999 -u root)
 
     "${mysql_client[@]}" "${@}"
 }

@@ -221,7 +221,7 @@ DateFormatter::fromTimeAndPrepareSpecifierOffsets(time_t time, SpecifierOffsets&
   return formatted_time;
 }
 
-std::string DateFormatter::now(TimeSource& time_source) {
+std::string DateFormatter::now(TimeSource& time_source) const {
   return fromTime(time_source.systemTime());
 }
 
