@@ -292,7 +292,7 @@ TEST(TestConfig, DisableHttp3) {
       Not(HasSubstr("envoy.extensions.filters.http.alternate_protocols_cache.v3.FilterConfig")));
 #endif
 }
-
+#ifdef ENVOY_GOOGLE_GRPC
 TEST(TestConfig, RtdsWithoutAds) {
   EngineBuilder engine_builder;
   engine_builder.addRtdsLayer("some rtds layer");
@@ -353,6 +353,7 @@ TEST(TestConfig, AdsConfig) {
                 .token_lifetime_seconds(),
             500);
 }
+#endif
 
 TEST(TestConfig, EnablePlatformCertificatesValidation) {
   EngineBuilder engine_builder;

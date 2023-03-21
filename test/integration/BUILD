@@ -76,12 +76,14 @@ envoy_cc_test(
 
 envoy_cc_test(
     name = "alpn_integration_test",
+    size = "large",
     srcs = ["alpn_integration_test.cc"],
     deps = [":http_integration_lib"],
 )
 
 envoy_cc_test(
     name = "api_listener_integration_test",
+    size = "large",
     srcs = ["api_listener_integration_test.cc"],
     deps = [
         ":http_integration_lib",
@@ -136,6 +138,7 @@ envoy_cc_test(
 
 envoy_cc_test(
     name = "eds_integration_test",
+    size = "large",
     srcs = ["eds_integration_test.cc"],
     deps = [
         ":http_integration_lib",
@@ -154,6 +157,7 @@ envoy_cc_test(
 
 envoy_cc_test(
     name = "leds_integration_test",
+    size = "large",
     srcs = ["leds_integration_test.cc"],
     deps = [
         ":http_integration_lib",
@@ -174,6 +178,7 @@ envoy_proto_library(
 
 envoy_cc_test(
     name = "filter_manager_integration_test",
+    size = "large",
     srcs = [
         "filter_manager_integration_test.cc",
     ],
@@ -204,6 +209,7 @@ envoy_proto_library(
 
 envoy_cc_test(
     name = "upstream_filter_state_integration_test",
+    size = "large",
     srcs = [
         "upstream_filter_state_integration_test.cc",
     ],
@@ -221,6 +227,7 @@ envoy_cc_test(
 
 envoy_cc_test(
     name = "cluster_filter_integration_test",
+    size = "large",
     srcs = ["cluster_filter_integration_test.cc"],
     deps = [
         ":http_integration_lib",
@@ -236,6 +243,7 @@ envoy_cc_test(
 
 envoy_cc_test(
     name = "custom_cluster_integration_test",
+    size = "large",
     srcs = ["custom_cluster_integration_test.cc"],
     deps = [
         ":http_integration_lib",
@@ -250,6 +258,7 @@ envoy_cc_test(
 
 envoy_cc_test(
     name = "vhds_integration_test",
+    size = "large",
     srcs = ["vhds_integration_test.cc"],
     data = [
         "//test/config/integration/certs",
@@ -279,6 +288,7 @@ envoy_cc_test_library(
 
 envoy_cc_test(
     name = "drain_close_integration_test",
+    size = "large",
     srcs = envoy_select_admin_functionality([
         "drain_close_integration_test.cc",
     ]),
@@ -335,6 +345,7 @@ envoy_sh_test(
 
 envoy_cc_test(
     name = "alpn_selection_integration_test",
+    size = "large",
     srcs = [
         "alpn_selection_integration_test.cc",
     ],
@@ -352,6 +363,7 @@ envoy_cc_test(
 
 envoy_cc_test(
     name = "header_integration_test",
+    size = "large",
     srcs = [
         "header_integration_test.cc",
     ],
@@ -375,6 +387,7 @@ envoy_cc_test(
 
 envoy_cc_test(
     name = "http_conn_pool_integration_test",
+    size = "large",
     srcs = ["http_conn_pool_integration_test.cc"],
     deps = [
         ":http_protocol_integration_lib",
@@ -385,6 +398,7 @@ envoy_cc_test(
 
 envoy_cc_test(
     name = "circuit_breakers_integration_test",
+    size = "large",
     srcs = ["circuit_breakers_integration_test.cc"],
     deps = [
         ":http_protocol_integration_lib",
@@ -395,6 +409,7 @@ envoy_cc_test(
 
 envoy_cc_test(
     name = "http2_flood_integration_test",
+    size = "large",
     srcs = [
         "http2_flood_integration_test.cc",
     ],
@@ -420,6 +435,7 @@ envoy_cc_test(
 
 envoy_cc_test(
     name = "multiplexed_integration_test",
+    size = "large",
     srcs = [
         "multiplexed_integration_test.cc",
     ],
@@ -451,6 +467,7 @@ envoy_cc_test(
 
 envoy_cc_test(
     name = "shadow_policy_integration_test",
+    size = "large",
     srcs = ["shadow_policy_integration_test.cc"],
     deps = [
         ":http_integration_lib",
@@ -469,6 +486,7 @@ envoy_cc_test(
 
 envoy_cc_test(
     name = "upstream_http_filter_integration_test",
+    size = "large",
     srcs = ["upstream_http_filter_integration_test.cc"],
     deps = [
         ":http_integration_lib",
@@ -522,6 +540,7 @@ envoy_cc_test_library(
 
 envoy_cc_test(
     name = "http_subset_lb_integration_test",
+    size = "large",
     srcs = [
         "http_subset_lb_integration_test.cc",
     ],
@@ -537,6 +556,7 @@ envoy_cc_test(
 
 envoy_cc_test(
     name = "transport_socket_match_integration_test",
+    size = "large",
     srcs = [
         "transport_socket_match_integration_test.cc",
     ],
@@ -554,6 +574,7 @@ envoy_cc_test(
 
 envoy_cc_test(
     name = "header_casing_integration_test",
+    size = "large",
     srcs = [
         "header_casing_integration_test.cc",
     ],
@@ -566,6 +587,7 @@ envoy_cc_test(
 
 envoy_cc_test(
     name = "http_typed_per_filter_config_test",
+    size = "large",
     srcs = envoy_select_admin_functionality([
         "http_typed_per_filter_config_test.cc",
     ]),
@@ -577,6 +599,7 @@ envoy_cc_test(
 
 envoy_cc_test(
     name = "http_timeout_integration_test",
+    size = "large",
     srcs = [
         "http_timeout_integration_test.cc",
         "http_timeout_integration_test.h",
@@ -590,6 +613,7 @@ envoy_cc_test(
 
 envoy_cc_test(
     name = "filter_integration_test",
+    size = "large",
     srcs = envoy_select_admin_functionality([
         "filter_integration_test.cc",
     ]),
@@ -659,6 +683,7 @@ envoy_cc_test_library(
 
 envoy_cc_test(
     name = "protocol_integration_test",
+    size = "large",
     srcs = [
         "instantiate_protocol_integration_test.cc",
     ],
@@ -672,6 +697,7 @@ envoy_cc_test(
 
 envoy_cc_test(
     name = "multi_envoy_test",
+    size = "large",
     srcs = envoy_select_admin_functionality([
         "multi_envoy_test.cc",
     ]),
@@ -682,6 +708,7 @@ envoy_cc_test(
 
 envoy_cc_test(
     name = "multiplexed_upstream_integration_test",
+    size = "large",
     srcs = [
         "multiplexed_upstream_integration_test.cc",
     ],
@@ -700,6 +727,7 @@ envoy_cc_test(
 
 envoy_cc_test(
     name = "integration_admin_test",
+    size = "large",
     srcs = envoy_select_admin_functionality(
         [
             "integration_admin_test.cc",
@@ -797,6 +825,7 @@ envoy_cc_test_library(
 
 envoy_cc_test(
     name = "idle_timeout_integration_test",
+    size = "large",
     srcs = ["idle_timeout_integration_test.cc"],
     # As this test has many pauses for idle timeouts, it takes a while to run.
     # Shard it enough to bring the run time in line with other integration tests.
@@ -1110,6 +1139,7 @@ envoy_cc_test_library(
 
 envoy_cc_test(
     name = "integration_test",
+    size = "large",
     srcs = [
         "integration_test.cc",
         "integration_test.h",
@@ -1141,6 +1171,7 @@ envoy_cc_test(
 
 envoy_cc_test(
     name = "redirect_integration_test",
+    size = "large",
     srcs = [
         "redirect_integration_test.cc",
     ],
@@ -1158,6 +1189,7 @@ envoy_cc_test(
 
 envoy_cc_test(
     name = "regex_engine_integration_test",
+    size = "large",
     srcs = ["regex_engine_integration_test.cc"],
     deps = [
         ":integration_lib",
@@ -1169,6 +1201,7 @@ envoy_cc_test(
 
 envoy_cc_test(
     name = "websocket_integration_test",
+    size = "large",
     srcs = [
         "websocket_integration_test.cc",
         "websocket_integration_test.h",
@@ -1187,6 +1220,7 @@ envoy_cc_test(
 
 envoy_cc_test(
     name = "socket_interface_integration_test",
+    size = "large",
     srcs = ["socket_interface_integration_test.cc"],
     deps = [
         ":http_integration_lib",
@@ -1197,6 +1231,7 @@ envoy_cc_test(
 
 envoy_cc_test(
     name = "stats_integration_test",
+    size = "large",
     srcs = ["stats_integration_test.cc"],
     data = [
         "//test/config/integration/certs",
@@ -1221,6 +1256,7 @@ envoy_cc_test(
 
 envoy_cc_test(
     name = "load_stats_integration_test",
+    size = "large",
     srcs = ["load_stats_integration_test.cc"],
     deps = [
         ":http_integration_lib",
@@ -1238,6 +1274,7 @@ envoy_cc_test(
 
 envoy_cc_test(
     name = "hds_integration_test",
+    size = "large",
     srcs = ["hds_integration_test.cc"],
     data = [
         "//test/config/integration/certs",
@@ -1265,6 +1302,7 @@ envoy_cc_test(
 
 envoy_cc_test(
     name = "header_prefix_integration_test",
+    size = "large",
     srcs = ["header_prefix_integration_test.cc"],
     coverage = False,
     deps = [
@@ -1306,6 +1344,7 @@ envoy_cc_test_library(
 
 envoy_cc_test(
     name = "overload_integration_test",
+    size = "large",
     srcs = ["overload_integration_test.cc"],
     shard_count = 8,
     deps = [
@@ -1319,6 +1358,7 @@ envoy_cc_test(
 
 envoy_cc_test(
     name = "rtds_integration_test",
+    size = "large",
     srcs = envoy_select_admin_functionality([
         "rtds_integration_test.cc",
     ]),
@@ -1332,6 +1372,7 @@ envoy_cc_test(
 
 envoy_cc_test(
     name = "extension_discovery_integration_test",
+    size = "large",
     srcs = ["extension_discovery_integration_test.cc"],
     deps = [
         ":http_integration_lib",
@@ -1352,6 +1393,7 @@ envoy_cc_test(
 
 envoy_cc_test(
     name = "listener_extension_discovery_integration_test",
+    size = "large",
     srcs = ["listener_extension_discovery_integration_test.cc"],
     deps = [
         ":http_integration_lib",
@@ -1376,6 +1418,7 @@ envoy_cc_test_library(
 
 envoy_cc_test(
     name = "sds_static_integration_test",
+    size = "large",
     srcs = [
         "sds_static_integration_test.cc",
     ],
@@ -1400,6 +1443,7 @@ envoy_cc_test(
 
 envoy_cc_test(
     name = "sds_dynamic_integration_test",
+    size = "large",
     srcs = [
         "sds_dynamic_integration_test.cc",
     ],
@@ -1443,6 +1487,7 @@ envoy_cc_test(
 
 envoy_cc_test(
     name = "sds_generic_secret_integration_test",
+    size = "large",
     srcs = [
         "sds_generic_secret_integration_test.cc",
     ],
@@ -1466,6 +1511,7 @@ envoy_proto_library(
 
 envoy_cc_test(
     name = "tcp_proxy_integration_test",
+    size = "large",
     srcs = [
         "tcp_proxy_integration_test.cc",
         "tcp_proxy_integration_test.h",
@@ -1525,6 +1571,7 @@ envoy_cc_test(
 
 envoy_cc_test(
     name = "tcp_conn_pool_integration_test",
+    size = "large",
     srcs = [
         "tcp_conn_pool_integration_test.cc",
     ],
@@ -1540,6 +1587,7 @@ envoy_cc_test(
 
 envoy_cc_test(
     name = "tcp_async_client_integration_test",
+    size = "large",
     srcs = [
         "tcp_async_client_integration_test.cc",
     ],
@@ -1576,6 +1624,7 @@ envoy_cc_test_library(
 
 envoy_cc_test(
     name = "tracked_watermark_buffer_test",
+    size = "large",
     srcs = ["tracked_watermark_buffer_test.cc"],
     deps = [
         ":tracked_watermark_buffer_lib",
@@ -1586,6 +1635,7 @@ envoy_cc_test(
 
 envoy_cc_test(
     name = "uds_integration_test",
+    size = "large",
     srcs = envoy_select_admin_functionality([
         "uds_integration_test.cc",
         "uds_integration_test.h",
@@ -1603,6 +1653,7 @@ envoy_cc_test(
 
 envoy_cc_test(
     name = "dynamic_validation_integration_test",
+    size = "large",
     srcs = envoy_select_admin_functionality(
         ["dynamic_validation_integration_test.cc"],
     ),
@@ -1617,6 +1668,7 @@ envoy_cc_test(
 
 envoy_cc_test(
     name = "xds_integration_test",
+    size = "large",
     srcs = envoy_select_admin_functionality([
         "xds_integration_test.cc",
     ]),
@@ -1647,6 +1699,7 @@ envoy_cc_test(
 
 envoy_cc_test(
     name = "xfcc_integration_test",
+    size = "large",
     srcs = envoy_select_admin_functionality([
         "xfcc_integration_test.cc",
         "xfcc_integration_test.h",
@@ -1792,6 +1845,7 @@ envoy_cc_fuzz_test(
 
 envoy_cc_test(
     name = "scoped_rds_lib",
+    size = "large",
     srcs = [
         "scoped_rds.h",
     ],
@@ -1816,6 +1870,7 @@ envoy_cc_test(
 
 envoy_cc_test(
     name = "scoped_rds_integration_test",
+    size = "large",
     srcs = [
         "scoped_rds_integration_test.cc",
     ],
@@ -1841,6 +1896,7 @@ envoy_cc_test(
 
 envoy_cc_test(
     name = "listener_lds_integration_test",
+    size = "large",
     srcs = [
         "listener_lds_integration_test.cc",
     ],
@@ -1872,6 +1928,7 @@ envoy_cc_test(
 
 envoy_cc_test(
     name = "cx_limit_integration_test",
+    size = "large",
     srcs = ["cx_limit_integration_test.cc"],
     deps = [
         ":http_integration_lib",
@@ -1886,6 +1943,7 @@ envoy_cc_test(
 
 envoy_cc_test(
     name = "direct_response_integration_test",
+    size = "large",
     srcs = ["direct_response_integration_test.cc"],
     deps = [
         ":http_integration_lib",
@@ -1894,6 +1952,7 @@ envoy_cc_test(
 
 envoy_cc_test(
     name = "local_reply_integration_test",
+    size = "large",
     srcs = [
         "local_reply_integration_test.cc",
     ],
@@ -1907,6 +1966,7 @@ envoy_cc_test(
 
 envoy_cc_test(
     name = "command_formatter_extension_integration_test",
+    size = "large",
     srcs = [
         "command_formatter_extension_integration_test.cc",
     ],
@@ -1919,6 +1979,7 @@ envoy_cc_test(
 
 envoy_cc_test(
     name = "health_check_integration_test",
+    size = "large",
     srcs = ["health_check_integration_test.cc"],
     deps = [
         ":http_integration_lib",
@@ -1932,6 +1993,7 @@ envoy_cc_test(
 
 envoy_cc_test(
     name = "cluster_upstream_extension_integration_test",
+    size = "large",
     srcs = [
         "cluster_upstream_extension_integration_test.cc",
     ],
@@ -2028,6 +2090,7 @@ envoy_cc_test(
 
 envoy_cc_test(
     name = "original_ip_detection_integration_test",
+    size = "large",
     srcs = [
         "original_ip_detection_integration_test.cc",
     ],
@@ -2041,6 +2104,7 @@ envoy_cc_test(
 
 envoy_cc_test(
     name = "weighted_cluster_integration_test",
+    size = "large",
     srcs = ["weighted_cluster_integration_test.cc"],
     deps = [
         ":http_integration_lib",
@@ -2059,6 +2123,7 @@ envoy_proto_library(
 
 envoy_cc_test(
     name = "typed_metadata_integration_test",
+    size = "large",
     srcs = [
         "typed_metadata_integration_test.cc",
     ],
@@ -2075,6 +2140,7 @@ envoy_cc_test(
 
 envoy_cc_test(
     name = "tcp_proxy_odcds_integration_test",
+    size = "large",
     srcs = ["tcp_proxy_odcds_integration_test.cc"],
     data = [
         "//test/config/integration/certs",
@@ -2095,6 +2161,7 @@ envoy_cc_test(
 
 envoy_cc_test(
     name = "xds_delegate_extension_integration_test",
+    size = "large",
     srcs = envoy_select_admin_functionality([
         "xds_delegate_extension_integration_test.cc",
     ]),
@@ -2118,6 +2185,7 @@ envoy_proto_library(
 
 envoy_cc_test(
     name = "xds_config_tracker_integration_test",
+    size = "large",
     srcs = ["xds_config_tracker_integration_test.cc"],
     external_deps = ["abseil_strings"],
     deps = [
