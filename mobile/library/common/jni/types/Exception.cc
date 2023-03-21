@@ -16,13 +16,18 @@ bool Exception::checkAndClear() {
     env->ExceptionClear();
 
     const auto exception = Exception(env, throwable);
-    ENVOY_LOG_EVENT_TO_LOGGER(GET_MISC_LOGGER(), info, "jni_exception", exception.description());
+    ENVOY_LOG_EVENT_TO_LOGGER(GET_MISC_LOGGER(), info, "jni_cleared_pending_exception",
+                              exception.description());
     return true;
   } else {
     return false;
   }
 }
 
+/**
+ * @brief Creates a description of an exception in the following format:
+ * GENERIC_EXCEPTION_DESCRIPTION||EXCEPTION_STACKTRACE||EXCEPTION_CAUSE_STACKTRACE
+ */
 std::string Exception::description() const {
   std::vector<std::string> comps = {
       throwableDescription(throwable_),

@@ -106,7 +106,7 @@ class FilterThrowingExceptionTest {
     val engine = builder
       .addLogLevel(LogLevel.DEBUG)
       .setEventTracker { event ->
-        if (event["name"] == "event_log" && event["log_name"] == "jni_exception") {
+        if (event["name"] == "event_log" && event["log_name"] == "jni_cleared_pending_exception") {
           assertThat(event["message"]).contains(expectedMessages.removeFirst())
           onJNIExceptionEventLatch.countDown()
         }
