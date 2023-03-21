@@ -534,7 +534,7 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
   {
     StreamInfoFormatter duration_format("DURATION");
     absl::optional<std::chrono::nanoseconds> dur = std::chrono::nanoseconds(15000000);
-    EXPECT_CALL(stream_info, requestComplete()).WillRepeatedly(Return(dur));
+    EXPECT_CALL(stream_info, currentDuration()).WillRepeatedly(Return(dur));
     EXPECT_EQ("15", duration_format.format(request_headers, response_headers, response_trailers,
                                            stream_info, body));
     EXPECT_THAT(duration_format.formatValue(request_headers, response_headers, response_trailers,
