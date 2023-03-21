@@ -26,15 +26,15 @@ bool Exception::checkAndClear(const std::string& details) {
 
 /**
  * @brief Creates a description of an exception in the following format:
- * GENERIC_EXCEPTION_DESCRIPTION||EXCEPTION_STACKTRACE||EXCEPTION_CAUSE_STACKTRACE
+ * GENERIC_EXCEPTION_DESCRIPTION||DETAIL||EXCEPTION_STACKTRACE||EXCEPTION_CAUSE_STACKTRACE
  */
-std::string Exception::description(const std::string& details) const {
+std::string Exception::description(const std::string& detail) const {
   std::vector<std::string> descriptionComponents = {
       throwableDescription(throwable_),
   };
 
-  if (details != "") {
-    descriptionComponents.push_back(details);
+  if (detail != "") {
+    descriptionComponents.push_back(detail);
   }
 
   descriptionComponents.push_back(throwableStacktraceDescription(throwable_));
