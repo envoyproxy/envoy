@@ -1041,7 +1041,7 @@ ClusterInfoImpl::ClusterInfoImpl(
                      ? std::make_unique<LoadBalancerSubsetInfoImpl>(config.lb_subset_config())
                      : nullptr),
       metadata_(config.has_metadata()
-                    ? std::make_unique<const envoy::config::core::v3::Metadata>(config.metadata())
+                    ? std::make_unique<envoy::config::core::v3::Metadata>(config.metadata())
                     : nullptr),
       typed_metadata_(config.has_metadata()
                           ? std::make_unique<ClusterTypedMetadata>(config.metadata())
