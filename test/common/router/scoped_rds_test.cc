@@ -1736,6 +1736,51 @@ key:
                                             std::move(route_config_updated_cb));
 }
 
+TEST_F(ScopedRdsTest, OnScopeKeyBuilderUpdate) {
+  setup();
+
+  // update scope_key_builder separator to ,
+  const std::string hcm_config = R"EOF(
+name: foo_scoped_routes
+scope_key_builder:
+  fragments:
+    - header_value_extractor:
+        name: Addr
+        element:
+          key: x-foo-key
+          separator: ","
+)EOF";
+  envoy::extensions::filters::network::http_connection_manager::v3::ScopedRoutes
+      scoped_routes_config;
+  TestUtility::loadFromYaml(hcm_config, scoped_routes_config);
+  provider_ = config_provider_manager_->createXdsConfigProvider(
+      scoped_routes_config.scoped_rds(), server_factory_context_, context_init_manager_, "foo.",
+      ScopedRoutesConfigProviderManagerOptArg(
+          scoped_routes_config.name(), scoped_routes_config.rds_config_source(),
+          scoped_routes_config.scope_key_builder(), OptionalHttpFilters()));
+  srds_subscription_ = server_factory_context_.cluster_manager_.subscription_factory_.callbacks_;
+
+  const std::string config_yaml = R"EOF(
+name: foo_scope
+route_configuration_name: foo_routes
+key:
+  fragments:
+    - string_key: x-bar-key
+)EOF";
+  const auto resource = parseScopedRouteConfigurationFromYaml(config_yaml);
+  init_watcher_.expectReady(); // Only the SRDS parent_init_target_.
+  context_init_manager_.initialize(init_watcher_);
+  const auto decoded_resources = TestUtility::decodeResources({resource});
+  EXPECT_NO_THROW(srds_subscription_->onConfigUpdate(decoded_resources.refvec_, "1"));
+
+  pushRdsConfig({"foo_routes"}, "111");
+
+  auto config = getScopedRdsProvider()->config<ScopedConfigImpl>()->getRouteConfig(
+      TestRequestHeaderMapImpl{{"Addr", "x-foo-key,x-bar-key"}});
+  ASSERT_THAT(config, Not(IsNull()));
+  EXPECT_EQ(config->name(), "foo_routes");
+}
+
 } // namespace
 } // namespace Router
 } // namespace Envoy

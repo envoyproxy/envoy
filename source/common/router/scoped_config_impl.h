@@ -78,6 +78,8 @@ private:
   std::vector<std::unique_ptr<FragmentBuilderBase>> fragment_builders_;
 };
 
+using ScopeKeyBuilderImplPtr = std::unique_ptr<ScopeKeyBuilderImpl>;
+
 // ScopedRouteConfiguration and corresponding RouteConfigProvider.
 class ScopedRouteInfo {
 public:
@@ -112,11 +114,11 @@ using ScopedRouteMap = std::map<std::string, ScopedRouteInfoConstSharedPtr>;
 class ScopedConfigImpl : public ScopedConfig {
 public:
   explicit ScopedConfigImpl(ScopedRoutes::ScopeKeyBuilder&& scope_key_builder)
-      : scope_key_builder_(std::move(scope_key_builder)) {}
+      : scope_key_builder_(std::make_unique<ScopeKeyBuilderImpl>(std::move(scope_key_builder))) {}
 
   ScopedConfigImpl(ScopedRoutes::ScopeKeyBuilder&& scope_key_builder,
                    const std::vector<ScopedRouteInfoConstSharedPtr>& scoped_route_infos)
-      : scope_key_builder_(std::move(scope_key_builder)) {
+      : scope_key_builder_(std::make_unique<ScopeKeyBuilderImpl>(std::move(scope_key_builder))) {
     addOrUpdateRoutingScopes(scoped_route_infos);
   }
 
@@ -130,8 +132,12 @@ public:
   // The return value is not null only if the scope corresponding to the header exists.
   ScopeKeyPtr computeScopeKey(const Http::HeaderMap& headers) const override;
 
+  void updateScopeKeyBuilder(ScopedRoutes::ScopeKeyBuilder&& scope_key_builder) {
+    scope_key_builder_ = std::make_unique<ScopeKeyBuilderImpl>(std::move(scope_key_builder));
+  }
+
 private:
-  ScopeKeyBuilderImpl scope_key_builder_;
+  ScopeKeyBuilderImplPtr scope_key_builder_;
   // From scope name to cached ScopedRouteInfo.
   absl::flat_hash_map<std::string, ScopedRouteInfoConstSharedPtr> scoped_route_info_by_name_;
   // Hash by ScopeKey hash to lookup in constant time.

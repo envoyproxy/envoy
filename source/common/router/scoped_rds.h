@@ -133,6 +133,9 @@ public:
                     Http::RouteConfigUpdatedCallback&& route_config_updated_cb,
                     std::weak_ptr<Envoy::Config::ConfigSubscriptionCommonBase> weak_subscription);
 
+  void updateScopeKeyBuilder(const envoy::extensions::filters::network::http_connection_manager::
+                                 v3::ScopedRoutes::ScopeKeyBuilder& scope_key_builder);
+
 private:
   // A helper class that takes care of the life cycle management of a RDS route provider and the
   // update callback handle.
@@ -230,8 +233,8 @@ private:
   Stats::ScopeSharedPtr scope_;
   ScopedRdsStats stats_;
   Envoy::Config::SubscriptionPtr subscription_;
-  const envoy::extensions::filters::network::http_connection_manager::v3::ScopedRoutes::
-      ScopeKeyBuilder scope_key_builder_;
+  envoy::extensions::filters::network::http_connection_manager::v3::ScopedRoutes::ScopeKeyBuilder
+      scope_key_builder_;
   const envoy::config::core::v3::ConfigSource rds_config_source_;
   const std::string stat_prefix_;
   RouteConfigProviderManager& route_config_provider_manager_;

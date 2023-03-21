@@ -552,6 +552,22 @@ void ScopedRdsConfigSubscription::onDemandRdsUpdate(
   });
 }
 
+void ScopedRdsConfigSubscription::updateScopeKeyBuilder(
+    const envoy::extensions::filters::network::http_connection_manager::v3::ScopedRoutes::
+        ScopeKeyBuilder& scope_key_builder) {
+  applyConfigUpdate([scope_key_builder](ConfigProvider::ConfigConstSharedPtr config)
+                        -> ConfigProvider::ConfigConstSharedPtr {
+    auto* thread_local_scoped_config =
+        const_cast<ScopedConfigImpl*>(static_cast<const ScopedConfigImpl*>(config.get()));
+
+    thread_local_scoped_config->updateScopeKeyBuilder(
+        envoy::extensions::filters::network::http_connection_manager::v3::ScopedRoutes::
+            ScopeKeyBuilder(scope_key_builder));
+    return config;
+  });
+  scope_key_builder_ = scope_key_builder;
+}
+
 ScopedRdsConfigProvider::ScopedRdsConfigProvider(
     ScopedRdsConfigSubscriptionSharedPtr&& subscription)
     : MutableConfigProviderCommonBase(std::move(subscription), ConfigProvider::ApiType::Delta) {}
@@ -623,6 +639,8 @@ ConfigProviderPtr ScopedRoutesConfigProviderManager::createXdsConfigProvider(
                     .routeConfigProviderManager(),
                 static_cast<ScopedRoutesConfigProviderManager&>(config_provider_manager));
           });
+
+  subscription->updateScopeKeyBuilder(typed_optarg.scope_key_builder_);
 
   return std::make_unique<ScopedRdsConfigProvider>(std::move(subscription));
 }

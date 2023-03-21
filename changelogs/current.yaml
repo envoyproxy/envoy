@@ -22,6 +22,9 @@ minor_behavior_changes:
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
+- area: router
+  change: |
+    Fixed the bug that updating scope_key_builder of SRDS config doesn't work.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
