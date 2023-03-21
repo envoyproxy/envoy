@@ -32,6 +32,8 @@ fi
 # This is for local RBE setup, should be no-op for builds without RBE setting in bazelrc files.
 IFS=" " read -ra BAZEL_BUILD_OPTIONS <<< "${BAZEL_BUILD_OPTIONS:-}"
 
+# We want the binary at the end
+BAZEL_BUILD_OPTIONS+=(--remote_download_toplevel)
 
 if [[ "${AZP_BRANCH}" =~ ^refs/pull ]]; then
     # For PRs use the unmerged PR commit in the version string.
