@@ -19,7 +19,7 @@ public:
    * @brief Construct a new String object. Retrieves a pointer to an array of bytes representing
    * the string in modified UTF-8 encoding.
    */
-  String(jstring jni_string)
+  explicit String(jstring jni_string)
       : env_(Env::get()), jni_string_(jni_string),
         string_(env_->GetStringUTFChars(jni_string, nullptr)) {}
 
@@ -30,11 +30,14 @@ public:
   }
 
   /**
-   * @brief Returns a string_view that points at underlying array of bytes representing the string
-   * in modified UTF-8 encoding. The view is valid for as long as the String wrapping it stays
-   * alive.
+   * @brief Returns a string that represents the underlying array of bytes.
    */
-  absl::string_view get() { return absl::string_view(string_); }
+  std::string get() { 
+    if (string_ != nullptr) {
+        return std::string(string_); 
+    }
+    return "nullptr";
+  }
   void operator=(const String&) = delete;
 
 private:

@@ -59,7 +59,7 @@ std::string Exception::throwableDescription(jthrowable throwable) const {
     return "Throwable.toString: exception was thrown during method call";
   }
 
-  return std::string(String(j_description).get());
+  return String(j_description).get();
 }
 
 std::string Exception::throwableStacktraceDescription(jthrowable throwable) const {
@@ -111,7 +111,7 @@ std::string Exception::throwableStacktraceDescription(jthrowable throwable) cons
       break;
     }
 
-    lines.push_back(std::string(String(j_description).get()));
+    lines.push_back(String(j_description).get());
     env_->DeleteLocalRef(j_frame);
   }
 
