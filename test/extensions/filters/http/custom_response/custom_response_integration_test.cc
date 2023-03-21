@@ -646,9 +646,7 @@ TEST_P(CustomResponseIntegrationTest, ModifyRequestHeaders) {
 // TODO(#26236): Fix test suite for HTTP/3.
 INSTANTIATE_TEST_SUITE_P(
     Protocols, CustomResponseIntegrationTest,
-    testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams(
-        /*downstream_protocols = */ {Envoy::Http::CodecType::HTTP1, Envoy::Http::CodecType::HTTP2},
-        /*upstream_protocols = */ {Envoy::Http::CodecType::HTTP1, Envoy::Http::CodecType::HTTP2})),
+    testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParamsWithoutHTTP3()),
     HttpProtocolIntegrationTest::protocolTestParamsToString);
 } // namespace CustomResponse
 } // namespace HttpFilters
