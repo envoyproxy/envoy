@@ -74,8 +74,6 @@ itself. HTTP filters can then query the route-specific filter config during
 request processing.
 
 
-.. _arch_overview_advanced_dynamic_state:
-
 Dynamic State
 ^^^^^^^^^^^^^
 
@@ -91,6 +89,8 @@ the class definition (e.g., HTTP protocol, requested server name, etc.). In
 addition, it provides a facility to store typed objects in a map
 (``map<string, FilterState::Object>``). The state stored per filter can be
 either write-once (immutable), or write-many (mutable).
+
+.. _arch_overview_advanced_filter_state_sharing:
 
 Filter state sharing
 --------------------
