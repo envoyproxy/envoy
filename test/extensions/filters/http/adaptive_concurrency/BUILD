@@ -29,6 +29,7 @@ envoy_extension_cc_test(
 
 envoy_extension_cc_test(
     name = "adaptive_concurrency_integration_test",
+    size = "large",
     srcs = [
         "adaptive_concurrency_filter_integration_test.cc",
         "adaptive_concurrency_filter_integration_test.h",

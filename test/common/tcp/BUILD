@@ -29,3 +29,19 @@ envoy_cc_test(
         "//test/test_common:utility_lib",
     ],
 )
+
+envoy_cc_test(
+    name = "async_tcp_client_impl_test",
+    srcs = ["async_tcp_client_impl_test.cc"],
+    deps = [
+        "//source/common/network:utility_lib",
+        "//source/common/tcp:async_tcp_client_lib",
+        "//test/common/upstream:utility_lib",
+        "//test/mocks/buffer:buffer_mocks",
+        "//test/mocks/network:network_mocks",
+        "//test/mocks/tcp:tcp_mocks",
+        "//test/mocks/upstream:cluster_info_mocks",
+        "//test/mocks/upstream:cluster_manager_mocks",
+        "//test/mocks/upstream:host_mocks",
+    ],
+)

@@ -1035,7 +1035,7 @@ TEST_P(IntegrationTest, TestClientAllowChunkedLength) {
 TEST_P(IntegrationTest, BadFirstline) {
   initialize();
   std::string response;
-  sendRawHttpAndWaitForResponse(lookupPort("http"), "hello", &response);
+  sendRawHttpAndWaitForResponse(lookupPort("http"), "hello\r\n", &response);
   EXPECT_THAT(response, StartsWith("HTTP/1.1 400 Bad Request\r\n"));
 }
 
@@ -1053,6 +1053,13 @@ TEST_P(IntegrationTest, MissingDelimiter) {
 }
 
 TEST_P(IntegrationTest, InvalidCharacterInFirstline) {
+#ifndef ENVOY_ENABLE_UHV
+  if (http1_implementation_ == Http1ParserImpl::BalsaParser) {
+    // BalsaParser allows custom methods if UHV is enabled.
+    return;
+  }
+#endif
+
   initialize();
   std::string response;
   sendRawHttpAndWaitForResponse(lookupPort("http"), "GE(T / HTTP/1.1\r\nHost: host\r\n\r\n",
@@ -1070,11 +1077,7 @@ TEST_P(IntegrationTest, InvalidVersion) {
 
 // Expect that malformed trailers to break the connection
 TEST_P(IntegrationTest, BadTrailer) {
-  if (http1_implementation_ == Http1ParserImpl::BalsaParser) {
-    // TODO(#21245): Re-enable this test for BalsaParser.
-    return;
-  }
-
+  config_helper_.addConfigModifier(setEnableDownstreamTrailersHttp1());
   initialize();
   std::string response;
   sendRawHttpAndWaitForResponse(lookupPort("http"),
@@ -1091,11 +1094,6 @@ TEST_P(IntegrationTest, BadTrailer) {
 
 // Expect malformed headers to break the connection
 TEST_P(IntegrationTest, BadHeader) {
-  if (http1_implementation_ == Http1ParserImpl::BalsaParser) {
-    // TODO(#21245): Re-enable this test for BalsaParser.
-    return;
-  }
-
   initialize();
   std::string response;
   sendRawHttpAndWaitForResponse(lookupPort("http"),
@@ -1162,7 +1160,8 @@ TEST_P(IntegrationTest, Http09Enabled) {
 
 TEST_P(IntegrationTest, Http09WithKeepalive) {
   if (http1_implementation_ == Http1ParserImpl::BalsaParser) {
-    // TODO(#21245): Re-enable this test for BalsaParser.
+    // HTTP/0.9 does not allow for headers.
+    // BalsaParser correctly ignores data after "\r\n".
     return;
   }
 

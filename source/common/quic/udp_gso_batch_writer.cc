@@ -15,30 +15,26 @@ Api::IoCallUint64Result convertQuicWriteResult(quic::WriteResult quic_result, si
       ENVOY_LOG_MISC(trace, "sendmsg successful, flushed bytes {}", quic_result.bytes_written);
     }
     // Return payload_len as rc & nullptr as error on success
-    return Api::IoCallUint64Result(
-        /*rc=*/payload_len,
-        /*err=*/Api::IoErrorPtr(nullptr, Network::IoSocketError::deleteIoError));
+    return {/*rc=*/payload_len,
+            /*err=*/Api::IoErrorPtr(nullptr, Network::IoSocketError::deleteIoError)};
   case quic::WRITE_STATUS_BLOCKED_DATA_BUFFERED:
     // Data was buffered, Return payload_len as rc & nullptr as error
     ENVOY_LOG_MISC(trace, "sendmsg blocked, message buffered to send");
-    return Api::IoCallUint64Result(
-        /*rc=*/payload_len,
-        /*err=*/Api::IoErrorPtr(nullptr, Network::IoSocketError::deleteIoError));
+    return {/*rc=*/payload_len,
+            /*err=*/Api::IoErrorPtr(nullptr, Network::IoSocketError::deleteIoError)};
   case quic::WRITE_STATUS_BLOCKED:
     // Writer blocked, return error
     ENVOY_LOG_MISC(trace, "sendmsg blocked, message not buffered");
-    return Api::IoCallUint64Result(
-        /*rc=*/0,
-        /*err=*/Api::IoErrorPtr(Network::IoSocketError::getIoSocketEagainInstance(),
-                                Network::IoSocketError::deleteIoError));
+    return {/*rc=*/0,
+            /*err=*/Api::IoErrorPtr(Network::IoSocketError::getIoSocketEagainInstance(),
+                                    Network::IoSocketError::deleteIoError)};
   default:
     // Write Failed, return {0 and error_code}
     ENVOY_LOG_MISC(trace, "sendmsg failed with error code {}",
                    static_cast<int>(quic_result.error_code));
-    return Api::IoCallUint64Result(
-        /*rc=*/0,
-        /*err=*/Api::IoErrorPtr(new Network::IoSocketError(quic_result.error_code),
-                                Network::IoSocketError::deleteIoError));
+    return {/*rc=*/0,
+            /*err=*/Api::IoErrorPtr(new Network::IoSocketError(quic_result.error_code),
+                                    Network::IoSocketError::deleteIoError)};
   }
 }
 
@@ -78,8 +74,8 @@ UdpGsoBatchWriter::getNextWriteLocation(const Network::Address::Ip* local_ip,
   quic::QuicSocketAddress peer_addr = envoyIpAddressToQuicSocketAddress(peer_address.ip());
   quic::QuicSocketAddress self_addr = envoyIpAddressToQuicSocketAddress(local_ip);
   quic::QuicPacketBuffer quic_buf = GetNextWriteLocation(self_addr.host(), peer_addr);
-  return Network::UdpPacketWriterBuffer(reinterpret_cast<uint8_t*>(quic_buf.buffer),
-                                        Network::UdpMaxOutgoingPacketSize, quic_buf.release_buffer);
+  return {reinterpret_cast<uint8_t*>(quic_buf.buffer), Network::UdpMaxOutgoingPacketSize,
+          quic_buf.release_buffer};
 }
 
 Api::IoCallUint64Result UdpGsoBatchWriter::flush() {

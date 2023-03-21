@@ -434,7 +434,7 @@ TEST_P(ListenerMultiAddressesIntegrationTest, BasicSuccessWithMultiAddresses) {
   EXPECT_EQ(test_server_->server().listenerManager().listeners().size(), 1);
   registerTestServerPorts({"address1", "address2"});
 
-  const std::string route_config_tmpl = R"EOF(
+  constexpr absl::string_view route_config_tmpl = R"EOF(
       name: {}
       virtual_hosts:
       - name: integration
@@ -508,7 +508,7 @@ TEST_P(ListenerMultiAddressesIntegrationTest, BasicSuccessWithMultiAddressesAndS
   EXPECT_EQ(test_server_->server().listenerManager().listeners().size(), 1);
   registerTestServerPorts({"address1", "address2"});
 
-  const std::string route_config_tmpl = R"EOF(
+  constexpr absl::string_view route_config_tmpl = R"EOF(
       name: {}
       virtual_hosts:
       - name: integration
@@ -582,7 +582,7 @@ TEST_P(ListenerIntegrationTest, BasicSuccess) {
   EXPECT_EQ(test_server_->server().listenerManager().listeners().size(), 1);
   registerTestServerPorts({listener_name_});
 
-  const std::string route_config_tmpl = R"EOF(
+  constexpr absl::string_view route_config_tmpl = R"EOF(
       name: {}
       virtual_hosts:
       - name: integration
@@ -633,7 +633,7 @@ TEST_P(ListenerIntegrationTest, MultipleLdsUpdatesSharingListenSocketFactory) {
   EXPECT_EQ(test_server_->server().listenerManager().listeners().size(), 1);
   registerTestServerPorts({listener_name_});
 
-  const std::string route_config_tmpl = R"EOF(
+  constexpr absl::string_view route_config_tmpl = R"EOF(
       name: {}
       virtual_hosts:
       - name: integration
@@ -706,7 +706,7 @@ TEST_P(ListenerMultiAddressesIntegrationTest,
   EXPECT_EQ(test_server_->server().listenerManager().listeners().size(), 1);
   registerTestServerPorts({"address1", "address2"});
 
-  const std::string route_config_tmpl = R"EOF(
+  constexpr absl::string_view route_config_tmpl = R"EOF(
       name: {}
       virtual_hosts:
       - name: integration
@@ -787,7 +787,7 @@ TEST_P(ListenerMultiAddressesIntegrationTest, MultipleAddressesListenerInPlaceUp
   EXPECT_EQ(test_server_->server().listenerManager().listeners().size(), 1);
   registerTestServerPorts({"address1", "address2"});
 
-  const std::string route_config_tmpl = R"EOF(
+  constexpr absl::string_view route_config_tmpl = R"EOF(
       name: {}
       virtual_hosts:
       - name: integration
@@ -864,7 +864,7 @@ TEST_P(ListenerIntegrationTest, RemoveListenerAfterInPlaceUpdate) {
   EXPECT_EQ(test_server_->server().listenerManager().listeners().size(), 1);
   registerTestServerPorts({listener_name_});
 
-  const std::string route_config_tmpl = R"EOF(
+  constexpr absl::string_view route_config_tmpl = R"EOF(
       name: {}
       virtual_hosts:
       - name: integration
@@ -947,7 +947,7 @@ TEST_P(ListenerIntegrationTest, RemoveListenerAfterMultipleInPlaceUpdate) {
   EXPECT_EQ(test_server_->server().listenerManager().listeners().size(), 1);
   registerTestServerPorts({listener_name_});
 
-  const std::string route_config_tmpl = R"EOF(
+  constexpr absl::string_view route_config_tmpl = R"EOF(
       name: {}
       virtual_hosts:
       - name: integration
@@ -1035,7 +1035,7 @@ TEST_P(ListenerIntegrationTest, ChangeListenerAddress) {
   EXPECT_EQ(test_server_->server().listenerManager().listeners().size(), 1);
   registerTestServerPorts({listener_name_});
 
-  const std::string route_config_tmpl = R"EOF(
+  constexpr absl::string_view route_config_tmpl = R"EOF(
       name: {}
       virtual_hosts:
       - name: integration
@@ -1582,6 +1582,7 @@ TEST_P(ListenerFilterIntegrationTest,
   ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
   ASSERT_TRUE(fake_upstream_connection->waitForData(data.size(), &data));
   tcp_client->close();
+  ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
 
   auto* socket_option = listener_config_.add_socket_options();
   socket_option->set_level(IPPROTO_IP);

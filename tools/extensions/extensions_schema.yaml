@@ -10,6 +10,7 @@ builtin:
 - envoy.matching.inputs.request_trailers
 - envoy.matching.inputs.response_headers
 - envoy.matching.inputs.response_trailers
+- envoy.matching.inputs.query_params
 - envoy.matching.inputs.destination_ip
 - envoy.matching.inputs.destination_port
 - envoy.matching.inputs.source_ip
@@ -19,6 +20,7 @@ builtin:
 - envoy.matching.inputs.server_name
 - envoy.matching.inputs.transport_protocol
 - envoy.matching.inputs.application_protocol
+- envoy.matching.inputs.filter_state
 - envoy.matching.inputs.uri_san
 - envoy.matching.inputs.dns_san
 - envoy.matching.inputs.subject
@@ -84,6 +86,7 @@ categories:
 - envoy.quic.connection_id_generator
 - envoy.quic.proof_source
 - envoy.quic.server.crypto_stream
+- envoy.quic.server_preferred_address
 - envoy.rate_limit_descriptors
 - envoy.regex_engines
 - envoy.request_id
@@ -106,6 +109,7 @@ categories:
 - envoy.network.dns_resolver
 - envoy.network.connection_balance
 - envoy.rbac.matchers
+- envoy.rbac.audit_loggers
 - envoy.access_loggers.extension_filters
 - envoy.http.stateful_session
 - envoy.matching.action

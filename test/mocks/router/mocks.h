@@ -53,7 +53,7 @@ public:
               (const));
   MOCK_METHOD(Http::HeaderTransforms, responseHeaderTransforms,
               (const StreamInfo::StreamInfo& stream_info, bool do_formatting), (const));
-  MOCK_METHOD(std::string, newPath, (const Http::RequestHeaderMap& headers), (const));
+  MOCK_METHOD(std::string, newUri, (const Http::RequestHeaderMap& headers), (const));
   MOCK_METHOD(void, rewritePathHeader,
               (Http::RequestHeaderMap & headers, bool insert_envoy_original_path), (const));
   MOCK_METHOD(Http::Code, responseCode, (), (const));

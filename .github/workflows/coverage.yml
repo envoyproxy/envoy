@@ -12,6 +12,7 @@ concurrency:
 
 jobs:
   coverage:
+    if: github.repository == 'envoyproxy/envoy'
     name: coverage
     runs-on: ubuntu-20.04
     timeout-minutes: 120
@@ -19,9 +20,11 @@ jobs:
       run:
         shell: bash
     container:
-      image: envoyproxy/envoy-build-ubuntu:7304f974de2724617b7492ccb4c9c58cd420353a
+      image: envoyproxy/envoy-build-ubuntu:458cb49ca2013c0ccf057d00ad1d4407920c4e52
     steps:
-    - uses: actions/checkout@v1
+    - uses: actions/checkout@v3
+      with:
+        fetch-depth: 0
     - name: Add safe directory
       run: git config --global --add safe.directory /__w/envoy/envoy
     - id: should_run
@@ -30,9 +33,10 @@ jobs:
     - name: 'Run coverage'
       if: steps.should_run.outputs.run_ci_job == 'true'
       continue-on-error: true
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
-        echo "build --remote_header=\"Authorization=Bearer ${{ secrets.GITHUB_TOKEN }}\"" > ~/.bazelrc
-          cd mobile && BAZEL_BUILD_OPTIONS="--config=remote-ci-linux-coverage" \
+        cd mobile && BAZEL_BUILD_OPTIONS="--config=remote-ci-linux-coverage" \
             PATH=/opt/llvm/bin:${PATH} \
             COVERAGE_THRESHOLD=95 \
             ../test/run_envoy_bazel_coverage.sh //test/common/...

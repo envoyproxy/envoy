@@ -41,13 +41,14 @@ public class NativeCronetEngineBuilderImpl extends CronetEngineBuilderImpl {
   private int mDnsFailureRefreshSecondsMax = 10;
   private int mDnsQueryTimeoutSeconds = 25;
   private int mDnsMinRefreshSeconds = 60;
-  private String mDnsPreresolveHostnames = "[]";
+  private List<String> mDnsPreresolveHostnames = Collections.emptyList();
   private boolean mEnableDNSCache = false;
+  private int mDnsCacheSaveIntervalSeconds = 1;
   private List<String> mDnsFallbackNameservers = Collections.emptyList();
   private boolean mEnableDnsFilterUnroutableFamilies = true;
   private boolean mDnsUseSystemResolver = true;
   private boolean mEnableDrainPostDnsRefresh = false;
-  private boolean mEnableGzip = true;
+  private boolean mEnableGzipDecompression = true;
   private boolean mEnableSocketTag = true;
   private boolean mEnableHappyEyeballs = true;
   private boolean mEnableInterfaceBinding = false;
@@ -62,8 +63,22 @@ public class NativeCronetEngineBuilderImpl extends CronetEngineBuilderImpl {
   private String mAppVersion = "unspecified";
   private String mAppId = "unspecified";
   private TrustChainVerification mTrustChainVerification = VERIFY_TRUST_CHAIN;
-  private String mVirtualClusters = "[]";
+  private List<String> mVirtualClusters = Collections.emptyList();
   private boolean mEnablePlatformCertificatesValidation = true;
+  private String mRtdsLayerName = "";
+  private int mRtdsTimeoutSeconds = 0;
+  private String mAdsAddress = "";
+  private int mAdsPort = 0;
+  private String mAdsToken = "";
+  private int mAdsTokenLifetime = 0;
+  private String mAdsRootCerts = "";
+  private String mNodeId = "";
+  private String mNodeRegion = "";
+  private String mNodeZone = "";
+  private String mNodeSubZone = "";
+  private String mCdsResourcesLocator = "";
+  private int mCdsTimeoutSeconds = 0;
+  private boolean mEnableCds = false;
 
   /**
    * Builder for Native Cronet Engine. Default config enables SPDY, disables QUIC and HTTP cache.
@@ -118,17 +133,22 @@ public class NativeCronetEngineBuilderImpl extends CronetEngineBuilderImpl {
     Map<String, EnvoyStringAccessor> stringAccessors = Collections.emptyMap();
     Map<String, EnvoyKeyValueStore> keyValueStores = Collections.emptyMap();
     List<String> statSinks = Collections.emptyList();
+    Map<String, Boolean> runtimeGuards = Collections.emptyMap();
 
     return new EnvoyConfiguration(
         mAdminInterfaceEnabled, mGrpcStatsDomain, mConnectTimeoutSeconds, mDnsRefreshSeconds,
         mDnsFailureRefreshSecondsBase, mDnsFailureRefreshSecondsMax, mDnsQueryTimeoutSeconds,
-        mDnsMinRefreshSeconds, mDnsPreresolveHostnames, mEnableDNSCache, mEnableDrainPostDnsRefresh,
-        quicEnabled(), mEnableGzip, brotliEnabled(), mEnableSocketTag, mEnableHappyEyeballs,
+        mDnsMinRefreshSeconds, mDnsPreresolveHostnames, mEnableDNSCache,
+        mDnsCacheSaveIntervalSeconds, mEnableDrainPostDnsRefresh, quicEnabled(),
+        mEnableGzipDecompression, brotliEnabled(), mEnableSocketTag, mEnableHappyEyeballs,
         mEnableInterfaceBinding, mH2ConnectionKeepaliveIdleIntervalMilliseconds,
         mH2ConnectionKeepaliveTimeoutSeconds, mMaxConnectionsPerHost, mStatsFlushSeconds,
         mStreamIdleTimeoutSeconds, mPerTryIdleTimeoutSeconds, mAppVersion, mAppId,
         mTrustChainVerification, mVirtualClusters, nativeFilterChain, platformFilterChain,
-        stringAccessors, keyValueStores, statSinks, mEnableSkipDNSLookupForProxiedRequests,
-        mEnablePlatformCertificatesValidation);
+        stringAccessors, keyValueStores, statSinks, runtimeGuards,
+        mEnableSkipDNSLookupForProxiedRequests, mEnablePlatformCertificatesValidation,
+        mRtdsLayerName, mRtdsTimeoutSeconds, mAdsAddress, mAdsPort, mAdsToken, mAdsTokenLifetime,
+        mAdsRootCerts, mNodeId, mNodeRegion, mNodeZone, mNodeSubZone, mCdsResourcesLocator,
+        mCdsTimeoutSeconds, mEnableCds);
   }
 }

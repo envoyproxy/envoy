@@ -22,6 +22,17 @@
 namespace Envoy {
 
 /**
+ * Converts a `timespec` structure to a `std::chrono::time_point` aka. `Envoy::SystemTime`.
+ * @param t the `timespec`
+ * @return Envoy::SystemTime the same time, represented as a `std::chrono::time_point`,
+ *         to microsecond accuracy. (`SystemTime` does not accept nanosecond accuracy.)
+ */
+constexpr SystemTime timespecToChrono(const struct timespec& t) {
+  return SystemTime{} + std::chrono::duration_cast<std::chrono::microseconds>(
+                            std::chrono::seconds{t.tv_sec} + std::chrono::nanoseconds{t.tv_nsec});
+}
+
+/**
  * Retrieve string description of error code
  * @param int error code
  * @return const std::string error detail description
@@ -46,7 +57,7 @@ public:
    * @param time_source time keeping source.
    * @return std::string representing the GMT/UTC time of a TimeSource based on the format string.
    */
-  std::string now(TimeSource& time_source);
+  std::string now(TimeSource& time_source) const;
 
   /**
    * @return std::string the format string used.

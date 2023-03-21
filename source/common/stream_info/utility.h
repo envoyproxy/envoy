@@ -94,6 +94,7 @@ public:
   absl::optional<std::chrono::nanoseconds> lastUpstreamTxByteSent();
   absl::optional<std::chrono::nanoseconds> firstUpstreamRxByteReceived();
   absl::optional<std::chrono::nanoseconds> lastUpstreamRxByteReceived();
+  absl::optional<std::chrono::nanoseconds> upstreamHandshakeComplete();
   absl::optional<std::chrono::nanoseconds> firstDownstreamTxByteSent();
   absl::optional<std::chrono::nanoseconds> lastDownstreamTxByteSent();
   absl::optional<std::chrono::nanoseconds> lastDownstreamRxByteReceived();
@@ -122,6 +123,13 @@ public:
    */
   static const std::string
   formatDownstreamAddressJustPort(const Network::Address::Instance& address);
+
+  /**
+   * @param address supplies the downstream address.
+   * @return a port, extracted from the provided downstream address for logs, header expansion, etc.
+   */
+  static absl::optional<uint32_t>
+  extractDownstreamAddressJustPort(const Network::Address::Instance& address);
 };
 
 // Static utils for creating, consuming, and producing strings from the

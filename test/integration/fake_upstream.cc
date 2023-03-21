@@ -15,6 +15,7 @@
 #include "source/common/network/listen_socket_impl.h"
 #include "source/common/network/socket_option_factory.h"
 #include "source/common/network/utility.h"
+#include "source/common/runtime/runtime_features.h"
 
 #ifdef ENVOY_ENABLE_QUIC
 #include "source/common/quic/server_codec_impl.h"
@@ -109,7 +110,7 @@ void FakeStream::encodeHeaders(const Http::HeaderMap& headers, bool end_stream) 
   });
 }
 
-void FakeStream::encodeData(absl::string_view data, bool end_stream) {
+void FakeStream::encodeData(std::string data, bool end_stream) {
   postToConnectionThread([this, data, end_stream]() -> void {
     {
       absl::MutexLock lock(&lock_);
@@ -351,6 +352,8 @@ FakeHttpConnection::FakeHttpConnection(
   ASSERT(max_request_headers_count != 0);
   if (type == Http::CodecType::HTTP1) {
     Http::Http1Settings http1_settings;
+    http1_settings.use_balsa_parser_ =
+        Runtime::runtimeFeatureEnabled("envoy.reloadable_features.http1_use_balsa_parser");
     // For the purpose of testing, we always have the upstream encode the trailers if any
     http1_settings.enable_trailers_ = true;
     Http::Http1::CodecStats& stats = fake_upstream.http1CodecStats();
@@ -984,6 +987,15 @@ void FakeHttpConnection::writeRawData(absl::string_view data) {
   Api::IoCallUint64Result result =
       dynamic_cast<Network::ConnectionImpl*>(&connection())->ioHandle().write(buffer);
   ASSERT(result.ok());
+}
+
+AssertionResult FakeHttpConnection::postWriteRawData(std::string data) {
+  return shared_connection_.executeOnDispatcher(
+      [data](Network::Connection& connection) {
+        Buffer::OwnedImpl to_write(data);
+        connection.write(to_write, false);
+      },
+      TestUtility::DefaultTimeout);
 }
 
 } // namespace Envoy

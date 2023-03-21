@@ -2,11 +2,11 @@
 
 #include "test/integration/integration.h"
 
-#include "library/cc/engine_builder.h"
 #include "library/cc/stream.h"
 #include "library/cc/stream_prototype.h"
 #include "library/common/http/client.h"
 #include "library/common/types/c_types.h"
+#include "test_engine_builder.h"
 
 namespace Envoy {
 
@@ -41,31 +41,29 @@ public:
   BaseClientIntegrationTest(Network::Address::IpVersion ip_version,
                             const std::string& bootstrap_config = defaultConfig());
   virtual ~BaseClientIntegrationTest() = default;
+  // Note: This class does not inherit from testing::Test and so this TearDown() method
+  // does not override testing::Test::TearDown(). As a result, it will not be called
+  // automatically by gtest during shutdown and must be called manually.
+  void TearDown();
 
 protected:
   envoy_engine_t& rawEngine() { return engine_->engine_; }
   virtual void initialize() override;
-  virtual void cleanup();
   void createEnvoy() override;
   void threadRoutine(absl::Notification& engine_running);
-  // Must be called manually by subclasses in their TearDown();
-  void TearDown();
-  // helpers to access protected functions in the friend class
-  void setOverrideConfigForTests(Platform::EngineBuilder builder, std::string config) {
-    builder.setOverrideConfigForTests(config);
-  }
-  void setAdminAddressPathForTests(Platform::EngineBuilder& builder, std::string admin) {
-    builder.setAdminAddressPathForTests(admin);
-  }
+
   // Converts TestRequestHeaderMapImpl to Envoy::Platform::RequestHeadersSharedPtr
   Envoy::Platform::RequestHeadersSharedPtr
   envoyToMobileHeaders(const Http::TestRequestHeaderMapImpl& request_headers);
 
   // Get the value of a Counter in the Envoy instance.
-  uint64_t getCounterValue(const std::string& counter);
+  uint64_t getCounterValue(const std::string& name);
   // Wait until the Counter specified by `name` is >= `value`.
   ABSL_MUST_USE_RESULT testing::AssertionResult waitForCounterGe(const std::string& name,
                                                                  uint64_t value);
+  uint64_t getGaugeValue(const std::string& name);
+  ABSL_MUST_USE_RESULT testing::AssertionResult waitForGaugeGe(const std::string& name,
+                                                               uint64_t value);
 
   Event::ProvisionalDispatcherPtr dispatcher_ = std::make_unique<Event::ProvisionalDispatcher>();
   envoy_http_callbacks bridge_callbacks_;
@@ -82,7 +80,7 @@ protected:
   bool override_builder_config_ = false;
   // True if data plane requests are expected in the test; false otherwise.
   bool expect_data_streams_ = true;
-  Platform::EngineBuilder builder_;
+  TestEngineBuilder builder_;
 };
 
 } // namespace Envoy

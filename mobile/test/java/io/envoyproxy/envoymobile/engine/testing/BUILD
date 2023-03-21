@@ -10,12 +10,13 @@ android_library(
     name = "testing",
     testonly = True,
     srcs = [
-        "QuicTestServer.java",
         "RequestScenario.java",
         "Response.java",
+        "TestJni.java",
     ],
     visibility = ["//test:__subpackages__"],
     deps = [
+        "//library/java/io/envoyproxy/envoymobile/engine:envoy_base_engine_lib",
         "//library/kotlin/io/envoyproxy/envoymobile:envoy_lib",
     ],
 )
@@ -30,8 +31,8 @@ envoy_mobile_android_test(
         "sandboxNetwork": "standard",
     },
     native_deps = [
-        "//test/common/jni:libquic_test_server_jni.so",
-        "//test/common/jni:libquic_test_server_jni.jnilib",
+        "//test/common/jni:libenvoy_jni_with_test_extensions.so",
+        "//test/common/jni:libenvoy_jni_with_test_extensions_jnilib",
     ],
     deps = [
         ":testing",

@@ -191,7 +191,6 @@ Http::HeaderValidatorFactoryPtr createHeaderValidatorFactory(
 SINGLETON_MANAGER_REGISTRATION(date_provider);
 SINGLETON_MANAGER_REGISTRATION(route_config_provider_manager);
 SINGLETON_MANAGER_REGISTRATION(scoped_routes_config_provider_manager);
-SINGLETON_MANAGER_REGISTRATION(tracer_manager);
 
 Utility::Singletons Utility::createSingletons(Server::Configuration::FactoryContext& context) {
   std::shared_ptr<Http::TlsCachingDateProviderImpl> date_provider =
@@ -215,12 +214,7 @@ Utility::Singletons Utility::createSingletons(Server::Configuration::FactoryCont
                 context.admin(), *route_config_provider_manager);
           });
 
-  auto tracer_manager = context.singletonManager().getTyped<Tracing::TracerManagerImpl>(
-      SINGLETON_MANAGER_REGISTERED_NAME(tracer_manager), [&context] {
-        return std::make_shared<Tracing::TracerManagerImpl>(
-            std::make_unique<Tracing::TracerFactoryContextImpl>(
-                context.getServerFactoryContext(), context.messageValidationVisitor()));
-      });
+  auto tracer_manager = Tracing::TracerManagerImpl::singleton(context);
 
   std::shared_ptr<Http::DownstreamFilterConfigProviderManager> filter_config_provider_manager =
       Http::FilterChainUtility::createSingletonDownstreamFilterConfigProviderManager(
@@ -384,7 +378,9 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
                                : nullptr),
       header_validator_factory_(
           createHeaderValidatorFactory(config, context.messageValidationVisitor())),
-      append_x_forwarded_port_(config.append_x_forwarded_port()) {
+      append_x_forwarded_port_(config.append_x_forwarded_port()),
+      add_proxy_protocol_connection_state_(
+          PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, add_proxy_protocol_connection_state, true)) {
   if (!idle_timeout_) {
     idle_timeout_ = std::chrono::hours(1);
   } else if (idle_timeout_.value().count() == 0) {
@@ -541,60 +537,19 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
 
   if (config.has_tracing()) {
     http_tracer_ = tracer_manager.getOrCreateTracer(getPerFilterTracerConfig(config));
-
-    const auto& tracing_config = config.tracing();
-
-    Tracing::OperationName tracing_operation_name;
-
-    // Listener level traffic direction overrides the operation name
-    switch (context.direction()) {
-      PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
-    case envoy::config::core::v3::UNSPECIFIED:
-      // Continuing legacy behavior; if unspecified, we treat this as ingress.
-      tracing_operation_name = Tracing::OperationName::Ingress;
-      break;
-    case envoy::config::core::v3::INBOUND:
-      tracing_operation_name = Tracing::OperationName::Ingress;
-      break;
-    case envoy::config::core::v3::OUTBOUND:
-      tracing_operation_name = Tracing::OperationName::Egress;
-      break;
-    }
-
-    Tracing::CustomTagMap custom_tags;
-    for (const auto& tag : tracing_config.custom_tags()) {
-      custom_tags.emplace(tag.tag(), Tracing::CustomTagUtility::createCustomTag(tag));
-    }
-
-    envoy::type::v3::FractionalPercent client_sampling;
-    client_sampling.set_numerator(
-        tracing_config.has_client_sampling() ? tracing_config.client_sampling().value() : 100);
-    envoy::type::v3::FractionalPercent random_sampling;
-    // TODO: Random sampling historically was an integer and default to out of 10,000. We should
-    // deprecate that and move to a straight fractional percent config.
-    uint64_t random_sampling_numerator{PROTOBUF_PERCENT_TO_ROUNDED_INTEGER_OR_DEFAULT(
-        tracing_config, random_sampling, 10000, 10000)};
-    random_sampling.set_numerator(random_sampling_numerator);
-    random_sampling.set_denominator(envoy::type::v3::FractionalPercent::TEN_THOUSAND);
-    envoy::type::v3::FractionalPercent overall_sampling;
-    uint64_t overall_sampling_numerator{PROTOBUF_PERCENT_TO_ROUNDED_INTEGER_OR_DEFAULT(
-        tracing_config, overall_sampling, 10000, 10000)};
-    overall_sampling.set_numerator(overall_sampling_numerator);
-    overall_sampling.set_denominator(envoy::type::v3::FractionalPercent::TEN_THOUSAND);
-
-    const uint32_t max_path_tag_length = PROTOBUF_GET_WRAPPED_OR_DEFAULT(
-        tracing_config, max_path_tag_length, Tracing::DefaultMaxPathTagLength);
-
-    tracing_config_ =
-        std::make_unique<Http::TracingConnectionManagerConfig>(Http::TracingConnectionManagerConfig{
-            tracing_operation_name, custom_tags, client_sampling, random_sampling, overall_sampling,
-            tracing_config.verbose(), max_path_tag_length});
+    tracing_config_ = std::make_unique<Http::TracingConnectionManagerConfig>(context.direction(),
+                                                                             config.tracing());
   }
 
   for (const auto& access_log : config.access_log()) {
     AccessLog::InstanceSharedPtr current_access_log =
         AccessLog::AccessLogFactory::fromProto(access_log, context_);
     access_logs_.push_back(current_access_log);
+  }
+
+  if (config.has_access_log_flush_interval()) {
+    access_log_flush_interval_ = std::chrono::milliseconds(
+        DurationUtil::durationToMilliseconds(config.access_log_flush_interval()));
   }
 
   server_transformation_ = config.server_header_transformation();
@@ -789,7 +744,6 @@ HttpConnectionManagerFactory::createHttpConnectionManagerFactoryFromProto(
         proto_config,
     Server::Configuration::FactoryContext& context, Network::ReadFilterCallbacks& read_callbacks,
     bool clear_hop_by_hop_headers) {
-
   Utility::Singletons singletons = Utility::createSingletons(context);
 
   auto filter_config = Utility::createConfig(
