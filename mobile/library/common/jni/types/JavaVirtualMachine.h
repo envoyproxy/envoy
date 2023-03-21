@@ -14,10 +14,10 @@ public:
   /**
    * @brief Initializes virtual machine with JavaVM type. It should be called only once.
    */
-  static void initialize(JavaVM* jvm) { jvm_ = jvm; }
-  static JavaVM* getJavaVM() { return jvm_; }
+  static void initialize(JavaVM* jvm);
+  static JavaVM* getJavaVM();
   static jint getJNIVersion();
-  static void detachCurrentThread() { jvm_->DetachCurrentThread(); }
+  static void detachCurrentThread();
 
 private:
   static JavaVM* jvm_;
