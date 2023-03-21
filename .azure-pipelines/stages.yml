@@ -562,29 +562,13 @@ stages:
       inputs:
         buildType: current
         artifactName: "bazel.release"
-        itemPattern: "bazel.release/envoy_binary.tar.gz"
-        downloadType: single
-        targetPath: $(Build.StagingDirectory)
-    - task: DownloadBuildArtifacts@0
-      inputs:
-        buildType: current
-        artifactName: "bazel.release"
-        itemPattern: "bazel.release/envoy-contrib_binary.tar.gz"
-        downloadType: single
+        itemPattern: "bazel.release/envoy*binary.tar.gz"
         targetPath: $(Build.StagingDirectory)
     - task: DownloadBuildArtifacts@0
       inputs:
         buildType: current
         artifactName: "bazel.release.arm64"
-        itemPattern: "bazel.release.arm64/envoy_binary.tar.gz"
-        downloadType: single
-        targetPath: $(Build.StagingDirectory)
-    - task: DownloadBuildArtifacts@0
-      inputs:
-        buildType: current
-        artifactName: "bazel.release.arm64"
-        itemPattern: "bazel.release.arm64/envoy-contrib_binary.tar.gz"
-        downloadType: single
+        itemPattern: "bazel.release.arm64/envoy*binary.tar.gz"
         targetPath: $(Build.StagingDirectory)
     - bash: |
         set -e

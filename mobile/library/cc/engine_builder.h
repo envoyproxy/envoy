@@ -68,6 +68,7 @@ public:
   EngineBuilder& enableDrainPostDnsRefresh(bool drain_post_dns_refresh_on);
   EngineBuilder& enforceTrustChainVerification(bool trust_chain_verification_on);
   EngineBuilder& enablePlatformCertificatesValidation(bool platform_certificates_validation_on);
+#ifdef ENVOY_GOOGLE_GRPC
   // Sets the node.id field in the Bootstrap configuration.
   EngineBuilder& setNodeId(std::string node_id);
   // Sets the node.locality field in the Bootstrap configuration.
@@ -85,6 +86,7 @@ public:
   // is used for identifying resources. If not using xdstp, then set `cds_resources_locator` to the
   // empty string.
   EngineBuilder& addCdsLayer(std::string cds_resources_locator = "", const int timeout_seconds = 0);
+#endif
   EngineBuilder& enableDnsCache(bool dns_cache_on, int save_interval_seconds = 1);
   EngineBuilder& setForceAlwaysUsev6(bool value);
   EngineBuilder& setSkipDnsLookupForProxiedRequests(bool value);
