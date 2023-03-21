@@ -29,17 +29,17 @@ bool Exception::checkAndClear() {
  * GENERIC_EXCEPTION_DESCRIPTION||EXCEPTION_STACKTRACE||EXCEPTION_CAUSE_STACKTRACE
  */
 std::string Exception::description() const {
-  std::vector<std::string> comps = {
+  std::vector<std::string> descriptionComponents = {
       throwableDescription(throwable_),
       throwableStacktraceDescription(throwable_),
   };
 
   auto throwable_cause_description = causedByThrowableDescription();
   if (throwable_cause_description != "") {
-    comps.push_back(throwable_cause_description);
+    descriptionComponents.push_back(throwable_cause_description);
   }
 
-  return fmt::format("{}", fmt::join(comps, "||"));
+  return fmt::format("{}", fmt::join(descriptionComponents, "||"));
 }
 
 std::string Exception::throwableDescription(jthrowable throwable) const {
