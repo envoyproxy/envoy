@@ -32,9 +32,9 @@ public:
   /**
    * @brief Returns a string that represents the underlying array of bytes.
    */
-  std::string get() { 
+  std::string get() {
     if (string_ != nullptr) {
-        return std::string(string_); 
+      return std::string(string_);
     }
     return "nullptr";
   }

@@ -244,7 +244,7 @@ static void* jvm_on_headers(const char* method, const Envoy::Types::ManagedEnvoy
                                          end_stream ? JNI_TRUE : JNI_FALSE, j_stream_intel);
   // TODO(Augustyniak): Pass the name of the filter in here so that we can instrument the origin of
   // the JNI exception better.
-  bool exception_cleared = Envoy::JNI::Exception::checkAndClear();
+  bool exception_cleared = Envoy::JNI::Exception::checkAndClear(method);
 
   env->DeleteLocalRef(j_stream_intel);
   env->DeleteLocalRef(jcls_JvmCallbackContext);

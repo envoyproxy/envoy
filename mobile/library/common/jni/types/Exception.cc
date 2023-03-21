@@ -9,7 +9,7 @@
 namespace Envoy {
 namespace JNI {
 
-bool Exception::checkAndClear() {
+bool Exception::checkAndClear(const std::string& details) {
   auto env = Env::get();
   if (env->ExceptionCheck() == JNI_TRUE) {
     jthrowable throwable = env->ExceptionOccurred();
@@ -17,7 +17,7 @@ bool Exception::checkAndClear() {
 
     const auto exception = Exception(env, throwable);
     ENVOY_LOG_EVENT_TO_LOGGER(GET_MISC_LOGGER(), info, "jni_cleared_pending_exception",
-                              exception.description());
+                              exception.description(details));
     return true;
   } else {
     return false;
@@ -28,11 +28,16 @@ bool Exception::checkAndClear() {
  * @brief Creates a description of an exception in the following format:
  * GENERIC_EXCEPTION_DESCRIPTION||EXCEPTION_STACKTRACE||EXCEPTION_CAUSE_STACKTRACE
  */
-std::string Exception::description() const {
+std::string Exception::description(const std::string& details) const {
   std::vector<std::string> descriptionComponents = {
       throwableDescription(throwable_),
-      throwableStacktraceDescription(throwable_),
   };
+
+  if (details != "") {
+    descriptionComponents.push_back(details);
+  }
+
+  descriptionComponents.push_back(throwableStacktraceDescription(throwable_));
 
   auto throwable_cause_description = causedByThrowableDescription();
   if (throwable_cause_description != "") {

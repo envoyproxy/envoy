@@ -16,15 +16,16 @@ public:
    * @brief Checks and clears any pending exceptions. Reports pending exceptions to a platform
    * layer.
    *
+   * @param details Information that will be attached to a pending exception log if any is emitted.
    * @return true If a pending exception was present and cleared.
-   * @return false if there was no pending exception.
+   * @return false If there was no pending exception.
    */
-  static bool checkAndClear();
+  static bool checkAndClear(const std::string& details = "");
 
 private:
   Exception(JNIEnv* env, jthrowable throwable) : env_(env), throwable_(throwable) {}
 
-  std::string description() const;
+  std::string description(const std::string& details) const;
   std::string throwableDescription(jthrowable) const;
   std::string throwableStacktraceDescription(jthrowable) const;
   std::string causedByThrowableDescription() const;
