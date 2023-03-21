@@ -46,17 +46,22 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic, strong) NSDictionary<NSString *, EnvoyStringAccessor *> *stringAccessors;
 @property (nonatomic, strong) NSDictionary<NSString *, id<EnvoyKeyValueStore>> *keyValueStores;
 @property (nonatomic, strong) NSArray<NSString *> *statsSinks;
-@property (nonatomic, strong) NSString *rtdsLayerName;
+@property (nonatomic, strong, nullable) NSString *rtdsLayerName;
 @property (nonatomic, assign) UInt32 rtdsTimeoutSeconds;
-@property (nonatomic, strong) NSString *adsAddress;
+@property (nonatomic, strong, nullable) NSString *adsAddress;
 @property (nonatomic, assign) UInt32 adsPort;
-@property (nonatomic, strong) NSString *adsJwtToken;
+@property (nonatomic, strong, nullable) NSString *adsJwtToken;
 @property (nonatomic, assign) UInt32 adsJwtTokenLifetimeSeconds;
-@property (nonatomic, strong) NSString *adsSslRootCerts;
-@property (nonatomic, strong) NSString *nodeId;
-@property (nonatomic, strong) NSString *nodeRegion;
-@property (nonatomic, strong) NSString *nodeZone;
-@property (nonatomic, strong) NSString *nodeSubZone;
+@property (nonatomic, strong, nullable) NSString *adsSslRootCerts;
+@property (nonatomic, strong, nullable) NSString *nodeId;
+@property (nonatomic, strong, nullable) NSString *nodeRegion;
+@property (nonatomic, strong, nullable) NSString *nodeZone;
+@property (nonatomic, strong, nullable) NSString *nodeSubZone;
+@property (nonatomic, strong) NSString *cdsResourcesLocator;
+@property (nonatomic, assign) UInt32 cdsTimeoutSeconds;
+@property (nonatomic, assign) BOOL enableCds;
+@property (nonatomic, assign) intptr_t bootstrapPointer;
+
 /**
  Create a new instance of the configuration.
  */
@@ -104,17 +109,20 @@ NS_ASSUME_NONNULL_BEGIN
                                        (NSDictionary<NSString *, id<EnvoyKeyValueStore>> *)
                                            keyValueStores
                                        statsSinks:(NSArray<NSString *> *)statsSinks
-                                    rtdsLayerName:(NSString *)rtdsLayerName
+                                    rtdsLayerName:(nullable NSString *)rtdsLayerName
                                rtdsTimeoutSeconds:(UInt32)rtdsTimeoutSeconds
-                                       adsAddress:(NSString *)adsAddress
+                                       adsAddress:(nullable NSString *)adsAddress
                                           adsPort:(UInt32)adsPort
-                                      adsJwtToken:(NSString *)adsJwtToken
+                                      adsJwtToken:(nullable NSString *)adsJwtToken
                        adsJwtTokenLifetimeSeconds:(UInt32)adsJwtTokenLifetimeSeconds
-                                  adsSslRootCerts:(NSString *)adsSslRootCerts
-                                           nodeId:(NSString *)nodeId
-                                       nodeRegion:(NSString *)nodeRegion
-                                         nodeZone:(NSString *)nodeZone
-                                      nodeSubZone:(NSString *)nodeSubZone;
+                                  adsSslRootCerts:(nullable NSString *)adsSslRootCerts
+                                           nodeId:(nullable NSString *)nodeId
+                                       nodeRegion:(nullable NSString *)nodeRegion
+                                         nodeZone:(nullable NSString *)nodeZone
+                                      nodeSubZone:(nullable NSString *)nodeSubZone
+                              cdsResourcesLocator:(NSString *)cdsResourcesLocator
+                                cdsTimeoutSeconds:(UInt32)cdsTimeoutSeconds
+                                        enableCds:(BOOL)enableCds;
 
 /**
  Generate a string description of the C++ Envoy bootstrap from this configuration.

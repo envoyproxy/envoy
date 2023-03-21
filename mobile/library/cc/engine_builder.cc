@@ -58,6 +58,7 @@ EngineBuilder& EngineBuilder::setOnEngineRunning(std::function<void()> closure) 
   return *this;
 }
 
+#ifdef ENVOY_MOBILE_STATS_REPORTING
 EngineBuilder& EngineBuilder::addStatsSinks(std::vector<std::string> stats_sinks) {
   stats_sinks_ = std::move(stats_sinks);
   return *this;
@@ -67,6 +68,12 @@ EngineBuilder& EngineBuilder::addGrpcStatsDomain(std::string stats_domain) {
   stats_domain_ = std::move(stats_domain);
   return *this;
 }
+
+EngineBuilder& EngineBuilder::addStatsFlushSeconds(int stats_flush_seconds) {
+  stats_flush_seconds_ = stats_flush_seconds;
+  return *this;
+}
+#endif
 
 EngineBuilder& EngineBuilder::addConnectTimeoutSeconds(int connect_timeout_seconds) {
   connect_timeout_seconds_ = connect_timeout_seconds;
@@ -119,11 +126,6 @@ EngineBuilder& EngineBuilder::addH2ConnectionKeepaliveIdleIntervalMilliseconds(
 EngineBuilder&
 EngineBuilder::addH2ConnectionKeepaliveTimeoutSeconds(int h2_connection_keepalive_timeout_seconds) {
   h2_connection_keepalive_timeout_seconds_ = h2_connection_keepalive_timeout_seconds;
-  return *this;
-}
-
-EngineBuilder& EngineBuilder::addStatsFlushSeconds(int stats_flush_seconds) {
-  stats_flush_seconds_ = stats_flush_seconds;
   return *this;
 }
 
@@ -221,7 +223,7 @@ EngineBuilder& EngineBuilder::enforceTrustChainVerification(bool trust_chain_ver
   enforce_trust_chain_verification_ = trust_chain_verification_on;
   return *this;
 }
-
+#ifdef ENVOY_GOOGLE_GRPC
 EngineBuilder& EngineBuilder::setNodeId(std::string node_id) {
   node_id_ = std::move(node_id);
   return *this;
@@ -237,9 +239,6 @@ EngineBuilder& EngineBuilder::setAggregatedDiscoveryService(std::string address,
                                                             std::string jwt_token,
                                                             const int jwt_token_lifetime_seconds,
                                                             std::string ssl_root_certs) {
-#ifndef ENVOY_GOOGLE_GRPC
-  throw std::runtime_error("google_grpc must be enabled in bazel to use ADS");
-#endif
   ads_address_ = address;
   ads_port_ = port;
   ads_jwt_token_ = std::move(jwt_token);
@@ -262,6 +261,7 @@ EngineBuilder& EngineBuilder::addCdsLayer(std::string cds_resources_locator,
   cds_timeout_seconds_ = timeout_seconds == 0 ? DefaultXdsTimeout : timeout_seconds;
   return *this;
 }
+#endif
 
 EngineBuilder&
 EngineBuilder::enablePlatformCertificatesValidation(bool platform_certificates_validation_on) {
@@ -1013,6 +1013,13 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
 #else
     throw std::runtime_error("Admin functionality was not compiled in this build of Envoy Mobile");
 #endif
+  } else {
+    // Default Envoy mobile to the lightweight API listener. This is not
+    // supported if the admin interface is enabled.
+    envoy::config::listener::v3::ApiListenerManager api;
+    auto* listener_manager = bootstrap->mutable_listener_manager();
+    listener_manager->mutable_typed_config()->PackFrom(api);
+    listener_manager->set_name("envoy.listener_manager_impl.api");
   }
 
   return bootstrap;

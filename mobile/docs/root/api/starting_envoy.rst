@@ -547,6 +547,26 @@ https://www.envoyproxy.io/docs/envoy/latest/api-v3/service/runtime/v3/rtds.proto
   // C++
   builder.addRtdsLayer("rtds_layer_name", 10)
 
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+``addCdsLayer``
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Adds a CDS layer to the bootstrap configuration.
+Requires that ADS be configured via `setAggregatedDiscoveryService()`.
+See the following link for details:
+https://www.envoyproxy.io/docs/envoy/latest/configuration/upstream/cluster_manager/cds
+
+**Example**::
+
+  // Kotlin
+  builder.addCdsLayer(resourcesLocator = "xdstp://td-location.com/cluster_location", timeoutSeconds = 10)
+
+  // Swift
+  builder.addCDSLayer(resourcesLocator: "xdstp://td-location.com/cluster_location", timeoutSeconds: 10)
+
+  // C++
+  builder.addCdsLayer("xdstp://td-location.com/cluster_location", 10)
+
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 ``setAggregatedDiscoveryService``
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

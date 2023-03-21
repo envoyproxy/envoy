@@ -85,18 +85,18 @@ TEST(HeaderMutationFilterTest, HeaderMutationFilterTest) {
   HeaderMutationConfigSharedPtr global_config =
       std::make_shared<HeaderMutationConfig>(proto_config);
 
-  NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks;
-  NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks;
-
-  const Http::RequestHeaderMap* request_headers_pointer =
-      Http::StaticEmptyHeaders::get().request_headers.get();
-  ON_CALL(encoder_callbacks.stream_info_, getRequestHeaders())
-      .WillByDefault(testing::Return(request_headers_pointer));
-
   {
+    NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks;
+    NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks;
+
     HeaderMutation filter{global_config};
     filter.setDecoderFilterCallbacks(decoder_callbacks);
     filter.setEncoderFilterCallbacks(encoder_callbacks);
+
+    ON_CALL(decoder_callbacks, mostSpecificPerFilterConfig())
+        .WillByDefault(testing::Return(config.get()));
+    ON_CALL(decoder_callbacks, mostSpecificPerFilterConfig())
+        .WillByDefault(testing::Return(config.get()));
 
     {
       Envoy::Http::TestRequestHeaderMapImpl headers = {
@@ -109,9 +109,6 @@ TEST(HeaderMutationFilterTest, HeaderMutationFilterTest) {
           {":path", "/"},
           {":scheme", "http"},
           {":authority", "host"}};
-
-      EXPECT_CALL(decoder_callbacks, mostSpecificPerFilterConfig())
-          .WillRepeatedly(testing::Return(config.get()));
 
       EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter.decodeHeaders(headers, true));
 
@@ -127,6 +124,7 @@ TEST(HeaderMutationFilterTest, HeaderMutationFilterTest) {
       EXPECT_EQ("flag-header-4-value", headers.get_("flag-header-4"));
     }
 
+    // Case where the decodeHeaders() is not called and the encodeHeaders() is called.
     {
       Envoy::Http::TestResponseHeaderMapImpl headers = {
           {"flag-header", "flag-header-value"},
@@ -136,6 +134,39 @@ TEST(HeaderMutationFilterTest, HeaderMutationFilterTest) {
           {"flag-header-4", "flag-header-4-value-old"},
           {":status", "200"},
       };
+
+      const Http::RequestHeaderMap* request_headers_pointer =
+          Http::StaticEmptyHeaders::get().request_headers.get();
+      EXPECT_CALL(encoder_callbacks.stream_info_, getRequestHeaders())
+          .WillOnce(testing::Return(request_headers_pointer));
+
+      EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter.encodeHeaders(headers, true));
+
+      // 'flag-header' is removed and new 'flag-header' is added.
+      EXPECT_EQ("another-flag-header-value", headers.get_("flag-header"));
+      // 'flag-header-2' is appended.
+      EXPECT_EQ(2, headers.get(Envoy::Http::LowerCaseString("flag-header-2")).size());
+      // 'flag-header-3' is not appended and keep the old value.
+      EXPECT_EQ(1, headers.get(Envoy::Http::LowerCaseString("flag-header-3")).size());
+      EXPECT_EQ("flag-header-3-value-old", headers.get_("flag-header-3"));
+      // 'flag-header-4' is overwritten.
+      EXPECT_EQ(1, headers.get(Envoy::Http::LowerCaseString("flag-header-4")).size());
+      EXPECT_EQ("flag-header-4-value", headers.get_("flag-header-4"));
+    }
+
+    // Case where the request headers map is nullptr.
+    {
+      Envoy::Http::TestResponseHeaderMapImpl headers = {
+          {"flag-header", "flag-header-value"},
+          {"another-flag-header", "another-flag-header-value"},
+          {"flag-header-2", "flag-header-2-value-old"},
+          {"flag-header-3", "flag-header-3-value-old"},
+          {"flag-header-4", "flag-header-4-value-old"},
+          {":status", "200"},
+      };
+
+      EXPECT_CALL(encoder_callbacks.stream_info_, getRequestHeaders())
+          .WillOnce(testing::Return(nullptr));
 
       EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter.encodeHeaders(headers, true));
 
@@ -153,6 +184,9 @@ TEST(HeaderMutationFilterTest, HeaderMutationFilterTest) {
   }
 
   {
+    NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks;
+    NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks;
+
     HeaderMutation filter{global_config};
     filter.setDecoderFilterCallbacks(decoder_callbacks);
     filter.setEncoderFilterCallbacks(encoder_callbacks);
@@ -185,6 +219,9 @@ TEST(HeaderMutationFilterTest, HeaderMutationFilterTest) {
   }
 
   {
+    NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks;
+    NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks;
+
     HeaderMutation filter{global_config};
     filter.setDecoderFilterCallbacks(decoder_callbacks);
     filter.setEncoderFilterCallbacks(encoder_callbacks);

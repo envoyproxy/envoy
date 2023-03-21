@@ -70,6 +70,12 @@ bug_fixes:
 - area: ext_proc
   change: |
     Let onData always raise StopIterationAndWatermark when waiting for headers response, to avoid http errors (413 on request path, and 500 on response path) when data size goes above high watermark.
+- area: http filter
+  change: |
+    Fix possible illegal memory access in the header_mutaion filter when the request is aborted before the request headers are received completely.
+- area: upstream
+  change: |
+    Initialize upstream network read filters via their ``onNewConnection()`` callback once the upstream connection has been established even if there is no data available for reading on the new upstream connection. This behavior change can be reverted by setting ``envoy.reloadable_features.initialize_upstream_filters`` to ``false``.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
@@ -119,6 +125,9 @@ new_features:
 - area: access_log
   change: |
     enhanced observability into local close for :ref:`%RESPONSE_CODE_DETAILS% <config_http_conn_man_details>`.
+- area: oauth filter
+  change: |
+    extended :ref:`cookie_names <envoy_v3_api_field_extensions.filters.http.oauth2.v3.OAuth2Credentials.cookie_names>` to allow overriding (default) cookie names (``IdToken``, ``RefreshToken``) set by the filter.
 - area: tracing
   change: |
     allow :ref:`grpc_service <envoy_v3_api_field_config.trace.v3.OpenTelemetryConfig.grpc_service>` to be optional. This enables a means to disable collection of traces.
@@ -184,11 +193,21 @@ new_features:
 - area: tcp_proxy
   change: |
     added an option to dynamically disable TCP tunneling even if set in the filter config, by setting a filter state object for the key ``envoy.tcp_proxy.disable_tunneling``.
+- area: tcp_proxy
+  change: |
+    add :ref:`flush access log on connected <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.flush_access_log_on_connected>` to allow recording an access log entry
+    on the connection open event. This option does not require periodic access logging enabled, and the other way around.
 - area: http
   change: |
     add :ref:`periodic access logging <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.access_log_flush_interval>`
     to http access logs for long-lived requests (Websockets, CONNECT, etc). :ref:`%DURATION% <config_access_log_format_duration>` will
     be empty for mid-request logs. Enabling this may affect access loggers and filters that register as access loggers that expect to be called only once.
+- area: redis_health_check
+  change: |
+    added :ref:`exists_failure <config_health_checkers_redis>` stat to indicate health check failures caused by EXISTS check failure.
+- area: redis
+  change: |
+    added :ref:`wait_for_warm_on_init <envoy_v3_api_field_config.cluster.v3.Cluster.wait_for_warm_on_init>` support for :ref:`Redis Cluster<arch_overview_redis>`.
 
 deprecated:
 - area: ext_authz
