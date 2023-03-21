@@ -526,7 +526,7 @@ absl::optional<uint64_t> HttpIntegrationTest::waitForNextUpstreamConnection(
   while (!result) {
     upstream_index = upstream_index % upstream_indices.size();
     result = fake_upstreams_[upstream_indices[upstream_index]]->waitForHttpConnection(
-        *dispatcher_, fake_upstream_connection, std::chrono::milliseconds(5));
+        *dispatcher_, fake_upstream_connection, TestUtility::DefaultTimeout);
     if (result) {
       return upstream_index;
     } else if (!bound.withinBound()) {
