@@ -202,6 +202,58 @@ TEST(SubstitutionFormatterTest, plainNumberFormatter) {
               ProtoEq(ValueUtil::numberValue(400)));
 }
 
+class StalledTimeSource : public TimeSource {
+public:
+  StalledTimeSource(uint64_t system_time_ms, uint64_t monotonic_time_progress_ms) {
+    calls_counter_ = 0;
+    system_time_ms_ = system_time_ms;
+    monotonic_time_progress_ms_ = monotonic_time_progress_ms;
+  }
+
+  SystemTime systemTime() override {
+    return SystemTime(std::chrono::milliseconds(system_time_ms_));
+  }
+
+  MonotonicTime monotonicTime() override {
+    calls_counter_ += 1;
+    return MonotonicTime(std::chrono::milliseconds(
+      system_time_ms_ + calls_counter_ * monotonic_time_progress_ms_));
+  }
+
+private:
+  int calls_counter_;
+  uint64_t system_time_ms_;
+  uint64_t monotonic_time_progress_ms_;
+};
+
+TEST(SubstitutionFormatterTest, inFlightDuration) {
+  StalledTimeSource start_time_source_{1000, 100};
+  StreamInfo::StreamInfoImpl stream_info{Http::Protocol::Http2, start_time_source_, nullptr};
+  Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"}, {":path", "/"}};
+  Http::TestResponseHeaderMapImpl response_headers;
+  Http::TestResponseTrailerMapImpl response_trailers;
+  std::string body;
+
+  {
+    // First call, expect 100
+    StreamInfoFormatter duration_format("DURATION");
+    EXPECT_EQ("100", duration_format.format(request_headers, response_headers, response_trailers,
+                                           stream_info, body));
+  }
+
+  {
+    // First call, expect 200
+    StreamInfoFormatter duration_format("DURATION");
+    EXPECT_EQ("200", duration_format.format(request_headers, response_headers, response_trailers,
+                                           stream_info, body));
+
+    // Third call, expect 300
+    EXPECT_THAT(duration_format.formatValue(request_headers, response_headers, response_trailers,
+                                            stream_info, body),
+                ProtoEq(ValueUtil::numberValue(300.0)));
+  }
+}
+
 TEST(SubstitutionFormatterTest, streamInfoFormatter) {
   EXPECT_THROW(StreamInfoFormatter formatter("unknown_field"), EnvoyException);
 
