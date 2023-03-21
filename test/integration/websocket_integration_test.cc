@@ -129,6 +129,7 @@ void WebsocketIntegrationTest::initialize() {
               *bootstrap.mutable_static_resources()->mutable_clusters(0), protocol_options);
         });
   } else if (upstreamProtocol() == Http::CodecType::HTTP3) {
+    Runtime::maybeSetRuntimeGuard("envoy.reloadable_features.use_http3_header_normalisation", true);
     config_helper_.addConfigModifier(
         [&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
           ConfigHelper::HttpProtocolOptions protocol_options;
@@ -139,11 +140,13 @@ void WebsocketIntegrationTest::initialize() {
               *bootstrap.mutable_static_resources()->mutable_clusters(0), protocol_options);
         });
   }
+
   if (downstreamProtocol() == Http::CodecType::HTTP2) {
     config_helper_.addConfigModifier(
         [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
                 hcm) -> void { hcm.mutable_http2_protocol_options()->set_allow_connect(true); });
   } else if (downstreamProtocol() == Http::CodecType::HTTP3) {
+    Runtime::maybeSetRuntimeGuard("envoy.reloadable_features.use_http3_header_normalisation", true);
     config_helper_.addConfigModifier(
         [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
                 hcm) -> void {
@@ -477,6 +480,54 @@ TEST_P(WebsocketIntegrationTest, WebsocketCustomFilterChain) {
     codec_client_->close();
     ASSERT_TRUE(waitForUpstreamDisconnectOrReset());
   }
+}
+
+// This test relies on the legacy behavior of the H/1 codec client that uses
+// chunked transfer encoding if request had neither TE nor CL headers.
+TEST_P(WebsocketIntegrationTest, BidirectionalChunkedDataLegacyAddTE) {
+  if (downstreamProtocol() >= Http::CodecType::HTTP2 ||
+      upstreamProtocol() >= Http::CodecType::HTTP2) {
+    return;
+  }
+
+  config_helper_.addRuntimeOverride(
+      "envoy.reloadable_features.http_skip_adding_content_length_to_upgrade", "false");
+  config_helper_.addConfigModifier(setRouteUsingWebsocket());
+  initialize();
+
+  auto request_headers = upgradeRequestHeaders();
+  request_headers.removeContentLength();
+  auto response_headers = upgradeResponseHeaders();
+  response_headers.removeContentLength();
+  performUpgrade(request_headers, response_headers);
+
+  // With content-length not present, the HTTP codec will send the request with
+  // transfer-encoding: chunked.
+  if (upstreamProtocol() == Http::CodecType::HTTP1) {
+    ASSERT_TRUE(upstream_request_->headers().TransferEncoding() != nullptr);
+  }
+
+  // Send both a chunked request body and "websocket" payload.
+  std::string request_payload = "3\r\n123\r\n0\r\n\r\nSomeWebsocketRequestPayload";
+  codec_client_->sendData(*request_encoder_, request_payload, false);
+  ASSERT_TRUE(upstream_request_->waitForData(*dispatcher_, request_payload));
+
+  // Send both a chunked response body and "websocket" payload.
+  std::string response_payload = "4\r\nabcd\r\n0\r\n\r\nSomeWebsocketResponsePayload";
+  upstream_request_->encodeData(response_payload, false);
+  response_->waitForBodyData(response_payload.size());
+  EXPECT_EQ(response_payload, response_->body());
+
+  // Verify follow-up bidirectional data still works.
+  codec_client_->sendData(*request_encoder_, "FinalClientPayload", false);
+  ASSERT_TRUE(upstream_request_->waitForData(*dispatcher_, request_payload + "FinalClientPayload"));
+  upstream_request_->encodeData("FinalServerPayload", false);
+  response_->waitForBodyData(response_->body().size() + 5);
+  EXPECT_EQ(response_payload + "FinalServerPayload", response_->body());
+
+  // Clean up.
+  codec_client_->close();
+  ASSERT_TRUE(waitForUpstreamDisconnectOrReset());
 }
 
 TEST_P(WebsocketIntegrationTest, BidirectionalNoContentLengthNoTransferEncoding) {

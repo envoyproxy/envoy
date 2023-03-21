@@ -611,6 +611,10 @@ bool Utility::isH2UpgradeRequest(const RequestHeaderMap& headers) {
          headers.Protocol()->value() != Headers::get().ProtocolValues.Bytestream;
 }
 
+bool Utility::isH3UpgradeRequest(const RequestHeaderMap& headers) {
+  return isH2UpgradeRequest(headers);
+}
+
 bool Utility::isWebSocketUpgradeRequest(const RequestHeaderMap& headers) {
   return (isUpgrade(headers) &&
           absl::EqualsIgnoreCase(headers.getUpgradeValue(),
@@ -1023,6 +1027,10 @@ void Utility::transformUpgradeRequestFromH1toH2(RequestHeaderMap& headers) {
   }
 }
 
+void Utility::transformUpgradeRequestFromH1toH3(RequestHeaderMap& headers) {
+  transformUpgradeRequestFromH1toH2(headers);
+}
+
 void Utility::transformUpgradeResponseFromH1toH2(ResponseHeaderMap& headers) {
   if (getResponseStatus(headers) == 101) {
     headers.setStatus(200);
@@ -1034,6 +1042,10 @@ void Utility::transformUpgradeResponseFromH1toH2(ResponseHeaderMap& headers) {
   }
 }
 
+void Utility::transformUpgradeResponseFromH1toH3(ResponseHeaderMap& headers) {
+  transformUpgradeResponseFromH1toH2(headers);
+}
+
 void Utility::transformUpgradeRequestFromH2toH1(RequestHeaderMap& headers) {
   ASSERT(Utility::isH2UpgradeRequest(headers));
 
@@ -1043,6 +1055,10 @@ void Utility::transformUpgradeRequestFromH2toH1(RequestHeaderMap& headers) {
   headers.removeProtocol();
 }
 
+void Utility::transformUpgradeRequestFromH3toH1(RequestHeaderMap& headers) {
+  transformUpgradeRequestFromH2toH1(headers);
+}
+
 void Utility::transformUpgradeResponseFromH2toH1(ResponseHeaderMap& headers,
                                                  absl::string_view upgrade) {
   if (getResponseStatus(headers) == 200) {
@@ -1050,6 +1066,11 @@ void Utility::transformUpgradeResponseFromH2toH1(ResponseHeaderMap& headers,
     headers.setReferenceConnection(Http::Headers::get().ConnectionValues.Upgrade);
     headers.setStatus(101);
   }
+}
+
+void Utility::transformUpgradeResponseFromH3toH1(ResponseHeaderMap& headers,
+                                                 absl::string_view upgrade) {
+  transformUpgradeResponseFromH2toH1(headers, upgrade);
 }
 
 std::string Utility::PercentEncoding::encode(absl::string_view value,
