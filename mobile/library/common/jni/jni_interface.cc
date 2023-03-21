@@ -10,7 +10,6 @@
 #include "library/common/jni/import/jni_import.h"
 #include "library/common/jni/jni_support.h"
 #include "library/common/jni/jni_utility.h"
-#include "library/common/jni/jni_version.h"
 #include "library/common/main_interface.h"
 #include "library/common/types/managed_envoy_headers.h"
 
@@ -20,12 +19,13 @@ using Envoy::Platform::EngineBuilder;
 
 JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM* vm, void* reserved) {
   JNIEnv* env = nullptr;
-  if (vm->GetEnv(reinterpret_cast<void**>(&env), JNI_VERSION) != JNI_OK) {
+  if (vm->GetEnv(reinterpret_cast<void**>(&env), Envoy::JNI::JavaVirtualMachine::getJNIVersion()) !=
+      JNI_OK) {
     return -1;
   }
 
-  set_vm(vm);
-  return JNI_VERSION;
+  Envoy::JNI::JavaVirtualMachine::initialize(vm);
+  return Envoy::JNI::JavaVirtualMachine::getJNIVersion();
 }
 
 // JniLibrary
@@ -73,7 +73,7 @@ static void jvm_on_exit(void*) {
   // needs to be detached is the engine thread.
   // This function is called from the context of the engine's
   // thread due to it being posted to the engine's event dispatcher.
-  jvm_detach_thread();
+  Envoy::JNI::JavaVirtualMachine::detachCurrentThread();
 }
 
 static void jvm_on_track(envoy_map events, const void* context) {

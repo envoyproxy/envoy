@@ -30,11 +30,9 @@ cc_library(
     name = "jni_utility_lib",
     srcs = [
         "jni_utility.cc",
-        "jni_version.cc",
     ],
     hdrs = [
         "jni_utility.h",
-        "jni_version.h",
     ],
     deps = [
         ":jni_support_lib",

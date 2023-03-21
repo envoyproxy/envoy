@@ -9,10 +9,7 @@
 
 // NOLINT(namespace-envoy)
 
-void set_vm(JavaVM* vm);
-
-JavaVM* get_vm();
-
+// TODO(Augustyniak): Replace the usages of this global method with Envoy::JNI::Env::get()
 JNIEnv* get_env();
 
 void set_class_loader(jobject class_loader);
@@ -38,8 +35,6 @@ void set_class_loader(jobject class_loader);
  *         it couldn't be found.
  */
 jclass find_class(const char* class_name);
-
-void jvm_detach_thread();
 
 void jni_delete_global_ref(void* context);
 
