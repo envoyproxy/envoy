@@ -84,13 +84,10 @@ typed_config:
 // end_stream permutations when rate limiting.
 class FaultIntegrationTestAllProtocols : public FaultIntegrationTest {};
 
-// Test for HTTP1/2 only.
-// TODO(asingh-g): Fix test suite for HTTP/3.
+// TODO(#26236): Fix test suite for HTTP/3.
 INSTANTIATE_TEST_SUITE_P(
     Protocols, FaultIntegrationTestAllProtocols,
-    testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams(
-        /*downstream_protocols = */ {Http::CodecType::HTTP1, Http::CodecType::HTTP2},
-        /*upstream_protocols = */ {Http::CodecType::HTTP1, Http::CodecType::HTTP2})),
+    testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParamsWithoutHTTP3()),
     HttpProtocolIntegrationTest::protocolTestParamsToString);
 
 // No fault injected.

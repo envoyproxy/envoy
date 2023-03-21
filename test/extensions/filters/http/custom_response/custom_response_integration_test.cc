@@ -643,8 +643,7 @@ TEST_P(CustomResponseIntegrationTest, ModifyRequestHeaders) {
   EXPECT_EQ("Modify action response body", response->body());
 }
 
-// Test for HTTP1/2 only.
-// TODO(asingh-g): Fix test suite for HTTP/3.
+// TODO(#26236): Fix test suite for HTTP/3.
 INSTANTIATE_TEST_SUITE_P(
     Protocols, CustomResponseIntegrationTest,
     testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams(

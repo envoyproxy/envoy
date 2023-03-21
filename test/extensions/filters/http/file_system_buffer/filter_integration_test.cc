@@ -57,8 +57,7 @@ std::string smallRequestBufferConfig() {
 
 using FileSystemBufferIntegrationTest = HttpProtocolIntegrationTest;
 
-// Test for HTTP1/2 only.
-// TODO(asingh-g): Fix test suite for HTTP/3.
+// TODO(#26236): Fix test suite for HTTP/3.
 INSTANTIATE_TEST_SUITE_P(
     Protocols, FileSystemBufferIntegrationTest,
     testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams(

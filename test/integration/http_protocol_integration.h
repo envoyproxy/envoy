@@ -55,6 +55,12 @@ public:
                             Http::CodecType::HTTP3,
                         });
 
+  static std::vector<HttpProtocolTestParams> getProtocolTestParamsWithoutHTTP3() {
+    return getProtocolTestParams(
+        /*downstream_protocols = */ {Http::CodecType::HTTP1, Http::CodecType::HTTP2},
+        /*upstream_protocols = */ {Http::CodecType::HTTP1, Http::CodecType::HTTP2});
+  }
+
   // Allows pretty printed test names of the form
   // FooTestCase.BarInstance/IPv4_Http2Downstream_HttpUpstream
   static std::string

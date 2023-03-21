@@ -341,13 +341,10 @@ typed_config:
 
 using RBACIntegrationTest = HttpProtocolIntegrationTest;
 
-// Test for HTTP1/2 only.
-// TODO(asingh-g): Fix test suite for HTTP/3.
+// TODO(#26236): Fix test suite for HTTP/3.
 INSTANTIATE_TEST_SUITE_P(
     Protocols, RBACIntegrationTest,
-    testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams(
-        /*downstream_protocols = */ {Http::CodecType::HTTP1, Http::CodecType::HTTP2},
-        /*upstream_protocols = */ {Http::CodecType::HTTP1, Http::CodecType::HTTP2})),
+    testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParamsWithoutHTTP3()),
     HttpProtocolIntegrationTest::protocolTestParamsToString);
 
 TEST_P(RBACIntegrationTest, Allowed) {

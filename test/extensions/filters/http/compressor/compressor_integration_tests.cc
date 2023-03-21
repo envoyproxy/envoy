@@ -119,8 +119,7 @@ void WebsocketWithCompressorIntegrationTest::validateUpgradeResponseHeaders(
   EXPECT_THAT(&proxied_response_headers, HeaderMapEqualIgnoreOrder(&original_response_headers));
 }
 
-// Test for HTTP1/2 only.
-// TODO(asingh-g): Fix test suite for HTTP/3.
+// TODO(#26236): Fix test suite for HTTP/3.
 INSTANTIATE_TEST_SUITE_P(
     Protocols, WebsocketWithCompressorIntegrationTest,
     testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams(

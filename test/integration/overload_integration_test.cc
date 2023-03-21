@@ -303,7 +303,7 @@ TEST_P(OverloadScaledTimerIntegrationTest, CloseIdleHttpStream) {
 TEST_P(OverloadScaledTimerIntegrationTest, TlsHandshakeTimeout) {
   if (downstreamProtocol() == Http::CodecClient::Type::HTTP3 ||
       upstreamProtocol() == Http::CodecClient::Type::HTTP3) {
-    // TODO(asingh-g): Fix for H3
+    // TODO(#26236): Fix this test for H3.
     return;
   }
   // Set up the Envoy to expect a TLS connection, with a 20 second timeout that can scale down to 5

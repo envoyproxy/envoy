@@ -111,8 +111,8 @@ void Http3ConnPoolImpl::onConnectFailed(Envoy::ConnectionPool::ActiveClient& cli
 // Make sure all connections are torn down before quic_info_ is deleted.
 Http3ConnPoolImpl::~Http3ConnPoolImpl() {
   destructAllConnections();
-  // set this to zero since state_ is not tracking connections for H3, only the initial capacity
-  // pending_streams_ and active_streams_ are verified to be zero in the destructor of state_
+  // Set this to zero since state_ is not tracking connections for H3, only the initial capacity
+  // pending_streams_ and active_streams_ are verified to be zero in the destructor of state_.
   state_.connecting_and_connected_stream_capacity_ = 0;
 }
 
