@@ -73,7 +73,6 @@ protected:
                     const unsigned default_min_protocol_version,
                     const unsigned default_max_protocol_version,
                     const std::string& default_cipher_suites, const std::string& default_curves,
-                    const std::string& default_signature_algorithms,
                     Server::Configuration::TransportSocketFactoryContext& factory_context);
   Api::Api& api_;
   const Server::Options& options_;
@@ -120,7 +119,6 @@ class ClientContextConfigImpl : public ContextConfigImpl, public Envoy::Ssl::Cli
 public:
   static const std::string DEFAULT_CIPHER_SUITES;
   static const std::string DEFAULT_CURVES;
-  static const std::string DEFAULT_SIGNATURE_ALGORITHMS;
 
   ClientContextConfigImpl(
       const envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext& config,
@@ -173,7 +171,6 @@ private:
   static const unsigned DEFAULT_MAX_VERSION;
   static const std::string DEFAULT_CIPHER_SUITES;
   static const std::string DEFAULT_CURVES;
-  static const std::string DEFAULT_SIGNATURE_ALGORITHMS;
 
   const bool require_client_certificate_;
   const OcspStaplePolicy ocsp_staple_policy_;

@@ -123,7 +123,10 @@ message TlsParameters {
   repeated string ecdh_curves = 4;
 
   // If specified, the TLS connection will only support the specified signature algorithms.
-  // If not specified, the default signature algorithms will be used:
+  // The list is ordered by preference.
+  // If not specified, the default signature algorithms defined by BoringSSL will be used.
+  //
+  // Default signature algorithms selected by BoringSSL are currently:
   //
   // .. code-block:: none
   //
@@ -137,6 +140,24 @@ message TlsParameters {
   //   rsa_pkcs1_sha512
   //   rsa_pkcs1_sha1
   //
+  // Signature algorithms supported by BoringSSL are currently:
+  //
+  // .. code-block:: none
+  //
+  //   rsa_pkcs1_sha256
+  //   rsa_pkcs1_sha384
+  //   rsa_pkcs1_sha512
+  //   ecdsa_secp256r1_sha256
+  //   ecdsa_secp384r1_sha384
+  //   ecdsa_secp521r1_sha512
+  //   rsa_pss_rsae_sha256
+  //   rsa_pss_rsae_sha384
+  //   rsa_pss_rsae_sha512
+  //   ed25519
+  //   rsa_pkcs1_sha1
+  //   ecdsa_sha1
+  //
+  // The algorithms may change over time in response to security considerations.
   repeated string signature_algorithms = 5;
 }
 
