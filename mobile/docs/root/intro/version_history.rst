@@ -49,6 +49,7 @@ Features:
 - build: Add a build feature ``envoy_mobile_stats_reporting`` to allow disabling stats reporting. (:issue:`26086 <26086>`)
 - swift: Add a new Swift implementation of generating the Envoy bootstrap that replaces the previous Objective-C implementation.
   This can be enabled by setting ``useSwiftBootstrap(true)`` and requires building with ``--define=envoy_mobile_swift_cxx_interop=enabled``. (:issue:`#26111 <26111>`)
+- kotlin: cleared JNI exceptions are logged to platform layer as `jni_cleared_pending_exception` events (:issue:`#26133 <26133>`).
 
 0.5.0 (September 2, 2022)
 ===========================
