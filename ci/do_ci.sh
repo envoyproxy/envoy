@@ -176,9 +176,7 @@ function run_ci_verify () {
 
     docker images | grep envoy
 
-    export DEBIAN_FRONTEND=noninteractive
-    sudo apt-get -qq update -y
-    sudo apt-get -qq install -y --no-install-recommends expect
+    export TERM=xterm-256color
     export DOCKER_NO_PULL=1
     export DOCKER_RMI_CLEANUP=1
     # This is set to simulate an environment where users have shared home drives protected
