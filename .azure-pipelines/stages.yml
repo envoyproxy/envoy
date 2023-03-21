@@ -901,15 +901,6 @@ stages:
       timeoutInMinutes: 10
       condition: always()
 
-    - script: bazel run //ci/flaky_test:process_xml
-      displayName: "Process Test Results"
-      env:
-        TEST_TMPDIR: $(Build.SourcesDirectory)
-        SLACK_TOKEN: $(SLACK_TOKEN)
-        CI_TARGET: "MacOS"
-        REPO_URI: $(Build.Repository.Uri)
-        BUILD_URI: $(Build.BuildUri)
-
   - job: tested
     # displayName: Complete
     dependsOn: ["test"]
