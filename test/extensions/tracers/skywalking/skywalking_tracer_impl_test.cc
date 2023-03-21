@@ -177,7 +177,7 @@ TEST_F(SkyWalkingDriverTest, SkyWalkingDriverStartSpanTestWithClientConfig) {
   }
 
   {
-    // Create root segment span with disabled tracing.
+    // Create null span with disabled tracing.
     decision.traced = false;
     Http::TestRequestHeaderMapImpl request_headers{
         {":path", "/path"}, {":method", "GET"}, {":authority", "test.com"}};
@@ -191,7 +191,7 @@ TEST_F(SkyWalkingDriverTest, SkyWalkingDriverStartSpanTestWithClientConfig) {
   }
 
   {
-    // Create new span segment with error propagation header and disabled tracing.
+    // Create null span with disabled tracing.
     decision.traced = false;
     Http::TestRequestHeaderMapImpl error_request_headers{
         {":path", "/path"},
@@ -209,7 +209,7 @@ TEST_F(SkyWalkingDriverTest, SkyWalkingDriverStartSpanTestWithClientConfig) {
   }
 
   {
-    // Create new span segment with error propagation header and disabled tracing.
+    // Create null span with disabled tracing.
     decision.traced = false;
     Http::TestRequestHeaderMapImpl error_request_headers{
         {":path", "/path"},
