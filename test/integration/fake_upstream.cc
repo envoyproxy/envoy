@@ -872,7 +872,7 @@ void FakeUpstream::FakeListenSocketFactory::doFinalPreWorkerInit() {
 FakeRawConnection::~FakeRawConnection() {
   // If the filter was already deleted, it means the shared_connection_ was too, so don't try to
   // access it.
-  if (read_filter_ != nullptr) {
+  if (read_filter_ != nullptr && read_filter_.use_count() == 1) {
     EXPECT_TRUE(shared_connection_.executeOnDispatcher(
         [filter = std::move(read_filter_)](Network::Connection& connection) {
           connection.removeReadFilter(filter);
