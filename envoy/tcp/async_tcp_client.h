@@ -47,6 +47,7 @@ public:
   /**
    * Close the client. It closes the connection based on close type.
    * The underlying connection will be defer deleted when a Close event is received.
+   * Abrt/NoFlush will abortively closes the connection discarding any unsent data.
    * @param type the connection close type.
    */
   virtual void close(Network::ConnectionCloseType type) PURE;
