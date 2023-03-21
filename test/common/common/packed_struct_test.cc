@@ -65,7 +65,7 @@ TEST_F(PackedStructTest, StringStructMove) {
   EXPECT_FALSE(redirect_strings.get<RedirectStringElement::HostRedirect>().has_value());
 
   // Invoke move constructor.
-  RedirectStringsPackedStruct redirect_strings2(move(redirect_strings));
+  RedirectStringsPackedStruct redirect_strings2(std::move(redirect_strings));
   // Ensure no memory was allocated on the heap by the move constructor.
   EXPECT_MEMORY_LE(memory_test.consumedBytes(), 2 * sizeof(std::string) + 16);
 
@@ -77,7 +77,7 @@ TEST_F(PackedStructTest, StringStructMove) {
 
   // Invoke move assignment.
   RedirectStringsPackedStruct redirect_strings3(0);
-  redirect_strings3 = move(redirect_strings2);
+  redirect_strings3 = std::move(redirect_strings2);
   // Ensure no memory was allocated on the heap by the move assignment.
   EXPECT_MEMORY_LE(memory_test.consumedBytes(), 2 * sizeof(std::string) + 16);
 

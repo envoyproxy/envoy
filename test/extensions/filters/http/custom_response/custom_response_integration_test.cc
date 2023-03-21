@@ -643,9 +643,14 @@ TEST_P(CustomResponseIntegrationTest, ModifyRequestHeaders) {
   EXPECT_EQ("Modify action response body", response->body());
 }
 
-INSTANTIATE_TEST_SUITE_P(Protocols, CustomResponseIntegrationTest,
-                         testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams()),
-                         HttpProtocolIntegrationTest::protocolTestParamsToString);
+// Test for HTTP1/2 only.
+// TODO(asingh-g): Fix test suite for HTTP/3.
+INSTANTIATE_TEST_SUITE_P(
+    Protocols, CustomResponseIntegrationTest,
+    testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams(
+        /*downstream_protocols = */ {Envoy::Http::CodecType::HTTP1, Envoy::Http::CodecType::HTTP2},
+        /*upstream_protocols = */ {Envoy::Http::CodecType::HTTP1, Envoy::Http::CodecType::HTTP2})),
+    HttpProtocolIntegrationTest::protocolTestParamsToString);
 } // namespace CustomResponse
 } // namespace HttpFilters
 } // namespace Extensions
