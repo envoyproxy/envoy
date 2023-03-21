@@ -461,9 +461,8 @@ TEST(TestConfig, AddVirtualClusterLegacy) {
 TEST(TestConfig, AddVirtualCluster) {
   EngineBuilder engine_builder;
 
-  std::vector<EngineBuilder::MatcherData> matchers = {
-      {":method", EngineBuilder::MatcherData::EXACT, "POST"},
-      {":method", EngineBuilder::MatcherData::SAFE_REGEX, ".*E.*"}};
+  std::vector<MatcherData> matchers = {{":method", MatcherData::EXACT, "POST"},
+                                       {":method", MatcherData::SAFE_REGEX, ".*E.*"}};
   engine_builder.addVirtualCluster("cluster1", matchers);
   std::unique_ptr<Bootstrap> bootstrap = engine_builder.generateBootstrap();
   EXPECT_THAT(bootstrap->ShortDebugString(), HasSubstr("cluster1"));
