@@ -1037,7 +1037,9 @@ ClusterInfoImpl::ClusterInfoImpl(
                            ? std::make_unique<envoy::config::core::v3::TypedExtensionConfig>(
                                  config.upstream_config())
                            : nullptr),
-      lb_subset_(LoadBalancerSubsetInfoImpl(config.lb_subset_config())),
+      lb_subset_(config.has_lb_subset_config()
+                     ? std::make_unique<LoadBalancerSubsetInfoImpl>(config.lb_subset_config())
+                     : nullptr),
       metadata_(config.metadata()), typed_metadata_(config.metadata()),
       common_lb_config_(config.common_lb_config()),
       cluster_type_(config.has_cluster_type()

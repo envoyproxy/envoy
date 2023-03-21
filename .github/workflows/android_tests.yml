@@ -45,7 +45,6 @@ jobs:
             --test_output=all \
             --build_tests_only \
             $([ -z $GITHUB_TOKEN ] || echo "--config=remote-ci-macos") \
-            --remote_header="Authorization=Bearer $GITHUB_TOKEN" \
             //test/kotlin/io/...
   javatestsmac:
     if: github.repository == 'envoyproxy/envoy'
@@ -81,7 +80,6 @@ jobs:
             --config test-android \
             --define envoy_mobile_listener=enabled \
             $([ -z $GITHUB_TOKEN ] || echo "--config=remote-ci-macos") \
-            --remote_header="Authorization=Bearer $GITHUB_TOKEN" \
             --define=signal_trace=disabled \
             //test/java/...
   kotlintestslinux:
@@ -115,5 +113,4 @@ jobs:
             --build_tests_only \
             --config test-android \
             $([ -z $GITHUB_TOKEN ] || echo "--config=remote-ci-linux-clang") \
-            --remote_header="Authorization=Bearer $GITHUB_TOKEN" \
             //test/kotlin/...

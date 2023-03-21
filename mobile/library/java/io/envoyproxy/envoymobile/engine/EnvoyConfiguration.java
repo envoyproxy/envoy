@@ -75,6 +75,9 @@ public class EnvoyConfiguration {
   public final String nodeRegion;
   public final String nodeZone;
   public final String nodeSubZone;
+  public final String cdsResourcesLocator;
+  public final Integer cdsTimeoutSeconds;
+  public final Boolean enableCds;
 
   private static final Pattern UNRESOLVED_KEY_PATTERN = Pattern.compile("\\{\\{ (.+) \\}\\}");
 
@@ -151,6 +154,10 @@ public class EnvoyConfiguration {
    * @param nodeZone                                      the node zone to use for the ADS server.
    * @param nodeSubZone                                   the node sub-zone to use for the ADS
    *     server.
+   * @param cdsResourcesLocator                           the resources locator for CDS.
+   * @param cdsTimeoutSeconds                             the timeout for CDS fetches.
+   * @param enableCds                                     enables CDS, used because all CDS params
+   *     could be empty.
    */
   public EnvoyConfiguration(
       boolean adminInterfaceEnabled, String grpcStatsDomain, int connectTimeoutSeconds,
@@ -171,7 +178,8 @@ public class EnvoyConfiguration {
       boolean enablePlatformCertificatesValidation, String rtdsLayerName,
       Integer rtdsTimeoutSeconds, String adsAddress, Integer adsPort, String adsToken,
       Integer adsTokenLifetime, String adsRootCerts, String nodeId, String nodeRegion,
-      String nodeZone, String nodeSubZone) {
+      String nodeZone, String nodeSubZone, String cdsResourcesLocator, Integer cdsTimeoutSeconds,
+      boolean enableCds) {
     JniLibrary.load();
     this.adminInterfaceEnabled = adminInterfaceEnabled;
     this.grpcStatsDomain = grpcStatsDomain;
@@ -236,6 +244,9 @@ public class EnvoyConfiguration {
     this.nodeRegion = nodeRegion;
     this.nodeZone = nodeZone;
     this.nodeSubZone = nodeSubZone;
+    this.cdsResourcesLocator = cdsResourcesLocator;
+    this.cdsTimeoutSeconds = cdsTimeoutSeconds;
+    this.enableCds = enableCds;
   }
 
   public long createBootstrap() {
@@ -261,7 +272,7 @@ public class EnvoyConfiguration {
         filter_chain, stats_sinks, enablePlatformCertificatesValidation,
         enableSkipDNSLookupForProxiedRequests, runtime_guards, rtdsLayerName, rtdsTimeoutSeconds,
         adsAddress, adsPort, adsToken, adsTokenLifetime, adsRootCerts, nodeId, nodeRegion, nodeZone,
-        nodeSubZone);
+        nodeSubZone, cdsResourcesLocator, cdsTimeoutSeconds, enableCds);
   }
 
   static class ConfigurationException extends RuntimeException {

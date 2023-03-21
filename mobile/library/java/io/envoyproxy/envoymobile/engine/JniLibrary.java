@@ -311,5 +311,5 @@ public class JniLibrary {
       boolean enableSkipDNSLookupForProxiedRequests, byte[][] runtimeGuards, String rtdsLayerName,
       long rtdsTimeoutSeconds, String adsAddress, long adsPort, String adsToken,
       long adsTokenLifetime, String adsRootCerts, String nodeId, String nodeRegion, String nodeZone,
-      String nodeSubZone);
+      String nodeSubZone, String cdsResourcesLocator, long cdsTimeoutSeconds, boolean enableCds);
 }
