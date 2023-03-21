@@ -1,6 +1,14 @@
 version: 2
 updates:
 
+# We currently have CI to make sure that all python `requirements.txt` files
+# are listed here, and only existing `requirements.txt` files are listed here.
+#
+# Until https://github.com/envoyproxy/envoy/issues/26163 is resolved `Dockerfiles`,
+# and `go.mod` files need to be kept in sync manually.
+#
+# Please ensure any new ones are added here, and any that are removed are removed here also.
+
 - package-ecosystem: "pip"
   directory: "/.github/actions/pr_notifier"
   schedule:
