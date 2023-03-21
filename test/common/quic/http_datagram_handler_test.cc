@@ -77,7 +77,10 @@ TEST_F(HttpDatagramHandlerTest, Http3DatagramToCapsule) {
 
 TEST_F(HttpDatagramHandlerTest, CapsuleToHttp3Datagram) {
   EXPECT_CALL(stream_, SendHttp3Datagram(testing::Eq(datagram_payload_)))
-      .WillOnce(testing::Return(quic::MessageStatus::MESSAGE_STATUS_SUCCESS));
+      .WillOnce(testing::Return(quic::MessageStatus::MESSAGE_STATUS_SUCCESS))
+      .WillOnce(testing::Return(quic::MessageStatus::MESSAGE_STATUS_BLOCKED));
+  EXPECT_TRUE(
+      http_datagram_handler_.encodeCapsuleFragment(capsule_fragment_, /*end_stream=*/false));
   EXPECT_TRUE(
       http_datagram_handler_.encodeCapsuleFragment(capsule_fragment_, /*end_stream=*/false));
 }
