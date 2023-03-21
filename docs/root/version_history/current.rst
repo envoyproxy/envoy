@@ -1,5 +1,5 @@
-1.22.9 (Pending)
-================
+1.22.9 (March 22, 2023)
+=======================
 
 Incompatible Behavior Changes
 -----------------------------
@@ -12,6 +12,8 @@ Minor Behavior Changes
 Bug Fixes
 ---------
 *Changes expected to improve the state of the world and are unlikely to have negative effects*
+
+* dependency: update Wasmtime -> 6.0.1 to resolve CVE-2023-26489, CVE-2023-27477.
 
 Removed Config or Runtime
 -------------------------
