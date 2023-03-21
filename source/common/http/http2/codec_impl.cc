@@ -1204,10 +1204,15 @@ int ConnectionImpl::onFrameSend(int32_t stream_id, size_t length, uint8_t type, 
 
   case NGHTTP2_HEADERS:
   case NGHTTP2_DATA: {
-    const bool end_stream_sent = flags & NGHTTP2_FLAG_END_STREAM;
-    stream->local_end_stream_sent_ = end_stream_sent;
-    if (end_stream_sent) {
-      stream->onEndStreamEncoded();
+    // This should be the case since we're sending these frames. It's possible
+    // that codec fuzzers would incorrectly send frames for non-existent streams
+    // which is why this is not an assert.
+    if (stream != nullptr) {
+      const bool end_stream_sent = flags & NGHTTP2_FLAG_END_STREAM;
+      stream->local_end_stream_sent_ = end_stream_sent;
+      if (end_stream_sent) {
+        stream->onEndStreamEncoded();
+      }
     }
     break;
   }
