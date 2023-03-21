@@ -10,6 +10,8 @@
 #include "library/common/jni/import/jni_import.h"
 #include "library/common/jni/jni_support.h"
 #include "library/common/jni/jni_utility.h"
+#include "library/common/jni/types/Exception.h"
+#include "library/common/jni/types/JavaVirtualMachine.h"
 #include "library/common/main_interface.h"
 #include "library/common/types/managed_envoy_headers.h"
 
@@ -242,7 +244,7 @@ static void* jvm_on_headers(const char* method, const Envoy::Types::ManagedEnvoy
                                          end_stream ? JNI_TRUE : JNI_FALSE, j_stream_intel);
   // TODO(Augustyniak): Pass the name of the filter in here so that we can instrument the origin of
   // the JNI exception better.
-  bool exception_cleared = clear_pending_exceptions(env);
+  bool exception_cleared = Envoy::JNI::Exception::checkAndClear();
 
   env->DeleteLocalRef(j_stream_intel);
   env->DeleteLocalRef(jcls_JvmCallbackContext);
@@ -697,7 +699,7 @@ static void* call_jvm_on_complete(envoy_stream_intel stream_intel,
   jobject result =
       env->CallObjectMethod(j_context, jmid_onComplete, j_stream_intel, j_final_stream_intel);
 
-  clear_pending_exceptions(env);
+  Envoy::JNI::Exception::checkAndClear();
 
   env->DeleteLocalRef(j_stream_intel);
   env->DeleteLocalRef(j_final_stream_intel);
@@ -722,7 +724,7 @@ static void* call_jvm_on_error(envoy_error error, envoy_stream_intel stream_inte
   jobject result = env->CallObjectMethod(j_context, jmid_onError, error.error_code, j_error_message,
                                          error.attempt_count, j_stream_intel, j_final_stream_intel);
 
-  clear_pending_exceptions(env);
+  Envoy::JNI::Exception::checkAndClear();
 
   env->DeleteLocalRef(j_stream_intel);
   env->DeleteLocalRef(j_final_stream_intel);
@@ -756,7 +758,7 @@ static void* call_jvm_on_cancel(envoy_stream_intel stream_intel,
   jobject result =
       env->CallObjectMethod(j_context, jmid_onCancel, j_stream_intel, j_final_stream_intel);
 
-  clear_pending_exceptions(env);
+  Envoy::JNI::Exception::checkAndClear();
 
   env->DeleteLocalRef(j_stream_intel);
   env->DeleteLocalRef(j_final_stream_intel);

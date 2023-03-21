@@ -44,16 +44,6 @@ void jni_delete_const_global_ref(const void* context) {
   jni_delete_global_ref(const_cast<void*>(context));
 }
 
-bool clear_pending_exceptions(JNIEnv* env) {
-  if (env->ExceptionCheck() == JNI_TRUE) {
-    env->ExceptionClear();
-    // TODO(Augustyniak): Log exception details.
-    return true;
-  } else {
-    return false;
-  }
-}
-
 int unbox_integer(JNIEnv* env, jobject boxedInteger) {
   jclass jcls_Integer = env->FindClass("java/lang/Integer");
   jmethodID jmid_intValue = env->GetMethodID(jcls_Integer, "intValue", "()I");
