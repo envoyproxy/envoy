@@ -1040,7 +1040,12 @@ ClusterInfoImpl::ClusterInfoImpl(
       lb_subset_(config.has_lb_subset_config()
                      ? std::make_unique<LoadBalancerSubsetInfoImpl>(config.lb_subset_config())
                      : nullptr),
-      metadata_(config.metadata()), typed_metadata_(config.metadata()),
+      metadata_(config.has_metadata()
+                    ? std::make_unique<const envoy::config::core::v3::Metadata>(config.metadata())
+                    : nullptr),
+      typed_metadata_(config.has_metadata()
+                          ? std::make_unique<ClusterTypedMetadata>(config.metadata())
+                          : nullptr),
       common_lb_config_(config.common_lb_config()),
       cluster_type_(config.has_cluster_type()
                         ? std::make_unique<envoy::config::cluster::v3::Cluster::CustomClusterType>(

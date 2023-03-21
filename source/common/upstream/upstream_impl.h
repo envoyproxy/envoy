@@ -869,8 +869,22 @@ public:
     }
     return DefaultLoadBalancerSubsetInfoImpl::get();
   }
-  const envoy::config::core::v3::Metadata& metadata() const override { return metadata_; }
-  const Envoy::Config::TypedMetadata& typedMetadata() const override { return typed_metadata_; }
+  using DefaultMetadata = ConstSingleton<envoy::config::core::v3::Metadata>;
+  const envoy::config::core::v3::Metadata& metadata() const override {
+    if (metadata_ != nullptr) {
+      return *metadata_;
+    }
+    return DefaultMetadata::get();
+  }
+  using ClusterTypedMetadata = Envoy::Config::TypedMetadataImpl<ClusterTypedMetadataFactory>;
+  const Envoy::Config::TypedMetadata& typedMetadata() const override {
+    if (typed_metadata_ != nullptr) {
+      return *typed_metadata_;
+    }
+    static const ClusterTypedMetadata* defaultTypedMetadata =
+        new ClusterTypedMetadata(DefaultMetadata::get());
+    return *defaultTypedMetadata;
+  }
 
   bool drainConnectionsOnHostRemoval() const override { return drain_connections_on_host_removal_; }
   bool connectionPoolPerDownstreamConnection() const override {
@@ -988,8 +1002,8 @@ private:
       lb_original_dst_config_;
   std::unique_ptr<envoy::config::core::v3::TypedExtensionConfig> upstream_config_;
   std::unique_ptr<LoadBalancerSubsetInfoImpl> lb_subset_;
-  const envoy::config::core::v3::Metadata metadata_;
-  Envoy::Config::TypedMetadataImpl<ClusterTypedMetadataFactory> typed_metadata_;
+  std::unique_ptr<const envoy::config::core::v3::Metadata> metadata_;
+  std::unique_ptr<ClusterTypedMetadata> typed_metadata_;
   ProtobufTypes::MessagePtr load_balancing_policy_;
   TypedLoadBalancerFactory* load_balancer_factory_ = nullptr;
   const envoy::config::cluster::v3::Cluster::CommonLbConfig common_lb_config_;
