@@ -28,6 +28,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
             "com_github_spf13_afero",
             "org_golang_google_genproto",
             "org_golang_x_text",
+            "org_golang_x_mod",
+            "org_golang_x_sys",
         ],
         license = "Apache-2.0",
         license_url = "https://github.com/bufbuild/protoc-gen-validate/blob/v{version}/LICENSE",
