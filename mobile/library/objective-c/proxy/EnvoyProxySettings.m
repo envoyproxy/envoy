@@ -5,13 +5,13 @@
 @interface EnvoyProxySettings ()
 
 @property (nonatomic, strong) NSString *host;
-@property (nonatomic, assign) NSUInteger port;
+@property (nonatomic, assign) uint16_t port;
 
 @end
 
 @implementation EnvoyProxySettings
 
-- (instancetype)initWithHost:(NSString *)host port:(NSUInteger)port {
+- (instancetype)initWithHost:(NSString *)host port:(uint16_t)port {
   self = [super init];
   if (self) {
     self.host = host;

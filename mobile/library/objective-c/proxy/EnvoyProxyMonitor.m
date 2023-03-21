@@ -11,6 +11,7 @@ NSTimeInterval kProxySettingsRefreshRateSeconds = 7;
 @property (nonatomic, strong) EnvoyProxySystemSettings *proxySettings;
 @property (nonatomic, copy) EnvoyProxyMonitorUpdate proxySettingsDidChange;
 @property (nonatomic, assign) BOOL isStarted;
+@property (nonatomic, strong) dispatch_queue_t queue;
 
 @end
 
@@ -33,17 +34,18 @@ NSTimeInterval kProxySettingsRefreshRateSeconds = 7;
   self.isStarted = true;
   [self stop];
 
-  self.dispatchSource =
-      dispatch_source_create(DISPATCH_SOURCE_TYPE_TIMER, 0, 0,
-                             dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0));
+  self.queue = dispatch_queue_create("io.envoyproxy.envoymobile.EnvoyProxyMonitor", NULL);
+  self.dispatchSource = dispatch_source_create(DISPATCH_SOURCE_TYPE_TIMER, 0, 0, self.queue);
   dispatch_source_set_timer(self.dispatchSource, dispatch_time(DISPATCH_TIME_NOW, 0),
                             (int64_t)(kProxySettingsRefreshRateSeconds * NSEC_PER_SEC), 0);
 
-  __block BOOL isInitialUpdate = YES;
   __weak typeof(self) weakSelf = self;
   dispatch_source_set_event_handler(self.dispatchSource, ^{
-    [weakSelf pollProxySettings:isInitialUpdate];
-    isInitialUpdate = NO;
+    [weakSelf pollProxySettings:false];
+  });
+
+  dispatch_sync(self.queue, ^{
+    [weakSelf pollProxySettings:true];
   });
 
   dispatch_resume(self.dispatchSource);
@@ -94,12 +96,11 @@ NSTimeInterval kProxySettingsRefreshRateSeconds = 7;
     NSString *urlString = settings[(NSString *)kCFNetworkProxiesProxyAutoConfigURLString];
     NSURL *url = [NSURL URLWithString:urlString];
     if (url) {
-      // TODO: is ignoring the string which are invalid URLs a right thing to do in here?
-      [self updateProxySettings:nil force:forceUpdate];
-    } else {
       EnvoyProxySystemSettings *settings =
           [[EnvoyProxySystemSettings alloc] initWithPACFileURL:url];
       [self updateProxySettings:settings force:forceUpdate];
+    } else {
+      [self updateProxySettings:nil force:forceUpdate];
     }
 
   } else {

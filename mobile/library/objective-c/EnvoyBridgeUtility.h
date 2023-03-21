@@ -165,7 +165,7 @@ static inline envoy_proxy_settings_list
 toNativeEnvoyProxySettingsList(NSArray<EnvoyProxySettings *> *proxySettingsList) {
   envoy_proxy_settings_list list;
   list.length = (uint64_t)proxySettingsList.count;
-  list.proxy_settings = safe_malloc(list.length);
+  list.proxy_settings = (envoy_proxy_settings *)safe_malloc(list.length);
 
   for (NSUInteger i = 0; i < proxySettingsList.count; i++) {
     EnvoyProxySettings *current = proxySettingsList[i];

@@ -503,7 +503,7 @@ ios_resolve_proxy(envoy_data c_host, envoy_proxy_settings_list *proxy_settings_l
   context.engineHandle = self->_engineHandle;
   context.proxyResolver = proxyResolver;
 
-  envoy_proxy_resolver *resolver = safe_malloc(sizeof(envoy_proxy_resolver));
+  envoy_proxy_resolver *resolver = (envoy_proxy_resolver *)safe_malloc(sizeof(envoy_proxy_resolver));
   resolver->context = CFBridgingRetain(context);
   resolver->resolve = ios_resolve_proxy;
 

@@ -39,8 +39,8 @@ NS_ASSUME_NONNULL_BEGIN
                proxySettings:(NSArray<EnvoyProxySettings *> **)proxySettings
          withCompletionBlock:
              (void (^)(NSArray<EnvoyProxySettings *> *_Nullable, NSError *_Nullable))completion {
-  self.proxySettings = [[EnvoyProxySystemSettings alloc]
-      initWithPACFileURL:[NSURL URLWithString:@"https://s3.magneticbear.com/uploads/rafal.pac"]];
+//  self.proxySettings = [[EnvoyProxySystemSettings alloc]
+//      initWithPACFileURL:[NSURL URLWithString:@"https://s3.magneticbear.com/uploads/rafal.pac"]];
   @synchronized(self) {
     if (self.proxySettings.pacFileURL) {
       [self.pacProxyResolver
@@ -48,14 +48,20 @@ NS_ASSUME_NONNULL_BEGIN
            proxyAutoConfigurationURL:self.proxySettings.pacFileURL
                  withCompletionBlock:^void(NSArray<EnvoyProxySettings *> *_Nullable proxySettings,
                                            NSError *_Nullable error) {
-                   completion(proxySettings, error);
+        if (error) {
+          // Treat failure to resolve a proxy as no proxy
+          completion(@[], nil);
+        } else {
+          completion(proxySettings, error);
+        }
+
                  }];
       return ENVOY_PROXY_RESOLUTION_RESULT_IN_PROGRESS;
     } else if (self.proxySettings) {
       EnvoyProxySettings *resolvedProxySettings =
           [[EnvoyProxySettings alloc] initWithHost:self.proxySettings.host
                                               port:self.proxySettings.port];
-      *proxySettings = @[ resolvedProxySettings ];
+      *proxySettings = @[resolvedProxySettings];
       return ENVOY_PROXY_RESOLUTION_RESULT_COMPLETED;
     } else {
       return ENVOY_PROXY_RESOLUTION_RESULT_NO_PROXY_CONFIGURED;
