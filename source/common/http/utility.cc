@@ -391,9 +391,9 @@ Utility::parseCookies(const RequestHeaderMap& headers,
   return cookies;
 }
 
-bool Utility::Url::containsFragment() { return (component_bitmap_ & (1 << UC_FRAGMENT)); }
+bool Utility::Url::containsFragment() { return (component_bitmap_ & (1 << UcFragment)); }
 
-bool Utility::Url::containsUserinfo() { return (component_bitmap_ & (1 << UC_USERINFO)); }
+bool Utility::Url::containsUserinfo() { return (component_bitmap_ & (1 << UcUserinfo)); }
 
 bool Utility::Url::initialize(absl::string_view absolute_url, bool is_connect) {
   struct http_parser_url u;

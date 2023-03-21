@@ -127,15 +127,15 @@ initializeAndValidateOptions(const envoy::config::core::v3::Http3ProtocolOptions
 namespace Http {
 namespace Utility {
 
-enum url_components {
-  UC_SCHEMA = 0,
-  UC_HOST = 1,
-  UC_PORT = 2,
-  UC_PATH = 3,
-  UC_QUERY = 4,
-  UC_FRAGMENT = 5,
-  UC_USERINFO = 6,
-  UC_MAX = 7
+enum UrlComponents {
+  UcSchema = 0,
+  UcHost = 1,
+  UcPort = 2,
+  UcPath = 3,
+  UcQuery = 4,
+  UcFragment = 5,
+  UcUserinfo = 6,
+  UcMax = 7
 };
 
 /**
