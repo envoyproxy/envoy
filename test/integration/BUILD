@@ -669,6 +669,7 @@ envoy_cc_test_library(
         "//test/integration/filters:local_reply_during_encoding_data_filter_lib",
         "//test/integration/filters:local_reply_during_encoding_filter_lib",
         "//test/integration/filters:local_reply_with_metadata_filter_lib",
+        "//test/integration/filters:metadata_control_filter_lib",
         "//test/integration/filters:random_pause_filter_lib",
         "//test/integration/filters:remove_response_headers_lib",
         "//test/integration/filters:stop_iteration_headers_inject_body",
