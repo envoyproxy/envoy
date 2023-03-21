@@ -1438,7 +1438,9 @@ void ConnectionManagerImpl::ActiveStream::refreshDurationTimeout() {
 }
 
 void ConnectionManagerImpl::ActiveStream::refreshCachedRoute(const Router::RouteCallback& cb) {
-  if (cached_route_blocked_) {
+  // If the cached route is blocked then any attempt to clear it or refresh it
+  // will be ignored.
+  if (routeCacheBlocked()) {
     return;
   }
 
@@ -1598,6 +1600,8 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ResponseHeaderMap& heade
     state_.is_tunneling_ = true;
   }
 
+  // Block route cache if the response headers is received and processed. Because after this point,
+  // the cached route should never be updated or refreshed.
   blockRouteCache();
 
   if (connection_manager_.drain_state_ != DrainState::NotDraining &&
@@ -1800,8 +1804,16 @@ ConnectionManagerImpl::ActiveStream::route(const Router::RouteCallback& cb) {
  * functions as a helper to refreshCachedRoute(const Router::RouteCallback& cb).
  */
 void ConnectionManagerImpl::ActiveStream::setRoute(Router::RouteConstSharedPtr route) {
+  // If the cached route is blocked then any attempt to clear it or refresh it
+  // will be ignored.
+  // setRoute() may be called directly by the interface of DownstreamStreamFilterCallbacks,
+  // so check for routeCacheBlocked() here again.
+  if (routeCacheBlocked()) {
+    return;
+  }
+
   filter_manager_.streamInfo().route_ = route;
-  cached_route_ = std::move(route);
+  setCachedRoute({std::move(route)});
   if (nullptr == filter_manager_.streamInfo().route() ||
       nullptr == filter_manager_.streamInfo().route()->routeEntry()) {
     cached_cluster_info_ = nullptr;
@@ -1850,25 +1862,32 @@ void ConnectionManagerImpl::ActiveStream::refreshAccessLogFlushTimer() {
 }
 
 void ConnectionManagerImpl::ActiveStream::clearRouteCache() {
-  if (cached_route_blocked_) {
+  // If the cached route is blocked then any attempt to clear it or refresh it
+  // will be ignored.
+  if (routeCacheBlocked()) {
     return;
   }
 
-  if (hasCachedRoute()) {
-    // The configuration of the route may be referenced by some filters.
-    // Cache the route to avoid it's destroyed before the stream is destroyed.
-    cleared_cached_routes_.emplace_back(std::move(cached_route_.value()));
-  }
+  setCachedRoute({});
 
-  cached_route_ = absl::optional<Router::RouteConstSharedPtr>();
   cached_cluster_info_ = absl::optional<Upstream::ClusterInfoConstSharedPtr>();
   if (tracing_custom_tags_) {
     tracing_custom_tags_->clear();
   }
 }
 
+void ConnectionManagerImpl::ActiveStream::setCachedRoute(
+    absl::optional<Router::RouteConstSharedPtr>&& route) {
+  if (hasCachedRoute()) {
+    // The configuration of the route may be referenced by some filters.
+    // Cache the route to avoid it's destroyed before the stream is destroyed.
+    cleared_cached_routes_.emplace_back(std::move(cached_route_.value()));
+  }
+  cached_route_ = std::move(route);
+}
+
 void ConnectionManagerImpl::ActiveStream::blockRouteCache() {
-  cached_route_blocked_ = true;
+  route_cache_blocked_ = true;
   // Clear the snapped route configuration because it is unnecessary to keep it.
   snapped_route_config_.reset();
   snapped_scoped_routes_config_.reset();

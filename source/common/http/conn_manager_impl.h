@@ -302,11 +302,16 @@ private:
     void requestRouteConfigUpdate(
         Http::RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb) override;
 
+    // Set cached route. This method should never be called directly. This is only called in the
+    // setRoute(), clearRouteCache(), and refreshCachedRoute() methods.
+    void setCachedRoute(absl::optional<Router::RouteConstSharedPtr>&& route);
     // Block the route cache and clear the snapped route config. By doing this the route cache will
     // not be updated. And if the route config is updated by the RDS, the snapped route config may
     // be freed before the stream is destroyed.
     // This will be called automatically at the end of handle response headers.
     void blockRouteCache();
+    // Return true if the cached route is blocked.
+    bool routeCacheBlocked() const { return route_cache_blocked_; }
 
     absl::optional<Router::ConfigConstSharedPtr> routeConfig();
     void traceRequest();
@@ -438,7 +443,7 @@ private:
     absl::optional<Router::RouteConstSharedPtr> cached_route_;
     // This is used to track whether the route has been blocked. If the route is blocked, we can not
     // clear it or refresh it.
-    bool cached_route_blocked_{false};
+    bool route_cache_blocked_{false};
     // This is used to track routes that have been cleared from the request. By this way, all the
     // configurations that have been used in the processing of the request will be alive until the
     // request is finished.
