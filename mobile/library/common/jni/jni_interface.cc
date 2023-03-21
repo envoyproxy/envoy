@@ -10,8 +10,8 @@
 #include "library/common/jni/import/jni_import.h"
 #include "library/common/jni/jni_support.h"
 #include "library/common/jni/jni_utility.h"
-#include "library/common/jni/types/Exception.h"
-#include "library/common/jni/types/JavaVirtualMachine.h"
+#include "library/common/jni/types/exception.h"
+#include "library/common/jni/types/java_virtual_machine.h"
 #include "library/common/main_interface.h"
 #include "library/common/types/managed_envoy_headers.h"
 

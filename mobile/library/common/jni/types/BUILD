@@ -7,10 +7,10 @@ envoy_package()
 cc_library(
     name = "jni_exception_lib",
     srcs = [
-        "Exception.cc",
+        "exception.cc",
     ],
     hdrs = [
-        "Exception.h",
+        "exception.h",
     ],
     defines = envoy_mobile_defines("@envoy"),
     deps = [
@@ -25,7 +25,7 @@ cc_library(
 cc_library(
     name = "jni_string_lib",
     hdrs = [
-        "String.h",
+        "string.h",
     ],
     defines = envoy_mobile_defines("@envoy"),
     deps = [
@@ -39,10 +39,10 @@ cc_library(
 cc_library(
     name = "jni_env_lib",
     srcs = [
-        "Env.cc",
+        "env.cc",
     ],
     hdrs = [
-        "Env.h",
+        "env.h",
     ],
     defines = envoy_mobile_defines("@envoy"),
     deps = [
@@ -58,10 +58,10 @@ cc_library(
 cc_library(
     name = "jni_javavm_lib",
     srcs = [
-        "JavaVirtualMachine.cc",
+        "java_virtual_machine.cc",
     ],
     hdrs = [
-        "JavaVirtualMachine.h",
+        "java_virtual_machine.h",
     ],
     defines = envoy_mobile_defines("@envoy"),
     deps = [

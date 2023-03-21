@@ -1,10 +1,10 @@
-#include "library/common/jni/types/Exception.h"
+#include "library/common/jni/types/exception.h"
 
 #include "source/common/common/assert.h"
 
 #include "fmt/format.h"
-#include "library/common/jni/types/Env.h"
-#include "library/common/jni/types/String.h"
+#include "library/common/jni/types/env.h"
+#include "library/common/jni/types/string.h"
 
 namespace Envoy {
 namespace JNI {

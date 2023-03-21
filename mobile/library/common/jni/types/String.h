@@ -2,7 +2,7 @@
 
 #include "absl/strings/string_view.h"
 #include "library/common/jni/import/jni_import.h"
-#include "library/common/jni/types/Env.h"
+#include "library/common/jni/types/env.h"
 
 namespace Envoy {
 namespace JNI {

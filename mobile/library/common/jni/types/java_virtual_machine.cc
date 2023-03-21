@@ -1,4 +1,4 @@
-#include "library/common/jni/types/JavaVirtualMachine.h"
+#include "library/common/jni/types/java_virtual_machine.h"
 
 #include "source/common/common/assert.h"
 

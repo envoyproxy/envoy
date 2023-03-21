@@ -3,7 +3,7 @@
 #include "library/common/data/utility.h"
 #include "library/common/jni/jni_support.h"
 #include "library/common/jni/jni_utility.h"
-#include "library/common/jni/types/JavaVirtualMachine.h"
+#include "library/common/jni/types/java_virtual_machine.h"
 #include "openssl/ssl.h"
 
 // NOLINT(namespace-envoy)

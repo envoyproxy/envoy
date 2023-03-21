@@ -6,7 +6,7 @@
 #include "source/common/common/assert.h"
 
 #include "library/common/jni/jni_support.h"
-#include "library/common/jni/types/Env.h"
+#include "library/common/jni/types/env.h"
 
 // NOLINT(namespace-envoy)
 
