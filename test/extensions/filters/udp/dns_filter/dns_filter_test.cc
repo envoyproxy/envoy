@@ -2271,7 +2271,7 @@ server_config:
 
 // test typed_dns_resolver_config exits which overrides dns_resolution_config.
 TEST_F(DnsFilterTest, DEPRECATED_FEATURE_TEST(TypedDnsResolverConfigOverrideDnsResolutionConfig)) {
-  const absl::string_view typed_dns_resolver_config_exist = R"EOF(
+  constexpr absl::string_view typed_dns_resolver_config_exist = R"EOF(
 stat_prefix: "my_prefix"
 client_config:
   resolver_timeout: 1s
