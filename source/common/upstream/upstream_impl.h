@@ -881,9 +881,7 @@ public:
     if (typed_metadata_ != nullptr) {
       return *typed_metadata_;
     }
-    static const ClusterTypedMetadata* defaultTypedMetadata =
-        new ClusterTypedMetadata(DefaultMetadata::get());
-    return *defaultTypedMetadata;
+    CONSTRUCT_ON_FIRST_USE(ClusterTypedMetadata, DefaultMetadata::get());
   }
 
   bool drainConnectionsOnHostRemoval() const override { return drain_connections_on_host_removal_; }
