@@ -3,6 +3,7 @@ load(
     "envoy_cc_library",
     "envoy_package",
     "envoy_select_enable_http3",
+    "envoy_select_enable_http_datagrams",
 )
 
 licenses(["notice"])  # Apache 2
@@ -530,7 +531,9 @@ envoy_cc_library(
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
         "@envoy_api//envoy/type/v3:pkg_cc_proto",
-    ],
+    ] + envoy_select_enable_http_datagrams([
+        "@com_github_google_quiche//:quiche_common_structured_headers_lib",
+    ]),
 )
 
 envoy_cc_library(
