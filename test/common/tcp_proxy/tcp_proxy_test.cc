@@ -962,6 +962,9 @@ TEST_F(TcpProxyTest, IntermediateLogEntry) {
   config.mutable_access_log_flush_interval()->set_seconds(1);
   config.mutable_idle_timeout()->set_seconds(0);
 
+  EXPECT_CALL(filter_callbacks_.connection_.stream_info_, streamState())
+      .WillRepeatedly(Return(StreamInfo::StreamState::InProgress));
+
   auto* flush_timer = new NiceMock<Event::MockTimer>(&filter_callbacks_.connection_.dispatcher_);
   EXPECT_CALL(*flush_timer, enableTimer(std::chrono::milliseconds(1000), _));
 
