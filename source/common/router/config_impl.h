@@ -966,8 +966,13 @@ public:
   private:
     const RouteEntryAndRoute* parent_;
 
-    // Keep an copy of the shared pointer to the parent Route. This is needed
-    // to ensure that the parent Route is not destroyed before this entry.
+    // If a DynamicRouteEntry instance is created and returned to the caller directly, then keep an
+    // copy of the shared pointer to the parent Route (RouteEntryImplBase) to ensure the parent
+    // is not destroyed before this entry.
+    //
+    // This should be nullptr if the DynamicRouteEntry is part of the parent (RouteEntryImplBase) to
+    // avoid possible circular reference. For example, the WeightedClusterEntry (derived from
+    // DynamicRouteEntry) will be member of the RouteEntryImplBase, so the owner_ should be nullptr.
     const RouteConstSharedPtr owner_;
     const std::string cluster_name_;
   };
