@@ -367,7 +367,7 @@ public:
     // If this operation is part of the multi request (txn is true), we do not need to encode its
     // metadata (packet len, xid and opcode). This is because these information will be replaced by
     // the metadata of the multi request. If this operation comes from a separate request (txn is
-    // false), we need to encode these metadata to the request.
+    // false), we need to encode its metadata to the request.
     if (!txn) {
       buffer.writeBEInt<int32_t>(16 + path.length());
       buffer.writeBEInt<int32_t>(1000);
