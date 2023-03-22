@@ -39,7 +39,7 @@ steps:
     cacheHitVar: CACHE_RESTORED
 
 # Prime the cache for all jobs
-- script: sudo .azure-pipelines/docker/prime_cache.sh "${{ parameters.tmpDirectory }}"
+- script: sudo .azure-pipelines/docker/prime_cache.sh "${{ parameters.tmpDirectory }}" "${{ parameters.arch }}"
   displayName: "Cache/prime ${{ parameters.name }})"
   # TODO(phlax): figure if there is a way to test cache without downloading it
   condition: and(not(canceled()), eq(${{ parameters.prime }}, true), ne(variables.CACHE_RESTORED, 'true'))

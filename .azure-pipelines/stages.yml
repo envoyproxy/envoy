@@ -78,7 +78,8 @@ stages:
   - job: cache_arm
     dependsOn: []
     displayName: Cache (arm64)
-    pool: arm-large
+    pool:
+      vmImage: "ubuntu-20.04"
     steps:
     - template: cached.yml
       parameters:
