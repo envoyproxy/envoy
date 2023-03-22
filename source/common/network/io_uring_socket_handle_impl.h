@@ -53,6 +53,7 @@ public:
   Api::SysCallIntResult listen(int backlog) override;
   IoHandlePtr accept(struct sockaddr* addr, socklen_t* addrlen) override;
   Api::SysCallIntResult connect(Address::InstanceConstSharedPtr address) override;
+  Api::SysCallIntResult shutdown(int how) override;
   void initializeFileEvent(Event::Dispatcher& dispatcher, Event::FileReadyCb cb,
                            Event::FileTriggerType trigger, uint32_t events) override;
   void activateFileEvents(uint32_t events) override;

@@ -362,6 +362,20 @@ Api::SysCallIntResult IoUringSocketHandleImpl::connect(Address::InstanceConstSha
   return Api::SysCallIntResult{0, 0};
 }
 
+Api::SysCallIntResult IoUringSocketHandleImpl::shutdown(int how) {
+  ENVOY_LOG(trace, "shutdown, fd = {}, io_uring_socket_type = {}", fd_, ioUringSocketTypeStr());
+
+  if ((io_uring_socket_type_ == IoUringSocketType::Client && !enable_client_socket_) ||
+      (io_uring_socket_type_ == IoUringSocketType::Server && !enable_server_socket_) ||
+      (io_uring_socket_type_ == IoUringSocketType::Accept && !enable_accept_socket_)) {
+    ENVOY_LOG(trace, "fallback to IoSocketHandle for shutdown socket");
+    return shadow_io_handle_->shutdown(how);
+  }
+
+  io_uring_socket_->shutdown(how);
+  return Api::SysCallIntResult{0, 0};
+}
+
 void IoUringSocketHandleImpl::initializeFileEvent(Event::Dispatcher& dispatcher,
                                                   Event::FileReadyCb cb,
                                                   Event::FileTriggerType trigger, uint32_t events) {

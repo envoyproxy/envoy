@@ -63,6 +63,7 @@ public:
   void connect(const Network::Address::InstanceConstSharedPtr&) override { PANIC("not implement"); }
   void write(Buffer::Instance&) override { PANIC("not implement"); }
   uint64_t write(const Buffer::RawSlice*, uint64_t) override { PANIC("not implement"); }
+  void shutdown(int) override { PANIC("not implement"); }
   // This will cleanup all the injected completions for this socket and
   // unlink itself from the worker.
   void cleanup();
@@ -131,6 +132,7 @@ public:
   Request* submitWriteRequest(IoUringSocket& socket, const Buffer::RawSliceVector& slices) override;
   Request* submitCloseRequest(IoUringSocket& socket) override;
   Request* submitCancelRequest(IoUringSocket& socket, Request* request_to_cancel) override;
+  Request* submitShutdownRequest(IoUringSocket& socket, int how) override;
 
   // From socket from the worker.
   IoUringSocketEntryPtr removeSocket(IoUringSocketEntry& socket);
@@ -187,6 +189,7 @@ public:
   void disable() override;
   void write(Buffer::Instance& data) override;
   uint64_t write(const Buffer::RawSlice* slices, uint64_t num_slice) override;
+  void shutdown(int how) override;
   void onClose(int32_t result, bool injected) override;
   void onRead(Request* req, int32_t result, bool injected) override;
   void onWrite(int32_t result, bool injected) override;

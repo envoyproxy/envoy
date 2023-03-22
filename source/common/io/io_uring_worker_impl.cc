@@ -210,6 +210,23 @@ Request* IoUringWorkerImpl::submitCancelRequest(IoUringSocket& socket, Request* 
   return req;
 }
 
+Request* IoUringWorkerImpl::submitShutdownRequest(IoUringSocket& socket, int how) {
+  Request* req = new BaseRequest(RequestType::Shutdown, socket);
+
+  ENVOY_LOG(trace, "submit shutdown request, fd = {}, shutdown req = {}", socket.fd(),
+            fmt::ptr(req));
+
+  auto res = io_uring_->prepareShutdown(socket.fd(), how, req);
+  if (res == IoUringResult::Failed) {
+    // TODO(rojkov): handle `EBUSY` in case the completion queue is never reaped.
+    submit();
+    res = io_uring_->prepareShutdown(socket.fd(), how, req);
+    RELEASE_ASSERT(res == IoUringResult::Ok, "unable to prepare cancel");
+  }
+  submit();
+  return req;
+}
+
 IoUringSocketEntryPtr IoUringWorkerImpl::removeSocket(IoUringSocketEntry& socket) {
   return socket.removeFromList(sockets_);
 }
@@ -260,6 +277,10 @@ void IoUringWorkerImpl::onFileEvent() {
       ENVOY_LOG(trace, "receive cancel request completion, fd = {}, req = {}", req->socket().fd(),
                 fmt::ptr(req));
       req->socket().onCancel(result, injected);
+      break;
+    case RequestType::Shutdown:
+      ENVOY_LOG(trace, "receive shutdown request completion, fd = {}, req = {}", req->socket().fd(),
+                fmt::ptr(req));
       break;
     }
 
@@ -428,6 +449,32 @@ uint64_t IoUringServerSocket::write(const Buffer::RawSlice* slices, uint64_t num
   return bytes_written;
 }
 
+void IoUringServerSocket::shutdown(int how) {
+  switch (how) {
+  case SHUT_RD:
+    if (read_req_ != nullptr) {
+      status_ = IoUringSocketStatus::SHUTDOWN_READ;
+      break;
+    }
+    parent_.submitShutdownRequest(*this, how);
+    break;
+  case SHUT_WR:
+    if (write_req_ != nullptr) {
+      status_ = IoUringSocketStatus::SHUTDOWN_WRITE;
+      break;
+    }
+    parent_.submitShutdownRequest(*this, how);
+    break;
+  case SHUT_RDWR:
+    if (write_req_ != nullptr) {
+      status_ = IoUringSocketStatus::SHUTDOWN_READ_WRITE;
+      break;
+    }
+    parent_.submitShutdownRequest(*this, how);
+    break;
+  }
+}
+
 void IoUringServerSocket::onClose(int32_t result, bool injected) {
   IoUringSocketEntry::onClose(result, injected);
   ASSERT(!injected);
@@ -448,6 +495,12 @@ void IoUringServerSocket::onRead(Request* req, int32_t result, bool injected) {
       ENVOY_LOG(trace, "ready to close, fd = {}", fd_);
       close_req_ = parent_.submitCloseRequest(*this);
       return;
+    }
+
+    if (status_ == SHUTDOWN_READ) {
+      parent_.submitShutdownRequest(*this, SHUT_RD);
+    } else if (status_ == SHUTDOWN_READ_WRITE && write_req_ == nullptr) {
+      parent_.submitShutdownRequest(*this, SHUT_RDWR);
     }
   }
 
@@ -522,12 +575,25 @@ void IoUringServerSocket::onWrite(int32_t result, bool injected) {
   if (result <= 0 && result != -EAGAIN) {
     WriteParam param{result};
     io_uring_handler_.onWrite(param);
+    if (status_ == SHUTDOWN_WRITE) {
+      parent_.submitShutdownRequest(*this, SHUT_WR);
+    } else if (status_ == SHUTDOWN_READ_WRITE && read_req_ == nullptr) {
+      parent_.submitShutdownRequest(*this, SHUT_RDWR);
+    }
     return;
   }
 
   if (result > 0) {
     write_buf_.drain(result);
     ENVOY_LOG(trace, "drain write buf, drain size = {}, fd = {}", result, fd_);
+  }
+
+  if (status_ == SHUTDOWN_WRITE) {
+    parent_.submitShutdownRequest(*this, SHUT_WR);
+    return;
+  } else if (status_ == SHUTDOWN_READ_WRITE && read_req_ == nullptr) {
+    parent_.submitShutdownRequest(*this, SHUT_RDWR);
+    return;
   }
 
   if (write_buf_.length() > 0) {

@@ -42,6 +42,7 @@ public:
                               off_t offset, void* user_data) override;
   IoUringResult prepareClose(os_fd_t fd, void* user_data) override;
   IoUringResult prepareCancel(void* cancelling_user_data, void* user_data) override;
+  IoUringResult prepareShutdown(os_fd_t fd, int how, void* user_data) override;
   IoUringResult submit() override;
   void injectCompletion(os_fd_t fd, void* user_data, int32_t result) override;
   void removeInjectedCompletion(os_fd_t fd) override;

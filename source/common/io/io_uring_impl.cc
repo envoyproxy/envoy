@@ -200,6 +200,18 @@ IoUringResult IoUringImpl::prepareCancel(void* cancelling_user_data, void* user_
   return IoUringResult::Ok;
 }
 
+IoUringResult IoUringImpl::prepareShutdown(os_fd_t fd, int how, void* user_data) {
+  ENVOY_LOG(trace, "prepare shutdown for fd = {}, how", fd, how);
+  struct io_uring_sqe* sqe = io_uring_get_sqe(&ring_);
+  if (sqe == nullptr) {
+    return IoUringResult::Failed;
+  }
+
+  io_uring_prep_shutdown(sqe, fd, how);
+  io_uring_sqe_set_data(sqe, user_data);
+  return IoUringResult::Ok;
+}
+
 IoUringResult IoUringImpl::submit() {
   int res = io_uring_submit(&ring_);
   ENVOY_LOG(trace, "submit requests to the ring, number of entries = {}", res);

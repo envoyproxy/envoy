@@ -98,6 +98,13 @@ public:
   virtual IoUringResult prepareCancel(void* cancelling_user_data, void* user_data) PURE;
 
   /**
+   * Prepares a shutdown operation and puts it into the submission queue.
+   * Returns IoUringResult::Failed in case the submission queue is full already
+   * and IoUringResult::Ok otherwise.
+   */
+  virtual IoUringResult prepareShutdown(os_fd_t fd, int how, void* user_data) PURE;
+
+  /**
    * Submits the entries in the submission queue to the kernel using the
    * `io_uring_enter()` system call.
    * Returns IoUringResult::Ok in case of success and may return
@@ -130,6 +137,7 @@ struct RequestType {
   static constexpr uint32_t Write = 0x8;
   static constexpr uint32_t Close = 0x10;
   static constexpr uint32_t Cancel = 0x20;
+  static constexpr uint32_t Shutdown = 0x40;
 };
 
 class IoUringSocket;
@@ -159,6 +167,9 @@ enum IoUringSocketStatus {
   INITIALIZED,
   ENABLED,
   DISABLED,
+  SHUTDOWN_READ,
+  SHUTDOWN_WRITE,
+  SHUTDOWN_READ_WRITE,
   CLOSING,
   CLOSED,
 };
@@ -267,6 +278,12 @@ public:
    * @return the status.
    */
   virtual IoUringSocketStatus getStatus() const PURE;
+
+  /**
+   * Shutdown the socket.
+   * @param how is SHUT_RD, SHUT_WR and SHUT_RDWR.
+   */
+  virtual void shutdown(int how) PURE;
 };
 
 struct AcceptedSocketParam {
@@ -355,6 +372,11 @@ public:
    * Submit a cancel request for a socket.
    */
   virtual Request* submitCancelRequest(IoUringSocket& socket, Request* request_to_cancel) PURE;
+
+  /**
+   * Submit a shutdown request for a socket.
+   */
+  virtual Request* submitShutdownRequest(IoUringSocket& socket, int how) PURE;
 };
 
 /**
