@@ -581,7 +581,7 @@ void OAuth2Filter::finishUpdateAccessTokenFlow() {
 
 void OAuth2Filter::onUpdateAccessTokenFailure() {
   config_->stats().oauth_refreshtoken_failure_.inc();
-  // the access token hasn't been got using by refresh token, send a user to oauth endpoint
+  // We failed to get an access token via the refresh token, so send the user to the oauth endpoint.
   redirectToOAuthServer(*request_headers_);
 }
 
