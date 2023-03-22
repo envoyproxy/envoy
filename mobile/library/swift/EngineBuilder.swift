@@ -73,6 +73,9 @@ open class EngineBuilder: NSObject {
   private var nodeRegion: String?
   private var nodeZone: String?
   private var nodeSubZone: String?
+  private var cdsResourcesLocator: String = ""
+  private var cdsTimeoutSeconds: UInt32 = 0
+  private var enableCds: Bool = false
   private var enableSwiftBootstrap = false
 
   // MARK: - Public
@@ -551,6 +554,7 @@ open class EngineBuilder: NSObject {
     self.virtualClusters.append(contentsOf: virtualClusters)
     return self
   }
+#if ENVOY_GOOGLE_GRPC
 
   /// Sets the node.id field in the Bootstrap configuration.
   ///
@@ -587,7 +591,8 @@ open class EngineBuilder: NSObject {
   /// - parameter address:                 The network address of the server.
   /// - parameter port:                    The port of the server.
   /// - parameter jwtToken:                The JWT token.
-  /// - parameter jwtTokenLifetimeSeconds: The JWT token lifetime in seconds.
+  /// - parameter jwtTokenLifetimeSeconds: The JWT token lifetime in seconds. If zero, a
+  ///                                      default value is set in engine_builder.h.
   /// - parameter sslRootCerts:            The SSL root certificates.
   ///
   /// - returns: This builder.
@@ -610,7 +615,8 @@ open class EngineBuilder: NSObject {
   /// Adds an RTDS layer to the configuration.
   ///
   /// - parameter layerName:      The layer name.
-  /// - parameter timeoutSeconds: The timeout in seconds.
+  /// - parameter timeoutSeconds: The timeout in seconds. If zero, a default value is set in
+  ///                             engine_builder.h.
   ///
   /// - returns: This builder.
   @discardableResult
@@ -619,6 +625,23 @@ open class EngineBuilder: NSObject {
     self.rtdsTimeoutSeconds = timeoutSeconds
     return self
   }
+
+  /// Adds a CDS layer to the configuration.
+  ///
+  /// - parameter resourcesLocator: The xdstp resource URI for fetching clusters.
+  ///                               If empty, xdstp is not used and a wildcard is inferred.
+  /// - parameter timeoutSeconds:   The timeout in seconds. If zero, a default value is set in
+  ///                               engine_builder.h.
+  ///
+  /// - returns: This builder.
+  @discardableResult
+  public func addCDSLayer(resourcesLocator: String = "", timeoutSeconds: UInt32 = 0) -> Self {
+    self.cdsResourcesLocator = resourcesLocator
+    self.cdsTimeoutSeconds = timeoutSeconds
+    self.enableCds = true
+    return self
+  }
+#endif
 
 #if ENVOY_ADMIN_FUNCTIONALITY
   /// Enable admin interface on 127.0.0.1:9901 address. Admin interface is intended to be
@@ -749,7 +772,10 @@ open class EngineBuilder: NSObject {
       nodeId: self.nodeID,
       nodeRegion: self.nodeRegion,
       nodeZone: self.nodeZone,
-      nodeSubZone: self.nodeSubZone
+      nodeSubZone: self.nodeSubZone,
+      cdsResourcesLocator: self.cdsResourcesLocator,
+      cdsTimeoutSeconds: self.cdsTimeoutSeconds,
+      enableCds: self.enableCds
     )
   }
 
@@ -765,6 +791,7 @@ open class EngineBuilder: NSObject {
   }
 }
 
+// swiftlint:disable cyclomatic_complexity
 #if canImport(EnvoyCxxSwiftInterop)
 private extension EngineBuilder {
   func generateBootstrap() -> Bootstrap {
@@ -860,8 +887,11 @@ private extension EngineBuilder {
         adsSslRootCerts.toCXX()
       )
     }
-
+    if self.enableCds {
+      cxxBuilder.addCdsLayer(self.cdsResourcesLocator.toCXX(), Int32(self.cdsTimeoutSeconds))
+    }
     return cxxBuilder.generateBootstrap()
   }
+  // swiftlint:enable cyclomatic_complexity
 }
 #endif

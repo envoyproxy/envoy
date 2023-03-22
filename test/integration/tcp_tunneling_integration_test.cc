@@ -928,6 +928,7 @@ TEST_P(TcpTunnelingIntegrationTest, Goaway) {
   // Make sure the last stream is finished before doing test teardown.
   fake_upstream_connection->encodeGoAway();
   test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_destroy", 2);
+  ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
 }
 
 TEST_P(TcpTunnelingIntegrationTest, InvalidResponseHeaders) {
