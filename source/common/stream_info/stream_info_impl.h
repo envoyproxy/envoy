@@ -108,13 +108,13 @@ struct StreamInfoImpl : public StreamInfo {
       TimeSource& time_source,
       const Network::ConnectionInfoProviderSharedPtr& downstream_connection_info_provider,
       FilterState::LifeSpan life_span = FilterState::LifeSpan::FilterChain)
-      : StreamInfoImpl(absl::nullopt, time_source, downstream_connection_info_provider,
+      : StreamInfoImpl(absl::nullopt, absl::nullopt, time_source, downstream_connection_info_provider,
                        std::make_shared<FilterStateImpl>(life_span)) {}
 
   StreamInfoImpl(
       Http::Protocol protocol, TimeSource& time_source,
       const Network::ConnectionInfoProviderSharedPtr& downstream_connection_info_provider)
-      : StreamInfoImpl(protocol, time_source, downstream_connection_info_provider,
+      : StreamInfoImpl(protocol, absl::nullopt, time_source, downstream_connection_info_provider,
                        std::make_shared<FilterStateImpl>(FilterState::LifeSpan::FilterChain)) {}
 
   StreamInfoImpl(
@@ -122,7 +122,7 @@ struct StreamInfoImpl : public StreamInfo {
       const Network::ConnectionInfoProviderSharedPtr& downstream_connection_info_provider,
       FilterStateSharedPtr parent_filter_state, FilterState::LifeSpan life_span)
       : StreamInfoImpl(
-            protocol, time_source, downstream_connection_info_provider,
+            protocol, absl::nullopt, time_source, downstream_connection_info_provider,
             std::make_shared<FilterStateImpl>(
                 FilterStateImpl::LazyCreateAncestor(std::move(parent_filter_state), life_span),
                 FilterState::LifeSpan::FilterChain)) {}
@@ -176,6 +176,10 @@ struct StreamInfoImpl : public StreamInfo {
   void addBytesReceived(uint64_t bytes_received) override { bytes_received_ += bytes_received; }
 
   uint64_t bytesReceived() const override { return bytes_received_; }
+
+  absl::optional<StreamState> streamState() const override { return stream_state_; }
+
+  void streamState(StreamState stream_state) override { stream_state_ = stream_state; }
 
   absl::optional<Http::Protocol> protocol() const override { return protocol_; }
 
@@ -330,6 +334,7 @@ struct StreamInfoImpl : public StreamInfo {
   void setFromForRecreateStream(StreamInfo& info) {
     downstream_timing_ = info.downstreamTiming();
     protocol_ = info.protocol();
+    stream_state_ = info.streamState();
     bytes_received_ = info.bytesReceived();
     downstream_bytes_meter_ = info.getDownstreamBytesMeter();
     // These two are set in the constructor, but to T(recreate), and should be T(create)
@@ -392,6 +397,7 @@ struct StreamInfoImpl : public StreamInfo {
   absl::optional<MonotonicTime> final_time_;
 
   absl::optional<Http::Protocol> protocol_;
+  absl::optional<StreamState> stream_state_;
   absl::optional<uint32_t> response_code_;
   absl::optional<std::string> response_code_details_;
   absl::optional<std::string> connection_termination_details_;
@@ -414,12 +420,12 @@ private:
   }
 
   StreamInfoImpl(
-      absl::optional<Http::Protocol> protocol, TimeSource& time_source,
+      absl::optional<Http::Protocol> protocol, absl::optional<StreamState> stream_state, TimeSource& time_source,
       const Network::ConnectionInfoProviderSharedPtr& downstream_connection_info_provider,
       FilterStateSharedPtr filter_state)
       : time_source_(time_source), start_time_(time_source.systemTime()),
         start_time_monotonic_(time_source.monotonicTime()), protocol_(protocol),
-        filter_state_(std::move(filter_state)),
+        stream_state_(stream_state), filter_state_(std::move(filter_state)),
         downstream_connection_info_provider_(downstream_connection_info_provider != nullptr
                                                  ? downstream_connection_info_provider
                                                  : emptyDownstreamAddressProvider()),

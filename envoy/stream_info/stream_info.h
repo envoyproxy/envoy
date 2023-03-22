@@ -205,6 +205,16 @@ struct ResponseCodeDetailValues {
 
 using ResponseCodeDetails = ConstSingleton<ResponseCodeDetailValues>;
 
+struct StreamStateStringValues {
+  const std::string StreamStarted = "Started";
+  const std::string StreamInProgress = "InProgress";
+  const std::string StreamEnded = "Ended";
+};
+
+using StreamStateStrings = ConstSingleton<StreamStateStringValues>;
+
+enum class StreamState { Started, InProgress, Ended };
+
 /**
  * Constants for the locally closing a connection. This is used in response code
  * details field of StreamInfo for details sent by core (non-extension) code.
@@ -564,6 +574,16 @@ public:
    * @return the number of body bytes received by the stream.
    */
   virtual uint64_t bytesReceived() const PURE;
+
+  /**
+   * @return the stream's state.
+   */
+  virtual absl::optional<StreamState> streamState() const PURE;
+
+  /**
+   * @param protocol the stream's state.
+   */
+  virtual void streamState(StreamState stream_state) PURE;
 
   /**
    * @return the protocol of the request.
