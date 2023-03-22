@@ -216,8 +216,8 @@ public:
 
   MonotonicTime monotonicTime() override {
     calls_counter_ += 1;
-    return MonotonicTime(std::chrono::milliseconds(
-      system_time_ms_ + calls_counter_ * monotonic_time_progress_ms_));
+    return MonotonicTime(
+        std::chrono::milliseconds(system_time_ms_ + calls_counter_ * monotonic_time_progress_ms_));
   }
 
 private:
@@ -238,14 +238,14 @@ TEST(SubstitutionFormatterTest, inFlightDuration) {
     // First call, expect 100
     StreamInfoFormatter duration_format("DURATION");
     EXPECT_EQ("100", duration_format.format(request_headers, response_headers, response_trailers,
-                                           stream_info, body));
+                                            stream_info, body));
   }
 
   {
     // First call, expect 200
     StreamInfoFormatter duration_format("DURATION");
     EXPECT_EQ("200", duration_format.format(request_headers, response_headers, response_trailers,
-                                           stream_info, body));
+                                            stream_info, body));
 
     // Third call, expect 300
     EXPECT_THAT(duration_format.formatValue(request_headers, response_headers, response_trailers,
