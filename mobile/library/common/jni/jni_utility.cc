@@ -6,17 +6,11 @@
 #include "source/common/common/assert.h"
 
 #include "library/common/jni/jni_support.h"
-#include "library/common/jni/jni_version.h"
+#include "library/common/jni/types/env.h"
 
 // NOLINT(namespace-envoy)
 
-static JavaVM* static_jvm = nullptr;
 static jobject static_class_loader = nullptr;
-static thread_local JNIEnv* local_env = nullptr;
-
-void set_vm(JavaVM* vm) { static_jvm = vm; }
-
-JavaVM* get_vm() { return static_jvm; }
 
 void set_class_loader(jobject class_loader) { static_class_loader = class_loader; }
 
@@ -38,23 +32,7 @@ jclass find_class(const char* class_name) {
   return clazz;
 }
 
-JNIEnv* get_env() {
-  if (local_env) {
-    return local_env;
-  }
-
-  jint result = static_jvm->GetEnv(reinterpret_cast<void**>(&local_env), JNI_VERSION);
-  if (result == JNI_EDETACHED) {
-    // Note: the only thread that should need to be attached is Envoy's engine std::thread.
-    static const char* thread_name = "EnvoyMain";
-    JavaVMAttachArgs args = {JNI_VERSION, const_cast<char*>(thread_name), nullptr};
-    result = attach_jvm(static_jvm, &local_env, &args);
-  }
-  RELEASE_ASSERT(result == JNI_OK, "Unable to get a JVM env for the current thread");
-  return local_env;
-}
-
-void jvm_detach_thread() { static_jvm->DetachCurrentThread(); }
+JNIEnv* get_env() { return Envoy::JNI::Env::get(); }
 
 void jni_delete_global_ref(void* context) {
   JNIEnv* env = get_env();
@@ -64,16 +42,6 @@ void jni_delete_global_ref(void* context) {
 
 void jni_delete_const_global_ref(const void* context) {
   jni_delete_global_ref(const_cast<void*>(context));
-}
-
-bool clear_pending_exceptions(JNIEnv* env) {
-  if (env->ExceptionCheck() == JNI_TRUE) {
-    env->ExceptionClear();
-    // TODO(Augustyniak): Log exception details.
-    return true;
-  } else {
-    return false;
-  }
 }
 
 int unbox_integer(JNIEnv* env, jobject boxedInteger) {

@@ -41,6 +41,9 @@ minor_behavior_changes:
 - area: matchers
   change: |
     Moved all of the network input matchers to extensions. If you use network matchers and override extensions_build_config.bzl you will now need to include them explicitly.
+- area: skywalking
+  change: |
+    If sw8 header is invalid, skywalking extension will create a new trace context and a null span respectively when sampling is enabled and disabled.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*

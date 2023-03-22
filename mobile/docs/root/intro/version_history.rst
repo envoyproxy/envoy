@@ -20,6 +20,7 @@ Breaking changes:
 - api: move ``dnsPreresolveHostnames`` APIs from taking concatenated cluster YAML to taking a list of String hostnames (:issue: `#25297 <25297>`, :issue: `#25259 <25259>`, :issue: `#25457 <25457>`)
 - api: added ``setRuntimeGuard`` APIs for all languages (:issue: `#25434 <25434>`)
 - api: added ``setRtdsLayer``, ``addAggregatedDiscoveryService``, ``setNodeId``, ``setNodeLocality`` APIs for all languages
+- api: added ``setCdsLayer`` APIs for all languages (:issue: `#26122 <26122>`)
 - clusters: removing the base_h2 cluster. Requests with ``x-envoy-mobile-upstream-protocol`` set to ``http2`` will be sent to the base cluster and use the best available protocol (:issue `#25796 <25796>`).
 - clusters: only creating the stats cluster if an endpoint is configured. Previously if no domain was configured a cluster would be configured pointed at 127.0.0.1. (:issue: `#25816 <25816>`).
 - clusters: removing the base_h3 cluster. If HTTP/3 is enabled, the base cluster will use HTTP/3 instead. (:issue: `#25814 <25814>`).
@@ -46,9 +47,11 @@ Features:
 - api: Add support for Native Filters and Platform Filters to the C++ EngineBuilder. (:issue:`#2498 <2498>`)
 - api: added upstream protocol to final stream intel. (:issue:`#2613 <2613>`)
 - build: Add a build feature ``exclude_certificates`` to disable inclusion of the Envoy Mobile certificate list, for use when using platform certificate validation.
+- build: Add a build feature ``envoy_http_datagrams`` to allow disabling HTTP Datagram support. (:issue:`#23564 <23564>`)
 - build: Add a build feature ``envoy_mobile_stats_reporting`` to allow disabling stats reporting. (:issue:`26086 <26086>`)
 - swift: Add a new Swift implementation of generating the Envoy bootstrap that replaces the previous Objective-C implementation.
   This can be enabled by setting ``useSwiftBootstrap(true)`` and requires building with ``--define=envoy_mobile_swift_cxx_interop=enabled``. (:issue:`#26111 <26111>`)
+- android: log cleared JNI exceptions to platform layer as `jni_cleared_pending_exception` events (:issue:`#26133 <26133>`).
 
 0.5.0 (September 2, 2022)
 ===========================
