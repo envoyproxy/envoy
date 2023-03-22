@@ -9,19 +9,22 @@ import java.util.List;
  * https://github.com/envoyproxy/envoy/blob/main/api/envoy/config/route/v3/route_components.proto
  * */
 public class HeaderMatchConfig {
-  // Indicates the match value is for an exact match.
-  public static final int EXACT = 0;
-  // Indicates the match value is a regular expression.
-  public static final int SAFE_REGEX = 1;
+  public enum Type {
+    // Indicates the match value is for an exact match.
+    EXACT,
+    // Indicates the match value is a regular expression.
+    SAFE_REGEX
+  }
+  ;
 
   // The name of the matcher.
   public final String name;
-  // The type of the matcher, one of the types defined above.
-  public final int type;
+  // The type of the matcher.
+  public final Type type;
   // The value of the matcher, interpreted based on the defined type.
   public final String value;
 
-  public HeaderMatchConfig(String name, int type, String value) {
+  public HeaderMatchConfig(String name, Type type, String value) {
     this.name = name;
     this.type = type;
     this.value = value;

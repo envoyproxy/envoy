@@ -5,6 +5,8 @@ import io.envoyproxy.envoymobile.engine.types.EnvoyHTTPFilterFactory
 import io.envoyproxy.envoymobile.engine.EnvoyConfiguration.TrustChainVerification
 import io.envoyproxy.envoymobile.engine.JniLibrary
 import io.envoyproxy.envoymobile.engine.VirtualClusterConfig
+import io.envoyproxy.envoymobile.engine.HeaderMatchConfig
+import io.envoyproxy.envoymobile.engine.HeaderMatchConfig.Type
 import io.envoyproxy.envoymobile.engine.types.EnvoyStreamIntel
 import io.envoyproxy.envoymobile.engine.types.EnvoyFinalStreamIntel
 import io.envoyproxy.envoymobile.engine.types.EnvoyHTTPFilterCallbacks
@@ -328,8 +330,8 @@ class EnvoyConfigurationTest {
     JniLibrary.loadTestLibrary()
     val envoyConfiguration = buildTestEnvoyConfiguration(
       runtimeGuards = mapOf("test_feature_false" to true, "test_feature_true" to false),
-      virtualClusters = listOf(VirtualClusterConfig("cluster1", listOf(HeaderMatchConfig(":method", 0, "POST"),
-            HeaderMatchConfig(":authority", 1, "foo")))),
+      virtualClusters = listOf(VirtualClusterConfig("cluster1", listOf(HeaderMatchConfig(":method", Type.EXACT, "POST"),
+            HeaderMatchConfig(":authority", Type.SAFE_REGEX, "foo")))),
     )
 
     val resolvedTemplate = TestJni.createYaml(envoyConfiguration)
