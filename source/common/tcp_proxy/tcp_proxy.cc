@@ -822,8 +822,8 @@ void Filter::onMaxDownstreamConnectionDuration() {
 }
 
 void Filter::onAccessLogFlushInterval() {
-  if (!streamInfo().streamState() ||
-      streamInfo().streamState() != StreamInfo::StreamState::InProgress) {
+  if (!getStreamInfo().streamState() ||
+      getStreamInfo().streamState() != StreamInfo::StreamState::InProgress) {
     return;
   }
 
