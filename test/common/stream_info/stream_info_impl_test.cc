@@ -403,7 +403,7 @@ TEST_F(StreamInfoImplTest, DumpStateTest) {
     std::string state = out.str();
     EXPECT_TRUE(absl::StartsWith(state, prefix));
     EXPECT_THAT(state, testing::HasSubstr("protocol_: 2"));
-    EXPECT_THAT(state, testing::HasSubstr("stream_state_: 1"));
+    EXPECT_THAT(state, testing::HasSubstr("stream_state_: 2"));
     prefix = prefix + "  ";
   }
 }
