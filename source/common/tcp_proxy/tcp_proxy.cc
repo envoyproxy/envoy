@@ -822,6 +822,11 @@ void Filter::onMaxDownstreamConnectionDuration() {
 }
 
 void Filter::onAccessLogFlushInterval() {
+  if (!streamInfo().streamState() ||
+      streamInfo().streamState() != StreamInfo::StreamState::InProgress) {
+    return;
+  }
+
   for (const auto& access_log : config_->accessLogs()) {
     access_log->log(nullptr, nullptr, nullptr, getStreamInfo());
   }

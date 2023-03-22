@@ -816,7 +816,8 @@ ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connect
         connection_manager.read_callbacks_->connection().dispatcher().createTimer([this]() -> void {
           // If the request is complete, we've already done the stream-end access-log, and shouldn't
           // do the periodic log.
-          if (!streamInfo().requestComplete().has_value()) {
+          if (streamInfo().streamState() &&
+              streamInfo().streamState() == StreamInfo::StreamState::InProgress) {
             filter_manager_.log();
             refreshAccessLogFlushTimer();
           }
