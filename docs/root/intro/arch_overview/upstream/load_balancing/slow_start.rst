@@ -61,3 +61,5 @@ Once endpoints E1 and E2 exit slow start mode, their load balancing weight remai
 .. image:: /_static/slow_start_example.svg
    :width: 60%
    :align: center
+
+*Note* that slow start does not work with priorities, e.g. when traffic spills over across priorities there will be no progressive increase of traffic to destination endpoints, all traffic will shift at once.
