@@ -49,7 +49,9 @@ TEST(TestConfig, ConfigIsApplied) {
       .enableAdminInterface(true)
 #endif
       .setForceAlwaysUsev6(true)
+#ifdef ENVOY_GOOGLE_GRPC
       .setNodeId("my_test_node")
+#endif
       .setDeviceOs("probably-ubuntu-on-CI");
 
   std::unique_ptr<Bootstrap> bootstrap = engine_builder.generateBootstrap();
@@ -457,6 +459,7 @@ TEST(TestConfig, AddVirtualCluster) {
   EXPECT_THAT(bootstrap->ShortDebugString(), HasSubstr("cluster2"));
 }
 
+#ifdef ENVOY_GOOGLE_GRPC
 TEST(TestConfig, SetNodeId) {
   EngineBuilder engine_builder;
   const std::string default_node_id = "envoy-mobile";
@@ -502,6 +505,7 @@ TEST(TestConfig, AddCdsLayer) {
   EXPECT_EQ(bootstrap->dynamic_resources().cds_config().api_config_source().transport_api_version(),
             envoy::config::core::v3::ApiVersion::V3);
 }
+#endif
 
 } // namespace
 } // namespace Envoy
