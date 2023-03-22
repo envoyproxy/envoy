@@ -11,13 +11,13 @@
 #include "library/common/extensions/filters/http/test_read/config.h"
 
 void register_test_extensions() {
+  Envoy::Extensions::HttpFilters::Assertion::forceRegisterAssertionFilterFactory();
+  Envoy::Extensions::HttpFilters::BufferFilter::forceRegisterBufferFilterFactory();
+  Envoy::Extensions::HttpFilters::RouteCacheReset::forceRegisterRouteCacheResetFilterFactory();
   Envoy::Extensions::HttpFilters::TestAccessor::forceRegisterTestAccessorFilterFactory();
   Envoy::Extensions::HttpFilters::TestEventTracker::forceRegisterTestEventTrackerFilterFactory();
   Envoy::Extensions::HttpFilters::TestKeyValueStore::forceRegisterTestKeyValueStoreFilterFactory();
   Envoy::Extensions::HttpFilters::TestLogger::forceRegisterFactory();
   Envoy::HttpFilters::TestRead::forceRegisterTestReadFilterFactory();
-  Envoy::Extensions::HttpFilters::Assertion::forceRegisterAssertionFilterFactory();
-  Envoy::Extensions::HttpFilters::BufferFilter::forceRegisterBufferFilterFactory();
-  Envoy::Extensions::HttpFilters::RouteCacheReset::forceRegisterRouteCacheResetFilterFactory();
   Envoy::Upstream::forceRegisterStaticClusterFactory();
 }

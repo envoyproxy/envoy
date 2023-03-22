@@ -86,7 +86,7 @@ void ExtensionRegistry::registerFactories() {
   // figure out how to build into test apps.
   Extensions::HttpFilters::BufferFilter::forceRegisterBufferFilterFactory();
 
-  // Thi is the default cluster used by Envoy mobile to establish connections upstream.
+  // This is the default cluster used by Envoy mobile to establish connections upstream.
   Extensions::Clusters::DynamicForwardProxy::forceRegisterClusterFactory();
   // This allows decompression of brotli-compresssed responses.
   Extensions::Compression::Brotli::Decompressor::forceRegisterBrotliDecompressorLibraryFactory();
