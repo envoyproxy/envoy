@@ -307,7 +307,7 @@ void ConnectionManagerImpl::doDeferredStreamDestroy(ActiveStream& stream) {
   }
 
   stream.filter_manager_.onStreamComplete();
-  stream.streamInfo().setStreamState(StreamState::Ended);
+  stream.streamInfo().setStreamState(StreamInfo::StreamState::Ended);
 
   // For HTTP/3, skip access logging here and add deferred logging info
   // to stream info for QuicStatsGatherer to use later.
@@ -385,7 +385,7 @@ RequestDecoder& ConnectionManagerImpl::newStream(ResponseEncoder& response_encod
   }
   new_stream->response_encoder_->getStream().setFlushTimeout(new_stream->idle_timeout_ms_);
   new_stream->streamInfo().setDownstreamBytesMeter(response_encoder.getStream().bytesMeter());
-  new_stream->streamInfo().setStreamState(StreamState::InProgress);
+  new_stream->streamInfo().setStreamState(StreamInfo::StreamState::InProgress);
   // If the network connection is backed up, the stream should be made aware of it on creation.
   // Both HTTP/1.x and HTTP/2 codecs handle this in StreamCallbackHelper::addCallbacksHelper.
   ASSERT(read_callbacks_->connection().aboveHighWatermark() == false ||
