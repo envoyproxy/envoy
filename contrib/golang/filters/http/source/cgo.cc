@@ -151,7 +151,7 @@ CAPIStatus envoyGoFilterHttpGetIntegerValue(void* r, int id, void* value) {
   });
 }
 
-CAPIStatus envoyGoFilterHttpLog(void* r, uint32_t level, void *message) {
+CAPIStatus envoyGoFilterHttpLog(void* r, uint32_t level, void* message) {
   return envoyGoFilterHandlerWrapper(
       r, [level, message](std::shared_ptr<Filter>& filter) -> CAPIStatus {
         auto mesg = referGoString(message);
