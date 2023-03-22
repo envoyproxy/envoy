@@ -1662,8 +1662,12 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ResponseHeaderMap& heade
   ENVOY_STREAM_LOG(debug, "encoding headers via codec (end_stream={}):\n{}", *this, end_stream,
                    headers);
 
+  // According to RFC7231 any 2xx response indicates that the connection is established.
+  if (Http::CodeUtility::is2xx(Http::Utility::getResponseStatus(headers))) {
+    filter_manager_.streamInfo().setStreamState(StreamInfo::StreamState::InProgress);
+  }
+
   // Now actually encode via the codec.
-  filter_manager_.streamInfo().setStreamState(StreamInfo::StreamState::InProgress);
   filter_manager_.streamInfo().downstreamTiming().onFirstDownstreamTxByteSent(
       connection_manager_.time_source_);
   response_encoder_->encodeHeaders(headers, end_stream);
