@@ -197,6 +197,14 @@ The following command operators are supported:
   In typed JSON logs, PROTOCOL will render the string ``"-"`` if the protocol is not
   available (e.g. in TCP logs).
 
+%STREAM_STATE%
+  HTTP/TCP
+    The state of the stream. Currently either *Started* *InProgress* *Ended*.
+    In case the stream has not started yet, the value will be null.
+
+  UDP
+    Not implemented ("-").
+
 %UPSTREAM_PROTOCOL%
   HTTP
     Upstream protocol. Currently either *HTTP/1.1* *HTTP/2* or *HTTP/3*.
