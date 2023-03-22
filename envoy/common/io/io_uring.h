@@ -167,9 +167,9 @@ enum IoUringSocketStatus {
   INITIALIZED,
   ENABLED,
   DISABLED,
-  SHUTDOWN_READ,
   SHUTDOWN_WRITE,
-  SHUTDOWN_READ_WRITE,
+  CLOSE_AFTER_SHUTDOWN_WRITE,
+  ALREADY_SHUTDOWN,
   CLOSING,
   CLOSED,
 };
@@ -266,6 +266,14 @@ public:
    * @param injected indicates the completion is injected or not.
    */
   virtual void onCancel(int32_t result, bool injected) PURE;
+
+  /**
+   * On shutdown request completed.
+   * TODO (soulxu): wrap the raw result into a type. It can be `IoCallUint64Result`.
+   * @param result the result of operation in the request.
+   * @param injected indicates the completion is injected or not.
+   */
+  virtual void onShutdown(int32_t result, bool injected) PURE;
 
   /**
    * Inject a request completion to the io uring instance.

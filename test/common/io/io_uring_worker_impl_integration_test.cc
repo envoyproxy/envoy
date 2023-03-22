@@ -708,6 +708,7 @@ TEST_F(IoUringWorkerIntegrationTest, ServerSocketShutdownAfterWrite) {
   slice.len_ = write_data.length();
   socket.write(&slice, 1);
   socket.shutdown(SHUT_WR);
+
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
 
   // Read data from client socket.
@@ -719,8 +720,9 @@ TEST_F(IoUringWorkerIntegrationTest, ServerSocketShutdownAfterWrite) {
   EXPECT_EQ(write_data.size(), size);
 
   socket.close();
-  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
-  EXPECT_EQ(io_uring_worker_->getSockets().size(), 0);
+  while (io_uring_worker_->getSockets().size() != 0) {
+    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  }
   cleanup();
 }
 
@@ -735,6 +737,40 @@ TEST_F(IoUringWorkerIntegrationTest, ServerSocketCloseAfterShutdown) {
   socket.close();
   runToClose(server_socket_);
   EXPECT_EQ(io_uring_worker_->getSockets().size(), 0);
+  cleanup();
+}
+
+TEST_F(IoUringWorkerIntegrationTest, ServerSocketCloseAfterShutdownWrite) {
+  initialize();
+  initializeSockets();
+
+  auto& socket = io_uring_worker_->addServerSocket(server_socket_, io_uring_handler_);
+  EXPECT_EQ(io_uring_worker_->getSockets().size(), 1);
+
+  // Waiting for the server socket sending the data.
+  std::string write_data = "hello world";
+  struct Buffer::RawSlice slice;
+  slice.mem_ = write_data.data();
+  slice.len_ = write_data.length();
+  socket.write(&slice, 1);
+  socket.shutdown(SHUT_WR);
+  socket.close();
+
+  while (io_uring_worker_->getSockets().size() != 0) {
+    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  }
+
+  // Read data from client socket.
+  struct iovec read_iov;
+  auto read_buf = std::make_unique<uint8_t[]>(20);
+  read_iov.iov_base = read_buf.get();
+  read_iov.iov_len = 20;
+  auto size = Api::OsSysCallsSingleton::get().readv(client_socket_, &read_iov, 1).return_value_;
+  EXPECT_EQ(write_data.size(), size);
+
+  size = Api::OsSysCallsSingleton::get().readv(client_socket_, &read_iov, 1).return_value_;
+  EXPECT_EQ(0, size);
+
   cleanup();
 }
 

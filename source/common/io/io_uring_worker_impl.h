@@ -97,6 +97,11 @@ public:
       injected_completions_ &= ~RequestType::Cancel;
     }
   }
+  void onShutdown(int32_t, bool injected) override {
+    if (injected && (injected_completions_ & RequestType::Shutdown)) {
+      injected_completions_ &= ~RequestType::Shutdown;
+    }
+  }
   void injectCompletion(uint32_t type) override;
   IoUringSocketStatus getStatus() const override { return status_; }
 
@@ -194,6 +199,7 @@ public:
   void onRead(Request* req, int32_t result, bool injected) override;
   void onWrite(int32_t result, bool injected) override;
   void onCancel(int32_t, bool injected) override;
+  void onShutdown(int32_t, bool injected) override;
 
 private:
   // For read.

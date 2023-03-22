@@ -77,6 +77,9 @@ IoUringWorkerImpl::~IoUringWorkerImpl() {
 
   while (sockets_.size() != 0) {
     ENVOY_LOG(trace, "still left {} sockets are not closed", sockets_.size());
+    for (auto& socket : sockets_) {
+      ENVOY_LOG(trace, "the socket fd = {} not closed", socket->fd());
+    }
     dispatcher_.run(Event::Dispatcher::RunType::NonBlock);
   }
 
@@ -281,6 +284,7 @@ void IoUringWorkerImpl::onFileEvent() {
     case RequestType::Shutdown:
       ENVOY_LOG(trace, "receive shutdown request completion, fd = {}, req = {}", req->socket().fd(),
                 fmt::ptr(req));
+      req->socket().onShutdown(result, injected);
       break;
     }
 
@@ -386,9 +390,16 @@ IoUringServerSocket::IoUringServerSocket(os_fd_t fd, IoUringWorkerImpl& parent,
 }
 
 void IoUringServerSocket::close() {
+  ENVOY_LOG(trace, "close the socket, fd = {}, status = {}", fd_, status_);
+
+  if (status_ == SHUTDOWN_WRITE || status_ == CLOSE_AFTER_SHUTDOWN_WRITE) {
+    ENVOY_LOG(trace, "wait for the shutdown write done before close");
+    status_ = CLOSE_AFTER_SHUTDOWN_WRITE;
+    return;
+  }
+
   IoUringSocketEntry::close();
 
-  ENVOY_LOG(trace, "close the socket, fd = {}", fd_);
   if (read_req_ == nullptr && write_req_ == nullptr && cancel_req_ == nullptr) {
     ENVOY_LOG(trace, "ready to close, fd = {}", fd_);
     close_req_ = parent_.submitCloseRequest(*this);
@@ -414,7 +425,12 @@ void IoUringServerSocket::enable() {
   submitReadRequest();
 }
 
-void IoUringServerSocket::disable() { IoUringSocketEntry::disable(); }
+void IoUringServerSocket::disable() {
+  // We didn't implement the disable socket after shutdown.
+  ASSERT(status_ != SHUTDOWN_WRITE && status_ != CLOSE_AFTER_SHUTDOWN_WRITE &&
+         status_ != ALREADY_SHUTDOWN);
+  IoUringSocketEntry::disable();
+}
 
 void IoUringServerSocket::write(Buffer::Instance& data) {
   ENVOY_LOG(trace, "write, buffer size = {}, fd = {}", data.length(), fd_);
@@ -450,29 +466,17 @@ uint64_t IoUringServerSocket::write(const Buffer::RawSlice* slices, uint64_t num
 }
 
 void IoUringServerSocket::shutdown(int how) {
-  switch (how) {
-  case SHUT_RD:
-    if (read_req_ != nullptr) {
-      status_ = IoUringSocketStatus::SHUTDOWN_READ;
-      break;
-    }
-    parent_.submitShutdownRequest(*this, how);
-    break;
-  case SHUT_WR:
-    if (write_req_ != nullptr) {
-      status_ = IoUringSocketStatus::SHUTDOWN_WRITE;
-      break;
-    }
-    parent_.submitShutdownRequest(*this, how);
-    break;
-  case SHUT_RDWR:
-    if (write_req_ != nullptr) {
-      status_ = IoUringSocketStatus::SHUTDOWN_READ_WRITE;
-      break;
-    }
-    parent_.submitShutdownRequest(*this, how);
-    break;
+  ENVOY_LOG(trace, "shutdown the socket, fd = {}, how = {}", fd_, how);
+  if (how != SHUT_WR) {
+    PANIC("only the SHUT_WR implemented");
   }
+
+  status_ = IoUringSocketStatus::SHUTDOWN_WRITE;
+  if (write_req_ != nullptr) {
+    return;
+  }
+
+  parent_.submitShutdownRequest(*this, how);
 }
 
 void IoUringServerSocket::onClose(int32_t result, bool injected) {
@@ -486,7 +490,8 @@ void IoUringServerSocket::onClose(int32_t result, bool injected) {
 void IoUringServerSocket::onRead(Request* req, int32_t result, bool injected) {
   IoUringSocketEntry::onRead(req, result, injected);
 
-  ENVOY_LOG(trace, "onRead with result {}, fd = {}, injected = {}", result, fd_, injected);
+  ENVOY_LOG(trace, "onRead with result {}, fd = {}, injected = {}, status_ = {}", result, fd_,
+            injected, status_);
   if (!injected) {
     read_req_ = nullptr;
     // Close if it is in closing status and no write request.
@@ -495,12 +500,6 @@ void IoUringServerSocket::onRead(Request* req, int32_t result, bool injected) {
       ENVOY_LOG(trace, "ready to close, fd = {}", fd_);
       close_req_ = parent_.submitCloseRequest(*this);
       return;
-    }
-
-    if (status_ == SHUTDOWN_READ) {
-      parent_.submitShutdownRequest(*this, SHUT_RD);
-    } else if (status_ == SHUTDOWN_READ_WRITE && write_req_ == nullptr) {
-      parent_.submitShutdownRequest(*this, SHUT_RDWR);
     }
   }
 
@@ -521,7 +520,8 @@ void IoUringServerSocket::onRead(Request* req, int32_t result, bool injected) {
   }
 
   // If the socket is enabled, notify handler to read.
-  if (status_ == ENABLED) {
+  if (status_ == ENABLED || status_ == SHUTDOWN_WRITE || status_ == CLOSE_AFTER_SHUTDOWN_WRITE ||
+      status_ == ALREADY_SHUTDOWN) {
     if (buf_.length() > 0) {
       ENVOY_LOG(trace, "read from socket, fd = {}, result = {}", fd_, buf_.length());
       ReadParam param{buf_, static_cast<int32_t>(buf_.length())};
@@ -534,7 +534,8 @@ void IoUringServerSocket::onRead(Request* req, int32_t result, bool injected) {
       read_error_.reset();
     }
     // The socket may be disabled during handler onRead callback, check it again here.
-    if (status_ == ENABLED) {
+    if (status_ == ENABLED || status_ == SHUTDOWN_WRITE || status_ == CLOSE_AFTER_SHUTDOWN_WRITE ||
+        status_ == ALREADY_SHUTDOWN) {
       // If the read error is zero, it means remote close, then needn't new request.
       if (!read_error_.has_value() || read_error_.value() != 0) {
         // Submit a read accept request for the next read.
@@ -575,10 +576,8 @@ void IoUringServerSocket::onWrite(int32_t result, bool injected) {
   if (result <= 0 && result != -EAGAIN) {
     WriteParam param{result};
     io_uring_handler_.onWrite(param);
-    if (status_ == SHUTDOWN_WRITE) {
+    if (status_ == SHUTDOWN_WRITE || status_ == CLOSE_AFTER_SHUTDOWN_WRITE) {
       parent_.submitShutdownRequest(*this, SHUT_WR);
-    } else if (status_ == SHUTDOWN_READ_WRITE && read_req_ == nullptr) {
-      parent_.submitShutdownRequest(*this, SHUT_RDWR);
     }
     return;
   }
@@ -588,19 +587,16 @@ void IoUringServerSocket::onWrite(int32_t result, bool injected) {
     ENVOY_LOG(trace, "drain write buf, drain size = {}, fd = {}", result, fd_);
   }
 
-  if (status_ == SHUTDOWN_WRITE) {
-    parent_.submitShutdownRequest(*this, SHUT_WR);
-    return;
-  } else if (status_ == SHUTDOWN_READ_WRITE && read_req_ == nullptr) {
-    parent_.submitShutdownRequest(*this, SHUT_RDWR);
-    return;
-  }
-
+  // If there are data in the buffer, then we need to flush them before shutdown
+  // the socket.
   if (write_buf_.length() > 0) {
     ENVOY_LOG(trace, "continue write buf since still have data, size = {}, fd = {}",
               write_buf_.length(), fd_);
     submitWriteRequest();
-    return;
+  } else {
+    if (status_ == SHUTDOWN_WRITE || status_ == CLOSE_AFTER_SHUTDOWN_WRITE) {
+      parent_.submitShutdownRequest(*this, SHUT_WR);
+    }
   }
 }
 
@@ -616,6 +612,19 @@ void IoUringServerSocket::onCancel(int32_t result, bool injected) {
   }
 }
 
+void IoUringServerSocket::onShutdown(int32_t result, bool injected) {
+  IoUringSocketEntry::onCancel(result, injected);
+  ASSERT(!injected);
+  ENVOY_LOG(trace, "shutdown done, result = {}, fd = {}", result, fd_);
+  if (status_ == CLOSE_AFTER_SHUTDOWN_WRITE) {
+    ENVOY_LOG(trace, "close after shutdown write, fd = {}", fd_);
+    status_ = ALREADY_SHUTDOWN;
+    close();
+    return;
+  }
+  status_ = ALREADY_SHUTDOWN;
+}
+
 void IoUringServerSocket::submitReadRequest() {
   if (!read_req_) {
     read_req_ = parent_.submitReadRequest(*this);
@@ -626,7 +635,7 @@ void IoUringServerSocket::submitWriteRequest() {
   ASSERT(write_req_ == nullptr);
   ASSERT(iovecs_ == nullptr);
 
-  Buffer::RawSliceVector slices = write_buf_.getRawSlices();
+  Buffer::RawSliceVector slices = write_buf_.getRawSlices(IOV_MAX);
 
   ENVOY_LOG(trace, "submit write request, write_buf size = {}, num_iovecs = {}, fd = {}",
             write_buf_.length(), slices.size(), fd_);

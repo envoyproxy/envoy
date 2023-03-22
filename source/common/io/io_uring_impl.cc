@@ -201,7 +201,7 @@ IoUringResult IoUringImpl::prepareCancel(void* cancelling_user_data, void* user_
 }
 
 IoUringResult IoUringImpl::prepareShutdown(os_fd_t fd, int how, void* user_data) {
-  ENVOY_LOG(trace, "prepare shutdown for fd = {}, how", fd, how);
+  ENVOY_LOG(trace, "prepare shutdown for fd = {}, how = {}", fd, how);
   struct io_uring_sqe* sqe = io_uring_get_sqe(&ring_);
   if (sqe == nullptr) {
     return IoUringResult::Failed;
