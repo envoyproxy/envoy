@@ -2475,6 +2475,9 @@ TEST_F(HttpConnectionManagerImplTest, TestPeriodicAccessLogging) {
   max_stream_duration_ = std::nullopt;
   setup(false, "server_name");
 
+  EXPECT_CALL(filter_callbacks_.connection_.stream_info_, streamState())
+      .WillRepeatedly(Return(StreamInfo::StreamState::InProgress));
+
   std::shared_ptr<MockStreamDecoderFilter> filter(new NiceMock<MockStreamDecoderFilter>());
   std::shared_ptr<AccessLog::MockInstance> handler(new NiceMock<AccessLog::MockInstance>());
 
