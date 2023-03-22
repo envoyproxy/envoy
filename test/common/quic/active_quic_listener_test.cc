@@ -46,7 +46,7 @@ using testing::ReturnRef;
 namespace Envoy {
 namespace Quic {
 
-// A test quic listner that exits after processing one round of packets.
+// A test quic listener that exits after processing one round of packets.
 class TestActiveQuicListener : public ActiveQuicListener {
   using ActiveQuicListener::ActiveQuicListener;
 
