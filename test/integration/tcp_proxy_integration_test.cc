@@ -583,8 +583,9 @@ TEST_P(TcpProxyIntegrationTest, AccessLogOnUpstreamConnect) {
 
   ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
   auto log_result = waitForAccessLog(access_log_path);
-  EXPECT_THAT(log_result, MatchesRegex(fmt::format("STREAM_STATE={}",
-              StreamInfo::StreamStateStrings::get().StreamStarted)));
+  EXPECT_THAT(log_result,
+              MatchesRegex(fmt::format("STREAM_STATE={}",
+                                       StreamInfo::StreamStateStrings::get().StreamStarted)));
 
   ASSERT_TRUE(fake_upstream_connection->waitForData(5));
   ASSERT_TRUE(tcp_client->write("", true));

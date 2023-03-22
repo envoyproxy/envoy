@@ -542,24 +542,28 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
 
   {
     StreamInfoFormatter stream_info_format("STREAM_STATE");
-    EXPECT_CALL(stream_info, streamState()).WillRepeatedly(Return(StreamInfo::StreamState::Started));
+    EXPECT_CALL(stream_info, streamState())
+        .WillRepeatedly(Return(StreamInfo::StreamState::Started));
     EXPECT_EQ(StreamInfo::StreamStateStrings::get().StreamStarted,
               stream_info_format.format(request_headers, response_headers, response_trailers,
                                         stream_info, body));
-    EXPECT_THAT(stream_info_format.formatValue(request_headers, response_headers,
-                                               response_trailers, stream_info, body),
-                ProtoEq(ValueUtil::stringValue(StreamInfo::StreamStateStrings::get().StreamStarted)));
+    EXPECT_THAT(
+        stream_info_format.formatValue(request_headers, response_headers, response_trailers,
+                                       stream_info, body),
+        ProtoEq(ValueUtil::stringValue(StreamInfo::StreamStateStrings::get().StreamStarted)));
   }
 
   {
     StreamInfoFormatter stream_info_format("STREAM_STATE");
-    EXPECT_CALL(stream_info, streamState()).WillRepeatedly(Return(StreamInfo::StreamState::InProgress));
+    EXPECT_CALL(stream_info, streamState())
+        .WillRepeatedly(Return(StreamInfo::StreamState::InProgress));
     EXPECT_EQ(StreamInfo::StreamStateStrings::get().StreamInProgress,
               stream_info_format.format(request_headers, response_headers, response_trailers,
                                         stream_info, body));
-    EXPECT_THAT(stream_info_format.formatValue(request_headers, response_headers,
-                                               response_trailers, stream_info, body),
-                ProtoEq(ValueUtil::stringValue(StreamInfo::StreamStateStrings::get().StreamInProgress)));
+    EXPECT_THAT(
+        stream_info_format.formatValue(request_headers, response_headers, response_trailers,
+                                       stream_info, body),
+        ProtoEq(ValueUtil::stringValue(StreamInfo::StreamStateStrings::get().StreamInProgress)));
   }
 
   {
@@ -568,8 +572,8 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
     EXPECT_EQ(StreamInfo::StreamStateStrings::get().StreamEnded,
               stream_info_format.format(request_headers, response_headers, response_trailers,
                                         stream_info, body));
-    EXPECT_THAT(stream_info_format.formatValue(request_headers, response_headers,
-                                               response_trailers, stream_info, body),
+    EXPECT_THAT(stream_info_format.formatValue(request_headers, response_headers, response_trailers,
+                                               stream_info, body),
                 ProtoEq(ValueUtil::stringValue(StreamInfo::StreamStateStrings::get().StreamEnded)));
   }
 

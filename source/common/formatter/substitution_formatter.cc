@@ -88,7 +88,8 @@ SubstitutionFormatUtils::protocolToStringOrDefault(const absl::optional<Http::Pr
 }
 
 const absl::optional<std::reference_wrapper<const std::string>>
-SubstitutionFormatUtils::streamStateToString(const absl::optional<StreamInfo::StreamState>& stream_state) {
+SubstitutionFormatUtils::streamStateToString(
+    const absl::optional<StreamInfo::StreamState>& stream_state) {
   if (stream_state) {
     return StreamInfo::Utility::getStreamStateString(stream_state.value());
   }
