@@ -38,7 +38,7 @@ class StreamInfoImplTest : public testing::Test {
 protected:
   void assertStreamInfoSize(StreamInfoImpl stream_info) {
     ASSERT_TRUE(sizeof(stream_info) == 824 || sizeof(stream_info) == 840 ||
-                sizeof(stream_info) == 872)
+                sizeof(stream_info) == 872 || sizeof(stream_info) == 880)
         << "If adding fields to StreamInfoImpl, please check to see if you "
            "need to add them to setFromForRecreateStream or setFrom! Current size "
         << sizeof(stream_info);
@@ -242,6 +242,7 @@ TEST_F(StreamInfoImplTest, MiscSettersAndGetters) {
 
 TEST_F(StreamInfoImplTest, SetFromForRecreateStream) {
   StreamInfoImpl s1(Http::Protocol::Http2, test_time_.timeSystem(), nullptr);
+  s1.streamState(StreamState::InProgress);
 
   s1.addBytesReceived(1);
   s1.downstreamTiming().onLastDownstreamRxByteReceived(test_time_.timeSystem());
@@ -255,11 +256,14 @@ TEST_F(StreamInfoImplTest, SetFromForRecreateStream) {
 #endif
 
   StreamInfoImpl s2(Http::Protocol::Http11, test_time_.timeSystem(), nullptr);
+  s2.streamState(StreamState::Ended);
   s2.setFromForRecreateStream(s1);
+
   EXPECT_EQ(s1.startTime(), s2.startTime());
   EXPECT_EQ(s1.startTimeMonotonic(), s2.startTimeMonotonic());
   EXPECT_EQ(s1.downstreamTiming().lastDownstreamRxByteReceived(),
             s2.downstreamTiming().lastDownstreamRxByteReceived());
+  EXPECT_EQ(s1.streamState(), s2.streamState());
   EXPECT_EQ(s1.protocol(), s2.protocol());
   EXPECT_EQ(s1.bytesReceived(), s2.bytesReceived());
   EXPECT_EQ(s1.getDownstreamBytesMeter(), s2.getDownstreamBytesMeter());
@@ -272,6 +276,7 @@ TEST_F(StreamInfoImplTest, SetFrom) {
   // setFromForRecreateStream
   s1.addBytesReceived(1);
   s1.downstreamTiming().onLastDownstreamRxByteReceived(test_time_.timeSystem());
+  s1.streamState(StreamState::InProgress);
 
   // setFrom
   s1.setRouteName("foo");
@@ -311,6 +316,7 @@ TEST_F(StreamInfoImplTest, SetFrom) {
 
   StreamInfoImpl s2(Http::Protocol::Http11, test_time_.timeSystem(), nullptr);
   Http::TestRequestHeaderMapImpl headers2;
+  s2.streamState(StreamState::Ended);
   s2.setFrom(s1, &headers2);
 
   // Copied by setFromForRecreateStream
@@ -318,6 +324,7 @@ TEST_F(StreamInfoImplTest, SetFrom) {
   EXPECT_EQ(s1.startTimeMonotonic(), s2.startTimeMonotonic());
   EXPECT_EQ(s1.downstreamTiming().lastDownstreamRxByteReceived(),
             s2.downstreamTiming().lastDownstreamRxByteReceived());
+  EXPECT_EQ(s1.streamState(), s2.streamState());
   EXPECT_EQ(s1.protocol(), s2.protocol());
   EXPECT_EQ(s1.bytesReceived(), s2.bytesReceived());
   EXPECT_EQ(s1.getDownstreamBytesMeter(), s2.getDownstreamBytesMeter());
@@ -387,6 +394,7 @@ TEST_F(StreamInfoImplTest, DynamicMetadataTest) {
 
 TEST_F(StreamInfoImplTest, DumpStateTest) {
   StreamInfoImpl stream_info(Http::Protocol::Http2, test_time_.timeSystem(), nullptr);
+  stream_info.streamState(StreamState::InProgress);
   std::string prefix = "";
 
   for (int i = 0; i < 7; ++i) {
@@ -395,8 +403,23 @@ TEST_F(StreamInfoImplTest, DumpStateTest) {
     std::string state = out.str();
     EXPECT_TRUE(absl::StartsWith(state, prefix));
     EXPECT_THAT(state, testing::HasSubstr("protocol_: 2"));
+    EXPECT_THAT(state, testing::HasSubstr("stream_state_: 1"));
     prefix = prefix + "  ";
   }
+}
+
+TEST_F(StreamInfoImplTest, StreamStateTest) {
+  StreamInfoImpl stream_info(Http::Protocol::Http2, test_time_.timeSystem(), nullptr);
+  EXPECT_EQ(absl::nullopt, stream_info.streamState());
+
+  stream_info.streamState(StreamState::Started);
+  EXPECT_EQ(StreamState::Started, stream_info.streamState());
+
+  stream_info.streamState(StreamState::InProgress);
+  EXPECT_EQ(StreamState::InProgress, stream_info.streamState());
+
+  stream_info.streamState(StreamState::Ended);
+  EXPECT_EQ(StreamState::Ended, stream_info.streamState());
 }
 
 TEST_F(StreamInfoImplTest, RequestHeadersTest) {

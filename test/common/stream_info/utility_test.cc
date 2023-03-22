@@ -79,6 +79,17 @@ TEST(UtilityTest, extractDownstreamAddressJustPort) {
                       Network::Address::Ipv4Instance("1.2.3.4", 8080)));
 }
 
+TEST(UtilityTest, getStreamStateString) {
+  EXPECT_EQ(StreamStateStrings::get().StreamStarted,
+            Utility::getStreamStateString(StreamState::Started));
+
+  EXPECT_EQ(StreamStateStrings::get().StreamInProgress,
+            Utility::getStreamStateString(StreamState::InProgress));
+
+  EXPECT_EQ(StreamStateStrings::get().StreamEnded,
+            Utility::getStreamStateString(StreamState::Ended));
+}
+
 class ProxyStatusTest : public ::testing::Test {
 protected:
   void SetUp() override {
