@@ -318,9 +318,9 @@ protected:
   void serverSendNewTimeout(const uint32_t timeout_ms) {
     ProcessingResponse response;
     if (timeout_ms < 1000) {
-      response.mutable_new_message_timeout()->set_nanos(timeout_ms * 1000000);
+      response.mutable_override_message_timeout()->set_nanos(timeout_ms * 1000000);
     } else {
-      response.mutable_new_message_timeout()->set_seconds(timeout_ms / 1000);
+      response.mutable_override_message_timeout()->set_seconds(timeout_ms / 1000);
     }
     processor_stream_->sendGrpcMessage(response);
   }

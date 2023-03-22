@@ -554,8 +554,8 @@ void Filter::onReceiveMessage(std::unique_ptr<ProcessingResponse>&& r) {
   auto response = std::move(r);
 
   // Check whether the server is asking to extend the timer.
-  if (response->has_new_message_timeout()) {
-    onNewTimeout(DurationUtil::durationToMilliseconds(response->new_message_timeout()));
+  if (response->has_override_message_timeout()) {
+    onNewTimeout(DurationUtil::durationToMilliseconds(response->override_message_timeout()));
     return;
   }
 
