@@ -208,13 +208,12 @@ protected:
         *listen_socket_->connectionInfoProvider().localAddress());
     ASSERT_EQ(slice[0].len_, send_rc.return_value_);
 
-#if defined(__APPLE__)
     // This sleep makes the tests pass more reliably. Some debugging showed that without this,
     // no packet is received when the event loop is running.
     // TODO(ggreenway): make tests more reliable, and handle packet loss during the tests, possibly
     // by retransmitting on a timer.
+    // TODO(https://github.com/envoyproxy/envoy/issues/26188) fix
     ::usleep(1000); // NO_CHECK_FORMAT(real_time)
-#endif
   }
 
   void readFromClientSockets() {
