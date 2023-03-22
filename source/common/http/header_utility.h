@@ -170,6 +170,14 @@ public:
   static bool isConnectResponse(const RequestHeaderMap* request_headers,
                                 const ResponseHeaderMap& response_headers);
 
+#ifdef ENVOY_ENABLE_HTTP_DATAGRAMS
+  /**
+   * @brief Returns true if the Capsule-Protocol header field (RFC 9297) is set to true. If the
+   * header field is included multiple times, returns false as per RFC 9297.
+   */
+  static bool isCapsuleProtocol(const RequestOrResponseHeaderMap& headers);
+#endif
+
   static bool requestShouldHaveNoBody(const RequestHeaderMap& headers);
 
   /**
