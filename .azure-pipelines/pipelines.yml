@@ -340,6 +340,7 @@ stages:
       parameters:
         managedAgent: false
         ciTarget: bazel.release
+        bazelBuildExtraOptions: "--sandbox_base=/tmp/sandbox_base"
 
   - job: released
     dependsOn: ["release"]
