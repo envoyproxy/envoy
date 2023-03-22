@@ -367,7 +367,7 @@ void JavaArrayOfByteToBytesVector(JNIEnv* env, jbyteArray array, std::vector<uin
   env->ReleaseByteArrayElements(array, jbytes, JNI_ABORT);
 }
 
-MatcherData::Type stringToType(std::string type_as_string) {
+MatcherData::Type StringToType(std::string type_as_string) {
   if (type_as_string.length() != 4) {
     ASSERT("conversion failure failure");
     return MatcherData::EXACT;
@@ -384,7 +384,7 @@ MatcherData::Type stringToType(std::string type_as_string) {
 }
 
 std::vector<MatcherData> javaObjectArrayToMatcherData(JNIEnv* env, jobjectArray array,
-                                                      std::string& cluster_out) {
+                                                      std::string& cluster_name_out) {
   const size_t len = env->GetArrayLength(array);
   std::vector<MatcherData> ret;
   if (len == 0) {
@@ -396,7 +396,7 @@ std::vector<MatcherData> javaObjectArrayToMatcherData(JNIEnv* env, jobjectArray 
   }
 
   JavaArrayOfByteToString(env, static_cast<jbyteArray>(env->GetObjectArrayElement(array, 0)),
-                          &cluster_out);
+                          &cluster_name_out);
   for (int i = 1; i < len; i += 3) {
     std::string name;
     std::string type_as_string;
@@ -407,7 +407,7 @@ std::vector<MatcherData> javaObjectArrayToMatcherData(JNIEnv* env, jobjectArray 
                             &type_as_string);
     JavaArrayOfByteToString(env, static_cast<jbyteArray>(env->GetObjectArrayElement(array, i + 2)),
                             &value);
-    ret.emplace_back(MatcherData(name, stringToType(type_as_string), value));
+    ret.emplace_back(MatcherData(name, StringToType(type_as_string), value));
   }
   return ret;
 }

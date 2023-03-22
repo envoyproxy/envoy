@@ -94,8 +94,8 @@ class EnvoyConfigurationTest {
     appVersion: String = "v1.2.3",
     appId: String = "com.example.myapp",
     trustChainVerification: TrustChainVerification = TrustChainVerification.VERIFY_TRUST_CHAIN,
-    virtualClusters: MutableList<String> = mutableListOf("{name: test1}", "{name: test2}"),
-    virtualClusterConfig: List<VirtualClusterConfig> = emptyList(),
+    legacyVirtualClusters: MutableList<String> = mutableListOf("{name: test1}", "{name: test2}"),
+    virtualClusters: List<VirtualClusterConfig> = emptyList(),
     filterChain: MutableList<EnvoyNativeFilterConfig> = mutableListOf(EnvoyNativeFilterConfig("buffer_filter_1", "{'@type': 'type.googleapis.com/envoy.extensions.filters.http.buffer.v3.Buffer'}"), EnvoyNativeFilterConfig("buffer_filter_2", "{'@type': 'type.googleapis.com/envoy.extensions.filters.http.buffer.v3.Buffer'}")),
     platformFilterFactories: MutableList<EnvoyHTTPFilterFactory> = mutableListOf(TestEnvoyHTTPFilterFactory("name1"), TestEnvoyHTTPFilterFactory("name2")),
     runtimeGuards: Map<String,Boolean> = emptyMap(),
@@ -146,8 +146,8 @@ class EnvoyConfigurationTest {
       appVersion,
       appId,
       trustChainVerification,
+      legacyVirtualClusters,
       virtualClusters,
-      virtualClusterConfig,
       filterChain,
       platformFilterFactories,
       emptyMap(),
@@ -269,7 +269,7 @@ class EnvoyConfigurationTest {
       enableSkipDNSLookupForProxiedRequests = true,
       enablePlatformCertificatesValidation = true,
       dnsPreresolveHostnames = mutableListOf(),
-      virtualClusters = mutableListOf(),
+      legacyVirtualClusters = mutableListOf(),
       filterChain = mutableListOf(),
       runtimeGuards = mapOf("test_feature_false" to true),
       statSinks = mutableListOf("{ name: envoy.stat_sinks.statsd, typed_config: { '@type': type.googleapis.com/envoy.config.metrics.v3.StatsdSink, address: { socket_address: { address: 127.0.0.1, port_value: 123 } } } }"),
@@ -328,7 +328,7 @@ class EnvoyConfigurationTest {
     JniLibrary.loadTestLibrary()
     val envoyConfiguration = buildTestEnvoyConfiguration(
       runtimeGuards = mapOf("test_feature_false" to true, "test_feature_true" to false),
-      virtualClusterConfig = listOf(VirtualClusterConfig("cluster1", listOf(HeaderMatchConfig(":method", 0, "POST"),
+      virtualClusters = listOf(VirtualClusterConfig("cluster1", listOf(HeaderMatchConfig(":method", 0, "POST"),
             HeaderMatchConfig(":authority", 1, "foo")))),
     )
 

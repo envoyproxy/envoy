@@ -57,8 +57,8 @@ public class EnvoyConfiguration {
   public final String appVersion;
   public final String appId;
   public final TrustChainVerification trustChainVerification;
-  public final List<String> virtualClusters;
-  public final List<VirtualClusterConfig> virtualClusterConfig;
+  public final List<String> legacyVirtualClusters;
+  public final List<VirtualClusterConfig> virtualClusters;
   public final List<EnvoyNativeFilterConfig> nativeFilterChain;
   public final Map<String, EnvoyStringAccessor> stringAccessors;
   public final Map<String, EnvoyKeyValueStore> keyValueStores;
@@ -134,8 +134,9 @@ public class EnvoyConfiguration {
    *     Client.
    * @param trustChainVerification                        whether to mute TLS Cert verification -
    *     for tests.
-   * @param virtualClusters                               the JSON list of virtual cluster configs.
-   * @param virtualClusterConfig                          the structured list of virtual cluster
+   * @param legacyVirtualClusters                               the JSON list of virtual cluster
+   *     configs.
+   * @param virtualClusters                          the structured list of virtual cluster
    *     configs.
    * @param nativeFilterChain                             the configuration for native filters.
    * @param httpPlatformFilterFactories                   the configuration for platform filters.
@@ -173,9 +174,8 @@ public class EnvoyConfiguration {
       int h2ConnectionKeepaliveIdleIntervalMilliseconds, int h2ConnectionKeepaliveTimeoutSeconds,
       int maxConnectionsPerHost, int statsFlushSeconds, int streamIdleTimeoutSeconds,
       int perTryIdleTimeoutSeconds, String appVersion, String appId,
-      TrustChainVerification trustChainVerification, List<String> virtualClusters,
-      List<VirtualClusterConfig> virtualClusterConfig,
-      List<EnvoyNativeFilterConfig> nativeFilterChain,
+      TrustChainVerification trustChainVerification, List<String> legacyVirtualClusters,
+      List<VirtualClusterConfig> virtualClusters, List<EnvoyNativeFilterConfig> nativeFilterChain,
       List<EnvoyHTTPFilterFactory> httpPlatformFilterFactories,
       Map<String, EnvoyStringAccessor> stringAccessors,
       Map<String, EnvoyKeyValueStore> keyValueStores, List<String> statSinks,
@@ -214,8 +214,8 @@ public class EnvoyConfiguration {
     this.appVersion = appVersion;
     this.appId = appId;
     this.trustChainVerification = trustChainVerification;
+    this.legacyVirtualClusters = legacyVirtualClusters;
     this.virtualClusters = virtualClusters;
-    this.virtualClusterConfig = virtualClusterConfig;
     int index = 0;
     // Insert in this order to preserve prior ordering constraints.
     for (EnvoyHTTPFilterFactory filterFactory : httpPlatformFilterFactories) {
@@ -262,11 +262,11 @@ public class EnvoyConfiguration {
     Collections.reverse(reverseFilterChain);
 
     byte[][] filter_chain = JniBridgeUtility.toJniBytes(reverseFilterChain);
-    byte[][] clusters_legacy = JniBridgeUtility.stringsToJniBytes(virtualClusters);
+    byte[][] clusters_legacy = JniBridgeUtility.stringsToJniBytes(legacyVirtualClusters);
     byte[][] stats_sinks = JniBridgeUtility.stringsToJniBytes(statSinks);
     byte[][] dns_preresolve = JniBridgeUtility.stringsToJniBytes(dnsPreresolveHostnames);
     byte[][] runtime_guards = JniBridgeUtility.mapToJniBytes(runtimeGuards);
-    byte[][] clusters = JniBridgeUtility.clusterConfigToJniBytes(virtualClusterConfig);
+    byte[][] clusters = JniBridgeUtility.clusterConfigToJniBytes(virtualClusters);
 
     return JniLibrary.createBootstrap(
         grpcStatsDomain, adminInterfaceEnabled, connectTimeoutSeconds, dnsRefreshSeconds,

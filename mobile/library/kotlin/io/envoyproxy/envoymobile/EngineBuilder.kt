@@ -571,7 +571,7 @@ open class EngineBuilder(
    *
    * @return this builder.
    */
-  fun addVirtualClusterConfig(config: List<VirtualClusterConfig>): EngineBuilder {
+  fun addVirtualCluster(config: List<VirtualClusterConfig>): EngineBuilder {
     this.virtualClusterConfig + config;
     return this
   }
