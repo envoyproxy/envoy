@@ -587,7 +587,7 @@ public:
   /**
    * @param protocol the stream's state.
    */
-  virtual void streamState(StreamState stream_state) PURE;
+  virtual void setStreamState(StreamState stream_state) PURE;
 
   /**
    * @return the protocol of the request.

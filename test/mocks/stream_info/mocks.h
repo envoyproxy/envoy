@@ -92,7 +92,7 @@ public:
   MOCK_METHOD(const std::string&, getRouteName, (), (const));
   MOCK_METHOD(const absl::optional<std::string>&, virtualClusterName, (), (const));
   MOCK_METHOD(absl::optional<StreamState>, streamState, (), (const));
-  MOCK_METHOD(void, streamState, (StreamState stream_state));
+  MOCK_METHOD(void, setStreamState, (StreamState stream_state));
   MOCK_METHOD(absl::optional<Http::Protocol>, protocol, (), (const));
   MOCK_METHOD(void, protocol, (Http::Protocol protocol));
   MOCK_METHOD(absl::optional<uint32_t>, responseCode, (), (const));

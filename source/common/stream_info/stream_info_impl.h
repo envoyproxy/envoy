@@ -180,7 +180,7 @@ struct StreamInfoImpl : public StreamInfo {
 
   absl::optional<StreamState> streamState() const override { return stream_state_; }
 
-  void streamState(StreamState stream_state) override { stream_state_ = stream_state; }
+  void setStreamState(StreamState stream_state) override { stream_state_ = stream_state; }
 
   absl::optional<Http::Protocol> protocol() const override { return protocol_; }
 

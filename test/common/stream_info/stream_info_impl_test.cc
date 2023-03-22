@@ -242,7 +242,7 @@ TEST_F(StreamInfoImplTest, MiscSettersAndGetters) {
 
 TEST_F(StreamInfoImplTest, SetFromForRecreateStream) {
   StreamInfoImpl s1(Http::Protocol::Http2, test_time_.timeSystem(), nullptr);
-  s1.streamState(StreamState::InProgress);
+  s1.setStreamState(StreamState::InProgress);
 
   s1.addBytesReceived(1);
   s1.downstreamTiming().onLastDownstreamRxByteReceived(test_time_.timeSystem());
@@ -256,7 +256,7 @@ TEST_F(StreamInfoImplTest, SetFromForRecreateStream) {
 #endif
 
   StreamInfoImpl s2(Http::Protocol::Http11, test_time_.timeSystem(), nullptr);
-  s2.streamState(StreamState::Ended);
+  s2.setStreamState(StreamState::Ended);
   s2.setFromForRecreateStream(s1);
 
   EXPECT_EQ(s1.startTime(), s2.startTime());
@@ -276,7 +276,7 @@ TEST_F(StreamInfoImplTest, SetFrom) {
   // setFromForRecreateStream
   s1.addBytesReceived(1);
   s1.downstreamTiming().onLastDownstreamRxByteReceived(test_time_.timeSystem());
-  s1.streamState(StreamState::InProgress);
+  s1.setStreamState(StreamState::InProgress);
 
   // setFrom
   s1.setRouteName("foo");
@@ -316,7 +316,7 @@ TEST_F(StreamInfoImplTest, SetFrom) {
 
   StreamInfoImpl s2(Http::Protocol::Http11, test_time_.timeSystem(), nullptr);
   Http::TestRequestHeaderMapImpl headers2;
-  s2.streamState(StreamState::Ended);
+  s2.setStreamState(StreamState::Ended);
   s2.setFrom(s1, &headers2);
 
   // Copied by setFromForRecreateStream
@@ -394,7 +394,7 @@ TEST_F(StreamInfoImplTest, DynamicMetadataTest) {
 
 TEST_F(StreamInfoImplTest, DumpStateTest) {
   StreamInfoImpl stream_info(Http::Protocol::Http2, test_time_.timeSystem(), nullptr);
-  stream_info.streamState(StreamState::InProgress);
+  stream_info.setStreamState(StreamState::InProgress);
   std::string prefix = "";
 
   for (int i = 0; i < 7; ++i) {
@@ -412,13 +412,13 @@ TEST_F(StreamInfoImplTest, StreamStateTest) {
   StreamInfoImpl stream_info(Http::Protocol::Http2, test_time_.timeSystem(), nullptr);
   EXPECT_EQ(absl::nullopt, stream_info.streamState());
 
-  stream_info.streamState(StreamState::Started);
+  stream_info.setStreamState(StreamState::Started);
   EXPECT_EQ(StreamState::Started, stream_info.streamState());
 
-  stream_info.streamState(StreamState::InProgress);
+  stream_info.setStreamState(StreamState::InProgress);
   EXPECT_EQ(StreamState::InProgress, stream_info.streamState());
 
-  stream_info.streamState(StreamState::Ended);
+  stream_info.setStreamState(StreamState::Ended);
   EXPECT_EQ(StreamState::Ended, stream_info.streamState());
 }
 
