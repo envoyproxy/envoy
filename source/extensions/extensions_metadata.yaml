@@ -745,6 +745,27 @@ envoy.grpc_credentials.file_based_metadata:
   - envoy.grpc_credentials
   security_posture: data_plane_agnostic
   status: alpha
+envoy.health_checkers.http:
+  categories:
+  - envoy.health_checkers
+  security_posture: robust_to_untrusted_downstream
+  status: stable
+  type_urls:
+  - envoy.config.core.v3.HealthCheck.HttpHealthCheck
+envoy.health_checkers.grpc:
+  categories:
+  - envoy.health_checkers
+  security_posture: robust_to_untrusted_downstream
+  status: stable
+  type_urls:
+  - envoy.config.core.v3.HealthCheck.GrpcHealthCheck
+envoy.health_checkers.tcp:
+  categories:
+  - envoy.health_checkers
+  security_posture: robust_to_untrusted_downstream
+  status: stable
+  type_urls:
+  - envoy.config.core.v3.HealthCheck.TcpHealthCheck
 envoy.health_checkers.redis:
   categories:
   - envoy.health_checkers

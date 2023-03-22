@@ -299,6 +299,10 @@ extensions/filters/http/oauth2 @derekargueta @snowp
 /*/extensions/matching/network/ @kyessenov @snowp
 # Header mutation
 /*/extensions/filters/http/header_mutation @wbpcode @htuch @soulxu
+# Health checkers
+/*/extensions/health_checkers/grpc @snowp @zuercher
+/*/extensions/health_checkers/http @snowp @zuercher
+/*/extensions/health_checkers/tcp @snowp @zuercher
 
 # Intentionally exempt (treated as core code)
 /*/extensions/filters/common @UNOWNED @UNOWNED

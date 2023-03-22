@@ -8,6 +8,9 @@ behavior_changes:
 - area: admin
   change: |
     Adds a new admin stats format option 'html-active' to display a periodically updated list of the top most frequently changed stats.
+- area: build
+  change: |
+    moved the tcp, http, and grpc health checkers to extensions. If you use these and override extensions_build_config.bzl you will now need to include them explicitly.
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
