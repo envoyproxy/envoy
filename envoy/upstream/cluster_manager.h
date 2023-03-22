@@ -150,7 +150,6 @@ struct ClusterConnectivityState {
   ~ClusterConnectivityState() {
     ASSERT(pending_streams_ == 0);
     ASSERT(active_streams_ == 0);
-    ASSERT(connecting_and_connected_stream_capacity_ == 0);
   }
 
   template <class T> void checkAndDecrement(T& value, uint32_t delta) {

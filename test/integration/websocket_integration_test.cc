@@ -200,7 +200,7 @@ TEST_P(WebsocketIntegrationTest, WebSocketConnectionDownstreamDisconnect) {
 #endif
   if (upstreamProtocol() == Http::CodecType::HTTP3 ||
       downstreamProtocol() == Http::CodecType::HTTP3) {
-    // TODO(#23564) - finish CONNECT-UDP support
+    // TODO(#23564) - Finish CONNECT-UDP support.
     return;
   }
 
@@ -303,7 +303,7 @@ TEST_P(WebsocketIntegrationTest, WebSocketConnectionIdleTimeout) {
 #endif
   if (upstreamProtocol() == Http::CodecType::HTTP3 ||
       downstreamProtocol() == Http::CodecType::HTTP3) {
-    // TODO(#23564) - finish CONNECT-UDP support
+    // TODO(#23564) - Finish CONNECT-UDP support.
     return;
   }
 
@@ -337,7 +337,7 @@ TEST_P(WebsocketIntegrationTest, NonWebsocketUpgrade) {
 #endif
   if (upstreamProtocol() == Http::CodecType::HTTP3 ||
       downstreamProtocol() == Http::CodecType::HTTP3) {
-    // TODO(#23564) - finish CONNECT-UDP support
+    // TODO(#23564) - Finish CONNECT-UDP support.
     return;
   }
 
@@ -375,7 +375,7 @@ TEST_P(WebsocketIntegrationTest, RouteSpecificUpgrade) {
 #endif
   if (upstreamProtocol() == Http::CodecType::HTTP3 ||
       downstreamProtocol() == Http::CodecType::HTTP3) {
-    // TODO(#23564) - finish CONNECT-UDP support
+    // TODO(#23564) - Finish CONNECT-UDP support.
     return;
   }
 
@@ -415,7 +415,7 @@ TEST_P(WebsocketIntegrationTest, WebsocketCustomFilterChain) {
 #endif
   if (upstreamProtocol() == Http::CodecType::HTTP3 ||
       downstreamProtocol() == Http::CodecType::HTTP3) {
-    // TODO(#23564) - finish CONNECT-UDP support
+    // TODO(#23564) - Finish CONNECT-UDP support.
     return;
   }
 

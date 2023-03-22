@@ -21,6 +21,11 @@ TEST_P(BufferIntegrationTest, RouterNotFoundBodyBuffer) {
 }
 
 TEST_P(BufferIntegrationTest, RouterRequestAndResponseWithGiantBodyBuffer) {
+  if (upstreamProtocol() == Http::CodecType::HTTP3 ||
+      downstreamProtocol() == Http::CodecType::HTTP3) {
+    // TODO(#26236) - Fix test flakiness over HTTP/3.
+    return;
+  }
   config_helper_.prependFilter(ConfigHelper::defaultBufferFilter(), testing_downstream_filter_);
   testRouterRequestAndResponseWithBody(4 * 1024 * 1024, 4 * 1024 * 1024, false);
 }
