@@ -34,7 +34,8 @@ std::string Exception::description(const std::string& detail) const {
       throwableDescription(throwable_),
       detail == "" ? "NO_DETAIL" : detail,
       throwableStacktraceDescription(throwable_),
-      throwable_cause_description == "" ? "NO_CAUSE" : throwable_cause_description, 
+      throwable_cause_description == "" ? "CAUSE_UNKNOWN_OR_NONEXISTENT"
+                                        : throwable_cause_description,
   };
 
   return fmt::format("{}", fmt::join(descriptionComponents, "||"));

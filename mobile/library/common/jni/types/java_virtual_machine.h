@@ -12,9 +12,12 @@ namespace JNI {
 class JavaVirtualMachine {
 public:
   /**
-   * @brief Initializes virtual machine with JavaVM type. It should be called only once.
+   * @brief Initializes virtual machine. It should be called only once.
+   *
+   * @param jvm A pointer to running JavaVM instance.
+   * @return jint JNI_OK if the operation was successful, error code information otherwise.
    */
-  static void initialize(JavaVM* jvm);
+  static jint initialize(JavaVM* jvm);
   static JavaVM* getJavaVM();
   static jint getJNIVersion();
   static void detachCurrentThread();

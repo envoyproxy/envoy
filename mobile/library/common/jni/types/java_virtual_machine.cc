@@ -7,10 +7,17 @@
 namespace Envoy {
 namespace JNI {
 
-void JavaVirtualMachine::initialize(JavaVM* jvm) {
+jint JavaVirtualMachine::initialize(JavaVM* jvm) {
+  JNIEnv* env = nullptr;
+  if (jvm->GetEnv(reinterpret_cast<void**>(&env), getJNIVersion()) != JNI_OK) {
+    return -1;
+  }
+
   ASSERT(jvm_ == nullptr, "JavaVM has already been set");
   ASSERT(jvm != nullptr, "Passed JavaVM is invalid");
   jvm_ = jvm;
+
+  return JNI_OK;
 }
 
 JavaVM* JavaVirtualMachine::getJavaVM() { return jvm_; }

@@ -20,13 +20,11 @@ using Envoy::Platform::EngineBuilder;
 // NOLINT(namespace-envoy)
 
 JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM* vm, void* reserved) {
-  JNIEnv* env = nullptr;
-  if (vm->GetEnv(reinterpret_cast<void**>(&env), Envoy::JNI::JavaVirtualMachine::getJNIVersion()) !=
-      JNI_OK) {
-    return -1;
+  const auto result = Envoy::JNI::JavaVirtualMachine::initialize(vm);
+  if (result != JNI_OK) {
+    return result;
   }
 
-  Envoy::JNI::JavaVirtualMachine::initialize(vm);
   return Envoy::JNI::JavaVirtualMachine::getJNIVersion();
 }
 

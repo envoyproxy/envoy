@@ -13,8 +13,10 @@ namespace JNI {
 class Exception {
 public:
   /**
-   * @brief Checks and clears any pending exceptions. Reports pending exceptions to a platform
-   * layer.
+   * @brief Checks and clears any pending exceptions. Reports pending exceptions using
+   * ENVOY_LOG_EVENT_TO_LOGGER macro. The macro ends up propagating the information to
+   * platform layer using platform's logger and event tracker APIs. The corresponding log/event
+   * uses emits `jni_cleared_pending_exception` log.
    *
    * @param detail Information that will be attached to a pending exception log if any is emitted.
    * @return true If a pending exception was present and cleared.

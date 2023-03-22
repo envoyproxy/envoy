@@ -98,8 +98,8 @@ class FilterThrowingExceptionTest {
     val onJNIExceptionEventLatch = CountDownLatch(2)
 
     var expectedMessages = mutableListOf(
-      "Simulated onRequestHeaders exception",
-      "Simulated onResponseHeaders exception")
+      "Simulated onRequestHeaders exception||onRequestHeaders||",
+      "Simulated onResponseHeaders exception||onResponseHeaders||")
 
     val context = ApplicationProvider.getApplicationContext<Context>()
     val builder = AndroidEngineBuilder(context)
