@@ -37,6 +37,11 @@ DEFINE_PROTO_FUZZER(const envoy::config::bootstrap::v3::Bootstrap& input) {
       }
     }
   }
+  auto* static_layer =
+      sanitizedInput.mutable_layered_runtime()->add_layers()->mutable_static_layer();
+  (*static_layer->mutable_fields())["envoy.reloadable_features.validate_upstream_headers"] =
+      ValueUtil::stringValue(std::string("true"));
+
   testing::NiceMock<MockOptions> options;
   TestComponentFactory component_factory;
   Fuzz::PerTestEnvironment test_env;

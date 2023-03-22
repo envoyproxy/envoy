@@ -887,7 +887,7 @@ TEST_P(Http2CodecImplTest, RefusedStreamReset) {
   driveToCompletion();
 }
 
-TEST_P(Http2CodecImplTest, InvalidHeadersFrame) {
+TEST_P(Http2CodecImplTest, InvalidHeadersFrameMissing) {
   initialize();
 
   const auto status = request_encoder_->encodeHeaders(TestRequestHeaderMapImpl{}, true);
@@ -3825,6 +3825,29 @@ TEST_F(Http2CodecMetadataTest, UnknownStreamId) {
   EXPECT_TRUE(client_->submitMetadata(metadata_vector, 1000));
   driveToCompletion();
 }
+
+#ifdef NDEBUG
+// These tests send invalid request and response header names which violate ASSERT while creating
+// such request/response headers. So they can only be run in NDEBUG mode.
+TEST_P(Http2CodecImplTest, InvalidHeadersFrameInvalid) {
+  initialize();
+
+  {
+    const auto status = request_encoder_->encodeHeaders(
+        TestRequestHeaderMapImpl{{":path", "/"}, {":method", "GET"}, {"x-foo\r\n", "/"}}, true);
+    EXPECT_FALSE(status.ok());
+    EXPECT_THAT(status.message(), testing::HasSubstr("invalid header name: x-foo\\r\\n"));
+  }
+
+  {
+    const auto status = request_encoder_->encodeHeaders(
+        TestRequestHeaderMapImpl{{":path", "/"}, {":method", "GET"}, {"x-foo", "hello\r\nGET"}},
+        true);
+    EXPECT_FALSE(status.ok());
+    EXPECT_THAT(status.message(), testing::HasSubstr("invalid header value for: x-foo"));
+  }
+}
+#endif
 
 } // namespace Http2
 } // namespace Http

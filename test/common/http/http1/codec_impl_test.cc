@@ -3415,5 +3415,31 @@ TEST_F(Http1ClientConnectionImplTest, ShouldDumpCorrespondingRequestWithoutAlloc
   EXPECT_THAT(ostream.contents(), testing::HasSubstr("Dumping corresponding downstream request:"));
 }
 
+#ifdef NDEBUG
+// These tests send invalid request and response header names which violate ASSERT while creating
+// such request/response headers. So they can only be run in NDEBUG mode.
+TEST_F(Http1ClientConnectionImplTest, BadEncodeInvalidParams) {
+  initialize();
+
+  NiceMock<MockResponseDecoder> response_decoder;
+
+  Http::RequestEncoder& request_encoder = codec_->newStream(response_decoder);
+  EXPECT_THAT(
+      request_encoder
+          .encodeHeaders(
+              TestRequestHeaderMapImpl{{":path", "/"}, {":method", "GET"}, {"x-foo\r\n", "/"}},
+              true)
+          .message(),
+      testing::HasSubstr("invalid header name: x-foo\\r\\n"));
+  EXPECT_THAT(request_encoder
+                  .encodeHeaders(TestRequestHeaderMapImpl{{":path", "/"},
+                                                          {":method", "GET"},
+                                                          {"x-foo", "hello\r\nGET"}},
+                                 true)
+                  .message(),
+              testing::HasSubstr("invalid header value for: x-foo"));
+}
+#endif
+
 } // namespace Http
 } // namespace Envoy
