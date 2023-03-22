@@ -1,5 +1,5 @@
-github.com/envoyproxy/envoy v1.24.0 h1:MjBA9/3ZWuoTf1JaQU8imn5GIHhmF54klBPVfcmTF4U=
-github.com/envoyproxy/envoy v1.24.0/go.mod h1:h4LHzNYz/dk4kj2No4DgPaH3a087hHIKz/3DGL6m1v8=
+github.com/envoyproxy/envoy/contrib/golang/filters/http/source/go v0.0.0-20230322081540-83fb51f1fe04 h1:/8FR/LbFi/ibztIKKjqXOb448MrhwMqxup309ekspUs=
+github.com/envoyproxy/envoy/contrib/golang/filters/http/source/go v0.0.0-20230322081540-83fb51f1fe04/go.mod h1:6jQX6+Ax2WX+I5jGTyJAahriNycu/UZjO5KpRflsgzg=
 github.com/golang/protobuf v1.5.0/go.mod h1:FsONVRAS9T7sI+LIUmWTfcYkHO4aIWwzhcaSAoJOfIk=
 github.com/google/go-cmp v0.5.5 h1:Khx7svrCpmxxtHBq5j2mp/xVjsi8hQMfNLvJFAlrGgU=
 github.com/google/go-cmp v0.5.5/go.mod h1:v8dTdLbMG2kIc/vJvl+f65V22dbkXbowE6jgT/gNBxE=
