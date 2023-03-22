@@ -561,5 +561,29 @@ TEST_F(EnvoyQuicClientStreamTest, MaxIncomingHeadersCount) {
   quic_stream_->OnStreamFrame(frame);
 }
 
+#ifdef NDEBUG
+// These tests send invalid request and response header names which violate ASSERT while creating
+// such request/response headers. So they can only be run in NDEBUG mode.
+TEST_F(EnvoyQuicClientStreamTest, HeaderInvalidKey) {
+  request_headers_.addCopy("x-foo\r\n", "hello world");
+  const auto result = quic_stream_->encodeHeaders(request_headers_, false);
+  EXPECT_FALSE(result.ok());
+  EXPECT_THAT(result.message(), testing::HasSubstr("invalid header name: x-foo\\r\\n"));
+
+  EXPECT_CALL(stream_callbacks_, onResetStream(Http::StreamResetReason::ConnectionFailure, _));
+  quic_stream_->resetStream(Http::StreamResetReason::ConnectionFailure);
+}
+
+TEST_F(EnvoyQuicClientStreamTest, HeaderInvalidValue) {
+  request_headers_.addCopy("x-foo", "hello\r\n\r\nGET /evil HTTP/1.1");
+  const auto result = quic_stream_->encodeHeaders(request_headers_, false);
+  EXPECT_FALSE(result.ok());
+  EXPECT_THAT(result.message(), testing::HasSubstr("invalid header value for: x-foo"));
+
+  EXPECT_CALL(stream_callbacks_, onResetStream(Http::StreamResetReason::ConnectionFailure, _));
+  quic_stream_->resetStream(Http::StreamResetReason::ConnectionFailure);
+}
+#endif
+
 } // namespace Quic
 } // namespace Envoy

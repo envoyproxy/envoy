@@ -15,6 +15,7 @@
 #include "test/mocks/server/options.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/test_common/environment.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/test_time.h"
 
 namespace Envoy {
@@ -119,7 +120,9 @@ DEFINE_PROTO_FUZZER(const envoy::config::bootstrap::v3::Bootstrap& input) {
   DangerousDeprecatedTestTime test_time;
   Fuzz::PerTestEnvironment test_env;
   Init::ManagerImpl init_manager{"Server"};
+  TestScopedRuntime scoped_runtime;
 
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.validate_upstream_headers", "false"}});
   {
     const std::string bootstrap_path = test_env.temporaryPath("bootstrap.pb_text");
     std::ofstream bootstrap_file(bootstrap_path);

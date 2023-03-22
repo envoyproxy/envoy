@@ -401,6 +401,7 @@ envoy_cc_fuzz_test(
         "//test/mocks/server:options_mocks",
         "//test/mocks/server:hot_restart_mocks",
         "//test/test_common:environment_lib",
+        "//test/test_common:test_runtime_lib",
     ] + select({
         "//bazel:windows_x86_64": envoy_all_extensions(WINDOWS_SKIP_TARGETS),
         "//bazel:linux_ppc": envoy_all_extensions(PPC_SKIP_TARGETS),
