@@ -213,11 +213,7 @@ struct StreamStateStringValues {
 
 using StreamStateStrings = ConstSingleton<StreamStateStringValues>;
 
-enum StreamState {
-  Started = 0x1,
-  InProgress = 0x2,
-  Ended = 0x4
-};
+enum StreamState { Started = 0x1, InProgress = 0x2, Ended = 0x4 };
 
 /**
  * Constants for the locally closing a connection. This is used in response code
