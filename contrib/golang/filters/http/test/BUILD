@@ -48,25 +48,26 @@ envoy_cc_test(
     ],
 )
 
-envoy_cc_test(
-    name = "golang_integration_test",
-    srcs = ["golang_integration_test.cc"],
-    data = [
-        "//contrib/golang/filters/http/test/test_data/basic:filter.so",
-        "//contrib/golang/filters/http/test/test_data/echo:filter.so",
-        "//contrib/golang/filters/http/test/test_data/passthrough:filter.so",
-        "//contrib/golang/filters/http/test/test_data/routeconfig:filter.so",
-    ],
-    env = {"GODEBUG": "cgocheck=0"},
-    deps = [
-        "//contrib/golang/filters/http/source:config",
-        "//source/exe:main_common_lib",
-        "//test/config:v2_link_hacks",
-        "//test/integration:http_integration_lib",
-        "//test/test_common:utility_lib",
-        "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
-    ],
-)
+#disabled: https://github.com/envoyproxy/envoy/issues/26182
+#envoy_cc_test(
+#    name = "golang_integration_test",
+#    srcs = ["golang_integration_test.cc"],
+#    data = [
+#        "//contrib/golang/filters/http/test/test_data/basic:filter.so",
+#        "//contrib/golang/filters/http/test/test_data/echo:filter.so",
+#        "//contrib/golang/filters/http/test/test_data/passthrough:filter.so",
+#        "//contrib/golang/filters/http/test/test_data/routeconfig:filter.so",
+#    ],
+#    env = {"GODEBUG": "cgocheck=0"},
+#    deps = [
+#        "//contrib/golang/filters/http/source:config",
+#        "//source/exe:main_common_lib",
+#        "//test/config:v2_link_hacks",
+#        "//test/integration:http_integration_lib",
+#        "//test/test_common:utility_lib",
+#        "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
+#    ],
+#)
 
 envoy_proto_library(
     name = "golang_filter_fuzz_proto",
@@ -84,8 +85,8 @@ envoy_cc_fuzz_test(
     corpus = "golang_filter_corpus",
     deps = [
         ":golang_filter_fuzz_proto_cc_proto",
+        "//contrib/golang/common/dso/test:dso_mocks",
         "//contrib/golang/filters/http/source:config",
-        "//contrib/golang/filters/http/test/common/dso:dso_mocks",
         "//source/common/network:address_lib",
         "//test/extensions/filters/http/common/fuzz:http_filter_fuzzer_lib",
         "//test/mocks/http:http_mocks",

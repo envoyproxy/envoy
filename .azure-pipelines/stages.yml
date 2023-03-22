@@ -65,7 +65,30 @@ stages:
   #
 
   jobs:
+  # Warm build image caches
+  - job: cache
+    displayName: Cache
+    pool:
+      vmImage: "ubuntu-20.04"
+    steps:
+    - template: cached.yml
+      parameters:
+        version: "$(buildImageCacheVersion)"
+        prime: true
+  - job: cache_arm
+    dependsOn: []
+    displayName: Cache (arm64)
+    pool:
+      vmImage: "ubuntu-20.04"
+    steps:
+    - template: cached.yml
+      parameters:
+        prime: true
+        arch: .arm64
+        version: "$(buildImageCacheVersion)"
+
   - job: repo
+    dependsOn: []
     displayName: Repository
     pool:
       vmImage: "ubuntu-20.04"
@@ -161,6 +184,10 @@ stages:
         path: $(Build.StagingDirectory)/repository_cache
       continueOnError: true
 
+    - template: cached.yml
+      parameters:
+        version: "$(buildImageCacheVersion)"
+
     - script: ci/run_envoy_docker.sh 'ci/do_ci.sh format'
       workingDirectory: $(Build.SourcesDirectory)
       env:
@@ -192,6 +219,10 @@ stages:
         path: $(Build.StagingDirectory)/repository_cache
       continueOnError: true
 
+    - template: cached.yml
+      parameters:
+        version: "$(buildImageCacheVersion)"
+
     - script: ci/run_envoy_docker.sh 'ci/check_and_fix_format.sh'
       workingDirectory: $(Build.SourcesDirectory)
       env:
@@ -222,6 +253,10 @@ stages:
         key: "docs | ./WORKSPACE | **/*.bzl"
         path: $(Build.StagingDirectory)/repository_cache
       continueOnError: true
+
+    - template: cached.yml
+      parameters:
+        version: "$(buildImageCacheVersion)"
 
     - script: ci/run_envoy_docker.sh 'ci/do_ci.sh docs'
       workingDirectory: $(Build.SourcesDirectory)
@@ -255,6 +290,10 @@ stages:
         key: "dependencies | ./WORKSPACE | **/*.bzl"
         path: $(Build.StagingDirectory)/repository_cache
       continueOnError: true
+
+    - template: cached.yml
+      parameters:
+        version: "$(buildImageCacheVersion)"
 
     - script: ci/run_envoy_docker.sh 'ci/do_ci.sh deps'
       workingDirectory: $(Build.SourcesDirectory)
@@ -365,6 +404,7 @@ stages:
       parameters:
         managedAgent: false
         ciTarget: bazel.release
+        bazelBuildExtraOptions: "--sandbox_base=/tmp/sandbox_base"
 
   - job: released
     # displayName: Complete
@@ -524,29 +564,13 @@ stages:
       inputs:
         buildType: current
         artifactName: "bazel.release"
-        itemPattern: "bazel.release/envoy_binary.tar.gz"
-        downloadType: single
-        targetPath: $(Build.StagingDirectory)
-    - task: DownloadBuildArtifacts@0
-      inputs:
-        buildType: current
-        artifactName: "bazel.release"
-        itemPattern: "bazel.release/envoy-contrib_binary.tar.gz"
-        downloadType: single
+        itemPattern: "bazel.release/envoy*binary.tar.gz"
         targetPath: $(Build.StagingDirectory)
     - task: DownloadBuildArtifacts@0
       inputs:
         buildType: current
         artifactName: "bazel.release.arm64"
-        itemPattern: "bazel.release.arm64/envoy_binary.tar.gz"
-        downloadType: single
-        targetPath: $(Build.StagingDirectory)
-    - task: DownloadBuildArtifacts@0
-      inputs:
-        buildType: current
-        artifactName: "bazel.release.arm64"
-        itemPattern: "bazel.release.arm64/envoy-contrib_binary.tar.gz"
-        downloadType: single
+        itemPattern: "bazel.release.arm64/envoy*binary.tar.gz"
         targetPath: $(Build.StagingDirectory)
     - bash: |
         set -e
@@ -878,15 +902,6 @@ stages:
         testRunTitle: "macOS"
       timeoutInMinutes: 10
       condition: always()
-
-    - script: bazel run //ci/flaky_test:process_xml
-      displayName: "Process Test Results"
-      env:
-        TEST_TMPDIR: $(Build.SourcesDirectory)
-        SLACK_TOKEN: $(SLACK_TOKEN)
-        CI_TARGET: "MacOS"
-        REPO_URI: $(Build.Repository.Uri)
-        BUILD_URI: $(Build.BuildUri)
 
   - job: tested
     # displayName: Complete

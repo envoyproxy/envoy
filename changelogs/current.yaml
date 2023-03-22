@@ -41,6 +41,9 @@ minor_behavior_changes:
 - area: matchers
   change: |
     Moved all of the network input matchers to extensions. If you use network matchers and override extensions_build_config.bzl you will now need to include them explicitly.
+- area: skywalking
+  change: |
+    If sw8 header is invalid, skywalking extension will create a new trace context and a null span respectively when sampling is enabled and disabled.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
@@ -70,6 +73,12 @@ bug_fixes:
 - area: ext_proc
   change: |
     Let onData always raise StopIterationAndWatermark when waiting for headers response, to avoid http errors (413 on request path, and 500 on response path) when data size goes above high watermark.
+- area: http filter
+  change: |
+    Fix possible illegal memory access in the header_mutaion filter when the request is aborted before the request headers are received completely.
+- area: upstream
+  change: |
+    Initialize upstream network read filters via their ``onNewConnection()`` callback once the upstream connection has been established even if there is no data available for reading on the new upstream connection. This behavior change can be reverted by setting ``envoy.reloadable_features.initialize_upstream_filters`` to ``false``.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
