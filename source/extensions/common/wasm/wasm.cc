@@ -148,7 +148,7 @@ Wasm::~Wasm() {
   lifecycle_stats_handler_.onEvent(WasmEvent::VmShutDown);
   ENVOY_LOG(debug, "~Wasm {} remaining active", lifecycle_stats_handler_.getActiveVmCount());
   if (server_shutdown_post_cb_) {
-    dispatcher_.post(server_shutdown_post_cb_);
+    dispatcher_.post(std::move(server_shutdown_post_cb_));
   }
 }
 
