@@ -88,7 +88,8 @@ TEST_F(InputsIntegrationTest, DestinationIPInput) {
 
   Network::MockConnectionSocket socket;
   StreamInfo::FilterStateImpl filter_state(StreamInfo::FilterState::LifeSpan::Connection);
-  MatchingDataImpl data(socket, filter_state);
+  envoy::config::core::v3::Metadata metadata;
+  MatchingDataImpl data(socket, filter_state, metadata);
   socket.connection_info_provider_->setLocalAddress(
       std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 8080));
 
@@ -102,7 +103,8 @@ TEST_F(InputsIntegrationTest, DestinationPortInput) {
 
   Network::MockConnectionSocket socket;
   StreamInfo::FilterStateImpl filter_state(StreamInfo::FilterState::LifeSpan::Connection);
-  MatchingDataImpl data(socket, filter_state);
+  envoy::config::core::v3::Metadata metadata;
+  MatchingDataImpl data(socket, filter_state, metadata);
   socket.connection_info_provider_->setLocalAddress(
       std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 8080));
 
@@ -116,7 +118,8 @@ TEST_F(InputsIntegrationTest, SourceIPInput) {
 
   Network::MockConnectionSocket socket;
   StreamInfo::FilterStateImpl filter_state(StreamInfo::FilterState::LifeSpan::Connection);
-  MatchingDataImpl data(socket, filter_state);
+  envoy::config::core::v3::Metadata metadata;
+  MatchingDataImpl data(socket, filter_state, metadata);
   socket.connection_info_provider_->setRemoteAddress(
       std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 8080));
 
@@ -130,7 +133,8 @@ TEST_F(InputsIntegrationTest, SourcePortInput) {
 
   Network::MockConnectionSocket socket;
   StreamInfo::FilterStateImpl filter_state(StreamInfo::FilterState::LifeSpan::Connection);
-  MatchingDataImpl data(socket, filter_state);
+  envoy::config::core::v3::Metadata metadata;
+  MatchingDataImpl data(socket, filter_state, metadata);
   socket.connection_info_provider_->setRemoteAddress(
       std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 8080));
 
@@ -144,7 +148,8 @@ TEST_F(InputsIntegrationTest, DirectSourceIPInput) {
 
   Network::MockConnectionSocket socket;
   StreamInfo::FilterStateImpl filter_state(StreamInfo::FilterState::LifeSpan::Connection);
-  MatchingDataImpl data(socket, filter_state);
+  envoy::config::core::v3::Metadata metadata;
+  MatchingDataImpl data(socket, filter_state, metadata);
   socket.connection_info_provider_->setDirectRemoteAddressForTest(
       std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 8080));
 
@@ -158,7 +163,8 @@ TEST_F(InputsIntegrationTest, SourceTypeInput) {
 
   Network::MockConnectionSocket socket;
   StreamInfo::FilterStateImpl filter_state(StreamInfo::FilterState::LifeSpan::Connection);
-  MatchingDataImpl data(socket, filter_state);
+  envoy::config::core::v3::Metadata metadata;
+  MatchingDataImpl data(socket, filter_state, metadata);
   socket.connection_info_provider_->setRemoteAddress(
       std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 8080));
 
@@ -173,7 +179,8 @@ TEST_F(InputsIntegrationTest, ServerNameInput) {
 
   Network::MockConnectionSocket socket;
   StreamInfo::FilterStateImpl filter_state(StreamInfo::FilterState::LifeSpan::Connection);
-  MatchingDataImpl data(socket, filter_state);
+  envoy::config::core::v3::Metadata metadata;
+  MatchingDataImpl data(socket, filter_state, metadata);
   socket.connection_info_provider_->setRequestedServerName(host);
 
   const auto result = match_tree_()->match(data);
@@ -186,7 +193,8 @@ TEST_F(InputsIntegrationTest, TransportProtocolInput) {
 
   Network::MockConnectionSocket socket;
   StreamInfo::FilterStateImpl filter_state(StreamInfo::FilterState::LifeSpan::Connection);
-  MatchingDataImpl data(socket, filter_state);
+  envoy::config::core::v3::Metadata metadata;
+  MatchingDataImpl data(socket, filter_state, metadata);
   EXPECT_CALL(socket, detectedTransportProtocol).WillOnce(testing::Return("tls"));
 
   const auto result = match_tree_()->match(data);
@@ -199,7 +207,8 @@ TEST_F(InputsIntegrationTest, ApplicationProtocolInput) {
 
   Network::MockConnectionSocket socket;
   StreamInfo::FilterStateImpl filter_state(StreamInfo::FilterState::LifeSpan::Connection);
-  MatchingDataImpl data(socket, filter_state);
+  envoy::config::core::v3::Metadata metadata;
+  MatchingDataImpl data(socket, filter_state, metadata);
   std::vector<std::string> protocols = {"http/1.1"};
   EXPECT_CALL(socket, requestedApplicationProtocols).WillOnce(testing::ReturnRef(protocols));
 
@@ -219,7 +228,8 @@ TEST_F(InputsIntegrationTest, FilterStateInput) {
                        StreamInfo::FilterState::LifeSpan::Connection);
 
   Network::MockConnectionSocket socket;
-  MatchingDataImpl data(socket, filter_state);
+  envoy::config::core::v3::Metadata metadata;
+  MatchingDataImpl data(socket, filter_state, metadata);
 
   const auto result = match_tree_()->match(data);
   EXPECT_EQ(result.match_state_, Matcher::MatchState::MatchComplete);
@@ -233,7 +243,8 @@ TEST_F(InputsIntegrationTest, FilterStateInputFailure) {
 
   StreamInfo::FilterStateImpl filter_state(StreamInfo::FilterState::LifeSpan::Connection);
   Network::MockConnectionSocket socket;
-  MatchingDataImpl data(socket, filter_state);
+  envoy::config::core::v3::Metadata metadata;
+  MatchingDataImpl data(socket, filter_state, metadata);
 
   // No filter state object - no match
   const auto result_no_fs = match_tree_()->match(data);
