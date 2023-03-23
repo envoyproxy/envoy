@@ -86,7 +86,6 @@ HealthCheckerSharedPtr HealthCheckerFactory::create(
         log_manager, dispatcher.timeSource(), health_check_config.event_log_path());
   }
   Server::Configuration::CustomHealthCheckerFactory* factory = nullptr;
-  ;
 
   switch (health_check_config.health_checker_case()) {
   case envoy::config::core::v3::HealthCheck::HealthCheckerCase::HEALTH_CHECKER_NOT_SET:
