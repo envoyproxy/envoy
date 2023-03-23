@@ -201,11 +201,6 @@ TEST_P(WebsocketIntegrationTest, WebSocketConnectionDownstreamDisconnect) {
   // TODO(#23286) - add web socket support for H2 UHV
   return;
 #endif
-  if (upstreamProtocol() == Http::CodecType::HTTP3 ||
-      downstreamProtocol() == Http::CodecType::HTTP3) {
-    // TODO(#23564) - Finish CONNECT-UDP support.
-    return;
-  }
 
   config_helper_.addConfigModifier(setRouteUsingWebsocket());
   initialize();
@@ -304,11 +299,6 @@ TEST_P(WebsocketIntegrationTest, WebSocketConnectionIdleTimeout) {
   // TODO(#23286) - add web socket support for H2 UHV
   return;
 #endif
-  if (upstreamProtocol() == Http::CodecType::HTTP3 ||
-      downstreamProtocol() == Http::CodecType::HTTP3) {
-    // TODO(#23564) - Finish CONNECT-UDP support.
-    return;
-  }
 
   config_helper_.addConfigModifier(setRouteUsingWebsocket());
   config_helper_.addConfigModifier(
@@ -338,11 +328,6 @@ TEST_P(WebsocketIntegrationTest, NonWebsocketUpgrade) {
   // TODO(#23286) - add web socket support for H2 UHV
   return;
 #endif
-  if (upstreamProtocol() == Http::CodecType::HTTP3 ||
-      downstreamProtocol() == Http::CodecType::HTTP3) {
-    // TODO(#23564) - Finish CONNECT-UDP support.
-    return;
-  }
 
   config_helper_.addConfigModifier(
       [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
@@ -376,11 +361,6 @@ TEST_P(WebsocketIntegrationTest, RouteSpecificUpgrade) {
   // TODO(#23286) - add web socket support for H2 UHV
   return;
 #endif
-  if (upstreamProtocol() == Http::CodecType::HTTP3 ||
-      downstreamProtocol() == Http::CodecType::HTTP3) {
-    // TODO(#23564) - Finish CONNECT-UDP support.
-    return;
-  }
 
   config_helper_.addConfigModifier(
       [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
@@ -416,11 +396,6 @@ TEST_P(WebsocketIntegrationTest, WebsocketCustomFilterChain) {
   // TODO(#23286) - add web socket support for H2 UHV
   return;
 #endif
-  if (upstreamProtocol() == Http::CodecType::HTTP3 ||
-      downstreamProtocol() == Http::CodecType::HTTP3) {
-    // TODO(#23564) - Finish CONNECT-UDP support.
-    return;
-  }
 
   config_helper_.addConfigModifier(setRouteUsingWebsocket());
 

@@ -378,7 +378,6 @@ bool isUpgrade(const RequestOrResponseHeaderMap& headers);
 bool isH2UpgradeRequest(const RequestHeaderMap& headers);
 
 /**
- * Same as isH2UpgradeRequest
  * @return true if this is a CONNECT request with a :protocol header present, false otherwise.
  */
 bool isH3UpgradeRequest(const RequestHeaderMap& headers);
@@ -545,8 +544,8 @@ const std::string resetReasonToString(const Http::StreamResetReason reset_reason
 void transformUpgradeRequestFromH1toH2(RequestHeaderMap& headers);
 
 /**
- * Transforms the supplied headers from an HTTP/1 Upgrade request to an H3 style upgrade.
- * which is the same as the H2 upgrade
+ * Transforms the supplied headers from an HTTP/1 Upgrade request to an H3 style upgrade,
+ * which is the same as the H2 upgrade.
  * @param headers the headers to convert.
  */
 void transformUpgradeRequestFromH1toH3(RequestHeaderMap& headers);
@@ -559,8 +558,8 @@ void transformUpgradeRequestFromH1toH3(RequestHeaderMap& headers);
 void transformUpgradeResponseFromH1toH2(ResponseHeaderMap& headers);
 
 /**
- * Transforms the supplied headers from an HTTP/1 Upgrade response to an H3 style upgrade response.
- * which is the same as the H2 style upgrade
+ * Transforms the supplied headers from an HTTP/1 Upgrade response to an H3 style upgrade response,
+ * which is the same as the H2 style upgrade.
  * @param headers the headers to convert.
  */
 void transformUpgradeResponseFromH1toH3(ResponseHeaderMap& headers);
@@ -583,6 +582,7 @@ void transformUpgradeRequestFromH3toH1(RequestHeaderMap& headers);
  * Transforms the supplied headers from an H2 "CONNECT success" to an HTTP/1 style Upgrade response.
  * The caller is responsible for ensuring this only happens on upgraded streams.
  * @param headers the headers to convert.
+ * @param upgrade the HTTP Upgrade token.
  */
 void transformUpgradeResponseFromH2toH1(ResponseHeaderMap& headers, absl::string_view upgrade);
 
@@ -591,6 +591,7 @@ void transformUpgradeResponseFromH2toH1(ResponseHeaderMap& headers, absl::string
  * The caller is responsible for ensuring this only happens on upgraded streams.
  * Same as H2 Upgrade response transform
  * @param headers the headers to convert.
+ * @param upgrade the HTTP Upgrade token.
  */
 void transformUpgradeResponseFromH3toH1(ResponseHeaderMap& headers, absl::string_view upgrade);
 

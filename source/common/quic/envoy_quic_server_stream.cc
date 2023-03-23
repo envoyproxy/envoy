@@ -54,21 +54,27 @@ void EnvoyQuicServerStream::encodeHeaders(const Http::ResponseHeaderMap& headers
     IS_ENVOY_BUG("encodeHeaders is called on write-closed stream.");
     return;
   }
-  auto modified_headers = Http::createHeaderMap<Http::ResponseHeaderMapImpl>(headers);
-  // Internally, responses are handled in HTTP/1 form, regardless of the format of the original
-  // request Therefore, before forwarding the response to a peer, we must convert it back to HTTP/3
-  // form
+
+  // In Envoy, both upgrade requests and extended CONNECT requests are
+  // represented as their HTTP/1 forms, regardless of the HTTP version used.
+  // Therefore, these need to be transformed into their HTTP/3 form, before
+  // sending them.
+  const Http::ResponseHeaderMap* header_map = &headers;
+  std::unique_ptr<Http::ResponseHeaderMapImpl> modified_headers;
   if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.use_http3_header_normalisation") &&
       Http::Utility::isUpgrade(headers)) {
+    modified_headers = Http::createHeaderMap<Http::ResponseHeaderMapImpl>(headers);
     Http::Utility::transformUpgradeResponseFromH1toH3(*modified_headers);
+    header_map = modified_headers.get();
   }
+
   // This is counting not serialized bytes in the send buffer.
   local_end_stream_ = end_stream;
   SendBufferMonitor::ScopedWatermarkBufferUpdater updater(this, this);
   {
     IncrementalBytesSentTracker tracker(*this, *mutableBytesMeter(), true);
     size_t bytes_sent =
-        WriteHeaders(envoyHeadersToHttp2HeaderBlock(*modified_headers), end_stream, nullptr);
+        WriteHeaders(envoyHeadersToHttp2HeaderBlock(*header_map), end_stream, nullptr);
     stats_gatherer_->addBytesSent(bytes_sent, end_stream);
     ENVOY_BUG(bytes_sent != 0, "Failed to encode headers.");
   }
