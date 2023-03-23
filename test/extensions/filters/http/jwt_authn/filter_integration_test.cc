@@ -59,9 +59,11 @@ std::string getFilterConfig(bool use_local_jwks) {
 
 class LocalJwksIntegrationTest : public HttpProtocolIntegrationTest {};
 
-INSTANTIATE_TEST_SUITE_P(Protocols, LocalJwksIntegrationTest,
-                         testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams()),
-                         HttpProtocolIntegrationTest::protocolTestParamsToString);
+// TODO(#26236): Fix test suite for HTTP/3.
+INSTANTIATE_TEST_SUITE_P(
+    Protocols, LocalJwksIntegrationTest,
+    testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParamsWithoutHTTP3()),
+    HttpProtocolIntegrationTest::protocolTestParamsToString);
 
 // With local Jwks, this test verifies a request is passed with a good Jwt token.
 TEST_P(LocalJwksIntegrationTest, WithGoodToken) {
@@ -385,9 +387,10 @@ public:
   FakeStreamPtr jwks_request_{};
 };
 
-INSTANTIATE_TEST_SUITE_P(Protocols, RemoteJwksIntegrationTest,
-                         testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams()),
-                         HttpProtocolIntegrationTest::protocolTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(
+    Protocols, RemoteJwksIntegrationTest,
+    testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParamsWithoutHTTP3()),
+    HttpProtocolIntegrationTest::protocolTestParamsToString);
 
 // With remote Jwks, this test verifies a request is passed with a good Jwt token
 // and a good public key fetched from a remote server.
@@ -609,9 +612,10 @@ public:
   }
 };
 
-INSTANTIATE_TEST_SUITE_P(Protocols, PerRouteIntegrationTest,
-                         testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams()),
-                         HttpProtocolIntegrationTest::protocolTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(
+    Protocols, PerRouteIntegrationTest,
+    testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParamsWithoutHTTP3()),
+    HttpProtocolIntegrationTest::protocolTestParamsToString);
 
 // This test verifies per-route config disabled.
 TEST_P(PerRouteIntegrationTest, PerRouteConfigDisabled) {
