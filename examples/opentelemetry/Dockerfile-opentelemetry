@@ -1,7 +1,7 @@
 FROM alpine:3.17@sha256:ff6bdca1701f3a8a67e328815ff2346b0e4067d32ec36b7992c1fdc001dc8517 as otelc_curl
 RUN apk --update add curl
 
-FROM otel/opentelemetry-collector:latest@sha256:69b1cde6062a8ad68fa025fb240b5ec3efbb29205a0538924683471439a73353
+FROM otel/opentelemetry-collector:latest@sha256:ec03ba5b62abdac846b840c0e0f53a6675be772884ae3690ca20bb8821fc17d3
 
 COPY --from=otelc_curl / /
 
