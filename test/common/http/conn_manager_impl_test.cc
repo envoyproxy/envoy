@@ -2453,7 +2453,6 @@ TEST_F(HttpConnectionManagerImplTest, TestAccessLogOnUpstreamConnected) {
                                          {"x-request-id", "125a4afb-6f55-a4ba-ad80-413f09f48a28"}}};
         decoder_->decodeHeaders(std::move(headers), true);
 
-        filter->callbacks_->onUpstreamConnectionEstablished();
         filter->callbacks_->streamInfo().setResponseCodeDetails("");
         ResponseHeaderMapPtr response_headers{new TestResponseHeaderMapImpl{{":status", "200"}}};
         filter->callbacks_->encodeHeaders(std::move(response_headers), true, "details");
