@@ -2504,7 +2504,7 @@ TEST_F(HttpConnectionManagerImplTest, TestPeriodicAccessLogging) {
     filter->callbacks_->streamInfo().setResponseCodeDetails("");
     ResponseHeaderMapPtr response_headers{new TestResponseHeaderMapImpl{{":status", "200"}}};
     filter->callbacks_->encodeHeaders(std::move(response_headers), false, "details");
-    
+
     EXPECT_EQ(StreamInfo::StreamState::InProgress, filter->callbacks_->streamInfo().streamState());
 
     data.drain(4);
@@ -2578,7 +2578,8 @@ TEST_F(HttpConnectionManagerImplTest, TestStreamStateSuccessStatusCode) {
         ResponseHeaderMapPtr response_headers{new TestResponseHeaderMapImpl{{":status", "200"}}};
         filter->callbacks_->encodeHeaders(std::move(response_headers), false, "details");
 
-        EXPECT_EQ(StreamInfo::StreamState::InProgress, filter->callbacks_->streamInfo().streamState());
+        EXPECT_EQ(StreamInfo::StreamState::InProgress,
+                  filter->callbacks_->streamInfo().streamState());
 
         ResponseTrailerMapPtr response_trailers{new TestResponseTrailerMapImpl{{"x-trailer", "1"}}};
         filter->callbacks_->encodeTrailers(std::move(response_trailers));
