@@ -381,9 +381,8 @@ TEST_P(Http11ConnectHttpIntegrationTest, TestHttp2) {
 
 #ifdef ENVOY_ENABLE_QUIC
 
-// TODO(#26236) - Fix test flakiness over HTTP/3.
 // Test Http3 failing to HTTP/2 if proxy settings are enabled.
-TEST_P(Http11ConnectHttpIntegrationTest, DISABLED_TestHttp3Failover) {
+TEST_P(Http11ConnectHttpIntegrationTest, TestHttp3Failover) {
   setUpstreamProtocol(Http::CodecType::HTTP2);
   use_alpn_ = true;
   try_http3_ = true;

@@ -21,11 +21,6 @@ TEST_P(BufferIntegrationTest, RouterNotFoundBodyBuffer) {
 }
 
 TEST_P(BufferIntegrationTest, RouterRequestAndResponseWithGiantBodyBuffer) {
-  if (upstreamProtocol() == Http::CodecType::HTTP3 ||
-      downstreamProtocol() == Http::CodecType::HTTP3) {
-    // TODO(#26236) - Fix test flakiness over HTTP/3.
-    return;
-  }
   config_helper_.prependFilter(ConfigHelper::defaultBufferFilter(), testing_downstream_filter_);
   testRouterRequestAndResponseWithBody(4 * 1024 * 1024, 4 * 1024 * 1024, false);
 }
@@ -51,11 +46,8 @@ TEST_P(BufferIntegrationTest, RouterRequestPopulateContentLength) {
   initialize();
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
-  auto encoder_decoder =
-      codec_client_->startRequest(Http::TestRequestHeaderMapImpl{{":method", "POST"},
-                                                                 {":scheme", "http"},
-                                                                 {":path", "/shelf"},
-                                                                 {":authority", "sni.lyft.com"}});
+  auto encoder_decoder = codec_client_->startRequest(Http::TestRequestHeaderMapImpl{
+      {":method", "POST"}, {":scheme", "http"}, {":path", "/shelf"}, {":authority", "host"}});
   request_encoder_ = &encoder_decoder.first;
   IntegrationStreamDecoderPtr response = std::move(encoder_decoder.second);
   codec_client_->sendData(*request_encoder_, "123", false);
@@ -82,11 +74,8 @@ TEST_P(BufferIntegrationTest, RouterRequestPopulateContentLengthOnTrailers) {
   initialize();
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
-  auto encoder_decoder =
-      codec_client_->startRequest(Http::TestRequestHeaderMapImpl{{":method", "POST"},
-                                                                 {":scheme", "http"},
-                                                                 {":path", "/shelf"},
-                                                                 {":authority", "sni.lyft.com"}});
+  auto encoder_decoder = codec_client_->startRequest(Http::TestRequestHeaderMapImpl{
+      {":method", "POST"}, {":scheme", "http"}, {":path", "/shelf"}, {":authority", "host"}});
   request_encoder_ = &encoder_decoder.first;
   IntegrationStreamDecoderPtr response = std::move(encoder_decoder.second);
   codec_client_->sendData(*request_encoder_, "0123", false);
@@ -127,7 +116,7 @@ TEST_P(BufferIntegrationTest, RouterRequestBufferLimitExceeded) {
       Http::TestRequestHeaderMapImpl{{":method", "POST"},
                                      {":path", "/dynamo/url"},
                                      {":scheme", "http"},
-                                     {":authority", "sni.lyft.com"},
+                                     {":authority", "host"},
                                      {"x-forwarded-for", "10.0.0.1"},
                                      {"x-envoy-retry-on", "5xx"}},
       1024 * 65, false);
@@ -170,7 +159,7 @@ TEST_P(BufferIntegrationTest, RouteDisabled) {
       Http::TestRequestHeaderMapImpl{{":method", "POST"},
                                      {":path", "/test/long/url"},
                                      {":scheme", "http"},
-                                     {":authority", "sni.lyft.com"},
+                                     {":authority", "host"},
                                      {"x-forwarded-for", "10.0.0.1"}},
       1024 * 65);
 
@@ -199,7 +188,7 @@ TEST_P(BufferIntegrationTest, RouteOverride) {
       Http::TestRequestHeaderMapImpl{{":method", "POST"},
                                      {":path", "/test/long/url"},
                                      {":scheme", "http"},
-                                     {":authority", "sni.lyft.com"},
+                                     {":authority", "host"},
                                      {"x-forwarded-for", "10.0.0.1"}},
       1024 * 65);
 

@@ -74,11 +74,9 @@ protected:
   }
 };
 
-// TODO(#26236): Fix test suite for HTTP/3.
-INSTANTIATE_TEST_SUITE_P(
-    Protocols, CsrfFilterIntegrationTest,
-    testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParamsWithoutHTTP3()),
-    HttpProtocolIntegrationTest::protocolTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(Protocols, CsrfFilterIntegrationTest,
+                         testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams()),
+                         HttpProtocolIntegrationTest::protocolTestParamsToString);
 
 TEST_P(CsrfFilterIntegrationTest, TestCsrfSuccess) {
   config_helper_.prependFilter(CSRF_FILTER_ENABLED_CONFIG);

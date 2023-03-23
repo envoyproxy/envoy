@@ -10,11 +10,9 @@ public:
   void initialize() override { HttpProtocolIntegrationTest::initialize(); }
 };
 
-// TODO(#26236): Fix test suite for HTTP/3.
-INSTANTIATE_TEST_SUITE_P(
-    Protocols, CircuitBreakersIntegrationTest,
-    testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParamsWithoutHTTP3()),
-    HttpProtocolIntegrationTest::protocolTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(Protocols, CircuitBreakersIntegrationTest,
+                         testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams()),
+                         HttpProtocolIntegrationTest::protocolTestParamsToString);
 
 // This test checks that triggered max requests circuit breaker
 // doesn't force outlier detectors to eject an upstream host.
