@@ -71,8 +71,8 @@ open class EngineBuilder(
   private var appVersion = "unspecified"
   private var appId = "unspecified"
   private var trustChainVerification = TrustChainVerification.VERIFY_TRUST_CHAIN
-  private var virtualClusters = mutableListOf<String>()
-  private var virtualClusterConfig = mutableListOf<VirtualClusterConfig>()
+  private var virtualClustersLegacy = mutableListOf<String>()
+  private var virtualClusters = mutableListOf<VirtualClusterConfig>()
   private var platformFilterChain = mutableListOf<EnvoyHTTPFilterFactory>()
   private var nativeFilterChain = mutableListOf<EnvoyNativeFilterConfig>()
   private var stringAccessors = mutableMapOf<String, EnvoyStringAccessor>()
@@ -560,7 +560,7 @@ open class EngineBuilder(
    * @return this builder.
    */
   fun addVirtualCluster(cluster: String): EngineBuilder {
-    this.virtualClusters.add(cluster)
+    this.virtualClustersLegacy.add(cluster)
     return this
   }
 
@@ -572,7 +572,7 @@ open class EngineBuilder(
    * @return this builder.
    */
   fun addVirtualCluster(config: List<VirtualClusterConfig>): EngineBuilder {
-    this.virtualClusterConfig + config;
+    this.virtualClusters + config;
     return this
   }
 
@@ -722,8 +722,8 @@ open class EngineBuilder(
       appVersion,
       appId,
       trustChainVerification,
+      virtualClustersLegacy,
       virtualClusters,
-      virtualClusterConfig,
       nativeFilterChain,
       platformFilterChain,
       stringAccessors,
