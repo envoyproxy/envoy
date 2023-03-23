@@ -217,9 +217,9 @@ public:
    */
   virtual const absl::optional<std::chrono::milliseconds>& accessLogFlushInterval() PURE;
 
-  // If set to true, access log will be flushed when the router has successfully established a
-  // connection with the upstream. If the connection failed, the access log will not be flushed.
-  virtual bool flushAccessLogOnConnected() PURE;
+  // If set to true, access log will be flushed when a new HTTP request is received, after request
+  // headers have been evaluated, and before attempting to establish a connection with the upstream.
+  virtual bool flushAccessLogOnNewRequest() PURE;
 
   /**
    * Called to create a codec for the connection manager. This function will be called when the

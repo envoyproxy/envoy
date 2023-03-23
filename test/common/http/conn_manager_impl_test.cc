@@ -2406,7 +2406,6 @@ TEST_F(HttpConnectionManagerImplTest, TestAccessLogWithInvalidRequest) {
 }
 
 TEST_F(HttpConnectionManagerImplTest, TestAccessLogOnNewRequest) {
-  flush_access_log_on_new_request_ = true;
   setup(false, "");
 
   std::shared_ptr<MockStreamDecoderFilter> filter(new NiceMock<MockStreamDecoderFilter>());
@@ -2422,11 +2421,13 @@ TEST_F(HttpConnectionManagerImplTest, TestAccessLogOnNewRequest) {
         return true;
       }));
 
+  flush_access_log_on_new_request_ = true;
+
   EXPECT_CALL(*handler, log(_, _, _, _))
-      .Times(2) // flush_access_log_on_connected_ enabled.
+      .Times(2) // flush_access_log_on_new_request_ enabled.
       .WillOnce(Invoke([](const HeaderMap*, const HeaderMap*, const HeaderMap*,
                           const StreamInfo::StreamInfo& stream_info) {
-        // First call to log() is made when upstream connection is established
+        // First call to log() is made when a new HTTP request has been received
         // On the first call it is expected that there is no response code.
         EXPECT_FALSE(stream_info.responseCode());
       }))

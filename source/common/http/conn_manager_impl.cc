@@ -1026,10 +1026,6 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapSharedPt
     request_header_timer_.reset();
   }
 
-  if (connection_manager_.config_.flushAccessLogOnNewRequest()) {
-    filter_manager_.log();
-  }
-
   // Both saw_connection_close_ and is_head_request_ affect local replies: set
   // them as early as possible.
   const Protocol protocol = connection_manager_.codec_->protocol();
@@ -1205,6 +1201,10 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapSharedPt
   filter_manager_.streamInfo().setRequestHeaders(*request_headers_);
 
   const bool upgrade_rejected = filter_manager_.createFilterChain() == false;
+
+  if (connection_manager_.config_.flushAccessLogOnNewRequest()) {
+    filter_manager_.log();
+  }
 
   // TODO if there are no filters when starting a filter iteration, the connection manager
   // should return 404. The current returns no response if there is no router filter.
