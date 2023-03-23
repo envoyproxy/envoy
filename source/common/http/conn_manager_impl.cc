@@ -814,14 +814,14 @@ ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connect
   if (connection_manager_.config_.accessLogFlushInterval().has_value()) {
     access_log_flush_timer_ =
         connection_manager.read_callbacks_->connection().dispatcher().createTimer([this]() -> void {
-          // If the request is complete, we've already done the stream-end access-log, and shouldn't
-          // do the periodic log.
-          if (connection_manager_.read_callbacks_->connection().streamInfo().streamState() &&
-              connection_manager_.read_callbacks_->connection().streamInfo().streamState() ==
-                  StreamInfo::StreamState::InProgress) {
-            filter_manager_.log();
-            refreshAccessLogFlushTimer();
+          // If the request is not in active state, we shouldn't do the periodic log.
+          if (!streamInfo().streamState() || streamInfo().streamState() !=
+              StreamInfo::StreamState::InProgress) {
+            return;
           }
+
+          filter_manager_.log();
+          refreshAccessLogFlushTimer();
         });
     refreshAccessLogFlushTimer();
   }
