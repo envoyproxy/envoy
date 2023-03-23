@@ -66,6 +66,7 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "apple_platform_cert_verifier",
+    repository = "@envoy",
     srcs = select({
         "@envoy//bazel:apple": ["apple_platform_cert_verifier.cc"],
         "//conditions:default": [],
