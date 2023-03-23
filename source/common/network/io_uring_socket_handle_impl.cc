@@ -511,6 +511,10 @@ void IoUringSocketHandleImpl::onRead(Io::ReadParam& param) {
             "calling event callback since pending read buf has {} size data, data = {}, "
             "io_uring_socket_type = {}, fd = {}",
             read_param_->buf_.length(), read_param_->buf_.toString(), ioUringSocketTypeStr(), fd_);
+  if (!SOCKET_VALID(fd_)) {
+    ENVOY_LOG(trace, "The socket already closed, ignore this read event");
+    return;
+  }
   cb_(Event::FileReadyType::Read);
   read_param_ = absl::nullopt;
 }
