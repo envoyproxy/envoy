@@ -34,8 +34,7 @@ parseHttpConnectionManagerFromYaml(const std::string& yaml) {
 
 class HttpConnectionManagerConfigTest : public testing::Test {
 public:
-  HttpConnectionManagerConfigTest()
-      : filter_config_provider_manager_(context_.getServerFactoryContext()) {
+  HttpConnectionManagerConfigTest() {
     scoped_runtime_.mergeValues(
         {{"envoy.reloadable_features.no_extension_lookup_by_name", "false"}});
   }
