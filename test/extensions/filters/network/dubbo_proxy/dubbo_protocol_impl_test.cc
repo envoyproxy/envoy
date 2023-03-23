@@ -117,7 +117,7 @@ TEST(DubboProtocolImplTest, Normal) {
     auto result = dubbo_protocol.decodeHeader(buffer, metadata);
     auto context = result.first;
     EXPECT_TRUE(result.second);
-    EXPECT_EQ(ResponseStatus::ServerError, metadata->responseStatus());
+    EXPECT_EQ(ResponseStatus::BadRequest, metadata->responseStatus());
     EXPECT_EQ(1, metadata->requestId());
     EXPECT_EQ(body_size, context->bodySize());
     EXPECT_EQ(MessageType::Response, metadata->messageType());
