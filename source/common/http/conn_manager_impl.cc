@@ -1767,12 +1767,6 @@ OptRef<const Tracing::Config> ConnectionManagerImpl::ActiveStream::tracingConfig
 
 const ScopeTrackedObject& ConnectionManagerImpl::ActiveStream::scope() { return *this; }
 
-void ConnectionManagerImpl::ActiveStream::onUpstreamConnectionEstablished() {
-  if (connection_manager_.config_.flushAccessLogOnConnected()) {
-    filter_manager_.log();
-  }
-}
-
 Upstream::ClusterInfoConstSharedPtr ConnectionManagerImpl::ActiveStream::clusterInfo() {
   // NOTE: Refreshing route caches clusterInfo as well.
   if (!cached_route_.has_value()) {

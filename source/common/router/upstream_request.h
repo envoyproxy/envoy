@@ -356,7 +356,6 @@ public:
   void disarmRequestTimeout() override {}
   void resetIdleTimer() override {}
   void onLocalReply(Http::Code) override {}
-  void onUpstreamConnectionEstablished() override {}
   // Upgrade filter chains not supported.
   const Router::RouteEntry::UpgradeMap* upgradeMap() override { return nullptr; }
 

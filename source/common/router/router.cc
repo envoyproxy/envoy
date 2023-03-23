@@ -1328,8 +1328,6 @@ void Filter::onUpstreamReset(Http::StreamResetReason reset_reason,
   onUpstreamAbort(error_code, response_flags, body, dropped, details);
 }
 
-void Filter::onUpstreamConnectionEstablished() { callbacks_->onUpstreamConnectionEstablished(); }
-
 void Filter::onUpstreamHostSelected(Upstream::HostDescriptionConstSharedPtr host) {
   if (retry_state_ && host) {
     retry_state_->onHostAttempted(host);

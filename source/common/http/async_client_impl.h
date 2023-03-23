@@ -489,7 +489,6 @@ private:
   void resetIdleTimer() override {}
   void setUpstreamOverrideHost(absl::string_view) override {}
   absl::optional<absl::string_view> upstreamOverrideHost() const override { return {}; }
-  void onUpstreamConnectionEstablished() override {}
 
   // ScopeTrackedObject
   void dumpState(std::ostream& os, int indent_level) const override {

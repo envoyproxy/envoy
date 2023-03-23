@@ -239,7 +239,6 @@ struct ActiveStreamDecoderFilter : public ActiveStreamFilterBase,
   Buffer::BufferMemoryAccountSharedPtr account() const override;
   void setUpstreamOverrideHost(absl::string_view host) override;
   absl::optional<absl::string_view> upstreamOverrideHost() const override;
-  void onUpstreamConnectionEstablished() override;
 
   // Each decoder filter instance checks if the request passed to the filter is gRPC
   // so that we can issue gRPC local responses to gRPC requests. Filter's decodeHeaders()
@@ -518,11 +517,6 @@ public:
    * Returns a handle to the downstream callbacks, if available.
    */
   virtual OptRef<DownstreamStreamFilterCallbacks> downstreamCallbacks() { return {}; }
-
-  /**
-   * A callback to be used once an upstream connection has successfully established.
-   */
-  virtual void onUpstreamConnectionEstablished() PURE;
 };
 
 /**
