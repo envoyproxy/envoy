@@ -549,7 +549,7 @@ elif [[ "$CI_TARGET" == "publish" ]]; then
     # It can take some time to get here in CI so the branch may have changed - create the release
     # from the current commit (as this only happens on non-PRs we are safe from merges)
     BUILD_SHA="$(git rev-parse HEAD)"
-    bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/project:publish -- --publish-commitish="$BUILD_SHA"
+    bazel run "${BAZEL_BUILD_OPTIONS[@]}" @envoy_repo//:publish -- --publish-commitish="$BUILD_SHA"
     exit 0
 else
   echo "Invalid do_ci.sh target, see ci/README.md for valid targets."
