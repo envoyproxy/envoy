@@ -388,6 +388,7 @@ envoy_cc_fuzz_test(
         "//source/common/quic:envoy_quic_alarm_factory_lib",
         "//source/common/quic:envoy_quic_proof_verifier_lib",
         "//source/common/quic:envoy_quic_connection_helper_lib",
+        "//source/common/quic:envoy_quic_dispatcher_lib",
         "//source/common/quic:envoy_quic_server_connection_lib",
         "//source/common/quic:envoy_quic_server_session_lib",
         "//source/common/quic:server_codec_lib",

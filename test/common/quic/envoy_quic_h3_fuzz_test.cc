@@ -5,13 +5,17 @@
 #include "quiche/quic/core/tls_server_handshaker.h"
 #include "quiche/quic/core/quic_crypto_server_stream.h"
 #include "quiche/quic/test_tools/quic_test_utils.h"
+#include "quiche/quic/core/quic_dispatcher.h"
 
 #include "source/common/quic/envoy_quic_alarm_factory.h"
 #include "source/common/quic/envoy_quic_connection_helper.h"
 #include "source/common/quic/envoy_quic_server_connection.h"
 #include "source/common/quic/envoy_quic_server_session.h"
 #include "source/common/quic/envoy_quic_utils.h"
+#include "source/common/quic/envoy_quic_dispatcher.h"
 #include "source/common/quic/server_codec_impl.h"
+
+#include "source/common/quic/platform/quiche_logging_impl.h"
 
 #include "test/fuzz/fuzz_runner.h"
 #include "test/common/quic/test_utils.h"
@@ -173,18 +177,55 @@ class H3Packetizer {
     }
 };
 
+class FuzzEncrypter : public quic::QuicEncrypter {
+  public:
+    bool SetKey(absl::string_view key) override { return key.empty(); };
+    bool SetNoncePrefix(absl::string_view nonce_prefix) override { return nonce_prefix.empty(); };
+    bool SetIV(absl::string_view iv) override { return iv.empty(); };
+    bool SetHeaderProtectionKey(absl::string_view key) override { return key.empty(); };
+    size_t GetKeySize() const override { return 0; };
+    size_t GetNoncePrefixSize() const override { return 0; };
+    size_t GetIVSize() const override { return 0; };
+    bool EncryptPacket(uint64_t, absl::string_view,
+        absl::string_view plaintext, char* output, size_t* output_length,
+        size_t max_output_length) override {
+      assert(plaintext.length() <= max_output_length);
+      memcpy(output, plaintext.data(), plaintext.length());
+      *output_length = plaintext.length();
+      return true;
+    };
+    std::string GenerateHeaderProtectionMask(absl::string_view) override {
+      return std::string(5, 0);
+    };
+    size_t GetMaxPlaintextSize(size_t ciphertext_size) const override {
+      return ciphertext_size;
+    }
+    size_t GetCiphertextSize(size_t plaintext_size) const override {
+      return plaintext_size;
+    }
+    absl::string_view GetKey() const override { return absl::string_view(); };
+    absl::string_view GetNoncePrefix() const override { return absl::string_view(); };
+    quic::QuicPacketCount GetConfidentialityLimit() const override {
+      return std::numeric_limits<quic::QuicPacketCount>::max();
+    }
+};
+
 class QuicPacketizer {
   public:
     QuicPacketizer(const quic::ParsedQuicVersion &quic_version,
-        EnvoyQuicConnectionHelper &connection_helper)
+        quic::QuicConnectionHelperInterface* connection_helper)
       : quic_version_(quic_version),
         connection_helper_(connection_helper),
         packet_number_(0),
         idx_(0),
-        destination_connection_id_(quic::test::TestConnectionId()) {
-        for(size_t i = 0; i < kMaxNumPackets; i++) {
-          quic_packet_sizes[i] = 0;
-        }
+        destination_connection_id_(quic::test::TestConnectionId()),
+        framer_({quic_version_}, connection_helper_->GetClock()->Now(),
+            quic::Perspective::IS_CLIENT, quic::kQuicDefaultConnectionIdLength)
+    {
+        framer_.SetEncrypter(quic::ENCRYPTION_INITIAL, std::unique_ptr<quic::QuicEncrypter>(new FuzzEncrypter()));
+        framer_.SetEncrypter(quic::ENCRYPTION_HANDSHAKE, std::unique_ptr<quic::QuicEncrypter>(new FuzzEncrypter()));
+        framer_.SetEncrypter(quic::ENCRYPTION_ZERO_RTT, std::unique_ptr<quic::QuicEncrypter>(new FuzzEncrypter()));
+        framer_.SetEncrypter(quic::ENCRYPTION_FORWARD_SECURE, std::unique_ptr<quic::QuicEncrypter>(new FuzzEncrypter()));
     }
 
     void serializePackets(const QuicH3FuzzCase &input) {
@@ -202,6 +243,12 @@ class QuicPacketizer {
       }
     }
 
+    void reset() {
+      idx_ = 0;
+      packet_number_ = quic::QuicPacketNumber(0);
+    }
+
+#define PUSH(frame) frames.push_back(quic::QuicFrame(frame))
   private:
     void serializePacket(const QuicFrame &frame) {
       std::unique_ptr<quic::QuicCryptoFrame> crypto_frame = nullptr;
@@ -222,7 +269,6 @@ class QuicPacketizer {
       header.source_connection_id = destination_connection_id_;
       packet_number_++;
       quic::QuicFrames frames;
-#define PUSH(frame) frames.push_back(quic::QuicFrame(frame))
       switch (frame.frame_case()) {
         case QuicFrame::kPadding: {
           int padding = frame.padding().num_padding_bytes() & 0xff;
@@ -377,16 +423,20 @@ class QuicPacketizer {
         default:
           return;
       }
-      quic::QuicTime creation_time = connection_helper_.GetClock()->Now();
-      quic::QuicFramer framer({quic_version_}, creation_time, quic::Perspective::IS_CLIENT, 8);
+      quic::QuicFramer framer({quic_version_}, connection_helper_->GetClock()->Now(),
+          quic::Perspective::IS_CLIENT, quic::kQuicDefaultConnectionIdLength);
+
+      framer.SetEncrypter(quic::ENCRYPTION_INITIAL, std::unique_ptr<quic::QuicEncrypter>(new FuzzEncrypter()));
       quic_packet_sizes[idx_] = framer.BuildDataPacket(header, frames,
           quic_packets[idx_], kMaxQuicPacketSize,
           quic::EncryptionLevel::ENCRYPTION_INITIAL);
       idx_++;
     }
 
+#undef PUSH
+
     static quic::QuicConnectionId toConnectionId(const std::string &data) {
-      size_t size = std::min(data.size(), 16UL);
+      size_t size = std::min(data.size(), static_cast<size_t>(quic::kQuicDefaultConnectionIdLength));
       return quic::QuicConnectionId(data.data(), size);
     }
 
@@ -413,12 +463,13 @@ class QuicPacketizer {
     }
 
     quic::ParsedQuicVersion quic_version_;
-    EnvoyQuicConnectionHelper &connection_helper_;
+    quic::QuicConnectionHelperInterface* connection_helper_;
     quic::QuicPacketNumber packet_number_;
     size_t idx_;
 
     // For fuzzing
     quic::QuicConnectionId destination_connection_id_;
+    quic::QuicFramer framer_;
 };
 
 class ProofSourceDetailsSetter {
@@ -783,15 +834,27 @@ envoy::config::core::v3::Http3ProtocolOptions http3_settings() {
   return envoy::config::core::v3::Http3ProtocolOptions();
 }
 
-class QuicHarness {
+QuicDispatcherStats generateStats(Stats::Scope& store) {
+  return {QUIC_DISPATCHER_STATS(POOL_COUNTER_PREFIX(store, "quic.dispatcher"))};
+}
+
+class FuzzDispatcher: public quic::QuicDispatcher {
   public:
-    QuicHarness()
-      : http3_options_(http3_settings()),
-        api_(Api::createApiForTest()),
-        dispatcher_(api_->allocateDispatcher("envoy_quic_h3_fuzzer_thread")),
-        connection_helper_(*dispatcher_),
-        alarm_factory_(*dispatcher_, *connection_helper_.GetClock()),
-        quic_version_(quic::CurrentSupportedHttp3Versions()[0]),
+    FuzzDispatcher(quic::ParsedQuicVersion quic_version,
+                quic::QuicVersionManager *version_manager,
+                std::unique_ptr<quic::QuicConnectionHelperInterface> connection_helper,
+                std::unique_ptr<quic::QuicAlarmFactory> alarm_factory,
+                Event::Dispatcher& dispatcher)
+        : quic::QuicDispatcher(&quic_config_, &crypto_config_, version_manager,
+            std::move(connection_helper),
+            std::make_unique<EnvoyQuicCryptoServerStreamHelper>(),
+            std::move(alarm_factory), quic::kQuicDefaultConnectionIdLength, generator_),
+        listener_config_(&mock_listener_config_),
+        quic_stats_(generateStats(listener_config_->listenerScope())),
+        dispatcher_(dispatcher),
+        http3_options_(http3_settings()),
+        quic_version_(quic_version),
+        packetizer_(quic_version_, helper()),
         crypto_config_(quic::QuicCryptoServerConfig::TESTING, quic::QuicRandom::GetInstance(),
             std::make_unique<TestProofSource>(), quic::KeyExchangeSource::Default()),
         peer_addr_(Network::Utility::getAddressWithPort(*Network::Utility::getIpv6LoopbackAddress(),
@@ -800,122 +863,177 @@ class QuicHarness {
               54321)),
         cli_addr_(peer_addr_->sockAddr(), peer_addr_->sockAddrLen()),
         srv_addr_(self_addr_->sockAddr(), self_addr_->sockAddrLen()),
-        quic_stat_names_(listener_config_.listenerScope().symbolTable()),
+        quic_stat_names_(listener_config_->listenerScope().symbolTable()),
         http3_stats_({ALL_HTTP3_CODEC_STATS(
-            POOL_COUNTER_PREFIX(listener_config_.listenerScope(), "http3."),
-            POOL_GAUGE_PREFIX(listener_config_.listenerScope(), "http3."))})
+            POOL_COUNTER_PREFIX(listener_config_->listenerScope(), "http3."),
+            POOL_GAUGE_PREFIX(listener_config_->listenerScope(), "http3."))})
     {
       ON_CALL(http_connection_callbacks_, newStream(_,_))
         .WillByDefault(Invoke([&](Http::ResponseEncoder&,bool) -> Http::RequestDecoder& {
               return orphan_request_decoder_;
               }));
+      auto writer = new testing::NiceMock<quic::test::MockPacketWriter>();
+      ON_CALL(*writer, WritePacket(_, _, _, _, _))
+        .WillByDefault(Return(quic::WriteResult(quic::WRITE_STATUS_OK, 0)));
+      InitializeWithWriter(writer);
     }
 
     void fuzzQuic(const QuicH3FuzzCase &input) {
-      auto connection = std::make_unique<EnvoyQuicServerConnection>(
-          quic::test::TestConnectionId(),
-          srv_addr_, cli_addr_,
-          connection_helper_, alarm_factory_,
-          &writer_, false,
-          quic::ParsedQuicVersionVector{quic_version_},
-          Quic::createConnectionSocket(peer_addr_, self_addr_, nullptr),
-          connection_id_generator_);
+      for(size_t i = 0; i < kMaxNumPackets; i++) {
+        quic_packet_sizes[i] = 0;
+      }
 
-      EnvoyQuicServerConnection *pconnection = connection.get();
+      // Process a (fake) CHLO packet, which will trigger creation of a session
+      // Setting the data pointer to nullptr will let the processing of the
+      // packet fail, but will not have consequences on the state of the
+      // session
+      quic::QuicReceivedPacket first_packet(nullptr, 0, helper()->GetClock()->Now());
+      quic::ParsedClientHello chlo;
+      quic::ReceivedPacketInfo chlo_packet_info(srv_addr_, cli_addr_, first_packet);
+      chlo_packet_info.destination_connection_id = quic::test::TestConnectionId();
+      chlo_packet_info.version = quic_version_;
+      SetQuicFlag(quic_allow_chlo_buffering, false);
+      ProcessChlo(chlo, &chlo_packet_info);
+
+      packetizer_.serializePackets(input);
+      for(size_t i = 0; i < kMaxNumPackets; i++) {
+        const char *payload = quic_packets[i];
+        size_t size = quic_packet_sizes[i];
+        if (size == 0) continue;
+        auto receipt_time = helper()->GetClock()->Now();
+        quic::QuicReceivedPacket p(payload, size, receipt_time, false);
+        ProcessPacket(srv_addr_, cli_addr_, p);
+      }
+      packetizer_.reset();
+      Shutdown();
+    }
+    // quic::QuicDispatcher
+    void OnConnectionClosed(quic::QuicConnectionId connection_id, quic::QuicErrorCode error,
+                            const std::string& error_details,
+                            quic::ConnectionCloseSource source) override {
+      quic::QuicDispatcher::OnConnectionClosed(connection_id, error, error_details, source);
+    }
+    quic::QuicTimeWaitListManager* CreateQuicTimeWaitListManager() override {
+      return new EnvoyQuicTimeWaitListManager(writer(), this, helper()->GetClock(), alarm_factory(),
+          quic_stats_);
+    }
+  
+    void closeConnectionsWithFilterChain(const Network::FilterChain*) {}
+  
+    void updateListenerConfig(Network::ListenerConfig& new_listener_config) {
+      listener_config_ = &new_listener_config;
+    }
+  
+  protected:
+    // quic::QuicDispatcher
+    std::unique_ptr<quic::QuicSession> CreateQuicSession(
+        quic::QuicConnectionId server_connection_id, const quic::QuicSocketAddress& self_address,
+        const quic::QuicSocketAddress& peer_address, absl::string_view /*alpn*/,
+        const quic::ParsedQuicVersion& version, const quic::ParsedClientHello& /*parsed_chlo*/) override {
+
+      auto connection_socket = Quic::createConnectionSocket(peer_addr_, self_addr_, nullptr);
+      auto connection = std::make_unique<EnvoyQuicServerConnection>(
+          server_connection_id,
+          self_address, peer_address,
+          *helper(), *alarm_factory(),
+          writer(), false,
+          quic::ParsedQuicVersionVector{quic_version_},
+          std::move(connection_socket),
+          connection_id_generator());
 
       auto decrypter = std::make_unique<FuzzDecrypter>();
-      auto encrypter = std::make_unique<quic::NullEncrypter>(quic::Perspective::IS_SERVER);
+      auto encrypter = std::make_unique<quic::NullEncrypter>(quic::Perspective::IS_CLIENT);
       connection->InstallDecrypter(quic::EncryptionLevel::ENCRYPTION_FORWARD_SECURE,
           std::move(decrypter));
       connection->SetEncrypter(quic::EncryptionLevel::ENCRYPTION_FORWARD_SECURE,
           std::move(encrypter));
 
       connection->SetDefaultEncryptionLevel(quic::EncryptionLevel::ENCRYPTION_FORWARD_SECURE);
-
-      auto stream_info = std::make_unique<StreamInfo::StreamInfoImpl>(
-          dispatcher_->timeSource(),
-          connection->connectionSocket()->connectionInfoProviderSharedPtr());
-      session_ = std::make_unique<EnvoyQuicServerSession>(
-          quic_config_,
-          quic::ParsedQuicVersionVector{quic_version_},
-          std::move(connection),
-          nullptr,
-          &crypto_stream_helper_, &crypto_config_, &compressed_certs_cache_,
-          *dispatcher_,
-          quic::kDefaultFlowControlSendWindow * 1.5,
-          quic_stat_names_, listener_config_.listenerScope(),
-          crypto_stream_factory_, std::move(stream_info));
-      session_->Initialize();
-      setQuicConfigWithDefaultValues(session_->config());
-      session_->OnConfigNegotiated();
 #ifdef __DEBUG_QUIC_H3_FUZZER
-      session_->set_debug_visitor(&http3_debug_visitor);
-      pconnection->set_debug_visitor(&con_debug_visitor);
+      connection->set_debug_visitor(&con_debug_visitor);
 #endif
 
-      auto server = std::make_unique<QuicHttpServerConnectionImpl>(
-          *session_.get(), http_connection_callbacks_, http3_stats_, http3_options_, 64 * 1024,
-          100, envoy::config::core::v3::HttpProtocolOptions::ALLOW);
-
-
-      QuicPacketizer packetizer(quic_version_, connection_helper_);
-      packetizer.serializePackets(input);
-      for(size_t i = 0; i < kMaxNumPackets; i++) {
-        dispatchPacket(quic_packets[i], quic_packet_sizes[i]);
-      }
-      //session_->ProcessAllPendingStreams();
-      pconnection->CloseConnection(quic::QUIC_NO_ERROR,
-          quic::NO_IETF_QUIC_ERROR, "fuzzer done",
-          quic::ConnectionCloseBehavior::SILENT_CLOSE);
+      auto stream_info = std::make_unique<StreamInfo::StreamInfoImpl>(
+          dispatcher_.timeSource(),
+          connection->connectionSocket()->connectionInfoProviderSharedPtr());
+      auto session = std::make_unique<EnvoyQuicServerSession>(
+          quic_config_,
+          quic::ParsedQuicVersionVector{version},
+          std::move(connection),
+          this,
+          &crypto_stream_helper_, &crypto_config_, &compressed_certs_cache_,
+          dispatcher_,
+          quic::kDefaultFlowControlSendWindow * 1.5,
+          quic_stat_names_, listener_config_->listenerScope(),
+          crypto_stream_factory_, std::move(stream_info));
+      session->Initialize();
+      session->setHttp3Options(http3_options_);
+      session->setCodecStats(http3_stats_);
+      session->setHttpConnectionCallbacks(http_connection_callbacks_);
+      setQuicConfigWithDefaultValues(session->config());
+      session->OnConfigNegotiated();
+#ifdef __DEBUG_QUIC_H3_FUZZER
+      session->set_debug_visitor(&http3_debug_visitor);
+#endif
+      return session;
     }
 
   private:
-    void dispatchPacket(const char *payload, size_t size) {
-      if (size == 0) return;
-      auto receipt_time = connection_helper_.GetClock()->Now();
-      quic::QuicReceivedPacket p(payload, size, receipt_time, false);
-      session_->ProcessUdpPacket(srv_addr_, cli_addr_, p);
-    }
+    NiceMock<Network::MockListenerConfig> mock_listener_config_;
+    Network::ListenerConfig *listener_config_{};
+    QuicDispatcherStats quic_stats_;
+    Event::Dispatcher& dispatcher_;
 
-  protected:
     envoy::config::core::v3::Http3ProtocolOptions http3_options_;
-    Api::ApiPtr api_;
-    Event::DispatcherPtr dispatcher_;
-    EnvoyQuicConnectionHelper connection_helper_;
-    EnvoyQuicAlarmFactory alarm_factory_;
-    testing::NiceMock<quic::test::MockPacketWriter> writer_;
     quic::ParsedQuicVersion quic_version_;
+    QuicPacketizer packetizer_;
     quic::QuicCryptoServerConfig crypto_config_;
-    testing::NiceMock<quic::test::MockQuicCryptoServerStreamHelper> crypto_stream_helper_;
+    NiceMock<quic::test::MockQuicCryptoServerStreamHelper> crypto_stream_helper_;
     Network::Address::InstanceConstSharedPtr peer_addr_;
     Network::Address::InstanceConstSharedPtr self_addr_;
     quic::QuicSocketAddress cli_addr_;
     quic::QuicSocketAddress srv_addr_;
-    testing::NiceMock<Network::MockListenerConfig> listener_config_;
     QuicStatNames quic_stat_names_;
     Http::Http3::CodecStats http3_stats_;
 
     quic::QuicConfig quic_config_;
-    quic::DeterministicConnectionIdGenerator connection_id_generator_{
-      quic::kQuicDefaultConnectionIdLength};
+    quic::DeterministicConnectionIdGenerator generator_{quic::kQuicDefaultConnectionIdLength};
     quic::QuicCompressedCertsCache compressed_certs_cache_{100};
     EnvoyQuicTestCryptoServerStreamFactory crypto_stream_factory_;
 
-
-    std::unique_ptr<EnvoyQuicServerSession> session_;
     Http::MockServerConnectionCallbacks http_connection_callbacks_;
     quic::test::MockQuicConnectionVisitor mock_connection_visitor_;
     NiceMock<Http::MockRequestDecoder> orphan_request_decoder_;
 };
 
-static std::unique_ptr<QuicHarness> harness;
+struct Harness {
+  Harness(quic::ParsedQuicVersion quic_version)
+    : quic_version_(quic_version),
+      version_manager(quic::CurrentSupportedHttp3Versions())
+  {
+    api = Api::createApiForTest();
+    dispatcher = api->allocateDispatcher("envoy_quic_h3_fuzzer_thread");
+    auto connection_helper = std::unique_ptr<quic::QuicConnectionHelperInterface>(new EnvoyQuicConnectionHelper(*dispatcher.get()));
+    auto alarm_factory = std::unique_ptr<quic::QuicAlarmFactory>(new EnvoyQuicAlarmFactory(*dispatcher.get(), *connection_helper->GetClock()));
+    fuzz_dispatcher = std::make_unique<FuzzDispatcher>(quic_version_, &version_manager, std::move(connection_helper), std::move(alarm_factory), *dispatcher.get());
+  }
+  quic::ParsedQuicVersion quic_version_;
+  Api::ApiPtr api;
+  Event::DispatcherPtr dispatcher;
+  std::unique_ptr<FuzzDispatcher> fuzz_dispatcher;
+  quic::QuicVersionManager version_manager;
+};
+
+std::unique_ptr<Harness> harness;
 static void reset_harness() { harness = nullptr; };
 DEFINE_PROTO_FUZZER(const test::common::quic::QuicH3FuzzCase &input) {
   if(harness == nullptr) {
-    harness = std::make_unique<QuicHarness>();
+    quiche::setVerbosityLogThreshold(0);
+    harness = std::make_unique<Harness>(quic::CurrentSupportedHttp3Versions()[0]);
     atexit(reset_harness);
   }
-  harness->fuzzQuic(input);
+  harness->fuzz_dispatcher->fuzzQuic(input);
+  fflush(stdout);
 }
 
 } // namespace Quic
