@@ -3,6 +3,7 @@
 #include "library/common/data/utility.h"
 #include "library/common/jni/jni_support.h"
 #include "library/common/jni/jni_utility.h"
+#include "library/common/jni/types/java_virtual_machine.h"
 #include "openssl/ssl.h"
 
 // NOLINT(namespace-envoy)
@@ -144,6 +145,8 @@ static envoy_cert_validation_result verify_x509_cert_chain(const envoy_data* cer
             "AndroidNetworkLibrary_verifyServerCertificates failed: not yet valid."};
   }
 }
+
+void jvm_detach_thread() { Envoy::JNI::JavaVirtualMachine::detachCurrentThread(); }
 
 envoy_cert_validator* get_android_cert_validator_api() {
   envoy_cert_validator* api = (envoy_cert_validator*)safe_malloc(sizeof(envoy_cert_validator));
