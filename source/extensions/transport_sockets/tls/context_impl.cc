@@ -159,10 +159,11 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
     }
 
     // Set signature algorithms if given, otherwise fall back to BoringSSL defaults.
-    if (!capabilities_.provides_sigalgs && !config.signatureAlgorithms().empty() &&
-        !SSL_CTX_set1_sigalgs_list(ctx.ssl_ctx_.get(), config.signatureAlgorithms().c_str())) {
-      throw EnvoyException(absl::StrCat("Failed to initialize TLS signature algorithms ",
-                                        config.signatureAlgorithms()));
+    if (!capabilities_.provides_sigalgs && !config.signatureAlgorithms().empty()) {
+      if (!SSL_CTX_set1_sigalgs_list(ctx.ssl_ctx_.get(), config.signatureAlgorithms().c_str())) {
+        throw EnvoyException(absl::StrCat("Failed to initialize TLS signature algorithms ",
+                                          config.signatureAlgorithms()));
+      }
     }
   }
 

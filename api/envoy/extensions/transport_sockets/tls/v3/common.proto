@@ -126,7 +126,7 @@ message TlsParameters {
   // The list is ordered by preference.
   // If not specified, the default signature algorithms defined by BoringSSL will be used.
   //
-  // Default signature algorithms selected by BoringSSL are currently:
+  // Default signature algorithms selected by BoringSSL (may be out of date):
   //
   // .. code-block:: none
   //
@@ -140,7 +140,7 @@ message TlsParameters {
   //   rsa_pkcs1_sha512
   //   rsa_pkcs1_sha1
   //
-  // Signature algorithms supported by BoringSSL are currently:
+  // Signature algorithms supported by BoringSSL (may be out of date):
   //
   // .. code-block:: none
   //
@@ -156,8 +156,6 @@ message TlsParameters {
   //   ed25519
   //   rsa_pkcs1_sha1
   //   ecdsa_sha1
-  //
-  // The algorithms may change over time in response to security considerations.
   repeated string signature_algorithms = 5;
 }
 
