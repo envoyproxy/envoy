@@ -242,7 +242,6 @@ TEST_F(StreamInfoImplTest, MiscSettersAndGetters) {
 
 TEST_F(StreamInfoImplTest, SetFromForRecreateStream) {
   StreamInfoImpl s1(Http::Protocol::Http2, test_time_.timeSystem(), nullptr);
-  s1.setStreamState(StreamState::InProgress);
 
   s1.addBytesReceived(1);
   s1.downstreamTiming().onLastDownstreamRxByteReceived(test_time_.timeSystem());
@@ -256,14 +255,11 @@ TEST_F(StreamInfoImplTest, SetFromForRecreateStream) {
 #endif
 
   StreamInfoImpl s2(Http::Protocol::Http11, test_time_.timeSystem(), nullptr);
-  s2.setStreamState(StreamState::Ended);
   s2.setFromForRecreateStream(s1);
-
   EXPECT_EQ(s1.startTime(), s2.startTime());
   EXPECT_EQ(s1.startTimeMonotonic(), s2.startTimeMonotonic());
   EXPECT_EQ(s1.downstreamTiming().lastDownstreamRxByteReceived(),
             s2.downstreamTiming().lastDownstreamRxByteReceived());
-  EXPECT_EQ(s1.streamState(), s2.streamState());
   EXPECT_EQ(s1.protocol(), s2.protocol());
   EXPECT_EQ(s1.bytesReceived(), s2.bytesReceived());
   EXPECT_EQ(s1.getDownstreamBytesMeter(), s2.getDownstreamBytesMeter());
@@ -276,7 +272,6 @@ TEST_F(StreamInfoImplTest, SetFrom) {
   // setFromForRecreateStream
   s1.addBytesReceived(1);
   s1.downstreamTiming().onLastDownstreamRxByteReceived(test_time_.timeSystem());
-  s1.setStreamState(StreamState::InProgress);
 
   // setFrom
   s1.setRouteName("foo");
@@ -324,7 +319,6 @@ TEST_F(StreamInfoImplTest, SetFrom) {
   EXPECT_EQ(s1.startTimeMonotonic(), s2.startTimeMonotonic());
   EXPECT_EQ(s1.downstreamTiming().lastDownstreamRxByteReceived(),
             s2.downstreamTiming().lastDownstreamRxByteReceived());
-  EXPECT_EQ(s1.streamState(), s2.streamState());
   EXPECT_EQ(s1.protocol(), s2.protocol());
   EXPECT_EQ(s1.bytesReceived(), s2.bytesReceived());
   EXPECT_EQ(s1.getDownstreamBytesMeter(), s2.getDownstreamBytesMeter());

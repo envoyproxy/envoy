@@ -335,7 +335,6 @@ struct StreamInfoImpl : public StreamInfo {
   void setFromForRecreateStream(StreamInfo& info) {
     downstream_timing_ = info.downstreamTiming();
     protocol_ = info.protocol();
-    stream_state_ = info.streamState();
     bytes_received_ = info.bytesReceived();
     downstream_bytes_meter_ = info.getDownstreamBytesMeter();
     // These two are set in the constructor, but to T(recreate), and should be T(create)
