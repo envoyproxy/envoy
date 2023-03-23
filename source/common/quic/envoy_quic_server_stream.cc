@@ -38,7 +38,7 @@ EnvoyQuicServerStream::EnvoyQuicServerStream(
   ASSERT(static_cast<uint32_t>(GetReceiveWindow().value()) > 8 * 1024,
          "Send buffer limit should be larger than 8KB.");
 
-  stats_gatherer_ = new QuicStatsGatherer(&connection()->dispatcher().timeSource());
+  stats_gatherer_ = new QuicStatsGatherer(&filterManagerConnection()->dispatcher().timeSource());
   set_ack_listener(stats_gatherer_);
 }
 
@@ -82,32 +82,44 @@ void EnvoyQuicServerStream::encodeData(Buffer::Instance& data, bool end_stream) 
   ASSERT(!local_end_stream_);
   local_end_stream_ = end_stream;
   SendBufferMonitor::ScopedWatermarkBufferUpdater updater(this, this);
-  Buffer::RawSliceVector raw_slices = data.getRawSlices();
-  absl::InlinedVector<quiche::QuicheMemSlice, 4> quic_slices;
-  quic_slices.reserve(raw_slices.size());
-  for (auto& slice : raw_slices) {
-    ASSERT(slice.len_ != 0);
-    // Move each slice into a stand-alone buffer.
-    // TODO(danzh): investigate the cost of allocating one buffer per slice.
-    // If it turns out to be expensive, add a new function to free data in the middle in buffer
-    // interface and re-design QuicheMemSliceImpl.
-    quic_slices.emplace_back(quiche::QuicheMemSlice::InPlace(), data, slice.len_);
-  }
-  quic::QuicConsumedData result{0, false};
-  absl::Span<quiche::QuicheMemSlice> span(quic_slices);
-  {
+#ifdef ENVOY_ENABLE_HTTP_DATAGRAMS
+  if (http_datagram_handler_) {
     IncrementalBytesSentTracker tracker(*this, *mutableBytesMeter(), false);
-    result = WriteBodySlices(span, end_stream);
-    stats_gatherer_->addBytesSent(result.bytes_consumed, end_stream);
+    if (!http_datagram_handler_->encodeCapsuleFragment(data.toString(), end_stream)) {
+      Reset(quic::QUIC_BAD_APPLICATION_PAYLOAD);
+      return;
+    }
+  } else {
+#endif
+    Buffer::RawSliceVector raw_slices = data.getRawSlices();
+    absl::InlinedVector<quiche::QuicheMemSlice, 4> quic_slices;
+    quic_slices.reserve(raw_slices.size());
+    for (auto& slice : raw_slices) {
+      ASSERT(slice.len_ != 0);
+      // Move each slice into a stand-alone buffer.
+      // TODO(danzh): investigate the cost of allocating one buffer per slice.
+      // If it turns out to be expensive, add a new function to free data in the middle in buffer
+      // interface and re-design QuicheMemSliceImpl.
+      quic_slices.emplace_back(quiche::QuicheMemSlice::InPlace(), data, slice.len_);
+    }
+    quic::QuicConsumedData result{0, false};
+    absl::Span<quiche::QuicheMemSlice> span(quic_slices);
+    {
+      IncrementalBytesSentTracker tracker(*this, *mutableBytesMeter(), false);
+      result = WriteBodySlices(span, end_stream);
+      stats_gatherer_->addBytesSent(result.bytes_consumed, end_stream);
+    }
+    // QUIC stream must take all.
+    if (result.bytes_consumed == 0 && has_data) {
+      IS_ENVOY_BUG(fmt::format("Send buffer didn't take all the data. Stream is write {} with {} "
+                               "bytes in send buffer. Current write was rejected.",
+                               write_side_closed() ? "closed" : "open", BufferedDataBytes()));
+      Reset(quic::QUIC_BAD_APPLICATION_PAYLOAD);
+      return;
+    }
+#ifdef ENVOY_ENABLE_HTTP_DATAGRAMS
   }
-  // QUIC stream must take all.
-  if (result.bytes_consumed == 0 && has_data) {
-    IS_ENVOY_BUG(fmt::format("Send buffer didn't take all the data. Stream is write {} with {} "
-                             "bytes in send buffer. Current write was rejected.",
-                             write_side_closed() ? "closed" : "open", BufferedDataBytes()));
-    Reset(quic::QUIC_BAD_APPLICATION_PAYLOAD);
-    return;
-  }
+#endif
   if (local_end_stream_) {
     onLocalEndStream();
   }
@@ -202,8 +214,7 @@ void EnvoyQuicServerStream::OnInitialHeadersComplete(bool fin, size_t frame_len,
     onStreamError(absl::nullopt);
     return;
   }
-  request_decoder_->decodeHeaders(std::move(headers),
-                                  /*end_stream=*/fin);
+  request_decoder_->decodeHeaders(std::move(headers), /*end_stream=*/fin);
   ConsumeHeaderList();
 }
 
@@ -467,6 +478,17 @@ bool EnvoyQuicServerStream::hasPendingData() {
   // buffer if needed. So checking this buffer is sufficient.
   return (!write_side_closed()) && BufferedDataBytes() > 0;
 }
+
+#ifdef ENVOY_ENABLE_HTTP_DATAGRAMS
+// TODO(https://github.com/envoyproxy/envoy/issues/23564): Make the stream use Capsule Protocol
+// for CONNECT-UDP support when the headers contain "Capsule-Protocol: ?1" or "Upgrade:
+// connect-udp".
+void EnvoyQuicServerStream::useCapsuleProtocol() {
+  http_datagram_handler_ = std::make_unique<HttpDatagramHandler>(*this);
+  ASSERT(request_decoder_ != nullptr);
+  http_datagram_handler_->setStreamDecoder(request_decoder_);
+}
+#endif
 
 } // namespace Quic
 } // namespace Envoy

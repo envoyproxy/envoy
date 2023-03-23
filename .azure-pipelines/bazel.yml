@@ -19,6 +19,24 @@ parameters:
   default: ""
 
 steps:
+# Set up tmpfs directories for self-hosted agents which have a surplus of mem.
+#
+# NB: Do not add any directory that grow larger than spare memory capacity!
+- bash: |
+    TMPDIRS=(
+        # This is used as the final delivery directory for the binaries
+        "$(Build.StagingDirectory)/envoy"
+        # Bazel repository_cache which is cached by AZP (this speeds up cache load/save)
+        "$(Build.StagingDirectory)/repository_cache")
+    for tmpdir in "${TMPDIRS[@]}"; do
+        echo "Mount(tmpfs): ${tmpdir}"
+        sudo mkdir -p "$tmpdir"
+        sudo mount -t tmpfs none "$tmpdir"
+        sudo chown azure-pipelines "$tmpdir"
+    done
+  displayName: "Mount/tmpfs directories"
+  condition: and(succeeded(), eq('${{ parameters.managedAgent }}', false))
+
 - task: Cache@2
   env:
     VSO_DEDUP_REDIRECT_TIMEOUT_IN_SEC: 5

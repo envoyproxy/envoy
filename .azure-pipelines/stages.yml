@@ -78,7 +78,8 @@ stages:
   - job: cache_arm
     dependsOn: []
     displayName: Cache (arm64)
-    pool: arm-large
+    pool:
+      vmImage: "ubuntu-20.04"
     steps:
     - template: cached.yml
       parameters:
@@ -403,6 +404,7 @@ stages:
       parameters:
         managedAgent: false
         ciTarget: bazel.release
+        bazelBuildExtraOptions: "--sandbox_base=/tmp/sandbox_base"
 
   - job: released
     # displayName: Complete
@@ -554,6 +556,13 @@ stages:
     pool:
       vmImage: "ubuntu-20.04"
     steps:
+    - template: cached.yml
+      parameters:
+        name: publish_docker
+        # VERSION.txt is included to refresh Docker images for release
+        key: "ci/Dockerfile-envoy | VERSION.txt"
+        version: "$(dockerBuildCacheVersion)"
+        path: ""
     - bash: |
         echo "disk space at beginning of build:"
         df -h
@@ -600,6 +609,8 @@ stages:
         artifactName: docker
       timeoutInMinutes: 10
       condition: always()
+    - script: sudo .azure-pipelines/docker/save_cache.sh /mnt/docker_cache
+      displayName: "Cache/save (publish_docker)"
 
   - job: package_x64
     displayName: Linux debs (x64)
@@ -900,15 +911,6 @@ stages:
         testRunTitle: "macOS"
       timeoutInMinutes: 10
       condition: always()
-
-    - script: bazel run //ci/flaky_test:process_xml
-      displayName: "Process Test Results"
-      env:
-        TEST_TMPDIR: $(Build.SourcesDirectory)
-        SLACK_TOKEN: $(SLACK_TOKEN)
-        CI_TARGET: "MacOS"
-        REPO_URI: $(Build.Repository.Uri)
-        BUILD_URI: $(Build.BuildUri)
 
   - job: tested
     # displayName: Complete
