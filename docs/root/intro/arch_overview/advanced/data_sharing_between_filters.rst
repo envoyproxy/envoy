@@ -103,10 +103,17 @@ TCP or HTTP filter can access the shared object. Upstream transport sockets can
 also read the shared objects and customize the creation of the upstream
 transport. For example, the :ref:`internal upstream transport socket
 <envoy_v3_api_msg_extensions.transport_sockets.internal_upstream.v3.InternalUpstreamTransport>`
-copies the shared objects to the internal connection downstream filter state.
+copies references to the shared objects to the internal connection downstream
+filter state.
 
 The filter state objects that are shared with the upstream also affect the
 connection pooling decisions if they implement a hashing interface. Whenever a
 shared hashable object is added, an upstream connection is created for each
 distinct hash value, which ensures that these objects are not overwritten by
-subsequent downstream requests to the same upstream connection.
+subsequent downstream requests to the same upstream connection. For example, a
+custom HTTP filter may create a shared hashable object from the value of a
+special header. In this case, a separate upstream connection is created for
+each distinct special header value, so that no two requests with different
+header values share an upstream connection. The same procedure applies to each
+shared hashable object individually, creating a combination matrix of the
+upstream connections per distinct combination of the object values.

@@ -1135,7 +1135,7 @@ TEST_F(IoHandleImplTest, PassthroughState) {
   auto object = std::make_shared<TestObject>(1000);
   source_filter_state.push_back(
       {object, StreamInfo::FilterState::StateType::ReadOnly,
-       StreamInfo::FilterState::StreamSharing::SharedWithUpstreamConnection, "object_key"});
+       StreamInfo::StreamSharingMayImpactPooling::SharedWithUpstreamConnection, "object_key"});
   ASSERT_NE(nullptr, io_handle_->passthroughState());
   io_handle_->passthroughState()->initialize(std::move(source_metadata), source_filter_state);
 
