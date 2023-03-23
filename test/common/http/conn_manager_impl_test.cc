@@ -2510,6 +2510,9 @@ TEST_F(HttpConnectionManagerImplTest, TestPeriodicAccessLogging) {
   Buffer::OwnedImpl fake_input("1234");
   conn_manager_->onData(fake_input, false);
 
+  EXPECT_CALL(*periodic_log_timer, enableTimer(*access_log_flush_interval_, _));
+  periodic_log_timer->invokeCallback();
+
   filter->callbacks_->streamInfo().setResponseCodeDetails("");
   ResponseHeaderMapPtr response_headers{new TestResponseHeaderMapImpl{{":status", "200"}}};
   filter->callbacks_->encodeHeaders(std::move(response_headers), false, "details");
