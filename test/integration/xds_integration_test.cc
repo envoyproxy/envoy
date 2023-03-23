@@ -793,13 +793,13 @@ TEST_P(LdsStsIntegrationTest, TcpListenerRemoveFilterChainCalledAfterListenerIsR
   ASSERT_TRUE(fake_upstream_connection_0->waitForData(5, &observed_data_0));
   EXPECT_EQ("hello", observed_data_0);
 
-  // Wait for the filter chain removal start.
-  test_server_->waitForGaugeEq("listener_manager.total_filter_chains_draining", 1);
-
   ASSERT_TRUE(fake_upstream_connection_0->write("world"));
   while (response_0.find("world") == std::string::npos) {
     ASSERT_TRUE(client_conn_0->run(Event::Dispatcher::RunType::NonBlock));
   }
+  // Wait for the filter chain removal start.
+  test_server_->waitForGaugeEq("listener_manager.total_filter_chains_draining", 1);
+
   client_conn_0->close();
   while (!client_conn_0->closed()) {
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
