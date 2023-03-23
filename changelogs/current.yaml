@@ -44,6 +44,9 @@ minor_behavior_changes:
 - area: skywalking
   change: |
     If sw8 header is invalid, skywalking extension will create a new trace context and a null span respectively when sampling is enabled and disabled.
+- area: http3
+  change: |
+    Convert HTTP/3 extended connect to/from HTTP/1 upgrade. This behavior change can be reverted by setting ``envoy.reloadable_features.use_http3_header_normalisation`` to ``false``.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
