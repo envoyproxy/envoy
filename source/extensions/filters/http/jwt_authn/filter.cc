@@ -65,11 +65,12 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   }
 
   const Verifier* verifier = nullptr;
-  const auto* per_route_config =
-      Http::Utility::resolveMostSpecificPerFilterConfig<PerRouteFilterConfig>(decoder_callbacks_);
-  if (per_route_config != nullptr) {
+  per_route_config_ =
+      Http::Utility::resolveMostSpecificPerFilterConfigWithOwnerShip<PerRouteFilterConfig>(
+          decoder_callbacks_);
+  if (per_route_config_ != nullptr) {
     std::string error_msg;
-    std::tie(verifier, error_msg) = config_->findPerRouteVerifier(*per_route_config);
+    std::tie(verifier, error_msg) = config_->findPerRouteVerifier(*per_route_config_);
     if (!error_msg.empty()) {
       stats_.denied_.inc();
       state_ = Responded;

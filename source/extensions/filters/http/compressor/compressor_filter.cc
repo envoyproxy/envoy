@@ -631,7 +631,7 @@ void CompressorFilter::sanitizeEtagHeader(Http::ResponseHeaderMap& headers) {
 // True if response compression is enabled.
 bool CompressorFilter::compressionEnabled(
     const CompressorFilterConfig::ResponseDirectionConfig& config) const {
-  const CompressorPerRouteFilterConfig* per_route_config =
+  const auto per_route_config =
       Http::Utility::resolveMostSpecificPerFilterConfig<CompressorPerRouteFilterConfig>(
           decoder_callbacks_);
   return per_route_config && per_route_config->responseCompressionEnabled().has_value()

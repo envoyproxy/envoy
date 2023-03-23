@@ -180,7 +180,7 @@ private:
 
   const FilterConfig* getConfig() const;
   FilterConfigSharedPtr config_;
-
+  mutable std::shared_ptr<const FilterConfig> per_route_config_;
   absl::optional<std::vector<RateLimit::LocalDescriptor>> stored_descriptors_;
   VhRateLimitOptions vh_rate_limits_;
 };

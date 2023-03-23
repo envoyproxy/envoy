@@ -126,10 +126,10 @@ Http::FilterHeadersStatus CsrfFilter::decodeHeaders(Http::RequestHeaderMap& head
 }
 
 void CsrfFilter::determinePolicy() {
-  const CsrfPolicy* policy =
-      Http::Utility::resolveMostSpecificPerFilterConfig<CsrfPolicy>(callbacks_);
-  if (policy != nullptr) {
-    policy_ = policy;
+  route_config_ =
+      Http::Utility::resolveMostSpecificPerFilterConfigWithOwnerShip<CsrfPolicy>(callbacks_);
+  if (route_config_ != nullptr) {
+    policy_ = route_config_.get();
   } else {
     policy_ = config_->policy();
   }

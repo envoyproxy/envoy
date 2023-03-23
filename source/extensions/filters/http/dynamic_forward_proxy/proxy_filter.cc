@@ -119,10 +119,10 @@ Http::FilterHeadersStatus ProxyFilter::decodeHeaders(Http::RequestHeaderMap& hea
   }
 
   // Check for per route filter config.
-  const auto* config =
+  const auto config =
       Http::Utility::resolveMostSpecificPerFilterConfig<ProxyPerRouteConfig>(decoder_callbacks_);
 
-  if (config != nullptr) {
+  if (config.has_value()) {
     const auto& host_rewrite = config->hostRewrite();
     if (!host_rewrite.empty()) {
       headers.setHost(host_rewrite);

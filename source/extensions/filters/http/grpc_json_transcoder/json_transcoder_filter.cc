@@ -426,10 +426,11 @@ JsonTranscoderConfig::translateProtoMessageToJson(const Protobuf::Message& messa
 JsonTranscoderFilter::JsonTranscoderFilter(const JsonTranscoderConfig& config) : config_(config) {}
 
 void JsonTranscoderFilter::initPerRouteConfig() {
-  const auto* route_local =
-      Http::Utility::resolveMostSpecificPerFilterConfig<JsonTranscoderConfig>(decoder_callbacks_);
+  owned_per_route_config_ =
+      Http::Utility::resolveMostSpecificPerFilterConfigWithOwnerShip<JsonTranscoderConfig>(
+          decoder_callbacks_);
 
-  per_route_config_ = route_local ? route_local : &config_;
+  per_route_config_ = owned_per_route_config_ ? owned_per_route_config_.get() : &config_;
 }
 
 void JsonTranscoderFilter::maybeExpandBufferLimits() {

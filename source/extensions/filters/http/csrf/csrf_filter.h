@@ -115,6 +115,7 @@ private:
 
   Http::StreamDecoderFilterCallbacks* callbacks_{};
   CsrfFilterConfigSharedPtr config_;
+  std::shared_ptr<const CsrfPolicy> route_config_;
   const CsrfPolicy* policy_;
 };
 

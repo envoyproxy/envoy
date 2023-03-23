@@ -94,6 +94,7 @@ RoleBasedAccessControlRouteSpecificFilterConfig::RoleBasedAccessControlRouteSpec
 
 Http::FilterHeadersStatus
 RoleBasedAccessControlFilter::decodeHeaders(Http::RequestHeaderMap& headers, bool) {
+  route_ = callbacks_->route();
   ENVOY_LOG(
       debug,
       "checking request: requestedServerName: {}, sourceIP: {}, directRemoteIP: {}, remoteIP: {},"

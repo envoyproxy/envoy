@@ -114,6 +114,7 @@ public:
   void onDestroy() override {}
 
 private:
+  Router::RouteConstSharedPtr route_;
   RoleBasedAccessControlFilterConfigSharedPtr config_;
   Http::StreamDecoderFilterCallbacks* callbacks_{};
 };

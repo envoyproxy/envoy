@@ -275,16 +275,16 @@ void ActiveStreamFilterBase::resetIdleTimer() {
   parent_.filter_manager_callbacks_.resetIdleTimer();
 }
 
-const Router::RouteSpecificFilterConfig*
+Router::RouteSpecificFilterConfigOptConstRef
 ActiveStreamFilterBase::mostSpecificPerFilterConfig() const {
   auto current_route = getRoute();
   if (current_route == nullptr) {
-    return nullptr;
+    return {};
   }
 
-  auto* result = current_route->mostSpecificPerFilterConfig(filter_context_.config_name);
+  auto result = current_route->mostSpecificPerFilterConfig(filter_context_.config_name);
 
-  if (result == nullptr && filter_context_.filter_name != filter_context_.config_name) {
+  if (result.has_value() && filter_context_.filter_name != filter_context_.config_name) {
     // Fallback to use filter name.
     result = current_route->mostSpecificPerFilterConfig(filter_context_.filter_name);
   }

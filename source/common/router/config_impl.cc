@@ -674,7 +674,7 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
 
   if (route.route().has_cors()) {
     cors_policy_ =
-        std::make_unique<CorsPolicyImpl>(route.route().cors(), factory_context.runtime());
+        std::make_shared<CorsPolicyImpl>(route.route().cors(), factory_context.runtime());
   }
   for (const auto& upgrade_config : route.route().upgrade_configs()) {
     const bool enabled = upgrade_config.has_enabled() ? upgrade_config.enabled().value() : true;
@@ -1739,7 +1739,7 @@ VirtualHostImpl::VirtualHostImpl(
   }
 
   if (virtual_host.has_cors()) {
-    cors_policy_ = std::make_unique<CorsPolicyImpl>(virtual_host.cors(), factory_context.runtime());
+    cors_policy_ = std::make_shared<CorsPolicyImpl>(virtual_host.cors(), factory_context.runtime());
   }
 }
 
@@ -1759,11 +1759,12 @@ VirtualHostImpl::VirtualClusterEntry::VirtualClusterEntry(
 
 const Config& VirtualHostImpl::routeConfig() const { return global_route_config_; }
 
-const RouteSpecificFilterConfig*
+RouteSpecificFilterConfigOptConstRef
 VirtualHostImpl::mostSpecificPerFilterConfig(const std::string& name) const {
   auto* per_filter_config = per_filter_configs_.get(name);
-  return per_filter_config != nullptr ? per_filter_config
-                                      : global_route_config_.perFilterConfig(name);
+  return makeOptRefFromPtr<const RouteSpecificFilterConfig>(
+      per_filter_config != nullptr ? per_filter_config
+                                   : global_route_config_.perFilterConfig(name));
 }
 void VirtualHostImpl::traversePerFilterConfig(
     const std::string& filter_name,

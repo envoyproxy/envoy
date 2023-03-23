@@ -263,10 +263,10 @@ void Filter::populateDescriptors(const Router::RateLimitPolicy& rate_limit_polic
 }
 
 const FilterConfig* Filter::getConfig() const {
-  const auto* config =
-      Http::Utility::resolveMostSpecificPerFilterConfig<FilterConfig>(decoder_callbacks_);
-  if (config) {
-    return config;
+  per_route_config_ = Http::Utility::resolveMostSpecificPerFilterConfigWithOwnerShip<FilterConfig>(
+      decoder_callbacks_);
+  if (per_route_config_) {
+    return per_route_config_.get();
   }
 
   return config_.get();

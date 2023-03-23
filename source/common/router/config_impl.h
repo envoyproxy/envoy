@@ -129,8 +129,9 @@ public:
   const RouteEntry* routeEntry() const override { return nullptr; }
   const Decorator* decorator() const override { return nullptr; }
   const RouteTracing* tracingConfig() const override { return nullptr; }
-  const RouteSpecificFilterConfig* mostSpecificPerFilterConfig(const std::string&) const override {
-    return nullptr;
+  RouteSpecificFilterConfigOptConstRef
+  mostSpecificPerFilterConfig(const std::string&) const override {
+    return {};
   }
   void traversePerFilterConfig(
       const std::string&,
@@ -256,7 +257,8 @@ public:
     return DefaultRateLimitPolicy::get();
   }
   const Config& routeConfig() const override;
-  const RouteSpecificFilterConfig* mostSpecificPerFilterConfig(const std::string&) const override;
+  RouteSpecificFilterConfigOptConstRef
+  mostSpecificPerFilterConfig(const std::string&) const override;
   bool includeAttemptCountInRequest() const override { return include_attempt_count_in_request_; }
   bool includeAttemptCountInResponse() const override { return include_attempt_count_in_response_; }
   bool includeIsTimeoutRetryHeader() const override { return include_is_timeout_retry_header_; }
@@ -334,7 +336,7 @@ private:
   std::vector<VirtualClusterEntry> virtual_clusters_;
   std::unique_ptr<const RateLimitPolicyImpl> rate_limit_policy_;
   std::vector<ShadowPolicyPtr> shadow_policies_;
-  std::unique_ptr<const CorsPolicyImpl> cors_policy_;
+  std::shared_ptr<const CorsPolicyImpl> cors_policy_;
   const ConfigImpl& global_route_config_; // See note in RouteEntryImplBase::clusterEntry() on why
                                           // raw ref to the top level config is currently safe.
   HeaderParserPtr request_headers_parser_;
@@ -794,10 +796,13 @@ public:
   const RouteEntry* routeEntry() const override;
   const Decorator* decorator() const override { return decorator_.get(); }
   const RouteTracing* tracingConfig() const override { return route_tracing_.get(); }
-  const RouteSpecificFilterConfig*
+  RouteSpecificFilterConfigOptConstRef
   mostSpecificPerFilterConfig(const std::string& name) const override {
     auto* config = per_filter_configs_.get(name);
-    return config ? config : vhost_.mostSpecificPerFilterConfig(name);
+    if (config != nullptr) {
+      return makeOptRefFromPtr<const RouteSpecificFilterConfig>(config);
+    }
+    return vhost_.mostSpecificPerFilterConfig(name);
   }
   void traversePerFilterConfig(
       const std::string& filter_name,
@@ -925,7 +930,7 @@ public:
     const RouteEntry* routeEntry() const override { return this; }
     const Decorator* decorator() const override { return parent_->decorator(); }
     const RouteTracing* tracingConfig() const override { return parent_->tracingConfig(); }
-    const RouteSpecificFilterConfig*
+    RouteSpecificFilterConfigOptConstRef
     mostSpecificPerFilterConfig(const std::string& name) const override {
       return parent_->mostSpecificPerFilterConfig(name);
     }
@@ -1001,10 +1006,13 @@ public:
     Http::HeaderTransforms responseHeaderTransforms(const StreamInfo::StreamInfo& stream_info,
                                                     bool do_formatting = true) const override;
 
-    const RouteSpecificFilterConfig*
+    RouteSpecificFilterConfigOptConstRef
     mostSpecificPerFilterConfig(const std::string& name) const override {
       auto* config = per_filter_configs_.get(name);
-      return config ? config : DynamicRouteEntry::mostSpecificPerFilterConfig(name);
+      if (config != nullptr) {
+        return makeOptRefFromPtr<const RouteSpecificFilterConfig>(config);
+      }
+      return DynamicRouteEntry::mostSpecificPerFilterConfig(name);
     }
 
     void traversePerFilterConfig(
@@ -1146,7 +1154,7 @@ private:
   // Default timeout is 15s if nothing is specified in the route config.
   static const uint64_t DEFAULT_ROUTE_TIMEOUT_MS = 15000;
 
-  std::unique_ptr<const CorsPolicyImpl> cors_policy_;
+  std::shared_ptr<const CorsPolicyImpl> cors_policy_;
   const VirtualHostImpl& vhost_; // See note in RouteEntryImplBase::clusterEntry() on why raw ref
                                  // to virtual host is currently safe.
   const absl::optional<Http::LowerCaseString> auto_host_rewrite_header_;

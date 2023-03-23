@@ -122,11 +122,12 @@ public:
  *   NamedHttpFilterConfigFactory::createRouteSpecificFilterConfig
  * should be derived from this class.
  */
-class RouteSpecificFilterConfig {
+class RouteSpecificFilterConfig : public std::enable_shared_from_this<RouteSpecificFilterConfig> {
 public:
   virtual ~RouteSpecificFilterConfig() = default;
 };
 using RouteSpecificFilterConfigConstSharedPtr = std::shared_ptr<const RouteSpecificFilterConfig>;
+using RouteSpecificFilterConfigOptConstRef = OptRef<const RouteSpecificFilterConfig>;
 
 /**
  * CorsPolicy for Route and VirtualHost.
@@ -668,7 +669,7 @@ public:
    * This is a helper to get the route's per-filter config if it exists, up along the config
    * hierarchy (Route --> VirtualHost --> RouteConfiguration). Or nullptr if none of them exist.
    */
-  virtual const RouteSpecificFilterConfig*
+  virtual RouteSpecificFilterConfigOptConstRef
   mostSpecificPerFilterConfig(const std::string& name) const PURE;
 
   /**
@@ -1202,7 +1203,7 @@ public:
    * This is a helper to get the route's per-filter config if it exists, up along the config
    * hierarchy(Route --> VirtualHost --> RouteConfiguration). Or nullptr if none of them exist.
    */
-  virtual const RouteSpecificFilterConfig*
+  virtual RouteSpecificFilterConfigOptConstRef
   mostSpecificPerFilterConfig(const std::string& name) const PURE;
 
   /**

@@ -7,6 +7,7 @@
 #include "source/common/common/thread.h"
 #include "source/extensions/filters/http/jwt_authn/filter_config.h"
 #include "source/extensions/filters/http/jwt_authn/matcher.h"
+#include <memory>
 
 namespace Envoy {
 namespace Extensions {
@@ -47,6 +48,7 @@ private:
   bool stopped_ = false;
   // Filter config object.
   FilterConfigSharedPtr config_;
+  std::shared_ptr<const PerRouteFilterConfig> per_route_config_;
   // Verify context for current request.
   ContextSharedPtr context_;
 

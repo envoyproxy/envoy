@@ -74,7 +74,7 @@ public:
 
 private:
   HeaderMutationConfigSharedPtr config_{};
-  const PerRouteHeaderMutation* route_config_{};
+  std::shared_ptr<const PerRouteHeaderMutation> route_config_{};
 };
 
 } // namespace HeaderMutation

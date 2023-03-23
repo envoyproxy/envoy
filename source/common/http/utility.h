@@ -580,11 +580,37 @@ void transformUpgradeResponseFromH2toH1(ResponseHeaderMap& headers, absl::string
  * pointer's lifetime is the same as the matched route.
  */
 template <class ConfigType>
-const ConfigType* resolveMostSpecificPerFilterConfig(const Http::StreamFilterCallbacks* callbacks) {
+OptRef<const ConfigType>
+resolveMostSpecificPerFilterConfig(const Http::StreamFilterCallbacks* callbacks) {
   static_assert(std::is_base_of<Router::RouteSpecificFilterConfig, ConfigType>::value,
                 "ConfigType must be a subclass of Router::RouteSpecificFilterConfig");
   ASSERT(callbacks != nullptr);
-  return dynamic_cast<const ConfigType*>(callbacks->mostSpecificPerFilterConfig());
+  return makeOptRefFromPtr(
+      dynamic_cast<const ConfigType*>(callbacks->mostSpecificPerFilterConfig().ptr()));
+}
+
+/**
+ * Variant of resolveMostSpecificPerFilterConfig that returns a shared_ptr. The
+ * resolveMostSpecificPerFilterConfig will return an OptRef<const ConfigType> which is a reference
+ * to a ConfigType object that is owned by the route and has the same lifetime as the route. If the
+ * route is refreshed or the route is deleted, the ConfigType object will be deleted as well.
+ *
+ * This function will return a shared_ptr<const ConfigType>. The caller could maintain the lifetime
+ * of the ConfigType object by itself.
+ */
+template <class ConfigType>
+std::shared_ptr<const ConfigType>
+resolveMostSpecificPerFilterConfigWithOwnerShip(const Http::StreamFilterCallbacks* callbacks) {
+  static_assert(std::is_base_of<Router::RouteSpecificFilterConfig, ConfigType>::value,
+                "ConfigType must be a subclass of Router::RouteSpecificFilterConfig");
+  ASSERT(callbacks != nullptr);
+  auto untyped_ref = callbacks->mostSpecificPerFilterConfig();
+  if (!untyped_ref.has_value()) {
+    return nullptr;
+  }
+  Router::RouteSpecificFilterConfigConstSharedPtr untyped_shared_ptr =
+      untyped_ref->shared_from_this();
+  return std::dynamic_pointer_cast<const ConfigType>(untyped_shared_ptr);
 }
 
 /**

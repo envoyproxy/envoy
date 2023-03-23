@@ -399,7 +399,7 @@ public:
    * This is a helper to get the route's per-filter config if it exists, otherwise the virtual
    * host's. Or nullptr if none of them exist.
    */
-  virtual const Router::RouteSpecificFilterConfig* mostSpecificPerFilterConfig() const PURE;
+  virtual Router::RouteSpecificFilterConfigOptConstRef mostSpecificPerFilterConfig() const PURE;
 
   /**
    * Find all the available per route filter configs, invoking the callback with each config (if

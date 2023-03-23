@@ -98,7 +98,7 @@ struct ActiveStreamFilterBase : public virtual StreamFilterCallbacks,
   const ScopeTrackedObject& scope() override;
   void restoreContextOnContinue(ScopeTrackedObjectStack& tracked_object_stack) override;
   void resetIdleTimer() override;
-  const Router::RouteSpecificFilterConfig* mostSpecificPerFilterConfig() const override;
+  Router::RouteSpecificFilterConfigOptConstRef mostSpecificPerFilterConfig() const override;
   void traversePerFilterConfig(
       std::function<void(const Router::RouteSpecificFilterConfig&)> cb) const override;
   Http1StreamEncoderOptionsOptRef http1StreamEncoderOptions() override;

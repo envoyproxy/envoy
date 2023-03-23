@@ -265,8 +265,10 @@ const Config* HeaderToMetadataFilter::getConfig() const {
     return effective_config_;
   }
 
-  effective_config_ = Http::Utility::resolveMostSpecificPerFilterConfig<Config>(decoder_callbacks_);
-  if (effective_config_) {
+  per_route_config_ =
+      Http::Utility::resolveMostSpecificPerFilterConfigWithOwnerShip<Config>(decoder_callbacks_);
+  if (per_route_config_ != nullptr) {
+    effective_config_ = per_route_config_.get();
     return effective_config_;
   }
 

@@ -27,7 +27,7 @@ public:
   const Router::Decorator* decorator() const override;
   const Router::RouteTracing* tracingConfig() const override;
 
-  const RouteSpecificFilterConfig*
+  RouteSpecificFilterConfigOptConstRef
   mostSpecificPerFilterConfig(const std::string& name) const override {
     return base_route_->mostSpecificPerFilterConfig(name);
   }

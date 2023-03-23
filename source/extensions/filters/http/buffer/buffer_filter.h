@@ -65,6 +65,7 @@ private:
   void maybeAddContentLength();
 
   BufferFilterConfigSharedPtr config_;
+  std::shared_ptr<const BufferFilterSettings> route_config_;
   const BufferFilterSettings* settings_;
   Http::StreamDecoderFilterCallbacks* callbacks_{};
   Http::RequestHeaderMap* request_headers_{};

@@ -39,7 +39,8 @@ Http::FilterHeadersStatus HeaderMutation::decodeHeaders(Http::RequestHeaderMap& 
   // TODO(wbpcode): It's possible to traverse all the route configs to merge the header mutations
   // in the future.
   route_config_ =
-      Http::Utility::resolveMostSpecificPerFilterConfig<PerRouteHeaderMutation>(decoder_callbacks_);
+      Http::Utility::resolveMostSpecificPerFilterConfigWithOwnerShip<PerRouteHeaderMutation>(
+          decoder_callbacks_);
 
   if (route_config_ != nullptr) {
     route_config_->mutations().mutateRequestHeaders(headers, decoder_callbacks_->streamInfo());
@@ -65,8 +66,9 @@ Http::FilterHeadersStatus HeaderMutation::encodeHeaders(Http::ResponseHeaderMap&
 
   if (route_config_ == nullptr) {
     // If we haven't already resolved the route config, do so now.
-    route_config_ = Http::Utility::resolveMostSpecificPerFilterConfig<PerRouteHeaderMutation>(
-        encoder_callbacks_);
+    route_config_ =
+        Http::Utility::resolveMostSpecificPerFilterConfigWithOwnerShip<PerRouteHeaderMutation>(
+            encoder_callbacks_);
   }
 
   if (route_config_ != nullptr) {

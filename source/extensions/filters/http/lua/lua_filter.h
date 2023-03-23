@@ -449,7 +449,7 @@ PerLuaCodeSetup* getPerLuaCodeSetup(const FilterConfig* filter_config,
   const FilterConfigPerRoute* config_per_route = nullptr;
   if (callbacks && callbacks->route()) {
     config_per_route =
-        Http::Utility::resolveMostSpecificPerFilterConfig<FilterConfigPerRoute>(callbacks);
+        Http::Utility::resolveMostSpecificPerFilterConfig<FilterConfigPerRoute>(callbacks).ptr();
   }
 
   if (config_per_route != nullptr) {
@@ -488,6 +488,7 @@ public:
   // Http::StreamDecoderFilter
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers,
                                           bool end_stream) override {
+    decoder_route_ = decoder_callbacks_.callbacks_->route();
     PerLuaCodeSetup* setup = getPerLuaCodeSetup(config_.get(), decoder_callbacks_.callbacks_);
     const int function_ref = setup ? setup->requestFunctionRef() : LUA_REFNIL;
     return doHeaders(request_stream_wrapper_, request_coroutine_, decoder_callbacks_, function_ref,
@@ -509,6 +510,7 @@ public:
   }
   Http::FilterHeadersStatus encodeHeaders(Http::ResponseHeaderMap& headers,
                                           bool end_stream) override {
+    encoder_route_ = encoder_callbacks_.callbacks_->route();
     PerLuaCodeSetup* setup = getPerLuaCodeSetup(config_.get(), decoder_callbacks_.callbacks_);
     const int function_ref = setup ? setup->responseFunctionRef() : LUA_REFNIL;
     return doHeaders(response_stream_wrapper_, response_coroutine_, encoder_callbacks_,
@@ -589,6 +591,9 @@ private:
   FilterConfigConstSharedPtr config_;
   DecoderCallbacks decoder_callbacks_{*this};
   EncoderCallbacks encoder_callbacks_{*this};
+  Router::RouteConstSharedPtr decoder_route_;
+  Router::RouteConstSharedPtr encoder_route_;
+
   StreamHandleRef request_stream_wrapper_;
   StreamHandleRef response_stream_wrapper_;
   bool destroyed_{};

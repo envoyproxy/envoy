@@ -450,9 +450,9 @@ Filter::PerRouteFlags Filter::getPerRouteFlags(const Router::RouteConstSharedPtr
     return PerRouteFlags{true /*skip_check_*/, false /*skip_request_body_buffering_*/};
   }
 
-  const auto* specific_per_route_config =
+  const auto specific_per_route_config =
       Http::Utility::resolveMostSpecificPerFilterConfig<FilterConfigPerRoute>(decoder_callbacks_);
-  if (specific_per_route_config != nullptr) {
+  if (specific_per_route_config.has_value()) {
     return PerRouteFlags{specific_per_route_config->disabled(),
                          specific_per_route_config->disableRequestBodyBuffering()};
   }

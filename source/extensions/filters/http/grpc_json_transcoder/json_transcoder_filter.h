@@ -208,6 +208,7 @@ private:
   void maybeExpandBufferLimits();
 
   const JsonTranscoderConfig& config_;
+  std::shared_ptr<const JsonTranscoderConfig> owned_per_route_config_;
   const JsonTranscoderConfig* per_route_config_{};
   std::unique_ptr<google::grpc::transcoding::Transcoder> transcoder_;
   TranscoderInputStreamImpl request_in_;

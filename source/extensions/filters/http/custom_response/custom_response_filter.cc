@@ -42,11 +42,11 @@ Http::FilterHeadersStatus CustomResponseFilter::encodeHeaders(Http::ResponseHead
   }
 
   // Check for route specific config.
-  const FilterConfig* per_route_settings =
+  const auto per_route_settings =
       Http::Utility::resolveMostSpecificPerFilterConfig<FilterConfig>(decoder_callbacks_);
-  const FilterConfig* config_to_use = per_route_settings
-                                          ? static_cast<const FilterConfig*>(per_route_settings)
-                                          : static_cast<const FilterConfig*>(config_.get());
+  const FilterConfig* config_to_use =
+      per_route_settings ? static_cast<const FilterConfig*>(per_route_settings.ptr())
+                         : static_cast<const FilterConfig*>(config_.get());
   // Check if any custom response policy applies to this response.
   const PolicySharedPtr policy =
       config_to_use->getPolicy(headers, encoder_callbacks_->streamInfo());

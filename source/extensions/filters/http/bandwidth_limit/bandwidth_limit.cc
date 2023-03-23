@@ -262,7 +262,7 @@ void BandwidthLimiter::updateStatsOnEncodeFinish() {
 }
 
 const FilterConfig& BandwidthLimiter::getConfig() const {
-  const auto* config =
+  const auto config =
       Http::Utility::resolveMostSpecificPerFilterConfig<FilterConfig>(decoder_callbacks_);
   if (config) {
     return *config;

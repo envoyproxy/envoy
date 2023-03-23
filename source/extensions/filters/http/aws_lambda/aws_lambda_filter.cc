@@ -117,7 +117,7 @@ Filter::Filter(const FilterSettings& settings, const FilterStats& stats,
     : settings_(settings), stats_(stats), sigv4_signer_(sigv4_signer) {}
 
 absl::optional<FilterSettings> Filter::getRouteSpecificSettings() const {
-  const auto* settings =
+  const auto settings =
       Http::Utility::resolveMostSpecificPerFilterConfig<FilterSettings>(decoder_callbacks_);
   if (!settings) {
     return absl::nullopt;

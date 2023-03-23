@@ -51,14 +51,15 @@ PerRouteStatefulSession::PerRouteStatefulSession(
 
 Http::FilterHeadersStatus StatefulSession::decodeHeaders(Http::RequestHeaderMap& headers, bool) {
   const StatefulSessionConfig* config = config_.get();
-  auto route_config = Http::Utility::resolveMostSpecificPerFilterConfig<PerRouteStatefulSession>(
-      decoder_callbacks_);
+  per_route_config_ =
+      Http::Utility::resolveMostSpecificPerFilterConfigWithOwnerShip<PerRouteStatefulSession>(
+          decoder_callbacks_);
 
-  if (route_config != nullptr) {
-    if (route_config->disabled()) {
+  if (per_route_config_ != nullptr) {
+    if (per_route_config_->disabled()) {
       return Http::FilterHeadersStatus::Continue;
     }
-    config = route_config->statefuleSessionConfig();
+    config = per_route_config_->statefuleSessionConfig();
   }
   session_state_ = config->createSessionState(headers);
   if (session_state_ == nullptr) {

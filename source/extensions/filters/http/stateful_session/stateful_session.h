@@ -69,6 +69,7 @@ private:
   Http::SessionStatePtr session_state_;
 
   StatefulSessionConfigSharedPtr config_{};
+  std::shared_ptr<const PerRouteStatefulSession> per_route_config_{};
 };
 
 } // namespace StatefulSession

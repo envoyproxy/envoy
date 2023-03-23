@@ -210,9 +210,9 @@ private:
     uint32_t retryShadowBufferLimit() const override {
       return std::numeric_limits<uint32_t>::max();
     }
-    const Router::RouteSpecificFilterConfig*
+    Router::RouteSpecificFilterConfigOptConstRef
     mostSpecificPerFilterConfig(const std::string&) const override {
-      return nullptr;
+      return {};
     }
     void traversePerFilterConfig(
         const std::string&,
@@ -374,9 +374,9 @@ private:
     const Router::RouteEntry* routeEntry() const override { return &route_entry_; }
     const Router::Decorator* decorator() const override { return nullptr; }
     const Router::RouteTracing* tracingConfig() const override { return nullptr; }
-    const Router::RouteSpecificFilterConfig*
+    Router::RouteSpecificFilterConfigOptConstRef
     mostSpecificPerFilterConfig(const std::string&) const override {
-      return nullptr;
+      return {};
     }
     void traversePerFilterConfig(
         const std::string&,
@@ -478,8 +478,8 @@ private:
   }
   void addUpstreamSocketOptions(const Network::Socket::OptionsSharedPtr&) override {}
   Network::Socket::OptionsSharedPtr getUpstreamSocketOptions() const override { return {}; }
-  const Router::RouteSpecificFilterConfig* mostSpecificPerFilterConfig() const override {
-    return nullptr;
+  Router::RouteSpecificFilterConfigOptConstRef mostSpecificPerFilterConfig() const override {
+    return {};
   }
   void traversePerFilterConfig(
       std::function<void(const Router::RouteSpecificFilterConfig&)>) const override {}

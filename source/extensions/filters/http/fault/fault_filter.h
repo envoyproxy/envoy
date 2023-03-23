@@ -214,6 +214,7 @@ private:
   void maybeSetupResponseRateLimit(const Http::RequestHeaderMap& request_headers);
 
   FaultFilterConfigSharedPtr config_;
+  std::shared_ptr<const FaultSettings> route_config_;
   Http::StreamDecoderFilterCallbacks* decoder_callbacks_{};
   Http::StreamEncoderFilterCallbacks* encoder_callbacks_{};
   Event::TimerPtr delay_timer_;

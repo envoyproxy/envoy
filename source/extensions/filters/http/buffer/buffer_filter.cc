@@ -42,9 +42,10 @@ void BufferFilter::initConfig() {
   config_initialized_ = true;
   settings_ = config_->settings();
 
-  const auto* route_local =
-      Http::Utility::resolveMostSpecificPerFilterConfig<BufferFilterSettings>(callbacks_);
-  settings_ = route_local ? route_local : settings_;
+  route_config_ =
+      Http::Utility::resolveMostSpecificPerFilterConfigWithOwnerShip<BufferFilterSettings>(
+          callbacks_);
+  settings_ = route_config_ ? route_config_.get() : settings_;
 }
 
 Http::FilterHeadersStatus BufferFilter::decodeHeaders(Http::RequestHeaderMap& headers,
