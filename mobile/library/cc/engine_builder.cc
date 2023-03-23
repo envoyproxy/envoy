@@ -556,6 +556,12 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
     tag_filter->mutable_typed_config()->PackFrom(tag_config);
   }
 
+  if (!direct_responses_.empty()) {
+    auto* cache_reset_filter = hcm->add_http_filters();
+    cache_reset_filter->set_name("envoy.filters.http.route_cache_reset");
+    cache_reset_filter->mutable_typed_config()->set_type_url("type.googleapis.com/envoymobile.extensions.filters.http.route_cache_reset.RouteCacheReset");
+  }
+
   // Set up the always-present filters
   envoymobile::extensions::filters::http::network_configuration::NetworkConfiguration
       network_config;
