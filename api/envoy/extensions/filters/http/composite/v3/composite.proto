@@ -37,3 +37,9 @@ message Composite {
 message ExecuteFilterAction {
   config.core.v3.TypedExtensionConfig typed_config = 1;
 }
+
+
+message ExecuteFilterMultiAction {
+  repeated config.core.v3.TypedExtensionConfig typed_config = 1;
+}
+

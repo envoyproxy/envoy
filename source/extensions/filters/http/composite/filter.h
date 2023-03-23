@@ -57,10 +57,10 @@ public:
 
   // Http::StreamFilterBase
   void onDestroy() override {
-    if (delegated_filter_) {
+    for (auto delegated_filter : delegated_filter_list_){
       // We need to explicitly specify which base class to the conversion via due
       // to the diamond inheritance between StreamFilter and StreamFilterBase.
-      static_cast<Http::StreamDecoderFilter&>(*delegated_filter_).onDestroy();
+      static_cast<Http::StreamDecoderFilter&>(*delegated_filter).onDestroy();
     }
   }
 
@@ -86,6 +86,8 @@ private:
   // We should be protected against this by the match tree validation that only allows request
   // headers, this just provides some additional sanity checking.
   bool decoded_headers_ : 1;
+
+  void ApplyWrapper(FactoryCallbacksWrapper& wrapper);
 
   // Wraps a stream encoder OR a stream decoder filter into a stream filter, making it easier to
   // delegate calls.
@@ -124,9 +126,9 @@ private:
   };
   std::vector<AccessLog::InstanceSharedPtr> access_loggers_;
 
-  Http::StreamFilterSharedPtr delegated_filter_;
-  Http::StreamEncoderFilterCallbacks* encoder_callbacks_{};
-  Http::StreamDecoderFilterCallbacks* decoder_callbacks_{};
+  std::vector<Http::StreamFilterSharedPtr> delegated_filter_list_;
+  Http::StreamEncoderFilterCallbacks* encoder_callbacks_;
+  Http::StreamDecoderFilterCallbacks* decoder_callbacks_;
   FilterStats& stats_;
 };
 

@@ -52,6 +52,49 @@ public:
 
 DECLARE_FACTORY(ExecuteFilterActionFactory);
 
+class ExecuteFilterMultiAction
+    : public Matcher::ActionBase<
+          envoy::extensions::filters::http::composite::v3::ExecuteFilterMultiAction> {
+public:
+  explicit ExecuteFilterMultiAction(std::vector<Http::FilterFactoryCb> cb_list)
+      : cb_list_(std::move(cb_list)) {}
+
+  void createFilters(std::function<void(Http::FilterFactoryCb&)> parse_wrapper) const;
+
+private:
+  std::vector<Http::FilterFactoryCb> cb_list_;
+};
+
+class ExecuteFilterMultiActionFactory
+    : public Matcher::ActionFactory<Http::Matching::HttpFilterActionContext> {
+public:
+  std::string name() const override { return "composite-multi-action"; }
+  Matcher::ActionFactoryCb
+  createActionFactoryCb(const Protobuf::Message& config,
+                        Envoy::Http::Matching::HttpFilterActionContext& context,
+                        ProtobufMessage::ValidationVisitor& validation) override {
+    const auto& composite_action =
+        MessageUtil::downcastAndValidate<const envoy::extensions::filters::http::composite::v3::ExecuteFilterMultiAction&>(config, validation);
+    std::vector<Http::FilterFactoryCb> callback_list;
+    for (auto typed_config : composite_action.typed_config()) {
+      auto& factory =
+          Config::Utility::getAndCheckFactory<Server::Configuration::NamedHttpFilterConfigFactory>(
+              typed_config);
+      ProtobufTypes::MessagePtr message = Config::Utility::translateAnyToFactoryConfig(
+          typed_config.typed_config(), validation, factory);
+      callback_list.push_back(factory.createFilterFactoryFromProto(*message, context.stat_prefix_,
+                                                               context.factory_context_));
+    }
+    return [cb_list = std::move(callback_list)]() -> Matcher::ActionPtr {
+      return std::make_unique<ExecuteFilterMultiAction>(cb_list);
+    };
+  }
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return std::make_unique<envoy::extensions::filters::http::composite::v3::ExecuteFilterMultiAction>();
+  }
+};
+
+DECLARE_FACTORY(ExecuteFilterMultiActionFactory);
 } // namespace Composite
 } // namespace HttpFilters
 } // namespace Extensions

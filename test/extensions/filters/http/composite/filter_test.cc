@@ -199,6 +199,56 @@ TEST_F(FilterTest, StreamFilterDelegationMultipleStreamEncoderFilters) {
   filter_.onDestroy();
 }
 
+
+// // Adding multiple decoder filters should cause delegation to be skipped.
+// TEST_F(FilterTest, StreamFilterDelegationMultiActionMultipleStreamDecoderFilters) {
+//   auto decoder_filter = std::make_shared<Http::MockStreamDecoderFilter>();
+
+//   auto factory_callback = [&](Http::FilterChainFactoryCallbacks& cb) {
+//     cb.addStreamDecoderFilter(decoder_filter);
+//     cb.addStreamDecoderFilter(decoder_filter);
+//   };
+
+//   ExecuteFilterMultiAction action(factory_callback);
+//   EXPECT_CALL(error_counter_, inc());
+//   filter_.onMatchCallback(action);
+
+//   doAllDecodingCallbacks();
+//   doAllEncodingCallbacks();
+//   filter_.onDestroy();
+// }
+
+// MutliFilters should run both encoder filters sequentially.
+TEST_F(FilterTest, StreamFilterDelegationMultiActionMultipleStreamEncoderFilters) {
+  auto decoder_filter = std::make_shared<Http::MockStreamDecoderFilter>();
+  auto decoder_filter2 = std::make_shared<Http::MockStreamDecoderFilter>();
+
+  std::function<void(Http::FilterChainFactoryCallbacks&)> factory_callback = [&](Http::FilterChainFactoryCallbacks& cb) {
+    cb.addStreamDecoderFilter(decoder_filter);
+  };
+
+  std::function<void(Http::FilterChainFactoryCallbacks&)> factory_callback2 = [&](Http::FilterChainFactoryCallbacks& cb) {
+    cb.addStreamDecoderFilter(decoder_filter2);
+  };
+
+  std::vector<std::function<void(Http::FilterChainFactoryCallbacks&)>> factory_callbacks{factory_callback, factory_callback2};
+
+  EXPECT_CALL(*decoder_filter, setDecoderFilterCallbacks(_));
+  EXPECT_CALL(*decoder_filter2, setDecoderFilterCallbacks(_));
+  ExecuteFilterMultiAction action(factory_callbacks);
+  EXPECT_CALL(success_counter_, inc()).Times(2);
+  filter_.onMatchCallback(action);
+
+
+  expectDelegatedDecoding(*decoder_filter);
+  expectDelegatedDecoding(*decoder_filter2);
+  doAllDecodingCallbacks();
+  doAllEncodingCallbacks();
+  EXPECT_CALL(*decoder_filter, onDestroy());
+  EXPECT_CALL(*decoder_filter2, onDestroy());
+  filter_.onDestroy();
+}
+
 // Adding a encoder filter and an access loggers should be permitted and delegate to the access
 // logger.
 TEST_F(FilterTest, StreamFilterDelegationMultipleAccessLoggers) {
