@@ -820,7 +820,10 @@ ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connect
             filter_manager_.log();
           }
 
-          refreshAccessLogFlushTimer();
+          if (streamInfo().streamState() && streamInfo().streamState() !=
+              StreamInfo::StreamState::Ended) {
+            refreshAccessLogFlushTimer();
+          }
         });
     refreshAccessLogFlushTimer();
   }
