@@ -553,9 +553,10 @@ message HttpConnectionManager {
   google.protobuf.Duration access_log_flush_interval = 54
       [(validate.rules).duration = {gte {nanos: 1000000}}];
 
-  // If set to true, HCM will flush an access log once when an upstream connection has successfully established.
-  // If the connection failed, the access log will not be flushed.
-  bool flush_access_log_on_connected = 55;
+  // If set to true, HCM will flush an access log once when a new HTTP request is received, and request
+  // headers have been evaludated, and before attempting to establish a connection with the upstream.
+  // Details related to upstream cluster, such as upstream host, will not be available for this log.
+  bool flush_access_log_on_new_request = 55;
 
   // If set to true, the connection manager will use the real remote address
   // of the client connection when determining internal versus external origin and manipulating

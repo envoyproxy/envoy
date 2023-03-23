@@ -123,7 +123,7 @@ public:
     return request_id_extension_;
   }
   const std::list<AccessLog::InstanceSharedPtr>& accessLogs() override { return access_logs_; }
-  bool flushAccessLogOnConnected() override { return flush_access_log_on_connected_; }
+  bool flushAccessLogOnNewRequest() override { return flush_access_log_on_new_request_; }
   const absl::optional<std::chrono::milliseconds>& accessLogFlushInterval() override {
     return null_access_log_flush_interval_;
   }
@@ -459,7 +459,7 @@ private:
   Server::Instance& server_;
   Http::RequestIDExtensionSharedPtr request_id_extension_;
   std::list<AccessLog::InstanceSharedPtr> access_logs_;
-  const bool flush_access_log_on_connected_ = false;
+  const bool flush_access_log_on_new_request_ = false;
   const absl::optional<std::chrono::milliseconds> null_access_log_flush_interval_;
   const std::string profile_path_;
   Http::ConnectionManagerStats stats_;

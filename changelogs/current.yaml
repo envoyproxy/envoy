@@ -204,9 +204,9 @@ new_features:
     be empty for mid-request logs. Enabling this may affect access loggers and filters that register as access loggers that expect to be called only once.
 - area: http
   change: |
-    add :ref:`flush access log on connected <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.flush_access_log_on_connected>` to allow recording
-    an access log entry on the connection open event. This option does not require periodic access logging enabled, and the other way around. The access log will be recorded
-    when the TCP connection is established with the upstream, regardless of the HTTP request and HTTP response.
+    add :ref:`flush access log on new request <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.flush_access_log_on_new_request>` to allow recording
+    an access log entry when a new HTTP request is received by the HTTP connection manager. Details related to upstream cluster, such as upstream host, will not be available for this log.
+    This option does not require periodic access logging enabled, and the other way around.
 - area: redis_health_check
   change: |
     added :ref:`exists_failure <config_health_checkers_redis>` stat to indicate health check failures caused by EXISTS check failure.

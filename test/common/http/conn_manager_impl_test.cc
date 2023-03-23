@@ -2405,8 +2405,8 @@ TEST_F(HttpConnectionManagerImplTest, TestAccessLogWithInvalidRequest) {
   conn_manager_->onData(fake_input, false);
 }
 
-TEST_F(HttpConnectionManagerImplTest, TestAccessLogOnUpstreamConnected) {
-  flush_access_log_on_connected_ = true;
+TEST_F(HttpConnectionManagerImplTest, TestAccessLogOnNewRequest) {
+  flush_access_log_on_new_request_ = true;
   setup(false, "");
 
   std::shared_ptr<MockStreamDecoderFilter> filter(new NiceMock<MockStreamDecoderFilter>());

@@ -1026,6 +1026,10 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapSharedPt
     request_header_timer_.reset();
   }
 
+  if (connection_manager_.config_.flushAccessLogOnNewRequest()) {
+    filter_manager_.log();
+  }
+
   // Both saw_connection_close_ and is_head_request_ affect local replies: set
   // them as early as possible.
   const Protocol protocol = connection_manager_.codec_->protocol();

@@ -24,9 +24,10 @@ Periodic access logs
 
 If access log is enabled, then by default it will be reported to the configured sinks at the end of a TCP
 stream, or HTTP request. It is possible to extend this behavior and report access logs periodically, and
-right after the TCP Proxy has successfully established a connection with the upstream, or the HTTP router has
-successfully established TCP connection with the upstream .Reporting access logs right after upstream
-connection establishment does not depend on periodic reporting, and and the other way around.
+right after the TCP Proxy has successfully established a connection with the upstream, or when a new HTTP
+request has been received by the HTTP connection manager. Note: When recording a log after a new HTTP
+has been received, some information such as upstream host will not be available yet. Reporting access logs
+right after upstream connection establishment does not depend on periodic reporting, and and the other way around.
 
 TCP Proxy
 *********
@@ -38,7 +39,7 @@ HTTP Connection Manager
 ***********************
 
 * Periodic access logs can be enabled using :ref:`access log flush interval <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.access_log_flush_interval>`
-* Access log after upstream connection can be enabled using :ref:`flush access log on connected <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.flush_access_log_on_connected>`
+* Access log when a new HTTP request is received can be enabled using :ref:`flush access log on new request <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.flush_access_log_on_new_request>`
 
 .. _arch_overview_access_log_filters:
 
