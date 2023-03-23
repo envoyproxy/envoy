@@ -406,20 +406,20 @@ Http::RequestDecoder& FakeHttpConnection::newStream(Http::ResponseEncoder& encod
 }
 
 void FakeHttpConnection::onGoAway(Http::GoAwayErrorCode code) {
-  ASSERT(type_ >= Http::CodecType::HTTP2);
+  ASSERT(type_ != Http::CodecType::HTTP1);
   // Usually indicates connection level errors, no operations are needed since
   // the connection will be closed soon.
   ENVOY_LOG(info, "FakeHttpConnection receives GOAWAY: ", static_cast<int>(code));
 }
 
 void FakeHttpConnection::encodeGoAway() {
-  ASSERT(type_ >= Http::CodecType::HTTP2);
+  ASSERT(type_ != Http::CodecType::HTTP1);
 
   postToConnectionThread([this]() { codec_->goAway(); });
 }
 
 void FakeHttpConnection::updateConcurrentStreams(uint64_t max_streams) {
-  ASSERT(type_ >= Http::CodecType::HTTP2);
+  ASSERT(type_ != Http::CodecType::HTTP1);
 
   if (type_ == Http::CodecType::HTTP2) {
     postToConnectionThread([this, max_streams]() {
@@ -441,7 +441,7 @@ void FakeHttpConnection::updateConcurrentStreams(uint64_t max_streams) {
 }
 
 void FakeHttpConnection::encodeProtocolError() {
-  ASSERT(type_ >= Http::CodecType::HTTP2);
+  ASSERT(type_ != Http::CodecType::HTTP1);
 
   Http::Http2::ServerConnectionImpl* codec =
       dynamic_cast<Http::Http2::ServerConnectionImpl*>(codec_.get());
