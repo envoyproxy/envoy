@@ -2501,18 +2501,20 @@ TEST_F(HttpConnectionManagerImplTest, TestPeriodicAccessLogging) {
                                      {"x-request-id", "125a4afb-6f55-a4ba-ad80-413f09f48a28"}}};
     decoder_->decodeHeaders(std::move(headers), true);
 
-    filter->callbacks_->streamInfo().setResponseCodeDetails("");
-    ResponseHeaderMapPtr response_headers{new TestResponseHeaderMapImpl{{":status", "200"}}};
-    filter->callbacks_->encodeHeaders(std::move(response_headers), false, "details");
-
-    EXPECT_EQ(StreamInfo::StreamState::InProgress, filter->callbacks_->streamInfo().streamState());
-
     data.drain(4);
     return Http::okStatus();
   }));
 
+  EXPECT_CALL(*handler, log(_, _, _, _)).Times(0);
+
   Buffer::OwnedImpl fake_input("1234");
   conn_manager_->onData(fake_input, false);
+
+  filter->callbacks_->streamInfo().setResponseCodeDetails("");
+  ResponseHeaderMapPtr response_headers{new TestResponseHeaderMapImpl{{":status", "200"}}};
+  filter->callbacks_->encodeHeaders(std::move(response_headers), false, "details");
+
+  EXPECT_EQ(StreamInfo::StreamState::InProgress, filter->callbacks_->streamInfo().streamState());
 
   EXPECT_CALL(*handler, log(_, _, _, _))
       .Times(2)
@@ -2522,7 +2524,8 @@ TEST_F(HttpConnectionManagerImplTest, TestPeriodicAccessLogging) {
             EXPECT_EQ(&decoder_->streamInfo(), &stream_info);
             EXPECT_THAT(request_headers, testing::NotNull());
             EXPECT_THAT(response_headers, testing::NotNull());
-            EXPECT_EQ(StreamInfo::StreamState::InProgress, stream_info.streamState());
+            EXPECT_EQ(stream_info.requestComplete(), absl::nullopt);
+            EXPECT_EQ(stream_info.streamState(), StreamInfo::StreamState::InProgress);
           }));
 
   // Pretend like some 30s has passed, and the log should be written.
@@ -2539,7 +2542,7 @@ TEST_F(HttpConnectionManagerImplTest, TestPeriodicAccessLogging) {
         EXPECT_THAT(response_headers, testing::NotNull());
         EXPECT_THAT(stream_info.responseCodeDetails(),
                     testing::Optional(testing::StrEq("details")));
-        EXPECT_EQ(StreamInfo::StreamState::Ended, stream_info.streamState());
+        EXPECT_EQ(stream_info.streamState(), StreamInfo::StreamState::Ended);
         EXPECT_THAT(stream_info.responseCode(), testing::Optional(200));
       }));
 
@@ -2572,19 +2575,19 @@ TEST_F(HttpConnectionManagerImplTest, TestStreamStateSuccessStatusCode) {
                                          {"x-request-id", "125a4afb-6f55-a4ba-ad80-413f09f48a28"}}};
         decoder_->decodeHeaders(std::move(headers), true);
 
-        EXPECT_EQ(StreamInfo::StreamState::Started, filter->callbacks_->streamInfo().streamState());
+        EXPECT_EQ(filter->callbacks_->streamInfo().streamState(), StreamInfo::StreamState::Started);
 
         filter->callbacks_->streamInfo().setResponseCodeDetails("");
         ResponseHeaderMapPtr response_headers{new TestResponseHeaderMapImpl{{":status", "200"}}};
         filter->callbacks_->encodeHeaders(std::move(response_headers), false, "details");
 
-        EXPECT_EQ(StreamInfo::StreamState::InProgress,
-                  filter->callbacks_->streamInfo().streamState());
+        EXPECT_EQ(filter->callbacks_->streamInfo().streamState(),
+                  StreamInfo::StreamState::InProgress);
 
         ResponseTrailerMapPtr response_trailers{new TestResponseTrailerMapImpl{{"x-trailer", "1"}}};
         filter->callbacks_->encodeTrailers(std::move(response_trailers));
 
-        EXPECT_EQ(StreamInfo::StreamState::Ended, filter->callbacks_->streamInfo().streamState());
+        EXPECT_EQ(filter->callbacks_->streamInfo().streamState(), StreamInfo::StreamState::Ended);
 
         data.drain(4);
         return Http::okStatus();
@@ -2617,13 +2620,13 @@ TEST_F(HttpConnectionManagerImplTest, TestStreamStateNonSuccessStatusCode) {
                                          {"x-request-id", "125a4afb-6f55-a4ba-ad80-413f09f48a28"}}};
         decoder_->decodeHeaders(std::move(headers), true);
 
-        EXPECT_EQ(StreamInfo::StreamState::Started, filter->callbacks_->streamInfo().streamState());
+        EXPECT_EQ(filter->callbacks_->streamInfo().streamState(), StreamInfo::StreamState::Started);
 
         filter->callbacks_->streamInfo().setResponseCodeDetails("");
         ResponseHeaderMapPtr response_headers{new TestResponseHeaderMapImpl{{":status", "500"}}};
         filter->callbacks_->encodeHeaders(std::move(response_headers), true, "details");
 
-        EXPECT_EQ(StreamInfo::StreamState::Ended, filter->callbacks_->streamInfo().streamState());
+        EXPECT_EQ(filter->callbacks_->streamInfo().streamState(), StreamInfo::StreamState::Ended);
 
         data.drain(4);
         return Http::okStatus();

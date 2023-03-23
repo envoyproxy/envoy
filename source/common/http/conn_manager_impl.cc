@@ -1663,7 +1663,7 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ResponseHeaderMap& heade
                    headers);
 
   // According to RFC7231 any 2xx response indicates that the connection is established.
-  if (Http::CodeUtility::is2xx(Http::Utility::getResponseStatus(headers))) {
+  if (!end_stream && Http::CodeUtility::is2xx(Http::Utility::getResponseStatus(headers))) {
     filter_manager_.streamInfo().setStreamState(StreamInfo::StreamState::InProgress);
   }
 
