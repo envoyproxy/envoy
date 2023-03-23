@@ -189,7 +189,7 @@ void CheckRequestUtils::createHttpCheck(
     Protobuf::Map<std::string, std::string>&& context_extensions,
     envoy::config::core::v3::Metadata&& metadata_context,
     envoy::service::auth::v3::CheckRequest& request, uint64_t max_request_bytes, bool pack_as_bytes,
-    bool include_peer_certificate,
+    bool include_peer_certificate, bool include_tls_session,
     const Protobuf::Map<std::string, std::string>& destination_labels,
     const MatcherSharedPtr& request_header_matchers) {
 
@@ -207,6 +207,14 @@ void CheckRequestUtils::createHttpCheck(
                         cb->decodingBuffer(), headers, max_request_bytes, pack_as_bytes,
                         request_header_matchers);
 
+  if (include_tls_session) {
+    if (cb->connection()->ssl() != nullptr) {
+      if (!cb->connection()->ssl()->sni().empty()) {
+        const std::string server_name(cb->connection()->ssl()->sni());
+        attrs->mutable_tls_session()->set_sni(server_name);
+      }
+    }
+  }
   (*attrs->mutable_destination()->mutable_labels()) = destination_labels;
   // Fill in the context extensions and metadata context.
   (*attrs->mutable_context_extensions()) = std::move(context_extensions);
