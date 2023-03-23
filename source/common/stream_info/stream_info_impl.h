@@ -108,8 +108,7 @@ struct StreamInfoImpl : public StreamInfo {
       TimeSource& time_source,
       const Network::ConnectionInfoProviderSharedPtr& downstream_connection_info_provider,
       FilterState::LifeSpan life_span = FilterState::LifeSpan::FilterChain)
-      : StreamInfoImpl(absl::nullopt, time_source,
-                       downstream_connection_info_provider,
+      : StreamInfoImpl(absl::nullopt, time_source, downstream_connection_info_provider,
                        std::make_shared<FilterStateImpl>(life_span)) {}
 
   StreamInfoImpl(
