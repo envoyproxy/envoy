@@ -30,6 +30,11 @@ INSTANTIATE_TEST_SUITE_P(Protocols, HttpConnPoolIntegrationTest,
 
 // Tests that conn pools are cleaned up after becoming idle due to a LocalClose
 TEST_P(HttpConnPoolIntegrationTest, PoolCleanupAfterLocalClose) {
+  if (upstreamProtocol() == Http::CodecType::HTTP3 ||
+      downstreamProtocol() == Http::CodecType::HTTP3) {
+    // TODO(#26236) - Fix test flakiness over HTTP/3.
+    return;
+  }
   config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
     // Make Envoy close the upstream connection after a single request.
     ConfigHelper::HttpProtocolOptions protocol_options;
