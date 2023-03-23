@@ -2424,7 +2424,6 @@ TEST_F(HttpConnectionManagerImplTest, TestAccessLogOnNewRequest) {
   flush_access_log_on_new_request_ = true;
 
   EXPECT_CALL(*handler, log(_, _, _, _))
-      .Times(2) // flush_access_log_on_new_request_ enabled.
       .WillOnce(Invoke([](const HeaderMap*, const HeaderMap*, const HeaderMap*,
                           const StreamInfo::StreamInfo& stream_info) {
         // First call to log() is made when a new HTTP request has been received
