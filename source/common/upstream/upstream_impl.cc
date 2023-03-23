@@ -969,7 +969,9 @@ ClusterInfoImpl::ClusterInfoImpl(
     Stats::ScopeSharedPtr&& stats_scope, bool added_via_api,
     Server::Configuration::TransportSocketFactoryContext& factory_context)
     : runtime_(runtime), name_(config.name()),
-      observability_name_(PROTOBUF_GET_STRING_OR_DEFAULT(config, alt_stat_name, name_)),
+      observability_name_(!config.alt_stat_name().empty()
+                              ? std::make_unique<std::string>(config.alt_stat_name())
+                              : nullptr),
       extension_protocol_options_(parseExtensionProtocolOptions(config, factory_context)),
       http_protocol_options_(
           createOptions(config,
