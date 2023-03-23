@@ -93,7 +93,6 @@ envoy_cc_library(
     ],
     deps = [
         "//envoy/buffer:buffer_interface",
-        "//envoy/http:filter_interface",
         "//envoy/http:header_map_interface",
         "//envoy/server:admin_interface",
         "//source/common/html:utility_lib",

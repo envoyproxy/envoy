@@ -35,6 +35,26 @@ void renderHead(Http::ResponseHeaderMap& response_headers, Buffer::Instance& res
 
 void finalize(Buffer::Instance& response);
 
+/**
+ * Renders a table row for a URL endpoint, including the name of the endpoint,
+ * entries for each parameter, and help text.
+ *
+ * This must be called after renderTableBegin and before renderTableEnd. Any
+ * number of URL Handlers can be rendered.
+ *
+ * @param response buffer to write the HTML for the handler
+ * @param handler the URL handler.
+ * @param query query params
+ * @param index url handler's index.
+ * @param submit_on_change by default, editing parameters does not cause a
+ *        form-submit -- you have to click on the link or button first. This
+ *        is useful for the admin home page which lays out all the parameters
+ *        so users can tweak them before submitting. Setting to true, the form
+ *        auto-submits when any parameters change, and does not have its own
+ *        explicit submit button. This is used to enable the user to adjust
+ *        query-parameters while visiting an html-rendered endpoint.
+ * @param active indicates
+ */
 void urlHandler(Buffer::Instance& response, const Admin::UrlHandler& handler,
                 OptRef<const Http::Utility::QueryParams> query, int index, bool submit_on_change,
                 bool active);

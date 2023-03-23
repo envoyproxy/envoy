@@ -13,6 +13,14 @@ public:
   StatsHtmlRender(Http::ResponseHeaderMap& response_headers, Buffer::Instance& response,
                   const StatsParams& params);
 
+  /**
+   * Writes the header and starts the body for a stats page based on the
+   * supplied stats parameters.
+   *
+   * @param url_handler The stats URL handler.
+   * @param params The parameters for the stats page.
+   * @param response The buffer in which to write the HTML.
+   */
   void setupStatsPage(const Admin::UrlHandler& url_handler, const StatsParams& params,
                       Buffer::Instance& response);
 
@@ -27,55 +35,15 @@ public:
     StatsTextRender::generate(response, name, value);
   }
 
-  // Needed to allow gcc t compile, otherwise it warns about hidden overrides.
+  // generate() call directly calls parent method, which is needed to allow gcc
+  // to compile, otherwise it warns about hidden overrides.
   void generate(Buffer::Instance& response, const std::string& name,
                 const Stats::ParentHistogram& histogram) override {
     StatsTextRender::generate(response, name, histogram);
   }
   void finalize(Buffer::Instance&) override;
 
-  /**
-   * Initiates an HTML PRE section. The PRE will be auto-closed when the render
-   * object is finalized.
-   */
-  void startPre(Buffer::Instance&);
-
-  /**
-   * Renders a table row for a URL endpoint, including the name of the endpoint,
-   * entries for each parameter, and help text.
-   *
-   * This must be called after renderTableBegin and before renderTableEnd. Any
-   * number of URL Handlers can be rendered.
-   *
-   * @param handler the URL handler.
-   */
-  // void urlHandler(Buffer::Instance&, const Admin::UrlHandler& handler,
-  //                 OptRef<const Http::Utility::QueryParams> query);
-
-  // void input(Buffer::Instance&, absl::string_view id, absl::string_view name,
-  //            absl::string_view path, Admin::ParamDescriptor::Type type,
-  //            OptRef<const Http::Utility::QueryParams> query,
-  //            const std::vector<absl::string_view>& enum_choices);
-
-  // By default, editing parameters does not cause a form-submit -- you have
-  // to click on the link or button first. This is useful for the admin home
-  // page which lays out all the parameters so users can tweak them before submitting.
-  //
-  // Calling setSubmitOnChange(true) makes the form auto-submits when any
-  // parameters change, and does not have its own explicit submit button. This
-  // is used to enable the user to adjust query-parameters while visiting an
-  // html-rendered endpoint.
-  // void setSubmitOnChange(bool submit_on_change) { submit_on_change_ = submit_on_change; }
-
 private:
-  void appendResource(Buffer::Instance& response, absl::string_view file,
-                      absl::string_view default_value,
-                      std::function<std::string(absl::string_view)> xform = nullptr);
-
-  // int index_{0}; // Used to alternate row-group background color
-  // bool submit_on_change_{false};
-  // bool has_pre_{false};
-  // bool finalized_{false};
   const bool active_{false};
 };
 

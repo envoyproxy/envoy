@@ -11,7 +11,7 @@
 #include "absl/strings/str_replace.h"
 
 // Note: if you change this file, it's advisable to manually run
-// test/integration/admin_web_test.sh to semi-automatically validate
+// test/integration/admin_html/web_test.sh to semi-automatically validate
 // the web interface, in addition to updating and running unit tests.
 //
 // The admin web test does not yet run automatically.
@@ -29,7 +29,6 @@ void StatsHtmlRender::finalize(Buffer::Instance& response) { AdminHtmlUtil::fina
 
 void StatsHtmlRender::setupStatsPage(const Admin::UrlHandler& url_handler,
                                      const StatsParams& params, Buffer::Instance& response) {
-  // setSubmitOnChange(true);
   AdminHtmlUtil::tableBegin(response);
   AdminHtmlUtil::urlHandler(response, url_handler, params.query_, 1, !active_, active_);
   if (active_) {
@@ -45,25 +44,6 @@ void StatsHtmlRender::setupStatsPage(const Admin::UrlHandler& url_handler,
     response.add("<pre>\n");
   }
 }
-
-/*
-void StatsHtmlRender::finalize(Buffer::Instance& response) {
-  ASSERT(!finalized_);
-  finalized_ = true;
-  if (has_pre_) {
-    response.add("</pre>\n");
-  }
-  response.add("</body>\n"
-               "</html>");
-}
-
-void StatsHtmlRender::startPre(Buffer::Instance& response) {
-  if (!active_) {
-    has_pre_ = true;
-    response.add("<pre>\n");
-  }
-}
-*/
 
 void StatsHtmlRender::generate(Buffer::Instance& response, const std::string& name,
                                const std::string& value) {
