@@ -52,7 +52,7 @@ static_resources:
             address:
               socket_address:
                 address: service-https-http2
-                port_value: 443
+                port_value: 8443
   - name: service-https-http1.1
     type: STRICT_DNS
     lb_policy: ROUND_ROBIN
@@ -64,7 +64,7 @@ static_resources:
             address:
               socket_address:
                 address: service-https-http1.1
-                port_value: 443
+                port_value: 8443
   - name: service-http
     type: STRICT_DNS
     lb_policy: ROUND_ROBIN
@@ -76,4 +76,4 @@ static_resources:
             address:
               socket_address:
                 address: service-http
-                port_value: 80
+                port_value: 8080

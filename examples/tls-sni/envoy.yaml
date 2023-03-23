@@ -101,7 +101,7 @@ static_resources:
             address:
               socket_address:
                 address: http-upstream1
-                port_value: 80
+                port_value: 8080
 
   - name: proxy-domain2
     type: STRICT_DNS
@@ -114,7 +114,7 @@ static_resources:
             address:
               socket_address:
                 address: http-upstream2
-                port_value: 80
+                port_value: 8080
 
   - name: proxy-domain3
     type: STRICT_DNS
@@ -127,4 +127,4 @@ static_resources:
             address:
               socket_address:
                 address: https-upstream3
-                port_value: 443
+                port_value: 8443

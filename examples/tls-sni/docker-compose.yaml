@@ -22,13 +22,13 @@ services:
     - HTTPS_PORT=0
 
   http-upstream2:
-    image: mendhak/http-https-echo
+    image: mendhak/http-https-echo:29@sha256:096c8712d028307586aa9b7908e7cfca8ea3d9b82a324612342a3e398b152727
     hostname: http-upstream2
     environment:
     - HTTPS_PORT=0
 
   https-upstream3:
-    image: mendhak/http-https-echo
+    image: mendhak/http-https-echo:29@sha256:096c8712d028307586aa9b7908e7cfca8ea3d9b82a324612342a3e398b152727
     hostname: https-upstream3
     environment:
     - HTTP_PORT=0

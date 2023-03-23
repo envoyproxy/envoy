@@ -5,6 +5,14 @@ export NAME=tls
 # shellcheck source=examples/verify-common.sh
 . "$(dirname "${BASH_SOURCE[0]}")/../verify-common.sh"
 
+export -f _curl
+export -f responds_with
+
+wait_for 10 bash -c "responds_with \
+    '\"x-forwarded-proto\": \"https\",' \
+    -k \
+    https://localhost:10000"
+
 run_log "Test https -> http"
 responds_with \
     '"x-forwarded-proto": "https",' \
