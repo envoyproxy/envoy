@@ -121,7 +121,7 @@ public:
   void onFinishProcessorCall(Grpc::Status::GrpcStatus call_status,
                              CallbackState next_state = CallbackState::Idle);
   void stopMessageTimer();
-  void restartMessageTimer(const uint32_t message_timeout_ms);
+  bool restartMessageTimer(const uint32_t message_timeout_ms);
 
   // Idempotent methods for watermarking the body
   virtual void requestWatermark() PURE;

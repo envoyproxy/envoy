@@ -56,7 +56,7 @@ void ProcessorState::stopMessageTimer() {
 // Server sends back response to stop the original timer and start a new timer.
 // Do not change call_start_time_ since that call has not been responded yet.
 // Do not change callback_state_ either.
-void ProcessorState::restartMessageTimer(const uint32_t message_timeout_ms) {
+bool ProcessorState::restartMessageTimer(const uint32_t message_timeout_ms) {
   if (message_timer_ && message_timer_->enabled() && !new_timeout_received_) {
     ENVOY_LOG(debug,
               "Traffic direction {}: Server needs more time to process the request, start a "
@@ -67,11 +67,13 @@ void ProcessorState::restartMessageTimer(const uint32_t message_timeout_ms) {
     // Setting this flag to true to make sure Envoy ignore the future such
     // messages when in the same state.
     new_timeout_received_ = true;
+    return true;
   } else {
     ENVOY_LOG(debug,
               "Traffic direction {}: Ignoring server new timeout message {} ms due to timer not "
               "enabled or not the 1st such message",
               trafficDirectionDebugStr(), message_timeout_ms);
+    return false;
   }
 }
 

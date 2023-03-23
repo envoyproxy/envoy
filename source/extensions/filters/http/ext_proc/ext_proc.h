@@ -33,7 +33,9 @@ namespace ExternalProcessing {
   COUNTER(streams_failed)                                                                          \
   COUNTER(failure_mode_allowed)                                                                    \
   COUNTER(message_timeouts)                                                                        \
-  COUNTER(rejected_header_mutations)
+  COUNTER(rejected_header_mutations)                                                               \
+  COUNTER(override_message_timeout_received)                                                       \
+  COUNTER(override_message_timeout_ignored)
 
 struct ExtProcFilterStats {
   ALL_EXT_PROC_FILTER_STATS(GENERATE_COUNTER_STRUCT)
