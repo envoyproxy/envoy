@@ -292,10 +292,8 @@ TEST_P(RedirectExtensionIntegrationTest, InternalRedirectPreventedBySafeCrossSch
             response->headers().get(test_header_key_)[0]->value().getStringView());
 }
 
-// TODO(#26236): Fix test suite for HTTP/3.
-INSTANTIATE_TEST_SUITE_P(
-    Protocols, RedirectExtensionIntegrationTest,
-    testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParamsWithoutHTTP3()),
-    HttpProtocolIntegrationTest::protocolTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(Protocols, RedirectExtensionIntegrationTest,
+                         testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams()),
+                         HttpProtocolIntegrationTest::protocolTestParamsToString);
 
 } // namespace Envoy

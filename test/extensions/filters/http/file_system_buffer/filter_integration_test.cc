@@ -57,13 +57,9 @@ std::string smallRequestBufferConfig() {
 
 using FileSystemBufferIntegrationTest = HttpProtocolIntegrationTest;
 
-// TODO(#26236): Fix test suite for HTTP/3.
-INSTANTIATE_TEST_SUITE_P(
-    Protocols, FileSystemBufferIntegrationTest,
-    testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams(
-        /*downstream_protocols = */ {Envoy::Http::CodecType::HTTP1, Envoy::Http::CodecType::HTTP2},
-        /*upstream_protocols = */ {Envoy::Http::CodecType::HTTP1, Envoy::Http::CodecType::HTTP2})),
-    HttpProtocolIntegrationTest::protocolTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(Protocols, FileSystemBufferIntegrationTest,
+                         testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams()),
+                         HttpProtocolIntegrationTest::protocolTestParamsToString);
 
 TEST_P(FileSystemBufferIntegrationTest, NotFoundBodyBuffer) {
   config_helper_.prependFilter(contentLengthConfig());

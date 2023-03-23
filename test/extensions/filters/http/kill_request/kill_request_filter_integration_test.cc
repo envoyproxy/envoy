@@ -28,12 +28,9 @@ typed_config:
 
 // Tests should run with all protocols.
 class KillRequestFilterIntegrationTestAllProtocols : public KillRequestFilterIntegrationTest {};
-
-// TODO(#26236): Fix test suite for HTTP/3.
-INSTANTIATE_TEST_SUITE_P(
-    Protocols, KillRequestFilterIntegrationTestAllProtocols,
-    testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParamsWithoutHTTP3()),
-    HttpProtocolIntegrationTest::protocolTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(Protocols, KillRequestFilterIntegrationTestAllProtocols,
+                         testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams()),
+                         HttpProtocolIntegrationTest::protocolTestParamsToString);
 
 // Request crash Envoy controlled via header configuration.
 TEST_P(KillRequestFilterIntegrationTestAllProtocols, KillRequestCrashEnvoy) {
