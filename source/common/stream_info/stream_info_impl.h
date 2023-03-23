@@ -108,14 +108,14 @@ struct StreamInfoImpl : public StreamInfo {
       TimeSource& time_source,
       const Network::ConnectionInfoProviderSharedPtr& downstream_connection_info_provider,
       FilterState::LifeSpan life_span = FilterState::LifeSpan::FilterChain)
-      : StreamInfoImpl(absl::nullopt, absl::nullopt, time_source,
+      : StreamInfoImpl(absl::nullopt, time_source,
                        downstream_connection_info_provider,
                        std::make_shared<FilterStateImpl>(life_span)) {}
 
   StreamInfoImpl(
       Http::Protocol protocol, TimeSource& time_source,
       const Network::ConnectionInfoProviderSharedPtr& downstream_connection_info_provider)
-      : StreamInfoImpl(protocol, absl::nullopt, time_source, downstream_connection_info_provider,
+      : StreamInfoImpl(protocol, time_source, downstream_connection_info_provider,
                        std::make_shared<FilterStateImpl>(FilterState::LifeSpan::FilterChain)) {}
 
   StreamInfoImpl(
@@ -123,7 +123,7 @@ struct StreamInfoImpl : public StreamInfo {
       const Network::ConnectionInfoProviderSharedPtr& downstream_connection_info_provider,
       FilterStateSharedPtr parent_filter_state, FilterState::LifeSpan life_span)
       : StreamInfoImpl(
-            protocol, absl::nullopt, time_source, downstream_connection_info_provider,
+            protocol, time_source, downstream_connection_info_provider,
             std::make_shared<FilterStateImpl>(
                 FilterStateImpl::LazyCreateAncestor(std::move(parent_filter_state), life_span),
                 FilterState::LifeSpan::FilterChain)) {}
@@ -420,13 +420,12 @@ private:
   }
 
   StreamInfoImpl(
-      absl::optional<Http::Protocol> protocol, absl::optional<StreamState> stream_state,
-      TimeSource& time_source,
+      absl::optional<Http::Protocol> protocol, TimeSource& time_source,
       const Network::ConnectionInfoProviderSharedPtr& downstream_connection_info_provider,
       FilterStateSharedPtr filter_state)
       : time_source_(time_source), start_time_(time_source.systemTime()),
         start_time_monotonic_(time_source.monotonicTime()), protocol_(protocol),
-        stream_state_(stream_state), filter_state_(std::move(filter_state)),
+        stream_state_(absl::nullopt), filter_state_(std::move(filter_state)),
         downstream_connection_info_provider_(downstream_connection_info_provider != nullptr
                                                  ? downstream_connection_info_provider
                                                  : emptyDownstreamAddressProvider()),

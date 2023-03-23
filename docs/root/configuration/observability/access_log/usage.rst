@@ -200,7 +200,7 @@ The following command operators are supported:
 %STREAM_STATE%
   HTTP/TCP
     The state of the stream. Currently either *Started* *InProgress* *Ended*.
-    In case the stream has not started yet, the value will be null.
+    In case the stream has not started yet, the value will be - 'null'.
 
   UDP
     Not implemented ("-").
