@@ -449,7 +449,8 @@ IntegrationStreamDecoderPtr HttpIntegrationTest::sendRequestAndWaitForResponse(
     upstream_request_->encodeData(response_body_size, true);
   }
   // Wait for the response to be read by the codec client.
-  RELEASE_ASSERT(response->waitForEndStream(timeout), "unexpected timeout");
+  RELEASE_ASSERT(response->waitForEndStream(timeout),
+                 fmt::format("unexpected timeout after ", timeout.count(), " ms"));
   return response;
 }
 
@@ -1629,7 +1630,6 @@ void HttpIntegrationTest::expectUpstreamBytesSentAndReceived(BytesCountExpectati
                                                              BytesCountExpectation h2_expectation,
                                                              BytesCountExpectation h3_expectation,
                                                              const int id) {
-  auto integer_near = [](int x, int y) -> bool { return std::abs(x - y) <= (x / 20); };
   std::string access_log = waitForAccessLog(access_log_name_, id, true);
   std::vector<std::string> log_entries = absl::StrSplit(access_log, ' ');
   int wire_bytes_sent = std::stoi(log_entries[0]), wire_bytes_received = std::stoi(log_entries[1]),
@@ -1637,43 +1637,24 @@ void HttpIntegrationTest::expectUpstreamBytesSentAndReceived(BytesCountExpectati
       header_bytes_received = std::stoi(log_entries[3]);
   switch (upstreamProtocol()) {
   case Http::CodecType::HTTP1: {
-    EXPECT_EQ(h1_expectation.wire_bytes_sent_, wire_bytes_sent)
-        << "expect: " << h1_expectation.wire_bytes_sent_ << ", actual: " << wire_bytes_sent;
-    EXPECT_EQ(h1_expectation.wire_bytes_received_, wire_bytes_received)
-        << "expect: " << h1_expectation.wire_bytes_received_ << ", actual: " << wire_bytes_received;
-    EXPECT_EQ(h1_expectation.header_bytes_sent_, header_bytes_sent)
-        << "expect: " << h1_expectation.header_bytes_sent_ << ", actual: " << header_bytes_sent;
-    EXPECT_EQ(h1_expectation.header_bytes_received_, header_bytes_received)
-        << "expect: " << h1_expectation.header_bytes_received_
-        << ", actual: " << header_bytes_received;
+    EXPECT_EQ(h1_expectation.wire_bytes_sent_ == 0, wire_bytes_sent == 0);
+    EXPECT_EQ(h1_expectation.wire_bytes_received_ == 0, wire_bytes_received == 0);
+    EXPECT_EQ(h1_expectation.header_bytes_sent_ == 0, header_bytes_sent == 0);
+    EXPECT_EQ(h1_expectation.header_bytes_received_ == 0, header_bytes_received == 0);
     return;
   }
   case Http::CodecType::HTTP2: {
-    // Because of non-deterministic h2 compression, the same plain text length don't map to the
-    // same number of wire bytes.
-    EXPECT_TRUE(integer_near(h2_expectation.wire_bytes_sent_, wire_bytes_sent))
-        << "expect: " << h2_expectation.wire_bytes_sent_ << ", actual: " << wire_bytes_sent;
-    EXPECT_TRUE(integer_near(h2_expectation.wire_bytes_received_, wire_bytes_received))
-        << "expect: " << h2_expectation.wire_bytes_received_ << ", actual: " << wire_bytes_received;
-    EXPECT_TRUE(integer_near(h2_expectation.header_bytes_sent_, header_bytes_sent))
-        << "expect: " << h2_expectation.header_bytes_sent_ << ", actual: " << header_bytes_sent;
-    EXPECT_TRUE(integer_near(h2_expectation.header_bytes_received_, header_bytes_received))
-        << "expect: " << h2_expectation.header_bytes_received_
-        << ", actual: " << header_bytes_received;
+    EXPECT_EQ(h2_expectation.wire_bytes_sent_ == 0, wire_bytes_sent == 0);
+    EXPECT_EQ(h2_expectation.wire_bytes_received_ == 0, wire_bytes_received == 0);
+    EXPECT_EQ(h2_expectation.header_bytes_sent_ == 0, header_bytes_sent == 0);
+    EXPECT_EQ(h2_expectation.header_bytes_received_ == 0, header_bytes_received == 0);
     return;
   }
   case Http::CodecType::HTTP3: {
-    // Because of non-deterministic h2 compression, the same plain text length don't map to the
-    // Same number of wire bytes.
-    EXPECT_TRUE(integer_near(h3_expectation.wire_bytes_sent_, wire_bytes_sent))
-        << "expect: " << h3_expectation.wire_bytes_sent_ << ", actual: " << wire_bytes_sent;
-    EXPECT_TRUE(integer_near(h3_expectation.wire_bytes_received_, wire_bytes_received))
-        << "expect: " << h3_expectation.wire_bytes_received_ << ", actual: " << wire_bytes_received;
-    EXPECT_TRUE(integer_near(h3_expectation.header_bytes_sent_, header_bytes_sent))
-        << "expect: " << h3_expectation.header_bytes_sent_ << ", actual: " << header_bytes_sent;
-    EXPECT_TRUE(integer_near(h3_expectation.header_bytes_received_, header_bytes_received))
-        << "expect: " << h3_expectation.header_bytes_received_
-        << ", actual: " << header_bytes_received;
+    EXPECT_EQ(h3_expectation.wire_bytes_sent_ == 0, wire_bytes_sent == 0);
+    EXPECT_EQ(h3_expectation.wire_bytes_received_ == 0, wire_bytes_received == 0);
+    EXPECT_EQ(h3_expectation.header_bytes_sent_ == 0, header_bytes_sent == 0);
+    EXPECT_EQ(h3_expectation.header_bytes_received_ == 0, header_bytes_received == 0);
     return;
   }
 
@@ -1686,7 +1667,6 @@ void HttpIntegrationTest::expectDownstreamBytesSentAndReceived(BytesCountExpecta
                                                                BytesCountExpectation h2_expectation,
                                                                BytesCountExpectation h3_expectation,
                                                                const int id) {
-  auto integer_near = [](int x, int y) -> bool { return std::abs(x - y) <= (x / 5); };
   std::string access_log = waitForAccessLog(access_log_name_, id);
   std::vector<std::string> log_entries = absl::StrSplit(access_log, ' ');
   int wire_bytes_sent = std::stoi(log_entries[0]), wire_bytes_received = std::stoi(log_entries[1]),
@@ -1694,43 +1674,24 @@ void HttpIntegrationTest::expectDownstreamBytesSentAndReceived(BytesCountExpecta
       header_bytes_received = std::stoi(log_entries[3]);
   switch (downstreamProtocol()) {
   case Http::CodecType::HTTP1: {
-    EXPECT_TRUE(integer_near(h1_expectation.wire_bytes_sent_, wire_bytes_sent))
-        << "expect: " << h1_expectation.wire_bytes_sent_ << ", actual: " << wire_bytes_sent;
-    EXPECT_EQ(h1_expectation.wire_bytes_received_, wire_bytes_received)
-        << "expect: " << h1_expectation.wire_bytes_received_ << ", actual: " << wire_bytes_received;
-    EXPECT_TRUE(integer_near(h1_expectation.header_bytes_sent_, header_bytes_sent))
-        << "expect: " << h1_expectation.header_bytes_sent_ << ", actual: " << header_bytes_sent;
-    EXPECT_EQ(h1_expectation.header_bytes_received_, header_bytes_received)
-        << "expect: " << h1_expectation.header_bytes_received_
-        << ", actual: " << header_bytes_received;
+    EXPECT_EQ(h1_expectation.wire_bytes_sent_ == 0, wire_bytes_sent == 0);
+    EXPECT_EQ(h1_expectation.wire_bytes_received_ == 0, wire_bytes_received == 0);
+    EXPECT_EQ(h1_expectation.header_bytes_sent_ == 0, header_bytes_sent == 0);
+    EXPECT_EQ(h1_expectation.header_bytes_received_ == 0, header_bytes_received == 0);
     return;
   }
   case Http::CodecType::HTTP2: {
-    // Because of non-deterministic h2 compression, the same plain text length don't map to the
-    // same number of wire bytes.
-    EXPECT_TRUE(integer_near(h2_expectation.wire_bytes_sent_, wire_bytes_sent))
-        << "expect: " << h2_expectation.wire_bytes_sent_ << ", actual: " << wire_bytes_sent;
-    EXPECT_TRUE(integer_near(h2_expectation.wire_bytes_received_, wire_bytes_received))
-        << "expect: " << h2_expectation.wire_bytes_received_ << ", actual: " << wire_bytes_received;
-    EXPECT_TRUE(integer_near(h2_expectation.header_bytes_sent_, header_bytes_sent))
-        << "expect: " << h2_expectation.header_bytes_sent_ << ", actual: " << header_bytes_sent;
-    EXPECT_TRUE(integer_near(h2_expectation.header_bytes_received_, header_bytes_received))
-        << "expect: " << h2_expectation.header_bytes_received_
-        << ", actual: " << header_bytes_received;
+    EXPECT_EQ(h2_expectation.wire_bytes_sent_ == 0, wire_bytes_sent == 0);
+    EXPECT_EQ(h2_expectation.wire_bytes_received_ == 0, wire_bytes_received == 0);
+    EXPECT_EQ(h2_expectation.header_bytes_sent_ == 0, header_bytes_sent == 0);
+    EXPECT_EQ(h2_expectation.header_bytes_received_ == 0, header_bytes_received == 0);
     return;
   }
   case Http::CodecType::HTTP3: {
-    // Because of non-deterministic h3 compression, the same plain text length don't map to the
-    // same number of wire bytes.
-    EXPECT_TRUE(integer_near(h3_expectation.wire_bytes_sent_, wire_bytes_sent))
-        << "expect: " << h3_expectation.wire_bytes_sent_ << ", actual: " << wire_bytes_sent;
-    EXPECT_TRUE(integer_near(h3_expectation.wire_bytes_received_, wire_bytes_received))
-        << "expect: " << h3_expectation.wire_bytes_received_ << ", actual: " << wire_bytes_received;
-    EXPECT_TRUE(integer_near(h3_expectation.header_bytes_sent_, header_bytes_sent))
-        << "expect: " << h3_expectation.header_bytes_sent_ << ", actual: " << header_bytes_sent;
-    EXPECT_TRUE(integer_near(h3_expectation.header_bytes_received_, header_bytes_received))
-        << "expect: " << h3_expectation.header_bytes_received_
-        << ", actual: " << header_bytes_received;
+    EXPECT_EQ(h3_expectation.wire_bytes_sent_ == 0, wire_bytes_sent == 0);
+    EXPECT_EQ(h3_expectation.wire_bytes_received_ == 0, wire_bytes_received == 0);
+    EXPECT_EQ(h3_expectation.header_bytes_sent_ == 0, header_bytes_sent == 0);
+    EXPECT_EQ(h3_expectation.header_bytes_received_ == 0, header_bytes_received == 0);
     return;
   }
   default:

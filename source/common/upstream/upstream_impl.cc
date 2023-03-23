@@ -961,6 +961,35 @@ createOptions(const envoy::config::cluster::v3::Cluster& config,
       config.has_http2_protocol_options(), validation_visitor);
 }
 
+LBPolicyConfig::LBPolicyConfig(const envoy::config::cluster::v3::Cluster& config) {
+  switch (config.lb_config_case()) {
+  case envoy::config::cluster::v3::Cluster::kRoundRobinLbConfig:
+    lb_policy_ = std::make_unique<const envoy::config::cluster::v3::Cluster::RoundRobinLbConfig>(
+        config.round_robin_lb_config());
+    break;
+  case envoy::config::cluster::v3::Cluster::kLeastRequestLbConfig:
+    lb_policy_ = std::make_unique<envoy::config::cluster::v3::Cluster::LeastRequestLbConfig>(
+        config.least_request_lb_config());
+    break;
+  case envoy::config::cluster::v3::Cluster::kRingHashLbConfig:
+    lb_policy_ = std::make_unique<envoy::config::cluster::v3::Cluster::RingHashLbConfig>(
+        config.ring_hash_lb_config());
+    break;
+  case envoy::config::cluster::v3::Cluster::kMaglevLbConfig:
+    lb_policy_ = std::make_unique<envoy::config::cluster::v3::Cluster::MaglevLbConfig>(
+        config.maglev_lb_config());
+    break;
+  case envoy::config::cluster::v3::Cluster::kOriginalDstLbConfig:
+    lb_policy_ = std::make_unique<envoy::config::cluster::v3::Cluster::OriginalDstLbConfig>(
+        config.original_dst_lb_config());
+    break;
+  case envoy::config::cluster::v3::Cluster::LB_CONFIG_NOT_SET:
+    // The default value of the variant if there is no config would be nullptr
+    // Which is set when the class is initialized. No action needed if config isn't set
+    break;
+  }
+}
+
 ClusterInfoImpl::ClusterInfoImpl(
     Init::Manager& init_manager, Server::Configuration::ServerFactoryContext& server_context,
     const envoy::config::cluster::v3::Cluster& config,
@@ -1009,30 +1038,7 @@ ClusterInfoImpl::ClusterInfoImpl(
       maintenance_mode_runtime_key_(absl::StrCat("upstream.maintenance_mode.", name_)),
       upstream_local_address_selector_(
           std::make_shared<UpstreamLocalAddressSelectorImpl>(config, bind_config)),
-      lb_round_robin_config_(
-          config.has_round_robin_lb_config()
-              ? std::make_unique<envoy::config::cluster::v3::Cluster::RoundRobinLbConfig>(
-                    config.round_robin_lb_config())
-              : nullptr),
-      lb_least_request_config_(
-          config.has_least_request_lb_config()
-              ? std::make_unique<envoy::config::cluster::v3::Cluster::LeastRequestLbConfig>(
-                    config.least_request_lb_config())
-              : nullptr),
-      lb_ring_hash_config_(
-          config.has_ring_hash_lb_config()
-              ? std::make_unique<envoy::config::cluster::v3::Cluster::RingHashLbConfig>(
-                    config.ring_hash_lb_config())
-              : nullptr),
-      lb_maglev_config_(config.has_maglev_lb_config()
-                            ? std::make_unique<envoy::config::cluster::v3::Cluster::MaglevLbConfig>(
-                                  config.maglev_lb_config())
-                            : nullptr),
-      lb_original_dst_config_(
-          config.has_original_dst_lb_config()
-              ? std::make_unique<envoy::config::cluster::v3::Cluster::OriginalDstLbConfig>(
-                    config.original_dst_lb_config())
-              : nullptr),
+      lb_policy_config_(std::make_unique<const LBPolicyConfig>(config)),
       upstream_config_(config.has_upstream_config()
                            ? std::make_unique<envoy::config::core::v3::TypedExtensionConfig>(
                                  config.upstream_config())

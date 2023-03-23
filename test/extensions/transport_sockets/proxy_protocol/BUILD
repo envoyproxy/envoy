@@ -29,6 +29,7 @@ envoy_extension_cc_test(
 
 envoy_extension_cc_test(
     name = "proxy_protocol_integration_test",
+    size = "large",
     srcs = ["proxy_protocol_integration_test.cc"],
     extension_names = ["envoy.transport_sockets.upstream_proxy_protocol"],
     deps = [
