@@ -29,8 +29,8 @@ public:
   bool isShutdown() const override { return shutdown_; }
 
   SlotPtr allocateSlotMock() { return SlotPtr{new SlotImpl(*this, current_slot_++)}; }
-  void runOnAllThreads1(Event::PostCb cb) { cb(); }
-  void runOnAllThreads2(Event::PostCb cb, Event::PostCb main_callback) {
+  void runOnAllThreads1(std::function<void()> cb) { cb(); }
+  void runOnAllThreads2(std::function<void()> cb, std::function<void()> main_callback) {
     cb();
     main_callback();
   }

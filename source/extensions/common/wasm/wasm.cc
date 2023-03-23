@@ -68,7 +68,7 @@ void Wasm::initializeLifecycle(Server::ServerLifecycleNotifier& lifecycle_notifi
                                       [this, weak](Event::PostCb post_cb) {
                                         auto lock = weak.lock();
                                         if (lock) { // See if we are still alive.
-                                          server_shutdown_post_cb_ = post_cb;
+                                          server_shutdown_post_cb_ = std::move(post_cb);
                                         }
                                       });
 }
