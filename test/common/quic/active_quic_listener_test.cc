@@ -61,7 +61,7 @@ public:
   using ActiveQuicListenerFactory::ActiveQuicListenerFactory;
 
 protected:
-  virtual Network::ConnectionHandler::ActiveUdpListenerPtr createActiveQuicListener(
+  Network::ConnectionHandler::ActiveUdpListenerPtr createActiveQuicListener(
       Runtime::Loader& runtime, uint32_t worker_index, uint32_t concurrency,
       Event::Dispatcher& dispatcher, Network::UdpConnectionHandler& parent,
       Network::SocketSharedPtr&& listen_socket, Network::ListenerConfig& listener_config,
@@ -70,7 +70,7 @@ protected:
       uint32_t packets_to_read_to_connection_count_ratio,
       EnvoyQuicCryptoServerStreamFactoryInterface& crypto_server_stream_factory,
       EnvoyQuicProofSourceFactoryInterface& proof_source_factory,
-      QuicConnectionIdGeneratorPtr&& cid_generator) {
+      QuicConnectionIdGeneratorPtr&& cid_generator) override {
     return std::make_unique<TestActiveQuicListener>(
         runtime, worker_index, concurrency, dispatcher, parent, std::move(listen_socket),
         listener_config, quic_config, kernel_worker_routing, enabled, quic_stat_names,
