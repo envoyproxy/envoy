@@ -8,8 +8,7 @@ namespace Server {
 
 class ValidationListenerComponentFactory : public ListenerComponentFactory {
 public:
-  ValidationListenerComponentFactory(Instance& parent)
-      : tcp_listener_config_provider_manager_(parent.serverFactoryContext()), parent_(parent) {}
+  ValidationListenerComponentFactory(Instance& parent) : parent_(parent) {}
 
   // Server::ListenerComponentFactory
   LdsApiPtr createLdsApi(const envoy::config::core::v3::ConfigSource& lds_config,

@@ -44,8 +44,7 @@ class ListenerFilterChainFactoryBuilder;
 class ProdListenerComponentFactory : public ListenerComponentFactory,
                                      Logger::Loggable<Logger::Id::config> {
 public:
-  ProdListenerComponentFactory(Instance& server)
-      : server_(server), tcp_listener_config_provider_manager_(server.serverFactoryContext()) {}
+  ProdListenerComponentFactory(Instance& server) : server_(server) {}
   /**
    * Static worker for createNetworkFilterFactoryList() that can be used directly in tests.
    */

@@ -91,11 +91,6 @@ void FilterConfigSubscription::onConfigUpdate(
     const std::vector<Config::DecodedResourceRef>& resources, const std::string& version_info) {
   ConfigVersionSharedPtr next =
       std::make_shared<ConfigVersion>(version_info, factory_context_.timeSource().systemTime());
-  // During startup, workers await for the filter config subscriptions to initialize, so we cannot
-  // rely on the thread locals and the workers to mark the update completion.
-  if (!filter_config_provider_manager_.workersStarted()) {
-    init_target_.ready();
-  }
   if (resources.size() != 1) {
     throw EnvoyException(fmt::format(
         "Unexpected number of resources in ExtensionConfigDS response: {}", resources.size()));
@@ -126,9 +121,9 @@ void FilterConfigSubscription::onConfigUpdate(
     provider->validateMessage(filter_config_name_, *next->config_, next->factory_name_);
   }
   ENVOY_LOG(debug, "Updated filter config {} accepted, posting to workers", filter_config_name_);
-  // Update subscription config first, to prevent a race with new providers missing
-  // the latest config.
-  last_ = next;
+  // Update the latest subscription config first, to prevent a race with new
+  // providers missing the latest config.
+  last_ = std::move(next);
   Common::applyToAllWithCleanup<DynamicFilterConfigProviderImplBase*>(
       filter_config_providers_,
       [last = last_](DynamicFilterConfigProviderImplBase* provider,
@@ -136,6 +131,10 @@ void FilterConfigSubscription::onConfigUpdate(
         provider->onConfigUpdate(*last->config_, last->version_info_, [cleanup] {});
       },
       [me = shared_from_this()]() { me->updateComplete(); });
+  // The filter configs are created and published to worker queues at this point, so it
+  // is safe to mark the subscription as ready and publish the warmed parent resources.
+  ENVOY_LOG(debug, "Updated filter config {} created, warming done", filter_config_name_);
+  init_target_.ready();
 }
 
 void FilterConfigSubscription::onConfigUpdate(
@@ -167,9 +166,8 @@ void FilterConfigSubscription::onConfigUpdateFailed(Config::ConfigUpdateFailureR
 }
 
 void FilterConfigSubscription::updateComplete() {
-  ENVOY_LOG(debug, "Filter config {} update complete", filter_config_name_);
+  ENVOY_LOG(debug, "Filter config {} worker update complete", filter_config_name_);
   stats_.config_reload_.inc();
-  init_target_.ready();
 }
 
 FilterConfigSubscription::~FilterConfigSubscription() {

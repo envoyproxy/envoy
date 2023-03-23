@@ -368,9 +368,9 @@ private:
   std::unique_ptr<Runtime::ScopedLoaderSingleton> runtime_singleton_;
   std::unique_ptr<Runtime::Loader> runtime_;
   ProdWorkerFactory worker_factory_;
+  std::unique_ptr<ListenerManager> listener_manager_;
   absl::node_hash_map<Stage, LifecycleNotifierCallbacks> stage_callbacks_;
   absl::node_hash_map<Stage, LifecycleNotifierCompletionCallbacks> stage_completable_callbacks_;
-  std::unique_ptr<ListenerManager> listener_manager_;
   Configuration::MainImpl config_;
   Network::DnsResolverSharedPtr dns_resolver_;
   Event::TimerPtr stat_flush_timer_;

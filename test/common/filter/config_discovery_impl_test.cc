@@ -145,14 +145,7 @@ public:
     ON_CALL(factory_context_, getServerFactoryContext())
         .WillByDefault(ReturnRef(server_factory_context_));
     ON_CALL(factory_context_, initManager()).WillByDefault(ReturnRef(init_manager_));
-    EXPECT_CALL(server_factory_context_.lifecycle_notifier_,
-                registerCallback(_, testing::An<Server::ServerLifecycleNotifier::StageCallback>()))
-        .WillOnce(Invoke([](Server::ServerLifecycleNotifier::Stage,
-                            Server::ServerLifecycleNotifier::StageCallback callback) {
-          callback();
-          return nullptr;
-        }));
-    filter_config_provider_manager_ = std::make_unique<CfgProviderMgrImpl>(server_factory_context_);
+    filter_config_provider_manager_ = std::make_unique<CfgProviderMgrImpl>();
   }
 
   // Create listener filter config provider callbacks.

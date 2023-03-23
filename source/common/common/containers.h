@@ -22,7 +22,7 @@ void applyToAllWithCleanup(const ContainerT& container,
   // The Cleanup object is provided to allow each update callback to delay cleanup until some
   // arbitrary time the completion callback will be invoked once no more references to the provided
   // shared pointer exists.
-  auto cleanup = std::make_shared<Cleanup>(std::move(done_cb));
+  auto cleanup = std::make_shared<Cleanup>(done_cb);
   for (auto element : container) {
     update_cb(element, cleanup);
   }
