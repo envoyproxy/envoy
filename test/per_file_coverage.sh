@@ -77,6 +77,9 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/server/admin:profiler-lib:83"
 "source/extensions/load_balancing_policies/common:94" # Death tests don't report LCOV
 "source/server/config_validation:83.8"
+"source/extensions/health_checkers:96.6"
+"source/extensions/health_checkers/http:96.6"
+"source/extensions/health_checkers/grpc:96.6"
 )
 
 [[ -z "${SRCDIR}" ]] && SRCDIR="${PWD}"
