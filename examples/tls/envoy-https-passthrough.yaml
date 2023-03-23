@@ -24,4 +24,4 @@ static_resources:
             address:
               socket_address:
                 address: service-https
-                port_value: 443
+                port_value: 8443

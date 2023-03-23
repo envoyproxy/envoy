@@ -30,13 +30,13 @@ services:
     - "10003:10000"
 
   service-http:
-    image: mendhak/http-https-echo
+    image: mendhak/http-https-echo:29@sha256:096c8712d028307586aa9b7908e7cfca8ea3d9b82a324612342a3e398b152727
     hostname: service-http
     environment:
     - HTTPS_PORT=0
 
   service-https:
-    image: mendhak/http-https-echo
+    image: mendhak/http-https-echo:29@sha256:096c8712d028307586aa9b7908e7cfca8ea3d9b82a324612342a3e398b152727
     hostname: service-https
     environment:
     - HTTP_PORT=0
