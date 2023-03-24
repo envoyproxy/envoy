@@ -90,7 +90,11 @@ TEST_P(CompositeFilterIntegrationTest, TestBasic) {
     ASSERT_TRUE(response->waitForEndStream());
     EXPECT_THAT(response->headers(), Http::HttpStatusIs("403"));
   }
-
+}
+// Verifies that multi-actions are preformed in order of definition.
+TEST_P(CompositeFilterIntegrationTest, TestBasicMultiAction) {
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
   {
     const Http::TestRequestHeaderMapImpl request_headers = {{":method", "GET"},
                                                             {":path", "/somepath"},
