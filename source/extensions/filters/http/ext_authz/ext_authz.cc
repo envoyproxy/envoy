@@ -412,7 +412,9 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
         config_->incCounter(cluster_->statsScope(), config_->ext_authz_failure_mode_allowed_);
       }
       if (config_->failureModeAllowHeaderAdd()) {
-        request_headers_->addCopy(Http::LowerCaseString("x-envoy-failure-mode-allowed"), "true");
+        const Http::LowerCaseString failure_mode_allow_key{absl::StrCat(
+            ThreadSafeSingleton<Http::PrefixValue>::get().prefix(), "-failure-mode-allowed")};
+        request_headers_->addCopy(failure_mode_allow_key, "true");
       }
       continueDecoding();
     } else {
