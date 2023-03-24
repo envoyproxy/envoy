@@ -528,7 +528,6 @@ void Filter::sendTrailers(ProcessorState& state, const Http::HeaderMap& trailers
 }
 
 void Filter::onNewTimeout(const uint32_t message_timeout_ms) {
-  stats_.override_message_timeout_received_.inc();
   // The new timeout has to be >=1ms and <= max_message_timeout configured in filter.
   const uint32_t min_timeout_ms = 1;
   const uint32_t max_timeout_ms = config_->maxMessageTimeout();
@@ -544,7 +543,9 @@ void Filter::onNewTimeout(const uint32_t message_timeout_ms) {
   auto encoder_timer_restarted = encoding_state_.restartMessageTimer(message_timeout_ms);
   if (!decoder_timer_restarted && !encoder_timer_restarted) {
     stats_.override_message_timeout_ignored_.inc();
+    return;
   }
+  stats_.override_message_timeout_received_.inc();
 }
 
 void Filter::onReceiveMessage(std::unique_ptr<ProcessingResponse>&& r) {
