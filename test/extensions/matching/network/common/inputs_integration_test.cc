@@ -236,6 +236,25 @@ TEST_F(InputsIntegrationTest, FilterStateInput) {
   EXPECT_TRUE(result.on_match_.has_value());
 }
 
+TEST_F(InputsIntegrationTest, DynamicMetadataInput) {
+  Network::MockConnectionSocket socket;
+  StreamInfo::FilterStateImpl filter_state(StreamInfo::FilterState::LifeSpan::Connection);
+  envoy::config::core::v3::Metadata metadata;
+  MatchingDataImpl data(socket, filter_state, metadata);
+
+  std::string metadata_key("metadata_key");
+  std::string label_key("label_key");
+  auto label = MessageUtil::keyValueStruct(label_key, "bar");
+  metadata.mutable_filter_metadata()->insert(
+      Protobuf::MapPair<std::string, ProtobufWkt::Struct>(metadata_key, label));
+  auto stored_metadata = data.dynamicMetadata().filter_metadata();
+  EXPECT_EQ(label.fields_size(), 1);
+  EXPECT_EQ(stored_metadata[metadata_key].fields_size(), 1);
+  EXPECT_EQ(
+      (*label.mutable_fields())[label_key].string_value(),
+      (*stored_metadata[metadata_key].mutable_fields())[label_key].string_value());
+}
+
 TEST_F(InputsIntegrationTest, FilterStateInputFailure) {
   std::string key = "filter_state_key";
   std::string value = "filter_state_value";
