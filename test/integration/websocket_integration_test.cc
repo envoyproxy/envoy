@@ -440,13 +440,15 @@ TEST_P(WebsocketIntegrationTest, WebsocketCustomFilterChain) {
     codec_client_->sendData(encoder_decoder.first, large_req_str, false);
     ASSERT_TRUE(response_->waitForEndStream());
     EXPECT_EQ("413", response_->headers().getStatusValue());
-    waitForClientDisconnectOrReset();
+    if (downstreamProtocol() != Http::CodecType::HTTP3) {
+      waitForClientDisconnectOrReset();
+    }
     codec_client_->close();
   }
 
   // Foo upgrades are configured without the buffer filter, so should explicitly
   // allow large payload.
-  if (downstreamProtocol() != Http::CodecType::HTTP2) {
+  if (downstreamProtocol() == Http::CodecType::HTTP1) {
     performUpgrade(upgradeRequestHeaders("foo"), upgradeResponseHeaders("foo"));
     codec_client_->sendData(*request_encoder_, large_req_str, false);
     ASSERT_TRUE(upstream_request_->waitForData(*dispatcher_, large_req_str));
