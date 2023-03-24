@@ -979,6 +979,7 @@ uint64_t FilterConfig::getConfigId() {
   if (config_id_ != 0) {
     return config_id_;
   }
+
   std::string str;
   auto res = plugin_config_.SerializeToString(&str);
   ASSERT(res, "SerializeToString is always successful");
