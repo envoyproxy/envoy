@@ -34,7 +34,6 @@
 using testing::_;
 using testing::NiceMock;
 using testing::Return;
-using testing::SaveArg;
 
 namespace Envoy {
 namespace Upstream {
@@ -281,7 +280,9 @@ TEST_F(OriginalDstClusterTest, AddressCollision) {
 
   // New host gets created once again.
   EXPECT_CALL(membership_updated_, ready());
-  EXPECT_CALL(server_context_.dispatcher_, post(_)).WillOnce(SaveArg<0>(&post_cb1));
+  EXPECT_CALL(server_context_.dispatcher_, post(_)).WillOnce([&post_cb1](Event::PostCb cb) {
+    post_cb1 = std::move(cb);
+  });
   // Mock the cluster manager by recreating the load balancer with the new host map
   HostConstSharedPtr host4 = OriginalDstCluster::LoadBalancer(cluster_).chooseHost(&lb_context);
   post_cb1();
@@ -476,7 +477,9 @@ TEST_F(OriginalDstClusterTest, Membership) {
 
   // New host gets created
   EXPECT_CALL(membership_updated_, ready());
-  EXPECT_CALL(server_context_.dispatcher_, post(_)).WillOnce(SaveArg<0>(&post_cb));
+  EXPECT_CALL(server_context_.dispatcher_, post(_)).WillOnce([&post_cb](Event::PostCb cb) {
+    post_cb = std::move(cb);
+  });
   // Mock the cluster manager by recreating the load balancer with the new host map
   HostConstSharedPtr host3 = OriginalDstCluster::LoadBalancer(cluster_).chooseHost(&lb_context);
   post_cb();
@@ -532,7 +535,9 @@ TEST_F(OriginalDstClusterTest, Membership2) {
   EXPECT_EQ(*connection1.connectionInfoProvider().localAddress(), *host1->address());
 
   EXPECT_CALL(membership_updated_, ready());
-  EXPECT_CALL(server_context_.dispatcher_, post(_)).WillOnce(SaveArg<0>(&post_cb));
+  EXPECT_CALL(server_context_.dispatcher_, post(_)).WillOnce([&post_cb](Event::PostCb cb) {
+    post_cb = std::move(cb);
+  });
   HostConstSharedPtr host2 = lb.chooseHost(&lb_context2);
   post_cb();
   ASSERT_NE(host2, nullptr);
@@ -718,7 +723,9 @@ TEST_F(OriginalDstClusterTest, UseHttpHeaderEnabled) {
                                       "127.0.0.1:5556");
 
   EXPECT_CALL(membership_updated_, ready());
-  EXPECT_CALL(server_context_.dispatcher_, post(_)).WillOnce(SaveArg<0>(&post_cb));
+  EXPECT_CALL(server_context_.dispatcher_, post(_)).WillOnce([&post_cb](Event::PostCb cb) {
+    post_cb = std::move(cb);
+  });
   HostConstSharedPtr host2 = lb.chooseHost(&lb_context2);
   post_cb();
   ASSERT_NE(host2, nullptr);
