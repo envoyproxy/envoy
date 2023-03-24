@@ -89,6 +89,10 @@ private:
   // Setting |http_datagram_handler_| enables HTTP Datagram support.
   std::unique_ptr<HttpDatagramHandler> http_datagram_handler_;
 #endif
+
+  // When an HTTP Upgrade is requested, this contains the protocol upgrade type, e.g. "websocket".
+  // It will be empty, when no such request is active.
+  std::string upgrade_protocol_;
 };
 
 } // namespace Quic
