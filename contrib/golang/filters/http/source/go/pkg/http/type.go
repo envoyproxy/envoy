@@ -117,7 +117,7 @@ func (h *httpHeaderMap) Del(key string) {
 	if h.isTrailer {
 		panic("unsupported yet")
 	}
-	// Get all header values first before removing a key, since the set operation may not take affects immediately
+	// Get all header values first before removing a key, since the del operation may not take affects immediately
 	// when it's invoked in a Go thread, instead, it will post a callback to run in the envoy worker thread.
 	// Otherwise, we may get outdated values in a following Get call.
 	if h.headers != nil {

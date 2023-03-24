@@ -179,9 +179,11 @@ virtual_hosts:
 )EOF";
 };
 
-INSTANTIATE_TEST_SUITE_P(Protocols, LocalRateLimitFilterIntegrationTest,
-                         testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams()),
-                         HttpProtocolIntegrationTest::protocolTestParamsToString);
+// TODO(#26236): Fix test suite for HTTP/3.
+INSTANTIATE_TEST_SUITE_P(
+    Protocols, LocalRateLimitFilterIntegrationTest,
+    testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParamsWithoutHTTP3()),
+    HttpProtocolIntegrationTest::protocolTestParamsToString);
 
 TEST_P(LocalRateLimitFilterIntegrationTest, DenyRequestPerProcess) {
   initializeFilter(fmt::format(fmt::runtime(filter_config_), "false"));
