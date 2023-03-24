@@ -867,7 +867,9 @@ class FuzzDispatcher: public quic::QuicDispatcher {
         quic_stat_names_(listener_config_->listenerScope().symbolTable()),
         http3_stats_({ALL_HTTP3_CODEC_STATS(
             POOL_COUNTER_PREFIX(listener_config_->listenerScope(), "http3."),
-            POOL_GAUGE_PREFIX(listener_config_->listenerScope(), "http3."))})
+            POOL_GAUGE_PREFIX(listener_config_->listenerScope(), "http3."))}),
+        connection_stats_({QUIC_CONNECTION_STATS(
+            POOL_COUNTER_PREFIX(listener_config_->listenerScope(), "quic.connection"))})
     {
       ON_CALL(http_connection_callbacks_, newStream(_,_))
         .WillByDefault(Invoke([&](Http::ResponseEncoder&,bool) -> Http::RequestDecoder& {
@@ -875,7 +877,7 @@ class FuzzDispatcher: public quic::QuicDispatcher {
               }));
       auto writer = new testing::NiceMock<quic::test::MockPacketWriter>();
       ON_CALL(*writer, WritePacket(_, _, _, _, _))
-        .WillByDefault(Return(quic::WriteResult(quic::WRITE_STATUS_OK, 0)));
+        .WillByDefault(testing::Return(quic::WriteResult(quic::WRITE_STATUS_OK, 0)));
       InitializeWithWriter(writer);
     }
 
@@ -956,7 +958,7 @@ class FuzzDispatcher: public quic::QuicDispatcher {
           dispatcher_,
           quic::kDefaultFlowControlSendWindow * 1.5,
           quic_stat_names_, listener_config_->listenerScope(),
-          crypto_stream_factory_, std::move(stream_info));
+          crypto_stream_factory_, std::move(stream_info), connection_stats_);
       session->Initialize();
       session->setHttp3Options(http3_options_);
       session->setCodecStats(http3_stats_);
@@ -986,6 +988,7 @@ class FuzzDispatcher: public quic::QuicDispatcher {
     quic::QuicSocketAddress srv_addr_;
     QuicStatNames quic_stat_names_;
     Http::Http3::CodecStats http3_stats_;
+    QuicConnectionStats connection_stats_;
 
     quic::QuicConfig quic_config_;
     quic::DeterministicConnectionIdGenerator generator_{quic::kQuicDefaultConnectionIdLength};
