@@ -1,6 +1,7 @@
 #pragma once
 
 #include "source/common/network/utility.h"
+#include "library/common/data/utility.h"
 
 namespace Envoy {
 namespace Network {
@@ -42,6 +43,20 @@ struct ProxySettings {
       return nullptr;
     }
     return std::make_shared<ProxySettings>(host, port);
+  }
+
+  static const ProxySettingsConstSharedPtr create(envoy_proxy_settings_list proxy_settings_list) {
+    if (proxy_settings_list.length < 1) {
+      return nullptr;
+    }
+
+    const auto proxy_settings = proxy_settings_list.proxy_settings[0];
+    if (proxy_settings.type == ENVOY_PROXY_TYPE_DIRECT) {
+      return nullptr;
+    }
+
+    const auto hostname = Envoy::Data::Utility::copyToString(proxy_settings.host_data);
+    return std::make_shared<ProxySettings>(hostname, proxy_settings.port);
   }
 
   /**

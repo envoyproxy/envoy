@@ -369,6 +369,7 @@ objc_library(
         "TestExtensions.h",
     ],
     module_name = "TestExtensions",
+    visibility = ["//visibility:public"],
     deps = [
         ":test_extensions_cc",
     ],

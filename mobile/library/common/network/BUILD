@@ -15,6 +15,7 @@ envoy_cc_library(
     ],
     repository = "@envoy",
     deps = [
+        "//library/common/data:utility_lib",
         "//library/common/network:src_addr_socket_option_lib",
         "//library/common/types:c_types_lib",
         "@envoy//envoy/network:socket_interface",
@@ -83,3 +84,26 @@ cc_library(
         "//conditions:default": [],
     }),
 )
+
+envoy_cc_library(
+    name = "apple_system_proxy_settings_monitor",
+    srcs = select({
+        "@envoy//bazel:apple": ["apple_system_proxy_settings_monitor.cc"],
+        "//conditions:default": [],
+    }),
+    hdrs = select({
+        "@envoy//bazel:apple": [
+        "apple_system_proxy_settings_monitor.h",
+        "sytem_proxy_settings.h",
+        ],
+        "//conditions:default": [],
+    }),
+    repository = "@envoy",
+    deps = select({
+        "@envoy//bazel:apple": [
+            "//library/common/extensions/cert_validator/platform_bridge:c_types_lib",
+        ],
+        "//conditions:default": [],
+    }),
+)
+

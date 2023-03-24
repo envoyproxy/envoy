@@ -9,6 +9,7 @@
 #include "library/common/network/connectivity_manager.h"
 #include "library/common/stream_info/extra_stream_info.h"
 #include "library/common/types/c_types.h"
+#include "library/common/network/proxy_settings.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -45,7 +46,7 @@ public:
       const Extensions::Common::DynamicForwardProxy::DnsHostInfoSharedPtr& host_info) override;
 
   void onDestroy() override;
-  void onProxyResolutionComplete();
+  void onProxyResolutionComplete(Network::ProxySettingsConstSharedPtr proxy_settings);
 
 private:
   void setInfo(absl::string_view authority, Network::Address::InstanceConstSharedPtr address);
@@ -53,6 +54,7 @@ private:
   onAddressResolved(const Extensions::Common::DynamicForwardProxy::DnsHostInfoSharedPtr& host_info);
   Http::FilterHeadersStatus resolveProxy(Http::RequestHeaderMap& request_headers,
                                          envoy_proxy_resolver* resolver);
+  Http::FilterHeadersStatus continueWithProxySettings(Network::ProxySettingsConstSharedPtr proxy_settings);
 
   // This is only present if there is an active proxy DNS lookup in progress.
   std::unique_ptr<Extensions::Common::DynamicForwardProxy::DnsCache::LoadDnsCacheEntryHandle>

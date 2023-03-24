@@ -39,6 +39,7 @@ open class EngineBuilder: NSObject {
   private var enableHttp3: Bool = false
 #endif
   private var enableInterfaceBinding: Bool = false
+  private var enableProxying: Bool = false
   private var enforceTrustChainVerification: Bool = true
   private var enableDrainPostDnsRefresh: Bool = false
   private var forceIPv6: Bool = false
@@ -285,6 +286,25 @@ open class EngineBuilder: NSObject {
   @discardableResult
   public func enableInterfaceBinding(_ enableInterfaceBinding: Bool) -> Self {
     self.enableInterfaceBinding = enableInterfaceBinding
+    return self
+  }
+
+  ///
+  /// Specify whether system proxy settings should be respected. If yes, Envoy Mobile will
+  /// use iOS APIs to query iOS Proxy settings configured on a device and will
+  /// respect these settings when establishing connections with remote services.
+  ///
+  /// The method is introduced for experimentation purposes and as a safety guard against
+  /// critical issues in the implementation of the proxying feature. It's intended to be removed
+  /// after it's confirmed that proxies on iOS work as expected.
+  ///
+  /// - parameter enableProxying: whether to enable Envoy's support for proxies.
+  ///
+  /// @return This builder.
+  ///
+  @discardableResult
+  public func enableProxying(_ enableProxying: Bool) -> Self {
+    self.enableProxying = enableProxying
     return self
   }
 
@@ -682,7 +702,8 @@ open class EngineBuilder: NSObject {
   public func build() -> Engine {
     let engine = self.engineType.init(runningCallback: self.onEngineRunning, logger: self.logger,
                                       eventTracker: self.eventTracker,
-                                      networkMonitoringMode: Int32(self.monitoringMode.rawValue))
+                                      networkMonitoringMode: Int32(self.monitoringMode.rawValue),
+                                      enableProxying: self.enableProxying)
     let config = self.makeConfig()
 #if canImport(EnvoyCxxSwiftInterop)
     if self.enableSwiftBootstrap {

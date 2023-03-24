@@ -34,5 +34,6 @@ objc_library(
     visibility = ["//visibility:public"],
     deps = [
         "//library/common/api:c_types",
+        "//library/common/network:apple_system_proxy_settings_monitor",
     ],
 )

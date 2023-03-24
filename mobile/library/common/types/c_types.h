@@ -546,6 +546,8 @@ typedef struct {
   uint64_t length;
 } envoy_proxy_settings_list;
 
+void envoy_proxy_settings_list_release(envoy_proxy_settings_list);
+
 typedef void (*envoy_proxy_resolver_proxy_resolution_completed_f)(
     envoy_proxy_settings_list proxy_settings_list, const void* context);
 

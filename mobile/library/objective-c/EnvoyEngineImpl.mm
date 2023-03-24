@@ -13,6 +13,9 @@
 #import "library/common/engine.h"
 #import "library/objective-c/proxy/EnvoyProxyResolver.h"
 
+#include "library/common/network/apple_system_proxy_settings_monitor.h"
+
+
 #if TARGET_OS_IPHONE
 #import <UIKit/UIKit.h>
 #endif
@@ -450,7 +453,8 @@ ios_resolve_proxy(envoy_data c_host, envoy_proxy_settings_list *proxy_settings_l
 - (instancetype)initWithRunningCallback:(nullable void (^)())onEngineRunning
                                  logger:(nullable void (^)(NSString *))logger
                            eventTracker:(nullable void (^)(EnvoyEvent *))eventTracker
-                  networkMonitoringMode:(int)networkMonitoringMode {
+                  networkMonitoringMode:(int)networkMonitoringMode
+                         enableProxying:(BOOL)enableProxying {
   self = [super init];
   if (!self) {
     return nil;
@@ -481,15 +485,21 @@ ios_resolve_proxy(envoy_data c_host, envoy_proxy_settings_list *proxy_settings_l
   _engineHandle = init_engine(native_callbacks, native_logger, native_event_tracker);
 
   _networkMonitor = [[EnvoyNetworkMonitor alloc] initWithEngine:_engineHandle];
-  _proxyResolver = [EnvoyProxyResolver new];
-  [self registerProxyResolver:_proxyResolver];
-  [_proxyResolver start];
+
+  if (enableProxying) {
+    _proxyResolver = [EnvoyProxyResolver new];
+    [self registerProxyResolver:_proxyResolver];
+    [_proxyResolver start];
+  }
 
   if (networkMonitoringMode == 1) {
     [_networkMonitor startReachability];
   } else if (networkMonitoringMode == 2) {
     [_networkMonitor startPathMonitor];
   }
+
+  testProxy();
+
 
   return self;
 }

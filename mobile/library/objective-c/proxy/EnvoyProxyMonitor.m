@@ -1,6 +1,7 @@
 #import <CFNetwork/CFNetwork.h>
 
 #import "library/objective-c/proxy/EnvoyProxyMonitor.h"
+//#include "library/common/network/apple_system_proxy_settings_monitor.h"
 
 // The interval at which system proxy settings should be polled at.
 NSTimeInterval kProxySettingsRefreshRateSeconds = 7;
@@ -30,6 +31,8 @@ NSTimeInterval kProxySettingsRefreshRateSeconds = 7;
   if (self.isStarted) {
     return;
   }
+
+//  testProxy();
 
   self.isStarted = true;
   [self stop];
