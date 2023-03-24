@@ -65,7 +65,7 @@ message ExtAuthz {
 
   // When ``failure_mode_allow`` and ``failure_mode_allow_header_add`` are both set to true,
   // ``x-envoy-failure-mode-allowed: true`` will be added to request headers if the communication
-  // with the authorization service has failed, or if the authorization service has returned a 
+  // with the authorization service has failed, or if the authorization service has returned a
   // HTTP 5xx error.
   bool failure_mode_allow_header_add = 18;
 
