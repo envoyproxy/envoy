@@ -326,7 +326,7 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
   // if we're concerned about strict matching against the callback path.
   if (!config_->redirectPathMatcher().match(path_str)) {
 
-    // check a possibility to update access token using by refresh token
+    // Check if we can update the access token via a refresh token.
     if (config_->useRefreshToken() && validator_->canUpdateTokenByRefreshToken()) {
       // try to update access token by refresh token
       oauth_client_->asyncUpdateAccessToken(validator_->refreshToken(), config_->clientId(),
@@ -545,7 +545,9 @@ void OAuth2Filter::finishGetAccessTokenFlow() {
 
 void OAuth2Filter::finishUpdateAccessTokenFlow() {
   ASSERT(config_->useRefreshToken());
-  // update cookie header to send it on actual state to upstream
+  // At this point we have updated all of the pieces need to authorize a user
+  // We need to actualize keys in the cookie header of the current request related
+  // with authorization. So, the upstream can use updated cookies for itself purpose
   const CookieNames& cookie_names = config_->cookieNames();
 
   absl::flat_hash_map<std::string, std::string> cookies =
@@ -556,21 +558,23 @@ void OAuth2Filter::finishUpdateAccessTokenFlow() {
 
   if (config_->forwardBearerToken()) {
     cookies.insert_or_assign(cookie_names.bearer_token_, access_token_);
-    if (id_token_ != EMPTY_STRING) {
+    if (!id_token_.empty()) {
       cookies.insert_or_assign(cookie_names.id_token_, id_token_);
     }
-    if (refresh_token_ != EMPTY_STRING) {
+    if (!refresh_token_.empty()) {
       cookies.insert_or_assign(cookie_names.refresh_token_, refresh_token_);
     }
   }
 
-  std::string newCookies(absl::StrJoin(cookies, "; ", absl::PairFormatter("=")));
-  request_headers_->addReferenceKey(Http::Headers::get().Cookie, newCookies);
+  std::string new_cookies(absl::StrJoin(cookies, "; ", absl::PairFormatter("=")));
+  request_headers_->addReferenceKey(Http::Headers::get().Cookie, new_cookies);
   if (config_->forwardBearerToken() && !access_token_.empty()) {
     setBearerToken(*request_headers_, access_token_);
   }
 
-  // remember cookies for response(need for set cookie)
+  // At this point we add set-cookie headers to the temporary object of the response
+  // The temporary response will populate the response from upstream in the encodeHeaders method
+  // Eventually set-cookie headers will be send to the user agent (browser)
   response_headers_to_add_ = Http::ResponseHeaderMapImpl::create();
   addResponseCookies(*response_headers_to_add_, getEncodedToken());
 
@@ -607,12 +611,12 @@ void OAuth2Filter::addResponseCookies(Http::ResponseHeaderMap& headers,
     headers.addReferenceKey(
         Http::Headers::get().SetCookie,
         absl::StrCat(cookie_names.bearer_token_, "=", access_token_, cookie_tail));
-    if (id_token_ != EMPTY_STRING) {
+    if (!id_token_.empty()) {
       headers.addReferenceKey(Http::Headers::get().SetCookie,
                               absl::StrCat(cookie_names.id_token_, "=", id_token_, cookie_tail));
     }
 
-    if (refresh_token_ != EMPTY_STRING) {
+    if (!refresh_token_.empty()) {
       headers.addReferenceKey(
           Http::Headers::get().SetCookie,
           absl::StrCat(cookie_names.refresh_token_, "=", refresh_token_, cookie_tail));

@@ -1120,7 +1120,6 @@ TEST_F(OAuth2Test, OAuthTestFullFlowPostWithParametersLegacyEncoding) {
                                                   "https://traffic.example.com" + TEST_CALLBACK,
                                                   AuthType::UrlEncodedBody));
 
-  // Invoke the callback logic. As a side effect, state_ will be populated.
   EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndBuffer,
             filter_->decodeHeaders(second_request_headers, false));
 
@@ -1364,8 +1363,17 @@ TEST_F(OAuth2Test, OAuthBearerTokenFlowFromQueryParameters) {
             filter_->decodeHeaders(request_headers, false));
 }
 
+// - The filter receives the initial request
+// - The filter redirects a user to the authorization endpoint
+// - The filter receives the callback request from the authorization endpoint
+// - The filter gets a bearer and refresh tokens from the authorization endpoint
+// - The filter redirects a user to the user agent with actual authorization data
+// - The filter receives an other request when a bearer token is expired
+// - The filter tries to update a bearer token via the refresh token instead of redirect user to the
+// authorization endpoint
+// - The filter gets a new bearer and refresh tokens via the current refresh token
+// - The filter continues to handler the request without redirection to the user agent
 TEST_F(OAuth2Test, OAuthTestFullFlowWithUseRefreshToken) {
-
   init(getConfig(true /* forward_bearer_token */, true /* use_refresh_token */));
   // First construct the initial request to the oauth filter with URI parameters.
   Http::TestRequestHeaderMapImpl first_request_headers{
@@ -1642,7 +1650,6 @@ TEST_F(OAuth2Test, OAuthTestSetCookiesAfterUpdateAccessTokenWithBasicAuth) {
                      OAuth2Config_AuthType_BASIC_AUTH
                  /* authType */));
 
-  // the third request to the oauth filter with URI parameters.
   Http::TestRequestHeaderMapImpl request_headers{
       {Http::Headers::get().Path.get(), "/test?name=admin&level=trace"},
       {Http::Headers::get().Host.get(), "traffic.example.com"},
