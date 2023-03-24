@@ -63,7 +63,8 @@ Matcher::~Matcher() {
 
 bool Matcher::match(absl::string_view value) const {
   bool matched = false;
-  hs_scratch_t* scratch = tls_->get()->scratch_;
+  ScratchThreadLocalPtr local_scratch;
+  hs_scratch_t* scratch = getScratch(local_scratch);
   hs_error_t err = hs_scan(
       database_, value.data(), value.size(), 0, scratch,
       [](unsigned int, unsigned long long, unsigned long long, unsigned int, void* context) -> int {
@@ -84,9 +85,10 @@ bool Matcher::match(absl::string_view value) const {
 std::string Matcher::replaceAll(absl::string_view value, absl::string_view substitution) const {
   // Find matched bounds.
   std::vector<Bound> bounds;
-  hs_scratch_t* scratch_ = tls_->get()->scratch_;
+  ScratchThreadLocalPtr local_scratch;
+  hs_scratch_t* scratch = getScratch(local_scratch);
   hs_error_t err = hs_scan(
-      start_of_match_database_, value.data(), value.size(), 0, scratch_,
+      start_of_match_database_, value.data(), value.size(), 0, scratch,
       [](unsigned int, unsigned long long from, unsigned long long to, unsigned int,
          void* context) -> int {
         std::vector<Bound>* bounds = static_cast<std::vector<Bound>*>(context);
@@ -150,6 +152,15 @@ void Matcher::compile(const std::vector<const char*>& expressions,
     }
   }
   hs_free_compile_error(compile_err);
+}
+
+hs_scratch_t* Matcher::getScratch(ScratchThreadLocalPtr& local_scratch) const {
+  if (!tls_->currentThreadRegistered() || !tls_->get().has_value()) {
+    local_scratch = std::make_unique<ScratchThreadLocal>(database_, start_of_match_database_);
+    return local_scratch->scratch_;
+  }
+
+  return tls_->get()->scratch_;
 }
 
 } // namespace Hyperscan

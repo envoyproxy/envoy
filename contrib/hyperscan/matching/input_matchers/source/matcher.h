@@ -19,6 +19,8 @@ struct ScratchThreadLocal : public ThreadLocal::ThreadLocalObject {
   hs_scratch_t* scratch_{};
 };
 
+using ScratchThreadLocalPtr = std::unique_ptr<ScratchThreadLocal>;
+
 struct Bound {
   Bound(uint64_t begin, uint64_t end);
 
@@ -51,6 +53,8 @@ private:
   // regex patterns and flags. Vector parameters should have the same size.
   void compile(const std::vector<const char*>& expressions, const std::vector<unsigned int>& flags,
                const std::vector<unsigned int>& ids, hs_database_t** database);
+
+  hs_scratch_t* getScratch(ScratchThreadLocalPtr& local_scratch) const;
 };
 
 } // namespace Hyperscan
