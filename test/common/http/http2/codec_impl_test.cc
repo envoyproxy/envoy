@@ -1530,6 +1530,13 @@ TEST_P(Http2CodecImplTest, ShouldRestoreCrashDumpInfoWhenHandlingDeferredProcess
   EXPECT_THAT(ostream.contents(), HasSubstr("Network Connection info would be dumped..."));
 }
 
+TEST_P(Http2CodecImplTest, CodecClientEnvoyBugsIfCodecEventCallbacksSet) {
+  initialize();
+
+  EXPECT_ENVOY_BUG(request_encoder_->getStream().registerCodecEventCallbacks(nullptr),
+                   "CodecEventCallbacks for HTTP2 client stream unimplemented.");
+}
+
 class Http2CodecImplDeferredResetTest : public Http2CodecImplTest {};
 
 TEST_P(Http2CodecImplDeferredResetTest, NoDeferredResetForClientStreams) {
