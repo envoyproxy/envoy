@@ -129,6 +129,7 @@ void WebsocketIntegrationTest::initialize() {
               *bootstrap.mutable_static_resources()->mutable_clusters(0), protocol_options);
         });
   } else if (upstreamProtocol() == Http::CodecType::HTTP3) {
+    Runtime::maybeSetRuntimeGuard("envoy.reloadable_features.use_http3_header_normalisation", true);
     config_helper_.addConfigModifier(
         [&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
           ConfigHelper::HttpProtocolOptions protocol_options;
@@ -139,11 +140,13 @@ void WebsocketIntegrationTest::initialize() {
               *bootstrap.mutable_static_resources()->mutable_clusters(0), protocol_options);
         });
   }
+
   if (downstreamProtocol() == Http::CodecType::HTTP2) {
     config_helper_.addConfigModifier(
         [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
                 hcm) -> void { hcm.mutable_http2_protocol_options()->set_allow_connect(true); });
   } else if (downstreamProtocol() == Http::CodecType::HTTP3) {
+    Runtime::maybeSetRuntimeGuard("envoy.reloadable_features.use_http3_header_normalisation", true);
     config_helper_.addConfigModifier(
         [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
                 hcm) -> void {
@@ -198,11 +201,6 @@ TEST_P(WebsocketIntegrationTest, WebSocketConnectionDownstreamDisconnect) {
   // TODO(#23286) - add web socket support for H2 UHV
   return;
 #endif
-  if (upstreamProtocol() == Http::CodecType::HTTP3 ||
-      downstreamProtocol() == Http::CodecType::HTTP3) {
-    // TODO(#23564) - Finish CONNECT-UDP support.
-    return;
-  }
 
   config_helper_.addConfigModifier(setRouteUsingWebsocket());
   initialize();
@@ -301,11 +299,6 @@ TEST_P(WebsocketIntegrationTest, WebSocketConnectionIdleTimeout) {
   // TODO(#23286) - add web socket support for H2 UHV
   return;
 #endif
-  if (upstreamProtocol() == Http::CodecType::HTTP3 ||
-      downstreamProtocol() == Http::CodecType::HTTP3) {
-    // TODO(#23564) - Finish CONNECT-UDP support.
-    return;
-  }
 
   config_helper_.addConfigModifier(setRouteUsingWebsocket());
   config_helper_.addConfigModifier(
@@ -335,11 +328,6 @@ TEST_P(WebsocketIntegrationTest, NonWebsocketUpgrade) {
   // TODO(#23286) - add web socket support for H2 UHV
   return;
 #endif
-  if (upstreamProtocol() == Http::CodecType::HTTP3 ||
-      downstreamProtocol() == Http::CodecType::HTTP3) {
-    // TODO(#23564) - Finish CONNECT-UDP support.
-    return;
-  }
 
   config_helper_.addConfigModifier(
       [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
@@ -373,11 +361,6 @@ TEST_P(WebsocketIntegrationTest, RouteSpecificUpgrade) {
   // TODO(#23286) - add web socket support for H2 UHV
   return;
 #endif
-  if (upstreamProtocol() == Http::CodecType::HTTP3 ||
-      downstreamProtocol() == Http::CodecType::HTTP3) {
-    // TODO(#23564) - Finish CONNECT-UDP support.
-    return;
-  }
 
   config_helper_.addConfigModifier(
       [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
@@ -413,11 +396,6 @@ TEST_P(WebsocketIntegrationTest, WebsocketCustomFilterChain) {
   // TODO(#23286) - add web socket support for H2 UHV
   return;
 #endif
-  if (upstreamProtocol() == Http::CodecType::HTTP3 ||
-      downstreamProtocol() == Http::CodecType::HTTP3) {
-    // TODO(#23564) - Finish CONNECT-UDP support.
-    return;
-  }
 
   config_helper_.addConfigModifier(setRouteUsingWebsocket());
 
@@ -462,13 +440,15 @@ TEST_P(WebsocketIntegrationTest, WebsocketCustomFilterChain) {
     codec_client_->sendData(encoder_decoder.first, large_req_str, false);
     ASSERT_TRUE(response_->waitForEndStream());
     EXPECT_EQ("413", response_->headers().getStatusValue());
-    waitForClientDisconnectOrReset();
+    if (downstreamProtocol() != Http::CodecType::HTTP3) {
+      waitForClientDisconnectOrReset();
+    }
     codec_client_->close();
   }
 
   // Foo upgrades are configured without the buffer filter, so should explicitly
   // allow large payload.
-  if (downstreamProtocol() != Http::CodecType::HTTP2) {
+  if (downstreamProtocol() == Http::CodecType::HTTP1) {
     performUpgrade(upgradeRequestHeaders("foo"), upgradeResponseHeaders("foo"));
     codec_client_->sendData(*request_encoder_, large_req_str, false);
     ASSERT_TRUE(upstream_request_->waitForData(*dispatcher_, large_req_str));
