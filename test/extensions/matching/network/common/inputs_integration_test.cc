@@ -250,9 +250,8 @@ TEST_F(InputsIntegrationTest, DynamicMetadataInput) {
   auto stored_metadata = data.dynamicMetadata().filter_metadata();
   EXPECT_EQ(label.fields_size(), 1);
   EXPECT_EQ(stored_metadata[metadata_key].fields_size(), 1);
-  EXPECT_EQ(
-      (*label.mutable_fields())[label_key].string_value(),
-      (*stored_metadata[metadata_key].mutable_fields())[label_key].string_value());
+  EXPECT_EQ((*label.mutable_fields())[label_key].string_value(),
+            (*stored_metadata[metadata_key].mutable_fields())[label_key].string_value());
 }
 
 TEST_F(InputsIntegrationTest, FilterStateInputFailure) {
