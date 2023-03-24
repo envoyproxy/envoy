@@ -5181,6 +5181,31 @@ TEST_P(SslSocketTest, SetSignatureAlgorithms) {
   EXPECT_EQ(1UL, server_stats_store.counter("ssl.handshake").value());
 }
 
+TEST_P(SslSocketTest, SetSignatureAlgorithmsFailure) {
+  const std::string server_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_params:
+      signature_algorithms:
+      - invalid_sigalg_name
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/unittest_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/unittest_key.pem"
+)EOF";
+
+  const std::string client_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_params:
+      signature_algorithms:
+      - invalid_sigalg_name
+)EOF";
+
+  TestUtilOptions options(client_ctx_yaml, server_ctx_yaml, false, version_);
+  EXPECT_THROW_WITH_MESSAGE(testUtil(options), EnvoyException,
+                            "Failed to initialize TLS signature algorithms invalid_sigalg_name");
+}
+
 TEST_P(SslSocketTest, RevokedCertificate) {
 
   const std::string server_ctx_yaml = R"EOF(
