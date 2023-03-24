@@ -32,13 +32,13 @@ NSTimeInterval kProxySettingsRefreshRateSeconds = 7;
     return;
   }
 
-//  testProxy();
-
   self.isStarted = true;
   [self stop];
 
   self.queue = dispatch_queue_create("io.envoyproxy.envoymobile.EnvoyProxyMonitor", NULL);
   self.dispatchSource = dispatch_source_create(DISPATCH_SOURCE_TYPE_TIMER, 0, 0, self.queue);
+  dispatch_source_set_timer(self.dispatchSource, dispatch_time(DISPATCH_TIME_NOW, 0),
+                            (int64_t)(kProxySettingsRefreshRateSeconds * NSEC_PER_SEC), 0);
   dispatch_source_set_timer(self.dispatchSource, dispatch_time(DISPATCH_TIME_NOW, 0),
                             (int64_t)(kProxySettingsRefreshRateSeconds * NSEC_PER_SEC), 0);
 

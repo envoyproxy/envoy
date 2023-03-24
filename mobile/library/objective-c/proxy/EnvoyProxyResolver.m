@@ -41,7 +41,7 @@ NS_ASSUME_NONNULL_BEGIN
              (void (^)(NSArray<EnvoyProxySettings *> *_Nullable, NSError *_Nullable))completion {
   self.proxySettings = [[EnvoyProxySystemSettings alloc]
       initWithPACFileURL:[NSURL URLWithString:@"https://s3.magneticbear.com/uploads/rafal.pac"]];
-//   self.proxySettings = [[EnvoyProxySystemSettings alloc] initWithHost:@"localhost" port:8080];
+  //   self.proxySettings = [[EnvoyProxySystemSettings alloc] initWithHost:@"localhost" port:8080];
   @synchronized(self) {
     if (self.proxySettings.pacFileURL) {
       [self.pacProxyResolver
@@ -49,20 +49,21 @@ NS_ASSUME_NONNULL_BEGIN
            proxyAutoConfigurationURL:self.proxySettings.pacFileURL
                  withCompletionBlock:^void(NSArray<EnvoyProxySettings *> *_Nullable proxySettings,
                                            NSError *_Nullable error) {
-        if (error) {
-          // Treat failure to resolve a proxy as no proxy
-          completion(@[], nil);
-        } else {
-          completion(@[[[EnvoyProxySettings alloc] initWithHost:@"localhost" port:8080]], error);
-        }
-
+                   if (error) {
+                     // Treat failure to resolve a proxy as no proxy
+                     completion(@[], nil);
+                   } else {
+                     completion(@[ [[EnvoyProxySettings alloc] initWithHost:@"localhost"
+                                                                       port:8080] ],
+                                error);
+                   }
                  }];
       return ENVOY_PROXY_RESOLUTION_RESULT_IN_PROGRESS;
     } else if (self.proxySettings) {
       EnvoyProxySettings *resolvedProxySettings =
           [[EnvoyProxySettings alloc] initWithHost:self.proxySettings.host
                                               port:self.proxySettings.port];
-      *proxySettings = @[resolvedProxySettings];
+      *proxySettings = @[ resolvedProxySettings ];
       return ENVOY_PROXY_RESOLUTION_RESULT_COMPLETED;
     } else {
       return ENVOY_PROXY_RESOLUTION_RESULT_NO_PROXY_CONFIGURED;

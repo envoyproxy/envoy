@@ -93,8 +93,8 @@ envoy_cc_library(
     }),
     hdrs = select({
         "@envoy//bazel:apple": [
-        "apple_system_proxy_settings_monitor.h",
-        "sytem_proxy_settings.h",
+            "apple_system_proxy_settings_monitor.h",
+            "system_proxy_settings.h",
         ],
         "//conditions:default": [],
     }),
@@ -106,4 +106,3 @@ envoy_cc_library(
         "//conditions:default": [],
     }),
 )
-

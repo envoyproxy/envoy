@@ -1,6 +1,7 @@
 #pragma once
 
 #include <string>
+
 // NOLINT(namespace-envoy)
 
 #ifdef __cplusplus

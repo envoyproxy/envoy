@@ -60,17 +60,19 @@ bool NetworkConfigurationFilter::onAddressResolved(
   return false;
 }
 
-void
-NetworkConfigurationFilter::onProxyResolutionComplete(Network::ProxySettingsConstSharedPtr proxy_settings) {
+void NetworkConfigurationFilter::onProxyResolutionComplete(
+    Network::ProxySettingsConstSharedPtr proxy_settings) {
   if (continueWithProxySettings(proxy_settings) == Http::FilterHeadersStatus::Continue) {
-      continue_decoding_callback_ = decoder_callbacks_->dispatcher().createSchedulableCallback(
-      [this]() { decoder_callbacks_->continueDecoding(); });
-      continue_decoding_callback_->scheduleCallbackNextIteration(); 
+    continue_decoding_callback_ = decoder_callbacks_->dispatcher().createSchedulableCallback(
+        [this]() { decoder_callbacks_->continueDecoding(); });
+    continue_decoding_callback_->scheduleCallbackNextIteration();
   }
 }
 
 void proxyResolutionCompleted(envoy_proxy_settings_list proxy_settings_list, const void* context) {
-  const auto wrapped_filter = const_cast<std::unique_ptr<std::weak_ptr<NetworkConfigurationFilter>> *>(static_cast<const std::unique_ptr<std::weak_ptr<NetworkConfigurationFilter>> *>(context));
+  const auto wrapped_filter =
+      const_cast<std::unique_ptr<std::weak_ptr<NetworkConfigurationFilter>>*>(
+          static_cast<const std::unique_ptr<std::weak_ptr<NetworkConfigurationFilter>>*>(context));
   const auto filter = wrapped_filter->get()->lock();
   if (filter) {
     const auto proxy_settings = Network::ProxySettings::create(proxy_settings_list);
@@ -91,15 +93,16 @@ NetworkConfigurationFilter::decodeHeaders(Http::RequestHeaderMap& request_header
     return Http::FilterHeadersStatus::Continue;
   }
 
-  // TODO(Augustyniak): Update Android proxy resolution to use API extension registry. As of now, it's
-  // only iOS that uses that code path.
+  // TODO(Augustyniak): Update Android proxy resolution to use API extension registry. As of now,
+  // it's only iOS that uses that code path.
   const auto proxy_resolver =
       static_cast<envoy_proxy_resolver*>(Api::External::retrieveApiSafe("envoy_proxy_resolver"));
   if (proxy_resolver != nullptr) {
     return resolveProxy(request_headers, proxy_resolver);
   }
 
-  //TODO(Augustyniak): Migrate Android so that it uses API registry instead of calling getProxySettings().
+  // TODO(Augustyniak): Migrate Android so that it uses API registry instead of calling
+  // getProxySettings().
   const auto proxy_settings = connectivity_manager_->getProxySettings();
   return continueWithProxySettings(proxy_settings);
 }
@@ -116,8 +119,9 @@ NetworkConfigurationFilter::resolveProxy(Http::RequestHeaderMap& request_headers
           safe_malloc(sizeof(envoy_proxy_resolver_proxy_resolution_result_handler)));
 
   auto weak_self = weak_from_this();
-  auto wrapper = new std::unique_ptr<std::weak_ptr<NetworkConfigurationFilter>>(new std::weak_ptr(weak_self));
-  result_handler->context = static_cast<const void *>(wrapper);
+  auto wrapper =
+      new std::unique_ptr<std::weak_ptr<NetworkConfigurationFilter>>(new std::weak_ptr(weak_self));
+  result_handler->context = static_cast<const void*>(wrapper);
   result_handler->proxy_resolution_completed = proxyResolutionCompleted;
 
   envoy_proxy_settings_list proxy_settings_list;
@@ -138,7 +142,8 @@ NetworkConfigurationFilter::resolveProxy(Http::RequestHeaderMap& request_headers
   }
 }
 
-Http::FilterHeadersStatus NetworkConfigurationFilter::continueWithProxySettings(Network::ProxySettingsConstSharedPtr proxy_settings) {
+Http::FilterHeadersStatus NetworkConfigurationFilter::continueWithProxySettings(
+    Network::ProxySettingsConstSharedPtr proxy_settings) {
   // If there is no proxy configured, continue.
   if (proxy_settings == nullptr) {
     return Http::FilterHeadersStatus::Continue;
@@ -149,7 +154,7 @@ Http::FilterHeadersStatus NetworkConfigurationFilter::continueWithProxySettings(
   // TODO(Augustyniak): Remove this code path once Android's proxy resolution is migrated over to
   // API registry.
   const auto proxy_address = proxy_settings->address();
-if (proxy_address != nullptr) {
+  if (proxy_address != nullptr) {
     const auto host_value = decoder_callbacks_->streamInfo().getRequestHeaders()->getHostValue();
     setInfo(host_value, proxy_address);
     return Http::FilterHeadersStatus::Continue;

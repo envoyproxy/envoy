@@ -28,7 +28,7 @@ final class HTTPRequestUsingProxyTest: XCTestCase {
     let requestHeaders = RequestHeadersBuilder(method: .get, scheme: "https",
                                                authority: "api.lyft.com", path: "/ping")
       .build()
-    
+
     engine.streamClient()
       .newStreamPrototype()
       .setOnResponseHeaders { responseHeaders, _, _ in

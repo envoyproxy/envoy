@@ -8,11 +8,11 @@ licenses(["notice"])  # Apache 2
 
 # Change to your Apple Developer Team ID as shown in
 # https://developer.apple.com/account/#!/membership
-TEAM_ID = "X4ST43AL9W"
+TEAM_ID = "A8W96W266D"
 
 # If needed, change to the name shown by clicking the (i) next to
 # "Xcode Managed Profile" in the "Signing and Capabilities" tab
-PROFILE_NAME = "iOS Team Provisioning Profile: *"
+PROFILE_NAME = "iOS Team Provisioning Profile: io.envoyproxy.envoymobile.helloworld"
 
 xcode_provisioning_profile(
     name = "ios_provisioning_profile",
