@@ -178,16 +178,15 @@ enum class FilterTrailersStatus {
  */
 enum class FilterMetadataStatus {
   // Continue filter chain iteration for metadata only. Does not unblock returns of StopIteration*
-  // from  (decode|encode)(Headers|Data).
+  // from (decode|encode)(Headers|Data).
   Continue,
 
   // Continue filter chain iteration. If headers have not yet been sent to the next filter, they
-  // will be sent first via
-  // (decode|encode)Headers().
+  // will be sent first via (decode|encode)Headers().
   ContinueAll,
 
   // Stops iteration of the entire filter chain. Only to be used in the case of sending a local
-  // reply from decodeMetadata.
+  // reply from (decode|encode)Metadata.
   StopIterationForLocalReply,
 };
 

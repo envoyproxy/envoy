@@ -1,3 +1,5 @@
+#include <memory>
+
 #include "envoy/common/optref.h"
 #include "envoy/http/filter.h"
 #include "envoy/http/header_map.h"
@@ -505,7 +507,7 @@ TEST_F(FilterManagerTest, MetadataContinueAll) {
   filter_manager_->destroyFilters();
 }
 
-TEST_F(FilterManagerTest, MetadataSendsLocalReply) {
+TEST_F(FilterManagerTest, DecodeMetadataSendsLocalReply) {
   initialize();
 
   std::shared_ptr<MockStreamFilter> filter_1(new NiceMock<MockStreamFilter>());
@@ -549,6 +551,95 @@ TEST_F(FilterManagerTest, MetadataSendsLocalReply) {
   filter_manager_->destroyFilters();
 }
 
+TEST_F(FilterManagerTest, EncodeMetadataSendsLocalReply) {
+  initialize();
+
+  std::shared_ptr<MockStreamFilter> filter_1(new NiceMock<MockStreamFilter>());
+
+  std::shared_ptr<MockStreamFilter> filter_2(new NiceMock<MockStreamFilter>());
+  EXPECT_CALL(filter_factory_, createFilterChain(_))
+      .WillRepeatedly(Invoke([&](FilterChainManager& manager) -> bool {
+        auto factory = createStreamFilterFactoryCb(filter_1);
+        manager.applyFilterFactoryCb({"filter1", "filter1"}, factory);
+        factory = createStreamFilterFactoryCb(filter_2);
+        manager.applyFilterFactoryCb({"filter2", "filter2"}, factory);
+        return true;
+      }));
+  filter_manager_->createFilterChain();
+
+  // Encode headers first, as metadata can't get ahead of headers.
+  ResponseHeaderMapPtr response_headers{new TestResponseHeaderMapImpl{{":status", "200"}}};
+  ON_CALL(filter_manager_callbacks_, responseHeaders())
+      .WillByDefault(Return(makeOptRef(*response_headers)));
+
+  EXPECT_CALL(*filter_2, encodeHeaders(_, _));
+  EXPECT_CALL(*filter_1, encodeHeaders(_, _));
+  filter_2->decoder_callbacks_->encodeHeaders(
+      std::make_unique<TestResponseHeaderMapImpl>(*response_headers), false, "");
+
+  EXPECT_CALL(*filter_2, encodeMetadata(_)).WillOnce([&]() {
+    filter_2->encoder_callbacks_->sendLocalReply(Code::InternalServerError, "", nullptr,
+                                                 absl::nullopt, "bad_metadata");
+    return FilterMetadataStatus::StopIterationForLocalReply;
+  });
+  // Headers have already passed through; we will reset the stream.
+  EXPECT_CALL(filter_manager_callbacks_, resetStream(StreamResetReason::LocalReset, ""));
+  MetadataMap map1 = {{"a", "b"}};
+  filter_2->decoder_callbacks_->encodeMetadata(std::make_unique<MetadataMap>(map1));
+
+  filter_manager_->destroyFilters();
+}
+
+TEST_F(FilterManagerTest, IdleTimerResets) {
+  initialize();
+
+  std::shared_ptr<MockStreamFilter> filter_1(new NiceMock<MockStreamFilter>());
+  EXPECT_CALL(filter_factory_, createFilterChain(_))
+      .WillRepeatedly(Invoke([&](FilterChainManager& manager) -> bool {
+        auto factory = createStreamFilterFactoryCb(filter_1);
+        manager.applyFilterFactoryCb({"filter1", "filter1"}, factory);
+        return true;
+      }));
+  filter_manager_->createFilterChain();
+
+  RequestHeaderMapPtr basic_headers{
+      new TestRequestHeaderMapImpl{{":authority", "host"}, {":path", "/"}, {":method", "GET"}}};
+  ON_CALL(filter_manager_callbacks_, requestHeaders())
+      .WillByDefault(Return(makeOptRef(*basic_headers)));
+  filter_manager_->requestHeadersInitialized();
+
+  filter_manager_->decodeHeaders(*basic_headers, false);
+
+  Buffer::OwnedImpl data("absee");
+  EXPECT_CALL(filter_manager_callbacks_, resetIdleTimer());
+  filter_manager_->decodeData(data, false);
+
+  MetadataMap map = {{"a", "b"}};
+  EXPECT_CALL(filter_manager_callbacks_, resetIdleTimer());
+  filter_manager_->decodeMetadata(map);
+
+  RequestTrailerMapPtr basic_trailers{new TestRequestTrailerMapImpl{{"x", "y"}}};
+  filter_manager_->decodeTrailers(*basic_trailers);
+
+  ResponseHeaderMapPtr response_headers{new TestResponseHeaderMapImpl{{":status", "200"}}};
+  ON_CALL(filter_manager_callbacks_, responseHeaders())
+      .WillByDefault(Return(makeOptRef(*response_headers)));
+
+  EXPECT_CALL(filter_manager_callbacks_, resetIdleTimer());
+  filter_1->decoder_callbacks_->encodeHeaders(
+      std::make_unique<TestResponseHeaderMapImpl>(*response_headers), false, "");
+
+  EXPECT_CALL(filter_manager_callbacks_, resetIdleTimer());
+  filter_1->decoder_callbacks_->encodeData(data, false);
+
+  EXPECT_CALL(filter_manager_callbacks_, resetIdleTimer());
+  filter_1->decoder_callbacks_->encodeMetadata(std::make_unique<MetadataMap>(map));
+
+  ResponseTrailerMapPtr basic_resp_trailers{new TestResponseTrailerMapImpl{{"x", "y"}}};
+  EXPECT_CALL(filter_manager_callbacks_, resetIdleTimer());
+  filter_1->decoder_callbacks_->encodeTrailers(std::move(basic_resp_trailers));
+  filter_manager_->destroyFilters();
+}
 } // namespace
 } // namespace Http
 } // namespace Envoy

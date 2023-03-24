@@ -1234,8 +1234,8 @@ void FilterManager::encodeMetadata(ActiveStreamEncoderFilter* filter,
                      *metadata_map_ptr);
 
     if (status == FilterMetadataStatus::StopIterationForLocalReply) {
-      // The way is shut. It was made by those who are dead, and the dead keep it.
-      // The way is shut.
+      // In case of a local reply, we do not continue encoding metadata. Metadata is not sent on to
+      // the client.
       return;
     }
 

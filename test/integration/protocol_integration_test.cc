@@ -3074,7 +3074,7 @@ TEST_P(ProtocolIntegrationTest, ContinueAllFromDecodeMetadata) {
 
 TEST_P(ProtocolIntegrationTest, LocalReplyFromEncodeMetadata) {
   if (upstreamProtocol() != Http::CodecType::HTTP2) {
-    GTEST_SKIP() << "Metadata is not enabled for HTTP1.1 and less.";
+    GTEST_SKIP() << "Metadata is not enabled for non HTTP2 protocols.";
   }
   if (upstreamProtocol() >= Http::CodecType::HTTP2) {
     config_helper_.addConfigModifier(
@@ -3128,7 +3128,7 @@ TEST_P(ProtocolIntegrationTest, LocalReplyFromEncodeMetadata) {
 TEST_P(ProtocolIntegrationTest, ContinueAllFromEncodeMetadata) {
   if (upstreamProtocol() != Http::CodecType::HTTP2 ||
       downstream_protocol_ != Http::CodecType::HTTP2) {
-    GTEST_SKIP() << "Metadata is not enabled for HTTP1.1 and less.";
+    GTEST_SKIP() << "Metadata is not enabled for non HTTP2 protocols.";
   }
   config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
     RELEASE_ASSERT(bootstrap.mutable_static_resources()->clusters_size() >= 1, "");
