@@ -1,0 +1,1039 @@
+
+parameters:
+# NB: all stages _must_ depend on `env`
+- name: buildStageDeps
+  displayName: "Build stage dependencies"
+  type: object
+  default:
+  - env
+  - precheck
+- name: macBuildStageDeps
+  displayName: "macOS stage dependencies"
+  type: object
+  default:
+  - env
+  - precheck
+- name: windowsBuildStageDeps
+  displayName: "Windows stage dependencies"
+  type: object
+  default:
+  - env
+  - precheck
+- name: checkStageDeps
+  displayName: "Check stage dependencies"
+  type: object
+  default:
+  - env
+  - linux_x64
+
+stages:
+- stage: env
+  displayName: Environment
+  #
+  # Note to use the outputs created here - this `stage` must be set as a dependency in the relevant stage
+  # eg:
+  #
+  # stage: mystage
+  # dependsOn: ["env"]
+  #
+  # To use a variable as a condition for a `stage` you can specify it as follows:
+  #
+  # condition: and(not(canceled()), succeeded(), ne(dependencies.env.outputs['repo.changed.mobileOnly'], 'true'))
+  #
+  # To use a variable as a condition for a `job` you can specify it as follows:
+  #
+  # job:
+  #   condition: and(not(canceled()), succeeded(), ne(stageDependencies.env.repo.outputs['changed.mobileOnly'], 'true'))
+  #
+  # Note the difference in name resolution when used in stages and jobs.
+  #
+  # Note also, other conditions such as `not(canceled())` are not assumed and so need to be added to
+  # any conditions explicitly.
+  #
+  # NB: Avoid using _inclusive_ lists to trigger CI - eg _dont_ only trigger mobile CI if `mobile/` changed.
+  #  Instead use _exclusive_ bools - eg _do_ suppress other CI if only `mobile/` changed
+  #
+  # To use a variable in a `step` you can specify it as follows:
+  #
+  # stage: my_next_stage
+  #   jobs:
+  #     job: another_job
+  #     variables:
+  #       mobileOnly: $[stageDependencies.env.repo.outputs['changed.mobileOnly']]
+  #     steps:
+  #     - bash: echo $(mobileOnly)
+  #
+
+  jobs:
+  # Warm build image caches
+  - job: cache
+    displayName: Cache
+    pool:
+      vmImage: "ubuntu-20.04"
+    steps:
+    - template: cached.yml
+      parameters:
+        version: "$(buildImageCacheVersion)"
+        prime: true
+  - job: cache_arm
+    dependsOn: []
+    displayName: Cache (arm64)
+    pool:
+      vmImage: "ubuntu-20.04"
+    steps:
+    - template: cached.yml
+      parameters:
+        prime: true
+        arch: .arm64
+        version: "$(buildImageCacheVersion)"
+
+  - job: repo
+    dependsOn: []
+    displayName: Repository
+    pool:
+      vmImage: "ubuntu-20.04"
+    steps:
+    - checkout: self
+      fetchDepth: 0
+      fetchTags: true
+    - bash: |
+        set -e
+
+        # Only exclude checks in pull requests.
+        if [[ $(Build.Reason) != "PullRequest" ]]; then
+            echo "##vso[task.setvariable variable=mobileOnly;isoutput=true]false"
+            echo "##vso[task.setvariable variable=docsOnly;isoutput=true]false"
+            echo "##vso[task.setvariable variable=examplesOnly;isoutput=true]false"
+            exit 0
+        fi
+
+        CHANGE_TARGET="origin/$(System.PullRequest.TargetBranch)"
+
+        echo "Comparing changes ${CHANGE_TARGET}...HEAD"
+        CHANGED_PATHS="$(git diff --name-only ${CHANGE_TARGET}...HEAD | cut -d/ -f1 | sort -u | jq -sR 'rtrimstr("\n") | split("\n")')"
+        echo "$CHANGED_PATHS" | jq '.'
+        CHANGED_PATH_COUNT=$(echo $CHANGED_PATHS | jq '. | length')
+        CHANGED_MOBILE_ONLY=false
+        CHANGED_DOCS_ONLY=false
+        CHANGED_EXAMPLES_ONLY=false
+
+        CHANGED_MOBILE=$(echo $CHANGED_PATHS | jq '. as $A | "mobile" | IN($A[])')
+        if [[ $CHANGED_MOBILE == true && $CHANGED_PATH_COUNT -eq 1 ]]; then
+            CHANGED_MOBILE_ONLY=true
+        fi
+        CHANGED_DOCS=$(echo $CHANGED_PATHS | jq '. as $A | "docs" | IN($A[])')
+        if [[ $CHANGED_DOCS == true && $CHANGED_PATH_COUNT -eq 1 ]]; then
+            CHANGED_DOCS_ONLY=true
+        fi
+        CHANGED_EXAMPLES=$(echo $CHANGED_PATHS | jq '. as $A | "examples" | IN($A[])')
+        if [[ $CHANGED_EXAMPLES == true && $CHANGED_PATH_COUNT -eq 1 ]]; then
+            CHANGED_EXAMPLES_ONLY=true
+        fi
+
+        echo "##vso[task.setvariable variable=mobileOnly;isoutput=true]${CHANGED_MOBILE_ONLY}"
+        echo "##vso[task.setvariable variable=docsOnly;isoutput=true]${CHANGED_DOCS_ONLY}"
+        echo "##vso[task.setvariable variable=examplesOnly;isoutput=true]${CHANGED_EXAMPLES_ONLY}"
+      displayName: "Detect repo changes"
+      workingDirectory: $(Build.SourcesDirectory)
+      name: changed
+
+    - bash: |
+        set -e
+        VERSION_DEV="$(cat VERSION.txt | cut -d- -f2)"
+        if [[ $VERSION_DEV == "dev" ]]; then
+            echo "##vso[task.setvariable variable=isDev;isoutput=true]true"
+        else
+            if [[ $(Build.Reason) == "PullRequest" ]]; then
+                # Check to make sure that it was this PR that changed the version, otherwise fail
+                # as the branch needs to be reopened first.
+                # NB: this will not stop a PR that has already passed checks from being landed.
+                DIFF_TARGET_BRANCH="origin/$(System.PullRequest.TargetBranch)"
+                DIFF_REF="$(git merge-base HEAD "${DIFF_TARGET_BRANCH}")"
+                CHANGES="$(git diff "$DIFF_REF" HEAD VERSION.txt)"
+                if [[ -z "$CHANGES" ]]; then
+                    echo "VERSION.txt is not a development version. Please re-open the branch before making further changes" >&2
+                    exit 1
+                fi
+            fi
+            echo "##vso[task.setvariable variable=isDev;isoutput=true]false"
+        fi
+      displayName: Set development/release env
+      name: state
+
+    - bash: |
+        echo "env.outputs['changed.mobileOnly']: $(changed.mobileOnly)"
+        echo "env.outputs['changed.docsOnly']: $(changed.docsOnly)"
+        echo "env.outputs['changed.examplesOnly']: $(changed.examplesOnly)"
+        echo
+        echo "env.outputs['state.isDev]: $(state.isDev)"
+      displayName: "Print build environment"
+
+- stage: precheck
+  # displayName: Prechecks
+  dependsOn: ["env"]
+  jobs:
+  - job: format
+    # displayName: Code format
+    dependsOn: []
+    pool:
+      vmImage: "ubuntu-20.04"
+    steps:
+    - task: Cache@2
+      inputs:
+        key: "format | ./WORKSPACE | **/*.bzl"
+        path: $(Build.StagingDirectory)/repository_cache
+      continueOnError: true
+
+    - template: cached.yml
+      parameters:
+        version: "$(buildImageCacheVersion)"
+
+    - script: ci/run_envoy_docker.sh 'ci/do_ci.sh format'
+      workingDirectory: $(Build.SourcesDirectory)
+      env:
+        ENVOY_RBE: "true"
+        BAZEL_BUILD_EXTRA_OPTIONS: "--config=remote-ci --jobs=$(RbeJobs)"
+        ENVOY_DOCKER_BUILD_DIR: $(Build.StagingDirectory)
+        BAZEL_REMOTE_CACHE: grpcs://remotebuildexecution.googleapis.com
+        BAZEL_REMOTE_INSTANCE: projects/envoy-ci/instances/default_instance
+        GCP_SERVICE_ACCOUNT_KEY: $(GcpServiceAccountKey)
+        AZP_BRANCH: $(Build.SourceBranch)
+      displayName: "Run format checks"
+    - task: PublishBuildArtifacts@1
+      inputs:
+        pathtoPublish: "$(Build.StagingDirectory)/fix_format.diff"
+        artifactName: format
+      timeoutInMinutes: 10
+      # not all have fixes so improve condition/handling
+      condition: failed()
+
+  - job: proto_format
+    # displayName: Protobuf format
+    dependsOn: []
+    pool:
+      vmImage: "ubuntu-20.04"
+    steps:
+    - task: Cache@2
+      inputs:
+        key: "proto_format | ./WORKSPACE | **/*.bzl"
+        path: $(Build.StagingDirectory)/repository_cache
+      continueOnError: true
+
+    - template: cached.yml
+      parameters:
+        version: "$(buildImageCacheVersion)"
+
+    - script: ci/run_envoy_docker.sh 'ci/check_and_fix_format.sh'
+      workingDirectory: $(Build.SourcesDirectory)
+      env:
+        ENVOY_RBE: "true"
+        BAZEL_BUILD_EXTRA_OPTIONS: "--config=remote-ci --jobs=$(RbeJobs)"
+        ENVOY_DOCKER_BUILD_DIR: $(Build.StagingDirectory)
+        BAZEL_REMOTE_CACHE: grpcs://remotebuildexecution.googleapis.com
+        BAZEL_REMOTE_INSTANCE: projects/envoy-ci/instances/default_instance
+        GCP_SERVICE_ACCOUNT_KEY: $(GcpServiceAccountKey)
+      displayName: "Run check format scripts"
+
+    - task: PublishBuildArtifacts@1
+      inputs:
+        pathtoPublish: "$(Build.StagingDirectory)/fix_proto_format.diff"
+        artifactName: format
+      timeoutInMinutes: 10
+      condition: failed()
+
+  - job: docs
+    # displayName: Documentation
+    dependsOn: []  # this removes the implicit dependency on previous stage and causes this to run in parallel.
+    condition: ne(variables['PostSubmit'], true)
+    pool:
+      vmImage: "ubuntu-20.04"
+    steps:
+    - task: Cache@2
+      inputs:
+        key: "docs | ./WORKSPACE | **/*.bzl"
+        path: $(Build.StagingDirectory)/repository_cache
+      continueOnError: true
+
+    - template: cached.yml
+      parameters:
+        version: "$(buildImageCacheVersion)"
+
+    - script: ci/run_envoy_docker.sh 'ci/do_ci.sh docs'
+      workingDirectory: $(Build.SourcesDirectory)
+      env:
+        ENVOY_RBE: "true"
+        BAZEL_BUILD_EXTRA_OPTIONS: "--config=remote-ci --jobs=$(RbeJobs)"
+        AZP_BRANCH: $(Build.SourceBranch)
+        AZP_COMMIT_SHA: $(system.pullRequest.sourceCommitId)
+        ENVOY_DOCKER_BUILD_DIR: $(Build.StagingDirectory)
+        BAZEL_REMOTE_CACHE: grpcs://remotebuildexecution.googleapis.com
+        BAZEL_REMOTE_INSTANCE: projects/envoy-ci/instances/default_instance
+        GCP_SERVICE_ACCOUNT_KEY: $(GcpServiceAccountKey)
+      displayName: "Generate docs"
+
+    - script: |
+        ci/run_envoy_docker.sh 'ci/upload_gcs_artifact.sh /source/generated/docs docs'
+      displayName: "Upload Docs to GCS"
+      env:
+        ENVOY_DOCKER_BUILD_DIR: $(Build.StagingDirectory)
+        GCP_SERVICE_ACCOUNT_KEY: $(GcpServiceAccountKey)
+        GCS_ARTIFACT_BUCKET: $(GcsArtifactBucket)
+
+  - job: dependencies
+    # displayName: Dependency checks
+    dependsOn: []  # this removes the implicit dependency on previous stage and causes this to run in parallel.
+    pool:
+      vmImage: "ubuntu-20.04"
+    steps:
+    - task: Cache@2
+      inputs:
+        key: "dependencies | ./WORKSPACE | **/*.bzl"
+        path: $(Build.StagingDirectory)/repository_cache
+      continueOnError: true
+
+    - template: cached.yml
+      parameters:
+        version: "$(buildImageCacheVersion)"
+
+    - script: ci/run_envoy_docker.sh 'ci/do_ci.sh deps'
+      workingDirectory: $(Build.SourcesDirectory)
+      env:
+        ENVOY_RBE: "true"
+        BAZEL_BUILD_EXTRA_OPTIONS: "--config=remote-ci --jobs=$(RbeJobs)"
+        ENVOY_DOCKER_BUILD_DIR: $(Build.StagingDirectory)
+        BAZEL_REMOTE_CACHE: grpcs://remotebuildexecution.googleapis.com
+        BAZEL_REMOTE_INSTANCE: projects/envoy-ci/instances/default_instance
+        GCP_SERVICE_ACCOUNT_KEY: $(GcpServiceAccountKey)
+        GITHUB_TOKEN: $(GitHubPublicRepoOnlyAccessToken)
+      displayName: "Verify dependency information"
+
+  - job: docker_ci
+    displayName: Docker checks
+    dependsOn: []
+    pool:
+      vmImage: "ubuntu-20.04"
+    steps:
+    - script: |
+        DOCKER_CI_FIX_DIFF=$(Build.StagingDirectory)/fix_docker.diff DOCKER_CI_FIX=1 ci/test_docker_ci.sh
+      workingDirectory: $(Build.SourcesDirectory)
+      displayName: Docker build regression test
+    - task: PublishBuildArtifacts@1
+      inputs:
+        pathtoPublish: "$(Build.StagingDirectory)/fix_docker.diff"
+        artifactName: "docker_ci"
+        timeoutInMinutes: 10
+      condition: failed()
+
+- stage: sync
+  condition: and(succeeded(), eq(variables['PostSubmit'], true), ne(variables['NoSync'], true))
+  dependsOn: []
+  jobs:
+  - job: filter_example
+    dependsOn: []
+    pool:
+      vmImage: "ubuntu-20.04"
+    steps:
+    - task: InstallSSHKey@0
+      inputs:
+        hostName: "github.com ssh-rsa AAAAB3NzaC1yc2EAAAABIwAAAQEAq2A7hRGmdnm9tUDbO9IDSwBK6TbQa+PXYPCPy6rbTrTtw7PHkccKrpp0yVhp5HdEIcKr6pLlVDBfOLX9QUsyCOV0wzfjIJNlGEYsdlLJizHhbn2mUjvSAHQqZETYP81eFzLQNnPHt4EVVUh7VfDESU84KezmD5QlWpXLmvU31/yMf+Se8xhHTvKSCZIFImWwoG6mbUoWf9nzpIoaSjB+weqqUUmpaaasXVal72J+UX2B+2RPW3RcT0eOzQgqlJL3RKrTJvdsjE3JEAvGq3lGHSZXy28G3skua2SmVi/w4yCE6gbODqnTWlg7+wC604ydGXA8VJiS5ap43JXiUFFAaQ=="
+        sshPublicKey: "$(FilterExamplePublicKey)"
+        sshPassphrase: "$(SshDeployKeyPassphrase)"
+        sshKeySecureFile: "$(FilterExamplePrivateKey)"
+
+    - bash: ci/filter_example_mirror.sh
+      displayName: "Sync envoy-filter-example"
+      workingDirectory: $(Build.SourcesDirectory)
+      env:
+        AZP_BRANCH: $(Build.SourceBranch)
+
+  - job: data_plane_api
+    dependsOn: []
+    pool:
+      vmImage: "ubuntu-20.04"
+    steps:
+    - task: InstallSSHKey@0
+      inputs:
+        hostName: "github.com ssh-rsa AAAAB3NzaC1yc2EAAAABIwAAAQEAq2A7hRGmdnm9tUDbO9IDSwBK6TbQa+PXYPCPy6rbTrTtw7PHkccKrpp0yVhp5HdEIcKr6pLlVDBfOLX9QUsyCOV0wzfjIJNlGEYsdlLJizHhbn2mUjvSAHQqZETYP81eFzLQNnPHt4EVVUh7VfDESU84KezmD5QlWpXLmvU31/yMf+Se8xhHTvKSCZIFImWwoG6mbUoWf9nzpIoaSjB+weqqUUmpaaasXVal72J+UX2B+2RPW3RcT0eOzQgqlJL3RKrTJvdsjE3JEAvGq3lGHSZXy28G3skua2SmVi/w4yCE6gbODqnTWlg7+wC604ydGXA8VJiS5ap43JXiUFFAaQ=="
+        sshPublicKey: "$(DataPlaneApiPublicKey)"
+        sshPassphrase: "$(SshDeployKeyPassphrase)"
+        sshKeySecureFile: "$(DataPlaneApiPrivateKey)"
+
+    - bash: ci/api_mirror.sh
+      displayName: "Sync data-plane-api"
+      workingDirectory: $(Build.SourcesDirectory)
+      env:
+        AZP_BRANCH: $(Build.SourceBranch)
+
+  - job: go_control_plane
+    dependsOn: []
+    pool:
+      vmImage: "ubuntu-20.04"
+    steps:
+    - task: InstallSSHKey@0
+      inputs:
+        hostName: "github.com ssh-rsa AAAAB3NzaC1yc2EAAAABIwAAAQEAq2A7hRGmdnm9tUDbO9IDSwBK6TbQa+PXYPCPy6rbTrTtw7PHkccKrpp0yVhp5HdEIcKr6pLlVDBfOLX9QUsyCOV0wzfjIJNlGEYsdlLJizHhbn2mUjvSAHQqZETYP81eFzLQNnPHt4EVVUh7VfDESU84KezmD5QlWpXLmvU31/yMf+Se8xhHTvKSCZIFImWwoG6mbUoWf9nzpIoaSjB+weqqUUmpaaasXVal72J+UX2B+2RPW3RcT0eOzQgqlJL3RKrTJvdsjE3JEAvGq3lGHSZXy28G3skua2SmVi/w4yCE6gbODqnTWlg7+wC604ydGXA8VJiS5ap43JXiUFFAaQ=="
+        sshPublicKey: "$(GoControlPlanePublicKey)"
+        sshPassphrase: "$(SshDeployKeyPassphrase)"
+        sshKeySecureFile: "$(GoControlPlanePrivateKey)"
+
+    - bash: |
+        cp -a ~/.ssh $(Build.StagingDirectory)/
+        ci/run_envoy_docker.sh 'ci/go_mirror.sh'
+      displayName: "Sync go-control-plane"
+      workingDirectory: $(Build.SourcesDirectory)
+      env:
+        ENVOY_DOCKER_BUILD_DIR: $(Build.StagingDirectory)
+        BAZEL_REMOTE_CACHE: grpcs://remotebuildexecution.googleapis.com
+        BAZEL_REMOTE_INSTANCE: projects/envoy-ci/instances/default_instance
+        GCP_SERVICE_ACCOUNT_KEY: $(GcpServiceAccountKey)
+        AZP_BRANCH: $(Build.SourceBranch)
+
+- stage: linux_x64
+  # displayName: Linux x64
+  dependsOn: ${{ parameters.buildStageDeps }}
+  # For post-submit builds, continue even if precheck fails
+  condition: and(not(canceled()), or(succeeded(), eq(variables['PostSubmit'], true)))
+  jobs:
+  - job: release
+    displayName: Build and test
+    condition: and(not(canceled()), ne(stageDependencies.env.repo.outputs['changed.mobileOnly'], 'true'), ne(stageDependencies.env.repo.outputs['changed.docsOnly'], 'true'))
+    timeoutInMinutes: 120
+    pool: x64-large
+    steps:
+    - template: bazel.yml
+      parameters:
+        managedAgent: false
+        ciTarget: bazel.release
+        bazelBuildExtraOptions: "--sandbox_base=/tmp/sandbox_base"
+
+  - job: released
+    # displayName: Complete
+    dependsOn: ["release"]
+    pool:
+      vmImage: "ubuntu-20.04"
+    # This condition ensures that this (required) job passes if all of
+    # the preceeding jobs either pass or are skipped
+    # adapted from:
+    #   https://learn.microsoft.com/en-us/azure/devops/pipelines/process/expressions?view=azure-devops#job-to-job-dependencies-within-one-stage
+    condition: in(dependencies.release.result, 'Succeeded', 'SucceededWithIssues', 'Skipped')
+    steps:
+    - checkout: none
+    - bash: |
+        echo "linux_x64 released"
+
+- stage: linux_arm64
+  # displayName: Linux arm64
+  dependsOn: ${{ parameters.buildStageDeps }}
+  # For post-submit builds, continue even if precheck fails
+  condition: and(not(canceled()), or(succeeded(), eq(variables['PostSubmit'], true)))
+  jobs:
+  - job: release
+    displayName: Build and test
+    condition: and(not(canceled()), ne(stageDependencies.env.repo.outputs['changed.mobileOnly'], 'true'), ne(stageDependencies.env.repo.outputs['changed.docsOnly'], 'true'))
+    timeoutInMinutes: 120
+    pool: "arm-large"
+    steps:
+    - template: bazel.yml
+      parameters:
+        managedAgent: false
+        ciTarget: bazel.release
+        rbe: false
+        artifactSuffix: ".arm64"
+        bazelBuildExtraOptions: "--sandbox_base=/tmp/sandbox_base"
+
+  - job: released
+    # displayName: Complete
+    dependsOn: ["release"]
+    pool:
+      vmImage: "ubuntu-20.04"
+    # This condition ensures that this (required) job passes if all of
+    # the preceeding jobs either pass or are skipped
+    # adapted from:
+    #   https://learn.microsoft.com/en-us/azure/devops/pipelines/process/expressions?view=azure-devops#job-to-job-dependencies-within-one-stage
+    condition: in(dependencies.release.result, 'Succeeded', 'SucceededWithIssues', 'Skipped')
+    steps:
+    - checkout: none
+    - bash: |
+        echo "linux_arm64 released"
+
+- stage: check
+  # displayName: Checks (Linux x64)
+  dependsOn: ${{ parameters.checkStageDeps }}
+  jobs:
+  - job: bazel
+    displayName: linux_x64
+    # displayName: "Linux x64"
+    dependsOn: []
+    # Skip checks if only mobile/ or docs/ have changed.
+    condition: and(not(canceled()), or(succeeded(), eq(variables['PostSubmit'], true)), ne(stageDependencies.env.repo.outputs['changed.mobileOnly'], 'true'), ne(stageDependencies.env.repo.outputs['changed.docsOnly'], 'true'), ne(stageDependencies.env.repo.outputs['changed.examplesOnly'], 'true'))
+    strategy:
+      maxParallel: 3
+      matrix:
+        # These are ordered by most time-consuming first.
+        compile_time_options:
+          CI_TARGET: "bazel.compile_time_options"
+        tsan:
+          CI_TARGET: "bazel.tsan"
+        asan:
+          CI_TARGET: "bazel.asan"
+        # Disabled due to https://github.com/envoyproxy/envoy/pull/18218
+        # api_compat:
+        #  CI_TARGET: "bazel.api_compat"
+        gcc:
+          CI_TARGET: "bazel.gcc"
+        msan:
+          CI_TARGET: "bazel.msan"
+        clang_tidy:
+          CI_TARGET: "bazel.clang_tidy"
+        api:
+          CI_TARGET: "bazel.api"
+    timeoutInMinutes: 120
+    pool:
+      vmImage: "ubuntu-20.04"
+    steps:
+    - template: bazel.yml
+      parameters:
+        ciTarget: $(CI_TARGET)
+
+  - job: coverage
+    # displayName: "Linux x64"
+    dependsOn: []
+    # Skip checks if only mobile/ or docs/ have changed.
+    condition: and(not(canceled()), or(succeeded(), eq(variables['PostSubmit'], true)), ne(stageDependencies.env.repo.outputs['changed.mobileOnly'], 'true'), ne(stageDependencies.env.repo.outputs['changed.docsOnly'], 'true'), ne(stageDependencies.env.repo.outputs['changed.examplesOnly'], 'true'))
+    timeoutInMinutes: 180
+    pool: "x64-large"
+    strategy:
+      maxParallel: 2
+      matrix:
+        coverage:
+          CI_TARGET: "coverage"
+        fuzz_coverage:
+          CI_TARGET: "fuzz_coverage"
+    steps:
+    - template: bazel.yml
+      parameters:
+        managedAgent: false
+        ciTarget: bazel.$(CI_TARGET)
+        rbe: false
+        # /tmp/sandbox_base is a tmpfs in CI environment to optimize large I/O for coverage traces
+        bazelBuildExtraOptions: "--define=no_debug_info=1 --linkopt=-Wl,-s --test_env=ENVOY_IP_TEST_VERSIONS=v4only --sandbox_base=/tmp/sandbox_base"
+
+    - script: ci/run_envoy_docker.sh 'ci/upload_gcs_artifact.sh /source/generated/$(CI_TARGET) $(CI_TARGET)'
+      displayName: "Upload $(CI_TARGET) Report to GCS"
+      env:
+        ENVOY_DOCKER_BUILD_DIR: $(Build.StagingDirectory)
+        GCP_SERVICE_ACCOUNT_KEY: $(GcpServiceAccountKey)
+        GCS_ARTIFACT_BUCKET: $(GcsArtifactBucket)
+      condition: always()
+
+  - job: complete
+    displayName: linux_x64
+    # displayName: "Checks complete"
+    dependsOn: ["bazel", "coverage"]
+    pool:
+      vmImage: "ubuntu-20.04"
+    # This condition ensures that this (required) check passes if all of
+    # the preceding checks either pass or are skipped
+    # adapted from:
+    #   https://learn.microsoft.com/en-us/azure/devops/pipelines/process/expressions?view=azure-devops#job-to-job-dependencies-within-one-stage
+    condition: |
+      and(
+        in(dependencies.bazel.result, 'Succeeded', 'SucceededWithIssues', 'Skipped'),
+        in(dependencies.coverage.result, 'Succeeded', 'SucceededWithIssues', 'Skipped'))
+    steps:
+    - checkout: none
+    - bash: |
+        echo "checks complete"
+
+- stage: publish
+  displayName: Publish
+  dependsOn: ["env", "linux_x64", "linux_arm64"]
+  jobs:
+  - job: docker
+    displayName: "Docker (Linux multi arch)"
+    condition: and(not(canceled()), succeeded(), ne(stageDependencies.env.repo.outputs['changed.mobileOnly'], 'true'), ne(stageDependencies.env.repo.outputs['changed.docsOnly'], 'true'))
+    timeoutInMinutes: 120
+    pool:
+      vmImage: "ubuntu-20.04"
+    steps:
+    - template: cached.yml
+      parameters:
+        name: publish_docker
+        # VERSION.txt is included to refresh Docker images for release
+        key: "ci/Dockerfile-envoy | VERSION.txt"
+        version: "$(dockerBuildCacheVersion)"
+        path: ""
+    - bash: |
+        echo "disk space at beginning of build:"
+        df -h
+      displayName: "Check disk space at beginning"
+    - task: DownloadBuildArtifacts@0
+      inputs:
+        buildType: current
+        artifactName: "bazel.release"
+        itemPattern: "bazel.release/envoy*binary.tar.gz"
+        targetPath: $(Build.StagingDirectory)
+    - task: DownloadBuildArtifacts@0
+      inputs:
+        buildType: current
+        artifactName: "bazel.release.arm64"
+        itemPattern: "bazel.release.arm64/envoy*binary.tar.gz"
+        targetPath: $(Build.StagingDirectory)
+    - bash: |
+        set -e
+        mkdir -p linux/amd64
+        tar zxf $(Build.StagingDirectory)/bazel.release/envoy_binary.tar.gz -C ./linux/amd64
+        tar zxf $(Build.StagingDirectory)/bazel.release/envoy-contrib_binary.tar.gz -C ./linux/amd64
+        rm $(Build.StagingDirectory)/bazel.release/envoy_binary.tar.gz
+        rm $(Build.StagingDirectory)/bazel.release/envoy-contrib_binary.tar.gz
+        mkdir -p linux/arm64
+        tar zxf $(Build.StagingDirectory)/bazel.release.arm64/envoy_binary.tar.gz -C ./linux/arm64
+        tar zxf $(Build.StagingDirectory)/bazel.release.arm64/envoy-contrib_binary.tar.gz -C ./linux/arm64
+        rm $(Build.StagingDirectory)/bazel.release.arm64/envoy_binary.tar.gz
+        rm $(Build.StagingDirectory)/bazel.release.arm64/envoy-contrib_binary.tar.gz
+        ci/docker_ci.sh
+      workingDirectory: $(Build.SourcesDirectory)
+      env:
+        AZP_BRANCH: $(Build.SourceBranch)
+        AZP_SHA1: $(Build.SourceVersion)
+        DOCKERHUB_USERNAME: $(DockerUsername)
+        DOCKERHUB_PASSWORD: $(DockerPassword)
+    - bash: |
+        echo "disk space at end of build:"
+        df -h
+      displayName: "Check disk space at end"
+      condition: always()
+    - task: PublishBuildArtifacts@1
+      inputs:
+        pathtoPublish: "$(Build.StagingDirectory)/build_images"
+        artifactName: docker
+      timeoutInMinutes: 10
+      condition: always()
+    - script: sudo .azure-pipelines/docker/save_cache.sh /mnt/docker_cache
+      displayName: "Cache/save (publish_docker)"
+
+  - job: package_x64
+    displayName: Linux debs (x64)
+    dependsOn: []
+    condition: and(not(canceled()), succeeded(), ne(stageDependencies.env.repo.outputs['changed.mobileOnly'], 'true'), ne(stageDependencies.env.repo.outputs['changed.docsOnly'], 'true'), ne(stageDependencies.env.repo.outputs['changed.examplesOnly'], 'true'))
+    timeoutInMinutes: 120
+    pool:
+      vmImage: "ubuntu-20.04"
+    steps:
+    - template: bazel.yml
+      parameters:
+        ciTarget: bazel.distribution
+  - job: package_arm64
+    displayName: Linux debs (arm64)
+    dependsOn: []
+    condition: and(not(canceled()), succeeded(), ne(stageDependencies.env.repo.outputs['changed.mobileOnly'], 'true'), ne(stageDependencies.env.repo.outputs['changed.docsOnly'], 'true'), ne(stageDependencies.env.repo.outputs['changed.examplesOnly'], 'true'))
+    timeoutInMinutes: 120
+    pool: "arm-large"
+    steps:
+    - template: bazel.yml
+      parameters:
+        managedAgent: false
+        ciTarget: bazel.distribution
+        rbe: false
+        artifactSuffix: ".arm64"
+        bazelBuildExtraOptions: "--sandbox_base=/tmp/sandbox_base"
+
+  - job: success
+    dependsOn: ["docker", "package_x64", "package_arm64"]
+    displayName: Success (linux artefacts)
+    pool:
+      vmImage: "ubuntu-20.04"
+    # This condition ensures that this (required) check passes if all of
+    # the preceding checks either pass or are skipped
+    # adapted from:
+    #   https://learn.microsoft.com/en-us/azure/devops/pipelines/process/expressions?view=azure-devops#job-to-job-dependencies-within-one-stage
+    condition: |
+      and(
+        in(dependencies.docker.result, 'Succeeded', 'SucceededWithIssues', 'Skipped'),
+        in(dependencies.package_x64.result, 'Succeeded', 'SucceededWithIssues', 'Skipped'),
+        in(dependencies.package_arm64.result, 'Succeeded', 'SucceededWithIssues', 'Skipped'))
+    steps:
+    - checkout: none
+    - bash: |
+        echo "building publishable assets complete"
+
+  - job: docs
+    displayName: Publish docs to netlify
+    dependsOn: ["success"]
+    condition: and(succeeded(), eq(variables['PostSubmit'], true), ne(variables['NoSync'], true))
+    pool:
+      vmImage: "ubuntu-20.04"
+    steps:
+    - task: Cache@2
+      inputs:
+        key: "docs | ./WORKSPACE | **/*.bzl"
+        path: $(Build.StagingDirectory)/repository_cache
+      continueOnError: true
+
+    - script: ci/run_envoy_docker.sh 'ci/do_ci.sh docs'
+      workingDirectory: $(Build.SourcesDirectory)
+      env:
+        ENVOY_RBE: "true"
+        BAZEL_BUILD_EXTRA_OPTIONS: "--config=remote-ci --jobs=$(RbeJobs)"
+        AZP_BRANCH: $(Build.SourceBranch)
+        ENVOY_DOCKER_BUILD_DIR: $(Build.StagingDirectory)
+        BAZEL_REMOTE_CACHE: grpcs://remotebuildexecution.googleapis.com
+        BAZEL_REMOTE_INSTANCE: projects/envoy-ci/instances/default_instance
+        GCP_SERVICE_ACCOUNT_KEY: $(GcpServiceAccountKey)
+      displayName: "Generate docs"
+
+    - script: |
+        bazel run //tools/distribution:update_dockerhub_repository
+      displayName: "Publish Dockerhub description and README"
+      env:
+        DOCKERHUB_USERNAME: $(DockerUsername)
+        DOCKERHUB_PASSWORD: $(DockerPassword)
+      condition: and(eq(variables['isMain'], 'true'), eq(variables['PostSubmit'], true))
+
+    - script: |
+        ci/run_envoy_docker.sh 'ci/upload_gcs_artifact.sh /source/generated/docs docs'
+      displayName: "Upload Docs to GCS"
+      env:
+        ENVOY_DOCKER_BUILD_DIR: $(Build.StagingDirectory)
+        GCP_SERVICE_ACCOUNT_KEY: $(GcpServiceAccountKey)
+        GCS_ARTIFACT_BUCKET: $(GcsArtifactBucket)
+      condition: eq(variables['isMain'], 'true')
+
+    - task: InstallSSHKey@0
+      inputs:
+        hostName: "github.com ssh-rsa AAAAB3NzaC1yc2EAAAABIwAAAQEAq2A7hRGmdnm9tUDbO9IDSwBK6TbQa+PXYPCPy6rbTrTtw7PHkccKrpp0yVhp5HdEIcKr6pLlVDBfOLX9QUsyCOV0wzfjIJNlGEYsdlLJizHhbn2mUjvSAHQqZETYP81eFzLQNnPHt4EVVUh7VfDESU84KezmD5QlWpXLmvU31/yMf+Se8xhHTvKSCZIFImWwoG6mbUoWf9nzpIoaSjB+weqqUUmpaaasXVal72J+UX2B+2RPW3RcT0eOzQgqlJL3RKrTJvdsjE3JEAvGq3lGHSZXy28G3skua2SmVi/w4yCE6gbODqnTWlg7+wC604ydGXA8VJiS5ap43JXiUFFAaQ=="
+        sshPublicKey: "$(DocsPublicKey)"
+        sshPassphrase: "$(SshDeployKeyPassphrase)"
+        sshKeySecureFile: "$(DocsPrivateKey)"
+
+    - script: docs/publish.sh
+      displayName: "Publish to GitHub"
+      workingDirectory: $(Build.SourcesDirectory)
+      env:
+        AZP_BRANCH: $(Build.SourceBranch)
+        NETLIFY_TRIGGER_URL: $(NetlifyTriggerURL)
+
+  - job: github
+    displayName: Publish release tag
+    dependsOn: ["docs"]
+    condition: and(succeeded(), eq(variables['PostSubmit'], true), ne(variables['NoSync'], true), eq(variables['isStableBranch'], 'true'), eq(stageDependencies.env.repo.outputs['state.isDev'], 'false'))
+    pool:
+      vmImage: "ubuntu-20.04"
+    steps:
+
+    - task: DownloadBuildArtifacts@0
+      inputs:
+        buildType: current
+        artifactName: "bazel.release"
+        itemPattern: "bazel.release/envoy_binary.tar.gz"
+        downloadType: single
+        targetPath: $(Build.StagingDirectory)
+    - task: DownloadBuildArtifacts@0
+      inputs:
+        buildType: current
+        artifactName: "bazel.release"
+        itemPattern: "bazel.release/envoy-contrib_binary.tar.gz"
+        downloadType: single
+        targetPath: $(Build.StagingDirectory)
+    - task: DownloadBuildArtifacts@0
+      inputs:
+        buildType: current
+        artifactName: "bazel.release.arm64"
+        itemPattern: "bazel.release.arm64/envoy_binary.tar.gz"
+        downloadType: single
+        targetPath: $(Build.StagingDirectory)
+    - task: DownloadBuildArtifacts@0
+      inputs:
+        buildType: current
+        artifactName: "bazel.release.arm64"
+        itemPattern: "bazel.release.arm64/envoy-contrib_binary.tar.gz"
+        downloadType: single
+        targetPath: $(Build.StagingDirectory)
+
+    - task: DownloadSecureFile@1
+      name: MaintainerGPGKey
+      displayName: 'Download maintainer GPG key'
+      inputs:
+        # NB: This is the path to the key and **must** be set on a per-pipeline basis
+        secureFile: '$(maintainerGPGKey)'
+
+    - script: ./ci/run_envoy_docker.sh './ci/do_ci.sh publish'
+      displayName: "Publish release to Github"
+      workingDirectory: $(Build.SourcesDirectory)
+      env:
+        AZP_BRANCH: $(Build.SourceBranch)
+        GITHUB_TOKEN: $(GitHubPublicRepoOnlyAccessToken)
+
+    # TODO(phlax): combine this with publish step
+    - bash: |
+        set -e
+
+        VERSION="$(cat VERSION.txt)"
+
+        mkdir -p linux/amd64 linux/arm64 publish
+
+        # linux/amd64
+        tar zxf $(Build.StagingDirectory)/bazel.release/envoy_binary.tar.gz -C ./linux/amd64
+        tar zxf $(Build.StagingDirectory)/bazel.release/envoy-contrib_binary.tar.gz -C ./linux/amd64
+        cp -a linux/amd64/build_envoy_release_stripped/envoy "publish/envoy-${VERSION}-linux-x86_64"
+        cp -a linux/amd64/build_envoy-contrib_release_stripped/envoy "publish/envoy-contrib-${VERSION}-linux-x86_64"
+
+        # linux/arm64
+        tar zxf $(Build.StagingDirectory)/bazel.release.arm64/envoy_binary.tar.gz -C ./linux/arm64
+        tar zxf $(Build.StagingDirectory)/bazel.release.arm64/envoy-contrib_binary.tar.gz -C ./linux/arm64
+        cp -a linux/arm64/build_envoy_release_stripped/envoy "publish/envoy-${VERSION}-linux-aarch_64"
+        cp -a linux/arm64/build_envoy-contrib_release_stripped/envoy "publish/envoy-contrib-${VERSION}-linux-aarch_64"
+
+        echo "$MAINTAINER_GPG_KEY_PASSPHRASE" | gpg --batch --yes --passphrase-fd 0 --import "$(MaintainerGPGKey.secureFilePath)"
+
+        ci/publish_github_assets.sh "v${VERSION}" "${PWD}/publish"
+      workingDirectory: $(Build.SourcesDirectory)
+      env:
+        GITHUB_TOKEN: $(GitHubPublicRepoOnlyAccessToken)
+        MAINTAINER_GPG_KEY_PASSPHRASE: $(MaintainerGPGKeyPassphrase)
+
+- stage: verify
+  # displayName: Verify
+  dependsOn: ["env", "publish"]
+  jobs:
+  - job: examples
+    displayName: Examples (Docker/x64)
+    condition: and(not(canceled()), succeeded(), ne(stageDependencies.env.repo.outputs['changed.mobileOnly'], 'true'), ne(stageDependencies.env.repo.outputs['changed.docsOnly'], 'true'))
+    pool:
+      vmImage: "ubuntu-20.04"
+    steps:
+    - bash: .azure-pipelines/cleanup.sh
+      displayName: "Removing tools from agent"
+    - task: DownloadBuildArtifacts@0
+      inputs:
+        buildType: current
+        artifactName: "docker"
+        itemPattern: "docker/envoy*.tar"
+        targetPath: $(Build.StagingDirectory)
+    - bash: ./ci/do_ci.sh verify_examples
+      env:
+        ENVOY_DOCKER_BUILD_DIR: $(Build.StagingDirectory)
+        NO_BUILD_SETUP: 1
+        # ENVOY_EXAMPLES_DEBUG: 1
+
+  - job: packages_x64
+    displayName: Debs (x64)
+    condition: and(not(canceled()), succeeded(), ne(stageDependencies.env.repo.outputs['changed.mobileOnly'], 'true'), ne(stageDependencies.env.repo.outputs['changed.docsOnly'], 'true'), ne(stageDependencies.env.repo.outputs['changed.examplesOnly'], 'true'))
+    timeoutInMinutes: 120
+    pool:
+      vmImage: "ubuntu-20.04"
+    steps:
+    - task: DownloadBuildArtifacts@0
+      inputs:
+        buildType: current
+        artifactName: "bazel.distribution"
+        itemPattern: "bazel.distribution/packages.x64.tar.gz"
+        downloadType: single
+        targetPath: $(Build.StagingDirectory)
+    - script: ci/run_envoy_docker.sh 'ci/do_ci.sh verify_distro'
+      workingDirectory: $(Build.SourcesDirectory)
+      env:
+        AZP_BRANCH: $(Build.SourceBranch)
+        ENVOY_DOCKER_BUILD_DIR: $(Build.StagingDirectory)
+        ENVOY_DOCKER_IN_DOCKER: 1
+        BAZEL_REMOTE_CACHE: grpcs://remotebuildexecution.googleapis.com
+        BAZEL_REMOTE_INSTANCE: projects/envoy-ci/instances/default_instance
+        GCP_SERVICE_ACCOUNT_KEY: $(GcpServiceAccountKey)
+      displayName: "Verify packages"
+  - job: packages_arm64
+    displayName: Debs (arm64)
+    condition: and(not(canceled()), succeeded(), ne(stageDependencies.env.repo.outputs['changed.mobileOnly'], 'true'), ne(stageDependencies.env.repo.outputs['changed.docsOnly'], 'true'), ne(stageDependencies.env.repo.outputs['changed.examplesOnly'], 'true'))
+    timeoutInMinutes: 120
+    pool: "arm-large"
+    steps:
+    - task: DownloadBuildArtifacts@0
+      inputs:
+        buildType: current
+        artifactName: "bazel.distribution.arm64"
+        itemPattern: "bazel.distribution.arm64/packages.arm64.tar.gz"
+        downloadType: single
+        targetPath: $(Build.StagingDirectory)
+    - script: ci/run_envoy_docker.sh 'ci/do_ci.sh verify_distro'
+      workingDirectory: $(Build.SourcesDirectory)
+      env:
+        AZP_BRANCH: $(Build.SourceBranch)
+        ENVOY_DOCKER_BUILD_DIR: $(Build.StagingDirectory)
+        ENVOY_DOCKER_IN_DOCKER: 1
+        BAZEL_REMOTE_CACHE: grpcs://remotebuildexecution.googleapis.com
+        BAZEL_REMOTE_INSTANCE: projects/envoy-ci/instances/default_instance
+        GCP_SERVICE_ACCOUNT_KEY: $(GcpServiceAccountKey)
+      displayName: "Verify packages"
+
+  - job: verified
+    # displayName: Verification complete
+    dependsOn: ["examples", "packages_x64", "packages_arm64"]
+    pool:
+      vmImage: "ubuntu-20.04"
+    # This condition ensures that this (required) check passes if all of
+    # the preceding checks either pass or are skipped
+    # adapted from:
+    #   https://learn.microsoft.com/en-us/azure/devops/pipelines/process/expressions?view=azure-devops#job-to-job-dependencies-within-one-stage
+    condition: |
+      and(
+        in(dependencies.examples.result, 'Succeeded', 'SucceededWithIssues', 'Skipped'),
+        in(dependencies.packages_x64.result, 'Succeeded', 'SucceededWithIssues', 'Skipped'),
+        in(dependencies.packages_arm64.result, 'Succeeded', 'SucceededWithIssues', 'Skipped'))
+    steps:
+    - checkout: none
+    - bash: |
+        echo "checks complete"
+
+- stage: macos
+  # displayName: macOS
+  dependsOn: ${{ parameters.macBuildStageDeps }}
+  jobs:
+  - job: test
+    displayName: Build and test
+    condition: and(not(canceled()), succeeded(), ne(stageDependencies.env.repo.outputs['changed.mobileOnly'], 'true'), ne(stageDependencies.env.repo.outputs['changed.docsOnly'], 'true'), ne(stageDependencies.env.repo.outputs['changed.examplesOnly'], 'true'))
+    timeoutInMinutes: 180
+    pool:
+      vmImage: "macos-11"
+    steps:
+    - script: ./ci/mac_ci_setup.sh
+      displayName: "Install dependencies"
+
+    - script: ./ci/mac_ci_steps.sh
+      displayName: "Run Mac CI"
+      env:
+        BAZEL_BUILD_EXTRA_OPTIONS: "--remote_download_toplevel --flaky_test_attempts=2"
+        BAZEL_REMOTE_CACHE: grpcs://remotebuildexecution.googleapis.com
+        BAZEL_REMOTE_INSTANCE: projects/envoy-ci/instances/default_instance
+        GCP_SERVICE_ACCOUNT_KEY: $(GcpServiceAccountKey)
+
+    - task: PublishTestResults@2
+      inputs:
+        testResultsFiles: "**/bazel-testlogs/**/test.xml"
+        testRunTitle: "macOS"
+      timeoutInMinutes: 10
+      condition: always()
+
+  - job: tested
+    # displayName: Complete
+    dependsOn: ["test"]
+    pool:
+      vmImage: "ubuntu-20.04"
+    # This condition ensures that this (required) job passes if all of
+    # the preceeding jobs either pass or are skipped
+    # adapted from:
+    #   https://learn.microsoft.com/en-us/azure/devops/pipelines/process/expressions?view=azure-devops#job-to-job-dependencies-within-one-stage
+    condition: in(dependencies.test.result, 'Succeeded', 'SucceededWithIssues', 'Skipped')
+    steps:
+    - checkout: none
+    - bash: |
+        echo "macos tested"
+
+- stage: windows
+  # displayName: Windows
+  dependsOn: ${{ parameters.windowsBuildStageDeps }}
+  jobs:
+  - job: release
+    displayName: Build and test
+    condition: and(not(canceled()), succeeded(), ne(stageDependencies.env.repo.outputs['changed.mobileOnly'], 'true'), ne(stageDependencies.env.repo.outputs['changed.docsOnly'], 'true'), ne(stageDependencies.env.repo.outputs['changed.examplesOnly'], 'true'))
+    timeoutInMinutes: 180
+    pool:
+      vmImage: "windows-2019"
+    steps:
+    - task: Cache@2
+      inputs:
+        key: '"windows.release" | ./WORKSPACE | **/*.bzl'
+        path: $(Build.StagingDirectory)/repository_cache
+      continueOnError: true
+    - bash: ci/run_envoy_docker.sh ci/windows_ci_steps.sh
+      displayName: "Run Windows msvc-cl CI"
+      env:
+        CI_TARGET: "windows"
+        ENVOY_DOCKER_BUILD_DIR: "$(Build.StagingDirectory)"
+        SLACK_TOKEN: $(SLACK_TOKEN)
+        REPO_URI: $(Build.Repository.Uri)
+        BUILD_URI: $(Build.BuildUri)
+        ENVOY_RBE: "true"
+        BAZEL_BUILD_EXTRA_OPTIONS: "--config=remote-ci --config=remote-msvc-cl --jobs=$(RbeJobs) --flaky_test_attempts=2"
+        BAZEL_REMOTE_CACHE: grpcs://remotebuildexecution.googleapis.com
+        BAZEL_REMOTE_INSTANCE: projects/envoy-ci/instances/default_instance
+        GCP_SERVICE_ACCOUNT_KEY: $(GcpServiceAccountKey)
+
+    - task: PublishTestResults@2
+      inputs:
+        testResultsFiles: "**/bazel-out/**/testlogs/**/test.xml"
+        testRunTitle: "windows"
+        searchFolder: $(Build.StagingDirectory)/tmp
+      timeoutInMinutes: 10
+      condition: always()
+    - task: PublishBuildArtifacts@1
+      inputs:
+        pathtoPublish: "$(Build.StagingDirectory)/envoy"
+        artifactName: windows.release
+      timeoutInMinutes: 10
+      condition: always()
+
+  - job: docker
+    displayName: Build Docker image
+    condition: and(not(canceled()), succeeded(), ne(stageDependencies.env.repo.outputs['changed.mobileOnly'], 'true'), ne(stageDependencies.env.repo.outputs['changed.docsOnly'], 'true'), ne(stageDependencies.env.repo.outputs['changed.examplesOnly'], 'true'))
+    strategy:
+      matrix:
+        windows2019:
+          imageName: 'windows-2019'
+          windowsBuildType: "windows"
+          windowsImageBase: "mcr.microsoft.com/windows/servercore"
+          windowsImageTag: "ltsc2019"
+        windows2022:
+          imageName: 'windows-2022'
+          windowsBuildType: "windows-ltsc2022"
+          windowsImageBase: "mcr.microsoft.com/windows/nanoserver"
+          windowsImageTag: "ltsc2022"
+    dependsOn: ["release"]
+    timeoutInMinutes: 120
+    pool:
+      vmImage: $(imageName)
+    steps:
+    - task: DownloadBuildArtifacts@0
+      inputs:
+        buildType: current
+        artifactName: "windows.release"
+        itemPattern: "windows.release/envoy_binary.tar.gz"
+        downloadType: single
+        targetPath: $(Build.StagingDirectory)
+    - bash: |
+        set -e
+        # Convert to Unix-style path so tar doesn't think drive letter is a hostname
+        STAGING_DIR="/$(echo '$(Build.StagingDirectory)' | tr -d ':' | tr '\\' '/')"
+        mkdir -p windows/amd64 && tar zxf "${STAGING_DIR}/windows.release/envoy_binary.tar.gz" -C ./windows/amd64
+        ci/docker_ci.sh
+      workingDirectory: $(Build.SourcesDirectory)
+      env:
+        AZP_BRANCH: $(Build.SourceBranch)
+        AZP_SHA1: $(Build.SourceVersion)
+        DOCKERHUB_USERNAME: $(DockerUsername)
+        DOCKERHUB_PASSWORD: $(DockerPassword)
+        WINDOWS_BUILD_TYPE: $(windowsBuildType)
+        WINDOWS_IMAGE_BASE: $(windowsImageBase)
+        WINDOWS_IMAGE_TAG: $(windowsImageTag)
+    - task: PublishBuildArtifacts@1
+      inputs:
+        pathtoPublish: "$(Build.StagingDirectory)/build_images"
+        artifactName: docker_windows
+      timeoutInMinutes: 10
+      condition: always()
+
+  - job: released
+    # displayName: Complete
+    dependsOn: ["release", "docker"]
+    pool:
+      vmImage: "ubuntu-20.04"
+    # This condition ensures that this (required) job passes if all of
+    # the preceeding jobs either pass or are skipped
+    # adapted from:
+    #   https://learn.microsoft.com/en-us/azure/devops/pipelines/process/expressions?view=azure-devops#job-to-job-dependencies-within-one-stage
+    condition: |
+      and(
+        in(dependencies.release.result, 'Succeeded', 'SucceededWithIssues', 'Skipped'),
+        in(dependencies.docker.result, 'Succeeded', 'SucceededWithIssues', 'Skipped'))
+    steps:
+    - checkout: none
+    - bash: |
+        echo "windows released"

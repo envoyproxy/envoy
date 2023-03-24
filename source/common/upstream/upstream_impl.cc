@@ -505,9 +505,10 @@ Host::CreateConnectionData HostImpl::createConnection(
   // redirected to a proxy, create the TCP connection to the proxy's address not
   // the host's address.
   if (transport_socket_options && transport_socket_options->http11ProxyInfo().has_value()) {
-    ENVOY_LOG(debug, "Connecting to configured HTTP/1.1 proxy");
     auto upstream_local_address =
         source_address_selector->getUpstreamLocalAddress(address, options);
+    ENVOY_LOG(debug, "Connecting to configured HTTP/1.1 proxy at {}",
+              transport_socket_options->http11ProxyInfo()->proxy_address->asString());
     connection = dispatcher.createClientConnection(
         transport_socket_options->http11ProxyInfo()->proxy_address, upstream_local_address.address_,
         socket_factory.createTransportSocket(transport_socket_options, host),
@@ -960,6 +961,35 @@ createOptions(const envoy::config::cluster::v3::Cluster& config,
       config.has_http2_protocol_options(), validation_visitor);
 }
 
+LBPolicyConfig::LBPolicyConfig(const envoy::config::cluster::v3::Cluster& config) {
+  switch (config.lb_config_case()) {
+  case envoy::config::cluster::v3::Cluster::kRoundRobinLbConfig:
+    lb_policy_ = std::make_unique<const envoy::config::cluster::v3::Cluster::RoundRobinLbConfig>(
+        config.round_robin_lb_config());
+    break;
+  case envoy::config::cluster::v3::Cluster::kLeastRequestLbConfig:
+    lb_policy_ = std::make_unique<envoy::config::cluster::v3::Cluster::LeastRequestLbConfig>(
+        config.least_request_lb_config());
+    break;
+  case envoy::config::cluster::v3::Cluster::kRingHashLbConfig:
+    lb_policy_ = std::make_unique<envoy::config::cluster::v3::Cluster::RingHashLbConfig>(
+        config.ring_hash_lb_config());
+    break;
+  case envoy::config::cluster::v3::Cluster::kMaglevLbConfig:
+    lb_policy_ = std::make_unique<envoy::config::cluster::v3::Cluster::MaglevLbConfig>(
+        config.maglev_lb_config());
+    break;
+  case envoy::config::cluster::v3::Cluster::kOriginalDstLbConfig:
+    lb_policy_ = std::make_unique<envoy::config::cluster::v3::Cluster::OriginalDstLbConfig>(
+        config.original_dst_lb_config());
+    break;
+  case envoy::config::cluster::v3::Cluster::LB_CONFIG_NOT_SET:
+    // The default value of the variant if there is no config would be nullptr
+    // Which is set when the class is initialized. No action needed if config isn't set
+    break;
+  }
+}
+
 ClusterInfoImpl::ClusterInfoImpl(
     Init::Manager& init_manager, Server::Configuration::ServerFactoryContext& server_context,
     const envoy::config::cluster::v3::Cluster& config,
@@ -969,7 +999,6 @@ ClusterInfoImpl::ClusterInfoImpl(
     Server::Configuration::TransportSocketFactoryContext& factory_context)
     : runtime_(runtime), name_(config.name()),
       observability_name_(PROTOBUF_GET_STRING_OR_DEFAULT(config, alt_stat_name, name_)),
-      type_(config.type()),
       extension_protocol_options_(parseExtensionProtocolOptions(config, factory_context)),
       http_protocol_options_(
           createOptions(config,
@@ -1009,36 +1038,14 @@ ClusterInfoImpl::ClusterInfoImpl(
       maintenance_mode_runtime_key_(absl::StrCat("upstream.maintenance_mode.", name_)),
       upstream_local_address_selector_(
           std::make_shared<UpstreamLocalAddressSelectorImpl>(config, bind_config)),
-      lb_round_robin_config_(
-          config.has_round_robin_lb_config()
-              ? std::make_unique<envoy::config::cluster::v3::Cluster::RoundRobinLbConfig>(
-                    config.round_robin_lb_config())
-              : nullptr),
-      lb_least_request_config_(
-          config.has_least_request_lb_config()
-              ? std::make_unique<envoy::config::cluster::v3::Cluster::LeastRequestLbConfig>(
-                    config.least_request_lb_config())
-              : nullptr),
-      lb_ring_hash_config_(
-          config.has_ring_hash_lb_config()
-              ? std::make_unique<envoy::config::cluster::v3::Cluster::RingHashLbConfig>(
-                    config.ring_hash_lb_config())
-              : nullptr),
-      lb_maglev_config_(config.has_maglev_lb_config()
-                            ? std::make_unique<envoy::config::cluster::v3::Cluster::MaglevLbConfig>(
-                                  config.maglev_lb_config())
-                            : nullptr),
-      lb_original_dst_config_(
-          config.has_original_dst_lb_config()
-              ? std::make_unique<envoy::config::cluster::v3::Cluster::OriginalDstLbConfig>(
-                    config.original_dst_lb_config())
-              : nullptr),
+      lb_policy_config_(std::make_unique<const LBPolicyConfig>(config)),
       upstream_config_(config.has_upstream_config()
                            ? std::make_unique<envoy::config::core::v3::TypedExtensionConfig>(
                                  config.upstream_config())
                            : nullptr),
-      added_via_api_(added_via_api),
-      lb_subset_(LoadBalancerSubsetInfoImpl(config.lb_subset_config())),
+      lb_subset_(config.has_lb_subset_config()
+                     ? std::make_unique<LoadBalancerSubsetInfoImpl>(config.lb_subset_config())
+                     : nullptr),
       metadata_(config.metadata()), typed_metadata_(config.metadata()),
       common_lb_config_(config.common_lb_config()),
       cluster_type_(config.has_cluster_type()
@@ -1054,6 +1061,7 @@ ClusterInfoImpl::ClusterInfoImpl(
           http_protocol_options_->common_http_protocol_options_, max_headers_count,
           runtime_.snapshot().getInteger(Http::MaxResponseHeadersCountOverrideKey,
                                          Http::DEFAULT_MAX_HEADERS_COUNT))),
+      type_(config.type()),
       drain_connections_on_host_removal_(config.ignore_health_on_host_removal()),
       connection_pool_per_downstream_connection_(
           config.connection_pool_per_downstream_connection()),
@@ -1061,7 +1069,7 @@ ClusterInfoImpl::ClusterInfoImpl(
                   common_lb_config_.ignore_new_hosts_until_first_hc()),
       set_local_interface_name_on_upstream_connections_(
           config.upstream_connection_options().set_local_interface_name_on_upstream_connections()),
-      has_configured_http_filters_(false) {
+      added_via_api_(added_via_api), has_configured_http_filters_(false) {
 #ifdef WIN32
   if (set_local_interface_name_on_upstream_connections_) {
     throw EnvoyException("set_local_interface_name_on_upstream_connections_ cannot be set to true "
@@ -1658,6 +1666,34 @@ Http::Http2::CodecStats& ClusterInfoImpl::http2CodecStats() const {
 
 Http::Http3::CodecStats& ClusterInfoImpl::http3CodecStats() const {
   return Http::Http3::CodecStats::atomicGet(http3_codec_stats_, *stats_scope_);
+}
+
+#ifdef ENVOY_ENABLE_UHV
+::Envoy::Http::HeaderValidatorStats&
+ClusterInfoImpl::getHeaderValidatorStats(Http::Protocol protocol) const {
+  switch (protocol) {
+  case Http::Protocol::Http10:
+  case Http::Protocol::Http11:
+    return http1CodecStats();
+  case Http::Protocol::Http2:
+    return http2CodecStats();
+  case Http::Protocol::Http3:
+    return http3CodecStats();
+  }
+  PANIC_DUE_TO_CORRUPT_ENUM;
+}
+#endif
+
+Http::HeaderValidatorPtr
+ClusterInfoImpl::makeHeaderValidator([[maybe_unused]] Http::Protocol protocol) const {
+#ifdef ENVOY_ENABLE_UHV
+  return http_protocol_options_->header_validator_factory_
+             ? http_protocol_options_->header_validator_factory_->create(
+                   protocol, getHeaderValidatorStats(protocol))
+             : nullptr;
+#else
+  return nullptr;
+#endif
 }
 
 std::pair<absl::optional<double>, absl::optional<uint32_t>> ClusterInfoImpl::getRetryBudgetParams(

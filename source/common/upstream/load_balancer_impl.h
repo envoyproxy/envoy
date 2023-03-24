@@ -412,14 +412,6 @@ private:
   // The set of local Envoy instances which are load balancing across priority_set_.
   const PrioritySet* local_priority_set_;
 
-  // If locality weight aware routing is enabled.
-  const bool locality_weighted_balancing_{};
-
-  // Config for zone aware routing.
-  const uint32_t routing_enabled_;
-  const uint64_t min_cluster_size_;
-  const bool fail_traffic_on_panic_;
-
   struct PerPriorityState {
     // The percent of requests which can be routed to the local locality.
     uint64_t local_percent_to_route_{};
@@ -435,6 +427,15 @@ private:
   std::vector<PerPriorityStatePtr> per_priority_state_;
   Common::CallbackHandlePtr priority_update_cb_;
   Common::CallbackHandlePtr local_priority_set_member_update_cb_handle_;
+
+  // Config for zone aware routing.
+  const uint64_t min_cluster_size_;
+  // Keep small members (bools and enums) at the end of class, to reduce alignment overhead.
+  const uint32_t routing_enabled_;
+  const bool fail_traffic_on_panic_ : 1;
+
+  // If locality weight aware routing is enabled.
+  const bool locality_weighted_balancing_ : 1;
 
   friend class TestZoneAwareLoadBalancer;
 };
@@ -757,10 +758,11 @@ public:
 
 private:
   const std::set<std::string> selector_keys_;
+  const std::set<std::string> fallback_keys_subset_;
+  // Keep small members (bools and enums) at the end of class, to reduce alignment overhead.
   const envoy::config::cluster::v3::Cluster::LbSubsetConfig::LbSubsetSelector::
       LbSubsetSelectorFallbackPolicy fallback_policy_;
-  const std::set<std::string> fallback_keys_subset_;
-  const bool single_host_per_subset_;
+  const bool single_host_per_subset_ : 1;
 };
 
 /**
@@ -770,10 +772,10 @@ class LoadBalancerSubsetInfoImpl : public LoadBalancerSubsetInfo {
 public:
   LoadBalancerSubsetInfoImpl(
       const envoy::config::cluster::v3::Cluster::LbSubsetConfig& subset_config)
-      : enabled_(!subset_config.subset_selectors().empty()),
+      : default_subset_(subset_config.default_subset()),
         fallback_policy_(subset_config.fallback_policy()),
         metadata_fallback_policy_(subset_config.metadata_fallback_policy()),
-        default_subset_(subset_config.default_subset()),
+        enabled_(!subset_config.subset_selectors().empty()),
         locality_weight_aware_(subset_config.locality_weight_aware()),
         scale_locality_weight_(subset_config.scale_locality_weight()),
         panic_mode_any_(subset_config.panic_mode_any()), list_as_any_(subset_config.list_as_any()) {
@@ -785,6 +787,9 @@ public:
       }
     }
   }
+  LoadBalancerSubsetInfoImpl()
+      : LoadBalancerSubsetInfoImpl(
+            envoy::config::cluster::v3::Cluster::LbSubsetConfig::default_instance()) {}
 
   // Upstream::LoadBalancerSubsetInfo
   bool isEnabled() const override { return enabled_; }
@@ -806,18 +811,20 @@ public:
   bool listAsAny() const override { return list_as_any_; }
 
 private:
-  const bool enabled_;
+  const ProtobufWkt::Struct default_subset_;
+  std::vector<SubsetSelectorPtr> subset_selectors_;
+  // Keep small members (bools and enums) at the end of class, to reduce alignment overhead.
   const envoy::config::cluster::v3::Cluster::LbSubsetConfig::LbSubsetFallbackPolicy
       fallback_policy_;
   const envoy::config::cluster::v3::Cluster::LbSubsetConfig::LbSubsetMetadataFallbackPolicy
       metadata_fallback_policy_;
-  const ProtobufWkt::Struct default_subset_;
-  std::vector<SubsetSelectorPtr> subset_selectors_;
-  const bool locality_weight_aware_;
-  const bool scale_locality_weight_;
-  const bool panic_mode_any_;
-  const bool list_as_any_;
+  const bool enabled_ : 1;
+  const bool locality_weight_aware_ : 1;
+  const bool scale_locality_weight_ : 1;
+  const bool panic_mode_any_ : 1;
+  const bool list_as_any_ : 1;
 };
+using DefaultLoadBalancerSubsetInfoImpl = ConstSingleton<LoadBalancerSubsetInfoImpl>;
 
 } // namespace Upstream
 } // namespace Envoy

@@ -1,5 +1,10 @@
+#if canImport(EnvoyCxxSwiftInterop)
+@_implementationOnly import EnvoyCxxSwiftInterop
+#endif
 @_implementationOnly import EnvoyEngine
 import Foundation
+
+// swiftlint:disable file_length
 
 /// Builder used for creating and running a new Engine instance.
 @objcMembers
@@ -21,16 +26,20 @@ open class EngineBuilder: NSObject {
   private var dnsFailureRefreshSecondsMax: UInt32 = 10
   private var dnsQueryTimeoutSeconds: UInt32 = 25
   private var dnsMinRefreshSeconds: UInt32 = 60
-  private var dnsPreresolveHostnames: String = "[]"
+  private var dnsPreresolveHostnames: [String] = []
   private var dnsRefreshSeconds: UInt32 = 60
   private var enableDNSCache: Bool = false
+  private var dnsCacheSaveIntervalSeconds: UInt32 = 1
   private var enableHappyEyeballs: Bool = true
-  private var enableGzip: Bool = true
-  private var enableBrotli: Bool = false
+  private var enableGzipDecompression: Bool = true
+  private var enableBrotliDecompression: Bool = false
+#if ENVOY_ENABLE_QUIC
   private var enableHttp3: Bool = true
+#else
+  private var enableHttp3: Bool = false
+#endif
   private var enableInterfaceBinding: Bool = false
   private var enforceTrustChainVerification: Bool = true
-  private var enablePlatformCertificateValidation: Bool = false
   private var enableDrainPostDnsRefresh: Bool = false
   private var forceIPv6: Bool = false
   private var h2ConnectionKeepaliveIdleIntervalMilliseconds: UInt32 = 1
@@ -41,7 +50,7 @@ open class EngineBuilder: NSObject {
   private var perTryIdleTimeoutSeconds: UInt32 = 15
   private var appVersion: String = "unspecified"
   private var appId: String = "unspecified"
-  private var virtualClusters: String = "[]"
+  private var virtualClusters: [String] = []
   private var onEngineRunning: (() -> Void)?
   private var logger: ((String) -> Void)?
   private var eventTracker: (([String: String]) -> Void)?
@@ -50,8 +59,24 @@ open class EngineBuilder: NSObject {
   private var platformFilterChain: [EnvoyHTTPFilterFactory] = []
   private var stringAccessors: [String: EnvoyStringAccessor] = [:]
   private var keyValueStores: [String: EnvoyKeyValueStore] = [:]
+  private var runtimeGuards: [String: Bool] = [:]
   private var directResponses: [DirectResponse] = []
   private var statsSinks: [String] = []
+  private var rtdsLayerName: String?
+  private var rtdsTimeoutSeconds: UInt32 = 0
+  private var adsAddress: String?
+  private var adsPort: UInt32 = 0
+  private var adsJwtToken: String?
+  private var adsJwtTokenLifetimeSeconds: UInt32 = 0
+  private var adsSslRootCerts: String?
+  private var nodeID: String?
+  private var nodeRegion: String?
+  private var nodeZone: String?
+  private var nodeSubZone: String?
+  private var cdsResourcesLocator: String = ""
+  private var cdsTimeoutSeconds: UInt32 = 0
+  private var enableCds: Bool = false
+  private var enableSwiftBootstrap = false
 
   // MARK: - Public
 
@@ -68,6 +93,7 @@ open class EngineBuilder: NSObject {
     self.base = .custom(yaml)
   }
 
+#if ENVOY_MOBILE_STATS_REPORTING
   /// Add a stats domain for Envoy to flush stats to.
   /// Passing nil disables stats emission.
   ///
@@ -92,6 +118,7 @@ open class EngineBuilder: NSObject {
     self.statsSinks = statsSinks
     return self
   }
+#endif
 
   /// Add a log level to use with Envoy.
   ///
@@ -158,7 +185,7 @@ open class EngineBuilder: NSObject {
   ///
   /// - returns: This builder.
   @discardableResult
-  public func addDNSPreresolveHostnames(dnsPreresolveHostnames: String) -> Self {
+  public func addDNSPreresolveHostnames(dnsPreresolveHostnames: [String]) -> Self {
     self.dnsPreresolveHostnames = dnsPreresolveHostnames
     return self
   }
@@ -180,11 +207,14 @@ open class EngineBuilder: NSObject {
   /// 'reserved.platform_store'.
   ///
   /// - parameter enableDNSCache: whether to enable DNS cache. Disabled by default.
+  /// - parameter saveInterval:   the interval at which to save results to the configured
+  ///                             key value store.
   ///
   /// - returns: This builder.
   @discardableResult
-  public func enableDNSCache(_ enableDNSCache: Bool) -> Self {
+  public func enableDNSCache(_ enableDNSCache: Bool, saveInterval: UInt32 = 1) -> Self {
     self.enableDNSCache = enableDNSCache
+    self.dnsCacheSaveIntervalSeconds = saveInterval
     return self
   }
 
@@ -202,26 +232,27 @@ open class EngineBuilder: NSObject {
 
   /// Specify whether to do gzip response decompression or not.  Defaults to true.
   ///
-  /// - parameter enableGzip: whether or not to gunzip responses.
+  /// - parameter enableGzipDecompression: whether or not to gunzip responses.
   ///
   /// - returns: This builder.
   @discardableResult
-  public func enableGzip(_ enableGzip: Bool) -> Self {
-    self.enableGzip = enableGzip
+  public func enableGzipDecompression(_ enableGzipDecompression: Bool) -> Self {
+    self.enableGzipDecompression = enableGzipDecompression
     return self
   }
 
   /// Specify whether to do brotli response decompression or not.  Defaults to false.
   ///
-  /// - parameter enableBrotli: whether or not to brotli decompress responses.
+  /// - parameter enableBrotliDecompression: whether or not to brotli decompress responses.
   ///
   /// - returns: This builder.
   @discardableResult
-  public func enableBrotli(_ enableBrotli: Bool) -> Self {
-    self.enableBrotli = enableBrotli
+  public func enableBrotliDecompression(_ enableBrotliDecompression: Bool) -> Self {
+    self.enableBrotliDecompression = enableBrotliDecompression
     return self
   }
 
+#if ENVOY_ENABLE_QUIC
   /// Specify whether to enable support for HTTP/3 or not.  Defaults to true.
   ///
   /// - parameter enableHttp3: whether or not to enable HTTP/3.
@@ -232,6 +263,18 @@ open class EngineBuilder: NSObject {
     self.enableHttp3 = enableHttp3
     return self
   }
+
+  /// Add an interval at which to flush Envoy stats.
+  ///
+  /// - parameter statsFlushSeconds: Interval at which to flush Envoy stats.
+  ///
+  /// - returns: This builder.
+  @discardableResult
+  public func addStatsFlushSeconds(_ statsFlushSeconds: UInt32) -> Self {
+    self.statsFlushSeconds = statsFlushSeconds
+    return self
+  }
+#endif
 
   /// Specify whether sockets may attempt to bind to a specific interface, based on network
   /// conditions.
@@ -267,18 +310,6 @@ open class EngineBuilder: NSObject {
   @discardableResult
   public func enforceTrustChainVerification(_ enforceTrustChainVerification: Bool) -> Self {
     self.enforceTrustChainVerification = enforceTrustChainVerification
-    return self
-  }
-
-  /// Specify whether to use the platform certificate verifier.
-  ///
-  /// - parameter enablePlatformCertificateValidation: whether to use the platform verifier.
-  ///
-  /// - returns: This builder.
-  @discardableResult
-  public func enablePlatformCertificateValidation(
-    _ enablePlatformCertificateValidation: Bool) -> Self {
-    self.enablePlatformCertificateValidation = enablePlatformCertificateValidation
     return self
   }
 
@@ -330,17 +361,6 @@ open class EngineBuilder: NSObject {
   @discardableResult
   public func setMaxConnectionsPerHost(_ maxConnectionsPerHost: UInt32) -> Self {
     self.maxConnectionsPerHost = maxConnectionsPerHost
-    return self
-  }
-
-  /// Add an interval at which to flush Envoy stats.
-  ///
-  /// - parameter statsFlushSeconds: Interval at which to flush Envoy stats.
-  ///
-  /// - returns: This builder.
-  @discardableResult
-  public func addStatsFlushSeconds(_ statsFlushSeconds: UInt32) -> Self {
-    self.statsFlushSeconds = statsFlushSeconds
     return self
   }
 
@@ -434,6 +454,18 @@ open class EngineBuilder: NSObject {
     return self
   }
 
+  /// Set a runtime guard with the provided value.
+  ///
+  /// - parameter name:  the name of the runtime guard, e.g. test_feature_false.
+  /// - parameter value: the value for the runtime guard.
+  ///
+  /// - returns: This builder.
+  @discardableResult
+  public func setRuntimeGuard(_ name: String, _ value: Bool) -> Self {
+    self.runtimeGuards[name] = value
+    return self
+  }
+
   /// Set a closure to be called when the engine finishes its async startup and begins running.
   ///
   /// - parameter closure: The closure to be called.
@@ -503,15 +535,115 @@ open class EngineBuilder: NSObject {
 
   /// Add virtual cluster configuration.
   ///
-  /// - parameter virtualClusters: The JSON configuration string for virtual clusters.
+  /// - parameter virtualCluster: The JSON configuration string for a virtual cluster.
   ///
   /// - returns: This builder.
   @discardableResult
-  public func addVirtualClusters(_ virtualClusters: String) -> Self {
-    self.virtualClusters = virtualClusters
+  public func addVirtualCluster(_ virtualCluster: String) -> Self {
+    self.virtualClusters.append(virtualCluster)
     return self
   }
 
+  /// Add virtual cluster configurations.
+  ///
+  /// - parameter virtualClusters: The JSON configuration strings for virtual clusters.
+  ///
+  /// - returns: This builder.
+  @discardableResult
+  public func addVirtualClusters(_ virtualClusters: [String]) -> Self {
+    self.virtualClusters.append(contentsOf: virtualClusters)
+    return self
+  }
+#if ENVOY_GOOGLE_GRPC
+
+  /// Sets the node.id field in the Bootstrap configuration.
+  ///
+  /// - parameter nodeID: The node ID.
+  ///
+  /// - returns: This builder.
+  @discardableResult
+  public func setNodeID(_ nodeID: String) -> Self {
+    self.nodeID = nodeID
+    return self
+  }
+
+  /// Sets the node locality in the Bootstrap configuration.
+  ///
+  /// - parameter region:  The region.
+  /// - parameter zone:    The zone.
+  /// - parameter subZone: The sub-zone.
+  ///
+  /// - returns: This builder.
+  @discardableResult
+  public func setNodeLocality(
+    region: String,
+    zone: String,
+    subZone: String
+  ) -> Self {
+    self.nodeRegion = region
+    self.nodeZone = zone
+    self.nodeSubZone = subZone
+    return self
+  }
+
+  /// Adds an aggregated discovery service layer to the configuration.
+  ///
+  /// - parameter address:                 The network address of the server.
+  /// - parameter port:                    The port of the server.
+  /// - parameter jwtToken:                The JWT token.
+  /// - parameter jwtTokenLifetimeSeconds: The JWT token lifetime in seconds. If zero, a
+  ///                                      default value is set in engine_builder.h.
+  /// - parameter sslRootCerts:            The SSL root certificates.
+  ///
+  /// - returns: This builder.
+  @discardableResult
+  public func setAggregatedDiscoveryService(
+    address: String,
+    port: UInt32,
+    jwtToken: String = "",
+    jwtTokenLifetimeSeconds: UInt32 = 0,
+    sslRootCerts: String = ""
+  ) -> Self {
+    self.adsAddress = address
+    self.adsPort = port
+    self.adsJwtToken = jwtToken
+    self.adsJwtTokenLifetimeSeconds = jwtTokenLifetimeSeconds
+    self.adsSslRootCerts = sslRootCerts
+    return self
+  }
+
+  /// Adds an RTDS layer to the configuration.
+  ///
+  /// - parameter layerName:      The layer name.
+  /// - parameter timeoutSeconds: The timeout in seconds. If zero, a default value is set in
+  ///                             engine_builder.h.
+  ///
+  /// - returns: This builder.
+  @discardableResult
+  public func addRTDSLayer(name layerName: String, timeoutSeconds: UInt32 = 0) -> Self {
+    self.rtdsLayerName = layerName
+    self.rtdsTimeoutSeconds = timeoutSeconds
+    return self
+  }
+
+  /// Adds a CDS layer to the configuration.
+  ///
+  /// - parameter resourcesLocator: The xdstp resource URI for fetching clusters.
+  ///                               If empty, xdstp is not used and a wildcard is inferred.
+  /// - parameter timeoutSeconds:   The timeout in seconds. If zero, a default value is set in
+  ///                               engine_builder.h.
+  ///
+  /// - returns: This builder.
+  @discardableResult
+  public func addCDSLayer(resourcesLocator: String = "", timeoutSeconds: UInt32 = 0) -> Self {
+    self.cdsResourcesLocator = resourcesLocator
+    self.cdsTimeoutSeconds = timeoutSeconds
+    self.enableCds = true
+    return self
+  }
+#endif
+
+#if ENVOY_ADMIN_FUNCTIONALITY
   /// Enable admin interface on 127.0.0.1:9901 address. Admin interface is intended to be
   /// used for development/debugging purposes only. Enabling it in production may open
   /// your app to security vulnerabilities.
@@ -525,6 +657,22 @@ open class EngineBuilder: NSObject {
     self.adminInterfaceEnabled = true
     return self
   }
+#endif
+
+#if canImport(EnvoyCxxSwiftInterop)
+  /// Use Swift's experimental C++ interop support to generate the bootstrap object
+  /// instead of going through the Objective-C layer.
+  ///
+  /// - parameter enableSwiftBootstrap: Whether or not to use the Swift / C++ interop
+  ///                                   to generate the bootstrap object.
+  ///
+  /// - returns: This builder.
+  @discardableResult
+  public func enableSwiftBootstrap(_ enableSwiftBootstrap: Bool) -> Self {
+    self.enableSwiftBootstrap = enableSwiftBootstrap
+    return self
+  }
+#endif
 
   /// Builds and runs a new `Engine` instance with the provided configuration.
   ///
@@ -535,48 +683,12 @@ open class EngineBuilder: NSObject {
     let engine = self.engineType.init(runningCallback: self.onEngineRunning, logger: self.logger,
                                       eventTracker: self.eventTracker,
                                       networkMonitoringMode: Int32(self.monitoringMode.rawValue))
-    let config = EnvoyConfiguration(
-      adminInterfaceEnabled: self.adminInterfaceEnabled,
-      grpcStatsDomain: self.grpcStatsDomain,
-      connectTimeoutSeconds: self.connectTimeoutSeconds,
-      dnsRefreshSeconds: self.dnsRefreshSeconds,
-      dnsFailureRefreshSecondsBase: self.dnsFailureRefreshSecondsBase,
-      dnsFailureRefreshSecondsMax: self.dnsFailureRefreshSecondsMax,
-      dnsQueryTimeoutSeconds: self.dnsQueryTimeoutSeconds,
-      dnsMinRefreshSeconds: self.dnsMinRefreshSeconds,
-      dnsPreresolveHostnames: self.dnsPreresolveHostnames,
-      enableDNSCache: self.enableDNSCache,
-      enableHappyEyeballs: self.enableHappyEyeballs,
-      enableHttp3: self.enableHttp3,
-      enableGzip: self.enableGzip,
-      enableBrotli: self.enableBrotli,
-      enableInterfaceBinding: self.enableInterfaceBinding,
-      enableDrainPostDnsRefresh: self.enableDrainPostDnsRefresh,
-      enforceTrustChainVerification: self.enforceTrustChainVerification,
-      forceIPv6: self.forceIPv6,
-      enablePlatformCertificateValidation: self.enablePlatformCertificateValidation,
-      h2ConnectionKeepaliveIdleIntervalMilliseconds:
-        self.h2ConnectionKeepaliveIdleIntervalMilliseconds,
-      h2ConnectionKeepaliveTimeoutSeconds: self.h2ConnectionKeepaliveTimeoutSeconds,
-      maxConnectionsPerHost: self.maxConnectionsPerHost,
-      statsFlushSeconds: self.statsFlushSeconds,
-      streamIdleTimeoutSeconds: self.streamIdleTimeoutSeconds,
-      perTryIdleTimeoutSeconds: self.perTryIdleTimeoutSeconds,
-      appVersion: self.appVersion,
-      appId: self.appId,
-      virtualClusters: self.virtualClusters,
-      directResponseMatchers: self.directResponses
-        .map { $0.resolvedRouteMatchYAML() }
-        .joined(separator: "\n"),
-      directResponses: self.directResponses
-        .map { $0.resolvedDirectResponseYAML() }
-        .joined(separator: "\n"),
-      nativeFilterChain: self.nativeFilterChain,
-      platformFilterChain: self.platformFilterChain,
-      stringAccessors: self.stringAccessors,
-      keyValueStores: self.keyValueStores,
-      statsSinks: self.statsSinks
-    )
+    let config = self.makeConfig()
+#if canImport(EnvoyCxxSwiftInterop)
+    if self.enableSwiftBootstrap {
+      config.bootstrapPointer = self.generateBootstrap().pointer
+    }
+#endif
 
     switch self.base {
     case .custom(let yaml):
@@ -611,4 +723,177 @@ open class EngineBuilder: NSObject {
   func addDirectResponseInternal(_ directResponse: DirectResponse) {
     self.directResponses.append(directResponse)
   }
+
+  func makeConfig() -> EnvoyConfiguration {
+    EnvoyConfiguration(
+      adminInterfaceEnabled: self.adminInterfaceEnabled,
+      grpcStatsDomain: self.grpcStatsDomain,
+      connectTimeoutSeconds: self.connectTimeoutSeconds,
+      dnsRefreshSeconds: self.dnsRefreshSeconds,
+      dnsFailureRefreshSecondsBase: self.dnsFailureRefreshSecondsBase,
+      dnsFailureRefreshSecondsMax: self.dnsFailureRefreshSecondsMax,
+      dnsQueryTimeoutSeconds: self.dnsQueryTimeoutSeconds,
+      dnsMinRefreshSeconds: self.dnsMinRefreshSeconds,
+      dnsPreresolveHostnames: self.dnsPreresolveHostnames,
+      enableDNSCache: self.enableDNSCache,
+      dnsCacheSaveIntervalSeconds: self.dnsCacheSaveIntervalSeconds,
+      enableHappyEyeballs: self.enableHappyEyeballs,
+      enableHttp3: self.enableHttp3,
+      enableGzipDecompression: self.enableGzipDecompression,
+      enableBrotliDecompression: self.enableBrotliDecompression,
+      enableInterfaceBinding: self.enableInterfaceBinding,
+      enableDrainPostDnsRefresh: self.enableDrainPostDnsRefresh,
+      enforceTrustChainVerification: self.enforceTrustChainVerification,
+      forceIPv6: self.forceIPv6,
+      h2ConnectionKeepaliveIdleIntervalMilliseconds:
+        self.h2ConnectionKeepaliveIdleIntervalMilliseconds,
+      h2ConnectionKeepaliveTimeoutSeconds: self.h2ConnectionKeepaliveTimeoutSeconds,
+      maxConnectionsPerHost: self.maxConnectionsPerHost,
+      statsFlushSeconds: self.statsFlushSeconds,
+      streamIdleTimeoutSeconds: self.streamIdleTimeoutSeconds,
+      perTryIdleTimeoutSeconds: self.perTryIdleTimeoutSeconds,
+      appVersion: self.appVersion,
+      appId: self.appId,
+      virtualClusters: self.virtualClusters,
+      runtimeGuards: self.runtimeGuards.mapValues({ "\($0)" }),
+      typedDirectResponses: self.directResponses.map({ $0.toObjC() }),
+      nativeFilterChain: self.nativeFilterChain,
+      platformFilterChain: self.platformFilterChain,
+      stringAccessors: self.stringAccessors,
+      keyValueStores: self.keyValueStores,
+      statsSinks: self.statsSinks,
+      rtdsLayerName: self.rtdsLayerName,
+      rtdsTimeoutSeconds: self.rtdsTimeoutSeconds,
+      adsAddress: self.adsAddress,
+      adsPort: self.adsPort,
+      adsJwtToken: self.adsJwtToken,
+      adsJwtTokenLifetimeSeconds: self.adsJwtTokenLifetimeSeconds,
+      adsSslRootCerts: self.adsSslRootCerts,
+      nodeId: self.nodeID,
+      nodeRegion: self.nodeRegion,
+      nodeZone: self.nodeZone,
+      nodeSubZone: self.nodeSubZone,
+      cdsResourcesLocator: self.cdsResourcesLocator,
+      cdsTimeoutSeconds: self.cdsTimeoutSeconds,
+      enableCds: self.enableCds
+    )
+  }
+
+  func bootstrapDebugDescription() -> String {
+    let objcDescription = self.makeConfig().bootstrapDebugDescription()
+#if canImport(EnvoyCxxSwiftInterop)
+    assert(
+      self.generateBootstrap().debugDescription == objcDescription,
+      "Swift bootstrap is different from ObjC bootstrap"
+    )
+#endif
+    return objcDescription
+  }
 }
+
+// swiftlint:disable cyclomatic_complexity
+#if canImport(EnvoyCxxSwiftInterop)
+private extension EngineBuilder {
+  func generateBootstrap() -> Bootstrap {
+    var cxxBuilder = Envoy.Platform.EngineBuilder()
+    cxxBuilder.addLogLevel(self.logLevel.toCXX())
+#if ENVOY_ADMIN_FUNCTIONALITY
+    cxxBuilder.enableAdminInterface(self.adminInterfaceEnabled)
+#endif
+    if let grpcStatsDomain = self.grpcStatsDomain {
+      cxxBuilder.addGrpcStatsDomain(grpcStatsDomain.toCXX())
+    }
+
+    cxxBuilder.addConnectTimeoutSeconds(Int32(self.connectTimeoutSeconds))
+    cxxBuilder.addDnsRefreshSeconds(Int32(self.dnsRefreshSeconds))
+    cxxBuilder.addDnsFailureRefreshSeconds(Int32(self.dnsFailureRefreshSecondsBase),
+                                           Int32(self.dnsFailureRefreshSecondsMax))
+    cxxBuilder.addDnsQueryTimeoutSeconds(Int32(self.dnsQueryTimeoutSeconds))
+    cxxBuilder.addDnsMinRefreshSeconds(Int32(self.dnsMinRefreshSeconds))
+    cxxBuilder.addDnsPreresolveHostnames(self.dnsPreresolveHostnames.toCXX())
+    cxxBuilder.enableDnsCache(self.enableDNSCache, Int32(self.dnsCacheSaveIntervalSeconds))
+    cxxBuilder.enableHappyEyeballs(self.enableHappyEyeballs)
+#if ENVOY_ENABLE_QUIC
+    cxxBuilder.enableHttp3(self.enableHttp3)
+#endif
+    cxxBuilder.enableGzipDecompression(self.enableGzipDecompression)
+    cxxBuilder.enableBrotliDecompression(self.enableBrotliDecompression)
+    cxxBuilder.enableInterfaceBinding(self.enableInterfaceBinding)
+    cxxBuilder.enableDrainPostDnsRefresh(self.enableDrainPostDnsRefresh)
+    cxxBuilder.enforceTrustChainVerification(self.enforceTrustChainVerification)
+    cxxBuilder.setForceAlwaysUsev6(self.forceIPv6)
+    cxxBuilder.enablePlatformCertificatesValidation(true)
+    cxxBuilder.addH2ConnectionKeepaliveIdleIntervalMilliseconds(
+      Int32(self.h2ConnectionKeepaliveIdleIntervalMilliseconds)
+    )
+    cxxBuilder.addH2ConnectionKeepaliveTimeoutSeconds(
+      Int32(self.h2ConnectionKeepaliveTimeoutSeconds)
+    )
+    cxxBuilder.addMaxConnectionsPerHost(Int32(self.maxConnectionsPerHost))
+    cxxBuilder.addStatsFlushSeconds(Int32(self.statsFlushSeconds))
+    cxxBuilder.setStreamIdleTimeoutSeconds(Int32(self.streamIdleTimeoutSeconds))
+    cxxBuilder.setPerTryIdleTimeoutSeconds(Int32(self.perTryIdleTimeoutSeconds))
+    cxxBuilder.setAppVersion(self.appVersion.toCXX())
+    cxxBuilder.setAppId(self.appId.toCXX())
+    cxxBuilder.setDeviceOs("iOS".toCXX())
+    for cluster in self.virtualClusters {
+      cxxBuilder.addVirtualCluster(cluster.toCXX())
+    }
+
+    for (runtimeGuard, value) in self.runtimeGuards {
+      cxxBuilder.setRuntimeGuard(runtimeGuard.toCXX(), value)
+    }
+
+    for directResponse in self.directResponses {
+      cxxBuilder.addDirectResponse(directResponse.toCXX())
+    }
+
+    for filter in self.nativeFilterChain.reversed() {
+      cxxBuilder.addNativeFilter(filter.name.toCXX(), filter.typedConfig.toCXX())
+    }
+
+    for filter in self.platformFilterChain.reversed() {
+      cxxBuilder.addPlatformFilter(filter.filterName.toCXX())
+    }
+
+    cxxBuilder.addStatsSinks(self.statsSinks.toCXX())
+
+#if ENVOY_GOOGLE_GRPC
+    if
+      let nodeRegion = self.nodeRegion,
+      let nodeZone = self.nodeZone,
+      let nodeSubZone = self.nodeSubZone
+    {
+      cxxBuilder.setNodeLocality(nodeRegion.toCXX(), nodeZone.toCXX(), nodeSubZone.toCXX())
+    }
+
+    if let nodeID = self.nodeID {
+      cxxBuilder.setNodeId(nodeID.toCXX())
+    }
+
+    if let rtdsLayerName = self.rtdsLayerName {
+      cxxBuilder.addRtdsLayer(rtdsLayerName.toCXX(), Int32(self.rtdsTimeoutSeconds))
+    }
+
+    if
+      let adsAddress = self.adsAddress,
+      let adsJwtToken = self.adsJwtToken,
+      let adsSslRootCerts = self.adsSslRootCerts
+    {
+      cxxBuilder.setAggregatedDiscoveryService(
+        adsAddress.toCXX(),
+        Int32(self.adsPort),
+        adsJwtToken.toCXX(),
+        Int32(self.adsJwtTokenLifetimeSeconds),
+        adsSslRootCerts.toCXX()
+      )
+    }
+    if self.enableCds {
+      cxxBuilder.addCdsLayer(self.cdsResourcesLocator.toCXX(), Int32(self.cdsTimeoutSeconds))
+    }
+#endif
+    return cxxBuilder.generateBootstrap()
+  }
+  // swiftlint:enable cyclomatic_complexity
+}
+#endif

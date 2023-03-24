@@ -722,21 +722,21 @@ TEST_F(HttpConnectionManagerConfigTest, CidrRangeBasedInternalAddress) {
                                      date_provider_, route_config_provider_manager_,
                                      scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_);
-  Network::Address::Ipv4Instance firstInternalIpAddress{"100.64.0.10", 0, nullptr};
-  Network::Address::Ipv4Instance secondInternalIpAddress{"50.20.0.5", 0, nullptr};
+  Network::Address::Ipv4Instance first_internal_ip_address{"100.64.0.10", 0, nullptr};
+  Network::Address::Ipv4Instance second_internal_ip_address{"50.20.0.5", 0, nullptr};
   // This address is in the list of acceptable addresses (based on RFC1918) when the new config is
   // unset. However test is verifying that it doesn't match now because of provided cidr_ranges
   // config.
-  Network::Address::Ipv4Instance defaultIpAddress{"10.48.179.130", 0, nullptr};
-  Network::Address::Ipv4Instance externalIpAddress{"90.60.0.10", 0, nullptr};
-  // This test validates that unixAddress is not treated as internal since unix_sockets is set to
+  Network::Address::Ipv4Instance default_ip_address{"10.48.179.130", 0, nullptr};
+  Network::Address::Ipv4Instance external_ip_address{"90.60.0.10", 0, nullptr};
+  // This test validates that unix address is not treated as internal since unix_sockets is set to
   // false.
-  Network::Address::PipeInstance unixAddress{"/foo"};
-  EXPECT_TRUE(config.internalAddressConfig().isInternalAddress(firstInternalIpAddress));
-  EXPECT_TRUE(config.internalAddressConfig().isInternalAddress(secondInternalIpAddress));
-  EXPECT_FALSE(config.internalAddressConfig().isInternalAddress(defaultIpAddress));
-  EXPECT_FALSE(config.internalAddressConfig().isInternalAddress(externalIpAddress));
-  EXPECT_FALSE(config.internalAddressConfig().isInternalAddress(unixAddress));
+  Network::Address::PipeInstance unix_address{"/foo"};
+  EXPECT_TRUE(config.internalAddressConfig().isInternalAddress(first_internal_ip_address));
+  EXPECT_TRUE(config.internalAddressConfig().isInternalAddress(second_internal_ip_address));
+  EXPECT_FALSE(config.internalAddressConfig().isInternalAddress(default_ip_address));
+  EXPECT_FALSE(config.internalAddressConfig().isInternalAddress(external_ip_address));
+  EXPECT_FALSE(config.internalAddressConfig().isInternalAddress(unix_address));
 }
 
 TEST_F(HttpConnectionManagerConfigTest, MaxRequestHeadersKbDefault) {
@@ -1936,7 +1936,7 @@ public:
 
   Http::RequestIDExtensionSharedPtr
   createExtensionInstance(const Protobuf::Message& config,
-                          Server::Configuration::FactoryContext& context) override {
+                          Server::Configuration::CommonFactoryContext& context) override {
     const auto& custom_config = MessageUtil::downcastAndValidate<
         const test::http_connection_manager::CustomRequestIDExtension&>(
         config, context.messageValidationVisitor());

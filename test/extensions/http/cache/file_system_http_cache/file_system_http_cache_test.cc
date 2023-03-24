@@ -6,6 +6,7 @@
 #include "source/common/filesystem/directory.h"
 #include "source/extensions/filters/http/cache/cache_entry_utils.h"
 #include "source/extensions/filters/http/cache/cache_headers_utils.h"
+#include "source/extensions/http/cache/file_system_http_cache/cache_eviction_thread.h"
 #include "source/extensions/http/cache/file_system_http_cache/cache_file_fixed_block.h"
 #include "source/extensions/http/cache/file_system_http_cache/cache_file_header_proto_util.h"
 #include "source/extensions/http/cache/file_system_http_cache/file_system_http_cache.h"
@@ -27,7 +28,6 @@ namespace Extensions {
 namespace HttpFilters {
 namespace Cache {
 namespace FileSystemHttpCache {
-namespace {
 
 using Common::AsyncFiles::AsyncFileHandle;
 using Common::AsyncFiles::MockAsyncFileContext;
@@ -37,6 +37,7 @@ using Common::AsyncFiles::MockAsyncFileManagerFactory;
 using ::envoy::extensions::filters::http::cache::v3::CacheConfig;
 using ::testing::HasSubstr;
 using ::testing::NiceMock;
+using ::testing::Return;
 using ::testing::StrictMock;
 
 absl::string_view yaml_config = R"(
@@ -62,12 +63,17 @@ public:
       throw EnvoyException(
           fmt::format("Didn't find a registered implementation for type: '{}'", type));
     }
+    ON_CALL(context_.api_, threadFactory()).WillByDefault([]() -> Thread::ThreadFactory& {
+      return Thread::threadFactoryForTest();
+    });
   }
 
   void initCache() {
     cache_ = std::dynamic_pointer_cast<FileSystemHttpCache>(
         http_cache_factory_->getCache(cacheConfig(testConfig()), context_));
   }
+
+  void waitForEvictionThreadIdle() { cache_->cache_eviction_thread_.waitForIdle(); }
 
   ConfigProto testConfig() {
     envoy::extensions::filters::http::cache::v3::CacheConfig cache_config;
@@ -116,15 +122,99 @@ TEST_F(FileSystemHttpCacheTestWithNoDefaultCache, InitialStatsAreSetCorrectly) {
   env_.writeStringToFileForTest(absl::StrCat(cache_path_, "cache-b"), file_2_contents, true);
   cache_ = std::dynamic_pointer_cast<FileSystemHttpCache>(
       http_cache_factory_->getCache(cacheConfig(cfg), context_));
+  waitForEvictionThreadIdle();
   EXPECT_EQ(cache_->stats().size_limit_bytes_.value(), max_size);
   EXPECT_EQ(cache_->stats().size_limit_count_.value(), max_count);
   EXPECT_EQ(cache_->stats().size_bytes_.value(), file_1_contents.size() + file_2_contents.size());
   EXPECT_EQ(cache_->stats().size_count_.value(), 2);
+  EXPECT_EQ(cache_->stats().eviction_runs_.value(), 0);
+}
+
+TEST_F(FileSystemHttpCacheTestWithNoDefaultCache, EvictsOldestFilesUntilUnderCountLimit) {
+  const std::string file_contents = "XXXXX";
+  const uint64_t max_count = 2;
+  ConfigProto cfg = testConfig();
+  cfg.mutable_max_cache_entry_count()->set_value(max_count);
+  env_.writeStringToFileForTest(absl::StrCat(cache_path_, "cache-a"), file_contents, true);
+  env_.writeStringToFileForTest(absl::StrCat(cache_path_, "cache-b"), file_contents, true);
+  // TODO(#24994): replace this with backdating the files when that's possible.
+  sleep(1); // NO_CHECK_FORMAT(real_time)
+  cache_ = std::dynamic_pointer_cast<FileSystemHttpCache>(
+      http_cache_factory_->getCache(cacheConfig(cfg), context_));
+  waitForEvictionThreadIdle();
+  EXPECT_EQ(cache_->stats().eviction_runs_.value(), 0);
+  EXPECT_EQ(cache_->stats().size_bytes_.value(), file_contents.size() * 2);
+  EXPECT_EQ(cache_->stats().size_count_.value(), 2);
+  env_.writeStringToFileForTest(absl::StrCat(cache_path_, "cache-c"), file_contents, true);
+  env_.writeStringToFileForTest(absl::StrCat(cache_path_, "cache-d"), file_contents, true);
+  cache_->trackFileAdded(file_contents.size());
+  cache_->trackFileAdded(file_contents.size());
+  waitForEvictionThreadIdle();
+  EXPECT_EQ(cache_->stats().size_bytes_.value(), file_contents.size() * 2);
+  EXPECT_EQ(cache_->stats().size_count_.value(), 2);
+  EXPECT_FALSE(Filesystem::fileSystemForTest().fileExists(absl::StrCat(cache_path_, "cache-a")));
+  EXPECT_FALSE(Filesystem::fileSystemForTest().fileExists(absl::StrCat(cache_path_, "cache-b")));
+  EXPECT_TRUE(Filesystem::fileSystemForTest().fileExists(absl::StrCat(cache_path_, "cache-c")));
+  EXPECT_TRUE(Filesystem::fileSystemForTest().fileExists(absl::StrCat(cache_path_, "cache-d")));
+  // There may have been one or two eviction runs here, because there's a race
+  // between the eviction and the second file being added. Either amount of runs
+  // is valid, as the eventual consistency is achieved either way.
+  EXPECT_THAT(cache_->stats().eviction_runs_.value(), testing::AnyOf(1, 2));
+}
+
+TEST_F(FileSystemHttpCacheTestWithNoDefaultCache, EvictsOldestFilesUntilUnderSizeLimit) {
+  const std::string file_contents = "XXXXX";
+  const std::string large_file_contents = "XXXXXXXXXXXX";
+  const uint64_t max_size = large_file_contents.size();
+  ConfigProto cfg = testConfig();
+  cfg.mutable_max_cache_size_bytes()->set_value(max_size);
+  env_.writeStringToFileForTest(absl::StrCat(cache_path_, "cache-a"), file_contents, true);
+  env_.writeStringToFileForTest(absl::StrCat(cache_path_, "cache-b"), file_contents, true);
+  // TODO(#24994): replace this with backdating the files when that's possible.
+  sleep(1); // NO_CHECK_FORMAT(real_time)
+  cache_ = std::dynamic_pointer_cast<FileSystemHttpCache>(
+      http_cache_factory_->getCache(cacheConfig(cfg), context_));
+  waitForEvictionThreadIdle();
+  EXPECT_EQ(cache_->stats().eviction_runs_.value(), 0);
+  env_.writeStringToFileForTest(absl::StrCat(cache_path_, "cache-c"), large_file_contents, true);
+  EXPECT_EQ(cache_->stats().size_bytes_.value(), file_contents.size() * 2);
+  EXPECT_EQ(cache_->stats().size_count_.value(), 2);
+  cache_->trackFileAdded(large_file_contents.size());
+  waitForEvictionThreadIdle();
+  EXPECT_EQ(cache_->stats().size_bytes_.value(), large_file_contents.size());
+  EXPECT_EQ(cache_->stats().size_count_.value(), 1);
+  EXPECT_FALSE(Filesystem::fileSystemForTest().fileExists(absl::StrCat(cache_path_, "cache-a")));
+  EXPECT_FALSE(Filesystem::fileSystemForTest().fileExists(absl::StrCat(cache_path_, "cache-b")));
+  EXPECT_TRUE(Filesystem::fileSystemForTest().fileExists(absl::StrCat(cache_path_, "cache-c")));
+  EXPECT_EQ(cache_->stats().eviction_runs_.value(), 1);
 }
 
 class FileSystemHttpCacheTest : public FileSystemCacheTestContext, public ::testing::Test {
   void SetUp() override { initCache(); }
 };
+
+MATCHER_P2(IsStatTag, name, value, "") {
+  if (!ExplainMatchResult(name, arg.name_, result_listener) ||
+      !ExplainMatchResult(value, arg.value_, result_listener)) {
+    *result_listener << "\nexpected {name: \"" << name << "\", value: \"" << value
+                     << "\"},\n but got {name: \"" << arg.name_ << "\", value: \"" << arg.value_
+                     << "\"}\n";
+    return false;
+  }
+  return true;
+}
+
+TEST_F(FileSystemHttpCacheTest, StatsAreConstructedCorrectly) {
+  std::string cache_path_no_periods = absl::StrReplaceAll(cache_path_, {{".", "_"}});
+  // Validate that a gauge has appropriate name and tags.
+  EXPECT_EQ(cache_->stats().size_bytes_.tagExtractedName(), "cache.size_bytes");
+  EXPECT_THAT(cache_->stats().size_bytes_.tags(),
+              ::testing::ElementsAre(IsStatTag("cache_path", cache_path_no_periods)));
+  // Validate that a counter has appropriate name and tags.
+  EXPECT_EQ(cache_->stats().eviction_runs_.tagExtractedName(), "cache.eviction_runs");
+  EXPECT_THAT(cache_->stats().eviction_runs_.tags(),
+              ::testing::ElementsAre(IsStatTag("cache_path", cache_path_no_periods)));
+}
 
 TEST_F(FileSystemHttpCacheTest, TrackFileRemovedClampsAtZero) {
   cache_->trackFileAdded(1);
@@ -1198,6 +1288,9 @@ TEST(Registration, GetCacheFromFactory) {
   ASSERT_NE(factory, nullptr);
   envoy::extensions::filters::http::cache::v3::CacheConfig cache_config;
   NiceMock<Server::Configuration::MockFactoryContext> factory_context;
+  ON_CALL(factory_context.api_, threadFactory()).WillByDefault([]() -> Thread::ThreadFactory& {
+    return Thread::threadFactoryForTest();
+  });
   TestUtility::loadFromYaml(std::string(yaml_config), cache_config);
   EXPECT_EQ(factory->getCache(cache_config, factory_context)->cacheInfo().name_,
             "envoy.extensions.http.cache.file_system_http_cache");
@@ -1209,7 +1302,6 @@ TEST(Registration, GetCacheFromFactory) {
             "/tmp/");
 }
 
-} // namespace
 } // namespace FileSystemHttpCache
 } // namespace Cache
 } // namespace HttpFilters

@@ -2350,7 +2350,7 @@ TEST(OutlierUtility, SRThreshold) {
   DetectorImpl::EjectionPair success_rate_nums =
       DetectorImpl::successRateEjectionThreshold(sum, data, 1.9);
   EXPECT_EQ(90.0, success_rate_nums.success_rate_average_); // average success rate
-  EXPECT_EQ(52.0, success_rate_nums.ejection_threshold_);   // ejection threshold
+  EXPECT_EQ(52.0, success_rate_nums.ejection_threshold_);   //  ejection threshold
 }
 
 } // namespace

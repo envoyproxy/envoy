@@ -25,11 +25,17 @@
 #include "quiche/quic/test_tools/quic_connection_peer.h"
 #include "quiche/quic/test_tools/quic_session_peer.h"
 
+namespace Envoy {
+namespace Quic {
+
+namespace {
+
 using testing::_;
 using testing::Invoke;
 
-namespace Envoy {
-namespace Quic {
+constexpr unsigned int kStreamId = 4u;
+
+} // namespace
 
 class EnvoyQuicServerStreamTest : public testing::Test {
 public:
@@ -79,7 +85,7 @@ public:
     setQuicConfigWithDefaultValues(quic_session_.config());
     quic_connection_.SetEncrypter(
         quic::ENCRYPTION_FORWARD_SECURE,
-        std::make_unique<quic::NullEncrypter>(quic::Perspective::IS_SERVER));
+        std::make_unique<quic::test::TaggingEncrypter>(quic::ENCRYPTION_FORWARD_SECURE));
     quic_connection_.SetDefaultEncryptionLevel(quic::ENCRYPTION_FORWARD_SECURE);
 
     quic_session_.OnConfigNegotiated();
@@ -87,6 +93,13 @@ public:
     spdy_request_headers_[":method"] = "POST";
     spdy_request_headers_[":path"] = "/";
     spdy_request_headers_[":scheme"] = "https";
+
+    // OnSettingsFrame must be called since the MockEnvoyQuicSession object returns
+    // HttpDatagramSupport::kRfc in the LocalHttpDatagramSupport method. Otherwise, the session
+    // buffers data until the SETTINGS frame is received.
+    quic::SettingsFrame settings;
+    settings.values[quic::SETTINGS_H3_DATAGRAM] = 1;
+    EXPECT_TRUE(quic_session_.OnSettingsFrame(settings));
   }
 
   void TearDown() override {
@@ -101,6 +114,37 @@ public:
       quic_session_.close(Network::ConnectionCloseType::NoFlush);
     }
   }
+
+#ifdef ENVOY_ENABLE_HTTP_DATAGRAMS
+  void setUpCapsuleProtocol(bool close_send_stream, bool close_recv_stream) {
+    quic_stream_->useCapsuleProtocol();
+
+    // Decodes a CONNECT-UDP request.
+    EXPECT_CALL(stream_decoder_, decodeHeaders_(_, _))
+        .WillOnce(Invoke([](const Http::RequestHeaderMapSharedPtr& headers, bool) {
+          Http::HeaderMap::GetResult capsule_protocol =
+              headers->get(Http::LowerCaseString("Capsule-Protocol"));
+          EXPECT_FALSE(capsule_protocol.empty());
+          EXPECT_EQ(capsule_protocol[0]->value().getStringView(), "?1");
+        }));
+    spdy::Http2HeaderBlock request_headers;
+    request_headers[":authority"] = host_;
+    request_headers[":method"] = "CONNECT";
+    request_headers[":protocol"] = "connect-udp";
+    request_headers[":path"] = "/.well-known/masque/udp/192.0.2.6/443/";
+    request_headers[":scheme"] = "https";
+    request_headers["capsule-protocol"] = "?1";
+    std::string payload = spdyHeaderToHttp3StreamPayload(request_headers);
+    quic::QuicStreamFrame frame(stream_id_, close_recv_stream, 0, payload);
+    quic_stream_->OnStreamFrame(frame);
+    EXPECT_TRUE(quic_stream_->FinishedReadingHeaders());
+
+    // Encodes the response
+    Http::TestResponseHeaderMapImpl response_headers = {{":status", "200"},
+                                                        {"capsule-protocol", "?1"}};
+    quic_stream_->encodeHeaders(response_headers, close_send_stream);
+  }
+#endif
 
   size_t receiveRequest(const std::string& payload, bool fin,
                         size_t decoder_buffer_high_watermark) {
@@ -180,7 +224,7 @@ protected:
       quic::kQuicDefaultConnectionIdLength};
   testing::NiceMock<MockEnvoyQuicServerConnection> quic_connection_;
   MockEnvoyQuicSession quic_session_;
-  quic::QuicStreamId stream_id_{4u};
+  quic::QuicStreamId stream_id_{kStreamId};
   Http::Http3::CodecStats stats_;
   envoy::config::core::v3::Http3ProtocolOptions http3_options_;
   EnvoyQuicServerStream* quic_stream_;
@@ -192,6 +236,17 @@ protected:
   spdy::Http2HeaderBlock spdy_trailers_;
   std::string host_{"www.abc.com"};
   std::string request_body_{"Hello world"};
+#ifdef ENVOY_ENABLE_HTTP_DATAGRAMS
+  std::string capsule_fragment_ = absl::HexStringToBytes("00"               // DATAGRAM capsule type
+                                                         "08"               // capsule length
+                                                         "a1a2a3a4a5a6a7a8" // HTTP Datagram payload
+  );
+  std::string datagram_fragment_ =
+      absl::HexStringToBytes(absl::StrCat(absl::Hex(kStreamId / quic::kHttpDatagramStreamIdDivisor,
+                                                    absl::kZeroPad2), // Quarter Stream ID
+                                          "a1a2a3a4a5a6a7a8")         // HTTP Datagram Payload
+      );
+#endif
 };
 
 TEST_F(EnvoyQuicServerStreamTest, GetRequestAndResponse) {
@@ -789,6 +844,25 @@ TEST_F(EnvoyQuicServerStreamTest, MetadataNotSupported) {
                 ->value());
   EXPECT_CALL(stream_callbacks_, onResetStream(_, _));
 }
+
+#ifdef ENVOY_ENABLE_HTTP_DATAGRAMS
+TEST_F(EnvoyQuicServerStreamTest, EncodeCapsule) {
+  setUpCapsuleProtocol(false, true);
+  Buffer::OwnedImpl buffer(capsule_fragment_);
+  EXPECT_CALL(quic_connection_, SendMessage(_, _, _))
+      .WillOnce([this](quic::QuicMessageId, absl::Span<quiche::QuicheMemSlice> message, bool) {
+        EXPECT_EQ(message.data()->AsStringView(), datagram_fragment_);
+        return quic::MESSAGE_STATUS_SUCCESS;
+      });
+  quic_stream_->encodeData(buffer, /*end_stream=*/true);
+}
+
+TEST_F(EnvoyQuicServerStreamTest, DecodeHttp3Datagram) {
+  setUpCapsuleProtocol(true, false);
+  EXPECT_CALL(stream_decoder_, decodeData(BufferStringEqual(capsule_fragment_), _));
+  quic_session_.OnMessageReceived(datagram_fragment_);
+}
+#endif
 
 } // namespace Quic
 } // namespace Envoy

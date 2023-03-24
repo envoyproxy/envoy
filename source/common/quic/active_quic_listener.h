@@ -5,11 +5,13 @@
 #include "envoy/network/listener.h"
 #include "envoy/network/socket.h"
 #include "envoy/runtime/runtime.h"
+#include "envoy/server/process_context.h"
 
 #include "source/common/protobuf/utility.h"
 #include "source/common/quic/envoy_quic_connection_id_generator_factory.h"
 #include "source/common/quic/envoy_quic_dispatcher.h"
 #include "source/common/quic/envoy_quic_proof_source_factory_interface.h"
+#include "source/common/quic/envoy_quic_server_preferred_address_config_factory.h"
 #include "source/common/runtime/runtime_protos.h"
 #include "source/server/active_udp_listener.h"
 
@@ -94,7 +96,8 @@ class ActiveQuicListenerFactory : public Network::ActiveUdpListenerFactory,
 public:
   ActiveQuicListenerFactory(const envoy::config::listener::v3::QuicProtocolOptions& config,
                             uint32_t concurrency, QuicStatNames& quic_stat_names,
-                            ProtobufMessage::ValidationVisitor& validation_visitor);
+                            ProtobufMessage::ValidationVisitor& validation_visitor,
+                            ProcessContextOptRef context);
 
   // Network::ActiveUdpListenerFactory.
   Network::ConnectionHandler::ActiveUdpListenerPtr
@@ -117,6 +120,7 @@ private:
   absl::optional<std::reference_wrapper<EnvoyQuicProofSourceFactoryInterface>>
       proof_source_factory_;
   EnvoyQuicConnectionIdGeneratorFactoryPtr quic_cid_generator_factory_;
+  EnvoyQuicServerPreferredAddressConfigPtr server_preferred_address_config_;
   quic::QuicConfig quic_config_;
   const uint32_t concurrency_;
   envoy::config::core::v3::RuntimeFeatureFlag enabled_;
@@ -124,6 +128,7 @@ private:
   const uint32_t packets_to_read_to_connection_count_ratio_;
   const Network::Socket::OptionsSharedPtr options_{std::make_shared<Network::Socket::Options>()};
   bool kernel_worker_routing_{};
+  ProcessContextOptRef context_;
 
   static bool disable_kernel_bpf_packet_routing_for_test_;
 };

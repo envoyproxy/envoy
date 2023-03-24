@@ -1,9 +1,11 @@
 load("//bazel:android_debug_info.bzl", "android_debug_info")
-load("@envoy//bazel:envoy_build_system.bzl", "envoy_package")
+load("@envoy//bazel:envoy_build_system.bzl", "envoy_mobile_defines", "envoy_package")
 
 licenses(["notice"])  # Apache 2
 
 envoy_package()
+
+# TODO(jpsim): Migrate these to use `envoy_cc_library`
 
 # Support for JNI, using NDK on Android and Java otherwise, since the JNI APIs
 # differ a bit between the two.
@@ -28,15 +30,14 @@ cc_library(
     name = "jni_utility_lib",
     srcs = [
         "jni_utility.cc",
-        "jni_version.cc",
     ],
     hdrs = [
         "jni_utility.h",
-        "jni_version.h",
     ],
     deps = [
         ":jni_support_lib",
         "//library/common/jni/import:jni_import_lib",
+        "//library/common/jni/types:jni_env_lib",
         "//library/common/types:c_types_lib",
         "//library/common/types:managed_types_lib",
         "@envoy//source/common/common:assert_lib",
@@ -53,13 +54,17 @@ cc_library(
     srcs = [
         "jni_interface.cc",
     ],
+    defines = envoy_mobile_defines("@envoy"),
     deps = [
         ":android_network_utility_lib",
         ":jni_utility_lib",
+        "//library/cc:engine_builder_lib",
         "//library/common:envoy_main_interface_lib",
         "//library/common/api:c_types",
         "//library/common/extensions/cert_validator/platform_bridge:c_types_lib",
         "//library/common/extensions/key_value/platform:config",
+        "//library/common/jni/types:jni_exception_lib",
+        "//library/common/jni/types:jni_javavm_lib",
         "//library/common/types:managed_types_lib",
     ],
     # We need this to ensure that we link this into the .so even though there are no code references.
@@ -81,6 +86,7 @@ cc_library(
         "//library/common/data:utility_lib",
         "//library/common/extensions/cert_validator/platform_bridge:c_types_lib",
         "//library/common/jni/import:jni_import_lib",
+        "//library/common/jni/types:jni_javavm_lib",
         "//library/common/types:c_types_lib",
         "@envoy//bazel:boringssl",
     ],

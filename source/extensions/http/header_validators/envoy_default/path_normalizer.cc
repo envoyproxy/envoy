@@ -2,6 +2,7 @@
 
 #include "envoy/http/header_validator_errors.h"
 
+#include "source/common/http/header_utility.h"
 #include "source/common/http/headers.h"
 #include "source/extensions/http/header_validators/envoy_default/character_tables.h"
 
@@ -16,6 +17,7 @@ namespace EnvoyDefault {
 using ::envoy::extensions::http::header_validators::envoy_default::v3::HeaderValidatorConfig;
 using ::envoy::extensions::http::header_validators::envoy_default::v3::
     HeaderValidatorConfig_UriPathNormalizationOptions;
+using ::Envoy::Http::HeaderUtility;
 using ::Envoy::Http::RequestHeaderMap;
 using ::Envoy::Http::UhvResponseCodeDetail;
 
@@ -172,19 +174,16 @@ PathNormalizer::normalizePathUri(RequestHeaderMap& header_map) const {
   // asterisk-form  = "*"
   //
   // TODO(#23887) - potentially separate path normalization into multiple independent operations.
-  const bool is_connect_method =
-      header_map.method() == ::Envoy::Http::Headers::get().MethodValues.Connect;
-  const bool is_options_method =
-      header_map.method() == ::Envoy::Http::Headers::get().MethodValues.Options;
   const auto original_path = header_map.path();
-  if (original_path == "*" && is_options_method) {
+  if (original_path == "*" &&
+      header_map.method() == ::Envoy::Http::Headers::get().MethodValues.Options) {
     // asterisk-form, only valid for OPTIONS request
     return PathNormalizationResult::success();
   }
 
-  if (is_connect_method) {
-    // The :path can only be empty for CONNECT methods, where the request-target is in
-    // authority-form, which Envoy will have already moved :path to :authority.
+  if (HeaderUtility::isStandardConnectRequest(header_map)) {
+    // The :path can only be empty for standard CONNECT methods, where the request-target is in
+    // authority-form for HTTP/1 requests, or :path is empty for HTTP/2 requests.
     if (original_path.empty()) {
       return PathNormalizationResult::success();
     }

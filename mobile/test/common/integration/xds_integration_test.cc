@@ -21,7 +21,7 @@ using ::testing::AssertionSuccess;
 XdsIntegrationTest::XdsIntegrationTest() : BaseClientIntegrationTest(ipVersion()) {
   Grpc::forceRegisterDefaultGoogleGrpcCredentialsFactory();
   override_builder_config_ = false;
-  expect_dns_ = false; // TODO(alyssawilk) debug.
+  expect_dns_ = false; // doesn't use DFP.
   create_xds_upstream_ = true;
   sotw_or_delta_ = sotwOrDelta();
 
@@ -50,11 +50,6 @@ Grpc::SotwOrDelta XdsIntegrationTest::sotwOrDelta() const { return std::get<2>(G
 void XdsIntegrationTest::SetUp() {
   // TODO(abeyad): Add paramaterized tests for HTTP1, HTTP2, and HTTP3.
   setUpstreamProtocol(Http::CodecType::HTTP2);
-}
-
-void XdsIntegrationTest::TearDown() {
-  cleanup();
-  BaseClientIntegrationTest::TearDown();
 }
 
 void XdsIntegrationTest::createEnvoy() {

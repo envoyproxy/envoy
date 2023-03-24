@@ -2,6 +2,7 @@ load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_library",
     "envoy_package",
+    "envoy_select_enable_http_datagrams",
 )
 load(
     "@envoy_build_config//:extensions_build_config.bzl",
@@ -282,7 +283,9 @@ envoy_cc_library(
         "//source/common/common:assert_lib",
         "//source/common/http:header_map_lib",
         "@com_github_google_quiche//:quic_server_http_spdy_session_lib",
-    ],
+    ] + envoy_select_enable_http_datagrams([
+        ":http_datagram_handler",
+    ]),
 )
 
 envoy_cc_library(
@@ -312,7 +315,9 @@ envoy_cc_library(
         "//source/common/http:header_map_lib",
         "//source/common/http:header_utility_lib",
         "@com_github_google_quiche//:quic_core_http_client_lib",
-    ],
+    ] + envoy_select_enable_http_datagrams([
+        ":http_datagram_handler",
+    ]),
 )
 
 envoy_cc_library(
@@ -399,6 +404,7 @@ envoy_cc_library(
         ":envoy_quic_packet_writer_lib",
         ":envoy_quic_proof_source_factory_interface",
         ":envoy_quic_proof_source_lib",
+        ":envoy_quic_server_preferred_address_config_factory_interface",
         ":envoy_quic_utils_lib",
         "//envoy/network:listener_interface",
         "//source/common/network:listener_lib",
@@ -593,6 +599,17 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "envoy_quic_server_preferred_address_config_factory_interface",
+    hdrs = ["envoy_quic_server_preferred_address_config_factory.h"],
+    tags = ["nofips"],
+    deps = [
+        "//envoy/config:typed_config_interface",
+        "//envoy/network:address_interface",
+        "@com_github_google_quiche//:quic_platform_socket_address",
+    ],
+)
+
+envoy_cc_library(
     name = "quic_stats_gatherer",
     srcs = ["quic_stats_gatherer.cc"],
     hdrs = ["quic_stats_gatherer.h"],
@@ -601,5 +618,18 @@ envoy_cc_library(
         "//envoy/access_log:access_log_interface",
         "//source/common/http:header_map_lib",
         "@com_github_google_quiche//:quic_core_ack_listener_interface_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "http_datagram_handler",
+    srcs = ["http_datagram_handler.cc"],
+    hdrs = ["http_datagram_handler.h"],
+    deps = [
+        "//envoy/http:codec_interface",
+        "//source/common/common:logger_lib",
+        "//source/common/http:header_map_lib",
+        "@com_github_google_quiche//:quic_core_http_spdy_session_lib",
+        "@com_github_google_quiche//:quic_core_types_lib",
     ],
 )

@@ -48,7 +48,8 @@ void DecoderImpl::decodeOnData(Buffer::Instance& data, uint64_t& offset) {
 
   // Check message length.
   const int32_t len = helper_.peekInt32(data, offset);
-  ensureMinLength(len, INT_LENGTH + XID_LENGTH);
+  ENVOY_LOG(trace, "zookeeper_proxy: decoding request with len {} at offset {}", len, offset);
+  ensureMinLength(len, XID_LENGTH + INT_LENGTH); // xid + opcode
   ensureMaxLength(len);
 
   auto start_time = time_source_.monotonicTime();
@@ -64,6 +65,7 @@ void DecoderImpl::decodeOnData(Buffer::Instance& data, uint64_t& offset) {
   //       However, some client implementations might expose setWatches
   //       as a regular data request, so we support that as well.
   const int32_t xid = helper_.peekInt32(data, offset);
+  ENVOY_LOG(trace, "zookeeper_proxy: decoding request with xid {} at offset {}", xid, offset);
   switch (static_cast<XidCodes>(xid)) {
   case XidCodes::ConnectXid:
     parseConnect(data, offset, len);
@@ -95,7 +97,9 @@ void DecoderImpl::decodeOnData(Buffer::Instance& data, uint64_t& offset) {
   // for two cases: auth requests can happen at any time and ping requests
   // must happen every 1/3 of the negotiated session timeout, to keep
   // the session alive.
-  const auto opcode = static_cast<OpCodes>(helper_.peekInt32(data, offset));
+  const int32_t oc = helper_.peekInt32(data, offset);
+  ENVOY_LOG(trace, "zookeeper_proxy: decoding request with opcode {} at offset {}", oc, offset);
+  const auto opcode = static_cast<OpCodes>(oc);
   switch (opcode) {
   case OpCodes::GetData:
     parseGetDataRequest(data, offset, len);
@@ -142,6 +146,9 @@ void DecoderImpl::decodeOnData(Buffer::Instance& data, uint64_t& offset) {
   case OpCodes::SetWatches:
     parseSetWatchesRequest(data, offset, len);
     break;
+  case OpCodes::SetWatches2:
+    parseSetWatches2Request(data, offset, len);
+    break;
   case OpCodes::CheckWatches:
     parseXWatchesRequest(data, offset, len, OpCodes::CheckWatches);
     break;
@@ -170,10 +177,12 @@ void DecoderImpl::decodeOnWrite(Buffer::Instance& data, uint64_t& offset) {
 
   // Check message length.
   const int32_t len = helper_.peekInt32(data, offset);
-  ensureMinLength(len, INT_LENGTH + XID_LENGTH);
+  ENVOY_LOG(trace, "zookeeper_proxy: decoding response with len {} at offset {}", len, offset);
+  ensureMinLength(len, XID_LENGTH + ZXID_LENGTH + INT_LENGTH); // xid + zxid + err
   ensureMaxLength(len);
 
   const auto xid = helper_.peekInt32(data, offset);
+  ENVOY_LOG(trace, "zookeeper_proxy: decoding response with xid {} at offset {}", xid, offset);
   const auto xid_code = static_cast<XidCodes>(xid);
 
   std::chrono::milliseconds latency;
@@ -205,6 +214,8 @@ void DecoderImpl::decodeOnWrite(Buffer::Instance& data, uint64_t& offset) {
   // Control responses that aren't connect, with XIDs <= 0.
   const auto zxid = helper_.peekInt64(data, offset);
   const auto error = helper_.peekInt32(data, offset);
+  ENVOY_LOG(trace, "zookeeper_proxy: decoding response with zxid {} and error {} at offset {}",
+            zxid, error, offset);
   switch (xid_code) {
   case XidCodes::PingXid:
     callbacks_.onResponse(OpCodes::Ping, xid, zxid, error, latency);
@@ -288,7 +299,7 @@ void DecoderImpl::skipAcls(Buffer::Instance& data, uint64_t& offset) {
 
 void DecoderImpl::parseCreateRequest(Buffer::Instance& data, uint64_t& offset, uint32_t len,
                                      OpCodes opcode) {
-  ensureMinLength(len, XID_LENGTH + OPCODE_LENGTH + (3 * INT_LENGTH));
+  ensureMinLength(len, XID_LENGTH + OPCODE_LENGTH + (4 * INT_LENGTH));
 
   const std::string path = helper_.peekString(data, offset);
 
@@ -364,7 +375,7 @@ std::string DecoderImpl::pathOnlyRequest(Buffer::Instance& data, uint64_t& offse
 }
 
 void DecoderImpl::parseCheckRequest(Buffer::Instance& data, uint64_t& offset, uint32_t len) {
-  ensureMinLength(len, (2 * INT_LENGTH));
+  ensureMinLength(len, XID_LENGTH + OPCODE_LENGTH + (2 * INT_LENGTH));
 
   const std::string path = helper_.peekString(data, offset);
   const int32_t version = helper_.peekInt32(data, offset);
@@ -396,6 +407,9 @@ void DecoderImpl::parseMultiRequest(Buffer::Instance& data, uint64_t& offset, ui
     case OpCodes::Check:
       parseCheckRequest(data, offset, len);
       break;
+    case OpCodes::Delete:
+      parseDeleteRequest(data, offset, len);
+      break;
     default:
       throw EnvoyException(fmt::format("Unknown opcode within a transaction: {}", opcode));
     }
@@ -420,7 +434,7 @@ void DecoderImpl::parseReconfigRequest(Buffer::Instance& data, uint64_t& offset,
 }
 
 void DecoderImpl::parseSetWatchesRequest(Buffer::Instance& data, uint64_t& offset, uint32_t len) {
-  ensureMinLength(len, XID_LENGTH + OPCODE_LENGTH + (3 * INT_LENGTH));
+  ensureMinLength(len, XID_LENGTH + OPCODE_LENGTH + LONG_LENGTH + (3 * INT_LENGTH));
 
   // Ignore relative Zxid.
   helper_.peekInt64(data, offset);
@@ -432,6 +446,25 @@ void DecoderImpl::parseSetWatchesRequest(Buffer::Instance& data, uint64_t& offse
   skipStrings(data, offset);
 
   callbacks_.onSetWatchesRequest();
+}
+
+void DecoderImpl::parseSetWatches2Request(Buffer::Instance& data, uint64_t& offset, uint32_t len) {
+  ensureMinLength(len, XID_LENGTH + OPCODE_LENGTH + LONG_LENGTH + (5 * INT_LENGTH));
+
+  // Ignore relative Zxid.
+  helper_.peekInt64(data, offset);
+  // Data watches.
+  skipStrings(data, offset);
+  // Exist watches.
+  skipStrings(data, offset);
+  // Child watches.
+  skipStrings(data, offset);
+  // Persistent watches.
+  skipStrings(data, offset);
+  // Persistent recursive watches.
+  skipStrings(data, offset);
+
+  callbacks_.onSetWatches2Request();
 }
 
 void DecoderImpl::parseXWatchesRequest(Buffer::Instance& data, uint64_t& offset, uint32_t len,
@@ -467,9 +500,92 @@ void DecoderImpl::skipStrings(Buffer::Instance& data, uint64_t& offset) {
   }
 }
 
-void DecoderImpl::onData(Buffer::Instance& data) { decode(data, DecodeType::READ); }
+Network::FilterStatus DecoderImpl::onData(Buffer::Instance& data) {
+  return decodeAndBuffer(data, DecodeType::READ, zk_filter_read_buffer_);
+}
 
-void DecoderImpl::onWrite(Buffer::Instance& data) { decode(data, DecodeType::WRITE); }
+Network::FilterStatus DecoderImpl::onWrite(Buffer::Instance& data) {
+  return decodeAndBuffer(data, DecodeType::WRITE, zk_filter_write_buffer_);
+}
+
+Network::FilterStatus DecoderImpl::decodeAndBuffer(Buffer::Instance& data, DecodeType dtype,
+                                                   Buffer::OwnedImpl& zk_filter_buffer) {
+  const uint32_t zk_filter_buffer_len = zk_filter_buffer.length();
+
+  if (zk_filter_buffer_len == 0) {
+    decodeAndBufferHelper(data, dtype, zk_filter_buffer);
+    return Network::FilterStatus::Continue;
+  }
+
+  // ZooKeeper filter buffer contains partial packet data from the previous network filter buffer.
+  // Prepending ZooKeeper filter buffer to the current network filter buffer can help to generate
+  // full packets.
+  data.prepend(zk_filter_buffer);
+  decodeAndBufferHelper(data, dtype, zk_filter_buffer);
+  // Drain the prepended ZooKeeper filter buffer.
+  data.drain(zk_filter_buffer_len);
+  return Network::FilterStatus::Continue;
+}
+
+void DecoderImpl::decodeAndBufferHelper(Buffer::Instance& data, DecodeType dtype,
+                                        Buffer::OwnedImpl& zk_filter_buffer) {
+  ASSERT(dtype == DecodeType::READ || dtype == DecodeType::WRITE);
+
+  const uint32_t data_len = data.length();
+  uint64_t offset = 0;
+  uint32_t len = 0;
+  // Boolean to check whether there is at least one full packet in the network filter buffer (to
+  // which the ZooKeeper filter buffer is prepended).
+  bool has_full_packets = false;
+
+  while (offset < data_len) {
+    try {
+      // Peek packet length.
+      len = helper_.peekInt32(data, offset);
+      ensureMinLength(len, dtype == DecodeType::READ ? XID_LENGTH + INT_LENGTH
+                                                     : XID_LENGTH + ZXID_LENGTH + INT_LENGTH);
+      ensureMaxLength(len);
+      offset += len;
+      if (offset <= data_len) {
+        has_full_packets = true;
+      }
+    } catch (const EnvoyException& e) {
+      ENVOY_LOG(debug, "zookeeper_proxy: decoding exception {}", e.what());
+      callbacks_.onDecodeError();
+      return;
+    }
+  }
+
+  if (offset == data_len) {
+    decode(data, dtype);
+    return;
+  }
+
+  ASSERT(offset > data_len);
+  std::string temp_data;
+
+  if (has_full_packets) {
+    offset -= INT_LENGTH + len;
+    // Decode full packets.
+    // TODO(Winbobob): use BufferFragment to avoid copying the full packets.
+    temp_data.resize(offset);
+    data.copyOut(0, offset, temp_data.data());
+    Buffer::OwnedImpl full_packets;
+    full_packets.add(temp_data.data(), temp_data.length());
+    decode(full_packets, dtype);
+
+    // Copy out the rest of the data to the ZooKeeper filter buffer.
+    temp_data.resize(data_len - offset);
+    data.copyOut(offset, data_len - offset, temp_data.data());
+    zk_filter_buffer.add(temp_data.data(), temp_data.length());
+  } else {
+    // Copy out all the data to the ZooKeeper filter buffer, since after prepending the ZooKeeper
+    // filter buffer is drained by the prepend() method.
+    temp_data.resize(data_len);
+    data.copyOut(0, data_len, temp_data.data());
+    zk_filter_buffer.add(temp_data.data(), temp_data.length());
+  }
+}
 
 void DecoderImpl::decode(Buffer::Instance& data, DecodeType dtype) {
   uint64_t offset = 0;

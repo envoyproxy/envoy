@@ -547,6 +547,55 @@ TEST_P(TcpProxyIntegrationTest, AccessLogUpstreamConnectFailure) {
   EXPECT_THAT(log_result, testing::StartsWith("delayed_connect_error:"));
 }
 
+TEST_P(TcpProxyIntegrationTest, AccessLogOnUpstreamConnect) {
+  std::string access_log_path = TestEnvironment::temporaryPath(
+      fmt::format("access_log{}{}.txt", version_ == Network::Address::IpVersion::v4 ? "v4" : "v6",
+                  TestUtility::uniqueFilename()));
+
+  setupByteMeterAccessLog();
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+    auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
+    auto* filter_chain = listener->mutable_filter_chains(0);
+    auto* config_blob = filter_chain->mutable_filters(0)->mutable_typed_config();
+
+    ASSERT_TRUE(config_blob->Is<envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy>());
+    auto tcp_proxy_config =
+        MessageUtil::anyConvert<envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy>(
+            *config_blob);
+
+    tcp_proxy_config.set_flush_access_log_on_connected(true);
+    auto* access_log = tcp_proxy_config.add_access_log();
+    access_log->set_name("accesslog");
+    envoy::extensions::access_loggers::file::v3::FileAccessLog access_log_config;
+    access_log_config.set_path(access_log_path);
+    access_log_config.mutable_log_format()->mutable_text_format_source()->set_inline_string(
+        "DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT=%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%");
+    access_log->mutable_typed_config()->PackFrom(access_log_config);
+    config_blob->PackFrom(tcp_proxy_config);
+  });
+
+  const std::string ip_regex =
+      (version_ == Network::Address::IpVersion::v4) ? R"EOF(127\.0\.0\.1)EOF" : R"EOF(::1)EOF";
+
+  initialize();
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
+  ASSERT_TRUE(tcp_client->write("hello"));
+  FakeRawConnectionPtr fake_upstream_connection;
+
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+  auto log_result = waitForAccessLog(access_log_path);
+  EXPECT_THAT(log_result,
+              MatchesRegex(fmt::format("DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT={}", ip_regex)));
+
+  ASSERT_TRUE(fake_upstream_connection->waitForData(5));
+  ASSERT_TRUE(tcp_client->write("", true));
+  ASSERT_TRUE(fake_upstream_connection->waitForHalfClose());
+  ASSERT_TRUE(fake_upstream_connection->write("", true));
+  ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
+  tcp_client->waitForDisconnect();
+  test_server_.reset();
+}
+
 // Make sure no bytes are logged when no data is sent.
 TEST_P(TcpProxyIntegrationTest, TcpProxyNoDataBytesMeter) {
   setupByteMeterAccessLog();
@@ -1389,7 +1438,7 @@ void TcpProxySslIntegrationTest::sendAndReceiveTlsData(const std::string& data_t
 
   // Now send data downstream and make sure it arrives.
   ASSERT_TRUE(fake_upstream_connection_->write(data_to_send_downstream));
-  payload_reader_->set_data_to_wait_for(data_to_send_downstream);
+  payload_reader_->setDataToWaitFor(data_to_send_downstream);
   ssl_client_->dispatcher().run(Event::Dispatcher::RunType::Block);
 
   // Clean up.
@@ -1426,7 +1475,7 @@ TEST_P(TcpProxySslIntegrationTest, DownstreamHalfClose) {
 
   const std::string data("data");
   ASSERT_TRUE(fake_upstream_connection_->write(data, false));
-  payload_reader_->set_data_to_wait_for(data);
+  payload_reader_->setDataToWaitFor(data);
   ssl_client_->dispatcher().run(Event::Dispatcher::RunType::Block);
   EXPECT_FALSE(payload_reader_->readLastByte());
 

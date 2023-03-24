@@ -16,14 +16,39 @@ parameters:
   default: true
 - name: bazelBuildExtraOptions
   type: string
-  default: "--flaky_test_attempts=2"
+  default: ""
 
 steps:
+# Set up tmpfs directories for self-hosted agents which have a surplus of mem.
+#
+# NB: Do not add any directory that grow larger than spare memory capacity!
+- bash: |
+    TMPDIRS=(
+        # This is used as the final delivery directory for the binaries
+        "$(Build.StagingDirectory)/envoy"
+        # Bazel repository_cache which is cached by AZP (this speeds up cache load/save)
+        "$(Build.StagingDirectory)/repository_cache")
+    for tmpdir in "${TMPDIRS[@]}"; do
+        echo "Mount(tmpfs): ${tmpdir}"
+        sudo mkdir -p "$tmpdir"
+        sudo mount -t tmpfs none "$tmpdir"
+        sudo chown azure-pipelines "$tmpdir"
+    done
+  displayName: "Mount/tmpfs directories"
+  condition: and(succeeded(), eq('${{ parameters.managedAgent }}', false))
+
 - task: Cache@2
+  env:
+    VSO_DEDUP_REDIRECT_TIMEOUT_IN_SEC: 5
   inputs:
-    key: '"${{ parameters.ciTarget }}" | ./WORKSPACE | **/*.bzl'
+    key: '"${{ parameters.ciTarget }}" | "${{ parameters.artifactSuffix }}" | ./WORKSPACE | **/*.bzl, !mobile/**, !envoy-docs/**'
     path: $(Build.StagingDirectory)/repository_cache
   continueOnError: true
+
+- template: cached.yml
+  parameters:
+    version: "$(buildImageCacheVersion)"
+    arch: "${{ parameters.artifactSuffix }}"
 
 - bash: |
     echo "disk space at beginning of build:"
@@ -47,6 +72,10 @@ steps:
     SLACK_TOKEN: $(SLACK_TOKEN)
     REPO_URI: $(Build.Repository.Uri)
     BUILD_URI: $(Build.BuildUri)
+    ${{ if eq(variables['Build.Reason'], 'PullRequest') }}:
+      AZP_TARGET_BRANCH: "origin/$(System.PullRequest.TargetBranch)"
+    ${{ if ne(variables['Build.Reason'], 'PullRequest') }}:
+      AZP_TARGET_BRANCH: "origin/$(Build.SourceBranchName)"
     ${{ if parameters.rbe }}:
       GCP_SERVICE_ACCOUNT_KEY: $(GcpServiceAccountKey)
       ENVOY_RBE: "1"
@@ -56,7 +85,10 @@ steps:
     ${{ if eq(parameters.rbe, false) }}:
       BAZEL_BUILD_EXTRA_OPTIONS: "${{ parameters.bazelBuildExtraOptions }}"
       BAZEL_REMOTE_CACHE: $(LocalBuildCache)
-
+      ${{ if eq(variables['Build.Reason'], 'PullRequest') }}:
+        BAZEL_REMOTE_INSTANCE: "instances/$(System.PullRequest.TargetBranch)"
+      ${{ if ne(variables['Build.Reason'], 'PullRequest') }}:
+        BAZEL_REMOTE_INSTANCE: "instances/$(Build.SourceBranchName)"
   displayName: "Run CI script ${{ parameters.ciTarget }}"
 
 - bash: |
@@ -81,3 +113,10 @@ steps:
     artifactName: ${{ parameters.ciTarget }}${{ parameters.artifactSuffix }}
   timeoutInMinutes: 10
   condition: always()
+
+- task: PublishBuildArtifacts@1
+  inputs:
+    pathtoPublish: "$(Build.StagingDirectory)/tmp/lint-fixes"
+    artifactName: "${{ parameters.ciTarget }}.fixes"
+  timeoutInMinutes: 10
+  condition: failed()

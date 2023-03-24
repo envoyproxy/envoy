@@ -1,0 +1,42 @@
+name: mobile_tsan
+
+on:
+  push:
+    branches:
+    - main
+  pull_request:
+
+concurrency:
+  group: ${{ github.head_ref-github.workflow || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  tsan:
+    if: github.repository == 'envoyproxy/envoy'
+    name: tsan
+    runs-on: ubuntu-20.04
+    timeout-minutes: 90
+    container:
+      image: envoyproxy/envoy-build-ubuntu:mobile-458cb49ca2013c0ccf057d00ad1d4407920c4e52
+      env:
+        CC: /opt/llvm/bin/clang
+        CXX: /opt/llvm/bin/clang++
+    steps:
+    - uses: actions/checkout@v3
+      with:
+        fetch-depth: 0
+    - name: Add safe directory
+      run: git config --global --add safe.directory /__w/envoy/envoy
+    - id: should_run
+      name: 'Check whether to run'
+      run: ./mobile/tools/should_run_ci.sh
+    - name: 'Run tests'
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      if: steps.should_run.outputs.run_ci_job == 'true'
+      run: |
+        cd mobile && ./bazelw test \
+            --test_output=all \
+            --test_env=ENVOY_IP_TEST_VERSIONS=v4only \
+            $([ -z $GITHUB_TOKEN ] || echo "--config=remote-ci-linux-tsan") \
+            //test/common/...

@@ -5,6 +5,7 @@ load(
     "envoy_cc_test_library",
     "envoy_package",
     "envoy_proto_library",
+    "envoy_select_enable_http_datagrams",
 )
 
 licenses(["notice"])  # Apache 2
@@ -367,6 +368,18 @@ envoy_cc_test(
         "//test/test_common:environment_lib",
         "//test/test_common:utility_lib",
     ],
+)
+
+envoy_cc_test(
+    name = "http_datagram_handler_test",
+    srcs = envoy_select_enable_http_datagrams(["http_datagram_handler_test.cc"]),
+    tags = ["nofips"],
+    deps = envoy_select_enable_http_datagrams([
+        "//source/common/quic:http_datagram_handler",
+        "//test/mocks/buffer:buffer_mocks",
+        "//test/test_common:utility_lib",
+        "@com_github_google_quiche//:quic_test_tools_test_utils_lib",
+    ]),
 )
 
 envoy_proto_library(

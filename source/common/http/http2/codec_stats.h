@@ -57,6 +57,7 @@ struct CodecStats : public ::Envoy::Http::HeaderValidatorStats {
   void incRequestsRejectedWithUnderscoresInHeaders() override {
     requests_rejected_with_underscores_in_headers_.inc();
   }
+  void incMessagingError() override { rx_messaging_error_.inc(); }
 
   ALL_HTTP2_CODEC_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT)
 };

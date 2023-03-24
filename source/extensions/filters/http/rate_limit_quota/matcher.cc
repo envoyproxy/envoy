@@ -7,14 +7,13 @@ namespace Extensions {
 namespace HttpFilters {
 namespace RateLimitQuota {
 
-using ::envoy::type::v3::RateLimitStrategy;
 using ValueSpecifierCase = ::envoy::extensions::filters::http::rate_limit_quota::v3::
     RateLimitQuotaBucketSettings_BucketIdBuilder_ValueBuilder::ValueSpecifierCase;
 
 absl::StatusOr<BucketId>
-RateLimitOnMactchAction::generateBucketId(const Http::Matching::HttpMatchingDataImpl& data,
-                                          Server::Configuration::FactoryContext& factory_context,
-                                          RateLimitQuotaValidationVisitor& visitor) const {
+RateLimitOnMatchAction::generateBucketId(const Http::Matching::HttpMatchingDataImpl& data,
+                                         Server::Configuration::FactoryContext& factory_context,
+                                         RateLimitQuotaValidationVisitor& visitor) const {
   BucketId bucket_id;
   std::unique_ptr<Matcher::MatchInputFactory<Http::HttpMatchingData>> input_factory_ptr = nullptr;
   // Generate the `BucketId` based on the bucked id builder from the configuration.
@@ -66,8 +65,8 @@ RateLimitOnMactchAction::generateBucketId(const Http::Matching::HttpMatchingData
 /**
  * Static registration for the on match action factory.
  */
-REGISTER_FACTORY(RateLimitOnMactchActionFactory,
-                 Matcher::ActionFactory<RateLimitOnMactchActionContext>);
+REGISTER_FACTORY(RateLimitOnMatchActionFactory,
+                 Matcher::ActionFactory<RateLimitOnMatchActionContext>);
 
 } // namespace RateLimitQuota
 } // namespace HttpFilters

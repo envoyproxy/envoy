@@ -37,6 +37,7 @@ import org.chromium.net.UploadDataProvider;
 import org.chromium.net.UrlResponseInfo;
 import org.chromium.net.impl.Executors.CheckedRunnable;
 import org.chromium.net.impl.Executors.DirectPreventingExecutor;
+import io.envoyproxy.envoymobile.utilities.ThreadStatsUid;
 
 /**
  * Pure java UrlRequest, backed by {@link HttpURLConnection}.

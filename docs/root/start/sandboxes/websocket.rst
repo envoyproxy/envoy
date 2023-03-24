@@ -58,9 +58,9 @@ The socket servers are very trivial implementations, that simply output ``[ws] H
 
 .. code-block:: console
 
-  $ docker-compose pull
-  $ docker-compose up --build -d
-  $ docker-compose ps
+  $ docker compose pull
+  $ docker compose up --build -d
+  $ docker compose ps
 
               Name                             Command               State            Ports
   ---------------------------------------------------------------------------------------------------
