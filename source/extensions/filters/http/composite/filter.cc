@@ -10,24 +10,24 @@ namespace HttpFilters {
 namespace Composite {
 
 namespace {
-// Helper that returns `filter->func(args...)` if the filter is not null, returning `rval`
-// otherwise.
+// Helper that returns the last `filter->func(args...)` result in the list of filters, if the list
+// is empty, return `rval`.
 template <class FilterPtrT, class FuncT, class RValT, class... Args>
-RValT delegateAllFilterActionOr(std::vector<FilterPtrT> filter_list, FuncT func, RValT rval, Args&&... args) {
+RValT delegateAllFilterActionOr(std::vector<FilterPtrT>& filter_list, FuncT func, RValT rval,
+                                Args&&... args) {
   RValT value = rval;
-  for (auto filter : filter_list) {
-    value = ((*filter).*func)(std::forward<Args>(args)...);
+  for (auto filter = filter_list.rbegin(); filter != filter_list.rend(); ++filter) {
+    value = ((**filter).*func)(std::forward<Args>(args)...);
   }
-
   return value;
 }
-
+// Helper that returns `filter->func(args...)` if the filter is not null, returning `rval`
+// otherwise.
 template <class FilterPtrT, class FuncT, class RValT, class... Args>
 RValT delegateFilterActionOr(FilterPtrT& filter, FuncT func, RValT rval, Args&&... args) {
   if (filter) {
     return ((*filter).*func)(std::forward<Args>(args)...);
   }
-
   return rval;
 }
 } // namespace
@@ -35,22 +35,22 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   decoded_headers_ = true;
 
   return delegateAllFilterActionOr(delegated_filter_list_, &StreamDecoderFilter::decodeHeaders,
-                                Http::FilterHeadersStatus::Continue, headers, end_stream);
+                                   Http::FilterHeadersStatus::Continue, headers, end_stream);
 }
 
 Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_stream) {
   return delegateAllFilterActionOr(delegated_filter_list_, &StreamDecoderFilter::decodeData,
-                                Http::FilterDataStatus::Continue, data, end_stream);
+                                   Http::FilterDataStatus::Continue, data, end_stream);
 }
 
 Http::FilterTrailersStatus Filter::decodeTrailers(Http::RequestTrailerMap& trailers) {
   return delegateAllFilterActionOr(delegated_filter_list_, &StreamDecoderFilter::decodeTrailers,
-                                Http::FilterTrailersStatus::Continue, trailers);
+                                   Http::FilterTrailersStatus::Continue, trailers);
 }
 
 Http::FilterMetadataStatus Filter::decodeMetadata(Http::MetadataMap& metadata_map) {
   return delegateAllFilterActionOr(delegated_filter_list_, &StreamDecoderFilter::decodeMetadata,
-                                Http::FilterMetadataStatus::Continue, metadata_map);
+                                   Http::FilterMetadataStatus::Continue, metadata_map);
 }
 
 void Filter::decodeComplete() {
@@ -61,24 +61,24 @@ void Filter::decodeComplete() {
 
 Http::Filter1xxHeadersStatus Filter::encode1xxHeaders(Http::ResponseHeaderMap& headers) {
   return delegateAllFilterActionOr(delegated_filter_list_, &StreamEncoderFilter::encode1xxHeaders,
-                                Http::Filter1xxHeadersStatus::Continue, headers);
+                                   Http::Filter1xxHeadersStatus::Continue, headers);
 }
 
 Http::FilterHeadersStatus Filter::encodeHeaders(Http::ResponseHeaderMap& headers, bool end_stream) {
   return delegateAllFilterActionOr(delegated_filter_list_, &StreamEncoderFilter::encodeHeaders,
-                                Http::FilterHeadersStatus::Continue, headers, end_stream);
+                                   Http::FilterHeadersStatus::Continue, headers, end_stream);
 }
 Http::FilterDataStatus Filter::encodeData(Buffer::Instance& data, bool end_stream) {
   return delegateAllFilterActionOr(delegated_filter_list_, &StreamEncoderFilter::encodeData,
-                                Http::FilterDataStatus::Continue, data, end_stream);
+                                   Http::FilterDataStatus::Continue, data, end_stream);
 }
 Http::FilterTrailersStatus Filter::encodeTrailers(Http::ResponseTrailerMap& trailers) {
   return delegateAllFilterActionOr(delegated_filter_list_, &StreamEncoderFilter::encodeTrailers,
-                                Http::FilterTrailersStatus::Continue, trailers);
+                                   Http::FilterTrailersStatus::Continue, trailers);
 }
 Http::FilterMetadataStatus Filter::encodeMetadata(Http::MetadataMap& metadata_map) {
   return delegateAllFilterActionOr(delegated_filter_list_, &StreamEncoderFilter::encodeMetadata,
-                                Http::FilterMetadataStatus::Continue, metadata_map);                     
+                                   Http::FilterMetadataStatus::Continue, metadata_map);
 }
 void Filter::encodeComplete() {
   for (auto delegated_filter : delegated_filter_list_) {
@@ -126,11 +126,11 @@ void Filter::onMatchCallback(const Matcher::Action& action) {
   if (action.typeUrl() == ExecuteFilterAction::staticTypeUrl()) {
     const auto& composite_action = action.getTyped<ExecuteFilterAction>();
     FactoryCallbacksWrapper wrapper(*this, dispatcher_);
-    composite_action.createFilters(wrapper); 
+    composite_action.createFilters(wrapper);
     ApplyWrapper(wrapper);
   } else if (action.typeUrl() == ExecuteFilterMultiAction::staticTypeUrl()) {
     const auto& composite_multi_action = action.getTyped<ExecuteFilterMultiAction>();
-    std::function<void(Http::FilterFactoryCb&)> parse_wrapper = [this](Http::FilterFactoryCb& cb) { 
+    std::function<void(Http::FilterFactoryCb&)> parse_wrapper = [this](Http::FilterFactoryCb& cb) {
       FactoryCallbacksWrapper wrapper(*this, dispatcher_);
       cb(wrapper);
       ApplyWrapper(wrapper);

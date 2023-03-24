@@ -57,7 +57,7 @@ public:
 
   // Http::StreamFilterBase
   void onDestroy() override {
-    for (auto delegated_filter : delegated_filter_list_){
+    for (auto delegated_filter : delegated_filter_list_) {
       // We need to explicitly specify which base class to the conversion via due
       // to the diamond inheritance between StreamFilter and StreamFilterBase.
       static_cast<Http::StreamDecoderFilter&>(*delegated_filter).onDestroy();

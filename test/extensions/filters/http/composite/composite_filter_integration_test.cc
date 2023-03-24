@@ -1,5 +1,5 @@
-#include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 #include "envoy/extensions/common/matching/v3/extension_matcher.pb.h"
+#include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 
 #include "test/integration/http_integration.h"
 #include "test/mocks/http/mocks.h"
@@ -48,14 +48,14 @@ public:
                 typed_config:
                   "@type": type.googleapis.com/envoy.extensions.filters.http.composite.v3.ExecuteFilterMultiAction
                   typed_config:
-                  - name: skip
-                    typed_config:
-                      "@type": type.googleapis.com/envoy.extensions.filters.common.matcher.action.v3.SkipFilter
                   - name: set-response-code
                     typed_config:
                       "@type": type.googleapis.com/test.integration.filters.SetResponseCodeFilterConfig
+                      code: 403
+                  - name: set-response-code2
+                    typed_config:
+                      "@type": type.googleapis.com/test.integration.filters.SetResponseCodeFilterConfig
                       code: 404
-                
     )EOF");
     HttpIntegrationTest::initialize();
   }
@@ -90,22 +90,6 @@ TEST_P(CompositeFilterIntegrationTest, TestBasic) {
     ASSERT_TRUE(response->waitForEndStream());
     EXPECT_THAT(response->headers(), Http::HttpStatusIs("403"));
   }
-}
-
-// Verifies that if we don't match the match action the request is proxied as normal, while if the
-// match action is hit we apply the specified filter to the stream.
-TEST_P(CompositeFilterIntegrationTest, TestBasicMultiAction) {
-  initialize();
-  codec_client_ = makeHttpConnection(lookupPort("http"));
-
-  {
-    auto response = codec_client_->makeRequestWithBody(default_request_headers_, 1024);
-    waitForNextUpstreamRequest();
-
-    upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
-    ASSERT_TRUE(response->waitForEndStream());
-    EXPECT_THAT(response->headers(), Http::HttpStatusIs("200"));
-  }
 
   {
     const Http::TestRequestHeaderMapImpl request_headers = {{":method", "GET"},
@@ -118,5 +102,4 @@ TEST_P(CompositeFilterIntegrationTest, TestBasicMultiAction) {
     EXPECT_THAT(response->headers(), Http::HttpStatusIs("404"));
   }
 }
-
 } // namespace Envoy

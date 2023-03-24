@@ -199,39 +199,19 @@ TEST_F(FilterTest, StreamFilterDelegationMultipleStreamEncoderFilters) {
   filter_.onDestroy();
 }
 
-
-// // Adding multiple decoder filters should cause delegation to be skipped.
-// TEST_F(FilterTest, StreamFilterDelegationMultiActionMultipleStreamDecoderFilters) {
-//   auto decoder_filter = std::make_shared<Http::MockStreamDecoderFilter>();
-
-//   auto factory_callback = [&](Http::FilterChainFactoryCallbacks& cb) {
-//     cb.addStreamDecoderFilter(decoder_filter);
-//     cb.addStreamDecoderFilter(decoder_filter);
-//   };
-
-//   ExecuteFilterMultiAction action(factory_callback);
-//   EXPECT_CALL(error_counter_, inc());
-//   filter_.onMatchCallback(action);
-
-//   doAllDecodingCallbacks();
-//   doAllEncodingCallbacks();
-//   filter_.onDestroy();
-// }
-
-// MutliFilters should run both encoder filters sequentially.
-TEST_F(FilterTest, StreamFilterDelegationMultiActionMultipleStreamEncoderFilters) {
+// MultiFilters should run both decoder filters sequentially.
+TEST_F(FilterTest, StreamFilterDelegationMultiActionMultipleStreamDecoderFilters) {
   auto decoder_filter = std::make_shared<Http::MockStreamDecoderFilter>();
   auto decoder_filter2 = std::make_shared<Http::MockStreamDecoderFilter>();
 
-  std::function<void(Http::FilterChainFactoryCallbacks&)> factory_callback = [&](Http::FilterChainFactoryCallbacks& cb) {
-    cb.addStreamDecoderFilter(decoder_filter);
-  };
+  std::function<void(Http::FilterChainFactoryCallbacks&)> factory_callback =
+      [&](Http::FilterChainFactoryCallbacks& cb) { cb.addStreamDecoderFilter(decoder_filter); };
 
-  std::function<void(Http::FilterChainFactoryCallbacks&)> factory_callback2 = [&](Http::FilterChainFactoryCallbacks& cb) {
-    cb.addStreamDecoderFilter(decoder_filter2);
-  };
+  std::function<void(Http::FilterChainFactoryCallbacks&)> factory_callback2 =
+      [&](Http::FilterChainFactoryCallbacks& cb) { cb.addStreamDecoderFilter(decoder_filter2); };
 
-  std::vector<std::function<void(Http::FilterChainFactoryCallbacks&)>> factory_callbacks{factory_callback, factory_callback2};
+  std::vector<std::function<void(Http::FilterChainFactoryCallbacks&)>> factory_callbacks{
+      factory_callback, factory_callback2};
 
   EXPECT_CALL(*decoder_filter, setDecoderFilterCallbacks(_));
   EXPECT_CALL(*decoder_filter2, setDecoderFilterCallbacks(_));
@@ -239,13 +219,70 @@ TEST_F(FilterTest, StreamFilterDelegationMultiActionMultipleStreamEncoderFilters
   EXPECT_CALL(success_counter_, inc()).Times(2);
   filter_.onMatchCallback(action);
 
-
   expectDelegatedDecoding(*decoder_filter);
   expectDelegatedDecoding(*decoder_filter2);
   doAllDecodingCallbacks();
   doAllEncodingCallbacks();
   EXPECT_CALL(*decoder_filter, onDestroy());
   EXPECT_CALL(*decoder_filter2, onDestroy());
+  filter_.onDestroy();
+}
+
+// MultiFilters should run both encoder filters sequentially.
+TEST_F(FilterTest, StreamFilterDelegationMultiActionMultipleStreamEncoderFilters) {
+  auto encoder_filter = std::make_shared<Http::MockStreamEncoderFilter>();
+  auto encoder_filter2 = std::make_shared<Http::MockStreamEncoderFilter>();
+
+  std::function<void(Http::FilterChainFactoryCallbacks&)> factory_callback =
+      [&](Http::FilterChainFactoryCallbacks& cb) { cb.addStreamEncoderFilter(encoder_filter); };
+
+  std::function<void(Http::FilterChainFactoryCallbacks&)> factory_callback2 =
+      [&](Http::FilterChainFactoryCallbacks& cb) { cb.addStreamEncoderFilter(encoder_filter2); };
+
+  std::vector<std::function<void(Http::FilterChainFactoryCallbacks&)>> factory_callbacks{
+      factory_callback, factory_callback2};
+
+  EXPECT_CALL(*encoder_filter, setEncoderFilterCallbacks(_));
+  EXPECT_CALL(*encoder_filter2, setEncoderFilterCallbacks(_));
+  ExecuteFilterMultiAction action(factory_callbacks);
+  EXPECT_CALL(success_counter_, inc()).Times(2);
+  filter_.onMatchCallback(action);
+
+  doAllDecodingCallbacks();
+  expectDelegatedEncoding(*encoder_filter);
+  expectDelegatedEncoding(*encoder_filter2);
+  doAllEncodingCallbacks();
+  EXPECT_CALL(*encoder_filter, onDestroy());
+  EXPECT_CALL(*encoder_filter2, onDestroy());
+  filter_.onDestroy();
+}
+
+// MultiFilters should run both encoder and decoder filters sequentially.
+TEST_F(FilterTest, StreamFilterDelegationMultiActionMultipleStreamMixedFilters) {
+  auto encoder_filter = std::make_shared<Http::MockStreamEncoderFilter>();
+  auto decoder_filter = std::make_shared<Http::MockStreamDecoderFilter>();
+
+  std::function<void(Http::FilterChainFactoryCallbacks&)> factory_callback =
+      [&](Http::FilterChainFactoryCallbacks& cb) { cb.addStreamEncoderFilter(encoder_filter); };
+
+  std::function<void(Http::FilterChainFactoryCallbacks&)> factory_callback2 =
+      [&](Http::FilterChainFactoryCallbacks& cb) { cb.addStreamDecoderFilter(decoder_filter); };
+
+  std::vector<std::function<void(Http::FilterChainFactoryCallbacks&)>> factory_callbacks{
+      factory_callback, factory_callback2};
+
+  EXPECT_CALL(*encoder_filter, setEncoderFilterCallbacks(_));
+  EXPECT_CALL(*decoder_filter, setDecoderFilterCallbacks(_));
+  ExecuteFilterMultiAction action(factory_callbacks);
+  EXPECT_CALL(success_counter_, inc()).Times(2);
+  filter_.onMatchCallback(action);
+
+  expectDelegatedDecoding(*decoder_filter);
+  doAllDecodingCallbacks();
+  expectDelegatedEncoding(*encoder_filter);
+  doAllEncodingCallbacks();
+  EXPECT_CALL(*encoder_filter, onDestroy());
+  EXPECT_CALL(*decoder_filter, onDestroy());
   filter_.onDestroy();
 }
 

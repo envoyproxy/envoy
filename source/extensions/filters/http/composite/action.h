@@ -73,8 +73,9 @@ public:
   createActionFactoryCb(const Protobuf::Message& config,
                         Envoy::Http::Matching::HttpFilterActionContext& context,
                         ProtobufMessage::ValidationVisitor& validation) override {
-    const auto& composite_action =
-        MessageUtil::downcastAndValidate<const envoy::extensions::filters::http::composite::v3::ExecuteFilterMultiAction&>(config, validation);
+    const auto& composite_action = MessageUtil::downcastAndValidate<
+        const envoy::extensions::filters::http::composite::v3::ExecuteFilterMultiAction&>(
+        config, validation);
     std::vector<Http::FilterFactoryCb> callback_list;
     for (auto typed_config : composite_action.typed_config()) {
       auto& factory =
@@ -83,14 +84,15 @@ public:
       ProtobufTypes::MessagePtr message = Config::Utility::translateAnyToFactoryConfig(
           typed_config.typed_config(), validation, factory);
       callback_list.push_back(factory.createFilterFactoryFromProto(*message, context.stat_prefix_,
-                                                               context.factory_context_));
+                                                                   context.factory_context_));
     }
     return [cb_list = std::move(callback_list)]() -> Matcher::ActionPtr {
       return std::make_unique<ExecuteFilterMultiAction>(cb_list);
     };
   }
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<envoy::extensions::filters::http::composite::v3::ExecuteFilterMultiAction>();
+    return std::make_unique<
+        envoy::extensions::filters::http::composite::v3::ExecuteFilterMultiAction>();
   }
 };
 

@@ -38,7 +38,9 @@ message ExecuteFilterAction {
   config.core.v3.TypedExtensionConfig typed_config = 1;
 }
 
-
+// Composite match action (see :ref:`matching docs <arch_overview_matching_api>` for more info on match actions).
+// This allows multiple delegate filters to be linked to one action, executing individual parts in parallel.
+// The final filter in the list is the filter that returns the resulting status, all other filter statuses are dropped.
 message ExecuteFilterMultiAction {
   repeated config.core.v3.TypedExtensionConfig typed_config = 1;
 }

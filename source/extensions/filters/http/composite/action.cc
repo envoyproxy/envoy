@@ -10,7 +10,8 @@ void ExecuteFilterAction::createFilters(Http::FilterChainFactoryCallbacks& callb
 REGISTER_FACTORY(ExecuteFilterActionFactory,
                  Matcher::ActionFactory<Http::Matching::HttpFilterActionContext>);
 
-void ExecuteFilterMultiAction::createFilters(std::function<void(Envoy::Http::FilterFactoryCb&)> parse_wrapper) const {
+void ExecuteFilterMultiAction::createFilters(
+    std::function<void(Envoy::Http::FilterFactoryCb&)> parse_wrapper) const {
   for (auto cb : cb_list_) {
     parse_wrapper(cb);
   }
