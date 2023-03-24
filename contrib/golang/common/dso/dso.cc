@@ -80,5 +80,27 @@ void HttpFilterDsoImpl::envoyGoFilterOnHttpDestroy(httpRequest* p0, int p1) {
   envoy_go_filter_on_http_destroy_(p0, GoUint64(p1));
 }
 
+ClusterSpecifierDsoImpl::ClusterSpecifierDsoImpl(const std::string dso_name)
+    : ClusterSpecifierDso(dso_name) {
+  loaded_ = dlsymInternal<decltype(envoy_go_cluster_specifier_new_plugin_)>(
+      envoy_go_cluster_specifier_new_plugin_, handler_, dso_name,
+      "envoyGoClusterSpecifierNewPlugin");
+  loaded_ = dlsymInternal<decltype(envoy_go_on_cluster_specify_)>(
+      envoy_go_on_cluster_specify_, handler_, dso_name, "envoyGoOnClusterSpecify");
+}
+
+GoUint64 ClusterSpecifierDsoImpl::envoyGoClusterSpecifierNewPlugin(GoUint64 config_ptr,
+                                                                   GoUint64 config_len) {
+  ASSERT(envoy_go_cluster_specifier_new_plugin_ != nullptr);
+  return envoy_go_cluster_specifier_new_plugin_(config_ptr, config_len);
+}
+
+GoInt64 ClusterSpecifierDsoImpl::envoyGoOnClusterSpecify(GoUint64 plugin_ptr, GoUint64 header_ptr,
+                                                         GoUint64 plugin_id, GoUint64 buffer_ptr,
+                                                         GoUint64 buffer_len) {
+  ASSERT(envoy_go_on_cluster_specify_ != nullptr);
+  return envoy_go_on_cluster_specify_(plugin_ptr, header_ptr, plugin_id, buffer_ptr, buffer_len);
+}
+
 } // namespace Dso
 } // namespace Envoy

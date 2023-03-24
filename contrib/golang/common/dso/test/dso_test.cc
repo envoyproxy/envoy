@@ -44,6 +44,16 @@ TEST(DsoManagerTest, Pub) {
   // second time load http filter dso
   res = DsoManager<HttpFilterDsoImpl>::load(id, path);
   EXPECT_EQ(res, true);
+
+  // first time load cluster specifier dso
+  res = DsoManager<ClusterSpecifierDsoImpl>::load(id, path);
+  EXPECT_EQ(res, true);
+
+  // get after load cluster specifier dso
+  auto cluster_dso = DsoManager<ClusterSpecifierDsoImpl>::getDsoByID(id);
+  EXPECT_NE(cluster_dso, nullptr);
+
+  EXPECT_EQ(cluster_dso->envoyGoClusterSpecifierNewPlugin(0, 0), 200);
 }
 
 } // namespace
