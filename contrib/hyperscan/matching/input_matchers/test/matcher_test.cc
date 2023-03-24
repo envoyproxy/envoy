@@ -48,6 +48,20 @@ TEST(ThreadLocalTest, RaceScratchCreation) {
   }
 }
 
+// Verify that even if thread local is not initialized, matcher can work without crashes.
+TEST(ThreadLocalTest, NotInitialized) {
+  std::vector<const char*> expressions{"^/asdf/.+"};
+  std::vector<unsigned int> flags{0};
+  std::vector<unsigned int> ids{0};
+
+  ThreadLocal::InstanceImpl instance;
+  Matcher matcher(expressions, flags, ids, instance, false);
+  instance.shutdownThread();
+  instance.shutdownGlobalThreading();
+
+  EXPECT_TRUE(matcher.match("/asdf/1"));
+}
+
 // Verify that comparing works correctly for bounds.
 TEST(BoundTest, Compare) {
   EXPECT_LT(Bound(1, 1), Bound(2, 1));
@@ -71,7 +85,7 @@ protected:
   }
 
   ThreadLocal::InstanceImpl instance_;
-  std::shared_ptr<Matcher> matcher_;
+  std::unique_ptr<Matcher> matcher_;
 };
 
 // Verify that matching will be performed successfully.
