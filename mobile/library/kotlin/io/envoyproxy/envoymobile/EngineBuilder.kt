@@ -565,13 +565,13 @@ open class EngineBuilder(
   }
 
   /**
-   * Add virtual cluster configuration.
+   * Add virtual cluster configurations.
    *
-   * @param config the structured configuration for one or more virtual clusters.
+   * @param configs structured configurations of virtual clusters.
    *
    * @return this builder.
    */
-  fun addVirtualCluster(config: List<VirtualClusterConfig>): EngineBuilder {
+  fun addVirtualClusters(configs: List<VirtualClusterConfig>): EngineBuilder {
     this.virtualClusters + config;
     return this
   }
