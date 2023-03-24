@@ -37,7 +37,7 @@ open class EngineBuilder(
   protected var logger: ((String) -> Unit)? = null
   protected var eventTracker: ((Map<String, String>) -> Unit)? = null
   protected var enableProxying = false
-  private var runtimeGuards = mapOf<String, Boolean>()
+  private var runtimeGuards = mutableMapOf<String, Boolean>()
   private var enableSkipDNSLookupForProxiedRequests = false
   private var engineType: () -> EnvoyEngine = {
     EnvoyEngineImpl(onEngineRunning, logger, eventTracker)
@@ -77,6 +77,20 @@ open class EngineBuilder(
   private var keyValueStores = mutableMapOf<String, EnvoyKeyValueStore>()
   private var statsSinks = listOf<String>()
   private var enablePlatformCertificatesValidation = false
+  private var rtdsLayerName: String = ""
+  private var rtdsTimeoutSeconds: Int = 0
+  private var adsAddress: String = ""
+  private var adsPort: Int = 0
+  private var adsJwtToken: String = ""
+  private var adsJwtTokenLifetimeSeconds: Int = 0
+  private var adsSslRootCerts: String = ""
+  private var nodeId: String = ""
+  private var nodeRegion: String = ""
+  private var nodeZone: String = ""
+  private var nodeSubZone: String = ""
+  private var cdsResourcesLocator: String = ""
+  private var cdsTimeoutSeconds: Int = 0
+  private var enableCds: Boolean = false
 
   /**
    * Add a log level to use with Envoy.
@@ -549,6 +563,117 @@ open class EngineBuilder(
   }
 
   /**
+   * Sets the node.id field in the Bootstrap configuration.
+   *
+   * @param nodeId the node ID.
+   *
+   * @return this builder.
+   */
+  fun setNodeId(nodeId: String): EngineBuilder {
+    this.nodeId = nodeId
+    return this
+  }
+
+  /**
+   * Sets the node.locality field in the Bootstrap configuration.
+   *
+   * @param region the region of the node locality.
+   * @param zone the zone of the node locality.
+   * @param subZone the sub-zone of the node locality.
+   *
+   * @return this builder.
+   */
+  fun setNodeLocality(region: String, zone: String, subZone: String): EngineBuilder {
+    this.nodeRegion = region
+    this.nodeZone = zone
+    this.nodeSubZone = subZone
+    return this
+  }
+
+  /**
+  * Adds an ADS layer.
+  * Note that only the state-of-the-world gRPC protocol is supported, not Delta gRPC.
+  *
+  * @param address the network address of the server.
+  *
+  * @param port the port of the server.
+  *
+  * @param jwtToken the JWT token.
+  *
+  * @param jwtTokenLifetimeSeconds the lifetime of the JWT token. If zero,
+  *                                a default value is set in engine_builder.h.
+  *
+  * @param sslRootCerts the SSL root certificates.
+  *
+  * @return this builder.
+  */
+  fun setAggregatedDiscoveryService(
+    address: String,
+    port: Int,
+    jwtToken: String = "",
+    jwtTokenLifetimeSeconds: Int = 0,
+    sslRootCerts: String = ""
+  ): EngineBuilder {
+    this.adsAddress = address
+    this.adsPort = port
+    this.adsJwtToken = jwtToken
+    this.adsJwtTokenLifetimeSeconds = jwtTokenLifetimeSeconds
+    this.adsSslRootCerts = sslRootCerts
+    return this
+  }
+
+  /**
+  * Adds a CDS layer.
+  *
+  * @param resourcesLocator The xdstp resource URI for fetching clusters.
+  *                         If empty, xdstp is not used and a wildcard is inferred.
+  *
+  * @param timeoutSeconds The timeout in seconds. If zero, a default value is
+  *                       set in engine_builder.h.
+  *
+  * @return this builder.
+  */
+  fun addCdsLayer(
+    resourcesLocator: String = "",
+    timeoutSeconds: Int = 0,
+  ): EngineBuilder {
+    this.cdsResourcesLocator = resourcesLocator
+    this.cdsTimeoutSeconds = timeoutSeconds
+    this.enableCds = true
+    return this
+  }
+
+
+  /**
+  * Adds an RTDS layer to default config. Requires that ADS be configured.
+  *
+  * @param layerName the layer name.
+  *
+  * @param timeoutSeconds The timeout in seconds. If zero, a default value is
+  *                       set in engine_builder.h.
+  *
+  * @return this builder.
+  */
+  fun addRtdsLayer(layerName: String, timeoutSeconds: Int = 0): EngineBuilder {
+    this.rtdsLayerName = layerName
+    this.rtdsTimeoutSeconds = timeoutSeconds
+    return this
+  }
+
+  /**
+   * Set a runtime guard with the provided value.
+   *
+   * @param name the name of the runtime guard, e.g. test_feature_false.
+   * @param value the value for the runtime guard.
+   *
+   * @return This builder.
+   */
+  fun setRuntimeGuard(name: String, value: Boolean): EngineBuilder {
+    this.runtimeGuards.put(name, value)
+    return this
+  }
+
+  /**
    * Builds and runs a new Engine instance with the provided configuration.
    *
    * @return A new instance of Envoy.
@@ -592,7 +717,22 @@ open class EngineBuilder(
       runtimeGuards,
       enableSkipDNSLookupForProxiedRequests,
       enablePlatformCertificatesValidation,
+      rtdsLayerName,
+      rtdsTimeoutSeconds,
+      adsAddress,
+      adsPort,
+      adsJwtToken,
+      adsJwtTokenLifetimeSeconds,
+      adsSslRootCerts,
+      nodeId,
+      nodeRegion,
+      nodeZone,
+      nodeSubZone,
+      cdsResourcesLocator,
+      cdsTimeoutSeconds,
+      enableCds,
     )
+
 
     return when (configuration) {
       is Custom -> {

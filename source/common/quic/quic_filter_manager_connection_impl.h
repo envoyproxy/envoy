@@ -51,7 +51,7 @@ public:
     IS_ENVOY_BUG("unexpected call to addBytesSentCallback");
   }
   void enableHalfClose(bool enabled) override;
-  bool isHalfCloseEnabled() override;
+  bool isHalfCloseEnabled() const override;
   void close(Network::ConnectionCloseType type) override;
   void close(Network::ConnectionCloseType type, absl::string_view details) override {
     if (!details.empty()) {

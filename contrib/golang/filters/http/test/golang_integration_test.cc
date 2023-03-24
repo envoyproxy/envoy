@@ -162,6 +162,7 @@ typed_config:
         {":method", "POST"},        {":path", path},
         {":scheme", "http"},        {":authority", "test.com"},
         {"x-test-header-0", "foo"}, {"x-test-header-1", "bar"},
+        {"existed-header", "foo"},
     };
 
     auto encoder_decoder = codec_client_->startRequest(request_headers);
@@ -181,6 +182,18 @@ typed_config:
     EXPECT_EQ(true,
               upstream_request_->headers().get(Http::LowerCaseString("x-test-header-1")).empty());
 
+    // check header value which is appended in golang: existed-header
+    auto entries = upstream_request_->headers().get(Http::LowerCaseString("existed-header"));
+    EXPECT_EQ(2, entries.size());
+    EXPECT_EQ("foo", entries[0]->value().getStringView());
+    EXPECT_EQ("bar", entries[1]->value().getStringView());
+
+    // check header value which added in golang: newly-added-header
+    entries = upstream_request_->headers().get(Http::LowerCaseString("newly-added-header"));
+    EXPECT_EQ(2, entries.size());
+    EXPECT_EQ("foo", entries[0]->value().getStringView());
+    EXPECT_EQ("bar", entries[1]->value().getStringView());
+
     // "prepend_" + upper("helloworld") + "_append"
     std::string expected = "prepend_HELLOWORLD_append";
     // only match the prefix since data buffer may be combined into a single.
@@ -190,6 +203,7 @@ typed_config:
         {":status", "200"},
         {"x-test-header-0", "foo"},
         {"x-test-header-1", "bar"},
+        {"existed-header", "foo"},
     };
     upstream_request_->encodeHeaders(response_headers, false);
     Buffer::OwnedImpl response_data1("good");
@@ -207,6 +221,18 @@ typed_config:
 
     // check resp header exists which removed in golang side: x-test-header-1
     EXPECT_EQ(true, response->headers().get(Http::LowerCaseString("x-test-header-1")).empty());
+
+    // check header value which is appended in golang: existed-header
+    entries = response->headers().get(Http::LowerCaseString("existed-header"));
+    EXPECT_EQ(2, entries.size());
+    EXPECT_EQ("foo", entries[0]->value().getStringView());
+    EXPECT_EQ("bar", entries[1]->value().getStringView());
+
+    // check header value which added in golang: newly-added-header
+    entries = response->headers().get(Http::LowerCaseString("newly-added-header"));
+    EXPECT_EQ(2, entries.size());
+    EXPECT_EQ("foo", entries[0]->value().getStringView());
+    EXPECT_EQ("bar", entries[1]->value().getStringView());
 
     // length("helloworld") = 10
     EXPECT_EQ("10", getHeader(response->headers(), "test-req-body-length"));
@@ -277,19 +303,24 @@ typed_config:
     auto encoder_decoder = codec_client_->startRequest(request_headers);
     Http::RequestEncoder& request_encoder = encoder_decoder.first;
     auto response = std::move(encoder_decoder.second);
-    codec_client_->sendData(request_encoder, "hello", false);
-    codec_client_->sendData(request_encoder, "world", true);
 
-    // need upstream request then when not seen decode-, which means send local reply in encode
-    // phases.
-    if (path.find("decode-") == std::string::npos) {
+    // do not sendData when phase is decode-header,
+    // since the request may be terminated before sendData.
+    if (phase != "decode-header") {
+      codec_client_->sendData(request_encoder, "hello", true);
+    }
+
+    // need upstream request when send local reply in encode phases.
+    if (phase == "encode-header" || phase == "encode-data") {
       waitForNextUpstreamRequest();
       Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
       upstream_request_->encodeHeaders(response_headers, false);
-      Buffer::OwnedImpl response_data1("good");
-      upstream_request_->encodeData(response_data1, false);
-      Buffer::OwnedImpl response_data2("bye");
-      upstream_request_->encodeData(response_data2, true);
+
+      // do not sendData when phase is encode-header
+      if (phase == "encode-data") {
+        Buffer::OwnedImpl response_data("bye");
+        upstream_request_->encodeData(response_data, true);
+      }
     }
 
     ASSERT_TRUE(response->waitForEndStream());
@@ -330,7 +361,7 @@ typed_config:
     cleanup();
   }
 
-  void testPanicRecover(std::string path) {
+  void testPanicRecover(std::string path, std::string phase) {
     initializeBasicFilter(BASIC);
 
     codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
@@ -340,18 +371,24 @@ typed_config:
     auto encoder_decoder = codec_client_->startRequest(request_headers);
     Http::RequestEncoder& request_encoder = encoder_decoder.first;
     auto response = std::move(encoder_decoder.second);
-    codec_client_->sendData(request_encoder, "hello", false);
-    codec_client_->sendData(request_encoder, "world", true);
 
-    // need upstream request then when not seen decode-
-    if (path.find("decode-") == std::string::npos) {
+    // do not sendData when phase is decode-header,
+    // since the request may be terminated before sendData.
+    if (phase != "decode-header") {
+      codec_client_->sendData(request_encoder, "hello", true);
+    }
+
+    // need upstream request when send local reply in encode phases.
+    if (phase == "encode-header" || phase == "encode-data") {
       waitForNextUpstreamRequest();
       Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
       upstream_request_->encodeHeaders(response_headers, false);
-      Buffer::OwnedImpl response_data1("good");
-      upstream_request_->encodeData(response_data1, false);
-      Buffer::OwnedImpl response_data2("bye");
-      upstream_request_->encodeData(response_data2, true);
+
+      // do not sendData when phase is encode-header
+      if (phase == "encode-data") {
+        Buffer::OwnedImpl response_data("bye");
+        upstream_request_->encodeData(response_data, true);
+      }
     }
 
     ASSERT_TRUE(response->waitForEndStream());
@@ -399,9 +436,7 @@ TEST_P(GolangIntegrationTest, Echo) {
       {":method", "POST"}, {":path", path}, {":scheme", "http"}, {":authority", "test.com"}};
 
   auto encoder_decoder = codec_client_->startRequest(request_headers);
-  Http::RequestEncoder& request_encoder = encoder_decoder.first;
   auto response = std::move(encoder_decoder.second);
-  codec_client_->sendData(request_encoder, "helloworld", true);
 
   ASSERT_TRUE(response->waitForEndStream());
 
@@ -542,9 +577,7 @@ typed_config:
                                                  {"x-test-header-0", "foo"}};
 
   auto encoder_decoder = codec_client_->startRequest(request_headers);
-  Http::RequestEncoder& request_encoder = encoder_decoder.first;
   auto response = std::move(encoder_decoder.second);
-  codec_client_->sendData(request_encoder, "hello", true);
 
   ASSERT_TRUE(response->waitForEndStream());
 
@@ -586,30 +619,32 @@ TEST_P(GolangIntegrationTest, RouteConfig_Route) {
 
 // Out of range in decode header phase
 TEST_P(GolangIntegrationTest, PanicRecover_DecodeHeader) {
-  testPanicRecover("/test?panic=decode-header");
+  testPanicRecover("/test?panic=decode-header", "decode-header");
 }
 
 // Out of range in decode header phase with async mode
 TEST_P(GolangIntegrationTest, PanicRecover_DecodeHeader_Async) {
-  testPanicRecover("/test?async=1&panic=decode-header");
+  testPanicRecover("/test?async=1&panic=decode-header", "decode-header");
 }
 
 // Out of range in decode data phase
 TEST_P(GolangIntegrationTest, PanicRecover_DecodeData) {
-  testPanicRecover("/test?panic=decode-data");
+  testPanicRecover("/test?panic=decode-data", "decode-data");
 }
 
 // Out of range in decode data phase with async mode & sleep
 TEST_P(GolangIntegrationTest, PanicRecover_DecodeData_Async) {
-  testPanicRecover("/test?async=1&sleep=1&panic=decode-data");
+  testPanicRecover("/test?async=1&sleep=1&panic=decode-data", "decode-data");
 }
 
 // Out of range in encode data phase with async mode & sleep
 TEST_P(GolangIntegrationTest, PanicRecover_EncodeData_Async) {
-  testPanicRecover("/test?async=1&sleep=1&panic=encode-data");
+  testPanicRecover("/test?async=1&sleep=1&panic=encode-data", "encode-data");
 }
 
 // Panic ErrInvalidPhase
-TEST_P(GolangIntegrationTest, PanicRecover_BadAPI) { testPanicRecover("/test?badapi=decode-data"); }
+TEST_P(GolangIntegrationTest, PanicRecover_BadAPI) {
+  testPanicRecover("/test?badapi=decode-data", "decode-data");
+}
 
 } // namespace Envoy

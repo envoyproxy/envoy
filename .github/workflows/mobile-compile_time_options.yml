@@ -1,0 +1,115 @@
+name: mobile_compile_time_options
+
+on:
+  push:
+    branches:
+    - main
+  pull_request:
+
+concurrency:
+  group: ${{ github.head_ref-github.workflow || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  cc_test:
+    if: github.repository == 'envoyproxy/envoy'
+    name: cc_test
+    runs-on: ubuntu-20.04
+    timeout-minutes: 120
+    container:
+      image: envoyproxy/envoy-build-ubuntu:b0ff77ae3f25b0bf595f9b8bba46b489723ab446
+    steps:
+    - uses: actions/checkout@v3
+      with:
+        fetch-depth: 0
+    - name: Add safe directory
+      run: git config --global --add safe.directory /__w/envoy/envoy
+    - id: should_run
+      name: 'Check whether to run'
+      run: ./mobile/tools/should_run_ci.sh
+    - name: 'Build C++ library'
+      if: steps.should_run.outputs.run_ci_job == 'true'
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      # Envoy Mobile build verifies that the build configuration where HTTP/3 is enabled and
+      # HTTP Datagrams are disabled works.
+      run: |
+        cd mobile && ./bazelw test \
+            $([ -z $GITHUB_TOKEN ] || echo "--config=remote-ci-linux") \
+            --define=admin_html=enabled \
+            --define=envoy_mobile_request_compression=disabled \
+            --define=envoy_enable_http_datagrams=disabled \
+            --define=google_grpc=disabled \
+            --@envoy//bazel:http3=False \
+            --@com_envoyproxy_protoc_gen_validate//bazel:template-flavor= \
+            //test/cc/...
+  swift_build:
+    if: github.repository == 'envoyproxy/envoy'
+    name: swift_build
+    runs-on: macos-12
+    timeout-minutes: 120
+    steps:
+    - uses: actions/checkout@v3
+      with:
+        fetch-depth: 0
+    - id: should_run
+      name: 'Check whether to run'
+      run: ./mobile/tools/should_run_ci.sh
+    - run: cd mobile && ./ci/mac_ci_setup.sh
+      if: steps.should_run.outputs.run_ci_job == 'true'
+      name: 'Install dependencies'
+    - name: 'Build Swift library'
+      if: steps.should_run.outputs.run_ci_job == 'true'
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        cd mobile && ./bazelw shutdown
+          ./bazelw build \
+            --config=ios \
+            $([ -z $GITHUB_TOKEN ] || echo "--config=remote-ci-macos") \
+            --define=admin_html=enabled \
+            --define=envoy_mobile_request_compression=disabled \
+            --define=envoy_mobile_stats_reporting=disabled \
+            --define=envoy_mobile_swift_cxx_interop=disabled \
+            --define=envoy_enable_http_datagrams=disabled \
+            --define=google_grpc=disabled \
+            --@envoy//bazel:http3=False \
+            --@com_envoyproxy_protoc_gen_validate//bazel:template-flavor= \
+            //library/swift:ios_framework
+  kotlin_build:
+    if: github.repository == 'envoyproxy/envoy'
+    name: kotlin_build
+    runs-on: macos-12
+    timeout-minutes: 90
+    steps:
+    - uses: actions/checkout@v3
+      with:
+        fetch-depth: 0
+    - id: should_run
+      name: 'Check whether to run'
+      run: ./mobile/tools/should_run_ci.sh
+    - uses: actions/setup-java@3f07048e3d294f56e9b90ac5ea2c6f74e9ad0f98
+      if: steps.should_run.outputs.run_ci_job == 'true'
+      with:
+        java-version: '8'
+        java-package: jdk
+        architecture: x64
+        distribution: zulu
+    - name: 'Install dependencies'
+      if: steps.should_run.outputs.run_ci_job == 'true'
+      run: cd mobile && ./ci/mac_ci_setup.sh --android
+    - name: 'Build Kotlin library'
+      if: steps.should_run.outputs.run_ci_job == 'true'
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        cd mobile && ./bazelw build \
+        $([ -z $GITHUB_TOKEN ] || echo "--config=remote-ci-macos") \
+          --fat_apk_cpu=x86_64 \
+          --define=admin_html=enabled \
+          --define=envoy_mobile_request_compression=disabled \
+          --define=envoy_enable_http_datagrams=disabled \
+          --define=google_grpc=disabled \
+          --@envoy//bazel:http3=False \
+          --@com_envoyproxy_protoc_gen_validate//bazel:template-flavor= \
+          //:android_dist

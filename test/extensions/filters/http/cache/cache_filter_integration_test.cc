@@ -108,9 +108,11 @@ public:
   OptRef<const Http::TestResponseTrailerMapImpl> empty_trailers_;
 };
 
-INSTANTIATE_TEST_SUITE_P(Protocols, CacheIntegrationTest,
-                         testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams()),
-                         HttpProtocolIntegrationTest::protocolTestParamsToString);
+// TODO(#26236): Fix test suite for HTTP/3.
+INSTANTIATE_TEST_SUITE_P(
+    Protocols, CacheIntegrationTest,
+    testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParamsWithoutHTTP3()),
+    HttpProtocolIntegrationTest::protocolTestParamsToString);
 
 TEST_P(CacheIntegrationTest, MissInsertHit) {
   initializeFilter(default_config);
@@ -434,7 +436,8 @@ TEST_P(CacheIntegrationTest, ServeHeadFromCacheAfterGetRequest) {
   }
 }
 
-TEST_P(CacheIntegrationTest, ServeGetFromUpstreamAfterHeadRequest) {
+// Disabled: https://github.com/envoyproxy/envoy/issues/26081
+TEST_P(CacheIntegrationTest, DISABLED_ServeGetFromUpstreamAfterHeadRequest) {
   initializeFilter(default_config);
 
   const std::string response_body(42, 'a');

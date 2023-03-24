@@ -80,14 +80,30 @@ func (f *filter) sendLocalReply(phase string) api.StatusType {
 	return api.LocalReply
 }
 
-// test: get, set, remove, values
+// test: get, set, remove, values, add
 func (f *filter) decodeHeaders(header api.RequestHeaderMap, endStream bool) api.StatusType {
+	// test logging
+	f.callbacks.Log(api.Trace, "log test")
+	f.callbacks.Log(api.Debug, "log test")
+	f.callbacks.Log(api.Info, "log test")
+	f.callbacks.Log(api.Warn, "log test")
+	f.callbacks.Log(api.Error, "log test")
+	f.callbacks.Log(api.Critical, "log test")
+
 	if f.sleep {
 		time.Sleep(time.Millisecond * 100) // sleep 100 ms
 	}
 	if strings.Contains(f.localreplay, "decode-header") {
 		return f.sendLocalReply("decode-header")
 	}
+
+	header.Range(func(key, value string) bool {
+		if key == ":path" && value != f.path {
+			f.fail("path not match in Range")
+			return false
+		}
+		return true
+	})
 
 	origin, found := header.Get("x-test-header-0")
 	hdrs := header.Values("x-test-header-0")
@@ -98,6 +114,10 @@ func (f *filter) decodeHeaders(header api.RequestHeaderMap, endStream bool) api.
 	} else if hdrs != nil {
 		return f.fail("Values return unexpected data %v", hdrs)
 	}
+
+	header.Add("existed-header", "bar")
+	header.Add("newly-added-header", "foo")
+	header.Add("newly-added-header", "bar")
 
 	header.Set("test-x-set-header-0", origin)
 	header.Del("x-test-header-1")
@@ -182,6 +202,10 @@ func (f *filter) encodeHeaders(header api.ResponseHeaderMap, endStream bool) api
 	} else if hdrs != nil {
 		return f.fail("Values return unexpected data %v", hdrs)
 	}
+
+	header.Add("existed-header", "bar")
+	header.Add("newly-added-header", "foo")
+	header.Add("newly-added-header", "bar")
 
 	header.Set("test-x-set-header-0", origin)
 	header.Del("x-test-header-1")

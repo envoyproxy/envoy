@@ -25,7 +25,10 @@ void ProcessorState::onStartProcessorCall(Event::TimerCb cb, std::chrono::millis
     message_timer_ = filter_callbacks_->dispatcher().createTimer(cb);
   }
   message_timer_->enableTimer(timeout);
+  ENVOY_LOG(debug, "Traffic direction {}: {} ms timer enabled", trafficDirectionDebugStr(),
+            timeout.count());
   call_start_time_ = filter_callbacks_->dispatcher().timeSource().monotonicTime();
+  new_timeout_received_ = false;
 }
 
 void ProcessorState::onFinishProcessorCall(Grpc::Status::GrpcStatus call_status,
@@ -40,11 +43,37 @@ void ProcessorState::onFinishProcessorCall(Grpc::Status::GrpcStatus call_status,
     call_start_time_ = absl::nullopt;
   }
   callback_state_ = next_state;
+  new_timeout_received_ = false;
 }
 
 void ProcessorState::stopMessageTimer() {
   if (message_timer_) {
+    ENVOY_LOG(debug, "Traffic direction {}: timer disabled", trafficDirectionDebugStr());
     message_timer_->disableTimer();
+  }
+}
+
+// Server sends back response to stop the original timer and start a new timer.
+// Do not change call_start_time_ since that call has not been responded yet.
+// Do not change callback_state_ either.
+bool ProcessorState::restartMessageTimer(const uint32_t message_timeout_ms) {
+  if (message_timer_ && message_timer_->enabled() && !new_timeout_received_) {
+    ENVOY_LOG(debug,
+              "Traffic direction {}: Server needs more time to process the request, start a "
+              "new timer with timeout {} ms",
+              trafficDirectionDebugStr(), message_timeout_ms);
+    message_timer_->disableTimer();
+    message_timer_->enableTimer(std::chrono::milliseconds(message_timeout_ms));
+    // Setting this flag to true to make sure Envoy ignore the future such
+    // messages when in the same state.
+    new_timeout_received_ = true;
+    return true;
+  } else {
+    ENVOY_LOG(debug,
+              "Traffic direction {}: Ignoring server new timeout message {} ms due to timer not "
+              "enabled or not the 1st such message",
+              trafficDirectionDebugStr(), message_timeout_ms);
+    return false;
   }
 }
 

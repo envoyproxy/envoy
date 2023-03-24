@@ -51,8 +51,10 @@ TEST_P(OverloadIntegrationTest, CloseStreamsWhenOverloaded) {
   updateResource(0.9);
   test_server_->waitForGaugeEq("overload.envoy.overload_actions.stop_accepting_requests.active", 1);
 
-  Http::TestRequestHeaderMapImpl request_headers{
-      {":method", "GET"}, {":path", "/test/long/url"}, {":scheme", "http"}, {":authority", "host"}};
+  Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},
+                                                 {":path", "/test/long/url"},
+                                                 {":scheme", "http"},
+                                                 {":authority", "sni.lyft.com"}};
   codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
   auto response = codec_client_->makeRequestWithBody(request_headers, 10);
   ASSERT_TRUE(response->waitForEndStream());
@@ -104,8 +106,10 @@ TEST_P(OverloadIntegrationTest, DisableKeepaliveWhenOverloaded) {
   test_server_->waitForGaugeEq("overload.envoy.overload_actions.disable_http_keepalive.active", 1);
 
   codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
-  Http::TestRequestHeaderMapImpl request_headers{
-      {":method", "GET"}, {":path", "/test/long/url"}, {":scheme", "http"}, {":authority", "host"}};
+  Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},
+                                                 {":path", "/test/long/url"},
+                                                 {":scheme", "http"},
+                                                 {":authority", "sni.lyft.com"}};
   auto response = sendRequestAndWaitForResponse(request_headers, 1, default_response_headers_, 1);
   ASSERT_TRUE(codec_client_->waitForDisconnect());
 
@@ -204,8 +208,10 @@ TEST_P(OverloadScaledTimerIntegrationTest, CloseIdleHttpConnections) {
           min_timeout: 5s
     )EOF"));
 
-  const Http::TestRequestHeaderMapImpl request_headers{
-      {":method", "GET"}, {":path", "/test/long/url"}, {":scheme", "http"}, {":authority", "host"}};
+  const Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},
+                                                       {":path", "/test/long/url"},
+                                                       {":scheme", "http"},
+                                                       {":authority", "sni.lyft.com"}};
 
   // Create an HTTP connection and complete a request.
   codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
@@ -261,8 +267,10 @@ TEST_P(OverloadScaledTimerIntegrationTest, CloseIdleHttpStream) {
           min_timeout: 5s
     )EOF"));
 
-  const Http::TestRequestHeaderMapImpl request_headers{
-      {":method", "GET"}, {":path", "/test/long/url"}, {":scheme", "http"}, {":authority", "host"}};
+  const Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},
+                                                       {":path", "/test/long/url"},
+                                                       {":scheme", "http"},
+                                                       {":authority", "sni.lyft.com"}};
 
   // Create an HTTP connection and start a request.
   codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
@@ -293,6 +301,11 @@ TEST_P(OverloadScaledTimerIntegrationTest, CloseIdleHttpStream) {
 }
 
 TEST_P(OverloadScaledTimerIntegrationTest, TlsHandshakeTimeout) {
+  if (downstreamProtocol() == Http::CodecClient::Type::HTTP3 ||
+      upstreamProtocol() == Http::CodecClient::Type::HTTP3) {
+    // TODO(#26236): Fix this test for H3.
+    return;
+  }
   // Set up the Envoy to expect a TLS connection, with a 20 second timeout that can scale down to 5
   // seconds.
   config_helper_.addSslConfig();
