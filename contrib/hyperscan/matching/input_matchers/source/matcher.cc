@@ -157,14 +157,14 @@ void Matcher::compile(const std::vector<const char*>& expressions,
 
 hs_scratch_t* Matcher::getScratch(ScratchThreadLocalPtr& local_scratch) const {
   if (!tls_->get().has_value()) {
-    local_scratch = std::make_unique<ScratchThreadLocal>(database_, start_of_match_database_);
-    return local_scratch->scratch_;
-
     dispatcher_.post([this]() {
       tls_->set([this](Event::Dispatcher&) {
         return std::make_shared<ScratchThreadLocal>(database_, start_of_match_database_);
       });
     });
+
+    local_scratch = std::make_unique<ScratchThreadLocal>(database_, start_of_match_database_);
+    return local_scratch->scratch_;
   }
 
   return tls_->get()->scratch_;

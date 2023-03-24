@@ -25,6 +25,7 @@ envoy_cc_test(
         "//contrib/hyperscan/matching/input_matchers/source:matcher_lib",
         "//source/common/thread_local:thread_local_lib",
         "//test/mocks/event:event_mocks",
+        "//test/mocks/thread_local:thread_local_mocks",
         "//test/test_common:utility_lib",
     ],
 )

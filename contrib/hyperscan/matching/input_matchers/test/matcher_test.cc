@@ -2,10 +2,12 @@
 #include "source/common/thread_local/thread_local_impl.h"
 
 #include "test/mocks/event/mocks.h"
+#include "test/mocks/thread_local/mocks.h"
 #include "test/test_common/utility.h"
 
 #include "absl/synchronization/blocking_counter.h"
 #include "contrib/hyperscan/matching/input_matchers/source/matcher.h"
+#include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
 namespace Envoy {
@@ -47,6 +49,25 @@ TEST(ThreadLocalTest, RaceScratchCreation) {
   for (auto& thread : threads) {
     thread->join();
   }
+}
+
+// Verify that even if thread local is not initialized, matcher can work and create thread local
+// afterwards.
+TEST(ThreadLocalTest, NotInitialized) {
+  std::vector<const char*> expressions{"^/asdf/.+"};
+  std::vector<unsigned int> flags{0};
+  std::vector<unsigned int> ids{0};
+
+  Event::MockDispatcher dispatcher;
+  ThreadLocal::MockInstance instance;
+  EXPECT_CALL(instance, allocateSlot())
+      .WillOnce(testing::Invoke(&instance, &ThreadLocal::MockInstance::allocateSlotMock));
+  Matcher matcher(expressions, flags, ids, dispatcher, instance, false);
+  // Simulate moving to another thread.
+  instance.data_[0].reset();
+
+  EXPECT_CALL(dispatcher, post(_));
+  EXPECT_TRUE(matcher.match("/asdf/1"));
 }
 
 // Verify that comparing works correctly for bounds.
