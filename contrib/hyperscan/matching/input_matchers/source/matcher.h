@@ -33,8 +33,8 @@ struct Bound {
 class Matcher : public Envoy::Regex::CompiledMatcher, public Envoy::Matcher::InputMatcher {
 public:
   Matcher(const std::vector<const char*>& expressions, const std::vector<unsigned int>& flags,
-          const std::vector<unsigned int>& ids, ThreadLocal::SlotAllocator& tls,
-          bool report_start_of_matching);
+          const std::vector<unsigned int>& ids, Event::Dispatcher& dispatcher,
+          ThreadLocal::SlotAllocator& tls, bool report_start_of_matching);
   ~Matcher() override;
 
   // Envoy::Regex::CompiledMatcher
@@ -47,6 +47,7 @@ public:
 private:
   hs_database_t* database_{};
   hs_database_t* start_of_match_database_{};
+  Event::Dispatcher& dispatcher_;
   ThreadLocal::TypedSlotPtr<ScratchThreadLocal> tls_;
 
   // Compiles the Hyperscan database. It will throw on failure of insufficient memory or malformed

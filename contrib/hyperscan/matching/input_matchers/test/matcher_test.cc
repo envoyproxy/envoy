@@ -1,6 +1,7 @@
 #ifndef HYPERSCAN_DISABLED
 #include "source/common/thread_local/thread_local_impl.h"
 
+#include "test/mocks/event/mocks.h"
 #include "test/test_common/utility.h"
 
 #include "absl/synchronization/blocking_counter.h"
@@ -48,20 +49,6 @@ TEST(ThreadLocalTest, RaceScratchCreation) {
   }
 }
 
-// Verify that even if thread local is not initialized, matcher can work without crashes.
-TEST(ThreadLocalTest, NotInitialized) {
-  std::vector<const char*> expressions{"^/asdf/.+"};
-  std::vector<unsigned int> flags{0};
-  std::vector<unsigned int> ids{0};
-
-  ThreadLocal::InstanceImpl instance;
-  Matcher matcher(expressions, flags, ids, instance, false);
-  instance.shutdownThread();
-  instance.shutdownGlobalThreading();
-
-  EXPECT_TRUE(matcher.match("/asdf/1"));
-}
-
 // Verify that comparing works correctly for bounds.
 TEST(BoundTest, Compare) {
   EXPECT_LT(Bound(1, 1), Bound(2, 1));
@@ -75,8 +62,8 @@ protected:
     std::vector<const char*> expressions{expression};
     std::vector<unsigned int> flags{flag};
     std::vector<unsigned int> ids{0};
-    matcher_ =
-        std::make_unique<Matcher>(expressions, flags, ids, instance_, report_start_of_matching);
+    matcher_ = std::make_unique<Matcher>(expressions, flags, ids, dispatcher_, instance_,
+                                         report_start_of_matching);
   }
 
   void TearDown() override {
@@ -84,6 +71,7 @@ protected:
     ::testing::Test::TearDown();
   }
 
+  Event::MockDispatcher dispatcher_;
   ThreadLocal::InstanceImpl instance_;
   std::unique_ptr<Matcher> matcher_;
 };
@@ -162,7 +150,7 @@ TEST_F(MatcherTest, RegexWithCombination) {
   std::vector<unsigned int> flags{HS_FLAG_QUIET, HS_FLAG_QUIET, HS_FLAG_COMBINATION};
   std::vector<unsigned int> ids{1, 2, 0};
 
-  matcher_ = std::make_unique<Matcher>(expressions, flags, ids, instance_, false);
+  matcher_ = std::make_unique<Matcher>(expressions, flags, ids, dispatcher_, instance_, false);
 
   EXPECT_TRUE(matcher_->match("a"));
 }

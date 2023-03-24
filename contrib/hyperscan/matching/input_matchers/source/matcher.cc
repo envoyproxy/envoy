@@ -34,8 +34,9 @@ bool Bound::operator<(const Bound& other) const {
 
 Matcher::Matcher(const std::vector<const char*>& expressions,
                  const std::vector<unsigned int>& flags, const std::vector<unsigned int>& ids,
-                 ThreadLocal::SlotAllocator& tls, bool report_start_of_matching)
-    : tls_(ThreadLocal::TypedSlot<ScratchThreadLocal>::makeUnique(tls)) {
+                 Event::Dispatcher& dispatcher, ThreadLocal::SlotAllocator& tls,
+                 bool report_start_of_matching)
+    : dispatcher_(dispatcher), tls_(ThreadLocal::TypedSlot<ScratchThreadLocal>::makeUnique(tls)) {
   ASSERT(expressions.size() == flags.size());
   ASSERT(expressions.size() == ids.size());
 
@@ -155,9 +156,15 @@ void Matcher::compile(const std::vector<const char*>& expressions,
 }
 
 hs_scratch_t* Matcher::getScratch(ScratchThreadLocalPtr& local_scratch) const {
-  if (!tls_->currentThreadRegistered() || !tls_->get().has_value()) {
+  if (!tls_->get().has_value()) {
     local_scratch = std::make_unique<ScratchThreadLocal>(database_, start_of_match_database_);
     return local_scratch->scratch_;
+
+    dispatcher_.post([this]() {
+      tls_->set([this](Event::Dispatcher&) {
+        return std::make_shared<ScratchThreadLocal>(database_, start_of_match_database_);
+      });
+    });
   }
 
   return tls_->get()->scratch_;
