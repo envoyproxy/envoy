@@ -151,6 +151,14 @@ CAPIStatus envoyGoFilterHttpGetIntegerValue(void* r, int id, void* value) {
   });
 }
 
+CAPIStatus envoyGoFilterHttpLog(void* r, uint32_t level, void* message) {
+  return envoyGoFilterHandlerWrapper(
+      r, [level, message](std::shared_ptr<Filter>& filter) -> CAPIStatus {
+        auto mesg = referGoString(message);
+        return filter->log(level, mesg);
+      });
+}
+
 void envoyGoFilterHttpFinalize(void* r, int reason) {
   UNREFERENCED_PARAMETER(reason);
   // req is used by go, so need to use raw memory and then it is safe to release at the gc finalize
