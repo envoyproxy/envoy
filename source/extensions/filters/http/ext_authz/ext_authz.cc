@@ -411,6 +411,9 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
       if (cluster_) {
         config_->incCounter(cluster_->statsScope(), config_->ext_authz_failure_mode_allowed_);
       }
+      if (config_->failureModeAllowHeaderAdd()) {
+        request_headers_->addCopy(Http::LowerCaseString("x-envoy-failure-mode-allowed"), "true");
+      }
       continueDecoding();
     } else {
       ENVOY_STREAM_LOG(
