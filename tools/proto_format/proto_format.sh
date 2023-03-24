@@ -46,7 +46,7 @@ if [[ "$1" == "freeze" ]]; then
 fi
 
 # Generate api/BUILD file based on updated type database.
-bazel build "${BAZEL_BUILD_OPTIONS[@]}" //tools/type_whisperer:api_build_file
+bazel build "${BAZEL_BUILD_OPTIONS[@]}" --remote_download_toplevel //tools/type_whisperer:api_build_file
 cp -f bazel-bin/tools/type_whisperer/BUILD.api_build_file api/BUILD
 
 # Dont run this in git hooks by default

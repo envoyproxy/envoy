@@ -130,7 +130,7 @@ envoy_extension_cc_test(
 
 envoy_extension_cc_test(
     name = "streaming_integration_test",
-    size = "medium",
+    size = "large",
     srcs = ["streaming_integration_test.cc"],
     extension_names = ["envoy.filters.http.ext_proc"],
     deps = [

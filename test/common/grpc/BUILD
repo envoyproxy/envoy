@@ -170,6 +170,7 @@ envoy_cc_test_library(
 
 envoy_cc_test(
     name = "grpc_client_integration_test",
+    size = "large",
     srcs = ["grpc_client_integration_test.cc"],
     deps = [
         ":grpc_client_integration_test_harness_lib",
