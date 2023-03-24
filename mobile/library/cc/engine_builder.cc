@@ -223,7 +223,7 @@ EngineBuilder& EngineBuilder::enforceTrustChainVerification(bool trust_chain_ver
   enforce_trust_chain_verification_ = trust_chain_verification_on;
   return *this;
 }
-
+#ifdef ENVOY_GOOGLE_GRPC
 EngineBuilder& EngineBuilder::setNodeId(std::string node_id) {
   node_id_ = std::move(node_id);
   return *this;
@@ -239,9 +239,6 @@ EngineBuilder& EngineBuilder::setAggregatedDiscoveryService(std::string address,
                                                             std::string jwt_token,
                                                             const int jwt_token_lifetime_seconds,
                                                             std::string ssl_root_certs) {
-#ifndef ENVOY_GOOGLE_GRPC
-  throw std::runtime_error("google_grpc must be enabled in bazel to use ADS");
-#endif
   ads_address_ = address;
   ads_port_ = port;
   ads_jwt_token_ = std::move(jwt_token);
@@ -264,6 +261,7 @@ EngineBuilder& EngineBuilder::addCdsLayer(std::string cds_resources_locator,
   cds_timeout_seconds_ = timeout_seconds == 0 ? DefaultXdsTimeout : timeout_seconds;
   return *this;
 }
+#endif
 
 EngineBuilder&
 EngineBuilder::enablePlatformCertificatesValidation(bool platform_certificates_validation_on) {

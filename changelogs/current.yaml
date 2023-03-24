@@ -41,6 +41,12 @@ minor_behavior_changes:
 - area: matchers
   change: |
     Moved all of the network input matchers to extensions. If you use network matchers and override extensions_build_config.bzl you will now need to include them explicitly.
+- area: skywalking
+  change: |
+    If sw8 header is invalid, skywalking extension will create a new trace context and a null span respectively when sampling is enabled and disabled.
+- area: http3
+  change: |
+    Convert HTTP/3 extended connect to/from HTTP/1 upgrade. This behavior change can be reverted by setting ``envoy.reloadable_features.use_http3_header_normalisation`` to ``false``.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
@@ -76,6 +82,9 @@ bug_fixes:
 - area: upstream
   change: |
     Initialize upstream network read filters via their ``onNewConnection()`` callback once the upstream connection has been established even if there is no data available for reading on the new upstream connection. This behavior change can be reverted by setting ``envoy.reloadable_features.initialize_upstream_filters`` to ``false``.
+- area: dubbo
+  change: |
+    Fix a bug that the dubbo proxy will treat the response with status 80 as a illegal response.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
@@ -172,6 +181,10 @@ new_features:
   change: |
     added :ref:`failed_status_in_metadata <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.JwtProvider.failed_status_in_metadata>` to support setting the JWT
     authentication failure status code and message in dynamic metadata.
+- area: ext_proc
+  change: |
+    added the support :ref:`override_message_timeout <envoy_v3_api_field_service.ext_proc.v3.ProcessingResponse.override_message_timeout>` for the ext_proc server to send back a message to Envoy to extend the ext_proc timer.
+    added the field :ref:`max_message_timeout <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExternalProcessor.max_message_timeout>` for specifying the max override_message_timeout could be sent back by the ext_proc server.
 - area: http filter
   change: |
     added :ref:`header mutation http filter <config_http_filters_header_mutation>` which adds the ability to modify request and response headers in any position of HTTP filter chain.
