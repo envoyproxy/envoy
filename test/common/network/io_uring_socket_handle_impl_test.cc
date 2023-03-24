@@ -85,6 +85,31 @@ TEST(IoUringSocketHandleImpl, AcceptError) {
   EXPECT_EQ(impl.accept(&addr, &addrlen), nullptr);
 }
 
+TEST(IoUringSocketHandleImpl, IgnoreOnReadEventAfterClose) {
+  Api::MockOsSysCalls os_sys_calls;
+  TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
+  Event::MockDispatcher dispatcher;
+
+  Io::MockIoUringFactory factory;
+  IoUringSocketHandleTestImpl impl(factory, true);
+
+  Io::MockIoUringSocket socket;
+  Io::MockIoUringWorker worker;
+  EXPECT_CALL(worker, addServerSocket(_, _)).WillOnce(ReturnRef(socket));
+  EXPECT_CALL(factory, getIoUringWorker()).WillOnce(Return(OptRef<Io::IoUringWorker>(worker)));
+  impl.initializeFileEvent(
+      dispatcher,
+      [&](uint32_t) {
+        // Expect this callback never be called.
+        EXPECT_TRUE(false);
+      },
+      Event::PlatformDefaultTriggerType, Event::FileReadyType::Read);
+  EXPECT_EQ(IoUringSocketType::Server, impl.ioUringSocketType());
+  Buffer::OwnedImpl buf;
+  Io::ReadParam param{buf, 0};
+  impl.onRead(param);
+}
+
 } // namespace
 } // namespace Network
 } // namespace Envoy

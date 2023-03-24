@@ -40,6 +40,7 @@ public:
 class MockIoUringSocket : public IoUringSocket {
   MOCK_METHOD(os_fd_t, fd, (), (const));
   MOCK_METHOD(void, close, ());
+  MOCK_METHOD(void, shutdown, (int32_t how));
   MOCK_METHOD(void, enable, ());
   MOCK_METHOD(void, disable, ());
   MOCK_METHOD(void, connect, (const Network::Address::InstanceConstSharedPtr& address));
@@ -51,6 +52,7 @@ class MockIoUringSocket : public IoUringSocket {
   MOCK_METHOD(void, onWrite, (int32_t result, bool injected));
   MOCK_METHOD(void, onClose, (int32_t result, bool injected));
   MOCK_METHOD(void, onCancel, (int32_t result, bool injected));
+  MOCK_METHOD(void, onShutdown, (int32_t result, bool injected));
   MOCK_METHOD(void, injectCompletion, (uint32_t type));
   MOCK_METHOD(IoUringSocketStatus, getStatus, (), (const));
 };
@@ -69,6 +71,7 @@ public:
               (IoUringSocket & socket, const Buffer::RawSliceVector& slices));
   MOCK_METHOD(Request*, submitCloseRequest, (IoUringSocket & socket));
   MOCK_METHOD(Request*, submitCancelRequest, (IoUringSocket & socket, Request* request_to_cancel));
+  MOCK_METHOD(Request*, submitShutdownRequest, (IoUringSocket & socket, int how));
 };
 
 } // namespace Io
