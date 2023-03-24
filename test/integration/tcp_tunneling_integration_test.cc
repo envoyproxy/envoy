@@ -124,6 +124,11 @@ public:
 // Verify that H/2 extended CONNECT with bytestream protocol is treated like
 // standard CONNECT request
 TEST_P(ConnectTerminationIntegrationTest, ExtendedConnectWithBytestreamProtocol) {
+#ifdef ENVOY_ENABLE_UHV
+  // TODO(#24945): This test needs CONNECT/upgrade normalization code which is not yet
+  // available in UHV.
+  return;
+#endif
   if (downstream_protocol_ != Http::CodecType::HTTP2) {
     // Extended CONNECT is applicable to H/2 and H/3 protocols only
     // However H/3 codec does not support it yet
@@ -515,6 +520,11 @@ TEST_P(ProxyingConnectIntegrationTest, ProxyConnect) {
 }
 
 TEST_P(ProxyingConnectIntegrationTest, ProxyExtendedConnect) {
+#ifdef ENVOY_ENABLE_UHV
+  // TODO(#24945): This test needs CONNECT/upgrade normalization code which is not yet
+  // available in UHV.
+  return;
+#endif
   // TODO(#25290): QUICHE does not yet support extended CONNECT
   if (downstreamProtocol() == Http::CodecType::HTTP3 ||
       upstreamProtocol() == Http::CodecType::HTTP3) {
