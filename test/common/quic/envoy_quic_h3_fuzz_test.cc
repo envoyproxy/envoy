@@ -246,6 +246,9 @@ class QuicPacketizer {
     void reset() {
       idx_ = 0;
       packet_number_ = quic::QuicPacketNumber(0);
+      for(size_t i = 0; i < kMaxNumPackets; i++) {
+        quic_packet_sizes[i] = 0;
+      }
     }
 
 #define PUSH(frame) frames.push_back(quic::QuicFrame(frame))
@@ -263,7 +266,6 @@ class QuicPacketizer {
       quic::QuicNewConnectionIdFrame new_connection_id_frame;
 
       quic::QuicPacketHeader header;
-      // Need to initialize header.packet_number
       header.packet_number = packet_number_;
       header.destination_connection_id = destination_connection_id_;
       header.source_connection_id = destination_connection_id_;
@@ -432,7 +434,6 @@ class QuicPacketizer {
           quic::EncryptionLevel::ENCRYPTION_INITIAL);
       idx_++;
     }
-
 #undef PUSH
 
     static quic::QuicConnectionId toConnectionId(const std::string &data) {
@@ -879,14 +880,6 @@ class FuzzDispatcher: public quic::QuicDispatcher {
     }
 
     void fuzzQuic(const QuicH3FuzzCase &input) {
-      for(size_t i = 0; i < kMaxNumPackets; i++) {
-        quic_packet_sizes[i] = 0;
-      }
-
-      // Process a (fake) CHLO packet, which will trigger creation of a session
-      // Setting the data pointer to nullptr will let the processing of the
-      // packet fail, but will not have consequences on the state of the
-      // session
       quic::QuicReceivedPacket first_packet(nullptr, 0, helper()->GetClock()->Now());
       quic::ParsedClientHello chlo;
       quic::ReceivedPacketInfo chlo_packet_info(srv_addr_, cli_addr_, first_packet);
@@ -907,7 +900,6 @@ class FuzzDispatcher: public quic::QuicDispatcher {
       packetizer_.reset();
       Shutdown();
     }
-    // quic::QuicDispatcher
     void OnConnectionClosed(quic::QuicConnectionId connection_id, quic::QuicErrorCode error,
                             const std::string& error_details,
                             quic::ConnectionCloseSource source) override {
@@ -925,7 +917,6 @@ class FuzzDispatcher: public quic::QuicDispatcher {
     }
   
   protected:
-    // quic::QuicDispatcher
     std::unique_ptr<quic::QuicSession> CreateQuicSession(
         quic::QuicConnectionId server_connection_id, const quic::QuicSocketAddress& self_address,
         const quic::QuicSocketAddress& peer_address, absl::string_view /*alpn*/,
@@ -1002,7 +993,6 @@ class FuzzDispatcher: public quic::QuicDispatcher {
     EnvoyQuicTestCryptoServerStreamFactory crypto_stream_factory_;
 
     Http::MockServerConnectionCallbacks http_connection_callbacks_;
-    quic::test::MockQuicConnectionVisitor mock_connection_visitor_;
     NiceMock<Http::MockRequestDecoder> orphan_request_decoder_;
 };
 
