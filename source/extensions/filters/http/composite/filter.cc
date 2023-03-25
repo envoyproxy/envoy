@@ -107,7 +107,7 @@ void Filter::onMatchCallback(const Matcher::Action& action) {
           delegated_filter_ = std::make_shared<StreamFilterWrapper>(std::move(filter));
         },
         [this](Http::StreamFilterSharedPtr filter) { delegated_filter_ = std::move(filter); }};
-    std::visit(createDelegatedFilterFn, std::move(wrapper.filter_to_inject_.value()));
+    absl::visit(createDelegatedFilterFn, std::move(wrapper.filter_to_inject_.value()));
 
     delegated_filter_->setDecoderFilterCallbacks(*decoder_callbacks_);
     delegated_filter_->setEncoderFilterCallbacks(*encoder_callbacks_);
