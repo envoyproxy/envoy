@@ -2,7 +2,6 @@
 
 export NAME=wasm-cc
 export UID
-export RMI="wasm-cc_wasm_compile_update:latest"
 
 
 # shellcheck source=examples/verify-common.sh
@@ -24,10 +23,10 @@ responds_with_header \
     http://localhost:8000
 
 run_log "Bring down the proxy"
-docker-compose stop proxy
+"${DOCKER_COMPOSE[@]}" stop proxy
 
 run_log "Compile updated Wasm filter"
-docker-compose -f docker-compose-wasm.yaml up --remove-orphans wasm_compile_update
+"${DOCKER_COMPOSE[@]}" -f docker-compose-wasm.yaml up --quiet-pull --remove-orphans wasm_compile_update
 
 run_log "Check for the compiled update"
 ls -l lib/*updated*wasm
@@ -36,7 +35,7 @@ run_log "Edit the Docker recipe to use the updated binary"
 sed -i'.bak' s/\\.\\/lib\\/envoy_filter_http_wasm_example.wasm/.\\/lib\\/envoy_filter_http_wasm_updated_example.wasm/ Dockerfile-proxy
 
 run_log "Bring the proxy back up"
-docker-compose up --build -d proxy
+"${DOCKER_COMPOSE[@]}" up --build -d proxy
 wait_for 10 bash -c "\
          responds_with \
          'Hello, Wasm world' \
@@ -56,3 +55,6 @@ run_log "Test updated Wasm header"
 responds_with_header \
     "x-wasm-custom: BAR" \
     http://localhost:8000
+
+# Restore original Dockerfile
+mv Dockerfile-proxy.bak Dockerfile-proxy

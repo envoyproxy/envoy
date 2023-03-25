@@ -31,9 +31,9 @@ This should also start two upstream ``HTTP`` echo servers, ``service1`` and ``se
 
     $ pwd
     envoy/examples/dynamic-config-fs
-    $ docker-compose pull
-    $ docker-compose up --build -d
-    $ docker-compose ps
+    $ docker compose pull
+    $ docker compose up --build -d
+    $ docker compose ps
 
            Name                            Command                State                     Ports
     ------------------------------------------------------------------------------------------------------------------------
@@ -98,7 +98,7 @@ You can do this using ``sed`` inside the container:
 
 .. code-block:: console
 
-   docker-compose exec -T proxy sed -i s/service1/service2/ /var/lib/envoy/cds.yaml
+   docker compose exec -T proxy sed -i s/service1/service2/ /var/lib/envoy/cds.yaml
 
 .. note::
 

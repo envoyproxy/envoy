@@ -107,7 +107,6 @@ float ConnPoolImplBase::perUpstreamPreconnectRatio() const {
 }
 
 ConnPoolImplBase::ConnectionResult ConnPoolImplBase::tryCreateNewConnections() {
-  ASSERT(!is_draining_for_deletion_);
   ConnPoolImplBase::ConnectionResult result;
   // Somewhat arbitrarily cap the number of connections preconnected due to new
   // incoming connections. The preconnect ratio is capped at 3, so in steady
@@ -121,6 +120,7 @@ ConnPoolImplBase::ConnectionResult ConnPoolImplBase::tryCreateNewConnections() {
       break;
     }
   }
+  ASSERT(!is_draining_for_deletion_ || result != ConnectionResult::CreatedNewConnection);
   return result;
 }
 
@@ -206,8 +206,6 @@ void ConnPoolImplBase::attachStreamToClient(Envoy::ConnectionPool::ActiveClient&
   traffic_stats.upstream_rq_total_.inc();
   traffic_stats.upstream_rq_active_.inc();
   host_->cluster().resourceManager(priority_).requests().inc();
-  host_->setLastSuccessfulTrafficTime(envoy::data::core::v3::HealthCheckerType::TCP,
-                                      dispatcher_.timeSource().monotonicTime());
 
   onPoolReady(client, context);
 }
@@ -583,7 +581,10 @@ void ConnPoolImplBase::onConnectionEvent(ActiveClient& client, absl::string_view
           [&client]() { client.onConnectionDurationTimeout(); });
       client.connection_duration_timer_->enableTimer(max_connection_duration.value());
     }
-
+    // Initialize client read filters
+    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.initialize_upstream_filters")) {
+      client.initializeReadFilters();
+    }
     // At this point, for the mixed ALPN pool, the client may be deleted. Do not
     // refer to client after this point.
     onConnected(client);

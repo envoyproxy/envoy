@@ -188,7 +188,7 @@ const uint32_t OptionsLimits::DEFAULT_MAX_INBOUND_WINDOW_UPDATE_FRAMES_PER_DATA_
 envoy::config::core::v3::Http2ProtocolOptions
 initializeAndValidateOptions(const envoy::config::core::v3::Http2ProtocolOptions& options,
                              bool hcm_stream_error_set,
-                             const Protobuf::BoolValue& hcm_stream_error) {
+                             const ProtobufWkt::BoolValue& hcm_stream_error) {
   auto ret = initializeAndValidateOptions(options);
   if (!options.has_override_stream_error_on_invalid_http_message() && hcm_stream_error_set) {
     ret.mutable_override_stream_error_on_invalid_http_message()->set_value(
@@ -271,7 +271,7 @@ const uint32_t OptionsLimits::DEFAULT_INITIAL_CONNECTION_WINDOW_SIZE;
 envoy::config::core::v3::Http3ProtocolOptions
 initializeAndValidateOptions(const envoy::config::core::v3::Http3ProtocolOptions& options,
                              bool hcm_stream_error_set,
-                             const Protobuf::BoolValue& hcm_stream_error) {
+                             const ProtobufWkt::BoolValue& hcm_stream_error) {
   if (options.has_override_stream_error_on_invalid_http_message()) {
     return options;
   }
@@ -602,13 +602,17 @@ bool Utility::isUpgrade(const RequestOrResponseHeaderMap& headers) {
   // we should check if it contains the "Upgrade" token.
   return (headers.Upgrade() &&
           Envoy::StringUtil::caseFindToken(headers.getConnectionValue(), ",",
-                                           Http::Headers::get().ConnectionValues.Upgrade.c_str()));
+                                           Http::Headers::get().ConnectionValues.Upgrade));
 }
 
 bool Utility::isH2UpgradeRequest(const RequestHeaderMap& headers) {
   return headers.getMethodValue() == Http::Headers::get().MethodValues.Connect &&
          headers.Protocol() && !headers.Protocol()->value().empty() &&
          headers.Protocol()->value() != Headers::get().ProtocolValues.Bytestream;
+}
+
+bool Utility::isH3UpgradeRequest(const RequestHeaderMap& headers) {
+  return isH2UpgradeRequest(headers);
 }
 
 bool Utility::isWebSocketUpgradeRequest(const RequestHeaderMap& headers) {
@@ -1023,6 +1027,10 @@ void Utility::transformUpgradeRequestFromH1toH2(RequestHeaderMap& headers) {
   }
 }
 
+void Utility::transformUpgradeRequestFromH1toH3(RequestHeaderMap& headers) {
+  transformUpgradeRequestFromH1toH2(headers);
+}
+
 void Utility::transformUpgradeResponseFromH1toH2(ResponseHeaderMap& headers) {
   if (getResponseStatus(headers) == 101) {
     headers.setStatus(200);
@@ -1034,6 +1042,10 @@ void Utility::transformUpgradeResponseFromH1toH2(ResponseHeaderMap& headers) {
   }
 }
 
+void Utility::transformUpgradeResponseFromH1toH3(ResponseHeaderMap& headers) {
+  transformUpgradeResponseFromH1toH2(headers);
+}
+
 void Utility::transformUpgradeRequestFromH2toH1(RequestHeaderMap& headers) {
   ASSERT(Utility::isH2UpgradeRequest(headers));
 
@@ -1043,6 +1055,10 @@ void Utility::transformUpgradeRequestFromH2toH1(RequestHeaderMap& headers) {
   headers.removeProtocol();
 }
 
+void Utility::transformUpgradeRequestFromH3toH1(RequestHeaderMap& headers) {
+  transformUpgradeRequestFromH2toH1(headers);
+}
+
 void Utility::transformUpgradeResponseFromH2toH1(ResponseHeaderMap& headers,
                                                  absl::string_view upgrade) {
   if (getResponseStatus(headers) == 200) {
@@ -1050,6 +1066,11 @@ void Utility::transformUpgradeResponseFromH2toH1(ResponseHeaderMap& headers,
     headers.setReferenceConnection(Http::Headers::get().ConnectionValues.Upgrade);
     headers.setStatus(101);
   }
+}
+
+void Utility::transformUpgradeResponseFromH3toH1(ResponseHeaderMap& headers,
+                                                 absl::string_view upgrade) {
+  transformUpgradeResponseFromH2toH1(headers, upgrade);
 }
 
 std::string Utility::PercentEncoding::encode(absl::string_view value,

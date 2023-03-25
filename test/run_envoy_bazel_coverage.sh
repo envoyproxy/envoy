@@ -63,8 +63,6 @@ else
       "--test_tag_filters=-nocoverage,-fuzz_target")
 fi
 
-# Don't block coverage on flakes.
-BAZEL_BUILD_OPTIONS+=("--flaky_test_attempts=2")
 # Output unusually long logs due to trace logging.
 BAZEL_BUILD_OPTIONS+=("--experimental_ui_max_stdouterr_bytes=80000000")
 

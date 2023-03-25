@@ -126,7 +126,8 @@ void ConnectionManagerImpl::initializeReadFilterCallbacks(Network::ReadFilterCal
 
   read_callbacks_->connection().addConnectionCallbacks(*this);
 
-  if (!read_callbacks_->connection()
+  if (config_.addProxyProtocolConnectionState() &&
+      !read_callbacks_->connection()
            .streamInfo()
            .filterState()
            ->hasData<Network::ProxyProtocolFilterState>(Network::ProxyProtocolFilterState::key())) {
@@ -276,6 +277,10 @@ void ConnectionManagerImpl::doDeferredStreamDestroy(ActiveStream& stream) {
   if (stream.request_header_timer_ != nullptr) {
     stream.request_header_timer_->disableTimer();
     stream.request_header_timer_ = nullptr;
+  }
+  if (stream.access_log_flush_timer_ != nullptr) {
+    stream.access_log_flush_timer_->disableTimer();
+    stream.access_log_flush_timer_ = nullptr;
   }
 
   stream.completeRequest();
@@ -502,8 +507,9 @@ void ConnectionManagerImpl::onEvent(Network::ConnectionEvent event) {
     } else {
       absl::string_view local_close_reason = read_callbacks_->connection().localCloseReason();
       ENVOY_BUG(!local_close_reason.empty(), "Local Close Reason was not set!");
-      details = fmt::format(StreamInfo::ResponseCodeDetails::get().DownstreamLocalDisconnect,
-                            StringUtil::replaceAllEmptySpace(local_close_reason));
+      details = fmt::format(
+          fmt::runtime(StreamInfo::ResponseCodeDetails::get().DownstreamLocalDisconnect),
+          StringUtil::replaceAllEmptySpace(local_close_reason));
     }
 
     // TODO(mattklein123): It is technically possible that something outside of the filter causes
@@ -781,6 +787,19 @@ ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connect
             [this]() -> void { onStreamMaxDurationReached(); });
     max_stream_duration_timer_->enableTimer(connection_manager_.config_.maxStreamDuration().value(),
                                             this);
+  }
+
+  if (connection_manager_.config_.accessLogFlushInterval().has_value()) {
+    access_log_flush_timer_ =
+        connection_manager.read_callbacks_->connection().dispatcher().createTimer([this]() -> void {
+          // If the request is complete, we've already done the stream-end access-log, and shouldn't
+          // do the periodic log.
+          if (!streamInfo().requestComplete().has_value()) {
+            filter_manager_.log();
+            refreshAccessLogFlushTimer();
+          }
+        });
+    refreshAccessLogFlushTimer();
   }
 }
 
@@ -1814,6 +1833,13 @@ void ConnectionManagerImpl::ActiveStream::refreshIdleTimeout() {
         stream_idle_timer_ = nullptr;
       }
     }
+  }
+}
+
+void ConnectionManagerImpl::ActiveStream::refreshAccessLogFlushTimer() {
+  if (connection_manager_.config_.accessLogFlushInterval().has_value()) {
+    access_log_flush_timer_->enableTimer(
+        connection_manager_.config_.accessLogFlushInterval().value(), this);
   }
 }
 

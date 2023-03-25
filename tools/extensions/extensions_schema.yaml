@@ -20,6 +20,7 @@ builtin:
 - envoy.matching.inputs.server_name
 - envoy.matching.inputs.transport_protocol
 - envoy.matching.inputs.application_protocol
+- envoy.matching.inputs.filter_state
 - envoy.matching.inputs.uri_san
 - envoy.matching.inputs.dns_san
 - envoy.matching.inputs.subject
@@ -108,6 +109,7 @@ categories:
 - envoy.network.dns_resolver
 - envoy.network.connection_balance
 - envoy.rbac.matchers
+- envoy.rbac.audit_loggers
 - envoy.access_loggers.extension_filters
 - envoy.http.stateful_session
 - envoy.matching.action
@@ -124,6 +126,7 @@ categories:
 - envoy.load_balancing_policies
 - envoy.http.early_header_mutation
 - envoy.http.custom_response
+- envoy.router.cluster_specifier_plugin
 
 status_values:
 - name: stable

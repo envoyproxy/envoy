@@ -797,13 +797,13 @@ TEST_P(LdsStsIntegrationTest, TcpListenerRemoveFilterChainCalledAfterListenerIsR
   while (response_0.find("world") == std::string::npos) {
     ASSERT_TRUE(client_conn_0->run(Event::Dispatcher::RunType::NonBlock));
   }
+  // Wait for the filter chain removal start.
+  test_server_->waitForGaugeEq("listener_manager.total_filter_chains_draining", 1);
+
   client_conn_0->close();
   while (!client_conn_0->closed()) {
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   }
-  // Wait for the filter chain removal start. Ideally we have `drain_time_` to detect the
-  // value 1. Increase the drain_time_ at the beginning of the test if the test is flaky.
-  test_server_->waitForGaugeEq("listener_manager.total_filter_chains_draining", 1);
   // Wait for the filter chain removal at worker thread. When the value drops from 1, all pending
   // removal at the worker is completed. This is the end of the in place update.
   test_server_->waitForGaugeEq("listener_manager.total_filter_chains_draining", 0);

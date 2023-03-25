@@ -48,6 +48,7 @@ envoy_extension_cc_test(
 
 envoy_extension_cc_test(
     name = "hystrix_integration_test",
+    size = "large",
     srcs = envoy_select_admin_functionality(["hystrix_integration_test.cc"]),
     extension_names = ["envoy.stat_sinks.hystrix"],
     deps = [

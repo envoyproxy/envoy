@@ -5,6 +5,7 @@
 #include "envoy/network/listener.h"
 #include "envoy/network/socket.h"
 #include "envoy/runtime/runtime.h"
+#include "envoy/server/process_context.h"
 
 #include "source/common/protobuf/utility.h"
 #include "source/common/quic/envoy_quic_connection_id_generator_factory.h"
@@ -65,6 +66,9 @@ public:
   void onFilterChainDraining(
       const std::list<const Network::FilterChain*>& draining_filter_chains) override;
 
+protected:
+  Event::Dispatcher& dispatcher() { return dispatcher_; }
+
 private:
   friend class ActiveQuicListenerPeer;
 
@@ -95,7 +99,8 @@ class ActiveQuicListenerFactory : public Network::ActiveUdpListenerFactory,
 public:
   ActiveQuicListenerFactory(const envoy::config::listener::v3::QuicProtocolOptions& config,
                             uint32_t concurrency, QuicStatNames& quic_stat_names,
-                            ProtobufMessage::ValidationVisitor& validation_visitor);
+                            ProtobufMessage::ValidationVisitor& validation_visitor,
+                            ProcessContextOptRef context);
 
   // Network::ActiveUdpListenerFactory.
   Network::ConnectionHandler::ActiveUdpListenerPtr
@@ -109,6 +114,18 @@ public:
   static void setDisableKernelBpfPacketRoutingForTest(bool val) {
     disable_kernel_bpf_packet_routing_for_test_ = val;
   }
+
+protected:
+  virtual Network::ConnectionHandler::ActiveUdpListenerPtr createActiveQuicListener(
+      Runtime::Loader& runtime, uint32_t worker_index, uint32_t concurrency,
+      Event::Dispatcher& dispatcher, Network::UdpConnectionHandler& parent,
+      Network::SocketSharedPtr&& listen_socket, Network::ListenerConfig& listener_config,
+      const quic::QuicConfig& quic_config, bool kernel_worker_routing,
+      const envoy::config::core::v3::RuntimeFeatureFlag& enabled, QuicStatNames& quic_stat_names,
+      uint32_t packets_to_read_to_connection_count_ratio,
+      EnvoyQuicCryptoServerStreamFactoryInterface& crypto_server_stream_factory,
+      EnvoyQuicProofSourceFactoryInterface& proof_source_factory,
+      QuicConnectionIdGeneratorPtr&& cid_generator);
 
 private:
   friend class ActiveQuicListenerFactoryPeer;
@@ -126,6 +143,7 @@ private:
   const uint32_t packets_to_read_to_connection_count_ratio_;
   const Network::Socket::OptionsSharedPtr options_{std::make_shared<Network::Socket::Options>()};
   bool kernel_worker_routing_{};
+  ProcessContextOptRef context_;
 
   static bool disable_kernel_bpf_packet_routing_for_test_;
 };
