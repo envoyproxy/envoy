@@ -72,7 +72,7 @@ public:
  */
 int main(int argc, char** argv) {
   // The CSS, JS, and HTML resources needed for the admin panel are captured at
-  // build time as C++ string_view constants, so tha the Envoy binary is
+  // build time as C++ string_view constants, so that the Envoy binary is
   // self-contained. However, this makes iteration on those resources require a
   // C++ recompile and server restart. During debug, you can run with "-debug"
   // as the first argument, and we can inject a resource provider that reads
@@ -89,7 +89,7 @@ int main(int argc, char** argv) {
   // Install the "/test" endpoint in the admin console, which enables serving
   // the Javascript test framework and fixture to be served with same
   // origin. That is essential to the test's operation, as it depends on
-  // friendly iframes, which most be served on the same host and port.
+  // a friendly iframe, which most be served on the same host and port.
   return Envoy::MainCommon::main(argc, argv, [](Envoy::Server::Instance& server) {
     Envoy::OptRef<Envoy::Server::Admin> admin = server.admin();
     if (admin.has_value()) {
