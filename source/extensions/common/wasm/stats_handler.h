@@ -31,12 +31,13 @@ struct CreateWasmStats {
   CREATE_WASM_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT)
 };
 
-#define LIFECYCLE_STATS(COUNTER, GAUGE)                                                            \
+#define LIFECYCLE_STATS(COUNTER, GAUGE, PLUGIN_GAUGE)                                              \
   COUNTER(created)                                                                                 \
-  GAUGE(active, NeverImport)
+  GAUGE(active, NeverImport)                                                                       \
+  PLUGIN_GAUGE(crash, NeverImport)
 
 struct LifecycleStats {
-  LIFECYCLE_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT)
+  LIFECYCLE_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT, GENERATE_GAUGE_STRUCT)
 };
 
 using ScopeWeakPtr = std::weak_ptr<Stats::Scope>;
@@ -89,10 +90,13 @@ CreateStatsHandler& getCreateStatsHandler();
 
 class LifecycleStatsHandler {
 public:
-  LifecycleStatsHandler(const Stats::ScopeSharedPtr& scope, std::string runtime)
+  LifecycleStatsHandler(const Stats::ScopeSharedPtr& scope, std::string runtime,
+                        std::string plugin_name)
       : lifecycle_stats_(LifecycleStats{
             LIFECYCLE_STATS(POOL_COUNTER_PREFIX(*scope, absl::StrCat("wasm.", runtime, ".")),
-                            POOL_GAUGE_PREFIX(*scope, absl::StrCat("wasm.", runtime, ".")))}){};
+                            POOL_GAUGE_PREFIX(*scope, absl::StrCat("wasm.", runtime, ".")),
+                            POOL_GAUGE_PREFIX(*scope, absl::StrCat("wasm.", runtime, ".plugin.",
+                                                                   plugin_name, ".")))}){};
   ~LifecycleStatsHandler() = default;
 
   void onEvent(WasmEvent event);
@@ -100,6 +104,7 @@ public:
 
 protected:
   LifecycleStats lifecycle_stats_;
+  bool is_crashed_ = false;
 };
 
 } // namespace Wasm

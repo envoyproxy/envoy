@@ -70,10 +70,19 @@ void LifecycleStatsHandler::onEvent(WasmEvent event) {
   switch (event) {
   case WasmEvent::VmShutDown:
     lifecycle_stats_.active_.set(--active_wasms);
+    if (is_crashed_) {
+      lifecycle_stats_.crash_.dec();
+    }
     break;
   case WasmEvent::VmCreated:
     lifecycle_stats_.active_.set(++active_wasms);
     lifecycle_stats_.created_.inc();
+    break;
+  case WasmEvent::RuntimeError:
+    if (!is_crashed_) {
+      is_crashed_ = true;
+      lifecycle_stats_.crash_.inc();
+    }
     break;
   default:
     break;

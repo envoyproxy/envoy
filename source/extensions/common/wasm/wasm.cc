@@ -60,6 +60,28 @@ inline Wasm* getWasm(WasmHandleSharedPtr& base_wasm_handle) {
   return static_cast<Wasm*>(base_wasm_handle->wasm().get());
 }
 
+WasmEvent failStateToWasmEvent(FailState state) {
+  switch (state) {
+  case FailState::Ok:
+    return WasmEvent::Ok;
+  case FailState::UnableToCreateVm:
+    return WasmEvent::UnableToCreateVm;
+  case FailState::UnableToCloneVm:
+    return WasmEvent::UnableToCloneVm;
+  case FailState::MissingFunction:
+    return WasmEvent::MissingFunction;
+  case FailState::UnableToInitializeCode:
+    return WasmEvent::UnableToInitializeCode;
+  case FailState::StartFailed:
+    return WasmEvent::StartFailed;
+  case FailState::ConfigureFailed:
+    return WasmEvent::ConfigureFailed;
+  case FailState::RuntimeError:
+    return WasmEvent::RuntimeError;
+  }
+  PANIC("corrupt enum");
+}
+
 } // namespace
 
 void Wasm::initializeLifecycle(Server::ServerLifecycleNotifier& lifecycle_notifier) {
@@ -82,8 +104,9 @@ Wasm::Wasm(WasmConfig& config, absl::string_view vm_key, const Stats::ScopeShare
       scope_(scope), api_(api), stat_name_pool_(scope_->symbolTable()),
       custom_stat_namespace_(stat_name_pool_.add(CustomStatNamespace)),
       cluster_manager_(cluster_manager), dispatcher_(dispatcher),
-      time_source_(dispatcher.timeSource()), lifecycle_stats_handler_(LifecycleStatsHandler(
-                                                 scope, config.config().vm_config().runtime())) {
+      time_source_(dispatcher.timeSource()),
+      lifecycle_stats_handler_(LifecycleStatsHandler(scope, config.config().vm_config().runtime(),
+                                                     config.config().name())) {
   lifecycle_stats_handler_.onEvent(WasmEvent::VmCreated);
   ENVOY_LOG(debug, "Base Wasm created {} now active", lifecycle_stats_handler_.getActiveVmCount());
 }
@@ -102,6 +125,12 @@ Wasm::Wasm(WasmHandleSharedPtr base_wasm_handle, Event::Dispatcher& dispatcher)
       time_source_(dispatcher.timeSource()),
       lifecycle_stats_handler_(getWasm(base_wasm_handle)->lifecycle_stats_handler_) {
   lifecycle_stats_handler_.onEvent(WasmEvent::VmCreated);
+  auto* vm = wasm_vm();
+  if (vm) {
+    vm->addFailCallback([this](FailState fail_state) {
+      lifecycle_stats_handler_.onEvent(failStateToWasmEvent(fail_state));
+    });
+  }
   ENVOY_LOG(debug, "Thread-Local Wasm created {} now active",
             lifecycle_stats_handler_.getActiveVmCount());
 }
@@ -290,25 +319,7 @@ WasmEvent toWasmEvent(const std::shared_ptr<WasmHandleBase>& wasm) {
   if (!wasm) {
     return WasmEvent::UnableToCreateVm;
   }
-  switch (wasm->wasm()->fail_state()) {
-  case FailState::Ok:
-    return WasmEvent::Ok;
-  case FailState::UnableToCreateVm:
-    return WasmEvent::UnableToCreateVm;
-  case FailState::UnableToCloneVm:
-    return WasmEvent::UnableToCloneVm;
-  case FailState::MissingFunction:
-    return WasmEvent::MissingFunction;
-  case FailState::UnableToInitializeCode:
-    return WasmEvent::UnableToInitializeCode;
-  case FailState::StartFailed:
-    return WasmEvent::StartFailed;
-  case FailState::ConfigureFailed:
-    return WasmEvent::ConfigureFailed;
-  case FailState::RuntimeError:
-    return WasmEvent::RuntimeError;
-  }
-  PANIC("corrupt enum");
+  return failStateToWasmEvent(wasm->wasm()->fail_state());
 }
 
 bool createWasm(const PluginSharedPtr& plugin, const Stats::ScopeSharedPtr& scope,
