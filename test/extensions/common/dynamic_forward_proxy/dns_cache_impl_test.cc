@@ -52,7 +52,8 @@ public:
 
     EXPECT_CALL(context_.dispatcher_, isThreadSafe).WillRepeatedly(Return(true));
 
-    EXPECT_CALL(dns_resolver_factory_, createDnsResolver(_, _, _)).WillOnce(Return(resolver_));
+    EXPECT_CALL(dns_resolver_factory_, createDnsResolver(_, _, _))
+        .WillRepeatedly(Return(resolver_));
     dns_cache_ = std::make_unique<DnsCacheImpl>(context_, config_);
     update_callbacks_handle_ = dns_cache_->addUpdateCallbacks(update_callbacks_);
   }
@@ -927,6 +928,60 @@ TEST_F(DnsCacheImplTest, CacheHit) {
   EXPECT_EQ(result.handle_, nullptr);
   ASSERT_NE(absl::nullopt, result.host_info_);
   EXPECT_THAT(*result.host_info_, DnsHostInfoEquals("10.0.0.1:80", "foo.com", false));
+}
+
+// A successful resolve followed by a cache hit with different default port.
+TEST_F(DnsCacheImplTest, CacheHitWithDifferentDefaultPort) {
+  initialize();
+  InSequence s;
+
+  MockLoadDnsCacheEntryCallbacks callbacks;
+  Network::DnsResolver::ResolveCb resolve_cb;
+  EXPECT_CALL(*resolver_, resolve("foo.com", _, _))
+      .WillOnce(DoAll(SaveArg<2>(&resolve_cb), Return(&resolver_->active_query_)));
+  auto result = dns_cache_->loadDnsCacheEntry("foo.com", 80, false, callbacks);
+  EXPECT_EQ(DnsCache::LoadDnsCacheEntryStatus::Loading, result.status_);
+  EXPECT_NE(result.handle_, nullptr);
+  EXPECT_EQ(absl::nullopt, result.host_info_);
+
+  EXPECT_CALL(update_callbacks_,
+              onDnsHostAddOrUpdate("foo.com", DnsHostInfoEquals("10.0.0.1:80", "foo.com", false)));
+  EXPECT_CALL(callbacks,
+              onLoadDnsCacheComplete(DnsHostInfoEquals("10.0.0.1:80", "foo.com", false)));
+  EXPECT_CALL(update_callbacks_,
+              onDnsResolutionComplete("foo.com", DnsHostInfoEquals("10.0.0.1:80", "foo.com", false),
+                                      Network::DnsResolver::ResolutionStatus::Success));
+  resolve_cb(Network::DnsResolver::ResolutionStatus::Success,
+             TestUtility::makeDnsResponse({"10.0.0.1"}));
+
+  // Using the same DNS cache, resolve the same host but different default port 443,
+  // Envoy returns LoadDnsCacheEntryStatus::InCache since the DNS cache
+  // key is the host string, which does not include the port number.
+  // This means if HTTP and HTTPS traffic are destined to DFP clusters using same DNS
+  // cache table, it will cause traffic forwarding issues.
+  result = dns_cache_->loadDnsCacheEntry("foo.com", 443, false, callbacks);
+  EXPECT_EQ(DnsCache::LoadDnsCacheEntryStatus::InCache, result.status_);
+
+  // The way to resolve this is to config a different dns_cache_config name for HTTP and
+  // HTTPS DFP clusters. Then they will not conflict.
+  envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheConfig config_https;
+  // Set the dns_cache_config name to "bar" to make the HTTPS cache entries
+  // stored and looked up in a separate DNS cache table.
+  config_https.set_name("bar");
+  config_https.set_dns_lookup_family(envoy::config::cluster::v3::Cluster::V4_ONLY);
+  std::unique_ptr<DnsCache> dns_cache_https;
+  dns_cache_https = std::make_unique<DnsCacheImpl>(context_, config_https);
+  MockUpdateCallbacks update_callbacks_https;
+  DnsCache::AddUpdateCallbacksHandlePtr update_callbacks_handle_https;
+  update_callbacks_handle_https = dns_cache_https->addUpdateCallbacks(update_callbacks_https);
+  MockLoadDnsCacheEntryCallbacks callbacks_https;
+  Network::DnsResolver::ResolveCb resolve_cb_https;
+  EXPECT_CALL(*resolver_, resolve("foo.com", _, _))
+      .WillOnce(DoAll(SaveArg<2>(&resolve_cb_https), Return(&resolver_->active_query_)));
+  // So, now to resolve the same host and port 443 in DNS cache table "bar", it doesn't find
+  // an existing entry and returns LoadDnsCacheEntryStatus::Loading as expected.
+  auto result_https = dns_cache_https->loadDnsCacheEntry("foo.com", 80, false, callbacks_https);
+  EXPECT_EQ(DnsCache::LoadDnsCacheEntryStatus::Loading, result_https.status_);
 }
 
 // Make sure we destroy active queries if the cache goes away.

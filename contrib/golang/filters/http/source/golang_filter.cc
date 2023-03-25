@@ -897,6 +897,49 @@ CAPIStatus Filter::getStringValue(int id, GoString* value_str) {
   return CAPIStatus::CAPIOK;
 }
 
+CAPIStatus Filter::log(uint32_t level, absl::string_view message) {
+  Thread::LockGuard lock(mutex_);
+  if (has_destroyed_) {
+    ENVOY_LOG(debug, "golang filter has been destroyed");
+    return CAPIStatus::CAPIFilterIsDestroy;
+  }
+  auto& state = getProcessorState();
+  if (!state.isProcessingInGo()) {
+    ENVOY_LOG(debug, "golang filter is not processing Go");
+    return CAPIStatus::CAPINotInGo;
+  }
+
+  switch (static_cast<spdlog::level::level_enum>(level)) {
+  case spdlog::level::trace:
+    ENVOY_LOG(trace, "[go_plugin_http][{}] {}", config_->pluginName(), message);
+    return CAPIStatus::CAPIOK;
+  case spdlog::level::debug:
+    ENVOY_LOG(debug, "[go_plugin_http][{}] {}", config_->pluginName(), message);
+    return CAPIStatus::CAPIOK;
+  case spdlog::level::info:
+    ENVOY_LOG(info, "[go_plugin_http][{}] {}", config_->pluginName(), message);
+    return CAPIStatus::CAPIOK;
+  case spdlog::level::warn:
+    ENVOY_LOG(warn, "[go_plugin_http][{}] {}", config_->pluginName(), message);
+    return CAPIStatus::CAPIOK;
+  case spdlog::level::err:
+    ENVOY_LOG(error, "[go_plugin_http][{}] {}", config_->pluginName(), message);
+    return CAPIStatus::CAPIOK;
+  case spdlog::level::critical:
+    ENVOY_LOG(critical, "[go_plugin_http][{}] {}", config_->pluginName(), message);
+    return CAPIStatus::CAPIOK;
+  case spdlog::level::off:
+    // means not logging
+    return CAPIStatus::CAPIOK;
+  case spdlog::level::n_levels:
+    PANIC("not implemented");
+  }
+
+  ENVOY_LOG(warn, "[go_plugin_http][{}] undefined log level {}", config_->pluginName(), level);
+
+  PANIC_DUE_TO_CORRUPT_ENUM;
+}
+
 /* ConfigId */
 
 uint64_t Filter::getMergedConfigId(ProcessorState& state) {
@@ -924,7 +967,7 @@ uint64_t Filter::getMergedConfigId(ProcessorState& state) {
 
 FilterConfig::FilterConfig(
     const envoy::extensions::filters::http::golang::v3alpha::Config& proto_config,
-    Dso::DsoPtr dso_lib)
+    Dso::HttpFilterDsoPtr dso_lib)
     : plugin_name_(proto_config.plugin_name()), so_id_(proto_config.library_id()),
       so_path_(proto_config.library_path()), plugin_config_(proto_config.plugin_config()),
       dso_lib_(dso_lib) {
@@ -936,6 +979,7 @@ uint64_t FilterConfig::getConfigId() {
   if (config_id_ != 0) {
     return config_id_;
   }
+
   std::string str;
   auto res = plugin_config_.SerializeToString(&str);
   ASSERT(res, "SerializeToString is always successful");
@@ -980,7 +1024,7 @@ uint64_t RoutePluginConfig::getMergedConfigId(uint64_t parent_id, std::string so
     return merged_config_id_;
   }
 
-  auto dlib = Dso::DsoManager::getDsoByID(so_id);
+  auto dlib = Dso::DsoManager<Dso::HttpFilterDsoImpl>::getDsoByID(so_id);
   ASSERT(dlib != nullptr, "load at the config parse phase, so it should not be null");
 
   if (config_id_ == 0) {

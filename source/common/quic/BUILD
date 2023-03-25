@@ -2,6 +2,7 @@ load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_library",
     "envoy_package",
+    "envoy_select_enable_http_datagrams",
 )
 load(
     "@envoy_build_config//:extensions_build_config.bzl",
@@ -282,7 +283,9 @@ envoy_cc_library(
         "//source/common/common:assert_lib",
         "//source/common/http:header_map_lib",
         "@com_github_google_quiche//:quic_server_http_spdy_session_lib",
-    ],
+    ] + envoy_select_enable_http_datagrams([
+        ":http_datagram_handler",
+    ]),
 )
 
 envoy_cc_library(
@@ -312,7 +315,9 @@ envoy_cc_library(
         "//source/common/http:header_map_lib",
         "//source/common/http:header_utility_lib",
         "@com_github_google_quiche//:quic_core_http_client_lib",
-    ],
+    ] + envoy_select_enable_http_datagrams([
+        ":http_datagram_handler",
+    ]),
 )
 
 envoy_cc_library(
@@ -613,5 +618,18 @@ envoy_cc_library(
         "//envoy/access_log:access_log_interface",
         "//source/common/http:header_map_lib",
         "@com_github_google_quiche//:quic_core_ack_listener_interface_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "http_datagram_handler",
+    srcs = ["http_datagram_handler.cc"],
+    hdrs = ["http_datagram_handler.h"],
+    deps = [
+        "//envoy/http:codec_interface",
+        "//source/common/common:logger_lib",
+        "//source/common/http:header_map_lib",
+        "@com_github_google_quiche//:quic_core_http_spdy_session_lib",
+        "@com_github_google_quiche//:quic_core_types_lib",
     ],
 )

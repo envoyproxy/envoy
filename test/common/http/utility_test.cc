@@ -637,7 +637,7 @@ TEST(HttpUtility, ValidateStreamErrorConfigurationForHttp1) {
 
 TEST(HttpUtility, UseBalsaParser) {
   envoy::config::core::v3::Http1ProtocolOptions http1_options;
-  Protobuf::BoolValue hcm_value;
+  ProtobufWkt::BoolValue hcm_value;
   NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor;
 
   // If Http1ProtocolOptions::use_balsa_parser has no value set, then behavior is controlled by the

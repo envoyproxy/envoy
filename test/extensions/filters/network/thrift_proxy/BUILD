@@ -339,6 +339,7 @@ envoy_extension_cc_test(
 
 envoy_extension_cc_test(
     name = "integration_test",
+    size = "large",
     srcs = ["integration_test.cc"],
     data = [
         "//test/extensions/filters/network/thrift_proxy/driver:generate_fixture",
@@ -357,6 +358,7 @@ envoy_extension_cc_test(
 
 envoy_extension_cc_test(
     name = "translation_integration_test",
+    size = "large",
     srcs = ["translation_integration_test.cc"],
     data = [
         "//test/extensions/filters/network/thrift_proxy/driver:generate_fixture",
@@ -395,6 +397,7 @@ envoy_extension_cc_test(
 
 envoy_extension_cc_test(
     name = "trds_integration_test",
+    size = "large",
     srcs = ["trds_integration_test.cc"],
     data = [
         "//test/extensions/filters/network/thrift_proxy/driver:generate_fixture",

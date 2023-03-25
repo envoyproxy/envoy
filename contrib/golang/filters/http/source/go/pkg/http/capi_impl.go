@@ -216,6 +216,10 @@ func (c *httpCApiImpl) HttpGetIntegerValue(r unsafe.Pointer, id int) (uint64, bo
 	return value, true
 }
 
+func (c *httpCApiImpl) HttpLog(r unsafe.Pointer, level api.LogType, message string) {
+	C.envoyGoFilterHttpLog(r, C.uint32_t(level), unsafe.Pointer(&message))
+}
+
 func (c *httpCApiImpl) HttpFinalize(r unsafe.Pointer, reason int) {
 	C.envoyGoFilterHttpFinalize(r, C.int(reason))
 }
