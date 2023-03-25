@@ -20,6 +20,14 @@ RValT delegateFilterActionOr(FilterPtrT& filter, FuncT func, RValT rval, Args&&.
 
   return rval;
 }
+
+// Own version of lambda overloading since std::overloaded is not available yet.
+template <typename... Ts> struct overloaded : Ts... {
+  using Ts::operator()...;
+};
+
+template <typename... Ts> overloaded(Ts...) -> overloaded<Ts...>;
+
 } // namespace
 Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers, bool end_stream) {
   decoded_headers_ = true;
@@ -75,6 +83,7 @@ void Filter::encodeComplete() {
     delegated_filter_->encodeComplete();
   }
 }
+
 void Filter::onMatchCallback(const Matcher::Action& action) {
   const auto& composite_action = action.getTyped<ExecuteFilterAction>();
 
@@ -89,18 +98,18 @@ void Filter::onMatchCallback(const Matcher::Action& action) {
     return;
   }
 
-  if (wrapper.filter_to_inject_) {
+  if (wrapper.filter_to_inject_.has_value()) {
     stats_.filter_delegation_success_.inc();
-    if (absl::holds_alternative<Http::StreamDecoderFilterSharedPtr>(*wrapper.filter_to_inject_)) {
-      delegated_filter_ = std::make_shared<StreamFilterWrapper>(
-          absl::get<Http::StreamDecoderFilterSharedPtr>(*wrapper.filter_to_inject_));
-    } else if (absl::holds_alternative<Http::StreamEncoderFilterSharedPtr>(
-                   *wrapper.filter_to_inject_)) {
-      delegated_filter_ = std::make_shared<StreamFilterWrapper>(
-          absl::get<Http::StreamEncoderFilterSharedPtr>(*wrapper.filter_to_inject_));
-    } else {
-      delegated_filter_ = absl::get<Http::StreamFilterSharedPtr>(*wrapper.filter_to_inject_);
-    }
+
+    auto createDelegatedFilterFn = overloaded{
+        [this](Http::StreamDecoderFilterSharedPtr filter) {
+          delegated_filter_ = std::make_shared<StreamFilterWrapper>(std::move(filter));
+        },
+        [this](Http::StreamEncoderFilterSharedPtr filter) {
+          delegated_filter_ = std::make_shared<StreamFilterWrapper>(std::move(filter));
+        },
+        [this](Http::StreamFilterSharedPtr filter) { delegated_filter_ = std::move(filter); }};
+    std::visit(createDelegatedFilterFn, std::move(wrapper.filter_to_inject_.value()));
 
     delegated_filter_->setDecoderFilterCallbacks(*decoder_callbacks_);
     delegated_filter_->setEncoderFilterCallbacks(*encoder_callbacks_);
