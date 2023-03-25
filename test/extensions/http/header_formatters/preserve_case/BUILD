@@ -25,6 +25,7 @@ envoy_extension_cc_test(
 
 envoy_extension_cc_test(
     name = "preserve_case_formatter_integration_test",
+    size = "large",
     srcs = [
         "preserve_case_formatter_integration_test.cc",
     ],
@@ -42,6 +43,7 @@ envoy_extension_cc_test(
 
 envoy_extension_cc_test(
     name = "preserve_case_formatter_reason_phrase_integration_test",
+    size = "large",
     srcs = [
         "preserve_case_formatter_reason_phrase_integration_test.cc",
     ],

@@ -32,9 +32,21 @@ minor_behavior_changes:
 - area: http2
   change: |
     Metadata is parsed with the QUICHE HPACK library, rather than nghttp2. This behavior change can be reverted by setting ``envoy.reloadable_features.http2_decode_metadata_with_quiche`` to ``false``.
+- area: upstream
+  change: |
+    Changed HTTP/1 and HTTP/3 upstream streams not to disable reading (in case where downstream buffer reaches high watermark) till the full response headers have been received. This fixes a bug where Envoy upstream timeouts were not correctly adjusting to the fact that the response headers have already been sent from upstream. This behavior change can be reverted by setting ``envoy.reloadable_features.upstream_wait_for_response_headers_before_disabling_read`` to ``false``.
 - area: custom response
   change: |
     Changed how the uri for redirect policy is specified. It can now be specified either as a single fully qualified string, or by specifying individual components of the uri.
+- area: matchers
+  change: |
+    Moved all of the network input matchers to extensions. If you use network matchers and override extensions_build_config.bzl you will now need to include them explicitly.
+- area: skywalking
+  change: |
+    If sw8 header is invalid, skywalking extension will create a new trace context and a null span respectively when sampling is enabled and disabled.
+- area: http3
+  change: |
+    Convert HTTP/3 extended connect to/from HTTP/1 upgrade. This behavior change can be reverted by setting ``envoy.reloadable_features.use_http3_header_normalisation`` to ``false``.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
@@ -64,6 +76,15 @@ bug_fixes:
 - area: ext_proc
   change: |
     Let onData always raise StopIterationAndWatermark when waiting for headers response, to avoid http errors (413 on request path, and 500 on response path) when data size goes above high watermark.
+- area: http filter
+  change: |
+    Fix possible illegal memory access in the header_mutaion filter when the request is aborted before the request headers are received completely.
+- area: upstream
+  change: |
+    Initialize upstream network read filters via their ``onNewConnection()`` callback once the upstream connection has been established even if there is no data available for reading on the new upstream connection. This behavior change can be reverted by setting ``envoy.reloadable_features.initialize_upstream_filters`` to ``false``.
+- area: dubbo
+  change: |
+    Fix a bug that the dubbo proxy will treat the response with status 80 as a illegal response.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
@@ -113,6 +134,9 @@ new_features:
 - area: access_log
   change: |
     enhanced observability into local close for :ref:`%RESPONSE_CODE_DETAILS% <config_http_conn_man_details>`.
+- area: oauth filter
+  change: |
+    extended :ref:`cookie_names <envoy_v3_api_field_extensions.filters.http.oauth2.v3.OAuth2Credentials.cookie_names>` to allow overriding (default) cookie names (``IdToken``, ``RefreshToken``) set by the filter.
 - area: tracing
   change: |
     allow :ref:`grpc_service <envoy_v3_api_field_config.trace.v3.OpenTelemetryConfig.grpc_service>` to be optional. This enables a means to disable collection of traces.
@@ -131,6 +155,9 @@ new_features:
 - area: lua
   change: |
     added an new option to the options of lua ``httpCall``. This allows to skip adding ``x-forwarded-for`` by setting ``{["send_xff"] = false}`` as the ``options``.
+- area: ratelimit
+  change: |
+    added local rate limit listener filter to enable rate limit before TLS handshake and filter matching.
 - area: proxy_protocol
   change: |
     added the support :ref:`pass_through_tlvs for listener <envoy_v3_api_field_extensions.filters.listener.proxy_protocol.v3.ProxyProtocol.pass_through_tlvs>`
@@ -154,6 +181,13 @@ new_features:
   change: |
     added :ref:`failed_status_in_metadata <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.JwtProvider.failed_status_in_metadata>` to support setting the JWT
     authentication failure status code and message in dynamic metadata.
+- area: ext_proc
+  change: |
+    added the support :ref:`override_message_timeout <envoy_v3_api_field_service.ext_proc.v3.ProcessingResponse.override_message_timeout>` for the ext_proc server to send back a message to Envoy to extend the ext_proc timer.
+    added the field :ref:`max_message_timeout <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExternalProcessor.max_message_timeout>` for specifying the max override_message_timeout could be sent back by the ext_proc server.
+- area: http filter
+  change: |
+    added :ref:`header mutation http filter <config_http_filters_header_mutation>` which adds the ability to modify request and response headers in any position of HTTP filter chain.
 - area: matching
   change: |
     added :ref:`Filter State Input <envoy_v3_api_msg_extensions.matching.common_inputs.network.v3.FilterStateInput>` for matching based on filter state objects.
@@ -163,6 +197,30 @@ new_features:
 - area: sni_dynamic_forward_proxy
   change: |
     added an option to dynamically set the port used by the SNI dynamic forward proxy filter, by setting a filter state object under the key ``envoy.upstream.dynamic_port``.
+- area: route
+  change: |
+    support dynamic clusters for :ref:`VirtualHost.matcher <envoy_v3_api_field_config.route.v3.VirtualHost.matcher>`.
+- area: route
+  change: |
+    support route callback after route matches for :ref:`VirtualHost.matcher <envoy_v3_api_field_config.route.v3.VirtualHost.matcher>`.
+- area: tcp_proxy
+  change: |
+    added an option to dynamically disable TCP tunneling even if set in the filter config, by setting a filter state object for the key ``envoy.tcp_proxy.disable_tunneling``.
+- area: tcp_proxy
+  change: |
+    add :ref:`flush access log on connected <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.flush_access_log_on_connected>` to allow recording an access log entry
+    on the connection open event. This option does not require periodic access logging enabled, and the other way around.
+- area: http
+  change: |
+    add :ref:`periodic access logging <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.access_log_flush_interval>`
+    to http access logs for long-lived requests (Websockets, CONNECT, etc). :ref:`%DURATION% <config_access_log_format_duration>` will
+    be empty for mid-request logs. Enabling this may affect access loggers and filters that register as access loggers that expect to be called only once.
+- area: redis_health_check
+  change: |
+    added :ref:`exists_failure <config_health_checkers_redis>` stat to indicate health check failures caused by EXISTS check failure.
+- area: redis
+  change: |
+    added :ref:`wait_for_warm_on_init <envoy_v3_api_field_config.cluster.v3.Cluster.wait_for_warm_on_init>` support for :ref:`Redis Cluster<arch_overview_redis>`.
 
 deprecated:
 - area: ext_authz

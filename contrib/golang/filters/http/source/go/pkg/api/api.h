@@ -6,6 +6,8 @@
 extern "C" {
 #endif
 
+#include <stdint.h>
+
 typedef struct { // NOLINT(modernize-use-using)
   const char* data;
   unsigned long long int len;
@@ -56,6 +58,8 @@ CAPIStatus envoyGoFilterHttpSetTrailer(void* r, void* key, void* value);
 
 CAPIStatus envoyGoFilterHttpGetStringValue(void* r, int id, void* value);
 CAPIStatus envoyGoFilterHttpGetIntegerValue(void* r, int id, void* value);
+
+CAPIStatus envoyGoFilterHttpLog(void* r, uint32_t level, void* message);
 
 void envoyGoFilterHttpFinalize(void* r, int reason);
 

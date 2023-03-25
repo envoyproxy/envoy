@@ -36,6 +36,7 @@ IPTOS
 Repick
 SION
 TRA
+Websockets
 abc
 abcd
 abd
@@ -171,6 +172,7 @@ dereferencing
 differentially
 dnsresolvers
 endpos
+eps
 fo
 ghi
 golang
@@ -438,6 +440,7 @@ UUIDs
 VC
 VCHAR
 VCL
+VFS
 VH
 VHDS
 VLOG

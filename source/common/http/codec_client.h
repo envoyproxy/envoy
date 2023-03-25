@@ -73,6 +73,12 @@ public:
   bool isHalfCloseEnabled() { return connection_->isHalfCloseEnabled(); }
 
   /**
+   * Initialize all of the installed read filters on the underlying connection.
+   * This effectively calls onNewConnection() on each of them.
+   */
+  void initializeReadFilters() { connection_->initializeReadFilters(); }
+
+  /**
    * Close the underlying network connection. This is immediate and will not attempt to flush any
    * pending write data.
    */

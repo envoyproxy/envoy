@@ -17,7 +17,7 @@ routing PRs, questions, etc. to the right place.
 * Stephan Zuercher ([zuercher](https://github.com/zuercher)) (zuercher@gmail.com)
   * Load balancing, upstream clusters and cluster manager, logging, complex HTTP routing
     (metadata, etc.), and macOS build.
-* Lizan Zhou ([lizan](https://github.com/lizan)) (lizan@tetrate.io)
+* Lizan Zhou ([lizan](https://github.com/lizan)) (lizan.j@gmail.com)
   * gRPC, gRPC/JSON transcoding, and core networking (transport socket abstractions), Bazel, build
     issues, and CI in general.
 * Snow Pettersen ([snowp](https://github.com/snowp)) (aickck@gmail.com)

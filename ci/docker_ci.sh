@@ -55,14 +55,18 @@ else
 fi
 
 # Only push images for main builds, and non-dev release branch builds
-if [[ "${AZP_BRANCH}" == "${MAIN_BRANCH}" ]]; then
-    echo "Pushing images for main."
-    PUSH_IMAGES_TO_REGISTRY=1
-elif [[ "${AZP_BRANCH}" =~ ${RELEASE_BRANCH_REGEX} ]] && ! [[ "$ENVOY_VERSION" =~ $DEV_VERSION_REGEX ]]; then
-    echo "Pushing images for release branch ${AZP_BRANCH}."
-    PUSH_IMAGES_TO_REGISTRY=1
+if [[ -n "$DOCKERHUB_USERNAME" ]] && [[ -n "$DOCKERHUB_PASSWORD" ]]; then
+    if [[ "${AZP_BRANCH}" == "${MAIN_BRANCH}" ]]; then
+        echo "Pushing images for main."
+        PUSH_IMAGES_TO_REGISTRY=1
+    elif [[ "${AZP_BRANCH}" =~ ${RELEASE_BRANCH_REGEX} ]] && ! [[ "$ENVOY_VERSION" =~ $DEV_VERSION_REGEX ]]; then
+        echo "Pushing images for release branch ${AZP_BRANCH}."
+        PUSH_IMAGES_TO_REGISTRY=1
+    else
+        echo 'Ignoring non-release branch for docker push.'
+    fi
 else
-    echo 'Ignoring non-release branch for docker push.'
+    echo 'No credentials for docker push.'
 fi
 
 ENVOY_DOCKER_IMAGE_DIRECTORY="${ENVOY_DOCKER_IMAGE_DIRECTORY:-${BUILD_STAGINGDIRECTORY:-.}/build_images}"

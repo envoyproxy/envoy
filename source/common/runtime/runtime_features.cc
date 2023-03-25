@@ -49,6 +49,7 @@ RUNTIME_GUARD(envoy_reloadable_features_http_filter_avoid_reentrant_local_reply)
 RUNTIME_GUARD(envoy_reloadable_features_http_reject_path_with_fragment);
 RUNTIME_GUARD(envoy_reloadable_features_http_response_half_close);
 RUNTIME_GUARD(envoy_reloadable_features_http_strip_fragment_from_path_unsafe_if_disabled);
+RUNTIME_GUARD(envoy_reloadable_features_initialize_upstream_filters);
 RUNTIME_GUARD(envoy_reloadable_features_no_extension_lookup_by_name);
 RUNTIME_GUARD(envoy_reloadable_features_no_full_scan_certs_on_sni_mismatch);
 RUNTIME_GUARD(envoy_reloadable_features_oauth_header_passthrough_fix);
@@ -66,10 +67,13 @@ RUNTIME_GUARD(envoy_reloadable_features_thrift_connection_draining);
 RUNTIME_GUARD(envoy_reloadable_features_tls_async_cert_validation);
 RUNTIME_GUARD(envoy_reloadable_features_udp_proxy_connect);
 RUNTIME_GUARD(envoy_reloadable_features_unified_header_formatter);
+RUNTIME_GUARD(envoy_reloadable_features_upstream_wait_for_response_headers_before_disabling_read);
+RUNTIME_GUARD(envoy_reloadable_features_use_http3_header_normalisation);
 RUNTIME_GUARD(envoy_reloadable_features_validate_connect);
 RUNTIME_GUARD(envoy_reloadable_features_validate_detailed_override_host_statuses);
 RUNTIME_GUARD(envoy_restart_features_explicit_wildcard_resource);
 RUNTIME_GUARD(envoy_restart_features_remove_runtime_singleton);
+RUNTIME_GUARD(envoy_restart_features_udp_read_normalize_addresses);
 RUNTIME_GUARD(envoy_restart_features_use_apple_api_for_dns_lookups);
 
 // Begin false flags. These should come with a TODO to flip true.
@@ -94,8 +98,6 @@ FALSE_RUNTIME_GUARD(envoy_reloadable_features_runtime_initialized);
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_always_use_v6);
 // TODO(alyssawilk) remove in Q2.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_no_delay_close_for_upgrades);
-// TODO(alyssawilk) flip once Lyft has tested.
-FALSE_RUNTIME_GUARD(envoy_reloadable_features_use_api_listener);
 // TODO(pradeepcrao) reset this to true after 2 releases (1.27)
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_enable_include_histograms);
 

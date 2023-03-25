@@ -34,9 +34,9 @@ The control plane has not yet been started.
 
     $ pwd
     envoy/examples/dynamic-config-cp
-    $ docker-compose pull
-    $ docker-compose up --build -d proxy
-    $ docker-compose ps
+    $ docker compose pull
+    $ docker compose up --build -d proxy
+    $ docker compose ps
 
            Name                            Command                State                     Ports
     ------------------------------------------------------------------------------------------------------------------------
@@ -82,8 +82,8 @@ You may need to wait a moment or two for it to become ``healthy``.
 
 .. code-block:: console
 
-    $ docker-compose up --build -d go-control-plane
-    $ docker-compose ps
+    $ docker compose up --build -d go-control-plane
+    $ docker compose ps
 
             Name                                Command                  State                    Ports
     -------------------------------------------------------------------------------------------------------------------------------------
@@ -134,7 +134,7 @@ Stop the ``go-control-plane`` service:
 
 .. code-block:: console
 
-    $ docker-compose stop go-control-plane
+    $ docker compose stop go-control-plane
 
 The Envoy proxy should continue proxying responses from ``service1``.
 
@@ -176,7 +176,7 @@ Now rebuild and restart the control plane:
 
 .. code-block:: console
 
-    $ docker-compose up --build -d go-control-plane
+    $ docker compose up --build -d go-control-plane
 
 You may need to wait a moment or two for the ``go-control-plane`` service to become ``healthy`` again.
 

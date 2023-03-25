@@ -28,9 +28,10 @@ class FixedServerPreferredAddressConfigFactory
 public:
   std::string name() const override { return "quic.server_preferred_address.fixed"; }
 
-  Quic::EnvoyQuicServerPreferredAddressConfigPtr createServerPreferredAddressConfig(
-      const Protobuf::Message& message,
-      ProtobufMessage::ValidationVisitor& validation_visitor) override;
+  Quic::EnvoyQuicServerPreferredAddressConfigPtr
+  createServerPreferredAddressConfig(const Protobuf::Message& message,
+                                     ProtobufMessage::ValidationVisitor& validation_visitor,
+                                     ProcessContextOptRef context) override;
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
     return ProtobufTypes::MessagePtr{new envoy::extensions::quic::server_preferred_address::v3::
