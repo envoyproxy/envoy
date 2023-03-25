@@ -80,6 +80,40 @@ enableHeapCheck () {
     HEAPCHECK=${SAVED_HEAPCHECK}
 }
 
+# After starting an Envoy, it will eventually write the admin.port file, and
+# eventually start listening on it. This blocks on the file appearing, and for
+# the envoy to respond with "LIVE" on the admin port. It then echoes the admin
+# port for use in future queries.
+wait_for_admin_returning_admin_address() {
+  admin_address_file="$1"
+  ready=""
+  admin_address=""
+  while [ "$ready" != "LIVE" ]; do
+    sleep 1
+    admin_address=$(cat "$admin_address_file")
+    ready=$(curl "$admin_address/ready")
+  done
+  echo $admin_address
+}
+
+
+# After starting an Envoy, it will eventually write the admin.port file, and
+# eventually start listening on it. This blocks on the file appearing, and for
+# the envoy to respond with "LIVE" on the admin port. It then echoes the admin
+# port for use in future queries.
+wait_for_admin() {
+  admin_port_file="$1"
+  ready=""
+  admin_port=""
+  while [ "$ready" != "LIVE" ]; do
+    echo checking  "$admin_port_file"
+    admin_port=$(cat "$admin_port_file")
+    ready=$(curl "$admin_port/ready")
+    sleep 1
+  done
+  echo $admin_port
+}
+
 # Scrapes a stat value from an an admin port.
 scrape_stat() {
     local ADMIN_ADDRESS="$1"
@@ -118,4 +152,4 @@ wait_for_stat() {
     echo "$ret"
 }
 
-[[ -z "${ENVOY_BIN}" ]] && ENVOY_BIN="${TEST_SRCDIR}/envoy/source/exe/envoy-static"
+# [[ -z "${ENVOY_BIN}" ]] && ENVOY_BIN="${TEST_SRCDIR}/envoy/source/exe/envoy-static"

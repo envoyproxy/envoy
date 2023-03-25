@@ -7,17 +7,15 @@
 namespace Envoy {
 namespace {
 
-/*std::string readFileOrDie(absl::string_view prefix, absl::string_view filename) {
-  Filesystem::InstanceImpl file_system;
-  std::string path = absl::StrCat(prefix, filename);
-  TRY_ASSERT_MAIN_THREAD { return file_system.fileReadToEnd(path); }
-  END_TRY
-  catch (EnvoyException& e) {
-    ENVOY_LOG_MISC(error, "Error reading file {}", e.what());
-    return e.what();
-  }
-  }*/
-
+/**
+ * Handles Admin requests to /test?file=$file, reading XXX from
+ * test/integration/admin_server/$file, returning "Bad Request" if
+ * query param "file" is not present, and "Not Found" if there was
+ * a query param but it could not be found.
+ *
+ * This test-server is only for testing; it potentially makes the
+ * entire file-system avail
+ */
 Http::Code testCallback(Http::ResponseHeaderMap& response_headers, Buffer::Instance& response,
                         Server::AdminStream& admin_stream) {
   Http::Utility::QueryParams query_params = admin_stream.queryParams();
@@ -26,9 +24,16 @@ Http::Code testCallback(Http::ResponseHeaderMap& response_headers, Buffer::Insta
     response.add("query param 'file' missing");
     return Http::Code::BadRequest;
   }
+  absl::string_view leaf = iter->second;
+
+  // ".." is not a good thing to allow into the path, even for a test server.
+  if (leaf.find("..") != absl::string_view::npos) {
+    response.add("bad file argument");
+    return Http::Code::BadRequest;
+  }
 
   Filesystem::InstanceImpl file_system;
-  std::string path = absl::StrCat("test/integration/", iter->second);
+  std::string path = absl::StrCat("test/integration/admin_html/", iter->second);
   TRY_ASSERT_MAIN_THREAD { response.add(file_system.fileReadToEnd(path)); }
   END_TRY
   catch (EnvoyException& e) {
@@ -66,6 +71,13 @@ public:
  * files.
  */
 int main(int argc, char** argv) {
+  // The CSS, JS, and HTML resources needed for the admin panel are captured at
+  // build time as C++ string_view constants, so tha the Envoy binary is
+  // self-contained. However, this makes iteration on those resources require a
+  // C++ recompile and server restart. During debug, you can run with "-debug"
+  // as the first argument, and we can inject a resource provider that reads
+  // those files from the file-system on ever access. This makes iteration on
+  // the web interface rapid and fun.
   if (argc > 1 && absl::string_view("-debug") == argv[1]) {
     Envoy::Server::AdminHtmlUtil::setHtmlResourceProvider(
         std::make_unique<Envoy::DebugHtmlResourceProvider>());
@@ -74,6 +86,10 @@ int main(int argc, char** argv) {
     ++argv;
   }
 
+  // Install the "/test" endpoint in the admin console, which enables serving
+  // the Javascript test framework and fixture to be served with same
+  // origin. That is essential to the test's operation, as it depends on
+  // friendly iframes, which most be served on the same host and port.
   return Envoy::MainCommon::main(argc, argv, [](Envoy::Server::Instance& server) {
     Envoy::OptRef<Envoy::Server::Admin> admin = server.admin();
     if (admin.has_value()) {

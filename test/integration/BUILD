@@ -333,6 +333,13 @@ envoy_sh_test(
     tags = ["skip_on_windows"],
 )
 
+filegroup(
+    name = "test_utility_files",
+    srcs = [
+        "test_utility.sh",
+    ],
+)
+
 envoy_sh_test(
     name = "run_envoy_test",
     srcs = ["run_envoy_test.sh"],
