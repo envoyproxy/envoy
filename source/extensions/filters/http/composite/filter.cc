@@ -22,9 +22,7 @@ RValT delegateFilterActionOr(FilterPtrT& filter, FuncT func, RValT rval, Args&&.
 }
 
 // Own version of lambda overloading since std::overloaded is not available yet.
-template <typename... Ts> struct overloaded : Ts... {
-  using Ts::operator()...;
-};
+template <typename... Ts> struct overloaded : Ts... { using Ts::operator()...; };
 
 template <typename... Ts> overloaded(Ts...) -> overloaded<Ts...>;
 
