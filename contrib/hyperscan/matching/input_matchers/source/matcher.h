@@ -33,7 +33,7 @@ struct Bound {
 class Matcher : public Envoy::Regex::CompiledMatcher, public Envoy::Matcher::InputMatcher {
 public:
   Matcher(const std::vector<const char*>& expressions, const std::vector<unsigned int>& flags,
-          const std::vector<unsigned int>& ids, Event::Dispatcher& dispatcher,
+          const std::vector<unsigned int>& ids, Event::Dispatcher& main_thread_dispatcher,
           ThreadLocal::SlotAllocator& tls, bool report_start_of_matching);
   ~Matcher() override;
 
