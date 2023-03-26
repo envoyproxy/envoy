@@ -107,17 +107,20 @@ void AdminHtmlUtil::renderHead(Http::ResponseHeaderMap& response_headers,
   response.add("</head>\n<body>\n");
 }
 
-void AdminHtmlUtil::tableBegin(Buffer::Instance& response) { response.add(AdminHtmlTableBegin); }
+void AdminHtmlUtil::renderTableBegin(Buffer::Instance& response) {
+  response.add(AdminHtmlTableBegin);
+}
 
-void AdminHtmlUtil::tableEnd(Buffer::Instance& response) { response.add(AdminHtmlTableEnd); }
+void AdminHtmlUtil::renderTableEnd(Buffer::Instance& response) { response.add(AdminHtmlTableEnd); }
 
 void AdminHtmlUtil::finalize(Buffer::Instance& response) { response.add("</body>\n</html>\n"); }
 
-void AdminHtmlUtil::input(Buffer::Instance& response, absl::string_view id, absl::string_view name,
-                          absl::string_view path, Admin::ParamDescriptor::Type type,
-                          OptRef<const Http::Utility::QueryParams> query,
-                          const std::vector<absl::string_view>& enum_choices,
-                          bool submit_on_change) {
+void AdminHtmlUtil::renderHandlerParam(Buffer::Instance& response, absl::string_view id,
+                                       absl::string_view name, absl::string_view path,
+                                       Admin::ParamDescriptor::Type type,
+                                       OptRef<const Http::Utility::QueryParams> query,
+                                       const std::vector<absl::string_view>& enum_choices,
+                                       bool submit_on_change) {
   std::string value;
   if (query.has_value()) {
     auto iter = query->find(std::string(name));
@@ -160,9 +163,10 @@ void AdminHtmlUtil::input(Buffer::Instance& response, absl::string_view id, absl
   }
 }
 
-void AdminHtmlUtil::urlHandler(Buffer::Instance& response, const Admin::UrlHandler& handler,
-                               OptRef<const Http::Utility::QueryParams> query, int index,
-                               bool submit_on_change, bool active) {
+void AdminHtmlUtil::renderEndpointTableRow(Buffer::Instance& response,
+                                           const Admin::UrlHandler& handler,
+                                           OptRef<const Http::Utility::QueryParams> query,
+                                           int index, bool submit_on_change, bool active) {
   absl::string_view path = handler.prefix_;
 
   if (path == "/") {
@@ -222,8 +226,8 @@ void AdminHtmlUtil::urlHandler(Buffer::Instance& response, const Admin::UrlHandl
     std::string id =
         absl::StrCat("param-", index, "-", absl::StrReplaceAll(path, {{"/", "-"}}), "-", param.id_);
     response.addFragments({"<tr", row_class, ">\n  <td class='option'>"});
-    input(response, id, param.id_, path, param.type_, query, param.enum_choices_,
-          submit_on_change && (!active || param.id_ == "format"));
+    renderHandlerParam(response, id, param.id_, path, param.type_, query, param.enum_choices_,
+                       submit_on_change && (!active || param.id_ == "format"));
     response.addFragments({"</td>\n  <td class='home-data'>", "<label for='", id, "'>",
                            Html::Utility::sanitize(param.help_), "</label></td>\n</tr>\n"});
   }

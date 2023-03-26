@@ -12,16 +12,17 @@ namespace Server {
 Http::Code AdminImpl::handlerAdminHome(Http::ResponseHeaderMap& response_headers,
                                        Buffer::Instance& response, AdminStream&) {
   AdminHtmlUtil::renderHead(response_headers, response);
-  AdminHtmlUtil::tableBegin(response);
+  AdminHtmlUtil::renderTableBegin(response);
 
   // Prefix order is used during searching, but for printing do them in alpha order.
   OptRef<const Http::Utility::QueryParams> no_query_params;
   uint32_t index = 0;
   for (const UrlHandler* handler : sortedHandlers()) {
-    AdminHtmlUtil::urlHandler(response, *handler, no_query_params, ++index, false, false);
+    AdminHtmlUtil::renderEndpointTableRow(response, *handler, no_query_params, ++index, false,
+                                          false);
   }
 
-  AdminHtmlUtil::tableEnd(response);
+  AdminHtmlUtil::renderTableEnd(response);
   AdminHtmlUtil::finalize(response);
 
   return Http::Code::OK;

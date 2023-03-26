@@ -23,17 +23,24 @@ get_status_code_for_invalid_file() {
 }
 
 function run_testsuite() {
-  debug="$1"
   rm -rf "$tmp"
   mkdir -p "$tmp"
 
-  echo Starting test_server $debug
-  "${ENVOY_BIN}" $debug -c test/integration/admin_html/web_test.yaml \
-    --admin-address-path "$tmp/admin.address" -l info >& "$tmp/envoy.log" &
+  debug="$1"
+  echo Starting test_server "$debug"
+  if [ "$debug" = "-debug" ]; then
+    "${ENVOY_BIN}" -debug \
+      -c test/integration/admin_html/web_test.yaml \
+      --admin-address-path "$tmp/admin.address" -l info >& "$tmp/envoy.log" &
+  else
+    "${ENVOY_BIN}" \
+      -c test/integration/admin_html/web_test.yaml \
+      --admin-address-path "$tmp/admin.address" -l info >& "$tmp/envoy.log" &
+  fi
 
   echo wait_for_admin_returning_admin_address "$tmp/admin.address"
   admin_address=$(wait_for_admin_returning_admin_address "$tmp/admin.address")
-  echo found admin_address $admin_address
+  echo found admin_address "$admin_address"
 
   # Verify we can serve all the test files we expect to.
   check_file active_stats_test.js

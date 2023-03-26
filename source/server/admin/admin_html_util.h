@@ -47,16 +47,24 @@ public:
    * Renders the beginning of the help-table into the response buffer provided
    * in the constructor.
    */
-  static void tableBegin(Buffer::Instance&);
+  static void renderTableBegin(Buffer::Instance&);
 
   /**
    * Renders the end of the help-table into the response buffer provided in the
    * constructor.
    */
-  static void tableEnd(Buffer::Instance&);
+  static void renderTableEnd(Buffer::Instance&);
 
+  /**
+   * Renders the head of an admin HTML page. This provides shared styling
+   * between the admin home page and endpoints with HTML support. This
+   * must be matched with a call to finalize().
+   */
   static void renderHead(Http::ResponseHeaderMap& response_headers, Buffer::Instance& response);
 
+  /**
+   * Renders the end of a web page that has had renderHead called on it.
+   */
   static void finalize(Buffer::Instance& response);
 
   /**
@@ -79,17 +87,19 @@ public:
    *        query-parameters while visiting an html-rendered endpoint.
    * @param active indicates
    */
-  static void urlHandler(Buffer::Instance& response, const Admin::UrlHandler& handler,
-                         OptRef<const Http::Utility::QueryParams> query, int index,
-                         bool submit_on_change, bool active);
+  static void renderEndpointTableRow(Buffer::Instance& response, const Admin::UrlHandler& handler,
+                                     OptRef<const Http::Utility::QueryParams> query, int index,
+                                     bool submit_on_change, bool active);
 
   static void setHtmlResourceProvider(std::unique_ptr<ResourceProvider> resource_provider);
 
 private:
-  static void input(Buffer::Instance& response, absl::string_view id, absl::string_view name,
-                    absl::string_view path, Admin::ParamDescriptor::Type type,
-                    OptRef<const Http::Utility::QueryParams> query,
-                    const std::vector<absl::string_view>& enum_choices, bool submit_on_change);
+  static void renderHandlerParam(Buffer::Instance& response, absl::string_view id,
+                                 absl::string_view name, absl::string_view path,
+                                 Admin::ParamDescriptor::Type type,
+                                 OptRef<const Http::Utility::QueryParams> query,
+                                 const std::vector<absl::string_view>& enum_choices,
+                                 bool submit_on_change);
 };
 
 } // namespace Server

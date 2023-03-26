@@ -29,13 +29,13 @@ void StatsHtmlRender::finalize(Buffer::Instance& response) { AdminHtmlUtil::fina
 
 void StatsHtmlRender::setupStatsPage(const Admin::UrlHandler& url_handler,
                                      const StatsParams& params, Buffer::Instance& response) {
-  AdminHtmlUtil::tableBegin(response);
-  AdminHtmlUtil::urlHandler(response, url_handler, params.query_, 1, !active_, active_);
+  AdminHtmlUtil::renderTableBegin(response);
+  AdminHtmlUtil::renderEndpointTableRow(response, url_handler, params.query_, 1, !active_, active_);
   if (active_) {
     std::string buf;
     response.add(AdminHtmlUtil::getResource("active_params.html", buf));
   }
-  AdminHtmlUtil::tableEnd(response);
+  AdminHtmlUtil::renderTableEnd(response);
   if (active_) {
     std::string buf;
     response.addFragments(

@@ -31,17 +31,17 @@ protected:
 };
 
 TEST_F(AdminHtmlUtilTest, RenderTableBegin) {
-  AdminHtmlUtil::tableBegin(response_);
+  AdminHtmlUtil::renderTableBegin(response_);
   EXPECT_THAT(response_.toString(), HasSubstr("<table class='home-table'>"));
 }
 
 TEST_F(AdminHtmlUtilTest, RenderTableEnd) {
-  AdminHtmlUtil::tableEnd(response_);
+  AdminHtmlUtil::renderTableEnd(response_);
   EXPECT_THAT(response_.toString(), HasSubstr("</table>"));
 }
 
-TEST_F(AdminHtmlUtilTest, RenderUrlHandlerNoQuery) {
-  AdminHtmlUtil::urlHandler(response_, handler(), query_params_, 42, false, false);
+TEST_F(AdminHtmlUtilTest, RenderRenderEndpointTableRowNoQuery) {
+  AdminHtmlUtil::renderEndpointTableRow(response_, handler(), query_params_, 42, false, false);
   std::string out = response_.toString();
   EXPECT_THAT(out, HasSubstr("<input type='checkbox' name='boolparam' "
                              "id='param-42-prefix-boolparam' form='prefix'"));
@@ -53,10 +53,10 @@ TEST_F(AdminHtmlUtilTest, RenderUrlHandlerNoQuery) {
   EXPECT_THAT(out, Not(HasSubstr(" type='hidden' ")));
 }
 
-TEST_F(AdminHtmlUtilTest, RenderUrlHandlerWithQuery) {
+TEST_F(AdminHtmlUtilTest, RenderRenderEndpointTableRowWithQuery) {
   query_params_["boolparam"] = "on";
   query_params_["strparam"] = "str value";
-  AdminHtmlUtil::urlHandler(response_, handler(), query_params_, 31415, false, false);
+  AdminHtmlUtil::renderEndpointTableRow(response_, handler(), query_params_, 31415, false, false);
   std::string out = response_.toString();
   EXPECT_THAT(out,
               HasSubstr("<input type='checkbox' name='boolparam' id='param-31415-prefix-boolparam' "
@@ -81,8 +81,8 @@ TEST_F(AdminHtmlUtilTest, RenderHead) {
             response_headers.ContentType()->value().getStringView());
 }
 
-TEST_F(AdminHtmlUtilTest, RenderUrlHandlerSubmitOnChange) {
-  AdminHtmlUtil::urlHandler(response_, handler(), query_params_, 0, true, false);
+TEST_F(AdminHtmlUtilTest, RenderRenderEndpointTableRowSubmitOnChange) {
+  AdminHtmlUtil::renderEndpointTableRow(response_, handler(), query_params_, 0, true, false);
   std::string out = response_.toString();
   EXPECT_THAT(out, HasSubstr(" onchange='prefix.submit()"));
   EXPECT_THAT(out, Not(HasSubstr("<button class='button-as-link'>prefix</button>")));
