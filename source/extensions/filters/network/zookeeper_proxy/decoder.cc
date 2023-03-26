@@ -566,12 +566,11 @@ void DecoderImpl::decodeAndBufferHelper(Buffer::Instance& data, DecodeType dtype
 
   if (has_full_packets) {
     offset -= INT_LENGTH + len;
-    // Decode full packets.
-    // TODO(Winbobob): use BufferFragment to avoid copying the full packets.
-    temp_data.resize(offset);
-    data.copyOut(0, offset, temp_data.data());
+    // Decode full packets with BufferFragment.
     Buffer::OwnedImpl full_packets;
-    full_packets.add(temp_data.data(), temp_data.length());
+    Buffer::BufferFragmentImpl* frag =
+        new Buffer::BufferFragmentImpl(data.linearize(data.length()), offset, nullptr);
+    full_packets.addBufferFragment(*frag);
     decode(full_packets, dtype);
 
     // Copy out the rest of the data to the ZooKeeper filter buffer.
