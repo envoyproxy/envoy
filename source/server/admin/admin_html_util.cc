@@ -50,11 +50,11 @@ const char EnvoyFavicon[] =
 
 namespace Envoy {
 namespace Server {
-namespace AdminHtmlUtil {
 
-class BuiltinHtmlResourceProvider : public HtmlResourceProvider {
+namespace {
+class BuiltinResourceProvider : public AdminHtmlUtil::ResourceProvider {
 public:
-  BuiltinHtmlResourceProvider() {
+  BuiltinResourceProvider() {
     map_["admin_head_start.html"] = AdminHtmlStart;
     map_["admin.css"] = AdminCss;
     map_["active_stats.js"] = AdminActiveStatsJs;
@@ -69,21 +69,31 @@ private:
   absl::flat_hash_map<absl::string_view, absl::string_view> map_;
 };
 
+// This is a hack to make a lazy-constructed holder for a pointer to the
+// resource provider.
+//
+// We use a mutable singleton rather than plumbing in the resource
+// provider. This is because the HTML features in the admin console can be
+// compiled out of Envoy. It's awkward to plumb the resource provider through
+// multiple layers that do not want to compile in the class definition. There
+// would be many ifdefs through constructors, initializers, etc.
 struct ProviderContainer {
-  std::unique_ptr<HtmlResourceProvider> provider_{std::make_unique<BuiltinHtmlResourceProvider>()};
+  std::unique_ptr<AdminHtmlUtil::ResourceProvider> provider_{std::make_unique<BuiltinResourceProvider>()};
 };
 
 ProviderContainer& getProviderContainer() { MUTABLE_CONSTRUCT_ON_FIRST_USE(ProviderContainer); }
 
-absl::string_view getResource(absl::string_view resource_name, std::string& buf) {
+} // namespace
+
+absl::string_view AdminHtmlUtil::getResource(absl::string_view resource_name, std::string& buf) {
   return getProviderContainer().provider_->getResource(resource_name, buf);
 }
 
-void setHtmlResourceProvider(std::unique_ptr<HtmlResourceProvider> resource_provider) {
+void AdminHtmlUtil::setHtmlResourceProvider(std::unique_ptr<ResourceProvider> resource_provider) {
   getProviderContainer().provider_ = std::move(resource_provider);
 }
 
-void renderHead(Http::ResponseHeaderMap& response_headers, Buffer::Instance& response) {
+void AdminHtmlUtil::renderHead(Http::ResponseHeaderMap& response_headers, Buffer::Instance& response) {
   response_headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Html);
   std::string buf1, buf2, buf3;
   response.addFragments({"<!DOCTYPE html>\n"
@@ -95,13 +105,13 @@ void renderHead(Http::ResponseHeaderMap& response_headers, Buffer::Instance& res
   response.add("</head>\n<body>\n");
 }
 
-void tableBegin(Buffer::Instance& response) { response.add(AdminHtmlTableBegin); }
+void AdminHtmlUtil::tableBegin(Buffer::Instance& response) { response.add(AdminHtmlTableBegin); }
 
-void tableEnd(Buffer::Instance& response) { response.add(AdminHtmlTableEnd); }
+void AdminHtmlUtil::tableEnd(Buffer::Instance& response) { response.add(AdminHtmlTableEnd); }
 
-void finalize(Buffer::Instance& response) { response.add("</body>\n</html>\n"); }
+void AdminHtmlUtil::finalize(Buffer::Instance& response) { response.add("</body>\n</html>\n"); }
 
-void input(Buffer::Instance& response, absl::string_view id, absl::string_view name,
+void AdminHtmlUtil::input(Buffer::Instance& response, absl::string_view id, absl::string_view name,
            absl::string_view path, Admin::ParamDescriptor::Type type,
            OptRef<const Http::Utility::QueryParams> query,
            const std::vector<absl::string_view>& enum_choices, bool submit_on_change) {
@@ -147,7 +157,7 @@ void input(Buffer::Instance& response, absl::string_view id, absl::string_view n
   }
 }
 
-void urlHandler(Buffer::Instance& response, const Admin::UrlHandler& handler,
+void AdminHtmlUtil::urlHandler(Buffer::Instance& response, const Admin::UrlHandler& handler,
                 OptRef<const Http::Utility::QueryParams> query, int index, bool submit_on_change,
                 bool active) {
   absl::string_view path = handler.prefix_;
@@ -216,6 +226,5 @@ void urlHandler(Buffer::Instance& response, const Admin::UrlHandler& handler,
   }
 }
 
-} // namespace AdminHtmlUtil
 } // namespace Server
 } // namespace Envoy

@@ -34,7 +34,9 @@ Http::Code testCallback(Http::ResponseHeaderMap& response_headers, Buffer::Insta
 
   Filesystem::InstanceImpl file_system;
   std::string path = absl::StrCat("test/integration/admin_html/", iter->second);
-  TRY_ASSERT_MAIN_THREAD { response.add(file_system.fileReadToEnd(path)); }
+  TRY_ASSERT_MAIN_THREAD {
+    response.add(file_system.fileReadToEnd(path));
+  }
   END_TRY
   catch (EnvoyException& e) {
     response.add(e.what());
@@ -48,12 +50,15 @@ Http::Code testCallback(Http::ResponseHeaderMap& response_headers, Buffer::Insta
   return Http::Code::OK;
 }
 
-class DebugHtmlResourceProvider : public Server::AdminHtmlUtil::HtmlResourceProvider {
+class DebugHtmlResourceProvider : public Server::AdminHtmlUtil::ResourceProvider {
 public:
   absl::string_view getResource(absl::string_view resource_name, std::string& buf) override {
     std::string path = absl::StrCat("source/server/admin/html/", resource_name);
     Filesystem::InstanceImpl file_system;
-    TRY_ASSERT_MAIN_THREAD { buf = file_system.fileReadToEnd(path); }
+    TRY_ASSERT_MAIN_THREAD {
+      buf = file_system.fileReadToEnd(path);
+      ENVOY_LOG_MISC(info, "Read {} bytes from {}", buf.size(), path);
+    }
     END_TRY
     catch (EnvoyException& e) {
       ENVOY_LOG_MISC(error, "Error reading file {}", e.what());

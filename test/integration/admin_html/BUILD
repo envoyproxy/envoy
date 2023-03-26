@@ -26,14 +26,15 @@ envoy_cc_test_binary(
 )
 
 # This is a complex test starting up a binary and fetching files, but it really
-# only takes about 1.2 seconds.
+# only takes a couple of seconds.
 envoy_sh_test(
     name = "test_server_test",
-    size = "medium",
+    size = "large",
     srcs = ["test_server_test.sh"],
     cc_binary = [":test_server"],
     data = [
         ":test_server_files",
+        "//source/server/admin/html:admin_web_files",
         "//test/integration:test_utility_files",
     ],
     # tags = ["skip_on_windows"],

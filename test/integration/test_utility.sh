@@ -21,6 +21,13 @@ check() {
     "$@" || handle_failure
 }
 
+check_not() {
+    echo "     check" "$@" ...
+    # see https://github.com/koalaman/shellcheck/issues/1679
+    # shellcheck disable=SC2119
+    "$@" && handle_failure
+}
+
 export BACKGROUND_PID="?"
 run_in_background_saving_pid() {
     echo "     backgrounding:" "$@" ...
