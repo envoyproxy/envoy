@@ -90,8 +90,12 @@ absl::string_view AdminHtmlUtil::getResource(absl::string_view resource_name, st
   return getProviderContainer().provider_->getResource(resource_name, buf);
 }
 
-void AdminHtmlUtil::setHtmlResourceProvider(std::unique_ptr<ResourceProvider> resource_provider) {
-  getProviderContainer().provider_ = std::move(resource_provider);
+std::unique_ptr<AdminHtmlUtil::ResourceProvider>
+AdminHtmlUtil::setResourceProvider(std::unique_ptr<ResourceProvider> resource_provider) {
+  ProviderContainer& container = getProviderContainer();
+  std::unique_ptr<ResourceProvider> prev = std::move(container.provider_);
+  container.provider_ = std::move(resource_provider);
+  return prev;
 }
 
 void AdminHtmlUtil::renderHead(Http::ResponseHeaderMap& response_headers,

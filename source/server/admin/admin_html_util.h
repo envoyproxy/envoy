@@ -91,7 +91,20 @@ public:
                                      OptRef<const Http::Utility::QueryParams> query, int index,
                                      bool submit_on_change, bool active);
 
-  static void setHtmlResourceProvider(std::unique_ptr<ResourceProvider> resource_provider);
+  /**
+   * By default, JS, HTML, and CSS files are compiled into the binary. To make it
+   * faster to iterate while debugging, You can override the resource provider to
+   * load these assets from the file-system every time they are rendered.
+   *
+   * This function is thread hostile; it must be called before threads are
+   * started up, e.g. while parsing arguments in main().
+   *
+   * The previous resource provider is provided to make unit-testing easier.
+   *
+   * @return the previous resource provider
+   */
+  static std::unique_ptr<ResourceProvider>
+  setResourceProvider(std::unique_ptr<ResourceProvider> resource_provider);
 
 private:
   static void renderHandlerParam(Buffer::Instance& response, absl::string_view id,

@@ -82,7 +82,7 @@ int main(int argc, char** argv) {
   // those files from the file-system on ever access. This makes iteration on
   // the web interface rapid and fun.
   if (argc > 1 && absl::string_view("-debug") == argv[1]) {
-    Envoy::Server::AdminHtmlUtil::setHtmlResourceProvider(
+    Envoy::Server::AdminHtmlUtil::setResourceProvider(
         std::make_unique<Envoy::DebugHtmlResourceProvider>());
     argv[1] = argv[0];
     --argc;

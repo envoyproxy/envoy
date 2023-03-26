@@ -89,5 +89,24 @@ TEST_F(AdminHtmlUtilTest, RenderRenderEndpointTableRowSubmitOnChange) {
   EXPECT_THAT(out, Not(HasSubstr(" type='hidden' ")));
 }
 
+namespace {
+class TestResourceProvider : public Server::AdminHtmlUtil::ResourceProvider {
+public:
+  static constexpr absl::string_view testResourceValue = "This is only a test";
+
+  absl::string_view getResource(absl::string_view, std::string&) override {
+    return testResourceValue;
+  }
+};
+} // namespace
+
+TEST_F(AdminHtmlUtilTest, OverrideResourceProvider) {
+  std::unique_ptr<AdminHtmlUtil::ResourceProvider> prev =
+      AdminHtmlUtil::setResourceProvider(std::make_unique<TestResourceProvider>());
+  std::string buf;
+  EXPECT_EQ(TestResourceProvider::testResourceValue, AdminHtmlUtil::getResource("foo", buf));
+  AdminHtmlUtil::setResourceProvider(std::move(prev));
+}
+
 } // namespace Server
 } // namespace Envoy
