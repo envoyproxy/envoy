@@ -2,6 +2,7 @@
 
 tmp="${TEST_TMPDIR}/test/integration/admin_html/tempfiles"
 export ENVOY_BIN="${TEST_SRCDIR}/envoy/test/integration/admin_html/test_server"
+# shellcheck source=test/integration/test_utility.sh
 source "${TEST_SRCDIR}/envoy/test/integration/test_utility.sh"
 
 # Verifies that a file can be fetched from the admin address, and it matches
