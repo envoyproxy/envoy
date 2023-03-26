@@ -36,7 +36,7 @@ envoy_sh_test(
     data = [
         ":test_server_files",
         "//source/server/admin/html:admin_web_files",
-        "//test/integration:test_utility_files",
+        "//test/integration:test_utility.sh",
     ],
 )
 
