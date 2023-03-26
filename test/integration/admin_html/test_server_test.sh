@@ -23,7 +23,16 @@ get_status_code_for_invalid_file() {
   grep HTTP/ "$tmp/$file.headers" | cut -d\  -f2
 }
 
-function run_testsuite() {
+# Verifies that an html-generated admin endpoint contains some expected fragments.
+verify_admin_contains() {
+  check curl "$admin_address$1" --output "$tmp/admin.out"
+  check grep "$2" "$tmp/admin.out"
+}
+
+# Starts up test_server (a variant of envoy-static) and runs a few queries
+# against its admin port to ensure it can serve test files, and that we are
+# able to read html/css/js files from the file-system when run with -debug.
+run_testsuite() {
   rm -rf "$tmp"
   mkdir -p "$tmp"
 
@@ -53,10 +62,8 @@ function run_testsuite() {
   # Check that whwen we read the admin home page or stats it works, but
   # we don't want to diff as these files are computed, and we don't need
   # to do detailed content anslysis here.
-  check curl "$admin_address/" --output "$tmp/admin.out"
-  check grep 'font-family: sans-serif' "$tmp/admin.out"
-  check curl "$admin_address/stats?format=active-html" --output "$tmp/stats-active.out"
-  check grep 'let statusDiv = null;' "$tmp/stats-active.out"
+  verify_admin_contains "/" "font-family: sans-serif"
+  verify_admin_contains "/stats?format=active-html" "let statusDiv = null;"
 
   curl -X POST "$admin_address/quitquitquit"
   wait
@@ -65,11 +72,18 @@ function run_testsuite() {
 # Run the test server in normal log. There will be no logs about reading the web
 # resources from the file system while serving admin ppges.
 run_testsuite ""
+
+# Check that we are not reading the resources from the file-system when
+# test_server was not run with debug mode.
 check_not egrep "Read [0-9]+ bytes from " "$tmp/envoy.log"
 
 # Now run the test server in debug mode. There will be logs about reading the web
 # resources from the file system while serving admin ppges.
 run_testsuite "-debug"
+
+# Verify that the envoy log writen by run_testsuite contains the specified
+# fragment. This is used to ensure we are reading the resources from the file
+# system in debug mode.
 check_debug_log() {
   check egrep "Read [0-9]+ bytes from source/server/admin/html/$1" "$tmp/envoy.log"
 }
