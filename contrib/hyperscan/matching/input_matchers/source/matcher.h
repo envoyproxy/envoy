@@ -47,7 +47,7 @@ public:
 private:
   hs_database_t* database_{};
   hs_database_t* start_of_match_database_{};
-  Event::Dispatcher& dispatcher_;
+  Event::Dispatcher& main_thread_dispatcher_;
   ThreadLocal::TypedSlotPtr<ScratchThreadLocal> tls_;
 
   // Compiles the Hyperscan database. It will throw on failure of insufficient memory or malformed

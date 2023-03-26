@@ -36,7 +36,8 @@ Matcher::Matcher(const std::vector<const char*>& expressions,
                  const std::vector<unsigned int>& flags, const std::vector<unsigned int>& ids,
                  Event::Dispatcher& dispatcher, ThreadLocal::SlotAllocator& tls,
                  bool report_start_of_matching)
-    : dispatcher_(dispatcher), tls_(ThreadLocal::TypedSlot<ScratchThreadLocal>::makeUnique(tls)) {
+    : main_thread_dispatcher_(dispatcher),
+      tls_(ThreadLocal::TypedSlot<ScratchThreadLocal>::makeUnique(tls)) {
   ASSERT(expressions.size() == flags.size());
   ASSERT(expressions.size() == ids.size());
 
@@ -156,8 +157,12 @@ void Matcher::compile(const std::vector<const char*>& expressions,
 }
 
 hs_scratch_t* Matcher::getScratch(ScratchThreadLocalPtr& local_scratch) const {
+  // Some matchers are constructed before diaptching threads and set() method of thread local slot
+  // will only initialize thread local object in existing threads, which may lead to unintialized
+  // thread local object in threads which are dispatched later. E.g, stats matchers are constructed
+  // before workers while there is chance to use these matchers in working threads.
   if (!tls_->get().has_value()) {
-    dispatcher_.post([this]() {
+    main_thread_dispatcher_.post([this]() {
       tls_->set([this](Event::Dispatcher&) {
         return std::make_shared<ScratchThreadLocal>(database_, start_of_match_database_);
       });
