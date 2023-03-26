@@ -76,9 +76,10 @@ private:
 // provider. This is because the HTML features in the admin console can be
 // compiled out of Envoy. It's awkward to plumb the resource provider through
 // multiple layers that do not want to compile in the class definition. There
-// would be many ifdefs through constructors, initializers, etc.
+// would be many `ifdefs` through constructors, initializers, etc.
 struct ProviderContainer {
-  std::unique_ptr<AdminHtmlUtil::ResourceProvider> provider_{std::make_unique<BuiltinResourceProvider>()};
+  std::unique_ptr<AdminHtmlUtil::ResourceProvider> provider_{
+      std::make_unique<BuiltinResourceProvider>()};
 };
 
 ProviderContainer& getProviderContainer() { MUTABLE_CONSTRUCT_ON_FIRST_USE(ProviderContainer); }
@@ -93,7 +94,8 @@ void AdminHtmlUtil::setHtmlResourceProvider(std::unique_ptr<ResourceProvider> re
   getProviderContainer().provider_ = std::move(resource_provider);
 }
 
-void AdminHtmlUtil::renderHead(Http::ResponseHeaderMap& response_headers, Buffer::Instance& response) {
+void AdminHtmlUtil::renderHead(Http::ResponseHeaderMap& response_headers,
+                               Buffer::Instance& response) {
   response_headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Html);
   std::string buf1, buf2, buf3;
   response.addFragments({"<!DOCTYPE html>\n"
@@ -112,9 +114,10 @@ void AdminHtmlUtil::tableEnd(Buffer::Instance& response) { response.add(AdminHtm
 void AdminHtmlUtil::finalize(Buffer::Instance& response) { response.add("</body>\n</html>\n"); }
 
 void AdminHtmlUtil::input(Buffer::Instance& response, absl::string_view id, absl::string_view name,
-           absl::string_view path, Admin::ParamDescriptor::Type type,
-           OptRef<const Http::Utility::QueryParams> query,
-           const std::vector<absl::string_view>& enum_choices, bool submit_on_change) {
+                          absl::string_view path, Admin::ParamDescriptor::Type type,
+                          OptRef<const Http::Utility::QueryParams> query,
+                          const std::vector<absl::string_view>& enum_choices,
+                          bool submit_on_change) {
   std::string value;
   if (query.has_value()) {
     auto iter = query->find(std::string(name));
@@ -158,8 +161,8 @@ void AdminHtmlUtil::input(Buffer::Instance& response, absl::string_view id, absl
 }
 
 void AdminHtmlUtil::urlHandler(Buffer::Instance& response, const Admin::UrlHandler& handler,
-                OptRef<const Http::Utility::QueryParams> query, int index, bool submit_on_change,
-                bool active) {
+                               OptRef<const Http::Utility::QueryParams> query, int index,
+                               bool submit_on_change, bool active) {
   absl::string_view path = handler.prefix_;
 
   if (path == "/") {

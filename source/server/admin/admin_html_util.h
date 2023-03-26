@@ -13,8 +13,7 @@ namespace Envoy {
 namespace Server {
 
 class AdminHtmlUtil {
- public:
-
+public:
   // Overridable mechanism to provide resources for constructing HTML resources.
   // The default implementation uses files that were imported into C++ constants
   // via the build system in target //source/server/admin/html:generate_admin_html.
@@ -28,7 +27,7 @@ class AdminHtmlUtil {
   // rather than make a production-ready version of the full memory-based
   // filesystem.
   class ResourceProvider {
-   public:
+  public:
     virtual ~ResourceProvider() = default;
 
     /**
@@ -37,7 +36,6 @@ class AdminHtmlUtil {
      */
     virtual absl::string_view getResource(absl::string_view resource_name, std::string& buf) PURE;
   };
-
 
   /**
    * @param buf a buffer that may be used by the implementation to prepare the return value.
@@ -82,17 +80,16 @@ class AdminHtmlUtil {
    * @param active indicates
    */
   static void urlHandler(Buffer::Instance& response, const Admin::UrlHandler& handler,
-                         OptRef<const Http::Utility::QueryParams> query, int index, bool submit_on_change,
-                         bool active);
+                         OptRef<const Http::Utility::QueryParams> query, int index,
+                         bool submit_on_change, bool active);
 
   static void setHtmlResourceProvider(std::unique_ptr<ResourceProvider> resource_provider);
 
- private:
+private:
   static void input(Buffer::Instance& response, absl::string_view id, absl::string_view name,
                     absl::string_view path, Admin::ParamDescriptor::Type type,
                     OptRef<const Http::Utility::QueryParams> query,
                     const std::vector<absl::string_view>& enum_choices, bool submit_on_change);
-
 };
 
 } // namespace Server

@@ -34,9 +34,7 @@ Http::Code testCallback(Http::ResponseHeaderMap& response_headers, Buffer::Insta
 
   Filesystem::InstanceImpl file_system;
   std::string path = absl::StrCat("test/integration/admin_html/", iter->second);
-  TRY_ASSERT_MAIN_THREAD {
-    response.add(file_system.fileReadToEnd(path));
-  }
+  TRY_ASSERT_MAIN_THREAD { response.add(file_system.fileReadToEnd(path)); }
   END_TRY
   catch (EnvoyException& e) {
     response.add(e.what());
