@@ -22,9 +22,9 @@ RValT delegateFilterActionOr(FilterPtrT& filter, FuncT func, RValT rval, Args&&.
 }
 
 // Own version of lambda overloading since std::overloaded is not available to use yet.
-template <typename... Ts> struct overloaded : Ts... { using Ts::operator()...; };
+template <class... Ts> struct Overloaded : Ts... { using Ts::operator()...; };
 
-template <typename... Ts> overloaded(Ts...) -> overloaded<Ts...>;
+template <class... Ts> Overloaded(Ts...) -> Overloaded<Ts...>;
 
 } // namespace
 Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers, bool end_stream) {
@@ -99,7 +99,7 @@ void Filter::onMatchCallback(const Matcher::Action& action) {
   if (wrapper.filter_to_inject_.has_value()) {
     stats_.filter_delegation_success_.inc();
 
-    auto createDelegatedFilterFn = overloaded{
+    auto createDelegatedFilterFn = Overloaded{
         [this](Http::StreamDecoderFilterSharedPtr filter) {
           delegated_filter_ = std::make_shared<StreamFilterWrapper>(std::move(filter));
         },
