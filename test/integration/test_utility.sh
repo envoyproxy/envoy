@@ -142,4 +142,4 @@ wait_for_stat() {
     echo "$ret"
 }
 
-# [[ -z "${ENVOY_BIN}" ]] && ENVOY_BIN="${TEST_SRCDIR}/envoy/source/exe/envoy-static"
+[[ -z "${ENVOY_BIN}" ]] && ENVOY_BIN="${TEST_SRCDIR}/envoy/source/exe/envoy-static"

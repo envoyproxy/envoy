@@ -2,6 +2,7 @@ load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_test_binary",
     "envoy_package",
+    "envoy_select_admin_html",
     "envoy_sh_test",
 )
 
@@ -30,14 +31,13 @@ envoy_cc_test_binary(
 envoy_sh_test(
     name = "test_server_test",
     size = "large",
-    srcs = ["test_server_test.sh"],
+    srcs = envoy_select_admin_html(["test_server_test.sh"]),
     cc_binary = [":test_server"],
     data = [
         ":test_server_files",
         "//source/server/admin/html:admin_web_files",
         "//test/integration:test_utility_files",
     ],
-    # tags = ["skip_on_windows"],
 )
 
 filegroup(
