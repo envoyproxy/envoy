@@ -33,7 +33,6 @@
 #include "library/common/engine.h"
 #include "library/common/extensions/cert_validator/platform_bridge/platform_bridge.pb.h"
 #include "library/common/extensions/filters/http/local_error/filter.pb.h"
-#include "library/common/extensions/filters/http/route_cache_reset/filter.pb.h"
 #include "library/common/extensions/filters/http/network_configuration/filter.pb.h"
 #include "library/common/extensions/filters/http/socket_tag/filter.pb.h"
 #include "library/common/extensions/key_value/platform/platform.pb.h"
@@ -558,10 +557,11 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
   }
 
   if (!direct_responses_.empty()) {
-    envoymobile::extensions::filters::http::route_cache_reset::RouteCacheReset cache_reset;
     auto* cache_reset_filter = hcm->add_http_filters();
     cache_reset_filter->set_name("envoy.filters.http.route_cache_reset");
-    cache_reset_filter->mutable_typed_config()->PackFrom(cache_reset);
+    cache_reset_filter->mutable_typed_config()->set_type_url(
+        "type.googleapis.com/"
+        "envoymobile.extensions.filters.http.route_cache_reset.RouteCacheReset");
   }
 
   // Set up the always-present filters
