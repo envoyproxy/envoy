@@ -40,6 +40,7 @@ open class EngineBuilder: NSObject {
 #endif
   private var enableInterfaceBinding: Bool = false
   private var enforceTrustChainVerification: Bool = true
+  private var enablePlatformCertificateValidation: Bool = false
   private var enableDrainPostDnsRefresh: Bool = false
   private var forceIPv6: Bool = false
   private var h2ConnectionKeepaliveIdleIntervalMilliseconds: UInt32 = 1
@@ -310,6 +311,18 @@ open class EngineBuilder: NSObject {
   @discardableResult
   public func enforceTrustChainVerification(_ enforceTrustChainVerification: Bool) -> Self {
     self.enforceTrustChainVerification = enforceTrustChainVerification
+    return self
+  }
+
+  /// Specify whether to use the platform certificate verifier.
+  ///
+  /// - parameter enablePlatformCertificateValidation: whether to use the platform verifier.
+  ///
+  /// - returns: This builder.
+  @discardableResult
+  public func enablePlatformCertificateValidation(
+    _ enablePlatformCertificateValidation: Bool) -> Self {
+    self.enablePlatformCertificateValidation = enablePlatformCertificateValidation
     return self
   }
 
@@ -745,6 +758,7 @@ open class EngineBuilder: NSObject {
       enableDrainPostDnsRefresh: self.enableDrainPostDnsRefresh,
       enforceTrustChainVerification: self.enforceTrustChainVerification,
       forceIPv6: self.forceIPv6,
+      enablePlatformCertificateValidation: self.enablePlatformCertificateValidation,
       h2ConnectionKeepaliveIdleIntervalMilliseconds:
         self.h2ConnectionKeepaliveIdleIntervalMilliseconds,
       h2ConnectionKeepaliveTimeoutSeconds: self.h2ConnectionKeepaliveTimeoutSeconds,
@@ -822,7 +836,7 @@ private extension EngineBuilder {
     cxxBuilder.enableDrainPostDnsRefresh(self.enableDrainPostDnsRefresh)
     cxxBuilder.enforceTrustChainVerification(self.enforceTrustChainVerification)
     cxxBuilder.setForceAlwaysUsev6(self.forceIPv6)
-    cxxBuilder.enablePlatformCertificatesValidation(true)
+    cxxBuilder.enablePlatformCertificatesValidation(self.enablePlatformCertificateValidation)
     cxxBuilder.addH2ConnectionKeepaliveIdleIntervalMilliseconds(
       Int32(self.h2ConnectionKeepaliveIdleIntervalMilliseconds)
     )
