@@ -31,15 +31,15 @@ verify_admin_contains() {
 
 # Starts up test_server (a variant of envoy-static) and runs a few queries
 # against its admin port to ensure it can serve test files, and that we are
-# able to read html/css/js files from the file-system when run with -debug.
+# able to read html/css/js files from the file-system when run with debug.
 run_testsuite() {
   rm -rf "$tmp"
   mkdir -p "$tmp"
 
   debug="$1"
   echo Starting test_server "$debug"
-  if [ "$debug" = "-debug" ]; then
-    "${ENVOY_BIN}" -debug \
+  if [ "$debug" = "debug" ]; then
+    "${ENVOY_BIN}" debug \
       -c test/integration/admin_html/web_test.yaml \
       --admin-address-path "$tmp/admin.address" -l info >& "$tmp/envoy.log" &
   else
@@ -79,7 +79,7 @@ check_not egrep "Read [0-9]+ bytes from " "$tmp/envoy.log"
 
 # Now run the test server in debug mode. There will be logs about reading the web
 # resources from the file system while serving admin ppges.
-run_testsuite "-debug"
+run_testsuite "debug"
 
 # Verify that the envoy log writen by run_testsuite contains the specified
 # fragment. This is used to ensure we are reading the resources from the file

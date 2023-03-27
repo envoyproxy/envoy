@@ -77,11 +77,11 @@ int main(int argc, char** argv) {
   // The CSS, JS, and HTML resources needed for the admin panel are captured at
   // build time as C++ string_view constants, so that the Envoy binary is
   // self-contained. However, this makes iteration on those resources require a
-  // C++ recompile and server restart. During debug, you can run with "-debug"
+  // C++ recompile and server restart. During debug, you can run with "debug"
   // as the first argument, and we can inject a resource provider that reads
   // those files from the file-system on ever access. This makes iteration on
   // the web interface rapid and fun.
-  if (argc > 1 && absl::string_view("-debug") == argv[1]) {
+  if (argc > 1 && absl::string_view("debug") == argv[1]) {
     Envoy::Server::AdminHtmlUtil::setResourceProvider(
         std::make_unique<Envoy::DebugHtmlResourceProvider>());
     argv[1] = argv[0];
