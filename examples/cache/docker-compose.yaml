@@ -1,10 +1,8 @@
-version: "3.8"
 services:
 
   front-envoy:
     build:
-      context: .
-      dockerfile: Dockerfile-frontenvoy
+      dockerfile: ../shared/envoy/Dockerfile
     depends_on:
       service1:
         condition: service_healthy
@@ -15,7 +13,8 @@ services:
 
   service1:
     build:
-      context: ../shared/flask
+      context: ../shared/python
+      target: aiohttp-service
     volumes:
     - ./responses.yaml:/etc/responses.yaml
     - ./service.py:/code/service.py
@@ -24,7 +23,8 @@ services:
 
   service2:
     build:
-      context: ../shared/flask
+      context: ../shared/python
+      target: aiohttp-service
     volumes:
     - ./responses.yaml:/etc/responses.yaml
     - ./service.py:/code/service.py

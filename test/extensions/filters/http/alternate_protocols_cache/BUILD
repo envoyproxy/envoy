@@ -26,6 +26,7 @@ envoy_extension_cc_test(
 
 envoy_extension_cc_test(
     name = "filter_integration_test",
+    size = "large",
     srcs = ["filter_integration_test.cc"],
     data = [
         "//test/config/integration/certs",

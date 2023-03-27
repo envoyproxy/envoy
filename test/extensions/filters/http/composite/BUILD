@@ -26,6 +26,7 @@ envoy_extension_cc_test(
 
 envoy_extension_cc_test(
     name = "composite_integration_test",
+    size = "large",
     srcs = ["composite_filter_integration_test.cc"],
     extension_names = ["envoy.filters.http.composite"],
     deps = [

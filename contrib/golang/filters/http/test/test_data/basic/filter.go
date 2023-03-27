@@ -82,12 +82,28 @@ func (f *filter) sendLocalReply(phase string) api.StatusType {
 
 // test: get, set, remove, values, add
 func (f *filter) decodeHeaders(header api.RequestHeaderMap, endStream bool) api.StatusType {
+	// test logging
+	f.callbacks.Log(api.Trace, "log test")
+	f.callbacks.Log(api.Debug, "log test")
+	f.callbacks.Log(api.Info, "log test")
+	f.callbacks.Log(api.Warn, "log test")
+	f.callbacks.Log(api.Error, "log test")
+	f.callbacks.Log(api.Critical, "log test")
+
 	if f.sleep {
 		time.Sleep(time.Millisecond * 100) // sleep 100 ms
 	}
 	if strings.Contains(f.localreplay, "decode-header") {
 		return f.sendLocalReply("decode-header")
 	}
+
+	header.Range(func(key, value string) bool {
+		if key == ":path" && value != f.path {
+			f.fail("path not match in Range")
+			return false
+		}
+		return true
+	})
 
 	origin, found := header.Get("x-test-header-0")
 	hdrs := header.Values("x-test-header-0")

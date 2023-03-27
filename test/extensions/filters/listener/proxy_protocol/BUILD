@@ -62,6 +62,7 @@ envoy_cc_fuzz_test(
 
 envoy_extension_cc_test(
     name = "proxy_proto_integration_test",
+    size = "large",
     srcs = [
         "proxy_proto_integration_test.cc",
         "proxy_proto_integration_test.h",

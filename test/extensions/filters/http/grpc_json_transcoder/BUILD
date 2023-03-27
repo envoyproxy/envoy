@@ -53,6 +53,7 @@ envoy_extension_cc_test(
 
 envoy_extension_cc_test(
     name = "grpc_json_transcoder_integration_test",
+    size = "large",
     srcs = [
         "grpc_json_transcoder_integration_test.cc",
     ],

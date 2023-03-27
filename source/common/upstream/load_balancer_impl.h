@@ -787,6 +787,9 @@ public:
       }
     }
   }
+  LoadBalancerSubsetInfoImpl()
+      : LoadBalancerSubsetInfoImpl(
+            envoy::config::cluster::v3::Cluster::LbSubsetConfig::default_instance()) {}
 
   // Upstream::LoadBalancerSubsetInfo
   bool isEnabled() const override { return enabled_; }
@@ -821,6 +824,7 @@ private:
   const bool panic_mode_any_ : 1;
   const bool list_as_any_ : 1;
 };
+using DefaultLoadBalancerSubsetInfoImpl = ConstSingleton<LoadBalancerSubsetInfoImpl>;
 
 } // namespace Upstream
 } // namespace Envoy

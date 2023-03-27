@@ -44,6 +44,7 @@ envoy_extension_cc_test(
 
 envoy_extension_cc_test(
     name = "proxy_filter_integration_test",
+    size = "large",
     srcs = ["proxy_filter_integration_test.cc"],
     data = [
         "//test/config/integration/certs",
