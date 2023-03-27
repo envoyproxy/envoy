@@ -1,11 +1,11 @@
 #include "source/extensions/tracers/datadog/tracer.h"
 
-#include <cassert>
 #include <memory>
 #include <utility>
 
 #include "envoy/tracing/trace_context.h"
 
+#include "source/common/common/assert.h"
 #include "source/common/config/utility.h"
 #include "source/common/tracing/null_span_impl.h"
 #include "source/extensions/tracers/datadog/agent_http_client.h"
@@ -27,7 +27,7 @@ namespace Tracers {
 namespace Datadog {
 namespace {
 
-ThreadLocal::ThreadLocalObjectSharedPtr makeThreadLocalTracer(
+std::shared_ptr<Tracer::ThreadLocalTracer> makeThreadLocalTracer(
     datadog::tracing::TracerConfig config, Upstream::ClusterManager& cluster_manager,
     const std::string& collector_cluster, const std::string& collector_reference_host,
     TracerStats& tracer_stats, Event::Dispatcher& dispatcher, spdlog::logger& logger) {
@@ -36,9 +36,11 @@ ThreadLocal::ThreadLocalObjectSharedPtr makeThreadLocalTracer(
   config.agent.http_client = std::make_shared<AgentHTTPClient>(
       cluster_manager, collector_cluster, collector_reference_host, tracer_stats);
 
-  auto maybe_config = datadog::tracing::finalize_config(config);
-  if (auto* error = maybe_config.if_error()) {
-    auto prefix = "Unable to configure Datadog tracer. Tracing is now disabled. Error: ";
+  datadog::tracing::Expected<datadog::tracing::FinalizedTracerConfig> maybe_config =
+      datadog::tracing::finalize_config(config);
+  if (datadog::tracing::Error* error = maybe_config.if_error()) {
+    datadog::tracing::StringView prefix =
+        "Unable to configure Datadog tracer. Tracing is now disabled. Error: ";
     config.logger->log_error(error->with_prefix(prefix));
     return std::make_shared<Tracer::ThreadLocalTracer>();
   }
@@ -56,7 +58,8 @@ Tracer::Tracer(const std::string& collector_cluster, const std::string& collecto
                Upstream::ClusterManager& cluster_manager, Stats::Scope& scope,
                ThreadLocal::SlotAllocator& thread_local_slot_allocator)
     : tracer_stats_(makeTracerStats(scope)),
-      thread_local_slot_(thread_local_slot_allocator.allocateSlot()) {
+      thread_local_slot_(
+          ThreadLocal::TypedSlot<ThreadLocalTracer>::makeUnique(thread_local_slot_allocator)) {
   const bool allow_added_via_api = true;
   Config::Utility::checkCluster("envoy.tracers.datadog", collector_cluster, cluster_manager,
                                 allow_added_via_api);
@@ -74,7 +77,7 @@ Tracer::Tracer(const std::string& collector_cluster, const std::string& collecto
 Tracing::SpanPtr Tracer::startSpan(const Tracing::Config&, Tracing::TraceContext& trace_context,
                                    const std::string& operation_name, SystemTime start_time,
                                    const Tracing::Decision tracing_decision) {
-  auto& thread_local_tracer = thread_local_slot_->getTyped<ThreadLocalTracer>();
+  ThreadLocalTracer& thread_local_tracer = **thread_local_slot_;
   if (!thread_local_tracer.tracer) {
     return std::make_unique<Tracing::NullSpan>();
   }
@@ -87,8 +90,9 @@ Tracing::SpanPtr Tracer::startSpan(const Tracing::Config&, Tracing::TraceContext
 
   datadog::tracing::Tracer& tracer = *thread_local_tracer.tracer;
   TraceContextReader reader{trace_context};
-  auto maybe_span = tracer.extract_span(reader, span_config);
-  if (auto* error = maybe_span.if_error()) {
+  datadog::tracing::Expected<datadog::tracing::Span> maybe_span =
+      tracer.extract_span(reader, span_config);
+  if (datadog::tracing::Error* error = maybe_span.if_error()) {
     // We didn't extract a span. Either there's no span to extract, or an
     // error occurred during extraction.
     //
@@ -104,7 +108,7 @@ Tracing::SpanPtr Tracer::startSpan(const Tracing::Config&, Tracing::TraceContext
     maybe_span = tracer.create_span(span_config);
   }
 
-  assert(maybe_span);
+  ASSERT(maybe_span);
   datadog::tracing::Span& span = *maybe_span;
 
   // If Envoy is telling us to drop the trace, then we treat that as a

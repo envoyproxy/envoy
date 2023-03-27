@@ -45,8 +45,6 @@ TEST_F(DatadogTracerTest, Breathing) {
 
   Tracer tracer("fake_cluster", "test_host", config, cluster_manager_, *store_.rootScope(),
                 thread_local_slot_allocator_);
-
-  (void)tracer;
 }
 
 TEST_F(DatadogTracerTest, NoOpMode) {
