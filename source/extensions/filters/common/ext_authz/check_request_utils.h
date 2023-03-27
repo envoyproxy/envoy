@@ -87,6 +87,7 @@ public:
    * @param with_request_body when true, will add the request body to the check request.
    * @param pack_as_bytes when true, will set the check request body as bytes.
    * @param include_peer_certificate whether to include the peer certificate in the check request.
+   * @param include_tls_session whether to include the TLS session details in the check request.
    */
   static void createHttpCheck(const Envoy::Http::StreamDecoderFilterCallbacks* callbacks,
                               const Envoy::Http::RequestHeaderMap& headers,
@@ -94,7 +95,7 @@ public:
                               envoy::config::core::v3::Metadata&& metadata_context,
                               envoy::service::auth::v3::CheckRequest& request,
                               uint64_t max_request_bytes, bool pack_as_bytes,
-                              bool include_peer_certificate,
+                              bool include_peer_certificate, bool include_tls_session,
                               const Protobuf::Map<std::string, std::string>& destination_labels,
                               const MatcherSharedPtr& request_header_matchers);
 
