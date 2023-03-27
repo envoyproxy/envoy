@@ -85,6 +85,9 @@ bug_fixes:
 - area: upstream
   change: |
     Initialize upstream network read filters via their ``onNewConnection()`` callback once the upstream connection has been established even if there is no data available for reading on the new upstream connection. This behavior change can be reverted by setting ``envoy.reloadable_features.initialize_upstream_filters`` to ``false``.
+- area: ecds
+  change: |
+    Delay listener activation until after the new ECDS filter configuration is created. Previously, listeners were activated with the xDS acceptance before the new extension config is fully processed.
 - area: dubbo
   change: |
     Fix a bug that the dubbo proxy will treat the response with status 80 as a illegal response.
