@@ -62,11 +62,11 @@ AppleSystemProxySettingsMonitor::readSystemProxySettings() const {
   if (is_http_proxy_enabled) {
     const auto hostname = readStringValue(proxy_settings, kCFNetworkProxiesHTTPProxy);
     const auto port = readIntValue(proxy_settings, kCFNetworkProxiesHTTPPort);
-    settings = absl::make_optional<SystemProxySettings>({hostname, port});
+    settings = absl::make_optional<SystemProxySettings>({std::move(hostname), port});
   } else if (is_auto_config_proxy_enabled) {
     const auto pac_file_url =
         readStringValue(proxy_settings, kCFNetworkProxiesProxyAutoConfigURLString);
-    settings = absl::make_optional(pac_file_url);
+    settings = absl::make_optional(std::move(pac_file_url));
   }
 
   CFRelease(proxy_settings);

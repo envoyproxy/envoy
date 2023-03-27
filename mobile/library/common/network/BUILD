@@ -11,18 +11,16 @@ envoy_cc_library(
     ],
     hdrs = [
         "connectivity_manager.h",
-        "proxy_settings.h",
     ],
     repository = "@envoy",
     deps = [
-        "//library/common/data:utility_lib",
+        ":proxy_settings_lib",
         "//library/common/network:src_addr_socket_option_lib",
         "//library/common/types:c_types_lib",
         "@envoy//envoy/network:socket_interface",
         "@envoy//envoy/singleton:manager_interface",
         "@envoy//source/common/common:assert_lib",
         "@envoy//source/common/common:scalar_to_byte_vector_lib",
-        "@envoy//source/common/common:utility_lib",
         "@envoy//source/common/network:addr_family_aware_socket_option_lib",
         "@envoy//source/common/network:socket_option_lib",
         "@envoy//source/extensions/common/dynamic_forward_proxy:dns_cache_manager_impl",
@@ -86,13 +84,27 @@ cc_library(
 )
 
 envoy_cc_library(
-    name = "apple_system_proxy_settings_monitor",
+    name = "proxy_settings_lib",
+    hdrs = ["proxy_settings.h"],
+    repository = "@envoy",
+    deps = [
+      "//library/common/data:utility_lib",
+      "@envoy//source/common/network:utility_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "apple_proxy_resolution_lib",
     srcs = select({
-        "@envoy//bazel:apple": ["apple_system_proxy_settings_monitor.cc"],
+        "@envoy//bazel:apple": [
+          "apple_pac_proxy_resolver.cc",
+          "apple_system_proxy_settings_monitor.cc",
+        ],
         "//conditions:default": [],
     }),
     hdrs = select({
         "@envoy//bazel:apple": [
+            "apple_pac_proxy_resolver.h",
             "apple_system_proxy_settings_monitor.h",
             "system_proxy_settings.h",
         ],
@@ -101,6 +113,7 @@ envoy_cc_library(
     repository = "@envoy",
     deps = select({
         "@envoy//bazel:apple": [
+            ":proxy_settings_lib",
             "//library/common/extensions/cert_validator/platform_bridge:c_types_lib",
         ],
         "//conditions:default": [],

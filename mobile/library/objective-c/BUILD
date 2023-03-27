@@ -57,7 +57,7 @@ envoy_objc_library(
         "//library/common:envoy_main_interface_lib",
         "//library/common/api:c_types",
         "//library/common/network:apple_platform_cert_verifier",
-        "//library/common/network:apple_system_proxy_settings_monitor",
+        "//library/common/network:apple_proxy_resolution_lib",
         "//library/objective-c/proxy:envoy_proxy_lib",
     ],
 )

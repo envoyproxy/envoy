@@ -14,7 +14,7 @@ public:
    * @param hostname A domain name or an IP address.
    * @param port     A valid internet port from within [0-65535] range.
    */
-  SystemProxySettings(const std::string& hostname, int port) : hostname_(hostname), port_(port){};
+  SystemProxySettings(const std::string& hostname, int port) : hostname_(std::move(hostname)), port_(port){};
 
   /**
    * Creates proxy settings using provided URL to a Proxy Auto-Configuration (PAC) file.
