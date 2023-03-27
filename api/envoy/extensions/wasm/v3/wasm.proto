@@ -40,7 +40,7 @@ message SanitizationConfig {
 }
 
 // Configuration for a Wasm VM.
-// [#next-free-field: 8]
+// [#next-free-field: 9]
 message VmConfig {
   // An ID which will be used along with a hash of the wasm code (or the name of the registered Null
   // VM plugin) to determine which VM will be used for the plugin. All plugins which use the same
@@ -106,6 +106,19 @@ message VmConfig {
   // vars just like when you do on native platforms.
   // Warning: Envoy rejects the configuration if there's conflict of key space.
   EnvironmentVariables environment_variables = 7;
+
+  // Specifies the log destination for the plugin.
+  // If not specified, the plugin will log to the default Envoy log
+  // example: "audit-logs": { file_path: "/var/log/audit.log" }
+  map<string, LogDestination> log_destination = 8;
+}
+
+message LogDestination {
+  // Target destination for the log messages from the plugin.
+  oneof target {
+    string file_path = 1;
+    // TODO: Remote logging service
+  }
 }
 
 message EnvironmentVariables {

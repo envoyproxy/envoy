@@ -75,10 +75,11 @@ void Wasm::initializeLifecycle(Server::ServerLifecycleNotifier& lifecycle_notifi
 
 Wasm::Wasm(WasmConfig& config, absl::string_view vm_key, const Stats::ScopeSharedPtr& scope,
            Api::Api& api, Upstream::ClusterManager& cluster_manager, Event::Dispatcher& dispatcher)
-    : WasmBase(
-          createWasmVm(config.config().vm_config().runtime()), config.config().vm_config().vm_id(),
-          MessageUtil::anyToBytes(config.config().vm_config().configuration()),
-          toStdStringView(vm_key), config.environmentVariables(), config.allowedCapabilities()),
+    : WasmBase(createWasmVm(config.config().vm_config().runtime()),
+               config.config().vm_config().vm_id(),
+               MessageUtil::anyToBytes(config.config().vm_config().configuration()),
+               toStdStringView(vm_key), config.environmentVariables(), config.logDestinations(),
+               config.allowedCapabilities()),
       scope_(scope), api_(api), stat_name_pool_(scope_->symbolTable()),
       custom_stat_namespace_(stat_name_pool_.add(CustomStatNamespace)),
       cluster_manager_(cluster_manager), dispatcher_(dispatcher),
@@ -330,7 +331,8 @@ bool createWasm(const PluginSharedPtr& plugin, const Stats::ScopeSharedPtr& scop
       code_cache = new std::remove_reference<decltype(*code_cache)>::type;
     }
     Stats::ScopeSharedPtr create_wasm_stats_scope = stats_handler.lockAndCreateStats(scope);
-    // Remove entries older than CODE_CACHE_SECONDS_CACHING_TTL except for our target.
+    // Remove entries older than CODE_CACHE_SECONDS_CACHING_TTL except for our
+    // target.
     for (auto it = code_cache->begin(); it != code_cache->end();) {
       if (now - it->second.use_time > std::chrono::seconds(CODE_CACHE_SECONDS_CACHING_TTL) &&
           it->first != vm_config.code().remote().sha256()) {
@@ -423,8 +425,8 @@ bool createWasm(const PluginSharedPtr& plugin, const Stats::ScopeSharedPtr& scop
         }
         stats_handler.onRemoteCacheEntriesChanged(code_cache->size());
       }
-      // NB: xDS currently does not support failing asynchronously, so we fail immediately
-      // if remote Wasm code is not cached and do a background fill.
+      // NB: xDS currently does not support failing asynchronously, so we fail
+      // immediately if remote Wasm code is not cached and do a background fill.
       if (!vm_config.nack_on_code_cache_miss()) {
         if (code.empty()) {
           ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::wasm), trace,

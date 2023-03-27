@@ -52,6 +52,36 @@ WasmConfig::WasmConfig(const envoy::extensions::wasm::v3::PluginConfig& config) 
       }
     }
   }
+
+  if (config.vm_config().runtime() == "envoy.wasm.runtime.null" &&
+      !config_.vm_config().log_destination().empty()) {
+    throw EnvoyException("envoy.extensions.wasm.v3.VmConfig.log_destination must "
+                         "not be set for NullVm.");
+  }
+  // Check key duplication.
+  absl::flat_hash_set<std::string> keys;
+  for (const auto& ld : config_.vm_config().log_destination()) {
+    keys.insert(ld.first);
+  }
+  for (const auto& ld : config_.vm_config().log_destination()) {
+    if (!keys.insert(ld.first).second) {
+      throw EnvoyException(fmt::format("Key {} is duplicated in "
+                                       "envoy.extensions.wasm.v3.VmConfig.log_destination for {}. "
+                                       "All the keys must be unique.",
+                                       ld.first, config_.name()));
+    }
+  }
+  // Construct merged key-value pairs. Also check for boundary conditions
+  // (e.g. empty file path).
+  for (const auto& ld : config_.vm_config().log_destination()) {
+    if (ld.second.file_path().empty()) {
+      throw EnvoyException(
+          fmt::format("Key {} value envoy.extensions.wasm.v3.VmConfig.LogDestination.file_path "
+                      "must not be empty for {}.",
+                      ld.first, config_.name()));
+    }
+    log_destinations_[ld.first] = ld.second.file_path();
+  }
 }
 
 } // namespace Wasm

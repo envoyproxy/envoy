@@ -18,6 +18,7 @@ namespace Wasm {
 
 // clang-format off
 using EnvironmentVariableMap = std::unordered_map<std::string, std::string>;
+using LogDestinationMap = std::unordered_map<std::string, std::string>;
 // clang-format on
 
 class WasmConfig {
@@ -26,11 +27,13 @@ public:
   const envoy::extensions::wasm::v3::PluginConfig& config() { return config_; }
   proxy_wasm::AllowedCapabilitiesMap& allowedCapabilities() { return allowed_capabilities_; }
   EnvironmentVariableMap& environmentVariables() { return envs_; }
+  LogDestinationMap& logDestinations() { return log_destinations_; }
 
 private:
   const envoy::extensions::wasm::v3::PluginConfig config_;
   proxy_wasm::AllowedCapabilitiesMap allowed_capabilities_{};
   EnvironmentVariableMap envs_;
+  LogDestinationMap log_destinations_;
 };
 
 using WasmConfigPtr = std::unique_ptr<WasmConfig>;
