@@ -41,6 +41,9 @@ minor_behavior_changes:
 - area: matchers
   change: |
     Moved all of the network input matchers to extensions. If you use network matchers and override extensions_build_config.bzl you will now need to include them explicitly.
+- area: matchers
+  change: |
+    Added dynamic metadata to the MatchingData object to enable writing matcher_tree input objects that can parse provided dynamic metadata.
 - area: skywalking
   change: |
     If sw8 header is invalid, skywalking extension will create a new trace context and a null span respectively when sampling is enabled and disabled.
