@@ -896,6 +896,9 @@ TEST_P(TcpTunnelingIntegrationTest, HeaderEvaluatorConfigUpdate) {
                 .getStringView(),
             "2");
   upstream_request_2->encodeHeaders(default_response_headers_, false);
+  // Write some data for ensuring the response headers is finished.
+  ASSERT_TRUE(tcp_client_2->write("hello", false));
+  ASSERT_TRUE(upstream_request_2->waitForData(*dispatcher_, 5));
 
   tcp_client_->close();
   tcp_client_2->close();
