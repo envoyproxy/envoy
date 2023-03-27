@@ -568,8 +568,9 @@ void DecoderImpl::decodeAndBufferHelper(Buffer::Instance& data, DecodeType dtype
     offset -= INT_LENGTH + len;
     // Decode full packets with BufferFragment.
     Buffer::OwnedImpl full_packets;
-    Buffer::BufferFragmentImpl* frag =
-        new Buffer::BufferFragmentImpl(data.linearize(data.length()), offset, nullptr);
+    Buffer::BufferFragmentImpl* frag = new Buffer::BufferFragmentImpl(
+        data.linearize(data.length()), offset,
+        [](const void*, size_t, const Buffer::BufferFragmentImpl* frag) { delete frag; });
     full_packets.addBufferFragment(*frag);
     decode(full_packets, dtype);
 
