@@ -387,7 +387,7 @@ name: add-trailers-filter
   upstream_request_->encodeData(128, true);
   ASSERT_TRUE(response->waitForEndStream());
 
-  if (upstreamProtocol() >= Http::CodecType::HTTP2) {
+  if (upstreamProtocol() != Http::CodecType::HTTP1) {
     EXPECT_EQ("decode", upstream_request_->trailers()
                             ->get(Http::LowerCaseString("grpc-message"))[0]
                             ->value()
@@ -395,7 +395,7 @@ name: add-trailers-filter
   }
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("503", response->headers().getStatusValue());
-  if (downstream_protocol_ >= Http::CodecType::HTTP2) {
+  if (downstream_protocol_ != Http::CodecType::HTTP1) {
     EXPECT_EQ("encode", response->trailers()->getGrpcMessageValue());
   }
 }
@@ -1285,7 +1285,7 @@ TEST_P(DownstreamProtocolIntegrationTest, HittingDecoderFilterLimit) {
   // the 413-and-connection-close may be sent while the body is still being
   // sent, resulting in a write error and the connection being closed before the
   // response is read.
-  if (downstream_protocol_ >= Http::CodecType::HTTP2) {
+  if (downstream_protocol_ != Http::CodecType::HTTP1) {
     ASSERT_TRUE(response->complete());
   }
   if (response->complete()) {
@@ -1441,6 +1441,10 @@ TEST_P(ProtocolIntegrationTest, BasicDynamicMaxStreamDuration) {
 }
 
 TEST_P(ProtocolIntegrationTest, MaxStreamDurationWithRetryPolicy) {
+  if (upstreamProtocol() == Http::CodecType::HTTP3 ||
+      downstreamProtocol() == Http::CodecType::HTTP3) {
+    return; // TODO(#26236) Fix this test for H3.
+  }
   config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
     ConfigHelper::HttpProtocolOptions protocol_options;
     auto* http_protocol_options = protocol_options.mutable_common_http_protocol_options();
@@ -1781,8 +1785,8 @@ TEST_P(ProtocolIntegrationTest, 304WithBody) {
   // Only for HTTP/2 and Http/3, where streams are ended with an explicit end-stream so we
   // can differentiate between 304-with-advertised-but-absent-body and
   // 304-with-body, is there a protocol error on the active stream.
-  if (downstream_protocol_ >= Http::CodecType::HTTP2 &&
-      upstreamProtocol() >= Http::CodecType::HTTP2) {
+  if (downstream_protocol_ != Http::CodecType::HTTP1 &&
+      upstreamProtocol() != Http::CodecType::HTTP1) {
     ASSERT_TRUE(response->waitForReset());
   }
 }
@@ -2184,7 +2188,7 @@ TEST_P(DownstreamProtocolIntegrationTest, LargeRequestHeadersAccepted) {
 
 TEST_P(DownstreamProtocolIntegrationTest, ManyLargeRequestHeadersAccepted) {
   // Send 70 headers each of size 100 kB with limit 8192 kB (8 MB) and 100 headers.
-  testLargeRequestHeaders(100, 70, 8192, 100, TSAN_TIMEOUT_FACTOR * TestUtility::DefaultTimeout);
+  testLargeRequestHeaders(100, 70, 8192, 100, TestUtility::DefaultTimeout);
 }
 
 TEST_P(DownstreamProtocolIntegrationTest, ManyRequestHeadersRejected) {

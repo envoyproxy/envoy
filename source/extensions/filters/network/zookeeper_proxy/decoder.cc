@@ -299,7 +299,7 @@ void DecoderImpl::skipAcls(Buffer::Instance& data, uint64_t& offset) {
 
 void DecoderImpl::parseCreateRequest(Buffer::Instance& data, uint64_t& offset, uint32_t len,
                                      OpCodes opcode) {
-  ensureMinLength(len, XID_LENGTH + OPCODE_LENGTH + (3 * INT_LENGTH));
+  ensureMinLength(len, XID_LENGTH + OPCODE_LENGTH + (4 * INT_LENGTH));
 
   const std::string path = helper_.peekString(data, offset);
 
@@ -375,7 +375,7 @@ std::string DecoderImpl::pathOnlyRequest(Buffer::Instance& data, uint64_t& offse
 }
 
 void DecoderImpl::parseCheckRequest(Buffer::Instance& data, uint64_t& offset, uint32_t len) {
-  ensureMinLength(len, (2 * INT_LENGTH));
+  ensureMinLength(len, XID_LENGTH + OPCODE_LENGTH + (2 * INT_LENGTH));
 
   const std::string path = helper_.peekString(data, offset);
   const int32_t version = helper_.peekInt32(data, offset);
@@ -406,6 +406,9 @@ void DecoderImpl::parseMultiRequest(Buffer::Instance& data, uint64_t& offset, ui
       break;
     case OpCodes::Check:
       parseCheckRequest(data, offset, len);
+      break;
+    case OpCodes::Delete:
+      parseDeleteRequest(data, offset, len);
       break;
     default:
       throw EnvoyException(fmt::format("Unknown opcode within a transaction: {}", opcode));

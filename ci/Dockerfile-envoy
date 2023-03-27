@@ -20,6 +20,10 @@ FROM ${BUILD_OS}:${BUILD_TAG} AS envoy-base
 ENV DEBIAN_FRONTEND=noninteractive
 RUN mkdir -p /etc/envoy
 RUN adduser --group --system envoy
+# NB: Adding this here means that following steps, for example updating the system packages, are run
+#   when the version file changes. This should mean that a release version will always update.
+#   In PRs this will just use cached layers unless either this file changes or the version has changed.
+ADD VERSION.txt /etc/envoy
 RUN apt-get -qq update && apt-get -qq upgrade -y \
     && apt-get -qq install --no-install-recommends -y ca-certificates \
     && apt-get -qq autoremove -y && apt-get clean \

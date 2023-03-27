@@ -858,6 +858,7 @@ private extension EngineBuilder {
 
     cxxBuilder.addStatsSinks(self.statsSinks.toCXX())
 
+#if ENVOY_GOOGLE_GRPC
     if
       let nodeRegion = self.nodeRegion,
       let nodeZone = self.nodeZone,
@@ -890,6 +891,7 @@ private extension EngineBuilder {
     if self.enableCds {
       cxxBuilder.addCdsLayer(self.cdsResourcesLocator.toCXX(), Int32(self.cdsTimeoutSeconds))
     }
+#endif
     return cxxBuilder.generateBootstrap()
   }
   // swiftlint:enable cyclomatic_complexity
