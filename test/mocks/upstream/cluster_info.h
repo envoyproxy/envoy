@@ -187,6 +187,7 @@ public:
                Http::FilterChainManager& manager),
               (const));
   MOCK_METHOD(Http::HeaderValidatorPtr, makeHeaderValidator, (Http::Protocol), (const));
+  MOCK_METHOD(const envoy::config::cluster::v3::Cluster, originalClusterConfig, (), (const));
 
   Http::Http1::CodecStats& http1CodecStats() const override;
   Http::Http2::CodecStats& http2CodecStats() const override;

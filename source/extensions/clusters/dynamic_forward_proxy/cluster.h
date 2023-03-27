@@ -43,8 +43,24 @@ public:
                                Network::DnsResolver::ResolutionStatus) override {}
 
   bool allowCoalescedConnections() const { return allow_coalesced_connections_; }
+  bool enableStrictDnsCluster() const { return enable_strict_dns_cluster_; }
+  Upstream::HostConstSharedPtr chooseHost(absl::string_view host,
+                                          Upstream::LoadBalancerContext* context);
 
 private:
+  struct ClusterInfo {
+    ClusterInfo(std::string cluster_name, Cluster& parent);
+    void touch();
+    void checkIdle();
+
+    std::string cluster_name_;
+    Cluster& parent_;
+    Event::TimerPtr idle_timer_;
+    std::atomic<std::chrono::steady_clock::duration> last_used_time_;
+  };
+
+  using ClusterInfoMap = absl::flat_hash_map<std::string, std::shared_ptr<ClusterInfo>>;
+
   struct HostInfo {
     HostInfo(const Extensions::Common::DynamicForwardProxy::DnsHostInfoSharedPtr& shared_host_info,
              const Upstream::LogicalHostSharedPtr& logical_host)
@@ -59,7 +75,7 @@ private:
   class LoadBalancer : public Upstream::LoadBalancer,
                        public Envoy::Http::ConnectionPool::ConnectionLifetimeCallbacks {
   public:
-    LoadBalancer(const Cluster& cluster) : cluster_(cluster) {}
+    LoadBalancer(Cluster& cluster) : cluster_(cluster) {}
 
     // Upstream::LoadBalancer
     Upstream::HostConstSharedPtr chooseHost(Upstream::LoadBalancerContext* context) override;
@@ -101,7 +117,7 @@ private:
 
     absl::flat_hash_map<LookupKey, std::vector<ConnectionInfo>, LookupKeyHash> connection_info_map_;
 
-    const Cluster& cluster_;
+    Cluster& cluster_;
   };
 
   class LoadBalancerFactory : public Upstream::LoadBalancerFactory {
@@ -147,12 +163,21 @@ private:
   const envoy::config::endpoint::v3::LocalityLbEndpoints dummy_locality_lb_endpoint_;
   const envoy::config::endpoint::v3::LbEndpoint dummy_lb_endpoint_;
   const LocalInfo::LocalInfo& local_info_;
+  Event::Dispatcher& main_thread_dispatcher_;
+  const std::chrono::milliseconds refresh_interval_;
+  const std::chrono::milliseconds host_ttl_;
 
   // True if H2 and H3 connections may be reused across different origins.
   const bool allow_coalesced_connections_;
 
   mutable absl::Mutex host_map_lock_;
   HostInfoMap host_map_ ABSL_GUARDED_BY(host_map_lock_);
+
+  mutable absl::Mutex cluster_map_lock_;
+  ClusterInfoMap cluster_map_ ABSL_GUARDED_BY(cluster_map_lock_);
+
+  Upstream::ClusterManager& cm_;
+  bool enable_strict_dns_cluster_;
 
   friend class ClusterFactory;
   friend class ClusterTest;

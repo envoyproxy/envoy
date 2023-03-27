@@ -107,6 +107,8 @@ FALSE_RUNTIME_GUARD(envoy_reloadable_features_always_use_v6);
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_no_delay_close_for_upgrades);
 // TODO(pradeepcrao) reset this to true after 2 releases (1.27)
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_enable_include_histograms);
+// TODO(doujiang24) reset this to true when it keep strict backward compability.
+FALSE_RUNTIME_GUARD(envoy_reloadable_features_enable_strict_dns_sub_cluster_for_dfp_cluster);
 
 // Block of non-boolean flags. Use of int flags is deprecated. Do not add more.
 ABSL_FLAG(uint64_t, re2_max_program_size_error_level, 100, ""); // NOLINT

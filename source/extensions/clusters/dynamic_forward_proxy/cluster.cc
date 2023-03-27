@@ -30,7 +30,14 @@ Cluster::Cluster(
       dns_cache_manager_(cache_manager_factory.get()),
       dns_cache_(dns_cache_manager_->getCache(config.dns_cache_config())),
       update_callbacks_handle_(dns_cache_->addUpdateCallbacks(*this)), local_info_(local_info),
-      allow_coalesced_connections_(config.allow_coalesced_connections()) {}
+      main_thread_dispatcher_(server_context.mainThreadDispatcher()),
+      refresh_interval_(
+          PROTOBUF_GET_MS_OR_DEFAULT(config.dns_cache_config(), dns_refresh_rate, 60000)),
+      host_ttl_(PROTOBUF_GET_MS_OR_DEFAULT(config.dns_cache_config(), host_ttl, 300000)),
+      allow_coalesced_connections_(config.allow_coalesced_connections()),
+      cm_(context.clusterManager()),
+      enable_strict_dns_cluster_(Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.enable_strict_dns_sub_cluster_for_dfp_cluster")) {}
 
 void Cluster::startPreInit() {
   // If we are attaching to a pre-populated cache we need to initialize our hosts.
@@ -45,6 +52,91 @@ void Cluster::startPreInit() {
   onPreInitComplete();
 }
 
+Upstream::HostConstSharedPtr Cluster::chooseHost(absl::string_view host,
+                                                 Upstream::LoadBalancerContext* context) {
+  uint16_t default_port = 80;
+  if (info_->transportSocketMatcher().resolve(nullptr).factory_.implementsSecureTransport()) {
+    default_port = 443;
+  }
+
+  const auto host_attributes = Http::Utility::parseAuthority(host);
+  auto dynamic_host = std::string(host_attributes.host_);
+  auto port = host_attributes.port_.value_or(default_port);
+
+  // cluster name is prefix + host + port
+  auto dynamic_cluster_name = "DFPCluster:" + dynamic_host + ":" + std::to_string(port);
+
+  // try again to get the real cluster.
+  auto dynamic_cluster = cm_.getThreadLocalCluster(dynamic_cluster_name);
+  if (dynamic_cluster == nullptr) {
+    return nullptr;
+  }
+
+  auto chosen_host = dynamic_cluster->loadBalancer().chooseHost(context);
+  if (chosen_host == nullptr) {
+    return nullptr;
+  }
+
+  // TODO: check cluster in cluster_map.
+  // 1. if cluster not existing, add to cluster map, and create a idle timeout timer.
+  // 2. if cluster existing, update the last active time.
+  {
+    absl::ReaderMutexLock lock{&cluster_map_lock_};
+    const auto cluster_it = cluster_map_.find(dynamic_cluster_name);
+    if (cluster_it != cluster_map_.end()) {
+      cluster_it->second->touch();
+      return chosen_host;
+    }
+  }
+  {
+    absl::WriterMutexLock lock{&cluster_map_lock_};
+    const auto cluster_it = cluster_map_.find(dynamic_cluster_name);
+    if (cluster_it == cluster_map_.end()) {
+      cluster_map_.emplace(dynamic_cluster_name,
+                           std::make_shared<ClusterInfo>(dynamic_cluster_name, *this));
+    } else {
+      cluster_it->second->touch();
+    }
+  }
+  return chosen_host;
+}
+
+Cluster::ClusterInfo::ClusterInfo(std::string cluster_name, Cluster& parent)
+    : cluster_name_(cluster_name), parent_(parent) {
+  ENVOY_LOG(debug, "cluster='{}' created, enable TTL check", cluster_name_);
+  parent_.main_thread_dispatcher_.post([this]() {
+    idle_timer_ = parent_.main_thread_dispatcher_.createTimer([this]() { checkIdle(); });
+    std::chrono::seconds dns_ttl =
+        std::chrono::duration_cast<std::chrono::seconds>(parent_.refresh_interval_);
+    idle_timer_->enableTimer(std::chrono::milliseconds(dns_ttl));
+  });
+  touch();
+}
+
+void Cluster::ClusterInfo::touch() {
+  last_used_time_ = parent_.time_source_.monotonicTime().time_since_epoch();
+}
+
+// checkIdle run in the main thread.
+void Cluster::ClusterInfo::checkIdle() {
+  ASSERT(parent_.main_thread_dispatcher_.isThreadSafe());
+
+  const std::chrono::steady_clock::duration now_duration =
+      parent_.main_thread_dispatcher_.timeSource().monotonicTime().time_since_epoch();
+  auto last_used_time = last_used_time_.load();
+  ENVOY_LOG(debug, "cluster='{}' TTL check: now={} last_used={} TTL {}", cluster_name_,
+            now_duration.count(), last_used_time.count(), parent_.host_ttl_.count());
+
+  if ((now_duration - last_used_time) > parent_.host_ttl_) {
+    ENVOY_LOG(debug, "cluster='{}' TTL expired, removing in main thread", cluster_name_);
+    parent_.cm_.removeCluster(cluster_name_);
+  } else {
+    std::chrono::seconds dns_ttl =
+        std::chrono::duration_cast<std::chrono::seconds>(parent_.refresh_interval_);
+    idle_timer_->enableTimer(std::chrono::milliseconds(dns_ttl));
+  }
+}
+
 void Cluster::addOrUpdateHost(
     absl::string_view host,
     const Extensions::Common::DynamicForwardProxy::DnsHostInfoSharedPtr& host_info,
@@ -55,9 +147,10 @@ void Cluster::addOrUpdateHost(
 
     // NOTE: Right now we allow a DNS cache to be shared between multiple clusters. Though we have
     // connection/request circuit breakers on the cluster, we don't have any way to control the
-    // maximum hosts on a cluster. We currently assume that host data shared via shared pointer is a
-    // marginal memory cost above that already used by connections and requests, so relying on
-    // connection/request circuit breakers is sufficient. We may have to revisit this in the future.
+    // maximum hosts on a cluster. We currently assume that host data shared via shared pointer is
+    // a marginal memory cost above that already used by connections and requests, so relying on
+    // connection/request circuit breakers is sufficient. We may have to revisit this in the
+    // future.
     const auto host_map_it = host_map_.find(host);
     if (host_map_it != host_map_.end()) {
       // If we only have an address change, we can do that swap inline without any other updates.
@@ -172,6 +265,11 @@ Cluster::LoadBalancer::chooseHost(Upstream::LoadBalancerContext* context) {
   if (host.empty()) {
     return nullptr;
   }
+
+  if (cluster_.enableStrictDnsCluster()) {
+    return cluster_.chooseHost(host, context);
+  }
+
   {
     absl::ReaderMutexLock lock{&cluster_.host_map_lock_};
     const auto host_it = cluster_.host_map_.find(host);

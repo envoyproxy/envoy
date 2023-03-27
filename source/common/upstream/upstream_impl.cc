@@ -1074,7 +1074,7 @@ ClusterInfoImpl::ClusterInfoImpl(
           http_protocol_options_->common_http_protocol_options_, max_headers_count,
           runtime_.snapshot().getInteger(Http::MaxResponseHeadersCountOverrideKey,
                                          Http::DEFAULT_MAX_HEADERS_COUNT))),
-      type_(config.type()),
+      type_(config.type()), original_config_(config),
       drain_connections_on_host_removal_(config.ignore_health_on_host_removal()),
       connection_pool_per_downstream_connection_(
           config.connection_pool_per_downstream_connection()),

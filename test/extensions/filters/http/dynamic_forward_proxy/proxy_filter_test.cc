@@ -7,6 +7,7 @@
 
 #include "test/extensions/common/dynamic_forward_proxy/mocks.h"
 #include "test/mocks/http/mocks.h"
+#include "test/mocks/server/factory_context.h"
 #include "test/mocks/upstream/basic_resource_limit.h"
 #include "test/mocks/upstream/cluster_manager.h"
 #include "test/mocks/upstream/transport_socket_match.h"
@@ -50,7 +51,7 @@ public:
     EXPECT_CALL(*dns_cache_manager_, getCache(_));
 
     envoy::extensions::filters::http::dynamic_forward_proxy::v3::FilterConfig proto_config;
-    filter_config_ = std::make_shared<ProxyFilterConfig>(proto_config, *this, cm_);
+    filter_config_ = std::make_shared<ProxyFilterConfig>(proto_config, *this, factory_context_);
     filter_ = std::make_unique<ProxyFilter>(filter_config_);
 
     filter_->setDecoderFilterCallbacks(callbacks_);
@@ -88,6 +89,7 @@ public:
       new Network::MockTransportSocketFactory()};
   NiceMock<Upstream::MockTransportSocketMatcher>* transport_socket_match_;
   Upstream::MockClusterManager cm_;
+  NiceMock<Server::Configuration::MockFactoryContext> factory_context_;
   ProxyFilterConfigSharedPtr filter_config_;
   std::unique_ptr<ProxyFilter> filter_;
   NiceMock<Http::MockStreamDecoderFilterCallbacks> callbacks_;
@@ -381,7 +383,7 @@ public:
     envoy::extensions::filters::http::dynamic_forward_proxy::v3::FilterConfig proto_config;
     proto_config.set_save_upstream_address(true);
 
-    filter_config_ = std::make_shared<ProxyFilterConfig>(proto_config, *this, cm_);
+    filter_config_ = std::make_shared<ProxyFilterConfig>(proto_config, *this, factory_context_);
     filter_ = std::make_unique<ProxyFilter>(filter_config_);
 
     filter_->setDecoderFilterCallbacks(callbacks_);

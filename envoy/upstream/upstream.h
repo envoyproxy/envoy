@@ -1192,6 +1192,8 @@ public:
    */
   virtual Http::HeaderValidatorPtr makeHeaderValidator(Http::Protocol protocol) const PURE;
 
+  virtual const envoy::config::cluster::v3::Cluster originalClusterConfig() const PURE;
+
 protected:
   /**
    * Invoked by extensionProtocolOptionsTyped.

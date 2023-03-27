@@ -2,10 +2,12 @@
 
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/config/core/v3/base.pb.h"
+#include "envoy/extensions/clusters/dynamic_forward_proxy/v3/cluster.pb.h"
 #include "envoy/extensions/filters/http/dynamic_forward_proxy/v3/dynamic_forward_proxy.pb.h"
 
 #include "source/common/http/utility.h"
 #include "source/common/network/filter_state_proxy_info.h"
+#include "source/common/protobuf/protobuf.h"
 #include "source/common/runtime/runtime_features.h"
 #include "source/common/stream_info/upstream_address.h"
 #include "source/extensions/common/dynamic_forward_proxy/dns_cache.h"
@@ -45,11 +47,105 @@ using LoadDnsCacheEntryStatus = Common::DynamicForwardProxy::DnsCache::LoadDnsCa
 ProxyFilterConfig::ProxyFilterConfig(
     const envoy::extensions::filters::http::dynamic_forward_proxy::v3::FilterConfig& proto_config,
     Extensions::Common::DynamicForwardProxy::DnsCacheManagerFactory& cache_manager_factory,
-    Upstream::ClusterManager& cluster_manager)
+    Server::Configuration::FactoryContext& context)
     : dns_cache_manager_(cache_manager_factory.get()),
       dns_cache_(dns_cache_manager_->getCache(proto_config.dns_cache_config())),
-      cluster_manager_(cluster_manager),
-      save_upstream_address_(proto_config.save_upstream_address()) {}
+      cluster_manager_(context.clusterManager()),
+      main_thread_dispatcher_(context.mainThreadDispatcher()), tls_slot_(context.threadLocal()),
+      save_upstream_address_(proto_config.save_upstream_address()),
+      enable_strict_dns_cluster_(Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.enable_strict_dns_sub_cluster_for_dfp_cluster")) {
+  tls_slot_.set(
+      [&](Event::Dispatcher&) { return std::make_shared<ThreadLocalClusterInfo>(*this); });
+}
+
+LoadClusterEntryHandlePtr
+ProxyFilterConfig::addDynamicCluster(Upstream::ClusterInfoConstSharedPtr parent_info,
+                                     const std::string& cluster_name, const std::string& host,
+                                     const int port, LoadClusterEntryCallbacks& callbacks) {
+  // clone cluster config from the parent DFP cluster.
+  envoy::config::cluster::v3::Cluster config = parent_info->originalClusterConfig();
+
+  // inherit dns config from cluster_type
+  auto cluster_type = config.cluster_type();
+  envoy::extensions::clusters::dynamic_forward_proxy::v3::ClusterConfig proto_config;
+  MessageUtil::unpackTo(cluster_type.typed_config(), proto_config);
+  config.set_dns_lookup_family(proto_config.dns_cache_config().dns_lookup_family());
+
+  // overwrite to a strict_dns cluster.
+  config.set_name(cluster_name);
+  config.clear_cluster_type();
+  config.set_type(
+      envoy::config::cluster::v3::Cluster_DiscoveryType::Cluster_DiscoveryType_STRICT_DNS);
+  config.set_lb_policy(envoy::config::cluster::v3::Cluster_LbPolicy::Cluster_LbPolicy_ROUND_ROBIN);
+
+  /*
+    config.set_dns_lookup_family(
+        envoy::config::cluster::v3::Cluster_DnsLookupFamily::Cluster_DnsLookupFamily_V4_ONLY);
+    config.mutable_connect_timeout()->CopyFrom(
+        Protobuf::util::TimeUtil::MillisecondsToDuration(parent_info->connectTimeout().count()));
+  */
+
+  auto load_assignments = config.mutable_load_assignment();
+  load_assignments->set_cluster_name(cluster_name);
+  load_assignments->clear_endpoints();
+
+  auto socket_address = load_assignments->add_endpoints()
+                            ->add_lb_endpoints()
+                            ->mutable_endpoint()
+                            ->mutable_address()
+                            ->mutable_socket_address();
+  socket_address->set_address(host);
+  socket_address->set_port_value(port);
+
+  std::string version_info = "";
+
+  ENVOY_LOG(debug, "deliver dynamic cluster {} creation to main thread", cluster_name);
+  main_thread_dispatcher_.post([this, cluster = config, version_info]() {
+    ENVOY_LOG(debug, "initilizing dynamic cluster {} creation in main thread", cluster.name());
+    cluster_manager_.addOrUpdateCluster(cluster, version_info);
+  });
+
+  // register a callback that will continue the request when the created cluster is ready.
+  ENVOY_LOG(debug, "adding pending cluster for: {}", cluster_name);
+  ThreadLocalClusterInfo& tls_cluster_info = *tls_slot_;
+  return std::make_unique<LoadClusterEntryHandleImpl>(tls_cluster_info.pending_clusters_,
+                                                      cluster_name, callbacks);
+}
+
+Upstream::ClusterUpdateCallbacksHandlePtr
+ProxyFilterConfig::addThreadLocalClusterUpdateCallbacks() {
+  return cluster_manager_.addThreadLocalClusterUpdateCallbacks(*this);
+}
+
+ProxyFilterConfig::ThreadLocalClusterInfo::~ThreadLocalClusterInfo() {
+  for (const auto& it : pending_clusters_) {
+    for (auto cluster : it.second) {
+      cluster->cancel();
+    }
+  }
+}
+
+void ProxyFilterConfig::onClusterAddOrUpdate(Upstream::ThreadLocalCluster& cluster) {
+  const std::string& cluster_name = cluster.info()->name();
+  ENVOY_LOG(debug, "thread local cluster {} added or updated", cluster_name);
+  ThreadLocalClusterInfo& tls_cluster_info = *tls_slot_;
+  auto it = tls_cluster_info.pending_clusters_.find(cluster_name);
+  if (it != tls_cluster_info.pending_clusters_.end()) {
+    for (auto* cluster : it->second) {
+      auto& callbacks = cluster->callbacks_;
+      cluster->cancel();
+      callbacks.onLoadClusterComplete();
+    }
+    tls_cluster_info.pending_clusters_.erase(it);
+  } else {
+    ENVOY_LOG(debug, "but not pending request waiting on {}", cluster_name);
+  }
+}
+
+void ProxyFilterConfig::onClusterRemoval(const std::string&) {
+  // do nothing, should have no pending clusters.
+}
 
 ProxyPerRouteConfig::ProxyPerRouteConfig(
     const envoy::extensions::filters::http::dynamic_forward_proxy::v3::PerRouteConfig& config)
@@ -57,10 +153,11 @@ ProxyPerRouteConfig::ProxyPerRouteConfig(
       host_rewrite_header_(Http::LowerCaseString(config.host_rewrite_header())) {}
 
 void ProxyFilter::onDestroy() {
-  // Make sure we destroy any active cache load handle in case we are getting reset and deferred
-  // deleted.
+  // Make sure we destroy any active cache/cluster load handle in case we are getting reset and
+  // deferred deleted.
   cache_load_handle_.reset();
   circuit_breaker_.reset();
+  cluster_load_handle_.reset();
 }
 
 bool ProxyFilter::isProxying() {
@@ -101,16 +198,6 @@ Http::FilterHeadersStatus ProxyFilter::decodeHeaders(Http::RequestHeaderMap& hea
     return Http::FilterHeadersStatus::Continue;
   }
 
-  circuit_breaker_ = config_->cache().canCreateDnsRequest();
-
-  if (circuit_breaker_ == nullptr) {
-    ENVOY_STREAM_LOG(debug, "pending request overflow", *this->decoder_callbacks_);
-    this->decoder_callbacks_->sendLocalReply(
-        Http::Code::ServiceUnavailable, ResponseStrings::get().PendingRequestOverflow, nullptr,
-        absl::nullopt, RcDetails::get().PendingRequestOverflow);
-    return Http::FilterHeadersStatus::StopIteration;
-  }
-
   uint16_t default_port = 80;
   if (cluster_info_->transportSocketMatcher()
           .resolve(nullptr)
@@ -140,8 +227,23 @@ Http::FilterHeadersStatus ProxyFilter::decodeHeaders(Http::RequestHeaderMap& hea
     }
   }
 
+  if (config_->enableStrictDnsCluster()) {
+    return loadDynamicCluster(headers, default_port);
+  }
+
+  circuit_breaker_ = config_->cache().canCreateDnsRequest();
+
+  if (circuit_breaker_ == nullptr) {
+    ENVOY_STREAM_LOG(debug, "pending request overflow", *this->decoder_callbacks_);
+    this->decoder_callbacks_->sendLocalReply(
+        Http::Code::ServiceUnavailable, ResponseStrings::get().PendingRequestOverflow, nullptr,
+        absl::nullopt, RcDetails::get().PendingRequestOverflow);
+    return Http::FilterHeadersStatus::StopIteration;
+  }
+
   latchTime(decoder_callbacks_, DNS_START);
-  // See the comments in dns_cache.h for how loadDnsCacheEntry() handles hosts with embedded ports.
+  // See the comments in dns_cache.h for how loadDnsCacheEntry() handles hosts with embedded
+  // ports.
   // TODO(mattklein123): Because the filter and cluster have independent configuration, it is
   //                     not obvious to the user if something is misconfigured. We should see if
   //                     we can do better here, perhaps by checking the cache to see if anything
@@ -183,6 +285,33 @@ Http::FilterHeadersStatus ProxyFilter::decodeHeaders(Http::RequestHeaderMap& hea
   PANIC_DUE_TO_CORRUPT_ENUM;
 }
 
+Http::FilterHeadersStatus ProxyFilter::loadDynamicCluster(Http::RequestHeaderMap& headers,
+                                                          uint16_t default_port) {
+  const auto host_attributes = Http::Utility::parseAuthority(headers.getHostValue());
+  auto host = std::string(host_attributes.host_);
+  auto port = host_attributes.port_.value_or(default_port);
+  // TODO: another cluster type when it's an IP.
+  // host_attributes.is_ip_address_;
+
+  latchTime(decoder_callbacks_, DNS_START);
+
+  // cluster name is prefix + host + port
+  auto cluster_name = "DFPCluster:" + host + ":" + std::to_string(port);
+  Upstream::ThreadLocalCluster* dfp_cluster =
+      config_->clusterManager().getThreadLocalCluster(cluster_name);
+  if (dfp_cluster) {
+    // DFP cluster already exists
+    latchTime(decoder_callbacks_, DNS_END);
+    return Http::FilterHeadersStatus::Continue;
+  }
+
+  // not found, create a new cluster & register a callback to tls
+  cluster_load_handle_ = config_->addDynamicCluster(cluster_info_, cluster_name, host, port, *this);
+  ASSERT(cluster_load_handle_ != nullptr);
+  ENVOY_STREAM_LOG(debug, "waiting to load cluster entry", *decoder_callbacks_);
+  return Http::FilterHeadersStatus::StopAllIterationAndWatermark;
+}
+
 void ProxyFilter::addHostAddressToFilterState(
     const Network::Address::InstanceConstSharedPtr& address) {
   ASSERT(address); // null pointer checks must be done before calling this function.
@@ -203,6 +332,12 @@ void ProxyFilter::addHostAddressToFilterState(
   filter_state->setData(StreamInfo::UpstreamAddress::key(), std::move(address_obj),
                         StreamInfo::FilterState::StateType::Mutable,
                         StreamInfo::FilterState::LifeSpan::Request);
+}
+
+void ProxyFilter::onLoadClusterComplete() {
+  latchTime(decoder_callbacks_, DNS_END);
+  ENVOY_STREAM_LOG(debug, "load cluster complete, continuing", *decoder_callbacks_);
+  decoder_callbacks_->continueDecoding();
 }
 
 void ProxyFilter::onDnsResolutionFail() {
