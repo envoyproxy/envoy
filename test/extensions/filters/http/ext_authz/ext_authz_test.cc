@@ -114,7 +114,7 @@ public:
     EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers, false));
     EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(response_data, false));
     EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->encodeTrailers(response_trailers));
-    EXPECT_EQ(Http::FilterMetadataStatus::Continue, filter_->encodeMetadata(response_metadata));
+    EXPECT_EQ(Http::FilterMetadataStatus::ContinueOnlyMetadata, filter_->encodeMetadata(response_metadata));
   }
 
   NiceMock<Stats::MockIsolatedStatsStore> stats_store_;
@@ -1217,7 +1217,7 @@ TEST_F(HttpFilterTest, MetadataContext) {
 
   filter_->decodeHeaders(request_headers_, false);
   Http::MetadataMap metadata_map{{"metadata", "metadata"}};
-  EXPECT_EQ(Http::FilterMetadataStatus::Continue, filter_->decodeMetadata(metadata_map));
+  EXPECT_EQ(Http::FilterMetadataStatus::ContinueOnlyMetadata, filter_->decodeMetadata(metadata_map));
 
   EXPECT_EQ("john", check_request.attributes()
                         .metadata_context()
@@ -1629,7 +1629,7 @@ TEST_P(HttpFilterTestParam, ContextExtensions) {
   // Engage the filter so that check is called.
   filter_->decodeHeaders(request_headers_, false);
   Http::MetadataMap metadata_map{{"metadata", "metadata"}};
-  EXPECT_EQ(Http::FilterMetadataStatus::Continue, filter_->decodeMetadata(metadata_map));
+  EXPECT_EQ(Http::FilterMetadataStatus::ContinueOnlyMetadata, filter_->decodeMetadata(metadata_map));
 
   // Make sure that the extensions appear in the check request issued by the filter.
   EXPECT_EQ("value_vhost", check_request.attributes().context_extensions().at("key_vhost"));
@@ -2001,7 +2001,7 @@ TEST_P(HttpFilterTestParam, ImmediateOkResponseWithHttpAttributes) {
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers, false));
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(response_data, false));
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->encodeTrailers(response_trailers));
-  EXPECT_EQ(Http::FilterMetadataStatus::Continue, filter_->encodeMetadata(response_metadata));
+  EXPECT_EQ(Http::FilterMetadataStatus::ContinueOnlyMetadata, filter_->encodeMetadata(response_metadata));
   EXPECT_EQ(Http::HeaderUtility::getAllOfHeaderAsString(response_headers,
                                                         Http::LowerCaseString("set-cookie"))
                 .result()

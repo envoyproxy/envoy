@@ -515,7 +515,7 @@ TEST_F(GrpcJsonTranscoderFilterTest, NoTranscoding) {
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers, false));
   EXPECT_EQ(expected_request_headers, request_headers);
   Http::MetadataMap metadata_map{{"metadata", "metadata"}};
-  EXPECT_EQ(Http::FilterMetadataStatus::Continue, filter_.decodeMetadata(metadata_map));
+  EXPECT_EQ(Http::FilterMetadataStatus::ContinueOnlyMetadata, filter_.decodeMetadata(metadata_map));
 
   Buffer::OwnedImpl request_data{"{}"};
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.decodeData(request_data, false));
@@ -583,7 +583,7 @@ TEST_F(GrpcJsonTranscoderFilterTest, TranscodingUnaryPost) {
   EXPECT_EQ(Http::Filter1xxHeadersStatus::Continue, filter_.encode1xxHeaders(continue_headers));
 
   Http::MetadataMap metadata_map{{"metadata", "metadata"}};
-  EXPECT_EQ(Http::FilterMetadataStatus::Continue, filter_.encodeMetadata(metadata_map));
+  EXPECT_EQ(Http::FilterMetadataStatus::ContinueOnlyMetadata, filter_.encodeMetadata(metadata_map));
 
   Http::TestResponseHeaderMapImpl response_headers{{"content-type", "application/grpc"},
                                                    {":status", "200"}};
@@ -781,7 +781,7 @@ TEST_F(GrpcJsonTranscoderFilterTest, ResponseBodyExceedsBufferLimit) {
   EXPECT_EQ(Http::Filter1xxHeadersStatus::Continue, filter_.encode1xxHeaders(continue_headers));
 
   Http::MetadataMap metadata_map{{"metadata", "metadata"}};
-  EXPECT_EQ(Http::FilterMetadataStatus::Continue, filter_.encodeMetadata(metadata_map));
+  EXPECT_EQ(Http::FilterMetadataStatus::ContinueOnlyMetadata, filter_.encodeMetadata(metadata_map));
 
   Http::TestResponseHeaderMapImpl response_headers{{"content-type", "application/grpc"},
                                                    {":status", "200"}};

@@ -116,7 +116,7 @@ Http::FilterMetadataStatus UpstreamCodecFilter::decodeMetadata(Http::MetadataMap
   Http::MetadataMapVector metadata_map_vector;
   metadata_map_vector.emplace_back(std::make_unique<Http::MetadataMap>(metadata_map));
   callbacks_->upstreamCallbacks()->upstream()->encodeMetadata(metadata_map_vector);
-  return Http::FilterMetadataStatus::Continue;
+  return Http::FilterMetadataStatus::ContinueOnlyMetadata;
 }
 
 // Store the callbacks from the UpstreamFilterManager, for sending the response to.

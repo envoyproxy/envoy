@@ -40,7 +40,7 @@ Http::FilterTrailersStatus Filter::decodeTrailers(Http::RequestTrailerMap& trail
 
 Http::FilterMetadataStatus Filter::decodeMetadata(Http::MetadataMap& metadata_map) {
   return delegateFilterActionOr(delegated_filter_, &StreamDecoderFilter::decodeMetadata,
-                                Http::FilterMetadataStatus::Continue, metadata_map);
+                                Http::FilterMetadataStatus::ContinueOnlyMetadata, metadata_map);
 }
 
 void Filter::decodeComplete() {
@@ -68,7 +68,7 @@ Http::FilterTrailersStatus Filter::encodeTrailers(Http::ResponseTrailerMap& trai
 }
 Http::FilterMetadataStatus Filter::encodeMetadata(Http::MetadataMap& metadata_map) {
   return delegateFilterActionOr(delegated_filter_, &StreamEncoderFilter::encodeMetadata,
-                                Http::FilterMetadataStatus::Continue, metadata_map);
+                                Http::FilterMetadataStatus::ContinueOnlyMetadata, metadata_map);
 }
 void Filter::encodeComplete() {
   if (delegated_filter_) {
@@ -132,7 +132,7 @@ Filter::StreamFilterWrapper::decodeTrailers(Http::RequestTrailerMap& trailers) {
 Http::FilterMetadataStatus
 Filter::StreamFilterWrapper::decodeMetadata(Http::MetadataMap& metadata_map) {
   return delegateFilterActionOr(decoder_filter_, &StreamDecoderFilter::decodeMetadata,
-                                Http::FilterMetadataStatus::Continue, metadata_map);
+                                Http::FilterMetadataStatus::ContinueOnlyMetadata, metadata_map);
 }
 void Filter::StreamFilterWrapper::setDecoderFilterCallbacks(
     Http::StreamDecoderFilterCallbacks& callbacks) {
@@ -169,7 +169,7 @@ Filter::StreamFilterWrapper::encodeTrailers(Http::ResponseTrailerMap& trailers) 
 Http::FilterMetadataStatus
 Filter::StreamFilterWrapper::encodeMetadata(Http::MetadataMap& metadata_map) {
   return delegateFilterActionOr(encoder_filter_, &StreamEncoderFilter::encodeMetadata,
-                                Http::FilterMetadataStatus::Continue, metadata_map);
+                                Http::FilterMetadataStatus::ContinueOnlyMetadata, metadata_map);
 }
 void Filter::StreamFilterWrapper::setEncoderFilterCallbacks(
     Http::StreamEncoderFilterCallbacks& callbacks) {

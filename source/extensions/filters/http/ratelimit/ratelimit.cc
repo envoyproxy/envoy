@@ -124,7 +124,7 @@ Http::FilterTrailersStatus Filter::encodeTrailers(Http::ResponseTrailerMap&) {
 }
 
 Http::FilterMetadataStatus Filter::encodeMetadata(Http::MetadataMap&) {
-  return Http::FilterMetadataStatus::Continue;
+  return Http::FilterMetadataStatus::ContinueOnlyMetadata;
 }
 
 void Filter::setEncoderFilterCallbacks(Http::StreamEncoderFilterCallbacks&) {}

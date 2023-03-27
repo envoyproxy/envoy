@@ -42,7 +42,7 @@ public:
 
   Http::FilterMetadataStatus decodeMetadata(Http::MetadataMap&) override {
     ASSERT(timer_triggered_);
-    return Http::FilterMetadataStatus::Continue;
+    return Http::FilterMetadataStatus::ContinueOnlyMetadata;
   }
 
 private:

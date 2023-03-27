@@ -50,7 +50,7 @@ public:
   Http::FilterDataStatus encodeData(Buffer::Instance&, bool) override;
   Http::FilterTrailersStatus encodeTrailers(Http::ResponseTrailerMap&) override;
   Http::FilterMetadataStatus encodeMetadata(Http::MetadataMap&) override {
-    return Http::FilterMetadataStatus::Continue;
+    return Http::FilterMetadataStatus::ContinueOnlyMetadata;
   }
   void setEncoderFilterCallbacks(Http::StreamEncoderFilterCallbacks& callbacks) override {
     encoder_callbacks_ = &callbacks;

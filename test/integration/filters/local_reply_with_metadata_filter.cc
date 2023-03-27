@@ -28,7 +28,7 @@ public:
   Http::FilterMetadataStatus decodeMetadata(Http::MetadataMap& metadata_map) override {
     metadata_map["data"] = "data";
     ASSERT(false);
-    return Http::FilterMetadataStatus::Continue;
+    return Http::FilterMetadataStatus::ContinueOnlyMetadata;
   }
 };
 

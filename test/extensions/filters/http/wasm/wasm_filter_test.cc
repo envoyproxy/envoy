@@ -177,7 +177,7 @@ TEST_P(WasmHttpFilterTest, AllHeadersAndTrailers) {
   Http::TestRequestTrailerMapImpl request_trailers{};
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter().decodeTrailers(request_trailers));
   Http::MetadataMap request_metadata{};
-  EXPECT_EQ(Http::FilterMetadataStatus::Continue, filter().decodeMetadata(request_metadata));
+  EXPECT_EQ(Http::FilterMetadataStatus::ContinueOnlyMetadata, filter().decodeMetadata(request_metadata));
 
   // Verify that route cache is NOT cleared when modifying HTTP response headers.
   EXPECT_CALL(decoder_callbacks.downstream_callbacks_, clearRouteCache()).Times(0);
@@ -188,7 +188,7 @@ TEST_P(WasmHttpFilterTest, AllHeadersAndTrailers) {
   Http::TestResponseTrailerMapImpl response_trailers{};
   EXPECT_EQ(Http::FilterTrailersStatus::StopIteration, filter().encodeTrailers(response_trailers));
   Http::MetadataMap response_metadata{};
-  EXPECT_EQ(Http::FilterMetadataStatus::Continue, filter().encodeMetadata(response_metadata));
+  EXPECT_EQ(Http::FilterMetadataStatus::ContinueOnlyMetadata, filter().encodeMetadata(response_metadata));
   filter().onDestroy();
 }
 
@@ -236,13 +236,13 @@ TEST_P(WasmHttpFilterTest, AllHeadersAndTrailersNotStarted) {
   Http::TestRequestTrailerMapImpl request_trailers{};
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter().decodeTrailers(request_trailers));
   Http::MetadataMap request_metadata{};
-  EXPECT_EQ(Http::FilterMetadataStatus::Continue, filter().decodeMetadata(request_metadata));
+  EXPECT_EQ(Http::FilterMetadataStatus::ContinueOnlyMetadata, filter().decodeMetadata(request_metadata));
   Http::TestResponseHeaderMapImpl response_headers{};
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter().encodeHeaders(response_headers, false));
   Http::TestResponseTrailerMapImpl response_trailers{};
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter().encodeTrailers(response_trailers));
   Http::MetadataMap response_metadata{};
-  EXPECT_EQ(Http::FilterMetadataStatus::Continue, filter().encodeMetadata(response_metadata));
+  EXPECT_EQ(Http::FilterMetadataStatus::ContinueOnlyMetadata, filter().encodeMetadata(response_metadata));
   Buffer::OwnedImpl data("data");
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter().decodeData(data, false));
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter().encodeData(data, false));

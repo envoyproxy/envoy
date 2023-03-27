@@ -68,7 +68,7 @@ public:
     if (it != metadata_map.end()) {
       metadata_map.erase("metadata");
     }
-    return Http::FilterMetadataStatus::Continue;
+    return Http::FilterMetadataStatus::ContinueOnlyMetadata;
   }
 };
 

@@ -179,7 +179,7 @@ enum class FilterTrailersStatus {
 enum class FilterMetadataStatus {
   // Continue filter chain iteration for metadata only. Does not unblock returns of StopIteration*
   // from (decode|encode)(Headers|Data).
-  Continue,
+  ContinueOnlyMetadata,
 
   // Continue filter chain iteration. If headers have not yet been sent to the next filter, they
   // will be sent first via (decode|encode)Headers().
@@ -854,16 +854,10 @@ public:
    * Called with decoded metadata. Add new metadata to metadata_map directly. Do not call
    * StreamDecoderFilterCallbacks::addDecodedMetadata() to add new metadata.
    *
-   * Note: decodeMetadata() currently cannot stop the filter iteration, and always returns Continue.
-   * That means metadata will go through the complete filter chain at once, even if the other frame
-   * types return StopIteration. If metadata should not pass through all filters at once, users
-   * should consider using StopAllIterationAndBuffer or StopAllIterationAndWatermark in
-   * decodeHeaders() to prevent metadata passing to the following filters.
-   *
    * @param metadata_map supplies the decoded metadata.
    */
   virtual FilterMetadataStatus decodeMetadata(MetadataMap& /* metadata_map */) {
-    return Http::FilterMetadataStatus::Continue;
+    return Http::FilterMetadataStatus::ContinueOnlyMetadata;
   }
 
   /**
@@ -1090,7 +1084,7 @@ public:
    * NOT call StreamDecoderFilterCallbacks::encodeMetadata() interface to add new metadata.
    *
    * @param metadata_map supplies the metadata to be encoded.
-   * @return FilterMetadataStatus, which currently is always FilterMetadataStatus::Continue;
+   * @return FilterMetadataStatus
    */
   virtual FilterMetadataStatus encodeMetadata(MetadataMap& metadata_map) PURE;
 

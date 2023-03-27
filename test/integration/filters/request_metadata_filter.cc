@@ -44,7 +44,7 @@ public:
       metadata_map.emplace("replace", "replace");
     }
     metadata_map["metadata"] = "metadata";
-    return Http::FilterMetadataStatus::Continue;
+    return Http::FilterMetadataStatus::ContinueOnlyMetadata;
   }
 };
 

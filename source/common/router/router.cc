@@ -900,7 +900,7 @@ Http::FilterMetadataStatus Filter::decodeMetadata(Http::MetadataMap& metadata_ma
     // TODO(soya3129): Save metadata for retry, redirect and shadowing case.
     upstream_requests_.front()->acceptMetadataFromRouter(std::move(metadata_map_ptr));
   }
-  return Http::FilterMetadataStatus::Continue;
+  return Http::FilterMetadataStatus::ContinueOnlyMetadata;
 }
 
 void Filter::setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) {
