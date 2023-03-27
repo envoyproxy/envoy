@@ -436,8 +436,7 @@ TEST_P(CacheIntegrationTest, ServeHeadFromCacheAfterGetRequest) {
   }
 }
 
-// Disabled: https://github.com/envoyproxy/envoy/issues/26081
-TEST_P(CacheIntegrationTest, DISABLED_ServeGetFromUpstreamAfterHeadRequest) {
+TEST_P(CacheIntegrationTest, ServeGetFromUpstreamAfterHeadRequest) {
   initializeFilter(default_config);
 
   const std::string response_body(42, 'a');
@@ -457,10 +456,7 @@ TEST_P(CacheIntegrationTest, DISABLED_ServeGetFromUpstreamAfterHeadRequest) {
     EXPECT_THAT(waitForAccessLog(access_log_name_), testing::HasSubstr("- via_upstream"));
   }
 
-  // Advance time, to verify the original date header is preserved.
-  simTime().advanceTimeWait(Seconds(10));
-
-  // Send GET request, and get response from cache.
+  // Send GET request, and get response from upstream.
   {
     // Include test name and params in URL to make each test's requests unique.
     const Http::TestRequestHeaderMapImpl request_headers =
@@ -471,7 +467,11 @@ TEST_P(CacheIntegrationTest, DISABLED_ServeGetFromUpstreamAfterHeadRequest) {
     EXPECT_THAT(response_decoder->headers(), IsSupersetOfHeaders(response_headers));
     EXPECT_EQ(response_decoder->body(), response_body);
     EXPECT_EQ(response_decoder->headers().get(Http::CustomHeaders::get().Age).size(), 0);
-    EXPECT_THAT(waitForAccessLog(access_log_name_), testing::HasSubstr("- via_upstream"));
+
+    // Advance time to force a log flush.
+    simTime().advanceTimeWait(Seconds(1));
+
+    EXPECT_THAT(waitForAccessLog(access_log_name_, 1), testing::HasSubstr("- via_upstream"));
   }
 }
 
