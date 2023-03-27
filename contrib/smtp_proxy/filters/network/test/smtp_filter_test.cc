@@ -43,7 +43,7 @@ TEST_F(SmtpFilterTest, NewSessionStatsTest) {
   initialize();
 
   EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onNewConnection());
-  EXPECT_EQ(filter_->getSession().getState(), SmtpSession::State::CONNECTION_REQUEST);
+  EXPECT_EQ(filter_->getSession().getState(), SmtpSession::State::ConnectionRequest);
 
   EXPECT_EQ(1, config_->stats().smtp_session_requests_.value());
 }
@@ -55,17 +55,17 @@ TEST_F(SmtpFilterTest, TestDownstreamStarttls) {
   filter_->getConfig()->upstream_tls_ =
       envoy::extensions::filters::network::smtp_proxy::v3alpha::SmtpProxy::DISABLE;
   ASSERT_FALSE(filter_->upstreamTlsRequired());
-  filter_->getSession().setState(SmtpSession::State::CONNECTION_SUCCESS);
+  filter_->getSession().setState(SmtpSession::State::ConnectionSuccess);
 
   data_.add("EHLO localhost\r\n");
   ASSERT_THAT(Network::FilterStatus::Continue, filter_->onData(data_, false));
-  EXPECT_EQ(SmtpSession::State::SESSION_INIT_REQUEST, filter_->getSession().getState());
+  EXPECT_EQ(SmtpSession::State::SessionInitRequest, filter_->getSession().getState());
 
   data_.drain(data_.length());
 
   data_.add("250-Hello localhost\r\n250-PIPELINING\r\n250-8BITMIME\r\n250-STARTTLS\r\n");
   ASSERT_THAT(Network::FilterStatus::Continue, filter_->onWrite(data_, false));
-  EXPECT_EQ(SmtpSession::State::SESSION_IN_PROGRESS, filter_->getSession().getState());
+  EXPECT_EQ(SmtpSession::State::SessionInProgress, filter_->getSession().getState());
   data_.drain(data_.length());
   data_.add("STARTTLS\r\n");
 
@@ -86,7 +86,7 @@ TEST_F(SmtpFilterTest, TestDownstreamStarttls) {
   EXPECT_CALL(connection_, close(_)).Times(0);
   cb(buf.length());
 
-  EXPECT_EQ(SmtpSession::State::SESSION_IN_PROGRESS, filter_->getSession().getState());
+  EXPECT_EQ(SmtpSession::State::SessionInProgress, filter_->getSession().getState());
   EXPECT_EQ(config_->stats().smtp_tls_terminated_sessions_.value(), 1);
 
   // Send starttls command again, receive 503 out of order command response from filter.
@@ -125,24 +125,24 @@ TEST_F(SmtpFilterTest, TestUpstreamStartTls) {
   filter_->getConfig()->upstream_tls_ =
       envoy::extensions::filters::network::smtp_proxy::v3alpha::SmtpProxy::REQUIRE;
   ASSERT_TRUE(filter_->upstreamTlsRequired());
-  filter_->getSession().setState(SmtpSession::State::CONNECTION_SUCCESS);
+  filter_->getSession().setState(SmtpSession::State::ConnectionSuccess);
 
   data_.add("EHLO localhost\r\n");
   ASSERT_THAT(Network::FilterStatus::Continue, filter_->onData(data_, false));
-  EXPECT_EQ(SmtpSession::State::SESSION_INIT_REQUEST, filter_->getSession().getState());
+  EXPECT_EQ(SmtpSession::State::SessionInitRequest, filter_->getSession().getState());
 
   data_.drain(data_.length());
 
   data_.add("250-Hello localhost\r\n250-PIPELINING\r\n250-8BITMIME\r\n250-STARTTLS\r\n");
   ASSERT_THAT(Network::FilterStatus::Continue, filter_->onWrite(data_, false));
-  EXPECT_EQ(SmtpSession::State::SESSION_IN_PROGRESS, filter_->getSession().getState());
+  EXPECT_EQ(SmtpSession::State::SessionInProgress, filter_->getSession().getState());
   data_.drain(data_.length());
   data_.add("STARTTLS\r\n");
 
   // Upstream TLS termination successful after STARTTLS
 
   ASSERT_THAT(Network::FilterStatus::Continue, filter_->onData(data_, false));
-  ASSERT_EQ(SmtpSession::State::UPSTREAM_TLS_NEGOTIATION, filter_->getSession().getState());
+  ASSERT_EQ(SmtpSession::State::UpstreamTlsNegotiation, filter_->getSession().getState());
 
   data_.drain(data_.length());
   data_.add("220 Ready to start TLS\r\n");
@@ -155,7 +155,7 @@ TEST_F(SmtpFilterTest, TestUpstreamStartTls) {
   EXPECT_EQ(config_->stats().sessions_upstream_tls_success_.value(), 1);
 
   filter_->getSession().setSessionEncrypted(false);
-  filter_->getSession().setState(SmtpSession::State::UPSTREAM_TLS_NEGOTIATION);
+  filter_->getSession().setState(SmtpSession::State::UpstreamTlsNegotiation);
 
   data_.drain(data_.length());
   data_.add("220 Ready to start TLS\r\n");
@@ -163,7 +163,7 @@ TEST_F(SmtpFilterTest, TestUpstreamStartTls) {
   EXPECT_CALL(filter_callbacks_, startUpstreamSecureTransport()).WillOnce(testing::Return(false));
 
   ASSERT_THAT(Network::FilterStatus::StopIteration, filter_->onWrite(data_, false));
-  ASSERT_EQ(SmtpSession::State::SESSION_TERMINATED, filter_->getSession().getState());
+  ASSERT_EQ(SmtpSession::State::SessionTerminated, filter_->getSession().getState());
   EXPECT_EQ(config_->stats().sessions_upstream_tls_failed_.value(), 1);
 }
 

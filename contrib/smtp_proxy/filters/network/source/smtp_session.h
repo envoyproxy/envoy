@@ -13,28 +13,28 @@ namespace SmtpProxy {
 class SmtpSession {
 public:
   enum class State {
-    CONNECTION_REQUEST = 0,
-    CONNECTION_SUCCESS = 1,
-    SESSION_INIT_REQUEST = 2,
-    SESSION_IN_PROGRESS = 3,
-    SESSION_TERMINATION_REQUEST = 4,
-    SESSION_TERMINATED = 5,
-    UPSTREAM_TLS_NEGOTIATION = 6,
-    DOWNSTREAM_TLS_NEGOTIATION = 7,
-    SESSION_AUTH_REQUEST = 8,
+    ConnectionRequest = 0,
+    ConnectionSuccess = 1,
+    SessionInitRequest = 2,
+    SessionInProgress = 3,
+    SessionTerminationRequest = 4,
+    SessionTerminated = 5,
+    UpstreamTlsNegotiation = 6,
+    DownstreamTlsNegotiation = 7,
+    SessionAuthRequest = 8,
   };
 
   void setState(SmtpSession::State state) { state_ = state; }
   SmtpSession::State getState() { return state_; }
 
-  void SetTransactionState(SmtpTransaction::State state) { smtp_transaction_.setState(state); };
+  void setTransactionState(SmtpTransaction::State state) { smtp_transaction_.setState(state); };
   SmtpTransaction::State getTransactionState() { return smtp_transaction_.getState(); }
 
   void setSessionEncrypted(bool flag) { session_encrypted_ = flag; }
   bool isSessionEncrypted() const { return session_encrypted_; }
 
 private:
-  SmtpSession::State state_{State::CONNECTION_REQUEST};
+  SmtpSession::State state_{State::ConnectionRequest};
   SmtpTransaction smtp_transaction_{};
   bool session_encrypted_{false}; // tells if exchange is encrypted
 };

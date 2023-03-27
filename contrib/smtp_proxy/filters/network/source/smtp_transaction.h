@@ -12,13 +12,13 @@ class SmtpTransaction {
 public:
   enum class State {
     NONE = 0,
-    TRANSACTION_REQUEST = 1,
-    TRANSACTION_IN_PROGRESS = 2,
-    TRANSACTION_ABORT_REQUEST = 3,
-    TRANSACTION_ABORTED = 4,
-    MAIL_DATA_TRANSFER_REQUEST = 5,
-    RCPT_COMMAND = 6,
-    TRANSACTION_COMPLETED = 7,
+    TransactionRequest = 1,
+    TransactionInProgress = 2,
+    TransactionAbortRequest = 3,
+    TransactionAborted = 4,
+    MailDataTransferRequest = 5,
+    RcptCommand = 6,
+    TransactionCompleted = 7,
   };
 
   void setState(SmtpTransaction::State state) { state_ = state; }
