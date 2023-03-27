@@ -39,7 +39,7 @@ public:
     maybeCreateParent(ParentAccessMode::ReadOnly);
   }
 
-  std::string serializeAsString() const override;
+  std::string serializeAsString(int indent_level = 0) const override;
 
   // FilterState
   void

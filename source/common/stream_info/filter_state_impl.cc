@@ -6,13 +6,17 @@
 namespace Envoy {
 namespace StreamInfo {
 
-std::string FilterStateImpl::serializeAsString() const {
+std::string FilterStateImpl::serializeAsString(int indent_level) const {
   std::string out = "";
-  absl::StrAppend(&out, "At life span ", life_span_, "\n");
+  std::string base_indent(2 * indent_level, ' ');
+  absl::StrAppend(&out, base_indent, "At life span ", life_span_, "\n");
   const std::string indent = "  ";
   for (const auto& [name, object] : data_storage_) {
     const auto obj_ser = object->data_->serializeAsString();
-    absl::StrAppend(&out, indent, name, ": ", obj_ser.value_or(""), "\n");
+    absl::StrAppend(&out, base_indent, indent, name, ": ", obj_ser.value_or(""), "\n", base_indent,
+                    indent, indent, "shared: ", object->stream_sharing_, "\n", base_indent, indent,
+                    indent, "readOnly: ", object->state_type_ == FilterState::StateType::ReadOnly,
+                    "\n");
   }
   std::string parent_value = parent_ ? parent_->serializeAsString() : "";
   absl::StrAppend(&out, parent_value);
@@ -171,36 +175,55 @@ absl::Status FilterStateImpl::addAncestor(const FilterStateSharedPtr& ancestor) 
   if (!ancestor) {
     return absl::OkStatus();
   }
+  // Make sure that the ancestor has an acceptable life span.
   if (ancestor->lifeSpan() <= life_span_) {
     return absl::FailedPreconditionError(absl::StrCat("Ancestor lifespan ", ancestor->lifeSpan(),
                                                       " must be larger than current lifespan ",
                                                       life_span_));
   }
+  // Make sure there's no data conflicts between `this` and the proposed ancestor.
+  for (const auto& [key, _] : data_storage_) {
+    if (ancestor->hasDataWithName(key)) {
+      return absl::FailedPreconditionError(absl::StrCat("Ancestor and this share a key: ", key));
+    }
+  }
+  // Add the ancestor to the pre-existing parent/ancestor
   if (parent_) {
     if (parent_.get() == ancestor.get()) {
       return absl::OkStatus();
     }
-    return parent_->addAncestor(ancestor);
+    auto status = parent_->addAncestor(ancestor);
+    if (status.ok()) {
+      return status;
+    }
+    return absl::FailedPreconditionError(
+        absl::StrCat("Could not add ancestor to pre-existing ancestor: ", status.message()));
   }
   if (auto* ancestor_ptr = absl::get_if<FilterStateSharedPtr>(&ancestor_);
       ancestor_ptr && *ancestor_ptr) {
     if (ancestor_ptr->get() == ancestor.get()) {
       return absl::OkStatus();
     }
-    return (*ancestor_ptr)->addAncestor(ancestor);
+    auto status = (*ancestor_ptr)->addAncestor(ancestor);
+    if (status.ok()) {
+      return status;
+    }
+    return absl::FailedPreconditionError(
+        absl::StrCat("Could not add ancestor to pre-existing ancestor: ", status.message()));
   }
   if (auto* lazy_create_ancestor = absl::get_if<LazyCreateAncestor>(&ancestor_);
       lazy_create_ancestor && lazy_create_ancestor->first) {
     if (lazy_create_ancestor->first.get() == ancestor.get()) {
       return absl::OkStatus();
     }
-    return lazy_create_ancestor->first->addAncestor(ancestor);
-  }
-  for (const auto& [key, _] : data_storage_) {
-    if (ancestor->hasDataWithName(key)) {
-      return absl::FailedPreconditionError(absl::StrCat("Ancestor and this share a key: ", key));
+    auto status = lazy_create_ancestor->first->addAncestor(ancestor);
+    if (status.ok()) {
+      return status;
     }
+    return absl::FailedPreconditionError(
+        absl::StrCat("Could not add ancestor to pre-existing ancestor: ", status.message()));
   }
+  // There are no pre-existing parents/ancestors, so we add it here.
   ancestor_ = ancestor;
   maybeCreateParent(ParentAccessMode::ReadOnly);
   return absl::OkStatus();

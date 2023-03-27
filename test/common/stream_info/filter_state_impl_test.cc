@@ -486,12 +486,16 @@ TEST_F(FilterStateImplTest, AddAncestorWithBadLifetime) {
   EXPECT_THAT(filterState().addAncestor(elder_filter_state),
               testing::AllOf(StatusHelpers::HasStatusCode(absl::StatusCode::kFailedPrecondition),
                              StatusHelpers::HasStatusMessage(
-                                 "Ancestor lifespan 2 must be larger than current lifespan 2")));
+                                 "Could not add ancestor to pre-existing ancestor: Could not add "
+                                 "ancestor to pre-existing ancestor: Ancestor lifespan 2 must be "
+                                 "larger than current lifespan 2")));
 }
 
 TEST_F(FilterStateImplTest, AddAncestorWithBadData) {
   filterState().setData("test_1", std::make_unique<SimpleType>(1), FilterState::StateType::ReadOnly,
                         FilterState::LifeSpan::FilterChain);
+  filterState().setData("test_2", std::make_unique<SimpleType>(1), FilterState::StateType::ReadOnly,
+                        FilterState::LifeSpan::Request);
   auto elder_filter_state = std::make_shared<FilterStateImpl>(FilterState::LifeSpan::Connection);
   elder_filter_state->setData("test_1", std::make_unique<SimpleType>(1),
                               FilterState::StateType::ReadOnly, FilterState::LifeSpan::Connection);

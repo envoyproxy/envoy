@@ -122,13 +122,11 @@ TEST_P(FilterIntegrationTest, AltSvc) {
   int port = fake_upstreams_[1]->localAddress()->ip()->port();
   std::string alt_svc = absl::StrCat("h3=\":", port, "\"; ma=86400");
   Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}, {"alt-svc", alt_svc}};
-  std::cout << "pgal: A";
 
   // First request should go out over HTTP/2 (upstream index 0). The response includes an
   // Alt-Svc header.
   auto response = sendRequestAndWaitForResponse(request_headers, request_size, response_headers,
                                                 response_size, 0, timeout);
-  std::cout << "pgal: B";
   checkSimpleRequestSuccess(request_size, response_size, response.get());
 
   // Close the connection so the HTTP/2 connection will not be used.

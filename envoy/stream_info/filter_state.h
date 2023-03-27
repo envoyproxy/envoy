@@ -114,7 +114,7 @@ public:
 
   virtual ~FilterState() = default;
 
-  virtual std::string serializeAsString() const PURE;
+  virtual std::string serializeAsString(int indent_level = 0) const PURE;
 
   /**
    * @param data_name the name of the data being set.
