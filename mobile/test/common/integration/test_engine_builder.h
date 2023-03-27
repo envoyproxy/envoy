@@ -18,6 +18,8 @@ public:
   // Overrides the EngineBuilder's config with the provided string. Calls to the EngineBuilder's
   // bootstrap modifying APIs do not take effect after this function is called.
   void setOverrideConfig(std::string config);
+
+  using Platform::EngineBuilder::addDirectResponse;
 };
 
 } // namespace Envoy

@@ -105,10 +105,6 @@ public:
   EngineBuilder& addVirtualCluster(std::string virtual_cluster);
   EngineBuilder& setRuntimeGuard(std::string guard, bool value);
 
-  // Add a direct response. For testing purposes only.
-  // TODO(jpsim): Move this out of the main engine builder API
-  EngineBuilder& addDirectResponse(DirectResponseTesting::DirectResponse direct_response);
-
   // These functions don't affect the Bootstrap configuration but instead perform registrations.
   EngineBuilder& addKeyValueStore(std::string name, KeyValueStoreSharedPtr key_value_store);
   EngineBuilder& addStringAccessor(std::string name, StringAccessorSharedPtr accessor);
@@ -119,6 +115,11 @@ public:
   EngineSharedPtr build();
 
 protected:
+  // Add a direct response. For testing purposes only. Only accessible from TestEngineBuilder.
+  // Note users of this are responsible for linking in the route cache reset filter.
+  // TODO(jpsim): Move this out of the main engine builder API
+  EngineBuilder& addDirectResponse(DirectResponseTesting::DirectResponse direct_response);
+
   // Overrides the EngineBuilder's constructed configuration with the YAML config supplied in the
   // `config` parameter. Any prior or subsequent calls to the EngineBuilder's APIs are ignored in
   // favor of using the YAML string to construct the Envoy Engine's Bootsrap configuration.
