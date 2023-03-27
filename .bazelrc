@@ -22,6 +22,7 @@ build --platform_mappings=bazel/platform_mappings
 build --copt=-DABSL_MIN_LOG_LEVEL=4
 build --define envoy_mobile_listener=enabled
 build --experimental_repository_downloader_retries=2
+build --experimental_remote_build_event_upload=minimal
 
 # Pass PATH, CC, CXX and LLVM_CONFIG variables from the environment.
 build --action_env=CC --host_action_env=CC
@@ -196,6 +197,7 @@ build:coverage --experimental_use_llvm_covmap
 build:coverage --collect_code_coverage
 build:coverage --test_tag_filters=-nocoverage
 build:coverage --instrumentation_filter="//source(?!/common/quic/platform)[/:],//envoy[/:],//contrib(?!/.*/test)[/:]"
+build:coverage --experimental_remote_build_event_upload=minimal
 build:test-coverage --test_arg="-l trace"
 build:test-coverage --test_arg="--log-path /dev/null"
 build:fuzz-coverage --config=plain-fuzzer
