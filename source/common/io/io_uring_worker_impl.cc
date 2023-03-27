@@ -414,6 +414,7 @@ void IoUringServerSocket::close() {
 
 void IoUringServerSocket::enable() {
   IoUringSocketEntry::enable();
+  ENVOY_LOG(trace, "enable, fd = {}", fd_);
 
   // Continue processing read buffer remained by the previous read.
   if (buf_.length() > 0 || read_error_.has_value()) {
@@ -520,18 +521,29 @@ void IoUringServerSocket::onRead(Request* req, int32_t result, bool injected) {
   }
 
   // If the socket is enabled, notify handler to read.
-  if (status_ == ENABLED || status_ == SHUTDOWN_WRITE || status_ == CLOSE_AFTER_SHUTDOWN_WRITE ||
-      status_ == ALREADY_SHUTDOWN) {
-    if (buf_.length() > 0) {
+  if (status_ == ENABLED || status_ == DISABLED || status_ == SHUTDOWN_WRITE ||
+      status_ == CLOSE_AFTER_SHUTDOWN_WRITE || status_ == ALREADY_SHUTDOWN) {
+    if (buf_.length() > 0 && status_ != DISABLED) {
       ENVOY_LOG(trace, "read from socket, fd = {}, result = {}", fd_, buf_.length());
       ReadParam param{buf_, static_cast<int32_t>(buf_.length())};
       io_uring_handler_.onRead(param);
       ENVOY_LOG(trace, "after read from socket, fd = {}, remain = {}", fd_, buf_.length());
     } else if (read_error_.has_value() && read_error_ <= 0) {
-      ENVOY_LOG(trace, "read error from socket, fd = {}, result = {}", fd_, read_error_.value());
-      ReadParam param{buf_, read_error_.value()};
-      io_uring_handler_.onRead(param);
-      read_error_.reset();
+      // When the socket is disabled, the close event still need to be monitored and delivered.
+      if (status_ != DISABLED) {
+        ENVOY_LOG(trace, "read error from socket, fd = {}, result = {}", fd_, read_error_.value());
+        ReadParam param{buf_, read_error_.value()};
+        io_uring_handler_.onRead(param);
+        read_error_.reset();
+      } else if (status_ == DISABLED && read_error_.has_value() && read_error_ == 0) {
+        ENVOY_LOG(trace,
+                  "read disabled and got a remote close from socket, raise the close event, fd = "
+                  "{}, result = {}",
+                  fd_, read_error_.value());
+        io_uring_handler_.onClose();
+        read_error_.reset();
+        return;
+      }
     }
     // The socket may be disabled during handler onRead callback, check it again here.
     if (status_ == ENABLED || status_ == SHUTDOWN_WRITE || status_ == CLOSE_AFTER_SHUTDOWN_WRITE ||

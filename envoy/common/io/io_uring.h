@@ -319,6 +319,7 @@ public:
   virtual void onAcceptSocket(AcceptedSocketParam& param) PURE;
   virtual void onRead(ReadParam& param) PURE;
   virtual void onWrite(WriteParam& param) PURE;
+  virtual void onClose() PURE;
 };
 
 /**

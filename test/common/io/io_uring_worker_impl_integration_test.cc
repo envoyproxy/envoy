@@ -61,6 +61,12 @@ public:
     is_cancel_injected_completion_ = injected;
     nr_completion_++;
   }
+  void onShutdown(int32_t result, bool injected) override {
+    IoUringSocketEntry::onShutdown(result, injected);
+    shutdown_result_ = result;
+    is_shutdown_injected_completion_ = injected;
+    nr_completion_++;
+  }
 
   int32_t accept_result_{-1};
   bool is_accept_injected_completion_{false};
@@ -76,6 +82,8 @@ public:
   bool is_close_injected_completion_{false};
   int32_t cancel_result_{-1};
   bool is_cancel_injected_completion_{false};
+  int32_t shutdown_result_{-1};
+  bool is_shutdown_injected_completion_{false};
 };
 
 class IoUringWorkerTestImpl : public IoUringWorkerImpl {
@@ -107,6 +115,7 @@ public:
     }
   }
   void onWrite(WriteParam& param) override { write_result_ = param.result_; }
+  void onClose() override { is_closed = true; }
 
   void expectRead(uint32_t size) { expected_read_size_ = size; }
   void expectError(IoUringSocket& socket) { expected_close_socket_ = socket; }
@@ -114,6 +123,7 @@ public:
   os_fd_t accept_result_{INVALID_SOCKET};
   std::queue<int32_t> read_results_;
   int32_t write_result_{0};
+  bool is_closed{false};
 
   uint32_t expected_read_size_{0};
   OptRef<IoUringSocket> expected_close_socket_;
@@ -770,6 +780,27 @@ TEST_F(IoUringWorkerIntegrationTest, ServerSocketCloseAfterShutdownWrite) {
 
   size = Api::OsSysCallsSingleton::get().readv(client_socket_, &read_iov, 1).return_value_;
   EXPECT_EQ(0, size);
+
+  cleanup();
+}
+
+// This tests the case when the socket disabled, then a remote close happened.
+// In this case, we should call IoHandle's onClose, not the onRead to emulate
+// a close event.
+TEST_F(IoUringWorkerIntegrationTest, ServerSocketCloseAfterDisabled) {
+  initialize();
+  initializeSockets();
+
+  auto& socket = io_uring_worker_->addServerSocket(server_socket_, io_uring_handler_);
+  EXPECT_EQ(io_uring_worker_->getSockets().size(), 1);
+  // Waiting for the server socket sending the data.
+  socket.disable();
+
+  Api::OsSysCallsSingleton::get().close(client_socket_);
+
+  while (!io_uring_handler_.is_closed) {
+    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  }
 
   cleanup();
 }

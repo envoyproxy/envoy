@@ -31,6 +31,7 @@ IoUringSocketHandleImpl::IoUringSocketHandleImpl(Io::IoUringFactory& io_uring_fa
 }
 
 IoUringSocketHandleImpl::~IoUringSocketHandleImpl() {
+  ENVOY_LOG(trace, "~IoUringSocketHandleImpl, type = {}", ioUringSocketTypeStr());
   if (SOCKET_VALID(fd_)) {
     // The TLS slot has been shut down by this moment with IoUring wiped out, thus
     // better use this posix system call instead of IoUringSocketHandleImpl::close().
@@ -515,6 +516,7 @@ void IoUringSocketHandleImpl::onRead(Io::ReadParam& param) {
     ENVOY_LOG(trace, "The socket already closed, ignore this read event");
     return;
   }
+  ASSERT(cb_ != nullptr);
   cb_(Event::FileReadyType::Read);
   read_param_ = absl::nullopt;
 }
@@ -524,6 +526,11 @@ void IoUringSocketHandleImpl::onWrite(Io::WriteParam& param) {
   ENVOY_LOG(trace, "call event callback for write since result = {}", write_param_->result_);
   cb_(Event::FileReadyType::Write);
   write_param_ = absl::nullopt;
+}
+
+void IoUringSocketHandleImpl::onClose() {
+  ASSERT(cb_ != nullptr);
+  cb_(Event::FileReadyType::Closed);
 }
 
 } // namespace Network

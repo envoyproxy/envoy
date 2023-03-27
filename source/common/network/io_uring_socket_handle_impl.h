@@ -66,6 +66,7 @@ public:
   void onAcceptSocket(Io::AcceptedSocketParam& param) override;
   void onRead(Io::ReadParam& param) override;
   void onWrite(Io::WriteParam& param) override;
+  void onClose() override;
 
 protected:
   std::string ioUringSocketTypeStr() {
