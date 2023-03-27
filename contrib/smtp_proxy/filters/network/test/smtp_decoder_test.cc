@@ -119,8 +119,7 @@ TEST_F(DecoderImplTest, TestParseCommand) {
   data_->add("quit\r\n");
   decoder_impl_->getSession().setState(SmtpSession::State::SessionInProgress);
   EXPECT_EQ(Decoder::Result::ReadyForNext, decoder_impl_->parseCommand(*data_));
-  EXPECT_EQ(SmtpSession::State::SessionTerminationRequest,
-            decoder_impl_->getSession().getState());
+  EXPECT_EQ(SmtpSession::State::SessionTerminationRequest, decoder_impl_->getSession().getState());
 
   // When the session state is SessionTerminated and any command is received, filter drops the
   // request.
@@ -208,13 +207,11 @@ TEST_F(DecoderImplTest, TestSmtpTransactionCommands) {
   command = SmtpTestUtils::smtpRcptCommand;
   decoder_impl_->getSession().setTransactionState(SmtpTransaction::State::TransactionInProgress);
   decoder_impl_->decodeSmtpTransactionCommands(command);
-  EXPECT_EQ(decoder_impl_->getSession().getTransactionState(),
-            SmtpTransaction::State::RcptCommand);
+  EXPECT_EQ(decoder_impl_->getSession().getTransactionState(), SmtpTransaction::State::RcptCommand);
 
   // Test multiple RCPT commands
   decoder_impl_->decodeSmtpTransactionCommands(command);
-  EXPECT_EQ(decoder_impl_->getSession().getTransactionState(),
-            SmtpTransaction::State::RcptCommand);
+  EXPECT_EQ(decoder_impl_->getSession().getTransactionState(), SmtpTransaction::State::RcptCommand);
 
   // Test case 3: TransactionInProgress state and smtpDataCommand
   command = SmtpUtils::smtpDataCommand;
@@ -230,8 +227,7 @@ TEST_F(DecoderImplTest, TestSmtpTransactionCommands) {
   EXPECT_EQ(decoder_impl_->getSession().getTransactionState(),
             SmtpTransaction::State::TransactionAbortRequest);
 
-  decoder_impl_->getSession().setTransactionState(
-      SmtpTransaction::State::MailDataTransferRequest);
+  decoder_impl_->getSession().setTransactionState(SmtpTransaction::State::MailDataTransferRequest);
   decoder_impl_->decodeSmtpTransactionCommands(command);
   EXPECT_EQ(decoder_impl_->getSession().getTransactionState(),
             SmtpTransaction::State::TransactionAbortRequest);
@@ -242,8 +238,7 @@ TEST_F(DecoderImplTest, TestSmtpTransactionCommands) {
   EXPECT_EQ(decoder_impl_->getSession().getTransactionState(),
             SmtpTransaction::State::TransactionAbortRequest);
 
-  decoder_impl_->getSession().setTransactionState(
-      SmtpTransaction::State::MailDataTransferRequest);
+  decoder_impl_->getSession().setTransactionState(SmtpTransaction::State::MailDataTransferRequest);
   decoder_impl_->decodeSmtpTransactionCommands(command);
   EXPECT_EQ(decoder_impl_->getSession().getTransactionState(),
             SmtpTransaction::State::TransactionAbortRequest);
@@ -389,13 +384,11 @@ TEST_F(DecoderImplTest, TestDecodeSmtpTransactionResponse) {
   response_code = 500;
   EXPECT_CALL(callbacks_, incMailRcptErrors());
   decoder_impl_->decodeSmtpTransactionResponse(response_code);
-  EXPECT_EQ(decoder_impl_->getSession().getTransactionState(),
-            SmtpTransaction::State::RcptCommand);
+  EXPECT_EQ(decoder_impl_->getSession().getTransactionState(), SmtpTransaction::State::RcptCommand);
   testing::Mock::VerifyAndClearExpectations(&callbacks_);
 
   // 2xx Success response to DATA Command
-  decoder_impl_->getSession().setTransactionState(
-      SmtpTransaction::State::MailDataTransferRequest);
+  decoder_impl_->getSession().setTransactionState(SmtpTransaction::State::MailDataTransferRequest);
   response_code = 250;
   EXPECT_CALL(callbacks_, incSmtpTransactions());
   decoder_impl_->decodeSmtpTransactionResponse(response_code);
@@ -404,8 +397,7 @@ TEST_F(DecoderImplTest, TestDecodeSmtpTransactionResponse) {
   testing::Mock::VerifyAndClearExpectations(&callbacks_);
 
   // Error response to DATA Command
-  decoder_impl_->getSession().setTransactionState(
-      SmtpTransaction::State::MailDataTransferRequest);
+  decoder_impl_->getSession().setTransactionState(SmtpTransaction::State::MailDataTransferRequest);
   response_code = 500;
   EXPECT_CALL(callbacks_, incMailDataTransferErrors());
   EXPECT_CALL(callbacks_, incSmtpTransactions());
@@ -414,8 +406,7 @@ TEST_F(DecoderImplTest, TestDecodeSmtpTransactionResponse) {
   testing::Mock::VerifyAndClearExpectations(&callbacks_);
 
   // 3xx Intermediate response to DATA Command
-  decoder_impl_->getSession().setTransactionState(
-      SmtpTransaction::State::MailDataTransferRequest);
+  decoder_impl_->getSession().setTransactionState(SmtpTransaction::State::MailDataTransferRequest);
   response_code = 339;
   decoder_impl_->decodeSmtpTransactionResponse(response_code);
   EXPECT_EQ(decoder_impl_->getSession().getTransactionState(),
@@ -423,8 +414,7 @@ TEST_F(DecoderImplTest, TestDecodeSmtpTransactionResponse) {
   testing::Mock::VerifyAndClearExpectations(&callbacks_);
 
   // Transaction abort request is successful
-  decoder_impl_->getSession().setTransactionState(
-      SmtpTransaction::State::TransactionAbortRequest);
+  decoder_impl_->getSession().setTransactionState(SmtpTransaction::State::TransactionAbortRequest);
   response_code = 250;
   EXPECT_CALL(callbacks_, incSmtpTransactionsAborted());
   decoder_impl_->decodeSmtpTransactionResponse(response_code);
@@ -432,8 +422,7 @@ TEST_F(DecoderImplTest, TestDecodeSmtpTransactionResponse) {
   testing::Mock::VerifyAndClearExpectations(&callbacks_);
 
   // Transaction abort request failed
-  decoder_impl_->getSession().setTransactionState(
-      SmtpTransaction::State::TransactionAbortRequest);
+  decoder_impl_->getSession().setTransactionState(SmtpTransaction::State::TransactionAbortRequest);
   response_code = 500;
   decoder_impl_->decodeSmtpTransactionResponse(response_code);
   EXPECT_EQ(decoder_impl_->getSession().getTransactionState(),
