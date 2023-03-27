@@ -13,6 +13,7 @@
 #include "engine.h"
 #include "engine_callbacks.h"
 #include "key_value_store.h"
+#include "library/common/types/matcher_data.h"
 #include "log_level.h"
 #include "string_accessor.h"
 
@@ -39,8 +40,6 @@ public:
 
   EngineBuilder& addLogLevel(LogLevel log_level);
   EngineBuilder& setOnEngineRunning(std::function<void()> closure);
-
-  EngineBuilder& addGrpcStatsDomain(std::string stats_domain);
   EngineBuilder& addConnectTimeoutSeconds(int connect_timeout_seconds);
   EngineBuilder& addDnsRefreshSeconds(int dns_refresh_seconds);
   EngineBuilder& addDnsFailureRefreshSeconds(int base, int max);
@@ -52,7 +51,6 @@ public:
       int h2_connection_keepalive_idle_interval_milliseconds);
   EngineBuilder&
   addH2ConnectionKeepaliveTimeoutSeconds(int h2_connection_keepalive_timeout_seconds);
-  EngineBuilder& addStatsFlushSeconds(int stats_flush_seconds);
   // Configures Envoy to use the PlatformBridge filter named `name`. An instance of
   // envoy_http_filter must be registered as a platform API with the same name.
   EngineBuilder& setAppVersion(std::string app_version);
@@ -71,26 +69,25 @@ public:
   EngineBuilder& enableDrainPostDnsRefresh(bool drain_post_dns_refresh_on);
   EngineBuilder& enforceTrustChainVerification(bool trust_chain_verification_on);
   EngineBuilder& enablePlatformCertificatesValidation(bool platform_certificates_validation_on);
+#ifdef ENVOY_GOOGLE_GRPC
   // Sets the node.id field in the Bootstrap configuration.
   EngineBuilder& setNodeId(std::string node_id);
   // Sets the node.locality field in the Bootstrap configuration.
-  EngineBuilder& setNodeLocality(const NodeLocality& node_locality);
+  EngineBuilder& setNodeLocality(std::string region, std::string zone, std::string sub_zone);
   // Adds an ADS layer. Note that only the state-of-the-world gRPC protocol is supported, not Delta
   // gRPC.
-  EngineBuilder&
-  setAggregatedDiscoveryService(const std::string& address, const int port,
-                                std::string jwt_token = "",
-                                int jwt_token_lifetime_seconds = DefaultJwtTokenLifetimeSeconds,
-                                std::string ssl_root_certs = "");
+  EngineBuilder& setAggregatedDiscoveryService(std::string address, const int port,
+                                               std::string jwt_token = "",
+                                               int jwt_token_lifetime_seconds = 0,
+                                               std::string ssl_root_certs = "");
   // Adds an RTDS layer to default config. Requires that ADS be configured.
-  EngineBuilder& addRtdsLayer(const std::string& layer_name,
-                              const int timeout_seconds = DefaultXdsTimeout);
+  EngineBuilder& addRtdsLayer(std::string layer_name, const int timeout_seconds = 0);
   // Adds a CDS layer to default config. Requires that ADS be configured via
   // setAggregatedDiscoveryService(). If `cds_resources_locator` is non-empty, the xdstp namespace
   // is used for identifying resources. If not using xdstp, then set `cds_resources_locator` to the
   // empty string.
-  EngineBuilder& addCdsLayer(std::string cds_resources_locator = "",
-                             const int timeout_seconds = DefaultXdsTimeout);
+  EngineBuilder& addCdsLayer(std::string cds_resources_locator = "", const int timeout_seconds = 0);
+#endif
   EngineBuilder& enableDnsCache(bool dns_cache_on, int save_interval_seconds = 1);
   EngineBuilder& setForceAlwaysUsev6(bool value);
   EngineBuilder& setSkipDnsLookupForProxiedRequests(bool value);
@@ -99,9 +96,17 @@ public:
 #ifdef ENVOY_ADMIN_FUNCTIONALITY
   EngineBuilder& enableAdminInterface(bool admin_interface_on);
 #endif
+
+#ifdef ENVOY_MOBILE_STATS_REPORTING
   EngineBuilder& addStatsSinks(std::vector<std::string> stat_sinks);
+  EngineBuilder& addGrpcStatsDomain(std::string stats_domain);
+  EngineBuilder& addStatsFlushSeconds(int stats_flush_seconds);
+#endif
   EngineBuilder& addPlatformFilter(std::string name);
+  // TODO(alyssawilk) remove the legacy APIs and update docs once Lyft is moved over.
   EngineBuilder& addVirtualCluster(std::string virtual_cluster);
+
+  EngineBuilder& addVirtualCluster(std::string name, std::vector<MatcherData> matchers);
   EngineBuilder& setRuntimeGuard(std::string guard, bool value);
 
   // Add a direct response. For testing purposes only.
@@ -164,14 +169,14 @@ private:
   int rtds_timeout_seconds_;
   std::string node_id_;
   absl::optional<NodeLocality> node_locality_ = absl::nullopt;
-  std::string ads_address_ = "";
+  std::string ads_address_ = ""; // make absl:optional?
   int ads_port_;
   std::string ads_jwt_token_;
   int ads_jwt_token_lifetime_seconds_;
   std::string ads_ssl_root_certs_;
-  bool enable_cds_ = false;
   std::string cds_resources_locator_;
   int cds_timeout_seconds_;
+  bool enable_cds_ = false;
   bool dns_cache_on_ = false;
   int dns_cache_save_interval_seconds_ = 1;
 
@@ -191,6 +196,7 @@ private:
   std::vector<NativeFilterConfig> native_filter_chain_;
   std::vector<std::string> dns_preresolve_hostnames_;
   std::vector<std::string> virtual_clusters_;
+  std::vector<std::pair<std::string, std::vector<MatcherData>>> virtual_cluster_data_;
   std::vector<DirectResponseTesting::DirectResponse> direct_responses_;
 
   std::vector<std::pair<std::string, bool>> runtime_guards_;

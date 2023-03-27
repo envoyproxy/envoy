@@ -34,6 +34,7 @@ envoy_extension_cc_test(
 
 envoy_extension_cc_test(
     name = "compressor_filter_integration_test",
+    size = "large",
     srcs = [
         "compressor_filter_integration_test.cc",
     ],
@@ -103,6 +104,7 @@ envoy_benchmark_test(
 
 envoy_cc_test(
     name = "compressor_integration_tests",
+    size = "large",
     srcs = [
         "compressor_integration_tests.cc",
         "compressor_integration_tests.h",

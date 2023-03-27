@@ -33,6 +33,7 @@ kt_android_library(
         "//library/java/io/envoyproxy/envoymobile/engine:envoy_base_engine_lib",
         "//library/java/io/envoyproxy/envoymobile/engine:envoy_engine_lib",
         "//library/java/io/envoyproxy/envoymobile/engine/types:envoy_c_types_lib",
+        "//library/java/io/envoyproxy/envoymobile/utilities",
     ],
 )
 
@@ -70,7 +71,6 @@ envoy_mobile_kt_library(
         "StreamPrototype.kt",
         "StringAccessor.kt",
         "Trailers.kt",
-        "UpstreamHttpProtocol.kt",
         "filters/*.kt",
         "grpc/*.kt",
         "mocks/*.kt",

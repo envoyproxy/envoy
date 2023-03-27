@@ -80,14 +80,30 @@ func (f *filter) sendLocalReply(phase string) api.StatusType {
 	return api.LocalReply
 }
 
-// test: get, set, remove, values
+// test: get, set, remove, values, add
 func (f *filter) decodeHeaders(header api.RequestHeaderMap, endStream bool) api.StatusType {
+	// test logging
+	f.callbacks.Log(api.Trace, "log test")
+	f.callbacks.Log(api.Debug, "log test")
+	f.callbacks.Log(api.Info, "log test")
+	f.callbacks.Log(api.Warn, "log test")
+	f.callbacks.Log(api.Error, "log test")
+	f.callbacks.Log(api.Critical, "log test")
+
 	if f.sleep {
 		time.Sleep(time.Millisecond * 100) // sleep 100 ms
 	}
 	if strings.Contains(f.localreplay, "decode-header") {
 		return f.sendLocalReply("decode-header")
 	}
+
+	header.Range(func(key, value string) bool {
+		if key == ":path" && value != f.path {
+			f.fail("path not match in Range")
+			return false
+		}
+		return true
+	})
 
 	origin, found := header.Get("x-test-header-0")
 	hdrs := header.Values("x-test-header-0")
@@ -98,6 +114,10 @@ func (f *filter) decodeHeaders(header api.RequestHeaderMap, endStream bool) api.
 	} else if hdrs != nil {
 		return f.fail("Values return unexpected data %v", hdrs)
 	}
+
+	header.Add("existed-header", "bar")
+	header.Add("newly-added-header", "foo")
+	header.Add("newly-added-header", "bar")
 
 	header.Set("test-x-set-header-0", origin)
 	header.Del("x-test-header-1")
@@ -162,6 +182,17 @@ func (f *filter) encodeHeaders(header api.ResponseHeaderMap, endStream bool) api
 	if strings.Contains(f.localreplay, "encode-header") {
 		return f.sendLocalReply("encode-header")
 	}
+
+	if protocol, ok := f.callbacks.StreamInfo().Protocol(); ok {
+		header.Set("rsp-protocol", protocol)
+	}
+	if code, ok := f.callbacks.StreamInfo().ResponseCode(); ok {
+		header.Set("rsp-response-code", strconv.Itoa(int(code)))
+	}
+	if details, ok := f.callbacks.StreamInfo().ResponseCodeDetails(); ok {
+		header.Set("rsp-response-code-details", details)
+	}
+
 	origin, found := header.Get("x-test-header-0")
 	hdrs := header.Values("x-test-header-0")
 	if found {
@@ -172,12 +203,18 @@ func (f *filter) encodeHeaders(header api.ResponseHeaderMap, endStream bool) api
 		return f.fail("Values return unexpected data %v", hdrs)
 	}
 
+	header.Add("existed-header", "bar")
+	header.Add("newly-added-header", "foo")
+	header.Add("newly-added-header", "bar")
+
 	header.Set("test-x-set-header-0", origin)
 	header.Del("x-test-header-1")
 	header.Set("test-req-body-length", strconv.Itoa(int(f.req_body_length)))
 	header.Set("test-query-param-foo", f.query_params.Get("foo"))
 	header.Set("test-path", f.path)
 	header.Set("rsp-route-name", f.callbacks.StreamInfo().GetRouteName())
+	header.Set("rsp-filter-chain-name", f.callbacks.StreamInfo().FilterChainName())
+	header.Set("rsp-attempt-count", strconv.Itoa(int(f.callbacks.StreamInfo().AttemptCount())))
 
 	if f.panic == "encode-header" {
 		badcode()

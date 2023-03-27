@@ -94,19 +94,30 @@ func (h *httpHeaderMap) Set(key, value string) {
 	if h.isTrailer {
 		cAPI.HttpSetTrailer(unsafe.Pointer(h.request.req), &key, &value)
 	} else {
-		cAPI.HttpSetHeader(unsafe.Pointer(h.request.req), &key, &value)
+		cAPI.HttpSetHeader(unsafe.Pointer(h.request.req), &key, &value, false)
 	}
 }
 
 func (h *httpHeaderMap) Add(key, value string) {
-	panic("unsupported yet")
+	if h.headers != nil {
+		if hdrs, found := h.headers[key]; found {
+			h.headers[key] = append(hdrs, value)
+		} else {
+			h.headers[key] = []string{value}
+		}
+	}
+	if h.isTrailer {
+		panic("unsupported yet")
+	} else {
+		cAPI.HttpSetHeader(unsafe.Pointer(h.request.req), &key, &value, true)
+	}
 }
 
 func (h *httpHeaderMap) Del(key string) {
 	if h.isTrailer {
 		panic("unsupported yet")
 	}
-	// Get all header values first before removing a key, since the set operation may not take affects immediately
+	// Get all header values first before removing a key, since the del operation may not take affects immediately
 	// when it's invoked in a Go thread, instead, it will post a callback to run in the envoy worker thread.
 	// Otherwise, we may get outdated values in a following Get call.
 	if h.headers != nil {
@@ -117,7 +128,13 @@ func (h *httpHeaderMap) Del(key string) {
 }
 
 func (h *httpHeaderMap) Range(f func(key, value string) bool) {
-	panic("unsupported yet")
+	for key, values := range h.headers {
+		for _, value := range values {
+			if !f(key, value) {
+				return
+			}
+		}
+	}
 }
 
 // ByteSize return size of HeaderMap

@@ -17,6 +17,7 @@ envoy_extension_cc_test(
         "agent_http_client_test.cc",
         "datadog_tracer_impl_test.cc",
         "dict_util_test.cc",
+        "event_scheduler_test.cc",
         "logger_test.cc",
         "span_test.cc",
         "time_util_test.cc",

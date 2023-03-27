@@ -17,6 +17,27 @@ logs<envoy_v3_api_field_config.listener.v3.Listener.access_log>`. The listener a
 HTTP request access logging and can be enabled separately and independently from
 filter access logs.
 
+.. _arch_overview_access_log_periodic:
+
+Periodic access logs
+--------------------
+
+If access log is enabled, then by default it will be reported to the configured sinks at the end of a TCP
+stream, or HTTP request. It is possible to extend this behavior and report  access logs periodically, and
+right after the TCP Proxy has successfully established a connection with the upstream. Reporting access logs
+right after upstream connection establishment does not depend on periodic reporting, and and the other way around.
+
+TCP Proxy
+*********
+
+* Periodic access logs can be enabled using :ref:`access log flush interval <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.access_log_flush_interval>`
+* Access log after upstream connection can be enabled using :ref:`flush access log on connected <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.flush_access_log_on_connected>`
+
+HTTP Connection Manager
+***********************
+
+* Periodic access logs can be enabled using :ref:`access log flush interval <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.access_log_flush_interval>`
+
 .. _arch_overview_access_log_filters:
 
 Access log filters

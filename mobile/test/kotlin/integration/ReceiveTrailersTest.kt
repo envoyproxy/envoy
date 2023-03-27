@@ -14,7 +14,6 @@ import io.envoyproxy.envoymobile.FilterHeadersStatus
 import io.envoyproxy.envoymobile.FilterTrailersStatus
 import io.envoyproxy.envoymobile.ResponseTrailers
 import io.envoyproxy.envoymobile.RequestTrailersBuilder
-import io.envoyproxy.envoymobile.UpstreamHttpProtocol
 import io.envoyproxy.envoymobile.engine.JniLibrary
 import java.nio.ByteBuffer
 import java.util.concurrent.CountDownLatch
@@ -92,7 +91,6 @@ class SendTrailersTest {
       authority = "example.com",
       path = "/test"
     )
-      .addUpstreamHttpProtocol(UpstreamHttpProtocol.HTTP2)
     builder.add("send-trailers", "true")
     val requestHeadersDefault = builder.build()
 
