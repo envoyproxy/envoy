@@ -836,7 +836,7 @@ private extension EngineBuilder {
     cxxBuilder.enableDrainPostDnsRefresh(self.enableDrainPostDnsRefresh)
     cxxBuilder.enforceTrustChainVerification(self.enforceTrustChainVerification)
     cxxBuilder.setForceAlwaysUsev6(self.forceIPv6)
-    cxxBuilder.enablePlatformCertificatesValidation(true)
+    cxxBuilder.enablePlatformCertificatesValidation(self.enablePlatformCertificateValidation)
     cxxBuilder.addH2ConnectionKeepaliveIdleIntervalMilliseconds(
       Int32(self.h2ConnectionKeepaliveIdleIntervalMilliseconds)
     )
