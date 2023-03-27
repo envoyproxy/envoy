@@ -1946,7 +1946,9 @@ Http::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateConnPool(
     PANIC("unexpected");
 #endif
   }
-  ASSERT(protocols.size() == 1 && protocols[0] == Http::Protocol::Http11);
+  ASSERT(protocols.size() == 1 &&
+         (protocols[0] == Http::Protocol::Http11 || protocols[0] == Http::Protocol::Http10));
+  // NP: will use HTTP11 since we do not support http10 for upstream yet.
   return Http::Http1::allocateConnPool(dispatcher, context_.api().randomGenerator(), host, priority,
                                        options, transport_socket_options, state);
 }
