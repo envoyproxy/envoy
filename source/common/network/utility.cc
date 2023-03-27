@@ -30,6 +30,7 @@
 #include "absl/container/fixed_array.h"
 #include "absl/strings/match.h"
 #include "absl/strings/string_view.h"
+#include "address_impl.h"
 
 namespace Envoy {
 namespace Network {
@@ -491,7 +492,16 @@ Utility::protobufAddressToAddress(const envoy::config::core::v3::Address& proto_
     return std::make_shared<Address::PipeInstance>(proto_address.pipe().path(),
                                                    proto_address.pipe().mode());
   case envoy::config::core::v3::Address::AddressCase::kEnvoyInternalAddress:
-    PANIC("internal address not supported"); // TODO(lambdai) fix.
+    switch (proto_address.envoy_internal_address().address_name_specifier_case()) {
+    case envoy::config::core::v3::EnvoyInternalAddress::AddressNameSpecifierCase::
+        kServerListenerName:
+      return std::make_shared<Address::EnvoyInternalInstance>(
+          proto_address.envoy_internal_address().server_listener_name(),
+          proto_address.envoy_internal_address().endpoint_id());
+    case envoy::config::core::v3::EnvoyInternalAddress::AddressNameSpecifierCase::
+        ADDRESS_NAME_SPECIFIER_NOT_SET:
+      PANIC("No address name specifier for internal listener");
+    }
   case envoy::config::core::v3::Address::AddressCase::ADDRESS_NOT_SET:
     PANIC_DUE_TO_PROTO_UNSET;
   }

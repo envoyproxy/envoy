@@ -570,6 +570,13 @@ TEST(NetworkUtility, ParseProtobufAddress) {
               Utility::protobufAddressToAddress(proto_address)->asString());
   }
 #endif
+  {
+    envoy::config::core::v3::Address proto_address;
+    proto_address.mutable_envoy_internal_address()->set_server_listener_name("internal_listener");
+    proto_address.mutable_envoy_internal_address()->set_endpoint_id("endpoint");
+    EXPECT_EQ(Utility::protobufAddressToAddress(proto_address)->asString(),
+              "envoy://internal_listener/endpoint");
+  }
 }
 
 TEST(NetworkUtility, AddressToProtobufAddress) {
