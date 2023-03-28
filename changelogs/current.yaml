@@ -44,6 +44,9 @@ minor_behavior_changes:
 - area: skywalking
   change: |
     If sw8 header is invalid, skywalking extension will create a new trace context and a null span respectively when sampling is enabled and disabled.
+- area: ext_authz
+  change: |
+    ext_authz supports adding ``x-envoy-failure-mode-allowed`` header optionally when `failure_mode_allow` is enable.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
