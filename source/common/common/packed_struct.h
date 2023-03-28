@@ -104,8 +104,13 @@ public:
         data_.get()[indices_[static_cast<std::underlying_type_t<ElementName>>(element_name)]]);
   }
 
-  template <ElementName element_name> const Envoy::OptRef<const T&> get() const {
-    return const_cast<Envoy::OptRef<const T&>>(get<element_name>());
+  template <ElementName element_name> const Envoy::OptRef<const T> get() const {
+    sizeCheck<element_name>();
+    if (!has<element_name>()) {
+      return Envoy::OptRef<const T>{};
+    }
+    return Envoy::makeOptRef<const T>(
+        data_.get()[indices_[static_cast<std::underlying_type_t<ElementName>>(element_name)]]);
   }
 
   // Set element.

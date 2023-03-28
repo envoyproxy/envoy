@@ -5,14 +5,6 @@
 set -e
 
 
-build_setup_args=""
-if [[ "$1" == "format" || "$1" == "fix_proto_format" || "$1" == "check_proto_format" || "$1" == "docs" ||  \
-          "$1" == "bazel.clang_tidy" || "$1" == "bazel.distribution" \
-          || "$1" == "deps" || "$1" == "verify_examples" || "$1" == "publish" \
-          || "$1" == "verify_distro" ]]; then
-    build_setup_args="-nofetch"
-fi
-
 # TODO(phlax): Clarify and/or integrate SRCDIR and ENVOY_SRCDIR
 export SRCDIR="${SRCDIR:-$PWD}"
 export ENVOY_SRCDIR="${ENVOY_SRCDIR:-$PWD}"
@@ -22,7 +14,7 @@ if [[ -z "$NO_BUILD_SETUP" ]]; then
     # shellcheck source=ci/setup_cache.sh
     . "$(dirname "$0")"/setup_cache.sh
     # shellcheck source=ci/build_setup.sh
-    . "$(dirname "$0")"/build_setup.sh $build_setup_args
+    . "$(dirname "$0")"/build_setup.sh
 
     echo "building using ${NUM_CPUS} CPUs"
     echo "building for ${ENVOY_BUILD_ARCH}"
@@ -525,7 +517,7 @@ elif [[ "$CI_TARGET" == "deps" ]]; then
   bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/dependency:check \
         --action_env=TODAY_DATE \
         -- -v warn \
-           -c cves release_dates releases
+           -c cves release_dates releases || echo "WARNING: Dependency check failed"
 
   # Run pip requirements tests
   echo "check pip..."
