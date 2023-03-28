@@ -490,6 +490,15 @@ TEST(HttpUtility, updateAuthority) {
     EXPECT_EQ("dns.name", headers.get_(":authority"));
     EXPECT_EQ("host.com", headers.get_("x-forwarded-host"));
   }
+
+  // Test that we only append to x-forwarded-host if it is not already present.
+  {
+    TestRequestHeaderMapImpl headers{{":authority", "dns.name"},
+                                     {"x-forwarded-host", "host.com,dns.name"}};
+    Utility::updateAuthority(headers, "newhost.com", true);
+    EXPECT_EQ("newhost.com", headers.get_(":authority"));
+    EXPECT_EQ("host.com,dns.name", headers.get_("x-forwarded-host"));
+  }
 }
 
 TEST(HttpUtility, createSslRedirectPath) {

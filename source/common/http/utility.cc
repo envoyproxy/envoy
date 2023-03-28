@@ -462,9 +462,19 @@ void Utility::appendVia(RequestOrResponseHeaderMap& headers, const std::string& 
 
 void Utility::updateAuthority(RequestHeaderMap& headers, absl::string_view hostname,
                               const bool append_xfh) {
-  if (append_xfh && !headers.getHostValue().empty()) {
-    headers.appendForwardedHost(headers.getHostValue(), ",");
+  // only append to x-forwarded-host if the value was not the last value appended
+  const auto host = headers.getHostValue();
+  const auto xfh = headers.getForwardedHostValue();
+
+  if (!host.empty() && !xfh.empty()) {
+    const auto xfh_split = StringUtil::splitToken(xfh, ",");
+    if (append_xfh && !xfh_split.empty() && xfh_split.back() != host) {
+      headers.appendForwardedHost(host, ",");
+    }
+  } else if (!host.empty() && append_xfh) {
+    headers.appendForwardedHost(host, ",");
   }
+
   headers.setHost(hostname);
 }
 
