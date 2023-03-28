@@ -466,12 +466,12 @@ void Utility::updateAuthority(RequestHeaderMap& headers, absl::string_view hostn
   const auto host = headers.getHostValue();
   const auto xfh = headers.getForwardedHostValue();
 
-  if (!host.empty() && !xfh.empty()) {
+  if (append_xfh && !host.empty() && !xfh.empty()) {
     const auto xfh_split = StringUtil::splitToken(xfh, ",");
-    if (append_xfh && !xfh_split.empty() && xfh_split.back() != host) {
+    if (!xfh_split.empty() && xfh_split.back() != host) {
       headers.appendForwardedHost(host, ",");
     }
-  } else if (!host.empty() && append_xfh) {
+  } else if (append_xfh && !host.empty()) {
     headers.appendForwardedHost(host, ",");
   }
 
