@@ -248,7 +248,7 @@ new_features:
 - area: access_log
   change: |
     added access log support for ``%STREAM_STATE%`` command operator. Using the command operator will extract a value representing the state of the stream.
-    Access logs at the beggining of the stream will have 'Started' value. Periodic access logs during a living stream, will have 'InProgress' value. Default access log,
+    Access logs at the beginning of the stream will have 'Started' value. Periodic access logs during an active stream, will have 'InProgress' value. Default access log,
     at the end of a stream will have 'Ended' value. In case the stream has not started yet, the value will be null.
 - area: ext_authz
   change: |
