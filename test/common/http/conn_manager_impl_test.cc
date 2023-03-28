@@ -2624,6 +2624,18 @@ TEST_F(HttpConnectionManagerImplTest, TestStreamStateNonSuccessStatusCode) {
         decoder_->decodeHeaders(std::move(headers), true);
 
         EXPECT_EQ(filter->callbacks_->streamInfo().streamState(), StreamInfo::StreamState::Started);
+        
+        filter->callbacks_->streamInfo().setResponseCodeDetails("");
+        ResponseHeaderMapPtr response_headers{new TestResponseHeaderMapImpl{{":status", "500"}}};
+        filter->callbacks_->encodeHeaders(std::move(response_headers), false, "details");
+
+        // Non-success status code should not change the state to InProgress
+        EXPECT_EQ(filter->callbacks_->streamInfo().streamState(), StreamInfo::StreamState::Started);
+
+        ResponseTrailerMapPtr response_trailers{new TestResponseTrailerMapImpl{{"x-trailer", "1"}}};
+        filter->callbacks_->encodeTrailers(std::move(response_trailers));
+
+        EXPECT_EQ(filter->callbacks_->streamInfo().streamState(), StreamInfo::StreamState::Ended);
 
         data.drain(4);
         return Http::okStatus();
@@ -2631,18 +2643,6 @@ TEST_F(HttpConnectionManagerImplTest, TestStreamStateNonSuccessStatusCode) {
 
   Buffer::OwnedImpl fake_input("1234");
   conn_manager_->onData(fake_input, false);
-
-  filter->callbacks_->streamInfo().setResponseCodeDetails("");
-  ResponseHeaderMapPtr response_headers{new TestResponseHeaderMapImpl{{":status", "500"}}};
-  filter->callbacks_->encodeHeaders(std::move(response_headers), false, "details");
-
-  // Non-success status code should not change the state to InProgress
-  EXPECT_EQ(filter->callbacks_->streamInfo().streamState(), StreamInfo::StreamState::Started);
-
-  ResponseTrailerMapPtr response_trailers{new TestResponseTrailerMapImpl{{"x-trailer", "1"}}};
-  filter->callbacks_->encodeTrailers(std::move(response_trailers));
-
-  EXPECT_EQ(filter->callbacks_->streamInfo().streamState(), StreamInfo::StreamState::Ended);
 }
 
 class StreamErrorOnInvalidHttpMessageTest : public HttpConnectionManagerImplTest {
