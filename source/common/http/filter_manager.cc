@@ -1243,7 +1243,7 @@ void FilterManager::encodeMetadata(ActiveStreamEncoderFilter* filter,
       if (std::next(entry) != encoder_filters_.end()) {
         (*std::next(entry))->getSavedResponseMetadata()->emplace_back(std::move(metadata_map_ptr));
       } else {
-        filter_manager_callbacks_->encodeMetadata(std::move(metadata_map_ptr));
+        filter_manager_callbacks_.encodeMetadata(std::move(metadata_map_ptr));
       }
       (*entry)->commonContinue();
       return;
