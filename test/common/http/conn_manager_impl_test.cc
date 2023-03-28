@@ -2630,7 +2630,7 @@ TEST_F(HttpConnectionManagerImplTest, TestStreamStateNonSuccessStatusCode) {
         filter->callbacks_->encodeHeaders(std::move(response_headers), false, "details");
 
         // Non-success status code should not change the state to InProgress
-        EXPECT_EQ(filter->callbacks_->streamInfo().streamState(), StreamInfo::StreamState::Started);
+        EXPECT_EQ(filter->callbacks_->streamInfo().streamState(), StreamInfo::StreamState::Ended);
 
         ResponseTrailerMapPtr response_trailers{new TestResponseTrailerMapImpl{{"x-trailer", "1"}}};
         filter->callbacks_->encodeTrailers(std::move(response_trailers));
