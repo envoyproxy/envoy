@@ -453,6 +453,10 @@ private:
     // Note that we assume that the number of routes that have been cleared is small. So we use
     // inline vector to avoid heap allocation. If this assumption is wrong, we should consider using
     // a list or other data structures.
+    //
+    // TODO(wbpcode): This is a helpless compromise. To avoid exposing the complexity of the route
+    // lifetime management to every HTTP filter, we do a hack here. But if every filter could manage
+    // the lifetime of the route config by itself easily, we could remove this hack.
     absl::InlinedVector<Router::RouteConstSharedPtr, 3> cleared_cached_routes_;
 
     absl::optional<Upstream::ClusterInfoConstSharedPtr> cached_cluster_info_;
