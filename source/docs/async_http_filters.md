@@ -6,9 +6,9 @@ This documentation is to explain the less obvious behaviors when a filter perfor
 
 ### How to wait for an asynchronous callback
 
-If you send a callback and your filter needs the response before it can complete the current step (e.g. `decodeHeaders`, `encodeHeaders`, etc.) the function must return one of the states that indicates work should not continue, e.g. [`Http::FilterHeadersStatus::StopIteration`](https://github.com/envoyproxy/envoy/blob/2d82c10a467cbb933ed5cb9bdb7eaae4ffa160de/envoy/http/filter.h#L45). For more details on this, see [flow_control.md](flow_control.md).
+If your extension initiates a long running operation and needs to wait for its completion before it can complete the current step (e.g. `decodeHeaders`, `encodeHeaders`, etc.) the function must return one of the states that indicates work should not continue, e.g. [`Http::FilterHeadersStatus::StopIteration`](https://github.com/envoyproxy/envoy/blob/2d82c10a467cbb933ed5cb9bdb7eaae4ffa160de/envoy/http/filter.h#L45). For more details on this, see [flow_control.md](flow_control.md).
 
-When your callback is completed, if flow control is paused, it should execute either `sendLocalReply` or `continueDecoding`/`continueEncoding` when the filter is ready to resume normal operation.
+When the callback for your long running operation is completed, if flow control is paused, it should execute either `sendLocalReply` or `continueDecoding`/`continueEncoding` when the filter is ready to resume normal operation.
 
 If the filter is performing changes to the body of the request or response, it will need to call [`addDecodedData`](https://github.com/envoyproxy/envoy/blob/2d82c10a467cbb933ed5cb9bdb7eaae4ffa160de/envoy/http/filter.h#L514)/`addEncodedData` or [`injectDecodedDataToFilterChain`](https://github.com/envoyproxy/envoy/blob/2d82c10a467cbb933ed5cb9bdb7eaae4ffa160de/envoy/http/filter.h#L538)/`injectEncodedDataToFilterChain` as part of that operation - see linked function comments for more details.
 
