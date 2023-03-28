@@ -37,7 +37,7 @@ Features:
 
 - api: Add support for brotli and gzip request compression.  (:issue:`#25352 <25352>`, :issue:`#25595 <25595>`)
 - api: Add a constructor which takes a URL to C++ RequestEngineBuilder.
-- api: add option to support platform provided certificates validation interfaces on iOS (always enabled) and Android. (:issue `#2144 <2144>`)
+- api: add option to support platform provided certificates validation interfaces on iOS and Android. (:issue `#2144 <2144>`)
 - api: Add a ``setPerTryIdleTimeoutSeconds()`` method to C++ EngineBuilder.
 - swift/kotlin: add an option to enable DNS cache by calling ``enableDNSCache(_:)`` method.
 - kotlin: add a way to tell Envoy Mobile to respect system proxy settings by calling an ``enableProxying(true)`` method on the engine builder. (:issue:`#2416 <2416>`)
@@ -51,6 +51,7 @@ Features:
 - build: Add a build feature ``envoy_mobile_stats_reporting`` to allow disabling stats reporting. (:issue:`26086 <26086>`)
 - swift: Add a new Swift implementation of generating the Envoy bootstrap that replaces the previous Objective-C implementation.
   This can be enabled by setting ``useSwiftBootstrap(true)`` and requires building with ``--define=envoy_mobile_swift_cxx_interop=enabled``. (:issue:`#26111 <26111>`)
+- android: log cleared JNI exceptions to platform layer as `jni_cleared_pending_exception` events (:issue:`#26133 <26133>`).
 
 0.5.0 (September 2, 2022)
 ===========================

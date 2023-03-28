@@ -164,6 +164,7 @@ public:
   CAPIStatus setTrailer(absl::string_view key, absl::string_view value);
   CAPIStatus getStringValue(int id, GoString* value_str);
   CAPIStatus getIntegerValue(int id, uint64_t* value);
+  CAPIStatus log(uint32_t level, absl::string_view message);
 
 private:
   ProcessorState& getProcessorState();

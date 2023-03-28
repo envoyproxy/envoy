@@ -1678,6 +1678,9 @@ public:
           createConnectionAndWrite("dummy", connections.back().response_);
       connections.back().client_conn_->waitForConnection();
       ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(connections.back().upstream_conn_));
+      std::string data;
+      EXPECT_TRUE(connections.back().upstream_conn_->waitForData(5, &data));
+      EXPECT_EQ("dummy", data);
     }
     for (auto& conn : connections) {
       conn.client_conn_->close();
