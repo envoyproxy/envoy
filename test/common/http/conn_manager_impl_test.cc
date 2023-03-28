@@ -2624,7 +2624,7 @@ TEST_F(HttpConnectionManagerImplTest, TestStreamStateNonSuccessStatusCode) {
         decoder_->decodeHeaders(std::move(headers), true);
 
         EXPECT_EQ(filter->callbacks_->streamInfo().streamState(), StreamInfo::StreamState::Started);
-        
+
         filter->callbacks_->streamInfo().setResponseCodeDetails("");
         ResponseHeaderMapPtr response_headers{new TestResponseHeaderMapImpl{{":status", "500"}}};
         filter->callbacks_->encodeHeaders(std::move(response_headers), false, "details");
