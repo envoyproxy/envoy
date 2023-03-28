@@ -1202,6 +1202,10 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapSharedPt
 
   const bool upgrade_rejected = filter_manager_.createFilterChain() == false;
 
+  if (connection_manager_.config_.flushAccessLogOnNewRequest()) {
+    filter_manager_.log();
+  }
+
   // TODO if there are no filters when starting a filter iteration, the connection manager
   // should return 404. The current returns no response if there is no router filter.
   if (hasCachedRoute()) {

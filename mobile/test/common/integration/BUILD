@@ -124,6 +124,7 @@ envoy_cc_test_library(
         "@envoy//test/common/grpc:grpc_client_integration_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
+        "@envoy_build_config//:test_extensions",
     ],
 )
 
