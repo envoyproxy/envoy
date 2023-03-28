@@ -129,9 +129,8 @@ TEST_P(ConnectTerminationIntegrationTest, ExtendedConnectWithBytestreamProtocol)
   // available in UHV.
   return;
 #endif
-  if (downstream_protocol_ != Http::CodecType::HTTP2) {
+  if (downstream_protocol_ == Http::CodecType::HTTP1) {
     // Extended CONNECT is applicable to H/2 and H/3 protocols only
-    // However H/3 codec does not support it yet
     return;
   }
   initialize();
@@ -525,11 +524,6 @@ TEST_P(ProxyingConnectIntegrationTest, ProxyExtendedConnect) {
   // available in UHV.
   return;
 #endif
-  // TODO(#25290): QUICHE does not yet support extended CONNECT
-  if (downstreamProtocol() == Http::CodecType::HTTP3 ||
-      upstreamProtocol() == Http::CodecType::HTTP3) {
-    return;
-  }
   add_upgrade_config_ = true;
   initialize();
 
