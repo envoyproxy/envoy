@@ -130,7 +130,7 @@ message RBAC {
     // Configurations for RBAC-based authorization audit loggers.
     //
     // [#not-implemented-hide:]
-    repeated AuditLoggerConfig logger_configs = 2 [(validate.rules).repeated = {min_items: 1}];
+    repeated AuditLoggerConfig logger_configs = 2;
   }
 
   // The action to take if a policy matches. Every action either allows or denies a request,
