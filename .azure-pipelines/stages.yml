@@ -472,10 +472,12 @@ stages:
         # These are ordered by most time-consuming first.
         compile_time_options:
           CI_TARGET: "bazel.compile_time_options"
+          ENVOY_FILTER_EXAMPLE: true
         tsan:
           CI_TARGET: "bazel.tsan"
         asan:
           CI_TARGET: "bazel.asan"
+          ENVOY_FILTER_EXAMPLE: true
         # Disabled due to https://github.com/envoyproxy/envoy/pull/18218
         # api_compat:
         #  CI_TARGET: "bazel.api_compat"
@@ -483,6 +485,7 @@ stages:
           CI_TARGET: "bazel.gcc"
         msan:
           CI_TARGET: "bazel.msan"
+          ENVOY_FILTER_EXAMPLE: true
         clang_tidy:
           CI_TARGET: "bazel.clang_tidy"
         api:
@@ -494,6 +497,7 @@ stages:
     - template: bazel.yml
       parameters:
         ciTarget: $(CI_TARGET)
+        envoyBuildFilterExample: $(ENVOY_FILTER_EXAMPLE)
 
   - job: coverage
     # displayName: "Linux x64"
