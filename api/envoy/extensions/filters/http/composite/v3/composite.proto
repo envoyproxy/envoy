@@ -44,4 +44,3 @@ message ExecuteFilterAction {
 message ExecuteFilterMultiAction {
   repeated config.core.v3.TypedExtensionConfig typed_config = 1;
 }
-
