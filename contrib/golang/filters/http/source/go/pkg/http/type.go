@@ -32,102 +32,15 @@ const (
 	errInvalidPhase    = "invalid phase, maybe headers/buffer already continued"
 )
 
-type httpHeaderMap struct {
+// api.HeaderMap
+type headerMapImpl struct {
 	request     *httpRequest
 	headers     map[string][]string
 	headerNum   uint64
 	headerBytes uint64
-	isTrailer   bool
 }
 
-var _ api.HeaderMap = (*httpHeaderMap)(nil)
-
-func (h *httpHeaderMap) GetRaw(key string) string {
-	if h.isTrailer {
-		panic("unsupported yet")
-	}
-	var value string
-	cAPI.HttpGetHeader(unsafe.Pointer(h.request.req), &key, &value)
-	return value
-}
-
-func (h *httpHeaderMap) Get(key string) (string, bool) {
-	if h.headers == nil {
-		if h.isTrailer {
-			h.headers = cAPI.HttpCopyTrailers(unsafe.Pointer(h.request.req), h.headerNum, h.headerBytes)
-		} else {
-			h.headers = cAPI.HttpCopyHeaders(unsafe.Pointer(h.request.req), h.headerNum, h.headerBytes)
-		}
-	}
-	value, ok := h.headers[key]
-	if !ok {
-		return "", false
-	}
-	return value[0], ok
-}
-
-func (h *httpHeaderMap) Values(key string) []string {
-	if h.headers == nil {
-		if h.isTrailer {
-			h.headers = cAPI.HttpCopyTrailers(unsafe.Pointer(h.request.req), h.headerNum, h.headerBytes)
-		} else {
-			h.headers = cAPI.HttpCopyHeaders(unsafe.Pointer(h.request.req), h.headerNum, h.headerBytes)
-		}
-	}
-	value, ok := h.headers[key]
-	if !ok {
-		return nil
-	}
-	return value
-}
-
-func (h *httpHeaderMap) Set(key, value string) {
-	// Get all header values first before setting a value, since the set operation may not take affects immediately
-	// when it's invoked in a Go thread, instead, it will post a callback to run in the envoy worker thread.
-	// Otherwise, we may get outdated values in a following Get call.
-	if h.headers == nil && !h.isTrailer {
-		h.headers = cAPI.HttpCopyHeaders(unsafe.Pointer(h.request.req), h.headerNum, h.headerBytes)
-	}
-	if h.headers != nil {
-		h.headers[key] = []string{value}
-	}
-	if h.isTrailer {
-		cAPI.HttpSetTrailer(unsafe.Pointer(h.request.req), &key, &value)
-	} else {
-		cAPI.HttpSetHeader(unsafe.Pointer(h.request.req), &key, &value, false)
-	}
-}
-
-func (h *httpHeaderMap) Add(key, value string) {
-	if h.headers != nil {
-		if hdrs, found := h.headers[key]; found {
-			h.headers[key] = append(hdrs, value)
-		} else {
-			h.headers[key] = []string{value}
-		}
-	}
-	if h.isTrailer {
-		panic("unsupported yet")
-	} else {
-		cAPI.HttpSetHeader(unsafe.Pointer(h.request.req), &key, &value, true)
-	}
-}
-
-func (h *httpHeaderMap) Del(key string) {
-	if h.isTrailer {
-		panic("unsupported yet")
-	}
-	// Get all header values first before removing a key, since the del operation may not take affects immediately
-	// when it's invoked in a Go thread, instead, it will post a callback to run in the envoy worker thread.
-	// Otherwise, we may get outdated values in a following Get call.
-	if h.headers != nil {
-		h.headers = cAPI.HttpCopyHeaders(unsafe.Pointer(h.request.req), h.headerNum, h.headerBytes)
-	}
-	delete(h.headers, key)
-	cAPI.HttpRemoveHeader(unsafe.Pointer(h.request.req), &key)
-}
-
-func (h *httpHeaderMap) Range(f func(key, value string) bool) {
+func (h *headerMapImpl) Range(f func(key, value string) bool) {
 	for key, values := range h.headers {
 		for _, value := range values {
 			if !f(key, value) {
@@ -138,10 +51,297 @@ func (h *httpHeaderMap) Range(f func(key, value string) bool) {
 }
 
 // ByteSize return size of HeaderMap
-func (h *httpHeaderMap) ByteSize() uint64 {
+func (h *headerMapImpl) ByteSize() uint64 {
 	return h.headerBytes
 }
 
+// api.RequestHeaderMap
+type requestHeaderMapImpl struct {
+	headerMapImpl
+}
+
+var _ api.RequestHeaderMap = (*requestHeaderMapImpl)(nil)
+
+func (h *requestHeaderMapImpl) GetRaw(key string) string {
+	var value string
+	cAPI.HttpGetHeader(unsafe.Pointer(h.request.req), &key, &value)
+	return value
+}
+
+func (h *requestHeaderMapImpl) Get(key string) (string, bool) {
+	if h.headers == nil {
+		h.headers = cAPI.HttpCopyHeaders(unsafe.Pointer(h.request.req), h.headerNum, h.headerBytes)
+	}
+	value, ok := h.headers[key]
+	if !ok {
+		return "", false
+	}
+	return value[0], ok
+}
+
+func (h *requestHeaderMapImpl) Values(key string) []string {
+	if h.headers == nil {
+		h.headers = cAPI.HttpCopyHeaders(unsafe.Pointer(h.request.req), h.headerNum, h.headerBytes)
+	}
+	value, ok := h.headers[key]
+	if !ok {
+		return nil
+	}
+	return value
+}
+
+func (h *requestHeaderMapImpl) Set(key, value string) {
+	// Get all header values first before setting a value, since the set operation may not take affects immediately
+	// when it's invoked in a Go thread, instead, it will post a callback to run in the envoy worker thread.
+	// Otherwise, we may get outdated values in a following Get call.
+	if h.headers == nil {
+		h.headers = cAPI.HttpCopyHeaders(unsafe.Pointer(h.request.req), h.headerNum, h.headerBytes)
+	}
+	if h.headers != nil {
+		h.headers[key] = []string{value}
+	}
+
+	cAPI.HttpSetHeader(unsafe.Pointer(h.request.req), &key, &value, false)
+}
+
+func (h *requestHeaderMapImpl) Add(key, value string) {
+	if h.headers != nil {
+		if hdrs, found := h.headers[key]; found {
+			h.headers[key] = append(hdrs, value)
+		} else {
+			h.headers[key] = []string{value}
+		}
+	}
+	cAPI.HttpSetHeader(unsafe.Pointer(h.request.req), &key, &value, true)
+}
+
+func (h *requestHeaderMapImpl) Del(key string) {
+	// Get all header values first before removing a key, since the del operation may not take affects immediately
+	// when it's invoked in a Go thread, instead, it will post a callback to run in the envoy worker thread.
+	// Otherwise, we may get outdated values in a following Get call.
+	if h.headers != nil {
+		h.headers = cAPI.HttpCopyHeaders(unsafe.Pointer(h.request.req), h.headerNum, h.headerBytes)
+	}
+	delete(h.headers, key)
+	cAPI.HttpRemoveHeader(unsafe.Pointer(h.request.req), &key)
+}
+
+func (h *requestHeaderMapImpl) Protocol() string {
+	v, _ := h.Get(":protocol")
+	return v
+}
+
+func (h *requestHeaderMapImpl) Scheme() string {
+	v, _ := h.Get(":scheme")
+	return v
+}
+
+func (h *requestHeaderMapImpl) Method() string {
+	v, _ := h.Get(":method")
+	return v
+}
+
+func (h *requestHeaderMapImpl) Path() string {
+	v, _ := h.Get(":path")
+	return v
+}
+
+func (h *requestHeaderMapImpl) Host() string {
+	v, _ := h.Get(":authority")
+	return v
+}
+
+// api.ResponseHeaderMap
+type responseHeaderMapImpl struct {
+	headerMapImpl
+}
+
+var _ api.ResponseHeaderMap = (*responseHeaderMapImpl)(nil)
+
+func (h *responseHeaderMapImpl) GetRaw(key string) string {
+	var value string
+	cAPI.HttpGetHeader(unsafe.Pointer(h.request.req), &key, &value)
+	return value
+}
+
+func (h *responseHeaderMapImpl) Get(key string) (string, bool) {
+	if h.headers == nil {
+		h.headers = cAPI.HttpCopyHeaders(unsafe.Pointer(h.request.req), h.headerNum, h.headerBytes)
+	}
+	value, ok := h.headers[key]
+	if !ok {
+		return "", false
+	}
+	return value[0], ok
+}
+
+func (h *responseHeaderMapImpl) Values(key string) []string {
+	if h.headers == nil {
+		h.headers = cAPI.HttpCopyHeaders(unsafe.Pointer(h.request.req), h.headerNum, h.headerBytes)
+	}
+	value, ok := h.headers[key]
+	if !ok {
+		return nil
+	}
+	return value
+}
+
+func (h *responseHeaderMapImpl) Set(key, value string) {
+	// Get all header values first before setting a value, since the set operation may not take affects immediately
+	// when it's invoked in a Go thread, instead, it will post a callback to run in the envoy worker thread.
+	// Otherwise, we may get outdated values in a following Get call.
+	if h.headers == nil {
+		h.headers = cAPI.HttpCopyHeaders(unsafe.Pointer(h.request.req), h.headerNum, h.headerBytes)
+	}
+	if h.headers != nil {
+		h.headers[key] = []string{value}
+	}
+
+	cAPI.HttpSetHeader(unsafe.Pointer(h.request.req), &key, &value, false)
+}
+
+func (h *responseHeaderMapImpl) Add(key, value string) {
+	if h.headers != nil {
+		if hdrs, found := h.headers[key]; found {
+			h.headers[key] = append(hdrs, value)
+		} else {
+			h.headers[key] = []string{value}
+		}
+	}
+	cAPI.HttpSetHeader(unsafe.Pointer(h.request.req), &key, &value, true)
+}
+
+func (h *responseHeaderMapImpl) Del(key string) {
+	// Get all header values first before removing a key, since the del operation may not take affects immediately
+	// when it's invoked in a Go thread, instead, it will post a callback to run in the envoy worker thread.
+	// Otherwise, we may get outdated values in a following Get call.
+	if h.headers != nil {
+		h.headers = cAPI.HttpCopyHeaders(unsafe.Pointer(h.request.req), h.headerNum, h.headerBytes)
+	}
+	delete(h.headers, key)
+	cAPI.HttpRemoveHeader(unsafe.Pointer(h.request.req), &key)
+}
+
+func (h *responseHeaderMapImpl) Status() int {
+	if str, ok := h.Get(":status"); ok {
+		v, _ := strconv.Atoi(str)
+		return v
+	}
+	return 0
+}
+
+// api.RequestTrailerMap
+type requestTrailerMapImpl struct {
+	headerMapImpl
+}
+
+var _ api.RequestTrailerMap = (*requestTrailerMapImpl)(nil)
+
+func (h *requestTrailerMapImpl) GetRaw(key string) string {
+	panic("unsupported yet")
+}
+
+func (h *requestTrailerMapImpl) Get(key string) (string, bool) {
+	if h.headers == nil {
+		h.headers = cAPI.HttpCopyTrailers(unsafe.Pointer(h.request.req), h.headerNum, h.headerBytes)
+	}
+	value, ok := h.headers[key]
+	if !ok {
+		return "", false
+	}
+	return value[0], ok
+	return "", false
+}
+
+func (h *requestTrailerMapImpl) Values(key string) []string {
+	if h.headers == nil {
+		h.headers = cAPI.HttpCopyTrailers(unsafe.Pointer(h.request.req), h.headerNum, h.headerBytes)
+	}
+	value, ok := h.headers[key]
+	if !ok {
+		return nil
+	}
+	return value
+}
+
+func (h *requestTrailerMapImpl) Set(key, value string) {
+	// Get all header values first before setting a value, since the set operation may not take affects immediately
+	// when it's invoked in a Go thread, instead, it will post a callback to run in the envoy worker thread.
+	// Otherwise, we may get outdated values in a following Get call.
+	if h.headers == nil {
+		h.headers = cAPI.HttpCopyTrailers(unsafe.Pointer(h.request.req), h.headerNum, h.headerBytes)
+	}
+	if h.headers != nil {
+		h.headers[key] = []string{value}
+	}
+
+	cAPI.HttpSetTrailer(unsafe.Pointer(h.request.req), &key, &value)
+}
+
+func (h *requestTrailerMapImpl) Add(key, value string) {
+	panic("unsupported yet")
+}
+
+func (h *requestTrailerMapImpl) Del(key string) {
+	panic("unsupported yet")
+}
+
+// api.ResponseTrailerMap
+type responseTrailerMapImpl struct {
+	headerMapImpl
+}
+
+var _ api.ResponseTrailerMap = (*responseTrailerMapImpl)(nil)
+
+func (h *responseTrailerMapImpl) GetRaw(key string) string {
+	panic("unsupported yet")
+}
+
+func (h *responseTrailerMapImpl) Get(key string) (string, bool) {
+	if h.headers == nil {
+		h.headers = cAPI.HttpCopyTrailers(unsafe.Pointer(h.request.req), h.headerNum, h.headerBytes)
+	}
+	value, ok := h.headers[key]
+	if !ok {
+		return "", false
+	}
+	return value[0], ok
+}
+
+func (h *responseTrailerMapImpl) Values(key string) []string {
+	if h.headers == nil {
+		h.headers = cAPI.HttpCopyTrailers(unsafe.Pointer(h.request.req), h.headerNum, h.headerBytes)
+	}
+	value, ok := h.headers[key]
+	if !ok {
+		return nil
+	}
+	return value
+}
+
+func (h *responseTrailerMapImpl) Set(key, value string) {
+	// Get all header values first before setting a value, since the set operation may not take affects immediately
+	// when it's invoked in a Go thread, instead, it will post a callback to run in the envoy worker thread.
+	// Otherwise, we may get outdated values in a following Get call.
+	if h.headers == nil {
+		h.headers = cAPI.HttpCopyTrailers(unsafe.Pointer(h.request.req), h.headerNum, h.headerBytes)
+	}
+	if h.headers != nil {
+		h.headers[key] = []string{value}
+	}
+
+	cAPI.HttpSetTrailer(unsafe.Pointer(h.request.req), &key, &value)
+}
+
+func (h *responseTrailerMapImpl) Add(key, value string) {
+	panic("unsupported yet")
+}
+
+func (h *responseTrailerMapImpl) Del(key string) {
+	panic("unsupported yet")
+}
+
+// api.BufferInstance
 type httpBuffer struct {
 	request             *httpRequest
 	envoyBufferInstance uint64

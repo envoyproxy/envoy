@@ -124,22 +124,43 @@ func envoyGoFilterOnHttpHeader(r *C.httpRequest, endStream, headerNum, headerByt
 	defer req.RecoverPanic()
 	f := req.httpFilter
 
-	header := &httpHeaderMap{
-		request:     req,
-		headerNum:   headerNum,
-		headerBytes: headerBytes,
-		isTrailer:   phase == api.DecodeTrailerPhase || phase == api.EncodeTrailerPhase,
-	}
-
 	var status api.StatusType
 	switch phase {
 	case api.DecodeHeaderPhase:
+		header := &requestHeaderMapImpl{
+			headerMapImpl{
+				request:     req,
+				headerNum:   headerNum,
+				headerBytes: headerBytes,
+			},
+		}
 		status = f.DecodeHeaders(header, endStream == 1)
 	case api.DecodeTrailerPhase:
+		header := &requestTrailerMapImpl{
+			headerMapImpl{
+				request:     req,
+				headerNum:   headerNum,
+				headerBytes: headerBytes,
+			},
+		}
 		status = f.DecodeTrailers(header)
 	case api.EncodeHeaderPhase:
+		header := &responseHeaderMapImpl{
+			headerMapImpl{
+				request:     req,
+				headerNum:   headerNum,
+				headerBytes: headerBytes,
+			},
+		}
 		status = f.EncodeHeaders(header, endStream == 1)
 	case api.EncodeTrailerPhase:
+		header := &responseTrailerMapImpl{
+			headerMapImpl{
+				request:     req,
+				headerNum:   headerNum,
+				headerBytes: headerBytes,
+			},
+		}
 		status = f.EncodeTrailers(header)
 	}
 	return uint64(status)
