@@ -258,14 +258,6 @@ public:
 
 private:
   enum class CodecType { HTTP1, HTTP2, HTTP3, AUTO };
-  void
-  processDynamicFilterConfig(const std::string& name,
-                             const envoy::config::core::v3::ExtensionConfigSource& config_discovery,
-                             FilterFactoriesList& filter_factories,
-                             const std::string& filter_chain_type,
-                             bool last_filter_in_current_config);
-  void createFilterChainForFactories(Http::FilterChainManager& manager,
-                                     const FilterFactoriesList& filter_factories);
 
   ::Envoy::Http::HeaderValidatorStats& getHeaderValidatorStats(Http::Protocol protocol);
 

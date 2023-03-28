@@ -24,7 +24,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // TCP Proxy :ref:`configuration overview <config_network_filters_tcp_proxy>`.
 // [#extension: envoy.filters.network.tcp_proxy]
 
-// [#next-free-field: 16]
+// [#next-free-field: 17]
 message TcpProxy {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.network.tcp_proxy.v2.TcpProxy";
@@ -218,4 +218,8 @@ message TcpProxy {
   // The interval must be at least 1ms.
   google.protobuf.Duration access_log_flush_interval = 15
       [(validate.rules).duration = {gte {nanos: 1000000}}];
+
+  // If set to true, access log will be flushed when the TCP proxy has successfully established a
+  // connection with the upstream. If the connection failed, the access log will not be flushed.
+  bool flush_access_log_on_connected = 16;
 }
