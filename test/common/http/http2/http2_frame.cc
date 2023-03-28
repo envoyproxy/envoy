@@ -270,7 +270,6 @@ Http2Frame Http2Frame::makeWindowUpdateFrame(uint32_t stream_index, uint32_t inc
 }
 
 // Note: encoder in codebase persists multiple maps, with each map representing an individual frame.
-// The frame payload size is capped at 4MiB.
 Http2Frame Http2Frame::makeMetadataFrameFromMetadataMap(uint32_t stream_index,
                                                         const MetadataMap& metadata_map,
                                                         MetadataFlags flags) {
@@ -286,7 +285,7 @@ Http2Frame Http2Frame::makeMetadataFrameFromMetadataMap(uint32_t stream_index,
   auto payload_sequence = encoder.EncodeRepresentations(representations);
   ASSERT(payload_sequence->HasNext() || numberOfNameValuePairs == 0);
   // Concatenate all the payload segments to a single string.
-  std::string payload("");
+  std::string payload;
   const size_t maxPayloadSegmentSize = 4 * 1024 * 1024;
   while (payload_sequence->HasNext()) {
     absl::StrAppend(&payload, payload_sequence->Next(maxPayloadSegmentSize));
