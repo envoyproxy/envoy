@@ -240,7 +240,7 @@ TEST_P(PlatformBridgeCertValidatorTest, ValidCertificateEmptySocketOptions) {
   // Set up transport socket options with an empty SAN list.
   std::vector<std::string> subject_alt_names;
   transport_socket_options_ =
-    std::make_shared<Network::TransportSocketOptionsImpl>("", std::move(subject_alt_names));
+      std::make_shared<Network::TransportSocketOptionsImpl>("", std::move(subject_alt_names));
 
   ValidationResults results =
       validator.doVerifyCertChain(*cert_chain, std::move(callback_), transport_socket_options_,
