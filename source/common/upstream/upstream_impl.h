@@ -866,7 +866,12 @@ public:
   uint64_t maxRequestsPerConnection() const override { return max_requests_per_connection_; }
   uint32_t maxResponseHeadersCount() const override { return max_response_headers_count_; }
   const std::string& name() const override { return name_; }
-  const std::string& observabilityName() const override { return observability_name_; }
+  const std::string& observabilityName() const override {
+    if (observability_name_ != nullptr) {
+      return *observability_name_;
+    }
+    return name_;
+  }
   ResourceManager& resourceManager(ResourcePriority priority) const override;
   TransportSocketMatcher& transportSocketMatcher() const override { return *socket_matcher_; }
   LazyClusterTrafficStats& trafficStats() const override { return traffic_stats_; }
@@ -986,7 +991,7 @@ private:
 
   Runtime::Loader& runtime_;
   const std::string name_;
-  const std::string observability_name_;
+  std::unique_ptr<const std::string> observability_name_;
   const absl::flat_hash_map<std::string, ProtocolOptionsConfigConstSharedPtr>
       extension_protocol_options_;
   const std::shared_ptr<const HttpProtocolOptionsConfigImpl> http_protocol_options_;
