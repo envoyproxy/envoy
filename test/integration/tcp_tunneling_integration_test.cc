@@ -458,11 +458,6 @@ public:
 
   Http::TestRequestHeaderMapImpl connect_headers_{{":method", "CONNECT"},
                                                   {":authority", "foo.lyft.com:80"}};
-  // The client H/2 codec expects the request header map to be in the form of H/1
-  // upgrade to issue an extended CONNECT request
-  Http::TestRequestHeaderMapImpl extended_connect_headers_h2_{
-      {":method", "GET"},        {":path", "/"},       {"upgrade", "websocket"},
-      {"connection", "upgrade"}, {":scheme", "https"}, {":authority", "foo.lyft.com:80"}};
 
   IntegrationStreamDecoderPtr response_;
   bool add_upgrade_config_{false};
@@ -529,7 +524,16 @@ TEST_P(ProxyingConnectIntegrationTest, ProxyExtendedConnect) {
 
   // Send request headers.
   codec_client_ = makeHttpConnection(lookupPort("http"));
-  auto encoder_decoder = codec_client_->startRequest(extended_connect_headers_h2_);
+
+  // The test client H/2 or H/3 codecs expect the request header map to be in the form of H/1
+  // upgrade to issue an extended CONNECT request.
+  auto encoder_decoder = codec_client_->startRequest(
+      Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                     {":path", "/"},
+                                     {"upgrade", "websocket"},
+                                     {"connection", "upgrade"},
+                                     {":scheme", "https"},
+                                     {":authority", "foo.lyft.com:80"}});
   request_encoder_ = &encoder_decoder.first;
   response_ = std::move(encoder_decoder.second);
 
