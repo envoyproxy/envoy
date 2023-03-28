@@ -29,10 +29,7 @@ public:
     }
   }
 
-  envoy_status_t post(std::function<void()> callback) override {
-    callbacks_.push_back(callback);
-    return post_(callback);
-  }
+  envoy_status_t post(Event::PostCb callback) override { return post_(std::move(callback)); }
 
   // Event::ProvisionalDispatcher
   MOCK_METHOD(void, drain, (Event::Dispatcher & event_dispatcher));
@@ -47,7 +44,6 @@ public:
 
   Event::GlobalTimeSystem time_system_;
   std::list<DeferredDeletablePtr> to_delete_;
-  std::list<std::function<void()>> callbacks_;
 };
 
 } // namespace Event

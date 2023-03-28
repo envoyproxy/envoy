@@ -11,6 +11,9 @@ behavior_changes:
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
+- area: event
+  change: |
+          ``Event::PostCb`` type changed from ``std::function`` to ``absl::AnyInvocable``. This makes it possible to capture unique_ptrs in dispatcher callbacks. If you have used ``Event::PostCb`` as shorthand for ``std::function<void()>`` in a non-post-callback-related context, you will have to change that. If you have used ``std::function`` in a mock dispatcher, you will have to change that to ``Event::PostCb`` and may need to make it moveable. See https://github.com/envoyproxy/envoy/pull/26296 for a variety of example fixes.
 - area: quic
   change: |
     Access logging is now deferred to the QUIC ack listener, and roundtrip response time is added as a downstream timing metric. New runtime flag ``envoy.reloadable_features.quic_defer_logging_to_ack_listener`` can be used for revert this behavior.
