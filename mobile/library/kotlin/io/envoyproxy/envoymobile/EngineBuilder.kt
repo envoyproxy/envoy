@@ -5,6 +5,7 @@ import io.envoyproxy.envoymobile.engine.EnvoyConfiguration.TrustChainVerificatio
 import io.envoyproxy.envoymobile.engine.EnvoyEngine
 import io.envoyproxy.envoymobile.engine.EnvoyEngineImpl
 import io.envoyproxy.envoymobile.engine.EnvoyNativeFilterConfig
+import io.envoyproxy.envoymobile.engine.VirtualClusterConfig
 import io.envoyproxy.envoymobile.engine.types.EnvoyHTTPFilterFactory
 import io.envoyproxy.envoymobile.engine.types.EnvoyKeyValueStore
 import io.envoyproxy.envoymobile.engine.types.EnvoyStringAccessor
@@ -70,7 +71,8 @@ open class EngineBuilder(
   private var appVersion = "unspecified"
   private var appId = "unspecified"
   private var trustChainVerification = TrustChainVerification.VERIFY_TRUST_CHAIN
-  private var virtualClusters = mutableListOf<String>()
+  private var virtualClustersLegacy = mutableListOf<String>()
+  private var virtualClusters = mutableListOf<VirtualClusterConfig>()
   private var platformFilterChain = mutableListOf<EnvoyHTTPFilterFactory>()
   private var nativeFilterChain = mutableListOf<EnvoyNativeFilterConfig>()
   private var stringAccessors = mutableMapOf<String, EnvoyStringAccessor>()
@@ -558,7 +560,19 @@ open class EngineBuilder(
    * @return this builder.
    */
   fun addVirtualCluster(cluster: String): EngineBuilder {
-    this.virtualClusters.add(cluster)
+    this.virtualClustersLegacy.add(cluster)
+    return this
+  }
+
+  /**
+   * Add virtual cluster configurations.
+   *
+   * @param configs structured configurations of virtual clusters.
+   *
+   * @return this builder.
+   */
+  fun addVirtualClusters(configs: List<VirtualClusterConfig>): EngineBuilder {
+    this.virtualClusters + configs;
     return this
   }
 
@@ -708,6 +722,7 @@ open class EngineBuilder(
       appVersion,
       appId,
       trustChainVerification,
+      virtualClustersLegacy,
       virtualClusters,
       nativeFilterChain,
       platformFilterChain,
