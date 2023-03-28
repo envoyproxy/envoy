@@ -108,6 +108,11 @@ private:
 
 // Implements the Render base interface for textual representation of Prometheus stats
 // (see: https://prometheus.io/docs/concepts/data_model).
+// The APIs for rendering Prometheus stats take as input a string (the stat's name)
+// and a vector of counters, gauges etc. (each entry in the vector holds a set of labels
+// and the stat's value for that set of labels). The Prometheus stat is rendered
+// as per the text-based format described at
+// https://prometheus.io/docs/instrumenting/exposition_formats/#text-based-format.
 class PrometheusStatsRender : public StatsRenderBase {
 public:
   void generate(Buffer::Instance& response, const std::string& prefixed_tag_extracted_name,
