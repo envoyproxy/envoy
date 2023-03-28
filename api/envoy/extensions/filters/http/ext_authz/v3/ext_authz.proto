@@ -185,6 +185,12 @@ message ExtAuthz {
   //  consequently the value of *Content-Length* of the authorization request reflects the size of
   //  its payload size.
   type.matcher.v3.ListStringMatcher allowed_headers = 17;
+
+  // Specifies if the TLS session level details like SNI are sent to the external service.
+  //
+  // When this field is true, Envoy will include the SNI name used for TLSClientHello, if available, in the
+  // :ref:`tls_session<envoy_v3_api_field_service.auth.v3.AttributeContext.tls_session>`.
+  bool include_tls_session = 18;
 }
 
 // Configuration for buffering the request data.

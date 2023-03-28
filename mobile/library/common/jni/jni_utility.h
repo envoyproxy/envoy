@@ -6,6 +6,7 @@
 #include "library/common/jni/import/jni_import.h"
 #include "library/common/types/c_types.h"
 #include "library/common/types/managed_envoy_headers.h"
+#include "library/common/types/matcher_data.h"
 
 // NOLINT(namespace-envoy)
 
@@ -114,3 +115,6 @@ void JavaArrayOfByteArrayToStringVector(JNIEnv* env, jobjectArray array,
 void JavaArrayOfByteToBytesVector(JNIEnv* env, jbyteArray array, std::vector<uint8_t>* out);
 
 void JavaArrayOfByteToString(JNIEnv* env, jbyteArray jbytes, std::string* out);
+
+std::vector<MatcherData> javaObjectArrayToMatcherData(JNIEnv* env, jobjectArray array,
+                                                      std::string& cluster_out);

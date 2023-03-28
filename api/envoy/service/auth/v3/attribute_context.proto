@@ -38,7 +38,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // - field mask to send
 // - which return values from request_context are copied back
 // - which return values are copied into request_headers]
-// [#next-free-field: 12]
+// [#next-free-field: 13]
 message AttributeContext {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.service.auth.v2.AttributeContext";
@@ -155,6 +155,12 @@ message AttributeContext {
     bytes raw_body = 12;
   }
 
+  // This message defines attributes for the underlying TLS session.
+  message TLSSession {
+    // SNI used for TLS session.
+    string sni = 1;
+  }
+
   // The source of a network activity, such as starting a TCP connection.
   // In a multi hop network activity, the source represents the sender of the
   // last hop.
@@ -176,4 +182,9 @@ message AttributeContext {
 
   // Dynamic metadata associated with the request.
   config.core.v3.Metadata metadata_context = 11;
+
+  // TLS session details of the underlying connection.
+  // This is not populated by default and will be populated if ext_authz filter's
+  // :ref:`include_tls_session <config_http_filters_ext_authz>` is set to true.
+  TLSSession tls_session = 12;
 }
