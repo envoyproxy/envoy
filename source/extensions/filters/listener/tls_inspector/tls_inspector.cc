@@ -61,6 +61,7 @@ Config::Config(
                 client_hello, TLSEXT_TYPE_application_layer_protocol_negotiation, &data, &len)) {
           filter->onALPN(data, len);
         }
+        filter->onDetectCiphers(client_hello);
         return ssl_select_cert_success;
       });
   SSL_CTX_set_tlsext_servername_callback(
@@ -108,6 +109,16 @@ void Filter::onALPN(const unsigned char* data, unsigned int len) {
   ENVOY_LOG(trace, "tls:onALPN(), ALPN: {}", absl::StrJoin(protocols, ","));
   cb_->socket().setRequestedApplicationProtocols(protocols);
   alpn_found_ = true;
+}
+
+void Filter::onDetectCiphers(const SSL_CLIENT_HELLO* ssl_client_hello) {
+  CBS cipher_suites;
+  CBS_init(&cipher_suites, ssl_client_hello->cipher_suites, ssl_client_hello->cipher_suites_len);
+  while (CBS_len(&cipher_suites) > 0) {
+    uint16_t cipher_id;
+    CBS_get_u16(&cipher_suites, &cipher_id);
+    detected_tls_ciphers_.push_back(cipher_id);
+  }
 }
 
 void Filter::onServername(absl::string_view name) {
@@ -184,10 +195,22 @@ ParseState Filter::parseClientHello(const void* data, size_t len) {
     } else {
       config_->stats().tls_not_found_.inc();
     }
+    setCipherMetadata();
     return ParseState::Done;
   default:
     return ParseState::Error;
   }
+}
+
+void Filter::setCipherMetadata() {
+  ProtobufWkt::Struct struct_obj;
+  ProtobufWkt::Value val;
+  ProtobufWkt::ListValue* ciphers = val.mutable_list_value();
+  for (uint16_t cipher_val : detected_tls_ciphers_) {
+    ciphers->add_values()->set_number_value(cipher_val);
+  }
+  (*struct_obj.mutable_fields())["tls_ciphers"].mutable_list_value()->CopyFrom(*ciphers);
+  cb_->setDynamicMetadata("detected_tls_ciphers", struct_obj);
 }
 
 // Google GREASE values (https://datatracker.ietf.org/doc/html/rfc8701)

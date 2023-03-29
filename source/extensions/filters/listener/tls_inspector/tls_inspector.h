@@ -88,9 +88,12 @@ private:
   void onALPN(const unsigned char* data, unsigned int len);
   void onServername(absl::string_view name);
   void createJA3Hash(const SSL_CLIENT_HELLO* ssl_client_hello);
+  void onDetectCiphers(const SSL_CLIENT_HELLO* ssl_client_hello);
+  void setCipherMetadata();
 
   ConfigSharedPtr config_;
   Network::ListenerFilterCallbacks* cb_{};
+  std::vector<uint16_t> detected_tls_ciphers_;
 
   bssl::UniquePtr<SSL> ssl_;
   uint64_t read_{0};
