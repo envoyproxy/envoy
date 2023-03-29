@@ -1134,33 +1134,35 @@ ClusterInfoImpl::ClusterInfoImpl(
                                      name_));
   }
 
-  absl::optional<std::chrono::milliseconds> idle_timeout;
+  // Use default (1h) or configured `idle_timeout`, unless it's set to 0, indicating that no
+  // timeout should be used.
+  absl::optional<std::chrono::milliseconds> idle_timeout(std::chrono::hours(1));
   if (http_protocol_options_->common_http_protocol_options_.has_idle_timeout()) {
     idle_timeout = std::chrono::milliseconds(DurationUtil::durationToMilliseconds(
         http_protocol_options_->common_http_protocol_options_.idle_timeout()));
     if (idle_timeout.value().count() == 0) {
       idle_timeout = absl::nullopt;
     }
-  } else {
-    idle_timeout = std::chrono::hours(1);
   }
   if (idle_timeout.has_value()) {
     optional_timeouts_.set<OptionalTimeoutNames::IdleTimeout>(*idle_timeout);
   }
 
-  absl::optional<std::chrono::milliseconds> tcp_pool_idle_timeout;
+  // Use default (10m) or configured `tcp_pool_idle_timeout`, unless it's set to 0, indicating that
+  // no timeout should be used.
+  absl::optional<std::chrono::milliseconds> tcp_pool_idle_timeout(std::chrono::minutes(10));
   if (tcp_protocol_options_ && tcp_protocol_options_->idleTimeout().has_value()) {
     tcp_pool_idle_timeout = tcp_protocol_options_->idleTimeout();
     if (tcp_pool_idle_timeout.value().count() == 0) {
       tcp_pool_idle_timeout = absl::nullopt;
     }
-  } else {
-    tcp_pool_idle_timeout = std::chrono::minutes(10);
   }
   if (tcp_pool_idle_timeout.has_value()) {
     optional_timeouts_.set<OptionalTimeoutNames::TcpPoolIdleTimeout>(*tcp_pool_idle_timeout);
   }
 
+  // Use configured `max_connection_duration`, unless it's set to 0, indicating that
+  // no timeout should be used. No timeout by default either.
   absl::optional<std::chrono::milliseconds> max_connection_duration;
   if (http_protocol_options_->common_http_protocol_options_.has_max_connection_duration()) {
     max_connection_duration = std::chrono::milliseconds(DurationUtil::durationToMilliseconds(
@@ -1168,8 +1170,6 @@ ClusterInfoImpl::ClusterInfoImpl(
     if (max_connection_duration.value().count() == 0) {
       max_connection_duration = absl::nullopt;
     }
-  } else {
-    max_connection_duration = absl::nullopt;
   }
   if (max_connection_duration.has_value()) {
     optional_timeouts_.set<OptionalTimeoutNames::MaxConnectionDuration>(*max_connection_duration);
