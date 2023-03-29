@@ -291,6 +291,8 @@ extensions/filters/http/oauth2 @derekargueta @snowp
 /*/extensions/load_balancing_policies/round_robin @wbpcode @UNOWNED
 # Early header mutation
 /*/extensions/http/early_header_mutation/header_mutation @wbpcode @UNOWNED
+# IP Geolocation
+/*/extensions/filters/http/geoip @nezdolik @mattklein123
 
 # Intentionally exempt (treated as core code)
 /*/extensions/filters/common @UNOWNED @UNOWNED
