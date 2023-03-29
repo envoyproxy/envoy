@@ -139,6 +139,10 @@ message HeaderValidatorConfig {
   // Restrict HTTP methods to these defined in the `RFC 7231 section 4.1 <https://datatracker.ietf.org/doc/html/rfc7231#section-4.1>`_
   // Envoy will respond with 400 to requests with disallowed methods.
   // By default methods with arbitrary names are accepted.
+  // Note that for HTTP/1, this setting is only effective if BalsaParser is used
+  // (as opposed to http-parser), and :ref:`allow_custom_methods
+  // <envoy_v3_api_field_config.core.v3.Http1ProtocolOptions.allow_custom_methods>`
+  // is enabled.
   bool restrict_http_methods = 3;
 
   // Action to take when a client request with a header name containing underscore characters is received.
