@@ -181,7 +181,7 @@ public:
   size_t GetIVSize() const override { return 0; };
   bool EncryptPacket(uint64_t, absl::string_view, absl::string_view plaintext, char* output,
                      size_t* output_length, size_t max_output_length) override {
-    assert(plaintext.length() <= max_output_length);
+    ASSERT(plaintext.length() <= max_output_length);
     memcpy(output, plaintext.data(), plaintext.length());
     *output_length = plaintext.length();
     return true;
@@ -559,7 +559,7 @@ public:
   bool SetDiversificationNonce(const quic::DiversificationNonce&) override { return true; };
   bool DecryptPacket(uint64_t, absl::string_view, absl::string_view ciphertext, char* output,
                      size_t* output_length, size_t max_output_length) override {
-    assert(ciphertext.length() <= max_output_length);
+    ASSERT(ciphertext.length() <= max_output_length);
     memcpy(output, ciphertext.data(), ciphertext.length());
     *output_length = ciphertext.length();
     return true;
