@@ -2589,6 +2589,7 @@ TEST_F(HttpConnectionManagerImplTest, TestStreamStateSuccessStatusCode) {
 
         ResponseTrailerMapPtr response_trailers{new TestResponseTrailerMapImpl{{"x-trailer", "1"}}};
         filter->callbacks_->encodeTrailers(std::move(response_trailers));
+        response_encoder_.stream_.codec_callbacks_->onCodecEncodeComplete();
 
         EXPECT_EQ(filter->callbacks_->streamInfo().streamState(), StreamInfo::StreamState::Ended);
 
@@ -2634,6 +2635,7 @@ TEST_F(HttpConnectionManagerImplTest, TestStreamStateNonSuccessStatusCode) {
 
         ResponseTrailerMapPtr response_trailers{new TestResponseTrailerMapImpl{{"x-trailer", "1"}}};
         filter->callbacks_->encodeTrailers(std::move(response_trailers));
+        response_encoder_.stream_.codec_callbacks_->onCodecEncodeComplete();
 
         EXPECT_EQ(filter->callbacks_->streamInfo().streamState(), StreamInfo::StreamState::Ended);
 
