@@ -111,6 +111,7 @@ message RBAC {
       ON_DENY_AND_ALLOW = 3;
     }
 
+    // [#not-implemented-hide:]
     message AuditLoggerConfig {
       // Typed logger configuration.
       //
