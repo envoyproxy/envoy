@@ -5,14 +5,6 @@
 set -e
 
 
-build_setup_args=""
-if [[ "$1" == "format" || "$1" == "fix_proto_format" || "$1" == "check_proto_format" || "$1" == "docs" ||  \
-          "$1" == "bazel.clang_tidy" || "$1" == "bazel.distribution" \
-          || "$1" == "deps" || "$1" == "verify_examples" || "$1" == "publish" \
-          || "$1" == "verify_distro" ]]; then
-    build_setup_args="-nofetch"
-fi
-
 # TODO(phlax): Clarify and/or integrate SRCDIR and ENVOY_SRCDIR
 export SRCDIR="${SRCDIR:-$PWD}"
 export ENVOY_SRCDIR="${ENVOY_SRCDIR:-$PWD}"
@@ -22,7 +14,7 @@ if [[ -z "$NO_BUILD_SETUP" ]]; then
     # shellcheck source=ci/setup_cache.sh
     . "$(dirname "$0")"/setup_cache.sh
     # shellcheck source=ci/build_setup.sh
-    . "$(dirname "$0")"/build_setup.sh $build_setup_args
+    . "$(dirname "$0")"/build_setup.sh
 
     echo "building using ${NUM_CPUS} CPUs"
     echo "building for ${ENVOY_BUILD_ARCH}"
@@ -556,7 +548,7 @@ elif [[ "$CI_TARGET" == "publish" ]]; then
     # It can take some time to get here in CI so the branch may have changed - create the release
     # from the current commit (as this only happens on non-PRs we are safe from merges)
     BUILD_SHA="$(git rev-parse HEAD)"
-    bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/project:publish -- --publish-commitish="$BUILD_SHA"
+    bazel run "${BAZEL_BUILD_OPTIONS[@]}" @envoy_repo//:publish -- --publish-commitish="$BUILD_SHA"
     exit 0
 else
   echo "Invalid do_ci.sh target, see ci/README.md for valid targets."

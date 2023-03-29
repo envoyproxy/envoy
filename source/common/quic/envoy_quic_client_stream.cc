@@ -44,8 +44,20 @@ Http::Status EnvoyQuicClientStream::encodeHeaders(const Http::RequestHeaderMap& 
 
   local_end_stream_ = end_stream;
   SendBufferMonitor::ScopedWatermarkBufferUpdater updater(this, this);
-  auto spdy_headers = envoyHeadersToHttp2HeaderBlock(headers);
-  if (headers.Method()) {
+  spdy::Http2HeaderBlock spdy_headers;
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.use_http3_header_normalisation") &&
+      Http::Utility::isUpgrade(headers)) {
+    // In Envoy, both upgrade requests and extended CONNECT requests are
+    // represented as their HTTP/1 forms, regardless of the HTTP version used.
+    // Therefore, these need to be transformed into their HTTP/3 form, before
+    // sending them.
+    upgrade_protocol_ = std::string(headers.getUpgradeValue());
+    Http::RequestHeaderMapPtr modified_headers =
+        Http::createHeaderMap<Http::RequestHeaderMapImpl>(headers);
+    Http::Utility::transformUpgradeRequestFromH1toH3(*modified_headers);
+    spdy_headers = envoyHeadersToHttp2HeaderBlock(*modified_headers);
+  } else if (headers.Method()) {
+    spdy_headers = envoyHeadersToHttp2HeaderBlock(headers);
     if (headers.Method()->value() == "CONNECT") {
       spdy_headers.erase(":scheme");
       spdy_headers.erase(":path");
@@ -61,6 +73,9 @@ Http::Status EnvoyQuicClientStream::encodeHeaders(const Http::RequestHeaderMap& 
   }
 
   if (local_end_stream_) {
+    if (codec_callbacks_) {
+      codec_callbacks_->onCodecEncodeComplete();
+    }
     onLocalEndStream();
   }
   return Http::okStatus();
@@ -118,6 +133,9 @@ void EnvoyQuicClientStream::encodeData(Buffer::Instance& data, bool end_stream) 
   }
 #endif
   if (local_end_stream_) {
+    if (codec_callbacks_) {
+      codec_callbacks_->onCodecEncodeComplete();
+    }
     onLocalEndStream();
   }
 }
@@ -138,6 +156,9 @@ void EnvoyQuicClientStream::encodeTrailers(const Http::RequestTrailerMap& traile
     ENVOY_BUG(bytes_sent != 0, "Failed to encode trailers");
   }
 
+  if (codec_callbacks_) {
+    codec_callbacks_->onCodecEncodeComplete();
+  }
   onLocalEndStream();
 }
 
@@ -205,6 +226,15 @@ void EnvoyQuicClientStream::OnInitialHeadersComplete(bool fin, size_t frame_len,
     // These are Informational 1xx headers, not the actual response headers.
     set_headers_decompressed(false);
   }
+
+  // In Envoy, both upgrade requests and extended CONNECT requests are
+  // represented as their HTTP/1 forms, regardless of the HTTP version used.
+  // Therefore, these need to be transformed into their HTTP/1 form.
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.use_http3_header_normalisation") &&
+      !upgrade_protocol_.empty()) {
+    Http::Utility::transformUpgradeResponseFromH3toH1(*headers, upgrade_protocol_);
+  }
+
   const bool is_special_1xx = Http::HeaderUtility::isSpecial1xx(*headers);
   if (is_special_1xx && !decoded_1xx_) {
     // This is 100 Continue, only decode it once to support Expect:100-Continue header.
@@ -238,8 +268,10 @@ bool EnvoyQuicClientStream::OnStopSending(quic::QuicResetStreamError error) {
   if (!quic::QuicSpdyClientStream::OnStopSending(error)) {
     return false;
   }
+
+  stats_.rx_reset_.inc();
+
   if (read_side_closed() && !end_stream_encoded) {
-    stats_.rx_reset_.inc();
     // If both directions are closed but end stream hasn't been encoded yet, notify reset callbacks.
     // Treat this as a remote reset, since the stream will be closed in both directions.
     runResetCallbacks(quicRstErrorToEnvoyRemoteResetReason(error.internal_code()));

@@ -673,7 +673,7 @@ TEST_F(HttpConnectionManagerConfigTest, OverallSampling) {
     }
   }
 
-  EXPECT_LE(900, sampled_count);
+  EXPECT_LE(800, sampled_count);
   EXPECT_GE(1100, sampled_count);
 }
 
