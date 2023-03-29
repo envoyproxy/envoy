@@ -611,20 +611,20 @@ public:
       // match the ID of this connection.
       void OnIncorrectConnectionId(quic::QuicConnectionId /*connection_id*/) LOG_VISIT
 
-      // Called when an undecryptable packet has been received. If |dropped| is
+      // Called when an un-decryptable packet has been received. If |dropped| is
       // true, the packet has been dropped. Otherwise, the packet will be queued and
       // connection will attempt to process it later.
       void OnUndecryptablePacket(quic::EncryptionLevel /*decryption_level*/,
                                  bool /*dropped*/) LOG_VISIT
 
-      // Called when attempting to process a previously undecryptable packet.
+      // Called when attempting to process a previously un-decryptable packet.
       void OnAttemptingToProcessUndecryptablePacket(
           quic::EncryptionLevel /*decryption_level*/) LOG_VISIT
 
       // Called when a duplicate packet has been received.
       void OnDuplicatePacket(quic::QuicPacketNumber /*packet_number*/) LOG_VISIT
 
-      // Called when the protocol version on the received packet doensn't match
+      // Called when the protocol version on the received packet does not match
       // current protocol version of the connection.
       void OnProtocolVersionMismatch(quic::ParsedQuicVersion /*version*/) LOG_VISIT
 
