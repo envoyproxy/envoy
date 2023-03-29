@@ -126,6 +126,8 @@ public:
   protocolToString(const absl::optional<Http::Protocol>& protocol);
   static const std::string&
   protocolToStringOrDefault(const absl::optional<Http::Protocol>& protocol);
+  static const absl::optional<std::reference_wrapper<const std::string>>
+  streamStateToString(const absl::optional<StreamInfo::StreamState>& stream_state);
   static const absl::optional<std::string> getHostname();
   static const std::string getHostnameOrDefault();
 
