@@ -33,6 +33,7 @@
 #include "envoy/ssl/context_manager.h"
 #include "envoy/stats/scope.h"
 #include "envoy/thread_local/thread_local.h"
+#include "envoy/upstream/cluster_factory.h"
 #include "envoy/upstream/cluster_manager.h"
 #include "envoy/upstream/health_checker.h"
 #include "envoy/upstream/load_balancer.h"
@@ -1079,13 +1080,6 @@ public:
   void setOutlierDetector(const Outlier::DetectorSharedPtr& outlier_detector);
 
   /**
-   * Set the TransportSocketFactoryContext pointer so that the memory isn't lost
-   * for the cluster lifetime in case SDS is used.
-   */
-  void setTransportFactoryContext(
-      Server::Configuration::TransportSocketFactoryContextPtr transport_factory_context);
-
-  /**
    * Wrapper around Network::Address::resolveProtoAddress() that provides improved error message
    * based on the cluster's type.
    * @param address supplies the address proto to resolve.
@@ -1118,9 +1112,9 @@ public:
 
 protected:
   ClusterImplBase(Server::Configuration::ServerFactoryContext& server_context,
-                  const envoy::config::cluster::v3::Cluster& cluster, Runtime::Loader& runtime,
-                  Server::Configuration::TransportSocketFactoryContextImpl& factory_context,
-                  Stats::ScopeSharedPtr&& stats_scope, bool added_via_api, TimeSource& time_source);
+                  const envoy::config::cluster::v3::Cluster& cluster,
+                  ClusterFactoryContext& cluster_context, Runtime::Loader& runtime,
+                  bool added_via_api, TimeSource& time_source);
 
   /**
    * Overridden by every concrete cluster. The cluster should do whatever pre-init is needed. E.g.,
@@ -1160,6 +1154,8 @@ protected:
   Outlier::DetectorSharedPtr outlier_detector_;
   const bool wait_for_warm_on_init_;
 
+  Server::Configuration::TransportSocketFactoryContextImplPtr transport_factory_context_{};
+
 protected:
   TimeSource& time_source_;
   MainPrioritySetImpl priority_set_;
@@ -1177,7 +1173,6 @@ private:
   const bool local_cluster_;
   Config::ConstMetadataSharedPoolSharedPtr const_metadata_shared_pool_;
   Common::CallbackHandlePtr priority_update_cb_;
-  Server::Configuration::TransportSocketFactoryContextPtr transport_factory_context_{};
 };
 
 using ClusterImplBaseSharedPtr = std::shared_ptr<ClusterImplBase>;
