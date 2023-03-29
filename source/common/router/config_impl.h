@@ -23,11 +23,11 @@
 #include "envoy/upstream/cluster_manager.h"
 
 #include "source/common/common/matchers.h"
+#include "source/common/common/packed_struct.h"
 #include "source/common/config/metadata.h"
 #include "source/common/http/hash_policy.h"
 #include "source/common/http/header_utility.h"
 #include "source/common/matcher/matcher.h"
-#include "source/common/common/packed_struct.h"
 #include "source/common/router/config_utility.h"
 #include "source/common/router/header_formatter.h"
 #include "source/common/router/header_parser.h"
