@@ -39,8 +39,9 @@ public:
   void setup() {
     envoy::config::core::v3::ConfigSource lds_config;
     EXPECT_CALL(init_manager_, add(_));
-    lds_ = std::make_unique<LdsApiImpl>(lds_config, nullptr, cluster_manager_, init_manager_,
-                                        store_, listener_manager_, validation_visitor_);
+    lds_ =
+        std::make_unique<LdsApiImpl>(lds_config, nullptr, cluster_manager_, init_manager_,
+                                     *store_.rootScope(), listener_manager_, validation_visitor_);
     EXPECT_CALL(*cluster_manager_.subscription_factory_.subscription_, start(_));
     init_target_handle_->initialize(init_watcher_);
     lds_callbacks_ = cluster_manager_.subscription_factory_.callbacks_;
@@ -364,7 +365,7 @@ resources:
       TestUtility::decodeResources<envoy::config::listener::v3::Listener>(response1);
   lds_callbacks_->onConfigUpdate(decoded_resources.refvec_, response1.version_info());
 
-  std::string response2_basic = R"EOF(
+  constexpr absl::string_view response2_basic = R"EOF(
 version_info: '1'
 resources:
 - "@type": type.googleapis.com/envoy.config.listener.v3.Listener

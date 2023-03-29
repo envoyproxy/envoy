@@ -17,7 +17,7 @@ TEST(DynamoStats, PartitionIdStatString) {
   auto build_partition_string =
       [&store](const std::string& stat_prefix, const std::string& table_name,
                const std::string& operation, const std::string& partition_id) -> std::string {
-    DynamoStats stats(store, stat_prefix);
+    DynamoStats stats(*store.rootScope(), stat_prefix);
     Stats::Counter& counter = stats.buildPartitionStatCounter(table_name, operation, partition_id);
     return counter.name();
   };

@@ -4,17 +4,17 @@ aiohttp>=3.8.1
 cffi>=1.15.0
 colorama
 coloredlogs
-envoy.base.utils>=0.3.8
-envoy.code.check>=0.3.4
-envoy.dependency.check>=0.1.5
-envoy.dependency.pip_check>=0.1.2
-envoy.distribution.release>=0.0.8
-envoy.distribution.repo>=0.0.5
-envoy.distribution.verify>=0.0.8
-envoy.docs.sphinx-runner>=0.1.9
+envoy.base.utils>=0.4.2
+envoy.code.check>=0.4.0
+envoy.dependency.check>=0.1.7
+envoy.dependency.pip_check>=0.1.4
+envoy.distribution.release>=0.0.9
+envoy.distribution.repo>=0.0.8
+envoy.distribution.verify>=0.0.11
+envoy.docs.sphinx_runner>=0.2.5
 envoy.gpg.identity>=0.1.0
-envoy.gpg.sign>=0.1.0
-flake8
+envoy.gpg.sign>=0.1.1
+flake8>=6
 frozendict
 gitpython
 jinja2
@@ -31,3 +31,6 @@ thrift
 verboselogs
 yapf
 yarl>=1.7.2
+
+# This has packaging issues, so use the github tarball until resolved (https://github.com/sphinx-contrib/jquery/issues/15)
+https://github.com/sphinx-contrib/jquery/archive/refs/tags/v3.0.0.zip

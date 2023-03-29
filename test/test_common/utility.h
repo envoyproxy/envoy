@@ -29,6 +29,7 @@
 #include "test/test_common/file_system_for_test.h"
 #include "test/test_common/logging.h"
 #include "test/test_common/printers.h"
+#include "test/test_common/test_random_generator.h"
 #include "test/test_common/test_time_system.h"
 #include "test/test_common/thread_factory_for_test.h"
 
@@ -46,6 +47,8 @@ using testing::Invoke; //  NOLINT(misc-unused-using-decls)
 namespace Envoy {
 
 #if defined(__has_feature) && __has_feature(thread_sanitizer)
+#define TSAN_TIMEOUT_FACTOR 3
+#elif defined(ENVOY_CONFIG_COVERAGE)
 #define TSAN_TIMEOUT_FACTOR 3
 #else
 #define TSAN_TIMEOUT_FACTOR 1
@@ -127,20 +130,6 @@ namespace Envoy {
 class TestEnvoyBug {
 public:
   static void callEnvoyBug() { ENVOY_BUG(false, ""); }
-};
-
-// Random number generator which logs its seed to stderr. To repeat a test run with a non-zero seed
-// one can run the test with --test_arg=--gtest_random_seed=[seed]
-class TestRandomGenerator {
-public:
-  TestRandomGenerator();
-
-  uint64_t random();
-
-private:
-  const int32_t seed_;
-  std::ranlux48 generator_;
-  RealTimeSource real_time_source_;
 };
 
 // See https://github.com/envoyproxy/envoy/issues/21245.
@@ -356,10 +345,7 @@ public:
    *
    * @return a filename based on the process id and current time.
    */
-
-  static std::string uniqueFilename() {
-    return absl::StrCat(getpid(), "_", std::chrono::system_clock::now().time_since_epoch().count());
-  }
+  static std::string uniqueFilename(absl::string_view prefix = "");
 
   /**
    * Compare two protos of the same type for equality.
@@ -586,7 +572,8 @@ public:
   static std::string convertTime(const std::string& input, const std::string& input_format,
                                  const std::string& output_format);
 
-  static constexpr std::chrono::milliseconds DefaultTimeout = std::chrono::milliseconds(10000);
+  static constexpr std::chrono::milliseconds DefaultTimeout =
+      std::chrono::milliseconds(10000) * TSAN_TIMEOUT_FACTOR;
 
   /**
    * Return a prefix string matcher.
@@ -849,7 +836,7 @@ public:
     }
   }
   absl::string_view protocol() const override { return context_protocol_; }
-  absl::string_view authority() const override { return context_authority_; }
+  absl::string_view host() const override { return context_host_; }
   absl::string_view path() const override { return context_path_; }
   absl::string_view method() const override { return context_method_; }
   void forEach(IterateCallback callback) const override {
@@ -875,7 +862,7 @@ public:
   void setByReference(absl::string_view key, absl::string_view val) override { setByKey(key, val); }
 
   std::string context_protocol_;
-  std::string context_authority_;
+  std::string context_host_;
   std::string context_path_;
   std::string context_method_;
   absl::flat_hash_map<std::string, std::string> context_map_;
@@ -1099,7 +1086,7 @@ public:
 
   // Tracing::TraceContext
   absl::string_view protocol() const override { return header_map_->getProtocolValue(); }
-  absl::string_view authority() const override { return header_map_->getHostValue(); }
+  absl::string_view host() const override { return header_map_->getHostValue(); }
   absl::string_view path() const override { return header_map_->getPathValue(); }
   absl::string_view method() const override { return header_map_->getMethodValue(); }
   void forEach(IterateCallback callback) const override {

@@ -82,7 +82,7 @@ public:
 UpstreamRequest::UpstreamRequest(RouterFilterInterface& parent,
                                  std::unique_ptr<GenericConnPool>&& conn_pool,
                                  bool can_send_early_data, bool can_use_http3)
-    : parent_(parent), conn_pool_(std::move(conn_pool)), grpc_rq_success_deferred_(false),
+    : parent_(parent), conn_pool_(std::move(conn_pool)),
       stream_info_(parent_.callbacks()->dispatcher().timeSource(), nullptr),
       start_time_(parent_.callbacks()->dispatcher().timeSource().monotonicTime()),
       calling_encode_headers_(false), upstream_canary_(false), router_sent_end_stream_(false),
@@ -94,7 +94,9 @@ UpstreamRequest::UpstreamRequest(RouterFilterInterface& parent,
       cleaned_up_(false), had_upstream_(false),
       allow_upstream_filters_(
           Runtime::runtimeFeatureEnabled("envoy.reloadable_features.allow_upstream_filters")),
-      stream_options_({can_send_early_data, can_use_http3}) {
+      stream_options_({can_send_early_data, can_use_http3}), grpc_rq_success_deferred_(false),
+      upstream_wait_for_response_headers_before_disabling_read_(Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.upstream_wait_for_response_headers_before_disabling_read")) {
   if (parent_.config().start_child_span_) {
     if (auto tracing_config = parent_.callbacks()->tracingConfig(); tracing_config.has_value()) {
       span_ = parent_.callbacks()->activeSpan().spawnChild(
@@ -108,6 +110,7 @@ UpstreamRequest::UpstreamRequest(RouterFilterInterface& parent,
     }
   }
   stream_info_.setUpstreamInfo(std::make_shared<StreamInfo::UpstreamInfoImpl>());
+  stream_info_.route_ = parent.callbacks()->route();
   parent_.callbacks()->streamInfo().setUpstreamInfo(stream_info_.upstreamInfo());
 
   stream_info_.healthCheck(parent_.callbacks()->streamInfo().healthCheck());
@@ -228,6 +231,7 @@ void UpstreamRequest::decode1xxHeaders(Http::ResponseHeaderMapPtr&& headers) {
 
   ASSERT(Http::HeaderUtility::isSpecial1xx(*headers));
   addResponseHeadersSize(headers->byteSize());
+  maybeHandleDeferredReadDisable();
   parent_.onUpstream1xxHeaders(std::move(headers), *this);
 }
 
@@ -280,8 +284,21 @@ void UpstreamRequest::decodeHeaders(Http::ResponseHeaderMapPtr&& headers, bool e
     paused_for_connect_ = false;
   }
 
+  maybeHandleDeferredReadDisable();
   ASSERT(headers.get());
   parent_.onUpstreamHeaders(response_code, std::move(headers), *this, end_stream);
+}
+
+void UpstreamRequest::maybeHandleDeferredReadDisable() {
+  for (; deferred_read_disabling_count_ > 0; --deferred_read_disabling_count_) {
+    // If the deferred read disabling count hasn't been cancelled out by read
+    // enabling count so far, stop the upstream from reading the rest response.
+    // Because readDisable keeps track of how many time it is called with
+    // "true" or "false", here it has to be called with "true" the same number
+    // of times as it would be called with "false" in the future.
+    parent_.cluster()->trafficStats()->upstream_flow_control_paused_reading_total_.inc();
+    upstream_->readDisable(true);
+  }
 }
 
 void UpstreamRequest::decodeData(Buffer::Instance& data, bool end_stream) {
@@ -780,6 +797,46 @@ void UpstreamRequest::clearRequestEncoder() {
   upstream_.reset();
 }
 
+void UpstreamRequest::readDisableOrDefer(bool disable) {
+  if (!upstream_wait_for_response_headers_before_disabling_read_) {
+    if (disable) {
+      parent_.cluster()->trafficStats()->upstream_flow_control_paused_reading_total_.inc();
+      upstream_->readDisable(true);
+    } else {
+      parent_.cluster()->trafficStats()->upstream_flow_control_resumed_reading_total_.inc();
+      upstream_->readDisable(false);
+    }
+    return;
+  }
+
+  if (disable) {
+    // See comments on deferred_read_disabling_count_ for when we do and don't defer.
+    if (parent_.downstreamResponseStarted()) {
+      // The downstream connection is overrun. Pause reads from upstream.
+      // If there are multiple calls to readDisable either the codec (H2) or the
+      // underlying Network::Connection (H1) will handle reference counting.
+      parent_.cluster()->trafficStats()->upstream_flow_control_paused_reading_total_.inc();
+      upstream_->readDisable(disable);
+    } else {
+      ++deferred_read_disabling_count_;
+    }
+    return;
+  }
+
+  // One source of connection blockage has buffer available.
+  if (deferred_read_disabling_count_ > 0) {
+    ASSERT(!parent_.downstreamResponseStarted());
+    // Cancel out an existing deferred read disabling.
+    --deferred_read_disabling_count_;
+    return;
+  }
+  ASSERT(parent_.downstreamResponseStarted());
+  // Pass this on to the stream, which
+  // will resume reads if this was the last remaining high watermark.
+  parent_.cluster()->trafficStats()->upstream_flow_control_resumed_reading_total_.inc();
+  upstream_->readDisable(disable);
+}
+
 void UpstreamRequest::DownstreamWatermarkManager::onAboveWriteBufferHighWatermark() {
   ASSERT(parent_.upstream_);
 
@@ -790,20 +847,12 @@ void UpstreamRequest::DownstreamWatermarkManager::onAboveWriteBufferHighWatermar
   // can disable reads from upstream.
   ASSERT(!parent_.parent_.finalUpstreamRequest() ||
          &parent_ == parent_.parent_.finalUpstreamRequest());
-  // The downstream connection is overrun. Pause reads from upstream.
-  // If there are multiple calls to readDisable either the codec (H2) or the underlying
-  // Network::Connection (H1) will handle reference counting.
-  parent_.parent_.cluster()->trafficStats()->upstream_flow_control_paused_reading_total_.inc();
-  parent_.upstream_->readDisable(true);
+  parent_.readDisableOrDefer(true);
 }
 
 void UpstreamRequest::DownstreamWatermarkManager::onBelowWriteBufferLowWatermark() {
   ASSERT(parent_.upstream_);
-
-  // One source of connection blockage has buffer available. Pass this on to the stream, which
-  // will resume reads if this was the last remaining high watermark.
-  parent_.parent_.cluster()->trafficStats()->upstream_flow_control_resumed_reading_total_.inc();
-  parent_.upstream_->readDisable(false);
+  parent_.readDisableOrDefer(false);
 }
 
 void UpstreamRequest::disableDataFromDownstreamForFlowControl() {

@@ -80,7 +80,7 @@ protected:
   MockHostSet& hostSet() { return GetParam() ? host_set_ : failover_host_set_; }
 
   LoadBalancerTestBase()
-      : stat_names_(stats_store_.symbolTable()), stats_(stat_names_, stats_store_) {
+      : stat_names_(stats_store_.symbolTable()), stats_(stat_names_, *stats_store_.rootScope()) {
     least_request_lb_config_.mutable_choice_count()->set_value(2);
   }
 

@@ -318,6 +318,9 @@ TEST_P(NetworkUtilityGetLocalAddress, GetLocalAddress) {
   auto local_address = Utility::getLocalAddress(ip_version);
   EXPECT_NE(nullptr, local_address);
   EXPECT_EQ(ip_version, local_address->ip()->version());
+  if (ip_version == Address::IpVersion::v6) {
+    EXPECT_EQ(0u, local_address->ip()->ipv6()->scopeId());
+  }
 }
 
 TEST(NetworkUtility, GetOriginalDst) {
@@ -558,6 +561,13 @@ TEST(NetworkUtility, ParseProtobufAddress) {
     envoy::config::core::v3::Address proto_address;
     proto_address.mutable_pipe()->set_path("/tmp/unix-socket");
     EXPECT_EQ("/tmp/unix-socket", Utility::protobufAddressToAddress(proto_address)->asString());
+  }
+  {
+    envoy::config::core::v3::Address proto_address;
+    proto_address.mutable_envoy_internal_address()->set_server_listener_name("internal_listener");
+    proto_address.mutable_envoy_internal_address()->set_endpoint_id("12345");
+    EXPECT_EQ("envoy://internal_listener/12345",
+              Utility::protobufAddressToAddress(proto_address)->asString());
   }
 #if defined(__linux__)
   {

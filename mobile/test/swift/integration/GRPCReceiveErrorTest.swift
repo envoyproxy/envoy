@@ -1,9 +1,15 @@
 import Envoy
 import EnvoyEngine
 import Foundation
+import TestExtensions
 import XCTest
 
 final class GRPCReceiveErrorTests: XCTestCase {
+  override static func setUp() {
+    super.setUp()
+    register_test_extensions()
+  }
+
   func testReceiveError() {
     // swiftlint:disable:next line_length
     let emhcmType = "type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.EnvoyMobileHttpConnectionManager"
@@ -14,6 +20,10 @@ final class GRPCReceiveErrorTests: XCTestCase {
     let filterName = "error_validation_filter"
     let config =
 """
+listener_manager:
+    name: envoy.listener_manager_impl.api
+    typed_config:
+      "@type": type.googleapis.com/envoy.config.listener.v3.ApiListenerManager
 static_resources:
   listeners:
   - name: base_api_listener
@@ -124,7 +134,7 @@ static_resources:
       .sendHeaders(requestHeaders, endStream: false)
       .sendMessage(message)
 
-    XCTAssertEqual(XCTWaiter.wait(for: expectations, timeout: 1), .completed)
+    XCTAssertEqual(XCTWaiter.wait(for: expectations, timeout: 10), .completed)
 
     engine.terminate()
   }

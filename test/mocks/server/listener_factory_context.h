@@ -66,7 +66,8 @@ public:
   testing::NiceMock<LocalInfo::MockLocalInfo> local_info_;
   testing::NiceMock<Envoy::Random::MockRandomGenerator> random_;
   testing::NiceMock<Envoy::Runtime::MockLoader> runtime_loader_;
-  testing::NiceMock<Stats::MockIsolatedStatsStore> scope_;
+  testing::NiceMock<Stats::MockIsolatedStatsStore> store_;
+  Stats::Scope& scope_{*store_.rootScope()};
   testing::NiceMock<ThreadLocal::MockInstance> thread_local_;
   Singleton::ManagerPtr singleton_manager_;
   testing::NiceMock<MockAdmin> admin_;

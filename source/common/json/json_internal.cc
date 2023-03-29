@@ -464,7 +464,7 @@ std::vector<ObjectSharedPtr> Field::getObjectArray(const std::string& name,
   auto value_itr = value_.object_value_.find(name);
   if (value_itr == value_.object_value_.end() || !value_itr->second->isType(Type::Array)) {
     if (allow_empty && value_itr == value_.object_value_.end()) {
-      return std::vector<ObjectSharedPtr>();
+      return {};
     }
     throw Exception(fmt::format("key '{}' missing or not an array from lines {}-{}", name,
                                 line_number_start_, line_number_end_));

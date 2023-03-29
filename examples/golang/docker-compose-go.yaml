@@ -1,0 +1,17 @@
+services:
+  go_plugin_compile:
+    build:
+      context: ../shared/build
+    command: >
+      bash -c "
+      bazel build --experimental_repository_downloader_retries=2 --disk_cache=/tmp/disk_cache --repository_cache=/tmp/repository_cache --experimental_repository_cache_hardlinks //examples/golang/simple:simple.so
+      && cp -a ./bazel-bin/examples/golang/simple/simple.so /output"
+    entrypoint: /source/examples/shared/build/build-entrypoint.sh
+    environment:
+    - BUILD_UID=${UID:-1000}
+    - TEST_TMPDIR=/tmp
+    working_dir: /source
+    volumes:
+    - ${ENVOY_DOCKER_BUILD_DIR:-/tmp/envoy-docker-build}:/tmp
+    - ../..:/source
+    - ./lib:/output

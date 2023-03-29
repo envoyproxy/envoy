@@ -27,9 +27,9 @@ Build and start the containers.
 
   $ pwd
   envoy/examples/postgres
-  $ docker-compose pull
-  $ docker-compose up --build -d
-  $ docker-compose ps
+  $ docker compose pull
+  $ docker compose up --build -d
+  $ docker compose ps
 
          Name                      Command             State                             Ports
   --------------------------------------------------------------------------------------------------------

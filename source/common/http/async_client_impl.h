@@ -9,6 +9,7 @@
 #include <string>
 #include <vector>
 
+#include "envoy/buffer/buffer.h"
 #include "envoy/common/random_generator.h"
 #include "envoy/common/scope_tracker.h"
 #include "envoy/config/core/v3/base.pb.h"
@@ -18,6 +19,7 @@
 #include "envoy/http/async_client.h"
 #include "envoy/http/codec.h"
 #include "envoy/http/context.h"
+#include "envoy/http/filter.h"
 #include "envoy/http/header_map.h"
 #include "envoy/http/message.h"
 #include "envoy/router/context.h"
@@ -52,7 +54,7 @@ constexpr uint64_t kBufferLimitForRetry = 1 << 16;
 } // namespace
 
 class AsyncStreamImpl;
-class AsyncRequestImpl;
+class AsyncRequestSharedImpl;
 
 class AsyncClientImpl final : public AsyncClient {
 public:
@@ -67,9 +69,12 @@ public:
   Request* send(RequestMessagePtr&& request, Callbacks& callbacks,
                 const AsyncClient::RequestOptions& options) override;
   Stream* start(StreamCallbacks& callbacks, const AsyncClient::StreamOptions& options) override;
+  OngoingRequest* startRequest(RequestHeaderMapPtr&& request_headers, Callbacks& callbacks,
+                               const AsyncClient::RequestOptions& options) override;
   Event::Dispatcher& dispatcher() override { return dispatcher_; }
 
 private:
+  template <typename T> T* internalStartRequest(T* async_request);
   Upstream::ClusterInfoConstSharedPtr cluster_;
   Router::FilterConfig config_;
   Event::Dispatcher& dispatcher_;
@@ -77,14 +82,14 @@ private:
   Singleton::Manager& singleton_manager_;
 
   friend class AsyncStreamImpl;
-  friend class AsyncRequestImpl;
+  friend class AsyncRequestSharedImpl;
 };
 
 /**
  * Implementation of AsyncRequest. This implementation is capable of sending HTTP requests to a
  * ConnectionPool asynchronously.
  */
-class AsyncStreamImpl : public AsyncClient::Stream,
+class AsyncStreamImpl : public virtual AsyncClient::Stream,
                         public StreamDecoderFilterCallbacks,
                         public Event::DeferredDeletable,
                         Logger::Loggable<Logger::Id::http>,
@@ -93,7 +98,40 @@ class AsyncStreamImpl : public AsyncClient::Stream,
 public:
   AsyncStreamImpl(AsyncClientImpl& parent, AsyncClient::StreamCallbacks& callbacks,
                   const AsyncClient::StreamOptions& options);
-  ~AsyncStreamImpl() override { router_.onDestroy(); }
+  ~AsyncStreamImpl() override {
+    router_.onDestroy();
+    // UpstreamRequest::cleanUp() is guaranteed to reset the high watermark calls.
+    ENVOY_BUG(high_watermark_calls_ == 0, "Excess high watermark calls after async stream ended.");
+    if (destructor_callback_.has_value()) {
+      (*destructor_callback_)();
+    }
+  }
+
+  void setDestructorCallback(AsyncClient::StreamDestructorCallbacks callback) override {
+    ASSERT(!destructor_callback_);
+    destructor_callback_.emplace(callback);
+  }
+
+  void removeDestructorCallback() override {
+    ASSERT(destructor_callback_);
+    destructor_callback_.reset();
+  }
+
+  void setWatermarkCallbacks(DecoderFilterWatermarkCallbacks& callbacks) override {
+    ASSERT(!watermark_callbacks_);
+    watermark_callbacks_.emplace(callbacks);
+    for (uint32_t i = 0; i < high_watermark_calls_; ++i) {
+      watermark_callbacks_->get().onDecoderFilterAboveWriteBufferHighWatermark();
+    }
+  }
+
+  void removeWatermarkCallbacks() override {
+    ASSERT(watermark_callbacks_);
+    for (uint32_t i = 0; i < high_watermark_calls_; ++i) {
+      watermark_callbacks_->get().onDecoderFilterBelowWriteBufferLowWatermark();
+    }
+    watermark_callbacks_.reset();
+  }
 
   // Http::AsyncClient::Stream
   void sendHeaders(RequestHeaderMap& headers, bool end_stream) override;
@@ -108,6 +146,10 @@ protected:
   StreamInfo::StreamInfoImpl& streamInfo() override { return stream_info_; }
 
   AsyncClientImpl& parent_;
+  // Callback to listen for stream destruction.
+  absl::optional<AsyncClient::StreamDestructorCallbacks> destructor_callback_;
+  // Callback to listen for low/high/overflow watermark events.
+  absl::optional<std::reference_wrapper<DecoderFilterWatermarkCallbacks>> watermark_callbacks_;
 
 private:
   struct NullHedgePolicy : public Router::HedgePolicy {
@@ -215,7 +257,7 @@ private:
     const Router::CorsPolicy* corsPolicy() const override { return nullptr; }
     absl::optional<std::string>
     currentUrlPathAfterRewrite(const Http::RequestHeaderMap&) const override {
-      return absl::optional<std::string>();
+      return {};
     }
     void finalizeRequestHeaders(Http::RequestHeaderMap&, const StreamInfo::StreamInfo&,
                                 bool) const override {}
@@ -360,7 +402,7 @@ private:
   Upstream::ClusterInfoConstSharedPtr clusterInfo() override { return parent_.cluster_; }
   uint64_t streamId() const override { return stream_id_; }
   // TODO(kbaichoo): Plumb account from owning request filter.
-  Buffer::BufferMemoryAccountSharedPtr account() const override { return nullptr; }
+  Buffer::BufferMemoryAccountSharedPtr account() const override { return account_; }
   Tracing::Span& activeSpan() override { return active_span_; }
   OptRef<const Tracing::Config> tracingConfig() const override {
     return makeOptRef<const Tracing::Config>(tracing_config_);
@@ -410,15 +452,25 @@ private:
   void encodeTrailers(ResponseTrailerMapPtr&& trailers) override;
   ResponseTrailerMapOptRef responseTrailers() const override { return {}; }
   void encodeMetadata(MetadataMapPtr&&) override {}
-  void onDecoderFilterAboveWriteBufferHighWatermark() override { ++high_watermark_calls_; }
+  void onDecoderFilterAboveWriteBufferHighWatermark() override {
+    ++high_watermark_calls_;
+    if (watermark_callbacks_.has_value()) {
+      watermark_callbacks_->get().onDecoderFilterAboveWriteBufferHighWatermark();
+    }
+  }
   void onDecoderFilterBelowWriteBufferLowWatermark() override {
     ASSERT(high_watermark_calls_ != 0);
     --high_watermark_calls_;
+    if (watermark_callbacks_.has_value()) {
+      watermark_callbacks_->get().onDecoderFilterBelowWriteBufferLowWatermark();
+    }
   }
   void addDownstreamWatermarkCallbacks(DownstreamWatermarkCallbacks&) override {}
   void removeDownstreamWatermarkCallbacks(DownstreamWatermarkCallbacks&) override {}
-  void setDecoderBufferLimit(uint32_t) override {}
-  uint32_t decoderBufferLimit() override { return 0; }
+  void setDecoderBufferLimit(uint32_t) override {
+    IS_ENVOY_BUG("decoder buffer limits should not be overridden on async streams.");
+  }
+  uint32_t decoderBufferLimit() override { return buffer_limit_.value_or(0); }
   bool recreateStream(const ResponseHeaderMap*) override { return false; }
   const ScopeTrackedObject& scope() override { return *this; }
   void restoreContextOnContinue(ScopeTrackedObjectStack& tracked_object_stack) override {
@@ -456,6 +508,8 @@ private:
   bool local_closed_{};
   bool remote_closed_{};
   Buffer::InstancePtr buffered_body_;
+  Buffer::BufferMemoryAccountSharedPtr account_{nullptr};
+  absl::optional<uint32_t> buffer_limit_{absl::nullopt};
   bool encoded_response_headers_{};
   bool is_grpc_request_{};
   bool is_head_request_{false};
@@ -465,25 +519,59 @@ private:
   friend class AsyncClientImplUnitTest;
 };
 
-class AsyncRequestImpl final : public AsyncClient::Request,
-                               AsyncStreamImpl,
-                               AsyncClient::StreamCallbacks {
+class AsyncRequestSharedImpl : public virtual AsyncClient::Request,
+                               protected AsyncStreamImpl,
+                               protected AsyncClient::StreamCallbacks {
 public:
-  AsyncRequestImpl(RequestMessagePtr&& request, AsyncClientImpl& parent,
-                   AsyncClient::Callbacks& callbacks, const AsyncClient::RequestOptions& options);
+  void cancel() final;
 
-  // AsyncClient::Request
-  void cancel() override;
+protected:
+  AsyncRequestSharedImpl(AsyncClientImpl& parent, AsyncClient::Callbacks& callbacks,
+                         const AsyncClient::RequestOptions& options);
+  void onHeaders(ResponseHeaderMapPtr&& headers, bool end_stream) final;
+  void onData(Buffer::Instance& data, bool end_stream) final;
+  void onTrailers(ResponseTrailerMapPtr&& trailers) final;
+  void onComplete() final;
+  void onReset() final;
+
+  AsyncClient::Callbacks& callbacks_;
+  Tracing::SpanPtr child_span_;
+  std::unique_ptr<ResponseMessageImpl> response_;
+  bool cancelled_{};
+};
+
+class AsyncOngoingRequestImpl final : public AsyncClient::OngoingRequest,
+                                      public AsyncRequestSharedImpl {
+public:
+  AsyncOngoingRequestImpl(RequestHeaderMapPtr&& request_headers, AsyncClientImpl& parent,
+                          AsyncClient::Callbacks& callbacks,
+                          const AsyncClient::RequestOptions& options)
+      : AsyncRequestSharedImpl(parent, callbacks, options),
+        request_headers_(std::move(request_headers)) {
+    ASSERT(request_headers_);
+  }
+  void captureAndSendTrailers(RequestTrailerMapPtr&& trailers) override {
+    request_trailers_ = std::move(trailers);
+    sendTrailers(*request_trailers_);
+  }
 
 private:
   void initialize();
 
-  // AsyncClient::StreamCallbacks
-  void onHeaders(ResponseHeaderMapPtr&& headers, bool end_stream) override;
-  void onData(Buffer::Instance& data, bool end_stream) override;
-  void onTrailers(ResponseTrailerMapPtr&& trailers) override;
-  void onComplete() override;
-  void onReset() override;
+  RequestHeaderMapPtr request_headers_;
+  RequestTrailerMapPtr request_trailers_;
+
+  friend class AsyncClientImpl;
+};
+
+class AsyncRequestImpl final : public AsyncRequestSharedImpl {
+public:
+  AsyncRequestImpl(RequestMessagePtr&& request, AsyncClientImpl& parent,
+                   AsyncClient::Callbacks& callbacks, const AsyncClient::RequestOptions& options)
+      : AsyncRequestSharedImpl(parent, callbacks, options), request_(std::move(request)) {}
+
+private:
+  void initialize();
 
   // Http::StreamDecoderFilterCallbacks
   void addDecodedData(Buffer::Instance&, bool) override {
@@ -494,10 +582,6 @@ private:
   void modifyDecodingBuffer(std::function<void(Buffer::Instance&)>) override {}
 
   RequestMessagePtr request_;
-  AsyncClient::Callbacks& callbacks_;
-  std::unique_ptr<ResponseMessageImpl> response_;
-  bool cancelled_{};
-  Tracing::SpanPtr child_span_;
 
   friend class AsyncClientImpl;
 };

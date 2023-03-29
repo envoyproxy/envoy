@@ -172,7 +172,7 @@ void Utility::extractCommonAccessLogProperties(
         *stream_info.downstreamAddressProvider().localAddress(),
         *common_access_log.mutable_downstream_local_address());
   }
-  if (stream_info.downstreamAddressProvider().requestedServerName() != nullptr) {
+  if (!stream_info.downstreamAddressProvider().requestedServerName().empty()) {
     common_access_log.mutable_tls_properties()->set_tls_sni_hostname(
         std::string(stream_info.downstreamAddressProvider().requestedServerName()));
   }
@@ -324,6 +324,15 @@ void Utility::extractCommonAccessLogProperties(
   // Set stream unique id from the stream info.
   if (auto provider = stream_info.getStreamIdProvider(); provider.has_value()) {
     common_access_log.set_stream_id(std::string(provider->toStringView().value_or("")));
+  }
+
+  if (const auto& bytes_meter = stream_info.getDownstreamBytesMeter(); bytes_meter != nullptr) {
+    common_access_log.set_downstream_wire_bytes_sent(bytes_meter->wireBytesSent());
+    common_access_log.set_downstream_wire_bytes_received(bytes_meter->wireBytesReceived());
+  }
+  if (const auto& bytes_meter = stream_info.getUpstreamBytesMeter(); bytes_meter != nullptr) {
+    common_access_log.set_upstream_wire_bytes_sent(bytes_meter->wireBytesSent());
+    common_access_log.set_upstream_wire_bytes_received(bytes_meter->wireBytesReceived());
   }
 }
 

@@ -1,9 +1,15 @@
 import Envoy
 import EnvoyEngine
 import Foundation
+import TestExtensions
 import XCTest
 
 final class CancelStreamTests: XCTestCase {
+  override static func setUp() {
+    super.setUp()
+    register_test_extensions()
+  }
+
   func testCancelStream() {
     let remotePort = Int.random(in: 10001...11000)
     // swiftlint:disable:next line_length
@@ -14,6 +20,10 @@ final class CancelStreamTests: XCTestCase {
     let filterName = "cancel_validation_filter"
     let config =
 """
+listener_manager:
+    name: envoy.listener_manager_impl.api
+    typed_config:
+      "@type": type.googleapis.com/envoy.config.listener.v3.ApiListenerManager
 static_resources:
   listeners:
   - name: base_api_listener
@@ -101,7 +111,6 @@ static_resources:
 
     let requestHeaders = RequestHeadersBuilder(method: .get, scheme: "https",
                                                authority: "example.com", path: "/test")
-      .addUpstreamHttpProtocol(.http2)
       .build()
 
     client
@@ -113,7 +122,8 @@ static_resources:
       .sendHeaders(requestHeaders, endStream: false)
       .cancel()
 
-    XCTAssertEqual(XCTWaiter.wait(for: [filterExpectation, runExpectation], timeout: 3), .completed)
+    let expectations = [filterExpectation, runExpectation]
+    XCTAssertEqual(XCTWaiter.wait(for: expectations, timeout: 10), .completed)
 
     engine.terminate()
   }

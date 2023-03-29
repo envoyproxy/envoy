@@ -135,7 +135,7 @@ TEST(DefaultCertValidatorTest, TestMatchSubjectAltNameNotMatched) {
 
 TEST(DefaultCertValidatorTest, TestCertificateVerificationWithSANMatcher) {
   Stats::TestUtil::TestStore test_store;
-  SslStats stats = generateSslStats(test_store);
+  SslStats stats = generateSslStats(*test_store.rootScope());
   // Create the default validator object.
   auto default_validator =
       std::make_unique<Extensions::TransportSockets::Tls::DefaultCertValidator>(
@@ -168,7 +168,7 @@ TEST(DefaultCertValidatorTest, TestCertificateVerificationWithSANMatcher) {
 
 TEST(DefaultCertValidatorTest, TestCertificateVerificationWithNoValidationContext) {
   Stats::TestUtil::TestStore test_store;
-  SslStats stats = generateSslStats(test_store);
+  SslStats stats = generateSslStats(*test_store.rootScope());
   // Create the default validator object.
   auto default_validator =
       std::make_unique<Extensions::TransportSockets::Tls::DefaultCertValidator>(
@@ -198,7 +198,7 @@ TEST(DefaultCertValidatorTest, TestCertificateVerificationWithNoValidationContex
 
 TEST(DefaultCertValidatorTest, TestCertificateVerificationWithEmptyCertChain) {
   Stats::TestUtil::TestStore test_store;
-  SslStats stats = generateSslStats(test_store);
+  SslStats stats = generateSslStats(*test_store.rootScope());
   // Create the default validator object.
   auto default_validator =
       std::make_unique<Extensions::TransportSockets::Tls::DefaultCertValidator>(
@@ -229,7 +229,7 @@ TEST(DefaultCertValidatorTest, NoSanInCert) {
 TEST(DefaultCertValidatorTest, WithVerifyDepth) {
 
   Stats::TestUtil::TestStore test_store;
-  SslStats stats = generateSslStats(test_store);
+  SslStats stats = generateSslStats(*test_store.rootScope());
   envoy::config::core::v3::TypedExtensionConfig typed_conf;
   std::vector<envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher> san_matchers{};
 
@@ -332,7 +332,7 @@ TEST(DefaultCertValidatorTest, TestUnexpectedSanMatcherType) {
   auto matchers =
       std::vector<envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher>();
   Stats::TestUtil::TestStore store;
-  auto ssl_stats = generateSslStats(store);
+  auto ssl_stats = generateSslStats(*store.rootScope());
   auto validator = std::make_unique<DefaultCertValidator>(mock_context_config.get(), ssl_stats,
                                                           Event::GlobalTimeSystem().timeSystem());
   auto ctx = std::vector<SSL_CTX*>();

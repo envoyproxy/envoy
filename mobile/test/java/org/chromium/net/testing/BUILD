@@ -36,6 +36,7 @@ android_library(
     deps = [
         "//library/java/io/envoyproxy/envoymobile/engine:envoy_base_engine_lib",
         "//library/java/io/envoyproxy/envoymobile/engine:envoy_engine_lib",
+        "//library/java/io/envoyproxy/envoymobile/utilities",
         "//library/java/org/chromium/net",
         "//library/java/org/chromium/net/impl:cronvoy",
         "//library/kotlin/io/envoyproxy/envoymobile:envoy_interfaces_lib",
@@ -60,8 +61,8 @@ envoy_mobile_android_test(
         "CronetTestRuleTest.java",
     ],
     native_deps = [
-        "//library/common/jni:libndk_envoy_jni.so",
-        "//library/common/jni:libndk_envoy_jni_jnilib",
+        "//test/common/jni:libenvoy_jni_with_test_extensions.so",
+        "//test/common/jni:libenvoy_jni_with_test_extensions_jnilib",
     ],
     deps = [
         ":testing",
@@ -83,8 +84,8 @@ envoy_mobile_android_test(
         "sandboxNetwork": "standard",
     },
     native_deps = [
-        "//library/common/jni:libndk_envoy_jni.so",
-        "//library/common/jni:libndk_envoy_jni_jnilib",
+        "//test/common/jni:libenvoy_jni_with_test_extensions.so",
+        "//test/common/jni:libenvoy_jni_with_test_extensions_jnilib",
     ],
     deps = [
         ":testing",
@@ -102,8 +103,8 @@ envoy_mobile_android_test(
         "sandboxNetwork": "standard",
     },
     native_deps = [
-        "//library/common/jni:libndk_envoy_jni.so",
-        "//library/common/jni:libndk_envoy_jni_jnilib",
+        "//test/common/jni:libenvoy_jni_with_test_extensions.so",
+        "//test/common/jni:libenvoy_jni_with_test_extensions_jnilib",
     ],
     deps = [
         ":testing",

@@ -20,6 +20,7 @@
  */
 #include "http_parser.h"
 #include <assert.h>
+#include <stdbool.h>
 #include <stddef.h>
 #include <ctype.h>
 #include <string.h>
@@ -2478,7 +2479,7 @@ http_parser_parse_url(const char *buf, size_t buflen, int is_connect,
         break;
 
       default:
-        assert(!"Unexpected state");
+        assert(false && "Unexpected state");
         return 1;
     }
 

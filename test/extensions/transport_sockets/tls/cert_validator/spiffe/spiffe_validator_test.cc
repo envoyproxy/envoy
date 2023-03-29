@@ -38,7 +38,7 @@ using SSLContextPtr = CSmartPtr<SSL_CTX, SSL_CTX_free>;
 
 class TestSPIFFEValidator : public ::testing::Test, public testing::WithParamInterface<bool> {
 public:
-  TestSPIFFEValidator() : stats_(generateSslStats(store_)) {
+  TestSPIFFEValidator() : stats_(generateSslStats(*store_.rootScope())) {
     Runtime::maybeSetRuntimeGuard("envoy.reloadable_features.tls_async_cert_validation",
                                   GetParam());
   }

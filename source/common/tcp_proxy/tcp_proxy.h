@@ -114,18 +114,40 @@ using TunnelingConfig =
     envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy_TunnelingConfig;
 
 /**
+ * Base class for both tunnel response headers and trailers.
+ */
+class TunnelResponseHeadersOrTrailers : public StreamInfo::FilterState::Object {
+public:
+  ProtobufTypes::MessagePtr serializeAsProto() const override;
+  virtual const Http::HeaderMap& value() const PURE;
+};
+
+/**
  * Response headers for the tunneling connections.
  */
-class TunnelResponseHeaders : public StreamInfo::FilterState::Object {
+class TunnelResponseHeaders : public TunnelResponseHeadersOrTrailers {
 public:
   TunnelResponseHeaders(Http::ResponseHeaderMapPtr&& response_headers)
       : response_headers_(std::move(response_headers)) {}
-  const Http::ResponseHeaderMap& value() const { return *response_headers_; }
-  ProtobufTypes::MessagePtr serializeAsProto() const override;
+  const Http::HeaderMap& value() const override { return *response_headers_; }
   static const std::string& key();
 
 private:
   const Http::ResponseHeaderMapPtr response_headers_;
+};
+
+/**
+ * Response trailers for the tunneling connections.
+ */
+class TunnelResponseTrailers : public TunnelResponseHeadersOrTrailers {
+public:
+  TunnelResponseTrailers(Http::ResponseTrailerMapPtr&& response_trailers)
+      : response_trailers_(std::move(response_trailers)) {}
+  const Http::HeaderMap& value() const override { return *response_trailers_; }
+  static const std::string& key();
+
+private:
+  const Http::ResponseTrailerMapPtr response_trailers_;
 };
 
 class TunnelingConfigHelperImpl : public TunnelingConfigHelper,
@@ -142,12 +164,16 @@ public:
   void
   propagateResponseHeaders(Http::ResponseHeaderMapPtr&& headers,
                            const StreamInfo::FilterStateSharedPtr& filter_state) const override;
+  void
+  propagateResponseTrailers(Http::ResponseTrailerMapPtr&& trailers,
+                            const StreamInfo::FilterStateSharedPtr& filter_state) const override;
 
 private:
   const bool use_post_;
   std::unique_ptr<Envoy::Router::HeaderParser> header_parser_;
   Formatter::FormatterPtr hostname_fmt_;
   const bool propagate_response_headers_;
+  const bool propagate_response_trailers_;
   std::string post_path_;
 };
 
@@ -196,6 +222,7 @@ public:
                  Server::Configuration::FactoryContext& context);
     const TcpProxyStats& stats() { return stats_; }
     const absl::optional<std::chrono::milliseconds>& idleTimeout() { return idle_timeout_; }
+    bool flushAccessLogOnConnected() const { return flush_access_log_on_connected_; }
     const absl::optional<std::chrono::milliseconds>& maxDownstreamConnectionDuration() const {
       return max_downstream_connection_duration_;
     }
@@ -225,6 +252,7 @@ public:
     const Stats::ScopeSharedPtr stats_scope_;
 
     const TcpProxyStats stats_;
+    const bool flush_access_log_on_connected_;
     absl::optional<std::chrono::milliseconds> idle_timeout_;
     absl::optional<std::chrono::milliseconds> max_downstream_connection_duration_;
     absl::optional<std::chrono::milliseconds> access_log_flush_interval_;
@@ -282,6 +310,7 @@ public:
   // This function must not be called if on demand is disabled.
   const OnDemandStats& onDemandStats() const { return shared_config_->onDemandConfig()->stats(); }
   Random::RandomGenerator& randomGenerator() { return random_generator_; }
+  bool flushAccessLogOnConnected() const { return shared_config_->flushAccessLogOnConnected(); }
 
 private:
   struct SimpleRouteImpl : public Route {
@@ -459,10 +488,7 @@ protected:
     return config_->getRouteFromEntries(read_callbacks_->connection());
   }
 
-  virtual void onInitFailure(UpstreamFailureReason) {
-    read_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
-  }
-
+  virtual void onInitFailure(UpstreamFailureReason reason);
   void initialize(Network::ReadFilterCallbacks& callbacks, bool set_connection_stats);
 
   // Create connection to the upstream cluster. This function can be repeatedly called on upstream

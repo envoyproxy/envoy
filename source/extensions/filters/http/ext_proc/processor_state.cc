@@ -25,7 +25,10 @@ void ProcessorState::onStartProcessorCall(Event::TimerCb cb, std::chrono::millis
     message_timer_ = filter_callbacks_->dispatcher().createTimer(cb);
   }
   message_timer_->enableTimer(timeout);
+  ENVOY_LOG(debug, "Traffic direction {}: {} ms timer enabled", trafficDirectionDebugStr(),
+            timeout.count());
   call_start_time_ = filter_callbacks_->dispatcher().timeSource().monotonicTime();
+  new_timeout_received_ = false;
 }
 
 void ProcessorState::onFinishProcessorCall(Grpc::Status::GrpcStatus call_status,
@@ -40,11 +43,37 @@ void ProcessorState::onFinishProcessorCall(Grpc::Status::GrpcStatus call_status,
     call_start_time_ = absl::nullopt;
   }
   callback_state_ = next_state;
+  new_timeout_received_ = false;
 }
 
 void ProcessorState::stopMessageTimer() {
   if (message_timer_) {
+    ENVOY_LOG(debug, "Traffic direction {}: timer disabled", trafficDirectionDebugStr());
     message_timer_->disableTimer();
+  }
+}
+
+// Server sends back response to stop the original timer and start a new timer.
+// Do not change call_start_time_ since that call has not been responded yet.
+// Do not change callback_state_ either.
+bool ProcessorState::restartMessageTimer(const uint32_t message_timeout_ms) {
+  if (message_timer_ && message_timer_->enabled() && !new_timeout_received_) {
+    ENVOY_LOG(debug,
+              "Traffic direction {}: Server needs more time to process the request, start a "
+              "new timer with timeout {} ms",
+              trafficDirectionDebugStr(), message_timeout_ms);
+    message_timer_->disableTimer();
+    message_timer_->enableTimer(std::chrono::milliseconds(message_timeout_ms));
+    // Setting this flag to true to make sure Envoy ignore the future such
+    // messages when in the same state.
+    new_timeout_received_ = true;
+    return true;
+  } else {
+    ENVOY_LOG(debug,
+              "Traffic direction {}: Ignoring server new timeout message {} ms due to timer not "
+              "enabled or not the 1st such message",
+              trafficDirectionDebugStr(), message_timeout_ms);
+    return false;
   }
 }
 
@@ -147,8 +176,9 @@ absl::Status ProcessorState::handleHeadersResponse(const HeadersResponse& respon
           filter_.sendBodyChunk(*this, all_data.data,
                                 ProcessorState::CallbackState::BufferedPartialBodyCallback, false);
         } else {
+          // Let data continue to flow, but don't resume yet -- we would like to hold
+          // the headers while we buffer the body up to the limit.
           clearWatermark();
-          continueIfNecessary();
         }
         return absl::OkStatus();
       }
@@ -163,6 +193,7 @@ absl::Status ProcessorState::handleHeadersResponse(const HeadersResponse& respon
 
     // If we got here, then the processor doesn't care about the body or is not ready for
     // trailers, so we can just continue.
+    ENVOY_LOG(trace, "Clearing stored headers");
     headers_ = nullptr;
     continueIfNecessary();
     clearWatermark();
@@ -180,14 +211,18 @@ absl::Status ProcessorState::handleBodyResponse(const BodyResponse& response) {
       callback_state_ == CallbackState::BufferedPartialBodyCallback) {
     ENVOY_LOG(debug, "Processing body response");
     if (callback_state_ == CallbackState::BufferedBodyCallback) {
-      if (common_response.has_header_mutation() && headers_ != nullptr) {
-        ENVOY_LOG(debug, "Applying header mutations to buffered body message");
-        const auto mut_status = MutationUtils::applyHeaderMutations(
-            common_response.header_mutation(), *headers_,
-            common_response.status() == CommonResponse::CONTINUE_AND_REPLACE,
-            filter_.config().mutationChecker(), filter_.stats().rejected_header_mutations_);
-        if (!mut_status.ok()) {
-          return mut_status;
+      if (common_response.has_header_mutation()) {
+        if (headers_ != nullptr) {
+          ENVOY_LOG(debug, "Applying header mutations to buffered body message");
+          const auto mut_status = MutationUtils::applyHeaderMutations(
+              common_response.header_mutation(), *headers_,
+              common_response.status() == CommonResponse::CONTINUE_AND_REPLACE,
+              filter_.config().mutationChecker(), filter_.stats().rejected_header_mutations_);
+          if (!mut_status.ok()) {
+            return mut_status;
+          }
+        } else {
+          ENVOY_LOG(debug, "Response had header mutations but headers aren't available");
         }
       }
       if (common_response.has_body_mutation()) {
@@ -240,7 +275,25 @@ absl::Status ProcessorState::handleBodyResponse(const BodyResponse& response) {
       auto queued_chunk = dequeueStreamingChunk(false);
       ENVOY_BUG(queued_chunk, "Bad partial body callback state");
       auto chunk = std::move(*queued_chunk);
+      if (common_response.has_header_mutation()) {
+        if (headers_ != nullptr) {
+          ENVOY_LOG(debug, "Applying header mutations to buffered body message");
+          const auto mut_status = MutationUtils::applyHeaderMutations(
+              common_response.header_mutation(), *headers_,
+              common_response.status() == CommonResponse::CONTINUE_AND_REPLACE,
+              filter_.config().mutationChecker(), filter_.stats().rejected_header_mutations_);
+          if (!mut_status.ok()) {
+            return mut_status;
+          }
+        } else {
+          ENVOY_LOG(debug, "Response had header mutations but headers aren't available");
+        }
+      }
       if (common_response.has_body_mutation()) {
+        if (headers_ != nullptr) {
+          // Always reset the content length here to prevent later problems.
+          headers_->removeContentLength();
+        }
         MutationUtils::applyBodyMutations(common_response.body_mutation(), chunk->data);
       }
       if (chunk->data.length() > 0) {

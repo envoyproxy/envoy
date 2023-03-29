@@ -132,7 +132,7 @@ IntegrationUtil::createQuicUpstreamTransportSocketFactory(Api::Api& api, Stats::
                                                           const std::string& san_to_match) {
   NiceMock<Server::Configuration::MockTransportSocketFactoryContext> context;
   ON_CALL(context, api()).WillByDefault(testing::ReturnRef(api));
-  ON_CALL(context, scope()).WillByDefault(testing::ReturnRef(store));
+  ON_CALL(context, scope()).WillByDefault(testing::ReturnRef(*store.rootScope()));
   ON_CALL(context, sslContextManager()).WillByDefault(testing::ReturnRef(context_manager));
   envoy::extensions::transport_sockets::quic::v3::QuicUpstreamTransport
       quic_transport_socket_config;
@@ -233,8 +233,8 @@ IntegrationUtil::makeSingleRequest(const Network::Address::InstanceConstSharedPt
       quic::QuicServerId(
           quic_transport_socket_factory.clientContextConfig()->serverNameIndication(),
           static_cast<uint16_t>(addr->ip()->port())),
-      *dispatcher, addr, local_address, quic_stat_names, {}, mock_stats_store, nullptr, nullptr,
-      generator);
+      *dispatcher, addr, local_address, quic_stat_names, {}, *mock_stats_store.rootScope(), nullptr,
+      nullptr, generator);
   connection->addConnectionCallbacks(connection_callbacks);
   Http::CodecClientProd client(type, std::move(connection), host_description, *dispatcher, random,
                                options);

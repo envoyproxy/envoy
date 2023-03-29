@@ -131,12 +131,20 @@ public:
   /**
    * @return true if half-close semantics are enabled, false otherwise.
    */
-  virtual bool isHalfCloseEnabled() PURE;
+  virtual bool isHalfCloseEnabled() const PURE;
 
   /**
    * Close the connection.
+   * @param type the connection close type.
    */
   virtual void close(ConnectionCloseType type) PURE;
+
+  /**
+   * Close the connection.
+   * @param type the connection close type.
+   * @param details the reason the connection is being closed.
+   */
+  virtual void close(ConnectionCloseType type, absl::string_view details) PURE;
 
   /**
    * @return Event::Dispatcher& the dispatcher backing this connection.
@@ -311,10 +319,16 @@ public:
   virtual void setDelayedCloseTimeout(std::chrono::milliseconds timeout) PURE;
 
   /**
-   * @return std::string the failure reason of the underlying transport socket, if no failure
-   *         occurred an empty string is returned.
+   * @return absl::string_view the failure reason of the underlying transport socket, if no failure
+   *         occurred an empty string view is returned.
    */
   virtual absl::string_view transportFailureReason() const PURE;
+
+  /**
+   * @return absl::string_view the local close reason of the underlying socket, if local close
+   *         did not occur an empty string view is returned.
+   */
+  virtual absl::string_view localCloseReason() const PURE;
 
   /**
    * Instructs the connection to start using secure transport.

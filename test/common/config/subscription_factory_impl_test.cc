@@ -54,7 +54,7 @@ public:
   SubscriptionPtr
   subscriptionFromConfigSource(const envoy::config::core::v3::ConfigSource& config) {
     return subscription_factory_.subscriptionFromConfigSource(
-        config, Config::TypeUrl::get().ClusterLoadAssignment, stats_store_, callbacks_,
+        config, Config::TypeUrl::get().ClusterLoadAssignment, *stats_store_.rootScope(), callbacks_,
         resource_decoder_, {});
   }
 
@@ -63,8 +63,8 @@ public:
                                 const envoy::config::core::v3::ConfigSource& config) {
     const auto resource_locator = XdsResourceIdentifier::decodeUrl(xds_url);
     return subscription_factory_.collectionSubscriptionFromUrl(
-        resource_locator, config, "envoy.config.endpoint.v3.ClusterLoadAssignment", stats_store_,
-        callbacks_, resource_decoder_);
+        resource_locator, config, "envoy.config.endpoint.v3.ClusterLoadAssignment",
+        *stats_store_.rootScope(), callbacks_, resource_decoder_);
   }
 
   Upstream::MockClusterManager cm_;
@@ -393,14 +393,35 @@ TEST_P(SubscriptionFactoryTestUnifiedOrLegacyMux, GrpcCollectionAggregatedSubscr
   Upstream::ClusterManager::ClusterSet primary_clusters;
   primary_clusters.insert("static_cluster");
   EXPECT_CALL(cm_, primaryClusters()).WillOnce(ReturnRef(primary_clusters));
-  GrpcMuxSharedPtr ads_mux = std::make_shared<NiceMock<MockGrpcMux>>();
+  auto ads_mux = std::make_shared<NiceMock<MockGrpcMux>>();
   EXPECT_CALL(cm_, adsMux()).WillOnce(Return(ads_mux));
   EXPECT_CALL(dispatcher_, createTimer_(_));
   // onConfigUpdateFailed() should not be called for gRPC stream connection failure
   EXPECT_CALL(callbacks_, onConfigUpdateFailed(_, _)).Times(0);
+  // Since this is ADS, the mux's start() should not be called (which attempts to create a gRPC
+  // stream).
+  EXPECT_CALL(*ads_mux, start()).Times(0);
   collectionSubscriptionFromUrl("xdstp://foo/envoy.config.endpoint.v3.ClusterLoadAssignment/bar",
                                 config)
       ->start({});
+}
+
+TEST_P(SubscriptionFactoryTestUnifiedOrLegacyMux, GrpcCollectionAggregatedSotwSubscription) {
+  envoy::config::core::v3::ConfigSource config;
+  auto* api_config_source = config.mutable_api_config_source();
+  api_config_source->set_api_type(envoy::config::core::v3::ApiConfigSource::AGGREGATED_GRPC);
+  api_config_source->set_transport_api_version(envoy::config::core::v3::V3);
+  api_config_source->add_grpc_services()->mutable_envoy_grpc()->set_cluster_name("static_cluster");
+
+  Upstream::ClusterManager::ClusterSet primary_clusters;
+  primary_clusters.insert("static_cluster");
+  EXPECT_CALL(cm_, primaryClusters()).WillOnce(ReturnRef(primary_clusters));
+  const std::string xds_url = "xdstp://foo/envoy.config.endpoint.v3.ClusterLoadAssignment/bar";
+
+  GrpcMuxSharedPtr ads_mux = std::make_shared<NiceMock<MockGrpcMux>>();
+  EXPECT_CALL(cm_, adsMux()).WillOnce(Return(ads_mux));
+  EXPECT_CALL(dispatcher_, createTimer_(_));
+  collectionSubscriptionFromUrl(xds_url, config)->start({});
 }
 
 TEST_P(SubscriptionFactoryTestUnifiedOrLegacyMux, GrpcCollectionDeltaSubscription) {
@@ -437,8 +458,8 @@ TEST_F(SubscriptionFactoryTest, LogWarningOnDeprecatedV2Transport) {
   EXPECT_CALL(cm_, primaryClusters()).WillOnce(ReturnRef(primary_clusters));
 
   EXPECT_THROW_WITH_REGEX(subscription_factory_.subscriptionFromConfigSource(
-                              config, Config::TypeUrl::get().ClusterLoadAssignment, stats_store_,
-                              callbacks_, resource_decoder_, {}),
+                              config, Config::TypeUrl::get().ClusterLoadAssignment,
+                              *stats_store_.rootScope(), callbacks_, resource_decoder_, {}),
                           EnvoyException,
                           "V2 .and AUTO. xDS transport protocol versions are deprecated in");
 }
@@ -459,8 +480,8 @@ TEST_F(SubscriptionFactoryTest, LogWarningOnDeprecatedAutoTransport) {
   EXPECT_CALL(cm_, primaryClusters()).WillOnce(ReturnRef(primary_clusters));
 
   EXPECT_THROW_WITH_REGEX(subscription_factory_.subscriptionFromConfigSource(
-                              config, Config::TypeUrl::get().ClusterLoadAssignment, stats_store_,
-                              callbacks_, resource_decoder_, {}),
+                              config, Config::TypeUrl::get().ClusterLoadAssignment,
+                              *stats_store_.rootScope(), callbacks_, resource_decoder_, {}),
                           EnvoyException,
                           "V2 .and AUTO. xDS transport protocol versions are deprecated in");
 }

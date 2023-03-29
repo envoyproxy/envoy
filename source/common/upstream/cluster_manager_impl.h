@@ -24,6 +24,7 @@
 #include "envoy/secret/secret_manager.h"
 #include "envoy/ssl/context_manager.h"
 #include "envoy/stats/scope.h"
+#include "envoy/tcp/async_tcp_client.h"
 #include "envoy/thread_local/thread_local.h"
 #include "envoy/upstream/cluster_manager.h"
 
@@ -34,6 +35,7 @@
 #include "source/common/http/http_server_properties_cache_impl.h"
 #include "source/common/http/http_server_properties_cache_manager_impl.h"
 #include "source/common/quic/quic_stat_names.h"
+#include "source/common/tcp/async_tcp_client_impl.h"
 #include "source/common/upstream/cluster_discovery_manager.h"
 #include "source/common/upstream/host_utility.h"
 #include "source/common/upstream/load_stats_reporter.h"
@@ -369,13 +371,14 @@ protected:
   struct ThreadLocalClusterUpdateParams {
     struct PerPriority {
       PerPriority(uint32_t priority, const HostVector& hosts_added, const HostVector& hosts_removed)
-          : priority_(priority), hosts_added_(hosts_added), hosts_removed_(hosts_removed) {}
+          : hosts_added_(hosts_added), hosts_removed_(hosts_removed), priority_(priority) {}
 
-      const uint32_t priority_;
       const HostVector hosts_added_;
       const HostVector hosts_removed_;
       PrioritySet::UpdateHostsParams update_hosts_params_;
       LocalityWeightsConstSharedPtr locality_weights_;
+      // Keep small members (bools and enums) at the end of class, to reduce alignment overhead.
+      const uint32_t priority_;
       uint32_t overprovisioning_factor_;
     };
 
@@ -523,6 +526,9 @@ private:
                                               LoadBalancerContext* context) override;
       Host::CreateConnectionData tcpConn(LoadBalancerContext* context) override;
       Http::AsyncClient& httpAsyncClient() override;
+      Tcp::AsyncTcpClientPtr
+      tcpAsyncClient(LoadBalancerContext* context,
+                     Tcp::AsyncTcpClientOptionsConstSharedPtr options) override;
 
       // Updates the hosts in the priority set.
       void updateHosts(const std::string& name, uint32_t priority,
@@ -649,8 +655,9 @@ private:
                 const uint64_t cluster_config_hash, const std::string& version_info,
                 bool added_via_api, ClusterSharedPtr&& cluster, TimeSource& time_source)
         : cluster_config_(cluster_config), config_hash_(cluster_config_hash),
-          version_info_(version_info), added_via_api_(added_via_api), cluster_(std::move(cluster)),
-          last_updated_(time_source.systemTime()) {}
+          version_info_(version_info), cluster_(std::move(cluster)),
+          last_updated_(time_source.systemTime()),
+          added_via_api_(added_via_api), added_or_updated_{} {}
 
     bool blockUpdate(uint64_t hash) { return !added_via_api_ || config_hash_ == hash; }
 
@@ -672,14 +679,15 @@ private:
     const envoy::config::cluster::v3::Cluster cluster_config_;
     const uint64_t config_hash_;
     const std::string version_info_;
-    const bool added_via_api_;
     ClusterSharedPtr cluster_;
     // Optional thread aware LB depending on the LB type. Not all clusters have one.
     ThreadAwareLoadBalancerPtr thread_aware_lb_;
     SystemTime last_updated_;
-    bool added_or_updated_{};
     Common::CallbackHandlePtr member_update_cb_;
     Common::CallbackHandlePtr priority_update_cb_;
+    // Keep smaller fields near the end to reduce padding
+    const bool added_via_api_ : 1;
+    bool added_or_updated_ : 1;
   };
 
   struct ClusterUpdateCallbacksHandleImpl : public ClusterUpdateCallbacksHandle,

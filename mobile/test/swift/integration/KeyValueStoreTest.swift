@@ -1,9 +1,15 @@
 import Envoy
 import EnvoyEngine
 import Foundation
+import TestExtensions
 import XCTest
 
 final class KeyValueStoreTests: XCTestCase {
+  override static func setUp() {
+    super.setUp()
+    register_test_extensions()
+  }
+
   func testKeyValueStore() {
     // swiftlint:disable:next line_length
     let ehcmType = "type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.EnvoyMobileHttpConnectionManager"
@@ -13,6 +19,10 @@ final class KeyValueStoreTests: XCTestCase {
     let testValue = "bar"
     let config =
 """
+listener_manager:
+    name: envoy.listener_manager_impl.api
+    typed_config:
+      "@type": type.googleapis.com/envoy.config.listener.v3.ApiListenerManager
 static_resources:
   listeners:
   - name: base_api_listener
@@ -77,6 +87,7 @@ static_resources:
         name: "envoy.key_value.platform_test",
         keyValueStore: testStore
       )
+      .setRuntimeGuard("test_feature_false", true)
       .build()
 
     let client = engine.streamClient()
@@ -85,7 +96,6 @@ static_resources:
       method: .get, scheme: "https",
       authority: "example.com", path: "/test"
     )
-    .addUpstreamHttpProtocol(.http2)
     .build()
 
     client

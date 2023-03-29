@@ -7,6 +7,7 @@
 #include "envoy/type/matcher/v3/http_inputs.pb.validate.h"
 
 #include "source/common/http/header_utility.h"
+#include "source/common/http/utility.h"
 
 namespace Envoy {
 namespace Http {
@@ -86,6 +87,8 @@ public:
   HttpRequestHeadersDataInputFactory() : HttpHeadersDataInputFactoryBase("request_headers") {}
 };
 
+DECLARE_FACTORY(HttpRequestHeadersDataInputFactory);
+
 class HttpResponseHeadersDataInput : public HttpHeadersDataInputBase<ResponseHeaderMap> {
 public:
   explicit HttpResponseHeadersDataInput(const std::string& name) : HttpHeadersDataInputBase(name) {}
@@ -101,6 +104,8 @@ class HttpResponseHeadersDataInputFactory
 public:
   HttpResponseHeadersDataInputFactory() : HttpHeadersDataInputFactoryBase("response_headers") {}
 };
+
+DECLARE_FACTORY(HttpResponseHeadersDataInputFactory);
 
 class HttpRequestTrailersDataInput : public HttpHeadersDataInputBase<RequestTrailerMap> {
 public:
@@ -118,6 +123,8 @@ public:
   HttpRequestTrailersDataInputFactory() : HttpHeadersDataInputFactoryBase("request_trailers") {}
 };
 
+DECLARE_FACTORY(HttpRequestTrailersDataInputFactory);
+
 class HttpResponseTrailersDataInput : public HttpHeadersDataInputBase<ResponseTrailerMap> {
 public:
   explicit HttpResponseTrailersDataInput(const std::string& name)
@@ -134,6 +141,63 @@ class HttpResponseTrailersDataInputFactory
 public:
   HttpResponseTrailersDataInputFactory() : HttpHeadersDataInputFactoryBase("response_trailers") {}
 };
+
+DECLARE_FACTORY(HttpResponseTrailersDataInputFactory);
+
+class HttpRequestQueryParamsDataInput : public Matcher::DataInput<HttpMatchingData> {
+public:
+  explicit HttpRequestQueryParamsDataInput(const std::string& query_param)
+      : query_param_(query_param) {}
+
+  Matcher::DataInputGetResult get(const HttpMatchingData& data) const override {
+    const auto maybe_headers = data.requestHeaders();
+
+    if (!maybe_headers) {
+      return {Matcher::DataInputGetResult::DataAvailability::NotAvailable, absl::nullopt};
+    }
+
+    const auto ret = maybe_headers->Path();
+    if (!ret) {
+      return {Matcher::DataInputGetResult::DataAvailability::NotAvailable, absl::nullopt};
+    }
+
+    Utility::QueryParams params =
+        Http::Utility::parseAndDecodeQueryString(ret->value().getStringView());
+
+    auto ItParam = params.find(query_param_);
+    if (ItParam == params.end()) {
+      return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::nullopt};
+    }
+    return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,
+            std::move(ItParam->second)};
+  }
+
+private:
+  const std::string query_param_;
+};
+
+class HttpRequestQueryParamsDataInputFactory : public Matcher::DataInputFactory<HttpMatchingData> {
+public:
+  std::string name() const override { return "query_params"; }
+
+  Matcher::DataInputFactoryCb<HttpMatchingData>
+  createDataInputFactoryCb(const Protobuf::Message& config,
+                           ProtobufMessage::ValidationVisitor& validation_visitor) override {
+    const auto& typed_config = MessageUtil::downcastAndValidate<
+        const envoy::type::matcher::v3::HttpRequestQueryParamMatchInput&>(config,
+                                                                          validation_visitor);
+
+    return [query_param = typed_config.query_param()] {
+      return std::make_unique<HttpRequestQueryParamsDataInput>(query_param);
+    };
+  };
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return std::make_unique<envoy::type::matcher::v3::HttpRequestQueryParamMatchInput>();
+  }
+};
+
+DECLARE_FACTORY(HttpRequestQueryParamsDataInputFactory);
+
 } // namespace Matching
 } // namespace Http
 } // namespace Envoy

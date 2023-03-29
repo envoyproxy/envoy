@@ -4,6 +4,7 @@
 #include "envoy/network/connection.h"
 
 #include "source/common/common/assert.h"
+#include "source/common/tracing/tracer_impl.h"
 
 #include "contrib/generic_proxy/filters/network/source/interface/filter.h"
 
@@ -22,17 +23,36 @@ absl::string_view resetReasonToStringView(StreamResetReason reason) {
 } // namespace
 
 UpstreamRequest::UpstreamRequest(RouterFilter& parent, Upstream::TcpPoolData tcp_data)
-    : parent_(parent), tcp_data_(std::move(tcp_data)) {}
+    : parent_(parent), tcp_data_(std::move(tcp_data)),
+      stream_info_(parent.context_.mainThreadDispatcher().timeSource(), nullptr) {
+
+  stream_info_.setUpstreamInfo(std::make_shared<StreamInfo::UpstreamInfoImpl>());
+  parent_.callbacks_->streamInfo().setUpstreamInfo(stream_info_.upstreamInfo());
+
+  stream_info_.healthCheck(parent_.callbacks_->streamInfo().healthCheck());
+  stream_info_.setUpstreamClusterInfo(parent_.cluster_);
+
+  tracing_config_ = parent_.callbacks_->tracingConfig();
+  if (tracing_config_.has_value()) {
+    span_ = parent_.callbacks_->activeSpan().spawnChild(
+        tracing_config_.value().get(),
+        absl::StrCat("router ", parent_.cluster_->observabilityName(), " egress"),
+        parent.context_.mainThreadDispatcher().timeSource().systemTime());
+  }
+}
 
 void UpstreamRequest::startStream() {
   Tcp::ConnectionPool::Cancellable* handle = tcp_data_.newConnection(*this);
   conn_pool_handle_ = handle;
 }
 
-// TODO(wbpcode): To support stream reset reason.
 void UpstreamRequest::resetStream(StreamResetReason reason) {
-  ENVOY_LOG(debug, "generic proxy upstream request: reset upstream request");
+  if (stream_reset_) {
+    return;
+  }
   stream_reset_ = true;
+
+  ENVOY_LOG(debug, "generic proxy upstream request: reset upstream request");
 
   if (conn_pool_handle_) {
     ASSERT(!conn_data_);
@@ -48,14 +68,41 @@ void UpstreamRequest::resetStream(StreamResetReason reason) {
     conn_data_.reset();
   }
 
+  if (span_ != nullptr) {
+    span_->setTag(Tracing::Tags::get().Error, Tracing::Tags::get().True);
+    span_->setTag(Tracing::Tags::get().ErrorReason, resetReasonToStringView(reason));
+    Tracing::TracerUtility::finalizeSpan(*span_, *parent_.request_, stream_info_,
+                                         tracing_config_.value().get(), true);
+  }
+
+  // Remove this stream form the parent's list because this upstream request is reset.
+  deferredDelete();
+
+  // Notify the parent filter that the upstream request has been reset.
   parent_.onUpstreamRequestReset(*this, reason);
 }
 
 void UpstreamRequest::completeUpstreamRequest() {
+  if (span_ != nullptr) {
+    Tracing::TracerUtility::finalizeSpan(*span_, *parent_.request_, stream_info_,
+                                         tracing_config_.value().get(), true);
+  }
+
   response_complete_ = true;
   ASSERT(conn_pool_handle_ == nullptr);
   ASSERT(conn_data_ != nullptr);
   conn_data_.reset();
+
+  // Remove this stream form the parent's list because this upstream request is complete.
+  deferredDelete();
+}
+
+void UpstreamRequest::deferredDelete() {
+  if (inserted()) {
+    // Remove this stream from the parent's list of upstream requests and delete it at
+    // next event loop iteration.
+    parent_.callbacks_->dispatcher().deferredDelete(removeFromList(parent_.upstream_requests_));
+  }
 }
 
 void UpstreamRequest::onPoolFailure(ConnectionPool::PoolFailureReason reason, absl::string_view,
@@ -73,6 +120,15 @@ void UpstreamRequest::onPoolFailure(ConnectionPool::PoolFailureReason reason, ab
   resetStream(StreamResetReason::ConnectionFailure);
 }
 
+void UpstreamRequest::onEncodingSuccess(Buffer::Instance& buffer, bool expect_response) {
+  ENVOY_LOG(debug, "upstream request encoding success");
+  encodeBufferToUpstream(buffer);
+  if (!expect_response) {
+    completeUpstreamRequest();
+    parent_.completeDirectly();
+  }
+}
+
 void UpstreamRequest::onPoolReady(Tcp::ConnectionPool::ConnectionDataPtr&& conn,
                                   Upstream::HostDescriptionConstSharedPtr host) {
   ENVOY_LOG(debug, "upstream request: tcp connection has ready");
@@ -82,12 +138,11 @@ void UpstreamRequest::onPoolReady(Tcp::ConnectionPool::ConnectionDataPtr&& conn,
   conn_data_->addUpstreamCallbacks(*this);
   conn_pool_handle_ = nullptr;
 
-  encodeBufferToUpstream(parent_.upstream_request_buffer_);
-
-  if (parent_.expect_response_ == false) {
-    completeUpstreamRequest();
-    parent_.completeDirectly();
+  if (span_ != nullptr) {
+    span_->injectContext(*parent_.request_, upstream_host_);
   }
+
+  parent_.request_encoder_->encode(*parent_.request_, *this);
 }
 
 void UpstreamRequest::onUpstreamData(Buffer::Instance& data, bool end_stream) {
@@ -145,21 +200,16 @@ void UpstreamRequest::encodeBufferToUpstream(Buffer::Instance& buffer) {
 }
 
 void RouterFilter::onUpstreamResponse(ResponsePtr response) {
-  // TODO(wbpcode): To support retry policy.
-  callbacks_->upstreamResponse(std::move(response));
   filter_complete_ = true;
+  callbacks_->upstreamResponse(std::move(response));
 }
 
 void RouterFilter::completeDirectly() {
-  callbacks_->completeDirectly();
   filter_complete_ = true;
+  callbacks_->completeDirectly();
 }
 
-void RouterFilter::onUpstreamRequestReset(UpstreamRequest& upstream_request,
-                                          StreamResetReason reason) {
-  // Remove upstream request from router filter and move it to the deferred-delete list.
-  callbacks_->dispatcher().deferredDelete(upstream_request.removeFromList(upstream_requests_));
-
+void RouterFilter::onUpstreamRequestReset(UpstreamRequest&, StreamResetReason reason) {
   if (filter_complete_) {
     return;
   }
@@ -186,6 +236,11 @@ void RouterFilter::onDestroy() {
 }
 
 void RouterFilter::resetStream(StreamResetReason reason) {
+  if (filter_complete_) {
+    return;
+  }
+  filter_complete_ = true;
+
   ASSERT(upstream_requests_.empty());
   switch (reason) {
   case StreamResetReason::LocalReset:
@@ -204,15 +259,6 @@ void RouterFilter::resetStream(StreamResetReason reason) {
     callbacks_->sendLocalReply(Status(StatusCode::kUnavailable, resetReasonToStringView(reason)));
     break;
   }
-
-  filter_complete_ = true;
-}
-
-void RouterFilter::onEncodingSuccess(Buffer::Instance& buffer, bool expect_response) {
-  ENVOY_LOG(debug, "upstream request encoding success");
-  upstream_request_buffer_.move(buffer);
-  kickOffNewUpstreamRequest();
-  expect_response_ = expect_response;
 }
 
 void RouterFilter::kickOffNewUpstreamRequest() {
@@ -220,15 +266,17 @@ void RouterFilter::kickOffNewUpstreamRequest() {
 
   auto thread_local_cluster = context_.clusterManager().getThreadLocalCluster(cluster_name);
   if (thread_local_cluster == nullptr) {
-    callbacks_->sendLocalReply(Status(StatusCode::kNotFound, "cluster_not_found"));
     filter_complete_ = true;
+    callbacks_->sendLocalReply(Status(StatusCode::kNotFound, "cluster_not_found"));
     return;
   }
 
-  auto cluster_info = thread_local_cluster->info();
-  if (cluster_info->maintenanceMode()) {
-    callbacks_->sendLocalReply(Status(StatusCode::kUnavailable, "cluster_maintain_mode"));
+  cluster_ = thread_local_cluster->info();
+  callbacks_->streamInfo().setUpstreamClusterInfo(cluster_);
+
+  if (cluster_->maintenanceMode()) {
     filter_complete_ = true;
+    callbacks_->sendLocalReply(Status(StatusCode::kUnavailable, "cluster_maintain_mode"));
     return;
   }
 
@@ -250,6 +298,7 @@ FilterStatus RouterFilter::onStreamDecoded(Request& request) {
   ENVOY_LOG(debug, "Try route request to the upstream based on the route entry");
 
   setRouteEntry(callbacks_->routeEntry());
+  request_ = &request;
 
   if (route_entry_ == nullptr) {
     ENVOY_LOG(debug, "No route for current request and send local reply");
@@ -258,8 +307,7 @@ FilterStatus RouterFilter::onStreamDecoded(Request& request) {
   }
 
   request_encoder_ = callbacks_->downstreamCodec().requestEncoder();
-  request_encoder_->encode(request, *this);
-
+  kickOffNewUpstreamRequest();
   return FilterStatus::StopIteration;
 }
 

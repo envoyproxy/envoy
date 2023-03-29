@@ -62,7 +62,7 @@ public:
   };
 
   struct HedgingParams {
-    bool hedge_on_per_try_timeout_;
+    bool hedge_on_per_try_timeout_ : 1;
   };
 
   class StrictHeaderChecker {
@@ -364,9 +364,11 @@ class Filter : Logger::Loggable<Logger::Id::router>,
                public RouterFilterInterface {
 public:
   Filter(FilterConfig& config, FilterStats& stats)
-      : config_(config), stats_(stats), downstream_1xx_headers_encoded_(false),
-        downstream_response_started_(false), downstream_end_stream_(false), is_retry_(false),
-        request_buffer_overflowed_(false) {}
+      : config_(config), stats_(stats), grpc_request_(false), exclude_http_code_stats_(false),
+        downstream_1xx_headers_encoded_(false), downstream_response_started_(false),
+        downstream_end_stream_(false), is_retry_(false), request_buffer_overflowed_(false),
+        streaming_shadows_(
+            Runtime::runtimeFeatureEnabled("envoy.reloadable_features.streaming_shadow")) {}
 
   ~Filter() override;
 
@@ -624,19 +626,14 @@ private:
   RouteStatsContextOptRef route_stats_context_;
   Event::TimerPtr response_timeout_;
   FilterUtility::TimeoutData timeout_;
-  FilterUtility::HedgingParams hedging_params_;
-  Http::Code timeout_response_code_ = Http::Code::GatewayTimeout;
   std::list<UpstreamRequestPtr> upstream_requests_;
   FilterStats stats_;
   // Tracks which upstream request "wins" and will have the corresponding
   // response forwarded downstream
   UpstreamRequest* final_upstream_request_ = nullptr;
-  bool grpc_request_{};
-  bool exclude_http_code_stats_ = false;
   Http::RequestHeaderMap* downstream_headers_{};
   Http::RequestTrailerMap* downstream_trailers_{};
   MonotonicTime downstream_request_complete_time_;
-  uint32_t retry_shadow_buffer_limit_{std::numeric_limits<uint32_t>::max()};
   MetadataMatchCriteriaConstPtr metadata_match_;
   std::function<void(Http::ResponseHeaderMap&)> modify_headers_;
   std::vector<std::reference_wrapper<const ShadowPolicy>> active_shadow_policies_{};
@@ -647,6 +644,19 @@ private:
   // list of cookies to add to upstream headers
   std::vector<std::string> downstream_set_cookies_;
 
+  Network::TransportSocketOptionsConstSharedPtr transport_socket_options_;
+  Network::Socket::OptionsSharedPtr upstream_options_;
+  // Set of ongoing shadow streams which have not yet received end stream.
+  absl::flat_hash_set<Http::AsyncClient::OngoingRequest*> shadow_streams_;
+
+  // Keep small members (bools and enums) at the end of class, to reduce alignment overhead.
+  uint32_t retry_shadow_buffer_limit_{std::numeric_limits<uint32_t>::max()};
+  uint32_t attempt_count_{1};
+  uint32_t pending_retries_{0};
+  Http::Code timeout_response_code_ = Http::Code::GatewayTimeout;
+  FilterUtility::HedgingParams hedging_params_;
+  bool grpc_request_ : 1;
+  bool exclude_http_code_stats_ : 1;
   bool downstream_1xx_headers_encoded_ : 1;
   bool downstream_response_started_ : 1;
   bool downstream_end_stream_ : 1;
@@ -654,12 +664,7 @@ private:
   bool include_attempt_count_in_request_ : 1;
   bool include_timeout_retry_header_in_request_ : 1;
   bool request_buffer_overflowed_ : 1;
-  bool conn_pool_new_stream_with_early_data_and_http3_ : 1;
-  uint32_t attempt_count_{1};
-  uint32_t pending_retries_{0};
-
-  Network::TransportSocketOptionsConstSharedPtr transport_socket_options_;
-  Network::Socket::OptionsSharedPtr upstream_options_;
+  const bool streaming_shadows_ : 1;
 };
 
 class ProdFilter : public Filter {

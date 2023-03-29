@@ -1,4 +1,4 @@
-FROM gcr.io/envoy-ci/envoy-build:b0ff77ae3f25b0bf595f9b8bba46b489723ab446
+FROM gcr.io/envoy-ci/envoy-build:321658b6b50abda6869f89fac275f59bf3b1e757
 
 ARG USERNAME=vscode
 ARG USER_UID=501

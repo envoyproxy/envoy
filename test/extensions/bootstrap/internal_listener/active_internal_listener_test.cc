@@ -227,6 +227,11 @@ TEST_F(ActiveInternalListenerTest, DestroyListenerCloseAllConnections) {
   internal_listener_->onAccept(Network::ConnectionSocketPtr{accepted_socket});
 
   EXPECT_CALL(conn_handler_, decNumConnections());
+  EXPECT_CALL(*connection, close(_, _))
+      .WillOnce(Invoke([&connection](Network::ConnectionCloseType, absl::string_view details) {
+        EXPECT_EQ(details, "Active Internal Listener destructor");
+        connection->raiseEvent(Network::ConnectionEvent::LocalClose);
+      }));
   internal_listener_.reset();
 }
 
@@ -307,7 +312,7 @@ public:
     bool continueOnListenerFiltersTimeout() const override {
       return continue_on_listener_filters_timeout_;
     }
-    Stats::Scope& listenerScope() override { return parent_.stats_store_; }
+    Stats::Scope& listenerScope() override { return *parent_.stats_store_.rootScope(); }
     uint64_t listenerTag() const override { return tag_; }
     const std::string& name() const override { return name_; }
     Network::UdpListenerConfigOptRef udpListenerConfig() override { return {}; }

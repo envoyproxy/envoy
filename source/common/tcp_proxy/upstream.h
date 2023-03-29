@@ -15,6 +15,8 @@
 namespace Envoy {
 namespace TcpProxy {
 
+constexpr absl::string_view DisableTunnelingFilterStateKey = "envoy.tcp_proxy.disable_tunneling";
+
 class TcpConnPool : public GenericConnPool, public Tcp::ConnectionPool::Callbacks {
 public:
   TcpConnPool(Upstream::ThreadLocalCluster& thread_local_cluster,
@@ -171,11 +173,12 @@ private:
     // Http::ResponseDecoder
     void decode1xxHeaders(Http::ResponseHeaderMapPtr&&) override {}
     void decodeHeaders(Http::ResponseHeaderMapPtr&& headers, bool end_stream) override {
-      if (!parent_.isValidResponse(*headers) || end_stream) {
+      bool is_valid_response = parent_.isValidResponse(*headers);
+      parent_.config_.propagateResponseHeaders(std::move(headers),
+                                               parent_.downstream_info_.filterState());
+      if (!is_valid_response || end_stream) {
         parent_.resetEncoder(Network::ConnectionEvent::LocalClose);
       } else if (parent_.conn_pool_callbacks_ != nullptr) {
-        parent_.config_.propagateResponseHeaders(std::move(headers),
-                                                 parent_.downstream_info_.filterState());
         parent_.conn_pool_callbacks_->onSuccess(*parent_.request_encoder_);
         parent_.conn_pool_callbacks_.reset();
       }
@@ -186,7 +189,14 @@ private:
         parent_.doneReading();
       }
     }
-    void decodeTrailers(Http::ResponseTrailerMapPtr&&) override {}
+    void decodeTrailers(Http::ResponseTrailerMapPtr&& trailers) override {
+      parent_.config_.propagateResponseTrailers(std::move(trailers),
+                                                parent_.downstream_info_.filterState());
+      if (Runtime::runtimeFeatureEnabled(
+              "envoy.reloadable_features.finish_reading_on_decode_trailers")) {
+        parent_.doneReading();
+      }
+    }
     void decodeMetadata(Http::MetadataMapPtr&&) override {}
     void dumpState(std::ostream& os, int indent_level) const override {
       DUMP_STATE_UNIMPLEMENTED(DecoderShim);

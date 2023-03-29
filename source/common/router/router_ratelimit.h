@@ -157,6 +157,7 @@ private:
   const std::string descriptor_key_;
   const std::string default_value_;
   const envoy::config::route::v3::RateLimit::Action::MetaData::Source source_;
+  const bool skip_if_absent_;
 };
 
 /**

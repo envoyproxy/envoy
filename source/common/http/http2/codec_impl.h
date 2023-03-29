@@ -210,16 +210,19 @@ protected:
     // Http::MultiplexedStreamImplBase
     void destroy() override;
     void onPendingFlushTimer() override;
+    CodecEventCallbacks*
+    registerCodecEventCallbacks(CodecEventCallbacks* codec_callbacks) override {
+      extend_stream_lifetime_flag_ = true;
+      return MultiplexedStreamImplBase::registerCodecEventCallbacks(codec_callbacks);
+    }
 
     StreamImpl* base() { return this; }
-    ssize_t onDataSourceRead(uint64_t length, uint32_t* data_flags);
-    void onDataSourceSend(const uint8_t* framehd, size_t length);
     void resetStreamWorker(StreamResetReason reason);
     static void buildHeaders(std::vector<nghttp2_nv>& final_headers, const HeaderMap& headers);
     static std::vector<http2::adapter::Header> buildHeaders(const HeaderMap& headers);
     void saveHeader(HeaderString&& name, HeaderString&& value);
     void encodeHeadersBase(const HeaderMap& headers, bool end_stream);
-    virtual void submitHeaders(const HeaderMap& headers, nghttp2_data_provider* provider) PURE;
+    virtual void submitHeaders(const HeaderMap& headers, bool end_stream) PURE;
     void encodeTrailersBase(const HeaderMap& headers);
     void submitTrailers(const HeaderMap& trailers);
     // Returns true if the stream should defer the local reset stream until after the next call to
@@ -292,7 +295,6 @@ protected:
     void decodeData();
 
     // Get MetadataEncoder for this stream.
-    MetadataEncoder& getMetadataEncoderOld();
     NewMetadataEncoder& getMetadataEncoder();
     // Get MetadataDecoder for this stream.
     MetadataDecoder& getMetadataDecoder();
@@ -308,6 +310,13 @@ protected:
                           bool skip_encoding_empty_trailers);
     // Called from either process_buffered_data_callback_.
     void processBufferedData();
+
+    // Called when the frame with END_STREAM is sent for this stream.
+    void onEndStreamEncoded() {
+      if (codec_callbacks_) {
+        codec_callbacks_->onCodecEncodeComplete();
+      }
+    }
 
     const StreamInfo::BytesMeterSharedPtr& bytesMeter() override { return bytes_meter_; }
     ConnectionImpl& parent_;
@@ -330,7 +339,6 @@ protected:
     HeaderMapPtr pending_trailers_to_encode_;
     std::unique_ptr<MetadataDecoder> metadata_decoder_;
     std::unique_ptr<NewMetadataEncoder> metadata_encoder_;
-    std::unique_ptr<MetadataEncoder> metadata_encoder_old_;
     absl::optional<StreamResetReason> deferred_reset_;
     // Holds the reset reason for this stream. Useful if we have buffered data
     // to determine whether we should continue processing that data.
@@ -338,12 +346,15 @@ protected:
     HeaderString cookies_;
     bool local_end_stream_sent_ : 1;
     bool remote_end_stream_ : 1;
+    bool remote_rst_ : 1;
     bool data_deferred_ : 1;
     bool received_noninformational_headers_ : 1;
     bool pending_receive_buffer_high_watermark_called_ : 1;
     bool pending_send_buffer_high_watermark_called_ : 1;
     bool reset_due_to_messaging_error_ : 1;
     bool defer_processing_backedup_streams_ : 1;
+    // Latch whether this stream is operating with this flag.
+    bool extend_stream_lifetime_flag_ : 1;
     absl::string_view details_;
 
     /**
@@ -400,6 +411,24 @@ protected:
     void grantPeerAdditionalStreamWindow();
   };
 
+  // Encapsulates the logic for sending DATA frames on a given stream.
+  class StreamDataFrameSource : public http2::adapter::DataFrameSource {
+  public:
+    explicit StreamDataFrameSource(StreamImpl& stream) : stream_(stream) {}
+
+    // Returns a pair of the next payload length, and whether that payload is the end of the data
+    // for this stream.
+    std::pair<int64_t, bool> SelectPayloadLength(size_t max_length) override;
+    // Queues the frame header and a DATA frame payload of the specified length for writing.
+    bool Send(absl::string_view frame_header, size_t payload_length) override;
+    // Whether the codec should send the END_STREAM flag on the final DATA frame.
+    bool send_fin() const override { return send_fin_; }
+
+  private:
+    StreamImpl& stream_;
+    bool send_fin_ = true;
+  };
+
   using StreamImplPtr = std::unique_ptr<StreamImpl>;
 
   /**
@@ -415,8 +444,12 @@ protected:
     // Client streams do not need a flush timer because we currently assume that any failure
     // to flush would be covered by a request/stream/etc. timeout.
     void setFlushTimeout(std::chrono::milliseconds /*timeout*/) override {}
+    CodecEventCallbacks* registerCodecEventCallbacks(CodecEventCallbacks*) override {
+      ENVOY_BUG(false, "CodecEventCallbacks for HTTP2 client stream unimplemented.");
+      return nullptr;
+    }
     // StreamImpl
-    void submitHeaders(const HeaderMap& headers, nghttp2_data_provider* provider) override;
+    void submitHeaders(const HeaderMap& headers, bool end_stream) override;
     // Do not use deferred reset on upstream connections.
     bool useDeferredReset() const override { return false; }
     StreamDecoder& decoder() override { return response_decoder_; }
@@ -468,7 +501,7 @@ protected:
 
     // StreamImpl
     void destroy() override;
-    void submitHeaders(const HeaderMap& headers, nghttp2_data_provider* provider) override;
+    void submitHeaders(const HeaderMap& headers, bool end_stream) override;
     // Enable deferred reset on downstream connections so outbound HTTP internal error replies are
     // written out before force resetting the stream, assuming there is enough H2 connection flow
     // control window is available.
@@ -477,8 +510,8 @@ protected:
     void decodeHeaders() override;
     void decodeTrailers() override;
     HeaderMap& headers() override {
-      if (absl::holds_alternative<RequestHeaderMapPtr>(headers_or_trailers_)) {
-        return *absl::get<RequestHeaderMapPtr>(headers_or_trailers_);
+      if (absl::holds_alternative<RequestHeaderMapSharedPtr>(headers_or_trailers_)) {
+        return *absl::get<RequestHeaderMapSharedPtr>(headers_or_trailers_);
       } else {
         return *absl::get<RequestTrailerMapPtr>(headers_or_trailers_);
       }
@@ -498,11 +531,15 @@ protected:
       encodeTrailersBase(trailers);
     }
     void setRequestDecoder(Http::RequestDecoder& decoder) override { request_decoder_ = &decoder; }
+    void setDeferredLoggingHeadersAndTrailers(Http::RequestHeaderMapConstSharedPtr,
+                                              Http::ResponseHeaderMapConstSharedPtr,
+                                              Http::ResponseTrailerMapConstSharedPtr,
+                                              StreamInfo::StreamInfo&) override {}
 
     // ScopeTrackedObject
     void dumpState(std::ostream& os, int indent_level) const override;
 
-    absl::variant<RequestHeaderMapPtr, RequestTrailerMapPtr> headers_or_trailers_;
+    absl::variant<RequestHeaderMapSharedPtr, RequestTrailerMapPtr> headers_or_trailers_;
 
     bool streamErrorOnInvalidHttpMessage() const override {
       return parent_.stream_error_on_invalid_http_messaging_;
@@ -519,9 +556,10 @@ protected:
   // edge cases (such as for METADATA frames) where nghttp2 will issue a callback for a stream_id
   // that is not associated with an existing stream.
   const StreamImpl* getStream(int32_t stream_id) const;
-  // Same as getStream, but without the ASSERT.
-  StreamImpl* getStreamUnchecked(int32_t stream_id);
   StreamImpl* getStream(int32_t stream_id);
+  // Same as getStream, but without the ASSERT.
+  const StreamImpl* getStreamUnchecked(int32_t stream_id) const;
+  StreamImpl* getStreamUnchecked(int32_t stream_id);
   int saveHeader(const nghttp2_frame* frame, HeaderString&& name, HeaderString&& value);
 
   /**
@@ -570,10 +608,10 @@ protected:
   }
 
   /**
-   * Save `status` into nghttp2_callback_status_.
-   * Return nghttp2 callback return code corresponding to `status`.
+   * Save `status` into codec_callback_status_.
+   * Return codec callback return code corresponding to `status`.
    */
-  int setAndCheckNghttp2CallbackStatus(Status&& status);
+  int setAndCheckCodecCallbackStatus(Status&& status);
 
   /**
    * Callback for terminating connection when protocol constrain has been violated
@@ -608,9 +646,9 @@ protected:
 
   // Status for any errors encountered by the nghttp2 callbacks.
   // nghttp2 library uses single return code to indicate callback failure and
-  // `nghttp2_callback_status_` is used to save right error information returned by a callback. The
-  // `nghttp2_callback_status_` is valid iff nghttp call returned NGHTTP2_ERR_CALLBACK_FAILURE.
-  Status nghttp2_callback_status_;
+  // `codec_callback_status_` is used to save right error information returned by a callback. The
+  // `codec_callback_status_` is valid iff nghttp call returned NGHTTP2_ERR_CALLBACK_FAILURE.
+  Status codec_callback_status_;
 
   // Set if the type of frame that is about to be sent is PING or SETTINGS with the ACK flag set, or
   // RST_STREAM.
@@ -646,10 +684,11 @@ private:
   virtual ConnectionCallbacks& callbacks() PURE;
   virtual Status onBeginHeaders(const nghttp2_frame* frame) PURE;
   int onData(int32_t stream_id, const uint8_t* data, size_t len);
-  Status onBeforeFrameReceived(const nghttp2_frame_hd* hd);
+  Status onBeforeFrameReceived(int32_t stream_id, size_t length, uint8_t type, uint8_t flags);
   Status onFrameReceived(const nghttp2_frame* frame);
-  int onBeforeFrameSend(const nghttp2_frame* frame);
-  int onFrameSend(const nghttp2_frame* frame);
+  int onBeforeFrameSend(int32_t stream_id, size_t length, uint8_t type, uint8_t flags);
+  int onFrameSend(int32_t stream_id, size_t length, uint8_t type, uint8_t flags,
+                  uint32_t error_code);
   int onError(absl::string_view error);
   virtual int onHeader(const nghttp2_frame* frame, HeaderString&& name, HeaderString&& value) PURE;
   int onInvalidFrame(int32_t stream_id, int error_code);
@@ -663,7 +702,8 @@ private:
 
   // Adds buffer fragment for a new outbound frame to the supplied Buffer::OwnedImpl.
   void addOutboundFrameFragment(Buffer::OwnedImpl& output, const uint8_t* data, size_t length);
-  virtual Status trackInboundFrames(const nghttp2_frame_hd* hd, uint32_t padding_length) PURE;
+  virtual Status trackInboundFrames(int32_t stream_id, size_t length, uint8_t type, uint8_t flags,
+                                    uint32_t padding_length) PURE;
   void onKeepaliveResponse();
   void onKeepaliveResponseTimeout();
   bool slowContainsStreamId(int32_t stream_id) const;
@@ -678,7 +718,6 @@ private:
   std::map<int32_t, StreamImpl*> pending_deferred_reset_streams_;
   bool dispatching_ : 1;
   bool raised_goaway_ : 1;
-  const bool delay_keepalive_timeout_ : 1;
   Event::SchedulableCallbackPtr protocol_constraint_violation_callback_;
   Random::RandomGenerator& random_;
   MonotonicTime last_received_data_time_{};
@@ -710,7 +749,8 @@ private:
   ConnectionCallbacks& callbacks() override { return callbacks_; }
   Status onBeginHeaders(const nghttp2_frame* frame) override;
   int onHeader(const nghttp2_frame* frame, HeaderString&& name, HeaderString&& value) override;
-  Status trackInboundFrames(const nghttp2_frame_hd*, uint32_t) override;
+  Status trackInboundFrames(int32_t stream_id, size_t length, uint8_t type, uint8_t flags,
+                            uint32_t) override;
   void dumpStreams(std::ostream& os, int indent_level) const override;
   StreamResetReason getMessagingErrorResetReason() const override;
   Http::ConnectionCallbacks& callbacks_;
@@ -735,7 +775,8 @@ private:
   ConnectionCallbacks& callbacks() override { return callbacks_; }
   Status onBeginHeaders(const nghttp2_frame* frame) override;
   int onHeader(const nghttp2_frame* frame, HeaderString&& name, HeaderString&& value) override;
-  Status trackInboundFrames(const nghttp2_frame_hd* hd, uint32_t padding_length) override;
+  Status trackInboundFrames(int32_t stream_id, size_t length, uint8_t type, uint8_t flags,
+                            uint32_t padding_length) override;
   absl::optional<int> checkHeaderNameForUnderscores(absl::string_view header_name) override;
   StreamResetReason getMessagingErrorResetReason() const override {
     return StreamResetReason::LocalReset;

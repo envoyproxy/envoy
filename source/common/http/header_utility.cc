@@ -12,6 +12,8 @@
 
 #include "absl/strings/match.h"
 #include "nghttp2/nghttp2.h"
+#include "quiche/common/structured_headers.h"
+#include "quiche/http2/adapter/header_validator.h"
 
 namespace Envoy {
 namespace Http {
@@ -190,8 +192,8 @@ bool HeaderUtility::schemeIsValid(const absl::string_view scheme) {
 }
 
 bool HeaderUtility::headerValueIsValid(const absl::string_view header_value) {
-  return nghttp2_check_header_value(reinterpret_cast<const uint8_t*>(header_value.data()),
-                                    header_value.size()) != 0;
+  return http2::adapter::HeaderValidator::IsValidHeaderValue(header_value,
+                                                             http2::adapter::ObsTextOption::kAllow);
 }
 
 bool HeaderUtility::headerNameContainsUnderscore(const absl::string_view header_name) {
@@ -199,8 +201,13 @@ bool HeaderUtility::headerNameContainsUnderscore(const absl::string_view header_
 }
 
 bool HeaderUtility::authorityIsValid(const absl::string_view header_value) {
-  return nghttp2_check_authority(reinterpret_cast<const uint8_t*>(header_value.data()),
-                                 header_value.size()) != 0;
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.http2_validate_authority_with_quiche")) {
+    return http2::adapter::HeaderValidator::IsValidAuthority(header_value);
+  } else {
+    return nghttp2_check_authority(reinterpret_cast<const uint8_t*>(header_value.data()),
+                                   header_value.size()) != 0;
+  }
 }
 
 bool HeaderUtility::isSpecial1xx(const ResponseHeaderMap& response_headers) {
@@ -218,6 +225,23 @@ bool HeaderUtility::isConnectResponse(const RequestHeaderMap* request_headers,
          static_cast<Http::Code>(Http::Utility::getResponseStatus(response_headers)) ==
              Http::Code::OK;
 }
+
+#ifdef ENVOY_ENABLE_HTTP_DATAGRAMS
+bool HeaderUtility::isCapsuleProtocol(const RequestOrResponseHeaderMap& headers) {
+  Http::HeaderMap::GetResult capsule_protocol =
+      headers.get(Envoy::Http::LowerCaseString("Capsule-Protocol"));
+  // When there are multiple Capsule-Protocol header entries, it returns false. RFC 9297 specifies
+  // that non-boolean value types must be ignored. If there are multiple header entries, the value
+  // type becomes a List so the header field must be ignored.
+  if (capsule_protocol.size() != 1) {
+    return false;
+  }
+  // Parses the header value and extracts the boolean value ignoring parameters.
+  absl::optional<quiche::structured_headers::ParameterizedItem> header_item =
+      quiche::structured_headers::ParseItem(capsule_protocol[0]->value().getStringView());
+  return header_item && header_item->item.is_boolean() && header_item->item.GetBoolean();
+}
+#endif
 
 bool HeaderUtility::requestShouldHaveNoBody(const RequestHeaderMap& headers) {
   return (headers.Method() &&
@@ -470,6 +494,16 @@ std::string HeaderUtility::addEncodingToAcceptEncoding(absl::string_view accept_
   // Finally add a single instance of our content encoding.
   newContentEncodings.push_back(encoding);
   return absl::StrJoin(newContentEncodings, ",");
+}
+
+bool HeaderUtility::isStandardConnectRequest(const Http::RequestHeaderMap& headers) {
+  return headers.method() == Http::Headers::get().MethodValues.Connect &&
+         headers.getProtocolValue().empty();
+}
+
+bool HeaderUtility::isExtendedH2ConnectRequest(const Http::RequestHeaderMap& headers) {
+  return headers.method() == Http::Headers::get().MethodValues.Connect &&
+         !headers.getProtocolValue().empty();
 }
 
 } // namespace Http

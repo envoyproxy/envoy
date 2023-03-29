@@ -7,6 +7,7 @@
 #include <memory>
 #include <string>
 
+#include "envoy/common/optref.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/stats/scope.h"
@@ -32,13 +33,10 @@ public:
       LoadBalancerType lb_type, PrioritySet& priority_set, const PrioritySet* local_priority_set,
       ClusterLbStats& stats, Stats::Scope& scope, Runtime::Loader& runtime,
       Random::RandomGenerator& random, const LoadBalancerSubsetInfo& subsets,
-      const absl::optional<envoy::config::cluster::v3::Cluster::RingHashLbConfig>&
-          lb_ring_hash_config,
-      const absl::optional<envoy::config::cluster::v3::Cluster::MaglevLbConfig>& lb_maglev_config,
-      const absl::optional<envoy::config::cluster::v3::Cluster::RoundRobinLbConfig>&
-          round_robin_config,
-      const absl::optional<envoy::config::cluster::v3::Cluster::LeastRequestLbConfig>&
-          least_request_config,
+      OptRef<const envoy::config::cluster::v3::Cluster::RingHashLbConfig> lb_ring_hash_config,
+      OptRef<const envoy::config::cluster::v3::Cluster::MaglevLbConfig> lb_maglev_config,
+      OptRef<const envoy::config::cluster::v3::Cluster::RoundRobinLbConfig> round_robin_config,
+      OptRef<const envoy::config::cluster::v3::Cluster::LeastRequestLbConfig> least_request_config,
       const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config,
       TimeSource& time_source);
   ~SubsetLoadBalancer() override;
@@ -358,11 +356,42 @@ private:
   const ProtobufWkt::Value* getMetadataFallbackList(LoadBalancerContext* context) const;
   LoadBalancerContextWrapper removeMetadataFallbackList(LoadBalancerContext* context);
 
-  const LoadBalancerType lb_type_;
-  const absl::optional<envoy::config::cluster::v3::Cluster::RingHashLbConfig> lb_ring_hash_config_;
-  const absl::optional<envoy::config::cluster::v3::Cluster::MaglevLbConfig> lb_maglev_config_;
-  const absl::optional<envoy::config::cluster::v3::Cluster::RoundRobinLbConfig> round_robin_config_;
-  const absl::optional<envoy::config::cluster::v3::Cluster::LeastRequestLbConfig>
+  OptRef<const envoy::config::cluster::v3::Cluster::RoundRobinLbConfig> lbRoundRobinConfig() const {
+    if (round_robin_config_ != nullptr) {
+      return *round_robin_config_;
+    }
+    return absl::nullopt;
+  }
+
+  OptRef<const envoy::config::cluster::v3::Cluster::LeastRequestLbConfig>
+  lbLeastRequestConfig() const {
+    if (least_request_config_ != nullptr) {
+      return *least_request_config_;
+    }
+    return absl::nullopt;
+  }
+
+  OptRef<const envoy::config::cluster::v3::Cluster::MaglevLbConfig> lbMaglevConfig() const {
+    if (lb_maglev_config_ != nullptr) {
+      return *lb_maglev_config_;
+    }
+    return absl::nullopt;
+  }
+
+  OptRef<const envoy::config::cluster::v3::Cluster::RingHashLbConfig> lbRingHashConfig() const {
+    if (lb_ring_hash_config_ != nullptr) {
+      return *lb_ring_hash_config_;
+    }
+    return absl::nullopt;
+  }
+
+  const std::unique_ptr<const envoy::config::cluster::v3::Cluster::RingHashLbConfig>
+      lb_ring_hash_config_;
+  const std::unique_ptr<const envoy::config::cluster::v3::Cluster::MaglevLbConfig>
+      lb_maglev_config_;
+  const std::unique_ptr<const envoy::config::cluster::v3::Cluster::RoundRobinLbConfig>
+      round_robin_config_;
+  const std::unique_ptr<const envoy::config::cluster::v3::Cluster::LeastRequestLbConfig>
       least_request_config_;
   const envoy::config::cluster::v3::Cluster::CommonLbConfig common_config_;
   ClusterLbStats& stats_;
@@ -396,13 +425,15 @@ private:
 
   Stats::Gauge* single_duplicate_stat_{};
 
-  const bool locality_weight_aware_;
-  const bool scale_locality_weight_;
-  const bool list_as_any_;
-
   TimeSource& time_source_;
 
-  friend class SubsetLoadBalancerDescribeMetadataTester;
+  // Keep small members (bools and enums) at the end of class, to reduce alignment overhead.
+  const LoadBalancerType lb_type_;
+  const bool locality_weight_aware_ : 1;
+  const bool scale_locality_weight_ : 1;
+  const bool list_as_any_ : 1;
+
+  friend class SubsetLoadBalancerInternalStateTester;
 };
 
 } // namespace Upstream

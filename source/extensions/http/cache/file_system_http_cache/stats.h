@@ -19,17 +19,44 @@ namespace FileSystemHttpCache {
  *
  * Drift will eventually be reconciled at the next pre-cache-purge measurement.
  **/
-#define ALL_CACHE_STATS(GAUGE)                                                                     \
+
+#define ALL_CACHE_STATS(COUNTER, GAUGE, HISTOGRAM, TEXT_READOUT, STATNAME)                         \
+  COUNTER(eviction_runs)                                                                           \
   GAUGE(size_bytes, NeverImport)                                                                   \
   GAUGE(size_count, NeverImport)                                                                   \
   GAUGE(size_limit_bytes, NeverImport)                                                             \
-  GAUGE(size_limit_count, NeverImport)
+  GAUGE(size_limit_count, NeverImport)                                                             \
+  STATNAME(cache)                                                                                  \
+  STATNAME(cache_path)
+// TODO(ravenblack): Add other stats from DESIGN.md
+
+#define COUNTER_HELPER_(NAME)                                                                      \
+  , NAME##_(                                                                                       \
+        Envoy::Stats::Utility::counterFromStatNames(scope, {prefix_, stat_names.NAME##_}, tags_))
+#define GAUGE_HELPER_(NAME, MODE)                                                                  \
+  , NAME##_(Envoy::Stats::Utility::gaugeFromStatNames(                                             \
+        scope, {prefix_, stat_names.NAME##_}, Envoy::Stats::Gauge::ImportMode::MODE, tags_))
+#define STATNAME_HELPER_(NAME)
+
+MAKE_STAT_NAMES_STRUCT(CacheStatNames, ALL_CACHE_STATS);
 
 struct CacheStats {
-  ALL_CACHE_STATS(GENERATE_GAUGE_STRUCT)
+  CacheStats(const CacheStatNames& stat_names, Envoy::Stats::Scope& scope,
+             Stats::StatName cache_path)
+      : stat_names_(stat_names), prefix_(stat_names_.cache_), cache_path_(cache_path),
+        tags_({{stat_names_.cache_path_, cache_path_}})
+            ALL_CACHE_STATS(COUNTER_HELPER_, GAUGE_HELPER_, HISTOGRAM_HELPER_, TEXT_READOUT_HELPER_,
+                            STATNAME_HELPER_) {}
+  const CacheStatNames& stat_names_;
+  const Stats::StatName prefix_;
+  const Stats::StatName cache_path_;
+  Stats::StatNameTagVector tags_;
+  ALL_CACHE_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT, GENERATE_HISTOGRAM_STRUCT,
+                  GENERATE_TEXT_READOUT_STRUCT, GENERATE_STATNAME_STRUCT)
 };
 
-CacheStats generateStats(Stats::Scope& scope, absl::string_view cache_path);
+CacheStats generateStats(CacheStatNames& stat_names, Stats::Scope& scope,
+                         absl::string_view cache_path);
 
 } // namespace FileSystemHttpCache
 } // namespace Cache
