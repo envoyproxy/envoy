@@ -303,8 +303,10 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
     Config::ConfigProviderManager& scoped_routes_config_provider_manager,
     Tracing::TracerManager& tracer_manager,
     FilterConfigProviderManager& filter_config_provider_manager)
-    : context_(context), flush_access_log_on_new_request_(config.has_access_log_options() ?
-          config.access_log_options().flush_access_log_on_new_request() : false),
+    : context_(context), flush_access_log_on_new_request_(
+                             config.has_access_log_options()
+                                 ? config.access_log_options().flush_access_log_on_new_request()
+                                 : false),
       stats_prefix_(fmt::format("http.{}.", config.stat_prefix())),
       stats_(Http::ConnectionManagerImpl::generateStats(stats_prefix_, context_.scope())),
       tracing_stats_(

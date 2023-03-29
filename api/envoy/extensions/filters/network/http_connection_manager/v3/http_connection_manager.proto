@@ -355,6 +355,23 @@ message HttpConnectionManager {
     }
   }
 
+  message HcmAccessLogOptions {
+    // The interval to flush the above access logs. By default, the HCM will flush exactly one access log
+    // on stream close, when the HTTP request is complete. If this field is set, the HCM will flush access
+    // logs periodically at the specified interval. This is especially useful in the case of long-lived
+    // requests, such as CONNECT and Websockets. Final access logs can be detected via the
+    // `requestComplete()` method of `StreamInfo` in access log filters, or thru the `%DURATION%` substitution
+    // string.
+    // The interval must be at least 1 millisecond.
+    google.protobuf.Duration access_log_flush_interval = 1
+        [(validate.rules).duration = {gte {nanos: 1000000}}];
+
+    // If set to true, HCM will flush an access log once when a new HTTP request is received, after request
+    // headers have been evaluated, before iterating through the HTTP filter chain.
+    // Details related to upstream cluster, such as upstream host, will not be available for this log.
+    bool flush_access_log_on_new_request = 2;
+  }
+
   reserved 27, 11;
 
   reserved "idle_timeout";
@@ -542,23 +559,6 @@ message HttpConnectionManager {
   // Configuration for :ref:`HTTP access logs <arch_overview_access_logs>`
   // emitted by the connection manager.
   repeated config.accesslog.v3.AccessLog access_log = 13;
-
-  message HcmAccessLogOptions {
-    // The interval to flush the above access logs. By default, the HCM will flush exactly one access log
-    // on stream close, when the HTTP request is complete. If this field is set, the HCM will flush access
-    // logs periodically at the specified interval. This is especially useful in the case of long-lived
-    // requests, such as CONNECT and Websockets. Final access logs can be detected via the
-    // `requestComplete()` method of `StreamInfo` in access log filters, or thru the `%DURATION%` substitution
-    // string.
-    // The interval must be at least 1 millisecond.
-    google.protobuf.Duration access_log_flush_interval = 1
-        [(validate.rules).duration = {gte {nanos: 1000000}}];
-
-    // If set to true, HCM will flush an access log once when a new HTTP request is received, after request
-    // headers have been evaluated, before iterating through the HTTP filter chain.
-    // Details related to upstream cluster, such as upstream host, will not be available for this log.
-    bool flush_access_log_on_new_request = 2;
-  }
 
   // Additional access log options for HTTP connection manager.
   HcmAccessLogOptions access_log_options = 54;
