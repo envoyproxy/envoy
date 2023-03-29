@@ -66,16 +66,10 @@ message Geoip {
 
   message GeolocationProvider {
     // The name of the geoip driver to instantiate. The name must match a
-    // supported geoip driver. Built-in drivers:
-    //
-    // - *envoy.extensions.geoip_providers.maxmind*
+    // supported geoip driver.
     string name = 1 [(validate.rules).string = {min_bytes: 1}];
 
     // Geoip driver specific configuration which depends on the driver being instantiated.
-    // See the geoip drivers for examples:
-    //
-    // - :ref:`MaxMindConfig <envoy_api_msg_config.geoip.v3.MaxMindConfig>`
-    // [#extension-category: envoy.geoip_providers]
     oneof config_type {
       google.protobuf.Any typed_config = 3;
     }
