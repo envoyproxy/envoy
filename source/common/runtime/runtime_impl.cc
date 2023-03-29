@@ -233,10 +233,53 @@ SnapshotImpl::Entry SnapshotImpl::createEntry(const std::string& value) {
   return entry;
 }
 
+void parseFractionValue(SnapshotImpl::Entry& entry, const ProtobufWkt::Struct& value) {
+  envoy::type::v3::FractionalPercent percent;
+  percent.set_denominator(envoy::type::v3::FractionalPercent::HUNDRED);
+  for (const auto& f : value.fields()) {
+    if (f.first == "numerator") {
+      if (f.second.has_number_value()) {
+        percent.set_numerator(f.second.number_value());
+      }
+    } else if (f.first == "denominator" && f.second.has_string_value()) {
+      if (f.second.string_value() == "HUNDRED") {
+        percent.set_denominator(envoy::type::v3::FractionalPercent::HUNDRED);
+      } else if (f.second.string_value() == "TEN_THOUSAND") {
+        percent.set_denominator(envoy::type::v3::FractionalPercent::TEN_THOUSAND);
+      } else if (f.second.string_value() == "MILLION") {
+        percent.set_denominator(envoy::type::v3::FractionalPercent::MILLION);
+      } else {
+        return;
+      }
+    } else {
+      return;
+    }
+  }
+
+  entry.fractional_percent_value_ = percent;
+}
+
 SnapshotImpl::Entry SnapshotImpl::createEntry(const ProtobufWkt::Value& value) {
-  // This isn't the smartest way to do it; we're round-tripping via YAML, this should be optimized
-  // if runtime parsing becomes performance sensitive.
-  return createEntry(MessageUtil::getYamlStringFromMessage(value, false, false));
+  Entry entry;
+  switch (value.kind_case()) {
+  case ProtobufWkt::Value::kNumberValue:
+    entry.double_value_ = value.number_value();
+    entry.bool_value_ = value.number_value() != 0;
+    if (entry.double_value_ >= 0 && entry.double_value_ <= std::numeric_limits<uint64_t>::max()) {
+      entry.uint_value_ = entry.double_value_;
+    }
+    break;
+  case ProtobufWkt::Value::kBoolValue:
+    entry.bool_value_ = value.bool_value();
+    return entry;
+  case ProtobufWkt::Value::kStructValue:
+    parseFractionValue(entry, value.struct_value());
+    break;
+  default:
+    break;
+  }
+
+  return entry;
 }
 
 bool SnapshotImpl::parseEntryBooleanValue(Entry& entry) {
