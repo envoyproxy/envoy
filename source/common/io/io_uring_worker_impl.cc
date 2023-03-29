@@ -406,7 +406,7 @@ void IoUringServerSocket::close() {
     return;
   }
 
-  if (cancel_req_ == nullptr) {
+  if (cancel_req_ == nullptr && read_req_ != nullptr) {
     ENVOY_LOG(trace, "cancel the read request, fd = {}", fd_);
     cancel_req_ = parent_.submitCancelRequest(*this, read_req_);
   }
