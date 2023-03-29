@@ -46,3 +46,33 @@
   font-size: medium;
   color: #c00;
 }
+
+.histogram-graphics {
+  display: flex;
+  align-items: flex-start;
+  justify-content: stretch;
+  background-color: #ccc;
+  height: 40px;
+}
+
+.histogram-labels {
+  display: flex;
+  align-items: flex-start;
+  justify-content: stretch;
+  background-color: #ddd;
+}
+
+.histogram-graphics span {
+    margin-right: 10px;
+    width: 60px;
+    background-color: #f55;
+    align-self: baseline;
+}
+
+.histogram-labels span {
+    margin-right: 10px;
+    width: 60px;
+    align-self: baseline;
+    font-family: sans-serif;
+    font-size: 12px;
+}

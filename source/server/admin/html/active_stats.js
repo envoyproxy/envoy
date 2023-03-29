@@ -29,6 +29,11 @@ const nameStatsMap = new Map();
 let activeStatsPreElement = null;
 
 /**
+ * A table into which we render histograms.
+ */
+let activeStatsHistogramsDiv = null;
+
+/**
  * A small div for displaying status and error messages.
  */
 let statusDiv = null;
@@ -65,8 +70,13 @@ function initHook() {
   statusDiv.className = 'error-status-line';
   activeStatsPreElement = document.createElement('pre');
   activeStatsPreElement.id = 'active-content-pre';
+  const table = document.createElement('table');
+  table.classList.add('histogram-body', 'histogram-column');
+  activeStatsHistogramsDiv = document.createElement('div');
+  //activeStatsHistogramsTable.id = 'active-content-histograms-table';
   document.body.appendChild(statusDiv);
   document.body.appendChild(activeStatsPreElement);
+  document.body.appendChild(activeStatsHistogramsDiv);
   loadStats();
 }
 
@@ -149,7 +159,8 @@ function renderStats(data) {
   sortedStats = [];
   for (stat of data.stats) {
     if (!stat.name) {
-      continue; // Skip histograms for now.
+      renderHistograms(stat.histograms);
+      continue;
     }
     let statRecord = nameStatsMap.get(stat.name);
     if (statRecord) {
@@ -191,6 +202,45 @@ function renderStats(data) {
   }
 
   statusDiv.textContent = '';
+}
+
+function renderHistograms(histograms) {
+  if (stat.histograms) {
+    activeStatsHistogramsDiv.replaceChildren();
+    for (histogram of stat.histograms) {
+      const div = document.createElement('div');
+
+      const label = document.createElement('div');
+      label.textContent = histogram.name;
+      div.appendChild(label);
+
+      let maxValue = 0;
+      for (bucket of histogram.buckets) {
+        maxValue = Math.max(maxValue, bucket.cumulative);
+      }
+
+      const graphics = document.createElement('div');
+      graphics.className = 'histogram-graphics';
+      for (bucket of histogram.buckets) {
+        const span = document.createElement('span');
+        const percent = maxValue == 0 ? 0 : Math.round((100 * bucket.cumulative) / maxValue);
+        span.style.height = '' + percent + '%';
+        graphics.appendChild(span);
+      }
+      div.appendChild(graphics);
+
+      const labels = document.createElement('div');
+      labels.className = 'histogram-labels';
+      for (bucket of histogram.buckets) {
+        const span = document.createElement('span');
+        span.textContent = bucket.upper_bound + ':' + bucket.cumulative;
+        labels.appendChild(span);
+      }
+      div.appendChild(labels);
+
+      activeStatsHistogramsDiv.appendChild(div);
+    }
+  }
 }
 
 // We don't want to trigger any DOM manipulations until the DOM is fully loaded.
