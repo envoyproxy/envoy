@@ -801,9 +801,13 @@ void EventLoggerImpl::logEject(const HostDescriptionConstSharedPtr& host, Detect
     event.mutable_eject_consecutive_event();
   }
 
-  const auto json =
-      MessageUtil::getJsonStringFromMessageOrError(event, /* pretty_print */ false,
-                                                   /* always_print_primitive_fields */ true);
+  std::string json;
+#ifdef ENVOY_ENABLE_YAML
+  json = MessageUtil::getJsonStringFromMessageOrError(event, /* pretty_print */ false,
+                                                      /* always_print_primitive_fields */ true);
+#else
+  IS_ENVOY_BUG("attempting outlier logging with JSON support removed");
+#endif
   file_->write(fmt::format("{}\n", json));
 }
 
@@ -815,9 +819,13 @@ void EventLoggerImpl::logUneject(const HostDescriptionConstSharedPtr& host) {
 
   event.set_action(envoy::data::cluster::v3::UNEJECT);
 
-  const auto json =
-      MessageUtil::getJsonStringFromMessageOrError(event, /* pretty_print */ false,
-                                                   /* always_print_primitive_fields */ true);
+  std::string json;
+#ifdef ENVOY_ENABLE_YAML
+  json = MessageUtil::getJsonStringFromMessageOrError(event, /* pretty_print */ false,
+                                                      /* always_print_primitive_fields */ true);
+#else
+  IS_ENVOY_BUG("attempting outlier logging with JSON support removed");
+#endif
   file_->write(fmt::format("{}\n", json));
 }
 
