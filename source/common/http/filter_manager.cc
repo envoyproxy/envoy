@@ -804,8 +804,12 @@ void FilterManager::decodeMetadata(ActiveStreamDecoderFilter* filter, MetadataMa
                      (*entry)->filter_context_.config_name, static_cast<uint64_t>(status),
                      metadata_map);
 
+    // If the decoder filter chain has been aborted, then either:
+    // 1. This filter has sent a local reply from decode metadata.
+    // 2. This filter is the Router filter, and and upstream filter has sent a local reply.
     ASSERT(state_.decoder_filter_chain_aborted_ ==
-           (status == FilterMetadataStatus::StopIterationForLocalReply));
+           ((status == FilterMetadataStatus::StopIterationForLocalReply) ||
+            (std::next(entry) == decoder_filters_.end())));
     if (state_.decoder_filter_chain_aborted_) {
       executeLocalReplyIfPrepared();
       ENVOY_STREAM_LOG(trace,

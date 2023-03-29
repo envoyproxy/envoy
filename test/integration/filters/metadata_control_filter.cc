@@ -58,5 +58,8 @@ constexpr char MetadataControlFilter::name[];
 static Registry::RegisterFactory<SimpleFilterConfig<MetadataControlFilter>,
                                  Server::Configuration::NamedHttpFilterConfigFactory>
     register_;
+static Registry::RegisterFactory<SimpleFilterConfig<MetadataControlFilter>,
+                                 Server::Configuration::UpstreamHttpFilterConfigFactory>
+    register_upstream_;
 
 } // namespace Envoy
