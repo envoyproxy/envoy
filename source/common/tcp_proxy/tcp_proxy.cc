@@ -822,18 +822,16 @@ void Filter::onMaxDownstreamConnectionDuration() {
 }
 
 void Filter::onAccessLogFlushInterval() {
-  if (!getStreamInfo().streamState()) {
-    return;
+  if (!getStreamInfo().streamState() ||
+      getStreamInfo().streamState() != StreamInfo::StreamState::Ended) {
+    resetAccessLogFlushTimer();
   }
 
-  if (getStreamInfo().streamState() == StreamInfo::StreamState::InProgress) {
+  if (getStreamInfo().streamState() &&
+      getStreamInfo().streamState() == StreamInfo::StreamState::InProgress) {
     for (const auto& access_log : config_->accessLogs()) {
       access_log->log(nullptr, nullptr, nullptr, getStreamInfo());
     }
-  }
-
-  if (getStreamInfo().streamState() != StreamInfo::StreamState::Ended) {
-    resetAccessLogFlushTimer();
   }
 }
 
