@@ -292,7 +292,8 @@ struct ExtensionConfigDiscoveryStats {
  */
 class FilterConfigSubscription
     : Config::SubscriptionBase<envoy::config::core::v3::TypedExtensionConfig>,
-      Logger::Loggable<Logger::Id::filter> {
+      Logger::Loggable<Logger::Id::filter>,
+      public std::enable_shared_from_this<FilterConfigSubscription> {
 public:
   FilterConfigSubscription(const envoy::config::core::v3::ConfigSource& config_source,
                            const std::string& filter_config_name,
@@ -305,15 +306,29 @@ public:
 
   const Init::SharedTargetImpl& initTarget() { return init_target_; }
   const std::string& name() { return filter_config_name_; }
-  const Protobuf::Message* lastConfig() { return last_config_.get(); }
-  const std::string& lastTypeUrl() { return last_type_url_; }
-  const std::string& lastVersionInfo() { return last_version_info_; }
-  const std::string& lastFactoryName() { return last_factory_name_; }
-  const SystemTime& lastUpdated() { return last_updated_; }
+  const Protobuf::Message* lastConfig() { return last_->config_.get(); }
+  const std::string& lastTypeUrl() { return last_->type_url_; }
+  const std::string& lastVersionInfo() { return last_->version_info_; }
+  const std::string& lastFactoryName() { return last_->factory_name_; }
+  const SystemTime& lastUpdated() { return last_->updated_; }
 
   void incrementConflictCounter();
 
 private:
+  struct ConfigVersion {
+    ConfigVersion(const std::string& version_info, SystemTime updated)
+        : version_info_(version_info), updated_(updated) {}
+    ProtobufTypes::MessagePtr config_;
+    std::string type_url_;
+    const std::string version_info_;
+    std::string factory_name_;
+    uint64_t config_hash_{0ul};
+    const SystemTime updated_;
+  };
+  // Using a heap allocated record because updates are completed by all workers asynchronously.
+  using ConfigVersionSharedPtr = std::shared_ptr<ConfigVersion>;
+  using ConfigVersionConstSharedPtr = std::shared_ptr<const ConfigVersion>;
+
   void start();
 
   // Config::SubscriptionCallbacks
@@ -324,14 +339,10 @@ private:
                       const std::string&) override;
   void onConfigUpdateFailed(Config::ConfigUpdateFailureReason reason,
                             const EnvoyException*) override;
+  void updateComplete();
 
   const std::string filter_config_name_;
-  uint64_t last_config_hash_{0ul};
-  ProtobufTypes::MessagePtr last_config_;
-  std::string last_type_url_;
-  std::string last_version_info_;
-  std::string last_factory_name_;
-  SystemTime last_updated_;
+  ConfigVersionConstSharedPtr last_;
   Server::Configuration::ServerFactoryContext& factory_context_;
 
   Init::SharedTargetImpl init_target_;
@@ -474,10 +485,11 @@ public:
                            last_filter_in_filter_chain, filter_chain_type, require_type_urls);
     }
 
-    auto provider = createFilterConfigProviderImpl(subscription, require_type_urls, server_context,
-                                                   factory_context, std::move(default_config),
-                                                   last_filter_in_filter_chain, filter_chain_type,
-                                                   provider_stat_prefix, listener_filter_matcher);
+    std::unique_ptr<DynamicFilterConfigProviderImpl<FactoryCb>> provider =
+        std::make_unique<DynamicFilterConfigImpl>(subscription, require_type_urls, server_context,
+                                                  factory_context, std::move(default_config),
+                                                  last_filter_in_filter_chain, filter_chain_type,
+                                                  provider_stat_prefix, listener_filter_matcher);
 
     // Ensure the subscription starts if it has not already.
     if (config_source.apply_default_config_without_warming()) {
@@ -528,19 +540,6 @@ protected:
                     isTerminalFilter(default_factory, *message, server_context),
                     last_filter_in_filter_chain);
     return message;
-  }
-
-private:
-  std::unique_ptr<DynamicFilterConfigProviderImpl<FactoryCb>> createFilterConfigProviderImpl(
-      FilterConfigSubscriptionSharedPtr& subscription,
-      const absl::flat_hash_set<std::string>& require_type_urls,
-      Server::Configuration::ServerFactoryContext& server_context, FactoryCtx& factory_context,
-      ProtobufTypes::MessagePtr&& default_config, bool last_filter_in_filter_chain,
-      const std::string& filter_chain_type, absl::string_view stat_prefix,
-      const Network::ListenerFilterMatcherSharedPtr& listener_filter_matcher) {
-    return std::make_unique<DynamicFilterConfigImpl>(
-        subscription, require_type_urls, server_context, factory_context, std::move(default_config),
-        last_filter_in_filter_chain, filter_chain_type, stat_prefix, listener_filter_matcher);
   }
 };
 

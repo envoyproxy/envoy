@@ -115,7 +115,9 @@ bool DurationFilter::evaluate(const StreamInfo::StreamInfo& info, const Http::Re
                               const Http::ResponseHeaderMap&,
                               const Http::ResponseTrailerMap&) const {
   absl::optional<std::chrono::nanoseconds> final = info.requestComplete();
-  ASSERT(final);
+  if (!final.has_value()) {
+    return false;
+  }
 
   return compareAgainstValue(
       std::chrono::duration_cast<std::chrono::milliseconds>(final.value()).count());

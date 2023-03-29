@@ -135,6 +135,7 @@ public:
          &traffic_stats.bind_errors_, nullptr});
   }
 
+  void initializeReadFilters() override { codec_client_->initializeReadFilters(); }
   absl::optional<Http::Protocol> protocol() const override { return codec_client_->protocol(); }
   void close() override { codec_client_->close(); }
   virtual Http::RequestEncoder& newStreamEncoder(Http::ResponseDecoder& response_decoder) PURE;

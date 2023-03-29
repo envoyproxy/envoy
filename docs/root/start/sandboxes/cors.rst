@@ -39,9 +39,9 @@ Change to the ``examples/cors/frontend`` directory, and start the containers:
 
   $ pwd
   envoy/examples/cors/frontend
-  $ docker-compose pull
-  $ docker-compose up --build -d
-  $ docker-compose ps
+  $ docker compose pull
+  $ docker compose up --build -d
+  $ docker compose ps
 
             Name                          Command              State                    Ports
   -----------------------------------------------------------------------------------------------------------
@@ -54,9 +54,9 @@ Now, switch to the ``backend`` directory in the ``cors`` example, and start the 
 
   $ pwd
   envoy/examples/cors/backend
-  $ docker-compose pull
-  $ docker-compose up --build -d
-  $ docker-compose ps
+  $ docker compose pull
+  $ docker compose up --build -d
+  $ docker compose ps
 
             Name                         Command             State                            Ports
   -----------------------------------------------------------------------------------------------------------------------------------

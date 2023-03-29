@@ -410,8 +410,8 @@ scope_key_builder:
   // Helper function which pushes an update to given RDS subscription, the start(_) of the
   // subscription must have been called.
   void pushRdsConfig(const std::vector<std::string>& route_config_names, const std::string& version,
-                     const std::string& override_config_tmpl = "") {
-    std::string route_config_tmpl = R"EOF(
+                     const fmt::format_string<const std::string&>& override_config_tmpl = "") {
+    constexpr absl::string_view default_route_config_tmpl = R"EOF(
       name: {}
       virtual_hosts:
       - name: test
@@ -420,9 +420,10 @@ scope_key_builder:
         - match: {{ prefix: "/" }}
           route: {{ cluster: bluh }}
 )EOF";
-    if (!override_config_tmpl.empty()) {
-      route_config_tmpl = override_config_tmpl;
-    }
+
+    fmt::format_string<const std::string&> route_config_tmpl =
+        fmt::basic_string_view<char>(override_config_tmpl).size() != 0 ? override_config_tmpl
+                                                                       : default_route_config_tmpl;
     for (const std::string& name : route_config_names) {
       const auto route_config =
           TestUtility::parseYaml<envoy::config::route::v3::RouteConfiguration>(
@@ -498,7 +499,7 @@ key:
   context_init_manager_.initialize(init_watcher_);
   EXPECT_NO_THROW(srds_subscription_->onConfigUpdate(decoded_resources.refvec_, "1"));
 
-  std::string route_config_tmpl = R"EOF(
+  constexpr absl::string_view route_config_tmpl = R"EOF(
       name: {}
       virtual_hosts:
       - name: test
@@ -578,7 +579,7 @@ key:
   context_init_manager_.initialize(init_watcher_);
   EXPECT_NO_THROW(srds_subscription_->onConfigUpdate(decoded_resources.refvec_, "1"));
 
-  std::string route_config_tmpl = R"EOF(
+  constexpr absl::string_view route_config_tmpl = R"EOF(
       name: {}
       virtual_hosts:
       - name: test

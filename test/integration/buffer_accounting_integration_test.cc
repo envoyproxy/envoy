@@ -229,7 +229,9 @@ TEST_P(Http2BufferWatermarksTest, ShouldCreateFourBuffersPerAccount) {
 
   // Check the expected number of buffers per account
   if (streamBufferAccounting()) {
-    EXPECT_TRUE(buffer_factory_->waitUntilExpectedNumberOfAccountsAndBoundBuffers(1, 4));
+    // Wait for a short period less than the request timeout time.
+    EXPECT_TRUE(buffer_factory_->waitUntilExpectedNumberOfAccountsAndBoundBuffers(
+        1, 4, std::chrono::milliseconds(2000)));
   } else {
     EXPECT_TRUE(buffer_factory_->waitUntilExpectedNumberOfAccountsAndBoundBuffers(0, 0));
   }

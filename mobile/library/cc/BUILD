@@ -22,6 +22,7 @@ envoy_cc_library(
     deps = [
         ":envoy_engine_cc_lib_no_stamp",
         "@envoy//source/common/common:assert_lib",
+        "@envoy_mobile//library/common/types:matcher_data_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/metrics/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/compression/brotli/decompressor/v3:pkg_cc_proto",
@@ -76,7 +77,6 @@ envoy_cc_library(
         "stream_client.cc",
         "stream_prototype.cc",
         "string_accessor.cc",
-        "upstream_http_protocol.cc",
     ],
     hdrs = [
         "bridge_utility.h",
@@ -105,7 +105,6 @@ envoy_cc_library(
         "stream_prototype.h",
         "string_accessor.h",
         "trailers.h",
-        "upstream_http_protocol.h",
     ],
     external_deps = ["abseil_optional"],
     repository = "@envoy",

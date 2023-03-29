@@ -317,6 +317,7 @@ private:
     void refreshCachedTracingCustomTags();
     void refreshDurationTimeout();
     void refreshIdleTimeout();
+    void refreshAccessLogFlushTimer();
 
     // All state for the stream. Put here for readability.
     struct State {
@@ -432,6 +433,10 @@ private:
     // Per-stream alive duration. This timer is enabled once when the stream is created and, if
     // triggered, will close the stream.
     Event::TimerPtr max_stream_duration_timer_;
+    // Per-stream access log flush duration. This timer is enabled once when the stream is created
+    // and will log to all access logs once per trigger.
+    Event::TimerPtr access_log_flush_timer_;
+
     std::chrono::milliseconds idle_timeout_ms_{};
     State state_;
     const bool expand_agnostic_stream_lifetime_;

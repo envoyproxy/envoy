@@ -32,7 +32,9 @@ absl::string_view referGoString(void* str) {
   return absl::string_view(goStr->p, goStr->n); // NOLINT(modernize-return-braced-init-list)
 }
 
+#ifdef __cplusplus
 extern "C" {
+#endif
 
 CAPIStatus envoyGoFilterHandlerWrapper(void* r,
                                        std::function<CAPIStatus(std::shared_ptr<Filter>&)> f) {
@@ -86,13 +88,13 @@ CAPIStatus envoyGoFilterHttpCopyHeaders(void* r, void* strs, void* buf) {
   });
 }
 
-CAPIStatus envoyGoFilterHttpSetHeader(void* r, void* key, void* value) {
-  return envoyGoFilterHandlerWrapper(r,
-                                     [key, value](std::shared_ptr<Filter>& filter) -> CAPIStatus {
-                                       auto keyStr = referGoString(key);
-                                       auto valueStr = referGoString(value);
-                                       return filter->setHeader(keyStr, valueStr);
-                                     });
+CAPIStatus envoyGoFilterHttpSetHeaderHelper(void* r, void* key, void* value, headerAction act) {
+  return envoyGoFilterHandlerWrapper(
+      r, [key, value, act](std::shared_ptr<Filter>& filter) -> CAPIStatus {
+        auto keyStr = referGoString(key);
+        auto valueStr = referGoString(value);
+        return filter->setHeader(keyStr, valueStr, act);
+      });
 }
 
 CAPIStatus envoyGoFilterHttpRemoveHeader(void* r, void* key) {
@@ -139,9 +141,24 @@ CAPIStatus envoyGoFilterHttpSetTrailer(void* r, void* key, void* value) {
 
 CAPIStatus envoyGoFilterHttpGetStringValue(void* r, int id, void* value) {
   return envoyGoFilterHandlerWrapper(r, [id, value](std::shared_ptr<Filter>& filter) -> CAPIStatus {
-    auto valueStr = reinterpret_cast<GoString*>(value);
-    return filter->getStringValue(id, valueStr);
+    auto value_str = reinterpret_cast<GoString*>(value);
+    return filter->getStringValue(id, value_str);
   });
+}
+
+CAPIStatus envoyGoFilterHttpGetIntegerValue(void* r, int id, void* value) {
+  return envoyGoFilterHandlerWrapper(r, [id, value](std::shared_ptr<Filter>& filter) -> CAPIStatus {
+    auto value_int = reinterpret_cast<uint64_t*>(value);
+    return filter->getIntegerValue(id, value_int);
+  });
+}
+
+CAPIStatus envoyGoFilterHttpLog(void* r, uint32_t level, void* message) {
+  return envoyGoFilterHandlerWrapper(
+      r, [level, message](std::shared_ptr<Filter>& filter) -> CAPIStatus {
+        auto mesg = referGoString(message);
+        return filter->log(level, mesg);
+      });
 }
 
 void envoyGoFilterHttpFinalize(void* r, int reason) {
@@ -151,7 +168,10 @@ void envoyGoFilterHttpFinalize(void* r, int reason) {
   auto req = reinterpret_cast<httpRequestInternal*>(r);
   delete req;
 }
+
+#ifdef __cplusplus
 }
+#endif
 
 } // namespace Golang
 } // namespace HttpFilters

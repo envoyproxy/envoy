@@ -33,7 +33,6 @@
 #include "library/common/engine.h"
 #include "library/common/extensions/cert_validator/platform_bridge/platform_bridge.pb.h"
 #include "library/common/extensions/filters/http/local_error/filter.pb.h"
-#include "library/common/extensions/filters/http/route_cache_reset/filter.pb.h"
 #include "library/common/extensions/filters/http/network_configuration/filter.pb.h"
 #include "library/common/extensions/filters/http/socket_tag/filter.pb.h"
 #include "library/common/extensions/key_value/platform/platform.pb.h"
@@ -58,6 +57,7 @@ EngineBuilder& EngineBuilder::setOnEngineRunning(std::function<void()> closure) 
   return *this;
 }
 
+#ifdef ENVOY_MOBILE_STATS_REPORTING
 EngineBuilder& EngineBuilder::addStatsSinks(std::vector<std::string> stats_sinks) {
   stats_sinks_ = std::move(stats_sinks);
   return *this;
@@ -67,6 +67,12 @@ EngineBuilder& EngineBuilder::addGrpcStatsDomain(std::string stats_domain) {
   stats_domain_ = std::move(stats_domain);
   return *this;
 }
+
+EngineBuilder& EngineBuilder::addStatsFlushSeconds(int stats_flush_seconds) {
+  stats_flush_seconds_ = stats_flush_seconds;
+  return *this;
+}
+#endif
 
 EngineBuilder& EngineBuilder::addConnectTimeoutSeconds(int connect_timeout_seconds) {
   connect_timeout_seconds_ = connect_timeout_seconds;
@@ -122,13 +128,15 @@ EngineBuilder::addH2ConnectionKeepaliveTimeoutSeconds(int h2_connection_keepaliv
   return *this;
 }
 
-EngineBuilder& EngineBuilder::addStatsFlushSeconds(int stats_flush_seconds) {
-  stats_flush_seconds_ = stats_flush_seconds;
+EngineBuilder& EngineBuilder::addVirtualCluster(std::string virtual_cluster) {
+  virtual_clusters_.push_back(std::move(virtual_cluster));
   return *this;
 }
 
-EngineBuilder& EngineBuilder::addVirtualCluster(std::string virtual_cluster) {
-  virtual_clusters_.push_back(std::move(virtual_cluster));
+EngineBuilder& EngineBuilder::addVirtualCluster(std::string name,
+                                                std::vector<MatcherData> matchers) {
+  std::pair<std::string, std::vector<MatcherData>> matcher(name, std::move(matchers));
+  virtual_cluster_data_.emplace_back(std::move(matcher));
   return *this;
 }
 
@@ -221,36 +229,34 @@ EngineBuilder& EngineBuilder::enforceTrustChainVerification(bool trust_chain_ver
   enforce_trust_chain_verification_ = trust_chain_verification_on;
   return *this;
 }
-
+#ifdef ENVOY_GOOGLE_GRPC
 EngineBuilder& EngineBuilder::setNodeId(std::string node_id) {
   node_id_ = std::move(node_id);
   return *this;
 }
 
-EngineBuilder& EngineBuilder::setNodeLocality(const NodeLocality& node_locality) {
-  node_locality_ = node_locality;
+EngineBuilder& EngineBuilder::setNodeLocality(std::string region, std::string zone,
+                                              std::string sub_zone) {
+  node_locality_ = {region, zone, sub_zone};
   return *this;
 }
 
-EngineBuilder& EngineBuilder::setAggregatedDiscoveryService(const std::string& address,
-                                                            const int port, std::string jwt_token,
+EngineBuilder& EngineBuilder::setAggregatedDiscoveryService(std::string address, const int port,
+                                                            std::string jwt_token,
                                                             const int jwt_token_lifetime_seconds,
                                                             std::string ssl_root_certs) {
-#ifndef ENVOY_GOOGLE_GRPC
-  throw std::runtime_error("google_grpc must be enabled in bazel to use ADS");
-#endif
   ads_address_ = address;
   ads_port_ = port;
   ads_jwt_token_ = std::move(jwt_token);
-  ads_jwt_token_lifetime_seconds_ = jwt_token_lifetime_seconds;
+  ads_jwt_token_lifetime_seconds_ =
+      jwt_token_lifetime_seconds == 0 ? DefaultJwtTokenLifetimeSeconds : jwt_token_lifetime_seconds;
   ads_ssl_root_certs_ = std::move(ssl_root_certs);
   return *this;
 }
 
-EngineBuilder& EngineBuilder::addRtdsLayer(const std::string& layer_name,
-                                           const int timeout_seconds) {
-  rtds_layer_name_ = layer_name;
-  rtds_timeout_seconds_ = timeout_seconds;
+EngineBuilder& EngineBuilder::addRtdsLayer(std::string layer_name, const int timeout_seconds) {
+  rtds_layer_name_ = std::move(layer_name);
+  rtds_timeout_seconds_ = timeout_seconds == 0 ? DefaultXdsTimeout : timeout_seconds;
   return *this;
 }
 
@@ -258,9 +264,10 @@ EngineBuilder& EngineBuilder::addCdsLayer(std::string cds_resources_locator,
                                           const int timeout_seconds) {
   enable_cds_ = true;
   cds_resources_locator_ = std::move(cds_resources_locator);
-  cds_timeout_seconds_ = timeout_seconds;
+  cds_timeout_seconds_ = timeout_seconds == 0 ? DefaultXdsTimeout : timeout_seconds;
   return *this;
 }
+#endif
 
 EngineBuilder&
 EngineBuilder::enablePlatformCertificatesValidation(bool platform_certificates_validation_on) {
@@ -351,16 +358,16 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
       auto* direct_response_headers = direct_response_route_match->add_headers();
       direct_response_headers->set_name(header.name);
       switch (header.mode) {
-      case DirectResponseTesting::contains:
+      case DirectResponseTesting::MatchMode::Contains:
         direct_response_headers->set_contains_match(header.value);
         break;
-      case DirectResponseTesting::exact:
+      case DirectResponseTesting::MatchMode::Exact:
         direct_response_headers->set_exact_match(header.value);
         break;
-      case DirectResponseTesting::prefix:
+      case DirectResponseTesting::MatchMode::Prefix:
         direct_response_headers->set_prefix_match(header.value);
         break;
-      case DirectResponseTesting::suffix:
+      case DirectResponseTesting::MatchMode::Suffix:
         direct_response_headers->set_suffix_match(header.value);
         break;
       }
@@ -389,6 +396,20 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
     MessageUtil::loadFromYaml(cluster, *api_service->add_virtual_clusters(),
                               ProtobufMessage::getStrictValidationVisitor());
   }
+  for (auto& name_and_data : virtual_cluster_data_) {
+    auto* virtual_cluster = api_service->add_virtual_clusters();
+    virtual_cluster->set_name(name_and_data.first);
+    for (auto& matcher : name_and_data.second) {
+      auto* match = virtual_cluster->add_headers();
+      match->set_name(matcher.name);
+      if (matcher.type == MatcherData::EXACT) {
+        match->set_exact_match(matcher.value);
+      } else {
+        ASSERT(matcher.type == MatcherData::SAFE_REGEX);
+        match->mutable_safe_regex_match()->set_regex(matcher.value);
+      }
+    }
+  }
 
   for (auto& direct_response_in : direct_responses_) {
     auto* this_route = api_service->add_routes();
@@ -406,16 +427,16 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
       auto* direct_response_headers = direct_response_route_match->add_headers();
       direct_response_headers->set_name(header.name);
       switch (header.mode) {
-      case DirectResponseTesting::contains:
+      case DirectResponseTesting::MatchMode::Contains:
         direct_response_headers->set_contains_match(header.value);
         break;
-      case DirectResponseTesting::exact:
+      case DirectResponseTesting::MatchMode::Exact:
         direct_response_headers->set_exact_match(header.value);
         break;
-      case DirectResponseTesting::prefix:
+      case DirectResponseTesting::MatchMode::Prefix:
         direct_response_headers->set_prefix_match(header.value);
         break;
-      case DirectResponseTesting::suffix:
+      case DirectResponseTesting::MatchMode::Suffix:
         direct_response_headers->set_suffix_match(header.value);
         break;
       }
@@ -557,10 +578,11 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
   }
 
   if (!direct_responses_.empty()) {
-    envoymobile::extensions::filters::http::route_cache_reset::RouteCacheReset cache_reset;
     auto* cache_reset_filter = hcm->add_http_filters();
     cache_reset_filter->set_name("envoy.filters.http.route_cache_reset");
-    cache_reset_filter->mutable_typed_config()->PackFrom(cache_reset);
+    cache_reset_filter->mutable_typed_config()->set_type_url(
+        "type.googleapis.com/"
+        "envoymobile.extensions.filters.http.route_cache_reset.RouteCacheReset");
   }
 
   // Set up the always-present filters
@@ -731,31 +753,29 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
     address->mutable_socket_address()->set_port_value(10101);
   }
 
-  // Stats cluster
-  auto* stats_cluster = static_resources->add_clusters();
-  stats_cluster->set_name("stats");
-  stats_cluster->set_type(envoy::config::cluster::v3::Cluster::LOGICAL_DNS);
-  stats_cluster->mutable_connect_timeout()->set_seconds(connect_timeout_seconds_);
-  stats_cluster->mutable_dns_refresh_rate()->set_seconds(dns_refresh_seconds_);
-  stats_cluster->mutable_transport_socket()->CopyFrom(base_tls_socket);
-  stats_cluster->mutable_load_assignment()->set_cluster_name("stats");
-  auto* address = stats_cluster->mutable_load_assignment()
-                      ->add_endpoints()
-                      ->add_lb_endpoints()
-                      ->mutable_endpoint()
-                      ->mutable_address();
-  if (stats_domain_.empty()) {
-    address->mutable_socket_address()->set_address("127.0.0.1");
-  } else {
-    address->mutable_socket_address()->set_address(stats_domain_);
-  }
-  address->mutable_socket_address()->set_port_value(443);
   envoy::extensions::upstreams::http::v3::HttpProtocolOptions h2_protocol_options;
   h2_protocol_options.mutable_explicit_http_config()->mutable_http2_protocol_options();
-  (*stats_cluster->mutable_typed_extension_protocol_options())
-      ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]
-          .PackFrom(h2_protocol_options);
-  stats_cluster->mutable_wait_for_warm_on_init();
+  if (!stats_domain_.empty()) {
+    // Stats cluster
+    auto* stats_cluster = static_resources->add_clusters();
+    stats_cluster->set_name("stats");
+    stats_cluster->set_type(envoy::config::cluster::v3::Cluster::LOGICAL_DNS);
+    stats_cluster->mutable_connect_timeout()->set_seconds(connect_timeout_seconds_);
+    stats_cluster->mutable_dns_refresh_rate()->set_seconds(dns_refresh_seconds_);
+    stats_cluster->mutable_transport_socket()->CopyFrom(base_tls_socket);
+    stats_cluster->mutable_load_assignment()->set_cluster_name("stats");
+    auto* address = stats_cluster->mutable_load_assignment()
+                        ->add_endpoints()
+                        ->add_lb_endpoints()
+                        ->mutable_endpoint()
+                        ->mutable_address();
+    address->mutable_socket_address()->set_address(stats_domain_);
+    address->mutable_socket_address()->set_port_value(443);
+    (*stats_cluster->mutable_typed_extension_protocol_options())
+        ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]
+            .PackFrom(h2_protocol_options);
+    stats_cluster->mutable_wait_for_warm_on_init();
+  }
 
   // Base cluster config (DFP cluster config)
   auto* base_cluster = static_resources->add_clusters();
@@ -849,64 +869,34 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
   tls_socket.mutable_common_tls_context()->add_alpn_protocols("h2");
   ssl_proxy_socket.mutable_transport_socket()->mutable_typed_config()->PackFrom(tls_socket);
 
-  // Base h2 cluster.
-  auto* base_h2 = static_resources->add_clusters();
-  base_h2->set_name("base_h2");
-  h2_protocol_options.mutable_explicit_http_config()->mutable_http2_protocol_options()->CopyFrom(
-      *alpn_options.mutable_auto_config()->mutable_http2_protocol_options());
-  h2_protocol_options.mutable_upstream_http_protocol_options()->set_auto_sni(true);
-  h2_protocol_options.mutable_upstream_http_protocol_options()->set_auto_san_validation(true);
-  base_h2->mutable_connect_timeout()->set_seconds(connect_timeout_seconds_);
-  base_h2->set_lb_policy(envoy::config::cluster::v3::Cluster::CLUSTER_PROVIDED);
-  base_h2->mutable_cluster_type()->CopyFrom(base_cluster_type);
-  base_h2->mutable_transport_socket()->set_name("envoy.transport_sockets.http_11_proxy");
-  base_h2->mutable_transport_socket()->mutable_typed_config()->PackFrom(ssl_proxy_socket);
-  base_h2->mutable_upstream_connection_options()->CopyFrom(
-      *base_cluster->mutable_upstream_connection_options());
-  base_h2->mutable_circuit_breakers()->CopyFrom(*base_cluster->mutable_circuit_breakers());
-  (*base_h2->mutable_typed_extension_protocol_options())
-      ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]
-          .PackFrom(h2_protocol_options);
+  // Edit base cluster to be an HTTP/3 cluster.
+  if (enable_http3_) {
+    envoy::extensions::transport_sockets::quic::v3::QuicUpstreamTransport h3_inner_socket;
+    tls_socket.mutable_common_tls_context()->mutable_alpn_protocols()->Clear();
+    h3_inner_socket.mutable_upstream_tls_context()->CopyFrom(tls_socket);
+    envoy::extensions::transport_sockets::http_11_proxy::v3::Http11ProxyUpstreamTransport
+        h3_proxy_socket;
+    h3_proxy_socket.mutable_transport_socket()->mutable_typed_config()->PackFrom(h3_inner_socket);
+    h3_proxy_socket.mutable_transport_socket()->set_name("envoy.transport_sockets.quic");
+    alpn_options.mutable_auto_config()->mutable_http3_protocol_options();
+    alpn_options.mutable_auto_config()->mutable_alternate_protocols_cache_options()->set_name(
+        "default_alternate_protocols_cache");
 
-  // Base h3 cluster set up
-  envoy::extensions::transport_sockets::quic::v3::QuicUpstreamTransport h3_inner_socket;
-  tls_socket.mutable_common_tls_context()->mutable_alpn_protocols()->Clear();
-  h3_inner_socket.mutable_upstream_tls_context()->CopyFrom(tls_socket);
-  envoy::extensions::transport_sockets::http_11_proxy::v3::Http11ProxyUpstreamTransport
-      h3_proxy_socket;
-  h3_proxy_socket.mutable_transport_socket()->mutable_typed_config()->PackFrom(h3_inner_socket);
-  h3_proxy_socket.mutable_transport_socket()->set_name("envoy.transport_sockets.quic");
-  alpn_options.mutable_auto_config()->mutable_http3_protocol_options();
-  alpn_options.mutable_auto_config()->mutable_alternate_protocols_cache_options()->set_name(
-      "default_alternate_protocols_cache");
-
-  // Base h3 cluster
-  auto* base_h3 = static_resources->add_clusters();
-  base_h3->set_name("base_h3");
-  base_h3->mutable_connect_timeout()->set_seconds(connect_timeout_seconds_);
-  base_h3->set_lb_policy(envoy::config::cluster::v3::Cluster::CLUSTER_PROVIDED);
-  base_h3->mutable_cluster_type()->CopyFrom(base_cluster_type);
-  base_h3->mutable_transport_socket()->set_name("envoy.transport_sockets.http_11_proxy");
-  base_h3->mutable_transport_socket()->mutable_typed_config()->PackFrom(h3_proxy_socket);
-  base_h3->mutable_upstream_connection_options()->CopyFrom(
-      *base_cluster->mutable_upstream_connection_options());
-  base_h3->mutable_circuit_breakers()->CopyFrom(*base_cluster->mutable_circuit_breakers());
-  (*base_h3->mutable_typed_extension_protocol_options())
-      ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]
-          .PackFrom(alpn_options);
+    base_cluster->mutable_transport_socket()->mutable_typed_config()->PackFrom(h3_proxy_socket);
+    (*base_cluster->mutable_typed_extension_protocol_options())
+        ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]
+            .PackFrom(alpn_options);
+  }
 
   // Set up stats.
   bootstrap->mutable_stats_flush_interval()->set_seconds(stats_flush_seconds_);
   bootstrap->mutable_stats_sinks();
   auto* list = bootstrap->mutable_stats_config()->mutable_stats_matcher()->mutable_inclusion_list();
   list->add_patterns()->set_prefix("cluster.base.upstream_rq_");
-  list->add_patterns()->set_prefix("cluster.base_h2.upstream_rq_");
   list->add_patterns()->set_prefix("cluster.stats.upstream_rq_");
   list->add_patterns()->set_prefix("cluster.base.upstream_cx_");
-  list->add_patterns()->set_prefix("cluster.base_h2.upstream_cx_");
   list->add_patterns()->set_prefix("cluster.stats.upstream_cx_");
   list->add_patterns()->set_exact("cluster.base.http2.keepalive_timeout");
-  list->add_patterns()->set_exact("cluster.base_h2.http2.keepalive_timeout");
   list->add_patterns()->set_exact("cluster.stats.http2.keepalive_timeout");
   list->add_patterns()->set_prefix("http.hcm.downstream_rq_");
   list->add_patterns()->set_prefix("http.hcm.decompressor.");
@@ -928,7 +918,7 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
   auto* node = bootstrap->mutable_node();
   node->set_id(node_id_.empty() ? "envoy-mobile" : node_id_);
   node->set_cluster("envoy-mobile");
-  if (node_locality_) {
+  if (node_locality_ && !node_locality_->region.empty()) {
     node->mutable_locality()->set_region(node_locality_->region);
     node->mutable_locality()->set_zone(node_locality_->zone);
     node->mutable_locality()->set_sub_zone(node_locality_->sub_zone);
@@ -1044,6 +1034,13 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
 #else
     throw std::runtime_error("Admin functionality was not compiled in this build of Envoy Mobile");
 #endif
+  } else {
+    // Default Envoy mobile to the lightweight API listener. This is not
+    // supported if the admin interface is enabled.
+    envoy::config::listener::v3::ApiListenerManager api;
+    auto* listener_manager = bootstrap->mutable_listener_manager();
+    listener_manager->mutable_typed_config()->PackFrom(api);
+    listener_manager->set_name("envoy.listener_manager_impl.api");
   }
 
   return bootstrap;

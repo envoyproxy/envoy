@@ -166,7 +166,8 @@ ConnectionImpl::StreamImpl::StreamImpl(ConnectionImpl& parent, uint32_t buffer_l
       pending_receive_buffer_high_watermark_called_(false),
       pending_send_buffer_high_watermark_called_(false), reset_due_to_messaging_error_(false),
       defer_processing_backedup_streams_(
-          Runtime::runtimeFeatureEnabled(Runtime::defer_processing_backedup_streams)) {
+          Runtime::runtimeFeatureEnabled(Runtime::defer_processing_backedup_streams)),
+      extend_stream_lifetime_flag_(false) {
   parent_.stats_.streams_active_.inc();
   if (buffer_limit > 0) {
     setWriteBufferWatermarks(buffer_limit);
@@ -1203,10 +1204,15 @@ int ConnectionImpl::onFrameSend(int32_t stream_id, size_t length, uint8_t type, 
 
   case NGHTTP2_HEADERS:
   case NGHTTP2_DATA: {
-    const bool end_stream_sent = flags & NGHTTP2_FLAG_END_STREAM;
-    stream->local_end_stream_sent_ = end_stream_sent;
-    if (end_stream_sent) {
-      stream->onEndStreamEncoded();
+    // This should be the case since we're sending these frames. It's possible
+    // that codec fuzzers would incorrectly send frames for non-existent streams
+    // which is why this is not an assert.
+    if (stream != nullptr) {
+      const bool end_stream_sent = flags & NGHTTP2_FLAG_END_STREAM;
+      stream->local_end_stream_sent_ = end_stream_sent;
+      if (end_stream_sent) {
+        stream->onEndStreamEncoded();
+      }
     }
     break;
   }
@@ -1321,7 +1327,15 @@ Status ConnectionImpl::onStreamClose(StreamImpl* stream, uint32_t error_code) {
     // Even if we have received both the remote_end_stream and the
     // local_end_stream (e.g. we have all the data for the response), if we've
     // received a remote reset we should reset the stream.
-    if (!stream->remote_end_stream_ || !stream->local_end_stream_ || stream->remote_rst_) {
+    // We only do so currently for server side streams by checking for
+    // extend_stream_lifetime_flag_ as its observers all unregisters stream
+    // callbacks.
+    bool should_reset_stream = !stream->remote_end_stream_ || !stream->local_end_stream_;
+    if (stream->extend_stream_lifetime_flag_) {
+      should_reset_stream = should_reset_stream || stream->remote_rst_;
+    }
+
+    if (should_reset_stream) {
       StreamResetReason reason;
       if (stream->reset_due_to_messaging_error_) {
         // Unfortunately, the nghttp2 API makes it incredibly difficult to clearly understand

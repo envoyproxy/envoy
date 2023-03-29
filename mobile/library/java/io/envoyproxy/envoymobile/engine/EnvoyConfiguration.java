@@ -10,6 +10,7 @@ import java.util.regex.Matcher;
 import java.lang.StringBuilder;
 import javax.annotation.Nullable;
 
+import io.envoyproxy.envoymobile.engine.VirtualClusterConfig;
 import io.envoyproxy.envoymobile.engine.types.EnvoyHTTPFilterFactory;
 import io.envoyproxy.envoymobile.engine.types.EnvoyStringAccessor;
 import io.envoyproxy.envoymobile.engine.types.EnvoyKeyValueStore;
@@ -56,14 +57,29 @@ public class EnvoyConfiguration {
   public final String appVersion;
   public final String appId;
   public final TrustChainVerification trustChainVerification;
-  public final List<String> virtualClusters;
+  public final List<String> legacyVirtualClusters;
+  public final List<VirtualClusterConfig> virtualClusters;
   public final List<EnvoyNativeFilterConfig> nativeFilterChain;
   public final Map<String, EnvoyStringAccessor> stringAccessors;
   public final Map<String, EnvoyKeyValueStore> keyValueStores;
   public final List<String> statSinks;
-  Map<String, String> runtimeGuards;
+  public final Map<String, String> runtimeGuards;
   public final Boolean enablePlatformCertificatesValidation;
   public final Boolean enableSkipDNSLookupForProxiedRequests;
+  public final String rtdsLayerName;
+  public final Integer rtdsTimeoutSeconds;
+  public final String adsAddress;
+  public final Integer adsPort;
+  public final String adsToken;
+  public final Integer adsTokenLifetime;
+  public final String adsRootCerts;
+  public final String nodeId;
+  public final String nodeRegion;
+  public final String nodeZone;
+  public final String nodeSubZone;
+  public final String cdsResourcesLocator;
+  public final Integer cdsTimeoutSeconds;
+  public final Boolean enableCds;
 
   private static final Pattern UNRESOLVED_KEY_PATTERN = Pattern.compile("\\{\\{ (.+) \\}\\}");
 
@@ -118,7 +134,10 @@ public class EnvoyConfiguration {
    *     Client.
    * @param trustChainVerification                        whether to mute TLS Cert verification -
    *     for tests.
-   * @param virtualClusters                               the JSON list of virtual cluster configs.
+   * @param legacyVirtualClusters                               the JSON list of virtual cluster
+   *     configs.
+   * @param virtualClusters                          the structured list of virtual cluster
+   *     configs.
    * @param nativeFilterChain                             the configuration for native filters.
    * @param httpPlatformFilterFactories                   the configuration for platform filters.
    * @param stringAccessors                               platform string accessors to register.
@@ -126,6 +145,24 @@ public class EnvoyConfiguration {
    * @param enableSkipDNSLookupForProxiedRequests         whether to skip waiting on DNS response
    *     for proxied requests.
    * @param enablePlatformCertificatesValidation          whether to use the platform verifier.
+   * @param rtdsLayerName                                 the RTDS layer name for this client.
+   * @param rtdsTimeoutSeconds                            the timeout for RTDS fetches.
+   * @param adsAddress                                    the address for the ADS server.
+   * @param adsPort                                       the port for the ADS server.
+   * @param adsToken                                      the token to use for authenticating with
+   *                                                      the ADS server.
+   * @param adsTokenLifetime                              the lifetime of the ADS token.
+   * @param adsRootCerts                                  the root certificates to use for
+   *     validating the ADS server.
+   * @param nodeId                                        the node ID to use for the ADS server.
+   * @param nodeRegion                                    the node region to use for the ADS server.
+   * @param nodeZone                                      the node zone to use for the ADS server.
+   * @param nodeSubZone                                   the node sub-zone to use for the ADS
+   *     server.
+   * @param cdsResourcesLocator                           the resources locator for CDS.
+   * @param cdsTimeoutSeconds                             the timeout for CDS fetches.
+   * @param enableCds                                     enables CDS, used because all CDS params
+   *     could be empty.
    */
   public EnvoyConfiguration(
       boolean adminInterfaceEnabled, String grpcStatsDomain, int connectTimeoutSeconds,
@@ -137,13 +174,17 @@ public class EnvoyConfiguration {
       int h2ConnectionKeepaliveIdleIntervalMilliseconds, int h2ConnectionKeepaliveTimeoutSeconds,
       int maxConnectionsPerHost, int statsFlushSeconds, int streamIdleTimeoutSeconds,
       int perTryIdleTimeoutSeconds, String appVersion, String appId,
-      TrustChainVerification trustChainVerification, List<String> virtualClusters,
-      List<EnvoyNativeFilterConfig> nativeFilterChain,
+      TrustChainVerification trustChainVerification, List<String> legacyVirtualClusters,
+      List<VirtualClusterConfig> virtualClusters, List<EnvoyNativeFilterConfig> nativeFilterChain,
       List<EnvoyHTTPFilterFactory> httpPlatformFilterFactories,
       Map<String, EnvoyStringAccessor> stringAccessors,
       Map<String, EnvoyKeyValueStore> keyValueStores, List<String> statSinks,
       Map<String, Boolean> runtimeGuards, Boolean enableSkipDNSLookupForProxiedRequests,
-      boolean enablePlatformCertificatesValidation) {
+      boolean enablePlatformCertificatesValidation, String rtdsLayerName,
+      Integer rtdsTimeoutSeconds, String adsAddress, Integer adsPort, String adsToken,
+      Integer adsTokenLifetime, String adsRootCerts, String nodeId, String nodeRegion,
+      String nodeZone, String nodeSubZone, String cdsResourcesLocator, Integer cdsTimeoutSeconds,
+      boolean enableCds) {
     JniLibrary.load();
     this.adminInterfaceEnabled = adminInterfaceEnabled;
     this.grpcStatsDomain = grpcStatsDomain;
@@ -173,6 +214,7 @@ public class EnvoyConfiguration {
     this.appVersion = appVersion;
     this.appId = appId;
     this.trustChainVerification = trustChainVerification;
+    this.legacyVirtualClusters = legacyVirtualClusters;
     this.virtualClusters = virtualClusters;
     int index = 0;
     // Insert in this order to preserve prior ordering constraints.
@@ -197,45 +239,35 @@ public class EnvoyConfiguration {
     }
     this.enablePlatformCertificatesValidation = enablePlatformCertificatesValidation;
     this.enableSkipDNSLookupForProxiedRequests = enableSkipDNSLookupForProxiedRequests;
+    this.rtdsLayerName = rtdsLayerName;
+    this.rtdsTimeoutSeconds = rtdsTimeoutSeconds;
+    this.adsAddress = adsAddress;
+    this.adsPort = adsPort;
+    this.adsToken = adsToken;
+    this.adsTokenLifetime = adsTokenLifetime;
+    this.adsRootCerts = adsRootCerts;
+    this.nodeId = nodeId;
+    this.nodeRegion = nodeRegion;
+    this.nodeZone = nodeZone;
+    this.nodeSubZone = nodeSubZone;
+    this.cdsResourcesLocator = cdsResourcesLocator;
+    this.cdsTimeoutSeconds = cdsTimeoutSeconds;
+    this.enableCds = enableCds;
   }
 
-  // TODO(alyssawilk) move this to the test only JNI library.
-  String createYaml() {
+  public long createBootstrap() {
     Boolean enforceTrustChainVerification =
         trustChainVerification == EnvoyConfiguration.TrustChainVerification.VERIFY_TRUST_CHAIN;
     List<EnvoyNativeFilterConfig> reverseFilterChain = new ArrayList<>(nativeFilterChain);
     Collections.reverse(reverseFilterChain);
 
     byte[][] filter_chain = JniBridgeUtility.toJniBytes(reverseFilterChain);
-    byte[][] clusters = JniBridgeUtility.stringsToJniBytes(virtualClusters);
+    byte[][] clusters_legacy = JniBridgeUtility.stringsToJniBytes(legacyVirtualClusters);
     byte[][] stats_sinks = JniBridgeUtility.stringsToJniBytes(statSinks);
     byte[][] dns_preresolve = JniBridgeUtility.stringsToJniBytes(dnsPreresolveHostnames);
     byte[][] runtime_guards = JniBridgeUtility.mapToJniBytes(runtimeGuards);
+    byte[][] clusters = JniBridgeUtility.clusterConfigToJniBytes(virtualClusters);
 
-    return JniLibrary.createYaml(
-        grpcStatsDomain, adminInterfaceEnabled, connectTimeoutSeconds, dnsRefreshSeconds,
-        dnsFailureRefreshSecondsBase, dnsFailureRefreshSecondsMax, dnsQueryTimeoutSeconds,
-        dnsMinRefreshSeconds, dns_preresolve, enableDNSCache, dnsCacheSaveIntervalSeconds,
-        enableDrainPostDnsRefresh, enableHttp3, enableGzipDecompression, enableBrotliDecompression,
-        enableSocketTagging, enableHappyEyeballs, enableInterfaceBinding,
-        h2ConnectionKeepaliveIdleIntervalMilliseconds, h2ConnectionKeepaliveTimeoutSeconds,
-        maxConnectionsPerHost, statsFlushSeconds, streamIdleTimeoutSeconds,
-        perTryIdleTimeoutSeconds, appVersion, appId, enforceTrustChainVerification, clusters,
-        filter_chain, stats_sinks, enablePlatformCertificatesValidation,
-        enableSkipDNSLookupForProxiedRequests, runtime_guards);
-  }
-
-  long createBootstrap() {
-    Boolean enforceTrustChainVerification =
-        trustChainVerification == EnvoyConfiguration.TrustChainVerification.VERIFY_TRUST_CHAIN;
-    List<EnvoyNativeFilterConfig> reverseFilterChain = new ArrayList<>(nativeFilterChain);
-    Collections.reverse(reverseFilterChain);
-
-    byte[][] filter_chain = JniBridgeUtility.toJniBytes(reverseFilterChain);
-    byte[][] clusters = JniBridgeUtility.stringsToJniBytes(virtualClusters);
-    byte[][] stats_sinks = JniBridgeUtility.stringsToJniBytes(statSinks);
-    byte[][] dns_preresolve = JniBridgeUtility.stringsToJniBytes(dnsPreresolveHostnames);
-    byte[][] runtime_guards = JniBridgeUtility.mapToJniBytes(runtimeGuards);
     return JniLibrary.createBootstrap(
         grpcStatsDomain, adminInterfaceEnabled, connectTimeoutSeconds, dnsRefreshSeconds,
         dnsFailureRefreshSecondsBase, dnsFailureRefreshSecondsMax, dnsQueryTimeoutSeconds,
@@ -244,9 +276,11 @@ public class EnvoyConfiguration {
         enableSocketTagging, enableHappyEyeballs, enableInterfaceBinding,
         h2ConnectionKeepaliveIdleIntervalMilliseconds, h2ConnectionKeepaliveTimeoutSeconds,
         maxConnectionsPerHost, statsFlushSeconds, streamIdleTimeoutSeconds,
-        perTryIdleTimeoutSeconds, appVersion, appId, enforceTrustChainVerification, clusters,
-        filter_chain, stats_sinks, enablePlatformCertificatesValidation,
-        enableSkipDNSLookupForProxiedRequests, runtime_guards);
+        perTryIdleTimeoutSeconds, appVersion, appId, enforceTrustChainVerification, clusters_legacy,
+        clusters, filter_chain, stats_sinks, enablePlatformCertificatesValidation,
+        enableSkipDNSLookupForProxiedRequests, runtime_guards, rtdsLayerName, rtdsTimeoutSeconds,
+        adsAddress, adsPort, adsToken, adsTokenLifetime, adsRootCerts, nodeId, nodeRegion, nodeZone,
+        nodeSubZone, cdsResourcesLocator, cdsTimeoutSeconds, enableCds);
   }
 
   static class ConfigurationException extends RuntimeException {

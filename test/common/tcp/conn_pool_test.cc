@@ -289,6 +289,7 @@ public:
     EXPECT_CALL(*connection_, streamInfo());
     EXPECT_CALL(*connection_, id()).Times(AnyNumber());
     EXPECT_CALL(*connection_, readDisable(_)).Times(AnyNumber());
+    EXPECT_CALL(*connection_, initializeReadFilters());
 
     connect_timer_ = new NiceMock<Event::MockTimer>(&dispatcher_);
     EXPECT_CALL(dispatcher_, createClientConnection_(_, _, _, _)).WillOnce(Return(connection_));

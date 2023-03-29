@@ -210,6 +210,11 @@ protected:
     // Http::MultiplexedStreamImplBase
     void destroy() override;
     void onPendingFlushTimer() override;
+    CodecEventCallbacks*
+    registerCodecEventCallbacks(CodecEventCallbacks* codec_callbacks) override {
+      extend_stream_lifetime_flag_ = true;
+      return MultiplexedStreamImplBase::registerCodecEventCallbacks(codec_callbacks);
+    }
 
     StreamImpl* base() { return this; }
     void resetStreamWorker(StreamResetReason reason);
@@ -348,6 +353,8 @@ protected:
     bool pending_send_buffer_high_watermark_called_ : 1;
     bool reset_due_to_messaging_error_ : 1;
     bool defer_processing_backedup_streams_ : 1;
+    // Latch whether this stream is operating with this flag.
+    bool extend_stream_lifetime_flag_ : 1;
     absl::string_view details_;
 
     /**
@@ -437,6 +444,10 @@ protected:
     // Client streams do not need a flush timer because we currently assume that any failure
     // to flush would be covered by a request/stream/etc. timeout.
     void setFlushTimeout(std::chrono::milliseconds /*timeout*/) override {}
+    CodecEventCallbacks* registerCodecEventCallbacks(CodecEventCallbacks*) override {
+      ENVOY_BUG(false, "CodecEventCallbacks for HTTP2 client stream unimplemented.");
+      return nullptr;
+    }
     // StreamImpl
     void submitHeaders(const HeaderMap& headers, bool end_stream) override;
     // Do not use deferred reset on upstream connections.

@@ -48,6 +48,7 @@ envoy_cc_test_library(
 
 envoy_cc_test(
     name = "config_impl_integration_test",
+    size = "large",
     srcs = [
         "config_impl_integration_test.cc",
     ],

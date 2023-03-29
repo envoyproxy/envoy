@@ -1,5 +1,7 @@
 #pragma once
 
+#include <memory>
+
 #include "envoy/buffer/buffer.h"
 #include "envoy/config/core/v3/protocol.pb.h"
 #include "envoy/event/dispatcher.h"
