@@ -196,9 +196,15 @@ TEST_P(DownstreamProtocolIntegrationTest, RouterRedirectHttpRequest) {
     EXPECT_EQ("301", response->headers().getStatusValue());
     EXPECT_EQ("https://www.redirect.com/foo",
               response->headers().get(Http::Headers::get().Location)[0]->value().getStringView());
-    expectDownstreamBytesSentAndReceived(BytesCountExpectation(145, 45, 111, 23),
-                                         BytesCountExpectation(0, 30, 0, 30),
-                                         BytesCountExpectation(0, 30, 0, 30));
+    if (Runtime::runtimeFeatureEnabled(Runtime::expand_agnostic_stream_lifetime)) {
+      expectDownstreamBytesSentAndReceived(BytesCountExpectation(145, 45, 111, 23),
+                                           BytesCountExpectation(69, 30, 69, 30),
+                                           BytesCountExpectation(0, 30, 0, 30));
+    } else {
+      expectDownstreamBytesSentAndReceived(BytesCountExpectation(145, 45, 111, 23),
+                                           BytesCountExpectation(0, 30, 0, 30),
+                                           BytesCountExpectation(0, 30, 0, 30));
+    }
   } else {
     // All QUIC requests use https, and should not be redirected. (Even those sent with http scheme
     // will be overridden to https by HCM.)
@@ -640,9 +646,15 @@ TEST_P(DownstreamProtocolIntegrationTest, MissingHeadersLocalReplyDownstreamByte
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
-  expectDownstreamBytesSentAndReceived(BytesCountExpectation(90, 88, 71, 54),
-                                       BytesCountExpectation(0, 58, 0, 58),
-                                       BytesCountExpectation(7, 10, 7, 8));
+  if (Runtime::runtimeFeatureEnabled(Runtime::expand_agnostic_stream_lifetime)) {
+    expectDownstreamBytesSentAndReceived(BytesCountExpectation(90, 88, 71, 54),
+                                         BytesCountExpectation(40, 58, 40, 58),
+                                         BytesCountExpectation(7, 10, 7, 8));
+  } else {
+    expectDownstreamBytesSentAndReceived(BytesCountExpectation(90, 88, 71, 54),
+                                         BytesCountExpectation(0, 58, 0, 58),
+                                         BytesCountExpectation(7, 10, 7, 8));
+  }
 }
 
 TEST_P(DownstreamProtocolIntegrationTest, MissingHeadersLocalReplyUpstreamBytesCount) {
@@ -3399,6 +3411,95 @@ TEST_P(DownstreamProtocolIntegrationTest, OverflowDecoderBufferFromDecodeTrailer
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("413", response->headers().getStatusValue());
+}
+
+TEST_P(ProtocolIntegrationTest,
+       EnvoyUpstreamResetAfterFullResponseReceivedAndRequestFullyReceivedButNotEntirelySerialized) {
+  // No reset for HTTP1.
+  if (upstreamProtocol() == Http::CodecType::HTTP1) {
+    return;
+  }
+  // QUIC does not yet populate downstream_cx_rx_bytes_total.
+  if (downstreamProtocol() == Http::CodecType::HTTP3) {
+    return;
+  }
+
+  constexpr uint32_t window_size = 65535;
+  envoy::config::core::v3::Http2ProtocolOptions http2_options =
+      ::Envoy::Http2::Utility::initializeAndValidateOptions(
+          envoy::config::core::v3::Http2ProtocolOptions());
+  http2_options.mutable_initial_stream_window_size()->set_value(window_size);
+  http2_options.mutable_initial_connection_window_size()->set_value(window_size);
+
+  envoy::config::listener::v3::QuicProtocolOptions quic_options;
+  auto* quic_protocol_options = quic_options.mutable_quic_protocol_options();
+  quic_protocol_options->mutable_initial_connection_window_size()->set_value(window_size);
+  quic_protocol_options->mutable_initial_stream_window_size()->set_value(window_size);
+
+  // Make the fake upstreams use a small window size.
+  mergeOptions(http2_options);
+  mergeOptions(quic_options);
+
+  initialize();
+
+  codec_client_ = makeRawHttpConnection(makeClientConnection(lookupPort("http")), http2_options);
+
+  // The response is larger than the stream flow control window. So it will
+  // remain in the Envoy's upstream codec waiting for serialization when given
+  // more window.
+  constexpr uint32_t request_size = 3 * window_size;
+
+  auto encoder_decoder = codec_client_->startRequest(
+      Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                     {":path", "/"},
+                                     {":scheme", "http"},
+                                     {":authority", "sni.lyft.com"},
+                                     {"content-length", absl::StrCat(request_size)}});
+  auto& encoder = encoder_decoder.first;
+
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+
+  // Don't grant additional window to the Envoy upstream codec.
+  upstream_request_->readDisable(true);
+
+  // Finalize the request from the downstream before the response has started.
+  // The request will go through all of Envoy's stream layer, but not be
+  // serialized on the wire due to flow control.
+  codec_client_->sendData(encoder, request_size, true);
+  test_server_->waitForCounterGe("http.config_test.downstream_cx_rx_bytes_total", request_size);
+
+  // Now that the downstream request has fully made it to Envoy, encode the response.
+  upstream_request_->encodeHeaders(
+      Http::TestResponseHeaderMapImpl{
+          {":status", "200"},
+      },
+      true);
+
+  auto response = std::move(encoder_decoder.second);
+  response->waitForHeaders();
+
+  // HCM thinks we have no active stream now.
+  test_server_->waitForCounterEq("http.config_test.downstream_rq_completed", 1);
+  test_server_->waitForGaugeEq("http.config_test.downstream_rq_active", 0);
+
+  // There is no reset for the cluster yet.
+  if (upstreamProtocol() == Envoy::Http::CodecType::HTTP2) {
+    test_server_->waitForCounterEq("cluster.cluster_0.http2.rx_reset", 0);
+  } else {
+    test_server_->waitForCounterEq("cluster.cluster_0.http3.rx_reset", 0);
+  }
+
+  // Send the reset stream to Envoy's upstream codec client. Envoy protocol
+  // agnostic stream representations should already be destroyed but the codec
+  // should still know about the stream.
+  upstream_request_->encodeResetStream();
+
+  if (upstreamProtocol() == Envoy::Http::CodecType::HTTP2) {
+    test_server_->waitForCounterEq("cluster.cluster_0.http2.rx_reset", 1);
+  } else {
+    test_server_->waitForCounterEq("cluster.cluster_0.http3.rx_reset", 1);
+  }
 }
 
 TEST_P(ProtocolIntegrationTest, ResetLargeResponseUponReceivingHeaders) {
