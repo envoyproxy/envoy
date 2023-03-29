@@ -219,7 +219,7 @@ Http::Filter1xxHeadersStatus FileSystemBufferFilter::encode1xxHeaders(Http::Resp
 }
 
 Http::FilterMetadataStatus FileSystemBufferFilter::encodeMetadata(Http::MetadataMap&) {
-  return Http::FilterMetadataStatus::ContinueOnlyMetadata;
+  return Http::FilterMetadataStatus::Continue;
 }
 
 void FileSystemBufferFilter::setEncoderFilterCallbacks(

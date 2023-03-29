@@ -201,7 +201,7 @@ protected:
     startDownstreamRequest();
 
     Http::MetadataMap metadata_map{{"metadata", "metadata"}};
-    EXPECT_EQ(Http::FilterMetadataStatus::ContinueOnlyMetadata, filter_->decodeMetadata(metadata_map));
+    EXPECT_EQ(Http::FilterMetadataStatus::Continue, filter_->decodeMetadata(metadata_map));
     Http::TestRequestTrailerMapImpl trailers;
     // Complete a full request cycle
     Envoy::Buffer::OwnedImpl buffer("nothing here");

@@ -77,7 +77,7 @@ public:
     return Http::FilterTrailersStatus::Continue;
   };
   Http::FilterMetadataStatus encodeMetadata(Http::MetadataMap&) override {
-    return Http::FilterMetadataStatus::ContinueOnlyMetadata;
+    return Http::FilterMetadataStatus::Continue;
   }
   void setEncoderFilterCallbacks(Http::StreamEncoderFilterCallbacks& callbacks) override {
     encoder_callbacks_ = &callbacks;

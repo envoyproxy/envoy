@@ -169,7 +169,7 @@ TEST_F(KillRequestFilterTest, EncodeMetadataReturnsContinue) {
   envoy::extensions::filters::http::kill_request::v3::KillRequest kill_request;
   setUpTest(kill_request);
   Http::MetadataMap metadata_map;
-  EXPECT_EQ(Http::FilterMetadataStatus::ContinueOnlyMetadata, filter_->encodeMetadata(metadata_map));
+  EXPECT_EQ(Http::FilterMetadataStatus::Continue, filter_->encodeMetadata(metadata_map));
 }
 
 TEST_F(KillRequestFilterTest, CanKillOnResponse) {

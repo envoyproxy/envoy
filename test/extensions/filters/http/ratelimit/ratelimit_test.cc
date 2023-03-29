@@ -139,7 +139,7 @@ TEST_F(HttpRateLimitFilterTest, NoRoute) {
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers_));
   EXPECT_EQ(Http::Filter1xxHeadersStatus::Continue, filter_->encode1xxHeaders(response_headers_));
   Http::MetadataMap metadata_map{{"metadata", "metadata"}};
-  EXPECT_EQ(Http::FilterMetadataStatus::ContinueOnlyMetadata, filter_->encodeMetadata(metadata_map));
+  EXPECT_EQ(Http::FilterMetadataStatus::Continue, filter_->encodeMetadata(metadata_map));
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers_, false));
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(response_data_, false));
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->encodeTrailers(response_trailers_));
@@ -227,7 +227,7 @@ TEST_F(HttpRateLimitFilterTest, OkResponse) {
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(request_headers_, false));
   Http::MetadataMap metadata_map{{"metadata", "metadata"}};
-  EXPECT_EQ(Http::FilterMetadataStatus::ContinueOnlyMetadata, filter_->decodeMetadata(metadata_map));
+  EXPECT_EQ(Http::FilterMetadataStatus::Continue, filter_->decodeMetadata(metadata_map));
   EXPECT_EQ(Http::FilterDataStatus::StopIterationAndWatermark, filter_->decodeData(data_, false));
   EXPECT_EQ(Http::FilterTrailersStatus::StopIteration, filter_->decodeTrailers(request_trailers_));
   EXPECT_EQ(Http::Filter1xxHeadersStatus::Continue, filter_->encode1xxHeaders(response_headers_));

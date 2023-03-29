@@ -73,7 +73,7 @@ public:
   }
 
   Http::FilterMetadataStatus encodeMetadata(Http::MetadataMap&) override {
-    return Http::FilterMetadataStatus::ContinueOnlyMetadata;
+    return Http::FilterMetadataStatus::Continue;
   }
 
   void setEncoderFilterCallbacks(Http::StreamEncoderFilterCallbacks&) override {}

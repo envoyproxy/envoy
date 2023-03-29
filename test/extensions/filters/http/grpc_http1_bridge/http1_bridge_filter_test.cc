@@ -66,7 +66,7 @@ TEST_F(GrpcHttp1BridgeFilterTest, NoRoute) {
 
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
   Http::MetadataMap metadata_map{{"metadata", "metadata"}};
-  EXPECT_EQ(Http::FilterMetadataStatus::ContinueOnlyMetadata, filter_->decodeMetadata(metadata_map));
+  EXPECT_EQ(Http::FilterMetadataStatus::Continue, filter_->decodeMetadata(metadata_map));
 
   Http::TestResponseHeaderMapImpl response_headers{{":status", "404"}};
 }
@@ -98,7 +98,7 @@ TEST_F(GrpcHttp1BridgeFilterTest, Http2HeaderOnlyResponse) {
   Http::TestResponseHeaderMapImpl continue_headers{{":status", "100"}};
   EXPECT_EQ(Http::Filter1xxHeadersStatus::Continue, filter_->encode1xxHeaders(continue_headers));
   Http::MetadataMap metadata_map{{"metadata", "metadata"}};
-  EXPECT_EQ(Http::FilterMetadataStatus::ContinueOnlyMetadata, filter_->encodeMetadata(metadata_map));
+  EXPECT_EQ(Http::FilterMetadataStatus::Continue, filter_->encodeMetadata(metadata_map));
 
   Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}, {"grpc-status", "1"}};
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers, true));

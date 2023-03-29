@@ -165,7 +165,7 @@ DelegatingStreamFilter::decodeTrailers(Envoy::Http::RequestTrailerMap& trailers)
 Envoy::Http::FilterMetadataStatus
 DelegatingStreamFilter::decodeMetadata(Envoy::Http::MetadataMap& metadata_map) {
   if (match_state_.skipFilter()) {
-    return Envoy::Http::FilterMetadataStatus::ContinueOnlyMetadata;
+    return Envoy::Http::FilterMetadataStatus::Continue;
   }
   return decoder_filter_->decodeMetadata(metadata_map);
 }
@@ -225,7 +225,7 @@ DelegatingStreamFilter::encodeTrailers(Envoy::Http::ResponseTrailerMap& trailers
 Envoy::Http::FilterMetadataStatus
 DelegatingStreamFilter::encodeMetadata(Envoy::Http::MetadataMap& metadata_map) {
   if (match_state_.skipFilter()) {
-    return Envoy::Http::FilterMetadataStatus::ContinueOnlyMetadata;
+    return Envoy::Http::FilterMetadataStatus::Continue;
   }
   return decoder_filter_->decodeMetadata(metadata_map);
 }

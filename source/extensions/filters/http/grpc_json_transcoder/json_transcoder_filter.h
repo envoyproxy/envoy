@@ -167,7 +167,7 @@ public:
   Http::FilterDataStatus encodeData(Buffer::Instance& data, bool end_stream) override;
   Http::FilterTrailersStatus encodeTrailers(Http::ResponseTrailerMap& trailers) override;
   Http::FilterMetadataStatus encodeMetadata(Http::MetadataMap&) override {
-    return Http::FilterMetadataStatus::ContinueOnlyMetadata;
+    return Http::FilterMetadataStatus::Continue;
   }
   void setEncoderFilterCallbacks(Http::StreamEncoderFilterCallbacks& callbacks) override;
 

@@ -164,7 +164,7 @@ TEST_F(GrpcWebFilterTest, SupportedContentTypes) {
     request_headers.addCopy(Http::Headers::get().ContentType, content_type);
     EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers, false));
     Http::MetadataMap metadata_map{{"metadata", "metadata"}};
-    EXPECT_EQ(Http::FilterMetadataStatus::ContinueOnlyMetadata, filter_.decodeMetadata(metadata_map));
+    EXPECT_EQ(Http::FilterMetadataStatus::Continue, filter_.decodeMetadata(metadata_map));
     EXPECT_EQ(Http::Headers::get().ContentTypeValues.Grpc, request_headers.getContentTypeValue());
   }
 }
@@ -438,7 +438,7 @@ TEST_P(GrpcWebFilterTest, StatsNormalResponse) {
   EXPECT_EQ(Http::Filter1xxHeadersStatus::Continue, filter_.encode1xxHeaders(continue_headers));
 
   Http::MetadataMap metadata_map{{"metadata", "metadata"}};
-  EXPECT_EQ(Http::FilterMetadataStatus::ContinueOnlyMetadata, filter_.encodeMetadata(metadata_map));
+  EXPECT_EQ(Http::FilterMetadataStatus::Continue, filter_.encodeMetadata(metadata_map));
 
   Http::TestResponseHeaderMapImpl response_headers{
       {":status", "200"}, {"content-type", Http::Headers::get().ContentTypeValues.GrpcWebProto}};

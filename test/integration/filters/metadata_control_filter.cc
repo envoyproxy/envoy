@@ -31,7 +31,7 @@ public:
                                          "reallybad");
       return Http::FilterMetadataStatus::StopIterationForLocalReply;
     }
-    return Http::FilterMetadataStatus::ContinueOnlyMetadata;
+    return Http::FilterMetadataStatus::Continue;
   }
 
   Http::FilterHeadersStatus encodeHeaders(Http::ResponseHeaderMap&, bool end_stream) override {
@@ -50,7 +50,7 @@ public:
                                          "reallybad");
       return Http::FilterMetadataStatus::StopIterationForLocalReply;
     }
-    return Http::FilterMetadataStatus::ContinueOnlyMetadata;
+    return Http::FilterMetadataStatus::Continue;
   }
 };
 

@@ -308,7 +308,7 @@ TEST(DelegatingFilterTest, MatchTreeSkipActionDecodingHeaders) {
   EXPECT_EQ(Envoy::Http::FilterHeadersStatus::Continue,
             delegating_filter->decodeHeaders(*request_headers, false));
   EXPECT_EQ(Envoy::Http::FilterDataStatus::Continue, delegating_filter->decodeData(buffer, false));
-  EXPECT_EQ(Envoy::Http::FilterMetadataStatus::ContinueOnlyMetadata,
+  EXPECT_EQ(Envoy::Http::FilterMetadataStatus::Continue,
             delegating_filter->decodeMetadata(metadata_map));
   EXPECT_EQ(Envoy::Http::FilterTrailersStatus::Continue,
             delegating_filter->decodeTrailers(*request_trailers));
@@ -345,7 +345,7 @@ TEST(DelegatingFilterTest, MatchTreeQueryParamsSkipActionDecodingHeaders) {
   EXPECT_EQ(Envoy::Http::FilterHeadersStatus::Continue,
             delegating_filter->decodeHeaders(*request_headers, false));
   EXPECT_EQ(Envoy::Http::FilterDataStatus::Continue, delegating_filter->decodeData(buffer, false));
-  EXPECT_EQ(Envoy::Http::FilterMetadataStatus::ContinueOnlyMetadata,
+  EXPECT_EQ(Envoy::Http::FilterMetadataStatus::Continue,
             delegating_filter->decodeMetadata(metadata_map));
   EXPECT_EQ(Envoy::Http::FilterTrailersStatus::Continue,
             delegating_filter->decodeTrailers(*request_trailers));
@@ -386,7 +386,7 @@ TEST(DelegatingFilterTest, MatchTreeSkipActionEncodingHeaders) {
             delegating_filter->encode1xxHeaders(*response_headers));
 
   EXPECT_EQ(Envoy::Http::FilterDataStatus::Continue, delegating_filter->encodeData(buffer, false));
-  EXPECT_EQ(Envoy::Http::FilterMetadataStatus::ContinueOnlyMetadata,
+  EXPECT_EQ(Envoy::Http::FilterMetadataStatus::Continue,
             delegating_filter->encodeMetadata(metadata_map));
   EXPECT_EQ(Envoy::Http::FilterTrailersStatus::Continue,
             delegating_filter->encodeTrailers(*response_trailers));

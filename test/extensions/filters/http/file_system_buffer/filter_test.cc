@@ -790,7 +790,7 @@ TEST_F(FileSystemBufferFilterTest, PassesThrough1xxHeaders) {
 TEST_F(FileSystemBufferFilterTest, PassesThroughMetadata) {
   createFilterFromYaml(minimal_config);
   Http::MetadataMap metadata;
-  EXPECT_EQ(Http::FilterMetadataStatus::ContinueOnlyMetadata, filter_->encodeMetadata(metadata));
+  EXPECT_EQ(Http::FilterMetadataStatus::Continue, filter_->encodeMetadata(metadata));
 }
 
 } // namespace FileSystemBuffer

@@ -100,7 +100,7 @@ TEST_F(HealthCheckFilterNoPassThroughTest, OkOrFailed) {
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(request_headers_, false));
   Http::MetadataMap metadata_map{{"metadata", "metadata"}};
-  EXPECT_EQ(Http::FilterMetadataStatus::ContinueOnlyMetadata, filter_->decodeMetadata(metadata_map));
+  EXPECT_EQ(Http::FilterMetadataStatus::Continue, filter_->decodeMetadata(metadata_map));
 }
 
 TEST_F(HealthCheckFilterNoPassThroughTest, NotHcRequest) {
@@ -276,7 +276,7 @@ TEST_F(HealthCheckFilterPassThroughTest, OkWithContinue) {
   Http::TestResponseHeaderMapImpl continue_response{{":status", "100"}};
   EXPECT_EQ(Http::Filter1xxHeadersStatus::Continue, filter_->encode1xxHeaders(continue_response));
   Http::MetadataMap metadata_map{{"metadata", "metadata"}};
-  EXPECT_EQ(Http::FilterMetadataStatus::ContinueOnlyMetadata, filter_->encodeMetadata(metadata_map));
+  EXPECT_EQ(Http::FilterMetadataStatus::Continue, filter_->encodeMetadata(metadata_map));
   Http::TestResponseHeaderMapImpl service_hc_response{{":status", "200"}};
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(service_hc_response, true));
   EXPECT_EQ("cluster_name", service_hc_response.getEnvoyUpstreamHealthCheckedClusterValue());

@@ -1374,7 +1374,7 @@ Http::FilterMetadataStatus convertFilterMetadataStatus(proxy_wasm::FilterMetadat
   switch (status) {
   default:
   case proxy_wasm::FilterMetadataStatus::Continue:
-    return Http::FilterMetadataStatus::ContinueOnlyMetadata;
+    return Http::FilterMetadataStatus::Continue;
   }
 };
 
@@ -1704,11 +1704,11 @@ Http::FilterTrailersStatus Context::decodeTrailers(Http::RequestTrailerMap& trai
 
 Http::FilterMetadataStatus Context::decodeMetadata(Http::MetadataMap& request_metadata) {
   if (!in_vm_context_created_) {
-    return Http::FilterMetadataStatus::ContinueOnlyMetadata;
+    return Http::FilterMetadataStatus::Continue;
   }
   request_metadata_ = &request_metadata;
   auto result = convertFilterMetadataStatus(onRequestMetadata(headerSize(&request_metadata)));
-  if (result == Http::FilterMetadataStatus::ContinueOnlyMetadata) {
+  if (result == Http::FilterMetadataStatus::Continue) {
     request_metadata_ = nullptr;
   }
   return result;
@@ -1774,17 +1774,17 @@ Http::FilterTrailersStatus Context::encodeTrailers(Http::ResponseTrailerMap& tra
 
 Http::FilterMetadataStatus Context::encodeMetadata(Http::MetadataMap& response_metadata) {
   if (!in_vm_context_created_) {
-    return Http::FilterMetadataStatus::ContinueOnlyMetadata;
+    return Http::FilterMetadataStatus::Continue;
   }
   response_metadata_ = &response_metadata;
   auto result = convertFilterMetadataStatus(onResponseMetadata(headerSize(&response_metadata)));
-  if (result == Http::FilterMetadataStatus::ContinueOnlyMetadata) {
+  if (result == Http::FilterMetadataStatus::Continue) {
     response_metadata_ = nullptr;
   }
   return result;
 }
 
-//  Http::FilterMetadataStatus::ContinueOnlyMetadata;
+//  Http::FilterMetadataStatus::Continue;
 
 void Context::setEncoderFilterCallbacks(Envoy::Http::StreamEncoderFilterCallbacks& callbacks) {
   encoder_callbacks_ = &callbacks;

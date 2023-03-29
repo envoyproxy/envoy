@@ -99,7 +99,7 @@ TEST_F(HeaderToMetadataTest, BasicRequestTest) {
   EXPECT_CALL(req_info_, setDynamicMetadata("envoy.lb", MapEq(expected)));
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(incoming_headers, false));
   Http::MetadataMap metadata_map{{"metadata", "metadata"}};
-  EXPECT_EQ(Http::FilterMetadataStatus::ContinueOnlyMetadata, filter_->decodeMetadata(metadata_map));
+  EXPECT_EQ(Http::FilterMetadataStatus::Continue, filter_->decodeMetadata(metadata_map));
   Buffer::OwnedImpl data("data");
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data, false));
   Http::TestRequestTrailerMapImpl incoming_trailers;
@@ -117,7 +117,7 @@ TEST_F(HeaderToMetadataTest, BasicRequestDoubleHeadersTest) {
   EXPECT_CALL(req_info_, setDynamicMetadata("envoy.lb", MapEq(expected)));
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(incoming_headers, false));
   Http::MetadataMap metadata_map{{"metadata", "metadata"}};
-  EXPECT_EQ(Http::FilterMetadataStatus::ContinueOnlyMetadata, filter_->decodeMetadata(metadata_map));
+  EXPECT_EQ(Http::FilterMetadataStatus::Continue, filter_->decodeMetadata(metadata_map));
   Buffer::OwnedImpl data("data");
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data, false));
   Http::TestRequestTrailerMapImpl incoming_trailers;
@@ -142,7 +142,7 @@ TEST_F(HeaderToMetadataTest, PerRouteOverride) {
   EXPECT_CALL(req_info_, setDynamicMetadata("envoy.lb", MapEq(expected)));
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(incoming_headers, false));
   Http::MetadataMap metadata_map{{"metadata", "metadata"}};
-  EXPECT_EQ(Http::FilterMetadataStatus::ContinueOnlyMetadata, filter_->decodeMetadata(metadata_map));
+  EXPECT_EQ(Http::FilterMetadataStatus::Continue, filter_->decodeMetadata(metadata_map));
   Buffer::OwnedImpl data("data");
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data, false));
   Http::TestRequestTrailerMapImpl incoming_trailers;
@@ -205,7 +205,7 @@ response_rules:
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(incoming_headers, false));
   EXPECT_EQ(empty_headers, incoming_headers);
   Http::MetadataMap metadata_map{{"metadata", "metadata"}};
-  EXPECT_EQ(Http::FilterMetadataStatus::ContinueOnlyMetadata, filter_->encodeMetadata(metadata_map));
+  EXPECT_EQ(Http::FilterMetadataStatus::Continue, filter_->encodeMetadata(metadata_map));
   Buffer::OwnedImpl data("data");
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(data, false));
   Http::TestResponseTrailerMapImpl incoming_trailers;

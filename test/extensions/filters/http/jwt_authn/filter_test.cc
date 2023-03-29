@@ -89,7 +89,7 @@ TEST_F(FilterTest, InlineOK) {
   auto headers = Http::TestRequestHeaderMapImpl{};
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, false));
   Http::MetadataMap metadata_map{{"metadata", "metadata"}};
-  EXPECT_EQ(Http::FilterMetadataStatus::ContinueOnlyMetadata, filter_->decodeMetadata(metadata_map));
+  EXPECT_EQ(Http::FilterMetadataStatus::Continue, filter_->decodeMetadata(metadata_map));
   EXPECT_EQ(1U, mock_config_->stats().allowed_.value());
 
   Buffer::OwnedImpl data("");
@@ -109,7 +109,7 @@ TEST_F(FilterTest, CorsPreflight) {
   };
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, false));
   Http::MetadataMap metadata_map{{"metadata", "metadata"}};
-  EXPECT_EQ(Http::FilterMetadataStatus::ContinueOnlyMetadata, filter_->decodeMetadata(metadata_map));
+  EXPECT_EQ(Http::FilterMetadataStatus::Continue, filter_->decodeMetadata(metadata_map));
   EXPECT_EQ(1U, mock_config_->stats().allowed_.value());
   EXPECT_EQ(1U, mock_config_->stats().cors_preflight_bypassed_.value());
   EXPECT_EQ(0U, mock_config_->stats().denied_.value());
