@@ -249,6 +249,9 @@ new_features:
   change: |
     added :ref:`include_tls_session <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.include_tls_session>` to support sending TLS SNI data
     as part of CheckRequest for authorization check.
+- area: tls
+  change: |
+    added new field :ref:`signature_algorithms <envoy_v3_api_field_extensions.transport_sockets.tls.v3.TlsParameters.signature_algorithms>` to set signature algorithms.
 
 deprecated:
 - area: ext_authz
