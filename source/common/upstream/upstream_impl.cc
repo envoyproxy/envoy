@@ -1145,7 +1145,7 @@ ClusterInfoImpl::ClusterInfoImpl(
     idle_timeout = std::chrono::hours(1);
   }
   if (idle_timeout.has_value()) {
-    optional_timeouts_.set<OptionalTimeoutNames::idle_timeout>(*idle_timeout);
+    optional_timeouts_.set<OptionalTimeoutNames::IdleTimeout>(*idle_timeout);
   }
 
   absl::optional<std::chrono::milliseconds> tcp_pool_idle_timeout;
@@ -1158,7 +1158,7 @@ ClusterInfoImpl::ClusterInfoImpl(
     tcp_pool_idle_timeout = std::chrono::minutes(10);
   }
   if (tcp_pool_idle_timeout.has_value()) {
-    optional_timeouts_.set<OptionalTimeoutNames::tcp_pool_idle_timeout>(*tcp_pool_idle_timeout);
+    optional_timeouts_.set<OptionalTimeoutNames::TcpPoolIdleTimeout>(*tcp_pool_idle_timeout);
   }
 
   absl::optional<std::chrono::milliseconds> max_connection_duration;
@@ -1172,7 +1172,7 @@ ClusterInfoImpl::ClusterInfoImpl(
     max_connection_duration = absl::nullopt;
   }
   if (max_connection_duration.has_value()) {
-    optional_timeouts_.set<OptionalTimeoutNames::max_connection_duration>(*max_connection_duration);
+    optional_timeouts_.set<OptionalTimeoutNames::MaxConnectionDuration>(*max_connection_duration);
   }
 
   if (config.has_eds_cluster_config()) {

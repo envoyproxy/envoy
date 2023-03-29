@@ -797,28 +797,24 @@ public:
   }
   std::chrono::milliseconds connectTimeout() const override { return connect_timeout_; }
 
-  enum class OptionalTimeoutNames {
-    idle_timeout = 0,
-    tcp_pool_idle_timeout,
-    max_connection_duration
-  };
+  enum class OptionalTimeoutNames { IdleTimeout = 0, TcpPoolIdleTimeout, MaxConnectionDuration };
   using OptionalTimeouts = PackedStruct<std::chrono::milliseconds, 3, OptionalTimeoutNames>;
   const absl::optional<std::chrono::milliseconds> idleTimeout() const override {
-    auto timeout = optional_timeouts_.get<OptionalTimeoutNames::idle_timeout>();
+    auto timeout = optional_timeouts_.get<OptionalTimeoutNames::IdleTimeout>();
     if (timeout.has_value()) {
       return *timeout;
     }
     return absl::nullopt;
   }
   const absl::optional<std::chrono::milliseconds> tcpPoolIdleTimeout() const override {
-    auto timeout = optional_timeouts_.get<OptionalTimeoutNames::tcp_pool_idle_timeout>();
+    auto timeout = optional_timeouts_.get<OptionalTimeoutNames::TcpPoolIdleTimeout>();
     if (timeout.has_value()) {
       return *timeout;
     }
     return absl::nullopt;
   }
   const absl::optional<std::chrono::milliseconds> maxConnectionDuration() const override {
-    auto timeout = optional_timeouts_.get<OptionalTimeoutNames::max_connection_duration>();
+    auto timeout = optional_timeouts_.get<OptionalTimeoutNames::MaxConnectionDuration>();
     if (timeout.has_value()) {
       return *timeout;
     }
