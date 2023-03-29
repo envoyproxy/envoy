@@ -462,7 +462,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
             "envoy.matching.input_matchers.hyperscan",
             "envoy.regex_engines.hyperscan",
         ],
-        release_date = "2022-03-23",
+        release_date = "2023-03-23",
         cpe = "N/A",
         license = "BSD-3-Clause",
         license_url = "https://github.com/intel/hyperscan/blob/{version}/LICENSE",

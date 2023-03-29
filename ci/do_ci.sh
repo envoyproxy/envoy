@@ -517,7 +517,7 @@ elif [[ "$CI_TARGET" == "deps" ]]; then
   bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/dependency:check \
         --action_env=TODAY_DATE \
         -- -v warn \
-           -c cves release_dates releases || echo "WARNING: Dependency check failed"
+           -c cves release_dates releases
 
   # Run pip requirements tests
   echo "check pip..."
