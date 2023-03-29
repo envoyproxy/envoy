@@ -569,6 +569,5 @@ typedef envoy_proxy_resolution_result (*envoy_proxy_resolver_resolve_f)(
 
 typedef struct {
   envoy_proxy_resolver_resolve_f resolve;
-  envoy_proxy_resolver_proxy_resolution_result_handler proxy_resolution_result_handler;
   const void* context;
 } envoy_proxy_resolver;

@@ -88,8 +88,8 @@ envoy_cc_library(
     hdrs = ["proxy_settings.h"],
     repository = "@envoy",
     deps = [
-      "//library/common/data:utility_lib",
-      "@envoy//source/common/network:utility_lib",
+        "//library/common/data:utility_lib",
+        "@envoy//source/common/network:utility_lib",
     ],
 )
 
@@ -97,14 +97,18 @@ envoy_cc_library(
     name = "apple_proxy_resolution_lib",
     srcs = select({
         "@envoy//bazel:apple": [
-          "apple_pac_proxy_resolver.cc",
-          "apple_system_proxy_settings_monitor.cc",
+            "apple_pac_proxy_resolver.cc",
+            "apple_proxy_resolution.cc",
+            "apple_proxy_resolver.cc",
+            "apple_system_proxy_settings_monitor.cc",
         ],
         "//conditions:default": [],
     }),
     hdrs = select({
         "@envoy//bazel:apple": [
             "apple_pac_proxy_resolver.h",
+            "apple_proxy_resolver.h",
+            "apple_proxy_resolution.h",
             "apple_system_proxy_settings_monitor.h",
             "system_proxy_settings.h",
         ],
@@ -114,6 +118,7 @@ envoy_cc_library(
     deps = select({
         "@envoy//bazel:apple": [
             ":proxy_settings_lib",
+            "//library/common/apple:utility_lib",
             "//library/common/extensions/cert_validator/platform_bridge:c_types_lib",
         ],
         "//conditions:default": [],

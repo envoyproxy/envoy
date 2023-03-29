@@ -35,8 +35,6 @@ public:
 
 private:
   absl::optional<SystemProxySettings> readSystemProxySettings() const;
-  int readIntValue(CFDictionaryRef, CFStringRef) const;
-  std::string readStringValue(CFDictionaryRef, CFStringRef) const;
 
   dispatch_source_t source_;
   dispatch_queue_t queue_;

@@ -3,6 +3,8 @@
 #include <CFNetwork/CFNetwork.h>
 #include <dispatch/dispatch.h>
 
+#include "library/common/apple/utility.h"
+
 namespace Envoy {
 namespace Network {
 
@@ -54,62 +56,31 @@ AppleSystemProxySettingsMonitor::readSystemProxySettings() const {
   // iOS system settings allow users to enter an arbitrary big integer number i.e. 88888888. That
   // being said, testing using iOS 16 shows that Apple's APIs return `is_http_proxy_enabled` equal
   // to false unless entered port number is within [0, 65535] range.
-  const auto is_http_proxy_enabled = readIntValue(proxy_settings, kCFNetworkProxiesHTTPEnable) > 0;
-  const auto is_auto_config_proxy_enabled =
-      readIntValue(proxy_settings, kCFNetworkProxiesProxyAutoConfigEnable) > 0;
+  CFNumberRef cf_is_http_proxy_enabled =
+      static_cast<CFNumberRef>(CFDictionaryGetValue(proxy_settings, kCFNetworkProxiesHTTPEnable));
+  CFNumberRef cf_is_auto_config_proxy_enabled = static_cast<CFNumberRef>(
+      CFDictionaryGetValue(proxy_settings, kCFNetworkProxiesProxyAutoConfigEnable));
+  const auto is_http_proxy_enabled = Apple::toInt(cf_is_http_proxy_enabled) > 0;
+  const auto is_auto_config_proxy_enabled = Apple::toInt(cf_is_auto_config_proxy_enabled) > 0;
 
   absl::optional<SystemProxySettings> settings;
   if (is_http_proxy_enabled) {
-    const auto hostname = readStringValue(proxy_settings, kCFNetworkProxiesHTTPProxy);
-    const auto port = readIntValue(proxy_settings, kCFNetworkProxiesHTTPPort);
+    CFStringRef cf_hostname =
+        static_cast<CFStringRef>(CFDictionaryGetValue(proxy_settings, kCFNetworkProxiesHTTPProxy));
+    CFNumberRef cf_port =
+        static_cast<CFNumberRef>(CFDictionaryGetValue(proxy_settings, kCFNetworkProxiesHTTPPort));
+    const auto hostname = Apple::toString(cf_hostname);
+    const auto port = Apple::toInt(cf_port);
     settings = absl::make_optional<SystemProxySettings>({std::move(hostname), port});
   } else if (is_auto_config_proxy_enabled) {
-    const auto pac_file_url =
-        readStringValue(proxy_settings, kCFNetworkProxiesProxyAutoConfigURLString);
-    settings = absl::make_optional(std::move(pac_file_url));
+    CFStringRef cf_pac_file_url_string = static_cast<CFStringRef>(
+        CFDictionaryGetValue(proxy_settings, kCFNetworkProxiesProxyAutoConfigURLString));
+    const auto pac_file_url_string = Apple::toString(cf_pac_file_url_string);
+    settings = absl::make_optional(std::move(pac_file_url_string));
   }
 
   CFRelease(proxy_settings);
   return settings;
-}
-
-int AppleSystemProxySettingsMonitor::readIntValue(CFDictionaryRef dictionary,
-                                                  CFStringRef key) const {
-  CFNumberRef number = static_cast<CFNumberRef>(CFDictionaryGetValue(dictionary, key));
-  if (number == nullptr) {
-    return 0;
-  }
-
-  int value;
-  CFNumberGetValue(number, kCFNumberSInt64Type, &value);
-  return value;
-}
-
-std::string AppleSystemProxySettingsMonitor::readStringValue(CFDictionaryRef dictionary,
-                                                             CFStringRef key) const {
-  CFStringRef string = static_cast<CFStringRef>(CFDictionaryGetValue(dictionary, key));
-  if (string == nullptr) {
-    return "";
-  }
-
-  // A pointer to a C string or NULL if the internal storage of string
-  // does not allow this to be returned efficiently.
-  auto efficient_c_str = CFStringGetCStringPtr(string, kCFStringEncodingUTF8);
-  if (efficient_c_str) {
-    return std::string(efficient_c_str);
-  }
-
-  CFIndex length = CFStringGetLength(string);
-  CFIndex size = CFStringGetMaximumSizeForEncoding(length, kCFStringEncodingUTF8) + 1;
-  char* c_str = static_cast<char*>(malloc(size));
-  // Use less efficient method of getting c string if the most performant one failed
-  if (CFStringGetCString(string, c_str, size, kCFStringEncodingUTF8)) {
-    const auto ret = std::string(c_str);
-    free(c_str);
-    return ret;
-  }
-
-  return "";
 }
 
 } // namespace Network

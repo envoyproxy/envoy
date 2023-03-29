@@ -46,6 +46,9 @@ struct ProxySettings {
     return std::make_shared<ProxySettings>(host, port);
   }
 
+  // Whether proxy settings
+  bool isNoProxy() const { return hostname_ == "" && port_ == 0; }
+
   static const ProxySettingsConstSharedPtr create(envoy_proxy_settings_list proxy_settings_list) {
     if (proxy_settings_list.length < 1) {
       return nullptr;
