@@ -185,6 +185,63 @@ public:
     decoder->onData(buffer, underflow);
   }
 
+  void writeMessageMultiStruct() {
+    Buffer::OwnedImpl buffer;
+    auto metadata_ptr =
+        std::make_shared<Extensions::NetworkFilters::ThriftProxy::MessageMetadata>();
+    auto& metadata = *metadata_ptr;
+
+    Buffer::OwnedImpl msg;
+    ProtocolPtr proto = NamedProtocolConfigFactory::getFactory(protocol_).createProtocol();
+    metadata.setProtocol(protocol_);
+    metadata.setMethodName("foo");
+    metadata.setMessageType(MessageType::Call);
+    metadata.setSequenceId(0);
+
+    proto->writeMessageBegin(msg, metadata);
+    proto->writeStructBegin(msg, "wrapper");
+    proto->writeFieldBegin(msg, "context", FieldType::Struct, 1);
+    proto->writeStructBegin(msg, "context");
+
+    proto->writeFieldBegin(msg, "source", FieldType::String, 1);
+    proto->writeString(msg, "bar");
+    proto->writeFieldEnd(msg);
+
+    proto->writeFieldBegin(msg, "requestId", FieldType::String, 2);
+    proto->writeString(msg, "42");
+    proto->writeFieldEnd(msg);
+
+    proto->writeFieldBegin(msg, "", FieldType::Stop, 0); // context stop field
+    proto->writeStructEnd(msg);
+    proto->writeFieldEnd(msg);
+
+    proto->writeFieldBegin(msg, "request", FieldType::Struct, 2);
+    proto->writeStructBegin(msg, "request");
+
+    proto->writeFieldBegin(msg, "baz", FieldType::String, 1);
+    proto->writeString(msg, "qux");
+    proto->writeFieldEnd(msg);
+
+    proto->writeFieldBegin(msg, "", FieldType::Stop, 0); // request stop field
+    proto->writeStructEnd(msg);
+    proto->writeFieldEnd(msg);
+
+    proto->writeFieldBegin(msg, "", FieldType::Stop, 0); // wrapper stop field
+    proto->writeStructEnd(msg);
+    proto->writeMessageEnd(msg);
+
+    TransportPtr transport = NamedTransportConfigFactory::getFactory(transport_).createTransport();
+    transport->encodeFrame(buffer, metadata, msg);
+
+    // Simulate the decoder events. Check PassThroughDecoderEventHandler.
+    ProtocolPtr decoder_proto = NamedProtocolConfigFactory::getFactory(protocol_).createProtocol();
+    TransportPtr decoder_transport =
+        NamedTransportConfigFactory::getFactory(transport_).createTransport();
+    DecoderPtr decoder = std::make_unique<Decoder>(*decoder_transport, *decoder_proto, *this);
+    bool underflow = false;
+    decoder->onData(buffer, underflow);
+  }
+
   NiceMock<ThriftProxy::ThriftFilters::MockDecoderFilterCallbacks> decoder_callbacks_;
   NiceMock<Envoy::StreamInfo::MockStreamInfo> req_info_;
   std::shared_ptr<PayloadToMetadataFilter> filter_;
@@ -1125,6 +1182,80 @@ request_rules:
   EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
 
   writeMessage();
+  filter_->onDestroy();
+}
+
+TEST_F(PayloadToMetadataTest, MultipleRulesInSamePathFirstRuleUnmatched) {
+  const std::string request_config_yaml = R"EOF(
+request_rules:
+  - method_name: not_foo
+    field_selector:
+      name: second_field
+      id: 2
+    on_present:
+      metadata_namespace: envoy.lb
+      key: present
+  - method_name: foo
+    field_selector:
+      name: second_field
+      id: 2
+    on_present:
+      metadata_namespace: envoy.lb
+      key: present2
+)EOF";
+
+  std::map<std::string, std::string> expected = {{"present2", "two"}};
+
+  initializeFilter(request_config_yaml);
+  EXPECT_CALL(req_info_, setDynamicMetadata("envoy.lb", MapEq(expected)));
+  EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
+
+  writeMessage();
+  filter_->onDestroy();
+}
+
+TEST_F(PayloadToMetadataTest, MultipleRulesOnMultiStruct) {
+  const std::string request_config_yaml = R"EOF(
+request_rules:
+  - method_name: unmatched_foo
+    field_selector:
+      name: request
+      id: 2
+      child:
+        name: baz
+        id: 1
+    on_present:
+      metadata_namespace: envoy.lb
+      key: baz
+  - method_name: unmatched_foo2
+    field_selector:
+      name: request
+      id: 2
+      child:
+        name: baz
+        id: 1
+    on_present:
+      metadata_namespace: envoy.lb
+      key: baz
+  - method_name: foo
+    field_selector:
+      name: request
+      id: 2
+      child:
+        name: baz
+        id: 1
+    on_present:
+      metadata_namespace: envoy.lb
+      key: baz
+)EOF";
+
+  std::map<std::string, std::string> expected = {{"baz", "qux"}};
+
+  initializeFilter(request_config_yaml);
+  EXPECT_CALL(req_info_, setDynamicMetadata("envoy.lb", MapEq(expected)));
+  EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
+
+  writeMessageMultiStruct();
   filter_->onDestroy();
 }
 
