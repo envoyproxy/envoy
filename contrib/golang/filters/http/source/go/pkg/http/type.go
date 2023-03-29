@@ -230,7 +230,16 @@ func (h *requestOrResponseTrailerMapImpl) Del(key string) {
 }
 
 func (h *requestOrResponseTrailerMapImpl) Range(f func(key, value string) bool) {
-	panic("unsupported yet")
+	if h.headers == nil {
+		h.headers = cAPI.HttpCopyTrailers(unsafe.Pointer(h.request.req), h.headerNum, h.headerBytes)
+	}
+	for key, values := range h.headers {
+		for _, value := range values {
+			if !f(key, value) {
+				return
+			}
+		}
+	}
 }
 
 // api.RequestTrailerMap
