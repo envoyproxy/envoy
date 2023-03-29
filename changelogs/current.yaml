@@ -254,7 +254,6 @@ new_features:
   change: |
     added :ref:`include_tls_session <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.include_tls_session>` to support sending TLS SNI data
     as part of CheckRequest for authorization check.
-
 deprecated:
 - area: ext_authz
   change: |
