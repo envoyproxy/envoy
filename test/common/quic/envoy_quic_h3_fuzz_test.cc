@@ -610,14 +610,8 @@ public:
       // Called when a packet is received with a connection id that does not
       // match the ID of this connection.
       void OnIncorrectConnectionId(quic::QuicConnectionId /*connection_id*/) LOG_VISIT
-
-      // Called when an un-decryptable packet has been received. If |dropped| is
-      // true, the packet has been dropped. Otherwise, the packet will be queued and
-      // connection will attempt to process it later.
       void OnUndecryptablePacket(quic::EncryptionLevel /*decryption_level*/,
                                  bool /*dropped*/) LOG_VISIT
-
-      // Called when attempting to process a previously un-decryptable packet.
       void OnAttemptingToProcessUndecryptablePacket(
           quic::EncryptionLevel /*decryption_level*/) LOG_VISIT
 
