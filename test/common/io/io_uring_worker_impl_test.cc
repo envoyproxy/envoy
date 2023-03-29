@@ -6,8 +6,10 @@
 
 #include "gtest/gtest.h"
 
+using testing::DoAll;
 using testing::Invoke;
 using testing::NiceMock;
+using testing::Return;
 using testing::ReturnNew;
 using testing::SaveArg;
 
@@ -34,6 +36,7 @@ public:
   void onAcceptSocket(AcceptedSocketParam&) override {}
   void onRead(ReadParam&) override {}
   void onWrite(WriteParam&) override {}
+  void onClose() override {}
 };
 
 TEST(IoUringWorkerImplTest, CleanupSocket) {
@@ -117,8 +120,10 @@ TEST(IoUringWorkerImplTest, ServerSocketInjectAfterWrite) {
   TestIoUringHandler handler;
   SET_SOCKET_INVALID(fd);
 
+  void* read_req = nullptr;
   // The read request added by server socket constructor.
-  EXPECT_CALL(mock_io_uring, prepareReadv(fd, _, _, _, _));
+  EXPECT_CALL(mock_io_uring, prepareReadv(fd, _, _, _, _))
+      .WillOnce(DoAll(SaveArg<4>(&read_req), Return<IoUringResult>(IoUringResult::Ok)));
   EXPECT_CALL(mock_io_uring, submit()).Times(1).RetiresOnSaturation();
   auto& io_uring_socket = worker.addServerSocket(fd, handler);
 
@@ -126,7 +131,10 @@ TEST(IoUringWorkerImplTest, ServerSocketInjectAfterWrite) {
   std::string data = "Hello";
   Buffer::OwnedImpl buf1;
   buf1.add(data);
-  EXPECT_CALL(mock_io_uring, prepareWritev(fd, _, _, _, _)).Times(1).RetiresOnSaturation();
+  void* write_req = nullptr;
+  EXPECT_CALL(mock_io_uring, prepareWritev(fd, _, _, _, _))
+      .WillOnce(DoAll(SaveArg<4>(&write_req), Return<IoUringResult>(IoUringResult::Ok)))
+      .RetiresOnSaturation();
   EXPECT_CALL(mock_io_uring, submit()).Times(1).RetiresOnSaturation();
   io_uring_socket.write(buf1);
 
@@ -148,11 +156,40 @@ TEST(IoUringWorkerImplTest, ServerSocketInjectAfterWrite) {
   EXPECT_CALL(mock_io_uring, submit()).Times(0).RetiresOnSaturation();
   io_uring_socket.write(buf2);
 
+  // Start the close process.
+  void* cancel_req = nullptr;
+  EXPECT_CALL(mock_io_uring, prepareCancel(_, _))
+      .WillOnce(DoAll(SaveArg<1>(&cancel_req), Return<IoUringResult>(IoUringResult::Ok)))
+      .RetiresOnSaturation();
+  EXPECT_CALL(mock_io_uring, submit()).Times(1).RetiresOnSaturation();
+  io_uring_socket.close();
+
+  // Finish the read, cancel and write request, then expect the close request submitted.
+  EXPECT_CALL(mock_io_uring, forEveryCompletion(_))
+      .WillOnce(Invoke([&read_req, &cancel_req, &write_req](const CompletionCb& cb) {
+        cb(reinterpret_cast<void*>(read_req), -EAGAIN, false);
+        cb(reinterpret_cast<void*>(cancel_req), 0, false);
+        cb(reinterpret_cast<void*>(write_req), -EAGAIN, false);
+      }));
+  void* close_req = nullptr;
+  EXPECT_CALL(mock_io_uring, prepareClose(_, _))
+      .WillOnce(DoAll(SaveArg<1>(&close_req), Return<IoUringResult>(IoUringResult::Ok)))
+      .RetiresOnSaturation();
+  EXPECT_CALL(mock_io_uring, submit()).Times(1).RetiresOnSaturation();
+  file_event_callback(Event::FileReadyType::Read);
+
+  // After the close request finsihed, the socket will be cleanup.
+  EXPECT_CALL(mock_io_uring, forEveryCompletion(_))
+      .WillOnce(Invoke([&close_req](const CompletionCb& cb) {
+        cb(reinterpret_cast<void*>(close_req), 0, false);
+      }));
   EXPECT_CALL(mock_io_uring, removeInjectedCompletion(fd));
   EXPECT_CALL(dispatcher, deferredDelete_);
-  worker.getSockets().front()->cleanup();
-  EXPECT_EQ(0, worker.getSockets().size());
   EXPECT_CALL(dispatcher, clearDeferredDeleteList());
+  EXPECT_CALL(mock_io_uring, submit()).Times(1).RetiresOnSaturation();
+  file_event_callback(Event::FileReadyType::Read);
+
+  EXPECT_EQ(0, worker.getSockets().size());
 }
 
 // This tests ensure the read request won't be override by an injected completion.
@@ -174,7 +211,9 @@ TEST(IoUringWorkerImplTest, ServerSocketInjectAfterRead) {
   SET_SOCKET_INVALID(fd);
 
   // The read request added by server socket constructor.
-  EXPECT_CALL(mock_io_uring, prepareReadv(fd, _, _, _, _));
+  void* read_req = nullptr;
+  EXPECT_CALL(mock_io_uring, prepareReadv(fd, _, _, _, _))
+      .WillOnce(DoAll(SaveArg<4>(&read_req), Return<IoUringResult>(IoUringResult::Ok)));
   EXPECT_CALL(mock_io_uring, submit()).Times(1).RetiresOnSaturation();
   auto& io_uring_socket = worker.addServerSocket(fd, handler);
 
@@ -189,15 +228,38 @@ TEST(IoUringWorkerImplTest, ServerSocketInjectAfterRead) {
 
   // When close the socket, expect there still have a incomplete read
   // request, so it has to cancel the request first.
-  EXPECT_CALL(mock_io_uring, prepareCancel(_, _));
+  void* cancel_req = nullptr;
+  EXPECT_CALL(mock_io_uring, prepareCancel(_, _))
+      .WillOnce(DoAll(SaveArg<1>(&cancel_req), Return<IoUringResult>(IoUringResult::Ok)))
+      .RetiresOnSaturation();
   EXPECT_CALL(mock_io_uring, submit()).Times(1).RetiresOnSaturation();
   io_uring_socket.close();
 
+  // Finish the read and cancel request, then expect the close request submitted.
+  EXPECT_CALL(mock_io_uring, forEveryCompletion(_))
+      .WillOnce(Invoke([&read_req, &cancel_req](const CompletionCb& cb) {
+        cb(reinterpret_cast<void*>(read_req), -EAGAIN, false);
+        cb(reinterpret_cast<void*>(cancel_req), 0, false);
+      }));
+  void* close_req = nullptr;
+  EXPECT_CALL(mock_io_uring, prepareClose(_, _))
+      .WillOnce(DoAll(SaveArg<1>(&close_req), Return<IoUringResult>(IoUringResult::Ok)))
+      .RetiresOnSaturation();
+  EXPECT_CALL(mock_io_uring, submit()).Times(1).RetiresOnSaturation();
+  file_event_callback(Event::FileReadyType::Read);
+
+  // After the close request finsihed, the socket will be cleanup.
+  EXPECT_CALL(mock_io_uring, forEveryCompletion(_))
+      .WillOnce(Invoke([&close_req](const CompletionCb& cb) {
+        cb(reinterpret_cast<void*>(close_req), 0, false);
+      }));
   EXPECT_CALL(mock_io_uring, removeInjectedCompletion(fd));
   EXPECT_CALL(dispatcher, deferredDelete_);
-  worker.getSockets().front()->cleanup();
-  EXPECT_EQ(0, worker.getSockets().size());
   EXPECT_CALL(dispatcher, clearDeferredDeleteList());
+  EXPECT_CALL(mock_io_uring, submit()).Times(1).RetiresOnSaturation();
+  file_event_callback(Event::FileReadyType::Read);
+
+  EXPECT_EQ(0, worker.getSockets().size());
 }
 
 TEST(IoUringWorkerImplTest, CloseAllSocketsWhenDestruction) {
@@ -219,42 +281,47 @@ TEST(IoUringWorkerImplTest, CloseAllSocketsWhenDestruction) {
   SET_SOCKET_INVALID(fd);
 
   // The read request added by server socket constructor.
-  EXPECT_CALL(mock_io_uring, prepareReadv(fd, _, _, _, _));
+  void* read_req = nullptr;
+  EXPECT_CALL(mock_io_uring, prepareReadv(fd, _, _, _, _))
+      .WillOnce(DoAll(SaveArg<4>(&read_req), Return<IoUringResult>(IoUringResult::Ok)));
   EXPECT_CALL(mock_io_uring, submit()).Times(1).RetiresOnSaturation();
-  auto& io_uring_socket = worker.addServerSocket(fd, handler);
+  worker.addServerSocket(fd, handler);
 
   // The IoUringWorker will close all the existing sockets.
-  EXPECT_CALL(mock_io_uring, prepareCancel(_, _));
+  void* cancel_req = nullptr;
+  EXPECT_CALL(mock_io_uring, prepareCancel(_, _))
+      .WillOnce(DoAll(SaveArg<1>(&cancel_req), Return<IoUringResult>(IoUringResult::Ok)))
+      .RetiresOnSaturation();
   EXPECT_CALL(mock_io_uring, submit()).Times(1).RetiresOnSaturation();
 
   // The IoUringWorker will wait for the socket closed.
   EXPECT_CALL(dispatcher, run(_))
-      .WillOnce(Invoke(
-          [&io_uring_socket, &file_event_callback, &mock_io_uring, fd](Event::Dispatcher::RunType) {
-            // Fake an injected completion.
-            EXPECT_CALL(mock_io_uring, forEveryCompletion(_))
-                .WillOnce(Invoke([&mock_io_uring, &io_uring_socket, fd](const CompletionCb& cb) {
-                  // When the cancel request is done, the close request will be submitted.
-                  EXPECT_CALL(mock_io_uring, prepareClose(fd, _));
-                  EXPECT_CALL(mock_io_uring, submit()).Times(1).RetiresOnSaturation();
+      .WillOnce(Invoke([&file_event_callback, &mock_io_uring, fd, &read_req,
+                        &cancel_req](Event::Dispatcher::RunType) {
+        // Fake an injected completion.
+        EXPECT_CALL(mock_io_uring, forEveryCompletion(_))
+            .WillOnce(Invoke([&mock_io_uring, fd, &read_req, &cancel_req](const CompletionCb& cb) {
+              // When the cancel request is done, the close request will be submitted.
+              void* close_req = nullptr;
+              EXPECT_CALL(mock_io_uring, prepareClose(fd, _))
+                  .WillOnce(DoAll(SaveArg<1>(&close_req), Return<IoUringResult>(IoUringResult::Ok)))
+                  .RetiresOnSaturation();
+              EXPECT_CALL(mock_io_uring, submit()).Times(1).RetiresOnSaturation();
 
-                  EXPECT_CALL(mock_io_uring, removeInjectedCompletion(fd));
+              EXPECT_CALL(mock_io_uring, removeInjectedCompletion(fd));
 
-                  // Fake the read request cancel completion.
-                  auto* read_req = new ReadRequest(io_uring_socket, 10);
-                  cb(reinterpret_cast<void*>(read_req), -ECANCELED, false);
+              // Fake the read request cancel completion.
+              cb(reinterpret_cast<void*>(read_req), -ECANCELED, false);
 
-                  // Fake the cancel request is done.
-                  auto* cancel_req = new BaseRequest(RequestType::Cancel, io_uring_socket);
-                  cb(reinterpret_cast<void*>(cancel_req), 0, false);
+              // Fake the cancel request is done.
+              cb(reinterpret_cast<void*>(cancel_req), 0, false);
 
-                  // Fake the close request is done.
-                  auto* close_req = new BaseRequest(RequestType::Close, io_uring_socket);
-                  cb(reinterpret_cast<void*>(close_req), 0, false);
-                }));
+              // Fake the close request is done.
+              cb(reinterpret_cast<void*>(close_req), 0, false);
+            }));
 
-            file_event_callback(Event::FileReadyType::Read);
-          }));
+        file_event_callback(Event::FileReadyType::Read);
+      }));
 
   EXPECT_CALL(dispatcher, deferredDelete_);
   EXPECT_CALL(dispatcher, clearDeferredDeleteList());
