@@ -195,36 +195,12 @@ absl::Status FilterStateImpl::addAncestor(const FilterStateSharedPtr& ancestor) 
       return absl::FailedPreconditionError(absl::StrCat("Ancestor and this share a key: ", key));
     }
   }
-  // Add the ancestor to the pre-existing parent/ancestor
+  // Add the ancestor to the pre-existing parent/ancestor.
   if (parent_) {
     if (parent_.get() == ancestor.get()) {
       return absl::OkStatus();
     }
     auto status = parent_->addAncestor(ancestor);
-    if (status.ok()) {
-      return status;
-    }
-    return absl::FailedPreconditionError(
-        absl::StrCat("Could not add ancestor to pre-existing ancestor: ", status.message()));
-  }
-  if (auto* ancestor_ptr = absl::get_if<FilterStateSharedPtr>(&ancestor_);
-      ancestor_ptr && *ancestor_ptr) {
-    if (ancestor_ptr->get() == ancestor.get()) {
-      return absl::OkStatus();
-    }
-    auto status = (*ancestor_ptr)->addAncestor(ancestor);
-    if (status.ok()) {
-      return status;
-    }
-    return absl::FailedPreconditionError(
-        absl::StrCat("Could not add ancestor to pre-existing ancestor: ", status.message()));
-  }
-  if (auto* lazy_create_ancestor = absl::get_if<LazyCreateAncestor>(&ancestor_);
-      lazy_create_ancestor && lazy_create_ancestor->first) {
-    if (lazy_create_ancestor->first.get() == ancestor.get()) {
-      return absl::OkStatus();
-    }
-    auto status = lazy_create_ancestor->first->addAncestor(ancestor);
     if (status.ok()) {
       return status;
     }

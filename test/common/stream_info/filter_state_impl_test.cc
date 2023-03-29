@@ -510,53 +510,6 @@ TEST_F(FilterStateImplTest, AddAncestorWithBadData) {
                      StatusHelpers::HasStatusMessage("Ancestor and this share a key: test_1")));
 }
 
-// The following two tests are very similar, only differing by whether bottom filter state is
-// instantiated via LazyCreateAncestor or a direct ancestor.
-TEST_F(FilterStateImplTest, AddAncestorWithExistingLazyAncestor) {
-  auto middle_filter_state = std::make_shared<FilterStateImpl>(FilterState::LifeSpan::Request);
-  middle_filter_state->setData("test_1", std::make_shared<SimpleType>(1),
-                               FilterState::StateType::ReadOnly, FilterState::LifeSpan::Request);
-  auto bottom_filter_state =
-      FilterStateImpl(std::make_pair(middle_filter_state, FilterState::LifeSpan::Request),
-                      FilterState::LifeSpan::FilterChain);
-  auto elder_filter_state = std::make_shared<FilterStateImpl>(FilterState::LifeSpan::Connection);
-  elder_filter_state->setData("test_1", std::make_shared<SimpleType>(1),
-                              FilterState::StateType::ReadOnly, FilterState::LifeSpan::Connection);
-  // Fail to add elder filter state because it conflicts with the existing ancestor.
-  EXPECT_THAT(bottom_filter_state.addAncestor(elder_filter_state),
-              testing::AllOf(StatusHelpers::HasStatusCode(absl::StatusCode::kFailedPrecondition),
-                             StatusHelpers::HasStatusMessage(
-                                 "Could not add ancestor to pre-existing ancestor: Ancestor and "
-                                 "this share a key: test_1")));
-  // Re-adding existing ancestor.
-  EXPECT_OK(bottom_filter_state.addAncestor(middle_filter_state));
-  // Successfully adding a top level ancestor.
-  elder_filter_state = std::make_shared<FilterStateImpl>(FilterState::LifeSpan::Connection);
-  EXPECT_OK(bottom_filter_state.addAncestor(elder_filter_state));
-}
-
-TEST_F(FilterStateImplTest, AddAncestorWithExistingAncestor) {
-  auto middle_filter_state = std::make_shared<FilterStateImpl>(FilterState::LifeSpan::Request);
-  middle_filter_state->setData("test_1", std::make_shared<SimpleType>(1),
-                               FilterState::StateType::ReadOnly, FilterState::LifeSpan::Request);
-  auto bottom_filter_state =
-      FilterStateImpl(middle_filter_state, FilterState::LifeSpan::FilterChain);
-  auto elder_filter_state = std::make_shared<FilterStateImpl>(FilterState::LifeSpan::Connection);
-  elder_filter_state->setData("test_1", std::make_shared<SimpleType>(1),
-                              FilterState::StateType::ReadOnly, FilterState::LifeSpan::Connection);
-  // Fail to add elder filter state because it conflicts with the existing ancestor.
-  EXPECT_THAT(bottom_filter_state.addAncestor(elder_filter_state),
-              testing::AllOf(StatusHelpers::HasStatusCode(absl::StatusCode::kFailedPrecondition),
-                             StatusHelpers::HasStatusMessage(
-                                 "Could not add ancestor to pre-existing ancestor: Ancestor and "
-                                 "this share a key: test_1")));
-  // Re-adding existing ancestor.
-  EXPECT_OK(bottom_filter_state.addAncestor(middle_filter_state));
-  // Successfully adding a top level ancestor.
-  elder_filter_state = std::make_shared<FilterStateImpl>(FilterState::LifeSpan::Connection);
-  EXPECT_OK(bottom_filter_state.addAncestor(elder_filter_state));
-}
-
 TEST_F(FilterStateImplTest, AddNullptrAncestor) { EXPECT_OK(filterState().addAncestor(nullptr)); }
 
 TEST_F(FilterStateImplTest, CreateStateWithEmptyAncestor) {
@@ -566,6 +519,20 @@ TEST_F(FilterStateImplTest, CreateStateWithEmptyAncestor) {
 
   filter_state.setData("test", std::make_unique<SimpleType>(1), FilterState::StateType::ReadOnly,
                        FilterState::LifeSpan::Connection);
+}
+
+TEST_F(FilterStateImplTest, CreateStateWithNonEmptyAncestor) {
+  auto ancestor_filter_state = std::make_shared<FilterStateImpl>(FilterState::LifeSpan::Connection);
+  // Non-lazy initialization:
+  auto filter_state = FilterStateImpl(ancestor_filter_state, FilterState::LifeSpan::FilterChain);
+  EXPECT_THAT(filter_state.parent(), testing::NotNull());
+
+  // Lazy initialization:
+  auto lazy_filter_state =
+      FilterStateImpl(std::make_pair<FilterStateSharedPtr, FilterState::LifeSpan>(
+                          ancestor_filter_state, FilterState::LifeSpan::Connection),
+                      FilterState::LifeSpan::FilterChain);
+  EXPECT_THAT(lazy_filter_state.parent(), testing::NotNull());
 }
 
 } // namespace StreamInfo
