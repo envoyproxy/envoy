@@ -40,19 +40,6 @@ type headerMapImpl struct {
 	headerBytes uint64
 }
 
-func (h *headerMapImpl) Range(f func(key, value string) bool) {
-	if h.headers == nil {
-		h.headers = cAPI.HttpCopyHeaders(unsafe.Pointer(h.request.req), h.headerNum, h.headerBytes)
-	}
-	for key, values := range h.headers {
-		for _, value := range values {
-			if !f(key, value) {
-				return
-			}
-		}
-	}
-}
-
 // ByteSize return size of HeaderMap
 func (h *headerMapImpl) ByteSize() uint64 {
 	return h.headerBytes
@@ -127,6 +114,19 @@ func (h *requestOrResponseHeaderMapImpl) Del(key string) {
 	}
 	delete(h.headers, key)
 	cAPI.HttpRemoveHeader(unsafe.Pointer(h.request.req), &key)
+}
+
+func (h *requestOrResponseHeaderMapImpl) Range(f func(key, value string) bool) {
+	if h.headers == nil {
+		h.headers = cAPI.HttpCopyHeaders(unsafe.Pointer(h.request.req), h.headerNum, h.headerBytes)
+	}
+	for key, values := range h.headers {
+		for _, value := range values {
+			if !f(key, value) {
+				return
+			}
+		}
+	}
 }
 
 // api.RequestHeaderMap
@@ -226,6 +226,10 @@ func (h *requestOrResponseTrailerMapImpl) Add(key, value string) {
 }
 
 func (h *requestOrResponseTrailerMapImpl) Del(key string) {
+	panic("unsupported yet")
+}
+
+func (h *requestOrResponseTrailerMapImpl) Range(f func(key, value string) bool) {
 	panic("unsupported yet")
 }
 
