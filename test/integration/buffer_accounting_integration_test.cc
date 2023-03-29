@@ -812,6 +812,13 @@ TEST_P(Http2OverloadManagerIntegrationTest,
 }
 
 TEST_P(Http2OverloadManagerIntegrationTest, CanResetStreamIfEnvoyLevelStreamEnded) {
+  // This test is not applicable if expand_agnostic_stream_lifetime is enabled
+  // as the gap between lifetimes of the codec level and envoy level stream
+  // shrinks.
+  if (Runtime::runtimeFeatureEnabled(Runtime::expand_agnostic_stream_lifetime)) {
+    return;
+  }
+
   useAccessLog("%RESPONSE_CODE%");
   initializeOverloadManagerInBootstrap(
       TestUtility::parseYaml<envoy::config::overload::v3::OverloadAction>(R"EOF(
