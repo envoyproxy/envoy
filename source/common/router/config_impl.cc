@@ -27,7 +27,6 @@
 #include "source/common/common/fmt.h"
 #include "source/common/common/hash.h"
 #include "source/common/common/logger.h"
-#include "source/common/common/packed_struct.h"
 #include "source/common/common/regex.h"
 #include "source/common/common/utility.h"
 #include "source/common/config/metadata.h"
