@@ -731,7 +731,7 @@ duration_filter:
 
   StreamInfo::MockStreamInfo mock_stream_info;
   EXPECT_CALL(mock_stream_info, currentDuration())
-      .WillOnce(testing::Return(std::chrono::microseconds(1000))) // 1ms
+      .WillOnce(testing::Return(std::chrono::microseconds(1000)))     // 1ms
       .WillOnce(testing::Return(std::chrono::microseconds(1000000))); // 1000ms
 
   EXPECT_FALSE(
