@@ -128,37 +128,45 @@ func envoyGoFilterOnHttpHeader(r *C.httpRequest, endStream, headerNum, headerByt
 	switch phase {
 	case api.DecodeHeaderPhase:
 		header := &requestHeaderMapImpl{
-			headerMapImpl{
-				request:     req,
-				headerNum:   headerNum,
-				headerBytes: headerBytes,
+			requestOrResponseHeaderMapImpl{
+				headerMapImpl{
+					request:     req,
+					headerNum:   headerNum,
+					headerBytes: headerBytes,
+				},
 			},
 		}
 		status = f.DecodeHeaders(header, endStream == 1)
 	case api.DecodeTrailerPhase:
 		header := &requestTrailerMapImpl{
-			headerMapImpl{
-				request:     req,
-				headerNum:   headerNum,
-				headerBytes: headerBytes,
+			requestOrResponseTrailerMapImpl{
+				headerMapImpl{
+					request:     req,
+					headerNum:   headerNum,
+					headerBytes: headerBytes,
+				},
 			},
 		}
 		status = f.DecodeTrailers(header)
 	case api.EncodeHeaderPhase:
 		header := &responseHeaderMapImpl{
-			headerMapImpl{
-				request:     req,
-				headerNum:   headerNum,
-				headerBytes: headerBytes,
+			requestOrResponseHeaderMapImpl{
+				headerMapImpl{
+					request:     req,
+					headerNum:   headerNum,
+					headerBytes: headerBytes,
+				},
 			},
 		}
 		status = f.EncodeHeaders(header, endStream == 1)
 	case api.EncodeTrailerPhase:
 		header := &responseTrailerMapImpl{
-			headerMapImpl{
-				request:     req,
-				headerNum:   headerNum,
-				headerBytes: headerBytes,
+			requestOrResponseTrailerMapImpl{
+				headerMapImpl{
+					request:     req,
+					headerNum:   headerNum,
+					headerBytes: headerBytes,
+				},
 			},
 		}
 		status = f.EncodeTrailers(header)
