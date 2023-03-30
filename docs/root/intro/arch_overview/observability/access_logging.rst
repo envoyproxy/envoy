@@ -30,7 +30,7 @@ Start of session access logs
 TCP Proxy
 *********
 
-For TCP Proxy, it is possible to enable an access log record once after a successful upstream connection by using 
+For TCP Proxy, it is possible to enable an access log record once after a successful upstream connection by using
 :ref:`flush access log on connected <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.flush_access_log_on_connected>`
 
 HTTP Connection Manager
