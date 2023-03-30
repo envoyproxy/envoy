@@ -119,7 +119,7 @@ message Router {
   // [#extension-category: envoy.filters.http.upstream]
   repeated network.http_connection_manager.v3.HttpFilter upstream_http_filters = 8;
 
-  // If set to true, an upstream access log will recorded an access log once when a new HTTP request is received, after request
-  // headers have been evaluated, before iterating through the HTTP filter chain.
+  // If set to true, an upstream access log will recorded once when a new HTTP request is received,
+  // and an upstream connection has been successfully established.
   bool flush_upstream_log_on_new_request = 9;
 }
