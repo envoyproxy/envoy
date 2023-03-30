@@ -23,6 +23,9 @@ minor_behavior_changes:
 - area: local_ratelimit
   change: |
     Tokens from local descriptor's token buckets are burned before tokens from the default token bucket.
+- area: http stream
+  change: |
+    Extended the lifetime of the protocol agnostic stream object to correct discrepancies between what is access logged and what occurred with the protocol specific stream. This behavior change can be reverted by setting ``envoy_reloadable_features_expand_agnostic_stream_lifetime`` to ``false``.
 - area: http2
   change: |
     Request authorities are now validated with a library function from QUICHE rather than nghttp2. This behavior change can be reverted by setting ``envoy.reloadable_features.http2_validate_authority_with_quiche`` to ``false``.
@@ -56,6 +59,10 @@ minor_behavior_changes:
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
+- area: http
+  change: |
+    sanitization of the referer header has been relaxed to allow relative URLs, and also tightened to remove referers containing userinfo or fragment components, as documented here :ref:`here <config_http_conn_man_headers_referer>`.
+    This behavioral change can be temporarily reverted by setting runtime guard ``envoy.reloadable_features.http_allow_partial_urls_in_referer`` to false.
 - area: stats
   change: |
     now updating upstream total connection stats as happy eyeballs connections are created.
@@ -238,15 +245,22 @@ new_features:
 - area: redis
   change: |
     added :ref:`wait_for_warm_on_init <envoy_v3_api_field_config.cluster.v3.Cluster.wait_for_warm_on_init>` support for :ref:`Redis Cluster<arch_overview_redis>`.
+- area: access_log
+  change: |
+    added access log support for ``%STREAM_STATE%`` command operator. Using the command operator will extract a value representing the state of the stream.
+    Access logs at the beginning of the stream will have 'Started' value. Periodic access logs during an active stream, will have 'InProgress' value. Default access log,
+    at the end of a stream will have 'Ended' value. In case the stream has not started yet, the value will be null.
 - area: ext_authz
   change: |
     added :ref:`include_tls_session <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.include_tls_session>` to support sending TLS SNI data
     as part of CheckRequest for authorization check.
+- area: tls
+  change: |
+    added new field :ref:`signature_algorithms <envoy_v3_api_field_extensions.transport_sockets.tls.v3.TlsParameters.signature_algorithms>` to set signature algorithms.
 - area: http
   change: |
     added capability for continuing filter chain iteration or send local replies from (decode|encode)Metadata. Additionally, reset idle timer on
     metadata actions.
-
 
 deprecated:
 - area: ext_authz

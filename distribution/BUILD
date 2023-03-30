@@ -8,11 +8,20 @@ envoy_package()
 
 MAINTAINER = "Envoy maintainers <envoy-maintainers@googlegroups.com>"
 
+exports_files(glob([
+    "custom/envoy*",
+]))
+
 genrule(
     name = "envoy-bin",
     srcs = ["//source/exe:envoy-static"],
     outs = ["envoy"],
     cmd = "strip $(location //source/exe:envoy-static) -o $@",
+)
+
+label_flag(
+    name = "envoy-binary",
+    build_setting_default = ":envoy-bin",
 )
 
 envoy_pkg_distros(
