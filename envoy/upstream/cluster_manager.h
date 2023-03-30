@@ -362,12 +362,12 @@ public:
   virtual ClusterManagerFactory& clusterManagerFactory() PURE;
 
   /**
-   * Obtain the subscription factory for the cluster manager. Since subscriptions may have an
-   * upstream component, the factory is a facet of the cluster manager.
+   * Obtain the subscription creator for the cluster manager. Since subscriptions may have an
+   * upstream component, the creator is a facet of the cluster manager.
    *
-   * @return Config::SubscriptionFactory& the subscription factory.
+   * @return Config::SubscriptionCreator& the subscription creator.
    */
-  virtual Config::SubscriptionFactory& subscriptionFactory() PURE;
+  virtual Config::SubscriptionCreator& subscriptionCreator() PURE;
 
   /**
    * Returns a struct with all the Stats::StatName objects needed by

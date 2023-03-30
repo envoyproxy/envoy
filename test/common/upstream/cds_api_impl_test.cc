@@ -40,9 +40,9 @@ protected:
     cds_ = CdsApiImpl::create(cds_config, nullptr, cm_, *store_.rootScope(), validation_visitor_);
     cds_->setInitializedCb([this]() -> void { initialized_.ready(); });
 
-    EXPECT_CALL(*cm_.subscription_factory_.subscription_, start(_));
+    EXPECT_CALL(*cm_.subscription_creator_.subscription_, start(_));
     cds_->initialize();
-    cds_callbacks_ = cm_.subscription_factory_.callbacks_;
+    cds_callbacks_ = cm_.subscription_creator_.callbacks_;
   }
 
   void expectAdd(const std::string& cluster_name, const std::string& version = std::string("")) {

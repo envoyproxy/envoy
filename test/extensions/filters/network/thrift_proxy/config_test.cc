@@ -275,7 +275,7 @@ resources:
       TestUtility::parseYaml<envoy::service::discovery::v3::DiscoveryResponse>(response_yaml);
   const auto decoded_resources = TestUtility::decodeResources<
       envoy::extensions::filters::network::thrift_proxy::v3::RouteConfiguration>(response);
-  context_.server_factory_context_.cluster_manager_.subscription_factory_.callbacks_
+  context_.server_factory_context_.cluster_manager_.subscription_creator_.callbacks_
       ->onConfigUpdate(decoded_resources.refvec_, response.version_info());
   auto message_ptr = context_.admin_.config_tracker_.config_tracker_callbacks_["trds_routes"](
       universal_name_matcher);

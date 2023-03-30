@@ -175,7 +175,7 @@ virtual_hosts: null
     auto response =
         TestUtility::parseYaml<envoy::service::discovery::v3::DiscoveryResponse>(response_json);
     const auto decoded_resources = TestUtility::decodeResources<RouteConfiguration>(response);
-    server_factory_context_.cluster_manager_.subscription_factory_.callbacks_->onConfigUpdate(
+    server_factory_context_.cluster_manager_.subscription_creator_.callbacks_->onConfigUpdate(
         decoded_resources.refvec_, response.version_info());
   }
 

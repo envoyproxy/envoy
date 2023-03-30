@@ -117,8 +117,8 @@ http_filters:
     rds_ = RouteConfigProviderUtil::create(
         parseHttpConnectionManagerFromYaml(config_yaml), server_factory_context_,
         validation_visitor_, outer_init_manager_, "foo.", *route_config_provider_manager_);
-    rds_callbacks_ = server_factory_context_.cluster_manager_.subscription_factory_.callbacks_;
-    EXPECT_CALL(*server_factory_context_.cluster_manager_.subscription_factory_.subscription_,
+    rds_callbacks_ = server_factory_context_.cluster_manager_.subscription_creator_.callbacks_;
+    EXPECT_CALL(*server_factory_context_.cluster_manager_.subscription_creator_.subscription_,
                 start(_));
     outer_init_manager_.initialize(init_watcher_);
   }
@@ -764,7 +764,7 @@ TEST_F(RdsRouteConfigSubscriptionTest, CreatesNoopInitManager) {
   EXPECT_EQ(init_vhds, nullptr);
   EXPECT_EQ(noop_init_manager, nullptr);
   // Now mark local_init_target_ ready by forcing an update failure.
-  auto* rds_callbacks_ = server_factory_context_.cluster_manager_.subscription_factory_.callbacks_;
+  auto* rds_callbacks_ = server_factory_context_.cluster_manager_.subscription_creator_.callbacks_;
   EnvoyException e("test");
   rds_callbacks_->onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason::UpdateRejected,
                                        &e);
@@ -782,7 +782,7 @@ public:
     rds_.mutable_config_source()->set_path("foo_path");
     provider_ = route_config_provider_manager_->createRdsRouteConfigProvider(
         rds_, OptionalHttpFilters(), server_factory_context_, "foo_prefix.", outer_init_manager_);
-    rds_callbacks_ = server_factory_context_.cluster_manager_.subscription_factory_.callbacks_;
+    rds_callbacks_ = server_factory_context_.cluster_manager_.subscription_creator_.callbacks_;
   }
 
   RouteConfigProviderManagerImplTest() {
@@ -867,7 +867,7 @@ dynamic_route_configs:
 
   // Static + dynamic.
   setup();
-  EXPECT_CALL(*server_factory_context_.cluster_manager_.subscription_factory_.subscription_,
+  EXPECT_CALL(*server_factory_context_.cluster_manager_.subscription_creator_.subscription_,
               start(_));
   outer_init_manager_.initialize(init_watcher_);
 
@@ -986,7 +986,7 @@ virtual_hosts:
 )EOF");
   const auto decoded_resources = TestUtility::decodeResources({route_config});
 
-  server_factory_context_.cluster_manager_.subscription_factory_.callbacks_->onConfigUpdate(
+  server_factory_context_.cluster_manager_.subscription_creator_.callbacks_->onConfigUpdate(
       decoded_resources.refvec_, "1");
 
   RouteConfigProviderSharedPtr provider2 =
@@ -1010,7 +1010,7 @@ virtual_hosts:
       route_config_provider_manager_->createRdsRouteConfigProvider(
           rds2, OptionalHttpFilters(), server_factory_context_, "foo_prefix", outer_init_manager_);
   EXPECT_NE(provider3, provider_);
-  server_factory_context_.cluster_manager_.subscription_factory_.callbacks_->onConfigUpdate(
+  server_factory_context_.cluster_manager_.subscription_creator_.callbacks_->onConfigUpdate(
       decoded_resources.refvec_, "provider3");
   UniversalStringMatcher universal_name_matcher;
   EXPECT_EQ(2UL, route_config_provider_manager_->dumpRouteConfigs(universal_name_matcher)
@@ -1071,7 +1071,7 @@ virtual_hosts:
 )EOF");
     const auto decoded_resources = TestUtility::decodeResources({route_config});
 
-    server_factory_context_.cluster_manager_.subscription_factory_.callbacks_->onConfigUpdate(
+    server_factory_context_.cluster_manager_.subscription_creator_.callbacks_->onConfigUpdate(
         decoded_resources.refvec_, "1");
 
     EXPECT_TRUE(provider_->configInfo().has_value());
@@ -1082,23 +1082,23 @@ virtual_hosts:
 
 TEST_F(RouteConfigProviderManagerImplTest, OnConfigUpdateEmpty) {
   setup();
-  EXPECT_CALL(*server_factory_context_.cluster_manager_.subscription_factory_.subscription_,
+  EXPECT_CALL(*server_factory_context_.cluster_manager_.subscription_creator_.subscription_,
               start(_));
   outer_init_manager_.initialize(init_watcher_);
   EXPECT_CALL(init_watcher_, ready());
-  server_factory_context_.cluster_manager_.subscription_factory_.callbacks_->onConfigUpdate({}, "");
+  server_factory_context_.cluster_manager_.subscription_creator_.callbacks_->onConfigUpdate({}, "");
 }
 
 TEST_F(RouteConfigProviderManagerImplTest, OnConfigUpdateWrongSize) {
   setup();
-  EXPECT_CALL(*server_factory_context_.cluster_manager_.subscription_factory_.subscription_,
+  EXPECT_CALL(*server_factory_context_.cluster_manager_.subscription_creator_.subscription_,
               start(_));
   outer_init_manager_.initialize(init_watcher_);
   envoy::config::route::v3::RouteConfiguration route_config;
   const auto decoded_resources = TestUtility::decodeResources({route_config, route_config});
   EXPECT_CALL(init_watcher_, ready());
   EXPECT_THROW_WITH_MESSAGE(
-      server_factory_context_.cluster_manager_.subscription_factory_.callbacks_->onConfigUpdate(
+      server_factory_context_.cluster_manager_.subscription_creator_.callbacks_->onConfigUpdate(
           decoded_resources.refvec_, ""),
       EnvoyException, "Unexpected RDS resource length: 2");
 }
@@ -1125,7 +1125,7 @@ dynamic_route_configs:
 
   // dynamic.
   setup();
-  EXPECT_CALL(*server_factory_context_.cluster_manager_.subscription_factory_.subscription_,
+  EXPECT_CALL(*server_factory_context_.cluster_manager_.subscription_creator_.subscription_,
               start(_));
   outer_init_manager_.initialize(init_watcher_);
 

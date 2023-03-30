@@ -81,7 +81,7 @@ public:
     )EOF",
                  Envoy::Upstream::Cluster::InitializePhase::Secondary);
 
-    EXPECT_CALL(*server_context_.cluster_manager_.subscription_factory_.subscription_, start(_));
+    EXPECT_CALL(*server_context_.cluster_manager_.subscription_creator_.subscription_, start(_));
     cluster_->initialize([this] { initialized_ = true; });
     EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(testing::Return(&async_stream_));
     subscription_->start({"fare"});
@@ -98,7 +98,7 @@ public:
     cluster_ = std::make_shared<EdsClusterImpl>(server_context_, eds_cluster_, factory_context,
                                                 runtime_, false);
     EXPECT_EQ(initialize_phase, cluster_->initializePhase());
-    eds_callbacks_ = server_context_.cluster_manager_.subscription_factory_.callbacks_;
+    eds_callbacks_ = server_context_.cluster_manager_.subscription_creator_.callbacks_;
     subscription_ = std::make_unique<Config::GrpcSubscriptionImpl>(
         grpc_mux_, *eds_callbacks_, resource_decoder_, subscription_stats_, type_url_,
         server_context_.dispatcher_, std::chrono::milliseconds(), false,

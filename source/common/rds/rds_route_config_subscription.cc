@@ -33,7 +33,7 @@ RdsRouteConfigSubscription::RdsRouteConfigSubscription(
       resource_decoder_(std::move(resource_decoder)) {
   const auto resource_type = route_config_provider_manager_.protoTraits().resourceType();
   subscription_ =
-      factory_context.clusterManager().subscriptionFactory().subscriptionFromConfigSource(
+      factory_context.clusterManager().subscriptionCreator().subscriptionFromConfigSource(
           config_source, Envoy::Grpc::Common::typeUrl(resource_type), *scope_, *this,
           resource_decoder_, {});
   local_init_manager_.add(local_init_target_);

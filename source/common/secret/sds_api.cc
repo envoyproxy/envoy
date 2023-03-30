@@ -16,7 +16,7 @@ SdsApiStats SdsApi::generateStats(Stats::Scope& scope) {
 }
 
 SdsApi::SdsApi(envoy::config::core::v3::ConfigSource sds_config, absl::string_view sds_config_name,
-               Config::SubscriptionFactory& subscription_factory, TimeSource& time_source,
+               Config::SubscriptionCreator& subscription_creator, TimeSource& time_source,
                ProtobufMessage::ValidationVisitor& validation_visitor, Stats::Store& stats,
                std::function<void()> destructor_cb, Event::Dispatcher& dispatcher, Api::Api& api)
     : Envoy::Config::SubscriptionBase<envoy::extensions::transport_sockets::tls::v3::Secret>(
@@ -26,12 +26,12 @@ SdsApi::SdsApi(envoy::config::core::v3::ConfigSource sds_config, absl::string_vi
       scope_(stats.createScope(absl::StrCat("sds.", sds_config_name, "."))),
       sds_api_stats_(generateStats(*scope_)), sds_config_(std::move(sds_config)),
       sds_config_name_(sds_config_name), secret_hash_(0), clean_up_(std::move(destructor_cb)),
-      subscription_factory_(subscription_factory),
+      subscription_creator_(subscription_creator),
       time_source_(time_source), secret_data_{sds_config_name_, "uninitialized",
                                               time_source_.systemTime()} {
   const auto resource_name = getResourceName();
   // This has to happen here (rather than in initialize()) as it can throw exceptions.
-  subscription_ = subscription_factory_.subscriptionFromConfigSource(
+  subscription_ = subscription_creator_.subscriptionFromConfigSource(
       sds_config_, Grpc::Common::typeUrl(resource_name), *scope_, *this, resource_decoder_, {});
 }
 

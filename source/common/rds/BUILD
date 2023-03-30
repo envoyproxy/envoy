@@ -40,7 +40,7 @@ envoy_cc_library(
         "//source/common/common:minimal_logger_lib",
         "//source/common/config:api_version_lib",
         "//source/common/config:subscription_base_interface",
-        "//source/common/config:subscription_factory_lib",
+        "//source/common/config:subscription_creator_lib",
         "//source/common/config:utility_lib",
         "//source/common/init:manager_lib",
         "//source/common/init:target_lib",

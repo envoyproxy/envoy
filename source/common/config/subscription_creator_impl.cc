@@ -1,4 +1,4 @@
-#include "source/common/config/subscription_factory_impl.h"
+#include "source/common/config/subscription_creator_impl.h"
 
 #include "envoy/config/core/v3/config_source.pb.h"
 #include "envoy/config/xds_resources_delegate.h"
@@ -18,7 +18,7 @@
 namespace Envoy {
 namespace Config {
 
-SubscriptionFactoryImpl::SubscriptionFactoryImpl(
+SubscriptionCreatorImpl::SubscriptionCreatorImpl(
     const LocalInfo::LocalInfo& local_info, Event::Dispatcher& dispatcher,
     Upstream::ClusterManager& cm, ProtobufMessage::ValidationVisitor& validation_visitor,
     Api::Api& api, const Server::Instance& server,
@@ -27,7 +27,7 @@ SubscriptionFactoryImpl::SubscriptionFactoryImpl(
       validation_visitor_(validation_visitor), api_(api), server_(server),
       xds_resources_delegate_(xds_resources_delegate), xds_config_tracker_(xds_config_tracker) {}
 
-SubscriptionPtr SubscriptionFactoryImpl::subscriptionFromConfigSource(
+SubscriptionPtr SubscriptionCreatorImpl::subscriptionFromConfigSource(
     const envoy::config::core::v3::ConfigSource& config, absl::string_view type_url,
     Stats::Scope& scope, SubscriptionCallbacks& callbacks,
     OpaqueResourceDecoderSharedPtr resource_decoder, const SubscriptionOptions& options) {
@@ -151,7 +151,7 @@ SubscriptionPtr SubscriptionFactoryImpl::subscriptionFromConfigSource(
                          resource_decoder, stats, validation_visitor_);
 }
 
-SubscriptionPtr SubscriptionFactoryImpl::collectionSubscriptionFromUrl(
+SubscriptionPtr SubscriptionCreatorImpl::collectionSubscriptionFromUrl(
     const xds::core::v3::ResourceLocator& collection_locator,
     const envoy::config::core::v3::ConfigSource& config, absl::string_view resource_type,
     Stats::Scope& scope, SubscriptionCallbacks& callbacks,

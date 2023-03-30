@@ -407,10 +407,10 @@ protected:
 
   /**
    * Returns the subscription associated with the config_source_proto; if none exists, a new one
-   * is allocated according to the subscription_factory_fn.
+   * is allocated according to the subscription_creator_fn.
    * @param config_source_proto supplies the proto specifying the config subscription parameters.
    * @param init_manager supplies the init manager.
-   * @param subscription_factory_fn supplies a function to be called when a new subscription needs
+   * @param subscription_creator_fn supplies a function to be called when a new subscription needs
    *                                to be allocated.
    * @return std::shared_ptr<T> an existing (if a match is found) or newly allocated subscription.
    */
@@ -418,7 +418,7 @@ protected:
   std::shared_ptr<T>
   getSubscription(const Protobuf::Message& config_source_proto, Init::Manager& init_manager,
                   const std::function<ConfigSubscriptionCommonBaseSharedPtr(
-                      const uint64_t, ConfigProviderManagerImplBase&)>& subscription_factory_fn) {
+                      const uint64_t, ConfigProviderManagerImplBase&)>& subscription_creator_fn) {
     static_assert(std::is_base_of<ConfigSubscriptionCommonBase, T>::value,
                   "T must be a subclass of ConfigSubscriptionCommonBase");
 
@@ -430,7 +430,7 @@ protected:
       // std::make_shared does not work for classes with private constructors. There are ways
       // around it. However, since this is not a performance critical path we err on the side
       // of simplicity.
-      subscription = subscription_factory_fn(manager_identifier, *this);
+      subscription = subscription_creator_fn(manager_identifier, *this);
       init_manager.add(subscription->parent_init_target_);
 
       bindSubscription(manager_identifier, subscription);

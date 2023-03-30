@@ -49,7 +49,7 @@ VhdsSubscription::VhdsSubscription(RouteConfigUpdatePtr& config_update_info,
   Envoy::Config::SubscriptionOptions options;
   options.use_namespace_matching_ = true;
   subscription_ =
-      factory_context.clusterManager().subscriptionFactory().subscriptionFromConfigSource(
+      factory_context.clusterManager().subscriptionCreator().subscriptionFromConfigSource(
           config_update_info_->protobufConfigurationCast().vhds().config_source(),
           Grpc::Common::typeUrl(resource_name), *scope_, *this, resource_decoder_, options);
 }

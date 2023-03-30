@@ -274,9 +274,9 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "subscription_factory_lib",
-    srcs = ["subscription_factory_impl.cc"],
-    hdrs = ["subscription_factory_impl.h"],
+    name = "subscription_creator_lib",
+    srcs = ["subscription_creator_impl.cc"],
+    hdrs = ["subscription_creator_impl.h"],
     deps = [
         ":custom_config_validators_lib",
         ":grpc_subscription_lib",

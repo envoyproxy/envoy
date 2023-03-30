@@ -475,7 +475,7 @@ RtdsSubscription::RtdsSubscription(
 
 void RtdsSubscription::createSubscription() {
   const auto resource_name = getResourceName();
-  subscription_ = parent_.cm_->subscriptionFactory().subscriptionFromConfigSource(
+  subscription_ = parent_.cm_->subscriptionCreator().subscriptionFromConfigSource(
       config_source_, Grpc::Common::typeUrl(resource_name), *stats_scope_, *this, resource_decoder_,
       {});
 }

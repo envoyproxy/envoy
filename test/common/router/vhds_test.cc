@@ -91,7 +91,7 @@ vhds:
   Envoy::Rds::RouteConfigProvider* provider_ = nullptr;
   Protobuf::util::MessageDifferencer messageDifferencer_;
   std::string default_vhds_config_;
-  NiceMock<Envoy::Config::MockSubscriptionFactory> subscription_factory_;
+  NiceMock<Envoy::Config::MockSubscriptionCreator> subscription_creator_;
 };
 
 // verify that api_type: DELTA_GRPC passes validation
@@ -136,7 +136,7 @@ TEST_F(VhdsTest, VhdsAddsVirtualHosts) {
   const auto decoded_resources =
       TestUtility::decodeResources<envoy::config::route::v3::VirtualHost>(added_resources);
   const Protobuf::RepeatedPtrField<std::string> removed_resources;
-  factory_context_.cluster_manager_.subscription_factory_.callbacks_->onConfigUpdate(
+  factory_context_.cluster_manager_.subscription_creator_.callbacks_->onConfigUpdate(
       decoded_resources.refvec_, removed_resources, "1");
 
   EXPECT_EQ(1UL, config_update_info->protobufConfigurationCast().virtual_hosts_size());
@@ -196,7 +196,7 @@ vhds:
   const auto decoded_resources =
       TestUtility::decodeResources<envoy::config::route::v3::VirtualHost>(added_resources);
   const Protobuf::RepeatedPtrField<std::string> removed_resources;
-  factory_context_.cluster_manager_.subscription_factory_.callbacks_->onConfigUpdate(
+  factory_context_.cluster_manager_.subscription_creator_.callbacks_->onConfigUpdate(
       decoded_resources.refvec_, removed_resources, "1");
   EXPECT_EQ(2UL, config_update_info->protobufConfigurationCast().virtual_hosts_size());
 

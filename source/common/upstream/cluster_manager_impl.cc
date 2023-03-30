@@ -343,7 +343,7 @@ ClusterManagerImpl::ClusterManagerImpl(
         validation_context.dynamicValidationVisitor(), main_thread_dispatcher, *stats.rootScope());
   }
 
-  subscription_factory_ = std::make_unique<Config::SubscriptionFactoryImpl>(
+  subscription_creator_ = std::make_unique<Config::SubscriptionCreatorImpl>(
       local_info, main_thread_dispatcher, *this, validation_context.dynamicValidationVisitor(), api,
       server, makeOptRefFromPtr(xds_resources_delegate_.get()),
       makeOptRefFromPtr(xds_config_tracker_.get()));
@@ -360,7 +360,7 @@ ClusterManagerImpl::ClusterManagerImpl(
   auto is_primary_cluster = [](const envoy::config::cluster::v3::Cluster& cluster) -> bool {
     return cluster.type() != envoy::config::cluster::v3::Cluster::EDS ||
            (cluster.type() == envoy::config::cluster::v3::Cluster::EDS &&
-            Config::SubscriptionFactory::isPathBasedConfigSource(
+            Config::SubscriptionCreator::isPathBasedConfigSource(
                 cluster.eds_cluster_config().eds_config().config_source_specifier_case()));
   };
   // Build book-keeping for which clusters are primary. This is useful when we
@@ -459,7 +459,7 @@ ClusterManagerImpl::ClusterManagerImpl(
   for (const auto& cluster : bootstrap.static_resources().clusters()) {
     // Now load all the secondary clusters.
     if (cluster.type() == envoy::config::cluster::v3::Cluster::EDS &&
-        !Config::SubscriptionFactory::isPathBasedConfigSource(
+        !Config::SubscriptionCreator::isPathBasedConfigSource(
             cluster.eds_cluster_config().eds_config().config_source_specifier_case())) {
       loadCluster(cluster, MessageUtil::hash(cluster), "", false, active_clusters_);
     }

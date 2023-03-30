@@ -13,9 +13,9 @@
 namespace Envoy {
 namespace Config {
 
-class SubscriptionFactory {
+class SubscriptionCreator {
 public:
-  virtual ~SubscriptionFactory() = default;
+  virtual ~SubscriptionCreator() = default;
 
   /**
    * @return true if a config source comes from the local filesystem.

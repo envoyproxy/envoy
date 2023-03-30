@@ -93,7 +93,7 @@ public:
         stats_, validation_visitor_);
 
     // Setup LEDS subscription.
-    EXPECT_CALL(server_context_.cluster_manager_.subscription_factory_,
+    EXPECT_CALL(server_context_.cluster_manager_.subscription_creator_,
                 collectionSubscriptionFromUrl(
                     _, _,
                     Eq(envoy::config::endpoint::v3::LbEndpoint().GetDescriptor()->full_name()), _,

@@ -25,10 +25,10 @@ CdsApiImpl::CdsApiImpl(const envoy::config::core::v3::ConfigSource& cds_config,
       helper_(cm, "cds"), cm_(cm), scope_(scope.createScope("cluster_manager.cds.")) {
   const auto resource_name = getResourceName();
   if (cds_resources_locator == nullptr) {
-    subscription_ = cm_.subscriptionFactory().subscriptionFromConfigSource(
+    subscription_ = cm_.subscriptionCreator().subscriptionFromConfigSource(
         cds_config, Grpc::Common::typeUrl(resource_name), *scope_, *this, resource_decoder_, {});
   } else {
-    subscription_ = cm.subscriptionFactory().collectionSubscriptionFromUrl(
+    subscription_ = cm.subscriptionCreator().collectionSubscriptionFromUrl(
         *cds_resources_locator, cds_config, resource_name, *scope_, *this, resource_decoder_);
   }
 }

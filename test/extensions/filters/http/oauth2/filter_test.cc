@@ -223,10 +223,10 @@ TEST_F(OAuth2Test, SdsDynamicGenericSecret) {
 
   auto client_secret_provider = secret_manager.findOrCreateGenericSecretProvider(
       config_source, "client", secret_context, init_manager);
-  auto client_callback = secret_context.cluster_manager_.subscription_factory_.callbacks_;
+  auto client_callback = secret_context.cluster_manager_.subscription_creator_.callbacks_;
   auto token_secret_provider = secret_manager.findOrCreateGenericSecretProvider(
       config_source, "token", secret_context, init_manager);
-  auto token_callback = secret_context.cluster_manager_.subscription_factory_.callbacks_;
+  auto token_callback = secret_context.cluster_manager_.subscription_creator_.callbacks_;
 
   SDSSecretReader secret_reader(client_secret_provider, token_secret_provider, *api);
   EXPECT_TRUE(secret_reader.clientSecret().empty());

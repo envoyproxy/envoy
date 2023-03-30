@@ -329,18 +329,18 @@ protected:
         .WillByDefault(Return(std::make_shared<::Envoy::Config::NullGrpcMuxImpl>()));
 
     InSequence s;
-    // Since server_factory_context_.cluster_manager_.subscription_factory_.callbacks_ is taken by
+    // Since server_factory_context_.cluster_manager_.subscription_creator_.callbacks_ is taken by
     // the SRDS subscription. We need to return a different MockSubscription here for each RDS
     // subscription. To build the map from RDS route_config_name to the RDS subscription, we need to
     // get the route_config_name by mocking start() on the Config::Subscription.
 
     // srds subscription
-    EXPECT_CALL(server_factory_context_.cluster_manager_.subscription_factory_,
+    EXPECT_CALL(server_factory_context_.cluster_manager_.subscription_creator_,
                 subscriptionFromConfigSource(_, _, _, _, _, _))
         .Times(AnyNumber());
     // rds subscription
     EXPECT_CALL(
-        server_factory_context_.cluster_manager_.subscription_factory_,
+        server_factory_context_.cluster_manager_.subscription_creator_,
         subscriptionFromConfigSource(
             _,
             Eq(Grpc::Common::typeUrl(
@@ -393,7 +393,7 @@ scope_key_builder:
         ScopedRoutesConfigProviderManagerOptArg(
             scoped_routes_config.name(), scoped_routes_config.rds_config_source(),
             scoped_routes_config.scope_key_builder(), optional_http_filters));
-    srds_subscription_ = server_factory_context_.cluster_manager_.subscription_factory_.callbacks_;
+    srds_subscription_ = server_factory_context_.cluster_manager_.subscription_creator_.callbacks_;
   }
 
   void srdsUpdateWithYaml(std::vector<std::string> const& config_yamls,

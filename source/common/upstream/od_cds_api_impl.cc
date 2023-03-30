@@ -30,10 +30,10 @@ OdCdsApiImpl::OdCdsApiImpl(const envoy::config::core::v3::ConfigSource& odcds_co
   // class for CDS and ODCDS.
   const auto resource_name = getResourceName();
   if (!odcds_resources_locator.has_value()) {
-    subscription_ = cm_.subscriptionFactory().subscriptionFromConfigSource(
+    subscription_ = cm_.subscriptionCreator().subscriptionFromConfigSource(
         odcds_config, Grpc::Common::typeUrl(resource_name), *scope_, *this, resource_decoder_, {});
   } else {
-    subscription_ = cm.subscriptionFactory().collectionSubscriptionFromUrl(
+    subscription_ = cm.subscriptionCreator().collectionSubscriptionFromUrl(
         *odcds_resources_locator, odcds_config, resource_name, *scope_, *this, resource_decoder_);
   }
 }

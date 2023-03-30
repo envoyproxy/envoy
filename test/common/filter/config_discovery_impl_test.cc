@@ -170,8 +170,8 @@ public:
 
   void setup(bool warm = true, bool default_configuration = false, bool last_filter_config = true) {
     provider_ = createProvider("foo", warm, default_configuration, last_filter_config);
-    callbacks_ = server_factory_context_.cluster_manager_.subscription_factory_.callbacks_;
-    EXPECT_CALL(*server_factory_context_.cluster_manager_.subscription_factory_.subscription_,
+    callbacks_ = server_factory_context_.cluster_manager_.subscription_creator_.callbacks_;
+    EXPECT_CALL(*server_factory_context_.cluster_manager_.subscription_creator_.subscription_,
                 start(_));
     if (!warm) {
       EXPECT_CALL(init_watcher_, ready());

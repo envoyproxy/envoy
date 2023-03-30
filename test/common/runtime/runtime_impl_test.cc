@@ -871,8 +871,8 @@ public:
       rtds_layer->set_name(layer_resource_name);
       rtds_layer->mutable_rtds_config();
     }
-    EXPECT_CALL(cm_, subscriptionFactory()).Times(layers_.size());
-    ON_CALL(cm_.subscription_factory_, subscriptionFromConfigSource(_, _, _, _, _, _))
+    EXPECT_CALL(cm_, subscriptionCreator()).Times(layers_.size());
+    ON_CALL(cm_.subscription_creator_, subscriptionFromConfigSource(_, _, _, _, _, _))
         .WillByDefault(testing::Invoke(
             [this](const envoy::config::core::v3::ConfigSource&, absl::string_view, Stats::Scope&,
                    Config::SubscriptionCallbacks& callbacks, Config::OpaqueResourceDecoderSharedPtr,
@@ -1206,7 +1206,7 @@ TEST_F(RtdsLoaderImplTest, MultipleRtdsLayers) {
 
 TEST_F(RtdsLoaderImplTest, BadConfigSource) {
   Upstream::MockClusterManager cm_;
-  EXPECT_CALL(cm_.subscription_factory_, subscriptionFromConfigSource(_, _, _, _, _, _))
+  EXPECT_CALL(cm_.subscription_creator_, subscriptionFromConfigSource(_, _, _, _, _, _))
       .WillOnce(InvokeWithoutArgs([]() -> Config::SubscriptionPtr {
         throw EnvoyException("bad config");
         return nullptr;
@@ -1219,7 +1219,7 @@ TEST_F(RtdsLoaderImplTest, BadConfigSource) {
   rtds_layer->set_name("some_resource");
   rtds_layer->mutable_rtds_config();
 
-  EXPECT_CALL(cm_, subscriptionFactory());
+  EXPECT_CALL(cm_, subscriptionCreator());
   LoaderImpl loader(dispatcher_, tls_, config, local_info_, store_, generator_, validation_visitor_,
                     *api_);
 

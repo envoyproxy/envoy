@@ -74,10 +74,10 @@ public:
               (const absl::flat_hash_set<std::string>& add_these_names));
 };
 
-class MockSubscriptionFactory : public SubscriptionFactory {
+class MockSubscriptionCreator : public SubscriptionCreator {
 public:
-  MockSubscriptionFactory();
-  ~MockSubscriptionFactory() override;
+  MockSubscriptionCreator();
+  ~MockSubscriptionCreator() override;
 
   MOCK_METHOD(SubscriptionPtr, subscriptionFromConfigSource,
               (const envoy::config::core::v3::ConfigSource& config, absl::string_view type_url,

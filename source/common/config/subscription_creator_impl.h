@@ -16,16 +16,16 @@
 namespace Envoy {
 namespace Config {
 
-class SubscriptionFactoryImpl : public SubscriptionFactory, Logger::Loggable<Logger::Id::config> {
+class SubscriptionCreatorImpl : public SubscriptionCreator, Logger::Loggable<Logger::Id::config> {
 public:
-  SubscriptionFactoryImpl(const LocalInfo::LocalInfo& local_info, Event::Dispatcher& dispatcher,
+  SubscriptionCreatorImpl(const LocalInfo::LocalInfo& local_info, Event::Dispatcher& dispatcher,
                           Upstream::ClusterManager& cm,
                           ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api,
                           const Server::Instance& server,
                           XdsResourcesDelegateOptRef xds_resources_delegate,
                           XdsConfigTrackerOptRef xds_config_tracker);
 
-  // Config::SubscriptionFactory
+  // Config::SubscriptionCreator
   SubscriptionPtr subscriptionFromConfigSource(const envoy::config::core::v3::ConfigSource& config,
                                                absl::string_view type_url, Stats::Scope& scope,
                                                SubscriptionCallbacks& callbacks,

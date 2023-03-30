@@ -24,7 +24,7 @@ LedsSubscription::LedsSubscription(
       Config::XdsResourceIdentifier::decodeUrl(leds_config.leds_collection_name());
   const auto resource_name = getResourceName();
   subscription_ =
-      factory_context.clusterManager().subscriptionFactory().collectionSubscriptionFromUrl(
+      factory_context.clusterManager().subscriptionCreator().collectionSubscriptionFromUrl(
           leds_resource_locator, leds_config.leds_config(), resource_name, *stats_scope_, *this,
           resource_decoder_);
   subscription_->start({});

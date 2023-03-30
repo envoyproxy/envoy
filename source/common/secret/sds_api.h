@@ -56,7 +56,7 @@ public:
   };
 
   SdsApi(envoy::config::core::v3::ConfigSource sds_config, absl::string_view sds_config_name,
-         Config::SubscriptionFactory& subscription_factory, TimeSource& time_source,
+         Config::SubscriptionCreator& subscription_creator, TimeSource& time_source,
          ProtobufMessage::ValidationVisitor& validation_visitor, Stats::Store& stats,
          std::function<void()> destructor_cb, Event::Dispatcher& dispatcher, Api::Api& api);
 
@@ -110,7 +110,7 @@ private:
   uint64_t secret_hash_;
   uint64_t files_hash_;
   Cleanup clean_up_;
-  Config::SubscriptionFactory& subscription_factory_;
+  Config::SubscriptionCreator& subscription_creator_;
   TimeSource& time_source_;
   SecretData secret_data_;
   std::unique_ptr<Filesystem::Watcher> watcher_;
@@ -139,7 +139,7 @@ public:
     // is too late to throw.
     Config::Utility::checkLocalInfo("TlsCertificateSdsApi", secret_provider_context.localInfo());
     return std::make_shared<TlsCertificateSdsApi>(
-        sds_config, sds_config_name, secret_provider_context.clusterManager().subscriptionFactory(),
+        sds_config, sds_config_name, secret_provider_context.clusterManager().subscriptionCreator(),
         secret_provider_context.mainThreadDispatcher().timeSource(),
         secret_provider_context.messageValidationVisitor(), secret_provider_context.stats(),
         destructor_cb, secret_provider_context.mainThreadDispatcher(),
@@ -148,11 +148,11 @@ public:
 
   TlsCertificateSdsApi(const envoy::config::core::v3::ConfigSource& sds_config,
                        const std::string& sds_config_name,
-                       Config::SubscriptionFactory& subscription_factory, TimeSource& time_source,
+                       Config::SubscriptionCreator& subscription_creator, TimeSource& time_source,
                        ProtobufMessage::ValidationVisitor& validation_visitor, Stats::Store& stats,
                        std::function<void()> destructor_cb, Event::Dispatcher& dispatcher,
                        Api::Api& api)
-      : SdsApi(sds_config, sds_config_name, subscription_factory, time_source, validation_visitor,
+      : SdsApi(sds_config, sds_config_name, subscription_creator, time_source, validation_visitor,
                stats, std::move(destructor_cb), dispatcher, api) {}
 
   // SecretProvider
@@ -226,7 +226,7 @@ public:
     Config::Utility::checkLocalInfo("CertificateValidationContextSdsApi",
                                     secret_provider_context.localInfo());
     return std::make_shared<CertificateValidationContextSdsApi>(
-        sds_config, sds_config_name, secret_provider_context.clusterManager().subscriptionFactory(),
+        sds_config, sds_config_name, secret_provider_context.clusterManager().subscriptionCreator(),
         secret_provider_context.mainThreadDispatcher().timeSource(),
         secret_provider_context.messageValidationVisitor(), secret_provider_context.stats(),
         destructor_cb, secret_provider_context.mainThreadDispatcher(),
@@ -234,12 +234,12 @@ public:
   }
   CertificateValidationContextSdsApi(const envoy::config::core::v3::ConfigSource& sds_config,
                                      const std::string& sds_config_name,
-                                     Config::SubscriptionFactory& subscription_factory,
+                                     Config::SubscriptionCreator& subscription_creator,
                                      TimeSource& time_source,
                                      ProtobufMessage::ValidationVisitor& validation_visitor,
                                      Stats::Store& stats, std::function<void()> destructor_cb,
                                      Event::Dispatcher& dispatcher, Api::Api& api)
-      : SdsApi(sds_config, sds_config_name, subscription_factory, time_source, validation_visitor,
+      : SdsApi(sds_config, sds_config_name, subscription_creator, time_source, validation_visitor,
                stats, std::move(destructor_cb), dispatcher, api) {}
 
   // SecretProvider
@@ -321,7 +321,7 @@ public:
     Config::Utility::checkLocalInfo("TlsSessionTicketKeysSdsApi",
                                     secret_provider_context.localInfo());
     return std::make_shared<TlsSessionTicketKeysSdsApi>(
-        sds_config, sds_config_name, secret_provider_context.clusterManager().subscriptionFactory(),
+        sds_config, sds_config_name, secret_provider_context.clusterManager().subscriptionCreator(),
         secret_provider_context.mainThreadDispatcher().timeSource(),
         secret_provider_context.messageValidationVisitor(), secret_provider_context.stats(),
         destructor_cb, secret_provider_context.mainThreadDispatcher(),
@@ -330,12 +330,12 @@ public:
 
   TlsSessionTicketKeysSdsApi(const envoy::config::core::v3::ConfigSource& sds_config,
                              const std::string& sds_config_name,
-                             Config::SubscriptionFactory& subscription_factory,
+                             Config::SubscriptionCreator& subscription_creator,
                              TimeSource& time_source,
                              ProtobufMessage::ValidationVisitor& validation_visitor,
                              Stats::Store& stats, std::function<void()> destructor_cb,
                              Event::Dispatcher& dispatcher, Api::Api& api)
-      : SdsApi(sds_config, sds_config_name, subscription_factory, time_source, validation_visitor,
+      : SdsApi(sds_config, sds_config_name, subscription_creator, time_source, validation_visitor,
                stats, std::move(destructor_cb), dispatcher, api) {}
 
   // SecretProvider
@@ -394,7 +394,7 @@ public:
     // is too late to throw.
     Config::Utility::checkLocalInfo("GenericSecretSdsApi", secret_provider_context.localInfo());
     return std::make_shared<GenericSecretSdsApi>(
-        sds_config, sds_config_name, secret_provider_context.clusterManager().subscriptionFactory(),
+        sds_config, sds_config_name, secret_provider_context.clusterManager().subscriptionCreator(),
         secret_provider_context.mainThreadDispatcher().timeSource(),
         secret_provider_context.messageValidationVisitor(), secret_provider_context.stats(),
         destructor_cb, secret_provider_context.mainThreadDispatcher(),
@@ -403,11 +403,11 @@ public:
 
   GenericSecretSdsApi(const envoy::config::core::v3::ConfigSource& sds_config,
                       const std::string& sds_config_name,
-                      Config::SubscriptionFactory& subscription_factory, TimeSource& time_source,
+                      Config::SubscriptionCreator& subscription_creator, TimeSource& time_source,
                       ProtobufMessage::ValidationVisitor& validation_visitor, Stats::Store& stats,
                       std::function<void()> destructor_cb, Event::Dispatcher& dispatcher,
                       Api::Api& api)
-      : SdsApi(sds_config, sds_config_name, subscription_factory, time_source, validation_visitor,
+      : SdsApi(sds_config, sds_config_name, subscription_creator, time_source, validation_visitor,
                stats, std::move(destructor_cb), dispatcher, api) {}
 
   // SecretProvider

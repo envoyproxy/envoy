@@ -28,7 +28,7 @@ EdsClusterImpl::EdsClusterImpl(Server::Configuration::ServerFactoryContext& serv
   Event::Dispatcher& dispatcher = cluster_context.mainThreadDispatcher();
   assignment_timeout_ = dispatcher.createTimer([this]() -> void { onAssignmentTimeout(); });
   const auto& eds_config = cluster.eds_cluster_config().eds_config();
-  if (Config::SubscriptionFactory::isPathBasedConfigSource(
+  if (Config::SubscriptionCreator::isPathBasedConfigSource(
           eds_config.config_source_specifier_case())) {
     initialize_phase_ = InitializePhase::Primary;
   } else {
@@ -36,7 +36,7 @@ EdsClusterImpl::EdsClusterImpl(Server::Configuration::ServerFactoryContext& serv
   }
   const auto resource_name = getResourceName();
   subscription_ =
-      cluster_context.clusterManager().subscriptionFactory().subscriptionFromConfigSource(
+      cluster_context.clusterManager().subscriptionCreator().subscriptionFromConfigSource(
           eds_config, Grpc::Common::typeUrl(resource_name), info_->statsScope(), *this,
           resource_decoder_, {});
 }

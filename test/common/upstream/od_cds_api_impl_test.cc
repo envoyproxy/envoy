@@ -26,7 +26,7 @@ public:
     OptRef<xds::core::v3::ResourceLocator> null_locator;
     odcds_ = OdCdsApiImpl::create(odcds_config, null_locator, cm_, notifier_, *store_.rootScope(),
                                   validation_visitor_);
-    odcds_callbacks_ = cm_.subscription_factory_.callbacks_;
+    odcds_callbacks_ = cm_.subscription_creator_.callbacks_;
   }
 
   NiceMock<MockClusterManager> cm_;
@@ -41,7 +41,7 @@ public:
 TEST_F(OdCdsApiImplTest, FirstUpdateStarts) {
   InSequence s;
 
-  EXPECT_CALL(*cm_.subscription_factory_.subscription_, start(ElementsAre("fake_cluster")));
+  EXPECT_CALL(*cm_.subscription_creator_.subscription_, start(ElementsAre("fake_cluster")));
   odcds_->updateOnDemand("fake_cluster");
 }
 
@@ -50,8 +50,8 @@ TEST_F(OdCdsApiImplTest, FirstUpdateStarts) {
 TEST_F(OdCdsApiImplTest, FollowingClusterNamesHitAwaitingList) {
   InSequence s;
 
-  EXPECT_CALL(*cm_.subscription_factory_.subscription_, start(ElementsAre("fake_cluster")));
-  EXPECT_CALL(*cm_.subscription_factory_.subscription_, requestOnDemandUpdate(_)).Times(0);
+  EXPECT_CALL(*cm_.subscription_creator_.subscription_, start(ElementsAre("fake_cluster")));
+  EXPECT_CALL(*cm_.subscription_creator_.subscription_, requestOnDemandUpdate(_)).Times(0);
   odcds_->updateOnDemand("fake_cluster");
   odcds_->updateOnDemand("another_cluster");
 }
@@ -69,7 +69,7 @@ TEST_F(OdCdsApiImplTest, AwaitingListIsProcessedOnConfigUpdate) {
   cluster.set_name("fake_cluster");
   const auto decoded_resources = TestUtility::decodeResources({cluster});
   EXPECT_CALL(
-      *cm_.subscription_factory_.subscription_,
+      *cm_.subscription_creator_.subscription_,
       requestOnDemandUpdate(UnorderedElementsAre("another_cluster_1", "another_cluster_2")));
   odcds_callbacks_->onConfigUpdate(decoded_resources.refvec_, {}, "0");
 }
@@ -84,7 +84,7 @@ TEST_F(OdCdsApiImplTest, AwaitingListIsProcessedOnConfigUpdateFailed) {
   odcds_->updateOnDemand("another_cluster_2");
 
   EXPECT_CALL(
-      *cm_.subscription_factory_.subscription_,
+      *cm_.subscription_creator_.subscription_,
       requestOnDemandUpdate(UnorderedElementsAre("another_cluster_1", "another_cluster_2")));
   odcds_callbacks_->onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason::FetchTimedout,
                                          nullptr);
@@ -100,7 +100,7 @@ TEST_F(OdCdsApiImplTest, AwaitingListIsProcessedOnceOnly) {
   odcds_->updateOnDemand("another_cluster_2");
 
   EXPECT_CALL(
-      *cm_.subscription_factory_.subscription_,
+      *cm_.subscription_creator_.subscription_,
       requestOnDemandUpdate(UnorderedElementsAre("another_cluster_1", "another_cluster_2")));
   odcds_callbacks_->onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason::FetchTimedout,
                                          nullptr);
@@ -114,7 +114,7 @@ TEST_F(OdCdsApiImplTest, NothingIsRequestedOnEmptyAwaitingList) {
 
   odcds_->updateOnDemand("fake_cluster");
 
-  EXPECT_CALL(*cm_.subscription_factory_.subscription_, requestOnDemandUpdate(_)).Times(0);
+  EXPECT_CALL(*cm_.subscription_creator_.subscription_, requestOnDemandUpdate(_)).Times(0);
   odcds_callbacks_->onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason::FetchTimedout,
                                          nullptr);
 }
@@ -129,7 +129,7 @@ TEST_F(OdCdsApiImplTest, OnDemandUpdateIsRequestedAfterInitialFetch) {
   cluster.set_name("fake_cluster");
   const auto decoded_resources = TestUtility::decodeResources({cluster});
   odcds_callbacks_->onConfigUpdate(decoded_resources.refvec_, {}, "0");
-  EXPECT_CALL(*cm_.subscription_factory_.subscription_,
+  EXPECT_CALL(*cm_.subscription_creator_.subscription_,
               requestOnDemandUpdate(UnorderedElementsAre("another_cluster")));
   odcds_->updateOnDemand("another_cluster");
 }

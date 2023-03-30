@@ -382,7 +382,7 @@ tls_certificate:
   TestUtility::loadFromYaml(TestEnvironment::substitute(yaml), typed_secret);
   const auto decoded_resources = TestUtility::decodeResources({typed_secret});
   init_target_handle->initialize(init_watcher);
-  secret_context.cluster_manager_.subscription_factory_.callbacks_->onConfigUpdate(
+  secret_context.cluster_manager_.subscription_creator_.callbacks_->onConfigUpdate(
       decoded_resources.refvec_, "");
   testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext> ctx;
   Ssl::TlsCertificateConfigImpl tls_config(*secret_provider->secret(), ctx, *api_);
@@ -433,7 +433,7 @@ generic_secret:
   TestUtility::loadFromYaml(TestEnvironment::substitute(yaml), typed_secret);
   const auto decoded_resources = TestUtility::decodeResources({typed_secret});
   init_target_handle->initialize(init_watcher);
-  secret_context.cluster_manager_.subscription_factory_.callbacks_->onConfigUpdate(
+  secret_context.cluster_manager_.subscription_creator_.callbacks_->onConfigUpdate(
       decoded_resources.refvec_, "");
 
   const envoy::extensions::transport_sockets::tls::v3::GenericSecret generic_secret(
@@ -482,7 +482,7 @@ tls_certificate:
   TestUtility::loadFromYaml(TestEnvironment::substitute(yaml), typed_secret);
   const auto decoded_resources = TestUtility::decodeResources({typed_secret});
   init_target_handle->initialize(init_watcher);
-  secret_context.cluster_manager_.subscription_factory_.callbacks_->onConfigUpdate(
+  secret_context.cluster_manager_.subscription_creator_.callbacks_->onConfigUpdate(
       decoded_resources.refvec_, "keycert-v1");
   testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext> ctx;
   Ssl::TlsCertificateConfigImpl tls_config(*secret_provider->secret(), ctx, *api_);
@@ -528,7 +528,7 @@ validation_context:
   const auto decoded_resources_2 = TestUtility::decodeResources({typed_secret});
 
   init_target_handle->initialize(init_watcher);
-  secret_context.cluster_manager_.subscription_factory_.callbacks_->onConfigUpdate(
+  secret_context.cluster_manager_.subscription_creator_.callbacks_->onConfigUpdate(
       decoded_resources_2.refvec_, "validation-context-v1");
   Ssl::CertificateValidationContextConfigImpl cert_validation_context(
       *context_secret_provider->secret(), *api_);
@@ -582,7 +582,7 @@ session_ticket_keys:
   const auto decoded_resources_3 = TestUtility::decodeResources({typed_secret});
 
   init_target_handle->initialize(init_watcher);
-  secret_context.cluster_manager_.subscription_factory_.callbacks_->onConfigUpdate(
+  secret_context.cluster_manager_.subscription_creator_.callbacks_->onConfigUpdate(
       decoded_resources_3.refvec_, "stek-context-v1");
   EXPECT_EQ(stek_secret_provider->secret()->keys()[1].inline_string(), "DUMMY_INLINE_STRING");
 
@@ -646,7 +646,7 @@ generic_secret:
   TestUtility::loadFromYaml(TestEnvironment::substitute(generic_secret_yaml), typed_secret);
   const auto decoded_resources_4 = TestUtility::decodeResources({typed_secret});
   init_target_handle->initialize(init_watcher);
-  secret_context.cluster_manager_.subscription_factory_.callbacks_->onConfigUpdate(
+  secret_context.cluster_manager_.subscription_creator_.callbacks_->onConfigUpdate(
       decoded_resources_4.refvec_, "signing-key-v1");
 
   const envoy::extensions::transport_sockets::tls::v3::GenericSecret generic_secret(
@@ -1109,7 +1109,7 @@ tls_certificate:
   EXPECT_FALSE(typed_secret.tls_certificate().has_private_key());
   const auto decoded_resources = TestUtility::decodeResources({typed_secret});
   init_target_handle->initialize(init_watcher);
-  secret_context.cluster_manager_.subscription_factory_.callbacks_->onConfigUpdate(
+  secret_context.cluster_manager_.subscription_creator_.callbacks_->onConfigUpdate(
       decoded_resources.refvec_, "");
   EXPECT_TRUE(secret_provider->secret()->has_private_key_provider());
   EXPECT_FALSE(secret_provider->secret()->has_private_key());

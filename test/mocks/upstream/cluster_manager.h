@@ -55,7 +55,7 @@ public:
   MOCK_METHOD(const absl::optional<std::string>&, localClusterName, (), (const));
   MOCK_METHOD(ClusterUpdateCallbacksHandle*, addThreadLocalClusterUpdateCallbacks_,
               (ClusterUpdateCallbacks & callbacks));
-  MOCK_METHOD(Config::SubscriptionFactory&, subscriptionFactory, ());
+  MOCK_METHOD(Config::SubscriptionCreator&, subscriptionCreator, ());
   const ClusterTrafficStatNames& clusterStatNames() const override { return cluster_stat_names_; }
   const ClusterConfigUpdateStatNames& clusterConfigUpdateStatNames() const override {
     return cluster_config_update_stat_names_;
@@ -93,7 +93,7 @@ public:
   NiceMock<Grpc::MockAsyncClientManager> async_client_manager_;
   absl::optional<std::string> local_cluster_name_;
   NiceMock<MockClusterManagerFactory> cluster_manager_factory_;
-  NiceMock<Config::MockSubscriptionFactory> subscription_factory_;
+  NiceMock<Config::MockSubscriptionCreator> subscription_creator_;
   absl::flat_hash_map<std::string, std::unique_ptr<MockCluster>> active_clusters_;
   absl::flat_hash_map<std::string, std::unique_ptr<MockCluster>> warming_clusters_;
   Stats::TestUtil::TestSymbolTable symbol_table_;

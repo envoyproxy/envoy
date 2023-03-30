@@ -75,7 +75,7 @@ FilterConfigSubscription::FilterConfigSubscription(
       subscription_id_(subscription_id) {
   const auto resource_name = getResourceName();
   subscription_ =
-      factory_context.clusterManager().subscriptionFactory().subscriptionFromConfigSource(
+      factory_context.clusterManager().subscriptionCreator().subscriptionFromConfigSource(
           config_source, Grpc::Common::typeUrl(resource_name), *scope_, *this, resource_decoder_,
           {});
 }

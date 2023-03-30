@@ -9,12 +9,12 @@ licenses(["notice"])  # Apache 2
 envoy_package()
 
 envoy_cc_test(
-    name = "subscription_factory_impl_test",
-    srcs = ["subscription_factory_impl_test.cc"],
+    name = "subscription_creator_impl_test",
+    srcs = ["subscription_creator_impl_test.cc"],
     deps = [
         "//envoy/config:xds_config_tracker_interface",
         "//envoy/config:xds_resources_delegate_interface",
-        "//source/common/config:subscription_factory_lib",
+        "//source/common/config:subscription_creator_lib",
         "//source/common/config:xds_resource_lib",
         "//source/extensions/config_subscription/filesystem:filesystem_subscription_lib",
         "//source/extensions/config_subscription/rest:http_subscription_lib",

@@ -11,7 +11,7 @@ using testing::ReturnRef;
 namespace Envoy {
 namespace Config {
 
-MockSubscriptionFactory::MockSubscriptionFactory() {
+MockSubscriptionCreator::MockSubscriptionCreator() {
   ON_CALL(*this, subscriptionFromConfigSource(_, _, _, _, _, _))
       .WillByDefault(Invoke([this](const envoy::config::core::v3::ConfigSource&, absl::string_view,
                                    Stats::Scope&, SubscriptionCallbacks& callbacks,
@@ -26,7 +26,7 @@ MockSubscriptionFactory::MockSubscriptionFactory() {
       .WillByDefault(ReturnRef(ProtobufMessage::getStrictValidationVisitor()));
 }
 
-MockSubscriptionFactory::~MockSubscriptionFactory() = default;
+MockSubscriptionCreator::~MockSubscriptionCreator() = default;
 
 MockGrpcMuxWatch::MockGrpcMuxWatch() = default;
 MockGrpcMuxWatch::~MockGrpcMuxWatch() { cancel(); }

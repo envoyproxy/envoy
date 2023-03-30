@@ -30,7 +30,7 @@
 
 #include "source/common/common/cleanup.h"
 #include "source/common/config/grpc_mux_impl.h"
-#include "source/common/config/subscription_factory_impl.h"
+#include "source/common/config/subscription_creator_impl.h"
 #include "source/common/http/async_client_impl.h"
 #include "source/common/http/http_server_properties_cache_impl.h"
 #include "source/common/http/http_server_properties_cache_manager_impl.h"
@@ -328,7 +328,7 @@ public:
 
   ClusterManagerFactory& clusterManagerFactory() override { return factory_; }
 
-  Config::SubscriptionFactory& subscriptionFactory() override { return *subscription_factory_; }
+  Config::SubscriptionCreator& subscriptionCreator() override { return *subscription_creator_; }
 
   void
   initializeSecondaryClusters(const envoy::config::bootstrap::v3::Bootstrap& bootstrap) override;
@@ -819,7 +819,7 @@ private:
   ClusterRequestResponseSizeStatNames cluster_request_response_size_stat_names_;
   ClusterTimeoutBudgetStatNames cluster_timeout_budget_stat_names_;
 
-  std::unique_ptr<Config::SubscriptionFactoryImpl> subscription_factory_;
+  std::unique_ptr<Config::SubscriptionCreatorImpl> subscription_creator_;
   ClusterSet primary_clusters_;
 
   std::unique_ptr<Config::XdsResourcesDelegate> xds_resources_delegate_;
