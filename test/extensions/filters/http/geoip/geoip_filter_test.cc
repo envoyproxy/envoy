@@ -44,7 +44,7 @@ public:
     ON_CALL(filter_callbacks_, dispatcher()).WillByDefault(::testing::ReturnRef(*dispatcher_));
     envoy::extensions::filters::http::geoip::v3::Geoip config;
     TestUtility::loadFromYaml(yaml, config);
-    config_ = std::make_shared<GeoipFilterConfig>(config, "prefix.", stats_, runtime_);
+    config_ = std::make_shared<GeoipFilterConfig>(config, "prefix.", stats_.mockScope(), runtime_);
     filter_ = std::make_shared<GeoipFilter>(config_, dummy_driver_);
     filter_->setDecoderFilterCallbacks(filter_callbacks_);
   }
