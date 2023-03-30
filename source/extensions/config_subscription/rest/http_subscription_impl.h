@@ -62,5 +62,29 @@ private:
   ProtobufMessage::ValidationVisitor& validation_visitor_;
 };
 
+class HttpSubscriptionFactory : public ConfigSubscriptionFactory {
+public:
+  std::string name() const override { return "envoy.config_subscription.rest"; }
+  SubscriptionPtr create(const LocalInfo::LocalInfo& local_info, Upstream::ClusterManager& cm,
+                         const std::string& remote_cluster_name, Event::Dispatcher& dispatcher,
+                         Random::RandomGenerator& random,
+                         std::chrono::milliseconds refresh_interval,
+                         std::chrono::milliseconds request_timeout,
+                         const Protobuf::MethodDescriptor& service_method,
+                         absl::string_view type_url, SubscriptionCallbacks& callbacks,
+                         OpaqueResourceDecoderSharedPtr resource_decoder, SubscriptionStats stats,
+                         std::chrono::milliseconds init_fetch_timeout,
+                         ProtobufMessage::ValidationVisitor& validation_visitor) override {
+
+    return std::make_unique<HttpSubscriptionImpl>(
+        local_info, cm, remote_cluster_name, dispatcher, random, refresh_interval, request_timeout,
+        service_method, type_url, callbacks, resource_decoder, stats, init_fetch_timeout,
+        validation_visitor);
+  }
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return std::make_unique<envoy::config::core::v3::RestSubscription>();
+  }
+};
+
 } // namespace Config
 } // namespace Envoy
