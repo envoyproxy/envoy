@@ -123,6 +123,8 @@ UpstreamRequest::UpstreamRequest(RouterFilterInterface& parent,
     return;
   }
 
+  stream_info_.setStreamState(StreamInfo::StreamState::Started);
+
   // Set up the upstream filter manager.
   filter_manager_callbacks_ = std::make_unique<UpstreamRequestFilterManagerCallbacks>(*this);
   filter_manager_ = std::make_unique<UpstreamFilterManager>(
@@ -205,6 +207,7 @@ void UpstreamRequest::cleanUp() {
     }
   }
 
+  stream_info_.setStreamState(StreamInfo::StreamState::Ended);
   stream_info_.onRequestComplete();
   for (const auto& upstream_log : parent_.config().upstream_logs_) {
     upstream_log->log(parent_.downstreamHeaders(), upstream_headers_.get(),
@@ -286,6 +289,12 @@ void UpstreamRequest::decodeHeaders(Http::ResponseHeaderMapPtr&& headers, bool e
 
   maybeHandleDeferredReadDisable();
   ASSERT(headers.get());
+
+  // According to RFC7231 any 2xx response indicates that the connection is established.
+  if (!end_stream && Http::CodeUtility::is2xx(response_code)) {
+    stream_info_.setStreamState(StreamInfo::StreamState::InProgress);
+  }
+
   parent_.onUpstreamHeaders(response_code, std::move(headers), *this, end_stream);
 }
 
