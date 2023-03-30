@@ -11,9 +11,8 @@
 #import "library/common/extensions/key_value/platform/c_types.h"
 #import "library/cc/engine_builder.h"
 #import "library/common/engine.h"
-#import "library/objective-c/proxy/EnvoyProxyResolver.h"
 
-#include "library/common/network/apple_system_proxy_settings_monitor.h"
+#include "library/common/network/apple_proxy_resolution.h"
 
 #if TARGET_OS_IPHONE
 #import <UIKit/UIKit.h>
@@ -401,52 +400,9 @@ static void ios_track_event(envoy_map map, const void *context) {
   }
 }
 
-@interface EnvoyProxyResolutionContext : NSObject
-
-@property (nonatomic, assign) envoy_engine_t engineHandle;
-@property (nonatomic, strong) EnvoyProxyResolver *proxyResolver;
-
-@end
-
-@implementation EnvoyProxyResolutionContext
-@end
-
-static envoy_proxy_resolution_result
-ios_resolve_proxy(envoy_data c_host, envoy_proxy_settings_list *proxy_settings_list,
-                  const envoy_proxy_resolver_proxy_resolution_result_handler *result_handler,
-                  const void *context) {
-  @autoreleasepool {
-    EnvoyProxyResolutionContext *resolutionContext =
-        (__bridge EnvoyProxyResolutionContext *)context;
-    NSString *host = to_ios_string(c_host);
-    NSArray<EnvoyProxySettings *> *proxySettings;
-
-    envoy_proxy_resolution_result result = [resolutionContext.proxyResolver
-        resolveProxyForTargetURL:[NSURL URLWithString:host]
-                   proxySettings:&proxySettings
-             withCompletionBlock:^(NSArray<EnvoyProxySettings *> *_Nullable settings,
-                                   NSError *_Nullable error) {
-               if (error) {
-                 NSLog(@"RAF TEST");
-               } else {
-                 envoy_proxy_settings_list proxyList = toNativeEnvoyProxySettingsList(settings);
-                 complete_proxy_resolution(resolutionContext.engineHandle, proxyList,
-                                           result_handler);
-               }
-             }];
-
-    if (result == ENVOY_PROXY_RESOLUTION_RESULT_COMPLETED) {
-      *proxy_settings_list = toNativeEnvoyProxySettingsList(proxySettings);
-    }
-
-    return result;
-  }
-}
-
 @implementation EnvoyEngineImpl {
   envoy_engine_t _engineHandle;
   EnvoyNetworkMonitor *_networkMonitor;
-  EnvoyProxyResolver *_proxyResolver;
 }
 
 - (instancetype)initWithRunningCallback:(nullable void (^)())onEngineRunning
@@ -486,9 +442,7 @@ ios_resolve_proxy(envoy_data c_host, envoy_proxy_settings_list *proxy_settings_l
   _networkMonitor = [[EnvoyNetworkMonitor alloc] initWithEngine:_engineHandle];
 
   if (enableProxying) {
-    _proxyResolver = [EnvoyProxyResolver new];
-    [self registerProxyResolver:_proxyResolver];
-    [_proxyResolver start];
+    register_apple_proxy_resolver(_engineHandle);
   }
 
   if (networkMonitoringMode == 1) {
@@ -497,30 +451,11 @@ ios_resolve_proxy(envoy_data c_host, envoy_proxy_settings_list *proxy_settings_l
     [_networkMonitor startPathMonitor];
   }
 
-  auto t = Envoy::Network::AppleSystemProxySettingsMonitor(
-      [](absl::optional<Envoy::Network::SystemProxySettings> proxy_settings) {
-
-      });
-  t.start();
-
   return self;
 }
 
 - (void)dealloc {
   [[NSNotificationCenter defaultCenter] removeObserver:self];
-}
-
-- (void)registerProxyResolver:(EnvoyProxyResolver *)proxyResolver {
-  EnvoyProxyResolutionContext *context = [EnvoyProxyResolutionContext new];
-  context.engineHandle = self->_engineHandle;
-  context.proxyResolver = proxyResolver;
-
-  envoy_proxy_resolver *resolver =
-      (envoy_proxy_resolver *)safe_malloc(sizeof(envoy_proxy_resolver));
-  resolver->context = CFBridgingRetain(context);
-  resolver->resolve = ios_resolve_proxy;
-
-  register_platform_api("envoy_proxy_resolver", resolver);
 }
 
 - (int)registerFilterFactory:(EnvoyHTTPFilterFactory *)filterFactory {

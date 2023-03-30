@@ -1,6 +1,6 @@
 #pragma once
 
-#include "library/cc/types/c_types.h"
+#include "library/common/types/c_types.h"
 
 // NOLINT(namespace-envoy)
 

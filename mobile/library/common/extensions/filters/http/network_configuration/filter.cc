@@ -73,10 +73,13 @@ void proxyResolutionCompleted(envoy_proxy_settings_list proxy_settings_list, con
   const auto wrapped_filter =
       const_cast<std::unique_ptr<std::weak_ptr<NetworkConfigurationFilter>>*>(
           static_cast<const std::unique_ptr<std::weak_ptr<NetworkConfigurationFilter>>*>(context));
+
+  // Release proxy settings list no matter whether filter still exists or not.
+  const auto proxy_settings = Network::ProxySettings::create(proxy_settings_list);
+  envoy_proxy_settings_list_release(proxy_settings_list);
+
   const auto filter = wrapped_filter->get()->lock();
   if (filter) {
-    const auto proxy_settings = Network::ProxySettings::create(proxy_settings_list);
-    envoy_proxy_settings_list_release(proxy_settings_list);
     filter->onProxyResolutionComplete(proxy_settings);
   }
 

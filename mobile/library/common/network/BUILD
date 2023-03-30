@@ -118,8 +118,10 @@ envoy_cc_library(
     deps = select({
         "@envoy//bazel:apple": [
             ":proxy_settings_lib",
+            "//library/common:envoy_main_interface_lib_no_stamp",
             "//library/common/apple:utility_lib",
             "//library/common/extensions/cert_validator/platform_bridge:c_types_lib",
+            "//library/common/types:c_types_lib",
         ],
         "//conditions:default": [],
     }),

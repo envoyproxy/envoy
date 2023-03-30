@@ -36,7 +36,7 @@ static void proxyAutoConfigurationResultCallback(void* ptr, CFArrayRef cf_proxie
         static_cast<CFStringRef>(CFDictionaryGetValue(cf_dictionary, kCFProxyTypeKey));
     bool is_http_proxy = CFStringCompare(cf_proxy_type, kCFProxyTypeHTTP, 0) == kCFCompareEqualTo;
     bool is_https_proxy = CFStringCompare(cf_proxy_type, kCFProxyTypeHTTPS, 0) == kCFCompareEqualTo;
-    bool is_no_proxy = CFStringCompare(cf_proxy_type, kCFProxyTypeNone, 0) == kCFCompareEqualTo;
+    bool is_direct_proxy = CFStringCompare(cf_proxy_type, kCFProxyTypeNone, 0) == kCFCompareEqualTo;
 
     if (is_http_proxy || is_https_proxy) {
       CFStringRef cf_host =
@@ -47,11 +47,11 @@ static void proxyAutoConfigurationResultCallback(void* ptr, CFArrayRef cf_proxie
       int port = Apple::toInt(cf_port);
       proxies.push_back(ProxySettings(std::move(hostname), port));
 
-    } else if (is_no_proxy) {
-      // TODO(Augustyniak) add an empty proxy to the list of proxies instead of doing nothing
-      continue;
+    } else if (is_direct_proxy) {
+      proxies.push_back(ProxySettings::direct());
     }
   }
+
   completion(proxies);
 }
 
@@ -65,6 +65,9 @@ void ApplePACProxyResolver::resolveProxies(
   auto callbackWrapper =
       static_cast<void*>(new class PACProxyResolutionCompletionCallback(didResolveProxy));
   CFStreamClientContext context = {0, callbackWrapper, nullptr, nullptr, nullptr};
+  // Even though neither the name of the method nor Apple's documentation mentions that, manual testing shows
+  // that `CFNetworkExecuteProxyAutoConfigurationURL` method does caching of fetched PAC file and does not
+  // fetch it on every proxy resolution request.
   CFRunLoopSourceRef runLoopSource =
       CFNetworkExecuteProxyAutoConfigurationURL(cf_proxy_autoconfiguration_file_url, cf_target_url,
                                                 proxyAutoConfigurationResultCallback, &context);

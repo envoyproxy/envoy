@@ -12,16 +12,29 @@
 namespace Envoy {
 namespace Network {
 
+/**
+ * Resolves proxies on Apple platforms.
+ */
 class AppleProxyResolver {
+public:
   AppleProxyResolver();
   /**
    * Starts proxy resolver. It needs to be called prior to any proxy resolution attempt.
    */
   void start();
 
-  envoy_proxy_resolution_result
-  resolveProxy(std::string target_url_string, std::vector<ProxySettings>& proxies,
-               std::function<void(std::vector<ProxySettings> proxies)>);
+  /**
+   * Resolves proxy for a given url. Depending on the type current system proxy settings the method
+   * may return results in synchronous or asynchronous way.
+   * @param proxies Result proxies for when the proxy resolution is performed synchronously.
+   * @param proxy_resolution_did_complete A function that's called with result proxies as its
+   * arguments for when the proxy resolution is performed asynchronously.
+   * @return Whether there is a proxy or no and whether proxy resolution was performed synchronously
+   * or whether it's still running.
+   */
+  envoy_proxy_resolution_result resolveProxy(
+      std::string target_url_string, std::vector<ProxySettings>& proxies,
+      std::function<void(std::vector<ProxySettings> proxies)> proxy_resolution_did_complete);
 
 private:
   AppleSystemProxySettingsMonitor proxy_settings_monitor_;

@@ -564,10 +564,9 @@ typedef enum {
 
 typedef envoy_proxy_resolution_result (*envoy_proxy_resolver_resolve_f)(
     envoy_data host, envoy_proxy_settings_list* proxy_settings_list,
-    const envoy_proxy_resolver_proxy_resolution_result_handler* result_handler,
-    const void* context);
+    const envoy_proxy_resolver_proxy_resolution_result_handler* result_handler, void* context);
 
 typedef struct {
   envoy_proxy_resolver_resolve_f resolve;
-  const void* context;
+  void* context;
 } envoy_proxy_resolver;

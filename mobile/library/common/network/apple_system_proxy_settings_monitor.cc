@@ -30,6 +30,8 @@ void AppleSystemProxySettingsMonitor::start() {
   });
 
   source_ = dispatch_source_create(DISPATCH_SOURCE_TYPE_TIMER, 0, 0, queue_);
+  dispatch_source_set_timer(source_, dispatch_time(DISPATCH_TIME_NOW, 0),
+                            kProxySettingsRefreshRateSeconds * NSEC_PER_SEC, 0);
   dispatch_source_set_event_handler(source_, ^{
     const auto new_proxy_settings = readSystemProxySettings();
     if (new_proxy_settings != proxy_settings) {
@@ -52,10 +54,13 @@ AppleSystemProxySettingsMonitor::~AppleSystemProxySettingsMonitor() {
 absl::optional<SystemProxySettings>
 AppleSystemProxySettingsMonitor::readSystemProxySettings() const {
   CFDictionaryRef proxy_settings = CFNetworkCopySystemProxySettings();
+  if (proxy_settings == nullptr) {
+    return absl::nullopt;
+  }
 
-  // iOS system settings allow users to enter an arbitrary big integer number i.e. 88888888. That
-  // being said, testing using iOS 16 shows that Apple's APIs return `is_http_proxy_enabled` equal
-  // to false unless entered port number is within [0, 65535] range.
+  // iOS system settings allow users to enter an arbitrary big integer number i.e. 88888888 as a
+  // port number. That being said, testing using iOS 16 shows that Apple's APIs return
+  // `is_http_proxy_enabled` equal to false unless entered port number is within [0, 65535] range.
   CFNumberRef cf_is_http_proxy_enabled =
       static_cast<CFNumberRef>(CFDictionaryGetValue(proxy_settings, kCFNetworkProxiesHTTPEnable));
   CFNumberRef cf_is_auto_config_proxy_enabled = static_cast<CFNumberRef>(

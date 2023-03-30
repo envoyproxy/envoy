@@ -44,5 +44,3 @@ private:
 
 } // namespace Network
 } // namespace Envoy
-
-// NOLINT(namespace-envoy)

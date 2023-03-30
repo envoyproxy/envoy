@@ -24,7 +24,7 @@ AppleProxyResolver::resolveProxy(std::string target_url_string, std::vector<Prox
   const auto proxy_settings = proxy_settings_.value();
   if (!proxy_settings.isPACEnabled()) {
     auto settings = ProxySettings(proxy_settings.hostname(), proxy_settings.port());
-    if (settings.isNoProxy()) {
+    if (settings.isDirect()) {
       return ENVOY_PROXY_RESOLUTION_RESULT_NO_PROXY_CONFIGURED;
     } else {
       proxies.push_back(settings);
