@@ -17,29 +17,54 @@ logs<envoy_v3_api_field_config.listener.v3.Listener.access_log>`. The listener a
 HTTP request access logging and can be enabled separately and independently from
 filter access logs.
 
+If access log is enabled, then by default it will be reported to the configured sinks at the end of a TCP
+stream, or HTTP request. It is possible to extend this behavior and report access logs periodically or at the
+start of a TCP stream or HTTP request. Reporting access logs right after upstream connection establishment
+does not depend on periodic reporting, and and the other way around.
+
+.. _arch_overview_access_log_start:
+
+Start of session access logs
+----------------------------
+
+TCP Proxy
+*********
+
+For TCP Proxy, it is possible to enable an access log record once after a successful upstream connection by using 
+:ref:`flush access log on connected <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.flush_access_log_on_connected>`
+
+HTTP Connection Manager
+***********************
+
+For HTTP Connection Manager, it is possible to enable an access log once when a new HTTP request is received, and before iterating the filter chain by using
+:ref:`flush access log on new request <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.flush_access_log_on_new_request>`
+Note: Some information such as upstream host will not be available yet.
+
+HTTP Router Filter
+******************
+
+For Router Filter, is is possible to enable an upstream access log when a new HTTP request is received, and after successfully establishing a connection
+with the upstream by using :ref:`flush upstream log on new request <envoy_v3_api_field_extensions.filters.http.router.v3.Router.flush_upstream_log_on_new_request>`
+Note: In case that the HTTP request involved retries, an upstream access log will be recorded for each retry.
+
 .. _arch_overview_access_log_periodic:
 
 Periodic access logs
 --------------------
 
-If access log is enabled, then by default it will be reported to the configured sinks at the end of a TCP
-stream, or HTTP request. It is possible to extend this behavior and report access logs periodically, and
-right after the TCP Proxy has successfully established a connection with the upstream, or when a new HTTP
-request has been received by the HTTP connection manager. Note: When recording a log after a new HTTP
-has been received, some information such as upstream host will not be available yet. Reporting access logs
-right after upstream connection establishment does not depend on periodic reporting, and and the other way around.
-
 TCP Proxy
 *********
 
-* Periodic access logs can be enabled using :ref:`access log flush interval <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.access_log_flush_interval>`
-* Access log after upstream connection can be enabled using :ref:`flush access log on connected <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.flush_access_log_on_connected>`
+For TCP Proxy, it is possible to enable a prediodic access log by using
+:ref:`access log flush interval <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.access_log_flush_interval>`
+Note: The first interval count will start right after a new connection received by the TCP Proxy, and before making an upstream request.
 
 HTTP Connection Manager
 ***********************
 
-* Periodic access logs can be enabled using :ref:`access log flush interval <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.access_log_flush_interval>`
-* Access log when a new HTTP request is received can be enabled using :ref:`flush access log on new request <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.flush_access_log_on_new_request>`
+For HTTP Connection Manager, it is possible to enable a prediodic access log by using
+:ref:`access log flush interval <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.access_log_flush_interval>`
+Note: The first interval count will start right after the HTTP request is received by the HTTP Connection Manager filter, and before iterating the HTTP filter chain.
 
 .. _arch_overview_access_log_filters:
 
