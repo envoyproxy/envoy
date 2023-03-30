@@ -6,6 +6,8 @@
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
 #include "source/common/config/api_version.h"
+#include "source/common/config/type_to_endpoint.h"
+#include "source/common/config/utility.h"
 #include "source/common/http/rest_api_fetcher.h"
 
 namespace Envoy {
@@ -66,19 +68,18 @@ class HttpSubscriptionFactory : public ConfigSubscriptionFactory {
 public:
   std::string name() const override { return "envoy.config_subscription.rest"; }
   SubscriptionPtr create(const LocalInfo::LocalInfo& local_info, Upstream::ClusterManager& cm,
-                         const std::string& remote_cluster_name, Event::Dispatcher& dispatcher,
-                         Random::RandomGenerator& random,
-                         std::chrono::milliseconds refresh_interval,
-                         std::chrono::milliseconds request_timeout,
-                         const Protobuf::MethodDescriptor& service_method,
+                         Event::Dispatcher& dispatcher, Api::Api& api,
+                         const envoy::config::core::v3::ConfigSource& config,
                          absl::string_view type_url, SubscriptionCallbacks& callbacks,
                          OpaqueResourceDecoderSharedPtr resource_decoder, SubscriptionStats stats,
-                         std::chrono::milliseconds init_fetch_timeout,
                          ProtobufMessage::ValidationVisitor& validation_visitor) override {
 
+    const envoy::config::core::v3::ApiConfigSource& api_config_source = config.api_config_source();
     return std::make_unique<HttpSubscriptionImpl>(
-        local_info, cm, remote_cluster_name, dispatcher, random, refresh_interval, request_timeout,
-        service_method, type_url, callbacks, resource_decoder, stats, init_fetch_timeout,
+        local_info, cm, api_config_source.cluster_names()[0], dispatcher, api.randomGenerator(),
+        Utility::apiConfigSourceRefreshDelay(api_config_source),
+        Utility::apiConfigSourceRequestTimeout(api_config_source), restMethod(type_url), type_url,
+        callbacks, resource_decoder, stats, Utility::configSourceInitialFetchTimeout(config),
         validation_visitor);
   }
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {

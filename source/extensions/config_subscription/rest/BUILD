@@ -27,6 +27,7 @@ envoy_cc_extension(
         "//source/common/common:utility_lib",
         "//source/common/config:api_version_lib",
         "//source/common/config:decoded_resource_lib",
+        "//source/common/config:type_to_endpoint_lib",
         "//source/common/config:utility_lib",
         "//source/common/http:headers_lib",
         "//source/common/http:rest_api_fetcher_lib",

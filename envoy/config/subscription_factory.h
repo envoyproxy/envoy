@@ -1,6 +1,6 @@
 #pragma once
 
-#include "envoy/common/random_generator.h"
+#include "envoy/api/api.h"
 #include "envoy/config/core/v3/config_source.pb.h"
 #include "envoy/config/subscription.h"
 #include "envoy/config/typed_config.h"
@@ -72,15 +72,13 @@ public:
 class ConfigSubscriptionFactory : public Config::TypedFactory {
 public:
   std::string category() const override { return "envoy.config_subscription"; }
-  virtual SubscriptionPtr
-  create(const LocalInfo::LocalInfo& local_info, Upstream::ClusterManager& cm,
-         const std::string& remote_cluster_name, Event::Dispatcher& dispatcher,
-         Random::RandomGenerator& random, std::chrono::milliseconds refresh_interval,
-         std::chrono::milliseconds request_timeout,
-         const Protobuf::MethodDescriptor& service_method, absl::string_view type_url,
-         SubscriptionCallbacks& callbacks, OpaqueResourceDecoderSharedPtr resource_decoder,
-         SubscriptionStats stats, std::chrono::milliseconds init_fetch_timeout,
-         ProtobufMessage::ValidationVisitor& validation_visitor) PURE;
+  virtual SubscriptionPtr create(const LocalInfo::LocalInfo& local_info,
+                                 Upstream::ClusterManager& cm, Event::Dispatcher& dispatcher,
+                                 Api::Api& api, const envoy::config::core::v3::ConfigSource& config,
+                                 absl::string_view type_url, SubscriptionCallbacks& callbacks,
+                                 OpaqueResourceDecoderSharedPtr resource_decoder,
+                                 SubscriptionStats stats,
+                                 ProtobufMessage::ValidationVisitor& validation_visitor) PURE;
 };
 
 } // namespace Config

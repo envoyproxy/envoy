@@ -150,13 +150,8 @@ SubscriptionPtr SubscriptionFactoryImpl::subscriptionFromConfigSource(
         "Didn't find a registered config subscription factory implementation for name: '{}'",
         subscription_type));
   }
-  const envoy::config::core::v3::ApiConfigSource& api_config_source = config.api_config_source();
-  return factory->create(local_info_, cm_, api_config_source.cluster_names()[0], dispatcher_,
-                         api_.randomGenerator(),
-                         Utility::apiConfigSourceRefreshDelay(api_config_source),
-                         Utility::apiConfigSourceRequestTimeout(api_config_source),
-                         restMethod(type_url), type_url, callbacks, resource_decoder, stats,
-                         Utility::configSourceInitialFetchTimeout(config), validation_visitor_);
+  return factory->create(local_info_, cm_, dispatcher_, api_, config, type_url, callbacks,
+                         resource_decoder, stats, validation_visitor_);
 }
 
 SubscriptionPtr SubscriptionFactoryImpl::collectionSubscriptionFromUrl(
