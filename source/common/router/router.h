@@ -236,7 +236,7 @@ public:
                      PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, dynamic_stats, true),
                      config.start_child_span(), config.suppress_envoy_headers(),
                      config.respect_expected_rq_timeout(),
-                     config.suppress_grpc_request_failure_code_stats(), 
+                     config.suppress_grpc_request_failure_code_stats(),
                      config.flush_upstream_log_on_new_request(), config.strict_check_headers(),
                      context.api().timeSource(), context.httpContext(), context.routerContext()) {
     for (const auto& upstream_log : config.upstream_log()) {
