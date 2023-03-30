@@ -15,7 +15,7 @@ using testing::StartsWith;
 class RouterTestSuppressEnvoyHeaders : public RouterTestBase {
 public:
   RouterTestSuppressEnvoyHeaders()
-      : RouterTestBase(false, true, false, Protobuf::RepeatedPtrField<std::string>{}) {}
+      : RouterTestBase(false, true, false, false, Protobuf::RepeatedPtrField<std::string>{}) {}
 };
 
 // We don't get x-envoy-expected-rq-timeout-ms or an indication to insert
@@ -107,7 +107,7 @@ TEST_F(RouterTestSuppressEnvoyHeaders, EnvoyAttemptCountInResponseNotPresent) {
 
 class WatermarkTest : public RouterTestBase {
 public:
-  WatermarkTest() : RouterTestBase(false, false, false, Protobuf::RepeatedPtrField<std::string>{}) {
+  WatermarkTest() : RouterTestBase(false, false, false, false, Protobuf::RepeatedPtrField<std::string>{}) {
     EXPECT_CALL(callbacks_, activeSpan()).WillRepeatedly(ReturnRef(span_));
   };
 
@@ -394,7 +394,7 @@ TEST_F(WatermarkTest, RetryRequestNotComplete) {
 class RouterTestChildSpan : public RouterTestBase {
 public:
   RouterTestChildSpan()
-      : RouterTestBase(true, false, false, Protobuf::RepeatedPtrField<std::string>{}) {}
+      : RouterTestBase(true, false, false, false, Protobuf::RepeatedPtrField<std::string>{}) {}
 };
 
 // Make sure child spans start/inject/finish with a normal flow.
@@ -644,7 +644,7 @@ TEST_F(RouterTestChildSpan, ResetRetryFlow) {
 class RouterTestNoChildSpan : public RouterTestBase {
 public:
   RouterTestNoChildSpan()
-      : RouterTestBase(false, false, false, Protobuf::RepeatedPtrField<std::string>{}) {}
+      : RouterTestBase(false, false, false, false, Protobuf::RepeatedPtrField<std::string>{}) {}
 };
 
 TEST_F(RouterTestNoChildSpan, BasicFlow) {
@@ -695,7 +695,7 @@ class RouterTestStrictCheckOneHeader : public RouterTestBase,
                                        public testing::WithParamInterface<std::string> {
 public:
   RouterTestStrictCheckOneHeader()
-      : RouterTestBase(false, false, false, protobufStrList({GetParam()})){};
+      : RouterTestBase(false, false, false, false, protobufStrList({GetParam()})){};
 };
 
 INSTANTIATE_TEST_SUITE_P(StrictHeaderCheck, RouterTestStrictCheckOneHeader,
@@ -745,7 +745,7 @@ class RouterTestStrictCheckSomeHeaders
       public testing::WithParamInterface<std::vector<std::string>> {
 public:
   RouterTestStrictCheckSomeHeaders()
-      : RouterTestBase(false, false, false, protobufStrList(GetParam())){};
+      : RouterTestBase(false, false, false, false, protobufStrList(GetParam())){};
 };
 
 INSTANTIATE_TEST_SUITE_P(StrictHeaderCheck, RouterTestStrictCheckSomeHeaders,
@@ -778,7 +778,7 @@ class RouterTestStrictCheckAllHeaders
       public testing::WithParamInterface<std::tuple<std::string, std::string>> {
 public:
   RouterTestStrictCheckAllHeaders()
-      : RouterTestBase(false, false, false, protobufStrList(SUPPORTED_STRICT_CHECKED_HEADERS)){};
+      : RouterTestBase(false, false, false, false, protobufStrList(SUPPORTED_STRICT_CHECKED_HEADERS)){};
 };
 
 INSTANTIATE_TEST_SUITE_P(StrictHeaderCheck, RouterTestStrictCheckAllHeaders,
@@ -850,7 +850,7 @@ TEST(RouterFilterUtilityTest, StrictCheckValidHeaders) {
 class RouterTestSupressGRPCStatsEnabled : public RouterTestBase {
 public:
   RouterTestSupressGRPCStatsEnabled()
-      : RouterTestBase(false, false, true, Protobuf::RepeatedPtrField<std::string>{}) {}
+      : RouterTestBase(false, false, true, false, Protobuf::RepeatedPtrField<std::string>{}) {}
 };
 
 TEST_F(RouterTestSupressGRPCStatsEnabled, ExcludeTimeoutHttpStats) {
@@ -912,7 +912,7 @@ TEST_F(RouterTestSupressGRPCStatsEnabled, ExcludeTimeoutHttpStats) {
 class RouterTestSupressGRPCStatsDisabled : public RouterTestBase {
 public:
   RouterTestSupressGRPCStatsDisabled()
-      : RouterTestBase(false, false, false, Protobuf::RepeatedPtrField<std::string>{}) {}
+      : RouterTestBase(false, false, false, false, Protobuf::RepeatedPtrField<std::string>{}) {}
 };
 
 TEST_F(RouterTestSupressGRPCStatsDisabled, IncludeHttpTimeoutStats) {
