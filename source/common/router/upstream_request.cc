@@ -564,7 +564,7 @@ void UpstreamRequest::onPerTryTimeout() {
   }
 }
 
-void UpstreamRequest::onConnectionPoolCallback() {
+void UpstreamRequest::recordConnectionPoolCallbackLatency() {
   upstreamTiming().recordConnectionPoolCallbackLatency(
       start_time_, parent_.callbacks()->dispatcher().timeSource());
 }
@@ -572,7 +572,7 @@ void UpstreamRequest::onConnectionPoolCallback() {
 void UpstreamRequest::onPoolFailure(ConnectionPool::PoolFailureReason reason,
                                     absl::string_view transport_failure_reason,
                                     Upstream::HostDescriptionConstSharedPtr host) {
-  onConnectionPoolCallback();
+  recordConnectionPoolCallbackLatency();
   Http::StreamResetReason reset_reason = Http::StreamResetReason::ConnectionFailure;
   switch (reason) {
   case ConnectionPool::PoolFailureReason::Overflow:
@@ -602,7 +602,7 @@ void UpstreamRequest::onPoolReady(std::unique_ptr<GenericUpstream>&& upstream,
   // This may be called under an existing ScopeTrackerScopeState but it will unwind correctly.
   ScopeTrackerScopeState scope(&parent_.callbacks()->scope(), parent_.callbacks()->dispatcher());
   ENVOY_STREAM_LOG(debug, "pool ready", *parent_.callbacks());
-  onConnectionPoolCallback();
+  recordConnectionPoolCallbackLatency();
   upstream_ = std::move(upstream);
   had_upstream_ = true;
   // Have the upstream use the account of the downstream.
