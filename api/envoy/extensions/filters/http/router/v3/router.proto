@@ -118,4 +118,13 @@ message Router {
   // upstream filters will count as a final response if hedging is configured.
   // [#extension-category: envoy.filters.http.upstream]
   repeated network.http_connection_manager.v3.HttpFilter upstream_http_filters = 8;
+
+  // The interval to flush the upstream access logs. If this field is set, the router will flush access
+  // logs periodically at the specified interval. This is especially useful in the case of long-lived
+  // requests, such as CONNECT and Websockets. Final access logs can be detected via the
+  // `requestComplete()` method of `StreamInfo` in access log filters, or thru the `%STREAM_STATE%`
+  // substitution string.
+  // The interval must be at least 1 millisecond.
+  google.protobuf.Duration upstream_log_flush_interval = 9
+      [(validate.rules).duration = {gte {nanos: 1000000}}];
 }
