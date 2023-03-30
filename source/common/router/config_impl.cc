@@ -1111,7 +1111,17 @@ std::unique_ptr<InternalRedirectPolicyImpl> RouteEntryImplBase::buildInternalRed
 
 RouteEntryImplBase::OptionalTimeouts RouteEntryImplBase::buildOptionalTimeouts(
     const envoy::config::route::v3::RouteAction& route) const {
-  OptionalTimeouts timeouts;
+  // Calculate how many values are actually set, to initialize `OptionalTimeouts` packed_struct,
+  // avoiding memory re-allocation on each set() call.
+  int num_timeouts_set = route.has_idle_timeout() ? 1 : 0;
+  num_timeouts_set += route.has_max_grpc_timeout() ? 1 : 0;
+  num_timeouts_set += route.has_grpc_timeout_offset() ? 1 : 0;
+  if (route.has_max_stream_duration()) {
+    num_timeouts_set += route.max_stream_duration().has_max_stream_duration() ? 1 : 0;
+    num_timeouts_set += route.max_stream_duration().has_grpc_timeout_header_max() ? 1 : 0;
+    num_timeouts_set += route.max_stream_duration().has_grpc_timeout_header_offset() ? 1 : 0;
+  }
+  OptionalTimeouts timeouts(num_timeouts_set);
   if (route.has_idle_timeout()) {
     timeouts.set<OptionalTimeoutNames::IdleTimeout>(
         std::chrono::milliseconds(PROTOBUF_GET_MS_REQUIRED(route, idle_timeout)));

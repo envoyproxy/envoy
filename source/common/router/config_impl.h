@@ -687,42 +687,42 @@ public:
   using OptionalTimeouts = PackedStruct<std::chrono::milliseconds, 6, OptionalTimeoutNames>;
 
   absl::optional<std::chrono::milliseconds> idleTimeout() const override {
-    auto timeout = optional_timeouts_.get<OptionalTimeoutNames::IdleTimeout>();
+    const auto timeout = optional_timeouts_.get<OptionalTimeoutNames::IdleTimeout>();
     if (timeout.has_value()) {
       return *timeout;
     }
     return absl::nullopt;
   }
   absl::optional<std::chrono::milliseconds> maxStreamDuration() const override {
-    auto timeout = optional_timeouts_.get<OptionalTimeoutNames::MaxStreamDuration>();
+    const auto timeout = optional_timeouts_.get<OptionalTimeoutNames::MaxStreamDuration>();
     if (timeout.has_value()) {
       return *timeout;
     }
     return absl::nullopt;
   }
   absl::optional<std::chrono::milliseconds> grpcTimeoutHeaderMax() const override {
-    auto timeout = optional_timeouts_.get<OptionalTimeoutNames::GrpcTimeoutHeaderMax>();
+    const auto timeout = optional_timeouts_.get<OptionalTimeoutNames::GrpcTimeoutHeaderMax>();
     if (timeout.has_value()) {
       return *timeout;
     }
     return absl::nullopt;
   }
   absl::optional<std::chrono::milliseconds> grpcTimeoutHeaderOffset() const override {
-    auto timeout = optional_timeouts_.get<OptionalTimeoutNames::GrpcTimeoutHeaderOffset>();
+    const auto timeout = optional_timeouts_.get<OptionalTimeoutNames::GrpcTimeoutHeaderOffset>();
     if (timeout.has_value()) {
       return *timeout;
     }
     return absl::nullopt;
   }
   absl::optional<std::chrono::milliseconds> maxGrpcTimeout() const override {
-    auto timeout = optional_timeouts_.get<OptionalTimeoutNames::MaxGrpcTimeout>();
+    const auto timeout = optional_timeouts_.get<OptionalTimeoutNames::MaxGrpcTimeout>();
     if (timeout.has_value()) {
       return *timeout;
     }
     return absl::nullopt;
   }
   absl::optional<std::chrono::milliseconds> grpcTimeoutOffset() const override {
-    auto timeout = optional_timeouts_.get<OptionalTimeoutNames::GrpcTimeoutOffset>();
+    const auto timeout = optional_timeouts_.get<OptionalTimeoutNames::GrpcTimeoutOffset>();
     if (timeout.has_value()) {
       return *timeout;
     }
