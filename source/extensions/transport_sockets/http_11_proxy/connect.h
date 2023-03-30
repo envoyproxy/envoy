@@ -62,7 +62,8 @@ public:
 class SelfContainedParser : public Http::Http1::ParserCallbacks {
 public:
   SelfContainedParser()
-      : parser_(Http::Http1::MessageType::Response, this, 2000, /* enable_trailers = */ false) {}
+      : parser_(Http::Http1::MessageType::Response, this, 2000, /* enable_trailers = */ false,
+                /* allow_custom_methods = */ false) {}
   Http::Http1::CallbackResult onMessageBegin() override {
     return Http::Http1::CallbackResult::Success;
   }
