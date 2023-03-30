@@ -513,6 +513,7 @@ envoy_cc_library(
         "//source/common/common:callback_impl_lib",
         "//source/common/common:enum_to_int",
         "//source/common/common:minimal_logger_lib",
+        "//source/common/common:packed_struct_lib",
         "//source/common/config:metadata_lib",
         "//source/common/config:well_known_names",
         "//source/common/http/http1:codec_stats_lib",

@@ -43,6 +43,7 @@
 #include "source/common/common/callback_impl.h"
 #include "source/common/common/enum_to_int.h"
 #include "source/common/common/logger.h"
+#include "source/common/common/packed_struct.h"
 #include "source/common/common/thread.h"
 #include "source/common/config/metadata.h"
 #include "source/common/config/well_known_names.h"
@@ -795,15 +796,35 @@ public:
     return common_lb_config_;
   }
   std::chrono::milliseconds connectTimeout() const override { return connect_timeout_; }
+
+  // `OptionalTimeouts` manages various `optional` values. We pack them in a separate data
+  // structure for memory efficiency -- avoiding overhead of `absl::optional` per variable, and
+  // avoiding overhead of storing unset timeouts.
+  enum class OptionalTimeoutNames { IdleTimeout = 0, TcpPoolIdleTimeout, MaxConnectionDuration };
+  using OptionalTimeouts = PackedStruct<std::chrono::milliseconds, 3, OptionalTimeoutNames>;
+
   const absl::optional<std::chrono::milliseconds> idleTimeout() const override {
-    return idle_timeout_;
+    auto timeout = optional_timeouts_.get<OptionalTimeoutNames::IdleTimeout>();
+    if (timeout.has_value()) {
+      return *timeout;
+    }
+    return absl::nullopt;
   }
   const absl::optional<std::chrono::milliseconds> tcpPoolIdleTimeout() const override {
-    return tcp_pool_idle_timeout_;
+    auto timeout = optional_timeouts_.get<OptionalTimeoutNames::TcpPoolIdleTimeout>();
+    if (timeout.has_value()) {
+      return *timeout;
+    }
+    return absl::nullopt;
   }
   const absl::optional<std::chrono::milliseconds> maxConnectionDuration() const override {
-    return max_connection_duration_;
+    auto timeout = optional_timeouts_.get<OptionalTimeoutNames::MaxConnectionDuration>();
+    if (timeout.has_value()) {
+      return *timeout;
+    }
+    return absl::nullopt;
   }
+
   float perUpstreamPreconnectRatio() const override { return per_upstream_preconnect_ratio_; }
   float peekaheadRatio() const override { return peekahead_ratio_; }
   uint32_t perConnectionBufferLimitBytes() const override {
@@ -1010,9 +1031,7 @@ private:
   const std::shared_ptr<const TcpProtocolOptionsConfigImpl> tcp_protocol_options_;
   const uint64_t max_requests_per_connection_;
   const std::chrono::milliseconds connect_timeout_;
-  absl::optional<std::chrono::milliseconds> idle_timeout_;
-  absl::optional<std::chrono::milliseconds> tcp_pool_idle_timeout_;
-  absl::optional<std::chrono::milliseconds> max_connection_duration_;
+  OptionalTimeouts optional_timeouts_;
   const float per_upstream_preconnect_ratio_;
   const float peekahead_ratio_;
   TransportSocketMatcherPtr socket_matcher_;
