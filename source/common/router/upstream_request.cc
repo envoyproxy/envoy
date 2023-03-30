@@ -123,8 +123,6 @@ UpstreamRequest::UpstreamRequest(RouterFilterInterface& parent,
     return;
   }
 
-  stream_info_.setStreamState(StreamInfo::StreamState::Started);
-
   // Set up the upstream filter manager.
   filter_manager_callbacks_ = std::make_unique<UpstreamRequestFilterManagerCallbacks>(*this);
   filter_manager_ = std::make_unique<UpstreamFilterManager>(
@@ -209,10 +207,7 @@ void UpstreamRequest::cleanUp() {
 
   stream_info_.setStreamState(StreamInfo::StreamState::Ended);
   stream_info_.onRequestComplete();
-  for (const auto& upstream_log : parent_.config().upstream_logs_) {
-    upstream_log->log(parent_.downstreamHeaders(), upstream_headers_.get(),
-                      upstream_trailers_.get(), stream_info_);
-  }
+  log();
 
   while (downstream_data_disabled_ != 0) {
     parent_.callbacks()->onDecoderFilterBelowWriteBufferLowWatermark();
@@ -224,6 +219,15 @@ void UpstreamRequest::cleanUp() {
     // chain. Make sure to not delete them immediately when the stream ends, as the stream often
     // ends during filter chain processing and it causes use-after-free violations.
     parent_.callbacks()->dispatcher().deferredDelete(std::move(filter_manager_callbacks_));
+  }
+}
+
+void UpstreamRequest::log() {
+  Http::ResponseHeaderMap* upstream_headers = upstream_headers_ ? upstream_headers_.get() : nullptr;
+  Http::ResponseTrailerMap* upstream_trailers = upstream_trailers_ ? upstream_trailers_.get() : nullptr;
+
+  for (const auto& upstream_log : parent_.config().upstream_logs_) {
+    upstream_log->log(parent_.downstreamHeaders(), upstream_headers, upstream_trailers, stream_info_);
   }
 }
 
