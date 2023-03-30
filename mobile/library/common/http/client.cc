@@ -257,6 +257,7 @@ void Client::DirectStreamCallbacks::closeStream() {
 }
 
 void Client::DirectStreamCallbacks::onComplete() {
+  direct_stream_.notifyAdapter(DirectStream::AdapterSignal::EncodeComplete);
   http_client_.removeStream(direct_stream_.stream_handle_);
   remote_end_stream_forwarded_ = true;
   ENVOY_LOG(debug, "[S{}] complete stream (success={})", direct_stream_.stream_handle_, success_);
@@ -279,6 +280,7 @@ void Client::DirectStreamCallbacks::onComplete() {
 }
 
 void Client::DirectStreamCallbacks::onError() {
+  direct_stream_.notifyAdapter(DirectStream::AdapterSignal::Error);
   ScopeTrackerScopeState scope(&direct_stream_, http_client_.scopeTracker());
   ENVOY_LOG(debug, "[S{}] remote reset stream", direct_stream_.stream_handle_);
 
@@ -600,6 +602,7 @@ void Client::cancelStream(envoy_stream_t stream) {
     bool stream_was_open =
         getStream(stream, GetStreamFilters::ALLOW_ONLY_FOR_OPEN_STREAMS) != nullptr;
     ScopeTrackerScopeState scope(direct_stream.get(), scopeTracker());
+    direct_stream->notifyAdapter(DirectStream::AdapterSignal::Cancel);
     removeStream(direct_stream->stream_handle_);
 
     ENVOY_LOG(debug, "[S{}] application cancelled stream", stream);

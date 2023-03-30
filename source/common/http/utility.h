@@ -127,10 +127,22 @@ initializeAndValidateOptions(const envoy::config::core::v3::Http3ProtocolOptions
 namespace Http {
 namespace Utility {
 
+enum UrlComponents {
+  UcSchema = 0,
+  UcHost = 1,
+  UcPort = 2,
+  UcPath = 3,
+  UcQuery = 4,
+  UcFragment = 5,
+  UcUserinfo = 6,
+  UcMax = 7
+};
+
 /**
  * Given a fully qualified URL, splits the string_view provided into scheme,
  * host and path with query parameters components.
  */
+
 class Url {
 public:
   bool initialize(absl::string_view absolute_url, bool is_connect_request);
@@ -145,10 +157,14 @@ public:
   /** Returns the fully qualified URL as a string. */
   std::string toString() const;
 
+  bool containsFragment();
+  bool containsUserinfo();
+
 private:
   absl::string_view scheme_;
   absl::string_view host_and_port_;
   absl::string_view path_and_query_params_;
+  uint8_t component_bitmap_;
 };
 
 class PercentEncoding {
@@ -699,6 +715,13 @@ convertCoreToRouteRetryPolicy(const envoy::config::core::v3::RetryPolicy& retry_
  * https://www.rfc-editor.org/rfc/rfc7231#section-4.2.1
  */
 bool isSafeRequest(const Http::RequestHeaderMap& request_headers);
+
+/**
+ * @param value: the value of the referer header field
+ * @return true if the given value conforms to RFC specifications
+ * https://www.rfc-editor.org/rfc/rfc7231#section-5.5.2
+ */
+bool isValidRefererValue(absl::string_view value);
 
 /**
  * Return the GatewayTimeout HTTP code to indicate the request is full received.
