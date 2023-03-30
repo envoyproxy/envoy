@@ -12,10 +12,12 @@ Network::DownstreamTransportSocketFactoryPtr TestServer::createQuicUpstreamTlsCo
   envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
   Extensions::TransportSockets::Tls::ContextManagerImpl context_manager{time_system_};
   tls_context.mutable_common_tls_context()->add_alpn_protocols("h3");
-    envoy::extensions::transport_sockets::tls::v3::TlsCertificate* certs =
-        tls_context.mutable_common_tls_context()->add_tls_certificates();
-  certs->mutable_certificate_chain()->set_filename("../envoy/test/config/integration/certs/upstreamcert.pem");
-  certs->mutable_private_key()->set_filename("../envoy/test/config/integration/certs/upstreamkey.pem");
+  envoy::extensions::transport_sockets::tls::v3::TlsCertificate* certs =
+      tls_context.mutable_common_tls_context()->add_tls_certificates();
+  certs->mutable_certificate_chain()->set_filename(
+      "../envoy/test/config/integration/certs/upstreamcert.pem");
+  certs->mutable_private_key()->set_filename(
+      "../envoy/test/config/integration/certs/upstreamkey.pem");
   envoy::extensions::transport_sockets::quic::v3::QuicDownstreamTransport quic_config;
   quic_config.mutable_downstream_tls_context()->MergeFrom(tls_context);
 
@@ -30,12 +32,15 @@ Network::DownstreamTransportSocketFactoryPtr TestServer::createQuicUpstreamTlsCo
 Network::DownstreamTransportSocketFactoryPtr TestServer::createUpstreamTlsContext(
     testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext>& factory_context) {
   envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
-    envoy::extensions::transport_sockets::tls::v3::TlsCertificate* certs =
-        tls_context.mutable_common_tls_context()->add_tls_certificates();
-  certs->mutable_certificate_chain()->set_filename("../envoy/test/config/integration/certs/upstreamcert.pem");
-  certs->mutable_private_key()->set_filename("../envoy/test/config/integration/certs/upstreamkey.pem");
+  envoy::extensions::transport_sockets::tls::v3::TlsCertificate* certs =
+      tls_context.mutable_common_tls_context()->add_tls_certificates();
+  certs->mutable_certificate_chain()->set_filename(
+      "../envoy/test/config/integration/certs/upstreamcert.pem");
+  certs->mutable_private_key()->set_filename(
+      "../envoy/test/config/integration/certs/upstreamkey.pem");
   auto* ctx = tls_context.mutable_common_tls_context()->mutable_validation_context();
-  ctx->mutable_trusted_ca()->set_filename("../envoy/test/config/integration/certs/upstreamcacert.pem");
+  ctx->mutable_trusted_ca()->set_filename(
+      "../envoy/test/config/integration/certs/upstreamcacert.pem");
   tls_context.mutable_common_tls_context()->add_alpn_protocols("h2");
   auto cfg = std::make_unique<Extensions::TransportSockets::Tls::ServerContextConfigImpl>(
       tls_context, factory_context);
