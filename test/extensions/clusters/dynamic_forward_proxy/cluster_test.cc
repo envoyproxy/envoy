@@ -121,7 +121,7 @@ public:
     filter_state.setData(
         "envoy.upstream.dynamic_host", std::make_shared<Router::StringAccessorImpl>(host),
         StreamInfo::FilterState::StateType::Mutable, StreamInfo::FilterState::LifeSpan::Connection,
-        StreamInfo::FilterState::StreamSharing::SharedWithUpstreamConnection);
+        StreamInfo::StreamSharingMayImpactPooling::SharedWithUpstreamConnection);
 
     return &lb_context_;
   }
