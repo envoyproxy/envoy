@@ -34,11 +34,11 @@ using PolicySharedPtr = std::shared_ptr<const Policy>;
 struct CustomResponseFilterState : public std::enable_shared_from_this<CustomResponseFilterState>,
                                    public StreamInfo::FilterState::Object {
 
-  CustomResponseFilterState(PolicySharedPtr a_policy, std::optional<::Envoy::Http::Code> code)
+  CustomResponseFilterState(PolicySharedPtr a_policy, absl::optional<::Envoy::Http::Code> code)
       : policy(a_policy), original_response_code(code) {}
 
   PolicySharedPtr policy;
-  std::optional<::Envoy::Http::Code> original_response_code;
+  absl::optional<::Envoy::Http::Code> original_response_code;
 };
 
 struct CustomResponseMatchAction : public Matcher::ActionBase<ProtobufWkt::Any> {
