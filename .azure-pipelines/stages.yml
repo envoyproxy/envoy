@@ -624,6 +624,12 @@ stages:
     pool:
       vmImage: "ubuntu-20.04"
     steps:
+    - task: DownloadBuildArtifacts@0
+      inputs:
+        buildType: current
+        artifactName: "bazel.release"
+        itemPattern: "bazel.release/envoy*binary.tar.gz"
+        targetPath: $(Build.StagingDirectory)
     - template: bazel.yml
       parameters:
         ciTarget: bazel.distribution
@@ -634,6 +640,12 @@ stages:
     timeoutInMinutes: 120
     pool: "arm-large"
     steps:
+    - task: DownloadBuildArtifacts@0
+      inputs:
+        buildType: current
+        artifactName: "bazel.release.arm64"
+        itemPattern: "bazel.release.arm64/envoy*binary.tar.gz"
+        targetPath: $(Build.StagingDirectory)
     - template: bazel.yml
       parameters:
         managedAgent: false
