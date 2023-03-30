@@ -257,6 +257,16 @@ using LocalCloseReasons = ConstSingleton<LocalCloseReasonValues>;
 
 struct UpstreamTiming {
   /**
+   * Records the latency from when the upstream request was created to when the
+   * connection pool callbacks (either success of failure were triggered).
+   */
+  void recordConnectionPoolCallbackLatency(MonotonicTime start, TimeSource& time_source) {
+    ASSERT(!connection_pool_callback_latency_);
+    connection_pool_callback_latency_ =
+        std::chrono::duration_cast<std::chrono::nanoseconds>(time_source.monotonicTime() - start);
+  }
+
+  /**
    * Sets the time when the first byte of the request was sent upstream.
    */
   void onFirstUpstreamTxByteSent(TimeSource& time_source) {
@@ -305,6 +315,11 @@ struct UpstreamTiming {
     return upstream_handshake_complete_;
   }
 
+  absl::optional<std::chrono::nanoseconds> connectionPoolCallbackLatency() const {
+    return connection_pool_callback_latency_;
+  }
+
+  absl::optional<std::chrono::nanoseconds> connection_pool_callback_latency_;
   absl::optional<MonotonicTime> first_upstream_tx_byte_sent_;
   absl::optional<MonotonicTime> last_upstream_tx_byte_sent_;
   absl::optional<MonotonicTime> first_upstream_rx_byte_received_;

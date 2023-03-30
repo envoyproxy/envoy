@@ -193,6 +193,7 @@ private:
   StreamInfo::UpstreamTiming& upstreamTiming() {
     return stream_info_.upstreamInfo()->upstreamTiming();
   }
+  void onConnectionPoolCallback();
   bool shouldSendEndStream() {
     // Only encode end stream if the full request has been received, the body
     // has been sent, and any trailers or metadata have also been sent.
