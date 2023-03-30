@@ -214,10 +214,7 @@ func (f *filter) encodeHeaders(header api.ResponseHeaderMap, endStream bool) api
 		return f.fail("Values return unexpected data %v", hdrs)
 	}
 
-	status := header.Status()
-	if status == 0 {
-		return f.fail("Status return 0")
-	} else {
+	if status, ok := header.Status(); ok {
 		header.Add("rsp-status", strconv.Itoa(status))
 	}
 

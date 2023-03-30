@@ -126,7 +126,7 @@ type RequestTrailerMap interface {
 
 type ResponseHeaderMap interface {
 	HeaderMap
-	Status() int
+	Status() (int, bool)
 }
 
 type ResponseTrailerMap interface {
