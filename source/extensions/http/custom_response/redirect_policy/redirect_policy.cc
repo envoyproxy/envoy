@@ -192,7 +192,7 @@ std::unique_ptr<ModifyRequestHeadersAction> RedirectPolicy::createModifyRequestH
   // Apply header mutations before recalculating the route.
   request_header_parser_->evaluateHeaders(*downstream_headers, decoder_callbacks->streamInfo());
   if (modify_request_headers_action_) {
-    modify_request_headers_action_->modifyRequestHeaders(*downstream_headers,
+    modify_request_headers_action_->modifyRequestHeaders(*downstream_headers, headers,
                                                          decoder_callbacks->streamInfo(), *this);
   }
   const auto route = decoder_callbacks->route();
