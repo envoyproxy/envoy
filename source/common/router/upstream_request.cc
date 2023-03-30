@@ -123,6 +123,8 @@ UpstreamRequest::UpstreamRequest(RouterFilterInterface& parent,
     return;
   }
 
+  stream_info_.setStreamState(StreamInfo::StreamState::Started);
+
   // Set up the upstream filter manager.
   filter_manager_callbacks_ = std::make_unique<UpstreamRequestFilterManagerCallbacks>(*this);
   filter_manager_ = std::make_unique<UpstreamFilterManager>(
@@ -205,6 +207,7 @@ void UpstreamRequest::cleanUp() {
     }
   }
 
+  stream_info_.setStreamState(StreamInfo::StreamState::Ended);
   stream_info_.onRequestComplete();
   upstreamLog();
 
