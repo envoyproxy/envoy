@@ -723,6 +723,11 @@ void UpstreamRequest::onPoolReady(std::unique_ptr<GenericUpstream>&& upstream,
 
   stream_info_.setRequestHeaders(*parent_.downstreamHeaders());
 
+  stream_info_.setStreamState(StreamInfo::StreamState::Started);
+  if (parent_.config().flush_upstream_log_on_new_request_) {
+    log();
+  }
+
   for (auto* callback : upstream_callbacks_) {
     callback->onUpstreamConnectionEstablished();
     return;
