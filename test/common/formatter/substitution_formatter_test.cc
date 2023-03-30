@@ -203,30 +203,6 @@ TEST(SubstitutionFormatterTest, plainNumberFormatter) {
               ProtoEq(ValueUtil::numberValue(400)));
 }
 
-class StalledTimeSource : public TimeSource {
-public:
-  StalledTimeSource(uint64_t system_time_ms, uint64_t monotonic_time_progress_ms) {
-    calls_counter_ = 0;
-    system_time_ms_ = system_time_ms;
-    monotonic_time_progress_ms_ = monotonic_time_progress_ms;
-  }
-
-  SystemTime systemTime() override {
-    return SystemTime(std::chrono::milliseconds(system_time_ms_));
-  }
-
-  MonotonicTime monotonicTime() override {
-    calls_counter_ += 1;
-    return MonotonicTime(
-        std::chrono::milliseconds(system_time_ms_ + calls_counter_ * monotonic_time_progress_ms_));
-  }
-
-private:
-  int calls_counter_;
-  uint64_t system_time_ms_;
-  uint64_t monotonic_time_progress_ms_;
-};
-
 TEST(SubstitutionFormatterTest, inFlightDuration) {
   Event::SimulatedTimeSystem time_system;
   time_system.setSystemTime(std::chrono::milliseconds(0));
