@@ -1138,7 +1138,7 @@ std::string createLargeJson(int level) {
     (*next->mutable_struct_value()->mutable_fields())["k"] = val;
     cur = next;
   }
-  return MessageUtil::getJsonStringFromMessageOrDie(*cur, false, false);
+  return MessageUtil::getJsonStringFromMessageOrError(*cur, false, false);
 }
 
 TEST_P(GrpcJsonTranscoderIntegrationTest, LargeStruct) {

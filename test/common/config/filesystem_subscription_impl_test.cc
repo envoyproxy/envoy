@@ -191,7 +191,7 @@ resource:
   entries:
   - inline_entry: {}
   )EOF",
-                  MessageUtil::getJsonStringFromMessageOrDie(inline_entry));
+                  MessageUtil::getJsonStringFromMessageOrError(inline_entry));
   DecodedResourcesWrapper decoded_resources;
   decoded_resources.pushBack(std::make_unique<DecodedResourceImpl>(resource_decoder, inline_entry));
   EXPECT_CALL(callbacks_,
@@ -220,7 +220,7 @@ resource:
   entries:
   - inline_entry: {}
   )EOF",
-                  MessageUtil::getJsonStringFromMessageOrDie(inline_entry_2));
+                  MessageUtil::getJsonStringFromMessageOrError(inline_entry_2));
   {
     DecodedResourcesWrapper decoded_resources_2;
     decoded_resources_2.pushBack(

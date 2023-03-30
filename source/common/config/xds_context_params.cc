@@ -42,7 +42,12 @@ const NodeContextRenderers& nodeParamCbs() {
 void mergeMetadataJson(Protobuf::Map<std::string, std::string>& params,
                        const ProtobufWkt::Struct& metadata, const std::string& prefix) {
   for (const auto& it : metadata.fields()) {
-    params[prefix + it.first] = MessageUtil::getJsonStringFromMessageOrDie(it.second);
+    ProtobufUtil::StatusOr<std::string> json_or_error =
+        MessageUtil::getJsonStringFromMessage(it.second);
+    ENVOY_BUG(json_or_error.ok(), "Failed to parse json");
+    if (json_or_error.ok()) {
+      params[prefix + it.first] = json_or_error.value();
+    }
   }
 }
 
