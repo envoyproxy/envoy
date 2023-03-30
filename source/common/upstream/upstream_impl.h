@@ -1036,8 +1036,6 @@ private:
   ProtobufTypes::MessagePtr load_balancing_policy_;
   TypedLoadBalancerFactory* load_balancer_factory_ = nullptr;
   const envoy::config::cluster::v3::Cluster::CommonLbConfig common_lb_config_;
-  const absl::optional<envoy::config::core::v3::UpstreamHttpProtocolOptions>
-      upstream_http_protocol_options_;
   absl::optional<std::string> eds_service_name_;
   std::unique_ptr<const envoy::config::cluster::v3::Cluster::CustomClusterType> cluster_type_;
   const std::unique_ptr<Server::Configuration::CommonFactoryContext> factory_context_;
