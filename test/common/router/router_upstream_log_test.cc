@@ -83,7 +83,8 @@ public:
 
 class RouterUpstreamLogTest : public testing::Test {
 public:
-  void init(absl::optional<envoy::config::accesslog::v3::AccessLog> upstream_log) {
+  void init(absl::optional<envoy::config::accesslog::v3::AccessLog> upstream_log,
+            bool flush_upstream_log_on_new_request = false) {
     envoy::extensions::filters::http::router::v3::Router router_proto;
     static const std::string cluster_name = "cluster_0";
 
@@ -94,6 +95,7 @@ public:
     EXPECT_CALL(callbacks_.dispatcher_, deferredDelete_).Times(testing::AnyNumber());
 
     if (upstream_log) {
+      router_proto.set_flush_upstream_log_on_new_request(flush_upstream_log_on_new_request);
       ON_CALL(*context_.access_log_manager_.file_, write(_))
           .WillByDefault(
               Invoke([&](absl::string_view data) { output_.push_back(std::string(data)); }));
@@ -409,6 +411,26 @@ typed_config:
 
   EXPECT_EQ(output_.size(), 1U);
   EXPECT_EQ(output_.front(), "cluster_0");
+}
+
+TEST_F(RouterUpstreamLogTest, StreamState) {
+  const std::string yaml = R"EOF(
+name: accesslog
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
+  log_format:
+    text_format_source:
+      inline_string: "%STREAM_STATE%"
+  path: "/dev/null"
+  )EOF";
+
+  envoy::config::accesslog::v3::AccessLog upstream_log;
+  TestUtility::loadFromYaml(yaml, upstream_log);
+
+  init(absl::optional<envoy::config::accesslog::v3::AccessLog>(upstream_log), true);
+  run();
+std::cout << output_.size() << "\n\n";
+  EXPECT_EQ(output_.front(), StreamInfo::StreamStateStrings::get().StreamEnded);
 }
 
 } // namespace Router
