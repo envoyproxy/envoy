@@ -41,6 +41,7 @@ public:
                     absl::string_view header_value) const;
 
 private:
+  bool canClearCache() const;
   bool isAllowed(CheckOperation op, const Http::LowerCaseString& header_name) const;
   bool isValidValue(const Http::LowerCaseString& header_name, absl::string_view header_value) const;
   static const ExtraRoutingHeaders& extraRoutingHeaders();
