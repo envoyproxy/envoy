@@ -117,6 +117,6 @@ async function testActiveFiltered(iframe) {
 }
 
 
-addTest('/stats?format=active', 'testActiveDefaults', testActiveDefaults);
-addTest('/stats?format=active', 'testActiveCustomMaxCount', testActiveCustomMaxCount);
-addTest('/stats?format=active', 'testActiveFiltered', testActiveFiltered);
+addTest('/stats?format=active-html', 'testActiveDefaults', testActiveDefaults);
+addTest('/stats?format=active-html', 'testActiveCustomMaxCount', testActiveCustomMaxCount);
+addTest('/stats?format=active-html', 'testActiveFiltered', testActiveFiltered);

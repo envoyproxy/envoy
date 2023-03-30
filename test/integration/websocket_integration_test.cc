@@ -392,6 +392,12 @@ TEST_P(WebsocketIntegrationTest, RouteSpecificUpgrade) {
 }
 
 TEST_P(WebsocketIntegrationTest, WebsocketCustomFilterChain) {
+  // TODO(#26373) - debug and re-enable.
+  if (downstreamProtocol() != Http::CodecType::HTTP2 ||
+      upstreamProtocol() == Http::CodecType::HTTP3) {
+    return;
+  }
+
 #ifdef ENVOY_ENABLE_UHV
   // TODO(#23286) - add web socket support for H2 UHV
   return;

@@ -130,6 +130,12 @@ public:
    */
   static absl::optional<uint32_t>
   extractDownstreamAddressJustPort(const Network::Address::Instance& address);
+
+  /**
+   * @param stream_state supplies the stream's state.
+   * @return a string representation of the stream's state.
+   */
+  static const std::string& getStreamStateString(const StreamState stream_state);
 };
 
 // Static utils for creating, consuming, and producing strings from the

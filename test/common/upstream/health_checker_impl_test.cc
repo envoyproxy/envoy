@@ -20,6 +20,9 @@
 #include "source/common/protobuf/utility.h"
 #include "source/common/upstream/health_checker_impl.h"
 #include "source/common/upstream/upstream_impl.h"
+#include "source/extensions/health_checkers/grpc/health_checker_impl.h"
+#include "source/extensions/health_checkers/http/health_checker_impl.h"
+#include "source/extensions/health_checkers/tcp/health_checker_impl.h"
 
 #include "test/common/http/common.h"
 #include "test/common/upstream/utility.h"
