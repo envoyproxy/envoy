@@ -24,6 +24,17 @@
 namespace Envoy {
 namespace Server {
 
+class Trigger {
+public:
+  virtual ~Trigger() = default;
+
+  // Updates the current value of the metric and returns whether the trigger has changed state.
+  virtual bool updateValue(double value) PURE;
+
+  // Returns the action state for the trigger.
+  virtual OverloadActionState actionState() const PURE;
+};
+
 class OverloadAction {
 public:
   OverloadAction(const envoy::config::overload::v3::OverloadAction& config,
@@ -36,23 +47,34 @@ public:
   // Returns the current action state, which is the max state across all registered triggers.
   OverloadActionState getState() const;
 
-  class Trigger {
-  public:
-    virtual ~Trigger() = default;
-
-    // Updates the current value of the metric and returns whether the trigger has changed state.
-    virtual bool updateValue(double value) PURE;
-
-    // Returns the action state for the trigger.
-    virtual OverloadActionState actionState() const PURE;
-  };
-  using TriggerPtr = std::unique_ptr<Trigger>;
-
 private:
+  using TriggerPtr = std::unique_ptr<Trigger>;
   absl::node_hash_map<std::string, TriggerPtr> triggers_;
   OverloadActionState state_;
   Stats::Gauge& active_gauge_;
   Stats::Gauge& scale_percent_gauge_;
+};
+
+class LoadShedPointImpl : public LoadShedPoint {
+public:
+  LoadShedPointImpl(const envoy::config::overload::v3::LoadShedPoint& config,
+                    Stats::Scope& stats_scope, Random::RandomGenerator& random_generator);
+  LoadShedPointImpl(const LoadShedPointImpl&) = delete;
+  LoadShedPointImpl& operator=(const LoadShedPointImpl&) = delete;
+
+  bool shouldShedLoad() override;
+  void updateResource(const std::string& name, double pressure);
+
+private:
+  using TriggerPtr = std::unique_ptr<Trigger>;
+
+  // Helper to handle updating the probability to shed load given the triggers.
+  void updateProbabilityShedLoad();
+
+  absl::flat_hash_map<std::string, TriggerPtr> triggers_;
+  std::atomic<float> probability_shed_load_{0};
+  Stats::Gauge& scale_percent_;
+  Random::RandomGenerator& random_generator_;
 };
 
 // Simple table that converts strings into Symbol instances. Symbols are guaranteed to start at 0
@@ -117,6 +139,7 @@ public:
   bool registerForAction(const std::string& action, Event::Dispatcher& dispatcher,
                          OverloadActionCb callback) override;
   ThreadLocalOverloadState& getThreadLocalOverloadState() override;
+  LoadShedPoint* getLoadShedPoint(const std::string& point_name) override;
   Event::ScaledRangeTimerManagerFactory scaledTimerFactory() override;
 
   // Stop the overload manager timer and wait for any pending resource updates to complete.
@@ -183,6 +206,8 @@ private:
       proactive_resources_;
 
   absl::node_hash_map<NamedOverloadActionSymbolTable::Symbol, OverloadAction> actions_;
+
+  absl::flat_hash_map<std::string, std::unique_ptr<LoadShedPointImpl>> loadshed_points_;
 
   Event::ScaledTimerTypeMapConstSharedPtr timer_minimums_;
 

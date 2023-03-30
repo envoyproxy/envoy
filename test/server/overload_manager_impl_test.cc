@@ -426,8 +426,8 @@ TEST_F(OverloadManagerImplTest, ScaledTrigger) {
   EXPECT_EQ(0, active_gauge.value());
   EXPECT_EQ(0, scale_percent_gauge.value());
 
-  // The trigger for fake_resource3 is a scaled trigger with a min of 0.5 and a max of 0.8. Set the
-  // current pressure value to halfway in that range.
+  // The trigger for fake_resource3 is a scaled trigger with a min of 0.5 and a max of 0.8. Set
+  // the current pressure value to halfway in that range.
   factory3_.monitor_->setPressure(0.65);
   timer_cb_();
 
@@ -476,8 +476,8 @@ TEST_F(OverloadManagerImplTest, AggregatesMultipleResourceUpdates) {
 
   factory1_.monitor_->setUpdateAsync(true);
 
-  // Monitor 2 will respond immediately at the timer callback, but that won't push an update to the
-  // thread-local state because monitor 1 hasn't finished its update yet.
+  // Monitor 2 will respond immediately at the timer callback, but that won't push an update to
+  // the thread-local state because monitor 1 hasn't finished its update yet.
   factory2_.monitor_->setPressure(1.0);
   timer_cb_();
 
@@ -523,8 +523,8 @@ TEST_F(OverloadManagerImplTest, FlushesUpdatesEvenWithOneUnresponsive) {
   // Set monitor 1 to async, but never publish updates for it.
   factory1_.monitor_->setUpdateAsync(true);
 
-  // Monitor 2 will respond immediately at the timer callback, but that won't push an update to the
-  // thread-local state because monitor 1 hasn't finished its update yet.
+  // Monitor 2 will respond immediately at the timer callback, but that won't push an update to
+  // the thread-local state because monitor 1 hasn't finished its update yet.
   factory2_.monitor_->setPressure(1.0);
   timer_cb_();
 
@@ -871,6 +871,198 @@ TEST_F(OverloadManagerSimulatedTimeTest, RefreshLoopDelay) {
 
   manager->stop();
 }
+
+class OverloadManagerLoadShedPointImplTest : public OverloadManagerImplTest {};
+
+TEST_F(OverloadManagerLoadShedPointImplTest, DuplicateLoadShedPoints) {
+  const std::string config = R"EOF(
+    loadshed_points:
+      - name: "envoy.load_shed_point.dummy_point"
+      - name: "envoy.load_shed_point.dummy_point"
+  )EOF";
+
+  EXPECT_THROW_WITH_REGEX(createOverloadManager(config), EnvoyException,
+                          "Duplicate loadshed point .*");
+}
+
+TEST_F(OverloadManagerLoadShedPointImplTest, UnknownResource) {
+  const std::string config = R"EOF(
+    loadshed_points:
+      - name: "envoy.load_shed_point.dummy_point"
+        triggers:
+          - name: "envoy.resource_monitors.unknown_resource"
+            threshold:
+              value: 0.9
+  )EOF";
+
+  EXPECT_THROW_WITH_REGEX(createOverloadManager(config), EnvoyException,
+                          "Unknown trigger resource .* for loadshed point .*");
+}
+
+TEST_F(OverloadManagerLoadShedPointImplTest, ThrowsIfDuplicateTrigger) {
+  const std::string config = R"EOF(
+    resource_monitors:
+      - name: envoy.resource_monitors.fake_resource1
+    loadshed_points:
+      - name: "envoy.load_shed_point.dummy_point"
+        triggers:
+          - name: "envoy.resource_monitors.fake_resource1"
+            threshold:
+              value: 0.9
+          - name: "envoy.resource_monitors.fake_resource1"
+            threshold:
+              value: 0.7
+  )EOF";
+
+  EXPECT_THROW_WITH_REGEX(createOverloadManager(config), EnvoyException,
+                          "Duplicate trigger resource for LoadShedPoint .*");
+}
+
+TEST_F(OverloadManagerLoadShedPointImplTest, PointUsesTriggerToDetermineWhetherToLoadShed) {
+  setDispatcherExpectation();
+  const std::string config = R"EOF(
+    resource_monitors:
+      - name: envoy.resource_monitors.fake_resource1
+    loadshed_points:
+      - name: "test_point"
+        triggers:
+          - name: "envoy.resource_monitors.fake_resource1"
+            threshold:
+              value: 0.9
+  )EOF";
+
+  auto manager{createOverloadManager(config)};
+  manager->start();
+
+  LoadShedPoint* point = manager->getLoadShedPoint("test_point");
+  ASSERT_NE(point, nullptr);
+
+  Stats::Gauge& scale_percent =
+      stats_.gauge("overload.test_point.scale_percent", Stats::Gauge::ImportMode::Accumulate);
+
+  EXPECT_EQ(0, scale_percent.value());
+  EXPECT_FALSE(point->shouldShedLoad());
+
+  factory1_.monitor_->setPressure(0.65);
+  timer_cb_();
+  EXPECT_EQ(0, scale_percent.value());
+  EXPECT_FALSE(point->shouldShedLoad());
+
+  factory1_.monitor_->setPressure(0.95);
+  timer_cb_();
+  EXPECT_TRUE(point->shouldShedLoad());
+  EXPECT_EQ(100, scale_percent.value());
+
+  factory1_.monitor_->setPressure(0.7);
+  timer_cb_();
+  EXPECT_FALSE(point->shouldShedLoad());
+  EXPECT_EQ(0, scale_percent.value());
+}
+
+TEST_F(OverloadManagerLoadShedPointImplTest, PointWithMultipleTriggers) {
+  setDispatcherExpectation();
+  const std::string config = R"EOF(
+    resource_monitors:
+      - name: envoy.resource_monitors.fake_resource1
+      - name: envoy.resource_monitors.fake_resource2
+    loadshed_points:
+      - name: "test_point"
+        triggers:
+          - name: "envoy.resource_monitors.fake_resource1"
+            threshold:
+              value: 0.9
+          - name: "envoy.resource_monitors.fake_resource2"
+            scaled:
+              scaling_threshold: 0.5
+              saturation_threshold: 1.0
+  )EOF";
+
+  auto manager{createOverloadManager(config)};
+  manager->start();
+
+  LoadShedPoint* point = manager->getLoadShedPoint("test_point");
+  ASSERT_NE(point, nullptr);
+
+  Stats::Gauge& scale_percent =
+      stats_.gauge("overload.test_point.scale_percent", Stats::Gauge::ImportMode::Accumulate);
+
+  EXPECT_FALSE(point->shouldShedLoad());
+  EXPECT_EQ(0, scale_percent.value());
+
+  factory1_.monitor_->setPressure(0.95);
+  timer_cb_();
+  EXPECT_TRUE(point->shouldShedLoad());
+  EXPECT_EQ(100, scale_percent.value());
+
+  factory2_.monitor_->setPressure(0.75);
+  timer_cb_();
+  EXPECT_TRUE(point->shouldShedLoad());
+  EXPECT_EQ(100, scale_percent.value());
+
+  // shouldCheckLoad is now random since we're using a
+  // scaling trigger that is now the highest activated trigger.
+  // As such just check the scaling percent.
+  factory1_.monitor_->setPressure(0.75);
+  timer_cb_();
+  EXPECT_EQ(50, scale_percent.value());
+
+  factory2_.monitor_->setPressure(0.45);
+  timer_cb_();
+  EXPECT_FALSE(point->shouldShedLoad());
+  EXPECT_EQ(0, scale_percent.value());
+}
+
+// Tests that compared to OverloadManagerActions that are posted with fixed
+// OverloadState, the LoadShedPoint uses the most current reading.
+TEST_F(OverloadManagerLoadShedPointImplTest, LoadShedPointShouldUseCurrentReading) {
+  setDispatcherExpectation();
+  const std::string config = R"EOF(
+    resource_monitors:
+      - name: envoy.resource_monitors.fake_resource1
+    loadshed_points:
+      - name: "test_point"
+        triggers:
+          - name: "envoy.resource_monitors.fake_resource1"
+            scaled:
+              scaling_threshold: 0.5
+              saturation_threshold: 1.0
+    actions:
+      - name: envoy.overload_actions.dummy_action
+        triggers:
+          - name: envoy.resource_monitors.fake_resource1
+            scaled:
+              scaling_threshold: 0.5
+              saturation_threshold: 1.0
+  )EOF";
+
+  auto manager{createOverloadManager(config)};
+
+  Event::DispatcherPtr other_dispatcher{api_->allocateDispatcher("other_dispatcher")};
+  std::vector<UnitFloat> overload_action_states;
+
+  manager->registerForAction(
+      "envoy.overload_actions.dummy_action", *other_dispatcher,
+      [&](OverloadActionState state) { overload_action_states.push_back(state.value()); });
+  manager->start();
+
+  LoadShedPoint* point = manager->getLoadShedPoint("test_point");
+  ASSERT_NE(point, nullptr);
+
+  factory1_.monitor_->setPressure(1.0f);
+  other_dispatcher->post([&point]() { EXPECT_FALSE(point->shouldShedLoad()); });
+  timer_cb_();
+
+  // The pressure change should be propagated to the LoadShedPoint but not
+  // the Overload Action.
+  factory1_.monitor_->setPressure(0);
+  other_dispatcher->post([&point]() { EXPECT_FALSE(point->shouldShedLoad()); });
+  timer_cb_();
+
+  other_dispatcher->run(Event::Dispatcher::RunType::Block);
+
+  EXPECT_EQ(overload_action_states[0], UnitFloat(1));
+}
+
 } // namespace
 } // namespace Server
 } // namespace Envoy

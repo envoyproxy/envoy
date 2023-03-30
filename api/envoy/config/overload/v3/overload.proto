@@ -136,10 +136,23 @@ message OverloadAction {
   // A set of triggers for this action. The state of the action is the maximum
   // state of all triggers, which can be scaling between 0 and 1 or saturated. Listeners
   // are notified when the overload action changes state.
+  // An overload manager action can only have one trigger for a given resource.
   repeated Trigger triggers = 2 [(validate.rules).repeated = {min_items: 1}];
 
   // Configuration for the action being instantiated.
   google.protobuf.Any typed_config = 3;
+}
+
+message LoadShedPoint {
+  // This is just a well-known string for the LoadShedPoint.
+  // Custom LoadShedPoints should be named using reverse DNS to ensure
+  // uniqueness.
+  string name = 1 [(validate.rules).string = {min_len: 1}];
+
+  // A set of triggers for this LoadShedPoint. The LoadShedPoint will use the
+  // the maximum state of all triggers, which can be scaling between 0 and 1 or
+  // saturated. A LoadShedPoint can only have one trigger for a given resource.
+  repeated Trigger triggers = 2 [(validate.rules).repeated = {min_items: 1}];
 }
 
 // Configuration for which accounts the WatermarkBuffer Factories should
@@ -162,6 +175,7 @@ message BufferFactoryConfig {
   uint32 minimum_account_to_track_power_of_two = 1 [(validate.rules).uint32 = {lte: 56 gte: 10}];
 }
 
+// [#next-free-field: 6]
 message OverloadManager {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.overload.v2alpha.OverloadManager";
@@ -174,6 +188,9 @@ message OverloadManager {
 
   // The set of overload actions.
   repeated OverloadAction actions = 3;
+
+  // The set of loadshed points.
+  repeated LoadShedPoint loadshed_points = 5;
 
   // Configuration for buffer factory.
   BufferFactoryConfig buffer_factory_config = 4;
