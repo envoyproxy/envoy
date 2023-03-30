@@ -44,6 +44,7 @@ minor_behavior_changes:
 - area: custom response
   change: |
     Changed how the uri for redirect policy is specified. It can now be specified either as a single fully qualified string, or by specifying individual components of the uri.
+    If :ref:`status_code <envoy_v3_api_msg_extensions.http.custom_response.redirect_policy.v3.RedirectPolicy.status_code` is not specified, Envoy now returns the original response code, instead of the response code returned after redirection to the error service.
 - area: matchers
   change: |
     Moved all of the network input matchers to extensions. If you use network matchers and override extensions_build_config.bzl you will now need to include them explicitly.
