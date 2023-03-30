@@ -413,7 +413,7 @@ typed_config:
   EXPECT_EQ(output_.front(), "cluster_0");
 }
 
-TEST_F(RouterUpstreamLogTest, StreamState) {
+TEST_F(RouterUpstreamLogTest, OnRequestLogAndStreamState) {
   const std::string yaml = R"EOF(
 name: accesslog
 typed_config:
@@ -429,8 +429,10 @@ typed_config:
 
   init(absl::optional<envoy::config::accesslog::v3::AccessLog>(upstream_log), true);
   run();
-std::cout << output_.size() << "\n\n";
-  EXPECT_EQ(output_.front(), StreamInfo::StreamStateStrings::get().StreamEnded);
+
+  EXPECT_EQ(output_.size(), 2U);
+  EXPECT_EQ(output_.front(), StreamInfo::StreamStateStrings::get().StreamStarted);
+  EXPECT_EQ(output_.back(), StreamInfo::StreamStateStrings::get().StreamEnded);
 }
 
 } // namespace Router
