@@ -246,11 +246,6 @@ public:
       upstream_logs_.push_back(AccessLog::AccessLogFactory::fromProto(upstream_log, context));
     }
 
-    if (config.has_upstream_log_flush_interval()) {
-      upstream_log_flush_interval_ = std::chrono::milliseconds(
-          DurationUtil::durationToMilliseconds(config.upstream_log_flush_interval()));
-    }
-
     if (config.upstream_http_filters_size() > 0) {
       auto& server_factory_ctx = context.getServerFactoryContext();
       const Http::FilterChainUtility::FiltersList& upstream_http_filters =
