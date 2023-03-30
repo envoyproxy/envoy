@@ -246,6 +246,11 @@ public:
       upstream_logs_.push_back(AccessLog::AccessLogFactory::fromProto(upstream_log, context));
     }
 
+    if (config.has_upstream_log_flush_interval()) {
+      upstream_log_flush_interval_ = std::chrono::milliseconds(
+          DurationUtil::durationToMilliseconds(config.upstream_log_flush_interval()));
+    }
+
     if (config.upstream_http_filters_size() > 0) {
       auto& server_factory_ctx = context.getServerFactoryContext();
       const Http::FilterChainUtility::FiltersList& upstream_http_filters =
@@ -304,7 +309,6 @@ public:
   const bool suppress_grpc_request_failure_code_stats_;
   // TODO(xyu-stripe): Make this a bitset to keep cluster memory footprint down.
   HeaderVectorPtr strict_check_headers_;
-  const bool flush_upstream_log_on_upstream_stream_;
   std::list<AccessLog::InstanceSharedPtr> upstream_logs_;
   Http::Context& http_context_;
   Stats::StatName zone_name_;

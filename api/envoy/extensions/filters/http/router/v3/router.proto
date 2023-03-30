@@ -5,6 +5,7 @@ package envoy.extensions.filters.http.router.v3;
 import "envoy/config/accesslog/v3/accesslog.proto";
 import "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.proto";
 
+import "google/protobuf/duration.proto";
 import "google/protobuf/wrappers.proto";
 
 import "udpa/annotations/status.proto";
