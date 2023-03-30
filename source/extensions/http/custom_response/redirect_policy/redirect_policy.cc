@@ -87,10 +87,6 @@ RedirectPolicy::RedirectPolicy(
         absl::StrCat("#fragment is not supported for custom response. Specified path_redirect is ",
                      redirect_action_->path_redirect_));
   }
-  if (redirect_action_ && redirect_action_->host_redirect_.empty() &&
-      redirect_action_->path_redirect_.empty()) {
-    throw EnvoyException("At least one of host_redirect and path_redirect needs to be specified");
-  }
 }
 
 std::unique_ptr<ModifyRequestHeadersAction> RedirectPolicy::createModifyRequestHeadersAction(
