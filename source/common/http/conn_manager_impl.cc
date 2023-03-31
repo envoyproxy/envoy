@@ -1630,9 +1630,12 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ResponseHeaderMap& heade
     state_.is_tunneling_ = true;
   }
 
-  // Block route cache if the response headers is received and processed. Because after this point,
-  // the cached route should never be updated or refreshed.
-  blockRouteCache();
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.prohibit_route_refresh_after_response_headers_sent")) {
+    // Block route cache if the response headers is received and processed. Because after this
+    // point, the cached route should never be updated or refreshed.
+    blockRouteCache();
+  }
 
   if (connection_manager_.drain_state_ != DrainState::NotDraining &&
       connection_manager_.codec_->protocol() < Protocol::Http2) {
