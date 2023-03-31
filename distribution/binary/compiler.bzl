@@ -75,7 +75,6 @@ compilation_config = transition(
 
 def _bundled_impl(ctx, **kwargs):
     output_files = []
-
     for i, target in enumerate(ctx.files.targets):
         path = ctx.attr.targets.values()[i]
         output_file = ctx.actions.declare_file(
@@ -86,15 +85,12 @@ def _bundled_impl(ctx, **kwargs):
                 path,
             ),
         )
-
-        ctx.actions.run(
-            outputs = [output_file],
-            inputs = [target],
-            arguments = [target.path, output_file.path],
-            executable = "cp",
-            mnemonic = "Bundle%sWrite" % ctx.attr.mode.capitalize(),
+        ctx.actions.symlink(
+            output = output_file,
+            target_file = target,
+            progress_message = "Bundling %s -> %s" % (target.path, output_file.path),
         )
-        outputs = output_files.append(output_file)
+        output_files.append(output_file)
     return [DefaultInfo(files = depset(output_files))]
 
 bundled = rule(
