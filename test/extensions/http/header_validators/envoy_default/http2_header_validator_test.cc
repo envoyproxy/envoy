@@ -76,6 +76,14 @@ TEST_F(Http2HeaderValidatorTest, ValidateRequestHeaderMapExtraPseudoHeader) {
                              UhvResponseCodeDetail::get().InvalidPseudoHeader);
 }
 
+TEST_F(Http2HeaderValidatorTest, ValidateRequestHeaderMapNoAuthorityIsOk) {
+  ::Envoy::Http::TestRequestHeaderMapImpl headers{
+      {":scheme", "https"}, {":method", "GET"}, {":path", "/"}, {"x-foo", "bar"}};
+  auto uhv = createH2(empty_config);
+
+  EXPECT_ACCEPT(uhv->validateRequestHeaderMap(headers));
+}
+
 TEST_F(Http2HeaderValidatorTest, ValidateRequestHeaderMapConnect) {
   ::Envoy::Http::TestRequestHeaderMapImpl headers{
       {":method", "CONNECT"}, {":authority", "envoy.com"}, {"x-foo", "bar"}};
@@ -179,6 +187,67 @@ TEST_F(Http2HeaderValidatorTest, ValidateRequestHeaderMapDropUnderscoreHeaders) 
       headers,
       ::Envoy::Http::TestRequestHeaderMapImpl(
           {{":scheme", "https"}, {":method", "GET"}, {":path", "/"}, {":authority", "envoy.com"}}));
+}
+
+TEST_F(Http2HeaderValidatorTest, RequestExtendedConnect) {
+  ::Envoy::Http::TestRequestHeaderMapImpl headers{
+      {":scheme", "https"},  {":method", "CONNECT"},      {":protocol", "websocket"},
+      {":path", "/foo/bar"}, {":authority", "envoy.com"}, {"x-foo", "bar"}};
+  auto uhv = createH2(empty_config);
+  EXPECT_ACCEPT(uhv->validateRequestHeaderMap(headers));
+}
+
+TEST_F(Http2HeaderValidatorTest, RequestExtendedConnectNoScheme) {
+  ::Envoy::Http::TestRequestHeaderMapImpl headers{{":method", "CONNECT"},
+                                                  {":protocol", "websocket"},
+                                                  {":path", "/foo/bar"},
+                                                  {":authority", "envoy.com"}};
+  auto uhv = createH2(empty_config);
+  EXPECT_REJECT_WITH_DETAILS(uhv->validateRequestHeaderMap(headers),
+                             UhvResponseCodeDetail::get().InvalidScheme);
+}
+
+TEST_F(Http2HeaderValidatorTest, RequestExtendedConnectNoPath) {
+  ::Envoy::Http::TestRequestHeaderMapImpl headers{{":scheme", "https"},
+                                                  {":method", "CONNECT"},
+                                                  {":protocol", "websocket"},
+                                                  {":authority", "envoy.com"}};
+  auto uhv = createH2(empty_config);
+  EXPECT_REJECT_WITH_DETAILS(uhv->validateRequestHeaderMap(headers),
+                             UhvResponseCodeDetail::get().InvalidUrl);
+}
+
+TEST_F(Http2HeaderValidatorTest, RequestExtendedConnectInvalidPath) {
+  // Character with value 0x7F is invalid in URI path
+  ::Envoy::Http::TestRequestHeaderMapImpl headers{{":scheme", "https"},
+                                                  {":method", "CONNECT"},
+                                                  {":protocol", "websocket"},
+                                                  {":path", "/fo\x7fo/bar"},
+                                                  {":authority", "envoy.com"}};
+  auto uhv = createH2(empty_config);
+  EXPECT_REJECT_WITH_DETAILS(uhv->validateRequestHeaderMap(headers),
+                             UhvResponseCodeDetail::get().InvalidUrl);
+}
+
+TEST_F(Http2HeaderValidatorTest, RequestExtendedConnectPathNormalization) {
+  ::Envoy::Http::TestRequestHeaderMapImpl headers{{":scheme", "https"},
+                                                  {":method", "CONNECT"},
+                                                  {":protocol", "websocket"},
+                                                  {":path", "/./dir1/../dir2"},
+                                                  {":authority", "envoy.com"}};
+  auto uhv = createH2(empty_config);
+
+  EXPECT_TRUE(uhv->validateRequestHeaderMap(headers).ok());
+  EXPECT_EQ(headers.path(), "/dir2");
+}
+
+TEST_F(Http2HeaderValidatorTest, RequestExtendedConnectNoAuthorityIsOk) {
+  ::Envoy::Http::TestRequestHeaderMapImpl headers{{":scheme", "https"},
+                                                  {":method", "CONNECT"},
+                                                  {":path", "/foo/bar"},
+                                                  {":protocol", "websocket"}};
+  auto uhv = createH2(empty_config);
+  EXPECT_ACCEPT(uhv->validateRequestHeaderMap(headers));
 }
 
 TEST_F(Http2HeaderValidatorTest, ValidateResponseHeaderMapValid) {
@@ -308,6 +377,17 @@ TEST_F(Http2HeaderValidatorTest, ValidateRequestHeaderScheme) {
   EXPECT_ACCEPT(uhv->validateRequestHeaderEntry(scheme, valid));
   EXPECT_REJECT_WITH_DETAILS(uhv->validateRequestHeaderEntry(scheme, invalid),
                              UhvResponseCodeDetail::get().InvalidScheme);
+}
+
+TEST_F(Http2HeaderValidatorTest, ValidateRequestHeaderProtocol) {
+  HeaderString scheme{":protocol"};
+  HeaderString valid{"websocket"};
+  HeaderString invalid{"something \x7F bad"};
+  auto uhv = createH2(empty_config);
+
+  EXPECT_ACCEPT(uhv->validateRequestHeaderEntry(scheme, valid));
+  EXPECT_REJECT_WITH_DETAILS(uhv->validateRequestHeaderEntry(scheme, invalid),
+                             UhvResponseCodeDetail::get().InvalidValueCharacters);
 }
 
 TEST_F(Http2HeaderValidatorTest, ValidateRequestHeaderGeneric) {

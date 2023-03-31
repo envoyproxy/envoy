@@ -170,6 +170,14 @@ public:
   static bool isConnectResponse(const RequestHeaderMap* request_headers,
                                 const ResponseHeaderMap& response_headers);
 
+#ifdef ENVOY_ENABLE_HTTP_DATAGRAMS
+  /**
+   * @brief Returns true if the Capsule-Protocol header field (RFC 9297) is set to true. If the
+   * header field is included multiple times, returns false as per RFC 9297.
+   */
+  static bool isCapsuleProtocol(const RequestOrResponseHeaderMap& headers);
+#endif
+
   static bool requestShouldHaveNoBody(const RequestHeaderMap& headers);
 
   /**
@@ -290,6 +298,19 @@ public:
    */
   static std::string addEncodingToAcceptEncoding(absl::string_view accept_encoding_header,
                                                  absl::string_view encoding);
+
+  /**
+   * Return `true` if the request is a standard HTTP CONNECT.
+   * HTTP/1 RFC: https://datatracker.ietf.org/doc/html/rfc9110#section-9.3.6
+   * HTTP/2 RFC: https://datatracker.ietf.org/doc/html/rfc9113#section-8.5
+   */
+  static bool isStandardConnectRequest(const Http::RequestHeaderMap& headers);
+
+  /**
+   * Return `true` if the request is an extended HTTP/2 CONNECT.
+   * according to https://datatracker.ietf.org/doc/html/rfc8441#section-4
+   */
+  static bool isExtendedH2ConnectRequest(const Http::RequestHeaderMap& headers);
 };
 
 } // namespace Http

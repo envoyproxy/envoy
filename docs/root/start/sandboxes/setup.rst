@@ -48,12 +48,19 @@ Install ``docker compose``
 The examples use
 `Docker compose configuration version 3.8 <https://docs.docker.com/compose/compose-file/compose-versioning/#version-38>`_.
 
-You will need to install a fairly recent version of `Docker Compose <https://docs.docker.com/compose/>`_.
+You will need to a fairly recent version of `Docker Compose <https://docs.docker.com/compose/>`_.
+
+.. note::
+   Any ``20.0+`` version of Docker provides a builtin ``docker compose`` command.
+
+   The sandboxes are tested using ``compose`` in this way, so this is preferable over using the python version.
+
+   See `Docker compose installation documenation <https://docs.docker.com/compose/install/>`_ for more information.
 
 Docker Compose (``docker-compose``) can also be installed as a `python application <https://pypi.org/project/docker-compose/>`_ and can be
-installed through a variety of methods including `pip <https://pip.pypa.io/en/stable/>`_ and
-`native operating system installation <https://docs.docker.com/compose/install/>`_. Most of the sandboxes should also
-work using ``docker-compose``.
+installed through a variety of methods including `pip <https://pip.pypa.io/en/stable/>`_ and native operating system installation.
+
+Most of the sandboxes should also work using ``docker-compose``.
 
 .. _start_sandboxes_setup_git:
 

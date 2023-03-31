@@ -4,6 +4,9 @@ import io.envoyproxy.envoymobile.engine.types.EnvoyHTTPFilter
 import io.envoyproxy.envoymobile.engine.types.EnvoyHTTPFilterFactory
 import io.envoyproxy.envoymobile.engine.EnvoyConfiguration.TrustChainVerification
 import io.envoyproxy.envoymobile.engine.JniLibrary
+import io.envoyproxy.envoymobile.engine.VirtualClusterConfig
+import io.envoyproxy.envoymobile.engine.HeaderMatchConfig
+import io.envoyproxy.envoymobile.engine.HeaderMatchConfig.Type
 import io.envoyproxy.envoymobile.engine.types.EnvoyStreamIntel
 import io.envoyproxy.envoymobile.engine.types.EnvoyFinalStreamIntel
 import io.envoyproxy.envoymobile.engine.types.EnvoyHTTPFilterCallbacks
@@ -93,7 +96,8 @@ class EnvoyConfigurationTest {
     appVersion: String = "v1.2.3",
     appId: String = "com.example.myapp",
     trustChainVerification: TrustChainVerification = TrustChainVerification.VERIFY_TRUST_CHAIN,
-    virtualClusters: MutableList<String> = mutableListOf("{name: test1}", "{name: test2}"),
+    legacyVirtualClusters: MutableList<String> = mutableListOf("{name: test1}", "{name: test2}"),
+    virtualClusters: List<VirtualClusterConfig> = emptyList(),
     filterChain: MutableList<EnvoyNativeFilterConfig> = mutableListOf(EnvoyNativeFilterConfig("buffer_filter_1", "{'@type': 'type.googleapis.com/envoy.extensions.filters.http.buffer.v3.Buffer'}"), EnvoyNativeFilterConfig("buffer_filter_2", "{'@type': 'type.googleapis.com/envoy.extensions.filters.http.buffer.v3.Buffer'}")),
     platformFilterFactories: MutableList<EnvoyHTTPFilterFactory> = mutableListOf(TestEnvoyHTTPFilterFactory("name1"), TestEnvoyHTTPFilterFactory("name2")),
     runtimeGuards: Map<String,Boolean> = emptyMap(),
@@ -111,6 +115,9 @@ class EnvoyConfigurationTest {
     nodeRegion: String = "",
     nodeZone: String = "",
     nodeSubZone: String = "",
+    cdsResourcesLocator: String = "",
+    cdsTimeoutSeconds: Int = 0,
+    enableCds: Boolean = false,
 
   ): EnvoyConfiguration {
     return EnvoyConfiguration(
@@ -141,6 +148,7 @@ class EnvoyConfigurationTest {
       appVersion,
       appId,
       trustChainVerification,
+      legacyVirtualClusters,
       virtualClusters,
       filterChain,
       platformFilterFactories,
@@ -161,6 +169,9 @@ class EnvoyConfigurationTest {
       nodeRegion,
       nodeZone,
       nodeSubZone,
+      cdsResourcesLocator,
+      cdsTimeoutSeconds,
+      enableCds
     )
   }
 
@@ -260,7 +271,7 @@ class EnvoyConfigurationTest {
       enableSkipDNSLookupForProxiedRequests = true,
       enablePlatformCertificatesValidation = true,
       dnsPreresolveHostnames = mutableListOf(),
-      virtualClusters = mutableListOf(),
+      legacyVirtualClusters = mutableListOf(),
       filterChain = mutableListOf(),
       runtimeGuards = mapOf("test_feature_false" to true),
       statSinks = mutableListOf("{ name: envoy.stat_sinks.statsd, typed_config: { '@type': type.googleapis.com/envoy.config.metrics.v3.StatsdSink, address: { socket_address: { address: 127.0.0.1, port_value: 123 } } } }"),
@@ -311,7 +322,7 @@ class EnvoyConfigurationTest {
     // ADS and RTDS not included by default
     assertThat(resolvedTemplate).doesNotContain("rtds_layer:");
     assertThat(resolvedTemplate).doesNotContain("ads_config:");
-
+    assertThat(resolvedTemplate).doesNotContain("cds_config:");
   }
 
   @Test
@@ -319,12 +330,16 @@ class EnvoyConfigurationTest {
     JniLibrary.loadTestLibrary()
     val envoyConfiguration = buildTestEnvoyConfiguration(
       runtimeGuards = mapOf("test_feature_false" to true, "test_feature_true" to false),
+      virtualClusters = listOf(VirtualClusterConfig("cluster1", listOf(HeaderMatchConfig(":method", Type.EXACT, "POST"),
+            HeaderMatchConfig(":authority", Type.SAFE_REGEX, "foo")))),
     )
 
     val resolvedTemplate = TestJni.createYaml(envoyConfiguration)
 
     assertThat(resolvedTemplate).contains("test_feature_false");
     assertThat(resolvedTemplate).contains("test_feature_true");
+    assertThat(resolvedTemplate).matches(Pattern.compile(".*name: :method\n *exact_match: POST.*", Pattern.DOTALL));
+    assertThat(resolvedTemplate).matches(Pattern.compile(".*name: :authority\n *safe_regex_match:\n *regex: foo.*", Pattern.DOTALL));
   }
 
   @Test
@@ -339,6 +354,46 @@ class EnvoyConfigurationTest {
     assertThat(resolvedTemplate).contains("fake_rtds_layer");
     assertThat(resolvedTemplate).contains("FAKE_ADDRESS");
     assertThat(resolvedTemplate).contains("initial_fetch_timeout: 5432s");
+  }
+
+  @Test
+  fun `test adding RTDS and CDS`() {
+    JniLibrary.loadTestLibrary()
+    val envoyConfiguration = buildTestEnvoyConfiguration(
+      cdsResourcesLocator = "FAKE_CDS_LOCATOR", cdsTimeoutSeconds = 356, adsAddress = "FAKE_ADDRESS", adsPort = 0, enableCds = true
+    )
+
+    val resolvedTemplate = TestJni.createYaml(envoyConfiguration)
+
+    assertThat(resolvedTemplate).contains("FAKE_CDS_LOCATOR");
+    assertThat(resolvedTemplate).contains("FAKE_ADDRESS");
+    assertThat(resolvedTemplate).contains("initial_fetch_timeout: 356s");
+  }
+
+  @Test
+  fun `test not using enableCds`() {
+    JniLibrary.loadTestLibrary()
+    val envoyConfiguration = buildTestEnvoyConfiguration(
+      cdsResourcesLocator = "FAKE_CDS_LOCATOR", cdsTimeoutSeconds = 356, adsAddress = "FAKE_ADDRESS", adsPort = 0
+    )
+
+    val resolvedTemplate = TestJni.createYaml(envoyConfiguration)
+
+    assertThat(resolvedTemplate).doesNotContain("FAKE_CDS_LOCATOR");
+    assertThat(resolvedTemplate).doesNotContain("initial_fetch_timeout: 356s");
+  }
+
+  @Test
+  fun `test enableCds with default string`() {
+    JniLibrary.loadTestLibrary()
+    val envoyConfiguration = buildTestEnvoyConfiguration(
+      enableCds = true, adsAddress = "FAKE_ADDRESS", adsPort = 0
+    )
+
+    val resolvedTemplate = TestJni.createYaml(envoyConfiguration)
+
+    assertThat(resolvedTemplate).contains("cds_config:");
+    assertThat(resolvedTemplate).contains("initial_fetch_timeout: 5s");
   }
 
   @Test

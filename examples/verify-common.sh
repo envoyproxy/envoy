@@ -6,6 +6,8 @@ MANUAL="${MANUAL:-}"
 NAME="${NAME:-}"
 PATHS="${PATHS:-.}"
 UPARGS="${UPARGS:-}"
+ENVOY_EXAMPLES_DEBUG="${ENVOY_EXAMPLES_DEBUG:-}"
+
 
 if [[ -n "$DOCKER_COMPOSE" ]]; then
     read -ra DOCKER_COMPOSE <<< "$DOCKER_COMPOSE"
@@ -30,6 +32,17 @@ bring_up_example_stack () {
     fi
     run_log "Bring up services ($path)"
     "${DOCKER_COMPOSE[@]}" "${up_args[@]}" || return 1
+
+    if [[ -n "$ENVOY_EXAMPLES_DEBUG" ]]; then
+        echo "----------------------------------------------"
+        docker system df -v
+        echo
+        sudo du -ch / | grep "[0-9]G"
+        echo
+        df -h
+        echo
+        echo "----------------------------------------------"
+    fi
     echo
 }
 
@@ -57,11 +70,34 @@ bring_up_example () {
     done
 }
 
+bring_down_example () {
+    local path paths
+    read -ra paths <<< "$(echo "$PATHS" | tr ',' ' ')"
+    for path in "${paths[@]}"; do
+        pushd "$path" > /dev/null || return 1
+        cleanup_stack "$path" || {
+            echo "ERROR: cleanup ${NAME} ${path}" >&2
+        }
+        popd > /dev/null
+    done
+}
+
 cleanup_stack () {
-    local path
+    local path down_args
     path="$1"
+    down_args=(--remove-orphans)
+
+    if [[ -n "$DOCKER_RMI_CLEANUP" ]]; then
+        down_args+=(--rmi all)
+    fi
+
+    # Remove sandbox volumes by default
+    if [[ -z "$DOCKER_SAVE_VOLUMES" ]]; then
+        down_args+=(--volumes)
+    fi
+
     run_log "Cleanup ($path)"
-    "${DOCKER_COMPOSE[@]}" down --remove-orphans
+    "${DOCKER_COMPOSE[@]}" down "${down_args[@]}"
 }
 
 debug_failure () {
@@ -81,26 +117,14 @@ cleanup () {
         debug_failure
     fi
 
-    local path paths image rmi
-    read -ra paths <<< "$(echo "$PATHS" | tr ',' ' ')"
-    for path in "${paths[@]}"; do
-        pushd "$path" > /dev/null || return 1
-        cleanup_stack "$path" || {
-            echo "ERROR: cleanup ${NAME} ${path}" >&2
-            return 1
-        }
-        popd > /dev/null
-    done
+    bring_down_example
 
-    read -ra rmi <<< "$(echo "$RMI" | tr ',' ' ')"
-
-    if [[ -n "$DOCKER_RMI_CLEANUP" ]]; then
-        for image in "${rmi[@]}"; do
-            docker rmi -f "$image"
-        done
-        docker image prune -f
+    if [[ "$code" -ne 0 ]]; then
+        run_log Failed
+    else
+        run_log Success
     fi
-
+    echo
 }
 
 _curl () {

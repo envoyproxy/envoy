@@ -56,6 +56,7 @@ public:
   // Http::Stream
   void addCallbacks(StreamCallbacks& callbacks) override { addCallbacksHelper(callbacks); }
   void removeCallbacks(StreamCallbacks& callbacks) override { removeCallbacksHelper(callbacks); }
+  CodecEventCallbacks* registerCodecEventCallbacks(CodecEventCallbacks* codec_callbacks) override;
   // After this is called, for the HTTP/1 codec, the connection should be closed, i.e. no further
   // progress may be made with the codec.
   void resetStream(StreamResetReason reason) override;
@@ -114,6 +115,11 @@ private:
    */
   void endEncode();
 
+  /**
+   * Encapsulates notification to various objects that the encode completed.
+   */
+  void notifyEncodeComplete();
+
   void encodeFormattedHeader(absl::string_view key, absl::string_view value,
                              HeaderKeyFormatterOptConstRef formatter);
 
@@ -121,6 +127,7 @@ private:
 
   absl::string_view details_;
   StreamInfo::BytesMeterSharedPtr bytes_meter_;
+  CodecEventCallbacks* codec_callbacks_{nullptr};
 };
 
 /**

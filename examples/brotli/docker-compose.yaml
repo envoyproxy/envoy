@@ -1,10 +1,8 @@
-version: "3.8"
 services:
 
   envoy-stats:
     build:
-      context: .
-      dockerfile: Dockerfile-brotli
+      dockerfile: ../shared/envoy/Dockerfile
     depends_on:
       service:
         condition: service_healthy
@@ -15,7 +13,5 @@ services:
 
   service:
     build:
-      context: ../shared/flask
-      target: data-flask
-    volumes:
-    - ./service.py:/code/service.py
+      context: ../shared/python
+      target: aiohttp-data-service

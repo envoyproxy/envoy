@@ -7,8 +7,8 @@
 #include "test/mocks/runtime/mocks.h"
 
 #include "contrib/envoy/extensions/filters/http/golang/v3alpha/golang.pb.validate.h"
+#include "contrib/golang/common/dso/test/mocks.h"
 #include "contrib/golang/filters/http/source/golang_filter.h"
-#include "contrib/golang/filters/http/test/common/dso/mocks.h"
 #include "contrib/golang/filters/http/test/golang_filter_fuzz.pb.validate.h"
 #include "gmock/gmock.h"
 
@@ -45,7 +45,7 @@ DEFINE_PROTO_FUZZER(const envoy::extensions::filters::http::golang::GolangFilter
     return;
   }
 
-  auto dso_lib = std::make_shared<Dso::MockDsoInstance>();
+  auto dso_lib = std::make_shared<Dso::MockHttpFilterDsoImpl>();
 
   // hard code the return config_id to 1 since the default 0 is invalid.
   ON_CALL(*dso_lib.get(), envoyGoFilterNewHttpPluginConfig(_, _)).WillByDefault(Return(1));

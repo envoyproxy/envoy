@@ -442,6 +442,7 @@ TEST_P(TcpProxyIntegrationTest, AccessLogBytesMeter) {
         "DOWNSTREAM_WIRE_BYTES_SENT=%DOWNSTREAM_WIRE_BYTES_SENT% "
         "DOWNSTREAM_WIRE_BYTES_RECEIVED=%DOWNSTREAM_WIRE_BYTES_RECEIVED% "
         "UPSTREAM_WIRE_BYTES_SENT=%UPSTREAM_WIRE_BYTES_SENT% "
+        "STREAM_STATE=%STREAM_STATE% "
         "UPSTREAM_WIRE_BYTES_RECEIVED=%UPSTREAM_WIRE_BYTES_RECEIVED%");
     access_log->mutable_typed_config()->PackFrom(access_log_config);
     auto* runtime_filter = access_log->mutable_filter()->mutable_runtime_filter();
@@ -493,6 +494,7 @@ TEST_P(TcpProxyIntegrationTest, AccessLogBytesMeter) {
                                        "DOWNSTREAM_WIRE_BYTES_SENT=5 "
                                        "DOWNSTREAM_WIRE_BYTES_RECEIVED=0 "
                                        "UPSTREAM_WIRE_BYTES_SENT=0 "
+                                       "STREAM_STATE=Ended "
                                        "UPSTREAM_WIRE_BYTES_RECEIVED=5"
                                        "\r?.*",
                                        ip_port_regex, ip_regex)));
@@ -545,6 +547,53 @@ TEST_P(TcpProxyIntegrationTest, AccessLogUpstreamConnectFailure) {
   auto log_result = waitForAccessLog(access_log_path);
 
   EXPECT_THAT(log_result, testing::StartsWith("delayed_connect_error:"));
+}
+
+TEST_P(TcpProxyIntegrationTest, AccessLogOnUpstreamConnect) {
+  std::string access_log_path = TestEnvironment::temporaryPath(
+      fmt::format("access_log{}{}.txt", version_ == Network::Address::IpVersion::v4 ? "v4" : "v6",
+                  TestUtility::uniqueFilename()));
+
+  setupByteMeterAccessLog();
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+    auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
+    auto* filter_chain = listener->mutable_filter_chains(0);
+    auto* config_blob = filter_chain->mutable_filters(0)->mutable_typed_config();
+
+    ASSERT_TRUE(config_blob->Is<envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy>());
+    auto tcp_proxy_config =
+        MessageUtil::anyConvert<envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy>(
+            *config_blob);
+
+    tcp_proxy_config.set_flush_access_log_on_connected(true);
+    auto* access_log = tcp_proxy_config.add_access_log();
+    access_log->set_name("accesslog");
+    envoy::extensions::access_loggers::file::v3::FileAccessLog access_log_config;
+    access_log_config.set_path(access_log_path);
+    access_log_config.mutable_log_format()->mutable_text_format_source()->set_inline_string(
+        "STREAM_STATE=%STREAM_STATE%");
+    access_log->mutable_typed_config()->PackFrom(access_log_config);
+    config_blob->PackFrom(tcp_proxy_config);
+  });
+
+  initialize();
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
+  ASSERT_TRUE(tcp_client->write("hello"));
+  FakeRawConnectionPtr fake_upstream_connection;
+
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+  auto log_result = waitForAccessLog(access_log_path);
+  EXPECT_THAT(log_result,
+              MatchesRegex(fmt::format("STREAM_STATE={}",
+                                       StreamInfo::StreamStateStrings::get().StreamStarted)));
+
+  ASSERT_TRUE(fake_upstream_connection->waitForData(5));
+  ASSERT_TRUE(tcp_client->write("", true));
+  ASSERT_TRUE(fake_upstream_connection->waitForHalfClose());
+  ASSERT_TRUE(fake_upstream_connection->write("", true));
+  ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
+  tcp_client->waitForDisconnect();
+  test_server_.reset();
 }
 
 // Make sure no bytes are logged when no data is sent.

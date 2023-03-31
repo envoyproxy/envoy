@@ -71,7 +71,8 @@ Config::SharedConfig::SharedConfig(
     const envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy& config,
     Server::Configuration::FactoryContext& context)
     : stats_scope_(context.scope().createScope(fmt::format("tcp.{}", config.stat_prefix()))),
-      stats_(generateStats(*stats_scope_)) {
+      stats_(generateStats(*stats_scope_)),
+      flush_access_log_on_connected_(config.flush_access_log_on_connected()) {
   if (config.has_idle_timeout()) {
     const uint64_t timeout = DurationUtil::durationToMilliseconds(config.idle_timeout());
     if (timeout > 0) {
@@ -188,6 +189,8 @@ Filter::Filter(ConfigSharedPtr config, Upstream::ClusterManager& cluster_manager
 Filter::~Filter() {
   // Disable access log flush timer if it is enabled.
   disableAccessLogFlushTimer();
+
+  getStreamInfo().setStreamState(StreamInfo::StreamState::Ended);
 
   // Flush the final end stream access log entry.
   for (const auto& access_log : config_->accessLogs()) {
@@ -788,6 +791,16 @@ void Filter::onUpstreamConnection() {
       });
     }
   }
+
+  getStreamInfo().setStreamState(StreamInfo::StreamState::Started);
+
+  if (config_->flushAccessLogOnConnected()) {
+    for (const auto& access_log : config_->accessLogs()) {
+      access_log->log(nullptr, nullptr, nullptr, getStreamInfo());
+    }
+  }
+
+  getStreamInfo().setStreamState(StreamInfo::StreamState::InProgress);
 }
 
 void Filter::onIdleTimeout() {
@@ -809,10 +822,17 @@ void Filter::onMaxDownstreamConnectionDuration() {
 }
 
 void Filter::onAccessLogFlushInterval() {
-  for (const auto& access_log : config_->accessLogs()) {
-    access_log->log(nullptr, nullptr, nullptr, getStreamInfo());
+  if (!getStreamInfo().streamState() ||
+      getStreamInfo().streamState() != StreamInfo::StreamState::Ended) {
+    resetAccessLogFlushTimer();
   }
-  resetAccessLogFlushTimer();
+
+  if (getStreamInfo().streamState() &&
+      getStreamInfo().streamState() == StreamInfo::StreamState::InProgress) {
+    for (const auto& access_log : config_->accessLogs()) {
+      access_log->log(nullptr, nullptr, nullptr, getStreamInfo());
+    }
+  }
 }
 
 void Filter::resetAccessLogFlushTimer() {

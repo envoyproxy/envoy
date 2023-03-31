@@ -73,6 +73,7 @@ envoy_cc_test(
 
 envoy_cc_test(
     name = "aws_metadata_fetcher_integration_test",
+    size = "large",
     srcs = [
         "aws_metadata_fetcher_integration_test.cc",
     ],
