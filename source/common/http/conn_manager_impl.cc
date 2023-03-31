@@ -265,7 +265,7 @@ void ConnectionManagerImpl::doEndStream(ActiveStream& stream, bool check_for_def
 }
 
 void ConnectionManagerImpl::doDeferredStreamDestroy(ActiveStream& stream) {
-  if (stream.max_stream_duration_timer_) {
+  if (stream.max_stream_duration_timer_ != nullptr) {
     stream.max_stream_duration_timer_->disableTimer();
     stream.max_stream_duration_timer_ = nullptr;
   }
@@ -283,6 +283,21 @@ void ConnectionManagerImpl::doDeferredStreamDestroy(ActiveStream& stream) {
     stream.access_log_flush_timer_ = nullptr;
   }
 
+  if (stream.expand_agnostic_stream_lifetime_) {
+    // Only destroy the active stream if the underlying codec has notified us of
+    // completion or we've internal redirect the stream.
+    if (!stream.canDestroyStream()) {
+      // Track that this stream is not expecting any additional calls apart from
+      // codec notification.
+      stream.state_.is_zombie_stream_ = true;
+      return;
+    }
+
+    if (stream.response_encoder_ != nullptr) {
+      stream.response_encoder_->getStream().registerCodecEventCallbacks(nullptr);
+    }
+  }
+
   stream.completeRequest();
 
   // Set roundtrip time in connectionInfoSetter before OnStreamComplete
@@ -292,6 +307,7 @@ void ConnectionManagerImpl::doDeferredStreamDestroy(ActiveStream& stream) {
   }
 
   stream.filter_manager_.onStreamComplete();
+  stream.streamInfo().setStreamState(StreamInfo::StreamState::Ended);
 
   // For HTTP/3, skip access logging here and add deferred logging info
   // to stream info for QuicStatsGatherer to use later.
@@ -364,8 +380,12 @@ RequestDecoder& ConnectionManagerImpl::newStream(ResponseEncoder& response_encod
   new_stream->state_.is_internally_created_ = is_internally_created;
   new_stream->response_encoder_ = &response_encoder;
   new_stream->response_encoder_->getStream().addCallbacks(*new_stream);
+  if (new_stream->expand_agnostic_stream_lifetime_) {
+    new_stream->response_encoder_->getStream().registerCodecEventCallbacks(new_stream.get());
+  }
   new_stream->response_encoder_->getStream().setFlushTimeout(new_stream->idle_timeout_ms_);
   new_stream->streamInfo().setDownstreamBytesMeter(response_encoder.getStream().bytesMeter());
+  new_stream->streamInfo().setStreamState(StreamInfo::StreamState::Started);
   // If the network connection is backed up, the stream should be made aware of it on creation.
   // Both HTTP/1.x and HTTP/2 codecs handle this in StreamCallbackHelper::addCallbacksHelper.
   ASSERT(read_callbacks_->connection().aboveHighWatermark() == false ||
@@ -715,6 +735,8 @@ ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connect
                       StreamInfo::FilterState::LifeSpan::Connection),
       request_response_timespan_(new Stats::HistogramCompletableTimespanImpl(
           connection_manager_.stats_.named_.downstream_rq_time_, connection_manager_.timeSource())),
+      expand_agnostic_stream_lifetime_(
+          Runtime::runtimeFeatureEnabled(Runtime::expand_agnostic_stream_lifetime)),
       header_validator_(
           connection_manager.config_.makeHeaderValidator(connection_manager.codec_->protocol())) {
   ASSERT(!connection_manager.config_.isRoutable() ||
@@ -792,11 +814,15 @@ ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connect
   if (connection_manager_.config_.accessLogFlushInterval().has_value()) {
     access_log_flush_timer_ =
         connection_manager.read_callbacks_->connection().dispatcher().createTimer([this]() -> void {
-          // If the request is complete, we've already done the stream-end access-log, and shouldn't
-          // do the periodic log.
-          if (!streamInfo().requestComplete().has_value()) {
-            filter_manager_.log();
+          if (!streamInfo().streamState() ||
+              streamInfo().streamState() != StreamInfo::StreamState::Ended) {
             refreshAccessLogFlushTimer();
+          }
+
+          // If the request is not in active state, we shouldn't do the periodic log.
+          if (streamInfo().streamState() &&
+              streamInfo().streamState() == StreamInfo::StreamState::InProgress) {
+            filter_manager_.log();
           }
         });
     refreshAccessLogFlushTimer();
@@ -1201,6 +1227,10 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapSharedPt
   filter_manager_.streamInfo().setRequestHeaders(*request_headers_);
 
   const bool upgrade_rejected = filter_manager_.createFilterChain() == false;
+
+  if (connection_manager_.config_.flushAccessLogOnNewRequest()) {
+    filter_manager_.log();
+  }
 
   // TODO if there are no filters when starting a filter iteration, the connection manager
   // should return 404. The current returns no response if there is no router filter.
@@ -1634,6 +1664,11 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ResponseHeaderMap& heade
   ENVOY_STREAM_LOG(debug, "encoding headers via codec (end_stream={}):\n{}", *this, end_stream,
                    headers);
 
+  // According to RFC7231 any 2xx response indicates that the connection is established.
+  if (!end_stream && Http::CodeUtility::is2xx(Http::Utility::getResponseStatus(headers))) {
+    filter_manager_.streamInfo().setStreamState(StreamInfo::StreamState::InProgress);
+  }
+
   // Now actually encode via the codec.
   filter_manager_.streamInfo().downstreamTiming().onFirstDownstreamTxByteSent(
       connection_manager_.time_source_);
@@ -1690,6 +1725,7 @@ void ConnectionManagerImpl::ActiveStream::onResetStream(StreamResetReason reset_
                    Http::Utility::resetReasonToString(reset_reason),
                    encoder_details.empty() ? absl::string_view{"-"} : encoder_details);
   connection_manager_.stats_.named_.downstream_rq_rx_reset_.inc();
+  state_.on_reset_stream_called_ = true;
 
   // If the codec sets its responseDetails() for a reason other than peer reset, set a
   // DownstreamProtocolError. Either way, propagate details.
@@ -1719,6 +1755,35 @@ void ConnectionManagerImpl::ActiveStream::onAboveWriteBufferHighWatermark() {
 void ConnectionManagerImpl::ActiveStream::onBelowWriteBufferLowWatermark() {
   ENVOY_STREAM_LOG(debug, "Enabling upstream stream due to downstream stream watermark.", *this);
   filter_manager_.callLowWatermarkCallbacks();
+}
+
+void ConnectionManagerImpl::ActiveStream::onCodecEncodeComplete() {
+  ASSERT(!state_.codec_encode_complete_);
+  ENVOY_STREAM_LOG(debug, "Codec completed encoding stream.", *this);
+  state_.codec_encode_complete_ = true;
+
+  // Update timing
+  filter_manager_.streamInfo().downstreamTiming().onLastDownstreamTxByteSent(
+      connection_manager_.time_source_);
+  request_response_timespan_->complete();
+
+  // Only reap stream once.
+  if (state_.is_zombie_stream_) {
+    connection_manager_.doDeferredStreamDestroy(*this);
+  }
+}
+
+void ConnectionManagerImpl::ActiveStream::onCodecLowLevelReset() {
+  ASSERT(!state_.codec_encode_complete_);
+  state_.on_reset_stream_called_ = true;
+  ENVOY_STREAM_LOG(debug, "Codec timed out flushing stream", *this);
+
+  // TODO(kbaichoo): Update streamInfo to account for the reset.
+
+  // Only reap stream once.
+  if (state_.is_zombie_stream_) {
+    connection_manager_.doDeferredStreamDestroy(*this);
+  }
 }
 
 Tracing::OperationName ConnectionManagerImpl::ActiveStream::operationName() const {
@@ -1868,12 +1933,15 @@ void ConnectionManagerImpl::ActiveStream::recreateStream(
   }
 
   response_encoder->getStream().removeCallbacks(*this);
+
   // This functionally deletes the stream (via deferred delete) so do not
   // reference anything beyond this point.
   // Make sure to not check for deferred close as we'll be immediately creating a new stream.
+  state_.is_internally_destroyed_ = true;
   connection_manager_.doEndStream(*this, /*check_for_deferred_close*/ false);
 
   RequestDecoder& new_stream = connection_manager_.newStream(*response_encoder, true);
+
   // Set the new RequestDecoder on the ResponseEncoder. Even though all of the decoder callbacks
   // have already been called at this point, the encoder still needs the new decoder for deferred
   // logging in some cases.

@@ -168,9 +168,15 @@ private:
 
   bool started_;
   Event::Dispatcher& dispatcher_;
+  TimeSource& time_source_;
   ThreadLocal::TypedSlot<ThreadLocalOverloadStateImpl> tls_;
   NamedOverloadActionSymbolTable action_symbol_table_;
   const std::chrono::milliseconds refresh_interval_;
+  // Tracks the latency between resource refresh updates.
+  Stats::Histogram& refresh_interval_delays_;
+  // Tracks when we last ran the resource monitor refresh loop.
+  // For the first measurement, we use the time when When the Overload Manager first starts.
+  MonotonicTime time_resources_last_measured_;
   Event::TimerPtr timer_;
   absl::node_hash_map<std::string, Resource> resources_;
   std::shared_ptr<absl::node_hash_map<OverloadProactiveResourceName, ProactiveResource>>

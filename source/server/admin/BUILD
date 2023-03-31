@@ -77,6 +77,26 @@ envoy_cc_library(
         "//source/extensions/access_loggers/common:file_access_log_lib",
         "//source/extensions/listener_managers/listener_manager:listener_manager_lib",
         "//source/extensions/request_id/uuid:config",
+    ] + envoy_select_admin_html([
+        ":admin_html_util",
+    ]),
+)
+
+envoy_cc_library(
+    name = "admin_html_util",
+    srcs = [
+        "admin_html_util.cc",
+        "//source/server/admin/html:generate_admin_html",
+    ],
+    hdrs = [
+        "admin_html_util.h",
+    ],
+    deps = [
+        "//envoy/buffer:buffer_interface",
+        "//envoy/http:header_map_interface",
+        "//envoy/server:admin_interface",
+        "//source/common/html:utility_lib",
+        "//source/common/http:headers_lib",
     ],
 )
 
@@ -138,7 +158,6 @@ envoy_cc_library(
 envoy_cc_library(
     name = "stats_render_lib",
     srcs = ["stats_render.cc"] + envoy_select_admin_html([
-        "//source/server/admin/html:generate_admin_html",
         "stats_html_render.cc",
     ]),
     hdrs = ["stats_render.h"] + envoy_select_admin_html([
@@ -153,6 +172,7 @@ envoy_cc_library(
         "//source/common/json:json_sanitizer_lib",
         "//source/common/stats:histogram_lib",
     ] + envoy_select_admin_html([
+        ":admin_html_util",
         "//source/common/html:utility_lib",
     ]),
 )

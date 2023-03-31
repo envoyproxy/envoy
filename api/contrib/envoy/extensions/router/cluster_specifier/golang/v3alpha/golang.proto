@@ -1,0 +1,51 @@
+syntax = "proto3";
+
+package envoy.extensions.router.cluster_specifier.golang.v3alpha;
+
+import "google/protobuf/any.proto";
+
+import "xds/annotations/v3/status.proto";
+
+import "udpa/annotations/status.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.router.cluster_specifier.golang.v3alpha";
+option java_outer_classname = "GolangProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/router/cluster_specifier/golang/v3alpha";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+option (xds.annotations.v3.file_status).work_in_progress = true;
+
+// [#protodoc-title: Golang]
+//
+// For an overview of the Golang cluster specifier please see the :ref:`configuration reference documentation <config_http_cluster_specifier_golang>`.
+// [#extension: envoy.router.cluster_specifier_plugin.golang]
+
+// [#extension-category: envoy.router.cluster_specifier_plugin]
+message Config {
+  // Globally unique ID for a dynamic library file.
+  string library_id = 1 [(validate.rules).string = {min_len: 1}];
+
+  // Path to a dynamic library implementing the
+  // :repo:`ClusterSpecifier API <contrib/golang/router/cluster_specifier/source/go/pkg/api.ClusterSpecifier>`
+  // interface.
+  // [#comment:TODO(wangfakang): Support for downloading libraries from remote repositories.]
+  string library_path = 2 [(validate.rules).string = {min_len: 1}];
+
+  // Default cluster.
+  //
+  // It will be used when the specifier interface return empty string or panic.
+  //
+  string default_cluster = 3 [(validate.rules).string = {min_len: 1}];
+
+  // Configuration for the Go cluster specifier plugin.
+  //
+  // .. note::
+  //     This configuration is only parsed in the go cluster specifier, and is therefore not validated
+  //     by Envoy.
+  //
+  //     See the :repo:`StreamFilter API <contrib/golang/router/cluster_specifier/source/go/pkg/cluster_specifier/config.go>`
+  //     for more information about how the plugin's configuration data can be accessed.
+  //
+  google.protobuf.Any config = 4;
+}
