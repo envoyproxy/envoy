@@ -44,13 +44,12 @@ bool isValidResponseStatus(ResponseStatus status) {
   case ResponseStatus::BadResponse:
   case ResponseStatus::ServiceNotFound:
   case ResponseStatus::ServiceError:
+  case ResponseStatus::ServerError:
   case ResponseStatus::ClientError:
   case ResponseStatus::ServerThreadpoolExhaustedError:
-    break;
-  default:
-    return false;
+    return true;
   }
-  return true;
+  return false;
 }
 
 void parseRequestInfoFromBuffer(Buffer::Instance& data, MessageMetadataSharedPtr metadata) {

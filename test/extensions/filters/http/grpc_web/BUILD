@@ -35,6 +35,7 @@ envoy_extension_cc_test(
 
 envoy_extension_cc_test(
     name = "grpc_web_integration_test",
+    size = "large",
     srcs = ["grpc_web_filter_integration_test.cc"],
     extension_names = ["envoy.filters.http.grpc_web"],
     deps = [

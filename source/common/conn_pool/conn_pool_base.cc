@@ -107,7 +107,6 @@ float ConnPoolImplBase::perUpstreamPreconnectRatio() const {
 }
 
 ConnPoolImplBase::ConnectionResult ConnPoolImplBase::tryCreateNewConnections() {
-  ASSERT(!is_draining_for_deletion_);
   ConnPoolImplBase::ConnectionResult result;
   // Somewhat arbitrarily cap the number of connections preconnected due to new
   // incoming connections. The preconnect ratio is capped at 3, so in steady
@@ -121,6 +120,7 @@ ConnPoolImplBase::ConnectionResult ConnPoolImplBase::tryCreateNewConnections() {
       break;
     }
   }
+  ASSERT(!is_draining_for_deletion_ || result != ConnectionResult::CreatedNewConnection);
   return result;
 }
 

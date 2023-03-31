@@ -103,7 +103,7 @@ private:
   // TODO(adisuissa): Avoid saving the entire cluster load assignment, only the
   // relevant parts of the config for each locality. Note that this field must
   // be set when LEDS is used.
-  absl::optional<envoy::config::endpoint::v3::ClusterLoadAssignment> cluster_load_assignment_;
+  std::unique_ptr<envoy::config::endpoint::v3::ClusterLoadAssignment> cluster_load_assignment_;
 };
 
 using EdsClusterImplSharedPtr = std::shared_ptr<EdsClusterImpl>;

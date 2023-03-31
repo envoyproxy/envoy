@@ -94,7 +94,7 @@ public:
   MockQuicClientTransportSocketFactory(
       Ssl::ClientContextConfigPtr config,
       Server::Configuration::TransportSocketFactoryContext& factory_context)
-      : Quic::QuicClientTransportSocketFactory(move(config), factory_context) {}
+      : Quic::QuicClientTransportSocketFactory(std::move(config), factory_context) {}
 
   MOCK_METHOD(Envoy::Ssl::ClientContextSharedPtr, sslCtx, ());
 };

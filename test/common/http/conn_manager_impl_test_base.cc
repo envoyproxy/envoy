@@ -146,12 +146,12 @@ void HttpConnectionManagerImplMixin::setupFilterChain(int num_decoder_filters,
 }
 
 void HttpConnectionManagerImplMixin::setUpBufferLimits() {
-  ON_CALL(response_encoder_, getStream()).WillByDefault(ReturnRef(stream_));
-  EXPECT_CALL(stream_, bufferLimit()).WillOnce(Return(initial_buffer_limit_));
-  EXPECT_CALL(stream_, addCallbacks(_))
+  auto& stream = response_encoder_.stream_;
+  EXPECT_CALL(stream, bufferLimit()).WillOnce(Return(initial_buffer_limit_));
+  EXPECT_CALL(stream, addCallbacks(_))
       .WillOnce(Invoke(
           [&](Http::StreamCallbacks& callbacks) -> void { stream_callbacks_ = &callbacks; }));
-  EXPECT_CALL(stream_, setFlushTimeout(_));
+  EXPECT_CALL(stream, setFlushTimeout(_));
 }
 
 void HttpConnectionManagerImplMixin::setUpEncoderAndDecoder(bool request_with_data_and_trailers,
@@ -279,7 +279,7 @@ void HttpConnectionManagerImplMixin::expectOnDestroy(bool deferred) {
 void HttpConnectionManagerImplMixin::doRemoteClose(bool deferred) {
   // We will call removeCallbacks twice.
   // Once in resetAllStreams, and once in doDeferredStreamDestroy.
-  EXPECT_CALL(stream_, removeCallbacks(_)).Times(2);
+  EXPECT_CALL(response_encoder_.stream_, removeCallbacks(_)).Times(2);
   expectOnDestroy(deferred);
   filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
 }

@@ -1582,6 +1582,7 @@ TEST_P(ListenerFilterIntegrationTest,
   ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
   ASSERT_TRUE(fake_upstream_connection->waitForData(data.size(), &data));
   tcp_client->close();
+  ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
 
   auto* socket_option = listener_config_.add_socket_options();
   socket_option->set_level(IPPROTO_IP);
@@ -1677,6 +1678,9 @@ public:
           createConnectionAndWrite("dummy", connections.back().response_);
       connections.back().client_conn_->waitForConnection();
       ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(connections.back().upstream_conn_));
+      std::string data;
+      EXPECT_TRUE(connections.back().upstream_conn_->waitForData(5, &data));
+      EXPECT_EQ("dummy", data);
     }
     for (auto& conn : connections) {
       conn.client_conn_->close();
