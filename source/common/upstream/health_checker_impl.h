@@ -19,7 +19,7 @@
 #include "source/common/http/codec_client.h"
 #include "source/common/router/header_parser.h"
 #include "source/common/stream_info/stream_info_impl.h"
-#include "source/common/upstream/health_checker_base_impl.h"
+#include "source/common/upstream/health_checker_event_logger.h"
 
 #include "src/proto/grpc/health/v1/health.pb.h"
 
@@ -27,6 +27,23 @@ namespace Envoy {
 namespace Upstream {
 
 constexpr uint64_t kDefaultMaxBytesInBuffer = 1024;
+
+/**
+ * HealthCheckerHash and HealthCheckerEqualTo are used to allow the HealthCheck proto to be used as
+ * a flat_hash_map key.
+ */
+struct HealthCheckerHash {
+  size_t operator()(const envoy::config::core::v3::HealthCheck& health_check) const {
+    return MessageUtil::hash(health_check);
+  }
+};
+
+struct HealthCheckerEqualTo {
+  bool operator()(const envoy::config::core::v3::HealthCheck& lhs,
+                  const envoy::config::core::v3::HealthCheck& rhs) const {
+    return Protobuf::util::MessageDifferencer::Equals(lhs, rhs);
+  }
+};
 
 /**
  * Factory for creating health checker implementations.

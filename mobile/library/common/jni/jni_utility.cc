@@ -7,6 +7,7 @@
 
 #include "library/common/jni/jni_support.h"
 #include "library/common/jni/types/env.h"
+#include "library/common/jni/types/exception.h"
 
 // NOLINT(namespace-envoy)
 
@@ -23,11 +24,15 @@ jobject get_class_loader() {
 jclass find_class(const char* class_name) {
   JNIEnv* env = get_env();
   jclass class_loader = env->FindClass("java/lang/ClassLoader");
+  Envoy::JNI::Exception::checkAndClear("find_class:FindClass");
   jmethodID find_class_method =
       env->GetMethodID(class_loader, "loadClass", "(Ljava/lang/String;)Ljava/lang/Class;");
+  Envoy::JNI::Exception::checkAndClear("find_class:GetMethodID");
   jstring str_class_name = env->NewStringUTF(class_name);
+  Envoy::JNI::Exception::checkAndClear("find_class:NewStringUTF");
   jclass clazz =
       (jclass)(env->CallObjectMethod(get_class_loader(), find_class_method, str_class_name));
+  Envoy::JNI::Exception::checkAndClear("find_class:CallObjectMethod");
   env->DeleteLocalRef(str_class_name);
   return clazz;
 }
