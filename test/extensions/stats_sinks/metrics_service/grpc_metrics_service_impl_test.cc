@@ -328,61 +328,62 @@ TEST_F(MetricsServiceSinkTest, FlushPredicate) {
   EXPECT_EQ(0, metrics->size());
 }
 
-// Test that verifies counters are reported as the delta between flushes when configured to do so.
-TEST_F(MetricsServiceSinkTest, HistogramEmitMode) {
+// This test will emit summary and histogram.
+TEST_F(MetricsServiceSinkTest, HistogramEmitModeBoth) {
   addHistogramToSnapshot("test_histogram");
 
-  {
-    // This test will emit summary and histogram.
-    MetricsServiceSink<envoy::service::metrics::v3::StreamMetricsMessage,
-                       envoy::service::metrics::v3::StreamMetricsResponse>
-        sink(streamer_, true, false,
-             envoy::config::metrics::v3::HistogramEmitMode::SUMMARY_AND_HISTOGRAM);
+  MetricsServiceSink<envoy::service::metrics::v3::StreamMetricsMessage,
+                     envoy::service::metrics::v3::StreamMetricsResponse>
+      sink(streamer_, true, false,
+           envoy::config::metrics::v3::HistogramEmitMode::SUMMARY_AND_HISTOGRAM);
 
-    EXPECT_CALL(*streamer_, send(_)).WillOnce(Invoke([](MetricsPtr&& metrics) {
-      ASSERT_EQ(2, metrics->size());
-      EXPECT_EQ("test_histogram", (*metrics)[0].name());
-      EXPECT_EQ("test_histogram", (*metrics)[1].name());
+  EXPECT_CALL(*streamer_, send(_)).WillOnce(Invoke([](MetricsPtr&& metrics) {
+    ASSERT_EQ(2, metrics->size());
+    EXPECT_EQ("test_histogram", (*metrics)[0].name());
+    EXPECT_EQ("test_histogram", (*metrics)[1].name());
 
-      const auto& metric1 = (*metrics)[0].metric(0);
-      ASSERT(metric1.has_summary());
-      const auto& metric2 = (*metrics)[1].metric(0);
-      ASSERT(metric2.has_histogram());
-    }));
-    sink.flush(snapshot_);
-  }
+    const auto& metric1 = (*metrics)[0].metric(0);
+    EXPECT_TRUE(metric1.has_summary());
+    const auto& metric2 = (*metrics)[1].metric(0);
+    EXPECT_TRUE(metric2.has_histogram());
+  }));
+  sink.flush(snapshot_);
+}
 
-  {
-    // This test will only summary.
-    MetricsServiceSink<envoy::service::metrics::v3::StreamMetricsMessage,
-                       envoy::service::metrics::v3::StreamMetricsResponse>
-        sink(streamer_, true, false, envoy::config::metrics::v3::HistogramEmitMode::SUMMARY);
+// This test will only summary.
+TEST_F(MetricsServiceSinkTest, HistogramEmitModeSummary) {
+  addHistogramToSnapshot("test_histogram");
 
-    EXPECT_CALL(*streamer_, send(_)).WillOnce(Invoke([](MetricsPtr&& metrics) {
-      ASSERT_EQ(1, metrics->size());
-      EXPECT_EQ("test_histogram", (*metrics)[0].name());
+  MetricsServiceSink<envoy::service::metrics::v3::StreamMetricsMessage,
+                     envoy::service::metrics::v3::StreamMetricsResponse>
+      sink(streamer_, true, false, envoy::config::metrics::v3::HistogramEmitMode::SUMMARY);
 
-      const auto& metric1 = (*metrics)[0].metric(0);
-      ASSERT(metric1.has_summary());
-    }));
-    sink.flush(snapshot_);
-  }
+  EXPECT_CALL(*streamer_, send(_)).WillOnce(Invoke([](MetricsPtr&& metrics) {
+    ASSERT_EQ(1, metrics->size());
+    EXPECT_EQ("test_histogram", (*metrics)[0].name());
 
-  {
-    // This test will only histogram.
-    MetricsServiceSink<envoy::service::metrics::v3::StreamMetricsMessage,
-                       envoy::service::metrics::v3::StreamMetricsResponse>
-        sink(streamer_, true, false, envoy::config::metrics::v3::HistogramEmitMode::HISTOGRAM);
+    const auto& metric1 = (*metrics)[0].metric(0);
+    EXPECT_TRUE(metric1.has_summary());
+  }));
+  sink.flush(snapshot_);
+}
 
-    EXPECT_CALL(*streamer_, send(_)).WillOnce(Invoke([](MetricsPtr&& metrics) {
-      ASSERT_EQ(1, metrics->size());
-      EXPECT_EQ("test_histogram", (*metrics)[0].name());
+// This test will only histogram.
+TEST_F(MetricsServiceSinkTest, HistogramEmitModeHistogram) {
+  addHistogramToSnapshot("test_histogram");
 
-      const auto& metric1 = (*metrics)[0].metric(0);
-      ASSERT(metric1.has_histogram());
-    }));
-    sink.flush(snapshot_);
-  }
+  MetricsServiceSink<envoy::service::metrics::v3::StreamMetricsMessage,
+                     envoy::service::metrics::v3::StreamMetricsResponse>
+      sink(streamer_, true, false, envoy::config::metrics::v3::HistogramEmitMode::HISTOGRAM);
+
+  EXPECT_CALL(*streamer_, send(_)).WillOnce(Invoke([](MetricsPtr&& metrics) {
+    ASSERT_EQ(1, metrics->size());
+    EXPECT_EQ("test_histogram", (*metrics)[0].name());
+
+    const auto& metric1 = (*metrics)[0].metric(0);
+    EXPECT_TRUE(metric1.has_histogram());
+  }));
+  sink.flush(snapshot_);
 }
 
 } // namespace
