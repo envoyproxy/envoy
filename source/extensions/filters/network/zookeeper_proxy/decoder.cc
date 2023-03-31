@@ -557,7 +557,7 @@ void DecoderImpl::decodeAndBufferHelper(Buffer::Instance& data, DecodeType dtype
   }
 
   if (offset == data_len) {
-    decode(data, dtype);
+    decode(data, dtype, offset);
     return;
   }
 
@@ -567,13 +567,9 @@ void DecoderImpl::decodeAndBufferHelper(Buffer::Instance& data, DecodeType dtype
   if (has_full_packets) {
     offset -= INT_LENGTH + len;
     ASSERT(offset < data_len);
-    // Decode full packets with BufferFragment.
-    Buffer::OwnedImpl full_packets;
-    Buffer::BufferFragmentImpl* frag = new Buffer::BufferFragmentImpl(
-        data.linearize(offset), offset,
-        [](const void*, size_t, const Buffer::BufferFragmentImpl* frag) { delete frag; });
-    full_packets.addBufferFragment(*frag);
-    decode(full_packets, dtype);
+    // Decode full packets.
+    // offset is the length of all full packets.
+    decode(data, dtype, offset);
 
     // Copy out the rest of the data to the ZooKeeper filter buffer.
     temp_data.resize(data_len - offset);
@@ -588,11 +584,11 @@ void DecoderImpl::decodeAndBufferHelper(Buffer::Instance& data, DecodeType dtype
   }
 }
 
-void DecoderImpl::decode(Buffer::Instance& data, DecodeType dtype) {
+void DecoderImpl::decode(Buffer::Instance& data, DecodeType dtype, uint64_t& full_packets_len) {
   uint64_t offset = 0;
 
   try {
-    while (offset < data.length()) {
+    while (offset < full_packets_len) {
       // Reset the helper's cursor, to ensure the current message stays within the
       // allowed max length, even when it's different than the declared length
       // by the message.
