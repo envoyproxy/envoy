@@ -442,6 +442,7 @@ TEST_P(TcpProxyIntegrationTest, AccessLogBytesMeter) {
         "DOWNSTREAM_WIRE_BYTES_SENT=%DOWNSTREAM_WIRE_BYTES_SENT% "
         "DOWNSTREAM_WIRE_BYTES_RECEIVED=%DOWNSTREAM_WIRE_BYTES_RECEIVED% "
         "UPSTREAM_WIRE_BYTES_SENT=%UPSTREAM_WIRE_BYTES_SENT% "
+        "STREAM_STATE=%STREAM_STATE% "
         "UPSTREAM_WIRE_BYTES_RECEIVED=%UPSTREAM_WIRE_BYTES_RECEIVED%");
     access_log->mutable_typed_config()->PackFrom(access_log_config);
     auto* runtime_filter = access_log->mutable_filter()->mutable_runtime_filter();
@@ -493,6 +494,7 @@ TEST_P(TcpProxyIntegrationTest, AccessLogBytesMeter) {
                                        "DOWNSTREAM_WIRE_BYTES_SENT=5 "
                                        "DOWNSTREAM_WIRE_BYTES_RECEIVED=0 "
                                        "UPSTREAM_WIRE_BYTES_SENT=0 "
+                                       "STREAM_STATE=Ended "
                                        "UPSTREAM_WIRE_BYTES_RECEIVED=5"
                                        "\r?.*",
                                        ip_port_regex, ip_regex)));
@@ -569,13 +571,10 @@ TEST_P(TcpProxyIntegrationTest, AccessLogOnUpstreamConnect) {
     envoy::extensions::access_loggers::file::v3::FileAccessLog access_log_config;
     access_log_config.set_path(access_log_path);
     access_log_config.mutable_log_format()->mutable_text_format_source()->set_inline_string(
-        "DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT=%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%");
+        "STREAM_STATE=%STREAM_STATE%");
     access_log->mutable_typed_config()->PackFrom(access_log_config);
     config_blob->PackFrom(tcp_proxy_config);
   });
-
-  const std::string ip_regex =
-      (version_ == Network::Address::IpVersion::v4) ? R"EOF(127\.0\.0\.1)EOF" : R"EOF(::1)EOF";
 
   initialize();
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
@@ -585,7 +584,8 @@ TEST_P(TcpProxyIntegrationTest, AccessLogOnUpstreamConnect) {
   ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
   auto log_result = waitForAccessLog(access_log_path);
   EXPECT_THAT(log_result,
-              MatchesRegex(fmt::format("DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT={}", ip_regex)));
+              MatchesRegex(fmt::format("STREAM_STATE={}",
+                                       StreamInfo::StreamStateStrings::get().StreamStarted)));
 
   ASSERT_TRUE(fake_upstream_connection->waitForData(5));
   ASSERT_TRUE(tcp_client->write("", true));
