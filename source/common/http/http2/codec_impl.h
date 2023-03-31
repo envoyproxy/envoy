@@ -476,7 +476,7 @@ protected:
     }
 
     // RequestEncoder
-    Status encodeHeaders(const RequestHeaderMap& headers, bool end_stream) override;
+    Status encodeHeaders(RequestHeaderMap& headers, bool end_stream) override;
     void encodeTrailers(const RequestTrailerMap& trailers) override {
       encodeTrailersBase(trailers);
     }

@@ -32,7 +32,7 @@ EnvoyQuicClientStream::EnvoyQuicClientStream(
          "Send buffer limit should be larger than 8KB.");
 }
 
-Http::Status EnvoyQuicClientStream::encodeHeaders(const Http::RequestHeaderMap& headers,
+Http::Status EnvoyQuicClientStream::encodeHeaders(Http::RequestHeaderMap& headers,
                                                   bool end_stream) {
   ENVOY_STREAM_LOG(debug, "encodeHeaders: (end_stream={}) {}.", *this, end_stream, headers);
   // Required headers must be present. This can only happen by some erroneous processing after the

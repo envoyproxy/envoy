@@ -903,7 +903,8 @@ TEST_P(Http2CodecImplTest, RefusedStreamReset) {
 TEST_P(Http2CodecImplTest, InvalidHeadersFrame) {
   initialize();
 
-  const auto status = request_encoder_->encodeHeaders(TestRequestHeaderMapImpl{}, true);
+  TestRequestHeaderMapImpl empty_headers;
+  const auto status = request_encoder_->encodeHeaders(empty_headers, true);
   driveToCompletion();
 
   EXPECT_FALSE(status.ok());

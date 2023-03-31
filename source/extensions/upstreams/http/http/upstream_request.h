@@ -69,7 +69,7 @@ public:
   void encodeMetadata(const Envoy::Http::MetadataMapVector& metadata_map_vector) override {
     request_encoder_->encodeMetadata(metadata_map_vector);
   }
-  Envoy::Http::Status encodeHeaders(const Envoy::Http::RequestHeaderMap& headers,
+  Envoy::Http::Status encodeHeaders(Envoy::Http::RequestHeaderMap& headers,
                                     bool end_stream) override {
     return request_encoder_->encodeHeaders(headers, end_stream);
   }

@@ -2861,12 +2861,12 @@ TEST_P(Http1ClientConnectionImplTest, BadEncodeParams) {
   // old codecs will still throw an exception (that presently will be uncaught in contexts like
   // sendLocalReply).
   Http::RequestEncoder& request_encoder = codec_->newStream(response_decoder);
-  EXPECT_THAT(
-      request_encoder.encodeHeaders(TestRequestHeaderMapImpl{{":path", "/"}}, true).message(),
-      testing::HasSubstr("missing required"));
-  EXPECT_THAT(
-      request_encoder.encodeHeaders(TestRequestHeaderMapImpl{{":method", "GET"}}, true).message(),
-      testing::HasSubstr("missing required"));
+  TestRequestHeaderMapImpl headers_with_no_method{{":path", "/"}};
+  EXPECT_THAT(request_encoder.encodeHeaders(headers_with_no_method, true).message(),
+              testing::HasSubstr("missing required"));
+  TestRequestHeaderMapImpl headers_with_no_path{{":method", "GET"}};
+  EXPECT_THAT(request_encoder.encodeHeaders(headers_with_no_path, true).message(),
+              testing::HasSubstr("missing required"));
 }
 
 TEST_P(Http1ClientConnectionImplTest, ResponseWithTrailers) {

@@ -436,7 +436,7 @@ void ResponseEncoderImpl::encodeHeaders(const ResponseHeaderMap& headers, bool e
 
 static constexpr absl::string_view REQUEST_POSTFIX = " HTTP/1.1\r\n";
 
-Status RequestEncoderImpl::encodeHeaders(const RequestHeaderMap& headers, bool end_stream) {
+Status RequestEncoderImpl::encodeHeaders(RequestHeaderMap& headers, bool end_stream) {
   // Required headers must be present. This can only happen by some erroneous processing after the
   // downstream codecs decode.
   RETURN_IF_ERROR(HeaderUtility::checkRequiredRequestHeaders(headers));

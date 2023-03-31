@@ -161,9 +161,8 @@ public:
           client_connection_(client_connection) {}
   };
 
-  HttpStream(ClientConnection& client, const TestRequestHeaderMapImpl& request_headers,
-             bool end_stream, StreamResetCallbackFn stream_reset_callback,
-             ConnectionContext& context)
+  HttpStream(ClientConnection& client, TestRequestHeaderMapImpl& request_headers, bool end_stream,
+             StreamResetCallbackFn stream_reset_callback, ConnectionContext& context)
       : http_protocol_(client.protocol()), stream_reset_callback_(stream_reset_callback),
         context_(context) {
     request_.request_encoder_ = &client.newStream(response_.response_decoder_);
@@ -255,11 +254,9 @@ public:
                                                           /*via=*/"", stream_info_, /*node_id=*/"");
           state.response_encoder_->encodeHeaders(headers, end_stream);
         } else {
-          state.request_encoder_
-              ->encodeHeaders(
-                  fromSanitizedHeaders<TestRequestHeaderMapImpl>(directional_action.headers()),
-                  end_stream)
-              .IgnoreError();
+          auto request_headers =
+              fromSanitizedHeaders<TestRequestHeaderMapImpl>(directional_action.headers());
+          state.request_encoder_->encodeHeaders(request_headers, end_stream).IgnoreError();
         }
         if (end_stream) {
           state.closeLocal();
@@ -689,10 +686,10 @@ void codecFuzz(const test::common::http::CodecImplFuzzTestCase& input, HttpVersi
           continue;
         }
       }
+      TestRequestHeaderMapImpl request_headers =
+          fromSanitizedHeaders<TestRequestHeaderMapImpl>(action.new_stream().request_headers());
       HttpStreamPtr stream = std::make_unique<HttpStream>(
-          *client,
-          fromSanitizedHeaders<TestRequestHeaderMapImpl>(action.new_stream().request_headers()),
-          action.new_stream().end_stream(),
+          *client, request_headers, action.new_stream().end_stream(),
           [&should_close_connection, http2]() {
             // HTTP/1 codec has stream reset implying connection close.
             if (!http2) {

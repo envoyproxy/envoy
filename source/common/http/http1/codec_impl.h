@@ -192,7 +192,7 @@ public:
   bool connectRequest() const { return connect_request_; }
 
   // Http::RequestEncoder
-  Status encodeHeaders(const RequestHeaderMap& headers, bool end_stream) override;
+  Status encodeHeaders(RequestHeaderMap& headers, bool end_stream) override;
   void encodeTrailers(const RequestTrailerMap& trailers) override { encodeTrailersBase(trailers); }
   void enableTcpTunneling() override { is_tcp_tunneling_ = true; }
 

@@ -52,8 +52,7 @@ public:
                       Upstream::HostDescriptionConstSharedPtr host)
       : HttpUpstream(upstream_request, encoder), host_(host) {}
 
-  Http::Status encodeHeaders(const Envoy::Http::RequestHeaderMap& headers,
-                             bool end_stream) override {
+  Http::Status encodeHeaders(Envoy::Http::RequestHeaderMap& headers, bool end_stream) override {
     auto dup = Envoy::Http::RequestHeaderMapImpl::create();
     Envoy::Http::HeaderMapImpl::copyFrom(*dup, headers);
     dup->setCopy(Envoy::Http::LowerCaseString("X-foo"), "foo-common");

@@ -72,7 +72,7 @@ protected:
 class RequestEncoderWrapper : public RequestEncoder {
 public:
   // RequestEncoder
-  Status encodeHeaders(const RequestHeaderMap& headers, bool end_stream) override {
+  Status encodeHeaders(RequestHeaderMap& headers, bool end_stream) override {
     ASSERT(inner_encoder_);
     RETURN_IF_ERROR(inner_encoder_->encodeHeaders(headers, end_stream));
     if (end_stream) {

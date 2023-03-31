@@ -257,28 +257,39 @@ void ConnectionImpl::StreamImpl::encodeHeadersBase(const HeaderMap& headers, boo
   }
 }
 
-Status ConnectionImpl::ClientStreamImpl::encodeHeaders(const RequestHeaderMap& headers,
-                                                       bool end_stream) {
+Status ConnectionImpl::ClientStreamImpl::encodeHeaders(RequestHeaderMap& headers, bool end_stream) {
   parent_.updateActiveStreamsOnEncode(*this);
   // Required headers must be present. This can only happen by some erroneous processing after the
   // downstream codecs decode.
   RETURN_IF_ERROR(HeaderUtility::checkRequiredRequestHeaders(headers));
   // This must exist outside of the scope of isUpgrade as the underlying memory is
   // needed until encodeHeadersBase has been called.
-  Http::RequestHeaderMapPtr modified_headers;
-  if (Http::Utility::isUpgrade(headers)) {
-    modified_headers = createHeaderMap<RequestHeaderMapImpl>(headers);
-    upgrade_type_ = std::string(headers.getUpgradeValue());
-    Http::Utility::transformUpgradeRequestFromH1toH2(*modified_headers);
-    encodeHeadersBase(*modified_headers, end_stream);
-  } else if (headers.Method() && headers.Method()->value() == "CONNECT") {
-    modified_headers = createHeaderMap<RequestHeaderMapImpl>(headers);
-    modified_headers->removeScheme();
-    modified_headers->removePath();
-    modified_headers->removeProtocol();
-    encodeHeadersBase(*modified_headers, end_stream);
-  } else {
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.http2_no_copy_extended_connect")) {
+    if (Http::Utility::isUpgrade(headers)) {
+      upgrade_type_ = std::string(headers.getUpgradeValue());
+      Http::Utility::transformUpgradeRequestFromH1toH2(headers);
+    } else if (headers.Method() && headers.Method()->value() == "CONNECT") {
+      headers.removeScheme();
+      headers.removePath();
+      headers.removeProtocol();
+    }
     encodeHeadersBase(headers, end_stream);
+  } else {
+    Http::RequestHeaderMapPtr modified_headers;
+    if (Http::Utility::isUpgrade(headers)) {
+      modified_headers = createHeaderMap<RequestHeaderMapImpl>(headers);
+      upgrade_type_ = std::string(headers.getUpgradeValue());
+      Http::Utility::transformUpgradeRequestFromH1toH2(*modified_headers);
+      encodeHeadersBase(*modified_headers, end_stream);
+    } else if (headers.Method() && headers.Method()->value() == "CONNECT") {
+      modified_headers = createHeaderMap<RequestHeaderMapImpl>(headers);
+      modified_headers->removeScheme();
+      modified_headers->removePath();
+      modified_headers->removeProtocol();
+      encodeHeadersBase(*modified_headers, end_stream);
+    } else {
+      encodeHeadersBase(headers, end_stream);
+    }
   }
   return okStatus();
 }

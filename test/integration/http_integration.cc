@@ -106,7 +106,9 @@ IntegrationCodecClient::makeHeaderOnlyRequest(const Http::RequestHeaderMap& head
   auto response = std::make_unique<IntegrationStreamDecoder>(dispatcher_);
   Http::RequestEncoder& encoder = newStream(*response);
   encoder.getStream().addCallbacks(*response);
-  encoder.encodeHeaders(headers, true).IgnoreError();
+  Http::RequestHeaderMapPtr non_const_headers =
+      Http::createHeaderMap<Http::RequestHeaderMapImpl>(headers);
+  encoder.encodeHeaders(*non_const_headers, true).IgnoreError();
   flushWrite();
   return response;
 }
@@ -123,7 +125,9 @@ IntegrationCodecClient::makeRequestWithBody(const Http::RequestHeaderMap& header
   auto response = std::make_unique<IntegrationStreamDecoder>(dispatcher_);
   Http::RequestEncoder& encoder = newStream(*response);
   encoder.getStream().addCallbacks(*response);
-  encoder.encodeHeaders(headers, false).IgnoreError();
+  Http::RequestHeaderMapPtr non_const_headers =
+      Http::createHeaderMap<Http::RequestHeaderMapImpl>(headers);
+  encoder.encodeHeaders(*non_const_headers, false).IgnoreError();
   Buffer::OwnedImpl data(body);
   encoder.encodeData(data, end_stream);
   flushWrite();
@@ -175,7 +179,9 @@ IntegrationCodecClient::startRequest(const Http::RequestHeaderMap& headers,
   auto response = std::make_unique<IntegrationStreamDecoder>(dispatcher_);
   Http::RequestEncoder& encoder = newStream(*response);
   encoder.getStream().addCallbacks(*response);
-  encoder.encodeHeaders(headers, /*end_stream=*/header_only_request).IgnoreError();
+  Http::RequestHeaderMapPtr non_const_headers =
+      Http::createHeaderMap<Http::RequestHeaderMapImpl>(headers);
+  encoder.encodeHeaders(*non_const_headers, /*end_stream=*/header_only_request).IgnoreError();
   flushWrite();
   return {encoder, std::move(response)};
 }

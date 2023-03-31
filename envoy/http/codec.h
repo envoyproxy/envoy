@@ -121,7 +121,7 @@ public:
    * @return Status indicating whether encoding succeeded. Encoding will fail if request
    * headers are missing required HTTP headers (method, path for non-CONNECT, host for CONNECT).
    */
-  virtual Status encodeHeaders(const RequestHeaderMap& headers, bool end_stream) PURE;
+  virtual Status encodeHeaders(RequestHeaderMap& headers, bool end_stream) PURE;
 
   /**
    * Encode trailers. This implicitly ends the stream.

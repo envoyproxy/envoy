@@ -1469,7 +1469,7 @@ public:
    * @return status indicating success. Encoding will fail if headers do not have required HTTP
    * headers.
    */
-  virtual Http::Status encodeHeaders(const Http::RequestHeaderMap& headers, bool end_stream) PURE;
+  virtual Http::Status encodeHeaders(Http::RequestHeaderMap& headers, bool end_stream) PURE;
   /**
    * Encode trailers. This implicitly ends the stream.
    * @param trailers supplies the trailers to encode.

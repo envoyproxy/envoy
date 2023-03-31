@@ -43,8 +43,7 @@ void TcpUpstream::encodeData(Buffer::Instance& data, bool end_stream) {
   upstream_conn_data_->connection().write(data, end_stream);
 }
 
-Envoy::Http::Status TcpUpstream::encodeHeaders(const Envoy::Http::RequestHeaderMap&,
-                                               bool end_stream) {
+Envoy::Http::Status TcpUpstream::encodeHeaders(Envoy::Http::RequestHeaderMap&, bool end_stream) {
   // Headers should only happen once, so use this opportunity to add the proxy
   // proto header, if configured.
   const Router::RouteEntry* route_entry = upstream_request_->route().routeEntry();
