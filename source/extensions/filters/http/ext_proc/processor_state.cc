@@ -91,8 +91,11 @@ absl::Status ProcessorState::handleHeadersResponse(const HeadersResponse& respon
         return mut_status;
       }
     }
+
+    bool allow_clearing_route_cache =
+        PROTOBUF_GET_WRAPPED_OR_DEFAULT(filter_.config(), allow_clearing_route_cache, false);
     // Only clear the route cache if there is a mutation to the filter.
-    if (common_response.clear_route_cache() && filter_.config().mutationChecker().canClearCache() &&
+    if (common_response.clear_route_cache() && allow_clearing_route_cache &&
         (common_response.has_header_mutation() || common_response.has_body_mutation())) {
       ENVOY_STREAM_LOG(debug, "ext_proc is clearing route cache", *decoder_callbacks_);
       filter_callbacks_->downstreamCallbacks()->clearRouteCache();
@@ -323,8 +326,11 @@ absl::Status ProcessorState::handleBodyResponse(const BodyResponse& response) {
       // is not an error from grpc.
       onFinishProcessorCall(Grpc::Status::FailedPrecondition);
     }
+    bool allow_clearing_route_cache =
+        PROTOBUF_GET_WRAPPED_OR_DEFAULT(filter_.config(), allow_clearing_route_cache, false);
+
     // Only clear the route cache if there is a mutation to the filter.
-    if (common_response.clear_route_cache() && filter_.config().mutationChecker().canClearCache() &&
+    if (common_response.clear_route_cache() && allow_clearing_route_cache &&
         (common_response.has_header_mutation() || common_response.has_body_mutation())) {
       ENVOY_STREAM_LOG(debug, "ext_proc is clearing route cache", *decoder_callbacks_);
       filter_callbacks_->downstreamCallbacks()->clearRouteCache();

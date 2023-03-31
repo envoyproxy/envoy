@@ -56,10 +56,6 @@ CheckResult Checker::check(CheckOperation op, const LowerCaseString& header_name
   return CheckResult::IGNORE;
 }
 
-bool Checker::canClearCache() const {
-  return PROTOBUF_GET_WRAPPED_OR_DEFAULT(rules_, allow_clearing_route_cache, true);
-}
-
 bool Checker::isAllowed(CheckOperation op, const LowerCaseString& header_name) const {
   if (op == CheckOperation::REMOVE && !HeaderUtility::isModifiableHeader(header_name)) {
     // No matter what, you can't remove the "host" or any ":" headers.

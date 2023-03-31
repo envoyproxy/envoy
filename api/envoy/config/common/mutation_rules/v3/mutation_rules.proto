@@ -85,10 +85,6 @@ message HeaderMutationRules {
   // cause the ``rejected_header_mutations`` counter to be incremented.
   // Default is false.
   google.protobuf.BoolValue disallow_is_error = 7;
-
-  // If true, allows the processing response to allow route cache clearing.
-  // If false, route cache clearing is ignored.
-  google.protobuf.BoolValue allow_clearing_route_cache = 8;
 }
 
 // The HeaderMutation structure specifies an action that may be taken on HTTP
