@@ -12,7 +12,7 @@
 
 namespace Envoy {
 namespace Stats {
-namespace  {
+namespace {
 
 #define AWESOME_STATS(COUNTER, GAUGE, HISTOGRAM, TEXT_READOUT, STATNAME) COUNTER(foo)
 
@@ -29,25 +29,12 @@ public:
 
 using MyStats = LazyCompatibleStats<AwesomeStats>;
 
-TEST_F(LazyInitStatsTest, NonLazyNoInitializedGauge) {
-  {
-    ScopeSharedPtr scope = store_.createScope("bluh");
-    MyStats non_lazy_y = MyStats::create(scope, stats_names_, false);
-    EXPECT_EQ(TestUtility::findGauge(store_, "bluh.AwesomeStats.initialized"), nullptr);
-    non_lazy_y->foo_.inc();
-    MyStats lazy_x = MyStats::create(scope, stats_names_, true);
-    EXPECT_EQ(TestUtility::findGauge(store_, "bluh.AwesomeStats.initialized")->value(), 0);
-    x->foo_.inc();
-    EXPECT_EQ(TestUtility::findGauge(store_, "bluh.AwesomeStats.initialized")->value(), 1);
-    EXPECT_EQ(x->foo_.value(), 1);
-    EXPECT_EQ(y->foo_.value(), 1);
-    EXPECT_EQ(TestUtility::findGauge(store_, "bluh.AwesomeStats.initialized")->value(), 2);
-}
-  }
-
+// Tests that "AwesomeStats.initialized" gauge equals the number of initiated MyStats instances.
 TEST_F(LazyInitStatsTest, StatsGoneWithScope) {
   {
     ScopeSharedPtr scope = store_.createScope("bluh");
+    // No such gauge when there is no lazy init stats instances.
+    EXPECT_EQ(TestUtility::findGauge(store_, "bluh.AwesomeStats.initialized"), nullptr);
     MyStats x = MyStats::create(scope, stats_names_, true);
     MyStats y = MyStats::create(scope, stats_names_, true);
     EXPECT_EQ(TestUtility::findGauge(store_, "bluh.AwesomeStats.initialized")->value(), 0);
@@ -59,56 +46,65 @@ TEST_F(LazyInitStatsTest, StatsGoneWithScope) {
   }
   // Deleted as scope deleted.
   EXPECT_EQ(TestUtility::findCounter(store_, "bluh.foo"), nullptr);
+  EXPECT_EQ(TestUtility::findGauge(store_, "bluh.AwesomeStats.initialized"), nullptr);
   {
+    // Recreate scope "bluh".
     ScopeSharedPtr scope = store_.createScope("bluh");
+    EXPECT_EQ(TestUtility::findGauge(store_, "bluh.AwesomeStats.initialized"), nullptr);
     MyStats x = MyStats::create(scope, stats_names_, true);
     EXPECT_EQ(TestUtility::findGauge(store_, "bluh.AwesomeStats.initialized")->value(), 0);
+    // Previous data is gone, as scope_v2 and scope_1's lifecycle do not overlap.
     EXPECT_EQ(x->foo_.value(), 0);
     // Initialized now.
     EXPECT_EQ(TestUtility::findGauge(store_, "bluh.AwesomeStats.initialized")->value(), 1);
   }
 }
 
-TEST_F(LazyInitStatsTest, StatsMutlipleInstancesDynamicallyDestructed) {
+// Tests that multiple stats struct instances within the same scope has no issue to keep the stats,
+// with removals.
+TEST_F(LazyInitStatsTest, MultipleInstancesSameScopeDynamicallyDestructed) {
   {
     ScopeSharedPtr scope_1 = store_.createScope("bluh");
-    auto x =
-        std::make_unique<MyStats>(MyStats::create(scope_1, stats_names_, true));
-    auto y =
-        std::make_unique<MyStats>(MyStats::create(scope_1, stats_names_, true));
+    auto x = std::make_unique<MyStats>(MyStats::create(scope_1, stats_names_, true));
+    auto y = std::make_unique<MyStats>(MyStats::create(scope_1, stats_names_, true));
     EXPECT_EQ(TestUtility::findGauge(store_, "bluh.AwesomeStats.initialized")->value(), 0);
+    // Only instantiate x, and then delete it.
     (*x)->foo_.inc();
     EXPECT_EQ(TestUtility::findGauge(store_, "bluh.AwesomeStats.initialized")->value(), 1);
     EXPECT_EQ((*x)->foo_.value(), 1);
+    x.reset();
+    // y is not instantiated before x was deleted, no AwesomeStats instance, but stats are not lost.
+    EXPECT_EQ(TestUtility::findCounter(store_, "bluh.foo")->value(), 1);
+    EXPECT_EQ(TestUtility::findGauge(store_, "bluh.AwesomeStats.initialized")->value(), 0);
+    // Instantiate y now.
     EXPECT_EQ((*y)->foo_.value(), 1);
-    // x,y instantiated.
-    EXPECT_EQ(TestUtility::findGauge(store_, "bluh.AwesomeStats.initialized")->value(), 2);
-    // Only x instantiated.
-    y.reset();
+    (*y)->foo_.inc();
     EXPECT_EQ(TestUtility::findGauge(store_, "bluh.AwesomeStats.initialized")->value(), 1);
-    EXPECT_EQ((*x)->foo_.value(), 1);
+    EXPECT_EQ((*y)->foo_.value(), 2);
   }
   // Deleted as scope deleted.
   EXPECT_EQ(TestUtility::findCounter(store_, "bluh.foo"), nullptr);
   EXPECT_EQ(TestUtility::findGauge(store_, "bluh.AwesomeStats.initialized"), nullptr);
   {
-    ScopeSharedPtr scope_2 = store_.createScope("bluh");
-    MyStats x = MyStats::create(scope_2, stats_names_, true);
+    ScopeSharedPtr scope_v2 = store_.createScope("bluh");
+    MyStats x = MyStats::create(scope_v2, stats_names_, true);
+    // Previous data is gone, as scope_v2 and scope_1's lifecycle do not overlap.
     EXPECT_EQ(TestUtility::findGauge(store_, "bluh.AwesomeStats.initialized")->value(), 0);
-    // Previous data is gone, as scope_2 and scope_1's lifecycle do not overlap.
     EXPECT_EQ(x->foo_.value(), 0);
     // Initialized now.
     EXPECT_EQ(TestUtility::findGauge(store_, "bluh.AwesomeStats.initialized")->value(), 1);
   }
+  // Deleted as scope deleted.
+  EXPECT_EQ(TestUtility::findCounter(store_, "bluh.foo"), nullptr);
+  EXPECT_EQ(TestUtility::findGauge(store_, "bluh.AwesomeStats.initialized"), nullptr);
 }
 
+// Tests that as long as scope lives, stats under the scope won't be lost.
 TEST_F(LazyInitStatsTest, ScopeOutlivesLazyStats) {
-      ScopeSharedPtr scope_1 = store_.createScope("bluh");
+  ScopeSharedPtr scope_1 = store_.createScope("bluh");
   {
-    auto x =
-        std::make_unique<MyStats>(MyStats::create(scope_1, stats_names_, true));
-    auto y =
-        std::make_unique<MyStats>(MyStats::create(scope_1, stats_names_, true));
+    auto x = std::make_unique<MyStats>(MyStats::create(scope_1, stats_names_, true));
+    auto y = std::make_unique<MyStats>(MyStats::create(scope_1, stats_names_, true));
     EXPECT_EQ(TestUtility::findGauge(store_, "bluh.AwesomeStats.initialized")->value(), 0);
     (*x)->foo_.inc();
     EXPECT_EQ(TestUtility::findGauge(store_, "bluh.AwesomeStats.initialized")->value(), 1);
@@ -119,24 +115,30 @@ TEST_F(LazyInitStatsTest, ScopeOutlivesLazyStats) {
     // Only x instantiated.
     y.reset();
     EXPECT_EQ(TestUtility::findGauge(store_, "bluh.AwesomeStats.initialized")->value(), 1);
-    EXPECT_EQ((*x)->foo_.value(), 1);
+    (*x)->foo_.inc();
+    EXPECT_EQ((*x)->foo_.value(), 2);
   }
   // Both MyStats deleted.
-  EXPECT_EQ(TestUtility::findCounter(store_, "bluh.foo")->value(), 1);
+  EXPECT_EQ(TestUtility::findCounter(store_, "bluh.foo")->value(), 2);
   EXPECT_EQ(TestUtility::findGauge(store_, "bluh.AwesomeStats.initialized")->value(), 0);
-
   {
-    // scope_1 overlaps with scope_2.
-    ScopeSharedPtr scope_2 = store_.createScope("bluh");
-    MyStats x = MyStats::create(scope_2, stats_names_, true);
+    // scope_1 overlaps with scope_v2.
+    ScopeSharedPtr scope_v2 = store_.createScope("bluh");
+
+    MyStats x_v2 = MyStats::create(scope_v2, stats_names_, true);
     EXPECT_EQ(TestUtility::findGauge(store_, "bluh.AwesomeStats.initialized")->value(), 0);
-    // Previous data is NOT gone, as scope_2 and scope_1's lifecycles overlap.
-    EXPECT_EQ(x->foo_.value(), 1);
-    // Initialized now.
+    // Previous data is NOT gone, as scope_v2 and scope_1's lifecycles overlap.
+    EXPECT_EQ(x_v2->foo_.value(), 2);
+
+    x_v2->foo_.inc();
+    EXPECT_EQ(TestUtility::findCounter(store_, "bluh.foo")->value(), 3);
     EXPECT_EQ(TestUtility::findGauge(store_, "bluh.AwesomeStats.initialized")->value(), 1);
   }
+  // scope_v2 is gone, but stat value kept since scope_1 is alive.
+  EXPECT_EQ(TestUtility::findCounter(store_, "bluh.foo")->value(), 3);
+  EXPECT_EQ(TestUtility::findGauge(store_, "bluh.AwesomeStats.initialized")->value(), 0);
 }
 
-}
-}
-}
+} // namespace
+} // namespace Stats
+} // namespace Envoy
