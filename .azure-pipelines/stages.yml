@@ -349,8 +349,6 @@ stages:
     # the preceeding jobs either pass or are skipped
     # adapted from:
     #   https://learn.microsoft.com/en-us/azure/devops/pipelines/process/expressions?view=azure-devops#job-to-job-dependencies-within-one-stage
-    condition: in(precheck.format.result, 'Succeeded', 'SucceededWithIssues', 'Skipped')
-
     condition: |
       and(
         in(dependencies.format.result, 'Succeeded', 'SucceededWithIssues', 'Skipped'),
