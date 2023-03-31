@@ -49,6 +49,13 @@ bool TcpUpstream::startUpstreamSecureTransport() {
              : upstream_conn_data_->connection().startSecureTransport();
 }
 
+Ssl::ConnectionInfoConstSharedPtr TcpUpstream::getUpstreamConnectionSslInfo() {
+    if(!upstream_conn_data_) {
+      return nullptr;
+    }
+    return upstream_conn_data_->connection().ssl();
+}
+
 Tcp::ConnectionPool::ConnectionData*
 TcpUpstream::onDownstreamEvent(Network::ConnectionEvent event) {
   if (event == Network::ConnectionEvent::RemoteClose) {
