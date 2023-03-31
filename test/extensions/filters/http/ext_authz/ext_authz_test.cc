@@ -386,7 +386,7 @@ TEST_F(HttpFilterTest, ErrorOpen) {
                     .counterFromString("ext_authz.error")
                     .value());
   EXPECT_EQ(1U, config_->stats().error_.value());
-  EXPECT_EQ(request_headers_.get_("x-envoy-failure-mode-allowed"), EMPTY_STRING);
+  EXPECT_EQ(request_headers_.get_("x-envoy-auth-failure-mode-allowed"), EMPTY_STRING);
 }
 
 // Test when failure_mode_allow is set and the response from the authorization service is an
@@ -430,7 +430,7 @@ TEST_F(HttpFilterTest, ImmediateErrorOpen) {
                     .value());
   EXPECT_EQ(1U, config_->stats().error_.value());
   EXPECT_EQ(1U, config_->stats().failure_mode_allowed_.value());
-  EXPECT_EQ(request_headers_.get_("x-envoy-failure-mode-allowed"), EMPTY_STRING);
+  EXPECT_EQ(request_headers_.get_("x-envoy-auth-failure-mode-allowed"), EMPTY_STRING);
 }
 
 // Test when failure_mode_allow and failure_mode_allow_header_add are set and the response from the
@@ -468,7 +468,7 @@ TEST_F(HttpFilterTest, ErrorOpenWithFailureModeAllowHeaderAddOpen) {
                     .counterFromString("ext_authz.error")
                     .value());
   EXPECT_EQ(1U, config_->stats().error_.value());
-  EXPECT_EQ(request_headers_.get_("x-envoy-failure-mode-allowed"), "true");
+  EXPECT_EQ(request_headers_.get_("x-envoy-auth-failure-mode-allowed"), "true");
 }
 
 // Test when failure_mode_allow and failure_mode_allow_header_add are set and the response from the
@@ -513,7 +513,7 @@ TEST_F(HttpFilterTest, ImmediateErrorOpenWithFailureModeAllowHeaderAddOpen) {
                     .value());
   EXPECT_EQ(1U, config_->stats().error_.value());
   EXPECT_EQ(1U, config_->stats().failure_mode_allowed_.value());
-  EXPECT_EQ(request_headers_.get_("x-envoy-failure-mode-allowed"), "true");
+  EXPECT_EQ(request_headers_.get_("x-envoy-auth-failure-mode-allowed"), "true");
 }
 
 // Check a bad configuration results in validation exception.
