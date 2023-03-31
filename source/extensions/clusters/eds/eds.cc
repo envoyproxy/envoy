@@ -211,11 +211,12 @@ void EdsClusterImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef
   // (optimize for no-copy).
   envoy::config::endpoint::v3::ClusterLoadAssignment* used_load_assignment;
   if (cla_leds_configs.empty()) {
-    cluster_load_assignment_ = absl::nullopt;
+    cluster_load_assignment_ = nullptr;
     used_load_assignment = &cluster_load_assignment;
   } else {
-    cluster_load_assignment_ = std::move(cluster_load_assignment);
-    used_load_assignment = &cluster_load_assignment_.value();
+    cluster_load_assignment_ = std::make_unique<envoy::config::endpoint::v3::ClusterLoadAssignment>(
+        std::move(cluster_load_assignment));
+    used_load_assignment = cluster_load_assignment_.get();
   }
 
   // Add all the LEDS localities that are new.

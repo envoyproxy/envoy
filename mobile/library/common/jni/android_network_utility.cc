@@ -3,6 +3,7 @@
 #include "library/common/data/utility.h"
 #include "library/common/jni/jni_support.h"
 #include "library/common/jni/jni_utility.h"
+#include "library/common/jni/types/exception.h"
 #include "library/common/jni/types/java_virtual_machine.h"
 #include "openssl/ssl.h"
 
@@ -16,8 +17,10 @@ bool jvm_cert_is_issued_by_known_root(JNIEnv* env, jobject result) {
       find_class("io.envoyproxy.envoymobile.utilities.AndroidCertVerifyResult");
   jmethodID jmid_isIssuedByKnownRoot =
       env->GetMethodID(jcls_AndroidCertVerifyResult, "isIssuedByKnownRoot", "()Z");
+  Envoy::JNI::Exception::checkAndClear("jvm_cert_is_issued_by_known_root:GetMethodID");
   ASSERT(jmid_isIssuedByKnownRoot);
   bool is_issued_by_known_root = env->CallBooleanMethod(result, jmid_isIssuedByKnownRoot);
+  Envoy::JNI::Exception::checkAndClear("jvm_cert_is_issued_by_known_root:CallBooleanMethod");
   env->DeleteLocalRef(jcls_AndroidCertVerifyResult);
   return is_issued_by_known_root;
 }
@@ -26,9 +29,11 @@ envoy_cert_verify_status_t jvm_cert_get_status(JNIEnv* env, jobject j_result) {
   jclass jcls_AndroidCertVerifyResult =
       find_class("io.envoyproxy.envoymobile.utilities.AndroidCertVerifyResult");
   jmethodID jmid_getStatus = env->GetMethodID(jcls_AndroidCertVerifyResult, "getStatus", "()I");
+  Envoy::JNI::Exception::checkAndClear("jvm_cert_get_status:GetMethodID");
   ASSERT(jmid_getStatus);
   envoy_cert_verify_status_t result = CERT_VERIFY_STATUS_FAILED;
   result = static_cast<envoy_cert_verify_status_t>(env->CallIntMethod(j_result, jmid_getStatus));
+  Envoy::JNI::Exception::checkAndClear("jvm_cert_get_status:CallIntMethod");
 
   env->DeleteLocalRef(jcls_AndroidCertVerifyResult);
   return result;
@@ -39,8 +44,10 @@ jobjectArray jvm_cert_get_certificate_chain_encoded(JNIEnv* env, jobject result)
       find_class("io.envoyproxy.envoymobile.utilities.AndroidCertVerifyResult");
   jmethodID jmid_getCertificateChainEncoded =
       env->GetMethodID(jcls_AndroidCertVerifyResult, "getCertificateChainEncoded", "()[[B");
+  Envoy::JNI::Exception::checkAndClear("jvm_cert_get_certificate_chain_encoded:GetMethodID");
   jobjectArray certificate_chain =
       static_cast<jobjectArray>(env->CallObjectMethod(result, jmid_getCertificateChainEncoded));
+  Envoy::JNI::Exception::checkAndClear("jvm_cert_get_certificate_chain_encoded:CallObjectMethod");
   env->DeleteLocalRef(jcls_AndroidCertVerifyResult);
   return certificate_chain;
 }
@@ -67,12 +74,14 @@ jobject call_jvm_verify_x509_cert_chain(JNIEnv* env, const std::vector<std::stri
   jmethodID jmid_verifyServerCertificates = env->GetStaticMethodID(
       jcls_AndroidNetworkLibrary, "verifyServerCertificates",
       "([[B[B[B)Lio/envoyproxy/envoymobile/utilities/AndroidCertVerifyResult;");
+  Envoy::JNI::Exception::checkAndClear("call_jvm_verify_x509_cert_chain:GetStaticMethodID");
   jobjectArray chain_byte_array = ToJavaArrayOfByteArray(env, cert_chain);
   jbyteArray auth_string = ToJavaByteArray(env, auth_type);
   jbyteArray host_string = ToJavaByteArray(env, host);
   jobject result =
       env->CallStaticObjectMethod(jcls_AndroidNetworkLibrary, jmid_verifyServerCertificates,
                                   chain_byte_array, auth_string, host_string);
+  Envoy::JNI::Exception::checkAndClear("call_jvm_verify_x509_cert_chain:CallStaticObjectMethod");
   env->DeleteLocalRef(chain_byte_array);
   env->DeleteLocalRef(auth_string);
   env->DeleteLocalRef(host_string);
@@ -88,17 +97,13 @@ static void jvm_verify_x509_cert_chain(const std::vector<std::string>& cert_chai
                                        std::vector<std::string>* verified_chain) {
   JNIEnv* env = get_env();
   jobject result = call_jvm_verify_x509_cert_chain(env, cert_chain, auth_type, host);
-  if (env->ExceptionCheck() == JNI_TRUE) {
-    env->ExceptionDescribe();
-    env->ExceptionClear();
+  if (Envoy::JNI::Exception::checkAndClear()) {
     *status = CERT_VERIFY_STATUS_NOT_YET_VALID;
   } else {
     ExtractCertVerifyResult(get_env(), result, status, is_issued_by_known_root, verified_chain);
-    if (env->ExceptionCheck() == JNI_TRUE) {
-      env->ExceptionDescribe();
-      env->ExceptionClear();
+    if (Envoy::JNI::Exception::checkAndClear()) {
       *status = CERT_VERIFY_STATUS_FAILED;
-    };
+    }
   }
   env->DeleteLocalRef(result);
 }

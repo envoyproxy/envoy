@@ -26,7 +26,12 @@ Dso::Dso(const std::string dso_name) : dso_name_(dso_name) {
   handler_ = dlopen(dso_name.c_str(), RTLD_LAZY);
   if (!handler_) {
     ENVOY_LOG_MISC(error, "cannot load : {} error: {}", dso_name, dlerror());
+    return;
   }
+
+  // loaded is set to true by default when dlopen successfully,
+  // and will set to false when load symbol failed.
+  loaded_ = true;
 }
 
 Dso::~Dso() {
@@ -39,17 +44,17 @@ Dso::~Dso() {
 }
 
 HttpFilterDsoImpl::HttpFilterDsoImpl(const std::string dso_name) : HttpFilterDso(dso_name) {
-  loaded_ = dlsymInternal<decltype(envoy_go_filter_new_http_plugin_config_)>(
+  loaded_ &= dlsymInternal<decltype(envoy_go_filter_new_http_plugin_config_)>(
       envoy_go_filter_new_http_plugin_config_, handler_, dso_name,
       "envoyGoFilterNewHttpPluginConfig");
-  loaded_ = dlsymInternal<decltype(envoy_go_filter_merge_http_plugin_config_)>(
+  loaded_ &= dlsymInternal<decltype(envoy_go_filter_merge_http_plugin_config_)>(
       envoy_go_filter_merge_http_plugin_config_, handler_, dso_name,
       "envoyGoFilterMergeHttpPluginConfig");
-  loaded_ = dlsymInternal<decltype(envoy_go_filter_on_http_header_)>(
+  loaded_ &= dlsymInternal<decltype(envoy_go_filter_on_http_header_)>(
       envoy_go_filter_on_http_header_, handler_, dso_name, "envoyGoFilterOnHttpHeader");
-  loaded_ = dlsymInternal<decltype(envoy_go_filter_on_http_data_)>(
+  loaded_ &= dlsymInternal<decltype(envoy_go_filter_on_http_data_)>(
       envoy_go_filter_on_http_data_, handler_, dso_name, "envoyGoFilterOnHttpData");
-  loaded_ = dlsymInternal<decltype(envoy_go_filter_on_http_destroy_)>(
+  loaded_ &= dlsymInternal<decltype(envoy_go_filter_on_http_destroy_)>(
       envoy_go_filter_on_http_destroy_, handler_, dso_name, "envoyGoFilterOnHttpDestroy");
 }
 
@@ -82,10 +87,10 @@ void HttpFilterDsoImpl::envoyGoFilterOnHttpDestroy(httpRequest* p0, int p1) {
 
 ClusterSpecifierDsoImpl::ClusterSpecifierDsoImpl(const std::string dso_name)
     : ClusterSpecifierDso(dso_name) {
-  loaded_ = dlsymInternal<decltype(envoy_go_cluster_specifier_new_plugin_)>(
+  loaded_ &= dlsymInternal<decltype(envoy_go_cluster_specifier_new_plugin_)>(
       envoy_go_cluster_specifier_new_plugin_, handler_, dso_name,
       "envoyGoClusterSpecifierNewPlugin");
-  loaded_ = dlsymInternal<decltype(envoy_go_on_cluster_specify_)>(
+  loaded_ &= dlsymInternal<decltype(envoy_go_on_cluster_specify_)>(
       envoy_go_on_cluster_specify_, handler_, dso_name, "envoyGoOnClusterSpecify");
 }
 

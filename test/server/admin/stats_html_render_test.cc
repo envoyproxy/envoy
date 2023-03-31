@@ -7,7 +7,6 @@
 #include "gtest/gtest.h"
 
 using testing::HasSubstr;
-using testing::Not;
 
 namespace Envoy {
 namespace Server {
@@ -45,63 +44,6 @@ TEST_F(StatsHtmlRenderTest, HistogramNoBuckets) {
   EXPECT_THAT(render<>(renderer_, "h1", populateHistogram("h1", {200, 300, 300})),
               HasSubstr(expected));
 }
-
-TEST_F(StatsHtmlRenderTest, RenderHead) {
-  // The "<head>...</head>" is rendered by the constructor.
-  EXPECT_THAT(response_.toString(), HasSubstr("<head>"));
-  EXPECT_THAT(response_.toString(), HasSubstr("</head>"));
-}
-
-TEST_F(StatsHtmlRenderTest, RenderTableBegin) {
-  renderer_.tableBegin(response_);
-  EXPECT_THAT(response_.toString(), HasSubstr("<table class='home-table'>"));
-}
-
-TEST_F(StatsHtmlRenderTest, RenderTableEnd) {
-  renderer_.tableEnd(response_);
-  EXPECT_THAT(response_.toString(), HasSubstr("</table>"));
-}
-
-TEST_F(StatsHtmlRenderTest, RenderUrlHandlerNoQuery) {
-  renderer_.urlHandler(response_, handler(), query_params_);
-  std::string out = response_.toString();
-  EXPECT_THAT(out, HasSubstr("<input type='checkbox' name='boolparam' "
-                             "id='param-1-prefix-boolparam' form='prefix'"));
-  EXPECT_THAT(out, Not(HasSubstr(" checked/>")));
-  EXPECT_THAT(out, HasSubstr("help text"));
-  EXPECT_THAT(out, HasSubstr("param help"));
-  EXPECT_THAT(out, HasSubstr("<button class='button-as-link'>prefix</button>"));
-  EXPECT_THAT(out, Not(HasSubstr(" onchange='prefix.submit()")));
-  EXPECT_THAT(out, Not(HasSubstr(" type='hidden' ")));
-}
-
-TEST_F(StatsHtmlRenderTest, RenderUrlHandlerWithQuery) {
-  query_params_["boolparam"] = "on";
-  query_params_["strparam"] = "str value";
-  renderer_.urlHandler(response_, handler(), query_params_);
-  std::string out = response_.toString();
-  EXPECT_THAT(out,
-              HasSubstr("<input type='checkbox' name='boolparam' id='param-1-prefix-boolparam' "
-                        "form='prefix'"));
-  EXPECT_THAT(out, HasSubstr("<input type='text' name='strparam' id='param-1-prefix-strparam' "
-                             "form='prefix' value='str value'"));
-  EXPECT_THAT(out, HasSubstr(" checked/>"));
-  EXPECT_THAT(out, HasSubstr("help text"));
-  EXPECT_THAT(out, HasSubstr("param help"));
-  EXPECT_THAT(out, HasSubstr("<button class='button-as-link'>prefix</button>"));
-  EXPECT_THAT(out, Not(HasSubstr(" onchange='prefix.submit()")));
-  EXPECT_THAT(out, Not(HasSubstr(" type='hidden' ")));
-}
-
-TEST_F(StatsHtmlRenderTest, RenderUrlHandlerSubmitOnChange) {
-  renderer_.setSubmitOnChange(true);
-  renderer_.urlHandler(response_, handler(), query_params_);
-  std::string out = response_.toString();
-  EXPECT_THAT(out, HasSubstr(" onchange='prefix.submit()"));
-  EXPECT_THAT(out, Not(HasSubstr("<button class='button-as-link'>prefix</button>")));
-  EXPECT_THAT(out, Not(HasSubstr(" type='hidden' ")));
-}
-
 class StatsActiveRenderTest : public StatsRenderTestBase {
 protected:
   StatsActiveRenderTest() {
