@@ -21,6 +21,7 @@ public:
 
 private:
   static constexpr uint64_t DefaultMessageTimeoutMs = 200;
+  static constexpr uint64_t DefaultMaxMessageTimeoutMs = 0;
 
   Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
       const envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor& proto_config,

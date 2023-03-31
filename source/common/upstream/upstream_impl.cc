@@ -961,6 +961,35 @@ createOptions(const envoy::config::cluster::v3::Cluster& config,
       config.has_http2_protocol_options(), validation_visitor);
 }
 
+LBPolicyConfig::LBPolicyConfig(const envoy::config::cluster::v3::Cluster& config) {
+  switch (config.lb_config_case()) {
+  case envoy::config::cluster::v3::Cluster::kRoundRobinLbConfig:
+    lb_policy_ = std::make_unique<const envoy::config::cluster::v3::Cluster::RoundRobinLbConfig>(
+        config.round_robin_lb_config());
+    break;
+  case envoy::config::cluster::v3::Cluster::kLeastRequestLbConfig:
+    lb_policy_ = std::make_unique<envoy::config::cluster::v3::Cluster::LeastRequestLbConfig>(
+        config.least_request_lb_config());
+    break;
+  case envoy::config::cluster::v3::Cluster::kRingHashLbConfig:
+    lb_policy_ = std::make_unique<envoy::config::cluster::v3::Cluster::RingHashLbConfig>(
+        config.ring_hash_lb_config());
+    break;
+  case envoy::config::cluster::v3::Cluster::kMaglevLbConfig:
+    lb_policy_ = std::make_unique<envoy::config::cluster::v3::Cluster::MaglevLbConfig>(
+        config.maglev_lb_config());
+    break;
+  case envoy::config::cluster::v3::Cluster::kOriginalDstLbConfig:
+    lb_policy_ = std::make_unique<envoy::config::cluster::v3::Cluster::OriginalDstLbConfig>(
+        config.original_dst_lb_config());
+    break;
+  case envoy::config::cluster::v3::Cluster::LB_CONFIG_NOT_SET:
+    // The default value of the variant if there is no config would be nullptr
+    // Which is set when the class is initialized. No action needed if config isn't set
+    break;
+  }
+}
+
 ClusterInfoImpl::ClusterInfoImpl(
     Init::Manager& init_manager, Server::Configuration::ServerFactoryContext& server_context,
     const envoy::config::cluster::v3::Cluster& config,
@@ -969,7 +998,9 @@ ClusterInfoImpl::ClusterInfoImpl(
     Stats::ScopeSharedPtr&& stats_scope, bool added_via_api,
     Server::Configuration::TransportSocketFactoryContext& factory_context)
     : runtime_(runtime), name_(config.name()),
-      observability_name_(PROTOBUF_GET_STRING_OR_DEFAULT(config, alt_stat_name, name_)),
+      observability_name_(!config.alt_stat_name().empty()
+                              ? std::make_unique<std::string>(config.alt_stat_name())
+                              : nullptr),
       extension_protocol_options_(parseExtensionProtocolOptions(config, factory_context)),
       http_protocol_options_(
           createOptions(config,
@@ -1009,36 +1040,20 @@ ClusterInfoImpl::ClusterInfoImpl(
       maintenance_mode_runtime_key_(absl::StrCat("upstream.maintenance_mode.", name_)),
       upstream_local_address_selector_(
           std::make_shared<UpstreamLocalAddressSelectorImpl>(config, bind_config)),
-      lb_round_robin_config_(
-          config.has_round_robin_lb_config()
-              ? std::make_unique<envoy::config::cluster::v3::Cluster::RoundRobinLbConfig>(
-                    config.round_robin_lb_config())
-              : nullptr),
-      lb_least_request_config_(
-          config.has_least_request_lb_config()
-              ? std::make_unique<envoy::config::cluster::v3::Cluster::LeastRequestLbConfig>(
-                    config.least_request_lb_config())
-              : nullptr),
-      lb_ring_hash_config_(
-          config.has_ring_hash_lb_config()
-              ? std::make_unique<envoy::config::cluster::v3::Cluster::RingHashLbConfig>(
-                    config.ring_hash_lb_config())
-              : nullptr),
-      lb_maglev_config_(config.has_maglev_lb_config()
-                            ? std::make_unique<envoy::config::cluster::v3::Cluster::MaglevLbConfig>(
-                                  config.maglev_lb_config())
-                            : nullptr),
-      lb_original_dst_config_(
-          config.has_original_dst_lb_config()
-              ? std::make_unique<envoy::config::cluster::v3::Cluster::OriginalDstLbConfig>(
-                    config.original_dst_lb_config())
-              : nullptr),
+      lb_policy_config_(std::make_unique<const LBPolicyConfig>(config)),
       upstream_config_(config.has_upstream_config()
                            ? std::make_unique<envoy::config::core::v3::TypedExtensionConfig>(
                                  config.upstream_config())
                            : nullptr),
-      lb_subset_(LoadBalancerSubsetInfoImpl(config.lb_subset_config())),
-      metadata_(config.metadata()), typed_metadata_(config.metadata()),
+      lb_subset_(config.has_lb_subset_config()
+                     ? std::make_unique<LoadBalancerSubsetInfoImpl>(config.lb_subset_config())
+                     : nullptr),
+      metadata_(config.has_metadata()
+                    ? std::make_unique<envoy::config::core::v3::Metadata>(config.metadata())
+                    : nullptr),
+      typed_metadata_(config.has_metadata()
+                          ? std::make_unique<ClusterTypedMetadata>(config.metadata())
+                          : nullptr),
       common_lb_config_(config.common_lb_config()),
       cluster_type_(config.has_cluster_type()
                         ? std::make_unique<envoy::config::cluster::v3::Cluster::CustomClusterType>(
@@ -1119,33 +1134,45 @@ ClusterInfoImpl::ClusterInfoImpl(
                                      name_));
   }
 
+  // Use default (1h) or configured `idle_timeout`, unless it's set to 0, indicating that no
+  // timeout should be used.
+  absl::optional<std::chrono::milliseconds> idle_timeout(std::chrono::hours(1));
   if (http_protocol_options_->common_http_protocol_options_.has_idle_timeout()) {
-    idle_timeout_ = std::chrono::milliseconds(DurationUtil::durationToMilliseconds(
+    idle_timeout = std::chrono::milliseconds(DurationUtil::durationToMilliseconds(
         http_protocol_options_->common_http_protocol_options_.idle_timeout()));
-    if (idle_timeout_.value().count() == 0) {
-      idle_timeout_ = absl::nullopt;
+    if (idle_timeout.value().count() == 0) {
+      idle_timeout = absl::nullopt;
     }
-  } else {
-    idle_timeout_ = std::chrono::hours(1);
+  }
+  if (idle_timeout.has_value()) {
+    optional_timeouts_.set<OptionalTimeoutNames::IdleTimeout>(*idle_timeout);
   }
 
+  // Use default (10m) or configured `tcp_pool_idle_timeout`, unless it's set to 0, indicating that
+  // no timeout should be used.
+  absl::optional<std::chrono::milliseconds> tcp_pool_idle_timeout(std::chrono::minutes(10));
   if (tcp_protocol_options_ && tcp_protocol_options_->idleTimeout().has_value()) {
-    tcp_pool_idle_timeout_ = tcp_protocol_options_->idleTimeout();
-    if (tcp_pool_idle_timeout_.value().count() == 0) {
-      tcp_pool_idle_timeout_ = absl::nullopt;
+    tcp_pool_idle_timeout = tcp_protocol_options_->idleTimeout();
+    if (tcp_pool_idle_timeout.value().count() == 0) {
+      tcp_pool_idle_timeout = absl::nullopt;
     }
-  } else {
-    tcp_pool_idle_timeout_ = std::chrono::minutes(10);
+  }
+  if (tcp_pool_idle_timeout.has_value()) {
+    optional_timeouts_.set<OptionalTimeoutNames::TcpPoolIdleTimeout>(*tcp_pool_idle_timeout);
   }
 
+  // Use configured `max_connection_duration`, unless it's set to 0, indicating that
+  // no timeout should be used. No timeout by default either.
+  absl::optional<std::chrono::milliseconds> max_connection_duration;
   if (http_protocol_options_->common_http_protocol_options_.has_max_connection_duration()) {
-    max_connection_duration_ = std::chrono::milliseconds(DurationUtil::durationToMilliseconds(
+    max_connection_duration = std::chrono::milliseconds(DurationUtil::durationToMilliseconds(
         http_protocol_options_->common_http_protocol_options_.max_connection_duration()));
-    if (max_connection_duration_.value().count() == 0) {
-      max_connection_duration_ = absl::nullopt;
+    if (max_connection_duration.value().count() == 0) {
+      max_connection_duration = absl::nullopt;
     }
-  } else {
-    max_connection_duration_ = absl::nullopt;
+  }
+  if (max_connection_duration.has_value()) {
+    optional_timeouts_.set<OptionalTimeoutNames::MaxConnectionDuration>(*max_connection_duration);
   }
 
   if (config.has_eds_cluster_config()) {

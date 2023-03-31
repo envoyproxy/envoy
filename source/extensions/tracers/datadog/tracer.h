@@ -86,7 +86,7 @@ public:
 
 private:
   TracerStats tracer_stats_;
-  ThreadLocal::SlotPtr thread_local_slot_;
+  ThreadLocal::TypedSlotPtr<ThreadLocalTracer> thread_local_slot_;
 };
 
 } // namespace Datadog

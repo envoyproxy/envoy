@@ -58,6 +58,7 @@ envoy_extension_cc_test(
 
 envoy_extension_cc_test(
     name = "cluster_integration_test",
+    size = "large",
     srcs = ["cluster_integration_test.cc"],
     extension_names = ["envoy.clusters.aggregate"],
     deps = [

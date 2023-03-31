@@ -10,6 +10,7 @@ import java.util.regex.Matcher;
 import java.lang.StringBuilder;
 import javax.annotation.Nullable;
 
+import io.envoyproxy.envoymobile.engine.VirtualClusterConfig;
 import io.envoyproxy.envoymobile.engine.types.EnvoyHTTPFilterFactory;
 import io.envoyproxy.envoymobile.engine.types.EnvoyStringAccessor;
 import io.envoyproxy.envoymobile.engine.types.EnvoyKeyValueStore;
@@ -56,7 +57,8 @@ public class EnvoyConfiguration {
   public final String appVersion;
   public final String appId;
   public final TrustChainVerification trustChainVerification;
-  public final List<String> virtualClusters;
+  public final List<String> legacyVirtualClusters;
+  public final List<VirtualClusterConfig> virtualClusters;
   public final List<EnvoyNativeFilterConfig> nativeFilterChain;
   public final Map<String, EnvoyStringAccessor> stringAccessors;
   public final Map<String, EnvoyKeyValueStore> keyValueStores;
@@ -75,6 +77,9 @@ public class EnvoyConfiguration {
   public final String nodeRegion;
   public final String nodeZone;
   public final String nodeSubZone;
+  public final String cdsResourcesLocator;
+  public final Integer cdsTimeoutSeconds;
+  public final Boolean enableCds;
 
   private static final Pattern UNRESOLVED_KEY_PATTERN = Pattern.compile("\\{\\{ (.+) \\}\\}");
 
@@ -129,7 +134,10 @@ public class EnvoyConfiguration {
    *     Client.
    * @param trustChainVerification                        whether to mute TLS Cert verification -
    *     for tests.
-   * @param virtualClusters                               the JSON list of virtual cluster configs.
+   * @param legacyVirtualClusters                               the JSON list of virtual cluster
+   *     configs.
+   * @param virtualClusters                          the structured list of virtual cluster
+   *     configs.
    * @param nativeFilterChain                             the configuration for native filters.
    * @param httpPlatformFilterFactories                   the configuration for platform filters.
    * @param stringAccessors                               platform string accessors to register.
@@ -151,6 +159,10 @@ public class EnvoyConfiguration {
    * @param nodeZone                                      the node zone to use for the ADS server.
    * @param nodeSubZone                                   the node sub-zone to use for the ADS
    *     server.
+   * @param cdsResourcesLocator                           the resources locator for CDS.
+   * @param cdsTimeoutSeconds                             the timeout for CDS fetches.
+   * @param enableCds                                     enables CDS, used because all CDS params
+   *     could be empty.
    */
   public EnvoyConfiguration(
       boolean adminInterfaceEnabled, String grpcStatsDomain, int connectTimeoutSeconds,
@@ -162,8 +174,8 @@ public class EnvoyConfiguration {
       int h2ConnectionKeepaliveIdleIntervalMilliseconds, int h2ConnectionKeepaliveTimeoutSeconds,
       int maxConnectionsPerHost, int statsFlushSeconds, int streamIdleTimeoutSeconds,
       int perTryIdleTimeoutSeconds, String appVersion, String appId,
-      TrustChainVerification trustChainVerification, List<String> virtualClusters,
-      List<EnvoyNativeFilterConfig> nativeFilterChain,
+      TrustChainVerification trustChainVerification, List<String> legacyVirtualClusters,
+      List<VirtualClusterConfig> virtualClusters, List<EnvoyNativeFilterConfig> nativeFilterChain,
       List<EnvoyHTTPFilterFactory> httpPlatformFilterFactories,
       Map<String, EnvoyStringAccessor> stringAccessors,
       Map<String, EnvoyKeyValueStore> keyValueStores, List<String> statSinks,
@@ -171,7 +183,8 @@ public class EnvoyConfiguration {
       boolean enablePlatformCertificatesValidation, String rtdsLayerName,
       Integer rtdsTimeoutSeconds, String adsAddress, Integer adsPort, String adsToken,
       Integer adsTokenLifetime, String adsRootCerts, String nodeId, String nodeRegion,
-      String nodeZone, String nodeSubZone) {
+      String nodeZone, String nodeSubZone, String cdsResourcesLocator, Integer cdsTimeoutSeconds,
+      boolean enableCds) {
     JniLibrary.load();
     this.adminInterfaceEnabled = adminInterfaceEnabled;
     this.grpcStatsDomain = grpcStatsDomain;
@@ -201,6 +214,7 @@ public class EnvoyConfiguration {
     this.appVersion = appVersion;
     this.appId = appId;
     this.trustChainVerification = trustChainVerification;
+    this.legacyVirtualClusters = legacyVirtualClusters;
     this.virtualClusters = virtualClusters;
     int index = 0;
     // Insert in this order to preserve prior ordering constraints.
@@ -236,6 +250,9 @@ public class EnvoyConfiguration {
     this.nodeRegion = nodeRegion;
     this.nodeZone = nodeZone;
     this.nodeSubZone = nodeSubZone;
+    this.cdsResourcesLocator = cdsResourcesLocator;
+    this.cdsTimeoutSeconds = cdsTimeoutSeconds;
+    this.enableCds = enableCds;
   }
 
   public long createBootstrap() {
@@ -245,10 +262,12 @@ public class EnvoyConfiguration {
     Collections.reverse(reverseFilterChain);
 
     byte[][] filter_chain = JniBridgeUtility.toJniBytes(reverseFilterChain);
-    byte[][] clusters = JniBridgeUtility.stringsToJniBytes(virtualClusters);
+    byte[][] clusters_legacy = JniBridgeUtility.stringsToJniBytes(legacyVirtualClusters);
     byte[][] stats_sinks = JniBridgeUtility.stringsToJniBytes(statSinks);
     byte[][] dns_preresolve = JniBridgeUtility.stringsToJniBytes(dnsPreresolveHostnames);
     byte[][] runtime_guards = JniBridgeUtility.mapToJniBytes(runtimeGuards);
+    byte[][] clusters = JniBridgeUtility.clusterConfigToJniBytes(virtualClusters);
+
     return JniLibrary.createBootstrap(
         grpcStatsDomain, adminInterfaceEnabled, connectTimeoutSeconds, dnsRefreshSeconds,
         dnsFailureRefreshSecondsBase, dnsFailureRefreshSecondsMax, dnsQueryTimeoutSeconds,
@@ -257,11 +276,11 @@ public class EnvoyConfiguration {
         enableSocketTagging, enableHappyEyeballs, enableInterfaceBinding,
         h2ConnectionKeepaliveIdleIntervalMilliseconds, h2ConnectionKeepaliveTimeoutSeconds,
         maxConnectionsPerHost, statsFlushSeconds, streamIdleTimeoutSeconds,
-        perTryIdleTimeoutSeconds, appVersion, appId, enforceTrustChainVerification, clusters,
-        filter_chain, stats_sinks, enablePlatformCertificatesValidation,
+        perTryIdleTimeoutSeconds, appVersion, appId, enforceTrustChainVerification, clusters_legacy,
+        clusters, filter_chain, stats_sinks, enablePlatformCertificatesValidation,
         enableSkipDNSLookupForProxiedRequests, runtime_guards, rtdsLayerName, rtdsTimeoutSeconds,
         adsAddress, adsPort, adsToken, adsTokenLifetime, adsRootCerts, nodeId, nodeRegion, nodeZone,
-        nodeSubZone);
+        nodeSubZone, cdsResourcesLocator, cdsTimeoutSeconds, enableCds);
   }
 
   static class ConfigurationException extends RuntimeException {

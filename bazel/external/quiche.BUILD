@@ -2088,7 +2088,6 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "quic_core_clock_lib",
-    srcs = ["quiche/quic/core/quic_clock.cc"],
     hdrs = ["quiche/quic/core/quic_clock.h"],
     copts = quiche_copts,
     repository = "@envoy",
@@ -4201,6 +4200,7 @@ envoy_cc_library(
     tags = ["nofips"],
     visibility = ["//visibility:public"],
     deps = [
+        ":quic_core_types_lib",
         ":quic_platform_export",
         ":quiche_common_platform_bug_tracker",
         ":quiche_common_structured_headers_lib",
@@ -5471,6 +5471,7 @@ envoy_cc_library(
     hdrs = ["quiche/common/structured_headers.h"],
     repository = "@envoy",
     tags = ["nofips"],
+    visibility = ["//visibility:public"],
     deps = [
         ":quiche_common_platform_export",
         ":quiche_common_platform_logging",

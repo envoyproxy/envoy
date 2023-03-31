@@ -13,6 +13,7 @@
 #include "engine.h"
 #include "engine_callbacks.h"
 #include "key_value_store.h"
+#include "library/common/types/matcher_data.h"
 #include "log_level.h"
 #include "string_accessor.h"
 
@@ -68,6 +69,7 @@ public:
   EngineBuilder& enableDrainPostDnsRefresh(bool drain_post_dns_refresh_on);
   EngineBuilder& enforceTrustChainVerification(bool trust_chain_verification_on);
   EngineBuilder& enablePlatformCertificatesValidation(bool platform_certificates_validation_on);
+#ifdef ENVOY_GOOGLE_GRPC
   // Sets the node.id field in the Bootstrap configuration.
   EngineBuilder& setNodeId(std::string node_id);
   // Sets the node.locality field in the Bootstrap configuration.
@@ -85,6 +87,7 @@ public:
   // is used for identifying resources. If not using xdstp, then set `cds_resources_locator` to the
   // empty string.
   EngineBuilder& addCdsLayer(std::string cds_resources_locator = "", const int timeout_seconds = 0);
+#endif
   EngineBuilder& enableDnsCache(bool dns_cache_on, int save_interval_seconds = 1);
   EngineBuilder& setForceAlwaysUsev6(bool value);
   EngineBuilder& setSkipDnsLookupForProxiedRequests(bool value);
@@ -100,7 +103,10 @@ public:
   EngineBuilder& addStatsFlushSeconds(int stats_flush_seconds);
 #endif
   EngineBuilder& addPlatformFilter(std::string name);
+  // TODO(alyssawilk) remove the legacy APIs and update docs once Lyft is moved over.
   EngineBuilder& addVirtualCluster(std::string virtual_cluster);
+
+  EngineBuilder& addVirtualCluster(std::string name, std::vector<MatcherData> matchers);
   EngineBuilder& setRuntimeGuard(std::string guard, bool value);
 
   // Add a direct response. For testing purposes only.
@@ -190,6 +196,7 @@ private:
   std::vector<NativeFilterConfig> native_filter_chain_;
   std::vector<std::string> dns_preresolve_hostnames_;
   std::vector<std::string> virtual_clusters_;
+  std::vector<std::pair<std::string, std::vector<MatcherData>>> virtual_cluster_data_;
   std::vector<DirectResponseTesting::DirectResponse> direct_responses_;
 
   std::vector<std::pair<std::string, bool>> runtime_guards_;
