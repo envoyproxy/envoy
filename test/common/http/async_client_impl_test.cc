@@ -1869,7 +1869,7 @@ public:
       Protobuf::RepeatedPtrField<envoy::config::route::v3::RouteAction::HashPolicy>(),
       absl::nullopt)};
   AsyncStreamImpl::NullVirtualHost vhost_;
-  AsyncStreamImpl::NullSharedConfig config_;
+  AsyncStreamImpl::NullCommonConfig config_;
 
   void setupRouteImpl(const std::string& yaml_config) {
     envoy::config::route::v3::RetryPolicy retry_policy;

@@ -10982,9 +10982,9 @@ virtual_hosts:
   EXPECT_NE(nullptr, dynamic_cast<const SslRedirectRoute*>(accepted_route.get()));
 }
 
-class SharedConfigImplTest : public testing::Test, public ConfigImplTestBase {};
+class CommonConfigImplTest : public testing::Test, public ConfigImplTestBase {};
 
-TEST_F(SharedConfigImplTest, TestSharedConfig) {
+TEST_F(CommonConfigImplTest, TestCommonConfig) {
   const std::string yaml = R"EOF(
 virtual_hosts:
   - name: bar
@@ -11005,7 +11005,7 @@ virtual_hosts:
   TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true);
 
   const auto& shared_config =
-      dynamic_cast<const SharedConfigImpl&>(config.route(genHeaders("bat.com", "/", "GET"), 0)
+      dynamic_cast<const CommonConfigImpl&>(config.route(genHeaders("bat.com", "/", "GET"), 0)
                                                 ->routeEntry()
                                                 ->virtualHost()
                                                 .routeConfig());

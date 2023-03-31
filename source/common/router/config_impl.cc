@@ -74,7 +74,7 @@ void mergeTransforms(Http::HeaderTransforms& dest, const Http::HeaderTransforms&
 }
 
 RouteEntryImplBaseConstSharedPtr createAndValidateRoute(
-    const envoy::config::route::v3::Route& route_config, const SharedVirtualHostSharedPtr& vhost,
+    const envoy::config::route::v3::Route& route_config, const CommonVirtualHostSharedPtr& vhost,
     const OptionalHttpFilters& optional_http_filters,
     Server::Configuration::ServerFactoryContext& factory_context,
     ProtobufMessage::ValidationVisitor& validator,
@@ -518,7 +518,7 @@ OptionalTimeouts::OptionalTimeouts(const envoy::config::route::v3::RouteAction& 
   }
 }
 
-RouteEntryImplBase::RouteEntryImplBase(const SharedVirtualHostSharedPtr& vhost,
+RouteEntryImplBase::RouteEntryImplBase(const CommonVirtualHostSharedPtr& vhost,
                                        const envoy::config::route::v3::Route& route,
                                        const OptionalHttpFilters& optional_http_filters,
                                        Server::Configuration::ServerFactoryContext& factory_context,
@@ -1451,7 +1451,7 @@ void RouteEntryImplBase::WeightedClusterEntry::traversePerFilterConfig(
 }
 
 UriTemplateMatcherRouteEntryImpl::UriTemplateMatcherRouteEntryImpl(
-    const SharedVirtualHostSharedPtr& vhost, const envoy::config::route::v3::Route& route,
+    const CommonVirtualHostSharedPtr& vhost, const envoy::config::route::v3::Route& route,
     const OptionalHttpFilters& optional_http_filters,
     Server::Configuration::ServerFactoryContext& factory_context,
     ProtobufMessage::ValidationVisitor& validator)
@@ -1480,7 +1480,7 @@ UriTemplateMatcherRouteEntryImpl::matches(const Http::RequestHeaderMap& headers,
 }
 
 PrefixRouteEntryImpl::PrefixRouteEntryImpl(
-    const SharedVirtualHostSharedPtr& vhost, const envoy::config::route::v3::Route& route,
+    const CommonVirtualHostSharedPtr& vhost, const envoy::config::route::v3::Route& route,
     const OptionalHttpFilters& optional_http_filters,
     Server::Configuration::ServerFactoryContext& factory_context,
     ProtobufMessage::ValidationVisitor& validator)
@@ -1508,7 +1508,7 @@ RouteConstSharedPtr PrefixRouteEntryImpl::matches(const Http::RequestHeaderMap& 
   return nullptr;
 }
 
-PathRouteEntryImpl::PathRouteEntryImpl(const SharedVirtualHostSharedPtr& vhost,
+PathRouteEntryImpl::PathRouteEntryImpl(const CommonVirtualHostSharedPtr& vhost,
                                        const envoy::config::route::v3::Route& route,
                                        const OptionalHttpFilters& optional_http_filters,
                                        Server::Configuration::ServerFactoryContext& factory_context,
@@ -1538,7 +1538,7 @@ RouteConstSharedPtr PathRouteEntryImpl::matches(const Http::RequestHeaderMap& he
 }
 
 RegexRouteEntryImpl::RegexRouteEntryImpl(
-    const SharedVirtualHostSharedPtr& vhost, const envoy::config::route::v3::Route& route,
+    const CommonVirtualHostSharedPtr& vhost, const envoy::config::route::v3::Route& route,
     const OptionalHttpFilters& optional_http_filters,
     Server::Configuration::ServerFactoryContext& factory_context,
     ProtobufMessage::ValidationVisitor& validator)
@@ -1575,7 +1575,7 @@ RouteConstSharedPtr RegexRouteEntryImpl::matches(const Http::RequestHeaderMap& h
 }
 
 ConnectRouteEntryImpl::ConnectRouteEntryImpl(
-    const SharedVirtualHostSharedPtr& vhost, const envoy::config::route::v3::Route& route,
+    const CommonVirtualHostSharedPtr& vhost, const envoy::config::route::v3::Route& route,
     const OptionalHttpFilters& optional_http_filters,
     Server::Configuration::ServerFactoryContext& factory_context,
     ProtobufMessage::ValidationVisitor& validator)
@@ -1604,7 +1604,7 @@ RouteConstSharedPtr ConnectRouteEntryImpl::matches(const Http::RequestHeaderMap&
 }
 
 PathSeparatedPrefixRouteEntryImpl::PathSeparatedPrefixRouteEntryImpl(
-    const SharedVirtualHostSharedPtr& vhost, const envoy::config::route::v3::Route& route,
+    const CommonVirtualHostSharedPtr& vhost, const envoy::config::route::v3::Route& route,
     const OptionalHttpFilters& optional_http_filters,
     Server::Configuration::ServerFactoryContext& factory_context,
     ProtobufMessage::ValidationVisitor& validator)
@@ -1640,10 +1640,10 @@ PathSeparatedPrefixRouteEntryImpl::matches(const Http::RequestHeaderMap& headers
   return nullptr;
 }
 
-SharedVirtualHostImpl::SharedVirtualHostImpl(
+CommonVirtualHostImpl::CommonVirtualHostImpl(
     const envoy::config::route::v3::VirtualHost& virtual_host,
     const OptionalHttpFilters& optional_http_filters,
-    const SharedConfigSharedPtr& global_route_config,
+    const CommonConfigSharedPtr& global_route_config,
     Server::Configuration::ServerFactoryContext& factory_context, Stats::Scope& scope,
     ProtobufMessage::ValidationVisitor& validator)
     : stat_name_storage_(virtual_host.name(), factory_context.scope().symbolTable()),
@@ -1713,7 +1713,7 @@ SharedVirtualHostImpl::SharedVirtualHostImpl(
   }
 }
 
-SharedVirtualHostImpl::VirtualClusterEntry::VirtualClusterEntry(
+CommonVirtualHostImpl::VirtualClusterEntry::VirtualClusterEntry(
     const envoy::config::route::v3::VirtualCluster& virtual_cluster, Stats::Scope& scope,
     const VirtualClusterStatNames& stat_names)
     : StatNameProvider(virtual_cluster.name(), scope.symbolTable()),
@@ -1727,15 +1727,15 @@ SharedVirtualHostImpl::VirtualClusterEntry::VirtualClusterEntry(
   headers_ = Http::HeaderUtility::buildHeaderDataVector(virtual_cluster.headers());
 }
 
-const SharedConfig& SharedVirtualHostImpl::routeConfig() const { return *global_route_config_; }
+const CommonConfig& CommonVirtualHostImpl::routeConfig() const { return *global_route_config_; }
 
 const RouteSpecificFilterConfig*
-SharedVirtualHostImpl::mostSpecificPerFilterConfig(const std::string& name) const {
+CommonVirtualHostImpl::mostSpecificPerFilterConfig(const std::string& name) const {
   auto* per_filter_config = per_filter_configs_.get(name);
   return per_filter_config != nullptr ? per_filter_config
                                       : global_route_config_->perFilterConfig(name);
 }
-void SharedVirtualHostImpl::traversePerFilterConfig(
+void CommonVirtualHostImpl::traversePerFilterConfig(
     const std::string& filter_name,
     std::function<void(const Router::RouteSpecificFilterConfig&)> cb) const {
   // Parent first.
@@ -1752,12 +1752,12 @@ void SharedVirtualHostImpl::traversePerFilterConfig(
 VirtualHostImpl::VirtualHostImpl(
     const envoy::config::route::v3::VirtualHost& virtual_host,
     const OptionalHttpFilters& optional_http_filters,
-    const SharedConfigSharedPtr& global_route_config,
+    const CommonConfigSharedPtr& global_route_config,
     Server::Configuration::ServerFactoryContext& factory_context, Stats::Scope& scope,
     ProtobufMessage::ValidationVisitor& validator,
     const absl::optional<Upstream::ClusterManager::ClusterInfoMaps>& validation_clusters) {
 
-  shared_virtual_host_ = std::make_shared<SharedVirtualHostImpl>(
+  shared_virtual_host_ = std::make_shared<CommonVirtualHostImpl>(
       virtual_host, optional_http_filters, global_route_config, factory_context, scope, validator);
 
   switch (virtual_host.require_tls()) {
@@ -1911,7 +1911,7 @@ const VirtualHostImpl* RouteMatcher::findWildcardVirtualHost(
 
 RouteMatcher::RouteMatcher(const envoy::config::route::v3::RouteConfiguration& route_config,
                            const OptionalHttpFilters& optional_http_filters,
-                           const SharedConfigSharedPtr& global_route_config,
+                           const CommonConfigSharedPtr& global_route_config,
                            Server::Configuration::ServerFactoryContext& factory_context,
                            ProtobufMessage::ValidationVisitor& validator, bool validate_clusters)
     : vhost_scope_(factory_context.scope().scopeFromStatName(
@@ -2020,7 +2020,7 @@ const Envoy::Config::TypedMetadataImpl<Envoy::Config::TypedMetadataFactory>
     SslRedirectRoute::typed_metadata_({});
 
 const VirtualCluster*
-SharedVirtualHostImpl::virtualClusterFromEntries(const Http::HeaderMap& headers) const {
+CommonVirtualHostImpl::virtualClusterFromEntries(const Http::HeaderMap& headers) const {
   for (const VirtualClusterEntry& entry : virtual_clusters_) {
     if (Http::HeaderUtility::matchHeaders(headers, entry.headers_)) {
       return &entry;
@@ -2034,7 +2034,7 @@ SharedVirtualHostImpl::virtualClusterFromEntries(const Http::HeaderMap& headers)
   return nullptr;
 }
 
-SharedConfigImpl::SharedConfigImpl(const envoy::config::route::v3::RouteConfiguration& config,
+CommonConfigImpl::CommonConfigImpl(const envoy::config::route::v3::RouteConfiguration& config,
                                    const OptionalHttpFilters& optional_http_filters,
                                    Server::Configuration::ServerFactoryContext& factory_context,
                                    ProtobufMessage::ValidationVisitor& validator)
@@ -2076,7 +2076,7 @@ SharedConfigImpl::SharedConfigImpl(const envoy::config::route::v3::RouteConfigur
 }
 
 ClusterSpecifierPluginSharedPtr
-SharedConfigImpl::clusterSpecifierPlugin(absl::string_view provider) const {
+CommonConfigImpl::clusterSpecifierPlugin(absl::string_view provider) const {
   auto iter = cluster_specifier_plugins_.find(provider);
   if (iter == cluster_specifier_plugins_.end() || iter->second == nullptr) {
     throw EnvoyException(
@@ -2092,7 +2092,7 @@ ConfigImpl::ConfigImpl(const envoy::config::route::v3::RouteConfiguration& confi
                        bool validate_clusters_default) {
 
   shared_config_ =
-      std::make_shared<SharedConfigImpl>(config, optional_http_filters, factory_context, validator);
+      std::make_shared<CommonConfigImpl>(config, optional_http_filters, factory_context, validator);
 
   route_matcher_ = std::make_unique<RouteMatcher>(
       config, optional_http_filters, shared_config_, factory_context, validator,

@@ -215,23 +215,23 @@ using RetryPolicyConstOptRef = const OptRef<const envoy::config::route::v3::Retr
 using HedgePolicyConstOptRef = const OptRef<const envoy::config::route::v3::HedgePolicy>;
 
 class ConfigImpl;
-class SharedConfigImpl;
-using SharedConfigSharedPtr = std::shared_ptr<SharedConfigImpl>;
+class CommonConfigImpl;
+using CommonConfigSharedPtr = std::shared_ptr<CommonConfigImpl>;
 
 /**
  * Implementation of VirtualHost that reads from the proto config. This class holds all shared
  * data for all routes in the virtual host.
  */
-class SharedVirtualHostImpl : public VirtualHost, Logger::Loggable<Logger::Id::router> {
+class CommonVirtualHostImpl : public VirtualHost, Logger::Loggable<Logger::Id::router> {
 public:
-  SharedVirtualHostImpl(const envoy::config::route::v3::VirtualHost& virtual_host,
+  CommonVirtualHostImpl(const envoy::config::route::v3::VirtualHost& virtual_host,
                         const OptionalHttpFilters& optional_http_filters,
-                        const SharedConfigSharedPtr& global_route_config,
+                        const CommonConfigSharedPtr& global_route_config,
                         Server::Configuration::ServerFactoryContext& factory_context,
                         Stats::Scope& scope, ProtobufMessage::ValidationVisitor& validator);
 
   const VirtualCluster* virtualClusterFromEntries(const Http::HeaderMap& headers) const;
-  const SharedConfigImpl& globalRouteConfig() const { return *global_route_config_; }
+  const CommonConfigImpl& globalRouteConfig() const { return *global_route_config_; }
   const HeaderParser& requestHeaderParser() const {
     if (request_headers_parser_ != nullptr) {
       return *request_headers_parser_;
@@ -254,7 +254,7 @@ public:
     }
     return DefaultRateLimitPolicy::get();
   }
-  const SharedConfig& routeConfig() const override;
+  const CommonConfig& routeConfig() const override;
   const RouteSpecificFilterConfig* mostSpecificPerFilterConfig(const std::string&) const override;
   bool includeAttemptCountInRequest() const override { return include_attempt_count_in_request_; }
   bool includeAttemptCountInResponse() const override { return include_attempt_count_in_response_; }
@@ -326,7 +326,7 @@ private:
   std::unique_ptr<const CorsPolicyImpl> cors_policy_;
   // Keep an copy of the shared pointer to the shared part of the route config. This is needed
   // to keep the shared part alive while the virtual host is alive.
-  const SharedConfigSharedPtr global_route_config_;
+  const CommonConfigSharedPtr global_route_config_;
   HeaderParserPtr request_headers_parser_;
   HeaderParserPtr response_headers_parser_;
   PerFilterConfigs per_filter_configs_;
@@ -340,7 +340,7 @@ private:
   const bool include_is_timeout_retry_header_ : 1;
 };
 
-using SharedVirtualHostSharedPtr = std::shared_ptr<SharedVirtualHostImpl>;
+using CommonVirtualHostSharedPtr = std::shared_ptr<CommonVirtualHostImpl>;
 
 /**
  * Virtual host that holds a collection of routes.
@@ -350,7 +350,7 @@ public:
   VirtualHostImpl(
       const envoy::config::route::v3::VirtualHost& virtual_host,
       const OptionalHttpFilters& optional_http_filters,
-      const SharedConfigSharedPtr& global_route_config,
+      const CommonConfigSharedPtr& global_route_config,
       Server::Configuration::ServerFactoryContext& factory_context, Stats::Scope& scope,
       ProtobufMessage::ValidationVisitor& validator,
       const absl::optional<Upstream::ClusterManager::ClusterInfoMaps>& validation_clusters);
@@ -370,7 +370,7 @@ private:
 
   static const std::shared_ptr<const SslRedirectRoute> SSL_REDIRECT_ROUTE;
 
-  SharedVirtualHostSharedPtr shared_virtual_host_;
+  CommonVirtualHostSharedPtr shared_virtual_host_;
 
   SslRequirements ssl_requirements_;
 
@@ -648,7 +648,7 @@ public:
   /**
    * @throw EnvoyException with reason if the route configuration contains any errors
    */
-  RouteEntryImplBase(const SharedVirtualHostSharedPtr& vhost,
+  RouteEntryImplBase(const CommonVirtualHostSharedPtr& vhost,
                      const envoy::config::route::v3::Route& route,
                      const OptionalHttpFilters& optional_http_filters,
                      Server::Configuration::ServerFactoryContext& factory_context,
@@ -1186,7 +1186,7 @@ private:
   std::unique_ptr<const CorsPolicyImpl> cors_policy_;
   // Keep an copy of the shared pointer to the shared part of the virtual host. This is needed
   // to keep the shared part alive while the route is alive.
-  const SharedVirtualHostSharedPtr vhost_;
+  const CommonVirtualHostSharedPtr vhost_;
   const absl::optional<Http::LowerCaseString> auto_host_rewrite_header_;
   const Regex::CompiledMatcherPtr host_rewrite_path_regex_;
   const std::string host_rewrite_path_regex_substitution_;
@@ -1247,7 +1247,7 @@ private:
  */
 class UriTemplateMatcherRouteEntryImpl : public RouteEntryImplBase {
 public:
-  UriTemplateMatcherRouteEntryImpl(const SharedVirtualHostSharedPtr& vhost,
+  UriTemplateMatcherRouteEntryImpl(const CommonVirtualHostSharedPtr& vhost,
                                    const envoy::config::route::v3::Route& route,
                                    const OptionalHttpFilters& optional_http_filters,
                                    Server::Configuration::ServerFactoryContext& factory_context,
@@ -1279,7 +1279,7 @@ private:
  */
 class PrefixRouteEntryImpl : public RouteEntryImplBase {
 public:
-  PrefixRouteEntryImpl(const SharedVirtualHostSharedPtr& vhost,
+  PrefixRouteEntryImpl(const CommonVirtualHostSharedPtr& vhost,
                        const envoy::config::route::v3::Route& route,
                        const OptionalHttpFilters& optional_http_filters,
                        Server::Configuration::ServerFactoryContext& factory_context,
@@ -1313,7 +1313,7 @@ private:
  */
 class PathRouteEntryImpl : public RouteEntryImplBase {
 public:
-  PathRouteEntryImpl(const SharedVirtualHostSharedPtr& vhost,
+  PathRouteEntryImpl(const CommonVirtualHostSharedPtr& vhost,
                      const envoy::config::route::v3::Route& route,
                      const OptionalHttpFilters& optional_http_filters,
                      Server::Configuration::ServerFactoryContext& factory_context,
@@ -1347,7 +1347,7 @@ private:
  */
 class RegexRouteEntryImpl : public RouteEntryImplBase {
 public:
-  RegexRouteEntryImpl(const SharedVirtualHostSharedPtr& vhost,
+  RegexRouteEntryImpl(const CommonVirtualHostSharedPtr& vhost,
                       const envoy::config::route::v3::Route& route,
                       const OptionalHttpFilters& optional_http_filters,
                       Server::Configuration::ServerFactoryContext& factory_context,
@@ -1382,7 +1382,7 @@ private:
  */
 class ConnectRouteEntryImpl : public RouteEntryImplBase {
 public:
-  ConnectRouteEntryImpl(const SharedVirtualHostSharedPtr& vhost,
+  ConnectRouteEntryImpl(const CommonVirtualHostSharedPtr& vhost,
                         const envoy::config::route::v3::Route& route,
                         const OptionalHttpFilters& optional_http_filters,
                         Server::Configuration::ServerFactoryContext& factory_context,
@@ -1412,7 +1412,7 @@ public:
  */
 class PathSeparatedPrefixRouteEntryImpl : public RouteEntryImplBase {
 public:
-  PathSeparatedPrefixRouteEntryImpl(const SharedVirtualHostSharedPtr& vhost,
+  PathSeparatedPrefixRouteEntryImpl(const CommonVirtualHostSharedPtr& vhost,
                                     const envoy::config::route::v3::Route& route,
                                     const OptionalHttpFilters& optional_http_filters,
                                     Server::Configuration::ServerFactoryContext& factory_context,
@@ -1443,7 +1443,7 @@ private:
 
 // Contextual information used to construct the route actions for a match tree.
 struct RouteActionContext {
-  const SharedVirtualHostSharedPtr& vhost;
+  const CommonVirtualHostSharedPtr& vhost;
   const OptionalHttpFilters& optional_http_filters;
   Server::Configuration::ServerFactoryContext& factory_context;
 };
@@ -1507,7 +1507,7 @@ class RouteMatcher {
 public:
   RouteMatcher(const envoy::config::route::v3::RouteConfiguration& config,
                const OptionalHttpFilters& optional_http_filters,
-               const SharedConfigSharedPtr& global_route_config,
+               const CommonConfigSharedPtr& global_route_config,
                Server::Configuration::ServerFactoryContext& factory_context,
                ProtobufMessage::ValidationVisitor& validator, bool validate_clusters);
 
@@ -1546,9 +1546,9 @@ private:
 /**
  * Shared part of the route configuration implementation.
  */
-class SharedConfigImpl : public SharedConfig {
+class CommonConfigImpl : public CommonConfig {
 public:
-  SharedConfigImpl(const envoy::config::route::v3::RouteConfiguration& config,
+  CommonConfigImpl(const envoy::config::route::v3::RouteConfiguration& config,
                    const OptionalHttpFilters& optional_http_filters,
                    Server::Configuration::ServerFactoryContext& factory_context,
                    ProtobufMessage::ValidationVisitor& validator);
@@ -1570,7 +1570,7 @@ public:
     return per_filter_configs_.get(name);
   }
 
-  // Router::SharedConfig
+  // Router::CommonConfig
   const std::list<Http::LowerCaseString>& internalOnlyHeaders() const override {
     return internal_only_headers_;
   }
@@ -1648,7 +1648,7 @@ public:
   }
 
 private:
-  SharedConfigSharedPtr shared_config_;
+  CommonConfigSharedPtr shared_config_;
   std::unique_ptr<RouteMatcher> route_matcher_;
 };
 

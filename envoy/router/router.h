@@ -610,7 +610,7 @@ public:
 
 class RateLimitPolicy;
 class Config;
-class SharedConfig;
+class CommonConfig;
 
 /**
  * Virtual host definition.
@@ -637,7 +637,7 @@ public:
   /**
    * @return const Config& the RouteConfiguration that owns this virtual host.
    */
-  virtual const SharedConfig& routeConfig() const PURE;
+  virtual const CommonConfig& routeConfig() const PURE;
 
   /**
    * @return bool whether to include the request count header in upstream requests.
@@ -1273,13 +1273,13 @@ using RouteCallback = std::function<RouteMatchStatus(RouteConstSharedPtr, RouteE
 
 /**
  * Shared part of the route configuration. This class contains interfaces that needn't depend on
- * router matcher. Then every virtualhost could keep a reference to the SharedConfig. When the
- * entire route config is destroyed, the part of SharedConfig will still alive until all
+ * router matcher. Then every virtualhost could keep a reference to the CommonConfig. When the
+ * entire route config is destroyed, the part of CommonConfig will still alive until all
  * virtualhosts are destroyed.
  */
-class SharedConfig {
+class CommonConfig {
 public:
-  virtual ~SharedConfig() = default;
+  virtual ~CommonConfig() = default;
 
   /**
    * Return a list of headers that will be cleaned from any requests that are not from an internal
@@ -1315,7 +1315,7 @@ public:
 /**
  * The router configuration.
  */
-class Config : public Rds::Config, public SharedConfig {
+class Config : public Rds::Config, public CommonConfig {
 public:
   /**
    * Based on the incoming HTTP request headers, determine the target route (containing either a

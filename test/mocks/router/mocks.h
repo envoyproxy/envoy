@@ -302,7 +302,7 @@ public:
   MOCK_METHOD(const std::string&, name, (), (const));
   MOCK_METHOD(const RateLimitPolicy&, rateLimitPolicy, (), (const));
   MOCK_METHOD(const CorsPolicy*, corsPolicy, (), (const));
-  MOCK_METHOD(const SharedConfig&, routeConfig, (), (const));
+  MOCK_METHOD(const CommonConfig&, routeConfig, (), (const));
   MOCK_METHOD(const RouteSpecificFilterConfig*, mostSpecificPerFilterConfig, (const std::string&),
               (const));
   MOCK_METHOD(bool, includeAttemptCountInRequest, (), (const));
