@@ -75,7 +75,7 @@ Config::SharedConfig::SharedConfig(
       flush_access_log_on_connected_(
           config.has_access_log_options()
               ? config.access_log_options().flush_access_log_on_connected()
-              : /* Deprecated field */ config.flush_access_log_on_connected()) {
+              : /* deprecated */ config.flush_access_log_on_connected()) {
   if (config.has_idle_timeout()) {
     const uint64_t timeout = DurationUtil::durationToMilliseconds(config.idle_timeout());
     if (timeout > 0) {
@@ -99,7 +99,7 @@ Config::SharedConfig::SharedConfig(
     const uint64_t flush_interval = DurationUtil::durationToMilliseconds(
         config.access_log_options().access_log_flush_interval());
     access_log_flush_interval_ = std::chrono::milliseconds(flush_interval);
-  } else if (config.has_access_log_flush_interval() /* Deprecated field */) {
+  } else if (config.has_access_log_flush_interval() /* deprecated */) {
     const uint64_t flush_interval =
         DurationUtil::durationToMilliseconds(config.access_log_flush_interval());
     access_log_flush_interval_ = std::chrono::milliseconds(flush_interval);
