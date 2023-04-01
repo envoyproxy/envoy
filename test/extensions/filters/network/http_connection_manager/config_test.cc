@@ -1589,9 +1589,9 @@ TEST_F(HttpConnectionManagerConfigTest, FlushAccessLogOnNewRequest) {
 
   {
     HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(base_yaml_string), context_,
-                                      date_provider_, route_config_provider_manager_,
-                                      scoped_routes_config_provider_manager_, tracer_manager_,
-                                      filter_config_provider_manager_);
+                                       date_provider_, route_config_provider_manager_,
+                                       scoped_routes_config_provider_manager_, tracer_manager_,
+                                       filter_config_provider_manager_);
 
     EXPECT_FALSE(config.flushAccessLogOnNewRequest());
   }
@@ -1603,9 +1603,9 @@ TEST_F(HttpConnectionManagerConfigTest, FlushAccessLogOnNewRequest) {
     )EOF";
 
     HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
-                                      date_provider_, route_config_provider_manager_,
-                                      scoped_routes_config_provider_manager_, tracer_manager_,
-                                      filter_config_provider_manager_);
+                                       date_provider_, route_config_provider_manager_,
+                                       scoped_routes_config_provider_manager_, tracer_manager_,
+                                       filter_config_provider_manager_);
 
     EXPECT_FALSE(config.flushAccessLogOnNewRequest());
   }
@@ -1617,9 +1617,9 @@ TEST_F(HttpConnectionManagerConfigTest, FlushAccessLogOnNewRequest) {
     )EOF";
 
     HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
-                                      date_provider_, route_config_provider_manager_,
-                                      scoped_routes_config_provider_manager_, tracer_manager_,
-                                      filter_config_provider_manager_);
+                                       date_provider_, route_config_provider_manager_,
+                                       scoped_routes_config_provider_manager_, tracer_manager_,
+                                       filter_config_provider_manager_);
 
     EXPECT_TRUE(config.flushAccessLogOnNewRequest());
   }
@@ -1630,9 +1630,9 @@ TEST_F(HttpConnectionManagerConfigTest, FlushAccessLogOnNewRequest) {
     )EOF";
 
     HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(deprecated_yaml_string), context_,
-                                      date_provider_, route_config_provider_manager_,
-                                      scoped_routes_config_provider_manager_, tracer_manager_,
-                                      filter_config_provider_manager_);
+                                       date_provider_, route_config_provider_manager_,
+                                       scoped_routes_config_provider_manager_, tracer_manager_,
+                                       filter_config_provider_manager_);
 
     EXPECT_TRUE(config.flushAccessLogOnNewRequest());
   }
@@ -1660,9 +1660,9 @@ TEST_F(HttpConnectionManagerConfigTest, AccessLogFlushInterval) {
 
   {
     HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(base_yaml_string), context_,
-                                      date_provider_, route_config_provider_manager_,
-                                      scoped_routes_config_provider_manager_, tracer_manager_,
-                                      filter_config_provider_manager_);
+                                       date_provider_, route_config_provider_manager_,
+                                       scoped_routes_config_provider_manager_, tracer_manager_,
+                                       filter_config_provider_manager_);
 
     EXPECT_FALSE(config.accessLogFlushInterval().has_value());
   }
@@ -1674,9 +1674,9 @@ TEST_F(HttpConnectionManagerConfigTest, AccessLogFlushInterval) {
     )EOF";
 
     HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
-                                      date_provider_, route_config_provider_manager_,
-                                      scoped_routes_config_provider_manager_, tracer_manager_,
-                                      filter_config_provider_manager_);
+                                       date_provider_, route_config_provider_manager_,
+                                       scoped_routes_config_provider_manager_, tracer_manager_,
+                                       filter_config_provider_manager_);
 
     EXPECT_TRUE(config.accessLogFlushInterval().has_value());
     EXPECT_EQ(std::chrono::seconds(1), config.accessLogFlushInterval().value());
@@ -1688,9 +1688,9 @@ TEST_F(HttpConnectionManagerConfigTest, AccessLogFlushInterval) {
     )EOF";
 
     HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(deprecated_yaml_string), context_,
-                                      date_provider_, route_config_provider_manager_,
-                                      scoped_routes_config_provider_manager_, tracer_manager_,
-                                      filter_config_provider_manager_);
+                                       date_provider_, route_config_provider_manager_,
+                                       scoped_routes_config_provider_manager_, tracer_manager_,
+                                       filter_config_provider_manager_);
 
     EXPECT_TRUE(config.accessLogFlushInterval().has_value());
     EXPECT_EQ(std::chrono::seconds(1), config.accessLogFlushInterval().value());
