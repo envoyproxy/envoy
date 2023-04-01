@@ -1,6 +1,5 @@
 ARG BUILD_OS=ubuntu
 ARG BUILD_TAG=20.04
-ARG ENVOY_VRP_BASE_IMAGE=envoy-base
 
 
 FROM scratch AS binary
@@ -64,42 +63,6 @@ COPY --from=binary --chown=0:0 --chmod=644 \
     /etc/envoy/envoy.yaml /etc/envoy/envoy.yaml
 COPY --from=binary --chown=0:0 --chmod=755 \
     /usr/local/bin/envoy /usr/local/bin/
-
-
-# STAGE: envoy-google-vrp-base
-FROM ${ENVOY_VRP_BASE_IMAGE} AS envoy-google-vrp-base
-EXPOSE 10000
-EXPOSE 10001
-CMD ["supervisord", "-c", "/etc/supervisor.conf"]
-ENTRYPOINT []
-ADD --chown=0:0 --chmod=644 \
-    configs/google-vrp/*.yaml /etc/envoy/
-ADD --chown=0:0 --chmod=755 \
-    configs/google-vrp/launch_envoy.sh /usr/local/bin/launch_envoy.sh
-ADD --chown=0:0 --chmod=644 \
-    test/config/integration/certs/serverkey.pem /etc/envoy/certs/serverkey.pem
-ADD --chown=0:0 --chmod=644 \
-    test/config/integration/certs/servercert.pem /etc/envoy/certs/servercert.pem
-RUN --mount=type=tmpfs,target=/var/cache/apt \
-    --mount=type=tmpfs,target=/var/lib/apt/lists \
-    apt-get -qq update \
-    && apt-get -qq upgrade -y \
-    && apt-get -qq install -y libc++1 supervisor gdb strace tshark \
-    && apt-get autoremove -y \
-    && chmod 777 /var/log/supervisor
-ADD --chown=0:0 --chmod=755 configs/google-vrp/supervisor.conf /etc/supervisor.conf
-
-
-# STAGE: envoy-google-vrp
-FROM envoy-google-vrp-base as envoy-google-vrp
-COPY  --from=binary --chown=0:0 --chmod=755 \
-    /usr/local/bin/envoy /usr/local/bin/envoy
-
-
-# STAGE: envoy-google-vrp-custom
-FROM envoy-google-vrp-base as envoy-google-vrp-custom
-ARG ENVOY_CTX_BINARY_PATH
-ADD "${ENVOY_CTX_BINARY_PATH}" /usr/local/bin/envoy
 
 
 # Make envoy image as last stage so it is built by default
