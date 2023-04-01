@@ -24,7 +24,15 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // [#next-free-field: 10]
 message Router {
   option (udpa.annotations.versioning).previous_message_type =
-      "envoy.config.filter.http.router.v2.Router";
+  "envoy.config.filter.http.router.v2.Router";
+
+  // [#next-free-field: 2]
+  message UpstreamAccessLogOptions {
+    // If set to true, an upstream access log will recorded once when a new HTTP request is received,
+    // and an upstream connection has been successfully established. Note that in case a retry is applied
+    // for the received request, a start of request upstream access log will be recorded for each retry.
+    bool flush_upstream_log_on_new_request = 1;
+  }
 
   message UpstreamAccessLogOptions {
     // If set to true, an upstream access log will be recorded when an upstream stream is
@@ -119,8 +127,6 @@ message Router {
   // [#extension-category: envoy.filters.http.upstream]
   repeated network.http_connection_manager.v3.HttpFilter upstream_http_filters = 8;
 
-  // If set to true, an upstream access log will recorded once when a new HTTP request is received,
-  // and an upstream connection has been successfully established. Note that in case a retry is applied
-  // for the received request, a start of request upstream access log will be recorded for each retry.
-  bool flush_upstream_log_on_new_request = 9;
+  // Additional upstream access log options.
+  UpstreamAccessLogOptions upstream_log_options = 9;
 }
