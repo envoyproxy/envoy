@@ -556,8 +556,8 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
     access_log_flush_interval_ = std::chrono::milliseconds(DurationUtil::durationToMilliseconds(
         config.access_log_options().access_log_flush_interval()));
   } else if (config.has_access_log_flush_interval()) { // Deprecated field
-    access_log_flush_interval_ = std::chrono::milliseconds(DurationUtil::durationToMilliseconds(
-        config.access_log_flush_interval()));
+    access_log_flush_interval_ = std::chrono::milliseconds(
+        DurationUtil::durationToMilliseconds(config.access_log_flush_interval()));
   }
 
   server_transformation_ = config.server_header_transformation();

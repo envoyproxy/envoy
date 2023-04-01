@@ -569,8 +569,9 @@ message HttpConnectionManager {
   // <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.HcmAccessLogOptions.access_log_flush_interval>`
   // are specified, the former (deprecated field) is ignored.
   google.protobuf.Duration access_log_flush_interval = 54 [
+    deprecated = true,
     (validate.rules).duration = {gte {nanos: 1000000}},
-    deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"
+    (envoy.annotations.deprecated_at_minor_version) = "3.0"
   ];
 
   // .. attention::
@@ -581,7 +582,7 @@ message HttpConnectionManager {
   // <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.HcmAccessLogOptions.flush_access_log_on_new_request>`
   // are specified, the former (deprecated field) is ignored.
   bool flush_access_log_on_new_request = 55
-    [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
+      [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 
   // Additional access log options for HTTP connection manager.
   HcmAccessLogOptions access_log_options = 56;
