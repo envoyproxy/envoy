@@ -24,9 +24,8 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // [#next-free-field: 10]
 message Router {
   option (udpa.annotations.versioning).previous_message_type =
-  "envoy.config.filter.http.router.v2.Router";
+      "envoy.config.filter.http.router.v2.Router";
 
-  // [#next-free-field: 2]
   message UpstreamAccessLogOptions {
     // If set to true, an upstream access log will recorded once when a new HTTP request is received,
     // and an upstream connection has been successfully established. Note that in case a retry is applied
