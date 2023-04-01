@@ -96,7 +96,8 @@ public:
 
     if (upstream_log) {
       auto upstream_log_options = router_proto.mutable_upstream_log_options();
-      upstream_log_options->set_flush_upstream_log_on_new_request(flush_upstream_log_on_new_request);
+      upstream_log_options->set_flush_upstream_log_on_new_request(
+          flush_upstream_log_on_new_request);
 
       ON_CALL(*context_.access_log_manager_.file_, write(_))
           .WillByDefault(
