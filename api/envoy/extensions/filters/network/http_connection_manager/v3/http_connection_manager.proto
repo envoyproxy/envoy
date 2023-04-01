@@ -2,7 +2,6 @@ syntax = "proto3";
 
 package envoy.extensions.filters.network.http_connection_manager.v3;
 
-import "envoy/annotations/deprecation.proto";
 import "envoy/config/accesslog/v3/accesslog.proto";
 import "envoy/config/core/v3/address.proto";
 import "envoy/config/core/v3/base.proto";
@@ -21,6 +20,7 @@ import "google/protobuf/any.proto";
 import "google/protobuf/duration.proto";
 import "google/protobuf/wrappers.proto";
 
+import "envoy/annotations/deprecation.proto";
 import "udpa/annotations/migrate.proto";
 import "udpa/annotations/security.proto";
 import "udpa/annotations/status.proto";
