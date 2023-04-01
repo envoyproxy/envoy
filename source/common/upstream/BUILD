@@ -505,6 +505,7 @@ envoy_cc_library(
         "//envoy/server:transport_socket_config_interface",
         "//envoy/ssl:context_manager_interface",
         "//envoy/thread_local:thread_local_interface",
+        "//envoy/upstream:cluster_factory_interface",
         "//envoy/upstream:cluster_manager_interface",
         "//envoy/upstream:health_checker_interface",
         "//envoy/upstream:load_balancer_interface",
