@@ -41,10 +41,11 @@ public:
     envoy::extensions::clusters::dynamic_forward_proxy::v3::ClusterConfig config;
     Config::Utility::translateOpaqueConfig(cluster_config.cluster_type().typed_config(),
                                            ProtobufMessage::getStrictValidationVisitor(), config);
-    Stats::ScopeSharedPtr scope = stats_store_.createScope("cluster.name.");
-    Server::Configuration::TransportSocketFactoryContextImpl factory_context(
-        server_context_, ssl_context_manager_, *scope, server_context_.cluster_manager_,
-        stats_store_, validation_visitor_);
+
+    Envoy::Upstream::ClusterFactoryContextImpl factory_context(
+        server_context_, server_context_.cluster_manager_, stats_store_, nullptr,
+        ssl_context_manager_, nullptr, false, validation_visitor_);
+
     if (uses_tls) {
       EXPECT_CALL(ssl_context_manager_, createSslClientContext(_, _));
     }
@@ -53,8 +54,8 @@ public:
     // actually correct. It's possible this will have to change in the future.
     EXPECT_CALL(*dns_cache_manager_->dns_cache_, addUpdateCallbacks_(_))
         .WillOnce(DoAll(SaveArgAddress(&update_callbacks_), Return(nullptr)));
-    cluster_ = std::make_shared<Cluster>(server_context_, cluster_config, config, runtime_, *this,
-                                         local_info_, factory_context, std::move(scope), false);
+    cluster_ = std::make_shared<Cluster>(server_context_, cluster_config, config, factory_context,
+                                         runtime_, *this, local_info_, false);
     thread_aware_lb_ = std::make_unique<Cluster::ThreadAwareLoadBalancer>(*cluster_);
     lb_factory_ = thread_aware_lb_->factory();
     refreshLb();

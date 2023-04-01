@@ -167,6 +167,12 @@ HostVector filterHosts(const absl::node_hash_set<HostSharedPtr>& hosts,
   return net_hosts;
 }
 
+Stats::ScopeSharedPtr generateStatsScope(const envoy::config::cluster::v3::Cluster& config,
+                                         Stats::Store& stats) {
+  return stats.createScope(fmt::format(
+      "cluster.{}.", config.alt_stat_name().empty() ? config.name() : config.alt_stat_name()));
+}
+
 } // namespace
 
 UpstreamLocalAddressSelectorImpl::UpstreamLocalAddressSelectorImpl(
@@ -1342,32 +1348,40 @@ ClusterInfoImpl::upstreamHttpProtocol(absl::optional<Http::Protocol> downstream_
                                                                : Http::Protocol::Http11};
 }
 
-ClusterImplBase::ClusterImplBase(
-    Server::Configuration::ServerFactoryContext& server_context,
-    const envoy::config::cluster::v3::Cluster& cluster, Runtime::Loader& runtime,
-    Server::Configuration::TransportSocketFactoryContextImpl& factory_context,
-    Stats::ScopeSharedPtr&& stats_scope, bool added_via_api, TimeSource& time_source)
+ClusterImplBase::ClusterImplBase(Server::Configuration::ServerFactoryContext& server_context,
+                                 const envoy::config::cluster::v3::Cluster& cluster,
+                                 ClusterFactoryContext& cluster_context, Runtime::Loader& runtime,
+                                 bool added_via_api, TimeSource& time_source)
     : init_manager_(fmt::format("Cluster {}", cluster.name())),
       init_watcher_("ClusterImplBase", [this]() { onInitDone(); }), runtime_(runtime),
       wait_for_warm_on_init_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(cluster, wait_for_warm_on_init, true)),
       time_source_(time_source),
-      local_cluster_(factory_context.clusterManager().localClusterName().value_or("") ==
+      local_cluster_(cluster_context.clusterManager().localClusterName().value_or("") ==
                      cluster.name()),
       const_metadata_shared_pool_(Config::Metadata::getConstMetadataSharedPool(
-          factory_context.singletonManager(), factory_context.mainThreadDispatcher())) {
-  factory_context.setInitManager(init_manager_);
-  auto socket_factory = createTransportSocketFactory(cluster, factory_context);
+          cluster_context.singletonManager(), cluster_context.mainThreadDispatcher())) {
+
+  auto stats_scope = generateStatsScope(cluster, cluster_context.stats());
+  transport_factory_context_ =
+      std::make_unique<Server::Configuration::TransportSocketFactoryContextImpl>(
+          server_context, cluster_context.sslContextManager(), *stats_scope,
+          cluster_context.clusterManager(), cluster_context.stats(),
+          cluster_context.messageValidationVisitor());
+  transport_factory_context_->setInitManager(init_manager_);
+
+  auto socket_factory = createTransportSocketFactory(cluster, *transport_factory_context_);
   auto* raw_factory_pointer = socket_factory.get();
 
   auto socket_matcher = std::make_unique<TransportSocketMatcherImpl>(
-      cluster.transport_socket_matches(), factory_context, socket_factory, *stats_scope);
+      cluster.transport_socket_matches(), *transport_factory_context_, socket_factory,
+      *stats_scope);
   const bool matcher_supports_alpn = socket_matcher->allMatchesSupportAlpn();
-  auto& dispatcher = factory_context.mainThreadDispatcher();
+  auto& dispatcher = cluster_context.mainThreadDispatcher();
   info_ = std::shared_ptr<const ClusterInfoImpl>(
       new ClusterInfoImpl(init_manager_, server_context, cluster,
-                          factory_context.clusterManager().bindConfig(), runtime,
+                          cluster_context.clusterManager().bindConfig(), runtime,
                           std::move(socket_matcher), std::move(stats_scope), added_via_api,
-                          factory_context),
+                          *transport_factory_context_),
       [&dispatcher](const ClusterInfoImpl* self) {
         ENVOY_LOG(trace, "Schedule destroy cluster info {}", self->name());
         dispatcher.deleteInDispatcherThread(
@@ -1564,11 +1578,6 @@ void ClusterImplBase::setOutlierDetector(const Outlier::DetectorSharedPtr& outli
   outlier_detector_ = outlier_detector;
   outlier_detector_->addChangedStateCb(
       [this](const HostSharedPtr& host) -> void { reloadHealthyHosts(host); });
-}
-
-void ClusterImplBase::setTransportFactoryContext(
-    Server::Configuration::TransportSocketFactoryContextPtr transport_factory_context) {
-  transport_factory_context_ = std::move(transport_factory_context);
 }
 
 void ClusterImplBase::reloadHealthyHosts(const HostSharedPtr& host) {
