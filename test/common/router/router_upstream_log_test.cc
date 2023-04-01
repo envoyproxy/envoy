@@ -95,7 +95,9 @@ public:
     EXPECT_CALL(callbacks_.dispatcher_, deferredDelete_).Times(testing::AnyNumber());
 
     if (upstream_log) {
-      router_proto.set_flush_upstream_log_on_new_request(flush_upstream_log_on_new_request);
+      auto upstream_log_options = router_proto.mutable_upstream_log_options();
+      upstream_log_options->set_flush_upstream_log_on_new_request(flush_upstream_log_on_new_request);
+
       ON_CALL(*context_.access_log_manager_.file_, write(_))
           .WillByDefault(
               Invoke([&](absl::string_view data) { output_.push_back(std::string(data)); }));
