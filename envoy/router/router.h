@@ -1274,7 +1274,7 @@ using RouteCallback = std::function<RouteMatchStatus(RouteConstSharedPtr, RouteE
 /**
  * Shared part of the route configuration. This class contains interfaces that needn't depend on
  * router matcher. Then every virtualhost could keep a reference to the CommonConfig. When the
- * entire route config is destroyed, the part of CommonConfig will still alive until all
+ * entire route config is destroyed, the part of CommonConfig will still live until all
  * virtualhosts are destroyed.
  */
 class CommonConfig {
