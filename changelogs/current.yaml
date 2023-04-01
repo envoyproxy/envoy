@@ -269,3 +269,11 @@ deprecated:
   change: |
     deprecated (1.25.0) :ref:`ext_authz.v3.AuthorizationRequest.allowed_headers <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.AuthorizationRequest.allowed_headers>` in favour
     of :ref:`ext_authz.v3.ExtAuthz.allowed_headers <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.allowed_headers>`.
+- area: tcp_proxy
+  change: |
+    deprecated (1.25.0) :ref:`access_log_flush_interval <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.access_log_flush_interval>` in favour
+    of :ref:`access_log_flush_interval <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.TcpAccessLogOptions.access_log_flush_interval>`.
+- area: tcp_proxy
+  change: |
+    deprecated (1.25.0) :ref:`flush_access_log_on_connected <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.flush_access_log_on_connected>` in favour
+    of :ref:`flush_access_log_on_connected <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.TcpAccessLogOptions.flush_access_log_on_connected>`.

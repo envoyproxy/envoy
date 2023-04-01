@@ -72,7 +72,9 @@ Config::SharedConfig::SharedConfig(
     Server::Configuration::FactoryContext& context)
     : stats_scope_(context.scope().createScope(fmt::format("tcp.{}", config.stat_prefix()))),
       stats_(generateStats(*stats_scope_)),
-      flush_access_log_on_connected_(config.flush_access_log_on_connected()) {
+      flush_access_log_on_connected_(config.has_access_log_options()
+          ? config.access_log_options().flush_access_log_on_connected()
+          : config.flush_access_log_on_connected() /* Deprecated field */) {
   if (config.has_idle_timeout()) {
     const uint64_t timeout = DurationUtil::durationToMilliseconds(config.idle_timeout());
     if (timeout > 0) {
@@ -91,7 +93,12 @@ Config::SharedConfig::SharedConfig(
     max_downstream_connection_duration_ = std::chrono::milliseconds(connection_duration);
   }
 
-  if (config.has_access_log_flush_interval()) {
+  if (config.has_access_log_options() &&
+      config.access_log_options().has_access_log_flush_interval()) {
+    const uint64_t flush_interval =
+        DurationUtil::durationToMilliseconds(config.access_log_options().access_log_flush_interval());
+    access_log_flush_interval_ = std::chrono::milliseconds(flush_interval);
+  } else if (config.has_access_log_flush_interval()) { // Deprecated feild
     const uint64_t flush_interval =
         DurationUtil::durationToMilliseconds(config.access_log_flush_interval());
     access_log_flush_interval_ = std::chrono::milliseconds(flush_interval);
