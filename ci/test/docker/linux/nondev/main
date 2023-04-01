@@ -57,18 +57,6 @@
 > docker buildx imagetools create docker.io/mocktest/repo-distroless:v1.73.0 --tag docker.io/mocktest/repo:distroless-v1.73-latest
 >> BUILDX: use multi-builder
 > docker buildx use multi-builder
->> BUILD: mocktest/repo-google-vrp:v1.73.0
-> docker buildx build --platform linux/amd64 -f ci/Dockerfile-envoy --target envoy-google-vrp --sbom=false --provenance=false -o type=oci,dest=/non/existent/test/path/envoy-google-vrp.tar -t mocktest/repo-google-vrp:v1.73.0 .
->> PUSH: oci-archive:/non/existent/test/path/envoy-google-vrp.tar -> docker://docker.io/mocktest/repo-google-vrp:v1.73.0
-> skopeo copy --all oci-archive:/non/existent/test/path/envoy-google-vrp.tar docker://docker.io/mocktest/repo-google-vrp:v1.73.0
->> TAG: mocktest/repo-google-vrp:v1.73.0 -> mocktest/repo:google-vrp-v1.73.0
-> docker buildx imagetools create docker.io/mocktest/repo-google-vrp:v1.73.0 --tag docker.io/mocktest/repo:google-vrp-v1.73.0
->> TAG: mocktest/repo-google-vrp:v1.73.0 -> mocktest/repo-google-vrp:v1.73-latest
-> docker buildx imagetools create docker.io/mocktest/repo-google-vrp:v1.73.0 --tag docker.io/mocktest/repo-google-vrp:v1.73-latest
->> TAG: mocktest/repo-google-vrp:v1.73.0 -> mocktest/repo:google-vrp-v1.73-latest
-> docker buildx imagetools create docker.io/mocktest/repo-google-vrp:v1.73.0 --tag docker.io/mocktest/repo:google-vrp-v1.73-latest
->> BUILDX: use multi-builder
-> docker buildx use multi-builder
 >> BUILD: mocktest/repo-tools:v1.73.0
 > docker buildx build --platform linux/arm64,linux/amd64 -f ci/Dockerfile-envoy --target envoy-tools --sbom=false --provenance=false -o type=oci,dest=/non/existent/test/path/envoy-tools.tar -t mocktest/repo-tools:v1.73.0 .
 >> PUSH: oci-archive:/non/existent/test/path/envoy-tools.tar -> docker://docker.io/mocktest/repo-tools:v1.73.0

@@ -157,7 +157,7 @@ function run_ci_verify () {
     local images image oci_archive
     echo "verify examples..."
 
-    images=("" "contrib" "google-vrp")
+    images=("" "contrib")
 
     for image in "${images[@]}"; do
         if [[ -n "$image" ]]; then

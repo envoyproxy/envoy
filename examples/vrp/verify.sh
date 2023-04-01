@@ -49,23 +49,3 @@ test_vrp () {
         https://localhost:10000/content \
         -k
 }
-
-# Running this does not currently work with buildkit (even if that is how it is built).
-export DOCKER_BUILDKIT=0
-
-# Test running the default build
-tag_default_vrp
-bring_up_example
-test_vrp
-bring_down_example
-
-# Test a build with custom binary
-echo "echo 'VRP PROXY MOCK'" > /tmp/envoy
-chmod +x /tmp/envoy
-rebuild_vrp /tmp/envoy
-docker run --rm --entrypoint=/bin/sh envoy-google-vrp:local -c "/usr/local/bin/envoy | grep MOCK"
-
-# Test rebuilding and running the default build (with some mock tools)
-rebuild_vrp
-bring_up_example
-docker run --rm --entrypoint=/bin/sh envoy-google-vrp:local -c "/usr/local/bin/envoy | grep 'MOCK 2'"

@@ -100,8 +100,7 @@ if is_windows; then
     # BuildKit is not available for Windows images, use standard build command
     BUILD_COMMAND=("build")
 else
-    # "-google-vrp" must come afer "" to ensure we rebuild the local base image dependency.
-    BUILD_TYPES=("" "-debug" "-contrib" "-contrib-debug" "-distroless" "-google-vrp" "-tools")
+    BUILD_TYPES=("" "-debug" "-contrib" "-contrib-debug" "-distroless" "-tools")
 
     # Configure docker-buildx tools
     BUILD_COMMAND=("buildx" "build")
@@ -146,8 +145,6 @@ build_platforms() {
 
     if is_windows; then
         echo -n "windows/amd64"
-    elif [[ "${build_type}" == *-google-vrp ]]; then
-        echo -n "linux/amd64"
     else
         echo -n "linux/arm64,linux/amd64"
     fi
