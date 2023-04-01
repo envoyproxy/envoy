@@ -1623,19 +1623,36 @@ TEST_F(HttpConnectionManagerConfigTest, FlushAccessLogOnNewRequest) {
 
     EXPECT_TRUE(config.flushAccessLogOnNewRequest());
   }
+}
 
-  {
-    std::string deprecated_yaml_string = base_yaml_string + R"EOF(
-      flush_access_log_on_new_request: true # deprecated field
-    )EOF";
+TEST_F(HttpConnectionManagerConfigTest,
+      DEPRECATED_FEATURE_TEST(DeprecatedFlushAccessLogOnNewRequest)) {
+  std::string yaml_string = R"EOF(
+    codec_type: http1
+    stat_prefix: my_stat_prefix
+    route_config:
+      virtual_hosts:
+      - name: default
+        domains:
+        - "*"
+        routes:
+        - match:
+            prefix: "/"
+          route:
+            cluster: fake_cluster
+    http_filters:
+    - name: envoy.filters.http.router
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+    flush_access_log_on_new_request: true # deprecated field
+  )EOF";
 
-    HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(deprecated_yaml_string),
-                                       context_, date_provider_, route_config_provider_manager_,
-                                       scoped_routes_config_provider_manager_, tracer_manager_,
-                                       filter_config_provider_manager_);
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string),
+                                      context_, date_provider_, route_config_provider_manager_,
+                                      scoped_routes_config_provider_manager_, tracer_manager_,
+                                      filter_config_provider_manager_);
 
-    EXPECT_TRUE(config.flushAccessLogOnNewRequest());
-  }
+  EXPECT_TRUE(config.flushAccessLogOnNewRequest());
 }
 
 TEST_F(HttpConnectionManagerConfigTest, AccessLogFlushInterval) {
@@ -1681,20 +1698,37 @@ TEST_F(HttpConnectionManagerConfigTest, AccessLogFlushInterval) {
     EXPECT_TRUE(config.accessLogFlushInterval().has_value());
     EXPECT_EQ(std::chrono::seconds(1), config.accessLogFlushInterval().value());
   }
+}
 
-  {
-    std::string deprecated_yaml_string = base_yaml_string + R"EOF(
-      access_log_flush_interval: 1s # deprecated field
-    )EOF";
+TEST_F(HttpConnectionManagerConfigTest,
+       DEPRECATED_FEATURE_TEST(DeprecatedAccessLogFlushInterval)) {
+  std::string yaml_string = R"EOF(
+    codec_type: http1
+    stat_prefix: my_stat_prefix
+    route_config:
+      virtual_hosts:
+      - name: default
+        domains:
+        - "*"
+        routes:
+        - match:
+            prefix: "/"
+          route:
+            cluster: fake_cluster
+    http_filters:
+    - name: envoy.filters.http.router
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+    access_log_flush_interval: 1s # deprecated field
+  )EOF";
 
-    HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(deprecated_yaml_string),
-                                       context_, date_provider_, route_config_provider_manager_,
-                                       scoped_routes_config_provider_manager_, tracer_manager_,
-                                       filter_config_provider_manager_);
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string),
+                                      context_, date_provider_, route_config_provider_manager_,
+                                      scoped_routes_config_provider_manager_, tracer_manager_,
+                                      filter_config_provider_manager_);
 
-    EXPECT_TRUE(config.accessLogFlushInterval().has_value());
-    EXPECT_EQ(std::chrono::seconds(1), config.accessLogFlushInterval().value());
-  }
+  EXPECT_TRUE(config.accessLogFlushInterval().has_value());
+  EXPECT_EQ(std::chrono::seconds(1), config.accessLogFlushInterval().value());
 }
 
 TEST_F(HttpConnectionManagerConfigTest, BadAccessLogConfig) {
