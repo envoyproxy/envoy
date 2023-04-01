@@ -1948,7 +1948,7 @@ void ConnectionManagerImpl::ActiveStream::setCachedRoute(
     absl::optional<Router::RouteConstSharedPtr>&& route) {
   if (hasCachedRoute()) {
     // The configuration of the route may be referenced by some filters.
-    // Cache the route to avoid it's destroyed before the stream is destroyed.
+    // Cache the route to avoid it being destroyed before the stream is destroyed.
     cleared_cached_routes_.emplace_back(std::move(cached_route_.value()));
   }
   cached_route_ = std::move(route);
