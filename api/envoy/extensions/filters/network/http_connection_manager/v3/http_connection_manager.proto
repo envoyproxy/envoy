@@ -2,6 +2,7 @@ syntax = "proto3";
 
 package envoy.extensions.filters.network.http_connection_manager.v3;
 
+import "envoy/annotations/deprecation.proto";
 import "envoy/config/accesslog/v3/accesslog.proto";
 import "envoy/config/core/v3/address.proto";
 import "envoy/config/core/v3/base.proto";
@@ -36,7 +37,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // HTTP connection manager :ref:`configuration overview <config_http_conn_man>`.
 // [#extension: envoy.filters.network.http_connection_manager]
 
-// [#next-free-field: 55]
+// [#next-free-field: 57]
 message HttpConnectionManager {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.network.http_connection_manager.v2.HttpConnectionManager";
@@ -560,8 +561,30 @@ message HttpConnectionManager {
   // emitted by the connection manager.
   repeated config.accesslog.v3.AccessLog access_log = 13;
 
+  // .. attention::
+  // This field is deprecated in favor of
+  // :ref:`access_log_flush_interval
+  // <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.HcmAccessLogOptions.access_log_flush_interval>`.
+  // Note that if both this field and :ref:`access_log_flush_interval
+  // <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.HcmAccessLogOptions.access_log_flush_interval>`
+  // are specified, the former (deprecated field) is ignored.
+  google.protobuf.Duration access_log_flush_interval = 54 [
+    (validate.rules).duration = {gte {nanos: 1000000}},
+    deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"
+  ];
+
+  // .. attention::
+  // This field is deprecated in favor of
+  // :ref:`flush_access_log_on_new_request
+  // <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.HcmAccessLogOptions.flush_access_log_on_new_request>`.
+  // Note that if both this field and :ref:`flush_access_log_on_new_request
+  // <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.HcmAccessLogOptions.flush_access_log_on_new_request>`
+  // are specified, the former (deprecated field) is ignored.
+  bool flush_access_log_on_new_request = 55
+    [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
+
   // Additional access log options for HTTP connection manager.
-  HcmAccessLogOptions access_log_options = 54;
+  HcmAccessLogOptions access_log_options = 56;
 
   // If set to true, the connection manager will use the real remote address
   // of the client connection when determining internal versus external origin and manipulating
