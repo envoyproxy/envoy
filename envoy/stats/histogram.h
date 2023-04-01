@@ -167,6 +167,14 @@ public:
    * Returns the bucket summary representation.
    */
   virtual std::string bucketSummary() const PURE;
+
+  struct Bucket {
+    double value_;
+    uint64_t count_;
+  };
+
+  virtual std::vector<Bucket> detailedBuckets() const PURE;
+  //virtual const std::vector<Bucket> detailedIntervalBuckets() const PURE;
 };
 
 using ParentHistogramSharedPtr = RefcountPtr<ParentHistogram>;

@@ -14,7 +14,17 @@
 //   * detect when user is not looking at page and stop or slow down pinging the server
 //   * hierarchical display
 //   * json flavor to send hierarchical names to save serialization/deserialization costs
-
+//   * pause auto-refresh for at least 5 seconds when editng fields.
+//   * don't auto-refresh when there is error -- provide a button to re-retry.
+//   * update URL history after editing params
+//   * erase spurious 'stats' link at lop left
+//   * consider removing histogram mode during active display, and overlay summary graphics
+//   * rename bucket mode "none" to "summary"
+//   * improve graphics
+//   * log Y axis
+//   * deal with large # of buckets (combine adjacent?).
+//    --  Say: max 24 buckets and interpolate in C++
+//   * integrate interval view.
 
 /**
  * Maps a stat name to a record containing name, value, and a use-count. This
@@ -159,8 +169,19 @@ function renderStats(data) {
   sortedStats = [];
   for (stat of data.stats) {
     if (!stat.name) {
-      renderHistograms(stat.histograms);
-      continue;
+      const histograms = stat.histograms;
+      if (histograms) {
+        if (histograms.supported_quantiles) {
+          renderHistogramSummary(histograms);
+        } else if (histograms.length && histograms[0].name) {
+          if (histograms[0].detail) {
+            renderHistogramDetail(histograms);
+          } else {
+            renderHistogramDisjoint(histograms);
+          }
+        }
+        continue;
+      }
     }
     let statRecord = nameStatsMap.get(stat.name);
     if (statRecord) {
@@ -204,42 +225,128 @@ function renderStats(data) {
   statusDiv.textContent = '';
 }
 
-function renderHistograms(histograms) {
-  if (stat.histograms) {
-    activeStatsHistogramsDiv.replaceChildren();
-    for (histogram of stat.histograms) {
-      const div = document.createElement('div');
+function renderHistogramDisjoint(histograms) {
+  activeStatsHistogramsDiv.replaceChildren();
+  for (histogram of histograms) {
+    const div = document.createElement('div');
 
-      const label = document.createElement('div');
-      label.textContent = histogram.name;
-      div.appendChild(label);
+    const label = document.createElement('div');
+    label.textContent = histogram.name;
+    div.appendChild(label);
 
-      let maxValue = 0;
-      for (bucket of histogram.buckets) {
-        maxValue = Math.max(maxValue, bucket.cumulative);
-      }
-
-      const graphics = document.createElement('div');
-      graphics.className = 'histogram-graphics';
-      for (bucket of histogram.buckets) {
-        const span = document.createElement('span');
-        const percent = maxValue == 0 ? 0 : Math.round((100 * bucket.cumulative) / maxValue);
-        span.style.height = '' + percent + '%';
-        graphics.appendChild(span);
-      }
-      div.appendChild(graphics);
-
-      const labels = document.createElement('div');
-      labels.className = 'histogram-labels';
-      for (bucket of histogram.buckets) {
-        const span = document.createElement('span');
-        span.textContent = bucket.upper_bound + ':' + bucket.cumulative;
-        labels.appendChild(span);
-      }
-      div.appendChild(labels);
-
-      activeStatsHistogramsDiv.appendChild(div);
+    let maxValue = 0;
+    for (bucket of histogram.buckets) {
+      maxValue = Math.max(maxValue, bucket.cumulative);
     }
+
+    const graphics = document.createElement('div');
+    graphics.className = 'histogram-graphics';
+    for (bucket of histogram.buckets) {
+      const span = document.createElement('span');
+      const percent = maxValue == 0 ? 0 : Math.round((100 * bucket.cumulative) / maxValue);
+      span.style.height = '' + percent + '%';
+      graphics.appendChild(span);
+    }
+    div.appendChild(graphics);
+
+    const labels = document.createElement('div');
+    labels.className = 'histogram-labels';
+    for (bucket of histogram.buckets) {
+      const span = document.createElement('span');
+      span.textContent = bucket.upper_bound + ':' + bucket.cumulative;
+      labels.appendChild(span);
+    }
+    div.appendChild(labels);
+
+    activeStatsHistogramsDiv.appendChild(div);
+  }
+}
+
+function renderHistogramDetail(histograms) {
+  activeStatsHistogramsDiv.replaceChildren();
+  for (histogram of histograms) {
+    const div = document.createElement('div');
+
+    const label = document.createElement('div');
+    label.textContent = histogram.name;
+    div.appendChild(label);
+
+    let maxCount = 0;
+    for (bucket of histogram.detail) {
+      maxCount = Math.max(maxCount, bucket.count);
+    }
+
+    const graphics = document.createElement('div');
+    graphics.className = 'histogram-graphics';
+    for (bucket of histogram.detail) {
+      const span = document.createElement('span');
+      const percent = maxCount == 0 ? 0 : Math.round((100 * bucket.count) / maxCount);
+      span.style.height = '' + percent + '%';
+      graphics.appendChild(span);
+    }
+    div.appendChild(graphics);
+
+    const labels = document.createElement('div');
+    labels.className = 'histogram-labels';
+    for (bucket of histogram.detail) {
+      const span = document.createElement('span');
+      span.textContent = bucket.value + ':' + bucket.count;
+      labels.appendChild(span);
+    }
+    div.appendChild(labels);
+
+    activeStatsHistogramsDiv.appendChild(div);
+  }
+}
+
+function renderHistogramSummary(histograms) {
+  activeStatsHistogramsDiv.replaceChildren();
+
+  const supported_quantiles = histograms.supported_quantiles;
+  const labels = document.createElement('div');
+  labels.className = 'histogram-labels';
+  for (quantile of supported_quantiles) {
+    const span = document.createElement('span');
+    span.textContent = 'P' + quantile;
+    labels.appendChild(span);
+  }
+  activeStatsHistogramsDiv.appendChild(labels);
+
+  for (histogram of histograms.computed_quantiles) {
+    const div = document.createElement('div');
+
+    const label = document.createElement('div');
+    label.textContent = histogram.name;
+    div.appendChild(label);
+
+    let maxValue = 0;
+    let values = [];
+    for (obj of histogram.values) {
+      const value = obj.cumulative;
+      values.push(value);
+      maxValue = Math.max(maxValue, value);
+    }
+
+    const graphics = document.createElement('div');
+    graphics.className = 'histogram-graphics';
+    for (value of values) {
+      const span = document.createElement('span');
+      const percent = maxValue == 0 ? 0 : Math.round((100 * value) / maxValue);
+      span.style.height = '' + percent + '%';
+      graphics.appendChild(span);
+    }
+    div.appendChild(graphics);
+
+    const labels = document.createElement('div');
+    labels.className = 'histogram-labels';
+    for (value of values) {
+      const span = document.createElement('span');
+      span.textContent = Math.round(100 * value) / 100;
+      labels.appendChild(span);
+    }
+    div.appendChild(labels);
+
+    activeStatsHistogramsDiv.appendChild(div);
   }
 }
 

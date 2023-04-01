@@ -958,6 +958,17 @@ std::string ParentHistogramImpl::bucketSummary() const {
   }
 }
 
+std::vector<Stats::ParentHistogram::Bucket> ParentHistogramImpl::detailedBuckets() const {
+  uint32_t num_buckets =  hist_num_buckets(cumulative_histogram_);
+  std::vector<Stats::ParentHistogram::Bucket> buckets(num_buckets);
+  Stats::ParentHistogram::Bucket* bucket = &buckets[0];
+  for (uint32_t i = 0; i < num_buckets; ++i, ++bucket) {
+    /*int ret = */ hist_bucket_idx(cumulative_histogram_, i, &bucket->value_, &bucket->count_);
+    //ASSERT(ret == 0);
+  }
+  return buckets;
+}
+
 void ParentHistogramImpl::addTlsHistogram(const TlsHistogramSharedPtr& hist_ptr) {
   Thread::LockGuard lock(merge_lock_);
   tls_histograms_.emplace_back(hist_ptr);

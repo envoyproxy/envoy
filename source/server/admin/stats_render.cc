@@ -42,6 +42,9 @@ void StatsTextRender::generate(Buffer::Instance& response, const std::string& na
   case Utility::HistogramBucketsMode::Disjoint:
     addDisjointBuckets(name, histogram, response);
     break;
+  case Utility::HistogramBucketsMode::Detailed:
+    //addDetailedBuckets(name, histogram, response);
+    break;
   }
 }
 
@@ -145,6 +148,22 @@ void StatsJsonRender::generate(Buffer::Instance&, const std::string& name,
     collectBuckets(name, histogram, interval_buckets, cumulative_buckets);
     break;
   }
+  case Utility::HistogramBucketsMode::Detailed: {
+    std::vector<Stats::ParentHistogram::Bucket> buckets = histogram.detailedBuckets();
+    ProtobufWkt::Struct histogram_obj;
+    ProtoMap& histogram_obj_fields = *histogram_obj.mutable_fields();
+    histogram_obj_fields["name"] = ValueUtil::stringValue(histogram.name());
+    ProtobufWkt::ListValue* bucket_array = histogram_obj_fields["detail"].mutable_list_value();
+
+    for (const Stats::ParentHistogram::Bucket& bucket : buckets) {
+      ProtobufWkt::Struct bucket_json;
+      ProtoMap& bucket_fields = *bucket_json.mutable_fields();
+      bucket_fields["value"] = ValueUtil::numberValue(bucket.value_);
+      bucket_fields["count"] = ValueUtil::numberValue(bucket.count_);
+      *bucket_array->add_values() = ValueUtil::structValue(bucket_json);
+    }
+    *histogram_array_->add_values() = ValueUtil::structValue(histogram_obj);
+  }
   }
 }
 
@@ -177,6 +196,15 @@ void StatsJsonRender::finalize(Buffer::Instance& response) {
   response.add("]}");
 }
 
+static void populateVector(absl::string_view name, const std::vector<double>& values,
+                           uint32_t multiplier, ProtoMap& histograms_obj_fields) {
+  ProtobufWkt::ListValue* array = histograms_obj_fields[name].mutable_list_value();
+
+  for (double value : values) {
+    *array->add_values() = ValueUtil::numberValue(value * multiplier);
+  }
+}
+
 // Summarizes the buckets in the specified histogram, collecting JSON objects.
 // Note, we do not flush this buffer to the network when it grows large, and
 // if this becomes an issue it should be possible to do, noting that we are
@@ -188,14 +216,9 @@ void StatsJsonRender::summarizeBuckets(const std::string& name,
     // It is not possible for the supported quantiles to differ across histograms, so it is ok
     // to send them once.
     Stats::HistogramStatisticsImpl empty_statistics;
-    ProtoMap& histograms_obj_fields = *histograms_obj_.mutable_fields();
-    ProtobufWkt::ListValue* supported_quantile_array =
-        histograms_obj_fields["supported_quantiles"].mutable_list_value();
-
-    for (double quantile : empty_statistics.supportedQuantiles()) {
-      *supported_quantile_array->add_values() = ValueUtil::numberValue(quantile * 100);
-    }
-
+    ProtoMap& fields = *histograms_obj_.mutable_fields();
+    populateVector("supported_quantiles", empty_statistics.supportedQuantiles(), 100, fields);
+    //populateVector("default_buckets", Stats::HistogramSettingsImpl::defaultBuckets(), 1, fields);
     found_used_histogram_ = true;
   }
 
@@ -207,12 +230,16 @@ void StatsJsonRender::summarizeBuckets(const std::string& name,
       computed_quantile_fields["values"].mutable_list_value();
   const Stats::HistogramStatistics& interval_statistics = histogram.intervalStatistics();
   const std::vector<double>& computed_quantiles = interval_statistics.computedQuantiles();
-  const std::vector<double>& cumulative_quantiles =
-      histogram.cumulativeStatistics().computedQuantiles();
+  const Stats::HistogramStatistics& histogram_stats = histogram.cumulativeStatistics();
+  const std::vector<double>& cumulative_quantiles = histogram_stats.computedQuantiles();
+  //const std::vector<double>& supported_buckets = histogram_stats.supportedBuckets();
   const size_t min_size = std::min({computed_quantiles.size(), cumulative_quantiles.size(),
                                     interval_statistics.supportedQuantiles().size()});
+  //const std::vector<double>& default_buckets = Stats::HistogramSettingsImpl::defaultBuckets();
   ASSERT(min_size == computed_quantiles.size());
   ASSERT(min_size == cumulative_quantiles.size());
+  /*  ASSERT(min_size == supported_buckets.size());
+      ASSERT(min_size == default_buckets.size());*/
 
   for (size_t i = 0; i < min_size; ++i) {
     ProtobufWkt::Struct computed_quantile_value;
@@ -223,6 +250,12 @@ void StatsJsonRender::summarizeBuckets(const std::string& name,
         std::isnan(interval) ? ValueUtil::nullValue() : ValueUtil::numberValue(interval);
     computed_quantile_value_fields["cumulative"] =
         std::isnan(cumulative) ? ValueUtil::nullValue() : ValueUtil::numberValue(cumulative);
+
+    /*
+    if (supported_buckets[i] != default_buckets[i] && !std::isnan(supported_buckets[i])) {
+      computed_quantile_value_fields["bucket"] = ValueUtil::numberValue(supported_buckets[i]);
+    }
+    */
 
     *computed_quantile_value_array->add_values() = ValueUtil::structValue(computed_quantile_value);
   }
