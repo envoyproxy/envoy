@@ -1588,9 +1588,7 @@ TEST_F(HttpConnectionManagerConfigTest, FlushAccessLogOnNewRequest) {
     )EOF";
 
   {
-    std::string yaml_string = base_yaml_string;
-
-    HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
+    HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(base_yaml_string), context_,
                                       date_provider_, route_config_provider_manager_,
                                       scoped_routes_config_provider_manager_, tracer_manager_,
                                       filter_config_provider_manager_);
@@ -1661,9 +1659,7 @@ TEST_F(HttpConnectionManagerConfigTest, AccessLogFlushInterval) {
     )EOF";
 
   {
-    std::string yaml_string = base_yaml_string;
-
-    HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
+    HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(base_yaml_string), context_,
                                       date_provider_, route_config_provider_manager_,
                                       scoped_routes_config_provider_manager_, tracer_manager_,
                                       filter_config_provider_manager_);
