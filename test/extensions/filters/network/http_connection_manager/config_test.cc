@@ -1588,8 +1588,8 @@ TEST_F(HttpConnectionManagerConfigTest, FlushAccessLogOnNewRequest) {
     )EOF";
 
   {
-    HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(base_yaml_string), context_,
-                                       date_provider_, route_config_provider_manager_,
+    HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(base_yaml_string),
+                                       context_, date_provider_, route_config_provider_manager_,
                                        scoped_routes_config_provider_manager_, tracer_manager_,
                                        filter_config_provider_manager_);
 
@@ -1629,8 +1629,8 @@ TEST_F(HttpConnectionManagerConfigTest, FlushAccessLogOnNewRequest) {
       flush_access_log_on_new_request: true # deprecated field
     )EOF";
 
-    HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(deprecated_yaml_string), context_,
-                                       date_provider_, route_config_provider_manager_,
+    HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(deprecated_yaml_string),
+                                       context_, date_provider_, route_config_provider_manager_,
                                        scoped_routes_config_provider_manager_, tracer_manager_,
                                        filter_config_provider_manager_);
 
@@ -1659,8 +1659,8 @@ TEST_F(HttpConnectionManagerConfigTest, AccessLogFlushInterval) {
     )EOF";
 
   {
-    HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(base_yaml_string), context_,
-                                       date_provider_, route_config_provider_manager_,
+    HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(base_yaml_string),
+                                       context_, date_provider_, route_config_provider_manager_,
                                        scoped_routes_config_provider_manager_, tracer_manager_,
                                        filter_config_provider_manager_);
 
@@ -1687,8 +1687,8 @@ TEST_F(HttpConnectionManagerConfigTest, AccessLogFlushInterval) {
       access_log_flush_interval: 1s # deprecated field
     )EOF";
 
-    HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(deprecated_yaml_string), context_,
-                                       date_provider_, route_config_provider_manager_,
+    HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(deprecated_yaml_string),
+                                       context_, date_provider_, route_config_provider_manager_,
                                        scoped_routes_config_provider_manager_, tracer_manager_,
                                        filter_config_provider_manager_);
 
