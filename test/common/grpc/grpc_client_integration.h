@@ -103,8 +103,13 @@ public:
   bool isUnified() const { return std::get<2>(GetParam()) == LegacyOrUnified::Unified; }
 };
 
+class BaseDeltaSotwIntegrationParamTest:public BaseGrpcClientIntegrationParamTest{
+  public: 
+  SotwOrDelta sotwOrDelta() const PURE;
+};
+
 class DeltaSotwIntegrationParamTest
-    : public BaseGrpcClientIntegrationParamTest,
+    : public BaseDeltaSotwIntegrationParamTest,
       public testing::TestWithParam<
           std::tuple<Network::Address::IpVersion, ClientType, SotwOrDelta>> {
 public:
@@ -118,7 +123,7 @@ public:
   }
   Network::Address::IpVersion ipVersion() const override { return std::get<0>(GetParam()); }
   ClientType clientType() const override { return std::get<1>(GetParam()); }
-  SotwOrDelta sotwOrDelta() const { return std::get<2>(GetParam()); }
+  SotwOrDelta sotwOrDelta() const override{ return std::get<2>(GetParam()); }
 };
 
 // Skip tests based on gRPC client type.

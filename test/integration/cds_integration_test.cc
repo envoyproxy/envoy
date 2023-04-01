@@ -29,7 +29,7 @@ const char ClusterName2[] = "cluster_2";
 const int UpstreamIndex1 = 1;
 const int UpstreamIndex2 = 2;
 
-class CdsIntegrationTest : public Grpc::DeltaSotwIntegrationParamTest, public HttpIntegrationTest {
+class CdsIntegrationTestBase : public Grpc::BaseDeltaSotwIntegrationParamTest, public HttpIntegrationTest {
 public:
   CdsIntegrationTest()
       : HttpIntegrationTest(Http::CodecType::HTTP2, ipVersion(),
@@ -147,6 +147,9 @@ public:
                                                     const std::string&)>
       cluster_creator_;
 };
+
+class CdsIntegrationTest : public CdsIntegrationTestBase, public Grpc::DeltaSotwIntegrationParamTest {};
+
 
 INSTANTIATE_TEST_SUITE_P(IpVersionsClientTypeDelta, CdsIntegrationTest,
                          DELTA_SOTW_GRPC_CLIENT_INTEGRATION_PARAMS);
