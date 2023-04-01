@@ -231,6 +231,14 @@ elif [[ "$CI_TARGET" == "bazel.distribution" ]]; then
 
   setup_clang_toolchain
 
+  mkdir -p distribution/custom
+
+  if [[ "${ENVOY_BUILD_ARCH}" == "x86_64" ]]; then
+      tar xfO "/build/bazel.release/envoy_binary.tar.gz" build_envoy_release_stripped/envoy > distribution/custom/envoy
+  else
+      tar xfO "/build/bazel.release.arm64/envoy_binary.tar.gz" build_envoy_release_stripped/envoy > distribution/custom/envoy
+  fi
+
   # By default the packages will be signed by the first available key.
   # If there is no key available, a throwaway key is created
   # and the packages signed with it, for the purpose of testing only.
@@ -243,7 +251,7 @@ elif [[ "$CI_TARGET" == "bazel.distribution" ]]; then
           "--action_env=PACKAGES_MAINTAINER_EMAIL")
   fi
 
-  bazel build "${BAZEL_BUILD_OPTIONS[@]}" --remote_download_toplevel -c opt //distribution:packages.tar.gz
+  bazel build "${BAZEL_BUILD_OPTIONS[@]}" --remote_download_toplevel -c opt --//distribution:envoy-binary=//distribution:custom/envoy //distribution:packages.tar.gz
   if [[ "${ENVOY_BUILD_ARCH}" == "x86_64" ]]; then
       cp -a bazel-bin/distribution/packages.tar.gz "${ENVOY_BUILD_DIR}/packages.x64.tar.gz"
   else

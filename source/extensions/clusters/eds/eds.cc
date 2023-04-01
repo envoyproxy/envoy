@@ -13,21 +13,19 @@
 namespace Envoy {
 namespace Upstream {
 
-EdsClusterImpl::EdsClusterImpl(
-    Server::Configuration::ServerFactoryContext& server_context,
-    const envoy::config::cluster::v3::Cluster& cluster, Runtime::Loader& runtime,
-    Server::Configuration::TransportSocketFactoryContextImpl& factory_context,
-    Stats::ScopeSharedPtr&& stats_scope, bool added_via_api)
-    : BaseDynamicClusterImpl(server_context, cluster, runtime, factory_context,
-                             std::move(stats_scope), added_via_api,
-                             factory_context.mainThreadDispatcher().timeSource()),
+EdsClusterImpl::EdsClusterImpl(Server::Configuration::ServerFactoryContext& server_context,
+                               const envoy::config::cluster::v3::Cluster& cluster,
+                               ClusterFactoryContext& cluster_context, Runtime::Loader& runtime,
+                               bool added_via_api)
+    : BaseDynamicClusterImpl(server_context, cluster, cluster_context, runtime, added_via_api,
+                             cluster_context.mainThreadDispatcher().timeSource()),
       Envoy::Config::SubscriptionBase<envoy::config::endpoint::v3::ClusterLoadAssignment>(
-          factory_context.messageValidationVisitor(), "cluster_name"),
-      factory_context_(factory_context), local_info_(factory_context.localInfo()),
+          cluster_context.messageValidationVisitor(), "cluster_name"),
+      local_info_(cluster_context.localInfo()),
       cluster_name_(cluster.eds_cluster_config().service_name().empty()
                         ? cluster.name()
                         : cluster.eds_cluster_config().service_name()) {
-  Event::Dispatcher& dispatcher = factory_context.mainThreadDispatcher();
+  Event::Dispatcher& dispatcher = cluster_context.mainThreadDispatcher();
   assignment_timeout_ = dispatcher.createTimer([this]() -> void { onAssignmentTimeout(); });
   const auto& eds_config = cluster.eds_cluster_config().eds_config();
   if (Config::SubscriptionFactory::isPathBasedConfigSource(
@@ -38,7 +36,7 @@ EdsClusterImpl::EdsClusterImpl(
   }
   const auto resource_name = getResourceName();
   subscription_ =
-      factory_context.clusterManager().subscriptionFactory().subscriptionFromConfigSource(
+      cluster_context.clusterManager().subscriptionFactory().subscriptionFromConfigSource(
           eds_config, Grpc::Common::typeUrl(resource_name), info_->statsScope(), *this,
           resource_decoder_, {});
 }
@@ -184,9 +182,9 @@ void EdsClusterImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef
 
   // Pause LEDS messages until the EDS config is finished processing.
   Config::ScopedResume maybe_resume_leds;
-  if (factory_context_.clusterManager().adsMux()) {
+  if (transport_factory_context_->clusterManager().adsMux()) {
     const auto type_url = Config::getTypeUrl<envoy::config::endpoint::v3::LbEndpoint>();
-    maybe_resume_leds = factory_context_.clusterManager().adsMux()->pause(type_url);
+    maybe_resume_leds = transport_factory_context_->clusterManager().adsMux()->pause(type_url);
   }
 
   // Compare the current set of LEDS localities (localities using LEDS) to the one received in the
@@ -211,11 +209,12 @@ void EdsClusterImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef
   // (optimize for no-copy).
   envoy::config::endpoint::v3::ClusterLoadAssignment* used_load_assignment;
   if (cla_leds_configs.empty()) {
-    cluster_load_assignment_ = absl::nullopt;
+    cluster_load_assignment_ = nullptr;
     used_load_assignment = &cluster_load_assignment;
   } else {
-    cluster_load_assignment_ = std::move(cluster_load_assignment);
-    used_load_assignment = &cluster_load_assignment_.value();
+    cluster_load_assignment_ = std::make_unique<envoy::config::endpoint::v3::ClusterLoadAssignment>(
+        std::move(cluster_load_assignment));
+    used_load_assignment = cluster_load_assignment_.get();
   }
 
   // Add all the LEDS localities that are new.
@@ -226,7 +225,7 @@ void EdsClusterImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef
 
       // Create a new LEDS subscription and add it to the subscriptions map.
       LedsSubscriptionPtr leds_locality_subscription = std::make_unique<LedsSubscription>(
-          leds_config, cluster_name_, factory_context_, info_->statsScope(),
+          leds_config, cluster_name_, *transport_factory_context_, info_->statsScope(),
           [&, used_load_assignment]() {
             // Called upon an update to the locality.
             if (validateAllLedsUpdated()) {
@@ -377,18 +376,15 @@ void EdsClusterImpl::onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReas
 }
 
 std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr>
-EdsClusterFactory::createClusterImpl(
-    Server::Configuration::ServerFactoryContext& server_context,
-    const envoy::config::cluster::v3::Cluster& cluster, ClusterFactoryContext& context,
-    Server::Configuration::TransportSocketFactoryContextImpl& socket_factory_context,
-    Stats::ScopeSharedPtr&& stats_scope) {
+EdsClusterFactory::createClusterImpl(Server::Configuration::ServerFactoryContext& server_context,
+                                     const envoy::config::cluster::v3::Cluster& cluster,
+                                     ClusterFactoryContext& context) {
   if (!cluster.has_eds_cluster_config()) {
     throw EnvoyException("cannot create an EDS cluster without an EDS config");
   }
 
-  return std::make_pair(std::make_unique<EdsClusterImpl>(
-                            server_context, cluster, context.runtime(), socket_factory_context,
-                            std::move(stats_scope), context.addedViaApi()),
+  return std::make_pair(std::make_unique<EdsClusterImpl>(server_context, cluster, context,
+                                                         context.runtime(), context.addedViaApi()),
                         nullptr);
 }
 
