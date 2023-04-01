@@ -237,7 +237,9 @@ public:
                      config.start_child_span(), config.suppress_envoy_headers(),
                      config.respect_expected_rq_timeout(),
                      config.suppress_grpc_request_failure_code_stats(),
-                     config.flush_upstream_log_on_new_request(), config.strict_check_headers(),
+                     config.has_upstream_log_options()
+                        ? config.upstream_log_options().flush_upstream_log_on_new_request()
+                        : false, config.strict_check_headers(),
                      context.api().timeSource(), context.httpContext(), context.routerContext()) {
     for (const auto& upstream_log : config.upstream_log()) {
       upstream_logs_.push_back(AccessLog::AccessLogFactory::fromProto(upstream_log, context));
