@@ -313,7 +313,11 @@ private:
     // This will be called automatically at the end of handle response headers.
     void blockRouteCache();
     // Return true if the cached route is blocked.
-    bool routeCacheBlocked() const { return route_cache_blocked_; }
+    bool routeCacheBlocked() const {
+      ENVOY_BUG(!route_cache_blocked_, "Should never try to refresh or clear the route cache when "
+                                       "it is blocked!");
+      return route_cache_blocked_;
+    }
 
     absl::optional<Router::ConfigConstSharedPtr> routeConfig();
     void traceRequest();

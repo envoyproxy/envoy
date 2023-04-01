@@ -1073,13 +1073,17 @@ TEST_F(HttpConnectionManagerImplTest, BlockRouteCacheTest) {
   filter->callbacks_->streamInfo().setResponseCodeDetails("");
   filter->callbacks_->encodeHeaders(std::move(response_headers), false, "details");
 
-  // The cached route will not be cleared after response headers are sent.
-  filter->callbacks_->downstreamCallbacks()->clearRouteCache();
-  EXPECT_EQ(filter->callbacks_->route().get(), mock_route_2.get());
+  EXPECT_ENVOY_BUG(
+      {
+        // The cached route will not be cleared after response headers are sent.
+        filter->callbacks_->downstreamCallbacks()->clearRouteCache();
+        EXPECT_EQ(filter->callbacks_->route().get(), mock_route_2.get());
 
-  // We cannot set route after response headers are sent.
-  filter->callbacks_->downstreamCallbacks()->setRoute(nullptr);
-  EXPECT_EQ(filter->callbacks_->route().get(), mock_route_2.get());
+        // We cannot set route after response headers are sent.
+        filter->callbacks_->downstreamCallbacks()->setRoute(nullptr);
+        EXPECT_EQ(filter->callbacks_->route().get(), mock_route_2.get());
+      },
+      "Should never try to refresh or clear the route cache when it is blocked!");
 
   EXPECT_CALL(response_encoder_, encodeData(_, true));
   expectOnDestroy();
@@ -1148,6 +1152,7 @@ TEST_F(HttpConnectionManagerImplTest, BlockRouteCacheTestWithRuntimeFeatureDisab
 
   // The cached route will be cleared because the runtime feature is disabled.
   filter->callbacks_->downstreamCallbacks()->clearRouteCache();
+  EXPECT_CALL(*route_config_provider_.route_config_, route(_, _, _, _)).WillOnce(Return(nullptr));
   EXPECT_EQ(filter->callbacks_->route().get(), nullptr);
 
   // We can set route after response headers are sent because the runtime feature is disabled.
