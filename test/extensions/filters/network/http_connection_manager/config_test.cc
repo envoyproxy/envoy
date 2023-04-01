@@ -1628,7 +1628,7 @@ TEST_F(HttpConnectionManagerConfigTest, FlushAccessLogOnNewRequest) {
 
   {
     std::string deprecated_yaml_string = base_yaml_string + R"EOF(
-      flush_access_log_on_new_request: false # deprecated field
+      flush_access_log_on_new_request: true # deprecated field
     )EOF";
 
     HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(deprecated_yaml_string), context_,
