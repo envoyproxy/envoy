@@ -68,6 +68,10 @@ TEST(ConfigTest, FlushAccessLogOnConnected) {
     Config config_obj(constructConfigFromYaml(yaml, factory_context));
     EXPECT_TRUE(config_obj.sharedConfig()->flushAccessLogOnConnected());
   }
+}
+
+TEST(ConfigTest, DEPRECATED_FEATURE_TEST(DeprecatedFlushAccessLogOnConnected)) {
+  NiceMock<Server::Configuration::MockFactoryContext> factory_context;
 
   {
     const std::string deprecated_yaml = R"EOF(
@@ -117,18 +121,20 @@ TEST(ConfigTest, AccessLogFlushInterval) {
     EXPECT_TRUE(config_obj.sharedConfig()->accessLogFlushInterval().has_value());
     EXPECT_EQ(std::chrono::seconds(1), config_obj.sharedConfig()->accessLogFlushInterval().value());
   }
+}
 
-  {
-    const std::string deprecated_yaml = R"EOF(
-      stat_prefix: name
-      cluster: foo
-      access_log_flush_interval: 1s # deprecated field
-    )EOF";
+TEST(ConfigTest, DEPRECATED_FEATURE_TEST(DeprecatedAccessLogFlushInterval)) {
+  NiceMock<Server::Configuration::MockFactoryContext> factory_context;
 
-    Config config_obj(constructConfigFromYaml(deprecated_yaml, factory_context));
-    EXPECT_TRUE(config_obj.sharedConfig()->accessLogFlushInterval().has_value());
-    EXPECT_EQ(std::chrono::seconds(1), config_obj.sharedConfig()->accessLogFlushInterval().value());
-  }
+  const std::string deprecated_yaml = R"EOF(
+    stat_prefix: name
+    cluster: foo
+    access_log_flush_interval: 1s # deprecated field
+  )EOF";
+
+  Config config_obj(constructConfigFromYaml(deprecated_yaml, factory_context));
+  EXPECT_TRUE(config_obj.sharedConfig()->accessLogFlushInterval().has_value());
+  EXPECT_EQ(std::chrono::seconds(1), config_obj.sharedConfig()->accessLogFlushInterval().value());
 }
 
 TEST(ConfigTest, CustomTimeout) {
