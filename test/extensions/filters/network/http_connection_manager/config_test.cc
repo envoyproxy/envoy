@@ -1626,7 +1626,7 @@ TEST_F(HttpConnectionManagerConfigTest, FlushAccessLogOnNewRequest) {
 }
 
 TEST_F(HttpConnectionManagerConfigTest,
-      DEPRECATED_FEATURE_TEST(DeprecatedFlushAccessLogOnNewRequest)) {
+       DEPRECATED_FEATURE_TEST(DeprecatedFlushAccessLogOnNewRequest)) {
   std::string yaml_string = R"EOF(
     codec_type: http1
     stat_prefix: my_stat_prefix
@@ -1647,10 +1647,10 @@ TEST_F(HttpConnectionManagerConfigTest,
     flush_access_log_on_new_request: true # deprecated field
   )EOF";
 
-  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string),
-                                      context_, date_provider_, route_config_provider_manager_,
-                                      scoped_routes_config_provider_manager_, tracer_manager_,
-                                      filter_config_provider_manager_);
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_,
+                                     scoped_routes_config_provider_manager_, tracer_manager_,
+                                     filter_config_provider_manager_);
 
   EXPECT_TRUE(config.flushAccessLogOnNewRequest());
 }
@@ -1700,8 +1700,7 @@ TEST_F(HttpConnectionManagerConfigTest, AccessLogFlushInterval) {
   }
 }
 
-TEST_F(HttpConnectionManagerConfigTest,
-       DEPRECATED_FEATURE_TEST(DeprecatedAccessLogFlushInterval)) {
+TEST_F(HttpConnectionManagerConfigTest, DEPRECATED_FEATURE_TEST(DeprecatedAccessLogFlushInterval)) {
   std::string yaml_string = R"EOF(
     codec_type: http1
     stat_prefix: my_stat_prefix
@@ -1722,10 +1721,10 @@ TEST_F(HttpConnectionManagerConfigTest,
     access_log_flush_interval: 1s # deprecated field
   )EOF";
 
-  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string),
-                                      context_, date_provider_, route_config_provider_manager_,
-                                      scoped_routes_config_provider_manager_, tracer_manager_,
-                                      filter_config_provider_manager_);
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_,
+                                     scoped_routes_config_provider_manager_, tracer_manager_,
+                                     filter_config_provider_manager_);
 
   EXPECT_TRUE(config.accessLogFlushInterval().has_value());
   EXPECT_EQ(std::chrono::seconds(1), config.accessLogFlushInterval().value());
