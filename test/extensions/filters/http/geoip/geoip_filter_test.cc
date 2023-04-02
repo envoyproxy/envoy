@@ -73,6 +73,7 @@ public:
   absl::optional<std::string> empty_response_;
   LookupRequest captured_rq_;
   LookupGeoHeadersCallback captured_cb_;
+  Buffer::OwnedImpl data_;
 };
 
 TEST_F(GeoipFilterTest, NoXffSuccessfulLookup) {
@@ -95,6 +96,9 @@ TEST_F(GeoipFilterTest, NoXffSuccessfulLookup) {
           DoAll(SaveArg<0>(&captured_rq_), SaveArg<1>(&captured_cb_), Invoke([this]() {
                   captured_cb_(LookupResult{{"x-geo-city", absl::make_optional("dummy-city")}});
                 })));
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data_, false));
+  Http::TestRequestTrailerMapImpl request_trailers;
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers));
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(request_headers, false));
   EXPECT_CALL(filter_callbacks_, continueDecoding());
