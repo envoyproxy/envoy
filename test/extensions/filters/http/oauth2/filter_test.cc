@@ -803,12 +803,12 @@ TEST_F(OAuth2Test, OAuthOptionsRequestAndContinue_oauth_header_passthrough_fix) 
 
 // Validates the behavior of the cookie validator.
 TEST_F(OAuth2Test, CookieValidator) {
-  expectValidCookies(CookieNames{"BearerToken", "OauthHMAC", "OauthExpires"});
+  expectValidCookies(CookieNames("BearerToken", "OauthHMAC", "OauthExpires"));
 }
 
 // Validates the behavior of the cookie validator with custom cookie names.
 TEST_F(OAuth2Test, CookieValidatorWithCustomNames) {
-  expectValidCookies(CookieNames{"CustomBearerToken", "CustomOauthHMAC", "CustomOauthExpires"});
+  expectValidCookies(CookieNames("CustomBearerToken", "CustomOauthHMAC", "CustomOauthExpires"));
 }
 
 // Validates the behavior of the cookie validator when the expires_at value is not a valid integer.
@@ -826,7 +826,7 @@ TEST_F(OAuth2Test, CookieValidatorInvalidExpiresAt) {
   };
 
   auto cookie_validator = std::make_shared<OAuth2CookieValidator>(
-      test_time_, CookieNames{"BearerToken", "OauthHMAC", "OauthExpires"});
+      test_time_, CookieNames("BearerToken", "OauthHMAC", "OauthExpires"));
   cookie_validator->setParams(request_headers, "mock-secret");
 
   EXPECT_TRUE(cookie_validator->hmacIsValid());
@@ -846,7 +846,7 @@ TEST_F(OAuth2Test, CookieValidatorCanUpdateToken) {
   };
 
   auto cookie_validator = std::make_shared<OAuth2CookieValidator>(
-      test_time_, CookieNames{"BearerToken", "OauthHMAC", "OauthExpires"});
+      test_time_, CookieNames("BearerToken", "OauthHMAC", "OauthExpires"));
   cookie_validator->setParams(request_headers, "mock-secret");
 
   EXPECT_TRUE(cookie_validator->canUpdateTokenByRefreshToken());
