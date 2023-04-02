@@ -60,10 +60,11 @@ MATCHER_P(HasGeoHeader, expected_header, "") {
 MATCHER_P(HasGeoHeadersSize, expected_size, "") {
   auto filter = std::static_pointer_cast<GeoipFilter>(arg);
   auto geo_headers = GeoipFilterPeer::geoHeaders(*filter);
-  if (expected_size == geo_headers.size()) {
+  if (expected_size == static_cast<int>(geo_headers.size())) {
     return true;
   }
-  *result_listener << "expected geo headers size=" << expected << " but was " << geo_headers.size();
+  *result_listener << "expected geo headers size=" << expected_size << " but was "
+                   << geo_headers.size();
   return false;
 }
 
@@ -82,10 +83,10 @@ MATCHER_P(HasGeoAnonHeader, expected_header, "") {
 MATCHER_P(HasAnonGeoHeadersSize, expected_size, "") {
   auto filter = std::static_pointer_cast<GeoipFilter>(arg);
   auto geo_headers = GeoipFilterPeer::geoAnonHeaders(*filter);
-  if (expected_size == geo_headers.size()) {
+  if (expected_size == static_cast<int>(geo_headers.size())) {
     return true;
   }
-  *result_listener << "expected geo anon headers size=" << expected << " but was "
+  *result_listener << "expected geo anon headers size=" << expected_size << " but was "
                    << geo_headers.size();
   return false;
 }
