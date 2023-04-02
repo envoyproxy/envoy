@@ -426,7 +426,7 @@ void ExtProcFuzzHelper::randomizeResponse(ProcessingResponse* resp, const Proces
   // 6. Randomize response_trailers message
   case ResponseType::ResponseTrailers: {
     ENVOY_LOG_MISC(trace, "ProcessingResponse setting response_trailers response");
-    HeaderMutation* header_mutation = resp->mutable_request_trailers()->mutable_header_mutation();
+    HeaderMutation* header_mutation = resp->mutable_response_trailers()->mutable_header_mutation();
     randomizeHeaderMutation(header_mutation, req, true);
     break;
   }

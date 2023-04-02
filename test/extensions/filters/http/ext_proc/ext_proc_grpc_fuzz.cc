@@ -8,7 +8,6 @@
 //    - Threads and fake gRPC client above might help
 //    - Local testing had almost 800k inline 8 bit counters resulting in ~3
 //      exec/s. How far can we reduce the number of counters?
-//    - At the loss of reproducibility use a persistent envoy
 // 5. Protobuf fuzzing would greatly increase crash test case readability
 //    - How will this impact speed?
 //    - Can it be done on single thread as well?
@@ -67,10 +66,16 @@ public:
   Grpc::ClientType clientType() const override { return client_type_; }
 
   void initializeFuzzer(bool autonomous_upstream) {
+    if (config_initialized_) {
+      return;
+    }
     autonomous_upstream_ = autonomous_upstream;
     autonomous_allow_incomplete_streams_ = true;
     initializeConfig();
     HttpIntegrationTest::initialize();
+    auto conn = makeClientConnection(lookupPort("http"));
+    codec_client_ = makeHttpConnection(std::move(conn));
+    config_initialized_ = true;
   }
 
   void initializeConfig() {
@@ -116,8 +121,6 @@ public:
   IntegrationStreamDecoderPtr sendDownstreamRequest(
       absl::optional<std::function<void(Http::HeaderMap& headers)>> modify_headers,
       absl::string_view http_method = "GET") {
-    auto conn = makeClientConnection(lookupPort("http"));
-    codec_client_ = makeHttpConnection(std::move(conn));
     Http::TestRequestHeaderMapImpl headers{{":method", std::string(http_method)}};
     if (modify_headers) {
       (*modify_headers)(headers);
@@ -130,8 +133,6 @@ public:
       absl::string_view body,
       absl::optional<std::function<void(Http::HeaderMap& headers)>> modify_headers,
       absl::string_view http_method = "POST") {
-    auto conn = makeClientConnection(lookupPort("http"));
-    codec_client_ = makeHttpConnection(std::move(conn));
     Http::TestRequestHeaderMapImpl headers{{":method", std::string(http_method)}};
     HttpTestUtility::addDefaultHeaders(headers, false);
     if (modify_headers) {
@@ -144,8 +145,6 @@ public:
       FuzzedDataProvider* fdp, ExtProcFuzzHelper* fh,
       absl::optional<std::function<void(Http::HeaderMap& headers)>> modify_headers,
       absl::string_view http_method = "POST") {
-    auto conn = makeClientConnection(lookupPort("http"));
-    codec_client_ = makeHttpConnection(std::move(conn));
     Http::TestRequestHeaderMapImpl headers{{":method", std::string(http_method)}};
     HttpTestUtility::addDefaultHeaders(headers, false);
     if (modify_headers) {
@@ -222,7 +221,13 @@ public:
   TestProcessor test_processor_;
   Network::Address::IpVersion ip_version_;
   Grpc::ClientType client_type_;
+  bool config_initialized_{false};
 };
+
+// Using persistent Envoy and ext_proc test server.
+static std::unique_ptr<ExtProcIntegrationFuzz> fuzzer = nullptr;
+static std::unique_ptr<ExtProcFuzzHelper> fuzz_helper = nullptr;
+static bool test_server_started = false;
 
 DEFINE_PROTO_FUZZER(const test::extensions::filters::http::ext_proc::ExtProcGrpcTestCase& input) {
   try {
@@ -239,64 +244,65 @@ DEFINE_PROTO_FUZZER(const test::extensions::filters::http::ext_proc::ExtProcGrpc
   FuzzedDataProvider ext_proc_provider(
       reinterpret_cast<const uint8_t*>(input.ext_proc_data().data()), input.ext_proc_data().size());
 
-  // Get IP and gRPC version from environment
-  ExtProcIntegrationFuzz fuzzer(TestEnvironment::getIpVersionsForTest()[0],
-                                TestEnvironment::getsGrpcVersionsForTest()[0]);
-  ExtProcFuzzHelper fuzz_helper(&ext_proc_provider);
+  // Initialize fuzzer once with IP and gRPC version from environment
+  if (fuzzer == nullptr) {
+    fuzzer = std::make_unique<ExtProcIntegrationFuzz>(
+        TestEnvironment::getIpVersionsForTest()[0], TestEnvironment::getsGrpcVersionsForTest()[0]);
+  }
+  // Initialize fuzz_helper every execution.
+  fuzz_helper.reset();
+  fuzz_helper = std::make_unique<ExtProcFuzzHelper>(&ext_proc_provider);
 
-  // This starts an external processor in a separate thread. This allows for the
-  // external process to consume messages in a loop without blocking the fuzz
-  // target from receiving the response.
-  fuzzer.test_processor_.start(
-      fuzzer.ip_version_,
-      [&fuzz_helper](grpc::ServerReaderWriter<ProcessingResponse, ProcessingRequest>* stream) {
-        while (true) {
-          ProcessingRequest req;
-          if (!stream->Read(&req)) {
-            return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT, "expected message");
+  // Initiazlize test server once.
+  if (!test_server_started) {
+    test_server_started = true;
+    // This starts an external processor in a separate thread. This allows for the
+    // external process to consume messages in a loop without blocking the fuzz
+    // target from receiving the response.
+    fuzzer->test_processor_.start(
+        fuzzer->ip_version_,
+        [](grpc::ServerReaderWriter<ProcessingResponse, ProcessingRequest>* stream) {
+          while (true) {
+            ProcessingRequest req;
+            if (!stream->Read(&req)) {
+              return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT, "expected message");
+            }
+            fuzz_helper->logRequest(&req);
+            // The following blocks generate random data for the 9 fields of the
+            // ProcessingResponse gRPC message
+
+            // 1 - 7. Randomize response
+            // If true, immediately close the connection with a random Grpc Status.
+            // Otherwise randomize the response
+            ProcessingResponse resp;
+            if (fuzz_helper->provider_->ConsumeBool()) {
+              ENVOY_LOG_MISC(trace, "Immediately Closing gRPC connection");
+              return fuzz_helper->randomGrpcStatusWithMessage();
+            } else {
+              ENVOY_LOG_MISC(trace, "Generating Random ProcessingResponse");
+              fuzz_helper->randomizeResponse(&resp, &req);
+            }
+
+            // 8. Randomize dynamic_metadata
+            // TODO(ikepolinsky): ext_proc does not support dynamic_metadata
+
+            // 9. Randomize mode_override
+            if (fuzz_helper->provider_->ConsumeBool()) {
+              ENVOY_LOG_MISC(trace, "Generating Random ProcessingMode Override");
+              ProcessingMode* msg = resp.mutable_mode_override();
+              fuzz_helper->randomizeOverrideResponse(msg);
+            }
+            ENVOY_LOG_MISC(trace, "Response generated, writing to stream.");
+            stream->Write(resp);
           }
-
-          fuzz_helper.logRequest(&req);
-
-          // The following blocks generate random data for the 9 fields of the
-          // ProcessingResponse gRPC message
-
-          // 1 - 7. Randomize response
-          // If true, immediately close the connection with a random Grpc Status.
-          // Otherwise randomize the response
-          ProcessingResponse resp;
-          if (fuzz_helper.provider_->ConsumeBool()) {
-            ENVOY_LOG_MISC(trace, "Immediately Closing gRPC connection");
-            return fuzz_helper.randomGrpcStatusWithMessage();
-          } else {
-            ENVOY_LOG_MISC(trace, "Generating Random ProcessingResponse");
-            fuzz_helper.randomizeResponse(&resp, &req);
-          }
-
-          // 8. Randomize dynamic_metadata
-          // TODO(ikepolinsky): ext_proc does not support dynamic_metadata
-
-          // 9. Randomize mode_override
-          if (fuzz_helper.provider_->ConsumeBool()) {
-            ENVOY_LOG_MISC(trace, "Generating Random ProcessingMode Override");
-            ProcessingMode* msg = resp.mutable_mode_override();
-            fuzz_helper.randomizeOverrideResponse(msg);
-          }
-
-          ENVOY_LOG_MISC(trace, "Response generated, writing to stream.");
-          stream->Write(resp);
-        }
-
-        return grpc::Status::OK;
-      });
-
-  ENVOY_LOG_MISC(trace, "External Process started.");
-
-  fuzzer.initializeFuzzer(true);
+          return grpc::Status::OK;
+        });
+  }
+  // Initialize Envoy once.
+  fuzzer->initializeFuzzer(true);
   ENVOY_LOG_MISC(trace, "Fuzzer initialized");
 
-  const auto response = fuzzer.randomDownstreamRequest(&downstream_provider, &fuzz_helper);
-
+  const auto response = fuzzer->randomDownstreamRequest(&downstream_provider, fuzz_helper.get());
   // For fuzz testing we don't care about the response code, only that
   // the stream ended in some graceful manner
   ENVOY_LOG_MISC(trace, "Waiting for response.");
@@ -308,7 +314,6 @@ DEFINE_PROTO_FUZZER(const test::extensions::filters::http::ext_proc::ExtProcGrpc
     // reduce executions/second.
     ENVOY_LOG_MISC(trace, "Response timed out.");
   }
-  fuzzer.tearDown();
 }
 
 } // namespace ExternalProcessing
