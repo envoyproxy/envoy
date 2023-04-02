@@ -31,7 +31,6 @@ envoy_cc_library(
         "@envoy//source/extensions/path/match/uri_template:config",
         "@envoy//source/extensions/path/rewrite/uri_template:config",
         "@envoy//source/extensions/request_id/uuid:config",
-        "@envoy//source/extensions/udp_packet_writer/default:config",
         "@envoy//source/extensions/transport_sockets/http_11_proxy:upstream_config",
         "@envoy//source/extensions/transport_sockets/raw_buffer:config",
         "@envoy//source/extensions/transport_sockets/tls/cert_validator:cert_validator_lib",
@@ -67,6 +66,7 @@ envoy_cc_library(
         "@envoy",
     ) + envoy_select_envoy_mobile_listener(
         [
+            "@envoy//source/extensions/udp_packet_writer/default:config",
             "@envoy//source/extensions/listener_managers/listener_manager:listener_manager_lib",
             "@envoy//source/extensions/listener_managers/listener_manager:connection_handler_lib",
         ],

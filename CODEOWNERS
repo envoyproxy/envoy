@@ -306,6 +306,7 @@ extensions/filters/http/oauth2 @derekargueta @snowp
 # IP Geolocation
 /*/extensions/filters/http/geoip @nezdolik @mattklein123
 
+/*/extensions/health_checkers/common @snowp @zuercher
 
 # Intentionally exempt (treated as core code)
 /*/extensions/filters/common @UNOWNED @UNOWNED
