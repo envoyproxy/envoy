@@ -37,8 +37,8 @@ std::chrono::nanoseconds checkDuration(std::chrono::nanoseconds last,
 class StreamInfoImplTest : public testing::Test {
 protected:
   void assertStreamInfoSize(StreamInfoImpl stream_info) {
-    ASSERT_TRUE(sizeof(stream_info) == 800 || sizeof(stream_info) == 816 ||
-                sizeof(stream_info) == 840)
+    ASSERT_TRUE(sizeof(stream_info) == 832 || sizeof(stream_info) == 848 ||
+                sizeof(stream_info) == 880)
         << "If adding fields to StreamInfoImpl, please check to see if you "
            "need to add them to setFromForRecreateStream or setFrom! Current size "
         << sizeof(stream_info);
@@ -91,6 +91,10 @@ TEST_F(StreamInfoImplTest, TimingTest) {
   EXPECT_FALSE(timing.downstreamHandshakeComplete());
   info.downstreamTiming().onDownstreamHandshakeComplete(test_time_.timeSystem());
   dur = checkDuration(dur, timing.downstreamHandshakeComplete());
+
+  EXPECT_FALSE(timing.upstreamHandshakeComplete());
+  upstream_timing.onUpstreamHandshakeComplete(test_time_.timeSystem());
+  dur = checkDuration(dur, timing.upstreamHandshakeComplete());
 
   EXPECT_FALSE(timing.lastDownstreamAckReceived());
   info.downstreamTiming().onLastDownstreamAckReceived(test_time_.timeSystem());
@@ -259,6 +263,7 @@ TEST_F(StreamInfoImplTest, SetFromForRecreateStream) {
   EXPECT_EQ(s1.protocol(), s2.protocol());
   EXPECT_EQ(s1.bytesReceived(), s2.bytesReceived());
   EXPECT_EQ(s1.getDownstreamBytesMeter(), s2.getDownstreamBytesMeter());
+  EXPECT_EQ(s1.downstreamTransportFailureReason(), s2.downstreamTransportFailureReason());
 }
 
 TEST_F(StreamInfoImplTest, SetFrom) {
@@ -292,6 +297,9 @@ TEST_F(StreamInfoImplTest, SetFrom) {
   s1.setTraceReason(Tracing::Reason::ClientForced);
   s1.setFilterChainName("foobar");
   s1.setAttemptCount(5);
+  s1.setDownstreamTransportFailureReason("error");
+  s1.addBytesSent(1);
+  s1.setIsShadow(true);
 
 #ifdef __clang__
 #if defined(__linux__)
@@ -303,6 +311,7 @@ TEST_F(StreamInfoImplTest, SetFrom) {
 
   StreamInfoImpl s2(Http::Protocol::Http11, test_time_.timeSystem(), nullptr);
   Http::TestRequestHeaderMapImpl headers2;
+  s2.setStreamState(StreamState::Ended);
   s2.setFrom(s1, &headers2);
 
   // Copied by setFromForRecreateStream
@@ -313,6 +322,7 @@ TEST_F(StreamInfoImplTest, SetFrom) {
   EXPECT_EQ(s1.protocol(), s2.protocol());
   EXPECT_EQ(s1.bytesReceived(), s2.bytesReceived());
   EXPECT_EQ(s1.getDownstreamBytesMeter(), s2.getDownstreamBytesMeter());
+  EXPECT_EQ(s1.downstreamTransportFailureReason(), s2.downstreamTransportFailureReason());
 
   // Copied by setFrom
   EXPECT_EQ(s1.getRouteName(), s2.getRouteName());
@@ -343,6 +353,8 @@ TEST_F(StreamInfoImplTest, SetFrom) {
   EXPECT_EQ(s1.filterChainName(), s2.filterChainName());
   EXPECT_EQ(s1.attemptCount(), s2.attemptCount());
   EXPECT_EQ(s1.getUpstreamBytesMeter(), s2.getUpstreamBytesMeter());
+  EXPECT_EQ(s1.bytesSent(), s2.bytesSent());
+  EXPECT_EQ(s1.isShadow(), s2.isShadow());
 }
 
 TEST_F(StreamInfoImplTest, DynamicMetadataTest) {
@@ -376,6 +388,7 @@ TEST_F(StreamInfoImplTest, DynamicMetadataTest) {
 
 TEST_F(StreamInfoImplTest, DumpStateTest) {
   StreamInfoImpl stream_info(Http::Protocol::Http2, test_time_.timeSystem(), nullptr);
+  stream_info.setStreamState(StreamState::InProgress);
   std::string prefix = "";
 
   for (int i = 0; i < 7; ++i) {
@@ -384,8 +397,23 @@ TEST_F(StreamInfoImplTest, DumpStateTest) {
     std::string state = out.str();
     EXPECT_TRUE(absl::StartsWith(state, prefix));
     EXPECT_THAT(state, testing::HasSubstr("protocol_: 2"));
+    EXPECT_THAT(state, testing::HasSubstr("stream_state_: 2"));
     prefix = prefix + "  ";
   }
+}
+
+TEST_F(StreamInfoImplTest, StreamStateTest) {
+  StreamInfoImpl stream_info(Http::Protocol::Http2, test_time_.timeSystem(), nullptr);
+  EXPECT_EQ(absl::nullopt, stream_info.streamState());
+
+  stream_info.setStreamState(StreamState::Started);
+  EXPECT_EQ(StreamState::Started, stream_info.streamState());
+
+  stream_info.setStreamState(StreamState::InProgress);
+  EXPECT_EQ(StreamState::InProgress, stream_info.streamState());
+
+  stream_info.setStreamState(StreamState::Ended);
+  EXPECT_EQ(StreamState::Ended, stream_info.streamState());
 }
 
 TEST_F(StreamInfoImplTest, RequestHeadersTest) {
@@ -419,6 +447,14 @@ TEST_F(StreamInfoImplTest, Details) {
   stream_info.setResponseCodeDetails("two_words");
   ASSERT_TRUE(stream_info.responseCodeDetails().has_value());
   EXPECT_EQ(stream_info.responseCodeDetails().value(), "two_words");
+}
+
+TEST_F(StreamInfoImplTest, DownstreamTransportFailureReason) {
+  StreamInfoImpl stream_info(test_time_.timeSystem(), nullptr);
+  EXPECT_TRUE(stream_info.downstreamTransportFailureReason().empty());
+  stream_info.setDownstreamTransportFailureReason("TLS error");
+  EXPECT_FALSE(stream_info.downstreamTransportFailureReason().empty());
+  EXPECT_EQ(stream_info.downstreamTransportFailureReason(), "TLS error");
 }
 
 TEST(UpstreamInfoImplTest, DumpState) {

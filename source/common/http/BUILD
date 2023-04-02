@@ -3,6 +3,7 @@ load(
     "envoy_cc_library",
     "envoy_package",
     "envoy_select_enable_http3",
+    "envoy_select_enable_http_datagrams",
 )
 
 licenses(["notice"])  # Apache 2
@@ -487,6 +488,7 @@ envoy_cc_library(
         ":header_map_lib",
         ":headers_lib",
         ":message_lib",
+        "//envoy/common:regex_interface",
         "//envoy/http:codes_interface",
         "//envoy/http:filter_interface",
         "//envoy/http:header_map_interface",
@@ -529,7 +531,9 @@ envoy_cc_library(
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
         "@envoy_api//envoy/type/v3:pkg_cc_proto",
-    ],
+    ] + envoy_select_enable_http_datagrams([
+        "@com_github_google_quiche//:quiche_common_structured_headers_lib",
+    ]),
 )
 
 envoy_cc_library(
@@ -573,5 +577,18 @@ envoy_cc_library(
     deps = [
         "//envoy/http:codes_interface",
         "//source/common/common:assert_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "header_mutation_lib",
+    srcs = ["header_mutation.cc"],
+    hdrs = ["header_mutation.h"],
+    deps = [
+        ":header_map_lib",
+        ":utility_lib",
+        "//envoy/http:header_evaluator",
+        "//source/common/router:header_parser_lib",
+        "@envoy_api//envoy/config/common/mutation_rules/v3:pkg_cc_proto",
     ],
 )

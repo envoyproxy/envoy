@@ -35,12 +35,12 @@ public:
       bootstrap.mutable_dynamic_resources()
           ->mutable_cds_config()
           ->mutable_path_config_source()
-          ->set_path(cds_helper_.cds_path());
+          ->set_path(cds_helper_.cdsPath());
       bootstrap.mutable_static_resources()->clear_clusters();
 
       const std::string filter =
           fmt::format(R"EOF(
-name: envoy.filters.http.dynamic_forward_proxy
+name: envoy.filters.network.sni_dynamic_forward_proxy
 typed_config:
   "@type": type.googleapis.com/envoy.extensions.filters.network.sni_dynamic_forward_proxy.v3.FilterConfig
   dns_cache_config:

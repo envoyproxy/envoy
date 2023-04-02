@@ -22,6 +22,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 //
 
 message OAuth2Credentials {
+  // [#next-free-field: 6]
   message CookieNames {
     // Cookie name to hold OAuth bearer token value. When the authentication server validates the
     // client and returns an authorization token back to the OAuth filter, no matter what format
@@ -37,6 +38,14 @@ message OAuth2Credentials {
 
     // Cookie name to hold OAuth expiry value. Defaults to ``OauthExpires``.
     string oauth_expires = 3
+        [(validate.rules).string = {well_known_regex: HTTP_HEADER_NAME ignore_empty: true}];
+
+    // Cookie name to hold the id token. Defaults to ``IdToken``.
+    string id_token = 4
+        [(validate.rules).string = {well_known_regex: HTTP_HEADER_NAME ignore_empty: true}];
+
+    // Cookie name to hold the refresh token. Defaults to ``RefreshToken``.
+    string refresh_token = 5
         [(validate.rules).string = {well_known_regex: HTTP_HEADER_NAME ignore_empty: true}];
   }
 

@@ -14,8 +14,6 @@
 #include "source/common/network/filter_matcher.h"
 
 #include "test/integration/filters/add_body_filter.pb.h"
-#include "test/integration/filters/test_listener_filter.h"
-#include "test/integration/filters/test_listener_filter.pb.h"
 #include "test/mocks/init/mocks.h"
 #include "test/mocks/local_info/mocks.h"
 #include "test/mocks/protobuf/mocks.h"
@@ -23,6 +21,7 @@
 #include "test/mocks/thread_local/mocks.h"
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/printers.h"
+#include "test/test_common/registry.h"
 #include "test/test_common/simulated_time_system.h"
 #include "test/test_common/utility.h"
 
@@ -40,53 +39,114 @@ namespace Envoy {
 namespace Filter {
 namespace {
 
+class TestFilterFactory {
+public:
+  virtual ~TestFilterFactory() = default;
+
+  bool created_{false};
+};
+
+class TestHttpFilterFactory : public TestFilterFactory,
+                              public Server::Configuration::NamedHttpFilterConfigFactory,
+                              public Server::Configuration::UpstreamHttpFilterConfigFactory {
+public:
+  Http::FilterFactoryCb
+  createFilterFactoryFromProto(const Protobuf::Message&, const std::string&,
+                               Server::Configuration::FactoryContext&) override {
+    created_ = true;
+    return [](Http::FilterChainFactoryCallbacks&) -> void {};
+  }
+  Http::FilterFactoryCb
+  createFilterFactoryFromProto(const Protobuf::Message&, const std::string&,
+                               Server::Configuration::UpstreamHttpFactoryContext&) override {
+    created_ = true;
+    return [](Http::FilterChainFactoryCallbacks&) -> void {};
+  }
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return std::make_unique<ProtobufWkt::StringValue>();
+  }
+  std::string name() const override { return "envoy.test.filter"; }
+  bool isTerminalFilterByProto(const Protobuf::Message&,
+                               Server::Configuration::ServerFactoryContext&) override {
+    return true;
+  }
+};
+
+class TestListenerFilterFactory : public TestFilterFactory,
+                                  public Server::Configuration::NamedListenerFilterConfigFactory {
+public:
+  Network::ListenerFilterFactoryCb
+  createListenerFilterFactoryFromProto(const Protobuf::Message&,
+                                       const Network::ListenerFilterMatcherSharedPtr&,
+                                       Server::Configuration::ListenerFactoryContext&) override {
+    created_ = true;
+    return [](Network::ListenerFilterManager&) -> void {};
+  }
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return std::make_unique<ProtobufWkt::StringValue>();
+  }
+  std::string name() const override { return "envoy.test.filter"; }
+};
+
+class TestUdpListenerFilterFactory
+    : public TestFilterFactory,
+      public Server::Configuration::NamedUdpListenerFilterConfigFactory {
+public:
+  Network::UdpListenerFilterFactoryCb
+  createFilterFactoryFromProto(const Protobuf::Message&,
+                               Server::Configuration::ListenerFactoryContext&) override {
+    created_ = true;
+    return [](Network::UdpListenerFilterManager&, Network::UdpReadFilterCallbacks&) -> void {};
+  }
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return std::make_unique<ProtobufWkt::StringValue>();
+  }
+  std::string name() const override { return "envoy.test.filter"; }
+};
+
 class FilterConfigDiscoveryTestBase {
 public:
   FilterConfigDiscoveryTestBase() {
     // For server_factory_context
-    ON_CALL(factory_context_.server_factory_context_, scope()).WillByDefault(ReturnRef(scope_));
-    ON_CALL(factory_context_, messageValidationContext())
-        .WillByDefault(ReturnRef(validation_context_));
-    ON_CALL(factory_context_.server_factory_context_, messageValidationContext())
+    ON_CALL(server_factory_context_, scope()).WillByDefault(ReturnRef(scope_));
+    ON_CALL(server_factory_context_, messageValidationContext())
         .WillByDefault(ReturnRef(validation_context_));
     ON_CALL(validation_context_, dynamicValidationVisitor())
         .WillByDefault(ReturnRef(validation_visitor_));
-    ON_CALL(factory_context_, initManager()).WillByDefault(ReturnRef(init_manager_));
     ON_CALL(init_manager_, add(_)).WillByDefault(Invoke([this](const Init::Target& target) {
       init_target_handle_ = target.createHandle("test");
     }));
     ON_CALL(init_manager_, initialize(_))
         .WillByDefault(Invoke(
             [this](const Init::Watcher& watcher) { init_target_handle_->initialize(watcher); }));
-    // Thread local storage assumes a single (main) thread with no workers.
-    ON_CALL(factory_context_.admin_, concurrency()).WillByDefault(Return(0));
-
-    ON_CALL(factory_context_, listenerConfig()).WillByDefault(ReturnRef(listener_config_));
   }
-
-  virtual ~FilterConfigDiscoveryTestBase() = default;
+  virtual ~FilterConfigDiscoveryTestBase() {
+    server_factory_context_.thread_local_.shutdownThread();
+  }
   Event::SimulatedTimeSystem& timeSystem() { return time_system_; }
 
   Event::SimulatedTimeSystem time_system_;
   NiceMock<ProtobufMessage::MockValidationContext> validation_context_;
   NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor_;
   NiceMock<Init::MockManager> init_manager_;
-  NiceMock<Server::Configuration::MockFactoryContext> factory_context_;
+  NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context_;
   Init::ExpectableWatcherImpl init_watcher_;
   Init::TargetHandlePtr init_target_handle_;
   NiceMock<Stats::MockIsolatedStatsStore> store_;
   Stats::Scope& scope_{*store_.rootScope()};
-  NiceMock<Network::MockListenerConfig> listener_config_;
 };
 
 // Common base ECDS test class for HTTP filter, and TCP/UDP listener filter.
-template <class FactoryCb, class FactoryCtx, class CfgProviderMgrImpl, class ProtoType>
+template <class FactoryCb, class FactoryCtx, class CfgProviderMgrImpl, class FilterFactory,
+          class FilterCategory, class MockFactoryCtx>
 class FilterConfigDiscoveryImplTest : public FilterConfigDiscoveryTestBase {
 public:
-  FilterConfigDiscoveryImplTest() {
+  FilterConfigDiscoveryImplTest() : inject_factory_(filter_factory_) {
+    ON_CALL(factory_context_, getServerFactoryContext())
+        .WillByDefault(ReturnRef(server_factory_context_));
+    ON_CALL(factory_context_, initManager()).WillByDefault(ReturnRef(init_manager_));
     filter_config_provider_manager_ = std::make_unique<CfgProviderMgrImpl>();
   }
-  ~FilterConfigDiscoveryImplTest() override { factory_context_.thread_local_.shutdownThread(); }
 
   // Create listener filter config provider callbacks.
   DynamicFilterConfigProviderPtr<FactoryCb> createProvider(std::string name, bool warm,
@@ -99,21 +159,19 @@ public:
     config_source.add_type_urls(getTypeUrl());
     config_source.set_apply_default_config_without_warming(!warm);
     if (default_configuration || !warm) {
-      ProtoType default_config;
+      ProtobufWkt::StringValue default_config;
       config_source.mutable_default_config()->PackFrom(default_config);
     }
 
     return filter_config_provider_manager_->createDynamicFilterConfigProvider(
-        config_source, name, factory_context_.getServerFactoryContext(), factory_context_,
-        last_filter_config, getFilterType(), getMatcher());
+        config_source, name, server_factory_context_, factory_context_, last_filter_config,
+        getFilterType(), getMatcher());
   }
 
   void setup(bool warm = true, bool default_configuration = false, bool last_filter_config = true) {
     provider_ = createProvider("foo", warm, default_configuration, last_filter_config);
-    callbacks_ =
-        factory_context_.server_factory_context_.cluster_manager_.subscription_factory_.callbacks_;
-    EXPECT_CALL(*factory_context_.server_factory_context_.cluster_manager_.subscription_factory_
-                     .subscription_,
+    callbacks_ = server_factory_context_.cluster_manager_.subscription_factory_.callbacks_;
+    EXPECT_CALL(*server_factory_context_.cluster_manager_.subscription_factory_.subscription_,
                 start(_));
     if (!warm) {
       EXPECT_CALL(init_watcher_, ready());
@@ -153,16 +211,16 @@ public:
     EXPECT_EQ(0UL, store_.counter(getConfigFailCounter()).value());
   }
 
-  const std::string getTypeUrl() const {
-    ProtoType proto;
-    return proto.GetDescriptor()->full_name();
-  }
+  const std::string getTypeUrl() const { return "google.protobuf.StringValue"; }
 
   virtual const std::string getFilterType() const PURE;
   virtual const Network::ListenerFilterMatcherSharedPtr getMatcher() const { return nullptr; }
   virtual const std::string getConfigReloadCounter() const PURE;
   virtual const std::string getConfigFailCounter() const PURE;
 
+  NiceMock<MockFactoryCtx> factory_context_;
+  FilterFactory filter_factory_;
+  Registry::InjectFactory<FilterCategory> inject_factory_;
   std::unique_ptr<FilterConfigProviderManager<FactoryCb, FactoryCtx>>
       filter_config_provider_manager_;
   DynamicFilterConfigProviderPtr<FactoryCb> provider_;
@@ -171,10 +229,28 @@ public:
 
 // HTTP filter test
 class HttpFilterConfigDiscoveryImplTest
-    : public FilterConfigDiscoveryImplTest<NamedHttpFilterFactoryCb,
-                                           Server::Configuration::FactoryContext,
-                                           HttpFilterConfigProviderManagerImpl,
-                                           envoy::extensions::filters::http::router::v3::Router> {
+    : public FilterConfigDiscoveryImplTest<
+          NamedHttpFilterFactoryCb, Server::Configuration::FactoryContext,
+          HttpFilterConfigProviderManagerImpl, TestHttpFilterFactory,
+          Server::Configuration::NamedHttpFilterConfigFactory,
+          Server::Configuration::MockFactoryContext> {
+public:
+  const std::string getFilterType() const override { return "http"; }
+  const std::string getConfigReloadCounter() const override {
+    return "extension_config_discovery.http_filter.foo.config_reload";
+  }
+  const std::string getConfigFailCounter() const override {
+    return "extension_config_discovery.http_filter.foo.config_fail";
+  }
+};
+
+// HTTP upstream filter test
+class HttpUpstreamFilterConfigDiscoveryImplTest
+    : public FilterConfigDiscoveryImplTest<
+          NamedHttpFilterFactoryCb, Server::Configuration::UpstreamHttpFactoryContext,
+          UpstreamHttpFilterConfigProviderManagerImpl, TestHttpFilterFactory,
+          Server::Configuration::UpstreamHttpFilterConfigFactory,
+          Server::Configuration::MockUpstreamHttpFactoryContext> {
 public:
   const std::string getFilterType() const override { return "http"; }
   const std::string getConfigReloadCounter() const override {
@@ -189,8 +265,9 @@ public:
 class TcpListenerFilterConfigDiscoveryImplTest
     : public FilterConfigDiscoveryImplTest<
           Network::ListenerFilterFactoryCb, Server::Configuration::ListenerFactoryContext,
-          TcpListenerFilterConfigProviderManagerImpl,
-          ::test::integration::filters::TestInspectorFilterConfig> {
+          TcpListenerFilterConfigProviderManagerImpl, TestListenerFilterFactory,
+          Server::Configuration::NamedListenerFilterConfigFactory,
+          Server::Configuration::MockFactoryContext> {
 public:
   const std::string getFilterType() const override { return "listener"; }
   const std::string getConfigReloadCounter() const override {
@@ -205,8 +282,9 @@ public:
 class UdpListenerFilterConfigDiscoveryImplTest
     : public FilterConfigDiscoveryImplTest<
           Network::UdpListenerFilterFactoryCb, Server::Configuration::ListenerFactoryContext,
-          UdpListenerFilterConfigProviderManagerImpl,
-          test::integration::filters::TestUdpListenerFilterConfig> {
+          UdpListenerFilterConfigProviderManagerImpl, TestUdpListenerFilterFactory,
+          Server::Configuration::NamedUdpListenerFilterConfigFactory,
+          Server::Configuration::MockFactoryContext> {
 public:
   const std::string getFilterType() const override { return "listener"; }
   const std::string getConfigReloadCounter() const override {
@@ -227,7 +305,8 @@ class FilterConfigDiscoveryImplTestParameter : public testing::Test {};
 
 // The test filter types.
 using FilterConfigDiscoveryTestTypes =
-    ::testing::Types<HttpFilterConfigDiscoveryImplTest, TcpListenerFilterConfigDiscoveryImplTest,
+    ::testing::Types<HttpFilterConfigDiscoveryImplTest, HttpUpstreamFilterConfigDiscoveryImplTest,
+                     TcpListenerFilterConfigDiscoveryImplTest,
                      UdpListenerFilterConfigDiscoveryImplTest>;
 
 TYPED_TEST_SUITE(FilterConfigDiscoveryImplTestParameter, FilterConfigDiscoveryTestTypes);
@@ -252,7 +331,10 @@ TYPED_TEST(FilterConfigDiscoveryImplTestParameter, Basic) {
     const auto decoded_resources =
         TestUtility::decodeResources<envoy::config::core::v3::TypedExtensionConfig>(response);
 
-    EXPECT_CALL(config_discovery_test.init_watcher_, ready());
+    EXPECT_CALL(config_discovery_test.init_watcher_, ready())
+        .WillOnce(Invoke([&config_discovery_test]() {
+          EXPECT_TRUE(config_discovery_test.filter_factory_.created_);
+        }));
     config_discovery_test.callbacks_->onConfigUpdate(decoded_resources.refvec_,
                                                      response.version_info());
     EXPECT_NE(absl::nullopt, config_discovery_test.provider_->config());
@@ -432,7 +514,7 @@ TYPED_TEST(FilterConfigDiscoveryImplTestParameter, WrongDefaultConfig) {
       "type.googleapis.com/test.integration.filters.Bogus");
   EXPECT_THROW_WITH_MESSAGE(
       config_discovery_test.filter_config_provider_manager_->createDynamicFilterConfigProvider(
-          config_source, "foo", config_discovery_test.factory_context_.getServerFactoryContext(),
+          config_source, "foo", config_discovery_test.server_factory_context_,
           config_discovery_test.factory_context_, true, config_discovery_test.getFilterType(),
           config_discovery_test.getMatcher()),
       EnvoyException,
@@ -457,7 +539,7 @@ TYPED_TEST(FilterConfigDiscoveryImplTestParameter, TerminalFilterInvalid) {
   - "@type": type.googleapis.com/envoy.config.core.v3.TypedExtensionConfig
     name: foo
     typed_config:
-      "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+      "@type": type.googleapis.com/google.protobuf.StringValue
   )EOF";
   const auto response =
       TestUtility::parseYaml<envoy::service::discovery::v3::DiscoveryResponse>(response_yaml);
@@ -468,7 +550,7 @@ TYPED_TEST(FilterConfigDiscoveryImplTestParameter, TerminalFilterInvalid) {
       config_discovery_test.callbacks_->onConfigUpdate(decoded_resources.refvec_,
                                                        response.version_info()),
       EnvoyException,
-      "Error: terminal filter named foo of type envoy.filters.http.router must be the last filter "
+      "Error: terminal filter named foo of type envoy.test.filter must be the last filter "
       "in a http filter chain.");
   EXPECT_EQ(
       0UL,

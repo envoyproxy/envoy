@@ -80,7 +80,7 @@ message ConnectionProperties {
 }
 
 // Defines fields that are shared by all Envoy access logs.
-// [#next-free-field: 28]
+// [#next-free-field: 33]
 message AccessLogCommon {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.data.accesslog.v2.AccessLogCommon";
@@ -215,6 +215,27 @@ message AccessLogCommon {
   // :ref:`stream_id <envoy_v3_api_field_data.accesslog.v3.AccessLogCommon.stream_id>` to
   // correlate all these intermediate log entries and final log entry.
   bool intermediate_log_entry = 27;
+
+  // If downstream connection in listener failed due to transport socket (e.g. TLS handshake), provides the
+  // failure reason from the transport socket. The format of this field depends on the configured downstream
+  // transport socket. Common TLS failures are in :ref:`TLS trouble shooting <arch_overview_ssl_trouble_shooting>`.
+  string downstream_transport_failure_reason = 28;
+
+  // For HTTP: Total number of bytes sent to the downstream by the http stream.
+  // For TCP: Total number of bytes sent to the downstream by the tcp proxy.
+  uint64 downstream_wire_bytes_sent = 29;
+
+  // For HTTP: Total number of bytes received from the downstream by the http stream. Envoy over counts sizes of received HTTP/1.1 pipelined requests by adding up bytes of requests in the pipeline to the one currently being processed.
+  // For TCP: Total number of bytes received from the downstream by the tcp proxy.
+  uint64 downstream_wire_bytes_received = 30;
+
+  // For HTTP: Total number of bytes sent to the upstream by the http stream. This value accumulates during upstream retries.
+  // For TCP: Total number of bytes sent to the upstream by the tcp proxy.
+  uint64 upstream_wire_bytes_sent = 31;
+
+  // For HTTP: Total number of bytes received from the upstream by the http stream.
+  // For TCP: Total number of bytes sent to the upstream by the tcp proxy.
+  uint64 upstream_wire_bytes_received = 32;
 }
 
 // Flags indicating occurrences during request/response processing.
@@ -384,7 +405,7 @@ message TLSProperties {
   string ja3_fingerprint = 7;
 }
 
-// [#next-free-field: 14]
+// [#next-free-field: 16]
 message HTTPRequestProperties {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.data.accesslog.v2.HTTPRequestProperties";
@@ -438,9 +459,17 @@ message HTTPRequestProperties {
 
   // Map of additional headers that have been configured to be logged.
   map<string, string> request_headers = 13;
+
+  // Number of header bytes sent to the upstream by the http stream, including protocol overhead.
+  //
+  // This value accumulates during upstream retries.
+  uint64 upstream_header_bytes_sent = 14;
+
+  // Number of header bytes received from the downstream by the http stream, including protocol overhead.
+  uint64 downstream_header_bytes_received = 15;
 }
 
-// [#next-free-field: 7]
+// [#next-free-field: 9]
 message HTTPResponseProperties {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.data.accesslog.v2.HTTPResponseProperties";
@@ -451,7 +480,7 @@ message HTTPResponseProperties {
   // Size of the HTTP response headers in bytes.
   //
   // This value is captured from the OSI layer 7 perspective, i.e. it does not
-  // include overhead from framing or encoding at other networking layers.
+  // include protocol overhead or overhead from framing or encoding at other networking layers.
   uint64 response_headers_bytes = 2;
 
   // Size of the HTTP response body in bytes.
@@ -468,4 +497,10 @@ message HTTPResponseProperties {
 
   // The HTTP response code details.
   string response_code_details = 6;
+
+  // Number of header bytes received from the upstream by the http stream, including protocol overhead.
+  uint64 upstream_header_bytes_received = 7;
+
+  // Number of header bytes sent to the downstream by the http stream, including protocol overhead.
+  uint64 downstream_header_bytes_sent = 8;
 }

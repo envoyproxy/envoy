@@ -219,7 +219,7 @@ server_config:
             - "10.0.0.1"
 )EOF";
 
-  const std::string external_dns_table_config = R"EOF(
+  static constexpr absl::string_view external_dns_table_config = R"EOF(
 stat_prefix: "my_prefix"
 client_config:
   resolver_timeout: 1s
@@ -237,7 +237,7 @@ server_config:
     filename: {}
 )EOF";
 
-  const std::string dns_resolver_options_config_not_set = R"EOF(
+  static constexpr absl::string_view dns_resolver_options_config_not_set = R"EOF(
 stat_prefix: "my_prefix"
 client_config:
   resolver_timeout: 1s
@@ -255,7 +255,7 @@ server_config:
     filename: {}
 )EOF";
 
-  const std::string dns_resolver_options_config_set_false = R"EOF(
+  static constexpr absl::string_view dns_resolver_options_config_set_false = R"EOF(
 stat_prefix: "my_prefix"
 client_config:
   resolver_timeout: 1s
@@ -276,7 +276,7 @@ server_config:
     filename: {}
 )EOF";
 
-  const std::string dns_resolver_options_config_set_true = R"EOF(
+  static constexpr absl::string_view dns_resolver_options_config_set_true = R"EOF(
 stat_prefix: "my_prefix"
 client_config:
   resolver_timeout: 1s
@@ -2233,7 +2233,7 @@ TEST_F(DnsFilterTest, DnsResolverOptionsSetFalse) {
 }
 
 TEST_F(DnsFilterTest, DEPRECATED_FEATURE_TEST(DnsResolutionConfigExist)) {
-  const std::string dns_resolution_config_exist = R"EOF(
+  constexpr absl::string_view dns_resolution_config_exist = R"EOF(
 stat_prefix: "my_prefix"
 client_config:
   resolver_timeout: 1s
@@ -2271,7 +2271,7 @@ server_config:
 
 // test typed_dns_resolver_config exits which overrides dns_resolution_config.
 TEST_F(DnsFilterTest, DEPRECATED_FEATURE_TEST(TypedDnsResolverConfigOverrideDnsResolutionConfig)) {
-  const std::string typed_dns_resolver_config_exist = R"EOF(
+  constexpr absl::string_view typed_dns_resolver_config_exist = R"EOF(
 stat_prefix: "my_prefix"
 client_config:
   resolver_timeout: 1s
@@ -2319,7 +2319,7 @@ server_config:
 
 // test typed_dns_resolver_config exits.
 TEST_F(DnsFilterTest, TypedDnsResolverConfigExist) {
-  const std::string typed_dns_resolver_config_exist = R"EOF(
+  constexpr absl::string_view typed_dns_resolver_config_exist = R"EOF(
 stat_prefix: "my_prefix"
 client_config:
   resolver_timeout: 1s
@@ -2359,7 +2359,7 @@ server_config:
 
 // test when no DNS related config exists, an empty typed_dns_resolver_config is the parameter.
 TEST_F(DnsFilterTest, NoDnsConfigExist) {
-  const std::string no_dns_config_exist = R"EOF(
+  constexpr absl::string_view no_dns_config_exist = R"EOF(
 stat_prefix: "my_prefix"
 client_config:
   resolver_timeout: 1s

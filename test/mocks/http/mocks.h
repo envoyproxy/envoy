@@ -38,8 +38,6 @@
 #include "absl/strings/str_join.h"
 #include "gmock/gmock.h"
 
-using testing::Return;
-
 namespace Envoy {
 namespace Http {
 
@@ -586,6 +584,7 @@ public:
     ON_CALL(*this, preserveExternalRequestId()).WillByDefault(testing::Return(false));
     ON_CALL(*this, alwaysSetRequestIdInResponse()).WillByDefault(testing::Return(false));
     ON_CALL(*this, schemeToSet()).WillByDefault(testing::ReturnRef(scheme_));
+    ON_CALL(*this, addProxyProtocolConnectionState()).WillByDefault(testing::Return(true));
   }
 
   // Http::ConnectionManagerConfig
@@ -596,6 +595,8 @@ public:
 
   MOCK_METHOD(const RequestIDExtensionSharedPtr&, requestIDExtension, ());
   MOCK_METHOD(const std::list<AccessLog::InstanceSharedPtr>&, accessLogs, ());
+  MOCK_METHOD(bool, flushAccessLogOnNewRequest, ());
+  MOCK_METHOD(const absl::optional<std::chrono::milliseconds>&, accessLogFlushInterval, ());
   MOCK_METHOD(ServerConnection*, createCodec_,
               (Network::Connection&, const Buffer::Instance&, ServerConnectionCallbacks&));
   MOCK_METHOD(DateProvider&, dateProvider, ());
@@ -661,6 +662,7 @@ public:
   MOCK_METHOD(const HttpConnectionManagerProto::ProxyStatusConfig*, proxyStatusConfig, (), (const));
   MOCK_METHOD(HeaderValidatorPtr, makeHeaderValidator, (Protocol protocol));
   MOCK_METHOD(bool, appendXForwardedPort, (), (const));
+  MOCK_METHOD(bool, addProxyProtocolConnectionState, (), (const));
 
   std::unique_ptr<Http::InternalAddressConfig> internal_address_config_ =
       std::make_unique<DefaultInternalAddressConfig>();

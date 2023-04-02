@@ -9,6 +9,7 @@
 #include "source/common/singleton/manager_impl.h"
 #include "source/common/upstream/health_discovery_service.h"
 #include "source/common/upstream/transport_socket_match_impl.h"
+#include "source/extensions/health_checkers/common/health_checker_base_impl.h"
 #include "source/extensions/transport_sockets/raw_buffer/config.h"
 #include "source/extensions/transport_sockets/tls/context_manager_impl.h"
 
@@ -38,7 +39,6 @@ using testing::InSequence;
 using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
-using testing::ReturnNew;
 using testing::ReturnRef;
 
 namespace Envoy {

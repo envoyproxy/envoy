@@ -26,7 +26,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // External Authorization :ref:`configuration overview <config_http_filters_ext_authz>`.
 // [#extension: envoy.filters.http.ext_authz]
 
-// [#next-free-field: 18]
+// [#next-free-field: 19]
 message ExtAuthz {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.http.ext_authz.v2.ExtAuthz";
@@ -179,6 +179,12 @@ message ExtAuthz {
   //  consequently the value of *Content-Length* of the authorization request reflects the size of
   //  its payload size.
   type.matcher.v3.ListStringMatcher allowed_headers = 17;
+
+  // Specifies if the TLS session level details like SNI are sent to the external service.
+  //
+  // When this field is true, Envoy will include the SNI name used for TLSClientHello, if available, in the
+  // :ref:`tls_session<envoy_v3_api_field_service.auth.v3.AttributeContext.tls_session>`.
+  bool include_tls_session = 18;
 }
 
 // Configuration for buffering the request data.
@@ -258,6 +264,8 @@ message AuthorizationRequest {
 
   // Authorization request includes the client request headers that have a correspondent match
   // in the :ref:`list <envoy_v3_api_msg_type.matcher.v3.ListStringMatcher>`.
+  // This field has been deprecated in favor of :ref:`allowed_headers
+  // <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.allowed_headers>`.
   //
   // .. note::
   //
@@ -272,8 +280,6 @@ message AuthorizationRequest {
   //   <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.with_request_body>`
   //   setting) hence the value of its ``Content-Length`` reflects the size of its payload size.
   //
-  //   This field has been deprecated in favor of :ref:`allowed_headers
-  //   <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.allowed_headers>`.
   type.matcher.v3.ListStringMatcher allowed_headers = 1
       [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 

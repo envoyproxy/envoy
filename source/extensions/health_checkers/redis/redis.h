@@ -9,15 +9,27 @@
 #include "envoy/extensions/filters/network/redis_proxy/v3/redis_proxy.pb.validate.h"
 #include "envoy/extensions/health_checkers/redis/v3/redis.pb.h"
 
-#include "source/common/upstream/health_checker_base_impl.h"
 #include "source/extensions/filters/network/common/redis/client_impl.h"
 #include "source/extensions/filters/network/redis_proxy/config.h"
 #include "source/extensions/filters/network/redis_proxy/conn_pool_impl.h"
+#include "source/extensions/health_checkers/common/health_checker_base_impl.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace HealthCheckers {
 namespace RedisHealthChecker {
+
+/**
+ * All redis health checker stats. @see stats_macros.h
+ */
+#define ALL_REDIS_HEALTH_CHECKER_STATS(COUNTER) COUNTER(exists_failure)
+
+/**
+ * Definition of all redis health checker stats. @see stats_macros.h
+ */
+struct RedisHealthCheckerStats {
+  ALL_REDIS_HEALTH_CHECKER_STATS(GENERATE_COUNTER_STRUCT)
+};
 
 /**
  * Redis health checker implementation. Sends PING and expects PONG.
@@ -49,6 +61,7 @@ protected:
 
 private:
   friend class RedisHealthCheckerTest;
+  RedisHealthCheckerStats generateRedisStats(Stats::Scope& scope);
 
   struct RedisActiveHealthCheckSession
       : public ActiveHealthCheckSession,
@@ -124,6 +137,7 @@ private:
   Extensions::NetworkFilters::Common::Redis::Client::ClientFactory& client_factory_;
   Type type_;
   const std::string key_;
+  RedisHealthCheckerStats redis_stats_;
   const std::string auth_username_;
   const std::string auth_password_;
 };

@@ -29,11 +29,14 @@ BSON
 BPF
 Bdecoded
 Bencoded
+DFP
+DOM
 GiB
 IPTOS
 Repick
 SION
 TRA
+Websockets
 abc
 abcd
 abd
@@ -160,6 +163,7 @@ FIPS
 FIRSTHDR
 FQDN
 FREEBIND
+eslint
 freeifaddrs
 FUZZER
 FUZZERS
@@ -168,6 +172,7 @@ dereferencing
 differentially
 dnsresolvers
 endpos
+eps
 fo
 ghi
 golang
@@ -239,6 +244,8 @@ LEV
 LF
 LHS
 hls
+iframe
+ingressed
 integrations
 jkl
 lang
@@ -433,6 +440,7 @@ UUIDs
 VC
 VCHAR
 VCL
+VFS
 VH
 VHDS
 VLOG

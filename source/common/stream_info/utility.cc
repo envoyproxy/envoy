@@ -4,6 +4,7 @@
 
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 
+#include "source/common/common/empty_string.h"
 #include "source/common/http/default_server_string.h"
 
 #include "absl/strings/str_format.h"
@@ -98,6 +99,14 @@ absl::optional<std::chrono::nanoseconds> TimingUtility::lastUpstreamRxByteReceiv
   return duration(timing.value().get().last_upstream_rx_byte_received_, stream_info_);
 }
 
+absl::optional<std::chrono::nanoseconds> TimingUtility::upstreamHandshakeComplete() {
+  OptRef<const UpstreamTiming> timing = getUpstreamTiming(stream_info_);
+  if (!timing) {
+    return absl::nullopt;
+  }
+  return duration(timing.value().get().upstreamHandshakeComplete(), stream_info_);
+}
+
 absl::optional<std::chrono::nanoseconds> TimingUtility::firstDownstreamTxByteSent() {
   OptRef<const DownstreamTiming> timing = stream_info_.downstreamTiming();
   if (!timing) {
@@ -162,6 +171,19 @@ Utility::extractDownstreamAddressJustPort(const Network::Address::Instance& addr
     return address.ip()->port();
   }
   return {};
+}
+
+const std::string& Utility::getStreamStateString(const StreamState stream_state) {
+  switch (stream_state) {
+  case StreamState::Started:
+    return StreamStateStrings::get().StreamStarted;
+  case StreamState::InProgress:
+    return StreamStateStrings::get().StreamInProgress;
+  case StreamState::Ended:
+    return StreamStateStrings::get().StreamEnded;
+  }
+
+  return EMPTY_STRING;
 }
 
 const absl::optional<Http::Code>

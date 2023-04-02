@@ -177,6 +177,10 @@ struct StreamInfoImpl : public StreamInfo {
 
   uint64_t bytesReceived() const override { return bytes_received_; }
 
+  absl::optional<StreamState> streamState() const override { return stream_state_; }
+
+  void setStreamState(StreamState stream_state) override { stream_state_ = stream_state; }
+
   absl::optional<Http::Protocol> protocol() const override { return protocol_; }
 
   void protocol(Http::Protocol protocol) override { protocol_ = protocol; }
@@ -276,7 +280,7 @@ struct StreamInfoImpl : public StreamInfo {
     os << spaces << "StreamInfoImpl " << this << DUMP_OPTIONAL_MEMBER(protocol_)
        << DUMP_OPTIONAL_MEMBER(response_code_) << DUMP_OPTIONAL_MEMBER(response_code_details_)
        << DUMP_OPTIONAL_MEMBER(attempt_count_) << DUMP_MEMBER(health_check_request_)
-       << DUMP_MEMBER(route_name_);
+       << DUMP_MEMBER(route_name_) << DUMP_OPTIONAL_MEMBER(stream_state_);
     DUMP_DETAILS(upstream_info_);
   }
 
@@ -335,6 +339,7 @@ struct StreamInfoImpl : public StreamInfo {
     // These two are set in the constructor, but to T(recreate), and should be T(create)
     start_time_ = info.startTime();
     start_time_monotonic_ = info.startTimeMonotonic();
+    downstream_transport_failure_reason_ = std::string(info.downstreamTransportFailureReason());
   }
 
   // This function is used to copy over every field exposed in the StreamInfo interface, with a
@@ -370,10 +375,20 @@ struct StreamInfoImpl : public StreamInfo {
     filter_chain_name_ = info.filterChainName();
     attempt_count_ = info.attemptCount();
     upstream_bytes_meter_ = info.getUpstreamBytesMeter();
+    bytes_sent_ = info.bytesSent();
+    is_shadow_ = info.isShadow();
   }
 
   void setIsShadow(bool is_shadow) { is_shadow_ = is_shadow; }
   bool isShadow() const override { return is_shadow_; }
+
+  void setDownstreamTransportFailureReason(absl::string_view failure_reason) override {
+    downstream_transport_failure_reason_ = std::string(failure_reason);
+  }
+
+  absl::string_view downstreamTransportFailureReason() const override {
+    return downstream_transport_failure_reason_;
+  }
 
   TimeSource& time_source_;
   SystemTime start_time_;
@@ -381,6 +396,7 @@ struct StreamInfoImpl : public StreamInfo {
   absl::optional<MonotonicTime> final_time_;
 
   absl::optional<Http::Protocol> protocol_;
+  absl::optional<StreamState> stream_state_;
   absl::optional<uint32_t> response_code_;
   absl::optional<std::string> response_code_details_;
   absl::optional<std::string> connection_termination_details_;
@@ -408,7 +424,7 @@ private:
       FilterStateSharedPtr filter_state)
       : time_source_(time_source), start_time_(time_source.systemTime()),
         start_time_monotonic_(time_source.monotonicTime()), protocol_(protocol),
-        filter_state_(std::move(filter_state)),
+        stream_state_(absl::nullopt), filter_state_(std::move(filter_state)),
         downstream_connection_info_provider_(downstream_connection_info_provider != nullptr
                                                  ? downstream_connection_info_provider
                                                  : emptyDownstreamAddressProvider()),
@@ -428,6 +444,7 @@ private:
   BytesMeterSharedPtr upstream_bytes_meter_{std::make_shared<BytesMeter>()};
   BytesMeterSharedPtr downstream_bytes_meter_;
   bool is_shadow_{false};
+  std::string downstream_transport_failure_reason_;
 };
 
 } // namespace StreamInfo

@@ -197,6 +197,16 @@ The following command operators are supported:
   In typed JSON logs, PROTOCOL will render the string ``"-"`` if the protocol is not
   available (e.g. in TCP logs).
 
+%STREAM_STATE%
+  HTTP/TCP
+    The state of the stream. Currently either *Started* *InProgress* *Ended*.
+    For TCP, the value will be 'Started', in case an upstream connection has been successfully made. The value will be 'InProgress' in case the stream has started, and it is active. The value will be 'Ended' in case the upstream stream has been terminated.
+    For HTTP, the value will be 'Started' in case downstream headers have been received. The value will be 'InProgress' in case an upstream connection was made, success status code has been returned and the request is active. The value will be 'Ended' in case the upstream request has been termindated.
+    In case the stream has not started yet, the value will be - 'null'.
+
+  UDP
+    Not implemented ("-").
+
 %UPSTREAM_PROTOCOL%
   HTTP
     Upstream protocol. Currently either *HTTP/1.1* *HTTP/2* or *HTTP/3*.
@@ -345,6 +355,8 @@ The following command operators are supported:
     Not implemented (0).
 
   Renders a numeric value in typed JSON logs.
+
+.. _config_access_log_format_duration:
 
 %DURATION%
   HTTP/THRIFT
@@ -514,6 +526,18 @@ The following command operators are supported:
     transport socket. Common TLS failures are in :ref:`TLS trouble shooting <arch_overview_ssl_trouble_shooting>`.
 
   TCP/UDP
+    Not implemented ("-")
+
+.. _config_access_log_format_downstream_transport_failure_reason:
+
+%DOWNSTREAM_TRANSPORT_FAILURE_REASON%
+  HTTP/TCP
+    If downstream connection failed due to transport socket (e.g. TLS handshake), provides the failure
+    reason from the transport socket. The format of this field depends on the configured downstream
+    transport socket. Common TLS failures are in :ref:`TLS trouble shooting <arch_overview_ssl_trouble_shooting>`.
+    Note: it only works in listener access config, and the HTTP or TCP access logs would observe empty values.
+
+  UDP
     Not implemented ("-")
 
 %DOWNSTREAM_REMOTE_ADDRESS%

@@ -23,9 +23,7 @@ public:
                      Upstream::ThreadLocalCluster& thread_local_cluster,
                      Upstream::LoadBalancerContext* context, bool enable_half_close);
 
-  ~AsyncTcpClientImpl() override;
-
-  void close() override;
+  void close(Network::ConnectionCloseType type) override;
 
   /**
    * @return true means a host is successfully picked from a Cluster.

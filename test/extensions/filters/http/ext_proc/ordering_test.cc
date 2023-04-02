@@ -52,6 +52,7 @@ static const uint32_t BufferSize = 100000;
 class OrderingTest : public testing::Test {
 protected:
   static constexpr std::chrono::milliseconds kMessageTimeout = 200ms;
+  static constexpr uint64_t kMaxMessageTimeoutMs = 10000;
   static constexpr auto kMessageTimeoutNanos =
       std::chrono::duration_cast<std::chrono::nanoseconds>(kMessageTimeout).count();
 
@@ -69,7 +70,8 @@ protected:
     if (cb) {
       (*cb)(proto_config);
     }
-    config_.reset(new FilterConfig(proto_config, kMessageTimeout, *stats_store_.rootScope(), ""));
+    config_.reset(new FilterConfig(proto_config, kMessageTimeout, kMaxMessageTimeoutMs,
+                                   *stats_store_.rootScope(), ""));
     filter_ = std::make_unique<Filter>(config_, std::move(client_), proto_config.grpc_service());
     filter_->setEncoderFilterCallbacks(encoder_callbacks_);
     filter_->setDecoderFilterCallbacks(decoder_callbacks_);
@@ -454,7 +456,7 @@ TEST_F(OrderingTest, ResponseAllDataComesFast) {
   sendResponseHeaders(true);
   // The rest of the data might come in even before the response headers
   // response comes back.
-  EXPECT_EQ(FilterDataStatus::StopIterationAndBuffer, filter_->encodeData(resp_body_1, true));
+  EXPECT_EQ(FilterDataStatus::StopIterationAndWatermark, filter_->encodeData(resp_body_1, true));
 
   // When the response does comes back, we should immediately send the body to the server
   EXPECT_CALL(stream_delegate_, send(_, false));

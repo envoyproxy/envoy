@@ -1444,7 +1444,8 @@ TEST_P(Http2FloodMitigationTest, UpstreamRstStreamOnDownstreamRemoteClose) {
 }
 
 // Verify that the server can detect flood of request METADATA frames
-TEST_P(Http2FloodMitigationTest, RequestMetadata) {
+// TODO(#26088): re-enable once the test is flaky no longer
+TEST_P(Http2FloodMitigationTest, DISABLED_RequestMetadata) {
   config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
     ASSERT(bootstrap.mutable_static_resources()->clusters_size() >= 1, "");
     ConfigHelper::HttpProtocolOptions protocol_options;

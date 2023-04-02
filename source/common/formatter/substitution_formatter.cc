@@ -29,6 +29,7 @@
 #include "source/common/stream_info/utility.h"
 
 #include "absl/strings/str_format.h"
+#include "absl/strings/str_replace.h"
 #include "absl/strings/str_split.h"
 #include "fmt/format.h"
 
@@ -84,6 +85,15 @@ SubstitutionFormatUtils::protocolToStringOrDefault(const absl::optional<Http::Pr
     return Http::Utility::getProtocolString(protocol.value());
   }
   return DefaultUnspecifiedValueString;
+}
+
+const absl::optional<std::reference_wrapper<const std::string>>
+SubstitutionFormatUtils::streamStateToString(
+    const absl::optional<StreamInfo::StreamState>& stream_state) {
+  if (stream_state) {
+    return StreamInfo::Utility::getStreamStateString(stream_state.value());
+  }
+  return absl::nullopt;
 }
 
 const absl::optional<std::string> SubstitutionFormatUtils::getHostname() {
@@ -281,6 +291,9 @@ ProtobufWkt::Value StructFormatter::structFormatMapCallback(
       continue;
     }
     (*fields)[pair.first] = value;
+  }
+  if (omit_empty_values_ && output.fields().empty()) {
+    return ValueUtil::nullValue();
   }
   return ValueUtil::structValue(output);
 }
@@ -1077,6 +1090,15 @@ const StreamInfoFormatter::FieldExtractorLookupTbl& StreamInfoFormatter::getKnow
                                     return stream_info.requestComplete();
                                   });
                             }}},
+                          {"STREAM_STATE",
+                           {CommandSyntaxChecker::COMMAND_ONLY,
+                            [](const std::string&, const absl::optional<size_t>&) {
+                              return std::make_unique<StreamInfoStringFieldExtractor>(
+                                  [](const StreamInfo::StreamInfo& stream_info) {
+                                    return SubstitutionFormatUtils::streamStateToString(
+                                        stream_info.streamState());
+                                  });
+                            }}},
                           {"RESPONSE_FLAGS",
                            {CommandSyntaxChecker::COMMAND_ONLY,
                             [](const std::string&, const absl::optional<size_t>&) {
@@ -1473,6 +1495,20 @@ const StreamInfoFormatter::FieldExtractorLookupTbl& StreamInfoFormatter::getKnow
                               return std::make_unique<StreamInfoSslConnectionInfoFieldExtractor>(
                                   [](const Ssl::ConnectionInfo& connection_info) {
                                     return connection_info.urlEncodedPemEncodedPeerCertificate();
+                                  });
+                            }}},
+                          {"DOWNSTREAM_TRANSPORT_FAILURE_REASON",
+                           {CommandSyntaxChecker::COMMAND_ONLY,
+                            [](const std::string&, const absl::optional<size_t>&) {
+                              return std::make_unique<StreamInfoStringFieldExtractor>(
+                                  [](const StreamInfo::StreamInfo& stream_info) {
+                                    absl::optional<std::string> result;
+                                    if (!stream_info.downstreamTransportFailureReason().empty()) {
+                                      result = absl::StrReplaceAll(
+                                          stream_info.downstreamTransportFailureReason(),
+                                          {{" ", "_"}});
+                                    }
+                                    return result;
                                   });
                             }}},
                           {"UPSTREAM_TRANSPORT_FAILURE_REASON",

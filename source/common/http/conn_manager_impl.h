@@ -157,6 +157,7 @@ private:
   struct ActiveStream final : LinkedObject<ActiveStream>,
                               public Event::DeferredDeletable,
                               public StreamCallbacks,
+                              public CodecEventCallbacks,
                               public RequestDecoder,
                               public Tracing::Config,
                               public ScopeTrackedObject,
@@ -183,6 +184,10 @@ private:
                        absl::string_view transport_failure_reason) override;
     void onAboveWriteBufferHighWatermark() override;
     void onBelowWriteBufferLowWatermark() override;
+
+    // Http::CodecEventCallbacks
+    void onCodecEncodeComplete() override;
+    void onCodecLowLevelReset() override;
 
     // Http::StreamDecoder
     void decodeData(Buffer::Instance& data, bool end_stream) override;
@@ -267,9 +272,6 @@ private:
     void endStream() override {
       ASSERT(!state_.codec_saw_local_complete_);
       state_.codec_saw_local_complete_ = true;
-      filter_manager_.streamInfo().downstreamTiming().onLastDownstreamTxByteSent(
-          connection_manager_.time_source_);
-      request_response_timespan_->complete();
       connection_manager_.doEndStream(*this);
     }
     void onDecoderFilterBelowWriteBufferLowWatermark() override;
@@ -315,19 +317,31 @@ private:
     void refreshCachedTracingCustomTags();
     void refreshDurationTimeout();
     void refreshIdleTimeout();
+    void refreshAccessLogFlushTimer();
 
     // All state for the stream. Put here for readability.
     struct State {
       State()
-          : codec_saw_local_complete_(false), saw_connection_close_(false),
-            successful_upgrade_(false), is_internally_created_(false), is_tunneling_(false),
-            decorated_propagate_(true) {}
+          : codec_saw_local_complete_(false), codec_encode_complete_(false),
+            on_reset_stream_called_(false), is_zombie_stream_(false), saw_connection_close_(false),
+            successful_upgrade_(false), is_internally_destroyed_(false),
+            is_internally_created_(false), is_tunneling_(false), decorated_propagate_(true) {}
 
-      bool codec_saw_local_complete_ : 1; // This indicates that local is complete as written all
-                                          // the way through to the codec.
+      // It's possibly for the codec to see the completed response but not fully
+      // encode it.
+      bool codec_saw_local_complete_ : 1; // This indicates that local is complete as the completed
+                                          // response has made its way to the codec.
+      bool codec_encode_complete_ : 1;    // This indicates that the codec has
+                                          // completed encoding the response.
+      bool on_reset_stream_called_ : 1;   // Whether the stream has been reset.
+      bool is_zombie_stream_ : 1;         // Whether stream is waiting for signal
+                                          // the underlying codec to be destroyed.
       bool saw_connection_close_ : 1;
       bool successful_upgrade_ : 1;
 
+      // True if this stream was the original externally created stream, but was
+      // destroyed as part of internal redirect.
+      bool is_internally_destroyed_ : 1;
       // True if this stream is internally created. Currently only used for
       // internal redirects or other streams created via recreateStream().
       bool is_internally_created_ : 1;
@@ -338,6 +352,11 @@ private:
 
       bool decorated_propagate_ : 1;
     };
+
+    bool canDestroyStream() const {
+      return state_.on_reset_stream_called_ || state_.codec_encode_complete_ ||
+             state_.is_internally_destroyed_;
+    }
 
     // Per-stream idle timeout callback.
     void onIdleTimeout();
@@ -414,8 +433,13 @@ private:
     // Per-stream alive duration. This timer is enabled once when the stream is created and, if
     // triggered, will close the stream.
     Event::TimerPtr max_stream_duration_timer_;
+    // Per-stream access log flush duration. This timer is enabled once when the stream is created
+    // and will log to all access logs once per trigger.
+    Event::TimerPtr access_log_flush_timer_;
+
     std::chrono::milliseconds idle_timeout_ms_{};
     State state_;
+    const bool expand_agnostic_stream_lifetime_;
     absl::optional<Router::RouteConstSharedPtr> cached_route_;
     absl::optional<Upstream::ClusterInfoConstSharedPtr> cached_cluster_info_;
     const std::string* decorated_operation_{nullptr};

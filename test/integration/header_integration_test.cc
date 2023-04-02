@@ -1422,7 +1422,7 @@ INSTANTIATE_TEST_SUITE_P(Protocols, EmptyHeaderIntegrationTest,
                          HttpProtocolIntegrationTest::protocolTestParamsToString);
 
 TEST_P(EmptyHeaderIntegrationTest, AllProtocolsPassEmptyHeaders) {
-  auto vhost = config_helper_.createVirtualHost("empty-headers.com");
+  auto vhost = config_helper_.createVirtualHost("sni.lyft.com");
   *vhost.add_request_headers_to_add() = TestUtility::parseYaml<HeaderValueOption>(R"EOF(
     header:
       key: "x-ds-add-empty"
@@ -1451,10 +1451,8 @@ TEST_P(EmptyHeaderIntegrationTest, AllProtocolsPassEmptyHeaders) {
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
   auto response = sendRequestAndWaitForResponse(
-      Http::TestRequestHeaderMapImpl{{":method", "GET"},
-                                     {":path", "/"},
-                                     {":scheme", "http"},
-                                     {":authority", "empty-headers.com"}},
+      Http::TestRequestHeaderMapImpl{
+          {":method", "GET"}, {":path", "/"}, {":scheme", "http"}, {":authority", "sni.lyft.com"}},
       0,
       Http::TestResponseHeaderMapImpl{
           {"server", "envoy"}, {"content-length", "0"}, {":status", "200"}},

@@ -51,7 +51,6 @@ namespace {
 
 using ::testing::_;
 using ::testing::DoAll;
-using ::testing::Eq;
 using ::testing::InSequence;
 using ::testing::Invoke;
 using ::testing::InvokeWithoutArgs;
@@ -808,7 +807,7 @@ public:
 
 // Test initialization of subset load balancer with every possible load balancer policy.
 TEST_P(ClusterManagerSubsetInitializationTest, SubsetLoadBalancerInitialization) {
-  const std::string yamlPattern = R"EOF(
+  constexpr absl::string_view yamlPattern = R"EOF(
  static_resources:
   clusters:
   - name: cluster_1

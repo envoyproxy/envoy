@@ -62,6 +62,9 @@ EXTENSIONS = {
 
     "envoy.health_checkers.redis":                      "//source/extensions/health_checkers/redis:config",
     "envoy.health_checkers.thrift":                     "//source/extensions/health_checkers/thrift:config",
+    "envoy.health_checkers.tcp":                        "//source/extensions/health_checkers/tcp:health_checker_lib",
+    "envoy.health_checkers.http":                       "//source/extensions/health_checkers/http:health_checker_lib",
+    "envoy.health_checkers.grpc":                       "//source/extensions/health_checkers/grpc:health_checker_lib",
 
     #
     # Input Matchers
@@ -69,6 +72,21 @@ EXTENSIONS = {
 
     "envoy.matching.matchers.consistent_hashing":       "//source/extensions/matching/input_matchers/consistent_hashing:config",
     "envoy.matching.matchers.ip":                       "//source/extensions/matching/input_matchers/ip:config",
+
+    #
+    # Network Matchers
+    #
+
+    "envoy.matching.inputs.application_protocol":       "//source/extensions/matching/network/application_protocol:config",
+    # Ideally these would be split up. We'll do so if anyone cares.
+    "envoy.matching.inputs.destination_ip":             "//source/extensions/matching/network/common:inputs_lib",
+    "envoy.matching.inputs.destination_port":           "//source/extensions/matching/network/common:inputs_lib",
+    "envoy.matching.inputs.source_ip":                  "//source/extensions/matching/network/common:inputs_lib",
+    "envoy.matching.inputs.source_port":                "//source/extensions/matching/network/common:inputs_lib",
+    "envoy.matching.inputs.direct_source_ip":           "//source/extensions/matching/network/common:inputs_lib",
+    "envoy.matching.inputs.source_type":                "//source/extensions/matching/network/common:inputs_lib",
+    "envoy.matching.inputs.server_name":                "//source/extensions/matching/network/common:inputs_lib",
+    "envoy.matching.inputs.transport_protocol":         "//source/extensions/matching/network/common:inputs_lib",
 
     #
     # Generic Inputs
@@ -132,12 +150,14 @@ EXTENSIONS = {
     "envoy.filters.http.tap":                           "//source/extensions/filters/http/tap:config",
     "envoy.filters.http.wasm":                          "//source/extensions/filters/http/wasm:config",
     "envoy.filters.http.stateful_session":              "//source/extensions/filters/http/stateful_session:config",
+    "envoy.filters.http.header_mutation":               "//source/extensions/filters/http/header_mutation:config",
 
     #
     # Listener filters
     #
 
     "envoy.filters.listener.http_inspector":            "//source/extensions/filters/listener/http_inspector:config",
+    "envoy.filters.listener.local_ratelimit":           "//source/extensions/filters/listener/local_ratelimit:config",
     # NOTE: The original_dst filter is implicitly loaded if original_dst functionality is
     #       configured on the listener. Do not remove it in that case or configs will fail to load.
     "envoy.filters.listener.original_dst":              "//source/extensions/filters/listener/original_dst:config",
@@ -333,6 +353,7 @@ EXTENSIONS = {
     "envoy.quic.deterministic_connection_id_generator": "//source/extensions/quic/connection_id_generator:envoy_deterministic_connection_id_generator_config",
     "envoy.quic.crypto_stream.server.quiche":           "//source/extensions/quic/crypto_stream:envoy_quic_default_crypto_server_stream",
     "envoy.quic.proof_source.filter_chain":             "//source/extensions/quic/proof_source:envoy_quic_default_proof_source",
+    "envoy.quic.server_preferred_address.fixed":        "//source/extensions/quic/server_preferred_address:fixed_server_preferred_address_config_factory_config",
 
     #
     # UDP packet writers

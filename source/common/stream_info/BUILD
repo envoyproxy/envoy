@@ -41,6 +41,7 @@ envoy_cc_library(
         "//envoy/common:time_interface",
         "//envoy/http:codes_interface",
         "//envoy/stream_info:stream_info_interface",
+        "//source/common/common:empty_string",
         "//source/common/http:default_server_string_lib",
         "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
     ],
@@ -69,5 +70,13 @@ envoy_cc_library(
     deps = [
         "//envoy/stream_info:stream_id_provider_interface",
         "//source/common/common:utility_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "bool_accessor_lib",
+    hdrs = ["bool_accessor_impl.h"],
+    deps = [
+        "//envoy/stream_info:bool_accessor_interface",
     ],
 )
