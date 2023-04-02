@@ -193,6 +193,14 @@ public:
 
   IntegrationStreamDecoderPtr randomDownstreamRequest(FuzzedDataProvider* fdp,
                                                       ExtProcFuzzHelper* fh) {
+    // If test server sends back an immediate response, the downstream client
+    // connection will be disconnected. Recreate the connection in such case.
+    if (codec_client_->disconnected()) {
+      ENVOY_LOG_MISC(trace, "Downstream client connection disconnected. Recreate";
+      auto conn = makeClientConnection(lookupPort("http"));
+      codec_client_ = makeHttpConnection(std::move(conn));
+    }
+
     // From the external processor's view each of these requests
     // are handled the same way. They only differ in what the server should
     // send back to the client.
@@ -253,7 +261,7 @@ DEFINE_PROTO_FUZZER(const test::extensions::filters::http::ext_proc::ExtProcGrpc
   fuzz_helper.reset();
   fuzz_helper = std::make_unique<ExtProcFuzzHelper>(&ext_proc_provider);
 
-  // Initiazlize test server once.
+  // Initialize test server once.
   if (!test_server_started) {
     test_server_started = true;
     // This starts an external processor in a separate thread. This allows for the
