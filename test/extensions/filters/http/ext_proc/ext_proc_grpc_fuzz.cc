@@ -196,7 +196,7 @@ public:
     // If test server sends back an immediate response, the downstream client
     // connection will be disconnected. Recreate the connection in such case.
     if (codec_client_->disconnected()) {
-      ENVOY_LOG_MISC(trace, "Downstream client connection disconnected. Recreate";
+      ENVOY_LOG_MISC(trace, "Downstream client connection disconnected. Recreate");
       auto conn = makeClientConnection(lookupPort("http"));
       codec_client_ = makeHttpConnection(std::move(conn));
     }
