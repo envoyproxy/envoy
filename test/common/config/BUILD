@@ -309,37 +309,6 @@ envoy_cc_test_library(
 )
 
 envoy_cc_test(
-    name = "http_subscription_impl_test",
-    srcs = ["http_subscription_impl_test.cc"],
-    deps = [
-        ":http_subscription_test_harness",
-    ],
-)
-
-envoy_cc_test_library(
-    name = "http_subscription_test_harness",
-    srcs = ["http_subscription_test_harness.h"],
-    deps = [
-        ":subscription_test_harness",
-        "//envoy/http:async_client_interface",
-        "//source/common/common:utility_lib",
-        "//source/common/config:http_subscription_lib",
-        "//source/common/config:utility_lib",
-        "//source/common/http:message_lib",
-        "//test/mocks/config:config_mocks",
-        "//test/mocks/event:event_mocks",
-        "//test/mocks/local_info:local_info_mocks",
-        "//test/mocks/protobuf:protobuf_mocks",
-        "//test/mocks/runtime:runtime_mocks",
-        "//test/mocks/upstream:cluster_manager_mocks",
-        "//test/test_common:utility_lib",
-        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
-        "@envoy_api//envoy/config/endpoint/v3:pkg_cc_proto",
-        "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
-    ],
-)
-
-envoy_cc_test(
     name = "opaque_resource_decoder_impl_test",
     srcs = ["opaque_resource_decoder_impl_test.cc"],
     deps = [
@@ -347,45 +316,6 @@ envoy_cc_test(
         "//source/common/protobuf:message_validator_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/endpoint/v3:pkg_cc_proto",
-    ],
-)
-
-envoy_cc_test(
-    name = "subscription_factory_impl_test",
-    srcs = ["subscription_factory_impl_test.cc"],
-    deps = [
-        "//envoy/config:xds_config_tracker_interface",
-        "//envoy/config:xds_resources_delegate_interface",
-        "//source/common/config:subscription_factory_lib",
-        "//source/common/config:xds_resource_lib",
-        "//test/config:v2_link_hacks",
-        "//test/mocks/config:config_mocks",
-        "//test/mocks/event:event_mocks",
-        "//test/mocks/filesystem:filesystem_mocks",
-        "//test/mocks/local_info:local_info_mocks",
-        "//test/mocks/protobuf:protobuf_mocks",
-        "//test/mocks/server:instance_mocks",
-        "//test/mocks/stats:stats_mocks",
-        "//test/mocks/upstream:cluster_manager_mocks",
-        "//test/test_common:environment_lib",
-        "//test/test_common:logging_lib",
-        "//test/test_common:test_runtime_lib",
-        "//test/test_common:utility_lib",
-        "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
-        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
-        "@envoy_api//envoy/config/endpoint/v3:pkg_cc_proto",
-    ],
-)
-
-envoy_cc_test(
-    name = "subscription_impl_test",
-    srcs = ["subscription_impl_test.cc"],
-    deps = [
-        ":delta_subscription_test_harness",
-        ":filesystem_subscription_test_harness",
-        ":grpc_subscription_test_harness",
-        ":http_subscription_test_harness",
-        ":subscription_test_harness",
     ],
 )
 
