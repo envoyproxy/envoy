@@ -45,13 +45,13 @@ stages:
   # job:
   #   condition: and(not(canceled()), succeeded(), ne(stageDependencies.env.repo.outputs['changed.mobileOnly'], 'true'))
   #
+  # NB: Avoid using _inclusive_ lists to trigger CI - eg _dont_ only trigger mobile CI if `mobile/` changed.
+  #  Instead use _exclusive_ bools - eg _do_ suppress other CI if only `mobile/` changed
+  #
   # Note the difference in name resolution when used in stages and jobs.
   #
   # Note also, other conditions such as `not(canceled())` are not assumed and so need to be added to
   # any conditions explicitly.
-  #
-  # NB: Avoid using _inclusive_ lists to trigger CI - eg _dont_ only trigger mobile CI if `mobile/` changed.
-  #  Instead use _exclusive_ bools - eg _do_ suppress other CI if only `mobile/` changed
   #
   # To use a variable in a `step` you can specify it as follows:
   #
@@ -97,6 +97,7 @@ stages:
       fetchDepth: 0
       fetchTags: true
     - bash: |
+        # TODO(phlax): move this to a script to ensure proper linting etc
         set -e
 
         # Only exclude checks in pull requests.
@@ -104,6 +105,7 @@ stages:
             echo "##vso[task.setvariable variable=mobileOnly;isoutput=true]false"
             echo "##vso[task.setvariable variable=docsOnly;isoutput=true]false"
             echo "##vso[task.setvariable variable=examplesOnly;isoutput=true]false"
+            echo "##vso[task.setvariable variable=dependency;isoutput=true]true"
             exit 0
         fi
 
@@ -133,6 +135,17 @@ stages:
         echo "##vso[task.setvariable variable=mobileOnly;isoutput=true]${CHANGED_MOBILE_ONLY}"
         echo "##vso[task.setvariable variable=docsOnly;isoutput=true]${CHANGED_DOCS_ONLY}"
         echo "##vso[task.setvariable variable=examplesOnly;isoutput=true]${CHANGED_EXAMPLES_ONLY}"
+
+        CHANGED_REQUIREMENT_PATHS="$(git diff --name-only ${CHANGE_TARGET}...HEAD | grep -E '\.*requirements.*\.txt$|go.mod$|\.*\.bzl$|^WORKSPACE$' || echo '')"
+
+        if [[ -n "$CHANGED_REQUIREMENT_PATHS" ]]; then
+            CHANGED_REQUIREMENTS=true
+        else
+            CHANGED_REQUIREMENTS=false
+        fi
+
+        echo "##vso[task.setvariable variable=requirements;isoutput=true]${CHANGED_REQUIREMENTS}"
+
       displayName: "Detect repo changes"
       workingDirectory: $(Build.SourcesDirectory)
       name: changed
@@ -165,7 +178,9 @@ stages:
         echo "env.outputs['changed.docsOnly']: $(changed.docsOnly)"
         echo "env.outputs['changed.examplesOnly']: $(changed.examplesOnly)"
         echo
-        echo "env.outputs['state.isDev]: $(state.isDev)"
+        echo "env.outputs['changed.requirements']: $(changed.requirements)"
+        echo
+        echo "env.outputs['state.isDev']: $(state.isDev)"
       displayName: "Print build environment"
 
 - stage: precheck
@@ -281,7 +296,8 @@ stages:
 
   - job: dependencies
     displayName: Dependency checks
-    dependsOn: []  # this removes the implicit dependency on previous stage and causes this to run in parallel.
+    dependsOn: []
+    condition: and(not(canceled()), eq(stageDependencies.env.repo.outputs['changed.requirements'], 'true'))
     pool:
       vmImage: "ubuntu-20.04"
     steps:
@@ -323,6 +339,28 @@ stages:
         artifactName: "docker_ci"
         timeoutInMinutes: 10
       condition: failed()
+
+  - job: prechecked
+    displayName: Prechecked
+    dependsOn: ["format", "proto_format", "docs", "dependencies", "docker_ci"]
+    pool:
+      vmImage: "ubuntu-20.04"
+    # This condition ensures that this (required) job passes if all of
+    # the preceeding jobs either pass or are skipped
+    # adapted from:
+    #   https://learn.microsoft.com/en-us/azure/devops/pipelines/process/expressions?view=azure-devops#job-to-job-dependencies-within-one-stage
+    condition: |
+      and(
+        in(dependencies.format.result, 'Succeeded', 'SucceededWithIssues', 'Skipped'),
+        in(dependencies.proto_format.result, 'Succeeded', 'SucceededWithIssues', 'Skipped'),
+        in(dependencies.docs.result, 'Succeeded', 'SucceededWithIssues', 'Skipped'),
+        in(dependencies.dependencies.result, 'Succeeded', 'SucceededWithIssues', 'Skipped'),
+        in(dependencies.docker_ci.result, 'Succeeded', 'SucceededWithIssues', 'Skipped'))
+
+    steps:
+    - checkout: none
+    - bash: |
+        echo "Prechecked"
 
 - stage: sync
   condition: and(succeeded(), eq(variables['PostSubmit'], true), ne(variables['NoSync'], true))
