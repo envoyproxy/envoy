@@ -39,6 +39,7 @@ struct CustomResponseFilterState : public std::enable_shared_from_this<CustomRes
 
   PolicySharedPtr policy;
   absl::optional<::Envoy::Http::Code> original_response_code;
+  static constexpr absl::string_view kFilterStateName = "envoy.filters.http.custom_response";
 };
 
 struct CustomResponseMatchAction : public Matcher::ActionBase<ProtobufWkt::Any> {

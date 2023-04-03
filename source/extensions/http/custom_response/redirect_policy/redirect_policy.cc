@@ -122,7 +122,7 @@ std::unique_ptr<ModifyRequestHeadersAction> RedirectPolicy::createModifyRequestH
     ENVOY_BUG(filter_state->policy.get() == this, "Policy filter state should be this policy.");
     // Apply header mutations.
     response_header_parser_->evaluateHeaders(headers, encoder_callbacks->streamInfo());
-    absl::optional<::Envoy::Http::Code> status_code_to_use =
+    const absl::optional<::Envoy::Http::Code> status_code_to_use =
         status_code_.has_value() ? status_code_
                                  : (filter_state->original_response_code.has_value()
                                         ? filter_state->original_response_code

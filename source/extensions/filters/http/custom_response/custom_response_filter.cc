@@ -24,7 +24,7 @@ Http::FilterHeadersStatus CustomResponseFilter::decodeHeaders(Http::RequestHeade
   // in the custom response framework.
   auto filter_state =
       encoder_callbacks_->streamInfo().filterState()->getDataReadOnly<CustomResponseFilterState>(
-          "envoy.filters.http.custom_response");
+          CustomResponseFilterState::kFilterStateName);
   if (!filter_state) {
     downstream_headers_ = &header_map;
   }
@@ -38,7 +38,7 @@ Http::FilterHeadersStatus CustomResponseFilter::encodeHeaders(Http::ResponseHead
   // the remote source and return.
   auto filter_state =
       encoder_callbacks_->streamInfo().filterState()->getDataReadOnly<CustomResponseFilterState>(
-          "envoy.filters.http.custom_response");
+          CustomResponseFilterState::kFilterStateName);
   if (filter_state) {
     return filter_state->policy->encodeHeaders(headers, end_stream, *this);
   }
