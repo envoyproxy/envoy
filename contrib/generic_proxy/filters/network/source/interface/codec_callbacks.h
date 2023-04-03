@@ -18,6 +18,12 @@ namespace GenericProxy {
  */
 class ExtendedOptions {
 public:
+  ExtendedOptions(absl::optional<uint64_t> stream_id, bool wait_response, bool drain_close,
+                  bool is_heartbeat)
+      : stream_id_(stream_id.value_or(0)), has_stream_id_(stream_id.has_value()),
+        wait_response_(wait_response), drain_close_(drain_close), is_heartbeat_(is_heartbeat) {}
+  ExtendedOptions() = default;
+
   /**
    * @return the stream id of the request or response. This is used to match the
    * downstream request with the upstream response.
@@ -28,19 +34,9 @@ public:
    * For example, when the multiple downstream requests are multiplexed into one
    * upstream connection.
    */
-  uint64_t streamId() const { return stream_id_; }
-  /**
-   * Set the stream id of the request or response.
-   * @param stream_id the stream id of the request or response.
-   */
-  void setStreamId(uint64_t stream_id) {
-    stream_id_ = stream_id;
-    has_stream_id_ = true;
+  absl::optional<uint64_t> streamId() const {
+    return has_stream_id_ ? absl::optional<uint64_t>(stream_id_) : absl::nullopt;
   }
-  /**
-   * @return whether the stream id is set.
-   */
-  bool hasStreamId() const { return has_stream_id_; }
 
   /**
    * @return whether the current request requires an upstream response.
@@ -48,42 +44,23 @@ public:
   bool waitResponse() const { return wait_response_; }
 
   /**
-   * Set whether the current request requires an upstream response.
-   * @param wait_response whether the current request requires an upstream response.
-   */
-  void setWaitResponse(bool wait_response) { wait_response_ = wait_response; }
-
-  /**
    * @return whether the downstream/upstream connection should be drained after
    * current active requests are finished.
    */
   bool drainClose() const { return drain_close_; }
-  /**
-   * Set whether the downstream/upstream connection should be drained after
-   * current active requests are finished.
-   * @param drain_close whether the downstream/upstream connection should be drained
-   * after current active requests are finished.
-   */
-  void setDrainClose(bool drain_close) { drain_close_ = drain_close; }
 
   /**
    * @return whether the current request/response is a heartbeat request/response.
    */
   bool isHeartbeat() const { return is_heartbeat_; }
-  /**
-   * Set whether the current request/response is a heartbeat request/response.
-   * @param is_heartbeat whether the current request/response is a heartbeat
-   * request/response.
-   */
-  void setHeartbeat(bool is_heartbeat) { is_heartbeat_ = is_heartbeat; }
 
 private:
-  uint64_t stream_id_{};
-  bool has_stream_id_{};
+  uint64_t stream_id_{0};
+  bool has_stream_id_{false};
 
   bool wait_response_{true};
-  bool drain_close_{};
-  bool is_heartbeat_{};
+  bool drain_close_{false};
+  bool is_heartbeat_{false};
 };
 
 /**
