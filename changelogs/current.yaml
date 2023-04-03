@@ -69,6 +69,10 @@ minor_behavior_changes:
   change: |
     Moved all of the network input matchers to extensions. If you use network matchers and override
     extensions_build_config.bzl you will now need to include them explicitly.
+- area: access_logs
+  change: |
+    Using %DURATION% in access logs will either resolve the total duration of the stream, or mid-stream duration.
+    This is useful to track stream duration with periodic access logs.
 - area: matchers
   change: |
     Added dynamic metadata to the MatchingData object to enable writing matcher_tree input objects that can parse provided
