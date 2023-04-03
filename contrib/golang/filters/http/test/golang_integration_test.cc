@@ -256,8 +256,23 @@ typed_config:
     // check response code details in encode phase
     EXPECT_EQ("1", getHeader(response->headers(), "rsp-attempt-count"));
 
+    // verify response status
+    EXPECT_EQ("200", getHeader(response->headers(), "rsp-status"));
+
+    // verify protocol
+    EXPECT_EQ(true, response->headers().get(Http::LowerCaseString("test-protocol")).empty());
+
+    // verify scheme
+    EXPECT_EQ("http", getHeader(response->headers(), "test-scheme"));
+
+    // verify method
+    EXPECT_EQ("POST", getHeader(response->headers(), "test-method"));
+
     // verify path
     EXPECT_EQ(path, getHeader(response->headers(), "test-path"));
+
+    // verify host
+    EXPECT_EQ("test.com", getHeader(response->headers(), "test-host"));
 
     // upper("goodbye")
     EXPECT_EQ("GOODBYE", response->body());
