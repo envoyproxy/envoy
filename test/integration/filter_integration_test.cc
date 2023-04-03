@@ -1277,7 +1277,7 @@ TEST_P(FilterIntegrationTest, LocalReplyFromDecodeMetadata) {
   metadata["local_reply"] = "true";
   codec_client_->sendMetadata(encoder, metadata);
 
-  ASSERT_TRUE(decoder->waitForEndStream(std::chrono::milliseconds(5000 + 500)));
+  ASSERT_TRUE(decoder->waitForEndStream());
 
   EXPECT_EQ("400", decoder->headers().getStatusValue());
 }

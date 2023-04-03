@@ -3009,34 +3009,6 @@ TEST_P(DownstreamProtocolIntegrationTest, LocalReplyWithMetadata) {
   ASSERT_EQ("200", response->headers().getStatusValue());
 }
 
-TEST_P(DownstreamProtocolIntegrationTest, LocalReplyFromDecodeMetadata) {
-  if (downstream_protocol_ != Http::CodecType::HTTP2) {
-    GTEST_SKIP() << "Metadata is not enabled for non HTTP2 protocols.";
-  }
-  config_helper_.prependFilter(R"EOF(
-    name: metadata-control-filter
-  )EOF");
-  autonomous_upstream_ = true;
-  config_helper_.addConfigModifier(
-      [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
-              hcm) -> void { hcm.mutable_http2_protocol_options()->set_allow_metadata(true); });
-  initialize();
-
-  codec_client_ = makeHttpConnection(lookupPort("http"));
-  // Send headers. We expect this to pause.
-  auto encoder_decoder = codec_client_->startRequest(default_request_headers_);
-  Http::RequestEncoder& encoder = encoder_decoder.first;
-  IntegrationStreamDecoderPtr& decoder = encoder_decoder.second;
-  codec_client_->sendData(encoder, "abc", false);
-  Http::MetadataMap metadata;
-  metadata["local_reply"] = "true";
-  codec_client_->sendMetadata(encoder, metadata);
-
-  ASSERT_TRUE(decoder->waitForEndStream(std::chrono::milliseconds(500)));
-
-  ASSERT_EQ("400", decoder->headers().getStatusValue());
-}
-
 TEST_P(ProtocolIntegrationTest, ContinueAllFromDecodeMetadata) {
   if (downstream_protocol_ != Http::CodecType::HTTP2 ||
       upstreamProtocol() != Http::CodecType::HTTP2) {
