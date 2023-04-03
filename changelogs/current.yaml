@@ -336,7 +336,7 @@ new_features:
     added new field :ref:`signature_algorithms
     <envoy_v3_api_field_extensions.transport_sockets.tls.v3.TlsParameters.signature_algorithms>` to set signature
     algorithms.
-s
+
 deprecated:
 - area: ext_authz
   change: |
