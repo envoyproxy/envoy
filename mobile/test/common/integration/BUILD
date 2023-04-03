@@ -146,7 +146,6 @@ envoy_cc_test_library(
     deps = [
         "@envoy//test/integration:autonomous_upstream_lib",
         "@envoy//source/exe:process_wide_lib",
-        "@envoy//test/config:utility_lib",
         "@envoy//test/integration:utility_lib",
         "@envoy//test/mocks/server:transport_socket_factory_context_mocks",
         "@envoy//test/test_common:environment_lib",
