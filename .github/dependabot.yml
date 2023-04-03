@@ -16,6 +16,12 @@ updates:
     time: "09:00"
 
 - package-ecosystem: "pip"
+  directory: "/ci/mac"
+  schedule:
+    interval: "daily"
+    time: "09:00"
+
+- package-ecosystem: "pip"
   directory: "/examples/grpc-bridge/client"
   schedule:
     interval: "daily"
