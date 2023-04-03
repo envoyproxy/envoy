@@ -4,8 +4,10 @@
 !/ci
 !/configs/google-vrp
 !/configs/*yaml
-!/linux/amd64/build_*release*
-!/linux/arm64/build_*release*
+!/linux/amd64/release.tar.zst
+!/linux/amd64/schema_validator_tool
+!/linux/arm64/release.tar.zst
+!/linux/arm64/schema_validator_tool
 !/local
 !/test/config/integration/certs
 !/windows
