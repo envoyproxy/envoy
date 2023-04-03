@@ -64,4 +64,4 @@ fi
 
 bazel version
 
-pip3 install -r mac/requirements.txt --require-hashes
+pip3 install -r ci/mac/requirements.txt --require-hashes
