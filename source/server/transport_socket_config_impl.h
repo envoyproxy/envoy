@@ -64,6 +64,8 @@ private:
   ProtobufMessage::ValidationVisitor& validation_visitor_;
 };
 
+using TransportSocketFactoryContextImplPtr = std::unique_ptr<TransportSocketFactoryContextImpl>;
+
 } // namespace Configuration
 } // namespace Server
 } // namespace Envoy

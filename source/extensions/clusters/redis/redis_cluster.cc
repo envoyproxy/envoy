@@ -18,15 +18,13 @@ RedisCluster::RedisCluster(
     Server::Configuration::ServerFactoryContext& server_context,
     const envoy::config::cluster::v3::Cluster& cluster,
     const envoy::extensions::clusters::redis::v3::RedisClusterConfig& redis_cluster,
+    Upstream::ClusterFactoryContext& context,
     NetworkFilters::Common::Redis::Client::ClientFactory& redis_client_factory,
     Upstream::ClusterManager& cluster_manager, Runtime::Loader& runtime, Api::Api& api,
-    Network::DnsResolverSharedPtr dns_resolver,
-    Server::Configuration::TransportSocketFactoryContextImpl& factory_context,
-    Stats::ScopeSharedPtr&& stats_scope, bool added_via_api,
+    Network::DnsResolverSharedPtr dns_resolver, bool added_via_api,
     ClusterSlotUpdateCallBackSharedPtr lb_factory)
-    : Upstream::BaseDynamicClusterImpl(server_context, cluster, runtime, factory_context,
-                                       std::move(stats_scope), added_via_api,
-                                       factory_context.mainThreadDispatcher().timeSource()),
+    : Upstream::BaseDynamicClusterImpl(server_context, cluster, context, runtime, added_via_api,
+                                       context.mainThreadDispatcher().timeSource()),
       cluster_manager_(cluster_manager),
       cluster_refresh_rate_(std::chrono::milliseconds(
           PROTOBUF_GET_MS_OR_DEFAULT(redis_cluster, cluster_refresh_rate, 5000))),
@@ -38,19 +36,18 @@ RedisCluster::RedisCluster(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(redis_cluster, redirect_refresh_threshold, 5)),
       failure_refresh_threshold_(redis_cluster.failure_refresh_threshold()),
       host_degraded_refresh_threshold_(redis_cluster.host_degraded_refresh_threshold()),
-      dispatcher_(factory_context.mainThreadDispatcher()), dns_resolver_(std::move(dns_resolver)),
+      dispatcher_(context.mainThreadDispatcher()), dns_resolver_(std::move(dns_resolver)),
       dns_lookup_family_(Upstream::getDnsLookupFamilyFromCluster(cluster)),
-      load_assignment_(cluster.load_assignment()), local_info_(factory_context.localInfo()),
+      load_assignment_(cluster.load_assignment()), local_info_(context.localInfo()),
       random_(api.randomGenerator()), redis_discovery_session_(*this, redis_client_factory),
       lb_factory_(std::move(lb_factory)),
       auth_username_(
           NetworkFilters::RedisProxy::ProtocolOptionsConfigImpl::authUsername(info(), api)),
       auth_password_(
           NetworkFilters::RedisProxy::ProtocolOptionsConfigImpl::authPassword(info(), api)),
-      cluster_name_(cluster.name()),
-      refresh_manager_(Common::Redis::getClusterRefreshManager(
-          factory_context.singletonManager(), factory_context.mainThreadDispatcher(),
-          factory_context.clusterManager(), factory_context.api().timeSource())),
+      cluster_name_(cluster.name()), refresh_manager_(Common::Redis::getClusterRefreshManager(
+                                         context.singletonManager(), context.mainThreadDispatcher(),
+                                         context.clusterManager(), context.api().timeSource())),
       registration_handle_(refresh_manager_->registerCluster(
           cluster_name_, redirect_refresh_interval_, redirect_refresh_threshold_,
           failure_refresh_threshold_, host_degraded_refresh_threshold_, [&]() {
@@ -579,9 +576,7 @@ RedisClusterFactory::createClusterWithConfig(
     Server::Configuration::ServerFactoryContext& server_context,
     const envoy::config::cluster::v3::Cluster& cluster,
     const envoy::extensions::clusters::redis::v3::RedisClusterConfig& proto_config,
-    Upstream::ClusterFactoryContext& context,
-    Envoy::Server::Configuration::TransportSocketFactoryContextImpl& socket_factory_context,
-    Envoy::Stats::ScopeSharedPtr&& stats_scope) {
+    Upstream::ClusterFactoryContext& context) {
   if (!cluster.has_cluster_type() || cluster.cluster_type().name() != "envoy.clusters.redis") {
     throw EnvoyException("Redis cluster can only created with redis cluster type.");
   }
@@ -589,21 +584,19 @@ RedisClusterFactory::createClusterWithConfig(
   // in the future
   if (cluster.lb_policy() != envoy::config::cluster::v3::Cluster::CLUSTER_PROVIDED) {
     return std::make_pair(std::make_shared<RedisCluster>(
-                              server_context, cluster, proto_config,
+                              server_context, cluster, proto_config, context,
                               NetworkFilters::Common::Redis::Client::ClientFactoryImpl::instance_,
                               context.clusterManager(), context.runtime(), context.api(),
-                              selectDnsResolver(cluster, context), socket_factory_context,
-                              std::move(stats_scope), context.addedViaApi(), nullptr),
+                              selectDnsResolver(cluster, context), context.addedViaApi(), nullptr),
                           nullptr);
   }
   auto lb_factory =
       std::make_shared<RedisClusterLoadBalancerFactory>(context.api().randomGenerator());
   return std::make_pair(std::make_shared<RedisCluster>(
-                            server_context, cluster, proto_config,
+                            server_context, cluster, proto_config, context,
                             NetworkFilters::Common::Redis::Client::ClientFactoryImpl::instance_,
                             context.clusterManager(), context.runtime(), context.api(),
-                            selectDnsResolver(cluster, context), socket_factory_context,
-                            std::move(stats_scope), context.addedViaApi(), lb_factory),
+                            selectDnsResolver(cluster, context), context.addedViaApi(), lb_factory),
                         std::make_unique<RedisClusterThreadAwareLoadBalancer>(lb_factory));
 }
 
