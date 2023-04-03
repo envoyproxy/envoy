@@ -89,7 +89,6 @@ private:
   Config::SubscriptionPtr subscription_;
   Server::Configuration::TransportSocketFactoryContextImpl factory_context_;
   const LocalInfo::LocalInfo& local_info_;
-  const std::string cluster_name_;
   std::vector<LocalityWeightsMap> locality_weights_map_;
   Event::TimerPtr assignment_timeout_;
   InitializePhase initialize_phase_;

@@ -23,10 +23,7 @@ EdsClusterImpl::EdsClusterImpl(
                              factory_context.mainThreadDispatcher().timeSource()),
       Envoy::Config::SubscriptionBase<envoy::config::endpoint::v3::ClusterLoadAssignment>(
           factory_context.messageValidationVisitor(), "cluster_name"),
-      factory_context_(factory_context), local_info_(factory_context.localInfo()),
-      cluster_name_(cluster.eds_cluster_config().service_name().empty()
-                        ? cluster.name()
-                        : cluster.eds_cluster_config().service_name()) {
+      factory_context_(factory_context), local_info_(factory_context.localInfo()) {
   Event::Dispatcher& dispatcher = factory_context.mainThreadDispatcher();
   assignment_timeout_ = dispatcher.createTimer([this]() -> void { onAssignmentTimeout(); });
   const auto& eds_config = cluster.eds_cluster_config().eds_config();
@@ -43,7 +40,7 @@ EdsClusterImpl::EdsClusterImpl(
           resource_decoder_, {});
 }
 
-void EdsClusterImpl::startPreInit() { subscription_->start({cluster_name_}); }
+void EdsClusterImpl::startPreInit() { subscription_->start({*info_->edsServiceName()}); }
 
 void EdsClusterImpl::BatchUpdateHelper::batchUpdate(PrioritySet::HostUpdateCb& host_update_cb) {
   absl::flat_hash_set<std::string> all_new_hosts;
@@ -153,8 +150,9 @@ void EdsClusterImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef
   envoy::config::endpoint::v3::ClusterLoadAssignment cluster_load_assignment =
       dynamic_cast<const envoy::config::endpoint::v3::ClusterLoadAssignment&>(
           resources[0].get().resource());
-  if (cluster_load_assignment.cluster_name() != cluster_name_) {
-    throw EnvoyException(fmt::format("Unexpected EDS cluster (expecting {}): {}", cluster_name_,
+  if (cluster_load_assignment.cluster_name() != *info_->edsServiceName()) {
+    throw EnvoyException(fmt::format("Unexpected EDS cluster (expecting {}): {}",
+                                     *info_->edsServiceName(),
                                      cluster_load_assignment.cluster_name()));
   }
   // Validate that each locality doesn't have both LEDS and endpoints defined.
@@ -165,7 +163,8 @@ void EdsClusterImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef
       throw EnvoyException(fmt::format(
           "A ClusterLoadAssignment for cluster {} cannot include both LEDS (resource: {}) and a "
           "list of endpoints.",
-          cluster_name_, locality.leds_cluster_locality_config().leds_collection_name()));
+          *info_->edsServiceName(),
+          locality.leds_cluster_locality_config().leds_collection_name()));
     }
   }
 
@@ -222,11 +221,11 @@ void EdsClusterImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef
   for (const auto& leds_config : cla_leds_configs) {
     if (leds_localities_.find(leds_config) == leds_localities_.end()) {
       ENVOY_LOG(trace, "Found new LEDS config in EDS onConfigUpdate() for cluster {}: {}",
-                cluster_name_, leds_config.DebugString());
+                *info_->edsServiceName(), leds_config.DebugString());
 
       // Create a new LEDS subscription and add it to the subscriptions map.
       LedsSubscriptionPtr leds_locality_subscription = std::make_unique<LedsSubscription>(
-          leds_config, cluster_name_, factory_context_, info_->statsScope(),
+          leds_config, *info_->edsServiceName(), factory_context_, info_->statsScope(),
           [&, used_load_assignment]() {
             // Called upon an update to the locality.
             if (validateAllLedsUpdated()) {
@@ -259,7 +258,8 @@ void EdsClusterImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef
 
 bool EdsClusterImpl::validateUpdateSize(int num_resources) {
   if (num_resources == 0) {
-    ENVOY_LOG(debug, "Missing ClusterLoadAssignment for {} in onConfigUpdate()", cluster_name_);
+    ENVOY_LOG(debug, "Missing ClusterLoadAssignment for {} in onConfigUpdate()",
+              *info_->edsServiceName());
     info_->configUpdateStats().update_empty_.inc();
     onPreInitComplete();
     return false;
@@ -278,7 +278,7 @@ void EdsClusterImpl::onAssignmentTimeout() {
   // stale.
   // TODO(snowp): This should probably just use xDS TTLs?
   envoy::config::endpoint::v3::ClusterLoadAssignment resource;
-  resource.set_cluster_name(cluster_name_);
+  resource.set_cluster_name(*info_->edsServiceName());
   ProtobufWkt::Any any_resource;
   any_resource.PackFrom(resource);
   auto decoded_resource =
