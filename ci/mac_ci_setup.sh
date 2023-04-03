@@ -64,4 +64,4 @@ fi
 
 bazel version
 
-pip3 install virtualenv
+pip3 install virtualenv --require-hashes
