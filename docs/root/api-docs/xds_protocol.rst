@@ -921,6 +921,8 @@ waiting for a timeout, as would be done in the SotW protocol variants. However, 
 encouraged to use a timeout to protect against the case where the management server fails to send
 a response in a timely manner.
 
+.. _extension_envoy.config_subscription.rest:
+
 REST-JSON polling subscriptions
 -------------------------------
 
