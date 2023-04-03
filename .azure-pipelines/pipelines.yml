@@ -28,10 +28,12 @@ variables:
 
 ## Variable settings
 # Caches (tip: append a version suffix while testing caches)
-- name: buildImageCacheVersion
+- name: cacheKeyBuildImage
   value: v0
-- name: dockerBuildCacheVersion
+- name: cacheKeyDockerBuild
   value: v0
+- name: cacheKeyRepository
+  value: './WORKSPACE | **/*.bzl, !mobile/**, !envoy-docs/**'
 
 
 stages:
@@ -45,6 +47,9 @@ stages:
     parameters:
       buildStageDeps:
       - env
+      checkStageDeps:
+      - env
+      checksConcurrency: 10
       macBuildStageDeps:
       - env
       windowsBuildStageDeps:
