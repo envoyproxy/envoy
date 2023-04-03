@@ -423,9 +423,15 @@ EXTENSIONS = {
     "envoy.load_balancing_policies.maglev":            "//source/extensions/load_balancing_policies/maglev:config",
     "envoy.load_balancing_policies.ring_hash":       "//source/extensions/load_balancing_policies/ring_hash:config",
 
+    #
     # HTTP Early Header Mutation
     #
     "envoy.http.early_header_mutation.header_mutation": "//source/extensions/http/early_header_mutation/header_mutation:config",
+
+    #
+    # Config Subscription
+    #
+    "envoy.config_subscription.rest": "//source/extensions/config_subscription/rest:http_subscription_lib",
 }
 
 # These can be changed to ["//visibility:public"], for  downstream builds which

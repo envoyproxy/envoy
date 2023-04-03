@@ -23,6 +23,7 @@ alias(
 envoy_cc_binary(
     name = "envoy-static",
     stamped = True,
+    visibility = ["//visibility:public"],
     deps = ["//source/exe:envoy_main_entry_lib"] + envoy_all_contrib_extensions(),
 )
 

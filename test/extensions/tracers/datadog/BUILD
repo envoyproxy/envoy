@@ -22,6 +22,7 @@ envoy_extension_cc_test(
         "span_test.cc",
         "time_util_test.cc",
         "tracer_stats_test.cc",
+        "tracer_test.cc",
     ],
     copts = [
         # Make sure that headers included from dd_trace_cpp use Abseil

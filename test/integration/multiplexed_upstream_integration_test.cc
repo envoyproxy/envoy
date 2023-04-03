@@ -169,6 +169,7 @@ void MultiplexedUpstreamIntegrationTest::bidirectionalStreaming(uint32_t bytes) 
 
   ASSERT_FALSE(response->headers().get(Http::LowerCaseString("upstream_connect_start")).empty());
   ASSERT_FALSE(response->headers().get(Http::LowerCaseString("upstream_connect_complete")).empty());
+  ASSERT_FALSE(response->headers().get(Http::LowerCaseString("connection_pool_latency")).empty());
 
   ASSERT_FALSE(response->headers().get(Http::LowerCaseString("num_streams")).empty());
   EXPECT_EQ(
