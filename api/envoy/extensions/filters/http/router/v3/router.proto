@@ -27,9 +27,12 @@ message Router {
       "envoy.config.filter.http.router.v2.Router";
 
   message UpstreamAccessLogOptions {
-    // If set to true, an upstream access log will recorded once when a new HTTP request is received,
-    // and an upstream connection has been successfully established. Note that in case a retry is applied
-    // for the received request, a start of request upstream access log will be recorded for each retry.
+    // If set to true, an upstream access log will recorded when a new HTTP request is received,
+    // and after an upstream connection has been successfully established. Note: Each HTTP request
+    // received for an already established connection will result in an upstream access log record.
+    // This includes, for example, consecutive HTTP requests over the same connection or a request
+    // that is retried. In case a retry is applied, an upstream access log will be recorded for
+    // each retry.
     bool flush_upstream_log_on_new_request = 1;
   }
 
@@ -48,6 +51,9 @@ message Router {
   // an upstream request. Presuming retries are configured, multiple upstream
   // requests may be made for each downstream (inbound) request.
   repeated config.accesslog.v3.AccessLog upstream_log = 3;
+
+  // Additional upstream access log options.
+  UpstreamAccessLogOptions upstream_log_options = 9;
 
   // Do not add any additional ``x-envoy-`` headers to requests or responses. This
   // only affects the :ref:`router filter generated x-envoy- headers
@@ -113,7 +119,4 @@ message Router {
   // upstream filters will count as a final response if hedging is configured.
   // [#extension-category: envoy.filters.http.upstream]
   repeated network.http_connection_manager.v3.HttpFilter upstream_http_filters = 8;
-
-  // Additional upstream access log options.
-  UpstreamAccessLogOptions upstream_log_options = 9;
 }
