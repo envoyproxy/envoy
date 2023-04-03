@@ -65,6 +65,7 @@ categories:
 - envoy.compression.compressor
 - envoy.compression.decompressor
 - envoy.config.validators
+- envoy.config_subscription
 - envoy.filters.http
 - envoy.filters.listener
 - envoy.filters.network

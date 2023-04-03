@@ -20,6 +20,7 @@ envoy_cc_extension(
         "//source/common/http:codec_client_lib",
         "//source/common/upstream:health_checker_lib",
         "//source/common/upstream:host_utility_lib",
+        "//source/extensions/health_checkers/common:health_checker_base_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/data/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/type/v3:pkg_cc_proto",

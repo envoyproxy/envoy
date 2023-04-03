@@ -21,11 +21,9 @@ public:
   Cluster(Server::Configuration::ServerFactoryContext& server_context,
           const envoy::config::cluster::v3::Cluster& cluster,
           const envoy::extensions::clusters::dynamic_forward_proxy::v3::ClusterConfig& config,
-          Runtime::Loader& runtime,
+          Upstream::ClusterFactoryContext& context, Runtime::Loader& runtime,
           Extensions::Common::DynamicForwardProxy::DnsCacheManagerFactory& cache_manager_factory,
-          const LocalInfo::LocalInfo& local_info,
-          Server::Configuration::TransportSocketFactoryContextImpl& factory_context,
-          Stats::ScopeSharedPtr&& stats_scope, bool added_via_api);
+          const LocalInfo::LocalInfo& local_info, bool added_via_api);
 
   // Upstream::Cluster
   Upstream::Cluster::InitializePhase initializePhase() const override {
@@ -171,9 +169,7 @@ private:
       Server::Configuration::ServerFactoryContext& server_context,
       const envoy::config::cluster::v3::Cluster& cluster,
       const envoy::extensions::clusters::dynamic_forward_proxy::v3::ClusterConfig& proto_config,
-      Upstream::ClusterFactoryContext& context,
-      Server::Configuration::TransportSocketFactoryContextImpl& socket_factory_context,
-      Stats::ScopeSharedPtr&& stats_scope) override;
+      Upstream::ClusterFactoryContext& context) override;
 };
 
 DECLARE_FACTORY(ClusterFactory);
