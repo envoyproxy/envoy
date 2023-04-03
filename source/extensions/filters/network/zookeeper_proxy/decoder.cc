@@ -584,7 +584,7 @@ void DecoderImpl::decodeAndBufferHelper(Buffer::Instance& data, DecodeType dtype
   }
 }
 
-void DecoderImpl::decode(Buffer::Instance& data, DecodeType dtype, uint64_t& full_packets_len) {
+void DecoderImpl::decode(Buffer::Instance& data, DecodeType dtype, uint64_t full_packets_len) {
   uint64_t offset = 0;
 
   try {
