@@ -171,7 +171,7 @@ message ExternalProcessor {
   google.protobuf.Duration max_message_timeout = 10;
 
   // If true, allows the processor response to allow route cache clearing.
-  // If false, route cache clearing is ignored.
+  // If false, route cache clearing is ignored. True, by default, to ensure backwards compatibility.
   google.protobuf.BoolValue allow_clearing_route_cache = 11;
 }
 

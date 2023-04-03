@@ -93,7 +93,7 @@ absl::Status ProcessorState::handleHeadersResponse(const HeadersResponse& respon
     }
 
     bool allow_clearing_route_cache =
-        PROTOBUF_GET_WRAPPED_OR_DEFAULT(filter_.config(), allow_clearing_route_cache, false);
+        PROTOBUF_GET_WRAPPED_OR_DEFAULT(filter_.config(), allow_clearing_route_cache, true);
     // Only clear the route cache if there is a mutation to the filter.
     if (common_response.clear_route_cache() && allow_clearing_route_cache &&
         (common_response.has_header_mutation() || common_response.has_body_mutation())) {
@@ -327,7 +327,7 @@ absl::Status ProcessorState::handleBodyResponse(const BodyResponse& response) {
       onFinishProcessorCall(Grpc::Status::FailedPrecondition);
     }
     bool allow_clearing_route_cache =
-        PROTOBUF_GET_WRAPPED_OR_DEFAULT(filter_.config(), allow_clearing_route_cache, false);
+        PROTOBUF_GET_WRAPPED_OR_DEFAULT(filter_.config(), allow_clearing_route_cache, true);
 
     // Only clear the route cache if there is a mutation to the filter.
     if (common_response.clear_route_cache() && allow_clearing_route_cache &&
