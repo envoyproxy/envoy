@@ -3,7 +3,6 @@
 #include <string>
 #include <vector>
 
-#include "source/server/admin/stats_params.h"
 #include "source/server/admin/stats_render.h"
 
 namespace Envoy {

@@ -1,7 +1,5 @@
 #include "source/server/admin/ungrouped_stats_request.h"
 
-#include "stats_params.h"
-
 #ifdef ENVOY_ADMIN_HTML
 #include "source/server/admin/stats_html_render.h"
 #endif

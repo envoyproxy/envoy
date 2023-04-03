@@ -17,9 +17,11 @@ template <class TextReadoutTyoe, class CounterType, class GaugeType, class Histo
 Http::Code StatsRequest<TextReadoutTyoe, CounterType, GaugeType, HistogramType>::start(
     Http::ResponseHeaderMap& response_headers) {
   setRenderPtr(response_headers);
+#ifdef ENVOY_ADMIN_HTML
   if (params_.format_ == StatsFormat::ActiveHtml) {
     return Http::Code::OK;
   }
+#endif
 
   // Populate the top-level scopes and the stats underneath any scopes with an empty name.
   // We will have to de-dup, but we can do that after sorting.
