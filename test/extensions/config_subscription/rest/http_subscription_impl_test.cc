@@ -1,6 +1,6 @@
 #include <memory>
 
-#include "test/common/config/http_subscription_test_harness.h"
+#include "test/extensions/config_subscription/rest/http_subscription_test_harness.h"
 
 #include "gtest/gtest.h"
 
