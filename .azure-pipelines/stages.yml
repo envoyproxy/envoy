@@ -169,11 +169,11 @@ stages:
       displayName: "Print build environment"
 
 - stage: precheck
-  # displayName: Prechecks
+  displayName: Prechecks
   dependsOn: ["env"]
   jobs:
   - job: format
-    # displayName: Code format
+    displayName: Code format
     dependsOn: []
     pool:
       vmImage: "ubuntu-20.04"
@@ -208,7 +208,7 @@ stages:
       condition: failed()
 
   - job: proto_format
-    # displayName: Protobuf format
+    displayName: Protobuf format
     dependsOn: []
     pool:
       vmImage: "ubuntu-20.04"
@@ -242,7 +242,7 @@ stages:
       condition: failed()
 
   - job: docs
-    # displayName: Documentation
+    displayName: Documentation
     dependsOn: []  # this removes the implicit dependency on previous stage and causes this to run in parallel.
     condition: ne(variables['PostSubmit'], true)
     pool:
@@ -280,7 +280,7 @@ stages:
         GCS_ARTIFACT_BUCKET: $(GcsArtifactBucket)
 
   - job: dependencies
-    # displayName: Dependency checks
+    displayName: Dependency checks
     dependsOn: []  # this removes the implicit dependency on previous stage and causes this to run in parallel.
     pool:
       vmImage: "ubuntu-20.04"
@@ -389,7 +389,7 @@ stages:
         AZP_BRANCH: $(Build.SourceBranch)
 
 - stage: linux_x64
-  # displayName: Linux x64
+  displayName: Linux x64
   dependsOn: ${{ parameters.buildStageDeps }}
   # For post-submit builds, continue even if precheck fails
   condition: and(not(canceled()), or(succeeded(), eq(variables['PostSubmit'], true)))
@@ -407,7 +407,7 @@ stages:
         bazelBuildExtraOptions: "--sandbox_base=/tmp/sandbox_base"
 
   - job: released
-    # displayName: Complete
+    displayName: Complete
     dependsOn: ["release"]
     pool:
       vmImage: "ubuntu-20.04"
@@ -422,7 +422,7 @@ stages:
         echo "linux_x64 released"
 
 - stage: linux_arm64
-  # displayName: Linux arm64
+  displayName: Linux arm64
   dependsOn: ${{ parameters.buildStageDeps }}
   # For post-submit builds, continue even if precheck fails
   condition: and(not(canceled()), or(succeeded(), eq(variables['PostSubmit'], true)))
@@ -442,7 +442,7 @@ stages:
         bazelBuildExtraOptions: "--sandbox_base=/tmp/sandbox_base"
 
   - job: released
-    # displayName: Complete
+    displayName: Complete
     dependsOn: ["release"]
     pool:
       vmImage: "ubuntu-20.04"
@@ -457,12 +457,11 @@ stages:
         echo "linux_arm64 released"
 
 - stage: check
-  # displayName: Checks (Linux x64)
+  displayName: Checks (Linux x64)
   dependsOn: ${{ parameters.checkStageDeps }}
   jobs:
   - job: bazel
-    displayName: linux_x64
-    # displayName: "Linux x64"
+    displayName: "Linux x64"
     dependsOn: []
     # Skip checks if only mobile/ or docs/ have changed.
     condition: and(not(canceled()), or(succeeded(), eq(variables['PostSubmit'], true)), ne(stageDependencies.env.repo.outputs['changed.mobileOnly'], 'true'), ne(stageDependencies.env.repo.outputs['changed.docsOnly'], 'true'), ne(stageDependencies.env.repo.outputs['changed.examplesOnly'], 'true'))
@@ -500,7 +499,7 @@ stages:
         envoyBuildFilterExample: $(ENVOY_FILTER_EXAMPLE)
 
   - job: coverage
-    # displayName: "Linux x64"
+    displayName: "Linux x64"
     dependsOn: []
     # Skip checks if only mobile/ or docs/ have changed.
     condition: and(not(canceled()), or(succeeded(), eq(variables['PostSubmit'], true)), ne(stageDependencies.env.repo.outputs['changed.mobileOnly'], 'true'), ne(stageDependencies.env.repo.outputs['changed.docsOnly'], 'true'), ne(stageDependencies.env.repo.outputs['changed.examplesOnly'], 'true'))
@@ -531,8 +530,7 @@ stages:
       condition: always()
 
   - job: complete
-    displayName: linux_x64
-    # displayName: "Checks complete"
+    displayName: "Checks complete"
     dependsOn: ["bazel", "coverage"]
     pool:
       vmImage: "ubuntu-20.04"
@@ -810,7 +808,7 @@ stages:
         MAINTAINER_GPG_KEY_PASSPHRASE: $(MaintainerGPGKeyPassphrase)
 
 - stage: verify
-  # displayName: Verify
+  displayName: Verify
   dependsOn: ["env", "publish"]
   jobs:
   - job: examples
@@ -882,7 +880,7 @@ stages:
       displayName: "Verify packages"
 
   - job: verified
-    # displayName: Verification complete
+    displayName: Verification complete
     dependsOn: ["examples", "packages_x64", "packages_arm64"]
     pool:
       vmImage: "ubuntu-20.04"
@@ -901,7 +899,7 @@ stages:
         echo "checks complete"
 
 - stage: macos
-  # displayName: macOS
+  displayName: macOS
   dependsOn: ${{ parameters.macBuildStageDeps }}
   jobs:
   - job: test
@@ -930,7 +928,7 @@ stages:
       condition: always()
 
   - job: tested
-    # displayName: Complete
+    displayName: Complete
     dependsOn: ["test"]
     pool:
       vmImage: "ubuntu-20.04"
@@ -945,7 +943,7 @@ stages:
         echo "macos tested"
 
 - stage: windows
-  # displayName: Windows
+  displayName: Windows
   dependsOn: ${{ parameters.windowsBuildStageDeps }}
   jobs:
   - job: release
@@ -1038,7 +1036,7 @@ stages:
       condition: always()
 
   - job: released
-    # displayName: Complete
+    displayName: Complete
     dependsOn: ["release", "docker"]
     pool:
       vmImage: "ubuntu-20.04"
