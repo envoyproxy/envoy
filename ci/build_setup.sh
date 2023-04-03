@@ -89,7 +89,11 @@ function cleanup() {
 cleanup
 trap cleanup EXIT
 
-"$(dirname "$0")"/../bazel/setup_clang.sh "${LLVM_ROOT}"
+if [[ -e "${LLVM_ROOT}" ]]; then
+    "$(dirname "$0")/../bazel/setup_clang.sh" "${LLVM_ROOT}"
+else
+    echo "LLVM_ROOT not found, not setting up llvm."
+fi
 
 if [[ "${BUILD_REASON}" != "PullRequest" ]]; then
     VERSION_DEV="$(cut -d- -f2 "${ENVOY_SRCDIR}/VERSION.txt")"
