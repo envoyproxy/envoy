@@ -75,7 +75,7 @@ IoUringWorkerImpl::~IoUringWorkerImpl() {
     }
   }
 
-  while (sockets_.size() != 0) {
+  while (!sockets_.empty()) {
     ENVOY_LOG(trace, "still left {} sockets are not closed", sockets_.size());
     for (auto& socket : sockets_) {
       ENVOY_LOG(trace, "the socket fd = {} not closed", socket->fd());

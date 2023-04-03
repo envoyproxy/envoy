@@ -103,30 +103,17 @@ public:
 class TestIoUringHandler : public IoUringHandler {
 public:
   void onAcceptSocket(AcceptedSocketParam& param) override { accept_result_ = param.fd_; }
-  void onRead(ReadParam& param) override {
-    read_results_.push(param.result_);
-    if (expected_read_size_) {
-      // Only drain expected size to emulate readDisable on reading.
-      param.buf_.drain(expected_read_size_);
-      expected_read_size_ = 0;
-    } else if (expected_close_socket_.has_value()) {
-      expected_close_socket_->close();
-      expected_close_socket_.reset();
-    }
-  }
+  void onRead(ReadParam& param) override { on_read_cb_(param); }
   void onWrite(WriteParam& param) override { write_result_ = param.result_; }
   void onClose() override { is_closed = true; }
 
-  void expectRead(uint32_t size) { expected_read_size_ = size; }
-  void expectError(IoUringSocket& socket) { expected_close_socket_ = socket; }
+  void expectRead(std::function<void(ReadParam&)> on_read_cb) { on_read_cb_ = on_read_cb; }
 
   os_fd_t accept_result_{INVALID_SOCKET};
-  std::queue<int32_t> read_results_;
   int32_t write_result_{0};
   bool is_closed{false};
 
-  uint32_t expected_read_size_{0};
-  OptRef<IoUringSocket> expected_close_socket_;
+  std::function<void(ReadParam&)> on_read_cb_;
 };
 
 class IoUringWorkerIntegrationTest : public testing::Test {
@@ -575,11 +562,12 @@ TEST_F(IoUringWorkerIntegrationTest, ServerSocketRead) {
   Api::OsSysCallsSingleton::get().write(client_socket_, write_data.data(), write_data.size());
 
   // Waiting for the server socket receive the data.
-  io_uring_handler_.expectRead(write_data.length());
-  while (io_uring_handler_.read_results_.empty()) {
+  absl::optional<int32_t> result = absl::nullopt;
+  io_uring_handler_.expectRead([&](ReadParam& param) { result = param.result_; });
+  while (!result.has_value()) {
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   }
-  EXPECT_EQ(io_uring_handler_.read_results_.front(), write_data.length());
+  EXPECT_EQ(result.value(), write_data.length());
 
   socket.close();
   runToClose(server_socket_);
@@ -594,12 +582,16 @@ TEST_F(IoUringWorkerIntegrationTest, ServerSocketReadError) {
   EXPECT_EQ(io_uring_worker_->getSockets().size(), 1);
 
   // Waiting for the server socket receive the data.
-  io_uring_handler_.expectError(socket);
-  while (io_uring_handler_.read_results_.empty()) {
+  absl::optional<int32_t> result = absl::nullopt;
+  io_uring_handler_.expectRead([&](ReadParam& param) {
+    result = param.result_;
+    socket.close();
+  });
+  while (!result.has_value()) {
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   }
 
-  EXPECT_EQ(io_uring_handler_.read_results_.front(), -EBADF);
+  EXPECT_EQ(result.value(), -EBADF);
 
   runToClose(server_socket_);
   EXPECT_EQ(io_uring_worker_->getSockets().size(), 0);
@@ -617,12 +609,16 @@ TEST_F(IoUringWorkerIntegrationTest, ServerSocketRemoteClose) {
   Api::OsSysCallsSingleton::get().close(client_socket_);
 
   // Waiting for the server socket receive the data.
-  io_uring_handler_.expectError(socket);
-  while (io_uring_handler_.read_results_.empty()) {
+  absl::optional<int32_t> result = absl::nullopt;
+  io_uring_handler_.expectRead([&](ReadParam& param) {
+    result = param.result_;
+    socket.close();
+  });
+  while (!result.has_value()) {
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   }
 
-  EXPECT_EQ(io_uring_handler_.read_results_.front(), 0);
+  EXPECT_EQ(result.value(), 0);
 
   runToClose(server_socket_);
   EXPECT_EQ(io_uring_worker_->getSockets().size(), 0);
@@ -642,23 +638,27 @@ TEST_F(IoUringWorkerIntegrationTest, ServerSocketDisable) {
   Api::OsSysCallsSingleton::get().write(client_socket_, write_data.data(), write_data.size());
 
   // Waiting for the server socket receive the data.
-  io_uring_handler_.expectRead(5);
-  while (io_uring_handler_.read_results_.empty()) {
+  absl::optional<int32_t> result = absl::nullopt;
+  io_uring_handler_.expectRead([&](ReadParam& param) {
+    result = param.result_;
+    param.buf_.drain(5);
+  });
+  while (!result.has_value()) {
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   }
 
-  EXPECT_EQ(io_uring_handler_.read_results_.front(), write_data.length());
+  EXPECT_EQ(result.value(), write_data.length());
 
   // Emulate enable behavior.
-  io_uring_handler_.read_results_.pop();
+  result.reset();
   socket.disable();
   socket.enable();
-  io_uring_handler_.expectRead(write_data.length() - 5);
-  while (io_uring_handler_.read_results_.empty()) {
+  io_uring_handler_.expectRead([&](ReadParam& param) { result = param.result_; });
+  while (!result.has_value()) {
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   }
 
-  EXPECT_EQ(io_uring_handler_.read_results_.front(), write_data.length() - 5);
+  EXPECT_EQ(result.value(), write_data.length() - 5);
 
   socket.close();
   runToClose(server_socket_);
@@ -699,7 +699,7 @@ TEST_F(IoUringWorkerIntegrationTest, ServerSocketWrite) {
   EXPECT_EQ(write_data.size(), size);
 
   socket.close();
-  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  runToClose(server_socket_);
   EXPECT_EQ(io_uring_worker_->getSockets().size(), 0);
   cleanup();
 }
@@ -718,7 +718,6 @@ TEST_F(IoUringWorkerIntegrationTest, ServerSocketShutdownAfterWrite) {
   slice.len_ = write_data.length();
   socket.write(&slice, 1);
   socket.shutdown(SHUT_WR);
-
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
 
   // Read data from client socket.
@@ -730,9 +729,8 @@ TEST_F(IoUringWorkerIntegrationTest, ServerSocketShutdownAfterWrite) {
   EXPECT_EQ(write_data.size(), size);
 
   socket.close();
-  while (io_uring_worker_->getSockets().size() != 0) {
-    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
-  }
+  runToClose(server_socket_);
+  EXPECT_EQ(io_uring_worker_->getSockets().size(), 0);
   cleanup();
 }
 
@@ -744,6 +742,7 @@ TEST_F(IoUringWorkerIntegrationTest, ServerSocketCloseAfterShutdown) {
   EXPECT_EQ(io_uring_worker_->getSockets().size(), 1);
 
   socket.shutdown(SHUT_WR);
+
   socket.close();
   runToClose(server_socket_);
   EXPECT_EQ(io_uring_worker_->getSockets().size(), 0);
@@ -765,10 +764,8 @@ TEST_F(IoUringWorkerIntegrationTest, ServerSocketCloseAfterShutdownWrite) {
   socket.write(&slice, 1);
   socket.shutdown(SHUT_WR);
   socket.close();
-
-  while (io_uring_worker_->getSockets().size() != 0) {
-    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
-  }
+  runToClose(server_socket_);
+  EXPECT_EQ(io_uring_worker_->getSockets().size(), 0);
 
   // Read data from client socket.
   struct iovec read_iov;
@@ -818,7 +815,7 @@ TEST_F(IoUringWorkerIntegrationTest, ServerSocketCloseWithAnyRequest) {
   std::string write_data = "hello world";
   Api::OsSysCallsSingleton::get().write(client_socket_, write_data.data(), write_data.size());
 
-  // Running the event loop, to let the IoUring worker process the read request.
+  // Running the event loop, to let the io_uring worker process the read request.
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
 
   // Close the socket now, it expected the socket will be close directly without cancel.

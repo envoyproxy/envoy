@@ -178,7 +178,7 @@ TEST(IoUringWorkerImplTest, ServerSocketInjectAfterWrite) {
   EXPECT_CALL(mock_io_uring, submit()).Times(1).RetiresOnSaturation();
   file_event_callback(Event::FileReadyType::Read);
 
-  // After the close request finsihed, the socket will be cleanup.
+  // After the close request finished, the socket will be cleanup.
   EXPECT_CALL(mock_io_uring, forEveryCompletion(_))
       .WillOnce(Invoke([&close_req](const CompletionCb& cb) {
         cb(reinterpret_cast<void*>(close_req), 0, false);
@@ -248,7 +248,7 @@ TEST(IoUringWorkerImplTest, ServerSocketInjectAfterRead) {
   EXPECT_CALL(mock_io_uring, submit()).Times(1).RetiresOnSaturation();
   file_event_callback(Event::FileReadyType::Read);
 
-  // After the close request finsihed, the socket will be cleanup.
+  // After the close request finished, the socket will be cleanup.
   EXPECT_CALL(mock_io_uring, forEveryCompletion(_))
       .WillOnce(Invoke([&close_req](const CompletionCb& cb) {
         cb(reinterpret_cast<void*>(close_req), 0, false);
@@ -386,7 +386,7 @@ TEST(IoUringWorkerImplTest, ServerCloseWithWriteRequestOnly) {
       }));
   file_event_callback(Event::FileReadyType::Read);
 
-  // After the close request finsihed, the socket will be cleanup.
+  // After the close request finished, the socket will be cleanup.
   EXPECT_CALL(mock_io_uring, forEveryCompletion(_))
       .WillOnce(Invoke([&close_req](const CompletionCb& cb) {
         cb(reinterpret_cast<void*>(close_req), 0, false);
