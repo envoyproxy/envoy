@@ -20,7 +20,7 @@ filter access logs.
 If access log is enabled, then by default it will be reported to the configured sinks at the end of a TCP
 stream, or HTTP request. It is possible to extend this behavior and report access logs periodically or at the
 start of a TCP stream or HTTP request. Reporting access logs right after upstream connection establishment
-does not depend on periodic reporting, and and the other way around.
+does not depend on periodic reporting, and the other way around.
 
 .. _arch_overview_access_log_start:
 
