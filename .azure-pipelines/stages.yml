@@ -105,7 +105,7 @@ stages:
             echo "##vso[task.setvariable variable=mobileOnly;isoutput=true]false"
             echo "##vso[task.setvariable variable=docsOnly;isoutput=true]false"
             echo "##vso[task.setvariable variable=examplesOnly;isoutput=true]false"
-            echo "##vso[task.setvariable variable=dependency;isoutput=true]true"
+            echo "##vso[task.setvariable variable=requirements;isoutput=true]true"
             exit 0
         fi
 
@@ -174,6 +174,8 @@ stages:
       name: state
 
     - bash: |
+        set -e
+
         echo "env.outputs['changed.mobileOnly']: $(changed.mobileOnly)"
         echo "env.outputs['changed.docsOnly']: $(changed.docsOnly)"
         echo "env.outputs['changed.examplesOnly']: $(changed.examplesOnly)"
