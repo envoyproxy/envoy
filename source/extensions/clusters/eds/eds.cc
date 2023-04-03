@@ -38,7 +38,7 @@ EdsClusterImpl::EdsClusterImpl(Server::Configuration::ServerFactoryContext& serv
           resource_decoder_, {});
 }
 
-void EdsClusterImpl::startPreInit() { subscription_->start({*info_->edsServiceName()}); }
+void EdsClusterImpl::startPreInit() { subscription_->start({edsServiceName()}); }
 
 void EdsClusterImpl::BatchUpdateHelper::batchUpdate(PrioritySet::HostUpdateCb& host_update_cb) {
   absl::flat_hash_set<std::string> all_new_hosts;
@@ -148,9 +148,8 @@ void EdsClusterImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef
   envoy::config::endpoint::v3::ClusterLoadAssignment cluster_load_assignment =
       dynamic_cast<const envoy::config::endpoint::v3::ClusterLoadAssignment&>(
           resources[0].get().resource());
-  if (cluster_load_assignment.cluster_name() != *info_->edsServiceName()) {
-    throw EnvoyException(fmt::format("Unexpected EDS cluster (expecting {}): {}",
-                                     *info_->edsServiceName(),
+  if (cluster_load_assignment.cluster_name() != edsServiceName()) {
+    throw EnvoyException(fmt::format("Unexpected EDS cluster (expecting {}): {}", edsServiceName(),
                                      cluster_load_assignment.cluster_name()));
   }
   // Validate that each locality doesn't have both LEDS and endpoints defined.
@@ -161,8 +160,7 @@ void EdsClusterImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef
       throw EnvoyException(fmt::format(
           "A ClusterLoadAssignment for cluster {} cannot include both LEDS (resource: {}) and a "
           "list of endpoints.",
-          *info_->edsServiceName(),
-          locality.leds_cluster_locality_config().leds_collection_name()));
+          edsServiceName(), locality.leds_cluster_locality_config().leds_collection_name()));
     }
   }
 
@@ -220,11 +218,11 @@ void EdsClusterImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef
   for (const auto& leds_config : cla_leds_configs) {
     if (leds_localities_.find(leds_config) == leds_localities_.end()) {
       ENVOY_LOG(trace, "Found new LEDS config in EDS onConfigUpdate() for cluster {}: {}",
-                *info_->edsServiceName(), leds_config.DebugString());
+                edsServiceName(), leds_config.DebugString());
 
       // Create a new LEDS subscription and add it to the subscriptions map.
       LedsSubscriptionPtr leds_locality_subscription = std::make_unique<LedsSubscription>(
-          leds_config, *info_->edsServiceName(), *transport_factory_context_, info_->statsScope(),
+          leds_config, edsServiceName(), *transport_factory_context_, info_->statsScope(),
           [&, used_load_assignment]() {
             // Called upon an update to the locality.
             if (validateAllLedsUpdated()) {
@@ -257,8 +255,7 @@ void EdsClusterImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef
 
 bool EdsClusterImpl::validateUpdateSize(int num_resources) {
   if (num_resources == 0) {
-    ENVOY_LOG(debug, "Missing ClusterLoadAssignment for {} in onConfigUpdate()",
-              *info_->edsServiceName());
+    ENVOY_LOG(debug, "Missing ClusterLoadAssignment for {} in onConfigUpdate()", edsServiceName());
     info_->configUpdateStats().update_empty_.inc();
     onPreInitComplete();
     return false;
@@ -277,7 +274,7 @@ void EdsClusterImpl::onAssignmentTimeout() {
   // stale.
   // TODO(snowp): This should probably just use xDS TTLs?
   envoy::config::endpoint::v3::ClusterLoadAssignment resource;
-  resource.set_cluster_name(*info_->edsServiceName());
+  resource.set_cluster_name(edsServiceName());
   ProtobufWkt::Any any_resource;
   any_resource.PackFrom(resource);
   auto decoded_resource =

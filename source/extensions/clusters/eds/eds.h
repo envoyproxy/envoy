@@ -56,6 +56,7 @@ private:
                               const HostMap& all_hosts,
                               const absl::flat_hash_set<std::string>& all_new_hosts);
   bool validateUpdateSize(int num_resources);
+  std::string edsServiceName() const { return info_->edsServiceName().value_or(info_->name()); }
 
   // ClusterImplBase
   void reloadHealthyHostsHelper(const HostSharedPtr& host) override;
