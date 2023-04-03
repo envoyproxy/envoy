@@ -1254,6 +1254,9 @@ TEST_P(FilterIntegrationTest, LocalReplyFromDecodeMetadata) {
       "@type": type.googleapis.com/test.integration.filters.CrashFilterConfig
       crash_in_encode_headers: false
       crash_in_encode_data: false
+      crash_in_decode_headers: true
+      crash_in_decode_data: true
+      crash_in_decode_metadata: true
   )EOF");
   prependFilter(R"EOF(
     name: metadata-control-filter
