@@ -21,6 +21,7 @@ envoy_cc_test_library(
     deps = [
         ":config_test_lib",
         "//source/common/filesystem:filesystem_lib",
+        "//source/extensions/config_subscription/rest:http_subscription_lib",
         "//test/config:v2_link_hacks",
         "//test/test_common:environment_lib",
         "//test/test_common:utility_lib",

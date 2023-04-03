@@ -72,13 +72,11 @@ public:
   void setupFromYaml(const std::string& yaml) { setup(parseClusterFromV3Yaml(yaml)); }
 
   void setup(const envoy::config::cluster::v3::Cluster& cluster_config) {
-    Envoy::Stats::ScopeSharedPtr scope = stats_store_.createScope(fmt::format(
-        "cluster.{}.", cluster_config.alt_stat_name().empty() ? cluster_config.name()
-                                                              : cluster_config.alt_stat_name()));
-    Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
-        server_context_, ssl_context_manager_, *scope, cm_, stats_store_, validation_visitor_);
-    cluster_ = std::make_shared<OriginalDstCluster>(server_context_, cluster_config, runtime_,
-                                                    factory_context, std::move(scope), false);
+    Envoy::Upstream::ClusterFactoryContextImpl factory_context(
+        server_context_, server_context_.cluster_manager_, stats_store_, nullptr,
+        ssl_context_manager_, nullptr, false, validation_visitor_);
+    cluster_ = std::make_shared<OriginalDstCluster>(server_context_, cluster_config,
+                                                    factory_context, runtime_, false);
     priority_update_cb_ = cluster_->prioritySet().addPriorityUpdateCb(
         [&](uint32_t, const HostVector&, const HostVector&) -> void {
           membership_updated_.ready();

@@ -92,6 +92,10 @@ public:
         headers.addCopy(Http::LowerCaseString("response_begin"),
                         toUsec(upstream_timing.first_upstream_rx_byte_received_.value()));
       }
+      if (upstream_timing.connectionPoolCallbackLatency().has_value()) {
+        headers.addCopy(Http::LowerCaseString("connection_pool_latency"),
+                        upstream_timing.connectionPoolCallbackLatency().value().count());
+      }
     }
     return Http::FilterHeadersStatus::Continue;
   }
