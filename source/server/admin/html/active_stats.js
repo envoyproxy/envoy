@@ -101,7 +101,7 @@ async function loadStats() {
   try {
     const response = await fetch(url);
     const data = await response.json();
-    renderStats(data);
+    await renderStats(data);
   } catch (e) {
     statusDiv.textContent = 'Error fetching ' + url + ': ' + e;
   }
@@ -173,12 +173,10 @@ function renderStats(data) {
       if (histograms) {
         if (histograms.supported_quantiles) {
           renderHistogramSummary(histograms);
+        } else if (histograms.supported_percentiles && histograms.details) {
+          renderHistogramDetail(histograms.supported_percentiles, histograms.details);
         } else if (histograms.length && histograms[0].name) {
-          if (histograms[0].detail) {
-            renderHistogramDetail(histograms);
-          } else {
-            renderHistogramDisjoint(histograms);
-          }
+          renderHistogramDisjoint(histograms);
         }
         continue;
       }
@@ -262,13 +260,19 @@ function renderHistogramDisjoint(histograms) {
   }
 }
 
-function renderHistogramDetail(histograms) {
+function renderHistogramDetail(percentiles, detail) {
   activeStatsHistogramsDiv.replaceChildren();
-  for (histogram of histograms) {
+  for (histogram of detail) {
     const div = document.createElement('div');
-
     const label = document.createElement('div');
-    label.textContent = histogram.name;
+    let name_and_percentiles = histogram.name;
+    let i = 0;
+    let prev = 0;
+    for (percentile of percentiles) {
+      name_and_percentiles += " P" + percentiles[i++] + "=" + (percentile - prev);
+      prev = percentile;
+    }
+    label.textContent = name_and_percentiles;
     div.appendChild(label);
 
     let maxCount = 0;

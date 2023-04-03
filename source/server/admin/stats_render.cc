@@ -129,9 +129,15 @@ void StatsJsonRender::generate(Buffer::Instance& response, const std::string& na
 void StatsJsonRender::generate(Buffer::Instance&, const std::string& name,
                                const Stats::ParentHistogram& histogram) {
   switch (histogram_buckets_mode_) {
-  case Utility::HistogramBucketsMode::NoBuckets:
-    summarizeBuckets(name, histogram);
+  case Utility::HistogramBucketsMode::NoBuckets: {
+    ProtobufWkt::Struct computed_quantile;
+    ProtoMap& computed_quantile_fields = *computed_quantile.mutable_fields();
+    computed_quantile_fields["name"] = ValueUtil::stringValue(name);
+    populateQuantiles(histogram, "supported_quantiles",
+                      computed_quantile_fields["values"].mutable_list_value());
+    *histogram_array_->add_values() = ValueUtil::structValue(computed_quantile);
     break;
+  }
   case Utility::HistogramBucketsMode::Cumulative: {
     const Stats::HistogramStatistics& interval_statistics = histogram.intervalStatistics();
     const std::vector<uint64_t>& interval_buckets = interval_statistics.computedBuckets();
@@ -153,6 +159,8 @@ void StatsJsonRender::generate(Buffer::Instance&, const std::string& name,
     ProtobufWkt::Struct histogram_obj;
     ProtoMap& histogram_obj_fields = *histogram_obj.mutable_fields();
     histogram_obj_fields["name"] = ValueUtil::stringValue(histogram.name());
+    populateQuantiles(histogram, "supported_percentiles",
+                      histogram_obj_fields["percentiles"].mutable_list_value());
     ProtobufWkt::ListValue* bucket_array = histogram_obj_fields["detail"].mutable_list_value();
 
     for (const Stats::ParentHistogram::Bucket& bucket : buckets) {
@@ -173,11 +181,18 @@ void StatsJsonRender::finalize(Buffer::Instance& response) {
   if (histogram_array_->values_size() > 0) {
     ProtoMap& histograms_obj_container_fields = *histograms_obj_container_.mutable_fields();
     if (found_used_histogram_) {
-      ASSERT(histogram_buckets_mode_ == Utility::HistogramBucketsMode::NoBuckets);
-      ProtoMap& histograms_obj_fields = *histograms_obj_.mutable_fields();
-      histograms_obj_fields["computed_quantiles"].set_allocated_list_value(
-          histogram_array_.release());
-      histograms_obj_container_fields["histograms"] = ValueUtil::structValue(histograms_obj_);
+      if (histogram_buckets_mode_ == Utility::HistogramBucketsMode::NoBuckets) {
+        ProtoMap& histograms_obj_fields = *histograms_obj_.mutable_fields();
+        histograms_obj_fields["computed_quantiles"].set_allocated_list_value(
+            histogram_array_.release());
+        histograms_obj_container_fields["histograms"] = ValueUtil::structValue(histograms_obj_);
+      } else if (histogram_buckets_mode_ == Utility::HistogramBucketsMode::Detailed) {
+        ProtoMap& histograms_obj_fields = *histograms_obj_.mutable_fields();
+        histograms_obj_fields["details"].set_allocated_list_value(histogram_array_.release());
+        histograms_obj_container_fields["histograms"] = ValueUtil::structValue(histograms_obj_);
+      } else {
+        IS_ENVOY_BUG("reached unexpected buckets mode with found_used_histogram_ set");
+      }
     } else {
       ASSERT(histogram_buckets_mode_ != Utility::HistogramBucketsMode::NoBuckets);
       histograms_obj_container_fields["histograms"].set_allocated_list_value(
@@ -210,36 +225,26 @@ static void populateVector(absl::string_view name, const std::vector<double>& va
 // if this becomes an issue it should be possible to do, noting that we are
 // one or two levels nesting below the list of scalar stats due to the Envoy
 // stats json schema, where histograms are grouped together.
-void StatsJsonRender::summarizeBuckets(const std::string& name,
-                                       const Stats::ParentHistogram& histogram) {
+void StatsJsonRender::populateQuantiles(const Stats::ParentHistogram& histogram,
+                                        absl::string_view label,
+                                        ProtobufWkt::ListValue* computed_quantile_value_array) {
   if (!found_used_histogram_) {
     // It is not possible for the supported quantiles to differ across histograms, so it is ok
     // to send them once.
     Stats::HistogramStatisticsImpl empty_statistics;
     ProtoMap& fields = *histograms_obj_.mutable_fields();
-    populateVector("supported_quantiles", empty_statistics.supportedQuantiles(), 100, fields);
-    //populateVector("default_buckets", Stats::HistogramSettingsImpl::defaultBuckets(), 1, fields);
+    populateVector(label, empty_statistics.supportedQuantiles(), 100, fields);
     found_used_histogram_ = true;
   }
 
-  ProtobufWkt::Struct computed_quantile;
-  ProtoMap& computed_quantile_fields = *computed_quantile.mutable_fields();
-  computed_quantile_fields["name"] = ValueUtil::stringValue(name);
-
-  ProtobufWkt::ListValue* computed_quantile_value_array =
-      computed_quantile_fields["values"].mutable_list_value();
   const Stats::HistogramStatistics& interval_statistics = histogram.intervalStatistics();
   const std::vector<double>& computed_quantiles = interval_statistics.computedQuantiles();
   const Stats::HistogramStatistics& histogram_stats = histogram.cumulativeStatistics();
   const std::vector<double>& cumulative_quantiles = histogram_stats.computedQuantiles();
-  //const std::vector<double>& supported_buckets = histogram_stats.supportedBuckets();
   const size_t min_size = std::min({computed_quantiles.size(), cumulative_quantiles.size(),
                                     interval_statistics.supportedQuantiles().size()});
-  //const std::vector<double>& default_buckets = Stats::HistogramSettingsImpl::defaultBuckets();
   ASSERT(min_size == computed_quantiles.size());
   ASSERT(min_size == cumulative_quantiles.size());
-  /*  ASSERT(min_size == supported_buckets.size());
-      ASSERT(min_size == default_buckets.size());*/
 
   for (size_t i = 0; i < min_size; ++i) {
     ProtobufWkt::Struct computed_quantile_value;
@@ -251,15 +256,8 @@ void StatsJsonRender::summarizeBuckets(const std::string& name,
     computed_quantile_value_fields["cumulative"] =
         std::isnan(cumulative) ? ValueUtil::nullValue() : ValueUtil::numberValue(cumulative);
 
-    /*
-    if (supported_buckets[i] != default_buckets[i] && !std::isnan(supported_buckets[i])) {
-      computed_quantile_value_fields["bucket"] = ValueUtil::numberValue(supported_buckets[i]);
-    }
-    */
-
     *computed_quantile_value_array->add_values() = ValueUtil::structValue(computed_quantile_value);
   }
-  *histogram_array_->add_values() = ValueUtil::structValue(computed_quantile);
 }
 
 // Collects the buckets from the specified histogram, using either the

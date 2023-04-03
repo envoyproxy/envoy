@@ -78,7 +78,8 @@ private:
   // if this becomes an issue it should be possible to do, noting that we are
   // one or two levels nesting below the list of scalar stats due to the Envoy
   // stats json schema, where histograms are grouped together.
-  void summarizeBuckets(const std::string& name, const Stats::ParentHistogram& histogram);
+  void populateQuantiles(const Stats::ParentHistogram& histogram, absl::string_view label,
+                         ProtobufWkt::ListValue* computed_quantile_value_array);
 
   // Collects the buckets from the specified histogram.
   void collectBuckets(const std::string& name, const Stats::ParentHistogram& histogram,
