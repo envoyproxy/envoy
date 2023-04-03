@@ -6,10 +6,10 @@
 #include "envoy/config/endpoint/v3/endpoint.pb.validate.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
-#include "source/common/config/filesystem_subscription_impl.h"
 #include "source/common/config/utility.h"
 #include "source/common/event/dispatcher_impl.h"
 #include "source/common/protobuf/utility.h"
+#include "source/extensions/config_subscription/filesystem/filesystem_subscription_impl.h"
 
 #include "test/common/config/subscription_test_harness.h"
 #include "test/mocks/config/mocks.h"

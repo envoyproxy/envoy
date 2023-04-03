@@ -16,6 +16,7 @@ envoy_cc_test(
         "//envoy/config:xds_resources_delegate_interface",
         "//source/common/config:subscription_factory_lib",
         "//source/common/config:xds_resource_lib",
+        "//source/extensions/config_subscription/filesystem:filesystem_subscription_lib",
         "//source/extensions/config_subscription/rest:http_subscription_lib",
         "//test/config:v2_link_hacks",
         "//test/mocks/config:config_mocks",
@@ -41,9 +42,9 @@ envoy_cc_test(
     srcs = ["subscription_impl_test.cc"],
     deps = [
         "//test/common/config:delta_subscription_test_harness",
-        "//test/common/config:filesystem_subscription_test_harness",
         "//test/common/config:grpc_subscription_test_harness",
         "//test/common/config:subscription_test_harness",
+        "//test/extensions/config_subscription/filesystem:filesystem_subscription_test_harness",
         "//test/extensions/config_subscription/rest:http_subscription_test_harness",
     ],
 )

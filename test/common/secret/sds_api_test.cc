@@ -7,10 +7,10 @@
 #include "envoy/service/secret/v3/sds.pb.h"
 
 #include "source/common/config/datasource.h"
-#include "source/common/config/filesystem_subscription_impl.h"
 #include "source/common/secret/sds_api.h"
 #include "source/common/ssl/certificate_validation_context_config_impl.h"
 #include "source/common/ssl/tls_certificate_config_impl.h"
+#include "source/extensions/config_subscription/filesystem/filesystem_subscription_impl.h"
 
 #include "test/common/stats/stat_test_utility.h"
 #include "test/mocks/config/mocks.h"

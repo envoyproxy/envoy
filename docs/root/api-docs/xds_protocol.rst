@@ -66,6 +66,9 @@ same validations that the server does. This can lead to problems where
 the server rejects a resource that the client would have accepted.
 
 
+.. _extension_envoy.config_subscription.filesystem:
+.. _extension_envoy.config_subscription.filesystem_collection:
+
 Filesystem subscriptions
 ------------------------
 

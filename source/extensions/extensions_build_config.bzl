@@ -433,6 +433,8 @@ EXTENSIONS = {
     # Config Subscription
     #
     "envoy.config_subscription.rest": "//source/extensions/config_subscription/rest:http_subscription_lib",
+    "envoy.config_subscription.filesystem": "//source/extensions/config_subscription/filesystem:filesystem_subscription_lib",
+    "envoy.config_subscription.filesystem_collection": "//source/extensions/config_subscription/filesystem:filesystem_subscription_lib",
 }
 
 # These can be changed to ["//visibility:public"], for  downstream builds which
