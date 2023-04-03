@@ -573,7 +573,7 @@ message Http2ProtocolOptions {
   // If set, force use of a particular HTTP/2 codec: oghttp2 if true, nghttp2 if false.
   // If unset, HTTP/2 codec is selected based on envoy.reloadable_features.http2_use_oghttp2.
   google.protobuf.BoolValue use_oghttp2_codec = 16
-                                                [(xds.annotations.v3.field_status).work_in_progress = true];
+      [(xds.annotations.v3.field_status).work_in_progress = true];
 }
 
 // [#not-implemented-hide:]
