@@ -13,6 +13,7 @@
 #include "envoy/upstream/cluster_manager.h"
 
 #include "source/common/buffer/buffer_impl.h"
+#include "source/common/common/token_bucket_impl.h"
 #include "source/common/network/address_impl.h"
 #include "source/common/network/filter_impl.h"
 #include "source/common/protobuf/utility.h"
@@ -41,7 +42,8 @@ namespace ConnPool {
 
 #define REDIS_CLUSTER_STATS(COUNTER)                                                               \
   COUNTER(upstream_cx_drained)                                                                     \
-  COUNTER(max_upstream_unknown_connections_reached)
+  COUNTER(max_upstream_unknown_connections_reached)                                                \
+  COUNTER(redis_cx_rate_limited)
 
 struct RedisClusterStats {
   REDIS_CLUSTER_STATS(GENERATE_COUNTER_STRUCT)
@@ -161,6 +163,7 @@ private:
     void onHostsAdded(const std::vector<Upstream::HostSharedPtr>& hosts_added);
     void onHostsRemoved(const std::vector<Upstream::HostSharedPtr>& hosts_removed);
     void drainClients();
+    bool consumeCxToken(Upstream::HostConstSharedPtr host);
 
     // Upstream::ClusterUpdateCallbacks
     void onClusterAddOrUpdate(Upstream::ThreadLocalCluster& cluster) override {
@@ -177,6 +180,8 @@ private:
     Upstream::ClusterUpdateCallbacksHandlePtr cluster_update_handle_;
     Upstream::ThreadLocalCluster* cluster_{};
     absl::node_hash_map<Upstream::HostConstSharedPtr, ThreadLocalActiveClientPtr> client_map_;
+    // todo: add config to enable this
+    absl::node_hash_map<Upstream::HostConstSharedPtr, TokenBucketPtr> cx_rate_limiter_map_;
     Envoy::Common::CallbackHandlePtr host_set_member_update_cb_handle_;
     absl::node_hash_map<std::string, Upstream::HostConstSharedPtr> host_address_map_;
     std::string auth_username_;

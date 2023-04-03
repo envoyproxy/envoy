@@ -28,7 +28,9 @@ ConfigImpl::ConfigImpl(
                // as the buffer is flushed on each request immediately.
       max_upstream_unknown_connections_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, max_upstream_unknown_connections, 100)),
-      enable_command_stats_(config.enable_command_stats()) {
+      enable_command_stats_(config.enable_command_stats()),
+      redis_cx_rate_limit_enabled_(config.redis_cx_rate_limit_enabled()),
+      redis_cx_rate_limit_per_sec_(config.redis_cx_rate_limit_per_sec()) {
   switch (config.read_policy()) {
     PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
   case envoy::extensions::filters::network::redis_proxy::v3::RedisProxy::ConnPoolSettings::MASTER:

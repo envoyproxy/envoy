@@ -181,6 +181,9 @@ public:
    * @return the read policy the proxy should use.
    */
   virtual ReadPolicy readPolicy() const PURE;
+
+  virtual bool redisCxRateLimitEnabled() const PURE;
+  virtual uint32_t redisCxRateLimitPerSec() const PURE;
 };
 
 using ConfigSharedPtr = std::shared_ptr<Config>;

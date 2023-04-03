@@ -50,7 +50,8 @@ namespace ConnPool {
 class RedisConnPoolImplTest : public testing::Test, public Common::Redis::Client::ClientFactory {
 public:
   void setup(bool cluster_exists = true, bool hashtagging = true, uint32_t max_unknown_conns = 100,
-             const Extensions::Common::DynamicForwardProxy::DnsCacheSharedPtr dns_cache = nullptr) {
+             const Extensions::Common::DynamicForwardProxy::DnsCacheSharedPtr dns_cache = nullptr,
+             uint32_t redis_cx_rate_limit_per_sec = 100) {
     EXPECT_CALL(cm_, addThreadLocalClusterUpdateCallbacks_(_))
         .WillOnce(DoAll(SaveArgAddress(&update_callbacks_),
                         ReturnNew<Upstream::MockClusterUpdateCallbacksHandle>()));
@@ -85,7 +86,7 @@ public:
     std::shared_ptr<InstanceImpl> conn_pool_impl = std::make_shared<InstanceImpl>(
         cluster_name_, cm_, *this, tls_,
         Common::Redis::Client::createConnPoolSettings(20, hashtagging, true, max_unknown_conns,
-                                                      read_policy_),
+                                                      read_policy_, redis_cx_rate_limit_per_sec),
         api_, store_.rootScope(), redis_command_stats, cluster_refresh_manager_, dns_cache);
     conn_pool_impl->init();
     // Set the authentication password for this connection pool.
@@ -405,6 +406,53 @@ TEST_F(RedisConnPoolImplTest, ClientRequestFailed) {
   // the request should be null and the callback is not called
   EXPECT_EQ(nullptr, request);
   EXPECT_CALL(*client, close());
+  tls_.shutdownThread();
+};
+
+TEST_F(RedisConnPoolImplTest, RedisConnectionRateLimited) {
+  InSequence s;
+
+  setup(true, true, 100, nullptr, 1);
+
+  Common::Redis::RespValue value;
+  Common::Redis::Client::MockPoolRequest active_request;
+  MockPoolCallbacks callbacks;
+  Common::Redis::Client::MockClient* client = new NiceMock<Common::Redis::Client::MockClient>();
+  EXPECT_CALL(cm_.thread_local_cluster_.lb_, chooseHost(_))
+      .WillOnce(Invoke([&](Upstream::LoadBalancerContext* context) -> Upstream::HostConstSharedPtr {
+        EXPECT_EQ(context->computeHashKey().value(), MurmurHash::murmurHash2("hash_key"));
+        EXPECT_EQ(context->metadataMatchCriteria(), nullptr);
+        EXPECT_EQ(context->downstreamConnection(), nullptr);
+        return cm_.thread_local_cluster_.lb_.host_;
+      }));
+  EXPECT_CALL(*this, create_(_)).WillOnce(Return(client));
+  EXPECT_CALL(*cm_.thread_local_cluster_.lb_.host_, address())
+      .WillRepeatedly(Return(test_address_));
+  EXPECT_CALL(*client, makeRequest_(Eq(value), _)).WillOnce(Return(&active_request));
+  Common::Redis::Client::PoolRequest* request =
+      conn_pool_->makeRequest("hash_key", ConnPool::RespVariant(value), callbacks, transaction_);
+  EXPECT_NE(nullptr, request);
+
+  // close local and reconnect, should be rate limited and get null
+  EXPECT_CALL(tls_.dispatcher_, deferredDelete_(_));
+  client->raiseEvent(Network::ConnectionEvent::LocalClose);
+
+  EXPECT_CALL(cm_.thread_local_cluster_.lb_, chooseHost(_))
+      .WillOnce(Invoke([&](Upstream::LoadBalancerContext* context) -> Upstream::HostConstSharedPtr {
+        EXPECT_EQ(context->computeHashKey().value(), MurmurHash::murmurHash2("hash_key"));
+        EXPECT_EQ(context->metadataMatchCriteria(), nullptr);
+        EXPECT_EQ(context->downstreamConnection(), nullptr);
+        return cm_.thread_local_cluster_.lb_.host_;
+      }));
+  EXPECT_CALL(*this, create_(_)).Times(0);
+  EXPECT_CALL(*cm_.thread_local_cluster_.lb_.host_, address())
+      .WillRepeatedly(Return(test_address_));
+  Common::Redis::Client::PoolRequest* request2 =
+      conn_pool_->makeRequest("hash_key", ConnPool::RespVariant(value), callbacks, transaction_);
+  EXPECT_EQ(nullptr, request2);
+
+  EXPECT_CALL(active_request, cancel());
+  EXPECT_CALL(callbacks, onFailure_());
   tls_.shutdownThread();
 };
 
