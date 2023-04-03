@@ -521,6 +521,75 @@ TEST_F(IoUringSocketHandleImplIntegrationTest, ActivateWriteEvent) {
   }
 }
 
+TEST_F(IoUringSocketHandleImplIntegrationTest, Recv) {
+  initialize();
+
+  // io_uring handle starts listening.
+  bool accepted = false;
+  auto local_addr = std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 0);
+  io_handle_->bind(local_addr);
+  io_handle_->listen(5);
+
+  IoHandlePtr server_io_handler;
+  io_handle_->initializeFileEvent(
+      *dispatcher_,
+      [this, &accepted, &server_io_handler](uint32_t) {
+        struct sockaddr addr;
+        socklen_t addrlen = sizeof(addr);
+        server_io_handler = io_handle_->accept(&addr, &addrlen);
+        EXPECT_NE(server_io_handler, nullptr);
+        accepted = true;
+      },
+      Event::PlatformDefaultTriggerType, Event::FileReadyType::Read);
+
+  // Connect from peer handle.
+  peer_io_handle_->connect(io_handle_->localAddress());
+
+  while (!accepted) {
+    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  }
+  EXPECT_TRUE(accepted);
+
+  std::string data = "Hello world";
+  Buffer::OwnedImpl write_buffer(data);
+  Buffer::OwnedImpl peek_buffer;
+  Buffer::OwnedImpl recv_buffer;
+
+  server_io_handler->initializeFileEvent(
+      *dispatcher_,
+      [&server_io_handler, &peek_buffer, &recv_buffer, &data](uint32_t event) {
+        EXPECT_EQ(event, Event::FileReadyType::Read);
+        // Recv with MSG_PEEK will not drain the buffer.
+        Buffer::Reservation reservation = peek_buffer.reserveForRead();
+        auto ret = server_io_handler->recv(reservation.slices()->mem_, 5, MSG_PEEK);
+        EXPECT_EQ(ret.return_value_, 5);
+        reservation.commit(ret.return_value_);
+
+        // Recv without flags bahaves the same as readv.
+        Buffer::Reservation reservation2 = recv_buffer.reserveForRead();
+        auto ret2 = server_io_handler->recv(reservation2.slices()->mem_, reservation2.length(), 0);
+        EXPECT_EQ(ret2.return_value_, data.size());
+        reservation2.commit(ret2.return_value_);
+      },
+      Event::PlatformDefaultTriggerType, Event::FileReadyType::Read);
+
+  peer_io_handle_->write(write_buffer);
+
+  while (recv_buffer.length() == 0) {
+    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  }
+
+  EXPECT_EQ(peek_buffer.toString(), "Hello");
+  EXPECT_EQ(recv_buffer.toString(), data);
+
+  // Close safely.
+  server_io_handler->close();
+  io_handle_->close();
+  while (fcntl(fd_, F_GETFD, 0) >= 0) {
+    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  }
+}
+
 } // namespace
 } // namespace Network
 } // namespace Envoy

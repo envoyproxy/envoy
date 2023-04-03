@@ -86,43 +86,11 @@ IoUringSocketHandleImpl::readv(uint64_t max_length, Buffer::RawSlice* slices, ui
     return shadow_io_handle_->readv(max_length, slices, num_slice);
   }
 
-  if (read_param_ == absl::nullopt) {
-    return {0, Api::IoErrorPtr(IoSocketError::getIoSocketEagainInstance(),
-                               IoSocketError::deleteIoError)};
+  Api::IoCallUint64Result result = copyOut(max_length, slices, num_slice);
+  if (result.ok()) {
+    read_param_->buf_.drain(result.return_value_);
   }
-
-  ASSERT(io_uring_socket_.has_value());
-  ENVOY_LOG(trace, "readv available, result = {}, fd = {}, type = {}", read_param_->result_, fd_,
-            ioUringSocketTypeStr());
-
-  if (read_param_->result_ == 0) {
-    ENVOY_LOG(trace, "readv remote close");
-    return Api::ioCallUint64ResultNoError();
-  }
-
-  if (read_param_->result_ < 0) {
-    ASSERT(read_param_->buf_.length() == 0);
-    if (read_param_->result_ == -EAGAIN) {
-      return {0, Api::IoErrorPtr(IoSocketError::getIoSocketEagainInstance(),
-                                 IoSocketError::deleteIoError)};
-    }
-    return {
-        0, Api::IoErrorPtr(new IoSocketError(-read_param_->result_), IoSocketError::deleteIoError)};
-  }
-
-  // This mean the buffer ready read by previous call, return EAGAIN to tell the
-  // caller waiting for next read event.
-  if (read_param_->buf_.length() == 0) {
-    return {0, Api::IoErrorPtr(IoSocketError::getIoSocketEagainInstance(),
-                               IoSocketError::deleteIoError)};
-  }
-
-  const uint64_t max_read_length =
-      std::min(max_length, static_cast<uint64_t>(read_param_->result_));
-  uint64_t num_bytes_to_read =
-      read_param_->buf_.copyOutToSlices(max_read_length, slices, num_slice);
-  read_param_->buf_.drain(num_bytes_to_read);
-  return {num_bytes_to_read, Api::IoErrorPtr(nullptr, IoSocketError::deleteIoError)};
+  return result;
 }
 
 Api::IoCallUint64Result IoUringSocketHandleImpl::read(Buffer::Instance& buffer,
@@ -285,7 +253,17 @@ Api::IoCallUint64Result IoUringSocketHandleImpl::recv(void* buffer, size_t lengt
       (io_uring_socket_type_ == IoUringSocketType::Accept && !enable_accept_socket_)) {
     return shadow_io_handle_->recv(buffer, length, flags);
   }
-  PANIC("IoUringSocketHandleImpl::recv not implemented");
+
+  // The only used valid in Envoy is MSG_PEEK for listener filter including TLS inspectors.
+  ASSERT(flags == 0 || flags == MSG_PEEK);
+  Buffer::RawSlice slice;
+  slice.mem_ = buffer;
+  slice.len_ = length;
+  if (flags == 0) {
+    return readv(length, &slice, 1);
+  }
+
+  return copyOut(length, &slice, 1);
 }
 
 Api::SysCallIntResult IoUringSocketHandleImpl::bind(Address::InstanceConstSharedPtr address) {
@@ -531,6 +509,47 @@ void IoUringSocketHandleImpl::onWrite(Io::WriteParam& param) {
 void IoUringSocketHandleImpl::onClose() {
   ASSERT(cb_ != nullptr);
   cb_(Event::FileReadyType::Closed);
+}
+
+Api::IoCallUint64Result IoUringSocketHandleImpl::copyOut(uint64_t max_length,
+                                                         Buffer::RawSlice* slices,
+                                                         uint64_t num_slice) {
+  if (read_param_ == absl::nullopt) {
+    return {0, Api::IoErrorPtr(IoSocketError::getIoSocketEagainInstance(),
+                               IoSocketError::deleteIoError)};
+  }
+
+  ASSERT(io_uring_socket_.has_value());
+  ENVOY_LOG(trace, "readv available, result = {}, fd = {}, type = {}", read_param_->result_, fd_,
+            ioUringSocketTypeStr());
+
+  if (read_param_->result_ == 0) {
+    ENVOY_LOG(trace, "readv remote close");
+    return Api::ioCallUint64ResultNoError();
+  }
+
+  if (read_param_->result_ < 0) {
+    ASSERT(read_param_->buf_.length() == 0);
+    if (read_param_->result_ == -EAGAIN) {
+      return {0, Api::IoErrorPtr(IoSocketError::getIoSocketEagainInstance(),
+                                 IoSocketError::deleteIoError)};
+    }
+    return {
+        0, Api::IoErrorPtr(new IoSocketError(-read_param_->result_), IoSocketError::deleteIoError)};
+  }
+
+  // This mean the buffer ready read by previous call, return EAGAIN to tell the
+  // caller waiting for next read event.
+  if (read_param_->buf_.length() == 0) {
+    return {0, Api::IoErrorPtr(IoSocketError::getIoSocketEagainInstance(),
+                               IoSocketError::deleteIoError)};
+  }
+
+  const uint64_t max_read_length =
+      std::min(max_length, static_cast<uint64_t>(read_param_->result_));
+  uint64_t num_bytes_to_read =
+      read_param_->buf_.copyOutToSlices(max_read_length, slices, num_slice);
+  return {num_bytes_to_read, Api::IoErrorPtr(nullptr, IoSocketError::deleteIoError)};
 }
 
 } // namespace Network
