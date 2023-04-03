@@ -87,6 +87,7 @@ EXTENSIONS = {
     "envoy.matching.inputs.source_type":                "//source/extensions/matching/network/common:inputs_lib",
     "envoy.matching.inputs.server_name":                "//source/extensions/matching/network/common:inputs_lib",
     "envoy.matching.inputs.transport_protocol":         "//source/extensions/matching/network/common:inputs_lib",
+    "envoy.matching.inputs.filter_state":               "//source/extensions/matching/network/common:inputs_lib",
 
     #
     # Generic Inputs
