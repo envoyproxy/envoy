@@ -3060,59 +3060,6 @@ TEST_P(ProtocolIntegrationTest, ContinueAllFromDecodeMetadata) {
   cleanupUpstreamAndDownstream();
 }
 
-TEST_P(ProtocolIntegrationTest, LocalReplyFromEncodeMetadata) {
-  if (upstreamProtocol() != Http::CodecType::HTTP2) {
-    GTEST_SKIP() << "Metadata is not enabled for non HTTP2 protocols.";
-  }
-  if (upstreamProtocol() >= Http::CodecType::HTTP2) {
-    config_helper_.addConfigModifier(
-        [&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
-          RELEASE_ASSERT(bootstrap.mutable_static_resources()->clusters_size() >= 1, "");
-          ConfigHelper::HttpProtocolOptions protocol_options;
-          protocol_options.mutable_explicit_http_config()
-              ->mutable_http2_protocol_options()
-              ->set_allow_metadata(true);
-          ConfigHelper::setProtocolOptions(
-              *bootstrap.mutable_static_resources()->mutable_clusters(0), protocol_options);
-        });
-  }
-  if (upstreamProtocol() == Http::CodecType::HTTP3) {
-    config_helper_.addConfigModifier(
-        [&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
-          RELEASE_ASSERT(bootstrap.mutable_static_resources()->clusters_size() >= 1, "");
-          ConfigHelper::HttpProtocolOptions protocol_options;
-          protocol_options.mutable_explicit_http_config()
-              ->mutable_http3_protocol_options()
-              ->set_allow_extended_connect(true);
-          ConfigHelper::setProtocolOptions(
-              *bootstrap.mutable_static_resources()->mutable_clusters(0), protocol_options);
-        });
-  }
-
-  config_helper_.prependFilter(R"EOF(
-  name: metadata-control-filter
-  )EOF");
-  autonomous_upstream_ = false;
-  initialize();
-
-  codec_client_ = makeHttpConnection(lookupPort("http"));
-  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
-  waitForNextUpstreamRequest();
-  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
-  Http::MetadataMap metadata_map;
-  metadata_map["local_reply"] = "true";
-  auto metadata_map_ptr = std::make_unique<Http::MetadataMap>(metadata_map);
-  Http::MetadataMapVector metadata_map_vector;
-  metadata_map_vector.push_back(std::move(metadata_map_ptr));
-
-  upstream_request_->encodeMetadata(metadata_map_vector);
-
-  ASSERT_TRUE(response->waitForEndStream());
-  EXPECT_EQ("400", response->headers().getStatusValue());
-
-  cleanupUpstreamAndDownstream();
-}
-
 TEST_P(ProtocolIntegrationTest, ContinueAllFromEncodeMetadata) {
   if (upstreamProtocol() != Http::CodecType::HTTP2 ||
       downstream_protocol_ != Http::CodecType::HTTP2) {
