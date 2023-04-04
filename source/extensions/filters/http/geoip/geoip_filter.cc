@@ -16,9 +16,9 @@ GeoipFilterConfig::GeoipFilterConfig(
     const std::string& stat_prefix, Stats::Scope& scope, Runtime::Loader& runtime)
     : scope_(scope), runtime_(runtime), stat_name_set_(scope.symbolTable().makeSet("Geoip")),
       stats_prefix_(stat_name_set_->add(stat_prefix + "geoip")),
-      total_(stat_name_set_->add("total")), use_xff_(config.use_xff()),
+      total_(stat_name_set_->add("total")), use_xff_(config.useXff()),
       xff_num_trusted_hops_(config.xff_num_trusted_hops()) {
-  auto geo_headers_to_add = config.geo_headers_to_add();
+  const auto& geo_headers_to_add = config.geo_headers_to_add();
   geo_headers_ = processGeoHeaders({geo_headers_to_add.country(), geo_headers_to_add.city(),
                                     geo_headers_to_add.region(), geo_headers_to_add.asn()});
   geo_anon_headers_ =
@@ -65,7 +65,7 @@ Http::FilterHeadersStatus GeoipFilter::decodeHeaders(Http::RequestHeaderMap& hea
     remote_address =
         Envoy::Http::Utility::getLastAddressFromXFF(headers, config_->xffNumTrustedHops()).address_;
   }
-  // If `config_->use_xff() == false` or xff header has not been populated for some reason.
+  // If `config_->useXff() == false` or xff header has not been populated for some reason.
   if (!remote_address) {
     remote_address = decoder_callbacks_->streamInfo().downstreamAddressProvider().remoteAddress();
   }

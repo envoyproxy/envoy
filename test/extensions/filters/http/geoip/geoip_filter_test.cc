@@ -16,7 +16,6 @@
 #include "gtest/gtest.h"
 
 using testing::DoAll;
-using testing::ReturnRef;
 using testing::SaveArg;
 
 namespace Envoy {
@@ -165,8 +164,8 @@ TEST_F(GeoipFilterTest, GeoHeadersOverridenForIncomingRequest) {
   request_headers.addCopy("x-geo-city", "ngnix_city");
   std::map<std::string, std::string> geo_headers = {{"x-geo-region", "dummy_region"},
                                                     {"x-geo-city", "dummy_city"}};
-  for (auto iter = geo_headers.begin(); iter != geo_headers.end(); ++iter) {
-    auto& header = iter->first;
+  for (auto& geo_header : geo_headers) {
+    auto& header = geo_header.first;
     expectStats(header);
   }
   Network::Address::InstanceConstSharedPtr remote_address =
@@ -222,12 +221,12 @@ TEST_F(GeoipFilterTest, AllHeadersPropagatedCorrectly) {
                                                          {"x-geo-anon-hosting", "true"},
                                                          {"x-geo-anon-tor", "true"},
                                                          {"x-geo-anon-proxy", "true"}};
-  for (auto iter = geo_headers.begin(); iter != geo_headers.end(); ++iter) {
-    auto& header = iter->first;
+  for (auto& geo_header : geo_headers) {
+    auto& header = geo_header.first;
     expectStats(header);
   }
-  for (auto iter = geo_anon_headers.begin(); iter != geo_anon_headers.end(); ++iter) {
-    auto& header = iter->first;
+  for (auto& geo_anon_header : geo_anon_headers) {
+    auto& header = geo_anon_header.first;
     expectStats(header);
   }
   Network::Address::InstanceConstSharedPtr remote_address =
@@ -260,14 +259,14 @@ TEST_F(GeoipFilterTest, AllHeadersPropagatedCorrectly) {
   EXPECT_THAT(captured_rq_.geoAnonHeaders(),
               testing::UnorderedElementsAre("x-geo-anon", "x-geo-anon-vpn", "x-geo-anon-hosting",
                                             "x-geo-anon-tor", "x-geo-anon-proxy"));
-  for (auto iter = geo_headers.begin(); iter != geo_headers.end(); ++iter) {
-    auto& header = iter->first;
-    auto& value = iter->second;
+  for (auto& geo_header : geo_headers) {
+    auto& header = geo_header.first;
+    auto& value = geo_header.second;
     EXPECT_THAT(request_headers, HasExpectedHeader(header, value));
   }
-  for (auto iter = geo_anon_headers.begin(); iter != geo_anon_headers.end(); ++iter) {
-    auto& header = iter->first;
-    auto& value = iter->second;
+  for (auto& geo_anon_header : geo_anon_headers) {
+    auto& header = geo_anon_header.first;
+    auto& value = geo_anon_header.second;
     EXPECT_THAT(request_headers, HasExpectedHeader(header, value));
   }
   ::testing::Mock::VerifyAndClearExpectations(&filter_callbacks_);

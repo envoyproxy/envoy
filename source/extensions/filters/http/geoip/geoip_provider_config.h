@@ -6,6 +6,8 @@
 #include "envoy/network/address.h"
 #include "envoy/protobuf/message_validator.h"
 
+#include "absl/container/flat_hash_set.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
@@ -28,8 +30,8 @@ public:
       : remote_address_(std::move(remote_address)), geo_headers_(std::move(geo_headers)),
         geo_anon_headers_(std::move(geo_anon_headers)){};
 
-  const absl::flat_hash_set<std::string> geoHeaders() const { return geo_headers_; }
-  const absl::flat_hash_set<std::string> geoAnonHeaders() const { return geo_anon_headers_; }
+  absl::flat_hash_set<std::string> geoHeaders() const { return geo_headers_; }
+  absl::flat_hash_set<std::string> geoAnonHeaders() const { return geo_anon_headers_; }
   const Network::Address::InstanceConstSharedPtr remoteAddress() const { return remote_address_; }
 
 private:

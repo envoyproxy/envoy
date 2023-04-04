@@ -1,5 +1,6 @@
 #pragma once
 
+#include "source/common/protobuf/utility.h"
 #include "source/extensions/filters/http/geoip/geoip_provider_config.h"
 
 namespace Envoy {

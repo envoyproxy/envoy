@@ -22,7 +22,7 @@ Http::FilterFactoryCb GeoipFilterFactory::createFilterFactoryFromProtoTyped(
   GeoipFilterConfigSharedPtr filter_config(std::make_shared<GeoipFilterConfig>(
       proto_config, stat_prefix, context.scope(), context.runtime()));
 
-  auto provider_config = proto_config.provider();
+  const auto& provider_config = proto_config.provider();
   auto& geo_provider_factory =
       Envoy::Config::Utility::getAndCheckFactory<GeoipProviderFactory>(provider_config);
   ProtobufTypes::MessagePtr message = Envoy::Config::Utility::translateToFactoryConfig(

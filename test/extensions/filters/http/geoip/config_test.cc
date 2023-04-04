@@ -15,7 +15,6 @@
 #include "gtest/gtest.h"
 
 using ::testing::AllOf;
-using ::testing::Truly;
 
 namespace Envoy {
 namespace Extensions {
@@ -49,7 +48,7 @@ MATCHER_P(HasGeoHeader, expected_header, "") {
   auto filter = std::static_pointer_cast<GeoipFilter>(arg);
   auto geo_headers = GeoipFilterPeer::geoHeaders(*filter);
   bool header_found = false;
-  for (auto header : geo_headers) {
+  for (const auto& header : geo_headers) {
     if (header == expected_header) {
       header_found = true;
     }
@@ -72,7 +71,7 @@ MATCHER_P(HasGeoAnonHeader, expected_header, "") {
   auto filter = std::static_pointer_cast<GeoipFilter>(arg);
   auto geo_anon_headers = GeoipFilterPeer::geoAnonHeaders(*filter);
   bool header_found = false;
-  for (auto header : geo_anon_headers) {
+  for (const auto& header : geo_anon_headers) {
     if (header == expected_header) {
       header_found = true;
     }

@@ -34,7 +34,7 @@ public:
     incCounter(stat_name_set_->getBuiltin(absl::StrCat(geo_header, ".total"), unknown_hit_));
   }
 
-  bool use_xff() const { return use_xff_; }
+  bool useXff() const { return use_xff_; }
   uint32_t xffNumTrustedHops() const { return xff_num_trusted_hops_; }
   const absl::flat_hash_set<std::string>& geoHeaders() const { return geo_headers_; }
   const absl::flat_hash_set<std::string>& geoAnonHeaders() const { return geo_anon_headers_; }
