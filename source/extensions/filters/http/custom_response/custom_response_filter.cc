@@ -22,8 +22,9 @@ Http::FilterHeadersStatus CustomResponseFilter::decodeHeaders(Http::RequestHeade
   // Note that the original request header map is NOT carried over to the
   // redirected response. The redirected request header map does NOT participate
   // in the custom response framework.
-  auto filter_state = encoder_callbacks_->streamInfo().filterState()->getDataReadOnly<Policy>(
-      "envoy.filters.http.custom_response");
+  auto filter_state =
+      encoder_callbacks_->streamInfo().filterState()->getDataReadOnly<CustomResponseFilterState>(
+          CustomResponseFilterState::kFilterStateName);
   if (!filter_state) {
     downstream_headers_ = &header_map;
   }
@@ -35,10 +36,11 @@ Http::FilterHeadersStatus CustomResponseFilter::encodeHeaders(Http::ResponseHead
   // If filter state for custom response exists, it means this response is a
   // custom response. Apply the custom response mutations to the response from
   // the remote source and return.
-  auto filter_state = encoder_callbacks_->streamInfo().filterState()->getDataReadOnly<Policy>(
-      "envoy.filters.http.custom_response");
+  auto filter_state =
+      encoder_callbacks_->streamInfo().filterState()->getDataReadOnly<CustomResponseFilterState>(
+          CustomResponseFilterState::kFilterStateName);
   if (filter_state) {
-    return filter_state->encodeHeaders(headers, end_stream, *this);
+    return filter_state->policy->encodeHeaders(headers, end_stream, *this);
   }
 
   // Check for route specific config.
