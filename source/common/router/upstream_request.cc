@@ -224,8 +224,8 @@ void UpstreamRequest::cleanUp() {
 
 void UpstreamRequest::upstreamLog() {
   for (const auto& upstream_log : parent_.config().upstream_logs_) {
-    upstream_log->log(parent_.downstreamHeaders(), upstream_headers_.get(), upstream_trailers_.get(),
-                      stream_info_);
+    upstream_log->log(parent_.downstreamHeaders(), upstream_headers_.get(),
+                      upstream_trailers_.get(), stream_info_);
   }
 }
 
