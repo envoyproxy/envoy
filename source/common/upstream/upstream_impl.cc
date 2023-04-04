@@ -1008,8 +1008,7 @@ ClusterInfoImpl::ClusterInfoImpl(
                               ? std::make_unique<std::string>(config.alt_stat_name())
                               : nullptr),
       eds_service_name_(
-          config.has_eds_cluster_config() && !config.eds_cluster_config().service_name().empty() &&
-                  config.eds_cluster_config().service_name() != config.name()
+          config.has_eds_cluster_config()
               ? std::make_unique<std::string>(config.eds_cluster_config().service_name())
               : nullptr),
       extension_protocol_options_(parseExtensionProtocolOptions(config, factory_context)),

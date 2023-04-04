@@ -968,11 +968,6 @@ public:
     if (eds_service_name_ != nullptr) {
       return *eds_service_name_;
     }
-    // If `eds_service_name` is not set, but it's an EDS cluster, use cluster
-    // name.
-    if (type_ == envoy::config::cluster::v3::Cluster::EDS) {
-      return name_;
-    }
     return absl::nullopt;
   }
 
