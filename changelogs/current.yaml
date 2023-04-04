@@ -85,6 +85,11 @@ minor_behavior_changes:
   change: |
     Convert HTTP/3 extended connect to/from HTTP/1 upgrade. This behavior change can be reverted by setting
     ``envoy.reloadable_features.use_http3_header_normalisation`` to ``false``.
+- area: http
+  change: |
+    prohibit route refresh after the response headers have been sent,  and clear the cached route table to more
+    aggressively free memory. This behavior can be reverted by setting runtime flag
+    ``envoy.reloadable_features.prohibit_route_refresh_after_response_headers_sent`` to false.
 
 bug_fixes:
 - area: http
