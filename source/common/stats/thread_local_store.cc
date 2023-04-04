@@ -958,14 +958,41 @@ std::string ParentHistogramImpl::bucketSummary() const {
   }
 }
 
-std::vector<Stats::ParentHistogram::Bucket> ParentHistogramImpl::detailedBuckets() const {
-  uint32_t num_buckets =  hist_num_buckets(cumulative_histogram_);
-  std::vector<Stats::ParentHistogram::Bucket> buckets(num_buckets);
-  Stats::ParentHistogram::Bucket* bucket = &buckets[0];
-  for (uint32_t i = 0; i < num_buckets; ++i, ++bucket) {
-    /*int ret = */ hist_bucket_idx(cumulative_histogram_, i, &bucket->value_, &bucket->count_);
-    //ASSERT(ret == 0);
+std::vector<Stats::ParentHistogram::Bucket> ParentHistogramImpl::detailedBuckets(
+    uint32_t max_buckets) const {
+  const uint32_t num_src_buckets =  hist_num_buckets(cumulative_histogram_);
+  if (max_buckets == 0) {
+    max_buckets = num_src_buckets;
   }
+  const uint32_t num_buckets = std::min(max_buckets, num_src_buckets);
+  uint32_t num_src_buckets_per_bucket = 1;
+  uint32_t remainder = 0;
+  if (num_src_buckets > num_buckets) {
+    num_src_buckets_per_bucket = num_src_buckets / num_buckets;
+    remainder = num_src_buckets - num_buckets * num_src_buckets_per_bucket;
+    ASSERT(remainder < num_buckets);
+  }
+
+  std::vector<Stats::ParentHistogram::Bucket> buckets(num_buckets);
+  uint32_t src = 0;
+  for (uint32_t dest = 0; dest < num_buckets; ++dest) {
+    ParentHistogram::Bucket& bucket = buckets[dest];
+    uint32_t merges = num_src_buckets_per_bucket;
+    if (remainder > 0) {
+      ++merges;
+      --remainder;
+    }
+    for (uint32_t i = 0; i < merges; ++i, ++src) {
+      ASSERT(src < src < num_src_buckets);
+      double value;
+      uint64_t count;
+      /*int ret = */ hist_bucket_idx(cumulative_histogram_, src, &value, &count);
+      bucket.count_ += count;
+      bucket.value_ += value;
+    }
+    bucket.value_ /= merges;
+  }
+  ASSERT(src == num_src_buckets);
   return buckets;
 }
 

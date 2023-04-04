@@ -101,7 +101,7 @@ async function loadStats() {
   try {
     const response = await fetch(url);
     const data = await response.json();
-    await renderStats(data);
+    renderStats(data);
   } catch (e) {
     statusDiv.textContent = 'Error fetching ' + url + ': ' + e;
   }
@@ -260,6 +260,11 @@ function renderHistogramDisjoint(histograms) {
   }
 }
 
+const log_10 = Math.log(10);
+function log10(num) {
+  return Math.log(num) / log_10;
+}
+
 function renderHistogramDetail(percentiles, detail) {
   activeStatsHistogramsDiv.replaceChildren();
   for (histogram of detail) {
@@ -275,10 +280,29 @@ function renderHistogramDetail(percentiles, detail) {
     label.textContent = name_and_percentiles;
     div.appendChild(label);
 
+    // First we can over the detailed bucket value and count info, and determine
+    // some limits so we can scale the histogram data to (for now) consume
+    // the desired width and height, which we'll express as percentages, so
+    // the graphics stretch when the user stretches the window.
+
     let maxCount = 0;
+    let minValue = null;
+    let maxValue = null;
     for (bucket of histogram.detail) {
       maxCount = Math.max(maxCount, bucket.count);
+      if (minValue == null) {
+        minValue = bucket.value;
+        maxValue = bucket.value;
+      } else if (bucket.value < minValue) {
+        minValue = bucket.value;
+      } else if (bucket.value > minValue) {
+        maxValue = bucket.value;
+      }
     }
+
+    const width = maxValue - minValue;
+    const scaledValue = value => 9*((value - minValue) / width) + 1; // between 1 and 10;
+    const valueToPercent = value => Math.round(80 * log10(scaledValue(value)));
 
     const graphics = document.createElement('div');
     graphics.className = 'histogram-graphics';
@@ -286,6 +310,7 @@ function renderHistogramDetail(percentiles, detail) {
       const span = document.createElement('span');
       const percent = maxCount == 0 ? 0 : Math.round((100 * bucket.count) / maxCount);
       span.style.height = '' + percent + '%';
+      span.style.width = '' + valueToPercent(bucket.value) + '%';
       graphics.appendChild(span);
     }
     div.appendChild(graphics);
@@ -325,8 +350,10 @@ function renderHistogramSummary(histograms) {
 
     let maxValue = 0;
     let values = [];
+    let prevValue = 0;
     for (obj of histogram.values) {
-      const value = obj.cumulative;
+      const value = obj.cumulative - prevValue;
+      prevValue = obj.cumulative;
       values.push(value);
       maxValue = Math.max(maxValue, value);
     }

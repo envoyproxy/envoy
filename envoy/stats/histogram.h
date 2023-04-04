@@ -169,11 +169,11 @@ public:
   virtual std::string bucketSummary() const PURE;
 
   struct Bucket {
-    double value_;
-    uint64_t count_;
+    double value_{0};
+    uint64_t count_{0};
   };
 
-  virtual std::vector<Bucket> detailedBuckets() const PURE;
+  virtual std::vector<Bucket> detailedBuckets(uint32_t max_buckets = 0) const PURE;
   //virtual const std::vector<Bucket> detailedIntervalBuckets() const PURE;
 };
 

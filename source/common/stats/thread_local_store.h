@@ -105,7 +105,7 @@ public:
   }
   std::string quantileSummary() const override;
   std::string bucketSummary() const override;
-  std::vector<Bucket> detailedBuckets() const override;
+  std::vector<Bucket> detailedBuckets(uint32_t max_buckets) const override;
 
   // Stats::Metric
   SymbolTable& symbolTable() override;
