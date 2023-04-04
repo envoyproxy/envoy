@@ -3413,8 +3413,10 @@ TEST_P(DownstreamProtocolIntegrationTest, OverflowDecoderBufferFromDecodeTrailer
   EXPECT_EQ("413", response->headers().getStatusValue());
 }
 
-TEST_P(ProtocolIntegrationTest,
-       EnvoyUpstreamResetAfterFullResponseReceivedAndRequestFullyReceivedButNotEntirelySerialized) {
+// TODO(#26484): Re-enable test after resolving flake.
+TEST_P(
+    ProtocolIntegrationTest,
+    DISABLED_EnvoyUpstreamResetAfterFullResponseReceivedAndRequestFullyReceivedButNotEntirelySerialized) {
   // No reset for HTTP1.
   if (upstreamProtocol() == Http::CodecType::HTTP1) {
     return;

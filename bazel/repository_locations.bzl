@@ -108,13 +108,13 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         # 2. Open https://chromium.googlesource.com/chromium/src/+/refs/tags/<current_version>/DEPS and note <boringssl_revision>.
         # 3. Find a commit in BoringSSL's "master-with-bazel" branch that merges <boringssl_revision>.
         #
-        # chromium-105.0.5195.37 (linux/beta)
-        version = "098695591f3a2665fccef83a3732ecfc99acdcdd",
-        sha256 = "e141448cf6f686b6e9695f6b6459293fd602c8d51efe118a83106752cf7e1280",
+        # chromium-112.0.5615.39 (linux/beta)
+        version = "88d7a40bd06a34da6ee0d985545755199d047258",
+        sha256 = "1e759891e168c5957f2f4d519929e2b4cef9303b7cf2049601081f4fca95bf21",
         strip_prefix = "boringssl-{version}",
         urls = ["https://github.com/google/boringssl/archive/{version}.tar.gz"],
         use_category = ["controlplane", "dataplane_core"],
-        release_date = "2022-07-19",
+        release_date = "2023-02-14",
         cpe = "cpe:2.3:a:google:boringssl:*",
         license = "Mixed",
         license_url = "https://github.com/google/boringssl/blob/{version}/LICENSE",
@@ -378,6 +378,11 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "ICU Library",
         project_desc = "Development files for International Components for Unicode",
         project_url = "https://github.com/unicode-org/icu",
+        # When this is updated, make sure to update the icu.patch patch file and remove
+        # all remaining Bazel build artifacts (for example WORKSPACE and BUILD.bazel files)
+        # from the icu source code, to prevent Bazel from treating the foreign library
+        # as a Bazel project.
+        # https://github.com/envoyproxy/envoy/issues/26395
         version = "72-1",
         sha256 = "43cbad628d98f37a3f95f6c34579f9144ef4bde60248fa6004a4f006d7487e69",
         strip_prefix = "icu-release-{version}",
