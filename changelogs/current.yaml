@@ -1,16 +1,11 @@
-date: Pending
+date: April 4, 2023
 
 behavior_changes:
-# *Changes that are expected to cause an incompatibility if applicable; deployment changes are likely required*
 - area: http
   change: |
     Validate upstream request header names and values. The new runtime flag ``envoy.reloadable_features.validate_upstream_headers`` can be used for revert this behavior.
 
-minor_behavior_changes:
-# *Changes that may cause incompatibilities for some users, but should not for most*
-
 bug_fixes:
-# *Changes expected to improve the state of the world and are unlikely to have negative effects*
 - area: oauth2
   change: |
     fixed a bug where the oauth2 filter would crash if it received a redirect URL without a state query param set.
@@ -36,10 +31,3 @@ bug_fixes:
 - area: http
   change: |
     fixed a bug where ``x-envoy-original-path`` was not being sanitized when sent from untrusted users. This behavioral change can be temporarily reverted by setting ``envoy.reloadable_features.sanitize_original_path`` to false.
-
-removed_config_or_runtime:
-# *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
-
-new_features:
-
-deprecated:
