@@ -518,7 +518,10 @@ elif [[ "$CI_TARGET" == "deps" ]]; then
   export TODAY_DATE
   bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/dependency:check \
         --action_env=TODAY_DATE \
-        -- -v warn
+        -- -v warn \
+           -c release_dates \
+           -c cves \
+           -c releases
 
   # Run pip requirements tests
   echo "check pip..."
