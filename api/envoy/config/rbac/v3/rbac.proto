@@ -111,6 +111,17 @@ message RBAC {
       ON_DENY_AND_ALLOW = 3;
     }
 
+    // [#not-implemented-hide:]
+    message AuditLoggerConfig {
+      // Typed logger configuration.
+      //
+      // [#extension-category: envoy.rbac.audit_loggers]
+      core.v3.TypedExtensionConfig audit_logger = 1;
+
+      // If true, when the logger is not supported, the data plane will not NACK but simply ignore it.
+      bool is_optional = 2;
+    }
+
     // Condition for the audit logging to happen.
     // If this condition is met, all the audit loggers configured here will be invoked.
     //
@@ -120,9 +131,7 @@ message RBAC {
     // Configurations for RBAC-based authorization audit loggers.
     //
     // [#not-implemented-hide:]
-    // [#extension-category: envoy.rbac.audit_loggers]
-    repeated core.v3.TypedExtensionConfig audit_loggers = 2
-        [(validate.rules).repeated = {min_items: 1}];
+    repeated AuditLoggerConfig logger_configs = 2;
   }
 
   // The action to take if a policy matches. Every action either allows or denies a request,

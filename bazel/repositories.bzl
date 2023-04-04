@@ -347,7 +347,6 @@ def _boringssl():
         patch_args = ["-p1"],
         patches = [
             "@envoy//bazel:boringssl_static.patch",
-            "@envoy//bazel:boringssl_CVE-2023-0286.patch",
         ],
     )
 
