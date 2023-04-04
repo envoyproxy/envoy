@@ -382,7 +382,7 @@ void UpstreamRequest::acceptHeadersFromRouter(bool end_stream) {
 
   // Make sure that when we are forwarding CONNECT payload we do not do so until
   // the upstream has accepted the CONNECT request.
-  if (headers->getMethodValue() == Http::Headers::get().MethodValues.Connect) {
+  if (!upstream_.get() && headers->getMethodValue() == Http::Headers::get().MethodValues.Connect) {
     paused_for_connect_ = true;
   }
 
