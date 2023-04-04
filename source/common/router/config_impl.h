@@ -714,22 +714,22 @@ public:
   using OptionalTimeouts = PackedStruct<std::chrono::milliseconds, 6, OptionalTimeoutNames>;
 
   absl::optional<std::chrono::milliseconds> idleTimeout() const override {
-    return optionalTimeout(OptionalTimeoutNames::IdleTimeout);
+    return getOptionalTimeout(OptionalTimeoutNames::IdleTimeout);
   }
   absl::optional<std::chrono::milliseconds> maxStreamDuration() const override {
-    return optionalTimeout(OptionalTimeoutNames::MaxStreamDuration);
+    return getOptionalTimeout(OptionalTimeoutNames::MaxStreamDuration);
   }
   absl::optional<std::chrono::milliseconds> grpcTimeoutHeaderMax() const override {
-    return optionalTimeout(OptionalTimeoutNames::GrpcTimeoutHeaderMax);
+    return getOptionalTimeout(OptionalTimeoutNames::GrpcTimeoutHeaderMax);
   }
   absl::optional<std::chrono::milliseconds> grpcTimeoutHeaderOffset() const override {
-    return optionalTimeout(OptionalTimeoutNames::GrpcTimeoutHeaderOffset);
+    return getOptionalTimeout(OptionalTimeoutNames::GrpcTimeoutHeaderOffset);
   }
   absl::optional<std::chrono::milliseconds> maxGrpcTimeout() const override {
-    return optionalTimeout(OptionalTimeoutNames::MaxGrpcTimeout);
+    return getOptionalTimeout(OptionalTimeoutNames::MaxGrpcTimeout);
   }
   absl::optional<std::chrono::milliseconds> grpcTimeoutOffset() const override {
-    return optionalTimeout(OptionalTimeoutNames::GrpcTimeoutOffset);
+    return getOptionalTimeout(OptionalTimeoutNames::GrpcTimeoutOffset);
   }
 
   const VirtualHost& virtualHost() const override { return *vhost_; }
@@ -1125,7 +1125,7 @@ private:
                               absl::string_view current_route_name) const;
 
   OptionalTimeouts buildOptionalTimeouts(const envoy::config::route::v3::RouteAction& route) const;
-  absl::optional<std::chrono::milliseconds> optionalTimeout(OptionalTimeoutNames timeout) const {
+  absl::optional<std::chrono::milliseconds> getOptionalTimeout(OptionalTimeoutNames timeout) const {
     const auto timeout = optional_timeouts_.get<timeout>();
     if (timeout.has_value()) {
       return *timeout;
