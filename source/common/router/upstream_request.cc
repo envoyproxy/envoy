@@ -296,8 +296,7 @@ void UpstreamRequest::decodeHeaders(Http::ResponseHeaderMapPtr&& headers, bool e
   maybeHandleDeferredReadDisable();
   ASSERT(headers.get());
 
-  // According to RFC7231 any 2xx response indicates that the connection is established.
-  if (!end_stream && Http::CodeUtility::is2xx(response_code)) {
+  if (!end_stream) {
     stream_info_.setStreamState(StreamInfo::StreamState::InProgress);
   }
 
