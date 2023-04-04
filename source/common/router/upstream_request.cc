@@ -223,12 +223,8 @@ void UpstreamRequest::cleanUp() {
 }
 
 void UpstreamRequest::upstreamLog() {
-  Http::ResponseHeaderMap* upstream_headers = upstream_headers_ ? upstream_headers_.get() : nullptr;
-  Http::ResponseTrailerMap* upstream_trailers =
-      upstream_trailers_ ? upstream_trailers_.get() : nullptr;
-
   for (const auto& upstream_log : parent_.config().upstream_logs_) {
-    upstream_log->log(parent_.downstreamHeaders(), upstream_headers, upstream_trailers,
+    upstream_log->log(parent_.downstreamHeaders(), upstream_headers_.get(), upstream_trailers_.get(),
                       stream_info_);
   }
 }
