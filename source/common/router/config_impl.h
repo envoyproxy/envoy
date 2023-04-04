@@ -731,7 +731,7 @@ public:
   absl::optional<std::chrono::milliseconds> grpcTimeoutOffset() const override {
     return optionalTimeout(OptionalTimeoutNames::GrpcTimeoutOffset);
   }
-  
+
   const VirtualHost& virtualHost() const override { return *vhost_; }
   bool autoHostRewrite() const override { return auto_host_rewrite_; }
   bool appendXfh() const override { return append_xfh_; }
@@ -1125,6 +1125,13 @@ private:
                               absl::string_view current_route_name) const;
 
   OptionalTimeouts buildOptionalTimeouts(const envoy::config::route::v3::RouteAction& route) const;
+  absl::optional<std::chrono::milliseconds> optionalTimeout(OptionalTimeoutNames timeout) const {
+    const auto timeout = optional_timeouts_.get<timeout>();
+    if (timeout.has_value()) {
+      return *timeout;
+    }
+    return absl::nullopt;
+  }
 
   PathMatcherSharedPtr buildPathMatcher(envoy::config::route::v3::Route route,
                                         ProtobufMessage::ValidationVisitor& validator) const;
@@ -1139,14 +1146,6 @@ private:
 
   RouteConstSharedPtr pickWeightedCluster(const Http::HeaderMap& headers, uint64_t random_value,
                                           bool ignore_overflow) const;
-
-  absl::optional<std::chrono::milliseconds> optionalTimeout(OptionalTimeoutNames timeout) const {
-    const auto timeout = optional_timeouts_.get<timeout>();
-    if (timeout.has_value()) {
-      return *timeout;
-    }
-    return absl::nullopt;
-  }
 
   // Default timeout is 15s if nothing is specified in the route config.
   static const uint64_t DEFAULT_ROUTE_TIMEOUT_MS = 15000;
