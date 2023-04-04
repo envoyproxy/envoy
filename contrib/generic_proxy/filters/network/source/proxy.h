@@ -156,9 +156,7 @@ public:
     }
     void completeDirectly() override { parent_.completeDirectly(); }
     void bindUpstreamConn(Upstream::TcpPoolData&& pool_data) override;
-    bool isUpstreamBound() override;
-    void upstreamCallback(UpstreamBindingCallback* cb) override;
-    void responseCallback(PendingResponseCallback* cb) override;
+    OptRef<UpstreamManager> boundUpstreamConn() override;
 
     DecoderFilterSharedPtr filter_;
   };
@@ -293,12 +291,13 @@ private:
 };
 using ActiveStreamPtr = std::unique_ptr<ActiveStream>;
 
-class UpstreamConnectionManager : public UpstreamConnectionManagerBase,
-                                  public ResponseDecoderCallback {
+class UpstreamManagerImpl : public UpstreamManagerImplBase,
+                            public UpstreamManager,
+                            public ResponseDecoderCallback {
 public:
-  UpstreamConnectionManager(Filter& parent, Upstream::TcpPoolData&& tcp_pool_data);
+  UpstreamManagerImpl(Filter& parent, Upstream::TcpPoolData&& tcp_pool_data);
 
-  // UpstreamConnectionManagerBase
+  // UpstreamManagerImplBase
   void onPoolSuccessImpl() override;
   void onPoolFailureImpl(ConnectionPool::PoolFailureReason reason,
                          absl::string_view transport_failure_reason) override;
@@ -308,8 +307,11 @@ public:
   void onDecodingSuccess(ResponsePtr response, ExtendedOptions options) override;
   void onDecodingFailure() override;
 
-  void registerResponseCallbacks(uint64_t stream_id, PendingResponseCallback* cb);
-  void registerUpstreamCallbacks(uint64_t stream_id, UpstreamBindingCallback* cb);
+  // UpstreamManager
+  void registerResponseCallback(uint64_t stream_id, PendingResponseCallback& cb) override;
+  void registerUpstreamCallback(uint64_t stream_id, UpstreamBindingCallback& cb) override;
+  void unregisterResponseCallback(uint64_t stream_id) override;
+  void unregisterUpstreamCallback(uint64_t stream_id) override;
 
   Filter& parent_;
 
@@ -356,9 +358,9 @@ public:
     resetStreamsForUnexpectedError();
 
     // If these is bound upstream connection, clean it up.
-    if (upstream_connection_manager_ != nullptr) {
-      upstream_connection_manager_->cleanUp(true);
-      upstream_connection_manager_ = nullptr;
+    if (upstream_manager_ != nullptr) {
+      upstream_manager_->cleanUp(true);
+      upstream_manager_ = nullptr;
     }
   }
   void onAboveWriteBufferHighWatermark() override {}
@@ -396,10 +398,10 @@ public:
 
   void mayBeDrainClose();
 
-  void registerResponseCallbacks(uint64_t stream_id, PendingResponseCallback* cb);
-  void registerUpstreamCallbacks(uint64_t stream_id, UpstreamBindingCallback* cb);
   void bindUpstreamConn(Upstream::TcpPoolData&& tcp_pool_data);
-  bool isUpstreamBound() { return upstream_connection_manager_ != nullptr; }
+  OptRef<UpstreamManager> boundUpstreamConn() {
+    return makeOptRefFromPtr<UpstreamManager>(upstream_manager_.get());
+  }
 
   void onBoundUpstreamConnectionEvent(Network::ConnectionEvent event);
 
@@ -412,7 +414,7 @@ protected:
 
 private:
   friend class ActiveStream;
-  friend class UpstreamConnectionManager;
+  friend class UpstreamManagerImpl;
 
   bool downstream_connection_closed_{};
 
@@ -429,7 +431,7 @@ private:
   Buffer::OwnedImpl response_buffer_;
 
   // The upstream connection manager.
-  std::unique_ptr<UpstreamConnectionManager> upstream_connection_manager_;
+  std::unique_ptr<UpstreamManagerImpl> upstream_manager_;
 
   std::list<ActiveStreamPtr> active_streams_;
 };

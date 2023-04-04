@@ -1,5 +1,7 @@
 #pragma once
 
+#include <cstdint>
+
 #include "envoy/event/dispatcher.h"
 #include "envoy/network/connection.h"
 #include "envoy/stream_info/stream_info.h"
@@ -94,6 +96,35 @@ public:
   virtual void onConnectionClose(Network::ConnectionEvent event) PURE;
 };
 
+/**
+ * The upstream manager is used to manage the upstream connection and the registered upstream
+ * or response callbacks.
+ */
+class UpstreamManager {
+public:
+  virtual ~UpstreamManager() = default;
+
+  /**
+   * @param callbacks supplies the callback to be called when the upstream connection is ready.
+   */
+  virtual void registerUpstreamCallback(uint64_t stream_id, UpstreamBindingCallback& cb) PURE;
+
+  /**
+   * @param stream_id supplies the stream id of request.
+   */
+  virtual void unregisterUpstreamCallback(uint64_t stream_id) PURE;
+
+  /**
+   * @param cb supplies the callback to be called when the upstream response is ready.
+   */
+  virtual void registerResponseCallback(uint64_t stream_id, PendingResponseCallback& cb) PURE;
+
+  /**
+   * @param stream_id supplies the stream id of request.
+   */
+  virtual void unregisterResponseCallback(uint64_t stream_id) PURE;
+};
+
 class DecoderFilterCallback : public virtual StreamFilterCallbacks {
 public:
   virtual void sendLocalReply(Status status, ResponseUpdateFunction&& cb = nullptr) PURE;
@@ -107,26 +138,14 @@ public:
   /**
    * Try to create a new upstream connection and bind it to the current downstream connection.
    * This should be called only once for each downstream connection.
-   * @param pool_data supplies the upstream connection pool.
+   * @param tcp_pool_data supplies the upstream connection pool.
    */
-  virtual void bindUpstreamConn(Upstream::TcpPoolData&& pool_data) PURE;
+  virtual void bindUpstreamConn(Upstream::TcpPoolData&& tcp_pool_data) PURE;
 
   /**
-   * @return bool whether the upstream connection is bound. This will be true if bindUpstreamConn()
-   * is called.
+   * @return OptRef<UpstreamManager> the upstream manager for the current downstream connection.
    */
-  virtual bool isUpstreamBound() PURE;
-
-  /**
-   * @param callbacks supplies the callback to be called when the bound upstream
-   * connection is ready.
-   */
-  virtual void upstreamCallback(UpstreamBindingCallback* cb) PURE;
-
-  /**
-   * @param cb supplies the callback to be called when the upstream response is ready.
-   */
-  virtual void responseCallback(PendingResponseCallback* cb) PURE;
+  virtual OptRef<UpstreamManager> boundUpstreamConn() PURE;
 };
 
 class EncoderFilterCallback : public virtual StreamFilterCallbacks {

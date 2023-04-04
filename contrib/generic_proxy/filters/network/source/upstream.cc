@@ -5,13 +5,13 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace GenericProxy {
 
-UpstreamConnectionManagerBase::~UpstreamConnectionManagerBase() {
+UpstreamManagerImplBase::~UpstreamManagerImplBase() {
   // Do clean up here again to ensure the cleanUp is called. This is safe to call
   // multiple times because of the is_cleand_up_ flag.
   cleanUp(true);
 }
 
-void UpstreamConnectionManagerBase::cleanUp(bool close_connection) {
+void UpstreamManagerImplBase::cleanUp(bool close_connection) {
   if (is_cleaned_up_) {
     return;
   }
@@ -36,7 +36,7 @@ void UpstreamConnectionManagerBase::cleanUp(bool close_connection) {
   }
 }
 
-void UpstreamConnectionManagerBase::onUpstreamData(Buffer::Instance& data, bool) {
+void UpstreamManagerImplBase::onUpstreamData(Buffer::Instance& data, bool) {
   ASSERT(!is_cleaned_up_);
   ASSERT(response_decoder_ != nullptr);
 
@@ -47,9 +47,9 @@ void UpstreamConnectionManagerBase::onUpstreamData(Buffer::Instance& data, bool)
   response_decoder_->decode(data);
 }
 
-void UpstreamConnectionManagerBase::onPoolFailure(ConnectionPool::PoolFailureReason reason,
-                                                  absl::string_view transport_failure_reason,
-                                                  Upstream::HostDescriptionConstSharedPtr host) {
+void UpstreamManagerImplBase::onPoolFailure(ConnectionPool::PoolFailureReason reason,
+                                            absl::string_view transport_failure_reason,
+                                            Upstream::HostDescriptionConstSharedPtr host) {
   ENVOY_LOG(debug, "generic proxy upstream manager: on upstream connection failure (host: {})",
             host != nullptr ? host->address()->asStringView() : absl::string_view{});
 
@@ -59,8 +59,8 @@ void UpstreamConnectionManagerBase::onPoolFailure(ConnectionPool::PoolFailureRea
   onPoolFailureImpl(reason, transport_failure_reason);
 }
 
-void UpstreamConnectionManagerBase::onPoolReady(Tcp::ConnectionPool::ConnectionDataPtr&& conn_data,
-                                                Upstream::HostDescriptionConstSharedPtr host) {
+void UpstreamManagerImplBase::onPoolReady(Tcp::ConnectionPool::ConnectionDataPtr&& conn_data,
+                                          Upstream::HostDescriptionConstSharedPtr host) {
   ASSERT(host != nullptr);
   ENVOY_LOG(debug, "generic proxy upstream manager: on upstream connection ready (host: {})",
             host->address()->asStringView());
@@ -74,7 +74,7 @@ void UpstreamConnectionManagerBase::onPoolReady(Tcp::ConnectionPool::ConnectionD
   onPoolSuccessImpl();
 }
 
-void UpstreamConnectionManagerBase::onEvent(Network::ConnectionEvent event) {
+void UpstreamManagerImplBase::onEvent(Network::ConnectionEvent event) {
   // Ignore events if the connection is already cleaned up.
   if (is_cleaned_up_) {
     return;

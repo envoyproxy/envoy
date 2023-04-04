@@ -22,16 +22,14 @@ absl::string_view resetReasonToStringView(StreamResetReason reason) {
 }
 } // namespace
 
-UpstreamConnectionManager::UpstreamConnectionManager(UpstreamRequest& parent,
-                                                     Upstream::TcpPoolData&& tcp_data,
-                                                     ResponseDecoderCallback& cb)
-    : UpstreamConnectionManagerBase(std::move(tcp_data),
-                                    parent.parent_.callbacks_->downstreamCodec().responseDecoder()),
+UpstreamManagerImpl::UpstreamManagerImpl(UpstreamRequest& parent, Upstream::TcpPoolData&& pool)
+    : UpstreamManagerImplBase(std::move(pool),
+                              parent.decoder_callbacks_.downstreamCodec().responseDecoder()),
       parent_(parent) {
-  response_decoder_->setDecoderCallback(cb);
+  response_decoder_->setDecoderCallback(parent);
 }
 
-void UpstreamConnectionManager::onEventImpl(Network::ConnectionEvent event) {
+void UpstreamManagerImpl::onEventImpl(Network::ConnectionEvent event) {
   if (event == Network::ConnectionEvent::Connected ||
       event == Network::ConnectionEvent::ConnectedZeroRtt) {
     return;
@@ -39,29 +37,37 @@ void UpstreamConnectionManager::onEventImpl(Network::ConnectionEvent event) {
   parent_.onConnectionClose(event);
 }
 
-void UpstreamConnectionManager::onPoolSuccessImpl() {
+void UpstreamManagerImpl::onPoolSuccessImpl() {
   parent_.onBindSuccess(*owned_conn_data_, upstream_host_);
 }
 
-void UpstreamConnectionManager::onPoolFailureImpl(ConnectionPool::PoolFailureReason reason,
-                                                  absl::string_view transport_failure_reason) {
+void UpstreamManagerImpl::onPoolFailureImpl(ConnectionPool::PoolFailureReason reason,
+                                            absl::string_view transport_failure_reason) {
   parent_.onBindFailure(reason, transport_failure_reason, upstream_host_);
 }
 
 UpstreamRequest::UpstreamRequest(RouterFilter& parent,
-                                 absl::optional<Upstream::TcpPoolData> pool_data)
-    : parent_(parent), pool_data_(std::move(pool_data)),
+                                 absl::optional<Upstream::TcpPoolData> tcp_pool_data)
+    : parent_(parent), decoder_callbacks_(*parent_.callbacks_),
+      tcp_pool_data_(std::move(tcp_pool_data)),
       stream_info_(parent.context_.mainThreadDispatcher().timeSource(), nullptr) {
 
+  // Set the upstream info for the stream info.
   stream_info_.setUpstreamInfo(std::make_shared<StreamInfo::UpstreamInfoImpl>());
-  parent_.callbacks_->streamInfo().setUpstreamInfo(stream_info_.upstreamInfo());
-
-  stream_info_.healthCheck(parent_.callbacks_->streamInfo().healthCheck());
+  decoder_callbacks_.streamInfo().setUpstreamInfo(stream_info_.upstreamInfo());
+  stream_info_.healthCheck(decoder_callbacks_.streamInfo().healthCheck());
   stream_info_.setUpstreamClusterInfo(parent_.cluster_);
 
-  tracing_config_ = parent_.callbacks_->tracingConfig();
+  // Set request options.
+  auto options = decoder_callbacks_.requestOptions();
+  ASSERT(options.has_value());
+  stream_id_ = options->streamId().value_or(0);
+  wait_response_ = options->waitResponse();
+
+  // Set tracing config.
+  tracing_config_ = decoder_callbacks_.tracingConfig();
   if (tracing_config_.has_value()) {
-    span_ = parent_.callbacks_->activeSpan().spawnChild(
+    span_ = decoder_callbacks_.activeSpan().spawnChild(
         tracing_config_.value().get(),
         absl::StrCat("router ", parent_.cluster_->observabilityName(), " egress"),
         parent.context_.mainThreadDispatcher().timeSource().systemTime());
@@ -69,20 +75,20 @@ UpstreamRequest::UpstreamRequest(RouterFilter& parent,
 }
 
 void UpstreamRequest::startStream() {
-  // If the pool_data_ has value, it means we should get or create an upstream connection
-  // for the request.
-  if (pool_data_.has_value()) {
-    upstream_connection_manager_ =
-        std::make_unique<UpstreamConnectionManager>(*this, std::move(pool_data_.value()), *this);
-    upstream_connection_manager_->newConnection();
+  if (!tcp_pool_data_.has_value()) {
+    // Iff the upstream connection binding is enabled, the upstream connection should be
+    // managed by the generic proxy directly. Then register the upstream callbacks to the
+    // generic proxy and wait for the bound upstream connection.
+    ASSERT(decoder_callbacks_.boundUpstreamConn().has_value());
+    decoder_callbacks_.boundUpstreamConn()->registerUpstreamCallback(stream_id_, *this);
     return;
   }
 
-  // Iff the upstream connection binding is enabled, the upstream connection should be
-  // managed by the generic proxy directly. Then register the upstream callbacks to the
-  // generic proxy and wait for the bound upstream connection.
-  ASSERT(parent_.callbacks_->isUpstreamBound());
-  parent_.callbacks_->upstreamCallback(this);
+  // If the tcp_pool_data_ has value, it means we should get or create an upstream connection
+  // for the request.
+  upstream_manager_ =
+      std::make_unique<UpstreamManagerImpl>(*this, std::move(tcp_pool_data_.value()));
+  upstream_manager_->newConnection();
 }
 
 void UpstreamRequest::resetStream(StreamResetReason reason) {
@@ -93,9 +99,9 @@ void UpstreamRequest::resetStream(StreamResetReason reason) {
 
   ENVOY_LOG(debug, "generic proxy upstream request: reset upstream request");
 
-  if (upstream_connection_manager_ != nullptr) {
-    upstream_connection_manager_->cleanUp(true);
-    upstream_connection_manager_ = nullptr;
+  if (upstream_manager_ != nullptr) {
+    upstream_manager_->cleanUp(true);
+    upstream_manager_ = nullptr;
   }
 
   if (span_ != nullptr) {
@@ -112,7 +118,7 @@ void UpstreamRequest::resetStream(StreamResetReason reason) {
   parent_.onUpstreamRequestReset(*this, reason);
 }
 
-void UpstreamRequest::completeUpstreamRequest(bool close_connection) {
+void UpstreamRequest::clearStream(bool close_connection) {
   // Set the upstream response complete flag to true first to ensure the possible
   // connection close event will not be handled.
   response_complete_ = true;
@@ -122,9 +128,9 @@ void UpstreamRequest::completeUpstreamRequest(bool close_connection) {
                                          tracing_config_.value().get(), true);
   }
 
-  if (upstream_connection_manager_ != nullptr) {
-    upstream_connection_manager_->cleanUp(close_connection);
-    upstream_connection_manager_ = nullptr;
+  if (upstream_manager_ != nullptr) {
+    upstream_manager_->cleanUp(close_connection);
+    upstream_manager_ = nullptr;
   }
 
   // Remove this stream form the parent's list because this upstream request is complete.
@@ -135,7 +141,7 @@ void UpstreamRequest::deferredDelete() {
   if (inserted()) {
     // Remove this stream from the parent's list of upstream requests and delete it at
     // next event loop iteration.
-    parent_.callbacks_->dispatcher().deferredDelete(removeFromList(parent_.upstream_requests_));
+    decoder_callbacks_.dispatcher().deferredDelete(removeFromList(parent_.upstream_requests_));
   }
 }
 
@@ -143,13 +149,20 @@ void UpstreamRequest::onEncodingSuccess(Buffer::Instance& buffer) {
   ENVOY_LOG(debug, "upstream request encoding success");
   encodeBufferToUpstream(buffer);
 
-  auto options = parent_.callbacks_->requestOptions();
-  ASSERT(options.has_value());
-
   // Need not to wait for the upstream response and complete directly.
-  if (!options->waitResponse()) {
-    completeUpstreamRequest(false);
+  if (!wait_response_) {
+    clearStream(false);
     parent_.completeDirectly();
+    return;
+  }
+
+  // If the upstream connection manager is null, it means the upstream
+  // connection is managed by the generic proxy directly. Register the
+  // response callback to the generic proxy and wait for the upstream
+  // response.
+  if (upstream_manager_ == nullptr) {
+    ASSERT(decoder_callbacks_.boundUpstreamConn().has_value());
+    decoder_callbacks_.boundUpstreamConn()->registerResponseCallback(stream_id_, *this);
   }
 }
 
@@ -183,7 +196,7 @@ void UpstreamRequest::onBindSuccess(Tcp::ConnectionPool::ConnectionData& conn,
 }
 
 void UpstreamRequest::onDecodingSuccess(ResponsePtr response, ExtendedOptions options) {
-  completeUpstreamRequest(options.drainClose());
+  clearStream(options.drainClose());
   parent_.onUpstreamResponse(std::move(response), options);
 }
 
@@ -302,7 +315,7 @@ void RouterFilter::kickOffNewUpstreamRequest() {
     return;
   }
 
-  if (callbacks_->isUpstreamBound()) {
+  if (callbacks_->boundUpstreamConn().has_value()) {
     // Upstream connection binding is enabled and the upstream connection is already bound.
     // Create a new upstream request without a connection pool and start the request.
     auto upstream_request = std::make_unique<UpstreamRequest>(*this, absl::nullopt);

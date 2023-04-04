@@ -37,10 +37,9 @@ enum class StreamResetReason : uint32_t {
 class RouterFilter;
 class UpstreamRequest;
 
-class UpstreamConnectionManager : public UpstreamConnectionManagerBase {
+class UpstreamManagerImpl : public UpstreamManagerImplBase {
 public:
-  UpstreamConnectionManager(UpstreamRequest& parent, Upstream::TcpPoolData&& tcp_data,
-                            ResponseDecoderCallback& cb);
+  UpstreamManagerImpl(UpstreamRequest& parent, Upstream::TcpPoolData&& pool);
 
   void onEventImpl(Network::ConnectionEvent event) override;
   void onPoolSuccessImpl() override;
@@ -61,7 +60,7 @@ public:
 
   void startStream();
   void resetStream(StreamResetReason reason);
-  void completeUpstreamRequest(bool close_connection);
+  void clearStream(bool close_connection);
 
   // Called when the stream has been reset or completed.
   void deferredDelete();
@@ -87,18 +86,20 @@ public:
   bool stream_reset_{};
 
   RouterFilter& parent_;
+  DecoderFilterCallback& decoder_callbacks_;
 
-  absl::optional<Upstream::TcpPoolData> pool_data_;
-  std::unique_ptr<UpstreamConnectionManager> upstream_connection_manager_;
+  uint64_t stream_id_{};
+  bool wait_response_{};
+
+  absl::optional<Upstream::TcpPoolData> tcp_pool_data_;
+  std::unique_ptr<UpstreamManagerImpl> upstream_manager_;
 
   Tcp::ConnectionPool::ConnectionData* conn_data_{};
   Upstream::HostDescriptionConstSharedPtr upstream_host_;
 
   bool response_complete_{};
-  ResponseDecoderPtr response_decoder_;
 
   Buffer::OwnedImpl upstream_request_buffer_;
-  bool expect_response_{};
 
   StreamInfo::StreamInfoImpl stream_info_;
 
@@ -134,7 +135,7 @@ public:
 
 private:
   friend class UpstreamRequest;
-  friend class UpstreamConnectionManager;
+  friend class UpstreamManagerImpl;
 
   void kickOffNewUpstreamRequest();
   void resetStream(StreamResetReason reason);
