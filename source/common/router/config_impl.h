@@ -1125,8 +1125,8 @@ private:
                               absl::string_view current_route_name) const;
 
   OptionalTimeouts buildOptionalTimeouts(const envoy::config::route::v3::RouteAction& route) const;
-  absl::optional<std::chrono::milliseconds> getOptionalTimeout(OptionalTimeoutNames timeout) const {
-    const auto timeout = optional_timeouts_.get<timeout>();
+  absl::optional<std::chrono::milliseconds> getOptionalTimeout(OptionalTimeoutNames timeout_name) const {
+    const auto timeout = optional_timeouts_.get<timeout_name>();
     if (timeout.has_value()) {
       return *timeout;
     }
