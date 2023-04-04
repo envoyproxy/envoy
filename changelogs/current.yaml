@@ -90,6 +90,11 @@ minor_behavior_changes:
     prohibit route refresh after the response headers have been sent,  and clear the cached route table to more
     aggressively free memory. This behavior can be reverted by setting runtime flag
     ``envoy.reloadable_features.prohibit_route_refresh_after_response_headers_sent`` to false.
+- area: ext_authz
+  change: |
+    Ext_authz will add ``x-envoy-auth-failure-mode-allowed`` header when ``failure_mode_allow`` is enable.
+    This behavior can be reverted by setting runtime flag
+    ``envoy.reloadable_features.http_ext_auth_failure_mode_allow_header_add`` to false.
 
 bug_fixes:
 - area: http
