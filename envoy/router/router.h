@@ -610,6 +610,7 @@ public:
 
 class RateLimitPolicy;
 class Config;
+class CommonConfig;
 
 /**
  * Virtual host definition.
@@ -636,7 +637,7 @@ public:
   /**
    * @return const Config& the RouteConfiguration that owns this virtual host.
    */
-  virtual const Config& routeConfig() const PURE;
+  virtual const CommonConfig& routeConfig() const PURE;
 
   /**
    * @return bool whether to include the request count header in upstream requests.
@@ -1271,9 +1272,50 @@ enum class RouteEvalStatus {
 using RouteCallback = std::function<RouteMatchStatus(RouteConstSharedPtr, RouteEvalStatus)>;
 
 /**
+ * Shared part of the route configuration. This class contains interfaces that needn't depend on
+ * router matcher. Then every virtualhost could keep a reference to the CommonConfig. When the
+ * entire route config is destroyed, the part of CommonConfig will still live until all
+ * virtualhosts are destroyed.
+ */
+class CommonConfig {
+public:
+  virtual ~CommonConfig() = default;
+
+  /**
+   * Return a list of headers that will be cleaned from any requests that are not from an internal
+   * (RFC1918) source.
+   */
+  virtual const std::list<Http::LowerCaseString>& internalOnlyHeaders() const PURE;
+
+  /**
+   * @return const std::string the RouteConfiguration name.
+   */
+  virtual const std::string& name() const PURE;
+
+  /**
+   * @return whether router configuration uses VHDS.
+   */
+  virtual bool usesVhds() const PURE;
+
+  /**
+   * @return bool whether most specific header mutations should take precedence. The default
+   * evaluation order is route level, then virtual host level and finally global connection
+   * manager level.
+   */
+  virtual bool mostSpecificHeaderMutationsWins() const PURE;
+
+  /**
+   * @return uint32_t The maximum bytes of the response direct response body size. The default value
+   * is 4096.
+   * TODO(dio): To allow overrides at different levels (e.g. per-route, virtual host, etc).
+   */
+  virtual uint32_t maxDirectResponseBodySizeBytes() const PURE;
+};
+
+/**
  * The router configuration.
  */
-class Config : public Rds::Config {
+class Config : public Rds::Config, public CommonConfig {
 public:
   /**
    * Based on the incoming HTTP request headers, determine the target route (containing either a
@@ -1305,36 +1347,6 @@ public:
   virtual RouteConstSharedPtr route(const RouteCallback& cb, const Http::RequestHeaderMap& headers,
                                     const StreamInfo::StreamInfo& stream_info,
                                     uint64_t random_value) const PURE;
-
-  /**
-   * Return a list of headers that will be cleaned from any requests that are not from an internal
-   * (RFC1918) source.
-   */
-  virtual const std::list<Http::LowerCaseString>& internalOnlyHeaders() const PURE;
-
-  /**
-   * @return const std::string the RouteConfiguration name.
-   */
-  virtual const std::string& name() const PURE;
-
-  /**
-   * @return whether router configuration uses VHDS.
-   */
-  virtual bool usesVhds() const PURE;
-
-  /**
-   * @return bool whether most specific header mutations should take precedence. The default
-   * evaluation order is route level, then virtual host level and finally global connection
-   * manager level.
-   */
-  virtual bool mostSpecificHeaderMutationsWins() const PURE;
-
-  /**
-   * @return uint32_t The maximum bytes of the response direct response body size. The default value
-   * is 4096.
-   * TODO(dio): To allow overrides at different levels (e.g. per-route, virtual host, etc).
-   */
-  virtual uint32_t maxDirectResponseBodySizeBytes() const PURE;
 };
 
 using ConfigConstSharedPtr = std::shared_ptr<const Config>;
