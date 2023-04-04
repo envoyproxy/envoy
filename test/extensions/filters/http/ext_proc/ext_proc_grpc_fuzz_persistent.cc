@@ -1,5 +1,10 @@
 #include "test/extensions/filters/http/ext_proc/ext_proc_grpc_fuzz.h"
 
+namespace Envoy {
+namespace Extensions {
+namespace HttpFilters {
+namespace ExternalProcessing {
+
 // Using persistent Envoy and ext_proc test server.
 static std::unique_ptr<ExtProcIntegrationFuzz> fuzzer = nullptr;
 static std::unique_ptr<ExtProcFuzzHelper> fuzz_helper = nullptr;

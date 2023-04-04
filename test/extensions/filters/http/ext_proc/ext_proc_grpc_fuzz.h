@@ -225,3 +225,8 @@ public:
   Network::Address::IpVersion ip_version_;
   Grpc::ClientType client_type_;
 };
+
+} // namespace ExternalProcessing
+} // namespace HttpFilters
+} // namespace Extensions
+} // namespace Envoy
