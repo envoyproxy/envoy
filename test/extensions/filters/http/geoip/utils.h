@@ -7,7 +7,7 @@ namespace Geoip {
 
 class GeoipFilterPeer {
 public:
-  static bool useXff(const GeoipFilter& filter) { return filter.config_->use_xff(); }
+  static bool useXff(const GeoipFilter& filter) { return filter.config_->useXff(); }
   static uint32_t xffNumTrustedHops(const GeoipFilter& filter) {
     return filter.config_->xffNumTrustedHops();
   }

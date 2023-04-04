@@ -19,10 +19,11 @@ class GeoipFilterFactory
 public:
   GeoipFilterFactory() : FactoryBase("envoy.filters.http.geoip") {}
 
-private:
   Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
       const envoy::extensions::filters::http::geoip::v3::Geoip& proto_config,
       const std::string& stats_prefix, Server::Configuration::FactoryContext& context) override;
+
+private:
   GeoipProviderFactoryContextPtr provider_context_;
 };
 

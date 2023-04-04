@@ -203,10 +203,11 @@ TEST(GeoipFilterConfigTest, GeoipFilterConfigUnknownProvider) {
 
   TestUtility::loadFromYaml(filter_config_yaml, filter_config);
   NiceMock<Server::Configuration::MockFactoryContext> context;
-  EXPECT_CALL(context, messageValidationVisitor()).Times(2);
+  EXPECT_CALL(context, messageValidationVisitor());
   GeoipFilterFactory factory;
   EXPECT_THROW_WITH_MESSAGE(
-      factory.createFilterFactoryFromProto(filter_config, "geoip", context), Envoy::EnvoyException,
+      factory.createFilterFactoryFromProtoTyped(filter_config, "geoip", context),
+      Envoy::EnvoyException,
       "Didn't find a registered implementation for name: 'envoy.geoip_providers.unknown'");
 }
 

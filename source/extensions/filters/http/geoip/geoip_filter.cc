@@ -16,7 +16,7 @@ GeoipFilterConfig::GeoipFilterConfig(
     const std::string& stat_prefix, Stats::Scope& scope, Runtime::Loader& runtime)
     : scope_(scope), runtime_(runtime), stat_name_set_(scope.symbolTable().makeSet("Geoip")),
       stats_prefix_(stat_name_set_->add(stat_prefix + "geoip")),
-      total_(stat_name_set_->add("total")), use_xff_(config.useXff()),
+      total_(stat_name_set_->add("total")), use_xff_(config.use_xff()),
       xff_num_trusted_hops_(config.xff_num_trusted_hops()) {
   const auto& geo_headers_to_add = config.geo_headers_to_add();
   geo_headers_ = processGeoHeaders({geo_headers_to_add.country(), geo_headers_to_add.city(),
@@ -61,7 +61,7 @@ Http::FilterHeadersStatus GeoipFilter::decodeHeaders(Http::RequestHeaderMap& hea
   state_ = State::NotStarted;
 
   Network::Address::InstanceConstSharedPtr remote_address;
-  if (config_->use_xff() && config_->xffNumTrustedHops() > 0) {
+  if (config_->useXff() && config_->xffNumTrustedHops() > 0) {
     remote_address =
         Envoy::Http::Utility::getLastAddressFromXFF(headers, config_->xffNumTrustedHops()).address_;
   }
