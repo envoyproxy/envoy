@@ -103,6 +103,5 @@ py_binary(
     deps = [
         ":test_data",
         "//tools:run_command",
-        "@envoy_repo",
     ],
 )
