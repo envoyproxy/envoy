@@ -232,7 +232,7 @@ stages:
     steps:
     - task: Cache@2
       inputs:
-        key: "proto_format | ./WORKSPACE | **/*.bzl"
+        key: "proto_format | ./WORKSPACE | **/*.bzl, !mobile/**, !envoy-docs/**"
         path: $(Build.StagingDirectory)/repository_cache
       continueOnError: true
 
