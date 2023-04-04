@@ -17,6 +17,14 @@ behavior_changes:
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
+- area: event
+  change: |
+    ``Event::PostCb`` type changed from ``std::function`` to ``absl::AnyInvocable``. This makes it possible
+    to capture unique_ptrs in dispatcher callbacks. If you have used ``Event::PostCb`` as shorthand for
+    ``std::function<void()>`` in a non-post-callback-related context, you will have to change that.
+    If you have used ``std::function`` in a mock dispatcher, you will have to change that to ``Event::PostCb``
+    and may need to make it moveable. See https://github.com/envoyproxy/envoy/pull/26296 for a variety of
+    example fixes.
 - area: build
   change: |
     Moved the REST config subscripton code into extensions. If you use REST for config updates and override
