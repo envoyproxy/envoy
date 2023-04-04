@@ -706,7 +706,6 @@ stages:
     #   https://learn.microsoft.com/en-us/azure/devops/pipelines/process/expressions?view=azure-devops#job-to-job-dependencies-within-one-stage
     condition: |
       and(
-        eq(variables['Build.Reason'], 'PullRequest'),
         in(dependencies.docker.result, 'Succeeded', 'SucceededWithIssues', 'Skipped'),
         in(dependencies.package_x64.result, 'Succeeded', 'SucceededWithIssues', 'Skipped'),
         in(dependencies.package_arm64.result, 'Succeeded', 'SucceededWithIssues', 'Skipped'))
