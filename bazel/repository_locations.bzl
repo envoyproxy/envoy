@@ -108,13 +108,13 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         # 2. Open https://chromium.googlesource.com/chromium/src/+/refs/tags/<current_version>/DEPS and note <boringssl_revision>.
         # 3. Find a commit in BoringSSL's "master-with-bazel" branch that merges <boringssl_revision>.
         #
-        # chromium-105.0.5195.37 (linux/beta)
-        version = "098695591f3a2665fccef83a3732ecfc99acdcdd",
-        sha256 = "e141448cf6f686b6e9695f6b6459293fd602c8d51efe118a83106752cf7e1280",
+        # chromium-112.0.5615.39 (linux/beta)
+        version = "88d7a40bd06a34da6ee0d985545755199d047258",
+        sha256 = "1e759891e168c5957f2f4d519929e2b4cef9303b7cf2049601081f4fca95bf21",
         strip_prefix = "boringssl-{version}",
         urls = ["https://github.com/google/boringssl/archive/{version}.tar.gz"],
         use_category = ["controlplane", "dataplane_core"],
-        release_date = "2022-07-19",
+        release_date = "2023-02-14",
         cpe = "cpe:2.3:a:google:boringssl:*",
         license = "Mixed",
         license_url = "https://github.com/google/boringssl/blob/{version}/LICENSE",
