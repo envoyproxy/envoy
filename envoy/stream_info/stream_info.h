@@ -275,7 +275,7 @@ struct UpstreamTiming {
   }
 
   /**
-   * Sets the time when the first byte of the response is received from upstream.
+   * Sets the time when the last byte of the request was sent upstream.
    */
   void onLastUpstreamTxByteSent(TimeSource& time_source) {
     ASSERT(!last_upstream_tx_byte_sent_);
@@ -283,7 +283,7 @@ struct UpstreamTiming {
   }
 
   /**
-   * Sets the time when the last byte of the response is received from upstream.
+   * Sets the time when the first byte of the response is received from upstream.
    */
   void onFirstUpstreamRxByteReceived(TimeSource& time_source) {
     ASSERT(!first_upstream_rx_byte_received_);
@@ -291,7 +291,7 @@ struct UpstreamTiming {
   }
 
   /**
-   * Sets the time when the last byte of the request was sent upstream.
+   * Sets the time when the last byte of the response is received from upstream.
    */
   void onLastUpstreamRxByteReceived(TimeSource& time_source) {
     ASSERT(!last_upstream_rx_byte_received_);
