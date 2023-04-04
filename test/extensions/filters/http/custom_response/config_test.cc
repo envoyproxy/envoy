@@ -46,6 +46,8 @@ TEST(CustomResponseFilterConfigTest, InvalidURI) {
                             "%#?*s://foo.example/gateway_error");
 }
 
+// Specifying neither host nor path redirect is valid when the routing decision
+// will take into account header matching. Hence this should be allowed.
 TEST(CustomResponseFilterConfigTest, NoHostAndPathRedirect) {
   envoy::extensions::filters::http::custom_response::v3::CustomResponse filter_config;
   std::string config(R"EOF(
@@ -64,9 +66,7 @@ TEST(CustomResponseFilterConfigTest, NoHostAndPathRedirect) {
   NiceMock<Server::Configuration::MockFactoryContext> context;
   EXPECT_CALL(context, messageValidationVisitor());
   CustomResponseFilterFactory factory;
-  EXPECT_THROW_WITH_MESSAGE(
-      factory.createFilterFactoryFromProto(filter_config, "stats", context), EnvoyException,
-      "At least one of host_redirect and path_redirect needs to be specified");
+  EXPECT_NO_THROW(factory.createFilterFactoryFromProto(filter_config, "stats", context));
 }
 
 TEST(CustomResponseFilterConfigTest, PrefixRewrite) {
