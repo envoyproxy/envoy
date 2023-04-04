@@ -167,6 +167,7 @@ for the service definition. This is used by Envoy as a client when
 is set inside the :ref:`rtds_layer <envoy_v3_api_field_config.bootstrap.v3.RuntimeLayer.rtds_layer>`
 field.
 
+
 REST endpoints
 ^^^^^^^^^^^^^^
 
