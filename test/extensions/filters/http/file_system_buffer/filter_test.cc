@@ -110,8 +110,9 @@ protected:
     // For simplicity's sake the dispatcher just runs the function immediately
     // - since the mock is capturing callbacks, we're effectively triggering
     // the dispatcher when we resolve the callback.
-    EXPECT_CALL(decoder_callbacks_.dispatcher_, post(_))
-        .WillRepeatedly([](std::function<void()> fn) { fn(); });
+    EXPECT_CALL(decoder_callbacks_.dispatcher_, post(_)).WillRepeatedly([](Event::PostCb fn) {
+      fn();
+    });
     filter_->setDecoderFilterCallbacks(decoder_callbacks_);
     filter_->setEncoderFilterCallbacks(encoder_callbacks_);
     EXPECT_CALL(decoder_callbacks_, onDecoderFilterAboveWriteBufferHighWatermark())
@@ -738,13 +739,13 @@ TEST_F(FileSystemBufferFilterTest, FilterDestroyedWhileFileActionIsInDispatcherI
   EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer,
             filter_->decodeData(request_body, false));
   completeCreateFileAndExpectWrite("1234567890");
-  std::function<void()> intercepted_dispatcher_callback;
+  Event::PostCb intercepted_dispatcher_callback;
   // Our default mock dispatcher behavior calls the callback immediately - here we intercept
   // one so we can call it after a 'realistic' delay during which something else happened to
   // destroy the filter.
   EXPECT_CALL(decoder_callbacks_.dispatcher_, post(_))
-      .WillOnce([&intercepted_dispatcher_callback](std::function<void()> fn) {
-        intercepted_dispatcher_callback = fn;
+      .WillOnce([&intercepted_dispatcher_callback](Event::PostCb fn) {
+        intercepted_dispatcher_callback = std::move(fn);
       });
   completeWriteOfSize(10);
   destroyFilter();

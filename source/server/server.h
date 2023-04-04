@@ -318,7 +318,7 @@ private:
   void startWorkers();
   void terminate();
   void notifyCallbacksForStage(
-      Stage stage, Event::PostCb completion_cb = [] {});
+      Stage stage, std::function<void()> completion_cb = [] {});
   void onRuntimeReady();
   void onClusterManagerPrimaryInitializationComplete();
 

@@ -32,7 +32,6 @@ using testing::ByMove;
 using testing::DoAll;
 using testing::FloatNear;
 using testing::Invoke;
-using testing::InvokeArgument;
 using testing::NiceMock;
 using testing::Pointee;
 using testing::Property;
@@ -628,7 +627,7 @@ TEST_F(OverloadManagerImplTest, AdjustScaleFactor) {
 
   manager->start();
 
-  EXPECT_CALL(mock_dispatcher, post).WillOnce(InvokeArgument<0>());
+  EXPECT_CALL(mock_dispatcher, post).WillOnce([](Event::PostCb cb) { cb(); });
   // The scaled trigger has range [0.5, 1.0] so 0.6 should map to a scale value of 0.2, which means
   // a timer scale factor of 0.8 (1 - 0.2).
   EXPECT_CALL(*mock_scaled_timer_manager,
