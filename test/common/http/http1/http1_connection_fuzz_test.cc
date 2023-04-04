@@ -39,13 +39,16 @@ public:
             [&](ResponseEncoder&, bool) -> RequestDecoder& { return orphan_request_decoder; }));
   }
 
-  void fuzz_response(Buffer::Instance& payload) {
+  void fuzz_response(Buffer::Instance& payload, bool use_balsa) {
+    client_settings.use_balsa_parser_ = use_balsa;
     client_ = std::make_unique<Http1::ClientConnectionImpl>(
         mock_client_connection, Http1::CodecStats::atomicGet(http1_stats, *stats_store.rootScope()),
         mock_client_callbacks, client_settings, Http::DEFAULT_MAX_HEADERS_COUNT);
     Status status = client_->dispatch(payload);
   }
-  void fuzz_request(Buffer::Instance& payload) {
+
+  void fuzz_request(Buffer::Instance& payload, bool use_balsa) {
+    server_settings.use_balsa_parser_ = use_balsa;
     server_ = std::make_unique<Http1::ServerConnectionImpl>(
         mock_server_connection, Http1::CodecStats::atomicGet(http1_stats, *stats_store.rootScope()),
         mock_server_callbacks, server_settings, Http::DEFAULT_MAX_REQUEST_HEADERS_KB,
@@ -55,7 +58,7 @@ public:
   }
 
 private:
-  const Http1Settings server_settings, client_settings;
+  Http1Settings server_settings, client_settings;
   Stats::IsolatedStoreImpl stats_store;
   Http1::CodecStats::AtomicPtr http1_stats;
 
@@ -88,8 +91,10 @@ DEFINE_FUZZER(const uint8_t* buf, size_t len) {
   httpmsg.add(buf, len);
   // HTTP requests and responses are handled differently in the codec, hence we
   // setup two instances of the parser, which do not interact.
-  harness->fuzz_request(httpmsg);
-  harness->fuzz_response(httpmsg);
+  harness->fuzz_request(httpmsg, false);
+  harness->fuzz_response(httpmsg, false);
+  harness->fuzz_request(httpmsg, true);
+  harness->fuzz_response(httpmsg, true);
 }
 
 } // namespace
