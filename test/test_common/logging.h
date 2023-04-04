@@ -202,7 +202,7 @@ using ExpectedLogMessages = std::vector<StringPair>;
   } while (false)
 
 // Validates that when stmt is executed, the supplied substring is eventually logged.
-// This both waits infinitely (not ideal) and walks the full log list every time (not ideal)
+// This both waits infinitely (not ideal) and walks the full log list every time (not ideal).
 #define WAIT_FOR_LOG_CONTAINS(loglevel_raw, substr_raw, stmt)                                      \
   do {                                                                                             \
     Envoy::LogLevelSetter save_levels(spdlog::level::trace);                                       \
