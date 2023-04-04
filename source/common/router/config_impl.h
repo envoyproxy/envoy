@@ -714,47 +714,24 @@ public:
   using OptionalTimeouts = PackedStruct<std::chrono::milliseconds, 6, OptionalTimeoutNames>;
 
   absl::optional<std::chrono::milliseconds> idleTimeout() const override {
-    const auto timeout = optional_timeouts_.get<OptionalTimeoutNames::IdleTimeout>();
-    if (timeout.has_value()) {
-      return *timeout;
-    }
-    return absl::nullopt;
+    return optionalTimeout(OptionalTimeoutNames::IdleTimeout);
   }
   absl::optional<std::chrono::milliseconds> maxStreamDuration() const override {
-    const auto timeout = optional_timeouts_.get<OptionalTimeoutNames::MaxStreamDuration>();
-    if (timeout.has_value()) {
-      return *timeout;
-    }
-    return absl::nullopt;
+    return optionalTimeout(OptionalTimeoutNames::MaxStreamDuration);
   }
   absl::optional<std::chrono::milliseconds> grpcTimeoutHeaderMax() const override {
-    const auto timeout = optional_timeouts_.get<OptionalTimeoutNames::GrpcTimeoutHeaderMax>();
-    if (timeout.has_value()) {
-      return *timeout;
-    }
-    return absl::nullopt;
+    return optionalTimeout(OptionalTimeoutNames::GrpcTimeoutHeaderMax);
   }
   absl::optional<std::chrono::milliseconds> grpcTimeoutHeaderOffset() const override {
-    const auto timeout = optional_timeouts_.get<OptionalTimeoutNames::GrpcTimeoutHeaderOffset>();
-    if (timeout.has_value()) {
-      return *timeout;
-    }
-    return absl::nullopt;
+    return optionalTimeout(OptionalTimeoutNames::GrpcTimeoutHeaderOffset);
   }
   absl::optional<std::chrono::milliseconds> maxGrpcTimeout() const override {
-    const auto timeout = optional_timeouts_.get<OptionalTimeoutNames::MaxGrpcTimeout>();
-    if (timeout.has_value()) {
-      return *timeout;
-    }
-    return absl::nullopt;
+    return optionalTimeout(OptionalTimeoutNames::MaxGrpcTimeout);
   }
   absl::optional<std::chrono::milliseconds> grpcTimeoutOffset() const override {
-    const auto timeout = optional_timeouts_.get<OptionalTimeoutNames::GrpcTimeoutOffset>();
-    if (timeout.has_value()) {
-      return *timeout;
-    }
-    return absl::nullopt;
+    return optionalTimeout(OptionalTimeoutNames::GrpcTimeoutOffset);
   }
+  
   const VirtualHost& virtualHost() const override { return *vhost_; }
   bool autoHostRewrite() const override { return auto_host_rewrite_; }
   bool appendXfh() const override { return append_xfh_; }
@@ -1162,6 +1139,14 @@ private:
 
   RouteConstSharedPtr pickWeightedCluster(const Http::HeaderMap& headers, uint64_t random_value,
                                           bool ignore_overflow) const;
+
+  absl::optional<std::chrono::milliseconds> optionalTimeout(OptionalTimeoutNames timeout) const {
+    const auto timeout = optional_timeouts_.get<timeout>();
+    if (timeout.has_value()) {
+      return *timeout;
+    }
+    return absl::nullopt;
+  }
 
   // Default timeout is 15s if nothing is specified in the route config.
   static const uint64_t DEFAULT_ROUTE_TIMEOUT_MS = 15000;
