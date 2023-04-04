@@ -179,6 +179,11 @@ Http::FilterTrailersStatus Filter::encodeTrailers(Http::ResponseTrailerMap& trai
 void Filter::onDestroy() {
   ENVOY_LOG(debug, "golang filter on destroy");
 
+  // do nothing, stream reset may happen before entering this filter.
+  if (req_ == nullptr) {
+    return;
+  }
+
   {
     Thread::LockGuard lock(mutex_);
     if (has_destroyed_) {
@@ -188,7 +193,6 @@ void Filter::onDestroy() {
     has_destroyed_ = true;
   }
 
-  ASSERT(req_ != nullptr);
   auto& state = getProcessorState();
   auto reason = state.isProcessingInGo() ? DestroyReason::Terminate : DestroyReason::Normal;
 
