@@ -658,6 +658,11 @@ public:
   virtual OptRef<const UpstreamInfo> upstreamInfo() const PURE;
 
   /**
+   * @return the current duration of the request, or the total duration of the request, if ended.
+   */
+  virtual absl::optional<std::chrono::nanoseconds> currentDuration() const PURE;
+
+  /**
    * @return the total duration of the request (i.e., when the request's ActiveStream is destroyed)
    * and may be longer than lastDownstreamTxByteSent.
    */
