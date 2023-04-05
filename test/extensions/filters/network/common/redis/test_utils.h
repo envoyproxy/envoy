@@ -29,8 +29,10 @@ createConnPoolSettings(
   setting.set_enable_redirection(redirection_support);
   setting.mutable_max_upstream_unknown_connections()->set_value(max_unknown_conns);
   setting.set_read_policy(read_policy);
-  setting.set_redis_cx_rate_limit_enabled(true);
-  setting.set_redis_cx_rate_limit_per_sec(redis_cx_rate_limit_per_sec);
+
+  auto rate_limit = setting.mutable_connection_rate_limit();
+  rate_limit->set_connection_rate_limit_per_sec(redis_cx_rate_limit_per_sec);
+
   return setting;
 }
 

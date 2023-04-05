@@ -31,7 +31,7 @@ message RedisProxy {
       "envoy.config.filter.network.redis_proxy.v2.RedisProxy";
 
   // Redis connection pool settings.
-  // [#next-free-field: 12]
+  // [#next-free-field: 11]
   message ConnPoolSettings {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.config.filter.network.redis_proxy.v2.RedisProxy.ConnPoolSettings";
@@ -128,9 +128,9 @@ message RedisProxy {
     // Read policy. The default is to read from the primary.
     ReadPolicy read_policy = 7 [(validate.rules).enum = {defined_only: true}];
 
-    bool redis_cx_rate_limit_enabled = 10;
-
-    uint32 redis_cx_rate_limit_per_sec = 11;
+    // Ops or connection timeout triggers reconnection to redis server which could result in reconnection
+    // storm to busy redis server. This config is a protection to rate limit reconnections.
+    ConnectionRateLimit connection_rate_limit = 10;
   }
 
   message PrefixRoutes {
@@ -218,6 +218,13 @@ message RedisProxy {
     // Commands fault is restricted to, if any. If not set, fault applies to all commands
     // other than auth and ping (due to special handling of those commands in Envoy).
     repeated string commands = 4;
+  }
+
+  // Configuration to limit reconnection rate to redis server to protect redis server
+  // from client reconnection storm.
+  message ConnectionRateLimit {
+    // Reconnection rate per sec. Rate limiting is implemented with TokenBucket.
+    uint32 connection_rate_limit_per_sec = 1;
   }
 
   reserved 2;

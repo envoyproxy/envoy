@@ -263,6 +263,9 @@ new_features:
 - area: tls
   change: |
     added new field :ref:`signature_algorithms <envoy_v3_api_field_extensions.transport_sockets.tls.v3.TlsParameters.signature_algorithms>` to set signature algorithms.
+- area: redis
+  change: |
+    added new field :ref:`connection_rate_limit <envoy_v3_api_field_extensions.filters.network.redis_proxy.v3.RedisProxy.ConnPoolSettings.connection_rate_limit>` to limit reconnection rate to redis server to avoid reconnection storm.
 
 deprecated:
 - area: ext_authz

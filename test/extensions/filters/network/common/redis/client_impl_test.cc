@@ -190,8 +190,8 @@ class ConfigBufferSizeGTSingleRequest : public Config {
   uint32_t maxUpstreamUnknownConnections() const override { return 0; }
   bool enableCommandStats() const override { return false; }
   ReadPolicy readPolicy() const override { return ReadPolicy::Primary; }
-  bool redisCxRateLimitEnabled() const override { return false; }
-  uint32_t redisCxRateLimitPerSec() const override { return 0; }
+  bool connectionRateLimitEnabled() const override { return false; }
+  uint32_t connectionRateLimitPerSec() const override { return 0; }
 };
 
 TEST_F(RedisClientImplTest, BatchWithTimerFiring) {
@@ -351,8 +351,8 @@ class ConfigEnableCommandStats : public Config {
   ReadPolicy readPolicy() const override { return ReadPolicy::Primary; }
   uint32_t maxUpstreamUnknownConnections() const override { return 0; }
   bool enableCommandStats() const override { return true; }
-  bool redisCxRateLimitEnabled() const override { return false; }
-  uint32_t redisCxRateLimitPerSec() const override { return 0; }
+  bool connectionRateLimitEnabled() const override { return false; }
+  uint32_t connectionRateLimitPerSec() const override { return 0; }
 };
 
 void initializeRedisSimpleCommand(Common::Redis::RespValue* request, std::string command_name,
@@ -739,8 +739,8 @@ class ConfigOutlierDisabled : public Config {
   ReadPolicy readPolicy() const override { return ReadPolicy::Primary; }
   uint32_t maxUpstreamUnknownConnections() const override { return 0; }
   bool enableCommandStats() const override { return false; }
-  bool redisCxRateLimitEnabled() const override { return false; }
-  uint32_t redisCxRateLimitPerSec() const override { return 0; }
+  bool connectionRateLimitEnabled() const override { return false; }
+  uint32_t connectionRateLimitPerSec() const override { return 0; }
 };
 
 TEST_F(RedisClientImplTest, OutlierDisabled) {

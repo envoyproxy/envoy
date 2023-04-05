@@ -54,8 +54,8 @@ public:
   }
   bool enableCommandStats() const override { return enable_command_stats_; }
   ReadPolicy readPolicy() const override { return read_policy_; }
-  bool redisCxRateLimitEnabled() const override { return redis_cx_rate_limit_enabled_; }
-  uint32_t redisCxRateLimitPerSec() const override { return redis_cx_rate_limit_per_sec_; }
+  bool connectionRateLimitEnabled() const override { return connection_rate_limit_enabled_; }
+  uint32_t connectionRateLimitPerSec() const override { return connection_rate_limit_per_sec_; }
 
 private:
   const std::chrono::milliseconds op_timeout_;
@@ -66,8 +66,8 @@ private:
   const uint32_t max_upstream_unknown_connections_;
   const bool enable_command_stats_;
   ReadPolicy read_policy_;
-  const bool redis_cx_rate_limit_enabled_;
-  const uint32_t redis_cx_rate_limit_per_sec_;
+  bool connection_rate_limit_enabled_;
+  uint32_t connection_rate_limit_per_sec_;
 };
 
 class ClientImpl : public Client, public DecoderCallbacks, public Network::ConnectionCallbacks {

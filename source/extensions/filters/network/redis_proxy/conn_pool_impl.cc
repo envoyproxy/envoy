@@ -242,14 +242,14 @@ void InstanceImpl::ThreadLocalPool::drainClients() {
 InstanceImpl::ThreadLocalActiveClientPtr&
 InstanceImpl::ThreadLocalPool::threadLocalActiveClient(Upstream::HostConstSharedPtr host) {
   TokenBucketPtr& rate_limiter = cx_rate_limiter_map_[host];
-  if (config_->redisCxRateLimitEnabled() && !rate_limiter) {
-    rate_limiter = std::make_unique<TokenBucketImpl>(config_->redisCxRateLimitPerSec(),
+  if (config_->connectionRateLimitEnabled() && !rate_limiter) {
+    rate_limiter = std::make_unique<TokenBucketImpl>(config_->connectionRateLimitPerSec(),
                                                      dispatcher_.timeSource(),
-                                                     config_->redisCxRateLimitPerSec());
+                                                     config_->connectionRateLimitPerSec());
   }
   ThreadLocalActiveClientPtr& client = client_map_[host];
   if (!client) {
-    if (!config_->redisCxRateLimitEnabled() || rate_limiter->consume(1, false) > 0) {
+    if (!config_->connectionRateLimitEnabled() || rate_limiter->consume(1, false) > 0) {
       client = std::make_unique<ThreadLocalActiveClient>(*this);
       client->host_ = host;
       client->redis_client_ =
@@ -257,7 +257,7 @@ InstanceImpl::ThreadLocalPool::threadLocalActiveClient(Upstream::HostConstShared
                                  auth_username_, auth_password_, false);
       client->redis_client_->addConnectionCallbacks(*client);
     } else {
-      redis_cluster_stats_.redis_cx_rate_limited_.inc();
+      redis_cluster_stats_.connection_rate_limited_.inc();
     }
   }
   return client;
@@ -301,6 +301,8 @@ InstanceImpl::ThreadLocalPool::makeRequest(const std::string& key, RespVariant&&
     ThreadLocalActiveClientPtr& client = this->threadLocalActiveClient(host);
     if (!client) {
       ENVOY_LOG(debug, "redis connection is rate limited, erasing empty client");
+      pending_request.request_handler_ = nullptr;
+      onRequestCompleted();
       client_map_.erase(host);
       return nullptr;
     }
