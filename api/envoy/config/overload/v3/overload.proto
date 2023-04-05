@@ -189,7 +189,7 @@ message OverloadManager {
   // The set of overload actions.
   repeated OverloadAction actions = 3;
 
-  // The set of loadshed points.
+  // The set of load shed points.
   repeated LoadShedPoint loadshed_points = 5;
 
   // Configuration for buffer factory.

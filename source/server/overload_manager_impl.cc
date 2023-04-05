@@ -457,7 +457,7 @@ OverloadManagerImpl::OverloadManagerImpl(Event::Dispatcher& dispatcher, Stats::S
     }
   }
 
-  // Validate the trigger resources for LoadshedPoints.
+  // Validate the trigger resources for Load shedPoints.
   for (const auto& point : config.loadshed_points()) {
     for (const auto& trigger : point.triggers()) {
       if (!resources_.contains(trigger.name())) {
