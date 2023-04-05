@@ -135,7 +135,7 @@ TEST_F(HandshakerFactoryTest, SetMockFunctionCb) {
   Extensions::TransportSockets::Tls::ClientSslSocketFactory socket_factory(
       /*config=*/
       std::make_unique<Extensions::TransportSockets::Tls::ClientContextConfigImpl>(
-          tls_context_, "", mock_factory_ctx),
+          tls_context_, mock_factory_ctx),
       *context_manager_, *stats_store_.rootScope());
 
   std::unique_ptr<Network::TransportSocket> socket =
@@ -161,7 +161,7 @@ TEST_F(HandshakerFactoryTest, SetSpecificSslCtxOption) {
   Extensions::TransportSockets::Tls::ClientSslSocketFactory socket_factory(
       /*config=*/
       std::make_unique<Extensions::TransportSockets::Tls::ClientContextConfigImpl>(
-          tls_context_, "", mock_factory_ctx),
+          tls_context_, mock_factory_ctx),
       *context_manager_, *stats_store_.rootScope());
 
   std::unique_ptr<Network::TransportSocket> socket =
@@ -198,7 +198,7 @@ TEST_F(HandshakerFactoryTest, HandshakerContextProvidesObjectsFromParentContext)
   Extensions::TransportSockets::Tls::ClientSslSocketFactory socket_factory(
       /*config=*/
       std::make_unique<Extensions::TransportSockets::Tls::ClientContextConfigImpl>(
-          tls_context_, "", mock_factory_ctx),
+          tls_context_, mock_factory_ctx),
       *context_manager_, *stats_store_.rootScope());
 
   std::unique_ptr<Network::TransportSocket> socket =

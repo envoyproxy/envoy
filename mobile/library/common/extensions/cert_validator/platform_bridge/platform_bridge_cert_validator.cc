@@ -75,7 +75,8 @@ ValidationResults PlatformBridgeCertValidator::doVerifyCertChain(
   }
 
   std::vector<std::string> subject_alt_names;
-  if (transport_socket_options != nullptr) {
+  if (transport_socket_options != nullptr &&
+      !transport_socket_options->verifySubjectAltNameListOverride().empty()) {
     subject_alt_names = transport_socket_options->verifySubjectAltNameListOverride();
   } else {
     subject_alt_names = {std::string(hostname)};

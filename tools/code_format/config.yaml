@@ -315,3 +315,4 @@ visibility_excludes:
 - source/extensions/health_checkers/BUILD
 - source/extensions/health_checkers/BUILD
 - source/extensions/health_checkers/BUILD
+- source/extensions/config_subscription/rest/BUILD
