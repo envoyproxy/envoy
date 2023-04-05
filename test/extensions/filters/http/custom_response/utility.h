@@ -223,8 +223,12 @@ public:
     }
   }
 
+  // Modify the request headers before redirection to the error service, and
+  // potentially save information about the original response in the filter
+  // state on StreamInfo.
   void modifyRequestHeaders(
-      ::Envoy::Http::RequestHeaderMap& headers, Envoy::StreamInfo::StreamInfo&,
+      ::Envoy::Http::RequestHeaderMap& headers, const ::Envoy::Http::ResponseHeaderMap&,
+      Envoy::StreamInfo::StreamInfo&,
       const Extensions::Http::CustomResponse::RedirectPolicy& redirect_policy) override {
     headers.setCopy(::Envoy::Http::LowerCaseString("x-envoy-cer-backend"),
                     redirect_policy.redirectAction()->host_redirect_);

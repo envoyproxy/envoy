@@ -232,7 +232,7 @@ stages:
     steps:
     - task: Cache@2
       inputs:
-        key: "proto_format | ./WORKSPACE | **/*.bzl"
+        key: "proto_format | ./WORKSPACE | **/*.bzl, !mobile/**, !envoy-docs/**"
         path: $(Build.StagingDirectory)/repository_cache
       continueOnError: true
 
@@ -706,7 +706,6 @@ stages:
     #   https://learn.microsoft.com/en-us/azure/devops/pipelines/process/expressions?view=azure-devops#job-to-job-dependencies-within-one-stage
     condition: |
       and(
-        eq(variables['Build.Reason'], 'PullRequest'),
         in(dependencies.docker.result, 'Succeeded', 'SucceededWithIssues', 'Skipped'),
         in(dependencies.package_x64.result, 'Succeeded', 'SucceededWithIssues', 'Skipped'),
         in(dependencies.package_arm64.result, 'Succeeded', 'SucceededWithIssues', 'Skipped'))
