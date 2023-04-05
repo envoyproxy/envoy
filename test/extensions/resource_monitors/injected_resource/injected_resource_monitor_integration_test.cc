@@ -159,7 +159,7 @@ TEST_P(OverloadIntegrationTest, NoNewStreamsWhenOverloaded) {
   upstream_request_->encodeHeaders(default_response_headers_, /*end_stream=*/false);
   upstream_request_->encodeData(10, true);
 
-  response2->waitForHeaders();
+  EXPECT_TRUE(response2->waitForEndStream());
   EXPECT_TRUE(codec_client_->waitForDisconnect());
 
   codec_client_->close();
