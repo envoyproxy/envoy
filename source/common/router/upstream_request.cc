@@ -205,7 +205,6 @@ void UpstreamRequest::cleanUp() {
     }
   }
 
-  stream_info_.setStreamState(StreamInfo::StreamState::Ended);
   stream_info_.onRequestComplete();
   upstreamLog();
 
@@ -291,10 +290,6 @@ void UpstreamRequest::decodeHeaders(Http::ResponseHeaderMapPtr&& headers, bool e
 
   maybeHandleDeferredReadDisable();
   ASSERT(headers.get());
-
-  if (!end_stream) {
-    stream_info_.setStreamState(StreamInfo::StreamState::InProgress);
-  }
 
   parent_.onUpstreamHeaders(response_code, std::move(headers), *this, end_stream);
 }
@@ -720,7 +715,6 @@ void UpstreamRequest::onPoolReady(std::unique_ptr<GenericUpstream>&& upstream,
 
   stream_info_.setRequestHeaders(*parent_.downstreamHeaders());
 
-  stream_info_.setStreamState(StreamInfo::StreamState::Started);
   if (parent_.config().flush_upstream_log_on_new_request_) {
     upstreamLog();
   }

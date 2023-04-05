@@ -416,14 +416,14 @@ typed_config:
   EXPECT_EQ(output_.front(), "cluster_0");
 }
 
-TEST_F(RouterUpstreamLogTest, OnRequestLogAndStreamState) {
+TEST_F(RouterUpstreamLogTest, OnRequestLog) {
   const std::string yaml = R"EOF(
 name: accesslog
 typed_config:
   "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
   log_format:
     text_format_source:
-      inline_string: "%STREAM_STATE%"
+      inline_string: "%UPSTREAM_CLUSTER%"
   path: "/dev/null"
   )EOF";
 
@@ -433,9 +433,11 @@ typed_config:
   init(absl::optional<envoy::config::accesslog::v3::AccessLog>(upstream_log), true);
   run();
 
+  // It is expected that there will be two log records, one when a new request is received
+  // and one when the request is finished, due to 'flush_upstream_log_on_new_request' enabled
   EXPECT_EQ(output_.size(), 2U);
-  EXPECT_EQ(output_.front(), StreamInfo::StreamStateStrings::get().StreamStarted);
-  EXPECT_EQ(output_.back(), StreamInfo::StreamStateStrings::get().StreamEnded);
+  EXPECT_EQ(output_.front(), "cluster_0");
+  EXPECT_EQ(output_.back(), "cluster_0");
 }
 
 } // namespace Router

@@ -547,8 +547,8 @@ message HttpConnectionManager {
   // on stream close, when the HTTP request is complete. If this field is set, the HCM will flush access
   // logs periodically at the specified interval. This is especially useful in the case of long-lived
   // requests, such as CONNECT and Websockets. Final access logs can be detected via the
-  // `requestComplete()` method of `StreamInfo` in access log filters, or thru the `%STREAM_STATE%`
-  // substitution string.
+  // `requestComplete()` method of `StreamInfo` in access log filters, or thru the `%DURATION%` substitution
+  // string.
   // The interval must be at least 1 millisecond.
   google.protobuf.Duration access_log_flush_interval = 54
       [(validate.rules).duration = {gte {nanos: 1000000}}];
