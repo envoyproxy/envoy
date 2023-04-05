@@ -757,6 +757,11 @@ INSTANTIATE_TEST_SUITE_P(
 
 // Verify that the listener in place update will accomplish anyway if the listener is removed.
 TEST_P(LdsStsIntegrationTest, TcpListenerRemoveFilterChainCalledAfterListenerIsRemoved) {
+// https://github.com/envoyproxy/envoy/issues/22489
+#if defined(__arm64__)
+  return;
+#endif
+
   // The in place listener update takes 2 seconds. We will remove the listener.
   drain_time_ = std::chrono::seconds(2);
   // 1. Start the first in place listener update.

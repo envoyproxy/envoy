@@ -1330,6 +1330,10 @@ ClusterInfoImpl::upstreamHttpProtocol(absl::optional<Http::Protocol> downstream_
         !(features_ & Upstream::ClusterInfo::Features::HTTP3)) {
       return {Http::Protocol::Http2};
     }
+    // use HTTP11 since HTTP10 upstream is not supported yet.
+    if (downstream_protocol.value() == Http::Protocol::Http10) {
+      return {Http::Protocol::Http11};
+    }
     return {downstream_protocol.value()};
   }
 
