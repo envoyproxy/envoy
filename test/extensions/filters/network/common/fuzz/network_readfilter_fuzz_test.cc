@@ -10,6 +10,17 @@
 
 // for GenerateValidMessage-Visitor
 #include "source/common/protobuf/visitor.h"
+#include "source/extensions/http/early_header_mutation/header_mutation/config.h"
+#include "source/extensions/http/header_validators/envoy_default/config.h"
+#include "source/extensions/http/original_ip_detection/custom_header/config.h"
+#include "source/extensions/http/original_ip_detection/xff/config.h"
+#include "source/extensions/matching/actions/format_string/config.h"
+#include "source/extensions/matching/common_inputs/environment_variable/config.h"
+#include "source/extensions/matching/input_matchers/consistent_hashing/config.h"
+#include "source/extensions/matching/input_matchers/ip/config.h"
+#include "source/extensions/request_id/uuid/config.h"
+#include "source/extensions/access_loggers/file/config.h"
+#include "envoy/config/route/v3/route_components.pb.h"
 #include "src/libfuzzer/libfuzzer_mutator.h"
 #include "validate/validate.h"
 
@@ -37,6 +48,8 @@ std::unique_ptr<Protobuf::Message> typeUrlToMessage(absl::string_view type_url) 
 class GenerateValidMessage : public ProtobufMessage::ProtoVisitor, private pgv::BaseValidator {
 #define MYLOGLEV error
 public:
+  static const std::string kAny;
+
   class Mutator : public protobuf_mutator::libfuzzer::Mutator {
   public:
     using protobuf_mutator::libfuzzer::Mutator::Mutator;
@@ -181,18 +194,39 @@ public:
     }
   }
 
-  static void handle_any_rules(Protobuf::Message* msg, const validate::AnyRules& any_rules) {
+  void handle_any_rules(Protobuf::Message* msg, const validate::AnyRules& any_rules,
+                        const absl::Span<const Protobuf::Message* const>& parents) {
     if (any_rules.has_required() && any_rules.required()) {
       const Protobuf::Descriptor* descriptor = msg->GetDescriptor();
       std::unique_ptr<Protobuf::Message> inner_message;
-      if (descriptor->full_name() == "google.protobuf.Any") {
-        auto* any_message = Protobuf::DynamicCastToGenerated<ProtobufWkt::Any>(msg);
-        inner_message = typeUrlToMessage(any_message->type_url());
-        // inner_message must be valid as parsing would have already failed to load if there was an
-        // invalid type_url.
-        if (!inner_message || !any_message->UnpackTo(inner_message.get())) {
-          any_message->clear_value();
+      msg->PrintDebugString();
+      if (descriptor->full_name() == kAny) {
+        const std::string class_name = parents.back()->GetDescriptor()->full_name();
+        AnyMap::const_iterator any_map_cand = any_map.find(class_name);
+        if (any_map_cand != any_map.end()) {
+          const FieldToTypeUrls& field_to_typeurls = any_map_cand->second;
+          const std::string field_name = std::string(message_path_.back());
+          FieldToTypeUrls::const_iterator name_cand = field_to_typeurls.find(field_name);
+          if (name_cand != any_map_cand->second.end()) {
+            auto* any_message = Protobuf::DynamicCastToGenerated<ProtobufWkt::Any>(msg);
+            inner_message = typeUrlToMessage(any_message->type_url());
+            if (!inner_message || !any_message->UnpackTo(inner_message.get())) {
+              any_message->set_type_url(
+                  absl::StrCat("type.googleapis.com/", name_cand->second.front().first));
+              auto prototype = name_cand->second.front().second();
+              ASSERT(prototype);
+              any_message->PackFrom(*prototype);
+              ENVOY_LOG_MISC(info, "!!!! Apply config for any: {}",
+                             name_cand->second.front().first);
+            }
+            return;
+          }
         }
+        ENVOY_LOG_MISC(info, "!!!! NOT FOUND parent of Any is: {}..{}",
+                       parents[parents.size() - 2]->GetDescriptor()->full_name(),
+                       message_path_[message_path_.size() - 2]);
+        const Protobuf::Descriptor* par_desc = parents.back()->GetDescriptor();
+        ENVOY_LOG_MISC(info, "!!!! NOT FOUND in class {}", par_desc->full_name());
       }
     }
     if (any_rules.in_size() > 0 || any_rules.not_in_size() > 0) {
@@ -202,7 +236,9 @@ public:
 
   void handle_message_typed_field(Protobuf::Message& msg, const Protobuf::FieldDescriptor& field,
                                   const Protobuf::Reflection* reflection,
-                                  const validate::FieldRules& rules, const bool force_create) {
+                                  const validate::FieldRules& rules,
+                                  const absl::Span<const Protobuf::Message* const>& parents,
+                                  const bool force_create) {
 
     if (field.is_repeated()) {
       const validate::RepeatedRules& repeated_rules = rules.repeated();
@@ -242,7 +278,7 @@ public:
         }
         switch (rules.type_case()) {
         case validate::FieldRules::kAny: {
-          handle_any_rules(value, rules.any());
+          handle_any_rules(value, rules.any(), parents);
           break;
         }
         default:
@@ -307,12 +343,13 @@ public:
     }
   }
 
-  void onField(Protobuf::Message& msg, const Protobuf::FieldDescriptor& field) override {
-    onField(msg, field, false);
+  void onField(Protobuf::Message& msg, const Protobuf::FieldDescriptor& field,
+               const absl::Span<const Protobuf::Message* const> parents) override {
+    onField(msg, field, parents, false);
   }
 
   void onField(Protobuf::Message& msg, const Protobuf::FieldDescriptor& field,
-               const bool force_create) {
+               const absl::Span<const Protobuf::Message* const> parents, const bool force_create) {
     const Protobuf::Reflection* reflection = msg.GetReflection();
 
     if (!field.options().HasExtension(validate::rules) && !force_create) {
@@ -385,7 +422,7 @@ public:
       break;
     }
     case Protobuf::FieldDescriptor::CPPTYPE_MESSAGE: {
-      handle_message_typed_field(msg, field, reflection, rules, force_create);
+      handle_message_typed_field(msg, field, reflection, rules, parents, force_create);
       break;
     }
     default:
@@ -393,10 +430,18 @@ public:
     }
   }
 
-  void onMessage(Protobuf::Message& msg, absl::Span<const Protobuf::Message* const>,
-                 bool) override {
+  void onEnterMessage(Protobuf::Message& msg, absl::Span<const Protobuf::Message* const> parents,
+                      bool, absl::string_view const& field_name) override {
     const Protobuf::Reflection* reflection = msg.GetReflection();
     const Protobuf::Descriptor* descriptor = msg.GetDescriptor();
+    message_path_.push_back(field_name);
+    if (descriptor->full_name() == kAny && message_path_.size() > 3) {
+      ENVOY_LOG_MISC(info, "!!!!!!!!!!!!!!!!!!! parent of Any is: {}..{}",
+                     parents[parents.size() - 2]->GetDescriptor()->full_name(),
+                     message_path_[message_path_.size() - 2]);
+      const Protobuf::Descriptor* par_desc = parents.back()->GetDescriptor();
+      ENVOY_LOG_MISC(info, "!!!!!!!!!!!!!!!!!!! in class {}", par_desc->full_name());
+    }
     for (int oneof_index = 0; oneof_index < descriptor->oneof_decl_count(); ++oneof_index) {
       const Protobuf::OneofDescriptor* oneof_desc = descriptor->oneof_decl(oneof_index);
       if (oneof_desc->options().HasExtension(validate::required) &&
@@ -404,7 +449,7 @@ public:
           !reflection->HasOneof(msg, descriptor->oneof_decl(oneof_index))) {
         // No required member in one of set.
         for (int index = 0; index < oneof_desc->field_count(); ++index) {
-          onField(msg, *oneof_desc->field(index), true);
+          onField(msg, *oneof_desc->field(index), parents, true);
           // Check if for the above field an entry could be created and quit the inner loop if so.
           // It might not be possible, when the datatype is not supported (yet).
           if (reflection->HasOneof(msg, descriptor->oneof_decl(oneof_index))) {
@@ -415,9 +460,162 @@ public:
     }
   }
 
+  void onLeaveMessage(Protobuf::Message&, absl::Span<const Protobuf::Message* const>, bool,
+                      absl::string_view const&) override {
+    message_path_.pop_back();
+  }
+
+  using SimpleProtoFactory = std::function<std::unique_ptr<Protobuf::Message>()>;
+  using TypeUrlAndFactory =
+      std::pair<std::string /* type_url */, SimpleProtoFactory /* simple_prototype_factory */>;
+  using FieldToTypeUrls =
+      std::map<std::string /* field */, std::vector<TypeUrlAndFactory> /* type_url_to_factories */>;
+  using AnyMap = std::map<std::string /* class name */, FieldToTypeUrls>;
+
 private:
   Mutator mutator_;
+  std::deque<absl::string_view> message_path_;
+
+  static const AnyMap any_map;
 };
+
+const std::string GenerateValidMessage::kAny = "google.protobuf.Any";
+
+const GenerateValidMessage::AnyMap GenerateValidMessage::any_map = {
+    //    {"envoy.extensions.filters.network.http_connection_manager.v3."
+    //     "RequestIDExtension",
+    //     {{"request_id_extension",
+    //       {{"envoy.extensions.request_id.uuid.v3.UuidRequestIdConfig",
+    //         []() -> std::unique_ptr<Protobuf::Message> {
+    //           return Envoy::Extensions::RequestId::UUIDRequestIDExtensionFactory()
+    //               .createEmptyConfigProto();
+    //         }}}}}},
+    {"envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager",
+     {{"typed_header_validation_config",
+       {{"envoy.extensions.http.header_validators.envoy_default.v3.HeaderValidatorConfig",
+         []() -> std::unique_ptr<Protobuf::Message> {
+           return Envoy::Extensions::Http::HeaderValidators::EnvoyDefault::
+               HeaderValidatorFactoryConfig()
+                   .createEmptyConfigProto();
+         }}}},
+      {"early_header_mutation_extensions",
+       {{"envoy.extensions.http.early_header_mutation.header_mutation.v3.HeaderMutation",
+         []() -> std::unique_ptr<Protobuf::Message> {
+           return Envoy::Extensions::Http::EarlyHeaderMutation::HeaderMutation::Factory()
+               .createEmptyConfigProto();
+         }}}},
+      {"original_ip_detection_extensions",
+       {{"envoy.extensions.http.original_ip_detection.custom_header.v3.CustomHeaderConfig",
+         []() -> std::unique_ptr<Protobuf::Message> {
+           return Envoy::Extensions::Http::OriginalIPDetection::CustomHeader::
+               CustomHeaderIPDetectionFactory()
+                   .createEmptyConfigProto();
+         }},
+        {"envoy.extensions.http.original_ip_detection.xff.v3.XffConfig",
+         []() -> std::unique_ptr<Protobuf::Message> {
+           return Envoy::Extensions::Http::OriginalIPDetection::Xff::XffIPDetectionFactory()
+               .createEmptyConfigProto();
+         }}}},
+      {"access_log",
+       {{"envoy.config.accesslog.v3.AccessLog.File",
+         []() -> std::unique_ptr<Protobuf::Message> {
+           return Envoy::Extensions::AccessLoggers::File::FileAccessLogFactory()
+               .createEmptyConfigProto();
+         }}}},
+      {"request_id_extension",
+       {{"envoy.extensions.request_id.uuid.v3.UuidRequestIdConfig",
+         []() -> std::unique_ptr<Protobuf::Message> {
+           return Envoy::Extensions::RequestId::UUIDRequestIDExtensionFactory()
+               .createEmptyConfigProto();
+         }}}}}},
+    {"xds.type.matcher.v3.Matcher",
+     {{"on_no_match",
+       {{"envoy.config.core.v3.SubstitutionFormatString",
+         []() -> std::unique_ptr<Protobuf::Message> {
+           return Envoy::Extensions::Matching::Actions::FormatString::ActionFactory()
+               .createEmptyConfigProto();
+         }},
+        {"envoy.extensions.matching.common_inputs.environment_variable.v3.Config",
+         []() -> std::unique_ptr<Protobuf::Message> {
+           return Envoy::Extensions::Matching::CommonInputs::EnvironmentVariable::Config()
+               .createEmptyConfigProto();
+         }},
+        {"envoy.extensions.matching.input_matchers.consistent_hashing.v3.ConsistentHashing",
+         []() -> std::unique_ptr<Protobuf::Message> {
+           return Envoy::Extensions::Matching::InputMatchers::ConsistentHashing::
+               ConsistentHashingConfig()
+                   .createEmptyConfigProto();
+         }},
+        {"envoy.extensions.matching.input_matchers.ip.v3.Ip",
+         []() -> std::unique_ptr<Protobuf::Message> {
+           return Envoy::Extensions::Matching::InputMatchers::IP::Config().createEmptyConfigProto();
+         }}}}}},
+    {"xds.type.matcher.v3.Matcher.OnMatch",
+     {{"action",
+       {{"envoy.config.core.v3.SubstitutionFormatString",
+         []() -> std::unique_ptr<Protobuf::Message> {
+           return Envoy::Extensions::Matching::Actions::FormatString::ActionFactory()
+               .createEmptyConfigProto();
+         }},
+        {"envoy.extensions.matching.common_inputs.environment_variable.v3.Config",
+         []() -> std::unique_ptr<Protobuf::Message> {
+           return Envoy::Extensions::Matching::CommonInputs::EnvironmentVariable::Config()
+               .createEmptyConfigProto();
+         }},
+        {"envoy.extensions.matching.input_matchers.consistent_hashing.v3.ConsistentHashing",
+         []() -> std::unique_ptr<Protobuf::Message> {
+           return Envoy::Extensions::Matching::InputMatchers::ConsistentHashing::
+               ConsistentHashingConfig()
+                   .createEmptyConfigProto();
+         }},
+        {"envoy.extensions.matching.input_matchers.ip.v3.Ip",
+         []() -> std::unique_ptr<Protobuf::Message> {
+           return Envoy::Extensions::Matching::InputMatchers::IP::Config().createEmptyConfigProto();
+         }}}}}},
+    {"xds.type.matcher.v3.Matcher.MatcherList.Predicate.SinglePredicate",
+     {{"input",
+       {{"envoy.config.core.v3.SubstitutionFormatString",
+         []() -> std::unique_ptr<Protobuf::Message> {
+           return Envoy::Extensions::Matching::Actions::FormatString::ActionFactory()
+               .createEmptyConfigProto();
+         }},
+        {"envoy.extensions.matching.common_inputs.environment_variable.v3.Config",
+         []() -> std::unique_ptr<Protobuf::Message> {
+           return Envoy::Extensions::Matching::CommonInputs::EnvironmentVariable::Config()
+               .createEmptyConfigProto();
+         }},
+        {"envoy.extensions.matching.input_matchers.consistent_hashing.v3.ConsistentHashing",
+         []() -> std::unique_ptr<Protobuf::Message> {
+           return Envoy::Extensions::Matching::InputMatchers::ConsistentHashing::
+               ConsistentHashingConfig()
+                   .createEmptyConfigProto();
+         }},
+        {"envoy.extensions.matching.input_matchers.ip.v3.Ip",
+         []() -> std::unique_ptr<Protobuf::Message> {
+           return Envoy::Extensions::Matching::InputMatchers::IP::Config().createEmptyConfigProto();
+         }}}}}},
+    {"envoy.config.core.v3.SubstitutionFormatString",
+     {{"formatters",
+       {{"envoy.extensions.formatter.metadata.v3.Metadata",
+         []() -> std::unique_ptr<Protobuf::Message> {
+           // TODO(av): I am pretty sure, this is incorrect.
+           return Envoy::Extensions::Matching::Actions::FormatString::ActionFactory()
+               .createEmptyConfigProto();
+         }},
+        {"envoy.extensions.formatter.req_without_query.v3.ReqWithoutQuery",
+         []() -> std::unique_ptr<Protobuf::Message> {
+           // TODO(av): I am pretty sure, this is incorrect.
+           return Envoy::Extensions::Matching::Actions::FormatString::ActionFactory()
+               .createEmptyConfigProto();
+         }}}}}},
+    {"envoy.config.route.v3.RouteConfiguration",
+     {{"cluster_specifier_plugins",
+       {{"envoy.config.route.v3.ClusterSpecifierPlugin", /* guessed */
+         []() -> std::unique_ptr<Protobuf::Message> {
+           return std::make_unique<envoy::config::route::v3::ClusterSpecifierPlugin>();
+           /* This is abstract: return
+            * Envoy::Router::ClusterSpecifierPluginFactoryConfig().createEmptyConfigProto(); */
+         }}}}}}};
 
 DEFINE_PROTO_FUZZER(const test::extensions::filters::network::FilterFuzzTestCase& input) {
   //  TestDeprecatedV2Api _deprecated_v2_api;
@@ -451,6 +649,8 @@ DEFINE_PROTO_FUZZER(const test::extensions::filters::network::FilterFuzzTestCase
         GenerateValidMessage generator(seed);
         ProtobufMessage::traverseMessage(generator, *input, true);
       }};
+
+  Envoy::Logger::Registry::setLogLevel(ENVOY_SPDLOG_LEVEL(info));
 
   try {
     TestUtility::validate(input);
