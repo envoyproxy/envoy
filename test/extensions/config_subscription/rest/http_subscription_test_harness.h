@@ -9,11 +9,11 @@
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
 #include "source/common/common/utility.h"
-#include "source/common/config/http_subscription_impl.h"
 #include "source/common/config/utility.h"
 #include "source/common/http/message_impl.h"
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/protobuf/utility.h"
+#include "source/extensions/config_subscription/rest/http_subscription_impl.h"
 
 #include "test/common/config/subscription_test_harness.h"
 #include "test/mocks/config/mocks.h"

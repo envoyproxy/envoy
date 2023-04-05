@@ -55,6 +55,8 @@ public:
   const Http::LowerCaseString EnvoyAuthPartialBody{absl::StrCat(prefix(), "-auth-partial-body")};
   const Http::LowerCaseString EnvoyAuthHeadersToRemove{
       absl::StrCat(prefix(), "-auth-headers-to-remove")};
+  const Http::LowerCaseString EnvoyAuthFailureModeAllowed{
+      absl::StrCat(prefix(), "-auth-failure-mode-allowed")};
 };
 
 using Headers = ConstSingleton<HeaderValues>;

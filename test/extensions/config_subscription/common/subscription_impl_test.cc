@@ -4,8 +4,8 @@
 #include "test/common/config/delta_subscription_test_harness.h"
 #include "test/common/config/filesystem_subscription_test_harness.h"
 #include "test/common/config/grpc_subscription_test_harness.h"
-#include "test/common/config/http_subscription_test_harness.h"
 #include "test/common/config/subscription_test_harness.h"
+#include "test/extensions/config_subscription/rest/http_subscription_test_harness.h"
 
 using testing::InSequence;
 

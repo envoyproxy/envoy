@@ -151,6 +151,14 @@ struct StreamInfoImpl : public StreamInfo {
     return *upstream_info_;
   }
 
+  absl::optional<std::chrono::nanoseconds> currentDuration() const override {
+    if (!final_time_) {
+      return duration(time_source_.monotonicTime());
+    }
+
+    return requestComplete();
+  }
+
   absl::optional<std::chrono::nanoseconds> requestComplete() const override {
     return duration(final_time_);
   }
