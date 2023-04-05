@@ -481,43 +481,6 @@ const envoy::type::v3::FractionalPercent& RouteTracingImpl::getOverallSampling()
 }
 const Tracing::CustomTagMap& RouteTracingImpl::getCustomTags() const { return custom_tags_; }
 
-OptionalTimeouts::OptionalTimeouts(const envoy::config::route::v3::RouteAction& route)
-    : has_idle_timeout_(false), has_max_stream_duration_(false),
-      has_grpc_timeout_header_max_(false), has_grpc_timeout_header_offset_(false),
-      has_max_grpc_timeout_(false), has_grpc_timeout_offset_(false) {
-  if (route.has_idle_timeout()) {
-    has_idle_timeout_ = true;
-    idle_timeout_ = std::chrono::milliseconds(PROTOBUF_GET_MS_REQUIRED(route, idle_timeout));
-  }
-  if (route.has_max_grpc_timeout()) {
-    has_max_grpc_timeout_ = true;
-    max_grpc_timeout_ =
-        std::chrono::milliseconds(PROTOBUF_GET_MS_REQUIRED(route, max_grpc_timeout));
-  }
-  if (route.has_grpc_timeout_offset()) {
-    has_grpc_timeout_offset_ = true;
-    grpc_timeout_offset_ =
-        std::chrono::milliseconds(PROTOBUF_GET_MS_REQUIRED(route, grpc_timeout_offset));
-  }
-  if (route.has_max_stream_duration()) {
-    if (route.max_stream_duration().has_max_stream_duration()) {
-      has_max_stream_duration_ = true;
-      max_stream_duration_ = std::chrono::milliseconds(
-          PROTOBUF_GET_MS_REQUIRED(route.max_stream_duration(), max_stream_duration));
-    }
-    if (route.max_stream_duration().has_grpc_timeout_header_max()) {
-      has_grpc_timeout_header_max_ = true;
-      grpc_timeout_header_max_ = std::chrono::milliseconds(
-          PROTOBUF_GET_MS_REQUIRED(route.max_stream_duration(), grpc_timeout_header_max));
-    }
-    if (route.max_stream_duration().has_grpc_timeout_header_offset()) {
-      has_grpc_timeout_header_offset_ = true;
-      grpc_timeout_header_offset_ = std::chrono::milliseconds(
-          PROTOBUF_GET_MS_REQUIRED(route.max_stream_duration(), grpc_timeout_header_offset));
-    }
-  }
-}
-
 RouteEntryImplBase::RouteEntryImplBase(const CommonVirtualHostSharedPtr& vhost,
                                        const envoy::config::route::v3::Route& route,
                                        const OptionalHttpFilters& optional_http_filters,
@@ -1146,13 +1109,46 @@ std::unique_ptr<InternalRedirectPolicyImpl> RouteEntryImplBase::buildInternalRed
   return std::make_unique<InternalRedirectPolicyImpl>(policy_config, validator, current_route_name);
 }
 
-std::unique_ptr<OptionalTimeouts> RouteEntryImplBase::buildOptionalTimeouts(
+RouteEntryImplBase::OptionalTimeouts RouteEntryImplBase::buildOptionalTimeouts(
     const envoy::config::route::v3::RouteAction& route) const {
-  if (route.has_idle_timeout() || route.has_max_grpc_timeout() || route.has_grpc_timeout_offset() ||
-      route.has_max_stream_duration()) {
-    return std::make_unique<OptionalTimeouts>(route);
+  // Calculate how many values are actually set, to initialize `OptionalTimeouts` packed_struct,
+  // avoiding memory re-allocation on each set() call.
+  int num_timeouts_set = route.has_idle_timeout() ? 1 : 0;
+  num_timeouts_set += route.has_max_grpc_timeout() ? 1 : 0;
+  num_timeouts_set += route.has_grpc_timeout_offset() ? 1 : 0;
+  if (route.has_max_stream_duration()) {
+    num_timeouts_set += route.max_stream_duration().has_max_stream_duration() ? 1 : 0;
+    num_timeouts_set += route.max_stream_duration().has_grpc_timeout_header_max() ? 1 : 0;
+    num_timeouts_set += route.max_stream_duration().has_grpc_timeout_header_offset() ? 1 : 0;
   }
-  return nullptr;
+  OptionalTimeouts timeouts(num_timeouts_set);
+  if (route.has_idle_timeout()) {
+    timeouts.set<OptionalTimeoutNames::IdleTimeout>(
+        std::chrono::milliseconds(PROTOBUF_GET_MS_REQUIRED(route, idle_timeout)));
+  }
+  if (route.has_max_grpc_timeout()) {
+    timeouts.set<OptionalTimeoutNames::MaxGrpcTimeout>(
+        std::chrono::milliseconds(PROTOBUF_GET_MS_REQUIRED(route, max_grpc_timeout)));
+  }
+  if (route.has_grpc_timeout_offset()) {
+    timeouts.set<OptionalTimeoutNames::GrpcTimeoutOffset>(
+        std::chrono::milliseconds(PROTOBUF_GET_MS_REQUIRED(route, grpc_timeout_offset)));
+  }
+  if (route.has_max_stream_duration()) {
+    if (route.max_stream_duration().has_max_stream_duration()) {
+      timeouts.set<OptionalTimeoutNames::MaxStreamDuration>(std::chrono::milliseconds(
+          PROTOBUF_GET_MS_REQUIRED(route.max_stream_duration(), max_stream_duration)));
+    }
+    if (route.max_stream_duration().has_grpc_timeout_header_max()) {
+      timeouts.set<OptionalTimeoutNames::GrpcTimeoutHeaderMax>(std::chrono::milliseconds(
+          PROTOBUF_GET_MS_REQUIRED(route.max_stream_duration(), grpc_timeout_header_max)));
+    }
+    if (route.max_stream_duration().has_grpc_timeout_header_offset()) {
+      timeouts.set<OptionalTimeoutNames::GrpcTimeoutHeaderOffset>(std::chrono::milliseconds(
+          PROTOBUF_GET_MS_REQUIRED(route.max_stream_duration(), grpc_timeout_header_offset)));
+    }
+  }
+  return timeouts;
 }
 
 PathRewriterSharedPtr
