@@ -160,6 +160,12 @@ Stats::Gauge& makeGauge(Stats::Scope& scope, absl::string_view a, absl::string_v
   return scope.gaugeFromStatName(stat_name.statName(), import_mode);
 }
 
+Stats::Histogram& makeHistogram(Stats::Scope& scope, absl::string_view name,
+                                Stats::Histogram::Unit unit) {
+  Stats::StatNameManagedStorage stat_name(absl::StrCat("overload.", name), scope.symbolTable());
+  return scope.histogramFromStatName(stat_name.statName(), unit);
+}
+
 Event::ScaledTimerType parseTimerType(
     envoy::config::overload::v3::ScaleTimersOverloadActionConfig::TimerType config_timer_type) {
   using Config = envoy::config::overload::v3::ScaleTimersOverloadActionConfig;
@@ -304,9 +310,11 @@ OverloadManagerImpl::OverloadManagerImpl(Event::Dispatcher& dispatcher, Stats::S
                                          const envoy::config::overload::v3::OverloadManager& config,
                                          ProtobufMessage::ValidationVisitor& validation_visitor,
                                          Api::Api& api, const Server::Options& options)
-    : started_(false), dispatcher_(dispatcher), tls_(slot_allocator),
-      refresh_interval_(
-          std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(config, refresh_interval, 1000))),
+    : started_(false), dispatcher_(dispatcher), time_source_(api.timeSource()),
+      tls_(slot_allocator), refresh_interval_(std::chrono::milliseconds(
+                                PROTOBUF_GET_MS_OR_DEFAULT(config, refresh_interval, 1000))),
+      refresh_interval_delays_(makeHistogram(stats_scope, "refresh_interval_delay",
+                                             Stats::Histogram::Unit::Milliseconds)),
       proactive_resources_(
           std::make_unique<
               absl::node_hash_map<OverloadProactiveResourceName, ProactiveResource>>()) {
@@ -421,8 +429,17 @@ void OverloadManagerImpl::start() {
       resource.second.update(flush_epoch_);
     }
 
+    // Record delay.
+    auto now = time_source_.monotonicTime();
+    std::chrono::milliseconds delay =
+        std::chrono::duration_cast<std::chrono::milliseconds>(now - time_resources_last_measured_);
+    refresh_interval_delays_.recordValue(delay.count());
+    time_resources_last_measured_ = now;
+
     timer_->enableTimer(refresh_interval_);
   });
+
+  time_resources_last_measured_ = time_source_.monotonicTime();
   timer_->enableTimer(refresh_interval_);
 }
 

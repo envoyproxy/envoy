@@ -1,12 +1,10 @@
 date: November 30, 2021
 
-behavior_changes:
-
 minor_behavior_changes:
 - area: config
   change: |
-    the log message for "gRPC config stream closed" now uses the most recent error message, and reports seconds instead of milliseconds for how long the most recent status has been received.
-
+    the log message for "gRPC config stream closed" now uses the most recent error message, and reports seconds instead of
+    milliseconds for how long the most recent status has been received.
 
 bug_fixes:
 - area: http
@@ -24,9 +22,3 @@ bug_fixes:
 - area: tcp
   change: |
     fixed a bug where upstream circuit breakers applied HTTP per-request bounds to TCP connections.
-
-removed_config_or_runtime:
-
-new_features:
-
-deprecated:

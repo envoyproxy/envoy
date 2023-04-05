@@ -1087,7 +1087,7 @@ const StreamInfoFormatter::FieldExtractorLookupTbl& StreamInfoFormatter::getKnow
                             [](const std::string&, const absl::optional<size_t>&) {
                               return std::make_unique<StreamInfoDurationFieldExtractor>(
                                   [](const StreamInfo::StreamInfo& stream_info) {
-                                    return stream_info.requestComplete();
+                                    return stream_info.currentDuration();
                                   });
                             }}},
                           {"STREAM_STATE",

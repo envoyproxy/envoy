@@ -1,4 +1,4 @@
-#include "source/common/config/filesystem_subscription_impl.h"
+#include "source/extensions/config_subscription/filesystem/filesystem_subscription_impl.h"
 
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
@@ -157,6 +157,9 @@ FilesystemCollectionSubscriptionImpl::refreshInternal(ProtobufTypes::MessagePtr*
   callbacks_.onConfigUpdate(decoded_resources.refvec_, resource_message.version());
   return resource_message.version();
 }
+
+REGISTER_FACTORY(FilesystemSubscriptionFactory, ConfigSubscriptionFactory);
+REGISTER_FACTORY(FilesystemCollectionSubscriptionFactory, ConfigSubscriptionFactory);
 
 } // namespace Config
 } // namespace Envoy
