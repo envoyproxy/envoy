@@ -225,13 +225,13 @@ TEST_P(LdsInplaceUpdateTcpProxyIntegrationTest, ReloadConfigDeletingFilterChain)
   initialize();
   std::string response_0;
   auto client_conn_0 = createConnectionAndWrite("alpn0", "hello", response_0);
-  client_conn_0->waitForConnection();
+  ASSERT_TRUE(client_conn_0->waitForConnection());
   FakeRawConnectionPtr fake_upstream_connection_0;
   ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection_0));
 
   std::string response_1;
   auto client_conn_1 = createConnectionAndWrite("alpn1", "dummy", response_1);
-  client_conn_1->waitForConnection();
+  ASSERT_TRUE(client_conn_1->waitForConnection());
   FakeRawConnectionPtr fake_upstream_connection_1;
   ASSERT_TRUE(fake_upstreams_[1]->waitForRawConnection(fake_upstream_connection_1));
 
@@ -291,7 +291,7 @@ TEST_P(LdsInplaceUpdateTcpProxyIntegrationTest, ReloadConfigAddingFilterChain) {
 
   std::string response_0;
   auto client_conn_0 = createConnectionAndWrite("alpn0", "hello", response_0);
-  client_conn_0->waitForConnection();
+  ASSERT_TRUE(client_conn_0->waitForConnection());
   FakeRawConnectionPtr fake_upstream_connection_0;
   ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection_0));
 
@@ -330,7 +330,7 @@ TEST_P(LdsInplaceUpdateTcpProxyIntegrationTest, ReloadConfigAddingFilterChain) {
 
   std::string response_2;
   auto client_conn_2 = createConnectionAndWrite("alpn2", "hello2", response_2);
-  client_conn_2->waitForConnection();
+  ASSERT_TRUE(client_conn_2->waitForConnection());
   FakeRawConnectionPtr fake_upstream_connection_2;
   ASSERT_TRUE(fake_upstreams_[1]->waitForRawConnection(fake_upstream_connection_2));
   std::string observed_data_2;
@@ -764,7 +764,7 @@ TEST_P(LdsStsIntegrationTest, TcpListenerRemoveFilterChainCalledAfterListenerIsR
   initialize();
   std::string response_0;
   auto client_conn_0 = createConnectionAndWrite("alpn0", "hello", response_0);
-  client_conn_0->waitForConnection();
+  ASSERT_TRUE(client_conn_0->waitForConnection());
   FakeRawConnectionPtr fake_upstream_connection_0;
   ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection_0));
 
