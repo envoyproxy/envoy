@@ -554,7 +554,7 @@ TEST_P(ServerInstanceImplTest, LifecycleNotifications) {
                                                // Block till we're told to complete
                                                completion_block.WaitForNotification();
                                                shutdown_with_completion = true;
-                                               server_->dispatcher().post(completion_cb);
+                                               server_->dispatcher().post(std::move(completion_cb));
                                                completion_done.Notify();
                                              });
     auto handle5 =

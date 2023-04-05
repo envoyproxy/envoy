@@ -1023,7 +1023,7 @@ InstanceImpl::registerCallback(Stage stage, StageCallbackWithCompletion callback
                                                                                 callback);
 }
 
-void InstanceImpl::notifyCallbacksForStage(Stage stage, Event::PostCb completion_cb) {
+void InstanceImpl::notifyCallbacksForStage(Stage stage, std::function<void()> completion_cb) {
   ASSERT_IS_MAIN_OR_TEST_THREAD();
   const auto it = stage_callbacks_.find(stage);
   if (it != stage_callbacks_.end()) {
