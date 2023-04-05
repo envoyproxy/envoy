@@ -144,7 +144,7 @@ TEST_F(LazyInitStatsTest, ScopeOutlivesLazyStats) {
 
     MyStats x_v2 = MyStats::create(scope_v2, stats_names_, true);
     EXPECT_EQ(TestUtility::findGauge(store_, "bluh.AwesomeStats.initialized")->value(), 0);
-    // Previous data is NOT gone, as scope_v2 and scope_1's lifecycles overlap.
+    // Previous data is NOT gone, as scope_v2 and scope_1's lifecycle overlap.
     EXPECT_EQ(x_v2->foo_.value(), 2);
 
     x_v2->foo_.inc();

@@ -228,11 +228,11 @@ TEST_P(CdsIntegrationTest, CdsClusterTeardownWhileConnecting) {
 
 class LazyInitClusterStatsTest : public CdsIntegrationTest {
 public:
-  void initializeLazyTest(bool enable_lazyinit) {
+  void initializeLazyTest(bool enable_lazyinit_stats) {
     use_real_stats_ = true;
     config_helper_.addConfigModifier(
-        [enable_lazyinit](::envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
-          bootstrap.set_enable_lazyinit_stats(enable_lazyinit);
+        [enable_lazyinit_stats](::envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+          bootstrap.set_enable_lazyinit_stats_stats(enable_lazyinit_stats);
         });
     CdsIntegrationTest::initialize();
     test_server_->waitForCounterGe("cluster_manager.cluster_added", 1);
@@ -267,7 +267,7 @@ INSTANTIATE_TEST_SUITE_P(IpVersionsClientTypeDelta, LazyInitClusterStatsTest,
 
 // Test that LazyInitTrafficStats gets created and updated correctly.
 TEST_P(LazyInitClusterStatsTest, LazyInitTrafficStatsWithClusterCreateUpdateDelete) {
-  initializeLazyTest(/*enable_lazyinit=*/true);
+  initializeLazyTest(/*enable_lazyinit_stats=*/true);
 
   EXPECT_EQ(test_server_->gauge("cluster.cluster_1.ClusterTrafficStats.initialized")->value(), 0);
   EXPECT_EQ(test_server_->counter("cluster.cluster_1.upstream_cx_total"), nullptr);
@@ -299,7 +299,7 @@ TEST_P(LazyInitClusterStatsTest, LazyInitTrafficStatsWithClusterCreateUpdateDele
 
 // Test that Non-LazyInitTrafficStats gets created and updated correctly.
 TEST_P(LazyInitClusterStatsTest, NonLazyInitTrafficStatsWithClusterCreateUpdateDelete) {
-  initializeLazyTest(/*enable_lazyinit=*/false);
+  initializeLazyTest(/*enable_lazyinit_stats=*/false);
   // cluster_1 trafficStats created by CDS push.
   EXPECT_EQ(test_server_->counter("cluster.cluster_1.upstream_cx_total")->value(), 0);
 
@@ -326,7 +326,7 @@ TEST_P(LazyInitClusterStatsTest, NonLazyInitTrafficStatsWithClusterCreateUpdateD
 
 // Test that LazyInitTrafficStats with cluster_1 create-remove-create sequence.
 TEST_P(LazyInitClusterStatsTest, LazyInitTrafficStatsWithClusterCreateDeleteRecrete) {
-  initializeLazyTest(/*enable_lazyinit=*/true);
+  initializeLazyTest(/*enable_lazyinit_stats=*/true);
   EXPECT_EQ(test_server_->gauge("cluster.cluster_1.ClusterTrafficStats.initialized")->value(), 0);
   EXPECT_EQ(test_server_->counter("cluster.cluster_1.upstream_cx_total"), nullptr);
 
@@ -361,7 +361,7 @@ TEST_P(LazyInitClusterStatsTest, LazyInitTrafficStatsWithClusterCreateDeleteRecr
 
 // Test that Non-LazyInitTrafficStats with cluster_1 create-remove-create sequence.
 TEST_P(LazyInitClusterStatsTest, NonLazyInitTrafficStatsWithClusterCreateDeleteRecrete) {
-  initializeLazyTest(/*enable_lazyinit=*/false);
+  initializeLazyTest(/*enable_lazyinit_stats=*/false);
   EXPECT_EQ(test_server_->counter("cluster.cluster_1.upstream_cx_total")->value(), 0);
 
   sendRequestToClusterAndWaitForResponse();

@@ -47,7 +47,6 @@ is enabled in Bootstrap, for stats that are created using the LazyCompatibleInte
 is deferred to first access of any member of that stats. E.g. when enabled, A ClusterTrafficStats structure is only
 created when any member of ClusterInfoImpl::trafficStats() is accessed.
 
-Current LazyCompatibleStats stats: 
+Current LazyCompatibleStats stats:
 
 * ClusterInfoImpl::trafficStats()
-
