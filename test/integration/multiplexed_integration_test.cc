@@ -1022,7 +1022,7 @@ TEST_P(MultiplexedIntegrationTest, CodecErrorAfterStreamStart) {
   codec_client_->rawConnection().write(bogus_data, false);
 
   // Verifies error is received.
-  ASSERT_TRUE(response->waitForEndStream());
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
 }
 
 TEST_P(MultiplexedIntegrationTest, Http2BadMagic) {

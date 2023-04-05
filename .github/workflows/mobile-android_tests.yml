@@ -27,7 +27,7 @@ jobs:
       run: ./mobile/tools/should_run_ci.sh
     - name: 'Java setup'
       if: steps.should_run.outputs.run_ci_job == 'true'
-      uses: actions/setup-java@3f07048e3d294f56e9b90ac5ea2c6f74e9ad0f98
+      uses: actions/setup-java@5ffc13f4174014e2d4d4572b3d74c3fa61aeb2c2
       with:
         java-version: '8'
         java-package: jdk
@@ -60,7 +60,7 @@ jobs:
       run: ./mobile/tools/should_run_ci.sh
     - name: 'Java setup'
       if: steps.should_run.outputs.run_ci_job == 'true'
-      uses: actions/setup-java@3f07048e3d294f56e9b90ac5ea2c6f74e9ad0f98
+      uses: actions/setup-java@5ffc13f4174014e2d4d4572b3d74c3fa61aeb2c2
       with:
         java-version: '8'
         java-package: jdk

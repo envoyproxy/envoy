@@ -7,7 +7,6 @@
 #include "source/common/config/filesystem_subscription_impl.h"
 #include "source/common/config/grpc_mux_impl.h"
 #include "source/common/config/grpc_subscription_impl.h"
-#include "source/common/config/http_subscription_impl.h"
 #include "source/common/config/new_grpc_mux_impl.h"
 #include "source/common/config/type_to_endpoint.h"
 #include "source/common/config/utility.h"
@@ -36,6 +35,7 @@ SubscriptionPtr SubscriptionFactoryImpl::subscriptionFromConfigSource(
   Config::Utility::checkLocalInfo(type_url, local_info_);
   SubscriptionStats stats = Utility::generateStats(scope);
 
+  std::string subscription_type = "";
   switch (config.config_source_specifier_case()) {
   case envoy::config::core::v3::ConfigSource::ConfigSourceSpecifierCase::kPath: {
     Utility::checkFilesystemSubscriptionBackingPath(config.path(), api_);
@@ -66,12 +66,8 @@ SubscriptionPtr SubscriptionFactoryImpl::subscriptionFromConfigSource(
           "Please specify an explicit supported api_type in the following config:\n" +
           config.DebugString());
     case envoy::config::core::v3::ApiConfigSource::REST:
-      return std::make_unique<HttpSubscriptionImpl>(
-          local_info_, cm_, api_config_source.cluster_names()[0], dispatcher_,
-          api_.randomGenerator(), Utility::apiConfigSourceRefreshDelay(api_config_source),
-          Utility::apiConfigSourceRequestTimeout(api_config_source), restMethod(type_url), type_url,
-          callbacks, resource_decoder, stats, Utility::configSourceInitialFetchTimeout(config),
-          validation_visitor_);
+      subscription_type = "envoy.config_subscription.rest";
+      break;
     case envoy::config::core::v3::ApiConfigSource::GRPC: {
       GrpcMuxSharedPtr mux;
       CustomConfigValidatorsPtr custom_config_validators =
@@ -133,7 +129,10 @@ SubscriptionPtr SubscriptionFactoryImpl::subscriptionFromConfigSource(
           Utility::configSourceInitialFetchTimeout(config), /*is_aggregated*/ false, options);
     }
     }
-    throw EnvoyException("Invalid API config source API type");
+    if (subscription_type.empty()) {
+      throw EnvoyException("Invalid API config source API type");
+    }
+    break;
   }
   case envoy::config::core::v3::ConfigSource::ConfigSourceSpecifierCase::kAds: {
     return std::make_unique<GrpcSubscriptionImpl>(
@@ -144,6 +143,15 @@ SubscriptionPtr SubscriptionFactoryImpl::subscriptionFromConfigSource(
     throw EnvoyException(
         "Missing config source specifier in envoy::config::core::v3::ConfigSource");
   }
+  ConfigSubscriptionFactory* factory =
+      Registry::FactoryRegistry<ConfigSubscriptionFactory>::getFactory(subscription_type);
+  if (factory == nullptr) {
+    throw EnvoyException(fmt::format(
+        "Didn't find a registered config subscription factory implementation for name: '{}'",
+        subscription_type));
+  }
+  return factory->create(local_info_, cm_, dispatcher_, api_, config, type_url, callbacks,
+                         resource_decoder, stats, validation_visitor_);
 }
 
 SubscriptionPtr SubscriptionFactoryImpl::collectionSubscriptionFromUrl(
