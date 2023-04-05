@@ -697,9 +697,12 @@ protected:
         listener_config_->listenerScope(), crypto_stream_factory_, std::move(stream_info),
         connection_stats_);
     session->Initialize();
+    session->setHeadersWithUnderscoreAction(envoy::config::core::v3::HttpProtocolOptions::ALLOW);
     session->setHttp3Options(http3_options_);
     session->setCodecStats(http3_stats_);
     session->setHttpConnectionCallbacks(http_connection_callbacks_);
+    session->setMaxIncomingHeadersCount(100);
+    session->set_max_inbound_header_list_size(64 * 1024u);
     setQuicConfigWithDefaultValues(session->config());
     session->OnConfigNegotiated();
     return session;
