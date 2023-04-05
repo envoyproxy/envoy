@@ -137,6 +137,9 @@ TEST_P(OverloadIntegrationTest, StopAcceptingConnectionsWhenOverloaded) {
 }
 
 TEST_P(OverloadIntegrationTest, NoNewStreamsWhenOverloaded) {
+  // For https://github.com/envoyproxy/envoy/issues/26264
+  // Set to trace since unable to reproduce issue locally.
+  LogLevelSetter save_levels(spdlog::level::trace);
   initialize();
   updateResource(file_updater_1_, 0.7);
 
