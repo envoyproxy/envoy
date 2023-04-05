@@ -2,10 +2,13 @@ services:
   go_plugin_compile:
     build:
       context: ../shared/build
+    # you are recommended to use the "go" command directly,
+    # instead of "bazel run @go_sdk//:bin/go --" here.
     command: >
       bash -c "
-      bazel build --experimental_repository_downloader_retries=2 --disk_cache=/tmp/disk_cache --repository_cache=/tmp/repository_cache --experimental_repository_cache_hardlinks //examples/golang/simple:simple.so
-      && cp -a ./bazel-bin/examples/golang/simple/simple.so /output"
+      cd examples/golang/simple
+      && bazel run @go_sdk//:bin/go -- build -o simple.so -buildmode=c-shared .
+      && cp -a ./simple.so /output"
     entrypoint: /source/examples/shared/build/build-entrypoint.sh
     environment:
     - BUILD_UID=${UID:-1000}
