@@ -545,6 +545,22 @@ TEST_F(EnvoyQuicServerStreamTest, ReadDisableUponTrailers) {
   EXPECT_CALL(stream_callbacks_, onResetStream(_, _));
 }
 
+TEST_F(EnvoyQuicServerStreamTest, ReadDisableUponMalformedTrailers) {
+  size_t payload_offset = receiveRequest(request_body_, false, request_body_.length() * 2);
+  EXPECT_FALSE(quic_stream_->HasBytesToRead());
+  EXPECT_CALL(stream_decoder_, decodeTrailers_(_)).Times(0);
+
+  // Invalid uppercase key
+  spdy_trailers_["KEY1"] = "value1";
+  std::string payload = spdyHeaderToHttp3StreamPayload(spdy_trailers_);
+  quic::QuicStreamFrame frame(stream_id_, true, payload_offset, payload);
+
+  EXPECT_CALL(quic_session_, MaybeSendRstStreamFrame(_, _, _));
+  EXPECT_CALL(stream_callbacks_, onResetStream(_, _));
+  quic_stream_->OnStreamFrame(frame);
+  EXPECT_TRUE(quic_stream_->IsDoneReading());
+}
+
 // Tests that the stream with a send buffer whose high limit is 16k and low
 // limit is 8k sends over 32kB response.
 TEST_F(EnvoyQuicServerStreamTest, WatermarkSendBuffer) {
