@@ -69,7 +69,7 @@ public:
     case H3Frame::kHeaders: {
       const auto& f = h3frame.headers();
       spdy::Http2HeaderBlock headers;
-      for (auto hdr : f.headers().headers()) {
+      for (const auto &hdr : f.headers().headers()) {
         headers.AppendValueOrAddHeader(hdr.key(), hdr.value());
       }
       return buildRawFrame(dw, Type::Headers, encodeHeaders(headers));
@@ -90,8 +90,9 @@ public:
       const auto& f = h3frame.push_promise();
       uint64_t push_id = f.push_id();
       spdy::Http2HeaderBlock headers;
-      for (auto& hdr : f.headers().headers())
+      for (auto& hdr : f.headers().headers()) {
         headers.AppendValueOrAddHeader(hdr.key(), hdr.value());
+      }
       return buildPushPromiseFrame(dw, push_id, encodeHeaders(headers));
     }
     case H3Frame::kGoAway: {
@@ -572,8 +573,8 @@ public:
   size_t GetKeySize() const override { return 0; };
   size_t GetNoncePrefixSize() const override { return 0; };
   size_t GetIVSize() const override { return 0; };
-  absl::string_view GetKey() const override { return absl::string_view(); };
-  absl::string_view GetNoncePrefix() const override { return absl::string_view(); };
+  absl::string_view GetKey() const override { return {}; };
+  absl::string_view GetNoncePrefix() const override { return {}; };
   uint32_t cipher_id() const override { return 0; };
   quic::QuicPacketCount GetIntegrityLimit() const override {
     return std::numeric_limits<quic::QuicPacketCount>::max();
