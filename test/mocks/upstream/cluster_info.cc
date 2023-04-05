@@ -215,6 +215,7 @@ MockClusterInfo::~MockClusterInfo() = default;
   case ::Envoy::Http::Protocol::Http3:
     return http3CodecStats();
   }
+  PANIC_DUE_TO_CORRUPT_ENUM;
 }
 
 Http::Http1::CodecStats& MockClusterInfo::http1CodecStats() const {

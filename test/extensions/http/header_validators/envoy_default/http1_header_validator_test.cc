@@ -592,6 +592,26 @@ TEST_F(Http1HeaderValidatorTest, ValidateInvalidValueResponseTrailerMap) {
   EXPECT_EQ(result.details(), "uhv.invalid_value_characters");
 }
 
+TEST_F(Http1HeaderValidatorTest, InvalidRequestHeaderBeforeSendingUpstream) {
+  auto uhv = createH1Client(empty_config);
+  // The DEL (0x7F) character is illegal in header values
+  ::Envoy::Http::TestRequestHeaderMapImpl headers{
+      {":scheme", "https"},        {":method", "GET"},          {":path", "/dir1%2fdir2"},
+      {":authority", "envoy.com"}, {"header0", "abcd\x7F\\ef"}, {"header1", "value1"}};
+  auto result = uhv->validateRequestHeaderMap(headers);
+  // TODO(yanavlasov): this is not implemented yet. Adding for coverage
+  EXPECT_TRUE(result.status.ok());
+}
+
+TEST_F(Http1HeaderValidatorTest, InvalidResponseHeaderBeforeSendingDownstream) {
+  auto uhv = createH1(empty_config);
+  // The DEL (0x7F) character is illegal in header values
+  ::Envoy::Http::TestResponseHeaderMapImpl headers{
+      {":status", "200"}, {"header0", "abcd\x7F\\ef"}, {"header1", "value1"}};
+  auto result = uhv->validateResponseHeaderMap(headers);
+  // TODO(yanavlasov): this is not implemented yet. Adding for coverage
+  EXPECT_TRUE(result.status.ok());
+}
 } // namespace
 } // namespace EnvoyDefault
 } // namespace HeaderValidators

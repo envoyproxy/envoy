@@ -26,8 +26,7 @@ HeaderValidatorFactory::createServerHeaderValidator(Protocol protocol,
   case Protocol::Http10:
     return std::make_unique<ServerHttp1HeaderValidator>(config_, protocol, stats);
   }
-
-  RELEASE_ASSERT(false, fmt::format("Unexpected protocol: {}", static_cast<int>(protocol)));
+  PANIC_DUE_TO_CORRUPT_ENUM;
 }
 
 ::Envoy::Http::ClientHeaderValidatorPtr
@@ -41,8 +40,7 @@ HeaderValidatorFactory::createClientHeaderValidator(Protocol protocol,
   case Protocol::Http10:
     return std::make_unique<ClientHttp1HeaderValidator>(config_, protocol, stats);
   }
-
-  RELEASE_ASSERT(false, fmt::format("Unexpected protocol: {}", static_cast<int>(protocol)));
+  PANIC_DUE_TO_CORRUPT_ENUM;
 }
 
 } // namespace EnvoyDefault

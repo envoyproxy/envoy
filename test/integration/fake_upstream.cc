@@ -438,6 +438,7 @@ Http::Protocol codeTypeToProtocol(Http::CodecType codec_type) {
   case Http::CodecType::HTTP3:
     return Http::Protocol::Http3;
   }
+  PANIC_DUE_TO_CORRUPT_ENUM;
 }
 } // namespace
 
