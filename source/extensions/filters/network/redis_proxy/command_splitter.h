@@ -93,7 +93,7 @@ public:
   virtual SplitRequestPtr makeRequest(Common::Redis::RespValuePtr&& request,
                                       SplitCallbacks& callbacks,
                                       Event::Dispatcher& dispatcher) PURE;
-  
+
   virtual void setReadFilterCallback(Network::ReadFilterCallbacks* callbacks) PURE;
 };
 

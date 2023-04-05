@@ -10,14 +10,15 @@
 
 #include "test/extensions/filters/network/common/redis/mocks.h"
 #include "test/extensions/filters/network/redis_proxy/mocks.h"
-#include "test/mocks/network/mocks.h"
 #include "test/mocks/network/connection.h"
+#include "test/mocks/network/mocks.h"
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/stream_info/mocks.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
+
 using testing::Eq;
 using testing::Matcher;
 using testing::NiceMock;
@@ -100,17 +101,16 @@ TEST(PrefixRoutesTest, TestKeyPrefixFormatter) {
   NiceMock<Network::MockReadFilterCallbacks> filter_callbacks;
   NiceMock<Network::MockConnection> connection;
   NiceMock<StreamInfo::MockStreamInfo> stream_info;
-  
+
   const std::string format = "%FILTER_STATE(redisKey)%";
-  
-  stream_info.filterState()->setData("redisKey",
-                                     std::make_unique<Envoy::Router::StringAccessorImpl>("test_value_"),
-                                     StreamInfo::FilterState::StateType::ReadOnly);
-  
+
+  stream_info.filterState()->setData(
+      "redisKey", std::make_unique<Envoy::Router::StringAccessorImpl>("test_value_"),
+      StreamInfo::FilterState::StateType::ReadOnly);
 
   ON_CALL(filter_callbacks, connection()).WillByDefault(ReturnRef(connection));
   ON_CALL(connection, streamInfo()).WillByDefault(ReturnRef(stream_info));
-  
+
   Upstreams upstreams;
   upstreams.emplace("fake_clusterA", std::make_shared<ConnPool::MockInstance>());
   upstreams.emplace("fake_clusterB", std::make_shared<ConnPool::MockInstance>());
@@ -136,17 +136,16 @@ TEST(PrefixRoutesTest, TestKeyPrefixFormatterWithMissingFilterState) {
   NiceMock<Network::MockReadFilterCallbacks> filter_callbacks;
   NiceMock<Network::MockConnection> connection;
   NiceMock<StreamInfo::MockStreamInfo> stream_info;
-  
+
   const std::string format = "%FILTER_STATE(redisKey)%";
-  
-  stream_info.filterState()->setData("randomKey",
-                                     std::make_unique<Envoy::Router::StringAccessorImpl>("test_value"),
-                                     StreamInfo::FilterState::StateType::ReadOnly);
-  
+
+  stream_info.filterState()->setData(
+      "randomKey", std::make_unique<Envoy::Router::StringAccessorImpl>("test_value"),
+      StreamInfo::FilterState::StateType::ReadOnly);
 
   ON_CALL(filter_callbacks, connection()).WillByDefault(ReturnRef(connection));
   ON_CALL(connection, streamInfo()).WillByDefault(ReturnRef(stream_info));
-  
+
   Upstreams upstreams;
   upstreams.emplace("fake_clusterA", std::make_shared<ConnPool::MockInstance>());
   upstreams.emplace("fake_clusterB", std::make_shared<ConnPool::MockInstance>());

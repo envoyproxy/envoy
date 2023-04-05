@@ -72,7 +72,9 @@ public:
 
   RouteSharedPtr upstreamPool(std::string& key) override;
 
-  void setReadFilterCallback(Network::ReadFilterCallbacks* callbacks) override  { callbacks_ = callbacks; }
+  void setReadFilterCallback(Network::ReadFilterCallbacks* callbacks) override {
+    callbacks_ = callbacks;
+  }
 
 private:
   TrieLookupTable<PrefixSharedPtr> prefix_lookup_table_;

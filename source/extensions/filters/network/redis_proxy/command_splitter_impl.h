@@ -360,7 +360,9 @@ public:
   SplitRequestPtr makeRequest(Common::Redis::RespValuePtr&& request, SplitCallbacks& callbacks,
                               Event::Dispatcher& dispatcher) override;
 
-  void setReadFilterCallback(Network::ReadFilterCallbacks* callbacks) override  { router_->setReadFilterCallback(callbacks); }
+  void setReadFilterCallback(Network::ReadFilterCallbacks* callbacks) override {
+    router_->setReadFilterCallback(callbacks);
+  }
 
 private:
   friend class RedisCommandSplitterImplTest;
