@@ -69,7 +69,7 @@ public:
     case H3Frame::kHeaders: {
       const auto& f = h3frame.headers();
       spdy::Http2HeaderBlock headers;
-      for (const auto &hdr : f.headers().headers()) {
+      for (const auto& hdr : f.headers().headers()) {
         headers.AppendValueOrAddHeader(hdr.key(), hdr.value());
       }
       return buildRawFrame(dw, Type::Headers, encodeHeaders(headers));
