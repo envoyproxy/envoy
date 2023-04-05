@@ -70,7 +70,6 @@ message Geoip {
 
     // Geoip driver specific configuration which depends on the driver being instantiated.
     google.protobuf.Any typed_config = 3;
-
   }
 
   // If set to true, the `xff_num_trusted_hops` field will be used to determine
