@@ -53,6 +53,9 @@ ConfigImpl::ConfigImpl(
   if (config.has_connection_rate_limit()) {
     connection_rate_limit_enabled_ = true;
     connection_rate_limit_per_sec_ = config.connection_rate_limit().connection_rate_limit_per_sec();
+  } else {
+    connection_rate_limit_enabled_ = false;
+    connection_rate_limit_per_sec_ = 100;
   }
 }
 

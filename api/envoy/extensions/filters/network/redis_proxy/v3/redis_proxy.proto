@@ -129,7 +129,7 @@ message RedisProxy {
     ReadPolicy read_policy = 7 [(validate.rules).enum = {defined_only: true}];
 
     // Ops or connection timeout triggers reconnection to redis server which could result in reconnection
-    // storm to busy redis server. This config is a protection to rate limit reconnections.
+    // storm to busy redis server. This config is a protection to rate limit reconnection rate.
     ConnectionRateLimit connection_rate_limit = 10;
   }
 
