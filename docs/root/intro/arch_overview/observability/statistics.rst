@@ -42,7 +42,7 @@ become histograms as the only difference between the two representations was the
 Lazy Initialization of Stats
 ============================
 
-When :ref:`enable_lazyinit_stats <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.enable_lazyinit_stats>` 
+When :ref:`enable_lazyinit_stats <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.enable_lazyinit_stats>`
 is enabled in Bootstrap, for stats that are created using the LazyCompatibleInterface, the actual stats struct creation
 is deferred to first access of any member of that stats. E.g. when enabled, A ClusterTrafficStats structure is only
 created when any member of ClusterInfoImpl::trafficStats() is accessed.

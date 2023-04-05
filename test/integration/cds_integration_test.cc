@@ -232,7 +232,7 @@ public:
     use_real_stats_ = true;
     config_helper_.addConfigModifier(
         [enable_lazyinit_stats](::envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
-          bootstrap.set_enable_lazyinit_stats_stats(enable_lazyinit_stats);
+          bootstrap.set_enable_lazyinit_stats(enable_lazyinit_stats);
         });
     CdsIntegrationTest::initialize();
     test_server_->waitForCounterGe("cluster_manager.cluster_added", 1);

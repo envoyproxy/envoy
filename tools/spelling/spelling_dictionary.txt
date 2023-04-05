@@ -248,7 +248,9 @@ iframe
 ingressed
 integrations
 jkl
+jmarantz
 lang
+lazyinit
 libsxg
 LLVM
 LPT
@@ -1234,6 +1236,7 @@ stderr
 stdev
 stdin
 stdout
+stevenzzzz
 stmt
 str
 streambuf

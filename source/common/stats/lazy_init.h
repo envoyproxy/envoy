@@ -81,7 +81,7 @@ private:
   // gauge to determine whether to instantiate the lazy block on construction.
   // TODO(stevenzzzz,jmarantz, #26106): See #14610. The initialized_ gauge could be disabled in a
   // corner case where a user disables stats with suffix "initialized". In which case, the
-  // initialized_ will be a NullGauge, which breaks the above scenaio 2.
+  // initialized_ will be a NullGauge, which breaks the above scenario 2.
   // TODO(stevenzzzz, jmarantz): Consider hiding this Gauge from being exported, through using the
   // stats flags mask.
   Gauge& initialized_;
