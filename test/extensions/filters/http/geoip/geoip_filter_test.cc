@@ -26,10 +26,21 @@ namespace {
 
 MATCHER_P2(HasExpectedHeader, expected_header, expected_value, "") {
   auto request_headers = static_cast<Http::TestRequestHeaderMapImpl>(arg);
+  if (!request_headers.has(expected_header)) {
+    *result_listener << "expected header=" << expected_header << " but header was not found";
+    return false;
+  }
   EXPECT_TRUE(request_headers.has(expected_header));
-  EXPECT_EQ(
-      expected_value,
-      request_headers.get(Http::LowerCaseString(expected_header))[0]->value().getStringView());
+  if (!testing::Matches(expected_value)(
+          request_headers.get(Http::LowerCaseString(expected_header))[0]
+              ->value()
+              .getStringView())) {
+    *result_listener
+        << "expected header value=" << expected_value << " for header " << expected_header
+        << "but got "
+        << request_headers.get(Http::LowerCaseString(expected_header))[0]->value().getStringView();
+    return false;
+  }
   return true;
 }
 

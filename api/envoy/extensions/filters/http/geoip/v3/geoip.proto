@@ -69,9 +69,8 @@ message Geoip {
     string name = 1 [(validate.rules).string = {min_len: 1}];
 
     // Geoip driver specific configuration which depends on the driver being instantiated.
-    oneof config_type {
-      google.protobuf.Any typed_config = 3;
-    }
+    google.protobuf.Any typed_config = 3;
+
   }
 
   // If set to true, the `xff_num_trusted_hops` field will be used to determine

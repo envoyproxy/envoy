@@ -47,13 +47,14 @@ MATCHER_P(HasXffNumTrustedHops, expected, "") {
 MATCHER_P(HasGeoHeader, expected_header, "") {
   auto filter = std::static_pointer_cast<GeoipFilter>(arg);
   auto geo_headers = GeoipFilterPeer::geoHeaders(*filter);
-  bool header_found = false;
   for (const auto& header : geo_headers) {
-    if (header == expected_header) {
-      header_found = true;
+    if (testing::Matches(expected_header)(header)) {
+      return true;
     }
   }
-  return header_found;
+  *result_listener << "expected header=" << expected_header
+                   << " but header was not found in header map";
+  return false;
 }
 
 MATCHER_P(HasGeoHeadersSize, expected_size, "") {
@@ -70,13 +71,14 @@ MATCHER_P(HasGeoHeadersSize, expected_size, "") {
 MATCHER_P(HasGeoAnonHeader, expected_header, "") {
   auto filter = std::static_pointer_cast<GeoipFilter>(arg);
   auto geo_anon_headers = GeoipFilterPeer::geoAnonHeaders(*filter);
-  bool header_found = false;
   for (const auto& header : geo_anon_headers) {
-    if (header == expected_header) {
-      header_found = true;
+    if (testing::Matches(expected_header)(header)) {
+      return true;
     }
   }
-  return header_found;
+  *result_listener << "expected anon header=" << expected_header
+                   << " but header was not found in header map";
+  return false;
 }
 
 MATCHER_P(HasAnonGeoHeadersSize, expected_size, "") {

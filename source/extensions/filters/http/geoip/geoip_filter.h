@@ -58,9 +58,6 @@ private:
 
 using GeoipFilterConfigSharedPtr = std::shared_ptr<GeoipFilterConfig>;
 
-// State of this filter's geolocation lookup.
-enum class State { NotStarted, InProgress, Complete };
-
 class GeoipFilter : public Http::StreamDecoderFilter,
                     public Logger::Loggable<Logger::Id::filter>,
                     public std::enable_shared_from_this<GeoipFilter> {
@@ -86,7 +83,6 @@ private:
   GeoipFilterConfigSharedPtr config_;
   Http::StreamDecoderFilterCallbacks* decoder_callbacks_{};
   DriverSharedPtr driver_;
-  State state_;
   OptRef<Http::RequestHeaderMap> request_headers_;
 };
 

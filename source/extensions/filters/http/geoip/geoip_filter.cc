@@ -49,7 +49,7 @@ void GeoipFilterConfig::incCounter(Stats::StatName name) {
 }
 
 GeoipFilter::GeoipFilter(GeoipFilterConfigSharedPtr config, DriverSharedPtr driver)
-    : config_(config), driver_(std::move(driver)), state_(State::NotStarted) {}
+    : config_(config), driver_(std::move(driver)) {}
 
 GeoipFilter::~GeoipFilter() = default;
 
@@ -58,7 +58,6 @@ void GeoipFilter::onDestroy() {}
 Http::FilterHeadersStatus GeoipFilter::decodeHeaders(Http::RequestHeaderMap& headers, bool) {
   // Save request headers for later header manipulation once geolocation lookups are complete.
   request_headers_ = headers;
-  state_ = State::NotStarted;
 
   Network::Address::InstanceConstSharedPtr remote_address;
   if (config_->useXff() && config_->xffNumTrustedHops() > 0) {
@@ -76,7 +75,6 @@ Http::FilterHeadersStatus GeoipFilter::decodeHeaders(Http::RequestHeaderMap& hea
   // This is a safe measure to protect against the case when filter gets deleted before the callback
   // is run.
   GeoipFilterWeakPtr self = weak_from_this();
-  state_ = State::InProgress;
   // Copy header values to pass to the driver lookup function (in case filter gets destroyed before
   // lookup completes).
   absl::flat_hash_set<std::string> geo_headers = config_->geoHeaders();
@@ -92,8 +90,7 @@ Http::FilterHeadersStatus GeoipFilter::decodeHeaders(Http::RequestHeaderMap& hea
       });
 
   // Stop the iteration for headers for the current filter and the filters following.
-  return state_ == State::Complete ? Http::FilterHeadersStatus::Continue
-                                   : Http::FilterHeadersStatus::StopIteration;
+  return Http::FilterHeadersStatus::StopIteration;
 }
 
 Http::FilterDataStatus GeoipFilter::decodeData(Buffer::Instance&, bool) {
@@ -121,7 +118,6 @@ void GeoipFilter::onLookupComplete(LookupResult&& result) {
   }
 
   ENVOY_LOG(debug, "Geoip filter: finished decoding geolocation headers");
-  state_ = State::Complete;
   decoder_callbacks_->continueDecoding();
 }
 
