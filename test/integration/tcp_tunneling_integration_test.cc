@@ -150,7 +150,20 @@ TEST_P(ConnectTerminationIntegrationTest, ExtendedConnectWithBytestreamProtocol)
 }
 
 TEST_P(ConnectTerminationIntegrationTest, Basic) {
+  // Regression test upstream connection establishment before connect termination.
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+    auto* static_resources = bootstrap.mutable_static_resources();
+    for (int i = 0; i < static_resources->clusters_size(); ++i) {
+      auto* cluster = bootstrap.mutable_static_resources()->mutable_clusters(i);
+      cluster->mutable_preconnect_policy()->mutable_predictive_preconnect_ratio()->set_value(2);
+    }
+  });
+
   initialize();
+
+  setUpConnection();
+  sendBidirectionalDataAndCleanShutdown();
+  cleanupUpstreamAndDownstream();
 
   setUpConnection();
   sendBidirectionalDataAndCleanShutdown();
@@ -509,6 +522,83 @@ TEST_P(ProxyingConnectIntegrationTest, ProxyConnect) {
   // Also test upstream to downstream data.
   upstream_request_->encodeData(12, false);
   response_->waitForBodyData(12);
+
+  cleanupUpstreamAndDownstream();
+}
+
+TEST_P(ProxyingConnectIntegrationTest, ProxyConnectEarlyData) {
+  initialize();
+
+  // Send request headers.
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto encoder_decoder = codec_client_->startRequest(connect_headers_);
+  request_encoder_ = &encoder_decoder.first;
+  response_ = std::move(encoder_decoder.second);
+  // Send early data.
+  codec_client_->sendData(*request_encoder_, "hello", false);
+
+  // Wait for them to arrive upstream.
+  AssertionResult result =
+      fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_);
+  RELEASE_ASSERT(result, result.message());
+
+  result = fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_);
+  RELEASE_ASSERT(result, result.message());
+  ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
+  EXPECT_EQ(upstream_request_->headers().get(Http::Headers::get().Method)[0]->value(), "CONNECT");
+  if (upstreamProtocol() == Http::CodecType::HTTP1) {
+    EXPECT_TRUE(upstream_request_->headers().get(Http::Headers::get().Protocol).empty());
+  } else {
+    EXPECT_EQ("", upstream_request_->headers().getSchemeValue());
+    EXPECT_EQ("", upstream_request_->headers().getProtocolValue());
+    EXPECT_EQ("", upstream_request_->headers().getSchemeValue());
+  }
+  // Make sure payload does not get forwarded ahead of response headers.
+  ASSERT_FALSE(upstream_request_->waitForData(*dispatcher_, 5, std::chrono::milliseconds(100)));
+
+  // Send response headers
+  upstream_request_->encodeHeaders(default_response_headers_, false);
+
+  // Wait for them to arrive downstream.
+  response_->waitForHeaders();
+  EXPECT_EQ("200", response_->headers().getStatusValue());
+
+  // Make sure the early data is eventually proxied.
+  ASSERT_TRUE(upstream_request_->waitForData(*dispatcher_, 5));
+
+  // Also test upstream to downstream data.
+  upstream_request_->encodeData(12, false);
+  response_->waitForBodyData(12);
+
+  // Test multiplexed stream reuse.
+  if (upstreamProtocol() != Http::CodecType::HTTP1 &&
+      downstreamProtocol() != Http::CodecType::HTTP1) {
+    // End the first stream cleanly
+    codec_client_->sendData(*request_encoder_, "", true);
+    upstream_request_->encodeData(0, true);
+    ASSERT_TRUE(response_->waitForEndStream());
+    ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
+    response_->reset();
+    upstream_request_.reset();
+
+    // Kick off a new stream.
+    auto encoder_decoder = codec_client_->startRequest(connect_headers_);
+    codec_client_->sendData(*request_encoder_, "hello", false);
+    request_encoder_ = &encoder_decoder.first;
+    response_ = std::move(encoder_decoder.second);
+    ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+    ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
+
+    // Make sure payload does not get forwarded ahead of response headers.
+    ASSERT_FALSE(upstream_request_->waitForData(*dispatcher_, 5, std::chrono::milliseconds(100)));
+    // Send response headers
+    upstream_request_->encodeHeaders(default_response_headers_, false);
+    // Wait for them to arrive downstream.
+    response_->waitForHeaders();
+    EXPECT_EQ("200", response_->headers().getStatusValue());
+    // Make sure the early data is eventually proxied.
+    ASSERT_TRUE(upstream_request_->waitForData(*dispatcher_, 5));
+  }
 
   cleanupUpstreamAndDownstream();
 }
