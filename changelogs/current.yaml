@@ -31,8 +31,8 @@ minor_behavior_changes:
     example fixes.
 - area: build
   change: |
-    Moved the REST config subscripton code into extensions. If you use REST for config updates and override
-    extensions_build_config.bzl you will now need to include it explicitly.
+    Moved the REST and filesystem config subscripton code into extensions. If you use them for config updates and
+    override extensions_build_config.bzl you will now need to include them explicitly.
 - area: quic
   change: |
     Access logging is now deferred to the QUIC ack listener, and roundtrip response time is added as a downstream timing

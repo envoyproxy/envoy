@@ -118,40 +118,6 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
-    name = "filesystem_subscription_impl_test",
-    srcs = ["filesystem_subscription_impl_test.cc"],
-    deps = [
-        ":filesystem_subscription_test_harness",
-        "//test/mocks/event:event_mocks",
-        "//test/mocks/filesystem:filesystem_mocks",
-        "//test/test_common:logging_lib",
-        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
-        "@envoy_api//envoy/config/endpoint/v3:pkg_cc_proto",
-        "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
-    ],
-)
-
-envoy_cc_test_library(
-    name = "filesystem_subscription_test_harness",
-    srcs = ["filesystem_subscription_test_harness.h"],
-    deps = [
-        ":subscription_test_harness",
-        "//source/common/config:filesystem_subscription_lib",
-        "//source/common/config:utility_lib",
-        "//source/common/event:dispatcher_lib",
-        "//test/mocks/config:config_mocks",
-        "//test/mocks/event:event_mocks",
-        "//test/mocks/filesystem:filesystem_mocks",
-        "//test/mocks/protobuf:protobuf_mocks",
-        "//test/test_common:environment_lib",
-        "//test/test_common:test_time_lib",
-        "//test/test_common:utility_lib",
-        "@envoy_api//envoy/config/endpoint/v3:pkg_cc_proto",
-        "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
-    ],
-)
-
-envoy_cc_test(
     name = "grpc_mux_impl_test",
     srcs = ["grpc_mux_impl_test.cc"],
     deps = [
