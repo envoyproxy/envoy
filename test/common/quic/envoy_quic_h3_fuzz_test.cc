@@ -185,7 +185,7 @@ public:
     return true;
   };
   std::string GenerateHeaderProtectionMask(absl::string_view) override {
-    return std::string(5, 0);
+    return {5, 0};
   };
   size_t GetMaxPlaintextSize(size_t ciphertext_size) const override { return ciphertext_size; }
   size_t GetCiphertextSize(size_t plaintext_size) const override { return plaintext_size; }
@@ -568,7 +568,7 @@ public:
     return true;
   };
   std::string GenerateHeaderProtectionMask(quic::QuicDataReader*) override {
-    return std::string(5, 0);
+    return {5, 0};
   };
   size_t GetKeySize() const override { return 0; };
   size_t GetNoncePrefixSize() const override { return 0; };
