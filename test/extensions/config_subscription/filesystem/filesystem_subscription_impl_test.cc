@@ -3,7 +3,7 @@
 #include "envoy/config/listener/v3/listener.pb.h"
 #include "envoy/config/listener/v3/listener.pb.validate.h"
 
-#include "test/common/config/filesystem_subscription_test_harness.h"
+#include "test/extensions/config_subscription/filesystem/filesystem_subscription_test_harness.h"
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/filesystem/mocks.h"
 #include "test/test_common/logging.h"
