@@ -29,16 +29,6 @@ public:
   virtual ~HeaderValidator() = default;
 
   using HeaderValueValidationResult = ::Envoy::Http::HeaderValidatorBase::RejectResult;
-  using HeaderEntryValidationResult =
-      ::Envoy::Http::HeaderValidatorBase::HeaderEntryValidationResult;
-  using RequestHeaderMapValidationResult =
-      ::Envoy::Http::HeaderValidatorBase::RequestHeaderMapValidationResult;
-  using ResponseHeaderMapValidationResult =
-      ::Envoy::Http::HeaderValidatorBase::ResponseHeaderMapValidationResult;
-  using ConstRequestHeaderMapValidationResult =
-      ::Envoy::Http::ClientHeaderValidator::ConstRequestHeaderMapValidationResult;
-  using ConstResponseHeaderMapValidationResult =
-      ::Envoy::Http::HeaderValidator::ConstResponseHeaderMapValidationResult;
   /*
    * Validate the :method pseudo header, honoring the restrict_http_methods configuration option.
    */
@@ -52,7 +42,7 @@ public:
   /*
    * Validate any request or response header name.
    */
-  virtual HeaderEntryValidationResult
+  virtual ::Envoy::Http::HeaderValidatorBase::HeaderEntryValidationResult
   validateGenericHeaderName(const ::Envoy::Http::HeaderString& name);
 
   /*
@@ -153,7 +143,7 @@ protected:
   using HeaderValidatorFunction = std::function<HeaderValidator::HeaderValueValidationResult(
       const ::Envoy::Http::HeaderString&)>;
   using HeaderValidatorMap = absl::node_hash_map<absl::string_view, HeaderValidatorFunction>;
-  ::Envoy::Http::HeaderValidator::HeaderEntryValidationResult
+  ::Envoy::Http::HeaderValidatorBase::HeaderEntryValidationResult
   validateGenericRequestHeaderEntry(const ::Envoy::Http::HeaderString& key,
                                     const ::Envoy::Http::HeaderString& value,
                                     const HeaderValidatorMap& protocol_specific_header_validators);
@@ -161,8 +151,8 @@ protected:
   /*
    * Common method for validating request or response trailers.
    */
-  using TrailerValidationResult = ::Envoy::Http::HeaderValidatorBase::TrailerValidationResult;
-  TrailerValidationResult validateTrailers(::Envoy::Http::HeaderMap& trailers);
+  ::Envoy::Http::HeaderValidatorBase::TrailerValidationResult
+  validateTrailers(::Envoy::Http::HeaderMap& trailers);
 
   const envoy::extensions::http::header_validators::envoy_default::v3::HeaderValidatorConfig
       config_;

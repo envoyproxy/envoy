@@ -15,21 +15,24 @@ public:
           config,
       ::Envoy::Http::Protocol protocol, ::Envoy::Http::HeaderValidatorStats& stats);
 
-  HeaderEntryValidationResult validateRequestHeaderEntry(const ::Envoy::Http::HeaderString& key,
-                                                         const ::Envoy::Http::HeaderString& value);
+  ::Envoy::Http::HeaderValidatorBase::HeaderEntryValidationResult
+  validateRequestHeaderEntry(const ::Envoy::Http::HeaderString& key,
+                             const ::Envoy::Http::HeaderString& value);
 
-  HeaderEntryValidationResult validateResponseHeaderEntry(const ::Envoy::Http::HeaderString& key,
-                                                          const ::Envoy::Http::HeaderString& value);
+  ::Envoy::Http::HeaderValidatorBase::HeaderEntryValidationResult
+  validateResponseHeaderEntry(const ::Envoy::Http::HeaderString& key,
+                              const ::Envoy::Http::HeaderString& value);
 
-  RequestHeaderMapValidationResult
+  ::Envoy::Http::HeaderValidatorBase::RequestHeaderMapValidationResult
   validateRequestHeaderMap(::Envoy::Http::RequestHeaderMap& header_map);
 
-  ResponseHeaderMapValidationResult
+  ::Envoy::Http::HeaderValidatorBase::ResponseHeaderMapValidationResult
   validateResponseHeaderMap(::Envoy::Http::ResponseHeaderMap& header_map);
 
-  TrailerValidationResult validateRequestTrailerMap(::Envoy::Http::RequestTrailerMap& trailer_map);
+  ::Envoy::Http::HeaderValidatorBase::TrailerValidationResult
+  validateRequestTrailerMap(::Envoy::Http::RequestTrailerMap& trailer_map);
 
-  TrailerValidationResult
+  ::Envoy::Http::HeaderValidatorBase::TrailerValidationResult
   validateResponseTrailerMap(::Envoy::Http::ResponseTrailerMap& trailer_map);
 
   /*
@@ -47,7 +50,7 @@ public:
    */
   HeaderValueValidationResult validateProtocolHeader(const ::Envoy::Http::HeaderString& value);
 
-  HeaderEntryValidationResult
+  ::Envoy::Http::HeaderValidatorBase::HeaderEntryValidationResult
   validateGenericHeaderName(const ::Envoy::Http::HeaderString& name) override;
 
 private:

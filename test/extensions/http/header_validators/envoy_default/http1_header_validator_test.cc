@@ -52,7 +52,7 @@ TEST_F(Http1HeaderValidatorTest, ValidateTransferEncoding) {
 TEST_F(Http1HeaderValidatorTest, ValidateRequestHeaderEntryEmpty) {
   HeaderString empty{""};
   HeaderString value{"foo"};
-  auto uhv = createH1(empty_config);
+  auto uhv = createH1Client(empty_config);
 
   EXPECT_REJECT_WITH_DETAILS(uhv->validateRequestHeaderEntry(empty, value),
                              UhvResponseCodeDetail::get().EmptyHeaderName);
@@ -139,7 +139,7 @@ TEST_F(Http1HeaderValidatorTest, ValidateRequestHeaderEntryGeneric) {
 TEST_F(Http1HeaderValidatorTest, ValidateResponseHeaderEntryEmpty) {
   HeaderString name{""};
   HeaderString valid{"chunked"};
-  auto uhv = createH1Client(empty_config);
+  auto uhv = createH1(empty_config);
   EXPECT_REJECT_WITH_DETAILS(uhv->validateResponseHeaderEntry(name, valid),
                              UhvResponseCodeDetail::get().EmptyHeaderName);
 }

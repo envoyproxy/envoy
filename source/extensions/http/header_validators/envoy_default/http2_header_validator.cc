@@ -26,8 +26,11 @@ using ::Envoy::Http::HeaderUtility;
 using ::Envoy::Http::LowerCaseString;
 using ::Envoy::Http::Protocol;
 using ::Envoy::Http::UhvResponseCodeDetail;
-using HeaderValidatorFunction1 =
-    HeaderValidator::HeaderValueValidationResult (Http2HeaderValidator::*)(const HeaderString&);
+using HeaderEntryValidationResult = ::Envoy::Http::HeaderValidatorBase::HeaderEntryValidationResult;
+using RequestHeaderMapValidationResult =
+    ::Envoy::Http::HeaderValidatorBase::RequestHeaderMapValidationResult;
+using ResponseHeaderMapValidationResult =
+    ::Envoy::Http::HeaderValidatorBase::ResponseHeaderMapValidationResult;
 
 struct Http2ResponseCodeDetailValues {
   const std::string InvalidTE = "uhv.http2.invalid_te";
@@ -60,13 +63,13 @@ Http2HeaderValidator::Http2HeaderValidator(const HeaderValidatorConfig& config, 
            absl::bind_front(&Http2HeaderValidator::validateContentLengthHeader, this)},
       } {}
 
-::Envoy::Http::HeaderValidator::HeaderEntryValidationResult
+::Envoy::Http::HeaderValidatorBase::HeaderEntryValidationResult
 Http2HeaderValidator::validateRequestHeaderEntry(const HeaderString& key,
                                                  const HeaderString& value) {
   return validateGenericRequestHeaderEntry(key, value, request_header_validator_map_);
 }
 
-::Envoy::Http::HeaderValidator::HeaderEntryValidationResult
+::Envoy::Http::HeaderValidatorBase::HeaderEntryValidationResult
 Http2HeaderValidator::validateResponseHeaderEntry(const HeaderString& key,
                                                   const HeaderString& value) {
   const auto& key_string_view = key.getStringView();
@@ -98,7 +101,7 @@ Http2HeaderValidator::validateResponseHeaderEntry(const HeaderString& key,
   return validateGenericHeaderValue(value);
 }
 
-::Envoy::Http::HeaderValidator::RequestHeaderMapValidationResult
+::Envoy::Http::HeaderValidatorBase::RequestHeaderMapValidationResult
 Http2HeaderValidator::validateRequestHeaderMap(::Envoy::Http::RequestHeaderMap& header_map) {
   static const absl::node_hash_set<absl::string_view> kAllowedPseudoHeadersForConnect = {
       ":method", ":authority"};
@@ -254,7 +257,7 @@ Http2HeaderValidator::validateRequestHeaderMap(::Envoy::Http::RequestHeaderMap& 
   return RequestHeaderMapValidationResult::success();
 }
 
-::Envoy::Http::HeaderValidator::ResponseHeaderMapValidationResult
+::Envoy::Http::HeaderValidatorBase::ResponseHeaderMapValidationResult
 Http2HeaderValidator::validateResponseHeaderMap(::Envoy::Http::ResponseHeaderMap& header_map) {
   static const absl::node_hash_set<absl::string_view> kAllowedPseudoHeaders = {":status"};
   // Step 1: verify that required pseudo headers are present
@@ -348,7 +351,7 @@ Http2HeaderValidator::validateProtocolHeader(const ::Envoy::Http::HeaderString& 
   return validateGenericHeaderValue(value);
 }
 
-::Envoy::Http::HeaderValidator::HeaderEntryValidationResult
+::Envoy::Http::HeaderValidatorBase::HeaderEntryValidationResult
 Http2HeaderValidator::validateGenericHeaderName(const HeaderString& name) {
   // Verify that the header name is valid. This also honors the underscore in
   // header configuration setting.
@@ -425,25 +428,25 @@ Http2HeaderValidator::validateGenericHeaderName(const HeaderString& name) {
   return HeaderEntryValidationResult::success();
 }
 
-HeaderValidator::TrailerValidationResult
+::Envoy::Http::HeaderValidatorBase::TrailerValidationResult
 Http2HeaderValidator::validateRequestTrailerMap(::Envoy::Http::RequestTrailerMap& trailer_map) {
-  TrailerValidationResult result = validateTrailers(trailer_map);
+  auto result = validateTrailers(trailer_map);
   if (!result.ok()) {
     stats_.incMessagingError();
   }
   return result;
 }
 
-HeaderValidator::TrailerValidationResult
+::Envoy::Http::HeaderValidatorBase::TrailerValidationResult
 Http2HeaderValidator::validateResponseTrailerMap(::Envoy::Http::ResponseTrailerMap& trailer_map) {
-  TrailerValidationResult result = validateTrailers(trailer_map);
+  auto result = validateTrailers(trailer_map);
   if (!result.ok()) {
     stats_.incMessagingError();
   }
   return result;
 }
 
-HeaderValidator::RequestHeaderMapValidationResult
+::Envoy::Http::HeaderValidatorBase::RequestHeaderMapValidationResult
 ServerHttp2HeaderValidator::validateRequestHeaderMap(::Envoy::Http::RequestHeaderMap& header_map) {
   auto result = Http2HeaderValidator::validateRequestHeaderMap(header_map);
   if (!result.ok()) {
@@ -458,7 +461,7 @@ ServerHttp2HeaderValidator::validateRequestHeaderMap(::Envoy::Http::RequestHeade
   return result;
 }
 
-HeaderValidator::ConstResponseHeaderMapValidationResult
+::Envoy::Http::HeaderValidator::ConstResponseHeaderMapValidationResult
 ServerHttp2HeaderValidator::validateResponseHeaderMap(
     const ::Envoy::Http::ResponseHeaderMap& header_map) {
   // Check if the response is for the the H/1 UPGRADE and transform it to the H/2 extended CONNECT
@@ -478,7 +481,7 @@ ServerHttp2HeaderValidator::validateResponseHeaderMap(
   return {RejectResult::success(), nullptr};
 }
 
-HeaderValidator::ConstRequestHeaderMapValidationResult
+::Envoy::Http::ClientHeaderValidator::ConstRequestHeaderMapValidationResult
 ClientHttp2HeaderValidator::validateRequestHeaderMap(
     const ::Envoy::Http::RequestHeaderMap& header_map) {
   // TODO(yanavlasov): Add validation of request header before sending them upstream.
@@ -507,7 +510,7 @@ ClientHttp2HeaderValidator::validateRequestHeaderMap(
   return {RejectResult::success(), std::move(modified_headers)};
 }
 
-HeaderValidator::ResponseHeaderMapValidationResult
+::Envoy::Http::HeaderValidatorBase::ResponseHeaderMapValidationResult
 ClientHttp2HeaderValidator::validateResponseHeaderMap(
     ::Envoy::Http::ResponseHeaderMap& header_map) {
   auto result = Http2HeaderValidator::validateResponseHeaderMap(header_map);

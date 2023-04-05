@@ -478,7 +478,7 @@ TEST_F(Http2HeaderValidatorTest, ValidateRequestHeaderGeneric) {
   HeaderString invalid_value;
   setHeaderStringUnvalidated(invalid_value, "hello\nworld");
 
-  auto uhv = createH2BaseUhv(empty_config);
+  auto uhv = createH2ClientUhv(empty_config);
 
   EXPECT_ACCEPT(uhv->validateRequestHeaderEntry(valid_name, valid_value));
   EXPECT_REJECT_WITH_DETAILS(uhv->validateRequestHeaderEntry(invalid_name, valid_value),
@@ -490,7 +490,7 @@ TEST_F(Http2HeaderValidatorTest, ValidateRequestHeaderGeneric) {
 TEST_F(Http2HeaderValidatorTest, ValidateRequestHeaderAllowUnderscores) {
   HeaderString name{"x_foo"};
   HeaderString value{"bar"};
-  auto uhv = createH2BaseUhv(empty_config);
+  auto uhv = createH2ServerUhv(empty_config);
 
   EXPECT_ACCEPT(uhv->validateRequestHeaderEntry(name, value));
 }
@@ -499,7 +499,7 @@ TEST_F(Http2HeaderValidatorTest, ValidateResponseHeaderStatus) {
   HeaderString status{":status"};
   HeaderString valid{"200"};
   HeaderString invalid{"1024"};
-  auto uhv = createH2BaseUhv(empty_config);
+  auto uhv = createH2ClientUhv(empty_config);
 
   EXPECT_ACCEPT(uhv->validateResponseHeaderEntry(status, valid));
   EXPECT_REJECT_WITH_DETAILS(uhv->validateResponseHeaderEntry(status, invalid),
@@ -516,7 +516,7 @@ TEST_F(Http2HeaderValidatorTest, ValidateResponseHeaderGeneric) {
   HeaderString invalid_value;
   setHeaderStringUnvalidated(invalid_value, "hello\nworld");
 
-  auto uhv = createH2BaseUhv(empty_config);
+  auto uhv = createH2ServerUhv(empty_config);
 
   EXPECT_ACCEPT(uhv->validateResponseHeaderEntry(valid_name, valid_value));
   EXPECT_ACCEPT(uhv->validateResponseHeaderEntry(valid_name_underscore, valid_value));

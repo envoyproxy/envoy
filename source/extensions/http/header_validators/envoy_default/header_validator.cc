@@ -164,7 +164,7 @@ HeaderValidator::validateStatusHeader(const HeaderString& value) {
   return HeaderValueValidationResult::success();
 }
 
-::Envoy::Http::HeaderValidator::HeaderEntryValidationResult
+::Envoy::Http::HeaderValidatorBase::HeaderEntryValidationResult
 HeaderValidator::validateGenericHeaderName(const HeaderString& name) {
   // Verify that the header name is valid. This also honors the underscore in
   // header configuration setting.
@@ -182,7 +182,7 @@ HeaderValidator::validateGenericHeaderName(const HeaderString& name) {
   const auto& key_string_view = name.getStringView();
   // This header name is initially invalid if the name is empty.
   if (key_string_view.empty()) {
-    return {HeaderEntryValidationResult::Action::Reject,
+    return {::Envoy::Http::HeaderValidatorBase::HeaderEntryValidationResult::Action::Reject,
             UhvResponseCodeDetail::get().EmptyHeaderName};
   }
 
@@ -201,23 +201,23 @@ HeaderValidator::validateGenericHeaderName(const HeaderString& name) {
   }
 
   if (!is_valid) {
-    return {HeaderEntryValidationResult::Action::Reject,
+    return {::Envoy::Http::HeaderValidatorBase::HeaderEntryValidationResult::Action::Reject,
             UhvResponseCodeDetail::get().InvalidNameCharacters};
   }
 
   if (has_underscore) {
     if (underscore_action == HeaderValidatorConfig::REJECT_REQUEST) {
       stats_.incRequestsRejectedWithUnderscoresInHeaders();
-      return {HeaderEntryValidationResult::Action::Reject,
+      return {::Envoy::Http::HeaderValidatorBase::HeaderEntryValidationResult::Action::Reject,
               UhvResponseCodeDetail::get().InvalidUnderscore};
     } else if (underscore_action == HeaderValidatorConfig::DROP_HEADER) {
       stats_.incDroppedHeadersWithUnderscores();
-      return {HeaderEntryValidationResult::Action::DropHeader,
+      return {::Envoy::Http::HeaderValidatorBase::HeaderEntryValidationResult::Action::DropHeader,
               UhvResponseCodeDetail::get().InvalidUnderscore};
     }
   }
 
-  return HeaderEntryValidationResult::success();
+  return ::Envoy::Http::HeaderValidatorBase::HeaderEntryValidationResult::success();
 }
 
 HeaderValidator::HeaderValueValidationResult
@@ -445,14 +445,14 @@ bool HeaderValidator::hasChunkedTransferEncoding(const HeaderString& value) {
   return false;
 }
 
-::Envoy::Http::HeaderValidator::HeaderEntryValidationResult
+::Envoy::Http::HeaderValidatorBase::HeaderEntryValidationResult
 HeaderValidator::validateGenericRequestHeaderEntry(
     const ::Envoy::Http::HeaderString& key, const ::Envoy::Http::HeaderString& value,
     const HeaderValidatorMap& protocol_specific_header_validators) {
   const auto& key_string_view = key.getStringView();
   if (key_string_view.empty()) {
     // reject empty header names
-    return {HeaderEntryValidationResult::Action::Reject,
+    return {::Envoy::Http::HeaderValidatorBase::HeaderEntryValidationResult::Action::Reject,
             UhvResponseCodeDetail::get().EmptyHeaderName};
   }
 
@@ -477,7 +477,7 @@ HeaderValidator::validateGenericRequestHeaderEntry(
     // header_validator_map contains every known pseudo header. If the header name starts with ":"
     // and we don't have a validator registered in the map, then the header name is an unknown
     // pseudo header.
-    return {HeaderEntryValidationResult::Action::Reject,
+    return {::Envoy::Http::HeaderValidatorBase::HeaderEntryValidationResult::Action::Reject,
             UhvResponseCodeDetail::get().InvalidPseudoHeader};
   }
 
@@ -493,7 +493,7 @@ HeaderValidator::validateGenericRequestHeaderEntry(
 // For H/1 the codec will never produce H/2 pseudo headers and per
 // https://www.rfc-editor.org/rfc/rfc9110#section-6.5 there are no other prohibitions.
 // As a result this common function can cover trailer validation for all protocols.
-HeaderValidator::TrailerValidationResult
+::Envoy::Http::HeaderValidatorBase::TrailerValidationResult
 HeaderValidator::validateTrailers(::Envoy::Http::HeaderMap& trailers) {
   std::string reject_details;
   std::vector<absl::string_view> drop_headers;
@@ -504,7 +504,8 @@ HeaderValidator::validateTrailers(::Envoy::Http::HeaderMap& trailers) {
         const auto& header_value = header_entry.value();
 
         auto entry_name_result = validateGenericHeaderName(header_name);
-        if (entry_name_result.action() == HeaderEntryValidationResult::Action::DropHeader) {
+        if (entry_name_result.action() ==
+            ::Envoy::Http::HeaderValidatorBase::HeaderEntryValidationResult::Action::DropHeader) {
           // drop the header, continue processing the request
           drop_headers.push_back(header_name.getStringView());
         } else if (!entry_name_result) {
@@ -521,14 +522,15 @@ HeaderValidator::validateTrailers(::Envoy::Http::HeaderMap& trailers) {
       });
 
   if (!reject_details.empty()) {
-    return {TrailerValidationResult::Action::Reject, reject_details};
+    return {::Envoy::Http::HeaderValidatorBase::TrailerValidationResult::Action::Reject,
+            reject_details};
   }
 
   for (auto& name : drop_headers) {
     trailers.remove(::Envoy::Http::LowerCaseString(name));
   }
 
-  return TrailerValidationResult::success();
+  return ::Envoy::Http::HeaderValidatorBase::TrailerValidationResult::success();
 }
 
 } // namespace EnvoyDefault

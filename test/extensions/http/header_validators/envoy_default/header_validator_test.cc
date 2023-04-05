@@ -17,7 +17,6 @@ using ::Envoy::Http::HeaderString;
 using ::Envoy::Http::HeaderValidatorStats;
 using ::Envoy::Http::Protocol;
 using ::Envoy::Http::RequestHeaderMap;
-using ::Envoy::Http::ResponseHeaderMap;
 using ::Envoy::Http::UhvResponseCodeDetail;
 
 using HeaderValidatorPtr = std::unique_ptr<HeaderValidator>;

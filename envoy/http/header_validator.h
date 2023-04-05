@@ -84,7 +84,7 @@ public:
  */
 class HeaderValidator : public HeaderValidatorBase {
 public:
-  virtual ~HeaderValidator() = default;
+  ~HeaderValidator() override = default;
 
   /**
    * Validate the entire request header map.
@@ -134,7 +134,7 @@ public:
  */
 class ClientHeaderValidator : public HeaderValidatorBase {
 public:
-  virtual ~ClientHeaderValidator() = default;
+  ~ClientHeaderValidator() override = default;
 
   /**
    * Validate the entire request header map.

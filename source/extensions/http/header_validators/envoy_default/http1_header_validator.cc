@@ -21,6 +21,11 @@ using ::Envoy::Http::LowerCaseString;
 using ::Envoy::Http::Protocol;
 using ::Envoy::Http::RequestHeaderMap;
 using ::Envoy::Http::UhvResponseCodeDetail;
+using HeaderEntryValidationResult = ::Envoy::Http::HeaderValidatorBase::HeaderEntryValidationResult;
+using RequestHeaderMapValidationResult =
+    ::Envoy::Http::HeaderValidatorBase::RequestHeaderMapValidationResult;
+using ResponseHeaderMapValidationResult =
+    ::Envoy::Http::HeaderValidatorBase::ResponseHeaderMapValidationResult;
 
 struct Http1ResponseCodeDetailValues {
   const std::string InvalidTransferEncoding = "uhv.http1.invalid_transfer_encoding";
@@ -53,16 +58,15 @@ Http1HeaderValidator::Http1HeaderValidator(const HeaderValidatorConfig& config, 
           {"content-length", absl::bind_front(&HeaderValidator::validateContentLengthHeader, this)},
       } {}
 
-::Envoy::Http::HeaderValidator::HeaderEntryValidationResult
+::Envoy::Http::HeaderValidatorBase::HeaderEntryValidationResult
 Http1HeaderValidator::validateRequestHeaderEntry(const HeaderString& key,
                                                  const HeaderString& value) {
   // Pseudo headers in HTTP/1.1 are synthesized by the codec from the request line prior to
   // submitting the header map for validation in UHV.
-
   return validateGenericRequestHeaderEntry(key, value, request_header_validator_map_);
 }
 
-::Envoy::Http::HeaderValidator::HeaderEntryValidationResult
+::Envoy::Http::HeaderValidatorBase::HeaderEntryValidationResult
 Http1HeaderValidator::validateResponseHeaderEntry(const HeaderString& key,
                                                   const HeaderString& value) {
   const auto& key_string_view = key.getStringView();
@@ -98,7 +102,7 @@ Http1HeaderValidator::validateResponseHeaderEntry(const HeaderString& key,
   return validateGenericHeaderValue(value);
 }
 
-::Envoy::Http::HeaderValidator::RequestHeaderMapValidationResult
+RequestHeaderMapValidationResult
 Http1HeaderValidator::validateRequestHeaderMap(RequestHeaderMap& header_map) {
   absl::string_view path = header_map.getPathValue();
   absl::string_view host = header_map.getHostValue();
@@ -310,7 +314,7 @@ Http1HeaderValidator::validateRequestHeaderMap(RequestHeaderMap& header_map) {
   return RequestHeaderMapValidationResult::success();
 }
 
-::Envoy::Http::HeaderValidator::ResponseHeaderMapValidationResult
+::Envoy::Http::HeaderValidatorBase::ResponseHeaderMapValidationResult
 Http1HeaderValidator::validateResponseHeaderMap(::Envoy::Http::ResponseHeaderMap& header_map) {
   // Step 1: verify that required pseudo headers are present
   //
@@ -390,12 +394,12 @@ Http1HeaderValidator::validateTransferEncodingHeader(const HeaderString& value) 
   return HeaderValueValidationResult::success();
 }
 
-HeaderValidator::TrailerValidationResult
+::Envoy::Http::HeaderValidatorBase::TrailerValidationResult
 Http1HeaderValidator::validateRequestTrailerMap(::Envoy::Http::RequestTrailerMap& trailer_map) {
   return validateTrailers(trailer_map);
 }
 
-HeaderValidator::TrailerValidationResult
+::Envoy::Http::HeaderValidatorBase::TrailerValidationResult
 Http1HeaderValidator::validateResponseTrailerMap(::Envoy::Http::ResponseTrailerMap& trailer_map) {
   return validateTrailers(trailer_map);
 }

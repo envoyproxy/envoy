@@ -18,7 +18,6 @@ namespace HeaderValidators {
 namespace EnvoyDefault {
 namespace {
 
-using ::Envoy::Http::HeaderValidatorFactory;
 using ::Envoy::Http::Protocol;
 using ::testing::NiceMock;
 
