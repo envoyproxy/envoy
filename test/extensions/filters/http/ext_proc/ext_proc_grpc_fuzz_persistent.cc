@@ -5,6 +5,10 @@ namespace Extensions {
 namespace HttpFilters {
 namespace ExternalProcessing {
 
+using envoy::extensions::filters::http::ext_proc::v3::ProcessingMode;
+using envoy::service::ext_proc::v3::ProcessingRequest;
+using envoy::service::ext_proc::v3::ProcessingResponse;
+
 // Using persistent Envoy and ext_proc test server.
 static std::unique_ptr<ExtProcIntegrationFuzz> fuzzer = nullptr;
 static std::unique_ptr<ExtProcFuzzHelper> fuzz_helper = nullptr;
@@ -100,7 +104,7 @@ DEFINE_PROTO_FUZZER(const test::extensions::filters::http::ext_proc::ExtProcGrpc
   // For fuzz testing we don't care about the response code, only that
   // the stream ended in some graceful manner
   ENVOY_LOG_MISC(trace, "Waiting for response.");
-  if (response->waitForEndStream(std::chrono::milliseconds(200))) {
+  if (response->waitForEndStream(std::chrono::milliseconds(500))) {
     ENVOY_LOG_MISC(trace, "Response received.");
   } else {
     // TODO(ikepolinsky): investigate if there is anyway around this.

@@ -38,10 +38,6 @@ namespace Extensions {
 namespace HttpFilters {
 namespace ExternalProcessing {
 
-using envoy::extensions::filters::http::ext_proc::v3::ProcessingMode;
-using envoy::service::ext_proc::v3::ProcessingRequest;
-using envoy::service::ext_proc::v3::ProcessingResponse;
-
 // The buffer size for the listeners
 static const uint32_t BufferSize = 100000;
 
