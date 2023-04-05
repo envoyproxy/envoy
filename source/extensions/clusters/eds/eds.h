@@ -31,9 +31,9 @@ class EdsClusterImpl
       Envoy::Config::SubscriptionBase<envoy::config::endpoint::v3::ClusterLoadAssignment> {
 public:
   EdsClusterImpl(Server::Configuration::ServerFactoryContext& server_context,
-                 const envoy::config::cluster::v3::Cluster& cluster, Runtime::Loader& runtime,
-                 Server::Configuration::TransportSocketFactoryContextImpl& factory_context,
-                 Stats::ScopeSharedPtr&& stats_scope, bool added_via_api);
+                 const envoy::config::cluster::v3::Cluster& cluster,
+                 ClusterFactoryContext& cluster_context, Runtime::Loader& runtime,
+                 bool added_via_api);
 
   // Upstream::Cluster
   InitializePhase initializePhase() const override { return initialize_phase_; }
@@ -87,7 +87,6 @@ private:
   };
 
   Config::SubscriptionPtr subscription_;
-  Server::Configuration::TransportSocketFactoryContextImpl factory_context_;
   const LocalInfo::LocalInfo& local_info_;
   const std::string cluster_name_;
   std::vector<LocalityWeightsMap> locality_weights_map_;
@@ -103,7 +102,7 @@ private:
   // TODO(adisuissa): Avoid saving the entire cluster load assignment, only the
   // relevant parts of the config for each locality. Note that this field must
   // be set when LEDS is used.
-  absl::optional<envoy::config::endpoint::v3::ClusterLoadAssignment> cluster_load_assignment_;
+  std::unique_ptr<envoy::config::endpoint::v3::ClusterLoadAssignment> cluster_load_assignment_;
 };
 
 using EdsClusterImplSharedPtr = std::shared_ptr<EdsClusterImpl>;
@@ -113,11 +112,10 @@ public:
   EdsClusterFactory() : ClusterFactoryImplBase("envoy.cluster.eds") {}
 
 private:
-  std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr> createClusterImpl(
-      Server::Configuration::ServerFactoryContext& server_context,
-      const envoy::config::cluster::v3::Cluster& cluster, ClusterFactoryContext& context,
-      Server::Configuration::TransportSocketFactoryContextImpl& socket_factory_context,
-      Stats::ScopeSharedPtr&& stats_scope) override;
+  std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr>
+  createClusterImpl(Server::Configuration::ServerFactoryContext& server_context,
+                    const envoy::config::cluster::v3::Cluster& cluster,
+                    ClusterFactoryContext& context) override;
 };
 
 } // namespace Upstream

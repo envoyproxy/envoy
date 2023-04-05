@@ -84,8 +84,8 @@ envoy_cc_fuzz_test(
     corpus = "golang_filter_corpus",
     deps = [
         ":golang_filter_fuzz_proto_cc_proto",
+        "//contrib/golang/common/dso/test:dso_mocks",
         "//contrib/golang/filters/http/source:config",
-        "//contrib/golang/filters/http/test/common/dso:dso_mocks",
         "//source/common/network:address_lib",
         "//test/extensions/filters/http/common/fuzz:http_filter_fuzzer_lib",
         "//test/mocks/http:http_mocks",

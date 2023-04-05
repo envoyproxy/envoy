@@ -26,14 +26,21 @@ variables:
   # A release branch can be either `main` or a `release/v1.x` stable branch
   value: $[or(eq(variables['isMain'], 'true'), eq(variables['isReleaseBranch'], 'true'))]
 
+## Variable settings
+# Caches (tip: append a version suffix while testing caches)
+- name: buildImageCacheVersion
+  value: v0
+- name: dockerBuildCacheVersion
+  value: v0
+
 
 stages:
-# Presubmit
-- ${{ if ne(variables['PostSubmit'], true) }}:
+# Presubmit/default
+- ${{ if ne(variables['Build.DefinitionName'], 'envoy-postsubmit') }}:
   - template: stages.yml
 
 # Postsubmit
-- ${{ if eq(variables['PostSubmit'], true) }}:
+- ${{ if eq(variables['Build.DefinitionName'], 'envoy-postsubmit') }}:
   - template: stages.yml
     parameters:
       buildStageDeps:

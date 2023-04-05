@@ -24,7 +24,7 @@ envoy_cc_library(
     ],
     deps = [
         ":cgo",
-        "//contrib/golang/filters/http/source/common/dso:dso_lib",
+        "//contrib/golang/common/dso:dso_lib",
         "//envoy/http:codes_interface",
         "//envoy/http:filter_interface",
         "//source/common/buffer:watermark_buffer_lib",
@@ -46,7 +46,7 @@ envoy_cc_contrib_extension(
     hdrs = ["config.h"],
     deps = [
         ":golang_filter_lib",
-        "//contrib/golang/filters/http/source/common/dso:dso_lib",
+        "//contrib/golang/common/dso:dso_lib",
         "//envoy/registry",
         "//envoy/server:filter_config_interface",
         "//envoy/server:lifecycle_notifier_interface",
@@ -63,7 +63,7 @@ envoy_cc_library(
         "processor_state.h",
     ],
     deps = [
-        "//contrib/golang/filters/http/source/common/dso:dso_lib",
+        "//contrib/golang/common/dso:dso_lib",
         "//envoy/http:codes_interface",
         "//envoy/http:filter_interface",
         "//source/common/buffer:watermark_buffer_lib",

@@ -33,7 +33,9 @@ namespace ExternalProcessing {
   COUNTER(streams_failed)                                                                          \
   COUNTER(failure_mode_allowed)                                                                    \
   COUNTER(message_timeouts)                                                                        \
-  COUNTER(rejected_header_mutations)
+  COUNTER(rejected_header_mutations)                                                               \
+  COUNTER(override_message_timeout_received)                                                       \
+  COUNTER(override_message_timeout_ignored)
 
 struct ExtProcFilterStats {
   ALL_EXT_PROC_FILTER_STATS(GENERATE_COUNTER_STRUCT)
@@ -68,15 +70,19 @@ private:
 class FilterConfig {
 public:
   FilterConfig(const envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor& config,
-               const std::chrono::milliseconds message_timeout, Stats::Scope& scope,
+               const std::chrono::milliseconds message_timeout,
+               const uint32_t max_message_timeout_ms, Stats::Scope& scope,
                const std::string& stats_prefix)
       : failure_mode_allow_(config.failure_mode_allow()), message_timeout_(message_timeout),
+        max_message_timeout_ms_(max_message_timeout_ms),
         stats_(generateStats(stats_prefix, config.stat_prefix(), scope)),
         processing_mode_(config.processing_mode()), mutation_checker_(config.mutation_rules()) {}
 
   bool failureModeAllow() const { return failure_mode_allow_; }
 
   const std::chrono::milliseconds& messageTimeout() const { return message_timeout_; }
+
+  uint32_t maxMessageTimeout() const { return max_message_timeout_ms_; }
 
   const ExtProcFilterStats& stats() const { return stats_; }
 
@@ -97,6 +103,7 @@ private:
 
   const bool failure_mode_allow_;
   const std::chrono::milliseconds message_timeout_;
+  const uint32_t max_message_timeout_ms_;
 
   ExtProcFilterStats stats_;
   const envoy::extensions::filters::http::ext_proc::v3::ProcessingMode processing_mode_;
@@ -178,6 +185,7 @@ public:
   void onGrpcClose() override;
 
   void onMessageTimeout();
+  void onNewTimeout(const uint32_t message_timeout_ms);
 
   void sendBufferedData(ProcessorState& state, ProcessorState::CallbackState new_state,
                         bool end_stream) {

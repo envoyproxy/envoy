@@ -807,7 +807,7 @@ public:
 
 // Test initialization of subset load balancer with every possible load balancer policy.
 TEST_P(ClusterManagerSubsetInitializationTest, SubsetLoadBalancerInitialization) {
-  const absl::string_view yamlPattern = R"EOF(
+  constexpr absl::string_view yamlPattern = R"EOF(
  static_resources:
   clusters:
   - name: cluster_1

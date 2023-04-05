@@ -660,8 +660,8 @@ TEST_P(ShadowPolicyIntegrationTest, BackedUpConnectionBeforeShadowBegins) {
   EXPECT_EQ(shadow_direct_response->headers().getStatusValue(), "200");
 
   // Two requests were sent over a single connection to cluster_1.
+  test_server_->waitForCounterGe("cluster.cluster_1.upstream_rq_completed", 2);
   EXPECT_EQ(test_server_->counter("cluster.cluster_1.upstream_cx_total")->value(), 1);
-  EXPECT_EQ(test_server_->counter("cluster.cluster_1.upstream_rq_completed")->value(), 2);
   EXPECT_EQ(test_server_->counter("http.config_test.downstream_flow_control_paused_reading_total")
                 ->value(),
             1);

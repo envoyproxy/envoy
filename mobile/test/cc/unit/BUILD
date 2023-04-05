@@ -12,6 +12,7 @@ envoy_cc_test(
         "//library/cc:engine_builder_lib",
         "//library/cc:envoy_engine_cc_lib_no_stamp",
         "@envoy_build_config//:extension_registry",
+        "@envoy_build_config//:test_extensions",
     ],
 )
 

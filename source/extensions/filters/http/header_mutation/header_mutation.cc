@@ -49,12 +49,16 @@ Http::FilterHeadersStatus HeaderMutation::decodeHeaders(Http::RequestHeaderMap& 
 }
 
 Http::FilterHeadersStatus HeaderMutation::encodeHeaders(Http::ResponseHeaderMap& headers, bool) {
-  // The request headers will be set to the downstream stream info before the filter chain is
-  // started. And in the current implementation, the upstream filter chain will reuse the downstream
-  // stream info. So the getRequestHeaders() will never return nullptr no matter the filter is
-  // is used as a downstream or upstream filter.
-  ASSERT(encoder_callbacks_->streamInfo().getRequestHeaders() != nullptr);
-  const auto& request_headers = *encoder_callbacks_->streamInfo().getRequestHeaders();
+  // There is an corner case that the downstream request headers will nullptr when the request is
+  // reset (for example, reset by the stream idle timer) before the request headers are completely
+  // received. The filter chain will be created and the encodeHeaders() will be called but the
+  // downstream request headers will be nullptr.
+  const Http::RequestHeaderMap* downstream_request_headers =
+      encoder_callbacks_->streamInfo().getRequestHeaders();
+  const Http::RequestHeaderMap& request_headers =
+      downstream_request_headers != nullptr
+          ? *downstream_request_headers
+          : *Http::StaticEmptyHeaders::get().request_headers.get();
 
   config_->mutations().mutateResponseHeaders(request_headers, headers,
                                              encoder_callbacks_->streamInfo());

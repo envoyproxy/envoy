@@ -76,6 +76,7 @@ envoy_extension_cc_test(
 
 envoy_extension_cc_test(
     name = "custom_response_integration_test",
+    size = "large",
     srcs = [
         "custom_response_integration_test.cc",
     ],

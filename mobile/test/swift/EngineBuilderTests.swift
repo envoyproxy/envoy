@@ -27,15 +27,6 @@ final class EngineBuilderTests: XCTestCase {
     )
   }
 
-  func testPlatformCertificateValidationAlwaysEnabled() {
-    let bootstrapDebugDescription = EngineBuilder()
-      .bootstrapDebugDescription()
-    XCTAssertTrue(
-      bootstrapDebugDescription
-        .contains("envoy_mobile.cert_validator.platform_bridge_cert_validator")
-    )
-  }
-
   func testMonitoringModeDefaultsToPathMonitor() {
     let builder = EngineBuilder()
     XCTAssertEqual(builder.monitoringMode, .pathMonitor)
@@ -430,6 +421,7 @@ final class EngineBuilderTests: XCTestCase {
     self.waitForExpectations(timeout: 0.01)
   }
 
+#if ENVOY_GOOGLE_GRPC
   func testAddingRtdsAndAdsConfigurationWhenRunningEnvoy() {
     let bootstrapDebugDescription = EngineBuilder()
       .addEngineType(MockEnvoyEngine.self)
@@ -441,15 +433,37 @@ final class EngineBuilderTests: XCTestCase {
     XCTAssertTrue(bootstrapDebugDescription.contains("FAKE_SWIFT_ADDRESS"))
   }
 
+  func testAddingCdsAndAdsConfigurationWhenRunningEnvoy() {
+    let bootstrapDebugDescription = EngineBuilder()
+      .addEngineType(MockEnvoyEngine.self)
+      .addCDSLayer(resourcesLocator: "FAKE_CDS_LOCATOR", timeoutSeconds: 2543)
+      .setAggregatedDiscoveryService(address: "FAKE_SWIFT_ADDRESS", port: 0)
+      .bootstrapDebugDescription()
+    XCTAssertTrue(bootstrapDebugDescription.contains("FAKE_CDS_LOCATOR"))
+    XCTAssertTrue(bootstrapDebugDescription.contains("initial_fetch_timeout { seconds: 2543 }"))
+    XCTAssertTrue(bootstrapDebugDescription.contains("FAKE_SWIFT_ADDRESS"))
+  }
+
+  func testAddingDefaultCdsConfigurationWhenRunningEnvoy() {
+    let bootstrapDebugDescription = EngineBuilder()
+      .addEngineType(MockEnvoyEngine.self)
+      .addCDSLayer()
+      .setAggregatedDiscoveryService(address: "FAKE_SWIFT_ADDRESS", port: 0)
+      .bootstrapDebugDescription()
+    XCTAssertTrue(bootstrapDebugDescription.contains("cds_config {"))
+    XCTAssertTrue(bootstrapDebugDescription.contains("initial_fetch_timeout { seconds: 5 }"))
+  }
+
   func testXDSDefaultValues() {
     // rtds, ads, node_id, node_locality
     let bootstrapDebugDescription = EngineBuilder()
       .addEngineType(MockEnvoyEngine.self)
       .bootstrapDebugDescription()
-    XCTAssertFalse(bootstrapDebugDescription.contains("rtds_layer:"))
-    XCTAssertFalse(bootstrapDebugDescription.contains("ads_config:"))
+    XCTAssertFalse(bootstrapDebugDescription.contains("rtds_layer {"))
+    XCTAssertFalse(bootstrapDebugDescription.contains("cds_config {"))
+    XCTAssertFalse(bootstrapDebugDescription.contains("ads_config {"))
     XCTAssertTrue(bootstrapDebugDescription.contains(#"id: "envoy-mobile""#))
-    XCTAssertFalse(bootstrapDebugDescription.contains("locality:"))
+    XCTAssertFalse(bootstrapDebugDescription.contains("locality {"))
   }
 
   func testCustomNodeID() {
@@ -468,6 +482,7 @@ final class EngineBuilderTests: XCTestCase {
     XCTAssertTrue(bootstrapDebugDescription.contains(#"zone: "SWIFT_ZONE""#))
     XCTAssertTrue(bootstrapDebugDescription.contains(#"sub_zone: "SWIFT_SUB""#))
   }
+#endif
 
   func testAddingKeyValueStoreToConfigurationWhenRunningEnvoy() {
     let expectation = self.expectation(description: "Run called with expected data")

@@ -116,27 +116,6 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "filesystem_subscription_lib",
-    srcs = ["filesystem_subscription_impl.cc"],
-    hdrs = ["filesystem_subscription_impl.h"],
-    deps = [
-        ":decoded_resource_lib",
-        ":watched_directory_lib",
-        "//envoy/config:subscription_interface",
-        "//envoy/event:dispatcher_interface",
-        "//envoy/filesystem:filesystem_interface",
-        "//source/common/common:minimal_logger_lib",
-        "//source/common/common:utility_lib",
-        "//source/common/config:utility_lib",
-        "//source/common/protobuf",
-        "//source/common/protobuf:message_validator_lib",
-        "//source/common/protobuf:utility_lib",
-        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
-        "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
-    ],
-)
-
-envoy_cc_library(
     name = "grpc_stream_lib",
     hdrs = ["grpc_stream.h"],
     deps = [
@@ -211,30 +190,6 @@ envoy_cc_library(
         "//envoy/event:dispatcher_interface",
         "//envoy/grpc:async_client_interface",
         "//source/common/memory:utils_lib",
-        "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
-    ],
-)
-
-envoy_cc_library(
-    name = "http_subscription_lib",
-    srcs = ["http_subscription_impl.cc"],
-    hdrs = ["http_subscription_impl.h"],
-    external_deps = [
-        "http_api_protos",
-    ],
-    deps = [
-        ":api_version_lib",
-        ":decoded_resource_lib",
-        "//envoy/config:subscription_interface",
-        "//envoy/event:dispatcher_interface",
-        "//source/common/buffer:buffer_lib",
-        "//source/common/common:minimal_logger_lib",
-        "//source/common/common:utility_lib",
-        "//source/common/config:utility_lib",
-        "//source/common/http:headers_lib",
-        "//source/common/http:rest_api_fetcher_lib",
-        "//source/common/protobuf",
-        "//source/common/protobuf:utility_lib",
         "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
     ],
 )
@@ -325,9 +280,7 @@ envoy_cc_library(
     hdrs = ["subscription_factory_impl.h"],
     deps = [
         ":custom_config_validators_lib",
-        ":filesystem_subscription_lib",
         ":grpc_subscription_lib",
-        ":http_subscription_lib",
         ":new_grpc_mux_lib",
         ":type_to_endpoint_lib",
         ":utility_lib",

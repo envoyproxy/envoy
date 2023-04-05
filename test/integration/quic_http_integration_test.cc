@@ -921,6 +921,8 @@ TEST_P(QuicHttpIntegrationTest, ResetRequestWithoutAuthorityHeader) {
 }
 
 TEST_P(QuicHttpIntegrationTest, ResetRequestWithInvalidCharacter) {
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.validate_upstream_headers", "false");
+
   initialize();
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -1692,6 +1694,70 @@ TEST_P(QuicHttpIntegrationTest, UsesPreferredAddress) {
     EXPECT_EQ("127.0.0.2", quic_connection_->peer_address().host().ToString());
     test_server_->waitForCounterGe(
         "listener.0.0.0.0_0.quic.connection.num_packets_rx_on_preferred_address", 2u);
+  }
+}
+
+TEST_P(QuicHttpIntegrationTest, UsesPreferredAddressDualStack) {
+  if (!(TestEnvironment::shouldRunTestForIpVersion(Network::Address::IpVersion::v6) &&
+        version_ == Network::Address::IpVersion::v4)) {
+    return;
+  }
+  // Only run this test with a v4 client if the test environment supports dual stack socket.
+  autonomous_upstream_ = true;
+  config_helper_.addConfigModifier([=](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+    auto* listen_address = bootstrap.mutable_static_resources()
+                               ->mutable_listeners(0)
+                               ->mutable_address()
+                               ->mutable_socket_address();
+    // Change listening address to Any. As long as the test environment support IPv6 use [::] as
+    // listening address.
+    listen_address->set_address("::");
+    listen_address->set_ipv4_compat(true);
+    auto* preferred_address_config = bootstrap.mutable_static_resources()
+                                         ->mutable_listeners(0)
+                                         ->mutable_udp_listener_config()
+                                         ->mutable_quic_options()
+                                         ->mutable_server_preferred_address_config();
+    // Configure a loopback interface as the server's preferred address.
+    preferred_address_config->set_name("quic.server_preferred_address.fixed");
+    envoy::extensions::quic::server_preferred_address::v3::FixedServerPreferredAddressConfig
+        server_preferred_address;
+    server_preferred_address.set_ipv4_address("127.0.0.2");
+    preferred_address_config->mutable_typed_config()->PackFrom(server_preferred_address);
+  });
+
+  initialize();
+  quic::QuicTagVector connection_options{quic::kRVCM, quic::kSPAD};
+  dynamic_cast<Quic::PersistentQuicInfoImpl&>(*quic_connection_persistent_info_)
+      .quic_config_.SetConnectionOptionsToSend(connection_options);
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  EnvoyQuicClientSession* quic_session =
+      static_cast<EnvoyQuicClientSession*>(codec_client_->connection());
+  EXPECT_EQ(Network::Test::getLoopbackAddressString(version_),
+            quic_connection_->peer_address().host().ToString());
+  ASSERT_TRUE(quic_session->config()->HasReceivedIPv4AlternateServerAddress());
+  ASSERT_TRUE(quic_connection_->waitForHandshakeDone());
+  EXPECT_TRUE(quic_connection_->IsValidatingServerPreferredAddress());
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "GET"},
+      {":path", "/test/long/url"},
+      {":authority", "sni.lyft.com"},
+      {":scheme", "http"},
+      {AutonomousStream::RESPONSE_SIZE_BYTES, std::to_string(1024 * 1024)}};
+  IntegrationStreamDecoderPtr response =
+      codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  EXPECT_TRUE(response->waitForEndStream());
+  ASSERT_TRUE(response->complete());
+
+  EXPECT_EQ("127.0.0.2", quic_connection_->peer_address().host().ToString());
+  if (Runtime::runtimeFeatureEnabled("envoy.restart_features.udp_read_normalize_addresses")) {
+    test_server_->waitForCounterGe(
+        "listener.[__]_0.quic.connection.num_packets_rx_on_preferred_address", 2u);
+  } else {
+    EXPECT_EQ(
+        0u,
+        test_server_->counter("listener.[__]_0.quic.connection.num_packets_rx_on_preferred_address")
+            ->value());
   }
 }
 

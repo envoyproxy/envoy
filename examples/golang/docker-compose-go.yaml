@@ -4,7 +4,7 @@ services:
       context: ../shared/build
     command: >
       bash -c "
-      bazel build  //examples/golang/simple:simple.so
+      bazel build --experimental_repository_downloader_retries=2 --disk_cache=/tmp/disk_cache --repository_cache=/tmp/repository_cache --experimental_repository_cache_hardlinks //examples/golang/simple:simple.so
       && cp -a ./bazel-bin/examples/golang/simple/simple.so /output"
     entrypoint: /source/examples/shared/build/build-entrypoint.sh
     environment:

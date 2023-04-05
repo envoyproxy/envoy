@@ -325,6 +325,25 @@ public:
 };
 
 /**
+ * Codec event callbacks for a given HTTP Stream.
+ * This can be used to tightly couple an entity with a streams low-level events.
+ */
+class CodecEventCallbacks {
+public:
+  virtual ~CodecEventCallbacks() = default;
+  /**
+   * Called when the the underlying codec finishes encoding.
+   */
+  virtual void onCodecEncodeComplete() PURE;
+
+  /**
+   * Called when the underlying codec has a low level reset.
+   * e.g. Envoy serialized the response but it has not been flushed.
+   */
+  virtual void onCodecLowLevelReset() PURE;
+};
+
+/**
  * An HTTP stream (request, response, and push).
  */
 class Stream : public StreamResetHandler {
@@ -340,6 +359,15 @@ public:
    * @param callbacks supplies the callbacks to remove.
    */
   virtual void removeCallbacks(StreamCallbacks& callbacks) PURE;
+
+  /**
+   * Register the codec event callbacks for this stream.
+   * The stream can only have a single registered callback at a time.
+   * @param codec_callbacks the codec callbacks for this stream.
+   * @return CodecEventCallbacks* the prior registered codec callbacks.
+   */
+  virtual CodecEventCallbacks*
+  registerCodecEventCallbacks(CodecEventCallbacks* codec_callbacks) PURE;
 
   /**
    * Enable/disable further data from this stream.

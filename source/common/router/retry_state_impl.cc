@@ -70,13 +70,13 @@ RetryStateImpl::RetryStateImpl(const RetryPolicy& route_policy,
                                Upstream::ResourcePriority priority, bool auto_configured_for_http3)
     : cluster_(cluster), vcluster_(vcluster), route_stats_context_(route_stats_context),
       runtime_(runtime), random_(random), dispatcher_(dispatcher), time_source_(time_source),
-      retry_on_(route_policy.retryOn()), retries_remaining_(route_policy.numRetries()),
-      priority_(priority), retry_host_predicates_(route_policy.retryHostPredicates()),
+      retry_host_predicates_(route_policy.retryHostPredicates()),
       retry_priority_(route_policy.retryPriority()),
       retriable_status_codes_(route_policy.retriableStatusCodes()),
       retriable_headers_(route_policy.retriableHeaders()),
       reset_headers_(route_policy.resetHeaders()),
-      reset_max_interval_(route_policy.resetMaxInterval()),
+      reset_max_interval_(route_policy.resetMaxInterval()), retry_on_(route_policy.retryOn()),
+      retries_remaining_(route_policy.numRetries()), priority_(priority),
       auto_configured_for_http3_(auto_configured_for_http3) {
   if ((cluster.features() & Upstream::ClusterInfo::Features::HTTP3) &&
       Http::Utility::isSafeRequest(request_headers)) {

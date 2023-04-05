@@ -86,6 +86,7 @@
                         enableDrainPostDnsRefresh:(BOOL)enableDrainPostDnsRefresh
                     enforceTrustChainVerification:(BOOL)enforceTrustChainVerification
                                         forceIPv6:(BOOL)forceIPv6
+              enablePlatformCertificateValidation:(BOOL)enablePlatformCertificateValidation
     h2ConnectionKeepaliveIdleIntervalMilliseconds:
         (UInt32)h2ConnectionKeepaliveIdleIntervalMilliseconds
               h2ConnectionKeepaliveTimeoutSeconds:(UInt32)h2ConnectionKeepaliveTimeoutSeconds
@@ -122,6 +123,9 @@
                                        nodeRegion:(NSString *)nodeRegion
                                          nodeZone:(NSString *)nodeZone
                                       nodeSubZone:(NSString *)nodeSubZone
+                              cdsResourcesLocator:(NSString *)cdsResourcesLocator
+                                cdsTimeoutSeconds:(UInt32)cdsTimeoutSeconds
+                                        enableCds:(BOOL)enableCds
 
 {
   self = [super init];
@@ -148,6 +152,7 @@
   self.enableDrainPostDnsRefresh = enableDrainPostDnsRefresh;
   self.enforceTrustChainVerification = enforceTrustChainVerification;
   self.forceIPv6 = forceIPv6;
+  self.enablePlatformCertificateValidation = enablePlatformCertificateValidation;
   self.h2ConnectionKeepaliveIdleIntervalMilliseconds =
       h2ConnectionKeepaliveIdleIntervalMilliseconds;
   self.h2ConnectionKeepaliveTimeoutSeconds = h2ConnectionKeepaliveTimeoutSeconds;
@@ -176,6 +181,9 @@
   self.nodeRegion = nodeRegion;
   self.nodeZone = nodeZone;
   self.nodeSubZone = nodeSubZone;
+  self.cdsResourcesLocator = cdsResourcesLocator;
+  self.cdsTimeoutSeconds = cdsTimeoutSeconds;
+  self.enableCds = enableCds;
   self.bootstrapPointer = 0;
 
   return self;
@@ -244,7 +252,7 @@
   for (NSString *cluster in self.virtualClusters) {
     builder.addVirtualCluster([cluster toCXXString]);
   }
-  builder.enablePlatformCertificatesValidation(true);
+  builder.enablePlatformCertificatesValidation(self.enablePlatformCertificateValidation);
   builder.enableDnsCache(self.enableDNSCache, self.dnsCacheSaveIntervalSeconds);
 
 #ifdef ENVOY_MOBILE_STATS_REPORTING
@@ -259,6 +267,8 @@
   builder.addGrpcStatsDomain([self.grpcStatsDomain toCXXString]);
   builder.addStatsFlushSeconds(self.statsFlushSeconds);
 #endif
+
+#ifdef ENVOY_GOOGLE_GRPC
   if (self.nodeRegion != nil) {
     builder.setNodeLocality([self.nodeRegion toCXXString], [self.nodeZone toCXXString],
                             [self.nodeSubZone toCXXString]);
@@ -274,6 +284,10 @@
         [self.adsAddress toCXXString], self.adsPort, [self.adsJwtToken toCXXString],
         self.adsJwtTokenLifetimeSeconds, [self.adsSslRootCerts toCXXString]);
   }
+  if (self.enableCds) {
+    builder.addCdsLayer([self.cdsResourcesLocator toCXXString], self.cdsTimeoutSeconds);
+  }
+#endif
 #ifdef ENVOY_ADMIN_FUNCTIONALITY
   builder.enableAdminInterface(self.adminInterfaceEnabled);
 #endif

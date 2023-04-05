@@ -174,7 +174,8 @@ void Utility::extractCommonAccessLogProperties(
   }
   if (!stream_info.downstreamAddressProvider().requestedServerName().empty()) {
     common_access_log.mutable_tls_properties()->set_tls_sni_hostname(
-        std::string(stream_info.downstreamAddressProvider().requestedServerName()));
+        MessageUtil::sanitizeUtf8String(
+            stream_info.downstreamAddressProvider().requestedServerName()));
   }
   if (!stream_info.downstreamAddressProvider().ja3Hash().empty()) {
     common_access_log.mutable_tls_properties()->set_ja3_fingerprint(
@@ -188,18 +189,20 @@ void Utility::extractCommonAccessLogProperties(
     auto* local_properties = tls_properties->mutable_local_certificate_properties();
     for (const auto& uri_san : downstream_ssl_connection->uriSanLocalCertificate()) {
       auto* local_san = local_properties->add_subject_alt_name();
-      local_san->set_uri(uri_san);
+      local_san->set_uri(MessageUtil::sanitizeUtf8String(uri_san));
     }
-    local_properties->set_subject(downstream_ssl_connection->subjectLocalCertificate());
+    local_properties->set_subject(
+        MessageUtil::sanitizeUtf8String(downstream_ssl_connection->subjectLocalCertificate()));
 
     auto* peer_properties = tls_properties->mutable_peer_certificate_properties();
     for (const auto& uri_san : downstream_ssl_connection->uriSanPeerCertificate()) {
       auto* peer_san = peer_properties->add_subject_alt_name();
-      peer_san->set_uri(uri_san);
+      peer_san->set_uri(MessageUtil::sanitizeUtf8String(uri_san));
     }
 
     peer_properties->set_subject(downstream_ssl_connection->subjectPeerCertificate());
-    tls_properties->set_tls_session_id(downstream_ssl_connection->sessionId());
+    tls_properties->set_tls_session_id(
+        MessageUtil::sanitizeUtf8String(downstream_ssl_connection->sessionId()));
     tls_properties->set_tls_version(
         tlsVersionStringToEnum(downstream_ssl_connection->tlsVersion()));
 
@@ -324,6 +327,15 @@ void Utility::extractCommonAccessLogProperties(
   // Set stream unique id from the stream info.
   if (auto provider = stream_info.getStreamIdProvider(); provider.has_value()) {
     common_access_log.set_stream_id(std::string(provider->toStringView().value_or("")));
+  }
+
+  if (const auto& bytes_meter = stream_info.getDownstreamBytesMeter(); bytes_meter != nullptr) {
+    common_access_log.set_downstream_wire_bytes_sent(bytes_meter->wireBytesSent());
+    common_access_log.set_downstream_wire_bytes_received(bytes_meter->wireBytesReceived());
+  }
+  if (const auto& bytes_meter = stream_info.getUpstreamBytesMeter(); bytes_meter != nullptr) {
+    common_access_log.set_upstream_wire_bytes_sent(bytes_meter->wireBytesSent());
+    common_access_log.set_upstream_wire_bytes_received(bytes_meter->wireBytesReceived());
   }
 }
 

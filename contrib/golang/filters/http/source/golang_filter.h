@@ -13,7 +13,7 @@
 #include "source/common/http/utility.h"
 
 #include "contrib/envoy/extensions/filters/http/golang/v3alpha/golang.pb.h"
-#include "contrib/golang/filters/http/source/common/dso/dso.h"
+#include "contrib/golang/common/dso/dso.h"
 #include "contrib/golang/filters/http/source/processor_state.h"
 
 namespace Envoy {
@@ -27,7 +27,7 @@ namespace Golang {
 class FilterConfig : Logger::Loggable<Logger::Id::http> {
 public:
   FilterConfig(const envoy::extensions::filters::http::golang::v3alpha::Config& proto_config,
-               Dso::DsoPtr dso_lib);
+               Dso::HttpFilterDsoPtr dso_lib);
   // TODO: delete config in Go
   virtual ~FilterConfig() = default;
 
@@ -41,7 +41,7 @@ private:
   const std::string so_id_;
   const std::string so_path_;
   const ProtobufWkt::Any plugin_config_;
-  Dso::DsoPtr dso_lib_;
+  Dso::HttpFilterDsoPtr dso_lib_;
   uint64_t config_id_{0};
 };
 
@@ -106,7 +106,7 @@ class Filter : public Http::StreamFilter,
                Logger::Loggable<Logger::Id::http>,
                public AccessLog::Instance {
 public:
-  explicit Filter(FilterConfigSharedPtr config, Dso::DsoPtr dynamic_lib)
+  explicit Filter(FilterConfigSharedPtr config, Dso::HttpFilterDsoPtr dynamic_lib)
       : config_(config), dynamic_lib_(dynamic_lib), decoding_state_(*this), encoding_state_(*this) {
   }
 
@@ -164,6 +164,7 @@ public:
   CAPIStatus setTrailer(absl::string_view key, absl::string_view value);
   CAPIStatus getStringValue(int id, GoString* value_str);
   CAPIStatus getIntegerValue(int id, uint64_t* value);
+  CAPIStatus log(uint32_t level, absl::string_view message);
 
 private:
   ProcessorState& getProcessorState();
@@ -189,7 +190,7 @@ private:
                               Grpc::Status::GrpcStatus grpc_status, absl::string_view details);
 
   const FilterConfigSharedPtr config_;
-  Dso::DsoPtr dynamic_lib_;
+  Dso::HttpFilterDsoPtr dynamic_lib_;
 
   Http::RequestOrResponseHeaderMap* headers_ ABSL_GUARDED_BY(mutex_){nullptr};
   Http::HeaderMap* trailers_ ABSL_GUARDED_BY(mutex_){nullptr};

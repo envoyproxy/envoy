@@ -406,20 +406,20 @@ Http::RequestDecoder& FakeHttpConnection::newStream(Http::ResponseEncoder& encod
 }
 
 void FakeHttpConnection::onGoAway(Http::GoAwayErrorCode code) {
-  ASSERT(type_ >= Http::CodecType::HTTP2);
+  ASSERT(type_ != Http::CodecType::HTTP1);
   // Usually indicates connection level errors, no operations are needed since
   // the connection will be closed soon.
   ENVOY_LOG(info, "FakeHttpConnection receives GOAWAY: ", static_cast<int>(code));
 }
 
 void FakeHttpConnection::encodeGoAway() {
-  ASSERT(type_ >= Http::CodecType::HTTP2);
+  ASSERT(type_ != Http::CodecType::HTTP1);
 
   postToConnectionThread([this]() { codec_->goAway(); });
 }
 
 void FakeHttpConnection::updateConcurrentStreams(uint64_t max_streams) {
-  ASSERT(type_ >= Http::CodecType::HTTP2);
+  ASSERT(type_ != Http::CodecType::HTTP1);
 
   if (type_ == Http::CodecType::HTTP2) {
     postToConnectionThread([this, max_streams]() {
@@ -441,7 +441,7 @@ void FakeHttpConnection::updateConcurrentStreams(uint64_t max_streams) {
 }
 
 void FakeHttpConnection::encodeProtocolError() {
-  ASSERT(type_ >= Http::CodecType::HTTP2);
+  ASSERT(type_ != Http::CodecType::HTTP1);
 
   Http::Http2::ServerConnectionImpl* codec =
       dynamic_cast<Http::Http2::ServerConnectionImpl*>(codec_.get());
@@ -872,9 +872,9 @@ void FakeUpstream::FakeListenSocketFactory::doFinalPreWorkerInit() {
 FakeRawConnection::~FakeRawConnection() {
   // If the filter was already deleted, it means the shared_connection_ was too, so don't try to
   // access it.
-  if (auto filter = read_filter_.lock(); filter != nullptr) {
+  if (read_filter_ != nullptr) {
     EXPECT_TRUE(shared_connection_.executeOnDispatcher(
-        [filter = std::move(filter)](Network::Connection& connection) {
+        [filter = std::move(read_filter_)](Network::Connection& connection) {
           connection.removeReadFilter(filter);
         }));
   }
@@ -882,14 +882,13 @@ FakeRawConnection::~FakeRawConnection() {
 
 void FakeRawConnection::initialize() {
   FakeConnectionBase::initialize();
-  Network::ReadFilterSharedPtr filter{new ReadFilter(*this)};
-  read_filter_ = filter;
+  read_filter_ = std::make_shared<ReadFilter>(*this);
   if (!shared_connection_.connected()) {
     ENVOY_LOG(warn, "FakeRawConnection::initialize: network connection is already disconnected");
     return;
   }
   ASSERT(shared_connection_.dispatcher().isThreadSafe());
-  shared_connection_.connection().addReadFilter(filter);
+  shared_connection_.connection().addReadFilter(read_filter_);
 }
 
 AssertionResult FakeRawConnection::waitForData(uint64_t num_bytes, std::string* data,

@@ -32,7 +32,9 @@ absl::string_view referGoString(void* str) {
   return absl::string_view(goStr->p, goStr->n); // NOLINT(modernize-return-braced-init-list)
 }
 
+#ifdef __cplusplus
 extern "C" {
+#endif
 
 CAPIStatus envoyGoFilterHandlerWrapper(void* r,
                                        std::function<CAPIStatus(std::shared_ptr<Filter>&)> f) {
@@ -151,6 +153,14 @@ CAPIStatus envoyGoFilterHttpGetIntegerValue(void* r, int id, void* value) {
   });
 }
 
+CAPIStatus envoyGoFilterHttpLog(void* r, uint32_t level, void* message) {
+  return envoyGoFilterHandlerWrapper(
+      r, [level, message](std::shared_ptr<Filter>& filter) -> CAPIStatus {
+        auto mesg = referGoString(message);
+        return filter->log(level, mesg);
+      });
+}
+
 void envoyGoFilterHttpFinalize(void* r, int reason) {
   UNREFERENCED_PARAMETER(reason);
   // req is used by go, so need to use raw memory and then it is safe to release at the gc finalize
@@ -158,7 +168,10 @@ void envoyGoFilterHttpFinalize(void* r, int reason) {
   auto req = reinterpret_cast<httpRequestInternal*>(r);
   delete req;
 }
+
+#ifdef __cplusplus
 }
+#endif
 
 } // namespace Golang
 } // namespace HttpFilters

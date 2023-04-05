@@ -11,6 +11,7 @@ build --define=admin_functionality=disabled
 build --define envoy_mobile_listener=disabled
 build --define=library_autolink=disabled
 build --define=envoy_mobile_swift_cxx_interop=enabled
+build --define=envoy_enable_http_datagrams=disabled
 build --experimental_inmemory_dotd_files
 build --experimental_inmemory_jdeps_files
 build --features=debug_prefix_map_pwd_is_dot
@@ -139,17 +140,17 @@ build:coverage --instrumentation_filter="//library/common[/:]"
 #############################################################################
 build:remote-ci-common --config=remote
 build:remote-ci-common --google_default_credentials=false
+build:remote-ci-common --remote_cache=grpcs://envoy.cluster.engflow.com
 build:remote-ci-common --remote_executor=grpcs://envoy.cluster.engflow.com
 build:remote-ci-common --bes_backend=grpcs://envoy.cluster.engflow.com/
 build:remote-ci-common --bes_results_url=https://envoy.cluster.engflow.com/invocation/
-build:remote-ci-common --bes_lifecycle_events
-build:remote-ci-common --bes_upload_mode=fully_async
+build:remote-ci-common --experimental_credential_helper=%workspace%/bazel/engflow-bazel-credential-helper.sh
 build:remote-ci-common --jobs=40
 build:remote-ci-common --verbose_failures
 build:remote-ci-common --spawn_strategy=remote,sandboxed,local
-# Avoid hanging if the remote side closes the connection without a TCP RST. Only
-# sends a keepalive if we don't receive any messages (server updates every 60s).
-build:remote-ci-common --grpc_keepalive_time=61s
+build:remote-ci-common --grpc_keepalive_time=30s
+build:remote-ci-common --remote_timeout=3600s
+build:remote-ci-common --bes_timeout=3600s
 #############################################################################
 # remote-ci-linux: These options are linux-only using GCC by default
 #############################################################################
@@ -157,7 +158,6 @@ build:remote-ci-common --grpc_keepalive_time=61s
 build:remote-ci-linux --define=EXECUTOR=remote
 build:remote-ci-linux --disk_cache=
 build:remote-ci-linux --incompatible_strict_action_env=true
-build:remote-ci-linux --remote_timeout=600
 # GCC toolchain options
 build:remote-ci-linux --action_env=BAZEL_DO_NOT_DETECT_CPP_TOOLCHAIN=1
 build:remote-ci-linux --crosstool_top=//third_party/rbe_configs/cc:toolchain

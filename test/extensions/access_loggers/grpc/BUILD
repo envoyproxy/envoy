@@ -75,6 +75,7 @@ envoy_extension_cc_test(
 
 envoy_extension_cc_test(
     name = "http_grpc_access_log_integration_test",
+    size = "large",
     srcs = ["http_grpc_access_log_integration_test.cc"],
     extension_names = ["envoy.access_loggers.http_grpc"],
     deps = [
@@ -106,6 +107,7 @@ envoy_extension_cc_test(
 
 envoy_extension_cc_test(
     name = "tcp_grpc_access_log_integration_test",
+    size = "large",
     srcs = ["tcp_grpc_access_log_integration_test.cc"],
     extension_names = ["envoy.access_loggers.tcp_grpc"],
     deps = [

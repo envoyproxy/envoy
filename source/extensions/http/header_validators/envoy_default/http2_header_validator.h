@@ -45,6 +45,11 @@ public:
    */
   HeaderValueValidationResult validateAuthorityHeader(const ::Envoy::Http::HeaderString& value);
 
+  /*
+   * Validate the :protocol header.
+   */
+  HeaderValueValidationResult validateProtocolHeader(const ::Envoy::Http::HeaderString& value);
+
   HeaderEntryValidationResult
   validateGenericHeaderName(const ::Envoy::Http::HeaderString& name) override;
 
