@@ -75,9 +75,9 @@ steps:
       BAZEL_BUILD_EXTRA_OPTIONS: "${{ parameters.bazelBuildExtraOptions }}"
       BAZEL_REMOTE_CACHE: $(LocalBuildCache)
       ${{ if eq(variables['Build.Reason'], 'PullRequest') }}:
-        BAZEL_REMOTE_INSTANCE: "instances/$(System.PullRequest.TargetBranch)"
+        BAZEL_REMOTE_INSTANCE_BRANCH: "$(System.PullRequest.TargetBranch)"
       ${{ if ne(variables['Build.Reason'], 'PullRequest') }}:
-        BAZEL_REMOTE_INSTANCE: "instances/$(Build.SourceBranchName)"
+        BAZEL_REMOTE_INSTANCE_BRANCH: "$(Build.SourceBranchName)"
   displayName: "Run CI script ${{ parameters.ciTarget }}"
 
 - bash: |
