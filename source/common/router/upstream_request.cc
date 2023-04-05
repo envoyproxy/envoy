@@ -205,7 +205,6 @@ void UpstreamRequest::cleanUp() {
     }
   }
 
-  stream_info_.setStreamState(StreamInfo::StreamState::Ended);
   stream_info_.onRequestComplete();
   upstreamLog();
 
