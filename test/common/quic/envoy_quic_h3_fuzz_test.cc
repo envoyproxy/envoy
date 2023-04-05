@@ -63,11 +63,11 @@ public:
     }
     switch (h3frame.frame_case()) {
     case H3Frame::kData: {
-      const auto &f = h3frame.data();
+      const auto& f = h3frame.data();
       return buildRawFrame(dw, Type::Data, f.data());
     }
     case H3Frame::kHeaders: {
-      const auto &f = h3frame.headers();
+      const auto& f = h3frame.headers();
       spdy::Http2HeaderBlock headers;
       for (auto hdr : f.headers().headers()) {
         headers.AppendValueOrAddHeader(hdr.key(), hdr.value());
@@ -75,31 +75,31 @@ public:
       return buildRawFrame(dw, Type::Headers, encodeHeaders(headers));
     }
     case H3Frame::kCancelPush: {
-      const auto &f = h3frame.cancel_push();
+      const auto& f = h3frame.cancel_push();
       return buildVarIntFrame(dw, Type::CancelPush, f.push_id());
     }
     case H3Frame::kSettings: {
-      const auto &f = h3frame.settings();
+      const auto& f = h3frame.settings();
       std::vector<std::pair<uint64_t, uint64_t>> values;
-      for (auto &setting : f.settings()) {
+      for (auto& setting : f.settings()) {
         values.push_back(std::make_pair<uint64_t, uint64_t>(setting.identifier(), setting.value()));
       }
       return buildSettingsFrame(dw, values);
     }
     case H3Frame::kPushPromise: {
-      const auto &f = h3frame.push_promise();
+      const auto& f = h3frame.push_promise();
       uint64_t push_id = f.push_id();
       spdy::Http2HeaderBlock headers;
-      for (auto &hdr : f.headers().headers())
+      for (auto& hdr : f.headers().headers())
         headers.AppendValueOrAddHeader(hdr.key(), hdr.value());
       return buildPushPromiseFrame(dw, push_id, encodeHeaders(headers));
     }
     case H3Frame::kGoAway: {
-      const auto &f = h3frame.go_away();
+      const auto& f = h3frame.go_away();
       return buildVarIntFrame(dw, Type::GoAway, f.push_id());
     }
     case H3Frame::kMaxPushId: {
-      const auto &f = h3frame.max_push_id();
+      const auto& f = h3frame.max_push_id();
       return buildVarIntFrame(dw, Type::MaxPushId, f.push_id());
     }
     default:
@@ -233,7 +233,7 @@ public:
   void reset() {
     idx_ = 0;
     packet_number_ = quic::QuicPacketNumber(0);
-    for (unsigned long & quic_packet_size : quic_packet_sizes) {
+    for (unsigned long& quic_packet_size : quic_packet_sizes) {
       quic_packet_size = 0;
     }
   }
@@ -267,7 +267,7 @@ private:
       PUSH(quic::QuicPaddingFrame(padding));
     } break;
     case QuicFrame::kStream: {
-      const auto &stream = frame.stream();
+      const auto& stream = frame.stream();
       size_t len = 0;
       bool unidirectional = stream.unidirectional();
       uint32_t type = stream.type();
@@ -275,7 +275,7 @@ private:
       bool fin = stream.fin();
       uint64_t offset = clampU64(stream.offset());
       if (stream.has_h3frame()) {
-        const auto &f = stream.h3frame();
+        const auto& f = stream.h3frame();
         H3Packetizer h3packetizer;
         len = h3packetizer.serialize(unidirectional, type, id, f);
         if (len == 0) {
@@ -291,11 +291,11 @@ private:
       PUSH(quic::QuicStreamFrame(id, fin, offset, h3_packet, len));
     } break;
     case QuicFrame::kHandshakeDone: {
-      const auto &f = frame.handshake_done();
+      const auto& f = frame.handshake_done();
       PUSH(quic::QuicHandshakeDoneFrame(f.control_frame_id()));
     } break;
     case QuicFrame::kCrypto: {
-      const auto &f = frame.crypto();
+      const auto& f = frame.crypto();
       uint16_t len = std::min(f.data().size(), sizeof(h3_packet));
       memcpy(h3_packet, f.data().data(), len);
       crypto_frame = std::make_unique<quic::QuicCryptoFrame>(
@@ -303,12 +303,12 @@ private:
       PUSH(crypto_frame.get());
     } break;
     case QuicFrame::kAck: {
-      const auto &f = frame.ack();
+      const auto& f = frame.ack();
       auto largest_acked = quic::QuicPacketNumber(clampU64(f.largest_acked()));
       ack_frame.largest_acked = largest_acked;
       ack_frame.packets.Add(largest_acked);
       if (f.has_ecn_counters()) {
-        const auto &c = f.ecn_counters();
+        const auto& c = f.ecn_counters();
         ack_frame.ecn_counters =
             quic::QuicEcnCounts(clampU64(c.ect0()), clampU64(c.ect1()), clampU64(c.ce()));
       }
@@ -322,11 +322,11 @@ private:
       return;
     } break;
     case QuicFrame::kPing: {
-      const auto &f = frame.ping();
+      const auto& f = frame.ping();
       PUSH(quic::QuicPingFrame(f.control_frame_id()));
     } break;
     case QuicFrame::kRstStream: {
-      const auto &f = frame.rst_stream();
+      const auto& f = frame.rst_stream();
       quic::QuicRstStreamErrorCode error_code =
           static_cast<quic::QuicRstStreamErrorCode>(f.error_code());
       reset_stream_frame = std::make_unique<quic::QuicRstStreamFrame>(
@@ -334,7 +334,7 @@ private:
       PUSH(reset_stream_frame.get());
     } break;
     case QuicFrame::kConnectionClose: {
-      const auto &f = frame.connection_close();
+      const auto& f = frame.connection_close();
       quic::QuicErrorCode error_code = toErrorCode(f.error_code());
       quic::QuicIetfTransportErrorCodes ietf_error =
           static_cast<quic::QuicIetfTransportErrorCodes>(clampU64(f.ietf_error()));
@@ -348,16 +348,16 @@ private:
       return;
     } break;
     case QuicFrame::kWindowUpdate: {
-      const auto &f = frame.window_update();
-      PUSH(quic::QuicWindowUpdateFrame(f.control_frame_id(), f.stream_id(),
-                                       clampU64(f.max_data())));
+      const auto& f = frame.window_update();
+      PUSH(
+          quic::QuicWindowUpdateFrame(f.control_frame_id(), f.stream_id(), clampU64(f.max_data())));
     } break;
     case QuicFrame::kBlocked: {
-      const auto &f = frame.blocked();
+      const auto& f = frame.blocked();
       PUSH(quic::QuicBlockedFrame(f.control_frame_id(), f.stream_id(), clampU64(f.offset())));
     } break;
     case QuicFrame::kNewConnectionId: {
-      const auto &f = frame.new_connection_id();
+      const auto& f = frame.new_connection_id();
       new_connection_id_frame.control_frame_id = f.control_frame_id();
       new_connection_id_frame.connection_id = toConnectionId(f.connection_id());
       new_connection_id_frame.stateless_reset_token =
@@ -370,37 +370,37 @@ private:
       return;
     } break;
     case QuicFrame::kMaxStreams: {
-      const auto &f = frame.max_streams();
+      const auto& f = frame.max_streams();
       PUSH(quic::QuicMaxStreamsFrame(f.control_frame_id(), f.stream_count(), f.unidirectional()));
     } break;
     case QuicFrame::kStreamsBlocked: {
-      const auto &f = frame.streams_blocked();
+      const auto& f = frame.streams_blocked();
       PUSH(quic::QuicStreamsBlockedFrame(f.control_frame_id(), f.stream_count(),
                                          f.unidirectional()));
     } break;
     case QuicFrame::kPathResponse: {
-      const auto &f = frame.path_response();
+      const auto& f = frame.path_response();
       PUSH(quic::QuicPathResponseFrame(f.control_frame_id(), toPathFrameBuffer(f.data())));
     } break;
     case QuicFrame::kPathChallenge: {
-      const auto &f = frame.path_challenge();
+      const auto& f = frame.path_challenge();
       PUSH(quic::QuicPathChallengeFrame(f.control_frame_id(), toPathFrameBuffer(f.data())));
     } break;
     case QuicFrame::kStopSending: {
-      const auto &f = frame.stop_sending();
+      const auto& f = frame.stop_sending();
       quic::QuicRstStreamErrorCode error_code =
           static_cast<quic::QuicRstStreamErrorCode>(f.error_code());
       PUSH(quic::QuicStopSendingFrame(f.control_frame_id(), f.stream_id(), error_code));
     } break;
     case QuicFrame::kMessageFrame: {
-      const auto &f = frame.message_frame();
+      const auto& f = frame.message_frame();
       size_t len = std::min(f.data().size(), sizeof(h3_packet));
       memcpy(h3_packet, f.data().data(), len);
       message_frame = std::make_unique<quic::QuicMessageFrame>(h3_packet, len);
       PUSH(message_frame.get());
     } break;
     case QuicFrame::kNewToken: {
-      const auto &f = frame.new_token();
+      const auto& f = frame.new_token();
       size_t len = std::min(f.token().size(), sizeof(h3_packet));
       memcpy(h3_packet, f.token().data(), len);
       absl::string_view token(h3_packet, len);
@@ -408,7 +408,7 @@ private:
       PUSH(new_token.get());
     } break;
     case QuicFrame::kAckFrequency: {
-      const auto &f = frame.ack_frequency();
+      const auto& f = frame.ack_frequency();
       auto delta = quic::QuicTime::Delta::FromMilliseconds(clampU64(f.milliseconds()));
       ack_frequency = std::make_unique<quic::QuicAckFrequencyFrame>(
           f.control_frame_id(), clampU64(f.sequence_number()), clampU64(f.packet_tolerance()),
@@ -431,7 +431,8 @@ private:
 #undef PUSH
 
   static quic::QuicConnectionId toConnectionId(const std::string& data) {
-    uint8_t size = std::min(static_cast<uint8_t>(data.size()), quic::kQuicDefaultConnectionIdLength);
+    uint8_t size =
+        std::min(static_cast<uint8_t>(data.size()), quic::kQuicDefaultConnectionIdLength);
     return {data.data(), size};
   }
 
@@ -579,9 +580,7 @@ public:
   }
 };
 
-envoy::config::core::v3::Http3ProtocolOptions http3Settings() {
-  return {};
-}
+envoy::config::core::v3::Http3ProtocolOptions http3Settings() { return {}; }
 
 QuicDispatcherStats generateStats(Stats::Scope& store) {
   return {QUIC_DISPATCHER_STATS(POOL_COUNTER_PREFIX(store, "quic.dispatcher"))};
