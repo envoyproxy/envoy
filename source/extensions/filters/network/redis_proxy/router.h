@@ -66,6 +66,9 @@ public:
    * @return a handle to the connection pool.
    */
   virtual RouteSharedPtr upstreamPool(std::string& key) PURE;
+  
+  virtual void setReadFilterCallback(Network::ReadFilterCallbacks* callbacks) PURE;
+
 };
 
 using RouterPtr = std::unique_ptr<Router>;

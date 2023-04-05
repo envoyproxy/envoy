@@ -154,6 +154,9 @@ envoy_extension_cc_test(
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/extensions/filters/network/redis_proxy/v3:pkg_cc_proto",
         "@envoy_api//envoy/type/v3:pkg_cc_proto",
+        "//test/mocks/network:network_mocks",
+        "//test/mocks/network:connection_mocks",
+        "//source/common/router:string_accessor_lib",
     ],
 )
 

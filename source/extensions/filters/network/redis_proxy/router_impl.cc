@@ -1,7 +1,10 @@
 #include "source/extensions/filters/network/redis_proxy/router_impl.h"
 
+#include "source/common/formatter/substitution_formatter.h"
 #include "envoy/extensions/filters/network/redis_proxy/v3/redis_proxy.pb.h"
 #include "envoy/type/v3/percent.pb.h"
+#include "source/common/http/header_map_impl.h"
+#include "iostream"
 
 namespace Envoy {
 namespace Extensions {
@@ -42,7 +45,7 @@ Prefix::Prefix(
     const envoy::extensions::filters::network::redis_proxy::v3::RedisProxy::PrefixRoutes::Route
         route,
     Upstreams& upstreams, Runtime::Loader& runtime)
-    : prefix_(route.prefix()), remove_prefix_(route.remove_prefix()),
+    : prefix_(route.prefix()), key_prefix_(route.key_prefix_formatter()), remove_prefix_(route.remove_prefix()),
       upstream_(upstreams.at(route.cluster())) {
   for (auto const& mirror_policy : route.request_mirror_policy()) {
     mirror_policies_.emplace_back(std::make_shared<MirrorPolicyImpl>(
@@ -85,6 +88,17 @@ RouteSharedPtr PrefixRoutes::upstreamPool(std::string& key) {
   if (value != nullptr) {
     if (value->removePrefix()) {
       key.erase(0, value->prefix().length());
+    }
+    if (!value->keyPrefix().empty()) {
+      auto providers = Formatter::SubstitutionFormatParser::parse(value->keyPrefix());
+
+      auto formatted_key_prefix = providers[0]->formatValue(*Http::StaticEmptyHeaders::get().request_headers,
+                             *Http::StaticEmptyHeaders::get().response_headers,
+                             *Http::StaticEmptyHeaders::get().response_trailers, callbacks_->connection().streamInfo(),
+                             absl::string_view());
+      if(formatted_key_prefix.has_string_value()) {
+        key =  formatted_key_prefix.string_value() + key;
+      }
     }
     return value;
   }
