@@ -21,6 +21,7 @@ envoy_cc_fuzz_test(
 
 envoy_cc_test(
     name = "original_dst_integration_test",
+    size = "large",
     srcs = [
         "original_dst_integration_test.cc",
     ],

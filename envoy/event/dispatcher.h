@@ -29,6 +29,8 @@
 #include "envoy/stream_info/stream_info.h"
 #include "envoy/thread/thread.h"
 
+#include "absl/functional/any_invocable.h"
+
 namespace Envoy {
 namespace Event {
 
@@ -51,7 +53,7 @@ using DispatcherStatsPtr = std::unique_ptr<DispatcherStats>;
 /**
  * Callback invoked when a dispatcher post() runs.
  */
-using PostCb = std::function<void()>;
+using PostCb = absl::AnyInvocable<void()>;
 
 using PostCbSharedPtr = std::shared_ptr<PostCb>;
 

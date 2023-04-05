@@ -21,6 +21,13 @@ check() {
     "$@" || handle_failure
 }
 
+check_not() {
+    echo "     check" "$@" ...
+    # see https://github.com/koalaman/shellcheck/issues/1679
+    # shellcheck disable=SC2119
+    "$@" && handle_failure
+}
+
 export BACKGROUND_PID="?"
 run_in_background_saving_pid() {
     echo "     backgrounding:" "$@" ...
@@ -79,6 +86,23 @@ disableHeapCheck () {
 enableHeapCheck () {
     HEAPCHECK=${SAVED_HEAPCHECK}
 }
+
+# After starting an Envoy, it will eventually write the admin.port file, and
+# eventually start listening on it. This blocks on the file appearing, and for
+# the envoy to respond with "LIVE" on the admin port. It then echoes the admin
+# port for use in future queries.
+wait_for_admin_returning_admin_address() {
+  admin_address_file="$1"
+  ready=""
+  admin_address=""
+  while [ "$ready" != "LIVE" ]; do
+    sleep 1
+    admin_address=$(cat "$admin_address_file")
+    ready=$(curl "$admin_address/ready")
+  done
+  echo "$admin_address"
+}
+
 
 # Scrapes a stat value from an an admin port.
 scrape_stat() {

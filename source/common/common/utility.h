@@ -57,7 +57,7 @@ public:
    * @param time_source time keeping source.
    * @return std::string representing the GMT/UTC time of a TimeSource based on the format string.
    */
-  std::string now(TimeSource& time_source);
+  std::string now(TimeSource& time_source) const;
 
   /**
    * @return std::string the format string used.

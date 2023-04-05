@@ -85,6 +85,8 @@ http_filters:
   typed_config:
     "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
   )EOF";
+  // Force a simulated time system.
+  Http::MockStreamDecoderFilterCallbacks decoder_callbacks;
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
                                      date_provider_, route_config_provider_manager_,
                                      scoped_routes_config_provider_manager_, tracer_manager_,
@@ -98,7 +100,6 @@ http_filters:
       .WillOnce(Return()); // MissingConfigFilter (only once) and router
   config.createFilterChain(manager);
 
-  Http::MockStreamDecoderFilterCallbacks decoder_callbacks;
   NiceMock<StreamInfo::MockStreamInfo> stream_info;
   EXPECT_CALL(decoder_callbacks, streamInfo()).WillRepeatedly(ReturnRef(stream_info));
   EXPECT_CALL(decoder_callbacks, sendLocalReply(Http::Code::InternalServerError, _, _, _, _))

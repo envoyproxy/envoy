@@ -96,7 +96,7 @@ public:
     return impl_.listenForSignal(signal_num, std::move(cb));
   }
 
-  void post(std::function<void()> callback) override { impl_.post(std::move(callback)); }
+  void post(Event::PostCb callback) override { impl_.post(std::move(callback)); }
 
   void deleteInDispatcherThread(DispatcherThreadDeletableConstPtr deletable) override {
     impl_.deleteInDispatcherThread(std::move(deletable));

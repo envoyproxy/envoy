@@ -18,6 +18,7 @@
 #include "test/mocks/server/options.h"
 #include "test/mocks/thread_local/mocks.h"
 #include "test/test_common/registry.h"
+#include "test/test_common/simulated_time_system.h"
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
@@ -31,7 +32,6 @@ using testing::ByMove;
 using testing::DoAll;
 using testing::FloatNear;
 using testing::Invoke;
-using testing::InvokeArgument;
 using testing::NiceMock;
 using testing::Pointee;
 using testing::Property;
@@ -627,7 +627,7 @@ TEST_F(OverloadManagerImplTest, AdjustScaleFactor) {
 
   manager->start();
 
-  EXPECT_CALL(mock_dispatcher, post).WillOnce(InvokeArgument<0>());
+  EXPECT_CALL(mock_dispatcher, post).WillOnce([](Event::PostCb cb) { cb(); });
   // The scaled trigger has range [0.5, 1.0] so 0.6 should map to a scale value of 0.2, which means
   // a timer scale factor of 0.8 (1 - 0.2).
   EXPECT_CALL(*mock_scaled_timer_manager,
@@ -841,6 +841,36 @@ TEST_F(OverloadManagerImplTest, ProactiveResourceAllocateAndDeallocateResourceTe
   manager->stop();
 }
 
+class OverloadManagerSimulatedTimeTest : public OverloadManagerImplTest,
+                                         public Envoy::Event::TestUsingSimulatedTime {};
+
+TEST_F(OverloadManagerSimulatedTimeTest, RefreshLoopDelay) {
+  setDispatcherExpectation();
+  auto manager(createOverloadManager(kRegularStateConfig));
+  manager->start();
+
+  simTime().advanceTimeWait(Envoy::Seconds(1));
+
+  timer_cb_();
+
+  // Check the first reading
+  const std::vector<uint64_t> first_reading =
+      stats_.histogramValues("overload.refresh_interval_delay", false);
+  EXPECT_EQ(first_reading.size(), 1);
+  EXPECT_EQ(first_reading[0], 1000);
+
+  simTime().advanceTimeWait(Envoy::Seconds(2));
+
+  timer_cb_();
+
+  // Check the second reading
+  const std::vector<uint64_t> second_reading =
+      stats_.histogramValues("overload.refresh_interval_delay", false);
+  EXPECT_EQ(second_reading.size(), 2);
+  EXPECT_EQ(second_reading[1], 2000);
+
+  manager->stop();
+}
 } // namespace
 } // namespace Server
 } // namespace Envoy

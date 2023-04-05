@@ -15,8 +15,6 @@
 #include "source/common/router/upstream_codec_filter.h"
 #include "source/common/watchdog/abort_action_config.h"
 #include "source/extensions/clusters/dynamic_forward_proxy/cluster.h"
-#include "source/extensions/clusters/logical_dns/logical_dns_cluster.h"
-#include "source/extensions/clusters/static/static_cluster.h"
 #include "source/extensions/compression/brotli/decompressor/config.h"
 #include "source/extensions/compression/gzip/decompressor/config.h"
 #include "source/extensions/early_data/default_early_data_policy.h"
@@ -33,13 +31,10 @@
 #include "source/extensions/path/match/uri_template/config.h"
 #include "source/extensions/path/rewrite/uri_template/config.h"
 #include "source/extensions/request_id/uuid/config.h"
-#include "source/extensions/stat_sinks/metrics_service/config.h"
-#include "source/extensions/stat_sinks/statsd/config.h"
 #include "source/extensions/transport_sockets/http_11_proxy/config.h"
 #include "source/extensions/transport_sockets/raw_buffer/config.h"
 #include "source/extensions/transport_sockets/tls/cert_validator/default_validator.h"
 #include "source/extensions/transport_sockets/tls/config.h"
-#include "source/extensions/udp_packet_writer/default/config.h"
 #include "source/extensions/upstreams/http/generic/config.h"
 
 #ifdef ENVOY_MOBILE_ENABLE_LISTENER
@@ -53,17 +48,22 @@
 #include "source/extensions/quic/connection_id_generator/envoy_deterministic_connection_id_generator_config.h"
 #include "source/extensions/quic/crypto_stream/envoy_quic_crypto_server_stream.h"
 #include "source/extensions/quic/proof_source/envoy_quic_proof_source_factory_impl.h"
+#include "source/extensions/udp_packet_writer/default/config.h"
 #endif
 #include "source/common/quic/quic_transport_socket_factory.h"
 #endif
 
+#ifdef ENVOY_MOBILE_STATS_REPORTING
+#include "source/extensions/clusters/logical_dns/logical_dns_cluster.h"
+#include "source/extensions/stat_sinks/metrics_service/config.h"
+#include "source/extensions/stat_sinks/statsd/config.h"
+#endif
+
 #include "extension_registry_platform_additions.h"
 #include "library/common/extensions/cert_validator/platform_bridge/config.h"
-#include "library/common/extensions/filters/http/assertion/config.h"
 #include "library/common/extensions/filters/http/local_error/config.h"
 #include "library/common/extensions/filters/http/network_configuration/config.h"
 #include "library/common/extensions/filters/http/platform_bridge/config.h"
-#include "library/common/extensions/filters/http/route_cache_reset/config.h"
 #include "library/common/extensions/filters/http/socket_tag/config.h"
 #include "library/common/extensions/key_value/platform/config.h"
 #include "library/common/extensions/listener_managers/api_listener_manager/api_listener_manager.h"
@@ -82,12 +82,9 @@ void ExtensionRegistry::registerFactories() {
   // This is the original IP detection code which ideally E-M could skip.
   Extensions::Http::OriginalIPDetection::Xff::forceRegisterXffIPDetectionFactory();
 
-  // TODO(alyssar) verify with Lyft that we can move this to be a test-only filter.
-  Extensions::HttpFilters::Assertion::forceRegisterAssertionFilterFactory();
-  // TODO(alyssar) verify with Lyft that we can move this to be a test-only filter.
+  // TODO(alyssar) verify with Lyft that we can move this to be a test-only and
+  // figure out how to build into test apps.
   Extensions::HttpFilters::BufferFilter::forceRegisterBufferFilterFactory();
-  // TODO(alyssawilk) verify with Lyft we can move this to be a test-only filter.
-  Extensions::HttpFilters::RouteCacheReset::forceRegisterRouteCacheResetFilterFactory();
 
   // This is the default cluster used by Envoy mobile to establish connections upstream.
   Extensions::Clusters::DynamicForwardProxy::forceRegisterClusterFactory();
@@ -129,8 +126,6 @@ void ExtensionRegistry::registerFactories() {
       forceRegisterHttpConnectionManagerFilterConfigFactory();
   // This works with the connectivity manager to allow retries across network interfaces.
   Extensions::Retry::Options::forceRegisterNetworkConfigurationRetryOptionsPredicateFactory();
-  // TODO(alyssawilk) move to the listener build.
-  Extensions::TransportSockets::RawBuffer::forceRegisterDownstreamRawBufferSocketFactory();
   // This is the default certificate validator, still compiled by default but hopefully soon to be
   // deprecated in production by iOS and Android platform validators.
   Extensions::TransportSockets::Tls::forceRegisterDefaultCertValidatorFactory();
@@ -167,11 +162,9 @@ void ExtensionRegistry::registerFactories() {
   Http::Matching::forceRegisterHttpResponseHeadersDataInputFactory();
   Http::Matching::forceRegisterHttpResponseTrailersDataInputFactory();
 
-  // Envoy Mobile uses the GetAddrInfo resolver for DNS lookups by default.
+  // Envoy Mobile uses the GetAddrInfo resolver for DNS lookups on android by default.
+  // This could be compiled out for iOS.
   Network::forceRegisterGetAddrInfoDnsResolverFactory();
-
-  // TODO(alyssawilk) looks like this is only needed for H3 downstream. Test and remove.
-  Network::forceRegisterUdpDefaultWriterFactoryFactory();
 
   // This is Envoy's lightweight listener manager which lets E-M avoid the 1M
   // hit of compiling in downstream code.
@@ -181,16 +174,17 @@ void ExtensionRegistry::registerFactories() {
   // Mobile compiles out watchdog support.
   Watchdog::forceRegisterAbortActionFactory();
 
-  // These are facties required for stats reporting. TODO(alyssawilk) allow compile out.
+#ifdef ENVOY_MOBILE_STATS_REPORTING
   Network::Address::forceRegisterIpResolver();
   Upstream::forceRegisterLogicalDnsClusterFactory();
-  Upstream::forceRegisterStaticClusterFactory();
   Extensions::StatSinks::MetricsService::forceRegisterMetricsServiceSinkFactory();
   Extensions::StatSinks::Statsd::forceRegisterStatsdSinkFactory();
+#endif
 
 #ifdef ENVOY_MOBILE_ENABLE_LISTENER
   // These are downstream factories required if Envoy Mobile is compiled with
   // proxy functionality.
+  Extensions::TransportSockets::RawBuffer::forceRegisterDownstreamRawBufferSocketFactory();
   Server::forceRegisterConnectionHandlerFactoryImpl();
   Server::forceRegisterDefaultListenerManagerFactoryImpl();
   Server::FilterChain::forceRegisterFilterChainNameActionFactory();
@@ -201,6 +195,7 @@ void ExtensionRegistry::registerFactories() {
 #ifdef ENVOY_MOBILE_ENABLE_LISTENER
   // These are QUIC downstream factories required if Envoy Mobile is compiled with
   // proxy functionality and QUIC support.
+  Network::forceRegisterUdpDefaultWriterFactoryFactory();
   Server::forceRegisterConnectionHandlerFactoryImpl();
   Quic::forceRegisterQuicHttpServerConnectionFactoryImpl();
   Quic::forceRegisterQuicServerTransportSocketConfigFactory();

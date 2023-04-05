@@ -42,11 +42,24 @@ public:
   //
   // Upstream and downstream protocols may be changed via the input vectors.
   // Address combinations are propagated from TestEnvironment::getIpVersionsForTest()
-  static std::vector<HttpProtocolTestParams> getProtocolTestParams(
-      const std::vector<Http::CodecType>& downstream_protocols = {Http::CodecType::HTTP1,
-                                                                  Http::CodecType::HTTP2},
-      const std::vector<Http::CodecType>& upstream_protocols = {Http::CodecType::HTTP1,
-                                                                Http::CodecType::HTTP2});
+  static std::vector<HttpProtocolTestParams>
+  getProtocolTestParams(const std::vector<Http::CodecType>& downstream_protocols =
+                            {
+                                Http::CodecType::HTTP1,
+                                Http::CodecType::HTTP2,
+                                Http::CodecType::HTTP3,
+                            },
+                        const std::vector<Http::CodecType>& upstream_protocols = {
+                            Http::CodecType::HTTP1,
+                            Http::CodecType::HTTP2,
+                            Http::CodecType::HTTP3,
+                        });
+
+  static std::vector<HttpProtocolTestParams> getProtocolTestParamsWithoutHTTP3() {
+    return getProtocolTestParams(
+        /*downstream_protocols = */ {Http::CodecType::HTTP1, Http::CodecType::HTTP2},
+        /*upstream_protocols = */ {Http::CodecType::HTTP1, Http::CodecType::HTTP2});
+  }
 
   // Allows pretty printed test names of the form
   // FooTestCase.BarInstance/IPv4_Http2Downstream_HttpUpstream
@@ -104,11 +117,18 @@ public:
                                   : "AllowReentrantFilterLocalReply");
   }
 
-  static std::vector<std::tuple<HttpProtocolTestParams, bool, bool>> getDefaultTestParams(
-      const std::vector<Http::CodecType>& downstream_protocols = {Http::CodecType::HTTP1,
-                                                                  Http::CodecType::HTTP2},
-      const std::vector<Http::CodecType>& upstream_protocols = {Http::CodecType::HTTP1,
-                                                                Http::CodecType::HTTP2}) {
+  static std::vector<std::tuple<HttpProtocolTestParams, bool, bool>>
+  getDefaultTestParams(const std::vector<Http::CodecType>& downstream_protocols =
+                           {
+                               Http::CodecType::HTTP1,
+                               Http::CodecType::HTTP2,
+                               Http::CodecType::HTTP3,
+                           },
+                       const std::vector<Http::CodecType>& upstream_protocols = {
+                           Http::CodecType::HTTP1,
+                           Http::CodecType::HTTP2,
+                           Http::CodecType::HTTP3,
+                       }) {
     std::vector<std::tuple<HttpProtocolTestParams, bool, bool>> ret;
     std::vector<HttpProtocolTestParams> protocol_defaults =
         HttpProtocolIntegrationTest::getProtocolTestParams(downstream_protocols,

@@ -410,7 +410,7 @@ scope_key_builder:
   // Helper function which pushes an update to given RDS subscription, the start(_) of the
   // subscription must have been called.
   void pushRdsConfig(const std::vector<std::string>& route_config_names, const std::string& version,
-                     const absl::string_view override_config_tmpl = "") {
+                     const fmt::format_string<const std::string&>& override_config_tmpl = "") {
     constexpr absl::string_view default_route_config_tmpl = R"EOF(
       name: {}
       virtual_hosts:
@@ -422,7 +422,8 @@ scope_key_builder:
 )EOF";
 
     fmt::format_string<const std::string&> route_config_tmpl =
-        override_config_tmpl.empty() ? default_route_config_tmpl : override_config_tmpl;
+        fmt::basic_string_view<char>(override_config_tmpl).size() != 0 ? override_config_tmpl
+                                                                       : default_route_config_tmpl;
     for (const std::string& name : route_config_names) {
       const auto route_config =
           TestUtility::parseYaml<envoy::config::route::v3::RouteConfiguration>(
@@ -1677,7 +1678,7 @@ TEST_F(ScopedRdsTest, DanglingSubscriptionOnDemandUpdate) {
   std::function<void(bool)> route_config_updated_cb = [](bool) {};
   Event::PostCb temp_post_cb;
   EXPECT_CALL(server_factory_context_.dispatcher_, post(_))
-      .WillOnce(testing::SaveArg<0>(&temp_post_cb));
+      .WillOnce([&temp_post_cb](Event::PostCb cb) { temp_post_cb = std::move(cb); });
   std::shared_ptr<ScopeKey> scope_key =
       getScopedRdsProvider()->config<ScopedConfigImpl>()->computeScopeKey(
           TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}});

@@ -1255,13 +1255,19 @@ TEST_P(ConnectionImplTest, WriteWithWatermarks) {
         return {-1, SOCKET_ERROR_AGAIN};
       }));
 
-  EXPECT_CALL(os_sys_calls, writev(_, _, _))
-      .WillOnce(Invoke([&](os_fd_t, const iovec*, int) -> Api::SysCallSizeResult {
+  EXPECT_CALL(os_sys_calls, recv(_, _, _, _))
+      .WillRepeatedly(Invoke([&](os_fd_t, void*, size_t, int) -> Api::SysCallSizeResult {
+        return {-1, SOCKET_ERROR_AGAIN};
+      }));
+
+  EXPECT_CALL(os_sys_calls, send(_, _, _, _))
+      .WillOnce(Invoke([&](os_fd_t, void*, size_t, int) -> Api::SysCallSizeResult {
         dispatcher_->exit();
         // Return to default os_sys_calls implementation
         os_calls.reset();
         return {-1, SOCKET_ERROR_AGAIN};
       }));
+
   // The write() call on the connection will buffer enough data to bring the connection above the
   // high watermark and as the data will not flush it should not return below the watermark.
   EXPECT_CALL(client_callbacks_, onAboveWriteBufferHighWatermark());
@@ -1342,13 +1348,13 @@ TEST_P(ConnectionImplTest, WatermarkFuzzing) {
     // drain |bytes_to_flush| before having writev syscall fail with EAGAIN
     EXPECT_CALL(*client_write_buffer_, move(_))
         .WillOnce(Invoke(client_write_buffer_, &MockWatermarkBuffer::baseMove));
-    EXPECT_CALL(os_sys_calls, writev(_, _, _))
-        .WillOnce(Invoke([&](os_fd_t, const iovec*, int) -> Api::SysCallSizeResult {
+    EXPECT_CALL(os_sys_calls, send(_, _, _, _))
+        .WillOnce(Invoke([&](os_fd_t, void*, size_t, int) -> Api::SysCallSizeResult {
           client_write_buffer_->drain(bytes_to_flush);
           dispatcher_->exit();
           return {-1, SOCKET_ERROR_AGAIN};
         }))
-        .WillRepeatedly(Invoke([&](os_fd_t, const iovec*, int) -> Api::SysCallSizeResult {
+        .WillRepeatedly(Invoke([&](os_fd_t, void*, size_t, int) -> Api::SysCallSizeResult {
           return {-1, SOCKET_ERROR_AGAIN};
         }));
 
@@ -3141,7 +3147,7 @@ TEST_P(ClientConnectionWithCustomRawBufferSocketTest, TransportSocketCallbacks) 
   filter_state.setData("test-filter-state", filter_state_object,
                        StreamInfo::FilterState::StateType::ReadOnly,
                        StreamInfo::FilterState::LifeSpan::Connection,
-                       StreamInfo::FilterState::StreamSharing::SharedWithUpstreamConnection);
+                       StreamInfo::StreamSharingMayImpactPooling::SharedWithUpstreamConnection);
   transport_socket_options_ = TransportSocketOptionsUtility::fromFilterState(filter_state);
   setUpBasicConnection();
 

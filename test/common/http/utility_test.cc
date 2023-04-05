@@ -637,7 +637,7 @@ TEST(HttpUtility, ValidateStreamErrorConfigurationForHttp1) {
 
 TEST(HttpUtility, UseBalsaParser) {
   envoy::config::core::v3::Http1ProtocolOptions http1_options;
-  Protobuf::BoolValue hcm_value;
+  ProtobufWkt::BoolValue hcm_value;
   NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor;
 
   // If Http1ProtocolOptions::use_balsa_parser has no value set, then behavior is controlled by the
@@ -1837,6 +1837,20 @@ TEST(Utility, isSafeRequest) {
 
   request_headers.removeMethod();
   EXPECT_FALSE(Utility::isSafeRequest(request_headers));
+};
+
+TEST(Utility, isValidRefererValue) {
+  EXPECT_TRUE(Utility::isValidRefererValue(absl::string_view("http://www.example.com")));
+  EXPECT_TRUE(
+      Utility::isValidRefererValue(absl::string_view("http://www.example.com/foo?bar=xyz")));
+  EXPECT_TRUE(Utility::isValidRefererValue(absl::string_view("/resource.html")));
+  EXPECT_TRUE(Utility::isValidRefererValue(absl::string_view("resource.html")));
+  EXPECT_TRUE(Utility::isValidRefererValue(absl::string_view("foo/bar/resource.html")));
+  EXPECT_FALSE(Utility::isValidRefererValue(absl::string_view("mal  formed/path/resource.html")));
+  EXPECT_FALSE(Utility::isValidRefererValue(absl::string_view("htp:/www.malformed.com")));
+  EXPECT_FALSE(
+      Utility::isValidRefererValue(absl::string_view("http://www.example.com/?foo=bar#fragment")));
+  EXPECT_FALSE(Utility::isValidRefererValue(absl::string_view("foo=bar#fragment")));
 };
 
 } // namespace Http

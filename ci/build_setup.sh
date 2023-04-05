@@ -17,6 +17,8 @@ export PPROF_PATH=/thirdparty_build/bin/pprof
     export ENVOY_BUILD_ARCH
 }
 
+export ENVOY_BUILD_FILTER_EXAMPLE="${ENVOY_BUILD_FILTER_EXAMPLE:-0}"
+
 read -ra BAZEL_BUILD_EXTRA_OPTIONS <<< "${BAZEL_BUILD_EXTRA_OPTIONS:-}"
 read -ra BAZEL_EXTRA_TEST_OPTIONS <<< "${BAZEL_EXTRA_TEST_OPTIONS:-}"
 read -ra BAZEL_OPTIONS <<< "${BAZEL_OPTIONS:-}"
@@ -126,10 +128,10 @@ export ENVOY_DELIVERY_DIR="${ENVOY_BUILD_DIR}"/source/exe
 mkdir -p "${ENVOY_DELIVERY_DIR}"
 
 # This is where we copy the coverage report to.
-export ENVOY_COVERAGE_ARTIFACT="${ENVOY_BUILD_DIR}"/generated/coverage.tar.gz
+export ENVOY_COVERAGE_ARTIFACT="${ENVOY_BUILD_DIR}/generated/coverage.tar.zst"
 
 # This is where we copy the fuzz coverage report to.
-export ENVOY_FUZZ_COVERAGE_ARTIFACT="${ENVOY_BUILD_DIR}"/generated/fuzz_coverage.tar.gz
+export ENVOY_FUZZ_COVERAGE_ARTIFACT="${ENVOY_BUILD_DIR}/generated/fuzz_coverage.tar.zst"
 
 # This is where we dump failed test logs for CI collection.
 export ENVOY_FAILED_TEST_LOGS="${ENVOY_BUILD_DIR}"/generated/failed-testlogs
@@ -142,15 +144,10 @@ mkdir -p "${ENVOY_BUILD_PROFILE}"
 export BUILDIFIER_BIN="${BUILDIFIER_BIN:-/usr/local/bin/buildifier}"
 export BUILDOZER_BIN="${BUILDOZER_BIN:-/usr/local/bin/buildozer}"
 
-# We set up an Envoy consuming project for test builds only if '-nofetch'
-# is not set AND this is an Envoy build. For derivative builds where Envoy
-# source tree is different than the current workspace, the setup step is
-# skipped.
-if [[ "$1" != "-nofetch" && "${ENVOY_SRCDIR}" == "$(bazel info workspace)" ]]; then
+
+if [[ "${ENVOY_BUILD_FILTER_EXAMPLE}" == "true" ]] && [[ "${ENVOY_SRCDIR}" == "$(bazel info workspace)" ]]; then
   # shellcheck source=ci/filter_example_setup.sh
   . "$(dirname "$0")"/filter_example_setup.sh
 else
   echo "Skip setting up Envoy Filter Example."
 fi
-
-export ENVOY_BUILD_FILTER_EXAMPLE="${FILTER_WORKSPACE_SET:-0}"

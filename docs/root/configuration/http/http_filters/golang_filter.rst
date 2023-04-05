@@ -43,7 +43,7 @@ For example, to build the ``.so`` for a ``foo`` plugin, you might run:
 
 .. code-block:: console
 
-   $ bazel run @go_sdk//:bin/go build --buildmode=c-shared  -v -o path/to/output/libfoo.so path/to/src/foo
+   $ bazel run @go_sdk//:bin/go build -- --buildmode=c-shared  -v -o path/to/output/libfoo.so path/to/src/foo
 
 Configuration
 -------------

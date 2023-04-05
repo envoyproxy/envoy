@@ -330,7 +330,9 @@ platform_filter_name: StopOnRequestHeadersThenResumeOnResumeDecoding
   EXPECT_EQ(invocations.on_request_headers_calls, 1);
 
   Event::PostCb resume_post_cb;
-  EXPECT_CALL(dispatcher_, post(_)).WillOnce(SaveArg<0>(&resume_post_cb));
+  EXPECT_CALL(dispatcher_, post(_)).WillOnce([&resume_post_cb](Event::PostCb cb) {
+    resume_post_cb = std::move(cb);
+  });
   EXPECT_CALL(decoder_callbacks_, continueDecoding());
   filter_->resumeDecoding();
   resume_post_cb();
@@ -401,7 +403,9 @@ platform_filter_name: StopOnRequestHeadersThenResumeOnResumeDecoding
   EXPECT_EQ(invocations.on_request_headers_calls, 1);
 
   Event::PostCb resume_post_cb;
-  EXPECT_CALL(dispatcher_, post(_)).WillOnce(SaveArg<0>(&resume_post_cb));
+  EXPECT_CALL(dispatcher_, post(_)).WillOnce([&resume_post_cb](Event::PostCb cb) {
+    resume_post_cb = std::move(cb);
+  });
   EXPECT_CALL(decoder_callbacks_, continueDecoding());
   filter_->resumeDecoding();
   resume_post_cb();
@@ -473,7 +477,9 @@ platform_filter_name: StopOnRequestHeadersThenResumeOnResumeDecoding
   EXPECT_EQ(invocations.on_request_headers_calls, 1);
 
   Event::PostCb resume_post_cb;
-  EXPECT_CALL(dispatcher_, post(_)).WillOnce(SaveArg<0>(&resume_post_cb));
+  EXPECT_CALL(dispatcher_, post(_)).WillOnce([&resume_post_cb](Event::PostCb cb) {
+    resume_post_cb = std::move(cb);
+  });
   Http::TestRequestTrailerMapImpl trailers;
   EXPECT_CALL(decoder_callbacks_, addDecodedTrailers()).WillOnce(ReturnRef(trailers));
   EXPECT_CALL(decoder_callbacks_, continueDecoding());
@@ -555,7 +561,9 @@ platform_filter_name: AsyncResumeDecodingIsNoopAfterPreviousResume
       "12");
 
   Event::PostCb resume_post_cb;
-  EXPECT_CALL(dispatcher_, post(_)).WillOnce(SaveArg<0>(&resume_post_cb));
+  EXPECT_CALL(dispatcher_, post(_)).WillOnce([&resume_post_cb](Event::PostCb cb) {
+    resume_post_cb = std::move(cb);
+  });
   EXPECT_CALL(decoder_callbacks_, continueDecoding()).Times(0);
   filter_->resumeDecoding();
   resume_post_cb();
@@ -1174,7 +1182,9 @@ platform_filter_name: StopOnRequestHeadersThenBufferThenResumeOnResumeDecoding
   EXPECT_EQ(invocations.on_request_trailers_calls, 1);
 
   Event::PostCb resume_post_cb;
-  EXPECT_CALL(dispatcher_, post(_)).WillOnce(SaveArg<0>(&resume_post_cb));
+  EXPECT_CALL(dispatcher_, post(_)).WillOnce([&resume_post_cb](Event::PostCb cb) {
+    resume_post_cb = std::move(cb);
+  });
   EXPECT_CALL(decoder_callbacks_, continueDecoding());
   filter_->resumeDecoding();
   resume_post_cb();
@@ -1303,7 +1313,9 @@ platform_filter_name: StopOnRequestHeadersThenBufferThenResumeOnResumeDecoding
   EXPECT_EQ(invocations.on_request_trailers_calls, 1);
 
   Event::PostCb resume_post_cb;
-  EXPECT_CALL(dispatcher_, post(_)).WillOnce(SaveArg<0>(&resume_post_cb));
+  EXPECT_CALL(dispatcher_, post(_)).WillOnce([&resume_post_cb](Event::PostCb cb) {
+    resume_post_cb = std::move(cb);
+  });
   filter_->resumeDecoding();
   resume_post_cb();
   EXPECT_EQ(invocations.on_resume_request_calls, 1);
@@ -1459,7 +1471,9 @@ platform_filter_name: StopOnResponseHeadersThenResumeOnResumeEncoding
   EXPECT_EQ(invocations.on_response_headers_calls, 1);
 
   Event::PostCb resume_post_cb;
-  EXPECT_CALL(dispatcher_, post(_)).WillOnce(SaveArg<0>(&resume_post_cb));
+  EXPECT_CALL(dispatcher_, post(_)).WillOnce([&resume_post_cb](Event::PostCb cb) {
+    resume_post_cb = std::move(cb);
+  });
   EXPECT_CALL(encoder_callbacks_, continueEncoding());
   filter_->resumeEncoding();
   resume_post_cb();
@@ -1535,7 +1549,9 @@ platform_filter_name: AsyncResumeEncodingIsNoopAfterPreviousResume
       "13");
 
   Event::PostCb resume_post_cb;
-  EXPECT_CALL(dispatcher_, post(_)).WillOnce(SaveArg<0>(&resume_post_cb));
+  EXPECT_CALL(dispatcher_, post(_)).WillOnce([&resume_post_cb](Event::PostCb cb) {
+    resume_post_cb = std::move(cb);
+  });
   EXPECT_CALL(encoder_callbacks_, continueEncoding()).Times(0);
   filter_->resumeEncoding();
   resume_post_cb();
@@ -1592,7 +1608,9 @@ platform_filter_name: AsyncResumeEncodingIsNoopAfterFilterIsPendingDestruction
 
   // Simulate posted resume call.
   Event::PostCb resume_post_cb;
-  EXPECT_CALL(dispatcher_, post(_)).WillOnce(SaveArg<0>(&resume_post_cb));
+  EXPECT_CALL(dispatcher_, post(_)).WillOnce([&resume_post_cb](Event::PostCb cb) {
+    resume_post_cb = std::move(cb);
+  });
   EXPECT_CALL(encoder_callbacks_, continueEncoding()).Times(0);
   filter_->resumeEncoding();
 
@@ -2160,7 +2178,9 @@ platform_filter_name: StopOnResponseHeadersThenBufferThenResumeOnResumeEncoding
   EXPECT_EQ(invocations.on_response_trailers_calls, 1);
 
   Event::PostCb resume_post_cb;
-  EXPECT_CALL(dispatcher_, post(_)).WillOnce(SaveArg<0>(&resume_post_cb));
+  EXPECT_CALL(dispatcher_, post(_)).WillOnce([&resume_post_cb](Event::PostCb cb) {
+    resume_post_cb = std::move(cb);
+  });
   EXPECT_CALL(encoder_callbacks_, continueEncoding());
   filter_->resumeEncoding();
   resume_post_cb();
@@ -2226,7 +2246,9 @@ platform_filter_name: StopOnRequestHeadersThenResumeOnResumeDecoding
   EXPECT_EQ(invocations.on_request_headers_calls, 1);
 
   Event::PostCb resume_post_cb;
-  EXPECT_CALL(dispatcher_, post(_)).WillOnce(SaveArg<0>(&resume_post_cb));
+  EXPECT_CALL(dispatcher_, post(_)).WillOnce([&resume_post_cb](Event::PostCb cb) {
+    resume_post_cb = std::move(cb);
+  });
   EXPECT_CALL(decoder_callbacks_, continueDecoding());
   filter_->resumeDecoding();
   resume_post_cb();
