@@ -29,6 +29,22 @@ public:
 
 using MyStats = LazyCompatibleStats<AwesomeStats>;
 
+// Tests that non-lazy stats has no "AwesomeStats.initialized" gauge.
+TEST_F(LazyInitStatsTest, NonLazyNoInitializedGauge) {
+  {
+    ScopeSharedPtr scope = store_.createScope("bluh");
+    MyStats non_lazy_y = MyStats::create(scope, stats_names_, false);
+    EXPECT_EQ(TestUtility::findGauge(store_, "bluh.AwesomeStats.initialized"), nullptr);
+    EXPECT_EQ(TestUtility::findCounter(store_, "bluh.foo")->value(), 0);
+    non_lazy_y->foo_.inc();
+    EXPECT_EQ(TestUtility::findGauge(store_, "bluh.AwesomeStats.initialized"), nullptr);
+    EXPECT_EQ(TestUtility::findCounter(store_, "bluh.foo")->value(), 1);
+  }
+  // Scope gone, stats deleted.
+  EXPECT_EQ(TestUtility::findGauge(store_, "bluh.AwesomeStats.initialized"), nullptr);
+  EXPECT_EQ(TestUtility::findCounter(store_, "bluh.foo"), nullptr);
+}
+
 // Tests that "AwesomeStats.initialized" gauge equals the number of initiated MyStats instances.
 TEST_F(LazyInitStatsTest, StatsGoneWithScope) {
   {
@@ -60,8 +76,8 @@ TEST_F(LazyInitStatsTest, StatsGoneWithScope) {
   }
 }
 
-// Tests that multiple stats struct instances within the same scope has no issue to keep the stats,
-// with removals.
+// Tests that multiple stats struct instances within the same scope has no issue to keep the
+// stats, with removals.
 TEST_F(LazyInitStatsTest, MultipleInstancesSameScopeDynamicallyDestructed) {
   {
     ScopeSharedPtr scope_1 = store_.createScope("bluh");
@@ -73,7 +89,8 @@ TEST_F(LazyInitStatsTest, MultipleInstancesSameScopeDynamicallyDestructed) {
     EXPECT_EQ(TestUtility::findGauge(store_, "bluh.AwesomeStats.initialized")->value(), 1);
     EXPECT_EQ((*x)->foo_.value(), 1);
     x.reset();
-    // y is not instantiated before x was deleted, no AwesomeStats instance, but stats are not lost.
+    // y is not instantiated before x was deleted, no AwesomeStats instance, but stats are not
+    // lost.
     EXPECT_EQ(TestUtility::findCounter(store_, "bluh.foo")->value(), 1);
     EXPECT_EQ(TestUtility::findGauge(store_, "bluh.AwesomeStats.initialized")->value(), 0);
     // Instantiate y now.
