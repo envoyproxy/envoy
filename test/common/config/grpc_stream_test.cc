@@ -30,7 +30,7 @@ protected:
       : async_client_owner_(std::make_unique<Grpc::MockAsyncClient>()),
         async_client_(async_client_owner_.get()),
         backoff_strategy_(std::make_unique<JitteredExponentialBackOffStrategy>(
-            SubscriptionFactory::RetryInitialDelayMs, SubscriptionFactory::RetryMaxDelayMs,
+            SubscriptionFactory::retry_initial_delay_ms, SubscriptionFactory::RetryMaxDelayMs,
             random_)),
         grpc_stream_(std::make_unique<GrpcStream<envoy::service::discovery::v3::DiscoveryRequest,
                                                  envoy::service::discovery::v3::DiscoveryResponse>>(
@@ -40,13 +40,13 @@ protected:
             random_, dispatcher_, *stats_.rootScope(), std::move(backoff_strategy_),
             rate_limit_settings_)) {}
 
-  void SetUpCustomBackoffRetryTimer(uint32_t retryInitialDelayMs,
-                                    absl::optional<uint32_t> retryMaxDelayMs,
+  void setUpCustomBackoffRetryTimer(uint32_t retry_initial_delay_ms,
+                                    absl::optional<uint32_t> retry_max_delay_ms,
                                     Random::RandomGenerator& random) {
     async_client_owner_ = std::make_unique<Grpc::MockAsyncClient>();
     async_client_ = async_client_owner_.get();
     backoff_strategy_ = std::make_unique<JitteredExponentialBackOffStrategy>(
-        retryInitialDelayMs,
+        retry_initial_delay_ms,
         (retryMaxDelayMs) ? retryMaxDelayMs.value() : SubscriptionFactory::RetryMaxDelayMs, random);
 
     grpc_stream_ = std::make_unique<GrpcStream<envoy::service::discovery::v3::DiscoveryRequest,
@@ -288,7 +288,7 @@ TEST_F(GrpcStreamTest, RetryOnEstablishNewStreamFailure) {
   NiceMock<Random::MockRandomGenerator> random;
   ON_CALL(random, random()).WillByDefault(Return(27));
 
-  // retryInitialDelayMs = 25ms, retryMaxDelayMs = 30 ms
+  // retry_initial_delay_ms = 25ms, retryMaxDelayMs = 30 ms
   SetUpCustomBackoffRetryTimer(25, 30, random);
 
   // simulate that first call to establish GRPC stream fails
@@ -335,7 +335,7 @@ TEST_F(GrpcStreamTest, RetryOnRemoteClose) {
   NiceMock<Random::MockRandomGenerator> random;
   ON_CALL(random, random()).WillByDefault(Return(27));
 
-  // retryInitialDelayMs = 25ms, retryMaxDelayMs = 30 ms
+  // retry_initial_delay_ms = 25ms, retryMaxDelayMs = 30 ms
   SetUpCustomBackoffRetryTimer(25, 30, random);
 
   // successful establishment
