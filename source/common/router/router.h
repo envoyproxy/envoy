@@ -206,7 +206,7 @@ public:
                Random::RandomGenerator& random, ShadowWriterPtr&& shadow_writer,
                bool emit_dynamic_stats, bool start_child_span, bool suppress_envoy_headers,
                bool respect_expected_rq_timeout, bool suppress_grpc_request_failure_code_stats,
-               bool flush_upstream_log_on_new_request,
+               bool flush_upstream_log_on_upstream_stream,
                const Protobuf::RepeatedPtrField<std::string>& strict_check_headers,
                TimeSource& time_source, Http::Context& http_context,
                Router::Context& router_context)
@@ -217,7 +217,7 @@ public:
         start_child_span_(start_child_span), suppress_envoy_headers_(suppress_envoy_headers),
         respect_expected_rq_timeout_(respect_expected_rq_timeout),
         suppress_grpc_request_failure_code_stats_(suppress_grpc_request_failure_code_stats),
-        flush_upstream_log_on_new_request_(flush_upstream_log_on_new_request),
+        flush_upstream_log_on_upstream_stream_(flush_upstream_log_on_upstream_stream),
         http_context_(http_context), zone_name_(local_info_.zoneStatName()),
         shadow_writer_(std::move(shadow_writer)), time_source_(time_source) {
     if (!strict_check_headers.empty()) {
@@ -238,7 +238,7 @@ public:
                      config.respect_expected_rq_timeout(),
                      config.suppress_grpc_request_failure_code_stats(),
                      config.has_upstream_log_options()
-                         ? config.upstream_log_options().flush_upstream_log_on_new_request()
+                         ? config.upstream_log_options().flush_upstream_log_on_upstream_stream()
                          : false,
                      config.strict_check_headers(), context.api().timeSource(),
                      context.httpContext(), context.routerContext()) {
@@ -304,7 +304,7 @@ public:
   const bool suppress_grpc_request_failure_code_stats_;
   // TODO(xyu-stripe): Make this a bitset to keep cluster memory footprint down.
   HeaderVectorPtr strict_check_headers_;
-  const bool flush_upstream_log_on_new_request_;
+  const bool flush_upstream_log_on_upstream_stream_;
   std::list<AccessLog::InstanceSharedPtr> upstream_logs_;
   Http::Context& http_context_;
   Stats::StatName zone_name_;

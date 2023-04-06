@@ -84,7 +84,7 @@ public:
 class RouterUpstreamLogTest : public testing::Test {
 public:
   void init(absl::optional<envoy::config::accesslog::v3::AccessLog> upstream_log,
-            bool flush_upstream_log_on_new_request = false) {
+            bool flush_upstream_log_on_upstream_stream = false) {
     envoy::extensions::filters::http::router::v3::Router router_proto;
     static const std::string cluster_name = "cluster_0";
 
@@ -96,8 +96,8 @@ public:
 
     if (upstream_log) {
       auto upstream_log_options = router_proto.mutable_upstream_log_options();
-      upstream_log_options->set_flush_upstream_log_on_new_request(
-          flush_upstream_log_on_new_request);
+      upstream_log_options->set_flush_upstream_log_on_upstream_stream(
+          flush_upstream_log_on_upstream_stream);
 
       ON_CALL(*context_.access_log_manager_.file_, write(_))
           .WillByDefault(
@@ -434,7 +434,7 @@ typed_config:
   run();
 
   // It is expected that there will be two log records, one when a new request is received
-  // and one when the request is finished, due to 'flush_upstream_log_on_new_request' enabled
+  // and one when the request is finished, due to 'flush_upstream_log_on_upstream_stream' enabled
   EXPECT_EQ(output_.size(), 2U);
   EXPECT_EQ(output_.front(), "cluster_0");
   EXPECT_EQ(output_.back(), "cluster_0");

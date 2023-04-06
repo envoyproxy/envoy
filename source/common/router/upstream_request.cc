@@ -715,7 +715,7 @@ void UpstreamRequest::onPoolReady(std::unique_ptr<GenericUpstream>&& upstream,
 
   stream_info_.setRequestHeaders(*parent_.downstreamHeaders());
 
-  if (parent_.config().flush_upstream_log_on_new_request_) {
+  if (parent_.config().flush_upstream_log_on_upstream_stream_) {
     upstreamLog();
   }
 

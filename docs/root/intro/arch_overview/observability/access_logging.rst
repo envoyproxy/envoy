@@ -44,7 +44,7 @@ HTTP Router Filter
 ******************
 
 For Router Filter, is is possible to enable an upstream access log when a new HTTP request is received, and after successfully establishing a connection
-with the upstream by using :ref:`flush upstream log on new request <envoy_v3_api_field_extensions.filters.http.router.v3.Router.UpstreamAccessLogOptions.flush_upstream_log_on_new_request>`
+with the upstream by using :ref:`flush upstream log on upstream stream <envoy_v3_api_field_extensions.filters.http.router.v3.Router.UpstreamAccessLogOptions.flush_upstream_log_on_upstream_stream>`
 Note: In case that the HTTP request involvs retries, a start of request upstream access log will be recorded for each retry.
 
 .. _arch_overview_access_log_periodic:
