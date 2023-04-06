@@ -1,9 +1,18 @@
 diff --git a/bazel/emscripten_deps.bzl b/bazel/emscripten_deps.bzl
-index 95801ba..95fdabd 100644
+index cd592e9..89bbe08 100644
 --- a/bazel/emscripten_deps.bzl
 +++ b/bazel/emscripten_deps.bzl
-@@ -69,31 +69,3 @@ def emscripten_deps(emscripten_version = "latest"):
-             build_file = "@emsdk//emscripten_toolchain:emscripten.BUILD",
+@@ -64,7 +64,7 @@ filegroup(
+     ] + glob(
+         include = [
+             "emscripten/cache/sysroot/lib/**",
+-            "emscripten/node_modules/**",
++            # "emscripten/node_modules/**",
+             "emscripten/src/**",
+         ],
+     ),
+@@ -153,31 +153,3 @@ def emscripten_deps(emscripten_version = "latest"):
+             build_file_content = BUILD_FILE_CONTENT_TEMPLATE.format(bin_extension = ".exe"),
              type = "zip",
          )
 -
@@ -34,15 +43,23 @@ index 95801ba..95fdabd 100644
 -            package_json = "@emscripten_bin_win//:emscripten/package.json",
 -            package_lock_json = "@emscripten_bin_win//:emscripten/package-lock.json",
 -        )
-diff --git a/bazel/emscripten_toolchain/BUILD.bazel b/bazel/emscripten_toolchain/BUILD.bazel
-index eb36959..12dba37 100644
---- a/bazel/emscripten_toolchain/BUILD.bazel
-+++ b/bazel/emscripten_toolchain/BUILD.bazel
-@@ -13,7 +13,6 @@ filegroup(
-         "env.sh",
-         "env.bat",
-         "@emsdk//:binaries",
--        "@emsdk//:node_modules",
-         "@nodejs//:node_files",
-     ],
- )
+diff --git a/bazel/emscripten_toolchain/wasm_cc_binary.bzl b/bazel/emscripten_toolchain/wasm_cc_binary.bzl
+index 9cf6328..167f797 100644
+--- a/bazel/emscripten_toolchain/wasm_cc_binary.bzl
++++ b/bazel/emscripten_toolchain/wasm_cc_binary.bzl
+@@ -163,7 +163,6 @@ def _wasm_cc_binary_legacy_impl(ctx):
+     )
+ 
+ _wasm_cc_binary = rule(
+-    name = "wasm_cc_binary",
+     implementation = _wasm_cc_binary_impl,
+     attrs = dict(
+         _WASM_BINARY_COMMON_ATTRS,
+@@ -193,7 +192,6 @@ def _wasm_binary_legacy_outputs(name, cc_target):
+     return outputs
+ 
+ _wasm_cc_binary_legacy = rule(
+-    name = "wasm_cc_binary",
+     implementation = _wasm_cc_binary_legacy_impl,
+     attrs = _WASM_BINARY_COMMON_ATTRS,
+     outputs = _wasm_binary_legacy_outputs,
