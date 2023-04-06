@@ -266,11 +266,6 @@ public:
    * responsibility of the caller to handle the duplicates.
    */
   virtual const Stats::TagVector& statsTags() const PURE;
-
-  /**
-   * @return the type of listener manager to create.
-   */
-  virtual const std::string& listenerManager() const PURE;
 };
 
 } // namespace Server
