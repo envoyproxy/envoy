@@ -19,6 +19,7 @@ envoy_extension_cc_test(
         "//envoy/network:proxy_protocol_options_lib",
         "//source/extensions/common/proxy_protocol:proxy_protocol_header_lib",
         "//source/extensions/transport_sockets/proxy_protocol:upstream_proxy_protocol",
+        "//source/extensions/transport_sockets/starttls:config",
         "//test/mocks/buffer:buffer_mocks",
         "//test/mocks/network:io_handle_mocks",
         "//test/mocks/network:network_mocks",

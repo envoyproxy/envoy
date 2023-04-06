@@ -38,6 +38,7 @@ public:
   void setTransportSocketCallbacks(Network::TransportSocketCallbacks& callbacks) override;
   Network::IoResult doWrite(Buffer::Instance& buffer, bool end_stream) override;
   void onConnected() override;
+  bool startSecureTransport() override { return transport_socket_->startSecureTransport(); }
 
 private:
   void generateHeader();
