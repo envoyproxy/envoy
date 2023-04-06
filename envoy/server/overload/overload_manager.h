@@ -53,7 +53,8 @@ public:
 using OverloadActionStatsNames = ConstSingleton<OverloadActionStatsNameValues>;
 
 /**
- * A point that provides context on whether to shed load.
+ * A point within the connection or request lifecycle that provides context on
+ * whether to shed load at that given stage for the current entity at the point.
  */
 class LoadShedPoint {
 public:
@@ -102,7 +103,7 @@ public:
    * Get the load shed point identified by the following string. Returns nullptr
    * on for non-configured points.
    */
-  virtual LoadShedPoint* getLoadShedPoint(const std::string& point_name) PURE;
+  virtual LoadShedPoint* getLoadShedPoint(absl::string_view point_name) PURE;
 
   /**
    * Get a factory for constructing scaled timer managers that respond to overload state.

@@ -34,7 +34,7 @@ public:
                OverloadActionCb callback));
   MOCK_METHOD(Event::ScaledRangeTimerManagerFactory, scaledTimerFactory, (), (override));
   MOCK_METHOD(ThreadLocalOverloadState&, getThreadLocalOverloadState, ());
-  MOCK_METHOD(LoadShedPoint*, getLoadShedPoint, (const std::string&));
+  MOCK_METHOD(LoadShedPoint*, getLoadShedPoint, (absl::string_view));
 
   testing::NiceMock<MockThreadLocalOverloadState> overload_state_;
 };

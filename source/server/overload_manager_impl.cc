@@ -193,28 +193,24 @@ public:
   bool tryAllocateResource(OverloadProactiveResourceName resource_name,
                            int64_t increment) override {
     const auto proactive_resource = proactive_resources_->find(resource_name);
-    if (proactive_resource != proactive_resources_->end()) {
-      return proactive_resource->second.tryAllocateResource(increment);
-    } else {
+    if (proactive_resource == proactive_resources_->end()) {
       ENVOY_LOG_MISC(warn, " {Failed to allocate unknown proactive resource }");
       // Resource monitor is not configured.
       return false;
     }
+
+    return proactive_resource->second.tryAllocateResource(increment);
   }
 
   bool tryDeallocateResource(OverloadProactiveResourceName resource_name,
                              int64_t decrement) override {
     const auto proactive_resource = proactive_resources_->find(resource_name);
-    if (proactive_resource != proactive_resources_->end()) {
-      if (proactive_resource->second.tryDeallocateResource(decrement)) {
-        return true;
-      } else {
-        return false;
-      }
-    } else {
+    if (proactive_resource == proactive_resources_->end()) {
       ENVOY_LOG_MISC(warn, " {Failed to deallocate unknown proactive resource }");
       return false;
     }
+
+    return proactive_resource->second.tryDeallocateResource(decrement);
   }
 
   bool isResourceMonitorEnabled(OverloadProactiveResourceName resource_name) override {
@@ -315,7 +311,7 @@ LoadShedPointImpl::LoadShedPointImpl(const envoy::config::overload::v3::LoadShed
                                      Stats::Scope& stats_scope,
                                      Random::RandomGenerator& random_generator)
     : scale_percent_(makeGauge(stats_scope, config.name(), "scale_percent",
-                               Stats::Gauge::ImportMode::Accumulate)),
+                               Stats::Gauge::ImportMode::NeverImport)),
       random_generator_(random_generator) {
   for (const auto& trigger_config : config.triggers()) {
     if (!triggers_.try_emplace(trigger_config.name(), createTriggerFromConfig(trigger_config))
@@ -324,17 +320,16 @@ LoadShedPointImpl::LoadShedPointImpl(const envoy::config::overload::v3::LoadShed
           absl::StrCat("Duplicate trigger resource for LoadShedPoint ", config.name()));
     }
   }
-
-  scale_percent_.set(0);
 };
 
-void LoadShedPointImpl::updateResource(const std::string& name, double pressure) {
-  auto it = triggers_.find(name);
+void LoadShedPointImpl::updateResource(absl::string_view resource_name,
+                                       double resource_utilization) {
+  auto it = triggers_.find(resource_name);
   if (it == triggers_.end()) {
     return;
   }
 
-  it->second->updateValue(pressure);
+  it->second->updateValue(resource_utilization);
   updateProbabilityShedLoad();
 }
 
@@ -560,7 +555,7 @@ Event::ScaledRangeTimerManagerFactory OverloadManagerImpl::scaledTimerFactory() 
   };
 }
 
-LoadShedPoint* OverloadManagerImpl::getLoadShedPoint(const std::string& point_name) {
+LoadShedPoint* OverloadManagerImpl::getLoadShedPoint(absl::string_view point_name) {
   if (auto it = loadshed_points_.find(point_name); it != loadshed_points_.end()) {
     return it->second.get();
   }

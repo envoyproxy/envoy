@@ -24,6 +24,10 @@
 namespace Envoy {
 namespace Server {
 
+/**
+ * Triggers encapsulate translating resource pressure into the corresponding
+ * OverloadActionState.
+ */
 class Trigger {
 public:
   virtual ~Trigger() = default;
@@ -55,6 +59,10 @@ private:
   Stats::Gauge& scale_percent_gauge_;
 };
 
+/**
+ * Implement a LoadShedPoint which is a particular point in the connection /
+ * request lifecycle where we can either abort or continue the given work.
+ */
 class LoadShedPointImpl : public LoadShedPoint {
 public:
   LoadShedPointImpl(const envoy::config::overload::v3::LoadShedPoint& config,
@@ -63,7 +71,15 @@ public:
   LoadShedPointImpl& operator=(const LoadShedPointImpl&) = delete;
 
   bool shouldShedLoad() override;
-  void updateResource(const std::string& name, double pressure);
+
+  /**
+   * Provide resource updates for the LoadShedPoint. It will update the
+   * probability of shedding load at this point atomically if needed.
+   * @param resource_name - the name of the resource that has been updated.
+   * @param resource_utilization - utilization of this resource. A ratio of the
+   *  current usage / the resource limit.
+   */
+  void updateResource(absl::string_view resource_name, double resource_utilization);
 
 private:
   using TriggerPtr = std::unique_ptr<Trigger>;
@@ -139,7 +155,7 @@ public:
   bool registerForAction(const std::string& action, Event::Dispatcher& dispatcher,
                          OverloadActionCb callback) override;
   ThreadLocalOverloadState& getThreadLocalOverloadState() override;
-  LoadShedPoint* getLoadShedPoint(const std::string& point_name) override;
+  LoadShedPoint* getLoadShedPoint(absl::string_view point_name) override;
   Event::ScaledRangeTimerManagerFactory scaledTimerFactory() override;
 
   // Stop the overload manager timer and wait for any pending resource updates to complete.
