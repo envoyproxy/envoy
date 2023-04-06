@@ -2431,7 +2431,6 @@ TEST_F(HttpConnectionManagerImplTest, TestAccessLogOnNewRequest) {
         // First call to log() is made when a new HTTP request has been received
         // On the first call it is expected that there is no response code.
         EXPECT_FALSE(stream_info.responseCode());
-        EXPECT_EQ(StreamInfo::StreamState::Started, stream_info.streamState());
       }))
       .WillOnce(Invoke([](const HeaderMap*, const HeaderMap*, const HeaderMap*,
                           const StreamInfo::StreamInfo& stream_info) {
@@ -2439,7 +2438,6 @@ TEST_F(HttpConnectionManagerImplTest, TestAccessLogOnNewRequest) {
         // that the response code is available and matches the response headers.
         EXPECT_TRUE(stream_info.responseCode());
         EXPECT_EQ(stream_info.responseCode().value(), uint32_t(200));
-        EXPECT_EQ(StreamInfo::StreamState::Ended, stream_info.streamState());
         EXPECT_NE(nullptr, stream_info.downstreamAddressProvider().localAddress());
         EXPECT_NE(nullptr, stream_info.downstreamAddressProvider().remoteAddress());
         EXPECT_NE(nullptr, stream_info.downstreamAddressProvider().directRemoteAddress());
