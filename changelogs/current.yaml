@@ -371,10 +371,9 @@ new_features:
     :ref:`Redis Cluster<arch_overview_redis>`.
 - area: access_log
   change: |
-    added access log support for ``%STREAM_STATE%`` command operator. Using the command operator will extract a value
-    representing the state of the stream. Access logs at the beginning of the stream will have 'Started' value. Periodic
-    access logs during an active stream, will have 'InProgress' value. Default access log, at the end of a stream will have
-    'Ended' value. In case the stream has not started yet, the value will be null.
+    added access log support for ``%ACCESS_LOG_TYPE%`` command operator. Using the command operator will extract a value
+    representing the type of the access log, corresponding to the occasion of the access log. For example, periodic access
+    logs, will have 'Periodic' value.
 - area: stream info
   change: |
     added the latency for how long an upstream request spends waiting for the connection pool callback to

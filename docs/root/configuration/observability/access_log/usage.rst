@@ -197,12 +197,13 @@ The following command operators are supported:
   In typed JSON logs, PROTOCOL will render the string ``"-"`` if the protocol is not
   available (e.g. in TCP logs).
 
-%STREAM_STATE%
+%ACCESS_LOG_TYPE%
   HTTP/TCP
-    The state of the stream. Currently either *Started* *InProgress* *Ended*.
-    For TCP, the value will be 'Started', in case an upstream connection has been successfully made. The value will be 'InProgress' in case the stream has started, and it is active. The value will be 'Ended' in case the upstream stream has been terminated.
-    For HTTP, the value will be 'Started' in case downstream headers have been received. The value will be 'InProgress' in case an upstream connection was made, success status code has been returned and the request is active. The value will be 'Ended' in case the upstream request has been termindated.
-    In case the stream has not started yet, the value will be - 'null'.
+    The type of the access log, that matches the occasion of the access log record.
+    For example, the substitution value in cases where the log record is a periodic
+    log record, will be 'Periodic'.
+    Available values:
+    - A1
 
   UDP
     Not implemented ("-").

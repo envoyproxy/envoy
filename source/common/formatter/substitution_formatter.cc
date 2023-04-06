@@ -71,14 +71,6 @@ FormatterPtr SubstitutionFormatUtils::defaultSubstitutionFormatter() {
   return std::make_unique<Envoy::Formatter::FormatterImpl>(DEFAULT_FORMAT, false);
 }
 
-const absl::optional<std::reference_wrapper<const std::string>>
-SubstitutionFormatUtils::protocolToString(const absl::optional<Http::Protocol>& protocol) {
-  if (protocol) {
-    return Http::Utility::getProtocolString(protocol.value());
-  }
-  return absl::nullopt;
-}
-
 const std::string&
 SubstitutionFormatUtils::protocolToStringOrDefault(const absl::optional<Http::Protocol>& protocol) {
   if (protocol) {
@@ -1088,15 +1080,6 @@ const StreamInfoFormatter::FieldExtractorLookupTbl& StreamInfoFormatter::getKnow
                               return std::make_unique<StreamInfoDurationFieldExtractor>(
                                   [](const StreamInfo::StreamInfo& stream_info) {
                                     return stream_info.currentDuration();
-                                  });
-                            }}},
-                          {"STREAM_STATE",
-                           {CommandSyntaxChecker::COMMAND_ONLY,
-                            [](const std::string&, const absl::optional<size_t>&) {
-                              return std::make_unique<StreamInfoStringFieldExtractor>(
-                                  [](const StreamInfo::StreamInfo& stream_info) {
-                                    return SubstitutionFormatUtils::streamStateToString(
-                                        stream_info.streamState());
                                   });
                             }}},
                           {"RESPONSE_FLAGS",
