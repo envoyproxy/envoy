@@ -13,8 +13,8 @@ namespace Geoip {
 
 GeoipFilterConfig::GeoipFilterConfig(
     const envoy::extensions::filters::http::geoip::v3::Geoip& config,
-    const std::string& stat_prefix, Stats::Scope& scope, Runtime::Loader& runtime)
-    : scope_(scope), runtime_(runtime), stat_name_set_(scope.symbolTable().makeSet("Geoip")),
+    const std::string& stat_prefix, Stats::Scope& scope)
+    : scope_(scope), stat_name_set_(scope.symbolTable().makeSet("Geoip")),
       stats_prefix_(stat_name_set_->add(stat_prefix + "geoip")),
       total_(stat_name_set_->add("total")), use_xff_(config.use_xff()),
       xff_num_trusted_hops_(config.xff_num_trusted_hops()) {

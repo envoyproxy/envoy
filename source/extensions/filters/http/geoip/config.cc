@@ -19,8 +19,8 @@ Http::FilterFactoryCb GeoipFilterFactory::createFilterFactoryFromProtoTyped(
     provider_context_ =
         std::make_unique<GeoipProviderFactoryContextImpl>(context.messageValidationVisitor());
   }
-  GeoipFilterConfigSharedPtr filter_config(std::make_shared<GeoipFilterConfig>(
-      proto_config, stat_prefix, context.scope(), context.runtime()));
+  GeoipFilterConfigSharedPtr filter_config(
+      std::make_shared<GeoipFilterConfig>(proto_config, stat_prefix, context.scope()));
 
   const auto& provider_config = proto_config.provider();
   auto& geo_provider_factory =

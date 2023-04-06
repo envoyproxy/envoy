@@ -4,7 +4,6 @@
 #include "envoy/common/optref.h"
 #include "envoy/extensions/filters/http/geoip/v3/geoip.pb.h"
 #include "envoy/http/filter.h"
-#include "envoy/runtime/runtime.h"
 #include "envoy/stats/scope.h"
 
 #include "source/extensions/filters/http/geoip/geoip_provider_config.h"
@@ -23,9 +22,7 @@ using GeolocationHeadersToAdd =
 class GeoipFilterConfig {
 public:
   GeoipFilterConfig(const envoy::extensions::filters::http::geoip::v3::Geoip& config,
-                    const std::string& stat_prefix, Stats::Scope& scope, Runtime::Loader& runtime);
-
-  Runtime::Loader& runtime() { return runtime_; }
+                    const std::string& stat_prefix, Stats::Scope& scope);
 
   void incHit(absl::string_view geo_header) {
     incCounter(stat_name_set_->getBuiltin(absl::StrCat(geo_header, ".hit"), unknown_hit_));
@@ -45,7 +42,6 @@ private:
   processGeoHeaders(const absl::flat_hash_set<absl::string_view>& headers) const;
 
   Stats::Scope& scope_;
-  Runtime::Loader& runtime_;
   Stats::StatNameSetPtr stat_name_set_;
   const Stats::StatName stats_prefix_;
   const Stats::StatName total_;

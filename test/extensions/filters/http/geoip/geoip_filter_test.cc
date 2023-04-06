@@ -6,7 +6,6 @@
 
 #include "test/extensions/filters/http/geoip/mocks.h"
 #include "test/mocks/http/mocks.h"
-#include "test/mocks/runtime/mocks.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/test_common/registry.h"
 #include "test/test_common/test_runtime.h"
@@ -54,7 +53,7 @@ public:
     ON_CALL(filter_callbacks_, dispatcher()).WillByDefault(::testing::ReturnRef(*dispatcher_));
     envoy::extensions::filters::http::geoip::v3::Geoip config;
     TestUtility::loadFromYaml(yaml, config);
-    config_ = std::make_shared<GeoipFilterConfig>(config, "prefix.", stats_.mockScope(), runtime_);
+    config_ = std::make_shared<GeoipFilterConfig>(config, "prefix.", stats_.mockScope());
     filter_ = std::make_shared<GeoipFilter>(config_, dummy_driver_);
     filter_->setDecoderFilterCallbacks(filter_callbacks_);
   }
@@ -77,7 +76,6 @@ public:
   std::unique_ptr<DummyGeoipProviderFactory> dummy_factory_;
   MockDriverSharedPtr dummy_driver_;
   NiceMock<Http::MockStreamDecoderFilterCallbacks> filter_callbacks_;
-  NiceMock<Runtime::MockLoader> runtime_;
   Api::ApiPtr api_ = Api::createApiForTest();
   Event::DispatcherPtr dispatcher_ = api_->allocateDispatcher("test_thread");
   absl::optional<std::string> empty_response_;
