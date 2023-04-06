@@ -166,9 +166,9 @@ public:
   void testAutoSniOptions(
       absl::optional<envoy::config::core::v3::UpstreamHttpProtocolOptions> dummy_option,
       Envoy::Http::TestRequestHeaderMapImpl headers, std::string server_name = "",
-      std::string alt_server_name = "",
-      std::string pre_set_sni = "",
-      StreamInfo::FilterState::LifeSpan pre_set_life_span = StreamInfo::FilterState::LifeSpan::FilterChain) {
+      std::string alt_server_name = "", std::string pre_set_sni = "",
+      StreamInfo::FilterState::LifeSpan pre_set_life_span =
+          StreamInfo::FilterState::LifeSpan::FilterChain) {
     NiceMock<StreamInfo::MockStreamInfo> stream_info;
     ON_CALL(*cm_.thread_local_cluster_.cluster_.info_, upstreamHttpProtocolOptions())
         .WillByDefault(ReturnRef(dummy_option));
@@ -180,20 +180,20 @@ public:
     if (pre_set_sni != "") {
       // Simulate a network filter setting the server name, e.g. based on SNI seen by the
       // tls_inspector by using the LifeSpan::Connection
-      stream_info.filterState()->setData(
-          Network::UpstreamServerName::key(),
-          std::make_unique<Network::UpstreamServerName>(pre_set_sni),
-          StreamInfo::FilterState::StateType::Mutable, pre_set_life_span);
+      stream_info.filterState()->setData(Network::UpstreamServerName::key(),
+                                         std::make_unique<Network::UpstreamServerName>(pre_set_sni),
+                                         StreamInfo::FilterState::StateType::Mutable,
+                                         pre_set_life_span);
     }
     expectResponseTimerCreate();
 
     HttpTestUtility::addDefaultHeaders(headers);
     router_->decodeHeaders(headers, true);
     if (server_name != "") {
-      EXPECT_EQ(server_name,
-                stream_info.filterState()
-                    ->getDataReadOnly<Network::UpstreamServerName>(Network::UpstreamServerName::key())
-                    ->value());
+      EXPECT_EQ(server_name, stream_info.filterState()
+                                 ->getDataReadOnly<Network::UpstreamServerName>(
+                                     Network::UpstreamServerName::key())
+                                 ->value());
     }
     if (alt_server_name != "") {
       EXPECT_EQ(alt_server_name, stream_info.filterState()
@@ -232,7 +232,8 @@ TEST_F(RouterTest, DontUpdateServerNameFilterStateWhenExistsConnectionLifeSpan) 
   dummy_option.value().set_auto_sni(true);
 
   Http::TestRequestHeaderMapImpl headers{};
-  testAutoSniOptions(dummy_option, headers, "old-host", "", "old-host", StreamInfo::FilterState::LifeSpan::Connection);
+  testAutoSniOptions(dummy_option, headers, "old-host", "", "old-host",
+                     StreamInfo::FilterState::LifeSpan::Connection);
 }
 
 TEST_F(RouterTest, UpdateServerNameFilterStateWithHostHeaderOverride) {
