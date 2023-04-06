@@ -307,7 +307,6 @@ void ConnectionManagerImpl::doDeferredStreamDestroy(ActiveStream& stream) {
   }
 
   stream.filter_manager_.onStreamComplete();
-  stream.streamInfo().setStreamState(StreamInfo::StreamState::Ended);
 
   // For HTTP/3, skip access logging here and add deferred logging info
   // to stream info for QuicStatsGatherer to use later.
@@ -385,7 +384,6 @@ RequestDecoder& ConnectionManagerImpl::newStream(ResponseEncoder& response_encod
   }
   new_stream->response_encoder_->getStream().setFlushTimeout(new_stream->idle_timeout_ms_);
   new_stream->streamInfo().setDownstreamBytesMeter(response_encoder.getStream().bytesMeter());
-  new_stream->streamInfo().setStreamState(StreamInfo::StreamState::Started);
   // If the network connection is backed up, the stream should be made aware of it on creation.
   // Both HTTP/1.x and HTTP/2 codecs handle this in StreamCallbackHelper::addCallbacksHelper.
   ASSERT(read_callbacks_->connection().aboveHighWatermark() == false ||
@@ -814,15 +812,11 @@ ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connect
   if (connection_manager_.config_.accessLogFlushInterval().has_value()) {
     access_log_flush_timer_ =
         connection_manager.read_callbacks_->connection().dispatcher().createTimer([this]() -> void {
-          if (!streamInfo().streamState() ||
-              streamInfo().streamState() != StreamInfo::StreamState::Ended) {
-            refreshAccessLogFlushTimer();
-          }
-
-          // If the request is not in active state, we shouldn't do the periodic log.
-          if (streamInfo().streamState() &&
-              streamInfo().streamState() == StreamInfo::StreamState::InProgress) {
+          // If the request is complete, we've already done the stream-end access-log, and shouldn't
+          // do the periodic log.
+          if (!streamInfo().requestComplete().has_value()) {
             filter_manager_.log();
+            refreshAccessLogFlushTimer();
           }
         });
     refreshAccessLogFlushTimer();
@@ -1684,11 +1678,6 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ResponseHeaderMap& heade
 
   ENVOY_STREAM_LOG(debug, "encoding headers via codec (end_stream={}):\n{}", *this, end_stream,
                    headers);
-
-  // According to RFC7231 any 2xx response indicates that the connection is established.
-  if (!end_stream && Http::CodeUtility::is2xx(Http::Utility::getResponseStatus(headers))) {
-    filter_manager_.streamInfo().setStreamState(StreamInfo::StreamState::InProgress);
-  }
 
   // Now actually encode via the codec.
   filter_manager_.streamInfo().downstreamTiming().onFirstDownstreamTxByteSent(
