@@ -97,11 +97,12 @@ public:
     const int expected_header_bytes_received = 0;
     checkAccessLogOutput(expected_wire_bytes_sent, expected_wire_bytes_received,
                          expected_header_bytes_sent, expected_header_bytes_received);
+    ++access_log_entry_;
   }
 
   void checkAccessLogOutput(int expected_wire_bytes_sent, int expected_wire_bytes_received,
                             int expected_header_bytes_sent, int expected_header_bytes_received) {
-    std::string log = waitForAccessLog(access_log_name_);
+    std::string log = waitForAccessLog(access_log_name_, access_log_entry_);
     std::vector<std::string> log_entries = absl::StrSplit(log, ' ');
     const int wire_bytes_sent = std::stoi(log_entries[0]),
               wire_bytes_received = std::stoi(log_entries[1]),
@@ -119,6 +120,7 @@ public:
   bool enable_timeout_{};
   bool exact_match_{};
   bool allow_post_{};
+  uint32_t access_log_entry_{0};
 };
 
 // Verify that H/2 extended CONNECT with bytestream protocol is treated like
