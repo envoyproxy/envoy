@@ -293,6 +293,7 @@ extensions/filters/http/oauth2 @derekargueta @snowp
 /*/extensions/load_balancing_policies/round_robin @wbpcode @UNOWNED
 /*/extensions/load_balancing_policies/ring_hash @wbpcode @UNOWNED
 /*/extensions/load_balancing_policies/maglev @wbpcode @UNOWNED
+/*/extensions/load_balancing_policies/subset @wbpcode @zuecher
 # Early header mutation
 /*/extensions/http/early_header_mutation/header_mutation @wbpcode @UNOWNED
 # Network matching extensions
