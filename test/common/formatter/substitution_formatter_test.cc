@@ -562,6 +562,15 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
   }
 
   {
+    StreamInfoFormatter stream_info_format("ACCESS_LOG_TYPE");
+    EXPECT_EQ(absl::nullopt, stream_info_format.format(request_headers, response_headers,
+                                                       response_trailers, stream_info, body));
+    EXPECT_THAT(stream_info_format.formatValue(request_headers, response_headers, response_trailers,
+                                               stream_info, body),
+                ProtoEq(ValueUtil::nullValue()));
+  }
+
+  {
     StreamInfoFormatter duration_format("DURATION");
     absl::optional<std::chrono::nanoseconds> dur = std::chrono::nanoseconds(15000000);
     EXPECT_CALL(stream_info, currentDuration()).WillRepeatedly(Return(dur));
