@@ -39,9 +39,6 @@ namespace {
 class TestFilter : public Filter {
 public:
   using Filter::Filter;
-  void onDestroy() override {
-    // do nothing
-  }
 };
 
 class GolangHttpFilterTest : public testing::Test {

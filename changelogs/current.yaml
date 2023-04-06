@@ -393,6 +393,11 @@ new_features:
     added new field :ref:`signature_algorithms
     <envoy_v3_api_field_extensions.transport_sockets.tls.v3.TlsParameters.signature_algorithms>` to set signature
     algorithms.
+- area: metrics_service
+  change: |
+    added new configuration field :ref:`histogram_emit_mode
+    <envoy_v3_api_field_config.metrics.v3.MetricsServiceConfig.histogram_emit_mode>` to configure which stats
+    should be emitted for histograms.
 
 deprecated:
 - area: ext_authz
