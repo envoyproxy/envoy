@@ -157,7 +157,7 @@ TEST_P(ConnectTerminationIntegrationTest, Basic) {
     auto* static_resources = bootstrap.mutable_static_resources();
     for (int i = 0; i < static_resources->clusters_size(); ++i) {
       auto* cluster = bootstrap.mutable_static_resources()->mutable_clusters(i);
-      cluster->mutable_preconnect_policy()->mutable_predictive_preconnect_ratio()->set_value(2);
+      cluster->mutable_preconnect_policy()->mutable_per_upstream_preconnect_ratio()->set_value(1.5);
     }
   });
 
@@ -165,6 +165,7 @@ TEST_P(ConnectTerminationIntegrationTest, Basic) {
 
   setUpConnection();
   sendBidirectionalDataAndCleanShutdown();
+  test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_total", 2);
   cleanupUpstreamAndDownstream();
 
   setUpConnection();
