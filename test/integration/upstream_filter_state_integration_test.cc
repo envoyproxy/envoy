@@ -140,6 +140,9 @@ TEST_P(UpstreamAccessLogTest, UpstreamFilterState) {
             hcm.mutable_http_filters(hcm.http_filters_size() - 1)->mutable_typed_config();
 
         envoy::extensions::filters::http::router::v3::Router router_config;
+        router_config.mutable_upstream_log_options()->set_flush_upstream_log_on_upstream_stream(
+            true);
+
         auto* upstream_log_config = router_config.add_upstream_log();
         upstream_log_config->set_name("accesslog");
         envoy::extensions::access_loggers::file::v3::FileAccessLog access_log_config;
@@ -159,6 +162,8 @@ TEST_P(UpstreamAccessLogTest, UpstreamFilterState) {
   auto response = codec_client_->makeRequestWithBody(headers, "hello!");
 
   waitForNextUpstreamRequest({}, std::chrono::milliseconds(300000));
+
+  EXPECT_THAT(waitForAccessLog(log_file), testing::HasSubstr("test_value"));
 
   EXPECT_TRUE(upstream_request_->complete());
   EXPECT_EQ("hello!", upstream_request_->body().toString());
