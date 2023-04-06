@@ -131,14 +131,13 @@ OriginalDstCluster::LoadBalancer::requestOverrideHost(LoadBalancerContext* conte
   return request_host;
 }
 
-OriginalDstCluster::OriginalDstCluster(
-    Server::Configuration::ServerFactoryContext& server_context,
-    const envoy::config::cluster::v3::Cluster& config, Runtime::Loader& runtime,
-    Server::Configuration::TransportSocketFactoryContextImpl& factory_context,
-    Stats::ScopeSharedPtr&& stats_scope, bool added_via_api)
-    : ClusterImplBase(server_context, config, runtime, factory_context, std::move(stats_scope),
-                      added_via_api, factory_context.mainThreadDispatcher().timeSource()),
-      dispatcher_(factory_context.mainThreadDispatcher()),
+OriginalDstCluster::OriginalDstCluster(Server::Configuration::ServerFactoryContext& server_context,
+                                       const envoy::config::cluster::v3::Cluster& config,
+                                       ClusterFactoryContext& context, Runtime::Loader& runtime,
+                                       bool added_via_api)
+    : ClusterImplBase(server_context, config, context, runtime, added_via_api,
+                      context.mainThreadDispatcher().timeSource()),
+      dispatcher_(context.mainThreadDispatcher()),
       cleanup_interval_ms_(
           std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(config, cleanup_interval, 5000))),
       cleanup_timer_(dispatcher_.createTimer([this]() -> void { cleanup(); })),
@@ -272,9 +271,7 @@ void OriginalDstCluster::cleanup() {
 std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr>
 OriginalDstClusterFactory::createClusterImpl(
     Server::Configuration::ServerFactoryContext& server_context,
-    const envoy::config::cluster::v3::Cluster& cluster, ClusterFactoryContext& context,
-    Server::Configuration::TransportSocketFactoryContextImpl& socket_factory_context,
-    Stats::ScopeSharedPtr&& stats_scope) {
+    const envoy::config::cluster::v3::Cluster& cluster, ClusterFactoryContext& context) {
   if (cluster.lb_policy() != envoy::config::cluster::v3::Cluster::CLUSTER_PROVIDED) {
     throw EnvoyException(
         fmt::format("cluster: LB policy {} is not valid for Cluster type {}. Only "
@@ -286,9 +283,8 @@ OriginalDstClusterFactory::createClusterImpl(
   // TODO(mattklein123): The original DST load balancer type should be deprecated and instead
   //                     the cluster should directly supply the load balancer. This will remove
   //                     a special case and allow this cluster to be compiled out as an extension.
-  auto new_cluster = std::make_shared<OriginalDstCluster>(
-      server_context, cluster, context.runtime(), socket_factory_context, std::move(stats_scope),
-      context.addedViaApi());
+  auto new_cluster = std::make_shared<OriginalDstCluster>(server_context, cluster, context,
+                                                          context.runtime(), context.addedViaApi());
   auto lb = std::make_unique<OriginalDstCluster::ThreadAwareLoadBalancer>(new_cluster);
   return std::make_pair(new_cluster, std::move(lb));
 }

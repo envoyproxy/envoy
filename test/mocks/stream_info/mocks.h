@@ -79,6 +79,7 @@ public:
   MOCK_METHOD(std::shared_ptr<UpstreamInfo>, upstreamInfo, ());
   MOCK_METHOD(OptRef<const UpstreamInfo>, upstreamInfo, (), (const));
   MOCK_METHOD(void, onRequestComplete, ());
+  MOCK_METHOD(absl::optional<std::chrono::nanoseconds>, currentDuration, (), (const));
   MOCK_METHOD(absl::optional<std::chrono::nanoseconds>, requestComplete, (), (const));
   MOCK_METHOD(DownstreamTiming&, downstreamTiming, ());
   MOCK_METHOD(OptRef<const DownstreamTiming>, downstreamTiming, (), (const));
