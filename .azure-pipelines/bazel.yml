@@ -44,13 +44,13 @@ steps:
   env:
     VSO_DEDUP_REDIRECT_TIMEOUT_IN_SEC: 5
   inputs:
-    key: '"${{ parameters.ciTarget }}" | "${{ parameters.artifactSuffix }}" | ./WORKSPACE | **/*.bzl, !mobile/**, !envoy-docs/**'
+    key: '"${{ parameters.ciTarget }}" | "${{ parameters.artifactSuffix }}" | $(cacheKeyRepository)'
     path: $(Build.StagingDirectory)/repository_cache
   continueOnError: true
 
 - template: cached.yml
   parameters:
-    version: "$(buildImageCacheVersion)"
+    version: "$(cacheKeyBuildImage)"
     arch: "${{ parameters.artifactSuffix }}"
 
 - bash: |
@@ -90,9 +90,9 @@ steps:
       BAZEL_BUILD_EXTRA_OPTIONS: "${{ parameters.bazelBuildExtraOptions }}"
       BAZEL_REMOTE_CACHE: $(LocalBuildCache)
       ${{ if eq(variables['Build.Reason'], 'PullRequest') }}:
-        BAZEL_REMOTE_INSTANCE: "instances/$(System.PullRequest.TargetBranch)"
+        BAZEL_REMOTE_INSTANCE_BRANCH: "$(System.PullRequest.TargetBranch)"
       ${{ if ne(variables['Build.Reason'], 'PullRequest') }}:
-        BAZEL_REMOTE_INSTANCE: "instances/$(Build.SourceBranchName)"
+        BAZEL_REMOTE_INSTANCE_BRANCH: "$(Build.SourceBranchName)"
   displayName: "Run CI script ${{ parameters.ciTarget }}"
 
 - bash: |

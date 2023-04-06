@@ -19,7 +19,7 @@
 # You can define the `targets` to be compiled, along with the destination `path`
 # of the compiled binary.
 #
-# You can also define lists of `stripopts` and `linkopts`.
+# You can also define lists of `stripopts`.
 #
 # For example, you can bundle some stripped binaries together in `opt` mode:
 #
@@ -59,7 +59,6 @@ def _compilation_config_impl(settings, attr):
     _ignore = settings
     return {
         "//command_line_option:compilation_mode": attr.mode,
-        "//command_line_option:linkopt": attr.linkopts,
         "//command_line_option:stripopt": attr.stripopts,
     }
 
@@ -68,7 +67,6 @@ compilation_config = transition(
     inputs = [],
     outputs = [
         "//command_line_option:compilation_mode",
-        "//command_line_option:linkopt",
         "//command_line_option:stripopt",
     ],
 )
@@ -97,7 +95,6 @@ bundled = rule(
     implementation = _bundled_impl,
     attrs = {
         "mode": attr.string(),
-        "linkopts": attr.string_list(),
         "stripopts": attr.string_list(),
         "targets": attr.label_keyed_string_dict(
             allow_files = True,
