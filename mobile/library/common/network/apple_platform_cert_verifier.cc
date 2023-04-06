@@ -71,7 +71,7 @@ envoy_cert_validation_result make_result(envoy_status_t status, uint8_t tls_aler
 }
 
 static envoy_cert_validation_result verify_cert(const envoy_data* certs, uint8_t num_certs,
-                                                const char* hostname) {
+                                                const char* /*hostname*/) {
   CFArrayRef trust_policies = CreateTrustPolicies();
   if (!trust_policies) {
     return make_result(ENVOY_FAILURE, SSL_AD_CERTIFICATE_UNKNOWN,
@@ -109,7 +109,8 @@ extern "C" {
 #endif
 
 void register_apple_platform_cert_verifier() {
-  envoy_cert_validator* api = (envoy_cert_validator*)safe_malloc(sizeof(envoy_cert_validator));
+  envoy_cert_validator* api =
+      static_cast<envoy_cert_validator*>(safe_malloc(sizeof(envoy_cert_validator)));
   api->validate_cert = verify_cert;
   api->validation_cleanup = NULL;
   register_platform_api("platform_cert_validator", api);

@@ -1,4 +1,4 @@
-#include "source/common/config/http_subscription_impl.h"
+#include "source/extensions/config_subscription/rest/http_subscription_impl.h"
 
 #include <memory>
 
@@ -148,6 +148,8 @@ void HttpSubscriptionImpl::disableInitFetchTimeoutTimer() {
     init_fetch_timeout_timer_.reset();
   }
 }
+
+REGISTER_FACTORY(HttpSubscriptionFactory, ConfigSubscriptionFactory);
 
 } // namespace Config
 } // namespace Envoy

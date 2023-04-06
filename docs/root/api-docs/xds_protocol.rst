@@ -66,6 +66,9 @@ same validations that the server does. This can lead to problems where
 the server rejects a resource that the client would have accepted.
 
 
+.. _extension_envoy.config_subscription.filesystem:
+.. _extension_envoy.config_subscription.filesystem_collection:
+
 Filesystem subscriptions
 ------------------------
 
@@ -920,6 +923,8 @@ field. This allows the client to quickly determine when a resource does not exis
 waiting for a timeout, as would be done in the SotW protocol variants. However, clients are still
 encouraged to use a timeout to protect against the case where the management server fails to send
 a response in a timely manner.
+
+.. _extension_envoy.config_subscription.rest:
 
 REST-JSON polling subscriptions
 -------------------------------
