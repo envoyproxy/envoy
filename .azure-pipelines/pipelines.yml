@@ -38,6 +38,11 @@ stages:
 # Presubmit/default
 - ${{ if ne(variables['Build.DefinitionName'], 'envoy-postsubmit') }}:
   - template: stages.yml
+    parameters:
+      buildStageDeps:
+      - env
+      checkStageDeps:
+      - env
 
 # Postsubmit
 - ${{ if eq(variables['Build.DefinitionName'], 'envoy-postsubmit') }}:
