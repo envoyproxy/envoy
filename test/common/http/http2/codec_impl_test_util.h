@@ -115,7 +115,7 @@ public:
   using ClientConnectionImpl::getStream;
   using ConnectionImpl::sendPendingFrames;
 
-  bool use_oghttp2_library() const { return use_oghttp2_library_; }
+  bool useOghttp2Library() const { return use_oghttp2_library_; }
 
 protected:
   // Overrides ClientConnectionImpl::onSettings().

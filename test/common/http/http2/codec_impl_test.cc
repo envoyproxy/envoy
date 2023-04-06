@@ -4577,7 +4577,7 @@ TEST(CodecChoiceTest, ProtocolOptionExplicitlySet) {
       max_request_headers_kb, max_response_headers_count, ProdNghttp2SessionFactory::get());
 
   // The protocol option takes precedence over the runtime feature.
-  EXPECT_TRUE(client->use_oghttp2_library());
+  EXPECT_TRUE(client->useOghttp2Library());
 
   http2_options.mutable_use_oghttp2_codec()->set_value(false);
 
@@ -4585,7 +4585,7 @@ TEST(CodecChoiceTest, ProtocolOptionExplicitlySet) {
       client_connection, client_callbacks, *client_stats_store.rootScope(), http2_options, random,
       max_request_headers_kb, max_response_headers_count, ProdNghttp2SessionFactory::get());
 
-  EXPECT_FALSE(client2->use_oghttp2_library());
+  EXPECT_FALSE(client2->useOghttp2Library());
 }
 
 TEST(CodecChoiceTest, ProtocolOptionNotSpecified) {
@@ -4614,7 +4614,7 @@ TEST(CodecChoiceTest, ProtocolOptionNotSpecified) {
       max_request_headers_kb, max_response_headers_count, ProdNghttp2SessionFactory::get());
 
   // Since no protocol option is specified, the runtime feature is used.
-  EXPECT_TRUE(client->use_oghttp2_library());
+  EXPECT_TRUE(client->useOghttp2Library());
 
   scoped_runtime.mergeValues({{"envoy.reloadable_features.http2_use_oghttp2", "false"}});
 
@@ -4622,7 +4622,7 @@ TEST(CodecChoiceTest, ProtocolOptionNotSpecified) {
       client_connection, client_callbacks, *client_stats_store.rootScope(), http2_options, random,
       max_request_headers_kb, max_response_headers_count, ProdNghttp2SessionFactory::get());
 
-  EXPECT_FALSE(client2->use_oghttp2_library());
+  EXPECT_FALSE(client2->useOghttp2Library());
 }
 
 #ifdef NDEBUG
