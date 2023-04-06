@@ -87,15 +87,6 @@ SubstitutionFormatUtils::protocolToStringOrDefault(const absl::optional<Http::Pr
   return DefaultUnspecifiedValueString;
 }
 
-const absl::optional<std::reference_wrapper<const std::string>>
-SubstitutionFormatUtils::streamStateToString(
-    const absl::optional<StreamInfo::StreamState>& stream_state) {
-  if (stream_state) {
-    return StreamInfo::Utility::getStreamStateString(stream_state.value());
-  }
-  return absl::nullopt;
-}
-
 const absl::optional<std::string> SubstitutionFormatUtils::getHostname() {
 #ifdef HOST_NAME_MAX
   const size_t len = HOST_NAME_MAX;
@@ -1088,15 +1079,6 @@ const StreamInfoFormatter::FieldExtractorLookupTbl& StreamInfoFormatter::getKnow
                               return std::make_unique<StreamInfoDurationFieldExtractor>(
                                   [](const StreamInfo::StreamInfo& stream_info) {
                                     return stream_info.currentDuration();
-                                  });
-                            }}},
-                          {"STREAM_STATE",
-                           {CommandSyntaxChecker::COMMAND_ONLY,
-                            [](const std::string&, const absl::optional<size_t>&) {
-                              return std::make_unique<StreamInfoStringFieldExtractor>(
-                                  [](const StreamInfo::StreamInfo& stream_info) {
-                                    return SubstitutionFormatUtils::streamStateToString(
-                                        stream_info.streamState());
                                   });
                             }}},
                           {"RESPONSE_FLAGS",
