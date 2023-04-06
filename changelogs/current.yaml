@@ -372,16 +372,6 @@ new_features:
   change: |
     added :ref:`wait_for_warm_on_init <envoy_v3_api_field_config.cluster.v3.Cluster.wait_for_warm_on_init>` support for
     :ref:`Redis Cluster<arch_overview_redis>`.
-- area: access_log
-  change: |
-    added access log support for ``%STREAM_STATE%`` command operator. Using the command operator will extract a value
-    representing the state of the stream. Access logs at the beginning of the stream will have 'Started' value. Periodic
-    access logs during an active stream, will have 'InProgress' value. Default access log, at the end of a stream will have
-    'Ended' value. In case the stream has not started yet, the value will be null.
-- area: stream info
-  change: |
-    added the latency for how long an upstream request spends waiting for the connection pool callback to
-    ``UpstreamTiming``.
 - area: ext_authz
   change: |
     added :ref:`include_tls_session <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.include_tls_session>`
