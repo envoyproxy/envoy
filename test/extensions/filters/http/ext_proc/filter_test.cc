@@ -1991,7 +1991,6 @@ TEST_F(HttpFilterTest, ClearRouteCacheBodyMutation) {
 
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, true));
 
-  EXPECT_CALL(decoder_callbacks_.downstream_callbacks_, clearRouteCache());
   processRequestHeaders(false, [](const HttpHeaders&, ProcessingResponse&, HeadersResponse& resp) {
     auto* resp_body_mut = resp.mutable_response()->mutable_body_mutation();
     resp_body_mut->set_body("Hello, World");
@@ -2007,7 +2006,6 @@ TEST_F(HttpFilterTest, ClearRouteCacheBodyMutation) {
 
   EXPECT_EQ(FilterDataStatus::StopIterationNoBuffer, filter_->encodeData(resp_data, true));
 
-  EXPECT_CALL(encoder_callbacks_.downstream_callbacks_, clearRouteCache());
   processResponseBody([](const HttpBody&, ProcessingResponse&, BodyResponse& resp) {
     auto* resp_body_mut = resp.mutable_response()->mutable_body_mutation();
     resp_body_mut->set_body("Hello, World");

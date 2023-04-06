@@ -199,24 +199,6 @@ TEST_F(FilterTest, StreamFilterDelegationMultipleStreamEncoderFilters) {
   filter_.onDestroy();
 }
 
-TEST_F(FilterTest, StreamEncoderFilterCacheClearing) {
-  auto stream_filter = std::make_shared<Http::MockStreamEncoderFilter>();
-  stream_filter.auto factory_callback = [&](Http::FilterChainFactoryCallbacks& cb) {
-    cb.addStreamEncoderFilter(stream_filter);
-  };
-
-  EXPECT_CALL(*stream_filter, setEncoderFilterCallbacks(_));
-  ExecuteFilterAction action(factory_callback);
-  EXPECT_CALL(success_counter_, inc());
-  filter_.onMatchCallback(action);
-
-  doAllDecodingCallbacks();
-  expectDelegatedEncoding(*stream_filter);
-  doAllEncodingCallbacks();
-  EXPECT_CALL(*stream_filter, onDestroy());
-  filter_.onDestroy();
-}
-
 // Adding a encoder filter and an access loggers should be permitted and delegate to the access
 // logger.
 TEST_F(FilterTest, StreamFilterDelegationMultipleAccessLoggers) {
