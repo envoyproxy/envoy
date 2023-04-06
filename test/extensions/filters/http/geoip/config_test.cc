@@ -106,7 +106,7 @@ TEST(GeoipFilterConfigTest, GeoipFilterDefaultValues) {
   GeoipFilterConfig filter_config;
   TestUtility::loadFromYaml(filter_config_yaml, filter_config);
   NiceMock<Server::Configuration::MockFactoryContext> context;
-  EXPECT_CALL(context, messageValidationVisitor()).Times(3);
+  EXPECT_CALL(context, messageValidationVisitor()).Times(2);
   GeoipFilterFactory factory;
   Http::FilterFactoryCb cb = factory.createFilterFactoryFromProto(filter_config, "geoip", context);
   Http::MockFilterChainFactoryCallbacks filter_callback;
@@ -135,7 +135,7 @@ TEST(GeoipFilterConfigTest, GeoipFilterConfigWithCorrectProto) {
   GeoipFilterConfig filter_config;
   TestUtility::loadFromYaml(filter_config_yaml, filter_config);
   NiceMock<Server::Configuration::MockFactoryContext> context;
-  EXPECT_CALL(context, messageValidationVisitor()).Times(3);
+  EXPECT_CALL(context, messageValidationVisitor()).Times(2);
   GeoipFilterFactory factory;
   Http::FilterFactoryCb cb = factory.createFilterFactoryFromProto(filter_config, "geoip", context);
   Http::MockFilterChainFactoryCallbacks filter_callback;

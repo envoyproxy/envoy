@@ -40,6 +40,7 @@ envoy_cc_extension(
         "//envoy/config:typed_config_interface",
         "//envoy/network:address_interface",
         "//envoy/protobuf:message_validator_interface",
+        "//source/common/common:hash_lib",
         "@envoy_api//envoy/extensions/filters/http/geoip/v3:pkg_cc_proto",
     ],
 )

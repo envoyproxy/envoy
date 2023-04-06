@@ -6,6 +6,8 @@
 #include "envoy/network/address.h"
 #include "envoy/protobuf/message_validator.h"
 
+#include "absl/container/flat_hash_set.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {

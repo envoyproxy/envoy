@@ -26,9 +26,8 @@ Http::FilterFactoryCb GeoipFilterFactory::createFilterFactoryFromProtoTyped(
   auto& geo_provider_factory =
       Envoy::Config::Utility::getAndCheckFactory<GeoipProviderFactory>(provider_config);
   ProtobufTypes::MessagePtr message = Envoy::Config::Utility::translateToFactoryConfig(
-      provider_config, context.messageValidationVisitor(), geo_provider_factory);
+      provider_config, provider_context_->messageValidationVisitor(), geo_provider_factory);
   auto driver = geo_provider_factory.createGeoipProviderDriver(*message, provider_context_);
-
   return [filter_config, driver](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamDecoderFilter(std::make_shared<GeoipFilter>(filter_config, driver));
   };

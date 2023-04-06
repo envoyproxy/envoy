@@ -29,7 +29,6 @@ MATCHER_P2(HasExpectedHeader, expected_header, expected_value, "") {
     *result_listener << "expected header=" << expected_header << " but header was not found";
     return false;
   }
-  EXPECT_TRUE(request_headers.has(expected_header));
   if (!testing::Matches(expected_value)(
           request_headers.get(Http::LowerCaseString(expected_header))[0]
               ->value()
@@ -100,15 +99,13 @@ TEST_F(GeoipFilterTest, NoXffSuccessfulLookup) {
   filter_callbacks_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
       remote_address);
   EXPECT_CALL(*dummy_driver_, lookup(_, _))
-      .WillRepeatedly(
-          DoAll(SaveArg<0>(&captured_rq_), SaveArg<1>(&captured_cb_), Invoke([this]() {
-                  captured_cb_(LookupResult{{"x-geo-city", absl::make_optional("dummy-city")}});
-                })));
+      .WillRepeatedly(DoAll(SaveArg<0>(&captured_rq_), SaveArg<1>(&captured_cb_)));
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data_, false));
   Http::TestRequestTrailerMapImpl request_trailers;
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers));
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(request_headers, false));
+  captured_cb_(LookupResult{{"x-geo-city", absl::make_optional("dummy-city")}});
   EXPECT_CALL(filter_callbacks_, continueDecoding());
   dispatcher_->run(Event::Dispatcher::RunType::Block);
   EXPECT_EQ(1, request_headers.size());
