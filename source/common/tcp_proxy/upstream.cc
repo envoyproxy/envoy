@@ -50,10 +50,10 @@ bool TcpUpstream::startUpstreamSecureTransport() {
 }
 
 Ssl::ConnectionInfoConstSharedPtr TcpUpstream::getUpstreamConnectionSslInfo() {
-  if (!upstream_conn_data_) {
-    return nullptr;
+  if (upstream_conn_data_ != nullptr) {
+    return upstream_conn_data_->connection().ssl();
   }
-  return upstream_conn_data_->connection().ssl();
+  return nullptr;
 }
 
 Tcp::ConnectionPool::ConnectionData*
