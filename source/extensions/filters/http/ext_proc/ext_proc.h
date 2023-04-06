@@ -73,12 +73,11 @@ public:
                const std::chrono::milliseconds message_timeout,
                const uint32_t max_message_timeout_ms, Stats::Scope& scope,
                const std::string& stats_prefix)
-      : failure_mode_allow_(config.failure_mode_allow()), 
+      : failure_mode_allow_(config.failure_mode_allow()),
         disable_route_cache_clearing_(config.disable_route_cache_clearing()),
-        message_timeout_(message_timeout),
-        max_message_timeout_ms_(max_message_timeout_ms),
+        message_timeout_(message_timeout), max_message_timeout_ms_(max_message_timeout_ms),
         stats_(generateStats(stats_prefix, config.stat_prefix(), scope)),
-        processing_mode_(config.processing_mode()), mutation_checker_(config.mutation_rules())  {}
+        processing_mode_(config.processing_mode()), mutation_checker_(config.mutation_rules()) {}
 
   bool failureModeAllow() const { return failure_mode_allow_; }
 

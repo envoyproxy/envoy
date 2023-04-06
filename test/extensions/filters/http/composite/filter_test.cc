@@ -199,11 +199,9 @@ TEST_F(FilterTest, StreamFilterDelegationMultipleStreamEncoderFilters) {
   filter_.onDestroy();
 }
 
-
 TEST_F(FilterTest, StreamEncoderFilterCacheClearing) {
   auto stream_filter = std::make_shared<Http::MockStreamEncoderFilter>();
-  stream_filter.
-  auto factory_callback = [&](Http::FilterChainFactoryCallbacks& cb) {
+  stream_filter.auto factory_callback = [&](Http::FilterChainFactoryCallbacks& cb) {
     cb.addStreamEncoderFilter(stream_filter);
   };
 
