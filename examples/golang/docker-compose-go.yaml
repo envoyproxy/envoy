@@ -1,20 +1,15 @@
 services:
   go_plugin_compile:
     build:
-      context: ../shared/build
-    # you are recommended to use the "go" command directly,
-    # instead of "bazel run @go_sdk//:bin/go --" here.
+      context: simple
+      dockerfile: ../../shared/golang/Dockerfile
+      target: golang-base
     command: >
       bash -c "
       cd examples/golang/simple
-      && bazel run @go_sdk//:bin/go -- build -o simple.so -buildmode=c-shared .
-      && cp -a ./simple.so /output"
-    entrypoint: /source/examples/shared/build/build-entrypoint.sh
-    environment:
-    - BUILD_UID=${UID:-1000}
-    - TEST_TMPDIR=/tmp
+      && go build -o simple.so -buildmode=c-shared .
+      && cp ./simple.so /output"
     working_dir: /source
     volumes:
-    - ${ENVOY_DOCKER_BUILD_DIR:-/tmp/envoy-docker-build}:/tmp
     - ../..:/source
     - ./lib:/output
