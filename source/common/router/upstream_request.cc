@@ -170,13 +170,20 @@ void UpstreamRequest::cleanUp() {
     // Allows for testing.
     per_try_timeout_->disableTimer();
   }
+
   if (per_try_idle_timeout_ != nullptr) {
     // Allows for testing.
     per_try_idle_timeout_->disableTimer();
   }
+
   if (max_stream_duration_timer_ != nullptr) {
     max_stream_duration_timer_->disableTimer();
   }
+
+  if (upstream_log_flush_timer_ != nullptr) {
+    upstream_log_flush_timer_->disableTimer();
+  }
+
   clearRequestEncoder();
 
   // If desired, fire the per-try histogram when the UpstreamRequest
@@ -389,6 +396,20 @@ void UpstreamRequest::acceptHeadersFromRouter(bool end_stream) {
   // creation but for now optimize for minimal latency and fetch the connection
   // as soon as possible.
   conn_pool_->newStream(this);
+
+  if (parent_.config().upstream_log_flush_interval_.has_value()) {
+    upstream_log_flush_timer_ = parent_.callbacks()->dispatcher().createTimer([this]() -> void {
+      // If the request is complete, we've already done the stream-end upstream log, and shouldn't
+      // do the periodic log.
+      if (!streamInfo().requestComplete().has_value()) {
+        upstreamLog();
+        resetUpstreamLogFlushTimer();
+      }
+    });
+
+    resetUpstreamLogFlushTimer();
+  }
+
   if (!allow_upstream_filters_) {
     return;
   }
@@ -531,6 +552,13 @@ void UpstreamRequest::resetStream() {
 void UpstreamRequest::resetPerTryIdleTimer() {
   if (per_try_idle_timeout_ != nullptr) {
     per_try_idle_timeout_->enableTimer(parent_.timeout().per_try_idle_timeout_);
+  }
+}
+
+void UpstreamRequest::resetUpstreamLogFlushTimer() {
+  if (upstream_log_flush_timer_ != nullptr) {
+    upstream_log_flush_timer_->enableTimer(
+        parent_.config().upstream_log_flush_interval_.value());
   }
 }
 

@@ -68,6 +68,14 @@ For HTTP Connection Manager, it is possible to enable a prediodic access log by 
 Note: The first access log entry is generated one interval after a new HTTP request is received by the HTTP Connection Manager and before iterating
 the HTTP filter chain, whether or not an upstream connection has been made.
 
+HTTP Router Filter
+******************
+
+For Router Filter, it is possible to enable a prediodic access log by using
+:ref:`upstream log flush interval <envoy_v3_api_field_extensions.filters.http.router.v3.Router.UpstreamAccessLogOptions.upstream_log_flush_interval>`
+Note: The first interval count will start right after an HTTP request is received by the HTTP Router filter. Each request in the HTTP stream will have its own
+periodic upstream log records.
+
 .. _arch_overview_access_log_filters:
 
 Access log filters
