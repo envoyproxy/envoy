@@ -46,18 +46,19 @@ public:
   bool enableStrictDnsCluster() const { return enable_strict_dns_cluster_; }
   Upstream::HostConstSharedPtr chooseHost(absl::string_view host,
                                           Upstream::LoadBalancerContext* context);
-  envoy::config::cluster::v3::Cluster
-  subClusterConfig(const std::string& cluster_name, const std::string& host, const int port) const;
+  std::pair<bool, std::unique_ptr<envoy::config::cluster::v3::Cluster>>
+  createSubClusterConfig(const std::string& cluster_name, const std::string& host, const int port);
+  bool touch(const std::string& cluster_name);
+  void checkIdleSubCluster();
 
 private:
   struct ClusterInfo {
     ClusterInfo(std::string cluster_name, Cluster& parent);
     void touch();
-    void checkIdle();
+    bool checkIdle();
 
     std::string cluster_name_;
     Cluster& parent_;
-    Event::TimerPtr idle_timer_;
     std::atomic<std::chrono::steady_clock::duration> last_used_time_;
   };
 
@@ -168,8 +169,11 @@ private:
   Event::Dispatcher& main_thread_dispatcher_;
   const std::chrono::milliseconds refresh_interval_;
   const std::chrono::milliseconds host_ttl_;
+  const size_t max_sub_clusters_{0};
   const envoy::config::cluster::v3::Cluster orig_cluster_config_;
   const envoy::extensions::clusters::dynamic_forward_proxy::v3::ClusterConfig orig_dfp_config_;
+
+  Event::TimerPtr idle_timer_;
 
   // True if H2 and H3 connections may be reused across different origins.
   const bool allow_coalesced_connections_;

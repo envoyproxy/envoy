@@ -34,11 +34,20 @@ Cluster::Cluster(
       refresh_interval_(
           PROTOBUF_GET_MS_OR_DEFAULT(config.dns_cache_config(), dns_refresh_rate, 60000)),
       host_ttl_(PROTOBUF_GET_MS_OR_DEFAULT(config.dns_cache_config(), host_ttl, 300000)),
+      max_sub_clusters_(
+          PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.dns_cache_config(), max_hosts, 1024)),
       orig_cluster_config_(cluster), orig_dfp_config_(config),
       allow_coalesced_connections_(config.allow_coalesced_connections()),
       cm_(context.clusterManager()),
       enable_strict_dns_cluster_(Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.enable_strict_dns_sub_cluster_for_dfp_cluster")) {}
+          "envoy.reloadable_features.enable_strict_dns_sub_cluster_for_dfp_cluster")) {
+
+  if (enable_strict_dns_cluster_) {
+    idle_timer_ = main_thread_dispatcher_.createTimer([this]() { checkIdleSubCluster(); });
+    auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(refresh_interval_);
+    idle_timer_->enableTimer(ms);
+  }
+}
 
 void Cluster::startPreInit() {
   // If we are attaching to a pre-populated cache we need to initialize our hosts.
@@ -53,28 +62,72 @@ void Cluster::startPreInit() {
   onPreInitComplete();
 }
 
-envoy::config::cluster::v3::Cluster Cluster::subClusterConfig(const std::string& cluster_name,
-                                                              const std::string& host,
-                                                              const int port) const {
-  envoy::config::cluster::v3::Cluster config = orig_cluster_config_;
+bool Cluster::touch(const std::string& cluster_name) {
+  absl::ReaderMutexLock lock{&cluster_map_lock_};
+  const auto cluster_it = cluster_map_.find(cluster_name);
+  if (cluster_it != cluster_map_.end()) {
+    cluster_it->second->touch();
+    return true;
+  }
+  ENVOY_LOG(debug, "cluster='{}' is removed while touching", cluster_name);
+  return false;
+}
 
-  config.set_dns_lookup_family(orig_dfp_config_.dns_cache_config().dns_lookup_family());
+void Cluster::checkIdleSubCluster() {
+  ASSERT(main_thread_dispatcher_.isThreadSafe());
+  {
+    absl::WriterMutexLock lock{&cluster_map_lock_};
+    for (auto it = cluster_map_.cbegin(); it != cluster_map_.cend();) {
+      if (it->second->checkIdle()) {
+        auto cluster_name = it->first;
+        ENVOY_LOG(debug, "cluster='{}' removing from cluster_map & cluster manager", cluster_name);
+        cluster_map_.erase(it++);
+        cm_.removeCluster(cluster_name);
+      } else {
+        ++it;
+      }
+    }
+  }
+  auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(refresh_interval_);
+  idle_timer_->enableTimer(ms);
+}
+
+std::pair<bool, std::unique_ptr<envoy::config::cluster::v3::Cluster>>
+Cluster::createSubClusterConfig(const std::string& cluster_name, const std::string& host,
+                                const int port) {
+  {
+    absl::WriterMutexLock lock{&cluster_map_lock_};
+    const auto cluster_it = cluster_map_.find(cluster_name);
+    if (cluster_it != cluster_map_.end()) {
+      cluster_it->second->touch();
+      return std::make_pair(true, nullptr);
+    }
+    if (max_sub_clusters_ > 0 && cluster_map_.size() >= max_sub_clusters_) {
+      ENVOY_LOG(debug, "cluster='{}' create failed due to max sub cluster limitation",
+                cluster_name);
+      return std::make_pair(false, nullptr);
+    }
+    cluster_map_.emplace(cluster_name, std::make_shared<ClusterInfo>(cluster_name, *this));
+  }
+  auto config = std::make_unique<envoy::config::cluster::v3::Cluster>(orig_cluster_config_);
+
+  config->set_dns_lookup_family(orig_dfp_config_.dns_cache_config().dns_lookup_family());
 
   // overwrite to a strict_dns cluster.
-  config.set_name(cluster_name);
-  config.clear_cluster_type();
-  config.set_type(
+  config->set_name(cluster_name);
+  config->clear_cluster_type();
+  config->set_type(
       envoy::config::cluster::v3::Cluster_DiscoveryType::Cluster_DiscoveryType_STRICT_DNS);
-  config.set_lb_policy(envoy::config::cluster::v3::Cluster_LbPolicy::Cluster_LbPolicy_ROUND_ROBIN);
+  config->set_lb_policy(envoy::config::cluster::v3::Cluster_LbPolicy::Cluster_LbPolicy_ROUND_ROBIN);
 
   /*
-    config.set_dns_lookup_family(
+    config->set_dns_lookup_family(
         envoy::config::cluster::v3::Cluster_DnsLookupFamily::Cluster_DnsLookupFamily_V4_ONLY);
-    config.mutable_connect_timeout()->CopyFrom(
+    config->mutable_connect_timeout()->CopyFrom(
         Protobuf::util::TimeUtil::MillisecondsToDuration(parent_info->connectTimeout().count()));
   */
 
-  auto load_assignments = config.mutable_load_assignment();
+  auto load_assignments = config->mutable_load_assignment();
   load_assignments->set_cluster_name(cluster_name);
   load_assignments->clear_endpoints();
 
@@ -86,7 +139,7 @@ envoy::config::cluster::v3::Cluster Cluster::subClusterConfig(const std::string&
   socket_address->set_address(host);
   socket_address->set_port_value(port);
 
-  return config;
+  return std::make_pair(true, std::move(config));
 }
 
 Upstream::HostConstSharedPtr Cluster::chooseHost(absl::string_view host,
@@ -101,61 +154,31 @@ Upstream::HostConstSharedPtr Cluster::chooseHost(absl::string_view host,
   auto port = host_attributes.port_.value_or(default_port);
 
   // cluster name is prefix + host + port
-  auto dynamic_cluster_name = "DFPCluster:" + dynamic_host + ":" + std::to_string(port);
+  auto cluster_name = "DFPCluster:" + dynamic_host + ":" + std::to_string(port);
 
-  // try again to get the real cluster.
-  auto dynamic_cluster = cm_.getThreadLocalCluster(dynamic_cluster_name);
-  if (dynamic_cluster == nullptr) {
+  // try again to get the sub cluster.
+  auto cluster = cm_.getThreadLocalCluster(cluster_name);
+  if (cluster == nullptr) {
+    ENVOY_LOG(error, "cluster='{}' get thread local failed, too short ttl?", cluster_name);
     return nullptr;
   }
 
-  auto chosen_host = dynamic_cluster->loadBalancer().chooseHost(context);
-  if (chosen_host == nullptr) {
-    return nullptr;
-  }
-
-  // TODO: check cluster in cluster_map.
-  // 1. if cluster not existing, add to cluster map, and create a idle timeout timer.
-  // 2. if cluster existing, update the last active time.
-  {
-    absl::ReaderMutexLock lock{&cluster_map_lock_};
-    const auto cluster_it = cluster_map_.find(dynamic_cluster_name);
-    if (cluster_it != cluster_map_.end()) {
-      cluster_it->second->touch();
-      return chosen_host;
-    }
-  }
-  {
-    absl::WriterMutexLock lock{&cluster_map_lock_};
-    const auto cluster_it = cluster_map_.find(dynamic_cluster_name);
-    if (cluster_it == cluster_map_.end()) {
-      cluster_map_.emplace(dynamic_cluster_name,
-                           std::make_shared<ClusterInfo>(dynamic_cluster_name, *this));
-    } else {
-      cluster_it->second->touch();
-    }
-  }
-  return chosen_host;
+  return cluster->loadBalancer().chooseHost(context);
 }
 
 Cluster::ClusterInfo::ClusterInfo(std::string cluster_name, Cluster& parent)
     : cluster_name_(cluster_name), parent_(parent) {
-  ENVOY_LOG(debug, "cluster='{}' created, enable TTL check", cluster_name_);
-  parent_.main_thread_dispatcher_.post([this]() {
-    idle_timer_ = parent_.main_thread_dispatcher_.createTimer([this]() { checkIdle(); });
-    std::chrono::seconds dns_ttl =
-        std::chrono::duration_cast<std::chrono::seconds>(parent_.refresh_interval_);
-    idle_timer_->enableTimer(std::chrono::milliseconds(dns_ttl));
-  });
+  ENVOY_LOG(debug, "cluster='{}' ClusterInfo created", cluster_name_);
   touch();
 }
 
 void Cluster::ClusterInfo::touch() {
+  ENVOY_LOG(debug, "cluster='{}' updating last used time", cluster_name_);
   last_used_time_ = parent_.time_source_.monotonicTime().time_since_epoch();
 }
 
 // checkIdle run in the main thread.
-void Cluster::ClusterInfo::checkIdle() {
+bool Cluster::ClusterInfo::checkIdle() {
   ASSERT(parent_.main_thread_dispatcher_.isThreadSafe());
 
   const std::chrono::steady_clock::duration now_duration =
@@ -165,13 +188,10 @@ void Cluster::ClusterInfo::checkIdle() {
             now_duration.count(), last_used_time.count(), parent_.host_ttl_.count());
 
   if ((now_duration - last_used_time) > parent_.host_ttl_) {
-    ENVOY_LOG(debug, "cluster='{}' TTL expired, removing in main thread", cluster_name_);
-    parent_.cm_.removeCluster(cluster_name_);
-  } else {
-    std::chrono::seconds dns_ttl =
-        std::chrono::duration_cast<std::chrono::seconds>(parent_.refresh_interval_);
-    idle_timer_->enableTimer(std::chrono::milliseconds(dns_ttl));
+    ENVOY_LOG(debug, "cluster='{}' TTL expired", cluster_name_);
+    return true;
   }
+  return false;
 }
 
 void Cluster::addOrUpdateHost(
@@ -409,8 +429,8 @@ ClusterFactory::createClusterWithConfig(
                                                context, context.runtime(), cache_manager_factory,
                                                context.localInfo(), context.addedViaApi());
 
-  // Save the cluster into cluster_info, so that we can get the cluster in the worker thread through
-  // cluster_info.
+  // Save the cluster into cluster_info, so that we can get the cluster in the worker thread
+  // through cluster_info.
   new_cluster->info()->cluster(new_cluster);
 
   auto& options = new_cluster->info()->upstreamHttpProtocolOptions();

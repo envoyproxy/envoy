@@ -6,6 +6,7 @@
 #include "envoy/upstream/cluster_manager.h"
 
 #include "source/common/upstream/upstream_impl.h"
+#include "source/extensions/clusters/dynamic_forward_proxy/cluster.h"
 #include "source/extensions/common/dynamic_forward_proxy/dns_cache.h"
 #include "source/extensions/filters/http/common/pass_through_filter.h"
 
@@ -44,7 +45,7 @@ public:
   Upstream::ClusterManager& clusterManager() { return cluster_manager_; }
   bool saveUpstreamAddress() const { return save_upstream_address_; };
 
-  LoadClusterEntryHandlePtr addDynamicCluster(Upstream::ClusterInfoConstSharedPtr parent_info,
+  LoadClusterEntryHandlePtr addDynamicCluster(Clusters::DynamicForwardProxy::Cluster* cluster,
                                               const std::string& cluster_name,
                                               const std::string& host, const int port,
                                               LoadClusterEntryCallbacks& callback);

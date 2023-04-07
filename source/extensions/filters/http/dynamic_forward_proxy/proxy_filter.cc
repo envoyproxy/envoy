@@ -10,8 +10,6 @@
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/runtime/runtime_features.h"
 #include "source/common/stream_info/upstream_address.h"
-#include "source/extensions/clusters/dynamic_forward_proxy/cluster.h"
-#include "source/extensions/common/dynamic_forward_proxy/dns_cache.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -61,24 +59,28 @@ ProxyFilterConfig::ProxyFilterConfig(
 }
 
 LoadClusterEntryHandlePtr
-ProxyFilterConfig::addDynamicCluster(Upstream::ClusterInfoConstSharedPtr parent_info,
+ProxyFilterConfig::addDynamicCluster(Clusters::DynamicForwardProxy::Cluster* cluster,
                                      const std::string& cluster_name, const std::string& host,
                                      const int port, LoadClusterEntryCallbacks& callbacks) {
-  Upstream::ClusterSharedPtr cluster = parent_info->cluster();
-  ASSERT(cluster != nullptr);
-  Envoy::Extensions::Clusters::DynamicForwardProxy::Cluster* dfp_cluster =
-      dynamic_cast<Envoy::Extensions::Clusters::DynamicForwardProxy::Cluster*>(cluster.get());
-  ASSERT(dfp_cluster != nullptr);
-  envoy::config::cluster::v3::Cluster config =
-      dfp_cluster->subClusterConfig(cluster_name, host, port);
+  std::pair<bool, std::unique_ptr<envoy::config::cluster::v3::Cluster>> sub_cluster_pair =
+      cluster->createSubClusterConfig(cluster_name, host, port);
 
-  std::string version_info = "";
+  if (!sub_cluster_pair.first) {
+    ENVOY_LOG(debug, "cluster='{}' create failed due to max sub cluster limitation", cluster_name);
+    return nullptr;
+  }
 
-  ENVOY_LOG(debug, "deliver dynamic cluster {} creation to main thread", cluster_name);
-  main_thread_dispatcher_.post([this, cluster = config, version_info]() {
-    ENVOY_LOG(debug, "initilizing dynamic cluster {} creation in main thread", cluster.name());
-    cluster_manager_.addOrUpdateCluster(cluster, version_info);
-  });
+  auto config = std::move(sub_cluster_pair.second);
+  if (config != nullptr) {
+    std::string version_info = "";
+    ENVOY_LOG(debug, "deliver dynamic cluster {} creation to main thread", cluster_name);
+    main_thread_dispatcher_.post([this, cluster = std::move(config), version_info]() {
+      ENVOY_LOG(debug, "initilizing dynamic cluster {} creation in main thread", cluster->name());
+      cluster_manager_.addOrUpdateCluster(*cluster.get(), version_info);
+    });
+  } else {
+    ENVOY_LOG(debug, "cluster='{}' already created, waiting it warming", cluster_name);
+  }
 
   // register a callback that will continue the request when the created cluster is ready.
   ENVOY_LOG(debug, "adding pending cluster for: {}", cluster_name);
@@ -267,20 +269,33 @@ Http::FilterHeadersStatus ProxyFilter::loadDynamicCluster(Http::RequestHeaderMap
   // TODO: another cluster type when it's an IP.
   // host_attributes.is_ip_address_;
 
+  Upstream::ClusterSharedPtr cluster = cluster_info_->cluster();
+  if (cluster == nullptr) {
+    // TODO: local reply
+    PANIC("TODO");
+  }
+  auto dfp_cluster = dynamic_cast<Clusters::DynamicForwardProxy::Cluster*>(cluster.get());
+  ASSERT(dfp_cluster != nullptr);
+
   latchTime(decoder_callbacks_, DNS_START);
 
   // cluster name is prefix + host + port
   auto cluster_name = "DFPCluster:" + host + ":" + std::to_string(port);
-  Upstream::ThreadLocalCluster* dfp_cluster =
+  Upstream::ThreadLocalCluster* local_cluster =
       config_->clusterManager().getThreadLocalCluster(cluster_name);
-  if (dfp_cluster) {
-    // DFP cluster already exists
+  if (local_cluster && dfp_cluster->touch(cluster_name)) {
+    ENVOY_STREAM_LOG(debug, "using the thread local cluster after touch success",
+                     *decoder_callbacks_);
     latchTime(decoder_callbacks_, DNS_END);
     return Http::FilterHeadersStatus::Continue;
   }
 
+  // Still need to add dynamic cluster again even the thread local cluster exists while touch
+  // failed, that means the cluster is removed in main thread due to ttl reached.
+  // Otherwise, we may not be able to get the thread local cluster in router.
+
   // not found, create a new cluster & register a callback to tls
-  cluster_load_handle_ = config_->addDynamicCluster(cluster_info_, cluster_name, host, port, *this);
+  cluster_load_handle_ = config_->addDynamicCluster(dfp_cluster, cluster_name, host, port, *this);
   ASSERT(cluster_load_handle_ != nullptr);
   ENVOY_STREAM_LOG(debug, "waiting to load cluster entry", *decoder_callbacks_);
   return Http::FilterHeadersStatus::StopAllIterationAndWatermark;
