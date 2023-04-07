@@ -186,17 +186,19 @@ HeaderValidator::validateGenericHeaderName(const HeaderString& name) {
             UhvResponseCodeDetail::get().EmptyHeaderName};
   }
 
+  const bool reject_header_names_with_underscores =
+      config_.headers_with_underscores_action() == HeaderValidatorConfig::REJECT_REQUEST;
   bool is_valid = true;
-  bool has_underscore = false;
+  bool reject_due_to_underscore = false;
   char c = '\0';
-  const auto& underscore_action = config_.headers_with_underscores_action();
 
-  for (auto iter = key_string_view.begin(); iter != key_string_view.end() && is_valid; ++iter) {
+  for (auto iter = key_string_view.begin();
+       iter != key_string_view.end() && is_valid && !reject_due_to_underscore; ++iter) {
     c = *iter;
     if (c != '_') {
       is_valid &= testChar(kGenericHeaderNameCharTable, c);
     } else {
-      has_underscore = true;
+      reject_due_to_underscore = reject_header_names_with_underscores;
     }
   }
 
@@ -205,16 +207,10 @@ HeaderValidator::validateGenericHeaderName(const HeaderString& name) {
             UhvResponseCodeDetail::get().InvalidNameCharacters};
   }
 
-  if (has_underscore) {
-    if (underscore_action == HeaderValidatorConfig::REJECT_REQUEST) {
-      stats_.incRequestsRejectedWithUnderscoresInHeaders();
-      return {HeaderEntryValidationResult::Action::Reject,
-              UhvResponseCodeDetail::get().InvalidUnderscore};
-    } else if (underscore_action == HeaderValidatorConfig::DROP_HEADER) {
-      stats_.incDroppedHeadersWithUnderscores();
-      return {HeaderEntryValidationResult::Action::DropHeader,
-              UhvResponseCodeDetail::get().InvalidUnderscore};
-    }
+  if (reject_due_to_underscore) {
+    stats_.incRequestsRejectedWithUnderscoresInHeaders();
+    return {HeaderEntryValidationResult::Action::Reject,
+            UhvResponseCodeDetail::get().InvalidUnderscore};
   }
 
   return HeaderEntryValidationResult::success();
@@ -492,42 +488,58 @@ HeaderValidator::HeaderEntryValidationResult HeaderValidator::validateGenericReq
 // For H/1 the codec will never produce H/2 pseudo headers and per
 // https://www.rfc-editor.org/rfc/rfc9110#section-6.5 there are no other prohibitions.
 // As a result this common function can cover trailer validation for all protocols.
-HeaderValidator::TrailerValidationResult
-HeaderValidator::validateTrailers(::Envoy::Http::HeaderMap& trailers) {
+HeaderValidator::ValidationResult
+HeaderValidator::validateTrailers(const ::Envoy::Http::HeaderMap& trailers) {
   std::string reject_details;
-  std::vector<absl::string_view> drop_headers;
-  trailers.iterate(
-      [this, &reject_details, &drop_headers](
-          const ::Envoy::Http::HeaderEntry& header_entry) -> ::Envoy::Http::HeaderMap::Iterate {
-        const auto& header_name = header_entry.key();
-        const auto& header_value = header_entry.value();
+  trailers.iterate([this, &reject_details](const ::Envoy::Http::HeaderEntry& header_entry)
+                       -> ::Envoy::Http::HeaderMap::Iterate {
+    const auto& header_name = header_entry.key();
+    const auto& header_value = header_entry.value();
 
-        auto entry_name_result = validateGenericHeaderName(header_name);
-        if (entry_name_result.action() == HeaderEntryValidationResult::Action::DropHeader) {
-          // drop the header, continue processing the request
-          drop_headers.push_back(header_name.getStringView());
-        } else if (!entry_name_result) {
-          reject_details = static_cast<std::string>(entry_name_result.details());
-        } else {
-          auto entry_value_result = validateGenericHeaderValue(header_value);
-          if (!entry_value_result) {
-            reject_details = static_cast<std::string>(entry_value_result.details());
-          }
-        }
+    auto entry_name_result = validateGenericHeaderName(header_name);
+    if (!entry_name_result.ok()) {
+      reject_details = static_cast<std::string>(entry_name_result.details());
+    } else {
+      auto entry_value_result = validateGenericHeaderValue(header_value);
+      if (!entry_value_result) {
+        reject_details = static_cast<std::string>(entry_value_result.details());
+      }
+    }
 
-        return reject_details.empty() ? ::Envoy::Http::HeaderMap::Iterate::Continue
-                                      : ::Envoy::Http::HeaderMap::Iterate::Break;
-      });
+    return reject_details.empty() ? ::Envoy::Http::HeaderMap::Iterate::Continue
+                                  : ::Envoy::Http::HeaderMap::Iterate::Break;
+  });
 
   if (!reject_details.empty()) {
-    return {TrailerValidationResult::Action::Reject, reject_details};
+    return {ValidationResult::Action::Reject, reject_details};
   }
 
+  return ValidationResult::success();
+}
+
+void HeaderValidator::sanitizeHeadersWithUnderscores(::Envoy::Http::HeaderMap& header_map) {
+  const auto& underscore_action = config_.headers_with_underscores_action();
+  if (underscore_action == HeaderValidatorConfig::ALLOW) {
+    return;
+  }
+
+  std::vector<absl::string_view> drop_headers;
+  header_map.iterate([&drop_headers](const ::Envoy::Http::HeaderEntry& header_entry)
+                         -> ::Envoy::Http::HeaderMap::Iterate {
+    const absl::string_view header_name = header_entry.key().getStringView();
+    if (absl::StrContains(header_name, '_')) {
+      drop_headers.push_back(header_name);
+    }
+
+    return ::Envoy::Http::HeaderMap::Iterate::Continue;
+  });
+
+  // The reject case is handled in the validate... methods
+  ASSERT(drop_headers.empty() || underscore_action == HeaderValidatorConfig::DROP_HEADER);
   for (auto& name : drop_headers) {
-    trailers.remove(::Envoy::Http::LowerCaseString(name));
+    stats_.incDroppedHeadersWithUnderscores();
+    header_map.remove(::Envoy::Http::LowerCaseString(name));
   }
-
-  return TrailerValidationResult::success();
 }
 
 } // namespace EnvoyDefault

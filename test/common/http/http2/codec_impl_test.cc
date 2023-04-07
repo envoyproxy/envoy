@@ -2693,9 +2693,11 @@ TEST_P(Http2CodecImplTest, HeaderNameWithUnderscoreAreDropped) {
   // Header validation is done by the HCM when header map is fully parsed.
   EXPECT_CALL(request_decoder_, decodeHeaders_(_, _))
       .WillOnce(Invoke([this, &expected_headers](RequestHeaderMapSharedPtr& headers, bool) -> void {
-        auto result = header_validator_->validateRequestHeaderMap(*headers);
+        auto validation_result = header_validator_->validateRequestHeaders(*headers);
+        EXPECT_TRUE(validation_result.ok());
+        auto transformation_result = header_validator_->transformRequestHeaders(*headers);
         EXPECT_THAT(headers, HeaderMapEqualIgnoreOrder(&expected_headers));
-        ASSERT_TRUE(result.ok());
+        EXPECT_TRUE(transformation_result.ok());
       }));
 #else
   EXPECT_CALL(request_decoder_, decodeHeaders_(HeaderMapEqual(&expected_headers), _));
@@ -2722,7 +2724,7 @@ TEST_P(Http2CodecImplTest, HeaderNameWithUnderscoreAreRejected) {
   // stream_error_on_invalid_http_message flag, which in this test is assumed to equal false).
   EXPECT_CALL(request_decoder_, decodeHeaders_(_, _))
       .WillOnce(Invoke([this](RequestHeaderMapSharedPtr& headers, bool) -> void {
-        auto result = header_validator_->validateRequestHeaderMap(*headers);
+        auto result = header_validator_->validateRequestHeaders(*headers);
         ASSERT_FALSE(result.ok());
         response_encoder_->encodeHeaders(TestResponseHeaderMapImpl{{":status", "400"},
                                                                    {"connection", "close"},
@@ -2756,7 +2758,7 @@ TEST_P(Http2CodecImplTest, HeaderNameWithUnderscoreAllowed) {
   // Header validation is done by the HCM when header map is fully parsed.
   EXPECT_CALL(request_decoder_, decodeHeaders_(_, _))
       .WillOnce(Invoke([this, &expected_headers](RequestHeaderMapSharedPtr& headers, bool) -> void {
-        auto result = header_validator_->validateRequestHeaderMap(*headers);
+        auto result = header_validator_->validateRequestHeaders(*headers);
         EXPECT_THAT(headers, HeaderMapEqualIgnoreOrder(&expected_headers));
         ASSERT_TRUE(result.ok());
       }));
@@ -4385,7 +4387,7 @@ TEST_P(Http2CodecImplTest, BadResponseHeader) {
   // Header validation is done by the CodecClient after header map is fully parsed.
   EXPECT_CALL(response_decoder_, decodeHeaders_(_, _))
       .WillOnce(Invoke([this](ResponseHeaderMapPtr& headers, bool) -> void {
-        auto result = header_validator_->validateResponseHeaderMap(*headers);
+        auto result = header_validator_->validateResponseHeaders(*headers);
         ASSERT_FALSE(result.ok());
       }));
 #else

@@ -27,9 +27,7 @@ public:
           config,
       ::Envoy::Http::Protocol protocol, ::Envoy::Http::HeaderValidatorStats& stats);
 
-  enum class RejectOrDropHeaderAction { Accept, Reject, DropHeader };
-
-  using HeaderEntryValidationResult = Result<RejectOrDropHeaderAction>;
+  using HeaderEntryValidationResult = RejectResult;
   using HeaderValueValidationResult = RejectResult;
   /*
    * Validate the :method pseudo header, honoring the restrict_http_methods configuration option.
@@ -152,7 +150,8 @@ protected:
   /*
    * Common method for validating request or response trailers.
    */
-  TrailerValidationResult validateTrailers(::Envoy::Http::HeaderMap& trailers);
+  ValidationResult validateTrailers(const ::Envoy::Http::HeaderMap& trailers);
+  void sanitizeHeadersWithUnderscores(::Envoy::Http::HeaderMap& header_map);
 
   const envoy::extensions::http::header_validators::envoy_default::v3::HeaderValidatorConfig
       config_;

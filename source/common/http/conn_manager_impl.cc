@@ -938,15 +938,23 @@ uint32_t ConnectionManagerImpl::ActiveStream::localPort() {
 
 bool ConnectionManagerImpl::ActiveStream::validateHeaders() {
   if (header_validator_) {
-    auto validation_result = header_validator_->validateRequestHeaderMap(*request_headers_);
-    if (!validation_result.ok()) {
+    auto validation_result = header_validator_->validateRequestHeaders(*request_headers_);
+    bool failure = !validation_result.ok();
+    bool redirect = false;
+    absl::string_view failure_details = validation_result.details();
+    if (!failure) {
+      auto transformation_result = header_validator_->transformRequestHeaders(*request_headers_);
+      failure = !transformation_result.ok();
+      redirect = transformation_result.action() ==
+                 Http::HeaderValidator::HeadersTransformationResult::Action::Redirect;
+      failure_details = transformation_result.details();
+    }
+    if (failure) {
       std::function<void(ResponseHeaderMap & headers)> modify_headers;
       Code response_code = Code::BadRequest;
       absl::optional<Grpc::Status::GrpcStatus> grpc_status;
       bool is_grpc = Grpc::Common::hasGrpcContentType(*request_headers_);
-      if (validation_result.action() ==
-              Http::HeaderValidator::RequestHeaderMapValidationResult::Action::Redirect &&
-          !is_grpc) {
+      if (redirect && !is_grpc) {
         response_code = Code::TemporaryRedirect;
         modify_headers = [new_path = request_headers_->Path()->value().getStringView()](
                              Http::ResponseHeaderMap& response_headers) -> void {
@@ -959,14 +967,14 @@ bool ConnectionManagerImpl::ActiveStream::validateHeaders() {
       // H/2 codec was resetting requests that were rejected due to headers with underscores,
       // instead of sending 400. Preserving this behavior for now.
       // TODO(#24466): Make H/2 behavior consistent with H/1 and H/3.
-      if (validation_result.details() == UhvResponseCodeDetail::get().InvalidUnderscore &&
+      if (failure_details == UhvResponseCodeDetail::get().InvalidUnderscore &&
           connection_manager_.codec_->protocol() == Protocol::Http2) {
-        filter_manager_.streamInfo().setResponseCodeDetails(validation_result.details());
+        filter_manager_.streamInfo().setResponseCodeDetails(failure_details);
         resetStream();
       } else {
-        sendLocalReply(response_code, "", modify_headers, grpc_status, validation_result.details());
+        sendLocalReply(response_code, "", modify_headers, grpc_status, failure_details);
         if (!response_encoder_->streamErrorOnInvalidHttpMessage()) {
-          connection_manager_.handleCodecError(validation_result.details());
+          connection_manager_.handleCodecError(failure_details);
         }
       }
       return false;
@@ -981,9 +989,14 @@ bool ConnectionManagerImpl::ActiveStream::validateTrailers() {
     return true;
   }
 
-  auto validation_result = header_validator_->validateRequestTrailerMap(*request_trailers_);
+  auto validation_result = header_validator_->validateRequestTrailers(*request_trailers_);
+  absl::string_view failure_details = validation_result.details();
   if (validation_result.ok()) {
-    return true;
+    auto transformation_result = header_validator_->transformRequestTrailers(*request_trailers_);
+    if (transformation_result.ok()) {
+      return true;
+    }
+    failure_details = transformation_result.details();
   }
 
   Code response_code = Code::BadRequest;
@@ -995,20 +1008,20 @@ bool ConnectionManagerImpl::ActiveStream::validateTrailers() {
   // H/2 codec was resetting requests that were rejected due to headers with underscores,
   // instead of sending 400. Preserving this behavior for now.
   // TODO(#24466): Make H/2 behavior consistent with H/1 and H/3.
-  if (validation_result.details() == UhvResponseCodeDetail::get().InvalidUnderscore &&
+  if (failure_details == UhvResponseCodeDetail::get().InvalidUnderscore &&
       connection_manager_.codec_->protocol() == Protocol::Http2) {
-    filter_manager_.streamInfo().setResponseCodeDetails(validation_result.details());
+    filter_manager_.streamInfo().setResponseCodeDetails(failure_details);
     resetStream();
   } else {
     // TODO(#24735): Harmonize H/2 and H/3 behavior with H/1
     if (connection_manager_.codec_->protocol() < Protocol::Http2) {
-      sendLocalReply(response_code, "", nullptr, grpc_status, validation_result.details());
+      sendLocalReply(response_code, "", nullptr, grpc_status, failure_details);
     } else {
-      filter_manager_.streamInfo().setResponseCodeDetails(validation_result.details());
+      filter_manager_.streamInfo().setResponseCodeDetails(failure_details);
       resetStream();
     }
     if (!response_encoder_->streamErrorOnInvalidHttpMessage()) {
-      connection_manager_.handleCodecError(validation_result.details());
+      connection_manager_.handleCodecError(failure_details);
     }
   }
   return false;
