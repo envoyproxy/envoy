@@ -30,7 +30,7 @@ protected:
       : async_client_owner_(std::make_unique<Grpc::MockAsyncClient>()),
         async_client_(async_client_owner_.get()),
         backoff_strategy_(std::make_unique<JitteredExponentialBackOffStrategy>(
-            SubscriptionFactory::retry_initial_delay_ms, SubscriptionFactory::RetryMaxDelayMs,
+            SubscriptionFactory::RetryInitialDelayMs, SubscriptionFactory::RetryMaxDelayMs,
             random_)),
         grpc_stream_(std::make_unique<GrpcStream<envoy::service::discovery::v3::DiscoveryRequest,
                                                  envoy::service::discovery::v3::DiscoveryResponse>>(
@@ -47,7 +47,8 @@ protected:
     async_client_ = async_client_owner_.get();
     backoff_strategy_ = std::make_unique<JitteredExponentialBackOffStrategy>(
         retry_initial_delay_ms,
-        (retryMaxDelayMs) ? retryMaxDelayMs.value() : SubscriptionFactory::RetryMaxDelayMs, random);
+        (retry_max_delay_ms) ? retry_max_delay_ms.value() : SubscriptionFactory::RetryMaxDelayMs,
+        random);
 
     grpc_stream_ = std::make_unique<GrpcStream<envoy::service::discovery::v3::DiscoveryRequest,
                                                envoy::service::discovery::v3::DiscoveryResponse>>(
@@ -288,8 +289,8 @@ TEST_F(GrpcStreamTest, RetryOnEstablishNewStreamFailure) {
   NiceMock<Random::MockRandomGenerator> random;
   ON_CALL(random, random()).WillByDefault(Return(27));
 
-  // retry_initial_delay_ms = 25ms, retryMaxDelayMs = 30 ms
-  SetUpCustomBackoffRetryTimer(25, 30, random);
+  // retry_initial_delay_ms = 25ms, retry_max_delay_ms = 30 ms
+  setUpCustomBackoffRetryTimer(25, 30, random);
 
   // simulate that first call to establish GRPC stream fails
   {
@@ -335,8 +336,8 @@ TEST_F(GrpcStreamTest, RetryOnRemoteClose) {
   NiceMock<Random::MockRandomGenerator> random;
   ON_CALL(random, random()).WillByDefault(Return(27));
 
-  // retry_initial_delay_ms = 25ms, retryMaxDelayMs = 30 ms
-  SetUpCustomBackoffRetryTimer(25, 30, random);
+  // retry_initial_delay_ms = 25ms, retry_max_delay_ms = 30 ms
+  setUpCustomBackoffRetryTimer(25, 30, random);
 
   // successful establishment
   {
