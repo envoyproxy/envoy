@@ -136,22 +136,32 @@ message OverloadAction {
   // A set of triggers for this action. The state of the action is the maximum
   // state of all triggers, which can be scaling between 0 and 1 or saturated. Listeners
   // are notified when the overload action changes state.
-  // An overload manager action can only have one trigger for a given resource.
+  // An overload manager action can only have one trigger for a given resource
+  // e.g. :ref:`Trigger.name
+  // <envoy_v3_api_field_config.overload.v3.Trigger.name>` must be unique
+  // in this list.
   repeated Trigger triggers = 2 [(validate.rules).repeated = {min_items: 1}];
 
   // Configuration for the action being instantiated.
   google.protobuf.Any typed_config = 3;
 }
 
+// A point within the connection or request lifecycle that provides context on
+// whether to shed load at that given stage for the current entity at the
+// point.
 message LoadShedPoint {
   // This is just a well-known string for the LoadShedPoint.
-  // Custom LoadShedPoints should be named using reverse DNS to ensure
-  // uniqueness.
+  // Deployment specific LoadShedPoints e.g. within a custom extension should
+  // be prefixed by the company / deployment name to avoid colliding with any
+  // open source LoadShedPoints.
   string name = 1 [(validate.rules).string = {min_len: 1}];
 
   // A set of triggers for this LoadShedPoint. The LoadShedPoint will use the
   // the maximum state of all triggers, which can be scaling between 0 and 1 or
-  // saturated. A LoadShedPoint can only have one trigger for a given resource.
+  // saturated. A LoadShedPoint can only have one trigger for a given resource
+  // e.g. :ref:`Trigger.name
+  // <envoy_v3_api_field_config.overload.v3.Trigger.name>` must be unique in
+  // this list.
   repeated Trigger triggers = 2 [(validate.rules).repeated = {min_items: 1}];
 }
 

@@ -559,6 +559,7 @@ LoadShedPoint* OverloadManagerImpl::getLoadShedPoint(absl::string_view point_nam
   if (auto it = loadshed_points_.find(point_name); it != loadshed_points_.end()) {
     return it->second.get();
   }
+  ENVOY_LOG(warn, "LoadShedPoint {} is not found. Is it configured?", point_name);
   return nullptr;
 }
 
