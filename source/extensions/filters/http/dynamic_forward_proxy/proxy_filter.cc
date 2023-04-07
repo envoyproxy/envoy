@@ -10,6 +10,7 @@
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/runtime/runtime_features.h"
 #include "source/common/stream_info/upstream_address.h"
+#include "source/extensions/clusters/dynamic_forward_proxy/cluster.h"
 #include "source/extensions/common/dynamic_forward_proxy/dns_cache.h"
 
 namespace Envoy {
@@ -63,40 +64,13 @@ LoadClusterEntryHandlePtr
 ProxyFilterConfig::addDynamicCluster(Upstream::ClusterInfoConstSharedPtr parent_info,
                                      const std::string& cluster_name, const std::string& host,
                                      const int port, LoadClusterEntryCallbacks& callbacks) {
-  // clone cluster config from the parent DFP cluster.
-  envoy::config::cluster::v3::Cluster config = parent_info->originalClusterConfig();
-
-  // inherit dns config from cluster_type
-  auto cluster_type = config.cluster_type();
-  envoy::extensions::clusters::dynamic_forward_proxy::v3::ClusterConfig proto_config;
-  MessageUtil::unpackTo(cluster_type.typed_config(), proto_config);
-  config.set_dns_lookup_family(proto_config.dns_cache_config().dns_lookup_family());
-
-  // overwrite to a strict_dns cluster.
-  config.set_name(cluster_name);
-  config.clear_cluster_type();
-  config.set_type(
-      envoy::config::cluster::v3::Cluster_DiscoveryType::Cluster_DiscoveryType_STRICT_DNS);
-  config.set_lb_policy(envoy::config::cluster::v3::Cluster_LbPolicy::Cluster_LbPolicy_ROUND_ROBIN);
-
-  /*
-    config.set_dns_lookup_family(
-        envoy::config::cluster::v3::Cluster_DnsLookupFamily::Cluster_DnsLookupFamily_V4_ONLY);
-    config.mutable_connect_timeout()->CopyFrom(
-        Protobuf::util::TimeUtil::MillisecondsToDuration(parent_info->connectTimeout().count()));
-  */
-
-  auto load_assignments = config.mutable_load_assignment();
-  load_assignments->set_cluster_name(cluster_name);
-  load_assignments->clear_endpoints();
-
-  auto socket_address = load_assignments->add_endpoints()
-                            ->add_lb_endpoints()
-                            ->mutable_endpoint()
-                            ->mutable_address()
-                            ->mutable_socket_address();
-  socket_address->set_address(host);
-  socket_address->set_port_value(port);
+  Upstream::ClusterSharedPtr cluster = parent_info->cluster();
+  ASSERT(cluster != nullptr);
+  Envoy::Extensions::Clusters::DynamicForwardProxy::Cluster* dfp_cluster =
+      dynamic_cast<Envoy::Extensions::Clusters::DynamicForwardProxy::Cluster*>(cluster.get());
+  ASSERT(dfp_cluster != nullptr);
+  envoy::config::cluster::v3::Cluster config =
+      dfp_cluster->subClusterConfig(cluster_name, host, port);
 
   std::string version_info = "";
 

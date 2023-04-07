@@ -833,6 +833,12 @@ class TypedLoadBalancerFactory;
 using AddressSelectFn = std::function<const Network::Address::InstanceConstSharedPtr(
     const Network::Address::InstanceConstSharedPtr&)>;
 
+class Cluster;
+
+using ClusterSharedPtr = std::shared_ptr<Cluster>;
+using ClusterWeakPtr = std::weak_ptr<Cluster>;
+using ClusterConstOptRef = absl::optional<std::reference_wrapper<const Cluster>>;
+
 /**
  * Information about a given upstream cluster.
  * This includes the information and interfaces for building an upstream filter chain.
@@ -1192,7 +1198,15 @@ public:
    */
   virtual Http::HeaderValidatorPtr makeHeaderValidator(Http::Protocol protocol) const PURE;
 
-  virtual const envoy::config::cluster::v3::Cluster originalClusterConfig() const PURE;
+  /**
+   * Setting the cluster that owning this info, only for dynamic forward proxy cluster.
+   */
+  virtual void cluster(ClusterSharedPtr) const PURE;
+
+  /**
+   * @return the cluster that owning this info, only for dynamic forward proxy cluster.
+   */
+  virtual ClusterSharedPtr cluster() const PURE;
 
 protected:
   /**
@@ -1264,9 +1278,6 @@ public:
    */
   virtual const PrioritySet& prioritySet() const PURE;
 };
-
-using ClusterSharedPtr = std::shared_ptr<Cluster>;
-using ClusterConstOptRef = absl::optional<std::reference_wrapper<const Cluster>>;
 
 } // namespace Upstream
 } // namespace Envoy

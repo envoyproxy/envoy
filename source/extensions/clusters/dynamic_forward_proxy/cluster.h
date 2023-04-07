@@ -46,6 +46,8 @@ public:
   bool enableStrictDnsCluster() const { return enable_strict_dns_cluster_; }
   Upstream::HostConstSharedPtr chooseHost(absl::string_view host,
                                           Upstream::LoadBalancerContext* context);
+  envoy::config::cluster::v3::Cluster
+  subClusterConfig(const std::string& cluster_name, const std::string& host, const int port) const;
 
 private:
   struct ClusterInfo {
@@ -166,6 +168,8 @@ private:
   Event::Dispatcher& main_thread_dispatcher_;
   const std::chrono::milliseconds refresh_interval_;
   const std::chrono::milliseconds host_ttl_;
+  const envoy::config::cluster::v3::Cluster orig_cluster_config_;
+  const envoy::extensions::clusters::dynamic_forward_proxy::v3::ClusterConfig orig_dfp_config_;
 
   // True if H2 and H3 connections may be reused across different origins.
   const bool allow_coalesced_connections_;

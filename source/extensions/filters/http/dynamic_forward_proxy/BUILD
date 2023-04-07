@@ -19,6 +19,7 @@ envoy_cc_library(
         "//source/common/network:filter_state_proxy_info_lib",
         "//source/common/stream_info:upstream_address_lib",
         "//source/common/upstream:upstream_includes",
+        "//source/extensions/clusters/dynamic_forward_proxy:cluster",
         "//source/extensions/common/dynamic_forward_proxy:dns_cache_interface",
         "//source/extensions/filters/http/common:pass_through_filter_lib",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",

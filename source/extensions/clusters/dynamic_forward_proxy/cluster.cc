@@ -34,6 +34,7 @@ Cluster::Cluster(
       refresh_interval_(
           PROTOBUF_GET_MS_OR_DEFAULT(config.dns_cache_config(), dns_refresh_rate, 60000)),
       host_ttl_(PROTOBUF_GET_MS_OR_DEFAULT(config.dns_cache_config(), host_ttl, 300000)),
+      orig_cluster_config_(cluster), orig_dfp_config_(config),
       allow_coalesced_connections_(config.allow_coalesced_connections()),
       cm_(context.clusterManager()),
       enable_strict_dns_cluster_(Runtime::runtimeFeatureEnabled(
@@ -50,6 +51,42 @@ void Cluster::startPreInit() {
     updatePriorityState(*hosts_added, {});
   }
   onPreInitComplete();
+}
+
+envoy::config::cluster::v3::Cluster Cluster::subClusterConfig(const std::string& cluster_name,
+                                                              const std::string& host,
+                                                              const int port) const {
+  envoy::config::cluster::v3::Cluster config = orig_cluster_config_;
+
+  config.set_dns_lookup_family(orig_dfp_config_.dns_cache_config().dns_lookup_family());
+
+  // overwrite to a strict_dns cluster.
+  config.set_name(cluster_name);
+  config.clear_cluster_type();
+  config.set_type(
+      envoy::config::cluster::v3::Cluster_DiscoveryType::Cluster_DiscoveryType_STRICT_DNS);
+  config.set_lb_policy(envoy::config::cluster::v3::Cluster_LbPolicy::Cluster_LbPolicy_ROUND_ROBIN);
+
+  /*
+    config.set_dns_lookup_family(
+        envoy::config::cluster::v3::Cluster_DnsLookupFamily::Cluster_DnsLookupFamily_V4_ONLY);
+    config.mutable_connect_timeout()->CopyFrom(
+        Protobuf::util::TimeUtil::MillisecondsToDuration(parent_info->connectTimeout().count()));
+  */
+
+  auto load_assignments = config.mutable_load_assignment();
+  load_assignments->set_cluster_name(cluster_name);
+  load_assignments->clear_endpoints();
+
+  auto socket_address = load_assignments->add_endpoints()
+                            ->add_lb_endpoints()
+                            ->mutable_endpoint()
+                            ->mutable_address()
+                            ->mutable_socket_address();
+  socket_address->set_address(host);
+  socket_address->set_port_value(port);
+
+  return config;
 }
 
 Upstream::HostConstSharedPtr Cluster::chooseHost(absl::string_view host,
@@ -371,6 +408,10 @@ ClusterFactory::createClusterWithConfig(
   auto new_cluster = std::make_shared<Cluster>(server_context, cluster_config, proto_config,
                                                context, context.runtime(), cache_manager_factory,
                                                context.localInfo(), context.addedViaApi());
+
+  // Save the cluster into cluster_info, so that we can get the cluster in the worker thread through
+  // cluster_info.
+  new_cluster->info()->cluster(new_cluster);
 
   auto& options = new_cluster->info()->upstreamHttpProtocolOptions();
 
