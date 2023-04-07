@@ -49,10 +49,12 @@ void IoUringSocketEntry::injectCompletion(uint32_t type) {
 }
 
 IoUringWorkerImpl::IoUringWorkerImpl(uint32_t io_uring_size, bool use_submission_queue_polling,
-                                     uint32_t accept_size, uint32_t buffer_size,
+                                     uint32_t accept_size, uint32_t read_buffer_size,
+                                     uint32_t connect_timeout_ms, uint32_t write_timeout_ms,
                                      Event::Dispatcher& dispatcher)
-    : IoUringWorkerImpl(std::make_unique<IoUringImpl>(io_uring_size, use_submission_queue_polling),
-                        accept_size, buffer_size, dispatcher) {}
+    : IoUringWorkerImpl(std::make_unique<IoUringImpl>(io_uring_size, use_submission_queue_polling,
+                                                      connect_timeout_ms, write_timeout_ms),
+                        accept_size, read_buffer_size, dispatcher) {}
 
 IoUringWorkerImpl::IoUringWorkerImpl(std::unique_ptr<IoUring> io_uring, uint32_t accept_size,
                                      uint32_t read_buffer_size, Event::Dispatcher& dispatcher)
@@ -248,6 +250,9 @@ void IoUringWorkerImpl::onFileEvent() {
   ENVOY_LOG(trace, "io uring worker, on file event");
   delay_submit_ = true;
   io_uring_->forEveryCompletion([](void* user_data, int32_t result, bool injected) {
+    if (user_data == nullptr) {
+      return;
+    }
     auto req = static_cast<Request*>(user_data);
 
     switch (req->type()) {

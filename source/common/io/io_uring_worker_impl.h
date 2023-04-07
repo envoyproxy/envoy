@@ -118,7 +118,8 @@ using IoUringSocketEntryPtr = std::unique_ptr<IoUringSocketEntry>;
 class IoUringWorkerImpl : public IoUringWorker, private Logger::Loggable<Logger::Id::io> {
 public:
   IoUringWorkerImpl(uint32_t io_uring_size, bool use_submission_queue_polling, uint32_t accept_size,
-                    uint32_t read_buffer_size, Event::Dispatcher& dispatcher);
+                    uint32_t read_buffer_size, uint32_t connect_timeout_ms,
+                    uint32_t write_timeout_ms, Event::Dispatcher& dispatcher);
   IoUringWorkerImpl(IoUringPtr io_uring, uint32_t accept_size, uint32_t read_buffer_size,
                     Event::Dispatcher& dispatcher);
   ~IoUringWorkerImpl() override;

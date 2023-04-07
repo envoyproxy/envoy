@@ -48,6 +48,8 @@ public:
   static constexpr uint32_t DefaultIoUringSize = 300;
   static constexpr uint32_t DefaultAcceptSize = 5;
   static constexpr uint32_t DefaultReadBufferSize = 8192;
+  static constexpr uint32_t DefaultConnectTimeoutMs = 1000;
+  static constexpr uint32_t DefaultWriteTimeoutMs = 1000;
   static constexpr bool UseSubmissionQueuePolling = false;
 
 protected:
