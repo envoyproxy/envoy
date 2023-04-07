@@ -22,8 +22,8 @@
 #include "datadog/sampling_priority.h"
 #include "datadog/span_data.h"
 #include "datadog/tags.h"
-#include "datadog/tracer.h"
 #include "datadog/trace_segment.h"
+#include "datadog/tracer.h"
 #include "gtest/gtest.h"
 
 namespace datadog {

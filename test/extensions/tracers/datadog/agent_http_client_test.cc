@@ -26,10 +26,12 @@ namespace Tracers {
 namespace Datadog {
 namespace {
 
+using testing::DoAll;
+using testing::Return;
+using testing::WithArg;
+
 struct InitializedMockClusterManager {
   InitializedMockClusterManager() {
-    using testing::DoAll;
-    using testing::Return;
     EXPECT_CALL(instance_, addThreadLocalClusterUpdateCallbacks_(_))
         .WillOnce(DoAll(SaveArgAddress(&cluster_update_callbacks_), Return(nullptr)));
 
@@ -469,10 +471,6 @@ TEST_F(DatadogAgentHttpClientTest, OnBeforeFinalizeUpstreamSpanIsANoOp) {
 TEST_F(DatadogAgentHttpClientTest, SkipReportIfCollectorClusterHasBeenRemoved) {
   // Verify the effect of onClusterAddOrUpdate()/onClusterRemoval() on reporting logic,
   // keeping in mind that they will be called both for relevant and irrelevant clusters.
-  using testing::DoAll;
-  using testing::Return;
-  using testing::WithArg;
-
   NiceMock<Upstream::MockClusterManager>& cm = cluster_manager_.instance_;
   Upstream::ClusterUpdateCallbacks* cluster_update_callbacks =
       cluster_manager_.cluster_update_callbacks_;
