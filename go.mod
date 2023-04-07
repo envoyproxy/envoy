@@ -1,4 +1,4 @@
-module github.com/envoyproxy/envoy/contrib/golang
+module github.com/envoyproxy/envoy
 
 go 1.18
 

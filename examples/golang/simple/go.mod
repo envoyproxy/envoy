@@ -6,7 +6,7 @@ go 1.18
 // NOTICE: these lines could be generated automatically by "go mod tidy"
 require (
 	github.com/cncf/xds/go v0.0.0-20230310173818-32f1caf87195
-	github.com/envoyproxy/envoy/contrib/golang/filters/http/source/go v0.0.0-20230324062628-466cf15f1790
+	github.com/envoyproxy/envoy v1.24.0
 	google.golang.org/protobuf v1.30.0
 )
 
@@ -21,4 +21,4 @@ require (
 )
 
 // NOTICE: it's just for testing, please remove it.
-replace github.com/envoyproxy/envoy/contrib/golang => ../../../contrib/golang
+replace github.com/envoyproxy/envoy => ../../..
