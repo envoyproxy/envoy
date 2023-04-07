@@ -248,3 +248,9 @@ updates:
   schedule:
     interval: daily
     time: "09:00"
+
+- package-ecosystem: "gomod"
+  directory: "/examples/golang/simple"
+  schedule:
+    interval: daily
+    time: "09:00"
