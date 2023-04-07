@@ -1014,7 +1014,7 @@ stages:
 
     - powershell: |
         Stop-Service docker
-        Remove-Item -path c:\\ProgramData\\docker -force
+        rm -Recurse -Force -ErrorAction SilentlyContinue C:\\ProgramData\\docker
         Start-Service docker
 
     - bash: |
