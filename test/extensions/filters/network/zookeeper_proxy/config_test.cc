@@ -61,7 +61,7 @@ TEST(ZookeeperFilterConfigTest, NegativeLatencyThreshold) {
 stat_prefix: test_prefix
 latency_thresholds:
   - opcode: Default
-    threshold: -150
+    threshold: -151
   )EOF";
 
   ZooKeeperProxyProtoConfig proto_config;
