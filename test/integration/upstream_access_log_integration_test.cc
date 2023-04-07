@@ -208,9 +208,9 @@ TEST_P(UpstreamAccessLogTest, Retry) {
   codec_client_ = makeHttpConnection(lookupPort("http"));
   auto response = codec_client_->makeRequestWithBody(
       Http::TestRequestHeaderMapImpl{{":method", "POST"},
-                                     {":path", "/test/long/url"},
+                                     {":path", "/test"},
                                      {":scheme", "http"},
-                                     {":authority", "sni.lyft.com"},
+                                     {":authority", "host.com"},
                                      {"x-forwarded-for", "10.0.0.1"},
                                      {"x-envoy-retry-on", "5xx"}},
       1024);
