@@ -35,7 +35,7 @@ public:
     auto* threshold = thresholds.Add();
     threshold->set_opcode(
         envoy::extensions::filters::network::zookeeper_proxy::v3::LatencyThreshold::Default);
-    google::protobuf::UInt32Value threshold_val;
+    ProtobufWkt::UInt32Value threshold_val;
     threshold_val.set_value(150);
     threshold->mutable_threshold()->CopyFrom(threshold_val);
     // Populate latency threshold for Multi opcode

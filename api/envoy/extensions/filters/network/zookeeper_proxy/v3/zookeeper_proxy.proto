@@ -48,7 +48,8 @@ message ZooKeeperProxy {
   // If the default threshold is not set, it will be set as 100 millisecond.
   // If the threshold of one opcode is not set, it will fallback to use the default
   // threshold.
-  repeated LatencyThreshold latency_thresholds = 4 [(validate.rules).repeated = {min_items: 0, max_items: 27}];
+  repeated LatencyThreshold latency_thresholds = 4
+      [(validate.rules).repeated = {min_items: 0 max_items: 27}];
 }
 
 message LatencyThreshold {
