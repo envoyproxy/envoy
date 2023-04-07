@@ -177,7 +177,7 @@ public:
     EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _, _))
         .WillOnce(Return(&cancellable_));
 
-    if (pre_set_sni != "") {
+    if (!pre_set_sni.empty()) {
       // Simulate a network filter setting the server name, e.g. based on SNI seen by the
       // tls_inspector by using the LifeSpan::Connection
       stream_info.filterState()->setData(Network::UpstreamServerName::key(),
@@ -189,13 +189,13 @@ public:
 
     HttpTestUtility::addDefaultHeaders(headers);
     router_->decodeHeaders(headers, true);
-    if (server_name != "") {
+    if (!server_name.empty()) {
       EXPECT_EQ(server_name, stream_info.filterState()
                                  ->getDataReadOnly<Network::UpstreamServerName>(
                                      Network::UpstreamServerName::key())
                                  ->value());
     }
-    if (alt_server_name != "") {
+    if (!alt_server_name.empty()) {
       EXPECT_EQ(alt_server_name, stream_info.filterState()
                                      ->getDataReadOnly<Network::UpstreamSubjectAltNames>(
                                          Network::UpstreamSubjectAltNames::key())
