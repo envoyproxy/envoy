@@ -462,17 +462,24 @@ void Utility::appendVia(RequestOrResponseHeaderMap& headers, const std::string& 
 
 void Utility::updateAuthority(RequestHeaderMap& headers, absl::string_view hostname,
                               const bool append_xfh) {
-  // Only append to x-forwarded-host if the value was not the last value appended.
   const auto host = headers.getHostValue();
-  const auto xfh = headers.getForwardedHostValue();
 
-  if (append_xfh && !host.empty() && !xfh.empty()) {
-    const auto xfh_split = StringUtil::splitToken(xfh, ",");
-    if (!xfh_split.empty() && xfh_split.back() != host) {
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.append_xfh_idempotent")) {
+    // Only append to x-forwarded-host if the value was not the last value appended.
+    const auto xfh = headers.getForwardedHostValue();
+
+    if (append_xfh && !host.empty() && !xfh.empty()) {
+      const auto xfh_split = StringUtil::splitToken(xfh, ",");
+      if (!xfh_split.empty() && xfh_split.back() != host) {
+        headers.appendForwardedHost(host, ",");
+      }
+    } else if (append_xfh && !host.empty()) {
       headers.appendForwardedHost(host, ",");
     }
-  } else if (append_xfh && !host.empty()) {
-    headers.appendForwardedHost(host, ",");
+  } else {
+    if (append_xfh && !host.empty()) {
+      headers.appendForwardedHost(host, ",");
+    }
   }
 
   headers.setHost(hostname);

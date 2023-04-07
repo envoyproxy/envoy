@@ -493,6 +493,8 @@ TEST(HttpUtility, updateAuthority) {
 
   // Test that we only append to x-forwarded-host if it is not already present.
   {
+    TestScopedRuntime scoped_runtime;
+    scoped_runtime.mergeValues({{"envoy.reloadable_features.append_xfh_idempotent", "true"}});
     TestRequestHeaderMapImpl headers{{":authority", "dns.name"},
                                      {"x-forwarded-host", "host.com,dns.name"}};
     Utility::updateAuthority(headers, "newhost.com", true);
