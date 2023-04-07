@@ -50,7 +50,7 @@ public:
         ctor_([stats_scope = std::move(scope), &stat_names, this]() -> StatsStructType* {
           initialized_.inc();
           // Reset ctor_ to save some RAM.
-          Envoy::Cleanup reset_ctor([&] { ctor_ = nullptr; });
+          Cleanup reset_ctor([&] { ctor_ = nullptr; });
           return new StatsStructType(stat_names, *stats_scope);
         }) {
     if (initialized_.value() > 0) {
