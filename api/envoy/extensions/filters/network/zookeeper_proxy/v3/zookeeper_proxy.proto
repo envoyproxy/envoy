@@ -39,4 +39,50 @@ message ZooKeeperProxy {
   //
   // if that is set. If it isn't, ZooKeeper's default is also 1Mb.
   google.protobuf.UInt32Value max_packet_bytes = 3;
+
+  // List of latency thresholds for opcodes to decide the fast/slow responses and emit metrics (used for error budget calculation).
+  //
+  // https://sre.google/workbook/implementing-slos/
+  //
+  // If no latency threshold is set, the fast/slow response counters will always be 0.
+  // If the default threshold is not set, it will be set as 100 millisecond.
+  // If the threshold of one opcode is not set, it will fallback to use the default
+  // threshold.
+  repeated LatencyThreshold latency_thresholds = 4;
+}
+
+message LatencyThreshold {
+  enum Opcode {
+    Default = 0;
+    Connect = 1;
+    Create = 2;
+    Delete = 3;
+    Exists = 4;
+    GetData = 5;
+    SetData = 6;
+    GetAcl = 7;
+    SetAcl = 8;
+    GetChildren = 9;
+    Sync = 10;
+    Ping = 11;
+    GetChildren2 = 12;
+    Check = 13;
+    Multi = 14;
+    Create2 = 15;
+    Reconfig = 16;
+    CheckWatches = 17;
+    RemoveWatches = 18;
+    CreateContainer = 19;
+    CreateTtl = 20;
+    Close = 21;
+    SetAuth = 22;
+    SetWatches = 23;
+    GetEphemerals = 24;
+    GetAllChildrenNumber = 25;
+    SetWatches2 = 26;
+  }
+
+  Opcode opcode = 1 [(validate.rules).enum = {defined_only: true}];
+
+  google.protobuf.UInt32Value threshold = 2 [(validate.rules).uint32 = {gt: 0}];
 }

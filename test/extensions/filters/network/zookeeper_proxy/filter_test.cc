@@ -1,3 +1,6 @@
+#include "envoy/extensions/filters/network/zookeeper_proxy/v3/zookeeper_proxy.pb.h"
+#include "envoy/extensions/filters/network/zookeeper_proxy/v3/zookeeper_proxy.pb.validate.h"
+
 #include "source/common/buffer/buffer_impl.h"
 #include "source/extensions/filters/network/zookeeper_proxy/decoder.h"
 #include "source/extensions/filters/network/zookeeper_proxy/filter.h"
@@ -30,7 +33,25 @@ public:
   ZooKeeperFilterTest() { ENVOY_LOG_MISC(info, "test"); }
 
   void initialize() {
-    config_ = std::make_shared<ZooKeeperFilterConfig>(stat_prefix_, 1048576, scope_);
+    // Populate default latency threshold
+    auto* threshold = thresholds.Add();
+    threshold->set_opcode(
+        envoy::extensions::filters::network::zookeeper_proxy::v3::LatencyThreshold::Default);
+    google::protobuf::UInt32Value threshold_val;
+    threshold_val.set_value(150);
+    threshold->mutable_threshold()->CopyFrom(threshold_val);
+    // Populate latency threshold for Multi opcode
+    threshold = thresholds.Add();
+    threshold->set_opcode(
+        envoy::extensions::filters::network::zookeeper_proxy::v3::LatencyThreshold::Multi);
+    threshold_val.set_value(200);
+    threshold->mutable_threshold()->CopyFrom(threshold_val);
+
+    Protobuf::RepeatedPtrField<
+        envoy::extensions::filters::network::zookeeper_proxy::v3::LatencyThreshold>&
+        latency_thresholds_ = thresholds;
+    config_ =
+        std::make_shared<ZooKeeperFilterConfig>(stat_prefix_, 1048576, latency_thresholds_, scope_);
     filter_ = std::make_unique<ZooKeeperFilter>(config_, time_system_);
     filter_->initializeReadFilterCallbacks(filter_callbacks_);
   }
@@ -634,8 +655,15 @@ public:
     EXPECT_EQ(1UL * response_count, stat.value());
     EXPECT_EQ(20UL * response_count, config_->stats().response_bytes_.value());
     EXPECT_EQ(0UL, config_->stats().decoder_error_.value());
-    const auto histogram_name =
-        fmt::format("test.zookeeper.{}_latency", metadata_values[0].find("opname")->second);
+
+    const std::string opname = metadata_values[0].find("opname")->second;
+    const auto resp_fast_counter_name = fmt::format("test.zookeeper.{}_fast", opname);
+    EXPECT_EQ(1UL * response_count,
+              store_.findCounterByString(resp_fast_counter_name).value().get().value());
+    const auto resp_slow_counter_name = fmt::format("test.zookeeper.{}_slow", opname);
+    EXPECT_EQ(0UL * response_count,
+              store_.findCounterByString(resp_slow_counter_name).value().get().value());
+    const auto histogram_name = fmt::format("test.zookeeper.{}_latency", opname);
     EXPECT_NE(absl::nullopt, findHistogram(histogram_name));
   }
 
@@ -651,6 +679,9 @@ public:
   NiceMock<Network::MockReadFilterCallbacks> filter_callbacks_;
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info_;
   Event::SimulatedTimeSystem time_system_;
+  Protobuf::RepeatedPtrField<
+      envoy::extensions::filters::network::zookeeper_proxy::v3::LatencyThreshold>
+      thresholds;
 };
 
 TEST_F(ZooKeeperFilterTest, Connect) {
@@ -661,7 +692,7 @@ TEST_F(ZooKeeperFilterTest, Connect) {
   testRequest(data, {{{"opname", "connect"}}, {{"bytes", "32"}}}, config_->stats().connect_rq_, 32);
 
   data = encodeConnectResponse();
-  expectSetDynamicMetadata({{{"opname", "connect_response"},
+  expectSetDynamicMetadata({{{"opname", "connect_resp"},
                              {"protocol_version", "0"},
                              {"timeout", "10"},
                              {"readonly", "0"}},
@@ -669,8 +700,10 @@ TEST_F(ZooKeeperFilterTest, Connect) {
   EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onWrite(data, false));
   EXPECT_EQ(1UL, config_->stats().connect_resp_.value());
   EXPECT_EQ(24UL, config_->stats().response_bytes_.value());
+  EXPECT_EQ(1UL, config_->stats().connect_resp_fast_.value());
+  EXPECT_EQ(0UL, config_->stats().connect_resp_slow_.value());
   EXPECT_EQ(0UL, config_->stats().decoder_error_.value());
-  EXPECT_NE(absl::nullopt, findHistogram("test.zookeeper.connect_response_latency"));
+  EXPECT_NE(absl::nullopt, findHistogram("test.zookeeper.connect_resp_latency"));
 }
 
 TEST_F(ZooKeeperFilterTest, ConnectReadonly) {
@@ -682,7 +715,7 @@ TEST_F(ZooKeeperFilterTest, ConnectReadonly) {
               config_->stats().connect_readonly_rq_, 33);
 
   data = encodeConnectResponse(true);
-  expectSetDynamicMetadata({{{"opname", "connect_response"},
+  expectSetDynamicMetadata({{{"opname", "connect_resp"},
                              {"protocol_version", "0"},
                              {"timeout", "10"},
                              {"readonly", "1"}},
@@ -690,8 +723,10 @@ TEST_F(ZooKeeperFilterTest, ConnectReadonly) {
   EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onWrite(data, false));
   EXPECT_EQ(1UL, config_->stats().connect_resp_.value());
   EXPECT_EQ(25UL, config_->stats().response_bytes_.value());
+  EXPECT_EQ(1UL, config_->stats().connect_resp_fast_.value());
+  EXPECT_EQ(0UL, config_->stats().connect_resp_slow_.value());
   EXPECT_EQ(0UL, config_->stats().decoder_error_.value());
-  EXPECT_NE(absl::nullopt, findHistogram("test.zookeeper.connect_response_latency"));
+  EXPECT_NE(absl::nullopt, findHistogram("test.zookeeper.connect_resp_latency"));
 }
 
 TEST_F(ZooKeeperFilterTest, Fallback) {
@@ -747,7 +782,7 @@ TEST_F(ZooKeeperFilterTest, PingRequest) {
   Buffer::OwnedImpl data = encodePing();
 
   testRequest(data, {{{"opname", "ping"}}, {{"bytes", "12"}}}, config_->stats().ping_rq_, 12);
-  testResponse({{{"opname", "ping_response"}, {"zxid", "2000"}, {"error", "0"}}, {{"bytes", "20"}}},
+  testResponse({{{"opname", "ping_resp"}, {"zxid", "2000"}, {"error", "0"}}, {{"bytes", "20"}}},
                config_->stats().ping_resp_, enumToSignedInt(XidCodes::PingXid));
 }
 
@@ -758,7 +793,7 @@ TEST_F(ZooKeeperFilterTest, AuthRequest) {
 
   testRequest(data, {{{"opname", "auth"}}, {{"bytes", "36"}}},
               store_.counter("test.zookeeper.auth.digest_rq"), 36);
-  testResponse({{{"opname", "auth_response"}, {"zxid", "2000"}, {"error", "0"}}, {{"bytes", "20"}}},
+  testResponse({{{"opname", "auth_resp"}, {"zxid", "2000"}, {"error", "0"}}, {{"bytes", "20"}}},
                config_->stats().auth_resp_, enumToSignedInt(XidCodes::AuthXid));
 }
 
@@ -805,7 +840,11 @@ TEST_F(ZooKeeperFilterTest, CreateRequestPersistentSequential) {
                config_->stats().create_resp_);
 }
 
-TEST_F(ZooKeeperFilterTest, CreateRequestEphemeral) { testCreate(CreateFlags::Ephemeral); }
+TEST_F(ZooKeeperFilterTest, CreateRequestEphemeral) {
+  testCreate(CreateFlags::Ephemeral);
+  testResponse({{{"opname", "create_resp"}, {"zxid", "2000"}, {"error", "0"}}, {{"bytes", "20"}}},
+               config_->stats().create_resp_);
+}
 
 TEST_F(ZooKeeperFilterTest, CreateRequestEphemeralSequential) {
   testCreate(CreateFlags::EphemeralSequential);
@@ -1413,6 +1452,8 @@ TEST_F(ZooKeeperFilterTest, OneResponseWithMultipleOnWriteCalls) {
 
   EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onWrite(resp_data, false));
   EXPECT_EQ(0UL, config_->stats().getdata_resp_.value());
+  EXPECT_EQ(0UL, config_->stats().getdata_resp_fast_.value());
+  EXPECT_EQ(0UL, config_->stats().getdata_resp_slow_.value());
   EXPECT_EQ(0UL, config_->stats().response_bytes_.value());
   EXPECT_EQ(0UL, config_->stats().decoder_error_.value());
   // Mock the buffer is drained by the tcp_proxy filter.
@@ -1424,6 +1465,8 @@ TEST_F(ZooKeeperFilterTest, OneResponseWithMultipleOnWriteCalls) {
 
   EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onWrite(resp_data, false));
   EXPECT_EQ(1UL, config_->stats().getdata_resp_.value());
+  EXPECT_EQ(1UL, config_->stats().getdata_resp_fast_.value());
+  EXPECT_EQ(0UL, config_->stats().getdata_resp_slow_.value());
   EXPECT_EQ(24UL, config_->stats().response_bytes_.value());
   EXPECT_EQ(0UL, config_->stats().decoder_error_.value());
 }
@@ -1448,6 +1491,8 @@ TEST_F(ZooKeeperFilterTest, MultipleResponsesWithOneOnWriteCall) {
 
   EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onWrite(resp_data, false));
   EXPECT_EQ(2UL, config_->stats().getdata_resp_.value());
+  EXPECT_EQ(2UL, config_->stats().getdata_resp_fast_.value());
+  EXPECT_EQ(0UL, config_->stats().getdata_resp_slow_.value());
   EXPECT_EQ(48UL, config_->stats().response_bytes_.value());
   EXPECT_EQ(0UL, config_->stats().decoder_error_.value());
 }
@@ -1472,6 +1517,8 @@ TEST_F(ZooKeeperFilterTest, MultipleResponsesWithMultipleOnWriteCalls) {
 
   EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onWrite(resp_data, false));
   EXPECT_EQ(0UL, config_->stats().getdata_resp_.value());
+  EXPECT_EQ(0UL, config_->stats().getdata_resp_fast_.value());
+  EXPECT_EQ(0UL, config_->stats().getdata_resp_slow_.value());
   EXPECT_EQ(0UL, config_->stats().response_bytes_.value());
   EXPECT_EQ(0UL, config_->stats().decoder_error_.value());
   // Mock the buffer is drained by the tcp_proxy filter.
@@ -1487,6 +1534,8 @@ TEST_F(ZooKeeperFilterTest, MultipleResponsesWithMultipleOnWriteCalls) {
 
   EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onWrite(resp_data, false));
   EXPECT_EQ(1UL, config_->stats().getdata_resp_.value());
+  EXPECT_EQ(1UL, config_->stats().getdata_resp_fast_.value());
+  EXPECT_EQ(0UL, config_->stats().getdata_resp_slow_.value());
   EXPECT_EQ(24UL, config_->stats().response_bytes_.value());
   EXPECT_EQ(0UL, config_->stats().decoder_error_.value());
   // Mock the buffer is drained by the tcp_proxy filter.
@@ -1499,6 +1548,8 @@ TEST_F(ZooKeeperFilterTest, MultipleResponsesWithMultipleOnWriteCalls) {
 
   EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onWrite(resp_data, false));
   EXPECT_EQ(2UL, config_->stats().getdata_resp_.value());
+  EXPECT_EQ(2UL, config_->stats().getdata_resp_fast_.value());
+  EXPECT_EQ(0UL, config_->stats().getdata_resp_slow_.value());
   EXPECT_EQ(50UL, config_->stats().response_bytes_.value());
   EXPECT_EQ(0UL, config_->stats().decoder_error_.value());
 }
@@ -1525,6 +1576,8 @@ TEST_F(ZooKeeperFilterTest, MultipleResponsesWithMultipleOnWriteCalls2) {
 
   EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onWrite(resp_data, false));
   EXPECT_EQ(0UL, config_->stats().getdata_resp_.value());
+  EXPECT_EQ(0UL, config_->stats().getdata_resp_fast_.value());
+  EXPECT_EQ(0UL, config_->stats().getdata_resp_slow_.value());
   EXPECT_EQ(0UL, config_->stats().response_bytes_.value());
   EXPECT_EQ(0UL, config_->stats().decoder_error_.value());
   // Mock the buffer is drained by the tcp_proxy filter.
@@ -1539,6 +1592,8 @@ TEST_F(ZooKeeperFilterTest, MultipleResponsesWithMultipleOnWriteCalls2) {
 
   EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onWrite(resp_data, false));
   EXPECT_EQ(3UL, config_->stats().getdata_resp_.value());
+  EXPECT_EQ(3UL, config_->stats().getdata_resp_fast_.value());
+  EXPECT_EQ(0UL, config_->stats().getdata_resp_slow_.value());
   EXPECT_EQ(72UL, config_->stats().response_bytes_.value());
   EXPECT_EQ(0UL, config_->stats().decoder_error_.value());
 }
@@ -1567,6 +1622,8 @@ TEST_F(ZooKeeperFilterTest, MultipleResponsesWithMultipleOnWriteCalls3) {
 
   EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onWrite(resp_data, false));
   EXPECT_EQ(2UL, config_->stats().getdata_resp_.value());
+  EXPECT_EQ(2UL, config_->stats().getdata_resp_fast_.value());
+  EXPECT_EQ(0UL, config_->stats().getdata_resp_slow_.value());
   EXPECT_EQ(48UL, config_->stats().response_bytes_.value());
   EXPECT_EQ(0UL, config_->stats().decoder_error_.value());
   // Mock the buffer is drained by the tcp_proxy filter.
@@ -1578,6 +1635,8 @@ TEST_F(ZooKeeperFilterTest, MultipleResponsesWithMultipleOnWriteCalls3) {
 
   EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onWrite(resp_data, false));
   EXPECT_EQ(3UL, config_->stats().getdata_resp_.value());
+  EXPECT_EQ(3UL, config_->stats().getdata_resp_fast_.value());
+  EXPECT_EQ(0UL, config_->stats().getdata_resp_slow_.value());
   EXPECT_EQ(72UL, config_->stats().response_bytes_.value());
   EXPECT_EQ(0UL, config_->stats().decoder_error_.value());
 }
@@ -1605,6 +1664,8 @@ TEST_F(ZooKeeperFilterTest, MultipleResponsesWithMultipleOnWriteCalls4) {
 
   EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onWrite(resp_data, false));
   EXPECT_EQ(1UL, config_->stats().getdata_resp_.value());
+  EXPECT_EQ(1UL, config_->stats().getdata_resp_fast_.value());
+  EXPECT_EQ(0UL, config_->stats().getdata_resp_slow_.value());
   EXPECT_EQ(24UL, config_->stats().response_bytes_.value());
   EXPECT_EQ(0UL, config_->stats().decoder_error_.value());
   // Mock the buffer is drained by the tcp_proxy filter.
@@ -1616,6 +1677,8 @@ TEST_F(ZooKeeperFilterTest, MultipleResponsesWithMultipleOnWriteCalls4) {
 
   EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onWrite(resp_data, false));
   EXPECT_EQ(1UL, config_->stats().getdata_resp_.value());
+  EXPECT_EQ(1UL, config_->stats().getdata_resp_fast_.value());
+  EXPECT_EQ(0UL, config_->stats().getdata_resp_slow_.value());
   EXPECT_EQ(24UL, config_->stats().response_bytes_.value());
   EXPECT_EQ(0UL, config_->stats().decoder_error_.value());
   // Mock the buffer is drained by the tcp_proxy filter.
@@ -1629,6 +1692,8 @@ TEST_F(ZooKeeperFilterTest, MultipleResponsesWithMultipleOnWriteCalls4) {
 
   EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onWrite(resp_data, false));
   EXPECT_EQ(3UL, config_->stats().getdata_resp_.value());
+  EXPECT_EQ(3UL, config_->stats().getdata_resp_fast_.value());
+  EXPECT_EQ(0UL, config_->stats().getdata_resp_slow_.value());
   EXPECT_EQ(72UL, config_->stats().response_bytes_.value());
   EXPECT_EQ(0UL, config_->stats().decoder_error_.value());
 }

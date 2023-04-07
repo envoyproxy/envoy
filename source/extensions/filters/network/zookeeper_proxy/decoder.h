@@ -100,8 +100,10 @@ public:
   virtual void onRemoveWatchesRequest(const std::string& path, int32_t type) PURE;
   virtual void onCloseRequest() PURE;
   virtual void onResponseBytes(uint64_t bytes) PURE;
-  virtual void onConnectResponse(int32_t proto_version, int32_t timeout, bool readonly,
-                                 const std::chrono::milliseconds& latency) PURE;
+  virtual void onConnectResponse(OpCodes opcode, int32_t proto_version, int32_t timeout,
+                                 bool readonly, const std::chrono::milliseconds& latency) PURE;
+  virtual std::string onResponseHelper(const OpCodes opcode,
+                                       const std::chrono::milliseconds& latency) PURE;
   virtual void onResponse(OpCodes opcode, int32_t xid, int64_t zxid, int32_t error,
                           const std::chrono::milliseconds& latency) PURE;
   virtual void onWatchEvent(int32_t event_type, int32_t client_state, const std::string& path,

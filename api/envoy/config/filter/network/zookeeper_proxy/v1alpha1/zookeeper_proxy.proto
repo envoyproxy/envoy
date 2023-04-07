@@ -38,43 +38,4 @@ message ZooKeeperProxy {
   //
   // if that is set. If it isn't, ZooKeeper's default is also 1Mb.
   google.protobuf.UInt32Value max_packet_bytes = 3;
-
-  // List of latency thresholds for opcodes to decide the fast/slow requests and calculate
-  // the SLI used for error budget calculation.
-  // If the threshold of one opcode is not set, it will fallback to use the default
-  // threshold.
-  // If the default threshold is not set, it will be set as 100 millisecond.
-  repeated LatencyThreshold latency_thresholds = 4;
-}
-
-message LatencyThreshold {
-  oneof opcode {
-    google.protobuf.UInt32Value default = 1 [(validate.rules).uint32.gt = 0];
-    google.protobuf.UInt32Value connect = 2 [(validate.rules).uint32.gt = 0];
-    google.protobuf.UInt32Value create = 3 [(validate.rules).uint32.gt = 0];
-    google.protobuf.UInt32Value delete = 4 [(validate.rules).uint32.gt = 0];
-    google.protobuf.UInt32Value exists = 5 [(validate.rules).uint32.gt = 0];
-    google.protobuf.UInt32Value getData = 6 [(validate.rules).uint32.gt = 0];
-    google.protobuf.UInt32Value setData = 7 [(validate.rules).uint32.gt = 0];
-    google.protobuf.UInt32Value getAcl = 8 [(validate.rules).uint32.gt = 0];
-    google.protobuf.UInt32Value setAcl = 9 [(validate.rules).uint32.gt = 0];
-    google.protobuf.UInt32Value get_children = 10 [(validate.rules).uint32.gt = 0];
-    google.protobuf.UInt32Value sync = 11 [(validate.rules).uint32.gt = 0];
-    google.protobuf.UInt32Value ping = 12 [(validate.rules).uint32.gt = 0];
-    google.protobuf.UInt32Value get_children2 = 13 [(validate.rules).uint32.gt = 0];
-    google.protobuf.UInt32Value check = 14 [(validate.rules).uint32.gt = 0];
-    google.protobuf.UInt32Value multi = 15 [(validate.rules).uint32.gt = 0];
-    google.protobuf.UInt32Value create2 = 16 [(validate.rules).uint32.gt = 0];
-    google.protobuf.UInt32Value reconfig = 17 [(validate.rules).uint32.gt = 0];
-    google.protobuf.UInt32Value check_watches = 18 [(validate.rules).uint32.gt = 0];
-    google.protobuf.UInt32Value remove_watches = 19 [(validate.rules).uint32.gt = 0];
-    google.protobuf.UInt32Value create_container = 20 [(validate.rules).uint32.gt = 0];
-    google.protobuf.UInt32Value create_ttl = 21 [(validate.rules).uint32.gt = 0];
-    google.protobuf.UInt32Value close = 22 [(validate.rules).uint32.gt = 0];
-    google.protobuf.UInt32Value set_auth = 23 [(validate.rules).uint32.gt = 0];
-    google.protobuf.UInt32Value set_watches = 24 [(validate.rules).uint32.gt = 0];
-    google.protobuf.UInt32Value get_ephemerals = 25 [(validate.rules).uint32.gt = 0];
-    google.protobuf.UInt32Value get_all_children_number = 26 [(validate.rules).uint32.gt = 0];
-    google.protobuf.UInt32Value set_watches2 = 27 [(validate.rules).uint32.gt = 0];
-  }
 }

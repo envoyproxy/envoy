@@ -5,6 +5,8 @@
 #include <vector>
 
 #include "envoy/access_log/access_log.h"
+#include "envoy/extensions/filters/network/zookeeper_proxy/v3/zookeeper_proxy.pb.h"
+#include "envoy/extensions/filters/network/zookeeper_proxy/v3/zookeeper_proxy.pb.validate.h"
 #include "envoy/network/connection.h"
 #include "envoy/network/filter.h"
 #include "envoy/stats/scope.h"
@@ -81,7 +83,61 @@ namespace ZooKeeperProxy {
   COUNTER(checkwatches_resp)                                                                       \
   COUNTER(removewatches_resp)                                                                      \
   COUNTER(check_resp)                                                                              \
-  COUNTER(watch_event)
+  COUNTER(watch_event)                                                                             \
+  COUNTER(connect_resp_fast)                                                                       \
+  COUNTER(ping_resp_fast)                                                                          \
+  COUNTER(auth_resp_fast)                                                                          \
+  COUNTER(getdata_resp_fast)                                                                       \
+  COUNTER(create_resp_fast)                                                                        \
+  COUNTER(create2_resp_fast)                                                                       \
+  COUNTER(createcontainer_resp_fast)                                                               \
+  COUNTER(createttl_resp_fast)                                                                     \
+  COUNTER(setdata_resp_fast)                                                                       \
+  COUNTER(getchildren_resp_fast)                                                                   \
+  COUNTER(getchildren2_resp_fast)                                                                  \
+  COUNTER(getephemerals_resp_fast)                                                                 \
+  COUNTER(getallchildrennumber_resp_fast)                                                          \
+  COUNTER(delete_resp_fast)                                                                        \
+  COUNTER(exists_resp_fast)                                                                        \
+  COUNTER(getacl_resp_fast)                                                                        \
+  COUNTER(setacl_resp_fast)                                                                        \
+  COUNTER(sync_resp_fast)                                                                          \
+  COUNTER(multi_resp_fast)                                                                         \
+  COUNTER(reconfig_resp_fast)                                                                      \
+  COUNTER(close_resp_fast)                                                                         \
+  COUNTER(setauth_resp_fast)                                                                       \
+  COUNTER(setwatches_resp_fast)                                                                    \
+  COUNTER(setwatches2_resp_fast)                                                                   \
+  COUNTER(checkwatches_resp_fast)                                                                  \
+  COUNTER(removewatches_resp_fast)                                                                 \
+  COUNTER(check_resp_fast)                                                                         \
+  COUNTER(connect_resp_slow)                                                                       \
+  COUNTER(ping_resp_slow)                                                                          \
+  COUNTER(auth_resp_slow)                                                                          \
+  COUNTER(getdata_resp_slow)                                                                       \
+  COUNTER(create_resp_slow)                                                                        \
+  COUNTER(create2_resp_slow)                                                                       \
+  COUNTER(createcontainer_resp_slow)                                                               \
+  COUNTER(createttl_resp_slow)                                                                     \
+  COUNTER(setdata_resp_slow)                                                                       \
+  COUNTER(getchildren_resp_slow)                                                                   \
+  COUNTER(getchildren2_resp_slow)                                                                  \
+  COUNTER(getephemerals_resp_slow)                                                                 \
+  COUNTER(getallchildrennumber_resp_slow)                                                          \
+  COUNTER(delete_resp_slow)                                                                        \
+  COUNTER(exists_resp_slow)                                                                        \
+  COUNTER(getacl_resp_slow)                                                                        \
+  COUNTER(setacl_resp_slow)                                                                        \
+  COUNTER(sync_resp_slow)                                                                          \
+  COUNTER(multi_resp_slow)                                                                         \
+  COUNTER(reconfig_resp_slow)                                                                      \
+  COUNTER(close_resp_slow)                                                                         \
+  COUNTER(setauth_resp_slow)                                                                       \
+  COUNTER(setwatches_resp_slow)                                                                    \
+  COUNTER(setwatches2_resp_slow)                                                                   \
+  COUNTER(checkwatches_resp_slow)                                                                  \
+  COUNTER(removewatches_resp_slow)                                                                 \
+  COUNTER(check_resp_slow)
 
 /**
  * Struct definition for all ZooKeeper proxy stats. @see stats_macros.h
@@ -95,8 +151,12 @@ struct ZooKeeperProxyStats {
  */
 class ZooKeeperFilterConfig {
 public:
-  ZooKeeperFilterConfig(const std::string& stat_prefix, uint32_t max_packet_bytes,
-                        Stats::Scope& scope);
+  ZooKeeperFilterConfig(
+      const std::string& stat_prefix, uint32_t max_packet_bytes,
+      const Protobuf::RepeatedPtrField<
+          envoy::extensions::filters::network::zookeeper_proxy::v3::LatencyThreshold>&
+          latency_thresholds,
+      Stats::Scope& scope);
 
   const ZooKeeperProxyStats& stats() { return stats_; }
   uint32_t maxPacketBytes() const { return max_packet_bytes_; }
@@ -107,6 +167,8 @@ public:
   // instance.
   struct OpCodeInfo {
     Stats::Counter* counter_;
+    Stats::Counter* resp_fast_counter_;
+    Stats::Counter* resp_slow_counter_;
     std::string opname_;
     Stats::StatName latency_name_;
   };
@@ -115,18 +177,120 @@ public:
   Stats::Scope& scope_;
   const uint32_t max_packet_bytes_;
   ZooKeeperProxyStats stats_;
+  // Key: opcode enum value, value: latency threshold in millisecond.
+  absl::flat_hash_map<int32_t, uint32_t> latency_threshold_map_;
   Stats::StatNameSetPtr stat_name_set_;
   const Stats::StatName stat_prefix_;
   const Stats::StatName auth_;
-  const Stats::StatName connect_latency_;
   const Stats::StatName unknown_scheme_rq_;
   const Stats::StatName unknown_opcode_latency_;
 
 private:
-  void initOpCode(OpCodes opcode, Stats::Counter& counter, absl::string_view name);
+  void initOpCode(OpCodes opcode, Stats::Counter& counter, Stats::Counter& resp_fast_counter,
+                  Stats::Counter& resp_slow_counter, absl::string_view name);
 
   ZooKeeperProxyStats generateStats(const std::string& prefix, Stats::Scope& scope) {
     return ZooKeeperProxyStats{ALL_ZOOKEEPER_PROXY_STATS(POOL_COUNTER_PREFIX(scope, prefix))};
+  }
+
+  absl::flat_hash_map<int32_t, uint32_t> parseLatencyThresholds(
+      const Protobuf::RepeatedPtrField<
+          envoy::extensions::filters::network::zookeeper_proxy::v3::LatencyThreshold>&
+          latency_thresholds) {
+    absl::flat_hash_map<int32_t, uint32_t> latency_threshold_map;
+    for (const auto& threshold : latency_thresholds) {
+      uint32_t threshold_val = static_cast<uint32_t>(threshold.threshold().value());
+      switch (threshold.opcode()) {
+      case envoy::extensions::filters::network::zookeeper_proxy::v3::LatencyThreshold::Default:
+        latency_threshold_map[-1] = threshold_val;
+        break;
+      case envoy::extensions::filters::network::zookeeper_proxy::v3::LatencyThreshold::Connect:
+        latency_threshold_map[0] = threshold_val;
+        break;
+      case envoy::extensions::filters::network::zookeeper_proxy::v3::LatencyThreshold::Create:
+        latency_threshold_map[1] = threshold_val;
+        break;
+      case envoy::extensions::filters::network::zookeeper_proxy::v3::LatencyThreshold::Delete:
+        latency_threshold_map[2] = threshold_val;
+        break;
+      case envoy::extensions::filters::network::zookeeper_proxy::v3::LatencyThreshold::Exists:
+        latency_threshold_map[3] = threshold_val;
+        break;
+      case envoy::extensions::filters::network::zookeeper_proxy::v3::LatencyThreshold::GetData:
+        latency_threshold_map[4] = threshold_val;
+        break;
+      case envoy::extensions::filters::network::zookeeper_proxy::v3::LatencyThreshold::SetData:
+        latency_threshold_map[5] = threshold_val;
+        break;
+      case envoy::extensions::filters::network::zookeeper_proxy::v3::LatencyThreshold::GetAcl:
+        latency_threshold_map[6] = threshold_val;
+        break;
+      case envoy::extensions::filters::network::zookeeper_proxy::v3::LatencyThreshold::SetAcl:
+        latency_threshold_map[7] = threshold_val;
+        break;
+      case envoy::extensions::filters::network::zookeeper_proxy::v3::LatencyThreshold::GetChildren:
+        latency_threshold_map[8] = threshold_val;
+        break;
+      case envoy::extensions::filters::network::zookeeper_proxy::v3::LatencyThreshold::Sync:
+        latency_threshold_map[9] = threshold_val;
+        break;
+      case envoy::extensions::filters::network::zookeeper_proxy::v3::LatencyThreshold::Ping:
+        latency_threshold_map[11] = threshold_val;
+        break;
+      case envoy::extensions::filters::network::zookeeper_proxy::v3::LatencyThreshold::GetChildren2:
+        latency_threshold_map[12] = threshold_val;
+        break;
+      case envoy::extensions::filters::network::zookeeper_proxy::v3::LatencyThreshold::Check:
+        latency_threshold_map[13] = threshold_val;
+        break;
+      case envoy::extensions::filters::network::zookeeper_proxy::v3::LatencyThreshold::Multi:
+        latency_threshold_map[14] = threshold_val;
+        break;
+      case envoy::extensions::filters::network::zookeeper_proxy::v3::LatencyThreshold::Create2:
+        latency_threshold_map[15] = threshold_val;
+        break;
+      case envoy::extensions::filters::network::zookeeper_proxy::v3::LatencyThreshold::Reconfig:
+        latency_threshold_map[16] = threshold_val;
+        break;
+      case envoy::extensions::filters::network::zookeeper_proxy::v3::LatencyThreshold::CheckWatches:
+        latency_threshold_map[17] = threshold_val;
+        break;
+      case envoy::extensions::filters::network::zookeeper_proxy::v3::LatencyThreshold::
+          RemoveWatches:
+        latency_threshold_map[18] = threshold_val;
+        break;
+      case envoy::extensions::filters::network::zookeeper_proxy::v3::LatencyThreshold::
+          CreateContainer:
+        latency_threshold_map[19] = threshold_val;
+        break;
+      case envoy::extensions::filters::network::zookeeper_proxy::v3::LatencyThreshold::CreateTtl:
+        latency_threshold_map[21] = threshold_val;
+        break;
+      case envoy::extensions::filters::network::zookeeper_proxy::v3::LatencyThreshold::Close:
+        latency_threshold_map[-11] = threshold_val;
+        break;
+      case envoy::extensions::filters::network::zookeeper_proxy::v3::LatencyThreshold::SetAuth:
+        latency_threshold_map[100] = threshold_val;
+        break;
+      case envoy::extensions::filters::network::zookeeper_proxy::v3::LatencyThreshold::SetWatches:
+        latency_threshold_map[101] = threshold_val;
+        break;
+      case envoy::extensions::filters::network::zookeeper_proxy::v3::LatencyThreshold::
+          GetEphemerals:
+        latency_threshold_map[103] = threshold_val;
+        break;
+      case envoy::extensions::filters::network::zookeeper_proxy::v3::LatencyThreshold::
+          GetAllChildrenNumber:
+        latency_threshold_map[104] = threshold_val;
+        break;
+      case envoy::extensions::filters::network::zookeeper_proxy::v3::LatencyThreshold::SetWatches2:
+        latency_threshold_map[105] = threshold_val;
+        break;
+      default:
+        break;
+      }
+    }
+    return latency_threshold_map;
   }
 };
 
@@ -175,10 +339,12 @@ public:
   void onGetAllChildrenNumberRequest(const std::string& path) override;
   void onCloseRequest() override;
   void onResponseBytes(uint64_t bytes) override;
-  void onConnectResponse(int32_t proto_version, int32_t timeout, bool readonly,
+  void onConnectResponse(OpCodes opcode, int32_t proto_version, int32_t timeout, bool readonly,
                          const std::chrono::milliseconds& latency) override;
   void onResponse(OpCodes opcode, int32_t xid, int64_t zxid, int32_t error,
                   const std::chrono::milliseconds& latency) override;
+  std::string onResponseHelper(const OpCodes opcode,
+                               const std::chrono::milliseconds& latency) override;
   void onWatchEvent(int32_t event_type, int32_t client_state, const std::string& path, int64_t zxid,
                     int32_t error) override;
 

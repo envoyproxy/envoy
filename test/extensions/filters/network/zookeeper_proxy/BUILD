@@ -21,6 +21,7 @@ envoy_extension_cc_test(
         "//source/extensions/filters/network/zookeeper_proxy:config",
         "//test/mocks/network:network_mocks",
         "//test/test_common:simulated_time_system_lib",
+        "@envoy_api//envoy/extensions/filters/network/zookeeper_proxy/v3:pkg_cc_proto",
     ],
 )
 

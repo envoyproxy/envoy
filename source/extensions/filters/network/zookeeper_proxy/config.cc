@@ -27,9 +27,12 @@ Network::FilterFactoryCb ZooKeeperConfigFactory::createFilterFactoryFromProtoTyp
   const std::string stat_prefix = fmt::format("{}.zookeeper", proto_config.stat_prefix());
   const uint32_t max_packet_bytes =
       PROTOBUF_GET_WRAPPED_OR_DEFAULT(proto_config, max_packet_bytes, 1024 * 1024);
+  const Protobuf::RepeatedPtrField<
+      envoy::extensions::filters::network::zookeeper_proxy::v3::LatencyThreshold>&
+      latency_thresholds = proto_config.latency_thresholds();
 
-  ZooKeeperFilterConfigSharedPtr filter_config(
-      std::make_shared<ZooKeeperFilterConfig>(stat_prefix, max_packet_bytes, context.scope()));
+  ZooKeeperFilterConfigSharedPtr filter_config(std::make_shared<ZooKeeperFilterConfig>(
+      stat_prefix, max_packet_bytes, latency_thresholds, context.scope()));
   auto& time_source = context.mainThreadDispatcher().timeSource();
 
   return [filter_config, &time_source](Network::FilterManager& filter_manager) -> void {
