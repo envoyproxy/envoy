@@ -7,12 +7,13 @@ const process = require('process');
 // In order for the span(s) associated with an HTTP request to be considered
 // finished, the body of the response corresponding to the request must have
 // ended.
-const ignoreRequestBody = request => {
-  request.on('data', () => {});
-  request.on('end', () => {});
+function ignoreRequestBody(request) {
+  function ignore() {}
+  request.on('data', ignore);
+  request.on('end', ignore);
 }
 
-const requestListener = function (request, response) {
+function requestListener (request, response) {
   ignoreRequestBody(request);
   const responseBody = JSON.stringify({
     "service": "http",
