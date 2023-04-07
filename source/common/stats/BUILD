@@ -40,6 +40,7 @@ envoy_cc_library(
     name = "lazy_init",
     hdrs = ["lazy_init.h"],
     deps = [
+        "//source/common/common:cleanup_lib",
         "//source/common/common:thread_lib",
     ],
 )

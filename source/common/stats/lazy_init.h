@@ -1,5 +1,6 @@
 #pragma once
 
+#include "source/common/common/cleanup.h"
 #include "source/common/common/thread.h"
 
 namespace Envoy {
@@ -46,10 +47,11 @@ public:
               *scope, {pool.add(StatsStructType::typeName()), pool.add("initialized")},
               Stats::Gauge::ImportMode::Accumulate);
         }()),
-        ctor_([scope = std::move(scope), &stat_names, this]() -> StatsStructType* {
+        ctor_([stats_scope = std::move(scope), &stat_names, this]() -> StatsStructType* {
           initialized_.inc();
-          ctor_ = nullptr;
-          return new StatsStructType(stat_names, *scope);
+          // Reset ctor_ to save some RAM.
+          Envoy::Cleanup reset_ctor([&] { ctor_ = nullptr; });
+          return new StatsStructType(stat_names, *stats_scope);
         }) {
     if (initialized_.value() > 0) {
       instantiate();
