@@ -357,7 +357,7 @@ std::string ZooKeeperFilter::onResponseHelper(const OpCodes opcode,
     opname = opcode_info.opname_;
     opcode_latency = opcode_info.latency_name_;
 
-    if (config_->latency_threshold_map_.size() > 0) {
+    if (!config_->latency_threshold_map_.empty()) {
       // Set default latency threshold.
       uint32_t default_latency_threshold = 100;
       auto it = config_->latency_threshold_map_.find(-1);
