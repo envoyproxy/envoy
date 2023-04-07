@@ -388,8 +388,8 @@ new_features:
     should be emitted for histograms.
 - area: http
   change: |
-    added capability for continuing filter chain iteration or send local replies from (decode|encode)Metadata. Additionally, reset idle timer on
-    metadata actions.
+    added capability for continuing filter chain iteration or send local replies from (decode|encode)Metadata. Additionally,
+    reset idle timer on metadata actions.
 
 deprecated:
 - area: ext_authz
