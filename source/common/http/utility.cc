@@ -462,7 +462,7 @@ void Utility::appendVia(RequestOrResponseHeaderMap& headers, const std::string& 
 
 void Utility::updateAuthority(RequestHeaderMap& headers, absl::string_view hostname,
                               const bool append_xfh) {
-  // only append to x-forwarded-host if the value was not the last value appended
+  // Only append to x-forwarded-host if the value was not the last value appended.
   const auto host = headers.getHostValue();
   const auto xfh = headers.getForwardedHostValue();
 
