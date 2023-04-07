@@ -23,7 +23,7 @@ void UpstreamManagerImplBase::cleanUp(bool close_connection) {
   if (close_connection && owned_conn_data_ != nullptr) {
     ENVOY_LOG(debug, "generic proxy upstream request: close upstream connection");
     ASSERT(tcp_pool_handle_ == nullptr);
-    owned_conn_data_->connection().close(Network::ConnectionCloseType::NoFlush);
+    owned_conn_data_->connection().close(Network::ConnectionCloseType::FlushWrite);
   }
   owned_conn_data_.reset();
 

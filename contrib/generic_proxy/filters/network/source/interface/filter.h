@@ -87,7 +87,7 @@ public:
                              absl::string_view transport_failure_reason,
                              Upstream::HostDescriptionConstSharedPtr host) PURE;
 
-  virtual void onBindSuccess(Tcp::ConnectionPool::ConnectionData& conn,
+  virtual void onBindSuccess(Network::ClientConnection& conn,
                              Upstream::HostDescriptionConstSharedPtr host) PURE;
 };
 

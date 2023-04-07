@@ -306,6 +306,7 @@ public:
   // ResponseDecoderCallback
   void onDecodingSuccess(ResponsePtr response, ExtendedOptions options) override;
   void onDecodingFailure() override;
+  void writeToConnection(Buffer::Instance& buffer) override;
 
   // UpstreamManager
   void registerResponseCallback(uint64_t stream_id, PendingResponseCallback& cb) override;
@@ -347,6 +348,7 @@ public:
   // RequestDecoderCallback
   void onDecodingSuccess(RequestPtr request, ExtendedOptions options) override;
   void onDecodingFailure() override;
+  void writeToConnection(Buffer::Instance& data) override;
 
   // Network::ConnectionCallbacks
   void onEvent(Network::ConnectionEvent event) override {
@@ -395,6 +397,8 @@ public:
 
   // This may be called multiple times in some scenarios. But it is safe.
   void resetStreamsForUnexpectedError();
+  // This may be called multiple times in some scenarios. But it is safe.
+  void closeDownstreamConnection();
 
   void mayBeDrainClose();
 
@@ -420,6 +424,7 @@ private:
 
   FilterConfigSharedPtr config_{};
   const Network::DrainDecision& drain_decision_;
+  bool stream_drain_decision_{};
   TimeSource& time_source_;
   Runtime::Loader& runtime_;
 

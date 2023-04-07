@@ -37,9 +37,17 @@ enum class StreamResetReason : uint32_t {
 class RouterFilter;
 class UpstreamRequest;
 
+/**
+ * We needn't to inherit from UpstreamManager interfaces because
+ * the Router::UpstreamManagerImpl is only used by Router::UpstreamRequest and
+ * only one request is allowed to be processed at the same time.
+ * We still inherit from UpstreamManagerImplBase to avoid code duplication.
+ */
 class UpstreamManagerImpl : public UpstreamManagerImplBase {
 public:
   UpstreamManagerImpl(UpstreamRequest& parent, Upstream::TcpPoolData&& pool);
+
+  void setResponseCallback();
 
   void onEventImpl(Network::ConnectionEvent event) override;
   void onPoolSuccessImpl() override;
@@ -69,12 +77,13 @@ public:
   void onBindFailure(ConnectionPool::PoolFailureReason reason,
                      absl::string_view transport_failure_reason,
                      Upstream::HostDescriptionConstSharedPtr host) override;
-  void onBindSuccess(Tcp::ConnectionPool::ConnectionData& conn,
+  void onBindSuccess(Network::ClientConnection& conn,
                      Upstream::HostDescriptionConstSharedPtr host) override;
 
   // PendingResponseCallback
   void onDecodingSuccess(ResponsePtr response, ExtendedOptions options) override;
   void onDecodingFailure() override;
+  void writeToConnection(Buffer::Instance& buffer) override;
   void onConnectionClose(Network::ConnectionEvent event) override;
 
   // RequestEncoderCallback
@@ -94,7 +103,7 @@ public:
   absl::optional<Upstream::TcpPoolData> tcp_pool_data_;
   std::unique_ptr<UpstreamManagerImpl> upstream_manager_;
 
-  Tcp::ConnectionPool::ConnectionData* conn_data_{};
+  Network::ClientConnection* upstream_conn_{};
   Upstream::HostDescriptionConstSharedPtr upstream_host_;
 
   bool response_complete_{};

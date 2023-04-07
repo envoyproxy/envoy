@@ -124,6 +124,7 @@ void ActiveStream::continueDecoding() {
 void ActiveStream::upstreamResponse(ResponsePtr response, ExtendedOptions options) {
   local_or_upstream_response_stream_ = std::move(response);
   local_or_upstream_response_options_ = options;
+  parent_.stream_drain_decision_ = options.drainClose();
   continueEncoding();
 }
 
@@ -215,7 +216,7 @@ void UpstreamManagerImpl::registerUpstreamCallback(uint64_t stream_id,
                                                    UpstreamBindingCallback& cb) {
   // Connection is already bound to a downstream connection and use it directly.
   if (owned_conn_data_ != nullptr) {
-    cb.onBindSuccess(*owned_conn_data_, upstream_host_);
+    cb.onBindSuccess(owned_conn_data_->connection(), upstream_host_);
     return;
   }
 
@@ -246,14 +247,10 @@ void UpstreamManagerImpl::onEventImpl(Network::ConnectionEvent event) {
     return;
   }
 
-  while (!registered_upstream_callbacks_.empty()) {
-    auto it = registered_upstream_callbacks_.begin();
-    auto cb = it->second;
-    registered_upstream_callbacks_.erase(it);
-
-    cb->onBindFailure(Tcp::ConnectionPool::PoolFailureReason::RemoteConnectionFailure, "",
-                      upstream_host_);
-  }
+  // If the connection event is consumed by this upstream manager, it means that
+  // the upstream connection is ready and onPoolReady()/onPoolSuccessImpl() have
+  // been called. So the registered upstream callbacks should be empty.
+  ASSERT(registered_upstream_callbacks_.empty());
 
   while (!registered_response_callbacks_.empty()) {
     auto it = registered_response_callbacks_.begin();
@@ -274,7 +271,7 @@ void UpstreamManagerImpl::onPoolSuccessImpl() {
     auto* cb = iter->second;
     registered_upstream_callbacks_.erase(iter);
 
-    cb->onBindSuccess(*owned_conn_data_, upstream_host_);
+    cb->onBindSuccess(owned_conn_data_->connection(), upstream_host_);
   }
 }
 
@@ -329,6 +326,17 @@ void UpstreamManagerImpl::onDecodingFailure() {
   parent_.onBoundUpstreamConnectionEvent(Network::ConnectionEvent::RemoteClose);
 }
 
+void UpstreamManagerImpl::writeToConnection(Buffer::Instance& buffer) {
+  if (is_cleaned_up_) {
+    return;
+  }
+
+  if (owned_conn_data_ != nullptr) {
+    ASSERT(owned_conn_data_->connection().state() == Network::Connection::State::Open);
+    owned_conn_data_->connection().write(buffer, false);
+  }
+}
+
 Envoy::Network::FilterStatus Filter::onData(Envoy::Buffer::Instance& data, bool) {
   if (downstream_connection_closed_) {
     return Envoy::Network::FilterStatus::StopIteration;
@@ -344,7 +352,14 @@ void Filter::onDecodingSuccess(RequestPtr request, ExtendedOptions options) {
 
 void Filter::onDecodingFailure() {
   resetStreamsForUnexpectedError();
-  connection().close(Network::ConnectionCloseType::FlushWrite);
+  closeDownstreamConnection();
+}
+
+void Filter::writeToConnection(Buffer::Instance& data) {
+  if (downstream_connection_closed_) {
+    return;
+  }
+  connection().write(data, false);
 }
 
 void Filter::sendReplyDownstream(Response& response, ResponseEncoderCallback& callback) {
@@ -378,19 +393,25 @@ void Filter::resetStreamsForUnexpectedError() {
   }
 }
 
+void Filter::closeDownstreamConnection() {
+  if (downstream_connection_closed_) {
+    return;
+  }
+  downstream_connection_closed_ = true;
+  connection().close(Network::ConnectionCloseType::FlushWrite);
+}
+
 void Filter::mayBeDrainClose() {
-  if (drain_decision_.drainClose() && active_streams_.empty()) {
+  if ((drain_decision_.drainClose() || stream_drain_decision_) && active_streams_.empty()) {
     onDrainCloseAndNoActiveStreams();
   }
 }
 
 // Default implementation for connection draining.
-void Filter::onDrainCloseAndNoActiveStreams() {
-  connection().close(Network::ConnectionCloseType::FlushWrite);
-}
+void Filter::onDrainCloseAndNoActiveStreams() { closeDownstreamConnection(); }
 
 void Filter::bindUpstreamConn(Upstream::TcpPoolData&& tcp_pool_data) {
-  auto response_decoder = config_->codecFactory().responseDecoder();
+  ASSERT(config_->codecFactory().protocolOptions().bindUpstreamConnection());
   upstream_manager_ = std::make_unique<UpstreamManagerImpl>(*this, std::move(tcp_pool_data));
   upstream_manager_->newConnection();
 }
@@ -412,7 +433,7 @@ void Filter::onBoundUpstreamConnectionEvent(Network::ConnectionEvent event) {
     }
 
     // Close downstream connection.
-    connection().close(Network::ConnectionCloseType::FlushWrite);
+    closeDownstreamConnection();
   }
 }
 

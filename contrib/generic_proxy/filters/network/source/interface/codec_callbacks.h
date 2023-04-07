@@ -40,17 +40,22 @@ public:
 
   /**
    * @return whether the current request requires an upstream response.
+   * NOTE: This is only used for the request.
    */
   bool waitResponse() const { return wait_response_; }
 
   /**
    * @return whether the downstream/upstream connection should be drained after
    * current active requests are finished.
+   * NOTE: This is only used for the response.
    */
   bool drainClose() const { return drain_close_; }
 
   /**
    * @return whether the current request/response is a heartbeat request/response.
+   * NOTE: It would be better to handle heartbeat request/response by another L4
+   * filter. Then the generic proxy filter can be used for the simple ping-pong
+   * use case.
    */
   bool isHeartbeat() const { return is_heartbeat_; }
 
@@ -81,6 +86,16 @@ public:
    * If request decoding failure then this method will be called.
    */
   virtual void onDecodingFailure() PURE;
+
+  /**
+   * Write specified data to the downstream connection. This is could be used to write
+   * some raw binary to peer before the onDecodingSuccess()/onDecodingFailure() is
+   * called. By this way, when some special data is received from peer, the custom
+   * codec could handle it directly and write some reply to peer without notifying
+   * the generic proxy filter.
+   * @param buffer data to write.
+   */
+  virtual void writeToConnection(Buffer::Instance& buffer) PURE;
 };
 
 /**
@@ -101,6 +116,16 @@ public:
    * If response decoding failure then this method will be called.
    */
   virtual void onDecodingFailure() PURE;
+
+  /**
+   * Write specified data to the upstream connection. This is could be used to write
+   * some raw binary to peer before the onDecodingSuccess()/onDecodingFailure() is
+   * called. By this way, when some special data is received from peer, the custom
+   * codec could handle it directly and write some reply to peer without notifying
+   * the generic proxy filter.
+   * @param buffer data to write.
+   */
+  virtual void writeToConnection(Buffer::Instance& buffer) PURE;
 };
 
 /**

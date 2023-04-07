@@ -18,7 +18,7 @@ class UpstreamManagerImplBase : public Tcp::ConnectionPool::Callbacks,
 public:
   ~UpstreamManagerImplBase() override;
 
-  void newConnection() { tcp_pool_data_.newConnection(*this); }
+  void newConnection() { tcp_pool_handle_ = tcp_pool_data_.newConnection(*this); }
 
   void cleanUp(bool close_connection);
 
