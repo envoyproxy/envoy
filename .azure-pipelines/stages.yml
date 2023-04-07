@@ -1005,11 +1005,47 @@ stages:
         key: '"windows.release" | $(cacheKeyRepository)'
         path: $(Build.StagingDirectory)/repository_cache
       continueOnError: true
+
+    - task: Cache@2
+      inputs:
+        key: 'windows_build_image | "$(cacheKeyBuildImage).dev0" | .devcontainer/Dockerfile'
+        path: $(Build.StagingDirectory)/build_image
+      continueOnError: true
+
+    - powershell: |
+        Stop-Service docker
+        Remove-Item -path c:\\ProgramData\\docker -force
+        Start-Service docker
+
+    - bash: |
+        pwd
+        df -h
+        docker info
+        echo "$(Build.StagingDirectory)"
+
+        # du -ch C:\\ProgramData\\docker || echo "Cant do that!"
+
+        # du -ch /ProgramData/docker || echo "Cant do that!"
+
+        rm -rf c:\\ProgramData\\docker
+        Start-Service docker
+
+        docker images
+
+        free
+
+        mkdir -p $(Build.StagingDirectory)/build_image
+
+      displayName: "Debug Windows msvc-cl CI"
+
+
+
     - bash: ci/run_envoy_docker.sh ci/windows_ci_steps.sh
       displayName: "Run Windows msvc-cl CI"
       env:
         CI_TARGET: "windows"
         ENVOY_DOCKER_BUILD_DIR: "$(Build.StagingDirectory)"
+        ENVOY_DOCKER_PULL: 1
         SLACK_TOKEN: $(SLACK_TOKEN)
         REPO_URI: $(Build.Repository.Uri)
         BUILD_URI: $(Build.BuildUri)
