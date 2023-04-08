@@ -153,7 +153,7 @@ void ActiveStream::continueEncoding() {
   }
 
   if (next_encoder_filter_index_ == encoder_filters_.size()) {
-    ENVOY_LOG(debug, "Complete decoder filters");
+    ENVOY_LOG(debug, "Complete encoder filters");
     parent_.sendReplyDownstream(*local_or_upstream_response_stream_, *this);
   }
 }
@@ -429,6 +429,7 @@ void Filter::onBoundUpstreamConnectionEvent(Network::ConnectionEvent event) {
       // flag to true to ensure the upstream connection is closed in case of
       // the onBoundUpstreamConnectionEvent() is called for other reasons.
       upstream_manager_->cleanUp(true);
+      connection().dispatcher().deferredDelete(std::move(upstream_manager_));
       upstream_manager_ = nullptr;
     }
 

@@ -12,6 +12,7 @@ UpstreamManagerImplBase::~UpstreamManagerImplBase() {
 }
 
 void UpstreamManagerImplBase::cleanUp(bool close_connection) {
+  // If the cleanUp is called multiple times, just return.
   if (is_cleaned_up_) {
     return;
   }

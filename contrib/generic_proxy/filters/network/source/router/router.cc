@@ -103,6 +103,7 @@ void UpstreamRequest::resetStream(StreamResetReason reason) {
     // If the upstream connection is managed by the upstream request self, we should clean
     // up the upstream connection.
     upstream_manager_->cleanUp(true);
+    decoder_callbacks_.dispatcher().deferredDelete(std::move(upstream_manager_));
     upstream_manager_ = nullptr;
   } else {
     // If the upstream connection is not managed by the generic proxy, we should unregister
@@ -140,6 +141,7 @@ void UpstreamRequest::clearStream(bool close_connection) {
 
   if (upstream_manager_ != nullptr) {
     upstream_manager_->cleanUp(close_connection);
+    decoder_callbacks_.dispatcher().deferredDelete(std::move(upstream_manager_));
     upstream_manager_ = nullptr;
   }
 
@@ -195,7 +197,8 @@ void UpstreamRequest::onBindFailure(ConnectionPool::PoolFailureReason reason, ab
 
 void UpstreamRequest::onBindSuccess(Network::ClientConnection& conn,
                                     Upstream::HostDescriptionConstSharedPtr host) {
-  ENVOY_LOG(debug, "upstream request: tcp connection (bound or owned) has ready");
+  ENVOY_LOG(debug, "upstream request: {} tcp connection has ready",
+            upstream_manager_ != nullptr ? "owned" : "bound");
 
   onUpstreamHostSelected(std::move(host));
   upstream_conn_ = &conn;

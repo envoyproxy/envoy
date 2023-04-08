@@ -12,7 +12,8 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace GenericProxy {
 
-class UpstreamManagerImplBase : public Tcp::ConnectionPool::Callbacks,
+class UpstreamManagerImplBase : public Envoy::Event::DeferredDeletable,
+                                public Tcp::ConnectionPool::Callbacks,
                                 public Tcp::ConnectionPool::UpstreamCallbacks,
                                 public Envoy::Logger::Loggable<Envoy::Logger::Id::upstream> {
 public:

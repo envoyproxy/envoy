@@ -352,6 +352,7 @@ public:
 
   // Network::ConnectionCallbacks
   void onEvent(Network::ConnectionEvent event) override {
+    ENVOY_LOG(debug, "generic proxy: downstream connection event {}", static_cast<uint32_t>(event));
     if (event == Network::ConnectionEvent::Connected ||
         event == Network::ConnectionEvent::ConnectedZeroRtt) {
       return;
@@ -362,6 +363,7 @@ public:
     // If these is bound upstream connection, clean it up.
     if (upstream_manager_ != nullptr) {
       upstream_manager_->cleanUp(true);
+      connection().dispatcher().deferredDelete(std::move(upstream_manager_));
       upstream_manager_ = nullptr;
     }
   }
