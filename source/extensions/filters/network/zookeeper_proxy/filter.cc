@@ -20,12 +20,10 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace ZooKeeperProxy {
 
-ZooKeeperFilterConfig::ZooKeeperFilterConfig(
-    const std::string& stat_prefix, const uint32_t max_packet_bytes,
-    const Protobuf::RepeatedPtrField<
-        envoy::extensions::filters::network::zookeeper_proxy::v3::LatencyThreshold>&
-        latency_thresholds,
-    Stats::Scope& scope)
+ZooKeeperFilterConfig::ZooKeeperFilterConfig(const std::string& stat_prefix,
+                                             const uint32_t max_packet_bytes,
+                                             LatencyThresholdList latency_thresholds,
+                                             Stats::Scope& scope)
     : scope_(scope), max_packet_bytes_(max_packet_bytes), stats_(generateStats(stat_prefix, scope)),
       latency_threshold_map_(parseLatencyThresholds(latency_thresholds)),
       stat_name_set_(scope.symbolTable().makeSet("Zookeeper")),
@@ -105,8 +103,104 @@ void ZooKeeperFilterConfig::initOpCode(OpCodes opcode, Stats::Counter& counter,
   opcode_info.latency_name_ = stat_name_set_->add(absl::StrCat(name, "_latency"));
 }
 
+absl::flat_hash_map<int32_t, uint32_t>
+ZooKeeperFilterConfig::parseLatencyThresholds(LatencyThresholdList latency_thresholds) {
+  absl::flat_hash_map<int32_t, uint32_t> latency_threshold_map;
+  for (const auto& threshold : latency_thresholds) {
+    switch (threshold.opcode()) {
+    case envoy::extensions::filters::network::zookeeper_proxy::v3::LatencyThreshold::Default:
+      latency_threshold_map[-1] = threshold.threshold();
+      break;
+    case envoy::extensions::filters::network::zookeeper_proxy::v3::LatencyThreshold::Connect:
+      latency_threshold_map[0] = threshold.threshold();
+      break;
+    case envoy::extensions::filters::network::zookeeper_proxy::v3::LatencyThreshold::Create:
+      latency_threshold_map[1] = threshold.threshold();
+      break;
+    case envoy::extensions::filters::network::zookeeper_proxy::v3::LatencyThreshold::Delete:
+      latency_threshold_map[2] = threshold.threshold();
+      break;
+    case envoy::extensions::filters::network::zookeeper_proxy::v3::LatencyThreshold::Exists:
+      latency_threshold_map[3] = threshold.threshold();
+      break;
+    case envoy::extensions::filters::network::zookeeper_proxy::v3::LatencyThreshold::GetData:
+      latency_threshold_map[4] = threshold.threshold();
+      break;
+    case envoy::extensions::filters::network::zookeeper_proxy::v3::LatencyThreshold::SetData:
+      latency_threshold_map[5] = threshold.threshold();
+      break;
+    case envoy::extensions::filters::network::zookeeper_proxy::v3::LatencyThreshold::GetAcl:
+      latency_threshold_map[6] = threshold.threshold();
+      break;
+    case envoy::extensions::filters::network::zookeeper_proxy::v3::LatencyThreshold::SetAcl:
+      latency_threshold_map[7] = threshold.threshold();
+      break;
+    case envoy::extensions::filters::network::zookeeper_proxy::v3::LatencyThreshold::GetChildren:
+      latency_threshold_map[8] = threshold.threshold();
+      break;
+    case envoy::extensions::filters::network::zookeeper_proxy::v3::LatencyThreshold::Sync:
+      latency_threshold_map[9] = threshold.threshold();
+      break;
+    case envoy::extensions::filters::network::zookeeper_proxy::v3::LatencyThreshold::Ping:
+      latency_threshold_map[11] = threshold.threshold();
+      break;
+    case envoy::extensions::filters::network::zookeeper_proxy::v3::LatencyThreshold::GetChildren2:
+      latency_threshold_map[12] = threshold.threshold();
+      break;
+    case envoy::extensions::filters::network::zookeeper_proxy::v3::LatencyThreshold::Check:
+      latency_threshold_map[13] = threshold.threshold();
+      break;
+    case envoy::extensions::filters::network::zookeeper_proxy::v3::LatencyThreshold::Multi:
+      latency_threshold_map[14] = threshold.threshold();
+      break;
+    case envoy::extensions::filters::network::zookeeper_proxy::v3::LatencyThreshold::Create2:
+      latency_threshold_map[15] = threshold.threshold();
+      break;
+    case envoy::extensions::filters::network::zookeeper_proxy::v3::LatencyThreshold::Reconfig:
+      latency_threshold_map[16] = threshold.threshold();
+      break;
+    case envoy::extensions::filters::network::zookeeper_proxy::v3::LatencyThreshold::CheckWatches:
+      latency_threshold_map[17] = threshold.threshold();
+      break;
+    case envoy::extensions::filters::network::zookeeper_proxy::v3::LatencyThreshold::RemoveWatches:
+      latency_threshold_map[18] = threshold.threshold();
+      break;
+    case envoy::extensions::filters::network::zookeeper_proxy::v3::LatencyThreshold::
+        CreateContainer:
+      latency_threshold_map[19] = threshold.threshold();
+      break;
+    case envoy::extensions::filters::network::zookeeper_proxy::v3::LatencyThreshold::CreateTtl:
+      latency_threshold_map[21] = threshold.threshold();
+      break;
+    case envoy::extensions::filters::network::zookeeper_proxy::v3::LatencyThreshold::Close:
+      latency_threshold_map[-11] = threshold.threshold();
+      break;
+    case envoy::extensions::filters::network::zookeeper_proxy::v3::LatencyThreshold::SetAuth:
+      latency_threshold_map[100] = threshold.threshold();
+      break;
+    case envoy::extensions::filters::network::zookeeper_proxy::v3::LatencyThreshold::SetWatches:
+      latency_threshold_map[101] = threshold.threshold();
+      break;
+    case envoy::extensions::filters::network::zookeeper_proxy::v3::LatencyThreshold::GetEphemerals:
+      latency_threshold_map[103] = threshold.threshold();
+      break;
+    case envoy::extensions::filters::network::zookeeper_proxy::v3::LatencyThreshold::
+        GetAllChildrenNumber:
+      latency_threshold_map[104] = threshold.threshold();
+      break;
+    case envoy::extensions::filters::network::zookeeper_proxy::v3::LatencyThreshold::SetWatches2:
+      latency_threshold_map[105] = threshold.threshold();
+      break;
+    default:
+      break;
+    }
+  }
+  return latency_threshold_map;
+}
+
 ZooKeeperFilter::ZooKeeperFilter(ZooKeeperFilterConfigSharedPtr config, TimeSource& time_source)
-    : config_(std::move(config)), decoder_(createDecoder(*this, time_source)) {}
+    : config_(std::move(config)), decoder_(createDecoder(*this, time_source)),
+      default_latency_threshold_(setDefaultLatencyThreshold(config_->latency_threshold_map_)) {}
 
 void ZooKeeperFilter::initializeReadFilterCallbacks(Network::ReadFilterCallbacks& callbacks) {
   read_callbacks_ = &callbacks;
@@ -126,6 +220,20 @@ Network::FilterStatus ZooKeeperFilter::onNewConnection() { return Network::Filte
 
 DecoderPtr ZooKeeperFilter::createDecoder(DecoderCallbacks& callbacks, TimeSource& time_source) {
   return std::make_unique<DecoderImpl>(callbacks, config_->maxPacketBytes(), time_source);
+}
+
+uint32_t
+ZooKeeperFilter::setDefaultLatencyThreshold(const absl::flat_hash_map<int32_t, uint32_t> map) {
+  if (map.empty()) {
+    return 0;
+  }
+
+  uint32_t default_latency_threshold = 100;
+  auto it = map.find(-1);
+  if (it != map.end()) {
+    default_latency_threshold = it->second;
+  }
+  return default_latency_threshold;
 }
 
 void ZooKeeperFilter::setDynamicMetadata(const std::string& key, const std::string& value) {
@@ -328,9 +436,22 @@ void ZooKeeperFilter::onCloseRequest() {
 void ZooKeeperFilter::onConnectResponse(const OpCodes opcode, const int32_t proto_version,
                                         const int32_t timeout, const bool readonly,
                                         const std::chrono::milliseconds& latency) {
-  std::string opname = onResponseHelper(opcode, latency);
+  config_->stats_.connect_resp_.inc();
 
-  setDynamicMetadata({{"opname", opname},
+  Stats::StatName opcode_latency = config_->unknown_opcode_latency_;
+  auto iter = config_->op_code_map_.find(opcode);
+  if (iter != config_->op_code_map_.end()) {
+    const ZooKeeperFilterConfig::OpCodeInfo& opcode_info = iter->second;
+    opcode_latency = opcode_info.latency_name_;
+    recordErrorBudgetMetrics(opcode, opcode_info, latency);
+  }
+
+  Stats::Histogram& histogram = Stats::Utility::histogramFromElements(
+      config_->scope_, {config_->stat_prefix_, opcode_latency},
+      Stats::Histogram::Unit::Milliseconds);
+  histogram.recordValue(latency.count());
+
+  setDynamicMetadata({{"opname", "connect_resp"},
                       {"protocol_version", std::to_string(proto_version)},
                       {"timeout", std::to_string(timeout)},
                       {"readonly", std::to_string(readonly)}});
@@ -338,49 +459,15 @@ void ZooKeeperFilter::onConnectResponse(const OpCodes opcode, const int32_t prot
 
 void ZooKeeperFilter::onResponse(const OpCodes opcode, const int32_t xid, const int64_t zxid,
                                  const int32_t error, const std::chrono::milliseconds& latency) {
-  std::string opname = onResponseHelper(opcode, latency);
-
-  setDynamicMetadata({{"opname", opname},
-                      {"xid", std::to_string(xid)},
-                      {"zxid", std::to_string(zxid)},
-                      {"error", std::to_string(error)}});
-}
-
-std::string ZooKeeperFilter::onResponseHelper(const OpCodes opcode,
-                                              const std::chrono::milliseconds& latency) {
   Stats::StatName opcode_latency = config_->unknown_opcode_latency_;
-  auto iter = config_->op_code_map_.find(opcode);
   std::string opname = "";
+  auto iter = config_->op_code_map_.find(opcode);
   if (iter != config_->op_code_map_.end()) {
     const ZooKeeperFilterConfig::OpCodeInfo& opcode_info = iter->second;
     opcode_info.counter_->inc();
-    opname = opcode_info.opname_;
     opcode_latency = opcode_info.latency_name_;
-
-    if (!config_->latency_threshold_map_.empty()) {
-      // Set default latency threshold.
-      uint32_t default_latency_threshold = 100;
-      auto it = config_->latency_threshold_map_.find(-1);
-      if (it != config_->latency_threshold_map_.end()) {
-        default_latency_threshold = it->second;
-      }
-
-      // Set latency threshold for the current opcode.
-      uint32_t latency_threshold = default_latency_threshold;
-      int32_t opcode_val = static_cast<int32_t>(opcode);
-      it = config_->latency_threshold_map_.find(opcode_val);
-      if (it != config_->latency_threshold_map_.end()) {
-        latency_threshold = it->second;
-      }
-
-      // Determine fast/slow response based on the threshold.
-      uint32_t current_latency = static_cast<uint32_t>(latency.count());
-      if (current_latency <= latency_threshold) {
-        opcode_info.resp_fast_counter_->inc();
-      } else {
-        opcode_info.resp_slow_counter_->inc();
-      }
-    }
+    opname = opcode_info.opname_;
+    recordErrorBudgetMetrics(opcode, opcode_info, latency);
   }
 
   Stats::Histogram& histogram = Stats::Utility::histogramFromStatNames(
@@ -388,7 +475,34 @@ std::string ZooKeeperFilter::onResponseHelper(const OpCodes opcode,
       Stats::Histogram::Unit::Milliseconds);
   histogram.recordValue(latency.count());
 
-  return opname;
+  setDynamicMetadata({{"opname", opname},
+                      {"xid", std::to_string(xid)},
+                      {"zxid", std::to_string(zxid)},
+                      {"error", std::to_string(error)}});
+}
+
+void ZooKeeperFilter::recordErrorBudgetMetrics(const OpCodes opcode,
+                                               const ZooKeeperFilterConfig::OpCodeInfo& opcode_info,
+                                               const std::chrono::milliseconds& latency) {
+  if (config_->latency_threshold_map_.empty()) {
+    return;
+  }
+
+  // Set latency threshold for the current opcode.
+  uint32_t latency_threshold = default_latency_threshold_;
+  int32_t opcode_val = static_cast<int32_t>(opcode);
+  auto it = config_->latency_threshold_map_.find(opcode_val);
+  if (it != config_->latency_threshold_map_.end()) {
+    latency_threshold = it->second;
+  }
+
+  // Determine fast/slow response based on the threshold.
+  uint32_t current_latency = static_cast<uint32_t>(latency.count());
+  if (current_latency <= latency_threshold) {
+    opcode_info.resp_fast_counter_->inc();
+  } else {
+    opcode_info.resp_slow_counter_->inc();
+  }
 }
 
 void ZooKeeperFilter::onWatchEvent(const int32_t event_type, const int32_t client_state,

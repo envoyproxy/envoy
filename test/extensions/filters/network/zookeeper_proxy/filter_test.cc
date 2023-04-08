@@ -31,19 +31,13 @@ public:
   ZooKeeperFilterTest() { ENVOY_LOG_MISC(info, "test"); }
 
   void initialize() {
-    // Populate default latency threshold
+    // Populate latency threshold for Multi opcode. The latency thresholds of all other opcode
+    // fallback to the default threshold. Since we did not specify the default threshold, it
+    // fallbacks to 100 millisecond.
     auto* threshold = thresholds.Add();
     threshold->set_opcode(
-        envoy::extensions::filters::network::zookeeper_proxy::v3::LatencyThreshold::Default);
-    ProtobufWkt::UInt32Value threshold_val;
-    threshold_val.set_value(150);
-    threshold->mutable_threshold()->CopyFrom(threshold_val);
-    // Populate latency threshold for Multi opcode
-    threshold = thresholds.Add();
-    threshold->set_opcode(
         envoy::extensions::filters::network::zookeeper_proxy::v3::LatencyThreshold::Multi);
-    threshold_val.set_value(200);
-    threshold->mutable_threshold()->CopyFrom(threshold_val);
+    threshold->set_threshold(200);
 
     Protobuf::RepeatedPtrField<
         envoy::extensions::filters::network::zookeeper_proxy::v3::LatencyThreshold>&

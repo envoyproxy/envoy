@@ -48,8 +48,7 @@ message ZooKeeperProxy {
   // If the default threshold is not set, it will be set as 100 millisecond.
   // If the threshold of one opcode is not set, it will fallback to use the default
   // threshold.
-  repeated LatencyThreshold latency_thresholds = 4
-      [(validate.rules).repeated = {min_items: 0 max_items: 27}];
+  repeated LatencyThreshold latency_thresholds = 4 [(validate.rules).repeated = {max_items: 27}];
 }
 
 message LatencyThreshold {
@@ -85,5 +84,5 @@ message LatencyThreshold {
 
   Opcode opcode = 1 [(validate.rules).enum = {defined_only: true}];
 
-  google.protobuf.UInt32Value threshold = 2 [(validate.rules).uint32 = {gt: 0}];
+  uint32 threshold = 2 [(validate.rules).uint32 = {gt: 0}];
 }

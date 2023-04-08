@@ -146,17 +146,16 @@ struct ZooKeeperProxyStats {
   ALL_ZOOKEEPER_PROXY_STATS(GENERATE_COUNTER_STRUCT)
 };
 
+using LatencyThresholdList = const Protobuf::RepeatedPtrField<
+    envoy::extensions::filters::network::zookeeper_proxy::v3::LatencyThreshold>&;
+
 /**
  * Configuration for the ZooKeeper proxy filter.
  */
 class ZooKeeperFilterConfig {
 public:
-  ZooKeeperFilterConfig(
-      const std::string& stat_prefix, uint32_t max_packet_bytes,
-      const Protobuf::RepeatedPtrField<
-          envoy::extensions::filters::network::zookeeper_proxy::v3::LatencyThreshold>&
-          latency_thresholds,
-      Stats::Scope& scope);
+  ZooKeeperFilterConfig(const std::string& stat_prefix, uint32_t max_packet_bytes,
+                        LatencyThresholdList latency_thresholds, Stats::Scope& scope);
 
   const ZooKeeperProxyStats& stats() { return stats_; }
   uint32_t maxPacketBytes() const { return max_packet_bytes_; }
@@ -178,7 +177,7 @@ public:
   const uint32_t max_packet_bytes_;
   ZooKeeperProxyStats stats_;
   // Key: opcode enum value, value: latency threshold in millisecond.
-  absl::flat_hash_map<int32_t, uint32_t> latency_threshold_map_;
+  const absl::flat_hash_map<int32_t, uint32_t> latency_threshold_map_;
   Stats::StatNameSetPtr stat_name_set_;
   const Stats::StatName stat_prefix_;
   const Stats::StatName auth_;
@@ -193,105 +192,8 @@ private:
     return ZooKeeperProxyStats{ALL_ZOOKEEPER_PROXY_STATS(POOL_COUNTER_PREFIX(scope, prefix))};
   }
 
-  absl::flat_hash_map<int32_t, uint32_t> parseLatencyThresholds(
-      const Protobuf::RepeatedPtrField<
-          envoy::extensions::filters::network::zookeeper_proxy::v3::LatencyThreshold>&
-          latency_thresholds) {
-    absl::flat_hash_map<int32_t, uint32_t> latency_threshold_map;
-    for (const auto& threshold : latency_thresholds) {
-      uint32_t threshold_val = static_cast<uint32_t>(threshold.threshold().value());
-      switch (threshold.opcode()) {
-      case envoy::extensions::filters::network::zookeeper_proxy::v3::LatencyThreshold::Default:
-        latency_threshold_map[-1] = threshold_val;
-        break;
-      case envoy::extensions::filters::network::zookeeper_proxy::v3::LatencyThreshold::Connect:
-        latency_threshold_map[0] = threshold_val;
-        break;
-      case envoy::extensions::filters::network::zookeeper_proxy::v3::LatencyThreshold::Create:
-        latency_threshold_map[1] = threshold_val;
-        break;
-      case envoy::extensions::filters::network::zookeeper_proxy::v3::LatencyThreshold::Delete:
-        latency_threshold_map[2] = threshold_val;
-        break;
-      case envoy::extensions::filters::network::zookeeper_proxy::v3::LatencyThreshold::Exists:
-        latency_threshold_map[3] = threshold_val;
-        break;
-      case envoy::extensions::filters::network::zookeeper_proxy::v3::LatencyThreshold::GetData:
-        latency_threshold_map[4] = threshold_val;
-        break;
-      case envoy::extensions::filters::network::zookeeper_proxy::v3::LatencyThreshold::SetData:
-        latency_threshold_map[5] = threshold_val;
-        break;
-      case envoy::extensions::filters::network::zookeeper_proxy::v3::LatencyThreshold::GetAcl:
-        latency_threshold_map[6] = threshold_val;
-        break;
-      case envoy::extensions::filters::network::zookeeper_proxy::v3::LatencyThreshold::SetAcl:
-        latency_threshold_map[7] = threshold_val;
-        break;
-      case envoy::extensions::filters::network::zookeeper_proxy::v3::LatencyThreshold::GetChildren:
-        latency_threshold_map[8] = threshold_val;
-        break;
-      case envoy::extensions::filters::network::zookeeper_proxy::v3::LatencyThreshold::Sync:
-        latency_threshold_map[9] = threshold_val;
-        break;
-      case envoy::extensions::filters::network::zookeeper_proxy::v3::LatencyThreshold::Ping:
-        latency_threshold_map[11] = threshold_val;
-        break;
-      case envoy::extensions::filters::network::zookeeper_proxy::v3::LatencyThreshold::GetChildren2:
-        latency_threshold_map[12] = threshold_val;
-        break;
-      case envoy::extensions::filters::network::zookeeper_proxy::v3::LatencyThreshold::Check:
-        latency_threshold_map[13] = threshold_val;
-        break;
-      case envoy::extensions::filters::network::zookeeper_proxy::v3::LatencyThreshold::Multi:
-        latency_threshold_map[14] = threshold_val;
-        break;
-      case envoy::extensions::filters::network::zookeeper_proxy::v3::LatencyThreshold::Create2:
-        latency_threshold_map[15] = threshold_val;
-        break;
-      case envoy::extensions::filters::network::zookeeper_proxy::v3::LatencyThreshold::Reconfig:
-        latency_threshold_map[16] = threshold_val;
-        break;
-      case envoy::extensions::filters::network::zookeeper_proxy::v3::LatencyThreshold::CheckWatches:
-        latency_threshold_map[17] = threshold_val;
-        break;
-      case envoy::extensions::filters::network::zookeeper_proxy::v3::LatencyThreshold::
-          RemoveWatches:
-        latency_threshold_map[18] = threshold_val;
-        break;
-      case envoy::extensions::filters::network::zookeeper_proxy::v3::LatencyThreshold::
-          CreateContainer:
-        latency_threshold_map[19] = threshold_val;
-        break;
-      case envoy::extensions::filters::network::zookeeper_proxy::v3::LatencyThreshold::CreateTtl:
-        latency_threshold_map[21] = threshold_val;
-        break;
-      case envoy::extensions::filters::network::zookeeper_proxy::v3::LatencyThreshold::Close:
-        latency_threshold_map[-11] = threshold_val;
-        break;
-      case envoy::extensions::filters::network::zookeeper_proxy::v3::LatencyThreshold::SetAuth:
-        latency_threshold_map[100] = threshold_val;
-        break;
-      case envoy::extensions::filters::network::zookeeper_proxy::v3::LatencyThreshold::SetWatches:
-        latency_threshold_map[101] = threshold_val;
-        break;
-      case envoy::extensions::filters::network::zookeeper_proxy::v3::LatencyThreshold::
-          GetEphemerals:
-        latency_threshold_map[103] = threshold_val;
-        break;
-      case envoy::extensions::filters::network::zookeeper_proxy::v3::LatencyThreshold::
-          GetAllChildrenNumber:
-        latency_threshold_map[104] = threshold_val;
-        break;
-      case envoy::extensions::filters::network::zookeeper_proxy::v3::LatencyThreshold::SetWatches2:
-        latency_threshold_map[105] = threshold_val;
-        break;
-      default:
-        break;
-      }
-    }
-    return latency_threshold_map;
-  }
+  absl::flat_hash_map<int32_t, uint32_t>
+  parseLatencyThresholds(LatencyThresholdList latency_thresholds);
 };
 
 using ZooKeeperFilterConfigSharedPtr = std::shared_ptr<ZooKeeperFilterConfig>;
@@ -343,12 +245,14 @@ public:
                          const std::chrono::milliseconds& latency) override;
   void onResponse(OpCodes opcode, int32_t xid, int64_t zxid, int32_t error,
                   const std::chrono::milliseconds& latency) override;
-  std::string onResponseHelper(const OpCodes opcode,
-                               const std::chrono::milliseconds& latency) override;
   void onWatchEvent(int32_t event_type, int32_t client_state, const std::string& path, int64_t zxid,
                     int32_t error) override;
 
   DecoderPtr createDecoder(DecoderCallbacks& callbacks, TimeSource& time_source);
+  uint32_t setDefaultLatencyThreshold(const absl::flat_hash_map<int32_t, uint32_t> map);
+  void recordErrorBudgetMetrics(const OpCodes opcode,
+                                const ZooKeeperFilterConfig::OpCodeInfo& opcode_info,
+                                const std::chrono::milliseconds& latency);
   void setDynamicMetadata(const std::string& key, const std::string& value);
   void setDynamicMetadata(const std::vector<std::pair<const std::string, const std::string>>& data);
   void clearDynamicMetadata();
@@ -357,6 +261,7 @@ private:
   Network::ReadFilterCallbacks* read_callbacks_{};
   ZooKeeperFilterConfigSharedPtr config_;
   std::unique_ptr<Decoder> decoder_;
+  const uint32_t default_latency_threshold_;
 };
 
 } // namespace ZooKeeperProxy
