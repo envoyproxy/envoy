@@ -568,7 +568,7 @@ void DecoderImpl::decodeAndBufferHelper(Buffer::Instance& data, DecodeType dtype
     offset -= INT_LENGTH + len;
     ASSERT(offset < data_len);
     // Decode full packets.
-    // offset is the length of all full packets.
+    // offset here represents the length of all full packets.
     decode(data, dtype, offset);
 
     // Copy out the rest of the data to the ZooKeeper filter buffer.
