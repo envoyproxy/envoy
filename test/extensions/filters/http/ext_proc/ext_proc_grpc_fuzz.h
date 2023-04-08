@@ -54,9 +54,13 @@ public:
     client_type_ = client_type;
   }
 
-  void tearDown() {
+  void tearDown(bool keep_test_server) {
     cleanupUpstreamAndDownstream();
-    test_processor_.shutdown();
+    fake_upstreams_.clear();
+    codec_client_ = nullptr;
+    if (!keep_test_server) {
+      test_processor_.shutdown();
+    }
   }
 
   Network::Address::IpVersion ipVersion() const override { return ip_version_; }
@@ -133,7 +137,7 @@ public:
   }
 
   IntegrationStreamDecoderPtr sendDownstreamRequestWithChunks(
-      FuzzedDataProvider* fdp, ExtProcFuzzHelper* fh,
+      FuzzedDataProvider* fdp,
       absl::optional<std::function<void(Http::HeaderMap& headers)>> modify_headers,
       absl::string_view http_method = "POST") {
     Http::TestRequestHeaderMapImpl headers{{":method", std::string(http_method)}};
@@ -148,50 +152,28 @@ public:
     const uint32_t num_chunks =
         fdp->ConsumeIntegralInRange<uint32_t>(0, ExtProcFuzzMaxStreamChunks);
     for (uint32_t i = 0; i < num_chunks; i++) {
-      // TODO(ikepolinsky): open issue for this crash and remove locks once
-      // fixed.
-      // If proxy closes connection before body is fully sent it causes a
-      // crash. To address this, the external processor sets a flag to
-      // signal when it has generated an immediate response which will close
-      // the connection in the future. We check this flag, which is protected
-      // by a lock, before sending a chunk. If the flag is set, we don't attempt
-      // to send more data, regardless of whether or not the
-      // codec_client connection is still open. There are no locks protecting
-      // the codec_client connection and cannot trust that it's safe to send
-      // another chunk
-      fh->immediate_resp_lock_.lock();
-      if (fh->immediate_resp_sent_) {
+      if (codec_client_->streamOpen()) {
+        const uint32_t data_size = fdp->ConsumeIntegralInRange<uint32_t>(0, ExtProcFuzzMaxDataSize);
+        ENVOY_LOG_MISC(trace, "Sending chunk of {} bytes", data_size);
+        codec_client_->sendData(encoder, data_size, false);
+      } else {
         ENVOY_LOG_MISC(trace, "Proxy closed connection, returning early");
-        fh->immediate_resp_lock_.unlock();
         return response;
       }
-      const uint32_t data_size = fdp->ConsumeIntegralInRange<uint32_t>(0, ExtProcFuzzMaxDataSize);
-      ENVOY_LOG_MISC(trace, "Sending chunk of {} bytes", data_size);
-      codec_client_->sendData(encoder, data_size, false);
-      fh->immediate_resp_lock_.unlock();
     }
-
-    // See comment above
-    fh->immediate_resp_lock_.lock();
-    if (!fh->immediate_resp_sent_) {
+    if (codec_client_->streamOpen()) {
       ENVOY_LOG_MISC(trace, "Sending empty chunk to close stream");
       Buffer::OwnedImpl empty_chunk;
       codec_client_->sendData(encoder, empty_chunk, true);
     }
-    fh->immediate_resp_lock_.unlock();
     return response;
   }
 
-  IntegrationStreamDecoderPtr randomDownstreamRequest(FuzzedDataProvider* fdp,
-                                                      ExtProcFuzzHelper* fh) {
-    // If test server sends back an immediate response, the downstream client
-    // connection will be disconnected. Recreate the connection in such case.
+  IntegrationStreamDecoderPtr randomDownstreamRequest(FuzzedDataProvider* fdp) {
     if (!codec_client_ || codec_client_->disconnected()) {
-      ENVOY_LOG_MISC(trace, "Downstream client connection disconnected. Recreate");
       auto conn = makeClientConnection(lookupPort("http"));
       codec_client_ = makeHttpConnection(std::move(conn));
     }
-
     // From the external processor's view each of these requests
     // are handled the same way. They only differ in what the server should
     // send back to the client.
@@ -209,8 +191,9 @@ public:
         return sendDownstreamRequestWithBody(data, absl::nullopt);
       } else {
         ENVOY_LOG_MISC(trace, "Sending POST request with chunked body");
-        return sendDownstreamRequestWithChunks(fdp, fh, absl::nullopt);
+        return sendDownstreamRequestWithChunks(fdp, absl::nullopt);
       }
+      break;
     default:
       RELEASE_ASSERT(false, "Unhandled HttpMethod");
     }

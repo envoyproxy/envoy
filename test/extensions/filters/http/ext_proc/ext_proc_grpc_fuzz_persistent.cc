@@ -17,12 +17,6 @@ using envoy::extensions::filters::http::ext_proc::v3::ProcessingMode;
 using envoy::service::ext_proc::v3::ProcessingRequest;
 using envoy::service::ext_proc::v3::ProcessingResponse;
 
-// Using persistent Envoy and ext_proc test server.
-static std::unique_ptr<ExtProcIntegrationFuzz> fuzzer = nullptr;
-static std::unique_ptr<ExtProcFuzzHelper> fuzz_helper = nullptr;
-// Protects fuzz_helper which will be accessed by multiple threads.
-static Thread::MutexBasicLockable fuzz_helper_lock_;
-
 DEFINE_PROTO_FUZZER(const test::extensions::filters::http::ext_proc::ExtProcGrpcTestCase& input) {
   try {
     TestUtility::validate(input);
@@ -30,12 +24,19 @@ DEFINE_PROTO_FUZZER(const test::extensions::filters::http::ext_proc::ExtProcGrpc
     ENVOY_LOG_MISC(debug, "ProtoValidationException: {}", e.what());
     return;
   }
+
   // have separate data providers.
   FuzzedDataProvider downstream_provider(
       reinterpret_cast<const uint8_t*>(input.downstream_data().data()),
       input.downstream_data().size());
   FuzzedDataProvider ext_proc_provider(
       reinterpret_cast<const uint8_t*>(input.ext_proc_data().data()), input.ext_proc_data().size());
+
+  // Using persistent Envoy and ext_proc test server.
+  static std::unique_ptr<ExtProcIntegrationFuzz> fuzzer = nullptr;
+  static std::unique_ptr<ExtProcFuzzHelper> fuzz_helper = nullptr;
+  // Protects fuzz_helper which will be accessed by multiple threads.
+  static Thread::MutexBasicLockable fuzz_helper_lock_;
 
   static uint32_t fuzz_exec_count = 0;
   // Initialize fuzzer once with IP and gRPC version from environment
@@ -104,24 +105,24 @@ DEFINE_PROTO_FUZZER(const test::extensions::filters::http::ext_proc::ExtProcGrpc
     ENVOY_LOG_MISC(trace, "Fuzzer initialized");
   }
 
-  const auto response = fuzzer->randomDownstreamRequest(&downstream_provider, fuzz_helper.get());
+  const auto response = fuzzer->randomDownstreamRequest(&downstream_provider);
   // For fuzz testing we don't care about the response code, only that
   // the stream ended in some graceful manner
   ENVOY_LOG_MISC(trace, "Waiting for response.");
+
   if (response->waitForEndStream(std::chrono::milliseconds(500))) {
     ENVOY_LOG_MISC(trace, "Response received.");
   } else {
-    // TODO(ikepolinsky): investigate if there is anyway around this.
-    // Waiting too long for a fuzz case to fail will drastically
-    // reduce executions/second.
     ENVOY_LOG_MISC(trace, "Response timed out.");
   }
 
   fuzz_exec_count++;
   if (fuzzCreateEnvoy(fuzz_exec_count)) {
-    fuzzer->tearDown();
+    fuzzer->tearDown(false);
     fuzzer.reset();
     fuzzer = nullptr;
+  } else {
+    fuzzer->tearDown(true);
   }
   // Protect fuzz_helper before reset since it is used in the test server.
   fuzz_helper_lock_.lock();

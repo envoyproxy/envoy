@@ -103,10 +103,7 @@ const grpc::StatusCode GrpcStatusCodes[] = {
     grpc::StatusCode::UNAUTHENTICATED,
 };
 
-ExtProcFuzzHelper::ExtProcFuzzHelper(FuzzedDataProvider* provider) {
-  provider_ = provider;
-  immediate_resp_sent_ = false;
-}
+ExtProcFuzzHelper::ExtProcFuzzHelper(FuzzedDataProvider* provider) { provider_ = provider; }
 
 std::string ExtProcFuzzHelper::consumeRepeatedString() {
   const uint32_t str_len = provider_->ConsumeIntegralInRange<uint32_t>(0, ExtProcFuzzMaxDataSize);
@@ -435,17 +432,6 @@ void ExtProcFuzzHelper::randomizeResponse(ProcessingResponse* resp, const Proces
     ENVOY_LOG_MISC(trace, "ProcessingResponse setting immediate_response response");
     ImmediateResponse* msg = resp->mutable_immediate_response();
     randomizeImmediateResponse(msg, req);
-
-    // Since we are sending an immediate response, envoy will close the
-    // mock connection with the downstream. As a result, the
-    // codec_client_connection will be deleted and if the upstream is still
-    // sending data chunks (e.g., streaming mode) it will cause a crash
-    // Note: At this point provider_lock_ is not held so deadlock is not
-    // possible
-
-    immediate_resp_lock_.lock();
-    immediate_resp_sent_ = true;
-    immediate_resp_lock_.unlock();
     break;
   }
   default:

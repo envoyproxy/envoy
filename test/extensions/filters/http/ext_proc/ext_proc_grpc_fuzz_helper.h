@@ -108,11 +108,6 @@ public:
   void randomizeResponse(ProcessingResponse* resp, const ProcessingRequest* req);
 
   FuzzedDataProvider* provider_;
-
-  // Protects immediate_resp_sent_
-  Thread::MutexBasicLockable immediate_resp_lock_;
-  // Flags if an immediate response was generated and sent
-  bool immediate_resp_sent_;
 };
 
 } // namespace ExternalProcessing

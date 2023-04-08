@@ -80,7 +80,7 @@ DEFINE_PROTO_FUZZER(const test::extensions::filters::http::ext_proc::ExtProcGrpc
   fuzzer.initializeFuzzer(true);
   ENVOY_LOG_MISC(trace, "Fuzzer initialized");
 
-  const auto response = fuzzer.randomDownstreamRequest(&downstream_provider, &fuzz_helper);
+  const auto response = fuzzer.randomDownstreamRequest(&downstream_provider);
 
   // For fuzz testing we don't care about the response code, only that
   // the stream ended in some graceful manner
@@ -93,7 +93,7 @@ DEFINE_PROTO_FUZZER(const test::extensions::filters::http::ext_proc::ExtProcGrpc
     // reduce executions/second.
     ENVOY_LOG_MISC(trace, "Response timed out.");
   }
-  fuzzer.tearDown();
+  fuzzer.tearDown(false);
 }
 
 } // namespace ExternalProcessing
