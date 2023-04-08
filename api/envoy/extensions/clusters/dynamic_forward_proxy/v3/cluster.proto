@@ -2,7 +2,11 @@ syntax = "proto3";
 
 package envoy.extensions.clusters.dynamic_forward_proxy.v3;
 
+import "envoy/config/core/v3/address.proto";
 import "envoy/extensions/common/dynamic_forward_proxy/v3/dns_cache.proto";
+
+import "google/protobuf/duration.proto";
+import "google/protobuf/wrappers.proto";
 
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
@@ -26,8 +30,7 @@ message ClusterConfig {
   // The DNS cache configuration that the cluster will attach to. Note this configuration must
   // match that of associated :ref:`dynamic forward proxy HTTP filter configuration
   // <envoy_v3_api_field_extensions.filters.http.dynamic_forward_proxy.v3.FilterConfig.dns_cache_config>`.
-  common.dynamic_forward_proxy.v3.DnsCacheConfig dns_cache_config = 1
-      [(validate.rules).message = {required: true}];
+  common.dynamic_forward_proxy.v3.DnsCacheConfig dns_cache_config = 1;
 
   // If true allow the cluster configuration to disable the auto_sni and auto_san_validation options
   // in the :ref:`cluster's upstream_http_protocol_options
@@ -53,4 +56,21 @@ message ClusterConfig {
   //   <https://datatracker.ietf.org/doc/html/rfc7540#section-9.1.1>`_
   //
   bool allow_coalesced_connections = 3;
+
+  // Enable strict dns sub cluster instead logic dns.
+  SubClustersConfig sub_clusters_config = 4;
+}
+
+message SubClustersConfig {
+  // The maximum number of sub clusters that the DFP cluster will hold. If not specified defaults to 1024.
+  google.protobuf.UInt32Value max_sub_clusters = 1 [(validate.rules).uint32 = {gt: 0}];
+
+  // The TTL for sub clusters that are unused. Sub clusters that have not been used in the configured time
+  // interval will be purged. If not specified defaults to 5m.
+  google.protobuf.Duration sub_cluster_ttl = 2 [(validate.rules).duration = {gt {}}];
+
+  // Sub clusters that should be created & warmed upon creation. This might provide a
+  // performance improvement, in the form of cache hits, for sub clusters that are going to be
+  // warmed during steady state and are known at config load time.
+  repeated config.core.v3.SocketAddress preresolve_clusters = 3;
 }
