@@ -84,7 +84,8 @@ public:
 class RouterUpstreamLogTest : public testing::Test {
 public:
   void init(absl::optional<envoy::config::accesslog::v3::AccessLog> upstream_log,
-            bool flush_upstream_log_on_upstream_stream = false) {
+            bool flush_upstream_log_on_upstream_stream = false,
+            bool enable_periodic_upstream_log = false) {
     envoy::extensions::filters::http::router::v3::Router router_proto;
     static const std::string cluster_name = "cluster_0";
 
@@ -98,6 +99,10 @@ public:
       auto upstream_log_options = router_proto.mutable_upstream_log_options();
       upstream_log_options->set_flush_upstream_log_on_upstream_stream(
           flush_upstream_log_on_upstream_stream);
+
+      if (enable_periodic_upstream_log) {
+        upstream_log_options->mutable_upstream_log_flush_interval()->set_seconds(1);
+      }
 
       ON_CALL(*context_.access_log_manager_.file_, write(_))
           .WillByDefault(
@@ -267,6 +272,7 @@ public:
                                                       upstream_local_address2_};
   Event::MockTimer* response_timeout_{};
   Event::MockTimer* per_try_timeout_{};
+  Event::MockTimer* periodic_log_flush_{};
 
   NiceMock<Http::MockStreamDecoderFilterCallbacks> callbacks_;
   std::shared_ptr<FilterConfig> config_;
@@ -438,6 +444,75 @@ typed_config:
   EXPECT_EQ(output_.size(), 2U);
   EXPECT_EQ(output_.front(), "cluster_0");
   EXPECT_EQ(output_.back(), "cluster_0");
+}
+
+TEST_F(RouterUpstreamLogTest, PeriodicLog) {
+  const std::string yaml = R"EOF(
+name: accesslog
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
+  log_format:
+    text_format_source:
+      inline_string: "%UPSTREAM_CLUSTER%"
+  path: "/dev/null"
+  )EOF";
+
+  envoy::config::accesslog::v3::AccessLog upstream_log;
+  TestUtility::loadFromYaml(yaml, upstream_log);
+
+  init(absl::optional<envoy::config::accesslog::v3::AccessLog>(upstream_log), false, true);
+
+  NiceMock<Http::MockRequestEncoder> encoder;
+  Http::ResponseDecoder* response_decoder = nullptr;
+
+  EXPECT_CALL(context_.cluster_manager_.thread_local_cluster_.conn_pool_, newStream(_, _, _))
+      .WillOnce(Invoke([&](Http::ResponseDecoder& decoder,
+                            Http::ConnectionPool::Callbacks& callbacks,
+                            const Http::ConnectionPool::Instance::StreamOptions&)
+                            -> Http::ConnectionPool::Cancellable* {
+        response_decoder = &decoder;
+        EXPECT_CALL(encoder.stream_, connectionInfoProvider())
+            .WillRepeatedly(ReturnRef(connection_info1_));
+        callbacks.onPoolReady(encoder,
+                              context_.cluster_manager_.thread_local_cluster_.conn_pool_.host_,
+                              stream_info_, Http::Protocol::Http10);
+        return nullptr;
+      }));
+
+  expectResponseTimerCreate();
+  periodic_log_flush_ = new Event::MockTimer(&callbacks_.dispatcher_);
+
+  Http::TestRequestHeaderMapImpl headers;
+  HttpTestUtility::addDefaultHeaders(headers);
+
+  EXPECT_CALL(*periodic_log_flush_, enableTimer(_, _));
+  router_->decodeHeaders(headers, true);
+
+  EXPECT_CALL(*router_->retry_state_, shouldRetryHeaders(_, _, _))
+      .WillOnce(Return(RetryStatus::No));
+
+  EXPECT_CALL(*periodic_log_flush_, enableTimer(_, _));
+  periodic_log_flush_->invokeCallback();
+  EXPECT_EQ(output_.size(), 1U);
+  EXPECT_EQ(output_.front(), "cluster_0");
+
+  EXPECT_CALL(*periodic_log_flush_, enableTimer(_, _));
+  periodic_log_flush_->invokeCallback();
+  EXPECT_EQ(output_.size(), 2U);
+  EXPECT_EQ(output_.front(), "cluster_0");
+  EXPECT_EQ(output_.back(), "cluster_0");
+
+  Http::ResponseHeaderMapPtr response_headers(new Http::TestResponseHeaderMapImpl());
+  response_headers->setStatus(200);
+
+  EXPECT_CALL(context_.cluster_manager_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
+              putHttpResponseCode(200));
+
+  response_decoder->decodeHeaders(std::move(response_headers), false);
+
+  EXPECT_CALL(*periodic_log_flush_, disableTimer());
+  Http::ResponseTrailerMapPtr response_trailers(new Http::TestResponseTrailerMapImpl());
+  response_decoder->decodeTrailers(std::move(response_trailers));
 }
 
 } // namespace Router
