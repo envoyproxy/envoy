@@ -166,7 +166,7 @@ updates:
     time: "09:00"
 
 - package-ecosystem: "docker"
-  directory: "/examples/skywalking-tracing"
+  directory: "/examples/skywalking"
   schedule:
     interval: daily
     time: "09:00"
@@ -196,12 +196,6 @@ updates:
     time: "09:00"
 
 - package-ecosystem: "docker"
-  directory: "/examples/websocket"
-  schedule:
-    interval: daily
-    time: "09:00"
-
-- package-ecosystem: "docker"
   directory: "/examples/zipkin"
   schedule:
     interval: daily
@@ -214,13 +208,43 @@ updates:
     time: "09:00"
 
 - package-ecosystem: "gomod"
-  directory: "/contrib/golang/filters/http/source/go"
+  directory: "/contrib/golang"
+  schedule:
+    interval: daily
+    time: "09:00"
+
+- package-ecosystem: "gomod"
+  directory: "/contrib/golang/filters/http/test/test_data/basic"
+  schedule:
+    interval: daily
+    time: "09:00"
+
+- package-ecosystem: "gomod"
+  directory: "/contrib/golang/filters/http/test/test_data/dummy"
+  schedule:
+    interval: daily
+    time: "09:00"
+
+- package-ecosystem: "gomod"
+  directory: "/contrib/golang/filters/http/test/test_data/echo"
   schedule:
     interval: daily
     time: "09:00"
 
 - package-ecosystem: "gomod"
   directory: "/contrib/golang/filters/http/test/test_data/passthrough"
+  schedule:
+    interval: daily
+    time: "09:00"
+
+- package-ecosystem: "gomod"
+  directory: "/contrib/golang/filters/http/test/test_data/routeconfig"
+  schedule:
+    interval: daily
+    time: "09:00"
+
+- package-ecosystem: "gomod"
+  directory: "/contrib/golang/router/cluster_specifier/test/test_data/simple"
   schedule:
     interval: daily
     time: "09:00"
@@ -239,12 +263,6 @@ updates:
 
 - package-ecosystem: "gomod"
   directory: "/examples/grpc-bridge/server"
-  schedule:
-    interval: daily
-    time: "09:00"
-
-- package-ecosystem: "gomod"
-  directory: "/examples/grpc-bridge/server/kv"
   schedule:
     interval: daily
     time: "09:00"
