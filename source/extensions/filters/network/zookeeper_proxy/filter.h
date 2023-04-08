@@ -176,7 +176,7 @@ public:
   Stats::Scope& scope_;
   const uint32_t max_packet_bytes_;
   ZooKeeperProxyStats stats_;
-  // Key: opcode enum value, value: latency threshold in millisecond.
+  // Key: opcode enum value defined in decoder.h, value: latency threshold in millisecond.
   const absl::flat_hash_map<int32_t, uint32_t> latency_threshold_map_;
   Stats::StatNameSetPtr stat_name_set_;
   const Stats::StatName stat_prefix_;
@@ -249,7 +249,8 @@ public:
                     int32_t error) override;
 
   DecoderPtr createDecoder(DecoderCallbacks& callbacks, TimeSource& time_source);
-  uint32_t setDefaultLatencyThreshold(const absl::flat_hash_map<int32_t, uint32_t> map);
+  uint32_t
+  getDefaultLatencyThreshold(const absl::flat_hash_map<int32_t, uint32_t> latency_threshold_map);
   void recordErrorBudgetMetrics(const OpCodes opcode,
                                 const ZooKeeperFilterConfig::OpCodeInfo& opcode_info,
                                 const std::chrono::milliseconds& latency);

@@ -200,7 +200,7 @@ ZooKeeperFilterConfig::parseLatencyThresholds(LatencyThresholdList latency_thres
 
 ZooKeeperFilter::ZooKeeperFilter(ZooKeeperFilterConfigSharedPtr config, TimeSource& time_source)
     : config_(std::move(config)), decoder_(createDecoder(*this, time_source)),
-      default_latency_threshold_(setDefaultLatencyThreshold(config_->latency_threshold_map_)) {}
+      default_latency_threshold_(getDefaultLatencyThreshold(config_->latency_threshold_map_)) {}
 
 void ZooKeeperFilter::initializeReadFilterCallbacks(Network::ReadFilterCallbacks& callbacks) {
   read_callbacks_ = &callbacks;
@@ -222,15 +222,15 @@ DecoderPtr ZooKeeperFilter::createDecoder(DecoderCallbacks& callbacks, TimeSourc
   return std::make_unique<DecoderImpl>(callbacks, config_->maxPacketBytes(), time_source);
 }
 
-uint32_t
-ZooKeeperFilter::setDefaultLatencyThreshold(const absl::flat_hash_map<int32_t, uint32_t> map) {
-  if (map.empty()) {
+uint32_t ZooKeeperFilter::getDefaultLatencyThreshold(
+    const absl::flat_hash_map<int32_t, uint32_t> latency_threshold_map) {
+  if (latency_threshold_map.empty()) {
     return 0;
   }
 
   uint32_t default_latency_threshold = 100;
-  auto it = map.find(-1);
-  if (it != map.end()) {
+  auto it = latency_threshold_map.find(-1);
+  if (it != latency_threshold_map.end()) {
     default_latency_threshold = it->second;
   }
   return default_latency_threshold;
