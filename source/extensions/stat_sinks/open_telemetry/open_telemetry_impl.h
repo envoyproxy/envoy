@@ -117,7 +117,7 @@ public:
   OpenTelemetryGrpcSink(const GrpcMetricsExporterSharedPtr& otlp_metrics_exporter,
                         bool report_counters_as_deltas, bool report_histograms_as_deltas,
                         bool emit_tags_as_attributes, bool use_tag_extracted_name)
-      : flusher_(MetricsFlusher(report_counters_as_deltas, report_histograms_as_deltas, 
+      : flusher_(MetricsFlusher(report_counters_as_deltas, report_histograms_as_deltas,
                                 emit_tags_as_attributes, use_tag_extracted_name)),
         metrics_exporter_(otlp_metrics_exporter) {}
 
