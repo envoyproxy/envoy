@@ -15,12 +15,14 @@ option java_multiple_files = true;
 option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/stat_sinks/open_telemetry/v3;open_telemetryv3";
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
-// [#protodoc-title: OpenTelemetryStatsSink]
+// [#protodoc-title: Open Telemetry Stats Sink]
 // Stats configuration proto schema for ``envoy.stat_sinks.open_telemetry`` sink.
 // [#extension: envoy.stat_sinks.open_telemetry]
+
 // [#next-free-field: 6]
 message SinkConfig {
   reserved 2;
+  reserved "http_service";
 
   oneof protocol_specifier {
     option (validate.required) = true;
@@ -29,8 +31,12 @@ message SinkConfig {
     config.core.v3.GrpcService grpc_service = 1 [(validate.rules).message = {required: true}];
   }
 
+  // If set to true, counters will be emitted as deltas, and the OTLP message will have
+  // AGGREGATION_TEMPORALITY_DELTA set as AggregationTemporality. Default value is false.
   google.protobuf.BoolValue report_counters_as_deltas = 3;
 
+  // If set to true, histograms will be emitted as deltas, and the OTLP message will have
+  // AGGREGATION_TEMPORALITY_DELTA set as AggregationTemporality. Default value is false.
   google.protobuf.BoolValue report_histograms_as_deltas = 4;
 
   // If true, metrics will have their tags emitted as labels on the metrics objects sent to the MetricsService,
