@@ -307,7 +307,6 @@ envoy_cc_test_binary(
     external_deps = [
         "abseil_symbolize",
     ],
-    stamped = True,
     deps = [
         "//source/exe:envoy_main_common_with_core_extensions_lib",
         "//source/exe:platform_impl_lib",
@@ -946,6 +945,7 @@ envoy_cc_test_library(
         "base_integration_test.h",
     ],
     deps = [
+        "//source/extensions/config_subscription/filesystem:filesystem_subscription_lib",
         "//source/server:proto_descriptors_lib",
         "//source/extensions/request_id/uuid:config",
         ":autonomous_upstream_lib",
@@ -1113,6 +1113,9 @@ envoy_cc_test_library(
         "//source/common/upstream:upstream_lib",
         "//source/extensions/access_loggers/file:config",
         "//source/extensions/access_loggers/stream:config",
+        "//source/extensions/health_checkers/grpc:health_checker_lib",
+        "//source/extensions/health_checkers/http:health_checker_lib",
+        "//source/extensions/health_checkers/tcp:health_checker_lib",
         "//source/extensions/listener_managers/listener_manager:connection_handler_lib",
         "//source/extensions/transport_sockets/raw_buffer:config",
         "//source/server:drain_manager_lib",

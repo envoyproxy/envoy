@@ -93,11 +93,10 @@ public:
   RedisCluster(Server::Configuration::ServerFactoryContext& server_context,
                const envoy::config::cluster::v3::Cluster& cluster,
                const envoy::extensions::clusters::redis::v3::RedisClusterConfig& redis_cluster,
+               Upstream::ClusterFactoryContext& context,
                NetworkFilters::Common::Redis::Client::ClientFactory& client_factory,
                Upstream::ClusterManager& cluster_manager, Runtime::Loader& runtime, Api::Api& api,
-               Network::DnsResolverSharedPtr dns_resolver,
-               Server::Configuration::TransportSocketFactoryContextImpl& factory_context,
-               Stats::ScopeSharedPtr&& stats_scope, bool added_via_api,
+               Network::DnsResolverSharedPtr dns_resolver, bool added_via_api,
                ClusterSlotUpdateCallBackSharedPtr factory);
 
   struct ClusterSlotsRequest : public Extensions::NetworkFilters::Common::Redis::RespValue {
@@ -303,9 +302,7 @@ private:
       Server::Configuration::ServerFactoryContext& server_context,
       const envoy::config::cluster::v3::Cluster& cluster,
       const envoy::extensions::clusters::redis::v3::RedisClusterConfig& proto_config,
-      Upstream::ClusterFactoryContext& context,
-      Server::Configuration::TransportSocketFactoryContextImpl& socket_factory_context,
-      Stats::ScopeSharedPtr&& stats_scope) override;
+      Upstream::ClusterFactoryContext& context) override;
 };
 } // namespace Redis
 } // namespace Clusters

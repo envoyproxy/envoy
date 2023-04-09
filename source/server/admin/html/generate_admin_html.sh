@@ -1,14 +1,10 @@
 #!/bin/sh
 
-echo '#include "absl/strings/str_replace.h"'
-echo ''
 echo 'constexpr absl::string_view AdminHtmlStart = R"EOF('
-echo '<head>'
 cat "$1"
-echo '<style>'
+echo ')EOF";'
+echo 'constexpr absl::string_view AdminCss = R"EOF('
 cat "$2"
-echo '</style>'
-echo '</head>'
 echo ')EOF";'
 echo 'constexpr absl::string_view AdminActiveStatsJs = R"EOF('
 cat "$3"

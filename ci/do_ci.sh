@@ -5,14 +5,6 @@
 set -e
 
 
-build_setup_args=""
-if [[ "$1" == "format" || "$1" == "fix_proto_format" || "$1" == "check_proto_format" || "$1" == "docs" ||  \
-          "$1" == "bazel.clang_tidy" || "$1" == "bazel.distribution" \
-          || "$1" == "deps" || "$1" == "verify_examples" || "$1" == "publish" \
-          || "$1" == "verify_distro" ]]; then
-    build_setup_args="-nofetch"
-fi
-
 # TODO(phlax): Clarify and/or integrate SRCDIR and ENVOY_SRCDIR
 export SRCDIR="${SRCDIR:-$PWD}"
 export ENVOY_SRCDIR="${ENVOY_SRCDIR:-$PWD}"
@@ -22,7 +14,7 @@ if [[ -z "$NO_BUILD_SETUP" ]]; then
     # shellcheck source=ci/setup_cache.sh
     . "$(dirname "$0")"/setup_cache.sh
     # shellcheck source=ci/build_setup.sh
-    . "$(dirname "$0")"/build_setup.sh $build_setup_args
+    . "$(dirname "$0")"/build_setup.sh
 
     echo "building using ${NUM_CPUS} CPUs"
     echo "building for ${ENVOY_BUILD_ARCH}"
@@ -224,20 +216,41 @@ if [[ "$CI_TARGET" == "bazel.release" ]]; then
   [[ "${ENVOY_BUILD_ARCH}" == "x86_64" ]] && BAZEL_BUILD_OPTIONS+=("--test_env=ENVOY_MEMORY_TEST_EXACT=true")
 
   setup_clang_toolchain
+
+  ENVOY_BINARY_DIR="${ENVOY_BUILD_DIR}/bin"
+  mkdir -p "$ENVOY_BINARY_DIR"
+
+  # Run release tests
   echo "Testing ${TEST_TARGETS[*]} with options: ${BAZEL_BUILD_OPTIONS[*]}"
   bazel_with_collection test "${BAZEL_BUILD_OPTIONS[@]}" --remote_download_minimal -c opt "${TEST_TARGETS[@]}"
 
-  echo "bazel release build..."
-  bazel_envoy_binary_build release
+  # Build release binaries
+  bazel build "${BAZEL_BUILD_OPTIONS[@]}" //distribution/binary:release
 
-  echo "bazel contrib release build..."
-  bazel_contrib_binary_build release
+  # Copy release binaries to binary export directory
+  cp -a "bazel-bin/distribution/binary/release.tar.zst" "${ENVOY_BINARY_DIR}/release.tar.zst"
+
+  # Grab the schema_validator_tool
+  # TODO(phlax): bundle this with the release when #26390 is resolved
+  bazel build "${BAZEL_BUILD_OPTIONS[@]}" --remote_download_toplevel --stripopt=--strip-all -c opt //test/tools/schema_validator:schema_validator_tool.stripped
+
+  # Copy schema_validator_tool to binary export directory
+  cp -a bazel-bin/test/tools/schema_validator/schema_validator_tool.stripped "${ENVOY_BINARY_DIR}/schema_validator_tool"
 
   exit 0
 elif [[ "$CI_TARGET" == "bazel.distribution" ]]; then
   echo "Building distro packages..."
 
   setup_clang_toolchain
+
+  # Extract the Envoy binary from the tarball
+  mkdir -p distribution/custom
+  if [[ "${ENVOY_BUILD_ARCH}" == "x86_64" ]]; then
+      ENVOY_RELEASE_TARBALL="/build/bazel.release/bin/release.tar.zst"
+  else
+      ENVOY_RELEASE_TARBALL="/build/bazel.release.arm64/bin/release.tar.zst"
+  fi
+  bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/zstd -- --stdout -d "$ENVOY_RELEASE_TARBALL" | tar xfO - envoy > distribution/custom/envoy
 
   # By default the packages will be signed by the first available key.
   # If there is no key available, a throwaway key is created
@@ -251,7 +264,8 @@ elif [[ "$CI_TARGET" == "bazel.distribution" ]]; then
           "--action_env=PACKAGES_MAINTAINER_EMAIL")
   fi
 
-  bazel build "${BAZEL_BUILD_OPTIONS[@]}" --remote_download_toplevel -c opt //distribution:packages.tar.gz
+  # Build the packages
+  bazel build "${BAZEL_BUILD_OPTIONS[@]}" --remote_download_toplevel -c opt --//distribution:envoy-binary=//distribution:custom/envoy //distribution:packages.tar.gz
   if [[ "${ENVOY_BUILD_ARCH}" == "x86_64" ]]; then
       cp -a bazel-bin/distribution/packages.tar.gz "${ENVOY_BUILD_DIR}/packages.x64.tar.gz"
   else
@@ -423,6 +437,11 @@ elif [[ "$CI_TARGET" == "bazel.api" ]]; then
   ENVOY_STDLIB="libstdc++"
   setup_clang_toolchain
   export LLVM_CONFIG="${LLVM_ROOT}"/bin/llvm-config
+  echo "Run protoxform test"
+  bazel run "${BAZEL_BUILD_OPTIONS[@]}" \
+        --//tools/api_proto_plugin:default_type_db_target=//tools/testdata/protoxform:fix_protos \
+        --//tools/api_proto_plugin:extra_args=api_version:3.7 \
+        //tools/protoprint:protoprint_test
   echo "Validating API structure..."
   "${ENVOY_SRCDIR}"/tools/api/validate_structure.py
   echo "Validate Golang protobuf generation..."
@@ -485,17 +504,12 @@ elif [[ "$CI_TARGET" == "format" ]]; then
 elif [[ "$CI_TARGET" == "fix_proto_format" ]]; then
   # proto_format.sh needs to build protobuf.
   setup_clang_toolchain
-  BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS[*]}" "${ENVOY_SRCDIR}"/tools/proto_format/proto_format.sh fix
+  BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS[*]}" "${ENVOY_SRCDIR}/tools/proto_format/proto_format.sh" fix
   exit 0
 elif [[ "$CI_TARGET" == "check_proto_format" ]]; then
-  # proto_format.sh needs to build protobuf.
   setup_clang_toolchain
-  echo "Run protoxform test"
-  bazel run "${BAZEL_BUILD_OPTIONS[@]}" \
-        --//tools/api_proto_plugin:default_type_db_target=//tools/testdata/protoxform:fix_protos \
-        --//tools/api_proto_plugin:extra_args=api_version:3.7 \
-        //tools/protoprint:protoprint_test
-  BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS[*]}" "${ENVOY_SRCDIR}"/tools/proto_format/proto_format.sh check
+  echo "Check proto format ..."
+  BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS[*]}" "${ENVOY_SRCDIR}/tools/proto_format/proto_format.sh" check
   exit 0
 elif [[ "$CI_TARGET" == "docs" ]]; then
   setup_clang_toolchain

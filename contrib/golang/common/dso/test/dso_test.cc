@@ -56,6 +56,13 @@ TEST(DsoManagerTest, Pub) {
   EXPECT_EQ(cluster_dso->envoyGoClusterSpecifierNewPlugin(0, 0), 200);
 }
 
+// missing a symbol
+TEST(DsoInstanceTest, BadSo) {
+  auto path = genSoPath("bad.so");
+  ClusterSpecifierDsoPtr dso(new ClusterSpecifierDsoImpl(path));
+  EXPECT_EQ(dso->loaded(), false);
+}
+
 } // namespace
 } // namespace Dso
 } // namespace Envoy

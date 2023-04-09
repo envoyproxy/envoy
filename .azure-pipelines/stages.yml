@@ -25,6 +25,10 @@ parameters:
   default:
   - env
   - linux_x64
+- name: checksConcurrency
+  displayName: "Check concurrency"
+  type: number
+  default: 3
 
 stages:
 - stage: env
@@ -45,13 +49,13 @@ stages:
   # job:
   #   condition: and(not(canceled()), succeeded(), ne(stageDependencies.env.repo.outputs['changed.mobileOnly'], 'true'))
   #
+  # NB: Avoid using _inclusive_ lists to trigger CI - eg _dont_ only trigger mobile CI if `mobile/` changed.
+  #  Instead use _exclusive_ bools - eg _do_ suppress other CI if only `mobile/` changed
+  #
   # Note the difference in name resolution when used in stages and jobs.
   #
   # Note also, other conditions such as `not(canceled())` are not assumed and so need to be added to
   # any conditions explicitly.
-  #
-  # NB: Avoid using _inclusive_ lists to trigger CI - eg _dont_ only trigger mobile CI if `mobile/` changed.
-  #  Instead use _exclusive_ bools - eg _do_ suppress other CI if only `mobile/` changed
   #
   # To use a variable in a `step` you can specify it as follows:
   #
@@ -73,7 +77,7 @@ stages:
     steps:
     - template: cached.yml
       parameters:
-        version: "$(buildImageCacheVersion)"
+        version: "$(cacheKeyBuildImage)"
         prime: true
   - job: cache_arm
     dependsOn: []
@@ -85,7 +89,7 @@ stages:
       parameters:
         prime: true
         arch: .arm64
-        version: "$(buildImageCacheVersion)"
+        version: "$(cacheKeyBuildImage)"
 
   - job: repo
     dependsOn: []
@@ -97,6 +101,7 @@ stages:
       fetchDepth: 0
       fetchTags: true
     - bash: |
+        # TODO(phlax): move this to a script to ensure proper linting etc
         set -e
 
         # Only exclude checks in pull requests.
@@ -104,6 +109,7 @@ stages:
             echo "##vso[task.setvariable variable=mobileOnly;isoutput=true]false"
             echo "##vso[task.setvariable variable=docsOnly;isoutput=true]false"
             echo "##vso[task.setvariable variable=examplesOnly;isoutput=true]false"
+            echo "##vso[task.setvariable variable=requirements;isoutput=true]true"
             exit 0
         fi
 
@@ -133,6 +139,17 @@ stages:
         echo "##vso[task.setvariable variable=mobileOnly;isoutput=true]${CHANGED_MOBILE_ONLY}"
         echo "##vso[task.setvariable variable=docsOnly;isoutput=true]${CHANGED_DOCS_ONLY}"
         echo "##vso[task.setvariable variable=examplesOnly;isoutput=true]${CHANGED_EXAMPLES_ONLY}"
+
+        CHANGED_REQUIREMENT_PATHS="$(git diff --name-only ${CHANGE_TARGET}...HEAD | grep -E '\.*requirements.*\.txt$|go.mod$|\.*\.bzl$|^WORKSPACE$' || echo '')"
+
+        if [[ -n "$CHANGED_REQUIREMENT_PATHS" ]]; then
+            CHANGED_REQUIREMENTS=true
+        else
+            CHANGED_REQUIREMENTS=false
+        fi
+
+        echo "##vso[task.setvariable variable=requirements;isoutput=true]${CHANGED_REQUIREMENTS}"
+
       displayName: "Detect repo changes"
       workingDirectory: $(Build.SourcesDirectory)
       name: changed
@@ -161,32 +178,36 @@ stages:
       name: state
 
     - bash: |
+        set -e
+
         echo "env.outputs['changed.mobileOnly']: $(changed.mobileOnly)"
         echo "env.outputs['changed.docsOnly']: $(changed.docsOnly)"
         echo "env.outputs['changed.examplesOnly']: $(changed.examplesOnly)"
         echo
-        echo "env.outputs['state.isDev]: $(state.isDev)"
+        echo "env.outputs['changed.requirements']: $(changed.requirements)"
+        echo
+        echo "env.outputs['state.isDev']: $(state.isDev)"
       displayName: "Print build environment"
 
 - stage: precheck
-  # displayName: Prechecks
+  displayName: Prechecks
   dependsOn: ["env"]
   jobs:
   - job: format
-    # displayName: Code format
+    displayName: Code format
     dependsOn: []
     pool:
       vmImage: "ubuntu-20.04"
     steps:
     - task: Cache@2
       inputs:
-        key: "format | ./WORKSPACE | **/*.bzl"
+        key: 'format | $(cacheKeyRepository)'
         path: $(Build.StagingDirectory)/repository_cache
       continueOnError: true
 
     - template: cached.yml
       parameters:
-        version: "$(buildImageCacheVersion)"
+        version: "$(cacheKeyBuildImage)"
 
     - script: ci/run_envoy_docker.sh 'ci/do_ci.sh format'
       workingDirectory: $(Build.SourcesDirectory)
@@ -208,20 +229,20 @@ stages:
       condition: failed()
 
   - job: proto_format
-    # displayName: Protobuf format
+    displayName: Protobuf format
     dependsOn: []
     pool:
       vmImage: "ubuntu-20.04"
     steps:
     - task: Cache@2
       inputs:
-        key: "proto_format | ./WORKSPACE | **/*.bzl"
+        key: 'proto_format | $(cacheKeyRepository)'
         path: $(Build.StagingDirectory)/repository_cache
       continueOnError: true
 
     - template: cached.yml
       parameters:
-        version: "$(buildImageCacheVersion)"
+        version: "$(cacheKeyBuildImage)"
 
     - script: ci/run_envoy_docker.sh 'ci/check_and_fix_format.sh'
       workingDirectory: $(Build.SourcesDirectory)
@@ -242,7 +263,7 @@ stages:
       condition: failed()
 
   - job: docs
-    # displayName: Documentation
+    displayName: Documentation
     dependsOn: []  # this removes the implicit dependency on previous stage and causes this to run in parallel.
     condition: ne(variables['PostSubmit'], true)
     pool:
@@ -250,13 +271,13 @@ stages:
     steps:
     - task: Cache@2
       inputs:
-        key: "docs | ./WORKSPACE | **/*.bzl"
+        key: 'docs | $(cacheKeyRepository)'
         path: $(Build.StagingDirectory)/repository_cache
       continueOnError: true
 
     - template: cached.yml
       parameters:
-        version: "$(buildImageCacheVersion)"
+        version: "$(cacheKeyBuildImage)"
 
     - script: ci/run_envoy_docker.sh 'ci/do_ci.sh docs'
       workingDirectory: $(Build.SourcesDirectory)
@@ -280,20 +301,21 @@ stages:
         GCS_ARTIFACT_BUCKET: $(GcsArtifactBucket)
 
   - job: dependencies
-    # displayName: Dependency checks
-    dependsOn: []  # this removes the implicit dependency on previous stage and causes this to run in parallel.
+    displayName: Dependency checks
+    dependsOn: []
+    condition: and(not(canceled()), eq(stageDependencies.env.repo.outputs['changed.requirements'], 'true'))
     pool:
       vmImage: "ubuntu-20.04"
     steps:
     - task: Cache@2
       inputs:
-        key: "dependencies | ./WORKSPACE | **/*.bzl"
+        key: 'dependencies | $(cacheKeyRepository)'
         path: $(Build.StagingDirectory)/repository_cache
       continueOnError: true
 
     - template: cached.yml
       parameters:
-        version: "$(buildImageCacheVersion)"
+        version: "$(cacheKeyBuildImage)"
 
     - script: ci/run_envoy_docker.sh 'ci/do_ci.sh deps'
       workingDirectory: $(Build.SourcesDirectory)
@@ -323,6 +345,29 @@ stages:
         artifactName: "docker_ci"
         timeoutInMinutes: 10
       condition: failed()
+
+  - job: prechecked
+    displayName: Prechecked
+    dependsOn: ["format", "proto_format", "docs", "dependencies", "docker_ci"]
+    pool:
+      vmImage: "ubuntu-20.04"
+    # This condition ensures that this (required) job passes if all of
+    # the preceeding jobs either pass or are skipped
+    # adapted from:
+    #   https://learn.microsoft.com/en-us/azure/devops/pipelines/process/expressions?view=azure-devops#job-to-job-dependencies-within-one-stage
+    condition: |
+      and(
+        eq(variables['Build.Reason'], 'PullRequest'),
+        in(dependencies.format.result, 'Succeeded', 'SucceededWithIssues', 'Skipped'),
+        in(dependencies.proto_format.result, 'Succeeded', 'SucceededWithIssues', 'Skipped'),
+        in(dependencies.docs.result, 'Succeeded', 'SucceededWithIssues', 'Skipped'),
+        in(dependencies.dependencies.result, 'Succeeded', 'SucceededWithIssues', 'Skipped'),
+        in(dependencies.docker_ci.result, 'Succeeded', 'SucceededWithIssues', 'Skipped'))
+
+    steps:
+    - checkout: none
+    - bash: |
+        echo "Prechecked"
 
 - stage: sync
   condition: and(succeeded(), eq(variables['PostSubmit'], true), ne(variables['NoSync'], true))
@@ -389,7 +434,7 @@ stages:
         AZP_BRANCH: $(Build.SourceBranch)
 
 - stage: linux_x64
-  # displayName: Linux x64
+  displayName: Linux x64
   dependsOn: ${{ parameters.buildStageDeps }}
   # For post-submit builds, continue even if precheck fails
   condition: and(not(canceled()), or(succeeded(), eq(variables['PostSubmit'], true)))
@@ -407,7 +452,7 @@ stages:
         bazelBuildExtraOptions: "--sandbox_base=/tmp/sandbox_base"
 
   - job: released
-    # displayName: Complete
+    displayName: Complete
     dependsOn: ["release"]
     pool:
       vmImage: "ubuntu-20.04"
@@ -415,14 +460,14 @@ stages:
     # the preceeding jobs either pass or are skipped
     # adapted from:
     #   https://learn.microsoft.com/en-us/azure/devops/pipelines/process/expressions?view=azure-devops#job-to-job-dependencies-within-one-stage
-    condition: in(dependencies.release.result, 'Succeeded', 'SucceededWithIssues', 'Skipped')
+    condition: and(eq(variables['Build.Reason'], 'PullRequest'), in(dependencies.release.result, 'Succeeded', 'SucceededWithIssues', 'Skipped'))
     steps:
     - checkout: none
     - bash: |
         echo "linux_x64 released"
 
 - stage: linux_arm64
-  # displayName: Linux arm64
+  displayName: Linux arm64
   dependsOn: ${{ parameters.buildStageDeps }}
   # For post-submit builds, continue even if precheck fails
   condition: and(not(canceled()), or(succeeded(), eq(variables['PostSubmit'], true)))
@@ -442,7 +487,7 @@ stages:
         bazelBuildExtraOptions: "--sandbox_base=/tmp/sandbox_base"
 
   - job: released
-    # displayName: Complete
+    displayName: Complete
     dependsOn: ["release"]
     pool:
       vmImage: "ubuntu-20.04"
@@ -450,32 +495,33 @@ stages:
     # the preceeding jobs either pass or are skipped
     # adapted from:
     #   https://learn.microsoft.com/en-us/azure/devops/pipelines/process/expressions?view=azure-devops#job-to-job-dependencies-within-one-stage
-    condition: in(dependencies.release.result, 'Succeeded', 'SucceededWithIssues', 'Skipped')
+    condition: and(eq(variables['Build.Reason'], 'PullRequest'), in(dependencies.release.result, 'Succeeded', 'SucceededWithIssues', 'Skipped'))
     steps:
     - checkout: none
     - bash: |
         echo "linux_arm64 released"
 
 - stage: check
-  # displayName: Checks (Linux x64)
+  displayName: Checks (Linux x64)
   dependsOn: ${{ parameters.checkStageDeps }}
   jobs:
   - job: bazel
-    displayName: linux_x64
-    # displayName: "Linux x64"
+    displayName: "Linux x64"
     dependsOn: []
     # Skip checks if only mobile/ or docs/ have changed.
     condition: and(not(canceled()), or(succeeded(), eq(variables['PostSubmit'], true)), ne(stageDependencies.env.repo.outputs['changed.mobileOnly'], 'true'), ne(stageDependencies.env.repo.outputs['changed.docsOnly'], 'true'), ne(stageDependencies.env.repo.outputs['changed.examplesOnly'], 'true'))
     strategy:
-      maxParallel: 3
+      maxParallel: ${{ parameters.checksConcurrency }}
       matrix:
         # These are ordered by most time-consuming first.
         compile_time_options:
           CI_TARGET: "bazel.compile_time_options"
+          ENVOY_FILTER_EXAMPLE: true
         tsan:
           CI_TARGET: "bazel.tsan"
         asan:
           CI_TARGET: "bazel.asan"
+          ENVOY_FILTER_EXAMPLE: true
         # Disabled due to https://github.com/envoyproxy/envoy/pull/18218
         # api_compat:
         #  CI_TARGET: "bazel.api_compat"
@@ -483,6 +529,7 @@ stages:
           CI_TARGET: "bazel.gcc"
         msan:
           CI_TARGET: "bazel.msan"
+          ENVOY_FILTER_EXAMPLE: true
         clang_tidy:
           CI_TARGET: "bazel.clang_tidy"
         api:
@@ -494,9 +541,10 @@ stages:
     - template: bazel.yml
       parameters:
         ciTarget: $(CI_TARGET)
+        envoyBuildFilterExample: $(ENVOY_FILTER_EXAMPLE)
 
   - job: coverage
-    # displayName: "Linux x64"
+    displayName: "Linux x64"
     dependsOn: []
     # Skip checks if only mobile/ or docs/ have changed.
     condition: and(not(canceled()), or(succeeded(), eq(variables['PostSubmit'], true)), ne(stageDependencies.env.repo.outputs['changed.mobileOnly'], 'true'), ne(stageDependencies.env.repo.outputs['changed.docsOnly'], 'true'), ne(stageDependencies.env.repo.outputs['changed.examplesOnly'], 'true'))
@@ -527,8 +575,7 @@ stages:
       condition: always()
 
   - job: complete
-    displayName: linux_x64
-    # displayName: "Checks complete"
+    displayName: "Checks complete"
     dependsOn: ["bazel", "coverage"]
     pool:
       vmImage: "ubuntu-20.04"
@@ -538,6 +585,7 @@ stages:
     #   https://learn.microsoft.com/en-us/azure/devops/pipelines/process/expressions?view=azure-devops#job-to-job-dependencies-within-one-stage
     condition: |
       and(
+        eq(variables['Build.Reason'], 'PullRequest'),
         in(dependencies.bazel.result, 'Succeeded', 'SucceededWithIssues', 'Skipped'),
         in(dependencies.coverage.result, 'Succeeded', 'SucceededWithIssues', 'Skipped'))
     steps:
@@ -561,7 +609,7 @@ stages:
         name: publish_docker
         # VERSION.txt is included to refresh Docker images for release
         key: "ci/Dockerfile-envoy | VERSION.txt"
-        version: "$(dockerBuildCacheVersion)"
+        version: "$(cacheKeyDockerBuild)"
         path: ""
     - bash: |
         echo "disk space at beginning of build:"
@@ -571,26 +619,27 @@ stages:
       inputs:
         buildType: current
         artifactName: "bazel.release"
-        itemPattern: "bazel.release/envoy*binary.tar.gz"
+        itemPattern: "bazel.release/bin/*"
         targetPath: $(Build.StagingDirectory)
     - task: DownloadBuildArtifacts@0
       inputs:
         buildType: current
         artifactName: "bazel.release.arm64"
-        itemPattern: "bazel.release.arm64/envoy*binary.tar.gz"
+        itemPattern: "bazel.release.arm64/bin/*"
         targetPath: $(Build.StagingDirectory)
     - bash: |
         set -e
-        mkdir -p linux/amd64
-        tar zxf $(Build.StagingDirectory)/bazel.release/envoy_binary.tar.gz -C ./linux/amd64
-        tar zxf $(Build.StagingDirectory)/bazel.release/envoy-contrib_binary.tar.gz -C ./linux/amd64
-        rm $(Build.StagingDirectory)/bazel.release/envoy_binary.tar.gz
-        rm $(Build.StagingDirectory)/bazel.release/envoy-contrib_binary.tar.gz
-        mkdir -p linux/arm64
-        tar zxf $(Build.StagingDirectory)/bazel.release.arm64/envoy_binary.tar.gz -C ./linux/arm64
-        tar zxf $(Build.StagingDirectory)/bazel.release.arm64/envoy-contrib_binary.tar.gz -C ./linux/arm64
-        rm $(Build.StagingDirectory)/bazel.release.arm64/envoy_binary.tar.gz
-        rm $(Build.StagingDirectory)/bazel.release.arm64/envoy-contrib_binary.tar.gz
+
+        mkdir -p linux/amd64 linux/arm64
+
+        # x64
+        cp -a $(Build.StagingDirectory)/bazel.release/bin/release.tar.zst linux/amd64/release.tar.zst
+        cp -a $(Build.StagingDirectory)/bazel.release/bin/schema_validator_tool linux/amd64/schema_validator_tool
+
+        # arm64
+        cp -a $(Build.StagingDirectory)/bazel.release.arm64/bin/release.tar.zst linux/arm64/release.tar.zst
+        cp -a $(Build.StagingDirectory)/bazel.release.arm64/bin/schema_validator_tool linux/arm64/schema_validator_tool
+
         ci/docker_ci.sh
       workingDirectory: $(Build.SourcesDirectory)
       env:
@@ -620,6 +669,12 @@ stages:
     pool:
       vmImage: "ubuntu-20.04"
     steps:
+    - task: DownloadBuildArtifacts@0
+      inputs:
+        buildType: current
+        artifactName: "bazel.release"
+        itemPattern: "bazel.release/bin/*"
+        targetPath: $(Build.StagingDirectory)
     - template: bazel.yml
       parameters:
         ciTarget: bazel.distribution
@@ -630,6 +685,12 @@ stages:
     timeoutInMinutes: 120
     pool: "arm-large"
     steps:
+    - task: DownloadBuildArtifacts@0
+      inputs:
+        buildType: current
+        artifactName: "bazel.release.arm64"
+        itemPattern: "bazel.release.arm64/bin/*"
+        targetPath: $(Build.StagingDirectory)
     - template: bazel.yml
       parameters:
         managedAgent: false
@@ -666,7 +727,7 @@ stages:
     steps:
     - task: Cache@2
       inputs:
-        key: "docs | ./WORKSPACE | **/*.bzl"
+        key: 'docs | $(cacheKeyRepository)'
         path: $(Build.StagingDirectory)/repository_cache
       continueOnError: true
 
@@ -793,7 +854,7 @@ stages:
         MAINTAINER_GPG_KEY_PASSPHRASE: $(MaintainerGPGKeyPassphrase)
 
 - stage: verify
-  # displayName: Verify
+  displayName: Verify
   dependsOn: ["env", "publish"]
   jobs:
   - job: examples
@@ -865,7 +926,7 @@ stages:
       displayName: "Verify packages"
 
   - job: verified
-    # displayName: Verification complete
+    displayName: Verification complete
     dependsOn: ["examples", "packages_x64", "packages_arm64"]
     pool:
       vmImage: "ubuntu-20.04"
@@ -875,6 +936,7 @@ stages:
     #   https://learn.microsoft.com/en-us/azure/devops/pipelines/process/expressions?view=azure-devops#job-to-job-dependencies-within-one-stage
     condition: |
       and(
+        eq(variables['Build.Reason'], 'PullRequest'),
         in(dependencies.examples.result, 'Succeeded', 'SucceededWithIssues', 'Skipped'),
         in(dependencies.packages_x64.result, 'Succeeded', 'SucceededWithIssues', 'Skipped'),
         in(dependencies.packages_arm64.result, 'Succeeded', 'SucceededWithIssues', 'Skipped'))
@@ -884,7 +946,7 @@ stages:
         echo "checks complete"
 
 - stage: macos
-  # displayName: macOS
+  displayName: macOS
   dependsOn: ${{ parameters.macBuildStageDeps }}
   jobs:
   - job: test
@@ -913,7 +975,7 @@ stages:
       condition: always()
 
   - job: tested
-    # displayName: Complete
+    displayName: Complete
     dependsOn: ["test"]
     pool:
       vmImage: "ubuntu-20.04"
@@ -921,14 +983,14 @@ stages:
     # the preceeding jobs either pass or are skipped
     # adapted from:
     #   https://learn.microsoft.com/en-us/azure/devops/pipelines/process/expressions?view=azure-devops#job-to-job-dependencies-within-one-stage
-    condition: in(dependencies.test.result, 'Succeeded', 'SucceededWithIssues', 'Skipped')
+    condition: and(eq(variables['Build.Reason'], 'PullRequest'), in(dependencies.test.result, 'Succeeded', 'SucceededWithIssues', 'Skipped'))
     steps:
     - checkout: none
     - bash: |
         echo "macos tested"
 
 - stage: windows
-  # displayName: Windows
+  displayName: Windows
   dependsOn: ${{ parameters.windowsBuildStageDeps }}
   jobs:
   - job: release
@@ -940,7 +1002,7 @@ stages:
     steps:
     - task: Cache@2
       inputs:
-        key: '"windows.release" | ./WORKSPACE | **/*.bzl'
+        key: '"windows.release" | $(cacheKeyRepository)'
         path: $(Build.StagingDirectory)/repository_cache
       continueOnError: true
     - bash: ci/run_envoy_docker.sh ci/windows_ci_steps.sh
@@ -1021,7 +1083,7 @@ stages:
       condition: always()
 
   - job: released
-    # displayName: Complete
+    displayName: Complete
     dependsOn: ["release", "docker"]
     pool:
       vmImage: "ubuntu-20.04"
@@ -1031,6 +1093,7 @@ stages:
     #   https://learn.microsoft.com/en-us/azure/devops/pipelines/process/expressions?view=azure-devops#job-to-job-dependencies-within-one-stage
     condition: |
       and(
+        eq(variables['Build.Reason'], 'PullRequest'),
         in(dependencies.release.result, 'Succeeded', 'SucceededWithIssues', 'Skipped'),
         in(dependencies.docker.result, 'Succeeded', 'SucceededWithIssues', 'Skipped'))
     steps:

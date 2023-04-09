@@ -33,6 +33,7 @@
 #include "envoy/ssl/context_manager.h"
 #include "envoy/stats/scope.h"
 #include "envoy/thread_local/thread_local.h"
+#include "envoy/upstream/cluster_factory.h"
 #include "envoy/upstream/cluster_manager.h"
 #include "envoy/upstream/health_checker.h"
 #include "envoy/upstream/load_balancer.h"
@@ -43,6 +44,7 @@
 #include "source/common/common/callback_impl.h"
 #include "source/common/common/enum_to_int.h"
 #include "source/common/common/logger.h"
+#include "source/common/common/packed_struct.h"
 #include "source/common/common/thread.h"
 #include "source/common/config/metadata.h"
 #include "source/common/config/well_known_names.h"
@@ -795,15 +797,35 @@ public:
     return common_lb_config_;
   }
   std::chrono::milliseconds connectTimeout() const override { return connect_timeout_; }
+
+  // `OptionalTimeouts` manages various `optional` values. We pack them in a separate data
+  // structure for memory efficiency -- avoiding overhead of `absl::optional` per variable, and
+  // avoiding overhead of storing unset timeouts.
+  enum class OptionalTimeoutNames { IdleTimeout = 0, TcpPoolIdleTimeout, MaxConnectionDuration };
+  using OptionalTimeouts = PackedStruct<std::chrono::milliseconds, 3, OptionalTimeoutNames>;
+
   const absl::optional<std::chrono::milliseconds> idleTimeout() const override {
-    return idle_timeout_;
+    auto timeout = optional_timeouts_.get<OptionalTimeoutNames::IdleTimeout>();
+    if (timeout.has_value()) {
+      return *timeout;
+    }
+    return absl::nullopt;
   }
   const absl::optional<std::chrono::milliseconds> tcpPoolIdleTimeout() const override {
-    return tcp_pool_idle_timeout_;
+    auto timeout = optional_timeouts_.get<OptionalTimeoutNames::TcpPoolIdleTimeout>();
+    if (timeout.has_value()) {
+      return *timeout;
+    }
+    return absl::nullopt;
   }
   const absl::optional<std::chrono::milliseconds> maxConnectionDuration() const override {
-    return max_connection_duration_;
+    auto timeout = optional_timeouts_.get<OptionalTimeoutNames::MaxConnectionDuration>();
+    if (timeout.has_value()) {
+      return *timeout;
+    }
+    return absl::nullopt;
   }
+
   float perUpstreamPreconnectRatio() const override { return per_upstream_preconnect_ratio_; }
   float peekaheadRatio() const override { return peekahead_ratio_; }
   uint32_t perConnectionBufferLimitBytes() const override {
@@ -866,7 +888,12 @@ public:
   uint64_t maxRequestsPerConnection() const override { return max_requests_per_connection_; }
   uint32_t maxResponseHeadersCount() const override { return max_response_headers_count_; }
   const std::string& name() const override { return name_; }
-  const std::string& observabilityName() const override { return observability_name_; }
+  const std::string& observabilityName() const override {
+    if (observability_name_ != nullptr) {
+      return *observability_name_;
+    }
+    return name_;
+  }
   ResourceManager& resourceManager(ResourcePriority priority) const override;
   TransportSocketMatcher& transportSocketMatcher() const override { return *socket_matcher_; }
   LazyClusterTrafficStats& trafficStats() const override { return traffic_stats_; }
@@ -904,8 +931,20 @@ public:
     }
     return DefaultLoadBalancerSubsetInfoImpl::get();
   }
-  const envoy::config::core::v3::Metadata& metadata() const override { return metadata_; }
-  const Envoy::Config::TypedMetadata& typedMetadata() const override { return typed_metadata_; }
+  using DefaultMetadata = ConstSingleton<envoy::config::core::v3::Metadata>;
+  const envoy::config::core::v3::Metadata& metadata() const override {
+    if (metadata_ != nullptr) {
+      return *metadata_;
+    }
+    return DefaultMetadata::get();
+  }
+  using ClusterTypedMetadata = Envoy::Config::TypedMetadataImpl<ClusterTypedMetadataFactory>;
+  const Envoy::Config::TypedMetadata& typedMetadata() const override {
+    if (typed_metadata_ != nullptr) {
+      return *typed_metadata_;
+    }
+    CONSTRUCT_ON_FIRST_USE(ClusterTypedMetadata, DefaultMetadata::get());
+  }
 
   bool drainConnectionsOnHostRemoval() const override { return drain_connections_on_host_removal_; }
   bool connectionPoolPerDownstreamConnection() const override {
@@ -986,16 +1025,14 @@ private:
 
   Runtime::Loader& runtime_;
   const std::string name_;
-  const std::string observability_name_;
+  std::unique_ptr<const std::string> observability_name_;
   const absl::flat_hash_map<std::string, ProtocolOptionsConfigConstSharedPtr>
       extension_protocol_options_;
   const std::shared_ptr<const HttpProtocolOptionsConfigImpl> http_protocol_options_;
   const std::shared_ptr<const TcpProtocolOptionsConfigImpl> tcp_protocol_options_;
   const uint64_t max_requests_per_connection_;
   const std::chrono::milliseconds connect_timeout_;
-  absl::optional<std::chrono::milliseconds> idle_timeout_;
-  absl::optional<std::chrono::milliseconds> tcp_pool_idle_timeout_;
-  absl::optional<std::chrono::milliseconds> max_connection_duration_;
+  OptionalTimeouts optional_timeouts_;
   const float per_upstream_preconnect_ratio_;
   const float peekahead_ratio_;
   TransportSocketMatcherPtr socket_matcher_;
@@ -1014,13 +1051,11 @@ private:
   const std::unique_ptr<const LBPolicyConfig> lb_policy_config_;
   std::unique_ptr<envoy::config::core::v3::TypedExtensionConfig> upstream_config_;
   std::unique_ptr<LoadBalancerSubsetInfoImpl> lb_subset_;
-  const envoy::config::core::v3::Metadata metadata_;
-  Envoy::Config::TypedMetadataImpl<ClusterTypedMetadataFactory> typed_metadata_;
+  std::unique_ptr<const envoy::config::core::v3::Metadata> metadata_;
+  std::unique_ptr<ClusterTypedMetadata> typed_metadata_;
   ProtobufTypes::MessagePtr load_balancing_policy_;
   TypedLoadBalancerFactory* load_balancer_factory_ = nullptr;
   const envoy::config::cluster::v3::Cluster::CommonLbConfig common_lb_config_;
-  const absl::optional<envoy::config::core::v3::UpstreamHttpProtocolOptions>
-      upstream_http_protocol_options_;
   absl::optional<std::string> eds_service_name_;
   std::unique_ptr<const envoy::config::cluster::v3::Cluster::CustomClusterType> cluster_type_;
   const std::unique_ptr<Server::Configuration::CommonFactoryContext> factory_context_;
@@ -1079,13 +1114,6 @@ public:
   void setOutlierDetector(const Outlier::DetectorSharedPtr& outlier_detector);
 
   /**
-   * Set the TransportSocketFactoryContext pointer so that the memory isn't lost
-   * for the cluster lifetime in case SDS is used.
-   */
-  void setTransportFactoryContext(
-      Server::Configuration::TransportSocketFactoryContextPtr transport_factory_context);
-
-  /**
    * Wrapper around Network::Address::resolveProtoAddress() that provides improved error message
    * based on the cluster's type.
    * @param address supplies the address proto to resolve.
@@ -1118,9 +1146,9 @@ public:
 
 protected:
   ClusterImplBase(Server::Configuration::ServerFactoryContext& server_context,
-                  const envoy::config::cluster::v3::Cluster& cluster, Runtime::Loader& runtime,
-                  Server::Configuration::TransportSocketFactoryContextImpl& factory_context,
-                  Stats::ScopeSharedPtr&& stats_scope, bool added_via_api, TimeSource& time_source);
+                  const envoy::config::cluster::v3::Cluster& cluster,
+                  ClusterFactoryContext& cluster_context, Runtime::Loader& runtime,
+                  bool added_via_api, TimeSource& time_source);
 
   /**
    * Overridden by every concrete cluster. The cluster should do whatever pre-init is needed. E.g.,
@@ -1160,6 +1188,8 @@ protected:
   Outlier::DetectorSharedPtr outlier_detector_;
   const bool wait_for_warm_on_init_;
 
+  Server::Configuration::TransportSocketFactoryContextImplPtr transport_factory_context_{};
+
 protected:
   TimeSource& time_source_;
   MainPrioritySetImpl priority_set_;
@@ -1177,7 +1207,6 @@ private:
   const bool local_cluster_;
   Config::ConstMetadataSharedPoolSharedPtr const_metadata_shared_pool_;
   Common::CallbackHandlePtr priority_update_cb_;
-  Server::Configuration::TransportSocketFactoryContextPtr transport_factory_context_{};
 };
 
 using ClusterImplBaseSharedPtr = std::shared_ptr<ClusterImplBase>;

@@ -17,6 +17,9 @@ parameters:
 - name: bazelBuildExtraOptions
   type: string
   default: ""
+- name: envoyBuildFilterExample
+  type: string
+  default: ""
 
 steps:
 # Set up tmpfs directories for self-hosted agents which have a surplus of mem.
@@ -41,13 +44,13 @@ steps:
   env:
     VSO_DEDUP_REDIRECT_TIMEOUT_IN_SEC: 5
   inputs:
-    key: '"${{ parameters.ciTarget }}" | "${{ parameters.artifactSuffix }}" | ./WORKSPACE | **/*.bzl, !mobile/**, !envoy-docs/**'
+    key: '"${{ parameters.ciTarget }}" | "${{ parameters.artifactSuffix }}" | $(cacheKeyRepository)'
     path: $(Build.StagingDirectory)/repository_cache
   continueOnError: true
 
 - template: cached.yml
   parameters:
-    version: "$(buildImageCacheVersion)"
+    version: "$(cacheKeyBuildImage)"
     arch: "${{ parameters.artifactSuffix }}"
 
 - bash: |
@@ -72,6 +75,7 @@ steps:
     SLACK_TOKEN: $(SLACK_TOKEN)
     REPO_URI: $(Build.Repository.Uri)
     BUILD_URI: $(Build.BuildUri)
+    ENVOY_BUILD_FILTER_EXAMPLE: ${{ parameters.envoyBuildFilterExample }}
     ${{ if eq(variables['Build.Reason'], 'PullRequest') }}:
       AZP_TARGET_BRANCH: "origin/$(System.PullRequest.TargetBranch)"
     ${{ if ne(variables['Build.Reason'], 'PullRequest') }}:
@@ -86,9 +90,9 @@ steps:
       BAZEL_BUILD_EXTRA_OPTIONS: "${{ parameters.bazelBuildExtraOptions }}"
       BAZEL_REMOTE_CACHE: $(LocalBuildCache)
       ${{ if eq(variables['Build.Reason'], 'PullRequest') }}:
-        BAZEL_REMOTE_INSTANCE: "instances/$(System.PullRequest.TargetBranch)"
+        BAZEL_REMOTE_INSTANCE_BRANCH: "$(System.PullRequest.TargetBranch)"
       ${{ if ne(variables['Build.Reason'], 'PullRequest') }}:
-        BAZEL_REMOTE_INSTANCE: "instances/$(Build.SourceBranchName)"
+        BAZEL_REMOTE_INSTANCE_BRANCH: "$(Build.SourceBranchName)"
   displayName: "Run CI script ${{ parameters.ciTarget }}"
 
 - bash: |

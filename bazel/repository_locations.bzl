@@ -108,13 +108,13 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         # 2. Open https://chromium.googlesource.com/chromium/src/+/refs/tags/<current_version>/DEPS and note <boringssl_revision>.
         # 3. Find a commit in BoringSSL's "master-with-bazel" branch that merges <boringssl_revision>.
         #
-        # chromium-105.0.5195.37 (linux/beta)
-        version = "098695591f3a2665fccef83a3732ecfc99acdcdd",
-        sha256 = "e141448cf6f686b6e9695f6b6459293fd602c8d51efe118a83106752cf7e1280",
+        # chromium-112.0.5615.39 (linux/beta)
+        version = "88d7a40bd06a34da6ee0d985545755199d047258",
+        sha256 = "1e759891e168c5957f2f4d519929e2b4cef9303b7cf2049601081f4fca95bf21",
         strip_prefix = "boringssl-{version}",
         urls = ["https://github.com/google/boringssl/archive/{version}.tar.gz"],
         use_category = ["controlplane", "dataplane_core"],
-        release_date = "2022-07-19",
+        release_date = "2023-02-14",
         cpe = "cpe:2.3:a:google:boringssl:*",
         license = "Mixed",
         license_url = "https://github.com/google/boringssl/blob/{version}/LICENSE",
@@ -378,6 +378,11 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "ICU Library",
         project_desc = "Development files for International Components for Unicode",
         project_url = "https://github.com/unicode-org/icu",
+        # When this is updated, make sure to update the icu.patch patch file and remove
+        # all remaining Bazel build artifacts (for example WORKSPACE and BUILD.bazel files)
+        # from the icu source code, to prevent Bazel from treating the foreign library
+        # as a Bazel project.
+        # https://github.com/envoyproxy/envoy/issues/26395
         version = "72-1",
         sha256 = "43cbad628d98f37a3f95f6c34579f9144ef4bde60248fa6004a4f006d7487e69",
         strip_prefix = "icu-release-{version}",
@@ -453,19 +458,19 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "Hyperscan",
         project_desc = "High-performance regular expression matching library",
         project_url = "https://hyperscan.io",
-        version = "5.4.0",
-        sha256 = "e51aba39af47e3901062852e5004d127fa7763b5dbbc16bcca4265243ffa106f",
+        version = "5c724f73d1aa5add73c06c97c59930899c713d47",
+        sha256 = "c0c9074a9f19db2fe70a78d4fcf39709072068a652b474f30f8f3931aa86ef3a",
         strip_prefix = "hyperscan-{version}",
-        urls = ["https://github.com/intel/hyperscan/archive/v{version}.tar.gz"],
+        urls = ["https://github.com/intel/hyperscan/archive/{version}.tar.gz"],
         use_category = ["dataplane_ext"],
         extensions = [
             "envoy.matching.input_matchers.hyperscan",
             "envoy.regex_engines.hyperscan",
         ],
-        release_date = "2021-01-13",
+        release_date = "2023-03-23",
         cpe = "N/A",
         license = "BSD-3-Clause",
-        license_url = "https://github.com/intel/hyperscan/blob/v{version}/LICENSE",
+        license_url = "https://github.com/intel/hyperscan/blob/{version}/LICENSE",
     ),
     io_opentracing_cpp = dict(
         project_name = "OpenTracing",
@@ -1079,12 +1084,12 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "QUICHE",
         project_desc = "QUICHE (QUIC, HTTP/2, Etc) is Google‘s implementation of QUIC and related protocols",
         project_url = "https://github.com/google/quiche",
-        version = "09a54d2f17d18b9bb8fe92b169354df2c50ba9ef",
-        sha256 = "d89ce3b01555e46fbf86dcd6dfdf20836d34e006b10576f1ff4cb816c839c20a",
+        version = "bd548ab081feb21557e52d1ce09930267501d59b",
+        sha256 = "5157911ad189275182d8b3ac99267a322189064076bf70cd4eddb89860adb9cd",
         urls = ["https://github.com/google/quiche/archive/{version}.tar.gz"],
         strip_prefix = "quiche-{version}",
         use_category = ["controlplane", "dataplane_core"],
-        release_date = "2023-03-23",
+        release_date = "2023-04-05",
         cpe = "N/A",
         license = "BSD-3-Clause",
         license_url = "https://github.com/google/quiche/blob/{version}/LICENSE",
@@ -1342,12 +1347,12 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "Bazel rust rules",
         project_desc = "Bazel rust rules (used by Wasm)",
         project_url = "https://github.com/bazelbuild/rules_rust",
-        version = "0.18.0",
-        sha256 = "2466e5b2514772e84f9009010797b9cd4b51c1e6445bbd5b5e24848d90e6fb2e",
+        version = "0.19.1",
+        sha256 = "b4e622a36904b5dd2d2211e40008fc473421c8b51c9efca746ab2ecf11dca08e",
         urls = ["https://github.com/bazelbuild/rules_rust/releases/download/{version}/rules_rust-v{version}.tar.gz"],
         use_category = ["dataplane_ext"],
         extensions = ["envoy.wasm.runtime.wasmtime"],
-        release_date = "2023-02-09",
+        release_date = "2023-03-22",
         cpe = "N/A",
         license = "Apache-2.0",
         license_url = "https://github.com/bazelbuild/rules_rust/blob/{version}/LICENSE.txt",

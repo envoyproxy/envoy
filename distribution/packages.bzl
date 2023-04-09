@@ -11,7 +11,7 @@ def _release_version_for(version):
 
 def envoy_pkg_distros(
         name,
-        envoy_bin = ":envoy-bin",
+        envoy_bin = ":envoy-binary",
         version = None,
         maintainer = None,
         config = "//configs:envoyproxy_io_proxy.yaml"):

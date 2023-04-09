@@ -369,6 +369,16 @@ void UpstreamRequest::acceptHeadersFromRouter(bool end_stream) {
   ASSERT(!router_sent_end_stream_);
   router_sent_end_stream_ = end_stream;
 
+  // Make sure that when we are forwarding CONNECT payload we do not do so until
+  // the upstream has accepted the CONNECT request.
+  // This must be done before conn_pool->newStream, as onPoolReady un-pauses for CONNECT
+  // termination.
+  auto* headers = parent_.downstreamHeaders();
+  if (allow_upstream_filters_ &&
+      headers->getMethodValue() == Http::Headers::get().MethodValues.Connect) {
+    paused_for_connect_ = true;
+  }
+
   // Kick off creation of the upstream connection immediately upon receiving headers.
   // In future it may be possible for upstream filters to delay this, or influence connection
   // creation but for now optimize for minimal latency and fetch the connection
@@ -376,14 +386,6 @@ void UpstreamRequest::acceptHeadersFromRouter(bool end_stream) {
   conn_pool_->newStream(this);
   if (!allow_upstream_filters_) {
     return;
-  }
-
-  auto* headers = parent_.downstreamHeaders();
-
-  // Make sure that when we are forwarding CONNECT payload we do not do so until
-  // the upstream has accepted the CONNECT request.
-  if (headers->getMethodValue() == Http::Headers::get().MethodValues.Connect) {
-    paused_for_connect_ = true;
   }
 
   filter_manager_->requestHeadersInitialized();
@@ -564,9 +566,15 @@ void UpstreamRequest::onPerTryTimeout() {
   }
 }
 
+void UpstreamRequest::recordConnectionPoolCallbackLatency() {
+  upstreamTiming().recordConnectionPoolCallbackLatency(
+      start_time_, parent_.callbacks()->dispatcher().timeSource());
+}
+
 void UpstreamRequest::onPoolFailure(ConnectionPool::PoolFailureReason reason,
                                     absl::string_view transport_failure_reason,
                                     Upstream::HostDescriptionConstSharedPtr host) {
+  recordConnectionPoolCallbackLatency();
   Http::StreamResetReason reset_reason = Http::StreamResetReason::ConnectionFailure;
   switch (reason) {
   case ConnectionPool::PoolFailureReason::Overflow:
@@ -596,6 +604,7 @@ void UpstreamRequest::onPoolReady(std::unique_ptr<GenericUpstream>&& upstream,
   // This may be called under an existing ScopeTrackerScopeState but it will unwind correctly.
   ScopeTrackerScopeState scope(&parent_.callbacks()->scope(), parent_.callbacks()->dispatcher());
   ENVOY_STREAM_LOG(debug, "pool ready", *parent_.callbacks());
+  recordConnectionPoolCallbackLatency();
   upstream_ = std::move(upstream);
   had_upstream_ = true;
   // Have the upstream use the account of the downstream.
