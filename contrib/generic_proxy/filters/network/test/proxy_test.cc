@@ -814,7 +814,8 @@ TEST_F(FilterTest, BindUpstreamConnectionFailure) {
   EXPECT_CALL(filter_callbacks_.connection_, write(BufferStringEqual("test"), false));
 
   EXPECT_CALL(factory_context_.drain_manager_, drainClose()).WillOnce(Return(false));
-  EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_));
+  // One for the upstream_manager_ and one for the active stream.
+  EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_)).Times(2);
 
   EXPECT_CALL(*encoder_, encode(_, _))
       .WillOnce(Invoke([&](const Response& response, ResponseEncoderCallback& callback) {
@@ -879,7 +880,8 @@ TEST_F(FilterTest, BindUpstreamConnectionSuccessButCloseBeforeUpstreamResponse) 
   EXPECT_CALL(filter_callbacks_.connection_, write(BufferStringEqual("test"), false));
 
   EXPECT_CALL(factory_context_.drain_manager_, drainClose()).WillOnce(Return(false));
-  EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_));
+  // One for the upstream_manager_ and one for the active stream.
+  EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_)).Times(2);
 
   EXPECT_CALL(*encoder_, encode(_, _))
       .WillOnce(Invoke([&](const Response& response, ResponseEncoderCallback& callback) {
@@ -947,7 +949,8 @@ TEST_F(FilterTest, BindUpstreamConnectionSuccessButDecodingFailure) {
   EXPECT_CALL(filter_callbacks_.connection_, write(BufferStringEqual("test"), false));
 
   EXPECT_CALL(factory_context_.drain_manager_, drainClose()).WillOnce(Return(false));
-  EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_));
+  // One for the upstream_manager_ and one for the active stream.
+  EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_)).Times(2);
 
   EXPECT_CALL(*encoder_, encode(_, _))
       .WillOnce(Invoke([&](const Response& response, ResponseEncoderCallback& callback) {
@@ -1010,6 +1013,7 @@ TEST_F(FilterTest, BindUpstreamConnectionSuccessAndDecodingSuccess) {
   EXPECT_CALL(filter_callbacks_.connection_, write(BufferStringEqual("test"), false));
 
   EXPECT_CALL(factory_context_.drain_manager_, drainClose()).WillOnce(Return(false));
+  // For the active stream.
   EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_));
 
   EXPECT_CALL(*encoder_, encode(_, _))
@@ -1088,6 +1092,7 @@ TEST_F(FilterTest, BindUpstreamConnectionSuccessAndMultipleDecodingSuccess) {
   EXPECT_CALL(filter_callbacks_.connection_, write(BufferStringEqual("test"), false)).Times(2);
 
   EXPECT_CALL(factory_context_.drain_manager_, drainClose()).Times(2).WillRepeatedly(Return(false));
+  // Both for the active streams.
   EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_)).Times(2);
 
   EXPECT_CALL(*encoder_, encode(_, _))
@@ -1173,7 +1178,8 @@ TEST_F(FilterTest, BindUpstreamConnectionSuccessButMultipleRequestHasSameStreamI
   filter_->boundUpstreamConn()->registerUpstreamCallback(123, upstream_callback_1);
 
   EXPECT_CALL(factory_context_.drain_manager_, drainClose()).Times(2).WillRepeatedly(Return(false));
-  EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_)).Times(2);
+  // One for upstream_manager_ and two for the active streams.
+  EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_)).Times(3);
   // The second request has the same stream id as the first one and this will cause the connection
   // to be closed.
   EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::FlushWrite));
@@ -1221,7 +1227,8 @@ TEST_F(FilterTest, BindUpstreamConnectionSuccessAndWriteSomethinToConnection) {
   EXPECT_CALL(filter_callbacks_.connection_, write(BufferStringEqual("test"), false));
 
   EXPECT_CALL(factory_context_.drain_manager_, drainClose()).WillOnce(Return(false));
-  EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_));
+  // One for the upstream_manager_ and one for the active stream.
+  EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_)).Times(2);
 
   EXPECT_CALL(*encoder_, encode(_, _))
       .WillOnce(Invoke([&](const Response& response, ResponseEncoderCallback& callback) {
