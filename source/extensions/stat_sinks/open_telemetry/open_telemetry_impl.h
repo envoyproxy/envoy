@@ -21,8 +21,10 @@ namespace Extensions {
 namespace StatSinks {
 namespace OpenTelemetry {
 
-using MetricsExportRequest = opentelemetry::proto::collector::metrics::v1::ExportMetricsServiceRequest;
-using MetricsExportResponse = opentelemetry::proto::collector::metrics::v1::ExportMetricsServiceResponse;
+using MetricsExportRequest =
+    opentelemetry::proto::collector::metrics::v1::ExportMetricsServiceRequest;
+using MetricsExportResponse =
+    opentelemetry::proto::collector::metrics::v1::ExportMetricsServiceResponse;
 using MetricsExportRequestPtr = std::unique_ptr<MetricsExportRequest>;
 
 class OpenTelemetryGrpcMetricsExporter : public Grpc::AsyncRequestCallbacks<MetricsExportResponse> {
@@ -66,7 +68,8 @@ private:
   const Protobuf::MethodDescriptor& service_method_;
 };
 
-using OpenTelemetryGrpcMetricsExporterImplPtr = std::unique_ptr<OpenTelemetryGrpcMetricsExporterImpl>;
+using OpenTelemetryGrpcMetricsExporterImplPtr =
+    std::unique_ptr<OpenTelemetryGrpcMetricsExporterImpl>;
 
 class MetricsFlusher {
 public:
@@ -75,8 +78,8 @@ public:
       std::function<bool(const Stats::Metric&)> predicate =
           [](const auto& metric) { return metric.used(); })
       : report_counters_as_deltas_(report_counters_as_deltas),
-        report_histograms_as_deltas_(report_histograms_as_deltas),
-        emit_labels_(emit_labels), predicate_(predicate) {}
+        report_histograms_as_deltas_(report_histograms_as_deltas), emit_labels_(emit_labels),
+        predicate_(predicate) {}
 
   MetricsExportRequestPtr flush(Stats::MetricSnapshot& snapshot) const;
 
@@ -109,8 +112,10 @@ private:
 class OpenTelemetryGrpcSink : public Stats::Sink {
 public:
   OpenTelemetryGrpcSink(const GrpcMetricsExporterSharedPtr& otlp_metrics_exporter,
-      bool report_counters_as_deltas, bool report_histograms_as_deltas, bool emit_labels)
-      : flusher_(MetricsFlusher(report_counters_as_deltas, report_histograms_as_deltas, emit_labels)),
+                        bool report_counters_as_deltas, bool report_histograms_as_deltas,
+                        bool emit_labels)
+      : flusher_(
+            MetricsFlusher(report_counters_as_deltas, report_histograms_as_deltas, emit_labels)),
         metrics_exporter_(otlp_metrics_exporter) {}
 
   // Stats::Sink

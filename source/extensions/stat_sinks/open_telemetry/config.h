@@ -14,7 +14,7 @@ namespace OpenTelemetry {
  * Config registration for the OpenTelemetry stats sink. @see StatsSinkFactory.
  */
 class OpenTelemetrySinkFactory : Logger::Loggable<Logger::Id::config>,
-                                     public Server::Configuration::StatsSinkFactory {
+                                 public Server::Configuration::StatsSinkFactory {
 public:
   Stats::SinkPtr createStatsSink(const Protobuf::Message& config,
                                  Server::Configuration::ServerFactoryContext& server) override;
