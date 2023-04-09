@@ -944,6 +944,53 @@ CAPIStatus Filter::log(uint32_t level, absl::string_view message) {
   PANIC_DUE_TO_CORRUPT_ENUM;
 }
 
+
+CAPIStatus Filter::setDynamicMetadata(std::string filter_name, std::string key, absl::string_view bufStr) {
+  Thread::LockGuard lock(mutex_);
+  if (has_destroyed_) {
+    ENVOY_LOG(debug, "golang filter has been destroyed");
+    return CAPIStatus::CAPIFilterIsDestroy;
+  }
+
+  auto& state = getProcessorState();
+  if (!state.isProcessingInGo()) {
+    ENVOY_LOG(debug, "golang filter is not processing Go");
+    return CAPIStatus::CAPINotInGo;
+  }
+
+  if (!state.isThreadSafe()) {
+    auto weak_ptr = weak_from_this();
+    state.getDispatcher().post([this, &state, weak_ptr, filter_name, key, bufStr] {
+      ASSERT(state.isThreadSafe());
+      // TODO: do not need lock here, since it's the work thread now.
+      Thread::ReleasableLockGuard lock(mutex_);
+      if (!weak_ptr.expired() && !has_destroyed_) {
+        lock.release();
+        // it's safe reuse bufStr since Go will wait until C callback.
+        setDynamicMetadataInternal(state, filter_name, key, bufStr);
+      } else {
+        ENVOY_LOG(info, "golang filter has gone or destroyed in setDynamicMetadata");
+      }
+    });
+    return CAPIStatus::CAPIOK;
+  }
+
+  // it's safe to do it here since we are in the safe envoy worker thread now.
+  setDynamicMetadataInternal(state, filter_name, key, bufStr);
+  return  CAPIStatus::CAPIOK;
+}
+
+void Filter::setDynamicMetadataInternal(ProcessorState& state, std::string filter_name,
+                                        std::string key, const absl::string_view& bufStr) {
+  ProtobufWkt::Struct value;
+  ProtobufWkt::Value v;
+  v.ParseFromArray(bufStr.data(), bufStr.length());
+
+  (*value.mutable_fields())[key] = v;
+
+  state.streamInfo().setDynamicMetadata(filter_name, value);
+}
+
 /* ConfigId */
 
 uint64_t Filter::getMergedConfigId(ProcessorState& state) {

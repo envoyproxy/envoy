@@ -38,6 +38,8 @@ import (
 	"unsafe"
 
 	"github.com/envoyproxy/envoy/contrib/golang/filters/http/source/go/pkg/api"
+	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/structpb"
 )
 
 const (
@@ -214,6 +216,19 @@ func (c *httpCApiImpl) HttpGetIntegerValue(r unsafe.Pointer, id int) (uint64, bo
 	}
 	handleCApiStatus(res)
 	return value, true
+}
+
+func (c *httpCApiImpl) HttpSetDynamicMetadata(r unsafe.Pointer, filterName string, key string, value interface{}) {
+	v, err := structpb.NewValue(value)
+	if err != nil {
+		panic(err)
+	}
+	buf, err := proto.Marshal(v)
+	if err != nil {
+		panic(err)
+	}
+	res := C.envoyGoFilterHttpSetDynamicMetadata(r, unsafe.Pointer(&filterName), unsafe.Pointer(&key), unsafe.Pointer(&buf))
+	handleCApiStatus(res)
 }
 
 func (c *httpCApiImpl) HttpLog(r unsafe.Pointer, level api.LogType, message string) {

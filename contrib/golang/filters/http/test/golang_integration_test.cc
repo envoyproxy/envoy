@@ -1,8 +1,11 @@
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 
+
 #include "test/config/v2_link_hacks.h"
+#include "test/extensions/filters/http/common/empty_http_filter_config.h"
 #include "test/integration/http_integration.h"
 #include "test/test_common/utility.h"
+#include "test/test_common/registry.h"
 
 #include "contrib/golang/filters/http/source/golang_filter.h"
 #include "gtest/gtest.h"
@@ -18,10 +21,58 @@ absl::string_view getHeader(const Http::HeaderMap& headers, absl::string_view ke
   return values[0]->value().getStringView();
 }
 
+
+class RetrieveDynamicMetadataFilter : public Http::StreamDecoderFilter {
+public:
+  // Http::StreamDecoderFilter
+  Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap&, bool) override {
+    return Http::FilterHeadersStatus::Continue;
+  }
+
+  Http::FilterDataStatus decodeData(Buffer::Instance&, bool) override {
+    const auto& metadata = decoder_callbacks_->streamInfo().dynamicMetadata().filter_metadata();
+    const auto& filter_it = metadata.find("filter.go");
+    ASSERT(filter_it != metadata.end());
+    const auto& fields = filter_it->second.fields();
+    std::string val = fields.at("foo").string_value();
+    EXPECT_EQ(val, "bar");
+    return Http::FilterDataStatus::Continue;
+  }
+
+  Http::FilterTrailersStatus decodeTrailers(Http::RequestTrailerMap&) override {
+    return Http::FilterTrailersStatus::Continue;
+  }
+
+  void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) override {
+    decoder_callbacks_ = &callbacks;
+  }
+
+  void onDestroy() override{};
+  Http::StreamDecoderFilterCallbacks* decoder_callbacks_;
+};
+
+class RetrieveDynamicMetadataFilterConfig
+    : public Extensions::HttpFilters::Common::EmptyHttpFilterConfig {
+public:
+  RetrieveDynamicMetadataFilterConfig() : Extensions::HttpFilters::Common::EmptyHttpFilterConfig("validate-dynamic-metadata") {}
+
+  Http::FilterFactoryCb
+  createFilter(const std::string&,
+               Server::Configuration::FactoryContext&) override {
+    return
+        [](Http::FilterChainFactoryCallbacks& callbacks) -> void {
+          callbacks.addStreamDecoderFilter(std::make_shared<::Envoy::RetrieveDynamicMetadataFilter>());
+        };
+  }
+};
+
 class GolangIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
                               public HttpIntegrationTest {
 public:
-  GolangIntegrationTest() : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam()) {}
+  GolangIntegrationTest() : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam()), registration_(factory_) {}
+
+  RetrieveDynamicMetadataFilterConfig factory_;
+  Registry::InjectFactory<Server::Configuration::NamedHttpFilterConfigFactory> registration_;
 
   void createUpstreams() override {
     HttpIntegrationTest::createUpstreams();
@@ -55,7 +106,7 @@ typed_config:
     config_helper_.skipPortUsageValidation();
   }
 
-  void initializeBasicFilter(const std::string& so_id, const std::string& domain = "*") {
+  void initializeBasicFilter(const std::string& so_id, const std::string& domain = "*", bool with_injected_metadata_validator = false) {
     const auto yaml_fmt = R"EOF(
 name: golang
 typed_config:
@@ -72,6 +123,10 @@ typed_config:
 
     auto yaml_string = absl::StrFormat(yaml_fmt, so_id, genSoPath(so_id), so_id);
     config_helper_.prependFilter(yaml_string);
+    if (with_injected_metadata_validator) {
+      config_helper_.prependFilter("{ name: validate-dynamic-metadata }");
+    }
+
     config_helper_.skipPortUsageValidation();
 
     config_helper_.addConfigModifier(
@@ -429,6 +484,30 @@ typed_config:
     }
   }
 
+  void testDynamicMetadata(std::string path) {
+    initializeBasicFilter(BASIC, "*", true);
+
+    codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+    Http::TestRequestHeaderMapImpl request_headers{
+        {":method", "POST"},
+        {":path", path},
+        {":scheme", "http"},
+        {":authority", "test.com"},
+        {"x-set-metadata", "true"},
+    };
+
+    auto encoder_decoder = codec_client_->startRequest(request_headers);
+    Http::RequestEncoder& request_encoder = encoder_decoder.first;
+    auto response = std::move(encoder_decoder.second);
+    codec_client_->sendData(request_encoder, "helloworld", true);
+    
+    waitForNextUpstreamRequest();
+    // check no dynamic metadata
+    EXPECT_EQ(true,
+              upstream_request_->headers().get(Http::LowerCaseString("dy-envoy-lb-foo")).empty());
+    cleanup();
+  }
+
   const std::string ECHO{"echo"};
   const std::string BASIC{"basic"};
   const std::string PASSTHROUGH{"passthrough"};
@@ -661,5 +740,15 @@ TEST_P(GolangIntegrationTest, PanicRecover_EncodeData_Async) {
 TEST_P(GolangIntegrationTest, PanicRecover_BadAPI) {
   testPanicRecover("/test?badapi=decode-data", "decode-data");
 }
+
+TEST_P(GolangIntegrationTest, DynamicMetadata) { testDynamicMetadata("/test?dymeta=1"); }
+
+// TEST_P(GolangIntegrationTest, DynamicMetadata_Async) {
+//   testDynamicMetadata("/test?dymeta=1&async=1");
+// }
+
+// TEST_P(GolangIntegrationTest, DynamicMetadata_Async_Sleep) {
+//   testDynamicMetadata("/test?dymeta=1&async=1&sleep=1");
+// }
 
 } // namespace Envoy
