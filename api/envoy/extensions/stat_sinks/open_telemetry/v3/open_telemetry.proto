@@ -1,0 +1,40 @@
+syntax = "proto3";
+
+package envoy.extensions.stat_sinks.open_telemetry.v3;
+
+import "envoy/config/core/v3/grpc_service.proto";
+
+import "google/protobuf/wrappers.proto";
+
+import "udpa/annotations/status.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.stat_sinks.open_telemetry.v3";
+option java_outer_classname = "OpenTelemetryProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/stat_sinks/open_telemetry/v3;open_telemetryv3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: OpenTelemetryStatsSink]
+// Stats configuration proto schema for ``envoy.stat_sinks.open_telemetry`` sink.
+// [#extension: envoy.stat_sinks.open_telemetry]
+message SinkConfig {
+  oneof protocol_specifier {
+    option (validate.required) = true;
+
+    // The upstream gRPC cluster that hosts the OpenTelemetry gRPC service.
+    config.core.v3.GrpcService grpc_service = 1 [(validate.rules).message = {required: true}];
+  }
+
+  // Possibly OTLP-HTTP sink will be implemented in the future.
+  reserved 2;
+
+  google.protobuf.BoolValue report_counters_as_deltas = 3;
+
+  google.protobuf.BoolValue report_histograms_as_deltas = 4;
+
+  // If true, metrics will have their tags emitted as labels on the metrics objects sent to the MetricsService,
+  // and the tag extracted name will be used instead of the full name, which may contain values used by the tag
+  // extractor or additional tags added during stats creation.
+  google.protobuf.BoolValue emit_tags_as_labels = 5;
+}
