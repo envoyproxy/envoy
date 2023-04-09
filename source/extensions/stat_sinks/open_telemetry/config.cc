@@ -35,7 +35,8 @@ OpenTelemetrySinkFactory::createStatsSink(const Protobuf::Message& config,
         otlp_metrics_exporter,
         PROTOBUF_GET_WRAPPED_OR_DEFAULT(sink_config, report_counters_as_deltas, false),
         PROTOBUF_GET_WRAPPED_OR_DEFAULT(sink_config, report_histograms_as_deltas, false),
-        PROTOBUF_GET_WRAPPED_OR_DEFAULT(sink_config, emit_tags_as_labels, true));
+        PROTOBUF_GET_WRAPPED_OR_DEFAULT(sink_config, emit_tags_as_attributes, true),
+        PROTOBUF_GET_WRAPPED_OR_DEFAULT(sink_config, use_tag_extracted_name, true));
   }
 
   case SinkConfig::ProtocolSpecifierCase::PROTOCOL_SPECIFIER_NOT_SET:

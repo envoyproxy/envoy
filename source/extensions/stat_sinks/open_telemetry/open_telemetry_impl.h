@@ -74,11 +74,14 @@ using OpenTelemetryGrpcMetricsExporterImplPtr =
 class MetricsFlusher {
 public:
   MetricsFlusher(
-      bool report_counters_as_deltas, bool report_histograms_as_deltas, bool emit_labels,
+      bool report_counters_as_deltas, bool report_histograms_as_deltas,
+      bool emit_tags_as_attributes, bool use_tag_extracted_name,
       std::function<bool(const Stats::Metric&)> predicate =
           [](const auto& metric) { return metric.used(); })
       : report_counters_as_deltas_(report_counters_as_deltas),
-        report_histograms_as_deltas_(report_histograms_as_deltas), emit_labels_(emit_labels),
+        report_histograms_as_deltas_(report_histograms_as_deltas),
+        emit_tags_as_attributes_(emit_tags_as_attributes),
+        use_tag_extracted_name_(use_tag_extracted_name),
         predicate_(predicate) {}
 
   MetricsExportRequestPtr flush(Stats::MetricSnapshot& snapshot) const;
@@ -105,7 +108,8 @@ private:
 
   const bool report_counters_as_deltas_;
   const bool report_histograms_as_deltas_;
-  const bool emit_labels_;
+  const bool emit_tags_as_attributes_;
+  const bool use_tag_extracted_name_;
   const std::function<bool(const Stats::Metric&)> predicate_;
 };
 
@@ -113,9 +117,10 @@ class OpenTelemetryGrpcSink : public Stats::Sink {
 public:
   OpenTelemetryGrpcSink(const GrpcMetricsExporterSharedPtr& otlp_metrics_exporter,
                         bool report_counters_as_deltas, bool report_histograms_as_deltas,
-                        bool emit_labels)
+                        bool emit_tags_as_attributes, bool use_tag_extracted_name)
       : flusher_(
-            MetricsFlusher(report_counters_as_deltas, report_histograms_as_deltas, emit_labels)),
+            MetricsFlusher(report_counters_as_deltas, report_histograms_as_deltas, 
+                           emit_tags_as_attributes, use_tag_extracted_name)),
         metrics_exporter_(otlp_metrics_exporter) {}
 
   // Stats::Sink

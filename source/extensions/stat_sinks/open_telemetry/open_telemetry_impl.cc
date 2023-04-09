@@ -127,17 +127,14 @@ void MetricsFlusher::setMetricCommon(opentelemetry::proto::metrics::v1::Metric& 
                                      opentelemetry::proto::metrics::v1::NumberDataPoint& data_point,
                                      int64_t snapshot_time_ns, const Stats::Metric& stat) const {
   data_point.set_time_unix_nano(snapshot_time_ns);
+  metric.set_name(use_tag_extracted_name_ ? stat.tagExtractedName() : stat.name());
 
-  if (!emit_labels_) {
-    metric.set_name(stat.name());
-    return;
-  }
-
-  metric.set_name(stat.tagExtractedName());
-  for (const auto& tag : stat.tags()) {
-    auto* attribute = data_point.add_attributes();
-    attribute->set_key(tag.name_);
-    attribute->mutable_value()->set_string_value(tag.value_);
+  if (emit_tags_as_attributes_) {
+    for (const auto& tag : stat.tags()) {
+      auto* attribute = data_point.add_attributes();
+      attribute->set_key(tag.name_);
+      attribute->mutable_value()->set_string_value(tag.value_);
+    }
   }
 }
 
@@ -146,17 +143,14 @@ void MetricsFlusher::setMetricCommon(
     opentelemetry::proto::metrics::v1::HistogramDataPoint& data_point, int64_t snapshot_time_ns,
     const Stats::Metric& stat) const {
   data_point.set_time_unix_nano(snapshot_time_ns);
+  metric.set_name(use_tag_extracted_name_ ? stat.tagExtractedName() : stat.name());
 
-  if (!emit_labels_) {
-    metric.set_name(stat.name());
-    return;
-  }
-
-  metric.set_name(stat.tagExtractedName());
-  for (const auto& tag : stat.tags()) {
-    auto* attribute = data_point.add_attributes();
-    attribute->set_key(tag.name_);
-    attribute->mutable_value()->set_string_value(tag.value_);
+  if (emit_tags_as_attributes_) {
+    for (const auto& tag : stat.tags()) {
+      auto* attribute = data_point.add_attributes();
+      attribute->set_key(tag.name_);
+      attribute->mutable_value()->set_string_value(tag.value_);
+    }
   }
 }
 

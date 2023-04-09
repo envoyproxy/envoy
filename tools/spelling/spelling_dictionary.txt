@@ -477,6 +477,8 @@ acks
 acls
 addr
 agg
+AggregationTemporality
+AGGREGATION_TEMPORALITY_DELTA
 alice
 alignas
 alignof
