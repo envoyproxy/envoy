@@ -31,7 +31,8 @@ OpenTelemetrySinkFactory::createStatsSink(const Protobuf::Message& config,
             server.clusterManager().grpcAsyncClientManager().getOrCreateRawAsyncClient(
                 grpc_service, server.scope(), false));
 
-    return std::make_unique<OpenTelemetryGrpcSink>(otlp_metrics_exporter,
+    return std::make_unique<OpenTelemetryGrpcSink>(
+        otlp_metrics_exporter,
         PROTOBUF_GET_WRAPPED_OR_DEFAULT(sink_config, report_counters_as_deltas, false),
         PROTOBUF_GET_WRAPPED_OR_DEFAULT(sink_config, report_histograms_as_deltas, false),
         PROTOBUF_GET_WRAPPED_OR_DEFAULT(sink_config, emit_tags_as_labels, true));

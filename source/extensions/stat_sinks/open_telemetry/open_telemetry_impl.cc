@@ -123,10 +123,9 @@ void MetricsFlusher::flushHistogram(opentelemetry::proto::metrics::v1::Metric& m
   }
 }
 
-void MetricsFlusher::setMetricCommon(
-    opentelemetry::proto::metrics::v1::Metric& metric,
-    opentelemetry::proto::metrics::v1::NumberDataPoint& data_point, int64_t snapshot_time_ns,
-    const Stats::Metric& stat) const {
+void MetricsFlusher::setMetricCommon(opentelemetry::proto::metrics::v1::Metric& metric,
+                                     opentelemetry::proto::metrics::v1::NumberDataPoint& data_point,
+                                     int64_t snapshot_time_ns, const Stats::Metric& stat) const {
   data_point.set_time_unix_nano(snapshot_time_ns);
 
   if (!emit_labels_) {
