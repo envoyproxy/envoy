@@ -71,9 +71,8 @@
 namespace Envoy {
 namespace Upstream {
 
-using ConstCommonLbConfigSharedPoolSharedPtr =
-    std::shared_ptr<SharedPool::ObjectSharedPool<const envoy::config::cluster::v3::Cluster::CommonLbConfig,
-                                                 MessageUtil, MessageUtil>>;
+using ConstCommonLbConfigSharedPoolSharedPtr = std::shared_ptr<SharedPool::ObjectSharedPool<
+    const envoy::config::cluster::v3::Cluster::CommonLbConfig, MessageUtil, MessageUtil>>;
 
 /**
  * An implementation of UpstreamLocalAddressSelector.

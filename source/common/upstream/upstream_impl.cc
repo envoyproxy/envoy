@@ -1070,12 +1070,17 @@ ClusterInfoImpl::ClusterInfoImpl(
           std::make_unique<FactoryContextImpl>(*stats_scope_, runtime, factory_context)),
       upstream_context_(server_context, init_manager, *stats_scope_),
       common_lb_config_(
-        ((factory_context.singletonManager()).getTyped<SharedPool::ObjectSharedPool<const envoy::config::cluster::v3::Cluster::CommonLbConfig,
-                                                       MessageUtil, MessageUtil>>(
-      SINGLETON_MANAGER_REGISTERED_NAME(const_common_lb_config_shared_pool), [&factory_context] {
-        return std::make_shared<SharedPool::ObjectSharedPool<
-            const envoy::config::cluster::v3::Cluster::CommonLbConfig, MessageUtil, MessageUtil>>(factory_context.mainThreadDispatcher());
-      }))->getObject(config.common_lb_config())),
+          ((factory_context.singletonManager())
+               .getTyped<SharedPool::ObjectSharedPool<
+                   const envoy::config::cluster::v3::Cluster::CommonLbConfig, MessageUtil,
+                   MessageUtil>>(
+                   SINGLETON_MANAGER_REGISTERED_NAME(const_common_lb_config_shared_pool),
+                   [&factory_context] {
+                     return std::make_shared<SharedPool::ObjectSharedPool<
+                         const envoy::config::cluster::v3::Cluster::CommonLbConfig, MessageUtil,
+                         MessageUtil>>(factory_context.mainThreadDispatcher());
+                   }))
+              ->getObject(config.common_lb_config())),
       per_connection_buffer_limit_bytes_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, per_connection_buffer_limit_bytes, 1024 * 1024)),
       max_response_headers_count_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
