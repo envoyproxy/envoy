@@ -13,12 +13,10 @@ namespace Golang {
 /**
  * All golang filter stats. @see stats_macros.h
  */
-#define ALL_GOLANG_FILTER_STATS(COUNTER, GAUGE, HISTOGRAM)                                         \
-  COUNTER(panic_error)                                                         \
-
+#define ALL_GOLANG_FILTER_STATS(COUNTER, GAUGE, HISTOGRAM) COUNTER(panic_error)
 
 /**
- * Struct definition for all thrift proxy stats. @see stats_macros.h
+ * Struct definition for all golang proxy stats. @see stats_macros.h
  */
 struct GolangFilterStats {
   ALL_GOLANG_FILTER_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT, GENERATE_HISTOGRAM_STRUCT)

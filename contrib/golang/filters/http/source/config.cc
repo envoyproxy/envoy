@@ -30,7 +30,8 @@ Http::FilterFactoryCb GolangFilterConfig::createFilterFactoryFromProtoTyped(
   }
 
   auto dso_lib = Dso::DsoManager<Dso::HttpFilterDsoImpl>::getDsoByID(proto_config.library_id());
-  FilterConfigSharedPtr config = std::make_shared<FilterConfig>(proto_config, dso_lib, fmt::format("{}golang.", stats_prefix), context);
+  FilterConfigSharedPtr config = std::make_shared<FilterConfig>(
+      proto_config, dso_lib, fmt::format("{}golang.", stats_prefix), context);
 
   return [config, dso_lib](Http::FilterChainFactoryCallbacks& callbacks) {
     auto filter = std::make_shared<Filter>(config, dso_lib);
