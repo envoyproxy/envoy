@@ -1680,10 +1680,10 @@ TEST_F(HttpConnectionManagerConfigTest,
     )EOF";
 
     EXPECT_THROW_WITH_MESSAGE(
-        HttpConnectionManagerConfig config(
-            parseHttpConnectionManagerFromYaml(yaml_string), context_, date_provider_,
-            route_config_provider_manager_, scoped_routes_config_provider_manager_,
-            tracer_manager_, filter_config_provider_manager_),
+        HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string),
+                                           context_, date_provider_, route_config_provider_manager_,
+                                           scoped_routes_config_provider_manager_, tracer_manager_,
+                                           filter_config_provider_manager_),
         EnvoyException,
         "Only one of flush_access_log_on_new_request from HttpConnectionManager or"
         "flush_access_log_on_new_request from HcmAccessLogOptions can be specified.");
@@ -1790,10 +1790,10 @@ TEST_F(HttpConnectionManagerConfigTest, DEPRECATED_FEATURE_TEST(DeprecatedAccess
     )EOF";
 
     EXPECT_THROW_WITH_MESSAGE(
-        HttpConnectionManagerConfig config(
-            parseHttpConnectionManagerFromYaml(yaml_string), context_, date_provider_,
-            route_config_provider_manager_, scoped_routes_config_provider_manager_,
-            tracer_manager_, filter_config_provider_manager_),
+        HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string),
+                                           context_, date_provider_, route_config_provider_manager_,
+                                           scoped_routes_config_provider_manager_, tracer_manager_,
+                                           filter_config_provider_manager_),
         EnvoyException,
         "Only one of access_log_flush_interval from HttpConnectionManager or"
         "access_log_flush_interval from HcmAccessLogOptions can be specified.");
