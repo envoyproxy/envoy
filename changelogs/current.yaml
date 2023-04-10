@@ -390,7 +390,7 @@ new_features:
   change: |
     added new configuration field :ref:`key_formatter
     <envoy_v3_api_field_extensions.filters.network.redis_proxy.v3.RedisProxy.PrefixRoutes.Route.key_formatter>` to format redis key.
-    The field supports using `%KEY%` as a formatter command for substituting the redis key as part of the substitution formatter expression.
+    The field supports using %KEY% as a formatter command for substituting the redis key as part of the substitution formatter expression.
 deprecated:
 - area: ext_authz
   change: |
