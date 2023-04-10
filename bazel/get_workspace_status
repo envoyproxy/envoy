@@ -33,11 +33,20 @@ git_rev=$(git rev-parse HEAD) || exit 1
 echo "BUILD_SCM_REVISION ${git_rev}"
 echo "STABLE_BUILD_SCM_REVISION ${git_rev}"
 
-# Check whether there are any uncommitted changes
-tree_status="Clean"
-git diff-index --quiet HEAD -- || {
-    tree_status="Modified"
-}
+# If BAZEL_VOLATILE_DIRTY is set then stamped builds will rebuild uncached when
+# either a tracked file changes or an untracked file is added or removed.
+if [[ -n "$BAZEL_VOLATILE_DIRTY" ]]; then
+    porcelain_status="$(git status --porcelain | sha256sum)"
+    tracked_status="$(git ls-files -s | sha256sum)"
+    tree_status="$(echo "${porcelain_status}:${tracked_status}" | sha256sum | head -c 40)"
+else
+    # Check whether there are any uncommitted changes
+    tree_status="Clean"
+    git diff-index --quiet HEAD -- || {
+        tree_status="Modified"
+    }
+fi
+
 echo "BUILD_SCM_STATUS ${tree_status}"
 echo "STABLE_BUILD_SCM_STATUS ${tree_status}"
 
@@ -48,5 +57,3 @@ git_remote=$(git remote get-url origin)
 if [[ -n "$git_remote" ]]; then
     echo "BUILD_SCM_REMOTE ${git_remote}"
 fi
-
-

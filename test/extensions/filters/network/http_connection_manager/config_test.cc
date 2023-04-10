@@ -674,7 +674,7 @@ TEST_F(HttpConnectionManagerConfigTest, OverallSampling) {
   }
 
   EXPECT_LE(800, sampled_count);
-  EXPECT_GE(1100, sampled_count);
+  EXPECT_GE(1200, sampled_count);
 }
 
 TEST_F(HttpConnectionManagerConfigTest, UnixSocketInternalAddress) {
