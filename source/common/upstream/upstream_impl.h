@@ -30,6 +30,7 @@
 #include "envoy/secret/secret_manager.h"
 #include "envoy/server/filter_config.h"
 #include "envoy/server/transport_socket_config.h"
+#include "envoy/singleton/manager.h"
 #include "envoy/ssl/context_manager.h"
 #include "envoy/stats/scope.h"
 #include "envoy/thread_local/thread_local.h"
@@ -69,6 +70,10 @@
 
 namespace Envoy {
 namespace Upstream {
+
+using ConstCommonLbConfigSharedPoolSharedPtr =
+    std::shared_ptr<SharedPool::ObjectSharedPool<const envoy::config::cluster::v3::Cluster::CommonLbConfig,
+                                                 MessageUtil, MessageUtil>>;
 
 /**
  * An implementation of UpstreamLocalAddressSelector.
@@ -794,7 +799,7 @@ public:
   }
   TypedLoadBalancerFactory* loadBalancerFactory() const override { return load_balancer_factory_; }
   const envoy::config::cluster::v3::Cluster::CommonLbConfig& lbConfig() const override {
-    return common_lb_config_;
+    return *common_lb_config_;
   }
   std::chrono::milliseconds connectTimeout() const override { return connect_timeout_; }
 
@@ -1055,7 +1060,6 @@ private:
   std::unique_ptr<ClusterTypedMetadata> typed_metadata_;
   ProtobufTypes::MessagePtr load_balancing_policy_;
   TypedLoadBalancerFactory* load_balancer_factory_ = nullptr;
-  const envoy::config::cluster::v3::Cluster::CommonLbConfig common_lb_config_;
   absl::optional<std::string> eds_service_name_;
   std::unique_ptr<const envoy::config::cluster::v3::Cluster::CustomClusterType> cluster_type_;
   const std::unique_ptr<Server::Configuration::CommonFactoryContext> factory_context_;
@@ -1065,6 +1069,7 @@ private:
   mutable Http::Http2::CodecStats::AtomicPtr http2_codec_stats_;
   mutable Http::Http3::CodecStats::AtomicPtr http3_codec_stats_;
   UpstreamHttpFactoryContextImpl upstream_context_;
+  std::shared_ptr<const envoy::config::cluster::v3::Cluster::CommonLbConfig> common_lb_config_;
 
   // Keep small values like bools and enums at the end of the class to reduce
   // overhead via alignment

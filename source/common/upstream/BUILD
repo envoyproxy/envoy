@@ -470,6 +470,7 @@ envoy_cc_library(
         "//source/common/protobuf:utility_lib",
         "//source/common/runtime:runtime_lib",
         "//source/server:transport_socket_config_lib",
+        "//source/common/shared_pool:shared_pool_lib",
     ],
 )
 
