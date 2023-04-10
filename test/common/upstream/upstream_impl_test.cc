@@ -4396,7 +4396,8 @@ TEST_F(ClusterInfoImplTest, UseDownstreamHttpProtocolWithDowngrade) {
 
   auto cluster = makeCluster(yaml);
 
-  EXPECT_EQ(Http::Protocol::Http10,
+  // use HTTP11 since HTTP10 upstream is not supported yet.
+  EXPECT_EQ(Http::Protocol::Http11,
             cluster->info()->upstreamHttpProtocol({Http::Protocol::Http10})[0]);
   EXPECT_EQ(Http::Protocol::Http11,
             cluster->info()->upstreamHttpProtocol({Http::Protocol::Http11})[0]);
@@ -4682,7 +4683,8 @@ TEST_F(ClusterInfoImplTest, UseDownstreamHttpProtocolWithoutDowngrade) {
                                                        Network::Address::IpVersion::v4);
   auto cluster = makeCluster(yaml);
 
-  EXPECT_EQ(Http::Protocol::Http10,
+  // use HTTP11 since HTTP10 upstream is not supported yet.
+  EXPECT_EQ(Http::Protocol::Http11,
             cluster->info()->upstreamHttpProtocol({Http::Protocol::Http10})[0]);
   EXPECT_EQ(Http::Protocol::Http11,
             cluster->info()->upstreamHttpProtocol({Http::Protocol::Http11})[0]);

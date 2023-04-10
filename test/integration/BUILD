@@ -307,7 +307,6 @@ envoy_cc_test_binary(
     external_deps = [
         "abseil_symbolize",
     ],
-    stamped = True,
     deps = [
         "//source/exe:envoy_main_common_with_core_extensions_lib",
         "//source/exe:platform_impl_lib",
@@ -946,6 +945,7 @@ envoy_cc_test_library(
         "base_integration_test.h",
     ],
     deps = [
+        "//source/extensions/config_subscription/filesystem:filesystem_subscription_lib",
         "//source/server:proto_descriptors_lib",
         "//source/extensions/request_id/uuid:config",
         ":autonomous_upstream_lib",
