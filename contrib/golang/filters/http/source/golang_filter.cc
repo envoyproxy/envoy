@@ -993,7 +993,6 @@ void Filter::setDynamicMetadataInternal(ProcessorState& state, std::string filte
   state.streamInfo().setDynamicMetadata(filter_name, value);
 }
 
-
 /* ConfigId */
 
 uint64_t Filter::getMergedConfigId(ProcessorState& state) {
