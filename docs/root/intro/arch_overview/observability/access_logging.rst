@@ -20,7 +20,7 @@ filter access logs.
 If access log is enabled, then by default it will be reported to the configured sinks at the end of a TCP
 connection, or HTTP stream. It is possible to extend this behavior and report access logs periodically or at the
 start of a TCP connection or HTTP stream. Reporting access logs right after upstream connection establishment
-does not depend on periodic reporting, and the other way around.
+or new incoming HTTP request does not depend on periodic reporting, and the other way around.
 
 .. _arch_overview_access_log_start:
 
@@ -43,8 +43,9 @@ Note: Some information such as upstream host will not be available yet.
 HTTP Router Filter
 ******************
 
-For Router Filter, is is possible to enable an upstream access log when a new HTTP request is received, and after successfully establishing a connection
-with the upstream by using :ref:`flush upstream log on upstream stream <envoy_v3_api_field_extensions.filters.http.router.v3.Router.UpstreamAccessLogOptions.flush_upstream_log_on_upstream_stream>`
+For Router Filter, is is possible to enable an upstream access log when a new upstream stream is associated with the downstream stream,
+and after successfully establishing a connection with the upstream by using
+:ref:`flush upstream log on upstream stream <envoy_v3_api_field_extensions.filters.http.router.v3.Router.UpstreamAccessLogOptions.flush_upstream_log_on_upstream_stream>`
 Note: In case that the HTTP request involvs retries, a start of request upstream access log will be recorded for each retry.
 
 .. _arch_overview_access_log_periodic:
@@ -57,7 +58,7 @@ TCP Proxy
 
 For TCP Proxy, it is possible to enable a prediodic access log by using
 :ref:`access log flush interval <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.access_log_flush_interval>`
-Note: The first interval count will start right after a new connection received by the TCP Proxy and before making an upstream request.
+Note: The first interval count will start right after a new connection received by the TCP Proxy and before making an upstream connection.
 
 HTTP Connection Manager
 ***********************
