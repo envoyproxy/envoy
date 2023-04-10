@@ -13,7 +13,6 @@ bool fuzzCreateEnvoy(const uint32_t exec) {
 }
 } // namespace
 
-using envoy::extensions::filters::http::ext_proc::v3::ProcessingMode;
 using envoy::service::ext_proc::v3::ProcessingRequest;
 using envoy::service::ext_proc::v3::ProcessingResponse;
 
