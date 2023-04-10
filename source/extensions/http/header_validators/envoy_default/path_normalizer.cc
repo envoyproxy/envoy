@@ -275,9 +275,9 @@ PathNormalizer::normalizePathUri(RequestHeaderMap& header_map) const {
 }
 
 void PathNormalizer::translateBackToForwardSlashes(std::string& path) const {
-  for (auto iter = path.begin(); iter != path.end(); ++iter) {
-    if (*iter == '\\') {
-      *iter = '/';
+  for (char& character : path) {
+    if (character == '\\') {
+      character = '/';
     }
   }
 }
