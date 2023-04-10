@@ -388,4 +388,56 @@ TEST_P(OverloadScaledTimerIntegrationTest, TlsHandshakeTimeout) {
   EXPECT_TRUE(connect_callbacks.closed());
 }
 
+class LoadShedPointIntegrationTest : public BaseOverloadIntegrationTest,
+                                     public HttpProtocolIntegrationTest {
+protected:
+  void initializeOverloadManager(const envoy::config::overload::v3::LoadShedPoint& config) {
+    setupOverloadManagerConfig(config);
+    config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      *bootstrap.mutable_overload_manager() = this->overload_manager_config_;
+    });
+    initialize();
+    updateResource(0);
+  }
+};
+
+INSTANTIATE_TEST_SUITE_P(Protocols, LoadShedPointIntegrationTest,
+                         testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams(
+                             {Http::CodecClient::Type::HTTP1, Http::CodecClient::Type::HTTP2},
+                             {FakeHttpConnection::Type::HTTP1})),
+                         HttpProtocolIntegrationTest::protocolTestParamsToString);
+
+TEST_P(LoadShedPointIntegrationTest, ListenerAcceptShedsLoad) {
+  autonomous_upstream_ = true;
+  initializeOverloadManager(
+      TestUtility::parseYaml<envoy::config::overload::v3::LoadShedPoint>(R"EOF(
+      name: "core.listener_accept"
+      triggers:
+        - name: "envoy.resource_monitors.testonly.fake_resource_monitor"
+          threshold:
+            value: 0.90
+    )EOF"));
+
+  // Put envoy in overloaded state and check that it rejects the new client connection.
+  updateResource(0.95);
+  test_server_->waitForGaugeEq("overload.core.listener_accept.scale_percent", 100);
+
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+
+  if (version_ == Network::Address::IpVersion::v4) {
+    test_server_->waitForCounterEq("listener.127.0.0.1_0.downstream_cx_overload_reject", 1);
+  } else {
+    test_server_->waitForCounterEq("listener.[__1]_0.downstream_cx_overload_reject", 1);
+  }
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
+
+  // Disable overload, we should allow connections.
+  updateResource(0.80);
+  test_server_->waitForGaugeEq("overload.core.listener_accept.scale_percent", 0);
+
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  ASSERT_TRUE(response->waitForEndStream());
+}
+
 } // namespace Envoy
