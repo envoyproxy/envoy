@@ -1679,11 +1679,14 @@ TEST_F(HttpConnectionManagerConfigTest,
       flush_access_log_on_new_request: true # deprecated field
     )EOF";
 
-    EXPECT_THROW(HttpConnectionManagerConfig config(
-                     parseHttpConnectionManagerFromYaml(yaml_string), context_, date_provider_,
-                     route_config_provider_manager_, scoped_routes_config_provider_manager_,
-                     tracer_manager_, filter_config_provider_manager_),
-                 EnvoyException);
+    EXPECT_THROW_WITH_MESSAGE(
+        HttpConnectionManagerConfig config(
+            parseHttpConnectionManagerFromYaml(yaml_string), context_, date_provider_,
+            route_config_provider_manager_, scoped_routes_config_provider_manager_,
+            tracer_manager_, filter_config_provider_manager_),
+        EnvoyException,
+        "Only one of flush_access_log_on_new_request from TcpProxy or"
+        "flush_access_log_on_new_request from TcpAccessLogOptions can be specified.");
   }
 }
 
@@ -1786,11 +1789,14 @@ TEST_F(HttpConnectionManagerConfigTest, DEPRECATED_FEATURE_TEST(DeprecatedAccess
       access_log_flush_interval: 1s # deprecated field
     )EOF";
 
-    EXPECT_THROW(HttpConnectionManagerConfig config(
-                     parseHttpConnectionManagerFromYaml(yaml_string), context_, date_provider_,
-                     route_config_provider_manager_, scoped_routes_config_provider_manager_,
-                     tracer_manager_, filter_config_provider_manager_),
-                 EnvoyException);
+    EXPECT_THROW_WITH_MESSAGE(
+        HttpConnectionManagerConfig config(
+            parseHttpConnectionManagerFromYaml(yaml_string), context_, date_provider_,
+            route_config_provider_manager_, scoped_routes_config_provider_manager_,
+            tracer_manager_, filter_config_provider_manager_),
+        EnvoyException,
+        "Only one of access_log_flush_interval from TcpProxy or"
+        "access_log_flush_interval from TcpAccessLogOptions can be specified.");
   }
 }
 

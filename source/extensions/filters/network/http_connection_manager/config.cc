@@ -552,13 +552,14 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
   if (config.has_access_log_options() &&
       config.access_log_options().has_access_log_flush_interval()) {
     if (config.has_access_log_flush_interval()) {
-      throw EnvoyException("Can't use deprecated field 'access_log_flush_interval' together with"
-                           "non-deprecated field HcmAccessLogOptions.access_log_flush_interval.");
+      throw EnvoyException(
+          "Only one of access_log_flush_interval from TcpProxy or"
+          "access_log_flush_interval from TcpAccessLogOptions can be specified.");
     }
 
     access_log_flush_interval_ = std::chrono::milliseconds(DurationUtil::durationToMilliseconds(
         config.access_log_options().access_log_flush_interval()));
-  } else if (config.has_access_log_flush_interval()) { // Deprecated field
+  } else if (config.has_access_log_flush_interval() /* deprecated field */) {
     access_log_flush_interval_ = std::chrono::milliseconds(
         DurationUtil::durationToMilliseconds(config.access_log_flush_interval()));
   }
@@ -736,12 +737,12 @@ const envoy::config::trace::v3::Tracing_Http* HttpConnectionManagerConfig::getPe
 bool HttpConnectionManagerConfig::getFlushAccessLogNewRequestConfig(
     const envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
         filter_config) {
-  if (filter_config.has_access_log_options() &&
-      filter_config.access_log_options().flush_access_log_on_new_request()) {
-    if (filter_config.flush_access_log_on_new_request() /* deprecated */) {
+  if (filter_config.has_access_log_options()) {
+    if (filter_config.access_log_options().flush_access_log_on_new_request() &&
+        filter_config.flush_access_log_on_new_request() /* deprecated */) {
       throw EnvoyException(
-          "Can't use deprecated field 'flush_access_log_on_new_request' together with"
-          "non-deprecated field HcmAccessLogOptions.flush_access_log_on_new_request.");
+          "Only one of flush_access_log_on_new_request from TcpProxy or"
+          "flush_access_log_on_new_request from TcpAccessLogOptions can be specified.");
     }
 
     return filter_config.access_log_options().flush_access_log_on_new_request();
