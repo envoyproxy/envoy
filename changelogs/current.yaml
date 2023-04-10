@@ -113,7 +113,7 @@ minor_behavior_changes:
 - area: uhv
   change: |
     Translate backslash to slash in the default header validator. This behavior can be reverted by setting runtime flag
-    ``envoy.reloadable_features.uhv_translate_backslash_to_slash`` to false, in which case requests with backslah in path 
+    ``envoy.reloadable_features.uhv_translate_backslash_to_slash`` to false, in which case requests with backslah in path
     are rejected.
 
 bug_fixes:
