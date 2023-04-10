@@ -386,7 +386,11 @@ new_features:
     added new configuration field :ref:`histogram_emit_mode
     <envoy_v3_api_field_config.metrics.v3.MetricsServiceConfig.histogram_emit_mode>` to configure which stats
     should be emitted for histograms.
-
+- area: redis_proxy
+  change: |
+    added new configuration field :ref:`key_formatter
+    <envoy_v3_api_field_extensions.filters.network.redis_proxy.v3.RedisProxy.PrefixRoutes.Route.key_formatter>` to format redis key.
+    The field supports using `%KEY%` as a formatter command for substituting the redis key as part of the substitution formatter expression.
 deprecated:
 - area: ext_authz
   change: |
