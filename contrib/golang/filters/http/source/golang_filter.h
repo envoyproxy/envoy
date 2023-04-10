@@ -190,8 +190,9 @@ private:
                               std::function<void(Http::ResponseHeaderMap& headers)> modify_headers,
                               Grpc::Status::GrpcStatus grpc_status, absl::string_view details);
 
-  void setDynamicMetadataInternal(ProcessorState& state, std::string filter_name, std::string key, const absl::string_view& bufStr);
-  
+  void setDynamicMetadataInternal(ProcessorState& state, std::string filter_name, std::string key,
+                                  const absl::string_view& bufStr);
+
   const FilterConfigSharedPtr config_;
   Dso::HttpFilterDsoPtr dynamic_lib_;
 

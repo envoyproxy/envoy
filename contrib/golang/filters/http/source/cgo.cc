@@ -163,12 +163,12 @@ CAPIStatus envoyGoFilterHttpGetIntegerValue(void* r, int id, void* value) {
 
 // Sotiris
 CAPIStatus envoyGoFilterHttpSetDynamicMetadata(void* r, void* name, void* key, void* buf) {
-    return envoyGoFilterHandlerWrapper(
+  return envoyGoFilterHandlerWrapper(
       r, [name, key, buf](std::shared_ptr<Filter>& filter) -> CAPIStatus {
-          auto nameStr = copyGoString(name);
-          auto keyStr = copyGoString(key);
-          auto bufStr = stringViewFromGoSlice(buf);
-          return filter->setDynamicMetadata(nameStr, keyStr, bufStr);
+        auto nameStr = copyGoString(name);
+        auto keyStr = copyGoString(key);
+        auto bufStr = stringViewFromGoSlice(buf);
+        return filter->setDynamicMetadata(nameStr, keyStr, bufStr);
       });
 }
 

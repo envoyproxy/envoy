@@ -944,8 +944,8 @@ CAPIStatus Filter::log(uint32_t level, absl::string_view message) {
   PANIC_DUE_TO_CORRUPT_ENUM;
 }
 
-
-CAPIStatus Filter::setDynamicMetadata(std::string filter_name, std::string key, absl::string_view bufStr) {
+CAPIStatus Filter::setDynamicMetadata(std::string filter_name, std::string key,
+                                      absl::string_view bufStr) {
   Thread::LockGuard lock(mutex_);
   if (has_destroyed_) {
     ENVOY_LOG(debug, "golang filter has been destroyed");
@@ -977,7 +977,7 @@ CAPIStatus Filter::setDynamicMetadata(std::string filter_name, std::string key, 
 
   // it's safe to do it here since we are in the safe envoy worker thread now.
   setDynamicMetadataInternal(state, filter_name, key, bufStr);
-  return  CAPIStatus::CAPIOK;
+  return CAPIStatus::CAPIOK;
 }
 
 void Filter::setDynamicMetadataInternal(ProcessorState& state, std::string filter_name,

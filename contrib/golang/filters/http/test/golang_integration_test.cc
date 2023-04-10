@@ -1,11 +1,10 @@
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 
-
 #include "test/config/v2_link_hacks.h"
 #include "test/extensions/filters/http/common/empty_http_filter_config.h"
 #include "test/integration/http_integration.h"
-#include "test/test_common/utility.h"
 #include "test/test_common/registry.h"
+#include "test/test_common/utility.h"
 
 #include "contrib/golang/filters/http/source/golang_filter.h"
 #include "gtest/gtest.h"
@@ -20,7 +19,6 @@ absl::string_view getHeader(const Http::HeaderMap& headers, absl::string_view ke
   }
   return values[0]->value().getStringView();
 }
-
 
 class RetrieveDynamicMetadataFilter : public Http::StreamDecoderFilter {
 public:
@@ -54,22 +52,22 @@ public:
 class RetrieveDynamicMetadataFilterConfig
     : public Extensions::HttpFilters::Common::EmptyHttpFilterConfig {
 public:
-  RetrieveDynamicMetadataFilterConfig() : Extensions::HttpFilters::Common::EmptyHttpFilterConfig("validate-dynamic-metadata") {}
+  RetrieveDynamicMetadataFilterConfig()
+      : Extensions::HttpFilters::Common::EmptyHttpFilterConfig("validate-dynamic-metadata") {}
 
-  Http::FilterFactoryCb
-  createFilter(const std::string&,
-               Server::Configuration::FactoryContext&) override {
-    return
-        [](Http::FilterChainFactoryCallbacks& callbacks) -> void {
-          callbacks.addStreamDecoderFilter(std::make_shared<::Envoy::RetrieveDynamicMetadataFilter>());
-        };
+  Http::FilterFactoryCb createFilter(const std::string&,
+                                     Server::Configuration::FactoryContext&) override {
+    return [](Http::FilterChainFactoryCallbacks& callbacks) -> void {
+      callbacks.addStreamDecoderFilter(std::make_shared<::Envoy::RetrieveDynamicMetadataFilter>());
+    };
   }
 };
 
 class GolangIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
                               public HttpIntegrationTest {
 public:
-  GolangIntegrationTest() : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam()), registration_(factory_) {}
+  GolangIntegrationTest()
+      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam()), registration_(factory_) {}
 
   RetrieveDynamicMetadataFilterConfig factory_;
   Registry::InjectFactory<Server::Configuration::NamedHttpFilterConfigFactory> registration_;
@@ -106,7 +104,8 @@ typed_config:
     config_helper_.skipPortUsageValidation();
   }
 
-  void initializeBasicFilter(const std::string& so_id, const std::string& domain = "*", bool with_injected_metadata_validator = false) {
+  void initializeBasicFilter(const std::string& so_id, const std::string& domain = "*",
+                             bool with_injected_metadata_validator = false) {
     const auto yaml_fmt = R"EOF(
 name: golang
 typed_config:
@@ -489,10 +488,8 @@ typed_config:
 
     codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
     Http::TestRequestHeaderMapImpl request_headers{
-        {":method", "POST"},
-        {":path", path},
-        {":scheme", "http"},
-        {":authority", "test.com"},
+        {":method", "POST"},        {":path", path},
+        {":scheme", "http"},        {":authority", "test.com"},
         {"x-set-metadata", "true"},
     };
 
@@ -500,7 +497,7 @@ typed_config:
     Http::RequestEncoder& request_encoder = encoder_decoder.first;
     auto response = std::move(encoder_decoder.second);
     codec_client_->sendData(request_encoder, "helloworld", true);
-    
+
     waitForNextUpstreamRequest();
     // check no dynamic metadata
     EXPECT_EQ(true,
