@@ -91,7 +91,7 @@ func createRequest(r *C.httpRequest) *httpRequest {
 	}
 
 	configId := uint64(r.configId)
-	filterFactory := getOrCreateHttpFilterFactory(C.GoStringN(r.plugin_name.data, C.int(r.plugin_name.len)), configId)
+	filterFactory := getOrCreateHttpFilterFactory(req.pluginName(), configId)
 	f := filterFactory(req)
 	req.httpFilter = f
 

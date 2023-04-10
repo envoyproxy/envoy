@@ -38,10 +38,7 @@ type HttpCAPI interface {
 	HttpGetStringValue(r unsafe.Pointer, id int) (string, bool)
 	HttpGetIntegerValue(r unsafe.Pointer, id int) (uint64, bool)
 
-	// HttpLog writes message to the registered logger during request processes.
-	// we are also consider adding MiscLog to write the misc logger during non-request
-	// processes in the future.
-	HttpLog(r unsafe.Pointer, level LogType, message string)
+	HttpLog(level LogType, message string)
 
 	HttpFinalize(r unsafe.Pointer, reason int)
 }

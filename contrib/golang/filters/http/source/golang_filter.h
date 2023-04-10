@@ -164,7 +164,6 @@ public:
   CAPIStatus setTrailer(absl::string_view key, absl::string_view value);
   CAPIStatus getStringValue(int id, GoString* value_str);
   CAPIStatus getIntegerValue(int id, uint64_t* value);
-  CAPIStatus log(uint32_t level, absl::string_view message);
 
 private:
   ProcessorState& getProcessorState();
@@ -227,6 +226,13 @@ struct httpRequestInternal : httpRequest {
   std::string strValue;
   httpRequestInternal(std::weak_ptr<Filter> f) { filter_ = f; }
   std::weak_ptr<Filter> weakFilter() { return filter_; }
+};
+
+class FilterLogger : Logger::Loggable<Logger::Id::http> {
+public:
+  FilterLogger() {}
+
+  void log(uint32_t level, absl::string_view message);
 };
 
 } // namespace Golang

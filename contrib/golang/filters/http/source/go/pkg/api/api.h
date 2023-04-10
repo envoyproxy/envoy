@@ -59,7 +59,7 @@ CAPIStatus envoyGoFilterHttpSetTrailer(void* r, void* key, void* value);
 CAPIStatus envoyGoFilterHttpGetStringValue(void* r, int id, void* value);
 CAPIStatus envoyGoFilterHttpGetIntegerValue(void* r, int id, void* value);
 
-CAPIStatus envoyGoFilterHttpLog(void* r, uint32_t level, void* message);
+void envoyGoFilterHttpLog(uint32_t level, void* message);
 
 void envoyGoFilterHttpFinalize(void* r, int reason);
 
