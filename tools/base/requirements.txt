@@ -35,9 +35,9 @@ aio-api-nist==0.0.3 \
     --hash=sha256:3465d25e4ffdec35d824960e6d68fbff070f823fde55a40fa4eb53a7fd7d18ca \
     --hash=sha256:5ecf9f32e19ad8804bba1358dde93d1008029335009541dadc69c3823241b382
     # via envoy-dependency-check
-aio-core==0.9.1 \
-    --hash=sha256:9b1b48f1808804d48260515f17d943864e3a4368a733314dda4685e8fd888945 \
-    --hash=sha256:c679a571057fc3c26f3b499dbbb492ac95876401030336e22cc7040f2ccab832
+aio-core==0.10.0 \
+    --hash=sha256:57e2d8dd8ee8779b0ebc2e2447492c0db8d7ed782e9ad1bb2662593740751acb \
+    --hash=sha256:cb00d530b1e16228b36174c23d446c66e3f2a50ef91aa527c0e58a654316f635
     # via
     #   aio-api-bazel
     #   aio-api-github
@@ -428,9 +428,9 @@ envoy-base-utils==0.4.2 \
     #   envoy-docs-sphinx-runner
     #   envoy-github-release
     #   envoy-gpg-sign
-envoy-code-check==0.4.0 \
-    --hash=sha256:2d8bce395da31f9f5cdefc2d3c18142d02a11117008878adfa81390fe0a5e063 \
-    --hash=sha256:f17f78de8f2601e7f4400cd328c22b104fd6761b9803427546d295c6f51f5a92
+envoy-code-check==0.4.1 \
+    --hash=sha256:3b4d3c9f8f80d47edd0bedd4df2bc7f8a90fcb37cf4142f4882703f4141a1b01 \
+    --hash=sha256:a3806deee1565d80488e3c7758e54b9a19025fbe4e91378969f6be342f083eda
     # via -r requirements.in
 envoy-dependency-check==0.1.7 \
     --hash=sha256:27906f882bd3e22a9a8dc90cc6e178f702b06d30d7a39aa70d264594cd5df5ee \
@@ -834,7 +834,6 @@ orjson==3.8.9 \
     --hash=sha256:f0e19801836cf1b30f333d475b05d79051b8ae8639a8e2422fb5f64e82676ae7
     # via
     #   -r requirements.in
-    #   aio-core
     #   envoy-base-utils
 packaging==23.0 \
     --hash=sha256:714ac14496c3e68c99c29b00845f7a2b85f3bb6f1078fd9f72fd20f0570002b2 \
@@ -928,6 +927,7 @@ pytz==2022.7.1 \
     --hash=sha256:01a0681c4b9684a28304615eba55d1ab31ae00bf68ec157ec3708a8182dbbcd0 \
     --hash=sha256:78f4f37d8198e0627c5f1143240bb0206b8691d8d7ac6d78fee88b78733f8c4a
     # via
+    #   aio-core
     #   babel
     #   envoy-base-utils
 pyyaml==6.0 \
@@ -973,6 +973,7 @@ pyyaml==6.0 \
     --hash=sha256:f84fbc98b019fef2ee9a1cb3ce93e3187a6df0b2538a651bfb890254ba9f90b5
     # via
     #   -r requirements.in
+    #   aio-core
     #   envoy-base-utils
     #   yamllint
 requests==2.28.2 \
@@ -1059,10 +1060,6 @@ trycast==1.0.0 \
     # via
     #   aio-core
     #   envoy-base-utils
-types-orjson==3.6.2 \
-    --hash=sha256:22ee9a79236b6b0bfb35a0684eded62ad930a88a56797fa3c449b026cf7dbfe4 \
-    --hash=sha256:cf9afcc79a86325c7aff251790338109ed6f6b1bab09d2d4262dd18c85a3c638
-    # via aio-core
 typing-extensions==4.4.0 \
     --hash=sha256:1511434bb92bf8dd198c12b1cc812e800d4181cfcb867674e0f8279cc93087aa \
     --hash=sha256:16fa4864408f655d35ec496218b85f79b3437c829e93320c7c9215ccfd92489e
