@@ -55,6 +55,16 @@ public:
 
 using AccessLogManagerPtr = std::unique_ptr<AccessLogManager>;
 
+struct AccessLogTypeStringValues {
+  const std::string Type1 = "Type1";
+};
+
+using AccessLogTypeString = ConstSingleton<AccessLogTypeStringValues>;
+
+enum class AccessLogType {
+  Type1
+};
+
 /**
  * Interface for access log filters.
  */
@@ -87,12 +97,14 @@ public:
    * @param response_headers supplies response headers.
    * @param response_trailers supplies response trailers.
    * @param stream_info supplies additional information about the request not
+   * @param access_log_type supplies the access log type.
    * contained in the request headers.
    */
   virtual void log(const Http::RequestHeaderMap* request_headers,
                    const Http::ResponseHeaderMap* response_headers,
                    const Http::ResponseTrailerMap* response_trailers,
-                   const StreamInfo::StreamInfo& stream_info) PURE;
+                   const StreamInfo::StreamInfo& stream_info,
+                   AccessLogType access_log_type) PURE;
 };
 
 using InstanceSharedPtr = std::shared_ptr<Instance>;
