@@ -367,8 +367,9 @@ message HttpConnectionManager {
     google.protobuf.Duration access_log_flush_interval = 1
         [(validate.rules).duration = {gte {nanos: 1000000}}];
 
-    // If set to true, HCM will flush an access log once when a new HTTP request is received, after request
+    // If set to true, HCM will flush an access log when a new HTTP request is received, after request
     // headers have been evaluated, before iterating through the HTTP filter chain.
+    // This log record, if enabled, does not depend on periodic log records or request completion log.
     // Details related to upstream cluster, such as upstream host, will not be available for this log.
     bool flush_access_log_on_new_request = 2;
   }
