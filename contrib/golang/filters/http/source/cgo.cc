@@ -37,8 +37,7 @@ absl::string_view stringViewFromGoSlice(void* slice) {
     return "";
   }
   auto goSlice = reinterpret_cast<GoSlice*>(slice);
-  return absl::string_view(static_cast<const char*>(goSlice->data),
-                           goSlice->len); // NOLINT(modernize-return-braced-init-list)
+  return {static_cast<const char*>(goSlice->data), static_cast<size_t>(goSlice->len)};
 }
 
 #ifdef __cplusplus
@@ -162,14 +161,13 @@ CAPIStatus envoyGoFilterHttpGetIntegerValue(void* r, int id, void* value) {
   });
 }
 
-// Sotiris
 CAPIStatus envoyGoFilterHttpSetDynamicMetadata(void* r, void* name, void* key, void* buf) {
   return envoyGoFilterHandlerWrapper(
       r, [name, key, buf](std::shared_ptr<Filter>& filter) -> CAPIStatus {
-        auto nameStr = copyGoString(name);
-        auto keyStr = copyGoString(key);
-        auto bufStr = stringViewFromGoSlice(buf);
-        return filter->setDynamicMetadata(nameStr, keyStr, bufStr);
+        auto name_str = copyGoString(name);
+        auto key_str = copyGoString(key);
+        auto buf_str = stringViewFromGoSlice(buf);
+        return filter->setDynamicMetadata(name_str, key_str, buf_str);
       });
 }
 

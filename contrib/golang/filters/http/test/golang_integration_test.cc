@@ -20,14 +20,19 @@ absl::string_view getHeader(const Http::HeaderMap& headers, absl::string_view ke
   return values[0]->value().getStringView();
 }
 
-class RetrieveDynamicMetadataFilter : public Http::StreamDecoderFilter {
+class RetrieveDynamicMetadataFilter : public Http::StreamEncoderFilter {
 public:
-  // Http::StreamDecoderFilter
-  Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap&, bool) override {
+  // Http::StreamEncoderFilter
+  Http::Filter1xxHeadersStatus encode1xxHeaders(Http::ResponseHeaderMap&) override {
+    return Http::Filter1xxHeadersStatus::Continue;
+  }
+
+  Http::FilterHeadersStatus encodeHeaders(Http::ResponseHeaderMap&, bool) override {
     return Http::FilterHeadersStatus::Continue;
   }
 
-  Http::FilterDataStatus decodeData(Buffer::Instance&, bool) override {
+  Http::FilterDataStatus encodeData(Buffer::Instance&, bool) override {
+    EXPECT_EQ("foo", "bar");
     const auto& metadata = decoder_callbacks_->streamInfo().dynamicMetadata().filter_metadata();
     const auto& filter_it = metadata.find("filter.go");
     ASSERT(filter_it != metadata.end());
@@ -37,16 +42,20 @@ public:
     return Http::FilterDataStatus::Continue;
   }
 
-  Http::FilterTrailersStatus decodeTrailers(Http::RequestTrailerMap&) override {
+  Http::FilterTrailersStatus encodeTrailers(Http::ResponseTrailerMap&) override {
     return Http::FilterTrailersStatus::Continue;
   }
 
-  void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) override {
+  Http::FilterMetadataStatus encodeMetadata(Http::MetadataMap&) override {
+    return Http::FilterMetadataStatus::Continue;
+  }
+
+  void setEncoderFilterCallbacks(Http::StreamEncoderFilterCallbacks& callbacks) override {
     decoder_callbacks_ = &callbacks;
   }
 
   void onDestroy() override{};
-  Http::StreamDecoderFilterCallbacks* decoder_callbacks_;
+  Http::StreamEncoderFilterCallbacks* decoder_callbacks_;
 };
 
 class RetrieveDynamicMetadataFilterConfig
@@ -58,7 +67,7 @@ public:
   Http::FilterFactoryCb createFilter(const std::string&,
                                      Server::Configuration::FactoryContext&) override {
     return [](Http::FilterChainFactoryCallbacks& callbacks) -> void {
-      callbacks.addStreamDecoderFilter(std::make_shared<::Envoy::RetrieveDynamicMetadataFilter>());
+      callbacks.addStreamEncoderFilter(std::make_shared<::Envoy::RetrieveDynamicMetadataFilter>());
     };
   }
 };
@@ -740,12 +749,12 @@ TEST_P(GolangIntegrationTest, PanicRecover_BadAPI) {
 
 TEST_P(GolangIntegrationTest, DynamicMetadata) { testDynamicMetadata("/test?dymeta=1"); }
 
-// TEST_P(GolangIntegrationTest, DynamicMetadata_Async) {
-//   testDynamicMetadata("/test?dymeta=1&async=1");
-// }
+TEST_P(GolangIntegrationTest, DynamicMetadata_Async) {
+  testDynamicMetadata("/test?dymeta=1&async=1");
+}
 
-// TEST_P(GolangIntegrationTest, DynamicMetadata_Async_Sleep) {
-//   testDynamicMetadata("/test?dymeta=1&async=1&sleep=1");
-// }
+TEST_P(GolangIntegrationTest, DynamicMetadata_Async_Sleep) {
+  testDynamicMetadata("/test?dymeta=1&async=1&sleep=1");
+}
 
 } // namespace Envoy
