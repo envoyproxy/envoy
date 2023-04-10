@@ -1,5 +1,6 @@
 
 parameters:
+## Build stages
 # NB: all stages _must_ depend on `env`
 - name: buildStageDeps
   displayName: "Build stage dependencies"
@@ -29,6 +30,12 @@ parameters:
   displayName: "Check concurrency"
   type: number
   default: 3
+
+## Build settings
+- name: cacheTestResults
+  displayName: "Cache test results"
+  type: boolean
+  default: true
 
 stages:
 - stage: env
@@ -450,6 +457,7 @@ stages:
         managedAgent: false
         ciTarget: bazel.release
         bazelBuildExtraOptions: "--sandbox_base=/tmp/sandbox_base"
+        cacheTestResults: ${{ parameters.cacheTestResults }}
 
   - job: released
     displayName: Complete
@@ -485,6 +493,7 @@ stages:
         rbe: false
         artifactSuffix: ".arm64"
         bazelBuildExtraOptions: "--sandbox_base=/tmp/sandbox_base"
+        cacheTestResults: ${{ parameters.cacheTestResults }}
 
   - job: released
     displayName: Complete
@@ -542,6 +551,7 @@ stages:
       parameters:
         ciTarget: $(CI_TARGET)
         envoyBuildFilterExample: $(ENVOY_FILTER_EXAMPLE)
+        cacheTestResults: ${{ parameters.cacheTestResults }}
 
   - job: coverage
     displayName: "Linux x64"
@@ -565,6 +575,7 @@ stages:
         rbe: false
         # /tmp/sandbox_base is a tmpfs in CI environment to optimize large I/O for coverage traces
         bazelBuildExtraOptions: "--define=no_debug_info=1 --linkopt=-Wl,-s --test_env=ENVOY_IP_TEST_VERSIONS=v4only --sandbox_base=/tmp/sandbox_base"
+        cacheTestResults: ${{ parameters.cacheTestResults }}
 
     - script: ci/run_envoy_docker.sh 'ci/upload_gcs_artifact.sh /source/generated/$(CI_TARGET) $(CI_TARGET)'
       displayName: "Upload $(CI_TARGET) Report to GCS"
