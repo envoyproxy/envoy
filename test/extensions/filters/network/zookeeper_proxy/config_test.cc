@@ -85,6 +85,37 @@ stat_prefix: test_prefix
   cb(connection);
 }
 
+TEST(ZookeeperFilterConfigTest, DuplicatedOpcodes) {
+  const std::string yaml = R"EOF(
+stat_prefix: test_prefix
+max_packet_bytes: 1048576
+latency_thresholds:
+  - opcode: Default
+    threshold: 150
+  - opcode: Default
+    threshold: 151
+  - opcode: Create
+    threshold: 152
+  - opcode: Create
+    threshold: 153
+  - opcode: Create
+    threshold: 154
+  - opcode: Create
+    threshold: 155
+  )EOF";
+
+  ZooKeeperProxyProtoConfig proto_config;
+  TestUtility::loadFromYamlAndValidate(yaml, proto_config);
+
+  testing::NiceMock<Server::Configuration::MockFactoryContext> context;
+  ZooKeeperConfigFactory factory;
+
+  Network::FilterFactoryCb cb = factory.createFilterFactoryFromProto(proto_config, context);
+  Network::MockConnection connection;
+  EXPECT_CALL(connection, addFilter(_));
+  cb(connection);
+}
+
 TEST(ZookeeperFilterConfigTest, FullConfig) {
   const std::string yaml = R"EOF(
 stat_prefix: test_prefix

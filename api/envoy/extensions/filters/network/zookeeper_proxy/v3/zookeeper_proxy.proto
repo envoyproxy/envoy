@@ -82,7 +82,12 @@ message LatencyThreshold {
     SetWatches2 = 26;
   }
 
+  // The ZooKeeper opcode defined in decoder.h. You can find them from the ZooKeeper source code:
+  //
+  // https://github.com/apache/zookeeper/blob/master/zookeeper-server/src/main/java/org/apache/zookeeper/ZooDefs.java
+  //
   Opcode opcode = 1 [(validate.rules).enum = {defined_only: true}];
 
+  // The latency threshold of each opcode in millisecond.
   uint32 threshold = 2 [(validate.rules).uint32 = {gt: 0}];
 }
