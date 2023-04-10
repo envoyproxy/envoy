@@ -208,7 +208,7 @@ updates:
     time: "09:00"
 
 - package-ecosystem: "gomod"
-  directory: "/contrib/golang"
+  directory: "/"
   schedule:
     interval: daily
     time: "09:00"
