@@ -37,7 +37,6 @@ namespace FileSystemHttpCache {
   STATNAME(miss)
 // TODO(ravenblack): Add other stats from DESIGN.md
 
-#define BEEP boop
 #define COUNTER_HELPER_(NAME)                                                                      \
   , NAME##_(                                                                                       \
         Envoy::Stats::Utility::counterFromStatNames(scope, {prefix_, stat_names.NAME##_}, tags_))
