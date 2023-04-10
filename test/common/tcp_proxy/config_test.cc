@@ -104,8 +104,11 @@ TEST(ConfigTest, DEPRECATED_FEATURE_TEST(DeprecatedFlushAccessLogOnConnected)) {
       flush_access_log_on_connected: true # deprecated field
     )EOF";
 
-    EXPECT_THROW(Config config_obj(constructConfigFromYaml(deprecated_yaml, factory_context)),
-                 EnvoyException);
+    EXPECT_THROW_WITH_MESSAGE(
+        Config config_obj(constructConfigFromYaml(deprecated_yaml, factory_context)),
+        EnvoyException,
+        "Only one of flush_access_log_on_connected from TcpProxy or"
+        "flush_access_log_on_connected from TcpAccessLogOptions can be specified.");
   }
 }
 
@@ -160,8 +163,11 @@ TEST(ConfigTest, DEPRECATED_FEATURE_TEST(DeprecatedAccessLogFlushInterval)) {
       access_log_flush_interval: 1s # deprecated field
     )EOF";
 
-    EXPECT_THROW(Config config_obj(constructConfigFromYaml(deprecated_yaml, factory_context)),
-                 EnvoyException);
+    EXPECT_THROW_WITH_MESSAGE(
+        Config config_obj(constructConfigFromYaml(deprecated_yaml, factory_context)),
+        EnvoyException,
+        "Only one of access_log_flush_interval from TcpProxy or"
+        "access_log_flush_interval from TcpAccessLogOptions can be specified.");
   }
 }
 
