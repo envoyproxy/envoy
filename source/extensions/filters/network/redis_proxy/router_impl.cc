@@ -5,6 +5,7 @@
 
 #include "source/common/formatter/substitution_formatter.h"
 #include "source/common/http/header_map_impl.h"
+#include "absl/strings/str_replace.h"
 
 #include "iostream"
 
@@ -47,7 +48,7 @@ Prefix::Prefix(
     const envoy::extensions::filters::network::redis_proxy::v3::RedisProxy::PrefixRoutes::Route
         route,
     Upstreams& upstreams, Runtime::Loader& runtime)
-    : prefix_(route.prefix()), key_prefix_(route.key_prefix_formatter()),
+    : prefix_(route.prefix()), key_formatter_(route.key_formatter()),
       remove_prefix_(route.remove_prefix()), upstream_(upstreams.at(route.cluster())) {
   for (auto const& mirror_policy : route.request_mirror_policy()) {
     mirror_policies_.emplace_back(std::make_shared<MirrorPolicyImpl>(
@@ -91,16 +92,28 @@ RouteSharedPtr PrefixRoutes::upstreamPool(std::string& key) {
     if (value->removePrefix()) {
       key.erase(0, value->prefix().length());
     }
-    if (!value->keyPrefix().empty()) {
-      auto providers = Formatter::SubstitutionFormatParser::parse(value->keyPrefix());
-
-      auto formatted_key_prefix =
-          providers[0]->formatValue(*Http::StaticEmptyHeaders::get().request_headers,
+    if (!value->keyFormatter().empty()) {
+      auto redis_key_formatter = value->keyFormatter();
+      // If key_formatter defines %KEY% command, then do a direct string replacement.
+      // ( TODO ) - Possibly define a RedisKeyFormatter as a SubstitutionFormatter
+      if(redis_key_formatter.find(redis_key_formatter_command_) != std::string::npos) {
+        redis_key_formatter = absl::StrReplaceAll(redis_key_formatter, {{redis_key_formatter_command_, key}});
+      }
+      auto providers = Formatter::SubstitutionFormatParser::parse(redis_key_formatter);
+      std::string formatted_key;
+      for(Formatter::FormatterProviderPtr& provider : providers) {
+        auto provider_formatted_key =
+          provider->formatValue(*Http::StaticEmptyHeaders::get().request_headers,
                                     *Http::StaticEmptyHeaders::get().response_headers,
                                     *Http::StaticEmptyHeaders::get().response_trailers,
-                                    callbacks_->connection().streamInfo(), absl::string_view());
-      if (formatted_key_prefix.has_string_value()) {
-        key = formatted_key_prefix.string_value() + key;
+                                    callbacks_->connection().streamInfo(), absl::string_view());  
+
+      if (provider_formatted_key.has_string_value()) {
+        formatted_key = formatted_key + provider_formatted_key.string_value();
+        }
+      }
+      if(!formatted_key.empty()) {
+        key = formatted_key;
       }
     }
     return value;

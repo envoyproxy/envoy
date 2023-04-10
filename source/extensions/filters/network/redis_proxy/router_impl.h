@@ -52,11 +52,11 @@ public:
   const MirrorPolicies& mirrorPolicies() const override { return mirror_policies_; };
   const std::string& prefix() const { return prefix_; }
   bool removePrefix() const { return remove_prefix_; }
-  const std::string& keyPrefix() const { return key_prefix_; }
+  const std::string& keyFormatter() const { return key_formatter_; }
 
 private:
   const std::string prefix_;
-  const std::string key_prefix_;
+  const std::string key_formatter_;
   const bool remove_prefix_;
   const ConnPool::InstanceSharedPtr upstream_;
   MirrorPolicies mirror_policies_;
@@ -82,6 +82,7 @@ private:
   Upstreams upstreams_;
   RouteSharedPtr catch_all_route_;
   Network::ReadFilterCallbacks* callbacks_{};
+  const std::string redis_key_formatter_command_ = "%KEY%";
 };
 
 } // namespace RedisProxy

@@ -101,10 +101,10 @@ TEST(PrefixRoutesTest, TestKeyPrefixFormatter) {
   NiceMock<Network::MockConnection> connection;
   NiceMock<StreamInfo::MockStreamInfo> stream_info;
 
-  const std::string format = "%FILTER_STATE(redisKey)%";
+  const std::string format = "{%KEY%}-%FILTER_STATE(redisKey)%-{%KEY%}";
 
   stream_info.filterState()->setData(
-      "redisKey", std::make_unique<Envoy::Router::StringAccessorImpl>("test_value_"),
+      "redisKey", std::make_unique<Envoy::Router::StringAccessorImpl>("subjectCN"),
       StreamInfo::FilterState::StateType::ReadOnly);
 
   ON_CALL(filter_callbacks, connection()).WillByDefault(ReturnRef(connection));
@@ -121,13 +121,13 @@ TEST(PrefixRoutesTest, TestKeyPrefixFormatter) {
     auto* route = prefix_routes.mutable_routes()->Add();
     route->set_prefix("abc");
     route->set_cluster("fake_clusterC");
-    route->set_key_prefix_formatter(format);
+    route->set_key_formatter(format);
   }
   PrefixRoutes router(prefix_routes, std::move(upstreams), runtime_);
   router.setReadFilterCallback(&filter_callbacks);
   std::string key("abc:bar");
   EXPECT_EQ(upstream_c, router.upstreamPool(key)->upstream());
-  EXPECT_EQ("test_value_abc:bar", key);
+  EXPECT_EQ("{abc:bar}-subjectCN-{abc:bar}", key);
 }
 
 TEST(PrefixRoutesTest, TestKeyPrefixFormatterWithMissingFilterState) {
@@ -156,7 +156,7 @@ TEST(PrefixRoutesTest, TestKeyPrefixFormatterWithMissingFilterState) {
     auto* route = prefix_routes.mutable_routes()->Add();
     route->set_prefix("abc");
     route->set_cluster("fake_clusterC");
-    route->set_key_prefix_formatter(format);
+    route->set_key_formatter(format);
   }
   PrefixRoutes router(prefix_routes, std::move(upstreams), runtime_);
   router.setReadFilterCallback(&filter_callbacks);
