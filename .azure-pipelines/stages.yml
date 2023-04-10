@@ -25,6 +25,10 @@ parameters:
   default:
   - env
   - linux_x64
+- name: checksConcurrency
+  displayName: "Check concurrency"
+  type: number
+  default: 3
 
 stages:
 - stage: env
@@ -73,7 +77,7 @@ stages:
     steps:
     - template: cached.yml
       parameters:
-        version: "$(buildImageCacheVersion)"
+        version: "$(cacheKeyBuildImage)"
         prime: true
   - job: cache_arm
     dependsOn: []
@@ -85,7 +89,7 @@ stages:
       parameters:
         prime: true
         arch: .arm64
-        version: "$(buildImageCacheVersion)"
+        version: "$(cacheKeyBuildImage)"
 
   - job: repo
     dependsOn: []
@@ -105,7 +109,7 @@ stages:
             echo "##vso[task.setvariable variable=mobileOnly;isoutput=true]false"
             echo "##vso[task.setvariable variable=docsOnly;isoutput=true]false"
             echo "##vso[task.setvariable variable=examplesOnly;isoutput=true]false"
-            echo "##vso[task.setvariable variable=dependency;isoutput=true]true"
+            echo "##vso[task.setvariable variable=requirements;isoutput=true]true"
             exit 0
         fi
 
@@ -174,6 +178,8 @@ stages:
       name: state
 
     - bash: |
+        set -e
+
         echo "env.outputs['changed.mobileOnly']: $(changed.mobileOnly)"
         echo "env.outputs['changed.docsOnly']: $(changed.docsOnly)"
         echo "env.outputs['changed.examplesOnly']: $(changed.examplesOnly)"
@@ -195,13 +201,13 @@ stages:
     steps:
     - task: Cache@2
       inputs:
-        key: "format | ./WORKSPACE | **/*.bzl"
+        key: 'format | $(cacheKeyRepository)'
         path: $(Build.StagingDirectory)/repository_cache
       continueOnError: true
 
     - template: cached.yml
       parameters:
-        version: "$(buildImageCacheVersion)"
+        version: "$(cacheKeyBuildImage)"
 
     - script: ci/run_envoy_docker.sh 'ci/do_ci.sh format'
       workingDirectory: $(Build.SourcesDirectory)
@@ -230,13 +236,13 @@ stages:
     steps:
     - task: Cache@2
       inputs:
-        key: "proto_format | ./WORKSPACE | **/*.bzl"
+        key: 'proto_format | $(cacheKeyRepository)'
         path: $(Build.StagingDirectory)/repository_cache
       continueOnError: true
 
     - template: cached.yml
       parameters:
-        version: "$(buildImageCacheVersion)"
+        version: "$(cacheKeyBuildImage)"
 
     - script: ci/run_envoy_docker.sh 'ci/check_and_fix_format.sh'
       workingDirectory: $(Build.SourcesDirectory)
@@ -265,13 +271,13 @@ stages:
     steps:
     - task: Cache@2
       inputs:
-        key: "docs | ./WORKSPACE | **/*.bzl"
+        key: 'docs | $(cacheKeyRepository)'
         path: $(Build.StagingDirectory)/repository_cache
       continueOnError: true
 
     - template: cached.yml
       parameters:
-        version: "$(buildImageCacheVersion)"
+        version: "$(cacheKeyBuildImage)"
 
     - script: ci/run_envoy_docker.sh 'ci/do_ci.sh docs'
       workingDirectory: $(Build.SourcesDirectory)
@@ -303,13 +309,13 @@ stages:
     steps:
     - task: Cache@2
       inputs:
-        key: "dependencies | ./WORKSPACE | **/*.bzl"
+        key: 'dependencies | $(cacheKeyRepository)'
         path: $(Build.StagingDirectory)/repository_cache
       continueOnError: true
 
     - template: cached.yml
       parameters:
-        version: "$(buildImageCacheVersion)"
+        version: "$(cacheKeyBuildImage)"
 
     - script: ci/run_envoy_docker.sh 'ci/do_ci.sh deps'
       workingDirectory: $(Build.SourcesDirectory)
@@ -351,6 +357,7 @@ stages:
     #   https://learn.microsoft.com/en-us/azure/devops/pipelines/process/expressions?view=azure-devops#job-to-job-dependencies-within-one-stage
     condition: |
       and(
+        eq(variables['Build.Reason'], 'PullRequest'),
         in(dependencies.format.result, 'Succeeded', 'SucceededWithIssues', 'Skipped'),
         in(dependencies.proto_format.result, 'Succeeded', 'SucceededWithIssues', 'Skipped'),
         in(dependencies.docs.result, 'Succeeded', 'SucceededWithIssues', 'Skipped'),
@@ -453,7 +460,7 @@ stages:
     # the preceeding jobs either pass or are skipped
     # adapted from:
     #   https://learn.microsoft.com/en-us/azure/devops/pipelines/process/expressions?view=azure-devops#job-to-job-dependencies-within-one-stage
-    condition: in(dependencies.release.result, 'Succeeded', 'SucceededWithIssues', 'Skipped')
+    condition: and(eq(variables['Build.Reason'], 'PullRequest'), in(dependencies.release.result, 'Succeeded', 'SucceededWithIssues', 'Skipped'))
     steps:
     - checkout: none
     - bash: |
@@ -488,7 +495,7 @@ stages:
     # the preceeding jobs either pass or are skipped
     # adapted from:
     #   https://learn.microsoft.com/en-us/azure/devops/pipelines/process/expressions?view=azure-devops#job-to-job-dependencies-within-one-stage
-    condition: in(dependencies.release.result, 'Succeeded', 'SucceededWithIssues', 'Skipped')
+    condition: and(eq(variables['Build.Reason'], 'PullRequest'), in(dependencies.release.result, 'Succeeded', 'SucceededWithIssues', 'Skipped'))
     steps:
     - checkout: none
     - bash: |
@@ -504,7 +511,7 @@ stages:
     # Skip checks if only mobile/ or docs/ have changed.
     condition: and(not(canceled()), or(succeeded(), eq(variables['PostSubmit'], true)), ne(stageDependencies.env.repo.outputs['changed.mobileOnly'], 'true'), ne(stageDependencies.env.repo.outputs['changed.docsOnly'], 'true'), ne(stageDependencies.env.repo.outputs['changed.examplesOnly'], 'true'))
     strategy:
-      maxParallel: 3
+      maxParallel: ${{ parameters.checksConcurrency }}
       matrix:
         # These are ordered by most time-consuming first.
         compile_time_options:
@@ -578,6 +585,7 @@ stages:
     #   https://learn.microsoft.com/en-us/azure/devops/pipelines/process/expressions?view=azure-devops#job-to-job-dependencies-within-one-stage
     condition: |
       and(
+        eq(variables['Build.Reason'], 'PullRequest'),
         in(dependencies.bazel.result, 'Succeeded', 'SucceededWithIssues', 'Skipped'),
         in(dependencies.coverage.result, 'Succeeded', 'SucceededWithIssues', 'Skipped'))
     steps:
@@ -601,7 +609,7 @@ stages:
         name: publish_docker
         # VERSION.txt is included to refresh Docker images for release
         key: "ci/Dockerfile-envoy | VERSION.txt"
-        version: "$(dockerBuildCacheVersion)"
+        version: "$(cacheKeyDockerBuild)"
         path: ""
     - bash: |
         echo "disk space at beginning of build:"
@@ -719,7 +727,7 @@ stages:
     steps:
     - task: Cache@2
       inputs:
-        key: "docs | ./WORKSPACE | **/*.bzl"
+        key: 'docs | $(cacheKeyRepository)'
         path: $(Build.StagingDirectory)/repository_cache
       continueOnError: true
 
@@ -928,6 +936,7 @@ stages:
     #   https://learn.microsoft.com/en-us/azure/devops/pipelines/process/expressions?view=azure-devops#job-to-job-dependencies-within-one-stage
     condition: |
       and(
+        eq(variables['Build.Reason'], 'PullRequest'),
         in(dependencies.examples.result, 'Succeeded', 'SucceededWithIssues', 'Skipped'),
         in(dependencies.packages_x64.result, 'Succeeded', 'SucceededWithIssues', 'Skipped'),
         in(dependencies.packages_arm64.result, 'Succeeded', 'SucceededWithIssues', 'Skipped'))
@@ -974,7 +983,7 @@ stages:
     # the preceeding jobs either pass or are skipped
     # adapted from:
     #   https://learn.microsoft.com/en-us/azure/devops/pipelines/process/expressions?view=azure-devops#job-to-job-dependencies-within-one-stage
-    condition: in(dependencies.test.result, 'Succeeded', 'SucceededWithIssues', 'Skipped')
+    condition: and(eq(variables['Build.Reason'], 'PullRequest'), in(dependencies.test.result, 'Succeeded', 'SucceededWithIssues', 'Skipped'))
     steps:
     - checkout: none
     - bash: |
@@ -993,7 +1002,7 @@ stages:
     steps:
     - task: Cache@2
       inputs:
-        key: '"windows.release" | ./WORKSPACE | **/*.bzl'
+        key: '"windows.release" | $(cacheKeyRepository)'
         path: $(Build.StagingDirectory)/repository_cache
       continueOnError: true
     - bash: ci/run_envoy_docker.sh ci/windows_ci_steps.sh
@@ -1084,6 +1093,7 @@ stages:
     #   https://learn.microsoft.com/en-us/azure/devops/pipelines/process/expressions?view=azure-devops#job-to-job-dependencies-within-one-stage
     condition: |
       and(
+        eq(variables['Build.Reason'], 'PullRequest'),
         in(dependencies.release.result, 'Succeeded', 'SucceededWithIssues', 'Skipped'),
         in(dependencies.docker.result, 'Succeeded', 'SucceededWithIssues', 'Skipped'))
     steps:

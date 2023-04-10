@@ -693,6 +693,10 @@ TEST_P(ListenerIntegrationTest, MultipleLdsUpdatesSharingListenSocketFactory) {
 // This is multiple addresses version test for the above one.
 TEST_P(ListenerMultiAddressesIntegrationTest,
        MultipleLdsUpdatesSharingListenSocketFactoryWithMultiAddresses) {
+// https://github.com/envoyproxy/envoy/issues/26336
+#if defined(__arm64__)
+  return;
+#endif
   on_server_init_function_ = [&]() {
     createLdsStream();
     sendLdsResponse({MessageUtil::getYamlStringFromMessage(listener_config_)}, "1");
@@ -1551,6 +1555,7 @@ TEST_P(ListenerFilterIntegrationTest,
   config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
     listener_config_.Swap(bootstrap.mutable_static_resources()->mutable_listeners(0));
     listener_config_.set_name("listener_foo");
+    listener_config_.set_stat_prefix("listener_stat");
     listener_config_.mutable_enable_reuse_port()->set_value(false);
     ENVOY_LOG_MISC(debug, "listener config: {}", listener_config_.DebugString());
     bootstrap.mutable_static_resources()->mutable_listeners()->Clear();
@@ -1583,6 +1588,7 @@ TEST_P(ListenerFilterIntegrationTest,
   ASSERT_TRUE(fake_upstream_connection->waitForData(data.size(), &data));
   tcp_client->close();
   ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
+  test_server_->waitForGaugeEq("listener.listener_stat.downstream_cx_active", 0);
 
   auto* socket_option = listener_config_.add_socket_options();
   socket_option->set_level(IPPROTO_IP);
@@ -1676,7 +1682,7 @@ public:
       connections.emplace_back();
       connections.back().client_conn_ =
           createConnectionAndWrite("dummy", connections.back().response_);
-      connections.back().client_conn_->waitForConnection();
+      ASSERT_TRUE(connections.back().client_conn_->waitForConnection());
       ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(connections.back().upstream_conn_));
       std::string data;
       EXPECT_TRUE(connections.back().upstream_conn_->waitForData(5, &data));
