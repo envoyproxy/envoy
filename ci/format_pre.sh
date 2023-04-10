@@ -42,8 +42,12 @@ trap_errors () {
 trap trap_errors ERR
 trap exit 1 INT
 
+
 CURRENT=check
-bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/code:check -- --fix -v warn -x mobile/dist/envoy-pom.xml
+# This test runs code check with:
+#   bazel run //tools/code:check -- --fix -v warn -x mobile/dist/envoy-pom.xml
+# see: /tools/code/BUILD
+time bazel test "${BAZEL_BUILD_OPTIONS[@]}" //tools/code:check_test
 
 CURRENT=configs
 bazel run "${BAZEL_BUILD_OPTIONS[@]}" //configs:example_configs_validation
