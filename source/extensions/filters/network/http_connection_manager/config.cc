@@ -304,9 +304,7 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
     Tracing::TracerManager& tracer_manager,
     FilterConfigProviderManager& filter_config_provider_manager)
     : context_(context), flush_access_log_on_new_request_(
-                             config.has_access_log_options()
-                                 ? config.access_log_options().flush_access_log_on_new_request()
-                                 : config.flush_access_log_on_new_request()),
+                             getFlushAccessLogNewRequestConfig(config)),
       stats_prefix_(fmt::format("http.{}.", config.stat_prefix())),
       stats_(Http::ConnectionManagerImpl::generateStats(stats_prefix_, context_.scope())),
       tracing_stats_(
@@ -553,6 +551,11 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
 
   if (config.has_access_log_options() &&
       config.access_log_options().has_access_log_flush_interval()) {
+    if (config.has_access_log_flush_interval()) {
+      throw EnvoyException("Can't use deprecated field 'access_log_flush_interval' together with"
+                           "non-deprecated field HcmAccessLogOptions.access_log_flush_interval.");
+    }
+
     access_log_flush_interval_ = std::chrono::milliseconds(DurationUtil::durationToMilliseconds(
         config.access_log_options().access_log_flush_interval()));
   } else if (config.has_access_log_flush_interval()) { // Deprecated field
@@ -728,6 +731,23 @@ const envoy::config::trace::v3::Tracing_Http* HttpConnectionManagerConfig::getPe
     return &context_.httpContext().defaultTracingConfig().http();
   }
   return nullptr;
+}
+
+bool HttpConnectionManagerConfig::getFlushAccessLogNewRequestConfig(
+      const envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+          filter_config) {
+  if (config.has_access_log_options() &&
+      config.access_log_options().flush_access_log_on_new_request()) {
+    if (config.flush_access_log_on_new_request() /* deprecated */) {
+      throw EnvoyException(
+          "Can't use deprecated field 'flush_access_log_on_new_request' together with"
+          "non-deprecated field HcmAccessLogOptions.flush_access_log_on_new_request.");
+    }
+
+    return config.access_log_options().flush_access_log_on_new_request();
+  }
+
+  return config.flush_access_log_on_new_request();
 }
 
 #ifdef ENVOY_ENABLE_UHV
