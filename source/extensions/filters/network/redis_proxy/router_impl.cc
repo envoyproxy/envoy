@@ -5,8 +5,8 @@
 
 #include "source/common/formatter/substitution_formatter.h"
 #include "source/common/http/header_map_impl.h"
-#include "absl/strings/str_replace.h"
 
+#include "absl/strings/str_replace.h"
 #include "iostream"
 
 namespace Envoy {
@@ -96,23 +96,24 @@ RouteSharedPtr PrefixRoutes::upstreamPool(std::string& key) {
       auto redis_key_formatter = value->keyFormatter();
       // If key_formatter defines %KEY% command, then do a direct string replacement.
       // ( TODO ) - Possibly define a RedisKeyFormatter as a SubstitutionFormatter
-      if(redis_key_formatter.find(redis_key_formatter_command_) != std::string::npos) {
-        redis_key_formatter = absl::StrReplaceAll(redis_key_formatter, {{redis_key_formatter_command_, key}});
+      if (redis_key_formatter.find(redis_key_formatter_command_) != std::string::npos) {
+        redis_key_formatter =
+            absl::StrReplaceAll(redis_key_formatter, {{redis_key_formatter_command_, key}});
       }
       auto providers = Formatter::SubstitutionFormatParser::parse(redis_key_formatter);
       std::string formatted_key;
-      for(Formatter::FormatterProviderPtr& provider : providers) {
+      for (Formatter::FormatterProviderPtr& provider : providers) {
         auto provider_formatted_key =
-          provider->formatValue(*Http::StaticEmptyHeaders::get().request_headers,
-                                    *Http::StaticEmptyHeaders::get().response_headers,
-                                    *Http::StaticEmptyHeaders::get().response_trailers,
-                                    callbacks_->connection().streamInfo(), absl::string_view());  
+            provider->formatValue(*Http::StaticEmptyHeaders::get().request_headers,
+                                  *Http::StaticEmptyHeaders::get().response_headers,
+                                  *Http::StaticEmptyHeaders::get().response_trailers,
+                                  callbacks_->connection().streamInfo(), absl::string_view());
 
-      if (provider_formatted_key.has_string_value()) {
-        formatted_key = formatted_key + provider_formatted_key.string_value();
+        if (provider_formatted_key.has_string_value()) {
+          formatted_key = formatted_key + provider_formatted_key.string_value();
         }
       }
-      if(!formatted_key.empty()) {
+      if (!formatted_key.empty()) {
         key = formatted_key;
       }
     }
