@@ -968,7 +968,12 @@ public:
     return http_protocol_options_->alternate_protocol_cache_options_;
   }
 
-  absl::optional<std::string> edsServiceName() const override { return eds_service_name_; }
+  absl::optional<std::string> edsServiceName() const override {
+    if (eds_service_name_ != nullptr) {
+      return *eds_service_name_;
+    }
+    return absl::nullopt;
+  }
 
   void createNetworkFilterChain(Network::Connection&) const override;
   std::vector<Http::Protocol>
@@ -1030,6 +1035,7 @@ private:
   Runtime::Loader& runtime_;
   const std::string name_;
   std::unique_ptr<const std::string> observability_name_;
+  std::unique_ptr<const std::string> eds_service_name_;
   const absl::flat_hash_map<std::string, ProtocolOptionsConfigConstSharedPtr>
       extension_protocol_options_;
   const std::shared_ptr<const HttpProtocolOptionsConfigImpl> http_protocol_options_;
@@ -1059,6 +1065,10 @@ private:
   std::unique_ptr<ClusterTypedMetadata> typed_metadata_;
   ProtobufTypes::MessagePtr load_balancing_policy_;
   TypedLoadBalancerFactory* load_balancer_factory_ = nullptr;
+<<<<<<< HEAD
+=======
+  const envoy::config::cluster::v3::Cluster::CommonLbConfig common_lb_config_;
+>>>>>>> upstream/main
   std::unique_ptr<const envoy::config::cluster::v3::Cluster::CustomClusterType> cluster_type_;
   const std::unique_ptr<Server::Configuration::CommonFactoryContext> factory_context_;
   std::vector<Network::FilterFactoryCb> filter_factories_;
