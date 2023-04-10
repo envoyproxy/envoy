@@ -94,6 +94,19 @@ TEST(ConfigTest, DEPRECATED_FEATURE_TEST(DeprecatedFlushAccessLogOnConnected)) {
     Config config_obj(constructConfigFromYaml(deprecated_yaml, factory_context));
     EXPECT_TRUE(config_obj.sharedConfig()->flushAccessLogOnConnected());
   }
+
+  {
+    const std::string deprecated_yaml = R"EOF(
+      stat_prefix: name
+      cluster: foo
+      access_log_options:
+        flush_access_log_on_connected: true
+      flush_access_log_on_connected: true # deprecated field
+    )EOF";
+
+    EXPECT_THROW(Config config_obj(constructConfigFromYaml(deprecated_yaml, factory_context)),
+                 EnvoyException);
+  }
 }
 
 TEST(ConfigTest, AccessLogFlushInterval) {
@@ -126,15 +139,30 @@ TEST(ConfigTest, AccessLogFlushInterval) {
 TEST(ConfigTest, DEPRECATED_FEATURE_TEST(DeprecatedAccessLogFlushInterval)) {
   NiceMock<Server::Configuration::MockFactoryContext> factory_context;
 
-  const std::string deprecated_yaml = R"EOF(
-    stat_prefix: name
-    cluster: foo
-    access_log_flush_interval: 1s # deprecated field
-  )EOF";
+  {
+    const std::string deprecated_yaml = R"EOF(
+      stat_prefix: name
+      cluster: foo
+      access_log_flush_interval: 1s # deprecated field
+    )EOF";
 
-  Config config_obj(constructConfigFromYaml(deprecated_yaml, factory_context));
-  EXPECT_TRUE(config_obj.sharedConfig()->accessLogFlushInterval().has_value());
-  EXPECT_EQ(std::chrono::seconds(1), config_obj.sharedConfig()->accessLogFlushInterval().value());
+    Config config_obj(constructConfigFromYaml(deprecated_yaml, factory_context));
+    EXPECT_TRUE(config_obj.sharedConfig()->accessLogFlushInterval().has_value());
+    EXPECT_EQ(std::chrono::seconds(1), config_obj.sharedConfig()->accessLogFlushInterval().value());
+  }
+
+  {
+    const std::string deprecated_yaml = R"EOF(
+      stat_prefix: name
+      cluster: foo
+      access_log_options:
+        access_log_flush_interval: 1s
+      access_log_flush_interval: 1s # deprecated field
+    )EOF";
+
+    EXPECT_THROW(Config config_obj(constructConfigFromYaml(deprecated_yaml, factory_context)),
+                 EnvoyException);
+  }
 }
 
 TEST(ConfigTest, CustomTimeout) {

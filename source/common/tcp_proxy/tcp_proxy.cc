@@ -72,10 +72,7 @@ Config::SharedConfig::SharedConfig(
     Server::Configuration::FactoryContext& context)
     : stats_scope_(context.scope().createScope(fmt::format("tcp.{}", config.stat_prefix()))),
       stats_(generateStats(*stats_scope_)),
-      flush_access_log_on_connected_(
-          config.has_access_log_options()
-              ? config.access_log_options().flush_access_log_on_connected()
-              : /* deprecated */ config.flush_access_log_on_connected()) {
+      flush_access_log_on_connected_(getFlushAccessLogOnConnectedConfig(config)) {
   if (config.has_idle_timeout()) {
     const uint64_t timeout = DurationUtil::durationToMilliseconds(config.idle_timeout());
     if (timeout > 0) {
@@ -96,6 +93,11 @@ Config::SharedConfig::SharedConfig(
 
   if (config.has_access_log_options() &&
       config.access_log_options().has_access_log_flush_interval()) {
+    if (config.has_access_log_flush_interval()) {
+      throw EnvoyException("Can't use deprecated field 'access_log_flush_interval' together with"
+                          "non-deprecated field TcpAccessLogOptions.access_log_flush_interval.");
+    }
+
     const uint64_t flush_interval = DurationUtil::durationToMilliseconds(
         config.access_log_options().access_log_flush_interval());
     access_log_flush_interval_ = std::chrono::milliseconds(flush_interval);
@@ -109,6 +111,21 @@ Config::SharedConfig::SharedConfig(
     on_demand_config_ =
         std::make_unique<OnDemandConfig>(config.on_demand(), context, *stats_scope_);
   }
+}
+
+bool Config::SharedConfig::SharedConfig::getFlushAccessLogOnConnectedConfig(
+        const envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy& config) {
+  if (config.has_access_log_options() &&
+      config.access_log_options().flush_access_log_on_connected()) {
+    if (config.flush_access_log_on_connected() /* deprecated */) {
+      throw EnvoyException("Can't use deprecated field 'flush_access_log_on_connected' together with"
+                          "non-deprecated field TcpAccessLogOptions.flush_access_log_on_connected.");
+    }
+
+    return config.access_log_options().flush_access_log_on_connected();
+  }
+
+  return config.flush_access_log_on_connected();
 }
 
 Config::Config(const envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy& config,
