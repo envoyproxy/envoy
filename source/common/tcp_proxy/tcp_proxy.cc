@@ -95,7 +95,7 @@ Config::SharedConfig::SharedConfig(
       config.access_log_options().has_access_log_flush_interval()) {
     if (config.has_access_log_flush_interval()) {
       throw EnvoyException("Can't use deprecated field 'access_log_flush_interval' together with"
-                          "non-deprecated field TcpAccessLogOptions.access_log_flush_interval.");
+                           "non-deprecated field TcpAccessLogOptions.access_log_flush_interval.");
     }
 
     const uint64_t flush_interval = DurationUtil::durationToMilliseconds(
@@ -114,12 +114,13 @@ Config::SharedConfig::SharedConfig(
 }
 
 bool Config::SharedConfig::SharedConfig::getFlushAccessLogOnConnectedConfig(
-        const envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy& config) {
+    const envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy& config) {
   if (config.has_access_log_options() &&
       config.access_log_options().flush_access_log_on_connected()) {
     if (config.flush_access_log_on_connected() /* deprecated */) {
-      throw EnvoyException("Can't use deprecated field 'flush_access_log_on_connected' together with"
-                          "non-deprecated field TcpAccessLogOptions.flush_access_log_on_connected.");
+      throw EnvoyException(
+          "Can't use deprecated field 'flush_access_log_on_connected' together with"
+          "non-deprecated field TcpAccessLogOptions.flush_access_log_on_connected.");
     }
 
     return config.access_log_options().flush_access_log_on_connected();
