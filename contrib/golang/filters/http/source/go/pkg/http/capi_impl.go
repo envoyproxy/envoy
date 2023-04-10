@@ -85,6 +85,11 @@ func (c *httpCApiImpl) HttpSendLocalReply(r unsafe.Pointer, response_code int, b
 	handleCApiStatus(res)
 }
 
+func (c *httpCApiImpl) HttpSendPanicReply(r unsafe.Pointer, details string) {
+	res := C.envoyGoFilterHttpSendPanicReply(r, unsafe.Pointer(&details))
+	handleCApiStatus(res)
+}
+
 func (c *httpCApiImpl) HttpGetHeader(r unsafe.Pointer, key *string, value *string) {
 	res := C.envoyGoFilterHttpGetHeader(r, unsafe.Pointer(key), unsafe.Pointer(value))
 	handleCApiStatus(res)

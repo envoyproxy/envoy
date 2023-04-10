@@ -169,6 +169,16 @@ void envoyGoFilterHttpFinalize(void* r, int reason) {
   delete req;
 }
 
+CAPIStatus envoyGoFilterHttpSendPanicReply(void* r, void* details) {
+  return envoyGoFilterHandlerWrapper(
+      r,
+      [details](std::shared_ptr<Filter>& filter) -> CAPIStatus {
+        // Deep clone the GoString into C++, since the GoString may be freed after the function
+        // returns, while they may still be used in the callback.
+        return filter->sendPanicReply(copyGoString(details));
+      });
+}
+
 #ifdef __cplusplus
 }
 #endif
