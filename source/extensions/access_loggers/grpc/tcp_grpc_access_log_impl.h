@@ -46,7 +46,8 @@ private:
   void emitLog(const Http::RequestHeaderMap& request_headers,
                const Http::ResponseHeaderMap& response_headers,
                const Http::ResponseTrailerMap& response_trailers,
-               const StreamInfo::StreamInfo& stream_info) override;
+               const StreamInfo::StreamInfo& stream_info,
+               AccessLogType access_log_type) override;
 
   const TcpGrpcAccessLogConfigConstSharedPtr config_;
   const ThreadLocal::SlotPtr tls_slot_;

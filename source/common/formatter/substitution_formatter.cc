@@ -129,13 +129,14 @@ std::string FormatterImpl::format(const Http::RequestHeaderMap& request_headers,
                                   const Http::ResponseHeaderMap& response_headers,
                                   const Http::ResponseTrailerMap& response_trailers,
                                   const StreamInfo::StreamInfo& stream_info,
-                                  absl::string_view local_reply_body) const {
+                                  absl::string_view local_reply_body,
+                                  absl::string_view access_log_type) const {
   std::string log_line;
   log_line.reserve(256);
 
   for (const FormatterProviderPtr& provider : providers_) {
     const auto bit = provider->format(request_headers, response_headers, response_trailers,
-                                      stream_info, local_reply_body);
+                                      stream_info, local_reply_body, access_log_type);
     log_line += bit.value_or(empty_value_string_);
   }
 
@@ -146,9 +147,11 @@ std::string JsonFormatterImpl::format(const Http::RequestHeaderMap& request_head
                                       const Http::ResponseHeaderMap& response_headers,
                                       const Http::ResponseTrailerMap& response_trailers,
                                       const StreamInfo::StreamInfo& stream_info,
-                                      absl::string_view local_reply_body) const {
+                                      absl::string_view local_reply_body,
+                                      absl::string_view access_log_type) const {
   const ProtobufWkt::Struct output_struct = struct_formatter_.format(
-      request_headers, response_headers, response_trailers, stream_info, local_reply_body);
+      request_headers, response_headers, response_trailers, stream_info, local_reply_body,
+      access_log_type);
 
   const std::string log_line =
       MessageUtil::getJsonStringFromMessageOrDie(output_struct, false, true);
@@ -243,29 +246,31 @@ ProtobufWkt::Value StructFormatter::providersCallback(
     const std::vector<FormatterProviderPtr>& providers,
     const Http::RequestHeaderMap& request_headers, const Http::ResponseHeaderMap& response_headers,
     const Http::ResponseTrailerMap& response_trailers, const StreamInfo::StreamInfo& stream_info,
-    absl::string_view local_reply_body) const {
+    absl::string_view local_reply_body,
+    absl::string_view access_log_type) const {
   ASSERT(!providers.empty());
   if (providers.size() == 1) {
     const auto& provider = providers.front();
     if (preserve_types_) {
       return provider->formatValue(request_headers, response_headers, response_trailers,
-                                   stream_info, local_reply_body);
+                                   stream_info, local_reply_body, access_log_type);
     }
 
     if (omit_empty_values_) {
       return ValueUtil::optionalStringValue(provider->format(
-          request_headers, response_headers, response_trailers, stream_info, local_reply_body));
+          request_headers, response_headers, response_trailers, stream_info, local_reply_body,
+          access_log_type));
     }
 
     const auto str = provider->format(request_headers, response_headers, response_trailers,
-                                      stream_info, local_reply_body);
+                                      stream_info, local_reply_body, access_log_type);
     return ValueUtil::stringValue(str.value_or(DefaultUnspecifiedValueString));
   }
   // Multiple providers forces string output.
   std::string str;
   for (const auto& provider : providers) {
     const auto bit = provider->format(request_headers, response_headers, response_trailers,
-                                      stream_info, local_reply_body);
+                                      stream_info, local_reply_body, access_log_type);
     str += bit.value_or(empty_value_);
   }
   return ValueUtil::stringValue(str);
@@ -307,11 +312,12 @@ ProtobufWkt::Struct StructFormatter::format(const Http::RequestHeaderMap& reques
                                             const Http::ResponseHeaderMap& response_headers,
                                             const Http::ResponseTrailerMap& response_trailers,
                                             const StreamInfo::StreamInfo& stream_info,
-                                            absl::string_view local_reply_body) const {
+                                            absl::string_view local_reply_body,
+                                            absl::string_view access_log_type) const {
   StructFormatMapVisitor visitor{
       [&](const std::vector<FormatterProviderPtr>& providers) {
         return providersCallback(providers, request_headers, response_headers, response_trailers,
-                                 stream_info, local_reply_body);
+                                 stream_info, local_reply_body, access_log_type);
       },
       [&, this](const StructFormatter::StructFormatMapWrapper& format_map) {
         return structFormatMapCallback(format_map, visitor);
@@ -1601,7 +1607,7 @@ absl::optional<std::string> StreamInfoFormatter::format(const Http::RequestHeade
                                                         const Http::ResponseHeaderMap&,
                                                         const Http::ResponseTrailerMap&,
                                                         const StreamInfo::StreamInfo& stream_info,
-                                                        absl::string_view) const {
+                                                        absl::string_view, absl::string_view) const {
   return field_extractor_->extract(stream_info);
 }
 
@@ -1609,7 +1615,7 @@ ProtobufWkt::Value StreamInfoFormatter::formatValue(const Http::RequestHeaderMap
                                                     const Http::ResponseHeaderMap&,
                                                     const Http::ResponseTrailerMap&,
                                                     const StreamInfo::StreamInfo& stream_info,
-                                                    absl::string_view) const {
+                                                    absl::string_view, absl::string_view) const {
   return field_extractor_->extractValue(stream_info);
 }
 
@@ -1619,7 +1625,7 @@ absl::optional<std::string> PlainStringFormatter::format(const Http::RequestHead
                                                          const Http::ResponseHeaderMap&,
                                                          const Http::ResponseTrailerMap&,
                                                          const StreamInfo::StreamInfo&,
-                                                         absl::string_view) const {
+                                                         absl::string_view, absl::string_view) const {
   return str_.string_value();
 }
 
@@ -1627,7 +1633,7 @@ ProtobufWkt::Value PlainStringFormatter::formatValue(const Http::RequestHeaderMa
                                                      const Http::ResponseHeaderMap&,
                                                      const Http::ResponseTrailerMap&,
                                                      const StreamInfo::StreamInfo&,
-                                                     absl::string_view) const {
+                                                     absl::string_view, absl::string_view) const {
   return str_;
 }
 
@@ -1637,7 +1643,7 @@ absl::optional<std::string> PlainNumberFormatter::format(const Http::RequestHead
                                                          const Http::ResponseHeaderMap&,
                                                          const Http::ResponseTrailerMap&,
                                                          const StreamInfo::StreamInfo&,
-                                                         absl::string_view) const {
+                                                         absl::string_view, absl::string_view) const {
   std::string str = absl::StrFormat("%g", num_.number_value());
   return str;
 }
@@ -1646,7 +1652,7 @@ ProtobufWkt::Value PlainNumberFormatter::formatValue(const Http::RequestHeaderMa
                                                      const Http::ResponseHeaderMap&,
                                                      const Http::ResponseTrailerMap&,
                                                      const StreamInfo::StreamInfo&,
-                                                     absl::string_view) const {
+                                                     absl::string_view, absl::string_view) const {
   return num_;
 }
 
@@ -1661,7 +1667,8 @@ ProtobufWkt::Value LocalReplyBodyFormatter::formatValue(const Http::RequestHeade
                                                         const Http::ResponseHeaderMap&,
                                                         const Http::ResponseTrailerMap&,
                                                         const StreamInfo::StreamInfo&,
-                                                        absl::string_view local_reply_body) const {
+                                                        absl::string_view local_reply_body,
+                                                        absl::string_view access_log_type) const {
   return ValueUtil::stringValue(std::string(local_reply_body));
 }
 
@@ -1711,13 +1718,15 @@ ResponseHeaderFormatter::ResponseHeaderFormatter(const std::string& main_header,
 
 absl::optional<std::string> ResponseHeaderFormatter::format(
     const Http::RequestHeaderMap&, const Http::ResponseHeaderMap& response_headers,
-    const Http::ResponseTrailerMap&, const StreamInfo::StreamInfo&, absl::string_view) const {
+    const Http::ResponseTrailerMap&, const StreamInfo::StreamInfo&, absl::string_view,
+    absl::string_view) const {
   return HeaderFormatter::format(response_headers);
 }
 
 ProtobufWkt::Value ResponseHeaderFormatter::formatValue(
     const Http::RequestHeaderMap&, const Http::ResponseHeaderMap& response_headers,
-    const Http::ResponseTrailerMap&, const StreamInfo::StreamInfo&, absl::string_view) const {
+    const Http::ResponseTrailerMap&, const StreamInfo::StreamInfo&, absl::string_view,
+    absl::string_view) const {
   return HeaderFormatter::formatValue(response_headers);
 }
 
@@ -1729,14 +1738,16 @@ RequestHeaderFormatter::RequestHeaderFormatter(const std::string& main_header,
 absl::optional<std::string>
 RequestHeaderFormatter::format(const Http::RequestHeaderMap& request_headers,
                                const Http::ResponseHeaderMap&, const Http::ResponseTrailerMap&,
-                               const StreamInfo::StreamInfo&, absl::string_view) const {
+                               const StreamInfo::StreamInfo&, absl::string_view,
+                               absl::string_view) const {
   return HeaderFormatter::format(request_headers);
 }
 
 ProtobufWkt::Value
 RequestHeaderFormatter::formatValue(const Http::RequestHeaderMap& request_headers,
                                     const Http::ResponseHeaderMap&, const Http::ResponseTrailerMap&,
-                                    const StreamInfo::StreamInfo&, absl::string_view) const {
+                                    const StreamInfo::StreamInfo&, absl::string_view,
+                                    absl::string_view) const {
   return HeaderFormatter::formatValue(request_headers);
 }
 
@@ -1748,14 +1759,16 @@ ResponseTrailerFormatter::ResponseTrailerFormatter(const std::string& main_heade
 absl::optional<std::string>
 ResponseTrailerFormatter::format(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
                                  const Http::ResponseTrailerMap& response_trailers,
-                                 const StreamInfo::StreamInfo&, absl::string_view) const {
+                                 const StreamInfo::StreamInfo&, absl::string_view,
+                                 absl::string_view) const {
   return HeaderFormatter::format(response_trailers);
 }
 
 ProtobufWkt::Value
 ResponseTrailerFormatter::formatValue(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
                                       const Http::ResponseTrailerMap& response_trailers,
-                                      const StreamInfo::StreamInfo&, absl::string_view) const {
+                                      const StreamInfo::StreamInfo&, absl::string_view,
+                                      absl::string_view) const {
   return HeaderFormatter::formatValue(response_trailers);
 }
 
@@ -1780,7 +1793,8 @@ absl::optional<std::string>
 HeadersByteSizeFormatter::format(const Http::RequestHeaderMap& request_headers,
                                  const Http::ResponseHeaderMap& response_headers,
                                  const Http::ResponseTrailerMap& response_trailers,
-                                 const StreamInfo::StreamInfo&, absl::string_view) const {
+                                 const StreamInfo::StreamInfo&, absl::string_view,
+                                 absl::string_view) const {
   return absl::StrCat(extractHeadersByteSize(request_headers, response_headers, response_trailers));
 }
 
@@ -1788,7 +1802,8 @@ ProtobufWkt::Value
 HeadersByteSizeFormatter::formatValue(const Http::RequestHeaderMap& request_headers,
                                       const Http::ResponseHeaderMap& response_headers,
                                       const Http::ResponseTrailerMap& response_trailers,
-                                      const StreamInfo::StreamInfo&, absl::string_view) const {
+                                      const StreamInfo::StreamInfo&, absl::string_view,
+                                      absl::string_view) const {
   return ValueUtil::numberValue(
       extractHeadersByteSize(request_headers, response_headers, response_trailers));
 }
@@ -1817,7 +1832,8 @@ absl::optional<std::string>
 GrpcStatusFormatter::format(const Http::RequestHeaderMap&,
                             const Http::ResponseHeaderMap& response_headers,
                             const Http::ResponseTrailerMap& response_trailers,
-                            const StreamInfo::StreamInfo& info, absl::string_view) const {
+                            const StreamInfo::StreamInfo& info, absl::string_view,
+                            absl::string_view) const {
   const auto grpc_status =
       Grpc::Common::getGrpcStatus(response_trailers, response_headers, info, true);
   if (!grpc_status.has_value()) {
@@ -1850,7 +1866,8 @@ ProtobufWkt::Value
 GrpcStatusFormatter::formatValue(const Http::RequestHeaderMap&,
                                  const Http::ResponseHeaderMap& response_headers,
                                  const Http::ResponseTrailerMap& response_trailers,
-                                 const StreamInfo::StreamInfo& info, absl::string_view) const {
+                                 const StreamInfo::StreamInfo& info, absl::string_view,
+                                 absl::string_view) const {
   const auto grpc_status =
       Grpc::Common::getGrpcStatus(response_trailers, response_headers, info, true);
   if (!grpc_status.has_value()) {
@@ -1927,7 +1944,7 @@ absl::optional<std::string> MetadataFormatter::format(const Http::RequestHeaderM
                                                       const Http::ResponseHeaderMap&,
                                                       const Http::ResponseTrailerMap&,
                                                       const StreamInfo::StreamInfo& stream_info,
-                                                      absl::string_view) const {
+                                                      absl::string_view, absl::string_view) const {
   auto metadata = get_func_(stream_info);
   return (metadata != nullptr) ? formatMetadata(*metadata) : absl::nullopt;
 }
@@ -1936,7 +1953,7 @@ ProtobufWkt::Value MetadataFormatter::formatValue(const Http::RequestHeaderMap&,
                                                   const Http::ResponseHeaderMap&,
                                                   const Http::ResponseTrailerMap&,
                                                   const StreamInfo::StreamInfo& stream_info,
-                                                  absl::string_view) const {
+                                                  absl::string_view, absl::string_view) const {
   auto metadata = get_func_(stream_info);
   return formatMetadataValue((metadata != nullptr) ? *metadata
                                                    : envoy::config::core::v3::Metadata());
@@ -2036,7 +2053,7 @@ absl::optional<std::string> FilterStateFormatter::format(const Http::RequestHead
                                                          const Http::ResponseHeaderMap&,
                                                          const Http::ResponseTrailerMap&,
                                                          const StreamInfo::StreamInfo& stream_info,
-                                                         absl::string_view) const {
+                                                         absl::string_view, absl::string_view) const {
   const Envoy::StreamInfo::FilterState::Object* state = filterState(stream_info);
   if (!state) {
     return absl::nullopt;
@@ -2072,7 +2089,7 @@ ProtobufWkt::Value FilterStateFormatter::formatValue(const Http::RequestHeaderMa
                                                      const Http::ResponseHeaderMap&,
                                                      const Http::ResponseTrailerMap&,
                                                      const StreamInfo::StreamInfo& stream_info,
-                                                     absl::string_view) const {
+                                                     absl::string_view, absl::string_view) const {
   const Envoy::StreamInfo::FilterState::Object* state = filterState(stream_info);
   if (!state) {
     return unspecifiedValue();
@@ -2166,7 +2183,7 @@ absl::optional<std::string> SystemTimeFormatter::format(const Http::RequestHeade
                                                         const Http::ResponseHeaderMap&,
                                                         const Http::ResponseTrailerMap&,
                                                         const StreamInfo::StreamInfo& stream_info,
-                                                        absl::string_view) const {
+                                                        absl::string_view, absl::string_view) const {
   const auto time_field = (*time_field_extractor_)(stream_info);
   if (!time_field.has_value()) {
     return absl::nullopt;
@@ -2180,9 +2197,10 @@ absl::optional<std::string> SystemTimeFormatter::format(const Http::RequestHeade
 ProtobufWkt::Value SystemTimeFormatter::formatValue(
     const Http::RequestHeaderMap& request_headers, const Http::ResponseHeaderMap& response_headers,
     const Http::ResponseTrailerMap& response_trailers, const StreamInfo::StreamInfo& stream_info,
-    absl::string_view local_reply_body) const {
+    absl::string_view local_reply_body, absl::string_view access_log_type) const {
   return ValueUtil::optionalStringValue(
-      format(request_headers, response_headers, response_trailers, stream_info, local_reply_body));
+      format(request_headers, response_headers, response_trailers, stream_info, local_reply_body,
+             access_log_type));
 }
 
 void CommandSyntaxChecker::verifySyntax(CommandSyntaxFlags flags, const std::string& command,
@@ -2219,14 +2237,14 @@ absl::optional<std::string> EnvironmentFormatter::format(const Http::RequestHead
                                                          const Http::ResponseHeaderMap&,
                                                          const Http::ResponseTrailerMap&,
                                                          const StreamInfo::StreamInfo&,
-                                                         absl::string_view) const {
+                                                         absl::string_view, absl::string_view) const {
   return str_.string_value();
 }
 ProtobufWkt::Value EnvironmentFormatter::formatValue(const Http::RequestHeaderMap&,
                                                      const Http::ResponseHeaderMap&,
                                                      const Http::ResponseTrailerMap&,
                                                      const StreamInfo::StreamInfo&,
-                                                     absl::string_view) const {
+                                                     absl::string_view, absl::string_view) const {
   return str_;
 }
 
@@ -2237,13 +2255,13 @@ StreamInfoRequestHeaderFormatter::StreamInfoRequestHeaderFormatter(
 
 absl::optional<std::string> StreamInfoRequestHeaderFormatter::format(
     const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&, const Http::ResponseTrailerMap&,
-    const StreamInfo::StreamInfo& stream_info, absl::string_view) const {
+    const StreamInfo::StreamInfo& stream_info, absl::string_view, absl::string_view) const {
   return HeaderFormatter::format(*stream_info.getRequestHeaders());
 }
 
 ProtobufWkt::Value StreamInfoRequestHeaderFormatter::formatValue(
     const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&, const Http::ResponseTrailerMap&,
-    const StreamInfo::StreamInfo& stream_info, absl::string_view) const {
+    const StreamInfo::StreamInfo& stream_info, absl::string_view, absl::string_view) const {
   return HeaderFormatter::formatValue(*stream_info.getRequestHeaders());
 }
 

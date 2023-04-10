@@ -79,7 +79,8 @@ AccessLog::AccessLog(
 void AccessLog::emitLog(const Http::RequestHeaderMap& request_headers,
                         const Http::ResponseHeaderMap& response_headers,
                         const Http::ResponseTrailerMap& response_trailers,
-                        const StreamInfo::StreamInfo& stream_info) {
+                        const StreamInfo::StreamInfo& stream_info,
+                        AccessLogType) {
   opentelemetry::proto::logs::v1::LogRecord log_entry;
   log_entry.set_time_unix_nano(std::chrono::duration_cast<std::chrono::nanoseconds>(
                                    stream_info.startTime().time_since_epoch())
