@@ -1,10 +1,5 @@
 #include "source/server/admin/stats_request.h"
 
-#include <string>
-#include <vector>
-
-#include "source/server/admin/stats_params.h"
-
 namespace Envoy {
 namespace Server {
 
@@ -47,23 +42,24 @@ bool StatsRequest<TextReadoutTyoe, CounterType, GaugeType, HistogramType>::nextC
 
   // nextChunk's contract is to add up to chunk_size_ additional bytes. The
   // caller is not required to drain the bytes after each call to nextChunk.
+  StatsRenderBase& stats_render = render();
   const uint64_t starting_response_length = response.length();
   while (response.length() - starting_response_length < chunk_size_) {
     while (stat_map_.empty()) {
       if (phase_stat_count_ == 0) {
-        getRender().noStats(response, phase_labels_[phases_.at(phase_index_)]);
+        stats_render.noStats(response, phase_labels_[phases_.at(phase_index_)]);
       } else {
         phase_stat_count_ = 0;
       }
       if (params_.type_ != StatsType::All) {
-        getRender().finalize(response);
+        stats_render.finalize(response);
         return false;
       }
 
       // Check if we are at the last phase: in that case, we are done;
       // if not, increment phase index and start next phase.
       if (phase_index_ == phases_.size() - 1) {
-        getRender().finalize(response);
+        stats_render.finalize(response);
         return false;
       } else {
         phase_index_++;

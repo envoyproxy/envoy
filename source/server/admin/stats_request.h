@@ -127,7 +127,7 @@ protected:
                                 const StatOrScopes& variant) PURE;
 
   virtual void setRenderPtr(Http::ResponseHeaderMap& response_headers) PURE;
-  virtual StatsRenderBase& getRender() PURE;
+  virtual StatsRenderBase& render() PURE;
 
   StatsParams params_;
   absl::btree_map<std::string, StatOrScopes> stat_map_;

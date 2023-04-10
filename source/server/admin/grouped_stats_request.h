@@ -1,22 +1,14 @@
 #pragma once
 
-#include <vector>
-
-#include "envoy/server/admin.h"
-
-#include "source/server/admin/stats_params.h"
-#include "source/server/admin/stats_render.h"
 #include "source/server/admin/stats_request.h"
-#include "source/server/admin/utils.h"
-
-#include "absl/container/btree_map.h"
-#include "absl/types/variant.h"
 
 namespace Envoy {
 namespace Server {
 
-// Renders stats grouped by tag-extracted name: this is currently used for Prometheus stats only
-// (and has some Prometheus-specific logic in it), but if needed could be generalized for other
+// In the context of this class, a stat is represented by a group of
+// gauges, counters etc. with the same tag-extracted name. This class
+// is currently used for Prometheus stats only (and has some Prometheus-specific
+// logic in it), but if needed could be generalized for other
 // formats.
 // TODO(rulex123): cleanup any Prometheus-specific logic if we decide to have a grouped view
 // for HTML or JSON stats.
@@ -54,7 +46,7 @@ protected:
   void renderStat(const std::string& name, Buffer::Instance& response, const StatOrScopes& variant);
 
   void setRenderPtr(Http::ResponseHeaderMap& response_headers) override;
-  StatsRenderBase& getRender() override {
+  StatsRenderBase& render() override {
     ASSERT(render_ != nullptr);
     return *render_;
   }

@@ -1,18 +1,14 @@
 #pragma once
 
-#include "envoy/server/admin.h"
-
-#include "source/server/admin/stats_params.h"
-#include "source/server/admin/stats_render.h"
 #include "source/server/admin/stats_request.h"
-#include "source/server/admin/utils.h"
-
-#include "absl/container/btree_map.h"
-#include "absl/types/variant.h"
 
 namespace Envoy {
 namespace Server {
 
+// In the context of this class, a stat is represented by an individual
+// gauge, counter etc.; this is in contrast to the GroupedStatsRequest class,
+// where a stat is a group of gauges, counters etc. with a common tag-extracted name.
+// This class is currently used for all non-Prometheus formats (e.g. text, JSON).
 class UngroupedStatsRequest
     : public StatsRequest<Stats::TextReadoutSharedPtr, Stats::CounterSharedPtr,
                           Stats::GaugeSharedPtr, Stats::HistogramSharedPtr> {
@@ -41,7 +37,7 @@ protected:
   void renderStat(const std::string& name, Buffer::Instance& response, const StatOrScopes& variant);
 
   void setRenderPtr(Http::ResponseHeaderMap& response_headers) override;
-  StatsRenderBase& getRender() override {
+  StatsRenderBase& render() override {
     ASSERT(render_ != nullptr);
     return *render_;
   }

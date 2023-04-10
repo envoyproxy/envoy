@@ -39,6 +39,9 @@ protected:
   Buffer::OwnedImpl response_;
 };
 
+// TODO(jmarantz): investigate whether we can reuse one of the pre-existing
+// scope classes instead of introducing a new subclass of IsolatedScopeImpl
+// (used only by a set of tests in prometheus_stats_test.cc).
 class TestScope : public Stats::IsolatedScopeImpl {
 public:
   TestScope(const std::string& prefix, Stats::MockStore& store);
