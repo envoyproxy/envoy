@@ -66,6 +66,9 @@ public:
   void onFilterChainDraining(
       const std::list<const Network::FilterChain*>& draining_filter_chains) override;
 
+protected:
+  Event::Dispatcher& dispatcher() { return dispatcher_; }
+
 private:
   friend class ActiveQuicListenerPeer;
 
@@ -111,6 +114,18 @@ public:
   static void setDisableKernelBpfPacketRoutingForTest(bool val) {
     disable_kernel_bpf_packet_routing_for_test_ = val;
   }
+
+protected:
+  virtual Network::ConnectionHandler::ActiveUdpListenerPtr createActiveQuicListener(
+      Runtime::Loader& runtime, uint32_t worker_index, uint32_t concurrency,
+      Event::Dispatcher& dispatcher, Network::UdpConnectionHandler& parent,
+      Network::SocketSharedPtr&& listen_socket, Network::ListenerConfig& listener_config,
+      const quic::QuicConfig& quic_config, bool kernel_worker_routing,
+      const envoy::config::core::v3::RuntimeFeatureFlag& enabled, QuicStatNames& quic_stat_names,
+      uint32_t packets_to_read_to_connection_count_ratio,
+      EnvoyQuicCryptoServerStreamFactoryInterface& crypto_server_stream_factory,
+      EnvoyQuicProofSourceFactoryInterface& proof_source_factory,
+      QuicConnectionIdGeneratorPtr&& cid_generator);
 
 private:
   friend class ActiveQuicListenerFactoryPeer;

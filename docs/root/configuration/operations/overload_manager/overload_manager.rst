@@ -279,6 +279,7 @@ with the following statistics:
   pressure, Gauge, Resource pressure as a percent
   failed_updates, Counter, Total failed attempts to update the resource pressure
   skipped_updates, Counter, Total skipped attempts to update the resource pressure due to a pending update
+  refresh_interval_delay, Histogram, Latencies for the delay between overload manager resource refresh loops
 
 Each configured overload action has a statistics tree rooted at *overload.<name>.*
 with the following statistics:

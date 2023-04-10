@@ -46,7 +46,6 @@ public:
   Http::TestRequestHeaderMapImpl downstream_request_header_map_{};
   Stats::TestUtil::TestSymbolTable symbol_table_;
   Stats::StatNamePool pool_;
-  NiceMock<MockTimeSystem> time_system;
   NiceMock<Server::Configuration::MockFactoryContext> context_;
   NiceMock<MockRouterFilterInterface> router_filter_interface_;
   std::unique_ptr<Router::FilterConfig> router_config_; // must outlive `UpstreamRequest`
@@ -159,6 +158,28 @@ TEST_F(UpstreamRequestTest, AcceptRouterHeaders) {
 
   EXPECT_CALL(router_filter_interface_.callbacks_, resetStream(_, _));
   filter->callbacks_->resetStream();
+}
+
+TEST_F(UpstreamRequestTest, ConnectionPoolLatencyTime) {
+  initialize();
+
+  const auto latency_to_add = std::chrono::microseconds(10);
+
+  EXPECT_CALL(*conn_pool_, newStream(_))
+      .WillOnce(Invoke([&](GenericConnectionPoolCallbacks* callbacks) {
+        router_filter_interface_.callbacks_.dispatcher_.globalTimeSystem().advanceTimeWait(
+            latency_to_add);
+
+        callbacks->onPoolFailure(ConnectionPool::PoolFailureReason::LocalConnectionFailure,
+                                 "Some Failure", nullptr);
+        return nullptr;
+      }));
+
+  upstream_request_->acceptHeadersFromRouter(false);
+  const StreamInfo::UpstreamTiming& timing =
+      upstream_request_->streamInfo().upstreamInfo()->upstreamTiming();
+  ASSERT_TRUE(timing.connectionPoolCallbackLatency().has_value());
+  EXPECT_EQ(timing.connectionPoolCallbackLatency().value(), latency_to_add);
 }
 
 // UpstreamRequest dumpState without allocating memory.

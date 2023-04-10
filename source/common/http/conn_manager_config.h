@@ -216,6 +216,11 @@ public:
    * @return const absl::optional<std::chrono::milliseconds>& the interval to flush the access logs.
    */
   virtual const absl::optional<std::chrono::milliseconds>& accessLogFlushInterval() PURE;
+
+  // If set to true, access log will be flushed when a new HTTP request is received, after request
+  // headers have been evaluated, and before attempting to establish a connection with the upstream.
+  virtual bool flushAccessLogOnNewRequest() PURE;
+
   /**
    * Called to create a codec for the connection manager. This function will be called when the
    * first byte of application data is received. This is done to support handling of ALPN, protocol

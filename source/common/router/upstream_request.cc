@@ -82,7 +82,7 @@ public:
 UpstreamRequest::UpstreamRequest(RouterFilterInterface& parent,
                                  std::unique_ptr<GenericConnPool>&& conn_pool,
                                  bool can_send_early_data, bool can_use_http3)
-    : parent_(parent), conn_pool_(std::move(conn_pool)), grpc_rq_success_deferred_(false),
+    : parent_(parent), conn_pool_(std::move(conn_pool)),
       stream_info_(parent_.callbacks()->dispatcher().timeSource(), nullptr),
       start_time_(parent_.callbacks()->dispatcher().timeSource().monotonicTime()),
       calling_encode_headers_(false), upstream_canary_(false), router_sent_end_stream_(false),
@@ -94,7 +94,7 @@ UpstreamRequest::UpstreamRequest(RouterFilterInterface& parent,
       cleaned_up_(false), had_upstream_(false),
       allow_upstream_filters_(
           Runtime::runtimeFeatureEnabled("envoy.reloadable_features.allow_upstream_filters")),
-      stream_options_({can_send_early_data, can_use_http3}),
+      stream_options_({can_send_early_data, can_use_http3}), grpc_rq_success_deferred_(false),
       upstream_wait_for_response_headers_before_disabling_read_(Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.upstream_wait_for_response_headers_before_disabling_read")) {
   if (parent_.config().start_child_span_) {
@@ -369,6 +369,16 @@ void UpstreamRequest::acceptHeadersFromRouter(bool end_stream) {
   ASSERT(!router_sent_end_stream_);
   router_sent_end_stream_ = end_stream;
 
+  // Make sure that when we are forwarding CONNECT payload we do not do so until
+  // the upstream has accepted the CONNECT request.
+  // This must be done before conn_pool->newStream, as onPoolReady un-pauses for CONNECT
+  // termination.
+  auto* headers = parent_.downstreamHeaders();
+  if (allow_upstream_filters_ &&
+      headers->getMethodValue() == Http::Headers::get().MethodValues.Connect) {
+    paused_for_connect_ = true;
+  }
+
   // Kick off creation of the upstream connection immediately upon receiving headers.
   // In future it may be possible for upstream filters to delay this, or influence connection
   // creation but for now optimize for minimal latency and fetch the connection
@@ -376,14 +386,6 @@ void UpstreamRequest::acceptHeadersFromRouter(bool end_stream) {
   conn_pool_->newStream(this);
   if (!allow_upstream_filters_) {
     return;
-  }
-
-  auto* headers = parent_.downstreamHeaders();
-
-  // Make sure that when we are forwarding CONNECT payload we do not do so until
-  // the upstream has accepted the CONNECT request.
-  if (headers->getMethodValue() == Http::Headers::get().MethodValues.Connect) {
-    paused_for_connect_ = true;
   }
 
   filter_manager_->requestHeadersInitialized();
@@ -564,9 +566,15 @@ void UpstreamRequest::onPerTryTimeout() {
   }
 }
 
+void UpstreamRequest::recordConnectionPoolCallbackLatency() {
+  upstreamTiming().recordConnectionPoolCallbackLatency(
+      start_time_, parent_.callbacks()->dispatcher().timeSource());
+}
+
 void UpstreamRequest::onPoolFailure(ConnectionPool::PoolFailureReason reason,
                                     absl::string_view transport_failure_reason,
                                     Upstream::HostDescriptionConstSharedPtr host) {
+  recordConnectionPoolCallbackLatency();
   Http::StreamResetReason reset_reason = Http::StreamResetReason::ConnectionFailure;
   switch (reason) {
   case ConnectionPool::PoolFailureReason::Overflow:
@@ -596,6 +604,7 @@ void UpstreamRequest::onPoolReady(std::unique_ptr<GenericUpstream>&& upstream,
   // This may be called under an existing ScopeTrackerScopeState but it will unwind correctly.
   ScopeTrackerScopeState scope(&parent_.callbacks()->scope(), parent_.callbacks()->dispatcher());
   ENVOY_STREAM_LOG(debug, "pool ready", *parent_.callbacks());
+  recordConnectionPoolCallbackLatency();
   upstream_ = std::move(upstream);
   had_upstream_ = true;
   // Have the upstream use the account of the downstream.

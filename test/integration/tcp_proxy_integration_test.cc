@@ -639,11 +639,11 @@ TEST_P(TcpProxyIntegrationTest, TcpProxyBidirectionalBytesMeter) {
 
   std::vector<IntegrationTcpClientPtr> clients{client_count};
   std::vector<FakeRawConnectionPtr> fake_connections{upstream_count};
-  const auto indicies = std::vector<uint64_t>({0, 1, 2});
+  const auto indices = std::vector<uint64_t>({0, 1, 2});
 
   for (int i = 0; i < client_count; ++i) {
     clients[i] = makeTcpConnection(lookupPort("tcp_proxy"));
-    waitForNextRawUpstreamConnection(indicies, fake_connections[i]);
+    waitForNextRawUpstreamConnection(indices, fake_connections[i]);
   }
 
   ASSERT_TRUE(clients[0]->write("hello")); // send initial client data

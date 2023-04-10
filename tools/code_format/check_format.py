@@ -1062,7 +1062,7 @@ if __name__ == "__main__":
             if output:
                 error_messages.append(
                     "This change appears to add visibility rules. Please get senior maintainer "
-                    "approval to add an exemption to check_visibility tools/code_format/check_format.py"
+                    "approval to add an exemption to visibility_excludes in tools/code_format/config.yaml"
                 )
             output = subprocess.check_output(
                 "grep -r --include BUILD envoy_package source/extensions/*",

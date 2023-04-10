@@ -61,7 +61,36 @@ private:
   void (*envoy_go_filter_on_http_destroy_)(httpRequest* p0, GoUint64 p1) = {nullptr};
 };
 
+class ClusterSpecifierDso : public Dso {
+public:
+  ClusterSpecifierDso(const std::string dso_name) : Dso(dso_name){};
+  virtual ~ClusterSpecifierDso() = default;
+
+  virtual GoInt64 envoyGoOnClusterSpecify(GoUint64 plugin_ptr, GoUint64 header_ptr,
+                                          GoUint64 plugin_id, GoUint64 buffer_ptr,
+                                          GoUint64 buffer_len) PURE;
+  virtual GoUint64 envoyGoClusterSpecifierNewPlugin(GoUint64 config_ptr, GoUint64 config_len) PURE;
+};
+
+class ClusterSpecifierDsoImpl : public ClusterSpecifierDso {
+public:
+  ClusterSpecifierDsoImpl(const std::string dso_name);
+  ~ClusterSpecifierDsoImpl() override = default;
+
+  GoInt64 envoyGoOnClusterSpecify(GoUint64 plugin_ptr, GoUint64 header_ptr, GoUint64 plugin_id,
+                                  GoUint64 buffer_ptr, GoUint64 buffer_len) override;
+  GoUint64 envoyGoClusterSpecifierNewPlugin(GoUint64 config_ptr, GoUint64 config_len) override;
+
+private:
+  GoUint64 (*envoy_go_cluster_specifier_new_plugin_)(GoUint64 config_ptr,
+                                                     GoUint64 config_len) = {nullptr};
+  GoUint64 (*envoy_go_on_cluster_specify_)(GoUint64 plugin_ptr, GoUint64 header_ptr,
+                                           GoUint64 plugin_id, GoUint64 buffer_ptr,
+                                           GoUint64 buffer_len) = {nullptr};
+};
+
 using HttpFilterDsoPtr = std::shared_ptr<HttpFilterDso>;
+using ClusterSpecifierDsoPtr = std::shared_ptr<ClusterSpecifierDso>;
 
 template <class T> class DsoManager {
 

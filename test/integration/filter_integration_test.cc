@@ -28,7 +28,7 @@ public:
   }
 
   void verifyUpStreamRequestAfterStopAllFilter() {
-    if (downstreamProtocol() >= Http::CodecType::HTTP2) {
+    if (downstreamProtocol() != Http::CodecType::HTTP1) {
       // decode-headers-return-stop-all-filter calls addDecodedData in decodeData and
       // decodeTrailers. 2 decoded data were added.
       EXPECT_EQ(count_ * size_ + added_decoded_data_size_ * 2, upstream_request_->bodyLength());
@@ -192,9 +192,15 @@ TEST_P(FilterIntegrationTest, MissingHeadersLocalReplyDownstreamBytesCount) {
   EXPECT_EQ("200", response->headers().getStatusValue());
 
   if (testing_downstream_filter_) {
-    expectDownstreamBytesSentAndReceived(BytesCountExpectation(90, 88, 71, 54),
-                                         BytesCountExpectation(0, 58, 0, 58),
-                                         BytesCountExpectation(7, 10, 7, 8));
+    if (Runtime::runtimeFeatureEnabled(Runtime::expand_agnostic_stream_lifetime)) {
+      expectDownstreamBytesSentAndReceived(BytesCountExpectation(90, 88, 71, 54),
+                                           BytesCountExpectation(40, 58, 40, 58),
+                                           BytesCountExpectation(7, 10, 7, 8));
+    } else {
+      expectDownstreamBytesSentAndReceived(BytesCountExpectation(90, 88, 71, 54),
+                                           BytesCountExpectation(0, 58, 0, 58),
+                                           BytesCountExpectation(7, 10, 7, 8));
+    }
   }
 }
 
@@ -409,7 +415,7 @@ name: add-trailers-filter
   upstream_request_->encodeData(128, true);
   ASSERT_TRUE(response->waitForEndStream());
 
-  if (upstreamProtocol() >= Http::CodecType::HTTP2) {
+  if (upstreamProtocol() != Http::CodecType::HTTP1) {
     EXPECT_EQ("decode", upstream_request_->trailers()
                             ->get(Http::LowerCaseString("grpc-message"))[0]
                             ->value()
@@ -417,7 +423,7 @@ name: add-trailers-filter
   }
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("503", response->headers().getStatusValue());
-  if (downstream_protocol_ >= Http::CodecType::HTTP2) {
+  if (downstream_protocol_ != Http::CodecType::HTTP1) {
     EXPECT_EQ("encode", response->trailers()->getGrpcMessageValue());
   }
 }
@@ -502,7 +508,7 @@ TEST_P(FilterIntegrationTest, HittingDecoderFilterLimit) {
   // the 413-and-connection-close may be sent while the body is still being
   // sent, resulting in a write error and the connection being closed before the
   // response is read.
-  if (downstream_protocol_ >= Http::CodecType::HTTP2) {
+  if (downstream_protocol_ != Http::CodecType::HTTP1) {
     ASSERT_TRUE(response->complete());
   }
   if (response->complete()) {

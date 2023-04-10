@@ -72,8 +72,14 @@ Tracing::SpanPtr Driver::startSpan(const Tracing::Config&, Tracing::TraceContext
           createSpanContext(toStdStringView(header_value_string)); // NOLINT(std::string_view)
       tracing_context = tracing_context_factory_->create(span_context);
     } catch (std::exception& e) {
-      ENVOY_LOG(warn, "New SkyWalking Span/Segment cannot be created for error: {}", e.what());
-      return std::make_unique<Tracing::NullSpan>();
+      ENVOY_LOG(
+          warn,
+          "New SkyWalking Span/Segment with previous span context cannot be created for error: {}",
+          e.what());
+      if (!decision.traced) {
+        return std::make_unique<Tracing::NullSpan>();
+      }
+      tracing_context = tracing_context_factory_->create();
     }
   }
 

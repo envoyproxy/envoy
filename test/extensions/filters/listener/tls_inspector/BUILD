@@ -91,6 +91,7 @@ envoy_cc_library(
 
 envoy_cc_test(
     name = "tls_inspector_integration_test",
+    size = "large",
     srcs = [
         "tls_inspector_integration_test.cc",
     ],

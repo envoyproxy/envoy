@@ -49,7 +49,9 @@ TEST(TestConfig, ConfigIsApplied) {
       .enableAdminInterface(true)
 #endif
       .setForceAlwaysUsev6(true)
+#ifdef ENVOY_GOOGLE_GRPC
       .setNodeId("my_test_node")
+#endif
       .setDeviceOs("probably-ubuntu-on-CI");
 
   std::unique_ptr<Bootstrap> bootstrap = engine_builder.generateBootstrap();
@@ -292,7 +294,7 @@ TEST(TestConfig, DisableHttp3) {
       Not(HasSubstr("envoy.extensions.filters.http.alternate_protocols_cache.v3.FilterConfig")));
 #endif
 }
-
+#ifdef ENVOY_GOOGLE_GRPC
 TEST(TestConfig, RtdsWithoutAds) {
   EngineBuilder engine_builder;
   engine_builder.addRtdsLayer("some rtds layer");
@@ -353,6 +355,7 @@ TEST(TestConfig, AdsConfig) {
                 .token_lifetime_seconds(),
             500);
 }
+#endif
 
 TEST(TestConfig, EnablePlatformCertificatesValidation) {
   EngineBuilder engine_builder;
@@ -443,8 +446,9 @@ TEST(TestConfig, DISABLED_StringAccessors) {
   release_envoy_data(data);
 }
 
-TEST(TestConfig, AddVirtualCluster) {
+TEST(TestConfig, AddVirtualClusterLegacy) {
   EngineBuilder engine_builder;
+
   engine_builder.addVirtualCluster(
       "{headers: [{name: ':method', string_match: {exact: POST}}], name: cluster1}");
   std::unique_ptr<Bootstrap> bootstrap = engine_builder.generateBootstrap();
@@ -456,6 +460,22 @@ TEST(TestConfig, AddVirtualCluster) {
   EXPECT_THAT(bootstrap->ShortDebugString(), HasSubstr("cluster2"));
 }
 
+TEST(TestConfig, AddVirtualCluster) {
+  EngineBuilder engine_builder;
+
+  std::vector<MatcherData> matchers = {{":method", MatcherData::EXACT, "POST"},
+                                       {":method", MatcherData::SAFE_REGEX, ".*E.*"}};
+  engine_builder.addVirtualCluster("cluster1", matchers);
+  std::unique_ptr<Bootstrap> bootstrap = engine_builder.generateBootstrap();
+  EXPECT_THAT(bootstrap->ShortDebugString(), HasSubstr("cluster1"));
+
+  engine_builder.addVirtualCluster("cluster2", matchers);
+  bootstrap = engine_builder.generateBootstrap();
+  EXPECT_THAT(bootstrap->ShortDebugString(), HasSubstr("cluster1"));
+  EXPECT_THAT(bootstrap->ShortDebugString(), HasSubstr("cluster2"));
+}
+
+#ifdef ENVOY_GOOGLE_GRPC
 TEST(TestConfig, SetNodeId) {
   EngineBuilder engine_builder;
   const std::string default_node_id = "envoy-mobile";
@@ -501,6 +521,7 @@ TEST(TestConfig, AddCdsLayer) {
   EXPECT_EQ(bootstrap->dynamic_resources().cds_config().api_config_source().transport_api_version(),
             envoy::config::core::v3::ApiVersion::V3);
 }
+#endif
 
 } // namespace
 } // namespace Envoy

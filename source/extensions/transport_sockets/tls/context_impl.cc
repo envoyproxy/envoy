@@ -157,6 +157,14 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
         !SSL_CTX_set1_curves_list(ctx.ssl_ctx_.get(), config.ecdhCurves().c_str())) {
       throw EnvoyException(absl::StrCat("Failed to initialize ECDH curves ", config.ecdhCurves()));
     }
+
+    // Set signature algorithms if given, otherwise fall back to BoringSSL defaults.
+    if (!capabilities_.provides_sigalgs && !config.signatureAlgorithms().empty()) {
+      if (!SSL_CTX_set1_sigalgs_list(ctx.ssl_ctx_.get(), config.signatureAlgorithms().c_str())) {
+        throw EnvoyException(absl::StrCat("Failed to initialize TLS signature algorithms ",
+                                          config.signatureAlgorithms()));
+      }
+    }
   }
 
   auto verify_mode = cert_validator_->initializeSslContexts(
@@ -641,17 +649,6 @@ ClientContextImpl::ClientContextImpl(Stats::Scope& scope,
     }
   }
 
-  if (!config.signingAlgorithmsForTest().empty()) {
-    const uint16_t sigalgs = parseSigningAlgorithmsForTest(config.signingAlgorithmsForTest());
-    RELEASE_ASSERT(sigalgs != 0, fmt::format("unsupported signing algorithm {}",
-                                             config.signingAlgorithmsForTest()));
-
-    for (auto& ctx : tls_contexts_) {
-      const int rc = SSL_CTX_set_verify_algorithm_prefs(ctx.ssl_ctx_.get(), &sigalgs, 1);
-      RELEASE_ASSERT(rc == 1, Utility::getLastCryptoError().value_or(""));
-    }
-  }
-
   if (max_session_keys_ > 0) {
     SSL_CTX_set_session_cache_mode(tls_contexts_[0].ssl_ctx_.get(), SSL_SESS_CACHE_CLIENT);
     SSL_CTX_sess_set_new_cb(
@@ -759,17 +756,6 @@ int ClientContextImpl::newSessionKey(SSL_SESSION* session) {
   // Add new session key at the front of the queue, so that it's used first.
   session_keys_.push_front(bssl::UniquePtr<SSL_SESSION>(session));
   return 1; // Tell BoringSSL that we took ownership of the session.
-}
-
-uint16_t ClientContextImpl::parseSigningAlgorithmsForTest(const std::string& sigalgs) {
-  // This is used only when testing RSA/ECDSA certificate selection, so only the signing algorithms
-  // used in tests are supported here.
-  if (sigalgs == "rsa_pss_rsae_sha256") {
-    return SSL_SIGN_RSA_PSS_RSAE_SHA256;
-  } else if (sigalgs == "ecdsa_secp256r1_sha256") {
-    return SSL_SIGN_ECDSA_SECP256R1_SHA256;
-  }
-  return 0;
 }
 
 ServerContextImpl::ServerContextImpl(Stats::Scope& scope,

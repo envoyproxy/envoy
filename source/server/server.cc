@@ -626,7 +626,7 @@ void InstanceImpl::initialize(Network::Address::InstanceConstSharedPtr local_add
         bootstrap_.listener_manager(), false);
   } else {
     listener_manager_factory_ = &Config::Utility::getAndCheckFactoryByName<ListenerManagerFactory>(
-        options_.listenerManager());
+        Config::ServerExtensionValues::get().DEFAULT_LISTENER);
   }
 
   // Workers get created first so they register for thread local updates.
@@ -1023,7 +1023,7 @@ InstanceImpl::registerCallback(Stage stage, StageCallbackWithCompletion callback
                                                                                 callback);
 }
 
-void InstanceImpl::notifyCallbacksForStage(Stage stage, Event::PostCb completion_cb) {
+void InstanceImpl::notifyCallbacksForStage(Stage stage, std::function<void()> completion_cb) {
   ASSERT_IS_MAIN_OR_TEST_THREAD();
   const auto it = stage_callbacks_.find(stage);
   if (it != stage_callbacks_.end()) {

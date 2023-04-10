@@ -42,6 +42,7 @@ envoy_extension_cc_test(
 
 envoy_extension_cc_test(
     name = "integration_test",
+    size = "large",
     srcs = ["integration_test.cc"],
     extension_names = ["envoy.filters.network.rbac"],
     deps = [

@@ -214,7 +214,8 @@ TEST_P(TcpProxyOdcdsIntegrationTest, RepeatedRequest) {
   }
 
   for (auto& tcp_client : tcp_clients_) {
-    tcp_client->waitForHalfClose();
+    // Ignore spurious events as any client can close in any order.
+    tcp_client->waitForHalfClose(true);
     tcp_client->close();
   }
 

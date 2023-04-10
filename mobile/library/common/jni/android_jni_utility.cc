@@ -9,7 +9,6 @@
 #include "library/common/data/utility.h"
 #include "library/common/jni/import/jni_import.h"
 #include "library/common/jni/jni_support.h"
-#include "library/common/jni/jni_version.h"
 #include "library/common/jni/jni_utility.h"
 #endif
 

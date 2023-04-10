@@ -25,6 +25,7 @@ envoy_cc_test(
 
 envoy_cc_test(
     name = "inputs_integration_test",
+    size = "large",
     srcs = ["inputs_integration_test.cc"],
     deps = [
         "//source/common/network:address_lib",

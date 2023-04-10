@@ -179,6 +179,11 @@ Http::FilterTrailersStatus Filter::encodeTrailers(Http::ResponseTrailerMap& trai
 void Filter::onDestroy() {
   ENVOY_LOG(debug, "golang filter on destroy");
 
+  // do nothing, stream reset may happen before entering this filter.
+  if (req_ == nullptr) {
+    return;
+  }
+
   {
     Thread::LockGuard lock(mutex_);
     if (has_destroyed_) {
@@ -188,7 +193,6 @@ void Filter::onDestroy() {
     has_destroyed_ = true;
   }
 
-  ASSERT(req_ != nullptr);
   auto& state = getProcessorState();
   auto reason = state.isProcessingInGo() ? DestroyReason::Terminate : DestroyReason::Normal;
 
@@ -897,6 +901,49 @@ CAPIStatus Filter::getStringValue(int id, GoString* value_str) {
   return CAPIStatus::CAPIOK;
 }
 
+CAPIStatus Filter::log(uint32_t level, absl::string_view message) {
+  Thread::LockGuard lock(mutex_);
+  if (has_destroyed_) {
+    ENVOY_LOG(debug, "golang filter has been destroyed");
+    return CAPIStatus::CAPIFilterIsDestroy;
+  }
+  auto& state = getProcessorState();
+  if (!state.isProcessingInGo()) {
+    ENVOY_LOG(debug, "golang filter is not processing Go");
+    return CAPIStatus::CAPINotInGo;
+  }
+
+  switch (static_cast<spdlog::level::level_enum>(level)) {
+  case spdlog::level::trace:
+    ENVOY_LOG(trace, "[go_plugin_http][{}] {}", config_->pluginName(), message);
+    return CAPIStatus::CAPIOK;
+  case spdlog::level::debug:
+    ENVOY_LOG(debug, "[go_plugin_http][{}] {}", config_->pluginName(), message);
+    return CAPIStatus::CAPIOK;
+  case spdlog::level::info:
+    ENVOY_LOG(info, "[go_plugin_http][{}] {}", config_->pluginName(), message);
+    return CAPIStatus::CAPIOK;
+  case spdlog::level::warn:
+    ENVOY_LOG(warn, "[go_plugin_http][{}] {}", config_->pluginName(), message);
+    return CAPIStatus::CAPIOK;
+  case spdlog::level::err:
+    ENVOY_LOG(error, "[go_plugin_http][{}] {}", config_->pluginName(), message);
+    return CAPIStatus::CAPIOK;
+  case spdlog::level::critical:
+    ENVOY_LOG(critical, "[go_plugin_http][{}] {}", config_->pluginName(), message);
+    return CAPIStatus::CAPIOK;
+  case spdlog::level::off:
+    // means not logging
+    return CAPIStatus::CAPIOK;
+  case spdlog::level::n_levels:
+    PANIC("not implemented");
+  }
+
+  ENVOY_LOG(warn, "[go_plugin_http][{}] undefined log level {}", config_->pluginName(), level);
+
+  PANIC_DUE_TO_CORRUPT_ENUM;
+}
+
 /* ConfigId */
 
 uint64_t Filter::getMergedConfigId(ProcessorState& state) {
@@ -936,6 +983,7 @@ uint64_t FilterConfig::getConfigId() {
   if (config_id_ != 0) {
     return config_id_;
   }
+
   std::string str;
   auto res = plugin_config_.SerializeToString(&str);
   ASSERT(res, "SerializeToString is always successful");

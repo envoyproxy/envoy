@@ -35,5 +35,15 @@ func envoyGoFilterOnHttpData(r *C.httpRequest, endStream, buffer, length uint64)
 func envoyGoFilterOnHttpDestroy(r *C.httpRequest, reason uint64) {
 }
 
+//export envoyGoClusterSpecifierNewPlugin
+func envoyGoClusterSpecifierNewPlugin(configPtr uint64, configLen uint64) uint64 {
+	return 200
+}
+
+//export envoyGoOnClusterSpecify
+func envoyGoOnClusterSpecify(pluginPtr uint64, headerPtr uint64, pluginId uint64, bufferPtr uint64, bufferLen uint64) int64 {
+	return 0
+}
+
 func main() {
 }

@@ -4,7 +4,6 @@
 
 #include "library/common/jni/jni_support.h"
 #include "library/common/jni/jni_utility.h"
-#include "library/common/jni/jni_version.h"
 
 // NOLINT(namespace-envoy)
 

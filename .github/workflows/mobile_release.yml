@@ -13,7 +13,7 @@ jobs:
     runs-on: ubuntu-20.04
     timeout-minutes: 120
     container:
-      image: envoyproxy/envoy-build-ubuntu:mobile-458cb49ca2013c0ccf057d00ad1d4407920c4e52
+      image: envoyproxy/envoy-build-ubuntu:mobile-321658b6b50abda6869f89fac275f59bf3b1e757
       env:
         CC: /opt/llvm/bin/clang
         CXX: /opt/llvm/bin/clang++
@@ -38,7 +38,12 @@ jobs:
           --linkopt=-fuse-ld=lld \
           //:android_dist
     - name: 'Tar artifacts'
-      run: tar -czvf envoy_android_aar_sources.tar.gz bazel-bin/library/kotlin/io/envoyproxy/envoymobile/envoy.aar bazel-bin/library/kotlin/io/envoyproxy/envoymobile/envoy-pom.xml bazel-bin/library/kotlin/io/envoyproxy/envoymobile/envoy-sources.jar bazel-bin/library/kotlin/io/envoyproxy/envoymobile/envoy-javadoc.jar
+      run: |
+        tar -czvf envoy_android_aar_sources.tar.gz \
+            bazel-bin/library/kotlin/io/envoyproxy/envoymobile/envoy.aar \
+            bazel-bin/library/kotlin/io/envoyproxy/envoymobile/envoy-pom.xml \
+            bazel-bin/library/kotlin/io/envoyproxy/envoymobile/envoy-sources.jar \
+            bazel-bin/library/kotlin/io/envoyproxy/envoymobile/envoy-javadoc.jar
       working-directory: mobile
     - uses: actions/upload-artifact@v2
       with:

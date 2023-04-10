@@ -68,7 +68,7 @@ void Filter::initiateCall(const Http::RequestHeaderMap& headers) {
   Filters::Common::ExtAuthz::CheckRequestUtils::createHttpCheck(
       decoder_callbacks_, headers, std::move(context_extensions), std::move(metadata_context),
       check_request_, config_->maxRequestBytes(), config_->packAsBytes(),
-      config_->includePeerCertificate(), config_->destinationLabels(),
+      config_->includePeerCertificate(), config_->includeTLSSession(), config_->destinationLabels(),
       config_->requestHeaderMatchers());
 
   ENVOY_STREAM_LOG(trace, "ext_authz filter calling authorization server", *decoder_callbacks_);
@@ -410,6 +410,11 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
       stats_.failure_mode_allowed_.inc();
       if (cluster_) {
         config_->incCounter(cluster_->statsScope(), config_->ext_authz_failure_mode_allowed_);
+      }
+      if (Runtime::runtimeFeatureEnabled(
+              "envoy.reloadable_features.http_ext_auth_failure_mode_allow_header_add")) {
+        request_headers_->addReferenceKey(
+            Filters::Common::ExtAuthz::Headers::get().EnvoyAuthFailureModeAllowed, "true");
       }
       continueDecoding();
     } else {

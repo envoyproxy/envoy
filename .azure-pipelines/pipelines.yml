@@ -26,9 +26,14 @@ variables:
   # A release branch can be either `main` or a `release/v1.x` stable branch
   value: $[or(eq(variables['isMain'], 'true'), eq(variables['isReleaseBranch'], 'true'))]
 
-# Variable settings
-- name: buildImageCacheVersion
+## Variable settings
+# Caches (tip: append a version suffix while testing caches)
+- name: cacheKeyBuildImage
   value: v0
+- name: cacheKeyDockerBuild
+  value: v0
+- name: cacheKeyRepository
+  value: './WORKSPACE | **/*.bzl, !mobile/**, !envoy-docs/**'
 
 
 stages:
@@ -42,6 +47,9 @@ stages:
     parameters:
       buildStageDeps:
       - env
+      checkStageDeps:
+      - env
+      checksConcurrency: 10
       macBuildStageDeps:
       - env
       windowsBuildStageDeps:

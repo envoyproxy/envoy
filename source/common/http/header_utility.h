@@ -140,6 +140,13 @@ public:
   static bool headerValueIsValid(const absl::string_view header_value);
 
   /**
+   * Validates that a header name is valid, according to RFC 7230, section 3.2.
+   * http://tools.ietf.org/html/rfc7230#section-3.2
+   * @return bool true if the header name is valid, according to the aforementioned RFC.
+   */
+  static bool headerNameIsValid(const absl::string_view header_key);
+
+  /**
    * Checks if header name contains underscore characters.
    * Underscore character is allowed in header names by the RFC-7230 and this check is implemented
    * as a security measure due to systems that treat '_' and '-' as interchangeable. Envoy by
@@ -169,6 +176,14 @@ public:
    */
   static bool isConnectResponse(const RequestHeaderMap* request_headers,
                                 const ResponseHeaderMap& response_headers);
+
+#ifdef ENVOY_ENABLE_HTTP_DATAGRAMS
+  /**
+   * @brief Returns true if the Capsule-Protocol header field (RFC 9297) is set to true. If the
+   * header field is included multiple times, returns false as per RFC 9297.
+   */
+  static bool isCapsuleProtocol(const RequestOrResponseHeaderMap& headers);
+#endif
 
   static bool requestShouldHaveNoBody(const RequestHeaderMap& headers);
 
@@ -230,6 +245,14 @@ public:
    * missing.
    */
   static Http::Status checkRequiredResponseHeaders(const Http::ResponseHeaderMap& headers);
+
+  /* Does a common header check ensuring that header keys and values are valid and do not contain
+   * forbidden characters (e.g. valid HTTP header keys/values should never contain embedded NULLs
+   * or new lines.)
+   * @return Status containing the result. If failed, message includes details on which header key
+   * or value was invalid.
+   */
+  static Http::Status checkValidRequestHeaders(const Http::RequestHeaderMap& headers);
 
   /**
    * Returns true if a header may be safely removed without causing additional
@@ -303,6 +326,11 @@ public:
    * according to https://datatracker.ietf.org/doc/html/rfc8441#section-4
    */
   static bool isExtendedH2ConnectRequest(const Http::RequestHeaderMap& headers);
+
+  /**
+   * Return true if the given header name is a pseudo header.
+   */
+  static bool isPseudoHeader(absl::string_view header_name);
 };
 
 } // namespace Http

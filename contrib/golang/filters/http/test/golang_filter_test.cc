@@ -39,9 +39,6 @@ namespace {
 class TestFilter : public Filter {
 public:
   using Filter::Filter;
-  void onDestroy() override {
-    // do nothing
-  }
 };
 
 class GolangHttpFilterTest : public testing::Test {
@@ -176,6 +173,19 @@ TEST_F(GolangHttpFilterTest, SetHeaderAtWrongStage) {
   EXPECT_EQ(CAPINotInGo, filter_->setHeader("foo", "bar", HeaderSet));
 }
 
+// test log
+TEST_F(GolangHttpFilterTest, TestLog) {
+  InSequence s;
+  setup(PASSTHROUGH, genSoPath(PASSTHROUGH), PASSTHROUGH);
+
+  EXPECT_EQ(CAPINotInGo, filter_->log(spdlog::level::trace, "test log"));
+  EXPECT_NO_FATAL_FAILURE(filter_->log(spdlog::level::trace, "test log"));
+  EXPECT_NO_FATAL_FAILURE(filter_->log(spdlog::level::debug, "test log"));
+  EXPECT_NO_FATAL_FAILURE(filter_->log(spdlog::level::info, "test log"));
+  EXPECT_NO_FATAL_FAILURE(filter_->log(spdlog::level::warn, "test log"));
+  EXPECT_NO_FATAL_FAILURE(filter_->log(spdlog::level::err, "test log"));
+  EXPECT_NO_FATAL_FAILURE(filter_->log(spdlog::level::critical, "test log"));
+}
 } // namespace
 } // namespace Golang
 } // namespace HttpFilters
