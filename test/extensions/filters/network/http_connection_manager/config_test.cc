@@ -1685,8 +1685,8 @@ TEST_F(HttpConnectionManagerConfigTest,
             route_config_provider_manager_, scoped_routes_config_provider_manager_,
             tracer_manager_, filter_config_provider_manager_),
         EnvoyException,
-        "Only one of flush_access_log_on_new_request from TcpProxy or"
-        "flush_access_log_on_new_request from TcpAccessLogOptions can be specified.");
+        "Only one of flush_access_log_on_new_request from HttpConnectionManager or"
+        "flush_access_log_on_new_request from HcmAccessLogOptions can be specified.");
   }
 }
 
@@ -1795,8 +1795,8 @@ TEST_F(HttpConnectionManagerConfigTest, DEPRECATED_FEATURE_TEST(DeprecatedAccess
             route_config_provider_manager_, scoped_routes_config_provider_manager_,
             tracer_manager_, filter_config_provider_manager_),
         EnvoyException,
-        "Only one of access_log_flush_interval from TcpProxy or"
-        "access_log_flush_interval from TcpAccessLogOptions can be specified.");
+        "Only one of access_log_flush_interval from HttpConnectionManager or"
+        "access_log_flush_interval from HcmAccessLogOptions can be specified.");
   }
 }
 

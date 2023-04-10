@@ -553,8 +553,8 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
       config.access_log_options().has_access_log_flush_interval()) {
     if (config.has_access_log_flush_interval()) {
       throw EnvoyException(
-          "Only one of access_log_flush_interval from TcpProxy or"
-          "access_log_flush_interval from TcpAccessLogOptions can be specified.");
+          "Only one of access_log_flush_interval from HttpConnectionManager or"
+          "access_log_flush_interval from HcmAccessLogOptions can be specified.");
     }
 
     access_log_flush_interval_ = std::chrono::milliseconds(DurationUtil::durationToMilliseconds(
@@ -741,8 +741,8 @@ bool HttpConnectionManagerConfig::getFlushAccessLogNewRequestConfig(
     if (filter_config.access_log_options().flush_access_log_on_new_request() &&
         filter_config.flush_access_log_on_new_request() /* deprecated */) {
       throw EnvoyException(
-          "Only one of flush_access_log_on_new_request from TcpProxy or"
-          "flush_access_log_on_new_request from TcpAccessLogOptions can be specified.");
+          "Only one of flush_access_log_on_new_request from HttpConnectionManager or"
+          "flush_access_log_on_new_request from HcmAccessLogOptions can be specified.");
     }
 
     return filter_config.access_log_options().flush_access_log_on_new_request();
