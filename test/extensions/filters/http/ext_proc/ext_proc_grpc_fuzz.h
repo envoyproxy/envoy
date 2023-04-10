@@ -54,7 +54,6 @@ public:
 
   void tearDown(bool keep_test_server) {
     cleanupUpstreamAndDownstream();
-    fake_upstreams_.clear();
     codec_client_ = nullptr;
     if (!keep_test_server) {
       test_processor_.shutdown();
