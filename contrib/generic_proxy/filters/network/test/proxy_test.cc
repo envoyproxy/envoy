@@ -906,11 +906,11 @@ TEST_F(FilterTest, BindUpstreamConnectionSuccessButCloseBeforeUpstreamResponse) 
       }));
 
   EXPECT_CALL(upstream_callback, onBindSuccess(_, _))
-      .WillOnce(
-          Invoke([&](Network::ClientConnection& conn, Upstream::HostDescriptionConstSharedPtr) {
-            EXPECT_EQ(&upstream_connection_, &conn);
-            filter_->boundUpstreamConn()->registerResponseCallback(123, response_callback);
-          }));
+      .WillOnce(Invoke([&](Network::ClientConnection& conn,
+                           Upstream::HostDescriptionConstSharedPtr) {
+        EXPECT_EQ(&upstream_connection_, &conn);
+        filter_->boundUpstreamConn()->registerResponseCallback(123, response_callback); // NOLINT
+      }));
 
   tcp_conn_pool_.poolReady(upstream_connection_);
   typed_upstream_manager->onEvent(Network::ConnectionEvent::RemoteClose);
@@ -972,11 +972,11 @@ TEST_F(FilterTest, BindUpstreamConnectionSuccessButDecodingFailure) {
   }));
 
   EXPECT_CALL(upstream_callback, onBindSuccess(_, _))
-      .WillOnce(
-          Invoke([&](Network::ClientConnection& conn, Upstream::HostDescriptionConstSharedPtr) {
-            EXPECT_EQ(&upstream_connection_, &conn);
-            filter_->boundUpstreamConn()->registerResponseCallback(123, response_callback);
-          }));
+      .WillOnce(Invoke([&](Network::ClientConnection& conn,
+                           Upstream::HostDescriptionConstSharedPtr) {
+        EXPECT_EQ(&upstream_connection_, &conn);
+        filter_->boundUpstreamConn()->registerResponseCallback(123, response_callback); // NOLINT
+      }));
 
   tcp_conn_pool_.poolReady(upstream_connection_);
   response_decoder_callback->onDecodingFailure();
@@ -1030,11 +1030,11 @@ TEST_F(FilterTest, BindUpstreamConnectionSuccessAndDecodingSuccess) {
       }));
 
   EXPECT_CALL(upstream_callback, onBindSuccess(_, _))
-      .WillOnce(
-          Invoke([&](Network::ClientConnection& conn, Upstream::HostDescriptionConstSharedPtr) {
-            EXPECT_EQ(&upstream_connection_, &conn);
-            filter_->boundUpstreamConn()->registerResponseCallback(123, response_callback);
-          }));
+      .WillOnce(Invoke([&](Network::ClientConnection& conn,
+                           Upstream::HostDescriptionConstSharedPtr) {
+        EXPECT_EQ(&upstream_connection_, &conn);
+        filter_->boundUpstreamConn()->registerResponseCallback(123, response_callback); // NOLINT
+      }));
 
   tcp_conn_pool_.poolReady(upstream_connection_);
 
@@ -1116,18 +1116,18 @@ TEST_F(FilterTest, BindUpstreamConnectionSuccessAndMultipleDecodingSuccess) {
       }));
 
   EXPECT_CALL(upstream_callback_1, onBindSuccess(_, _))
-      .WillOnce(
-          Invoke([&](Network::ClientConnection& conn, Upstream::HostDescriptionConstSharedPtr) {
-            EXPECT_EQ(&upstream_connection_, &conn);
-            filter_->boundUpstreamConn()->registerResponseCallback(123, response_callback_1);
-          }));
+      .WillOnce(Invoke([&](Network::ClientConnection& conn,
+                           Upstream::HostDescriptionConstSharedPtr) {
+        EXPECT_EQ(&upstream_connection_, &conn);
+        filter_->boundUpstreamConn()->registerResponseCallback(123, response_callback_1); // NOLINT
+      }));
 
   EXPECT_CALL(upstream_callback_2, onBindSuccess(_, _))
-      .WillOnce(
-          Invoke([&](Network::ClientConnection& conn, Upstream::HostDescriptionConstSharedPtr) {
-            EXPECT_EQ(&upstream_connection_, &conn);
-            filter_->boundUpstreamConn()->registerResponseCallback(321, response_callback_2);
-          }));
+      .WillOnce(Invoke([&](Network::ClientConnection& conn,
+                           Upstream::HostDescriptionConstSharedPtr) {
+        EXPECT_EQ(&upstream_connection_, &conn);
+        filter_->boundUpstreamConn()->registerResponseCallback(321, response_callback_2); // NOLINT
+      }));
 
   tcp_conn_pool_.poolReady(upstream_connection_);
 
@@ -1250,11 +1250,11 @@ TEST_F(FilterTest, BindUpstreamConnectionSuccessAndWriteSomethinToConnection) {
   }));
 
   EXPECT_CALL(upstream_callback, onBindSuccess(_, _))
-      .WillOnce(
-          Invoke([&](Network::ClientConnection& conn, Upstream::HostDescriptionConstSharedPtr) {
-            EXPECT_EQ(&upstream_connection_, &conn);
-            filter_->boundUpstreamConn()->registerResponseCallback(123, response_callback);
-          }));
+      .WillOnce(Invoke([&](Network::ClientConnection& conn,
+                           Upstream::HostDescriptionConstSharedPtr) {
+        EXPECT_EQ(&upstream_connection_, &conn);
+        filter_->boundUpstreamConn()->registerResponseCallback(123, response_callback); // NOLINT
+      }));
 
   tcp_conn_pool_.poolReady(upstream_connection_);
 
