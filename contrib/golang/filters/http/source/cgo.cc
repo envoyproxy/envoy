@@ -37,7 +37,7 @@ absl::string_view stringViewFromGoSlice(void* slice) {
     return "";
   }
   auto goSlice = reinterpret_cast<GoSlice*>(slice);
-  return absl::string_view(static_cast<const char*>(goSlice->data), goSlice->len);
+  return absl::string_view(static_cast<const char*>(goSlice->data), goSlice->len); // NOLINT(modernize-return-braced-init-list)
 }
 
 #ifdef __cplusplus
