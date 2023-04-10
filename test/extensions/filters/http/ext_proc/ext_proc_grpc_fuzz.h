@@ -8,14 +8,12 @@
 //    - Threads and fake gRPC client above might help
 //    - Local testing had almost 800k inline 8 bit counters resulting in ~3
 //      exec/s. How far can we reduce the number of counters?
-//    - At the loss of reproducibility use a persistent envoy
 // 5. Protobuf fuzzing would greatly increase crash test case readability
 //    - How will this impact speed?
 //    - Can it be done on single thread as well?
 // 6. Restructure to inherit common functions between ExtProcIntegrationTest
 //    and this class. This involves adding a new ExtProcIntegrationBase class
 //    common to both.
-// 7. Remove locks after crash is addressed by separate issue
 
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/extensions/filters/http/ext_proc/v3/ext_proc.pb.h"

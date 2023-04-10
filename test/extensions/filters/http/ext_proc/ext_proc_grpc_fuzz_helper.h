@@ -106,7 +106,8 @@ public:
   void randomizeImmediateResponse(ImmediateResponse* msg, const ProcessingRequest* req);
   void randomizeOverrideResponse(ProcessingMode* msg);
   void randomizeResponse(ProcessingResponse* resp, const ProcessingRequest* req);
-
+  grpc::Status generateResponse(ProcessingRequest& req, ProcessingResponse& resp,
+                                bool& immediate_close_grpc);
   FuzzedDataProvider* provider_;
 };
 

@@ -40,38 +40,14 @@ DEFINE_PROTO_FUZZER(const test::extensions::filters::http::ext_proc::ExtProcGrpc
           if (!stream->Read(&req)) {
             return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT, "expected message");
           }
-
-          fuzz_helper.logRequest(&req);
-
-          // The following blocks generate random data for the 9 fields of the
-          // ProcessingResponse gRPC message
-
-          // 1 - 7. Randomize response
-          // If true, immediately close the connection with a random Grpc Status.
-          // Otherwise randomize the response
+          bool immediate_close_grpc = false;
           ProcessingResponse resp;
-          if (fuzz_helper.provider_->ConsumeBool()) {
-            ENVOY_LOG_MISC(trace, "Immediately Closing gRPC connection");
-            return fuzz_helper.randomGrpcStatusWithMessage();
-          } else {
-            ENVOY_LOG_MISC(trace, "Generating Random ProcessingResponse");
-            fuzz_helper.randomizeResponse(&resp, &req);
+          auto result = fuzz_helper.generateResponse(req, resp, immediate_close_grpc);
+          if (immediate_close_grpc) {
+            return result;
           }
-
-          // 8. Randomize dynamic_metadata
-          // TODO(ikepolinsky): ext_proc does not support dynamic_metadata
-
-          // 9. Randomize mode_override
-          if (fuzz_helper.provider_->ConsumeBool()) {
-            ENVOY_LOG_MISC(trace, "Generating Random ProcessingMode Override");
-            ProcessingMode* msg = resp.mutable_mode_override();
-            fuzz_helper.randomizeOverrideResponse(msg);
-          }
-
-          ENVOY_LOG_MISC(trace, "Response generated, writing to stream.");
           stream->Write(resp);
         }
-
         return grpc::Status::OK;
       });
 

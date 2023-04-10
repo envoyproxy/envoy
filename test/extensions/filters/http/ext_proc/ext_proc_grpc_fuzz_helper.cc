@@ -439,6 +439,37 @@ void ExtProcFuzzHelper::randomizeResponse(ProcessingResponse* resp, const Proces
   }
 }
 
+grpc::Status ExtProcFuzzHelper::generateResponse(ProcessingRequest& req, ProcessingResponse& resp,
+                                                 bool& immediate_close_grpc) {
+  logRequest(&req);
+  // The following blocks generate random data for the 9 fields of the
+  // ProcessingResponse gRPC message
+
+  // 1 - 7. Randomize response
+  // If true, immediately close the connection with a random Grpc Status.
+  // Otherwise randomize the response
+  if (provider_->ConsumeBool()) {
+    immediate_close_grpc = true;
+    ENVOY_LOG_MISC(trace, "Immediately Closing gRPC connection");
+    return randomGrpcStatusWithMessage();
+  } else {
+    ENVOY_LOG_MISC(trace, "Generating Random ProcessingResponse");
+    randomizeResponse(&resp, &req);
+  }
+
+  // 8. Randomize dynamic_metadata
+  // TODO(ikepolinsky): ext_proc does not support dynamic_metadata
+
+  // 9. Randomize mode_override
+  if (provider_->ConsumeBool()) {
+    ENVOY_LOG_MISC(trace, "Generating Random ProcessingMode Override");
+    ProcessingMode* msg = resp.mutable_mode_override();
+    randomizeOverrideResponse(msg);
+  }
+  ENVOY_LOG_MISC(trace, "Response generated, writing to stream.");
+  return grpc::Status::OK;
+}
+
 } // namespace ExternalProcessing
 } // namespace HttpFilters
 } // namespace Extensions

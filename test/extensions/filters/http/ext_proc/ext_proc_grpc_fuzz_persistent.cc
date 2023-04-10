@@ -36,7 +36,7 @@ DEFINE_PROTO_FUZZER(const test::extensions::filters::http::ext_proc::ExtProcGrpc
   static std::unique_ptr<ExtProcIntegrationFuzz> fuzzer = nullptr;
   static std::unique_ptr<ExtProcFuzzHelper> fuzz_helper = nullptr;
   // Protects fuzz_helper which will be accessed by multiple threads.
-  static Thread::MutexBasicLockable fuzz_helper_lock_;
+  static Thread::MutexBasicLockable fuzz_helper_lock;
 
   static uint32_t fuzz_exec_count = 0;
   // Initialize fuzzer once with IP and gRPC version from environment
@@ -61,40 +61,18 @@ DEFINE_PROTO_FUZZER(const test::extensions::filters::http::ext_proc::ExtProcGrpc
             if (!stream->Read(&req)) {
               return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT, "expected message");
             }
-
-            fuzz_helper_lock_.lock();
+            fuzz_helper_lock.lock();
             if (fuzz_helper != nullptr) {
-              fuzz_helper->logRequest(&req);
-              // The following blocks generate random data for the 9 fields of the
-              // ProcessingResponse gRPC message
-
-              // 1 - 7. Randomize response
-              // If true, immediately close the connection with a random Grpc Status.
-              // Otherwise randomize the response
+              bool immediate_close_grpc = false;
               ProcessingResponse resp;
-              if (fuzz_helper->provider_->ConsumeBool()) {
-                ENVOY_LOG_MISC(trace, "Immediately Closing gRPC connection");
-                auto result = fuzz_helper->randomGrpcStatusWithMessage();
-                fuzz_helper_lock_.unlock();
+              auto result = fuzz_helper->generateResponse(req, resp, immediate_close_grpc);
+              if (immediate_close_grpc) {
+                fuzz_helper_lock.unlock();
                 return result;
-              } else {
-                ENVOY_LOG_MISC(trace, "Generating Random ProcessingResponse");
-                fuzz_helper->randomizeResponse(&resp, &req);
               }
-
-              // 8. Randomize dynamic_metadata
-              // TODO(ikepolinsky): ext_proc does not support dynamic_metadata
-
-              // 9. Randomize mode_override
-              if (fuzz_helper->provider_->ConsumeBool()) {
-                ENVOY_LOG_MISC(trace, "Generating Random ProcessingMode Override");
-                ProcessingMode* msg = resp.mutable_mode_override();
-                fuzz_helper->randomizeOverrideResponse(msg);
-              }
-              ENVOY_LOG_MISC(trace, "Response generated, writing to stream.");
               stream->Write(resp);
             }
-            fuzz_helper_lock_.unlock();
+            fuzz_helper_lock.unlock();
           }
           return grpc::Status::OK;
         });
@@ -125,10 +103,10 @@ DEFINE_PROTO_FUZZER(const test::extensions::filters::http::ext_proc::ExtProcGrpc
     fuzzer->tearDown(true);
   }
   // Protect fuzz_helper before reset since it is used in the test server.
-  fuzz_helper_lock_.lock();
+  fuzz_helper_lock.lock();
   fuzz_helper.reset();
   fuzz_helper = nullptr;
-  fuzz_helper_lock_.unlock();
+  fuzz_helper_lock.unlock();
 }
 
 } // namespace ExternalProcessing
