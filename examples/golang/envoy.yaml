@@ -17,7 +17,7 @@ static_resources:
             typed_config:
               "@type": type.googleapis.com/envoy.extensions.filters.http.golang.v3alpha.Config
               library_id: simple
-              library_path: "bazel-bin/examples/golang/simple/simple.so"
+              library_path: "lib/simple.so"
               plugin_name: simple
               plugin_config:
                 "@type": type.googleapis.com/xds.type.v3.TypedStruct
@@ -29,64 +29,23 @@ static_resources:
           route_config:
             name: local_route
             virtual_hosts:
-            - name: test
+            - name: local_service
               domains: ["*"]
               routes:
-                - match:
-                    prefix: "/"
-                    dynamic_metadata:
-                    - filter: envoy.filters.http.golang
-                      path:
-                      - key: k1
-                      value:
-                        string_match: 
-                          exact: foo
-                  # response_headers_to_add:
-                  #   - header:
-                  #     key: x-route-header
-                  #     value: dynamic
-                  route:
-                    host_rewrite_literal: www.envoyproxy.io
-                    cluster: service_envoyproxy_io
-                # - match:
-                #     prefix: "/"
-                #   route:
-                #     host_rewrite_literal: www.google.com
-                #     cluster: googlge
+              - match:
+                  prefix: "/"
+                route:
+                  cluster: helloworld_service_cluster
   clusters:
-  - name: googlge
-    type: LOGICAL_DNS
-    dns_lookup_family: V4_ONLY
+  - name: helloworld_service_cluster
+    type: STRICT_DNS
     lb_policy: ROUND_ROBIN
     load_assignment:
-      cluster_name: googlge
+      cluster_name: helloworld_service_cluster
       endpoints:
       - lb_endpoints:
         - endpoint:
             address:
               socket_address:
-                address: www.google.com
-                port_value: 443
-    transport_socket:
-      name: envoy.transport_sockets.tls
-      typed_config:
-        "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.UpstreamTlsContext
-        sni: www.google.com
-  - name: service_envoyproxy_io
-    type: LOGICAL_DNS
-    dns_lookup_family: V4_ONLY
-    lb_policy: ROUND_ROBIN
-    load_assignment:
-      cluster_name: service_envoyproxy_io
-      endpoints:
-      - lb_endpoints:
-        - endpoint:
-            address:
-              socket_address:
-                address: www.envoyproxy.io
-                port_value: 443
-    transport_socket:
-      name: envoy.transport_sockets.tls
-      typed_config:
-        "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.UpstreamTlsContext
-        sni: www.envoyproxy.io
+                address: helloworld_service
+                port_value: 8080
