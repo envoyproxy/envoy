@@ -18,6 +18,7 @@ envoy_cc_library(
         "//source/common/common:base64_lib",
         "//source/common/http:headers_lib",
         "//source/common/http:utility_lib",
+        "//source/common/json:json_loader_lib",
         "@envoy_api//envoy/extensions/http/stateful_session/cookie/v3:pkg_cc_proto",
     ],
 )
