@@ -246,15 +246,13 @@ public:
 
   private:
     static TcpProxyStats generateStats(Stats::Scope& scope);
-    bool getFlushAccessLogOnConnectedConfig(
-        const envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy& config);
 
     // Hold a Scope for the lifetime of the configuration because connections in
     // the UpstreamDrainManager can live longer than the listener.
     const Stats::ScopeSharedPtr stats_scope_;
 
     const TcpProxyStats stats_;
-    const bool flush_access_log_on_connected_;
+    bool flush_access_log_on_connected_;
     absl::optional<std::chrono::milliseconds> idle_timeout_;
     absl::optional<std::chrono::milliseconds> max_downstream_connection_duration_;
     absl::optional<std::chrono::milliseconds> access_log_flush_interval_;

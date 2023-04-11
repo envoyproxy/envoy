@@ -71,8 +71,7 @@ Config::SharedConfig::SharedConfig(
     const envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy& config,
     Server::Configuration::FactoryContext& context)
     : stats_scope_(context.scope().createScope(fmt::format("tcp.{}", config.stat_prefix()))),
-      stats_(generateStats(*stats_scope_)),
-      flush_access_log_on_connected_(getFlushAccessLogOnConnectedConfig(config)) {
+      stats_(generateStats(*stats_scope_)) {
   if (config.has_idle_timeout()) {
     const uint64_t timeout = DurationUtil::durationToMilliseconds(config.idle_timeout());
     if (timeout > 0) {
@@ -90,6 +89,19 @@ Config::SharedConfig::SharedConfig(
         DurationUtil::durationToMilliseconds(config.max_downstream_connection_duration());
     max_downstream_connection_duration_ = std::chrono::milliseconds(connection_duration);
   }
+
+  if (config.has_access_log_options()) {
+    if (config.access_log_options().flush_access_log_on_connected() &&
+        config.flush_access_log_on_connected() /* deprecated */) {
+      throw EnvoyException(
+          "Only one of flush_access_log_on_connected from TcpProxy or"
+          "flush_access_log_on_connected from TcpAccessLogOptions can be specified.");
+    }
+
+    flush_access_log_on_connected_ = config.access_log_options().flush_access_log_on_connected();
+  }
+
+  flush_access_log_on_connected_ = config.flush_access_log_on_connected();
 
   if (config.has_access_log_options() &&
       config.access_log_options().has_access_log_flush_interval()) {
@@ -111,22 +123,6 @@ Config::SharedConfig::SharedConfig(
     on_demand_config_ =
         std::make_unique<OnDemandConfig>(config.on_demand(), context, *stats_scope_);
   }
-}
-
-bool Config::SharedConfig::SharedConfig::getFlushAccessLogOnConnectedConfig(
-    const envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy& config) {
-  if (config.has_access_log_options()) {
-    if (config.access_log_options().flush_access_log_on_connected() &&
-        config.flush_access_log_on_connected() /* deprecated */) {
-      throw EnvoyException(
-          "Only one of flush_access_log_on_connected from TcpProxy or"
-          "flush_access_log_on_connected from TcpAccessLogOptions can be specified.");
-    }
-
-    return config.access_log_options().flush_access_log_on_connected();
-  }
-
-  return config.flush_access_log_on_connected();
 }
 
 Config::Config(const envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy& config,
