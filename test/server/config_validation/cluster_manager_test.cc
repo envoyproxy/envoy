@@ -52,11 +52,9 @@ TEST(ValidationClusterManagerTest, MockedMethods) {
   NiceMock<Server::MockInstance> server;
 
   ValidationClusterManagerFactory factory(
-      admin, runtime, stats_store, tls,
+      *server.server_factory_context_, stats_store, tls, http_context,
       [dns_resolver]() -> Network::DnsResolverSharedPtr { return dns_resolver; },
-      ssl_context_manager, dispatcher, local_info, secret_manager, validation_context, *api,
-      http_context, grpc_context, router_context, log_manager, singleton_manager, options,
-      quic_stat_names, server);
+      ssl_context_manager, secret_manager, quic_stat_names, server);
 
   const envoy::config::bootstrap::v3::Bootstrap bootstrap;
   ClusterManagerPtr cluster_manager = factory.clusterManagerFromProto(bootstrap);
