@@ -53,15 +53,6 @@ open class Stream(
   }
 
   /**
-   * Close the stream with trailers.
-   *
-   * @param trailers Trailers with which to close the stream.
-   */
-  open fun close(trailers: RequestTrailers) {
-    underlyingStream.sendTrailers(trailers.caseSensitiveHeaders())
-  }
-
-  /**
    * Close the stream with a data frame. By default, the length sent is the
    * **[ByteBuffer.capacity]**. However, the length will rather be **[ByteBuffer.position]**
    * if the Stream was configured to do so - see **[StreamPrototype.useByteBufferPosition]**.
