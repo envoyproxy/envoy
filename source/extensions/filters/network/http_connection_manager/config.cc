@@ -303,9 +303,7 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
     Config::ConfigProviderManager& scoped_routes_config_provider_manager,
     Tracing::TracerManager& tracer_manager,
     FilterConfigProviderManager& filter_config_provider_manager)
-    : context_(context),
-      flush_access_log_on_new_request_(getFlushAccessLogNewRequestConfig(config)),
-      stats_prefix_(fmt::format("http.{}.", config.stat_prefix())),
+    : context_(context), stats_prefix_(fmt::format("http.{}.", config.stat_prefix())),
       stats_(Http::ConnectionManagerImpl::generateStats(stats_prefix_, context_.scope())),
       tracing_stats_(
           Http::ConnectionManagerImpl::generateTracingStats(stats_prefix_, context_.scope())),
@@ -549,6 +547,19 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
     access_logs_.push_back(current_access_log);
   }
 
+  if (config.has_access_log_options()) {
+    if (config.access_log_options().flush_access_log_on_new_request() &&
+        config.flush_access_log_on_new_request() /* deprecated */) {
+      throw EnvoyException(
+          "Only one of flush_access_log_on_new_request from HttpConnectionManager or"
+          "flush_access_log_on_new_request from HcmAccessLogOptions can be specified.");
+    }
+
+    flush_access_log_on_new_request = config.access_log_options().flush_access_log_on_new_request();
+  }
+
+  flush_access_log_on_new_request = config.flush_access_log_on_new_request();
+
   if (config.has_access_log_options() &&
       config.access_log_options().has_access_log_flush_interval()) {
     if (config.has_access_log_flush_interval()) {
@@ -731,23 +742,6 @@ const envoy::config::trace::v3::Tracing_Http* HttpConnectionManagerConfig::getPe
     return &context_.httpContext().defaultTracingConfig().http();
   }
   return nullptr;
-}
-
-bool HttpConnectionManagerConfig::getFlushAccessLogNewRequestConfig(
-    const envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
-        filter_config) {
-  if (filter_config.has_access_log_options()) {
-    if (filter_config.access_log_options().flush_access_log_on_new_request() &&
-        filter_config.flush_access_log_on_new_request() /* deprecated */) {
-      throw EnvoyException(
-          "Only one of flush_access_log_on_new_request from HttpConnectionManager or"
-          "flush_access_log_on_new_request from HcmAccessLogOptions can be specified.");
-    }
-
-    return filter_config.access_log_options().flush_access_log_on_new_request();
-  }
-
-  return filter_config.flush_access_log_on_new_request();
 }
 
 #ifdef ENVOY_ENABLE_UHV

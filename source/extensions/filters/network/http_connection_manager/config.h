@@ -270,10 +270,6 @@ private:
       const envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
           filter_config);
 
-  bool getFlushAccessLogNewRequestConfig(
-      const envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
-          filter_config);
-
   Http::RequestIDExtensionSharedPtr request_id_extension_;
   Server::Configuration::FactoryContext& context_;
   FilterFactoriesList filter_factories_;
