@@ -1017,25 +1017,25 @@ void FilterLogger::log(uint32_t level, absl::string_view message) {
   switch (static_cast<spdlog::level::level_enum>(level)) {
   case spdlog::level::trace:
     ENVOY_LOG(trace, "{}", message);
-    break;
+    return;
   case spdlog::level::debug:
     ENVOY_LOG(debug, "{}", message);
-    break;
+    return;
   case spdlog::level::info:
     ENVOY_LOG(info, "{}", message);
-    break;
+    return;
   case spdlog::level::warn:
     ENVOY_LOG(warn, "{}", message);
-    break;
+    return;
   case spdlog::level::err:
     ENVOY_LOG(error, "{}", message);
-    break;
+    return;
   case spdlog::level::critical:
     ENVOY_LOG(critical, "{}", message);
-    break;
+    return;
   case spdlog::level::off:
     // means not logging
-    break;
+    return;
   case spdlog::level::n_levels:
     PANIC("not implemented");
   }

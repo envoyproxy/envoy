@@ -58,13 +58,12 @@ func envoyGoFilterNewHttpPluginConfig(configPtr uint64, configLen uint64) uint64
 	if httpFilterConfigParser != nil {
 		id, err := httpFilterConfigParser.Parse(&any)
 		if err != nil {
-			configCache.Store(configNum, id)
-		} else {
 			cAPI.HttpLog(api.Error, fmt.Sprintf("failed to parse golang plugin config: %v", err))
 			// TODO: we should reject the config in the Envoy side when Go returning 0.
 			// https://github.com/envoyproxy/envoy/issues/25369
 			return 0
 		}
+		configCache.Store(configNum, id)
 	} else {
 		configCache.Store(configNum, &any)
 	}
