@@ -46,6 +46,12 @@ namespace Tracers {
 namespace Datadog {
 namespace {
 
+template <typename Config> Config makeConfig(const std::string& yaml) {
+  Config result;
+  TestUtility::loadFromYaml(yaml, result);
+  return result;
+}
+
 const std::chrono::milliseconds flush_interval(2000);
 
 class DatadogConfigTest : public testing::Test {
@@ -66,11 +72,8 @@ public:
   }
 
   void setupValidDriver() {
-    const std::string yaml_string = R"EOF(
-    collector_cluster: fake_cluster
-    )EOF";
-    envoy::config::trace::v3::DatadogConfig datadog_config;
-    TestUtility::loadFromYaml(yaml_string, datadog_config);
+    auto datadog_config =
+        makeConfig<envoy::config::trace::v3::DatadogConfig>("collector_cluster: fake_cluster");
 
     cm_.initializeClusters({"fake_cluster"}, {});
     setup(datadog_config, true);
@@ -99,21 +102,15 @@ TEST_F(DatadogConfigTest, ConfigureTracer) {
 
   {
     // Valid config but not valid cluster.
-    const std::string yaml_string = R"EOF(
-    collector_cluster: fake_cluster
-    )EOF";
-    envoy::config::trace::v3::DatadogConfig datadog_config;
-    TestUtility::loadFromYaml(yaml_string, datadog_config);
+    auto datadog_config =
+        makeConfig<envoy::config::trace::v3::DatadogConfig>("collector_cluster: fake_cluster");
 
     EXPECT_THROW(setup(datadog_config, false), EnvoyException);
   }
 
   {
-    const std::string yaml_string = R"EOF(
-    collector_cluster: fake_cluster
-    )EOF";
-    envoy::config::trace::v3::DatadogConfig datadog_config;
-    TestUtility::loadFromYaml(yaml_string, datadog_config);
+    auto datadog_config =
+        makeConfig<envoy::config::trace::v3::DatadogConfig>("collector_cluster: fake_cluster");
 
     cm_.initializeClusters({"fake_cluster"}, {});
     setup(datadog_config, true);
@@ -124,16 +121,14 @@ TEST_F(DatadogConfigTest, ConfigureViaFactory) {
   NiceMock<Server::Configuration::MockTracerFactoryContext> context;
   context.server_factory_context_.cluster_manager_.initializeClusters({"fake_cluster"}, {});
 
-  const std::string yaml_string = R"EOF(
+  auto configuration = makeConfig<envoy::config::trace::v3::Tracing>(R"EOF(
   http:
     name: datadog
     typed_config:
       "@type": type.googleapis.com/envoy.config.trace.v3.DatadogConfig
       collector_cluster: fake_cluster
       service_name: fake_file
-   )EOF";
-  envoy::config::trace::v3::Tracing configuration;
-  TestUtility::loadFromYaml(yaml_string, configuration);
+   )EOF");
 
   DatadogTracerFactory factory;
   auto message = Config::Utility::translateToFactoryConfig(
@@ -146,11 +141,8 @@ TEST_F(DatadogConfigTest, AllowCollectorClusterToBeAddedViaApi) {
   cm_.initializeClusters({"fake_cluster"}, {});
   ON_CALL(*cm_.active_clusters_["fake_cluster"]->info_, addedViaApi()).WillByDefault(Return(true));
 
-  const std::string yaml_string = R"EOF(
-  collector_cluster: fake_cluster
-  )EOF";
-  envoy::config::trace::v3::DatadogConfig datadog_config;
-  TestUtility::loadFromYaml(yaml_string, datadog_config);
+  auto datadog_config =
+      makeConfig<envoy::config::trace::v3::DatadogConfig>("collector_cluster: fake_cluster");
 
   setup(datadog_config, true);
 }
@@ -158,12 +150,10 @@ TEST_F(DatadogConfigTest, AllowCollectorClusterToBeAddedViaApi) {
 TEST_F(DatadogConfigTest, CollectorHostname) {
   // We expect "fake_host" to be the Host header value, instead of the default
   // "fake_cluster".
-  const std::string yaml_string = R"EOF(
+  auto datadog_config = makeConfig<envoy::config::trace::v3::DatadogConfig>(R"EOF(
   collector_cluster: fake_cluster
   collector_hostname: fake_host
-  )EOF";
-  envoy::config::trace::v3::DatadogConfig datadog_config;
-  TestUtility::loadFromYaml(yaml_string, datadog_config);
+  )EOF");
   cm_.initializeClusters({"fake_cluster"}, {});
   setup(datadog_config, true);
 
