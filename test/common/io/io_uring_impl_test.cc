@@ -15,7 +15,7 @@ class IoUringImplTest : public ::testing::Test {
 public:
   IoUringImplTest() : api_(Api::createApiForTest()), should_skip_(!isIoUringSupported()) {
     if (!should_skip_) {
-      io_uring_ = std::make_unique<IoUringImpl>(2, 0, 0, false);
+      io_uring_ = std::make_unique<IoUringImpl>(2, false);
     }
   }
 

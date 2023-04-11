@@ -50,16 +50,16 @@ void IoUringSocketEntry::injectCompletion(uint32_t type) {
 
 IoUringWorkerImpl::IoUringWorkerImpl(uint32_t io_uring_size, bool use_submission_queue_polling,
                                      uint32_t accept_size, uint32_t read_buffer_size,
-                                     uint32_t connect_timeout_ms, uint32_t write_timeout_ms,
-                                     Event::Dispatcher& dispatcher)
-    : IoUringWorkerImpl(std::make_unique<IoUringImpl>(io_uring_size, use_submission_queue_polling,
-                                                      connect_timeout_ms, write_timeout_ms),
-                        accept_size, read_buffer_size, dispatcher) {}
+                                     uint32_t write_timeout_ms, Event::Dispatcher& dispatcher)
+    : IoUringWorkerImpl(std::make_unique<IoUringImpl>(io_uring_size, use_submission_queue_polling),
+                        accept_size, read_buffer_size, write_timeout_ms, dispatcher) {}
 
 IoUringWorkerImpl::IoUringWorkerImpl(std::unique_ptr<IoUring> io_uring, uint32_t accept_size,
-                                     uint32_t read_buffer_size, Event::Dispatcher& dispatcher)
+                                     uint32_t read_buffer_size, uint32_t write_timeout_ms,
+                                     Event::Dispatcher& dispatcher)
     : io_uring_(std::move(io_uring)), accept_size_(accept_size),
-      read_buffer_size_(read_buffer_size), dispatcher_(dispatcher) {
+      read_buffer_size_(read_buffer_size), write_timeout_ms_(write_timeout_ms),
+      dispatcher_(dispatcher) {
   const os_fd_t event_fd = io_uring_->registerEventfd();
   // We only care about the read event of Eventfd, since we only receive the
   // event here.
@@ -99,7 +99,7 @@ IoUringSocket& IoUringWorkerImpl::addAcceptSocket(os_fd_t fd, IoUringHandler& ha
 IoUringSocket& IoUringWorkerImpl::addServerSocket(os_fd_t fd, IoUringHandler& handler) {
   ENVOY_LOG(trace, "add server socket, fd = {}", fd);
   std::unique_ptr<IoUringServerSocket> socket =
-      std::make_unique<IoUringServerSocket>(fd, *this, handler);
+      std::make_unique<IoUringServerSocket>(fd, *this, handler, write_timeout_ms_);
   LinkedList::moveIntoListBack(std::move(socket), sockets_);
   return *sockets_.back();
 }
@@ -264,7 +264,7 @@ void IoUringWorkerImpl::onFileEvent() {
     case RequestType::Connect:
       ENVOY_LOG(trace, "receive connect request completion, fd = {}, req = {}", req->socket().fd(),
                 fmt::ptr(req));
-      req->socket().onConnect(result, injected);
+      req->socket().onConnect(req, result, injected);
       break;
     case RequestType::Read:
       ENVOY_LOG(trace, "receive Read request completion, fd = {}, req = {}", req->socket().fd(),
@@ -274,22 +274,22 @@ void IoUringWorkerImpl::onFileEvent() {
     case RequestType::Write:
       ENVOY_LOG(trace, "receive write request completion, fd = {}, req = {}", req->socket().fd(),
                 fmt::ptr(req));
-      req->socket().onWrite(result, injected);
+      req->socket().onWrite(req, result, injected);
       break;
     case RequestType::Close:
       ENVOY_LOG(trace, "receive close request completion, fd = {}, req = {}", req->socket().fd(),
                 fmt::ptr(req));
-      req->socket().onClose(result, injected);
+      req->socket().onClose(req, result, injected);
       break;
     case RequestType::Cancel:
       ENVOY_LOG(trace, "receive cancel request completion, fd = {}, req = {}", req->socket().fd(),
                 fmt::ptr(req));
-      req->socket().onCancel(result, injected);
+      req->socket().onCancel(req, result, injected);
       break;
     case RequestType::Shutdown:
       ENVOY_LOG(trace, "receive shutdown request completion, fd = {}, req = {}", req->socket().fd(),
                 fmt::ptr(req));
-      req->socket().onShutdown(result, injected);
+      req->socket().onShutdown(req, result, injected);
       break;
     }
 
@@ -347,8 +347,8 @@ void IoUringAcceptSocket::disable() {
   }
 }
 
-void IoUringAcceptSocket::onClose(int32_t result, bool injected) {
-  IoUringSocketEntry::onClose(result, injected);
+void IoUringAcceptSocket::onClose(Request* req, int32_t result, bool injected) {
+  IoUringSocketEntry::onClose(req, result, injected);
   ASSERT(!injected);
   cleanup();
 }
@@ -389,8 +389,9 @@ void IoUringAcceptSocket::submitRequests() {
 }
 
 IoUringServerSocket::IoUringServerSocket(os_fd_t fd, IoUringWorkerImpl& parent,
-                                         IoUringHandler& io_uring_handler)
-    : IoUringSocketEntry(fd, parent, io_uring_handler) {
+                                         IoUringHandler& io_uring_handler,
+                                         uint32_t write_timeout_ms)
+    : IoUringSocketEntry(fd, parent, io_uring_handler), write_timeout_ms_(write_timeout_ms) {
   enable();
 }
 
@@ -405,15 +406,28 @@ void IoUringServerSocket::close() {
 
   IoUringSocketEntry::close();
 
-  if (read_req_ == nullptr && write_req_ == nullptr && cancel_req_ == nullptr) {
+  if (read_req_ == nullptr && write_req_ == nullptr && cancel_read_req_ == nullptr &&
+      cancel_write_req_ == nullptr) {
     ENVOY_LOG(trace, "ready to close, fd = {}", fd_);
     close_req_ = parent_.submitCloseRequest(*this);
     return;
   }
 
-  if (cancel_req_ == nullptr && read_req_ != nullptr) {
+  if (cancel_read_req_ == nullptr && read_req_ != nullptr) {
     ENVOY_LOG(trace, "cancel the read request, fd = {}", fd_);
-    cancel_req_ = parent_.submitCancelRequest(*this, read_req_);
+    cancel_read_req_ = parent_.submitCancelRequest(*this, read_req_);
+  }
+
+  if (write_timeout_timer_ == nullptr && cancel_write_req_ == nullptr && write_req_ != nullptr) {
+    ENVOY_LOG(trace, "delay cancel write request, fd = {}", fd_);
+    write_timeout_timer_ = parent_.dispatcher().createTimer([this]() {
+      if (cancel_write_req_ == nullptr && write_req_ != nullptr) {
+        ENVOY_LOG(trace, "cancel the write request, fd = {}", fd_);
+        cancel_write_req_ = parent_.submitCancelRequest(*this, write_req_);
+        write_timeout_timer_ = nullptr;
+      }
+    });
+    write_timeout_timer_->enableTimer(std::chrono::milliseconds(write_timeout_ms_));
   }
 }
 
@@ -485,8 +499,8 @@ void IoUringServerSocket::shutdown(int how) {
   parent_.submitShutdownRequest(*this, how);
 }
 
-void IoUringServerSocket::onClose(int32_t result, bool injected) {
-  IoUringSocketEntry::onClose(result, injected);
+void IoUringServerSocket::onClose(Request* req, int32_t result, bool injected) {
+  IoUringSocketEntry::onClose(req, result, injected);
   ASSERT(!injected);
   cleanup();
 }
@@ -500,9 +514,9 @@ void IoUringServerSocket::onRead(Request* req, int32_t result, bool injected) {
             injected, status_);
   if (!injected) {
     read_req_ = nullptr;
-    // Close if it is in closing status and no write request.
+    // Close if it is in closing status and can be closed.
     if (status_ == CLOSING && close_req_ == nullptr && write_req_ == nullptr &&
-        cancel_req_ == nullptr) {
+        cancel_read_req_ == nullptr && cancel_write_req_ == nullptr) {
       ENVOY_LOG(trace, "ready to close, fd = {}", fd_);
       close_req_ = parent_.submitCloseRequest(*this);
       return;
@@ -525,16 +539,17 @@ void IoUringServerSocket::onRead(Request* req, int32_t result, bool injected) {
     }
   }
 
-  // If the socket is enabled, notify handler to read.
   if (status_ == ENABLED || status_ == DISABLED || status_ == SHUTDOWN_WRITE ||
       status_ == CLOSE_AFTER_SHUTDOWN_WRITE || status_ == ALREADY_SHUTDOWN) {
+    // If the socket is enabled and there is bytes to read, notify the handler.
     if (buf_.length() > 0 && status_ != DISABLED) {
       ENVOY_LOG(trace, "read from socket, fd = {}, result = {}", fd_, buf_.length());
       ReadParam param{buf_, static_cast<int32_t>(buf_.length())};
       io_uring_handler_.onRead(param);
       ENVOY_LOG(trace, "after read from socket, fd = {}, remain = {}", fd_, buf_.length());
     } else if (read_error_.has_value() && read_error_ <= 0) {
-      // When the socket is disabled, the close event still need to be monitored and delivered.
+      // If the socket is readable, all errors should be handled by the handler. Otherwise, only
+      // the Event::FileReadyType::Closed-equivalent event (remote close here) should be delivered.
       if (status_ != DISABLED) {
         ENVOY_LOG(trace, "read error from socket, fd = {}, result = {}", fd_, read_error_.value());
         ReadParam param{buf_, read_error_.value()};
@@ -550,7 +565,7 @@ void IoUringServerSocket::onRead(Request* req, int32_t result, bool injected) {
         return;
       }
     }
-    // The socket may be disabled during handler onRead callback, check it again here.
+    // The socket may be not readable during handler onRead callback, check it again here.
     if (status_ == ENABLED || status_ == SHUTDOWN_WRITE || status_ == CLOSE_AFTER_SHUTDOWN_WRITE ||
         status_ == ALREADY_SHUTDOWN) {
       // If the read error is zero, it means remote close, then needn't new request.
@@ -562,8 +577,8 @@ void IoUringServerSocket::onRead(Request* req, int32_t result, bool injected) {
   }
 }
 
-void IoUringServerSocket::onWrite(int32_t result, bool injected) {
-  IoUringSocketEntry::onWrite(result, injected);
+void IoUringServerSocket::onWrite(Request* req, int32_t result, bool injected) {
+  IoUringSocketEntry::onWrite(req, result, injected);
 
   ENVOY_LOG(trace, "onWrite with result {}, fd = {}, injected = {}", result, fd_, injected);
 
@@ -572,9 +587,15 @@ void IoUringServerSocket::onWrite(int32_t result, bool injected) {
     write_req_ = nullptr;
   }
 
+  // TODO(zhxie): even if there is pending write buffer, the socket will not handle on closing.
   if (status_ == CLOSING) {
-    // Close if it is in closing status and no read request.
-    if (read_req_ == nullptr && close_req_ == nullptr && cancel_req_ == nullptr) {
+    if (write_timeout_timer_) {
+      write_timeout_timer_->disableTimer();
+      write_timeout_timer_ = nullptr;
+    }
+    // Close if it is in closing status and can be closed.
+    if (read_req_ == nullptr && close_req_ == nullptr && cancel_read_req_ == nullptr &&
+        cancel_write_req_ == nullptr) {
       close_req_ = parent_.submitCloseRequest(*this);
     }
     return;
@@ -617,20 +638,27 @@ void IoUringServerSocket::onWrite(int32_t result, bool injected) {
   }
 }
 
-void IoUringServerSocket::onCancel(int32_t result, bool injected) {
-  IoUringSocketEntry::onCancel(result, injected);
+void IoUringServerSocket::onCancel(Request* req, int32_t result, bool injected) {
+  IoUringSocketEntry::onCancel(req, result, injected);
   ASSERT(!injected);
   ENVOY_LOG(trace, "cancel done, result = {}, fd = {}", result, fd_);
 
-  cancel_req_ = nullptr;
-  if (status_ == CLOSING && read_req_ == nullptr && write_req_ == nullptr) {
+  if (req == cancel_read_req_) {
+    cancel_read_req_ = nullptr;
+  }
+  if (req == cancel_write_req_) {
+    cancel_write_req_ = nullptr;
+  }
+
+  if (status_ == CLOSING && read_req_ == nullptr && write_req_ == nullptr &&
+      cancel_read_req_ == nullptr && cancel_write_req_ == nullptr) {
     ENVOY_LOG(trace, "ready to close, fd = {}", fd_);
     close_req_ = parent_.submitCloseRequest(*this);
   }
 }
 
-void IoUringServerSocket::onShutdown(int32_t result, bool injected) {
-  IoUringSocketEntry::onCancel(result, injected);
+void IoUringServerSocket::onShutdown(Request* req, int32_t result, bool injected) {
+  IoUringSocketEntry::onCancel(req, result, injected);
   ASSERT(!injected);
   ENVOY_LOG(trace, "shutdown done, result = {}, fd = {}", result, fd_);
   if (status_ == CLOSE_AFTER_SHUTDOWN_WRITE) {

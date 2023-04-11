@@ -72,7 +72,7 @@ public:
       injected_completions_ &= ~RequestType::Accept;
     }
   }
-  void onConnect(int32_t, bool injected) override {
+  void onConnect(Request*, int32_t, bool injected) override {
     if (injected && (injected_completions_ & RequestType::Connect)) {
       injected_completions_ &= ~RequestType::Connect;
     }
@@ -82,22 +82,22 @@ public:
       injected_completions_ &= ~RequestType::Read;
     }
   }
-  void onWrite(int32_t, bool injected) override {
+  void onWrite(Request*, int32_t, bool injected) override {
     if (injected && (injected_completions_ & RequestType::Write)) {
       injected_completions_ &= ~RequestType::Write;
     }
   }
-  void onClose(int32_t, bool injected) override {
+  void onClose(Request*, int32_t, bool injected) override {
     if (injected && (injected_completions_ & RequestType::Close)) {
       injected_completions_ &= ~RequestType::Close;
     }
   }
-  void onCancel(int32_t, bool injected) override {
+  void onCancel(Request*, int32_t, bool injected) override {
     if (injected && (injected_completions_ & RequestType::Cancel)) {
       injected_completions_ &= ~RequestType::Cancel;
     }
   }
-  void onShutdown(int32_t, bool injected) override {
+  void onShutdown(Request*, int32_t, bool injected) override {
     if (injected && (injected_completions_ & RequestType::Shutdown)) {
       injected_completions_ &= ~RequestType::Shutdown;
     }
@@ -118,10 +118,10 @@ using IoUringSocketEntryPtr = std::unique_ptr<IoUringSocketEntry>;
 class IoUringWorkerImpl : public IoUringWorker, private Logger::Loggable<Logger::Id::io> {
 public:
   IoUringWorkerImpl(uint32_t io_uring_size, bool use_submission_queue_polling, uint32_t accept_size,
-                    uint32_t read_buffer_size, uint32_t connect_timeout_ms,
-                    uint32_t write_timeout_ms, Event::Dispatcher& dispatcher);
-  IoUringWorkerImpl(IoUringPtr io_uring, uint32_t accept_size, uint32_t read_buffer_size,
+                    uint32_t read_buffer_size, uint32_t write_timeout_ms,
                     Event::Dispatcher& dispatcher);
+  IoUringWorkerImpl(IoUringPtr io_uring, uint32_t accept_size, uint32_t read_buffer_size,
+                    uint32_t write_timeout_ms, Event::Dispatcher& dispatcher);
   ~IoUringWorkerImpl() override;
 
   // IoUringWorker
@@ -152,6 +152,7 @@ protected:
   IoUringPtr io_uring_;
   const uint32_t accept_size_;
   const uint32_t read_buffer_size_;
+  const uint32_t write_timeout_ms_;
   Event::Dispatcher& dispatcher_;
   // The file event of io_uring's eventfd.
   Event::FileEventPtr file_event_{nullptr};
@@ -174,7 +175,7 @@ public:
   void close() override;
   void enable() override;
   void disable() override;
-  void onClose(int32_t result, bool injected) override;
+  void onClose(Request* req, int32_t result, bool injected) override;
   void onAccept(Request* req, int32_t result, bool injected) override;
 
 private:
@@ -188,7 +189,8 @@ private:
 
 class IoUringServerSocket : public IoUringSocketEntry {
 public:
-  IoUringServerSocket(os_fd_t fd, IoUringWorkerImpl& parent, IoUringHandler& io_uring_handler);
+  IoUringServerSocket(os_fd_t fd, IoUringWorkerImpl& parent, IoUringHandler& io_uring_handler,
+                      uint32_t write_timeout_ms);
 
   void close() override;
   void enable() override;
@@ -196,13 +198,14 @@ public:
   void write(Buffer::Instance& data) override;
   uint64_t write(const Buffer::RawSlice* slices, uint64_t num_slice) override;
   void shutdown(int how) override;
-  void onClose(int32_t result, bool injected) override;
+  void onClose(Request* req, int32_t result, bool injected) override;
   void onRead(Request* req, int32_t result, bool injected) override;
-  void onWrite(int32_t result, bool injected) override;
-  void onCancel(int32_t, bool injected) override;
-  void onShutdown(int32_t, bool injected) override;
+  void onWrite(Request* req, int32_t result, bool injected) override;
+  void onCancel(Request* req, int32_t, bool injected) override;
+  void onShutdown(Request* req, int32_t, bool injected) override;
 
 private:
+  const uint32_t write_timeout_ms_;
   // For read.
   Request* read_req_{};
   // TODO (soulxu): Add water mark here.
@@ -214,10 +217,12 @@ private:
   Buffer::OwnedImpl write_buf_;
   struct iovec* iovecs_{nullptr};
   Request* write_req_{nullptr};
+  Event::TimerPtr write_timeout_timer_{nullptr};
 
-  // This is used for avoid duplicated close or cancel
+  // This is used for avoid duplicated close or cancel.
   Request* close_req_{nullptr};
-  Request* cancel_req_{nullptr};
+  Request* cancel_read_req_{nullptr};
+  Request* cancel_write_req_{nullptr};
 
   void submitReadRequest();
   void submitWriteRequest();

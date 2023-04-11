@@ -163,6 +163,7 @@ public:
 /**
  * The Status of IoUringSocket.
  */
+// TODO(zhxie): separate read and write status.
 enum IoUringSocketStatus {
   INITIALIZED,
   ENABLED,
@@ -218,6 +219,12 @@ public:
   virtual uint64_t write(const Buffer::RawSlice* slices, uint64_t num_slice) PURE;
 
   /**
+   * Shutdown the socket.
+   * @param how is SHUT_RD, SHUT_WR and SHUT_RDWR.
+   */
+  virtual void shutdown(int how) PURE;
+
+  /**
    * On accept request completed.
    * TODO (soulxu): wrap the raw result into a type. It can be `IoCallUint64Result`.
    * @param req the AcceptRequest object which is as request user data.
@@ -229,10 +236,11 @@ public:
   /**
    * On connect request completed.
    * TODO (soulxu): wrap the raw result into a type. It can be `IoCallUint64Result`.
+   * @param req the request object which is as request user data.
    * @param result the result of operation in the request.
    * @param injected indicates the completion is injected or not.
    */
-  virtual void onConnect(int32_t result, bool injected) PURE;
+  virtual void onConnect(Request* req, int32_t result, bool injected) PURE;
 
   /**
    * On read request completed.
@@ -246,34 +254,38 @@ public:
   /**
    * On write request completed.
    * TODO (soulxu): wrap the raw result into a type. It can be `IoCallUint64Result`.
+   * @param req the WriteRequest object which is as request user data.
    * @param result the result of operation in the request.
    * @param injected indicates the completion is injected or not.
    */
-  virtual void onWrite(int32_t result, bool injected) PURE;
+  virtual void onWrite(Request* req, int32_t result, bool injected) PURE;
 
   /**
    * On close request completed.
    * TODO (soulxu): wrap the raw result into a type. It can be `IoCallUint64Result`.
+   * @param req the request object which is as request user data.
    * @param result the result of operation in the request.
    * @param injected indicates the completion is injected or not.
    */
-  virtual void onClose(int32_t result, bool injected) PURE;
+  virtual void onClose(Request* req, int32_t result, bool injected) PURE;
 
   /**
    * On cancel request completed.
    * TODO (soulxu): wrap the raw result into a type. It can be `IoCallUint64Result`.
+   * @param req the request object which is as request user data.
    * @param result the result of operation in the request.
    * @param injected indicates the completion is injected or not.
    */
-  virtual void onCancel(int32_t result, bool injected) PURE;
+  virtual void onCancel(Request* req, int32_t result, bool injected) PURE;
 
   /**
    * On shutdown request completed.
    * TODO (soulxu): wrap the raw result into a type. It can be `IoCallUint64Result`.
+   * @param req the request object which is as request user data.
    * @param result the result of operation in the request.
    * @param injected indicates the completion is injected or not.
    */
-  virtual void onShutdown(int32_t result, bool injected) PURE;
+  virtual void onShutdown(Request* req, int32_t result, bool injected) PURE;
 
   /**
    * Inject a request completion to the io uring instance.
@@ -286,12 +298,6 @@ public:
    * @return the status.
    */
   virtual IoUringSocketStatus getStatus() const PURE;
-
-  /**
-   * Shutdown the socket.
-   * @param how is SHUT_RD, SHUT_WR and SHUT_RDWR.
-   */
-  virtual void shutdown(int how) PURE;
 };
 
 struct AcceptedSocketParam {

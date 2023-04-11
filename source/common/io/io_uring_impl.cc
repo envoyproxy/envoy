@@ -45,22 +45,13 @@ bool isIoUringSupported() {
   return true;
 }
 
-IoUringImpl::IoUringImpl(uint32_t io_uring_size, bool use_submission_queue_polling,
-                         uint32_t connect_timeout_ms, uint32_t write_timeout_ms)
+IoUringImpl::IoUringImpl(uint32_t io_uring_size, bool use_submission_queue_polling)
     : io_uring_size_(io_uring_size), cqes_(io_uring_size_, nullptr) {
   struct io_uring_params p {};
   if (use_submission_queue_polling) {
     p.flags |= IORING_SETUP_SQPOLL;
   }
   int ret = io_uring_queue_init_params(io_uring_size_, &ring_, &p);
-  if (connect_timeout_ms > 0) {
-    connect_timeout_ =
-        __kernel_timespec{connect_timeout_ms / 1000, (connect_timeout_ms % 1000) * 1000000};
-  }
-  if (write_timeout_ms > 0) {
-    write_timeout_ =
-        __kernel_timespec{write_timeout_ms / 1000, (write_timeout_ms % 1000) * 1000000};
-  }
   RELEASE_ASSERT(ret == 0, fmt::format("unable to initialize io_uring: {}", errorDetails(-ret)));
 }
 
@@ -156,17 +147,6 @@ IoUringResult IoUringImpl::prepareConnect(os_fd_t fd,
 
   io_uring_prep_connect(sqe, fd, address->sockAddr(), address->sockAddrLen());
   io_uring_sqe_set_data(sqe, user_data);
-  if (connect_timeout_.has_value()) {
-    io_uring_sqe_set_flags(sqe, IOSQE_IO_LINK);
-
-    struct io_uring_sqe* sqe_timeout = io_uring_get_sqe(&ring_);
-    if (sqe_timeout == nullptr) {
-      return IoUringResult::Failed;
-    }
-
-    io_uring_prep_link_timeout(sqe_timeout, &connect_timeout_.value(), 0);
-    io_uring_sqe_set_data(sqe_timeout, nullptr);
-  }
   return IoUringResult::Ok;
 }
 
@@ -193,17 +173,6 @@ IoUringResult IoUringImpl::prepareWritev(os_fd_t fd, const struct iovec* iovecs,
 
   io_uring_prep_writev(sqe, fd, iovecs, nr_vecs, offset);
   io_uring_sqe_set_data(sqe, user_data);
-  if (write_timeout_.has_value()) {
-    io_uring_sqe_set_flags(sqe, IOSQE_IO_LINK);
-
-    struct io_uring_sqe* sqe_timeout = io_uring_get_sqe(&ring_);
-    if (sqe_timeout == nullptr) {
-      return IoUringResult::Failed;
-    }
-
-    io_uring_prep_link_timeout(sqe_timeout, &write_timeout_.value(), 0);
-    io_uring_sqe_set_data(sqe_timeout, nullptr);
-  }
   return IoUringResult::Ok;
 }
 

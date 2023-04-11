@@ -36,7 +36,7 @@ public:
     instance_.registerThread(*dispatcher_, true);
 
     io_uring_factory_ =
-        std::make_unique<Io::IoUringFactoryImpl>(10, false, 5, 8192, 1000, 1000, instance_);
+        std::make_unique<Io::IoUringFactoryImpl>(10, false, 5, 8192, 1000, instance_);
     io_uring_factory_->onServerInitialized();
     fd_ = Api::OsSysCallsSingleton::get().socket(AF_INET, SOCK_STREAM, IPPROTO_TCP).return_value_;
     EXPECT_GE(fd_, 0);

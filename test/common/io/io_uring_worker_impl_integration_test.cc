@@ -26,8 +26,8 @@ public:
     is_accept_injected_completion_ = injected;
     nr_completion_++;
   }
-  void onConnect(int32_t result, bool injected) override {
-    IoUringSocketEntry::onConnect(result, injected);
+  void onConnect(Request* req, int32_t result, bool injected) override {
+    IoUringSocketEntry::onConnect(req, result, injected);
     connect_result_ = result;
     is_connect_injected_completion_ = injected;
     nr_completion_++;
@@ -43,26 +43,26 @@ public:
     is_read_injected_completion_ = injected;
     nr_completion_++;
   }
-  void onWrite(int32_t result, bool injected) override {
-    IoUringSocketEntry::onWrite(result, injected);
+  void onWrite(Request* req, int32_t result, bool injected) override {
+    IoUringSocketEntry::onWrite(req, result, injected);
     write_result_ = result;
     is_write_injected_completion_ = injected;
     nr_completion_++;
   }
-  void onClose(int32_t result, bool injected) override {
-    IoUringSocketEntry::onClose(result, injected);
+  void onClose(Request* req, int32_t result, bool injected) override {
+    IoUringSocketEntry::onClose(req, result, injected);
     close_result_ = result;
     is_close_injected_completion_ = injected;
     nr_completion_++;
   }
-  void onCancel(int32_t result, bool injected) override {
-    IoUringSocketEntry::onCancel(result, injected);
+  void onCancel(Request* req, int32_t result, bool injected) override {
+    IoUringSocketEntry::onCancel(req, result, injected);
     cancel_result_ = result;
     is_cancel_injected_completion_ = injected;
     nr_completion_++;
   }
-  void onShutdown(int32_t result, bool injected) override {
-    IoUringSocketEntry::onShutdown(result, injected);
+  void onShutdown(Request* req, int32_t result, bool injected) override {
+    IoUringSocketEntry::onShutdown(req, result, injected);
     shutdown_result_ = result;
     is_shutdown_injected_completion_ = injected;
     nr_completion_++;
@@ -89,7 +89,7 @@ public:
 class IoUringWorkerTestImpl : public IoUringWorkerImpl {
 public:
   IoUringWorkerTestImpl(IoUringPtr io_uring_instance, Event::Dispatcher& dispatcher)
-      : IoUringWorkerImpl(std::move(io_uring_instance), 5, 8192, dispatcher) {}
+      : IoUringWorkerImpl(std::move(io_uring_instance), 5, 8192, 1000, dispatcher) {}
   IoUringSocket& addTestSocket(os_fd_t fd, IoUringHandler& handler) {
     std::unique_ptr<IoUringTestSocket> socket =
         std::make_unique<IoUringTestSocket>(fd, *this, handler);
@@ -130,7 +130,7 @@ public:
     api_ = Api::createApiForTest(time_system_);
     dispatcher_ = api_->allocateDispatcher("test_thread");
     io_uring_worker_ = std::make_unique<IoUringWorkerTestImpl>(
-        std::make_unique<IoUringImpl>(20, false, 1000, 1000), *dispatcher_);
+        std::make_unique<IoUringImpl>(20, false), *dispatcher_);
   }
   void initializeSockets() {
     socket(true, true);
@@ -279,42 +279,6 @@ TEST_F(IoUringWorkerIntegrationTest, Connect) {
   cleanup();
 }
 
-TEST_F(IoUringWorkerIntegrationTest, ConnectTimeout) {
-  initialize();
-  socket(true, false);
-  listen();
-
-  auto& socket = dynamic_cast<IoUringTestSocket&>(
-      io_uring_worker_->addTestSocket(client_socket_, io_uring_handler_));
-  EXPECT_EQ(io_uring_worker_->getSockets().size(), 1);
-
-  // Exhaust listen socket accept backlog.
-  for (int i = 0; i < 10; i++) {
-    os_fd_t fd = Api::OsSysCallsSingleton::get()
-                     .socket(AF_INET, SOCK_STREAM | SOCK_NONBLOCK, IPPROTO_TCP)
-                     .return_value_;
-    struct sockaddr_in listen_addr = getListenSocketAddress();
-    Api::OsSysCallsSingleton::get().connect(fd, reinterpret_cast<struct sockaddr*>(&listen_addr),
-                                            sizeof(listen_addr));
-  }
-
-  // Waiting for the client socket connect.
-  struct sockaddr_in listen_addr = getListenSocketAddress();
-  auto addr = std::make_shared<Network::Address::Ipv4Instance>(&listen_addr);
-  io_uring_worker_->submitConnectRequest(socket, addr);
-
-  while (socket.connect_result_ == -1) {
-    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
-  }
-
-  EXPECT_EQ(socket.connect_result_, -ECANCELED);
-  EXPECT_FALSE(socket.is_connect_injected_completion_);
-
-  socket.cleanup();
-  EXPECT_EQ(io_uring_worker_->getSockets().size(), 0);
-  cleanup();
-}
-
 TEST_F(IoUringWorkerIntegrationTest, Read) {
   initialize();
   initializeSockets();
@@ -368,38 +332,6 @@ TEST_F(IoUringWorkerIntegrationTest, Write) {
 
   std::string read_data(static_cast<char*>(read_iov.iov_base), size);
   EXPECT_EQ(read_data, write_data);
-  EXPECT_FALSE(socket.is_write_injected_completion_);
-
-  socket.cleanup();
-  EXPECT_EQ(io_uring_worker_->getSockets().size(), 0);
-  cleanup();
-}
-
-TEST_F(IoUringWorkerIntegrationTest, WriteTimeout) {
-  initialize();
-  initializeSockets();
-
-  auto& socket = dynamic_cast<IoUringTestSocket&>(
-      io_uring_worker_->addTestSocket(server_socket_, io_uring_handler_));
-  EXPECT_EQ(io_uring_worker_->getSockets().size(), 1);
-
-  // Waiting for the server socket sending the data.
-  std::string write_data = "hello world";
-  Buffer::OwnedImpl buffer;
-  buffer.add(write_data);
-  // Exhaust client socket receive buffer.
-  while (true) {
-    io_uring_worker_->submitWriteRequest(socket, buffer.getRawSlices());
-    while (socket.write_result_ == -1) {
-      dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
-    }
-    if (socket.write_result_ == -ECANCELED) {
-      break;
-    }
-    socket.write_result_ = -1;
-  }
-
-  EXPECT_EQ(socket.write_result_, -ECANCELED);
   EXPECT_FALSE(socket.is_write_injected_completion_);
 
   socket.cleanup();
@@ -768,6 +700,33 @@ TEST_F(IoUringWorkerIntegrationTest, ServerSocketWrite) {
 
   socket.close();
   runToClose(server_socket_);
+  EXPECT_EQ(io_uring_worker_->getSockets().size(), 0);
+  cleanup();
+}
+
+TEST_F(IoUringWorkerIntegrationTest, ServerSocketWriteTimeout) {
+  initialize();
+  initializeSockets();
+
+  auto& socket = io_uring_worker_->addServerSocket(server_socket_, io_uring_handler_);
+  EXPECT_EQ(io_uring_worker_->getSockets().size(), 1);
+
+  // Fill peer socket receive buffer.
+  std::string write_data(10000000, 'a');
+  struct Buffer::RawSlice slice;
+  slice.mem_ = write_data.data();
+  slice.len_ = write_data.length();
+  // The following line may partially complete since write buffer is full.
+  socket.write(&slice, 1);
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  // The following will block in io_uring.
+  socket.write(&slice, 1);
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+
+  // Continuously sending the data in server socket until timeout.
+  socket.close();
+  runToClose(server_socket_);
+
   EXPECT_EQ(io_uring_worker_->getSockets().size(), 0);
   cleanup();
 }

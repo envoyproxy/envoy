@@ -20,7 +20,7 @@ namespace {
 class IoUringWorkerTestImpl : public IoUringWorkerImpl {
 public:
   IoUringWorkerTestImpl(IoUringPtr io_uring_instance, Event::Dispatcher& dispatcher)
-      : IoUringWorkerImpl(std::move(io_uring_instance), 5, 8192, dispatcher) {}
+      : IoUringWorkerImpl(std::move(io_uring_instance), 5, 8192, 1000, dispatcher) {}
   IoUringSocket& addTestSocket(os_fd_t fd, IoUringHandler& io_uring_handler) {
     IoUringSocketEntryPtr socket =
         std::make_unique<IoUringSocketEntry>(fd, *this, io_uring_handler);
@@ -162,6 +162,7 @@ TEST(IoUringWorkerImplTest, ServerSocketInjectAfterWrite) {
       .WillOnce(DoAll(SaveArg<1>(&cancel_req), Return<IoUringResult>(IoUringResult::Ok)))
       .RetiresOnSaturation();
   EXPECT_CALL(mock_io_uring, submit()).Times(1).RetiresOnSaturation();
+  EXPECT_CALL(dispatcher, createTimer_(_)).WillOnce(ReturnNew<NiceMock<Event::MockTimer>>());
   io_uring_socket.close();
 
   // Finish the read, cancel and write request, then expect the close request submitted.
@@ -373,6 +374,7 @@ TEST(IoUringWorkerImplTest, ServerCloseWithWriteRequestOnly) {
 
   // Close the socket, but there is no read request, so cancel request won't
   // be submitted.
+  EXPECT_CALL(dispatcher, createTimer_(_)).WillOnce(ReturnNew<NiceMock<Event::MockTimer>>());
   io_uring_socket.close();
 
   void* close_req = nullptr;

@@ -25,8 +25,7 @@ class IoUringImpl : public IoUring,
                     public ThreadLocal::ThreadLocalObject,
                     protected Logger::Loggable<Logger::Id::io> {
 public:
-  IoUringImpl(uint32_t io_uring_size, bool use_submission_queue_polling,
-              uint32_t connect_timeout_ms, uint32_t write_timeout_ms);
+  IoUringImpl(uint32_t io_uring_size, bool use_submission_queue_polling);
   ~IoUringImpl() override;
 
   os_fd_t registerEventfd() override;
@@ -50,8 +49,6 @@ public:
 
 private:
   const uint32_t io_uring_size_;
-  absl::optional<struct __kernel_timespec> connect_timeout_{};
-  absl::optional<struct __kernel_timespec> write_timeout_{};
   struct io_uring ring_ {};
   std::vector<struct io_uring_cqe*> cqes_;
   os_fd_t event_fd_{INVALID_SOCKET};
