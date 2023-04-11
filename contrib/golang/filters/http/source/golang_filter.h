@@ -159,7 +159,7 @@ public:
                             std::function<void(Http::ResponseHeaderMap& headers)> modify_headers,
                             Grpc::Status::GrpcStatus grpc_status, std::string details);
 
-  CAPIStatus sendPanicReply(std::string details);
+  CAPIStatus sendPanicReply(absl::string_view details);
 
   CAPIStatus getHeader(absl::string_view key, GoString* go_value);
   CAPIStatus copyHeaders(GoString* go_strs, char* go_buf);

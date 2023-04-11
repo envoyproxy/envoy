@@ -525,7 +525,7 @@ Filter::sendLocalReply(Http::Code response_code, std::string body_text,
   return CAPIStatus::CAPIOK;
 };
 
-CAPIStatus Filter::sendPanicReply(std::string details) {
+CAPIStatus Filter::sendPanicReply(absl::string_view details) {
   config_->stats().panic_error_.inc();
   ENVOY_LOG(error, "[go_plugin_http][{}] {}", config_->pluginName(),
             absl::StrCat("filter paniced with error details: ", details));
