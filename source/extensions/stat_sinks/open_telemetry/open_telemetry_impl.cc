@@ -7,9 +7,19 @@ namespace Extensions {
 namespace StatSinks {
 namespace OpenTelemetry {
 
+OtlpOptions::OtlpOptions(const SinkConfig& sink_config)
+    : report_counters_as_deltas_(
+          PROTOBUF_GET_WRAPPED_OR_DEFAULT(sink_config, report_counters_as_deltas, false)),
+      report_histograms_as_deltas_(
+          PROTOBUF_GET_WRAPPED_OR_DEFAULT(sink_config, report_histograms_as_deltas, false)),
+      emit_tags_as_attributes_(
+          PROTOBUF_GET_WRAPPED_OR_DEFAULT(sink_config, emit_tags_as_attributes, true)),
+      use_tag_extracted_name_(
+          PROTOBUF_GET_WRAPPED_OR_DEFAULT(sink_config, use_tag_extracted_name, true)) {}
+
 OpenTelemetryGrpcMetricsExporterImpl::OpenTelemetryGrpcMetricsExporterImpl(
-    Grpc::RawAsyncClientSharedPtr raw_async_client)
-    : OpenTelemetryGrpcMetricsExporter(raw_async_client),
+    const OtlpOptionsSharedPtr config, Grpc::RawAsyncClientSharedPtr raw_async_client)
+    : OpenTelemetryGrpcMetricsExporter(config, raw_async_client),
       service_method_(*Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
           "opentelemetry.proto.collector.metrics.v1.MetricsService.Export")) {}
 
@@ -84,7 +94,7 @@ void MetricsFlusher::flushCounter(opentelemetry::proto::metrics::v1::Metric& met
   auto* data_point = sum->add_data_points();
   setMetricCommon(metric, *data_point, snapshot_time_ns, counter_snapshot.counter_);
 
-  if (report_counters_as_deltas_) {
+  if (config_->reportCountersAsDeltas()) {
     sum->set_aggregation_temporality(
         opentelemetry::proto::metrics::v1::AggregationTemporality::AGGREGATION_TEMPORALITY_DELTA);
 
@@ -105,12 +115,12 @@ void MetricsFlusher::flushHistogram(opentelemetry::proto::metrics::v1::Metric& m
   setMetricCommon(metric, *data_point, snapshot_time_ns, parent_histogram);
 
   histogram->set_aggregation_temporality(
-      report_histograms_as_deltas_
+      config_->reportHistogramsAsDeltas()
           ? opentelemetry::proto::metrics::v1::AggregationTemporality::AGGREGATION_TEMPORALITY_DELTA
           : opentelemetry::proto::metrics::v1::AggregationTemporality::
                 AGGREGATION_TEMPORALITY_CUMULATIVE);
 
-  const Stats::HistogramStatistics& histogram_stats = report_histograms_as_deltas_
+  const Stats::HistogramStatistics& histogram_stats = config_->reportHistogramsAsDeltas()
                                                           ? parent_histogram.intervalStatistics()
                                                           : parent_histogram.cumulativeStatistics();
 
@@ -129,9 +139,9 @@ void MetricsFlusher::setMetricCommon(opentelemetry::proto::metrics::v1::Metric& 
                                      int64_t snapshot_time_ns, const Stats::Metric& stat) const {
   data_point.set_time_unix_nano(snapshot_time_ns);
   // TODO(ohadvano): support start_time_unix_nano optional field
-  metric.set_name(use_tag_extracted_name_ ? stat.tagExtractedName() : stat.name());
+  metric.set_name(config_->useTagExtractedName() ? stat.tagExtractedName() : stat.name());
 
-  if (emit_tags_as_attributes_) {
+  if (config_->emitTagsAsAttributes()) {
     for (const auto& tag : stat.tags()) {
       auto* attribute = data_point.add_attributes();
       attribute->set_key(tag.name_);
@@ -146,9 +156,9 @@ void MetricsFlusher::setMetricCommon(
     const Stats::Metric& stat) const {
   data_point.set_time_unix_nano(snapshot_time_ns);
   // TODO(ohadvano): support start_time_unix_nano optional field
-  metric.set_name(use_tag_extracted_name_ ? stat.tagExtractedName() : stat.name());
+  metric.set_name(config_->useTagExtractedName() ? stat.tagExtractedName() : stat.name());
 
-  if (emit_tags_as_attributes_) {
+  if (config_->emitTagsAsAttributes()) {
     for (const auto& tag : stat.tags()) {
       auto* attribute = data_point.add_attributes();
       attribute->set_key(tag.name_);

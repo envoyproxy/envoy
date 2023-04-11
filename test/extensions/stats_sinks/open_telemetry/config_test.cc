@@ -44,6 +44,33 @@ TEST(OpenTelemetryConfigTest, OpenTelemetrySinkType) {
   }
 }
 
+TEST(OpenTelemetryConfigTest, OtlpOptionsTest) {
+  {
+    envoy::extensions::stat_sinks::open_telemetry::v3::SinkConfig sink_config;
+    OtlpOptions options(sink_config);
+
+    // Default options
+    EXPECT_FALSE(options.reportCountersAsDeltas());
+    EXPECT_FALSE(options.reportHistogramsAsDeltas());
+    EXPECT_TRUE(options.emitTagsAsAttributes());
+    EXPECT_TRUE(options.useTagExtractedName());
+  }
+
+  {
+    envoy::extensions::stat_sinks::open_telemetry::v3::SinkConfig sink_config;
+    sink_config.mutable_emit_tags_as_attributes()->set_value(false);
+    sink_config.mutable_use_tag_extracted_name()->set_value(false);
+
+    OtlpOptions options(sink_config);
+
+    // Default options
+    EXPECT_FALSE(options.reportCountersAsDeltas());
+    EXPECT_FALSE(options.reportHistogramsAsDeltas());
+    EXPECT_FALSE(options.emitTagsAsAttributes());
+    EXPECT_FALSE(options.useTagExtractedName());
+  }
+}
+
 } // namespace
 } // namespace OpenTelemetry
 } // namespace StatSinks
