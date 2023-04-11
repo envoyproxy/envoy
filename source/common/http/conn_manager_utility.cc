@@ -299,8 +299,9 @@ void ConnectionManagerUtility::cleanInternalHeaders(
     }
   }
 
-  // Headers to be stripped from edge *and* upstream server requests
-  // - these headers should only ever be seen or set by envoy itself.
+  // Headers to be stripped from edge *and* intermediate-hop external requests.
+  // TODO: some of these should only be stripped at edge, i.e. moved into
+  // the block above.
   request_headers.removeEnvoyRetriableStatusCodes();
   request_headers.removeEnvoyRetriableHeaderNames();
   request_headers.removeEnvoyRetryOn();
