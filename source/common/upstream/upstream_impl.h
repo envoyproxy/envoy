@@ -33,6 +33,7 @@
 #include "envoy/ssl/context_manager.h"
 #include "envoy/stats/scope.h"
 #include "envoy/thread_local/thread_local.h"
+#include "envoy/upstream/cluster_factory.h"
 #include "envoy/upstream/cluster_manager.h"
 #include "envoy/upstream/health_checker.h"
 #include "envoy/upstream/load_balancer.h"
@@ -43,6 +44,7 @@
 #include "source/common/common/callback_impl.h"
 #include "source/common/common/enum_to_int.h"
 #include "source/common/common/logger.h"
+#include "source/common/common/packed_struct.h"
 #include "source/common/common/thread.h"
 #include "source/common/config/metadata.h"
 #include "source/common/config/well_known_names.h"
@@ -795,15 +797,35 @@ public:
     return common_lb_config_;
   }
   std::chrono::milliseconds connectTimeout() const override { return connect_timeout_; }
+
+  // `OptionalTimeouts` manages various `optional` values. We pack them in a separate data
+  // structure for memory efficiency -- avoiding overhead of `absl::optional` per variable, and
+  // avoiding overhead of storing unset timeouts.
+  enum class OptionalTimeoutNames { IdleTimeout = 0, TcpPoolIdleTimeout, MaxConnectionDuration };
+  using OptionalTimeouts = PackedStruct<std::chrono::milliseconds, 3, OptionalTimeoutNames>;
+
   const absl::optional<std::chrono::milliseconds> idleTimeout() const override {
-    return idle_timeout_;
+    auto timeout = optional_timeouts_.get<OptionalTimeoutNames::IdleTimeout>();
+    if (timeout.has_value()) {
+      return *timeout;
+    }
+    return absl::nullopt;
   }
   const absl::optional<std::chrono::milliseconds> tcpPoolIdleTimeout() const override {
-    return tcp_pool_idle_timeout_;
+    auto timeout = optional_timeouts_.get<OptionalTimeoutNames::TcpPoolIdleTimeout>();
+    if (timeout.has_value()) {
+      return *timeout;
+    }
+    return absl::nullopt;
   }
   const absl::optional<std::chrono::milliseconds> maxConnectionDuration() const override {
-    return max_connection_duration_;
+    auto timeout = optional_timeouts_.get<OptionalTimeoutNames::MaxConnectionDuration>();
+    if (timeout.has_value()) {
+      return *timeout;
+    }
+    return absl::nullopt;
   }
+
   float perUpstreamPreconnectRatio() const override { return per_upstream_preconnect_ratio_; }
   float peekaheadRatio() const override { return peekahead_ratio_; }
   uint32_t perConnectionBufferLimitBytes() const override {
@@ -942,7 +964,12 @@ public:
     return http_protocol_options_->alternate_protocol_cache_options_;
   }
 
-  absl::optional<std::string> edsServiceName() const override { return eds_service_name_; }
+  absl::optional<std::string> edsServiceName() const override {
+    if (eds_service_name_ != nullptr) {
+      return *eds_service_name_;
+    }
+    return absl::nullopt;
+  }
 
   void createNetworkFilterChain(Network::Connection&) const override;
   std::vector<Http::Protocol>
@@ -1004,15 +1031,14 @@ private:
   Runtime::Loader& runtime_;
   const std::string name_;
   std::unique_ptr<const std::string> observability_name_;
+  std::unique_ptr<const std::string> eds_service_name_;
   const absl::flat_hash_map<std::string, ProtocolOptionsConfigConstSharedPtr>
       extension_protocol_options_;
   const std::shared_ptr<const HttpProtocolOptionsConfigImpl> http_protocol_options_;
   const std::shared_ptr<const TcpProtocolOptionsConfigImpl> tcp_protocol_options_;
   const uint64_t max_requests_per_connection_;
   const std::chrono::milliseconds connect_timeout_;
-  absl::optional<std::chrono::milliseconds> idle_timeout_;
-  absl::optional<std::chrono::milliseconds> tcp_pool_idle_timeout_;
-  absl::optional<std::chrono::milliseconds> max_connection_duration_;
+  OptionalTimeouts optional_timeouts_;
   const float per_upstream_preconnect_ratio_;
   const float peekahead_ratio_;
   TransportSocketMatcherPtr socket_matcher_;
@@ -1036,9 +1062,6 @@ private:
   ProtobufTypes::MessagePtr load_balancing_policy_;
   TypedLoadBalancerFactory* load_balancer_factory_ = nullptr;
   const envoy::config::cluster::v3::Cluster::CommonLbConfig common_lb_config_;
-  const absl::optional<envoy::config::core::v3::UpstreamHttpProtocolOptions>
-      upstream_http_protocol_options_;
-  absl::optional<std::string> eds_service_name_;
   std::unique_ptr<const envoy::config::cluster::v3::Cluster::CustomClusterType> cluster_type_;
   const std::unique_ptr<Server::Configuration::CommonFactoryContext> factory_context_;
   std::vector<Network::FilterFactoryCb> filter_factories_;
@@ -1096,13 +1119,6 @@ public:
   void setOutlierDetector(const Outlier::DetectorSharedPtr& outlier_detector);
 
   /**
-   * Set the TransportSocketFactoryContext pointer so that the memory isn't lost
-   * for the cluster lifetime in case SDS is used.
-   */
-  void setTransportFactoryContext(
-      Server::Configuration::TransportSocketFactoryContextPtr transport_factory_context);
-
-  /**
    * Wrapper around Network::Address::resolveProtoAddress() that provides improved error message
    * based on the cluster's type.
    * @param address supplies the address proto to resolve.
@@ -1135,9 +1151,9 @@ public:
 
 protected:
   ClusterImplBase(Server::Configuration::ServerFactoryContext& server_context,
-                  const envoy::config::cluster::v3::Cluster& cluster, Runtime::Loader& runtime,
-                  Server::Configuration::TransportSocketFactoryContextImpl& factory_context,
-                  Stats::ScopeSharedPtr&& stats_scope, bool added_via_api, TimeSource& time_source);
+                  const envoy::config::cluster::v3::Cluster& cluster,
+                  ClusterFactoryContext& cluster_context, Runtime::Loader& runtime,
+                  bool added_via_api, TimeSource& time_source);
 
   /**
    * Overridden by every concrete cluster. The cluster should do whatever pre-init is needed. E.g.,
@@ -1177,6 +1193,8 @@ protected:
   Outlier::DetectorSharedPtr outlier_detector_;
   const bool wait_for_warm_on_init_;
 
+  Server::Configuration::TransportSocketFactoryContextImplPtr transport_factory_context_{};
+
 protected:
   TimeSource& time_source_;
   MainPrioritySetImpl priority_set_;
@@ -1194,7 +1212,6 @@ private:
   const bool local_cluster_;
   Config::ConstMetadataSharedPoolSharedPtr const_metadata_shared_pool_;
   Common::CallbackHandlePtr priority_update_cb_;
-  Server::Configuration::TransportSocketFactoryContextPtr transport_factory_context_{};
 };
 
 using ClusterImplBaseSharedPtr = std::shared_ptr<ClusterImplBase>;

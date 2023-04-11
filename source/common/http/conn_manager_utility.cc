@@ -102,8 +102,7 @@ ConnectionManagerUtility::MutateRequestHeadersResult ConnectionManagerUtility::m
   // Sanitize referer field if exists.
   auto result = request_headers.get(Http::CustomHeaders::get().Referer);
   if (!result.empty()) {
-    Utility::Url url;
-    if (result.size() > 1 || !url.initialize(result[0]->value().getStringView(), false)) {
+    if (result.size() > 1 || !Utility::isValidRefererValue(result[0]->value().getStringView())) {
       // A request header shouldn't have multiple referer field.
       request_headers.remove(Http::CustomHeaders::get().Referer);
     }
@@ -309,6 +308,9 @@ void ConnectionManagerUtility::cleanInternalHeaders(
   request_headers.removeEnvoyIpTags();
   request_headers.removeEnvoyOriginalUrl();
   request_headers.removeEnvoyHedgeOnPerTryTimeout();
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.sanitize_original_path")) {
+    request_headers.removeEnvoyOriginalPath();
+  }
 
   for (const LowerCaseString& header : internal_only_headers) {
     request_headers.remove(header);

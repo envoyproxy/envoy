@@ -248,7 +248,7 @@ TEST_F(ConnectionManagerUtilityTest, RemoveRefererIfUrlInvalid) {
   connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
       std::make_shared<Network::Address::Ipv4Instance>("10.0.0.1"));
   ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
-  TestRequestHeaderMapImpl headers{{"referer", "foo"}};
+  TestRequestHeaderMapImpl headers{{"referer", "fo\\0o"}};
   EXPECT_EQ((MutateRequestRet{"10.0.0.1:0", true, Tracing::Reason::NotTraceable}),
             callMutateRequestHeaders(headers, Protocol::Http2));
   EXPECT_TRUE(headers.get(Http::CustomHeaders::get().Referer).empty());
@@ -265,7 +265,79 @@ TEST_F(ConnectionManagerUtilityTest, RemoveRefererIfMultipleEntriesAreFound) {
   EXPECT_TRUE(headers.get(Http::CustomHeaders::get().Referer).empty());
 }
 
+TEST_F(ConnectionManagerUtilityTest, RemoveRefererIfFragmentIsFound) {
+  connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
+      std::make_shared<Network::Address::Ipv4Instance>("10.0.0.1"));
+  ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
+  TestRequestHeaderMapImpl headers{{"referer", "https://example.com/foo/bar/#fragment"}};
+  EXPECT_EQ((MutateRequestRet{"10.0.0.1:0", true, Tracing::Reason::NotTraceable}),
+            callMutateRequestHeaders(headers, Protocol::Http2));
+  EXPECT_TRUE(headers.get(Http::CustomHeaders::get().Referer).empty());
+}
+
+TEST_F(ConnectionManagerUtilityTest, AllowRefererIfFragmentIsFoundWithoutGuard) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.http_allow_partial_urls_in_referer", "false"}});
+  connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
+      std::make_shared<Network::Address::Ipv4Instance>("10.0.0.1"));
+  ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
+  TestRequestHeaderMapImpl headers{{"referer", "https://example.com/foo/bar/#fragment"}};
+  EXPECT_EQ((MutateRequestRet{"10.0.0.1:0", true, Tracing::Reason::NotTraceable}),
+            callMutateRequestHeaders(headers, Protocol::Http2));
+  EXPECT_EQ("https://example.com/foo/bar/#fragment",
+            headers.get(Http::CustomHeaders::get().Referer)[0]->value().getStringView());
+}
+
+TEST_F(ConnectionManagerUtilityTest, RemoveRefererIfMalformedPath) {
+  connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
+      std::make_shared<Network::Address::Ipv4Instance>("10.0.0.1"));
+  ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
+  TestRequestHeaderMapImpl headers{{"referer", "https://example.com/  /foo"}};
+  EXPECT_EQ((MutateRequestRet{"10.0.0.1:0", true, Tracing::Reason::NotTraceable}),
+            callMutateRequestHeaders(headers, Protocol::Http2));
+  EXPECT_TRUE(headers.get(Http::CustomHeaders::get().Referer).empty());
+}
+
+TEST_F(ConnectionManagerUtilityTest, RemoveRefererIfUserinfoIncluded) {
+  connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
+      std::make_shared<Network::Address::Ipv4Instance>("10.0.0.1"));
+  ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
+  TestRequestHeaderMapImpl headers{{"referer", "https://user:info@example.com"}};
+  EXPECT_EQ((MutateRequestRet{"10.0.0.1:0", true, Tracing::Reason::NotTraceable}),
+            callMutateRequestHeaders(headers, Protocol::Http2));
+  EXPECT_TRUE(headers.get(Http::CustomHeaders::get().Referer).empty());
+}
+
+TEST_F(ConnectionManagerUtilityTest, AllowRefererIfUserinfoIncludedWithoutGuard) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.http_allow_partial_urls_in_referer", "false"}});
+  connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
+      std::make_shared<Network::Address::Ipv4Instance>("10.0.0.1"));
+  ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
+  TestRequestHeaderMapImpl headers{{"referer", "https://user:info@example.com"}};
+  EXPECT_EQ((MutateRequestRet{"10.0.0.1:0", true, Tracing::Reason::NotTraceable}),
+            callMutateRequestHeaders(headers, Protocol::Http2));
+  EXPECT_EQ("https://user:info@example.com",
+            headers.get(Http::CustomHeaders::get().Referer)[0]->value().getStringView());
+}
+
 TEST_F(ConnectionManagerUtilityTest, ValidRefererPassesSanitization) {
+  connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
+      std::make_shared<Network::Address::Ipv4Instance>("10.0.0.1"));
+  ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
+  TestRequestHeaderMapImpl headers{{"referer", "https://example.com/"}};
+  EXPECT_EQ((MutateRequestRet{"10.0.0.1:0", true, Tracing::Reason::NotTraceable}),
+            callMutateRequestHeaders(headers, Protocol::Http2));
+  EXPECT_EQ("https://example.com/",
+            headers.get(Http::CustomHeaders::get().Referer)[0]->value().getStringView());
+}
+
+TEST_F(ConnectionManagerUtilityTest, ValidRefererPassesSanitizationWithoutGuard) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.http_allow_partial_urls_in_referer", "false"}});
   connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
       std::make_shared<Network::Address::Ipv4Instance>("10.0.0.1"));
   ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
@@ -284,6 +356,41 @@ TEST_F(ConnectionManagerUtilityTest, AlphaNumCharRefererPassesSanitization) {
   EXPECT_EQ((MutateRequestRet{"10.0.0.1:0", true, Tracing::Reason::NotTraceable}),
             callMutateRequestHeaders(headers, Protocol::Http2));
   EXPECT_EQ("android-app+1.0://example.com/",
+            headers.get(Http::CustomHeaders::get().Referer)[0]->value().getStringView());
+}
+
+TEST_F(ConnectionManagerUtilityTest, ValidPathOnlyRefererPassesSanitization) {
+  connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
+      std::make_shared<Network::Address::Ipv4Instance>("10.0.0.1"));
+  ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
+  TestRequestHeaderMapImpl headers{{"referer", "/foo/bar/"}};
+  EXPECT_EQ((MutateRequestRet{"10.0.0.1:0", true, Tracing::Reason::NotTraceable}),
+            callMutateRequestHeaders(headers, Protocol::Http2));
+  EXPECT_EQ("/foo/bar/",
+            headers.get(Http::CustomHeaders::get().Referer)[0]->value().getStringView());
+}
+
+TEST_F(ConnectionManagerUtilityTest, RemovePathOnlyRefererWithoutGuard) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.http_allow_partial_urls_in_referer", "false"}});
+  connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
+      std::make_shared<Network::Address::Ipv4Instance>("10.0.0.1"));
+  ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
+  TestRequestHeaderMapImpl headers{{"referer", "/foo/bar/"}};
+  EXPECT_EQ((MutateRequestRet{"10.0.0.1:0", true, Tracing::Reason::NotTraceable}),
+            callMutateRequestHeaders(headers, Protocol::Http2));
+  EXPECT_TRUE(headers.get(Http::CustomHeaders::get().Referer).empty());
+}
+
+TEST_F(ConnectionManagerUtilityTest, ValidFileOnlyRefererPassesSanitization) {
+  connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
+      std::make_shared<Network::Address::Ipv4Instance>("10.0.0.1"));
+  ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
+  TestRequestHeaderMapImpl headers{{"referer", "resource.html"}};
+  EXPECT_EQ((MutateRequestRet{"10.0.0.1:0", true, Tracing::Reason::NotTraceable}),
+            callMutateRequestHeaders(headers, Protocol::Http2));
+  EXPECT_EQ("resource.html",
             headers.get(Http::CustomHeaders::get().Referer)[0]->value().getStringView());
 }
 
@@ -768,6 +875,7 @@ TEST_F(ConnectionManagerUtilityTest, ExternalAddressExternalRequestUseRemote) {
                                    {"x-envoy-expected-rq-timeout-ms", "10"},
                                    {"x-envoy-ip-tags", "bar"},
                                    {"x-envoy-original-url", "my_url"},
+                                   {"x-envoy-original-path", "/my_path"},
                                    {"custom_header", "foo"}};
 
   EXPECT_EQ((MutateRequestRet{"50.0.0.1:0", false, Tracing::Reason::NotTraceable}),
@@ -786,6 +894,7 @@ TEST_F(ConnectionManagerUtilityTest, ExternalAddressExternalRequestUseRemote) {
   EXPECT_FALSE(headers.has("x-envoy-expected-rq-timeout-ms"));
   EXPECT_FALSE(headers.has("x-envoy-ip-tags"));
   EXPECT_FALSE(headers.has("x-envoy-original-url"));
+  EXPECT_FALSE(headers.has("x-envoy-original-path"));
   EXPECT_FALSE(headers.has("custom_header"));
 }
 

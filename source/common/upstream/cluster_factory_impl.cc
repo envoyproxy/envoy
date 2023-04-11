@@ -14,16 +14,6 @@
 namespace Envoy {
 namespace Upstream {
 
-namespace {
-
-Stats::ScopeSharedPtr generateStatsScope(const envoy::config::cluster::v3::Cluster& config,
-                                         Stats::Store& stats) {
-  return stats.createScope(fmt::format(
-      "cluster.{}.", config.alt_stat_name().empty() ? config.name() : config.alt_stat_name()));
-}
-
-} // namespace
-
 std::pair<ClusterSharedPtr, ThreadAwareLoadBalancerPtr> ClusterFactoryImplBase::create(
     Server::Configuration::ServerFactoryContext& server_context,
     const envoy::config::cluster::v3::Cluster& cluster, ClusterManager& cluster_manager,
@@ -104,16 +94,9 @@ std::pair<ClusterSharedPtr, ThreadAwareLoadBalancerPtr>
 ClusterFactoryImplBase::create(Server::Configuration::ServerFactoryContext& server_context,
                                const envoy::config::cluster::v3::Cluster& cluster,
                                ClusterFactoryContext& context) {
-  auto stats_scope = generateStatsScope(cluster, context.stats());
-  std::unique_ptr<Server::Configuration::TransportSocketFactoryContextImpl>
-      transport_factory_context =
-          std::make_unique<Server::Configuration::TransportSocketFactoryContextImpl>(
-              server_context, context.sslContextManager(), *stats_scope, context.clusterManager(),
-              context.stats(), context.messageValidationVisitor());
 
   std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr> new_cluster_pair =
-      createClusterImpl(server_context, cluster, context, *transport_factory_context,
-                        std::move(stats_scope));
+      createClusterImpl(server_context, cluster, context);
 
   if (!cluster.health_checks().empty()) {
     // TODO(htuch): Need to support multiple health checks in v2.
@@ -131,7 +114,6 @@ ClusterFactoryImplBase::create(Server::Configuration::ServerFactoryContext& serv
       *new_cluster_pair.first, cluster, context.mainThreadDispatcher(), context.runtime(),
       context.outlierEventLogger(), context.api().randomGenerator()));
 
-  new_cluster_pair.first->setTransportFactoryContext(std::move(transport_factory_context));
   return new_cluster_pair;
 }
 

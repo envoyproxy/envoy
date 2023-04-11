@@ -19,6 +19,32 @@ class FilterState;
 
 using FilterStateSharedPtr = std::shared_ptr<FilterState>;
 
+// Objects stored in the filter state can optionally be shared between the
+// upstream and downstream filter state. Note that sharing happens at the
+// connection level and in some cases may significantly reduce performance by
+// preventing pooling of multiple downstream requests to a single
+// upstream connection.
+enum class StreamSharingMayImpactPooling {
+  // None implies the object is exclusive to the stream.
+  None,
+
+  // Mark a filter state object as shared with the upstream connection.
+  // Shared filter state objects are copied by reference from the downstream
+  // requests and connections to the upstream connection filter state. When
+  // upstream connections are re-used between streams, the downstream objects
+  // are captured for the first, initiating stream. To force distinct
+  // upstream connections, the shared filter state object must implement the
+  // hashing interface. Shared objects with distinct hashes will use distinct
+  // upstream connections. Note that this affects connection pooling,
+  // preventing any re-use of the upstream connections in the worst case.
+  SharedWithUpstreamConnection,
+
+  // Same as SharedWithUpstreamConnection, except that the filter state is
+  // not transitively shared. The filter state is imported into the upstream
+  // connection filter state as exclusive to the upstream connection.
+  SharedWithUpstreamConnectionOnce,
+};
+
 /**
  * FilterState represents dynamically generated information regarding a stream (TCP or HTTP level)
  * or a connection by various filters in Envoy. FilterState can be write-once or write-many.
@@ -58,29 +84,6 @@ public:
   // request, which remains open after the downstream request completes.
   enum LifeSpan { FilterChain, Request, Connection, TopSpan = Connection };
 
-  // Objects stored in the filter state can optionally be shared between the
-  // upstream and downstream filter state.
-  enum class StreamSharing {
-    // None implies the object is exclusive to the stream.
-    None,
-
-    // Mark a filter state object as shared with the upstream connection.
-    // Shared filter state objects are copied by reference from the downstream
-    // requests and connections to the upstream connection filter state. When
-    // upstream connections are re-used between streams, the downstream objects
-    // are captured for the first, initiating stream. To force distinct
-    // upstream connections, the shared filter state object must implement the
-    // hashing interface. Shared objects with distinct hashes will use distinct
-    // upstream connections. Note that this affects connection pooling,
-    // preventing any re-use of the upstream connections in the worst case.
-    SharedWithUpstreamConnection,
-
-    // Same as SharedWithUpstreamConnection, except that the filter state is
-    // not transitively shared. The filter state is imported into the upstream
-    // connection filter state as exclusive to the upstream connection.
-    SharedWithUpstreamConnectionOnce,
-  };
-
   class Object {
   public:
     virtual ~Object() = default;
@@ -103,7 +106,7 @@ public:
   struct FilterObject {
     std::shared_ptr<Object> data_;
     StateType state_type_{StateType::ReadOnly};
-    StreamSharing stream_sharing_{StreamSharing::None};
+    StreamSharingMayImpactPooling stream_sharing_{StreamSharingMayImpactPooling::None};
     std::string name_;
   };
 
@@ -126,9 +129,10 @@ public:
    * This is to enforce a single authoritative source for each piece of
    * data stored in FilterState.
    */
-  virtual void setData(absl::string_view data_name, std::shared_ptr<Object> data,
-                       StateType state_type, LifeSpan life_span = LifeSpan::FilterChain,
-                       StreamSharing stream_sharing = StreamSharing::None) PURE;
+  virtual void
+  setData(absl::string_view data_name, std::shared_ptr<Object> data, StateType state_type,
+          LifeSpan life_span = LifeSpan::FilterChain,
+          StreamSharingMayImpactPooling stream_sharing = StreamSharingMayImpactPooling::None) PURE;
 
   /**
    * @param data_name the name of the data being looked up (mutable/readonly).
