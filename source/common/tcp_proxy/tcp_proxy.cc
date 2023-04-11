@@ -90,33 +90,35 @@ Config::SharedConfig::SharedConfig(
     max_downstream_connection_duration_ = std::chrono::milliseconds(connection_duration);
   }
 
-  if (config.has_access_log_options()) {
-    if (config.access_log_options().flush_access_log_on_connected() &&
-        config.flush_access_log_on_connected() /* deprecated */) {
+  if (config.has_access_log_options()) {    
+    if (config.flush_access_log_on_connected() /* deprecated */) {
       throw EnvoyException(
           "Only one of flush_access_log_on_connected from TcpProxy or"
           "flush_access_log_on_connected from TcpAccessLogOptions can be specified.");
     }
 
-    flush_access_log_on_connected_ = config.access_log_options().flush_access_log_on_connected();
-  } else {
-    flush_access_log_on_connected_ = config.flush_access_log_on_connected();
-  }
-
-  if (config.has_access_log_options() &&
-      config.access_log_options().has_access_log_flush_interval()) {
-    if (config.has_access_log_flush_interval()) {
-      throw EnvoyException("Only one of access_log_flush_interval from TcpProxy or"
-                           "access_log_flush_interval from TcpAccessLogOptions can be specified.");
+    if (config.has_access_log_flush_interval() /* deprecated */) {
+      throw EnvoyException(
+          "Only one of access_log_flush_interval from TcpProxy or"
+          "access_log_flush_interval from TcpAccessLogOptions can be specified.");
     }
 
-    const uint64_t flush_interval = DurationUtil::durationToMilliseconds(
-        config.access_log_options().access_log_flush_interval());
-    access_log_flush_interval_ = std::chrono::milliseconds(flush_interval);
-  } else if (config.has_access_log_flush_interval() /* deprecated */) {
-    const uint64_t flush_interval =
-        DurationUtil::durationToMilliseconds(config.access_log_flush_interval());
-    access_log_flush_interval_ = std::chrono::milliseconds(flush_interval);
+    flush_access_log_on_connected_ =
+        config.access_log_options().flush_access_log_on_connected();
+
+    if (config.access_log_options().has_access_log_flush_interval()) {
+      const uint64_t flush_interval = DurationUtil::durationToMilliseconds(
+          config.access_log_options().access_log_flush_interval());
+      access_log_flush_interval_ = std::chrono::milliseconds(flush_interval);
+    }
+  } else {
+    flush_access_log_on_connected_ = config.flush_access_log_on_connected();
+
+    if (config.has_access_log_flush_interval()) {
+      const uint64_t flush_interval =
+          DurationUtil::durationToMilliseconds(config.access_log_flush_interval());
+      access_log_flush_interval_ = std::chrono::milliseconds(flush_interval);
+    }
   }
 
   if (config.has_on_demand() && config.on_demand().has_odcds_config()) {
