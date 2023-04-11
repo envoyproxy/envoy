@@ -1352,24 +1352,26 @@ ClusterInfoImpl::upstreamHttpProtocol(absl::optional<Http::Protocol> downstream_
                                                                : Http::Protocol::Http11};
 }
 
-ClusterImplBase::ClusterImplBase(Server::Configuration::ServerFactoryContext& server_context,
-                                 const envoy::config::cluster::v3::Cluster& cluster,
-                                 ClusterFactoryContext& cluster_context, Runtime::Loader& runtime,
-                                 bool added_via_api, TimeSource& time_source)
+ClusterImplBase::ClusterImplBase(const envoy::config::cluster::v3::Cluster& cluster,
+                                 ClusterFactoryContext& cluster_context)
     : init_manager_(fmt::format("Cluster {}", cluster.name())),
-      init_watcher_("ClusterImplBase", [this]() { onInitDone(); }), runtime_(runtime),
+      init_watcher_("ClusterImplBase", [this]() { onInitDone(); }),
+      runtime_(cluster_context.serverFactoryContext().runtime()),
       wait_for_warm_on_init_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(cluster, wait_for_warm_on_init, true)),
-      time_source_(time_source),
+      time_source_(cluster_context.serverFactoryContext().timeSource()),
       local_cluster_(cluster_context.clusterManager().localClusterName().value_or("") ==
                      cluster.name()),
       const_metadata_shared_pool_(Config::Metadata::getConstMetadataSharedPool(
-          cluster_context.singletonManager(), cluster_context.mainThreadDispatcher())) {
+          cluster_context.serverFactoryContext().singletonManager(),
+          cluster_context.serverFactoryContext().mainThreadDispatcher())) {
 
-  auto stats_scope = generateStatsScope(cluster, cluster_context.stats());
+  auto& server_context = cluster_context.serverFactoryContext();
+
+  auto stats_scope = generateStatsScope(cluster, server_context.serverScope().store());
   transport_factory_context_ =
       std::make_unique<Server::Configuration::TransportSocketFactoryContextImpl>(
           server_context, cluster_context.sslContextManager(), *stats_scope,
-          cluster_context.clusterManager(), cluster_context.stats(),
+          cluster_context.clusterManager(), server_context.serverScope().store(),
           cluster_context.messageValidationVisitor());
   transport_factory_context_->setInitManager(init_manager_);
 
@@ -1380,12 +1382,12 @@ ClusterImplBase::ClusterImplBase(Server::Configuration::ServerFactoryContext& se
       cluster.transport_socket_matches(), *transport_factory_context_, socket_factory,
       *stats_scope);
   const bool matcher_supports_alpn = socket_matcher->allMatchesSupportAlpn();
-  auto& dispatcher = cluster_context.mainThreadDispatcher();
+  auto& dispatcher = server_context.mainThreadDispatcher();
   info_ = std::shared_ptr<const ClusterInfoImpl>(
       new ClusterInfoImpl(init_manager_, server_context, cluster,
-                          cluster_context.clusterManager().bindConfig(), runtime,
-                          std::move(socket_matcher), std::move(stats_scope), added_via_api,
-                          *transport_factory_context_),
+                          cluster_context.clusterManager().bindConfig(), runtime_,
+                          std::move(socket_matcher), std::move(stats_scope),
+                          cluster_context.addedViaApi(), *transport_factory_context_),
       [&dispatcher](const ClusterInfoImpl* self) {
         ENVOY_LOG(trace, "Schedule destroy cluster info {}", self->name());
         dispatcher.deleteInDispatcherThread(
