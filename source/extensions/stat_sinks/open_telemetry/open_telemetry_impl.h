@@ -69,8 +69,7 @@ protected:
   Grpc::AsyncClient<MetricsExportRequest, MetricsExportResponse> client_;
 };
 
-using OpenTelemetryGrpcMetricsExporterSharedPtr =
-    std::shared_ptr<OpenTelemetryGrpcMetricsExporter>;
+using OpenTelemetryGrpcMetricsExporterSharedPtr = std::shared_ptr<OpenTelemetryGrpcMetricsExporter>;
 
 /**
  * Production implementation of OpenTelemetryGrpcMetricsExporter
