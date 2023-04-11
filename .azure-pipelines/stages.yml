@@ -262,9 +262,9 @@ stages:
       timeoutInMinutes: 10
       condition: failed()
 
-  - job: docs
-    displayName: Documentation
-    dependsOn: []  # this removes the implicit dependency on previous stage and causes this to run in parallel.
+  - job: publishing
+    displayName: Publishing
+    dependsOn: []
     condition: ne(variables['PostSubmit'], true)
     pool:
       vmImage: "ubuntu-20.04"
@@ -291,6 +291,17 @@ stages:
         BAZEL_REMOTE_INSTANCE: projects/envoy-ci/instances/default_instance
         GCP_SERVICE_ACCOUNT_KEY: $(GcpServiceAccountKey)
       displayName: "Generate docs"
+
+    - script: |
+        DOCKER_CI_FIX_DIFF=$(Build.StagingDirectory)/fix_docker.diff DOCKER_CI_FIX=1 ci/test_docker_ci.sh
+      workingDirectory: $(Build.SourcesDirectory)
+      displayName: Docker build regression test
+    - task: PublishBuildArtifacts@1
+      inputs:
+        pathtoPublish: "$(Build.StagingDirectory)/fix_docker.diff"
+        artifactName: "docker_ci"
+        timeoutInMinutes: 10
+      condition: failed()
 
     - script: |
         ci/run_envoy_docker.sh 'ci/upload_gcs_artifact.sh /source/generated/docs docs'
@@ -329,26 +340,9 @@ stages:
         GITHUB_TOKEN: $(GitHubPublicRepoOnlyAccessToken)
       displayName: "Verify dependency information"
 
-  - job: docker_ci
-    displayName: Docker checks
-    dependsOn: []
-    pool:
-      vmImage: "ubuntu-20.04"
-    steps:
-    - script: |
-        DOCKER_CI_FIX_DIFF=$(Build.StagingDirectory)/fix_docker.diff DOCKER_CI_FIX=1 ci/test_docker_ci.sh
-      workingDirectory: $(Build.SourcesDirectory)
-      displayName: Docker build regression test
-    - task: PublishBuildArtifacts@1
-      inputs:
-        pathtoPublish: "$(Build.StagingDirectory)/fix_docker.diff"
-        artifactName: "docker_ci"
-        timeoutInMinutes: 10
-      condition: failed()
-
   - job: prechecked
     displayName: Prechecked
-    dependsOn: ["format", "proto_format", "docs", "dependencies", "docker_ci"]
+    dependsOn: ["format", "proto_format", "publishing", "dependencies"]
     pool:
       vmImage: "ubuntu-20.04"
     # This condition ensures that this (required) job passes if all of
@@ -360,9 +354,8 @@ stages:
         eq(variables['Build.Reason'], 'PullRequest'),
         in(dependencies.format.result, 'Succeeded', 'SucceededWithIssues', 'Skipped'),
         in(dependencies.proto_format.result, 'Succeeded', 'SucceededWithIssues', 'Skipped'),
-        in(dependencies.docs.result, 'Succeeded', 'SucceededWithIssues', 'Skipped'),
-        in(dependencies.dependencies.result, 'Succeeded', 'SucceededWithIssues', 'Skipped'),
-        in(dependencies.docker_ci.result, 'Succeeded', 'SucceededWithIssues', 'Skipped'))
+        in(dependencies.publishing.result, 'Succeeded', 'SucceededWithIssues', 'Skipped'),
+        in(dependencies.dependencies.result, 'Succeeded', 'SucceededWithIssues', 'Skipped'))
 
     steps:
     - checkout: none
