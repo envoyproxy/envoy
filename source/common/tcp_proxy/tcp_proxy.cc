@@ -90,7 +90,7 @@ Config::SharedConfig::SharedConfig(
     max_downstream_connection_duration_ = std::chrono::milliseconds(connection_duration);
   }
 
-  if (config.has_access_log_options()) {    
+  if (config.has_access_log_options()) {
     if (config.flush_access_log_on_connected() /* deprecated */) {
       throw EnvoyException(
           "Only one of flush_access_log_on_connected from TcpProxy or"
