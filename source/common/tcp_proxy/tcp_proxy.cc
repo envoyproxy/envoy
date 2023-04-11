@@ -98,13 +98,11 @@ Config::SharedConfig::SharedConfig(
     }
 
     if (config.has_access_log_flush_interval() /* deprecated */) {
-      throw EnvoyException(
-          "Only one of access_log_flush_interval from TcpProxy or"
-          "access_log_flush_interval from TcpAccessLogOptions can be specified.");
+      throw EnvoyException("Only one of access_log_flush_interval from TcpProxy or"
+                           "access_log_flush_interval from TcpAccessLogOptions can be specified.");
     }
 
-    flush_access_log_on_connected_ =
-        config.access_log_options().flush_access_log_on_connected();
+    flush_access_log_on_connected_ = config.access_log_options().flush_access_log_on_connected();
 
     if (config.access_log_options().has_access_log_flush_interval()) {
       const uint64_t flush_interval = DurationUtil::durationToMilliseconds(
