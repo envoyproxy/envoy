@@ -964,11 +964,8 @@ public:
     return http_protocol_options_->alternate_protocol_cache_options_;
   }
 
-  absl::optional<std::string> edsServiceName() const override {
-    if (eds_service_name_ != nullptr) {
-      return *eds_service_name_;
-    }
-    return absl::nullopt;
+  OptRef<const std::string> edsServiceName() const override {
+    return makeOptRefFromPtr<const std::string>(eds_service_name_.get());
   }
 
   void createNetworkFilterChain(Network::Connection&) const override;

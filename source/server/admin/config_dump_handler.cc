@@ -302,7 +302,7 @@ ConfigDumpHandler::dumpEndpointConfigs(const Matchers::StringMatcher& name_match
     envoy::config::endpoint::v3::ClusterLoadAssignment cluster_load_assignment;
 
     if (cluster_info->edsServiceName().has_value()) {
-      cluster_load_assignment.set_cluster_name(cluster_info->edsServiceName().value());
+      cluster_load_assignment.set_cluster_name(cluster_info->edsServiceName().ref());
     } else {
       cluster_load_assignment.set_cluster_name(cluster_info->name());
     }

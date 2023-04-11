@@ -56,9 +56,9 @@ private:
                               const HostMap& all_hosts,
                               const absl::flat_hash_set<std::string>& all_new_hosts);
   bool validateUpdateSize(int num_resources);
-  std::string edsServiceName() const {
-    if (info_->edsServiceName().has_value() && !info_->edsServiceName()->empty()) {
-      return *info_->edsServiceName();
+  const std::string& edsServiceName() const {
+    if (const auto name = info_->edsServiceName(); name.has_value() && !name->empty()) {
+      return name.ref();
     }
     return info_->name();
   }
