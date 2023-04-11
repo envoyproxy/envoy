@@ -66,7 +66,6 @@ private:
 
   std::chrono::milliseconds timeout_;
   Event::Dispatcher& dispatcher_;
-  const Network::DnsResolverSharedPtr resolver_;
   DnsFilterResolverCallback& callback_;
   absl::flat_hash_map<const DnsQueryRecord*, LookupContext> lookups_;
   uint64_t max_pending_lookups_;
