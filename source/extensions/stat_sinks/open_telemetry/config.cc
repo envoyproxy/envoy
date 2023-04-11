@@ -39,7 +39,7 @@ OpenTelemetrySinkFactory::createStatsSink(const Protobuf::Message& config,
         PROTOBUF_GET_WRAPPED_OR_DEFAULT(sink_config, use_tag_extracted_name, true));
   }
 
-  case SinkConfig::ProtocolSpecifierCase::PROTOCOL_SPECIFIER_NOT_SET:
+  default:
     break;
   }
 
@@ -50,7 +50,7 @@ ProtobufTypes::MessagePtr OpenTelemetrySinkFactory::createEmptyConfigProto() {
   return std::make_unique<SinkConfig>();
 }
 
-std::string OpenTelemetrySinkFactory::name() const { return "envoy.stat_sinks.open_telemetry"; }
+std::string OpenTelemetrySinkFactory::name() const { return OpenTelemetryName; }
 
 /**
  * Static registration for the this sink factory. @see RegisterFactory.

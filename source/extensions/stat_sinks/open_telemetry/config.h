@@ -10,6 +10,8 @@ namespace Extensions {
 namespace StatSinks {
 namespace OpenTelemetry {
 
+constexpr char OpenTelemetryName[] = "envoy.stat_sinks.open_telemetry";
+
 /**
  * Config registration for the OpenTelemetry stats sink. @see StatsSinkFactory.
  */
