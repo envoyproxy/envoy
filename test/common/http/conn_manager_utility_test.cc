@@ -898,8 +898,8 @@ TEST_F(ConnectionManagerUtilityTest, ExternalAddressExternalRequestUseRemote) {
   EXPECT_FALSE(headers.has("custom_header"));
 }
 
-// A request that does not use remote address and is from an external address should be treated as
-// an external request but with only edge-sanitized headers removed.
+// A request that does not use remote address and is from an external address should pull the
+// external address from x-forwarded-for, and should not remove only-edge-sanitized headers.
 TEST_F(ConnectionManagerUtilityTest, ExternalAddressExternalRequestDontUseRemote) {
   connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
       std::make_shared<Network::Address::Ipv4Instance>("50.0.0.1"));
