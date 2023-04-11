@@ -288,6 +288,8 @@ message CommonResponse {
   // Clear the route cache for the current request.
   // This is necessary if the remote server
   // modified headers that are used to calculate the route.
+  // Note that in order to force route cache clearing,
+  // :ref:`clear_route_cache <envoy_v3_api_field_service.ext_proc.v3.CommonResponse.clear_route_cache>` field also must be set to true.
   bool clear_route_cache = 5;
 }
 
