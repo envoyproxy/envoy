@@ -1009,6 +1009,10 @@ ClusterInfoImpl::ClusterInfoImpl(
       observability_name_(!config.alt_stat_name().empty()
                               ? std::make_unique<std::string>(config.alt_stat_name())
                               : nullptr),
+      eds_service_name_(
+          config.has_eds_cluster_config()
+              ? std::make_unique<std::string>(config.eds_cluster_config().service_name())
+              : nullptr),
       extension_protocol_options_(parseExtensionProtocolOptions(config, factory_context)),
       http_protocol_options_(
           createOptions(config,
@@ -1188,7 +1192,6 @@ ClusterInfoImpl::ClusterInfoImpl(
     if (config.type() != envoy::config::cluster::v3::Cluster::EDS) {
       throw EnvoyException("eds_cluster_config set in a non-EDS cluster");
     }
-    eds_service_name_ = config.eds_cluster_config().service_name();
   }
 
   // TODO(htuch): Remove this temporary workaround when we have

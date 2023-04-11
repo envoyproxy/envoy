@@ -31,8 +31,8 @@ minor_behavior_changes:
     example fixes.
 - area: build
   change: |
-    Moved the REST config subscripton code into extensions. If you use REST for config updates and override
-    extensions_build_config.bzl you will now need to include it explicitly.
+    Moved the REST and filesystem config subscripton code into extensions. If you use them for config updates and
+    override extensions_build_config.bzl you will now need to include them explicitly.
 - area: quic
   change: |
     Access logging is now deferred to the QUIC ack listener, and roundtrip response time is added as a downstream timing
@@ -184,6 +184,9 @@ bug_fixes:
   change: |
     stop forwarding ``:method`` value which is not a valid token defined in https://www.rfc-editor.org/rfc/rfc9110#section-5.6.2.
     Also, reject ``:method`` and ``:scheme`` headers with multiple values.
+- area: http
+  change: |
+    fixed a bug where terminating CONNECT on a preconnected connection could result in session stalls.
 - area: http3
   change: |
     reject pseudo headers violating RFC 9114. Specifically, pseudo-header fields with more than one value for the ``:method``
@@ -373,16 +376,6 @@ new_features:
   change: |
     added :ref:`wait_for_warm_on_init <envoy_v3_api_field_config.cluster.v3.Cluster.wait_for_warm_on_init>` support for
     :ref:`Redis Cluster<arch_overview_redis>`.
-- area: access_log
-  change: |
-    added access log support for ``%STREAM_STATE%`` command operator. Using the command operator will extract a value
-    representing the state of the stream. Access logs at the beginning of the stream will have 'Started' value. Periodic
-    access logs during an active stream, will have 'InProgress' value. Default access log, at the end of a stream will have
-    'Ended' value. In case the stream has not started yet, the value will be null.
-- area: stream info
-  change: |
-    added the latency for how long an upstream request spends waiting for the connection pool callback to
-    ``UpstreamTiming``.
 - area: ext_authz
   change: |
     added :ref:`include_tls_session <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.include_tls_session>`
@@ -392,6 +385,11 @@ new_features:
     added new field :ref:`signature_algorithms
     <envoy_v3_api_field_extensions.transport_sockets.tls.v3.TlsParameters.signature_algorithms>` to set signature
     algorithms.
+- area: metrics_service
+  change: |
+    added new configuration field :ref:`histogram_emit_mode
+    <envoy_v3_api_field_config.metrics.v3.MetricsServiceConfig.histogram_emit_mode>` to configure which stats
+    should be emitted for histograms.
 
 deprecated:
 - area: ext_authz

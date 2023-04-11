@@ -190,8 +190,6 @@ Filter::~Filter() {
   // Disable access log flush timer if it is enabled.
   disableAccessLogFlushTimer();
 
-  getStreamInfo().setStreamState(StreamInfo::StreamState::Ended);
-
   // Flush the final end stream access log entry.
   for (const auto& access_log : config_->accessLogs()) {
     access_log->log(nullptr, nullptr, nullptr, getStreamInfo());
@@ -792,15 +790,11 @@ void Filter::onUpstreamConnection() {
     }
   }
 
-  getStreamInfo().setStreamState(StreamInfo::StreamState::Started);
-
   if (config_->flushAccessLogOnConnected()) {
     for (const auto& access_log : config_->accessLogs()) {
       access_log->log(nullptr, nullptr, nullptr, getStreamInfo());
     }
   }
-
-  getStreamInfo().setStreamState(StreamInfo::StreamState::InProgress);
 }
 
 void Filter::onIdleTimeout() {
@@ -822,17 +816,10 @@ void Filter::onMaxDownstreamConnectionDuration() {
 }
 
 void Filter::onAccessLogFlushInterval() {
-  if (!getStreamInfo().streamState() ||
-      getStreamInfo().streamState() != StreamInfo::StreamState::Ended) {
-    resetAccessLogFlushTimer();
+  for (const auto& access_log : config_->accessLogs()) {
+    access_log->log(nullptr, nullptr, nullptr, getStreamInfo());
   }
-
-  if (getStreamInfo().streamState() &&
-      getStreamInfo().streamState() == StreamInfo::StreamState::InProgress) {
-    for (const auto& access_log : config_->accessLogs()) {
-      access_log->log(nullptr, nullptr, nullptr, getStreamInfo());
-    }
-  }
+  resetAccessLogFlushTimer();
 }
 
 void Filter::resetAccessLogFlushTimer() {

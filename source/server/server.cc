@@ -626,7 +626,7 @@ void InstanceImpl::initialize(Network::Address::InstanceConstSharedPtr local_add
         bootstrap_.listener_manager(), false);
   } else {
     listener_manager_factory_ = &Config::Utility::getAndCheckFactoryByName<ListenerManagerFactory>(
-        options_.listenerManager());
+        Config::ServerExtensionValues::get().DEFAULT_LISTENER);
   }
 
   // Workers get created first so they register for thread local updates.
