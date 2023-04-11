@@ -24,3 +24,13 @@ envoy_extension_cc_test(
         "@envoy_api//envoy/extensions/stat_sinks/open_telemetry/v3:pkg_cc_proto",
     ],
 )
+
+envoy_extension_cc_test(
+    name = "open_telemetry_test",
+    srcs = ["open_telemetry_impl_test.cc"],
+    extension_names = ["envoy.stat_sinks.open_telemetry"],
+    deps = [
+        "//source/extensions/stat_sinks/open_telemetry:open_telemetry_lib",
+        "//test/mocks/grpc:grpc_mocks",
+    ],
+)

@@ -25,7 +25,8 @@ OpenTelemetrySinkFactory::createStatsSink(const Protobuf::Message& config,
     const auto& grpc_service = sink_config.grpc_service();
 
     std::shared_ptr<OpenTelemetryGrpcMetricsExporter> otlp_metrics_exporter =
-        std::make_shared<OpenTelemetryGrpcMetricsExporterImpl>(otlp_options,
+        std::make_shared<OpenTelemetryGrpcMetricsExporterImpl>(
+            otlp_options,
             server.clusterManager().grpcAsyncClientManager().getOrCreateRawAsyncClient(
                 grpc_service, server.scope(), false));
 

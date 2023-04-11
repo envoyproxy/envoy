@@ -19,7 +19,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // Stats configuration proto schema for ``envoy.stat_sinks.open_telemetry`` sink.
 // [#extension: envoy.stat_sinks.open_telemetry]
 
-// [#next-free-field: 7]
+// [#next-free-field: 9]
 message SinkConfig {
   oneof protocol_specifier {
     option (validate.required) = true;
@@ -49,13 +49,13 @@ message SinkConfig {
   // of the full metric name. Default value is true.
   google.protobuf.BoolValue use_tag_extracted_name = 6;
 
-  // Histograms are being emitted as OTLP's Histogram for the metric type. If set to true,
-  // histograms will be emitted as OTLP's Summary metric type in addition. Default value is false.
+  // Histograms are being emitted as OTLP Histogram for the metric type. If set to true,
+  // histograms will be emitted as OTLP Summary metric type in addition. Default value is false.
   // [#not-implemented-hide:]
   google.protobuf.BoolValue emit_histogram_as_summary = 7;
 
   // If set to true, failed export request will be retried with exponential backoff strategy,
-  // only if the response status code defined as retryable by the OpenTelemetry Procotol.
+  // only if the response status code defined as retryable by the OpenTelemetry Protocol.
   // Default value is false.
   // [#not-implemented-hide:]
   google.protobuf.BoolValue retry_otlp_retryable_failures = 8;

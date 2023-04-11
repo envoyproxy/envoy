@@ -20,7 +20,8 @@ namespace {
 TEST(OpenTelemetryConfigTest, OpenTelemetrySinkType) {
   NiceMock<Server::Configuration::MockServerFactoryContext> server;
   Server::Configuration::StatsSinkFactory* factory =
-      Registry::FactoryRegistry<Server::Configuration::StatsSinkFactory>::getFactory(OpenTelemetryName);
+      Registry::FactoryRegistry<Server::Configuration::StatsSinkFactory>::getFactory(
+          OpenTelemetryName);
   ASSERT_NE(factory, nullptr);
 
   {

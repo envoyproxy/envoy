@@ -69,7 +69,8 @@ protected:
   Grpc::AsyncClient<MetricsExportRequest, MetricsExportResponse> client_;
 };
 
-using GrpcMetricsExporterSharedPtr = std::shared_ptr<OpenTelemetryGrpcMetricsExporter>;
+using OpenTelemetryGrpcMetricsExporterSharedPtr =
+    std::shared_ptr<OpenTelemetryGrpcMetricsExporter>;
 
 /**
  * Production implementation of OpenTelemetryGrpcMetricsExporter
@@ -97,9 +98,9 @@ using OpenTelemetryGrpcMetricsExporterImplPtr =
 
 class MetricsFlusher {
 public:
-  MetricsFlusher(const OtlpOptionsSharedPtr config,
-                 std::function<bool(const Stats::Metric&)> predicate =
-                     [](const auto& metric) { return metric.used(); })
+  MetricsFlusher(
+      const OtlpOptionsSharedPtr config, std::function<bool(const Stats::Metric&)> predicate =
+                                             [](const auto& metric) { return metric.used(); })
       : config_(config), predicate_(predicate) {}
 
   MetricsExportRequestPtr flush(Stats::MetricSnapshot& snapshot) const;
@@ -131,7 +132,7 @@ private:
 class OpenTelemetryGrpcSink : public Stats::Sink {
 public:
   OpenTelemetryGrpcSink(const OtlpOptionsSharedPtr config,
-                        const GrpcMetricsExporterSharedPtr& otlp_metrics_exporter)
+                        const OpenTelemetryGrpcMetricsExporterSharedPtr& otlp_metrics_exporter)
       : flusher_(MetricsFlusher(config)), metrics_exporter_(otlp_metrics_exporter) {}
 
   // Stats::Sink
@@ -143,7 +144,7 @@ public:
 
 private:
   const MetricsFlusher flusher_;
-  GrpcMetricsExporterSharedPtr metrics_exporter_;
+  OpenTelemetryGrpcMetricsExporterSharedPtr metrics_exporter_;
 };
 
 } // namespace OpenTelemetry

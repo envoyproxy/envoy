@@ -126,7 +126,7 @@ void MetricsFlusher::flushHistogram(opentelemetry::proto::metrics::v1::Metric& m
 
   data_point->set_count(histogram_stats.sampleCount());
   data_point->set_sum(histogram_stats.sampleSum());
-  // TODO(ohadvano): support min/max optional fields for HistogramDataPoint
+  // TODO(ohadvano): support min/max optional fields for ``HistogramDataPoint``
 
   for (size_t i = 0; i < histogram_stats.supportedBuckets().size(); i++) {
     data_point->add_explicit_bounds(histogram_stats.supportedBuckets()[i]);
@@ -138,7 +138,7 @@ void MetricsFlusher::setMetricCommon(opentelemetry::proto::metrics::v1::Metric& 
                                      opentelemetry::proto::metrics::v1::NumberDataPoint& data_point,
                                      int64_t snapshot_time_ns, const Stats::Metric& stat) const {
   data_point.set_time_unix_nano(snapshot_time_ns);
-  // TODO(ohadvano): support start_time_unix_nano optional field
+  // TODO(ohadvano): support ``start_time_unix_nano`` optional field
   metric.set_name(config_->useTagExtractedName() ? stat.tagExtractedName() : stat.name());
 
   if (config_->emitTagsAsAttributes()) {
@@ -155,7 +155,7 @@ void MetricsFlusher::setMetricCommon(
     opentelemetry::proto::metrics::v1::HistogramDataPoint& data_point, int64_t snapshot_time_ns,
     const Stats::Metric& stat) const {
   data_point.set_time_unix_nano(snapshot_time_ns);
-  // TODO(ohadvano): support start_time_unix_nano optional field
+  // TODO(ohadvano): support ``start_time_unix_nano optional`` field
   metric.set_name(config_->useTagExtractedName() ? stat.tagExtractedName() : stat.name());
 
   if (config_->emitTagsAsAttributes()) {

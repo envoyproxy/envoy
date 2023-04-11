@@ -41,6 +41,5 @@ envoy_cc_extension(
         ":open_telemetry_proto_descriptors_lib",
         "//envoy/registry",
         "//source/server:configuration_lib",
-        "@envoy_api//envoy/extensions/stat_sinks/open_telemetry/v3:pkg_cc_proto",
     ],
 )
