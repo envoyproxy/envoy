@@ -555,9 +555,8 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
     }
 
     if (config.has_access_log_flush_interval()) {
-      throw EnvoyException(
-          "Only one of access_log_flush_interval from HttpConnectionManager or"
-          "access_log_flush_interval from HcmAccessLogOptions can be specified.");
+      throw EnvoyException("Only one of access_log_flush_interval from HttpConnectionManager or"
+                           "access_log_flush_interval from HcmAccessLogOptions can be specified.");
     }
 
     flush_access_log_on_new_request_ =
