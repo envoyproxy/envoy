@@ -631,7 +631,7 @@ void DecoderImpl::parseConnectResponse(Buffer::Instance& data, uint64_t& offset,
 
   const bool readonly = maybeReadBool(data, offset);
 
-  callbacks_.onConnectResponse(OpCodes::Connect, 0, timeout, readonly, latency);
+  callbacks_.onConnectResponse(0, timeout, readonly, latency);
 }
 
 void DecoderImpl::parseWatchEvent(Buffer::Instance& data, uint64_t& offset, const uint32_t len,

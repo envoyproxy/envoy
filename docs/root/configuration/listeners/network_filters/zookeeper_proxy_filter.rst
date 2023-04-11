@@ -164,9 +164,9 @@ Latency stats are in milliseconds:
   :header: Name, Type, Description
   :widths: 1, 1, 2
 
-  connect_resp_latency, Histogram, Opcode execution time in milliseconds
-  ping_resp_latency, Histogram, Opcode execution time in milliseconds
-  auth_resp_latency, Histogram, Opcode execution time in milliseconds
+  connect_response_latency, Histogram, Opcode execution time in milliseconds
+  ping_response_latency, Histogram, Opcode execution time in milliseconds
+  auth_response_latency, Histogram, Opcode execution time in milliseconds
   watch_event, Histogram, Opcode execution time in milliseconds
   getdata_resp_latency, Histogram, Opcode execution time in milliseconds
   create_resp_latency, Histogram, Opcode execution time in milliseconds

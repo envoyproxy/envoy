@@ -28,6 +28,7 @@ ZooKeeperFilterConfig::ZooKeeperFilterConfig(const std::string& stat_prefix,
       latency_threshold_map_(parseLatencyThresholds(latency_thresholds)),
       stat_name_set_(scope.symbolTable().makeSet("Zookeeper")),
       stat_prefix_(stat_name_set_->add(stat_prefix)), auth_(stat_name_set_->add("auth")),
+      connect_latency_(stat_name_set_->add("connect_response_latency")),
       unknown_scheme_rq_(stat_name_set_->add("unknown_scheme_rq")),
       unknown_opcode_latency_(stat_name_set_->add("unknown_opcode_latency")) {
   // https://zookeeper.apache.org/doc/r3.5.4-beta/zookeeperProgrammers.html#sc_BuiltinACLSchemes
@@ -36,12 +37,10 @@ ZooKeeperFilterConfig::ZooKeeperFilterConfig(const std::string& stat_prefix,
   stat_name_set_->rememberBuiltins(
       {"auth_rq", "digest_rq", "host_rq", "ip_rq", "ping_response_rq", "world_rq", "x509_rq"});
 
-  initOpCode(OpCodes::Connect, stats_.connect_resp_, stats_.connect_resp_fast_,
-             stats_.connect_resp_slow_, "connect_resp");
   initOpCode(OpCodes::Ping, stats_.ping_resp_, stats_.ping_resp_fast_, stats_.ping_resp_slow_,
-             "ping_resp");
+             "ping_response");
   initOpCode(OpCodes::SetAuth, stats_.auth_resp_, stats_.auth_resp_fast_, stats_.auth_resp_slow_,
-             "auth_resp");
+             "auth_response");
   initOpCode(OpCodes::GetData, stats_.getdata_resp_, stats_.getdata_resp_fast_,
              stats_.getdata_resp_slow_, "getdata_resp");
   initOpCode(OpCodes::Create, stats_.create_resp_, stats_.create_resp_fast_,
@@ -92,11 +91,11 @@ ZooKeeperFilterConfig::ZooKeeperFilterConfig(const std::string& stat_prefix,
              "close_resp");
 }
 
-void ZooKeeperFilterConfig::initOpCode(OpCodes opcode, Stats::Counter& counter,
+void ZooKeeperFilterConfig::initOpCode(OpCodes opcode, Stats::Counter& resp_counter,
                                        Stats::Counter& resp_fast_counter,
                                        Stats::Counter& resp_slow_counter, absl::string_view name) {
   OpCodeInfo& opcode_info = op_code_map_[opcode];
-  opcode_info.counter_ = &counter;
+  opcode_info.resp_counter_ = &resp_counter;
   opcode_info.resp_fast_counter_ = &resp_fast_counter;
   opcode_info.resp_slow_counter_ = &resp_slow_counter;
   opcode_info.opname_ = std::string(name);
@@ -109,7 +108,7 @@ ZooKeeperFilterConfig::parseLatencyThresholds(LatencyThresholdList latency_thres
   for (const auto& threshold : latency_thresholds) {
     switch (threshold.opcode()) {
     case envoy::extensions::filters::network::zookeeper_proxy::v3::LatencyThreshold::Default:
-      latency_threshold_map[-1] = threshold.threshold();
+      latency_threshold_map[-999] = threshold.threshold();
       break;
     case envoy::extensions::filters::network::zookeeper_proxy::v3::LatencyThreshold::Connect:
       latency_threshold_map[0] = threshold.threshold();
@@ -229,7 +228,7 @@ uint32_t ZooKeeperFilter::getDefaultLatencyThreshold(
   }
 
   uint32_t default_latency_threshold = 100;
-  auto it = latency_threshold_map.find(-1);
+  auto it = latency_threshold_map.find(-999);
   if (it != latency_threshold_map.end()) {
     default_latency_threshold = it->second;
   }
@@ -433,25 +432,34 @@ void ZooKeeperFilter::onCloseRequest() {
   setDynamicMetadata("opname", "close");
 }
 
-void ZooKeeperFilter::onConnectResponse(const OpCodes opcode, const int32_t proto_version,
-                                        const int32_t timeout, const bool readonly,
+void ZooKeeperFilter::onConnectResponse(const int32_t proto_version, const int32_t timeout,
+                                        const bool readonly,
                                         const std::chrono::milliseconds& latency) {
   config_->stats_.connect_resp_.inc();
 
-  Stats::StatName opcode_latency = config_->unknown_opcode_latency_;
-  auto iter = config_->op_code_map_.find(opcode);
-  if (iter != config_->op_code_map_.end()) {
-    const ZooKeeperFilterConfig::OpCodeInfo& opcode_info = iter->second;
-    opcode_latency = opcode_info.latency_name_;
-    recordErrorBudgetMetrics(opcode, opcode_info, latency);
+  if (!config_->latency_threshold_map_.empty()) {
+    // Set latency threshold for the Connect opcode.
+    uint32_t latency_threshold = default_latency_threshold_;
+    auto it = config_->latency_threshold_map_.find(0);
+    if (it != config_->latency_threshold_map_.end()) {
+      latency_threshold = it->second;
+    }
+
+    // Determine fast/slow response based on the threshold.
+    uint32_t current_latency = static_cast<uint32_t>(latency.count());
+    if (current_latency <= latency_threshold) {
+      config_->stats_.connect_resp_fast_.inc();
+    } else {
+      config_->stats_.connect_resp_slow_.inc();
+    }
   }
 
   Stats::Histogram& histogram = Stats::Utility::histogramFromElements(
-      config_->scope_, {config_->stat_prefix_, opcode_latency},
+      config_->scope_, {config_->stat_prefix_, config_->connect_latency_},
       Stats::Histogram::Unit::Milliseconds);
   histogram.recordValue(latency.count());
 
-  setDynamicMetadata({{"opname", "connect_resp"},
+  setDynamicMetadata({{"opname", "connect_response"},
                       {"protocol_version", std::to_string(proto_version)},
                       {"timeout", std::to_string(timeout)},
                       {"readonly", std::to_string(readonly)}});
@@ -464,7 +472,7 @@ void ZooKeeperFilter::onResponse(const OpCodes opcode, const int32_t xid, const 
   auto iter = config_->op_code_map_.find(opcode);
   if (iter != config_->op_code_map_.end()) {
     const ZooKeeperFilterConfig::OpCodeInfo& opcode_info = iter->second;
-    opcode_info.counter_->inc();
+    opcode_info.resp_counter_->inc();
     opcode_latency = opcode_info.latency_name_;
     opname = opcode_info.opname_;
     recordErrorBudgetMetrics(opcode, opcode_info, latency);

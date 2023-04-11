@@ -165,7 +165,7 @@ public:
   // latency-name will be joined with the stat_prefix_, which varies per filter
   // instance.
   struct OpCodeInfo {
-    Stats::Counter* counter_;
+    Stats::Counter* resp_counter_;
     Stats::Counter* resp_fast_counter_;
     Stats::Counter* resp_slow_counter_;
     std::string opname_;
@@ -181,11 +181,12 @@ public:
   Stats::StatNameSetPtr stat_name_set_;
   const Stats::StatName stat_prefix_;
   const Stats::StatName auth_;
+  const Stats::StatName connect_latency_;
   const Stats::StatName unknown_scheme_rq_;
   const Stats::StatName unknown_opcode_latency_;
 
 private:
-  void initOpCode(OpCodes opcode, Stats::Counter& counter, Stats::Counter& resp_fast_counter,
+  void initOpCode(OpCodes opcode, Stats::Counter& resp_counter, Stats::Counter& resp_fast_counter,
                   Stats::Counter& resp_slow_counter, absl::string_view name);
 
   ZooKeeperProxyStats generateStats(const std::string& prefix, Stats::Scope& scope) {
@@ -241,7 +242,7 @@ public:
   void onGetAllChildrenNumberRequest(const std::string& path) override;
   void onCloseRequest() override;
   void onResponseBytes(uint64_t bytes) override;
-  void onConnectResponse(OpCodes opcode, int32_t proto_version, int32_t timeout, bool readonly,
+  void onConnectResponse(int32_t proto_version, int32_t timeout, bool readonly,
                          const std::chrono::milliseconds& latency) override;
   void onResponse(OpCodes opcode, int32_t xid, int64_t zxid, int32_t error,
                   const std::chrono::milliseconds& latency) override;
