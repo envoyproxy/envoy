@@ -329,18 +329,16 @@ Http::FilterHeadersStatus ConnectGrpcBridgeFilter::decodeHeaders(Http::RequestHe
       renameHeader(headers, Http::CustomHeaders::get().AcceptEncoding,
                    Http::CustomHeaders::get().GrpcAcceptEncoding);
 
-      response_buffer_.add(message);
-      if (decoderBufferLimitReached(response_buffer_.length())) {
+      request_buffer_.add(message);
+      if (decoderBufferLimitReached(request_buffer_.length())) {
         return Http::FilterHeadersStatus::StopIteration;
       }
       headers.removeContentLength();
-    }
-  }
 
-  if (is_connect_unary_) {
-    if (end_stream) {
-      Grpc::Encoder().prependFrameHeader(unary_payload_frame_flags_, response_buffer_);
-      decoder_callbacks_->addDecodedData(response_buffer_, true);
+      if (end_stream) {
+        Grpc::Encoder().prependFrameHeader(unary_payload_frame_flags_, request_buffer_);
+        decoder_callbacks_->addDecodedData(request_buffer_, true);
+      }
     }
   }
 
@@ -350,8 +348,8 @@ Http::FilterHeadersStatus ConnectGrpcBridgeFilter::decodeHeaders(Http::RequestHe
 Http::FilterDataStatus ConnectGrpcBridgeFilter::decodeData(Buffer::Instance& data,
                                                            bool end_stream) {
   if (is_connect_unary_) {
-    response_buffer_.move(data);
-    if (decoderBufferLimitReached(response_buffer_.length())) {
+    request_buffer_.move(data);
+    if (decoderBufferLimitReached(request_buffer_.length())) {
       return Http::FilterDataStatus::StopIterationNoBuffer;
     }
 
@@ -359,8 +357,8 @@ Http::FilterDataStatus ConnectGrpcBridgeFilter::decodeData(Buffer::Instance& dat
       return Http::FilterDataStatus::StopIterationAndBuffer;
     }
 
-    Grpc::Encoder().prependFrameHeader(unary_payload_frame_flags_, response_buffer_);
-    data.move(response_buffer_);
+    Grpc::Encoder().prependFrameHeader(unary_payload_frame_flags_, request_buffer_);
+    data.move(request_buffer_);
   }
 
   return Http::FilterDataStatus::Continue;
@@ -368,8 +366,8 @@ Http::FilterDataStatus ConnectGrpcBridgeFilter::decodeData(Buffer::Instance& dat
 
 Http::FilterTrailersStatus ConnectGrpcBridgeFilter::decodeTrailers(Http::RequestTrailerMap&) {
   if (is_connect_unary_) {
-    Grpc::Encoder().prependFrameHeader(unary_payload_frame_flags_, response_buffer_);
-    decoder_callbacks_->addDecodedData(response_buffer_, true);
+    Grpc::Encoder().prependFrameHeader(unary_payload_frame_flags_, request_buffer_);
+    decoder_callbacks_->addDecodedData(request_buffer_, true);
   }
 
   return Http::FilterTrailersStatus::Continue;
@@ -474,8 +472,8 @@ Http::FilterDataStatus ConnectGrpcBridgeFilter::encodeData(Buffer::Instance& dat
       drained_frame_header_bytes_ += to_drain;
     }
 
-    request_buffer_.move(data);
-    if (encoderBufferLimitReached(request_buffer_.length())) {
+    response_buffer_.move(data);
+    if (encoderBufferLimitReached(response_buffer_.length())) {
       return Http::FilterDataStatus::StopIterationNoBuffer;
     }
 
@@ -483,7 +481,7 @@ Http::FilterDataStatus ConnectGrpcBridgeFilter::encodeData(Buffer::Instance& dat
       return Http::FilterDataStatus::StopIterationAndBuffer;
     }
 
-    data.move(request_buffer_);
+    data.move(response_buffer_);
   }
 
   return Http::FilterDataStatus::Continue;
@@ -510,7 +508,7 @@ ConnectGrpcBridgeFilter::encodeTrailers(Http::ResponseTrailerMap& trailers) {
       response_headers_->remove(Http::CustomHeaders::get().ContentEncoding);
       encoder_callbacks_->addEncodedData(*err_buf, true);
     } else {
-      encoder_callbacks_->addEncodedData(request_buffer_, true);
+      encoder_callbacks_->addEncodedData(response_buffer_, true);
     }
 
     trailers.clear();
