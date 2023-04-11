@@ -1,4 +1,4 @@
-date: Pending
+date: April 17, 2023
 
 behavior_changes:
 - area: oauth2
@@ -20,7 +20,6 @@ behavior_changes:
     ``envoy.reloadable_features.validate_upstream_headers`` can be used for revert this behavior.
 
 minor_behavior_changes:
-# *Changes that may cause incompatibilities for some users, but should not for most*
 - area: event
   change: |
     ``Event::PostCb`` type changed from ``std::function`` to ``absl::AnyInvocable``. This makes it possible
