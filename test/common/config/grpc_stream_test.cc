@@ -15,7 +15,6 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-using testing::InSequence;
 using testing::NiceMock;
 using testing::Return;
 using testing::SaveArg;
@@ -283,8 +282,6 @@ TEST_F(GrpcStreamTest, RetryOnEstablishNewStreamFailure) {
       .WillOnce(
           testing::DoAll(SaveArg<0>(&grpc_stream_retry_timer_cb), Return(grpc_stream_retry_timer)));
 
-  InSequence s;
-
   // make random generator deterministic for testing
   NiceMock<Random::MockRandomGenerator> random;
   ON_CALL(random, random()).WillByDefault(Return(27));
@@ -329,8 +326,6 @@ TEST_F(GrpcStreamTest, RetryOnRemoteClose) {
   EXPECT_CALL(dispatcher_, createTimer_(_))
       .WillOnce(
           testing::DoAll(SaveArg<0>(&grpc_stream_retry_timer_cb), Return(grpc_stream_retry_timer)));
-
-  InSequence s;
 
   // make random generator deterministic for testing
   NiceMock<Random::MockRandomGenerator> random;
