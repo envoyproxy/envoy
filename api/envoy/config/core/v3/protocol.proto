@@ -390,7 +390,7 @@ message KeepaliveSettings {
       [(validate.rules).duration = {gte {nanos: 1000000}}];
 }
 
-// [#next-free-field: 16]
+// [#next-free-field: 17]
 message Http2ProtocolOptions {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.api.v2.core.Http2ProtocolOptions";
@@ -568,6 +568,12 @@ message Http2ProtocolOptions {
   // Send HTTP/2 PING frames to verify that the connection is still healthy. If the remote peer
   // does not respond within the configured timeout, the connection will be aborted.
   KeepaliveSettings connection_keepalive = 15;
+
+  // [#not-implemented-hide:] Hiding so that the field can be removed after oghttp2 is rolled out.
+  // If set, force use of a particular HTTP/2 codec: oghttp2 if true, nghttp2 if false.
+  // If unset, HTTP/2 codec is selected based on envoy.reloadable_features.http2_use_oghttp2.
+  google.protobuf.BoolValue use_oghttp2_codec = 16
+      [(xds.annotations.v3.field_status).work_in_progress = true];
 }
 
 // [#not-implemented-hide:]
