@@ -230,7 +230,7 @@ struct httpRequestInternal : httpRequest {
 
 class FilterLogger : Logger::Loggable<Logger::Id::http> {
 public:
-  FilterLogger() {}
+  FilterLogger() = default;
 
   void log(uint32_t level, absl::string_view message);
 };
