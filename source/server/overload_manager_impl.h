@@ -25,7 +25,7 @@ namespace Envoy {
 namespace Server {
 
 /**
- * Triggers encapsulate translating resource pressure into the corresponding
+ * Trigger encapsulates translating resource pressure into the corresponding
  * OverloadActionState.
  */
 class Trigger {

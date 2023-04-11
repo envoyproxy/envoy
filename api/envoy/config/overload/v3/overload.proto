@@ -134,8 +134,8 @@ message OverloadAction {
   string name = 1 [(validate.rules).string = {min_len: 1}];
 
   // A set of triggers for this action. The state of the action is the maximum
-  // state of all triggers, which can be scaling between 0 and 1 or saturated. Listeners
-  // are notified when the overload action changes state.
+  // state of all triggers, which can be scalar values between 0 and 1 or
+  // saturated. Listeners are notified when the overload action changes state.
   // An overload manager action can only have one trigger for a given resource
   // e.g. :ref:`Trigger.name
   // <envoy_v3_api_field_config.overload.v3.Trigger.name>` must be unique
@@ -157,9 +157,9 @@ message LoadShedPoint {
   string name = 1 [(validate.rules).string = {min_len: 1}];
 
   // A set of triggers for this LoadShedPoint. The LoadShedPoint will use the
-  // the maximum state of all triggers, which can be scaling between 0 and 1 or
-  // saturated. A LoadShedPoint can only have one trigger for a given resource
-  // e.g. :ref:`Trigger.name
+  // the maximum state of all triggers, which can be scalar values between 0 and
+  // 1 or saturated. A LoadShedPoint can only have one trigger for a given
+  // resource e.g. :ref:`Trigger.name
   // <envoy_v3_api_field_config.overload.v3.Trigger.name>` must be unique in
   // this list.
   repeated Trigger triggers = 2 [(validate.rules).repeated = {min_items: 1}];
@@ -199,6 +199,7 @@ message OverloadManager {
   // The set of overload actions.
   repeated OverloadAction actions = 3;
 
+  // [#not-implemented-hide:]
   // The set of load shed points.
   repeated LoadShedPoint loadshed_points = 5;
 
