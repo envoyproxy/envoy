@@ -1688,6 +1688,39 @@ TEST_F(HttpConnectionManagerConfigTest,
         "Only one of flush_access_log_on_new_request from HttpConnectionManager or"
         "flush_access_log_on_new_request from HcmAccessLogOptions can be specified.");
   }
+
+  {
+    std::string yaml_string = R"EOF(
+      codec_type: http1
+      stat_prefix: my_stat_prefix
+      route_config:
+        virtual_hosts:
+        - name: default
+          domains:
+          - "*"
+          routes:
+          - match:
+              prefix: "/"
+            route:
+              cluster: fake_cluster
+      http_filters:
+      - name: envoy.filters.http.router
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+      access_log_options:
+        flush_access_log_on_new_request: true
+      access_log_flush_interval: 1s # deprecated field
+    )EOF";
+
+    EXPECT_THROW_WITH_MESSAGE(
+        HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string),
+                                           context_, date_provider_, route_config_provider_manager_,
+                                           scoped_routes_config_provider_manager_, tracer_manager_,
+                                           filter_config_provider_manager_),
+        EnvoyException,
+        "Only one of access_log_flush_interval from HttpConnectionManager or"
+        "access_log_flush_interval from HcmAccessLogOptions can be specified.");
+  }
 }
 
 TEST_F(HttpConnectionManagerConfigTest, AccessLogFlushInterval) {
@@ -1797,6 +1830,39 @@ TEST_F(HttpConnectionManagerConfigTest, DEPRECATED_FEATURE_TEST(DeprecatedAccess
         EnvoyException,
         "Only one of access_log_flush_interval from HttpConnectionManager or"
         "access_log_flush_interval from HcmAccessLogOptions can be specified.");
+  }
+
+  {
+    std::string yaml_string = R"EOF(
+      codec_type: http1
+      stat_prefix: my_stat_prefix
+      route_config:
+        virtual_hosts:
+        - name: default
+          domains:
+          - "*"
+          routes:
+          - match:
+              prefix: "/"
+            route:
+              cluster: fake_cluster
+      http_filters:
+      - name: envoy.filters.http.router
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+      access_log_options:
+        access_log_flush_interval: 1s
+      flush_access_log_on_new_request: true # deprecated field
+    )EOF";
+
+    EXPECT_THROW_WITH_MESSAGE(
+        HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string),
+                                           context_, date_provider_, route_config_provider_manager_,
+                                           scoped_routes_config_provider_manager_, tracer_manager_,
+                                           filter_config_provider_manager_),
+        EnvoyException,
+        "Only one of flush_access_log_on_new_request from HttpConnectionManager or"
+        "flush_access_log_on_new_request from HcmAccessLogOptions can be specified.");
   }
 }
 

@@ -548,31 +548,32 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
   }
 
   if (config.has_access_log_options()) {
-    if (config.access_log_options().flush_access_log_on_new_request() &&
-        config.flush_access_log_on_new_request() /* deprecated */) {
+    if (config.flush_access_log_on_new_request() /* deprecated */) {
       throw EnvoyException(
           "Only one of flush_access_log_on_new_request from HttpConnectionManager or"
           "flush_access_log_on_new_request from HcmAccessLogOptions can be specified.");
     }
 
-    flush_access_log_on_new_request_ =
-        config.access_log_options().flush_access_log_on_new_request();
-  } else {
-    flush_access_log_on_new_request_ = config.flush_access_log_on_new_request();
-  }
-
-  if (config.has_access_log_options() &&
-      config.access_log_options().has_access_log_flush_interval()) {
     if (config.has_access_log_flush_interval()) {
-      throw EnvoyException("Only one of access_log_flush_interval from HttpConnectionManager or"
-                           "access_log_flush_interval from HcmAccessLogOptions can be specified.");
+      throw EnvoyException(
+          "Only one of access_log_flush_interval from HttpConnectionManager or"
+          "access_log_flush_interval from HcmAccessLogOptions can be specified.");
     }
 
-    access_log_flush_interval_ = std::chrono::milliseconds(DurationUtil::durationToMilliseconds(
-        config.access_log_options().access_log_flush_interval()));
-  } else if (config.has_access_log_flush_interval() /* deprecated field */) {
-    access_log_flush_interval_ = std::chrono::milliseconds(
-        DurationUtil::durationToMilliseconds(config.access_log_flush_interval()));
+    flush_access_log_on_new_request_ =
+        config.access_log_options().flush_access_log_on_new_request();
+
+    if (config.access_log_options().has_access_log_flush_interval()) {
+      access_log_flush_interval_ = std::chrono::milliseconds(DurationUtil::durationToMilliseconds(
+          config.access_log_options().access_log_flush_interval()));
+    }
+  } else {
+    flush_access_log_on_new_request_ = config.flush_access_log_on_new_request();
+
+    if (config.has_access_log_flush_interval()) {
+      access_log_flush_interval_ = std::chrono::milliseconds(
+          DurationUtil::durationToMilliseconds(config.access_log_flush_interval()));
+    }
   }
 
   server_transformation_ = config.server_header_transformation();
