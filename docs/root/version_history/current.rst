@@ -13,6 +13,8 @@ Bug Fixes
 ---------
 *Changes expected to improve the state of the world and are unlikely to have negative effects*
 
+* dependency: update Curl -> 8.0.1 to resolve CVE-2023-27535, CVE-2023-27536, CVE-2023-27538.
+
 Removed Config or Runtime
 -------------------------
 *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
