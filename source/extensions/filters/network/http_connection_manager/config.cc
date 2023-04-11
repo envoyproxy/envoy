@@ -555,10 +555,10 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
           "flush_access_log_on_new_request from HcmAccessLogOptions can be specified.");
     }
 
-    flush_access_log_on_new_request = config.access_log_options().flush_access_log_on_new_request();
+    flush_access_log_on_new_request_ = config.access_log_options().flush_access_log_on_new_request();
   }
 
-  flush_access_log_on_new_request = config.flush_access_log_on_new_request();
+  flush_access_log_on_new_request_ = config.flush_access_log_on_new_request();
 
   if (config.has_access_log_options() &&
       config.access_log_options().has_access_log_flush_interval()) {
