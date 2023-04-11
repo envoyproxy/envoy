@@ -72,15 +72,14 @@ message ClusterConfig {
   bool allow_coalesced_connections = 3;
 }
 
+// [#next-free-field: 6]
 message SubClustersConfig {
   // The :ref:`service discovery type <arch_overview_service_discovery_types>`
-  // to use for resolving a sub cluster.
-  // Only STRICT_DNS and LOGICAL_DNS are supported here.
+  // to use for resolving a sub cluster. Only STRICT_DNS and LOGICAL_DNS are supported here.
   config.cluster.v3.Cluster.DiscoveryType type = 1 [(validate.rules).enum = {defined_only: true}];
 
   // The :ref:`load balancer type <arch_overview_load_balancing_types>` to use
-  // when picking a host in a sub cluster.
-  // Note that CLUSTER_PROVIDED is not allowed here.
+  // when picking a host in a sub cluster. Note that CLUSTER_PROVIDED is not allowed here.
   config.cluster.v3.Cluster.LbPolicy lb_policy = 2 [(validate.rules).enum = {defined_only: true}];
 
   // The maximum number of sub clusters that the DFP cluster will hold. If not specified defaults to 1024.
