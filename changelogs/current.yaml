@@ -8,6 +8,9 @@ minor_behavior_changes:
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
+- area: dependency
+  change: |
+    update Curl -> 8.0.1 to resolve CVE-2023-27535, CVE-2023-27536, CVE-2023-27538.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
