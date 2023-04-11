@@ -14,6 +14,8 @@ Bug Fixes
 *Changes expected to improve the state of the world and are unlikely to have negative effects*
 
 * dependency: update Curl -> 8.0.1 to resolve CVE-2023-27535, CVE-2023-27536, CVE-2023-27538.
+* http: amend the fix for ``x-envoy-original-path`` so it removes the header only at edge.
+  Previously this would also remove the header at any Envoy instance upstream of an external request, including an Envoy instance that added the header.
 
 Removed Config or Runtime
 -------------------------
