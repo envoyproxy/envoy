@@ -44,6 +44,7 @@ public:
   Extensions::Common::DynamicForwardProxy::DnsCache& cache() { return *dns_cache_; }
   Upstream::ClusterManager& clusterManager() { return cluster_manager_; }
   bool saveUpstreamAddress() const { return save_upstream_address_; };
+  const std::chrono::milliseconds clusterInitTimeout() const { return cluster_init_timeout_; };
 
   LoadClusterEntryHandlePtr addDynamicCluster(Clusters::DynamicForwardProxy::Cluster* cluster,
                                               const std::string& cluster_name,
@@ -55,8 +56,6 @@ public:
   // Upstream::ClusterUpdateCallbacks
   void onClusterAddOrUpdate(Upstream::ThreadLocalCluster& cluster) override;
   void onClusterRemoval(const std::string&) override;
-
-  bool enableStrictDnsCluster() const { return enable_strict_dns_cluster_; }
 
 private:
   struct LoadClusterEntryHandleImpl
@@ -87,8 +86,8 @@ private:
   Upstream::ClusterManager& cluster_manager_;
   Event::Dispatcher& main_thread_dispatcher_;
   ThreadLocal::TypedSlot<ThreadLocalClusterInfo> tls_slot_;
+  const std::chrono::milliseconds cluster_init_timeout_;
   const bool save_upstream_address_;
-  const bool enable_strict_dns_cluster_;
 };
 
 using ProxyFilterConfigSharedPtr = std::shared_ptr<ProxyFilterConfig>;
@@ -122,7 +121,8 @@ public:
                                           bool end_stream) override;
   void onDestroy() override;
 
-  Http::FilterHeadersStatus loadDynamicCluster(Http::RequestHeaderMap& headers,
+  Http::FilterHeadersStatus loadDynamicCluster(Clusters::DynamicForwardProxy::Cluster* cluster,
+                                               Http::RequestHeaderMap& headers,
                                                uint16_t default_port);
 
   // Extensions::Common::DynamicForwardProxy::DnsCache::LoadDnsCacheEntryCallbacks
@@ -131,6 +131,8 @@ public:
 
   // LoadClusterEntryCallbacks
   void onLoadClusterComplete() override;
+
+  void onClusterInitTimeout();
 
 private:
   void addHostAddressToFilterState(const Network::Address::InstanceConstSharedPtr& address);
@@ -142,6 +144,7 @@ private:
   Upstream::ResourceAutoIncDecPtr circuit_breaker_;
   Extensions::Common::DynamicForwardProxy::DnsCache::LoadDnsCacheEntryHandlePtr cache_load_handle_;
   LoadClusterEntryHandlePtr cluster_load_handle_;
+  Event::TimerPtr cluster_init_timer_;
 };
 
 } // namespace DynamicForwardProxy

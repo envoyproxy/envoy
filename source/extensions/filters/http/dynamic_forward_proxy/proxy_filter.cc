@@ -10,6 +10,7 @@
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/runtime/runtime_features.h"
 #include "source/common/stream_info/upstream_address.h"
+#include "source/extensions/common/dynamic_forward_proxy/cluster_store.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -28,12 +29,14 @@ struct ResponseStringValues {
   const std::string DnsCacheOverflow = "DNS cache overflow";
   const std::string PendingRequestOverflow = "Dynamic forward proxy pending request overflow";
   const std::string DnsResolutionFailure = "DNS resolution failure";
+  const std::string SubClusterWarmingTimeout = "Sub cluster warming timeout";
 };
 
 struct RcDetailsValues {
   const std::string DnsCacheOverflow = "dns_cache_overflow";
   const std::string PendingRequestOverflow = "dynamic_forward_proxy_pending_request_overflow";
   const std::string DnsResolutionFailure = "dns_resolution_failure";
+  const std::string SubClusterWarmingTimeout = "sub_cluster_warming_timeout";
 };
 
 using CustomClusterType = envoy::config::cluster::v3::Cluster::CustomClusterType;
@@ -51,9 +54,8 @@ ProxyFilterConfig::ProxyFilterConfig(
       dns_cache_(dns_cache_manager_->getCache(proto_config.dns_cache_config())),
       cluster_manager_(context.clusterManager()),
       main_thread_dispatcher_(context.mainThreadDispatcher()), tls_slot_(context.threadLocal()),
-      save_upstream_address_(proto_config.save_upstream_address()),
-      enable_strict_dns_cluster_(Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.enable_strict_dns_sub_cluster_for_dfp_cluster")) {
+      cluster_init_timeout_(PROTOBUF_GET_MS_OR_DEFAULT(proto_config, cluster_init_timeout, 5000)),
+      save_upstream_address_(proto_config.save_upstream_address()) {
   tls_slot_.set(
       [&](Event::Dispatcher&) { return std::make_shared<ThreadLocalClusterInfo>(*this); });
 }
@@ -203,8 +205,18 @@ Http::FilterHeadersStatus ProxyFilter::decodeHeaders(Http::RequestHeaderMap& hea
     }
   }
 
-  if (config_->enableStrictDnsCluster()) {
-    return loadDynamicCluster(headers, default_port);
+  Upstream::ClusterSharedPtr dfp_cluster_shared_ptr =
+      Common::DynamicForwardProxy::DFPClusterStore::load(cluster_info_->name());
+  if (cluster == nullptr) {
+    // TODO: local reply
+    PANIC("TODO");
+  }
+  auto dfp_cluster =
+      dynamic_cast<Clusters::DynamicForwardProxy::Cluster*>(dfp_cluster_shared_ptr.get());
+  ASSERT(dfp_cluster != nullptr);
+
+  if (dfp_cluster->enableSubCluster()) {
+    return loadDynamicCluster(dfp_cluster, headers, default_port);
   }
 
   circuit_breaker_ = config_->cache().canCreateDnsRequest();
@@ -261,21 +273,14 @@ Http::FilterHeadersStatus ProxyFilter::decodeHeaders(Http::RequestHeaderMap& hea
   PANIC_DUE_TO_CORRUPT_ENUM;
 }
 
-Http::FilterHeadersStatus ProxyFilter::loadDynamicCluster(Http::RequestHeaderMap& headers,
-                                                          uint16_t default_port) {
+Http::FilterHeadersStatus
+ProxyFilter::loadDynamicCluster(Clusters::DynamicForwardProxy::Cluster* cluster,
+                                Http::RequestHeaderMap& headers, uint16_t default_port) {
   const auto host_attributes = Http::Utility::parseAuthority(headers.getHostValue());
   auto host = std::string(host_attributes.host_);
   auto port = host_attributes.port_.value_or(default_port);
   // TODO: another cluster type when it's an IP.
   // host_attributes.is_ip_address_;
-
-  Upstream::ClusterSharedPtr cluster = cluster_info_->cluster();
-  if (cluster == nullptr) {
-    // TODO: local reply
-    PANIC("TODO");
-  }
-  auto dfp_cluster = dynamic_cast<Clusters::DynamicForwardProxy::Cluster*>(cluster.get());
-  ASSERT(dfp_cluster != nullptr);
 
   latchTime(decoder_callbacks_, DNS_START);
 
@@ -283,19 +288,23 @@ Http::FilterHeadersStatus ProxyFilter::loadDynamicCluster(Http::RequestHeaderMap
   auto cluster_name = "DFPCluster:" + host + ":" + std::to_string(port);
   Upstream::ThreadLocalCluster* local_cluster =
       config_->clusterManager().getThreadLocalCluster(cluster_name);
-  if (local_cluster && dfp_cluster->touch(cluster_name)) {
+  if (local_cluster && cluster->touch(cluster_name)) {
     ENVOY_STREAM_LOG(debug, "using the thread local cluster after touch success",
                      *decoder_callbacks_);
     latchTime(decoder_callbacks_, DNS_END);
     return Http::FilterHeadersStatus::Continue;
   }
 
+  cluster_init_timer_ =
+      decoder_callbacks_->dispatcher().createTimer([this]() { onClusterInitTimeout(); });
+  cluster_init_timer_->enableTimer(config_->clusterInitTimeout());
+
   // Still need to add dynamic cluster again even the thread local cluster exists while touch
   // failed, that means the cluster is removed in main thread due to ttl reached.
   // Otherwise, we may not be able to get the thread local cluster in router.
 
   // not found, create a new cluster & register a callback to tls
-  cluster_load_handle_ = config_->addDynamicCluster(dfp_cluster, cluster_name, host, port, *this);
+  cluster_load_handle_ = config_->addDynamicCluster(cluster, cluster_name, host, port, *this);
   ASSERT(cluster_load_handle_ != nullptr);
   ENVOY_STREAM_LOG(debug, "waiting to load cluster entry", *decoder_callbacks_);
   return Http::FilterHeadersStatus::StopAllIterationAndWatermark;
@@ -327,6 +336,15 @@ void ProxyFilter::onLoadClusterComplete() {
   latchTime(decoder_callbacks_, DNS_END);
   ENVOY_STREAM_LOG(debug, "load cluster complete, continuing", *decoder_callbacks_);
   decoder_callbacks_->continueDecoding();
+}
+
+void ProxyFilter::onClusterInitTimeout() {
+  latchTime(decoder_callbacks_, DNS_END);
+  ENVOY_STREAM_LOG(debug, "load cluster failed, aborting", *decoder_callbacks_);
+  cluster_load_handle_.reset();
+  decoder_callbacks_->sendLocalReply(Http::Code::ServiceUnavailable,
+                                     ResponseStrings::get().SubClusterWarmingTimeout, nullptr,
+                                     absl::nullopt, RcDetails::get().SubClusterWarmingTimeout);
 }
 
 void ProxyFilter::onDnsResolutionFail() {

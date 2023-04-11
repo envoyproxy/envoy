@@ -990,9 +990,6 @@ public:
   Http::Http3::CodecStats& http3CodecStats() const override;
   Http::HeaderValidatorPtr makeHeaderValidator(Http::Protocol protocol) const override;
 
-  void cluster(ClusterSharedPtr c) const override { cluster_ = c; }
-  ClusterSharedPtr cluster() const override { return cluster_.lock(); }
-
 protected:
   // Gets the retry budget percent/concurrency from the circuit breaker thresholds. If the retry
   // budget message is specified, defaults will be filled in if either params are unspecified.
@@ -1075,7 +1072,6 @@ private:
   const uint32_t max_response_headers_count_;
   LoadBalancerType lb_type_;
   const envoy::config::cluster::v3::Cluster::DiscoveryType type_;
-  mutable ClusterWeakPtr cluster_;
   const bool drain_connections_on_host_removal_ : 1;
   const bool connection_pool_per_downstream_connection_ : 1;
   const bool warm_hosts_ : 1;
