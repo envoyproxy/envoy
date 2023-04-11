@@ -99,9 +99,9 @@ Config::SharedConfig::SharedConfig(
     }
 
     flush_access_log_on_connected_ = config.access_log_options().flush_access_log_on_connected();
+  } else {
+    flush_access_log_on_connected_ = config.flush_access_log_on_connected();
   }
-
-  flush_access_log_on_connected_ = config.flush_access_log_on_connected();
 
   if (config.has_access_log_options() &&
       config.access_log_options().has_access_log_flush_interval()) {
