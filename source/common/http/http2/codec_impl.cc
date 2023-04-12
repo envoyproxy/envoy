@@ -824,9 +824,7 @@ ConnectionImpl::ConnectionImpl(Network::Connection& connection, CodecStats& stat
                                Random::RandomGenerator& random_generator,
                                const envoy::config::core::v3::Http2ProtocolOptions& http2_options,
                                const uint32_t max_headers_kb, const uint32_t max_headers_count)
-    : use_oghttp2_library_(
-          Runtime::runtimeFeatureEnabled("envoy.reloadable_features.http2_use_oghttp2")),
-      stats_(stats), connection_(connection), max_headers_kb_(max_headers_kb),
+    : stats_(stats), connection_(connection), max_headers_kb_(max_headers_kb),
       max_headers_count_(max_headers_count),
       per_stream_buffer_limit_(http2_options.initial_stream_window_size().value()),
       stream_error_on_invalid_http_messaging_(
@@ -834,6 +832,12 @@ ConnectionImpl::ConnectionImpl(Network::Connection& connection, CodecStats& stat
       protocol_constraints_(stats, http2_options), dispatching_(false), raised_goaway_(false),
       random_(random_generator),
       last_received_data_time_(connection_.dispatcher().timeSource().monotonicTime()) {
+  if (http2_options.has_use_oghttp2_codec()) {
+    use_oghttp2_library_ = http2_options.use_oghttp2_codec().value();
+  } else {
+    use_oghttp2_library_ =
+        Runtime::runtimeFeatureEnabled("envoy.reloadable_features.http2_use_oghttp2");
+  }
   if (http2_options.has_connection_keepalive()) {
     keepalive_interval_ = std::chrono::milliseconds(
         PROTOBUF_GET_MS_OR_DEFAULT(http2_options.connection_keepalive(), interval, 0));

@@ -92,7 +92,9 @@ MockClusterInfo::MockClusterInfo()
   ON_CALL(*this, perUpstreamPreconnectRatio()).WillByDefault(Return(1.0));
   ON_CALL(*this, name()).WillByDefault(ReturnRef(name_));
   ON_CALL(*this, observabilityName()).WillByDefault(ReturnRef(observability_name_));
-  ON_CALL(*this, edsServiceName()).WillByDefault(ReturnPointee(&eds_service_name_));
+  ON_CALL(*this, edsServiceName()).WillByDefault(Invoke([this]() -> const std::string& {
+    return eds_service_name_.has_value() ? eds_service_name_.value() : Envoy::EMPTY_STRING;
+  }));
   ON_CALL(*this, http1Settings()).WillByDefault(ReturnRef(http1_settings_));
   ON_CALL(*this, http2Options()).WillByDefault(ReturnRef(http2_options_));
   ON_CALL(*this, http3Options()).WillByDefault(ReturnRef(http3_options_));

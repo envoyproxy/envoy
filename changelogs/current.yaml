@@ -110,6 +110,11 @@ minor_behavior_changes:
     Ext_authz will add ``x-envoy-auth-failure-mode-allowed`` header when ``failure_mode_allow`` is enable.
     This behavior can be reverted by setting runtime flag
     ``envoy.reloadable_features.http_ext_auth_failure_mode_allow_header_add`` to false.
+- area: uhv
+  change: |
+    Translate backslash to slash in the default header validator. This behavior can be reverted by setting runtime flag
+    ``envoy.reloadable_features.uhv_translate_backslash_to_slash`` to false, in which case requests with backslash in path
+    are rejected. This setting is only applicable when the Unversal Header Validator is enabled and has no effect otherwise.
 
 bug_fixes:
 - area: http
@@ -195,6 +200,10 @@ bug_fixes:
   change: |
     fixed a bug where ``x-envoy-original-path`` was not being sanitized when sent from untrusted users. This behavioral change can
     be temporarily reverted by setting ``envoy.reloadable_features.sanitize_original_path`` to false.
+- area: http
+  change: |
+    fixed the fix for ``x-envoy-original-path`` so it removes the header *only* when sent from untrusted users,
+    not also before sending to upstream server.
 
 removed_config_or_runtime:
 - area: config
@@ -386,11 +395,39 @@ new_features:
     added new configuration field :ref:`histogram_emit_mode
     <envoy_v3_api_field_config.metrics.v3.MetricsServiceConfig.histogram_emit_mode>` to configure which stats
     should be emitted for histograms.
+- area: http
+  change: |
+    added capability for continuing filter chain iteration or send local replies from (decode|encode)Metadata. Additionally,
+    reset idle timer on metadata actions.
 
 deprecated:
+- area: tcp_proxy
+  change: |
+    deprecated (1.25.0) :ref:`access_log_flush_interval
+    <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.access_log_flush_interval>` in favour
+    of :ref:`access_log_flush_interval
+    <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.TcpAccessLogOptions.access_log_flush_interval>`.
+- area: tcp_proxy
+  change: |
+    deprecated (1.25.0) :ref:`flush_access_log_on_connected
+    <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.flush_access_log_on_connected>` in favour
+    of :ref:`flush_access_log_on_connected
+    <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.TcpAccessLogOptions.flush_access_log_on_connected>`.
 - area: ext_authz
   change: |
     deprecated (1.25.0) :ref:`ext_authz.v3.AuthorizationRequest.allowed_headers
     <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.AuthorizationRequest.allowed_headers>` in favour of
     :ref:`ext_authz.v3.ExtAuthz.allowed_headers
     <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.allowed_headers>`.
+- area: http
+  change: |
+    deprecated (1.25.0) :ref:`flush access log on new request
+    <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.flush_access_log_on_new_request>`
+    in favour of :ref:`flush access log on new request
+    <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.HcmAccessLogOptions.flush_access_log_on_new_request>`.
+- area: http
+  change: |
+    deprecated (1.25.0) :ref:`periodic access logging
+    <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.access_log_flush_interval>`
+    in favour of :ref:`periodic access logging
+    <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.HcmAccessLogOptions.access_log_flush_interval>`.
