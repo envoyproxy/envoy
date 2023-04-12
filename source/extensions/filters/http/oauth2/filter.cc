@@ -452,11 +452,10 @@ void OAuth2Filter::onGetAccessTokenSuccess(const std::string& access_code,
   id_token_ = id_token;
   refresh_token_ = refresh_token;
 
-  const auto current_epoch = time_source_.systemTime().time_since_epoch();
-
-  new_expires_ = std::to_string(expires_in.count());
-  max_age_ = std::to_string(
-      std::chrono::duration_cast<std::chrono::seconds>(expires_in - current_epoch).count());
+  const auto new_epoch = time_source_.systemTime() + expires_in;
+  new_expires_ = std::to_string(
+      std::chrono::duration_cast<std::chrono::seconds>(new_epoch.time_since_epoch()).count());
+  max_age_ = std::to_string(expires_in.count());
 
   finishFlow();
 }
