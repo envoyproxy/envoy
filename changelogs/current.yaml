@@ -200,6 +200,10 @@ bug_fixes:
   change: |
     fixed a bug where ``x-envoy-original-path`` was not being sanitized when sent from untrusted users. This behavioral change can
     be temporarily reverted by setting ``envoy.reloadable_features.sanitize_original_path`` to false.
+- area: http
+  change: |
+    fixed the fix for ``x-envoy-original-path`` so it removes the header *only* when sent from untrusted users,
+    not also before sending to upstream server.
 
 removed_config_or_runtime:
 - area: config

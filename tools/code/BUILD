@@ -33,3 +33,35 @@ envoy_entry_point(
     ],
     pkg = "envoy.code.check",
 )
+
+genrule(
+    name = "checked",
+    outs = ["checked.txt"],
+    cmd = """
+    $(location :check) \
+        --fix \
+        -v warn \
+        -x mobile/dist/envoy-pom.xml \
+        --extensions_build_config=$(location :extensions_build_config) \
+        --path=%s \
+        -b shellcheck:$(location @com_github_aignas_rules_shellcheck//:shellcheck) \
+        -b gofmt:$(location @go_sdk//:bin/gofmt) \
+      > $@ 2>&1 || :
+    """ % PATH,
+    tags = ["no-remote-exec"],
+    tools = [
+        ":check",
+        ":extensions_build_config",
+        "//bazel:volatile-scm-hash",
+        "@com_github_aignas_rules_shellcheck//:shellcheck",
+        "@go_sdk//:bin/gofmt",
+    ],
+)
+
+sh_test(
+    name = "check_test",
+    srcs = [":check_test.sh"],
+    args = ["$(location :checked)"],
+    data = [":checked"],
+    tags = ["no-remote-exec"],
+)
