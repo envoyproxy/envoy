@@ -63,15 +63,15 @@
 }
 
 .histogram-graphics span {
-    margin-right: 10px;
-    width: 60px;
+    margin-right: 50px;
+    width: 10px;
     background-color: #c11;
     align-self: baseline;
 }
 
 .histogram-labels span {
-    margin-right: 10px;
-    width: 60px;
+    margin-right: 50px;
+    width: 10px;
     align-self: baseline;
     font-family: sans-serif;
     font-size: 12px;

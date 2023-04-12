@@ -265,17 +265,19 @@ function log10(num) {
   return Math.log(num) / log_10;
 }
 
-function renderHistogramDetail(percentiles, detail) {
+function renderHistogramDetail(supported_percentiles, detail) {
   activeStatsHistogramsDiv.replaceChildren();
   for (histogram of detail) {
     const div = document.createElement('div');
     const label = document.createElement('div');
     let name_and_percentiles = histogram.name;
     let i = 0;
-    let prev = 0;
-    for (percentile of percentiles) {
-      name_and_percentiles += " P" + percentiles[i++] + "=" + (percentile - prev);
-      prev = percentile;
+    const percentile_values = histogram.percentiles;
+    //let prevValue = 0;
+    for (i = 0; i < supported_percentiles.length; ++i) {
+      const value = percentile_values[i].cumulative;
+      name_and_percentiles += ' P' + supported_percentiles[i] + '=' + value;
+      //prevValue = value;
     }
     label.textContent = name_and_percentiles;
     div.appendChild(label);
@@ -286,10 +288,11 @@ function renderHistogramDetail(percentiles, detail) {
     // the graphics stretch when the user stretches the window.
 
     let maxCount = 0;
-    let minValue = null;
-    let maxValue = null;
+    //let minValue = null;
+    //let maxValue = null;
     for (bucket of histogram.detail) {
       maxCount = Math.max(maxCount, bucket.count);
+/*
       if (minValue == null) {
         minValue = bucket.value;
         maxValue = bucket.value;
@@ -298,11 +301,14 @@ function renderHistogramDetail(percentiles, detail) {
       } else if (bucket.value > minValue) {
         maxValue = bucket.value;
       }
+*/
     }
 
+/*
     const width = maxValue - minValue;
     const scaledValue = value => 9*((value - minValue) / width) + 1; // between 1 and 10;
     const valueToPercent = value => Math.round(80 * log10(scaledValue(value)));
+*/
 
     const graphics = document.createElement('div');
     graphics.className = 'histogram-graphics';
@@ -310,7 +316,7 @@ function renderHistogramDetail(percentiles, detail) {
       const span = document.createElement('span');
       const percent = maxCount == 0 ? 0 : Math.round((100 * bucket.count) / maxCount);
       span.style.height = '' + percent + '%';
-      span.style.width = '' + valueToPercent(bucket.value) + '%';
+      //span.style.width = '' + valueToPercent(bucket.value) + '%';
       graphics.appendChild(span);
     }
     div.appendChild(graphics);

@@ -155,7 +155,7 @@ void StatsJsonRender::generate(Buffer::Instance&, const std::string& name,
     break;
   }
   case Utility::HistogramBucketsMode::Detailed: {
-    std::vector<Stats::ParentHistogram::Bucket> buckets = histogram.detailedBuckets();
+    std::vector<Stats::ParentHistogram::Bucket> buckets = histogram.detailedBuckets(64);
     ProtobufWkt::Struct histogram_obj;
     ProtoMap& histogram_obj_fields = *histogram_obj.mutable_fields();
     histogram_obj_fields["name"] = ValueUtil::stringValue(histogram.name());
