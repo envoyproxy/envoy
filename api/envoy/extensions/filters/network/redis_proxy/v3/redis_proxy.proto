@@ -306,6 +306,7 @@ message RedisProxy {
   // configuring the backing clusters.
   PrefixRoutes prefix_routes = 5;
 
+  // We can add validation to allow only on router config
   HashSlotRoutes hash_slot_routes = 10;
 
   // Authenticate Redis client connections locally by forcing downstream clients to issue a `Redis
