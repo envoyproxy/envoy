@@ -36,6 +36,16 @@ namespace Extensions {
 namespace HttpFilters {
 namespace ExternalProcessing {
 
+namespace {
+bool fuzzCreateEnvoy(const uint32_t exec, const bool non_persistent_mode) {
+  const uint32_t exec_before_reset_envoy = 2000;
+  return (non_persistent_mode || exec % exec_before_reset_envoy == 0);
+}
+} // namespace
+
+using envoy::service::ext_proc::v3::ProcessingRequest;
+using envoy::service::ext_proc::v3::ProcessingResponse;
+
 // The buffer size for the listeners
 static const uint32_t BufferSize = 100000;
 
@@ -201,6 +211,91 @@ public:
   Network::Address::IpVersion ip_version_;
   Grpc::ClientType client_type_;
 };
+
+// One fuzzer execution.
+inline void fuzzExtProcRun(const test::extensions::filters::http::ext_proc::ExtProcGrpcTestCase& input,
+                           const bool non_persistent_mode) {
+  try {
+    TestUtility::validate(input);
+  } catch (const ProtoValidationException& e) {
+    ENVOY_LOG_MISC(debug, "ProtoValidationException: {}", e.what());
+    return;
+  }
+
+  // have separate data providers.
+  FuzzedDataProvider downstream_provider(
+      reinterpret_cast<const uint8_t*>(input.downstream_data().data()),
+      input.downstream_data().size());
+  FuzzedDataProvider ext_proc_provider(
+      reinterpret_cast<const uint8_t*>(input.ext_proc_data().data()), input.ext_proc_data().size());
+
+  // Using persistent Envoy and ext_proc test server.
+  static std::unique_ptr<ExtProcIntegrationFuzz> fuzzer = nullptr;
+  static std::unique_ptr<ExtProcFuzzHelper> fuzz_helper = nullptr;
+
+  static uint32_t fuzz_exec_count = 0;
+  // Initialize fuzzer once with IP and gRPC version from environment
+  if (fuzzCreateEnvoy(fuzz_exec_count, non_persistent_mode)) {
+    fuzzer = std::make_unique<ExtProcIntegrationFuzz>(
+        TestEnvironment::getIpVersionsForTest()[0], TestEnvironment::getsGrpcVersionsForTest()[0]);
+  }
+  // Initialize fuzz_helper during every execution.
+  // This will be accessed by the test server which is initialized once.
+  fuzz_helper = std::make_unique<ExtProcFuzzHelper>(&ext_proc_provider);
+
+  // Initialize test server.
+  if (fuzzCreateEnvoy(fuzz_exec_count, non_persistent_mode)) {
+    // This starts an external processor in a separate thread. This allows for the
+    // external process to consume messages in a loop without blocking the fuzz
+    // target from receiving the response.
+    fuzzer->test_processor_.start(
+        fuzzer->ip_version_,
+        [](grpc::ServerReaderWriter<ProcessingResponse, ProcessingRequest>* stream) {
+          while (true) {
+            ProcessingRequest req;
+            if (!stream->Read(&req)) {
+              return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT, "expected message");
+            }
+            bool immediate_close_grpc = false;
+            ProcessingResponse resp;
+            auto result = fuzz_helper->generateResponse(req, resp, immediate_close_grpc);
+            if (immediate_close_grpc) {
+              return result;
+            }
+            stream->Write(resp);
+          }
+          return grpc::Status::OK;
+        });
+  }
+  // Initialize Envoy
+  if (fuzzCreateEnvoy(fuzz_exec_count, non_persistent_mode)) {
+    fuzzer->initializeFuzzer(true);
+    ENVOY_LOG_MISC(trace, "Fuzzer initialized");
+  }
+
+  const auto response = fuzzer->randomDownstreamRequest(&downstream_provider);
+  // For fuzz testing we don't care about the response code, only that
+  // the stream ended in some graceful manner
+  ENVOY_LOG_MISC(trace, "Waiting for response.");
+
+  bool response_timeout = false;
+  if (response->waitForEndStream(std::chrono::milliseconds(500))) {
+    ENVOY_LOG_MISC(trace, "Response received.");
+  } else {
+    response_timeout = true;
+    ENVOY_LOG_MISC(trace, "Response timed out.");
+  }
+
+  fuzz_exec_count++;
+  if (fuzzCreateEnvoy(fuzz_exec_count, non_persistent_mode) || response_timeout) {
+    fuzzer->tearDown(false);
+    fuzzer.reset();
+  } else {
+    fuzzer->tearDown(true);
+  }
+  fuzz_helper.reset();
+}
+
 
 } // namespace ExternalProcessing
 } // namespace HttpFilters
