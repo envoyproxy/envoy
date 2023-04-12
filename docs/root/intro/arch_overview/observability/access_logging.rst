@@ -46,7 +46,7 @@ HTTP Router Filter
 For Router Filter, is is possible to enable an upstream access log when a new upstream stream is associated with the downstream stream,
 and after successfully establishing a connection with the upstream by using
 :ref:`flush upstream log on upstream stream <envoy_v3_api_field_extensions.filters.http.router.v3.Router.UpstreamAccessLogOptions.flush_upstream_log_on_upstream_stream>`
-Note: In case that the HTTP request involvs retries, a start of request upstream access log will be recorded for each retry.
+Note: In case that the HTTP request involves retries, a start of request upstream access log will be recorded for each retry.
 
 .. _arch_overview_access_log_periodic:
 
@@ -58,14 +58,15 @@ TCP Proxy
 
 For TCP Proxy, it is possible to enable a prediodic access log by using
 :ref:`access log flush interval <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.TcpAccessLogOptions.access_log_flush_interval>`
-Note: The first interval count will start right after a new connection received by the TCP Proxy and before making an upstream connection.
+Note: The first access log entry is generated one interval after a new connection is received by the TCP Proxy whether or not an upstream connection has been made.
 
 HTTP Connection Manager
 ***********************
 
 For HTTP Connection Manager, it is possible to enable a prediodic access log by using
 :ref:`access log flush interval <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.HcmAccessLogOptions.access_log_flush_interval>`
-Note: The first interval count will start right after the HTTP request is received by the HTTP Connection Manager filter and before iterating the HTTP filter chain.
+Note: The first access log entry is generated one interval after a new HTTP request is received by the HTTP Connection Manager and before iterating
+the HTTP filter chain, whether or not an upstream connection has been made.
 
 .. _arch_overview_access_log_filters:
 
