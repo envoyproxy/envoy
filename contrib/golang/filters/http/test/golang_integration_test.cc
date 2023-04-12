@@ -28,17 +28,16 @@ public:
   }
 
   Http::FilterHeadersStatus encodeHeaders(Http::ResponseHeaderMap&, bool) override {
-    return Http::FilterHeadersStatus::Continue;
-  }
-
-  Http::FilterDataStatus encodeData(Buffer::Instance&, bool) override {
-    EXPECT_EQ("foo", "bar");
     const auto& metadata = decoder_callbacks_->streamInfo().dynamicMetadata().filter_metadata();
     const auto& filter_it = metadata.find("filter.go");
     ASSERT(filter_it != metadata.end());
     const auto& fields = filter_it->second.fields();
     std::string val = fields.at("foo").string_value();
     EXPECT_EQ(val, "bar");
+    return Http::FilterHeadersStatus::Continue;
+  }
+
+  Http::FilterDataStatus encodeData(Buffer::Instance&, bool) override {
     return Http::FilterDataStatus::Continue;
   }
 
@@ -508,9 +507,14 @@ typed_config:
     codec_client_->sendData(request_encoder, "helloworld", true);
 
     waitForNextUpstreamRequest();
-    // check no dynamic metadata
-    EXPECT_EQ(true,
-              upstream_request_->headers().get(Http::LowerCaseString("dy-envoy-lb-foo")).empty());
+
+    Http::TestResponseHeaderMapImpl response_headers{
+        {":status", "200"},
+    };
+    upstream_request_->encodeHeaders(response_headers, true);
+
+    ASSERT_TRUE(response->waitForEndStream());
+    EXPECT_THAT(response->headers(), Http::HttpStatusIs("200"));
     cleanup();
   }
 
