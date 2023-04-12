@@ -396,6 +396,9 @@ stages:
     dependsOn: []
     # Skip checks if only mobile/ or docs/ have changed.
     condition: and(not(canceled()), succeeded(), ne(stageDependencies.env.repo.outputs['changed.mobileOnly'], 'true'), ne(stageDependencies.env.repo.outputs['changed.docsOnly'], 'true'), ne(stageDependencies.env.repo.outputs['changed.examplesOnly'], 'true'))
+    variables:
+      REPO_FETCH_DEPTH: 1
+      REPO_FETCH_TAGS: false
     strategy:
       maxParallel: 3
       matrix:
@@ -408,6 +411,8 @@ stages:
           CI_TARGET: "bazel.gcc"
         clang_tidy:
           CI_TARGET: "bazel.clang_tidy"
+          REPO_FETCH_DEPTH: 0
+          REPO_FETCH_TAGS: true
         asan:
           CI_TARGET: "bazel.asan"
         msan:
@@ -423,6 +428,8 @@ stages:
     - template: bazel.yml
       parameters:
         ciTarget: $(CI_TARGET)
+        repoFetchDepth: $(REPO_FETCH_DEPTH)
+        repoFetchTags: $(REPO_FETCH_TAGS)
 
   - job: coverage
     displayName: "linux_x64"
