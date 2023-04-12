@@ -92,13 +92,13 @@ Config::SharedConfig::SharedConfig(
 
   if (config.has_access_log_options()) {
     if (config.flush_access_log_on_connected() /* deprecated */) {
-      throw EnvoyException("Only one of flush_access_log_on_connected from TcpProxy or"
-                           "access_log_options can be specified.");
+      throw EnvoyException(
+          "Only one of flush_access_log_on_connected or access_log_options can be specified.");
     }
 
     if (config.has_access_log_flush_interval() /* deprecated */) {
-      throw EnvoyException("Only one of access_log_flush_interval from TcpProxy or"
-                           "access_log_options can be specified.");
+      throw EnvoyException(
+          "Only one of access_log_flush_interval or access_log_options can be specified.");
     }
 
     flush_access_log_on_connected_ = config.access_log_options().flush_access_log_on_connected();
