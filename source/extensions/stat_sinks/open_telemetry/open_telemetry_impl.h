@@ -102,9 +102,6 @@ private:
 
 class OpenTelemetryGrpcMetricsExporter : public Grpc::AsyncRequestCallbacks<MetricsExportResponse> {
 public:
-  explicit OpenTelemetryGrpcMetricsExporter(const OtlpOptionsSharedPtr config,
-                                            const Grpc::RawAsyncClientSharedPtr& raw_async_client)
-      : config_(config), client_(raw_async_client) {}
   ~OpenTelemetryGrpcMetricsExporter() override = default;
 
   /**
@@ -115,10 +112,6 @@ public:
 
   // Grpc::AsyncRequestCallbacks
   void onCreateInitialMetadata(Http::RequestHeaderMap&) override {}
-
-protected:
-  const OtlpOptionsSharedPtr config_;
-  Grpc::AsyncClient<MetricsExportRequest, MetricsExportResponse> client_;
 };
 
 using OpenTelemetryGrpcMetricsExporterSharedPtr = std::shared_ptr<OpenTelemetryGrpcMetricsExporter>;
@@ -141,6 +134,8 @@ public:
   void onFailure(Grpc::Status::GrpcStatus, const std::string&, Tracing::Span&) override;
 
 private:
+  const OtlpOptionsSharedPtr config_;
+  Grpc::AsyncClient<MetricsExportRequest, MetricsExportResponse> client_;
   const Protobuf::MethodDescriptor& service_method_;
 };
 

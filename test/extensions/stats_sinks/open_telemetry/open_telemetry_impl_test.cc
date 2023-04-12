@@ -8,6 +8,7 @@
 #include "test/test_common/simulated_time_system.h"
 
 using testing::_;
+using testing::ByMove;
 using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
@@ -28,11 +29,10 @@ public:
     EXPECT_CALL(snapshot_, snapshotTime()).WillRepeatedly(Return(time));
   }
 
-  const OtlpOptionsSharedPtr otlpOptions(
-        bool report_counters_as_deltas = false,
-        bool report_histograms_as_deltas = false,
-        bool emit_tags_as_attributes = true,
-        bool use_tag_extracted_name = true) {
+  const OtlpOptionsSharedPtr otlpOptions(bool report_counters_as_deltas = false,
+                                         bool report_histograms_as_deltas = false,
+                                         bool emit_tags_as_attributes = true,
+                                         bool use_tag_extracted_name = true) {
     envoy::extensions::stat_sinks::open_telemetry::v3::SinkConfig sink_config;
     sink_config.mutable_report_counters_as_deltas()->set_value(report_counters_as_deltas);
     sink_config.mutable_report_histograms_as_deltas()->set_value(report_histograms_as_deltas);
@@ -42,9 +42,7 @@ public:
     return std::make_shared<OtlpOptions>(sink_config);
   }
 
-  std::string getTagExtractedName(const std::string name) {
-    return name + "-tagged";
-  }
+  std::string getTagExtractedName(const std::string name) { return name + "-tagged"; }
 
   void addCounterToSnapshot(const std::string& name, uint64_t delta, uint64_t value,
                             bool used = true) {
@@ -134,7 +132,7 @@ public:
   }
 
   const opentelemetry::proto::metrics::v1::Metric& metricAt(int index,
-      MetricsExportRequestSharedPtr metrics) {
+                                                            MetricsExportRequestSharedPtr metrics) {
     return metrics->resource_metrics()[0].scope_metrics()[0].metrics()[index];
   }
 
@@ -197,8 +195,8 @@ public:
     EXPECT_EQ(0, attributes.size());
   }
 
-  void expectAttributes(const Protobuf::RepeatedPtrField<KeyValue>& attributes,
-                        std::string key, std::string value) {
+  void expectAttributes(const Protobuf::RepeatedPtrField<KeyValue>& attributes, std::string key,
+                        std::string value) {
     EXPECT_EQ(1, attributes.size());
     EXPECT_EQ(key, attributes[0].key());
     EXPECT_EQ(value, attributes[0].value().string_value());
@@ -343,11 +341,6 @@ TEST_F(OtlpMetricsFlusherTests, DeltaHistogramMetric) {
 
 class MockOpenTelemetryGrpcMetricsExporter : public OpenTelemetryGrpcMetricsExporter {
 public:
-  MockOpenTelemetryGrpcMetricsExporter(const OtlpOptionsSharedPtr config,
-                                       const Grpc::RawAsyncClientSharedPtr& raw_async_client)
-      : OpenTelemetryGrpcMetricsExporter(config, raw_async_client) {}
-
-  // OpenTelemetryGrpcMetricsExporter
   MOCK_METHOD(void, send, (MetricsExportRequestPtr &&));
   MOCK_METHOD(void, onSuccess, (Grpc::ResponsePtr<MetricsExportResponse>&&, Tracing::Span&));
   MOCK_METHOD(void, onFailure, (Grpc::Status::GrpcStatus, const std::string&, Tracing::Span&));
@@ -355,12 +348,26 @@ public:
 
 class MockOtlpMetricsFlusher : public OtlpMetricsFlusher {
 public:
-
   MOCK_METHOD(MetricsExportRequestPtr, flush, (Stats::MetricSnapshot&), (const));
 };
 
-TEST_F(OpenTelemetryStatsSinkTests, TestOpenTelemetryGrpcSink) {
-  std::cout << "a";
+class OpenTelemetryGrpcSinkTests : public OpenTelemetryStatsSinkTests {
+public:
+  OpenTelemetryGrpcSinkTests()
+      : flusher_(std::make_shared<MockOtlpMetricsFlusher>()),
+        exporter_(std::make_shared<MockOpenTelemetryGrpcMetricsExporter>()) {}
+
+  const std::shared_ptr<MockOtlpMetricsFlusher> flusher_;
+  const std::shared_ptr<MockOpenTelemetryGrpcMetricsExporter> exporter_;
+};
+
+TEST_F(OpenTelemetryGrpcSinkTests, BasicFlow) {
+  MetricsExportRequestPtr request = std::make_unique<MetricsExportRequest>();
+  EXPECT_CALL(*flusher_, flush(_)).WillOnce(Return(ByMove(std::move(request))));
+  EXPECT_CALL(*exporter_, send(_));
+
+  OpenTelemetryGrpcSink sink(flusher_, exporter_);
+  sink.flush(snapshot_);
 }
 
 } // namespace

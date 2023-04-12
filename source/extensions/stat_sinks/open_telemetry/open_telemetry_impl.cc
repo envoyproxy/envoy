@@ -19,7 +19,7 @@ OtlpOptions::OtlpOptions(const SinkConfig& sink_config)
 
 OpenTelemetryGrpcMetricsExporterImpl::OpenTelemetryGrpcMetricsExporterImpl(
     const OtlpOptionsSharedPtr config, Grpc::RawAsyncClientSharedPtr raw_async_client)
-    : OpenTelemetryGrpcMetricsExporter(config, raw_async_client),
+    : config_(config), client_(raw_async_client),
       service_method_(*Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
           "opentelemetry.proto.collector.metrics.v1.MetricsService.Export")) {}
 
@@ -78,7 +78,8 @@ MetricsExportRequestPtr OtlpMetricsFlusherImpl::flush(Stats::MetricSnapshot& sna
 }
 
 void OtlpMetricsFlusherImpl::flushGauge(opentelemetry::proto::metrics::v1::Metric& metric,
-                                        const Stats::Gauge& gauge_stat, int64_t snapshot_time_ns) const {
+                                        const Stats::Gauge& gauge_stat,
+                                        int64_t snapshot_time_ns) const {
   auto* data_point = metric.mutable_gauge()->add_data_points();
   data_point->set_time_unix_nano(snapshot_time_ns);
   setMetricCommon(metric, *data_point, snapshot_time_ns, gauge_stat);
@@ -86,9 +87,10 @@ void OtlpMetricsFlusherImpl::flushGauge(opentelemetry::proto::metrics::v1::Metri
   data_point->set_as_int(gauge_stat.value());
 }
 
-void OtlpMetricsFlusherImpl::flushCounter(opentelemetry::proto::metrics::v1::Metric& metric,
-                                          const Stats::MetricSnapshot::CounterSnapshot& counter_snapshot,
-                                          int64_t snapshot_time_ns) const {
+void OtlpMetricsFlusherImpl::flushCounter(
+    opentelemetry::proto::metrics::v1::Metric& metric,
+    const Stats::MetricSnapshot::CounterSnapshot& counter_snapshot,
+    int64_t snapshot_time_ns) const {
   auto* sum = metric.mutable_sum();
   sum->set_is_monotonic(true);
   auto* data_point = sum->add_data_points();
