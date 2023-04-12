@@ -25,9 +25,9 @@ class OpenTelemetryGrpcIntegrationTest : public Grpc::GrpcClientIntegrationParam
                                          public HttpIntegrationTest {
 public:
   OpenTelemetryGrpcIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP1, ipVersion()) {
-    // TODO(ggreenway): add tag extraction rules.
-    // Missing stat tag-extraction rule for stat 'grpc.metrics_service.streams_closed_14' and
-    // stat_prefix 'metrics_service'.
+    // TODO(ohadvano): add tag extraction rules.
+    // Missing stat tag-extraction rule for stat 'grpc.otlp_collector.streams_closed_x' and
+    // stat_prefix 'otlp_collector'.
     skip_tag_extraction_rule_check_ = true;
   }
 
@@ -71,69 +71,77 @@ public:
 
   ABSL_MUST_USE_RESULT
   AssertionResult waitForMetricsRequest() {
-    bool known_summary_exists = false;
     bool known_histogram_exists = false;
     bool known_counter_exists = false;
     bool known_gauge_exists = false;
 
-    // Sometimes stats do not come in the first flush cycle, this loop ensures that we wait till
-    // required stats are flushed.
-    // TODO(ramaraochavali): Figure out a more robust way to find out all required stats have been
-    // flushed.
-    while (!(known_counter_exists && known_gauge_exists && known_summary_exists &&
-             known_histogram_exists)) {
+    while (!known_counter_exists || !known_gauge_exists || !known_histogram_exists) {
       opentelemetry::proto::collector::metrics::v1::ExportMetricsServiceRequest export_request;
       VERIFY_ASSERTION(otlp_collector_request_->waitForGrpcMessage(*dispatcher_, export_request));
       EXPECT_EQ("POST", otlp_collector_request_->headers().getMethodValue());
-      EXPECT_EQ("/opentelemetry.proto.collector.metrics.v1.MetricsService.Export/Export",
+      EXPECT_EQ("/opentelemetry.proto.collector.metrics.v1.MetricsService/Export",
                 otlp_collector_request_->headers().getPathValue());
       EXPECT_EQ("application/grpc", otlp_collector_request_->headers().getContentTypeValue());
+
       EXPECT_EQ(1, export_request.resource_metrics().size());
       EXPECT_EQ(1, export_request.resource_metrics()[0].scope_metrics().size());
-      EXPECT_TRUE(export_request.resource_metrics()[0].scope_metrics()[0].metrics().size() > 0);
       const Protobuf::RepeatedPtrField<opentelemetry::proto::metrics::v1::Metric>& metrics =
           export_request.resource_metrics()[0].scope_metrics()[0].metrics();
 
-      //int64_t previous_time_stamp = 0;
+      EXPECT_TRUE(metrics.size() > 0);
+
+      long long int previous_time_stamp = 0;
       for (const opentelemetry::proto::metrics::v1::Metric& metric : metrics) {
-        if (metric.name() == "cluster.cluster_0.membership_change" && metric.has_sum()) {
+        if (metric.name() == "cluster.membership_change" && metric.has_sum()) {
           known_counter_exists = true;
           EXPECT_EQ(1, metric.sum().data_points().size());
           EXPECT_EQ(1, metric.sum().data_points()[0].as_int());
           EXPECT_TRUE(metric.sum().data_points()[0].time_unix_nano() > 0);
+
+          if (previous_time_stamp > 0) {
+            EXPECT_EQ(previous_time_stamp, metric.sum().data_points()[0].time_unix_nano());
+          }
+
+          previous_time_stamp = metric.sum().data_points()[0].time_unix_nano();
         }
 
-        if (metric.name() == "cluster.cluster_0.membership_total" && metric.has_gauge()) {
+        if (metric.name() == "cluster.membership_total" && metric.has_gauge()) {
           known_gauge_exists = true;
           EXPECT_EQ(1, metric.gauge().data_points().size());
           EXPECT_EQ(1, metric.gauge().data_points()[0].as_int());
           EXPECT_TRUE(metric.gauge().data_points()[0].time_unix_nano() > 0);
+
+          if (previous_time_stamp > 0) {
+            EXPECT_EQ(previous_time_stamp, metric.gauge().data_points()[0].time_unix_nano());
+          }
+
+          previous_time_stamp = metric.gauge().data_points()[0].time_unix_nano();
         }
 
-        if (metric.name() == "cluster.cluster_0.upstream_rq_time" && metric.has_histogram()) {
+        if (metric.name() == "cluster.upstream_rq_time" && metric.has_histogram()) {
           known_histogram_exists = true;
           EXPECT_EQ(1, metric.histogram().data_points().size());
-          // EXPECT_EQ(metrics_family.metric(0).histogram().bucket_size(),
-          //           Stats::HistogramSettingsImpl::defaultBuckets().size());
+          EXPECT_EQ(metric.histogram().data_points()[0].bucket_counts().size(),
+                    Stats::HistogramSettingsImpl::defaultBuckets().size());
           EXPECT_TRUE(metric.histogram().data_points()[0].time_unix_nano() > 0);
+
+          if (previous_time_stamp > 0) {
+            EXPECT_EQ(previous_time_stamp, metric.histogram().data_points()[0].time_unix_nano());
+          }
+
+          previous_time_stamp = metric.histogram().data_points()[0].time_unix_nano();
         }
 
-        // if (previous_time_stamp > 0) {
-        //   EXPECT_EQ(previous_time_stamp, metrics_family.metric(0).timestamp_ms());
-        // }
 
-        // previous_time_stamp = metrics_family.metric(0).timestamp_ms();
-        // if (known_counter_exists && known_gauge_exists && known_summary_exists &&
-        //     known_histogram_exists) {
-        //   break;
-        // }
+        if (known_counter_exists && known_gauge_exists && known_histogram_exists) {
+          break;
+        }
       }
     }
+
     EXPECT_TRUE(known_counter_exists);
     EXPECT_TRUE(known_gauge_exists);
-    EXPECT_TRUE(known_summary_exists);
     EXPECT_TRUE(known_histogram_exists);
-
     return AssertionSuccess();
   }
 
@@ -156,10 +164,10 @@ INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, OpenTelemetryGrpcIntegrationTest,
 
 TEST_P(OpenTelemetryGrpcIntegrationTest, BasicFlow) {
   initialize();
-  // Send an empty request so that histogram values merged for cluster_0.
+
   codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
   Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},
-                                                 {":path", "/test/long/url"},
+                                                 {":path", "/path"},
                                                  {":scheme", "http"},
                                                  {":authority", "host"}};
 
@@ -178,10 +186,10 @@ TEST_P(OpenTelemetryGrpcIntegrationTest, BasicFlow) {
 
   switch (clientType()) {
   case Grpc::ClientType::EnvoyGrpc:
-    test_server_->waitForGaugeEq("cluster.metrics_service.upstream_rq_active", 0);
+    test_server_->waitForGaugeEq("cluster.otlp_collector.upstream_rq_active", 0);
     break;
   case Grpc::ClientType::GoogleGrpc:
-    test_server_->waitForCounterGe("grpc.metrics_service.streams_closed_0", 1);
+    test_server_->waitForCounterGe("grpc.otlp_collector.streams_closed_0", 1);
     break;
   default:
     PANIC("reached unexpected code");
