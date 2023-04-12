@@ -59,7 +59,7 @@ parseSubstitutionFormatField(absl::string_view field_name,
     return formatter->format(*Http::StaticEmptyHeaders::get().request_headers,
                              *Http::StaticEmptyHeaders::get().response_headers,
                              *Http::StaticEmptyHeaders::get().response_trailers, stream_info,
-                             absl::string_view());
+                             absl::string_view(), "");
   };
 }
 

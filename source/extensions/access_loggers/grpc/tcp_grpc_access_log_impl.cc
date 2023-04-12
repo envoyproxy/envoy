@@ -35,7 +35,7 @@ TcpGrpcAccessLog::TcpGrpcAccessLog(AccessLog::FilterPtr&& filter,
 void TcpGrpcAccessLog::emitLog(const Http::RequestHeaderMap& request_header,
                                const Http::ResponseHeaderMap&, const Http::ResponseTrailerMap&,
                                const StreamInfo::StreamInfo& stream_info,
-                               AccessLogType) {
+                               AccessLog::AccessLogType) {
   // Common log properties.
   envoy::data::accesslog::v3::TCPAccessLogEntry log_entry;
   GrpcCommon::Utility::extractCommonAccessLogProperties(*log_entry.mutable_common_properties(),

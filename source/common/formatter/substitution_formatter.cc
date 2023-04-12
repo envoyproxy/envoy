@@ -1659,7 +1659,7 @@ ProtobufWkt::Value PlainNumberFormatter::formatValue(const Http::RequestHeaderMa
 absl::optional<std::string>
 LocalReplyBodyFormatter::format(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
                                 const Http::ResponseTrailerMap&, const StreamInfo::StreamInfo&,
-                                absl::string_view local_reply_body) const {
+                                absl::string_view local_reply_body, absl::string_view) const {
   return std::string(local_reply_body);
 }
 
@@ -1668,7 +1668,7 @@ ProtobufWkt::Value LocalReplyBodyFormatter::formatValue(const Http::RequestHeade
                                                         const Http::ResponseTrailerMap&,
                                                         const StreamInfo::StreamInfo&,
                                                         absl::string_view local_reply_body,
-                                                        absl::string_view access_log_type) const {
+                                                        absl::string_view) const {
   return ValueUtil::stringValue(std::string(local_reply_body));
 }
 

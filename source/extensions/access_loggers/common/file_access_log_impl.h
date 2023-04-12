@@ -23,7 +23,7 @@ private:
                const Http::ResponseHeaderMap& response_headers,
                const Http::ResponseTrailerMap& response_trailers,
                const StreamInfo::StreamInfo& stream_info,
-               AccessLogType access_log_type) override;
+               AccessLog::AccessLogType access_log_type) override;
 
   AccessLog::AccessLogFileSharedPtr log_file_;
   Formatter::FormatterPtr formatter_;

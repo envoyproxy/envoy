@@ -213,7 +213,7 @@ Filter::~Filter() {
 
   // Flush the final end stream access log entry.
   for (const auto& access_log : config_->accessLogs()) {
-    access_log->log(nullptr, nullptr, nullptr, getStreamInfo(), AccessLogType::Type1);
+    access_log->log(nullptr, nullptr, nullptr, getStreamInfo(), AccessLog::AccessLogType::Type1);
   }
 
   ASSERT(generic_conn_pool_ == nullptr);
@@ -628,7 +628,7 @@ std::string TunnelingConfigHelperImpl::host(const StreamInfo::StreamInfo& stream
   return hostname_fmt_->format(*Http::StaticEmptyHeaders::get().request_headers,
                                *Http::StaticEmptyHeaders::get().response_headers,
                                *Http::StaticEmptyHeaders::get().response_trailers, stream_info,
-                               absl::string_view());
+                               absl::string_view(), "");
 }
 
 void TunnelingConfigHelperImpl::propagateResponseHeaders(
@@ -813,7 +813,7 @@ void Filter::onUpstreamConnection() {
 
   if (config_->flushAccessLogOnConnected()) {
     for (const auto& access_log : config_->accessLogs()) {
-      access_log->log(nullptr, nullptr, nullptr, getStreamInfo(), AccessLogType::Type1);
+      access_log->log(nullptr, nullptr, nullptr, getStreamInfo(), AccessLog::AccessLogType::Type1);
     }
   }
 }
@@ -838,7 +838,7 @@ void Filter::onMaxDownstreamConnectionDuration() {
 
 void Filter::onAccessLogFlushInterval() {
   for (const auto& access_log : config_->accessLogs()) {
-    access_log->log(nullptr, nullptr, nullptr, getStreamInfo(), AccessLogType::Type1);
+    access_log->log(nullptr, nullptr, nullptr, getStreamInfo(), AccessLog::AccessLogType::Type1);
   }
   resetAccessLogFlushTimer();
 }

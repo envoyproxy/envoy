@@ -12,7 +12,7 @@ void ImplBase::log(const Http::RequestHeaderMap* request_headers,
                    const Http::ResponseHeaderMap* response_headers,
                    const Http::ResponseTrailerMap* response_trailers,
                    const StreamInfo::StreamInfo& stream_info,
-                   AccessLogType access_log_type) {
+                   AccessLog::AccessLogType access_log_type) {
   if (!request_headers) {
     request_headers = Http::StaticEmptyHeaders::get().request_headers.get();
   }

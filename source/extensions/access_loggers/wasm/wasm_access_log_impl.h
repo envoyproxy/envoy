@@ -24,7 +24,7 @@ public:
            const Http::ResponseHeaderMap* response_headers,
            const Http::ResponseTrailerMap* response_trailers,
            const StreamInfo::StreamInfo& stream_info,
-           AccessLogType) override {
+           AccessLog::AccessLogType) override {
     if (filter_ && request_headers && response_headers && response_trailers) {
       if (!filter_->evaluate(stream_info, *request_headers, *response_headers,
                              *response_trailers)) {

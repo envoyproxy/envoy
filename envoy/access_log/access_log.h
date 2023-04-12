@@ -79,8 +79,7 @@ public:
   virtual bool evaluate(const StreamInfo::StreamInfo& info,
                         const Http::RequestHeaderMap& request_headers,
                         const Http::ResponseHeaderMap& response_headers,
-                        const Http::ResponseTrailerMap& response_trailers,
-                        AccessLogType access_log_type) const PURE;
+                        const Http::ResponseTrailerMap& response_trailers) const PURE;
 };
 
 using FilterPtr = std::unique_ptr<Filter>;
