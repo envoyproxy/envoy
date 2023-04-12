@@ -512,6 +512,9 @@ stages:
     dependsOn: []
     # Skip checks if only mobile/ or docs/ have changed.
     condition: and(not(canceled()), or(succeeded(), eq(variables['PostSubmit'], true)), ne(stageDependencies.env.repo.outputs['changed.mobileOnly'], 'true'), ne(stageDependencies.env.repo.outputs['changed.docsOnly'], 'true'), ne(stageDependencies.env.repo.outputs['changed.examplesOnly'], 'true'))
+    variables:
+      REPO_FETCH_DEPTH: 1
+      REPO_FETCH_TAGS: false
     strategy:
       maxParallel: ${{ parameters.checksConcurrency }}
       matrix:
@@ -534,6 +537,8 @@ stages:
           ENVOY_FILTER_EXAMPLE: true
         clang_tidy:
           CI_TARGET: "bazel.clang_tidy"
+          REPO_FETCH_DEPTH: 0
+          REPO_FETCH_TAGS: true
         api:
           CI_TARGET: "bazel.api"
     timeoutInMinutes: 120
@@ -545,6 +550,8 @@ stages:
         ciTarget: $(CI_TARGET)
         envoyBuildFilterExample: $(ENVOY_FILTER_EXAMPLE)
         cacheTestResults: ${{ parameters.cacheTestResults }}
+        repoFetchDepth: $(REPO_FETCH_DEPTH)
+        repoFetchTags: $(REPO_FETCH_TAGS)
 
   - job: coverage
     displayName: "Linux x64"
