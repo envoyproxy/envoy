@@ -3606,6 +3606,49 @@ TEST_F(ClusterInfoImplTest, RetryBudgetDefaultPopulation) {
   EXPECT_EQ(min_retry_concurrency, 123UL);
 }
 
+TEST_F(ClusterInfoImplTest, EqualCommonLbConfigsSharedPool) {
+  const std::string yaml = R"EOF(
+    name: name
+    connect_timeout: 0.25s
+    type: STRICT_DNS
+    common_lb_config:
+      healthy_panic_threshold:
+        value: 0.3
+  )EOF";
+
+  auto clusterA = makeCluster(yaml);
+  auto clusterB = makeCluster(yaml);
+
+  EXPECT_EQ(0.3, clusterA->info()->lbConfig().healthy_panic_threshold().value());
+  EXPECT_EQ(&(clusterA->info()->lbConfig()), &(clusterB->info()->lbConfig()));
+}
+
+TEST_F(ClusterInfoImplTest, DifferentCommonLbConfigsSharedPool) {
+  const std::string yamlA = R"EOF(
+    name: name
+    connect_timeout: 0.25s
+    type: STRICT_DNS
+    common_lb_config:
+      healthy_panic_threshold:
+        value: 0.3
+  )EOF";
+
+  const std::string yamlB = R"EOF(
+    name: name
+    connect_timeout: 0.25s
+    type: STRICT_DNS
+    common_lb_config:
+      healthy_panic_threshold:
+        value: 0.5
+  )EOF";
+
+  auto clusterA = makeCluster(yamlA);
+  auto clusterB = makeCluster(yamlB);
+
+  EXPECT_EQ(0.3, clusterA->info()->lbConfig().healthy_panic_threshold().value());
+  EXPECT_NE(&(clusterA->info()->lbConfig()), &(clusterB->info()->lbConfig()));
+}
+
 TEST_F(ClusterInfoImplTest, UnsupportedPerHostFields) {
   std::string yaml = R"EOF(
     name: name
