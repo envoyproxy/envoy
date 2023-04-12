@@ -174,6 +174,22 @@ TEST_F(Http2HeaderValidatorTest, ValidateRequestHeaderMapEmptyGenericName) {
                              UhvResponseCodeDetail::get().EmptyHeaderName);
 }
 
+TEST_F(Http2HeaderValidatorTest, ValidateRequestHeaderMapUnderscoreHeadersAllowedByDefault) {
+  ::Envoy::Http::TestRequestHeaderMapImpl headers{{":scheme", "https"},
+                                                  {":method", "GET"},
+                                                  {":path", "/"},
+                                                  {":authority", "envoy.com"},
+                                                  {"x_foo", "bar"}};
+  auto uhv = createH2(empty_config);
+
+  EXPECT_ACCEPT(uhv->validateRequestHeaderMap(headers));
+  EXPECT_EQ(headers, ::Envoy::Http::TestRequestHeaderMapImpl({{":scheme", "https"},
+                                                              {":method", "GET"},
+                                                              {":path", "/"},
+                                                              {":authority", "envoy.com"},
+                                                              {"x_foo", "bar"}}));
+}
+
 TEST_F(Http2HeaderValidatorTest, ValidateRequestHeaderMapDropUnderscoreHeaders) {
   ::Envoy::Http::TestRequestHeaderMapImpl headers{{":scheme", "https"},
                                                   {":method", "GET"},
@@ -187,6 +203,18 @@ TEST_F(Http2HeaderValidatorTest, ValidateRequestHeaderMapDropUnderscoreHeaders) 
       headers,
       ::Envoy::Http::TestRequestHeaderMapImpl(
           {{":scheme", "https"}, {":method", "GET"}, {":path", "/"}, {":authority", "envoy.com"}}));
+}
+
+TEST_F(Http2HeaderValidatorTest, ValidateRequestHeaderMapRejectUnderscoreHeaders) {
+  ::Envoy::Http::TestRequestHeaderMapImpl headers{{":scheme", "https"},
+                                                  {":method", "GET"},
+                                                  {":path", "/"},
+                                                  {":authority", "envoy.com"},
+                                                  {"x_foo", "bar"}};
+  auto uhv = createH2(reject_headers_with_underscores_config);
+
+  EXPECT_REJECT_WITH_DETAILS(uhv->validateRequestHeaderMap(headers),
+                             UhvResponseCodeDetail::get().InvalidUnderscore);
 }
 
 TEST_F(Http2HeaderValidatorTest, RequestExtendedConnect) {
@@ -518,6 +546,17 @@ TEST_F(Http2HeaderValidatorTest, ValidateRequestHeaderMapRedirectPath) {
   EXPECT_EQ(headers.path(), "/dir1/dir2");
 }
 
+TEST_F(Http2HeaderValidatorTest, ValidateRequestHeadersPathNormalizationDisabled) {
+  ::Envoy::Http::TestRequestHeaderMapImpl headers{{":scheme", "https"},
+                                                  {":method", "GET"},
+                                                  {":path", "/./dir1%2f../dir2"},
+                                                  {":authority", "envoy.com"}};
+  auto uhv = createH2(no_path_normalization);
+
+  EXPECT_TRUE(uhv->validateRequestHeaderMap(headers).ok());
+  EXPECT_EQ(headers.path(), "/./dir1%2f../dir2");
+}
+
 TEST_F(Http2HeaderValidatorTest, ValidateRequestTrailerMap) {
   auto uhv = createH2(empty_config);
   ::Envoy::Http::TestRequestTrailerMapImpl request_trailer_map{{"trailer1", "value1"},
@@ -546,6 +585,31 @@ TEST_F(Http2HeaderValidatorTest, ValidateInvalidValueRequestTrailerMap) {
   auto result = uhv->validateRequestTrailerMap(request_trailer_map);
   EXPECT_FALSE(result);
   EXPECT_EQ(result.details(), "uhv.invalid_value_characters");
+}
+
+TEST_F(Http2HeaderValidatorTest, UnderscoreHeadersAllowedInRequestTrailersByDefault) {
+  ::Envoy::Http::TestRequestTrailerMapImpl trailers{{"trailer1", "value1"}, {"x_foo", "bar"}};
+  auto uhv = createH2(empty_config);
+
+  EXPECT_ACCEPT(uhv->validateRequestTrailerMap(trailers));
+  EXPECT_EQ(trailers,
+            ::Envoy::Http::TestRequestTrailerMapImpl({{"trailer1", "value1"}, {"x_foo", "bar"}}));
+}
+
+TEST_F(Http2HeaderValidatorTest, ValidateRequestTrailersDropUnderscoreHeaders) {
+  ::Envoy::Http::TestRequestTrailerMapImpl trailers{{"trailer1", "value1"}, {"x_foo", "bar"}};
+  auto uhv = createH2(drop_headers_with_underscores_config);
+
+  EXPECT_ACCEPT(uhv->validateRequestTrailerMap(trailers));
+  EXPECT_EQ(trailers, ::Envoy::Http::TestRequestTrailerMapImpl({{"trailer1", "value1"}}));
+}
+
+TEST_F(Http2HeaderValidatorTest, ValidateRequestTrailersRejectUnderscoreHeaders) {
+  ::Envoy::Http::TestRequestTrailerMapImpl trailers{{"trailer1", "value1"}, {"x_foo", "bar"}};
+  auto uhv = createH2(reject_headers_with_underscores_config);
+
+  EXPECT_REJECT_WITH_DETAILS(uhv->validateRequestTrailerMap(trailers),
+                             UhvResponseCodeDetail::get().InvalidUnderscore);
 }
 
 TEST_F(Http2HeaderValidatorTest, ValidateResponseTrailerMap) {
