@@ -946,6 +946,40 @@ TEST_F(OAuth2Test, OAuthTestFullFlowPostWithParameters) {
   filter_->finishFlow();
 }
 
+/**
+ * Testing oauth response after tokens are set.
+ *
+ * Expected behavior: cookies are set.
+ */
+TEST_F(OAuth2Test, OAuthAccessTokenSucessWithTokens) {
+
+  // Set SystemTime to a fixed point so we get consistent HMAC encodings between test runs.
+  test_time_.setSystemTime(SystemTime(std::chrono::seconds(0)));
+
+  // Expected response after the callback is complete.
+  Http::TestRequestHeaderMapImpl expected_headers{
+      {Http::Headers::get().Status.get(), "302"},
+      {Http::Headers::get().SetCookie.get(),
+       "OauthHMAC="
+       "OTBhMzEwNjk4YzJiNjIxMTcwMTE0ZDE2NjUyNjIyNmI1YmE0Y2NhNTQ3ZWYwZGYzZTNhYjEwNzhmZmQyZGY4Zg==;"
+       "version=1;path=/;Max-Age=600;secure;HttpOnly"},
+      {Http::Headers::get().SetCookie.get(),
+       "OauthExpires=600;version=1;path=/;Max-Age=600;secure;HttpOnly"},
+      {Http::Headers::get().SetCookie.get(),
+       "BearerToken=access_code;version=1;path=/;Max-Age=600;secure"},
+      {Http::Headers::get().SetCookie.get(),
+       "IdToken=some-id-token;version=1;path=/;Max-Age=600;secure"},
+      {Http::Headers::get().SetCookie.get(),
+       "RefreshToken=some-refresh-token;version=1;path=/;Max-Age=600;secure"},
+      {Http::Headers::get().Location.get(), ""},
+  };
+
+  EXPECT_CALL(decoder_callbacks_, encodeHeaders_(HeaderMapEqualRef(&expected_headers), true));
+
+  filter_->onGetAccessTokenSuccess("access_code", "some-id-token", "some-refresh-token",
+                                   std::chrono::seconds(600));
+}
+
 TEST_F(OAuth2Test, OAuthBearerTokenFlowFromHeader) {
   Http::TestRequestHeaderMapImpl request_headers{
       {Http::Headers::get().Path.get(), "/test?role=bearer"},
