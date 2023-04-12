@@ -25,7 +25,11 @@ static_resources:
               path: /dev/stdout
               log_format:
                 text_format_source:
-                  inline_string: "[%START_TIME%] \"%REQ(:METHOD)% %REQ(X-ENVOY-ORIGINAL-PATH?:PATH):256% %PROTOCOL%\" %RESPONSE_CODE% %RESPONSE_FLAGS% %BYTES_RECEIVED% %BYTES_SENT% %DURATION% %RESP(X-ENVOY-UPSTREAM-SERVICE-TIME)% \"%REQ(X-FORWARDED-FOR)%\" \"%REQ(USER-AGENT)%\" \"%REQ(X-REQUEST-ID)%\" \"%REQ(:AUTHORITY)%\" \"%UPSTREAM_HOST%\" \"%RESP(X-AMZN-RequestId)%\" \"%REQ(X-DATADOG-TRACE-ID)%\" \"%REQ(X-DATADOG-PARENT-ID)%\"\n"
+                  inline_string: "[%START_TIME%] \"%REQ(:METHOD)% %REQ(X-ENVOY-ORIGINAL-PATH?:PATH):256% \
+                    %PROTOCOL%\" %RESPONSE_CODE% %RESPONSE_FLAGS% %BYTES_RECEIVED% %BYTES_SENT% \
+                    %DURATION% %RESP(X-ENVOY-UPSTREAM-SERVICE-TIME)% \"%REQ(X-FORWARDED-FOR)%\" \
+                    \"%REQ(USER-AGENT)%\" \"%REQ(X-REQUEST-ID)%\" \"%REQ(:AUTHORITY)%\" \"%UPSTREAM_HOST%\" \
+                    \"%RESP(X-AMZN-RequestId)%\" \"%REQ(X-DATADOG-TRACE-ID)%\" \"%REQ(X-DATADOG-PARENT-ID)%\"\n"
           codec_type: auto
           stat_prefix: ingress_http
           route_config:
