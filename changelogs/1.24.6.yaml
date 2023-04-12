@@ -7,4 +7,5 @@ bug_fixes:
 - area: http
   change: |
     amend the fix for ``x-envoy-original-path`` so it removes the header only at edge.
-    Previously this would also remove the header at any Envoy instance upstream of an external request, including an Envoy instance that added the header.
+    Previously this would also remove the header at any Envoy instance upstream of an external request, including an Envoy
+    instance that added the header.
