@@ -113,6 +113,11 @@ public:
 
 // Benchmark no-lazy-init on stats, the lazy init version is much faster since no allocation.
 void benchmarkLazyInitCreation(::benchmark::State& state) {
+  if (benchmark::skipExpensiveBenchmarks() && state.range(1) > 2000) {
+    state.SkipWithError("Skipping expensive benchmark");
+    return;
+  }
+
   IsolatedStoreImpl stats_store;
   LazyInitStatsBenchmarkBase base(state.range(0) == 1, state.range(1), stats_store);
 
@@ -122,11 +127,16 @@ void benchmarkLazyInitCreation(::benchmark::State& state) {
 }
 
 BENCHMARK(benchmarkLazyInitCreation)
-    ->ArgsProduct({{0, 1}, {1000, 2000, 5000, 10000}})
+    ->ArgsProduct({{0, 1}, {1000, 2000, 5000, 10000, 20000}})
     ->Unit(::benchmark::kMillisecond);
 
 // Benchmark lazy-init of stats in same thread, mimics main thread creation.
 void benchmarkLazyInitCreationInstantiateSameThread(::benchmark::State& state) {
+  if (benchmark::skipExpensiveBenchmarks() && state.range(1) > 2000) {
+    state.SkipWithError("Skipping expensive benchmark");
+    return;
+  }
+
   IsolatedStoreImpl stats_store;
   LazyInitStatsBenchmarkBase base(state.range(0) == 1, state.range(1), stats_store);
 
@@ -136,7 +146,7 @@ void benchmarkLazyInitCreationInstantiateSameThread(::benchmark::State& state) {
 }
 
 BENCHMARK(benchmarkLazyInitCreationInstantiateSameThread)
-    ->ArgsProduct({{0, 1}, {1000, 2000, 5000, 10000}})
+    ->ArgsProduct({{0, 1}, {1000, 2000, 5000, 10000, 20000}})
     ->Unit(::benchmark::kMillisecond);
 
 class MultiThreadLazyinitStatsTest : public ThreadLocalRealThreadsMixin,
@@ -161,6 +171,11 @@ public:
 
 // Benchmark lazy-init stats in different worker threads, mimics worker threads creation.
 void benchmarkLazyInitCreationInstantiateOnWorkerThreads(::benchmark::State& state) {
+  if (benchmark::skipExpensiveBenchmarks() && state.range(1) > 2000) {
+    state.SkipWithError("Skipping expensive benchmark");
+    return;
+  }
+
   ProcessWide process_wide_; // Process-wide state setup/teardown (excluding grpc).
   MultiThreadLazyinitStatsTest test(state.range(0) == 1, state.range(1));
 
@@ -188,11 +203,16 @@ void benchmarkLazyInitCreationInstantiateOnWorkerThreads(::benchmark::State& sta
 }
 
 BENCHMARK(benchmarkLazyInitCreationInstantiateOnWorkerThreads)
-    ->ArgsProduct({{0, 1}, {1000, 2000, 5000, 10000}})
+    ->ArgsProduct({{0, 1}, {1000, 2000, 5000, 10000, 20000}})
     ->Unit(::benchmark::kMillisecond);
 
 // Benchmark mimics that worker threads inc the stats.
 void benchmarkLazyInitStatsAccess(::benchmark::State& state) {
+  if (benchmark::skipExpensiveBenchmarks() && state.range(1) > 2000) {
+    state.SkipWithError("Skipping expensive benchmark");
+    return;
+  }
+
   ProcessWide process_wide_; // Process-wide state setup/teardown (excluding grpc).
   MultiThreadLazyinitStatsTest test(state.range(0) == 1, state.range(1));
 
@@ -211,7 +231,7 @@ void benchmarkLazyInitStatsAccess(::benchmark::State& state) {
 }
 
 BENCHMARK(benchmarkLazyInitStatsAccess)
-    ->ArgsProduct({{0, 1}, {1000, 2000, 5000, 10000}})
+    ->ArgsProduct({{0, 1}, {1000, 2000, 5000, 10000, 20000}})
     ->Unit(::benchmark::kMillisecond);
 
 } // namespace Stats
