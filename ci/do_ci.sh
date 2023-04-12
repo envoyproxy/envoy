@@ -541,9 +541,9 @@ elif [[ "$CI_TARGET" == "deps" ]]; then
         -- -v warn \
            -c cves release_dates releases
 
-  # Run pip requirements tests
-  echo "check pip..."
-  bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/dependency:pip_check
+  # Run dependabot tests
+  echo "Check dependabot ..."
+  bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/dependency:dependatool
 
   exit 0
 elif [[ "$CI_TARGET" == "verify_examples" ]]; then

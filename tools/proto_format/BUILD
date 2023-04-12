@@ -196,7 +196,7 @@ genrule(
         '" "api/'.join(API_FILES),
     ),
     stamp = True,
-    tags = ["no-remote"],
+    tags = ["no-remote-exec"],
 )
 
 # Stamped, local build to get porcelain status of local api tree
@@ -211,5 +211,5 @@ genrule(
         '" "api/'.join(API_FILES),
     ),
     stamp = True,
-    tags = ["no-remote"],
+    tags = ["no-remote-exec"],
 )

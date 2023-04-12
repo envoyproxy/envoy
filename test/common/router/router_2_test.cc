@@ -395,7 +395,11 @@ TEST_F(WatermarkTest, RetryRequestNotComplete) {
 class RouterTestChildSpan : public RouterTestBase {
 public:
   RouterTestChildSpan()
-      : RouterTestBase(true, false, false, false, Protobuf::RepeatedPtrField<std::string>{}) {}
+      : RouterTestBase(true, false, false, false, Protobuf::RepeatedPtrField<std::string>{}) {
+    ON_CALL(callbacks_.stream_info_, upstreamClusterInfo())
+        .WillByDefault(Return(absl::make_optional<Upstream::ClusterInfoConstSharedPtr>(
+            cm_.thread_local_cluster_.cluster_.info_)));
+  }
 };
 
 // Make sure child spans start/inject/finish with a normal flow.
