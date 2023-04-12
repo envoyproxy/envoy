@@ -2212,3 +2212,21 @@ envoy_proto_library(
     name = "xds_config_tracker_test_proto",
     srcs = ["xds_config_tracker_test.proto"],
 )
+
+envoy_cc_test(
+    name = "default_header_validator_integration_test",
+    size = "large",
+    srcs = [
+        "default_header_validator_integration_test.cc",
+    ],
+    deps = [
+        ":http_protocol_integration_lib",
+        "//source/common/http:header_map_lib",
+        "//source/extensions/clusters/logical_dns:logical_dns_cluster_lib",
+        "//source/extensions/clusters/strict_dns:strict_dns_cluster_lib",
+        "//source/extensions/filters/http/buffer:config",
+        "//test/test_common:logging_lib",
+        "//test/test_common:threadsafe_singleton_injector_lib",
+        "//test/test_common:utility_lib",
+    ],
+)
