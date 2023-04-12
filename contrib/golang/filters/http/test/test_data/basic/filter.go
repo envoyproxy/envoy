@@ -104,6 +104,13 @@ func (f *filter) decodeHeaders(header api.RequestHeaderMap, endStream bool) api.
 	if f.sleep {
 		time.Sleep(time.Millisecond * 100) // sleep 100 ms
 	}
+
+	_, found := header.Get("x-set-metadata")
+	if found {
+		md := f.callbacks.StreamInfo().DynamicMetadata()
+		md.Set("filter.go", "foo", "bar")
+	}
+
 	if strings.Contains(f.localreplay, "decode-header") {
 		return f.sendLocalReply("decode-header")
 	}
