@@ -1,4 +1,4 @@
-FROM python:3.11.3-slim-bullseye@sha256:5a67c38a7c28ad09d08f4e153280023a2df77189b55af7804d7ceb96fee6a68f as python-base
+FROM python:3.11.3-slim-bullseye@sha256:4765de0178e2207a65f9bf622c550271cda5b80e6f911b40b2e81538761d01a2 as python-base
 RUN rm -f /etc/apt/apt.conf.d/docker-clean \
     && echo 'Binary::apt::APT::Keep-Downloaded-Packages "true";' | tee /etc/apt/apt.conf.d/keep-cache
 
