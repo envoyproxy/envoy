@@ -403,11 +403,16 @@ protected:
 
 INSTANTIATE_TEST_SUITE_P(Protocols, LoadShedPointIntegrationTest,
                          testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams(
-                             {Http::CodecClient::Type::HTTP1, Http::CodecClient::Type::HTTP2},
+                             {Http::CodecClient::Type::HTTP1, Http::CodecClient::Type::HTTP2,
+                              Http::CodecClient::Type::HTTP3},
                              {FakeHttpConnection::Type::HTTP1})),
                          HttpProtocolIntegrationTest::protocolTestParamsToString);
 
 TEST_P(LoadShedPointIntegrationTest, ListenerAcceptShedsLoad) {
+  // QUIC uses UDP, not TCP.
+  if (downstreamProtocol() == Http::CodecClient::Type::HTTP3) {
+    return;
+  }
   autonomous_upstream_ = true;
   initializeOverloadManager(
       TestUtility::parseYaml<envoy::config::overload::v3::LoadShedPoint>(R"EOF(
@@ -440,6 +445,42 @@ TEST_P(LoadShedPointIntegrationTest, ListenerAcceptShedsLoad) {
   codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
   auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
   ASSERT_TRUE(response->waitForEndStream());
+}
+
+TEST_P(LoadShedPointIntegrationTest, AcceptNewHttpStreamShedsLoad) {
+  autonomous_upstream_ = true;
+  initializeOverloadManager(
+      TestUtility::parseYaml<envoy::config::overload::v3::LoadShedPoint>(R"EOF(
+      name: "envoy.load_shed_points.http_connection_manager_decode_headers"
+      triggers:
+        - name: "envoy.resource_monitors.testonly.fake_resource_monitor"
+          threshold:
+            value: 0.90
+    )EOF"));
+
+  // Put envoy in overloaded state and check that it sends a local reply for the
+  // new stream.
+  updateResource(0.95);
+  test_server_->waitForGaugeEq(
+      "overload.envoy.load_shed_points.http_connection_manager_decode_headers.scale_percent", 100);
+
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+  auto response_that_will_be_local_reply =
+      codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+
+  test_server_->waitForCounterEq("http.config_test.downstream_rq_overload_close", 1);
+  ASSERT_TRUE(response_that_will_be_local_reply->waitForEndStream());
+  EXPECT_EQ(response_that_will_be_local_reply->headers().getStatusValue(), "503");
+
+  // Disable overload, Envoy should proxy the request.
+  updateResource(0.80);
+  test_server_->waitForGaugeEq(
+      "overload.envoy.load_shed_points.http_connection_manager_decode_headers.scale_percent", 0);
+
+  auto response_that_will_be_proxied =
+      codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  ASSERT_TRUE(response_that_will_be_proxied->waitForEndStream());
+  EXPECT_EQ(response_that_will_be_proxied->headers().getStatusValue(), "200");
 }
 
 } // namespace Envoy
