@@ -10,7 +10,6 @@
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
-
 #include "opentelemetry/proto/collector/metrics/v1/metrics_service.pb.h"
 #include "opentelemetry/proto/common/v1/common.pb.h"
 #include "opentelemetry/proto/metrics/v1/metrics.pb.h"
@@ -132,7 +131,6 @@ public:
           previous_time_stamp = metric.histogram().data_points()[0].time_unix_nano();
         }
 
-
         if (known_counter_exists && known_gauge_exists && known_histogram_exists) {
           break;
         }
@@ -166,10 +164,8 @@ TEST_P(OpenTelemetryGrpcIntegrationTest, BasicFlow) {
   initialize();
 
   codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
-  Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},
-                                                 {":path", "/path"},
-                                                 {":scheme", "http"},
-                                                 {":authority", "host"}};
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "GET"}, {":path", "/path"}, {":scheme", "http"}, {":authority", "host"}};
 
   sendRequestAndWaitForResponse(request_headers, 0, default_response_headers_, 0);
 
