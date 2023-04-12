@@ -34,8 +34,6 @@ DEFINE_PROTO_FUZZER(const test::extensions::filters::http::ext_proc::ExtProcGrpc
   // Using persistent Envoy and ext_proc test server.
   static std::unique_ptr<ExtProcIntegrationFuzz> fuzzer = nullptr;
   static std::unique_ptr<ExtProcFuzzHelper> fuzz_helper = nullptr;
-  // Protects fuzz_helper which will be accessed by multiple threads.
-  static Thread::MutexBasicLockable fuzz_helper_lock;
 
   static uint32_t fuzz_exec_count = 0;
   // Initialize fuzzer once with IP and gRPC version from environment
@@ -60,18 +58,13 @@ DEFINE_PROTO_FUZZER(const test::extensions::filters::http::ext_proc::ExtProcGrpc
             if (!stream->Read(&req)) {
               return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT, "expected message");
             }
-            fuzz_helper_lock.lock();
-            if (fuzz_helper != nullptr) {
-              bool immediate_close_grpc = false;
-              ProcessingResponse resp;
-              auto result = fuzz_helper->generateResponse(req, resp, immediate_close_grpc);
-              if (immediate_close_grpc) {
-                fuzz_helper_lock.unlock();
-                return result;
-              }
-              stream->Write(resp);
+            bool immediate_close_grpc = false;
+            ProcessingResponse resp;
+            auto result = fuzz_helper->generateResponse(req, resp, immediate_close_grpc);
+            if (immediate_close_grpc) {
+              return result;
             }
-            fuzz_helper_lock.unlock();
+            stream->Write(resp);
           }
           return grpc::Status::OK;
         });
@@ -87,25 +80,22 @@ DEFINE_PROTO_FUZZER(const test::extensions::filters::http::ext_proc::ExtProcGrpc
   // the stream ended in some graceful manner
   ENVOY_LOG_MISC(trace, "Waiting for response.");
 
+  bool response_timeout = false;
   if (response->waitForEndStream(std::chrono::milliseconds(500))) {
     ENVOY_LOG_MISC(trace, "Response received.");
   } else {
+    response_timeout = true;
     ENVOY_LOG_MISC(trace, "Response timed out.");
   }
 
   fuzz_exec_count++;
-  if (fuzzCreateEnvoy(fuzz_exec_count)) {
+  if (fuzzCreateEnvoy(fuzz_exec_count) || response_timeout) {
     fuzzer->tearDown(false);
     fuzzer.reset();
-    fuzzer = nullptr;
   } else {
     fuzzer->tearDown(true);
   }
-  // Protect fuzz_helper before reset since it is used in the test server.
-  fuzz_helper_lock.lock();
   fuzz_helper.reset();
-  fuzz_helper = nullptr;
-  fuzz_helper_lock.unlock();
 }
 
 } // namespace ExternalProcessing
