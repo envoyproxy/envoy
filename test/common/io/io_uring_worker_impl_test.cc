@@ -274,7 +274,8 @@ TEST(IoUringWorkerImplTest, CloseAllSocketsWhenDestruction) {
       .WillOnce(
           DoAll(SaveArg<1>(&file_event_callback), ReturnNew<NiceMock<Event::MockFileEvent>>()));
 
-  IoUringWorkerTestImpl worker(std::move(io_uring_instance), dispatcher);
+  std::unique_ptr<IoUringWorkerTestImpl> worker =
+      std::make_unique<IoUringWorkerTestImpl>(std::move(io_uring_instance), dispatcher);
 
   os_fd_t fd = 11;
   TestIoUringHandler handler;
@@ -285,7 +286,7 @@ TEST(IoUringWorkerImplTest, CloseAllSocketsWhenDestruction) {
   EXPECT_CALL(mock_io_uring, prepareReadv(fd, _, _, _, _))
       .WillOnce(DoAll(SaveArg<4>(&read_req), Return<IoUringResult>(IoUringResult::Ok)));
   EXPECT_CALL(mock_io_uring, submit()).Times(1).RetiresOnSaturation();
-  worker.addServerSocket(fd, handler);
+  worker->addServerSocket(fd, handler);
 
   // The IoUringWorker will close all the existing sockets.
   void* cancel_req = nullptr;
@@ -325,6 +326,7 @@ TEST(IoUringWorkerImplTest, CloseAllSocketsWhenDestruction) {
 
   EXPECT_CALL(dispatcher, deferredDelete_);
   EXPECT_CALL(dispatcher, clearDeferredDeleteList());
+  worker.reset();
 }
 
 TEST(IoUringWorkerImplTest, ServerCloseWithWriteRequestOnly) {
