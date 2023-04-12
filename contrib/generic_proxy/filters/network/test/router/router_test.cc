@@ -419,6 +419,10 @@ TEST_P(RouterFilterTest, UpstreamRequestResetBeforePoolCallback) {
     EXPECT_CALL(*child_span_, setTag(Tracing::Tags::get().ErrorReason, "local_reset"));
     EXPECT_CALL(*child_span_, setTag(Tracing::Tags::get().Component, "proxy"));
     EXPECT_CALL(*child_span_, setTag(Tracing::Tags::get().ResponseFlags, "-"));
+    EXPECT_CALL(*child_span_, setTag(Tracing::Tags::get().UpstreamCluster, "fake_cluster"));
+    EXPECT_CALL(*child_span_,
+                setTag(Tracing::Tags::get().UpstreamClusterName, "observability_name"));
+
     EXPECT_CALL(*child_span_, finishSpan());
   }
 
@@ -443,6 +447,9 @@ TEST_P(RouterFilterTest, UpstreamRequestPoolFailureConnctionOverflow) {
     EXPECT_CALL(*child_span_, setTag(Tracing::Tags::get().ErrorReason, "overflow"));
     EXPECT_CALL(*child_span_, setTag(Tracing::Tags::get().Component, "proxy"));
     EXPECT_CALL(*child_span_, setTag(Tracing::Tags::get().ResponseFlags, "-"));
+    EXPECT_CALL(*child_span_, setTag(Tracing::Tags::get().UpstreamCluster, "fake_cluster"));
+    EXPECT_CALL(*child_span_,
+                setTag(Tracing::Tags::get().UpstreamClusterName, "observability_name"));
     EXPECT_CALL(*child_span_, finishSpan());
   }
 
@@ -463,6 +470,9 @@ TEST_P(RouterFilterTest, UpstreamRequestPoolFailureConnctionTimeout) {
     EXPECT_CALL(*child_span_, setTag(Tracing::Tags::get().ErrorReason, "connection_failure"));
     EXPECT_CALL(*child_span_, setTag(Tracing::Tags::get().Component, "proxy"));
     EXPECT_CALL(*child_span_, setTag(Tracing::Tags::get().ResponseFlags, "-"));
+    EXPECT_CALL(*child_span_, setTag(Tracing::Tags::get().UpstreamCluster, "fake_cluster"));
+    EXPECT_CALL(*child_span_,
+                setTag(Tracing::Tags::get().UpstreamClusterName, "observability_name"));
     EXPECT_CALL(*child_span_, finishSpan());
   }
 

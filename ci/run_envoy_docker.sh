@@ -106,6 +106,7 @@ docker run --rm \
        -e BAZEL_REMOTE_CACHE \
        -e ENVOY_STDLIB \
        -e BUILD_REASON \
+       -e BAZEL_NO_CACHE_TEST_RESULTS \
        -e BAZEL_REMOTE_INSTANCE \
        -e BAZEL_REMOTE_INSTANCE_BRANCH \
        -e GOOGLE_BES_PROJECT_ID \
