@@ -265,6 +265,11 @@ function log10(num) {
   return Math.log(num) / log_10;
 }
 
+// https://stackoverflow.com/questions/4059147/check-if-a-variable-is-a-string-in-javascript
+function isString(x) {
+  return Object.prototype.toString.call(x) === "[object String]";
+}
+
 function renderHistogramDetail(supported_percentiles, detail) {
   activeStatsHistogramsDiv.replaceChildren();
   for (histogram of detail) {
@@ -273,11 +278,26 @@ function renderHistogramDetail(supported_percentiles, detail) {
     let name_and_percentiles = histogram.name;
     let i = 0;
     const percentile_values = histogram.percentiles;
-    //let prevValue = 0;
+    let minValue = null;
+    let maxValue = null;
+    const updateMinMaxValue = (value) => {
+      if (minValue == null) {
+        minValue = value;
+        maxValue = value;
+      } else if (value < minValue) {
+        minValue = value;
+      } else if (value > minValue) {
+        maxValue = value;
+      }
+    };
+
+    let values = [];
+
     for (i = 0; i < supported_percentiles.length; ++i) {
       const value = percentile_values[i].cumulative;
       name_and_percentiles += ' P' + supported_percentiles[i] + '=' + value;
-      //prevValue = value;
+      updateMinMaxValue(value);
+      values.push([value, 'P' + supported_percentiles[i] + '=' + value]);
     }
     label.textContent = name_and_percentiles;
     div.appendChild(label);
@@ -288,47 +308,70 @@ function renderHistogramDetail(supported_percentiles, detail) {
     // the graphics stretch when the user stretches the window.
 
     let maxCount = 0;
-    //let minValue = null;
-    //let maxValue = null;
     for (bucket of histogram.detail) {
       maxCount = Math.max(maxCount, bucket.count);
-/*
-      if (minValue == null) {
-        minValue = bucket.value;
-        maxValue = bucket.value;
-      } else if (bucket.value < minValue) {
-        minValue = bucket.value;
-      } else if (bucket.value > minValue) {
-        maxValue = bucket.value;
-      }
-*/
+      updateMinMaxValue(bucket.value);
     }
+    console.log("min=" + minValue + " max=" + maxValue);
 
-/*
     const width = maxValue - minValue;
     const scaledValue = value => 9*((value - minValue) / width) + 1; // between 1 and 10;
     const valueToPercent = value => Math.round(80 * log10(scaledValue(value)));
-*/
 
     const graphics = document.createElement('div');
+    const labels = document.createElement('div');
+    labels.className = 'histogram-labels';
     graphics.className = 'histogram-graphics';
     for (bucket of histogram.detail) {
+/*
       const span = document.createElement('span');
       span.className = 'histogram-buckets';
       const percent = maxCount == 0 ? 0 : Math.round((100 * bucket.count) / maxCount);
       span.style.height = '' + percent + '%';
       //span.style.width = '' + valueToPercent(bucket.value) + '%';
       graphics.appendChild(span);
+*/
+      values.push([bucket.value, bucket.count]);
     }
-    div.appendChild(graphics);
 
-    const labels = document.createElement('div');
-    labels.className = 'histogram-labels';
-    for (bucket of histogram.detail) {
+    values.sort((a, b) => {
+      if (a[0] < b[0]) {
+        return -1;
+      } else if (a[0] > b[0]) {
+        return 1;
+      } else {
+        if (isString(a[1])) {
+          if (isString(b[1])) {
+            return a[1] < b[1];
+          } else {
+            return 1;
+          }
+        }
+        if (isString(b[1])) {
+          return -1;
+        }
+        return a[1] - b[1];
+      }
+    });
+    for (a of values) {
+      //console.log('' + a[0] + ': ' + a[1]);
       const span = document.createElement('span');
-      span.textContent = bucket.value + ':' + bucket.count;
-      labels.appendChild(span);
+      const label = document.createElement('span');
+      if (isString(a[1])) {
+        span.className = 'histogram-percentile';
+        label.textContent = a[1];
+      } else {
+        span.className = 'histogram-buckets';
+        const percent = maxCount == 0 ? 0 : Math.round((100 * a[1]) / maxCount);
+        span.style.height = '' + percent + '%';
+        label.textContent = a[0] + ':' + a[1];
+      }
+      //span.style.width = '' + valueToPercent(a[1]) + '%';
+      graphics.appendChild(span);
+      labels.appendChild(label);
     }
+
+    div.appendChild(graphics);
     div.appendChild(labels);
 
     activeStatsHistogramsDiv.appendChild(div);

@@ -69,6 +69,14 @@
     align-self: baseline;
 }
 
+.histogram-percentile {
+    margin-right: 50px;
+    width: 5px;
+    background-color: #7c7;
+    align-self: baseline;
+    height: 100%;
+}
+
 .histogram-labels span {
     margin-right: 50px;
     width: 10px;
