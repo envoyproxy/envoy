@@ -69,7 +69,7 @@ void LoadStatsReporter::sendLoadStatsRequest() {
     auto& cluster = it->second.get();
     auto* cluster_stats = request_.add_cluster_stats();
     cluster_stats->set_cluster_name(cluster_name);
-    if (auto name = cluster.info()->edsServiceName(); !name.empty()) {
+    if (const auto& name = cluster.info()->edsServiceName(); !name.empty()) {
       cluster_stats->set_cluster_service_name(name);
     }
     for (const HostSetPtr& host_set : cluster.prioritySet().hostSetsPerPriority()) {

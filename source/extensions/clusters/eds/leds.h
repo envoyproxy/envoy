@@ -42,7 +42,7 @@ public:
   using LbEndpointsMap = absl::flat_hash_map<std::string, envoy::config::endpoint::v3::LbEndpoint>;
 
   LedsSubscription(const envoy::config::endpoint::v3::LedsClusterLocalityConfig& leds_config,
-                   absl::string_view cluster_name,
+                   const std::string& cluster_name,
                    Server::Configuration::TransportSocketFactoryContext& factory_context,
                    Stats::Scope& stats_scope, const UpdateCb& callback);
 

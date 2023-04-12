@@ -42,6 +42,7 @@
 #include "envoy/upstream/upstream.h"
 
 #include "source/common/common/callback_impl.h"
+#include "source/common/common/empty_string.h"
 #include "source/common/common/enum_to_int.h"
 #include "source/common/common/logger.h"
 #include "source/common/common/packed_struct.h"
@@ -964,9 +965,8 @@ public:
     return http_protocol_options_->alternate_protocol_cache_options_;
   }
 
-  absl::string_view edsServiceName() const override {
-    return eds_service_name_ != nullptr ? absl::string_view{*eds_service_name_}
-                                        : absl::string_view{};
+  const std::string& edsServiceName() const override {
+    return eds_service_name_ != nullptr ? *eds_service_name_ : EMPTY_STRING;
   }
 
   void createNetworkFilterChain(Network::Connection&) const override;

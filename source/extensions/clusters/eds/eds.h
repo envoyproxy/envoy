@@ -56,11 +56,9 @@ private:
                               const HostMap& all_hosts,
                               const absl::flat_hash_set<std::string>& all_new_hosts);
   bool validateUpdateSize(int num_resources);
-  absl::string_view edsServiceName() const {
-    if (const auto name = info_->edsServiceName(); !name.empty()) {
-      return name;
-    }
-    return info_->name();
+  const std::string& edsServiceName() const {
+    const std::string& name = info_->edsServiceName();
+    return !name.empty() ? name : info_->name();
   }
 
   // ClusterImplBase

@@ -115,8 +115,8 @@ void ClustersHandler::writeClustersAsJson(Buffer::Instance& response) {
     envoy::admin::v3::ClusterStatus& cluster_status = *clusters.add_cluster_statuses();
     cluster_status.set_name(cluster_info->name());
     cluster_status.set_observability_name(cluster_info->observabilityName());
-    if (auto name = cluster_info->edsServiceName(); !name.empty()) {
-      cluster_status.set_eds_service_name(cluster_info->edsServiceName());
+    if (const auto& name = cluster_info->edsServiceName(); !name.empty()) {
+      cluster_status.set_eds_service_name(name);
     }
     addCircuitBreakerSettingsAsJson(
         envoy::config::core::v3::RoutingPriority::DEFAULT,
@@ -214,7 +214,7 @@ void ClustersHandler::writeClustersAsText(Buffer::Instance& response) {
 
     response.add(
         fmt::format("{}::added_via_api::{}\n", cluster_name, cluster.info()->addedViaApi()));
-    if (const auto name = cluster.info()->edsServiceName(); !name.empty()) {
+    if (const auto& name = cluster.info()->edsServiceName(); !name.empty()) {
       response.add(fmt::format("{}::eds_service_name::{}\n", cluster_name, name));
     }
     for (auto& host_set : cluster.prioritySet().hostSetsPerPriority()) {
