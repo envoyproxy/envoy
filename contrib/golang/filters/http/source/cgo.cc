@@ -32,6 +32,8 @@ absl::string_view referGoString(void* str) {
   return absl::string_view(goStr->p, goStr->n); // NOLINT(modernize-return-braced-init-list)
 }
 
+const FilterLogger& getFilterLogger() { CONSTRUCT_ON_FIRST_USE(FilterLogger); }
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -152,8 +154,6 @@ CAPIStatus envoyGoFilterHttpGetIntegerValue(void* r, int id, void* value) {
     return filter->getIntegerValue(id, value_int);
   });
 }
-
-const FilterLogger& getFilterLogger() { CONSTRUCT_ON_FIRST_USE(FilterLogger); }
 
 void envoyGoFilterHttpLog(uint32_t level, void* message) {
   auto mesg = referGoString(message);
