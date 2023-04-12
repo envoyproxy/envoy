@@ -738,7 +738,8 @@ TEST_F(StaticLoaderImplTest, ProtoParsing) {
 
   // While null values are generally filtered out by walkProtoValue, test manually.
   ProtobufWkt::Value empty_value;
-  const_cast<SnapshotImpl&>(dynamic_cast<const SnapshotImpl&>(loader_->snapshot())).createEntry(empty_value);
+  const_cast<SnapshotImpl&>(dynamic_cast<const SnapshotImpl&>(loader_->snapshot()))
+      .createEntry(empty_value);
 }
 
 TEST_F(StaticLoaderImplTest, InvalidNumerator) {

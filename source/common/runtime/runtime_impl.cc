@@ -235,7 +235,8 @@ SnapshotImpl::Entry SnapshotImpl::createEntry(const std::string& value) {
 
 void parseFractionValue(SnapshotImpl::Entry& entry, const ProtobufWkt::Struct& value) {
   envoy::type::v3::FractionalPercent percent;
-  static_assert(envoy::type::v3::FractionalPercent::MILLION == envoy::type::v3::FractionalPercent::DenominatorType_MAX);
+  static_assert(envoy::type::v3::FractionalPercent::MILLION ==
+                envoy::type::v3::FractionalPercent::DenominatorType_MAX);
   percent.set_denominator(envoy::type::v3::FractionalPercent::HUNDRED);
   for (const auto& f : value.fields()) {
     if (f.first == "numerator") {
