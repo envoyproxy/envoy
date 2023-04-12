@@ -20,6 +20,7 @@ import "google/protobuf/any.proto";
 import "google/protobuf/duration.proto";
 import "google/protobuf/wrappers.proto";
 
+import "envoy/annotations/deprecation.proto";
 import "udpa/annotations/migrate.proto";
 import "udpa/annotations/security.proto";
 import "udpa/annotations/status.proto";
@@ -36,7 +37,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // HTTP connection manager :ref:`configuration overview <config_http_conn_man>`.
 // [#extension: envoy.filters.network.http_connection_manager]
 
-// [#next-free-field: 56]
+// [#next-free-field: 57]
 message HttpConnectionManager {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.network.http_connection_manager.v2.HttpConnectionManager";
@@ -355,6 +356,24 @@ message HttpConnectionManager {
     }
   }
 
+  message HcmAccessLogOptions {
+    // The interval to flush the above access logs. By default, the HCM will flush exactly one access log
+    // on stream close, when the HTTP request is complete. If this field is set, the HCM will flush access
+    // logs periodically at the specified interval. This is especially useful in the case of long-lived
+    // requests, such as CONNECT and Websockets. Final access logs can be detected via the
+    // `requestComplete()` method of `StreamInfo` in access log filters, or thru the `%DURATION%` substitution
+    // string.
+    // The interval must be at least 1 millisecond.
+    google.protobuf.Duration access_log_flush_interval = 1
+        [(validate.rules).duration = {gte {nanos: 1000000}}];
+
+    // If set to true, HCM will flush an access log when a new HTTP request is received, after request
+    // headers have been evaluated, before iterating through the HTTP filter chain.
+    // This log record, if enabled, does not depend on periodic log records or request completion log.
+    // Details related to upstream cluster, such as upstream host, will not be available for this log.
+    bool flush_access_log_on_new_request = 2;
+  }
+
   reserved 27, 11;
 
   reserved "idle_timeout";
@@ -543,20 +562,31 @@ message HttpConnectionManager {
   // emitted by the connection manager.
   repeated config.accesslog.v3.AccessLog access_log = 13;
 
-  // The interval to flush the above access logs. By default, the HCM will flush exactly one access log
-  // on stream close, when the HTTP request is complete. If this field is set, the HCM will flush access
-  // logs periodically at the specified interval. This is especially useful in the case of long-lived
-  // requests, such as CONNECT and Websockets. Final access logs can be detected via the
-  // `requestComplete()` method of `StreamInfo` in access log filters, or thru the `%DURATION%` substitution
-  // string.
-  // The interval must be at least 1 millisecond.
-  google.protobuf.Duration access_log_flush_interval = 54
-      [(validate.rules).duration = {gte {nanos: 1000000}}];
+  // .. attention::
+  // This field is deprecated in favor of
+  // :ref:`access_log_flush_interval
+  // <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.HcmAccessLogOptions.access_log_flush_interval>`.
+  // Note that if both this field and :ref:`access_log_flush_interval
+  // <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.HcmAccessLogOptions.access_log_flush_interval>`
+  // are specified, the former (deprecated field) is ignored.
+  google.protobuf.Duration access_log_flush_interval = 54 [
+    deprecated = true,
+    (validate.rules).duration = {gte {nanos: 1000000}},
+    (envoy.annotations.deprecated_at_minor_version) = "3.0"
+  ];
 
-  // If set to true, HCM will flush an access log once when a new HTTP request is received, after request
-  // headers have been evaluated, before iterating through the HTTP filter chain.
-  // Details related to upstream cluster, such as upstream host, will not be available for this log.
-  bool flush_access_log_on_new_request = 55;
+  // .. attention::
+  // This field is deprecated in favor of
+  // :ref:`flush_access_log_on_new_request
+  // <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.HcmAccessLogOptions.flush_access_log_on_new_request>`.
+  // Note that if both this field and :ref:`flush_access_log_on_new_request
+  // <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.HcmAccessLogOptions.flush_access_log_on_new_request>`
+  // are specified, the former (deprecated field) is ignored.
+  bool flush_access_log_on_new_request = 55
+      [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
+
+  // Additional access log options for HTTP connection manager.
+  HcmAccessLogOptions access_log_options = 56;
 
   // If set to true, the connection manager will use the real remote address
   // of the client connection when determining internal versus external origin and manipulating

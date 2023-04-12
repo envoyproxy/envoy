@@ -80,6 +80,11 @@ private:
    */
   std::tuple<absl::string_view, absl::string_view>
   splitPathAndQueryParams(absl::string_view path_and_query_params) const;
+  /**
+   * Translate backslash to forward slash. Enabled by the
+   * envoy.reloadable_features.uhv_translate_backslash_to_slash flag.
+   */
+  void translateBackToForwardSlashes(std::string& path) const;
 
   const envoy::extensions::http::header_validators::envoy_default::v3::HeaderValidatorConfig
       config_;
