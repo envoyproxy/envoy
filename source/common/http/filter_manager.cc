@@ -777,9 +777,14 @@ void FilterManager::decodeTrailers(ActiveStreamDecoderFilter* filter, RequestTra
 }
 
 void FilterManager::decodeMetadata(ActiveStreamDecoderFilter* filter, MetadataMap& metadata_map) {
+  ScopeTrackerScopeState scope(&*this, dispatcher_);
+  filter_manager_callbacks_.resetIdleTimer();
+
   // Filter iteration may start at the current filter.
   std::list<ActiveStreamDecoderFilterPtr>::iterator entry =
       commonDecodePrefix(filter, FilterIterationStartState::CanStartFromCurrent);
+
+  ASSERT(!(state_.filter_call_state_ & FilterCallState::DecodeMetadata));
 
   for (; entry != decoder_filters_.end(); entry++) {
     // If the filter pointed by entry has stopped for all frame type, stores metadata and returns.
@@ -791,12 +796,36 @@ void FilterManager::decodeMetadata(ActiveStreamDecoderFilter* filter, MetadataMa
       (*entry)->getSavedRequestMetadata()->emplace_back(std::move(metadata_map_ptr));
       return;
     }
-
+    state_.filter_call_state_ |= FilterCallState::DecodeMetadata;
     FilterMetadataStatus status = (*entry)->handle_->decodeMetadata(metadata_map);
-    ASSERT(!hasPreparedLocalReply(), "Sending Local Reply from Metadata is not yet supported.");
+    state_.filter_call_state_ &= ~FilterCallState::DecodeMetadata;
+
     ENVOY_STREAM_LOG(trace, "decode metadata called: filter={} status={}, metadata: {}", *this,
                      (*entry)->filter_context_.config_name, static_cast<uint64_t>(status),
                      metadata_map);
+    if (state_.decoder_filter_chain_aborted_) {
+      // If the decoder filter chain has been aborted, then either:
+      // 1. This filter has sent a local reply from decode metadata.
+      // 2. This filter is the terminal http filter, and an upstream filter has sent a local reply.
+      ASSERT((status == FilterMetadataStatus::StopIterationForLocalReply) ||
+             (std::next(entry) == decoder_filters_.end()));
+      executeLocalReplyIfPrepared();
+      ENVOY_STREAM_LOG(trace,
+                       "decodeMetadata filter iteration aborted due to local reply: filter={}",
+                       *this, (*entry)->filter_context_.config_name);
+      return;
+    }
+
+    // Add the processed metadata to the next entry.
+    if (status == FilterMetadataStatus::ContinueAll && !(*entry)->canIterate()) {
+      if (std::next(entry) != decoder_filters_.end()) {
+        (*std::next(entry))
+            ->getSavedRequestMetadata()
+            ->emplace_back(std::make_unique<MetadataMap>(metadata_map));
+      }
+      (*entry)->commonContinue();
+      return;
+    }
   }
 }
 
@@ -1196,9 +1225,31 @@ void FilterManager::encodeMetadata(ActiveStreamEncoderFilter* filter,
       return;
     }
 
+    state_.filter_call_state_ |= FilterCallState::EncodeMetadata;
+
     FilterMetadataStatus status = (*entry)->handle_->encodeMetadata(*metadata_map_ptr);
-    ENVOY_STREAM_LOG(trace, "encode metadata called: filter={} status={}", *this,
-                     (*entry)->filter_context_.config_name, static_cast<uint64_t>(status));
+
+    state_.filter_call_state_ &= ~FilterCallState::EncodeMetadata;
+
+    ENVOY_STREAM_LOG(trace, "encode metadata called: filter={} status={} metadata={}", *this,
+                     (*entry)->filter_context_.config_name, static_cast<uint64_t>(status),
+                     *metadata_map_ptr);
+
+    if (status == FilterMetadataStatus::StopIterationForLocalReply) {
+      // In case of a local reply, we do not continue encoding metadata. Metadata is not sent on to
+      // the client.
+      return;
+    }
+
+    if (status == FilterMetadataStatus::ContinueAll && !(*entry)->canIterate()) {
+      if (std::next(entry) != encoder_filters_.end()) {
+        (*std::next(entry))->getSavedResponseMetadata()->emplace_back(std::move(metadata_map_ptr));
+      } else {
+        filter_manager_callbacks_.encodeMetadata(std::move(metadata_map_ptr));
+      }
+      (*entry)->commonContinue();
+      return;
+    }
   }
   // TODO(soya3129): update stats with metadata.
 

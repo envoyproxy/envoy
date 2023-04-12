@@ -31,7 +31,7 @@ TCP Proxy
 *********
 
 For TCP Proxy, it is possible to enable an access log record once after a successful upstream connection by using
-:ref:`flush access log on connected <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.flush_access_log_on_connected>`
+:ref:`flush access log on connected <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.TcpAccessLogOptions.flush_access_log_on_connected>`
 
 HTTP Connection Manager
 ***********************
@@ -57,7 +57,7 @@ TCP Proxy
 *********
 
 For TCP Proxy, it is possible to enable a prediodic access log by using
-:ref:`access log flush interval <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.access_log_flush_interval>`
+:ref:`access log flush interval <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.TcpAccessLogOptions.access_log_flush_interval>`
 Note: The first interval count will start right after a new connection received by the TCP Proxy and before making an upstream connection.
 
 HTTP Connection Manager

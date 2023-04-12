@@ -3,6 +3,7 @@
 #include "source/extensions/http/header_validators/envoy_default/http1_header_validator.h"
 
 #include "test/extensions/http/header_validators/envoy_default/header_validator_test.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 namespace Envoy {
@@ -38,6 +39,8 @@ protected:
   TestResponseHeaderMapImpl makeGoodResponseHeaders() {
     return TestResponseHeaderMapImpl{{":status", "200"}};
   }
+
+  TestScopedRuntime scoped_runtime_;
 };
 
 TEST_F(Http1HeaderValidatorTest, GoodHeadersAccepted) {
@@ -652,6 +655,31 @@ TEST_F(Http1HeaderValidatorTest, ValidateInvalidValueResponseTrailerMap) {
   auto result = uhv->validateResponseTrailerMap(response_trailer_map);
   EXPECT_FALSE(result);
   EXPECT_EQ(result.details(), "uhv.invalid_value_characters");
+}
+
+TEST_F(Http1HeaderValidatorTest, BackslashInPathIsTranslatedToSlash) {
+  scoped_runtime_.mergeValues(
+      {{"envoy.reloadable_features.uhv_translate_backslash_to_slash", "true"}});
+  ::Envoy::Http::TestRequestHeaderMapImpl headers{{":scheme", "https"},
+                                                  {":path", "/path\\with/back\\/slash%5c"},
+                                                  {":authority", "envoy.com"},
+                                                  {":method", "GET"}};
+  auto uhv = createH1(empty_config);
+
+  EXPECT_ACCEPT(uhv->validateRequestHeaderMap(headers));
+  EXPECT_EQ(headers.path(), "/path/with/back/slash%5C");
+}
+
+TEST_F(Http1HeaderValidatorTest, BackslashInPathIsRejectedWithOverride) {
+  scoped_runtime_.mergeValues(
+      {{"envoy.reloadable_features.uhv_translate_backslash_to_slash", "false"}});
+  ::Envoy::Http::TestRequestHeaderMapImpl headers{{":scheme", "https"},
+                                                  {":path", "/path\\with/back\\/slash%5c"},
+                                                  {":authority", "envoy.com"},
+                                                  {":method", "GET"}};
+  auto uhv = createH1(empty_config);
+
+  EXPECT_REJECT_WITH_DETAILS(uhv->validateRequestHeaderMap(headers), "uhv.invalid_url");
 }
 
 } // namespace
