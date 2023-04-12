@@ -235,6 +235,7 @@ SnapshotImpl::Entry SnapshotImpl::createEntry(const std::string& value) {
 
 void parseFractionValue(SnapshotImpl::Entry& entry, const ProtobufWkt::Struct& value) {
   envoy::type::v3::FractionalPercent percent;
+  static_assert(envoy::type::v3::FractionalPercent::MILLION == envoy::type::v3::FractionalPercent::DenominatorType_MAX);
   percent.set_denominator(envoy::type::v3::FractionalPercent::HUNDRED);
   for (const auto& f : value.fields()) {
     if (f.first == "numerator") {
@@ -266,12 +267,15 @@ SnapshotImpl::Entry SnapshotImpl::createEntry(const ProtobufWkt::Value& value) {
     entry.double_value_ = value.number_value();
     entry.bool_value_ = value.number_value() != 0;
     if (entry.double_value_ >= 0 && entry.double_value_ <= std::numeric_limits<uint64_t>::max()) {
+      // Valid uint values will always be parseable as doubles, so we assign the value to both the
+      // uint and double fields. In cases where the value is something like "3.1", we will floor the
+      // number by casting it to a uint and assigning the uint value.
       entry.uint_value_ = entry.double_value_;
     }
     break;
   case ProtobufWkt::Value::kBoolValue:
     entry.bool_value_ = value.bool_value();
-    return entry;
+    break;
   case ProtobufWkt::Value::kStructValue:
     parseFractionValue(entry, value.struct_value());
     break;
