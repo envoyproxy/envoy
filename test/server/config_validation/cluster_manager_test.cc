@@ -29,27 +29,21 @@ namespace Upstream {
 namespace {
 
 TEST(ValidationClusterManagerTest, MockedMethods) {
-  Stats::IsolatedStoreImpl stats_store;
-  Event::SimulatedTimeSystem time_system;
-  NiceMock<ProtobufMessage::MockValidationContext> validation_context;
+  NiceMock<Server::MockInstance> server;
+
+  Stats::TestUtil::TestStore& stats_store = server.server_factory_context_->store_;
+  Event::GlobalTimeSystem& time_system = server.server_factory_context_->time_system_;
   Api::ApiPtr api(Api::createApiForTest(stats_store, time_system));
-  NiceMock<Server::MockOptions> options;
-  NiceMock<Runtime::MockLoader> runtime;
-  NiceMock<ThreadLocal::MockInstance> tls;
-  NiceMock<Random::MockRandomGenerator> random;
+  ON_CALL(*server.server_factory_context_, api()).WillByDefault(testing::ReturnRef(*api));
+
+  NiceMock<ThreadLocal::MockInstance>& tls = server.server_factory_context_->thread_local_;
+
   testing::NiceMock<Secret::MockSecretManager> secret_manager;
   auto dns_resolver = std::make_shared<NiceMock<Network::MockDnsResolver>>();
   Extensions::TransportSockets::Tls::ContextManagerImpl ssl_context_manager{api->timeSource()};
-  NiceMock<Event::MockDispatcher> dispatcher;
-  LocalInfo::MockLocalInfo local_info;
-  NiceMock<Server::MockAdmin> admin;
+
   Http::ContextImpl http_context(stats_store.symbolTable());
-  Grpc::ContextImpl grpc_context(stats_store.symbolTable());
-  Router::ContextImpl router_context(stats_store.symbolTable());
   Quic::QuicStatNames quic_stat_names(stats_store.symbolTable());
-  AccessLog::MockAccessLogManager log_manager;
-  Singleton::ManagerImpl singleton_manager{Thread::threadFactoryForTest()};
-  NiceMock<Server::MockInstance> server;
 
   ValidationClusterManagerFactory factory(
       *server.server_factory_context_, stats_store, tls, http_context,
