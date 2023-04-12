@@ -81,10 +81,20 @@ struct HTTPStringTestCase {
   const absl::optional<absl::string_view> http_parser_expected_error_;
 };
 
-class MockRequestDecoderWithUhv : public Http::MockRequestDecoder {
+// Tests in this suite observe request headers produced by the codec
+// by returning a MockRequestDecoder object in the newStream callback.
+// For tests runs with Universal Header Validator (UHV) enabled, some checks and transformations
+// have moved from the codec to UHV, and for tests that verify behaviors that were moved to UHV this
+// shim class is used instead of plain MockRequestDecoder.
+// The shim is transparent when UHV is disabled (header_validator_ == nullptr) and simply defers to
+// the MockRequestDecoder::decodeHeaders() method. With UHV enabled it invokes UHV's
+// validateRequestHeaderMap() method. This will validate and apply transformations expected by the
+// test, before passing it to the base class MockRequestDecoder::decodeHeaders() method. If UHV
+// validation fails it calls the `sendLocalReply` on the decoder, indicating validation error.
+class MockRequestDecoderShimWithUhv : public Http::MockRequestDecoder {
 public:
-  MockRequestDecoderWithUhv(Http::HeaderValidator* header_validator,
-                            Network::MockConnection& connection)
+  MockRequestDecoderShimWithUhv(Http::HeaderValidator* header_validator,
+                                Network::MockConnection& connection)
       : header_validator_(header_validator), connection_(connection) {}
 
   void setResponseEncoder(Http::ResponseEncoder* response_encoder) {
@@ -393,7 +403,7 @@ void Http1ServerConnectionImplTest::testServerAllowChunkedContentLength(uint32_t
       connection_, http1CodecStats(), callbacks_, codec_settings_, max_request_headers_kb_,
       max_request_headers_count_, envoy::config::core::v3::HttpProtocolOptions::ALLOW);
 
-  MockRequestDecoderWithUhv decoder(header_validator_.get(), connection_);
+  MockRequestDecoderShimWithUhv decoder(header_validator_.get(), connection_);
   Http::ResponseEncoder* response_encoder = nullptr;
 
   EXPECT_CALL(callbacks_, newStream(_, _))
@@ -1361,7 +1371,7 @@ TEST_P(Http1ServerConnectionImplTest, HeaderNameWithUnderscoreAllowed) {
   headers_with_underscores_action_ = envoy::config::core::v3::HttpProtocolOptions::ALLOW;
   initialize();
 
-  MockRequestDecoderWithUhv decoder(header_validator_.get(), connection_);
+  MockRequestDecoderShimWithUhv decoder(header_validator_.get(), connection_);
   EXPECT_CALL(callbacks_, newStream(_, _)).WillOnce(ReturnRef(decoder));
 
   TestRequestHeaderMapImpl expected_headers{
@@ -1385,7 +1395,7 @@ TEST_P(Http1ServerConnectionImplTest, HeaderNameWithUnderscoreAreDropped) {
   headers_with_underscores_action_ = envoy::config::core::v3::HttpProtocolOptions::DROP_HEADER;
   initialize();
 
-  MockRequestDecoderWithUhv decoder(header_validator_.get(), connection_);
+  MockRequestDecoderShimWithUhv decoder(header_validator_.get(), connection_);
   EXPECT_CALL(callbacks_, newStream(_, _)).WillOnce(ReturnRef(decoder));
 
   TestRequestHeaderMapImpl expected_headers{
@@ -1408,7 +1418,7 @@ TEST_P(Http1ServerConnectionImplTest, HeaderNameWithUnderscoreCauseRequestReject
   headers_with_underscores_action_ = envoy::config::core::v3::HttpProtocolOptions::REJECT_REQUEST;
   initialize();
 
-  MockRequestDecoderWithUhv decoder(header_validator_.get(), connection_);
+  MockRequestDecoderShimWithUhv decoder(header_validator_.get(), connection_);
   Http::ResponseEncoder* response_encoder = nullptr;
   EXPECT_CALL(callbacks_, newStream(_, _))
       .WillOnce(Invoke([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {

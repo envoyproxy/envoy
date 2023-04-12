@@ -55,9 +55,22 @@ namespace Http2 {
 
 namespace {
 
-class MockRequestDecoderWithUhv : public Http::MockRequestDecoder {
+// Tests in this suite observe request headers produced by the codec
+// by returning a MockRequestDecoder object in the newStream callback.
+// For tests runs with Universal Header Validator (UHV) enabled, some checks and transformations
+// have moved from the codec to UHV, and for tests that verify behaviors that were moved to UHV this
+// shim class is required instead of plain MockRequestDecoder.
+// The shim is transparent when UHV is disabled (header_validator_ == nullptr) and simply defers to
+// the MockRequestDecoder::decodeHeaders() method. With UHV enabled it invokes UHV's
+// validateRequestHeaderMap() method. This will validate and apply transformations expected by the
+// test, before passing it to the base class MockRequestDecoder::decodeHeaders() method. If UHV
+// validation fails it calls the `sendLocalReply` on the decoder, indicating validation error. This
+// class also handles behavior specific to the H/2 codec, where it resets requests with headers
+// containing underscores (when configured), instead of sending 400. See
+// https://github.com/envoyproxy/envoy/issues/24466
+class MockRequestDecoderShimWithUhv : public Http::MockRequestDecoder {
 public:
-  MockRequestDecoderWithUhv() = default;
+  MockRequestDecoderShimWithUhv() = default;
 
   void setResponseEncoder(Http::ResponseEncoder* response_encoder) {
     response_encoder_ = response_encoder;
@@ -417,7 +430,7 @@ public:
   std::unique_ptr<ConnectionWrapper> server_wrapper_;
   MockResponseDecoder response_decoder_;
   RequestEncoder* request_encoder_;
-  MockRequestDecoderWithUhv request_decoder_;
+  MockRequestDecoderShimWithUhv request_decoder_;
   ResponseEncoder* response_encoder_{};
   MockStreamCallbacks server_stream_callbacks_;
   // Corrupt a metadata frame payload.
