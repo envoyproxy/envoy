@@ -213,8 +213,9 @@ public:
 };
 
 // One fuzzer execution.
-inline void fuzzExtProcRun(const test::extensions::filters::http::ext_proc::ExtProcGrpcTestCase& input,
-                           const bool non_persistent_mode) {
+inline void
+fuzzExtProcRun(const test::extensions::filters::http::ext_proc::ExtProcGrpcTestCase& input,
+               const bool non_persistent_mode) {
   try {
     TestUtility::validate(input);
   } catch (const ProtoValidationException& e) {
@@ -290,12 +291,12 @@ inline void fuzzExtProcRun(const test::extensions::filters::http::ext_proc::ExtP
   if (fuzzCreateEnvoy(fuzz_exec_count, non_persistent_mode) || response_timeout) {
     fuzzer->tearDown(false);
     fuzzer.reset();
+    fuzz_exec_count = 0;
   } else {
     fuzzer->tearDown(true);
   }
   fuzz_helper.reset();
 }
-
 
 } // namespace ExternalProcessing
 } // namespace HttpFilters
