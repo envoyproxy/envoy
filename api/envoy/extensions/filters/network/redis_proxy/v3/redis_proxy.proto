@@ -25,7 +25,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // Redis Proxy :ref:`configuration overview <config_network_filters_redis_proxy>`.
 // [#extension: envoy.filters.network.redis_proxy]
 
-// [#next-free-field: 10]
+// [#next-free-field: 11]
 message RedisProxy {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.network.redis_proxy.v2.RedisProxy";
@@ -134,6 +134,27 @@ message RedisProxy {
     ConnectionRateLimit connection_rate_limit = 10;
   }
 
+  // The router is capable of shadowing traffic from one cluster to another. The current
+  // implementation is "fire and forget," meaning Envoy will not wait for the shadow cluster to
+  // respond before returning the response from the primary cluster. All normal statistics are
+  // collected for the shadow cluster making this feature useful for testing.
+  message RequestMirrorPolicy {
+    // Specifies the cluster that requests will be mirrored to. The cluster must
+    // exist in the cluster manager configuration.
+    string cluster = 1 [(validate.rules).string = {min_len: 1}];
+
+    // If not specified or the runtime key is not present, all requests to the target cluster
+    // will be mirrored.
+    //
+    // If specified, Envoy will lookup the runtime key to get the percentage of requests to the
+    // mirror.
+    config.core.v3.RuntimeFractionalPercent runtime_fraction = 2;
+
+    // Set this to TRUE to only mirror write commands, this is effectively replicating the
+    // writes in a "fire and forget" manner.
+    bool exclude_read_commands = 3;
+  }
+
   message PrefixRoutes {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.config.filter.network.redis_proxy.v2.RedisProxy.PrefixRoutes";
@@ -142,31 +163,6 @@ message RedisProxy {
     message Route {
       option (udpa.annotations.versioning).previous_message_type =
           "envoy.config.filter.network.redis_proxy.v2.RedisProxy.PrefixRoutes.Route";
-
-      // The router is capable of shadowing traffic from one cluster to another. The current
-      // implementation is "fire and forget," meaning Envoy will not wait for the shadow cluster to
-      // respond before returning the response from the primary cluster. All normal statistics are
-      // collected for the shadow cluster making this feature useful for testing.
-      message RequestMirrorPolicy {
-        option (udpa.annotations.versioning).previous_message_type =
-            "envoy.config.filter.network.redis_proxy.v2.RedisProxy.PrefixRoutes.Route."
-            "RequestMirrorPolicy";
-
-        // Specifies the cluster that requests will be mirrored to. The cluster must
-        // exist in the cluster manager configuration.
-        string cluster = 1 [(validate.rules).string = {min_len: 1}];
-
-        // If not specified or the runtime key is not present, all requests to the target cluster
-        // will be mirrored.
-        //
-        // If specified, Envoy will lookup the runtime key to get the percentage of requests to the
-        // mirror.
-        config.core.v3.RuntimeFractionalPercent runtime_fraction = 2;
-
-        // Set this to TRUE to only mirror write commands, this is effectively replicating the
-        // writes in a "fire and forget" manner.
-        bool exclude_read_commands = 3;
-      }
 
       // String prefix that must match the beginning of the keys. Envoy will always favor the
       // longest match.
@@ -195,6 +191,40 @@ message RedisProxy {
 
     // Indicates that prefix matching should be case insensitive.
     bool case_insensitive = 2;
+
+    // Optional catch-all route to forward commands that doesn't match any of the routes. The
+    // catch-all route becomes required when no routes are specified.
+    Route catch_all_route = 4;
+  }
+
+  // Router based on hash slots, we can set max hash slot as 8192
+  message HashSlotRoutes {
+    message Route {
+      // Starting slot range and end slot range for this route.
+      message SlotRange {
+        uint32 start = 1;
+
+        uint32 end = 2;
+      }
+
+      repeated SlotRange slots = 1;
+
+      // Upstream cluster to forward the command to.
+      string cluster = 2 [(validate.rules).string = {min_len: 1}];
+
+      // Indicates that the route has a request mirroring policy.
+      repeated RequestMirrorPolicy request_mirror_policy = 3;
+    }
+
+    reserved 3;
+
+    reserved "catch_all_cluster";
+
+    // List of routes.
+    repeated Route routes = 1;
+
+    // Number of hashing slots
+    uint32 number_of_slots = 2;
 
     // Optional catch-all route to forward commands that doesn't match any of the routes. The
     // catch-all route becomes required when no routes are specified.
@@ -275,6 +305,8 @@ message RedisProxy {
   // <arch_overview_redis_configuration>` of the architecture overview for recommendations on
   // configuring the backing clusters.
   PrefixRoutes prefix_routes = 5;
+
+  HashSlotRoutes hash_slot_routes = 10;
 
   // Authenticate Redis client connections locally by forcing downstream clients to issue a `Redis
   // AUTH command <https://redis.io/commands/auth>`_ with this password before enabling any other
@@ -362,3 +394,4 @@ message RedisProtocolOptions {
   // `<https://redis.io/topics/acl>`_ in the server's configuration file.
   config.core.v3.DataSource auth_username = 2 [(udpa.annotations.sensitive) = true];
 }
+
