@@ -23,11 +23,14 @@ namespace Extensions {
 namespace StatSinks {
 namespace OpenTelemetry {
 
+using AggregationTemporality = opentelemetry::proto::metrics::v1::AggregationTemporality;
 using MetricsExportRequest =
     opentelemetry::proto::collector::metrics::v1::ExportMetricsServiceRequest;
 using MetricsExportResponse =
     opentelemetry::proto::collector::metrics::v1::ExportMetricsServiceResponse;
+using KeyValue = opentelemetry::proto::common::v1::KeyValue;
 using MetricsExportRequestPtr = std::unique_ptr<MetricsExportRequest>;
+using MetricsExportRequestSharedPtr = std::shared_ptr<MetricsExportRequest>;
 using SinkConfig = envoy::extensions::stat_sinks::open_telemetry::v3::SinkConfig;
 
 class OtlpOptions {
@@ -47,6 +50,55 @@ private:
 };
 
 using OtlpOptionsSharedPtr = std::shared_ptr<OtlpOptions>;
+
+class OtlpMetricsFlusher {
+public:
+  virtual ~OtlpMetricsFlusher() = default;
+
+  /**
+   * Creates an OTLP export request from metric snapshot.
+   * @param snapshot supplies the metrics snapshot to send.
+   */
+  virtual MetricsExportRequestPtr flush(Stats::MetricSnapshot& snapshot) const PURE;
+};
+
+using OtlpMetricsFlusherSharedPtr = std::shared_ptr<OtlpMetricsFlusher>;
+
+/**
+ * Production implementation of OtlpMetricsFlusher
+ */
+class OtlpMetricsFlusherImpl : public OtlpMetricsFlusher {
+public:
+  OtlpMetricsFlusherImpl(
+      const OtlpOptionsSharedPtr config, std::function<bool(const Stats::Metric&)> predicate =
+                                             [](const auto& metric) { return metric.used(); })
+      : config_(config), predicate_(predicate) {}
+
+  MetricsExportRequestPtr flush(Stats::MetricSnapshot& snapshot) const override;
+
+private:
+  void flushGauge(opentelemetry::proto::metrics::v1::Metric& metric, const Stats::Gauge& gauge,
+                  int64_t snapshot_time_ns) const;
+
+  void flushCounter(opentelemetry::proto::metrics::v1::Metric& metric,
+                    const Stats::MetricSnapshot::CounterSnapshot& counter_snapshot,
+                    int64_t snapshot_time_ns) const;
+
+  void flushHistogram(opentelemetry::proto::metrics::v1::Metric& metric,
+                      const Stats::ParentHistogram& parent_histogram,
+                      int64_t snapshot_time_ns) const;
+
+  void setMetricCommon(opentelemetry::proto::metrics::v1::Metric& metric,
+                       opentelemetry::proto::metrics::v1::NumberDataPoint& data_point,
+                       int64_t snapshot_time_ns, const Stats::Metric& stat) const;
+
+  void setMetricCommon(opentelemetry::proto::metrics::v1::Metric& metric,
+                       opentelemetry::proto::metrics::v1::HistogramDataPoint& data_point,
+                       int64_t snapshot_time_ns, const Stats::Metric& stat) const;
+
+  const OtlpOptionsSharedPtr config_;
+  const std::function<bool(const Stats::Metric&)> predicate_;
+};
 
 class OpenTelemetryGrpcMetricsExporter : public Grpc::AsyncRequestCallbacks<MetricsExportResponse> {
 public:
@@ -95,55 +147,22 @@ private:
 using OpenTelemetryGrpcMetricsExporterImplPtr =
     std::unique_ptr<OpenTelemetryGrpcMetricsExporterImpl>;
 
-class MetricsFlusher {
-public:
-  MetricsFlusher(
-      const OtlpOptionsSharedPtr config, std::function<bool(const Stats::Metric&)> predicate =
-                                             [](const auto& metric) { return metric.used(); })
-      : config_(config), predicate_(predicate) {}
-
-  MetricsExportRequestPtr flush(Stats::MetricSnapshot& snapshot) const;
-
-private:
-  void flushGauge(opentelemetry::proto::metrics::v1::Metric& metric, const Stats::Gauge& gauge,
-                  int64_t snapshot_time_ns) const;
-
-  void flushCounter(opentelemetry::proto::metrics::v1::Metric& metric,
-                    const Stats::MetricSnapshot::CounterSnapshot& counter_snapshot,
-                    int64_t snapshot_time_ns) const;
-
-  void flushHistogram(opentelemetry::proto::metrics::v1::Metric& metric,
-                      const Stats::ParentHistogram& parent_histogram,
-                      int64_t snapshot_time_ns) const;
-
-  void setMetricCommon(opentelemetry::proto::metrics::v1::Metric& metric,
-                       opentelemetry::proto::metrics::v1::NumberDataPoint& data_point,
-                       int64_t snapshot_time_ns, const Stats::Metric& stat) const;
-
-  void setMetricCommon(opentelemetry::proto::metrics::v1::Metric& metric,
-                       opentelemetry::proto::metrics::v1::HistogramDataPoint& data_point,
-                       int64_t snapshot_time_ns, const Stats::Metric& stat) const;
-
-  const OtlpOptionsSharedPtr config_;
-  const std::function<bool(const Stats::Metric&)> predicate_;
-};
-
 class OpenTelemetryGrpcSink : public Stats::Sink {
 public:
-  OpenTelemetryGrpcSink(const OtlpOptionsSharedPtr config,
-                        const OpenTelemetryGrpcMetricsExporterSharedPtr& otlp_metrics_exporter)
-      : flusher_(MetricsFlusher(config)), metrics_exporter_(otlp_metrics_exporter) {}
+  OpenTelemetryGrpcSink(const OtlpMetricsFlusherSharedPtr& otlp_metrics_flusher,
+                        const OpenTelemetryGrpcMetricsExporterSharedPtr& grpc_metrics_exporter)
+      : metrics_flusher_(otlp_metrics_flusher), metrics_exporter_(grpc_metrics_exporter) {}
 
   // Stats::Sink
   void flush(Stats::MetricSnapshot& snapshot) override {
-    metrics_exporter_->send(flusher_.flush(snapshot));
+    metrics_exporter_->send(metrics_flusher_->flush(snapshot));
   }
 
   void onHistogramComplete(const Stats::Histogram&, uint64_t) override {}
 
 private:
-  const MetricsFlusher flusher_;
-  OpenTelemetryGrpcMetricsExporterSharedPtr metrics_exporter_;
+  const OtlpMetricsFlusherSharedPtr metrics_flusher_;
+  const OpenTelemetryGrpcMetricsExporterSharedPtr metrics_exporter_;
 };
 
 } // namespace OpenTelemetry

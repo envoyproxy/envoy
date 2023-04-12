@@ -63,8 +63,6 @@ TEST(OpenTelemetryConfigTest, OtlpOptionsTest) {
     sink_config.mutable_use_tag_extracted_name()->set_value(false);
 
     OtlpOptions options(sink_config);
-
-    // Default options
     EXPECT_FALSE(options.reportCountersAsDeltas());
     EXPECT_FALSE(options.reportHistogramsAsDeltas());
     EXPECT_FALSE(options.emitTagsAsAttributes());

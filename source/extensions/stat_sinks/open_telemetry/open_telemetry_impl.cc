@@ -47,7 +47,7 @@ void OpenTelemetryGrpcMetricsExporterImpl::onFailure(Grpc::Status::GrpcStatus re
   ENVOY_LOG(warn, "export failure; status: {}, message: {}", response_status, response_message);
 }
 
-MetricsExportRequestPtr MetricsFlusher::flush(Stats::MetricSnapshot& snapshot) const {
+MetricsExportRequestPtr OtlpMetricsFlusherImpl::flush(Stats::MetricSnapshot& snapshot) const {
   auto request = std::make_unique<MetricsExportRequest>();
   auto* resource_metrics = request->add_resource_metrics();
   auto* scope_metrics = resource_metrics->add_scope_metrics();
@@ -77,8 +77,8 @@ MetricsExportRequestPtr MetricsFlusher::flush(Stats::MetricSnapshot& snapshot) c
   return request;
 }
 
-void MetricsFlusher::flushGauge(opentelemetry::proto::metrics::v1::Metric& metric,
-                                const Stats::Gauge& gauge_stat, int64_t snapshot_time_ns) const {
+void OtlpMetricsFlusherImpl::flushGauge(opentelemetry::proto::metrics::v1::Metric& metric,
+                                        const Stats::Gauge& gauge_stat, int64_t snapshot_time_ns) const {
   auto* data_point = metric.mutable_gauge()->add_data_points();
   data_point->set_time_unix_nano(snapshot_time_ns);
   setMetricCommon(metric, *data_point, snapshot_time_ns, gauge_stat);
@@ -86,39 +86,34 @@ void MetricsFlusher::flushGauge(opentelemetry::proto::metrics::v1::Metric& metri
   data_point->set_as_int(gauge_stat.value());
 }
 
-void MetricsFlusher::flushCounter(opentelemetry::proto::metrics::v1::Metric& metric,
-                                  const Stats::MetricSnapshot::CounterSnapshot& counter_snapshot,
-                                  int64_t snapshot_time_ns) const {
+void OtlpMetricsFlusherImpl::flushCounter(opentelemetry::proto::metrics::v1::Metric& metric,
+                                          const Stats::MetricSnapshot::CounterSnapshot& counter_snapshot,
+                                          int64_t snapshot_time_ns) const {
   auto* sum = metric.mutable_sum();
   sum->set_is_monotonic(true);
   auto* data_point = sum->add_data_points();
   setMetricCommon(metric, *data_point, snapshot_time_ns, counter_snapshot.counter_);
 
   if (config_->reportCountersAsDeltas()) {
-    sum->set_aggregation_temporality(
-        opentelemetry::proto::metrics::v1::AggregationTemporality::AGGREGATION_TEMPORALITY_DELTA);
-
+    sum->set_aggregation_temporality(AggregationTemporality::AGGREGATION_TEMPORALITY_DELTA);
     data_point->set_as_int(counter_snapshot.delta_);
   } else {
-    sum->set_aggregation_temporality(opentelemetry::proto::metrics::v1::AggregationTemporality::
-                                         AGGREGATION_TEMPORALITY_CUMULATIVE);
-
+    sum->set_aggregation_temporality(AggregationTemporality::AGGREGATION_TEMPORALITY_CUMULATIVE);
     data_point->set_as_int(counter_snapshot.counter_.get().value());
   }
 }
 
-void MetricsFlusher::flushHistogram(opentelemetry::proto::metrics::v1::Metric& metric,
-                                    const Stats::ParentHistogram& parent_histogram,
-                                    int64_t snapshot_time_ns) const {
+void OtlpMetricsFlusherImpl::flushHistogram(opentelemetry::proto::metrics::v1::Metric& metric,
+                                            const Stats::ParentHistogram& parent_histogram,
+                                            int64_t snapshot_time_ns) const {
   auto* histogram = metric.mutable_histogram();
   auto* data_point = histogram->add_data_points();
   setMetricCommon(metric, *data_point, snapshot_time_ns, parent_histogram);
 
   histogram->set_aggregation_temporality(
       config_->reportHistogramsAsDeltas()
-          ? opentelemetry::proto::metrics::v1::AggregationTemporality::AGGREGATION_TEMPORALITY_DELTA
-          : opentelemetry::proto::metrics::v1::AggregationTemporality::
-                AGGREGATION_TEMPORALITY_CUMULATIVE);
+          ? AggregationTemporality::AGGREGATION_TEMPORALITY_DELTA
+          : AggregationTemporality::AGGREGATION_TEMPORALITY_CUMULATIVE);
 
   const Stats::HistogramStatistics& histogram_stats = config_->reportHistogramsAsDeltas()
                                                           ? parent_histogram.intervalStatistics()
@@ -134,9 +129,10 @@ void MetricsFlusher::flushHistogram(opentelemetry::proto::metrics::v1::Metric& m
   }
 }
 
-void MetricsFlusher::setMetricCommon(opentelemetry::proto::metrics::v1::Metric& metric,
-                                     opentelemetry::proto::metrics::v1::NumberDataPoint& data_point,
-                                     int64_t snapshot_time_ns, const Stats::Metric& stat) const {
+void OtlpMetricsFlusherImpl::setMetricCommon(
+    opentelemetry::proto::metrics::v1::Metric& metric,
+    opentelemetry::proto::metrics::v1::NumberDataPoint& data_point, int64_t snapshot_time_ns,
+    const Stats::Metric& stat) const {
   data_point.set_time_unix_nano(snapshot_time_ns);
   // TODO(ohadvano): support ``start_time_unix_nano`` optional field
   metric.set_name(config_->useTagExtractedName() ? stat.tagExtractedName() : stat.name());
@@ -150,7 +146,7 @@ void MetricsFlusher::setMetricCommon(opentelemetry::proto::metrics::v1::Metric& 
   }
 }
 
-void MetricsFlusher::setMetricCommon(
+void OtlpMetricsFlusherImpl::setMetricCommon(
     opentelemetry::proto::metrics::v1::Metric& metric,
     opentelemetry::proto::metrics::v1::HistogramDataPoint& data_point, int64_t snapshot_time_ns,
     const Stats::Metric& stat) const {
