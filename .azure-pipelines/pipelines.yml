@@ -37,7 +37,7 @@ variables:
   value: ${{ and(eq(variables['Build.DefinitionName'], 'envoy-presubmit'), ne(variables['Build.Reason'], 'PullRequest')) }}
 # Any other run (ie PRs)
 - name: pipelineDefault
-  value: ${{ and(ne(variables.pipelineScheduled, true), ne(variables.pipelinePostubmit, true), ne(variables.pipelineCacheWarm, true)) }}
+  value: ${{ and(ne(variables.pipelineScheduled, true), ne(variables.pipelinePostsubmit, true), ne(variables.pipelineCacheWarm, true)) }}
 
 ## Variable settings
 # Caches (tip: append a version suffix while testing caches)
