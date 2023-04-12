@@ -232,7 +232,7 @@ class FilterLogger : Logger::Loggable<Logger::Id::http> {
 public:
   FilterLogger() = default;
 
-  void log(uint32_t level, absl::string_view message);
+  void log(uint32_t level, absl::string_view message) const;
 };
 
 } // namespace Golang

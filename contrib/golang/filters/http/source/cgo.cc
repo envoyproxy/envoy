@@ -153,11 +153,11 @@ CAPIStatus envoyGoFilterHttpGetIntegerValue(void* r, int id, void* value) {
   });
 }
 
-static FilterLogger logger;
+const FilterLogger& getFilterLogger() { CONSTRUCT_ON_FIRST_USE(FilterLogger); }
 
 void envoyGoFilterHttpLog(uint32_t level, void* message) {
   auto mesg = referGoString(message);
-  return logger.log(level, mesg);
+  getFilterLogger().log(level, mesg);
 }
 
 void envoyGoFilterHttpFinalize(void* r, int reason) {

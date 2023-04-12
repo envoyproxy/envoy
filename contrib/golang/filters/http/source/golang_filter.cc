@@ -1013,7 +1013,7 @@ ProcessorState& Filter::getProcessorState() {
 };
 
 /* FilterLogger */
-void FilterLogger::log(uint32_t level, absl::string_view message) {
+void FilterLogger::log(uint32_t level, absl::string_view message) const {
   switch (static_cast<spdlog::level::level_enum>(level)) {
   case spdlog::level::trace:
     ENVOY_LOG(trace, "{}", message);
