@@ -20,6 +20,10 @@ parameters:
 - name: envoyBuildFilterExample
   type: string
   default: ""
+- name: cacheTestResults
+  displayName: "Cache test results"
+  type: boolean
+  default: true
 
 steps:
 # Set up tmpfs directories for self-hosted agents which have a surplus of mem.
@@ -76,6 +80,8 @@ steps:
     REPO_URI: $(Build.Repository.Uri)
     BUILD_URI: $(Build.BuildUri)
     ENVOY_BUILD_FILTER_EXAMPLE: ${{ parameters.envoyBuildFilterExample }}
+    ${{ if ne(parameters['cacheTestResults'], true) }}:
+      BAZEL_NO_CACHE_TEST_RESULTS: 1
     ${{ if eq(variables['Build.Reason'], 'PullRequest') }}:
       AZP_TARGET_BRANCH: "origin/$(System.PullRequest.TargetBranch)"
     ${{ if ne(variables['Build.Reason'], 'PullRequest') }}:
