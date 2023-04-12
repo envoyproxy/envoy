@@ -5,6 +5,7 @@
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/runtime/mocks.h"
+#include "test/mocks/server/factory_context.h"
 
 #include "contrib/envoy/extensions/filters/http/golang/v3alpha/golang.pb.validate.h"
 #include "contrib/golang/common/dso/test/mocks.h"
@@ -74,7 +75,8 @@ DEFINE_PROTO_FUZZER(const envoy::extensions::filters::http::golang::GolangFilter
   TestUtility::loadFromYaml(yaml, proto_config);
 
   // Prepare filter.
-  FilterConfigSharedPtr config = std::make_shared<FilterConfig>(proto_config, dso_lib);
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  FilterConfigSharedPtr config = std::make_shared<FilterConfig>(proto_config, dso_lib, "", context);
   std::unique_ptr<Filter> filter = std::make_unique<Filter>(config, dso_lib);
   filter->setDecoderFilterCallbacks(mocks.decoder_callbacks_);
   filter->setEncoderFilterCallbacks(mocks.encoder_callbacks_);
