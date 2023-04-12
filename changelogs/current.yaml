@@ -401,6 +401,18 @@ new_features:
     reset idle timer on metadata actions.
 
 deprecated:
+- area: tcp_proxy
+  change: |
+    deprecated (1.25.0) :ref:`access_log_flush_interval
+    <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.access_log_flush_interval>` in favour
+    of :ref:`access_log_flush_interval
+    <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.TcpAccessLogOptions.access_log_flush_interval>`.
+- area: tcp_proxy
+  change: |
+    deprecated (1.25.0) :ref:`flush_access_log_on_connected
+    <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.flush_access_log_on_connected>` in favour
+    of :ref:`flush_access_log_on_connected
+    <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.TcpAccessLogOptions.flush_access_log_on_connected>`.
 - area: ext_authz
   change: |
     deprecated (1.25.0) :ref:`ext_authz.v3.AuthorizationRequest.allowed_headers
