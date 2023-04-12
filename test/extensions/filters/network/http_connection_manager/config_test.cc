@@ -1672,8 +1672,7 @@ TEST_F(HttpConnectionManagerConfigTest,
                                            scoped_routes_config_provider_manager_, tracer_manager_,
                                            filter_config_provider_manager_),
         EnvoyException,
-        "Only one of flush_access_log_on_new_request from HttpConnectionManager"
-        "or access_log_options can be specified.");
+        "Only one of flush_access_log_on_new_request or access_log_options can be specified.");
   }
 
   {
@@ -1689,8 +1688,7 @@ TEST_F(HttpConnectionManagerConfigTest,
                                            scoped_routes_config_provider_manager_, tracer_manager_,
                                            filter_config_provider_manager_),
         EnvoyException,
-        "Only one of access_log_flush_interval from HttpConnectionManager"
-        "or access_log_options can be specified.");
+        "Only one of access_log_flush_interval or access_log_options can be specified.");
   }
 }
 
@@ -1786,8 +1784,7 @@ TEST_F(HttpConnectionManagerConfigTest, DEPRECATED_FEATURE_TEST(DeprecatedAccess
                                            scoped_routes_config_provider_manager_, tracer_manager_,
                                            filter_config_provider_manager_),
         EnvoyException,
-        "Only one of access_log_flush_interval from HttpConnectionManager"
-        "or access_log_options can be specified.");
+        "Only one of access_log_flush_interval or access_log_options can be specified.");
   }
 
   {
@@ -1803,8 +1800,7 @@ TEST_F(HttpConnectionManagerConfigTest, DEPRECATED_FEATURE_TEST(DeprecatedAccess
                                            scoped_routes_config_provider_manager_, tracer_manager_,
                                            filter_config_provider_manager_),
         EnvoyException,
-        "Only one of flush_access_log_on_new_request from HttpConnectionManager"
-        "or access_log_options can be specified.");
+        "Only one of flush_access_log_on_new_request or access_log_options can be specified.");
   }
 }
 

@@ -549,13 +549,13 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
 
   if (config.has_access_log_options()) {
     if (config.flush_access_log_on_new_request() /* deprecated */) {
-      throw EnvoyException("Only one of flush_access_log_on_new_request from HttpConnectionManager"
-                           "or access_log_options can be specified.");
+      throw EnvoyException(
+          "Only one of flush_access_log_on_new_request or access_log_options can be specified.");
     }
 
     if (config.has_access_log_flush_interval()) {
-      throw EnvoyException("Only one of access_log_flush_interval from HttpConnectionManager"
-                           "or access_log_options can be specified.");
+      throw EnvoyException(
+          "Only one of access_log_flush_interval or access_log_options can be specified.");
     }
 
     flush_access_log_on_new_request_ =
