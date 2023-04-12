@@ -173,6 +173,7 @@ public:
   CAPIStatus getStringValue(int id, GoString* value_str);
   CAPIStatus getIntegerValue(int id, uint64_t* value);
   CAPIStatus log(uint32_t level, absl::string_view message);
+  CAPIStatus setDynamicMetadata(std::string filter_name, std::string key, absl::string_view buf);
 
 private:
   ProcessorState& getProcessorState();
@@ -196,6 +197,9 @@ private:
   void sendLocalReplyInternal(Http::Code response_code, absl::string_view body_text,
                               std::function<void(Http::ResponseHeaderMap& headers)> modify_headers,
                               Grpc::Status::GrpcStatus grpc_status, absl::string_view details);
+
+  void setDynamicMetadataInternal(ProcessorState& state, std::string filter_name, std::string key,
+                                  const absl::string_view& buf);
 
   const FilterConfigSharedPtr config_;
   Dso::HttpFilterDsoPtr dynamic_lib_;

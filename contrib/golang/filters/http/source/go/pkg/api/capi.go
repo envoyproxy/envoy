@@ -41,6 +41,9 @@ type HttpCAPI interface {
 	HttpGetStringValue(r unsafe.Pointer, id int) (string, bool)
 	HttpGetIntegerValue(r unsafe.Pointer, id int) (uint64, bool)
 
+	// TODO: HttpGetDynamicMetadata(r unsafe.Pointer, filterName string) map[string]interface{}
+	HttpSetDynamicMetadata(r unsafe.Pointer, filterName string, key string, value interface{})
+
 	// HttpLog writes message to the registered logger during request processes.
 	// we are also consider adding MiscLog to write the misc logger during non-request
 	// processes in the future.

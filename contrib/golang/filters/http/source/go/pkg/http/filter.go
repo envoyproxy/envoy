@@ -160,3 +160,17 @@ func (s *streamInfo) AttemptCount() uint32 {
 	count, _ := cAPI.HttpGetIntegerValue(unsafe.Pointer(s.request.req), ValueAttemptCount)
 	return uint32(count)
 }
+
+type dynamicMetadata struct {
+	request *httpRequest
+}
+
+func (s *streamInfo) DynamicMetadata() api.DynamicMetadata {
+	return &dynamicMetadata{
+		request: s.request,
+	}
+}
+
+func (d *dynamicMetadata) Set(filterName string, key string, value interface{}) {
+	cAPI.HttpSetDynamicMetadata(unsafe.Pointer(d.request.req), filterName, key, value)
+}

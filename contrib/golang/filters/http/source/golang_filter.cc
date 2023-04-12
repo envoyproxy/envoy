@@ -956,6 +956,55 @@ CAPIStatus Filter::log(uint32_t level, absl::string_view message) {
   PANIC_DUE_TO_CORRUPT_ENUM;
 }
 
+CAPIStatus Filter::setDynamicMetadata(std::string filter_name, std::string key,
+                                      absl::string_view buf) {
+  Thread::LockGuard lock(mutex_);
+  if (has_destroyed_) {
+    ENVOY_LOG(debug, "golang filter has been destroyed");
+    return CAPIStatus::CAPIFilterIsDestroy;
+  }
+
+  auto& state = getProcessorState();
+  if (!state.isProcessingInGo()) {
+    ENVOY_LOG(debug, "golang filter is not processing Go");
+    return CAPIStatus::CAPINotInGo;
+  }
+
+  if (!state.isThreadSafe()) {
+    auto weak_ptr = weak_from_this();
+    // Since go only waits for the CAPI return code we need to create a deep copy
+    // of the buffer slice and pass that to the dispatcher.
+    auto buff_copy = std::string(buf);
+    state.getDispatcher().post([this, &state, weak_ptr, filter_name, key, buff_copy] {
+      ASSERT(state.isThreadSafe());
+      // TODO: do not need lock here, since it's the work thread now.
+      Thread::ReleasableLockGuard lock(mutex_);
+      if (!weak_ptr.expired() && !has_destroyed_) {
+        lock.release();
+        setDynamicMetadataInternal(state, filter_name, key, buff_copy);
+      } else {
+        ENVOY_LOG(info, "golang filter has gone or destroyed in setDynamicMetadata");
+      }
+    });
+    return CAPIStatus::CAPIOK;
+  }
+
+  // it's safe to do it here since we are in the safe envoy worker thread now.
+  setDynamicMetadataInternal(state, filter_name, key, buf);
+  return CAPIStatus::CAPIOK;
+}
+
+void Filter::setDynamicMetadataInternal(ProcessorState& state, std::string filter_name,
+                                        std::string key, const absl::string_view& buf) {
+  ProtobufWkt::Struct value;
+  ProtobufWkt::Value v;
+  v.ParseFromArray(buf.data(), buf.length());
+
+  (*value.mutable_fields())[key] = v;
+
+  state.streamInfo().setDynamicMetadata(filter_name, value);
+}
+
 /* ConfigId */
 
 uint64_t Filter::getMergedConfigId(ProcessorState& state) {
