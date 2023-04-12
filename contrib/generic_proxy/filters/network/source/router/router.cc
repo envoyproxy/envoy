@@ -23,8 +23,8 @@ absl::string_view resetReasonToStringView(StreamResetReason reason) {
 } // namespace
 
 UpstreamManagerImpl::UpstreamManagerImpl(UpstreamRequest& parent, Upstream::TcpPoolData&& pool)
-    : UpstreamManagerImplBase(std::move(pool),
-                              parent.decoder_callbacks_.downstreamCodec().responseDecoder()),
+    : UpstreamConnection(std::move(pool),
+                         parent.decoder_callbacks_.downstreamCodec().responseDecoder()),
       parent_(parent) {}
 
 void UpstreamManagerImpl::onEventImpl(Network::ConnectionEvent event) {

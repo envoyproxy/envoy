@@ -1,7 +1,5 @@
 #pragma once
 
-#include <cstdint>
-
 #include "envoy/event/dispatcher.h"
 #include "envoy/network/connection.h"
 #include "envoy/stream_info/stream_info.h"

@@ -291,13 +291,13 @@ private:
 };
 using ActiveStreamPtr = std::unique_ptr<ActiveStream>;
 
-class UpstreamManagerImpl : public UpstreamManagerImplBase,
+class UpstreamManagerImpl : public UpstreamConnection,
                             public UpstreamManager,
                             public ResponseDecoderCallback {
 public:
   UpstreamManagerImpl(Filter& parent, Upstream::TcpPoolData&& tcp_pool_data);
 
-  // UpstreamManagerImplBase
+  // UpstreamConnection
   void onPoolSuccessImpl() override;
   void onPoolFailureImpl(ConnectionPool::PoolFailureReason reason,
                          absl::string_view transport_failure_reason) override;

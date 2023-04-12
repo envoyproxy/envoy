@@ -12,12 +12,12 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace GenericProxy {
 
-class UpstreamManagerImplBase : public Envoy::Event::DeferredDeletable,
-                                public Tcp::ConnectionPool::Callbacks,
-                                public Tcp::ConnectionPool::UpstreamCallbacks,
-                                public Envoy::Logger::Loggable<Envoy::Logger::Id::upstream> {
+class UpstreamConnection : public Envoy::Event::DeferredDeletable,
+                           public Tcp::ConnectionPool::Callbacks,
+                           public Tcp::ConnectionPool::UpstreamCallbacks,
+                           public Envoy::Logger::Loggable<Envoy::Logger::Id::upstream> {
 public:
-  ~UpstreamManagerImplBase() override;
+  ~UpstreamConnection() override;
 
   void newConnection() { tcp_pool_handle_ = tcp_pool_data_.newConnection(*this); }
 
@@ -36,8 +36,7 @@ public:
   void onEvent(Network::ConnectionEvent) override;
 
 protected:
-  UpstreamManagerImplBase(Upstream::TcpPoolData&& tcp_pool_data,
-                          ResponseDecoderPtr&& response_decoder)
+  UpstreamConnection(Upstream::TcpPoolData&& tcp_pool_data, ResponseDecoderPtr&& response_decoder)
       : tcp_pool_data_(std::move(tcp_pool_data)), response_decoder_(std::move(response_decoder)) {}
 
   virtual void onEventImpl(Network::ConnectionEvent event) PURE;

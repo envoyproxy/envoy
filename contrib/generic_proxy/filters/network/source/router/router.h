@@ -41,9 +41,9 @@ class UpstreamRequest;
  * We needn't to inherit from UpstreamManager interfaces because
  * the Router::UpstreamManagerImpl is only used by Router::UpstreamRequest and
  * only one request is allowed to be processed at the same time.
- * We still inherit from UpstreamManagerImplBase to avoid code duplication.
+ * We still inherit from UpstreamConnection to avoid code duplication.
  */
-class UpstreamManagerImpl : public UpstreamManagerImplBase {
+class UpstreamManagerImpl : public UpstreamConnection {
 public:
   UpstreamManagerImpl(UpstreamRequest& parent, Upstream::TcpPoolData&& pool);
 

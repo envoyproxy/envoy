@@ -191,8 +191,8 @@ void ActiveStream::completeRequest() {
 }
 
 UpstreamManagerImpl::UpstreamManagerImpl(Filter& parent, Upstream::TcpPoolData&& tcp_pool_data)
-    : UpstreamManagerImplBase(std::move(tcp_pool_data),
-                              parent.config_->codecFactory().responseDecoder()),
+    : UpstreamConnection(std::move(tcp_pool_data),
+                         parent.config_->codecFactory().responseDecoder()),
       parent_(parent) {
   response_decoder_->setDecoderCallback(*this);
 }
@@ -412,6 +412,7 @@ void Filter::onDrainCloseAndNoActiveStreams() { closeDownstreamConnection(); }
 
 void Filter::bindUpstreamConn(Upstream::TcpPoolData&& tcp_pool_data) {
   ASSERT(config_->codecFactory().protocolOptions().bindUpstreamConnection());
+  ASSERT(upstream_manager_ == nullptr);
   upstream_manager_ = std::make_unique<UpstreamManagerImpl>(*this, std::move(tcp_pool_data));
   upstream_manager_->newConnection();
 }
