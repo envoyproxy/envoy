@@ -38,7 +38,7 @@ EdsClusterImpl::EdsClusterImpl(Server::Configuration::ServerFactoryContext& serv
           resource_decoder_, {});
 }
 
-void EdsClusterImpl::startPreInit() { subscription_->start({edsServiceName()}); }
+void EdsClusterImpl::startPreInit() { subscription_->start({std::string(edsServiceName())}); }
 
 void EdsClusterImpl::BatchUpdateHelper::batchUpdate(PrioritySet::HostUpdateCb& host_update_cb) {
   absl::flat_hash_set<std::string> all_new_hosts;

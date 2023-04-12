@@ -94,9 +94,9 @@ MockClusterInfo::MockClusterInfo()
   ON_CALL(*this, observabilityName()).WillByDefault(ReturnRef(observability_name_));
   ON_CALL(*this, edsServiceName()).WillByDefault(Invoke([this]() {
     if (eds_service_name_.has_value()) {
-      return makeOptRef<const std::string>(eds_service_name_.value());
+      return absl::string_view{eds_service_name_.value()};
     }
-    return OptRef<const std::string>{};
+    return absl::string_view{};
   }));
   ON_CALL(*this, http1Settings()).WillByDefault(ReturnRef(http1_settings_));
   ON_CALL(*this, http2Options()).WillByDefault(ReturnRef(http2_options_));

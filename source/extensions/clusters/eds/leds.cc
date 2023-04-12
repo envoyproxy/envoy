@@ -12,7 +12,7 @@ namespace Upstream {
 
 LedsSubscription::LedsSubscription(
     const envoy::config::endpoint::v3::LedsClusterLocalityConfig& leds_config,
-    const std::string& cluster_name,
+    absl::string_view cluster_name,
     Server::Configuration::TransportSocketFactoryContext& factory_context,
     Stats::Scope& cluster_stats_scope, const UpdateCb& callback)
     : Envoy::Config::SubscriptionBase<envoy::config::endpoint::v3::LbEndpoint>(

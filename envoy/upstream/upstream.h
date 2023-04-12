@@ -1144,9 +1144,10 @@ public:
   virtual bool setLocalInterfaceNameOnUpstreamConnections() const PURE;
 
   /**
-   * @return eds cluster service_name of the cluster.
+   * @return absl::string_view eds cluster service_name of the cluster. Empty if not an EDS cluster.
+   * or eds cluster service_name is not set.
    */
-  virtual OptRef<const std::string> edsServiceName() const PURE;
+  virtual absl::string_view edsServiceName() const PURE;
 
   /**
    * Create network filters on a new upstream connection.
