@@ -108,7 +108,7 @@ TEST(ConfigTest, DEPRECATED_FEATURE_TEST(DeprecatedFlushAccessLogOnConnected)) {
         Config config_obj(constructConfigFromYaml(deprecated_yaml, factory_context)),
         EnvoyException,
         "Only one of flush_access_log_on_connected from TcpProxy or"
-        "flush_access_log_on_connected from TcpAccessLogOptions can be specified.");
+        "access_log_options can be specified.");
   }
 
   {
@@ -124,7 +124,7 @@ TEST(ConfigTest, DEPRECATED_FEATURE_TEST(DeprecatedFlushAccessLogOnConnected)) {
         Config config_obj(constructConfigFromYaml(deprecated_yaml, factory_context)),
         EnvoyException,
         "Only one of access_log_flush_interval from TcpProxy or"
-        "access_log_flush_interval from TcpAccessLogOptions can be specified.");
+        "access_log_options can be specified.");
   }
 }
 
@@ -183,7 +183,7 @@ TEST(ConfigTest, DEPRECATED_FEATURE_TEST(DeprecatedAccessLogFlushInterval)) {
         Config config_obj(constructConfigFromYaml(deprecated_yaml, factory_context)),
         EnvoyException,
         "Only one of access_log_flush_interval from TcpProxy or"
-        "access_log_flush_interval from TcpAccessLogOptions can be specified.");
+        "access_log_options can be specified.");
   }
 
   {
@@ -199,7 +199,7 @@ TEST(ConfigTest, DEPRECATED_FEATURE_TEST(DeprecatedAccessLogFlushInterval)) {
         Config config_obj(constructConfigFromYaml(deprecated_yaml, factory_context)),
         EnvoyException,
         "Only one of flush_access_log_on_connected from TcpProxy or"
-        "flush_access_log_on_connected from TcpAccessLogOptions can be specified.");
+        "access_log_options can be specified.");
   }
 }
 
