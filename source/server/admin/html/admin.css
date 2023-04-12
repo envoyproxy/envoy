@@ -62,7 +62,7 @@
   background-color: #ddd;
 }
 
-.histogram-graphics span {
+.histogram-buckets {
     margin-right: 50px;
     width: 10px;
     background-color: #c11;

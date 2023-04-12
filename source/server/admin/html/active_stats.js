@@ -314,6 +314,7 @@ function renderHistogramDetail(supported_percentiles, detail) {
     graphics.className = 'histogram-graphics';
     for (bucket of histogram.detail) {
       const span = document.createElement('span');
+      span.className = 'histogram-buckets';
       const percent = maxCount == 0 ? 0 : Math.round((100 * bucket.count) / maxCount);
       span.style.height = '' + percent + '%';
       //span.style.width = '' + valueToPercent(bucket.value) + '%';
