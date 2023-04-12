@@ -222,17 +222,6 @@ SnapshotImpl::SnapshotImpl(Random::RandomGenerator& generator, RuntimeStats& sta
   stats.num_keys_.set(values_.size());
 }
 
-SnapshotImpl::Entry SnapshotImpl::createEntry(const std::string& value) {
-  Entry entry;
-  entry.raw_string_value_ = value;
-
-  // As a perf optimization, attempt to parse the entry's string and store it inside the struct. If
-  // we don't succeed that's fine.
-  resolveEntryType(entry);
-
-  return entry;
-}
-
 void parseFractionValue(SnapshotImpl::Entry& entry, const ProtobufWkt::Struct& value) {
   envoy::type::v3::FractionalPercent percent;
   static_assert(envoy::type::v3::FractionalPercent::MILLION ==
@@ -261,18 +250,63 @@ void parseFractionValue(SnapshotImpl::Entry& entry, const ProtobufWkt::Struct& v
   entry.fractional_percent_value_ = percent;
 }
 
-SnapshotImpl::Entry SnapshotImpl::createEntry(const ProtobufWkt::Value& value) {
+void setNumberValue(Envoy::Runtime::Snapshot::Entry& entry, double value) {
+  entry.double_value_ = value;
+  if (value == static_cast<int>(value)) {
+    entry.bool_value_ = value != 0;
+  }
+  if (entry.double_value_ >= 0 && entry.double_value_ <= std::numeric_limits<uint64_t>::max()) {
+    // Valid uint values will always be parseable as doubles, so we assign the value to both the
+    // uint and double fields. In cases where the value is something like "3.1", we will floor the
+    // number by casting it to a uint and assigning the uint value.
+    entry.uint_value_ = entry.double_value_;
+  }
+}
+
+// Handle corner cases in parsing: negatives and decimals aren't always parsed as doubles.
+void parseEntryDoubleValue(Envoy::Runtime::Snapshot::Entry& entry) {
+  double converted_double;
+  if (absl::SimpleAtod(entry.raw_string_value_, &converted_double)) {
+    setNumberValue(entry, converted_double);
+  }
+}
+
+// Handle an absolutely awful corner case where we explicitly shove a yaml percent in a proto string
+// value.
+void parseEntryFractionalPercentValue(Envoy::Runtime::Snapshot::Entry& entry) {
+  if (!absl::StrContains(entry.raw_string_value_, "numerator:")) {
+    return;
+  }
+  envoy::type::v3::FractionalPercent converted_fractional_percent;
+  TRY_ASSERT_MAIN_THREAD {
+    MessageUtil::loadFromYamlAndValidate(entry.raw_string_value_, converted_fractional_percent,
+                                         ProtobufMessage::getStrictValidationVisitor());
+    entry.fractional_percent_value_ = converted_fractional_percent;
+  }
+  END_TRY
+  catch (const ProtoValidationException& ex) {
+    return;
+  }
+}
+
+// Handle corner cases in non-yaml parsing: mixed case strings aren't parsed as booleans.
+void parseEntryBooleanValue(Envoy::Runtime::Snapshot::Entry& entry) {
+  absl::string_view stripped = entry.raw_string_value_;
+  stripped = absl::StripAsciiWhitespace(stripped);
+
+  if (absl::EqualsIgnoreCase(stripped, "true")) {
+    entry.bool_value_ = true;
+  } else if (absl::EqualsIgnoreCase(stripped, "false")) {
+    entry.bool_value_ = false;
+  }
+}
+
+SnapshotImpl::Entry SnapshotImpl::createEntry(const ProtobufWkt::Value& value,
+                                              absl::string_view raw_string) {
   Entry entry;
   switch (value.kind_case()) {
   case ProtobufWkt::Value::kNumberValue:
-    entry.double_value_ = value.number_value();
-    entry.bool_value_ = value.number_value() != 0;
-    if (entry.double_value_ >= 0 && entry.double_value_ <= std::numeric_limits<uint64_t>::max()) {
-      // Valid uint values will always be parseable as doubles, so we assign the value to both the
-      // uint and double fields. In cases where the value is something like "3.1", we will floor the
-      // number by casting it to a uint and assigning the uint value.
-      entry.uint_value_ = entry.double_value_;
-    }
+    setNumberValue(entry, value.number_value());
     break;
   case ProtobufWkt::Value::kBoolValue:
     entry.bool_value_ = value.bool_value();
@@ -280,6 +314,16 @@ SnapshotImpl::Entry SnapshotImpl::createEntry(const ProtobufWkt::Value& value) {
   case ProtobufWkt::Value::kStructValue:
     parseFractionValue(entry, value.struct_value());
     break;
+  case ProtobufWkt::Value::kStringValue:
+    entry.raw_string_value_ = value.string_value();
+    parseEntryDoubleValue(entry);
+    // TODO(alyssawilk) after this PR lands and sticks, ENVOY_BUG these
+    // functions and see if we can remove the special casing.
+    parseEntryBooleanValue(entry);
+    parseEntryFractionalPercentValue(entry);
+    if (!raw_string.empty()) {
+      entry.raw_string_value_ = raw_string;
+    }
   default:
     break;
   }
@@ -287,60 +331,12 @@ SnapshotImpl::Entry SnapshotImpl::createEntry(const ProtobufWkt::Value& value) {
   return entry;
 }
 
-bool SnapshotImpl::parseEntryBooleanValue(Entry& entry) {
-  absl::string_view stripped = entry.raw_string_value_;
-  stripped = absl::StripAsciiWhitespace(stripped);
-
-  uint64_t parse_int;
-  if (absl::SimpleAtoi(stripped, &parse_int)) {
-    entry.bool_value_ = (parse_int != 0);
-    // This is really an integer, so return false here not because of failure, but so we continue to
-    // parse doubles/int.
-    return false;
-  } else if (absl::EqualsIgnoreCase(stripped, "true")) {
-    entry.bool_value_ = true;
-    return true;
-  } else if (absl::EqualsIgnoreCase(stripped, "false")) {
-    entry.bool_value_ = false;
-    return true;
-  }
-  return false;
-}
-
-bool SnapshotImpl::parseEntryDoubleValue(Entry& entry) {
-  double converted_double;
-  if (absl::SimpleAtod(entry.raw_string_value_, &converted_double)) {
-    entry.double_value_ = converted_double;
-    return true;
-  }
-  return false;
-}
-
-void SnapshotImpl::parseEntryFractionalPercentValue(Entry& entry) {
-  envoy::type::v3::FractionalPercent converted_fractional_percent;
-  TRY_ASSERT_MAIN_THREAD {
-    MessageUtil::loadFromYamlAndValidate(entry.raw_string_value_, converted_fractional_percent,
-                                         ProtobufMessage::getStrictValidationVisitor());
-  }
-  END_TRY
-  catch (const ProtoValidationException& ex) {
-    ENVOY_LOG(error, "unable to validate fraction percent runtime proto: {}", ex.what());
-    return;
-  }
-  catch (const EnvoyException& ex) {
-    // An EnvoyException is thrown when we try to parse a bogus string as a protobuf. This is fine,
-    // since there was no expectation that the raw string was a valid proto.
-    return;
-  }
-
-  entry.fractional_percent_value_ = converted_fractional_percent;
-}
-
 void AdminLayer::mergeValues(const absl::node_hash_map<std::string, std::string>& values) {
   for (const auto& kv : values) {
     values_.erase(kv.first);
     if (!kv.second.empty()) {
-      values_.emplace(kv.first, SnapshotImpl::createEntry(kv.second));
+      values_.emplace(kv.first,
+                      SnapshotImpl::createEntry(ValueUtil::loadFromYaml(kv.second), kv.second));
     }
   }
   stats_.admin_overrides_active_.set(values_.empty() ? 0 : 1);
@@ -403,7 +399,8 @@ void DiskLayer::walkDirectory(const std::string& path, const std::string& prefix
       // Separate erase/insert calls required due to the value type being constant; this prevents
       // the use of the [] operator. Can leverage insert_or_assign in C++17 in the future.
       values_.erase(full_prefix);
-      values_.insert({full_prefix, SnapshotImpl::createEntry(value)});
+      values_.insert(
+          {full_prefix, SnapshotImpl::createEntry(ValueUtil::loadFromYaml(value), value)});
     }
   }
 }
@@ -423,7 +420,7 @@ void ProtoLayer::walkProtoValue(const ProtobufWkt::Value& v, const std::string& 
     throw EnvoyException(absl::StrCat("Invalid runtime entry value for ", prefix));
     break;
   case ProtobufWkt::Value::kStringValue:
-    values_.emplace(prefix, SnapshotImpl::createEntry(v.string_value()));
+    values_.emplace(prefix, SnapshotImpl::createEntry(v));
     break;
   case ProtobufWkt::Value::kNumberValue:
   case ProtobufWkt::Value::kBoolValue:
