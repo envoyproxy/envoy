@@ -525,6 +525,18 @@ Filter::sendLocalReply(Http::Code response_code, std::string body_text,
   return CAPIStatus::CAPIOK;
 };
 
+CAPIStatus Filter::sendPanicReply(absl::string_view details) {
+  config_->stats().panic_error_.inc();
+  ENVOY_LOG(error, "[go_plugin_http][{}] {}", config_->pluginName(),
+            absl::StrCat("filter paniced with error details: ", details));
+  // We choose not to pass along the details in the response because
+  // we don't want to leak the operational details of the service for security reasons.
+  // Operators should be able to view the details via the log message above
+  // and use the stats for o11y
+  return sendLocalReply(Http::Code::InternalServerError, "error happened in filter\r\n", nullptr,
+                        Grpc::Status::WellKnownGrpcStatus::Ok, "");
+}
+
 CAPIStatus Filter::continueStatus(GolangStatus status) {
   Thread::LockGuard lock(mutex_);
   if (has_destroyed_) {
@@ -971,10 +983,11 @@ uint64_t Filter::getMergedConfigId(ProcessorState& state) {
 
 FilterConfig::FilterConfig(
     const envoy::extensions::filters::http::golang::v3alpha::Config& proto_config,
-    Dso::HttpFilterDsoPtr dso_lib)
+    Dso::HttpFilterDsoPtr dso_lib, const std::string& stats_prefix,
+    Server::Configuration::FactoryContext& context)
     : plugin_name_(proto_config.plugin_name()), so_id_(proto_config.library_id()),
       so_path_(proto_config.library_path()), plugin_config_(proto_config.plugin_config()),
-      dso_lib_(dso_lib) {
+      stats_(GolangFilterStats::generateStats(stats_prefix, context.scope())), dso_lib_(dso_lib) {
   ENVOY_LOG(debug, "initilizing golang filter config");
   // NP: dso may not loaded yet, can not invoke envoyGoFilterNewHttpPluginConfig yet.
 };

@@ -15,6 +15,7 @@
 #include "contrib/envoy/extensions/filters/http/golang/v3alpha/golang.pb.h"
 #include "contrib/golang/common/dso/dso.h"
 #include "contrib/golang/filters/http/source/processor_state.h"
+#include "contrib/golang/filters/http/source/stats.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -27,7 +28,8 @@ namespace Golang {
 class FilterConfig : Logger::Loggable<Logger::Id::http> {
 public:
   FilterConfig(const envoy::extensions::filters::http::golang::v3alpha::Config& proto_config,
-               Dso::HttpFilterDsoPtr dso_lib);
+               Dso::HttpFilterDsoPtr dso_lib, const std::string& stats_prefix,
+               Server::Configuration::FactoryContext& context);
   // TODO: delete config in Go
   virtual ~FilterConfig() = default;
 
@@ -35,12 +37,16 @@ public:
   const std::string& soPath() const { return so_path_; }
   const std::string& pluginName() const { return plugin_name_; }
   uint64_t getConfigId();
+  GolangFilterStats& stats() { return stats_; }
 
 private:
   const std::string plugin_name_;
   const std::string so_id_;
   const std::string so_path_;
   const ProtobufWkt::Any plugin_config_;
+
+  GolangFilterStats stats_;
+
   Dso::HttpFilterDsoPtr dso_lib_;
   uint64_t config_id_{0};
 };
@@ -152,6 +158,8 @@ public:
   CAPIStatus sendLocalReply(Http::Code response_code, std::string body_text,
                             std::function<void(Http::ResponseHeaderMap& headers)> modify_headers,
                             Grpc::Status::GrpcStatus grpc_status, std::string details);
+
+  CAPIStatus sendPanicReply(absl::string_view details);
 
   CAPIStatus getHeader(absl::string_view key, GoString* go_value);
   CAPIStatus copyHeaders(GoString* go_strs, char* go_buf);

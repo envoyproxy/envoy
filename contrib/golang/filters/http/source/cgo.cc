@@ -169,6 +169,13 @@ void envoyGoFilterHttpFinalize(void* r, int reason) {
   delete req;
 }
 
+CAPIStatus envoyGoFilterHttpSendPanicReply(void* r, void* details) {
+  return envoyGoFilterHandlerWrapper(r, [details](std::shared_ptr<Filter>& filter) -> CAPIStatus {
+    // Since this is only used for logs we don't need to deep copy.
+    return filter->sendPanicReply(referGoString(details));
+  });
+}
+
 #ifdef __cplusplus
 }
 #endif

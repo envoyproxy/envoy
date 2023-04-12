@@ -411,9 +411,11 @@ typed_config:
     // check resp status
     EXPECT_EQ("500", response->headers().getStatusValue());
 
-    // error happened in Golang filter\r\n
-    auto body = StringUtil::toUpper("error happened in Golang filter\r\n");
+    // error happened in filter\r\n
+    auto body = StringUtil::toUpper("error happened in filter\r\n");
     EXPECT_EQ(body, StringUtil::toUpper(response->body()));
+
+    EXPECT_EQ(1, test_server_->counter("http.config_test.golang.panic_error")->value());
 
     cleanup();
   }
