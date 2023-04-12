@@ -39,10 +39,14 @@ message ClusterConfig {
     // Most of the configuration of a sub cluster is inherit of the current cluster,
     // i.e. health_checks, dns_resolvers and etc.
     // And the load_assignment will be set to the only one endpoint, host:port.
+    //
     // Compared to the dns_cache_config, it has the following advantages:
+    //
     // 1. a sub cluster could be specified with the STRICT_DNS DiscoveryType,
     //    so that Envoy will use all of the IPs resolved from the host.
+    //
     // 2. each sub cluster is full featured cluster, with lb_policy and health check and etc enabled.
+    //
     SubClustersConfig sub_clusters_config = 4;
   }
 
