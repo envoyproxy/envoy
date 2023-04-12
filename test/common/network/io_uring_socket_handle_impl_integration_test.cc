@@ -565,7 +565,7 @@ TEST_F(IoUringSocketHandleImplIntegrationTest, Recv) {
         EXPECT_EQ(ret.return_value_, 5);
         reservation.commit(ret.return_value_);
 
-        // Recv without flags bahaves the same as readv.
+        // Recv without flags behaves the same as readv.
         Buffer::Reservation reservation2 = recv_buffer.reserveForRead();
         auto ret2 = server_io_handler->recv(reservation2.slices()->mem_, reservation2.length(), 0);
         EXPECT_EQ(ret2.return_value_, data.size());
