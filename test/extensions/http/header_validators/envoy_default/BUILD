@@ -66,7 +66,6 @@ envoy_extension_cc_test_library(
     ],
     extension_names = ["envoy.http.header_validators.envoy_default"],
     deps = [
-        "//source/extensions/http/header_validators/envoy_default:config",
         "//test/mocks/http:header_validator_mocks",
         "@envoy_api//envoy/extensions/http/header_validators/envoy_default/v3:pkg_cc_proto",
     ],

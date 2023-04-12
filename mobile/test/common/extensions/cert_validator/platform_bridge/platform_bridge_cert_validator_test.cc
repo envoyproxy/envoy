@@ -224,6 +224,38 @@ TEST_P(PlatformBridgeCertValidatorTest, ValidCertificate) {
   EXPECT_FALSE(waitForDispatcherToExit());
 }
 
+TEST_P(PlatformBridgeCertValidatorTest, ValidCertificateEmptySocketOptions) {
+  initializeConfig();
+  PlatformBridgeCertValidator validator(&config_, stats_, &platform_validator_);
+
+  std::string hostname = "server1.example.com";
+  bssl::UniquePtr<STACK_OF(X509)> cert_chain = readCertChainFromFile(TestEnvironment::substitute(
+      "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns2_cert.pem"));
+  envoy_cert_validation_result result = {ENVOY_SUCCESS, 0, NULL};
+  EXPECT_CALL(*mock_validator_, validate(_, _, _)).WillOnce(Return(result));
+  EXPECT_CALL(*mock_validator_, cleanup());
+  auto& callback_ref = *callback_;
+  EXPECT_CALL(callback_ref, dispatcher()).WillRepeatedly(ReturnRef(*dispatcher_));
+
+  // Set up transport socket options with an empty SAN list.
+  std::vector<std::string> subject_alt_names;
+  transport_socket_options_ =
+      std::make_shared<Network::TransportSocketOptionsImpl>("", std::move(subject_alt_names));
+
+  ValidationResults results =
+      validator.doVerifyCertChain(*cert_chain, std::move(callback_), transport_socket_options_,
+                                  *ssl_ctx_, validation_context_, is_server_, hostname);
+  EXPECT_EQ(ValidationResults::ValidationStatus::Pending, results.status);
+
+  EXPECT_CALL(callback_ref,
+              onCertValidationResult(true, Envoy::Ssl::ClientValidationStatus::Validated, "", 46))
+      .WillOnce(Invoke([this]() {
+        EXPECT_EQ(main_thread_id_, std::this_thread::get_id());
+        dispatcher_->exit();
+      }));
+  EXPECT_FALSE(waitForDispatcherToExit());
+}
+
 TEST_P(PlatformBridgeCertValidatorTest, ValidCertificateButInvalidSni) {
   initializeConfig();
   PlatformBridgeCertValidator validator(&config_, stats_, &platform_validator_);

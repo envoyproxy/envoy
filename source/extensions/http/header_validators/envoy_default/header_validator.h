@@ -27,6 +27,9 @@ public:
           config,
       ::Envoy::Http::Protocol protocol, ::Envoy::Http::HeaderValidatorStats& stats);
 
+  enum class RejectOrDropHeaderAction { Accept, Reject, DropHeader };
+
+  using HeaderEntryValidationResult = Result<RejectOrDropHeaderAction>;
   using HeaderValueValidationResult = RejectResult;
   /*
    * Validate the :method pseudo header, honoring the restrict_http_methods configuration option.
@@ -141,7 +144,7 @@ protected:
   using HeaderValidatorFunction = std::function<HeaderValidator::HeaderValueValidationResult(
       const ::Envoy::Http::HeaderString&)>;
   using HeaderValidatorMap = absl::node_hash_map<absl::string_view, HeaderValidatorFunction>;
-  ::Envoy::Http::HeaderValidator::HeaderEntryValidationResult
+  HeaderEntryValidationResult
   validateGenericRequestHeaderEntry(const ::Envoy::Http::HeaderString& key,
                                     const ::Envoy::Http::HeaderString& value,
                                     const HeaderValidatorMap& protocol_specific_header_validators);

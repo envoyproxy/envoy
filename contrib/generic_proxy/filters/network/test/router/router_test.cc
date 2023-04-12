@@ -197,6 +197,9 @@ TEST_F(RouterFilterTest, UpstreamRequestResetBeforePoolCallbackWithTracing) {
   EXPECT_CALL(*child_span_, setTag(Tracing::Tags::get().ErrorReason, "local_reset"));
   EXPECT_CALL(*child_span_, setTag(Tracing::Tags::get().Component, "proxy"));
   EXPECT_CALL(*child_span_, setTag(Tracing::Tags::get().ResponseFlags, "-"));
+  EXPECT_CALL(*child_span_, setTag(Tracing::Tags::get().UpstreamCluster, "fake_cluster"));
+  EXPECT_CALL(*child_span_, setTag(Tracing::Tags::get().UpstreamClusterName, "observability_name"));
+
   EXPECT_CALL(*child_span_, finishSpan());
 
   EXPECT_CALL(
@@ -234,6 +237,8 @@ TEST_F(RouterFilterTest, UpstreamRequestPoolFailureConnctionOverflowWithTracing)
   EXPECT_CALL(*child_span_, setTag(Tracing::Tags::get().ErrorReason, "overflow"));
   EXPECT_CALL(*child_span_, setTag(Tracing::Tags::get().Component, "proxy"));
   EXPECT_CALL(*child_span_, setTag(Tracing::Tags::get().ResponseFlags, "-"));
+  EXPECT_CALL(*child_span_, setTag(Tracing::Tags::get().UpstreamCluster, "fake_cluster"));
+  EXPECT_CALL(*child_span_, setTag(Tracing::Tags::get().UpstreamClusterName, "observability_name"));
   EXPECT_CALL(*child_span_, finishSpan());
 
   EXPECT_CALL(mock_filter_callback_, sendLocalReply(_, _))
@@ -264,6 +269,9 @@ TEST_F(RouterFilterTest, UpstreamRequestPoolFailureConnctionTimeoutWithTracing) 
   EXPECT_CALL(*child_span_, setTag(Tracing::Tags::get().ErrorReason, "connection_failure"));
   EXPECT_CALL(*child_span_, setTag(Tracing::Tags::get().Component, "proxy"));
   EXPECT_CALL(*child_span_, setTag(Tracing::Tags::get().ResponseFlags, "-"));
+  EXPECT_CALL(*child_span_, setTag(Tracing::Tags::get().UpstreamCluster, "fake_cluster"));
+  EXPECT_CALL(*child_span_, setTag(Tracing::Tags::get().UpstreamClusterName, "observability_name"));
+
   EXPECT_CALL(*child_span_, finishSpan());
 
   EXPECT_CALL(mock_filter_callback_, sendLocalReply(_, _))
@@ -605,6 +613,9 @@ TEST_F(RouterFilterTest, UpstreamRequestPoolReadyAndEndStreamBeforeResponseWithT
   EXPECT_CALL(*child_span_, setTag(Tracing::Tags::get().ErrorReason, "protocol_error"));
   EXPECT_CALL(*child_span_, setTag(Tracing::Tags::get().Component, "proxy"));
   EXPECT_CALL(*child_span_, setTag(Tracing::Tags::get().ResponseFlags, "-"));
+  EXPECT_CALL(*child_span_, setTag(Tracing::Tags::get().UpstreamCluster, "fake_cluster"));
+  EXPECT_CALL(*child_span_, setTag(Tracing::Tags::get().UpstreamClusterName, "observability_name"));
+
   EXPECT_CALL(*child_span_, finishSpan());
 
   upstream_request->onUpstreamData(test_buffer, true);

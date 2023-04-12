@@ -93,7 +93,7 @@ void WorkerImpl::removeFilterChains(uint64_t listener_tag,
       });
 }
 
-void WorkerImpl::start(GuardDog& guard_dog, const Event::PostCb& cb) {
+void WorkerImpl::start(GuardDog& guard_dog, const std::function<void()>& cb) {
   ASSERT(!thread_);
 
   // In posix, thread names are limited to 15 characters, so contrive to make
@@ -132,7 +132,7 @@ void WorkerImpl::stopListener(Network::ListenerConfig& listener, std::function<v
   });
 }
 
-void WorkerImpl::threadRoutine(GuardDog& guard_dog, const Event::PostCb& cb) {
+void WorkerImpl::threadRoutine(GuardDog& guard_dog, const std::function<void()>& cb) {
   ENVOY_LOG(debug, "worker entering dispatch loop");
   // The watch dog must be created after the dispatcher starts running and has post events flushed,
   // as this is when TLS stat scopes start working.

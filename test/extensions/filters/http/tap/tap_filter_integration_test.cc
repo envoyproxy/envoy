@@ -113,13 +113,16 @@ public:
   }
 
   void startAdminRequest(const std::string& admin_request_yaml) {
-    admin_client_ = makeHttpConnection(makeClientConnection(lookupPort("admin")));
     const Http::TestRequestHeaderMapImpl admin_request_headers{
         {":method", "POST"}, {":path", "/tap"}, {":scheme", "http"}, {":authority", "host"}};
-    admin_response_ = admin_client_->makeRequestWithBody(admin_request_headers, admin_request_yaml);
-    admin_response_->waitForHeaders();
-    EXPECT_EQ("200", admin_response_->headers().getStatusValue());
-    EXPECT_FALSE(admin_response_->complete());
+    WAIT_FOR_LOG_CONTAINS("debug", "New tap installed on all workers.", {
+      admin_client_ = makeHttpConnection(makeClientConnection(lookupPort("admin")));
+      admin_response_ =
+          admin_client_->makeRequestWithBody(admin_request_headers, admin_request_yaml);
+      admin_response_->waitForHeaders();
+      EXPECT_EQ("200", admin_response_->headers().getStatusValue());
+      EXPECT_FALSE(admin_response_->complete());
+    });
   }
 
   std::string getTempPathPrefix() {
