@@ -588,7 +588,11 @@ TEST_P(TcpListenerImplTest, EachQueuedConnectionShouldQueryTheLoadShedPoint) {
 
   // Now that we've seen that the connection hasn't been closed by the listener, make sure to
   // close it.
+  EXPECT_CALL(connection_callbacks2, onEvent(ConnectionEvent::LocalClose));
   client_connection2->close(ConnectionCloseType::NoFlush);
+
+  // Clear client_connection1.
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
 }
 
 } // namespace
