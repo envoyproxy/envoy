@@ -37,7 +37,7 @@ HTTP Connection Manager
 ***********************
 
 For HTTP Connection Manager, it is possible to enable an access log once when a new HTTP request is received, and before iterating the filter chain by using
-:ref:`flush access log on new request <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.flush_access_log_on_new_request>`
+:ref:`flush access log on new request <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.HcmAccessLogOptions.flush_access_log_on_new_request>`
 Note: Some information such as upstream host will not be available yet.
 
 HTTP Router Filter
@@ -64,7 +64,7 @@ HTTP Connection Manager
 ***********************
 
 For HTTP Connection Manager, it is possible to enable a prediodic access log by using
-:ref:`access log flush interval <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.access_log_flush_interval>`
+:ref:`access log flush interval <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.HcmAccessLogOptions.access_log_flush_interval>`
 Note: The first interval count will start right after the HTTP request is received by the HTTP Connection Manager filter and before iterating the HTTP filter chain.
 
 .. _arch_overview_access_log_filters:
