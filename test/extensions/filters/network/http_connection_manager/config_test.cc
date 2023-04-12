@@ -1567,6 +1567,243 @@ filter:
   EXPECT_THROW(parseHttpConnectionManagerFromYaml(yaml_string), EnvoyException);
 }
 
+TEST_F(HttpConnectionManagerConfigTest, FlushAccessLogOnNewRequest) {
+  std::string base_yaml_string = R"EOF(
+      codec_type: http1
+      stat_prefix: my_stat_prefix
+      route_config:
+        virtual_hosts:
+        - name: default
+          domains:
+          - "*"
+          routes:
+          - match:
+              prefix: "/"
+            route:
+              cluster: fake_cluster
+      http_filters:
+      - name: envoy.filters.http.router
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+    )EOF";
+
+  {
+    HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(base_yaml_string),
+                                       context_, date_provider_, route_config_provider_manager_,
+                                       scoped_routes_config_provider_manager_, tracer_manager_,
+                                       filter_config_provider_manager_);
+
+    EXPECT_FALSE(config.flushAccessLogOnNewRequest());
+  }
+
+  {
+    std::string yaml_string = base_yaml_string + R"EOF(
+      access_log_options:
+        flush_access_log_on_new_request: false
+    )EOF";
+
+    HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
+                                       date_provider_, route_config_provider_manager_,
+                                       scoped_routes_config_provider_manager_, tracer_manager_,
+                                       filter_config_provider_manager_);
+
+    EXPECT_FALSE(config.flushAccessLogOnNewRequest());
+  }
+
+  {
+    std::string yaml_string = base_yaml_string + R"EOF(
+      access_log_options:
+        flush_access_log_on_new_request: true
+    )EOF";
+
+    HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
+                                       date_provider_, route_config_provider_manager_,
+                                       scoped_routes_config_provider_manager_, tracer_manager_,
+                                       filter_config_provider_manager_);
+
+    EXPECT_TRUE(config.flushAccessLogOnNewRequest());
+  }
+}
+
+TEST_F(HttpConnectionManagerConfigTest,
+       DEPRECATED_FEATURE_TEST(DeprecatedFlushAccessLogOnNewRequest)) {
+  std::string base_yaml_string = R"EOF(
+      codec_type: http1
+      stat_prefix: my_stat_prefix
+      route_config:
+        virtual_hosts:
+        - name: default
+          domains:
+          - "*"
+          routes:
+          - match:
+              prefix: "/"
+            route:
+              cluster: fake_cluster
+      http_filters:
+      - name: envoy.filters.http.router
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+    )EOF";
+
+  {
+    std::string yaml_string = base_yaml_string + R"EOF(
+      flush_access_log_on_new_request: true # deprecated field
+    )EOF";
+
+    HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
+                                       date_provider_, route_config_provider_manager_,
+                                       scoped_routes_config_provider_manager_, tracer_manager_,
+                                       filter_config_provider_manager_);
+
+    EXPECT_TRUE(config.flushAccessLogOnNewRequest());
+  }
+
+  {
+    std::string yaml_string = base_yaml_string + R"EOF(
+      access_log_options:
+        flush_access_log_on_new_request: true
+      flush_access_log_on_new_request: true # deprecated field
+    )EOF";
+
+    EXPECT_THROW_WITH_MESSAGE(
+        HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string),
+                                           context_, date_provider_, route_config_provider_manager_,
+                                           scoped_routes_config_provider_manager_, tracer_manager_,
+                                           filter_config_provider_manager_),
+        EnvoyException,
+        "Only one of flush_access_log_on_new_request or access_log_options can be specified.");
+  }
+
+  {
+    std::string yaml_string = base_yaml_string + R"EOF(
+      access_log_options:
+        flush_access_log_on_new_request: true
+      access_log_flush_interval: 1s # deprecated field
+    )EOF";
+
+    EXPECT_THROW_WITH_MESSAGE(
+        HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string),
+                                           context_, date_provider_, route_config_provider_manager_,
+                                           scoped_routes_config_provider_manager_, tracer_manager_,
+                                           filter_config_provider_manager_),
+        EnvoyException,
+        "Only one of access_log_flush_interval or access_log_options can be specified.");
+  }
+}
+
+TEST_F(HttpConnectionManagerConfigTest, AccessLogFlushInterval) {
+  std::string base_yaml_string = R"EOF(
+      codec_type: http1
+      stat_prefix: my_stat_prefix
+      route_config:
+        virtual_hosts:
+        - name: default
+          domains:
+          - "*"
+          routes:
+          - match:
+              prefix: "/"
+            route:
+              cluster: fake_cluster
+      http_filters:
+      - name: envoy.filters.http.router
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+    )EOF";
+
+  {
+    HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(base_yaml_string),
+                                       context_, date_provider_, route_config_provider_manager_,
+                                       scoped_routes_config_provider_manager_, tracer_manager_,
+                                       filter_config_provider_manager_);
+
+    EXPECT_FALSE(config.accessLogFlushInterval().has_value());
+  }
+
+  {
+    std::string yaml_string = base_yaml_string + R"EOF(
+      access_log_options:
+        access_log_flush_interval: 1s
+    )EOF";
+
+    HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
+                                       date_provider_, route_config_provider_manager_,
+                                       scoped_routes_config_provider_manager_, tracer_manager_,
+                                       filter_config_provider_manager_);
+
+    EXPECT_TRUE(config.accessLogFlushInterval().has_value());
+    EXPECT_EQ(std::chrono::seconds(1), config.accessLogFlushInterval().value());
+  }
+}
+
+TEST_F(HttpConnectionManagerConfigTest, DEPRECATED_FEATURE_TEST(DeprecatedAccessLogFlushInterval)) {
+  std::string base_yaml_string = R"EOF(
+      codec_type: http1
+      stat_prefix: my_stat_prefix
+      route_config:
+        virtual_hosts:
+        - name: default
+          domains:
+          - "*"
+          routes:
+          - match:
+              prefix: "/"
+            route:
+              cluster: fake_cluster
+      http_filters:
+      - name: envoy.filters.http.router
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+    )EOF";
+
+  {
+    std::string yaml_string = base_yaml_string + R"EOF(
+      access_log_flush_interval: 1s # deprecated field
+    )EOF";
+
+    HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
+                                       date_provider_, route_config_provider_manager_,
+                                       scoped_routes_config_provider_manager_, tracer_manager_,
+                                       filter_config_provider_manager_);
+
+    EXPECT_TRUE(config.accessLogFlushInterval().has_value());
+    EXPECT_EQ(std::chrono::seconds(1), config.accessLogFlushInterval().value());
+  }
+
+  {
+    std::string yaml_string = base_yaml_string + R"EOF(
+      access_log_options:
+        access_log_flush_interval: 1s
+      access_log_flush_interval: 1s # deprecated field
+    )EOF";
+
+    EXPECT_THROW_WITH_MESSAGE(
+        HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string),
+                                           context_, date_provider_, route_config_provider_manager_,
+                                           scoped_routes_config_provider_manager_, tracer_manager_,
+                                           filter_config_provider_manager_),
+        EnvoyException,
+        "Only one of access_log_flush_interval or access_log_options can be specified.");
+  }
+
+  {
+    std::string yaml_string = base_yaml_string + R"EOF(
+      access_log_options:
+        access_log_flush_interval: 1s
+      flush_access_log_on_new_request: true # deprecated field
+    )EOF";
+
+    EXPECT_THROW_WITH_MESSAGE(
+        HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string),
+                                           context_, date_provider_, route_config_provider_manager_,
+                                           scoped_routes_config_provider_manager_, tracer_manager_,
+                                           filter_config_provider_manager_),
+        EnvoyException,
+        "Only one of flush_access_log_on_new_request or access_log_options can be specified.");
+  }
+}
+
 TEST_F(HttpConnectionManagerConfigTest, BadAccessLogConfig) {
   std::string yaml_string = R"EOF(
 codec_type: http1
