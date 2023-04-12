@@ -1,0 +1,32 @@
+syntax = "proto3";
+
+package envoy.extensions.geoip_providers.maxmind.v3;
+
+import "envoy/extensions/geoip_providers/common/v3/common.proto";
+
+import "xds/annotations/v3/status.proto";
+
+import "udpa/annotations/status.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.geoip_providers.maxmind.v3";
+option java_outer_classname = "MaxmindProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/geoip_providers/maxmind/v3;maxmindv3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+option (xds.annotations.v3.file_status).work_in_progress = true;
+
+// [#protodoc-title: MaxMind geolocation provider]
+
+// Configuration for the MaxMind geolocation provider.
+// [#extension: envoy.geoip_providers.maxmind]
+message MaxMindConfig {
+  string city_db_path = 1;
+
+  string isp_db_path = 2;
+
+  string anon_db_path = 3;
+
+  common.v3.CommonGeoipProviderConfig common_provider_config = 4
+      [(validate.rules).message = {required: true}];
+}

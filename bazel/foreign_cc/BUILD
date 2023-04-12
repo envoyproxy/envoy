@@ -570,3 +570,20 @@ envoy_cmake(
     }),
     working_directory = "build/cmake",
 )
+
+envoy_cmake(
+    name = "maxmind",
+    cache_entries = {
+        "CMAKE_BUILD_TYPE": "Release",
+        "CMAKE_INSTALL_LIBDIR": "lib",
+        "CMAKE_CXX_COMPILER_FORCED": "on",
+        "BUILD_SHARED_LIBS": "no",
+        "BUILD_TESTING": "no",
+    },
+    defines = ["MAXMIND_STATICLIB"],
+    lib_source = "@com_github_maxmind_libmaxminddb//:all",
+    out_static_libs = select({
+        "//bazel:windows_x86_64": ["libmaxminddb.lib"],
+        "//conditions:default": ["libmaxminddb.a"],
+    }),
+)

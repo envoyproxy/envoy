@@ -7,6 +7,7 @@ Filter uses client address to lookup information (eg client's city, country) in 
 Upon a successful lookup request will be enriched with the configured geolocation header and value from the database.
 In case the configured geolocation headers are present in the incoming request, they will be overriden by the filter.
 Geolocation filter emits stats for the number of successful lookups and the number of total lookups.
+As for now, only `Maxmind <https://www.maxmind.com/en/geoip2-services-and-databases>` geolocation provider is supported.
 
 Configuration
 -------------

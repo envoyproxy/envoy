@@ -17,7 +17,7 @@ envoy_cc_library(
     srcs = ["geoip_filter.cc"],
     hdrs = ["geoip_filter.h"],
     deps = [
-        ":provider_config",
+        "//envoy/geoip:geoip_provider_driver_interface",
         "//envoy/http:filter_interface",
         "//envoy/runtime:runtime_interface",
         "//source/common/common:assert_lib",
@@ -29,28 +29,12 @@ envoy_cc_library(
     ],
 )
 
-#todo(nezdolik) may need to split into interface and impl
-envoy_cc_extension(
-    name = "provider_config",
-    hdrs = [
-        "geoip_provider_config.h",
-        "geoip_provider_config_impl.h",
-    ],
-    deps = [
-        "//envoy/config:typed_config_interface",
-        "//envoy/network:address_interface",
-        "//envoy/protobuf:message_validator_interface",
-        "//source/common/common:hash_lib",
-        "@envoy_api//envoy/extensions/filters/http/geoip/v3:pkg_cc_proto",
-    ],
-)
-
 envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
     deps = [
-        ":provider_config",
+        "//envoy/geoip:geoip_provider_driver_interface",
         "//source/common/config:utility_lib",
         "//source/common/protobuf:utility_lib",
         "//source/extensions/filters/http/common:factory_base_lib",
