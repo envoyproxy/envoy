@@ -29,6 +29,12 @@ public:
     EXPECT_CALL(snapshot_, snapshotTime()).WillRepeatedly(Return(time));
   }
 
+  ~OpenTelemetryStatsSinkTests() {
+    for (histogram_t* hist : histogram_ptrs_) {
+      hist_free(hist);
+    }
+  }
+
   const OtlpOptionsSharedPtr otlpOptions(bool report_counters_as_deltas = false,
                                          bool report_histograms_as_deltas = false,
                                          bool emit_tags_as_attributes = true,

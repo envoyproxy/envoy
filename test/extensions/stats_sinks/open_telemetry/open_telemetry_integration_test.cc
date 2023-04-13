@@ -87,7 +87,7 @@ public:
       const Protobuf::RepeatedPtrField<opentelemetry::proto::metrics::v1::Metric>& metrics =
           export_request.resource_metrics()[0].scope_metrics()[0].metrics();
 
-      EXPECT_TRUE(metrics.size() > 0);
+      EXPECT_TRUE(!metrics.empty());
 
       long long int previous_time_stamp = 0;
       for (const opentelemetry::proto::metrics::v1::Metric& metric : metrics) {
