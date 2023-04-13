@@ -10,7 +10,6 @@
 // Follow-ups:
 //   * top-n algorithm to limit compute overhead with high cardinality stats with user control of N.
 //   * alternate sorting criteria, reverse-sort controls, etc.
-//   * render histograms
 //   * detect when user is not looking at page and stop or slow down pinging the server
 //   * hierarchical display
 //   * json flavor to send hierarchical names to save serialization/deserialization costs
@@ -22,9 +21,9 @@
 //   * rename bucket mode "none" to "summary"
 //   * improve graphics
 //   * log Y axis
-//   * deal with large # of buckets (combine adjacent?).
-//    --  Say: max 24 buckets and interpolate in C++
 //   * integrate interval view.
+//   * Remove empty buckets
+//   * stretchable height
 
 /**
  * Maps a stat name to a record containing name, value, and a use-count. This
