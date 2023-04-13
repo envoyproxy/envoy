@@ -24,6 +24,7 @@
 //   * integrate interval view.
 //   * Remove empty buckets
 //   * stretchable height
+//   * separate /stats/active-html endpoint w/o 'used only' and 'buckets' choices.
 
 /**
  * Maps a stat name to a record containing name, value, and a use-count. This
@@ -362,10 +363,13 @@ function renderHistogramDetail(supported_percentiles, detail) {
     }
     const graphics = document.createElement('div');
     const labels = document.createElement('div');
+    const percentiles = document.createElement('div');
     div.appendChild(label);
     div.appendChild(graphics);
     div.appendChild(labels);
+    div.appendChild(percentiles);
     graphics.className = 'histogram-graphics';
+    percentiles.className = 'histogram-percentiles';
     labels.className = 'histogram-labels';
     activeStatsHistogramsDiv.appendChild(div);
 
@@ -434,7 +438,7 @@ function renderHistogramDetail(supported_percentiles, detail) {
     const bucketWidthVpx = 20;
     const percentileWidthVpx = 10;
     const marginWidthVpx = 40;
-    const marginMinWidthVpx = 5;
+    const percentileWidthAndMarginVpx = 20;
     const widthVpx = numBuckets * (bucketWidthVpx + marginWidthVpx);
 
     let first = true;
@@ -448,10 +452,13 @@ function renderHistogramDetail(supported_percentiles, detail) {
     //const marginWidth = toPercent(marginWidthVpx);
 
     let leftVpx = marginWidthVpx / 2;
-    for (bucket of histogram.detail) {
+    let prevVpx = 0;
+    for (i = 0; i < histogram.detail.length; ++i) {
+      const bucket = histogram.detail[i];
+
       // let marginVpx = marginWidthVpx;
       if (bucket.percentiles && bucket.percentiles.length > 0) {
-        let percentileLeftVpx = leftVpx - marginWidthVpx;
+        //let percentileLeftVpx = leftVpx - marginWidthVpx;
 
         // Compute how much margin surrounds each percentile line. Say there are 2
         // percentiles, each 5vpx wide. We'd subtract 10vpx from the initial margin
@@ -460,45 +467,67 @@ function renderHistogramDetail(supported_percentiles, detail) {
         //
         // All this math is done as floating point -- it will be rendered below as
         // rounded percentages.
+/*
         const percentileMarginVpx = Math.max(
             marginMinWidthVpx,
             (marginWidthVpx - bucket.percentiles.length * percentileWidthVpx) /
               (bucket.percentiles.length + 1));
-        //const percentileMargin = toPercent(percentileMarginVpx);
+*/
+
+        // Keep track of where we write each percentile so if the next one is very close,
+        // we can avoid overlapping the text.
+        let prevPercentileLabelVpx = 0;
 
         for (percentile of bucket.percentiles) {
+          // Find the ideal place to draw the percentile bar, by linearly
+          // interpolating between the current bucket and the previous bucket.
+          // We know that the next bucket does not come into play becasue
+          // the percentiles held underneath a bucket are based on a value that
+          // is at most as large as the current bucket.
+          let percentileVpx = leftVpx;
+          const prevBucket = histogram.detail[i - 1];
+          const bucketDelta = bucket.value - prevBucket.value;
+          if (bucketDelta > 0) {
+            const weight = (bucket.value - percentile[1]) / bucketDelta;
+            percentileVpx = weight * prevVpx + (1 - weight) * leftVpx;
+          }
+
+          // We always put the marker proportionally between this bucket and
+          // the next one.
           const span = document.createElement('span');
-          //span.className = 'tooltip';
-          //const label = document.createElement('span');
           span.className = 'histogram-percentile';
-          //span.style['margin-left'] = percentileMargin;
-          percentileLeftVpx += percentileMarginVpx;
-          const percentileLeft = toPercent(percentileLeftVpx);
-          span.style.left = percentileLeft;
-          // span.style.width = percentileWidth;
+          let percentilePercent = toPercent(percentileVpx);
+          span.style.left = percentilePercent;
+
+          // We try to put the text there too unless it's too close to the previous one.
+          if (percentileVpx < prevPercentileLabelVpx) {
+            percentileVpx = prevPercentileLabelVpx;
+            percentilePercent = toPercent(percentileVpx);
+          }
+          prevPercentileLabelVpx = percentileVpx + percentileWidthAndMarginVpx;
+
+          //percentileLeftVpx += percentileMarginVpx;
+          //const percentileLeft = toPercent(percentileLeftVpx);
 
           const percentilePLabel = document.createElement('span');
           percentilePLabel.className = 'percentile-label';
-          percentilePLabel.style.bottom = '65%';
+          percentilePLabel.style.bottom = 0;
           percentilePLabel.textContent = 'P' + percentile[0];
-          // percentilePLabel.style.right = toPercentBackward(percentileLeftVpx);
-          percentilePLabel.style.left = percentileLeft;
+          percentilePLabel.style.left = percentilePercent; // percentileLeft;
 
           const percentileVLabel = document.createElement('span');
           percentileVLabel.className = 'percentile-label';
-          percentileVLabel.style.bottom = '35%';
+          percentileVLabel.style.bottom = '30%';
           percentileVLabel.textContent = format(percentile[1]);
-          percentileVLabel.style.left = percentileLeft;
+          percentileVLabel.style.left = percentilePercent; // percentileLeft;
 
-          percentileLeftVpx += percentileWidthVpx;
+          // percentileLeftVpx += percentileWidthVpx;
 
-          graphics.appendChild(span);
-          graphics.appendChild(percentilePLabel);
-          graphics.appendChild(percentileVLabel);
-          //marginVpx -= percentileMarginVpx;
+          percentiles.appendChild(span);
+          percentiles.appendChild(percentilePLabel);
+          percentiles.appendChild(percentileVLabel);
         }
-        percentileLeftVpx += percentileMarginVpx;
-        //marginVpx = Math.max(marginVpx, marginMinWidthVpx);
+        // percentileLeftVpx += percentileMarginVpx;
       }
 
       // Now draw the bucket.
@@ -523,6 +552,7 @@ function renderHistogramDetail(supported_percentiles, detail) {
       graphics.appendChild(bucketSpan);
       graphics.appendChild(bucketLabel);
       labels.appendChild(label);
+      prevVpx = leftVpx;
       leftVpx += bucketWidthVpx + marginWidthVpx;;
     }
   }

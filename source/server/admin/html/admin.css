@@ -48,10 +48,11 @@
 }
 
 .histogram-graphics {
-  /*display: flex;
-  align-items: flex-start;
-  justify-content: stretch;*/
-  /* background-color: #555; */
+  height: 40px;
+  position: relative;
+}
+
+.histogram-percentiles {
   height: 40px;
   position: relative;
 }
@@ -75,16 +76,18 @@
   /* background-color: #c11; */
   background-color: #e6d7ff;
   position: absolute;
-  width: 15px;
+  width: 16px;
+  /* margin-left: -8px; */
 }
 
 .histogram-percentile {
-    width: 5px;
-    background-color: #b7ceb7;
-    height: 40%;
-    width: 5px;
-    bottom: 0;
-    position: absolute;
+  width: 5px;
+  background-color: #b7ceb7;
+  height: 40%;
+  width: 4px;
+  top: 0;
+  position: absolute;
+  /* margin-left: -2px; */
 }
 
 .bucket-label {
@@ -93,7 +96,7 @@
   font-family: sans-serif;
   font-size: 12px;
   /* color: white; */
-  margin-left: 2px;
+  /* margin-left: -12px; */
 }
 
 .percentile-label {
@@ -101,7 +104,7 @@
   font-family: sans-serif;
   font-size: 12px;
   /* margin-left: 8px; */
-  margin-left: -5px;
+  /* margin-left: -5px; */
   /* margin-right: 3px; */
   /* color: white; */
   z-index: 2;
