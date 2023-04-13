@@ -20,7 +20,6 @@ using ::Envoy::Http::Protocol;
 using ::Envoy::Http::TestRequestHeaderMapImpl;
 using ::Envoy::Http::TestRequestTrailerMapImpl;
 using ::Envoy::Http::TestResponseHeaderMapImpl;
-using ::Envoy::Http::TestResponseTrailerMapImpl;
 using ::Envoy::Http::UhvResponseCodeDetail;
 
 class Http2HeaderValidatorTest : public HeaderValidatorTest {
