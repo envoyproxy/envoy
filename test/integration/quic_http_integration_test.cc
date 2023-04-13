@@ -1469,7 +1469,7 @@ TEST_P(QuicInplaceLdsIntegrationTest, ReloadConfigUpdateNonDefaultFilterChain) {
 
   // Remove filter_chain_1.
   ConfigHelper new_config_helper(
-      version_, *api_, MessageUtil::getJsonStringFromMessageOrDie(config_helper_.bootstrap()));
+      version_, *api_, MessageUtil::getJsonStringFromMessageOrError(config_helper_.bootstrap()));
   new_config_helper.addConfigModifier(
       [&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
         auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
@@ -1512,7 +1512,7 @@ TEST_P(QuicInplaceLdsIntegrationTest, ReloadConfigUpdateDefaultFilterChain) {
 
   // Remove filter_chain_1.
   ConfigHelper new_config_helper(
-      version_, *api_, MessageUtil::getJsonStringFromMessageOrDie(config_helper_.bootstrap()));
+      version_, *api_, MessageUtil::getJsonStringFromMessageOrError(config_helper_.bootstrap()));
   new_config_helper.addConfigModifier(
       [&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
         auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
@@ -1532,7 +1532,7 @@ TEST_P(QuicInplaceLdsIntegrationTest, ReloadConfigUpdateDefaultFilterChain) {
 
   // Modify the default filter chain.
   ConfigHelper new_config_helper1(
-      version_, *api_, MessageUtil::getJsonStringFromMessageOrDie(new_config_helper.bootstrap()));
+      version_, *api_, MessageUtil::getJsonStringFromMessageOrError(new_config_helper.bootstrap()));
   new_config_helper1.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap)
                                            -> void {
     auto default_filter_chain =
@@ -1556,7 +1556,8 @@ TEST_P(QuicInplaceLdsIntegrationTest, ReloadConfigUpdateDefaultFilterChain) {
 
   // Remove the default filter chain.
   ConfigHelper new_config_helper2(
-      version_, *api_, MessageUtil::getJsonStringFromMessageOrDie(new_config_helper1.bootstrap()));
+      version_, *api_,
+      MessageUtil::getJsonStringFromMessageOrError(new_config_helper1.bootstrap()));
   new_config_helper2.addConfigModifier(
       [&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
         auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
@@ -1586,7 +1587,7 @@ TEST_P(QuicInplaceLdsIntegrationTest, EnableAndDisableEarlyData) {
 
   // Modify 1st transport socket factory to disable early data.
   ConfigHelper new_config_helper(
-      version_, *api_, MessageUtil::getJsonStringFromMessageOrDie(config_helper_.bootstrap()));
+      version_, *api_, MessageUtil::getJsonStringFromMessageOrError(config_helper_.bootstrap()));
   new_config_helper.addQuicDownstreamTransportSocketConfig(/*enable_early_data=*/false);
 
   new_config_helper.setLds("1");

@@ -1,5 +1,6 @@
 
 parameters:
+## Build stages
 # NB: all stages _must_ depend on `env`
 - name: buildStageDeps
   displayName: "Build stage dependencies"
@@ -29,6 +30,12 @@ parameters:
   displayName: "Check concurrency"
   type: number
   default: 3
+
+## Build settings
+- name: cacheTestResults
+  displayName: "Cache test results"
+  type: boolean
+  default: true
 
 stages:
 - stage: env
@@ -371,6 +378,9 @@ stages:
     pool:
       vmImage: "ubuntu-20.04"
     steps:
+    - checkout: self
+      fetchDepth: 0
+      fetchTags: true
     - task: InstallSSHKey@0
       inputs:
         hostName: "github.com ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQCj7ndNxQowgcQnjshcLrqPEiiphnt+VTTvDP6mHBL9j1aNUkY4Ue1gvwnGLVlOhGeYrnZaMgRK6+PKCUXaDbC7qtbW8gIkhL7aGCsOr/C56SJMy/BCZfxd1nWzAOxSDPgVsmerOBYfNqltV9/hWCqBywINIR+5dIg6JTJ72pcEpEjcYgXkE2YEFXV1JHnsKgbLWNlhScqb2UmyRkQyytRLtL+38TGxkxCflmO+5Z8CSSNY7GidjMIZ7Q4zMjA2n1nGrlTDkzwDCsw+wqFPGQA179cnfGWOWRVruj16z6XyvxvjJwbz0wQZ75XK5tKSb7FNyeIEs4TT4jk+S4dhPeAUC5y+bDYirYgM4GC7uEnztnZyaVWQ7B381AK4Qdrwt51ZqExKbQpTUNn+EjqoTwvqNj4kqx5QUCI0ThS/YkOxJCXmPUWZbhjpCg56i+2aB6CmK2JGhn57K5mj0MNdBXA4/WnwH6XoPWJzK5Nyu2zB3nAZp+S5hpQs+p1vN1/wsjk="
@@ -389,6 +399,9 @@ stages:
     pool:
       vmImage: "ubuntu-20.04"
     steps:
+    - checkout: self
+      fetchDepth: 0
+      fetchTags: true
     - task: InstallSSHKey@0
       inputs:
         hostName: "github.com ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQCj7ndNxQowgcQnjshcLrqPEiiphnt+VTTvDP6mHBL9j1aNUkY4Ue1gvwnGLVlOhGeYrnZaMgRK6+PKCUXaDbC7qtbW8gIkhL7aGCsOr/C56SJMy/BCZfxd1nWzAOxSDPgVsmerOBYfNqltV9/hWCqBywINIR+5dIg6JTJ72pcEpEjcYgXkE2YEFXV1JHnsKgbLWNlhScqb2UmyRkQyytRLtL+38TGxkxCflmO+5Z8CSSNY7GidjMIZ7Q4zMjA2n1nGrlTDkzwDCsw+wqFPGQA179cnfGWOWRVruj16z6XyvxvjJwbz0wQZ75XK5tKSb7FNyeIEs4TT4jk+S4dhPeAUC5y+bDYirYgM4GC7uEnztnZyaVWQ7B381AK4Qdrwt51ZqExKbQpTUNn+EjqoTwvqNj4kqx5QUCI0ThS/YkOxJCXmPUWZbhjpCg56i+2aB6CmK2JGhn57K5mj0MNdBXA4/WnwH6XoPWJzK5Nyu2zB3nAZp+S5hpQs+p1vN1/wsjk="
@@ -407,6 +420,9 @@ stages:
     pool:
       vmImage: "ubuntu-20.04"
     steps:
+    - checkout: self
+      fetchDepth: 0
+      fetchTags: true
     - task: InstallSSHKey@0
       inputs:
         hostName: "github.com ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQCj7ndNxQowgcQnjshcLrqPEiiphnt+VTTvDP6mHBL9j1aNUkY4Ue1gvwnGLVlOhGeYrnZaMgRK6+PKCUXaDbC7qtbW8gIkhL7aGCsOr/C56SJMy/BCZfxd1nWzAOxSDPgVsmerOBYfNqltV9/hWCqBywINIR+5dIg6JTJ72pcEpEjcYgXkE2YEFXV1JHnsKgbLWNlhScqb2UmyRkQyytRLtL+38TGxkxCflmO+5Z8CSSNY7GidjMIZ7Q4zMjA2n1nGrlTDkzwDCsw+wqFPGQA179cnfGWOWRVruj16z6XyvxvjJwbz0wQZ75XK5tKSb7FNyeIEs4TT4jk+S4dhPeAUC5y+bDYirYgM4GC7uEnztnZyaVWQ7B381AK4Qdrwt51ZqExKbQpTUNn+EjqoTwvqNj4kqx5QUCI0ThS/YkOxJCXmPUWZbhjpCg56i+2aB6CmK2JGhn57K5mj0MNdBXA4/WnwH6XoPWJzK5Nyu2zB3nAZp+S5hpQs+p1vN1/wsjk="
@@ -443,6 +459,7 @@ stages:
         managedAgent: false
         ciTarget: bazel.release
         bazelBuildExtraOptions: "--sandbox_base=/tmp/sandbox_base"
+        cacheTestResults: ${{ parameters.cacheTestResults }}
 
   - job: released
     displayName: Complete
@@ -478,6 +495,7 @@ stages:
         rbe: false
         artifactSuffix: ".arm64"
         bazelBuildExtraOptions: "--sandbox_base=/tmp/sandbox_base"
+        cacheTestResults: ${{ parameters.cacheTestResults }}
 
   - job: released
     displayName: Complete
@@ -503,6 +521,9 @@ stages:
     dependsOn: []
     # Skip checks if only mobile/ or docs/ have changed.
     condition: and(not(canceled()), or(succeeded(), eq(variables['PostSubmit'], true)), ne(stageDependencies.env.repo.outputs['changed.mobileOnly'], 'true'), ne(stageDependencies.env.repo.outputs['changed.docsOnly'], 'true'), ne(stageDependencies.env.repo.outputs['changed.examplesOnly'], 'true'))
+    variables:
+      REPO_FETCH_DEPTH: 1
+      REPO_FETCH_TAGS: false
     strategy:
       maxParallel: ${{ parameters.checksConcurrency }}
       matrix:
@@ -525,6 +546,8 @@ stages:
           ENVOY_FILTER_EXAMPLE: true
         clang_tidy:
           CI_TARGET: "bazel.clang_tidy"
+          REPO_FETCH_DEPTH: 0
+          REPO_FETCH_TAGS: true
         api:
           CI_TARGET: "bazel.api"
     timeoutInMinutes: 120
@@ -535,6 +558,9 @@ stages:
       parameters:
         ciTarget: $(CI_TARGET)
         envoyBuildFilterExample: $(ENVOY_FILTER_EXAMPLE)
+        cacheTestResults: ${{ parameters.cacheTestResults }}
+        repoFetchDepth: $(REPO_FETCH_DEPTH)
+        repoFetchTags: $(REPO_FETCH_TAGS)
 
   - job: coverage
     displayName: "Linux x64"
@@ -558,6 +584,7 @@ stages:
         rbe: false
         # /tmp/sandbox_base is a tmpfs in CI environment to optimize large I/O for coverage traces
         bazelBuildExtraOptions: "--define=no_debug_info=1 --linkopt=-Wl,-s --test_env=ENVOY_IP_TEST_VERSIONS=v4only --sandbox_base=/tmp/sandbox_base"
+        cacheTestResults: ${{ parameters.cacheTestResults }}
 
     - script: ci/run_envoy_docker.sh 'ci/upload_gcs_artifact.sh /source/generated/$(CI_TARGET) $(CI_TARGET)'
       displayName: "Upload $(CI_TARGET) Report to GCS"
@@ -633,7 +660,11 @@ stages:
         cp -a $(Build.StagingDirectory)/bazel.release.arm64/bin/release.tar.zst linux/arm64/release.tar.zst
         cp -a $(Build.StagingDirectory)/bazel.release.arm64/bin/schema_validator_tool linux/arm64/schema_validator_tool
 
+        # Debug what files appear to have been downloaded
+        find linux -type f -name "*" | xargs ls -l
+
         ci/docker_ci.sh
+      timeoutInMinutes: 40
       workingDirectory: $(Build.SourcesDirectory)
       env:
         AZP_BRANCH: $(Build.SourceBranch)

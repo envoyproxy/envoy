@@ -26,6 +26,19 @@ variables:
   # A release branch can be either `main` or a `release/v1.x` stable branch
   value: $[or(eq(variables['isMain'], 'true'), eq(variables['isReleaseBranch'], 'true'))]
 
+## CI runs
+# Any scheduled run
+- name: pipelineScheduled
+  value: ${{ eq(variables['Build.Reason'], 'Schedule') }}
+# Non-scheduled postsubmit run
+- name: pipelinePostsubmit
+  value: ${{ and(eq(variables['Build.DefinitionName'], 'envoy-postsubmit'), ne(variables.pipelineScheduled, true)) }}
+- name: pipelineCacheWarm
+  value: ${{ and(eq(variables['Build.DefinitionName'], 'envoy-presubmit'), ne(variables['Build.Reason'], 'PullRequest')) }}
+# Any other run (ie PRs)
+- name: pipelineDefault
+  value: ${{ and(ne(variables.pipelineScheduled, true), ne(variables.pipelinePostsubmit, true), ne(variables.pipelineCacheWarm, true)) }}
+
 ## Variable settings
 # Caches (tip: append a version suffix while testing caches)
 - name: cacheKeyBuildImage
@@ -37,12 +50,33 @@ variables:
 
 
 stages:
+
 # Presubmit/default
-- ${{ if ne(variables['Build.DefinitionName'], 'envoy-postsubmit') }}:
+- ${{ if eq(variables.pipelineDefault, true) }}:
   - template: stages.yml
 
-# Postsubmit
-- ${{ if eq(variables['Build.DefinitionName'], 'envoy-postsubmit') }}:
+# Scheduled run anywhere
+- ${{ if eq(variables.pipelineScheduled, true) }}:
+  - template: stages.yml
+    parameters:
+      cacheTestResults: false
+
+# Cache warming in presubmit
+- ${{ if eq(variables.pipelineCacheWarm, true) }}:
+  - template: stages.yml
+    parameters:
+      buildStageDeps:
+      - env
+      checkStageDeps:
+      - env
+      checksConcurrency: 10
+      macBuildStageDeps:
+      - env
+      windowsBuildStageDeps:
+      - env
+
+# Postsubmit main/release branches
+- ${{ if eq(variables.pipelinePostsubmit, true) }}:
   - template: stages.yml
     parameters:
       buildStageDeps:

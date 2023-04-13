@@ -21,10 +21,19 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // Router :ref:`configuration overview <config_http_filters_router>`.
 // [#extension: envoy.filters.http.router]
 
-// [#next-free-field: 9]
+// [#next-free-field: 10]
 message Router {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.http.router.v2.Router";
+
+  message UpstreamAccessLogOptions {
+    // If set to true, an upstream access log will be recorded when an upstream stream is
+    // associated to an http request. Note: Each HTTP request received for an already established
+    // connection will result in an upstream access log record. This includes, for example,
+    // consecutive HTTP requests over the same connection or a request that is retried.
+    // In case a retry is applied, an upstream access log will be recorded for each retry.
+    bool flush_upstream_log_on_upstream_stream = 1;
+  }
 
   // Whether the router generates dynamic cluster statistics. Defaults to
   // true. Can be disabled in high performance scenarios.
@@ -41,6 +50,9 @@ message Router {
   // an upstream request. Presuming retries are configured, multiple upstream
   // requests may be made for each downstream (inbound) request.
   repeated config.accesslog.v3.AccessLog upstream_log = 3;
+
+  // Additional upstream access log options.
+  UpstreamAccessLogOptions upstream_log_options = 9;
 
   // Do not add any additional ``x-envoy-`` headers to requests or responses. This
   // only affects the :ref:`router filter generated x-envoy- headers

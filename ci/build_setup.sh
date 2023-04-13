@@ -95,7 +95,7 @@ else
     echo "LLVM_ROOT not found, not setting up llvm."
 fi
 
-if [[ "${BUILD_REASON}" != "PullRequest" ]]; then
+if [[ -n "$BAZEL_NO_CACHE_TEST_RESULTS" ]]; then
     VERSION_DEV="$(cut -d- -f2 "${ENVOY_SRCDIR}/VERSION.txt")"
     # Use uncached test results for non-release commits to a branch.
     if [[ $VERSION_DEV == "dev" ]]; then

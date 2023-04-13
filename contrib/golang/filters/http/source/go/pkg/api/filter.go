@@ -29,7 +29,7 @@ type StreamDecoderFilter interface {
 
 // TODO merge it to StreamFilterConfigFactory
 type StreamFilterConfigParser interface {
-	Parse(any *anypb.Any) interface{}
+	Parse(any *anypb.Any) (interface{}, error)
 	Merge(parentConfig interface{}, childConfig interface{}) interface{}
 }
 
@@ -67,6 +67,8 @@ type StreamInfo interface {
 	ResponseCodeDetails() (string, bool)
 	// AttemptCount return the number of times the request was attempted upstream.
 	AttemptCount() uint32
+	// Get the dynamic metadata of the request
+	DynamicMetadata() DynamicMetadata
 }
 
 type StreamFilterCallbacks interface {
@@ -80,13 +82,15 @@ type FilterCallbacks interface {
 	SendLocalReply(responseCode int, bodyText string, headers map[string]string, grpcStatus int64, details string)
 	// RecoverPanic recover panic in defer and terminate the request by SendLocalReply with 500 status code.
 	RecoverPanic()
-	// Log writes message to the http logger during request processes.
-	// we are also consider adding global api MiscLog to write the misc logger
-	// during non-request processes in the future.
 	Log(level LogType, msg string)
 	// TODO add more for filter callbacks
 }
 
 type FilterCallbackHandler interface {
 	FilterCallbacks
+}
+
+type DynamicMetadata interface {
+	// TODO: Get(filterName string) map[string]interface{}
+	Set(filterName string, key string, value interface{})
 }

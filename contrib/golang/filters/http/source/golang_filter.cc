@@ -525,6 +525,18 @@ Filter::sendLocalReply(Http::Code response_code, std::string body_text,
   return CAPIStatus::CAPIOK;
 };
 
+CAPIStatus Filter::sendPanicReply(absl::string_view details) {
+  config_->stats().panic_error_.inc();
+  ENVOY_LOG(error, "[go_plugin_http][{}] {}", config_->pluginName(),
+            absl::StrCat("filter paniced with error details: ", details));
+  // We choose not to pass along the details in the response because
+  // we don't want to leak the operational details of the service for security reasons.
+  // Operators should be able to view the details via the log message above
+  // and use the stats for o11y
+  return sendLocalReply(Http::Code::InternalServerError, "error happened in filter\r\n", nullptr,
+                        Grpc::Status::WellKnownGrpcStatus::Ok, "");
+}
+
 CAPIStatus Filter::continueStatus(GolangStatus status) {
   Thread::LockGuard lock(mutex_);
   if (has_destroyed_) {
@@ -901,47 +913,53 @@ CAPIStatus Filter::getStringValue(int id, GoString* value_str) {
   return CAPIStatus::CAPIOK;
 }
 
-CAPIStatus Filter::log(uint32_t level, absl::string_view message) {
+CAPIStatus Filter::setDynamicMetadata(std::string filter_name, std::string key,
+                                      absl::string_view buf) {
   Thread::LockGuard lock(mutex_);
   if (has_destroyed_) {
     ENVOY_LOG(debug, "golang filter has been destroyed");
     return CAPIStatus::CAPIFilterIsDestroy;
   }
+
   auto& state = getProcessorState();
   if (!state.isProcessingInGo()) {
     ENVOY_LOG(debug, "golang filter is not processing Go");
     return CAPIStatus::CAPINotInGo;
   }
 
-  switch (static_cast<spdlog::level::level_enum>(level)) {
-  case spdlog::level::trace:
-    ENVOY_LOG(trace, "[go_plugin_http][{}] {}", config_->pluginName(), message);
+  if (!state.isThreadSafe()) {
+    auto weak_ptr = weak_from_this();
+    // Since go only waits for the CAPI return code we need to create a deep copy
+    // of the buffer slice and pass that to the dispatcher.
+    auto buff_copy = std::string(buf);
+    state.getDispatcher().post([this, &state, weak_ptr, filter_name, key, buff_copy] {
+      ASSERT(state.isThreadSafe());
+      // TODO: do not need lock here, since it's the work thread now.
+      Thread::ReleasableLockGuard lock(mutex_);
+      if (!weak_ptr.expired() && !has_destroyed_) {
+        lock.release();
+        setDynamicMetadataInternal(state, filter_name, key, buff_copy);
+      } else {
+        ENVOY_LOG(info, "golang filter has gone or destroyed in setDynamicMetadata");
+      }
+    });
     return CAPIStatus::CAPIOK;
-  case spdlog::level::debug:
-    ENVOY_LOG(debug, "[go_plugin_http][{}] {}", config_->pluginName(), message);
-    return CAPIStatus::CAPIOK;
-  case spdlog::level::info:
-    ENVOY_LOG(info, "[go_plugin_http][{}] {}", config_->pluginName(), message);
-    return CAPIStatus::CAPIOK;
-  case spdlog::level::warn:
-    ENVOY_LOG(warn, "[go_plugin_http][{}] {}", config_->pluginName(), message);
-    return CAPIStatus::CAPIOK;
-  case spdlog::level::err:
-    ENVOY_LOG(error, "[go_plugin_http][{}] {}", config_->pluginName(), message);
-    return CAPIStatus::CAPIOK;
-  case spdlog::level::critical:
-    ENVOY_LOG(critical, "[go_plugin_http][{}] {}", config_->pluginName(), message);
-    return CAPIStatus::CAPIOK;
-  case spdlog::level::off:
-    // means not logging
-    return CAPIStatus::CAPIOK;
-  case spdlog::level::n_levels:
-    PANIC("not implemented");
   }
 
-  ENVOY_LOG(warn, "[go_plugin_http][{}] undefined log level {}", config_->pluginName(), level);
+  // it's safe to do it here since we are in the safe envoy worker thread now.
+  setDynamicMetadataInternal(state, filter_name, key, buf);
+  return CAPIStatus::CAPIOK;
+}
 
-  PANIC_DUE_TO_CORRUPT_ENUM;
+void Filter::setDynamicMetadataInternal(ProcessorState& state, std::string filter_name,
+                                        std::string key, const absl::string_view& buf) {
+  ProtobufWkt::Struct value;
+  ProtobufWkt::Value v;
+  v.ParseFromArray(buf.data(), buf.length());
+
+  (*value.mutable_fields())[key] = v;
+
+  state.streamInfo().setDynamicMetadata(filter_name, value);
 }
 
 /* ConfigId */
@@ -971,10 +989,11 @@ uint64_t Filter::getMergedConfigId(ProcessorState& state) {
 
 FilterConfig::FilterConfig(
     const envoy::extensions::filters::http::golang::v3alpha::Config& proto_config,
-    Dso::HttpFilterDsoPtr dso_lib)
+    Dso::HttpFilterDsoPtr dso_lib, const std::string& stats_prefix,
+    Server::Configuration::FactoryContext& context)
     : plugin_name_(proto_config.plugin_name()), so_id_(proto_config.library_id()),
       so_path_(proto_config.library_path()), plugin_config_(proto_config.plugin_config()),
-      dso_lib_(dso_lib) {
+      stats_(GolangFilterStats::generateStats(stats_prefix, context.scope())), dso_lib_(dso_lib) {
   ENVOY_LOG(debug, "initilizing golang filter config");
   // NP: dso may not loaded yet, can not invoke envoyGoFilterNewHttpPluginConfig yet.
 };
@@ -1054,6 +1073,39 @@ ProcessorState& Filter::getProcessorState() {
   return enter_encoding_ ? dynamic_cast<ProcessorState&>(encoding_state_)
                          : dynamic_cast<ProcessorState&>(decoding_state_);
 };
+
+/* FilterLogger */
+void FilterLogger::log(uint32_t level, absl::string_view message) const {
+  switch (static_cast<spdlog::level::level_enum>(level)) {
+  case spdlog::level::trace:
+    ENVOY_LOG(trace, "{}", message);
+    return;
+  case spdlog::level::debug:
+    ENVOY_LOG(debug, "{}", message);
+    return;
+  case spdlog::level::info:
+    ENVOY_LOG(info, "{}", message);
+    return;
+  case spdlog::level::warn:
+    ENVOY_LOG(warn, "{}", message);
+    return;
+  case spdlog::level::err:
+    ENVOY_LOG(error, "{}", message);
+    return;
+  case spdlog::level::critical:
+    ENVOY_LOG(critical, "{}", message);
+    return;
+  case spdlog::level::off:
+    // means not logging
+    return;
+  case spdlog::level::n_levels:
+    PANIC("not implemented");
+  }
+
+  ENVOY_LOG(error, "undefined log level {} with message '{}'", level, message);
+
+  PANIC_DUE_TO_CORRUPT_ENUM;
+}
 
 } // namespace Golang
 } // namespace HttpFilters
