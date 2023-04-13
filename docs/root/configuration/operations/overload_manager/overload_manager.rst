@@ -13,7 +13,7 @@ configuration to drain HTTP/X connections when heap memory usage reaches 92%
 accepting requests when heap memory usage reaches 95% (configured via
 ``envoy.overload_actions.stop_accepting_requests``) and to stop accepting new
 TCP connections when memory usage reaches 95% (configured via
-``core.tcp_listener_accept``).
+``envoy.load_shed_points.tcp_listener_accept``).
 
 .. code-block:: yaml
 
@@ -37,7 +37,7 @@ TCP connections when memory usage reaches 95% (configured via
            threshold:
              value: 0.95
     loadshed_points:
-      - name: "core.tcp_listener_accept"
+      - name: "envoy.load_shed_points.tcp_listener_accept"
         triggers:
           - name: "envoy.resource_monitors.fixed_heap"
             threshold:
@@ -128,11 +128,11 @@ at a later junction.
 
 In comparision to analogous overload actions, Load Shed Points are more
 reactive to changing conditions, especially in cases of large traffic spikes.
-Overload actions can be better suited in cases where we are deciding to shed load
-but we don't currently have aren't actively processing a connection or stream; for
-example ``envoy.overload_actions.reset_high_memory_stream`` can reset streams
-that are using a lot of memory even if those streams aren't actively making
-progress.
+Overload actions can be better suited in cases where Envoy is deciding to shed load
+but the worker threads aren't actively processing the connections or streams that
+Envoy wants to shed. For example
+``envoy.overload_actions.reset_high_memory_stream`` can reset streams that are
+using a lot of memory even if those streams aren't actively making progress.
 
 Compared to overload actions, Load Shed Points are also more flexible to
 integrate custom (e.g. company inteneral) Load Shed Points as long as the extension
@@ -147,7 +147,7 @@ The following core load shed points are supported:
   * - Name
     - Description
 
-  * - core.tcp_listener_accept
+  * - envoy.load_shed_points.tcp_listener_accept
     - Envoy will reject (close) new TCP connections. This occurs before the
       :ref:`Listener Filter Chain <life_of_a_request>` is created.
 

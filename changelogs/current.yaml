@@ -332,7 +332,7 @@ new_features:
     milliseconds.
 - area: load shed point
   change: |
-    added load shed point ``core.tcp_listener_accept`` that rejects new tcp connections
+    added load shed point ``envoy.load_shed_points.tcp_listener_accept`` that rejects new tcp connections
     by closing the connection before the new connection accept phase.
 - area: http
   change: |
