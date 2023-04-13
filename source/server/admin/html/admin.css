@@ -78,7 +78,7 @@
   position: absolute;
   /* width: 16px; */
   width: 2%;
-  /* margin-left: -8px; */
+  margin-left: -0.5%;
 }
 
 .histogram-percentile {
@@ -86,6 +86,7 @@
   background-color: #306844;
   height: 30%;
   width: 4px;
+  margin-left: 0.5%;
   top: 0;
   position: absolute;
   /* margin-left: -2px; */
