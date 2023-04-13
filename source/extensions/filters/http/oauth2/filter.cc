@@ -477,10 +477,17 @@ void OAuth2Filter::finishFlow() {
   std::string encoded_token;
   absl::Base64Escape(pre_encoded_token, &encoded_token);
 
+  std::string* max_age;
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.oauth_use_standard_max_age_value")) {
+    max_age = &expires_in_;
+  } else {
+    max_age = &new_expires_;
+  }
+
   // We use HTTP Only cookies for the HMAC and Expiry.
-  const std::string cookie_tail = fmt::format(CookieTailFormatString, expires_in_);
-  const std::string cookie_tail_http_only =
-      fmt::format(CookieTailHttpOnlyFormatString, expires_in_);
+  const std::string cookie_tail = fmt::format(CookieTailFormatString, *max_age);
+  const std::string cookie_tail_http_only = fmt::format(CookieTailHttpOnlyFormatString, *max_age);
 
   // At this point we have all of the pieces needed to authorize a user.
   // Now, we construct a redirect request to return the user to their
