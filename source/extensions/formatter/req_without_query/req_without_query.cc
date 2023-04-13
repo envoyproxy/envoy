@@ -45,8 +45,8 @@ absl::optional<std::string> ReqWithoutQuery::format(const Http::RequestHeaderMap
 ProtobufWkt::Value ReqWithoutQuery::formatValue(const Http::RequestHeaderMap& request,
                                                 const Http::ResponseHeaderMap&,
                                                 const Http::ResponseTrailerMap&,
-                                                const StreamInfo::StreamInfo&,
-                                                absl::string_view, absl::string_view) const {
+                                                const StreamInfo::StreamInfo&, absl::string_view,
+                                                absl::string_view) const {
   const Http::HeaderEntry* header = findHeader(request);
   if (!header) {
     return ValueUtil::nullValue();

@@ -30,7 +30,8 @@ UdpProxyFilter::~UdpProxyFilter() {
   if (!config_->proxyAccessLogs().empty()) {
     fillProxyStreamInfo();
     for (const auto& access_log : config_->proxyAccessLogs()) {
-      access_log->log(nullptr, nullptr, nullptr, udp_proxy_stats_.value(), AccessLog::AccessLogType::Type1);
+      access_log->log(nullptr, nullptr, nullptr, udp_proxy_stats_.value(),
+                      AccessLog::AccessLogType::Type1);
     }
   }
 }

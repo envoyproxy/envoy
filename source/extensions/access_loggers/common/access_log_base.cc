@@ -26,7 +26,8 @@ void ImplBase::log(const Http::RequestHeaderMap* request_headers,
       !filter_->evaluate(stream_info, *request_headers, *response_headers, *response_trailers)) {
     return;
   }
-  return emitLog(*request_headers, *response_headers, *response_trailers, stream_info, access_log_type);
+  return emitLog(*request_headers, *response_headers, *response_trailers, stream_info,
+                 access_log_type);
 }
 
 } // namespace Common

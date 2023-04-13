@@ -231,7 +231,8 @@ void Wasm::log(const PluginSharedPtr& plugin, const Http::RequestHeaderMap* requ
                const Http::ResponseTrailerMap* response_trailers,
                const StreamInfo::StreamInfo& stream_info) {
   auto context = getRootContext(plugin, true);
-  context->log(request_headers, response_headers, response_trailers, stream_info, AccessLog::AccessLogType::Type1);
+  context->log(request_headers, response_headers, response_trailers, stream_info,
+               AccessLog::AccessLogType::Type1);
 }
 
 void Wasm::onStatsUpdate(const PluginSharedPtr& plugin, Envoy::Stats::MetricSnapshot& snapshot) {

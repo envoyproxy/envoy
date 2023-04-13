@@ -59,7 +59,7 @@ struct AccessLogTypeStringValues {
   const std::string Type1 = "Type1";
 };
 
-using AccessLogTypeString = ConstSingleton<AccessLogTypeStringValues>;
+using AccessLogTypeStrings = ConstSingleton<AccessLogTypeStringValues>;
 
 enum class AccessLogType {
   Type1
@@ -103,8 +103,7 @@ public:
   virtual void log(const Http::RequestHeaderMap* request_headers,
                    const Http::ResponseHeaderMap* response_headers,
                    const Http::ResponseTrailerMap* response_trailers,
-                   const StreamInfo::StreamInfo& stream_info,
-                   AccessLogType access_log_type) PURE;
+                   const StreamInfo::StreamInfo& stream_info, AccessLogType access_log_type) PURE;
 };
 
 using InstanceSharedPtr = std::shared_ptr<Instance>;

@@ -1456,8 +1456,7 @@ void Context::initializeWriteFilterCallbacks(Network::WriteFilterCallbacks& call
 void Context::log(const Http::RequestHeaderMap* request_headers,
                   const Http::ResponseHeaderMap* response_headers,
                   const Http::ResponseTrailerMap* response_trailers,
-                  const StreamInfo::StreamInfo& stream_info,
-                  AccessLog::AccessLogType) {
+                  const StreamInfo::StreamInfo& stream_info, AccessLog::AccessLogType) {
   // `log` may be called multiple times due to mid-request logging -- we only want to run on the
   // last call.
   if (!stream_info.requestComplete().has_value()) {
