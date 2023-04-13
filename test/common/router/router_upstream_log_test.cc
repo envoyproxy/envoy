@@ -83,7 +83,8 @@ public:
 
 class RouterUpstreamLogTest : public testing::Test {
 public:
-  void init(absl::optional<envoy::config::accesslog::v3::AccessLog> upstream_log) {
+  void init(absl::optional<envoy::config::accesslog::v3::AccessLog> upstream_log,
+            bool flush_upstream_log_on_upstream_stream = false) {
     envoy::extensions::filters::http::router::v3::Router router_proto;
     static const std::string cluster_name = "cluster_0";
 
@@ -94,6 +95,10 @@ public:
     EXPECT_CALL(callbacks_.dispatcher_, deferredDelete_).Times(testing::AnyNumber());
 
     if (upstream_log) {
+      auto upstream_log_options = router_proto.mutable_upstream_log_options();
+      upstream_log_options->set_flush_upstream_log_on_upstream_stream(
+          flush_upstream_log_on_upstream_stream);
+
       ON_CALL(*context_.access_log_manager_.file_, write(_))
           .WillByDefault(
               Invoke([&](absl::string_view data) { output_.push_back(std::string(data)); }));
@@ -409,6 +414,30 @@ typed_config:
 
   EXPECT_EQ(output_.size(), 1U);
   EXPECT_EQ(output_.front(), "cluster_0");
+}
+
+TEST_F(RouterUpstreamLogTest, OnRequestLog) {
+  const std::string yaml = R"EOF(
+name: accesslog
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
+  log_format:
+    text_format_source:
+      inline_string: "%UPSTREAM_CLUSTER%"
+  path: "/dev/null"
+  )EOF";
+
+  envoy::config::accesslog::v3::AccessLog upstream_log;
+  TestUtility::loadFromYaml(yaml, upstream_log);
+
+  init(absl::optional<envoy::config::accesslog::v3::AccessLog>(upstream_log), true);
+  run();
+
+  // It is expected that there will be two log records, one when a new request is received
+  // and one when the request is finished, due to 'flush_upstream_log_on_upstream_stream' enabled
+  EXPECT_EQ(output_.size(), 2U);
+  EXPECT_EQ(output_.front(), "cluster_0");
+  EXPECT_EQ(output_.back(), "cluster_0");
 }
 
 } // namespace Router

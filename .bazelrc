@@ -29,6 +29,10 @@ build --action_env=CXX --host_action_env=CXX
 build --action_env=LLVM_CONFIG --host_action_env=LLVM_CONFIG
 build --action_env=PATH --host_action_env=PATH
 
+# Allow stamped caches to bust when local filesystem changes.
+# Requires setting `BAZEL_VOLATILE_DIRTY` in the env.
+build --action_env=BAZEL_VOLATILE_DIRTY --host_action_env=BAZEL_VOLATILE_DIRTY
+
 build --enable_platform_specific_config
 build --test_summary=terse
 

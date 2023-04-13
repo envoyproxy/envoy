@@ -206,10 +206,7 @@ void UpstreamRequest::cleanUp() {
   }
 
   stream_info_.onRequestComplete();
-  for (const auto& upstream_log : parent_.config().upstream_logs_) {
-    upstream_log->log(parent_.downstreamHeaders(), upstream_headers_.get(),
-                      upstream_trailers_.get(), stream_info_);
-  }
+  upstreamLog();
 
   while (downstream_data_disabled_ != 0) {
     parent_.callbacks()->onDecoderFilterBelowWriteBufferLowWatermark();
@@ -221,6 +218,13 @@ void UpstreamRequest::cleanUp() {
     // chain. Make sure to not delete them immediately when the stream ends, as the stream often
     // ends during filter chain processing and it causes use-after-free violations.
     parent_.callbacks()->dispatcher().deferredDelete(std::move(filter_manager_callbacks_));
+  }
+}
+
+void UpstreamRequest::upstreamLog() {
+  for (const auto& upstream_log : parent_.config().upstream_logs_) {
+    upstream_log->log(parent_.downstreamHeaders(), upstream_headers_.get(),
+                      upstream_trailers_.get(), stream_info_);
   }
 }
 
@@ -286,6 +290,7 @@ void UpstreamRequest::decodeHeaders(Http::ResponseHeaderMapPtr&& headers, bool e
 
   maybeHandleDeferredReadDisable();
   ASSERT(headers.get());
+
   parent_.onUpstreamHeaders(response_code, std::move(headers), *this, end_stream);
 }
 
@@ -369,6 +374,16 @@ void UpstreamRequest::acceptHeadersFromRouter(bool end_stream) {
   ASSERT(!router_sent_end_stream_);
   router_sent_end_stream_ = end_stream;
 
+  // Make sure that when we are forwarding CONNECT payload we do not do so until
+  // the upstream has accepted the CONNECT request.
+  // This must be done before conn_pool->newStream, as onPoolReady un-pauses for CONNECT
+  // termination.
+  auto* headers = parent_.downstreamHeaders();
+  if (allow_upstream_filters_ &&
+      headers->getMethodValue() == Http::Headers::get().MethodValues.Connect) {
+    paused_for_connect_ = true;
+  }
+
   // Kick off creation of the upstream connection immediately upon receiving headers.
   // In future it may be possible for upstream filters to delay this, or influence connection
   // creation but for now optimize for minimal latency and fetch the connection
@@ -376,14 +391,6 @@ void UpstreamRequest::acceptHeadersFromRouter(bool end_stream) {
   conn_pool_->newStream(this);
   if (!allow_upstream_filters_) {
     return;
-  }
-
-  auto* headers = parent_.downstreamHeaders();
-
-  // Make sure that when we are forwarding CONNECT payload we do not do so until
-  // the upstream has accepted the CONNECT request.
-  if (headers->getMethodValue() == Http::Headers::get().MethodValues.Connect) {
-    paused_for_connect_ = true;
   }
 
   filter_manager_->requestHeadersInitialized();
@@ -564,9 +571,15 @@ void UpstreamRequest::onPerTryTimeout() {
   }
 }
 
+void UpstreamRequest::recordConnectionPoolCallbackLatency() {
+  upstreamTiming().recordConnectionPoolCallbackLatency(
+      start_time_, parent_.callbacks()->dispatcher().timeSource());
+}
+
 void UpstreamRequest::onPoolFailure(ConnectionPool::PoolFailureReason reason,
                                     absl::string_view transport_failure_reason,
                                     Upstream::HostDescriptionConstSharedPtr host) {
+  recordConnectionPoolCallbackLatency();
   Http::StreamResetReason reset_reason = Http::StreamResetReason::ConnectionFailure;
   switch (reason) {
   case ConnectionPool::PoolFailureReason::Overflow:
@@ -596,6 +609,7 @@ void UpstreamRequest::onPoolReady(std::unique_ptr<GenericUpstream>&& upstream,
   // This may be called under an existing ScopeTrackerScopeState but it will unwind correctly.
   ScopeTrackerScopeState scope(&parent_.callbacks()->scope(), parent_.callbacks()->dispatcher());
   ENVOY_STREAM_LOG(debug, "pool ready", *parent_.callbacks());
+  recordConnectionPoolCallbackLatency();
   upstream_ = std::move(upstream);
   had_upstream_ = true;
   // Have the upstream use the account of the downstream.
@@ -702,6 +716,10 @@ void UpstreamRequest::onPoolReady(std::unique_ptr<GenericUpstream>&& upstream,
   }
 
   stream_info_.setRequestHeaders(*parent_.downstreamHeaders());
+
+  if (parent_.config().flush_upstream_log_on_upstream_stream_) {
+    upstreamLog();
+  }
 
   for (auto* callback : upstream_callbacks_) {
     callback->onUpstreamConnectionEstablished();

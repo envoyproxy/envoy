@@ -21,6 +21,7 @@ envoy_cc_library(
         "logger.cc",
         "span.cc",
         "time_util.cc",
+        "tracer.cc",
     ],
     hdrs = [
         "agent_http_client.h",
@@ -30,6 +31,7 @@ envoy_cc_library(
         "logger.h",
         "span.h",
         "time_util.h",
+        "tracer.h",
         "tracer_stats.h",
     ],
     copts = [

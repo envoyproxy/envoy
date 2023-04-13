@@ -54,25 +54,8 @@ public:
 
   enum class RejectAction { Accept, Reject };
   enum class RejectOrRedirectAction { Accept, Reject, Redirect };
-  enum class RejectOrDropHeaderAction { Accept, Reject, DropHeader };
   using RejectResult = Result<RejectAction>;
   using RejectOrRedirectResult = Result<RejectOrRedirectAction>;
-  using RejectOrDropHeaderResult = Result<RejectOrDropHeaderAction>;
-
-  /**
-   * Method for validating a request header entry.
-   * Returning the Reject value causes the request to be rejected with the 400 status.
-   */
-  using HeaderEntryValidationResult = RejectOrDropHeaderResult;
-  virtual HeaderEntryValidationResult validateRequestHeaderEntry(const HeaderString& key,
-                                                                 const HeaderString& value) PURE;
-
-  /**
-   * Method for validating a response header entry.
-   * Returning the Reject value causes the downstream request to be rejected with the 502 status.
-   */
-  virtual HeaderEntryValidationResult validateResponseHeaderEntry(const HeaderString& key,
-                                                                  const HeaderString& value) PURE;
 
   /**
    * Validate the entire request header map.

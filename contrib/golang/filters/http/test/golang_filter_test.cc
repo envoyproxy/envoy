@@ -39,9 +39,6 @@ namespace {
 class TestFilter : public Filter {
 public:
   using Filter::Filter;
-  void onDestroy() override {
-    // do nothing
-  }
 };
 
 class GolangHttpFilterTest : public testing::Test {
@@ -118,7 +115,8 @@ public:
     // Setup filter config for Golang filter.
     config_ = std::make_shared<FilterConfig>(
         proto_config,
-        Dso::DsoManager<Dso::HttpFilterDsoImpl>::getDsoByID(proto_config.library_id()));
+        Dso::DsoManager<Dso::HttpFilterDsoImpl>::getDsoByID(proto_config.library_id()), "",
+        context_);
     // Setup per route config for Golang filter.
     per_route_config_ =
         std::make_shared<FilterConfigPerRoute>(per_route_proto_config, server_factory_context_);
@@ -139,6 +137,7 @@ public:
     ON_CALL(*decoder_callbacks_.route_, metadata()).WillByDefault(testing::ReturnRef(metadata_));
   }
 
+  NiceMock<Server::Configuration::MockFactoryContext> context_;
   NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context_;
   NiceMock<ThreadLocal::MockInstance> tls_;
   NiceMock<Api::MockApi> api_;

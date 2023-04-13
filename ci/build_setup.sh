@@ -89,9 +89,13 @@ function cleanup() {
 cleanup
 trap cleanup EXIT
 
-"$(dirname "$0")"/../bazel/setup_clang.sh "${LLVM_ROOT}"
+if [[ -e "${LLVM_ROOT}" ]]; then
+    "$(dirname "$0")/../bazel/setup_clang.sh" "${LLVM_ROOT}"
+else
+    echo "LLVM_ROOT not found, not setting up llvm."
+fi
 
-if [[ "${BUILD_REASON}" != "PullRequest" ]]; then
+if [[ -n "$BAZEL_NO_CACHE_TEST_RESULTS" ]]; then
     VERSION_DEV="$(cut -d- -f2 "${ENVOY_SRCDIR}/VERSION.txt")"
     # Use uncached test results for non-release commits to a branch.
     if [[ $VERSION_DEV == "dev" ]]; then
@@ -128,10 +132,10 @@ export ENVOY_DELIVERY_DIR="${ENVOY_BUILD_DIR}"/source/exe
 mkdir -p "${ENVOY_DELIVERY_DIR}"
 
 # This is where we copy the coverage report to.
-export ENVOY_COVERAGE_ARTIFACT="${ENVOY_BUILD_DIR}"/generated/coverage.tar.gz
+export ENVOY_COVERAGE_ARTIFACT="${ENVOY_BUILD_DIR}/generated/coverage.tar.zst"
 
 # This is where we copy the fuzz coverage report to.
-export ENVOY_FUZZ_COVERAGE_ARTIFACT="${ENVOY_BUILD_DIR}"/generated/fuzz_coverage.tar.gz
+export ENVOY_FUZZ_COVERAGE_ARTIFACT="${ENVOY_BUILD_DIR}/generated/fuzz_coverage.tar.zst"
 
 # This is where we dump failed test logs for CI collection.
 export ENVOY_FAILED_TEST_LOGS="${ENVOY_BUILD_DIR}"/generated/failed-testlogs
