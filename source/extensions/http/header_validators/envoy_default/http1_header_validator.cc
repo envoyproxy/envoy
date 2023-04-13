@@ -53,7 +53,7 @@ Http1HeaderValidator::Http1HeaderValidator(const HeaderValidatorConfig& config, 
           {"content-length", absl::bind_front(&HeaderValidator::validateContentLengthHeader, this)},
       } {}
 
-::Envoy::Http::HeaderValidator::HeaderEntryValidationResult
+HeaderValidator::HeaderEntryValidationResult
 Http1HeaderValidator::validateRequestHeaderEntry(const HeaderString& key,
                                                  const HeaderString& value) {
   // Pseudo headers in HTTP/1.1 are synthesized by the codec from the request line prior to
@@ -62,7 +62,7 @@ Http1HeaderValidator::validateRequestHeaderEntry(const HeaderString& key,
   return validateGenericRequestHeaderEntry(key, value, request_header_validator_map_);
 }
 
-::Envoy::Http::HeaderValidator::HeaderEntryValidationResult
+HeaderValidator::HeaderEntryValidationResult
 Http1HeaderValidator::validateResponseHeaderEntry(const HeaderString& key,
                                                   const HeaderString& value) {
   const auto& key_string_view = key.getStringView();

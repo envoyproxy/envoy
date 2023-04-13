@@ -214,6 +214,14 @@ TEST_F(FileSystemHttpCacheTest, StatsAreConstructedCorrectly) {
   EXPECT_EQ(cache_->stats().eviction_runs_.tagExtractedName(), "cache.eviction_runs");
   EXPECT_THAT(cache_->stats().eviction_runs_.tags(),
               ::testing::ElementsAre(IsStatTag("cache_path", cache_path_no_periods)));
+  EXPECT_EQ(cache_->stats().cache_hit_.tagExtractedName(), "cache.event");
+  EXPECT_EQ(cache_->stats().cache_miss_.tagExtractedName(), "cache.event");
+  EXPECT_THAT(cache_->stats().cache_hit_.tags(),
+              ::testing::ElementsAre(IsStatTag("cache_path", cache_path_no_periods),
+                                     IsStatTag("event_type", "hit")));
+  EXPECT_THAT(cache_->stats().cache_miss_.tags(),
+              ::testing::ElementsAre(IsStatTag("cache_path", cache_path_no_periods),
+                                     IsStatTag("event_type", "miss")));
 }
 
 TEST_F(FileSystemHttpCacheTest, TrackFileRemovedClampsAtZero) {
@@ -531,6 +539,8 @@ TEST_F(FileSystemHttpCacheTestWithMockFiles, FailedOpenForReadReturnsMiss) {
   // File handle didn't get used but is expected to be closed.
   EXPECT_OK(mock_async_file_handle_->close([](absl::Status) {}));
   EXPECT_EQ(result.cache_entry_status_, CacheEntryStatus::Unusable);
+  EXPECT_EQ(cache_->stats().cache_miss_.value(), 1);
+  EXPECT_EQ(cache_->stats().cache_hit_.value(), 0);
 }
 
 TEST_F(FileSystemHttpCacheTestWithMockFiles, FailedReadOfHeaderBlockInvalidatesTheCacheEntry) {

@@ -24,7 +24,12 @@ if [[ "${AZP_BRANCH}" == "${MAIN_BRANCH}" ]]; then
   sed -e "s|{ENVOY_SRCDIR}|envoy|" "${ENVOY_SRCDIR}"/ci/WORKSPACE.filter.example > "${CHECKOUT_DIR}"/WORKSPACE
 
   echo "Committing, and Pushing..."
-  git -C "$CHECKOUT_DIR" commit -a -m "Update Envoy submodule to $ENVOY_SHA"
-  git -C "$CHECKOUT_DIR" push origin "${FILTER_EXAMPLE_MAIN_BRANCH}"
-  echo "Done"
+  if git -C "$CHECKOUT_DIR" status --porcelain; then
+      git -C "$CHECKOUT_DIR" commit -a -m "Update Envoy submodule to $ENVOY_SHA"
+      git -C "$CHECKOUT_DIR" push origin "${FILTER_EXAMPLE_MAIN_BRANCH}"
+      echo "Done"
+  else
+      # There can be no changes, eg in a scheduled run.
+      echo "Nothing to commit"
+  fi
 fi

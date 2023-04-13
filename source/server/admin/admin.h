@@ -330,6 +330,7 @@ private:
     ThreadLocalOverloadState& getThreadLocalOverloadState() override {
       return tls_->getTyped<OverloadState>();
     }
+    LoadShedPoint* getLoadShedPoint(absl::string_view) override { return nullptr; }
 
     Event::ScaledRangeTimerManagerFactory scaledTimerFactory() override { return nullptr; }
 

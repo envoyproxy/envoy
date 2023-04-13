@@ -67,6 +67,8 @@ type StreamInfo interface {
 	ResponseCodeDetails() (string, bool)
 	// AttemptCount return the number of times the request was attempted upstream.
 	AttemptCount() uint32
+	// Get the dynamic metadata of the request
+	DynamicMetadata() DynamicMetadata
 }
 
 type StreamFilterCallbacks interface {
@@ -86,4 +88,9 @@ type FilterCallbacks interface {
 
 type FilterCallbackHandler interface {
 	FilterCallbacks
+}
+
+type DynamicMetadata interface {
+	// TODO: Get(filterName string) map[string]interface{}
+	Set(filterName string, key string, value interface{})
 }

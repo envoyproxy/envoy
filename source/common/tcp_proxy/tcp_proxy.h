@@ -252,7 +252,7 @@ public:
     const Stats::ScopeSharedPtr stats_scope_;
 
     const TcpProxyStats stats_;
-    const bool flush_access_log_on_connected_;
+    bool flush_access_log_on_connected_;
     absl::optional<std::chrono::milliseconds> idle_timeout_;
     absl::optional<std::chrono::milliseconds> max_downstream_connection_duration_;
     absl::optional<std::chrono::milliseconds> access_log_flush_interval_;
