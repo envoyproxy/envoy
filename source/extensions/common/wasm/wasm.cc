@@ -230,7 +230,7 @@ void Wasm::log(const PluginSharedPtr& plugin, const Http::RequestHeaderMap* requ
                const Http::ResponseHeaderMap* response_headers,
                const Http::ResponseTrailerMap* response_trailers,
                const StreamInfo::StreamInfo& stream_info,
-               AccessLogType access_log_type) {
+               AccessLog::AccessLogType access_log_type) {
   auto context = getRootContext(plugin, true);
   context->log(request_headers, response_headers, response_trailers, stream_info,
                access_log_type);
