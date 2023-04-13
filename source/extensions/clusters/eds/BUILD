@@ -64,3 +64,14 @@ envoy_cc_library(
         "@envoy_api//envoy/config/endpoint/v3:pkg_cc_proto",
     ],
 )
+
+envoy_cc_library(
+    name = "eds_resources_cache_impl_lib",
+    srcs = ["eds_resources_cache_impl.cc"],
+    hdrs = ["eds_resources_cache_impl.h"],
+    deps = [
+        "//envoy/upstream:eds_resources_cache_interface",
+        "//source/common/common:minimal_logger_lib",
+        "//source/common/protobuf:utility_lib",
+    ],
+)

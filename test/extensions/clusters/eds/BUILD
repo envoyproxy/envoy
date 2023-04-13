@@ -99,3 +99,12 @@ envoy_cc_test(
         "@envoy_api//envoy/config/endpoint/v3:pkg_cc_proto",
     ],
 )
+
+envoy_cc_test(
+    name = "eds_resources_cache_impl_test",
+    srcs = ["eds_resources_cache_impl_test.cc"],
+    deps = [
+        "//source/extensions/clusters/eds:eds_resources_cache_impl_lib",
+        "//test/test_common:utility_lib",
+    ],
+)
