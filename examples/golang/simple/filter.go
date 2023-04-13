@@ -17,9 +17,7 @@ type filter struct {
 
 func (f *filter) sendLocalReplyInternal() api.StatusType {
 	headers := make(map[string]string)
-	configBody := f.config.echoBody
-
-	body := fmt.Sprintf("%s, path: %s\r\n", configBody, f.path)
+	body := fmt.Sprintf("%s, path: %s\r\n", f.config.echoBody, f.path)
 	f.callbacks.SendLocalReply(200, body, headers, -1, "test-from-go")
 	return api.LocalReply
 }
