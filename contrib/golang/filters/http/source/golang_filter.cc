@@ -568,7 +568,7 @@ CAPIStatus Filter::continueStatus(GolangStatus status) {
   return CAPIStatus::CAPIOK;
 }
 
-CAPIStatus Filter::getHeader(absl::string_view key, GoString* goValue) {
+CAPIStatus Filter::getHeader(absl::string_view key, GoString* go_value) {
   Thread::LockGuard lock(mutex_);
   if (has_destroyed_) {
     ENVOY_LOG(debug, "golang filter has been destroyed");
@@ -588,8 +588,8 @@ CAPIStatus Filter::getHeader(absl::string_view key, GoString* goValue) {
 
   if (!result.empty()) {
     auto str = result[0]->value().getStringView();
-    goValue->p = str.data();
-    goValue->n = str.length();
+    go_value->p = str.data();
+    go_value->n = str.length();
   }
   return CAPIStatus::CAPIOK;
 }
