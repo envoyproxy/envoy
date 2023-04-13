@@ -130,7 +130,7 @@ void TcpListenerImpl::setRejectFraction(const UnitFloat reject_fraction) {
 
 void TcpListenerImpl::configureLoadShedPoints(
     Server::LoadShedPointProvider& load_shed_point_provider) {
-  listener_accept_ = load_shed_point_provider.getLoadShedPoint("core.listener_accept");
+  listener_accept_ = load_shed_point_provider.getLoadShedPoint("core.tcp_listener_accept");
 }
 
 } // namespace Network

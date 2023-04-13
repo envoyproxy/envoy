@@ -332,8 +332,8 @@ new_features:
     milliseconds.
 - area: load shed point
   change: |
-    added load shed point ``core.listener_accept`` that rejects new tcp connections
-    by closing the connection at the during the new connection accept phase.
+    added load shed point ``core.tcp_listener_accept`` that rejects new tcp connections
+    by closing the connection before the new connection accept phase.
 - area: http
   change: |
     make adding ProxyProtocolFilterState in the HCM optional.

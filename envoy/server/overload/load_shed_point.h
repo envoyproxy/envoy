@@ -4,6 +4,8 @@
 
 #include "envoy/common/pure.h"
 
+#include "absl/strings/string_view.h"
+
 namespace Envoy {
 namespace Server {
 
@@ -30,7 +32,7 @@ public:
 
   /**
    * Get the load shed point identified by the following string. Returns nullptr
-   * on for non-configured points.
+   * for non-configured points.
    */
   virtual LoadShedPoint* getLoadShedPoint(absl::string_view point_name) PURE;
 };

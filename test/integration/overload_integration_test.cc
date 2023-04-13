@@ -411,7 +411,7 @@ TEST_P(LoadShedPointIntegrationTest, ListenerAcceptShedsLoad) {
   autonomous_upstream_ = true;
   initializeOverloadManager(
       TestUtility::parseYaml<envoy::config::overload::v3::LoadShedPoint>(R"EOF(
-      name: "core.listener_accept"
+      name: "core.tcp_listener_accept"
       triggers:
         - name: "envoy.resource_monitors.testonly.fake_resource_monitor"
           threshold:
@@ -420,7 +420,7 @@ TEST_P(LoadShedPointIntegrationTest, ListenerAcceptShedsLoad) {
 
   // Put envoy in overloaded state and check that it rejects the new client connection.
   updateResource(0.95);
-  test_server_->waitForGaugeEq("overload.core.listener_accept.scale_percent", 100);
+  test_server_->waitForGaugeEq("overload.core.tcp_listener_accept.scale_percent", 100);
 
   codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
 
@@ -433,7 +433,7 @@ TEST_P(LoadShedPointIntegrationTest, ListenerAcceptShedsLoad) {
 
   // Disable overload, we should allow connections.
   updateResource(0.80);
-  test_server_->waitForGaugeEq("overload.core.listener_accept.scale_percent", 0);
+  test_server_->waitForGaugeEq("overload.core.tcp_listener_accept.scale_percent", 0);
 
   codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
   auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
