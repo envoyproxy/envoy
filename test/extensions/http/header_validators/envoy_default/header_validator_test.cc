@@ -20,7 +20,7 @@ using ::Envoy::Http::RequestHeaderMap;
 using ::Envoy::Http::ResponseHeaderMap;
 using ::Envoy::Http::UhvResponseCodeDetail;
 
-class BaseHttpHeaderValidator : public HeaderValidator {
+class BaseHttpHeaderValidator : public HeaderValidator, public testing::Test {
 public:
   BaseHttpHeaderValidator(
       const envoy::extensions::http::header_validators::envoy_default::v3::HeaderValidatorConfig&

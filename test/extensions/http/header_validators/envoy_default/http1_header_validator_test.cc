@@ -21,7 +21,7 @@ using ::Envoy::Http::TestRequestTrailerMapImpl;
 using ::Envoy::Http::TestResponseHeaderMapImpl;
 using ::Envoy::Http::UhvResponseCodeDetail;
 
-class Http1HeaderValidatorTest : public HeaderValidatorTest {
+class Http1HeaderValidatorTest : public HeaderValidatorTest, public testing::Test {
 protected:
   Http1HeaderValidatorPtr createH1(absl::string_view config_yaml) {
     envoy::extensions::http::header_validators::envoy_default::v3::HeaderValidatorConfig

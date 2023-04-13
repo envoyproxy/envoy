@@ -379,7 +379,9 @@ TEST_F(PathNormalizerTest, NormalizePathUriInvalidRelative) {
 }
 
 TEST_F(PathNormalizerTest, NormalizePathUriInvalidEncoding) {
-  ::Envoy::Http::TestRequestHeaderMapImpl headers{{":path", "/%x"}};
+  scoped_runtime_.mergeValues(
+      {{"envoy.reloadable_features.uhv_allow_malformed_url_encoding", "false"}});
+  ::Envoy::Http::TestRequestHeaderMapImpl headers{{":path", "/path%Z%30with%xYbad%7Jencoding%A"}};
 
   auto normalizer = create(empty_config);
   auto result = normalizer->normalizePathUri(headers);
@@ -465,6 +467,18 @@ TEST_F(PathNormalizerTest, BackslashPreservedWithOverride) {
 
   EXPECT_EQ(result.action(), PathNormalizer::PathNormalizationResult::Action::Accept);
   EXPECT_EQ(headers.path(), "/path\\with/back\\/slash%5C");
+}
+
+TEST_F(PathNormalizerTest, MalformedUrlEncodingAllowed) {
+  scoped_runtime_.mergeValues(
+      {{"envoy.reloadable_features.uhv_allow_malformed_url_encoding", "true"}});
+  ::Envoy::Http::TestRequestHeaderMapImpl headers{{":path", "/path%Z%30with%xYbad%7Jencoding%A"}};
+
+  auto normalizer = create(empty_config);
+  auto result = normalizer->normalizePathUri(headers);
+
+  EXPECT_EQ(result.action(), PathNormalizer::PathNormalizationResult::Action::Accept);
+  EXPECT_EQ(headers.path(), "/path%Z0with%xYbad%7Jencoding%A");
 }
 
 } // namespace EnvoyDefault
