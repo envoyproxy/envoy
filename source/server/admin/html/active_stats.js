@@ -291,26 +291,55 @@ function renderHistogramDetail(supported_percentiles, detail) {
       }
     };
 
-    let values = [];
-
     for (i = 0; i < supported_percentiles.length; ++i) {
       const value = percentile_values[i].cumulative;
       name_and_percentiles += ' P' + supported_percentiles[i] + '=' + value;
       updateMinMaxValue(value);
-      values.push([value, 'P' + supported_percentiles[i] + '=' + value]);
     }
     label.textContent = name_and_percentiles;
+    const graphics = document.createElement('div');
+    const labels = document.createElement('div');
     div.appendChild(label);
+    div.appendChild(graphics);
+    div.appendChild(labels);
+    graphics.className = 'histogram-graphics';
+    labels.className = 'histogram-labels';
+    activeStatsHistogramsDiv.appendChild(div);
+
+    const numBuckets = histogram.detail.length;
+    if (numBuckets == 0) {
+      continue;
+    }
 
     // First we can over the detailed bucket value and count info, and determine
     // some limits so we can scale the histogram data to (for now) consume
     // the desired width and height, which we'll express as percentages, so
     // the graphics stretch when the user stretches the window.
-
     let maxCount = 0;
+    let percentileIndex = 0;
+    let prevBucket = null;
+
     for (bucket of histogram.detail) {
       maxCount = Math.max(maxCount, bucket.count);
       updateMinMaxValue(bucket.value);
+
+      // Attach percentile records with values between the previous bucket and
+      // this one. We will drop percentiles before the first bucket. Thus each
+      // bucket starting with the second one will have a 'percentiles' property
+      // with pairs of [percentile, value], which can then be used while
+      // rendering the bucket.
+      if (prevBucket != null) {
+        bucket.percentiles = [];
+        for (; percentileIndex < percentile_values.length; ++percentileIndex) {
+          const percentileValue = percentile_values[percentileIndex].cumulative;
+          name_and_percentiles += ' P' + supported_percentiles[i] + '=' + percentileValue;
+          if (percentileValue > bucket.value) {
+            break; // not increment index; re-consider percentile for next bucket.
+          }
+          bucket.percentiles.push([supported_percentiles[percentileIndex], percentileValue]);
+        }
+      }
+      prevBucket = bucket;
     }
     console.log("min=" + minValue + " max=" + maxValue);
 
@@ -318,19 +347,14 @@ function renderHistogramDetail(supported_percentiles, detail) {
     const scaledValue = value => 9*((value - minValue) / width) + 1; // between 1 and 10;
     const valueToPercent = value => Math.round(80 * log10(scaledValue(value)));
 
-    const graphics = document.createElement('div');
-    const labels = document.createElement('div');
-    labels.className = 'histogram-labels';
-    graphics.className = 'histogram-graphics';
-    for (bucket of histogram.detail) {
 /*
+    for (bucket of histogram.detail) {
       const span = document.createElement('span');
       span.className = 'histogram-buckets';
       const percent = maxCount == 0 ? 0 : Math.round((100 * bucket.count) / maxCount);
       span.style.height = '' + percent + '%';
       //span.style.width = '' + valueToPercent(bucket.value) + '%';
       graphics.appendChild(span);
-*/
       values.push([bucket.value, bucket.count]);
     }
 
@@ -353,28 +377,115 @@ function renderHistogramDetail(supported_percentiles, detail) {
         return a[1] - b[1];
       }
     });
+*/
+
+    // Lay out the buckets as vertical bars of some width that depends on how
+    // many bucekts there are. We will draw narrower percentile lines, setting
+    // up the graphics so they overlay on the layout dictated by the evenly
+    // spaced buckets. The percentile lines should appear as overlays onto
+    // the evenly spaced buckets. We'll have to keep track of where we are
+    // horizontally so we can lay out the buckets and percentile lines using
+    // CSS.
+    //
+    // We will not draw percentile lines outside of the buckets. E.g. we'll
+    // skip drawing P0 and P100, and possibly P25 and P99.5 etc.
+    //
+    // We lay out horzontally based on percentage so users can see the graphics
+    // better if they make the window wider. We do this by inventing arbitrary
+    // "virtual pixels" (Vpx suffix) during the computation in JS and converting
+    // them to percentages for writing element style.
+    //
+    // We do not size or space things in proportion to the values; we space
+    // them evenly and indicate values as rounded labels, with full resolution
+    // values rendered in hover-popups.
+    //let numNonConsecutivePercentiles = 0;
+    //let prevWasPercentile = false;
+
+    const bucketWidthVpx = 20;
+    const percentileWidthVpx = 5;
+    const marginWidthVpx = 40;
+    const marginMinWidthVpx = 5;
+    const widthVpx = numBuckets * bucketWidthVpx + (numBuckets - 1) * marginWidthVpx;
+
+    let first = true;
+/*
     for (a of values) {
-      //console.log('' + a[0] + ': ' + a[1]);
-      const span = document.createElement('span');
-      const label = document.createElement('span');
       if (isString(a[1])) {
-        span.className = 'histogram-percentile';
-        label.textContent = a[1];
+        if (!prevWasPercentile) {
+          prevWasPercentile = true;
+          ++numNonConsecutivePercentiles;
+          widthUnits += 15; // 5 quasi-pixels for a percentile impulse + 5 margin each side
+        }
       } else {
-        span.className = 'histogram-buckets';
-        const percent = maxCount == 0 ? 0 : Math.round((100 * a[1]) / maxCount);
-        span.style.height = '' + percent + '%';
-        label.textContent = a[0] + ':' + a[1];
+        prevWasPercentile = false;
+        widthUnits += 30;
       }
+      first = false;
+    }
+*/
+
+    const toPercent = vpx => '' + Math.round(100 * vpx / widthVpx) + '%';
+    const percentileWidth = toPercent(percentileWidthVpx);
+    const bucketWidth = toPercent(bucketWidthVpx);
+    const marginWidth = toPercent(marginWidthVpx);
+
+/*
+    // Remove any trailing percentiles; we are not going to render those.
+    var i;
+    for (i = values.length - 1; i >= 0; --i) {
+      if (!isString(values[i][1])) {
+        values.length = i;
+        break;
+      }
+    }
+*/
+
+    for (bucket of histogram.detail) {
+      let marginVpx = marginWidthVpx;
+      if (bucket.percentiles && bucket.percentiles.length > 0) {
+        // Compute how much margin surrounds each percentile line. Say there are 2
+        // percentiles, each 5vpx wide. We'd subtract 10vpx from the initial margin
+        // of 40vpx, and be left with 30vpx. But we want to divide that by 3 because
+        // we have [bucket][margin][percentile][margin][percentile][margin][bucket].
+        //
+        // All this math is done as floating point -- it will be rendered below as
+        // rounded percentages.
+        const percentileMarginVpx = Math.max(
+            marginMinWidthVpx,
+            (marginVpx - bucket.percentiles.length * percentileWidthVpx) /
+              (bucket.percentiles.length + 1));
+        const percentileMargin = toPercent(percentileMarginVpx);
+
+        for (percentile of bucket.percentiles) {
+          const span = document.createElement('span');
+          span.className = 'tooltip';
+          //const label = document.createElement('span');
+          span.className = 'histogram-percentile';
+          span.style['margin-left'] = percentileMargin;
+          const tip = document.createElement('span');
+          tip.className = 'tooltiptext';
+          tip.textContent = 'P' + percentile[0] + ': ' + percentile[1];
+          span.appendChild(tip);
+          graphics.appendChild(span);
+          marginVpx -= percentileMarginVpx;
+        }
+        marginVpx = Math.max(marginVpx, marginMinWidthVpx);
+      }
+
+      // Now draw the bucket.
+      const span = document.createElement('span');
+      span.className = 'histogram-buckets';
+      const heightPercent = maxCount == 0 ? 0 : Math.round((100 * bucket.count) / maxCount);
+      span.style.height = '' + heightPercent + '%';
+      span.style.width = bucketWidth;
+      const label = document.createElement('div');
+      label.textContent = '' + bucket.value + ':' + bucket.count;
+      span.style['margin-left'] = toPercent(marginVpx);
+      label.style['margin-left'] = marginWidth;
       //span.style.width = '' + valueToPercent(a[1]) + '%';
       graphics.appendChild(span);
       labels.appendChild(label);
     }
-
-    div.appendChild(graphics);
-    div.appendChild(labels);
-
-    activeStatsHistogramsDiv.appendChild(div);
   }
 }
 
@@ -412,8 +523,8 @@ function renderHistogramSummary(histograms) {
     graphics.className = 'histogram-graphics';
     for (value of values) {
       const span = document.createElement('span');
-      const percent = maxValue == 0 ? 0 : Math.round((100 * value) / maxValue);
-      span.style.height = '' + percent + '%';
+      const heightPercent = maxValue == 0 ? 0 : Math.round((100 * value) / maxValue);
+      span.style.height = '' + heightPercent + '%';
       graphics.appendChild(span);
     }
     div.appendChild(graphics);

@@ -63,24 +63,48 @@
 }
 
 .histogram-buckets {
-    margin-right: 50px;
+    /*margin-right: 50px;*/
     width: 10px;
     background-color: #c11;
     align-self: baseline;
 }
 
 .histogram-percentile {
-    margin-right: 50px;
+    /*margin-right: 50px;*/
     width: 5px;
-    background-color: #7c7;
+    background-color: #7a7;
     align-self: baseline;
     height: 100%;
 }
 
 .histogram-labels span {
-    margin-right: 50px;
+    /*margin-right: 50px;*/
     width: 10px;
     align-self: baseline;
     font-family: sans-serif;
     font-size: 12px;
+}
+
+.tooltip {
+  position: relative;
+  display: inline-block;
+  border-bottom: 1px dotted black;
+}
+
+.tooltip .tooltiptext {
+  visibility: hidden;
+  width: 120px;
+  background-color: yellow;
+  color: black;
+  text-align: center;
+  border-radius: 6px;
+  padding: 5px 0;
+
+  /* Position the tooltip */
+  position: absolute;
+  z-index: 1;
+}
+
+.tooltip:hover .tooltiptext {
+  visibility: visible;
 }
