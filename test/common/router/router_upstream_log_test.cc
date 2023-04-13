@@ -466,13 +466,13 @@ typed_config:
   Http::ResponseDecoder* response_decoder = nullptr;
 
   EXPECT_CALL(context_.cluster_manager_.thread_local_cluster_.conn_pool_, newStream(_, _, _))
-      .WillOnce(Invoke([&](Http::ResponseDecoder& decoder,
-                            Http::ConnectionPool::Callbacks& callbacks,
-                            const Http::ConnectionPool::Instance::StreamOptions&)
-                            -> Http::ConnectionPool::Cancellable* {
-        response_decoder = &decoder;
-        EXPECT_CALL(encoder.stream_, connectionInfoProvider())
-            .WillRepeatedly(ReturnRef(connection_info1_));
+      .WillOnce(
+          Invoke([&](Http::ResponseDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks,
+                     const Http::ConnectionPool::Instance::StreamOptions&)
+                     -> Http::ConnectionPool::Cancellable* {
+            response_decoder = &decoder;
+            EXPECT_CALL(encoder.stream_, connectionInfoProvider())
+                .WillRepeatedly(ReturnRef(connection_info1_));
         callbacks.onPoolReady(encoder,
                               context_.cluster_manager_.thread_local_cluster_.conn_pool_.host_,
                               stream_info_, Http::Protocol::Http10);

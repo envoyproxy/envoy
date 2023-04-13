@@ -557,8 +557,7 @@ void UpstreamRequest::resetPerTryIdleTimer() {
 
 void UpstreamRequest::resetUpstreamLogFlushTimer() {
   if (upstream_log_flush_timer_ != nullptr) {
-    upstream_log_flush_timer_->enableTimer(
-        parent_.config().upstream_log_flush_interval_.value());
+    upstream_log_flush_timer_->enableTimer(parent_.config().upstream_log_flush_interval_.value());
   }
 }
 
