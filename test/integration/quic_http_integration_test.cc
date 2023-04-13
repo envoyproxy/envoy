@@ -1394,7 +1394,6 @@ TEST_P(QuicHttpIntegrationTest, InvalidTrailer) {
   initialize();
   // Empty string in trailer key is invalid.
   Http::TestRequestTrailerMapImpl request_trailers{{"", "foo"}};
-  Http::TestResponseTrailerMapImpl response_trailers{{"a", "b"}, {"c", "d"}};
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
   auto encoder_decoder =
