@@ -22,6 +22,7 @@ using ::Envoy::Http::HeaderString;
 using ::Envoy::Http::HeaderUtility;
 using ::Envoy::Http::LowerCaseString;
 using ::Envoy::Http::Protocol;
+using ::Envoy::Http::testCharInTable;
 using ::Envoy::Http::UhvResponseCodeDetail;
 using HeaderValidatorFunction1 =
     HeaderValidator::HeaderValueValidationResult (Http2HeaderValidator::*)(const HeaderString&);
@@ -396,7 +397,8 @@ Http2HeaderValidator::validateGenericHeaderName(const HeaderString& name) {
   for (auto iter = key_string_view.begin(); iter != key_string_view.end() && is_valid; ++iter) {
     c = *iter;
     if (c != '_') {
-      is_valid &= testChar(kGenericHeaderNameCharTable, c) && (c < 'A' || c > 'Z');
+      is_valid &=
+          testCharInTable(::Envoy::Http::kGenericHeaderNameCharTable, c) && (c < 'A' || c > 'Z');
     } else {
       has_underscore = true;
     }

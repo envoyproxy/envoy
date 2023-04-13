@@ -27,6 +27,7 @@ std::from_chars_result fromChars(const absl::string_view string_value, IntType& 
 using ::envoy::extensions::http::header_validators::envoy_default::v3::HeaderValidatorConfig;
 using ::Envoy::Http::HeaderString;
 using ::Envoy::Http::Protocol;
+using ::Envoy::Http::testCharInTable;
 using ::Envoy::Http::UhvResponseCodeDetail;
 
 HeaderValidator::HeaderValidator(const HeaderValidatorConfig& config, Protocol protocol,
@@ -96,7 +97,7 @@ HeaderValidator::validateMethodHeader(const HeaderString& value) {
   } else {
     is_valid = !method.empty();
     for (auto iter = method.begin(); iter != method.end() && is_valid; ++iter) {
-      is_valid &= testChar(kMethodHeaderCharTable, *iter);
+      is_valid &= testCharInTable(kMethodHeaderCharTable, *iter);
     }
   }
 
@@ -194,7 +195,7 @@ HeaderValidator::validateGenericHeaderName(const HeaderString& name) {
   for (auto iter = key_string_view.begin(); iter != key_string_view.end() && is_valid; ++iter) {
     c = *iter;
     if (c != '_') {
-      is_valid &= testChar(kGenericHeaderNameCharTable, c);
+      is_valid &= testCharInTable(::Envoy::Http::kGenericHeaderNameCharTable, c);
     } else {
       has_underscore = true;
     }
@@ -239,7 +240,7 @@ HeaderValidator::validateGenericHeaderValue(const HeaderString& value) {
   bool is_valid = true;
 
   for (auto iter = value_string_view.begin(); iter != value_string_view.end() && is_valid; ++iter) {
-    is_valid &= testChar(kGenericHeaderValueCharTable, *iter);
+    is_valid &= testCharInTable(kGenericHeaderValueCharTable, *iter);
   }
 
   if (!is_valid) {
@@ -352,7 +353,7 @@ HeaderValidator::validateHostHeaderIPv6(absl::string_view host) {
   // Validate the IPv6 address characters
   bool is_valid = !address.empty();
   for (auto iter = address.begin(); iter != address.end() && is_valid; ++iter) {
-    is_valid &= testChar(kHostIPv6AddressCharTable, *iter);
+    is_valid &= testCharInTable(kHostIPv6AddressCharTable, *iter);
   }
 
   if (!is_valid) {
@@ -375,7 +376,7 @@ HeaderValidator::validateHostHeaderRegName(absl::string_view host) {
 
   // Validate the reg-name characters
   for (auto iter = address.begin(); iter != address.end() && is_valid; ++iter) {
-    is_valid &= testChar(kHostRegNameCharTable, *iter);
+    is_valid &= testCharInTable(kHostRegNameCharTable, *iter);
   }
 
   if (!is_valid) {
@@ -403,7 +404,7 @@ HeaderValidator::validatePathHeaderCharacters(const HeaderString& value) {
       break;
     }
 
-    is_valid &= testChar(kPathHeaderCharTable, ch);
+    is_valid &= testCharInTable(kPathHeaderCharTable, ch);
   }
 
   if (is_valid && iter != end && *iter == '?') {
@@ -415,7 +416,7 @@ HeaderValidator::validatePathHeaderCharacters(const HeaderString& value) {
         break;
       }
 
-      is_valid &= testChar(kUriQueryAndFragmentCharTable, ch);
+      is_valid &= testCharInTable(::Envoy::Http::kUriQueryAndFragmentCharTable, ch);
     }
   }
 
@@ -423,7 +424,7 @@ HeaderValidator::validatePathHeaderCharacters(const HeaderString& value) {
     // Validate the fragment component of the URI
     ++iter;
     for (; iter != end && is_valid; ++iter) {
-      is_valid &= testChar(kUriQueryAndFragmentCharTable, *iter);
+      is_valid &= testCharInTable(::Envoy::Http::kUriQueryAndFragmentCharTable, *iter);
     }
   }
 
