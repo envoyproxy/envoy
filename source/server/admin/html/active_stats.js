@@ -477,11 +477,14 @@ function renderHistogramDetail(supported_percentiles, detail) {
 
           const percentilePLabel = document.createElement('span');
           percentilePLabel.className = 'percentile-label';
+          percentilePLabel.style.bottom = '60%';
           percentilePLabel.textContent = 'P' + percentile[0];
-          percentilePLabel.style.right = toPercentBackward(percentileLeftVpx);
+          // percentilePLabel.style.right = toPercentBackward(percentileLeftVpx);
+          percentilePLabel.style.left = percentileLeft;
 
           const percentileVLabel = document.createElement('span');
           percentileVLabel.className = 'percentile-label';
+          percentilePLabel.style.bottom = '35%';
           percentileVLabel.textContent = format(percentile[1]);
           percentileVLabel.style.left = percentileLeft;
 
