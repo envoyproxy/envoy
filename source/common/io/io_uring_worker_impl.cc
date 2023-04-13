@@ -406,8 +406,8 @@ void IoUringServerSocket::close() {
 
   IoUringSocketEntry::close();
 
-  if (read_req_ == nullptr && write_req_ == nullptr && cancel_read_req_ == nullptr &&
-      cancel_write_req_ == nullptr) {
+  ASSERT(cancel_read_req_ == nullptr && cancel_write_req_ == nullptr);
+  if (read_req_ == nullptr && write_req_ == nullptr) {
     ENVOY_LOG(trace, "ready to close, fd = {}", fd_);
     close_req_ = parent_.submitCloseRequest(*this);
     return;
@@ -418,7 +418,8 @@ void IoUringServerSocket::close() {
     cancel_read_req_ = parent_.submitCancelRequest(*this, read_req_);
   }
 
-  if (write_timeout_timer_ == nullptr && cancel_write_req_ == nullptr && write_req_ != nullptr) {
+  ASSERT(write_timeout_timer_ == nullptr);
+  if (cancel_write_req_ == nullptr && write_req_ != nullptr) {
     ENVOY_LOG(trace, "delay cancel write request, fd = {}", fd_);
     write_timeout_timer_ = parent_.dispatcher().createTimer([this]() {
       if (cancel_write_req_ == nullptr && write_req_ != nullptr) {
@@ -658,7 +659,7 @@ void IoUringServerSocket::onCancel(Request* req, int32_t result, bool injected) 
 }
 
 void IoUringServerSocket::onShutdown(Request* req, int32_t result, bool injected) {
-  IoUringSocketEntry::onCancel(req, result, injected);
+  IoUringSocketEntry::onShutdown(req, result, injected);
   ASSERT(!injected);
   ENVOY_LOG(trace, "shutdown done, result = {}, fd = {}", result, fd_);
   if (status_ == CLOSE_AFTER_SHUTDOWN_WRITE) {
