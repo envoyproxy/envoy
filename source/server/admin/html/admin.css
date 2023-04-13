@@ -51,7 +51,7 @@
   /*display: flex;
   align-items: flex-start;
   justify-content: stretch;*/
-  background-color: #ccc;
+  background-color: #555;
   height: 40px;
   position: relative;
 }
@@ -60,6 +60,12 @@
   background-color: #ddd;
   position: relative;
   height: 15px;
+}
+
+.histogram-name {
+  font-family: sans-serif;
+  font-size: 14px;
+  margin-top: 10px;
 }
 
 .histogram-bucket {
@@ -78,12 +84,24 @@
     position: absolute;
 }
 
-.percentile-label {
+.bucket-label {
   position: absolute;
-  bottom: 50%;
+  bottom: 1%;
   font-family: sans-serif;
   font-size: 12px;
-  margin-left: 5px;
+  color: white;
+  margin-left: 2px;
+}
+
+.percentile-label {
+  position: absolute;
+  bottom: 60%;
+  font-family: sans-serif;
+  font-size: 12px;
+  margin-left: 8px;
+  margin-right: 3px;
+  color: white;
+  z-index: 2;
 }
 
 .histogram-labels span {

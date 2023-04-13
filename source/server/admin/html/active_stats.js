@@ -270,17 +270,20 @@ function isString(x) {
   return Object.prototype.toString.call(x) === "[object String]";
 }
 
-
-function roundToTwo(num) {
-  return +(Math.round(num + "e+2")  + "e-2");
-}
+// https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Intl/NumberFormat/NumberFormat
+let format = Intl.NumberFormat('en', {
+  notation: 'compact',
+  maximumFractionDigits: 2
+}).format;
 
 function renderHistogramDetail(supported_percentiles, detail) {
   activeStatsHistogramsDiv.replaceChildren();
   for (histogram of detail) {
     const div = document.createElement('div');
     const label = document.createElement('div');
-    let name_and_percentiles = histogram.name;
+    label.className = 'histogram-name';
+    label.textContent = histogram.name;
+
     let i = 0;
     const percentile_values = histogram.percentiles;
     let minValue = null;
@@ -297,11 +300,8 @@ function renderHistogramDetail(supported_percentiles, detail) {
     };
 
     for (i = 0; i < supported_percentiles.length; ++i) {
-      const value = percentile_values[i].cumulative;
-      name_and_percentiles += ' P' + supported_percentiles[i] + '=' + value;
-      updateMinMaxValue(value);
+      updateMinMaxValue(percentile_values[i].cumulative);
     }
-    label.textContent = name_and_percentiles;
     const graphics = document.createElement('div');
     const labels = document.createElement('div');
     div.appendChild(label);
@@ -337,7 +337,6 @@ function renderHistogramDetail(supported_percentiles, detail) {
         bucket.percentiles = [];
         for (; percentileIndex < percentile_values.length; ++percentileIndex) {
           const percentileValue = percentile_values[percentileIndex].cumulative;
-          name_and_percentiles += ' P' + supported_percentiles[i] + '=' + percentileValue;
           if (percentileValue > bucket.value) {
             break; // not increment index; re-consider percentile for next bucket.
           }
@@ -346,7 +345,7 @@ function renderHistogramDetail(supported_percentiles, detail) {
       }
       prevBucket = bucket;
     }
-    console.log("min=" + minValue + " max=" + maxValue);
+    //console.log("min=" + minValue + " max=" + maxValue);
 
     const height = maxValue - minValue;
     const scaledValue = value => 9*((value - minValue) / height) + 1; // between 1 and 10;
@@ -483,7 +482,7 @@ function renderHistogramDetail(supported_percentiles, detail) {
 
           const percentileVLabel = document.createElement('span');
           percentileVLabel.className = 'percentile-label';
-          percentileVLabel.textContent = roundToTwo(percentile[1]);
+          percentileVLabel.textContent = format(percentile[1]);
           percentileVLabel.style.left = percentileLeft;
 
           percentileLeftVpx += percentileWidthVpx;
@@ -491,7 +490,7 @@ function renderHistogramDetail(supported_percentiles, detail) {
 /*
           const tip = document.createElement('span');
           tip.className = 'tooltiptext';
-          tip.textContent = 'P' + percentile[0] + ': ' + roundToTwo(percentile[1]);
+          tip.textContent = 'P' + percentile[0] + ': ' + format(percentile[1]);
           span.appendChild(tip);
 */
           graphics.appendChild(span);
@@ -511,13 +510,19 @@ function renderHistogramDetail(supported_percentiles, detail) {
       const left = toPercent(leftVpx);
       bucketSpan.style.left = left;
       const label = document.createElement('span');
-      label.textContent = '' + roundToTwo(bucket.value) + ':' + bucket.count;
+      label.textContent = '' + format(bucket.value);
       label.style.left = left;
+
+      const bucketLabel = document.createElement('span');
+      bucketLabel.className = 'bucket-label';
+      bucketLabel.textContent = format(bucket.count);
+      bucketLabel.style.left = left;
 
       //span.style['margin-left'] = toPercent(marginVpx);
       //label.style['margin-left'] = marginWidth;
       //span.style.width = '' + valueToPercent(a[1]) + '%';
       graphics.appendChild(bucketSpan);
+      graphics.appendChild(bucketLabel);
       labels.appendChild(label);
       leftVpx += bucketWidthVpx + marginWidthVpx;;
     }
