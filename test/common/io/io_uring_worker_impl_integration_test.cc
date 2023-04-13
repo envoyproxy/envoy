@@ -18,7 +18,7 @@ namespace {
 class IoUringTestSocket : public IoUringSocketEntry {
 public:
   IoUringTestSocket(os_fd_t fd, IoUringWorkerImpl& parent, IoUringHandler& io_uring_handler)
-      : IoUringSocketEntry(fd, parent, io_uring_handler) {}
+      : IoUringSocketEntry(fd, parent, io_uring_handler, false) {}
 
   void onAccept(Request* req, int32_t result, bool injected) override {
     IoUringSocketEntry::onAccept(req, result, injected);
@@ -484,7 +484,7 @@ TEST_F(IoUringWorkerIntegrationTest, AcceptSocketAccept) {
   socket(false, true);
   listen();
 
-  auto& socket = io_uring_worker_->addAcceptSocket(listen_socket_, io_uring_handler_);
+  auto& socket = io_uring_worker_->addAcceptSocket(listen_socket_, io_uring_handler_, false);
   EXPECT_EQ(io_uring_worker_->getSockets().size(), 1);
 
   connect();
@@ -504,7 +504,7 @@ TEST_F(IoUringWorkerIntegrationTest, AcceptSocketDisable) {
   socket(false, true);
   listen();
 
-  auto& socket = io_uring_worker_->addAcceptSocket(listen_socket_, io_uring_handler_);
+  auto& socket = io_uring_worker_->addAcceptSocket(listen_socket_, io_uring_handler_, false);
   EXPECT_EQ(io_uring_worker_->getSockets().size(), 1);
 
   socket.disable();
@@ -537,7 +537,7 @@ TEST_F(IoUringWorkerIntegrationTest, AcceptSocketAcceptOnClosing) {
   socket(false, true);
   listen();
 
-  auto& socket = io_uring_worker_->addAcceptSocket(listen_socket_, io_uring_handler_);
+  auto& socket = io_uring_worker_->addAcceptSocket(listen_socket_, io_uring_handler_, false);
   EXPECT_EQ(io_uring_worker_->getSockets().size(), 1);
 
   // Accept when the socket is going to close.
@@ -554,7 +554,7 @@ TEST_F(IoUringWorkerIntegrationTest, ServerSocketRead) {
   initialize();
   initializeSockets();
 
-  auto& socket = io_uring_worker_->addServerSocket(server_socket_, io_uring_handler_);
+  auto& socket = io_uring_worker_->addServerSocket(server_socket_, io_uring_handler_, false);
   EXPECT_EQ(io_uring_worker_->getSockets().size(), 1);
 
   // Write data through client socket.
@@ -578,7 +578,7 @@ TEST_F(IoUringWorkerIntegrationTest, ServerSocketRead) {
 TEST_F(IoUringWorkerIntegrationTest, ServerSocketReadError) {
   initialize();
 
-  auto& socket = io_uring_worker_->addServerSocket(-1, io_uring_handler_);
+  auto& socket = io_uring_worker_->addServerSocket(-1, io_uring_handler_, false);
   EXPECT_EQ(io_uring_worker_->getSockets().size(), 1);
 
   // Waiting for the server socket receive the data.
@@ -602,7 +602,7 @@ TEST_F(IoUringWorkerIntegrationTest, ServerSocketRemoteClose) {
   initialize();
   initializeSockets();
 
-  auto& socket = io_uring_worker_->addServerSocket(server_socket_, io_uring_handler_);
+  auto& socket = io_uring_worker_->addServerSocket(server_socket_, io_uring_handler_, false);
   EXPECT_EQ(io_uring_worker_->getSockets().size(), 1);
 
   // Close the client socket to trigger an error.
@@ -630,7 +630,7 @@ TEST_F(IoUringWorkerIntegrationTest, ServerSocketDisable) {
   initialize();
   initializeSockets();
 
-  auto& socket = io_uring_worker_->addServerSocket(server_socket_, io_uring_handler_);
+  auto& socket = io_uring_worker_->addServerSocket(server_socket_, io_uring_handler_, false);
   EXPECT_EQ(io_uring_worker_->getSockets().size(), 1);
 
   // Write data through client socket.
@@ -670,7 +670,7 @@ TEST_F(IoUringWorkerIntegrationTest, ServerSocketWrite) {
   initialize();
   initializeSockets();
 
-  auto& socket = io_uring_worker_->addServerSocket(server_socket_, io_uring_handler_);
+  auto& socket = io_uring_worker_->addServerSocket(server_socket_, io_uring_handler_, false);
   EXPECT_EQ(io_uring_worker_->getSockets().size(), 1);
 
   // Waiting for the server socket sending the data.
@@ -708,7 +708,7 @@ TEST_F(IoUringWorkerIntegrationTest, ServerSocketWriteTimeout) {
   initialize();
   initializeSockets();
 
-  auto& socket = io_uring_worker_->addServerSocket(server_socket_, io_uring_handler_);
+  auto& socket = io_uring_worker_->addServerSocket(server_socket_, io_uring_handler_, false);
   EXPECT_EQ(io_uring_worker_->getSockets().size(), 1);
 
   // Fill peer socket receive buffer.
@@ -735,7 +735,7 @@ TEST_F(IoUringWorkerIntegrationTest, ServerSocketShutdownAfterWrite) {
   initialize();
   initializeSockets();
 
-  auto& socket = io_uring_worker_->addServerSocket(server_socket_, io_uring_handler_);
+  auto& socket = io_uring_worker_->addServerSocket(server_socket_, io_uring_handler_, false);
   EXPECT_EQ(io_uring_worker_->getSockets().size(), 1);
 
   // Waiting for the server socket sending the data.
@@ -765,7 +765,7 @@ TEST_F(IoUringWorkerIntegrationTest, ServerSocketCloseAfterShutdown) {
   initialize();
   initializeSockets();
 
-  auto& socket = io_uring_worker_->addServerSocket(server_socket_, io_uring_handler_);
+  auto& socket = io_uring_worker_->addServerSocket(server_socket_, io_uring_handler_, false);
   EXPECT_EQ(io_uring_worker_->getSockets().size(), 1);
 
   socket.shutdown(SHUT_WR);
@@ -780,7 +780,7 @@ TEST_F(IoUringWorkerIntegrationTest, ServerSocketCloseAfterShutdownWrite) {
   initialize();
   initializeSockets();
 
-  auto& socket = io_uring_worker_->addServerSocket(server_socket_, io_uring_handler_);
+  auto& socket = io_uring_worker_->addServerSocket(server_socket_, io_uring_handler_, false);
   EXPECT_EQ(io_uring_worker_->getSockets().size(), 1);
 
   // Waiting for the server socket sending the data.
@@ -809,13 +809,13 @@ TEST_F(IoUringWorkerIntegrationTest, ServerSocketCloseAfterShutdownWrite) {
 }
 
 // This tests the case when the socket disabled, then a remote close happened.
-// In this case, we should call IoHandle's onClose, not the onRead to emulate
-// a close event.
-TEST_F(IoUringWorkerIntegrationTest, ServerSocketCloseAfterDisabled) {
+// In this case, we should deliver this close event if the enable_close_event
+// is true.
+TEST_F(IoUringWorkerIntegrationTest, ServerSocketCloseAfterDisabledWithEnableCloseEvent) {
   initialize();
   initializeSockets();
 
-  auto& socket = io_uring_worker_->addServerSocket(server_socket_, io_uring_handler_);
+  auto& socket = io_uring_worker_->addServerSocket(server_socket_, io_uring_handler_, true);
   EXPECT_EQ(io_uring_worker_->getSockets().size(), 1);
   // Waiting for the server socket sending the data.
   socket.disable();
@@ -829,11 +829,43 @@ TEST_F(IoUringWorkerIntegrationTest, ServerSocketCloseAfterDisabled) {
   cleanup();
 }
 
+// This tests the case when the socket disabled, then a remote close happened.
+// In this case, we should deliver this remote close by read event if enable_close_event
+// is false.
+TEST_F(IoUringWorkerIntegrationTest, ServerSocketCloseAfterDisabledWithoutEnableCloseEvent) {
+  initialize();
+  initializeSockets();
+
+  bool is_closed = false;
+  io_uring_handler_.expectRead([&is_closed](ReadParam& param) {
+    if (param.result_ > 0) {
+      param.buf_.drain(param.result_);
+    }
+
+    if (param.result_ == 0) {
+      is_closed = true;
+    }
+  });
+
+  auto& socket = io_uring_worker_->addServerSocket(server_socket_, io_uring_handler_, false);
+  EXPECT_EQ(io_uring_worker_->getSockets().size(), 1);
+  // Waiting for the server socket sending the data.
+  socket.disable();
+
+  Api::OsSysCallsSingleton::get().close(client_socket_);
+
+  while (!is_closed) {
+    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  }
+
+  cleanup();
+}
+
 TEST_F(IoUringWorkerIntegrationTest, ServerSocketCloseWithAnyRequest) {
   initialize();
   initializeSockets();
 
-  auto& socket = io_uring_worker_->addServerSocket(server_socket_, io_uring_handler_);
+  auto& socket = io_uring_worker_->addServerSocket(server_socket_, io_uring_handler_, false);
   EXPECT_EQ(io_uring_worker_->getSockets().size(), 1);
 
   // Disable the socket, then it won't submit any new request.

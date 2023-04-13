@@ -23,7 +23,7 @@ public:
       : IoUringWorkerImpl(std::move(io_uring_instance), 5, 8192, 1000, dispatcher) {}
   IoUringSocket& addTestSocket(os_fd_t fd, IoUringHandler& io_uring_handler) {
     IoUringSocketEntryPtr socket =
-        std::make_unique<IoUringSocketEntry>(fd, *this, io_uring_handler);
+        std::make_unique<IoUringSocketEntry>(fd, *this, io_uring_handler, false);
     LinkedList::moveIntoListBack(std::move(socket), sockets_);
     return *sockets_.back();
   }
@@ -125,7 +125,7 @@ TEST(IoUringWorkerImplTest, ServerSocketInjectAfterWrite) {
   EXPECT_CALL(mock_io_uring, prepareReadv(fd, _, _, _, _))
       .WillOnce(DoAll(SaveArg<4>(&read_req), Return<IoUringResult>(IoUringResult::Ok)));
   EXPECT_CALL(mock_io_uring, submit()).Times(1).RetiresOnSaturation();
-  auto& io_uring_socket = worker.addServerSocket(fd, handler);
+  auto& io_uring_socket = worker.addServerSocket(fd, handler, false);
 
   // Add a write request.
   std::string data = "Hello";
@@ -216,7 +216,7 @@ TEST(IoUringWorkerImplTest, ServerSocketInjectAfterRead) {
   EXPECT_CALL(mock_io_uring, prepareReadv(fd, _, _, _, _))
       .WillOnce(DoAll(SaveArg<4>(&read_req), Return<IoUringResult>(IoUringResult::Ok)));
   EXPECT_CALL(mock_io_uring, submit()).Times(1).RetiresOnSaturation();
-  auto& io_uring_socket = worker.addServerSocket(fd, handler);
+  auto& io_uring_socket = worker.addServerSocket(fd, handler, false);
 
   // Fake an injected completion.
   EXPECT_CALL(mock_io_uring, forEveryCompletion(_))
@@ -287,7 +287,7 @@ TEST(IoUringWorkerImplTest, CloseAllSocketsWhenDestruction) {
   EXPECT_CALL(mock_io_uring, prepareReadv(fd, _, _, _, _))
       .WillOnce(DoAll(SaveArg<4>(&read_req), Return<IoUringResult>(IoUringResult::Ok)));
   EXPECT_CALL(mock_io_uring, submit()).Times(1).RetiresOnSaturation();
-  worker->addServerSocket(fd, handler);
+  worker->addServerSocket(fd, handler, false);
 
   // The IoUringWorker will close all the existing sockets.
   void* cancel_req = nullptr;
@@ -352,7 +352,7 @@ TEST(IoUringWorkerImplTest, ServerCloseWithWriteRequestOnly) {
   EXPECT_CALL(mock_io_uring, prepareReadv(fd, _, _, _, _))
       .WillOnce(DoAll(SaveArg<4>(&read_req), Return<IoUringResult>(IoUringResult::Ok)));
   EXPECT_CALL(mock_io_uring, submit()).Times(1).RetiresOnSaturation();
-  auto& io_uring_socket = worker.addServerSocket(fd, handler);
+  auto& io_uring_socket = worker.addServerSocket(fd, handler, false);
 
   // Disable the socket, then there will be no new read request.
   io_uring_socket.disable();

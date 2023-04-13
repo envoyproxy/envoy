@@ -203,6 +203,11 @@ public:
   virtual void disable() PURE;
 
   /**
+   * Enable close event.
+   */
+  virtual void enableCloseEvent(bool enable) PURE;
+
+  /**
    * Connect to an address.
    * @param address the peer of address which is connected to.
    */
@@ -338,17 +343,20 @@ public:
   /**
    * Add an accept socket socket to the worker.
    */
-  virtual IoUringSocket& addAcceptSocket(os_fd_t fd, IoUringHandler& handler) PURE;
+  virtual IoUringSocket& addAcceptSocket(os_fd_t fd, IoUringHandler& handler,
+                                         bool enable_close_event) PURE;
 
   /**
    * Add an server socket socket to the worker.
    */
-  virtual IoUringSocket& addServerSocket(os_fd_t fd, IoUringHandler& handler) PURE;
+  virtual IoUringSocket& addServerSocket(os_fd_t fd, IoUringHandler& handler,
+                                         bool enable_close_event) PURE;
 
   /**
    * Add an client socket socket to the worker.
    */
-  virtual IoUringSocket& addClientSocket(os_fd_t fd, IoUringHandler& handler) PURE;
+  virtual IoUringSocket& addClientSocket(os_fd_t fd, IoUringHandler& handler,
+                                         bool enable_close_event) PURE;
 
   /**
    * Return the current thread's dispatcher.

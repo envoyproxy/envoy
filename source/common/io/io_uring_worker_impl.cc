@@ -26,8 +26,9 @@ WriteRequest::WriteRequest(IoUringSocket& socket, const Buffer::RawSliceVector& 
 }
 
 IoUringSocketEntry::IoUringSocketEntry(os_fd_t fd, IoUringWorkerImpl& parent,
-                                       IoUringHandler& io_uring_handler)
-    : fd_(fd), parent_(parent), io_uring_handler_(io_uring_handler) {}
+                                       IoUringHandler& io_uring_handler, bool enable_close_event)
+    : fd_(fd), parent_(parent), io_uring_handler_(io_uring_handler),
+      enable_close_event_(enable_close_event) {}
 
 void IoUringSocketEntry::cleanup() {
   parent_.removeInjectedCompletion(*this);
@@ -88,23 +89,25 @@ IoUringWorkerImpl::~IoUringWorkerImpl() {
   dispatcher_.clearDeferredDeleteList();
 }
 
-IoUringSocket& IoUringWorkerImpl::addAcceptSocket(os_fd_t fd, IoUringHandler& handler) {
+IoUringSocket& IoUringWorkerImpl::addAcceptSocket(os_fd_t fd, IoUringHandler& handler,
+                                                  bool enable_close_event) {
   ENVOY_LOG(trace, "add accept socket, fd = {}", fd);
   std::unique_ptr<IoUringAcceptSocket> socket =
-      std::make_unique<IoUringAcceptSocket>(fd, *this, handler, accept_size_);
+      std::make_unique<IoUringAcceptSocket>(fd, *this, handler, accept_size_, enable_close_event);
   LinkedList::moveIntoListBack(std::move(socket), sockets_);
   return *sockets_.back();
 }
 
-IoUringSocket& IoUringWorkerImpl::addServerSocket(os_fd_t fd, IoUringHandler& handler) {
+IoUringSocket& IoUringWorkerImpl::addServerSocket(os_fd_t fd, IoUringHandler& handler,
+                                                  bool enable_close_event) {
   ENVOY_LOG(trace, "add server socket, fd = {}", fd);
-  std::unique_ptr<IoUringServerSocket> socket =
-      std::make_unique<IoUringServerSocket>(fd, *this, handler, write_timeout_ms_);
+  std::unique_ptr<IoUringServerSocket> socket = std::make_unique<IoUringServerSocket>(
+      fd, *this, handler, write_timeout_ms_, enable_close_event);
   LinkedList::moveIntoListBack(std::move(socket), sockets_);
   return *sockets_.back();
 }
 
-IoUringSocket& IoUringWorkerImpl::addClientSocket(os_fd_t fd, IoUringHandler&) {
+IoUringSocket& IoUringWorkerImpl::addClientSocket(os_fd_t fd, IoUringHandler&, bool) {
   ENVOY_LOG(trace, "add client socket, fd = {}", fd);
   PANIC("not implemented");
 }
@@ -306,9 +309,10 @@ void IoUringWorkerImpl::submit() {
 }
 
 IoUringAcceptSocket::IoUringAcceptSocket(os_fd_t fd, IoUringWorkerImpl& parent,
-                                         IoUringHandler& io_uring_handler, uint32_t accept_size)
-    : IoUringSocketEntry(fd, parent, io_uring_handler), accept_size_(accept_size),
-      requests_(std::vector<Request*>(accept_size_, nullptr)) {
+                                         IoUringHandler& io_uring_handler, uint32_t accept_size,
+                                         bool enable_close_event)
+    : IoUringSocketEntry(fd, parent, io_uring_handler, enable_close_event),
+      accept_size_(accept_size), requests_(std::vector<Request*>(accept_size_, nullptr)) {
   enable();
 }
 
@@ -325,9 +329,11 @@ void IoUringAcceptSocket::close() {
   // requests_ in close(). When there is a listener draining, all server sockets in the listener
   // will be closed by the main thread. Though there may be races, it is still safe to
   // submitCancelRequest since io_uring can accept cancelling an invalid user_data.
-  for (auto req : requests_) {
-    if (req != nullptr) {
-      parent_.submitCancelRequest(*this, req);
+  if (status_ != DISABLED) {
+    for (auto req : requests_) {
+      if (req != nullptr) {
+        parent_.submitCancelRequest(*this, req);
+      }
     }
   }
 }
@@ -390,8 +396,9 @@ void IoUringAcceptSocket::submitRequests() {
 
 IoUringServerSocket::IoUringServerSocket(os_fd_t fd, IoUringWorkerImpl& parent,
                                          IoUringHandler& io_uring_handler,
-                                         uint32_t write_timeout_ms)
-    : IoUringSocketEntry(fd, parent, io_uring_handler), write_timeout_ms_(write_timeout_ms) {
+                                         uint32_t write_timeout_ms, bool enable_close_event)
+    : IoUringSocketEntry(fd, parent, io_uring_handler, enable_close_event),
+      write_timeout_ms_(write_timeout_ms) {
   enable();
 }
 
@@ -511,8 +518,9 @@ void IoUringServerSocket::onClose(Request* req, int32_t result, bool injected) {
 void IoUringServerSocket::onRead(Request* req, int32_t result, bool injected) {
   IoUringSocketEntry::onRead(req, result, injected);
 
-  ENVOY_LOG(trace, "onRead with result {}, fd = {}, injected = {}, status_ = {}", result, fd_,
-            injected, status_);
+  ENVOY_LOG(trace,
+            "onRead with result {}, fd = {}, injected = {}, status_ = {}, enable_close_event = {}",
+            result, fd_, injected, status_, enable_close_event_);
   if (!injected) {
     read_req_ = nullptr;
     // Close if it is in closing status and can be closed.
@@ -548,23 +556,26 @@ void IoUringServerSocket::onRead(Request* req, int32_t result, bool injected) {
       ReadParam param{buf_, static_cast<int32_t>(buf_.length())};
       io_uring_handler_.onRead(param);
       ENVOY_LOG(trace, "after read from socket, fd = {}, remain = {}", fd_, buf_.length());
-    } else if (read_error_.has_value() && read_error_ <= 0) {
-      // If the socket is readable, all errors should be handled by the handler. Otherwise, only
-      // the Event::FileReadyType::Closed-equivalent event (remote close here) should be delivered.
-      if (status_ != DISABLED) {
-        ENVOY_LOG(trace, "read error from socket, fd = {}, result = {}", fd_, read_error_.value());
-        ReadParam param{buf_, read_error_.value()};
-        io_uring_handler_.onRead(param);
-        read_error_.reset();
-      } else if (status_ == DISABLED && read_error_.has_value() && read_error_ == 0) {
-        ENVOY_LOG(trace,
-                  "read disabled and got a remote close from socket, raise the close event, fd = "
-                  "{}, result = {}",
-                  fd_, read_error_.value());
-        io_uring_handler_.onClose();
-        read_error_.reset();
+    } else if (read_error_.has_value() && read_error_ <= 0 && !enable_close_event_) {
+      ENVOY_LOG(trace, "read error from socket, fd = {}, result = {}", fd_, read_error_.value());
+      ReadParam param{buf_, read_error_.value()};
+      io_uring_handler_.onRead(param);
+      read_error_.reset();
+
+      // Needn't to submit new read request if remote is closed.
+      if (read_error_.has_value() && read_error_ == 0) {
         return;
       }
+    }
+    // If `enable_close_event_` is true, then deliver the remote close as close event.
+    if (read_error_.has_value() && read_error_ == 0 && enable_close_event_) {
+      ENVOY_LOG(trace,
+                "remote closed and close event enabled, raise the close event, fd = "
+                "{}, result = {}",
+                fd_, read_error_.value());
+      io_uring_handler_.onClose();
+      read_error_.reset();
+      return;
     }
     // The socket may be not readable during handler onRead callback, check it again here.
     if (status_ == ENABLED || status_ == SHUTDOWN_WRITE || status_ == CLOSE_AFTER_SHUTDOWN_WRITE ||

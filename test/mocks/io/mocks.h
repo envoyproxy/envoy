@@ -44,6 +44,7 @@ class MockIoUringSocket : public IoUringSocket {
   MOCK_METHOD(void, shutdown, (int32_t how));
   MOCK_METHOD(void, enable, ());
   MOCK_METHOD(void, disable, ());
+  MOCK_METHOD(void, enableCloseEvent, (bool enable));
   MOCK_METHOD(void, connect, (const Network::Address::InstanceConstSharedPtr& address));
   MOCK_METHOD(void, write, (Buffer::Instance & data));
   MOCK_METHOD(uint64_t, write, (const Buffer::RawSlice* slices, uint64_t num_slice));
@@ -60,9 +61,12 @@ class MockIoUringSocket : public IoUringSocket {
 
 class MockIoUringWorker : public IoUringWorker {
 public:
-  MOCK_METHOD(IoUringSocket&, addAcceptSocket, (os_fd_t fd, IoUringHandler& handler));
-  MOCK_METHOD(IoUringSocket&, addServerSocket, (os_fd_t fd, IoUringHandler& handler));
-  MOCK_METHOD(IoUringSocket&, addClientSocket, (os_fd_t fd, IoUringHandler& handler));
+  MOCK_METHOD(IoUringSocket&, addAcceptSocket,
+              (os_fd_t fd, IoUringHandler& handler, bool enable_close_event));
+  MOCK_METHOD(IoUringSocket&, addServerSocket,
+              (os_fd_t fd, IoUringHandler& handler, bool enable_close_event));
+  MOCK_METHOD(IoUringSocket&, addClientSocket,
+              (os_fd_t fd, IoUringHandler& handler, bool enable_close_event));
   MOCK_METHOD(Event::Dispatcher&, dispatcher, ());
   MOCK_METHOD(Request*, submitAcceptRequest, (IoUringSocket & socket));
   MOCK_METHOD(Request*, submitConnectRequest,

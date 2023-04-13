@@ -53,13 +53,15 @@ class IoUringSocketEntry : public IoUringSocket,
                            public Event::DeferredDeletable,
                            protected Logger::Loggable<Logger::Id::io> {
 public:
-  IoUringSocketEntry(os_fd_t fd, IoUringWorkerImpl& parent, IoUringHandler& io_uring_handler);
+  IoUringSocketEntry(os_fd_t fd, IoUringWorkerImpl& parent, IoUringHandler& io_uring_handler,
+                     bool enable_close_event);
 
   // IoUringSocket
   os_fd_t fd() const override { return fd_; }
   void close() override { status_ = CLOSING; }
   void enable() override { status_ = ENABLED; }
   void disable() override { status_ = DISABLED; }
+  void enableCloseEvent(bool enable) override { enable_close_event_ = enable; }
   void connect(const Network::Address::InstanceConstSharedPtr&) override { PANIC("not implement"); }
   void write(Buffer::Instance&) override { PANIC("not implement"); }
   uint64_t write(const Buffer::RawSlice*, uint64_t) override { PANIC("not implement"); }
@@ -111,6 +113,7 @@ protected:
   IoUringHandler& io_uring_handler_;
   uint32_t injected_completions_{0};
   IoUringSocketStatus status_{INITIALIZED};
+  bool enable_close_event_;
 };
 
 using IoUringSocketEntryPtr = std::unique_ptr<IoUringSocketEntry>;
@@ -125,9 +128,12 @@ public:
   ~IoUringWorkerImpl() override;
 
   // IoUringWorker
-  IoUringSocket& addAcceptSocket(os_fd_t fd, IoUringHandler& handler) override;
-  IoUringSocket& addServerSocket(os_fd_t fd, IoUringHandler& handler) override;
-  IoUringSocket& addClientSocket(os_fd_t fd, IoUringHandler& handler) override;
+  IoUringSocket& addAcceptSocket(os_fd_t fd, IoUringHandler& handler,
+                                 bool enable_close_event) override;
+  IoUringSocket& addServerSocket(os_fd_t fd, IoUringHandler& handler,
+                                 bool enable_close_event) override;
+  IoUringSocket& addClientSocket(os_fd_t fd, IoUringHandler& handler,
+                                 bool enable_close_event) override;
 
   Event::Dispatcher& dispatcher() override;
 
@@ -170,7 +176,7 @@ protected:
 class IoUringAcceptSocket : public IoUringSocketEntry {
 public:
   IoUringAcceptSocket(os_fd_t fd, IoUringWorkerImpl& parent, IoUringHandler& io_uring_handler,
-                      uint32_t accept_size);
+                      uint32_t accept_size, bool enable_close_event);
 
   void close() override;
   void enable() override;
@@ -190,7 +196,7 @@ private:
 class IoUringServerSocket : public IoUringSocketEntry {
 public:
   IoUringServerSocket(os_fd_t fd, IoUringWorkerImpl& parent, IoUringHandler& io_uring_handler,
-                      uint32_t write_timeout_ms);
+                      uint32_t write_timeout_ms, bool enable_close_event);
 
   void close() override;
   void enable() override;

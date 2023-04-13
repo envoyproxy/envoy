@@ -381,7 +381,8 @@ void IoUringSocketHandleImpl::initializeFileEvent(Event::Dispatcher& dispatcher,
       shadow_io_handle_->initializeFileEvent(dispatcher, std::move(cb), trigger, events);
       return;
     }
-    io_uring_socket_ = io_uring_factory_.getIoUringWorker()->addServerSocket(fd_, *this);
+    io_uring_socket_ = io_uring_factory_.getIoUringWorker()->addServerSocket(
+        fd_, *this, events & Event::FileReadyType::Closed);
     break;
   }
   case IoUringSocketType::Accept: {
@@ -391,7 +392,8 @@ void IoUringSocketHandleImpl::initializeFileEvent(Event::Dispatcher& dispatcher,
       shadow_io_handle_->initializeFileEvent(dispatcher, std::move(cb), trigger, events);
       return;
     } else {
-      io_uring_socket_ = io_uring_factory_.getIoUringWorker()->addAcceptSocket(fd_, *this);
+      io_uring_socket_ = io_uring_factory_.getIoUringWorker()->addAcceptSocket(
+          fd_, *this, events & Event::FileReadyType::Closed);
     }
     break;
   }
@@ -448,6 +450,7 @@ void IoUringSocketHandleImpl::enableFileEvents(uint32_t events) {
   } else {
     io_uring_socket_->disable();
   }
+  io_uring_socket_->enableCloseEvent(events & Event::FileReadyType::Closed);
 }
 
 void IoUringSocketHandleImpl::resetFileEvents() {
