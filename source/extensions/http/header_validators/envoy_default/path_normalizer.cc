@@ -4,6 +4,7 @@
 
 #include "source/common/http/header_utility.h"
 #include "source/common/http/headers.h"
+#include "source/common/runtime/runtime_features.h"
 #include "source/extensions/http/header_validators/envoy_default/character_tables.h"
 
 #include "absl/strings/match.h"
@@ -235,6 +236,11 @@ PathNormalizer::normalizePathUri(RequestHeaderMap& header_map) const {
     redirect |= result.action() == PathNormalizationResult::Action::Redirect;
   }
 
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.uhv_translate_backslash_to_slash")) {
+    translateBackToForwardSlashes(path);
+  }
+
   if (!config_.uri_path_normalization_options().skip_merging_slashes()) {
     // pass 2: merge duplicate slashes (if configured to do so)
     const auto result = mergeSlashesPass(path);
@@ -266,6 +272,14 @@ PathNormalizer::normalizePathUri(RequestHeaderMap& header_map) const {
   }
 
   return PathNormalizationResult::success();
+}
+
+void PathNormalizer::translateBackToForwardSlashes(std::string& path) const {
+  for (char& character : path) {
+    if (character == '\\') {
+      character = '/';
+    }
+  }
 }
 
 PathNormalizer::PathNormalizationResult PathNormalizer::decodePass(std::string& path) const {

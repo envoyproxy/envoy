@@ -4551,6 +4551,80 @@ TEST_F(Http2CodecMetadataTest, UnknownStreamId) {
   driveToCompletion();
 }
 
+TEST(CodecChoiceTest, ProtocolOptionExplicitlySet) {
+  NiceMock<Network::MockConnection> client_connection;
+  MockConnectionCallbacks client_callbacks;
+  TestScopedRuntime scoped_runtime;
+  Stats::TestUtil::TestStore client_stats_store;
+  NiceMock<Random::MockRandomGenerator> random;
+  envoy::config::core::v3::Http2ProtocolOptions http2_options;
+  http2_options.mutable_hpack_table_size()->set_value(
+      CommonUtility::OptionsLimits::DEFAULT_HPACK_TABLE_SIZE);
+  http2_options.mutable_max_concurrent_streams()->set_value(
+      CommonUtility::OptionsLimits::DEFAULT_MAX_CONCURRENT_STREAMS);
+  http2_options.mutable_initial_stream_window_size()->set_value(
+      CommonUtility::OptionsLimits::DEFAULT_INITIAL_STREAM_WINDOW_SIZE);
+  http2_options.mutable_initial_connection_window_size()->set_value(
+      CommonUtility::OptionsLimits::DEFAULT_INITIAL_CONNECTION_WINDOW_SIZE);
+  uint32_t max_request_headers_kb = Http::DEFAULT_MAX_REQUEST_HEADERS_KB;
+  uint32_t max_response_headers_count = Http::DEFAULT_MAX_HEADERS_COUNT;
+
+  http2_options.mutable_use_oghttp2_codec()->set_value(true);
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.http2_use_oghttp2", "false"}});
+
+  auto client = std::make_unique<TestClientConnectionImpl>(
+      client_connection, client_callbacks, *client_stats_store.rootScope(), http2_options, random,
+      max_request_headers_kb, max_response_headers_count, ProdNghttp2SessionFactory::get());
+
+  // The protocol option takes precedence over the runtime feature.
+  EXPECT_TRUE(client->useOghttp2Library());
+
+  http2_options.mutable_use_oghttp2_codec()->set_value(false);
+
+  auto client2 = std::make_unique<TestClientConnectionImpl>(
+      client_connection, client_callbacks, *client_stats_store.rootScope(), http2_options, random,
+      max_request_headers_kb, max_response_headers_count, ProdNghttp2SessionFactory::get());
+
+  EXPECT_FALSE(client2->useOghttp2Library());
+}
+
+TEST(CodecChoiceTest, ProtocolOptionNotSpecified) {
+  NiceMock<Network::MockConnection> client_connection;
+  MockConnectionCallbacks client_callbacks;
+  Stats::TestUtil::TestStore client_stats_store;
+  NiceMock<Random::MockRandomGenerator> random;
+  envoy::config::core::v3::Http2ProtocolOptions http2_options;
+  http2_options.mutable_hpack_table_size()->set_value(
+      CommonUtility::OptionsLimits::DEFAULT_HPACK_TABLE_SIZE);
+  http2_options.mutable_max_concurrent_streams()->set_value(
+      CommonUtility::OptionsLimits::DEFAULT_MAX_CONCURRENT_STREAMS);
+  http2_options.mutable_initial_stream_window_size()->set_value(
+      CommonUtility::OptionsLimits::DEFAULT_INITIAL_STREAM_WINDOW_SIZE);
+  http2_options.mutable_initial_connection_window_size()->set_value(
+      CommonUtility::OptionsLimits::DEFAULT_INITIAL_CONNECTION_WINDOW_SIZE);
+  uint32_t max_request_headers_kb = Http::DEFAULT_MAX_REQUEST_HEADERS_KB;
+  uint32_t max_response_headers_count = Http::DEFAULT_MAX_HEADERS_COUNT;
+
+  ASSERT_FALSE(http2_options.has_use_oghttp2_codec());
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.http2_use_oghttp2", "true"}});
+
+  auto client = std::make_unique<TestClientConnectionImpl>(
+      client_connection, client_callbacks, *client_stats_store.rootScope(), http2_options, random,
+      max_request_headers_kb, max_response_headers_count, ProdNghttp2SessionFactory::get());
+
+  // Since no protocol option is specified, the runtime feature is used.
+  EXPECT_TRUE(client->useOghttp2Library());
+
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.http2_use_oghttp2", "false"}});
+
+  auto client2 = std::make_unique<TestClientConnectionImpl>(
+      client_connection, client_callbacks, *client_stats_store.rootScope(), http2_options, random,
+      max_request_headers_kb, max_response_headers_count, ProdNghttp2SessionFactory::get());
+
+  EXPECT_FALSE(client2->useOghttp2Library());
+}
+
 #ifdef NDEBUG
 // These tests send invalid request and response header names which violate ASSERT while creating
 // such request/response headers. So they can only be run in NDEBUG mode.

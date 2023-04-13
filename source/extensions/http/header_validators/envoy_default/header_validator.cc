@@ -164,7 +164,7 @@ HeaderValidator::validateStatusHeader(const HeaderString& value) {
   return HeaderValueValidationResult::success();
 }
 
-::Envoy::Http::HeaderValidator::HeaderEntryValidationResult
+HeaderValidator::HeaderEntryValidationResult
 HeaderValidator::validateGenericHeaderName(const HeaderString& name) {
   // Verify that the header name is valid. This also honors the underscore in
   // header configuration setting.
@@ -445,8 +445,7 @@ bool HeaderValidator::hasChunkedTransferEncoding(const HeaderString& value) {
   return false;
 }
 
-::Envoy::Http::HeaderValidator::HeaderEntryValidationResult
-HeaderValidator::validateGenericRequestHeaderEntry(
+HeaderValidator::HeaderEntryValidationResult HeaderValidator::validateGenericRequestHeaderEntry(
     const ::Envoy::Http::HeaderString& key, const ::Envoy::Http::HeaderString& value,
     const HeaderValidatorMap& protocol_specific_header_validators) {
   const auto& key_string_view = key.getStringView();

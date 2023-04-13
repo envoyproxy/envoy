@@ -437,6 +437,11 @@ elif [[ "$CI_TARGET" == "bazel.api" ]]; then
   ENVOY_STDLIB="libstdc++"
   setup_clang_toolchain
   export LLVM_CONFIG="${LLVM_ROOT}"/bin/llvm-config
+  echo "Run protoxform test"
+  bazel run "${BAZEL_BUILD_OPTIONS[@]}" \
+        --//tools/api_proto_plugin:default_type_db_target=//tools/testdata/protoxform:fix_protos \
+        --//tools/api_proto_plugin:extra_args=api_version:3.7 \
+        //tools/protoprint:protoprint_test
   echo "Validating API structure..."
   "${ENVOY_SRCDIR}"/tools/api/validate_structure.py
   echo "Validate Golang protobuf generation..."
@@ -503,16 +508,8 @@ elif [[ "$CI_TARGET" == "fix_proto_format" ]]; then
   exit 0
 elif [[ "$CI_TARGET" == "check_proto_format" ]]; then
   setup_clang_toolchain
-
   echo "Check proto format ..."
   BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS[*]}" "${ENVOY_SRCDIR}/tools/proto_format/proto_format.sh" check
-
-  echo "Run protoxform/protoprint test ..."
-  bazel run "${BAZEL_BUILD_OPTIONS[@]}" \
-        --remote_download_minimal \
-        --//tools/api_proto_plugin:default_type_db_target=//tools/testdata/protoxform:fix_protos \
-        --//tools/api_proto_plugin:extra_args=api_version:3.7 \
-        //tools/protoprint:protoprint_test
   exit 0
 elif [[ "$CI_TARGET" == "docs" ]]; then
   setup_clang_toolchain
@@ -544,9 +541,9 @@ elif [[ "$CI_TARGET" == "deps" ]]; then
         -- -v warn \
            -c cves release_dates releases
 
-  # Run pip requirements tests
-  echo "check pip..."
-  bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/dependency:pip_check
+  # Run dependabot tests
+  echo "Check dependabot ..."
+  bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/dependency:dependatool
 
   exit 0
 elif [[ "$CI_TARGET" == "verify_examples" ]]; then
