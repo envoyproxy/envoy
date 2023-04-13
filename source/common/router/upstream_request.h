@@ -210,7 +210,7 @@ private:
   void resetPerTryIdleTimer();
   void onPerTryTimeout();
   void onPerTryIdleTimeout();
-  void upstreamLog();
+  void upstreamLog(AccessLog::AccessLogType access_log_type);
 
   RouterFilterInterface& parent_;
   std::unique_ptr<GenericConnPool> conn_pool_;

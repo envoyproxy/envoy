@@ -48,6 +48,7 @@ envoy_cc_library(
     hdrs = ["grpc_access_log_utils.h"],
     deps = [
         "//envoy/upstream:upstream_interface",
+        "//source/common/access_log:utility_lib",
         "//source/common/network:utility_lib",
         "//source/common/stream_info:stream_info_lib",
         "//source/common/stream_info:utility_lib",

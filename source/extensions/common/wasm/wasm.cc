@@ -229,10 +229,11 @@ ContextBase* Wasm::createVmContext() { return new Context(this); }
 void Wasm::log(const PluginSharedPtr& plugin, const Http::RequestHeaderMap* request_headers,
                const Http::ResponseHeaderMap* response_headers,
                const Http::ResponseTrailerMap* response_trailers,
-               const StreamInfo::StreamInfo& stream_info) {
+               const StreamInfo::StreamInfo& stream_info,
+               AccessLogType access_log_type) {
   auto context = getRootContext(plugin, true);
   context->log(request_headers, response_headers, response_trailers, stream_info,
-               AccessLog::AccessLogType::Type1);
+               access_log_type);
 }
 
 void Wasm::onStatsUpdate(const PluginSharedPtr& plugin, Envoy::Stats::MetricSnapshot& snapshot) {

@@ -298,7 +298,8 @@ UdpProxyFilter::ActiveSession::~ActiveSession() {
   if (!cluster_.filter_.config_->sessionAccessLogs().empty()) {
     fillSessionStreamInfo();
     for (const auto& access_log : cluster_.filter_.config_->sessionAccessLogs()) {
-      access_log->log(nullptr, nullptr, nullptr, udp_session_stats_.value(), AccessLog::AccessLogType::Type1);
+      access_log->log(nullptr, nullptr, nullptr, udp_session_stats_.value(),
+                      AccessLog::AccessLogType::Type1);
     }
   }
 }

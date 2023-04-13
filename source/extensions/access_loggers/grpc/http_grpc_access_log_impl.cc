@@ -54,13 +54,14 @@ void HttpGrpcAccessLog::emitLog(const Http::RequestHeaderMap& request_headers,
                                 const Http::ResponseHeaderMap& response_headers,
                                 const Http::ResponseTrailerMap& response_trailers,
                                 const StreamInfo::StreamInfo& stream_info,
-                                AccessLog::AccessLogType) {
+                                AccessLog::AccessLogType access_log_type) {
   // Common log properties.
   // TODO(mattklein123): Populate sample_rate field.
   envoy::data::accesslog::v3::HTTPAccessLogEntry log_entry;
   GrpcCommon::Utility::extractCommonAccessLogProperties(*log_entry.mutable_common_properties(),
                                                         request_headers, stream_info,
-                                                        config_->common_config());
+                                                        config_->common_config(),
+                                                        access_log_type);
 
   if (stream_info.protocol()) {
     switch (stream_info.protocol().value()) {

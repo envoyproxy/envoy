@@ -56,6 +56,7 @@ envoy_cc_library(
     srcs = ["utility.cc"],
     hdrs = ["utility.h"],
     deps = [
+        "//envoy/access_log:access_log_interface",
         "//source/common/common:empty_string",
     ],
 )
