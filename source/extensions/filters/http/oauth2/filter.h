@@ -249,7 +249,7 @@ private:
   std::string id_token_;
   std::string refresh_token_;
   std::string new_expires_;
-  std::string max_age_;
+  std::string expires_in_;
   absl::string_view host_;
   std::string state_;
   Http::RequestHeaderMap* request_headers_{nullptr};

@@ -455,7 +455,7 @@ void OAuth2Filter::onGetAccessTokenSuccess(const std::string& access_code,
   const auto new_epoch = time_source_.systemTime() + expires_in;
   new_expires_ = std::to_string(
       std::chrono::duration_cast<std::chrono::seconds>(new_epoch.time_since_epoch()).count());
-  max_age_ = std::to_string(expires_in.count());
+  expires_in_ = std::to_string(expires_in.count());
 
   finishFlow();
 }
@@ -478,8 +478,9 @@ void OAuth2Filter::finishFlow() {
   absl::Base64Escape(pre_encoded_token, &encoded_token);
 
   // We use HTTP Only cookies for the HMAC and Expiry.
-  const std::string cookie_tail = fmt::format(CookieTailFormatString, max_age_);
-  const std::string cookie_tail_http_only = fmt::format(CookieTailHttpOnlyFormatString, max_age_);
+  const std::string cookie_tail = fmt::format(CookieTailFormatString, expires_in_);
+  const std::string cookie_tail_http_only =
+      fmt::format(CookieTailHttpOnlyFormatString, expires_in_);
 
   // At this point we have all of the pieces needed to authorize a user.
   // Now, we construct a redirect request to return the user to their
