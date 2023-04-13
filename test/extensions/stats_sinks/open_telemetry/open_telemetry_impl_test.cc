@@ -9,7 +9,6 @@
 
 using testing::_;
 using testing::ByMove;
-using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;
@@ -29,7 +28,7 @@ public:
     EXPECT_CALL(snapshot_, snapshotTime()).WillRepeatedly(Return(time));
   }
 
-  ~OpenTelemetryStatsSinkTests() {
+  ~OpenTelemetryStatsSinkTests() override {
     for (histogram_t* hist : histogram_ptrs_) {
       hist_free(hist);
     }
