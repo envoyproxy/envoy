@@ -995,6 +995,12 @@ std::string Utility::queryParamsToString(const QueryParams& params) {
 
 const std::string Utility::resetReasonToString(const Http::StreamResetReason reset_reason) {
   switch (reset_reason) {
+  case Http::StreamResetReason::LocalConnectionFailure:
+    return "local connection failure";
+  case Http::StreamResetReason::RemoteConnectionFailure:
+    return "remote connection failure";
+  case Http::StreamResetReason::ConnectionTimeout:
+    return "connection timeout";
   case Http::StreamResetReason::ConnectionFailure:
     return "connection failure";
   case Http::StreamResetReason::ConnectionTermination:

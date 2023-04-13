@@ -20,7 +20,17 @@ enum class StreamResetReason {
   // If a remote codec level refused stream reset was received on the stream (allowing for retry).
   RemoteRefusedStreamReset,
   // If the stream was locally reset by a connection pool due to an initial connection failure.
+  // TODO(kbaichoo): get rid of ConnectionFailure? Can use one of the more
+  // specific types below.
   ConnectionFailure,
+  // If the stream was locally reset by a connection pool due to an initial local connection
+  // failure.
+  LocalConnectionFailure,
+  // If the stream was locally reset by a connection pool due to an initial remote connection
+  // failure.
+  RemoteConnectionFailure,
+  // If the stream was reset due to timing out while creating a new connection.
+  ConnectionTimeout,
   // If the stream was locally reset due to connection termination.
   ConnectionTermination,
   // The stream was reset because of a resource overflow.
