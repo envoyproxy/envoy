@@ -473,11 +473,11 @@ typed_config:
             response_decoder = &decoder;
             EXPECT_CALL(encoder.stream_, connectionInfoProvider())
                 .WillRepeatedly(ReturnRef(connection_info1_));
-        callbacks.onPoolReady(encoder,
-                              context_.cluster_manager_.thread_local_cluster_.conn_pool_.host_,
-                              stream_info_, Http::Protocol::Http10);
-        return nullptr;
-      }));
+            callbacks.onPoolReady(encoder,
+                                  context_.cluster_manager_.thread_local_cluster_.conn_pool_.host_,
+                                  stream_info_, Http::Protocol::Http10);
+            return nullptr;
+          }));
 
   expectResponseTimerCreate();
   periodic_log_flush_ = new Event::MockTimer(&callbacks_.dispatcher_);
