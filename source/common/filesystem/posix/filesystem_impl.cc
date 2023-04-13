@@ -4,7 +4,6 @@
 #include <unistd.h>
 
 #include <cstdlib>
-#include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <memory>
@@ -186,9 +185,34 @@ Api::IoCallResult<FileInfo> InstanceImplPosix::stat(absl::string_view path) {
 }
 
 Api::IoCallBoolResult InstanceImplPosix::createPath(absl::string_view path) {
-  std::error_code ec;
-  bool result = std::filesystem::create_directories(std::string{path}, ec);
-  return result ? resultSuccess(true) : resultFailure(false, ec.value());
+  // Ideally we could just use std::filesystem::create_directories for this,
+  // but the supported iOS version for mobile doesn't support it, so we have to
+  // do recursive path creation manually.
+  if (path.back() == '/') {
+    path.remove_suffix(1);
+  }
+  if (directoryExists(std::string{path})) {
+    return resultSuccess(true);
+  }
+  absl::string_view subpath = path;
+  do {
+    size_t slashpos = subpath.find_last_of('/');
+    if (slashpos == absl::string_view::npos) {
+      return resultFailure(false, ENOENT);
+    }
+    subpath = subpath.substr(0, slashpos);
+  } while (!directoryExists(std::string{subpath}));
+  // We're now at the most-nested directory that already exists.
+  // Time to create paths recursively.
+  while (subpath != path) {
+    size_t slashpos = path.find_first_of('/', subpath.size() + 2);
+    subpath = (slashpos == absl::string_view::npos) ? path : path.substr(0, slashpos);
+    std::string dir_to_create{subpath};
+    if (mkdir(dir_to_create.c_str(), 0777)) {
+      return resultFailure(false, errno);
+    }
+  }
+  return resultSuccess(true);
 }
 
 FileImplPosix::FlagsAndMode FileImplPosix::translateFlag(FlagSet in) {
