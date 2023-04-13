@@ -270,6 +270,11 @@ function isString(x) {
   return Object.prototype.toString.call(x) === "[object String]";
 }
 
+
+function roundToTwo(num) {
+  return +(Math.round(num + "e+2")  + "e-2");
+}
+
 function renderHistogramDetail(supported_percentiles, detail) {
   activeStatsHistogramsDiv.replaceChildren();
   for (histogram of detail) {
@@ -343,8 +348,8 @@ function renderHistogramDetail(supported_percentiles, detail) {
     }
     console.log("min=" + minValue + " max=" + maxValue);
 
-    const width = maxValue - minValue;
-    const scaledValue = value => 9*((value - minValue) / width) + 1; // between 1 and 10;
+    const height = maxValue - minValue;
+    const scaledValue = value => 9*((value - minValue) / height) + 1; // between 1 and 10;
     const valueToPercent = value => Math.round(80 * log10(scaledValue(value)));
 
 /*
@@ -402,7 +407,7 @@ function renderHistogramDetail(supported_percentiles, detail) {
     //let prevWasPercentile = false;
 
     const bucketWidthVpx = 20;
-    const percentileWidthVpx = 5;
+    const percentileWidthVpx = 10;
     const marginWidthVpx = 40;
     const marginMinWidthVpx = 5;
     const widthVpx = numBuckets * bucketWidthVpx + (numBuckets - 1) * marginWidthVpx;
@@ -440,9 +445,12 @@ function renderHistogramDetail(supported_percentiles, detail) {
     }
 */
 
+    let leftVpx = 0;
     for (bucket of histogram.detail) {
       let marginVpx = marginWidthVpx;
       if (bucket.percentiles && bucket.percentiles.length > 0) {
+        let percentileLeftVpx = leftVpx - marginWidthVpx;
+
         // Compute how much margin surrounds each percentile line. Say there are 2
         // percentiles, each 5vpx wide. We'd subtract 10vpx from the initial margin
         // of 40vpx, and be left with 30vpx. But we want to divide that by 3 because
@@ -454,37 +462,49 @@ function renderHistogramDetail(supported_percentiles, detail) {
             marginMinWidthVpx,
             (marginVpx - bucket.percentiles.length * percentileWidthVpx) /
               (bucket.percentiles.length + 1));
-        const percentileMargin = toPercent(percentileMarginVpx);
+        //const percentileMargin = toPercent(percentileMarginVpx);
 
         for (percentile of bucket.percentiles) {
           const span = document.createElement('span');
-          span.className = 'tooltip';
+          //span.className = 'tooltip';
           //const label = document.createElement('span');
           span.className = 'histogram-percentile';
-          span.style['margin-left'] = percentileMargin;
+          //span.style['margin-left'] = percentileMargin;
+          percentileLeftVpx += percentileMarginVpx;
+          span.style.left = toPercent(percentileLeftVpx);
+          // span.style.width = percentileWidth;
+          percentileLeftVpx += percentileWidthVpx;
+
+/*
           const tip = document.createElement('span');
           tip.className = 'tooltiptext';
-          tip.textContent = 'P' + percentile[0] + ': ' + percentile[1];
+          tip.textContent = 'P' + percentile[0] + ': ' + roundToTwo(percentile[1]);
           span.appendChild(tip);
+*/
           graphics.appendChild(span);
-          marginVpx -= percentileMarginVpx;
+          //marginVpx -= percentileMarginVpx;
         }
-        marginVpx = Math.max(marginVpx, marginMinWidthVpx);
+        percentileLeftVpx += percentileMarginVpx;
+        //marginVpx = Math.max(marginVpx, marginMinWidthVpx);
       }
 
       // Now draw the bucket.
       const span = document.createElement('span');
-      span.className = 'histogram-buckets';
+      span.className = 'histogram-bucket';
       const heightPercent = maxCount == 0 ? 0 : Math.round((100 * bucket.count) / maxCount);
       span.style.height = '' + heightPercent + '%';
       span.style.width = bucketWidth;
-      const label = document.createElement('div');
-      label.textContent = '' + bucket.value + ':' + bucket.count;
-      span.style['margin-left'] = toPercent(marginVpx);
-      label.style['margin-left'] = marginWidth;
+      const left = toPercent(leftVpx);
+      span.style.left = left;
+      const label = document.createElement('span');
+      label.textContent = '' + roundToTwo(bucket.value) + ':' + bucket.count;
+      label.style.left = left;
+      //span.style['margin-left'] = toPercent(marginVpx);
+      //label.style['margin-left'] = marginWidth;
       //span.style.width = '' + valueToPercent(a[1]) + '%';
       graphics.appendChild(span);
       labels.appendChild(label);
+      leftVpx += bucketWidthVpx + marginWidthVpx;;
     }
   }
 }
