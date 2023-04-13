@@ -461,6 +461,14 @@ alias(
     }),
 )
 
+alias(
+    name = "boringcrypto",
+    actual = select({
+        "//bazel:boringssl_fips": "@boringssl_fips//:crypto",
+        "//conditions:default": "@boringssl//:crypto",
+    }),
+)
+
 config_setting(
     name = "linux_x86_64",
     values = {"cpu": "k8"},
