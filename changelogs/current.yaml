@@ -1,14 +1,24 @@
-date: April 5, 2023
+date: April 13, 2023
 
 behavior_changes:
 - area: http
   change: |
     Validate upstream request header names and values. The new runtime flag ``envoy.reloadable_features.validate_upstream_headers`` can be used for revert this behavior.
+- area: oauth2
+  change: |
+    The Max-Age attribute of Set-Cookie HTTP response header was fixed, and now it is being assigned a value
+    representing the number of seconds until the cookie expires. This behavioral change can be reverted by
+    setting runtime guard ``envoy.reloadable_features.oauth_use_standard_max_age_value`` to false.
 
 bug_fixes:
 - area: oauth2
   change: |
     fixed a bug where the oauth2 filter would crash if it received a redirect URL without a state query param set.
+- area: oauth2
+  change: |
+    The Max-Age attribute of Set-Cookie HTTP response header was being assigned a value representing Seconds Since
+    the Epoch, causing cookies to expire in ~53 years. This was fixed an now it is being assinged a value representing
+    the number of seconds until the cookie expires.
 - area: lua
   change: |
     lua coroutine should not execute after local reply is sent.
