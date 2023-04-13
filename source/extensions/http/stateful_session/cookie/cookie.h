@@ -32,13 +32,13 @@ public:
     absl::optional<absl::string_view> upstreamAddress() const override { return upstream_address_; }
     void onUpdate(const Upstream::HostDescription& host,
                   Envoy::Http::ResponseHeaderMap& headers) override;
-    void setEncodeStyle(bool style) {use_old_style_ = style;}
+    void setEncodeStyle(bool style) {use_old_style_encoding_ = style;}
 
   private:
     absl::optional<std::string> upstream_address_;
     const CookieBasedSessionStateFactory& factory_;
     TimeSource& time_source_;
-    bool use_old_style_{false};
+    bool use_old_style_encoding_{false};
   };
 
   CookieBasedSessionStateFactory(const CookieBasedSessionStateProto& config,
@@ -67,7 +67,7 @@ private:
     const std::string cookie_value = Envoy::Http::Utility::parseCookieValue(headers, name_);
     const std::string decoded_value = Envoy::Base64::decode(cookie_value);
     std::string address;
-    bool use_old_style = false;
+    bool use_old_style_encoding = false;
 
     // If the first character is a curly bracket, try to interpret the cookie as JSON payload.
     // Otherwise treat it as "old" style format, which is ipaddress:port.
@@ -82,51 +82,23 @@ private:
       auto now = std::chrono::duration_cast<std::chrono::seconds>(
           (time_source_.monotonicTime()).time_since_epoch());
       if (now > expiry_time) {
-        printf("EXPIIIIIIIREEEEED\n");
         // Ignore the address extracted from the cookie. This will cause
         // upstream cluster to select a new hosy and new cookie will be generated.
-        return std::make_pair(absl::nullopt, use_old_style);
+        return std::make_pair(absl::nullopt, use_old_style_encoding);
       }
 
       // get the address from json.
       address = root_obj->getString("address");
     } catch (...) {
-        return std::make_pair(absl::nullopt, use_old_style);
+        return std::make_pair(absl::nullopt, use_old_style_encoding);
     }
-#if 0
-
-    // Split the value into chunks separated by semicolon.
-    std::vector<std::string> v = absl::StrSplit(decoded_value, ";");
-
-    if (v.size() == 2) {
-    // The second element is expiration timestamp.
-    long expires = std::stol(v[1]);
-    auto now = std::chrono::duration_cast<std::chrono::seconds>((time_source_.monotonicTime()).time_since_epoch());
-    
-    std::chrono::seconds expiry_time(expires);
-
-    printf("TIIIIMES exp: %ld now %ld\n", expiry_time.count(), now.count());
-    if (now > expiry_time ) {
-        printf("EXPIIIIIIIREEEEED\n");
-        // Ignore the address extracted from the cookie. This will cause
-        // upstream cluster to select a new hosy and new cookie will be generated.
-        return absl::nullopt;
-    }
-    }
-    if (v.size() >= 1) {
-        address = v[0];
-    }
-   
-    //std::string address = Envoy::Base64::decode(cookie_value);
-    //const auto now =  time_source_.monotonicTime();
-#endif
     } else {
         // Treat this as "old" style cookie. 
         address = decoded_value;
-        use_old_style = true;
+        use_old_style_encoding = true;
     }
 
-    return std::make_pair(!address.empty() ? absl::make_optional(std::move(address)) : absl::nullopt, use_old_style);
+    return std::make_pair(!address.empty() ? absl::make_optional(std::move(address)) : absl::nullopt, use_old_style_encoding);
   }
 
   std::string makeSetCookie(const std::string& address) const {
