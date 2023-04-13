@@ -307,7 +307,6 @@ void ConnectionManagerImpl::doDeferredStreamDestroy(ActiveStream& stream) {
   }
 
   stream.filter_manager_.onStreamComplete();
-  stream.streamInfo().setStreamState(StreamInfo::StreamState::Ended);
 
   // For HTTP/3, skip access logging here and add deferred logging info
   // to stream info for QuicStatsGatherer to use later.
@@ -385,7 +384,6 @@ RequestDecoder& ConnectionManagerImpl::newStream(ResponseEncoder& response_encod
   }
   new_stream->response_encoder_->getStream().setFlushTimeout(new_stream->idle_timeout_ms_);
   new_stream->streamInfo().setDownstreamBytesMeter(response_encoder.getStream().bytesMeter());
-  new_stream->streamInfo().setStreamState(StreamInfo::StreamState::Started);
   // If the network connection is backed up, the stream should be made aware of it on creation.
   // Both HTTP/1.x and HTTP/2 codecs handle this in StreamCallbackHelper::addCallbacksHelper.
   ASSERT(read_callbacks_->connection().aboveHighWatermark() == false ||
@@ -814,15 +812,11 @@ ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connect
   if (connection_manager_.config_.accessLogFlushInterval().has_value()) {
     access_log_flush_timer_ =
         connection_manager.read_callbacks_->connection().dispatcher().createTimer([this]() -> void {
-          if (!streamInfo().streamState() ||
-              streamInfo().streamState() != StreamInfo::StreamState::Ended) {
-            refreshAccessLogFlushTimer();
-          }
-
-          // If the request is not in active state, we shouldn't do the periodic log.
-          if (streamInfo().streamState() &&
-              streamInfo().streamState() == StreamInfo::StreamState::InProgress) {
+          // If the request is complete, we've already done the stream-end access-log, and shouldn't
+          // do the periodic log.
+          if (!streamInfo().requestComplete().has_value()) {
             filter_manager_.log();
+            refreshAccessLogFlushTimer();
           }
         });
     refreshAccessLogFlushTimer();
@@ -1136,8 +1130,16 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapSharedPt
     return;
   }
 
-  // Verify header sanity checks which should have been performed by the codec.
-  ASSERT(HeaderUtility::requestHeadersValid(*request_headers_).has_value() == false);
+  // Apply header sanity checks.
+  absl::optional<std::reference_wrapper<const absl::string_view>> error =
+      HeaderUtility::requestHeadersValid(*request_headers_);
+  if (error != absl::nullopt) {
+    sendLocalReply(Code::BadRequest, "", nullptr, absl::nullopt, error.value().get());
+    if (!response_encoder_->streamErrorOnInvalidHttpMessage()) {
+      connection_manager_.handleCodecError(error.value().get());
+    }
+    return;
+  }
 
   // Check for the existence of the :path header for non-CONNECT requests, or present-but-empty
   // :path header for CONNECT requests. We expect the codec to have broken the path into pieces if
@@ -1468,6 +1470,12 @@ void ConnectionManagerImpl::ActiveStream::refreshDurationTimeout() {
 }
 
 void ConnectionManagerImpl::ActiveStream::refreshCachedRoute(const Router::RouteCallback& cb) {
+  // If the cached route is blocked then any attempt to clear it or refresh it
+  // will be ignored.
+  if (routeCacheBlocked()) {
+    return;
+  }
+
   Router::RouteConstSharedPtr route;
   if (request_headers_ != nullptr) {
     if (connection_manager_.config_.isRoutable() &&
@@ -1624,6 +1632,13 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ResponseHeaderMap& heade
     state_.is_tunneling_ = true;
   }
 
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.prohibit_route_refresh_after_response_headers_sent")) {
+    // Block route cache if the response headers is received and processed. Because after this
+    // point, the cached route should never be updated or refreshed.
+    blockRouteCache();
+  }
+
   if (connection_manager_.drain_state_ != DrainState::NotDraining &&
       connection_manager_.codec_->protocol() < Protocol::Http2) {
     // If the connection manager is draining send "Connection: Close" on HTTP/1.1 connections.
@@ -1663,11 +1678,6 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ResponseHeaderMap& heade
 
   ENVOY_STREAM_LOG(debug, "encoding headers via codec (end_stream={}):\n{}", *this, end_stream,
                    headers);
-
-  // According to RFC7231 any 2xx response indicates that the connection is established.
-  if (!end_stream && Http::CodeUtility::is2xx(Http::Utility::getResponseStatus(headers))) {
-    filter_manager_.streamInfo().setStreamState(StreamInfo::StreamState::InProgress);
-  }
 
   // Now actually encode via the codec.
   filter_manager_.streamInfo().downstreamTiming().onFirstDownstreamTxByteSent(
@@ -1859,8 +1869,16 @@ ConnectionManagerImpl::ActiveStream::route(const Router::RouteCallback& cb) {
  * functions as a helper to refreshCachedRoute(const Router::RouteCallback& cb).
  */
 void ConnectionManagerImpl::ActiveStream::setRoute(Router::RouteConstSharedPtr route) {
+  // If the cached route is blocked then any attempt to clear it or refresh it
+  // will be ignored.
+  // setRoute() may be called directly by the interface of DownstreamStreamFilterCallbacks,
+  // so check for routeCacheBlocked() here again.
+  if (routeCacheBlocked()) {
+    return;
+  }
+
   filter_manager_.streamInfo().route_ = route;
-  cached_route_ = std::move(route);
+  setCachedRoute({std::move(route)});
   if (nullptr == filter_manager_.streamInfo().route() ||
       nullptr == filter_manager_.streamInfo().route()->routeEntry()) {
     cached_cluster_info_ = nullptr;
@@ -1909,11 +1927,35 @@ void ConnectionManagerImpl::ActiveStream::refreshAccessLogFlushTimer() {
 }
 
 void ConnectionManagerImpl::ActiveStream::clearRouteCache() {
-  cached_route_ = absl::optional<Router::RouteConstSharedPtr>();
+  // If the cached route is blocked then any attempt to clear it or refresh it
+  // will be ignored.
+  if (routeCacheBlocked()) {
+    return;
+  }
+
+  setCachedRoute({});
+
   cached_cluster_info_ = absl::optional<Upstream::ClusterInfoConstSharedPtr>();
   if (tracing_custom_tags_) {
     tracing_custom_tags_->clear();
   }
+}
+
+void ConnectionManagerImpl::ActiveStream::setCachedRoute(
+    absl::optional<Router::RouteConstSharedPtr>&& route) {
+  if (hasCachedRoute()) {
+    // The configuration of the route may be referenced by some filters.
+    // Cache the route to avoid it being destroyed before the stream is destroyed.
+    cleared_cached_routes_.emplace_back(std::move(cached_route_.value()));
+  }
+  cached_route_ = std::move(route);
+}
+
+void ConnectionManagerImpl::ActiveStream::blockRouteCache() {
+  route_cache_blocked_ = true;
+  // Clear the snapped route configuration because it is unnecessary to keep it.
+  snapped_route_config_.reset();
+  snapped_scoped_routes_config_.reset();
 }
 
 void ConnectionManagerImpl::ActiveStream::onRequestDataTooLarge() {

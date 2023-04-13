@@ -1499,3 +1499,17 @@ envoy.config_subscription.rest:
   status: stable
   type_urls:
   - envoy.config.core.v3.RestSubscription
+envoy.config_subscription.filesystem:
+  categories:
+  - envoy.config_subscription
+  security_posture: unknown
+  status: stable
+  type_urls:
+  - envoy.config.core.v3.FilesystemSubscription
+envoy.config_subscription.filesystem_collection:
+  categories:
+  - envoy.config_subscription
+  security_posture: unknown
+  status: stable
+  type_urls:
+  - envoy.config.core.v3.FilesystemCollectionSubscription

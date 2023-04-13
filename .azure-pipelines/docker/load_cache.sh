@@ -34,7 +34,7 @@ fi
 
 if [[ -e "${DOCKER_CACHE_TARBALL}" ]]; then
     echo "Extracting docker cache ${DOCKER_CACHE_TARBALL} -> /var/lib/docker ..."
-    tar -I "zstd -d -T0 " -axf "$DOCKER_CACHE_TARBALL" -C /var/lib/docker
+    zstd --stdout -d "$DOCKER_CACHE_TARBALL" | tar -xf - -C /var/lib/docker
     touch /tmp/DOCKER_CACHE_RESTORED
 else
     echo "No cache to restore, starting Docker with no data"

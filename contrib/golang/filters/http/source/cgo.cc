@@ -32,6 +32,16 @@ absl::string_view referGoString(void* str) {
   return absl::string_view(goStr->p, goStr->n); // NOLINT(modernize-return-braced-init-list)
 }
 
+absl::string_view stringViewFromGoSlice(void* slice) {
+  if (slice == nullptr) {
+    return "";
+  }
+  auto goSlice = reinterpret_cast<GoSlice*>(slice);
+  return {static_cast<const char*>(goSlice->data), static_cast<size_t>(goSlice->len)};
+}
+
+const FilterLogger& getFilterLogger() { CONSTRUCT_ON_FIRST_USE(FilterLogger); }
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -153,11 +163,18 @@ CAPIStatus envoyGoFilterHttpGetIntegerValue(void* r, int id, void* value) {
   });
 }
 
-CAPIStatus envoyGoFilterHttpLog(void* r, uint32_t level, void* message) {
+void envoyGoFilterHttpLog(uint32_t level, void* message) {
+  auto mesg = referGoString(message);
+  getFilterLogger().log(level, mesg);
+}
+
+CAPIStatus envoyGoFilterHttpSetDynamicMetadata(void* r, void* name, void* key, void* buf) {
   return envoyGoFilterHandlerWrapper(
-      r, [level, message](std::shared_ptr<Filter>& filter) -> CAPIStatus {
-        auto mesg = referGoString(message);
-        return filter->log(level, mesg);
+      r, [name, key, buf](std::shared_ptr<Filter>& filter) -> CAPIStatus {
+        auto name_str = copyGoString(name);
+        auto key_str = copyGoString(key);
+        auto buf_str = stringViewFromGoSlice(buf);
+        return filter->setDynamicMetadata(name_str, key_str, buf_str);
       });
 }
 
@@ -167,6 +184,13 @@ void envoyGoFilterHttpFinalize(void* r, int reason) {
   // phase of the go object.
   auto req = reinterpret_cast<httpRequestInternal*>(r);
   delete req;
+}
+
+CAPIStatus envoyGoFilterHttpSendPanicReply(void* r, void* details) {
+  return envoyGoFilterHandlerWrapper(r, [details](std::shared_ptr<Filter>& filter) -> CAPIStatus {
+    // Since this is only used for logs we don't need to deep copy.
+    return filter->sendPanicReply(referGoString(details));
+  });
 }
 
 #ifdef __cplusplus

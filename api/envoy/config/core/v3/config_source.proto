@@ -285,3 +285,11 @@ message ExtensionConfigSource {
 // A placeholder proto for the registration for the REST subscription implementation.
 message RestSubscription {
 }
+
+// A placeholder proto for the registration for the filesystem subscription implementation.
+message FilesystemSubscription {
+}
+
+// A placeholder proto for the registration for the filesystem collection subscription implementation.
+message FilesystemCollectionSubscription {
+}
