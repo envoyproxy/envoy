@@ -44,10 +44,7 @@ type HttpCAPI interface {
 	// TODO: HttpGetDynamicMetadata(r unsafe.Pointer, filterName string) map[string]interface{}
 	HttpSetDynamicMetadata(r unsafe.Pointer, filterName string, key string, value interface{})
 
-	// HttpLog writes message to the registered logger during request processes.
-	// we are also consider adding MiscLog to write the misc logger during non-request
-	// processes in the future.
-	HttpLog(r unsafe.Pointer, level LogType, message string)
+	HttpLog(level LogType, message string)
 
 	HttpFinalize(r unsafe.Pointer, reason int)
 }

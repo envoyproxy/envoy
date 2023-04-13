@@ -63,7 +63,7 @@ CAPIStatus envoyGoFilterHttpGetIntegerValue(void* r, int id, void* value);
 // TODO: implement get dynamic metadata
 CAPIStatus envoyGoFilterHttpSetDynamicMetadata(void* r, void* name, void* key, void* buf);
 
-CAPIStatus envoyGoFilterHttpLog(void* r, uint32_t level, void* message);
+void envoyGoFilterHttpLog(uint32_t level, void* message);
 
 void envoyGoFilterHttpFinalize(void* r, int reason);
 
