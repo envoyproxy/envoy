@@ -977,7 +977,7 @@ TEST_F(OAuth2Test, OAuthAccessTokenSucessWithTokens) {
   EXPECT_CALL(decoder_callbacks_, encodeHeaders_(HeaderMapEqualRef(&expected_headers), true));
 
   filter_->onGetAccessTokenSuccess("access_code", "some-id-token", "some-refresh-token",
-                                   std::chrono::seconds(1600));
+                                   std::chrono::seconds(600));
 }
 
 TEST_F(OAuth2Test, OAuthBearerTokenFlowFromHeader) {
