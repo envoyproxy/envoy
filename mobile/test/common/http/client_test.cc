@@ -479,7 +479,7 @@ TEST_P(ClientTest, EnvoyLocalError) {
   stream_info_.setResponseCode(503);
   stream_info_.setResponseCodeDetails("nope");
   stream_info_.setAttemptCount(123);
-  response_encoder_->getStream().resetStream(Http::StreamResetReason::ConnectionFailure);
+  response_encoder_->getStream().resetStream(Http::StreamResetReason::LocalConnectionFailure);
   ASSERT_EQ(cc_.on_headers_calls, 0);
   // Ensure that the callbacks on the bridge_callbacks_ were called.
   ASSERT_EQ(cc_.on_complete_calls, 0);

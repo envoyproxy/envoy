@@ -191,7 +191,7 @@ public:
   const Http::StreamResetReason remote_refused_stream_reset_{
       Http::StreamResetReason::RemoteRefusedStreamReset};
   const Http::StreamResetReason overflow_reset_{Http::StreamResetReason::Overflow};
-  const Http::StreamResetReason connect_failure_{Http::StreamResetReason::ConnectionFailure};
+  const Http::StreamResetReason connect_failure_{Http::StreamResetReason::RemoteConnectionFailure};
 };
 
 TEST_F(RouterRetryStateImplTest, PolicyNoneRemoteReset) {

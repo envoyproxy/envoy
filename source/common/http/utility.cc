@@ -1001,8 +1001,6 @@ const std::string Utility::resetReasonToString(const Http::StreamResetReason res
     return "remote connection failure";
   case Http::StreamResetReason::ConnectionTimeout:
     return "connection timeout";
-  case Http::StreamResetReason::ConnectionFailure:
-    return "connection failure";
   case Http::StreamResetReason::ConnectionTermination:
     return "connection termination";
   case Http::StreamResetReason::LocalReset:
