@@ -1,1 +1,1 @@
-FROM mendhak/http-https-echo@sha256:a5661adca985057c94e31d633ee57051dbf29ada1ccfaa4f5fb58f4a5b1a2b2b
+FROM mendhak/http-https-echo@sha256:67b682bde2caa36fc7840379842cc1071fc9f61c9c570dcca3adfc8a37554f6e
