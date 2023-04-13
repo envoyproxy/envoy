@@ -660,7 +660,11 @@ stages:
         cp -a $(Build.StagingDirectory)/bazel.release.arm64/bin/release.tar.zst linux/arm64/release.tar.zst
         cp -a $(Build.StagingDirectory)/bazel.release.arm64/bin/schema_validator_tool linux/arm64/schema_validator_tool
 
+        # Debug what files appear to have been downloaded
+        find linux -type f -name "*" | xargs ls -l
+
         ci/docker_ci.sh
+      timeoutInMinutes: 40
       workingDirectory: $(Build.SourcesDirectory)
       env:
         AZP_BRANCH: $(Build.SourceBranch)
