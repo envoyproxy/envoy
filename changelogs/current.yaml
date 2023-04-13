@@ -139,6 +139,11 @@ bug_fixes:
 - area: dubbo
   change: |
     Fix a bug that the dubbo proxy will treat the response with status 80 as a illegal response.
+- area: http cookies
+  change: |
+    Changed internal format of http cookie to JSON and added expiry timestamp. Processing expired cookie
+    resultis in selection of a new upstream host and sending a new cookie to the client. Previous format of 
+    the cookie is still accepted, but is planned to be obsoleted in the future. 
 
 removed_config_or_runtime:
 - area: config

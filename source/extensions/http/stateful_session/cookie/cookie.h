@@ -94,6 +94,9 @@ private:
     }
     } else {
         // Treat this as "old" style cookie. 
+     ENVOY_LOG_MISC(
+          warn,
+          "Non-json cookie format detected. This format will be rejected in the future.");
         address = decoded_value;
         use_old_style_encoding = true;
     }
