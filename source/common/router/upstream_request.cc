@@ -206,10 +206,7 @@ void UpstreamRequest::cleanUp() {
   }
 
   stream_info_.onRequestComplete();
-  for (const auto& upstream_log : parent_.config().upstream_logs_) {
-    upstream_log->log(parent_.downstreamHeaders(), upstream_headers_.get(),
-                      upstream_trailers_.get(), stream_info_, AccessLog::AccessLogType::Type1);
-  }
+  upstreamLog(AccessLog::AccessLogType::Type1);
 
   while (downstream_data_disabled_ != 0) {
     parent_.callbacks()->onDecoderFilterBelowWriteBufferLowWatermark();
@@ -221,6 +218,13 @@ void UpstreamRequest::cleanUp() {
     // chain. Make sure to not delete them immediately when the stream ends, as the stream often
     // ends during filter chain processing and it causes use-after-free violations.
     parent_.callbacks()->dispatcher().deferredDelete(std::move(filter_manager_callbacks_));
+  }
+}
+
+void UpstreamRequest::upstreamLog(AccessLog::AccessLogType access_log_type) {
+  for (const auto& upstream_log : parent_.config().upstream_logs_) {
+    upstream_log->log(parent_.downstreamHeaders(), upstream_headers_.get(),
+                      upstream_trailers_.get(), stream_info_, access_log_type);
   }
 }
 
@@ -286,6 +290,7 @@ void UpstreamRequest::decodeHeaders(Http::ResponseHeaderMapPtr&& headers, bool e
 
   maybeHandleDeferredReadDisable();
   ASSERT(headers.get());
+
   parent_.onUpstreamHeaders(response_code, std::move(headers), *this, end_stream);
 }
 
@@ -711,6 +716,10 @@ void UpstreamRequest::onPoolReady(std::unique_ptr<GenericUpstream>&& upstream,
   }
 
   stream_info_.setRequestHeaders(*parent_.downstreamHeaders());
+
+  if (parent_.config().flush_upstream_log_on_upstream_stream_) {
+    upstreamLog(AccessLog::AccessLogType::Type1);
+  }
 
   for (auto* callback : upstream_callbacks_) {
     callback->onUpstreamConnectionEstablished();
