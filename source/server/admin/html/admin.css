@@ -66,6 +66,7 @@
   bottom: 0;
   background-color: #c11;
   position: absolute;
+  width: 15px;
 }
 
 .histogram-percentile {
@@ -77,11 +78,17 @@
     position: absolute;
 }
 
+.percentile-label {
+  position: absolute;
+  bottom: 50%;
+  font-family: sans-serif;
+  font-size: 12px;
+  margin-left: 5px;
+}
+
 .histogram-labels span {
   position: absolute;
   bottom: 0;
-  /*margin-right: 50px;*/
-  align-self: baseline;
   font-family: sans-serif;
   font-size: 12px;
 }

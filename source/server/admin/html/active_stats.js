@@ -410,7 +410,7 @@ function renderHistogramDetail(supported_percentiles, detail) {
     const percentileWidthVpx = 10;
     const marginWidthVpx = 40;
     const marginMinWidthVpx = 5;
-    const widthVpx = numBuckets * bucketWidthVpx + (numBuckets - 1) * marginWidthVpx;
+    const widthVpx = numBuckets * (bucketWidthVpx + marginWidthVpx);
 
     let first = true;
 /*
@@ -430,9 +430,10 @@ function renderHistogramDetail(supported_percentiles, detail) {
 */
 
     const toPercent = vpx => '' + Math.round(100 * vpx / widthVpx) + '%';
-    const percentileWidth = toPercent(percentileWidthVpx);
-    const bucketWidth = toPercent(bucketWidthVpx);
-    const marginWidth = toPercent(marginWidthVpx);
+    const toPercentBackward = vpx => '' + Math.round(100 - 100 * vpx / widthVpx) + '%';
+    //const percentileWidth = toPercent(percentileWidthVpx);
+    //const bucketWidth = toPercent(bucketWidthVpx);
+    //const marginWidth = toPercent(marginWidthVpx);
 
 /*
     // Remove any trailing percentiles; we are not going to render those.
@@ -445,7 +446,7 @@ function renderHistogramDetail(supported_percentiles, detail) {
     }
 */
 
-    let leftVpx = 0;
+    let leftVpx = marginWidthVpx / 2;
     for (bucket of histogram.detail) {
       let marginVpx = marginWidthVpx;
       if (bucket.percentiles && bucket.percentiles.length > 0) {
@@ -471,8 +472,20 @@ function renderHistogramDetail(supported_percentiles, detail) {
           span.className = 'histogram-percentile';
           //span.style['margin-left'] = percentileMargin;
           percentileLeftVpx += percentileMarginVpx;
-          span.style.left = toPercent(percentileLeftVpx);
+          const percentileLeft = toPercent(percentileLeftVpx);
+          span.style.left = percentileLeft;
           // span.style.width = percentileWidth;
+
+          const percentilePLabel = document.createElement('span');
+          percentilePLabel.className = 'percentile-label';
+          percentilePLabel.textContent = 'P' + percentile[0];
+          percentilePLabel.style.right = toPercentBackward(percentileLeftVpx);
+
+          const percentileVLabel = document.createElement('span');
+          percentileVLabel.className = 'percentile-label';
+          percentileVLabel.textContent = roundToTwo(percentile[1]);
+          percentileVLabel.style.left = percentileLeft;
+
           percentileLeftVpx += percentileWidthVpx;
 
 /*
@@ -482,6 +495,8 @@ function renderHistogramDetail(supported_percentiles, detail) {
           span.appendChild(tip);
 */
           graphics.appendChild(span);
+          graphics.appendChild(percentilePLabel);
+          graphics.appendChild(percentileVLabel);
           //marginVpx -= percentileMarginVpx;
         }
         percentileLeftVpx += percentileMarginVpx;
@@ -489,20 +504,20 @@ function renderHistogramDetail(supported_percentiles, detail) {
       }
 
       // Now draw the bucket.
-      const span = document.createElement('span');
-      span.className = 'histogram-bucket';
+      const bucketSpan = document.createElement('span');
+      bucketSpan.className = 'histogram-bucket';
       const heightPercent = maxCount == 0 ? 0 : Math.round((100 * bucket.count) / maxCount);
-      span.style.height = '' + heightPercent + '%';
-      span.style.width = bucketWidth;
+      bucketSpan.style.height = '' + heightPercent + '%';
       const left = toPercent(leftVpx);
-      span.style.left = left;
+      bucketSpan.style.left = left;
       const label = document.createElement('span');
       label.textContent = '' + roundToTwo(bucket.value) + ':' + bucket.count;
       label.style.left = left;
+
       //span.style['margin-left'] = toPercent(marginVpx);
       //label.style['margin-left'] = marginWidth;
       //span.style.width = '' + valueToPercent(a[1]) + '%';
-      graphics.appendChild(span);
+      graphics.appendChild(bucketSpan);
       labels.appendChild(label);
       leftVpx += bucketWidthVpx + marginWidthVpx;;
     }
