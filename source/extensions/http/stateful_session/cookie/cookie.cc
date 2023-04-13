@@ -1,6 +1,7 @@
 #include "source/extensions/http/stateful_session/cookie/cookie.h"
 
 #include "source/common/http/headers.h"
+#include "source/common/runtime/runtime_features.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -11,8 +12,10 @@ namespace Cookie {
 void CookieBasedSessionStateFactory::SessionStateImpl::onUpdate(
     const Upstream::HostDescription& host, Envoy::Http::ResponseHeaderMap& headers) {
   absl::string_view host_address = host.address()->asStringView();
+  std::string encoded_address;
   // auto& tm = factory_.context().mainThreadDispatcher().timeSource();
   if (!upstream_address_.has_value() || host_address != upstream_address_.value()) {
+    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.stateful_session_encode_ttl_in_cookie") && !use_old_style_) {
     // Create empty JSON document.
     // add address.
     // If TTL is non-zero, calculate expiry timestamp.
@@ -44,8 +47,13 @@ void CookieBasedSessionStateFactory::SessionStateImpl::onUpdate(
     printf("DIFFFFFFFFF: %ld\n", diff.count());
     // const std::string encoded_address =
     //   Envoy::Base64::encode(value.data(), value.length());
-    const std::string encoded_address =
+    encoded_address =
         Envoy::Base64::encode(json_cookie.data(), json_cookie.length());
+    } else {
+  //absl::string_view host_address = host.address()->asStringView();
+    encoded_address =
+        Envoy::Base64::encode(host_address.data(), host_address.length());
+    }
     // Envoy::Base64::encode(host_address.data(), host_address.length());
     headers.addReferenceKey(Envoy::Http::Headers::get().SetCookie,
                             factory_.makeSetCookie(encoded_address));

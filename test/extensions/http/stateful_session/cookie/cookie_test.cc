@@ -3,6 +3,7 @@
 
 #include "test/mocks/upstream/host.h"
 #include "test/test_common/utility.h"
+#include "test/test_common/simulated_time_system.h"
 
 #include "gtest/gtest.h"
 
@@ -15,22 +16,25 @@ namespace {
 
 TEST(CookieBasedSessionStateFactoryTest, EmptyCookieName) {
   CookieBasedSessionStateProto config;
+    Event::SimulatedTimeSystem time_simulator;
 
-  EXPECT_THROW_WITH_MESSAGE(std::make_shared<CookieBasedSessionStateFactory>(config),
+  EXPECT_THROW_WITH_MESSAGE(std::make_shared<CookieBasedSessionStateFactory>(config, time_simulator),
                             EnvoyException,
                             "Cookie key cannot be empty for cookie based stateful sessions");
   config.mutable_cookie()->set_name("override_host");
 
-  EXPECT_NO_THROW(std::make_shared<CookieBasedSessionStateFactory>(config));
+  EXPECT_NO_THROW(std::make_shared<CookieBasedSessionStateFactory>(config, time_simulator));
 }
 
 TEST(CookieBasedSessionStateFactoryTest, SessionStateTest) {
   testing::NiceMock<Envoy::Upstream::MockHostDescription> mock_host;
+    Event::SimulatedTimeSystem time_simulator;
+    time_simulator.setMonotonicTime(std::chrono::seconds(1000));
 
   {
     CookieBasedSessionStateProto config;
     config.mutable_cookie()->set_name("override_host");
-    CookieBasedSessionStateFactory factory(config);
+    CookieBasedSessionStateFactory factory(config, time_simulator);
 
     // No valid address in the request headers.
     Envoy::Http::TestRequestHeaderMapImpl request_headers;
@@ -38,16 +42,30 @@ TEST(CookieBasedSessionStateFactoryTest, SessionStateTest) {
     EXPECT_EQ(absl::nullopt, session_state->upstreamAddress());
 
     auto upstream_host = std::make_shared<Envoy::Network::Address::Ipv4Instance>("1.2.3.4", 80);
-    EXPECT_CALL(mock_host, address()).WillOnce(testing::Return(upstream_host));
-
-    Envoy::Http::TestResponseHeaderMapImpl response_headers;
-    session_state->onUpdate(mock_host, response_headers);
+    EXPECT_CALL(mock_host, address()).Times(2).WillRepeatedly(testing::Return(upstream_host));
 
     // No valid address then update it by set-cookie.
+    // Run the test twice: once with json cookie format and once
+    // with "old" style plain address.
+    for (bool json : std::vector<bool>({true, false})) {
+    std::string cookie_content;
+    if (json) {
+        cookie_content = "{\"address\":\"1.2.3.4:80\",\"expires\":1000}";
+    } else {
+        cookie_content = "1.2.3.4:80";
+    }
+Runtime::maybeSetRuntimeGuard("envoy.reloadable_features.stateful_session_encode_ttl_in_cookie",
+                                  json);
+
+    Envoy::Http::TestResponseHeaderMapImpl response_headers;
+    // Check the format of the cookie sent back to client.
+    session_state->onUpdate(mock_host, response_headers);
+
     EXPECT_EQ(response_headers.get_("set-cookie"),
               Envoy::Http::Utility::makeSetCookieValue("override_host",
-                                                       Envoy::Base64::encode("1.2.3.4:80", 10), "",
+                                                       Envoy::Base64::encode(cookie_content.c_str(), cookie_content.length()), "",
                                                        std::chrono::seconds(0), true));
+    }
   }
 
   {
@@ -55,16 +73,30 @@ TEST(CookieBasedSessionStateFactoryTest, SessionStateTest) {
     config.mutable_cookie()->set_name("override_host");
     config.mutable_cookie()->set_path("/path");
     config.mutable_cookie()->mutable_ttl()->set_seconds(5);
-    CookieBasedSessionStateFactory factory(config);
+    CookieBasedSessionStateFactory factory(config, time_simulator);
 
-    // Get upstream address from request headers.
+    // Test the following scenario:
+    // Cookie indicates to route to 1.2.3.4:80
+    // Upstream cluster routed to 1.2.3.4.:80. "set-cookie" should not be added to response headers.
+    // Repeat, but cluster routed to diffent host 2.3.4.5:80. "set-cookie" should be added to response headers.
+
+    // Run the test twice - once with JSON style cookie and once with "old" style plain address.
+    for (bool json : std::vector<bool>({true, false})) {
+    std::string cookie_content;
+        if (json) {
+    cookie_content = "{\"address\":\"1.2.3.4:80\",\"expires\":1005}";
+        } else {
+    cookie_content = "1.2.3.4:80";
+        }
+Runtime::maybeSetRuntimeGuard("envoy.reloadable_features.stateful_session_encode_ttl_in_cookie",
+                                  json);
     Envoy::Http::TestRequestHeaderMapImpl request_headers = {
-        {":path", "/path"}, {"cookie", "override_host=" + Envoy::Base64::encode("1.2.3.4:80", 10)}};
+        {":path", "/path"}, {"cookie", "override_host=" + Envoy::Base64::encode(cookie_content.c_str(), cookie_content.length())}};
     auto session_state = factory.create(request_headers);
     EXPECT_EQ("1.2.3.4:80", session_state->upstreamAddress().value());
 
     auto upstream_host = std::make_shared<Envoy::Network::Address::Ipv4Instance>("1.2.3.4", 80);
-    EXPECT_CALL(mock_host, address()).WillOnce(testing::Return(upstream_host));
+    EXPECT_CALL(mock_host, address()).Times(1).WillRepeatedly(testing::Return(upstream_host));
 
     Envoy::Http::TestResponseHeaderMapImpl response_headers;
     session_state->onUpdate(mock_host, response_headers);
@@ -78,10 +110,69 @@ TEST(CookieBasedSessionStateFactoryTest, SessionStateTest) {
     session_state->onUpdate(mock_host, response_headers);
 
     // Update session state because the current request is routed to a new upstream host.
+    if (json) {
+    cookie_content = "{\"address\":\"2.3.4.5:80\",\"expires\":1005}";
+    } else {
+    cookie_content = "2.3.4.5:80";
+    }
+    EXPECT_EQ(response_headers.get_("set-cookie"),
+              Envoy::Http::Utility::makeSetCookieValue("override_host",
+                                                       //Envoy::Base64::encode("2.3.4.5:80", 10),
+                                                       Envoy::Base64::encode(cookie_content.c_str(), cookie_content.length()),
+                                                       "/path", std::chrono::seconds(5), true));
+    //response_headers.remove("set-cookie");
+}
+#if 0
+    std::string cookie_content = "{\"address\":\"1.2.3.4:80\",\"expires\":1005}";
+    Envoy::Http::TestRequestHeaderMapImpl request_headers = {
+        {":path", "/path"}, {"cookie", "override_host=" + Envoy::Base64::encode(cookie_content.c_str(), cookie_content.length())}};
+    auto session_state = factory.create(request_headers);
+    EXPECT_EQ("1.2.3.4:80", session_state->upstreamAddress().value());
+
+#if 0
+    Envoy::Http::TestRequestHeaderMapImpl request_headers = {
+        {":path", "/path"}, {"cookie", "override_host=" + Envoy::Base64::encode("1.2.3.4:80", 10)}};
+    auto session_state = factory.create(request_headers);
+    EXPECT_EQ("1.2.3.4:80", session_state->upstreamAddress().value());
+#endif
+    auto upstream_host = std::make_shared<Envoy::Network::Address::Ipv4Instance>("1.2.3.4", 80);
+    EXPECT_CALL(mock_host, address()).Times(1).WillRepeatedly(testing::Return(upstream_host));
+
+    Envoy::Http::TestResponseHeaderMapImpl response_headers;
+    session_state->onUpdate(mock_host, response_headers);
+
+    // Session state is not updated and then do nothing.
+    EXPECT_EQ(response_headers.get_("set-cookie"), "");
+
+    auto upstream_host_2 = std::make_shared<Envoy::Network::Address::Ipv4Instance>("2.3.4.5", 80);
+    EXPECT_CALL(mock_host, address()).Times(2).WillRepeatedly(testing::Return(upstream_host_2));
+
+    session_state->onUpdate(mock_host, response_headers);
+
+    // Update session state because the current request is routed to a new upstream host.
+    cookie_content = "{\"address\":\"2.3.4.5:80\",\"expires\":1005}";
+    EXPECT_EQ(response_headers.get_("set-cookie"),
+              Envoy::Http::Utility::makeSetCookieValue("override_host",
+                                                       //Envoy::Base64::encode("2.3.4.5:80", 10),
+                                                       Envoy::Base64::encode(cookie_content.c_str(), cookie_content.length()),
+                                                       "/path", std::chrono::seconds(5), true));
+    response_headers.remove("set-cookie");
+
+    // Enable runtime guard to create non-json cookie format.
+Runtime::maybeSetRuntimeGuard("envoy.reloadable_features.stateful_session_encode_ttl_in_cookie",
+                                  false);
+
+    //Envoy::Http::TestResponseHeaderMapImpl response_headers_2;
+    session_state->onUpdate(mock_host, response_headers);
+
+    // Update session state because the current request is routed to a new upstream host.
     EXPECT_EQ(response_headers.get_("set-cookie"),
               Envoy::Http::Utility::makeSetCookieValue("override_host",
                                                        Envoy::Base64::encode("2.3.4.5:80", 10),
                                                        "/path", std::chrono::seconds(5), true));
+#endif
+//Runtime::maybeSetRuntimeGuard("envoy.reloadable_features.stateful_session_encode_ttl_in_cookie",
+  //                                true);
   }
 
   {
@@ -89,9 +180,9 @@ TEST(CookieBasedSessionStateFactoryTest, SessionStateTest) {
     config.mutable_cookie()->set_name("override_host");
     config.mutable_cookie()->set_path("/path");
     config.mutable_cookie()->mutable_ttl()->set_seconds(5);
-    CookieBasedSessionStateFactory factory(config);
+    CookieBasedSessionStateFactory factory(config, time_simulator);
 
-    // Get upstream address from request headers.
+    // Get upstream address from request headers' cookie.
     Envoy::Http::TestRequestHeaderMapImpl request_headers = {
         {":path", "/not_match_path"},
         {"cookie", "override_host=" + Envoy::Base64::encode("1.2.3.4:80", 10)}};
@@ -100,13 +191,47 @@ TEST(CookieBasedSessionStateFactoryTest, SessionStateTest) {
   }
 }
 
+TEST(CookieBasedSessionStateFactoryTest, SessionStateJsonCookie) {
+    CookieBasedSessionStateProto config;
+    config.mutable_cookie()->set_name("override_host");
+    config.mutable_cookie()->set_path("/path");
+    config.mutable_cookie()->mutable_ttl()->set_seconds(5);
+    Event::SimulatedTimeSystem time_simulator;
+    time_simulator.setMonotonicTime(std::chrono::seconds(1000));
+    CookieBasedSessionStateFactory factory(config, time_simulator);
+
+    std::string cookie_content = "{\"address\":\"2.3.4.5:80\",\"expires\":1005}";
+    // JSON format - expired cookie
+    time_simulator.setMonotonicTime(std::chrono::seconds(1006));
+    Envoy::Http::TestRequestHeaderMapImpl request_headers = {
+        {":path", "/path"}, {"cookie", "override_host=" + Envoy::Base64::encode(cookie_content.c_str(), cookie_content.length())}};
+    auto session_state = factory.create(request_headers);
+    EXPECT_EQ(absl::nullopt, session_state->upstreamAddress());
+
+    // JSON format - no "expired field"
+    cookie_content = "{\"address\":\"2.3.4.5:80\"}";
+    request_headers = {
+        {":path", "/path"}, {"cookie", "override_host=" + Envoy::Base64::encode(cookie_content.c_str(), cookie_content.length())}};
+    session_state = factory.create(request_headers);
+    EXPECT_EQ(absl::nullopt, session_state->upstreamAddress());
+
+
+    // JSON format - start with "{", but format incorrect.
+    cookie_content = "{\"address\": blahblah";
+    request_headers = {
+        {":path", "/path"}, {"cookie", "override_host=" + Envoy::Base64::encode(cookie_content.c_str(), cookie_content.length())}};
+    session_state = factory.create(request_headers);
+    EXPECT_EQ(absl::nullopt, session_state->upstreamAddress());
+}
+
 TEST(CookieBasedSessionStateFactoryTest, SessionStatePathMatchTest) {
+    Event::SimulatedTimeSystem time_simulator;
   {
     // Any request path will be accepted for empty cookie path.
     CookieBasedSessionStateProto config;
     config.mutable_cookie()->set_name("override_host");
     config.mutable_cookie()->mutable_ttl()->set_seconds(5);
-    CookieBasedSessionStateFactory factory(config);
+    CookieBasedSessionStateFactory factory(config, time_simulator);
 
     EXPECT_TRUE(factory.requestPathMatch("/"));
     EXPECT_TRUE(factory.requestPathMatch("/foo"));
@@ -123,7 +248,7 @@ TEST(CookieBasedSessionStateFactoryTest, SessionStatePathMatchTest) {
     config.mutable_cookie()->set_name("override_host");
     config.mutable_cookie()->set_path("/");
     config.mutable_cookie()->mutable_ttl()->set_seconds(5);
-    CookieBasedSessionStateFactory factory(config);
+    CookieBasedSessionStateFactory factory(config, time_simulator);
 
     EXPECT_TRUE(factory.requestPathMatch("/"));
     EXPECT_TRUE(factory.requestPathMatch("/foo"));
@@ -140,7 +265,7 @@ TEST(CookieBasedSessionStateFactoryTest, SessionStatePathMatchTest) {
     config.mutable_cookie()->set_name("override_host");
     config.mutable_cookie()->set_path("/foo/");
     config.mutable_cookie()->mutable_ttl()->set_seconds(5);
-    CookieBasedSessionStateFactory factory(config);
+    CookieBasedSessionStateFactory factory(config, time_simulator);
 
     EXPECT_FALSE(factory.requestPathMatch("/"));
     EXPECT_FALSE(factory.requestPathMatch("/foo"));
@@ -157,7 +282,7 @@ TEST(CookieBasedSessionStateFactoryTest, SessionStatePathMatchTest) {
     config.mutable_cookie()->set_name("override_host");
     config.mutable_cookie()->set_path("/foo");
     config.mutable_cookie()->mutable_ttl()->set_seconds(5);
-    CookieBasedSessionStateFactory factory(config);
+    CookieBasedSessionStateFactory factory(config, time_simulator);
 
     EXPECT_FALSE(factory.requestPathMatch("/"));
     EXPECT_TRUE(factory.requestPathMatch("/foo"));
