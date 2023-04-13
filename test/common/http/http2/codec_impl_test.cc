@@ -95,9 +95,8 @@ public:
         failure_details = transformation_result.details();
       }
       if (failure_details != UhvResponseCodeDetail::get().InvalidUnderscore) {
-        sendLocalReply(Http::Code::BadRequest,
-                        Http::CodeUtility::toString(Http::Code::BadRequest), nullptr,
-                        absl::nullopt, failure_details);
+        sendLocalReply(Http::Code::BadRequest, Http::CodeUtility::toString(Http::Code::BadRequest),
+                       nullptr, absl::nullopt, failure_details);
       }
       response_encoder_->getStream().resetStream(Http::StreamResetReason::LocalReset);
       // These tests assume that connection is not closed on protocol errors

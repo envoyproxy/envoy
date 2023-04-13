@@ -120,7 +120,7 @@ public:
         failure_details = transformation_result.details();
       }
       sendLocalReply(Http::Code::BadRequest, Http::CodeUtility::toString(Http::Code::BadRequest),
-                      nullptr, absl::nullopt, failure_details);
+                     nullptr, absl::nullopt, failure_details);
       response_encoder_->getStream().resetStream(Http::StreamResetReason::LocalReset);
       connection_.state_ = Network::Connection::State::Closing;
     } else {
