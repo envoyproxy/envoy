@@ -115,6 +115,10 @@ minor_behavior_changes:
     Translate backslash to slash in the default header validator. This behavior can be reverted by setting runtime flag
     ``envoy.reloadable_features.uhv_translate_backslash_to_slash`` to false, in which case requests with backslash in path
     are rejected. This setting is only applicable when the Unversal Header Validator is enabled and has no effect otherwise.
+- area: connection pool
+  change: |
+    Increase granularity mapping connection pool failures to specific stream failure reasons to make it more transparent why
+    the stream is reset when a connection pool's connection fails.
 
 bug_fixes:
 - area: http
