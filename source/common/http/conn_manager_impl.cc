@@ -941,7 +941,7 @@ bool ConnectionManagerImpl::ActiveStream::validateHeaders() {
     auto validation_result = header_validator_->validateRequestHeaders(*request_headers_);
     bool failure = !validation_result.ok();
     bool redirect = false;
-    absl::string_view failure_details = validation_result.details();
+    std::string failure_details(validation_result.details());
     if (!failure) {
       auto transformation_result = header_validator_->transformRequestHeaders(*request_headers_);
       failure = !transformation_result.ok();
@@ -990,7 +990,7 @@ bool ConnectionManagerImpl::ActiveStream::validateTrailers() {
   }
 
   auto validation_result = header_validator_->validateRequestTrailers(*request_trailers_);
-  absl::string_view failure_details = validation_result.details();
+  std::string failure_details(validation_result.details());
   if (validation_result.ok()) {
     auto transformation_result = header_validator_->transformRequestTrailers(*request_trailers_);
     if (transformation_result.ok()) {
