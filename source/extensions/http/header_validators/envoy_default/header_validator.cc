@@ -4,6 +4,7 @@
 
 #include "envoy/http/header_validator_errors.h"
 
+#include "source/common/runtime/runtime_features.h"
 #include "source/extensions/http/header_validators/envoy_default/character_tables.h"
 
 #include "absl/container/node_hash_set.h"
@@ -390,6 +391,15 @@ HeaderValidator::validatePathHeaderCharacters(const HeaderString& value) {
 
   auto iter = path.begin();
   auto end = path.end();
+  // When the envoy.reloadable_features.uhv_translate_backslash_to_slash == true
+  // the validation method needs to allow backslashes in path, so they can translated
+  // to slashes during path normalization.
+  const bool allow_backslash =
+      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.uhv_translate_backslash_to_slash");
+
+  const uint32_t(&allowed_path_chracters)[8] =
+      allow_backslash ? kPathHeaderCharTableWithBackSlashAllowed : kPathHeaderCharTable;
+
   // Validate the path component of the URI
   for (; iter != end && is_valid; ++iter) {
     const char ch = *iter;
@@ -399,7 +409,7 @@ HeaderValidator::validatePathHeaderCharacters(const HeaderString& value) {
       break;
     }
 
-    is_valid &= testChar(kPathHeaderCharTable, ch);
+    is_valid &= testChar(allowed_path_chracters, ch);
   }
 
   if (is_valid && iter != end && *iter == '?') {

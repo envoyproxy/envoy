@@ -673,7 +673,8 @@ TEST_F(Http1HeaderValidatorTest, BackslashInPathIsTranslatedToSlash) {
                                                   {":method", "GET"}};
   auto uhv = createH1(empty_config);
 
-  EXPECT_ACCEPT(uhv->validateRequestHeaderMap(headers));
+  EXPECT_ACCEPT(uhv->validateRequestHeaders(headers));
+  EXPECT_ACCEPT(uhv->transformRequestHeaders(headers));
   EXPECT_EQ(headers.path(), "/path/with/back/slash%5C");
 }
 
@@ -686,7 +687,7 @@ TEST_F(Http1HeaderValidatorTest, BackslashInPathIsRejectedWithOverride) {
                                                   {":method", "GET"}};
   auto uhv = createH1(empty_config);
 
-  EXPECT_REJECT_WITH_DETAILS(uhv->validateRequestHeaderMap(headers), "uhv.invalid_url");
+  EXPECT_REJECT_WITH_DETAILS(uhv->validateRequestHeaders(headers), "uhv.invalid_url");
 }
 
 } // namespace
