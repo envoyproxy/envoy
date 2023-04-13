@@ -32,7 +32,7 @@ public:
     absl::optional<absl::string_view> upstreamAddress() const override { return upstream_address_; }
     void onUpdate(const Upstream::HostDescription& host,
                   Envoy::Http::ResponseHeaderMap& headers) override;
-    void setEncodeStyle(bool style) {use_old_style_encoding_ = style;}
+    void setEncodeStyle(bool style) { use_old_style_encoding_ = style; }
 
   private:
     absl::optional<std::string> upstream_address_;
@@ -52,7 +52,7 @@ public:
     const auto address = parseAddress(headers);
     auto sessionState = std::make_unique<SessionStateImpl>(address.first, *this, time_source_);
     if (address.first != absl::nullopt) {
-    sessionState->setEncodeStyle(address.second);
+      sessionState->setEncodeStyle(address.second);
     }
     return sessionState;
   }
@@ -63,45 +63,47 @@ public:
   }
 
 private:
-  std::pair<absl::optional<std::string>, bool>  parseAddress(const Envoy::Http::RequestHeaderMap& headers) const {
+  std::pair<absl::optional<std::string>, bool>
+  parseAddress(const Envoy::Http::RequestHeaderMap& headers) const {
     const std::string cookie_value = Envoy::Http::Utility::parseCookieValue(headers, name_);
     const std::string decoded_value = Envoy::Base64::decode(cookie_value);
     std::string address;
     bool use_old_style_encoding = false;
 
-    // If the first character is a curly bracket, try to interpret the cookie as JSON payload.
-    // Otherwise treat it as "old" style format, which is ipaddress:port.
+    // If the first character is curly bracket, try to interpret the cookie as JSON payload.
+    // Otherwise treat it as "old" style format, which is ip-address:port.
     if (!decoded_value.empty() && decoded_value.at(0) == '{') {
-    Envoy::Json::ObjectSharedPtr root_obj;
-    try {
-      // Parsing JSON may throw exceptions if the format is not correct.
-      root_obj = Envoy::Json::Nlohmann::Factory::loadFromString(decoded_value);
-      // Look for expiration field.
-      uint64_t expires = root_obj->getInteger("expires");
-      std::chrono::seconds expiry_time(expires);
-      auto now = std::chrono::duration_cast<std::chrono::seconds>(
-          (time_source_.monotonicTime()).time_since_epoch());
-      if (now > expiry_time) {
-        // Ignore the address extracted from the cookie. This will cause
-        // upstream cluster to select a new hosy and new cookie will be generated.
+      try {
+        Envoy::Json::ObjectSharedPtr root_obj;
+        // Parsing JSON may throw exceptions if the format is not correct.
+        root_obj = Envoy::Json::Nlohmann::Factory::loadFromString(decoded_value);
+        // Look for expiration field.
+        uint64_t expires = root_obj->getInteger("expires");
+        std::chrono::seconds expiry_time(expires);
+        auto now = std::chrono::duration_cast<std::chrono::seconds>(
+            (time_source_.monotonicTime()).time_since_epoch());
+        if (now > expiry_time) {
+          // Ignore the address extracted from the cookie. This will cause
+          // upstream cluster to select a new host and new cookie will be generated.
+          return std::make_pair(absl::nullopt, use_old_style_encoding);
+        }
+
+        // get the address from json.
+        address = root_obj->getString("address");
+      } catch (...) {
         return std::make_pair(absl::nullopt, use_old_style_encoding);
       }
-
-      // get the address from json.
-      address = root_obj->getString("address");
-    } catch (...) {
-        return std::make_pair(absl::nullopt, use_old_style_encoding);
-    }
     } else {
-        // Treat this as "old" style cookie. 
-     ENVOY_LOG_MISC(
-          warn,
-          "Non-json cookie format detected. This format will be rejected in the future.");
-        address = decoded_value;
-        use_old_style_encoding = true;
+      // Treat this as "old" style cookie.
+      ENVOY_LOG_MISC(
+          warn, "Non-json cookie format detected. This format will be rejected in the future.");
+      address = decoded_value;
+      use_old_style_encoding = true;
     }
 
-    return std::make_pair(!address.empty() ? absl::make_optional(std::move(address)) : absl::nullopt, use_old_style_encoding);
+    return std::make_pair(!address.empty() ? absl::make_optional(std::move(address))
+                                           : absl::nullopt,
+                          use_old_style_encoding);
   }
 
   std::string makeSetCookie(const std::string& address) const {

@@ -19,8 +19,8 @@ envoy_extension_cc_test(
         "//source/common/http:utility_lib",
         "//source/extensions/http/stateful_session/cookie:cookie_lib",
         "//test/mocks/upstream:host_mocks",
+        "//test/test_common:simulated_time_system_lib",
         "//test/test_common:utility_lib",
-"//test/test_common:simulated_time_system_lib",
     ],
 )
 

@@ -14,23 +14,19 @@ void CookieBasedSessionStateFactory::SessionStateImpl::onUpdate(
   absl::string_view host_address = host.address()->asStringView();
   std::string encoded_address;
   if (!upstream_address_.has_value() || host_address != upstream_address_.value()) {
-    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.stateful_session_encode_ttl_in_cookie") && !use_old_style_encoding_) {
-    // Create empty JSON document.
-    // add address.
-    // calculate expiry timestamp.
+    if (Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.stateful_session_encode_ttl_in_cookie") &&
+        !use_old_style_encoding_) {
+      auto expiry_time = std::chrono::duration_cast<std::chrono::seconds>(
+          (time_source_.monotonicTime() + std::chrono::seconds(factory_.ttl_)).time_since_epoch());
+      std::string expiry_string = std::to_string(expiry_time.count());
+      // Build JSON document with address and expiration time (current time + ttl).
+      std::string json_cookie =
+          "{\"address\":\"" + std::string(host_address) + "\",\"expires\":" + expiry_string + "}";
 
-    auto expiry_time = std::chrono::duration_cast<std::chrono::seconds>(
-        (time_source_.monotonicTime() + std::chrono::seconds(factory_.ttl_)).time_since_epoch());
-    std::string expiry_string = std::to_string(expiry_time.count());
-    // Build JSON document
-    std::string json_cookie =
-        "{\"address\":\"" + std::string(host_address) + "\",\"expires\":" + expiry_string + "}";
-
-    encoded_address =
-        Envoy::Base64::encode(json_cookie.data(), json_cookie.length());
+      encoded_address = Envoy::Base64::encode(json_cookie.data(), json_cookie.length());
     } else {
-    encoded_address =
-        Envoy::Base64::encode(host_address.data(), host_address.length());
+      encoded_address = Envoy::Base64::encode(host_address.data(), host_address.length());
     }
     headers.addReferenceKey(Envoy::Http::Headers::get().SetCookie,
                             factory_.makeSetCookie(encoded_address));
