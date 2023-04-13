@@ -14,13 +14,8 @@ namespace HeaderValidators {
 namespace EnvoyDefault {
 namespace {
 
-using ::Envoy::Http::HeaderString;
-using ::Envoy::Http::LowerCaseString;
 using ::Envoy::Http::Protocol;
 using ::Envoy::Http::TestRequestHeaderMapImpl;
-using ::Envoy::Http::TestRequestTrailerMapImpl;
-using ::Envoy::Http::TestResponseHeaderMapImpl;
-using ::Envoy::Http::UhvResponseCodeDetail;
 
 enum class Protocols {
   Http1,
@@ -44,15 +39,6 @@ protected:
         typed_config, GetParam() == Protocols::Http2 ? Protocol::Http2 : Protocol::Http3, stats_);
   }
 
-  TestRequestHeaderMapImpl makeGoodRequestHeaders() {
-    return TestRequestHeaderMapImpl{
-        {":scheme", "https"}, {":method", "GET"}, {":authority", "envoy.com"}, {":path", "/"}};
-  }
-
-  TestResponseHeaderMapImpl makeGoodResponseHeaders() {
-    return TestResponseHeaderMapImpl{{":status", "200"}};
-  }
-
   TestScopedRuntime scoped_runtime_;
 };
 
@@ -69,10 +55,10 @@ INSTANTIATE_TEST_SUITE_P(Protocols, HttpCommonValidationTest,
 TEST_P(HttpCommonValidationTest, MalformedUrlEncodingAllowed) {
   scoped_runtime_.mergeValues(
       {{"envoy.reloadable_features.uhv_allow_malformed_url_encoding", "true"}});
-  ::Envoy::Http::TestRequestHeaderMapImpl headers{{":scheme", "https"},
-                                                  {":path", "/path%Z%30with%xYbad%7Jencoding%"},
-                                                  {":authority", "envoy.com"},
-                                                  {":method", "GET"}};
+  TestRequestHeaderMapImpl headers{{":scheme", "https"},
+                                   {":path", "/path%Z%30with%xYbad%7Jencoding%"},
+                                   {":authority", "envoy.com"},
+                                   {":method", "GET"}};
   auto uhv = createUhv(empty_config);
 
   EXPECT_ACCEPT(uhv->validateRequestHeaderMap(headers));
@@ -82,10 +68,10 @@ TEST_P(HttpCommonValidationTest, MalformedUrlEncodingAllowed) {
 TEST_P(HttpCommonValidationTest, MalformedUrlEncodingRejectedWithOverride) {
   scoped_runtime_.mergeValues(
       {{"envoy.reloadable_features.uhv_allow_malformed_url_encoding", "false"}});
-  ::Envoy::Http::TestRequestHeaderMapImpl headers{{":scheme", "https"},
-                                                  {":path", "/path%Z%30with%xYbad%7Jencoding%A"},
-                                                  {":authority", "envoy.com"},
-                                                  {":method", "GET"}};
+  TestRequestHeaderMapImpl headers{{":scheme", "https"},
+                                   {":path", "/path%Z%30with%xYbad%7Jencoding%A"},
+                                   {":authority", "envoy.com"},
+                                   {":method", "GET"}};
   auto uhv = createUhv(empty_config);
 
   EXPECT_REJECT_WITH_DETAILS(uhv->validateRequestHeaderMap(headers), "uhv.invalid_url");
