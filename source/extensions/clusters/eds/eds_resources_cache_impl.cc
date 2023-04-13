@@ -62,7 +62,7 @@ EdsResourcesCache::ConfigSourceResourcesMap& EdsResourcesCacheImpl::getConfigSou
     it = config_source_map_.emplace(config_source, std::make_unique<ConfigSourceResourcesMapImpl>())
              .first;
   }
-  return *(it->second.get());
+  return *(it->second);
 }
 
 } // namespace Upstream

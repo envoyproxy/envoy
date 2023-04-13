@@ -216,6 +216,31 @@ TEST_F(EdsResourcesCacheImplTest, RemoveCallbackNotCalledAfterUpdate) {
   EXPECT_EQ(0, callback.calls_counter_map_["foo_cla"]);
 }
 
+// Validate explicit callback removal does not get notification.
+TEST_F(EdsResourcesCacheImplTest, ExplicitRemoveCallback) {
+  ResourceRemovalCallbackCounter callback;
+
+  auto& resources_cache = cache_.getConfigSourceResourceMap(default_config_source_);
+  ResourceType resource;
+  resource.set_cluster_name("foo");
+  resources_cache.setResource("foo_cla", resource);
+  EXPECT_EQ(1, resources_cache.cacheSizeForTest());
+
+  // Fetch the resource and register a callback.
+  const auto& fetched_resource = resources_cache.getResource("foo_cla", &callback);
+  EXPECT_TRUE(fetched_resource.has_value());
+  EXPECT_EQ("foo", fetched_resource->cluster_name());
+  EXPECT_EQ(0, callback.calls_counter_map_["foo_cla"]);
+
+  // Remove the callback.
+  resources_cache.removeCallback("foo_cla", &callback);
+
+  // Remove the resource.
+  resources_cache.removeResource("foo_cla");
+  EXPECT_EQ(0, resources_cache.cacheSizeForTest());
+  EXPECT_EQ(0, callback.calls_counter_map_["foo_cla"]);
+}
+
 // Validate correct removal callback gets notified when multiple resources are used.
 TEST_F(EdsResourcesCacheImplTest, MultipleResourcesRemoveCallbackCalled) {
   ResourceRemovalCallbackCounter callback;
