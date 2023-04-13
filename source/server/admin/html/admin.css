@@ -76,14 +76,15 @@
   /* background-color: #c11; */
   background-color: #e6d7ff;
   position: absolute;
-  width: 16px;
+  /* width: 16px; */
+  width: 2%;
   /* margin-left: -8px; */
 }
 
 .histogram-percentile {
   width: 5px;
-  background-color: #b7ceb7;
-  height: 40%;
+  background-color: #306844;
+  height: 30%;
   width: 4px;
   top: 0;
   position: absolute;

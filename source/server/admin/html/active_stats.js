@@ -407,75 +407,39 @@ function renderHistogramDetail(supported_percentiles, detail) {
       }
       prevBucket = bucket;
     }
-    //console.log("min=" + minValue + " max=" + maxValue);
 
     const height = maxValue - minValue;
     const scaledValue = value => 9*((value - minValue) / height) + 1; // between 1 and 10;
     const valueToPercent = value => Math.round(80 * log10(scaledValue(value)));
 
-    // Lay out the buckets as vertical bars of some width that depends on how
-    // many bucekts there are. We will draw narrower percentile lines, setting
-    // up the graphics so they overlay on the layout dictated by the evenly
-    // spaced buckets. The percentile lines should appear as overlays onto
-    // the evenly spaced buckets. We'll have to keep track of where we are
-    // horizontally so we can lay out the buckets and percentile lines using
-    // CSS.
+    // Lay out the buckets evenly, independent of the bucket values. It's up
+    // to the circlhist library to space out the buckets in a way that shapes
+    // the data.
     //
-    // We will not draw percentile lines outside of the buckets. E.g. we'll
-    // skip drawing P0 and P100, and possibly P25 and P99.5 etc.
+    // We will not draw percentile lines outside of the bucket values. E.g. we
+    // may skip drawing outer percentiles like P0 and P100 etc.
     //
-    // We lay out horzontally based on percentage so users can see the graphics
-    // better if they make the window wider. We do this by inventing arbitrary
-    // "virtual pixels" (Vpx suffix) during the computation in JS and converting
-    // them to percentages for writing element style.
-    //
-    // We do not size or space things in proportion to the values; we space
-    // them evenly and indicate values as rounded labels, with full resolution
-    // values rendered in hover-popups.
-    //let numNonConsecutivePercentiles = 0;
-    //let prevWasPercentile = false;
-
+    // We lay out horzontally based on CSS percentage so users can see the
+    // graphics better if they make the window wider. We do this by inventing
+    // arbitrary "virtual pixels" (variables with Vpx suffix) during the
+    // computation in JS and converting them to percentages for writing element
+    // style.
     const bucketWidthVpx = 20;
-    const percentileWidthVpx = 10;
     const marginWidthVpx = 40;
     const percentileWidthAndMarginVpx = 20;
     const widthVpx = numBuckets * (bucketWidthVpx + marginWidthVpx);
 
-    let first = true;
-
-    //const toPercent = vpx => '' + Math.round(100 * vpx / widthVpx) + '%';
     const toPercent = vpx => formatPercent(vpx / widthVpx);
-
-    // const toPercentBackward = vpx => '' + Math.round(100 - 100 * vpx / widthVpx) + '%';
-    //const percentileWidth = toPercent(percentileWidthVpx);
-    //const bucketWidth = toPercent(bucketWidthVpx);
-    //const marginWidth = toPercent(marginWidthVpx);
 
     let leftVpx = marginWidthVpx / 2;
     let prevVpx = 0;
     for (i = 0; i < histogram.detail.length; ++i) {
       const bucket = histogram.detail[i];
 
-      // let marginVpx = marginWidthVpx;
       if (bucket.percentiles && bucket.percentiles.length > 0) {
-        //let percentileLeftVpx = leftVpx - marginWidthVpx;
-
-        // Compute how much margin surrounds each percentile line. Say there are 2
-        // percentiles, each 5vpx wide. We'd subtract 10vpx from the initial margin
-        // of 40vpx, and be left with 30vpx. But we want to divide that by 3 because
-        // we have [bucket][margin][percentile][margin][percentile][margin][bucket].
-        //
-        // All this math is done as floating point -- it will be rendered below as
-        // rounded percentages.
-/*
-        const percentileMarginVpx = Math.max(
-            marginMinWidthVpx,
-            (marginWidthVpx - bucket.percentiles.length * percentileWidthVpx) /
-              (bucket.percentiles.length + 1));
-*/
-
         // Keep track of where we write each percentile so if the next one is very close,
-        // we can avoid overlapping the text.
+        // we can minimize overlapping the text. This is not perfect as the JS is not
+        // tracking how wide the text actually is.
         let prevPercentileLabelVpx = 0;
 
         for (percentile of bucket.percentiles) {
@@ -506,9 +470,6 @@ function renderHistogramDetail(supported_percentiles, detail) {
           }
           prevPercentileLabelVpx = percentileVpx + percentileWidthAndMarginVpx;
 
-          //percentileLeftVpx += percentileMarginVpx;
-          //const percentileLeft = toPercent(percentileLeftVpx);
-
           const percentilePLabel = document.createElement('span');
           percentilePLabel.className = 'percentile-label';
           percentilePLabel.style.bottom = 0;
@@ -521,13 +482,10 @@ function renderHistogramDetail(supported_percentiles, detail) {
           percentileVLabel.textContent = format(percentile[1]);
           percentileVLabel.style.left = percentilePercent; // percentileLeft;
 
-          // percentileLeftVpx += percentileWidthVpx;
-
           percentiles.appendChild(span);
           percentiles.appendChild(percentilePLabel);
           percentiles.appendChild(percentileVLabel);
         }
-        // percentileLeftVpx += percentileMarginVpx;
       }
 
       // Now draw the bucket.
@@ -546,9 +504,6 @@ function renderHistogramDetail(supported_percentiles, detail) {
       bucketLabel.textContent = format(bucket.count);
       bucketLabel.style.left = left;
 
-      //span.style['margin-left'] = toPercent(marginVpx);
-      //label.style['margin-left'] = marginWidth;
-      //span.style.width = '' + valueToPercent(a[1]) + '%';
       graphics.appendChild(bucketSpan);
       graphics.appendChild(bucketLabel);
       labels.appendChild(label);
