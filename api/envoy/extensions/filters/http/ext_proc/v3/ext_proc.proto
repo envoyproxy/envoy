@@ -171,6 +171,8 @@ message ExternalProcessor {
 
   // If false, allows the processor response to allow route cache clearing.
   // If true, route cache clearing is ignored. False, by default, to ensure backwards compatibility.
+  // Note that in order to force route cache clearing,
+  // :ref:`clear_route_cache <envoy_v3_api_field_service.ext_proc.v3.CommonResponse.clear_route_cache>` field also must be set to true.
   bool disable_route_cache_clearing = 11;
 }
 
