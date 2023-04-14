@@ -39,5 +39,13 @@ public:
   testing::NiceMock<MockThreadLocalOverloadState> overload_state_;
 };
 
+class MockLoadShedPoint : public LoadShedPoint {
+public:
+  MockLoadShedPoint() = default;
+
+  // LoadShedPoint
+  MOCK_METHOD(bool, shouldShedLoad, ());
+};
+
 } // namespace Server
 } // namespace Envoy
