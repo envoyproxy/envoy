@@ -6,7 +6,6 @@
 #include "envoy/stats/stats_macros.h"
 
 #include "source/common/common/fmt.h"
-#include "source/common/runtime/runtime_features.h"
 #include "source/extensions/common/aws/credentials_provider_impl.h"
 #include "source/extensions/common/aws/signer_impl.h"
 #include "source/extensions/common/aws/utility.h"
@@ -44,11 +43,9 @@ Http::FilterFactoryCb AwsLambdaFilterFactory::createFilterFactoryFromProtoTyped(
   }
   const std::string region = arn->region();
 
-  const bool enable_credentials_file =
-      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.enable_aws_credentials_file");
   auto credentials_provider =
       std::make_shared<Extensions::Common::Aws::DefaultCredentialsProviderChain>(
-          context.api(), Extensions::Common::Aws::Utility::fetchMetadata, enable_credentials_file);
+          context.api(), Extensions::Common::Aws::Utility::fetchMetadata);
 
   auto signer = std::make_shared<Extensions::Common::Aws::SignerImpl>(
       service_name, region, std::move(credentials_provider),

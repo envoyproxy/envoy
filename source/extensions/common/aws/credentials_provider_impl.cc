@@ -8,6 +8,7 @@
 #include "source/common/http/message_impl.h"
 #include "source/common/http/utility.h"
 #include "source/common/json/json_loader.h"
+#include "source/common/runtime/runtime_features.h"
 #include "source/extensions/common/aws/utility.h"
 
 #include "absl/strings/str_format.h"
@@ -102,9 +103,9 @@ void CredentialsFileCredentialsProvider::refresh() {
 void CredentialsFileCredentialsProvider::extractCredentials(const std::string& credentials_file,
                                                             const std::string& profile) {
   // Update last_updated_ now so that even if this function returns before successfully
-  // extracting credentials, we'll cache an empty set of credentials. This prevents envoy
-  // from attempting and failing to read the credentials file on every request if there are
-  // errors extracting credentials from it (e.g. if the credentials file doesn't exist).
+  // extracting credentials, this function won't be called again until after the REFRESH_INTERVAL.
+  // This prevents envoy from attempting and failing to read the credentials file on every request
+  // if there are errors extracting credentials from it (e.g. if the credentials file doesn't exist).
   last_updated_ = api_.timeSource().systemTime();
 
   std::ifstream file(credentials_file);
@@ -339,11 +340,11 @@ Credentials CredentialsProviderChain::getCredentials() {
 
 DefaultCredentialsProviderChain::DefaultCredentialsProviderChain(
     Api::Api& api, const MetadataCredentialsProviderBase::MetadataFetcher& metadata_fetcher,
-    const CredentialsProviderChainFactories& factories, const bool enable_credentials_file) {
+    const CredentialsProviderChainFactories& factories) {
   ENVOY_LOG(debug, "Using environment credentials provider");
   add(factories.createEnvironmentCredentialsProvider());
 
-  if (enable_credentials_file) {
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.enable_aws_credentials_file")) {
     ENVOY_LOG(debug, "Using credentials file credentials provider");
     add(factories.createCredentialsFileCredentialsProvider(api));
   } else {
