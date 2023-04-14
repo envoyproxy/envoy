@@ -295,7 +295,7 @@ TEST(UtilityTest, PrepareDnsRefreshStrategy) {
 }
 
 // test that default values are used correctly when no retry configuration is provided
-TEST(UtilityTest, prepareJitteredExponentialBackOffStrategyStrategyNoConfig) {
+TEST(UtilityTest, PrepareJitteredExponentialBackOffStrategyNoConfig) {
   NiceMock<Random::MockRandomGenerator> random;
   // test prepareJitteredExponentialBackOffStrategy method with only default values
   {
@@ -385,7 +385,7 @@ TEST(UtilityTest, prepareJitteredExponentialBackOffStrategyStrategyNoConfig) {
 
 // confirm that user provided values in the retry configuration are correctly used to prepare the
 // backoff strategy
-TEST(UtilityTest, prepareJitteredExponentialBackOffStrategyStrategyConfigFileValues) {
+TEST(UtilityTest, PrepareJitteredExponentialBackOffStrategyConfigFileValues) {
   NiceMock<Random::MockRandomGenerator> random;
   // Provide config values for retry
   {
@@ -444,7 +444,7 @@ TEST(UtilityTest, prepareJitteredExponentialBackOffStrategyStrategyConfigFileVal
 
 // test out various retry backoff timer value scenarios (1. valid base and max intervals, 2. only
 // base interval, 3. max interval < base interval)
-TEST(UtilityTest, prepareJitteredExponentialBackOffStrategyStrategyCustomValues) {
+TEST(UtilityTest, PrepareJitteredExponentialBackOffStrategyCustomValues) {
   NiceMock<Random::MockRandomGenerator> random;
   {
     // set custom values for both base and max interval

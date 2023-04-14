@@ -326,7 +326,7 @@ JitteredExponentialBackOffStrategyPtr Utility::buildJitteredExponentialBackOffSt
   }
 
   // default_base_interval_ms must be greater than zero
-  if ((default_base_interval_ms > 0) == false) {
+  if (default_base_interval_ms == 0) {
     throw EnvoyException("default_base_interval_ms must be greater than zero");
   }
 
