@@ -455,7 +455,7 @@ typed_config:
   "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
   log_format:
     text_format_source:
-      inline_string: "%UPSTREAM_CLUSTER%"
+      inline_string: "%ACCESS_LOG_TYPE%"
   path: "/dev/null"
   )EOF";
 
@@ -496,13 +496,13 @@ typed_config:
   EXPECT_CALL(*periodic_log_flush_, enableTimer(_, _));
   periodic_log_flush_->invokeCallback();
   EXPECT_EQ(output_.size(), 1U);
-  EXPECT_EQ(output_.front(), "cluster_0");
+  EXPECT_EQ(output_.front(), AccessLog::AccessLogTypeStrings::get().RouterPeriodic);
 
   EXPECT_CALL(*periodic_log_flush_, enableTimer(_, _));
   periodic_log_flush_->invokeCallback();
   EXPECT_EQ(output_.size(), 2U);
-  EXPECT_EQ(output_.front(), "cluster_0");
-  EXPECT_EQ(output_.back(), "cluster_0");
+  EXPECT_EQ(output_.front(), AccessLog::AccessLogTypeStrings::get().RouterPeriodic);
+  EXPECT_EQ(output_.back(), AccessLog::AccessLogTypeStrings::get().RouterPeriodic);
 
   Http::ResponseHeaderMapPtr response_headers(new Http::TestResponseHeaderMapImpl());
   response_headers->setStatus(200);

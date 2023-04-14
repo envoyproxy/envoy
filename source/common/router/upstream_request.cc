@@ -402,7 +402,7 @@ void UpstreamRequest::acceptHeadersFromRouter(bool end_stream) {
       // If the request is complete, we've already done the stream-end upstream log, and shouldn't
       // do the periodic log.
       if (!streamInfo().requestComplete().has_value()) {
-        upstreamLog();
+        upstreamLog(AccessLog::AccessLogType::RouterPeriodic);
         resetUpstreamLogFlushTimer();
       }
     });
