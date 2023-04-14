@@ -211,8 +211,8 @@ TEST_P(CustomResponseIntegrationTest, LocalReply) {
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
   default_request_headers_.setHost("original.host");
-  auto response = sendRequestAndWaitForResponse(default_request_headers_, 0, unauthorized_response_,
-                                                0, 0, std::chrono::minutes(15));
+  auto response =
+      sendRequestAndWaitForResponse(default_request_headers_, 0, unauthorized_response_, 0, 0);
   // Verify that we get the modified status value.
   EXPECT_EQ("499", response->headers().getStatusValue());
   EXPECT_EQ("not allowed", response->body());
@@ -254,8 +254,8 @@ TEST_P(CustomResponseIntegrationTest, RedirectPolicyResponse) {
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
   default_request_headers_.setHost("original.host");
-  auto response = sendRequestAndWaitForResponse(
-      default_request_headers_, 0, gateway_error_response_, 0, 0, std::chrono::minutes(20));
+  auto response =
+      sendRequestAndWaitForResponse(default_request_headers_, 0, gateway_error_response_, 0, 0);
   // Verify we get the modified status value.
   EXPECT_EQ("299", response->headers().getStatusValue());
   EXPECT_EQ(0,
@@ -370,9 +370,8 @@ TEST_P(CustomResponseIntegrationTest, MatcherHierarchy) {
   {
     // Send request where response matches against route level config.
     default_request_headers_.setHost("host.with.route_specific.cer_config");
-    auto response = sendRequestAndWaitForResponse(default_request_headers_, 0,
-                                                  {{":status", "503"}, {"content-length", "0"}}, 0,
-                                                  0, std::chrono::minutes(5));
+    auto response = sendRequestAndWaitForResponse(
+        default_request_headers_, 0, {{":status", "503"}, {"content-length", "0"}}, 0, 0);
     // Verify we get the status code of route level config.
     EXPECT_EQ("293", response->headers().getStatusValue());
   }
@@ -380,9 +379,8 @@ TEST_P(CustomResponseIntegrationTest, MatcherHierarchy) {
   {
     // Send request where response matches against vhost level config.
     default_request_headers_.setHost("host.with.route_specific.cer_config");
-    auto response = sendRequestAndWaitForResponse(default_request_headers_, 0,
-                                                  {{":status", "501"}, {"content-length", "0"}}, 0,
-                                                  0, std::chrono::minutes(5));
+    auto response = sendRequestAndWaitForResponse(
+        default_request_headers_, 0, {{":status", "501"}, {"content-length", "0"}}, 0, 0);
     // Verify we get the status code of vhost level config.
     EXPECT_EQ("291", response->headers().getStatusValue());
   }
@@ -390,9 +388,8 @@ TEST_P(CustomResponseIntegrationTest, MatcherHierarchy) {
   {
     // Send request where response matches against vhost level config.
     default_request_headers_.setHost("host.with.route_specific.cer_config");
-    auto response = sendRequestAndWaitForResponse(default_request_headers_, 0,
-                                                  {{":status", "504"}, {"content-length", "0"}}, 0,
-                                                  0, std::chrono::minutes(5));
+    auto response = sendRequestAndWaitForResponse(
+        default_request_headers_, 0, {{":status", "504"}, {"content-length", "0"}}, 0, 0);
     // Verify we get the status code of vhost level config.
     EXPECT_EQ("299", response->headers().getStatusValue());
   }
@@ -508,8 +505,8 @@ TEST_P(CustomResponseIntegrationTest, OriginalResponseCodeOverrides200) {
   // Verify that 400_response policy cannot be triggered by the
   // gateway_error_response policy
   default_request_headers_.setHost("original.host");
-  auto response = sendRequestAndWaitForResponse(
-      default_request_headers_, 0, gateway_error_response_, 0, 0, std::chrono::seconds(500));
+  auto response =
+      sendRequestAndWaitForResponse(default_request_headers_, 0, gateway_error_response_, 0, 0);
   // Verify that we get the original response code 502.
   EXPECT_EQ("502", response->headers().getStatusValue());
 }
@@ -717,8 +714,8 @@ TEST_P(CustomResponseIntegrationTest, RouteHeaderMatch) {
   // Verify `host.with.route.with.header.matcher` is reachable via the redirect policy with the
   // "cer-only" header added.
   default_request_headers_.setHost("original.host");
-  auto response2 = sendRequestAndWaitForResponse(
-      default_request_headers_, 0, internal_server_error_, 0, 0, std::chrono::minutes(20));
+  auto response2 =
+      sendRequestAndWaitForResponse(default_request_headers_, 0, internal_server_error_, 0, 0);
   // The `500_action` redirect policy in kDefaultConfig adds the required header
   // to match the route for internal redirection. Verify that this is worked as
   // expected.
@@ -782,8 +779,7 @@ TEST_P(CustomResponseIntegrationTest, ModifyRequestHeaders) {
   default_request_headers_.setHost("original.host");
   auto response = sendRequestAndWaitForResponse(
       default_request_headers_, 0,
-      ::Envoy::Http::TestResponseHeaderMapImpl{{":status", "520"}, {"content-length", "0"}}, 0, 0,
-      std::chrono::minutes(20));
+      ::Envoy::Http::TestResponseHeaderMapImpl{{":status", "520"}, {"content-length", "0"}}, 0, 0);
   // Verify that we get the original response code in the absence of an
   // override.
   EXPECT_EQ("520", response->headers().getStatusValue());
