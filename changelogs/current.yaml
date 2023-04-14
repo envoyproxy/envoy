@@ -80,6 +80,7 @@ minor_behavior_changes:
     If ``status_code`` in :ref:`RedirectPolicy <envoy_v3_api_msg_extensions.http.custom_response.redirect_policy.v3.RedirectPolicy>`
     is not specified, Envoy now returns the original response code, instead of the response code returned after redirection
     to the error service.
+    The filter now traverses matchers from most specific to least specific per filter config till a match is found for the response.
 - area: matchers
   change: |
     Moved all of the network input matchers to extensions. If you use network matchers and override
