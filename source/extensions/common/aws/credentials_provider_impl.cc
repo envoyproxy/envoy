@@ -105,7 +105,8 @@ void CredentialsFileCredentialsProvider::extractCredentials(const std::string& c
   // Update last_updated_ now so that even if this function returns before successfully
   // extracting credentials, this function won't be called again until after the REFRESH_INTERVAL.
   // This prevents envoy from attempting and failing to read the credentials file on every request
-  // if there are errors extracting credentials from it (e.g. if the credentials file doesn't exist).
+  // if there are errors extracting credentials from it (e.g. if the credentials file doesn't
+  // exist).
   last_updated_ = api_.timeSource().systemTime();
 
   std::ifstream file(credentials_file);
