@@ -1,6 +1,7 @@
 #include "source/extensions/filters/http/custom_response/custom_response_filter.h"
 
 #include "envoy/http/filter.h"
+#include "envoy/router/router.h"
 #include "envoy/stream_info/filter_state.h"
 
 #include "source/common/common/enum_to_int.h"
@@ -43,15 +44,29 @@ Http::FilterHeadersStatus CustomResponseFilter::encodeHeaders(Http::ResponseHead
     return filter_state->policy->encodeHeaders(headers, end_stream, *this);
   }
 
-  // Check for route specific config.
-  const FilterConfig* per_route_settings =
-      Http::Utility::resolveMostSpecificPerFilterConfig<FilterConfig>(decoder_callbacks_);
-  const FilterConfig* config_to_use = per_route_settings
-                                          ? static_cast<const FilterConfig*>(per_route_settings)
-                                          : static_cast<const FilterConfig*>(config_.get());
-  // Check if any custom response policy applies to this response.
-  const PolicySharedPtr policy =
-      config_to_use->getPolicy(headers, encoder_callbacks_->streamInfo());
+  PolicySharedPtr policy;
+  // Traverse up route typed per filter hierarchy till we find a matching
+  // policy.
+  bool match_found = false;
+  decoder_callbacks_->traversePerFilterConfig(
+      [&policy, &match_found, &headers, this](const Router::RouteSpecificFilterConfig& config) {
+        if (match_found) {
+          return;
+        }
+        const FilterConfig* typed_config = dynamic_cast<const FilterConfig*>(&config);
+        if (typed_config) {
+          policy = typed_config->getPolicy(headers, encoder_callbacks_->streamInfo());
+          if (policy) {
+            match_found = true;
+          }
+        }
+      });
+  // Check the filter level config if we didn't find a match in the per route
+  // config.
+  if (match_found == false) {
+    ASSERT(!policy);
+    policy = config_->getPolicy(headers, encoder_callbacks_->streamInfo());
+  }
 
   // A valid custom response was not found. We should just pass through.
   if (!policy) {

@@ -128,6 +128,32 @@ public:
     config_helper_.addVirtualHost(host);
   }
 
+  Any createCerSinglePredicateConfig(absl::string_view match_code, int override_code) {
+    auto cer_config = TestUtility::parseYaml<CustomResponse>(std::string(kSinglePredicateConfig));
+
+    // Assign the code to match against.
+    cer_config.mutable_custom_response_matcher()
+        ->mutable_matcher_list()
+        ->mutable_matchers()
+        ->at(0)
+        .mutable_predicate()
+        ->mutable_single_predicate()
+        ->mutable_value_match()
+        ->mutable_exact()
+        ->assign(match_code);
+    // Assign the override response code.
+    modifyPolicy<RedirectPolicyProto>(
+        cer_config, "gateway_error_action", [override_code](RedirectPolicyProto& policy) {
+          policy.mutable_status_code()->set_value(override_code);
+          policy.mutable_response_headers_to_add()->at(0).mutable_header()->mutable_value()->assign(
+              "y-foo2");
+        });
+
+    Any cfg_any;
+    cfg_any.PackFrom(cer_config);
+    return cfg_any;
+  }
+
   void setPerHostConfig(VirtualHost& vh, const CustomResponse& cfg) {
     Any cfg_any;
     ASSERT_TRUE(cfg_any.PackFrom(cfg));
@@ -185,8 +211,8 @@ TEST_P(CustomResponseIntegrationTest, LocalReply) {
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
   default_request_headers_.setHost("original.host");
-  auto response =
-      sendRequestAndWaitForResponse(default_request_headers_, 0, unauthorized_response_, 0);
+  auto response = sendRequestAndWaitForResponse(default_request_headers_, 0, unauthorized_response_,
+                                                0, 0, std::chrono::minutes(15));
   // Verify that we get the modified status value.
   EXPECT_EQ("499", response->headers().getStatusValue());
   EXPECT_EQ("not allowed", response->body());
@@ -324,6 +350,55 @@ TEST_P(CustomResponseIntegrationTest, OnlyRouteSpecificFilter) {
   EXPECT_EQ(
       "y-foo2",
       response->headers().get(::Envoy::Http::LowerCaseString("foo2"))[0]->value().getStringView());
+}
+
+// Verify that the route specific filter is picked if specified.
+TEST_P(CustomResponseIntegrationTest, MatcherHierarchy) {
+  // Create Virtual host with per route and per host config.
+  auto host = config_helper_.createVirtualHost("host.with.route_specific.cer_config");
+  // Add per route typed filter config.
+  auto per_route_config = createCerSinglePredicateConfig("503", 293);
+  host.mutable_routes(0)->mutable_typed_per_filter_config()->insert(
+      MapPair<std::string, Any>("envoy.filters.http.custom_response", per_route_config));
+  auto per_virtual_host_config = createCerSinglePredicateConfig("501", 291);
+  host.mutable_typed_per_filter_config()->insert(
+      MapPair<std::string, Any>("envoy.filters.http.custom_response", per_virtual_host_config));
+  config_helper_.addVirtualHost(host);
+
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  {
+    // Send request where response matches against route level config.
+    default_request_headers_.setHost("host.with.route_specific.cer_config");
+    auto response = sendRequestAndWaitForResponse(default_request_headers_, 0,
+                                                  {{":status", "503"}, {"content-length", "0"}}, 0,
+                                                  0, std::chrono::minutes(5));
+    // Verify we get the status code of route level config.
+    EXPECT_EQ("293", response->headers().getStatusValue());
+  }
+
+  {
+    // Send request where response matches against vhost level config.
+    default_request_headers_.setHost("host.with.route_specific.cer_config");
+    auto response = sendRequestAndWaitForResponse(default_request_headers_, 0,
+                                                  {{":status", "501"}, {"content-length", "0"}}, 0,
+                                                  0, std::chrono::minutes(5));
+    // Verify we get the status code of vhost level config.
+    EXPECT_EQ("291", response->headers().getStatusValue());
+  }
+
+  {
+    // Send request where response matches against vhost level config.
+    default_request_headers_.setHost("host.with.route_specific.cer_config");
+    auto response = sendRequestAndWaitForResponse(default_request_headers_, 0,
+                                                  {{":status", "504"}, {"content-length", "0"}}, 0,
+                                                  0, std::chrono::minutes(5));
+    // Verify we get the status code of vhost level config.
+    EXPECT_EQ("299", response->headers().getStatusValue());
+  }
+
+  EXPECT_EQ(0, test_server_->counter("http.config_test.downstream_rq_5xx")->value());
+  EXPECT_EQ(0, test_server_->counter("custom_response_redirect_no_route")->value());
 }
 
 // Verify that we do not provide a custom response for a response that has
