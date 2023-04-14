@@ -110,7 +110,7 @@ void CredentialsFileCredentialsProvider::extractCredentials(const std::string& c
 
   std::ifstream file(credentials_file);
   if (!file) {
-    ENVOY_LOG(error, "Error opening credentials file {}", credentials_file);
+    ENVOY_LOG(debug, "Error opening credentials file {}", credentials_file);
     return;
   }
 
@@ -151,7 +151,7 @@ void CredentialsFileCredentialsProvider::extractCredentials(const std::string& c
     }
   }
 
-  ENVOY_LOG(error, "Found following AWS credentials for profile '{}' in {}: {}={}, {}={}, {}={}",
+  ENVOY_LOG(debug, "Found following AWS credentials for profile '{}' in {}: {}={}, {}={}, {}={}",
             profile, credentials_file, AWS_ACCESS_KEY_ID, access_key_id, AWS_SECRET_ACCESS_KEY,
             secret_access_key.empty() ? "" : "*****", AWS_SESSION_TOKEN,
             session_token.empty() ? "" : "*****");
