@@ -54,7 +54,7 @@ public:
     });
 
     HttpIntegrationTest::initialize();
-  }
+  } 
 
   ABSL_MUST_USE_RESULT
   AssertionResult waitForMetricsServiceConnection() {
