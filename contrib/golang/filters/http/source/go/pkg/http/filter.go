@@ -62,6 +62,10 @@ type httpRequest struct {
 	pInfo      panicInfo
 }
 
+func (r *httpRequest) pluginName() string {
+	return C.GoStringN(r.req.plugin_name.data, C.int(r.req.plugin_name.len))
+}
+
 func (r *httpRequest) sendPanicReply(details string) {
 	defer r.RecoverPanic()
 	cAPI.HttpSendPanicReply(unsafe.Pointer(r.req), details)
@@ -108,7 +112,7 @@ func (r *httpRequest) SendLocalReply(responseCode int, bodyText string, headers 
 func (r *httpRequest) Log(level api.LogType, message string) {
 	// TODO performance optimization points:
 	// Add a new goroutine to write logs asynchronously and avoid frequent cgo calls
-	cAPI.HttpLog(unsafe.Pointer(r.req), level, message)
+	cAPI.HttpLog(level, fmt.Sprintf("[go_plugin_http][%v] %v", r.pluginName(), message))
 }
 
 func (r *httpRequest) StreamInfo() api.StreamInfo {
