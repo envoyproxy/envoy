@@ -3,8 +3,10 @@
 #include "test/extensions/common/aws/mocks.h"
 #include "test/mocks/api/mocks.h"
 #include "test/mocks/event/mocks.h"
+#include "test/mocks/runtime/mocks.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/simulated_time_system.h"
+#include "test/test_common/test_runtime.h"
 
 using testing::_;
 using testing::InSequence;
@@ -175,7 +177,7 @@ TEST_F(CredentialsFileCredentialsProviderTest, SpacesBetweenParts) {
   EXPECT_EQ("profile4_token", credentials.sessionToken().value());
 }
 
-TEST_F(CredentialsFileCredentialsProviderTest, EmptyCredsCached) {
+TEST_F(CredentialsFileCredentialsProviderTest, RefreshInterval) {
   InSequence sequence;
   TestEnvironment::setEnvVar("AWS_SHARED_CREDENTIALS_FILE", "/file/does/not/exist", 1);
 
@@ -184,19 +186,34 @@ TEST_F(CredentialsFileCredentialsProviderTest, EmptyCredsCached) {
   EXPECT_FALSE(credentials.secretAccessKey().has_value());
   EXPECT_FALSE(credentials.sessionToken().has_value());
 
-  // Confirm that the empty credentials are cached even after we switch
-  // to a legitimate profile with valid credentials.
+  // Credentials won't be extracted even after we switch to a legitimate profile
+  // with valid credentials.
   setUpTest(CREDENTIALS_FILE_CONTENTS, "profile1");
   credentials = provider_.getCredentials();
   EXPECT_FALSE(credentials.accessKeyId().has_value());
   EXPECT_FALSE(credentials.secretAccessKey().has_value());
   EXPECT_FALSE(credentials.sessionToken().has_value());
 
+  // Credentials will be extracted again after the REFRESH_INTERVAL.
   time_system_.advanceTimeWait(std::chrono::hours(2));
   credentials = provider_.getCredentials();
   EXPECT_EQ("profile1_acc=ess_key", credentials.accessKeyId().value());
   EXPECT_EQ("profile1_secret", credentials.secretAccessKey().value());
   EXPECT_EQ("profile1_token", credentials.sessionToken().value());
+
+  // Previously cached credentials will be used.
+  setUpTest(CREDENTIALS_FILE_CONTENTS, "default");
+  credentials = provider_.getCredentials();
+  EXPECT_EQ("profile1_acc=ess_key", credentials.accessKeyId().value());
+  EXPECT_EQ("profile1_secret", credentials.secretAccessKey().value());
+  EXPECT_EQ("profile1_token", credentials.sessionToken().value());
+
+  // Credentials will be extracted again after the REFRESH_INTERVAL.
+  time_system_.advanceTimeWait(std::chrono::hours(2));
+  credentials = provider_.getCredentials();
+  EXPECT_EQ("default_access_key", credentials.accessKeyId().value());
+  EXPECT_EQ("default_secret", credentials.secretAccessKey().value());
+  EXPECT_EQ("default_token", credentials.sessionToken().value());
 }
 
 class MessageMatcher : public testing::MatcherInterface<Http::RequestMessage&> {
@@ -673,27 +690,30 @@ public:
 TEST_F(DefaultCredentialsProviderChainTest, NoEnvironmentVars) {
   EXPECT_CALL(factories_, createCredentialsFileCredentialsProvider(Ref(*api_)));
   EXPECT_CALL(factories_, createInstanceProfileCredentialsProvider(Ref(*api_), _));
-  DefaultCredentialsProviderChain chain(*api_, DummyMetadataFetcher(), factories_, true);
+  DefaultCredentialsProviderChain chain(*api_, DummyMetadataFetcher(), factories_);
 }
 
 TEST_F(DefaultCredentialsProviderChainTest, CredentialsFileDisabled) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.enable_aws_credentials_file", "false"}});
+
   EXPECT_CALL(factories_, createCredentialsFileCredentialsProvider(Ref(*api_))).Times(0);
   EXPECT_CALL(factories_, createInstanceProfileCredentialsProvider(Ref(*api_), _));
-  DefaultCredentialsProviderChain chain(*api_, DummyMetadataFetcher(), factories_, false);
+  DefaultCredentialsProviderChain chain(*api_, DummyMetadataFetcher(), factories_);
 }
 
 TEST_F(DefaultCredentialsProviderChainTest, MetadataDisabled) {
   TestEnvironment::setEnvVar("AWS_EC2_METADATA_DISABLED", "true", 1);
   EXPECT_CALL(factories_, createCredentialsFileCredentialsProvider(Ref(*api_)));
   EXPECT_CALL(factories_, createInstanceProfileCredentialsProvider(Ref(*api_), _)).Times(0);
-  DefaultCredentialsProviderChain chain(*api_, DummyMetadataFetcher(), factories_, true);
+  DefaultCredentialsProviderChain chain(*api_, DummyMetadataFetcher(), factories_);
 }
 
 TEST_F(DefaultCredentialsProviderChainTest, MetadataNotDisabled) {
   TestEnvironment::setEnvVar("AWS_EC2_METADATA_DISABLED", "false", 1);
   EXPECT_CALL(factories_, createCredentialsFileCredentialsProvider(Ref(*api_)));
   EXPECT_CALL(factories_, createInstanceProfileCredentialsProvider(Ref(*api_), _));
-  DefaultCredentialsProviderChain chain(*api_, DummyMetadataFetcher(), factories_, true);
+  DefaultCredentialsProviderChain chain(*api_, DummyMetadataFetcher(), factories_);
 }
 
 TEST_F(DefaultCredentialsProviderChainTest, RelativeUri) {
@@ -701,7 +721,7 @@ TEST_F(DefaultCredentialsProviderChainTest, RelativeUri) {
   EXPECT_CALL(factories_, createCredentialsFileCredentialsProvider(Ref(*api_)));
   EXPECT_CALL(factories_, createTaskRoleCredentialsProvider(Ref(*api_), _,
                                                             "169.254.170.2:80/path/to/creds", ""));
-  DefaultCredentialsProviderChain chain(*api_, DummyMetadataFetcher(), factories_, true);
+  DefaultCredentialsProviderChain chain(*api_, DummyMetadataFetcher(), factories_);
 }
 
 TEST_F(DefaultCredentialsProviderChainTest, FullUriNoAuthorizationToken) {
@@ -709,7 +729,7 @@ TEST_F(DefaultCredentialsProviderChainTest, FullUriNoAuthorizationToken) {
   EXPECT_CALL(factories_, createCredentialsFileCredentialsProvider(Ref(*api_)));
   EXPECT_CALL(factories_,
               createTaskRoleCredentialsProvider(Ref(*api_), _, "http://host/path/to/creds", ""));
-  DefaultCredentialsProviderChain chain(*api_, DummyMetadataFetcher(), factories_, true);
+  DefaultCredentialsProviderChain chain(*api_, DummyMetadataFetcher(), factories_);
 }
 
 TEST_F(DefaultCredentialsProviderChainTest, FullUriWithAuthorizationToken) {
@@ -718,7 +738,7 @@ TEST_F(DefaultCredentialsProviderChainTest, FullUriWithAuthorizationToken) {
   EXPECT_CALL(factories_, createCredentialsFileCredentialsProvider(Ref(*api_)));
   EXPECT_CALL(factories_, createTaskRoleCredentialsProvider(
                               Ref(*api_), _, "http://host/path/to/creds", "auth_token"));
-  DefaultCredentialsProviderChain chain(*api_, DummyMetadataFetcher(), factories_, true);
+  DefaultCredentialsProviderChain chain(*api_, DummyMetadataFetcher(), factories_);
 }
 
 TEST(CredentialsProviderChainTest, getCredentials_noCredentials) {

@@ -165,13 +165,12 @@ class DefaultCredentialsProviderChain : public CredentialsProviderChain,
                                         public CredentialsProviderChainFactories {
 public:
   DefaultCredentialsProviderChain(
-      Api::Api& api, const MetadataCredentialsProviderBase::MetadataFetcher& metadata_fetcher,
-      const bool enable_credentials_file)
-      : DefaultCredentialsProviderChain(api, metadata_fetcher, *this, enable_credentials_file) {}
+      Api::Api& api, const MetadataCredentialsProviderBase::MetadataFetcher& metadata_fetcher)
+      : DefaultCredentialsProviderChain(api, metadata_fetcher, *this) {}
 
   DefaultCredentialsProviderChain(
       Api::Api& api, const MetadataCredentialsProviderBase::MetadataFetcher& metadata_fetcher,
-      const CredentialsProviderChainFactories& factories, const bool enable_credentials_file);
+      const CredentialsProviderChainFactories& factories);
 
 private:
   CredentialsProviderSharedPtr createEnvironmentCredentialsProvider() const override {
