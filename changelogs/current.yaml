@@ -409,10 +409,6 @@ new_features:
   change: |
     added capability for continuing filter chain iteration or send local replies from (decode|encode)Metadata. Additionally,
     reset idle timer on metadata actions.
-- area: access_log
-  change: |
-    added %ACCESS_LOG_TYPE% substitution string, to help distinguishing between access log records and when they are being
-    recorded. Please refer to the access log configuration documentation for more information.
 - area: grpc
   change: |
     added support for buf connect HTTP GET requests in the :ref:`connect_grpc_bridge filter <config_http_filters_connect_grpc_bridge>`
