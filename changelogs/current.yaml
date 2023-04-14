@@ -345,7 +345,7 @@ new_features:
     by closing the connection before the new connection accept phase.
 - area: load shed point
   change: |
-    added load shed point ``envoy.load_shed_points.http_connection_manager_decode_headers`` that rejects new http stream
+    added load shed point ``envoy.load_shed_points.http_connection_manager_decode_headers`` that rejects new http streams
     by sending a local reply.
 - area: http
   change: |
