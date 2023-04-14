@@ -1048,7 +1048,8 @@ ServerConnectionImpl::ServerConnectionImpl(
     const Http1Settings& settings, uint32_t max_request_headers_kb,
     const uint32_t max_request_headers_count,
     envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
-        headers_with_underscores_action)
+        headers_with_underscores_action,
+    Server::OverloadManager& overload_manager)
     : ConnectionImpl(connection, stats, settings, MessageType::Request, max_request_headers_kb,
                      max_request_headers_count),
       callbacks_(callbacks),
@@ -1059,7 +1060,9 @@ ServerConnectionImpl::ServerConnectionImpl(
           [&]() -> void { this->onBelowLowWatermark(); },
           [&]() -> void { this->onAboveHighWatermark(); },
           []() -> void { /* TODO(adisuissa): handle overflow watermark */ })),
-      headers_with_underscores_action_(headers_with_underscores_action) {
+      headers_with_underscores_action_(headers_with_underscores_action),
+      abort_dispatch_(
+          overload_manager.getLoadShedPoint("envoy.load_shed_points.http1_server_abort_dispatch")) {
   owned_output_buffer_->setWatermarks(connection.bufferLimit());
   // Inform parent
   output_buffer_ = owned_output_buffer_.get();
@@ -1240,6 +1243,11 @@ void ServerConnectionImpl::onBody(Buffer::Instance& data) {
 }
 
 Http::Status ServerConnectionImpl::dispatch(Buffer::Instance& data) {
+  if (abort_dispatch_ != nullptr && abort_dispatch_->shouldShedLoad()) {
+    RETURN_IF_ERROR(sendOverloadError());
+    return envoyOverloadError("Aborting Server Dispatch");
+  }
+
   if (active_request_ != nullptr && active_request_->remote_complete_) {
     // Eagerly read disable the connection if the downstream is sending pipelined requests as we
     // serially process them. Reading from the connection will be re-enabled after the active
@@ -1296,6 +1304,18 @@ void ServerConnectionImpl::onResetStream(StreamResetReason reason) {
     active_request_->response_encoder_.runResetCallbacks(reason);
     connection_.dispatcher().deferredDelete(std::move(active_request_));
   }
+}
+
+Status ServerConnectionImpl::sendOverloadError() {
+  const bool latched_dispatching = dispatching_;
+
+  // We might be in the early stages of Server dispatching where this isn't yet
+  // flipped.
+  dispatching_ = true;
+  error_code_ = Http::Code::InternalServerError;
+  auto status = sendProtocolError(Envoy::StreamInfo::ResponseCodeDetails::get().Overload);
+  dispatching_ = latched_dispatching;
+  return status;
 }
 
 Status ServerConnectionImpl::sendProtocolError(absl::string_view details) {

@@ -49,6 +49,7 @@
 
 #include "test/mocks/common.h"
 #include "test/mocks/runtime/mocks.h"
+#include "test/mocks/server/overload_manager.h"
 #include "test/test_common/test_time_system.h"
 #include "test/test_common/utility.h"
 
@@ -528,6 +529,7 @@ private:
   const Http::CodecType type_;
   Http::ServerConnectionPtr codec_;
   std::list<FakeStreamPtr> new_streams_ ABSL_GUARDED_BY(lock_);
+  testing::NiceMock<Server::MockOverloadManager> overload_manager_;
   testing::NiceMock<Random::MockRandomGenerator> random_;
   testing::NiceMock<Http::MockHeaderValidatorStats> header_validator_stats_;
   Http::HeaderValidatorFactoryPtr header_validator_factory_;

@@ -544,7 +544,10 @@ private:
   void onDrainTimeout();
   void startDrainSequence();
   Tracing::Tracer& tracer() { return *config_.tracer(); }
+  void handleCodecErrorImpl(absl::string_view error, absl::string_view details,
+                            StreamInfo::ResponseFlag response_flag);
   void handleCodecError(absl::string_view error);
+  void handleCodecOverloadError(absl::string_view error);
   void doConnectionClose(absl::optional<Network::ConnectionCloseType> close_type,
                          absl::optional<StreamInfo::ResponseFlag> response_flag,
                          absl::string_view details);
@@ -574,6 +577,7 @@ private:
   Upstream::ClusterManager& cluster_manager_;
   Network::ReadFilterCallbacks* read_callbacks_{};
   ConnectionManagerListenerStats& listener_stats_;
+  Server::OverloadManager& overload_manager_;
   Server::ThreadLocalOverloadState& overload_state_;
   Server::LoadShedPoint* accept_new_http_stream_{nullptr};
   // References into the overload manager thread local state map. Using these lets us avoid a

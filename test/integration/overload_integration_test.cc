@@ -485,4 +485,88 @@ TEST_P(LoadShedPointIntegrationTest, AcceptNewHttpStreamShedsLoad) {
   test_server_->waitForCounterEq("http.config_test.downstream_rq_overload_close", 1);
 }
 
+TEST_P(LoadShedPointIntegrationTest, Http1ServerDispatchAbortShedsLoadWhenNewRequest) {
+  // Test only applies to HTTP1.
+  if (downstreamProtocol() != Http::CodecClient::Type::HTTP1) {
+    return;
+  }
+  autonomous_upstream_ = true;
+  initializeOverloadManager(
+      TestUtility::parseYaml<envoy::config::overload::v3::LoadShedPoint>(R"EOF(
+      name: "envoy.load_shed_points.http1_server_abort_dispatch"
+      triggers:
+        - name: "envoy.resource_monitors.testonly.fake_resource_monitor"
+          threshold:
+            value: 0.90
+    )EOF"));
+  test_server_->waitForCounterEq("http.config_test.downstream_rq_overload_close", 0);
+
+  // Put envoy in overloaded state and check that the dispatch fails.
+  updateResource(0.95);
+  test_server_->waitForGaugeEq(
+      "overload.envoy.load_shed_points.http1_server_abort_dispatch.scale_percent", 100);
+
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+  auto [encoder, decoder] = codec_client_->startRequest(default_request_headers_);
+
+  // We should get rejected local reply and connection close.
+  test_server_->waitForCounterEq("http.config_test.downstream_rq_overload_close", 1);
+  ASSERT_TRUE(decoder->waitForEndStream());
+  EXPECT_EQ(decoder->headers().getStatusValue(), "500");
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
+
+  // Disable overload, we should allow connections.
+  updateResource(0.80);
+  test_server_->waitForGaugeEq(
+      "overload.envoy.load_shed_points.http1_server_abort_dispatch.scale_percent", 0);
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ(response->headers().getStatusValue(), "200");
+}
+
+// We use 100-continue to already start the response before doing triggering
+// Overload.
+TEST_P(LoadShedPointIntegrationTest, Http1ServerDispatchAbortShedsLoadWhenResponseStarted) {
+  // Test only applies to HTTP1.
+  if (downstreamProtocol() != Http::CodecClient::Type::HTTP1) {
+    return;
+  }
+  initializeOverloadManager(
+      TestUtility::parseYaml<envoy::config::overload::v3::LoadShedPoint>(R"EOF(
+      name: "envoy.load_shed_points.http1_server_abort_dispatch"
+      triggers:
+        - name: "envoy.resource_monitors.testonly.fake_resource_monitor"
+          threshold:
+            value: 0.90
+    )EOF"));
+
+  // Start the 100-continue request
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+  auto encoder_decoder =
+      codec_client_->startRequest(Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                                                 {":path", "/dynamo/url"},
+                                                                 {":scheme", "http"},
+                                                                 {":authority", "sni.lyft.com"},
+                                                                 {"expect", "100-contINUE"}});
+
+  // Wait for 100-continue
+  request_encoder_ = &encoder_decoder.first;
+  auto response = std::move(encoder_decoder.second);
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  // The continue headers should arrive immediately.
+  response->waitFor1xxHeaders();
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+
+  // Put envoy in overloaded state and check that it rejects the continuing
+  // dispatch.
+  updateResource(0.95);
+  test_server_->waitForGaugeEq(
+      "overload.envoy.load_shed_points.http1_server_abort_dispatch.scale_percent", 100);
+  codec_client_->sendData(*request_encoder_, 10, true);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ(response->headers().getStatusValue(), "500");
+}
+
 } // namespace Envoy
