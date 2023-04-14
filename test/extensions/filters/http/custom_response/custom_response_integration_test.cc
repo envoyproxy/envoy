@@ -360,6 +360,7 @@ TEST_P(CustomResponseIntegrationTest, MatcherHierarchy) {
   auto per_route_config = createCerSinglePredicateConfig("503", 293);
   host.mutable_routes(0)->mutable_typed_per_filter_config()->insert(
       MapPair<std::string, Any>("envoy.filters.http.custom_response", per_route_config));
+  // Add per vhost typeed filter config.
   auto per_virtual_host_config = createCerSinglePredicateConfig("501", 291);
   host.mutable_typed_per_filter_config()->insert(
       MapPair<std::string, Any>("envoy.filters.http.custom_response", per_virtual_host_config));
@@ -386,11 +387,11 @@ TEST_P(CustomResponseIntegrationTest, MatcherHierarchy) {
   }
 
   {
-    // Send request where response matches against vhost level config.
+    // Send request where response matches against filter level config.
     default_request_headers_.setHost("host.with.route_specific.cer_config");
     auto response = sendRequestAndWaitForResponse(
         default_request_headers_, 0, {{":status", "504"}, {"content-length", "0"}}, 0, 0);
-    // Verify we get the status code of vhost level config.
+    // Verify we get the status code of filter level config.
     EXPECT_EQ("299", response->headers().getStatusValue());
   }
 
