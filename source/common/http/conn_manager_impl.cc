@@ -320,7 +320,7 @@ void ConnectionManagerImpl::doDeferredStreamDestroy(ActiveStream& stream) {
     stream.deferHeadersAndTrailers();
   } else {
     // For HTTP/1 and HTTP/2, log here as usual.
-    stream.filter_manager_.log();
+    stream.filter_manager_.log(AccessLog::AccessLogType::HcmEnd);
   }
 
   stream.filter_manager_.destroyFilters();
@@ -815,7 +815,7 @@ ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connect
           // If the request is complete, we've already done the stream-end access-log, and shouldn't
           // do the periodic log.
           if (!streamInfo().requestComplete().has_value()) {
-            filter_manager_.log();
+            filter_manager_.log(AccessLog::AccessLogType::HcmPeriodic);
             refreshAccessLogFlushTimer();
           }
         });
@@ -1231,7 +1231,7 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapSharedPt
   const bool upgrade_rejected = filter_manager_.createFilterChain() == false;
 
   if (connection_manager_.config_.flushAccessLogOnNewRequest()) {
-    filter_manager_.log();
+    filter_manager_.log(AccessLog::AccessLogType::HcmNewRequest);
   }
 
   // TODO if there are no filters when starting a filter iteration, the connection manager

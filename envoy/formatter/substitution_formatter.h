@@ -33,7 +33,7 @@ public:
                              const Http::ResponseTrailerMap& response_trailers,
                              const StreamInfo::StreamInfo& stream_info,
                              absl::string_view local_reply_body,
-                             absl::string_view access_log_type = "") const PURE;
+                             absl::string_view access_log_type) const PURE;
 };
 
 using FormatterPtr = std::unique_ptr<Formatter>;

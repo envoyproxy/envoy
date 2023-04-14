@@ -377,6 +377,7 @@ tcp_logs:
       downstream_wire_bytes_received: 3
       upstream_wire_bytes_sent: 3
       upstream_wire_bytes_received: 5
+      access_log_type: TcpPeriodic
       downstream_direct_remote_address:
         socket_address:
           address: {}

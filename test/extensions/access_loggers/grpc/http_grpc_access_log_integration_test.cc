@@ -143,6 +143,7 @@ http_logs:
         no_route_found: true
       downstream_wire_bytes_sent: 178
       downstream_wire_bytes_received: 38
+      access_log_type: HcmEnd
     protocol_version: HTTP11
     request:
       scheme: http
@@ -171,6 +172,7 @@ http_logs:
         no_route_found: true
       downstream_wire_bytes_sent: 178
       downstream_wire_bytes_received: 38
+      access_log_type: HcmEnd
     protocol_version: HTTP11
     request:
       downstream_header_bytes_received: 11
@@ -224,6 +226,7 @@ http_logs:
         no_route_found: true
       downstream_wire_bytes_sent: 178
       downstream_wire_bytes_received: 38
+      access_log_type: HcmEnd
     protocol_version: HTTP11
     request:
       downstream_header_bytes_received: 11
