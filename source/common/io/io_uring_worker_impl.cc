@@ -556,7 +556,7 @@ void IoUringServerSocket::onRead(Request* req, int32_t result, bool injected) {
       ReadParam param{buf_, static_cast<int32_t>(buf_.length())};
       io_uring_handler_.onRead(param);
       ENVOY_LOG(trace, "after read from socket, fd = {}, remain = {}", fd_, buf_.length());
-    } else if (read_error_.has_value() && read_error_ <= 0 && !enable_close_event_) {
+    } else if (read_error_.has_value() && read_error_ <= 0 && !enable_close_event_ && status_ != DISABLED) {
       ENVOY_LOG(trace, "read error from socket, fd = {}, result = {}", fd_, read_error_.value());
       ReadParam param{buf_, read_error_.value()};
       io_uring_handler_.onRead(param);

@@ -362,7 +362,7 @@ Api::SysCallIntResult IoUringSocketHandleImpl::shutdown(int how) {
 void IoUringSocketHandleImpl::initializeFileEvent(Event::Dispatcher& dispatcher,
                                                   Event::FileReadyCb cb,
                                                   Event::FileTriggerType trigger, uint32_t events) {
-  ENVOY_LOG(trace, "initialize file event fd = {}", fd_);
+  ENVOY_LOG(trace, "initialize file event fd = {}, io_uring_socket_type = {}", fd_, ioUringSocketTypeStr());
 
   // The io_uring_socket_ already created. This happened after resetFileEvent;
   if (io_uring_socket_ != absl::nullopt) {
@@ -372,7 +372,9 @@ void IoUringSocketHandleImpl::initializeFileEvent(Event::Dispatcher& dispatcher,
       shadow_io_handle_->initializeFileEvent(dispatcher, std::move(cb), trigger, events);
       return;
     }
+
     io_uring_socket_->enable();
+    io_uring_socket_->enableCloseEvent(events & Event::FileReadyType::Closed);
     cb_ = std::move(cb);
     return;
   }
@@ -469,6 +471,7 @@ void IoUringSocketHandleImpl::resetFileEvents() {
   }
 
   io_uring_socket_->disable();
+  io_uring_socket_->enableCloseEvent(false);
 }
 
 IoHandlePtr IoUringSocketHandleImpl::duplicate() {
