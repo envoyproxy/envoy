@@ -192,7 +192,7 @@ Api::IoCallBoolResult InstanceImplPosix::createPath(absl::string_view path) {
     path.remove_suffix(1);
   }
   if (directoryExists(std::string{path})) {
-    return resultSuccess(true);
+    return resultSuccess(false);
   }
   absl::string_view subpath = path;
   do {

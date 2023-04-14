@@ -375,7 +375,7 @@ TEST_F(FileSystemImplTest, CreatePathCreatesDirectoryAndReturnsSuccessForExistin
   EXPECT_EQ(info_result.return_value_.file_type_, FileType::Directory);
   // Ensure it returns true if we 'create' an existing path too.
   result = file_system_.createPath(new_dir_path);
-  EXPECT_TRUE(result.return_value_);
+  EXPECT_FALSE(result.return_value_);
   EXPECT_THAT(result.err_, ::testing::IsNull()) << result.err_->getErrorDetails();
 }
 

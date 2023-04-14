@@ -176,7 +176,9 @@ public:
 
   /**
    * Attempts to create the given path, recursively if necessary.
-   * @return bool true if the directory exists afterwards, or an error status.
+   * @return bool true if one or more directories was created and the path exists,
+   *         false if the path already existed, an error status if the path does
+   *         not exist after the call.
    */
   virtual Api::IoCallBoolResult createPath(absl::string_view path) PURE;
 
