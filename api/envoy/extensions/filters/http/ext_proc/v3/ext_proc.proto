@@ -169,10 +169,9 @@ message ExternalProcessor {
   // If not specified, by default it is 0, which will effectively disable the ``override_message_timeout`` API.
   google.protobuf.Duration max_message_timeout = 10;
 
-  // If false, allows the processor response to allow route cache clearing.
-  // If true, route cache clearing is ignored. False, by default, to ensure backwards compatibility.
-  // Note that in order to force route cache clearing,
-  // :ref:`clear_route_cache <envoy_v3_api_field_service.ext_proc.v3.CommonResponse.clear_route_cache>` field also must be set to true.
+  // Prevents clearing the route-cache when the
+  // :ref:`clear_route_cache <envoy_v3_api_field_service.ext_proc.v3.CommonResponse.clear_route_cache>`
+  // field is set in an external processor response.
   bool disable_route_cache_clearing = 11;
 }
 
