@@ -52,7 +52,8 @@ private:
   bool is_connect_unary_{false};
   bool is_connect_streaming_{false};
   bool is_grpc_response_{false};
-  uint64_t drained_frame_header_bytes_{false};
+  uint8_t unary_payload_frame_flags_{0};
+  uint64_t drained_frame_header_bytes_{0};
   Buffer::OwnedImpl request_buffer_;
   Buffer::OwnedImpl response_buffer_;
   Http::ResponseHeaderMap* response_headers_;

@@ -218,11 +218,12 @@ void HttpTracerUtility::setCommonTags(Span& span, const StreamInfo::StreamInfo& 
 
   span.setTag(Tracing::Tags::get().Component, Tracing::Tags::get().Proxy);
 
-  if (stream_info.upstreamInfo() && stream_info.upstreamInfo()->upstreamHost()) {
-    span.setTag(Tracing::Tags::get().UpstreamCluster,
-                stream_info.upstreamInfo()->upstreamHost()->cluster().name());
+  // Cluster info.
+  if (auto cluster_info = stream_info.upstreamClusterInfo();
+      cluster_info.has_value() && cluster_info.value() != nullptr) {
+    span.setTag(Tracing::Tags::get().UpstreamCluster, cluster_info.value()->name());
     span.setTag(Tracing::Tags::get().UpstreamClusterName,
-                stream_info.upstreamInfo()->upstreamHost()->cluster().observabilityName());
+                cluster_info.value()->observabilityName());
   }
 
   // Post response data.

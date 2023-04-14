@@ -47,22 +47,23 @@ CURRENT=check
 # This test runs code check with:
 #   bazel run //tools/code:check -- --fix -v warn -x mobile/dist/envoy-pom.xml
 # see: /tools/code/BUILD
-time bazel test "${BAZEL_BUILD_OPTIONS[@]}" //tools/code:check_test
+bazel test "${BAZEL_BUILD_OPTIONS[@]}" //tools/code:check_test
 
 CURRENT=configs
 bazel run "${BAZEL_BUILD_OPTIONS[@]}" //configs:example_configs_validation
 
 CURRENT=spelling
-"${ENVOY_SRCDIR}"/tools/spelling/check_spelling_pedantic.py --mark check
+"${ENVOY_SRCDIR}/tools/spelling/check_spelling_pedantic.py" --mark check
 
 # TODO(phlax): move clang/buildifier checks to bazel rules (/aspects)
 if [[ -n "$AZP_BRANCH" ]]; then
     CURRENT=check_format_test
-    "${ENVOY_SRCDIR}"/tools/code_format/check_format_test_helper.sh --log=WARN
+    "${ENVOY_SRCDIR}/tools/code_format/check_format_test_helper.sh" --log=WARN
 fi
 
 CURRENT=check_format
-"${ENVOY_SRCDIR}"/tools/code_format/check_format.py fix --fail_on_diff
+echo "Running ${ENVOY_SRCDIR}/tools/code_format/check_format.py"
+time "${ENVOY_SRCDIR}/tools/code_format/check_format.py" fix --fail_on_diff
 
 if [[ "${#FAILED[@]}" -ne "0" ]]; then
     echo "${BASH_ERR_PREFIX}TESTS FAILED:" >&2

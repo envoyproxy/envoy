@@ -5,7 +5,6 @@ import (
 	"strconv"
 
 	"github.com/envoyproxy/envoy/contrib/golang/filters/http/source/go/pkg/api"
-	"google.golang.org/protobuf/types/known/structpb"
 )
 
 var UpdateUpstreamBody = "upstream response body updated by the simple plugin"
@@ -13,18 +12,12 @@ var UpdateUpstreamBody = "upstream response body updated by the simple plugin"
 type filter struct {
 	callbacks api.FilterCallbackHandler
 	path      string
-	config    *structpb.Struct
+	config    *config
 }
 
 func (f *filter) sendLocalReplyInternal() api.StatusType {
 	headers := make(map[string]string)
-	configBody := ""
-	v, ok := f.config.AsMap()["prefix_localreply_body"]
-	if ok {
-		configBody = v.(string)
-	}
-
-	body := fmt.Sprintf("%s, path: %s\r\n", configBody, f.path)
+	body := fmt.Sprintf("%s, path: %s\r\n", f.config.echoBody, f.path)
 	f.callbacks.SendLocalReply(200, body, headers, -1, "test-from-go")
 	return api.LocalReply
 }
