@@ -149,7 +149,7 @@ public:
                      const Http::ResponseHeaderMap& response_headers,
                      const Http::ResponseTrailerMap& response_trailers,
                      const StreamInfo::StreamInfo& stream_info, absl::string_view local_reply_body,
-                     absl::string_view access_log_type = "") const override;
+                     absl::string_view access_log_type) const override;
 
 private:
   const std::string& empty_value_string_;
@@ -257,7 +257,7 @@ public:
                      const Http::ResponseHeaderMap& response_headers,
                      const Http::ResponseTrailerMap& response_trailers,
                      const StreamInfo::StreamInfo& stream_info, absl::string_view local_reply_body,
-                     absl::string_view access_log_type = "") const override;
+                     absl::string_view access_log_type) const override;
 
 private:
   const StructFormatter struct_formatter_;

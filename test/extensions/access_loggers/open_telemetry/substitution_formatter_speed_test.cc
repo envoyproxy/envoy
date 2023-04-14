@@ -76,11 +76,12 @@ static void BM_OpenTelemetryAccessLogFormatter(benchmark::State& state) {
   Http::TestResponseHeaderMapImpl response_headers;
   Http::TestResponseTrailerMapImpl response_trailers;
   std::string body;
+  std::string access_log_type;
   for (auto _ : state) { // NOLINT: Silences warning about dead store
-    output_bytes +=
-        otel_formatter
-            ->format(request_headers, response_headers, response_trailers, *stream_info, body)
-            .ByteSize();
+    output_bytes += otel_formatter
+                        ->format(request_headers, response_headers, response_trailers, *stream_info,
+                                 body, access_log_type)
+                        .ByteSize();
   }
   benchmark::DoNotOptimize(output_bytes);
 }
