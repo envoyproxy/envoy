@@ -406,6 +406,30 @@ name: add-trailers-filter
   }
 }
 
+TEST_P(ProtocolIntegrationTest, AccessLogTest) {
+  config_helper_.addConfigModifier(
+      [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) -> void {
+        hcm.mutable_access_log_options()->set_flush_access_log_on_new_request(true);
+      });
+
+  useAccessLog("%RESPONSE_CODE% %ACCESS_LOG_TYPE%");
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeHeaderOnlyRequest(Http::TestRequestHeaderMapImpl{
+      {":method", "GET"}, {":path", "/test"}, {":scheme", "http"}, {":authority", "host.com"}});
+  waitForNextUpstreamRequest();
+  EXPECT_EQ(absl::StrCat("0 ", AccessLog::AccessLogTypeStrings::get().HcmNewRequest),
+            waitForAccessLog(access_log_name_, 0, true));
+
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  EXPECT_EQ(absl::StrCat("200 ", AccessLog::AccessLogTypeStrings::get().HcmEnd),
+            waitForAccessLog(access_log_name_, 1, true));
+}
+
 // Regression test for https://github.com/envoyproxy/envoy/issues/9873
 TEST_P(ProtocolIntegrationTest, ResponseWithHostHeader) {
   initialize();

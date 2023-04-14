@@ -2427,15 +2427,19 @@ TEST_F(HttpConnectionManagerImplTest, TestAccessLogOnNewRequest) {
 
   EXPECT_CALL(*handler, log(_, _, _, _, _))
       .WillOnce(Invoke([](const HeaderMap*, const HeaderMap*, const HeaderMap*,
-                          const StreamInfo::StreamInfo& stream_info, AccessLog::AccessLogType) {
+                          const StreamInfo::StreamInfo& stream_info,
+                          AccessLog::AccessLogType access_log_type) {
         // First call to log() is made when a new HTTP request has been received
         // On the first call it is expected that there is no response code.
+        EXPECT_EQ(AccessLog::AccessLogType::HcmNewRequest, access_log_type);
         EXPECT_FALSE(stream_info.responseCode());
       }))
       .WillOnce(Invoke([](const HeaderMap*, const HeaderMap*, const HeaderMap*,
-                          const StreamInfo::StreamInfo& stream_info, AccessLog::AccessLogType) {
+                          const StreamInfo::StreamInfo& stream_info,
+                          AccessLog::AccessLogType access_log_type) {
         // Second call to log() is made when filter is destroyed, so it is expected
         // that the response code is available and matches the response headers.
+        EXPECT_EQ(AccessLog::AccessLogType::HcmEnd, access_log_type);
         EXPECT_TRUE(stream_info.responseCode());
         EXPECT_EQ(stream_info.responseCode().value(), uint32_t(200));
         EXPECT_NE(nullptr, stream_info.downstreamAddressProvider().localAddress());
@@ -2511,7 +2515,8 @@ TEST_F(HttpConnectionManagerImplTest, TestPeriodicAccessLogging) {
       .Times(2)
       .WillRepeatedly(Invoke(
           [&](const HeaderMap* request_headers, const HeaderMap* response_headers, const HeaderMap*,
-              const StreamInfo::StreamInfo& stream_info, AccessLog::AccessLogType) {
+              const StreamInfo::StreamInfo& stream_info, AccessLog::AccessLogType access_log_type) {
+            EXPECT_EQ(AccessLog::AccessLogType::HcmPeriodic, access_log_type);
             EXPECT_EQ(&decoder_->streamInfo(), &stream_info);
             EXPECT_THAT(request_headers, testing::NotNull());
             EXPECT_THAT(response_headers, testing::IsNull());
@@ -2524,7 +2529,8 @@ TEST_F(HttpConnectionManagerImplTest, TestPeriodicAccessLogging) {
   EXPECT_CALL(*handler, log(_, _, _, _, _))
       .WillOnce(Invoke([&](const HeaderMap* request_headers, const HeaderMap* response_headers,
                            const HeaderMap*, const StreamInfo::StreamInfo& stream_info,
-                           AccessLog::AccessLogType) {
+                           AccessLog::AccessLogType access_log_type) {
+        EXPECT_EQ(AccessLog::AccessLogType::HcmEnd, access_log_type);
         EXPECT_EQ(&decoder_->streamInfo(), &stream_info);
         EXPECT_THAT(request_headers, testing::NotNull());
         EXPECT_THAT(response_headers, testing::NotNull());

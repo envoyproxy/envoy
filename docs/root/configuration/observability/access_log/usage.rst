@@ -1051,6 +1051,20 @@ The following command operators are supported:
 %FILTER_CHAIN_NAME%
   The :ref:`network filter chain name <envoy_v3_api_field_config.listener.v3.FilterChain.name>` of the downstream connection.
 
+%ACCESS_LOG_TYPE%
+  The type of the access log, which indicates when the access log was recorded. If a non-supported log (from the list below),
+  uses this substitution string, then the value will be an empty string.
+
+  * TcpUpstreamConnected - When TCP Proxy filter has successfully established an upstream connection.
+  * TcpPeriodic - On any TCP Proxy filter periodic log record.
+  * TcpEnd - When a TCP connection is ended on TCP Proxy filter.
+  * HcmNewRequest - When HTTP Connection Manager filter receives a new HTTP request.
+  * HcmPeriodic - On any HTTP Connection Manager periodic log record.
+  * HcmEnd - When an HTTP stream is ended on HTTP Connection Manager filter.
+  * RouterNewRequest - When a new HTTP request is received by the HTTP Router filter.
+  * RouterPeriodic - On any HTTP Router filter periodic log record.
+  * RouterEnd - When an HTTP request is finished on the HTTP Router filter.
+
 %ENVIRONMENT(X):Z%
   Environment value of environment variable X. If no valid environment variable X, '-' symbol will be used.
   Z is an optional parameter denoting string truncation up to Z characters long.

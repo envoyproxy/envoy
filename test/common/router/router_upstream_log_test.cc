@@ -429,7 +429,7 @@ typed_config:
   "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
   log_format:
     text_format_source:
-      inline_string: "%UPSTREAM_CLUSTER%"
+      inline_string: "%UPSTREAM_CLUSTER% %ACCESS_LOG_TYPE%"
   path: "/dev/null"
   )EOF";
 
@@ -442,8 +442,10 @@ typed_config:
   // It is expected that there will be two log records, one when a new request is received
   // and one when the request is finished, due to 'flush_upstream_log_on_upstream_stream' enabled
   EXPECT_EQ(output_.size(), 2U);
-  EXPECT_EQ(output_.front(), "cluster_0");
-  EXPECT_EQ(output_.back(), "cluster_0");
+  EXPECT_EQ(output_.front(),
+            absl::StrCat("cluster_0 ", AccessLog::AccessLogTypeStrings::get().RouterNewRequest));
+  EXPECT_EQ(output_.back(),
+            absl::StrCat("cluster_0 ", AccessLog::AccessLogTypeStrings::get().RouterEnd));
 }
 
 TEST_F(RouterUpstreamLogTest, PeriodicLog) {

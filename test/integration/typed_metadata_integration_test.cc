@@ -47,7 +47,8 @@ class MockAccessLog : public AccessLog::Instance {
 public:
   MOCK_METHOD(void, log,
               (const Http::RequestHeaderMap*, const Http::ResponseHeaderMap*,
-               const Http::ResponseTrailerMap*, const StreamInfo::StreamInfo&));
+               const Http::ResponseTrailerMap*, const StreamInfo::StreamInfo&,
+               Accesslog::AccessLogType));
 };
 
 class TestAccessLogFactory : public Server::Configuration::AccessLogInstanceFactory {

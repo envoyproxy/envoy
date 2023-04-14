@@ -198,7 +198,7 @@ TEST_P(UpstreamAccessLogTest, Retry) {
         envoy::extensions::access_loggers::file::v3::FileAccessLog access_log_config;
         access_log_config.set_path(log_file);
         access_log_config.mutable_log_format()->mutable_text_format_source()->set_inline_string(
-            "%RESPONSE_CODE%\n");
+            "%RESPONSE_CODE% %ACCESS_LOG_TYPE%\n");
         upstream_log_config->mutable_typed_config()->PackFrom(access_log_config);
         typed_config->PackFrom(router_config);
       });
@@ -218,7 +218,8 @@ TEST_P(UpstreamAccessLogTest, Retry) {
   waitForNextUpstreamRequest({}, std::chrono::milliseconds(300000));
 
   // Start of first stream access log - no response status code yet
-  EXPECT_THAT(waitForAccessLog(log_file, 0, true), testing::HasSubstr("0"));
+  EXPECT_EQ(absl::StrCat("0 ", AccessLog::AccessLogTypeStrings::get().RouterNewRequest),
+            waitForAccessLog(log_file, 0, true));
 
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "503"}}, false);
 
@@ -231,12 +232,14 @@ TEST_P(UpstreamAccessLogTest, Retry) {
   }
 
   // End of first request access log
-  EXPECT_THAT(waitForAccessLog(log_file, 1, true), testing::HasSubstr("503"));
+  EXPECT_EQ(absl::StrCat("503 ", AccessLog::AccessLogTypeStrings::get().RouterEnd),
+            waitForAccessLog(log_file, 1, true));
 
   waitForNextUpstreamRequest();
 
   // Start of second stream access log - no response status code yet
-  EXPECT_THAT(waitForAccessLog(log_file, 2, true), testing::HasSubstr("0"));
+  EXPECT_EQ(absl::StrCat("0 ", AccessLog::AccessLogTypeStrings::get().RouterNewRequest),
+            waitForAccessLog(log_file, 2, true));
 
   upstream_request_->encodeHeaders(default_response_headers_, false);
   upstream_request_->encodeData(512, true);
@@ -250,7 +253,8 @@ TEST_P(UpstreamAccessLogTest, Retry) {
   EXPECT_EQ(512U, response->body().size());
 
   // End of second request access log
-  EXPECT_THAT(waitForAccessLog(log_file, 3, true), testing::HasSubstr("200"));
+  EXPECT_EQ(absl::StrCat("200 ", AccessLog::AccessLogTypeStrings::get().RouterEnd),
+            waitForAccessLog(log_file, 3, true));
 }
 
 } // namespace Envoy

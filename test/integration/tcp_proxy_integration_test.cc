@@ -569,7 +569,7 @@ TEST_P(TcpProxyIntegrationTest, AccessLogOnUpstreamConnect) {
     envoy::extensions::access_loggers::file::v3::FileAccessLog access_log_config;
     access_log_config.set_path(access_log_path);
     access_log_config.mutable_log_format()->mutable_text_format_source()->set_inline_string(
-        "DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT=%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%");
+        "ACCESS_LOG_TYPE=%ACCESS_LOG_TYPE%");
     access_log->mutable_typed_config()->PackFrom(access_log_config);
     config_blob->PackFrom(tcp_proxy_config);
   });
@@ -584,8 +584,9 @@ TEST_P(TcpProxyIntegrationTest, AccessLogOnUpstreamConnect) {
 
   ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
   auto log_result = waitForAccessLog(access_log_path);
-  EXPECT_THAT(log_result,
-              MatchesRegex(fmt::format("DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT={}", ip_regex)));
+  EXPECT_EQ(
+      absl::StrCat("ACCESS_LOG_TYPE=", AccessLog::AccessLogTypeStrings::get().TcpUpstreamConnected),
+      log_result);
 
   ASSERT_TRUE(fake_upstream_connection->waitForData(5));
   ASSERT_TRUE(tcp_client->write("", true));
@@ -594,6 +595,11 @@ TEST_P(TcpProxyIntegrationTest, AccessLogOnUpstreamConnect) {
   ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
   tcp_client->waitForDisconnect();
   test_server_.reset();
+  log_result = waitForAccessLog(access_log_path);
+  EXPECT_EQ(
+      absl::StrCat("ACCESS_LOG_TYPE=", AccessLog::AccessLogTypeStrings::get().TcpUpstreamConnected,
+                   "ACCESS_LOG_TYPE=", AccessLog::AccessLogTypeStrings::get().TcpEnd),
+      log_result);
 }
 
 // Make sure no bytes are logged when no data is sent.
