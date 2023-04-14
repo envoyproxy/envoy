@@ -50,7 +50,7 @@ public:
       metrics_sink->mutable_typed_config()->PackFrom(sink_config);
 
       bootstrap.mutable_stats_flush_interval()->CopyFrom(
-          Protobuf::util::TimeUtil::MillisecondsToDuration(100));
+          Protobuf::util::TimeUtil::MillisecondsToDuration(300));
     });
 
     HttpIntegrationTest::initialize();
@@ -74,7 +74,11 @@ public:
     bool known_counter_exists = false;
     bool known_gauge_exists = false;
 
+    VERIFY_ASSERTION(waitForMetricsServiceConnection());
+
     while (!known_counter_exists || !known_gauge_exists || !known_histogram_exists) {
+      std::cout << "loop\n\n";
+      VERIFY_ASSERTION(waitForMetricsStream());
       opentelemetry::proto::collector::metrics::v1::ExportMetricsServiceRequest export_request;
       VERIFY_ASSERTION(otlp_collector_request_->waitForGrpcMessage(*dispatcher_, export_request));
       EXPECT_EQ("POST", otlp_collector_request_->headers().getMethodValue());
@@ -135,6 +139,13 @@ public:
           break;
         }
       }
+
+      // Since each export request creates a new stream, reply with an export response for each
+      // export request.
+      otlp_collector_request_->startGrpcStream();
+      opentelemetry::proto::collector::metrics::v1::ExportMetricsServiceResponse export_response;
+      otlp_collector_request_->sendGrpcMessage(export_response);
+      otlp_collector_request_->finishGrpcStream(Grpc::Status::Ok);
     }
 
     EXPECT_TRUE(known_counter_exists);
@@ -168,17 +179,7 @@ TEST_P(OpenTelemetryGrpcIntegrationTest, BasicFlow) {
       {":method", "GET"}, {":path", "/path"}, {":scheme", "http"}, {":authority", "host"}};
 
   sendRequestAndWaitForResponse(request_headers, 0, default_response_headers_, 0);
-
-  ASSERT_TRUE(waitForMetricsServiceConnection());
-  ASSERT_TRUE(waitForMetricsStream());
   ASSERT_TRUE(waitForMetricsRequest());
-
-  // Send an empty response and end the stream. This should never happen but make sure nothing
-  // breaks and we make a new stream on a follow up request.
-  otlp_collector_request_->startGrpcStream();
-  opentelemetry::proto::collector::metrics::v1::ExportMetricsServiceResponse export_response;
-  otlp_collector_request_->sendGrpcMessage(export_response);
-  otlp_collector_request_->finishGrpcStream(Grpc::Status::Ok);
 
   switch (clientType()) {
   case Grpc::ClientType::EnvoyGrpc:
