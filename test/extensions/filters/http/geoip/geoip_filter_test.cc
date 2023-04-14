@@ -121,8 +121,8 @@ TEST_F(GeoipFilterTest, NoXffSuccessfulLookup) {
 TEST_F(GeoipFilterTest, UseXffSuccessfulLookup) {
   initializeProviderFactory();
   const std::string external_request_yaml = R"EOF(
-    use_xff: true
-    xff_num_trusted_hops: 1
+    xff_config:
+      xff_num_trusted_hops: 1
     geo_headers_to_add:
       region: "x-geo-region"
     provider:

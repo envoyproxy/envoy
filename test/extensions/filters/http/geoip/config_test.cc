@@ -102,6 +102,7 @@ TEST(GeoipFilterConfigTest, GeoipFilterDefaultValues) {
       city: "x-geo-city"
     provider:
         name: "envoy.geoip_providers.dummy"
+        typed_config: {}
   )EOF";
   GeoipFilterConfig filter_config;
   TestUtility::loadFromYaml(filter_config_yaml, filter_config);
@@ -123,14 +124,15 @@ TEST(GeoipFilterConfigTest, GeoipFilterConfigWithCorrectProto) {
   DummyGeoipProviderFactory dummy_factory;
   Registry::InjectFactory<GeoipProviderFactory> registered(dummy_factory);
   std::string filter_config_yaml = R"EOF(
-    use_xff: true
-    xff_num_trusted_hops: 1
+    xff_config:
+      xff_num_trusted_hops: 1
     geo_headers_to_add:
       country: "x-geo-country"
       region: "x-geo-region"
       anon_vpn: "x-anon-vpn"
     provider:
         name: "envoy.geoip_providers.dummy"
+        typed_config: {}
   )EOF";
   GeoipFilterConfig filter_config;
   TestUtility::loadFromYaml(filter_config_yaml, filter_config);
@@ -153,7 +155,8 @@ TEST(GeoipFilterConfigTest, GeoipFilterConfigMissingGeoHeaders) {
   DummyGeoipProviderFactory dummy_factory;
   Registry::InjectFactory<GeoipProviderFactory> registered(dummy_factory);
   std::string filter_config_yaml = R"EOF(
-    use_xff: true
+    xff_config:
+      xff_num_trusted_hops: 0
     provider:
         name: "envoy.geoip_providers.dummy"
   )EOF";

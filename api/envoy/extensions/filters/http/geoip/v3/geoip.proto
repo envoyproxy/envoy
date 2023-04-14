@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package envoy.extensions.filters.http.geoip.v3;
 
-import "google/protobuf/any.proto";
+import "envoy/config/core/v3/extension.proto";
 
 import "xds/annotations/v3/status.proto";
 
@@ -42,51 +42,49 @@ message Geoip {
         [(validate.rules).string = {well_known_regex: HTTP_HEADER_NAME ignore_empty: true}];
 
     // If set, the IP address will be checked if it belongs to any type of anonymization network (e.g. VPN, public proxy etc)
-    // and header will be populated with the check result.
+    // and header will be populated with the check result. Header value will be set to either "true" or "false" depending on the check result.
     string is_anon = 5
         [(validate.rules).string = {well_known_regex: HTTP_HEADER_NAME ignore_empty: true}];
 
     // If set, the IP address will be checked if it belongs to a VPN and header will be populated with the check result.
+    // Header value will be set to either "true" or "false" depending on the check result.
     string anon_vpn = 6
         [(validate.rules).string = {well_known_regex: HTTP_HEADER_NAME ignore_empty: true}];
 
     // If set, the IP address will be checked if it belongs to a hosting provider and header will be populated with the check result.
+    // Header value will be set to either "true" or "false" depending on the check result.
     string anon_hosting = 7
         [(validate.rules).string = {well_known_regex: HTTP_HEADER_NAME ignore_empty: true}];
 
     // If set, the IP address will be checked if it belongs to a TOR exit node and header will be populated with the check result.
+    // Header value will be set to either "true" or "false" depending on the check result.
     string anon_tor = 8
         [(validate.rules).string = {well_known_regex: HTTP_HEADER_NAME ignore_empty: true}];
 
     // If set, the IP address will be checked if it belongs to a public proxy and header will be populated with the check result.
+    // Header value will be set to either "true" or "false" depending on the check result.
     string anon_proxy = 9
         [(validate.rules).string = {well_known_regex: HTTP_HEADER_NAME ignore_empty: true}];
   }
 
-  message GeolocationProvider {
-    // The name of the geoip driver to instantiate. The name must match a
-    // supported geoip driver.
-    string name = 1 [(validate.rules).string = {min_len: 1}];
-
-    // Geoip driver specific configuration which depends on the driver being instantiated.
-    google.protobuf.Any typed_config = 3;
+  message XffConfig {
+    // The number of additional ingress proxy hops from the right side of the
+    // :ref:`config_http_conn_man_headers_x-forwarded-for` HTTP header to trust when
+    // determining the origin client's IP address. The default is zero if this option
+    // is not specified. See the documentation for
+    // :ref:`config_http_conn_man_headers_x-forwarded-for` for more information.
+    uint32 xff_num_trusted_hops = 1;
   }
 
-  // If set to true, the `xff_num_trusted_hops` field will be used to determine
+  // If set, the :ref:`xff_num_trusted_hops <envoy_api_field_Geoip.XffConfig.xff_num_trusted_hops>` field will be used to determine
   // trusted client address from `x-forwarded-for` header.
   // Otherwise, the immediate downstream connection source address will be used.
-  bool use_xff = 1;
-
-  // The number of additional ingress proxy hops from the right side of the
-  // :ref:`config_http_conn_man_headers_x-forwarded-for` HTTP header to trust when
-  // determining the origin client's IP address. The default is zero if this option
-  // is not specified. See the documentation for
-  // :ref:`config_http_conn_man_headers_x-forwarded-for` for more information.
-  uint32 xff_num_trusted_hops = 2;
+  // [#next-free-field: 2]
+  XffConfig xff_config = 1;
 
   // Configuration for geolocation headers to add to request.
-  GeolocationHeadersToAdd geo_headers_to_add = 3 [(validate.rules).message = {required: true}];
+  GeolocationHeadersToAdd geo_headers_to_add = 2 [(validate.rules).message = {required: true}];
 
   // Geolocation provider specific configuration.
-  GeolocationProvider provider = 4 [(validate.rules).message = {required: true}];
+  config.core.v3.TypedExtensionConfig provider = 3 [(validate.rules).message = {required: true}];
 }
