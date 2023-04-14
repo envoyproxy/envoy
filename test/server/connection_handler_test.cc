@@ -1031,7 +1031,8 @@ TEST_F(ConnectionHandlerTest, NormalRedirect) {
   EXPECT_CALL(*access_log_, log(_, _, _, _, _))
       .WillOnce(
           Invoke([&](const Http::RequestHeaderMap*, const Http::ResponseHeaderMap*,
-                     const Http::ResponseTrailerMap*, const StreamInfo::StreamInfo& stream_info) {
+                     const Http::ResponseTrailerMap*, const StreamInfo::StreamInfo& stream_info,
+                     AccessLog::AccessLogType) {
             EXPECT_EQ(alt_address, stream_info.downstreamAddressProvider().localAddress());
           }));
   connection->close(Network::ConnectionCloseType::NoFlush);
@@ -1101,7 +1102,8 @@ TEST_F(ConnectionHandlerTest, NormalRedirectWithMultiAddrs) {
   EXPECT_CALL(*access_log_, log(_, _, _, _, _))
       .WillOnce(
           Invoke([&](const Http::RequestHeaderMap*, const Http::ResponseHeaderMap*,
-                     const Http::ResponseTrailerMap*, const StreamInfo::StreamInfo& stream_info) {
+                     const Http::ResponseTrailerMap*, const StreamInfo::StreamInfo& stream_info,
+                     AccessLog::AccessLogType) {
             EXPECT_EQ(alt_address, stream_info.downstreamAddressProvider().localAddress());
           }));
   connection->close(Network::ConnectionCloseType::NoFlush);
