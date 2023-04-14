@@ -726,6 +726,7 @@ TEST_F(IoUringSocketHandleImplIntegrationTest, RemoteCloseWithEnableCloseEvent) 
   }
 }
 
+// This test ensure IoUringHandleImpl will close the socket when destructing.
 TEST_F(IoUringSocketHandleImplIntegrationTest, CloseIoUringSocketWhenDestructing) {
   initialize();
 
@@ -791,6 +792,8 @@ TEST_F(IoUringSocketHandleImplIntegrationTest, CloseIoUringSocketWhenDestructing
   }
 }
 
+// This test ensure IoUringHandleImpl can be released correctly when the IoUringWorker
+// is released early than it.
 TEST_F(IoUringSocketHandleImplIntegrationTest, ReleaseIoUringWorkerEarlyThanIohandle) {
   initialize();
 
