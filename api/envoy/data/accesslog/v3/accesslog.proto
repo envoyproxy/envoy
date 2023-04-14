@@ -80,7 +80,7 @@ message ConnectionProperties {
 }
 
 // Defines fields that are shared by all Envoy access logs.
-// [#next-free-field: 33]
+// [#next-free-field: 34]
 message AccessLogCommon {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.data.accesslog.v2.AccessLogCommon";
@@ -236,6 +236,9 @@ message AccessLogCommon {
   // For HTTP: Total number of bytes received from the upstream by the http stream.
   // For TCP: Total number of bytes sent to the upstream by the tcp proxy.
   uint64 upstream_wire_bytes_received = 32;
+
+  // The type of the access log, which indicates when the log was recorded.
+  string access_log_type = 33;
 }
 
 // Flags indicating occurrences during request/response processing.

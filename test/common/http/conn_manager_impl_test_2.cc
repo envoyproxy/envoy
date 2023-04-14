@@ -173,9 +173,9 @@ TEST_F(HttpConnectionManagerImplTest, TestDownstreamProtocolErrorAccessLog) {
   access_logs_ = {handler};
   setup(false, "");
 
-  EXPECT_CALL(*handler, log(_, _, _, _))
+  EXPECT_CALL(*handler, log(_, _, _, _, _))
       .WillOnce(Invoke([](const HeaderMap*, const HeaderMap*, const HeaderMap*,
-                          const StreamInfo::StreamInfo& stream_info) {
+                          const StreamInfo::StreamInfo& stream_info, AccessLog::AccessLogType) {
         EXPECT_FALSE(stream_info.responseCode());
         EXPECT_TRUE(stream_info.hasAnyResponseFlag());
         EXPECT_TRUE(stream_info.hasResponseFlag(StreamInfo::ResponseFlag::DownstreamProtocolError));
@@ -206,9 +206,9 @@ TEST_F(HttpConnectionManagerImplTest, TestDownstreamProtocolErrorAfterHeadersAcc
         return true;
       }));
 
-  EXPECT_CALL(*handler, log(_, _, _, _))
+  EXPECT_CALL(*handler, log(_, _, _, _, _))
       .WillOnce(Invoke([](const HeaderMap*, const HeaderMap*, const HeaderMap*,
-                          const StreamInfo::StreamInfo& stream_info) {
+                          const StreamInfo::StreamInfo& stream_info, AccessLog::AccessLogType) {
         EXPECT_FALSE(stream_info.responseCode());
         EXPECT_TRUE(stream_info.hasAnyResponseFlag());
         EXPECT_TRUE(stream_info.hasResponseFlag(StreamInfo::ResponseFlag::DownstreamProtocolError));
@@ -247,9 +247,9 @@ TEST_F(HttpConnectionManagerImplTest, FrameFloodError) {
   EXPECT_CALL(filter_callbacks_.connection_,
               close(Network::ConnectionCloseType::FlushWriteAndDelay, _));
 
-  EXPECT_CALL(*log_handler, log(_, _, _, _))
+  EXPECT_CALL(*log_handler, log(_, _, _, _, _))
       .WillOnce(Invoke([](const HeaderMap*, const HeaderMap*, const HeaderMap*,
-                          const StreamInfo::StreamInfo& stream_info) {
+                          const StreamInfo::StreamInfo& stream_info, AccessLog::AccessLogType) {
         ASSERT_TRUE(stream_info.responseCodeDetails().has_value());
         EXPECT_EQ("codec_error:too_many_outbound_frames",
                   stream_info.responseCodeDetails().value());
@@ -1515,9 +1515,9 @@ TEST_F(HttpConnectionManagerImplTest, HitFilterWatermarkLimits) {
   EXPECT_CALL(callbacks2, onBelowWriteBufferLowWatermark()).Times(0);
   encoder_filters_[1]->callbacks_->setEncoderBufferLimit((buffer_len + 1) * 2);
 
-  EXPECT_CALL(*log_handler_, log(_, _, _, _))
+  EXPECT_CALL(*log_handler_, log(_, _, _, _, _))
       .WillOnce(Invoke([](const HeaderMap*, const HeaderMap*, const HeaderMap*,
-                          const StreamInfo::StreamInfo& stream_info) {
+                          const StreamInfo::StreamInfo& stream_info, AccessLog::AccessLogType) {
         EXPECT_FALSE(stream_info.hasAnyResponseFlag());
       }));
 

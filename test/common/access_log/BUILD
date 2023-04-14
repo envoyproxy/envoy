@@ -51,3 +51,12 @@ envoy_cc_test(
         "//test/mocks/filesystem:filesystem_mocks",
     ],
 )
+
+envoy_cc_test(
+    name = "utility_test",
+    srcs = ["utility_test.cc"],
+    deps = [
+        "//source/common/access_log:utility_lib",
+        "//source/common/common:empty_string",
+    ],
+)

@@ -30,6 +30,7 @@ public:
   Http::TestResponseTrailerMapImpl response_trailers_;
   StreamInfo::MockStreamInfo stream_info_;
   std::string body_;
+  std::string access_log_type_;
 
   envoy::config::core::v3::SubstitutionFormatString config_;
   NiceMock<Server::Configuration::MockFactoryContext> context_;
@@ -51,7 +52,7 @@ TEST_F(SubstitutionFormatStringUtilsTest, TestFromProtoConfigText) {
   auto formatter = SubstitutionFormatStringUtils::fromProtoConfig(config_, context_);
   EXPECT_EQ("plain text, path=/bar/foo, code=200",
             formatter->format(request_headers_, response_headers_, response_trailers_, stream_info_,
-                              body_));
+                              body_, access_log_type_));
 }
 
 TEST_F(SubstitutionFormatStringUtilsTest, TestFromProtoConfigJson) {
@@ -67,7 +68,7 @@ TEST_F(SubstitutionFormatStringUtilsTest, TestFromProtoConfigJson) {
 
   auto formatter = SubstitutionFormatStringUtils::fromProtoConfig(config_, context_);
   const auto out_json = formatter->format(request_headers_, response_headers_, response_trailers_,
-                                          stream_info_, body_);
+                                          stream_info_, body_, access_log_type_);
 
   const std::string expected = R"EOF({
     "text": "plain text",
@@ -111,8 +112,9 @@ TEST_F(SubstitutionFormatStringUtilsTest, TestFromProtoConfigFormatterExtension)
   TestUtility::loadFromYaml(yaml, config_);
 
   auto formatter = SubstitutionFormatStringUtils::fromProtoConfig(config_, context_);
-  EXPECT_EQ("plain text TestFormatter", formatter->format(request_headers_, response_headers_,
-                                                          response_trailers_, stream_info_, body_));
+  EXPECT_EQ("plain text TestFormatter",
+            formatter->format(request_headers_, response_headers_, response_trailers_, stream_info_,
+                              body_, access_log_type_));
 }
 
 TEST_F(SubstitutionFormatStringUtilsTest,
@@ -171,7 +173,7 @@ TEST_F(SubstitutionFormatStringUtilsTest, TestFromProtoConfigJsonWithExtension) 
 
   auto formatter = SubstitutionFormatStringUtils::fromProtoConfig(config_, context_);
   const auto out_json = formatter->format(request_headers_, response_headers_, response_trailers_,
-                                          stream_info_, body_);
+                                          stream_info_, body_, access_log_type_);
 
   const std::string expected = R"EOF({
     "text": "plain text TestFormatter",
@@ -207,7 +209,7 @@ TEST_F(SubstitutionFormatStringUtilsTest, TestFromProtoConfigJsonWithMultipleExt
 
   auto formatter = SubstitutionFormatStringUtils::fromProtoConfig(config_, context_);
   const auto out_json = formatter->format(request_headers_, response_headers_, response_trailers_,
-                                          stream_info_, body_);
+                                          stream_info_, body_, access_log_type_);
 
   const std::string expected = R"EOF({
     "text": "plain text TestFormatter",

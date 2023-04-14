@@ -55,6 +55,34 @@ public:
 
 using AccessLogManagerPtr = std::unique_ptr<AccessLogManager>;
 
+struct AccessLogTypeStringValues {
+  const std::string NotSet = "-";
+  const std::string TcpUpstreamConnected = "TcpUpstreamConnected";
+  const std::string TcpPeriodic = "TcpPeriodic";
+  const std::string TcpEnd = "TcpEnd";
+  const std::string HcmNewRequest = "HcmNewRequest";
+  const std::string HcmPeriodic = "HcmPeriodic";
+  const std::string HcmEnd = "HcmEnd";
+  const std::string RouterNewRequest = "RouterNewRequest";
+  const std::string RouterPeriodic = "RouterPeriodic";
+  const std::string RouterEnd = "RouterEnd";
+};
+
+using AccessLogTypeStrings = ConstSingleton<AccessLogTypeStringValues>;
+
+enum class AccessLogType {
+  NotSet,
+  TcpUpstreamConnected,
+  TcpPeriodic,
+  TcpEnd,
+  HcmNewRequest,
+  HcmPeriodic,
+  HcmEnd,
+  RouterNewRequest,
+  RouterPeriodic,
+  RouterEnd,
+};
+
 /**
  * Interface for access log filters.
  */
@@ -92,7 +120,8 @@ public:
   virtual void log(const Http::RequestHeaderMap* request_headers,
                    const Http::ResponseHeaderMap* response_headers,
                    const Http::ResponseTrailerMap* response_trailers,
-                   const StreamInfo::StreamInfo& stream_info) PURE;
+                   const StreamInfo::StreamInfo& stream_info,
+                   AccessLogType access_log_type = AccessLogType::NotSet) PURE;
 };
 
 using InstanceSharedPtr = std::shared_ptr<Instance>;

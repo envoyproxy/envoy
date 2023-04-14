@@ -50,3 +50,13 @@ envoy_cc_library(
         "//source/common/common:thread_lib",
     ],
 )
+
+envoy_cc_library(
+    name = "utility_lib",
+    srcs = ["utility.cc"],
+    hdrs = ["utility.h"],
+    deps = [
+        "//envoy/access_log:access_log_interface",
+        "//source/common/common:empty_string",
+    ],
+)

@@ -32,7 +32,8 @@ public:
                              const Http::ResponseHeaderMap& response_headers,
                              const Http::ResponseTrailerMap& response_trailers,
                              const StreamInfo::StreamInfo& stream_info,
-                             absl::string_view local_reply_body) const PURE;
+                             absl::string_view local_reply_body,
+                             absl::string_view access_log_type = "") const PURE;
 };
 
 using FormatterPtr = std::unique_ptr<Formatter>;
@@ -60,7 +61,8 @@ public:
                                              const Http::ResponseHeaderMap& response_headers,
                                              const Http::ResponseTrailerMap& response_trailers,
                                              const StreamInfo::StreamInfo& stream_info,
-                                             absl::string_view local_reply_body) const PURE;
+                                             absl::string_view local_reply_body,
+                                             absl::string_view access_log_type = "") const PURE;
   /**
    * Extract a value from the provided headers/trailers/stream, preserving the value's type.
    * @param request_headers supplies the request headers.
@@ -75,7 +77,8 @@ public:
                                          const Http::ResponseHeaderMap& response_headers,
                                          const Http::ResponseTrailerMap& response_trailers,
                                          const StreamInfo::StreamInfo& stream_info,
-                                         absl::string_view local_reply_body) const PURE;
+                                         absl::string_view local_reply_body,
+                                         absl::string_view access_log_type = "") const PURE;
 };
 
 using FormatterProviderPtr = std::unique_ptr<FormatterProvider>;

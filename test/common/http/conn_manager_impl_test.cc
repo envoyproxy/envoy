@@ -2130,9 +2130,9 @@ TEST_F(HttpConnectionManagerImplTest, TestAccessLog) {
         return true;
       }));
 
-  EXPECT_CALL(*handler, log(_, _, _, _))
+  EXPECT_CALL(*handler, log(_, _, _, _, _))
       .WillOnce(Invoke([&](const HeaderMap*, const HeaderMap*, const HeaderMap*,
-                           const StreamInfo::StreamInfo& stream_info) {
+                           const StreamInfo::StreamInfo& stream_info, AccessLog::AccessLogType) {
         EXPECT_EQ(&decoder_->streamInfo(), &stream_info);
         EXPECT_TRUE(stream_info.responseCode());
         EXPECT_EQ(stream_info.responseCode().value(), uint32_t(200));
@@ -2196,9 +2196,9 @@ TEST_F(HttpConnectionManagerImplTest, TestFilterCanEnrichAccessLogs) {
     filter->callbacks_->streamInfo().setDynamicMetadata("metadata_key", metadata);
   }));
 
-  EXPECT_CALL(*handler, log(_, _, _, _))
+  EXPECT_CALL(*handler, log(_, _, _, _, _))
       .WillOnce(Invoke([](const HeaderMap*, const HeaderMap*, const HeaderMap*,
-                          const StreamInfo::StreamInfo& stream_info) {
+                          const StreamInfo::StreamInfo& stream_info, AccessLog::AccessLogType) {
         auto dynamic_meta = stream_info.dynamicMetadata().filter_metadata().at("metadata_key");
         EXPECT_EQ("value", dynamic_meta.fields().at("field").string_value());
       }));
@@ -2240,9 +2240,9 @@ TEST_F(HttpConnectionManagerImplTest, TestRemoteDownstreamDisconnectAccessLog) {
         return true;
       }));
 
-  EXPECT_CALL(*handler, log(_, _, _, _))
+  EXPECT_CALL(*handler, log(_, _, _, _, _))
       .WillOnce(Invoke([](const HeaderMap*, const HeaderMap*, const HeaderMap*,
-                          const StreamInfo::StreamInfo& stream_info) {
+                          const StreamInfo::StreamInfo& stream_info, AccessLog::AccessLogType) {
         EXPECT_FALSE(stream_info.responseCode());
         EXPECT_TRUE(stream_info.hasAnyResponseFlag());
         EXPECT_TRUE(
@@ -2284,9 +2284,9 @@ TEST_F(HttpConnectionManagerImplTest, TestLocalDownstreamDisconnectAccessLog) {
         return true;
       }));
 
-  EXPECT_CALL(*handler, log(_, _, _, _))
+  EXPECT_CALL(*handler, log(_, _, _, _, _))
       .WillOnce(Invoke([](const HeaderMap*, const HeaderMap*, const HeaderMap*,
-                          const StreamInfo::StreamInfo& stream_info) {
+                          const StreamInfo::StreamInfo& stream_info, AccessLog::AccessLogType) {
         EXPECT_EQ("downstream_local_disconnect(reason_for_local_close)",
                   stream_info.responseCodeDetails().value());
       }));
@@ -2326,9 +2326,9 @@ TEST_F(HttpConnectionManagerImplTest, TestAccessLogWithTrailers) {
         return true;
       }));
 
-  EXPECT_CALL(*handler, log(_, _, _, _))
+  EXPECT_CALL(*handler, log(_, _, _, _, _))
       .WillOnce(Invoke([](const HeaderMap*, const HeaderMap*, const HeaderMap*,
-                          const StreamInfo::StreamInfo& stream_info) {
+                          const StreamInfo::StreamInfo& stream_info, AccessLog::AccessLogType) {
         EXPECT_TRUE(stream_info.responseCode());
         EXPECT_EQ(stream_info.responseCode().value(), uint32_t(200));
         EXPECT_NE(nullptr, stream_info.downstreamAddressProvider().localAddress());
@@ -2379,9 +2379,9 @@ TEST_F(HttpConnectionManagerImplTest, TestAccessLogWithInvalidRequest) {
         return true;
       }));
 
-  EXPECT_CALL(*handler, log(_, _, _, _))
+  EXPECT_CALL(*handler, log(_, _, _, _, _))
       .WillOnce(Invoke([](const HeaderMap*, const HeaderMap*, const HeaderMap*,
-                          const StreamInfo::StreamInfo& stream_info) {
+                          const StreamInfo::StreamInfo& stream_info, AccessLog::AccessLogType) {
         EXPECT_TRUE(stream_info.responseCode());
         EXPECT_EQ(stream_info.responseCode().value(), uint32_t(400));
         EXPECT_EQ("missing_host_header", stream_info.responseCodeDetails().value());
@@ -2425,15 +2425,15 @@ TEST_F(HttpConnectionManagerImplTest, TestAccessLogOnNewRequest) {
 
   flush_access_log_on_new_request_ = true;
 
-  EXPECT_CALL(*handler, log(_, _, _, _))
+  EXPECT_CALL(*handler, log(_, _, _, _, _))
       .WillOnce(Invoke([](const HeaderMap*, const HeaderMap*, const HeaderMap*,
-                          const StreamInfo::StreamInfo& stream_info) {
+                          const StreamInfo::StreamInfo& stream_info, AccessLog::AccessLogType) {
         // First call to log() is made when a new HTTP request has been received
         // On the first call it is expected that there is no response code.
         EXPECT_FALSE(stream_info.responseCode());
       }))
       .WillOnce(Invoke([](const HeaderMap*, const HeaderMap*, const HeaderMap*,
-                          const StreamInfo::StreamInfo& stream_info) {
+                          const StreamInfo::StreamInfo& stream_info, AccessLog::AccessLogType) {
         // Second call to log() is made when filter is destroyed, so it is expected
         // that the response code is available and matches the response headers.
         EXPECT_TRUE(stream_info.responseCode());
@@ -2507,11 +2507,11 @@ TEST_F(HttpConnectionManagerImplTest, TestPeriodicAccessLogging) {
   Buffer::OwnedImpl fake_input("1234");
   conn_manager_->onData(fake_input, false);
 
-  EXPECT_CALL(*handler, log(_, _, _, _))
+  EXPECT_CALL(*handler, log(_, _, _, _, _))
       .Times(2)
-      .WillRepeatedly(
-          Invoke([&](const HeaderMap* request_headers, const HeaderMap* response_headers,
-                     const HeaderMap*, const StreamInfo::StreamInfo& stream_info) {
+      .WillRepeatedly(Invoke(
+          [&](const HeaderMap* request_headers, const HeaderMap* response_headers, const HeaderMap*,
+              const StreamInfo::StreamInfo& stream_info, AccessLog::AccessLogType) {
             EXPECT_EQ(&decoder_->streamInfo(), &stream_info);
             EXPECT_THAT(request_headers, testing::NotNull());
             EXPECT_THAT(response_headers, testing::IsNull());
@@ -2521,9 +2521,10 @@ TEST_F(HttpConnectionManagerImplTest, TestPeriodicAccessLogging) {
   EXPECT_CALL(*periodic_log_timer, enableTimer(*access_log_flush_interval_, _)).Times(2);
   periodic_log_timer->invokeCallback();
   periodic_log_timer->invokeCallback();
-  EXPECT_CALL(*handler, log(_, _, _, _))
+  EXPECT_CALL(*handler, log(_, _, _, _, _))
       .WillOnce(Invoke([&](const HeaderMap* request_headers, const HeaderMap* response_headers,
-                           const HeaderMap*, const StreamInfo::StreamInfo& stream_info) {
+                           const HeaderMap*, const StreamInfo::StreamInfo& stream_info,
+                           AccessLog::AccessLogType) {
         EXPECT_EQ(&decoder_->streamInfo(), &stream_info);
         EXPECT_THAT(request_headers, testing::NotNull());
         EXPECT_THAT(response_headers, testing::NotNull());
@@ -2634,9 +2635,9 @@ TEST_F(HttpConnectionManagerImplTest, TestAccessLogSsl) {
         return true;
       }));
 
-  EXPECT_CALL(*handler, log(_, _, _, _))
+  EXPECT_CALL(*handler, log(_, _, _, _, _))
       .WillOnce(Invoke([](const HeaderMap*, const HeaderMap*, const HeaderMap*,
-                          const StreamInfo::StreamInfo& stream_info) {
+                          const StreamInfo::StreamInfo& stream_info, AccessLog::AccessLogType) {
         EXPECT_TRUE(stream_info.responseCode());
         EXPECT_EQ(stream_info.responseCode().value(), uint32_t(200));
         EXPECT_NE(nullptr, stream_info.downstreamAddressProvider().localAddress());
@@ -2877,9 +2878,9 @@ TEST_F(HttpConnectionManagerImplTest, TestStreamIdleAccessLog) {
   std::string response_body;
   EXPECT_CALL(response_encoder_, encodeData(_, true)).WillOnce(AddBufferToString(&response_body));
 
-  EXPECT_CALL(*handler, log(_, _, _, _))
+  EXPECT_CALL(*handler, log(_, _, _, _, _))
       .WillOnce(Invoke([](const HeaderMap*, const HeaderMap*, const HeaderMap*,
-                          const StreamInfo::StreamInfo& stream_info) {
+                          const StreamInfo::StreamInfo& stream_info, AccessLog::AccessLogType) {
         EXPECT_TRUE(stream_info.responseCode());
         EXPECT_TRUE(stream_info.hasAnyResponseFlag());
         EXPECT_TRUE(stream_info.hasResponseFlag(StreamInfo::ResponseFlag::StreamIdleTimeout));

@@ -8,7 +8,7 @@ namespace Formatter {
 absl::optional<std::string> TestFormatter::format(const Http::RequestHeaderMap&,
                                                   const Http::ResponseHeaderMap&,
                                                   const Http::ResponseTrailerMap&,
-                                                  const StreamInfo::StreamInfo&,
+                                                  const StreamInfo::StreamInfo&, absl::string_view,
                                                   absl::string_view) const {
   return "TestFormatter";
 }
@@ -16,7 +16,7 @@ absl::optional<std::string> TestFormatter::format(const Http::RequestHeaderMap&,
 ProtobufWkt::Value TestFormatter::formatValue(const Http::RequestHeaderMap&,
                                               const Http::ResponseHeaderMap&,
                                               const Http::ResponseTrailerMap&,
-                                              const StreamInfo::StreamInfo&,
+                                              const StreamInfo::StreamInfo&, absl::string_view,
                                               absl::string_view) const {
   return ValueUtil::stringValue("");
 }
@@ -45,11 +45,10 @@ ProtobufTypes::MessagePtr TestCommandFactory::createEmptyConfigProto() {
 
 std::string TestCommandFactory::name() const { return "envoy.formatter.TestFormatter"; }
 
-absl::optional<std::string> AdditionalFormatter::format(const Http::RequestHeaderMap&,
-                                                        const Http::ResponseHeaderMap&,
-                                                        const Http::ResponseTrailerMap&,
-                                                        const StreamInfo::StreamInfo&,
-                                                        absl::string_view) const {
+absl::optional<std::string>
+AdditionalFormatter::format(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
+                            const Http::ResponseTrailerMap&, const StreamInfo::StreamInfo&,
+                            absl::string_view, absl::string_view) const {
   return "AdditionalFormatter";
 }
 
@@ -57,7 +56,7 @@ ProtobufWkt::Value AdditionalFormatter::formatValue(const Http::RequestHeaderMap
                                                     const Http::ResponseHeaderMap&,
                                                     const Http::ResponseTrailerMap&,
                                                     const StreamInfo::StreamInfo&,
-                                                    absl::string_view) const {
+                                                    absl::string_view, absl::string_view) const {
   return ValueUtil::stringValue("");
 }
 
