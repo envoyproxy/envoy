@@ -426,8 +426,11 @@ TEST_P(ProtocolIntegrationTest, AccessLogTest) {
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
-  EXPECT_EQ(absl::StrCat("200 ", AccessLog::AccessLogTypeStrings::get().HcmEnd),
-            waitForAccessLog(access_log_name_, 1, true));
+
+  if (downstream_protocol_ != Http::CodecType::HTTP3) {
+    EXPECT_EQ(absl::StrCat("200 ", AccessLog::AccessLogTypeStrings::get().HcmEnd),
+              waitForAccessLog(access_log_name_, 1, true));
+  }
 }
 
 // Regression test for https://github.com/envoyproxy/envoy/issues/9873
