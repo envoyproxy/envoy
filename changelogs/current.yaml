@@ -76,6 +76,9 @@ bug_fixes:
 - area: upstream
   change: |
     Initialize upstream network read filters via their ``onNewConnection()`` callback once the upstream connection has been established even if there is no data available for reading on the new upstream connection. This behavior change can be reverted by setting ``envoy.reloadable_features.initialize_upstream_filters`` to ``false``.
+- area: grpc
+  change: |
+    the :ref:`connect_grpc_bridge filter <config_http_filters_connect_grpc_bridge>` filter now works correctly when the request payload is compressed on a unary buf connect request.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
@@ -208,6 +211,9 @@ new_features:
 - area: redis
   change: |
     added :ref:`wait_for_warm_on_init <envoy_v3_api_field_config.cluster.v3.Cluster.wait_for_warm_on_init>` support for :ref:`Redis Cluster<arch_overview_redis>`.
+- area: grpc
+  change: |
+    added support for buf connect HTTP GET requests in the :ref:`connect_grpc_bridge filter <config_http_filters_connect_grpc_bridge>`
 
 deprecated:
 - area: ext_authz
