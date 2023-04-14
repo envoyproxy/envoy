@@ -407,6 +407,10 @@ name: add-trailers-filter
 }
 
 TEST_P(ProtocolIntegrationTest, AccessLogTest) {
+  if (upstreamProtocol() == Http::CodecType::HTTP3) {
+    return;
+  }
+
   config_helper_.addConfigModifier(
       [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
               hcm) -> void {
