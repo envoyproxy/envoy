@@ -204,6 +204,9 @@ bug_fixes:
   change: |
     fixed the fix for ``x-envoy-original-path`` so it removes the header *only* when sent from untrusted users,
     not also before sending to upstream server.
+- area: grpc
+  change: |
+    the :ref:`connect_grpc_bridge filter <config_http_filters_connect_grpc_bridge>` filter now works correctly when the request payload is compressed on a unary buf connect request.
 
 removed_config_or_runtime:
 - area: config
@@ -410,6 +413,9 @@ new_features:
   change: |
     added %ACCESS_LOG_TYPE% substitution string, to help distinguishing between access log records and when they are being
     recorded. Please refer to the access log configuration documentation for more information.
+- area: grpc
+  change: |
+    added support for buf connect HTTP GET requests in the :ref:`connect_grpc_bridge filter <config_http_filters_connect_grpc_bridge>`
 
 deprecated:
 - area: tcp_proxy
