@@ -18,7 +18,7 @@ ActionImpl::get(const Server::Configuration::FilterChainsByName& filter_chains_b
   const std::string name =
       formatter_->format(*Http::StaticEmptyHeaders::get().request_headers,
                          *Http::StaticEmptyHeaders::get().response_headers,
-                         *Http::StaticEmptyHeaders::get().response_trailers, info, "");
+                         *Http::StaticEmptyHeaders::get().response_trailers, info, "", "");
   const auto chain_match = filter_chains_by_name.find(name);
   if (chain_match != filter_chains_by_name.end()) {
     return chain_match->second.get();
