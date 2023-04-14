@@ -30,8 +30,9 @@ void deflate_headers(nghttp2_hd_deflater* deflater, const test::fuzz::Headers& f
   uint8_t buf[MAX_HD_TABLE_BUF_SIZE];
 
   unsigned n_headers = fragment.headers().size();
-  if (n_headers > MAX_HEADERS)
+  if (n_headers > MAX_HEADERS) {
     n_headers = MAX_HEADERS;
+  }
   auto headers = fragment.headers();
   for (unsigned i = 0; i < n_headers; i++) {
     auto hv = headers.at(i);
@@ -50,20 +51,21 @@ void deflate_headers(nghttp2_hd_deflater* deflater, const test::fuzz::Headers& f
     h2hdrs[i].flags = 0;
   }
   ssize_t len = nghttp2_hd_deflate_hd(deflater, buf, sizeof(buf), h2hdrs, n_headers);
-  if (len > 0)
+  if (len > 0) {
     payload.append(reinterpret_cast<char*>(buf), len);
+  }
 }
 
 Http2Frame pb_to_h2_frame(nghttp2_hd_deflater* deflater,
                           const test::common::http::http2::Http2FrameOrJunk& pb_frame) {
   if (pb_frame.has_junk()) {
     // Junk frame
-    auto junk = pb_frame.junk();
+    const auto& junk = pb_frame.junk();
     absl::string_view contents = junk.data();
     return Http2Frame::makeGenericFrame(contents);
   } else if (pb_frame.has_h2frame()) {
     // Need to encode headers
-    auto h2frame = pb_frame.h2frame();
+    const auto& h2frame = pb_frame.h2frame();
     uint32_t streamid = Http2Frame::makeClientStreamId(h2frame.streamid());
     uint8_t flags = static_cast<uint8_t>(h2frame.flags() & 0xff);
     bool use_padding = flags & static_cast<uint8_t>(Http2Frame::HeadersFlags::Padded);
@@ -71,11 +73,11 @@ Http2Frame pb_to_h2_frame(nghttp2_hd_deflater* deflater,
     std::string payload;
     if (h2frame.has_data()) {
       type = Http2Frame::Type::Data;
-      auto f = h2frame.data();
+      const auto& f = h2frame.data();
       payload.append(f.data());
     } else if (h2frame.has_headers()) {
       type = Http2Frame::Type::Headers;
-      auto f = h2frame.headers();
+      const auto& f = h2frame.headers();
       uint8_t padding_len = static_cast<uint8_t>(f.padding().size() & 0xff);
       if (use_padding) {
         payload.push_back(static_cast<char>(padding_len));
@@ -95,18 +97,18 @@ Http2Frame pb_to_h2_frame(nghttp2_hd_deflater* deflater,
       }
     } else if (h2frame.has_priority()) {
       type = Http2Frame::Type::Priority;
-      auto f = h2frame.priority();
+      const auto& f = h2frame.priority();
       uint32_t stream_dependency = htonl(f.stream_dependency());
       payload.append(reinterpret_cast<char*>(&stream_dependency), sizeof(stream_dependency));
       payload.push_back(static_cast<char>(f.weight() & 0xff));
     } else if (h2frame.has_rst()) {
       type = Http2Frame::Type::RstStream;
-      auto f = h2frame.rst();
+      const auto& f = h2frame.rst();
       uint32_t error_code = htonl(f.error_code());
       payload.append(reinterpret_cast<char*>(&error_code), sizeof(error_code));
     } else if (h2frame.has_settings()) {
       type = Http2Frame::Type::Settings;
-      auto f = h2frame.settings();
+      const auto& f = h2frame.settings();
       for (auto& setting : f.settings()) {
         uint16_t id = static_cast<uint16_t>(setting.identifier() & 0xffff);
         uint32_t value = htonl(setting.value());
@@ -115,7 +117,7 @@ Http2Frame pb_to_h2_frame(nghttp2_hd_deflater* deflater,
       }
     } else if (h2frame.has_push_promise()) {
       type = Http2Frame::Type::PushPromise;
-      auto f = h2frame.push_promise();
+      const auto& f = h2frame.push_promise();
       uint8_t padding_len = static_cast<uint8_t>(f.padding().size() & 0xff);
       if (use_padding) {
         payload.push_back(static_cast<char>(padding_len));
@@ -128,12 +130,12 @@ Http2Frame pb_to_h2_frame(nghttp2_hd_deflater* deflater,
       }
     } else if (h2frame.has_ping()) {
       type = Http2Frame::Type::Ping;
-      auto f = h2frame.ping();
+      const auto& f = h2frame.ping();
       uint64_t pdata = f.data();
       payload.append(reinterpret_cast<char*>(&pdata), sizeof(pdata));
     } else if (h2frame.has_go_away()) {
       type = Http2Frame::Type::GoAway;
-      auto f = h2frame.go_away();
+      const auto& f = h2frame.go_away();
       uint32_t last_stream_id = htonl(f.last_stream_id());
       payload.append(reinterpret_cast<char*>(&last_stream_id), sizeof(last_stream_id));
       uint32_t error_code = htonl(f.error_code());
@@ -141,12 +143,12 @@ Http2Frame pb_to_h2_frame(nghttp2_hd_deflater* deflater,
       payload.append(f.debug_data());
     } else if (h2frame.has_window_update()) {
       type = Http2Frame::Type::WindowUpdate;
-      auto f = h2frame.window_update();
+      const auto& f = h2frame.window_update();
       uint32_t wsi = htonl(f.window_size_increment());
       payload.append(reinterpret_cast<char*>(&wsi), sizeof(wsi));
     } else if (h2frame.has_continuation()) {
       type = Http2Frame::Type::Continuation;
-      auto f = h2frame.continuation();
+      const auto& f = h2frame.continuation();
       deflate_headers(deflater, f.headers(), payload);
     } else {
       // Empty frame
@@ -195,7 +197,7 @@ public:
     payload.add(Http2Frame::Preamble, 24);
     static Http2Frame emptySettingsFrame = Http2Frame::makeEmptySettingsFrame();
     payload.add(emptySettingsFrame.data(), emptySettingsFrame.size());
-    for (auto frame : frames) {
+    for (const auto& frame : frames) {
       payload.add(frame.data(), frame.size());
     }
     Status status = server_->dispatch(payload);
@@ -229,12 +231,14 @@ DEFINE_PROTO_FUZZER(const test::common::http::http2::Http2ConnectionFuzzCase& in
 
   // Convert input to Http2Frame wire format
   size_t n_frames = input.frames_size();
-  if (n_frames == 0)
+  if (n_frames == 0) {
     return;
+  }
   std::vector<Http2Frame> frames;
-  nghttp2_hd_deflater* deflater = NULL;
-  if (nghttp2_hd_deflate_new(&deflater, MAX_HD_TABLE_BUF_SIZE) != 0)
+  nghttp2_hd_deflater* deflater = nullptr;
+  if (nghttp2_hd_deflate_new(&deflater, MAX_HD_TABLE_BUF_SIZE) != 0) {
     return;
+  }
   for (auto& pbframe : input.frames()) {
     Http2Frame frame = pb_to_h2_frame(deflater, pbframe);
     frames.push_back(frame);

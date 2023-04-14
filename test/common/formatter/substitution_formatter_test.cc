@@ -25,6 +25,7 @@
 #include "test/mocks/upstream/cluster_info.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/printers.h"
+#include "test/test_common/simulated_time_system.h"
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
 #include "test/test_common/utility.h"
@@ -200,6 +201,35 @@ TEST(SubstitutionFormatterTest, plainNumberFormatter) {
   EXPECT_THAT(formatter.formatValue(request_headers, response_headers, response_trailers,
                                     stream_info, body),
               ProtoEq(ValueUtil::numberValue(400)));
+}
+
+TEST(SubstitutionFormatterTest, inFlightDuration) {
+  Event::SimulatedTimeSystem time_system;
+  time_system.setSystemTime(std::chrono::milliseconds(0));
+  StreamInfo::StreamInfoImpl stream_info{Http::Protocol::Http2, time_system, nullptr};
+  Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"}, {":path", "/"}};
+  Http::TestResponseHeaderMapImpl response_headers;
+  Http::TestResponseTrailerMapImpl response_trailers;
+  std::string body;
+
+  {
+    time_system.setMonotonicTime(MonotonicTime(std::chrono::milliseconds(100)));
+    StreamInfoFormatter duration_format("DURATION");
+    EXPECT_EQ("100", duration_format.format(request_headers, response_headers, response_trailers,
+                                            stream_info, body));
+  }
+
+  {
+    time_system.setMonotonicTime(MonotonicTime(std::chrono::milliseconds(200)));
+    StreamInfoFormatter duration_format("DURATION");
+    EXPECT_EQ("200", duration_format.format(request_headers, response_headers, response_trailers,
+                                            stream_info, body));
+
+    time_system.setMonotonicTime(MonotonicTime(std::chrono::milliseconds(300)));
+    EXPECT_THAT(duration_format.formatValue(request_headers, response_headers, response_trailers,
+                                            stream_info, body),
+                ProtoEq(ValueUtil::numberValue(300.0)));
+  }
 }
 
 TEST(SubstitutionFormatterTest, streamInfoFormatter) {
@@ -534,7 +564,7 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
   {
     StreamInfoFormatter duration_format("DURATION");
     absl::optional<std::chrono::nanoseconds> dur = std::chrono::nanoseconds(15000000);
-    EXPECT_CALL(stream_info, requestComplete()).WillRepeatedly(Return(dur));
+    EXPECT_CALL(stream_info, currentDuration()).WillRepeatedly(Return(dur));
     EXPECT_EQ("15", duration_format.format(request_headers, response_headers, response_trailers,
                                            stream_info, body));
     EXPECT_THAT(duration_format.formatValue(request_headers, response_headers, response_trailers,
@@ -609,7 +639,16 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
                                               stream_info, body));
     EXPECT_THAT(upstream_format.formatValue(request_headers, response_headers, response_trailers,
                                             stream_info, body),
-                ProtoEq(ValueUtil::stringValue("18443")));
+                ProtoEq(ValueUtil::numberValue(18443)));
+
+    {
+      TestScopedRuntime scoped_runtime;
+      scoped_runtime.mergeValues({{"envoy.reloadable_features.format_ports_as_numbers", "false"}});
+
+      EXPECT_THAT(upstream_format.formatValue(request_headers, response_headers, response_trailers,
+                                              stream_info, body),
+                  ProtoEq(ValueUtil::stringValue("18443")));
+    }
 
     // Validate for IPv6 address
     address =
@@ -619,7 +658,16 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
                                               stream_info, body));
     EXPECT_THAT(upstream_format.formatValue(request_headers, response_headers, response_trailers,
                                             stream_info, body),
-                ProtoEq(ValueUtil::stringValue("19443")));
+                ProtoEq(ValueUtil::numberValue(19443)));
+
+    {
+      TestScopedRuntime scoped_runtime;
+      scoped_runtime.mergeValues({{"envoy.reloadable_features.format_ports_as_numbers", "false"}});
+
+      EXPECT_THAT(upstream_format.formatValue(request_headers, response_headers, response_trailers,
+                                              stream_info, body),
+                  ProtoEq(ValueUtil::stringValue("19443")));
+    }
 
     // Validate for Pipe
     address = Network::Address::InstanceConstSharedPtr{new Network::Address::PipeInstance("/foo")};
@@ -628,7 +676,7 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
                                          stream_info, body));
     EXPECT_THAT(upstream_format.formatValue(request_headers, response_headers, response_trailers,
                                             stream_info, body),
-                ProtoEq(ValueUtil::stringValue("")));
+                ProtoEq(ValueUtil::nullValue()));
   }
 
   {
@@ -662,7 +710,16 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
                                             stream_info, body));
     EXPECT_THAT(upstream_format.formatValue(request_headers, response_headers, response_trailers,
                                             stream_info, body),
-                ProtoEq(ValueUtil::stringValue("443")));
+                ProtoEq(ValueUtil::numberValue(443)));
+
+    {
+      TestScopedRuntime scoped_runtime;
+      scoped_runtime.mergeValues({{"envoy.reloadable_features.format_ports_as_numbers", "false"}});
+
+      EXPECT_THAT(upstream_format.formatValue(request_headers, response_headers, response_trailers,
+                                              stream_info, body),
+                  ProtoEq(ValueUtil::stringValue("443")));
+    }
   }
 
   {
@@ -763,7 +820,16 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
                                              stream_info, body));
     EXPECT_THAT(upstream_format.formatValue(request_headers, response_headers, response_trailers,
                                             stream_info, body),
-                ProtoEq(ValueUtil::stringValue("8443")));
+                ProtoEq(ValueUtil::numberValue(8443)));
+
+    {
+      TestScopedRuntime scoped_runtime;
+      scoped_runtime.mergeValues({{"envoy.reloadable_features.format_ports_as_numbers", "false"}});
+
+      EXPECT_THAT(upstream_format.formatValue(request_headers, response_headers, response_trailers,
+                                              stream_info, body),
+                  ProtoEq(ValueUtil::stringValue("8443")));
+    }
 
     // Validate for IPv6 address
     address =
@@ -773,7 +839,16 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
                                              stream_info, body));
     EXPECT_THAT(upstream_format.formatValue(request_headers, response_headers, response_trailers,
                                             stream_info, body),
-                ProtoEq(ValueUtil::stringValue("9443")));
+                ProtoEq(ValueUtil::numberValue(9443)));
+
+    {
+      TestScopedRuntime scoped_runtime;
+      scoped_runtime.mergeValues({{"envoy.reloadable_features.format_ports_as_numbers", "false"}});
+
+      EXPECT_THAT(upstream_format.formatValue(request_headers, response_headers, response_trailers,
+                                              stream_info, body),
+                  ProtoEq(ValueUtil::stringValue("9443")));
+    }
 
     // Validate for Pipe
     address = Network::Address::InstanceConstSharedPtr{new Network::Address::PipeInstance("/foo")};
@@ -782,7 +857,7 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
                                          stream_info, body));
     EXPECT_THAT(upstream_format.formatValue(request_headers, response_headers, response_trailers,
                                             stream_info, body),
-                ProtoEq(ValueUtil::stringValue("")));
+                ProtoEq(ValueUtil::nullValue()));
   }
 
   {
@@ -809,7 +884,16 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
                                           stream_info, body));
     EXPECT_THAT(upstream_format.formatValue(request_headers, response_headers, response_trailers,
                                             stream_info, body),
-                ProtoEq(ValueUtil::stringValue("0")));
+                ProtoEq(ValueUtil::numberValue(0)));
+
+    {
+      TestScopedRuntime scoped_runtime;
+      scoped_runtime.mergeValues({{"envoy.reloadable_features.format_ports_as_numbers", "false"}});
+
+      EXPECT_THAT(upstream_format.formatValue(request_headers, response_headers, response_trailers,
+                                              stream_info, body),
+                  ProtoEq(ValueUtil::stringValue("0")));
+    }
   }
 
   {
@@ -836,7 +920,16 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
                                               stream_info, body));
     EXPECT_THAT(upstream_format.formatValue(request_headers, response_headers, response_trailers,
                                             stream_info, body),
-                ProtoEq(ValueUtil::stringValue("63443")));
+                ProtoEq(ValueUtil::numberValue(63443)));
+
+    {
+      TestScopedRuntime scoped_runtime;
+      scoped_runtime.mergeValues({{"envoy.reloadable_features.format_ports_as_numbers", "false"}});
+
+      EXPECT_THAT(upstream_format.formatValue(request_headers, response_headers, response_trailers,
+                                              stream_info, body),
+                  ProtoEq(ValueUtil::stringValue("63443")));
+    }
   }
 
   {
@@ -886,6 +979,28 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
                                             stream_info, body),
                 ProtoEq(ValueUtil::nullValue()));
   }
+
+  {
+    StreamInfoFormatter listener_format("DOWNSTREAM_TRANSPORT_FAILURE_REASON");
+    std::string downstream_transport_failure_reason = "TLS error";
+    stream_info.setDownstreamTransportFailureReason(downstream_transport_failure_reason);
+    EXPECT_EQ("TLS_error", listener_format.format(request_headers, response_headers,
+                                                  response_trailers, stream_info, body));
+    EXPECT_THAT(listener_format.formatValue(request_headers, response_headers, response_trailers,
+                                            stream_info, body),
+                ProtoEq(ValueUtil::stringValue("TLS_error")));
+  }
+  {
+    StreamInfoFormatter listener_format("DOWNSTREAM_TRANSPORT_FAILURE_REASON");
+    std::string downstream_transport_failure_reason;
+    stream_info.setDownstreamTransportFailureReason(downstream_transport_failure_reason);
+    EXPECT_EQ(absl::nullopt, listener_format.format(request_headers, response_headers,
+                                                    response_trailers, stream_info, body));
+    EXPECT_THAT(listener_format.formatValue(request_headers, response_headers, response_trailers,
+                                            stream_info, body),
+                ProtoEq(ValueUtil::nullValue()));
+  }
+
   {
     StreamInfoFormatter upstream_format("UPSTREAM_TRANSPORT_FAILURE_REASON");
     std::string upstream_transport_failure_reason = "SSL error";
@@ -2621,6 +2736,9 @@ void verifyStructOutput(ProtobufWkt::Struct output,
   for (const auto& pair : expected_map) {
     EXPECT_EQ(output.fields().at(pair.first).string_value(), pair.second);
   }
+  for (const auto& pair : output.fields()) {
+    EXPECT_TRUE(expected_map.contains(pair.first));
+  }
 }
 
 TEST(SubstitutionFormatterTest, StructFormatterPlainStringTest) {
@@ -3246,6 +3364,32 @@ TEST(SubstitutionFormatterTest, StructFormatterOmitEmptyTest) {
       test_key_req: '%REQ(nonexistent_key)%'
       test_key_res: '%RESP(nonexistent_key)%'
       test_key_dynamic_metadata: '%DYNAMIC_METADATA(nonexistent_key)%'
+    )EOF",
+                            key_mapping);
+  StructFormatter formatter(key_mapping, false, true);
+
+  verifyStructOutput(
+      formatter.format(request_headers, response_headers, response_trailers, stream_info, body),
+      {});
+}
+
+TEST(SubstitutionFormatterTest, StructFormatterOmitEmptyNestedTest) {
+  Http::TestRequestHeaderMapImpl request_headers;
+  Http::TestResponseHeaderMapImpl response_headers;
+  Http::TestResponseTrailerMapImpl response_trailers;
+  StreamInfo::MockStreamInfo stream_info;
+  std::string body;
+
+  EXPECT_CALL(Const(stream_info), filterState()).Times(testing::AtLeast(1));
+  EXPECT_CALL(Const(stream_info), dynamicMetadata()).Times(testing::AtLeast(1));
+
+  ProtobufWkt::Struct key_mapping;
+  TestUtility::loadFromYaml(R"EOF(
+      test_key_root:
+        test_key_filter_state: '%FILTER_STATE(nonexistent_key)%'
+        test_key_req: '%REQ(nonexistent_key)%'
+        test_key_res: '%RESP(nonexistent_key)%'
+        test_key_dynamic_metadata: '%DYNAMIC_METADATA(nonexistent_key)%'
     )EOF",
                             key_mapping);
   StructFormatter formatter(key_mapping, false, true);

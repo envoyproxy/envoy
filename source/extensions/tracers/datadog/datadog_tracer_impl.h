@@ -1,7 +1,5 @@
 #pragma once
 
-#include <datadog/opentracing.h>
-
 #include "envoy/config/trace/v3/datadog.pb.h"
 #include "envoy/local_info/local_info.h"
 #include "envoy/runtime/runtime.h"
@@ -14,6 +12,7 @@
 #include "source/common/upstream/cluster_update_tracker.h"
 #include "source/extensions/tracers/common/ot/opentracing_driver_impl.h"
 
+#include "datadog/opentracing.h"
 #include "fmt/ostream.h"
 
 namespace Envoy {

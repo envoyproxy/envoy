@@ -155,8 +155,7 @@ RateLimitQuotaFilter::requestMatching(const Http::RequestHeaderMap& headers) {
   // This avoids creating the data object for every request, which is expensive.
   if (data_ptr_ == nullptr) {
     if (callbacks_ != nullptr) {
-      data_ptr_ = std::make_unique<Http::Matching::HttpMatchingDataImpl>(
-          callbacks_->streamInfo().downstreamAddressProvider());
+      data_ptr_ = std::make_unique<Http::Matching::HttpMatchingDataImpl>(callbacks_->streamInfo());
     } else {
       return absl::InternalError("Filter callback has not been initialized successfully yet.");
     }

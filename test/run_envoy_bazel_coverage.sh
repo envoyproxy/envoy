@@ -1,6 +1,6 @@
 #!/bin/bash
 
-set -e
+set -e -o pipefail
 
 LLVM_VERSION="14.0.0"
 CLANG_VERSION=$(clang --version | grep version | sed -e 's/\ *clang version \(.*\)\ */\1/')
@@ -48,33 +48,48 @@ else
   COVERAGE_TARGETS=(//test/...)
 fi
 
+BAZEL_COVERAGE_OPTIONS=()
+
 if [[ "${FUZZ_COVERAGE}" == "true" ]]; then
-  # Filter targets to just fuzz tests.
-  _targets=$(bazel query "attr('tags', 'fuzz_target', ${COVERAGE_TARGETS[*]})")
-  COVERAGE_TARGETS=()
-  while read -r line; do COVERAGE_TARGETS+=("$line"); done \
-      <<< "$_targets"
-  BAZEL_BUILD_OPTIONS+=(
-      "--config=fuzz-coverage"
-      "--test_tag_filters=-nocoverage")
+    # Filter targets to just fuzz tests.
+    _targets=$(bazel query "attr('tags', 'fuzz_target', ${COVERAGE_TARGETS[*]})")
+    COVERAGE_TARGETS=()
+    while read -r line; do COVERAGE_TARGETS+=("$line"); done \
+        <<< "$_targets"
+    BAZEL_COVERAGE_OPTIONS+=(
+        "--config=fuzz-coverage"
+        "--test_tag_filters=-nocoverage")
 else
-  BAZEL_BUILD_OPTIONS+=(
-      "--config=test-coverage"
-      "--test_tag_filters=-nocoverage,-fuzz_target")
+    BAZEL_COVERAGE_OPTIONS+=(
+        "--config=test-coverage"
+        "--test_tag_filters=-nocoverage,-fuzz_target")
 fi
 
-# Don't block coverage on flakes.
-BAZEL_BUILD_OPTIONS+=("--flaky_test_attempts=2")
 # Output unusually long logs due to trace logging.
-BAZEL_BUILD_OPTIONS+=("--experimental_ui_max_stdouterr_bytes=80000000")
+BAZEL_COVERAGE_OPTIONS+=("--experimental_ui_max_stdouterr_bytes=80000000")
 
-bazel coverage "${BAZEL_BUILD_OPTIONS[@]}" "${COVERAGE_TARGETS[@]}"
+echo "Running bazel coverage with:"
+echo "  Options: ${BAZEL_BUILD_OPTIONS[*]} ${BAZEL_COVERAGE_OPTIONS[*]}"
+echo "  Targets: ${COVERAGE_TARGETS[*]}"
+bazel coverage "${BAZEL_BUILD_OPTIONS[@]}" "${BAZEL_COVERAGE_OPTIONS[@]}" "${COVERAGE_TARGETS[@]}"
 
-# Collecting profile and testlogs
-[[ -z "${ENVOY_BUILD_PROFILE}" ]] || cp -f "$(bazel info output_base)/command.profile.gz" "${ENVOY_BUILD_PROFILE}/coverage.profile.gz" || true
-[[ -z "${ENVOY_BUILD_DIR}" ]] || find bazel-testlogs/ -name test.log | tar zcf "${ENVOY_BUILD_DIR}/testlogs.tar.gz" -T -
+echo "Collecting profile and testlogs"
+if [[ -n "${ENVOY_BUILD_PROFILE}" ]]; then
+    cp -f "$(bazel info output_base)/command.profile.gz" "${ENVOY_BUILD_PROFILE}/coverage.profile.gz" || true
+fi
 
-COVERAGE_DIR="${SRCDIR}"/generated/coverage && [[ ${FUZZ_COVERAGE} == "true" ]] && COVERAGE_DIR="${SRCDIR}"/generated/fuzz_coverage
+if [[ -n "${ENVOY_BUILD_DIR}" ]]; then
+    find bazel-testlogs/ -name test.log \
+        | tar cf - -T - \
+        | bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/zstd -- \
+                - -T0 --fast -o "${ENVOY_BUILD_DIR}/testlogs.tar.zst"
+    echo "Profile/testlogs collected: ${ENVOY_BUILD_DIR}/testlogs.tar.zst"
+fi
+
+COVERAGE_DIR="${SRCDIR}/generated/coverage"
+if [[ ${FUZZ_COVERAGE} == "true" ]]; then
+    COVERAGE_DIR="${SRCDIR}"/generated/fuzz_coverage
+fi
 
 rm -rf "${COVERAGE_DIR}"
 mkdir -p "${COVERAGE_DIR}"
@@ -93,11 +108,17 @@ fi
 COVERAGE_VALUE="$(genhtml --prefix "${PWD}" --output "${COVERAGE_DIR}" "${COVERAGE_DATA}" | tee /dev/stderr | grep lines... | cut -d ' ' -f 4)"
 COVERAGE_VALUE=${COVERAGE_VALUE%?}
 
-if [ "${FUZZ_COVERAGE}" == "true" ]
-then
-  [[ -z "${ENVOY_FUZZ_COVERAGE_ARTIFACT}" ]] || tar zcf "${ENVOY_FUZZ_COVERAGE_ARTIFACT}" -C "${COVERAGE_DIR}" --transform 's/^\./fuzz_coverage/' .
-else
-  [[ -z "${ENVOY_COVERAGE_ARTIFACT}" ]] || tar zcf "${ENVOY_COVERAGE_ARTIFACT}" -C "${COVERAGE_DIR}" --transform 's/^\./coverage/' .
+echo "Compressing coveraged data"
+if [[ "${FUZZ_COVERAGE}" == "true" ]]; then
+    if [[ -n "${ENVOY_FUZZ_COVERAGE_ARTIFACT}" ]]; then
+        tar cf - -C "${COVERAGE_DIR}" --transform 's/^\./fuzz_coverage/' . \
+            | bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/zstd -- \
+                    - -T0 --fast -o "${ENVOY_FUZZ_COVERAGE_ARTIFACT}"
+    fi
+elif [[ -n "${ENVOY_COVERAGE_ARTIFACT}" ]]; then
+     tar cf - -C "${COVERAGE_DIR}" --transform 's/^\./coverage/' . \
+         | bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/zstd -- \
+                 - -T0 --fast -o "${ENVOY_COVERAGE_ARTIFACT}"
 fi
 
 if [[ "$VALIDATE_COVERAGE" == "true" ]]; then

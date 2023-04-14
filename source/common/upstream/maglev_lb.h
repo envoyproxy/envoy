@@ -1,5 +1,6 @@
 #pragma once
 
+#include "envoy/common/pure.h"
 #include "envoy/common/random_generator.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/extensions/load_balancing_policies/maglev/v3/maglev.pb.h"
@@ -7,6 +8,7 @@
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
 
+#include "source/common/common/bit_array.h"
 #include "source/common/upstream/thread_aware_lb_impl.h"
 #include "source/common/upstream/upstream_impl.h"
 
@@ -27,6 +29,9 @@ struct MaglevLoadBalancerStats {
   ALL_MAGLEV_LOAD_BALANCER_STATS(GENERATE_GAUGE_STRUCT)
 };
 
+class MaglevTable;
+using MaglevTableSharedPtr = std::shared_ptr<MaglevTable>;
+
 /**
  * This is an implementation of Maglev consistent hashing as described in:
  * https://static.googleusercontent.com/media/research.google.com/en//pubs/archive/44824.pdf
@@ -34,19 +39,16 @@ struct MaglevLoadBalancerStats {
  * fixed table size of 65537. This is the recommended table size in section 5.3.
  */
 class MaglevTable : public ThreadAwareLoadBalancerBase::HashingLoadBalancer,
-                    Logger::Loggable<Logger::Id::upstream> {
+                    protected Logger::Loggable<Logger::Id::upstream> {
 public:
-  MaglevTable(const NormalizedHostWeightVector& normalized_host_weights,
-              double max_normalized_weight, uint64_t table_size, bool use_hostname_for_hashing,
-              MaglevLoadBalancerStats& stats);
-
-  // ThreadAwareLoadBalancerBase::HashingLoadBalancer
-  HostConstSharedPtr chooseHost(uint64_t hash, uint32_t attempt) const override;
+  MaglevTable(uint64_t table_size, MaglevLoadBalancerStats& stats);
+  ~MaglevTable() override = default;
 
   // Recommended table size in section 5.3 of the paper.
-  static const uint64_t DefaultTableSize = 65537;
+  static constexpr uint64_t DefaultTableSize = 65537;
+  static constexpr uint64_t MaxNumberOfHostsForCompactMaglev = (static_cast<uint64_t>(1) << 32) - 1;
 
-private:
+protected:
   struct TableBuildEntry {
     TableBuildEntry(const HostConstSharedPtr& host, uint64_t offset, uint64_t skip, double weight)
         : host_(host), offset_(offset), skip_(skip), weight_(weight) {}
@@ -62,9 +64,81 @@ private:
 
   uint64_t permutation(const TableBuildEntry& entry);
 
+  /**
+   * Template method for constructing the Maglev table.
+   */
+  void constructMaglevTableInternal(const NormalizedHostWeightVector& normalized_host_weights,
+                                    double max_normalized_weight, bool use_hostname_for_hashing);
+
   const uint64_t table_size_;
-  std::vector<HostConstSharedPtr> table_;
   MaglevLoadBalancerStats& stats_;
+
+private:
+  /**
+   * Implementation specific construction of data structures to represent the
+   * Maglev Table.
+   */
+  virtual void constructImplementationInternals(std::vector<TableBuildEntry>& table_build_entries,
+                                                double max_normalized_weight) PURE;
+
+  /**
+   * Log each entry of the maglev table (useful for debugging).
+   */
+  virtual void logMaglevTable(bool use_hostname_for_hashing) const PURE;
+};
+
+/**
+ * This is an implementation of Maglev consistent hashing that directly holds
+ * pointers.
+ */
+class OriginalMaglevTable : public MaglevTable {
+public:
+  OriginalMaglevTable(const NormalizedHostWeightVector& normalized_host_weights,
+                      double max_normalized_weight, uint64_t table_size,
+                      bool use_hostname_for_hashing, MaglevLoadBalancerStats& stats)
+      : MaglevTable(table_size, stats) {
+    constructMaglevTableInternal(normalized_host_weights, max_normalized_weight,
+                                 use_hostname_for_hashing);
+  }
+  ~OriginalMaglevTable() override = default;
+
+  // ThreadAwareLoadBalancerBase::HashingLoadBalancer
+  HostConstSharedPtr chooseHost(uint64_t hash, uint32_t attempt) const override;
+
+private:
+  void constructImplementationInternals(std::vector<TableBuildEntry>& table_build_entries,
+                                        double max_normalized_weight) override;
+
+  void logMaglevTable(bool use_hostname_for_hashing) const override;
+  std::vector<HostConstSharedPtr> table_;
+};
+
+/**
+ * This maglev implementation leverages the number of hosts to more efficiently
+ * populate the maglev table.
+ * TODO(kbaichoo): Re-evaluate whether we should have the abstraction on the
+ * table representation.
+ */
+class CompactMaglevTable : public MaglevTable {
+public:
+  CompactMaglevTable(const NormalizedHostWeightVector& normalized_host_weights,
+                     double max_normalized_weight, uint64_t table_size,
+                     bool use_hostname_for_hashing, MaglevLoadBalancerStats& stats);
+  ~CompactMaglevTable() override = default;
+
+  // ThreadAwareLoadBalancerBase::HashingLoadBalancer
+  HostConstSharedPtr chooseHost(uint64_t hash, uint32_t attempt) const override;
+
+private:
+  void constructImplementationInternals(std::vector<TableBuildEntry>& table_build_entries,
+                                        double max_normalized_weight) override;
+  void logMaglevTable(bool use_hostname_for_hashing) const override;
+
+  // Leverage a BitArray to more compactly fit represent the MaglevTable.
+  // The BitArray will index into the host_table_ which will provide the given
+  // host to load balance to.
+  BitArray table_;
+  std::vector<HostConstSharedPtr> host_table_;
 };
 
 /**
@@ -90,19 +164,7 @@ private:
   // ThreadAwareLoadBalancerBase
   HashingLoadBalancerSharedPtr
   createLoadBalancer(const NormalizedHostWeightVector& normalized_host_weights,
-                     double /* min_normalized_weight */, double max_normalized_weight) override {
-    HashingLoadBalancerSharedPtr maglev_lb =
-        std::make_shared<MaglevTable>(normalized_host_weights, max_normalized_weight, table_size_,
-                                      use_hostname_for_hashing_, stats_);
-
-    if (hash_balance_factor_ == 0) {
-      return maglev_lb;
-    }
-
-    return std::make_shared<BoundedLoadHashingLoadBalancer>(
-        maglev_lb, std::move(normalized_host_weights), hash_balance_factor_);
-  }
-
+                     double /* min_normalized_weight */, double max_normalized_weight) override;
   static MaglevLoadBalancerStats generateStats(Stats::Scope& scope);
 
   Stats::ScopeSharedPtr scope_;

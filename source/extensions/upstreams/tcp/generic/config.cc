@@ -1,5 +1,6 @@
 #include "source/extensions/upstreams/tcp/generic/config.h"
 
+#include "envoy/stream_info/bool_accessor.h"
 #include "envoy/upstream/cluster_manager.h"
 
 #include "source/common/http/codec_client.h"
@@ -16,7 +17,7 @@ TcpProxy::GenericConnPoolPtr GenericConnPoolFactory::createGenericConnPool(
     TcpProxy::TunnelingConfigHelperOptConstRef config, Upstream::LoadBalancerContext* context,
     Envoy::Tcp::ConnectionPool::UpstreamCallbacks& upstream_callbacks,
     StreamInfo::StreamInfo& downstream_info) const {
-  if (config.has_value()) {
+  if (config.has_value() && !disableTunnelingByFilterState(downstream_info)) {
     Http::CodecType pool_type;
     if ((thread_local_cluster.info()->features() & Upstream::ClusterInfo::Features::HTTP2) != 0) {
       pool_type = Http::CodecType::HTTP2;
@@ -33,6 +34,15 @@ TcpProxy::GenericConnPoolPtr GenericConnPoolFactory::createGenericConnPool(
   auto ret =
       std::make_unique<TcpProxy::TcpConnPool>(thread_local_cluster, context, upstream_callbacks);
   return (ret->valid() ? std::move(ret) : nullptr);
+}
+
+bool GenericConnPoolFactory::disableTunnelingByFilterState(
+    StreamInfo::StreamInfo& downstream_info) const {
+  const StreamInfo::BoolAccessor* disable_tunneling =
+      downstream_info.filterState()->getDataReadOnly<StreamInfo::BoolAccessor>(
+          TcpProxy::DisableTunnelingFilterStateKey);
+
+  return disable_tunneling != nullptr && disable_tunneling->value() == true;
 }
 
 REGISTER_FACTORY(GenericConnPoolFactory, TcpProxy::GenericConnPoolFactory);

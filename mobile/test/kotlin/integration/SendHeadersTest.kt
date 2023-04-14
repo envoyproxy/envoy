@@ -5,7 +5,6 @@ import io.envoyproxy.envoymobile.EngineBuilder
 import io.envoyproxy.envoymobile.RequestHeadersBuilder
 import io.envoyproxy.envoymobile.RequestMethod
 import io.envoyproxy.envoymobile.ResponseHeaders
-import io.envoyproxy.envoymobile.UpstreamHttpProtocol
 import io.envoyproxy.envoymobile.engine.JniLibrary
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
@@ -36,7 +35,6 @@ class SendHeadersTest {
       authority = "example.com",
       path = "/test"
     )
-      .addUpstreamHttpProtocol(UpstreamHttpProtocol.HTTP2)
       .build()
 
     var resultHeaders: ResponseHeaders? = null

@@ -87,7 +87,8 @@ FileSystemHttpCache::FileSystemHttpCache(
 }
 
 CacheShared::CacheShared(ConfigProto config, Stats::Scope& stats_scope)
-    : config_(config), stats_(generateStats(stats_scope, cachePath())) {}
+    : config_(config), stat_names_(stats_scope.symbolTable()),
+      stats_(generateStats(stat_names_, stats_scope, cachePath())) {}
 
 FileSystemHttpCache::~FileSystemHttpCache() { cache_eviction_thread_.removeCache(shared_); }
 

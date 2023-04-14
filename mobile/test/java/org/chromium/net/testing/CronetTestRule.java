@@ -33,7 +33,7 @@ import org.junit.Assert;
 import org.junit.rules.TestRule;
 import org.junit.runner.Description;
 import org.junit.runners.model.Statement;
-import org.chromium.net.AndroidNetworkLibrary;
+import io.envoyproxy.envoymobile.utilities.AndroidNetworkLibrary;
 
 /**
  * Custom TestRule for Cronet instrumentation tests.

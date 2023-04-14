@@ -42,7 +42,7 @@ std::string ValidationServerTest::directory_ = "";
 
 // ValidationServerTest_1 is created only to run different set of parameterized
 // tests than set of tests for ValidationServerTest.
-class ValidationServerTest_1 : public ValidationServerTest {
+class ValidationServerTest1 : public ValidationServerTest {
 public:
   static const std::vector<std::string> getAllConfigFiles() {
     setupTestDirectory();
@@ -141,7 +141,7 @@ TEST_P(ValidationServerTest, DummyMethodsTest) {
 // exists.)
 
 auto testing_values =
-    ::testing::Values("front-proxy_front-envoy.yaml", "envoyproxy_io_proxy.yaml",
+    ::testing::Values("front-proxy_envoy.yaml", "envoyproxy_io_proxy.yaml",
 #if defined(WIN32) && defined(SO_ORIGINAL_DST)
                       "configs_original-dst-cluster_proxy_config.yaml",
 #endif
@@ -151,15 +151,15 @@ INSTANTIATE_TEST_SUITE_P(ValidConfigs, ValidationServerTest, testing_values);
 
 // Just make sure that all configs can be ingested without a crash. Processing of config files
 // may not be successful, but there should be no crash.
-TEST_P(ValidationServerTest_1, RunWithoutCrash) {
+TEST_P(ValidationServerTest1, RunWithoutCrash) {
   auto local_address = Network::Utility::getLocalAddress(options_.localAddressIpVersion());
   validateConfig(options_, local_address, component_factory_, Thread::threadFactoryForTest(),
                  Filesystem::fileSystemForTest());
   SUCCEED();
 }
 
-INSTANTIATE_TEST_SUITE_P(AllConfigs, ValidationServerTest_1,
-                         ::testing::ValuesIn(ValidationServerTest_1::getAllConfigFiles()));
+INSTANTIATE_TEST_SUITE_P(AllConfigs, ValidationServerTest1,
+                         ::testing::ValuesIn(ValidationServerTest1::getAllConfigFiles()));
 
 TEST_P(RuntimeFeatureValidationServerTest, ValidRuntimeLoaderSingleton) {
   Thread::MutexBasicLockable access_log_lock;

@@ -1,46 +1,11 @@
 #include "absl/synchronization/notification.h"
 #include "gtest/gtest.h"
-#include "library/common/config/templates.h"
+#include "library/cc/engine_builder.h"
 #include "library/common/engine.h"
 #include "library/common/engine_handle.h"
 #include "library/common/main_interface.h"
 
 namespace Envoy {
-
-// This config is the minimal envoy mobile config that allows for running the engine.
-const std::string MINIMAL_TEST_CONFIG = R"(
-static_resources:
-  listeners:
-  - name: base_api_listener
-    address:
-      socket_address: { protocol: TCP, address: 0.0.0.0, port_value: 10000 }
-    api_listener:
-      api_listener:
-        "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.EnvoyMobileHttpConnectionManager
-        config:
-          stat_prefix: hcm
-          route_config:
-            name: api_router
-            virtual_hosts:
-            - name: api
-              include_attempt_count_in_response: true
-              domains: ["*"]
-              routes:
-              - match: { prefix: "/" }
-                route:
-                  cluster_header: x-envoy-mobile-cluster
-                  retry_policy:
-                    retry_back_off: { base_interval: 0.25s, max_interval: 60s }
-          http_filters:
-          - name: envoy.router
-            typed_config:
-              "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
-layered_runtime:
-  layers:
-  - name: static_layer_0
-    static_layer:
-      overload: { global_downstream_max_connections: 50000 }
-)";
 
 // RAII wrapper for the engine, ensuring that we properly shut down the engine. If the engine
 // thread is not torn down, we end up with TSAN failures during shutdown due to a data race
@@ -50,7 +15,10 @@ struct TestEngineHandle {
   envoy_engine_t handle_;
   TestEngineHandle(envoy_engine_callbacks callbacks, const std::string& level) {
     handle_ = init_engine(callbacks, {}, {});
-    run_engine(handle_, MINIMAL_TEST_CONFIG.c_str(), level.c_str(), "");
+    Platform::EngineBuilder builder;
+    auto bootstrap = builder.generateBootstrap();
+    std::string yaml = Envoy::MessageUtil::getYamlStringFromMessage(*bootstrap);
+    run_engine(handle_, yaml.c_str(), level.c_str(), "");
   }
 
   void terminate() { terminate_engine(handle_, /* release */ false); }

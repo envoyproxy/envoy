@@ -91,7 +91,7 @@ protected:
       envoy::config::listener::v3::Filter ext_proc_filter;
       ext_proc_filter.set_name("envoy.filters.http.ext_proc");
       ext_proc_filter.mutable_typed_config()->PackFrom(proto_config_);
-      config_helper_.prependFilter(MessageUtil::getJsonStringFromMessageOrDie(ext_proc_filter));
+      config_helper_.prependFilter(MessageUtil::getJsonStringFromMessageOrError(ext_proc_filter));
 
       // Parameterize with defer processing to prevent bit rot as filter made
       // assumptions of data flow, prior relying on eager processing.
@@ -313,7 +313,50 @@ protected:
     processor_stream_->sendGrpcMessage(response);
   }
 
+  // ext_proc server sends back a response to tell Envoy to stop the
+  // original timer and start a new timer.
+  void serverSendNewTimeout(const uint32_t timeout_ms) {
+    ProcessingResponse response;
+    if (timeout_ms < 1000) {
+      response.mutable_override_message_timeout()->set_nanos(timeout_ms * 1000000);
+    } else {
+      response.mutable_override_message_timeout()->set_seconds(timeout_ms / 1000);
+    }
+    processor_stream_->sendGrpcMessage(response);
+  }
+
+  // The new timeout message is ignored by Envoy due to different reasons, like
+  // new_timeout setting is out-of-range, or max_message_timeout is not configured.
+  void newTimeoutWrongConfigTest(const uint32_t timeout_ms) {
+    // Set envoy filter timeout to be 200ms.
+    proto_config_.mutable_message_timeout()->set_nanos(200000000);
+    // Config max_message_timeout proto to enable the new timeout API.
+    if (max_message_timeout_ms_) {
+      if (max_message_timeout_ms_ < 1000) {
+        proto_config_.mutable_max_message_timeout()->set_nanos(max_message_timeout_ms_ * 1000000);
+      } else {
+        proto_config_.mutable_max_message_timeout()->set_seconds(max_message_timeout_ms_ / 1000);
+      }
+    }
+    initializeConfig();
+    HttpIntegrationTest::initialize();
+    auto response = sendDownstreamRequest(absl::nullopt);
+
+    processRequestHeadersMessage(*grpc_upstreams_[0], true,
+                                 [&](const HttpHeaders&, HeadersResponse&) {
+                                   serverSendNewTimeout(timeout_ms);
+                                   // ext_proc server stays idle for 300ms before sending back the
+                                   // response.
+                                   timeSystem().advanceTimeWaitImpl(300ms);
+                                   return true;
+                                 });
+    // Verify the new timer is not started and the original timer timeouts,
+    // and downstream receives 500.
+    verifyDownstreamResponse(*response, 500);
+  }
+
   envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor proto_config_{};
+  uint32_t max_message_timeout_ms_{0};
   std::vector<FakeUpstream*> grpc_upstreams_;
   FakeHttpConnectionPtr processor_connection_;
   FakeStreamPtr processor_stream_;
@@ -477,6 +520,56 @@ TEST_P(ExtProcIntegrationTest, GetAndSetHeaders) {
 
   EXPECT_THAT(upstream_request_->headers(), HasNoHeader("x-remove-this"));
   EXPECT_THAT(upstream_request_->headers(), SingleHeaderValueIs("x-new-header", "new"));
+
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
+  upstream_request_->encodeData(100, true);
+
+  processResponseHeadersMessage(
+      *grpc_upstreams_[0], false, [](const HttpHeaders& headers, HeadersResponse&) {
+        Http::TestRequestHeaderMapImpl expected_response_headers{{":status", "200"}};
+        EXPECT_THAT(headers.headers(), HeaderProtosEqual(expected_response_headers));
+        return true;
+      });
+
+  verifyDownstreamResponse(*response, 200);
+}
+
+TEST_P(ExtProcIntegrationTest, GetAndSetHeadersNonUtf8) {
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+  auto response = sendDownstreamRequest([](Http::HeaderMap& headers) {
+    std::string invalid_unicode("valid_prefix");
+    invalid_unicode.append(1, char(0xc3));
+    invalid_unicode.append(1, char(0x28));
+    invalid_unicode.append("valid_suffix");
+
+    headers.addCopy(LowerCaseString("x-bad-utf8"), invalid_unicode);
+  });
+
+  processRequestHeadersMessage(
+      *grpc_upstreams_[0], true, [](const HttpHeaders& headers, HeadersResponse& headers_resp) {
+        Http::TestRequestHeaderMapImpl expected_request_headers{
+            {":scheme", "http"},
+            {":method", "GET"},
+            {"host", "host"},
+            {":path", "/"},
+            {"x-bad-utf8", "valid_prefix!(valid_suffix"},
+            {"x-forwarded-proto", "http"}};
+        for (const auto& header : headers.headers().headers()) {
+          ENVOY_LOG_MISC(critical, "{}", header.value());
+        }
+        EXPECT_THAT(headers.headers(), HeaderProtosEqual(expected_request_headers));
+
+        auto response_header_mutation = headers_resp.mutable_response()->mutable_header_mutation();
+        response_header_mutation->add_remove_headers("x-bad-utf8");
+        return true;
+      });
+
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
+
+  EXPECT_THAT(upstream_request_->headers(), HasNoHeader("x-bad-utf8"));
 
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
   upstream_request_->encodeData(100, true);
@@ -1007,9 +1100,8 @@ TEST_P(ExtProcIntegrationTest, GetAndRespondImmediatelyOnRequestBody) {
 
 // Test the filter with body buffering enabled using
 // an ext_proc server that responds to the response_body message
-// by sending back an immediate_response message. Since this
-// happens after the response headers have been sent, as a result
-// Envoy should just reset the stream.
+// by sending back an immediate_response message. Since we
+// are in buffered mode, we should get the correct response code.
 TEST_P(ExtProcIntegrationTest, GetAndRespondImmediatelyOnResponseBody) {
   proto_config_.mutable_processing_mode()->set_response_body_mode(ProcessingMode::BUFFERED);
   initializeConfig();
@@ -1017,6 +1109,85 @@ TEST_P(ExtProcIntegrationTest, GetAndRespondImmediatelyOnResponseBody) {
   auto response = sendDownstreamRequest(absl::nullopt);
   processRequestHeadersMessage(*grpc_upstreams_[0], true, absl::nullopt);
   handleUpstreamRequest();
+  processResponseHeadersMessage(*grpc_upstreams_[0], false, absl::nullopt);
+
+  processAndRespondImmediately(*grpc_upstreams_[0], false, [](ImmediateResponse& immediate) {
+    immediate.mutable_status()->set_code(envoy::type::v3::StatusCode::Unauthorized);
+    immediate.set_body("{\"reason\": \"Not authorized\"}");
+    immediate.set_details("Failed because you are not authorized");
+  });
+
+  // Since we are stopping iteration on headers, and since the response is short,
+  // we actually get an error message here.
+  verifyDownstreamResponse(*response, 401);
+  EXPECT_EQ("{\"reason\": \"Not authorized\"}", response->body());
+}
+
+// Test the filter with body buffering enabled using
+// an ext_proc server that responds to the response_body message
+// by sending back an immediate_response message. Since we
+// are in buffered partial mode, we should get the correct response code.
+TEST_P(ExtProcIntegrationTest, GetAndRespondImmediatelyOnResponseBodyBufferedPartial) {
+  proto_config_.mutable_processing_mode()->set_response_body_mode(ProcessingMode::BUFFERED_PARTIAL);
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+  auto response = sendDownstreamRequest(absl::nullopt);
+  processRequestHeadersMessage(*grpc_upstreams_[0], true, absl::nullopt);
+  handleUpstreamRequest();
+  processResponseHeadersMessage(*grpc_upstreams_[0], false, absl::nullopt);
+
+  processAndRespondImmediately(*grpc_upstreams_[0], false, [](ImmediateResponse& immediate) {
+    immediate.mutable_status()->set_code(envoy::type::v3::StatusCode::Unauthorized);
+    immediate.set_body("{\"reason\": \"Not authorized\"}");
+    immediate.set_details("Failed because you are not authorized");
+  });
+
+  // Since we are stopping iteration on headers, and since the response is short,
+  // we actually get an error message here.
+  verifyDownstreamResponse(*response, 401);
+  EXPECT_EQ("{\"reason\": \"Not authorized\"}", response->body());
+}
+
+// Test the filter with body buffering enabled using
+// an ext_proc server that responds to the response_body message
+// by sending back an immediate_response message. Since we
+// are in buffered mode, we should get the correct response code.
+TEST_P(ExtProcIntegrationTest, GetAndRespondImmediatelyOnChunkedResponseBody) {
+  proto_config_.mutable_processing_mode()->set_response_body_mode(ProcessingMode::BUFFERED);
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+  auto response = sendDownstreamRequest(absl::nullopt);
+  processRequestHeadersMessage(*grpc_upstreams_[0], true, absl::nullopt);
+  Buffer::OwnedImpl full_response;
+  TestUtility::feedBufferWithRandomCharacters(full_response, 400);
+  handleUpstreamRequestWithResponse(full_response, 100);
+  processResponseHeadersMessage(*grpc_upstreams_[0], false, absl::nullopt);
+
+  processAndRespondImmediately(*grpc_upstreams_[0], false, [](ImmediateResponse& immediate) {
+    immediate.mutable_status()->set_code(envoy::type::v3::StatusCode::Unauthorized);
+    immediate.set_body("{\"reason\": \"Not authorized\"}");
+    immediate.set_details("Failed because you are not authorized");
+  });
+
+  // Since we are stopping iteration on headers, and since the response is short,
+  // we actually get an error message here.
+  verifyDownstreamResponse(*response, 401);
+  EXPECT_EQ("{\"reason\": \"Not authorized\"}", response->body());
+}
+
+// Test the filter with body buffering enabled using
+// an ext_proc server that responds to the response_body message
+// by sending back an immediate_response message. Since we
+// are in buffered partial mode, we should get the correct response code.
+TEST_P(ExtProcIntegrationTest, GetAndRespondImmediatelyOnChunkedResponseBodyBufferedPartial) {
+  proto_config_.mutable_processing_mode()->set_response_body_mode(ProcessingMode::BUFFERED_PARTIAL);
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+  auto response = sendDownstreamRequest(absl::nullopt);
+  processRequestHeadersMessage(*grpc_upstreams_[0], true, absl::nullopt);
+  Buffer::OwnedImpl full_response;
+  TestUtility::feedBufferWithRandomCharacters(full_response, 400);
+  handleUpstreamRequestWithResponse(full_response, 100);
   processResponseHeadersMessage(*grpc_upstreams_[0], false, absl::nullopt);
 
   processAndRespondImmediately(*grpc_upstreams_[0], false, [](ImmediateResponse& immediate) {
@@ -1640,6 +1811,150 @@ TEST_P(ExtProcIntegrationTest, PerRouteGrpcService) {
       });
   verifyDownstreamResponse(*response, 201);
   EXPECT_THAT(response->headers(), SingleHeaderValueIs("x-response-processed", "1"));
+}
+
+// Sending new timeout API in both downstream request and upstream response
+// handling path with header mutation.
+TEST_P(ExtProcIntegrationTest, RequestAndResponseMessageNewTimeoutWithHeaderMutation) {
+  // Set envoy filter timeout to be 200ms.
+  proto_config_.mutable_message_timeout()->set_nanos(200000000);
+  // Config max_message_timeout proto to 10s to enable the new timeout API.
+  proto_config_.mutable_max_message_timeout()->set_seconds(10);
+
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+  auto response = sendDownstreamRequest(
+      [](Http::HeaderMap& headers) { headers.addCopy(LowerCaseString("x-remove-this"), "yes"); });
+
+  // ext_proc server request processing.
+  processRequestHeadersMessage(
+      *grpc_upstreams_[0], true, [this](const HttpHeaders& headers, HeadersResponse& headers_resp) {
+        Http::TestRequestHeaderMapImpl expected_request_headers{
+            {":scheme", "http"}, {":method", "GET"},       {"host", "host"},
+            {":path", "/"},      {"x-remove-this", "yes"}, {"x-forwarded-proto", "http"}};
+        EXPECT_THAT(headers.headers(), HeaderProtosEqual(expected_request_headers));
+
+        // Sending the new timeout API to extend the timeout.
+        serverSendNewTimeout(500);
+        // ext_proc server stays idle for 300ms.
+        timeSystem().advanceTimeWaitImpl(300ms);
+        // Server sends back response with the header mutation instructions.
+        auto response_header_mutation = headers_resp.mutable_response()->mutable_header_mutation();
+        auto* mut1 = response_header_mutation->add_set_headers();
+        mut1->mutable_header()->set_key("x-new-header");
+        mut1->mutable_header()->set_value("new");
+        response_header_mutation->add_remove_headers("x-remove-this");
+        return true;
+      });
+
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
+  EXPECT_THAT(upstream_request_->headers(), HasNoHeader("x-remove-this"));
+  EXPECT_THAT(upstream_request_->headers(), SingleHeaderValueIs("x-new-header", "new"));
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
+  upstream_request_->encodeData(100, true);
+
+  // ext_proc server response processing.
+  processResponseHeadersMessage(
+      *grpc_upstreams_[0], false, [this](const HttpHeaders& headers, HeadersResponse&) {
+        Http::TestRequestHeaderMapImpl expected_response_headers{{":status", "200"}};
+        EXPECT_THAT(headers.headers(), HeaderProtosEqual(expected_response_headers));
+        // Sending the new timeout API to extend the timeout.
+        serverSendNewTimeout(500);
+        // ext_proc server stays idle for 300ms.
+        timeSystem().advanceTimeWaitImpl(300ms);
+        return true;
+      });
+  // Verify downstream client receives 200 okay. i.e, no timeout happened.
+  verifyDownstreamResponse(*response, 200);
+}
+
+// Extending timeout in downstream request handling also no mutation.
+TEST_P(ExtProcIntegrationTest, RequestMessageNewTimeoutNoMutation) {
+  // Set envoy filter timeout to be 200ms.
+  proto_config_.mutable_message_timeout()->set_nanos(200000000);
+  // Config max_message_timeout proto to 10s to enable the new timeout API.
+  proto_config_.mutable_max_message_timeout()->set_seconds(10);
+
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+  auto response = sendDownstreamRequest(absl::nullopt);
+
+  processRequestHeadersMessage(*grpc_upstreams_[0], true,
+                               [this](const HttpHeaders&, HeadersResponse&) {
+                                 // Sending the new timeout API to extend the timeout.
+                                 serverSendNewTimeout(500);
+                                 // ext_proc server stays idle for 300ms before sending back the
+                                 // response.
+                                 timeSystem().advanceTimeWaitImpl(300ms);
+                                 return true;
+                               });
+
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
+  upstream_request_->encodeData(100, true);
+  processResponseHeadersMessage(*grpc_upstreams_[0], false,
+                                [](const HttpHeaders&, HeadersResponse&) { return true; });
+  // Verify downstream client receives 200 okay. i.e, no timeout happened.
+  verifyDownstreamResponse(*response, 200);
+}
+
+// Test only the first new timeout message in one state is accepted.
+TEST_P(ExtProcIntegrationTest, RequestMessageNoMutationMultipleNewTimeout) {
+  // Set envoy filter timeout to be 200ms.
+  proto_config_.mutable_message_timeout()->set_nanos(200000000);
+  // Config max_message_timeout proto to 10s to enable the new timeout API.
+  proto_config_.mutable_max_message_timeout()->set_seconds(10);
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+  auto response = sendDownstreamRequest(absl::nullopt);
+
+  processRequestHeadersMessage(*grpc_upstreams_[0], true,
+                               [this](const HttpHeaders&, HeadersResponse&) {
+                                 // Send a 500ms new timeout update first.
+                                 serverSendNewTimeout(500);
+                                 // Server wait for 100ms.
+                                 timeSystem().advanceTimeWaitImpl(100ms);
+                                 // Send the 2nd 10ms new timeout update.
+                                 // The update is ignored by Envoy. No timeout event
+                                 // happened and the traffic went through fine.
+                                 serverSendNewTimeout(10);
+                                 // Server wait for 300ms
+                                 timeSystem().advanceTimeWaitImpl(300ms);
+                                 return true;
+                               });
+
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
+  upstream_request_->encodeData(100, true);
+  processResponseHeadersMessage(*grpc_upstreams_[0], false,
+                                [](const HttpHeaders&, HeadersResponse&) { return true; });
+  verifyDownstreamResponse(*response, 200);
+}
+
+// Setting new timeout 0ms which is < 1ms. The message is ignored.
+TEST_P(ExtProcIntegrationTest, RequestMessageNewTimeoutNegativeTestTimeoutTooSmall) {
+  // Config max_message_timeout proto to 10s to enable the new timeout API.
+  max_message_timeout_ms_ = 10000;
+  newTimeoutWrongConfigTest(0);
+}
+
+// Setting max_message_timeout proto to be 100ms. And send the new timeout 500ms
+// which is > max_message_timeout(100ms). The message is ignored.
+TEST_P(ExtProcIntegrationTest, RequestMessageNewTimeoutNegativeTestTimeoutTooBigWithSmallMax) {
+  // Config max_message_timeout proto to 100ms to enable the new timeout API.
+  max_message_timeout_ms_ = 100;
+  newTimeoutWrongConfigTest(500);
+}
+
+// Not setting the max_message_timeout effectively disabled the new timeout API.
+TEST_P(ExtProcIntegrationTest, RequestMessageNewTimeoutNegativeTestTimeoutNotAcceptedDefaultMax) {
+  newTimeoutWrongConfigTest(500);
 }
 
 } // namespace Envoy

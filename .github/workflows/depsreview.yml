@@ -11,6 +11,6 @@ jobs:
     if: github.repository == 'envoyproxy/envoy'
     steps:
     - name: 'Checkout Repository'
-      uses: actions/checkout@93ea575cb5d8a053eaa0ac8fa3b40d7e05a33cc8
+      uses: actions/checkout@v3
     - name: 'Dependency Review'
-      uses: actions/dependency-review-action@c090f4e553673e6e505ea70d6a95362ee12adb94
+      uses: actions/dependency-review-action@f46c48ed6d4f1227fb2d9ea62bf6bcbed315589e

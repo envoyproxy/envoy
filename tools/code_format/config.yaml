@@ -309,5 +309,11 @@ visibility_excludes:
 - source/extensions/path/match/uri_template/BUILD
 - source/extensions/path/rewrite/uri_template/BUILD
 - source/extensions/quic/connection_id_generator/BUILD
+- source/extensions/quic/server_preferred_address/BUILD
 - source/extensions/listener_managers/listener_manager/BUILD
 - source/extensions/upstreams/tcp/BUILD
+- source/extensions/health_checkers/BUILD
+- source/extensions/health_checkers/BUILD
+- source/extensions/health_checkers/BUILD
+- source/extensions/config_subscription/rest/BUILD
+- source/extensions/config_subscription/filesystem/BUILD

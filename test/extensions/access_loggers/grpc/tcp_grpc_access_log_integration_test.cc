@@ -107,7 +107,9 @@ public:
                      fake_upstreams_.back()->localAddress());
       access_log->mutable_typed_config()->PackFrom(access_log_config);
 
-      tcp_proxy_config.mutable_access_log_flush_interval()->set_seconds(1); // 1s
+      tcp_proxy_config.mutable_access_log_options()
+          ->mutable_access_log_flush_interval()
+          ->set_seconds(1); // 1s
 
       tcp_proxy->PackFrom(tcp_proxy_config);
     });
@@ -234,9 +236,7 @@ public:
     // Clear connection unique id which is not deterministic.
     log_entry->mutable_common_properties()->clear_stream_id();
 
-    EXPECT_TRUE(TestUtility::protoEqual(request_msg, expected_request_msg,
-                                        /*ignore_repeated_field_ordering=*/false));
-
+    EXPECT_THAT(request_msg, ProtoEq(expected_request_msg));
     return AssertionSuccess();
   }
 
@@ -311,6 +311,10 @@ tcp_logs:
           address: {}
       upstream_cluster: cluster_0
       upstream_request_attempt_count: 1
+      downstream_wire_bytes_sent: 5
+      downstream_wire_bytes_received: 3
+      upstream_wire_bytes_sent: 3
+      upstream_wire_bytes_received: 5
       downstream_direct_remote_address:
         socket_address:
           address: {}
@@ -369,6 +373,10 @@ tcp_logs:
           address: {}
       upstream_cluster: cluster_0
       upstream_request_attempt_count: 1
+      downstream_wire_bytes_sent: 5
+      downstream_wire_bytes_received: 3
+      upstream_wire_bytes_sent: 3
+      upstream_wire_bytes_received: 5
       downstream_direct_remote_address:
         socket_address:
           address: {}
@@ -457,6 +465,8 @@ tcp_logs:
           address: {}
       upstream_cluster: cluster_0
       upstream_request_attempt_count: 1
+      downstream_wire_bytes_sent: 5
+      upstream_wire_bytes_received: 5
       connection_termination_details: rbac_access_denied_matched_policy[none]
       downstream_direct_remote_address:
         socket_address:

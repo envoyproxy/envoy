@@ -63,6 +63,9 @@ envoy_cc_test_library(
     name = "utility_lib",
     srcs = ["utility.cc"],
     hdrs = ["utility.h"],
+    external_deps = [
+        "quiche_http2_adapter",
+    ],
     deps = [
         ":common_proto_cc_proto",
         "//source/common/common:empty_string",

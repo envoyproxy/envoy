@@ -102,7 +102,9 @@ void MultiConnectionBaseImpl::enableHalfClose(bool enabled) {
   }
 }
 
-bool MultiConnectionBaseImpl::isHalfCloseEnabled() { return connections_[0]->isHalfCloseEnabled(); }
+bool MultiConnectionBaseImpl::isHalfCloseEnabled() const {
+  return connections_[0]->isHalfCloseEnabled();
+}
 
 std::string MultiConnectionBaseImpl::nextProtocol() const {
   return connections_[0]->nextProtocol();

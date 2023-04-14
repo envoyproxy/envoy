@@ -40,9 +40,9 @@ Change to the ``examples/csrf/samesite`` directory, and start the containers:
 
   $ pwd
   envoy/examples/csrf/samesite
-  $ docker-compose pull
-  $ docker-compose up --build -d
-  $ docker-compose ps
+  $ docker compose pull
+  $ docker compose up --build -d
+  $ docker compose ps
 
             Name                        Command              State                                Ports
   ---------------------------------------------------------------------------------------------------------------------------------
@@ -55,8 +55,8 @@ Now, switch to the ``crosssite`` directory in the ``csrf`` example, and start th
 
   $ pwd
   envoy/examples/csrf/crosssite
-  $ docker-compose up --build -d
-  $ docker-compose ps
+  $ docker compose up --build -d
+  $ docker compose ps
 
             Name                       Command                State                   Ports
   ----------------------------------------------------------------------------------------------------------

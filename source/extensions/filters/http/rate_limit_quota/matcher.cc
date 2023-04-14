@@ -7,7 +7,6 @@ namespace Extensions {
 namespace HttpFilters {
 namespace RateLimitQuota {
 
-using ::envoy::type::v3::RateLimitStrategy;
 using ValueSpecifierCase = ::envoy::extensions::filters::http::rate_limit_quota::v3::
     RateLimitQuotaBucketSettings_BucketIdBuilder_ValueBuilder::ValueSpecifierCase;
 

@@ -142,7 +142,7 @@ TEST_P(IntegrationTest, PerWorkerStatsAndBalancing) {
 
   // Per-worker listener stats.
   auto check_listener_stats = [this](uint64_t cx_active, uint64_t cx_total) {
-    if (ip_version_ == Network::Address::IpVersion::v4) {
+    if (version_ == Network::Address::IpVersion::v4) {
       test_server_->waitForGaugeEq("listener.127.0.0.1_0.worker_0.downstream_cx_active", cx_active);
       test_server_->waitForGaugeEq("listener.127.0.0.1_0.worker_1.downstream_cx_active", cx_active);
       test_server_->waitForCounterEq("listener.127.0.0.1_0.worker_0.downstream_cx_total", cx_total);
@@ -212,7 +212,7 @@ TEST_P(IntegrationTest, ConnectionBalanceFactory) {
   initialize();
 
   auto check_listener_stats = [this](uint64_t cx_active, uint64_t cx_total) {
-    if (ip_version_ == Network::Address::IpVersion::v4) {
+    if (version_ == Network::Address::IpVersion::v4) {
       test_server_->waitForGaugeEq("listener.127.0.0.1_0.worker_0.downstream_cx_active", cx_active);
       test_server_->waitForGaugeEq("listener.127.0.0.1_0.worker_1.downstream_cx_active", cx_active);
       test_server_->waitForCounterEq("listener.127.0.0.1_0.worker_0.downstream_cx_total", cx_total);
@@ -251,7 +251,7 @@ TEST_P(IntegrationTest, AllWorkersAreHandlingLoad) {
   initialize();
 
   std::string worker0_stat_name, worker1_stat_name;
-  if (ip_version_ == Network::Address::IpVersion::v4) {
+  if (version_ == Network::Address::IpVersion::v4) {
     worker0_stat_name = "listener.127.0.0.1_0.worker_0.downstream_cx_total";
     worker1_stat_name = "listener.127.0.0.1_0.worker_1.downstream_cx_total";
   } else {
@@ -1035,7 +1035,7 @@ TEST_P(IntegrationTest, TestClientAllowChunkedLength) {
 TEST_P(IntegrationTest, BadFirstline) {
   initialize();
   std::string response;
-  sendRawHttpAndWaitForResponse(lookupPort("http"), "hello", &response);
+  sendRawHttpAndWaitForResponse(lookupPort("http"), "hello\r\n", &response);
   EXPECT_THAT(response, StartsWith("HTTP/1.1 400 Bad Request\r\n"));
 }
 
@@ -1053,6 +1053,13 @@ TEST_P(IntegrationTest, MissingDelimiter) {
 }
 
 TEST_P(IntegrationTest, InvalidCharacterInFirstline) {
+#ifndef ENVOY_ENABLE_UHV
+  if (http1_implementation_ == Http1ParserImpl::BalsaParser) {
+    // BalsaParser allows custom methods if UHV is enabled.
+    return;
+  }
+#endif
+
   initialize();
   std::string response;
   sendRawHttpAndWaitForResponse(lookupPort("http"), "GE(T / HTTP/1.1\r\nHost: host\r\n\r\n",
@@ -1505,7 +1512,7 @@ TEST_P(IntegrationTest, AbsolutePathUsingHttpsAllowedInternally) {
 TEST_P(IntegrationTest, TestHostWithAddress) {
   useAccessLog("%REQ(Host)%");
   std::string address_string;
-  if (ip_version_ == Network::Address::IpVersion::v4) {
+  if (version_ == Network::Address::IpVersion::v4) {
     address_string = TestUtility::getIpv4Loopback();
   } else {
     address_string = "[::1]";
@@ -1653,7 +1660,7 @@ TEST_P(IntegrationTest, TestHeadWithExplicitTE) {
 
 TEST_P(IntegrationTest, TestBind) {
   std::string address_string;
-  if (ip_version_ == Network::Address::IpVersion::v4) {
+  if (version_ == Network::Address::IpVersion::v4) {
     address_string = TestUtility::getIpv4Loopback();
   } else {
     address_string = "::1";
@@ -1916,7 +1923,7 @@ INSTANTIATE_TEST_SUITE_P(IpVersionsAndHttp1Parser, UpstreamEndpointIntegrationTe
 TEST_P(UpstreamEndpointIntegrationTest, TestUpstreamEndpointAddress) {
   initialize();
   EXPECT_STREQ(fake_upstreams_[0]->localAddress()->ip()->addressAsString().c_str(),
-               Network::Test::getLoopbackAddressString(ip_version_).c_str());
+               Network::Test::getLoopbackAddressString(version_).c_str());
 }
 
 // Send continuous pipelined requests while not reading responses, to check
@@ -2501,7 +2508,7 @@ TEST_P(IntegrationTest, SetRouteToDelegatingRouteWithClusterOverride) {
   initialize();
 
   const std::string ip_port_pair =
-      absl::StrCat(Network::Test::getLoopbackAddressUrlString(ip_version_), ":",
+      absl::StrCat(Network::Test::getLoopbackAddressUrlString(version_), ":",
                    fake_upstreams_[1]->localAddress()->ip()->port());
 
   Http::TestRequestHeaderMapImpl request_headers{

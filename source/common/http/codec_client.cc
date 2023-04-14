@@ -182,6 +182,35 @@ void CodecClient::onData(Buffer::Instance& data) {
          absl::StrCat("extraneous bytes after response complete: ", data.length()));
 }
 
+void CodecClient::ActiveRequest::decodeHeaders(ResponseHeaderMapPtr&& headers, bool end_stream) {
+  if (header_validator_) {
+    ::Envoy::Http::HeaderValidator::ResponseHeaderMapValidationResult result =
+        header_validator_->validateResponseHeaderMap(*headers);
+    if (!result.ok()) {
+      ENVOY_CONN_LOG(debug, "Response header validation failed\n{}", *parent_.connection_,
+                     *headers);
+      if ((parent_.codec_->protocol() == Protocol::Http2 &&
+           !parent_.host_->cluster()
+                .http2Options()
+                .override_stream_error_on_invalid_http_message()
+                .value()) ||
+          (parent_.codec_->protocol() == Protocol::Http3 &&
+           !parent_.host_->cluster()
+                .http3Options()
+                .override_stream_error_on_invalid_http_message()
+                .value())) {
+        parent_.host_->cluster().trafficStats()->upstream_cx_protocol_error_.inc();
+        parent_.protocol_error_ = true;
+        parent_.close();
+      } else {
+        inner_encoder_->getStream().resetStream(StreamResetReason::ProtocolError);
+      }
+      return;
+    }
+  }
+  ResponseDecoderWrapper::decodeHeaders(std::move(headers), end_stream);
+}
+
 CodecClientProd::CodecClientProd(CodecType type, Network::ClientConnectionPtr&& connection,
                                  Upstream::HostDescriptionConstSharedPtr host,
                                  Event::Dispatcher& dispatcher,

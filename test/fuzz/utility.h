@@ -13,7 +13,7 @@
 #include "test/mocks/upstream/host.h"
 #include "test/test_common/utility.h"
 
-#include "nghttp2/nghttp2.h"
+#include "quiche/http2/adapter/header_validator.h"
 
 // Strong assertion that applies across all compilation modes and doesn't rely
 // on gtest, which only provides soft fails that don't trip oss-fuzz failures.
@@ -53,7 +53,7 @@ inline std::string replaceInvalidHostCharacters(absl::string_view string) {
   std::string filtered;
   filtered.reserve(string.length());
   for (const char& c : string) {
-    if (nghttp2_check_authority(reinterpret_cast<const uint8_t*>(&c), 1)) {
+    if (http2::adapter::HeaderValidator::IsValidAuthority(absl::string_view(&c, 1))) {
       filtered.push_back(c);
     } else {
       filtered.push_back('0');

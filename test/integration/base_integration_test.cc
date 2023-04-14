@@ -208,7 +208,7 @@ std::string BaseIntegrationTest::finalizeConfigWithPorts(ConfigHelper& config_he
       resource->PackFrom(listener);
     }
     TestEnvironment::writeStringToFileForTest(
-        lds_path, MessageUtil::getJsonStringFromMessageOrDie(lds), true);
+        lds_path, MessageUtil::getJsonStringFromMessageOrError(lds), true);
 
     // Now that the listeners have been written to the lds file, remove them from static resources
     // or they will not be reloadable.
@@ -515,7 +515,8 @@ std::string BaseIntegrationTest::waitForAccessLog(const std::string& filename, u
 
   // Wait a max of 1s for logs to flush to disk.
   std::string contents;
-  for (int i = 0; i < 1000; ++i) {
+  const int num_iterations = TSAN_TIMEOUT_FACTOR * 1000;
+  for (int i = 0; i < num_iterations; ++i) {
     contents = TestEnvironment::readFileToStringForTest(filename);
     std::vector<std::string> entries = absl::StrSplit(contents, '\n', absl::SkipEmpty());
     if (entries.size() >= entry + 1) {
@@ -665,9 +666,10 @@ AssertionResult BaseIntegrationTest::waitForPortAvailable(uint32_t port,
   Event::TestTimeSystem::RealTimeBound bound(timeout);
   while (bound.withinBound()) {
     try {
-      Network::TcpListenSocket(Network::Utility::getAddressWithPort(
-                                   *Network::Test::getCanonicalLoopbackAddress(version_), port),
-                               nullptr, true);
+      Network::TcpListenSocket give_me_a_name(
+          Network::Utility::getAddressWithPort(
+              *Network::Test::getCanonicalLoopbackAddress(version_), port),
+          nullptr, true);
       return AssertionSuccess();
     } catch (const EnvoyException&) {
       // The nature of this function requires using a real sleep here.

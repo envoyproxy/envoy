@@ -3,10 +3,10 @@
 /**
  * This file contains functions related to time points and durations.
  *
- * Envoy has a time type that contains both a system time point and a steady
- * ("monotonic") time point. However, only the system time is exposed to the
- * tracing subsystem. This may be remedied in the future, but for now we work
- * with the system time.
+ * Envoy has a TimeSource abstraction that provides both a system time point and
+ * a steady ("monotonic") time point. However, only the system time is exposed
+ * to the tracing subsystem. This may be remedied in the future, but for now we
+ * work with the system time.
  *
  * This is problematic for the Datadog core tracing library (dd-trace-cpp),
  * because it uses the steady time to calculate the duration of a span
@@ -19,9 +19,9 @@
  * estimateTime function.
  */
 
-#include <datadog/clock.h>
-
 #include "envoy/common/time.h"
+
+#include "datadog/clock.h"
 
 namespace Envoy {
 namespace Extensions {

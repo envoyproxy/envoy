@@ -119,6 +119,71 @@ Api::IoCallSizeResult FileImplPosix::pwrite(const void* buf, uint64_t count, uin
   return (rc == -1) ? resultFailure(rc, errno) : resultSuccess(rc);
 }
 
+static FileType typeFromStat(const struct stat& s) {
+  if (S_ISDIR(s.st_mode)) {
+    return FileType::Directory;
+  }
+  if (S_ISREG(s.st_mode)) {
+    return FileType::Regular;
+  }
+  return FileType::Other;
+}
+
+static constexpr absl::optional<SystemTime> systemTimeFromTimespec(const struct timespec& t) {
+  if (t.tv_sec == 0) {
+    return absl::nullopt;
+  }
+  return timespecToChrono(t);
+}
+
+static FileInfo infoFromStat(absl::string_view path, const struct stat& s, FileType type) {
+  return {
+      std::string{InstanceImplPosix().splitPathFromFilename(path).file_},
+      s.st_size,
+      type,
+#ifdef _DARWIN_FEATURE_64_BIT_INODE
+      systemTimeFromTimespec(s.st_ctimespec),
+      systemTimeFromTimespec(s.st_atimespec),
+      systemTimeFromTimespec(s.st_mtimespec),
+#else
+      systemTimeFromTimespec(s.st_ctim),
+      systemTimeFromTimespec(s.st_atim),
+      systemTimeFromTimespec(s.st_mtim),
+#endif
+  };
+}
+
+static FileInfo infoFromStat(absl::string_view path, const struct stat& s) {
+  return infoFromStat(path, s, typeFromStat(s));
+}
+
+Api::IoCallResult<FileInfo> FileImplPosix::info() {
+  ASSERT(isOpen());
+  struct stat s;
+  if (::fstat(fd_, &s) != 0) {
+    return resultFailure<FileInfo>({}, errno);
+  }
+  return resultSuccess(infoFromStat(path(), s));
+}
+
+Api::IoCallResult<FileInfo> InstanceImplPosix::stat(absl::string_view path) {
+  struct stat s;
+  std::string full_path{path};
+  if (::stat(full_path.c_str(), &s) != 0) {
+    if (errno == ENOENT) {
+      if (::lstat(full_path.c_str(), &s) == 0 && S_ISLNK(s.st_mode)) {
+        // Special case. This directory entity is a symlink,
+        // but the reference is broken as the target could not be stat()'ed.
+        // After confirming this with an lstat, treat this file entity as
+        // a regular file, which may be unlink()'ed.
+        return resultSuccess(infoFromStat(path, s, FileType::Regular));
+      }
+    }
+    return resultFailure<FileInfo>({}, errno);
+  }
+  return resultSuccess(infoFromStat(path, s));
+}
+
 FileImplPosix::FlagsAndMode FileImplPosix::translateFlag(FlagSet in) {
   int out = 0;
   mode_t mode = 0;

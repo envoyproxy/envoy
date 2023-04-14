@@ -173,7 +173,7 @@ public:
               upstreamHttpProtocolOptions, (), (const));
   MOCK_METHOD(const absl::optional<const envoy::config::core::v3::AlternateProtocolsCacheOptions>&,
               alternateProtocolsCacheOptions, (), (const));
-  MOCK_METHOD(absl::optional<std::string>, edsServiceName, (), (const));
+  MOCK_METHOD(const std::string&, edsServiceName, (), (const));
   MOCK_METHOD(void, createNetworkFilterChain, (Network::Connection&), (const));
   MOCK_METHOD(std::vector<Http::Protocol>, upstreamHttpProtocol, (absl::optional<Http::Protocol>),
               (const));
@@ -186,6 +186,7 @@ public:
                const Http::FilterChainFactory::UpgradeMap* upgrade_map,
                Http::FilterChainManager& manager),
               (const));
+  MOCK_METHOD(Http::HeaderValidatorPtr, makeHeaderValidator, (Http::Protocol), (const));
 
   Http::Http1::CodecStats& http1CodecStats() const override;
   Http::Http2::CodecStats& http2CodecStats() const override;

@@ -30,7 +30,6 @@ envoy_cc_library(
         ":engine_common_lib",
         "//library/common/bridge:utility_lib",
         "//library/common/common:lambda_logger_delegate_lib",
-        "//library/common/config:config_lib",
         "//library/common/data:utility_lib",
         "//library/common/event:provisional_dispatcher_lib",
         "//library/common/http:client_lib",
@@ -50,12 +49,10 @@ envoy_cc_library(
     hdrs = ["engine_common.h"],
     repository = "@envoy",
     deps = [
-        "//library/common/config:config_lib",
         "@envoy//source/common/common:minimal_logger_lib",
         "@envoy//source/common/common:random_generator_lib",
         "@envoy//source/common/runtime:runtime_lib",
         "@envoy//source/exe:stripped_main_base_lib",
-        "@envoy//source/extensions/listener_managers/listener_manager:listener_manager_lib",
     ] + select({
         "@envoy//bazel:disable_signal_trace": [],
         "//conditions:default": [

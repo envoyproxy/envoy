@@ -4,6 +4,7 @@
 #include "source/common/ssl/matching/inputs.h"
 
 #include "test/mocks/ssl/mocks.h"
+#include "test/mocks/stream_info/mocks.h"
 
 namespace Envoy {
 namespace Ssl {
@@ -14,10 +15,8 @@ using testing::ReturnRef;
 
 TEST(Authentication, UriSanInput) {
   UriSanInput<Http::HttpMatchingData> input;
-  Network::ConnectionInfoSetterImpl connection_info_provider(
-      std::make_shared<Network::Address::Ipv4Instance>(80),
-      std::make_shared<Network::Address::Ipv4Instance>(80));
-  Http::Matching::HttpMatchingDataImpl data(connection_info_provider);
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  Http::Matching::HttpMatchingDataImpl data(stream_info);
 
   {
     const auto result = input.get(data);
@@ -27,7 +26,7 @@ TEST(Authentication, UriSanInput) {
   }
 
   std::shared_ptr<Ssl::MockConnectionInfo> ssl = std::make_shared<Ssl::MockConnectionInfo>();
-  connection_info_provider.setSslConnection(ssl);
+  stream_info.downstream_connection_info_provider_->setSslConnection(ssl);
 
   {
     std::vector<std::string> uri_sans;
@@ -62,11 +61,8 @@ TEST(Authentication, UriSanInput) {
 
 TEST(Authentication, DnsSanInput) {
   DnsSanInput<Http::HttpMatchingData> input;
-  Network::ConnectionInfoSetterImpl connection_info_provider(
-      std::make_shared<Network::Address::Ipv4Instance>(80),
-      std::make_shared<Network::Address::Ipv4Instance>(80));
-  Http::Matching::HttpMatchingDataImpl data(connection_info_provider);
-
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  Http::Matching::HttpMatchingDataImpl data(stream_info);
   {
     const auto result = input.get(data);
     EXPECT_EQ(result.data_availability_,
@@ -75,8 +71,7 @@ TEST(Authentication, DnsSanInput) {
   }
 
   std::shared_ptr<Ssl::MockConnectionInfo> ssl = std::make_shared<Ssl::MockConnectionInfo>();
-  connection_info_provider.setSslConnection(ssl);
-
+  stream_info.downstream_connection_info_provider_->setSslConnection(ssl);
   {
     std::vector<std::string> dns_sans;
     EXPECT_CALL(*ssl, dnsSansPeerCertificate()).WillRepeatedly(Return(dns_sans));
@@ -110,10 +105,9 @@ TEST(Authentication, DnsSanInput) {
 
 TEST(Authentication, SubjectInput) {
   SubjectInput<Http::HttpMatchingData> input;
-  Network::ConnectionInfoSetterImpl connection_info_provider(
-      std::make_shared<Network::Address::Ipv4Instance>(80),
-      std::make_shared<Network::Address::Ipv4Instance>(80));
-  Http::Matching::HttpMatchingDataImpl data(connection_info_provider);
+
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  Http::Matching::HttpMatchingDataImpl data(stream_info);
 
   {
     const auto result = input.get(data);
@@ -123,7 +117,8 @@ TEST(Authentication, SubjectInput) {
   }
 
   std::shared_ptr<Ssl::MockConnectionInfo> ssl = std::make_shared<Ssl::MockConnectionInfo>();
-  connection_info_provider.setSslConnection(ssl);
+  stream_info.downstream_connection_info_provider_->setSslConnection(ssl);
+  // connection_info_provider->setSslConnection(ssl);
   std::string subject;
   EXPECT_CALL(*ssl, subjectPeerCertificate()).WillRepeatedly(ReturnRef(subject));
 

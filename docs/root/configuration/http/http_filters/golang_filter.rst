@@ -43,7 +43,7 @@ For example, to build the ``.so`` for a ``foo`` plugin, you might run:
 
 .. code-block:: console
 
-   $ bazel run @go_sdk//:bin/go build --buildmode=c-shared  -v -o path/to/output/libfoo.so path/to/src/foo
+   $ bazel run @go_sdk//:bin/go build -- --buildmode=c-shared  -v -o path/to/output/libfoo.so path/to/src/foo
 
 Configuration
 -------------
@@ -122,3 +122,8 @@ Go plugins can also be configured on a
    :lines: 16-44
    :emphasize-lines: 2-7, 21-29
    :caption: :download:`golang-with-per-virtualhost-config.yaml </_configs/go/golang-with-per-virtualhost-config.yaml>`
+
+Complete example
+----------------
+
+Learn more about building and running a plugin for the Envoy Go filter in the step by step :ref:`Envoy Go Sandbox <install_sandboxes_golang>`.

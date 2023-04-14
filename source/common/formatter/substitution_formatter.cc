@@ -29,6 +29,7 @@
 #include "source/common/stream_info/utility.h"
 
 #include "absl/strings/str_format.h"
+#include "absl/strings/str_replace.h"
 #include "absl/strings/str_split.h"
 #include "fmt/format.h"
 
@@ -150,7 +151,7 @@ std::string JsonFormatterImpl::format(const Http::RequestHeaderMap& request_head
       request_headers, response_headers, response_trailers, stream_info, local_reply_body);
 
   const std::string log_line =
-      MessageUtil::getJsonStringFromMessageOrDie(output_struct, false, true);
+      MessageUtil::getJsonStringFromMessageOrError(output_struct, false, true);
   return absl::StrCat(log_line, "\n");
 }
 
@@ -281,6 +282,9 @@ ProtobufWkt::Value StructFormatter::structFormatMapCallback(
       continue;
     }
     (*fields)[pair.first] = value;
+  }
+  if (omit_empty_values_ && output.fields().empty()) {
+    return ValueUtil::nullValue();
   }
   return ValueUtil::structValue(output);
 }
@@ -771,6 +775,15 @@ public:
       return unspecifiedValue();
     }
 
+    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.format_ports_as_numbers")) {
+      if (extraction_type_ == StreamInfoFormatter::StreamInfoAddressFieldExtractionType::JustPort) {
+        const auto port = StreamInfo::Utility::extractDownstreamAddressJustPort(*address);
+        if (port) {
+          return ValueUtil::numberValue(*port);
+        }
+        return unspecifiedValue();
+      }
+    }
     return ValueUtil::stringValue(toString(*address));
   }
 
@@ -1065,7 +1078,7 @@ const StreamInfoFormatter::FieldExtractorLookupTbl& StreamInfoFormatter::getKnow
                             [](const std::string&, const absl::optional<size_t>&) {
                               return std::make_unique<StreamInfoDurationFieldExtractor>(
                                   [](const StreamInfo::StreamInfo& stream_info) {
-                                    return stream_info.requestComplete();
+                                    return stream_info.currentDuration();
                                   });
                             }}},
                           {"RESPONSE_FLAGS",
@@ -1464,6 +1477,20 @@ const StreamInfoFormatter::FieldExtractorLookupTbl& StreamInfoFormatter::getKnow
                               return std::make_unique<StreamInfoSslConnectionInfoFieldExtractor>(
                                   [](const Ssl::ConnectionInfo& connection_info) {
                                     return connection_info.urlEncodedPemEncodedPeerCertificate();
+                                  });
+                            }}},
+                          {"DOWNSTREAM_TRANSPORT_FAILURE_REASON",
+                           {CommandSyntaxChecker::COMMAND_ONLY,
+                            [](const std::string&, const absl::optional<size_t>&) {
+                              return std::make_unique<StreamInfoStringFieldExtractor>(
+                                  [](const StreamInfo::StreamInfo& stream_info) {
+                                    absl::optional<std::string> result;
+                                    if (!stream_info.downstreamTransportFailureReason().empty()) {
+                                      result = absl::StrReplaceAll(
+                                          stream_info.downstreamTransportFailureReason(),
+                                          {{" ", "_"}});
+                                    }
+                                    return result;
                                   });
                             }}},
                           {"UPSTREAM_TRANSPORT_FAILURE_REASON",
@@ -1870,7 +1897,12 @@ MetadataFormatter::formatMetadata(const envoy::config::core::v3::Metadata& metad
   if (value.kind_case() == ProtobufWkt::Value::kStringValue) {
     str = value.string_value();
   } else {
-    str = MessageUtil::getJsonStringFromMessageOrDie(value, false, true);
+    ProtobufUtil::StatusOr<std::string> json_or_error =
+        MessageUtil::getJsonStringFromMessage(value, false, true);
+    ENVOY_BUG(json_or_error.ok(), "Failed to parse json");
+    if (json_or_error.ok()) {
+      str = json_or_error.value();
+    }
   }
   truncate(str, max_length_);
   return str;

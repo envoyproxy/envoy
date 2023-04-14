@@ -17,7 +17,7 @@ routing PRs, questions, etc. to the right place.
 * Stephan Zuercher ([zuercher](https://github.com/zuercher)) (zuercher@gmail.com)
   * Load balancing, upstream clusters and cluster manager, logging, complex HTTP routing
     (metadata, etc.), and macOS build.
-* Lizan Zhou ([lizan](https://github.com/lizan)) (lizan@tetrate.io)
+* Lizan Zhou ([lizan](https://github.com/lizan)) (lizan.j@gmail.com)
   * gRPC, gRPC/JSON transcoding, and core networking (transport socket abstractions), Bazel, build
     issues, and CI in general.
 * Snow Pettersen ([snowp](https://github.com/snowp)) (aickck@gmail.com)
@@ -35,8 +35,6 @@ routing PRs, questions, etc. to the right place.
 
 * Joshua Marantz ([jmarantz](https://github.com/jmarantz)) (jmarantz@google.com)
   * Stats, abseil, scalability, and performance.
-* Antonio Vicente ([antoniovicente](https://github.com/antoniovicente)) (avd@google.com)
-  * Event management, security, performance, data plane.
 * Adi Peleg ([adisuissa](https://github.com/adisuissa)) (adip@google.com)
   * xDS APIs, configuration, control plane, fuzzing.
 * Kevin Baichoo ([KBaichoo](https://github.com/KBaichoo)) (kbaichoo@google.com)
@@ -47,6 +45,8 @@ routing PRs, questions, etc. to the right place.
   * Bazel, CI, compilers, linkers, general build issues, etc.
 * Kuat Yessenov ([kyessenov](https://github.com/kyessenov)) (kuat@google.com)
   * Listeners, RBAC, CEL, matching, Istio.
+* Raven Black ([ravenblackx](https://github.com/ravenblackx)) (ravenblack@dropbox.com)
+  * Caches, file filters, and file I/O.
 
 # Envoy mobile maintainers
 
@@ -111,6 +111,7 @@ contributors to envoy-setec and relevant Slack channels from:
 * Alan Chiu ([buildbreaker](https://github.com/buildbreaker)) (achiu@lyft.com)
 * Charles Le Borgne ([carloseltuerto](https://github.com/carloseltuerto)) (cleborgne@google.com)
 * William A Rowe Jr ([wrowe](https://github.com/wrowe)) (wrowe@rowe-clan.net)
+* Antonio Vicente ([antoniovicente](https://github.com/antoniovicente)) (avd@google.com)
 
 # Friends of Envoy
 

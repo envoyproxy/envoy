@@ -200,7 +200,7 @@ $ pprof -http=localhost:9999 /path/to/envoy perf.data
 
 Note that to see correct function names you need to pass an Envoy binary with debug symbols retained.
 Its version must be the same as the version of the profiled Envoy binary.
-You can get it from [envoyproxy/envoy-debug](https://hub.docker.com/r/envoyproxy/envoy-debug).
+You can get it from [envoyproxy/envoy:debug](https://hub.docker.com/r/envoyproxy/envoy/tags?name=debug).
 
 Alternatively, you can use [allegro/envoy-perf-pprof](https://github.com/allegro/envoy-perf-pprof) which
 wraps the pprof setup mentioned above (installing perf_to_profile, pprof and getting

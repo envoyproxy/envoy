@@ -1678,7 +1678,9 @@ TEST_F(OutlierDetectorImplTest, CrossThreadRemoveRace) {
   loadRq(hosts_[0], 4, 500);
 
   Event::PostCb post_cb;
-  EXPECT_CALL(dispatcher_, post(_)).WillOnce(SaveArg<0>(&post_cb));
+  EXPECT_CALL(dispatcher_, post(_)).WillOnce([&post_cb](Event::PostCb cb) {
+    post_cb = std::move(cb);
+  });
   loadRq(hosts_[0], 1, 500);
 
   // Remove before the cross thread event comes in.
@@ -1701,7 +1703,9 @@ TEST_F(OutlierDetectorImplTest, CrossThreadDestroyRace) {
   loadRq(hosts_[0], 4, 500);
 
   Event::PostCb post_cb;
-  EXPECT_CALL(dispatcher_, post(_)).WillOnce(SaveArg<0>(&post_cb));
+  EXPECT_CALL(dispatcher_, post(_)).WillOnce([&post_cb](Event::PostCb cb) {
+    post_cb = std::move(cb);
+  });
   loadRq(hosts_[0], 1, 500);
 
   // Destroy before the cross thread event comes in.
@@ -1725,7 +1729,9 @@ TEST_F(OutlierDetectorImplTest, CrossThreadFailRace) {
   loadRq(hosts_[0], 4, 500);
 
   Event::PostCb post_cb;
-  EXPECT_CALL(dispatcher_, post(_)).WillOnce(SaveArg<0>(&post_cb));
+  EXPECT_CALL(dispatcher_, post(_)).WillOnce([&post_cb](Event::PostCb cb) {
+    post_cb = std::move(cb);
+  });
   loadRq(hosts_[0], 1, 500);
 
   time_system_.setMonotonicTime(std::chrono::milliseconds(0));
@@ -2350,7 +2356,7 @@ TEST(OutlierUtility, SRThreshold) {
   DetectorImpl::EjectionPair success_rate_nums =
       DetectorImpl::successRateEjectionThreshold(sum, data, 1.9);
   EXPECT_EQ(90.0, success_rate_nums.success_rate_average_); // average success rate
-  EXPECT_EQ(52.0, success_rate_nums.ejection_threshold_);   // ejection threshold
+  EXPECT_EQ(52.0, success_rate_nums.ejection_threshold_);   //  ejection threshold
 }
 
 } // namespace

@@ -5,6 +5,7 @@ import io.envoyproxy.envoymobile.engine.EnvoyConfiguration.TrustChainVerificatio
 import io.envoyproxy.envoymobile.engine.EnvoyEngine
 import io.envoyproxy.envoymobile.engine.EnvoyEngineImpl
 import io.envoyproxy.envoymobile.engine.EnvoyNativeFilterConfig
+import io.envoyproxy.envoymobile.engine.VirtualClusterConfig
 import io.envoyproxy.envoymobile.engine.types.EnvoyHTTPFilterFactory
 import io.envoyproxy.envoymobile.engine.types.EnvoyKeyValueStore
 import io.envoyproxy.envoymobile.engine.types.EnvoyStringAccessor
@@ -37,12 +38,13 @@ open class EngineBuilder(
   protected var logger: ((String) -> Unit)? = null
   protected var eventTracker: ((Map<String, String>) -> Unit)? = null
   protected var enableProxying = false
+  private var runtimeGuards = mutableMapOf<String, Boolean>()
   private var enableSkipDNSLookupForProxiedRequests = false
   private var engineType: () -> EnvoyEngine = {
     EnvoyEngineImpl(onEngineRunning, logger, eventTracker)
   }
   private var logLevel = LogLevel.INFO
-  private var adminInterfaceEnabled = false
+  internal var adminInterfaceEnabled = false
   private var grpcStatsDomain: String? = null
   private var connectTimeoutSeconds = 30
   private var dnsRefreshSeconds = 60
@@ -54,12 +56,10 @@ open class EngineBuilder(
   private var enableDNSCache = false
   private var dnsCacheSaveIntervalSeconds = 1
   private var enableDrainPostDnsRefresh = false
-  private var enableHttp3 = true
+  internal var enableHttp3 = true
   private var enableHappyEyeballs = true
   private var enableGzipDecompression = true
-  internal var enableGzipCompression = false
   private var enableBrotliDecompression = false
-  internal var enableBrotliCompression = false
   private var enableSocketTagging = false
   private var enableInterfaceBinding = false
   private var h2ConnectionKeepaliveIdleIntervalMilliseconds = 1
@@ -71,13 +71,28 @@ open class EngineBuilder(
   private var appVersion = "unspecified"
   private var appId = "unspecified"
   private var trustChainVerification = TrustChainVerification.VERIFY_TRUST_CHAIN
-  private var virtualClusters = mutableListOf<String>()
+  private var virtualClustersLegacy = mutableListOf<String>()
+  private var virtualClusters = mutableListOf<VirtualClusterConfig>()
   private var platformFilterChain = mutableListOf<EnvoyHTTPFilterFactory>()
   private var nativeFilterChain = mutableListOf<EnvoyNativeFilterConfig>()
   private var stringAccessors = mutableMapOf<String, EnvoyStringAccessor>()
   private var keyValueStores = mutableMapOf<String, EnvoyKeyValueStore>()
   private var statsSinks = listOf<String>()
   private var enablePlatformCertificatesValidation = false
+  private var rtdsLayerName: String = ""
+  private var rtdsTimeoutSeconds: Int = 0
+  private var adsAddress: String = ""
+  private var adsPort: Int = 0
+  private var adsJwtToken: String = ""
+  private var adsJwtTokenLifetimeSeconds: Int = 0
+  private var adsSslRootCerts: String = ""
+  private var nodeId: String = ""
+  private var nodeRegion: String = ""
+  private var nodeZone: String = ""
+  private var nodeSubZone: String = ""
+  private var cdsResourcesLocator: String = ""
+  private var cdsTimeoutSeconds: Int = 0
+  private var enableCds: Boolean = false
 
   /**
    * Add a log level to use with Envoy.
@@ -225,20 +240,6 @@ open class EngineBuilder(
   fun enableDNSCache(enableDNSCache: Boolean, saveInterval: Int = 1): EngineBuilder {
     this.enableDNSCache = enableDNSCache
     this.dnsCacheSaveIntervalSeconds = saveInterval
-    return this
-  }
-
-  /**
-   * Specify whether to enable experimental HTTP/3 (QUIC) support. Note the actual protocol will
-   * be negotiated with the upstream endpoint and so upstream support is still required for HTTP/3
-   * to be utilized.
-   *
-   * @param enableHttp3 whether to enable HTTP/3.
-   *
-   * @return This builder.
-   */
-  fun enableHttp3(enableHttp3: Boolean): EngineBuilder {
-    this.enableHttp3 = enableHttp3
     return this
   }
 
@@ -559,22 +560,130 @@ open class EngineBuilder(
    * @return this builder.
    */
   fun addVirtualCluster(cluster: String): EngineBuilder {
-    this.virtualClusters.add(cluster)
+    this.virtualClustersLegacy.add(cluster)
     return this
   }
 
   /**
-   * Enable admin interface on 127.0.0.1:9901 address. Admin interface is intended to be
-   * used for development/debugging purposes only. Enabling it in production may open
-   * your app to security vulnerabilities.
+   * Add virtual cluster configurations.
    *
-   * Note this will not work with the default production build, as it builds with admin
-   * functionality disabled via --define=admin_functionality=disabled
+   * @param configs structured configurations of virtual clusters.
    *
    * @return this builder.
    */
-  fun enableAdminInterface(): EngineBuilder {
-    this.adminInterfaceEnabled = true
+  fun addVirtualClusters(configs: List<VirtualClusterConfig>): EngineBuilder {
+    this.virtualClusters + configs;
+    return this
+  }
+
+  /**
+   * Sets the node.id field in the Bootstrap configuration.
+   *
+   * @param nodeId the node ID.
+   *
+   * @return this builder.
+   */
+  fun setNodeId(nodeId: String): EngineBuilder {
+    this.nodeId = nodeId
+    return this
+  }
+
+  /**
+   * Sets the node.locality field in the Bootstrap configuration.
+   *
+   * @param region the region of the node locality.
+   * @param zone the zone of the node locality.
+   * @param subZone the sub-zone of the node locality.
+   *
+   * @return this builder.
+   */
+  fun setNodeLocality(region: String, zone: String, subZone: String): EngineBuilder {
+    this.nodeRegion = region
+    this.nodeZone = zone
+    this.nodeSubZone = subZone
+    return this
+  }
+
+  /**
+  * Adds an ADS layer.
+  * Note that only the state-of-the-world gRPC protocol is supported, not Delta gRPC.
+  *
+  * @param address the network address of the server.
+  *
+  * @param port the port of the server.
+  *
+  * @param jwtToken the JWT token.
+  *
+  * @param jwtTokenLifetimeSeconds the lifetime of the JWT token. If zero,
+  *                                a default value is set in engine_builder.h.
+  *
+  * @param sslRootCerts the SSL root certificates.
+  *
+  * @return this builder.
+  */
+  fun setAggregatedDiscoveryService(
+    address: String,
+    port: Int,
+    jwtToken: String = "",
+    jwtTokenLifetimeSeconds: Int = 0,
+    sslRootCerts: String = ""
+  ): EngineBuilder {
+    this.adsAddress = address
+    this.adsPort = port
+    this.adsJwtToken = jwtToken
+    this.adsJwtTokenLifetimeSeconds = jwtTokenLifetimeSeconds
+    this.adsSslRootCerts = sslRootCerts
+    return this
+  }
+
+  /**
+  * Adds a CDS layer.
+  *
+  * @param resourcesLocator The xdstp resource URI for fetching clusters.
+  *                         If empty, xdstp is not used and a wildcard is inferred.
+  *
+  * @param timeoutSeconds The timeout in seconds. If zero, a default value is
+  *                       set in engine_builder.h.
+  *
+  * @return this builder.
+  */
+  fun addCdsLayer(
+    resourcesLocator: String = "",
+    timeoutSeconds: Int = 0,
+  ): EngineBuilder {
+    this.cdsResourcesLocator = resourcesLocator
+    this.cdsTimeoutSeconds = timeoutSeconds
+    this.enableCds = true
+    return this
+  }
+
+
+  /**
+  * Adds an RTDS layer to default config. Requires that ADS be configured.
+  *
+  * @param layerName the layer name.
+  *
+  * @param timeoutSeconds The timeout in seconds. If zero, a default value is
+  *                       set in engine_builder.h.
+  *
+  * @return this builder.
+  */
+  fun addRtdsLayer(layerName: String, timeoutSeconds: Int = 0): EngineBuilder {
+    this.rtdsLayerName = layerName
+    this.rtdsTimeoutSeconds = timeoutSeconds
+    return this
+  }
+
+  /**
+   * Set a runtime guard with the provided value.
+   *
+   * @param name the name of the runtime guard, e.g. test_feature_false.
+   * @param value the value for the runtime guard.
+   *
+   * @return This builder.
+   */
+  fun setRuntimeGuard(name: String, value: Boolean): EngineBuilder {
+    this.runtimeGuards.put(name, value)
     return this
   }
 
@@ -600,9 +709,7 @@ open class EngineBuilder(
       enableDrainPostDnsRefresh,
       enableHttp3,
       enableGzipDecompression,
-      enableGzipCompression,
       enableBrotliDecompression,
-      enableBrotliCompression,
       enableSocketTagging,
       enableHappyEyeballs,
       enableInterfaceBinding,
@@ -615,15 +722,32 @@ open class EngineBuilder(
       appVersion,
       appId,
       trustChainVerification,
+      virtualClustersLegacy,
       virtualClusters,
       nativeFilterChain,
       platformFilterChain,
       stringAccessors,
       keyValueStores,
       statsSinks,
+      runtimeGuards,
       enableSkipDNSLookupForProxiedRequests,
-      enablePlatformCertificatesValidation
+      enablePlatformCertificatesValidation,
+      rtdsLayerName,
+      rtdsTimeoutSeconds,
+      adsAddress,
+      adsPort,
+      adsJwtToken,
+      adsJwtTokenLifetimeSeconds,
+      adsSslRootCerts,
+      nodeId,
+      nodeRegion,
+      nodeZone,
+      nodeSubZone,
+      cdsResourcesLocator,
+      cdsTimeoutSeconds,
+      enableCds,
     )
+
 
     return when (configuration) {
       is Custom -> {
@@ -667,5 +791,4 @@ open class EngineBuilder(
     this.enablePlatformCertificatesValidation = enablePlatformCertificatesValidation
     return this
   }
-
 }

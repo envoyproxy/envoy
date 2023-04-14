@@ -31,8 +31,7 @@ MAINTAINERS = {
     'zuercher': 'U78J72Q82',
     'phlax': 'U017PLM0GNQ',
     'jmarantz': 'U80HPLBPG',
-    'antoniovicente': 'UKVNCQ212',
-    'wrowe': 'UBQR8NGBS',
+    'ravenblackx': 'U02MJHFEX35',
     'yanavlasov': 'UJHLR5KFS',
     'RyanTheOptimist': 'U01SW3JC8GP',
     'adisuissa': 'UT17EMMTP',
@@ -127,17 +126,13 @@ def needs_api_review(labels, repo, pr_info):
     # repokitten tags each commit as pending unless there has been an API LGTM
     # since the latest API changes. If this PR is tagged pendding it needs an
     # API review, otherwise it's set.
-    headers, data = repo._requester.requestJsonAndCheck(
-        "GET",
-        ("https://api.github.com/repos/envoyproxy/envoy/statuses/" + pr_info.head.sha),
-    )
-    if (data and data[0]["state"] == 'pending'):
-        return True
-    return False
+    status = repo.get_commit(pr_info.head.sha).get_statuses()
+    return status[0].state == "pending" if status.totalCount else False
 
 
-def track_prs():
-    git = github.Github()
+def track_prs(github_token):
+    git = github.Github(github_token)
+
     repo = git.get_repo('envoyproxy/envoy')
 
     # The list of PRs which are not waiting, but are well within review SLO
@@ -244,7 +239,19 @@ if __name__ == '__main__':
         help="true if this is run by the daily cron job, false if run manually by a developer")
     args = parser.parse_args()
 
-    maintainers_and_messages, shephards_and_messages, stalled_prs = track_prs()
+    github_token = os.getenv('GITHUB_TOKEN')
+    if not github_token:
+        print('Missing GITHUB_TOKEN: please check github workflow configuration')
+        sys.exit(1)
+
+    slack_bot_token = os.getenv('SLACK_BOT_TOKEN')
+    if not slack_bot_token:
+        print(
+            'Missing SLACK_BOT_TOKEN: please export token from https://api.slack.com/apps/A023NPQQ33K/oauth?'
+        )
+        sys.exit(1)
+
+    maintainers_and_messages, shephards_and_messages, stalled_prs = track_prs(github_token)
 
     if not args.cron_job:
         print(maintainers_and_messages)
@@ -254,14 +261,7 @@ if __name__ == '__main__':
         print(stalled_prs)
         exit(0)
 
-    SLACK_BOT_TOKEN = os.getenv('SLACK_BOT_TOKEN')
-    if not SLACK_BOT_TOKEN:
-        print(
-            'Missing SLACK_BOT_TOKEN: please export token from https://api.slack.com/apps/A023NPQQ33K/oauth?'
-        )
-        sys.exit(1)
-
-    client = WebClient(token=SLACK_BOT_TOKEN)
+    client = WebClient(token=slack_bot_token)
     post_to_oncall(client, maintainers_and_messages['unassigned'], stalled_prs)
     post_to_assignee(client, shephards_and_messages, API_REVIEWERS)
     post_to_assignee(client, maintainers_and_messages, MAINTAINERS)

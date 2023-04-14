@@ -5,6 +5,7 @@
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/extensions/clusters/dynamic_forward_proxy/v3/cluster.pb.h"
 #include "envoy/extensions/clusters/dynamic_forward_proxy/v3/cluster.pb.validate.h"
+#include "envoy/router/string_accessor.h"
 
 #include "source/common/http/utility.h"
 #include "source/common/network/transport_socket_options_impl.h"
@@ -21,14 +22,11 @@ Cluster::Cluster(
     Server::Configuration::ServerFactoryContext& server_context,
     const envoy::config::cluster::v3::Cluster& cluster,
     const envoy::extensions::clusters::dynamic_forward_proxy::v3::ClusterConfig& config,
-    Runtime::Loader& runtime,
+    Upstream::ClusterFactoryContext& context, Runtime::Loader& runtime,
     Extensions::Common::DynamicForwardProxy::DnsCacheManagerFactory& cache_manager_factory,
-    const LocalInfo::LocalInfo& local_info,
-    Server::Configuration::TransportSocketFactoryContextImpl& factory_context,
-    Stats::ScopeSharedPtr&& stats_scope, bool added_via_api)
-    : Upstream::BaseDynamicClusterImpl(server_context, cluster, runtime, factory_context,
-                                       std::move(stats_scope), added_via_api,
-                                       factory_context.mainThreadDispatcher().timeSource()),
+    const LocalInfo::LocalInfo& local_info, bool added_via_api)
+    : Upstream::BaseDynamicClusterImpl(server_context, cluster, context, runtime, added_via_api,
+                                       context.mainThreadDispatcher().timeSource()),
       dns_cache_manager_(cache_manager_factory.get()),
       dns_cache_(dns_cache_manager_->getCache(config.dns_cache_config())),
       update_callbacks_handle_(dns_cache_->addUpdateCallbacks(*this)), local_info_(local_info),
@@ -153,8 +151,19 @@ Cluster::LoadBalancer::chooseHost(Upstream::LoadBalancerContext* context) {
     return nullptr;
   }
 
+  const Router::StringAccessor* dynamic_host_filter_state = nullptr;
+  if (context->downstreamConnection()) {
+    dynamic_host_filter_state =
+        context->downstreamConnection()
+            ->streamInfo()
+            .filterState()
+            .getDataReadOnly<Router::StringAccessor>("envoy.upstream.dynamic_host");
+  }
+
   absl::string_view host;
-  if (context->downstreamHeaders()) {
+  if (dynamic_host_filter_state) {
+    host = dynamic_host_filter_state->asString();
+  } else if (context->downstreamHeaders()) {
     host = context->downstreamHeaders()->getHostValue();
   } else if (context->downstreamConnection()) {
     host = context->downstreamConnection()->requestedServerName();
@@ -249,9 +258,7 @@ ClusterFactory::createClusterWithConfig(
     Server::Configuration::ServerFactoryContext& server_context,
     const envoy::config::cluster::v3::Cluster& cluster,
     const envoy::extensions::clusters::dynamic_forward_proxy::v3::ClusterConfig& proto_config,
-    Upstream::ClusterFactoryContext& context,
-    Server::Configuration::TransportSocketFactoryContextImpl& socket_factory_context,
-    Stats::ScopeSharedPtr&& stats_scope) {
+    Upstream::ClusterFactoryContext& context) {
   Extensions::Common::DynamicForwardProxy::DnsCacheManagerFactoryImpl cache_manager_factory(
       context);
   envoy::config::cluster::v3::Cluster cluster_config = cluster;
@@ -263,9 +270,9 @@ ClusterFactory::createClusterWithConfig(
     cluster_config.mutable_upstream_http_protocol_options()->set_auto_san_validation(true);
   }
 
-  auto new_cluster = std::make_shared<Cluster>(
-      server_context, cluster_config, proto_config, context.runtime(), cache_manager_factory,
-      context.localInfo(), socket_factory_context, std::move(stats_scope), context.addedViaApi());
+  auto new_cluster = std::make_shared<Cluster>(server_context, cluster_config, proto_config,
+                                               context, context.runtime(), cache_manager_factory,
+                                               context.localInfo(), context.addedViaApi());
 
   auto& options = new_cluster->info()->upstreamHttpProtocolOptions();
 

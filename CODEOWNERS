@@ -23,14 +23,14 @@ extensions/filters/common/original_src @snowp @klarose
 # cdn_loop extension
 /*/extensions/filters/http/cdn_loop @justin-mp @penguingao @alyssawilk
 # external processing filter
-/*/extensions/filters/http/ext_proc @gbrail @snowp @pradeepcrao @chaoqin-li1123
+/*/extensions/filters/http/ext_proc @gbrail @snowp @pradeepcrao @stevenzzzz
 /*/extensions/filters/common/mutation_rules @gbrail @snowp @pradeepcrao @chaoqin-li1123
 # jwt_authn http filter extension
 /*/extensions/filters/http/jwt_authn @qiwzhang @lizan
 # grpc_http1_reverse_bridge http filter extension
 /*/extensions/filters/http/grpc_http1_reverse_bridge @snowp @zuercher
 # alts transport socket extension
-/*/extensions/transport_sockets/alts @antoniovicente @adisuissa @yangminzhu
+/*/extensions/transport_sockets/alts @adisuissa @yangminzhu
 # tcp_stats transport socket extension
 /*/extensions/transport_sockets/tcp_stats @ggreenway @mattklein123
 # tls transport socket extension
@@ -115,6 +115,7 @@ extensions/filters/common/original_src @snowp @klarose
 /*/extensions/filters/common/rbac/matchers @conqerAtapple @ggreenway @alyssawilk
 /*/extensions/filters/http/grpc_web @fengli79 @lizan
 /*/extensions/filters/http/grpc_stats @kyessenov @lizan
+/*/extensions/filters/http/connect_grpc_bridge @UNOWNED @UNOWNED
 /*/extensions/filters/common/original_src @klarose @snowp
 /*/extensions/filters/listener/tls_inspector @ggreenway @KBaichoo
 /*/extensions/grpc_credentials/example @wozz @htuch
@@ -129,7 +130,7 @@ extensions/filters/common/original_src @snowp @klarose
 /*/extensions/resource_monitors/injected_resource @eziskind @htuch
 /*/extensions/resource_monitors/common @eziskind @htuch
 /*/extensions/resource_monitors/fixed_heap @eziskind @htuch
-/*/extensions/resource_monitors/downstream_connections @antoniovicente @nezdolik @mattklein123
+/*/extensions/resource_monitors/downstream_connections @nezdolik @mattklein123
 /*/extensions/retry/priority @snowp @alyssawilk
 /*/extensions/retry/priority/previous_priorities @snowp @alyssawilk
 /*/extensions/retry/host @snowp @alyssawilk
@@ -148,7 +149,7 @@ extensions/filters/common/original_src @snowp @klarose
 /*/extensions/filters/http/buffer @alyssawilk @mattklein123
 /*/extensions/transport_sockets/raw_buffer @alyssawilk @mattklein123
 # Watchdog Extensions
-/*/extensions/watchdog/profile_action @kbaichoo @antoniovicente
+/*/extensions/watchdog/profile_action @kbaichoo @alyssawilk
 # Core upstream code
 extensions/upstreams/http @alyssawilk @snowp @mattklein123
 extensions/upstreams/tcp @alyssawilk @ggreenway @mattklein123
@@ -168,7 +169,7 @@ extensions/filters/http/oauth2 @derekargueta @snowp
 # format string matching
 /*/extensions/matching/actions/format_string @kyessenov @UNOWNED
 # user space socket pair, event, connection and listener
-/*/extensions/io_socket/user_space @kyessenov @antoniovicente
+/*/extensions/io_socket/user_space @kyessenov @UNOWNED
 /*/extensions/bootstrap/internal_listener @kyessenov @adisuissa
 # Default UUID4 request ID extension
 /*/extensions/request_id/uuid @mattklein123 @alyssawilk
@@ -183,8 +184,8 @@ extensions/filters/http/oauth2 @derekargueta @snowp
 # HTTP Bandwidth Limit
 /*/extensions/filters/http/bandwidth_limit @nitgoy @mattklein123 @yanavlasov @tonya11en
 # Original IP detection
-/*/extensions/http/original_ip_detection/custom_header @alyssawilk @antoniovicente
-/*/extensions/http/original_ip_detection/xff @alyssawilk @antoniovicente
+/*/extensions/http/original_ip_detection/custom_header @alyssawilk @mattklein123
+/*/extensions/http/original_ip_detection/xff @alyssawilk @mattklein123
 # set_metadata extension
 /*/extensions/filters/http/set_metadata @aguinet @snowp
 # Formatters
@@ -231,6 +232,7 @@ extensions/filters/http/oauth2 @derekargueta @snowp
 /*/extensions/transport_sockets/tap @mattklein123 @daixiang0
 # local rate limit
 /*/extensions/filters/network/local_ratelimit @mattklein123 @wbpcode
+/*/extensions/filters/listener/local_ratelimit @mattklein123 @JuniorHsu
 # proxy protocol
 /*/extensions/filters/listener/proxy_protocol @ggreenway @soulxu
 # access loggers
@@ -293,6 +295,15 @@ extensions/filters/http/oauth2 @derekargueta @snowp
 /*/extensions/load_balancing_policies/maglev @wbpcode @UNOWNED
 # Early header mutation
 /*/extensions/http/early_header_mutation/header_mutation @wbpcode @UNOWNED
+# Network matching extensions
+/*/extensions/matching/network/ @kyessenov @snowp
+# Header mutation
+/*/extensions/filters/http/header_mutation @wbpcode @htuch @soulxu
+# Health checkers
+/*/extensions/health_checkers/grpc @snowp @zuercher
+/*/extensions/health_checkers/http @snowp @zuercher
+/*/extensions/health_checkers/tcp @snowp @zuercher
+/*/extensions/health_checkers/common @snowp @zuercher
 
 # Intentionally exempt (treated as core code)
 /*/extensions/filters/common @UNOWNED @UNOWNED
@@ -306,6 +317,7 @@ extensions/filters/http/oauth2 @derekargueta @snowp
 /*/extensions/clusters/eds/ @UNOWNED @UNOWNED
 /*/source/extensions/listener_managers/listener_manager @UNOWNED @UNOWNED
 /*/source/extensions/listener_managers/validation_listener_manager @UNOWNED @UNOWNED
+/*/source/extensions/config_subscription/ @UNOWNED @UNOWNED
 
 # URL Pattern Match and Rewrite Library
 /*/extensions/path/uri_template_lib @alyssawilk @yanjunxiang-google
@@ -327,10 +339,10 @@ extensions/filters/http/oauth2 @derekargueta @snowp
 /contrib/postgres_proxy/ @fabriziomello @cpakulski
 /contrib/sxg/ @cpapazian @alyssawilk
 /contrib/sip_proxy/ @durd07 @nearbyfly @dorisd0102
-/contrib/cryptomb/ @ipuustin @VillePihlava
+/contrib/cryptomb/ @giantcroc @soulxu
 /contrib/vcl/ @florincoras @KfreeZ
 /contrib/hyperscan/ @zhxie @soulxu
 /contrib/language/ @diceride @diceride
 /contrib/dlb/ @mattklein123 @daixiang0
-/contrib/qat/ @ipuustin @VillePihlava
+/contrib/qat/ @giantcroc @soulxu
 /contrib/generic_proxy/ @wbpcode @soulxu @zhaohuabing @rojkov @htuch

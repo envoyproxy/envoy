@@ -1,5 +1,7 @@
 #include "contrib/generic_proxy/filters/network/source/proxy.h"
 
+#include <cstdint>
+
 #include "envoy/common/exception.h"
 #include "envoy/network/connection.h"
 
@@ -16,19 +18,60 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace GenericProxy {
 
-ActiveStream::ActiveStream(Filter& parent, RequestPtr request)
-    : parent_(parent), downstream_request_stream_(std::move(request)) {}
+namespace {
 
-ActiveStream::~ActiveStream() {
-  for (auto& filter : decoder_filters_) {
-    filter->filter_->onDestroy();
+Tracing::Decision tracingDecision(const Tracing::ConnectionManagerTracingConfig& tracing_config,
+                                  Runtime::Loader& runtime) {
+  bool traced = runtime.snapshot().featureEnabled("tracing.random_sampling",
+                                                  tracing_config.getRandomSampling());
+
+  if (traced) {
+    return {Tracing::Reason::Sampling, true};
   }
-  for (auto& filter : encoder_filters_) {
-    if (filter->isDualFilter()) {
-      continue;
-    }
-    filter->filter_->onDestroy();
+  return {Tracing::Reason::NotTraceable, false};
+}
+
+} // namespace
+
+ActiveStream::ActiveStream(Filter& parent, RequestPtr request, ExtendedOptions options)
+    : parent_(parent), downstream_request_stream_(std::move(request)),
+      downstream_request_options_(options),
+      stream_info_(parent_.time_source_,
+                   parent_.callbacks_->connection().connectionInfoProviderSharedPtr()) {
+
+  connection_manager_tracing_config_ = parent_.config_->tracingConfig();
+
+  auto tracer = parent_.config_->tracingProvider();
+
+  if (!connection_manager_tracing_config_.has_value() || !tracer.has_value()) {
+    return;
   }
+
+  auto decision = tracingDecision(connection_manager_tracing_config_.value(), parent_.runtime_);
+  if (decision.traced) {
+    stream_info_.setTraceReason(decision.reason);
+  }
+  active_span_ = tracer->startSpan(*this, *downstream_request_stream_, stream_info_, decision);
+}
+
+Tracing::OperationName ActiveStream::operationName() const {
+  ASSERT(connection_manager_tracing_config_.has_value());
+  return connection_manager_tracing_config_->operationName();
+}
+
+const Tracing::CustomTagMap* ActiveStream::customTags() const {
+  ASSERT(connection_manager_tracing_config_.has_value());
+  return &connection_manager_tracing_config_->getCustomTags();
+}
+
+bool ActiveStream::verbose() const {
+  ASSERT(connection_manager_tracing_config_.has_value());
+  return connection_manager_tracing_config_->verbose();
+}
+
+uint32_t ActiveStream::maxPathTagLength() const {
+  ASSERT(connection_manager_tracing_config_.has_value());
+  return connection_manager_tracing_config_->maxPathTagLength();
 }
 
 Envoy::Event::Dispatcher& ActiveStream::dispatcher() { return parent_.connection().dispatcher(); }
@@ -42,9 +85,9 @@ void ActiveStream::resetStream() {
 }
 
 void ActiveStream::sendLocalReply(Status status, ResponseUpdateFunction&& func) {
-  ASSERT(parent_.creator_ != nullptr);
+  ASSERT(parent_.message_creator_ != nullptr);
   local_or_upstream_response_stream_ =
-      parent_.creator_->response(status, *downstream_request_stream_);
+      parent_.message_creator_->response(status, *downstream_request_stream_);
 
   ASSERT(local_or_upstream_response_stream_ != nullptr);
 
@@ -78,12 +121,21 @@ void ActiveStream::continueDecoding() {
   }
 }
 
-void ActiveStream::upstreamResponse(ResponsePtr response) {
+void ActiveStream::upstreamResponse(ResponsePtr response, ExtendedOptions options) {
   local_or_upstream_response_stream_ = std::move(response);
+  local_or_upstream_response_options_ = options;
+  parent_.stream_drain_decision_ = options.drainClose();
   continueEncoding();
 }
 
 void ActiveStream::completeDirectly() { parent_.deferredStream(*this); };
+
+void ActiveStream::ActiveDecoderFilter::bindUpstreamConn(Upstream::TcpPoolData&& pool_data) {
+  parent_.parent_.bindUpstreamConn(std::move(pool_data));
+}
+OptRef<UpstreamManager> ActiveStream::ActiveDecoderFilter::boundUpstreamConn() {
+  return parent_.parent_.boundUpstreamConn();
+}
 
 void ActiveStream::continueEncoding() {
   if (active_stream_reset_ || local_or_upstream_response_stream_ == nullptr) {
@@ -101,14 +153,14 @@ void ActiveStream::continueEncoding() {
   }
 
   if (next_encoder_filter_index_ == encoder_filters_.size()) {
-    ENVOY_LOG(debug, "Complete decoder filters");
+    ENVOY_LOG(debug, "Complete encoder filters");
     parent_.sendReplyDownstream(*local_or_upstream_response_stream_, *this);
   }
 }
 
-void ActiveStream::onEncodingSuccess(Buffer::Instance& buffer, bool close_connection) {
+void ActiveStream::onEncodingSuccess(Buffer::Instance& buffer) {
   ASSERT(parent_.connection().state() == Network::Connection::State::Open);
-  parent_.connection().write(buffer, close_connection);
+  parent_.connection().write(buffer, false);
   parent_.deferredStream(*this);
 }
 
@@ -119,28 +171,203 @@ void ActiveStream::initializeFilterChain(FilterChainFactory& factory) {
   std::reverse(encoder_filters_.begin(), encoder_filters_.end());
 }
 
+void ActiveStream::completeRequest() {
+  stream_info_.onRequestComplete();
+
+  if (active_span_) {
+    Tracing::TracerUtility::finalizeSpan(*active_span_, *downstream_request_stream_, stream_info_,
+                                         *this, false);
+  }
+
+  for (auto& filter : decoder_filters_) {
+    filter->filter_->onDestroy();
+  }
+  for (auto& filter : encoder_filters_) {
+    if (filter->isDualFilter()) {
+      continue;
+    }
+    filter->filter_->onDestroy();
+  }
+}
+
+UpstreamManagerImpl::UpstreamManagerImpl(Filter& parent, Upstream::TcpPoolData&& tcp_pool_data)
+    : UpstreamConnection(std::move(tcp_pool_data),
+                         parent.config_->codecFactory().responseDecoder()),
+      parent_(parent) {
+  response_decoder_->setDecoderCallback(*this);
+}
+
+void UpstreamManagerImpl::registerResponseCallback(uint64_t stream_id,
+                                                   PendingResponseCallback& cb) {
+  // The stream id is already registered and it should not happen. We treat it as
+  // request decoding failure.
+  // All pending streams will be reset and downstream connection will be closed and
+  // bound upstream connection will be cleaned up.
+  if (registered_response_callbacks_.find(stream_id) != registered_response_callbacks_.end()) {
+    ENVOY_LOG(error, "generic proxy: stream_id {} already registered", stream_id);
+    parent_.onDecodingFailure();
+    return;
+  }
+
+  registered_response_callbacks_[stream_id] = &cb;
+}
+
+void UpstreamManagerImpl::registerUpstreamCallback(uint64_t stream_id,
+                                                   UpstreamBindingCallback& cb) {
+  // Connection is already bound to a downstream connection and use it directly.
+  if (owned_conn_data_ != nullptr) {
+    cb.onBindSuccess(owned_conn_data_->connection(), upstream_host_);
+    return;
+  }
+
+  // The stream id is already registered and it should not happen. We treat it as
+  // request decoding failure.
+  // All pending streams will be reset and downstream connection will be closed and
+  // bound upstream connection will be cleaned up.
+  if (registered_upstream_callbacks_.find(stream_id) != registered_upstream_callbacks_.end()) {
+    ENVOY_LOG(error, "generic proxy: stream_id {} already registered", stream_id);
+    parent_.onDecodingFailure();
+    return;
+  }
+
+  registered_upstream_callbacks_[stream_id] = &cb;
+}
+
+void UpstreamManagerImpl::unregisterResponseCallback(uint64_t stream_id) {
+  registered_response_callbacks_.erase(stream_id);
+}
+
+void UpstreamManagerImpl::unregisterUpstreamCallback(uint64_t stream_id) {
+  registered_upstream_callbacks_.erase(stream_id);
+}
+
+void UpstreamManagerImpl::onEventImpl(Network::ConnectionEvent event) {
+  if (event == Network::ConnectionEvent::Connected ||
+      event == Network::ConnectionEvent::ConnectedZeroRtt) {
+    return;
+  }
+
+  // If the connection event is consumed by this upstream manager, it means that
+  // the upstream connection is ready and onPoolReady()/onPoolSuccessImpl() have
+  // been called. So the registered upstream callbacks should be empty.
+  ASSERT(registered_upstream_callbacks_.empty());
+
+  while (!registered_response_callbacks_.empty()) {
+    auto it = registered_response_callbacks_.begin();
+    auto cb = it->second;
+    registered_response_callbacks_.erase(it);
+
+    cb->onConnectionClose(event);
+  }
+
+  parent_.onBoundUpstreamConnectionEvent(event);
+}
+
+void UpstreamManagerImpl::onPoolSuccessImpl() {
+  ASSERT(registered_response_callbacks_.empty());
+
+  while (!registered_upstream_callbacks_.empty()) {
+    auto iter = registered_upstream_callbacks_.begin();
+    auto* cb = iter->second;
+    registered_upstream_callbacks_.erase(iter);
+
+    cb->onBindSuccess(owned_conn_data_->connection(), upstream_host_);
+  }
+}
+
+void UpstreamManagerImpl::onPoolFailureImpl(ConnectionPool::PoolFailureReason reason,
+                                            absl::string_view transport_failure_reason) {
+  ASSERT(registered_response_callbacks_.empty());
+
+  while (!registered_upstream_callbacks_.empty()) {
+    auto iter = registered_upstream_callbacks_.begin();
+    auto* cb = iter->second;
+    registered_upstream_callbacks_.erase(iter);
+
+    cb->onBindFailure(reason, transport_failure_reason, upstream_host_);
+  }
+
+  parent_.onBoundUpstreamConnectionEvent(Network::ConnectionEvent::RemoteClose);
+}
+
+void UpstreamManagerImpl::onDecodingSuccess(ResponsePtr response, ExtendedOptions options) {
+  // registered_upstream_callbacks_ should be empty because after upstream connection is ready.
+  ASSERT(registered_upstream_callbacks_.empty());
+
+  uint64_t stream_id = options.streamId().value_or(0);
+
+  auto it = registered_response_callbacks_.find(stream_id);
+  if (it == registered_response_callbacks_.end()) {
+    ENVOY_LOG(error, "generic proxy: stream_id {} not found", stream_id);
+    return;
+  }
+
+  auto cb = it->second;
+  registered_response_callbacks_.erase(it);
+
+  cb->onDecodingSuccess(std::move(response), options);
+}
+
+void UpstreamManagerImpl::onDecodingFailure() {
+  // registered_upstream_callbacks_ should be empty because after upstream connection is ready.
+  ASSERT(registered_upstream_callbacks_.empty());
+
+  ENVOY_LOG(error, "generic proxy bound upstream manager: decoding failure");
+
+  while (!registered_response_callbacks_.empty()) {
+    auto it = registered_response_callbacks_.begin();
+    auto cb = it->second;
+    registered_response_callbacks_.erase(it);
+
+    cb->onDecodingFailure();
+  }
+
+  // Close both the upstream and downstream connections by this call.
+  parent_.onBoundUpstreamConnectionEvent(Network::ConnectionEvent::RemoteClose);
+}
+
+void UpstreamManagerImpl::writeToConnection(Buffer::Instance& buffer) {
+  if (is_cleaned_up_) {
+    return;
+  }
+
+  if (owned_conn_data_ != nullptr) {
+    ASSERT(owned_conn_data_->connection().state() == Network::Connection::State::Open);
+    owned_conn_data_->connection().write(buffer, false);
+  }
+}
+
 Envoy::Network::FilterStatus Filter::onData(Envoy::Buffer::Instance& data, bool) {
   if (downstream_connection_closed_) {
     return Envoy::Network::FilterStatus::StopIteration;
   }
 
-  decoder_->decode(data);
+  request_decoder_->decode(data);
   return Envoy::Network::FilterStatus::StopIteration;
 }
 
-void Filter::onDecodingSuccess(RequestPtr request) { newDownstreamRequest(std::move(request)); }
+void Filter::onDecodingSuccess(RequestPtr request, ExtendedOptions options) {
+  newDownstreamRequest(std::move(request), options);
+}
 
 void Filter::onDecodingFailure() {
   resetStreamsForUnexpectedError();
-  connection().close(Network::ConnectionCloseType::FlushWrite);
+  closeDownstreamConnection();
+}
+
+void Filter::writeToConnection(Buffer::Instance& data) {
+  if (downstream_connection_closed_) {
+    return;
+  }
+  connection().write(data, false);
 }
 
 void Filter::sendReplyDownstream(Response& response, ResponseEncoderCallback& callback) {
   response_encoder_->encode(response, callback);
 }
 
-void Filter::newDownstreamRequest(RequestPtr request) {
-  auto stream = std::make_unique<ActiveStream>(*this, std::move(request));
+void Filter::newDownstreamRequest(RequestPtr request, ExtendedOptions options) {
+  auto stream = std::make_unique<ActiveStream>(*this, std::move(request), options);
   auto raw_stream = stream.get();
   LinkedList::moveIntoList(std::move(stream), active_streams_);
 
@@ -151,6 +378,8 @@ void Filter::newDownstreamRequest(RequestPtr request) {
 }
 
 void Filter::deferredStream(ActiveStream& stream) {
+  stream.completeRequest();
+
   if (!stream.inserted()) {
     return;
   }
@@ -164,15 +393,50 @@ void Filter::resetStreamsForUnexpectedError() {
   }
 }
 
+void Filter::closeDownstreamConnection() {
+  if (downstream_connection_closed_) {
+    return;
+  }
+  downstream_connection_closed_ = true;
+  connection().close(Network::ConnectionCloseType::FlushWrite);
+}
+
 void Filter::mayBeDrainClose() {
-  if (drain_decision_.drainClose() && active_streams_.empty()) {
+  if ((drain_decision_.drainClose() || stream_drain_decision_) && active_streams_.empty()) {
     onDrainCloseAndNoActiveStreams();
   }
 }
 
 // Default implementation for connection draining.
-void Filter::onDrainCloseAndNoActiveStreams() {
-  connection().close(Network::ConnectionCloseType::FlushWrite);
+void Filter::onDrainCloseAndNoActiveStreams() { closeDownstreamConnection(); }
+
+void Filter::bindUpstreamConn(Upstream::TcpPoolData&& tcp_pool_data) {
+  ASSERT(config_->codecFactory().protocolOptions().bindUpstreamConnection());
+  ASSERT(upstream_manager_ == nullptr);
+  upstream_manager_ = std::make_unique<UpstreamManagerImpl>(*this, std::move(tcp_pool_data));
+  upstream_manager_->newConnection();
+}
+
+void Filter::onBoundUpstreamConnectionEvent(Network::ConnectionEvent event) {
+  if (event == Network::ConnectionEvent::RemoteClose ||
+      event == Network::ConnectionEvent::LocalClose) {
+    ENVOY_LOG(debug, "generic proxy: bound upstream connection closed.");
+    // All pending streams should be reset by the upstream connection manager.
+    // In case there are still pending streams, we reset them here again.
+    resetStreamsForUnexpectedError();
+
+    if (upstream_manager_ != nullptr) {
+      // Clean up upstream connection manager. Always set the close_connection
+      // flag to true to ensure the upstream connection is closed in case of
+      // the onBoundUpstreamConnectionEvent() is called for other reasons.
+      upstream_manager_->cleanUp(true);
+      connection().dispatcher().deferredDelete(std::move(upstream_manager_));
+      upstream_manager_ = nullptr;
+    }
+
+    // Close downstream connection.
+    closeDownstreamConnection();
+  }
 }
 
 } // namespace GenericProxy

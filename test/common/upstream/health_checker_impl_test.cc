@@ -20,6 +20,9 @@
 #include "source/common/protobuf/utility.h"
 #include "source/common/upstream/health_checker_impl.h"
 #include "source/common/upstream/upstream_impl.h"
+#include "source/extensions/health_checkers/grpc/health_checker_impl.h"
+#include "source/extensions/health_checkers/http/health_checker_impl.h"
+#include "source/extensions/health_checkers/tcp/health_checker_impl.h"
 
 #include "test/common/http/common.h"
 #include "test/common/upstream/utility.h"
@@ -4604,7 +4607,9 @@ TEST_F(TcpHealthCheckerImplTest, PassiveFailureCrossThreadRemoveHostRace) {
 
   // Do a passive failure. This will not reset the active HC timers.
   Event::PostCb post_cb;
-  EXPECT_CALL(dispatcher_, post(_)).WillOnce(SaveArg<0>(&post_cb));
+  EXPECT_CALL(dispatcher_, post(_)).WillOnce([&post_cb](Event::PostCb cb) {
+    post_cb = std::move(cb);
+  });
   cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->healthChecker().setUnhealthy(
       HealthCheckHostMonitor::UnhealthyType::ImmediateHealthCheckFail);
 
@@ -4634,7 +4639,9 @@ TEST_F(TcpHealthCheckerImplTest, PassiveFailureCrossThreadRemoveClusterRace) {
 
   // Do a passive failure. This will not reset the active HC timers.
   Event::PostCb post_cb;
-  EXPECT_CALL(dispatcher_, post(_)).WillOnce(SaveArg<0>(&post_cb));
+  EXPECT_CALL(dispatcher_, post(_)).WillOnce([&post_cb](Event::PostCb cb) {
+    post_cb = std::move(cb);
+  });
   cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->healthChecker().setUnhealthy(
       HealthCheckHostMonitor::UnhealthyType::ImmediateHealthCheckFail);
 

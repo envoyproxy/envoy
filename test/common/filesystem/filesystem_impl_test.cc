@@ -4,6 +4,7 @@
 #include <string>
 
 #include "source/common/common/assert.h"
+#include "source/common/common/cleanup.h"
 #include "source/common/common/utility.h"
 #include "source/common/filesystem/directory.h"
 #include "source/common/filesystem/filesystem_impl.h"
@@ -109,7 +110,8 @@ TEST_F(FileSystemImplTest, FileReadToEndDoesNotExist) {
 
 #ifndef WIN32
 // In Windows this method of removing the permissions does not make read fail.
-TEST_F(FileSystemImplTest, FileReadToEndNotReadable) {
+// Issue https://github.com/envoyproxy/envoy/issues/25614, disabling this test
+TEST_F(FileSystemImplTest, DISABLED_FileReadToEndNotReadable) {
   const std::string data = "test string\ntest";
   const std::string file_path = TestEnvironment::writeStringToFileForTest("test_envoy", data);
 
@@ -347,6 +349,131 @@ TEST_F(FileSystemImplTest, PwriteWritesTheSpecifiedRange) {
   }
   auto contents = TestEnvironment::readFileToStringForTest(file_path);
   EXPECT_EQ(contents, "01BOOPS789");
+}
+
+TEST_F(FileSystemImplTest, StatOnDirectoryReturnsDirectoryType) {
+  const std::string new_dir_path = TestEnvironment::temporaryPath("envoy_test_dir");
+  TestEnvironment::createPath(new_dir_path);
+  Cleanup cleanup{[new_dir_path]() { TestEnvironment::removePath(new_dir_path); }};
+  const Api::IoCallResult<FileInfo> info_result = file_system_.stat(new_dir_path);
+  EXPECT_THAT(info_result.err_, ::testing::IsNull()) << info_result.err_->getErrorDetails();
+  EXPECT_EQ(info_result.return_value_.name_, "envoy_test_dir");
+  EXPECT_EQ(info_result.return_value_.file_type_, FileType::Directory);
+}
+
+TEST_F(FileSystemImplTest, StatOnFileOpenOrClosedMeasuresTheExpectedValues) {
+  const std::string file_path =
+      TestEnvironment::writeStringToFileForTest("test_envoy", "0123456789");
+  {
+    const char buf[6] = "BOOPS";
+    absl::string_view view{buf};
+    FilePathAndType file_info{Filesystem::DestinationType::File, file_path};
+    FilePtr file = file_system_.createFile(file_info);
+    const Api::IoCallBoolResult open_result = file->open(FlagSet{
+        (1 << Filesystem::File::Operation::Write) | (1 << Filesystem::File::Operation::Read) |
+        (1 << Filesystem::File::Operation::KeepExistingData)});
+    EXPECT_TRUE(open_result.return_value_) << open_result.err_->getErrorDetails();
+    const Api::IoCallSizeResult write_result = file->pwrite(buf, view.size(), 8);
+    EXPECT_EQ(write_result.return_value_, view.size()) << write_result.err_->getErrorDetails();
+    EXPECT_THAT(write_result.err_, ::testing::IsNull());
+    {
+      // Verify info() on an open file.
+      const Api::IoCallResult<FileInfo> info_result = file->info();
+      EXPECT_THAT(info_result.err_, ::testing::IsNull()) << info_result.err_->getErrorDetails();
+      EXPECT_EQ(info_result.return_value_.size_, 13U);
+      EXPECT_EQ(info_result.return_value_.name_, "test_envoy");
+      EXPECT_EQ(info_result.return_value_.file_type_, FileType::Regular);
+      // File system uses real system clock, so to validate that the value retrieved by info() is
+      // reasonable, we must also use the real system clock here.
+      SystemTime now = std::chrono::system_clock::now(); // NO_CHECK_FORMAT(real_time)
+      // Verify that the file times on the created file are within the last 5 seconds.
+      EXPECT_THAT(info_result.return_value_.time_created_,
+                  testing::AllOf(testing::Gt(now - std::chrono::seconds(5)), testing::Le(now)));
+      EXPECT_THAT(info_result.return_value_.time_last_accessed_,
+                  testing::AllOf(testing::Gt(now - std::chrono::seconds(5)), testing::Le(now)));
+      EXPECT_THAT(info_result.return_value_.time_last_modified_,
+                  testing::AllOf(testing::Gt(now - std::chrono::seconds(5)), testing::Le(now)));
+    }
+  }
+  auto contents = TestEnvironment::readFileToStringForTest(file_path);
+  EXPECT_EQ(contents, "01234567BOOPS");
+  {
+    // Verify stat() on a non-open file.
+    const Api::IoCallResult<FileInfo> info_result = file_system_.stat(file_path);
+    EXPECT_THAT(info_result.err_, ::testing::IsNull()) << info_result.err_->getErrorDetails();
+    EXPECT_EQ(info_result.return_value_.size_, 13U);
+    EXPECT_EQ(info_result.return_value_.name_, "test_envoy");
+    EXPECT_EQ(info_result.return_value_.file_type_, FileType::Regular);
+    // File system uses real system clock, so to validate that the value retrieved by stat() is
+    // reasonable, we must also use the real system clock here.
+    SystemTime now = std::chrono::system_clock::now(); // NO_CHECK_FORMAT(real_time)
+    // Verify that the file times on the created file are within the last 5 seconds.
+    EXPECT_THAT(info_result.return_value_.time_created_,
+                testing::AllOf(testing::Gt(now - std::chrono::seconds(5)), testing::Le(now)));
+    EXPECT_THAT(info_result.return_value_.time_last_accessed_,
+                testing::AllOf(testing::Gt(now - std::chrono::seconds(5)), testing::Le(now)));
+    EXPECT_THAT(info_result.return_value_.time_last_modified_,
+                testing::AllOf(testing::Gt(now - std::chrono::seconds(5)), testing::Le(now)));
+  }
+}
+
+#ifndef WIN32
+// We can't make a broken symlink the same way in Windows.
+TEST_F(FileSystemImplTest, StatOnBrokenSymlinkReturnsRegularFile) {
+  const std::string file_path =
+      TestEnvironment::writeStringToFileForTest("test_envoy", "0123456789");
+  const std::string link_path = absl::StrCat(file_path, "_link");
+  EXPECT_EQ(0, ::symlink(file_path.c_str(), link_path.c_str())) << errno;
+  EXPECT_EQ(0, ::unlink(file_path.c_str())) << errno;
+  const Api::IoCallResult<FileInfo> info_result = file_system_.stat(link_path);
+  EXPECT_THAT(info_result.err_, ::testing::IsNull()) << info_result.err_->getErrorDetails();
+  EXPECT_EQ(info_result.return_value_.file_type_, FileType::Regular);
+  EXPECT_EQ(info_result.return_value_.name_, "test_envoy_link");
+  EXPECT_EQ(0, ::unlink(link_path.c_str())) << errno;
+}
+#endif
+
+#ifndef WIN32
+// There's no `mkfifo` on Windows.
+TEST_F(FileSystemImplTest, StatOnFifoReturnsOtherFileType) {
+  const std::string fifo_path = TestEnvironment::temporaryPath("test_envoy_fifo");
+  ::mkfifo(fifo_path.c_str(), 0666);
+  const Api::IoCallResult<FileInfo> info_result = file_system_.stat(fifo_path);
+  if (info_result.err_ != nullptr) {
+    // Only do this test if we created a pipe successfully. If the test env can't
+    // do it then we can't test this behavior.
+    Cleanup cleanup{[fifo_path]() { ::unlink(fifo_path.c_str()); }};
+    EXPECT_EQ(info_result.return_value_.file_type_, FileType::Other);
+    EXPECT_EQ(info_result.return_value_.name_, "test_envoy_fifo");
+  }
+}
+#endif
+
+#ifndef WIN32
+// ::close doesn't work with WIN32
+TEST_F(FileSystemImplTest, InfoOnInvalidedFileDescriptorReturnsError) {
+  const std::string file_path =
+      TestEnvironment::writeStringToFileForTest("test_envoy", "0123456789");
+  FilePathAndType file_info{Filesystem::DestinationType::File, file_path};
+  FilePtr file = file_system_.createFile(file_info);
+  const Api::IoCallBoolResult open_result = file->open(
+      FlagSet{(1 << Filesystem::File::Operation::Write) | (1 << Filesystem::File::Operation::Read) |
+              (1 << Filesystem::File::Operation::KeepExistingData)});
+  EXPECT_TRUE(open_result.return_value_) << open_result.err_->getErrorDetails();
+  // Close the file descriptor to make it invalid.
+  EXPECT_EQ(0, ::close(getFd(file.get())));
+  const Api::IoCallResult<FileInfo> info_result = file->info();
+  EXPECT_THAT(info_result.err_, testing::NotNull());
+  // Close the file even though it's already closed, so we don't assert in the destructor.
+  file->close();
+}
+#endif
+
+TEST_F(FileSystemImplTest, StatOnNonexistentFileReturnsError) {
+  const std::string nonexistent_path =
+      TestEnvironment::temporaryPath("test_envoy_nonexistent_file");
+  const Api::IoCallResult<FileInfo> stat_result = file_system_.stat(nonexistent_path);
+  EXPECT_THAT(stat_result.err_, testing::NotNull());
 }
 
 TEST_F(FileSystemImplTest, PwriteFailureReturnsError) {

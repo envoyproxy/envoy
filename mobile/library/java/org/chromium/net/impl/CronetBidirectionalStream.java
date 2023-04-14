@@ -927,9 +927,6 @@ public final class CronetBidirectionalStream
     if (!hasUserAgent) {
       headers.computeIfAbsent(USER_AGENT, unused -> new ArrayList<>()).add(userAgent);
     }
-    // TODO: support H3
-    headers.computeIfAbsent("x-envoy-mobile-upstream-protocol", unused -> new ArrayList<>())
-        .add("http2");
     return headers;
   }
 

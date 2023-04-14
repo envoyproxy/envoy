@@ -1,5 +1,8 @@
 #pragma once
 
+#include "envoy/tracing/trace_config.h"
+#include "envoy/tracing/tracer.h"
+
 #include "contrib/generic_proxy/filters/network/source/interface/codec.h"
 #include "contrib/generic_proxy/filters/network/source/interface/filter.h"
 #include "contrib/generic_proxy/filters/network/source/interface/route.h"
@@ -32,6 +35,16 @@ public:
    * determine if they should be doing graceful closes on connections when possible.
    */
   virtual const Network::DrainDecision& drainDecision() const PURE;
+
+  /**
+   *  @return Tracing::Tracer tracing provider to use.
+   */
+  virtual OptRef<Tracing::Tracer> tracingProvider() const PURE;
+
+  /**
+   * @return connection manager tracing config.
+   */
+  virtual OptRef<const Tracing::ConnectionManagerTracingConfig> tracingConfig() const PURE;
 };
 
 } // namespace GenericProxy

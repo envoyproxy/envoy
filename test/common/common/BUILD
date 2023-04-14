@@ -483,3 +483,12 @@ envoy_cc_test(
         "//envoy/common:union_string",
     ],
 )
+
+envoy_cc_test(
+    name = "bit_array_test",
+    srcs = ["bit_array_test.cc"],
+    deps = [
+        "//source/common/common:bit_array_lib",
+        "//source/common/common:random_generator_lib",
+    ],
+)

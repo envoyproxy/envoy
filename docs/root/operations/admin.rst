@@ -459,9 +459,7 @@ modify different aspects of the server:
   with begin- and end-line anchors. (i.e.  ``/stats?filter=^server.concurrency$``)
 
   By default, the regular expression is evaluated using the
-  `Google RE2 <https://github.com/google/re2>`_ engine. To switch
-  to std::regex using Ecmascript syntax, POST an admin :ref:`runtime <arch_overview_runtime>` request:
-  ``/runtime_modify?envoy.reloadable_features.admin_stats_filter_use_re2=false``
+  `Google RE2 <https://github.com/google/re2>`_ engine.
 
   .. http:get:: /stats?histogram_buckets=cumulative
 
@@ -477,7 +475,27 @@ modify different aspects of the server:
   Buckets do not include values from other buckets with smaller upper bounds;
   the previous bucket's upper bound acts as a lower bound. Compatible with ``usedonly`` and ``filter``.
 
-.. http:get:: /stats?format=json
+  .. http:get:: /stats?format=html
+
+  Renders stats using HTML for a web browser, providing form fields to incrementally
+  modify the filter, toggle used-only mode, control the types of stats displayed,
+  and also toggle into another format.
+
+  This format is disabled if Envoy is compiled with `--define=admin_html=disabled`
+
+  .. http:get:: /stats?format=active-html
+
+  Renders stats continuously, displaying the top 50 stats ordered by frequency of
+  changes. In this format, used-only mode is implied. You can incrementally adjust
+  the filter, the subset of types, the number of stats displayed, and the interval
+  between updates.
+
+  After using this mode, be sure to close the browser tab to avoid
+  placing periodic load on the server as stats are updated regularly.
+
+  This format is disabled if Envoy is compiled with `--define=admin_html=disabled`
+
+  .. http:get:: /stats?format=json
 
   Outputs /stats in JSON format. This can be used for programmatic access of stats. Counters and Gauges
   will be in the form of a set of (name,value) pairs. Histograms will be under the element "histograms",

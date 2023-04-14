@@ -28,9 +28,12 @@ typed_config:
 
 // Tests should run with all protocols.
 class KillRequestFilterIntegrationTestAllProtocols : public KillRequestFilterIntegrationTest {};
-INSTANTIATE_TEST_SUITE_P(Protocols, KillRequestFilterIntegrationTestAllProtocols,
-                         testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams()),
-                         HttpProtocolIntegrationTest::protocolTestParamsToString);
+
+// TODO(#26236): Fix test suite for HTTP/3.
+INSTANTIATE_TEST_SUITE_P(
+    Protocols, KillRequestFilterIntegrationTestAllProtocols,
+    testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParamsWithoutHTTP3()),
+    HttpProtocolIntegrationTest::protocolTestParamsToString);
 
 // Request crash Envoy controlled via header configuration.
 TEST_P(KillRequestFilterIntegrationTestAllProtocols, KillRequestCrashEnvoy) {
@@ -48,6 +51,8 @@ TEST_P(KillRequestFilterIntegrationTestAllProtocols, KillRequestCrashEnvoy) {
 
 // Disabled for coverage per #18569
 #if !defined(ENVOY_CONFIG_COVERAGE)
+// KillRequestCrashEnvoyOnResponse is flaky on Windows
+#ifndef WIN32
 // Request crash Envoy controlled via response.
 TEST_P(KillRequestFilterIntegrationTestAllProtocols, KillRequestCrashEnvoyOnResponse) {
   const std::string filter_config_response =
@@ -75,6 +80,7 @@ TEST_P(KillRequestFilterIntegrationTestAllProtocols, KillRequestCrashEnvoyOnResp
   EXPECT_DEATH(sendRequestAndWaitForResponse(request_headers, 0, kill_response_headers, 1024),
                "KillRequestFilter is crashing Envoy!!!");
 }
+#endif
 
 TEST_P(KillRequestFilterIntegrationTestAllProtocols, KillRequestCrashEnvoyWithCustomKillHeader) {
   const std::string filter_config_with_custom_kill_header =

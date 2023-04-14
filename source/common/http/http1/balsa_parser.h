@@ -57,6 +57,9 @@ private:
   void HandleError(quiche::BalsaFrameEnums::ErrorCode error_code) override;
   void HandleWarning(quiche::BalsaFrameEnums::ErrorCode error_code) override;
 
+  // Shared implementation for ProcessHeaders() and ProcessTrailers().
+  void processHeadersOrTrailersImpl(const quiche::BalsaHeaders& headers);
+
   // Return ParserStatus::Error if `result` is CallbackResult::Error.
   // Return current value of `status_` otherwise.
   // Typical use would be `status_ = convertResult(result);`

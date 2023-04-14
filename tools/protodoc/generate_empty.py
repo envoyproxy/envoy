@@ -7,7 +7,7 @@ import pathlib
 import sys
 import tarfile
 
-import protodoc as _protodoc
+from tools.protodoc import protodoc as _protodoc
 from tools.protodoc.jinja import env as jinja_env
 
 

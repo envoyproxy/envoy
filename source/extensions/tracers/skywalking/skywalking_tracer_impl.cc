@@ -24,7 +24,6 @@ constexpr absl::string_view DEFAULT_SERVICE_AND_INSTANCE = "EnvoyProxy";
 
 using cpp2sky::createSpanContext;
 using cpp2sky::SpanContextPtr;
-using cpp2sky::TracerException;
 
 Driver::Driver(const envoy::config::trace::v3::SkyWalkingConfig& proto_config,
                Server::Configuration::TracerFactoryContext& context)
@@ -73,8 +72,14 @@ Tracing::SpanPtr Driver::startSpan(const Tracing::Config&, Tracing::TraceContext
           createSpanContext(toStdStringView(header_value_string)); // NOLINT(std::string_view)
       tracing_context = tracing_context_factory_->create(span_context);
     } catch (std::exception& e) {
-      ENVOY_LOG(warn, "New SkyWalking Span/Segment cannot be created for error: {}", e.what());
-      return std::make_unique<Tracing::NullSpan>();
+      ENVOY_LOG(
+          warn,
+          "New SkyWalking Span/Segment with previous span context cannot be created for error: {}",
+          e.what());
+      if (!decision.traced) {
+        return std::make_unique<Tracing::NullSpan>();
+      }
+      tracing_context = tracing_context_factory_->create();
     }
   }
 

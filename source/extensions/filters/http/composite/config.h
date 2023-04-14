@@ -43,6 +43,8 @@ public:
   }
 };
 
+DECLARE_FACTORY(CompositeFilterFactory);
+
 } // namespace Composite
 } // namespace HttpFilters
 } // namespace Extensions

@@ -279,6 +279,24 @@ TEST(Ipv6InstanceTest, AddressAndPort) {
   EXPECT_TRUE(address.ip()->isUnicastAddress());
 }
 
+TEST(Ipv6InstanceTest, ScopeIdStripping) {
+  sockaddr_in6 addr6;
+  memset(&addr6, 0, sizeof(addr6));
+  addr6.sin6_family = AF_INET6;
+  EXPECT_EQ(1, inet_pton(AF_INET6, "fe80::f8f3:11ff:fef4:25a8", &addr6.sin6_addr));
+  addr6.sin6_port = htons(80);
+  addr6.sin6_scope_id = 20u;
+
+  Ipv6Instance address(addr6);
+  EXPECT_EQ("[fe80::f8f3:11ff:fef4:25a8%20]:80", address.asString());
+  EXPECT_EQ(IpVersion::v6, address.ip()->version());
+  EXPECT_EQ(20U, address.ip()->ipv6()->scopeId());
+  auto no_scope_address = address.ip()->ipv6()->addressWithoutScopeId();
+  EXPECT_EQ("[fe80::f8f3:11ff:fef4:25a8]:80", no_scope_address->asString());
+  EXPECT_EQ(IpVersion::v6, no_scope_address->ip()->version());
+  EXPECT_EQ(0U, no_scope_address->ip()->ipv6()->scopeId());
+}
+
 TEST(Ipv6InstanceTest, PortOnly) {
   Ipv6Instance address(443);
   EXPECT_EQ("[::]:443", address.asString());

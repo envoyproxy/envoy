@@ -95,6 +95,7 @@ envoy_cc_library(
         "//envoy/http:codec_interface",
         "//envoy/protobuf:message_validator_interface",
         "//source/common/config:utility_lib",
+        "//source/common/runtime:runtime_features_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )

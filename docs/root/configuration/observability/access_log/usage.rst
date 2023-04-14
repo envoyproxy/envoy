@@ -346,6 +346,8 @@ The following command operators are supported:
 
   Renders a numeric value in typed JSON logs.
 
+.. _config_access_log_format_duration:
+
 %DURATION%
   HTTP/THRIFT
     Total duration in milliseconds of the request from the start time to the last byte out.
@@ -514,6 +516,18 @@ The following command operators are supported:
     transport socket. Common TLS failures are in :ref:`TLS trouble shooting <arch_overview_ssl_trouble_shooting>`.
 
   TCP/UDP
+    Not implemented ("-")
+
+.. _config_access_log_format_downstream_transport_failure_reason:
+
+%DOWNSTREAM_TRANSPORT_FAILURE_REASON%
+  HTTP/TCP
+    If downstream connection failed due to transport socket (e.g. TLS handshake), provides the failure
+    reason from the transport socket. The format of this field depends on the configured downstream
+    transport socket. Common TLS failures are in :ref:`TLS trouble shooting <arch_overview_ssl_trouble_shooting>`.
+    Note: it only works in listener access config, and the HTTP or TCP access logs would observe empty values.
+
+  UDP
     Not implemented ("-")
 
 %DOWNSTREAM_REMOTE_ADDRESS%

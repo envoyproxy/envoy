@@ -15,6 +15,7 @@
 #include "source/common/network/listen_socket_impl.h"
 #include "source/common/network/socket_option_factory.h"
 #include "source/common/network/utility.h"
+#include "source/common/runtime/runtime_features.h"
 
 #ifdef ENVOY_ENABLE_QUIC
 #include "source/common/quic/server_codec_impl.h"
@@ -109,7 +110,7 @@ void FakeStream::encodeHeaders(const Http::HeaderMap& headers, bool end_stream) 
   });
 }
 
-void FakeStream::encodeData(absl::string_view data, bool end_stream) {
+void FakeStream::encodeData(std::string data, bool end_stream) {
   postToConnectionThread([this, data, end_stream]() -> void {
     {
       absl::MutexLock lock(&lock_);
@@ -351,6 +352,8 @@ FakeHttpConnection::FakeHttpConnection(
   ASSERT(max_request_headers_count != 0);
   if (type == Http::CodecType::HTTP1) {
     Http::Http1Settings http1_settings;
+    http1_settings.use_balsa_parser_ =
+        Runtime::runtimeFeatureEnabled("envoy.reloadable_features.http1_use_balsa_parser");
     // For the purpose of testing, we always have the upstream encode the trailers if any
     http1_settings.enable_trailers_ = true;
     Http::Http1::CodecStats& stats = fake_upstream.http1CodecStats();
@@ -403,20 +406,20 @@ Http::RequestDecoder& FakeHttpConnection::newStream(Http::ResponseEncoder& encod
 }
 
 void FakeHttpConnection::onGoAway(Http::GoAwayErrorCode code) {
-  ASSERT(type_ >= Http::CodecType::HTTP2);
+  ASSERT(type_ != Http::CodecType::HTTP1);
   // Usually indicates connection level errors, no operations are needed since
   // the connection will be closed soon.
   ENVOY_LOG(info, "FakeHttpConnection receives GOAWAY: ", static_cast<int>(code));
 }
 
 void FakeHttpConnection::encodeGoAway() {
-  ASSERT(type_ >= Http::CodecType::HTTP2);
+  ASSERT(type_ != Http::CodecType::HTTP1);
 
   postToConnectionThread([this]() { codec_->goAway(); });
 }
 
 void FakeHttpConnection::updateConcurrentStreams(uint64_t max_streams) {
-  ASSERT(type_ >= Http::CodecType::HTTP2);
+  ASSERT(type_ != Http::CodecType::HTTP1);
 
   if (type_ == Http::CodecType::HTTP2) {
     postToConnectionThread([this, max_streams]() {
@@ -438,7 +441,7 @@ void FakeHttpConnection::updateConcurrentStreams(uint64_t max_streams) {
 }
 
 void FakeHttpConnection::encodeProtocolError() {
-  ASSERT(type_ >= Http::CodecType::HTTP2);
+  ASSERT(type_ != Http::CodecType::HTTP1);
 
   Http::Http2::ServerConnectionImpl* codec =
       dynamic_cast<Http::Http2::ServerConnectionImpl*>(codec_.get());
@@ -869,9 +872,9 @@ void FakeUpstream::FakeListenSocketFactory::doFinalPreWorkerInit() {
 FakeRawConnection::~FakeRawConnection() {
   // If the filter was already deleted, it means the shared_connection_ was too, so don't try to
   // access it.
-  if (auto filter = read_filter_.lock(); filter != nullptr) {
+  if (read_filter_ != nullptr) {
     EXPECT_TRUE(shared_connection_.executeOnDispatcher(
-        [filter = std::move(filter)](Network::Connection& connection) {
+        [filter = std::move(read_filter_)](Network::Connection& connection) {
           connection.removeReadFilter(filter);
         }));
   }
@@ -879,14 +882,13 @@ FakeRawConnection::~FakeRawConnection() {
 
 void FakeRawConnection::initialize() {
   FakeConnectionBase::initialize();
-  Network::ReadFilterSharedPtr filter{new ReadFilter(*this)};
-  read_filter_ = filter;
+  read_filter_ = std::make_shared<ReadFilter>(*this);
   if (!shared_connection_.connected()) {
     ENVOY_LOG(warn, "FakeRawConnection::initialize: network connection is already disconnected");
     return;
   }
   ASSERT(shared_connection_.dispatcher().isThreadSafe());
-  shared_connection_.connection().addReadFilter(filter);
+  shared_connection_.connection().addReadFilter(read_filter_);
 }
 
 AssertionResult FakeRawConnection::waitForData(uint64_t num_bytes, std::string* data,
@@ -984,6 +986,15 @@ void FakeHttpConnection::writeRawData(absl::string_view data) {
   Api::IoCallUint64Result result =
       dynamic_cast<Network::ConnectionImpl*>(&connection())->ioHandle().write(buffer);
   ASSERT(result.ok());
+}
+
+AssertionResult FakeHttpConnection::postWriteRawData(std::string data) {
+  return shared_connection_.executeOnDispatcher(
+      [data](Network::Connection& connection) {
+        Buffer::OwnedImpl to_write(data);
+        connection.write(to_write, false);
+      },
+      TestUtility::DefaultTimeout);
 }
 
 } // namespace Envoy

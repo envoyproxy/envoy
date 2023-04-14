@@ -77,3 +77,11 @@ envoy_cc_test(
         "//source/common/stream_info:uint32_accessor_lib",
     ],
 )
+
+envoy_cc_test(
+    name = "bool_accessor_impl_test",
+    srcs = ["bool_accessor_impl_test.cc"],
+    deps = [
+        "//source/common/stream_info:bool_accessor_lib",
+    ],
+)

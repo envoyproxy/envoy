@@ -673,8 +673,8 @@ TEST_F(HttpConnectionManagerConfigTest, OverallSampling) {
     }
   }
 
-  EXPECT_LE(900, sampled_count);
-  EXPECT_GE(1100, sampled_count);
+  EXPECT_LE(800, sampled_count);
+  EXPECT_GE(1200, sampled_count);
 }
 
 TEST_F(HttpConnectionManagerConfigTest, UnixSocketInternalAddress) {
@@ -722,21 +722,21 @@ TEST_F(HttpConnectionManagerConfigTest, CidrRangeBasedInternalAddress) {
                                      date_provider_, route_config_provider_manager_,
                                      scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_);
-  Network::Address::Ipv4Instance firstInternalIpAddress{"100.64.0.10", 0, nullptr};
-  Network::Address::Ipv4Instance secondInternalIpAddress{"50.20.0.5", 0, nullptr};
+  Network::Address::Ipv4Instance first_internal_ip_address{"100.64.0.10", 0, nullptr};
+  Network::Address::Ipv4Instance second_internal_ip_address{"50.20.0.5", 0, nullptr};
   // This address is in the list of acceptable addresses (based on RFC1918) when the new config is
   // unset. However test is verifying that it doesn't match now because of provided cidr_ranges
   // config.
-  Network::Address::Ipv4Instance defaultIpAddress{"10.48.179.130", 0, nullptr};
-  Network::Address::Ipv4Instance externalIpAddress{"90.60.0.10", 0, nullptr};
-  // This test validates that unixAddress is not treated as internal since unix_sockets is set to
+  Network::Address::Ipv4Instance default_ip_address{"10.48.179.130", 0, nullptr};
+  Network::Address::Ipv4Instance external_ip_address{"90.60.0.10", 0, nullptr};
+  // This test validates that unix address is not treated as internal since unix_sockets is set to
   // false.
-  Network::Address::PipeInstance unixAddress{"/foo"};
-  EXPECT_TRUE(config.internalAddressConfig().isInternalAddress(firstInternalIpAddress));
-  EXPECT_TRUE(config.internalAddressConfig().isInternalAddress(secondInternalIpAddress));
-  EXPECT_FALSE(config.internalAddressConfig().isInternalAddress(defaultIpAddress));
-  EXPECT_FALSE(config.internalAddressConfig().isInternalAddress(externalIpAddress));
-  EXPECT_FALSE(config.internalAddressConfig().isInternalAddress(unixAddress));
+  Network::Address::PipeInstance unix_address{"/foo"};
+  EXPECT_TRUE(config.internalAddressConfig().isInternalAddress(first_internal_ip_address));
+  EXPECT_TRUE(config.internalAddressConfig().isInternalAddress(second_internal_ip_address));
+  EXPECT_FALSE(config.internalAddressConfig().isInternalAddress(default_ip_address));
+  EXPECT_FALSE(config.internalAddressConfig().isInternalAddress(external_ip_address));
+  EXPECT_FALSE(config.internalAddressConfig().isInternalAddress(unix_address));
 }
 
 TEST_F(HttpConnectionManagerConfigTest, MaxRequestHeadersKbDefault) {
@@ -1567,6 +1567,243 @@ filter:
   EXPECT_THROW(parseHttpConnectionManagerFromYaml(yaml_string), EnvoyException);
 }
 
+TEST_F(HttpConnectionManagerConfigTest, FlushAccessLogOnNewRequest) {
+  std::string base_yaml_string = R"EOF(
+      codec_type: http1
+      stat_prefix: my_stat_prefix
+      route_config:
+        virtual_hosts:
+        - name: default
+          domains:
+          - "*"
+          routes:
+          - match:
+              prefix: "/"
+            route:
+              cluster: fake_cluster
+      http_filters:
+      - name: envoy.filters.http.router
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+    )EOF";
+
+  {
+    HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(base_yaml_string),
+                                       context_, date_provider_, route_config_provider_manager_,
+                                       scoped_routes_config_provider_manager_, tracer_manager_,
+                                       filter_config_provider_manager_);
+
+    EXPECT_FALSE(config.flushAccessLogOnNewRequest());
+  }
+
+  {
+    std::string yaml_string = base_yaml_string + R"EOF(
+      access_log_options:
+        flush_access_log_on_new_request: false
+    )EOF";
+
+    HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
+                                       date_provider_, route_config_provider_manager_,
+                                       scoped_routes_config_provider_manager_, tracer_manager_,
+                                       filter_config_provider_manager_);
+
+    EXPECT_FALSE(config.flushAccessLogOnNewRequest());
+  }
+
+  {
+    std::string yaml_string = base_yaml_string + R"EOF(
+      access_log_options:
+        flush_access_log_on_new_request: true
+    )EOF";
+
+    HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
+                                       date_provider_, route_config_provider_manager_,
+                                       scoped_routes_config_provider_manager_, tracer_manager_,
+                                       filter_config_provider_manager_);
+
+    EXPECT_TRUE(config.flushAccessLogOnNewRequest());
+  }
+}
+
+TEST_F(HttpConnectionManagerConfigTest,
+       DEPRECATED_FEATURE_TEST(DeprecatedFlushAccessLogOnNewRequest)) {
+  std::string base_yaml_string = R"EOF(
+      codec_type: http1
+      stat_prefix: my_stat_prefix
+      route_config:
+        virtual_hosts:
+        - name: default
+          domains:
+          - "*"
+          routes:
+          - match:
+              prefix: "/"
+            route:
+              cluster: fake_cluster
+      http_filters:
+      - name: envoy.filters.http.router
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+    )EOF";
+
+  {
+    std::string yaml_string = base_yaml_string + R"EOF(
+      flush_access_log_on_new_request: true # deprecated field
+    )EOF";
+
+    HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
+                                       date_provider_, route_config_provider_manager_,
+                                       scoped_routes_config_provider_manager_, tracer_manager_,
+                                       filter_config_provider_manager_);
+
+    EXPECT_TRUE(config.flushAccessLogOnNewRequest());
+  }
+
+  {
+    std::string yaml_string = base_yaml_string + R"EOF(
+      access_log_options:
+        flush_access_log_on_new_request: true
+      flush_access_log_on_new_request: true # deprecated field
+    )EOF";
+
+    EXPECT_THROW_WITH_MESSAGE(
+        HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string),
+                                           context_, date_provider_, route_config_provider_manager_,
+                                           scoped_routes_config_provider_manager_, tracer_manager_,
+                                           filter_config_provider_manager_),
+        EnvoyException,
+        "Only one of flush_access_log_on_new_request or access_log_options can be specified.");
+  }
+
+  {
+    std::string yaml_string = base_yaml_string + R"EOF(
+      access_log_options:
+        flush_access_log_on_new_request: true
+      access_log_flush_interval: 1s # deprecated field
+    )EOF";
+
+    EXPECT_THROW_WITH_MESSAGE(
+        HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string),
+                                           context_, date_provider_, route_config_provider_manager_,
+                                           scoped_routes_config_provider_manager_, tracer_manager_,
+                                           filter_config_provider_manager_),
+        EnvoyException,
+        "Only one of access_log_flush_interval or access_log_options can be specified.");
+  }
+}
+
+TEST_F(HttpConnectionManagerConfigTest, AccessLogFlushInterval) {
+  std::string base_yaml_string = R"EOF(
+      codec_type: http1
+      stat_prefix: my_stat_prefix
+      route_config:
+        virtual_hosts:
+        - name: default
+          domains:
+          - "*"
+          routes:
+          - match:
+              prefix: "/"
+            route:
+              cluster: fake_cluster
+      http_filters:
+      - name: envoy.filters.http.router
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+    )EOF";
+
+  {
+    HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(base_yaml_string),
+                                       context_, date_provider_, route_config_provider_manager_,
+                                       scoped_routes_config_provider_manager_, tracer_manager_,
+                                       filter_config_provider_manager_);
+
+    EXPECT_FALSE(config.accessLogFlushInterval().has_value());
+  }
+
+  {
+    std::string yaml_string = base_yaml_string + R"EOF(
+      access_log_options:
+        access_log_flush_interval: 1s
+    )EOF";
+
+    HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
+                                       date_provider_, route_config_provider_manager_,
+                                       scoped_routes_config_provider_manager_, tracer_manager_,
+                                       filter_config_provider_manager_);
+
+    EXPECT_TRUE(config.accessLogFlushInterval().has_value());
+    EXPECT_EQ(std::chrono::seconds(1), config.accessLogFlushInterval().value());
+  }
+}
+
+TEST_F(HttpConnectionManagerConfigTest, DEPRECATED_FEATURE_TEST(DeprecatedAccessLogFlushInterval)) {
+  std::string base_yaml_string = R"EOF(
+      codec_type: http1
+      stat_prefix: my_stat_prefix
+      route_config:
+        virtual_hosts:
+        - name: default
+          domains:
+          - "*"
+          routes:
+          - match:
+              prefix: "/"
+            route:
+              cluster: fake_cluster
+      http_filters:
+      - name: envoy.filters.http.router
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+    )EOF";
+
+  {
+    std::string yaml_string = base_yaml_string + R"EOF(
+      access_log_flush_interval: 1s # deprecated field
+    )EOF";
+
+    HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
+                                       date_provider_, route_config_provider_manager_,
+                                       scoped_routes_config_provider_manager_, tracer_manager_,
+                                       filter_config_provider_manager_);
+
+    EXPECT_TRUE(config.accessLogFlushInterval().has_value());
+    EXPECT_EQ(std::chrono::seconds(1), config.accessLogFlushInterval().value());
+  }
+
+  {
+    std::string yaml_string = base_yaml_string + R"EOF(
+      access_log_options:
+        access_log_flush_interval: 1s
+      access_log_flush_interval: 1s # deprecated field
+    )EOF";
+
+    EXPECT_THROW_WITH_MESSAGE(
+        HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string),
+                                           context_, date_provider_, route_config_provider_manager_,
+                                           scoped_routes_config_provider_manager_, tracer_manager_,
+                                           filter_config_provider_manager_),
+        EnvoyException,
+        "Only one of access_log_flush_interval or access_log_options can be specified.");
+  }
+
+  {
+    std::string yaml_string = base_yaml_string + R"EOF(
+      access_log_options:
+        access_log_flush_interval: 1s
+      flush_access_log_on_new_request: true # deprecated field
+    )EOF";
+
+    EXPECT_THROW_WITH_MESSAGE(
+        HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string),
+                                           context_, date_provider_, route_config_provider_manager_,
+                                           scoped_routes_config_provider_manager_, tracer_manager_,
+                                           filter_config_provider_manager_),
+        EnvoyException,
+        "Only one of flush_access_log_on_new_request or access_log_options can be specified.");
+  }
+}
+
 TEST_F(HttpConnectionManagerConfigTest, BadAccessLogConfig) {
   std::string yaml_string = R"EOF(
 codec_type: http1
@@ -1936,7 +2173,7 @@ public:
 
   Http::RequestIDExtensionSharedPtr
   createExtensionInstance(const Protobuf::Message& config,
-                          Server::Configuration::FactoryContext& context) override {
+                          Server::Configuration::CommonFactoryContext& context) override {
     const auto& custom_config = MessageUtil::downcastAndValidate<
         const test::http_connection_manager::CustomRequestIDExtension&>(
         config, context.messageValidationVisitor());

@@ -135,7 +135,7 @@ bool RecordDistributor::hasInterest(const std::string& topic) const {
   return false;
 }
 
-// XXX (adam.kotwasinski) Inefficient: locks aquired per record.
+// XXX (adam.kotwasinski) Inefficient: locks acquired per record.
 void RecordDistributor::receive(InboundRecordSharedPtr record) {
 
   const KafkaPartition kafka_partition = {record->topic_, record->partition_};
@@ -181,7 +181,7 @@ void RecordDistributor::receive(InboundRecordSharedPtr record) {
     }
   }
 
-  // Noone is interested in our record, so we are going to store it in a local cache.
+  // No-one is interested in our record, so we are going to store it in a local cache.
   if (!consumed_by_callback) {
     absl::MutexLock lock(&stored_records_mutex_);
     auto& stored_records = stored_records_[kafka_partition];

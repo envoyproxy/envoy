@@ -34,10 +34,21 @@ envoy_extension_cc_test(
     deps = [
         ":mock_server_lib",
         ":utils_lib",
+        "//envoy/http:filter_interface",
+        "//envoy/network:filter_interface",
+        "//source/common/http:context_lib",
+        "//source/common/network:address_lib",
+        "//source/common/stats:isolated_store_lib",
         "//source/extensions/filters/http/ext_proc",
         "//test/common/http:common_lib",
+        "//test/common/http:conn_manager_impl_test_base_lib",
         "//test/mocks/event:event_mocks",
+        "//test/mocks/http:stream_encoder_mock",
+        "//test/mocks/http:stream_mock",
+        "//test/mocks/local_info:local_info_mocks",
+        "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/server:factory_context_mocks",
+        "//test/mocks/server:overload_manager_mocks",
         "//test/test_common:test_runtime_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/service/ext_proc/v3:pkg_cc_proto",
@@ -119,7 +130,7 @@ envoy_extension_cc_test(
 
 envoy_extension_cc_test(
     name = "streaming_integration_test",
-    size = "medium",
+    size = "large",
     srcs = ["streaming_integration_test.cc"],
     extension_names = ["envoy.filters.http.ext_proc"],
     deps = [

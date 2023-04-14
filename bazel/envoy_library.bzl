@@ -13,6 +13,7 @@ load(
     "CONTRIB_EXTENSION_PACKAGE_VISIBILITY",
     "EXTENSION_CONFIG_VISIBILITY",
 )
+load(":envoy_mobile_defines.bzl", "envoy_mobile_defines")
 
 # As above, but wrapped in list form for adding to dep lists. This smell seems needed as
 # SelectorValue values have to match the attribute type. See
@@ -138,7 +139,7 @@ def envoy_cc_library(
         linkstatic = envoy_linkstatic(),
         strip_include_prefix = strip_include_prefix,
         include_prefix = include_prefix,
-        defines = defines,
+        defines = envoy_mobile_defines(repository) + defines,
     )
 
     # Intended for usage by external consumers. This allows them to disambiguate

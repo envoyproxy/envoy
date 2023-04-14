@@ -470,7 +470,7 @@ class RedisProxyWithRedirectionAndDNSIntegrationTest
 public:
   RedisProxyWithRedirectionAndDNSIntegrationTest()
       : RedisProxyWithRedirectionIntegrationTest(
-            fmt::format(CONFIG_WITH_REDIRECTION_DNS,
+            fmt::format(fmt::runtime(CONFIG_WITH_REDIRECTION_DNS),
                         Network::Test::ipVersionToDnsFamily(GetParam())),
             2) {}
 };

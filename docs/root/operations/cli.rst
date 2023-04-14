@@ -3,7 +3,7 @@
 Command line options
 ====================
 
-Envoy is driven both by a JSON configuration file as well as a set of command line options. The
+Envoy is driven both by a configuration file as well as a set of command line options. The
 following are the command line options that Envoy supports.
 
 .. option:: -c <path string>, --config-path <path string>

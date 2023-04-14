@@ -188,6 +188,7 @@ envoy_cc_test(
     size = "small",
     srcs = ["guarddog_impl_test.cc"],
     deps = [
+        ":guarddog_test_interlock",
         "//envoy/common:time_interface",
         "//source/common/api:api_lib",
         "//source/common/common:macros",
@@ -201,6 +202,14 @@ envoy_cc_test(
         "//test/test_common:registry_lib",
         "//test/test_common:simulated_time_system_lib",
         "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_test_library(
+    name = "guarddog_test_interlock",
+    hdrs = ["guarddog_test_interlock.h"],
+    deps = [
+        "//source/server:guarddog_lib",
     ],
 )
 
@@ -240,6 +249,7 @@ envoy_cc_test(
         "//test/mocks/server:options_mocks",
         "//test/mocks/thread_local:thread_local_mocks",
         "//test/test_common:registry_lib",
+        "//test/test_common:simulated_time_system_lib",
         "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/overload/v3:pkg_cc_proto",
@@ -297,6 +307,7 @@ envoy_cc_test(
         "//source/extensions/filters/http/health_check:config",
         "//source/extensions/filters/http/router:config",
         "//source/extensions/filters/network/http_connection_manager:config",
+        "//source/extensions/health_checkers/http:health_checker_lib",
         "//source/extensions/tracers/zipkin:config",
         "//source/server:process_context_lib",
         "//source/server:server_lib",

@@ -191,7 +191,6 @@ Http::HeaderValidatorFactoryPtr createHeaderValidatorFactory(
 SINGLETON_MANAGER_REGISTRATION(date_provider);
 SINGLETON_MANAGER_REGISTRATION(route_config_provider_manager);
 SINGLETON_MANAGER_REGISTRATION(scoped_routes_config_provider_manager);
-SINGLETON_MANAGER_REGISTRATION(tracer_manager);
 
 Utility::Singletons Utility::createSingletons(Server::Configuration::FactoryContext& context) {
   std::shared_ptr<Http::TlsCachingDateProviderImpl> date_provider =
@@ -215,12 +214,7 @@ Utility::Singletons Utility::createSingletons(Server::Configuration::FactoryCont
                 context.admin(), *route_config_provider_manager);
           });
 
-  auto tracer_manager = context.singletonManager().getTyped<Tracing::TracerManagerImpl>(
-      SINGLETON_MANAGER_REGISTERED_NAME(tracer_manager), [&context] {
-        return std::make_shared<Tracing::TracerManagerImpl>(
-            std::make_unique<Tracing::TracerFactoryContextImpl>(
-                context.getServerFactoryContext(), context.messageValidationVisitor()));
-      });
+  auto tracer_manager = Tracing::TracerManagerImpl::singleton(context);
 
   std::shared_ptr<Http::DownstreamFilterConfigProviderManager> filter_config_provider_manager =
       Http::FilterChainUtility::createSingletonDownstreamFilterConfigProviderManager(
@@ -384,7 +378,9 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
                                : nullptr),
       header_validator_factory_(
           createHeaderValidatorFactory(config, context.messageValidationVisitor())),
-      append_x_forwarded_port_(config.append_x_forwarded_port()) {
+      append_x_forwarded_port_(config.append_x_forwarded_port()),
+      add_proxy_protocol_connection_state_(
+          PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, add_proxy_protocol_connection_state, true)) {
   if (!idle_timeout_) {
     idle_timeout_ = std::chrono::hours(1);
   } else if (idle_timeout_.value().count() == 0) {
@@ -549,6 +545,33 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
     AccessLog::InstanceSharedPtr current_access_log =
         AccessLog::AccessLogFactory::fromProto(access_log, context_);
     access_logs_.push_back(current_access_log);
+  }
+
+  if (config.has_access_log_options()) {
+    if (config.flush_access_log_on_new_request() /* deprecated */) {
+      throw EnvoyException(
+          "Only one of flush_access_log_on_new_request or access_log_options can be specified.");
+    }
+
+    if (config.has_access_log_flush_interval()) {
+      throw EnvoyException(
+          "Only one of access_log_flush_interval or access_log_options can be specified.");
+    }
+
+    flush_access_log_on_new_request_ =
+        config.access_log_options().flush_access_log_on_new_request();
+
+    if (config.access_log_options().has_access_log_flush_interval()) {
+      access_log_flush_interval_ = std::chrono::milliseconds(DurationUtil::durationToMilliseconds(
+          config.access_log_options().access_log_flush_interval()));
+    }
+  } else {
+    flush_access_log_on_new_request_ = config.flush_access_log_on_new_request();
+
+    if (config.has_access_log_flush_interval()) {
+      access_log_flush_interval_ = std::chrono::milliseconds(
+          DurationUtil::durationToMilliseconds(config.access_log_flush_interval()));
+    }
   }
 
   server_transformation_ = config.server_header_transformation();
@@ -743,7 +766,6 @@ HttpConnectionManagerFactory::createHttpConnectionManagerFactoryFromProto(
         proto_config,
     Server::Configuration::FactoryContext& context, Network::ReadFilterCallbacks& read_callbacks,
     bool clear_hop_by_hop_headers) {
-
   Utility::Singletons singletons = Utility::createSingletons(context);
 
   auto filter_config = Utility::createConfig(

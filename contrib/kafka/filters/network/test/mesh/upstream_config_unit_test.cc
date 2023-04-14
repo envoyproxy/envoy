@@ -142,6 +142,68 @@ forwarding_rules:
   EXPECT_FALSE(res4.has_value());
 }
 
+TEST(UpstreamKafkaConfigurationTest, shouldBehaveProperlyWithCustomConfigs) {
+  // given
+  const std::string yaml = R"EOF(
+advertised_host: mock_host
+advertised_port: 42
+upstream_clusters:
+- cluster_name: cluster1
+  bootstrap_servers: s1
+  partition_count : 1
+  producer_config:
+    p1: "111"
+- cluster_name: cluster2
+  bootstrap_servers: s2
+  partition_count : 2
+  consumer_config:
+    p2: "222"
+    group.id: "custom-value"
+forwarding_rules:
+- target_cluster: cluster1
+  topic_prefix: prefix1
+- target_cluster: cluster2
+  topic_prefix: prefix2
+  )EOF";
+  KafkaMeshProtoConfig proto_config;
+  TestUtility::loadFromYamlAndValidate(yaml, proto_config);
+  const UpstreamKafkaConfiguration& testee = UpstreamKafkaConfigurationImpl{proto_config};
+
+  const ClusterConfig cluster1 = {"cluster1",
+                                  1,
+                                  {{"bootstrap.servers", "s1"}, {"p1", "111"}},
+                                  {{"bootstrap.servers", "s1"}, {"group.id", "envoy"}}};
+  const ClusterConfig cluster2 = {
+      "cluster2",
+      2,
+      {{"bootstrap.servers", "s2"}},
+      {{"bootstrap.servers", "s2"}, {"group.id", "custom-value"}, {"p2", "222"}}};
+
+  // when, then (advertised address is returned properly)
+  const auto address = testee.getAdvertisedAddress();
+  EXPECT_EQ(address.first, "mock_host");
+  EXPECT_EQ(address.second, 42);
+
+  // when, then (matching prefix with something more)
+  const auto res1 = testee.computeClusterConfigForTopic("prefix1somethingmore");
+  ASSERT_TRUE(res1.has_value());
+  EXPECT_EQ(*res1, cluster1);
+
+  // when, then (matching prefix alone)
+  const auto res2 = testee.computeClusterConfigForTopic("prefix1");
+  ASSERT_TRUE(res2.has_value());
+  EXPECT_EQ(*res2, cluster1);
+
+  // when, then (failing to match first rule, but then matching the second one)
+  const auto res3 = testee.computeClusterConfigForTopic("prefix2somethingmore");
+  ASSERT_TRUE(res3.has_value());
+  EXPECT_EQ(*res3, cluster2);
+
+  // when, then (no rules match)
+  const auto res4 = testee.computeClusterConfigForTopic("someotherthing");
+  EXPECT_FALSE(res4.has_value());
+}
+
 } // namespace Mesh
 } // namespace Kafka
 } // namespace NetworkFilters

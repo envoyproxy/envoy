@@ -12,6 +12,8 @@ namespace Envoy {
 namespace Config {
 namespace {
 
+using ::testing::Return;
+
 class DeltaSubscriptionImplTest : public DeltaSubscriptionTestHarness,
                                   public testing::TestWithParam<LegacyOrUnified> {
 protected:

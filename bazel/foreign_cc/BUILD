@@ -98,23 +98,6 @@ configure_make(
 )
 
 configure_make(
-    name = "moonjit",
-    configure_command = "build.py",
-    env = select({
-        # This shouldn't be needed! See
-        # https://github.com/envoyproxy/envoy/issues/6084
-        # TODO(htuch): Remove when #6084 is fixed
-        "//bazel:asan_build": {"ENVOY_CONFIG_ASAN": "1"},
-        "//bazel:msan_build": {"ENVOY_CONFIG_MSAN": "1"},
-        "//conditions:default": {},
-    }),
-    lib_source = "@com_github_moonjit_moonjit//:all",
-    out_include_dir = "include/moonjit-2.2",
-    out_static_libs = ["libluajit-5.1.a"],
-    tags = ["skip_on_windows"],
-)
-
-configure_make(
     name = "colm",
     autogen = True,
     configure_in_place = True,
@@ -171,6 +154,7 @@ configure_make(
         "--disable-draft",
         "--disable-dyload",
         "--disable-extras",
+        "--disable-icuio",
         "--disable-plugins",
         "--disable-samples",
         "--disable-shared",
@@ -179,7 +163,7 @@ configure_make(
     ],
     data = ["@com_github_unicode_org_icu//:all"],
     env = {
-        "CXXFLAGS": "-fPIC",
+        "CXXFLAGS": "-fPIC -DU_CHARSET_IS_UTF8=1 -DU_USING_ICU_NAMESPACE=0 -DUCONFIG_ONLY_HTML_CONVERSION=1 -DUCONFIG_NO_LEGACY_CONVERSION=1 -DUCONFIG_NO_BREAK_ITERATION=1 -DUCONFIG_NO_COLLATION=1 -DUCONFIG_NO_FORMATTING=1 -DUCONFIG_NO_TRANSLITERATION=1 -DUCONFIG_NO_REGULAR_EXPRESSIONS=1",
         "CFLAGS": "-fPIC",
         "ICU_DATA_FILTER_FILE": "$(execpath //bazel/foreign_cc:icu_data_filter.json)",
     },
@@ -194,20 +178,6 @@ configure_make(
 
 cc_library(
     name = "unicode_icu",
-    defines = [
-        "UCONFIG_ONLY_HTML_CONVERSION=1",
-        "U_CHARSET_IS_UTF8=1",
-        "U_USING_ICU_NAMESPACE=0",
-        "UNISTR_FROM_STRING_EXPLICIT=",
-        "UNISTR_FROM_CHAR_EXPLICIT=",
-    ] + select({
-        "//bazel:windows_x86_64": [
-            "U_STATIC_IMPLEMENTATION",
-            "UNICODE",
-            "_UNICODE",
-        ],
-        "//conditions:default": [],
-    }),
     tags = ["skip_on_windows"],
     # Can not be used for the core dataplane due to security concerns
     visibility = ["//contrib/language/filters/http/source:__pkg__"],

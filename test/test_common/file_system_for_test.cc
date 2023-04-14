@@ -2,13 +2,31 @@
 
 #include "source/common/filesystem/filesystem_impl.h"
 
+#include "test/test_common/test_time.h"
+
 namespace Envoy {
 
 namespace Filesystem {
 
 struct MemFileInfo {
+  MemFileInfo(SystemTime timestamp)
+      : create_time_(timestamp), access_time_(timestamp), modify_time_(timestamp) {}
   absl::Mutex lock_;
   std::string data_ ABSL_GUARDED_BY(lock_);
+  SystemTime create_time_;
+  SystemTime access_time_;
+  SystemTime modify_time_;
+  FileInfo toFileInfo(absl::string_view path) {
+    absl::MutexLock lock(&lock_);
+    return {
+        std::string{fileSystemForTest().splitPathFromFilename(path).file_},
+        data_.length(),
+        FileType::Regular,
+        create_time_,
+        access_time_,
+        modify_time_,
+    };
+  }
 };
 
 class MemfileImpl : public FileSharedImpl {
@@ -46,6 +64,7 @@ protected:
 
   Api::IoCallSizeResult pread(void* buf, uint64_t count, uint64_t offset) override;
   Api::IoCallSizeResult pwrite(const void* buf, uint64_t count, uint64_t offset) override;
+  Api::IoCallResult<FileInfo> info() override;
 
 private:
   FlagSet flags_;
@@ -88,6 +107,20 @@ Api::IoCallSizeResult MemfileImpl::pwrite(const void* buf, uint64_t count, uint6
   return resultSuccess<ssize_t>(count);
 }
 
+Api::IoCallResult<FileInfo> MemfileImpl::info() { return resultSuccess(info_->toFileInfo(path())); }
+
+Api::IoCallResult<FileInfo> MemfileInstanceImpl::stat(absl::string_view path) {
+  {
+    absl::MutexLock m(&lock_);
+    auto it = files_.find(path);
+    if (it != files_.end()) {
+      ASSERT(use_memfiles_);
+      return resultSuccess(it->second->toFileInfo(path));
+    }
+  }
+  return file_system_->stat(path);
+}
+
 MemfileInstanceImpl::MemfileInstanceImpl()
     : file_system_{new InstanceImpl()}, use_memfiles_(false) {}
 
@@ -102,17 +135,19 @@ FilePtr MemfileInstanceImpl::createFile(const FilePathAndType& file_info) {
   if (!use_memfiles_) {
     return file_system_->createFile(file_info);
   }
+  Event::GlobalTimeSystem time_source;
   if (file_info.file_type_ == DestinationType::TmpFile) {
     // tmp files ideally should have no filename, so we create an info
     // without adding it to files_.
-    return std::make_unique<MemfileImpl>(file_info, std::make_shared<MemFileInfo>());
+    return std::make_unique<MemfileImpl>(file_info,
+                                         std::make_shared<MemFileInfo>(time_source.systemTime()));
   }
   if (file_system_->fileExists(path)) {
     return file_system_->createFile(file_info);
   }
   std::shared_ptr<MemFileInfo>& info = files_[path];
   if (info == nullptr) {
-    info = std::make_shared<MemFileInfo>();
+    info = std::make_shared<MemFileInfo>(time_source.systemTime());
   }
   return std::make_unique<MemfileImpl>(file_info, info);
 }

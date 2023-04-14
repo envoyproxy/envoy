@@ -58,7 +58,7 @@ public:
   bool populateDescriptor(RateLimit::DescriptorEntry& descriptor_entry, const std::string&,
                           const Http::RequestHeaderMap& headers,
                           const StreamInfo::StreamInfo& info) const override {
-    Http::Matching::HttpMatchingDataImpl data(info.downstreamAddressProvider());
+    Http::Matching::HttpMatchingDataImpl data(info);
     data.onRequestHeaders(headers);
     auto result = data_input_->get(data);
     if (result.data_) {

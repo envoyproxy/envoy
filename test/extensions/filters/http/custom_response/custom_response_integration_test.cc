@@ -23,6 +23,7 @@ using LocalResponsePolicyProto =
     envoy::extensions::http::custom_response::local_response_policy::v3::LocalResponsePolicy;
 using RedirectPolicyProto =
     envoy::extensions::http::custom_response::redirect_policy::v3::RedirectPolicy;
+using RedirectActionProto = envoy::config::route::v3::RedirectAction;
 using Envoy::Protobuf::MapPair;
 using Envoy::ProtobufWkt::Any;
 
@@ -246,7 +247,7 @@ TEST_P(CustomResponseIntegrationTest, RouteNotFound) {
   // table for the internal redirect.
   modifyPolicy<RedirectPolicyProto>(
       custom_response_filter_config_, "gateway_error_action",
-      [](RedirectPolicyProto& policy) { policy.set_host("https://fo1.example"); });
+      [](RedirectPolicyProto& policy) { policy.set_uri("https://fo1.example"); });
   initialize();
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -344,7 +345,7 @@ TEST_P(CustomResponseIntegrationTest, NoRecursion) {
 
   modifyPolicy<RedirectPolicyProto>(
       custom_response_filter_config_, "gateway_error_action",
-      [](RedirectPolicyProto& policy) { policy.set_host("https://fo1.example"); });
+      [](RedirectPolicyProto& policy) { policy.set_uri("https://fo1.example"); });
 
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -364,8 +365,78 @@ TEST_P(CustomResponseIntegrationTest, NoRecursion) {
   // gateway_error_response policy
   default_request_headers_.setHost("original.host");
   response = sendRequestAndWaitForResponse(default_request_headers_, 0, gateway_error_response_, 0);
-  // Verify we get status code 401 for fo1.example
-  EXPECT_EQ("401", response->headers().getStatusValue());
+  // Verify we get status code 299 for fo1.example as set by
+  // gateway_error_action and not 499 or 401 which is the response code of the
+  // error service.
+  EXPECT_EQ("299", response->headers().getStatusValue());
+}
+
+// Verify that we get the response code of the original response if an override
+// response code is not specified.
+TEST_P(CustomResponseIntegrationTest, OriginalResponseCode) {
+  // Make the redirect policy response for gateway_error policy return 401
+  config_helper_.addVirtualHost(TestUtility::parseYaml<VirtualHost>(R"EOF(
+    name: fo1
+    domains: ["fo1.example"]
+    routes:
+    - direct_response:
+        status: 401
+        body:
+          inline_string: fo1
+      match:
+        prefix: "/"
+    )EOF"));
+
+  modifyPolicy<RedirectPolicyProto>(custom_response_filter_config_, "gateway_error_action",
+                                    [](RedirectPolicyProto& policy) {
+                                      policy.set_uri("https://fo1.example");
+                                      policy.clear_status_code();
+                                    });
+
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  // Verify that 400_response policy cannot be triggered by the
+  // gateway_error_response policy
+  default_request_headers_.setHost("original.host");
+  auto response =
+      sendRequestAndWaitForResponse(default_request_headers_, 0, gateway_error_response_, 0);
+  // Verify that we get the original response code 502.
+  EXPECT_EQ("502", response->headers().getStatusValue());
+}
+
+// Verify that we get the response code of the original response if an override
+// response code is not specified.
+TEST_P(CustomResponseIntegrationTest, OriginalResponseCodeOverrides200) {
+  // Make the redirect policy response for gateway_error policy return 401
+  config_helper_.addVirtualHost(TestUtility::parseYaml<VirtualHost>(R"EOF(
+    name: fo1
+    domains: ["fo1.example"]
+    routes:
+    - direct_response:
+        status: 200
+        body:
+          inline_string: fo1
+      match:
+        prefix: "/"
+    )EOF"));
+
+  modifyPolicy<RedirectPolicyProto>(custom_response_filter_config_, "gateway_error_action",
+                                    [](RedirectPolicyProto& policy) {
+                                      policy.set_uri("https://fo1.example");
+                                      policy.clear_status_code();
+                                    });
+
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  // Verify that 400_response policy cannot be triggered by the
+  // gateway_error_response policy
+  default_request_headers_.setHost("original.host");
+  auto response = sendRequestAndWaitForResponse(
+      default_request_headers_, 0, gateway_error_response_, 0, 0, std::chrono::seconds(500));
+  // Verify that we get the original response code 502.
+  EXPECT_EQ("502", response->headers().getStatusValue());
 }
 
 // Verify that we can NOT intercept local replies sent during decode
@@ -511,6 +582,8 @@ typed_config:
   EXPECT_EQ("500", response->headers().getStatusValue());
 }
 
+// Verify that RedirectPolicy works with local reply sent after decodeHeaders is
+// called for custom response filter.
 TEST_P(CustomResponseIntegrationTest, RouteSpecificDecodeLocalReplyAfterRedirectedCER) {
   // Add filter that sends local reply after.
   filters_after_cer_.emplace_back(R"EOF(
@@ -521,6 +594,18 @@ typed_config:
   SimpleFilterConfig<LocalReplyDuringDecodeIfNotCER> factory;
   Envoy::Registry::InjectFactory<Server::Configuration::NamedHttpFilterConfigFactory> registration(
       factory);
+  // Add route with header matcher
+  config_helper_.addVirtualHost(TestUtility::parseYaml<VirtualHost>(R"EOF(
+    name: cer-only-host
+    domains: ["host.with.route.with.header.matcher"]
+    routes:
+    - direct_response:
+        status: 202
+        body:
+          inline_string: cer-only-response
+      match:
+        prefix: "/"
+    )EOF"));
   initialize();
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -528,8 +613,9 @@ typed_config:
   auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_TRUE(response->complete());
-  //     Verify we do not get a modified status value. (500 instead of 292)
-  EXPECT_EQ("500", response->headers().getStatusValue());
+  // Verify we DO get a modified status value. (292 instead of 500) as defined
+  // in `500_action`
+  EXPECT_EQ("292", response->headers().getStatusValue());
 }
 
 // Verify that the route meant for custom response redirection can be routed to with the required
@@ -583,6 +669,11 @@ TEST_P(CustomResponseIntegrationTest, ModifyRequestHeaders) {
         auto action = policy.mutable_modify_request_headers_action();
         action->set_name("modify-request-headers-action");
         action->mutable_typed_config()->set_type_url("type.googleapis.com/google.protobuf.Struct");
+        *policy.mutable_redirect_action() = TestUtility::parseYaml<RedirectActionProto>(R"EOF(
+    host_redirect: "global.storage"
+    path_redirect: "/internal_server_error"
+    https_redirect: true
+    )EOF");
       });
 
   // Add TestModifyRequestHeaders extension that will add the
@@ -603,7 +694,7 @@ TEST_P(CustomResponseIntegrationTest, ModifyRequestHeaders) {
         route->mutable_match()->set_prefix("/internal_server_error");
         auto header = route->mutable_match()->mutable_headers()->Add();
         header->set_name("x-envoy-cer-backend");
-        header->mutable_string_match()->set_exact("global/storage");
+        header->mutable_string_match()->set_exact("global.storage");
         route->mutable_direct_response()->set_status(static_cast<uint32_t>(220));
         // Use inline bytes rather than a filename to avoid using a path that may look illegal
         // to Envoy.
@@ -618,13 +709,17 @@ TEST_P(CustomResponseIntegrationTest, ModifyRequestHeaders) {
       default_request_headers_, 0,
       ::Envoy::Http::TestResponseHeaderMapImpl{{":status", "520"}, {"content-length", "0"}}, 0, 0,
       std::chrono::minutes(20));
-  EXPECT_EQ("220", response->headers().getStatusValue());
+  // Verify that we get the original response code in the absence of an
+  // override.
+  EXPECT_EQ("520", response->headers().getStatusValue());
   EXPECT_EQ("Modify action response body", response->body());
 }
 
-INSTANTIATE_TEST_SUITE_P(Protocols, CustomResponseIntegrationTest,
-                         testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams()),
-                         HttpProtocolIntegrationTest::protocolTestParamsToString);
+// TODO(#26236): Fix test suite for HTTP/3.
+INSTANTIATE_TEST_SUITE_P(
+    Protocols, CustomResponseIntegrationTest,
+    testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParamsWithoutHTTP3()),
+    HttpProtocolIntegrationTest::protocolTestParamsToString);
 } // namespace CustomResponse
 } // namespace HttpFilters
 } // namespace Extensions

@@ -174,7 +174,8 @@ envoy_mobile_jni_kt_test(
     ],
 )
 
-envoy_mobile_jni_kt_test(
+#envoy_mobile_jni_kt_test(
+envoy_mobile_android_test(
     name = "send_data_test",
     srcs = [
         "SendDataTest.kt",
@@ -185,6 +186,7 @@ envoy_mobile_jni_kt_test(
     ],
     deps = [
         "//library/kotlin/io/envoyproxy/envoymobile:envoy_interfaces_lib",
+        "//test/java/io/envoyproxy/envoymobile/engine/testing",
     ],
 )
 
@@ -206,6 +208,20 @@ envoy_mobile_jni_kt_test(
     name = "send_trailers_test",
     srcs = [
         "SendTrailersTest.kt",
+    ],
+    native_deps = [
+        "//test/common/jni:libenvoy_jni_with_test_extensions.so",
+        "//test/common/jni:libenvoy_jni_with_test_extensions_jnilib",
+    ],
+    deps = [
+        "//library/kotlin/io/envoyproxy/envoymobile:envoy_interfaces_lib",
+    ],
+)
+
+envoy_mobile_jni_kt_test(
+    name = "receive_trailers_test",
+    srcs = [
+        "ReceiveTrailersTest.kt",
     ],
     native_deps = [
         "//test/common/jni:libenvoy_jni_with_test_extensions.so",

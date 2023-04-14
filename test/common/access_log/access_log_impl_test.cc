@@ -704,6 +704,41 @@ duration_filter:
   stream_info.end_time_ = stream_info.startTimeMonotonic() + std::chrono::microseconds(10000);
   EXPECT_CALL(runtime.snapshot_, getInteger("key", 1000000)).WillOnce(Return(100000000));
   EXPECT_FALSE(filter.evaluate(stream_info, request_headers, response_headers, response_trailers));
+
+  StreamInfo::MockStreamInfo mock_stream_info;
+  EXPECT_CALL(mock_stream_info, currentDuration()).WillOnce(testing::Return(std::nullopt));
+  EXPECT_FALSE(
+      filter.evaluate(mock_stream_info, request_headers, response_headers, response_trailers));
+}
+
+TEST(AccessLogFilterTest, MidStreamDuration) {
+  const std::string filter_yaml = R"EOF(
+duration_filter:
+  comparison:
+    op: GE
+    value:
+      default_value: 1000
+    )EOF";
+
+  NiceMock<Runtime::MockLoader> runtime;
+
+  envoy::config::accesslog::v3::AccessLogFilter config;
+  TestUtility::loadFromYaml(filter_yaml, config);
+  DurationFilter filter(config.duration_filter(), runtime);
+  Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"}, {":path", "/"}};
+  Http::TestResponseHeaderMapImpl response_headers;
+  Http::TestResponseTrailerMapImpl response_trailers;
+
+  StreamInfo::MockStreamInfo mock_stream_info;
+  EXPECT_CALL(mock_stream_info, currentDuration())
+      .WillOnce(testing::Return(std::chrono::microseconds(1000)))     // 1ms
+      .WillOnce(testing::Return(std::chrono::microseconds(1000000))); // 1000ms
+
+  EXPECT_FALSE(
+      filter.evaluate(mock_stream_info, request_headers, response_headers, response_trailers));
+
+  EXPECT_TRUE(
+      filter.evaluate(mock_stream_info, request_headers, response_headers, response_trailers));
 }
 
 TEST(AccessLogFilterTest, StatusCodeWithRuntimeKey) {

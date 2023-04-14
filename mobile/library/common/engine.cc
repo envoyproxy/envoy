@@ -4,7 +4,6 @@
 #include "source/common/common/lock_guard.h"
 
 #include "library/common/bridge/utility.h"
-#include "library/common/config/internal.h"
 #include "library/common/data/utility.h"
 #include "library/common/stats/utility.h"
 
@@ -29,7 +28,7 @@ envoy_status_t Engine::run(const std::string config, const std::string log_level
   // that of the temporary. The temporary object's state becomes the default state, which does
   // nothing.
   auto options = std::make_unique<Envoy::OptionsImpl>();
-  options->setConfigYaml(absl::StrCat(config_header, config));
+  options->setConfigYaml(config);
   if (!log_level.empty()) {
     options->setLogLevel(options->parseAndValidateLogLevel(log_level.c_str()));
   }

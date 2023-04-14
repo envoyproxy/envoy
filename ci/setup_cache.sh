@@ -24,19 +24,25 @@ if [[ -n "${GCP_SERVICE_ACCOUNT_KEY:0:1}" ]]; then
 
 fi
 
-
 if [[ -n "${BAZEL_REMOTE_CACHE}" ]]; then
-  export BAZEL_BUILD_EXTRA_OPTIONS+=" --remote_cache=${BAZEL_REMOTE_CACHE}"
-  echo "Set up bazel remote read/write cache at ${BAZEL_REMOTE_CACHE}."
+    export BAZEL_BUILD_EXTRA_OPTIONS+=" --remote_cache=${BAZEL_REMOTE_CACHE}"
+    echo "Set up bazel remote read/write cache at ${BAZEL_REMOTE_CACHE}."
 
-  if [[ -n "${BAZEL_REMOTE_INSTANCE}" ]]; then
-    export BAZEL_BUILD_EXTRA_OPTIONS+=" --remote_instance_name=${BAZEL_REMOTE_INSTANCE}"
-    echo "instance_name: ${BAZEL_REMOTE_INSTANCE}."
-  elif [[ -z "${ENVOY_RBE}" ]]; then
-    export BAZEL_BUILD_EXTRA_OPTIONS+=" --jobs=HOST_CPUS*.9 --remote_timeout=600"
-    echo "using local build cache."
-  fi
+    if [[ -n "${BAZEL_REMOTE_INSTANCE_BRANCH}" ]]; then
+        # Normalize branches - `release/vX.xx`, `vX.xx`, `vX.xx.x` -> `vX.xx`
+        BRANCH_NAME="$(echo "${BAZEL_REMOTE_INSTANCE_BRANCH}" | cut -d/ -f2 | cut -d. -f-2)"
+        BAZEL_REMOTE_INSTANCE="branch/${BRANCH_NAME}"
+    fi
 
+    if [[ -n "${BAZEL_REMOTE_INSTANCE}" ]]; then
+        export BAZEL_BUILD_EXTRA_OPTIONS+=" --remote_instance_name=${BAZEL_REMOTE_INSTANCE}"
+        echo "instance_name: ${BAZEL_REMOTE_INSTANCE}."
+    fi
+
+    if [[ -z "${ENVOY_RBE}" ]]; then
+        export BAZEL_BUILD_EXTRA_OPTIONS+=" --jobs=HOST_CPUS*.99 --remote_timeout=600"
+        echo "using local build cache."
+    fi
 else
-  echo "No remote cache is set, skipping setup remote cache."
+    echo "No remote cache is set, skipping setup remote cache."
 fi
