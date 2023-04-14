@@ -3,6 +3,7 @@
 #include "envoy/http/header_validator_errors.h"
 
 #include "source/common/http/header_utility.h"
+#include "source/common/runtime/runtime_features.h"
 #include "source/extensions/http/header_validators/envoy_default/character_tables.h"
 
 #include "absl/container/node_hash_map.h"
@@ -50,12 +51,21 @@ Http2HeaderValidator::Http2HeaderValidator(const HeaderValidatorConfig& config, 
           {":method", absl::bind_front(&HeaderValidator::validateMethodHeader, this)},
           {":authority", absl::bind_front(&Http2HeaderValidator::validateAuthorityHeader, this)},
           {":scheme", absl::bind_front(&HeaderValidator::validateSchemeHeader, this)},
-          {":path", absl::bind_front(&HeaderValidator::validatePathHeaderCharacters, this)},
+          {":path", getPathValidationMethod()},
           {":protocol", absl::bind_front(&Http2HeaderValidator::validateProtocolHeader, this)},
           {"te", absl::bind_front(&Http2HeaderValidator::validateTEHeader, this)},
           {"content-length",
            absl::bind_front(&Http2HeaderValidator::validateContentLengthHeader, this)},
       } {}
+
+HeaderValidator::HeaderValidatorFunction Http2HeaderValidator::getPathValidationMethod() {
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.uhv_allow_extended_ascii_in_path_for_http2")) {
+    return absl::bind_front(&Http2HeaderValidator::validatePathHeaderCharactersExtendedAsciiAllowed,
+                            this);
+  }
+  return absl::bind_front(&HeaderValidator::validatePathHeaderCharacters, this);
+}
 
 HeaderValidator::HeaderEntryValidationResult
 Http2HeaderValidator::validateRequestHeaderEntry(const HeaderString& key,
@@ -93,6 +103,103 @@ Http2HeaderValidator::validateResponseHeaderEntry(const HeaderString& key,
 
   // Validate the header value
   return validateGenericHeaderValue(value);
+}
+
+void Http2HeaderValidator::encodeExtendedAsciiInPath(::Envoy::Http::RequestHeaderMap& header_map) {
+  absl::string_view path = header_map.path();
+  // Check if URI the path contains any characters >= 0x80
+  auto extended_ascii_position = path.begin();
+  for (; extended_ascii_position != path.end() &&
+         static_cast<unsigned char>(*extended_ascii_position) < 0x7F;
+       ++extended_ascii_position) {
+    // Return early if we got to query or fragment without finding any extended ASCII characters.
+    if (*extended_ascii_position == '?' || *extended_ascii_position == '#') {
+      return;
+    }
+  }
+  if (extended_ascii_position == path.end()) {
+    return;
+  }
+  std::string encoded_path(path.begin(), extended_ascii_position);
+  encoded_path.reserve(path.size());
+
+  for (; extended_ascii_position != path.end(); ++extended_ascii_position) {
+    if (static_cast<unsigned char>(*extended_ascii_position) >= 0x80) {
+      absl::StrAppend(&encoded_path, fmt::format("%{:02X}", static_cast<const unsigned char&>(
+                                                                *extended_ascii_position)));
+    } else {
+      encoded_path.push_back(*extended_ascii_position);
+    }
+    if (*extended_ascii_position == '?' || *extended_ascii_position == '#') {
+      break;
+    }
+  }
+  // Append query and fragment if present
+  encoded_path.append(extended_ascii_position, path.end());
+  // Encoding would change the length of the path
+  if (encoded_path.size() > path.size()) {
+    header_map.setPath(encoded_path);
+  }
+}
+
+HeaderValidator::HeaderValueValidationResult
+Http2HeaderValidator::validatePathHeaderCharactersExtendedAsciiAllowed(const HeaderString& value) {
+  const auto& path = value.getStringView();
+  bool is_valid = !path.empty();
+
+  // When the envoy.reloadable_features.uhv_translate_backslash_to_slash == true
+  // the validation method needs to allow backslashes in path, so they can be translated
+  // to slashes during path normalization.
+  const bool allow_backslash =
+      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.uhv_translate_backslash_to_slash");
+
+  auto iter = path.begin();
+  auto end = path.end();
+  // Validate the path component of the URI
+  for (; iter != end && is_valid; ++iter) {
+    const char ch = *iter;
+    if ((allow_backslash && ch == '\\') || static_cast<unsigned char>(ch) >= 0x80) {
+      continue;
+    }
+    if (ch == '?' || ch == '#') {
+      // This is the start of the query or fragment portion of the path which uses a different
+      // character table.
+      break;
+    }
+
+    is_valid &= testChar(kPathHeaderCharTable, ch);
+  }
+
+  if (is_valid && iter != end && *iter == '?') {
+    // Validate the query component of the URI
+    ++iter;
+    for (; iter != end && is_valid; ++iter) {
+      const char ch = *iter;
+      if (static_cast<unsigned char>(*iter) >= 0x80) {
+        continue;
+      }
+      if (ch == '#') {
+        break;
+      }
+
+      is_valid &= testChar(kUriQueryAndFragmentCharTable, ch);
+    }
+  }
+
+  if (is_valid && iter != end && *iter == '#') {
+    // Validate the fragment component of the URI
+    ++iter;
+    for (; iter != end && is_valid; ++iter) {
+      if (static_cast<unsigned char>(*iter) >= 0x80) {
+        continue;
+      }
+      is_valid &= testChar(kUriQueryAndFragmentCharTable, *iter);
+    }
+  }
+
+  return is_valid ? HeaderValueValidationResult::success()
+                  : HeaderValueValidationResult{HeaderValueValidationResult::Action::Reject,
+                                                UhvResponseCodeDetail::get().InvalidUrl};
 }
 
 HeaderValidator::ValidationResult
@@ -234,6 +341,11 @@ Http2HeaderValidator::transformRequestHeaders(::Envoy::Http::RequestHeaderMap& h
     auto path_result = path_normalizer_.normalizePathUri(header_map);
     if (!path_result.ok()) {
       return path_result;
+    }
+    if (protocol_ == Protocol::Http2 &&
+        Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.uhv_allow_extended_ascii_in_path_for_http2")) {
+      encodeExtendedAsciiInPath(header_map);
     }
   }
   return HeadersTransformationResult::success();

@@ -111,6 +111,7 @@ envoy_cc_library(
         "//external:abseil_node_hash_set",
         "//source/common/http:header_utility_lib",
         "//source/common/http:headers_lib",
+        "//source/common/runtime:runtime_features_lib",
         "@com_google_absl//absl/functional:bind_front",
     ],
 )

@@ -392,7 +392,7 @@ HeaderValidator::validatePathHeaderCharacters(const HeaderString& value) {
   auto iter = path.begin();
   auto end = path.end();
   // When the envoy.reloadable_features.uhv_translate_backslash_to_slash == true
-  // the validation method needs to allow backslashes in path, so they can translated
+  // the validation method needs to allow backslashes in path, so they can be translated
   // to slashes during path normalization.
   const bool allow_backslash =
       Runtime::runtimeFeatureEnabled("envoy.reloadable_features.uhv_translate_backslash_to_slash");

@@ -58,6 +58,20 @@ private:
   HeaderEntryValidationResult validateResponseHeaderEntry(const ::Envoy::Http::HeaderString& key,
                                                           const ::Envoy::Http::HeaderString& value);
 
+  // URL-encode extended ASCII characters in URL path. This method is called iff
+  // `envoy.reloadable_features.uhv_allow_extended_ascii_in_path_for_http2` == true
+  void encodeExtendedAsciiInPath(::Envoy::Http::RequestHeaderMap& header_map);
+
+  // Relax validation of character set in URL path, query and fragment by allowing extended ASCII
+  // characters. This method is called iff
+  // `envoy.reloadable_features.uhv_allow_extended_ascii_in_path_for_http2` == true
+  HeaderValidator::HeaderValueValidationResult
+  validatePathHeaderCharactersExtendedAsciiAllowed(const ::Envoy::Http::HeaderString& value);
+
+  // Chooses path validation method based on the value of runtime flags that affect the validation
+  // algorithm.
+  HeaderValidatorFunction getPathValidationMethod();
+
   const HeaderValidatorMap request_header_validator_map_;
 };
 
