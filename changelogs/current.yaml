@@ -21,7 +21,7 @@ behavior_changes:
 - area: http cookies
   change: |
     Changed internal format of http cookie to JSON and added expiry timestamp. Processing expired cookie
-    resultis in selection of a new upstream host and sending a new cookie to the client. Previous format of
+    results in selection of a new upstream host and sending a new cookie to the client. Previous format of
     the cookie is still accepted, but is planned to be obsoleted in the future.
     This behavior change can be reverted by setting
     ``envoy.reloadable_features.stateful_session_encode_ttl_in_cookie`` to ``false``.
