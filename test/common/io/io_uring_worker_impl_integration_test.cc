@@ -105,7 +105,8 @@ public:
   void onAcceptSocket(AcceptedSocketParam& param) override { accept_result_ = param.fd_; }
   void onRead(ReadParam& param) override { on_read_cb_(param); }
   void onWrite(WriteParam& param) override { write_result_ = param.result_; }
-  void onClose() override { is_closed = true; }
+  void onRemoteClose() override { is_closed = true; }
+  void onLocalClose() override {}
 
   void expectRead(std::function<void(ReadParam&)> on_read_cb) { on_read_cb_ = on_read_cb; }
 

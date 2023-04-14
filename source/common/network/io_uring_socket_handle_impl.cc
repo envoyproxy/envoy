@@ -33,9 +33,13 @@ IoUringSocketHandleImpl::IoUringSocketHandleImpl(Io::IoUringFactory& io_uring_fa
 IoUringSocketHandleImpl::~IoUringSocketHandleImpl() {
   ENVOY_LOG(trace, "~IoUringSocketHandleImpl, type = {}", ioUringSocketTypeStr());
   if (SOCKET_VALID(fd_)) {
-    // The TLS slot has been shut down by this moment with IoUring wiped out, thus
-    // better use this posix system call instead of IoUringSocketHandleImpl::close().
-    ::close(fd_);
+    if (io_uring_socket_type_ != IoUringSocketType::Unknown && io_uring_socket_.has_value()) {
+      io_uring_socket_.ref().close();
+    } else {
+      // The TLS slot has been shut down by this moment with IoUring wiped out, thus
+      // better use this posix system call instead of IoUringSocketHandleImpl::close().
+      ::close(fd_);
+    }
   }
 }
 
@@ -509,7 +513,7 @@ void IoUringSocketHandleImpl::onWrite(Io::WriteParam& param) {
   write_param_ = absl::nullopt;
 }
 
-void IoUringSocketHandleImpl::onClose() {
+void IoUringSocketHandleImpl::onRemoteClose() {
   ASSERT(cb_ != nullptr);
   cb_(Event::FileReadyType::Closed);
 }

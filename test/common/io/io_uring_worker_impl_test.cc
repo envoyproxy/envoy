@@ -36,7 +36,8 @@ public:
   void onAcceptSocket(AcceptedSocketParam&) override {}
   void onRead(ReadParam&) override {}
   void onWrite(WriteParam&) override {}
-  void onClose() override {}
+  void onRemoteClose() override {}
+  void onLocalClose() override {}
 };
 
 TEST(IoUringWorkerImplTest, CleanupSocket) {

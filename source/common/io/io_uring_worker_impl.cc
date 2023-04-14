@@ -573,7 +573,7 @@ void IoUringServerSocket::onRead(Request* req, int32_t result, bool injected) {
                 "remote closed and close event enabled, raise the close event, fd = "
                 "{}, result = {}",
                 fd_, read_error_.value());
-      io_uring_handler_.onClose();
+      io_uring_handler_.onRemoteClose();
       read_error_.reset();
       return;
     }

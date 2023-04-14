@@ -58,7 +58,10 @@ public:
 
   // IoUringSocket
   os_fd_t fd() const override { return fd_; }
-  void close() override { status_ = CLOSING; }
+  void close() override {
+    status_ = CLOSING;
+    io_uring_handler_.onLocalClose();
+  }
   void enable() override { status_ = ENABLED; }
   void disable() override { status_ = DISABLED; }
   void enableCloseEvent(bool enable) override { enable_close_event_ = enable; }
