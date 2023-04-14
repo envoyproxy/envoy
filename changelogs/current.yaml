@@ -338,6 +338,10 @@ new_features:
   change: |
     added stat ``overload.refresh_interval_delay`` to track the delay between overload manager resource loop refresh in
     milliseconds.
+- area: load shed point
+  change: |
+    added load shed point ``envoy.load_shed_points.tcp_listener_accept`` that rejects new tcp connections
+    by closing the connection before the new connection accept phase.
 - area: http
   change: |
     make adding ProxyProtocolFilterState in the HCM optional.
