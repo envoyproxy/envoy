@@ -6,13 +6,11 @@
 #include "library/common/jni/import/jni_import.h"
 #include "library/common/types/c_types.h"
 #include "library/common/types/managed_envoy_headers.h"
+#include "library/common/types/matcher_data.h"
 
 // NOLINT(namespace-envoy)
 
-void set_vm(JavaVM* vm);
-
-JavaVM* get_vm();
-
+// TODO(Augustyniak): Replace the usages of this global method with Envoy::JNI::Env::get()
 JNIEnv* get_env();
 
 void set_class_loader(jobject class_loader);
@@ -38,8 +36,6 @@ void set_class_loader(jobject class_loader);
  *         it couldn't be found.
  */
 jclass find_class(const char* class_name);
-
-void jvm_detach_thread();
 
 void jni_delete_global_ref(void* context);
 
@@ -119,3 +115,6 @@ void JavaArrayOfByteArrayToStringVector(JNIEnv* env, jobjectArray array,
 void JavaArrayOfByteToBytesVector(JNIEnv* env, jbyteArray array, std::vector<uint8_t>* out);
 
 void JavaArrayOfByteToString(JNIEnv* env, jbyteArray jbytes, std::string* out);
+
+std::vector<MatcherData> javaObjectArrayToMatcherData(JNIEnv* env, jobjectArray array,
+                                                      std::string& cluster_out);

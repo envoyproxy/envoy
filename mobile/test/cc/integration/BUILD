@@ -11,6 +11,7 @@ envoy_cc_test(
     deps = [
         "//library/cc:envoy_engine_cc_lib_no_stamp",
         "//test/common/integration:test_engine_builder_lib",
+        "@envoy_build_config//:test_extensions",
     ],
 )
 
@@ -21,5 +22,6 @@ envoy_cc_test(
     deps = [
         "//library/cc:envoy_engine_cc_lib_no_stamp",
         "//test/common/integration:test_engine_builder_lib",
+        "@envoy_build_config//:test_extensions",
     ],
 )

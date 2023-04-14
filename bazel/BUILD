@@ -24,6 +24,18 @@ sh_library(
     srcs = ["volatile_env.sh"],
 )
 
+# Stamp derived from tree hash + dirty status if `BAZEL_VOLATILE_DIRTY`
+# is set, otherwise the git commit
+genrule(
+    name = "volatile-scm-hash",
+    outs = ["volatile-scm-hash.txt"],
+    cmd = """
+    grep BUILD_SCM_HASH bazel-out/volatile-status.txt > $@
+    """,
+    stamp = 1,
+    tags = ["no-remote-exec"],
+)
+
 genrule(
     name = "gnu_build_id",
     outs = ["gnu_build_id.ldscript"],
@@ -361,6 +373,11 @@ config_setting(
 config_setting(
     name = "disable_envoy_mobile_listener",
     values = {"define": "envoy_mobile_listener=disabled"},
+)
+
+config_setting(
+    name = "disable_http_datagrams",
+    values = {"define": "enable_http_datagrams=disabled"},
 )
 
 config_setting(

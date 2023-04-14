@@ -563,7 +563,7 @@ TEST_P(TcpProxyIntegrationTest, AccessLogOnUpstreamConnect) {
         MessageUtil::anyConvert<envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy>(
             *config_blob);
 
-    tcp_proxy_config.set_flush_access_log_on_connected(true);
+    tcp_proxy_config.mutable_access_log_options()->set_flush_access_log_on_connected(true);
     auto* access_log = tcp_proxy_config.add_access_log();
     access_log->set_name("accesslog");
     envoy::extensions::access_loggers::file::v3::FileAccessLog access_log_config;
@@ -639,11 +639,11 @@ TEST_P(TcpProxyIntegrationTest, TcpProxyBidirectionalBytesMeter) {
 
   std::vector<IntegrationTcpClientPtr> clients{client_count};
   std::vector<FakeRawConnectionPtr> fake_connections{upstream_count};
-  const auto indicies = std::vector<uint64_t>({0, 1, 2});
+  const auto indices = std::vector<uint64_t>({0, 1, 2});
 
   for (int i = 0; i < client_count; ++i) {
     clients[i] = makeTcpConnection(lookupPort("tcp_proxy"));
-    waitForNextRawUpstreamConnection(indicies, fake_connections[i]);
+    waitForNextRawUpstreamConnection(indices, fake_connections[i]);
   }
 
   ASSERT_TRUE(clients[0]->write("hello")); // send initial client data

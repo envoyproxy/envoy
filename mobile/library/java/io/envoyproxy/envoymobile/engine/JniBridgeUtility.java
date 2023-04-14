@@ -1,6 +1,7 @@
 package io.envoyproxy.envoymobile.engine;
 
 import java.nio.charset.StandardCharsets;
+import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -44,6 +45,34 @@ public final class JniBridgeUtility {
     final List<byte[]> convertedBytes = new ArrayList<byte[]>(stringList.size());
     for (String str : stringList) {
       convertedBytes.add(str.getBytes(StandardCharsets.UTF_8));
+    }
+    return convertedBytes.toArray(new byte[0][0]);
+  }
+
+  public static byte[][] clusterConfigToJniBytes(List<VirtualClusterConfig> configList) {
+    int size = 0;
+    for (VirtualClusterConfig config : configList) {
+      size += 1 + config.matches.size();
+    }
+    final List<byte[]> convertedBytes = new ArrayList<byte[]>(size);
+    for (VirtualClusterConfig config : configList) {
+      convertedBytes.add(config.name.getBytes(StandardCharsets.UTF_8));
+      for (HeaderMatchConfig match : config.matches) {
+        convertedBytes.add(match.name.getBytes(StandardCharsets.UTF_8));
+        ByteBuffer type = ByteBuffer.allocate(4);
+        int int_type = 0;
+        switch (match.type) {
+        case EXACT:
+          int_type = 0;
+          break;
+        case SAFE_REGEX:
+          int_type = 1;
+          break;
+        }
+        type.putInt(int_type);
+        convertedBytes.add(type.array());
+        convertedBytes.add(match.value.getBytes(StandardCharsets.UTF_8));
+      }
     }
     return convertedBytes.toArray(new byte[0][0]);
   }

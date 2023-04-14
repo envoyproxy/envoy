@@ -211,7 +211,7 @@ class EngineBuilderTest {
     engineBuilder.addVirtualCluster("[test]")
 
     val engine = engineBuilder.build() as EngineImpl
-    assertThat(engine.envoyConfiguration.virtualClusters.size).isEqualTo(1)
+    assertThat(engine.envoyConfiguration.legacyVirtualClusters.size).isEqualTo(1)
   }
 
   @Test

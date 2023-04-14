@@ -65,6 +65,7 @@ categories:
 - envoy.compression.compressor
 - envoy.compression.decompressor
 - envoy.config.validators
+- envoy.config_subscription
 - envoy.filters.http
 - envoy.filters.listener
 - envoy.filters.network
@@ -126,6 +127,7 @@ categories:
 - envoy.load_balancing_policies
 - envoy.http.early_header_mutation
 - envoy.http.custom_response
+- envoy.router.cluster_specifier_plugin
 
 status_values:
 - name: stable

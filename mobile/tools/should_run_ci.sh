@@ -52,7 +52,7 @@ if grep -q "^mobile/" <<< "$changed_files"; then
   success "mobile"
 elif grep -q "^bazel/repository_locations\.bzl" <<< "$changed_files"; then
   success "bazel/repository_locations.bzl"
-elif grep -q "^\.github/workflows/" <<< "$changed_files"; then
+elif grep -q "^\.github/workflows/mobile-*" <<< "$changed_files"; then
   success "GitHub Workflows"
 else
   failure

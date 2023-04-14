@@ -33,7 +33,6 @@
 #include "library/common/engine.h"
 #include "library/common/extensions/cert_validator/platform_bridge/platform_bridge.pb.h"
 #include "library/common/extensions/filters/http/local_error/filter.pb.h"
-#include "library/common/extensions/filters/http/route_cache_reset/filter.pb.h"
 #include "library/common/extensions/filters/http/network_configuration/filter.pb.h"
 #include "library/common/extensions/filters/http/socket_tag/filter.pb.h"
 #include "library/common/extensions/key_value/platform/platform.pb.h"
@@ -131,6 +130,13 @@ EngineBuilder::addH2ConnectionKeepaliveTimeoutSeconds(int h2_connection_keepaliv
 
 EngineBuilder& EngineBuilder::addVirtualCluster(std::string virtual_cluster) {
   virtual_clusters_.push_back(std::move(virtual_cluster));
+  return *this;
+}
+
+EngineBuilder& EngineBuilder::addVirtualCluster(std::string name,
+                                                std::vector<MatcherData> matchers) {
+  std::pair<std::string, std::vector<MatcherData>> matcher(name, std::move(matchers));
+  virtual_cluster_data_.emplace_back(std::move(matcher));
   return *this;
 }
 
@@ -390,6 +396,20 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
     MessageUtil::loadFromYaml(cluster, *api_service->add_virtual_clusters(),
                               ProtobufMessage::getStrictValidationVisitor());
   }
+  for (auto& name_and_data : virtual_cluster_data_) {
+    auto* virtual_cluster = api_service->add_virtual_clusters();
+    virtual_cluster->set_name(name_and_data.first);
+    for (auto& matcher : name_and_data.second) {
+      auto* match = virtual_cluster->add_headers();
+      match->set_name(matcher.name);
+      if (matcher.type == MatcherData::EXACT) {
+        match->set_exact_match(matcher.value);
+      } else {
+        ASSERT(matcher.type == MatcherData::SAFE_REGEX);
+        match->mutable_safe_regex_match()->set_regex(matcher.value);
+      }
+    }
+  }
 
   for (auto& direct_response_in : direct_responses_) {
     auto* this_route = api_service->add_routes();
@@ -558,10 +578,11 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
   }
 
   if (!direct_responses_.empty()) {
-    envoymobile::extensions::filters::http::route_cache_reset::RouteCacheReset cache_reset;
     auto* cache_reset_filter = hcm->add_http_filters();
     cache_reset_filter->set_name("envoy.filters.http.route_cache_reset");
-    cache_reset_filter->mutable_typed_config()->PackFrom(cache_reset);
+    cache_reset_filter->mutable_typed_config()->set_type_url(
+        "type.googleapis.com/"
+        "envoymobile.extensions.filters.http.route_cache_reset.RouteCacheReset");
   }
 
   // Set up the always-present filters

@@ -30,6 +30,7 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic, assign) BOOL enableDrainPostDnsRefresh;
 @property (nonatomic, assign) BOOL enforceTrustChainVerification;
 @property (nonatomic, assign) BOOL forceIPv6;
+@property (nonatomic, assign) BOOL enablePlatformCertificateValidation;
 @property (nonatomic, assign) UInt32 h2ConnectionKeepaliveIdleIntervalMilliseconds;
 @property (nonatomic, assign) UInt32 h2ConnectionKeepaliveTimeoutSeconds;
 @property (nonatomic, assign) UInt32 maxConnectionsPerHost;
@@ -84,6 +85,7 @@ NS_ASSUME_NONNULL_BEGIN
                         enableDrainPostDnsRefresh:(BOOL)enableDrainPostDnsRefresh
                     enforceTrustChainVerification:(BOOL)enforceTrustChainVerification
                                         forceIPv6:(BOOL)forceIPv6
+              enablePlatformCertificateValidation:(BOOL)enablePlatformCertificateValidation
     h2ConnectionKeepaliveIdleIntervalMilliseconds:
         (UInt32)h2ConnectionKeepaliveIdleIntervalMilliseconds
               h2ConnectionKeepaliveTimeoutSeconds:(UInt32)h2ConnectionKeepaliveTimeoutSeconds

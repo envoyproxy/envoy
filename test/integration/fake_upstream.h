@@ -148,9 +148,9 @@ public:
               std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
 
   ABSL_MUST_USE_RESULT
-  testing::AssertionResult waitForEndStream(
-      Event::Dispatcher& client_dispatcher,
-      std::chrono::milliseconds timeout = TSAN_TIMEOUT_FACTOR * TestUtility::DefaultTimeout);
+  testing::AssertionResult
+  waitForEndStream(Event::Dispatcher& client_dispatcher,
+                   std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
 
   ABSL_MUST_USE_RESULT
   testing::AssertionResult
@@ -597,7 +597,7 @@ private:
   };
 
   std::string data_ ABSL_GUARDED_BY(lock_);
-  std::weak_ptr<Network::ReadFilter> read_filter_;
+  std::shared_ptr<Network::ReadFilter> read_filter_;
 };
 
 using FakeRawConnectionPtr = std::unique_ptr<FakeRawConnection>;

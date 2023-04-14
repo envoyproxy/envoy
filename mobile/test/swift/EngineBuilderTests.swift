@@ -27,15 +27,6 @@ final class EngineBuilderTests: XCTestCase {
     )
   }
 
-  func testPlatformCertificateValidationAlwaysEnabled() {
-    let bootstrapDebugDescription = EngineBuilder()
-      .bootstrapDebugDescription()
-    XCTAssertTrue(
-      bootstrapDebugDescription
-        .contains("envoy_mobile.cert_validator.platform_bridge_cert_validator")
-    )
-  }
-
   func testMonitoringModeDefaultsToPathMonitor() {
     let builder = EngineBuilder()
     XCTAssertEqual(builder.monitoringMode, .pathMonitor)

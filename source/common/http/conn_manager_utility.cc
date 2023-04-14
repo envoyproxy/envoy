@@ -102,8 +102,7 @@ ConnectionManagerUtility::MutateRequestHeadersResult ConnectionManagerUtility::m
   // Sanitize referer field if exists.
   auto result = request_headers.get(Http::CustomHeaders::get().Referer);
   if (!result.empty()) {
-    Utility::Url url;
-    if (result.size() > 1 || !url.initialize(result[0]->value().getStringView(), false)) {
+    if (result.size() > 1 || !Utility::isValidRefererValue(result[0]->value().getStringView())) {
       // A request header shouldn't have multiple referer field.
       request_headers.remove(Http::CustomHeaders::get().Referer);
     }
@@ -290,11 +289,19 @@ void ConnectionManagerUtility::cleanInternalHeaders(
     RequestHeaderMap& request_headers, bool edge_request,
     const std::list<Http::LowerCaseString>& internal_only_headers) {
   if (edge_request) {
+    // Headers to be stripped from edge requests, i.e. to sanitize so
+    // clients can't inject values.
     request_headers.removeEnvoyDecoratorOperation();
     request_headers.removeEnvoyDownstreamServiceCluster();
     request_headers.removeEnvoyDownstreamServiceNode();
+    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.sanitize_original_path")) {
+      request_headers.removeEnvoyOriginalPath();
+    }
   }
 
+  // Headers to be stripped from edge *and* intermediate-hop external requests.
+  // TODO: some of these should only be stripped at edge, i.e. moved into
+  // the block above.
   request_headers.removeEnvoyRetriableStatusCodes();
   request_headers.removeEnvoyRetriableHeaderNames();
   request_headers.removeEnvoyRetryOn();

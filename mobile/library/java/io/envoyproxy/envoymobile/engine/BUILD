@@ -38,6 +38,7 @@ java_library(
         "EnvoyNativeResourceReleaser.java",
         "EnvoyNativeResourceWrapper.java",
         "EnvoyStreamIntelImpl.java",
+        "HeaderMatchConfig.java",
         "JniBridgeUtility.java",
         "JniLibrary.java",
         "JvmBridgeUtility.java",
@@ -46,6 +47,7 @@ java_library(
         "JvmFilterFactoryContext.java",
         "JvmKeyValueStoreContext.java",
         "JvmStringAccessorContext.java",
+        "VirtualClusterConfig.java",
     ],
     visibility = ["//visibility:public"],
     deps = [
