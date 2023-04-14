@@ -1,5 +1,6 @@
 
 parameters:
+## Build stages
 # NB: all stages _must_ depend on `env`
 - name: buildStageDeps
   displayName: "Build stage dependencies"
@@ -29,6 +30,12 @@ parameters:
   displayName: "Check concurrency"
   type: number
   default: 3
+
+## Build settings
+- name: cacheTestResults
+  displayName: "Cache test results"
+  type: boolean
+  default: true
 
 stages:
 - stage: env
@@ -262,9 +269,9 @@ stages:
       timeoutInMinutes: 10
       condition: failed()
 
-  - job: docs
-    displayName: Documentation
-    dependsOn: []  # this removes the implicit dependency on previous stage and causes this to run in parallel.
+  - job: publishing
+    displayName: Publishing
+    dependsOn: []
     condition: ne(variables['PostSubmit'], true)
     pool:
       vmImage: "ubuntu-20.04"
@@ -291,6 +298,17 @@ stages:
         BAZEL_REMOTE_INSTANCE: projects/envoy-ci/instances/default_instance
         GCP_SERVICE_ACCOUNT_KEY: $(GcpServiceAccountKey)
       displayName: "Generate docs"
+
+    - script: |
+        DOCKER_CI_FIX_DIFF=$(Build.StagingDirectory)/fix_docker.diff DOCKER_CI_FIX=1 ci/test_docker_ci.sh
+      workingDirectory: $(Build.SourcesDirectory)
+      displayName: Docker build regression test
+    - task: PublishBuildArtifacts@1
+      inputs:
+        pathtoPublish: "$(Build.StagingDirectory)/fix_docker.diff"
+        artifactName: "docker_ci"
+        timeoutInMinutes: 10
+      condition: failed()
 
     - script: |
         ci/run_envoy_docker.sh 'ci/upload_gcs_artifact.sh /source/generated/docs docs'
@@ -329,26 +347,9 @@ stages:
         GITHUB_TOKEN: $(GitHubPublicRepoOnlyAccessToken)
       displayName: "Verify dependency information"
 
-  - job: docker_ci
-    displayName: Docker checks
-    dependsOn: []
-    pool:
-      vmImage: "ubuntu-20.04"
-    steps:
-    - script: |
-        DOCKER_CI_FIX_DIFF=$(Build.StagingDirectory)/fix_docker.diff DOCKER_CI_FIX=1 ci/test_docker_ci.sh
-      workingDirectory: $(Build.SourcesDirectory)
-      displayName: Docker build regression test
-    - task: PublishBuildArtifacts@1
-      inputs:
-        pathtoPublish: "$(Build.StagingDirectory)/fix_docker.diff"
-        artifactName: "docker_ci"
-        timeoutInMinutes: 10
-      condition: failed()
-
   - job: prechecked
     displayName: Prechecked
-    dependsOn: ["format", "proto_format", "docs", "dependencies", "docker_ci"]
+    dependsOn: ["format", "proto_format", "publishing", "dependencies"]
     pool:
       vmImage: "ubuntu-20.04"
     # This condition ensures that this (required) job passes if all of
@@ -360,9 +361,8 @@ stages:
         eq(variables['Build.Reason'], 'PullRequest'),
         in(dependencies.format.result, 'Succeeded', 'SucceededWithIssues', 'Skipped'),
         in(dependencies.proto_format.result, 'Succeeded', 'SucceededWithIssues', 'Skipped'),
-        in(dependencies.docs.result, 'Succeeded', 'SucceededWithIssues', 'Skipped'),
-        in(dependencies.dependencies.result, 'Succeeded', 'SucceededWithIssues', 'Skipped'),
-        in(dependencies.docker_ci.result, 'Succeeded', 'SucceededWithIssues', 'Skipped'))
+        in(dependencies.publishing.result, 'Succeeded', 'SucceededWithIssues', 'Skipped'),
+        in(dependencies.dependencies.result, 'Succeeded', 'SucceededWithIssues', 'Skipped'))
 
     steps:
     - checkout: none
@@ -378,6 +378,9 @@ stages:
     pool:
       vmImage: "ubuntu-20.04"
     steps:
+    - checkout: self
+      fetchDepth: 0
+      fetchTags: true
     - task: InstallSSHKey@0
       inputs:
         hostName: "github.com ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQCj7ndNxQowgcQnjshcLrqPEiiphnt+VTTvDP6mHBL9j1aNUkY4Ue1gvwnGLVlOhGeYrnZaMgRK6+PKCUXaDbC7qtbW8gIkhL7aGCsOr/C56SJMy/BCZfxd1nWzAOxSDPgVsmerOBYfNqltV9/hWCqBywINIR+5dIg6JTJ72pcEpEjcYgXkE2YEFXV1JHnsKgbLWNlhScqb2UmyRkQyytRLtL+38TGxkxCflmO+5Z8CSSNY7GidjMIZ7Q4zMjA2n1nGrlTDkzwDCsw+wqFPGQA179cnfGWOWRVruj16z6XyvxvjJwbz0wQZ75XK5tKSb7FNyeIEs4TT4jk+S4dhPeAUC5y+bDYirYgM4GC7uEnztnZyaVWQ7B381AK4Qdrwt51ZqExKbQpTUNn+EjqoTwvqNj4kqx5QUCI0ThS/YkOxJCXmPUWZbhjpCg56i+2aB6CmK2JGhn57K5mj0MNdBXA4/WnwH6XoPWJzK5Nyu2zB3nAZp+S5hpQs+p1vN1/wsjk="
@@ -396,6 +399,9 @@ stages:
     pool:
       vmImage: "ubuntu-20.04"
     steps:
+    - checkout: self
+      fetchDepth: 0
+      fetchTags: true
     - task: InstallSSHKey@0
       inputs:
         hostName: "github.com ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQCj7ndNxQowgcQnjshcLrqPEiiphnt+VTTvDP6mHBL9j1aNUkY4Ue1gvwnGLVlOhGeYrnZaMgRK6+PKCUXaDbC7qtbW8gIkhL7aGCsOr/C56SJMy/BCZfxd1nWzAOxSDPgVsmerOBYfNqltV9/hWCqBywINIR+5dIg6JTJ72pcEpEjcYgXkE2YEFXV1JHnsKgbLWNlhScqb2UmyRkQyytRLtL+38TGxkxCflmO+5Z8CSSNY7GidjMIZ7Q4zMjA2n1nGrlTDkzwDCsw+wqFPGQA179cnfGWOWRVruj16z6XyvxvjJwbz0wQZ75XK5tKSb7FNyeIEs4TT4jk+S4dhPeAUC5y+bDYirYgM4GC7uEnztnZyaVWQ7B381AK4Qdrwt51ZqExKbQpTUNn+EjqoTwvqNj4kqx5QUCI0ThS/YkOxJCXmPUWZbhjpCg56i+2aB6CmK2JGhn57K5mj0MNdBXA4/WnwH6XoPWJzK5Nyu2zB3nAZp+S5hpQs+p1vN1/wsjk="
@@ -414,6 +420,9 @@ stages:
     pool:
       vmImage: "ubuntu-20.04"
     steps:
+    - checkout: self
+      fetchDepth: 0
+      fetchTags: true
     - task: InstallSSHKey@0
       inputs:
         hostName: "github.com ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQCj7ndNxQowgcQnjshcLrqPEiiphnt+VTTvDP6mHBL9j1aNUkY4Ue1gvwnGLVlOhGeYrnZaMgRK6+PKCUXaDbC7qtbW8gIkhL7aGCsOr/C56SJMy/BCZfxd1nWzAOxSDPgVsmerOBYfNqltV9/hWCqBywINIR+5dIg6JTJ72pcEpEjcYgXkE2YEFXV1JHnsKgbLWNlhScqb2UmyRkQyytRLtL+38TGxkxCflmO+5Z8CSSNY7GidjMIZ7Q4zMjA2n1nGrlTDkzwDCsw+wqFPGQA179cnfGWOWRVruj16z6XyvxvjJwbz0wQZ75XK5tKSb7FNyeIEs4TT4jk+S4dhPeAUC5y+bDYirYgM4GC7uEnztnZyaVWQ7B381AK4Qdrwt51ZqExKbQpTUNn+EjqoTwvqNj4kqx5QUCI0ThS/YkOxJCXmPUWZbhjpCg56i+2aB6CmK2JGhn57K5mj0MNdBXA4/WnwH6XoPWJzK5Nyu2zB3nAZp+S5hpQs+p1vN1/wsjk="
@@ -443,13 +452,14 @@ stages:
     displayName: Build and test
     condition: and(not(canceled()), ne(stageDependencies.env.repo.outputs['changed.mobileOnly'], 'true'), ne(stageDependencies.env.repo.outputs['changed.docsOnly'], 'true'))
     timeoutInMinutes: 120
-    pool: x64-large
+    pool: envoy-x64-large
     steps:
     - template: bazel.yml
       parameters:
         managedAgent: false
         ciTarget: bazel.release
         bazelBuildExtraOptions: "--sandbox_base=/tmp/sandbox_base"
+        cacheTestResults: ${{ parameters.cacheTestResults }}
 
   - job: released
     displayName: Complete
@@ -476,7 +486,7 @@ stages:
     displayName: Build and test
     condition: and(not(canceled()), ne(stageDependencies.env.repo.outputs['changed.mobileOnly'], 'true'), ne(stageDependencies.env.repo.outputs['changed.docsOnly'], 'true'))
     timeoutInMinutes: 120
-    pool: "arm-large"
+    pool: "envoy-arm-large"
     steps:
     - template: bazel.yml
       parameters:
@@ -485,6 +495,7 @@ stages:
         rbe: false
         artifactSuffix: ".arm64"
         bazelBuildExtraOptions: "--sandbox_base=/tmp/sandbox_base"
+        cacheTestResults: ${{ parameters.cacheTestResults }}
 
   - job: released
     displayName: Complete
@@ -510,6 +521,9 @@ stages:
     dependsOn: []
     # Skip checks if only mobile/ or docs/ have changed.
     condition: and(not(canceled()), or(succeeded(), eq(variables['PostSubmit'], true)), ne(stageDependencies.env.repo.outputs['changed.mobileOnly'], 'true'), ne(stageDependencies.env.repo.outputs['changed.docsOnly'], 'true'), ne(stageDependencies.env.repo.outputs['changed.examplesOnly'], 'true'))
+    variables:
+      REPO_FETCH_DEPTH: 1
+      REPO_FETCH_TAGS: false
     strategy:
       maxParallel: ${{ parameters.checksConcurrency }}
       matrix:
@@ -532,6 +546,8 @@ stages:
           ENVOY_FILTER_EXAMPLE: true
         clang_tidy:
           CI_TARGET: "bazel.clang_tidy"
+          REPO_FETCH_DEPTH: 0
+          REPO_FETCH_TAGS: true
         api:
           CI_TARGET: "bazel.api"
     timeoutInMinutes: 120
@@ -542,6 +558,9 @@ stages:
       parameters:
         ciTarget: $(CI_TARGET)
         envoyBuildFilterExample: $(ENVOY_FILTER_EXAMPLE)
+        cacheTestResults: ${{ parameters.cacheTestResults }}
+        repoFetchDepth: $(REPO_FETCH_DEPTH)
+        repoFetchTags: $(REPO_FETCH_TAGS)
 
   - job: coverage
     displayName: "Linux x64"
@@ -549,7 +568,7 @@ stages:
     # Skip checks if only mobile/ or docs/ have changed.
     condition: and(not(canceled()), or(succeeded(), eq(variables['PostSubmit'], true)), ne(stageDependencies.env.repo.outputs['changed.mobileOnly'], 'true'), ne(stageDependencies.env.repo.outputs['changed.docsOnly'], 'true'), ne(stageDependencies.env.repo.outputs['changed.examplesOnly'], 'true'))
     timeoutInMinutes: 180
-    pool: "x64-large"
+    pool: "envoy-x64-large"
     strategy:
       maxParallel: 2
       matrix:
@@ -565,6 +584,7 @@ stages:
         rbe: false
         # /tmp/sandbox_base is a tmpfs in CI environment to optimize large I/O for coverage traces
         bazelBuildExtraOptions: "--define=no_debug_info=1 --linkopt=-Wl,-s --test_env=ENVOY_IP_TEST_VERSIONS=v4only --sandbox_base=/tmp/sandbox_base"
+        cacheTestResults: ${{ parameters.cacheTestResults }}
 
     - script: ci/run_envoy_docker.sh 'ci/upload_gcs_artifact.sh /source/generated/$(CI_TARGET) $(CI_TARGET)'
       displayName: "Upload $(CI_TARGET) Report to GCS"
@@ -640,7 +660,11 @@ stages:
         cp -a $(Build.StagingDirectory)/bazel.release.arm64/bin/release.tar.zst linux/arm64/release.tar.zst
         cp -a $(Build.StagingDirectory)/bazel.release.arm64/bin/schema_validator_tool linux/arm64/schema_validator_tool
 
+        # Debug what files appear to have been downloaded
+        find linux -type f -name "*" | xargs ls -l
+
         ci/docker_ci.sh
+      timeoutInMinutes: 40
       workingDirectory: $(Build.SourcesDirectory)
       env:
         AZP_BRANCH: $(Build.SourceBranch)
@@ -683,7 +707,7 @@ stages:
     dependsOn: []
     condition: and(not(canceled()), succeeded(), ne(stageDependencies.env.repo.outputs['changed.mobileOnly'], 'true'), ne(stageDependencies.env.repo.outputs['changed.docsOnly'], 'true'), ne(stageDependencies.env.repo.outputs['changed.examplesOnly'], 'true'))
     timeoutInMinutes: 120
-    pool: "arm-large"
+    pool: "envoy-arm-large"
     steps:
     - task: DownloadBuildArtifacts@0
       inputs:
@@ -905,7 +929,7 @@ stages:
     displayName: Debs (arm64)
     condition: and(not(canceled()), succeeded(), ne(stageDependencies.env.repo.outputs['changed.mobileOnly'], 'true'), ne(stageDependencies.env.repo.outputs['changed.docsOnly'], 'true'), ne(stageDependencies.env.repo.outputs['changed.examplesOnly'], 'true'))
     timeoutInMinutes: 120
-    pool: "arm-large"
+    pool: "envoy-arm-large"
     steps:
     - task: DownloadBuildArtifacts@0
       inputs:

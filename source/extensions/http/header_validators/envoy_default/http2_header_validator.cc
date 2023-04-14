@@ -57,13 +57,13 @@ Http2HeaderValidator::Http2HeaderValidator(const HeaderValidatorConfig& config, 
            absl::bind_front(&Http2HeaderValidator::validateContentLengthHeader, this)},
       } {}
 
-::Envoy::Http::HeaderValidator::HeaderEntryValidationResult
+HeaderValidator::HeaderEntryValidationResult
 Http2HeaderValidator::validateRequestHeaderEntry(const HeaderString& key,
                                                  const HeaderString& value) {
   return validateGenericRequestHeaderEntry(key, value, request_header_validator_map_);
 }
 
-::Envoy::Http::HeaderValidator::HeaderEntryValidationResult
+HeaderValidator::HeaderEntryValidationResult
 Http2HeaderValidator::validateResponseHeaderEntry(const HeaderString& key,
                                                   const HeaderString& value) {
   const auto& key_string_view = key.getStringView();
@@ -345,7 +345,7 @@ Http2HeaderValidator::validateProtocolHeader(const ::Envoy::Http::HeaderString& 
   return validateGenericHeaderValue(value);
 }
 
-::Envoy::Http::HeaderValidator::HeaderEntryValidationResult
+HeaderValidator::HeaderEntryValidationResult
 Http2HeaderValidator::validateGenericHeaderName(const HeaderString& name) {
   // Verify that the header name is valid. This also honors the underscore in
   // header configuration setting.
