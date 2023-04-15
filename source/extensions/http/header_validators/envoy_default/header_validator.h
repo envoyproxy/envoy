@@ -151,6 +151,13 @@ protected:
    * Common method for validating request or response trailers.
    */
   ValidationResult validateTrailers(const ::Envoy::Http::HeaderMap& trailers);
+
+  /**
+   * Removes headers with underscores in their names iff the headers_with_underscores_action
+   * config value is DROP. Noop otherwise.
+   * The REJECT config option for header names with underscores is handled in the
+   * validateRequestHeaders or validateRequestTrailers methods.
+   */
   void sanitizeHeadersWithUnderscores(::Envoy::Http::HeaderMap& header_map);
 
   const envoy::extensions::http::header_validators::envoy_default::v3::HeaderValidatorConfig

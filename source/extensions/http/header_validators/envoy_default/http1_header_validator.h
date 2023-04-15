@@ -46,6 +46,15 @@ private:
   HeaderEntryValidationResult validateResponseHeaderEntry(const ::Envoy::Http::HeaderString& key,
                                                           const ::Envoy::Http::HeaderString& value);
 
+  /**
+   * Checks for presence of both Transfer-Encoding and Content-Length headers and
+   * removes the Content-Length header iff the http1_protocol_options.allow_chunked_length
+   * config options is true.
+   * If the http1_protocol_options.allow_chunked_length is false a request with both
+   * Transfer-Encoding and Content-Length headers is rejected in the validateRequestHeaders method.
+   * Additionally if request is CONNECT and Content-Length is 0, the Content-Length header is
+   * removed.
+   */
   void sanitizeContentLength(::Envoy::Http::RequestHeaderMap& header_map);
 
   const HeaderValidatorMap request_header_validator_map_;

@@ -544,7 +544,6 @@ void HeaderValidator::sanitizeHeadersWithUnderscores(::Envoy::Http::HeaderMap& h
     return ::Envoy::Http::HeaderMap::Iterate::Continue;
   });
 
-  // The reject case is handled in the validate... methods
   ASSERT(drop_headers.empty() || underscore_action == HeaderValidatorConfig::DROP_HEADER);
   for (auto& name : drop_headers) {
     stats_.incDroppedHeadersWithUnderscores();

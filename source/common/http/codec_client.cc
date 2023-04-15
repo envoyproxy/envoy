@@ -184,7 +184,7 @@ void CodecClient::onData(Buffer::Instance& data) {
 
 void CodecClient::ActiveRequest::decodeHeaders(ResponseHeaderMapPtr&& headers, bool end_stream) {
   if (header_validator_) {
-    ::Envoy::Http::HeaderValidator::ValidationResult result =
+    const ::Envoy::Http::HeaderValidator::ValidationResult result =
         header_validator_->validateResponseHeaders(*headers);
     if (!result.ok()) {
       ENVOY_CONN_LOG(debug, "Response header validation failed\n{}", *parent_.connection_,
