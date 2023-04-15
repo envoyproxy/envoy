@@ -66,5 +66,10 @@ new_features:
 - area: http_inspector
   change: |
     Added default-false ``envoy.reloadable_features.http_inspector_use_balsa_parser`` for HttpInspector to use BalsaParser.
+- area: tcp_proxy
+  change: |
+    added :ref:`an option <config_network_filters_tcp_proxy_receive_before_connect>` to allow filters to read from the
+    downstream connection before TCP proxy has opened the upstream connection, by setting a filter state object for the key
+    ``envoy.tcp_proxy.receive_before_connect``.
 
 deprecated:
