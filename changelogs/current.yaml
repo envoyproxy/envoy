@@ -493,5 +493,10 @@ new_features:
     Added a new WIP implementation of :ref:`client_side_weighted_round_robin
     <envoy_v3_api_msg_extensions.load_balancing_policies.client_side_weighted_round_robin.v3.ClientSideWeightedRoundRobin>`
     load balancing policy that uses ``OrcaLoadReport`` provided by the upstream host to calculate host load balancing weight.
+- area: tcp_proxy
+  change: |
+    added :ref:`an option <config_network_filters_tcp_proxy_receive_before_connect>` to allow filters to read from the
+    downstream connection before TCP proxy has opened the upstream connection, by setting a filter state object for the key
+    ``envoy.tcp_proxy.receive_before_connect``.
 
 deprecated:
