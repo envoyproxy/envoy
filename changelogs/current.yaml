@@ -259,6 +259,11 @@ new_features:
 - area: access_log
   change: |
     added upstream/downstream header and wire bytes fields to the grpc access log service proto.
+- area: config
+  change: |
+    added :ref:`RetryPolicy <envoy_v3_api_msg_config.core.v3.RetryPolicy>` to
+    :ref:`EnvoyGrpc <envoy_v3_api_msg_config.core.v3.GrpcService.EnvoyGrpc>` to make
+    EnvoyGrpc channel retry backoff timing values configurable.
 - area: oauth filter
   change: |
     extended :ref:`cookie_names <envoy_v3_api_field_extensions.filters.http.oauth2.v3.OAuth2Credentials.cookie_names>` to
