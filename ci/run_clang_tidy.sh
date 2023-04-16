@@ -134,6 +134,12 @@ else
             DIFF_REF=$("${ENVOY_SRCDIR}"/tools/git/last_github_commit.sh)
         fi
     fi
+    if [[ "${DIFF_REF}" == "${DIFF_HEAD}" ]]; then
+        # TODO(phlax): either skip this altogether in scheduled runs or run full clang tidy
+        echo "Nothing changed"
+        exit 0
+    fi
+
     echo "Running clang-tidy-diff against ${DIFF_REF} ($(git rev-parse "${DIFF_REF}")), current HEAD ($(git rev-parse "${DIFF_HEAD}"))"
     run_clang_tidy_diff "${DIFF_REF}"
 fi
