@@ -461,4 +461,3 @@ message RedisProtocolOptions {
   // `<https://redis.io/topics/acl>`_ in the server's configuration file.
   config.core.v3.DataSource auth_username = 2 [(udpa.annotations.sensitive) = true];
 }
-
