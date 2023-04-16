@@ -71,7 +71,7 @@ then
 fi
 
 # Environment setup.
-export TEST_TMPDIR="${TEST_TMPDIR:-$BUILD_DIR/tmp}"
+export ENVOY_TEST_TMPDIR="${ENVOY_TEST_TMPDIR:-$BUILD_DIR/tmp}"
 export LLVM_ROOT="${LLVM_ROOT:-/opt/llvm}"
 export PATH=${LLVM_ROOT}/bin:${PATH}
 export CLANG_FORMAT="${CLANG_FORMAT:-clang-format}"
@@ -120,6 +120,18 @@ BAZEL_BUILD_OPTIONS=(
 
 [[ "${ENVOY_BUILD_ARCH}" == "aarch64" ]] && BAZEL_BUILD_OPTIONS+=(
   "--test_env=HEAPCHECK=")
+
+_bazel="$(which bazel)"
+
+bazel () {
+    BAZEL_STARTUP_OPTIONS=(
+        "--output_user_root=${ENVOY_TEST_TMPDIR}/output")
+    "$_bazel" "${BAZEL_STARTUP_OPTIONS[@]}" "$@"
+}
+
+export _bazel
+export BAZEL_STARTUP_OPTIONS
+export -f bazel
 
 [[ "${BAZEL_EXPUNGE}" == "1" ]] && bazel clean --expunge
 
