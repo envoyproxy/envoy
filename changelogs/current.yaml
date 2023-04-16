@@ -211,7 +211,8 @@ bug_fixes:
     not also before sending to upstream server.
 - area: grpc
   change: |
-    the :ref:`connect_grpc_bridge filter <config_http_filters_connect_grpc_bridge>` filter now works correctly when the request payload is compressed on a unary buf connect request.
+    the :ref:`connect_grpc_bridge filter <config_http_filters_connect_grpc_bridge>`
+    filter now works correctly when the request payload is compressed on a unary buf connect request.
 
 removed_config_or_runtime:
 - area: config
@@ -343,6 +344,10 @@ new_features:
   change: |
     added stat ``overload.refresh_interval_delay`` to track the delay between overload manager resource loop refresh in
     milliseconds.
+- area: load shed point
+  change: |
+    added load shed point ``envoy.load_shed_points.tcp_listener_accept`` that rejects new tcp connections
+    by closing the connection before the new connection accept phase.
 - area: http
   change: |
     make adding ProxyProtocolFilterState in the HCM optional.
@@ -416,7 +421,8 @@ new_features:
     reset idle timer on metadata actions.
 - area: grpc
   change: |
-    added support for buf connect HTTP GET requests in the :ref:`connect_grpc_bridge filter <config_http_filters_connect_grpc_bridge>`
+    added support for buf connect HTTP GET requests in the
+    :ref:`connect_grpc_bridge filter <config_http_filters_connect_grpc_bridge>`.
 
 deprecated:
 - area: tcp_proxy
