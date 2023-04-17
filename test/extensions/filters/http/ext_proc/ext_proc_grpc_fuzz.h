@@ -230,18 +230,16 @@ fuzzExtProcRun(const test::extensions::filters::http::ext_proc::ExtProcGrpcTestC
   FuzzedDataProvider ext_proc_provider(
       reinterpret_cast<const uint8_t*>(input.ext_proc_data().data()), input.ext_proc_data().size());
 
-  // Using persistent Envoy and ext_proc test server.
   static std::unique_ptr<ExtProcIntegrationFuzz> fuzzer = nullptr;
   static std::unique_ptr<ExtProcFuzzHelper> fuzz_helper = nullptr;
 
   static uint32_t fuzz_exec_count = 0;
-  // Initialize fuzzer once with IP and gRPC version from environment
+  // Initialize fuzzer with IP and gRPC version from environment
   if (fuzzCreateEnvoy(fuzz_exec_count, persistent_mode)) {
     fuzzer = std::make_unique<ExtProcIntegrationFuzz>(
         TestEnvironment::getIpVersionsForTest()[0], TestEnvironment::getsGrpcVersionsForTest()[0]);
   }
-  // Initialize fuzz_helper during every execution.
-  // This will be accessed by the test server which is initialized once.
+  // Initialize fuzz_helper.
   fuzz_helper = std::make_unique<ExtProcFuzzHelper>(&ext_proc_provider, persistent_mode);
 
   // Initialize test server.
