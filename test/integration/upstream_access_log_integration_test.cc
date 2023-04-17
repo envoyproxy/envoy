@@ -199,8 +199,9 @@ TEST_P(UpstreamStateAccessLogTest, UpstreamFilterState) {
   waitForNextUpstreamRequest({}, std::chrono::milliseconds(300000));
 
   if (access_log_location_ == AccessLogLocation::UPSTREAM) {
-  EXPECT_THAT(waitForAccessLog(log_file),
-              testing::AllOf(testing::HasSubstr("test_value"), testing::HasSubstr("unique_header_value")));
+    EXPECT_THAT(waitForAccessLog(log_file),
+                testing::AllOf(testing::HasSubstr("test_value"),
+                               testing::HasSubstr("unique_header_value")));
   }
 
   EXPECT_TRUE(upstream_request_->complete());
