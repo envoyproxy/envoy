@@ -15,14 +15,6 @@ public:
           config,
       ::Envoy::Http::Protocol protocol, ::Envoy::Http::HeaderValidatorStats& stats);
 
-  HeaderEntryValidationResult
-  validateRequestHeaderEntry(const ::Envoy::Http::HeaderString& key,
-                             const ::Envoy::Http::HeaderString& value) override;
-
-  HeaderEntryValidationResult
-  validateResponseHeaderEntry(const ::Envoy::Http::HeaderString& key,
-                              const ::Envoy::Http::HeaderString& value) override;
-
   RequestHeaderMapValidationResult
   validateRequestHeaderMap(::Envoy::Http::RequestHeaderMap& header_map) override;
 
@@ -54,6 +46,12 @@ public:
   validateGenericHeaderName(const ::Envoy::Http::HeaderString& name) override;
 
 private:
+  HeaderEntryValidationResult validateRequestHeaderEntry(const ::Envoy::Http::HeaderString& key,
+                                                         const ::Envoy::Http::HeaderString& value);
+
+  HeaderEntryValidationResult validateResponseHeaderEntry(const ::Envoy::Http::HeaderString& key,
+                                                          const ::Envoy::Http::HeaderString& value);
+
   const HeaderValidatorMap request_header_validator_map_;
 };
 

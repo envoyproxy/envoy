@@ -212,6 +212,7 @@ proto_library(
         "//envoy/extensions/quic/proof_source/v3:pkg",
         "//envoy/extensions/quic/server_preferred_address/v3:pkg",
         "//envoy/extensions/rate_limit_descriptors/expr/v3:pkg",
+        "//envoy/extensions/rbac/audit_loggers/stream/v3:pkg",
         "//envoy/extensions/rbac/matchers/upstream_ip_port/v3:pkg",
         "//envoy/extensions/regex_engines/v3:pkg",
         "//envoy/extensions/request_id/uuid/v3:pkg",

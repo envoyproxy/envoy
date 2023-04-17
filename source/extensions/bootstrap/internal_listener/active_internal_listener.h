@@ -51,6 +51,7 @@ public:
     }
 
     void setRejectFraction(UnitFloat) override {}
+    void configureLoadShedPoints(Server::LoadShedPointProvider&) override {}
   };
 
   // Network::TcpConnectionHandler

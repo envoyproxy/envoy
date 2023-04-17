@@ -21,6 +21,7 @@ envoy_cc_library(
     hdrs = [
         "golang_filter.h",
         "processor_state.h",
+        "stats.h",
     ],
     deps = [
         ":cgo",
@@ -61,6 +62,7 @@ envoy_cc_library(
     hdrs = [
         "golang_filter.h",
         "processor_state.h",
+        "stats.h",
     ],
     deps = [
         "//contrib/golang/common/dso:dso_lib",
