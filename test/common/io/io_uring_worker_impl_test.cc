@@ -164,7 +164,7 @@ TEST(IoUringWorkerImplTest, ServerSocketInjectAfterWrite) {
       .RetiresOnSaturation();
   EXPECT_CALL(mock_io_uring, submit()).Times(1).RetiresOnSaturation();
   EXPECT_CALL(dispatcher, createTimer_(_)).WillOnce(ReturnNew<NiceMock<Event::MockTimer>>());
-  io_uring_socket.close();
+  io_uring_socket.close(false);
 
   // Finish the read, cancel and write request, then expect the close request submitted.
   EXPECT_CALL(mock_io_uring, forEveryCompletion(_))
@@ -235,7 +235,7 @@ TEST(IoUringWorkerImplTest, ServerSocketInjectAfterRead) {
       .WillOnce(DoAll(SaveArg<1>(&cancel_req), Return<IoUringResult>(IoUringResult::Ok)))
       .RetiresOnSaturation();
   EXPECT_CALL(mock_io_uring, submit()).Times(1).RetiresOnSaturation();
-  io_uring_socket.close();
+  io_uring_socket.close(false);
 
   // Finish the read and cancel request, then expect the close request submitted.
   EXPECT_CALL(mock_io_uring, forEveryCompletion(_))
@@ -376,7 +376,7 @@ TEST(IoUringWorkerImplTest, ServerCloseWithWriteRequestOnly) {
   // Close the socket, but there is no read request, so cancel request won't
   // be submitted.
   EXPECT_CALL(dispatcher, createTimer_(_)).WillOnce(ReturnNew<NiceMock<Event::MockTimer>>());
-  io_uring_socket.close();
+  io_uring_socket.close(false);
 
   void* close_req = nullptr;
   // Finish the read and cancel request, then expect the close request submitted.

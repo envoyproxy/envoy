@@ -599,12 +599,13 @@ void IoUringServerSocket::onRead(Request* req, int32_t result, bool injected) {
       ENVOY_LOG(trace, "read error from socket, fd = {}, result = {}", fd_, read_error_.value());
       ReadParam param{buf_, read_error_.value()};
       io_uring_handler_.onRead(param);
-      read_error_.reset();
 
       // Needn't to submit new read request if remote is closed.
       if (read_error_.has_value() && read_error_ == 0) {
+        read_error_.reset();
         return;
       }
+      read_error_.reset();
     }
     // If `enable_close_event_` is true, then deliver the remote close as close event.
     if (read_error_.has_value() && read_error_ == 0 && enable_close_event_) {

@@ -494,7 +494,7 @@ TEST_F(IoUringWorkerIntegrationTest, AcceptSocketAccept) {
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   }
 
-  socket.close();
+  socket.close(false);
   runToClose(listen_socket_);
   EXPECT_EQ(io_uring_worker_->getSockets().size(), 0);
   cleanup();
@@ -527,7 +527,7 @@ TEST_F(IoUringWorkerIntegrationTest, AcceptSocketDisable) {
   socket.disable();
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
 
-  socket.close();
+  socket.close(false);
   runToClose(listen_socket_);
   EXPECT_EQ(io_uring_worker_->getSockets().size(), 0);
   cleanup();
@@ -542,7 +542,7 @@ TEST_F(IoUringWorkerIntegrationTest, AcceptSocketAcceptOnClosing) {
   EXPECT_EQ(io_uring_worker_->getSockets().size(), 1);
 
   // Accept when the socket is going to close.
-  socket.close();
+  socket.close(false);
   connect();
 
   runToClose(listen_socket_);
@@ -570,7 +570,7 @@ TEST_F(IoUringWorkerIntegrationTest, ServerSocketRead) {
   }
   EXPECT_EQ(result.value(), write_data.length());
 
-  socket.close();
+  socket.close(false);
   runToClose(server_socket_);
   EXPECT_EQ(io_uring_worker_->getSockets().size(), 0);
   cleanup();
@@ -586,7 +586,7 @@ TEST_F(IoUringWorkerIntegrationTest, ServerSocketReadError) {
   absl::optional<int32_t> result = absl::nullopt;
   io_uring_handler_.expectRead([&](ReadParam& param) {
     result = param.result_;
-    socket.close();
+    socket.close(false);
   });
   while (!result.has_value()) {
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
@@ -613,7 +613,7 @@ TEST_F(IoUringWorkerIntegrationTest, ServerSocketRemoteClose) {
   absl::optional<int32_t> result = absl::nullopt;
   io_uring_handler_.expectRead([&](ReadParam& param) {
     result = param.result_;
-    socket.close();
+    socket.close(false);
   });
   while (!result.has_value()) {
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
@@ -661,7 +661,7 @@ TEST_F(IoUringWorkerIntegrationTest, ServerSocketDisable) {
 
   EXPECT_EQ(result.value(), write_data.length() - 5);
 
-  socket.close();
+  socket.close(false);
   runToClose(server_socket_);
   EXPECT_EQ(io_uring_worker_->getSockets().size(), 0);
   cleanup();
@@ -699,7 +699,7 @@ TEST_F(IoUringWorkerIntegrationTest, ServerSocketWrite) {
   size = Api::OsSysCallsSingleton::get().readv(client_socket_, &read_iov, 1).return_value_;
   EXPECT_EQ(write_data.size(), size);
 
-  socket.close();
+  socket.close(false);
   runToClose(server_socket_);
   EXPECT_EQ(io_uring_worker_->getSockets().size(), 0);
   cleanup();
@@ -725,7 +725,7 @@ TEST_F(IoUringWorkerIntegrationTest, ServerSocketWriteTimeout) {
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
 
   // Continuously sending the data in server socket until timeout.
-  socket.close();
+  socket.close(false);
   runToClose(server_socket_);
 
   EXPECT_EQ(io_uring_worker_->getSockets().size(), 0);
@@ -756,7 +756,7 @@ TEST_F(IoUringWorkerIntegrationTest, ServerSocketShutdownAfterWrite) {
   auto size = Api::OsSysCallsSingleton::get().readv(client_socket_, &read_iov, 1).return_value_;
   EXPECT_EQ(write_data.size(), size);
 
-  socket.close();
+  socket.close(false);
   runToClose(server_socket_);
   EXPECT_EQ(io_uring_worker_->getSockets().size(), 0);
   cleanup();
@@ -771,7 +771,7 @@ TEST_F(IoUringWorkerIntegrationTest, ServerSocketCloseAfterShutdown) {
 
   socket.shutdown(SHUT_WR);
 
-  socket.close();
+  socket.close(false);
   runToClose(server_socket_);
   EXPECT_EQ(io_uring_worker_->getSockets().size(), 0);
   cleanup();
@@ -791,7 +791,7 @@ TEST_F(IoUringWorkerIntegrationTest, ServerSocketCloseAfterShutdownWrite) {
   slice.len_ = write_data.length();
   socket.write(&slice, 1);
   socket.shutdown(SHUT_WR);
-  socket.close();
+  socket.close(false);
   runToClose(server_socket_);
   EXPECT_EQ(io_uring_worker_->getSockets().size(), 0);
 
@@ -833,25 +833,18 @@ TEST_F(IoUringWorkerIntegrationTest, ServerSocketCloseAfterDisabledWithEnableClo
 // This tests the case when the socket disabled, then a remote close happened.
 // In this case, we should deliver this remote close by read event if enable_close_event
 // is false.
-TEST_F(IoUringWorkerIntegrationTest, ServerSocketCloseAfterDisabledWithoutEnableCloseEvent) {
+TEST_F(IoUringWorkerIntegrationTest, ServerSocketCloseWithoutEnableCloseEvent) {
   initialize();
   initializeSockets();
 
   bool is_closed = false;
   io_uring_handler_.expectRead([&is_closed](ReadParam& param) {
-    if (param.result_ > 0) {
-      param.buf_.drain(param.result_);
-    }
-
-    if (param.result_ == 0) {
-      is_closed = true;
-    }
+    EXPECT_EQ(param.result_, 0);
+    is_closed = true;
   });
 
-  auto& socket = io_uring_worker_->addServerSocket(server_socket_, io_uring_handler_, false);
+  io_uring_worker_->addServerSocket(server_socket_, io_uring_handler_, false);
   EXPECT_EQ(io_uring_worker_->getSockets().size(), 1);
-  // Waiting for the server socket sending the data.
-  socket.disable();
 
   Api::OsSysCallsSingleton::get().close(client_socket_);
 
@@ -879,7 +872,7 @@ TEST_F(IoUringWorkerIntegrationTest, ServerSocketCloseWithAnyRequest) {
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
 
   // Close the socket now, it expected the socket will be close directly without cancel.
-  socket.close();
+  socket.close(false);
   runToClose(server_socket_);
   EXPECT_EQ(io_uring_worker_->getSockets().size(), 0);
   cleanup();

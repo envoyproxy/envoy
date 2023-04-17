@@ -40,7 +40,7 @@ public:
 
 class MockIoUringSocket : public IoUringSocket {
   MOCK_METHOD(os_fd_t, fd, (), (const));
-  MOCK_METHOD(void, close, ());
+  MOCK_METHOD(void, close, (bool));
   MOCK_METHOD(void, shutdown, (int32_t how));
   MOCK_METHOD(void, enable, ());
   MOCK_METHOD(void, disable, ());
