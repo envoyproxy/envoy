@@ -360,7 +360,7 @@ TEST_P(CustomResponseIntegrationTest, MatcherHierarchy) {
   auto per_route_config = createCerSinglePredicateConfig("503", 293);
   host.mutable_routes(0)->mutable_typed_per_filter_config()->insert(
       MapPair<std::string, Any>("envoy.filters.http.custom_response", per_route_config));
-  // Add per vhost typeed filter config.
+  // Add per vhost typed filter config.
   auto per_virtual_host_config = createCerSinglePredicateConfig("501", 291);
   host.mutable_typed_per_filter_config()->insert(
       MapPair<std::string, Any>("envoy.filters.http.custom_response", per_virtual_host_config));
