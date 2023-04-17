@@ -308,5 +308,41 @@ void Utility::translateOpaqueConfig(const ProtobufWkt::Any& typed_config,
   }
 }
 
+JitteredExponentialBackOffStrategyPtr Utility::buildJitteredExponentialBackOffStrategy(
+    absl::optional<const envoy::config::core::v3::BackoffStrategy> backoff,
+    Random::RandomGenerator& random, const uint32_t default_base_interval_ms,
+    absl::optional<const uint32_t> default_max_interval_ms) {
+  // BackoffStrategy config is specified
+  if (backoff != absl::nullopt) {
+    uint32_t base_interval_ms = PROTOBUF_GET_MS_REQUIRED(backoff.value(), base_interval);
+    uint32_t max_interval_ms =
+        PROTOBUF_GET_MS_OR_DEFAULT(backoff.value(), max_interval, base_interval_ms * 10);
+
+    if (max_interval_ms < base_interval_ms) {
+      throw EnvoyException("max_interval must be greater than or equal to the base_interval");
+    }
+    return std::make_unique<JitteredExponentialBackOffStrategy>(base_interval_ms, max_interval_ms,
+                                                                random);
+  }
+
+  // default_base_interval_ms must be greater than zero
+  if (default_base_interval_ms == 0) {
+    throw EnvoyException("default_base_interval_ms must be greater than zero");
+  }
+
+  // default maximum interval is specified
+  if (default_max_interval_ms != absl::nullopt) {
+    if (default_max_interval_ms.value() < default_base_interval_ms) {
+      throw EnvoyException(
+          "default_max_interval_ms must be greater than or equal to the default_base_interval_ms");
+    }
+    return std::make_unique<JitteredExponentialBackOffStrategy>(
+        default_base_interval_ms, default_max_interval_ms.value(), random);
+  }
+  // use default base interval
+  return std::make_unique<JitteredExponentialBackOffStrategy>(
+      default_base_interval_ms, default_base_interval_ms * 10, random);
+}
+
 } // namespace Config
 } // namespace Envoy

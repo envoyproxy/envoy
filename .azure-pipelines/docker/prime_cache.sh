@@ -34,7 +34,7 @@ systemctl stop docker
 
 echo "Exporting /var/lib/docker -> ${DOCKER_CACHE_PATH}"
 mkdir -p "$DOCKER_CACHE_PATH"
-tar -I "zstd -T0 --fast " -acf "$DOCKER_CACHE_TARBALL" -C /var/lib/docker .
+tar cf - -C /var/lib/docker . | zstd - -T0 -o "$DOCKER_CACHE_TARBALL"
 
 echo "Docker cache tarball created: ${DOCKER_CACHE_TARBALL}"
 ls -lh "$DOCKER_CACHE_TARBALL"
