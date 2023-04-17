@@ -1,3 +1,5 @@
+#include <atomic>
+
 #include "source/common/api/os_sys_calls_impl.h"
 #include "source/common/io/io_uring_factory_impl.h"
 #include "source/common/io/io_uring_impl.h"
@@ -30,10 +32,18 @@ public:
     instance_.shutdownThread();
   }
 
-  void initialize() {
+  void threadRoutine() { second_dispatcher_->run(Event::Dispatcher::RunType::Block); }
+
+  void initialize(bool create_second_thread = false) {
     api_ = Api::createApiForTest(time_system_);
     dispatcher_ = api_->allocateDispatcher("test_thread");
     instance_.registerThread(*dispatcher_, true);
+
+    if (create_second_thread) {
+      second_dispatcher_ = api_->allocateDispatcher("test_second_thread");
+      instance_.registerThread(*second_dispatcher_, false);
+      second_thread_ = api_->threadFactory().createThread([this]() -> void { threadRoutine(); });
+    }
 
     io_uring_factory_ =
         std::make_unique<Io::IoUringFactoryImpl>(10, false, 5, 8192, 1000, instance_);
@@ -58,6 +68,8 @@ public:
   os_fd_t fd_;
   IoHandlePtr io_handle_;
   IoHandlePtr peer_io_handle_;
+  Thread::ThreadPtr second_thread_;
+  Event::DispatcherPtr second_dispatcher_;
 };
 
 TEST_F(IoUringSocketHandleImplIntegrationTest, Close) {
@@ -806,6 +818,96 @@ TEST_F(IoUringSocketHandleImplIntegrationTest, ReleaseIoUringWorkerEarlyThanIoha
 
   io_uring_factory_.reset();
 
+  while (fcntl(fd_, F_GETFD, 0) >= 0) {
+    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  }
+}
+
+TEST_F(IoUringSocketHandleImplIntegrationTest, MigrateServerSocketBetweenThread) {
+  initialize(true);
+
+  // io_uring handle starts listening.
+  bool accepted = false;
+  auto local_addr = std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 0);
+  io_handle_->bind(local_addr);
+  io_handle_->listen(5);
+
+  IoHandlePtr server_io_handler;
+  io_handle_->initializeFileEvent(
+      *dispatcher_,
+      [this, &accepted, &server_io_handler](uint32_t) {
+        struct sockaddr addr;
+        socklen_t addrlen = sizeof(addr);
+        server_io_handler = io_handle_->accept(&addr, &addrlen);
+        EXPECT_NE(server_io_handler, nullptr);
+        accepted = true;
+      },
+      Event::PlatformDefaultTriggerType, Event::FileReadyType::Read);
+
+  // Connect from peer handle.
+  peer_io_handle_->connect(io_handle_->localAddress());
+
+  while (!accepted) {
+    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  }
+  EXPECT_TRUE(accepted);
+
+  std::string data = "Hello world";
+  Buffer::OwnedImpl write_buffer(data);
+  Buffer::OwnedImpl read_buffer;
+
+  server_io_handler->initializeFileEvent(
+      *dispatcher_,
+      [&server_io_handler, &read_buffer, &data](uint32_t event) {
+        EXPECT_EQ(event, Event::FileReadyType::Read);
+        auto ret = server_io_handler->read(read_buffer, absl::nullopt);
+        EXPECT_EQ(ret.return_value_, data.size());
+        // Read again would expect the EAGAIN returned.
+        ret = server_io_handler->read(read_buffer, absl::nullopt);
+        EXPECT_TRUE(ret.wouldBlock());
+      },
+      Event::PlatformDefaultTriggerType, Event::FileReadyType::Read);
+
+  peer_io_handle_->write(write_buffer);
+
+  while (read_buffer.length() == 0) {
+    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  }
+
+  EXPECT_EQ(read_buffer.toString(), data);
+
+  server_io_handler->resetFileEvents();
+  read_buffer.drain(read_buffer.length());
+  EXPECT_EQ(read_buffer.length(), 0);
+  std::atomic<bool> read_done = false;
+
+  second_dispatcher_->post([&server_io_handler, &second_dispatcher = second_dispatcher_,
+                            &read_buffer, &read_done, &data]() {
+    server_io_handler->initializeFileEvent(
+        *second_dispatcher,
+        [&server_io_handler, &read_buffer, &data, &read_done](uint32_t event) {
+          EXPECT_EQ(event, Event::FileReadyType::Read);
+          auto ret = server_io_handler->read(read_buffer, absl::nullopt);
+          EXPECT_EQ(ret.return_value_, data.size());
+          // Read again would expect the EAGAIN returned.
+          ret = server_io_handler->read(read_buffer, absl::nullopt);
+          EXPECT_TRUE(ret.wouldBlock());
+          read_done = true;
+        },
+        Event::PlatformDefaultTriggerType, Event::FileReadyType::Read);
+  });
+
+  write_buffer.add(data);
+  peer_io_handle_->write(write_buffer);
+
+  while (!read_done) {
+    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  }
+  EXPECT_EQ(read_buffer.toString(), data);
+
+  second_dispatcher_->exit();
+  second_thread_->join();
+  io_handle_->close();
   while (fcntl(fd_, F_GETFD, 0) >= 0) {
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   }

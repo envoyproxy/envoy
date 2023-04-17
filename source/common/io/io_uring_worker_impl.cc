@@ -1,3 +1,4 @@
+#include "io_uring_worker_impl.h"
 #include "source/common/io/io_uring_worker_impl.h"
 
 #include <sys/socket.h>
@@ -74,7 +75,7 @@ IoUringWorkerImpl::~IoUringWorkerImpl() {
 
   for (auto& socket : sockets_) {
     if (socket->getStatus() != IoUringSocketStatus::CLOSING) {
-      socket->close();
+      socket->close(false);
     }
   }
 
@@ -103,6 +104,21 @@ IoUringSocket& IoUringWorkerImpl::addServerSocket(os_fd_t fd, IoUringHandler& ha
   ENVOY_LOG(trace, "add server socket, fd = {}", fd);
   std::unique_ptr<IoUringServerSocket> socket = std::make_unique<IoUringServerSocket>(
       fd, *this, handler, write_timeout_ms_, enable_close_event);
+  LinkedList::moveIntoListBack(std::move(socket), sockets_);
+  return *sockets_.back();
+}
+
+IoUringSocket& IoUringWorkerImpl::addServerSocket(IoUringSocket& origin_socket,
+                                                  IoUringHandler& handler,
+                                                  bool enable_close_event) {
+  auto fd = origin_socket.fd();
+  ENVOY_LOG(trace, "add server socket through existing socket, fd = {}", fd);
+  Buffer::OwnedImpl buf;
+  buf.move(dynamic_cast<IoUringServerSocket*>(&origin_socket)->getReadBuffer());
+  origin_socket.getIoUringWorker().dispatcher().post(
+      [&origin_socket]() { origin_socket.close(true); });
+  std::unique_ptr<IoUringServerSocket> socket = std::make_unique<IoUringServerSocket>(
+      fd, buf, *this, handler, write_timeout_ms_, enable_close_event);
   LinkedList::moveIntoListBack(std::move(socket), sockets_);
   return *sockets_.back();
 }
@@ -316,8 +332,11 @@ IoUringAcceptSocket::IoUringAcceptSocket(os_fd_t fd, IoUringWorkerImpl& parent,
   enable();
 }
 
-void IoUringAcceptSocket::close() {
-  IoUringSocketEntry::close();
+void IoUringAcceptSocket::close(bool keep_fd_open) {
+  IoUringSocketEntry::close(keep_fd_open);
+
+  // We didn't implement keep_fd_open for accept socket.
+  ASSERT(!keep_fd_open);
 
   if (!request_count_) {
     parent_.submitCloseRequest(*this);
@@ -402,7 +421,17 @@ IoUringServerSocket::IoUringServerSocket(os_fd_t fd, IoUringWorkerImpl& parent,
   enable();
 }
 
-void IoUringServerSocket::close() {
+IoUringServerSocket::IoUringServerSocket(os_fd_t fd, Buffer::Instance& read_buf,
+                                         IoUringWorkerImpl& parent,
+                                         IoUringHandler& io_uring_handler,
+                                         uint32_t write_timeout_ms, bool enable_close_event)
+    : IoUringSocketEntry(fd, parent, io_uring_handler, enable_close_event),
+      write_timeout_ms_(write_timeout_ms) {
+  buf_.move(read_buf);
+  enable();
+}
+
+void IoUringServerSocket::close(bool keep_fd_open) {
   ENVOY_LOG(trace, "close the socket, fd = {}, status = {}", fd_, status_);
 
   if (status_ == SHUTDOWN_WRITE || status_ == CLOSE_AFTER_SHUTDOWN_WRITE) {
@@ -411,12 +440,17 @@ void IoUringServerSocket::close() {
     return;
   }
 
-  IoUringSocketEntry::close();
+  IoUringSocketEntry::close(keep_fd_open);
+  keep_fd_open_ = keep_fd_open;
 
   ASSERT(cancel_read_req_ == nullptr && cancel_write_req_ == nullptr);
   if (read_req_ == nullptr && write_req_ == nullptr) {
     ENVOY_LOG(trace, "ready to close, fd = {}", fd_);
-    close_req_ = parent_.submitCloseRequest(*this);
+    if (keep_fd_open_) {
+      cleanup();
+    } else {
+      close_req_ = parent_.submitCloseRequest(*this);
+    }
     return;
   }
 
@@ -527,7 +561,11 @@ void IoUringServerSocket::onRead(Request* req, int32_t result, bool injected) {
     if (status_ == CLOSING && close_req_ == nullptr && write_req_ == nullptr &&
         cancel_read_req_ == nullptr && cancel_write_req_ == nullptr) {
       ENVOY_LOG(trace, "ready to close, fd = {}", fd_);
-      close_req_ = parent_.submitCloseRequest(*this);
+      if (keep_fd_open_) {
+        cleanup();
+      } else {
+        close_req_ = parent_.submitCloseRequest(*this);
+      }
       return;
     }
   }
@@ -556,7 +594,8 @@ void IoUringServerSocket::onRead(Request* req, int32_t result, bool injected) {
       ReadParam param{buf_, static_cast<int32_t>(buf_.length())};
       io_uring_handler_.onRead(param);
       ENVOY_LOG(trace, "after read from socket, fd = {}, remain = {}", fd_, buf_.length());
-    } else if (read_error_.has_value() && read_error_ <= 0 && !enable_close_event_ && status_ != DISABLED) {
+    } else if (read_error_.has_value() && read_error_ <= 0 && !enable_close_event_ &&
+               status_ != DISABLED) {
       ENVOY_LOG(trace, "read error from socket, fd = {}, result = {}", fd_, read_error_.value());
       ReadParam param{buf_, read_error_.value()};
       io_uring_handler_.onRead(param);
@@ -608,7 +647,11 @@ void IoUringServerSocket::onWrite(Request* req, int32_t result, bool injected) {
     // Close if it is in closing status and can be closed.
     if (read_req_ == nullptr && close_req_ == nullptr && cancel_read_req_ == nullptr &&
         cancel_write_req_ == nullptr) {
-      close_req_ = parent_.submitCloseRequest(*this);
+      if (keep_fd_open_) {
+        cleanup();
+      } else {
+        close_req_ = parent_.submitCloseRequest(*this);
+      }
     }
     return;
   }
@@ -676,7 +719,7 @@ void IoUringServerSocket::onShutdown(Request* req, int32_t result, bool injected
   if (status_ == CLOSE_AFTER_SHUTDOWN_WRITE) {
     ENVOY_LOG(trace, "close after shutdown write, fd = {}", fd_);
     status_ = ALREADY_SHUTDOWN;
-    close();
+    close(false);
     return;
   }
   status_ = ALREADY_SHUTDOWN;

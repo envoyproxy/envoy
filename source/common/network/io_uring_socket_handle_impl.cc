@@ -34,7 +34,7 @@ IoUringSocketHandleImpl::~IoUringSocketHandleImpl() {
   ENVOY_LOG(trace, "~IoUringSocketHandleImpl, type = {}", ioUringSocketTypeStr());
   if (SOCKET_VALID(fd_)) {
     if (io_uring_socket_type_ != IoUringSocketType::Unknown && io_uring_socket_.has_value()) {
-      io_uring_socket_.ref().close();
+      io_uring_socket_.ref().close(false);
     } else {
       // The TLS slot has been shut down by this moment with IoUring wiped out, thus
       // better use this posix system call instead of IoUringSocketHandleImpl::close().
@@ -69,7 +69,7 @@ Api::IoCallUint64Result IoUringSocketHandleImpl::close() {
     return Api::ioCallUint64ResultNoError();
   }
 
-  io_uring_socket_.ref().close();
+  io_uring_socket_.ref().close(false);
   SET_SOCKET_INVALID(fd_);
   return Api::ioCallUint64ResultNoError();
 }
@@ -362,10 +362,11 @@ Api::SysCallIntResult IoUringSocketHandleImpl::shutdown(int how) {
 void IoUringSocketHandleImpl::initializeFileEvent(Event::Dispatcher& dispatcher,
                                                   Event::FileReadyCb cb,
                                                   Event::FileTriggerType trigger, uint32_t events) {
-  ENVOY_LOG(trace, "initialize file event fd = {}, io_uring_socket_type = {}", fd_, ioUringSocketTypeStr());
+  ENVOY_LOG(trace, "initialize file event fd = {}, io_uring_socket_type = {}, has socket = {}", fd_,
+            ioUringSocketTypeStr(), io_uring_socket_.has_value());
 
   // The io_uring_socket_ already created. This happened after resetFileEvent;
-  if (io_uring_socket_ != absl::nullopt) {
+  if (io_uring_socket_.has_value()) {
     if ((io_uring_socket_type_ == IoUringSocketType::Client && !enable_client_socket_) ||
         (io_uring_socket_type_ == IoUringSocketType::Server && !enable_server_socket_) ||
         (io_uring_socket_type_ == IoUringSocketType::Accept && !enable_accept_socket_)) {
@@ -373,8 +374,20 @@ void IoUringSocketHandleImpl::initializeFileEvent(Event::Dispatcher& dispatcher,
       return;
     }
 
-    io_uring_socket_->enable();
-    io_uring_socket_->enableCloseEvent(events & Event::FileReadyType::Closed);
+    ENVOY_LOG(trace, "compare dispatcher, {} == {}",
+              io_uring_socket_->getIoUringWorker().dispatcher().name(),
+              io_uring_factory_.getIoUringWorker()->dispatcher().name());
+    if (&io_uring_socket_->getIoUringWorker().dispatcher() ==
+        &io_uring_factory_.getIoUringWorker()->dispatcher()) {
+      io_uring_socket_->enable();
+      io_uring_socket_->enableCloseEvent(events & Event::FileReadyType::Closed);
+    } else {
+      ENVOY_LOG(trace,
+                "initialize file event on another thread, fd = {}, io_uring_socket_type = {}", fd_,
+                ioUringSocketTypeStr());
+      io_uring_socket_ = io_uring_factory_.getIoUringWorker()->addServerSocket(
+          *io_uring_socket_, *this, events & Event::FileReadyType::Closed);
+    }
     cb_ = std::move(cb);
     return;
   }
@@ -518,7 +531,13 @@ void IoUringSocketHandleImpl::onWrite(Io::WriteParam& param) {
 
 void IoUringSocketHandleImpl::onRemoteClose() {
   ASSERT(cb_ != nullptr);
+  ENVOY_LOG(trace, "onRemoteClose fd = {}", fd_);
   cb_(Event::FileReadyType::Closed);
+}
+
+void IoUringSocketHandleImpl::onLocalClose() {
+  ENVOY_LOG(trace, "onLocalClose fd = {}", fd_);
+  io_uring_socket_.reset();
 }
 
 Api::IoCallUint64Result IoUringSocketHandleImpl::copyOut(uint64_t max_length,

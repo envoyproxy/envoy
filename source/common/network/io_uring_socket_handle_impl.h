@@ -67,7 +67,7 @@ public:
   void onRead(Io::ReadParam& param) override;
   void onWrite(Io::WriteParam& param) override;
   void onRemoteClose() override;
-  void onLocalClose() override { io_uring_socket_.reset(); }
+  void onLocalClose() override;
 
 protected:
   std::string ioUringSocketTypeStr() {

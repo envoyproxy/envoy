@@ -175,6 +175,8 @@ enum IoUringSocketStatus {
   CLOSED,
 };
 
+class IoUringWorker;
+
 /**
  * Abstract for each socket.
  */
@@ -183,14 +185,22 @@ public:
   virtual ~IoUringSocket() = default;
 
   /**
+   * Get the IoUringWorker this socket bind to.
+   */
+  virtual IoUringWorker& getIoUringWorker() const PURE;
+
+  /**
    * Return the raw fd.
    */
   virtual os_fd_t fd() const PURE;
 
   /**
    * Close the socket.
+   * param keep_fd_open is indicated the file descriptor of the socket will be closed or not in the
+   * end. The value of `true` is used for destory the IoUringSocket but keep the file descriptor
+   * open.
    */
-  virtual void close() PURE;
+  virtual void close(bool keep_fd_open) PURE;
 
   /**
    * Enable the socket.
@@ -354,6 +364,11 @@ public:
                                          bool enable_close_event) PURE;
 
   /**
+   * Add an server socket through an existing socket from another thread.
+   */
+  virtual IoUringSocket& addServerSocket(IoUringSocket& origin_socket, IoUringHandler& handler,
+                                         bool enable_close_event) PURE;
+  /**
    * Add an client socket socket to the worker.
    */
   virtual IoUringSocket& addClientSocket(os_fd_t fd, IoUringHandler& handler,
@@ -401,6 +416,11 @@ public:
    * Submit a shutdown request for a socket.
    */
   virtual Request* submitShutdownRequest(IoUringSocket& socket, int how) PURE;
+
+  /**
+   * Return the number of sockets in the worker.
+   */
+  virtual uint32_t getNumOfSockets() const PURE;
 };
 
 /**

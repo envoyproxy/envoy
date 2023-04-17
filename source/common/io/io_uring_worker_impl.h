@@ -11,8 +11,6 @@
 namespace Envoy {
 namespace Io {
 
-class IoUringWorkerImpl;
-
 class BaseRequest : public Request {
 public:
   BaseRequest(uint32_t type, IoUringSocket& socket);
@@ -48,6 +46,67 @@ public:
   std::unique_ptr<struct iovec[]> iov_;
 };
 
+class IoUringSocketEntry;
+using IoUringSocketEntryPtr = std::unique_ptr<IoUringSocketEntry>;
+
+class IoUringWorkerImpl : public IoUringWorker, private Logger::Loggable<Logger::Id::io> {
+public:
+  IoUringWorkerImpl(uint32_t io_uring_size, bool use_submission_queue_polling, uint32_t accept_size,
+                    uint32_t read_buffer_size, uint32_t write_timeout_ms,
+                    Event::Dispatcher& dispatcher);
+  IoUringWorkerImpl(IoUringPtr io_uring, uint32_t accept_size, uint32_t read_buffer_size,
+                    uint32_t write_timeout_ms, Event::Dispatcher& dispatcher);
+  ~IoUringWorkerImpl() override;
+
+  // IoUringWorker
+  IoUringSocket& addAcceptSocket(os_fd_t fd, IoUringHandler& handler,
+                                 bool enable_close_event) override;
+  IoUringSocket& addServerSocket(os_fd_t fd, IoUringHandler& handler,
+                                 bool enable_close_event) override;
+  IoUringSocket& addServerSocket(IoUringSocket& origin_socket, IoUringHandler& handler,
+                                 bool enable_close_event) override;
+  IoUringSocket& addClientSocket(os_fd_t fd, IoUringHandler& handler,
+                                 bool enable_close_event) override;
+
+  Event::Dispatcher& dispatcher() override;
+
+  Request* submitAcceptRequest(IoUringSocket& socket) override;
+  Request* submitConnectRequest(IoUringSocket& socket,
+                                const Network::Address::InstanceConstSharedPtr& address) override;
+  Request* submitReadRequest(IoUringSocket& socket) override;
+  Request* submitWriteRequest(IoUringSocket& socket, const Buffer::RawSliceVector& slices) override;
+  Request* submitCloseRequest(IoUringSocket& socket) override;
+  Request* submitCancelRequest(IoUringSocket& socket, Request* request_to_cancel) override;
+  Request* submitShutdownRequest(IoUringSocket& socket, int how) override;
+  uint32_t getNumOfSockets() const override { return sockets_.size(); }
+
+  // From socket from the worker.
+  IoUringSocketEntryPtr removeSocket(IoUringSocketEntry& socket);
+  // Inject a request completion into the io_uring instance.
+  void injectCompletion(IoUringSocket& socket, uint32_t type, int32_t result);
+  // Remove all the injected completion for the specific socket.
+  void removeInjectedCompletion(IoUringSocket& socket);
+
+protected:
+  // The io_uring instance.
+  IoUringPtr io_uring_;
+  const uint32_t accept_size_;
+  const uint32_t read_buffer_size_;
+  const uint32_t write_timeout_ms_;
+  Event::Dispatcher& dispatcher_;
+  // The file event of io_uring's eventfd.
+  Event::FileEventPtr file_event_{nullptr};
+  // All the sockets in this worker.
+  std::list<IoUringSocketEntryPtr> sockets_;
+  // This is used to mark whether delay submit is enabled.
+  // The IoUriingWorks delay the submit the requests which are submitted in request completion
+  // callback.
+  bool delay_submit_{false};
+
+  void onFileEvent();
+  void submit();
+};
+
 class IoUringSocketEntry : public IoUringSocket,
                            public LinkedObject<IoUringSocketEntry>,
                            public Event::DeferredDeletable,
@@ -57,10 +116,16 @@ public:
                      bool enable_close_event);
 
   // IoUringSocket
+  IoUringWorker& getIoUringWorker() const override { return parent_; }
   os_fd_t fd() const override { return fd_; }
-  void close() override {
+  void close(bool keep_fd_open) override {
     status_ = CLOSING;
-    io_uring_handler_.onLocalClose();
+    // When keep_fd_open is true, the IoHandle needn't cleanup the
+    // reference to the IoUringSocket. The new IoUringSocket will be
+    // replaced with it.
+    if (!keep_fd_open) {
+      io_uring_handler_.onLocalClose();
+    }
   }
   void enable() override { status_ = ENABLED; }
   void disable() override { status_ = DISABLED; }
@@ -119,69 +184,12 @@ protected:
   bool enable_close_event_;
 };
 
-using IoUringSocketEntryPtr = std::unique_ptr<IoUringSocketEntry>;
-
-class IoUringWorkerImpl : public IoUringWorker, private Logger::Loggable<Logger::Id::io> {
-public:
-  IoUringWorkerImpl(uint32_t io_uring_size, bool use_submission_queue_polling, uint32_t accept_size,
-                    uint32_t read_buffer_size, uint32_t write_timeout_ms,
-                    Event::Dispatcher& dispatcher);
-  IoUringWorkerImpl(IoUringPtr io_uring, uint32_t accept_size, uint32_t read_buffer_size,
-                    uint32_t write_timeout_ms, Event::Dispatcher& dispatcher);
-  ~IoUringWorkerImpl() override;
-
-  // IoUringWorker
-  IoUringSocket& addAcceptSocket(os_fd_t fd, IoUringHandler& handler,
-                                 bool enable_close_event) override;
-  IoUringSocket& addServerSocket(os_fd_t fd, IoUringHandler& handler,
-                                 bool enable_close_event) override;
-  IoUringSocket& addClientSocket(os_fd_t fd, IoUringHandler& handler,
-                                 bool enable_close_event) override;
-
-  Event::Dispatcher& dispatcher() override;
-
-  Request* submitAcceptRequest(IoUringSocket& socket) override;
-  Request* submitConnectRequest(IoUringSocket& socket,
-                                const Network::Address::InstanceConstSharedPtr& address) override;
-  Request* submitReadRequest(IoUringSocket& socket) override;
-  Request* submitWriteRequest(IoUringSocket& socket, const Buffer::RawSliceVector& slices) override;
-  Request* submitCloseRequest(IoUringSocket& socket) override;
-  Request* submitCancelRequest(IoUringSocket& socket, Request* request_to_cancel) override;
-  Request* submitShutdownRequest(IoUringSocket& socket, int how) override;
-
-  // From socket from the worker.
-  IoUringSocketEntryPtr removeSocket(IoUringSocketEntry& socket);
-  // Inject a request completion into the io_uring instance.
-  void injectCompletion(IoUringSocket& socket, uint32_t type, int32_t result);
-  // Remove all the injected completion for the specific socket.
-  void removeInjectedCompletion(IoUringSocket& socket);
-
-protected:
-  // The io_uring instance.
-  IoUringPtr io_uring_;
-  const uint32_t accept_size_;
-  const uint32_t read_buffer_size_;
-  const uint32_t write_timeout_ms_;
-  Event::Dispatcher& dispatcher_;
-  // The file event of io_uring's eventfd.
-  Event::FileEventPtr file_event_{nullptr};
-  // All the sockets in this worker.
-  std::list<IoUringSocketEntryPtr> sockets_;
-  // This is used to mark whether delay submit is enabled.
-  // The IoUriingWorks delay the submit the requests which are submitted in request completion
-  // callback.
-  bool delay_submit_{false};
-
-  void onFileEvent();
-  void submit();
-};
-
 class IoUringAcceptSocket : public IoUringSocketEntry {
 public:
   IoUringAcceptSocket(os_fd_t fd, IoUringWorkerImpl& parent, IoUringHandler& io_uring_handler,
                       uint32_t accept_size, bool enable_close_event);
 
-  void close() override;
+  void close(bool keep_fd_open) override;
   void enable() override;
   void disable() override;
   void onClose(Request* req, int32_t result, bool injected) override;
@@ -200,8 +208,12 @@ class IoUringServerSocket : public IoUringSocketEntry {
 public:
   IoUringServerSocket(os_fd_t fd, IoUringWorkerImpl& parent, IoUringHandler& io_uring_handler,
                       uint32_t write_timeout_ms, bool enable_close_event);
+  IoUringServerSocket(os_fd_t fd, Buffer::Instance& read_buf, IoUringWorkerImpl& parent,
+                      IoUringHandler& io_uring_handler, uint32_t write_timeout_ms,
+                      bool enable_close_event);
 
-  void close() override;
+  // IoUringSocket
+  void close(bool keep_fd_open) override;
   void enable() override;
   void disable() override;
   void write(Buffer::Instance& data) override;
@@ -212,6 +224,8 @@ public:
   void onWrite(Request* req, int32_t result, bool injected) override;
   void onCancel(Request* req, int32_t, bool injected) override;
   void onShutdown(Request* req, int32_t, bool injected) override;
+
+  Buffer::OwnedImpl& getReadBuffer() { return buf_; }
 
 private:
   const uint32_t write_timeout_ms_;
@@ -232,6 +246,8 @@ private:
   Request* close_req_{nullptr};
   Request* cancel_read_req_{nullptr};
   Request* cancel_write_req_{nullptr};
+
+  bool keep_fd_open_{false};
 
   void submitReadRequest();
   void submitWriteRequest();
