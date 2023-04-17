@@ -57,6 +57,7 @@ class MockIoUringSocket : public IoUringSocket {
   MOCK_METHOD(void, onShutdown, (Request * req, int32_t result, bool injected));
   MOCK_METHOD(void, injectCompletion, (uint32_t type));
   MOCK_METHOD(IoUringSocketStatus, getStatus, (), (const));
+  MOCK_METHOD(IoUringWorker&, getIoUringWorker, (), (const));
 };
 
 class MockIoUringWorker : public IoUringWorker {
@@ -65,6 +66,8 @@ public:
               (os_fd_t fd, IoUringHandler& handler, bool enable_close_event));
   MOCK_METHOD(IoUringSocket&, addServerSocket,
               (os_fd_t fd, IoUringHandler& handler, bool enable_close_event));
+  MOCK_METHOD(IoUringSocket&, addServerSocket,
+              (IoUringSocket & origin_socket, IoUringHandler& handler, bool enable_close_event));
   MOCK_METHOD(IoUringSocket&, addClientSocket,
               (os_fd_t fd, IoUringHandler& handler, bool enable_close_event));
   MOCK_METHOD(Event::Dispatcher&, dispatcher, ());
@@ -77,6 +80,7 @@ public:
   MOCK_METHOD(Request*, submitCloseRequest, (IoUringSocket & socket));
   MOCK_METHOD(Request*, submitCancelRequest, (IoUringSocket & socket, Request* request_to_cancel));
   MOCK_METHOD(Request*, submitShutdownRequest, (IoUringSocket & socket, int how));
+  MOCK_METHOD(uint32_t, getNumOfSockets, (), (const));
 };
 
 } // namespace Io

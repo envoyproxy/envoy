@@ -95,7 +95,7 @@ TEST(IoUringSocketHandleImpl, IgnoreOnReadEventAfterClose) {
 
   Io::MockIoUringSocket socket;
   Io::MockIoUringWorker worker;
-  EXPECT_CALL(worker, addServerSocket(_, _, _)).WillOnce(ReturnRef(socket));
+  EXPECT_CALL(worker, addServerSocket(impl.fdDoNotUse(), _, _)).WillOnce(ReturnRef(socket));
   EXPECT_CALL(factory, getIoUringWorker()).WillOnce(Return(OptRef<Io::IoUringWorker>(worker)));
   impl.initializeFileEvent(
       dispatcher,
