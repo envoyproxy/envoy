@@ -591,6 +591,7 @@ void UpstreamRequest::onPoolFailure(ConnectionPool::PoolFailureReason reason,
     case ConnectionPool::PoolFailureReason::Timeout:
       return Http::StreamResetReason::ConnectionTimeout;
     }
+    PANIC_DUE_TO_CORRUPT_ENUM;
   }(reason);
 
   stream_info_.upstreamInfo()->setUpstreamTransportFailureReason(transport_failure_reason);
