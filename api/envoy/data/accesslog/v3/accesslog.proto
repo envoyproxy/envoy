@@ -230,9 +230,9 @@ message AccessLogCommon {
   // correlate all these intermediate log entries and final log entry.
   //
   // .. attention::
-  // This field is deprecated in favor of
-  // :ref:`access_log_type <envoy_v3_api_field_data.accesslog.v3.AccessLogCommon.access_log_type>`
-  // which gives a more fine grained indication about the type of the access log.
+  //
+  //   This field is deprecated in favor of access_log_type for better indication of the
+  //   type of the access log record.
   bool intermediate_log_entry = 27
       [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 
