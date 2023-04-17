@@ -99,7 +99,7 @@ protected:
   // All the sockets in this worker.
   std::list<IoUringSocketEntryPtr> sockets_;
   // This is used to mark whether delay submit is enabled.
-  // The IoUriingWorks delay the submit the requests which are submitted in request completion
+  // The IoUringWorker will delay the submit the requests which are submitted in request completion
   // callback.
   bool delay_submit_{false};
 
@@ -119,7 +119,7 @@ public:
   IoUringWorker& getIoUringWorker() const override { return parent_; }
   os_fd_t fd() const override { return fd_; }
   void close(bool keep_fd_open) override {
-    status_ = CLOSING;
+    status_ = Closed;
     // When keep_fd_open is true, the IoHandle needn't cleanup the
     // reference to the IoUringSocket. The new IoUringSocket will be
     // replaced with it.
@@ -127,8 +127,8 @@ public:
       io_uring_handler_.onLocalClose();
     }
   }
-  void enable() override { status_ = ENABLED; }
-  void disable() override { status_ = DISABLED; }
+  void enable() override { status_ = Enabled; }
+  void disable() override { status_ = Disabled; }
   void enableCloseEvent(bool enable) override { enable_close_event_ = enable; }
   void connect(const Network::Address::InstanceConstSharedPtr&) override { PANIC("not implement"); }
   void write(Buffer::Instance&) override { PANIC("not implement"); }
@@ -180,7 +180,7 @@ protected:
   IoUringWorkerImpl& parent_;
   IoUringHandler& io_uring_handler_;
   uint32_t injected_completions_{0};
-  IoUringSocketStatus status_{INITIALIZED};
+  IoUringSocketStatus status_{Initialized};
   bool enable_close_event_;
 };
 
@@ -211,6 +211,7 @@ public:
   IoUringServerSocket(os_fd_t fd, Buffer::Instance& read_buf, IoUringWorkerImpl& parent,
                       IoUringHandler& io_uring_handler, uint32_t write_timeout_ms,
                       bool enable_close_event);
+  ~IoUringServerSocket() override;
 
   // IoUringSocket
   void close(bool keep_fd_open) override;
@@ -222,10 +223,9 @@ public:
   void onClose(Request* req, int32_t result, bool injected) override;
   void onRead(Request* req, int32_t result, bool injected) override;
   void onWrite(Request* req, int32_t result, bool injected) override;
-  void onCancel(Request* req, int32_t, bool injected) override;
-  void onShutdown(Request* req, int32_t, bool injected) override;
+  void onShutdown(Request* req, int32_t result, bool injected) override;
 
-  Buffer::OwnedImpl& getReadBuffer() { return buf_; }
+  Buffer::OwnedImpl& getReadBuffer() { return read_buf_; }
 
 private:
   const uint32_t write_timeout_ms_;
@@ -235,23 +235,23 @@ private:
   // handler.
   Request* read_req_{};
   // TODO (soulxu): Add water mark here.
-  Buffer::OwnedImpl buf_;
+  Buffer::OwnedImpl read_buf_;
   // TODO (soulxu): using queue for completion.
   absl::optional<int32_t> read_error_;
 
-  // For write.
+  // For write. io_uring socket will write sequentially in the order of write_buf_ and shutdown_
+  // Unless the write_buf_ is empty, the shutdown operation will not be performed.
   Buffer::OwnedImpl write_buf_;
-  struct iovec* iovecs_{nullptr};
+  bool shutdown_{};
+  // If there is in progress write_req_ during closing, a write timeout timer may be setup to
+  // cancel the write_req_, either a write request or a shutdown request. So we can make sure all
+  // SQEs bounding to the io_uring socket is completed and the socket can be closed successfully.
   Request* write_req_{nullptr};
   Event::TimerPtr write_timeout_timer_{nullptr};
 
-  // This is used for avoid duplicated close or cancel.
-  Request* close_req_{nullptr};
-  Request* cancel_read_req_{nullptr};
-  Request* cancel_write_req_{nullptr};
-
   bool keep_fd_open_{false};
 
+  void closeInternal();
   void submitReadRequest();
   void submitWriteRequest();
 };

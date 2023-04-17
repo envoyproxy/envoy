@@ -1,4 +1,3 @@
-#include "io_uring_worker_impl.h"
 #include "source/common/io/io_uring_worker_impl.h"
 
 #include <sys/socket.h>
@@ -74,7 +73,7 @@ IoUringWorkerImpl::~IoUringWorkerImpl() {
   ENVOY_LOG(trace, "destruct io uring worker, existed sockets = {}", sockets_.size());
 
   for (auto& socket : sockets_) {
-    if (socket->getStatus() != IoUringSocketStatus::CLOSING) {
+    if (socket->getStatus() != Closed) {
       socket->close(false);
     }
   }
@@ -338,21 +337,20 @@ void IoUringAcceptSocket::close(bool keep_fd_open) {
   // We didn't implement keep_fd_open for accept socket.
   ASSERT(!keep_fd_open);
 
+  // Delay close until all accept requests are drained.
   if (!request_count_) {
     parent_.submitCloseRequest(*this);
     return;
   }
 
-  // TODO (soulxu): after kernel 5.19, we are able to cancel all requests for the specific fd.
+  // TODO(soulxu): after kernel 5.19, we are able to cancel all requests for the specific fd.
   // TODO(zhxie): there may be races between main thread and worker thread in request_count_ and
   // requests_ in close(). When there is a listener draining, all server sockets in the listener
   // will be closed by the main thread. Though there may be races, it is still safe to
   // submitCancelRequest since io_uring can accept cancelling an invalid user_data.
-  if (status_ != DISABLED) {
-    for (auto req : requests_) {
-      if (req != nullptr) {
-        parent_.submitCancelRequest(*this, req);
-      }
+  for (auto req : requests_) {
+    if (req != nullptr) {
+      parent_.submitCancelRequest(*this, req);
     }
   }
 }
@@ -385,14 +383,12 @@ void IoUringAcceptSocket::onAccept(Request* req, int32_t result, bool injected) 
   AcceptRequest* accept_req = static_cast<AcceptRequest*>(req);
   requests_[accept_req->i_] = nullptr;
   request_count_--;
-  if (status_ == CLOSING) {
-    if (!request_count_) {
-      parent_.submitCloseRequest(*this);
-    }
+  if (status_ == Closed && !request_count_) {
+    parent_.submitCloseRequest(*this);
   }
 
   // If the socket is not enabled, drop all following actions to all accepted fds.
-  if (status_ == ENABLED) {
+  if (status_ == Enabled) {
     // Submit a new accept request for the next connection.
     submitRequests();
     if (result != -ECANCELED) {
@@ -427,49 +423,43 @@ IoUringServerSocket::IoUringServerSocket(os_fd_t fd, Buffer::Instance& read_buf,
                                          uint32_t write_timeout_ms, bool enable_close_event)
     : IoUringSocketEntry(fd, parent, io_uring_handler, enable_close_event),
       write_timeout_ms_(write_timeout_ms) {
-  buf_.move(read_buf);
+  read_buf_.move(read_buf);
   enable();
+}
+
+IoUringServerSocket::~IoUringServerSocket() {
+  if (write_timeout_timer_) {
+    write_timeout_timer_->disableTimer();
+  }
 }
 
 void IoUringServerSocket::close(bool keep_fd_open) {
   ENVOY_LOG(trace, "close the socket, fd = {}, status = {}", fd_, status_);
 
-  if (status_ == SHUTDOWN_WRITE || status_ == CLOSE_AFTER_SHUTDOWN_WRITE) {
-    ENVOY_LOG(trace, "wait for the shutdown write done before close");
-    status_ = CLOSE_AFTER_SHUTDOWN_WRITE;
-    return;
-  }
-
   IoUringSocketEntry::close(keep_fd_open);
   keep_fd_open_ = keep_fd_open;
 
-  ASSERT(cancel_read_req_ == nullptr && cancel_write_req_ == nullptr);
+  // Delay close until read request and write (or shutdown) request are drained.
   if (read_req_ == nullptr && write_req_ == nullptr) {
-    ENVOY_LOG(trace, "ready to close, fd = {}", fd_);
-    if (keep_fd_open_) {
-      cleanup();
-    } else {
-      close_req_ = parent_.submitCloseRequest(*this);
-    }
-    return;
+    closeInternal();
   }
 
-  if (cancel_read_req_ == nullptr && read_req_ != nullptr) {
+  if (read_req_ != nullptr) {
     ENVOY_LOG(trace, "cancel the read request, fd = {}", fd_);
-    cancel_read_req_ = parent_.submitCancelRequest(*this, read_req_);
+    parent_.submitCancelRequest(*this, read_req_);
   }
 
-  ASSERT(write_timeout_timer_ == nullptr);
-  if (cancel_write_req_ == nullptr && write_req_ != nullptr) {
-    ENVOY_LOG(trace, "delay cancel write request, fd = {}", fd_);
-    write_timeout_timer_ = parent_.dispatcher().createTimer([this]() {
-      if (cancel_write_req_ == nullptr && write_req_ != nullptr) {
-        ENVOY_LOG(trace, "cancel the write request, fd = {}", fd_);
-        cancel_write_req_ = parent_.submitCancelRequest(*this, write_req_);
-        write_timeout_timer_ = nullptr;
-      }
-    });
-    write_timeout_timer_->enableTimer(std::chrono::milliseconds(write_timeout_ms_));
+  if (write_req_ != nullptr) {
+    ENVOY_LOG(trace, "delay cancel the write request, fd = {}", fd_);
+    if (write_timeout_ms_ > 0) {
+      write_timeout_timer_ = parent_.dispatcher().createTimer([this]() {
+        if (write_req_ != nullptr) {
+          ENVOY_LOG(trace, "cancel the write request, fd = {}", fd_);
+          parent_.submitCancelRequest(*this, write_req_);
+        }
+      });
+      write_timeout_timer_->enableTimer(std::chrono::milliseconds(write_timeout_ms_));
+    }
   }
 }
 
@@ -478,8 +468,8 @@ void IoUringServerSocket::enable() {
   ENVOY_LOG(trace, "enable, fd = {}", fd_);
 
   // Continue processing read buffer remained by the previous read.
-  if (buf_.length() > 0 || read_error_.has_value()) {
-    ENVOY_LOG(trace, "continue reading from socket, fd = {}, size = {}", fd_, buf_.length());
+  if (read_buf_.length() > 0 || read_error_.has_value()) {
+    ENVOY_LOG(trace, "continue reading from socket, fd = {}, size = {}", fd_, read_buf_.length());
     injectCompletion(RequestType::Read);
     return;
   }
@@ -487,40 +477,25 @@ void IoUringServerSocket::enable() {
   submitReadRequest();
 }
 
-void IoUringServerSocket::disable() {
-  // We didn't implement the disable socket after shutdown.
-  ASSERT(status_ != SHUTDOWN_WRITE && status_ != CLOSE_AFTER_SHUTDOWN_WRITE &&
-         status_ != ALREADY_SHUTDOWN);
-  IoUringSocketEntry::disable();
-}
+void IoUringServerSocket::disable() { IoUringSocketEntry::disable(); }
 
 void IoUringServerSocket::write(Buffer::Instance& data) {
   ENVOY_LOG(trace, "write, buffer size = {}, fd = {}", data.length(), fd_);
+  ASSERT(!shutdown_);
 
   write_buf_.move(data);
 
-  if (write_req_ != nullptr) {
-    ENVOY_LOG(trace, "write already submited, fd = {}", fd_);
-    return;
-  }
-
-  ENVOY_LOG(trace, "write buf, size = {}, slices = {}", write_buf_.length(),
-            write_buf_.getRawSlices().size());
   submitWriteRequest();
 }
 
 uint64_t IoUringServerSocket::write(const Buffer::RawSlice* slices, uint64_t num_slice) {
   ENVOY_LOG(trace, "write, num_slices = {}, fd = {}", num_slice, fd_);
+  ASSERT(!shutdown_);
 
   uint64_t bytes_written = 0;
   for (uint64_t i = 0; i < num_slice; i++) {
     write_buf_.add(slices[i].mem_, slices[i].len_);
     bytes_written += slices[i].len_;
-  }
-
-  if (write_req_ != nullptr) {
-    ENVOY_LOG(trace, "write already submited, fd = {}", fd_);
-    return bytes_written;
   }
 
   submitWriteRequest();
@@ -533,12 +508,9 @@ void IoUringServerSocket::shutdown(int how) {
     PANIC("only the SHUT_WR implemented");
   }
 
-  status_ = IoUringSocketStatus::SHUTDOWN_WRITE;
-  if (write_req_ != nullptr) {
-    return;
-  }
+  shutdown_ = true;
 
-  parent_.submitShutdownRequest(*this, how);
+  submitWriteRequest();
 }
 
 void IoUringServerSocket::onClose(Request* req, int32_t result, bool injected) {
@@ -557,15 +529,9 @@ void IoUringServerSocket::onRead(Request* req, int32_t result, bool injected) {
             result, fd_, injected, status_, enable_close_event_);
   if (!injected) {
     read_req_ = nullptr;
-    // Close if it is in closing status and can be closed.
-    if (status_ == CLOSING && close_req_ == nullptr && write_req_ == nullptr &&
-        cancel_read_req_ == nullptr && cancel_write_req_ == nullptr) {
-      ENVOY_LOG(trace, "ready to close, fd = {}", fd_);
-      if (keep_fd_open_) {
-        cleanup();
-      } else {
-        close_req_ = parent_.submitCloseRequest(*this);
-      }
+    // If the socket is going to close, discard all results.
+    if (status_ == Closed && write_req_ == nullptr) {
+      closeInternal();
       return;
     }
   }
@@ -579,60 +545,61 @@ void IoUringServerSocket::onRead(Request* req, int32_t result, bool injected) {
           delete[] reinterpret_cast<const uint8_t*>(data);
           delete this_fragment;
         });
-    buf_.addBufferFragment(*fragment);
+    read_buf_.addBufferFragment(*fragment);
   } else {
     if (result != -ECANCELED) {
       read_error_ = result;
     }
   }
 
-  if (status_ == ENABLED || status_ == DISABLED || status_ == SHUTDOWN_WRITE ||
-      status_ == CLOSE_AFTER_SHUTDOWN_WRITE || status_ == ALREADY_SHUTDOWN) {
-    // If the socket is enabled and there is bytes to read, notify the handler.
-    if (buf_.length() > 0 && status_ != DISABLED) {
-      ENVOY_LOG(trace, "read from socket, fd = {}, result = {}", fd_, buf_.length());
-      ReadParam param{buf_, static_cast<int32_t>(buf_.length())};
-      io_uring_handler_.onRead(param);
-      ENVOY_LOG(trace, "after read from socket, fd = {}, remain = {}", fd_, buf_.length());
-    } else if (read_error_.has_value() && read_error_ <= 0 && !enable_close_event_ &&
-               status_ != DISABLED) {
-      ENVOY_LOG(trace, "read error from socket, fd = {}, result = {}", fd_, read_error_.value());
-      ReadParam param{buf_, read_error_.value()};
-      io_uring_handler_.onRead(param);
+  // Discard calling back since the socket is not ready or closed.
+  if (status_ == Initialized || status_ == Closed) {
+    return;
+  }
 
+  // If the socket is enabled and there is bytes to read, notify the handler.
+  if (status_ == Enabled) {
+    if (read_buf_.length() > 0) {
+      ENVOY_LOG(trace, "read from socket, fd = {}, result = {}", fd_, read_buf_.length());
+      ReadParam param{read_buf_, static_cast<int32_t>(read_buf_.length())};
+      io_uring_handler_.onRead(param);
+      ENVOY_LOG(trace, "after read from socket, fd = {}, remain = {}", fd_, read_buf_.length());
+    } else if (read_error_.has_value() && read_error_ <= 0 && !enable_close_event_) {
+      ENVOY_LOG(trace, "read error from socket, fd = {}, result = {}", fd_, read_error_.value());
+      ReadParam param{read_buf_, read_error_.value()};
+      io_uring_handler_.onRead(param);
       // Needn't to submit new read request if remote is closed.
-      if (read_error_.has_value() && read_error_ == 0) {
+      if (read_error_ == 0) {
         read_error_.reset();
         return;
       }
       read_error_.reset();
     }
-    // If `enable_close_event_` is true, then deliver the remote close as close event.
-    if (read_error_.has_value() && read_error_ == 0 && enable_close_event_) {
-      ENVOY_LOG(trace,
-                "remote closed and close event enabled, raise the close event, fd = "
-                "{}, result = {}",
-                fd_, read_error_.value());
-      io_uring_handler_.onRemoteClose();
-      read_error_.reset();
-      return;
+  }
+  // If `enable_close_event_` is true, then deliver the remote close as close event.
+  if (read_error_.has_value() && read_error_ == 0 && enable_close_event_) {
+    ENVOY_LOG(trace,
+              "remote closed and close event enabled, raise the close event, fd = "
+              "{}, result = {}",
+              fd_, read_error_.value());
+    io_uring_handler_.onRemoteClose();
+    read_error_.reset();
+    return;
+  }
+
+  // The socket may be not readable during handler onRead callback, check it again here.
+  if (status_ == Enabled) {
+    // If the read error is zero, it means remote close, then needn't new request.
+    if (!read_error_.has_value() || read_error_.value() != 0) {
+      // Submit a read accept request for the next read.
+      submitReadRequest();
     }
-    // The socket may be closed during handler onRead callback, check it again here.
-    if (status_ == ENABLED || status_ == SHUTDOWN_WRITE || status_ == ALREADY_SHUTDOWN) {
-      // If there is error, let the handler to decide if the socket should be closed and stop
-      // submitting read request. And if the read error is zero, it means remote close, then
-      // needn't new request.
-      if (!read_error_.has_value() || read_error_.value() != 0) {
-        // Submit a read accept request for the next read.
-        submitReadRequest();
-      }
-    } else if (status_ == DISABLED) {
-      // Since error in a disabled socket will not be handled by the handler, stop submit read
-      // request if there is any error.
-      if (!read_error_.has_value()) {
-        // Submit a read accept request for the next read.
-        submitReadRequest();
-      }
+  } else if (status_ == Disabled) {
+    // Since error in a disabled socket will not be handled by the handler, stop submit read
+    // request if there is any error.
+    if (!read_error_.has_value()) {
+      // Submit a read accept request for the next read.
+      submitReadRequest();
     }
   }
 }
@@ -640,46 +607,21 @@ void IoUringServerSocket::onRead(Request* req, int32_t result, bool injected) {
 void IoUringServerSocket::onWrite(Request* req, int32_t result, bool injected) {
   IoUringSocketEntry::onWrite(req, result, injected);
 
-  ENVOY_LOG(trace, "onWrite with result {}, fd = {}, injected = {}", result, fd_, injected);
-
-  // Only cleanup request for non-injected write request.
+  ENVOY_LOG(trace, "onWrite with result {}, fd = {}, injected = {}, status_ = {}", result, fd_,
+            injected, status_);
   if (!injected) {
     write_req_ = nullptr;
   }
 
-  // TODO(zhxie): even if there is pending write buffer, the socket will not handle on closing.
-  if (status_ == CLOSING) {
-    if (write_timeout_timer_) {
-      write_timeout_timer_->disableTimer();
-      write_timeout_timer_ = nullptr;
-    }
-    // Close if it is in closing status and can be closed.
-    if (read_req_ == nullptr && close_req_ == nullptr && cancel_read_req_ == nullptr &&
-        cancel_write_req_ == nullptr) {
-      if (keep_fd_open_) {
-        cleanup();
-      } else {
-        close_req_ = parent_.submitCloseRequest(*this);
-      }
-    }
-    return;
-  }
-
-  // If this is injected request, then notify the handler directly.
+  // Notify the handler directly since it is an injected request.
   if (injected) {
     ENVOY_LOG(trace,
               "there is a inject event, and same time we have regular write request, fd = {}", fd_);
-    WriteParam param{result};
-    io_uring_handler_.onWrite(param);
-    return;
-  }
-
-  // If result is EAGAIN, the request should be submitted again.
-  if (result <= 0 && result != -EAGAIN) {
-    WriteParam param{result};
-    io_uring_handler_.onWrite(param);
-    if (status_ == SHUTDOWN_WRITE || status_ == CLOSE_AFTER_SHUTDOWN_WRITE) {
-      parent_.submitShutdownRequest(*this, SHUT_WR);
+    // There is case where write injection may come after shutdown or close which should be ignored
+    // since the I/O handle or connection may be released after closing.
+    if (!shutdown_ && status_ != Closed) {
+      WriteParam param{result};
+      io_uring_handler_.onWrite(param);
     }
     return;
   }
@@ -687,51 +629,35 @@ void IoUringServerSocket::onWrite(Request* req, int32_t result, bool injected) {
   if (result > 0) {
     write_buf_.drain(result);
     ENVOY_LOG(trace, "drain write buf, drain size = {}, fd = {}", result, fd_);
-  }
-
-  // If there are data in the buffer, then we need to flush them before shutdown
-  // the socket.
-  if (write_buf_.length() > 0) {
-    ENVOY_LOG(trace, "continue write buf since still have data, size = {}, fd = {}",
-              write_buf_.length(), fd_);
-    submitWriteRequest();
   } else {
-    if (status_ == SHUTDOWN_WRITE || status_ == CLOSE_AFTER_SHUTDOWN_WRITE) {
-      parent_.submitShutdownRequest(*this, SHUT_WR);
+    // Drain all write buf since the write failed.
+    write_buf_.drain(write_buf_.length());
+    if (!shutdown_ && status_ != Closed) {
+      WriteParam param{result};
+      io_uring_handler_.onWrite(param);
     }
   }
-}
 
-void IoUringServerSocket::onCancel(Request* req, int32_t result, bool injected) {
-  IoUringSocketEntry::onCancel(req, result, injected);
-  ASSERT(!injected);
-  ENVOY_LOG(trace, "cancel done, result = {}, fd = {}", result, fd_);
-
-  if (req == cancel_read_req_) {
-    cancel_read_req_ = nullptr;
-  }
-  if (req == cancel_write_req_) {
-    cancel_write_req_ = nullptr;
-  }
-
-  if (status_ == CLOSING && read_req_ == nullptr && write_req_ == nullptr &&
-      cancel_read_req_ == nullptr && cancel_write_req_ == nullptr) {
-    ENVOY_LOG(trace, "ready to close, fd = {}", fd_);
-    close_req_ = parent_.submitCloseRequest(*this);
-  }
+  submitWriteRequest();
 }
 
 void IoUringServerSocket::onShutdown(Request* req, int32_t result, bool injected) {
   IoUringSocketEntry::onShutdown(req, result, injected);
+
+  ENVOY_LOG(trace, "onShutdown with result {}, fd = {}, injected = {}", result, fd_, injected);
   ASSERT(!injected);
-  ENVOY_LOG(trace, "shutdown done, result = {}, fd = {}", result, fd_);
-  if (status_ == CLOSE_AFTER_SHUTDOWN_WRITE) {
-    ENVOY_LOG(trace, "close after shutdown write, fd = {}", fd_);
-    status_ = ALREADY_SHUTDOWN;
-    close(false);
+  write_req_ = nullptr;
+  shutdown_ = false;
+
+  submitWriteRequest();
+}
+
+void IoUringServerSocket::closeInternal() {
+  if (keep_fd_open_) {
+    cleanup();
     return;
   }
-  status_ = ALREADY_SHUTDOWN;
+  parent_.submitCloseRequest(*this);
 }
 
 void IoUringServerSocket::submitReadRequest() {
@@ -741,15 +667,19 @@ void IoUringServerSocket::submitReadRequest() {
 }
 
 void IoUringServerSocket::submitWriteRequest() {
-  ASSERT(write_req_ == nullptr);
-  ASSERT(iovecs_ == nullptr);
-
-  Buffer::RawSliceVector slices = write_buf_.getRawSlices(IOV_MAX);
-
-  ENVOY_LOG(trace, "submit write request, write_buf size = {}, num_iovecs = {}, fd = {}",
-            write_buf_.length(), slices.size(), fd_);
-
-  write_req_ = parent_.submitWriteRequest(*this, slices);
+  if (!write_req_) {
+    if (write_buf_.length() > 0) {
+      Buffer::RawSliceVector slices = write_buf_.getRawSlices(IOV_MAX);
+      ENVOY_LOG(trace, "submit write request, write_buf size = {}, num_iovecs = {}, fd = {}",
+                write_buf_.length(), slices.size(), fd_);
+      write_req_ = parent_.submitWriteRequest(*this, slices);
+    } else if (shutdown_) {
+      // Only SHUT_WR is supported now.
+      write_req_ = parent_.submitShutdownRequest(*this, SHUT_WR);
+    } else if (status_ == Closed && read_req_ == nullptr) {
+      closeInternal();
+    }
+  }
 }
 
 } // namespace Io

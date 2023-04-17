@@ -163,16 +163,11 @@ public:
 /**
  * The Status of IoUringSocket.
  */
-// TODO(zhxie): separate read and write status.
 enum IoUringSocketStatus {
-  INITIALIZED,
-  ENABLED,
-  DISABLED,
-  SHUTDOWN_WRITE,
-  CLOSE_AFTER_SHUTDOWN_WRITE,
-  ALREADY_SHUTDOWN,
-  CLOSING,
-  CLOSED,
+  Initialized,
+  Enabled,
+  Disabled,
+  Closed,
 };
 
 class IoUringWorker;
@@ -197,7 +192,7 @@ public:
   /**
    * Close the socket.
    * param keep_fd_open is indicated the file descriptor of the socket will be closed or not in the
-   * end. The value of `true` is used for destory the IoUringSocket but keep the file descriptor
+   * end. The value of `true` is used for destroy the IoUringSocket but keep the file descriptor
    * open.
    */
   virtual void close(bool keep_fd_open) PURE;
@@ -309,7 +304,7 @@ public:
   virtual void injectCompletion(uint32_t type) PURE;
 
   /**
-   * Return the currect status of IoUringSocket.
+   * Return the current status of IoUringSocket.
    * @return the status.
    */
   virtual IoUringSocketStatus getStatus() const PURE;
