@@ -92,7 +92,7 @@ enum class CommonResponseStatus {
 // threads (e.g., in the fuzzer thread and the external processor thread).
 class ExtProcFuzzHelper {
 public:
-  ExtProcFuzzHelper(FuzzedDataProvider* provider, bool persistent_mode);
+  ExtProcFuzzHelper(FuzzedDataProvider* provider);
 
   StatusCode randomHttpStatus();
   std::string consumeRepeatedString();
@@ -109,7 +109,6 @@ public:
   grpc::Status generateResponse(ProcessingRequest& req, ProcessingResponse& resp,
                                 bool& immediate_close_grpc);
   FuzzedDataProvider* provider_;
-  bool persistent_mode_{false};
 };
 
 } // namespace ExternalProcessing

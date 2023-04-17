@@ -240,7 +240,7 @@ fuzzExtProcRun(const test::extensions::filters::http::ext_proc::ExtProcGrpcTestC
         TestEnvironment::getIpVersionsForTest()[0], TestEnvironment::getsGrpcVersionsForTest()[0]);
   }
   // Initialize fuzz_helper.
-  fuzz_helper = std::make_unique<ExtProcFuzzHelper>(&ext_proc_provider, persistent_mode);
+  fuzz_helper = std::make_unique<ExtProcFuzzHelper>(&ext_proc_provider);
 
   // Initialize test server.
   if (fuzzCreateEnvoy(fuzz_exec_count, persistent_mode)) {
