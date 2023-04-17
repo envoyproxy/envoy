@@ -580,6 +580,17 @@ TEST_F(RouterRetryStateImplTest, RetriableStatusCodesHeader) {
     EXPECT_EQ(RetryStatus::No,
               state_->shouldRetryHeaders(response_headers, request_headers, header_callback_));
   }
+  // Validate that retriable-status-codes does not work for gRPC.
+  {
+    Http::TestRequestHeaderMapImpl request_headers{{"x-envoy-retry-on", "retriable-status-codes"},
+                                                   {"x-envoy-retriable-status-codes", "499"}};
+    setup(request_headers);
+    EXPECT_TRUE(state_->enabled());
+
+    Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}, {"grpc-status", "1"}};
+    EXPECT_EQ(RetryStatus::No,
+              state_->shouldRetryHeaders(response_headers, request_headers, header_callback_));
+  }
 }
 
 // Test that when 'retriable-headers' policy is set via request header, certain configured headers

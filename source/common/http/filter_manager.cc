@@ -593,7 +593,7 @@ void FilterManager::decodeHeaders(ActiveStreamDecoderFilter* filter, RequestHead
 void FilterManager::decodeData(ActiveStreamDecoderFilter* filter, Buffer::Instance& data,
                                bool end_stream,
                                FilterIterationStartState filter_iteration_start_state) {
-  ScopeTrackerScopeState scope(&*this, dispatcher_);
+  ScopeTrackerScopeState scope(this, dispatcher_);
   filter_manager_callbacks_.resetIdleTimer();
 
   // If a response is complete or a reset has been sent, filters do not care about further body
