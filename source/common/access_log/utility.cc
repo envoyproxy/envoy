@@ -31,8 +31,6 @@ const std::string& Utility::getAccessLogTypeString(const AccessLogType access_lo
     return AccessLogTypeStrings::get().UpstreamPeriodic;
   case AccessLogType::UpstreamEnd:
     return AccessLogTypeStrings::get().UpstreamEnd;
-  default:
-    return AccessLogTypeStrings::get().NotSet;
   }
 }
 
@@ -59,8 +57,6 @@ Utility::getAccessLogTypeProto(const AccessLogType access_log_type) {
     return AccessLogTypeProto::UpstreamPeriodic;
   case AccessLogType::UpstreamEnd:
     return AccessLogTypeProto::UpstreamEnd;
-  default:
-    return AccessLogTypeProto::NotSet;
   }
 }
 
