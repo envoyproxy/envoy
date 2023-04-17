@@ -199,7 +199,6 @@ message OverloadManager {
   // The set of overload actions.
   repeated OverloadAction actions = 3;
 
-  // [#not-implemented-hide:]
   // The set of load shed points.
   repeated LoadShedPoint loadshed_points = 5;
 
