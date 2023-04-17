@@ -27,6 +27,7 @@ public:
   void disable() override;
   void enable() override;
   void setRejectFraction(UnitFloat reject_fraction) override;
+  void configureLoadShedPoints(Server::LoadShedPointProvider& load_shed_point_provider) override;
 
   static const absl::string_view GlobalMaxCxRuntimeKey;
 
@@ -45,6 +46,7 @@ private:
   bool bind_to_port_;
   UnitFloat reject_fraction_;
   const bool ignore_global_conn_limit_;
+  Server::LoadShedPoint* listener_accept_{nullptr};
 };
 
 } // namespace Network

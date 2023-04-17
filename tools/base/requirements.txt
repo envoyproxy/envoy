@@ -436,9 +436,9 @@ envoy-code-check==0.4.1 \
     --hash=sha256:3b4d3c9f8f80d47edd0bedd4df2bc7f8a90fcb37cf4142f4882703f4141a1b01 \
     --hash=sha256:a3806deee1565d80488e3c7758e54b9a19025fbe4e91378969f6be342f083eda
     # via -r requirements.in
-envoy-dependency-check==0.1.7 \
-    --hash=sha256:27906f882bd3e22a9a8dc90cc6e178f702b06d30d7a39aa70d264594cd5df5ee \
-    --hash=sha256:28b7d61c73bfb22de4f2e63eb3c5a47c1ec20c9170816c5f5e4cc4b412c6b1ac
+envoy-dependency-check==0.1.8 \
+    --hash=sha256:ac9820e446bb44e05121e5c93c210f40ca37076580b0d082da2c63e7784c338a \
+    --hash=sha256:e92272ca1f4d850d3eb3bde3c22cff39c103e7850fbda8d1686814bfc8c45338
     # via -r requirements.in
 envoy-distribution-distrotest==0.0.10 \
     --hash=sha256:83e912c48da22eb3e514fc1142247d33eb7ed0d59e94eca2ffbd178a26fbf808 \
@@ -614,6 +614,7 @@ gidgethub==5.2.1 \
     --hash=sha256:a533f85a57955261433c250701476304cc374037c0ab66b0e5372b4846749d5c
     # via
     #   aio-api-github
+    #   envoy-dependency-check
     #   envoy-distribution-release
     #   envoy-github-abstract
     #   envoy-github-release

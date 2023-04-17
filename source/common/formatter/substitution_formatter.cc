@@ -151,7 +151,7 @@ std::string JsonFormatterImpl::format(const Http::RequestHeaderMap& request_head
       request_headers, response_headers, response_trailers, stream_info, local_reply_body);
 
   const std::string log_line =
-      MessageUtil::getJsonStringFromMessageOrDie(output_struct, false, true);
+      MessageUtil::getJsonStringFromMessageOrError(output_struct, false, true);
   return absl::StrCat(log_line, "\n");
 }
 
@@ -1897,7 +1897,12 @@ MetadataFormatter::formatMetadata(const envoy::config::core::v3::Metadata& metad
   if (value.kind_case() == ProtobufWkt::Value::kStringValue) {
     str = value.string_value();
   } else {
-    str = MessageUtil::getJsonStringFromMessageOrDie(value, false, true);
+    ProtobufUtil::StatusOr<std::string> json_or_error =
+        MessageUtil::getJsonStringFromMessage(value, false, true);
+    ENVOY_BUG(json_or_error.ok(), "Failed to parse json");
+    if (json_or_error.ok()) {
+      str = json_or_error.value();
+    }
   }
   truncate(str, max_length_);
   return str;

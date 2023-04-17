@@ -475,10 +475,10 @@ elif [[ "$CI_TARGET" == "bazel.clang_tidy" ]]; then
   ENVOY_STDLIB="libstdc++"
   setup_clang_toolchain
 
-  export CLANG_TIDY_FIX_DIFF="${TEST_TMPDIR}/lint-fixes/clang-tidy-fixed.diff"
-  export FIX_YAML="${TEST_TMPDIR}/lint-fixes/clang-tidy-fixes.yaml"
+  export CLANG_TIDY_FIX_DIFF="${ENVOY_TEST_TMPDIR}/lint-fixes/clang-tidy-fixed.diff"
+  export FIX_YAML="${ENVOY_TEST_TMPDIR}/lint-fixes/clang-tidy-fixes.yaml"
   export CLANG_TIDY_APPLY_FIXES=1
-  mkdir -p "${TEST_TMPDIR}/lint-fixes"
+  mkdir -p "${ENVOY_TEST_TMPDIR}/lint-fixes"
   BAZEL_BUILD_OPTIONS+=(--remote_download_minimal)
   BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS[*]}" NUM_CPUS=$NUM_CPUS "${ENVOY_SRCDIR}"/ci/run_clang_tidy.sh "$@" || {
       if [[ -s "$FIX_YAML" ]]; then

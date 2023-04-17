@@ -102,6 +102,12 @@ public:
 
 class AsyncClientImplTracingTest : public AsyncClientImplTest {
 public:
+  AsyncClientImplTracingTest() {
+    ON_CALL(stream_info_, upstreamClusterInfo())
+        .WillByDefault(Return(absl::make_optional<Upstream::ClusterInfoConstSharedPtr>(
+            cm_.thread_local_cluster_.cluster_.info_)));
+  }
+
   Tracing::MockSpan parent_span_;
   const std::string child_span_name_{"Test Child Span Name"};
 

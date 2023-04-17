@@ -24,7 +24,7 @@
 #include "gtest/gtest.h"
 
 /**
- * Integration tests for upstream filter state.
+ * Integration tests for upstream access logs.
  */
 
 namespace Envoy {
@@ -165,6 +165,8 @@ TEST_P(UpstreamStateAccessLogTest, UpstreamFilterState) {
         envoy::extensions::filters::http::router::v3::Router router_config;
 
         if (access_log_location_ == AccessLogLocation::UPSTREAM) {
+          router_config.mutable_upstream_log_options()->set_flush_upstream_log_on_upstream_stream(
+              true);
           *router_config.add_upstream_log() = access_log;
         }
 
@@ -196,6 +198,11 @@ TEST_P(UpstreamStateAccessLogTest, UpstreamFilterState) {
 
   waitForNextUpstreamRequest({}, std::chrono::milliseconds(300000));
 
+  if (access_log_location_ == AccessLogLocation::UPSTREAM) {
+  EXPECT_THAT(waitForAccessLog(log_file),
+              testing::AllOf(testing::HasSubstr("test_value"), testing::HasSubstr("unique_header_value")));
+  }
+
   EXPECT_TRUE(upstream_request_->complete());
   EXPECT_EQ("hello!", upstream_request_->body().toString());
 
@@ -211,6 +218,82 @@ TEST_P(UpstreamStateAccessLogTest, UpstreamFilterState) {
   EXPECT_THAT(
       waitForAccessLog(log_file),
       testing::AllOf(testing::HasSubstr("test_value"), testing::HasSubstr("unique_header_value")));
+}
+
+TEST_P(UpstreamStateAccessLogTest, Retry) {
+  if (access_log_location_ == AccessLogLocation::DOWNSTREAM) {
+    GTEST_SKIP() << "Only for upstream access logging.";
+  }
+  auto log_file = TestEnvironment::temporaryPath(TestUtility::uniqueFilename());
+
+  config_helper_.addConfigModifier(
+      [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) {
+        auto* typed_config =
+            hcm.mutable_http_filters(hcm.http_filters_size() - 1)->mutable_typed_config();
+
+        envoy::extensions::filters::http::router::v3::Router router_config;
+        router_config.mutable_upstream_log_options()->set_flush_upstream_log_on_upstream_stream(
+            true);
+
+        auto* upstream_log_config = router_config.add_upstream_log();
+        upstream_log_config->set_name("accesslog");
+        envoy::extensions::access_loggers::file::v3::FileAccessLog access_log_config;
+        access_log_config.set_path(log_file);
+        access_log_config.mutable_log_format()->mutable_text_format_source()->set_inline_string(
+            "%RESPONSE_CODE%\n");
+        upstream_log_config->mutable_typed_config()->PackFrom(access_log_config);
+        typed_config->PackFrom(router_config);
+      });
+
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeRequestWithBody(
+      Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                     {":path", "/test"},
+                                     {":scheme", "http"},
+                                     {":authority", "host.com"},
+                                     {"x-forwarded-for", "10.0.0.1"},
+                                     {"x-envoy-retry-on", "5xx"}},
+      1024);
+
+  waitForNextUpstreamRequest({}, std::chrono::milliseconds(300000));
+
+  // Start of first stream access log - no response status code yet
+  EXPECT_THAT(waitForAccessLog(log_file, 0, true), testing::HasSubstr("0"));
+
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "503"}}, false);
+
+  if (fake_upstreams_[0]->httpType() == Http::CodecType::HTTP1) {
+    ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
+    ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_,
+                                                          std::chrono::milliseconds(500)));
+  } else {
+    ASSERT_TRUE(upstream_request_->waitForReset());
+  }
+
+  // End of first request access log
+  EXPECT_THAT(waitForAccessLog(log_file, 1, true), testing::HasSubstr("503"));
+
+  waitForNextUpstreamRequest();
+
+  // Start of second stream access log - no response status code yet
+  EXPECT_THAT(waitForAccessLog(log_file, 2, true), testing::HasSubstr("0"));
+
+  upstream_request_->encodeHeaders(default_response_headers_, false);
+  upstream_request_->encodeData(512, true);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_EQ(1024U, upstream_request_->bodyLength());
+
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  EXPECT_EQ(512U, response->body().size());
+
+  // End of second request access log
+  EXPECT_THAT(waitForAccessLog(log_file, 3, true), testing::HasSubstr("200"));
 }
 
 } // namespace Envoy

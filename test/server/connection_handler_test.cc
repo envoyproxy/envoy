@@ -265,6 +265,7 @@ public:
     MOCK_METHOD(void, enable, (), (override));
     MOCK_METHOD(void, disable, (), (override));
     MOCK_METHOD(void, setRejectFraction, (UnitFloat));
+    MOCK_METHOD(void, configureLoadShedPoints, (Server::LoadShedPointProvider&));
     MOCK_METHOD(Event::Dispatcher&, dispatcher, (), (override));
     MOCK_METHOD(Network::Address::InstanceConstSharedPtr&, localAddress, (), (const, override));
     MOCK_METHOD(Api::IoCallUint64Result, send, (const Network::UdpSendData&), (override));

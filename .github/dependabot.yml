@@ -28,7 +28,7 @@ updates:
     time: "09:00"
 
 - package-ecosystem: "pip"
-  directory: "/examples/shared/python"
+  directory: "/examples/shared/python/aiohttp"
   schedule:
     interval: "daily"
     time: "09:00"
@@ -129,6 +129,13 @@ updates:
     interval: daily
     time: "09:00"
 
+# TODO(phlax): just use above
+- package-ecosystem: "docker"
+  directory: "/examples/shared/echo2"
+  schedule:
+    interval: daily
+    time: "09:00"
+
 - package-ecosystem: "docker"
   directory: "/examples/shared/golang"
   schedule:
@@ -167,24 +174,6 @@ updates:
 
 - package-ecosystem: "docker"
   directory: "/examples/skywalking"
-  schedule:
-    interval: daily
-    time: "09:00"
-
-- package-ecosystem: "docker"
-  directory: "/examples/tls"
-  schedule:
-    interval: daily
-    time: "09:00"
-
-- package-ecosystem: "docker"
-  directory: "/examples/tls-sni"
-  schedule:
-    interval: daily
-    time: "09:00"
-
-- package-ecosystem: "docker"
-  directory: "/examples/tls-inspector"
   schedule:
     interval: daily
     time: "09:00"

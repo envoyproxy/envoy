@@ -621,7 +621,7 @@ protected:
   void onProtocolConstraintViolation();
 
   // Whether to use the new HTTP/2 library.
-  const bool use_oghttp2_library_;
+  bool use_oghttp2_library_;
   static Http2Callbacks http2_callbacks_;
 
   // If deferred processing, the streams will be in LRU order based on when the
