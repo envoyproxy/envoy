@@ -37,9 +37,9 @@ namespace HttpFilters {
 namespace ExternalProcessing {
 
 namespace {
-bool fuzzCreateEnvoy(const uint32_t exec, const bool non_persistent_mode) {
+bool fuzzCreateEnvoy(const uint32_t exec, const bool persistent_mode) {
   const uint32_t exec_before_reset_envoy = 2000;
-  return (non_persistent_mode || exec % exec_before_reset_envoy == 0);
+  return (!persistent_mode || exec % exec_before_reset_envoy == 0);
 }
 } // namespace
 
@@ -215,7 +215,7 @@ public:
 // One fuzzer execution.
 inline void
 fuzzExtProcRun(const test::extensions::filters::http::ext_proc::ExtProcGrpcTestCase& input,
-               const bool non_persistent_mode) {
+               const bool persistent_mode) {
   try {
     TestUtility::validate(input);
   } catch (const ProtoValidationException& e) {
@@ -236,16 +236,16 @@ fuzzExtProcRun(const test::extensions::filters::http::ext_proc::ExtProcGrpcTestC
 
   static uint32_t fuzz_exec_count = 0;
   // Initialize fuzzer once with IP and gRPC version from environment
-  if (fuzzCreateEnvoy(fuzz_exec_count, non_persistent_mode)) {
+  if (fuzzCreateEnvoy(fuzz_exec_count, persistent_mode)) {
     fuzzer = std::make_unique<ExtProcIntegrationFuzz>(
         TestEnvironment::getIpVersionsForTest()[0], TestEnvironment::getsGrpcVersionsForTest()[0]);
   }
   // Initialize fuzz_helper during every execution.
   // This will be accessed by the test server which is initialized once.
-  fuzz_helper = std::make_unique<ExtProcFuzzHelper>(&ext_proc_provider);
+  fuzz_helper = std::make_unique<ExtProcFuzzHelper>(&ext_proc_provider, persistent_mode);
 
   // Initialize test server.
-  if (fuzzCreateEnvoy(fuzz_exec_count, non_persistent_mode)) {
+  if (fuzzCreateEnvoy(fuzz_exec_count, persistent_mode)) {
     // This starts an external processor in a separate thread. This allows for the
     // external process to consume messages in a loop without blocking the fuzz
     // target from receiving the response.
@@ -269,7 +269,7 @@ fuzzExtProcRun(const test::extensions::filters::http::ext_proc::ExtProcGrpcTestC
         });
   }
   // Initialize Envoy
-  if (fuzzCreateEnvoy(fuzz_exec_count, non_persistent_mode)) {
+  if (fuzzCreateEnvoy(fuzz_exec_count, persistent_mode)) {
     fuzzer->initializeFuzzer(true);
     ENVOY_LOG_MISC(trace, "Fuzzer initialized");
   }
@@ -288,7 +288,7 @@ fuzzExtProcRun(const test::extensions::filters::http::ext_proc::ExtProcGrpcTestC
   }
 
   fuzz_exec_count++;
-  if (fuzzCreateEnvoy(fuzz_exec_count, non_persistent_mode) || response_timeout) {
+  if (fuzzCreateEnvoy(fuzz_exec_count, persistent_mode) || response_timeout) {
     fuzzer->tearDown(false);
     fuzzer.reset();
     fuzz_exec_count = 0;

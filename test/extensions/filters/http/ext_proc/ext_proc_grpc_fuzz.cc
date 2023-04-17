@@ -6,7 +6,7 @@ namespace HttpFilters {
 namespace ExternalProcessing {
 
 DEFINE_PROTO_FUZZER(const test::extensions::filters::http::ext_proc::ExtProcGrpcTestCase& input) {
-  fuzzExtProcRun(input, true);
+  fuzzExtProcRun(input, false);
 }
 
 } // namespace ExternalProcessing

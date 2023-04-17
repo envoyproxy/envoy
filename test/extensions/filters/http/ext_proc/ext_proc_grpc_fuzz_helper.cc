@@ -103,7 +103,10 @@ const grpc::StatusCode GrpcStatusCodes[] = {
     grpc::StatusCode::UNAUTHENTICATED,
 };
 
-ExtProcFuzzHelper::ExtProcFuzzHelper(FuzzedDataProvider* provider) { provider_ = provider; }
+ExtProcFuzzHelper::ExtProcFuzzHelper(FuzzedDataProvider* provider, bool persistent_mode) {
+  provider_ = provider;
+  persistent_mode_ = persistent_mode;
+}
 
 std::string ExtProcFuzzHelper::consumeRepeatedString() {
   const uint32_t str_len = provider_->ConsumeIntegralInRange<uint32_t>(0, ExtProcFuzzMaxDataSize);
@@ -229,7 +232,7 @@ void ExtProcFuzzHelper::randomizeImmediateResponse(ImmediateResponse* msg,
   }
 
   // 3. Randomize body
-  if (provider_->ConsumeBool()) {
+  if (!persistent_mode_ && provider_->ConsumeBool()) {
     ENVOY_LOG_MISC(trace, "ImmediateResponse setting body");
     msg->set_body(consumeRepeatedString());
   }
@@ -241,7 +244,7 @@ void ExtProcFuzzHelper::randomizeImmediateResponse(ImmediateResponse* msg,
   }
 
   // 5. Randomize details
-  if (provider_->ConsumeBool()) {
+  if (!persistent_mode_ && provider_->ConsumeBool()) {
     ENVOY_LOG_MISC(trace, "ImmediateResponse setting details");
     msg->set_details(consumeRepeatedString());
   }
