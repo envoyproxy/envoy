@@ -121,6 +121,11 @@ BAZEL_BUILD_OPTIONS=(
 [[ "${ENVOY_BUILD_ARCH}" == "aarch64" ]] && BAZEL_BUILD_OPTIONS+=(
   "--test_env=HEAPCHECK=")
 
+if [[ -z "${ENVOY_RBE}" ]]; then
+    export BAZEL_BUILD_OPTIONS+=("--test_tmpdir=${ENVOY_TEST_TMPDIR}")
+    echo "Setting test_tmpdir to ${ENVOY_TEST_TMPDIR}."
+fi
+
 _bazel="$(which bazel)"
 
 bazel () {
