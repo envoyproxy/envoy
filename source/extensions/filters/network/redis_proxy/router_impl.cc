@@ -13,6 +13,33 @@ namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
 namespace RedisProxy {
+namespace {
+void formatKey(Network::ReadFilterCallbacks* callbacks, PrefixSharedPtr prefix_shared_ptr, std::string& key, std::string redis_key_formatter_command) {
+      auto redis_key_formatter = prefix_shared_ptr->keyFormatter();
+      // If key_formatter defines %KEY% command, then do a direct string replacement.
+      // TODO(deveshkandpal24121990) - Possibly define a RedisKeyFormatter as a SubstitutionFormatter
+      if (redis_key_formatter.find(redis_key_formatter_command) != std::string::npos) {
+        redis_key_formatter =
+            absl::StrReplaceAll(redis_key_formatter, {{redis_key_formatter_command, key}});
+      }
+      auto providers = Formatter::SubstitutionFormatParser::parse(redis_key_formatter);
+      std::string formatted_key;
+      for (Formatter::FormatterProviderPtr& provider : providers) {
+        auto provider_formatted_key =
+            provider->formatValue(*Http::StaticEmptyHeaders::get().request_headers,
+                                  *Http::StaticEmptyHeaders::get().response_headers,
+                                  *Http::StaticEmptyHeaders::get().response_trailers,
+                                  callbacks->connection().streamInfo(), absl::string_view());
+
+        if (provider_formatted_key.has_string_value()) {
+          formatted_key = formatted_key + provider_formatted_key.string_value();
+        }
+      }
+      if (!formatted_key.empty()) {
+        key = formatted_key;
+      }
+}
+}
 
 MirrorPolicyImpl::MirrorPolicyImpl(const envoy::extensions::filters::network::redis_proxy::v3::
                                        RedisProxy::PrefixRoutes::Route::RequestMirrorPolicy& config,
@@ -93,29 +120,7 @@ RouteSharedPtr PrefixRoutes::upstreamPool(std::string& key) {
       key.erase(0, value->prefix().length());
     }
     if (!value->keyFormatter().empty()) {
-      auto redis_key_formatter = value->keyFormatter();
-      // If key_formatter defines %KEY% command, then do a direct string replacement.
-      // ( TODO ) - Possibly define a RedisKeyFormatter as a SubstitutionFormatter
-      if (redis_key_formatter.find(redis_key_formatter_command_) != std::string::npos) {
-        redis_key_formatter =
-            absl::StrReplaceAll(redis_key_formatter, {{redis_key_formatter_command_, key}});
-      }
-      auto providers = Formatter::SubstitutionFormatParser::parse(redis_key_formatter);
-      std::string formatted_key;
-      for (Formatter::FormatterProviderPtr& provider : providers) {
-        auto provider_formatted_key =
-            provider->formatValue(*Http::StaticEmptyHeaders::get().request_headers,
-                                  *Http::StaticEmptyHeaders::get().response_headers,
-                                  *Http::StaticEmptyHeaders::get().response_trailers,
-                                  callbacks_->connection().streamInfo(), absl::string_view());
-
-        if (provider_formatted_key.has_string_value()) {
-          formatted_key = formatted_key + provider_formatted_key.string_value();
-        }
-      }
-      if (!formatted_key.empty()) {
-        key = formatted_key;
-      }
+      formatKey(callbacks_, value, key, redis_key_formatter_command_);
     }
     return value;
   }

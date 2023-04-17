@@ -14,6 +14,7 @@
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/stream_info/mocks.h"
+#include "test/test_common/environment.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -100,8 +101,9 @@ TEST(PrefixRoutesTest, TestKeyPrefixFormatter) {
   NiceMock<Network::MockReadFilterCallbacks> filter_callbacks;
   NiceMock<Network::MockConnection> connection;
   NiceMock<StreamInfo::MockStreamInfo> stream_info;
-
-  const std::string format = "{%KEY%}-%FILTER_STATE(redisKey)%-{%KEY%}";
+  TestEnvironment::setEnvVar("ENVOY_TEST_ENV", "test", 1);
+  Envoy::Cleanup cleanup([]() { TestEnvironment::unsetEnvVar("ENVOY_TEST_ENV"); });
+  const std::string format = "{%KEY%}-%ENVIRONMENT(ENVOY_TEST_ENV)%-%FILTER_STATE(redisKey)%-{%KEY%}";
 
   stream_info.filterState()->setData(
       "redisKey", std::make_unique<Envoy::Router::StringAccessorImpl>("subjectCN"),
@@ -127,7 +129,7 @@ TEST(PrefixRoutesTest, TestKeyPrefixFormatter) {
   router.setReadFilterCallback(&filter_callbacks);
   std::string key("abc:bar");
   EXPECT_EQ(upstream_c, router.upstreamPool(key)->upstream());
-  EXPECT_EQ("{abc:bar}-subjectCN-{abc:bar}", key);
+  EXPECT_EQ("{abc:bar}-test-subjectCN-{abc:bar}", key);
 }
 
 TEST(PrefixRoutesTest, TestKeyPrefixFormatterWithMissingFilterState) {
