@@ -889,6 +889,10 @@ stages:
     steps:
     - bash: .azure-pipelines/cleanup.sh
       displayName: "Removing tools from agent"
+    - bash: |
+        echo "disk space at beginning of build:"
+        df -h
+      displayName: "Check disk space at beginning"
     - task: DownloadBuildArtifacts@0
       inputs:
         buildType: current
@@ -900,6 +904,11 @@ stages:
         ENVOY_DOCKER_BUILD_DIR: $(Build.StagingDirectory)
         NO_BUILD_SETUP: 1
         # ENVOY_EXAMPLES_DEBUG: 1
+    - bash: |
+        echo "disk space at end of build:"
+        df -h
+      displayName: "Check disk space at end"
+      condition: always()
 
   - job: packages_x64
     displayName: Debs (x64)
