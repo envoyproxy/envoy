@@ -151,6 +151,14 @@ struct StreamInfoImpl : public StreamInfo {
     return *upstream_info_;
   }
 
+  absl::optional<std::chrono::nanoseconds> currentDuration() const override {
+    if (!final_time_) {
+      return duration(time_source_.monotonicTime());
+    }
+
+    return requestComplete();
+  }
+
   absl::optional<std::chrono::nanoseconds> requestComplete() const override {
     return duration(final_time_);
   }
@@ -176,10 +184,6 @@ struct StreamInfoImpl : public StreamInfo {
   void addBytesReceived(uint64_t bytes_received) override { bytes_received_ += bytes_received; }
 
   uint64_t bytesReceived() const override { return bytes_received_; }
-
-  absl::optional<StreamState> streamState() const override { return stream_state_; }
-
-  void setStreamState(StreamState stream_state) override { stream_state_ = stream_state; }
 
   absl::optional<Http::Protocol> protocol() const override { return protocol_; }
 
@@ -280,7 +284,7 @@ struct StreamInfoImpl : public StreamInfo {
     os << spaces << "StreamInfoImpl " << this << DUMP_OPTIONAL_MEMBER(protocol_)
        << DUMP_OPTIONAL_MEMBER(response_code_) << DUMP_OPTIONAL_MEMBER(response_code_details_)
        << DUMP_OPTIONAL_MEMBER(attempt_count_) << DUMP_MEMBER(health_check_request_)
-       << DUMP_MEMBER(route_name_) << DUMP_OPTIONAL_MEMBER(stream_state_);
+       << DUMP_MEMBER(route_name_);
     DUMP_DETAILS(upstream_info_);
   }
 
@@ -396,7 +400,6 @@ struct StreamInfoImpl : public StreamInfo {
   absl::optional<MonotonicTime> final_time_;
 
   absl::optional<Http::Protocol> protocol_;
-  absl::optional<StreamState> stream_state_;
   absl::optional<uint32_t> response_code_;
   absl::optional<std::string> response_code_details_;
   absl::optional<std::string> connection_termination_details_;
@@ -424,7 +427,7 @@ private:
       FilterStateSharedPtr filter_state)
       : time_source_(time_source), start_time_(time_source.systemTime()),
         start_time_monotonic_(time_source.monotonicTime()), protocol_(protocol),
-        stream_state_(absl::nullopt), filter_state_(std::move(filter_state)),
+        filter_state_(std::move(filter_state)),
         downstream_connection_info_provider_(downstream_connection_info_provider != nullptr
                                                  ? downstream_connection_info_provider
                                                  : emptyDownstreamAddressProvider()),

@@ -2,6 +2,7 @@
 
 #include "source/extensions/http/header_validators/envoy_default/path_normalizer.h"
 
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
@@ -53,6 +54,7 @@ protected:
       path_with_escaped_slashes_action: UNESCAPE_AND_FORWARD
       skip_merging_slashes: true
     )EOF";
+  TestScopedRuntime scoped_runtime_;
 };
 
 TEST_F(PathNormalizerTest, NormalizeAndDecodeOctetDecoded) {
@@ -439,6 +441,30 @@ TEST_F(PathNormalizerTest, NormalizePathUriAsteriskFormNotOptions) {
 
   EXPECT_EQ(result.action(), PathNormalizer::PathNormalizationResult::Action::Reject);
   EXPECT_EQ(result.details(), UhvResponseCodeDetail::get().InvalidUrl);
+}
+
+TEST_F(PathNormalizerTest, BackslashTranslatedToSlash) {
+  scoped_runtime_.mergeValues(
+      {{"envoy.reloadable_features.uhv_translate_backslash_to_slash", "true"}});
+  ::Envoy::Http::TestRequestHeaderMapImpl headers{{":path", "/path\\with/back\\/slash%5c"}};
+
+  auto normalizer = create(empty_config);
+  auto result = normalizer->normalizePathUri(headers);
+
+  EXPECT_EQ(result.action(), PathNormalizer::PathNormalizationResult::Action::Accept);
+  EXPECT_EQ(headers.path(), "/path/with/back/slash%5C");
+}
+
+TEST_F(PathNormalizerTest, BackslashPreservedWithOverride) {
+  scoped_runtime_.mergeValues(
+      {{"envoy.reloadable_features.uhv_translate_backslash_to_slash", "false"}});
+  ::Envoy::Http::TestRequestHeaderMapImpl headers{{":path", "/path\\with/back\\/slash%5c"}};
+
+  auto normalizer = create(empty_config);
+  auto result = normalizer->normalizePathUri(headers);
+
+  EXPECT_EQ(result.action(), PathNormalizer::PathNormalizationResult::Action::Accept);
+  EXPECT_EQ(headers.path(), "/path\\with/back\\/slash%5C");
 }
 
 } // namespace EnvoyDefault
