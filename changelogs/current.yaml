@@ -454,3 +454,7 @@ deprecated:
     <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.access_log_flush_interval>`
     in favour of :ref:`periodic access logging
     <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.HcmAccessLogOptions.access_log_flush_interval>`.
+- area: access_log
+  change: |
+    deprecated (1.25.0) :ref:`intermediate_log_entry <envoy_v3_api_field_data.accesslog.v3.AccessLogCommon.intermediate_log_entry>`
+    in favour of :ref:`access_log_type <envoy_v3_api_field_data.accesslog.v3.AccessLogCommon.access_log_type>`.

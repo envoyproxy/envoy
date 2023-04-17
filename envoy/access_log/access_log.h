@@ -8,6 +8,7 @@
 #include "envoy/http/header_map.h"
 #include "envoy/stream_info/stream_info.h"
 
+#include "source/common/common/empty_string.h"
 #include "source/common/protobuf/protobuf.h"
 
 namespace Envoy {
@@ -56,16 +57,16 @@ public:
 using AccessLogManagerPtr = std::unique_ptr<AccessLogManager>;
 
 struct AccessLogTypeStringValues {
-  const std::string NotSet = "-";
+  const std::string NotSet = EMPTY_STRING;
   const std::string TcpUpstreamConnected = "TcpUpstreamConnected";
   const std::string TcpPeriodic = "TcpPeriodic";
   const std::string TcpEnd = "TcpEnd";
-  const std::string HcmNewRequest = "HcmNewRequest";
-  const std::string HcmPeriodic = "HcmPeriodic";
-  const std::string HcmEnd = "HcmEnd";
-  const std::string RouterNewRequest = "RouterNewRequest";
-  const std::string RouterPeriodic = "RouterPeriodic";
-  const std::string RouterEnd = "RouterEnd";
+  const std::string DownstreamStart = "DownstreamStart";
+  const std::string DownstreamPeriodic = "DownstreamPeriodic";
+  const std::string DownstreamEnd = "DownstreamEnd";
+  const std::string UpstreamStart = "UpstreamStart";
+  const std::string UpstreamPeriodic = "UpstreamPeriodic";
+  const std::string UpstreamEnd = "UpstreamEnd";
 };
 
 using AccessLogTypeStrings = ConstSingleton<AccessLogTypeStringValues>;
@@ -75,12 +76,12 @@ enum class AccessLogType {
   TcpUpstreamConnected,
   TcpPeriodic,
   TcpEnd,
-  HcmNewRequest,
-  HcmPeriodic,
-  HcmEnd,
-  RouterNewRequest,
-  RouterPeriodic,
-  RouterEnd,
+  DownstreamStart,
+  DownstreamPeriodic,
+  DownstreamEnd,
+  UpstreamStart,
+  UpstreamPeriodic,
+  UpstreamEnd,
 };
 
 /**

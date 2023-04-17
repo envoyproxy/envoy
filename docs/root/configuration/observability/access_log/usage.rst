@@ -1058,12 +1058,12 @@ The following command operators are supported:
   * TcpUpstreamConnected - When TCP Proxy filter has successfully established an upstream connection.
   * TcpPeriodic - On any TCP Proxy filter periodic log record.
   * TcpEnd - When a TCP connection is ended on TCP Proxy filter.
-  * HcmNewRequest - When HTTP Connection Manager filter receives a new HTTP request.
-  * HcmPeriodic - On any HTTP Connection Manager periodic log record.
-  * HcmEnd - When an HTTP stream is ended on HTTP Connection Manager filter.
-  * RouterNewRequest - When a new HTTP request is received by the HTTP Router filter.
-  * RouterPeriodic - On any HTTP Router filter periodic log record.
-  * RouterEnd - When an HTTP request is finished on the HTTP Router filter.
+  * DownstreamStart - When HTTP Connection Manager filter receives a new HTTP request.
+  * DownstreamPeriodic - On any HTTP Connection Manager periodic log record.
+  * DownstreamEnd - When an HTTP stream is ended on HTTP Connection Manager filter.
+  * UpstreamStart - When a new HTTP request is received by the HTTP Router filter.
+  * UpstreamPeriodic - On any HTTP Router filter periodic log record.
+  * UpstreamEnd - When an HTTP request is finished on the HTTP Router filter.
 
 %ENVIRONMENT(X):Z%
   Environment value of environment variable X. If no valid environment variable X, '-' symbol will be used.

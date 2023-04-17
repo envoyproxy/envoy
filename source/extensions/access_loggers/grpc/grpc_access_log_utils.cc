@@ -323,7 +323,7 @@ void Utility::extractCommonAccessLogProperties(
 
   // If the stream is not complete, then this log entry is intermediate log entry.
   if (!stream_info.requestComplete().has_value()) {
-    common_access_log.set_intermediate_log_entry(true);
+    common_access_log.set_intermediate_log_entry(true); // Deprecated field
   }
 
   // Set stream unique id from the stream info.
@@ -340,8 +340,7 @@ void Utility::extractCommonAccessLogProperties(
     common_access_log.set_upstream_wire_bytes_received(bytes_meter->wireBytesReceived());
   }
 
-  common_access_log.set_access_log_type(
-      AccessLog::Utility::getAccessLogTypeString(access_log_type));
+  common_access_log.set_access_log_type(AccessLog::Utility::getAccessLogTypeProto(access_log_type));
 }
 
 } // namespace GrpcCommon

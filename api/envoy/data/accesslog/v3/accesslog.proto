@@ -85,6 +85,19 @@ message AccessLogCommon {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.data.accesslog.v2.AccessLogCommon";
 
+  enum AccessLogType {
+    NotSet = 0;
+    TcpUpstreamConnected = 1;
+    TcpPeriodic = 2;
+    TcpEnd = 3;
+    DownstreamStart = 4;
+    DownstreamPeriodic = 5;
+    DownstreamEnd = 6;
+    UpstreamStart = 7;
+    UpstreamPeriodic = 8;
+    UpstreamEnd = 9;
+  }
+
   // [#not-implemented-hide:]
   // This field indicates the rate at which this log entry was sampled.
   // Valid range is (0.0, 1.0].
@@ -214,6 +227,11 @@ message AccessLogCommon {
   // And if it is necessary, unique ID or identifier can be added to the log entry
   // :ref:`stream_id <envoy_v3_api_field_data.accesslog.v3.AccessLogCommon.stream_id>` to
   // correlate all these intermediate log entries and final log entry.
+  //
+  // .. attention::
+  // This field is deprecated in favor of
+  // :ref:`access_log_type <envoy_v3_api_field_data.accesslog.v3.AccessLogCommon.access_log_type>`
+  // which gives a more fine grained indication about the type of the access log.
   bool intermediate_log_entry = 27;
 
   // If downstream connection in listener failed due to transport socket (e.g. TLS handshake), provides the
@@ -238,7 +256,7 @@ message AccessLogCommon {
   uint64 upstream_wire_bytes_received = 32;
 
   // The type of the access log, which indicates when the log was recorded.
-  string access_log_type = 33;
+  AccessLogType access_log_type = 33;
 }
 
 // Flags indicating occurrences during request/response processing.

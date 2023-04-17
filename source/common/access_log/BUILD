@@ -58,5 +58,6 @@ envoy_cc_library(
     deps = [
         "//envoy/access_log:access_log_interface",
         "//source/common/common:empty_string",
+        "@envoy_api//envoy/data/accesslog/v3:pkg_cc_proto",
     ],
 )

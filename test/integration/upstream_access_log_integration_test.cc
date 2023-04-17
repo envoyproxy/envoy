@@ -218,7 +218,7 @@ TEST_P(UpstreamAccessLogTest, Retry) {
   waitForNextUpstreamRequest({}, std::chrono::milliseconds(300000));
 
   // Start of first stream access log - no response status code yet
-  EXPECT_EQ(absl::StrCat("0 ", AccessLog::AccessLogTypeStrings::get().RouterNewRequest),
+  EXPECT_EQ(absl::StrCat("0 ", AccessLog::AccessLogTypeStrings::get().UpstreamStart),
             waitForAccessLog(log_file, 0, true));
 
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "503"}}, false);
@@ -232,13 +232,13 @@ TEST_P(UpstreamAccessLogTest, Retry) {
   }
 
   // End of first request access log
-  EXPECT_EQ(absl::StrCat("503 ", AccessLog::AccessLogTypeStrings::get().RouterEnd),
+  EXPECT_EQ(absl::StrCat("503 ", AccessLog::AccessLogTypeStrings::get().UpstreamEnd),
             waitForAccessLog(log_file, 1, true));
 
   waitForNextUpstreamRequest();
 
   // Start of second stream access log - no response status code yet
-  EXPECT_EQ(absl::StrCat("0 ", AccessLog::AccessLogTypeStrings::get().RouterNewRequest),
+  EXPECT_EQ(absl::StrCat("0 ", AccessLog::AccessLogTypeStrings::get().UpstreamStart),
             waitForAccessLog(log_file, 2, true));
 
   upstream_request_->encodeHeaders(default_response_headers_, false);
@@ -253,7 +253,7 @@ TEST_P(UpstreamAccessLogTest, Retry) {
   EXPECT_EQ(512U, response->body().size());
 
   // End of second request access log
-  EXPECT_EQ(absl::StrCat("200 ", AccessLog::AccessLogTypeStrings::get().RouterEnd),
+  EXPECT_EQ(absl::StrCat("200 ", AccessLog::AccessLogTypeStrings::get().UpstreamEnd),
             waitForAccessLog(log_file, 3, true));
 }
 
