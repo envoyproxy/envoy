@@ -89,14 +89,14 @@ void AccessLog::emitLog(const Http::RequestHeaderMap& request_headers,
 
   // Unpacking the body "KeyValueList" to "AnyValue".
   if (body_formatter_) {
-    const auto formatted_body = unpackBody(body_formatter_->format(
-        request_headers, response_headers, response_trailers, stream_info, absl::string_view(),
-        Envoy::AccessLog::Utility::getAccessLogTypeString(access_log_type)));
+    const auto formatted_body =
+        unpackBody(body_formatter_->format(request_headers, response_headers, response_trailers,
+                                           stream_info, absl::string_view(), access_log_type));
     *log_entry.mutable_body() = formatted_body;
   }
-  const auto formatted_attributes = attributes_formatter_->format(
-      request_headers, response_headers, response_trailers, stream_info, absl::string_view(),
-      Envoy::AccessLog::Utility::getAccessLogTypeString(access_log_type));
+  const auto formatted_attributes =
+      attributes_formatter_->format(request_headers, response_headers, response_trailers,
+                                    stream_info, absl::string_view(), access_log_type);
   *log_entry.mutable_attributes() = formatted_attributes.values();
 
   tls_slot_->getTyped<ThreadLocalLogger>().logger_->log(std::move(log_entry));

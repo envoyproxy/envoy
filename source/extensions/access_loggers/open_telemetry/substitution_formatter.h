@@ -33,7 +33,7 @@ public:
          const Http::ResponseHeaderMap& response_headers,
          const Http::ResponseTrailerMap& response_trailers,
          const StreamInfo::StreamInfo& stream_info, absl::string_view local_reply_body,
-         absl::string_view access_log_type) const;
+         AccessLog::AccessLogType access_log_type) const;
 
 private:
   struct OpenTelemetryFormatMapWrapper;
@@ -81,7 +81,7 @@ private:
                     const Http::ResponseHeaderMap& response_headers,
                     const Http::ResponseTrailerMap& response_trailers,
                     const StreamInfo::StreamInfo& stream_info, absl::string_view local_reply_body,
-                    absl::string_view access_log_type) const;
+                    AccessLog::AccessLogType access_log_type) const;
   ::opentelemetry::proto::common::v1::AnyValue openTelemetryFormatMapCallback(
       const OpenTelemetryFormatter::OpenTelemetryFormatMapWrapper& format_map,
       const OpenTelemetryFormatMapVisitor& visitor) const;

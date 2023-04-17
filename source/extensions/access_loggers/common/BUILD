@@ -39,7 +39,6 @@ envoy_cc_library(
     visibility = ["//visibility:public"],
     deps = [
         ":access_log_base",
-        "//source/common/access_log:utility_lib",
     ],
 )
 

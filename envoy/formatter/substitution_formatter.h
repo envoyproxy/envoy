@@ -3,6 +3,7 @@
 #include <memory>
 #include <string>
 
+#include "envoy/access_log/access_log.h"
 #include "envoy/common/pure.h"
 #include "envoy/config/typed_config.h"
 #include "envoy/http/header_map.h"
@@ -28,12 +29,12 @@ public:
    * @param local_reply_body supplies the local reply body.
    * @return std::string string containing the complete formatted substitution line.
    */
-  virtual std::string format(const Http::RequestHeaderMap& request_headers,
-                             const Http::ResponseHeaderMap& response_headers,
-                             const Http::ResponseTrailerMap& response_trailers,
-                             const StreamInfo::StreamInfo& stream_info,
-                             absl::string_view local_reply_body,
-                             absl::string_view access_log_type) const PURE;
+  virtual std::string
+  format(const Http::RequestHeaderMap& request_headers,
+         const Http::ResponseHeaderMap& response_headers,
+         const Http::ResponseTrailerMap& response_trailers,
+         const StreamInfo::StreamInfo& stream_info, absl::string_view local_reply_body,
+         AccessLog::AccessLogType access_log_type = AccessLog::AccessLogType::NotSet) const PURE;
 };
 
 using FormatterPtr = std::unique_ptr<Formatter>;
@@ -57,12 +58,12 @@ public:
    * @return absl::optional<std::string> optional string containing a single value extracted from
    * the given headers/trailers/stream.
    */
-  virtual absl::optional<std::string> format(const Http::RequestHeaderMap& request_headers,
-                                             const Http::ResponseHeaderMap& response_headers,
-                                             const Http::ResponseTrailerMap& response_trailers,
-                                             const StreamInfo::StreamInfo& stream_info,
-                                             absl::string_view local_reply_body,
-                                             absl::string_view access_log_type) const PURE;
+  virtual absl::optional<std::string>
+  format(const Http::RequestHeaderMap& request_headers,
+         const Http::ResponseHeaderMap& response_headers,
+         const Http::ResponseTrailerMap& response_trailers,
+         const StreamInfo::StreamInfo& stream_info, absl::string_view local_reply_body,
+         AccessLog::AccessLogType access_log_type = AccessLog::AccessLogType::NotSet) const PURE;
   /**
    * Extract a value from the provided headers/trailers/stream, preserving the value's type.
    * @param request_headers supplies the request headers.
@@ -73,12 +74,12 @@ public:
    * @return ProtobufWkt::Value containing a single value extracted from the given
    *         headers/trailers/stream.
    */
-  virtual ProtobufWkt::Value formatValue(const Http::RequestHeaderMap& request_headers,
-                                         const Http::ResponseHeaderMap& response_headers,
-                                         const Http::ResponseTrailerMap& response_trailers,
-                                         const StreamInfo::StreamInfo& stream_info,
-                                         absl::string_view local_reply_body,
-                                         absl::string_view access_log_type) const PURE;
+  virtual ProtobufWkt::Value formatValue(
+      const Http::RequestHeaderMap& request_headers,
+      const Http::ResponseHeaderMap& response_headers,
+      const Http::ResponseTrailerMap& response_trailers, const StreamInfo::StreamInfo& stream_info,
+      absl::string_view local_reply_body,
+      AccessLog::AccessLogType access_log_type = AccessLog::AccessLogType::NotSet) const PURE;
 };
 
 using FormatterProviderPtr = std::unique_ptr<FormatterProvider>;
