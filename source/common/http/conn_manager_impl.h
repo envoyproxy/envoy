@@ -314,11 +314,12 @@ private:
     void blockRouteCache();
     // Return true if the cached route is blocked.
     bool routeCacheBlocked() const {
-      ENVOY_BUG(!route_cache_blocked_, "Should never try to refresh or clear the route cache when "
-                                       "it is blocked! To temporarily ignore this new constraint, "
-                                       "set runtime flag "
-                                       "`envoy.reloadable_features.prohibit_route_refresh_after_response_headers_sent`"
-                                       "to `false`");
+      ENVOY_BUG(!route_cache_blocked_,
+                "Should never try to refresh or clear the route cache when "
+                "it is blocked! To temporarily ignore this new constraint, "
+                "set runtime flag "
+                "`envoy.reloadable_features.prohibit_route_refresh_after_response_headers_sent`"
+                "to `false`");
       return route_cache_blocked_;
     }
 

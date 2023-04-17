@@ -1085,7 +1085,8 @@ TEST_F(HttpConnectionManagerImplTest, BlockRouteCacheTest) {
       },
       "Should never try to refresh or clear the route cache when it is blocked! "
       "To temporarily ignore this new constraint, "
-      "set runtime flag `envoy.reloadable_features.prohibit_route_refresh_after_response_headers_sent` "
+      "set runtime flag "
+      "`envoy.reloadable_features.prohibit_route_refresh_after_response_headers_sent` "
       "to `false`");
 
   EXPECT_CALL(response_encoder_, encodeData(_, true));
