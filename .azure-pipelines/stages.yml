@@ -176,7 +176,7 @@ stages:
                 CHANGES="$(git diff "$DIFF_REF" HEAD VERSION.txt)"
                 if [[ -z "$CHANGES" ]]; then
                     echo "VERSION.txt is not a development version. Please re-open the branch before making further changes" >&2
-                    # exit 1
+                    exit 1
                 fi
             fi
             echo "##vso[task.setvariable variable=isDev;isoutput=true]false"
