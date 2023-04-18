@@ -17,6 +17,9 @@ class SubscriptionFactory {
 public:
   virtual ~SubscriptionFactory() = default;
 
+  static constexpr uint32_t RetryInitialDelayMs = 500;
+  static constexpr uint32_t RetryMaxDelayMs = 30000; // Do not cross more than 30s
+
   /**
    * @return true if a config source comes from the local filesystem.
    */

@@ -28,16 +28,6 @@ public:
       Protocol protocol, HeaderValidatorStats& stats)
       : HeaderValidator(config, protocol, stats) {}
 
-  HeaderEntryValidationResult validateRequestHeaderEntry(const HeaderString&,
-                                                         const HeaderString&) override {
-    return HeaderEntryValidationResult::success();
-  }
-
-  HeaderEntryValidationResult validateResponseHeaderEntry(const HeaderString&,
-                                                          const HeaderString&) override {
-    return HeaderEntryValidationResult::success();
-  }
-
   RequestHeaderMapValidationResult validateRequestHeaderMap(RequestHeaderMap&) override {
     return RequestHeaderMapValidationResult::success();
   }
