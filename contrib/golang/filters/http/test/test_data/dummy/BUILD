@@ -10,9 +10,7 @@ go_binary(
     importpath = "github.com/envoyproxy/envoy/contrib/golang/filters/http/test/test_data/dummy",
     linkmode = "c-shared",
     visibility = ["//visibility:public"],
-    deps = [
-        "//contrib/golang/filters/http/source/go/pkg/http",
-    ],
+    deps = ["//contrib/golang/filters/go/pkg/http"],
 )
 
 go_binary(
@@ -23,9 +21,7 @@ go_binary(
     importpath = "github.com/envoyproxy/envoy/contrib/golang/filters/http/test/test_data/dummy",
     linkmode = "c-shared",
     visibility = ["//visibility:public"],
-    deps = [
-        "//contrib/golang/filters/http/source/go/pkg/http",
-    ],
+    deps = ["//contrib/golang/filters/go/pkg/http"],
 )
 
 go_binary(
@@ -36,9 +32,7 @@ go_binary(
     importpath = "github.com/envoyproxy/envoy/contrib/golang/filters/http/test/test_data/dummy",
     linkmode = "c-shared",
     visibility = ["//visibility:public"],
-    deps = [
-        "//contrib/golang/filters/http/source/go/pkg/http",
-    ],
+    deps = ["//contrib/golang/filters/go/pkg/http"],
 )
 
 go_binary(
@@ -49,9 +43,7 @@ go_binary(
     importpath = "github.com/envoyproxy/envoy/contrib/golang/filters/http/test/test_data/dummy",
     linkmode = "c-shared",
     visibility = ["//visibility:public"],
-    deps = [
-        "//contrib/golang/filters/http/source/go/pkg/http",
-    ],
+    deps = ["//contrib/golang/filters/go/pkg/http"],
 )
 
 filegroup(

@@ -203,7 +203,13 @@ updates:
     time: "09:00"
 
 - package-ecosystem: "gomod"
-  directory: "/contrib/golang/filters/http/test/test_data/basic"
+  directory: "/contrib/golang/filters/go"
+  schedule:
+    interval: daily
+    time: "09:00"
+
+- package-ecosystem: "gomod"
+  directory: "/contrib/golang/filters/network/test/test_data"
   schedule:
     interval: daily
     time: "09:00"
@@ -227,6 +233,12 @@ updates:
     time: "09:00"
 
 - package-ecosystem: "gomod"
+  directory: "/contrib/golang/filters/http/test/test_data/basic"
+  schedule:
+    interval: daily
+    time: "09:00"
+
+- package-ecosystem: "gomod"
   directory: "/contrib/golang/filters/http/test/test_data/routeconfig"
   schedule:
     interval: daily
@@ -234,6 +246,18 @@ updates:
 
 - package-ecosystem: "gomod"
   directory: "/contrib/golang/router/cluster_specifier/test/test_data/simple"
+  schedule:
+    interval: daily
+    time: "09:00"
+
+- package-ecosystem: "gomod"
+  directory: "/examples/golang-http/simple"
+  schedule:
+    interval: daily
+    time: "09:00"
+
+- package-ecosystem: "gomod"
+  directory: "/examples/golang-network/simple"
   schedule:
     interval: daily
     time: "09:00"
@@ -252,12 +276,6 @@ updates:
 
 - package-ecosystem: "gomod"
   directory: "/examples/grpc-bridge/server"
-  schedule:
-    interval: daily
-    time: "09:00"
-
-- package-ecosystem: "gomod"
-  directory: "/examples/golang/simple"
   schedule:
     interval: daily
     time: "09:00"

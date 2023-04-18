@@ -32,3 +32,4 @@ filters.
   sni_dynamic_forward_proxy_filter
   wasm_filter
   zookeeper_proxy_filter
+  golang_filter

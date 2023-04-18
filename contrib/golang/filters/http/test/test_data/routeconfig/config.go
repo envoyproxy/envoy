@@ -2,8 +2,8 @@ package main
 
 import (
 	xds "github.com/cncf/xds/go/xds/type/v3"
-	"github.com/envoyproxy/envoy/contrib/golang/filters/http/source/go/pkg/api"
-	"github.com/envoyproxy/envoy/contrib/golang/filters/http/source/go/pkg/http"
+	"github.com/envoyproxy/envoy/contrib/golang/filters/go/pkg/api"
+	"github.com/envoyproxy/envoy/contrib/golang/filters/go/pkg/http"
 	"google.golang.org/protobuf/types/known/anypb"
 )
 
