@@ -103,6 +103,7 @@ docker run --rm \
        -e BAZEL_STARTUP_OPTIONS \
        -e BAZEL_BUILD_EXTRA_OPTIONS \
        -e BAZEL_EXTRA_TEST_OPTIONS \
+       -e BAZEL_FAKE_SCM_REVISION \
        -e BAZEL_REMOTE_CACHE \
        -e ENVOY_STDLIB \
        -e BUILD_REASON \

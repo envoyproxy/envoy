@@ -95,7 +95,7 @@ void Span::finishSpan() {
   // `direction` will be either "ingress" or "egress"
   s.mutable_annotations()->insert({std::string(DirectionKey), direction()});
 
-  const std::string json = MessageUtil::getJsonStringFromMessageOrDie(
+  const std::string json = MessageUtil::getJsonStringFromMessageOrError(
       s, false /* pretty_print  */, false /* always_print_primitive_fields */);
 
   broker_.send(json);

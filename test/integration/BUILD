@@ -208,10 +208,10 @@ envoy_proto_library(
 )
 
 envoy_cc_test(
-    name = "upstream_filter_state_integration_test",
+    name = "upstream_access_log_integration_test",
     size = "large",
     srcs = [
-        "upstream_filter_state_integration_test.cc",
+        "upstream_access_log_integration_test.cc",
     ],
     deps = [
         ":http_integration_lib",

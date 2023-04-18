@@ -620,17 +620,17 @@ void InstanceImpl::initialize(Network::Address::InstanceConstSharedPtr local_add
     }
   }
 
-  ListenerManagerFactory* listener_manager_factory_ = nullptr;
+  ListenerManagerFactory* listener_manager_factory = nullptr;
   if (bootstrap_.has_listener_manager()) {
-    listener_manager_factory_ = Config::Utility::getAndCheckFactory<ListenerManagerFactory>(
+    listener_manager_factory = Config::Utility::getAndCheckFactory<ListenerManagerFactory>(
         bootstrap_.listener_manager(), false);
   } else {
-    listener_manager_factory_ = &Config::Utility::getAndCheckFactoryByName<ListenerManagerFactory>(
+    listener_manager_factory = &Config::Utility::getAndCheckFactoryByName<ListenerManagerFactory>(
         Config::ServerExtensionValues::get().DEFAULT_LISTENER);
   }
 
   // Workers get created first so they register for thread local updates.
-  listener_manager_ = listener_manager_factory_->createListenerManager(
+  listener_manager_ = listener_manager_factory->createListenerManager(
       *this, nullptr, worker_factory_, bootstrap_.enable_dispatcher_stats(), quic_stat_names_);
 
   // The main thread is also registered for thread local updates so that code that does not care
