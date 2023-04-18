@@ -95,8 +95,8 @@ Http2HeaderValidator::validateResponseHeaderEntry(const HeaderString& key,
   return validateGenericHeaderValue(value);
 }
 
-::Envoy::Http::HeaderValidator::RequestHeaderMapValidationResult
-Http2HeaderValidator::validateRequestHeaderMap(::Envoy::Http::RequestHeaderMap& header_map) {
+HeaderValidator::ValidationResult
+Http2HeaderValidator::validateRequestHeaders(const ::Envoy::Http::RequestHeaderMap& header_map) {
   static const absl::node_hash_set<absl::string_view> kAllowedPseudoHeadersForConnect = {
       ":method", ":authority"};
 
@@ -113,8 +113,7 @@ Http2HeaderValidator::validateRequestHeaderMap(::Envoy::Http::RequestHeaderMap& 
   // The method pseudo header is always mandatory.
   if (header_map.getMethodValue().empty()) {
     stats_.incMessagingError();
-    return {RequestHeaderMapValidationResult::Action::Reject,
-            UhvResponseCodeDetail::get().InvalidMethod};
+    return {ValidationResult::Action::Reject, UhvResponseCodeDetail::get().InvalidMethod};
   }
 
   // The CONNECT method with the ":protocol" header is called the extended CONNECT and covered in
@@ -137,7 +136,7 @@ Http2HeaderValidator::validateRequestHeaderMap(::Envoy::Http::RequestHeaderMap& 
     // request that omits mandatory pseudo-header fields is malformed (Section 8.1.1).
     auto details = path_is_empty ? UhvResponseCodeDetail::get().InvalidUrl
                                  : UhvResponseCodeDetail::get().InvalidScheme;
-    return {RequestHeaderMapValidationResult::Action::Reject, details};
+    return {ValidationResult::Action::Reject, details};
   } else if (is_standard_connect_request) {
     // If this is a CONNECT request, :path and :scheme must be empty and :authority must be
     // provided. This is based on RFC 9113,
@@ -158,7 +157,7 @@ Http2HeaderValidator::validateRequestHeaderMap(::Envoy::Http::RequestHeaderMap& 
     }
 
     if (!details.empty()) {
-      return {RequestHeaderMapValidationResult::Action::Reject, details};
+      return {ValidationResult::Action::Reject, details};
     }
   }
 
@@ -176,22 +175,7 @@ Http2HeaderValidator::validateRequestHeaderMap(::Envoy::Http::RequestHeaderMap& 
     //   these MUST include a ":path" pseudo-header field with a value of '*' (see Section 7.1 of
     //   [HTTP]).
     // * CONNECT requests (Section 8.5), where the ":path" pseudo-header field is omitted.
-    return {RequestHeaderMapValidationResult::Action::Reject,
-            UhvResponseCodeDetail::get().InvalidUrl};
-  }
-
-  if (!config_.uri_path_normalization_options().skip_path_normalization() && !path_is_empty) {
-    // Validate and normalize the path, which must be a valid URI. This is only run if the config
-    // is active and the path is not empty.
-    //
-    // If path normalization is disabled then the path will be validated against the RFC character
-    // set in validateRequestHeaderEntry.
-    auto path_result = path_normalizer_.normalizePathUri(header_map);
-    if (!path_result) {
-      return path_result;
-    }
-
-    path = header_map.path();
+    return {ValidationResult::Action::Reject, UhvResponseCodeDetail::get().InvalidUrl};
   }
 
   // Step 3: Verify each request header
@@ -201,13 +185,12 @@ Http2HeaderValidator::validateRequestHeaderMap(::Envoy::Http::RequestHeaderMap& 
           : (is_extended_connect_request ? kAllowedPseudoHeadersForExtendedConnect
                                          : kAllowedPseudoHeaders);
   std::string reject_details;
-  std::vector<absl::string_view> drop_headers;
 
   // TODO(#23290) - Add support for detecting and validating duplicate headers. This would most
   // likely need to occur within the H2 codec because, at this point, duplicate headers have been
   // concatenated into a list.
   header_map.iterate(
-      [this, &reject_details, &allowed_headers, &drop_headers](
+      [this, &reject_details, &allowed_headers](
           const ::Envoy::Http::HeaderEntry& header_entry) -> ::Envoy::Http::HeaderMap::Iterate {
         const auto& header_name = header_entry.key();
         const auto& header_value = header_entry.value();
@@ -227,10 +210,7 @@ Http2HeaderValidator::validateRequestHeaderMap(::Envoy::Http::RequestHeaderMap& 
           reject_details = UhvResponseCodeDetail::get().InvalidPseudoHeader;
         } else {
           auto entry_result = validateRequestHeaderEntry(header_name, header_value);
-          if (entry_result.action() == HeaderEntryValidationResult::Action::DropHeader) {
-            // drop the header, continue processing the request
-            drop_headers.push_back(string_header_name);
-          } else if (!entry_result) {
+          if (!entry_result.ok()) {
             reject_details = static_cast<std::string>(entry_result.details());
           }
         }
@@ -241,19 +221,26 @@ Http2HeaderValidator::validateRequestHeaderMap(::Envoy::Http::RequestHeaderMap& 
 
   if (!reject_details.empty()) {
     stats_.incMessagingError();
-    return {RequestHeaderMapValidationResult::Action::Reject, reject_details};
+    return {ValidationResult::Action::Reject, reject_details};
   }
 
-  for (auto& name : drop_headers) {
-    header_map.remove(LowerCaseString(name));
-  }
-
-  return RequestHeaderMapValidationResult::success();
+  return ValidationResult::success();
 }
 
-::Envoy::Http::HeaderValidator::ResponseHeaderMapValidationResult
-Http2HeaderValidator::validateResponseHeaderMap(::Envoy::Http::ResponseHeaderMap& header_map) {
-  static const absl::node_hash_set<absl::string_view> kAllowedPseudoHeaders = {":status"};
+HeaderValidator::HeadersTransformationResult
+Http2HeaderValidator::transformRequestHeaders(::Envoy::Http::RequestHeaderMap& header_map) {
+  sanitizeHeadersWithUnderscores(header_map);
+  if (!config_.uri_path_normalization_options().skip_path_normalization()) {
+    auto path_result = path_normalizer_.normalizePathUri(header_map);
+    if (!path_result.ok()) {
+      return path_result;
+    }
+  }
+  return HeadersTransformationResult::success();
+}
+
+HeaderValidator::ValidationResult
+Http2HeaderValidator::validateResponseHeaders(const ::Envoy::Http::ResponseHeaderMap& header_map) {
   // Step 1: verify that required pseudo headers are present
   //
   // For HTTP/2 responses, RFC 9113 states that only the :status
@@ -264,42 +251,46 @@ Http2HeaderValidator::validateResponseHeaderMap(::Envoy::Http::ResponseHeaderMap
   // responses, including interim responses; otherwise, the response is malformed (Section 8.1.1).
   if (header_map.getStatusValue().empty()) {
     stats_.incMessagingError();
-    return {ResponseHeaderMapValidationResult::Action::Reject,
-            UhvResponseCodeDetail::get().InvalidStatus};
+    return {ValidationResult::Action::Reject, UhvResponseCodeDetail::get().InvalidStatus};
   }
 
   // Step 2: Verify each response header
   std::string reject_details;
-  std::vector<absl::string_view> drop_headers;
-  header_map.iterate(
-      [this, &reject_details, &drop_headers](
-          const ::Envoy::Http::HeaderEntry& header_entry) -> ::Envoy::Http::HeaderMap::Iterate {
-        const auto& header_name = header_entry.key();
-        const auto& header_value = header_entry.value();
-        const auto& string_header_name = header_name.getStringView();
+  header_map.iterate([this, &reject_details](const ::Envoy::Http::HeaderEntry& header_entry)
+                         -> ::Envoy::Http::HeaderMap::Iterate {
+    static const absl::node_hash_set<absl::string_view> kAllowedResponsePseudoHeaders = {":status"};
+    const auto& header_name = header_entry.key();
+    const auto& header_value = header_entry.value();
+    const auto& string_header_name = header_name.getStringView();
+    bool is_pseudo_header = string_header_name.empty() ? false : string_header_name.at(0) == ':';
 
-        auto entry_result = validateResponseHeaderEntry(header_name, header_value);
-        if (entry_result.action() == HeaderEntryValidationResult::Action::DropHeader) {
-          // drop the header, continue processing the response
-          drop_headers.push_back(string_header_name);
-        } else if (!entry_result) {
-          reject_details = static_cast<std::string>(entry_result.details());
-        }
+    if (is_pseudo_header && !kAllowedResponsePseudoHeaders.contains(string_header_name)) {
+      // Reject unrecognized or unallowed pseudo header name, from RFC 9113,
+      // https://www.rfc-editor.org/rfc/rfc9113#section-8.3:
+      //
+      // Pseudo-header fields are only valid in the context in which they are defined.
+      // Pseudo-header fields defined for requests MUST NOT appear in responses; pseudo-header
+      // fields defined for responses MUST NOT appear in requests. Pseudo-header fields MUST
+      // NOT appear in a trailer section. Endpoints MUST treat a request or response that
+      // contains undefined or invalid pseudo-header fields as malformed (Section 8.1.1).
+      reject_details = UhvResponseCodeDetail::get().InvalidPseudoHeader;
+    } else {
+      auto entry_result = validateResponseHeaderEntry(header_name, header_value);
+      if (!entry_result) {
+        reject_details = static_cast<std::string>(entry_result.details());
+      }
+    }
 
-        return reject_details.empty() ? ::Envoy::Http::HeaderMap::Iterate::Continue
-                                      : ::Envoy::Http::HeaderMap::Iterate::Break;
-      });
+    return reject_details.empty() ? ::Envoy::Http::HeaderMap::Iterate::Continue
+                                  : ::Envoy::Http::HeaderMap::Iterate::Break;
+  });
 
   if (!reject_details.empty()) {
     stats_.incMessagingError();
-    return {ResponseHeaderMapValidationResult::Action::Reject, reject_details};
+    return {ValidationResult::Action::Reject, reject_details};
   }
 
-  for (auto& name : drop_headers) {
-    header_map.remove(LowerCaseString(name));
-  }
-
-  return ResponseHeaderMapValidationResult::success();
+  return ValidationResult::success();
 }
 
 HeaderValidator::HeaderValueValidationResult
@@ -369,7 +360,6 @@ Http2HeaderValidator::validateGenericHeaderName(const HeaderString& name) {
   static const absl::node_hash_set<absl::string_view> kRejectHeaderNames = {
       "transfer-encoding", "connection", "upgrade", "keep-alive", "proxy-connection"};
   const auto& key_string_view = name.getStringView();
-  const auto& underscore_action = config_.headers_with_underscores_action();
 
   // This header name is initially invalid if the name is empty or if the name
   // matches an incompatible connection-specific header.
@@ -383,9 +373,11 @@ Http2HeaderValidator::validateGenericHeaderName(const HeaderString& name) {
             Http2ResponseCodeDetail::get().ConnectionHeaderSanitization};
   }
 
+  const bool reject_header_names_with_underscores =
+      config_.headers_with_underscores_action() == HeaderValidatorConfig::REJECT_REQUEST;
   bool is_valid = true;
   char c = '\0';
-  bool has_underscore = false;
+  bool reject_due_to_underscore = false;
 
   // Verify that the header name is all lowercase. From RFC 9113,
   // https://www.rfc-editor.org/rfc/rfc9113#section-8.2.1:
@@ -393,12 +385,13 @@ Http2HeaderValidator::validateGenericHeaderName(const HeaderString& name) {
   // A field name MUST NOT contain characters in the ranges 0x00-0x20, 0x41-0x5a, or 0x7f-0xff (all
   // ranges inclusive). This specifically excludes all non-visible ASCII characters, ASCII SP
   // (0x20), and uppercase characters ('A' to 'Z', ASCII 0x41 to 0x5a).
-  for (auto iter = key_string_view.begin(); iter != key_string_view.end() && is_valid; ++iter) {
+  for (auto iter = key_string_view.begin();
+       iter != key_string_view.end() && is_valid && !reject_due_to_underscore; ++iter) {
     c = *iter;
     if (c != '_') {
       is_valid &= testChar(kGenericHeaderNameCharTable, c) && (c < 'A' || c > 'Z');
     } else {
-      has_underscore = true;
+      reject_due_to_underscore = reject_header_names_with_underscores;
     }
   }
 
@@ -407,33 +400,33 @@ Http2HeaderValidator::validateGenericHeaderName(const HeaderString& name) {
             UhvResponseCodeDetail::get().InvalidNameCharacters};
   }
 
-  if (has_underscore) {
-    if (underscore_action == HeaderValidatorConfig::REJECT_REQUEST) {
-      stats_.incRequestsRejectedWithUnderscoresInHeaders();
-      return {HeaderEntryValidationResult::Action::Reject,
-              UhvResponseCodeDetail::get().InvalidUnderscore};
-    } else if (underscore_action == HeaderValidatorConfig::DROP_HEADER) {
-      stats_.incDroppedHeadersWithUnderscores();
-      return {HeaderEntryValidationResult::Action::DropHeader,
-              UhvResponseCodeDetail::get().InvalidUnderscore};
-    }
+  if (reject_due_to_underscore) {
+    stats_.incRequestsRejectedWithUnderscoresInHeaders();
+    return {HeaderEntryValidationResult::Action::Reject,
+            UhvResponseCodeDetail::get().InvalidUnderscore};
   }
 
   return HeaderEntryValidationResult::success();
 }
 
-HeaderValidator::TrailerValidationResult
-Http2HeaderValidator::validateRequestTrailerMap(::Envoy::Http::RequestTrailerMap& trailer_map) {
-  TrailerValidationResult result = validateTrailers(trailer_map);
+HeaderValidator::ValidationResult
+Http2HeaderValidator::validateRequestTrailers(const ::Envoy::Http::RequestTrailerMap& trailer_map) {
+  HeaderValidator::ValidationResult result = validateTrailers(trailer_map);
   if (!result.ok()) {
     stats_.incMessagingError();
   }
   return result;
 }
 
-HeaderValidator::TrailerValidationResult
-Http2HeaderValidator::validateResponseTrailerMap(::Envoy::Http::ResponseTrailerMap& trailer_map) {
-  TrailerValidationResult result = validateTrailers(trailer_map);
+HeaderValidator::TrailersTransformationResult
+Http2HeaderValidator::transformRequestTrailers(::Envoy::Http::RequestTrailerMap& trailer_map) {
+  sanitizeHeadersWithUnderscores(trailer_map);
+  return HeadersTransformationResult::success();
+}
+
+HeaderValidator::ValidationResult Http2HeaderValidator::validateResponseTrailers(
+    const ::Envoy::Http::ResponseTrailerMap& trailer_map) {
+  HeaderValidator::ValidationResult result = validateTrailers(trailer_map);
   if (!result.ok()) {
     stats_.incMessagingError();
   }
