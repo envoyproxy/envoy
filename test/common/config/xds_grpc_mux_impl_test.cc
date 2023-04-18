@@ -65,6 +65,9 @@ public:
             "envoy.service.discovery.v2.AggregatedDiscoveryService.StreamAggregatedResources"),
         random_, *stats_.rootScope(), rate_limit_settings_, local_info_, true,
         std::move(config_validators_),
+        std::make_unique<JitteredExponentialBackOffStrategy>(
+            SubscriptionFactory::RetryInitialDelayMs, SubscriptionFactory::RetryMaxDelayMs,
+            random_),
         /*xds_config_tracker=*/XdsConfigTrackerOptRef());
   }
 
@@ -74,7 +77,11 @@ public:
         *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
             "envoy.service.discovery.v2.AggregatedDiscoveryService.StreamAggregatedResources"),
         random_, *stats_.rootScope(), custom_rate_limit_settings, local_info_, true,
-        std::move(config_validators_), /*xds_config_tracker=*/XdsConfigTrackerOptRef());
+        std::move(config_validators_),
+        std::make_unique<JitteredExponentialBackOffStrategy>(
+            SubscriptionFactory::RetryInitialDelayMs, SubscriptionFactory::RetryMaxDelayMs,
+            random_),
+        /*xds_config_tracker=*/XdsConfigTrackerOptRef());
   }
 
   void expectSendMessage(const std::string& type_url,
@@ -898,6 +905,9 @@ TEST_F(GrpcMuxImplTest, BadLocalInfoEmptyClusterName) {
               "envoy.service.discovery.v2.AggregatedDiscoveryService.StreamAggregatedResources"),
           random_, *stats_.rootScope(), rate_limit_settings_, local_info_, true,
           std::make_unique<NiceMock<MockCustomConfigValidators>>(),
+          std::make_unique<JitteredExponentialBackOffStrategy>(
+              SubscriptionFactory::RetryInitialDelayMs, SubscriptionFactory::RetryMaxDelayMs,
+              random_),
           /*xds_config_tracker=*/XdsConfigTrackerOptRef()),
       EnvoyException,
       "ads: node 'id' and 'cluster' are required. Set it either in 'node' config or via "
@@ -912,7 +922,7 @@ TEST_F(GrpcMuxImplTest, BadLocalInfoEmptyNodeName) {
           *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
               "envoy.service.discovery.v2.AggregatedDiscoveryService.StreamAggregatedResources"),
           random_, *stats_.rootScope(), rate_limit_settings_, local_info_, true,
-          std::make_unique<NiceMock<MockCustomConfigValidators>>(),
+          std::make_unique<NiceMock<MockCustomConfigValidators>>(), nullptr,
           /*xds_config_tracker=*/XdsConfigTrackerOptRef()),
       EnvoyException,
       "ads: node 'id' and 'cluster' are required. Set it either in 'node' config or via "
@@ -1026,6 +1036,8 @@ TEST_F(GrpcMuxImplTest, AllMuxesStateTest) {
           "envoy.service.discovery.v2.AggregatedDiscoveryService.StreamAggregatedResources"),
       random_, *stats_.rootScope(), rate_limit_settings_, local_info_, true,
       std::make_unique<NiceMock<MockCustomConfigValidators>>(),
+      std::make_unique<JitteredExponentialBackOffStrategy>(
+          SubscriptionFactory::RetryInitialDelayMs, SubscriptionFactory::RetryMaxDelayMs, random_),
       /*xds_config_tracker=*/XdsConfigTrackerOptRef());
 
   Config::XdsMux::GrpcMuxSotw::shutdownAll();
