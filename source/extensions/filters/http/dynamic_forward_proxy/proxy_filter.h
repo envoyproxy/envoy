@@ -46,7 +46,7 @@ public:
   bool saveUpstreamAddress() const { return save_upstream_address_; };
   const std::chrono::milliseconds clusterInitTimeout() const { return cluster_init_timeout_; };
 
-  LoadClusterEntryHandlePtr addDynamicCluster(Clusters::DynamicForwardProxy::Cluster* cluster,
+  LoadClusterEntryHandlePtr addDynamicCluster(Upstream::DfpClusterSharedPtr cluster,
                                               const std::string& cluster_name,
                                               const std::string& host, const int port,
                                               LoadClusterEntryCallbacks& callback);
@@ -121,7 +121,7 @@ public:
                                           bool end_stream) override;
   void onDestroy() override;
 
-  Http::FilterHeadersStatus loadDynamicCluster(Clusters::DynamicForwardProxy::Cluster* cluster,
+  Http::FilterHeadersStatus loadDynamicCluster(Upstream::DfpClusterSharedPtr cluster,
                                                Http::RequestHeaderMap& headers,
                                                uint16_t default_port);
 

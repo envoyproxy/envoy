@@ -30,5 +30,17 @@ public:
   std::function<void()> initialize_callback_;
   Network::Address::InstanceConstSharedPtr source_address_;
 };
+
+class MockDfpCluster : public DfpCluster {
+public:
+  MockDfpCluster(){};
+  ~MockDfpCluster() override = default;
+
+  // Upstream::DFPCluster
+  MOCK_METHOD(bool, enableSubCluster, (), (const));
+  MOCK_METHOD((std::pair<bool, std::unique_ptr<envoy::config::cluster::v3::Cluster>>),
+              createSubClusterConfig, (const std::string&, const std::string&, const int));
+  MOCK_METHOD(bool, touch, (const std::string&));
+};
 } // namespace Upstream
 } // namespace Envoy

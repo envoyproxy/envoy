@@ -12,13 +12,13 @@ namespace DynamicForwardProxy {
 class DFPClusterStore {
 public:
   // Load the dynamic forward proxy cluster from this store.
-  static Upstream::ClusterSharedPtr load(std::string cluster_name);
+  static Upstream::DfpClusterSharedPtr load(std::string cluster_name);
 
   // Save the dynamic forward proxy cluster into this store.
-  static void save(const std::string cluster_name, Upstream::ClusterSharedPtr cluster);
+  static void save(const std::string cluster_name, Upstream::DfpClusterSharedPtr cluster);
 
 private:
-  using ClusterMapType = absl::flat_hash_map<std::string, Upstream::ClusterWeakPtr>;
+  using ClusterMapType = absl::flat_hash_map<std::string, Upstream::DfpClusterWeakPtr>;
   struct ClusterStoreType {
     ClusterMapType map_ ABSL_GUARDED_BY(mutex_);
     absl::Mutex mutex_;

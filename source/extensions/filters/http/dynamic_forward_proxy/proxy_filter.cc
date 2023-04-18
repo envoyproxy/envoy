@@ -61,7 +61,7 @@ ProxyFilterConfig::ProxyFilterConfig(
 }
 
 LoadClusterEntryHandlePtr
-ProxyFilterConfig::addDynamicCluster(Clusters::DynamicForwardProxy::Cluster* cluster,
+ProxyFilterConfig::addDynamicCluster(Upstream::DfpClusterSharedPtr cluster,
                                      const std::string& cluster_name, const std::string& host,
                                      const int port, LoadClusterEntryCallbacks& callbacks) {
   std::pair<bool, std::unique_ptr<envoy::config::cluster::v3::Cluster>> sub_cluster_pair =
@@ -205,15 +205,12 @@ Http::FilterHeadersStatus ProxyFilter::decodeHeaders(Http::RequestHeaderMap& hea
     }
   }
 
-  Upstream::ClusterSharedPtr dfp_cluster_shared_ptr =
+  Upstream::DfpClusterSharedPtr dfp_cluster =
       Common::DynamicForwardProxy::DFPClusterStore::load(cluster_info_->name());
-  if (cluster == nullptr) {
+  if (!dfp_cluster) {
     // TODO: local reply
     PANIC("TODO");
   }
-  auto dfp_cluster =
-      dynamic_cast<Clusters::DynamicForwardProxy::Cluster*>(dfp_cluster_shared_ptr.get());
-  ASSERT(dfp_cluster != nullptr);
 
   if (dfp_cluster->enableSubCluster()) {
     return loadDynamicCluster(dfp_cluster, headers, default_port);
@@ -273,9 +270,9 @@ Http::FilterHeadersStatus ProxyFilter::decodeHeaders(Http::RequestHeaderMap& hea
   PANIC_DUE_TO_CORRUPT_ENUM;
 }
 
-Http::FilterHeadersStatus
-ProxyFilter::loadDynamicCluster(Clusters::DynamicForwardProxy::Cluster* cluster,
-                                Http::RequestHeaderMap& headers, uint16_t default_port) {
+Http::FilterHeadersStatus ProxyFilter::loadDynamicCluster(Upstream::DfpClusterSharedPtr cluster,
+                                                          Http::RequestHeaderMap& headers,
+                                                          uint16_t default_port) {
   const auto host_attributes = Http::Utility::parseAuthority(headers.getHostValue());
   auto host = std::string(host_attributes.host_);
   auto port = host_attributes.port_.value_or(default_port);

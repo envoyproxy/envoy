@@ -16,6 +16,7 @@ namespace Clusters {
 namespace DynamicForwardProxy {
 
 class Cluster : public Upstream::BaseDynamicClusterImpl,
+                public Upstream::DfpCluster,
                 public Extensions::Common::DynamicForwardProxy::DnsCache::UpdateCallbacks {
 public:
   Cluster(Server::Configuration::ServerFactoryContext& server_context,
@@ -43,12 +44,13 @@ public:
                                Network::DnsResolver::ResolutionStatus) override {}
 
   bool allowCoalescedConnections() const { return allow_coalesced_connections_; }
-  bool enableSubCluster() const { return enable_sub_cluster_; }
+  bool enableSubCluster() const override { return enable_sub_cluster_; }
   Upstream::HostConstSharedPtr chooseHost(absl::string_view host,
                                           Upstream::LoadBalancerContext* context) const;
   std::pair<bool, std::unique_ptr<envoy::config::cluster::v3::Cluster>>
-  createSubClusterConfig(const std::string& cluster_name, const std::string& host, const int port);
-  bool touch(const std::string& cluster_name);
+  createSubClusterConfig(const std::string& cluster_name, const std::string& host,
+                         const int port) override;
+  bool touch(const std::string& cluster_name) override;
   void checkIdleSubCluster();
 
 private:
