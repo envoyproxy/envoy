@@ -202,8 +202,9 @@ void AdminHtmlUtil::renderEndpointTableRow(Buffer::Instance& response,
   // page from accidentally mutating all the server state by GETting all the hrefs.
   const char* method = handler.mutates_server_state_ ? "post" : "get";
   if (submit_on_change || active) {
-    response.addFragments({"\n<tr><td><form action='", path, "' method='", method, "' id='", path,
-                           "' class='home-form'></form></td><td></td></tr>\n"});
+    response.addFragments({"\n<tr><td><form",
+        active ? "" : absl::StrCat(" action='", path, "' method='", method, "'"),
+        " id='", path, "' class='home-form'></form></td><td></td></tr>\n"});
   } else {
     response.addFragments({"\n<tr class='vert-space'><td></td><td></td></tr>\n<tr", row_class,
                            ">\n  <td class='home-data'>"});

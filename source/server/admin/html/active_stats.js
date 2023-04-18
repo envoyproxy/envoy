@@ -61,6 +61,10 @@ const paramIdPrefix = 'param-1-stats-';
 
 let postRenderTestHook = null;
 
+let filterValue = null;
+let typeValue = null;
+let reloadTimer = null;
+
 /**
  * To make testing easier, provide a hook for tests to set, to enable tests
  * to block on rendering.
@@ -90,15 +94,60 @@ function initHook() {
   document.body.appendChild(statusDiv);
   document.body.appendChild(activeStatsPreElement);
   document.body.appendChild(activeStatsHistogramsDiv);
+  filterValue = paramValue('filter');
+  typeValue = paramValue('type');
+  findWidget('filter').addEventListener('blur', updateParams);
+  findWidget('type').addEventListener('change', updateParams);
+  document.getElementById('active-max-display-count').addEventListener('blur', updateParams);
+  document.getElementById('active-update-interval').addEventListener('blur', updateParams);
   loadStats();
+}
+
+function updateParams() {
+  const newFilterValue = paramValue('filter');
+  const newTypeValue = paramValue('type');
+  if (newFilterValue != filterValue || newTypeValue != typeValue) {
+    filterValue = newFilterValue;
+    typeValue = newTypeValue;
+    history.pushState({filter : filterValue, type : typeValue}, null,
+                      'html-active?filter=' + encodeURIComponent(filterValue) +
+                      '&type=' + encodeURIComponent(typeValue));
+    loadStats();
+  }
+}
+
+function navigateHook(event) {
+  const setWidgetValue = (name, defaultValue) => {
+    let value;
+    if (event.state) {
+      value = event.state[name];
+    }
+    findWidget(name).value = value || defaultValue;
+  };
+  setWidgetValue('filter', '');
+  setWidgetValue('type', 'All');
+  loadStats();
+}
+
+function findWidget(name) {
+  return document.getElementById(paramIdPrefix + name);
+}
+
+function paramValue(name) {
+  return findWidget(name).value;
 }
 
 /**
  * Initiates an Ajax request for the stats JSON based on the stats parameters.
  */
 async function loadStats() {
-  const makeQueryParam = (name) => name + '=' + encodeURIComponent(
-      document.getElementById(paramIdPrefix + name).value);
+  // We will call loadStats directly when a user edits a field.
+  if (reloadTimer != null) {
+    window.clearTimeout(reloadTimer);
+    reloadTimer = null;
+  }
+
+  const makeQueryParam = (name) => name + '=' + encodeURIComponent(paramValue(name));
   const params = ['filter', 'type'];
   const url = '/stats?format=json&usedonly&histogram_buckets=detailed&' +
        params.map(makeQueryParam).join('&');
@@ -111,7 +160,10 @@ async function loadStats() {
   }
 
   // Update stats every 5 seconds by default.
-  window.setTimeout(loadStats, 1000*loadSettingOrUseDefault('active-update-interval', 5));
+  reloadTimer = window.setTimeout(() => {
+    reloadTimer = null;
+    loadStats();
+  }, 1000*loadSettingOrUseDefault('active-update-interval', 5));
 }
 
 /**
@@ -425,3 +477,4 @@ function renderHistogramDetail(supported_percentiles, detail) {
 
 // We don't want to trigger any DOM manipulations until the DOM is fully loaded.
 addEventListener('DOMContentLoaded', initHook);
+addEventListener('popstate', navigateHook);
