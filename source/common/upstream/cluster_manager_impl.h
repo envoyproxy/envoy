@@ -364,6 +364,11 @@ public:
   // Upstream::MissingClusterNotifier
   void notifyMissingCluster(absl::string_view name) override;
 
+  std::shared_ptr<const envoy::config::cluster::v3::Cluster::CommonLbConfig>
+  GetCommonLbConfigPtr(const envoy::config::cluster::v3::Cluster::CommonLbConfig common_lb_config) override {
+    return common_lb_config_pool_.getObject(common_lb_config);
+  }
+
 protected:
   virtual void postThreadLocalRemoveHosts(const Cluster& cluster, const HostVector& hosts_removed);
 
@@ -818,6 +823,7 @@ private:
   ClusterCircuitBreakersStatNames cluster_circuit_breakers_stat_names_;
   ClusterRequestResponseSizeStatNames cluster_request_response_size_stat_names_;
   ClusterTimeoutBudgetStatNames cluster_timeout_budget_stat_names_;
+  SharedPool::ObjectSharedPool<const envoy::config::cluster::v3::Cluster::CommonLbConfig> common_lb_config_pool_;
 
   std::unique_ptr<Config::SubscriptionFactoryImpl> subscription_factory_;
   ClusterSet primary_clusters_;

@@ -261,6 +261,7 @@ envoy_cc_mock(
     deps = [
         "//envoy/upstream:cluster_manager_interface",
         "//test/mocks/config:config_mocks",
+        "//test/mocks/event:event_mocks",
         "//test/mocks/grpc:grpc_mocks",
         "//test/mocks/http:http_mocks",
         "//test/mocks/tcp:tcp_mocks",

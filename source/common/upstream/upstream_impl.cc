@@ -60,8 +60,6 @@ namespace Envoy {
 namespace Upstream {
 namespace {
 
-SINGLETON_MANAGER_REGISTRATION(const_common_lb_config_shared_pool);
-
 std::string addressToString(Network::Address::InstanceConstSharedPtr address) {
   if (!address) {
     return "";
@@ -1067,17 +1065,7 @@ ClusterInfoImpl::ClusterInfoImpl(
                           ? std::make_unique<ClusterTypedMetadata>(config.metadata())
                           : nullptr),
       common_lb_config_(
-          (factory_context.singletonManager()
-               .getTyped<SharedPool::ObjectSharedPool<
-                   const envoy::config::cluster::v3::Cluster::CommonLbConfig, MessageUtil,
-                   MessageUtil>>(
-                   SINGLETON_MANAGER_REGISTERED_NAME(const_common_lb_config_shared_pool),
-                   [&factory_context] {
-                     return std::make_shared<SharedPool::ObjectSharedPool<
-                         const envoy::config::cluster::v3::Cluster::CommonLbConfig, MessageUtil,
-                         MessageUtil>>(factory_context.mainThreadDispatcher());
-                   }))
-              ->getObject(config.common_lb_config())),
+          factory_context.clusterManager().GetCommonLbConfigPtr(config.common_lb_config())),
       cluster_type_(config.has_cluster_type()
                         ? std::make_unique<envoy::config::cluster::v3::Cluster::CustomClusterType>(
                               config.cluster_type())

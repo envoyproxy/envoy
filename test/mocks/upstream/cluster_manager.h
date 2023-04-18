@@ -3,6 +3,7 @@
 #include "envoy/upstream/cluster_manager.h"
 
 #include "test/mocks/config/mocks.h"
+#include "test/mocks/event/mocks.h"
 #include "test/mocks/grpc/mocks.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/tcp/mocks.h"
@@ -84,6 +85,13 @@ public:
               (const envoy::config::core::v3::ConfigSource& odcds_config,
                OptRef<xds::core::v3::ResourceLocator> odcds_resources_locator,
                ProtobufMessage::ValidationVisitor& validation_visitor));
+  /*MOCK_METHOD(std::shared_ptr<const envoy::config::cluster::v3::Cluster::CommonLbConfig>,
+              GetCommonLbConfigPtr, (const envoy::config::cluster::v3::Cluster::CommonLbConfig common_lb_config));*/
+
+  std::shared_ptr<const envoy::config::cluster::v3::Cluster::CommonLbConfig>
+  GetCommonLbConfigPtr(const envoy::config::cluster::v3::Cluster::CommonLbConfig common_lb_config) override {
+    return common_lb_config_pool_.getObject(common_lb_config);
+  }
 
   envoy::config::core::v3::BindConfig& mutableBindConfig();
 
@@ -91,6 +99,7 @@ public:
   absl::optional<envoy::config::core::v3::BindConfig> bind_config_;
   std::shared_ptr<NiceMock<Config::MockGrpcMux>> ads_mux_;
   NiceMock<Grpc::MockAsyncClientManager> async_client_manager_;
+  NiceMock<Event::MockDispatcher> dispatcher_;
   absl::optional<std::string> local_cluster_name_;
   NiceMock<MockClusterManagerFactory> cluster_manager_factory_;
   NiceMock<Config::MockSubscriptionFactory> subscription_factory_;
@@ -105,6 +114,7 @@ public:
   ClusterCircuitBreakersStatNames cluster_circuit_breakers_stat_names_;
   ClusterRequestResponseSizeStatNames cluster_request_response_size_stat_names_;
   ClusterTimeoutBudgetStatNames cluster_timeout_budget_stat_names_;
+  SharedPool::ObjectSharedPool<const envoy::config::cluster::v3::Cluster::CommonLbConfig> common_lb_config_pool_;
 };
 } // namespace Upstream
 } // namespace Envoy
