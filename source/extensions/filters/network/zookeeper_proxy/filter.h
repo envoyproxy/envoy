@@ -177,7 +177,7 @@ public:
   const uint32_t max_packet_bytes_;
   ZooKeeperProxyStats stats_;
   // Key: opcode enum value defined in decoder.h, value: latency threshold in millisecond.
-  const absl::flat_hash_map<int32_t, uint32_t> latency_threshold_map_;
+  const absl::flat_hash_map<int32_t, std::chrono::milliseconds> latency_threshold_map_;
   Stats::StatNameSetPtr stat_name_set_;
   const Stats::StatName stat_prefix_;
   const Stats::StatName auth_;
@@ -193,7 +193,7 @@ private:
     return ZooKeeperProxyStats{ALL_ZOOKEEPER_PROXY_STATS(POOL_COUNTER_PREFIX(scope, prefix))};
   }
 
-  absl::flat_hash_map<int32_t, uint32_t>
+  absl::flat_hash_map<int32_t, std::chrono::milliseconds>
   parseLatencyThresholds(LatencyThresholdList latency_thresholds);
 };
 
@@ -250,8 +250,8 @@ public:
                     int32_t error) override;
 
   DecoderPtr createDecoder(DecoderCallbacks& callbacks, TimeSource& time_source);
-  uint32_t
-  getDefaultLatencyThreshold(const absl::flat_hash_map<int32_t, uint32_t> latency_threshold_map);
+  std::chrono::milliseconds getDefaultLatencyThreshold(
+      const absl::flat_hash_map<int32_t, std::chrono::milliseconds> latency_threshold_map);
   void recordErrorBudgetMetrics(const OpCodes opcode,
                                 const ZooKeeperFilterConfig::OpCodeInfo& opcode_info,
                                 const std::chrono::milliseconds& latency);
@@ -263,7 +263,7 @@ private:
   Network::ReadFilterCallbacks* read_callbacks_{};
   ZooKeeperFilterConfigSharedPtr config_;
   std::unique_ptr<Decoder> decoder_;
-  const uint32_t default_latency_threshold_;
+  const std::chrono::milliseconds default_latency_threshold_;
 };
 
 } // namespace ZooKeeperProxy

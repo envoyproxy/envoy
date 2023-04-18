@@ -37,7 +37,7 @@ public:
     auto* threshold = thresholds.Add();
     threshold->set_opcode(
         envoy::extensions::filters::network::zookeeper_proxy::v3::LatencyThreshold::Multi);
-    threshold->set_threshold(200);
+    threshold->mutable_threshold()->set_nanos(200000000); // 200 millisecond
 
     Protobuf::RepeatedPtrField<
         envoy::extensions::filters::network::zookeeper_proxy::v3::LatencyThreshold>&

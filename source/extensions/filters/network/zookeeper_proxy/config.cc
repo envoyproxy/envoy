@@ -29,6 +29,17 @@ Network::FilterFactoryCb ZooKeeperConfigFactory::createFilterFactoryFromProtoTyp
       PROTOBUF_GET_WRAPPED_OR_DEFAULT(proto_config, max_packet_bytes, 1024 * 1024);
   LatencyThresholdList latency_thresholds = proto_config.latency_thresholds();
 
+  // Check duplicated opcodes in config.
+  std::set<envoy::extensions::filters::network::zookeeper_proxy::v3::LatencyThreshold_Opcode>
+      opcodes;
+  for (const auto& threshold : latency_thresholds) {
+    if (opcodes.find(threshold.opcode()) != opcodes.end()) {
+      throw EnvoyException(fmt::format("Duplicated opcode find in config: {}",
+                                       static_cast<uint32_t>(threshold.opcode())));
+    }
+    opcodes.insert(threshold.opcode());
+  }
+
   ZooKeeperFilterConfigSharedPtr filter_config(std::make_shared<ZooKeeperFilterConfig>(
       stat_prefix, max_packet_bytes, latency_thresholds, context.scope()));
   auto& time_source = context.mainThreadDispatcher().timeSource();

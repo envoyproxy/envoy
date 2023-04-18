@@ -2,6 +2,7 @@ syntax = "proto3";
 
 package envoy.extensions.filters.network.zookeeper_proxy.v3;
 
+import "google/protobuf/duration.proto";
 import "google/protobuf/wrappers.proto";
 
 import "udpa/annotations/status.proto";
@@ -48,6 +49,8 @@ message ZooKeeperProxy {
   // If the default threshold is not set, it will be set as 100 millisecond.
   // If the threshold of one opcode is not set, it will fallback to use the default
   // threshold.
+  //
+  // Specifying latency thresholds multiple times for one opcode is not allowed.
   repeated LatencyThreshold latency_thresholds = 4 [(validate.rules).repeated = {max_items: 27}];
 }
 
@@ -88,6 +91,9 @@ message LatencyThreshold {
   //
   Opcode opcode = 1 [(validate.rules).enum = {defined_only: true}];
 
-  // The latency threshold of each opcode in millisecond.
-  uint32 threshold = 2 [(validate.rules).uint32 = {gt: 0}];
+  // The latency threshold of each opcode.
+  google.protobuf.Duration threshold = 2 [(validate.rules).duration = {
+    required: true
+    gt {}
+  }];
 }

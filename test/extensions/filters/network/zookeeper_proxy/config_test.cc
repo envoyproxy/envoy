@@ -48,7 +48,8 @@ TEST(ZookeeperFilterConfigTest, UndefinedOpcode) {
 stat_prefix: test_prefix
 latency_thresholds:
   - opcode: Undefined
-    threshold: 150
+    threshold:
+      nanos: 150000000
   )EOF";
 
   ZooKeeperProxyProtoConfig proto_config;
@@ -61,28 +62,24 @@ TEST(ZookeeperFilterConfigTest, NegativeLatencyThreshold) {
 stat_prefix: test_prefix
 latency_thresholds:
   - opcode: Default
-    threshold: -151
+    threshold:
+      nanos: -150000000
   )EOF";
 
   ZooKeeperProxyProtoConfig proto_config;
   EXPECT_THROW(TestUtility::loadFromYamlAndValidate(yaml, proto_config), EnvoyException);
 }
 
-TEST(ZookeeperFilterConfigTest, SimpleConfig) {
+TEST(ZookeeperFilterConfigTest, UnsetLatencyThreshold) {
   const std::string yaml = R"EOF(
 stat_prefix: test_prefix
+latency_thresholds:
+  - opcode: Default
+    threshold:
   )EOF";
 
   ZooKeeperProxyProtoConfig proto_config;
-  TestUtility::loadFromYamlAndValidate(yaml, proto_config);
-
-  testing::NiceMock<Server::Configuration::MockFactoryContext> context;
-  ZooKeeperConfigFactory factory;
-
-  Network::FilterFactoryCb cb = factory.createFilterFactoryFromProto(proto_config, context);
-  Network::MockConnection connection;
-  EXPECT_CALL(connection, addFilter(_));
-  cb(connection);
+  EXPECT_THROW(TestUtility::loadFromYamlAndValidate(yaml, proto_config), EnvoyException);
 }
 
 TEST(ZookeeperFilterConfigTest, DuplicatedOpcodes) {
@@ -91,17 +88,36 @@ stat_prefix: test_prefix
 max_packet_bytes: 1048576
 latency_thresholds:
   - opcode: Default
-    threshold: 150
+    threshold:
+      nanos: 150000000
   - opcode: Default
-    threshold: 151
+    threshold:
+      nanos: 151000000
   - opcode: Create
-    threshold: 152
+    threshold:
+      nanos: 152000000
   - opcode: Create
-    threshold: 153
+    threshold:
+      nanos: 153000000
   - opcode: Create
-    threshold: 154
+    threshold:
+      nanos: 154000000
   - opcode: Create
-    threshold: 155
+    threshold:
+      nanos: 155000000
+  )EOF";
+
+  ZooKeeperProxyProtoConfig proto_config;
+  TestUtility::loadFromYamlAndValidate(yaml, proto_config);
+
+  testing::NiceMock<Server::Configuration::MockFactoryContext> context;
+  EXPECT_THROW(ZooKeeperConfigFactory().createFilterFactoryFromProto(proto_config, context),
+               EnvoyException);
+}
+
+TEST(ZookeeperFilterConfigTest, SimpleConfig) {
+  const std::string yaml = R"EOF(
+stat_prefix: test_prefix
   )EOF";
 
   ZooKeeperProxyProtoConfig proto_config;
@@ -122,59 +138,86 @@ stat_prefix: test_prefix
 max_packet_bytes: 1048576
 latency_thresholds:
   - opcode: Default
-    threshold: 150
+    threshold:
+      nanos: 150000000
   - opcode: Connect
-    threshold: 151
+    threshold:
+      nanos: 151000000
   - opcode: Create
-    threshold: 152
+    threshold:
+      nanos: 152000000
   - opcode: Delete
-    threshold: 153
+    threshold:
+      nanos: 153000000
   - opcode: Exists
-    threshold: 154
+    threshold:
+      nanos: 154000000
   - opcode: GetData
-    threshold: 155
+    threshold:
+      nanos: 155000000
   - opcode: SetData
-    threshold: 156
+    threshold:
+      nanos: 156000000
   - opcode: GetAcl
-    threshold: 157
+    threshold:
+      nanos: 157000000
   - opcode: SetAcl
-    threshold: 158
+    threshold:
+      nanos: 158000000
   - opcode: GetChildren
-    threshold: 159
+    threshold:
+      nanos: 159000000
   - opcode: Sync
-    threshold: 160
+    threshold:
+      nanos: 160000000
   - opcode: Ping
-    threshold: 161
+    threshold:
+      nanos: 161000000
   - opcode: GetChildren2
-    threshold: 162
+    threshold:
+      nanos: 162000000
   - opcode: Check
-    threshold: 163
+    threshold:
+      nanos: 163000000
   - opcode: Multi
-    threshold: 164
+    threshold:
+      nanos: 164000000
   - opcode: Create2
-    threshold: 165
+    threshold:
+      nanos: 165000000
   - opcode: Reconfig
-    threshold: 166
+    threshold:
+      nanos: 166000000
   - opcode: CheckWatches
-    threshold: 167
+    threshold:
+      nanos: 167000000
   - opcode: RemoveWatches
-    threshold: 168
+    threshold:
+      nanos: 168000000
   - opcode: CreateContainer
-    threshold: 169
+    threshold:
+      nanos: 169000000
   - opcode: CreateTtl
-    threshold: 170
+    threshold:
+      nanos: 170000000
   - opcode: Close
-    threshold: 171
+    threshold:
+      nanos: 171000000
   - opcode: SetAuth
-    threshold: 172
+    threshold:
+      nanos: 172000000
   - opcode: SetWatches
-    threshold: 173
+    threshold:
+      nanos: 173000000
   - opcode: GetEphemerals
-    threshold: 174
+    threshold:
+      nanos: 174000000
   - opcode: GetAllChildrenNumber
-    threshold: 175
+    threshold:
+      nanos: 175000000
   - opcode: SetWatches2
-    threshold: 176
+    threshold:
+      nanos: 176000000
   )EOF";
 
   ZooKeeperProxyProtoConfig proto_config;
