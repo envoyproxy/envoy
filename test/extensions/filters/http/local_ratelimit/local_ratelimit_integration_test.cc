@@ -107,6 +107,37 @@ typed_config:
   local_rate_limit_per_downstream_connection: {}
 )EOF";
 
+
+  const std::string filter_config2_ =
+      R"EOF(
+name: envoy.filters.http.local_ratelimit
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.http.local_ratelimit.v3.LocalRateLimit
+  stat_prefix: http_local_rate_limiter
+  token_bucket:
+    max_tokens: 1
+    tokens_per_fill: 1
+    fill_interval: 1000s
+  filter_enabled:
+    runtime_key: local_rate_limit_enabled
+    default_value:
+      numerator: 100
+      denominator: HUNDRED
+  filter_enforced:
+    runtime_key: local_rate_limit_enforced
+    default_value:
+      numerator: 100
+      denominator: HUNDRED
+  custom_response_body: "your_request_be_limited"
+  response_headers_to_add:
+    - append_action: OVERWRITE_IF_EXISTS_OR_ADD
+      header:
+        key: x-local-rate-limit
+        value: 'true'
+  local_rate_limit_per_downstream_connection: {}
+)EOF";
+
+
   const std::string initial_route_config_ = R"EOF(
 name: basic_routes
 virtual_hosts:
@@ -135,6 +166,7 @@ virtual_hosts:
           default_value:
             numerator: 100
             denominator: HUNDRED
+        custom_response_body: "your_request_be_limited"
         response_headers_to_add:
           - append_action: OVERWRITE_IF_EXISTS_OR_ADD
             header:
@@ -171,6 +203,7 @@ virtual_hosts:
           default_value:
             numerator: 100
             denominator: HUNDRED
+        custom_response_body: "your_request_be_limited"
         response_headers_to_add:
           - header:
               key: x-local-rate-limit
@@ -213,7 +246,7 @@ TEST_P(LocalRateLimitFilterIntegrationTest, DenyRequestPerProcess) {
 }
 
 TEST_P(LocalRateLimitFilterIntegrationTest, DenyRequestWithinSameConnection) {
-  initializeFilter(fmt::format(fmt::runtime(filter_config_), "true"));
+  initializeFilter(fmt::format(fmt::runtime(filter_config2_), "true"));
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
   auto response = codec_client_->makeRequestWithBody(default_request_headers_, 0);
@@ -234,7 +267,7 @@ TEST_P(LocalRateLimitFilterIntegrationTest, DenyRequestWithinSameConnection) {
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("429", response->headers().getStatusValue());
-  EXPECT_EQ(18, response->body().size());
+  EXPECT_EQ("your_request_be_limited", response->body());
 }
 
 TEST_P(LocalRateLimitFilterIntegrationTest, PermitRequestAcrossDifferentConnections) {

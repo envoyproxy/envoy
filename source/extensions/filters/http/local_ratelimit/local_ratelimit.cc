@@ -63,6 +63,10 @@ FilterConfig::FilterConfig(
   if (per_route && !config.has_token_bucket()) {
     throw EnvoyException("local rate limit token bucket must be set for per filter configs");
   }
+
+  if (!config.custom_response_body().empty()) {
+    customResponseBody_ = config.custom_response_body();
+  }
 }
 
 bool FilterConfig::requestAllowed(
@@ -137,8 +141,12 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
 
   config->stats().enforced_.inc();
 
+  std::string body{"local_rate_limited"};
+  if (!config->customResponseBody().empty()) {
+    body = config->customResponseBody();
+  }
   decoder_callbacks_->sendLocalReply(
-      config->status(), "local_rate_limited",
+      config->status(), body,
       [this, config](Http::HeaderMap& headers) {
         config->responseHeadersParser().evaluateHeaders(headers, decoder_callbacks_->streamInfo());
       },

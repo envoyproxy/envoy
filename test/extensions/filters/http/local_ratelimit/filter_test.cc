@@ -32,6 +32,7 @@ filter_enforced:
   default_value:
     numerator: 100
     denominator: HUNDRED
+custom_response_body: "your_request_be_limited"
 response_headers_to_add:
   - append_action: OVERWRITE_IF_EXISTS_OR_ADD
     header:
@@ -154,7 +155,7 @@ TEST_F(FilterTest, RequestRateLimited) {
                           const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
                           absl::string_view details) {
         EXPECT_EQ(Http::Code::TooManyRequests, code);
-        EXPECT_EQ("local_rate_limited", body);
+        EXPECT_EQ("your_request_be_limited", body);
 
         Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
         modify_headers(response_headers);
@@ -202,7 +203,7 @@ TEST_F(FilterTest, RequestRateLimitedPerConnection) {
                           const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
                           absl::string_view details) {
         EXPECT_EQ(Http::Code::TooManyRequests, code);
-        EXPECT_EQ("local_rate_limited", body);
+        EXPECT_EQ("your_request_be_limited", body);
 
         Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
         modify_headers(response_headers);
@@ -285,6 +286,7 @@ filter_enforced:
   default_value:
     numerator: 100
     denominator: HUNDRED
+custom_response_body: "your_request_be_limited"
 response_headers_to_add:
   - append_action: OVERWRITE_IF_EXISTS_OR_ADD
     header:
@@ -328,6 +330,7 @@ filter_enforced:
   default_value:
     numerator: 100
     denominator: HUNDRED
+custom_response_body: "your_request_be_limited"
 response_headers_to_add:
   - append_action: OVERWRITE_IF_EXISTS_OR_ADD
     header:
