@@ -17,6 +17,13 @@ if [[ "${AZP_BRANCH}" == "${MAIN_BRANCH}" ]]; then
   echo "Updating Submodule..."
   # Update submodule to latest Envoy SHA
   ENVOY_SHA=$(git rev-parse HEAD)
+  CURRENT_SHA="$(git -C "$CHECKOUT_DIR" ls-files -s envoy | cut -d' ' -f2)"
+
+  if [[ "$CURRENT_SHA" == "$ENVOY_SHA" ]]; then
+      echo "Submodule already up to date (${ENVOY_SHA})"
+      exit 0
+  fi
+
   git -C "$CHECKOUT_DIR" submodule update --init
   git -C "$CHECKOUT_DIR/envoy" checkout "$ENVOY_SHA"
 
@@ -24,12 +31,7 @@ if [[ "${AZP_BRANCH}" == "${MAIN_BRANCH}" ]]; then
   sed -e "s|{ENVOY_SRCDIR}|envoy|" "${ENVOY_SRCDIR}"/ci/WORKSPACE.filter.example > "${CHECKOUT_DIR}"/WORKSPACE
 
   echo "Committing, and Pushing..."
-  if git -C "$CHECKOUT_DIR" status --porcelain; then
-      git -C "$CHECKOUT_DIR" commit -a -m "Update Envoy submodule to $ENVOY_SHA"
-      git -C "$CHECKOUT_DIR" push origin "${FILTER_EXAMPLE_MAIN_BRANCH}"
-      echo "Done"
-  else
-      # There can be no changes, eg in a scheduled run.
-      echo "Nothing to commit"
-  fi
+  git -C "$CHECKOUT_DIR" commit -a -m "Update Envoy submodule to $ENVOY_SHA"
+  git -C "$CHECKOUT_DIR" push origin "${FILTER_EXAMPLE_MAIN_BRANCH}"
+  echo "Done"
 fi
