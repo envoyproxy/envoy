@@ -563,14 +563,16 @@ elif [[ "$CI_TARGET" == "publish" ]]; then
     # create the tag/release from here
     version="$(cat VERSION.txt)"
     patch_version="$(echo "$version" | rev | cut -d. -f1)"
-    if [[ "$AZP_BRANCH" != "main" && "$patch_version" -eq 0 ]]; then
-        echo "Not creating a tag/release for ${version}"
-        exit 0
+    if [[ "$AZP_BRANCH" == "main" || "$AZP_BRANCH" == "refs/heads/main" ]]; then
+        if [[ "$patch_version" -eq 0 ]]; then
+            # It can take some time to get here in CI so the branch may have changed - create the release
+            # from the current commit (as this only happens on non-PRs we are safe from merges)
+            BUILD_SHA="$(git rev-parse HEAD)"
+            bazel run "${BAZEL_BUILD_OPTIONS[@]}" @envoy_repo//:publish -- --publish-commitish="$BUILD_SHA"
+            exit 0
+        fi
     fi
-    # It can take some time to get here in CI so the branch may have changed - create the release
-    # from the current commit (as this only happens on non-PRs we are safe from merges)
-    BUILD_SHA="$(git rev-parse HEAD)"
-    bazel run "${BAZEL_BUILD_OPTIONS[@]}" @envoy_repo//:publish -- --publish-commitish="$BUILD_SHA"
+    echo "Not creating a tag/release for ${version} from ${AZP_BRANCH}"
     exit 0
 else
   echo "Invalid do_ci.sh target, see ci/README.md for valid targets."
