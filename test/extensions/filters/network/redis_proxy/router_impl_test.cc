@@ -103,7 +103,8 @@ TEST(PrefixRoutesTest, TestKeyPrefixFormatter) {
   NiceMock<StreamInfo::MockStreamInfo> stream_info;
   TestEnvironment::setEnvVar("ENVOY_TEST_ENV", "test", 1);
   Envoy::Cleanup cleanup([]() { TestEnvironment::unsetEnvVar("ENVOY_TEST_ENV"); });
-  const std::string format = "{%KEY%}-%ENVIRONMENT(ENVOY_TEST_ENV)%-%FILTER_STATE(redisKey)%-{%KEY%}";
+  const std::string format =
+      "{%KEY%}-%ENVIRONMENT(ENVOY_TEST_ENV)%-%FILTER_STATE(redisKey)%-{%KEY%}";
 
   stream_info.filterState()->setData(
       "redisKey", std::make_unique<Envoy::Router::StringAccessorImpl>("subjectCN"),
