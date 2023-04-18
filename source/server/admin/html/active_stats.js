@@ -175,12 +175,8 @@ function renderStats(data) {
     if (!stat.name) {
       const histograms = stat.histograms;
       if (histograms) {
-        if (histograms.supported_quantiles) {
-          renderHistogramSummary(histograms);
-        } else if (histograms.supported_percentiles && histograms.details) {
+        if (histograms.supported_percentiles && histograms.details) {
           renderHistogramDetail(histograms.supported_percentiles, histograms.details);
-        } else if (histograms.length && histograms[0].name) {
-          renderHistogramDisjoint(histograms);
         }
         continue;
       }
@@ -227,43 +223,6 @@ function renderStats(data) {
   statusDiv.textContent = '';
 }
 
-function renderHistogramDisjoint(histograms) {
-  activeStatsHistogramsDiv.replaceChildren();
-  for (histogram of histograms) {
-    const div = document.createElement('div');
-
-    const label = document.createElement('div');
-    label.textContent = histogram.name;
-    div.appendChild(label);
-
-    let maxValue = 0;
-    for (bucket of histogram.buckets) {
-      maxValue = Math.max(maxValue, bucket.cumulative);
-    }
-
-    const graphics = document.createElement('div');
-    graphics.className = 'histogram-graphics';
-    for (bucket of histogram.buckets) {
-      const span = document.createElement('span');
-      const percent = maxValue == 0 ? 0 : Math.round((100 * bucket.cumulative) / maxValue);
-      span.style.height = '' + percent + '%';
-      graphics.appendChild(span);
-    }
-    div.appendChild(graphics);
-
-    const labels = document.createElement('div');
-    labels.className = 'histogram-labels';
-    for (bucket of histogram.buckets) {
-      const span = document.createElement('span');
-      span.textContent = bucket.upper_bound + ':' + bucket.cumulative;
-      labels.appendChild(span);
-    }
-    div.appendChild(labels);
-
-    activeStatsHistogramsDiv.appendChild(div);
-  }
-}
-
 const log_10 = Math.log(10);
 function log10(num) {
   return Math.log(num) / log_10;
@@ -284,60 +243,6 @@ let formatPercent = Intl.NumberFormat('en', {
   style: 'percent',
   maximumFractionDigits: 2
 }).format;
-
-
-function renderHistogramSummary(histograms) {
-  activeStatsHistogramsDiv.replaceChildren();
-
-  const supported_quantiles = histograms.supported_quantiles;
-  const labels = document.createElement('div');
-  labels.className = 'histogram-labels';
-  for (quantile of supported_quantiles) {
-    const span = document.createElement('span');
-    span.textContent = 'P' + quantile;
-    labels.appendChild(span);
-  }
-  activeStatsHistogramsDiv.appendChild(labels);
-
-  for (histogram of histograms.computed_quantiles) {
-    const div = document.createElement('div');
-
-    const label = document.createElement('div');
-    label.textContent = histogram.name;
-    div.appendChild(label);
-
-    let maxValue = 0;
-    let values = [];
-    let prevValue = 0;
-    for (obj of histogram.values) {
-      const value = obj.cumulative - prevValue;
-      prevValue = obj.cumulative;
-      values.push(value);
-      maxValue = Math.max(maxValue, value);
-    }
-
-    const graphics = document.createElement('div');
-    graphics.className = 'histogram-graphics';
-    for (value of values) {
-      const span = document.createElement('span');
-      const heightPercent = maxValue == 0 ? 0 : Math.round((100 * value) / maxValue);
-      span.style.height = '' + heightPercent + '%';
-      graphics.appendChild(span);
-    }
-    div.appendChild(graphics);
-
-    const labels = document.createElement('div');
-    labels.className = 'histogram-labels';
-    for (value of values) {
-      const span = document.createElement('span');
-      span.textContent = Math.round(100 * value) / 100;
-      labels.appendChild(span);
-    }
-    div.appendChild(labels);
-
-    activeStatsHistogramsDiv.appendChild(div);
-  }
-}
 
 function renderHistogramDetail(supported_percentiles, detail) {
   activeStatsHistogramsDiv.replaceChildren();
