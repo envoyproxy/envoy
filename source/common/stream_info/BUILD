@@ -50,6 +50,7 @@ envoy_cc_library(
     name = "uint32_accessor_lib",
     hdrs = ["uint32_accessor_impl.h"],
     deps = [
+        "//envoy/access_log:access_log_interface",
         "//envoy/stream_info:uint32_accessor_interface",
     ],
 )
