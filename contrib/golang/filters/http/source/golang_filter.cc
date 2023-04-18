@@ -568,7 +568,7 @@ CAPIStatus Filter::continueStatus(GolangStatus status) {
   return CAPIStatus::CAPIOK;
 }
 
-CAPIStatus Filter::getHeader(absl::string_view key, GoString* goValue) {
+CAPIStatus Filter::getHeader(absl::string_view key, GoString* go_value) {
   Thread::LockGuard lock(mutex_);
   if (has_destroyed_) {
     ENVOY_LOG(debug, "golang filter has been destroyed");
@@ -588,8 +588,8 @@ CAPIStatus Filter::getHeader(absl::string_view key, GoString* goValue) {
 
   if (!result.empty()) {
     auto str = result[0]->value().getStringView();
-    goValue->p = str.data();
-    goValue->n = str.length();
+    go_value->p = str.data();
+    go_value->n = str.length();
   }
   return CAPIStatus::CAPIOK;
 }
@@ -913,49 +913,6 @@ CAPIStatus Filter::getStringValue(int id, GoString* value_str) {
   return CAPIStatus::CAPIOK;
 }
 
-CAPIStatus Filter::log(uint32_t level, absl::string_view message) {
-  Thread::LockGuard lock(mutex_);
-  if (has_destroyed_) {
-    ENVOY_LOG(debug, "golang filter has been destroyed");
-    return CAPIStatus::CAPIFilterIsDestroy;
-  }
-  auto& state = getProcessorState();
-  if (!state.isProcessingInGo()) {
-    ENVOY_LOG(debug, "golang filter is not processing Go");
-    return CAPIStatus::CAPINotInGo;
-  }
-
-  switch (static_cast<spdlog::level::level_enum>(level)) {
-  case spdlog::level::trace:
-    ENVOY_LOG(trace, "[go_plugin_http][{}] {}", config_->pluginName(), message);
-    return CAPIStatus::CAPIOK;
-  case spdlog::level::debug:
-    ENVOY_LOG(debug, "[go_plugin_http][{}] {}", config_->pluginName(), message);
-    return CAPIStatus::CAPIOK;
-  case spdlog::level::info:
-    ENVOY_LOG(info, "[go_plugin_http][{}] {}", config_->pluginName(), message);
-    return CAPIStatus::CAPIOK;
-  case spdlog::level::warn:
-    ENVOY_LOG(warn, "[go_plugin_http][{}] {}", config_->pluginName(), message);
-    return CAPIStatus::CAPIOK;
-  case spdlog::level::err:
-    ENVOY_LOG(error, "[go_plugin_http][{}] {}", config_->pluginName(), message);
-    return CAPIStatus::CAPIOK;
-  case spdlog::level::critical:
-    ENVOY_LOG(critical, "[go_plugin_http][{}] {}", config_->pluginName(), message);
-    return CAPIStatus::CAPIOK;
-  case spdlog::level::off:
-    // means not logging
-    return CAPIStatus::CAPIOK;
-  case spdlog::level::n_levels:
-    PANIC("not implemented");
-  }
-
-  ENVOY_LOG(warn, "[go_plugin_http][{}] undefined log level {}", config_->pluginName(), level);
-
-  PANIC_DUE_TO_CORRUPT_ENUM;
-}
-
 CAPIStatus Filter::setDynamicMetadata(std::string filter_name, std::string key,
                                       absl::string_view buf) {
   Thread::LockGuard lock(mutex_);
@@ -1116,6 +1073,39 @@ ProcessorState& Filter::getProcessorState() {
   return enter_encoding_ ? dynamic_cast<ProcessorState&>(encoding_state_)
                          : dynamic_cast<ProcessorState&>(decoding_state_);
 };
+
+/* FilterLogger */
+void FilterLogger::log(uint32_t level, absl::string_view message) const {
+  switch (static_cast<spdlog::level::level_enum>(level)) {
+  case spdlog::level::trace:
+    ENVOY_LOG(trace, "{}", message);
+    return;
+  case spdlog::level::debug:
+    ENVOY_LOG(debug, "{}", message);
+    return;
+  case spdlog::level::info:
+    ENVOY_LOG(info, "{}", message);
+    return;
+  case spdlog::level::warn:
+    ENVOY_LOG(warn, "{}", message);
+    return;
+  case spdlog::level::err:
+    ENVOY_LOG(error, "{}", message);
+    return;
+  case spdlog::level::critical:
+    ENVOY_LOG(critical, "{}", message);
+    return;
+  case spdlog::level::off:
+    // means not logging
+    return;
+  case spdlog::level::n_levels:
+    PANIC("not implemented");
+  }
+
+  ENVOY_LOG(error, "undefined log level {} with message '{}'", level, message);
+
+  PANIC_DUE_TO_CORRUPT_ENUM;
+}
 
 } // namespace Golang
 } // namespace HttpFilters
