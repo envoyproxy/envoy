@@ -231,7 +231,7 @@ message AccessLogCommon {
   //
   // .. attention::
   //
-  //   This field is deprecated in favor of access_log_type for better indication of the
+  //   This field is deprecated in favor of ``access_log_type`` for better indication of the
   //   type of the access log record.
   bool intermediate_log_entry = 27
       [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
@@ -258,6 +258,9 @@ message AccessLogCommon {
   uint64 upstream_wire_bytes_received = 32;
 
   // The type of the access log, which indicates when the log was recorded.
+  // See :ref:`ACCESS_LOG_TYPE <config_access_log_format_access_log_type>` for the available values.
+  // In case the access log was recorded by a flow which does not correspond to one of the supported
+  // values, then an empty string will be the default value.
   AccessLogType access_log_type = 33;
 }
 

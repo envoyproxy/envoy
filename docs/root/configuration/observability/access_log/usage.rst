@@ -1051,6 +1051,8 @@ The following command operators are supported:
 %FILTER_CHAIN_NAME%
   The :ref:`network filter chain name <envoy_v3_api_field_config.listener.v3.FilterChain.name>` of the downstream connection.
 
+.. _config_access_log_format_access_log_type:
+
 %ACCESS_LOG_TYPE%
   The type of the access log, which indicates when the access log was recorded. If a non-supported log (from the list below),
   uses this substitution string, then the value will be an empty string.
