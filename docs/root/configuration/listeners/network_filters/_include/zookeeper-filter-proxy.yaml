@@ -13,11 +13,14 @@ static_resources:
           stat_prefix: zookeeper
           latency_thresholds:
             - opcode: Default
-              threshold: 100
+              threshold:
+                nanos: 100000000
             - opcode: Create
-              threshold: 150
+              threshold:
+                nanos: 150000000
             - opcode: Multi
-              threshold: 200
+              threshold:
+                nanos: 200000000
       - name: envoy.filters.network.tcp_proxy
         typed_config:
           "@type": type.googleapis.com/envoy.extensions.filters.network.tcp_proxy.v3.TcpProxy
