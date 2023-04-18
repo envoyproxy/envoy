@@ -101,6 +101,8 @@ steps:
     ${{ if eq(variables['Build.Reason'], 'PullRequest') }}:
       # sha1sum of `ENVOY_PULL_REQUEST`
       BAZEL_FAKE_SCM_REVISION: e3b4a6e9570da15ac1caffdded17a8bebdc7dfc9
+    ${{ if eq(variables['Build.Reason'], 'Schedule') }}:
+      BAZEL_FAKE_SCM_REVISION: RANDOM
     ${{ if parameters.rbe }}:
       GCP_SERVICE_ACCOUNT_KEY: $(GcpServiceAccountKey)
       ENVOY_RBE: "1"

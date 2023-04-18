@@ -121,6 +121,11 @@ BAZEL_BUILD_OPTIONS=(
 [[ "${ENVOY_BUILD_ARCH}" == "aarch64" ]] && BAZEL_BUILD_OPTIONS+=(
   "--test_env=HEAPCHECK=")
 
+if [[ "$BAZEL_FAKE_SCM_REVISION" == "RANDOM" ]]; then
+    BAZEL_FAKE_SCM_REVISION="$(tr -dc a-z0-9 </dev/urandom | head -c 43  | sha1sum | cut -d' ' -f1)"
+    export BAZEL_FAKE_SCM_REVISION
+fi
+
 if [[ -z "${ENVOY_RBE}" ]]; then
     export BAZEL_BUILD_OPTIONS+=("--test_tmpdir=${ENVOY_TEST_TMPDIR}")
     echo "Setting test_tmpdir to ${ENVOY_TEST_TMPDIR}."
