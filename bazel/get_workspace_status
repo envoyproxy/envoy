@@ -28,10 +28,15 @@ then
     exit 0
 fi
 
-# The code below presents an implementation that works for git repository
-git_rev=$(git rev-parse HEAD) || exit 1
-echo "BUILD_SCM_REVISION ${git_rev}"
-echo "STABLE_BUILD_SCM_REVISION ${git_rev}"
+if [[ -n "$BAZEL_FAKE_SCM_REVISION" ]]; then
+    echo "BUILD_SCM_REVISION $BAZEL_FAKE_SCM_REVISION"
+    echo "STABLE_BUILD_SCM_REVISION $BAZEL_FAKE_SCM_REVISION"
+else
+    # The code below presents an implementation that works for git repository
+    git_rev=$(git rev-parse HEAD) || exit 1
+    echo "BUILD_SCM_REVISION ${git_rev}"
+    echo "STABLE_BUILD_SCM_REVISION ${git_rev}"
+fi
 
 # If BAZEL_VOLATILE_DIRTY is set then stamped builds will rebuild uncached when
 # either a tracked file changes or an untracked file is added or removed.

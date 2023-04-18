@@ -82,7 +82,7 @@ if [[ -n "${ENVOY_BUILD_DIR}" ]]; then
     find bazel-testlogs/ -name test.log \
         | tar cf - -T - \
         | bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/zstd -- \
-                - -T0 --fast -o "${ENVOY_BUILD_DIR}/testlogs.tar.zst"
+                - -T0 -o "${ENVOY_BUILD_DIR}/testlogs.tar.zst"
     echo "Profile/testlogs collected: ${ENVOY_BUILD_DIR}/testlogs.tar.zst"
 fi
 
@@ -113,12 +113,12 @@ if [[ "${FUZZ_COVERAGE}" == "true" ]]; then
     if [[ -n "${ENVOY_FUZZ_COVERAGE_ARTIFACT}" ]]; then
         tar cf - -C "${COVERAGE_DIR}" --transform 's/^\./fuzz_coverage/' . \
             | bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/zstd -- \
-                    - -T0 --fast -o "${ENVOY_FUZZ_COVERAGE_ARTIFACT}"
+                    - -T0 -o "${ENVOY_FUZZ_COVERAGE_ARTIFACT}"
     fi
 elif [[ -n "${ENVOY_COVERAGE_ARTIFACT}" ]]; then
      tar cf - -C "${COVERAGE_DIR}" --transform 's/^\./coverage/' . \
          | bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/zstd -- \
-                 - -T0 --fast -o "${ENVOY_COVERAGE_ARTIFACT}"
+                 - -T0 -o "${ENVOY_COVERAGE_ARTIFACT}"
 fi
 
 if [[ "$VALIDATE_COVERAGE" == "true" ]]; then
