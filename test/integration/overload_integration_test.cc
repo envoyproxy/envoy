@@ -481,6 +481,8 @@ TEST_P(LoadShedPointIntegrationTest, AcceptNewHttpStreamShedsLoad) {
       codec_client_->makeHeaderOnlyRequest(default_request_headers_);
   ASSERT_TRUE(response_that_will_be_proxied->waitForEndStream());
   EXPECT_EQ(response_that_will_be_proxied->headers().getStatusValue(), "200");
+  // Should not be incremented as we didn't reject the request.
+  test_server_->waitForCounterEq("http.config_test.downstream_rq_overload_close", 1);
 }
 
 } // namespace Envoy
