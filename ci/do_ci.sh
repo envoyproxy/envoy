@@ -475,10 +475,10 @@ elif [[ "$CI_TARGET" == "bazel.clang_tidy" ]]; then
   ENVOY_STDLIB="libstdc++"
   setup_clang_toolchain
 
-  export CLANG_TIDY_FIX_DIFF="${TEST_TMPDIR}/lint-fixes/clang-tidy-fixed.diff"
-  export FIX_YAML="${TEST_TMPDIR}/lint-fixes/clang-tidy-fixes.yaml"
+  export CLANG_TIDY_FIX_DIFF="${ENVOY_TEST_TMPDIR}/lint-fixes/clang-tidy-fixed.diff"
+  export FIX_YAML="${ENVOY_TEST_TMPDIR}/lint-fixes/clang-tidy-fixes.yaml"
   export CLANG_TIDY_APPLY_FIXES=1
-  mkdir -p "${TEST_TMPDIR}/lint-fixes"
+  mkdir -p "${ENVOY_TEST_TMPDIR}/lint-fixes"
   BAZEL_BUILD_OPTIONS+=(--remote_download_minimal)
   BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS[*]}" NUM_CPUS=$NUM_CPUS "${ENVOY_SRCDIR}"/ci/run_clang_tidy.sh "$@" || {
       if [[ -s "$FIX_YAML" ]]; then
@@ -563,14 +563,16 @@ elif [[ "$CI_TARGET" == "publish" ]]; then
     # create the tag/release from here
     version="$(cat VERSION.txt)"
     patch_version="$(echo "$version" | rev | cut -d. -f1)"
-    if [[ "$AZP_BRANCH" != "main" && "$patch_version" -eq 0 ]]; then
-        echo "Not creating a tag/release for ${version}"
-        exit 0
+    if [[ "$AZP_BRANCH" == "main" || "$AZP_BRANCH" == "refs/heads/main" ]]; then
+        if [[ "$patch_version" -eq 0 ]]; then
+            # It can take some time to get here in CI so the branch may have changed - create the release
+            # from the current commit (as this only happens on non-PRs we are safe from merges)
+            BUILD_SHA="$(git rev-parse HEAD)"
+            bazel run "${BAZEL_BUILD_OPTIONS[@]}" @envoy_repo//:publish -- --publish-commitish="$BUILD_SHA"
+            exit 0
+        fi
     fi
-    # It can take some time to get here in CI so the branch may have changed - create the release
-    # from the current commit (as this only happens on non-PRs we are safe from merges)
-    BUILD_SHA="$(git rev-parse HEAD)"
-    bazel run "${BAZEL_BUILD_OPTIONS[@]}" @envoy_repo//:publish -- --publish-commitish="$BUILD_SHA"
+    echo "Not creating a tag/release for ${version} from ${AZP_BRANCH}"
     exit 0
 else
   echo "Invalid do_ci.sh target, see ci/README.md for valid targets."
