@@ -114,7 +114,7 @@ public:
   ClusterCircuitBreakersStatNames cluster_circuit_breakers_stat_names_;
   ClusterRequestResponseSizeStatNames cluster_request_response_size_stat_names_;
   ClusterTimeoutBudgetStatNames cluster_timeout_budget_stat_names_;
-  SharedPool::ObjectSharedPool<const envoy::config::cluster::v3::Cluster::CommonLbConfig> common_lb_config_pool_;
+  SharedPool::ObjectSharedPool<const envoy::config::cluster::v3::Cluster::CommonLbConfig, MessageUtil, MessageUtil> common_lb_config_pool_;
 };
 } // namespace Upstream
 } // namespace Envoy
