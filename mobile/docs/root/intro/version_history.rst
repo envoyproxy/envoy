@@ -27,6 +27,7 @@ Breaking changes:
 - clusters: removing the base_h3 cluster. If HTTP/3 is enabled, the base cluster will use HTTP/3 instead. (:issue: `#25814 <25814>`).
 - listeners: switched the default listener from Envoy's TCP listener to a lightweight API listener by default. (:issue: `#25899 <25899>`).
 - headers: removed the APIs for protocol based routing, as best available protocol is now automatically selected (:issue:`#25893 <25893>`).
+- building/iOS: the minimum supported iOS version is now 13.0 (:issue: `#24994 <24994>`).
 
 Bugfixes:
 
