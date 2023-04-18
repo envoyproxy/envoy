@@ -396,11 +396,11 @@ TEST_F(FileSystemImplTest, CreatePathCreatesDirectoryGivenTrailingSlash) {
   EXPECT_EQ(info_result.return_value_.file_type_, FileType::Directory);
 }
 
-TEST_F(FileSystemImplTest, CreatePathReturnsErrorOnNoBasePath) {
-  const std::string new_dir_path = "non_existing_directory_and_no_root/x/y";
+TEST_F(FileSystemImplTest, CreatePathReturnsErrorOnNoPermissionToWriteDir) {
+  const std::string new_dir_path = "/should_fail_to_create_directory_in_root/x/y";
   const Api::IoCallBoolResult result = file_system_.createPath(new_dir_path);
-  ASSERT_FALSE(result.return_value_);
-  EXPECT_THAT(result.err_->getSystemErrorCode(), testing::Eq(ENOENT));
+  EXPECT_FALSE(result.return_value_);
+  EXPECT_THAT(result.err_, testing::Not(testing::IsNull()));
 }
 
 TEST_F(FileSystemImplTest, StatOnFileOpenOrClosedMeasuresTheExpectedValues) {
