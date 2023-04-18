@@ -50,6 +50,7 @@ envoy_cc_library(
     hdrs = ["datasource.h"],
     deps = [
         ":remote_data_fetcher_lib",
+        ":utility_lib",
         "//envoy/api:api_interface",
         "//envoy/init:manager_interface",
         "//envoy/upstream:cluster_manager_interface",
