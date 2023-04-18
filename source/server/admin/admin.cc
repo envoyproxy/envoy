@@ -186,7 +186,10 @@ AdminImpl::AdminImpl(const std::string& profile_path, Server::Instance& server,
                       MAKE_ADMIN_HANDLER(server_info_handler_.handlerServerInfo), false, false),
           makeHandler("/ready", "print server state, return 200 if LIVE, otherwise return 503",
                       MAKE_ADMIN_HANDLER(server_info_handler_.handlerReady), false, false),
-          stats_handler_.statsHandler(false /* not active mode */),
+          stats_handler_.statsHandler("/stats", false /* not active mode */),
+#ifdef ENVOY_ADMIN_HTML
+          stats_handler_.statsHandler("/stats/html-active", true),
+#endif
           makeHandler("/stats/prometheus", "print server stats in prometheus format",
                       MAKE_ADMIN_HANDLER(stats_handler_.handlerPrometheusStats), false, false,
                       {{ParamDescriptor::Type::Boolean, "usedonly",

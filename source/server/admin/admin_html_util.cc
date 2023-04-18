@@ -12,7 +12,7 @@ const char AdminHtmlTableBegin[] = R"(
   <table class='home-table'>
     <thead>
       <tr>
-        <th class='home-data'>Command</th>
+        <th class='home-data'>@NAME_COLUMN@</th>
         <th class='home-data'>Description</th>
       </tr>
     </thead>
@@ -111,8 +111,8 @@ void AdminHtmlUtil::renderHead(Http::ResponseHeaderMap& response_headers,
   response.add("</head>\n<body>\n");
 }
 
-void AdminHtmlUtil::renderTableBegin(Buffer::Instance& response) {
-  response.add(AdminHtmlTableBegin);
+void AdminHtmlUtil::renderTableBegin(Buffer::Instance& response, absl::string_view name_column) {
+  response.add(absl::StrReplaceAll(AdminHtmlTableBegin, {{"@NAME_COLUMN@", name_column}}));
 }
 
 void AdminHtmlUtil::renderTableEnd(Buffer::Instance& response) { response.add(AdminHtmlTableEnd); }
@@ -201,7 +201,7 @@ void AdminHtmlUtil::renderEndpointTableRow(Buffer::Instance& response,
   // rather than an anchor tag. This should discourage crawlers that find the /
   // page from accidentally mutating all the server state by GETting all the hrefs.
   const char* method = handler.mutates_server_state_ ? "post" : "get";
-  if (submit_on_change) {
+  if (submit_on_change || active) {
     response.addFragments({"\n<tr><td><form action='", path, "' method='", method, "' id='", path,
                            "' class='home-form'></form></td><td></td></tr>\n"});
   } else {

@@ -47,7 +47,7 @@ public:
    * Renders the beginning of the help-table into the response buffer provided
    * in the constructor.
    */
-  static void renderTableBegin(Buffer::Instance&);
+  static void renderTableBegin(Buffer::Instance&, absl::string_view name_column);
 
   /**
    * Renders the end of the help-table into the response buffer provided in the

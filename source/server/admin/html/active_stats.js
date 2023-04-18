@@ -25,6 +25,9 @@
 //   * Remove empty buckets
 //   * stretchable height
 //   * separate /stats/active-html endpoint w/o 'used only' and 'buckets' choices.
+//   * sort histograms by change-count
+//   * incremental histogram update
+//   * resize histograms
 
 /**
  * Maps a stat name to a record containing name, value, and a use-count. This
@@ -96,8 +99,9 @@ function initHook() {
 async function loadStats() {
   const makeQueryParam = (name) => name + '=' + encodeURIComponent(
       document.getElementById(paramIdPrefix + name).value);
-  const params = ['filter', 'type', 'histogram_buckets'];
-  const url = '/stats?format=json&usedonly&' + params.map(makeQueryParam).join('&');
+  const params = ['filter', 'type'];
+  const url = '/stats?format=json&usedonly&histogram_buckets=detailed&' +
+       params.map(makeQueryParam).join('&');
   try {
     const response = await fetch(url);
     const data = await response.json();
@@ -496,13 +500,14 @@ function renderHistogramDetail(supported_percentiles, detail) {
       const left = toPercent(leftVpx);
       bucketSpan.style.left = left;
       const label = document.createElement('span');
-      label.textContent = '' + format(bucket.value);
+      label.textContent = format(bucket.value);
       label.style.left = left;
 
       const bucketLabel = document.createElement('span');
       bucketLabel.className = 'bucket-label';
       bucketLabel.textContent = format(bucket.count);
       bucketLabel.style.left = left;
+      bucketLabel.style.bottom = heightPercent;
 
       graphics.appendChild(bucketSpan);
       graphics.appendChild(bucketLabel);

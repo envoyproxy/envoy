@@ -84,11 +84,15 @@ public:
    *        that have never been written in a top-most-frequently-updated list.
    * @return a URL handler for stats.
    */
-  Admin::UrlHandler statsHandler(bool active_mode);
+  Admin::UrlHandler statsHandler(const std::string& prefix, bool active_mode);
+
+#ifdef ENVOY_ADMIN_HTML
+  Admin::UrlHandler activeHtmlStatsHandler();
+#endif
 
   static Admin::RequestPtr makeRequest(Stats::Store& stats, const StatsParams& params,
                                        StatsRequest::UrlHandlerFn url_handler_fn = nullptr);
-  Admin::RequestPtr makeRequest(AdminStream&);
+  Admin::RequestPtr makeRequest(AdminStream&, bool active_mode);
 
 private:
   static Http::Code prometheusStats(absl::string_view path_and_query, Buffer::Instance& response,

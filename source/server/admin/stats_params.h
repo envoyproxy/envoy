@@ -24,7 +24,6 @@ constexpr absl::string_view TextReadouts = "TextReadouts";
 enum class StatsFormat {
 #ifdef ENVOY_ADMIN_HTML
   Html,
-  ActiveHtml,
 #endif
   Json,
   Prometheus,
@@ -58,6 +57,7 @@ struct StatsParams {
   bool used_only_{false};
   bool prometheus_text_readouts_{false};
   bool pretty_{false};
+  bool active_html_{false};
   StatsFormat format_{StatsFormat::Text};
   std::string filter_string_;
   std::shared_ptr<re2::RE2> re2_filter_;

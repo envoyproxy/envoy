@@ -21,7 +21,7 @@ namespace Server {
 
 StatsHtmlRender::StatsHtmlRender(Http::ResponseHeaderMap& response_headers,
                                  Buffer::Instance& response, const StatsParams& params)
-    : StatsTextRender(params), active_(params.format_ == StatsFormat::ActiveHtml) {
+    : StatsTextRender(params), active_(params.active_html_) {
   AdminHtmlUtil::renderHead(response_headers, response);
 }
 
@@ -29,7 +29,7 @@ void StatsHtmlRender::finalize(Buffer::Instance& response) { AdminHtmlUtil::fina
 
 void StatsHtmlRender::setupStatsPage(const Admin::UrlHandler& url_handler,
                                      const StatsParams& params, Buffer::Instance& response) {
-  AdminHtmlUtil::renderTableBegin(response);
+  AdminHtmlUtil::renderTableBegin(response, "Parameter");
   AdminHtmlUtil::renderEndpointTableRow(response, url_handler, params.query_, 1, !active_, active_);
   if (active_) {
     std::string buf;

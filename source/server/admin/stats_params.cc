@@ -67,7 +67,7 @@ Http::Code StatsParams::parse(absl::string_view url, Buffer::Instance& response)
 #endif
     } else if (format_value.value() == "active-html") {
 #ifdef ENVOY_ADMIN_HTML
-      format_ = StatsFormat::ActiveHtml;
+      active_html_ = true;
 #else
       response.add("Active HTML output was disabled by building with --define=admin_html=disabled");
       return Http::Code::BadRequest;

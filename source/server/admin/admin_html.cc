@@ -12,7 +12,7 @@ namespace Server {
 Http::Code AdminImpl::handlerAdminHome(Http::ResponseHeaderMap& response_headers,
                                        Buffer::Instance& response, AdminStream&) {
   AdminHtmlUtil::renderHead(response_headers, response);
-  AdminHtmlUtil::renderTableBegin(response);
+  AdminHtmlUtil::renderTableBegin(response, "Command");
 
   // Prefix order is used during searching, but for printing do them in alpha order.
   OptRef<const Http::Utility::QueryParams> no_query_params;

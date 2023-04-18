@@ -50,6 +50,14 @@
 .histogram-graphics {
   height: 40px;
   position: relative;
+  margin-top: 15px;
+  /*
+   * TODO(jmarantz): enable resizing; to finish this we need to add a ResizeObserver
+   * to keep a map of the resized histograms for use when refreshing them.
+   *
+   *   resize: vertical;
+   *   overflow: auto;
+   */
 }
 
 .histogram-percentiles {
@@ -68,7 +76,7 @@
   font-size: 14px;
   font-weight: bold;
   margin-top: 10px;
-  margin-bottom: 5px;
+  margin-bottom: 8px;
 }
 
 .histogram-bucket {
@@ -76,6 +84,9 @@
   /* background-color: #c11; */
   background-color: #e6d7ff;
   position: absolute;
+  border-color: purple;
+  border-width: 1px;
+  border-style: solid;
   /* width: 16px; */
   width: 2%;
   margin-left: -0.5%;
@@ -97,6 +108,7 @@
   bottom: 1%;
   font-family: sans-serif;
   font-size: 12px;
+  margin-bottom: 1px;
   /* color: white; */
   /* margin-left: -12px; */
 }
@@ -118,22 +130,3 @@
   font-family: sans-serif;
   font-size: 12px;
 }
-
-/*
-.histogram-percentile .tooltiptext {
-  visibility: hidden;
-  width: 120px;
-  background-color: yellow;
-  color: black;
-  text-align: center;
-  border-radius: 6px;
-  padding: 5px 0;
-
-  Position the tooltip
-   position: absolute;
-  z-index: 1;
-}*/
-
-/*.tooltip:hover .tooltiptext {
-  visibility: visible;
-} */
