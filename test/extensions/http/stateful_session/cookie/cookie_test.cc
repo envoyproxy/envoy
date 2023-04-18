@@ -45,17 +45,20 @@ TEST(CookieBasedSessionStateFactoryTest, SessionStateTest) {
     EXPECT_CALL(mock_host, address()).Times(2).WillRepeatedly(testing::Return(upstream_host));
 
     // No valid address then update it by set-cookie.
-    // Run the test twice: once with json cookie format and once
+    // Run the test twice: once with proto cookie format and once
     // with "old" style plain address.
-    for (bool json : std::vector<bool>({true, false})) {
+    for (bool use_proto : std::vector<bool>({true, false})) {
       std::string cookie_content;
-      if (json) {
-        cookie_content = "{\"address\":\"1.2.3.4:80\",\"expires\":1000}";
+      if (use_proto) {
+        envoy::Cookie cookie;
+        cookie.set_address("1.2.3.4:80");
+        cookie.set_expires(1000);
+        cookie.SerializeToString(&cookie_content);
       } else {
         cookie_content = "1.2.3.4:80";
       }
       Runtime::maybeSetRuntimeGuard(
-          "envoy.reloadable_features.stateful_session_encode_ttl_in_cookie", json);
+          "envoy.reloadable_features.stateful_session_encode_ttl_in_cookie", use_proto);
 
       Envoy::Http::TestResponseHeaderMapImpl response_headers;
       // Check the format of the cookie sent back to client.
@@ -82,16 +85,19 @@ TEST(CookieBasedSessionStateFactoryTest, SessionStateTest) {
     // Repeat, but cluster routed to different host 2.3.4.5:80. "set-cookie" should be added to
     // response headers.
 
-    // Run the test twice - once with JSON style cookie and once with "old" style plain address.
-    for (bool json : std::vector<bool>({true, false})) {
+    // Run the test twice - once with PROTO style cookie and once with "old" style plain address.
+    for (bool use_proto : std::vector<bool>({true, false})) {
       std::string cookie_content;
-      if (json) {
-        cookie_content = "{\"address\":\"1.2.3.4:80\",\"expires\":1005}";
+      if (use_proto) {
+        envoy::Cookie cookie;
+        cookie.set_address("1.2.3.4:80");
+        cookie.set_expires(1005);
+        cookie.SerializeToString(&cookie_content);
       } else {
         cookie_content = "1.2.3.4:80";
       }
       Runtime::maybeSetRuntimeGuard(
-          "envoy.reloadable_features.stateful_session_encode_ttl_in_cookie", json);
+          "envoy.reloadable_features.stateful_session_encode_ttl_in_cookie", use_proto);
       Envoy::Http::TestRequestHeaderMapImpl request_headers = {
           {":path", "/path"},
           {"cookie", "override_host=" +
@@ -114,20 +120,21 @@ TEST(CookieBasedSessionStateFactoryTest, SessionStateTest) {
       session_state->onUpdate(mock_host, response_headers);
 
       // Update session state because the current request is routed to a new upstream host.
-      if (json) {
-        cookie_content = "{\"address\":\"2.3.4.5:80\",\"expires\":1005}";
+      if (use_proto) {
+        envoy::Cookie cookie;
+        cookie.set_address("2.3.4.5:80");
+        cookie.set_expires(1005);
+        cookie.SerializeToString(&cookie_content);
       } else {
         cookie_content = "2.3.4.5:80";
       }
       EXPECT_EQ(response_headers.get_("set-cookie"),
                 Envoy::Http::Utility::makeSetCookieValue(
                     "override_host",
-                    // Envoy::Base64::encode("2.3.4.5:80", 10),
                     Envoy::Base64::encode(cookie_content.c_str(), cookie_content.length()), "/path",
                     std::chrono::seconds(5), true));
     }
   }
-
   {
     CookieBasedSessionStateProto config;
     config.mutable_cookie()->set_name("override_host");
@@ -144,7 +151,7 @@ TEST(CookieBasedSessionStateFactoryTest, SessionStateTest) {
   }
 }
 
-TEST(CookieBasedSessionStateFactoryTest, SessionStateJsonCookie) {
+TEST(CookieBasedSessionStateFactoryTest, SessionStateProtoCookie) {
   CookieBasedSessionStateProto config;
   config.mutable_cookie()->set_name("override_host");
   config.mutable_cookie()->set_path("/path");
@@ -153,8 +160,12 @@ TEST(CookieBasedSessionStateFactoryTest, SessionStateJsonCookie) {
   time_simulator.setMonotonicTime(std::chrono::seconds(1000));
   CookieBasedSessionStateFactory factory(config, time_simulator);
 
-  std::string cookie_content = "{\"address\":\"2.3.4.5:80\",\"expires\":1005}";
-  // JSON format - expired cookie
+  std::string cookie_content;
+  envoy::Cookie cookie;
+  cookie.set_address("2.3.4.5:80");
+  cookie.set_expires(1005);
+  cookie.SerializeToString(&cookie_content);
+  // PROTO format - expired cookie
   time_simulator.setMonotonicTime(std::chrono::seconds(1006));
   Envoy::Http::TestRequestHeaderMapImpl request_headers = {
       {":path", "/path"},
@@ -163,21 +174,23 @@ TEST(CookieBasedSessionStateFactoryTest, SessionStateJsonCookie) {
   auto session_state = factory.create(request_headers);
   EXPECT_EQ(absl::nullopt, session_state->upstreamAddress());
 
-  // JSON format - no "expired field"
-  cookie_content = "{\"address\":\"2.3.4.5:80\"}";
+  // PROTO format - no "expired field"
+  cookie.set_expires(0);
+  cookie.SerializeToString(&cookie_content);
   request_headers = {{":path", "/path"},
                      {"cookie", "override_host=" + Envoy::Base64::encode(cookie_content.c_str(),
                                                                          cookie_content.length())}};
   session_state = factory.create(request_headers);
   EXPECT_EQ(absl::nullopt, session_state->upstreamAddress());
 
-  // JSON format - start with "{", but format incorrect.
-  cookie_content = "{\"address\": blahblah";
+  // PROTO format - pass incorrect format.
+  // The content should be treated as "old" style encoding.
+  cookie_content = "blahblah";
   request_headers = {{":path", "/path"},
                      {"cookie", "override_host=" + Envoy::Base64::encode(cookie_content.c_str(),
                                                                          cookie_content.length())}};
   session_state = factory.create(request_headers);
-  EXPECT_EQ(absl::nullopt, session_state->upstreamAddress());
+  EXPECT_EQ("blahblah", session_state->upstreamAddress());
 }
 
 TEST(CookieBasedSessionStateFactoryTest, SessionStatePathMatchTest) {

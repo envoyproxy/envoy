@@ -5,9 +5,9 @@
 
 #include "source/common/common/base64.h"
 #include "source/common/http/utility.h"
-#include "source/common/json/json_internal.h"
 #include "source/common/protobuf/protobuf.h"
 #include "source/extensions/filters/http/stateful_session/stateful_session.h"
+#include "source/extensions/http/stateful_session/cookie/cookie.pb.h"
 
 #include "test/integration/http_integration.h"
 
@@ -85,31 +85,32 @@ public:
   }
 };
 
-// Helper object to parse JSON encoded cookie and compare with other object.
-// Compare operator ignores cookie's "expire" field.
-class JsonCookieObject {
+// Helper object to parse proto encoded cookie and compare with other object.
+// "expire" field is ignored.
+class ProtoCookieObject {
 public:
-  JsonCookieObject() = delete;
-  // Constructor which parses JSON object.
-  JsonCookieObject(absl::string_view cookie) {
+  ProtoCookieObject() = delete;
+  // Constructor which parses PROTO object.
+  ProtoCookieObject(absl::string_view cookie) {
     std::vector<absl::string_view> v = absl::StrSplit(cookie, ";");
-    std::vector<absl::string_view> sub_v = absl::StrSplit(v[0], '=');
+    std::vector<absl::string_view> sub_v = absl::StrSplit(v[0], absl::MaxSplits('=', 1));
     sub_v[1].remove_prefix(1);
     sub_v[1].remove_suffix(1);
     const std::string decoded_value = Envoy::Base64::decode(sub_v[1]);
-    Envoy::Json::ObjectSharedPtr root_obj;
-    root_obj = Envoy::Json::Nlohmann::Factory::loadFromString(decoded_value);
-    address_ = root_obj->getString("address");
+
+    envoy::Cookie proto_cookie;
+    if (proto_cookie.ParseFromString(decoded_value)) {
+      address_ = proto_cookie.address();
+    }
     max_age_ = absl::StripLeadingAsciiWhitespace(v[1]);
     path_ = absl::StripLeadingAsciiWhitespace(v[2]);
     http_ = absl::StripLeadingAsciiWhitespace(v[3]);
   }
   // Constructor which initializes individual fields
-  JsonCookieObject(std::string address, uint32_t age, std::string path, std::string http)
+  ProtoCookieObject(std::string address, uint32_t age, std::string path, std::string http)
       : address_(address), max_age_(fmt::format("Max-Age={}", age)),
         path_(fmt::format("Path={}", path)), http_(http) {}
-
-  bool operator==(const JsonCookieObject& other) const {
+  bool operator==(const ProtoCookieObject& other) const {
     return (address_ == other.address_) && (max_age_ == other.max_age_) && (path_ == other.path_) &&
            (http_ == other.http_);
   }
@@ -182,11 +183,11 @@ stateful_session:
 TEST_F(StatefulSessionIntegrationTest, NormalStatefulSession) {
   initializeFilterAndRoute(STATEFUL_SESSION_FILTER, "");
 
-  // Run the test twice. Once with json cookie encoding and once with "old", non-json
+  // Run the test twice. Once with proto cookie encoding and once with "old", non-proto
   // encoding.
-  for (const bool json : std::vector<bool>({true, false})) {
+  for (const bool use_proto : std::vector<bool>({true, false})) {
     Runtime::maybeSetRuntimeGuard("envoy.reloadable_features.stateful_session_encode_ttl_in_cookie",
-                                  json);
+                                  use_proto);
     codec_client_ = makeHttpConnection(lookupPort("http"));
 
     Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},
@@ -212,12 +213,12 @@ TEST_F(StatefulSessionIntegrationTest, NormalStatefulSession) {
     EXPECT_TRUE(response->complete());
 
     // The selected upstream server address would be selected to the response headers.
-    if (json) {
-      EXPECT_EQ(JsonCookieObject(response->headers()
-                                     .get(Http::LowerCaseString("set-cookie"))[0]
-                                     ->value()
-                                     .getStringView()),
-                JsonCookieObject(address_string, 120, "/test", "HttpOnly"));
+    if (use_proto) {
+      EXPECT_EQ(ProtoCookieObject(response->headers()
+                                      .get(Http::LowerCaseString("set-cookie"))[0]
+                                      ->value()
+                                      .getStringView()),
+                ProtoCookieObject(address_string, 120, "/test", "HttpOnly"));
     } else {
       const std::string encoded_address =
           Envoy::Base64::encode(address_string.data(), address_string.size());
@@ -270,26 +271,26 @@ TEST_F(StatefulSessionIntegrationTest, NormalStatefulSessionHeader) {
 TEST_F(StatefulSessionIntegrationTest, DownstreamRequestWithStatefulSessionCookie) {
   initializeFilterAndRoute(STATEFUL_SESSION_FILTER, "");
 
-  // Run the test twice. Once with json cookie encoding and once with "old", non-json
+  // Run the test twice. Once with proto cookie encoding and once with "old", non-proto
   // encoding.
-  for (const bool json : std::vector<bool>({true, false})) {
+  for (const bool use_proto : std::vector<bool>({true, false})) {
     Runtime::maybeSetRuntimeGuard("envoy.reloadable_features.stateful_session_encode_ttl_in_cookie",
-                                  json);
+                                  use_proto);
     {
 
       envoy::config::endpoint::v3::LbEndpoint endpoint;
       setUpstreamAddress(1, endpoint);
 
       std::string address_string;
-      if (json) {
-        address_string = std::string("{") +
-                         fmt::format("\"address\": \"127.0.0.1:{}\", \"expires\": {}",
-                                     endpoint.endpoint().address().socket_address().port_value(),
-                                     std::chrono::duration_cast<std::chrono::seconds>(
-                                         std::chrono::steady_clock::now().time_since_epoch())
-                                             .count() +
-                                         120) +
-                         std::string("}");
+      if (use_proto) {
+        envoy::Cookie cookie;
+        cookie.set_address(std::string(fmt::format(
+            "127.0.0.1:{}", endpoint.endpoint().address().socket_address().port_value())));
+        cookie.set_expires(std::chrono::duration_cast<std::chrono::seconds>(
+                               std::chrono::steady_clock::now().time_since_epoch())
+                               .count() +
+                           120);
+        cookie.SerializeToString(&address_string);
       } else {
         address_string = fmt::format("127.0.0.1:{}",
                                      endpoint.endpoint().address().socket_address().port_value());
@@ -328,15 +329,15 @@ TEST_F(StatefulSessionIntegrationTest, DownstreamRequestWithStatefulSessionCooki
       envoy::config::endpoint::v3::LbEndpoint endpoint;
       setUpstreamAddress(2, endpoint);
       std::string address_string;
-      if (json) {
-        address_string = std::string("{") +
-                         fmt::format("\"address\": \"127.0.0.1:{}\", \"expires\": {}",
-                                     endpoint.endpoint().address().socket_address().port_value(),
-                                     std::chrono::duration_cast<std::chrono::seconds>(
-                                         std::chrono::steady_clock::now().time_since_epoch())
-                                             .count() +
-                                         120) +
-                         std::string("}");
+      if (use_proto) {
+        envoy::Cookie cookie;
+        cookie.set_address(std::string(fmt::format(
+            "127.0.0.1:{}", endpoint.endpoint().address().socket_address().port_value())));
+        cookie.set_expires(std::chrono::duration_cast<std::chrono::seconds>(
+                               std::chrono::steady_clock::now().time_since_epoch())
+                               .count() +
+                           120);
+        cookie.SerializeToString(&address_string);
       } else {
         address_string = fmt::format("127.0.0.1:{}",
                                      endpoint.endpoint().address().socket_address().port_value());
@@ -374,14 +375,14 @@ TEST_F(StatefulSessionIntegrationTest, DownstreamRequestWithStatefulSessionCooki
     // Test the case that stateful session cookie with unknown server address.
     {
       std::string address_string;
-      if (json) {
-        address_string =
-            std::string("{\"address\": \"127.0.0.1:50000\", ") +
-            fmt::format("\"expires\": {}", std::chrono::duration_cast<std::chrono::seconds>(
-                                               std::chrono::steady_clock::now().time_since_epoch())
-                                                   .count() +
-                                               120) +
-            std::string("}");
+      if (use_proto) {
+        envoy::Cookie cookie;
+        cookie.set_address(std::string("127.0.0.1:50000"));
+        cookie.set_expires(std::chrono::duration_cast<std::chrono::seconds>(
+                               std::chrono::steady_clock::now().time_since_epoch())
+                               .count() +
+                           120);
+        cookie.SerializeToString(&address_string);
       } else {
         address_string = "127.0.0.1:50000";
       }
@@ -412,12 +413,12 @@ TEST_F(StatefulSessionIntegrationTest, DownstreamRequestWithStatefulSessionCooki
       EXPECT_TRUE(upstream_request_->complete());
       EXPECT_TRUE(response->complete());
 
-      if (json) {
-        EXPECT_EQ(JsonCookieObject(response->headers()
-                                       .get(Http::LowerCaseString("set-cookie"))[0]
-                                       ->value()
-                                       .getStringView()),
-                  JsonCookieObject(address_string, 120, "/test", "HttpOnly"));
+      if (use_proto) {
+        EXPECT_EQ(ProtoCookieObject(response->headers()
+                                        .get(Http::LowerCaseString("set-cookie"))[0]
+                                        ->value()
+                                        .getStringView()),
+                  ProtoCookieObject(address_string, 120, "/test", "HttpOnly"));
       } else {
         encoded_address = Envoy::Base64::encode(address_string.data(), address_string.size());
         // The selected upstream server address would be selected to the response headers.
@@ -549,11 +550,11 @@ TEST_F(StatefulSessionIntegrationTest, DownstreamRequestWithStatefulSessionHeade
 TEST_F(StatefulSessionIntegrationTest, StatefulSessionDisabledByRoute) {
   initializeFilterAndRoute(STATEFUL_SESSION_FILTER, DISABLE_STATEFUL_SESSION);
 
-  // Run the test twice. Once with json cookie encoding and once with "old", non-json
+  // Run the test twice. Once with proto cookie encoding and once with "old", non-proto
   // encoding.
-  for (const bool json : std::vector<bool>({true, false})) {
+  for (const bool use_proto : std::vector<bool>({true, false})) {
     Runtime::maybeSetRuntimeGuard("envoy.reloadable_features.stateful_session_encode_ttl_in_cookie",
-                                  json);
+                                  use_proto);
     {
       uint64_t first_index = 0;
       uint64_t second_index = 0;
@@ -561,15 +562,15 @@ TEST_F(StatefulSessionIntegrationTest, StatefulSessionDisabledByRoute) {
       envoy::config::endpoint::v3::LbEndpoint endpoint;
       setUpstreamAddress(1, endpoint);
       std::string address_string;
-      if (json) {
-        address_string = std::string("{") +
-                         fmt::format("\"address\": \"127.0.0.1:{}\", \"expires\": {}",
-                                     endpoint.endpoint().address().socket_address().port_value(),
-                                     std::chrono::duration_cast<std::chrono::seconds>(
-                                         std::chrono::steady_clock::now().time_since_epoch())
-                                             .count() +
-                                         120) +
-                         std::string("}");
+      if (use_proto) {
+        envoy::Cookie cookie;
+        cookie.set_address(std::string(fmt::format(
+            "127.0.0.1:{}", endpoint.endpoint().address().socket_address().port_value())));
+        cookie.set_expires(std::chrono::duration_cast<std::chrono::seconds>(
+                               std::chrono::steady_clock::now().time_since_epoch())
+                               .count() +
+                           120);
+        cookie.SerializeToString(&address_string);
       } else {
         address_string = fmt::format("127.0.0.1:{}",
                                      endpoint.endpoint().address().socket_address().port_value());
@@ -701,24 +702,24 @@ TEST_F(StatefulSessionIntegrationTest, StatefulSessionDisabledByRoute) {
 TEST_F(StatefulSessionIntegrationTest, CookieStatefulSessionOverriddenByRoute) {
   initializeFilterAndRoute(STATEFUL_SESSION_FILTER, OVERRIDE_STATEFUL_SESSION);
 
-  // Run the test twice. Once with json cookie encoding and once with "old", non-json
+  // Run the test twice. Once with proto cookie encoding and once with "old", non-proto
   // encoding.
-  for (const bool json : std::vector<bool>({true, false})) {
+  for (const bool use_proto : std::vector<bool>({true, false})) {
     Runtime::maybeSetRuntimeGuard("envoy.reloadable_features.stateful_session_encode_ttl_in_cookie",
-                                  json);
+                                  use_proto);
     {
       envoy::config::endpoint::v3::LbEndpoint endpoint;
       setUpstreamAddress(1, endpoint);
       std::string address_string;
-      if (json) {
-        address_string = std::string("{") +
-                         fmt::format("\"address\": \"127.0.0.1:{}\", \"expires\": {}",
-                                     endpoint.endpoint().address().socket_address().port_value(),
-                                     std::chrono::duration_cast<std::chrono::seconds>(
-                                         std::chrono::steady_clock::now().time_since_epoch())
-                                             .count() +
-                                         120) +
-                         std::string("}");
+      if (use_proto) {
+        envoy::Cookie cookie;
+        cookie.set_address(std::string(fmt::format(
+            "127.0.0.1:{}", endpoint.endpoint().address().socket_address().port_value())));
+        cookie.set_expires(std::chrono::duration_cast<std::chrono::seconds>(
+                               std::chrono::steady_clock::now().time_since_epoch())
+                               .count() +
+                           120);
+        cookie.SerializeToString(&address_string);
       } else {
         address_string = fmt::format("127.0.0.1:{}",
                                      endpoint.endpoint().address().socket_address().port_value());
@@ -751,12 +752,12 @@ TEST_F(StatefulSessionIntegrationTest, CookieStatefulSessionOverriddenByRoute) {
       EXPECT_TRUE(upstream_request_->complete());
       EXPECT_TRUE(response->complete());
 
-      if (json) {
-        EXPECT_EQ(JsonCookieObject(response->headers()
-                                       .get(Http::LowerCaseString("set-cookie"))[0]
-                                       ->value()
-                                       .getStringView()),
-                  JsonCookieObject(route_address_string, 120, "/test", "HttpOnly"));
+      if (use_proto) {
+        EXPECT_EQ(ProtoCookieObject(response->headers()
+                                        .get(Http::LowerCaseString("set-cookie"))[0]
+                                        ->value()
+                                        .getStringView()),
+                  ProtoCookieObject(route_address_string, 120, "/test", "HttpOnly"));
       } else {
         const std::string route_encoded_address =
             Envoy::Base64::encode(route_address_string.data(), route_address_string.size());
@@ -775,15 +776,15 @@ TEST_F(StatefulSessionIntegrationTest, CookieStatefulSessionOverriddenByRoute) {
       envoy::config::endpoint::v3::LbEndpoint endpoint;
       setUpstreamAddress(2, endpoint);
       std::string address_string;
-      if (json) {
-        address_string = std::string("{") +
-                         fmt::format("\"address\": \"127.0.0.1:{}\", \"expires\": {}",
-                                     endpoint.endpoint().address().socket_address().port_value(),
-                                     std::chrono::duration_cast<std::chrono::seconds>(
-                                         std::chrono::steady_clock::now().time_since_epoch())
-                                             .count() +
-                                         120) +
-                         std::string("}");
+      if (use_proto) {
+        envoy::Cookie cookie;
+        cookie.set_address(std::string(fmt::format(
+            "127.0.0.1:{}", endpoint.endpoint().address().socket_address().port_value())));
+        cookie.set_expires(std::chrono::duration_cast<std::chrono::seconds>(
+                               std::chrono::steady_clock::now().time_since_epoch())
+                               .count() +
+                           120);
+        cookie.SerializeToString(&address_string);
       } else {
         address_string = fmt::format("127.0.0.1:{}",
                                      endpoint.endpoint().address().socket_address().port_value());
@@ -904,11 +905,11 @@ TEST_F(StatefulSessionIntegrationTest, HeaderStatefulSessionOverriddenByRoute) {
 TEST_F(StatefulSessionIntegrationTest, CookieBasedStatefulSessionDisabledByRequestPath) {
   initializeFilterAndRoute(STATEFUL_SESSION_FILTER, "");
 
-  // Run the test twice. Once with json cookie encoding and once with "old", non-json
+  // Run the test twice. Once with proto cookie encoding and once with "old", non-proto
   // encoding.
-  for (const bool json : std::vector<bool>({true, false})) {
+  for (const bool use_proto : std::vector<bool>({true, false})) {
     Runtime::maybeSetRuntimeGuard("envoy.reloadable_features.stateful_session_encode_ttl_in_cookie",
-                                  json);
+                                  use_proto);
     {
       uint64_t first_index = 0;
       uint64_t second_index = 0;
@@ -916,15 +917,15 @@ TEST_F(StatefulSessionIntegrationTest, CookieBasedStatefulSessionDisabledByReque
       envoy::config::endpoint::v3::LbEndpoint endpoint;
       setUpstreamAddress(1, endpoint);
       std::string address_string;
-      if (json) {
-        address_string = std::string("{") +
-                         fmt::format("\"address\": \"127.0.0.1:{}\", \"expires\": {}",
-                                     endpoint.endpoint().address().socket_address().port_value(),
-                                     std::chrono::duration_cast<std::chrono::seconds>(
-                                         std::chrono::steady_clock::now().time_since_epoch())
-                                             .count() +
-                                         120) +
-                         std::string("}");
+      if (use_proto) {
+        envoy::Cookie cookie;
+        cookie.set_address(std::string(fmt::format(
+            "127.0.0.1:{}", endpoint.endpoint().address().socket_address().port_value())));
+        cookie.set_expires(std::chrono::duration_cast<std::chrono::seconds>(
+                               std::chrono::steady_clock::now().time_since_epoch())
+                               .count() +
+                           120);
+        cookie.SerializeToString(&address_string);
       } else {
         address_string = fmt::format("127.0.0.1:{}",
                                      endpoint.endpoint().address().socket_address().port_value());
@@ -1059,8 +1060,8 @@ TEST_F(StatefulSessionIntegrationTest, CookieBasedStatefulSessionDisabledByReque
   }
 }
 
-// Test verifies that if a client sends a cookie in "old", non-json format, the
-// reply is also in the "old" non-json format.
+// Test verifies that if a client sends a cookie in "old", non-proto format, the
+// reply is also in the "old" non-proto format.
 TEST_F(StatefulSessionIntegrationTest, CookieBasedStatefulSessionBackwardCompatibility) {
   initializeFilterAndRoute(STATEFUL_SESSION_FILTER, "");
   Runtime::maybeSetRuntimeGuard("envoy.reloadable_features.stateful_session_encode_ttl_in_cookie",
@@ -1110,15 +1111,15 @@ TEST_F(StatefulSessionIntegrationTest, CookieBasedStatefulSessionRejectExpiredCo
   envoy::config::endpoint::v3::LbEndpoint endpoint;
   setUpstreamAddress(1, endpoint);
   // Create already expired cookie.
-  std::string address_string =
-      std::string("{") +
-      fmt::format("\"address\": \"127.0.0.1:{}\", \"expires\": {}",
-                  endpoint.endpoint().address().socket_address().port_value(),
-                  std::chrono::duration_cast<std::chrono::seconds>(
-                      std::chrono::steady_clock::now().time_since_epoch())
-                          .count() -
-                      10) +
-      std::string("}");
+  envoy::Cookie cookie;
+  cookie.set_address(std::string(
+      fmt::format("127.0.0.1:{}", endpoint.endpoint().address().socket_address().port_value())));
+  cookie.set_expires(std::chrono::duration_cast<std::chrono::seconds>(
+                         std::chrono::steady_clock::now().time_since_epoch())
+                         .count() -
+                     10);
+  std::string address_string;
+  cookie.SerializeToString(&address_string);
   std::string encoded_address = Envoy::Base64::encode(address_string.data(), address_string.size());
   codec_client_ = makeHttpConnection(lookupPort("http"));
   Http::TestRequestHeaderMapImpl request_headers{
@@ -1146,9 +1147,9 @@ TEST_F(StatefulSessionIntegrationTest, CookieBasedStatefulSessionRejectExpiredCo
 
   // response headers should contain a new cookie.
   EXPECT_EQ(
-      JsonCookieObject(
+      ProtoCookieObject(
           response->headers().get(Http::LowerCaseString("set-cookie"))[0]->value().getStringView()),
-      JsonCookieObject(address_string, 120, "/test", "HttpOnly"));
+      ProtoCookieObject(address_string, 120, "/test", "HttpOnly"));
 
   cleanupUpstreamAndDownstream();
 }

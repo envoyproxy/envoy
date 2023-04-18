@@ -18,13 +18,6 @@ behavior_changes:
   change: |
     Validate upstream request header names and values. The new runtime flag
     ``envoy.reloadable_features.validate_upstream_headers`` can be used for revert this behavior.
-- area: http cookies
-  change: |
-    Changed internal format of http cookie to JSON and added expiry timestamp. Processing expired cookie
-    results in selection of a new upstream host and sending a new cookie to the client. Previous format of
-    the cookie is still accepted, but is planned to be obsoleted in the future.
-    This behavior change can be reverted by setting
-    ``envoy.reloadable_features.stateful_session_encode_ttl_in_cookie`` to ``false``.
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*

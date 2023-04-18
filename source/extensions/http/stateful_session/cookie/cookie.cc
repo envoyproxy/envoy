@@ -19,12 +19,14 @@ void CookieBasedSessionStateFactory::SessionStateImpl::onUpdate(
         !use_old_style_encoding_) {
       auto expiry_time = std::chrono::duration_cast<std::chrono::seconds>(
           (time_source_.monotonicTime() + std::chrono::seconds(factory_.ttl_)).time_since_epoch());
-      std::string expiry_string = std::to_string(expiry_time.count());
-      // Build JSON document with address and expiration time (current time + ttl).
-      std::string json_cookie =
-          "{\"address\":\"" + std::string(host_address) + "\",\"expires\":" + expiry_string + "}";
+      // Build proto message
+      envoy::Cookie cookie;
+      cookie.set_address(std::string(host_address));
+      cookie.set_expires(expiry_time.count());
+      std::string proto_string;
+      cookie.SerializeToString(&proto_string);
 
-      encoded_address = Envoy::Base64::encode(json_cookie.data(), json_cookie.length());
+      encoded_address = Envoy::Base64::encode(proto_string.data(), proto_string.length());
     } else {
       encoded_address = Envoy::Base64::encode(host_address.data(), host_address.length());
     }
