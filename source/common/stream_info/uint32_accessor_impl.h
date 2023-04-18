@@ -1,5 +1,6 @@
 #pragma once
 
+#include "envoy/access_log/access_log.h"
 #include "envoy/stream_info/uint32_accessor.h"
 
 namespace Envoy {
