@@ -263,9 +263,9 @@ OverloadAction::OverloadAction(const envoy::config::overload::v3::OverloadAction
                                Stats::Scope& stats_scope)
     : state_(OverloadActionState::inactive()),
       active_gauge_(
-          makeGauge(stats_scope, config.name(), "active", Stats::Gauge::ImportMode::Accumulate)),
+          makeGauge(stats_scope, config.name(), "active", Stats::Gauge::ImportMode::NeverImport)),
       scale_percent_gauge_(makeGauge(stats_scope, config.name(), "scale_percent",
-                                     Stats::Gauge::ImportMode::Accumulate)) {
+                                     Stats::Gauge::ImportMode::NeverImport)) {
   for (const auto& trigger_config : config.triggers()) {
     if (!triggers_.try_emplace(trigger_config.name(), createTriggerFromConfig(trigger_config))
              .second) {
@@ -559,7 +559,7 @@ LoadShedPoint* OverloadManagerImpl::getLoadShedPoint(absl::string_view point_nam
   if (auto it = loadshed_points_.find(point_name); it != loadshed_points_.end()) {
     return it->second.get();
   }
-  ENVOY_LOG(warn, "LoadShedPoint {} is not found. Is it configured?", point_name);
+  ENVOY_LOG(trace, "LoadShedPoint {} is not found. Is it configured?", point_name);
   return nullptr;
 }
 

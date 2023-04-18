@@ -1719,7 +1719,7 @@ TEST_P(RebalancerTest, BindToPortUpdate) {
   initialize();
 
   ConfigHelper new_config_helper(
-      version_, *api_, MessageUtil::getJsonStringFromMessageOrDie(config_helper_.bootstrap()));
+      version_, *api_, MessageUtil::getJsonStringFromMessageOrError(config_helper_.bootstrap()));
 
   new_config_helper.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap)
                                           -> void {
