@@ -13,5 +13,9 @@ removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
 
 new_features:
+- area: stat_sinks
+  change: |
+    Added ``envoy.stat_sinks.open_telemetry`` stats_sink, that supports flushing metrics by the OTLP protocol,
+    for supported Open Telemetry collectors.
 
 deprecated:
