@@ -476,7 +476,7 @@ typed_config:
                 .WillRepeatedly(ReturnRef(connection_info1_));
             callbacks.onPoolReady(encoder,
                                   context_.cluster_manager_.thread_local_cluster_.conn_pool_.host_,
-                                  stream_info_, Http::Protocol::Http10);
+                                  upstream_stream_info_, Http::Protocol::Http10);
             return nullptr;
           }));
 
