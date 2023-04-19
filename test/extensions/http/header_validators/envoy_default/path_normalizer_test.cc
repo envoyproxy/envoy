@@ -18,6 +18,8 @@ using ::Envoy::Http::UhvResponseCodeDetail;
 class PathNormalizerTest : public testing::Test {
 protected:
   PathNormalizerPtr create(absl::string_view config_yaml) {
+    scoped_runtime_.mergeValues({{"envoy.reloadable_features.uhv_preserve_url_encoded_case",
+                                  preserve_percent_encoded_case_ ? "true" : "false"}});
     envoy::extensions::http::header_validators::envoy_default::v3::HeaderValidatorConfig
         typed_config;
     TestUtility::loadFromYaml(std::string(config_yaml), typed_config);
@@ -55,6 +57,7 @@ protected:
       skip_merging_slashes: true
     )EOF";
   TestScopedRuntime scoped_runtime_;
+  bool preserve_percent_encoded_case_{false};
 };
 
 TEST_F(PathNormalizerTest, NormalizeAndDecodeOctetDecoded) {
@@ -465,6 +468,28 @@ TEST_F(PathNormalizerTest, BackslashPreservedWithOverride) {
 
   EXPECT_EQ(result.action(), PathNormalizer::PathNormalizationResult::Action::Accept);
   EXPECT_EQ(headers.path(), "/path\\with/back\\/slash%5C");
+}
+
+TEST_F(PathNormalizerTest, PreservePercentEncodedCase) {
+  preserve_percent_encoded_case_ = true;
+  ::Envoy::Http::TestRequestHeaderMapImpl headers{{":path", "/dir1%Abdir2%3a%fF%5a"}};
+
+  auto normalizer = create(empty_config);
+  auto result = normalizer->normalizePathUri(headers);
+
+  EXPECT_EQ(result.action(), PathNormalizer::PathNormalizationResult::Action::Accept);
+  EXPECT_EQ(headers.path(), "/dir1%Abdir2%3a%fFZ");
+}
+
+TEST_F(PathNormalizerTest, NormalizePercentEncodedCase) {
+  preserve_percent_encoded_case_ = false;
+  ::Envoy::Http::TestRequestHeaderMapImpl headers{{":path", "/dir1%Abdir2%3a%fF%5a"}};
+
+  auto normalizer = create(empty_config);
+  auto result = normalizer->normalizePathUri(headers);
+
+  EXPECT_EQ(result.action(), PathNormalizer::PathNormalizationResult::Action::Accept);
+  EXPECT_EQ(headers.path(), "/dir1%ABdir2%3A%FFZ");
 }
 
 } // namespace EnvoyDefault
