@@ -79,6 +79,27 @@ public:
 };
 
 template <class ConfigProto, class RouteConfigProto = ConfigProto>
+class UpstreamFactoryBase : public CommonFactoryBase<ConfigProto, RouteConfigProto>,
+                            public Server::Configuration::UpstreamHttpFilterConfigFactory {
+public:
+  UpstreamFactoryBase(const std::string& name)
+      : CommonFactoryBase<ConfigProto, RouteConfigProto>(name) {}
+
+  Envoy::Http::FilterFactoryCb createFilterFactoryFromProto(
+      const Protobuf::Message& proto_config, const std::string& stats_prefix,
+      Server::Configuration::UpstreamHttpFactoryContext& context) override {
+    return createFilterFactoryFromProtoTyped(
+        MessageUtil::downcastAndValidate<const ConfigProto&>(
+            proto_config, context.getServerFactoryContext().messageValidationVisitor()),
+        stats_prefix, context);
+  }
+
+  virtual Envoy::Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
+      const ConfigProto& proto_config, const std::string& stats_prefix,
+      Server::Configuration::UpstreamHttpFactoryContext& context) PURE;
+};
+
+template <class ConfigProto, class RouteConfigProto = ConfigProto>
 class DualFactoryBase : public CommonFactoryBase<ConfigProto, RouteConfigProto>,
                         public Server::Configuration::NamedHttpFilterConfigFactory,
                         public Server::Configuration::UpstreamHttpFilterConfigFactory {
