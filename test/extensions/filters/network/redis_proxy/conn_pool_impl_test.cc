@@ -82,9 +82,9 @@ public:
     connection_rate_limited_.value_ = 0;
     ON_CALL(store_, counter(Eq("connection_rate_limited")))
         .WillByDefault(ReturnRef(connection_rate_limited_));
-    ON_CALL(connection_rate_limited_, value())
-        .WillByDefault(
-            Invoke([&]() -> uint64_t { return connection_rate_limited_.value_; }));
+    ON_CALL(connection_rate_limited_, value()).WillByDefault(Invoke([&]() -> uint64_t {
+      return connection_rate_limited_.value_;
+    }));
     ON_CALL(connection_rate_limited_, inc()).WillByDefault(Invoke([&]() {
       connection_rate_limited_.value_++;
     }));
