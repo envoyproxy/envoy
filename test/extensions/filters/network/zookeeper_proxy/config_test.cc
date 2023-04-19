@@ -144,8 +144,7 @@ latency_thresholds:
   - opcode: Create
     threshold: "0.152s"
   - opcode: Delete
-    threshold:
-      nanos: 153000000
+    threshold: "0.153s"
   - opcode: Exists
     threshold:
       nanos: 154000000
