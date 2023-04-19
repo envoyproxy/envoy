@@ -93,8 +93,7 @@ RouteSharedPtr PrefixRoutes::upstreamPool(std::string& key) {
       key.erase(0, value->prefix().length());
     }
     if (!value->keyFormatter().empty()) {
-      std::string redis_key_formatter(value->keyFormatter());
-      formatKey(key, redis_key_formatter);
+      formatKey(key, value->keyFormatter());
     }
     return value;
   }
@@ -102,7 +101,7 @@ RouteSharedPtr PrefixRoutes::upstreamPool(std::string& key) {
   return catch_all_route_;
 }
 
-void PrefixRoutes::formatKey(std::string& key, std::string& redis_key_formatter) {
+void PrefixRoutes::formatKey(std::string& key, std::string redis_key_formatter) {
   // If key_formatter defines %KEY% command, then do a direct string replacement.
   // TODO(deveshkandpal24121990) - Possibly define a RedisKeyFormatter as a SubstitutionFormatter
   if (redis_key_formatter.find(redis_key_formatter_command_) != std::string::npos) {

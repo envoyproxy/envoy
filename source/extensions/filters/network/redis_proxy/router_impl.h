@@ -75,12 +75,13 @@ public:
   void setReadFilterCallback(Network::ReadFilterCallbacks* callbacks) override {
     callbacks_ = callbacks;
   }
+
   /**
    * Formats redis key based on substitution formatter expression that is defined.
    * @param key redis key to be formatted.
    * @param redis_key_formatter substitution formatter expression to format redis key.
    */
-  void formatKey(std::string& key, std::string& redis_key_formatter);
+  void formatKey(std::string& key, std::string redis_key_formatter);
 
 private:
   TrieLookupTable<PrefixSharedPtr> prefix_lookup_table_;
