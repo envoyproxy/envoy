@@ -21,6 +21,7 @@
 #include "source/extensions/request_id/uuid/config.h"
 #include "source/extensions/access_loggers/file/config.h"
 #include "envoy/config/route/v3/route_components.pb.h"
+#include "envoy/config/trace/v3/datadog.pb.h"
 #include "external/com_github_cncf_udpa/xds/type/matcher/v3/cel.pb.h"
 #include "external/com_github_cncf_udpa/xds/type/matcher/v3/domain.pb.h"
 #include "external/com_github_cncf_udpa/xds/type/matcher/v3/http_inputs.pb.h"
@@ -69,6 +70,16 @@ public:
     random_.initializeSeed(seed);
     mutator_.Seed(seed);
   }
+
+  //  std::string get_full_member_path() const {
+  //    std::string retval;
+  //    for (const absl::string_view& member : message_path_) {
+  //      if (!retval.empty())
+  //        retval += '.';
+  //      retval += member;
+  //    }
+  //    return retval;
+  //  }
 
   template <typename T, typename R>
   static bool handle_numeric_rules(T& number, const R& number_rules) {
@@ -230,7 +241,9 @@ public:
               auto prototype = randomed_typeurl.second();
               ASSERT(prototype);
               any_message->PackFrom(*prototype);
-              ENVOY_LOG_MISC(info, "!!!! Apply config for any: {}", randomed_typeurl.first);
+              //              ENVOY_LOG_MISC(info, "!!!! Apply config for any: {}", /* on field {}",
+              //              */
+              //                             randomed_typeurl.first /*, get_full_member_path()*/);
             }
             return;
           }
@@ -449,14 +462,13 @@ public:
     const Protobuf::Descriptor* descriptor = msg.GetDescriptor();
     message_path_.push_back(field_name);
     if (descriptor->full_name() == kAny) {
-      ENVOY_LOG_MISC(info, "### parent of Any is: {}..{}",
-                     parents[parents.size() - 2]->GetDescriptor()->full_name(),
-                     message_path_[message_path_.size() - 2]);
-      const Protobuf::Descriptor* par_desc = parents.back()->GetDescriptor();
-      ENVOY_LOG_MISC(info, "### in class {}", par_desc->full_name());
+      //      ENVOY_LOG_MISC(info, "### parent of Any is: {}->{}",
+      //                     parents[parents.size() - 2]->GetDescriptor()->full_name(),
+      //                     message_path_[message_path_.size() - 2]);
+      //      ENVOY_LOG_MISC(info, "### in class {}", parents.back()->GetDescriptor()->full_name());
       auto* any_message = Protobuf::DynamicCastToGenerated<ProtobufWkt::Any>(&msg);
       std::unique_ptr<Protobuf::Message> inner_message = typeUrlToMessage(any_message->type_url());
-      if (!any_message->UnpackTo(inner_message.get())) {
+      if (!inner_message || !any_message->UnpackTo(inner_message.get())) {
         any_message->Clear();
       }
     }
@@ -465,11 +477,24 @@ public:
       if (oneof_desc->options().HasExtension(validate::required) &&
           oneof_desc->options().GetExtension(validate::required) &&
           !reflection->HasOneof(msg, descriptor->oneof_decl(oneof_index))) {
-        // No required member in one of set.
+        // No required member in one of set, so create one.
         for (int index = 0; index < oneof_desc->field_count(); ++index) {
-          // Do not use the first available option all the time, because of cyclic dependencies.
-          const int rnd_index = random_() % oneof_desc->field_count();
-          onField(msg, *oneof_desc->field(rnd_index), parents, true);
+          const std::string parents_class_name = parents.back()->GetDescriptor()->full_name();
+          //          ENVOY_LOG_MISC(info, "one in class: {}", parents_class_name);
+          // Treat matchers special, because in their oneof they reference themself, which may
+          // create long chains. Prefer the first alternative, which does not reference itself.
+          // Nevertheless do it randomly to allow for some nesting.
+          if ((parents_class_name == "xds.type.matcher.v3.Matcher.MatcherList.Predicate" ||
+               parents_class_name ==
+                   "xds.type.matcher.v3.Matcher.MatcherList.Predicate.SinglePredicate") &&
+              (random_() % 200) > 0) {
+            onField(msg, *oneof_desc->field(0), parents, true);
+          } else {
+            // Do not use the first available alternative all the time, because of cyclic
+            // dependencies.
+            const int rnd_index = random_() % oneof_desc->field_count();
+            onField(msg, *oneof_desc->field(rnd_index), parents, true);
+          }
           // Check if for the above field an entry could be created and quit the inner loop if so.
           // It might not be possible, when the datatype is not supported (yet).
           if (reflection->HasOneof(msg, descriptor->oneof_decl(oneof_index))) {
@@ -503,6 +528,10 @@ private:
 
 const std::string GenerateValidMessage::kAny = "google.protobuf.Any";
 
+static const auto dummy_proto_msg = []() -> std::unique_ptr<Protobuf::Message> {
+  return std::make_unique<ProtobufWkt::Struct>();
+};
+
 static const GenerateValidMessage::ListOfTypeUrlAndFactory matchers = {
     {"xds.type.matcher.v3.CelMatcher",
      []() -> std::unique_ptr<Protobuf::Message> {
@@ -528,15 +557,21 @@ static const GenerateValidMessage::ListOfTypeUrlAndFactory matchers = {
        return std::make_unique<xds::type::matcher::v3::StringMatcher>();
      }}};
 
+static const GenerateValidMessage::ListOfTypeUrlAndFactory input_matchers = {
+    {"xds.type.matcher.v3.StringMatcher", []() -> std::unique_ptr<Protobuf::Message> {
+       return std::make_unique<xds::type::matcher::v3::StringMatcher>();
+     }}};
+/*.{
+     {"envoy.extensions.matching.common_inputs.environment_variable.v3.Config",
+      []() -> std::unique_ptr<Protobuf::Message> {
+        return Envoy::Extensions::Matching::CommonInputs::EnvironmentVariable::Config()
+            .createEmptyConfigProto();
+      }}}*/
+
+static const GenerateValidMessage::ListOfTypeUrlAndFactory actions = {
+    {"envoy.config.core.v3.SubstitutionFormatString", dummy_proto_msg}};
+
 const GenerateValidMessage::AnyMap GenerateValidMessage::any_map = {
-    //    {"envoy.extensions.filters.network.http_connection_manager.v3."
-    //     "RequestIDExtension",
-    //     {{"request_id_extension",
-    //       {{"envoy.extensions.request_id.uuid.v3.UuidRequestIdConfig",
-    //         []() -> std::unique_ptr<Protobuf::Message> {
-    //           return Envoy::Extensions::RequestId::UUIDRequestIDExtensionFactory()
-    //               .createEmptyConfigProto();
-    //         }}}}}},
     {"envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager",
      {{"typed_header_validation_config",
        {{"envoy.extensions.http.header_validators.envoy_default.v3.HeaderValidatorConfig",
@@ -576,33 +611,26 @@ const GenerateValidMessage::AnyMap GenerateValidMessage::any_map = {
                .createEmptyConfigProto();
          }}}}}},
     {"xds.type.matcher.v3.Matcher", {{"on_no_match", matchers}}},
-    {"xds.type.matcher.v3.Matcher.OnMatch", {{"action", matchers}}},
-    {"xds.type.matcher.v3.Matcher.MatchTree", {{"input", matchers}}},
+    {"xds.type.matcher.v3.Matcher.OnMatch", {{"action", actions}}},
+    {"xds.type.matcher.v3.Matcher.MatcherTree",
+     {{"input", input_matchers}, {"custom_match", input_matchers}}},
     {"xds.type.matcher.v3.Matcher.MatcherList.Predicate.SinglePredicate",
-     {{"custom_match", matchers}, {"input", matchers}}},
+     {{"custom_match", input_matchers}, {"input", input_matchers}}},
     {"envoy.config.core.v3.SubstitutionFormatString",
      {{"formatters",
-       {{"envoy.extensions.formatter.metadata.v3.Metadata",
-         []() -> std::unique_ptr<Protobuf::Message> {
-           // TODO(av): I am pretty sure, this is incorrect.
-           return Envoy::Extensions::Matching::Actions::FormatString::ActionFactory()
-               .createEmptyConfigProto();
-         }},
-        {"envoy.extensions.formatter.req_without_query.v3.ReqWithoutQuery",
-         []() -> std::unique_ptr<Protobuf::Message> {
-           // TODO(av): I am pretty sure, this is incorrect.
-           return Envoy::Extensions::Matching::Actions::FormatString::ActionFactory()
-               .createEmptyConfigProto();
-         }}}}}},
+       {{"envoy.extensions.formatter.metadata.v3.Metadata", dummy_proto_msg},
+        {"envoy.extensions.formatter.req_without_query.v3.ReqWithoutQuery", dummy_proto_msg}}}}},
     {"envoy.config.route.v3.RouteConfiguration",
      {{"cluster_specifier_plugins",
        {{"envoy.config.route.v3.ClusterSpecifierPlugin",
          []() -> std::unique_ptr<Protobuf::Message> {
            return std::make_unique<envoy::config::route::v3::ClusterSpecifierPlugin>();
          }}}},
-      {"typed_per_filter_config",
-       {{"envoy.config.route.v3.FilterConfig", []() -> std::unique_ptr<Protobuf::Message> {
-           return std::make_unique<envoy::config::route::v3::FilterConfig>();
+      {"typed_per_filter_config", {{"envoy.config.route.v3.FilterConfig", dummy_proto_msg}}}}},
+    {"envoy.config.trace.v3.Tracing.Http",
+     {{"typed_config",
+       {{"envoy.config.trace.v3.DatadogConfig", []() -> std::unique_ptr<Protobuf::Message> {
+           return std::make_unique<envoy::config::trace::v3::DatadogConfig>();
          }}}}}}};
 
 DEFINE_PROTO_FUZZER(const test::extensions::filters::network::FilterFuzzTestCase& input) {

@@ -165,9 +165,9 @@ void traverseMessageWorkerExt(VISITOR& visitor, MESSAGE& message,
       auto* any_message = Protobuf::DynamicCastToGenerated<ProtobufWkt::Any>(&message);
       inner_message = typeUrlToMessage(any_message->type_url());
       target_type_url = any_message->type_url();
-      // inner_message must be valid as parsing would have already failed to load if there was an
-      // invalid type_url.
-      MessageUtil::unpackTo(*any_message, *inner_message);
+      if (inner_message) {
+        MessageUtil::unpackTo(*any_message, *inner_message);
+      }
     } else if (message.GetDescriptor()->full_name() == "xds.type.v3.TypedStruct") {
       std::tie(inner_message, target_type_url) =
           convertTypedStruct<xds::type::v3::TypedStruct>(message);
