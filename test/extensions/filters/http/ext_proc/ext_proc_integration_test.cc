@@ -1768,8 +1768,9 @@ TEST_P(ExtProcIntegrationTest, PerRouteGrpcService) {
 TEST_P(ExtProcIntegrationTest, RequestAndResponseMessageNewTimeoutWithHeaderMutation) {
   // Set envoy filter timeout to be 200ms.
   proto_config_.mutable_message_timeout()->set_nanos(200000000);
-  // Config max_message_timeout proto to 60s to enable the new timeout API.
-  proto_config_.mutable_max_message_timeout()->set_seconds(60);
+  // Config max_message_timeout proto to enable the new timeout API.
+  proto_config_.mutable_max_message_timeout()->set_seconds(TestUtility::DefaultTimeout.count() /
+                                                           1000);
 
   initializeConfig();
   HttpIntegrationTest::initialize();
@@ -1785,7 +1786,7 @@ TEST_P(ExtProcIntegrationTest, RequestAndResponseMessageNewTimeoutWithHeaderMuta
         EXPECT_THAT(headers.headers(), HeaderProtosEqual(expected_request_headers));
 
         // Sending the new timeout API to extend the timeout.
-        serverSendNewTimeout(60000);
+        serverSendNewTimeout(TestUtility::DefaultTimeout.count());
         // ext_proc server stays idle for 300ms.
         timeSystem().advanceTimeWaitImpl(300ms);
         // Server sends back response with the header mutation instructions.
@@ -1811,7 +1812,7 @@ TEST_P(ExtProcIntegrationTest, RequestAndResponseMessageNewTimeoutWithHeaderMuta
         Http::TestRequestHeaderMapImpl expected_response_headers{{":status", "200"}};
         EXPECT_THAT(headers.headers(), HeaderProtosEqual(expected_response_headers));
         // Sending the new timeout API to extend the timeout.
-        serverSendNewTimeout(60000);
+        serverSendNewTimeout(TestUtility::DefaultTimeout.count());
         // ext_proc server stays idle for 300ms.
         timeSystem().advanceTimeWaitImpl(300ms);
         return true;
@@ -1824,8 +1825,9 @@ TEST_P(ExtProcIntegrationTest, RequestAndResponseMessageNewTimeoutWithHeaderMuta
 TEST_P(ExtProcIntegrationTest, RequestMessageNewTimeoutNoMutation) {
   // Set envoy filter timeout to be 200ms.
   proto_config_.mutable_message_timeout()->set_nanos(200000000);
-  // Config max_message_timeout proto to 60s to enable the new timeout API.
-  proto_config_.mutable_max_message_timeout()->set_seconds(60);
+  // Config max_message_timeout proto to enable the new timeout API.
+  proto_config_.mutable_max_message_timeout()->set_seconds(TestUtility::DefaultTimeout.count() /
+                                                           1000);
 
   initializeConfig();
   HttpIntegrationTest::initialize();
@@ -1834,7 +1836,7 @@ TEST_P(ExtProcIntegrationTest, RequestMessageNewTimeoutNoMutation) {
   processRequestHeadersMessage(*grpc_upstreams_[0], true,
                                [this](const HttpHeaders&, HeadersResponse&) {
                                  // Sending the new timeout API to extend the timeout.
-                                 serverSendNewTimeout(60000);
+                                 serverSendNewTimeout(TestUtility::DefaultTimeout.count());
                                  // ext_proc server stays idle for 300ms before sending back the
                                  // response.
                                  timeSystem().advanceTimeWaitImpl(300ms);
@@ -1856,16 +1858,17 @@ TEST_P(ExtProcIntegrationTest, RequestMessageNewTimeoutNoMutation) {
 TEST_P(ExtProcIntegrationTest, RequestMessageNoMutationMultipleNewTimeout) {
   // Set envoy filter timeout to be 200ms.
   proto_config_.mutable_message_timeout()->set_nanos(200000000);
-  // Config max_message_timeout proto to 60s to enable the new timeout API.
-  proto_config_.mutable_max_message_timeout()->set_seconds(60);
+  // Config max_message_timeout proto to enable the new timeout API.
+  proto_config_.mutable_max_message_timeout()->set_seconds(TestUtility::DefaultTimeout.count() /
+                                                           1000);
   initializeConfig();
   HttpIntegrationTest::initialize();
   auto response = sendDownstreamRequest(absl::nullopt);
 
   processRequestHeadersMessage(*grpc_upstreams_[0], true,
                                [this](const HttpHeaders&, HeadersResponse&) {
-                                 // Send a 60s new timeout update first.
-                                 serverSendNewTimeout(60000);
+                                 // Sending the new big timeout API to extend the timeout.
+                                 serverSendNewTimeout(TestUtility::DefaultTimeout.count());
                                  // Server wait for 100ms.
                                  timeSystem().advanceTimeWaitImpl(100ms);
                                  // Send the 2nd 10ms new timeout update.
