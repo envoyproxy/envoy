@@ -12,9 +12,7 @@ namespace Envoy {
 namespace Http {
 
 /**
- * Interface for header key formatters that are stateful. A formatter is created during decoding
- * headers, attached to the header map, and can then be used during encoding for reverse
- * translations if applicable.
+ * Interface for header validators.
  */
 class HeaderValidator {
 public:
@@ -59,24 +57,30 @@ public:
 
   /**
    * Validate the entire request header map.
-   * This method may mutate the header map as well, for example by normalizing URI path.
    * Returning the Reject value form this method causes the HTTP request to be rejected with 400
+   * status, and the gRPC request with the INTERNAL (13) error code.
+   */
+  using ValidationResult = RejectResult;
+  virtual ValidationResult validateRequestHeaders(const RequestHeaderMap& header_map) PURE;
+
+  /**
+   * Transform the entire request header map.
+   * This method transforms the header map, for example by normalizing URI path, before processing
+   * by the filter chain.
+   * Returning the Reject value from this method causes the HTTP request to be rejected with 400
    * status, and the gRPC request with the INTERNAL (13) error code. Returning the Redirect
    * value causes the HTTP request to be redirected to the :path presudo header in the request map.
    * The gRPC request will still be rejected with the INTERNAL (13) error code.
    */
-  using RequestHeaderMapValidationResult = RejectOrRedirectResult;
-  virtual RequestHeaderMapValidationResult
-  validateRequestHeaderMap(RequestHeaderMap& header_map) PURE;
+  using HeadersTransformationResult = RejectOrRedirectResult;
+  virtual HeadersTransformationResult transformRequestHeaders(RequestHeaderMap& header_map) PURE;
 
   /**
    * Validate the entire response header map.
    * Returning the Reject value causes the HTTP request to be rejected with the 502 status,
    * and the gRPC request with the UNAVAILABLE (14) error code.
    */
-  using ResponseHeaderMapValidationResult = RejectResult;
-  virtual ResponseHeaderMapValidationResult
-  validateResponseHeaderMap(ResponseHeaderMap& header_map) PURE;
+  virtual ValidationResult validateResponseHeaders(const ResponseHeaderMap& header_map) PURE;
 
   /**
    * Validate the entire request trailer map.
@@ -84,14 +88,22 @@ public:
    * and the gRPC request with the UNAVAILABLE (14) error code.
    * If response headers have already been sent the request is reset.
    */
-  using TrailerValidationResult = RejectResult;
-  virtual TrailerValidationResult validateRequestTrailerMap(RequestTrailerMap& trailer_map) PURE;
+  virtual ValidationResult validateRequestTrailers(const RequestTrailerMap& trailer_map) PURE;
+
+  /**
+   * Transform the entire request trailer map.
+   * Returning the Reject value causes the HTTP request to be rejected with the 502 status,
+   * and the gRPC request with the UNAVAILABLE (14) error code.
+   * If response headers have already been sent the request is reset.
+   */
+  using TrailersTransformationResult = RejectResult;
+  virtual TrailersTransformationResult transformRequestTrailers(RequestTrailerMap& header_map) PURE;
 
   /**
    * Validate the entire response trailer map.
    * Returning the Reject value causes the HTTP request to be reset.
    */
-  virtual TrailerValidationResult validateResponseTrailerMap(ResponseTrailerMap& trailer_map) PURE;
+  virtual ValidationResult validateResponseTrailers(const ResponseTrailerMap& trailer_map) PURE;
 };
 
 using HeaderValidatorPtr = std::unique_ptr<HeaderValidator>;

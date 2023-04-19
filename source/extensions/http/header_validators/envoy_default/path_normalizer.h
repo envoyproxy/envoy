@@ -15,7 +15,7 @@ public:
       const envoy::extensions::http::header_validators::envoy_default::v3::HeaderValidatorConfig&
           config);
 
-  using PathNormalizationResult = ::Envoy::Http::HeaderValidator::RequestHeaderMapValidationResult;
+  using PathNormalizationResult = ::Envoy::Http::HeaderValidator::HeadersTransformationResult;
 
   /*
    * Normalize the path component of the :path header and update the header value. This method does

@@ -304,6 +304,9 @@ extensions/filters/http/oauth2 @derekargueta @snowp
 /*/extensions/health_checkers/grpc @snowp @zuercher
 /*/extensions/health_checkers/http @snowp @zuercher
 /*/extensions/health_checkers/tcp @snowp @zuercher
+# IP Geolocation
+/*/extensions/filters/http/geoip @nezdolik @ravenblackx
+
 /*/extensions/health_checkers/common @snowp @zuercher
 
 # Intentionally exempt (treated as core code)
