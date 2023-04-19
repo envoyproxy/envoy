@@ -138,14 +138,11 @@ stat_prefix: test_prefix
 max_packet_bytes: 1048576
 latency_thresholds:
   - opcode: Default
-    threshold:
-      nanos: 150000000
+    threshold: "0.15s"
   - opcode: Connect
-    threshold:
-      nanos: 151000000
+    threshold: "0.151s"
   - opcode: Create
-    threshold:
-      nanos: 152000000
+    threshold: "0.152s"
   - opcode: Delete
     threshold:
       nanos: 153000000
