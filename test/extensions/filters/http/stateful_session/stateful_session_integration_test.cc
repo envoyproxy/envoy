@@ -92,7 +92,7 @@ public:
   ProtoCookieObject() = delete;
   // Constructor which parses PROTO object.
   ProtoCookieObject(absl::string_view cookie) {
-    std::vector<absl::string_view> v = absl::StrSplit(cookie, ";");
+    std::vector<absl::string_view> v = absl::StrSplit(cookie, absl::ByChar(';'));
     std::vector<absl::string_view> sub_v = absl::StrSplit(v[0], absl::MaxSplits('=', 1));
     sub_v[1].remove_prefix(1);
     sub_v[1].remove_suffix(1);
