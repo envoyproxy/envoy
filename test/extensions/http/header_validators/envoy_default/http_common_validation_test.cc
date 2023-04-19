@@ -61,7 +61,8 @@ TEST_P(HttpCommonValidationTest, MalformedUrlEncodingAllowed) {
                                    {":method", "GET"}};
   auto uhv = createUhv(empty_config);
 
-  EXPECT_ACCEPT(uhv->validateRequestHeaderMap(headers));
+  EXPECT_ACCEPT(uhv->validateRequestHeaders(headers));
+  EXPECT_ACCEPT(uhv->transformRequestHeaders(headers));
   EXPECT_EQ(headers.path(), "/path%Z0with%xYbad%7Jencoding%");
 }
 
@@ -74,7 +75,8 @@ TEST_P(HttpCommonValidationTest, MalformedUrlEncodingRejectedWithOverride) {
                                    {":method", "GET"}};
   auto uhv = createUhv(empty_config);
 
-  EXPECT_REJECT_WITH_DETAILS(uhv->validateRequestHeaderMap(headers), "uhv.invalid_url");
+  EXPECT_ACCEPT(uhv->validateRequestHeaders(headers));
+  EXPECT_REJECT_WITH_DETAILS(uhv->transformRequestHeaders(headers), "uhv.invalid_url");
 }
 
 } // namespace
