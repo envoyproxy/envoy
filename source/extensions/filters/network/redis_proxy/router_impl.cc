@@ -7,7 +7,6 @@
 #include "source/common/http/header_map_impl.h"
 
 #include "absl/strings/str_replace.h"
-#include "iostream"
 
 namespace Envoy {
 namespace Extensions {
