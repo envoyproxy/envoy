@@ -334,7 +334,7 @@ stages:
   - job: release
     condition: and(not(canceled()), ne(stageDependencies.env.repo.outputs['changed.mobileOnly'], 'true'), ne(stageDependencies.env.repo.outputs['changed.docsOnly'], 'true'))
     timeoutInMinutes: 120
-    pool: x64-large
+    pool: envoy-x64-large
     steps:
     - template: bazel.yml
       parameters:
@@ -364,7 +364,7 @@ stages:
   - job: release
     condition: and(not(canceled()), ne(stageDependencies.env.repo.outputs['changed.mobileOnly'], 'true'), ne(stageDependencies.env.repo.outputs['changed.docsOnly'], 'true'))
     timeoutInMinutes: 120
-    pool: "arm-large"
+    pool: "envoy-arm-large"
     steps:
     - template: bazel.yml
       parameters:
@@ -430,7 +430,7 @@ stages:
     # Skip checks if only mobile/ or docs/ have changed.
     condition: and(not(canceled()), succeeded(), ne(stageDependencies.env.repo.outputs['changed.mobileOnly'], 'true'), ne(stageDependencies.env.repo.outputs['changed.docsOnly'], 'true'), ne(stageDependencies.env.repo.outputs['changed.examplesOnly'], 'true'))
     timeoutInMinutes: 180
-    pool: "x64-large"
+    pool: "envoy-x64-large"
     strategy:
       maxParallel: 2
       matrix:
@@ -562,7 +562,7 @@ stages:
     dependsOn: []
     condition: and(not(canceled()), succeeded(), ne(stageDependencies.env.repo.outputs['changed.mobileOnly'], 'true'), ne(stageDependencies.env.repo.outputs['changed.docsOnly'], 'true'), ne(stageDependencies.env.repo.outputs['changed.examplesOnly'], 'true'))
     timeoutInMinutes: 120
-    pool: "arm-large"
+    pool: "envoy-arm-large"
     steps:
     - template: bazel.yml
       parameters:
@@ -765,7 +765,7 @@ stages:
     displayName: Verify debs (arm64)
     condition: and(not(canceled()), succeeded(), ne(stageDependencies.env.repo.outputs['changed.mobileOnly'], 'true'), ne(stageDependencies.env.repo.outputs['changed.docsOnly'], 'true'), ne(stageDependencies.env.repo.outputs['changed.examplesOnly'], 'true'))
     timeoutInMinutes: 120
-    pool: "arm-large"
+    pool: "envoy-arm-large"
     steps:
     - task: DownloadBuildArtifacts@0
       inputs:
