@@ -1282,7 +1282,7 @@ public:
    *         created, or true and the created cluster config when it not exists and not
    *         reach the limitation of max_sub_clusters, otherwise, return false and nullptr.
    */
-  virtual std::pair<bool, std::unique_ptr<envoy::config::cluster::v3::Cluster>>
+  virtual std::pair<bool, absl::optional<envoy::config::cluster::v3::Cluster>>
   createSubClusterConfig(const std::string& cluster_name, const std::string& host,
                          const int port) PURE;
 

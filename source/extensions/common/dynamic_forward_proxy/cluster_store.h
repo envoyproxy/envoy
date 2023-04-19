@@ -17,6 +17,9 @@ public:
   // Save the dynamic forward proxy cluster into this store.
   static void save(const std::string cluster_name, Upstream::DfpClusterSharedPtr cluster);
 
+  // Remove the dynamic forward proxy cluster from this store.
+  static void remove(std::string cluster_name);
+
 private:
   using ClusterMapType = absl::flat_hash_map<std::string, Upstream::DfpClusterWeakPtr>;
   struct ClusterStoreType {

@@ -47,7 +47,8 @@ public:
     factory_context_.cluster_manager_.thread_local_cluster_.cluster_.info_
         ->transport_socket_matcher_.reset(transport_socket_match_);
     dfp_cluster_ = std::make_shared<NiceMock<Upstream::MockDfpCluster>>();
-    Common::DynamicForwardProxy::DFPClusterStore::save("fake_cluster", dfp_cluster_);
+    auto cluster = std::dynamic_pointer_cast<Upstream::DfpCluster>(dfp_cluster_);
+    Common::DynamicForwardProxy::DFPClusterStore::save("fake_cluster", cluster);
   }
 
   virtual void setupFilter() {
@@ -95,7 +96,7 @@ public:
       new Network::MockTransportSocketFactory()};
   NiceMock<Upstream::MockTransportSocketMatcher>* transport_socket_match_;
   NiceMock<Server::Configuration::MockFactoryContext> factory_context_;
-  Upstream::DfpClusterSharedPtr dfp_cluster_;
+  std::shared_ptr<NiceMock<Upstream::MockDfpCluster>> dfp_cluster_;
   ProxyFilterConfigSharedPtr filter_config_;
   std::unique_ptr<ProxyFilter> filter_;
   NiceMock<Http::MockStreamDecoderFilterCallbacks> callbacks_;
@@ -383,6 +384,94 @@ TEST_F(ProxyFilterTest, HostRewriteViaHeader) {
             filter_->decodeHeaders(headers, false));
 
   EXPECT_CALL(*handle, onDestroy());
+  filter_->onDestroy();
+}
+
+// Thread local cluster not exists.
+TEST_F(ProxyFilterTest, SubClusterNotExists) {
+  InSequence s;
+
+  EXPECT_CALL(callbacks_, route());
+  EXPECT_CALL(factory_context_.cluster_manager_, getThreadLocalCluster(_));
+  EXPECT_CALL(*transport_socket_factory_, implementsSecureTransport()).WillOnce(Return(false));
+  EXPECT_CALL(callbacks_, route());
+  EXPECT_CALL(*(dfp_cluster_.get()), enableSubCluster()).WillOnce(Return(true));
+  // get DFPCluster, not exists.
+  EXPECT_CALL(factory_context_.cluster_manager_, getThreadLocalCluster(Eq("DFPCluster:foo:80")));
+  // "true" means another thread already created it.
+  EXPECT_CALL(*(dfp_cluster_.get()), createSubClusterConfig(_, _, _))
+      .WillOnce(Return(std::make_pair(true, absl::nullopt)));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
+            filter_->decodeHeaders(request_headers_, false));
+
+  filter_->onDestroy();
+}
+
+// Thread local cluster exists.
+TEST_F(ProxyFilterTest, SubClusterExists) {
+  factory_context_.cluster_manager_.initializeThreadLocalClusters({"DFPCluster:foo:80"});
+  InSequence s;
+
+  EXPECT_CALL(callbacks_, route());
+  EXPECT_CALL(factory_context_.cluster_manager_, getThreadLocalCluster(_));
+  EXPECT_CALL(*transport_socket_factory_, implementsSecureTransport()).WillOnce(Return(false));
+  EXPECT_CALL(callbacks_, route());
+  EXPECT_CALL(*(dfp_cluster_.get()), enableSubCluster()).WillOnce(Return(true));
+  // get DFPCluster, exists.
+  EXPECT_CALL(factory_context_.cluster_manager_, getThreadLocalCluster(Eq("DFPCluster:foo:80")));
+  EXPECT_CALL(*(dfp_cluster_.get()), touch(_)).WillOnce(Return(true));
+  // should not create.
+  EXPECT_CALL(*(dfp_cluster_.get()), createSubClusterConfig(_, _, _)).Times(0);
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
+
+  filter_->onDestroy();
+}
+
+// Sub cluster overflow.
+TEST_F(ProxyFilterTest, SubClusterOverflow) {
+  InSequence s;
+
+  EXPECT_CALL(callbacks_, route());
+  EXPECT_CALL(factory_context_.cluster_manager_, getThreadLocalCluster(_));
+  EXPECT_CALL(*transport_socket_factory_, implementsSecureTransport()).WillOnce(Return(false));
+  EXPECT_CALL(callbacks_, route());
+  EXPECT_CALL(*(dfp_cluster_.get()), enableSubCluster()).WillOnce(Return(true));
+  // get DFPCluster
+  EXPECT_CALL(factory_context_.cluster_manager_, getThreadLocalCluster(Eq("DFPCluster:foo:80")));
+  // reach the max_sub_clusters limitation.
+  EXPECT_CALL(*(dfp_cluster_.get()), createSubClusterConfig(_, _, _))
+      .WillOnce(Return(std::make_pair(false, absl::nullopt)));
+
+  EXPECT_CALL(callbacks_, sendLocalReply(Http::Code::ServiceUnavailable, Eq("Sub cluster overflow"),
+                                         _, _, Eq("sub_cluster_overflow")));
+  EXPECT_CALL(callbacks_, encodeHeaders_(_, false));
+  EXPECT_CALL(callbacks_, encodeData(_, true));
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(request_headers_, false));
+
+  filter_->onDestroy();
+}
+
+// DFP cluster is removed early.
+TEST_F(ProxyFilterTest, DFPClusterIsGone) {
+  Common::DynamicForwardProxy::DFPClusterStore::remove("fake_cluster");
+  InSequence s;
+
+  EXPECT_CALL(callbacks_, route());
+  EXPECT_CALL(factory_context_.cluster_manager_, getThreadLocalCluster(_));
+  EXPECT_CALL(*transport_socket_factory_, implementsSecureTransport()).WillOnce(Return(false));
+  EXPECT_CALL(callbacks_, route());
+  EXPECT_CALL(*(dfp_cluster_.get()), enableSubCluster()).Times(0);
+  EXPECT_CALL(callbacks_, sendLocalReply(Http::Code::ServiceUnavailable,
+                                         Eq("Dynamic forward proxy cluster is gone"), _, _,
+                                         Eq("dynamic_forward_proxy_cluster_is_gone")));
+  EXPECT_CALL(callbacks_, encodeHeaders_(_, false));
+  EXPECT_CALL(callbacks_, encodeData(_, true));
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(request_headers_, false));
+
   filter_->onDestroy();
 }
 

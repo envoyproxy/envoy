@@ -96,7 +96,7 @@ void Cluster::checkIdleSubCluster() {
   idle_timer_->enableTimer(sub_cluster_ttl_);
 }
 
-std::pair<bool, std::unique_ptr<envoy::config::cluster::v3::Cluster>>
+std::pair<bool, absl::optional<envoy::config::cluster::v3::Cluster>>
 Cluster::createSubClusterConfig(const std::string& cluster_name, const std::string& host,
                                 const int port) {
   {
@@ -104,27 +104,27 @@ Cluster::createSubClusterConfig(const std::string& cluster_name, const std::stri
     const auto cluster_it = cluster_map_.find(cluster_name);
     if (cluster_it != cluster_map_.end()) {
       cluster_it->second->touch();
-      return std::make_pair(true, nullptr);
+      return std::make_pair(true, absl::nullopt);
     }
     if (cluster_map_.size() >= max_sub_clusters_) {
       ENVOY_LOG(debug, "cluster='{}' create failed due to max sub cluster limitation",
                 cluster_name);
-      return std::make_pair(false, nullptr);
+      return std::make_pair(false, absl::nullopt);
     }
     cluster_map_.emplace(cluster_name, std::make_shared<ClusterInfo>(cluster_name, *this));
   }
 
   // Inherit configuration from the parent DFP cluster.
-  auto config = std::make_unique<envoy::config::cluster::v3::Cluster>(orig_cluster_config_);
+  envoy::config::cluster::v3::Cluster config = orig_cluster_config_;
 
   // Overwrite the type.
-  config->set_name(cluster_name);
-  config->clear_cluster_type();
-  config->set_type(sub_cluster_type_);
-  config->set_lb_policy(sub_cluster_lb_policy_);
+  config.set_name(cluster_name);
+  config.clear_cluster_type();
+  config.set_type(sub_cluster_type_);
+  config.set_lb_policy(sub_cluster_lb_policy_);
 
   // Set endpoint.
-  auto load_assignments = config->mutable_load_assignment();
+  auto load_assignments = config.mutable_load_assignment();
   load_assignments->set_cluster_name(cluster_name);
   load_assignments->clear_endpoints();
 
@@ -136,7 +136,7 @@ Cluster::createSubClusterConfig(const std::string& cluster_name, const std::stri
   socket_address->set_address(host);
   socket_address->set_port_value(port);
 
-  return std::make_pair(true, std::move(config));
+  return std::make_pair(true, absl::make_optional(config));
 }
 
 Upstream::HostConstSharedPtr Cluster::chooseHost(absl::string_view host,

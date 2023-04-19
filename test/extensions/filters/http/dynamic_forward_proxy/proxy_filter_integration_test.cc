@@ -33,10 +33,17 @@ public:
 
   void initializeWithArgs(uint64_t max_hosts = 1024, uint32_t max_pending_requests = 1024,
                           const std::string& override_auto_sni_header = "",
-                          const std::string& typed_dns_resolver_config = "") {
+                          const std::string& typed_dns_resolver_config = "",
+                          bool use_sub_cluster = false) {
     setUpstreamProtocol(Http::CodecType::HTTP1);
 
-    const std::string filter =
+    const std::string filter_use_sub_cluster = R"EOF(
+name: dynamic_forward_proxy
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.http.dynamic_forward_proxy.v3.FilterConfig
+  cluster_init_timeout: 5s
+)EOF";
+    const std::string filter_use_dns_cache =
         fmt::format(R"EOF(
 name: dynamic_forward_proxy
 typed_config:
@@ -50,7 +57,7 @@ typed_config:
 )EOF",
                     Network::Test::ipVersionToDnsFamily(GetParam()), max_hosts,
                     max_pending_requests, key_value_config_, typed_dns_resolver_config);
-    config_helper_.prependFilter(filter);
+    config_helper_.prependFilter(use_sub_cluster ? filter_use_sub_cluster : filter_use_dns_cache);
 
     config_helper_.prependFilter(fmt::format(R"EOF(
 name: stream-info-to-headers-filter
@@ -79,6 +86,10 @@ name: stream-info-to-headers-filter
         Protobuf::util::TimeUtil::MillisecondsToDuration(5000));
     cluster_.set_name("cluster_0");
     cluster_.set_lb_policy(envoy::config::cluster::v3::Cluster::CLUSTER_PROVIDED);
+    cluster_.set_dns_lookup_family(
+        GetParam() == Network::Address::IpVersion::v4
+            ? envoy::config::cluster::v3::Cluster_DnsLookupFamily::Cluster_DnsLookupFamily_V4_ONLY
+            : envoy::config::cluster::v3::Cluster_DnsLookupFamily::Cluster_DnsLookupFamily_V6_ONLY);
 
     ConfigHelper::HttpProtocolOptions protocol_options;
     protocol_options.mutable_upstream_http_protocol_options()->set_auto_sni(true);
@@ -100,7 +111,16 @@ name: stream-info-to-headers-filter
       cluster_.mutable_transport_socket()->mutable_typed_config()->PackFrom(tls_context);
     }
 
-    const std::string cluster_type_config = fmt::format(
+    const std::string cluster_type_config_use_sub_cluster = fmt::format(
+        R"EOF(
+name: envoy.clusters.dynamic_forward_proxy
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.clusters.dynamic_forward_proxy.v3.ClusterConfig
+  sub_clusters_config:
+    max_sub_clusters: {}
+)EOF",
+        max_hosts);
+    const std::string cluster_type_config_use_dns_cache = fmt::format(
         R"EOF(
 name: envoy.clusters.dynamic_forward_proxy
 typed_config:
@@ -115,7 +135,9 @@ typed_config:
         Network::Test::ipVersionToDnsFamily(GetParam()), max_hosts, max_pending_requests,
         key_value_config_, typed_dns_resolver_config);
 
-    TestUtility::loadFromYaml(cluster_type_config, *cluster_.mutable_cluster_type());
+    TestUtility::loadFromYaml(use_sub_cluster ? cluster_type_config_use_sub_cluster
+                                              : cluster_type_config_use_dns_cache,
+                              *cluster_.mutable_cluster_type());
     cluster_.mutable_circuit_breakers()
         ->add_thresholds()
         ->mutable_max_pending_requests()
@@ -746,6 +768,77 @@ TEST_P(ProxyFilterIntegrationTest, TestQueueingBasedOnCircuitBreakers) {
   ASSERT_TRUE(response2->waitForEndStream());
   EXPECT_TRUE(response2->complete());
   EXPECT_EQ("200", response2->headers().getStatusValue());
+}
+
+// Sub cluster
+TEST_P(ProxyFilterIntegrationTest, SubClusterSimple) {
+  initializeWithArgs(1024, 1024, "", "", true);
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  const Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "POST"},
+      {":path", "/test/long/url"},
+      {":scheme", "http"},
+      {":authority",
+       fmt::format("localhost:{}", fake_upstreams_[0]->localAddress()->ip()->port())}};
+
+  auto response =
+      sendRequestAndWaitForResponse(request_headers, 1024, default_response_headers_, 1024);
+  checkSimpleRequestSuccess(1024, 1024, response.get());
+  // one more cluster
+  test_server_->waitForCounterEq("cluster_manager.cluster_added", 2);
+  test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 0);
+}
+
+// Verify that we expire sub clusters.
+TEST_P(ProxyFilterWithSimtimeIntegrationTest, RemoveSubClusterViaTTL) {
+  initializeWithArgs(1024, 1024, "", "", true);
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  const Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "POST"},
+      {":path", "/test/long/url"},
+      {":scheme", "http"},
+      {":authority",
+       fmt::format("localhost:{}", fake_upstreams_[0]->localAddress()->ip()->port())}};
+
+  auto response =
+      sendRequestAndWaitForResponse(request_headers, 1024, default_response_headers_, 1024);
+  checkSimpleRequestSuccess(1024, 1024, response.get());
+  // one more cluster
+  test_server_->waitForCounterEq("cluster_manager.cluster_added", 2);
+  test_server_->waitForCounterEq("cluster_manager.cluster_removed", 0);
+  cleanupUpstreamAndDownstream();
+
+  // > 5m
+  simTime().advanceTimeWait(std::chrono::milliseconds(300001));
+  test_server_->waitForCounterEq("cluster_manager.cluster_added", 2);
+  test_server_->waitForCounterEq("cluster_manager.cluster_removed", 1);
+}
+
+// Test sub clusters overflow.
+TEST_P(ProxyFilterIntegrationTest, SubClusterOverflow) {
+  initializeWithArgs(1, 1024, "", "", true);
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  const Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "POST"},
+      {":path", "/test/long/url"},
+      {":scheme", "http"},
+      {":authority",
+       fmt::format("localhost:{}", fake_upstreams_[0]->localAddress()->ip()->port())}};
+
+  auto response =
+      sendRequestAndWaitForResponse(request_headers, 1024, default_response_headers_, 1024);
+  checkSimpleRequestSuccess(1024, 1024, response.get());
+
+  // Send another request, this should lead to a response directly from the filter.
+  const Http::TestRequestHeaderMapImpl request_headers2{
+      {":method", "POST"},
+      {":path", "/test/long/url"},
+      {":scheme", "http"},
+      {":authority", fmt::format("localhost2", fake_upstreams_[0]->localAddress()->ip()->port())}};
+  response = codec_client_->makeHeaderOnlyRequest(request_headers2);
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("503", response->headers().getStatusValue());
 }
 
 } // namespace

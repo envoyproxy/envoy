@@ -47,7 +47,7 @@ public:
   bool enableSubCluster() const override { return enable_sub_cluster_; }
   Upstream::HostConstSharedPtr chooseHost(absl::string_view host,
                                           Upstream::LoadBalancerContext* context) const;
-  std::pair<bool, std::unique_ptr<envoy::config::cluster::v3::Cluster>>
+  std::pair<bool, absl::optional<envoy::config::cluster::v3::Cluster>>
   createSubClusterConfig(const std::string& cluster_name, const std::string& host,
                          const int port) override;
   bool touch(const std::string& cluster_name) override;

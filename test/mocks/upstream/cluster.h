@@ -38,7 +38,7 @@ public:
 
   // Upstream::DFPCluster
   MOCK_METHOD(bool, enableSubCluster, (), (const));
-  MOCK_METHOD((std::pair<bool, std::unique_ptr<envoy::config::cluster::v3::Cluster>>),
+  MOCK_METHOD((std::pair<bool, absl::optional<envoy::config::cluster::v3::Cluster>>),
               createSubClusterConfig, (const std::string&, const std::string&, const int));
   MOCK_METHOD(bool, touch, (const std::string&));
 };

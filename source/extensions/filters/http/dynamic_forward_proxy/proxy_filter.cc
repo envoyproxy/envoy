@@ -29,14 +29,18 @@ struct ResponseStringValues {
   const std::string DnsCacheOverflow = "DNS cache overflow";
   const std::string PendingRequestOverflow = "Dynamic forward proxy pending request overflow";
   const std::string DnsResolutionFailure = "DNS resolution failure";
+  const std::string SubClusterOverflow = "Sub cluster overflow";
   const std::string SubClusterWarmingTimeout = "Sub cluster warming timeout";
+  const std::string DFPClusterIsGone = "Dynamic forward proxy cluster is gone";
 };
 
 struct RcDetailsValues {
   const std::string DnsCacheOverflow = "dns_cache_overflow";
   const std::string PendingRequestOverflow = "dynamic_forward_proxy_pending_request_overflow";
   const std::string DnsResolutionFailure = "dns_resolution_failure";
+  const std::string SubClusterOverflow = "sub_cluster_overflow";
   const std::string SubClusterWarmingTimeout = "sub_cluster_warming_timeout";
+  const std::string DFPClusterIsGone = "dynamic_forward_proxy_cluster_is_gone";
 };
 
 using CustomClusterType = envoy::config::cluster::v3::Cluster::CustomClusterType;
@@ -64,7 +68,7 @@ LoadClusterEntryHandlePtr
 ProxyFilterConfig::addDynamicCluster(Upstream::DfpClusterSharedPtr cluster,
                                      const std::string& cluster_name, const std::string& host,
                                      const int port, LoadClusterEntryCallbacks& callbacks) {
-  std::pair<bool, std::unique_ptr<envoy::config::cluster::v3::Cluster>> sub_cluster_pair =
+  std::pair<bool, absl::optional<envoy::config::cluster::v3::Cluster>> sub_cluster_pair =
       cluster->createSubClusterConfig(cluster_name, host, port);
 
   if (!sub_cluster_pair.first) {
@@ -72,13 +76,14 @@ ProxyFilterConfig::addDynamicCluster(Upstream::DfpClusterSharedPtr cluster,
     return nullptr;
   }
 
-  auto config = std::move(sub_cluster_pair.second);
-  if (config != nullptr) {
+  if (sub_cluster_pair.second.has_value()) {
+    auto cluster = sub_cluster_pair.second.value();
+    // TODO: use version_info from dfp_cluster.
     std::string version_info = "";
     ENVOY_LOG(debug, "deliver dynamic cluster {} creation to main thread", cluster_name);
-    main_thread_dispatcher_.post([this, cluster = std::move(config), version_info]() {
-      ENVOY_LOG(debug, "initilizing dynamic cluster {} creation in main thread", cluster->name());
-      cluster_manager_.addOrUpdateCluster(*cluster.get(), version_info);
+    main_thread_dispatcher_.post([this, cluster, version_info]() {
+      ENVOY_LOG(debug, "initilizing dynamic cluster {} creation in main thread", cluster.name());
+      cluster_manager_.addOrUpdateCluster(cluster, version_info);
     });
   } else {
     ENVOY_LOG(debug, "cluster='{}' already created, waiting it warming", cluster_name);
@@ -136,6 +141,10 @@ void ProxyFilter::onDestroy() {
   cache_load_handle_.reset();
   circuit_breaker_.reset();
   cluster_load_handle_.reset();
+  if (cluster_init_timer_) {
+    cluster_init_timer_->disableTimer();
+    cluster_init_timer_.reset();
+  }
 }
 
 bool ProxyFilter::isProxying() {
@@ -208,8 +217,15 @@ Http::FilterHeadersStatus ProxyFilter::decodeHeaders(Http::RequestHeaderMap& hea
   Upstream::DfpClusterSharedPtr dfp_cluster =
       Common::DynamicForwardProxy::DFPClusterStore::load(cluster_info_->name());
   if (!dfp_cluster) {
-    // TODO: local reply
-    PANIC("TODO");
+    // This could happen in a very small race when users remove the DFP cluster and a route still
+    // using it, which is not a good usage, will end with ServiceUnavailable.
+    // Thread local cluster is existing due to the thread local cache, and the main thread notify
+    // work thread is on the way.
+    ENVOY_STREAM_LOG(debug, "dynamic foward cluster is gone", *this->decoder_callbacks_);
+    this->decoder_callbacks_->sendLocalReply(Http::Code::ServiceUnavailable,
+                                             ResponseStrings::get().DFPClusterIsGone, nullptr,
+                                             absl::nullopt, RcDetails::get().DFPClusterIsGone);
+    return Http::FilterHeadersStatus::StopIteration;
   }
 
   if (dfp_cluster->enableSubCluster()) {
@@ -292,17 +308,24 @@ Http::FilterHeadersStatus ProxyFilter::loadDynamicCluster(Upstream::DfpClusterSh
     return Http::FilterHeadersStatus::Continue;
   }
 
-  cluster_init_timer_ =
-      decoder_callbacks_->dispatcher().createTimer([this]() { onClusterInitTimeout(); });
-  cluster_init_timer_->enableTimer(config_->clusterInitTimeout());
-
   // Still need to add dynamic cluster again even the thread local cluster exists while touch
   // failed, that means the cluster is removed in main thread due to ttl reached.
   // Otherwise, we may not be able to get the thread local cluster in router.
 
-  // not found, create a new cluster & register a callback to tls
+  // Create a new cluster & register a callback to tls
   cluster_load_handle_ = config_->addDynamicCluster(cluster, cluster_name, host, port, *this);
-  ASSERT(cluster_load_handle_ != nullptr);
+  if (!cluster_load_handle_) {
+    ENVOY_STREAM_LOG(debug, "sub clusters overflow", *this->decoder_callbacks_);
+    this->decoder_callbacks_->sendLocalReply(Http::Code::ServiceUnavailable,
+                                             ResponseStrings::get().SubClusterOverflow, nullptr,
+                                             absl::nullopt, RcDetails::get().SubClusterOverflow);
+    return Http::FilterHeadersStatus::StopIteration;
+  }
+
+  cluster_init_timer_ =
+      decoder_callbacks_->dispatcher().createTimer([this]() { onClusterInitTimeout(); });
+  cluster_init_timer_->enableTimer(config_->clusterInitTimeout());
+
   ENVOY_STREAM_LOG(debug, "waiting to load cluster entry", *decoder_callbacks_);
   return Http::FilterHeadersStatus::StopAllIterationAndWatermark;
 }
@@ -330,6 +353,10 @@ void ProxyFilter::addHostAddressToFilterState(
 }
 
 void ProxyFilter::onLoadClusterComplete() {
+  // timer must be enabled.
+  cluster_init_timer_->disableTimer();
+  cluster_init_timer_.reset();
+
   latchTime(decoder_callbacks_, DNS_END);
   ENVOY_STREAM_LOG(debug, "load cluster complete, continuing", *decoder_callbacks_);
   decoder_callbacks_->continueDecoding();

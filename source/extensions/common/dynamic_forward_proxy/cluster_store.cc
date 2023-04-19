@@ -21,6 +21,12 @@ void DFPClusterStore::save(const std::string cluster_name, Upstream::DfpClusterS
   clusterStore.map_[cluster_name] = std::move(cluster);
 }
 
+void DFPClusterStore::remove(const std::string cluster_name) {
+  ClusterStoreType& clusterStore = getClusterStore();
+  absl::WriterMutexLock lock(&clusterStore.mutex_);
+  clusterStore.map_.erase(cluster_name);
+}
+
 } // namespace DynamicForwardProxy
 } // namespace Common
 } // namespace Extensions
