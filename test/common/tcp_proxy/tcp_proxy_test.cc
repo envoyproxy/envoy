@@ -973,12 +973,12 @@ TEST_F(TcpProxyTest, IntermediateLogEntry) {
   flush_timer->invokeCallback();
 
   // No valid duration until the connection is closed.
-  EXPECT_EQ(access_log_data_.value(), AccessLog::AccessLogTypeStrings::get().TcpPeriodic);
+  EXPECT_EQ(access_log_data_.value(), AccessLogType_Name(AccessLog::AccessLogType::TcpPeriodic));
 
   filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
   filter_.reset();
 
-  EXPECT_EQ(access_log_data_.value(), AccessLog::AccessLogTypeStrings::get().TcpEnd);
+  EXPECT_EQ(access_log_data_.value(), AccessLogType_Name(AccessLog::AccessLogType::TcpEnd));
 }
 
 TEST_F(TcpProxyTest, TestAccessLogOnUpstreamConnected) {
@@ -991,15 +991,15 @@ TEST_F(TcpProxyTest, TestAccessLogOnUpstreamConnected) {
   // Default access log will only be flushed after the stream is closed.
   // Passing the following check makes sure that the access log was flushed
   // before the stream was closed.
-  EXPECT_EQ(
-      access_log_data_.value(),
-      absl::StrCat("127.0.0.1:80 ", AccessLog::AccessLogTypeStrings::get().TcpUpstreamConnected));
+  EXPECT_EQ(access_log_data_.value(),
+            absl::StrCat("127.0.0.1:80 ",
+                         AccessLogType_Name(AccessLog::AccessLogType::TcpUpstreamConnected)));
 
   filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
   filter_.reset();
 
   EXPECT_EQ(access_log_data_.value(),
-            absl::StrCat("127.0.0.1:80 ", AccessLog::AccessLogTypeStrings::get().TcpEnd));
+            absl::StrCat("127.0.0.1:80 ", AccessLogType_Name(AccessLog::AccessLogType::TcpEnd)));
 }
 
 TEST_F(TcpProxyTest, AccessLogUpstreamSSLConnection) {

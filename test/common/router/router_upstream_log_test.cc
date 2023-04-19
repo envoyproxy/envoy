@@ -442,10 +442,11 @@ typed_config:
   // It is expected that there will be two log records, one when a new request is received
   // and one when the request is finished, due to 'flush_upstream_log_on_upstream_stream' enabled
   EXPECT_EQ(output_.size(), 2U);
-  EXPECT_EQ(output_.front(),
-            absl::StrCat("cluster_0 ", AccessLog::AccessLogTypeStrings::get().UpstreamStart));
+  EXPECT_EQ(
+      output_.front(),
+      absl::StrCat("cluster_0 ", AccessLogType_Name(AccessLog::AccessLogType::UpstreamStart)));
   EXPECT_EQ(output_.back(),
-            absl::StrCat("cluster_0 ", AccessLog::AccessLogTypeStrings::get().UpstreamEnd));
+            absl::StrCat("cluster_0 ", AccessLogType_Name(AccessLog::AccessLogType::UpstreamEnd)));
 }
 
 TEST_F(RouterUpstreamLogTest, PeriodicLog) {
@@ -496,13 +497,13 @@ typed_config:
   EXPECT_CALL(*periodic_log_flush_, enableTimer(_, _));
   periodic_log_flush_->invokeCallback();
   EXPECT_EQ(output_.size(), 1U);
-  EXPECT_EQ(output_.front(), AccessLog::AccessLogTypeStrings::get().UpstreamPeriodic);
+  EXPECT_EQ(output_.front(), AccessLogType_Name(AccessLog::AccessLogType::UpstreamPeriodic));
 
   EXPECT_CALL(*periodic_log_flush_, enableTimer(_, _));
   periodic_log_flush_->invokeCallback();
   EXPECT_EQ(output_.size(), 2U);
-  EXPECT_EQ(output_.front(), AccessLog::AccessLogTypeStrings::get().UpstreamPeriodic);
-  EXPECT_EQ(output_.back(), AccessLog::AccessLogTypeStrings::get().UpstreamPeriodic);
+  EXPECT_EQ(output_.front(), AccessLogType_Name(AccessLog::AccessLogType::UpstreamPeriodic));
+  EXPECT_EQ(output_.back(), AccessLogType_Name(AccessLog::AccessLogType::UpstreamPeriodic));
 
   Http::ResponseHeaderMapPtr response_headers(new Http::TestResponseHeaderMapImpl());
   response_headers->setStatus(200);

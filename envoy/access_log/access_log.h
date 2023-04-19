@@ -55,21 +55,6 @@ public:
 };
 
 using AccessLogManagerPtr = std::unique_ptr<AccessLogManager>;
-
-struct AccessLogTypeStringValues {
-  const std::string NotSet = "NotSet";
-  const std::string TcpUpstreamConnected = "TcpUpstreamConnected";
-  const std::string TcpPeriodic = "TcpPeriodic";
-  const std::string TcpEnd = "TcpEnd";
-  const std::string DownstreamStart = "DownstreamStart";
-  const std::string DownstreamPeriodic = "DownstreamPeriodic";
-  const std::string DownstreamEnd = "DownstreamEnd";
-  const std::string UpstreamStart = "UpstreamStart";
-  const std::string UpstreamPeriodic = "UpstreamPeriodic";
-  const std::string UpstreamEnd = "UpstreamEnd";
-};
-
-using AccessLogTypeStrings = ConstSingleton<AccessLogTypeStringValues>;
 using AccessLogType = envoy::data::accesslog::v3::AccessLogType;
 
 /**

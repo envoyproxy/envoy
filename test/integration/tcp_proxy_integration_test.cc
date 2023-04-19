@@ -584,9 +584,9 @@ TEST_P(TcpProxyIntegrationTest, AccessLogOnUpstreamConnect) {
 
   ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
   auto log_result = waitForAccessLog(access_log_path);
-  EXPECT_EQ(
-      absl::StrCat("ACCESS_LOG_TYPE=", AccessLog::AccessLogTypeStrings::get().TcpUpstreamConnected),
-      log_result);
+  EXPECT_EQ(absl::StrCat("ACCESS_LOG_TYPE=",
+                         AccessLogType_Name(AccessLog::AccessLogType::TcpUpstreamConnected)),
+            log_result);
 
   ASSERT_TRUE(fake_upstream_connection->waitForData(5));
   ASSERT_TRUE(tcp_client->write("", true));
@@ -596,10 +596,10 @@ TEST_P(TcpProxyIntegrationTest, AccessLogOnUpstreamConnect) {
   tcp_client->waitForDisconnect();
   test_server_.reset();
   log_result = waitForAccessLog(access_log_path);
-  EXPECT_EQ(
-      absl::StrCat("ACCESS_LOG_TYPE=", AccessLog::AccessLogTypeStrings::get().TcpUpstreamConnected,
-                   "ACCESS_LOG_TYPE=", AccessLog::AccessLogTypeStrings::get().TcpEnd),
-      log_result);
+  EXPECT_EQ(absl::StrCat("ACCESS_LOG_TYPE=",
+                         AccessLogType_Name(AccessLog::AccessLogType::TcpUpstreamConnected),
+                         "ACCESS_LOG_TYPE=", AccessLogType_Name(AccessLog::AccessLogType::TcpEnd)),
+            log_result);
 }
 
 // Make sure no bytes are logged when no data is sent.

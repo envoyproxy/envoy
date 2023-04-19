@@ -4,7 +4,6 @@
 #include "envoy/extensions/access_loggers/grpc/v3/als.pb.h"
 #include "envoy/upstream/upstream.h"
 
-#include "source/common/access_log/utility.h"
 #include "source/common/network/utility.h"
 #include "source/common/stream_info/utility.h"
 #include "source/common/tracing/custom_tag_impl.h"

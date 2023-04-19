@@ -7,7 +7,6 @@
 #include "envoy/extensions/access_loggers/grpc/v3/als.pb.h"
 #include "envoy/extensions/access_loggers/open_telemetry/v3/logs_service.pb.h"
 
-#include "source/common/access_log/utility.h"
 #include "source/common/common/assert.h"
 #include "source/common/config/utility.h"
 #include "source/common/http/headers.h"

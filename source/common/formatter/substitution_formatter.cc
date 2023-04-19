@@ -13,7 +13,6 @@
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/upstream/upstream.h"
 
-#include "source/common/access_log/utility.h"
 #include "source/common/api/os_sys_calls_impl.h"
 #include "source/common/common/assert.h"
 #include "source/common/common/empty_string.h"
@@ -1675,7 +1674,7 @@ absl::optional<std::string>
 AccessLogTypeFormatter::format(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
                                const Http::ResponseTrailerMap&, const StreamInfo::StreamInfo&,
                                absl::string_view, AccessLog::AccessLogType access_log_type) const {
-  return AccessLog::Utility::getAccessLogTypeString(access_log_type);
+  return AccessLogType_Name(access_log_type);
 }
 
 ProtobufWkt::Value
@@ -1683,7 +1682,7 @@ AccessLogTypeFormatter::formatValue(const Http::RequestHeaderMap&, const Http::R
                                     const Http::ResponseTrailerMap&, const StreamInfo::StreamInfo&,
                                     absl::string_view,
                                     AccessLog::AccessLogType access_log_type) const {
-  return ValueUtil::stringValue(AccessLog::Utility::getAccessLogTypeString(access_log_type));
+  return ValueUtil::stringValue(AccessLogType_Name(access_log_type));
 }
 
 HeaderFormatter::HeaderFormatter(const std::string& main_header,

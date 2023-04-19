@@ -423,7 +423,7 @@ TEST_P(ProtocolIntegrationTest, AccessLogTest) {
   auto response = codec_client_->makeHeaderOnlyRequest(Http::TestRequestHeaderMapImpl{
       {":method", "GET"}, {":path", "/test"}, {":scheme", "http"}, {":authority", "host.com"}});
   waitForNextUpstreamRequest();
-  EXPECT_EQ(absl::StrCat("0 ", AccessLog::AccessLogTypeStrings::get().DownstreamStart),
+  EXPECT_EQ(absl::StrCat("0 ", AccessLogType_Name(AccessLog::AccessLogType::DownstreamStart)),
             waitForAccessLog(access_log_name_, 0, true));
 
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
@@ -432,7 +432,7 @@ TEST_P(ProtocolIntegrationTest, AccessLogTest) {
   EXPECT_EQ("200", response->headers().getStatusValue());
 
   if (downstream_protocol_ != Http::CodecType::HTTP3) {
-    EXPECT_EQ(absl::StrCat("200 ", AccessLog::AccessLogTypeStrings::get().DownstreamEnd),
+    EXPECT_EQ(absl::StrCat("200 ", AccessLogType_Name(AccessLog::AccessLogType::DownstreamEnd)),
               waitForAccessLog(access_log_name_, 1, true));
   }
 }

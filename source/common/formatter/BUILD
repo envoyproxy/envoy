@@ -19,7 +19,6 @@ envoy_cc_library(
         "//envoy/runtime:runtime_interface",
         "//envoy/stream_info:stream_info_interface",
         "//envoy/upstream:upstream_interface",
-        "//source/common/access_log:utility_lib",
         "//source/common/common:assert_lib",
         "//source/common/common:utility_lib",
         "//source/common/config:datasource_lib",
