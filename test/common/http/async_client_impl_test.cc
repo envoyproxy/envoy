@@ -96,6 +96,8 @@ public:
   Router::ContextImpl router_context_;
   AsyncClientImpl client_;
   NiceMock<StreamInfo::MockStreamInfo> stream_info_;
+  NiceMock<StreamInfo::MockStreamInfo> upstream_stream_info_{
+      StreamInfo::FilterState::LifeSpan::Connection};
 };
 
 class AsyncClientImplTracingTest : public AsyncClientImplTest {
@@ -134,7 +136,7 @@ TEST_F(AsyncClientImplTest, BasicStream) {
           [&](ResponseDecoder& decoder, ConnectionPool::Callbacks& callbacks,
               const ConnectionPool::Instance::StreamOptions&) -> ConnectionPool::Cancellable* {
             callbacks.onPoolReady(stream_encoder_, cm_.thread_local_cluster_.conn_pool_.host_,
-                                  stream_info_, {});
+                                  upstream_stream_info_, {});
             response_decoder_ = &decoder;
             return nullptr;
           }));
@@ -180,7 +182,7 @@ TEST_F(AsyncClientImplTest, Basic) {
           [&](ResponseDecoder& decoder, ConnectionPool::Callbacks& callbacks,
               const ConnectionPool::Instance::StreamOptions&) -> ConnectionPool::Cancellable* {
             callbacks.onPoolReady(stream_encoder_, cm_.thread_local_cluster_.conn_pool_.host_,
-                                  stream_info_, {});
+                                  upstream_stream_info_, {});
             response_decoder_ = &decoder;
             return nullptr;
           }));
@@ -227,7 +229,7 @@ TEST_F(AsyncClientImplTest, BasicOngoingRequest) {
           [&](ResponseDecoder& decoder, ConnectionPool::Callbacks& callbacks,
               const ConnectionPool::Instance::StreamOptions&) -> ConnectionPool::Cancellable* {
             callbacks.onPoolReady(stream_encoder_, cm_.thread_local_cluster_.conn_pool_.host_,
-                                  stream_info_, {});
+                                  upstream_stream_info_, {});
             response_decoder_ = &decoder;
             return nullptr;
           }));
@@ -276,7 +278,7 @@ TEST_F(AsyncClientImplTest, OngoingRequestWithWatermarking) {
           [&](ResponseDecoder& decoder, ConnectionPool::Callbacks& callbacks,
               const ConnectionPool::Instance::StreamOptions&) -> ConnectionPool::Cancellable* {
             callbacks.onPoolReady(stream_encoder_, cm_.thread_local_cluster_.conn_pool_.host_,
-                                  stream_info_, {});
+                                  upstream_stream_info_, {});
             // Pretend like the connection is already backed up.
             dynamic_cast<MockStream&>(stream_encoder_.getStream()).runHighWatermarkCallbacks();
             response_decoder_ = &decoder;
@@ -335,7 +337,7 @@ TEST_F(AsyncClientImplTest, OngoingRequestWithWatermarkingAndReset) {
           [&](ResponseDecoder& decoder, ConnectionPool::Callbacks& callbacks,
               const ConnectionPool::Instance::StreamOptions&) -> ConnectionPool::Cancellable* {
             callbacks.onPoolReady(stream_encoder_, cm_.thread_local_cluster_.conn_pool_.host_,
-                                  stream_info_, {});
+                                  upstream_stream_info_, {});
             response_decoder_ = &decoder;
             return nullptr;
           }));
@@ -371,7 +373,7 @@ TEST_F(AsyncClientImplTracingTest, Basic) {
           [&](ResponseDecoder& decoder, ConnectionPool::Callbacks& callbacks,
               const ConnectionPool::Instance::StreamOptions&) -> ConnectionPool::Cancellable* {
             callbacks.onPoolReady(stream_encoder_, cm_.thread_local_cluster_.conn_pool_.host_,
-                                  stream_info_, {});
+                                  upstream_stream_info_, {});
             response_decoder_ = &decoder;
             return nullptr;
           }));
@@ -423,7 +425,7 @@ TEST_F(AsyncClientImplTracingTest, BasicNamedChildSpan) {
           [&](ResponseDecoder& decoder, ConnectionPool::Callbacks& callbacks,
               const ConnectionPool::Instance::StreamOptions&) -> ConnectionPool::Cancellable* {
             callbacks.onPoolReady(stream_encoder_, cm_.thread_local_cluster_.conn_pool_.host_,
-                                  stream_info_, {});
+                                  upstream_stream_info_, {});
             response_decoder_ = &decoder;
             return nullptr;
           }));
@@ -475,7 +477,7 @@ TEST_F(AsyncClientImplTracingTest, BasicNamedChildSpanKeepParentSampling) {
           [&](ResponseDecoder& decoder, ConnectionPool::Callbacks& callbacks,
               const ConnectionPool::Instance::StreamOptions&) -> ConnectionPool::Cancellable* {
             callbacks.onPoolReady(stream_encoder_, cm_.thread_local_cluster_.conn_pool_.host_,
-                                  stream_info_, {});
+                                  upstream_stream_info_, {});
             response_decoder_ = &decoder;
             return nullptr;
           }));
@@ -526,7 +528,7 @@ TEST_F(AsyncClientImplTest, BasicHashPolicy) {
           [&](ResponseDecoder& decoder, ConnectionPool::Callbacks& callbacks,
               const ConnectionPool::Instance::StreamOptions&) -> ConnectionPool::Cancellable* {
             callbacks.onPoolReady(stream_encoder_, cm_.thread_local_cluster_.conn_pool_.host_,
-                                  stream_info_, {});
+                                  upstream_stream_info_, {});
             response_decoder_ = &decoder;
             return nullptr;
           }));
@@ -571,7 +573,7 @@ TEST_F(AsyncClientImplTest, WithoutMetadata) {
           [&](ResponseDecoder& decoder, ConnectionPool::Callbacks& callbacks,
               const ConnectionPool::Instance::StreamOptions&) -> ConnectionPool::Cancellable* {
             callbacks.onPoolReady(stream_encoder_, cm_.thread_local_cluster_.conn_pool_.host_,
-                                  stream_info_, {});
+                                  upstream_stream_info_, {});
             response_decoder_ = &decoder;
             return nullptr;
           }));
@@ -615,7 +617,7 @@ TEST_F(AsyncClientImplTest, WithMetadata) {
           [&](ResponseDecoder& decoder, ConnectionPool::Callbacks& callbacks,
               const ConnectionPool::Instance::StreamOptions&) -> ConnectionPool::Cancellable* {
             callbacks.onPoolReady(stream_encoder_, cm_.thread_local_cluster_.conn_pool_.host_,
-                                  stream_info_, {});
+                                  upstream_stream_info_, {});
             response_decoder_ = &decoder;
             return nullptr;
           }));
@@ -666,7 +668,7 @@ TEST_F(AsyncClientImplTest, Retry) {
           [&](ResponseDecoder& decoder, ConnectionPool::Callbacks& callbacks,
               const ConnectionPool::Instance::StreamOptions&) -> ConnectionPool::Cancellable* {
             callbacks.onPoolReady(stream_encoder_, cm_.thread_local_cluster_.conn_pool_.host_,
-                                  stream_info_, {});
+                                  upstream_stream_info_, {});
             response_decoder_ = &decoder;
             return nullptr;
           }));
@@ -690,7 +692,7 @@ TEST_F(AsyncClientImplTest, Retry) {
           [&](ResponseDecoder& decoder, ConnectionPool::Callbacks& callbacks,
               const ConnectionPool::Instance::StreamOptions&) -> ConnectionPool::Cancellable* {
             callbacks.onPoolReady(stream_encoder_, cm_.thread_local_cluster_.conn_pool_.host_,
-                                  stream_info_, {});
+                                  upstream_stream_info_, {});
             response_decoder_ = &decoder;
             return nullptr;
           }));
@@ -715,7 +717,7 @@ TEST_F(AsyncClientImplTest, RetryWithStream) {
           [&](ResponseDecoder& decoder, ConnectionPool::Callbacks& callbacks,
               const ConnectionPool::Instance::StreamOptions&) -> ConnectionPool::Cancellable* {
             callbacks.onPoolReady(stream_encoder_, cm_.thread_local_cluster_.conn_pool_.host_,
-                                  stream_info_, {});
+                                  upstream_stream_info_, {});
             response_decoder_ = &decoder;
             return nullptr;
           }));
@@ -742,7 +744,7 @@ TEST_F(AsyncClientImplTest, RetryWithStream) {
           [&](ResponseDecoder& decoder, ConnectionPool::Callbacks& callbacks,
               const ConnectionPool::Instance::StreamOptions&) -> ConnectionPool::Cancellable* {
             callbacks.onPoolReady(stream_encoder_, cm_.thread_local_cluster_.conn_pool_.host_,
-                                  stream_info_, {});
+                                  upstream_stream_info_, {});
             response_decoder_ = &decoder;
             return nullptr;
           }));
@@ -768,7 +770,7 @@ TEST_F(AsyncClientImplTest, DataBufferForRetryOverflow) {
           [&](ResponseDecoder& decoder, ConnectionPool::Callbacks& callbacks,
               const ConnectionPool::Instance::StreamOptions&) -> ConnectionPool::Cancellable* {
             callbacks.onPoolReady(stream_encoder_, cm_.thread_local_cluster_.conn_pool_.host_,
-                                  stream_info_, {});
+                                  upstream_stream_info_, {});
             response_decoder_ = &decoder;
             return nullptr;
           }));
@@ -799,7 +801,7 @@ TEST_F(AsyncClientImplTest, DataBufferForRetryOverflow) {
           [&](ResponseDecoder& decoder, ConnectionPool::Callbacks& callbacks,
               const ConnectionPool::Instance::StreamOptions&) -> ConnectionPool::Cancellable* {
             callbacks.onPoolReady(stream_encoder_, cm_.thread_local_cluster_.conn_pool_.host_,
-                                  stream_info_, {});
+                                  upstream_stream_info_, {});
             response_decoder_ = &decoder;
             return nullptr;
           }));
@@ -828,7 +830,7 @@ TEST_F(AsyncClientImplTest, MultipleStreams) {
           [&](ResponseDecoder& decoder, ConnectionPool::Callbacks& callbacks,
               const ConnectionPool::Instance::StreamOptions&) -> ConnectionPool::Cancellable* {
             callbacks.onPoolReady(stream_encoder_, cm_.thread_local_cluster_.conn_pool_.host_,
-                                  stream_info_, {});
+                                  upstream_stream_info_, {});
             response_decoder_ = &decoder;
             return nullptr;
           }));
@@ -856,7 +858,7 @@ TEST_F(AsyncClientImplTest, MultipleStreams) {
           [&](ResponseDecoder& decoder, ConnectionPool::Callbacks& callbacks,
               const ConnectionPool::Instance::StreamOptions&) -> ConnectionPool::Cancellable* {
             callbacks.onPoolReady(stream_encoder2, cm_.thread_local_cluster_.conn_pool_.host_,
-                                  stream_info_, {});
+                                  upstream_stream_info_, {});
             response_decoder2 = &decoder;
             return nullptr;
           }));
@@ -893,7 +895,7 @@ TEST_F(AsyncClientImplTest, MultipleRequests) {
           [&](ResponseDecoder& decoder, ConnectionPool::Callbacks& callbacks,
               const ConnectionPool::Instance::StreamOptions&) -> ConnectionPool::Cancellable* {
             callbacks.onPoolReady(stream_encoder_, cm_.thread_local_cluster_.conn_pool_.host_,
-                                  stream_info_, {});
+                                  upstream_stream_info_, {});
             response_decoder_ = &decoder;
             return nullptr;
           }));
@@ -915,7 +917,7 @@ TEST_F(AsyncClientImplTest, MultipleRequests) {
           [&](ResponseDecoder& decoder, ConnectionPool::Callbacks& callbacks,
               const ConnectionPool::Instance::StreamOptions&) -> ConnectionPool::Cancellable* {
             callbacks.onPoolReady(stream_encoder2, cm_.thread_local_cluster_.conn_pool_.host_,
-                                  stream_info_, {});
+                                  upstream_stream_info_, {});
             response_decoder2 = &decoder;
             return nullptr;
           }));
@@ -935,7 +937,7 @@ TEST_F(AsyncClientImplTest, MultipleRequests) {
           [&](ResponseDecoder& decoder, ConnectionPool::Callbacks& callbacks,
               const ConnectionPool::Instance::StreamOptions&) -> ConnectionPool::Cancellable* {
             callbacks.onPoolReady(stream_encoder3, cm_.thread_local_cluster_.conn_pool_.host_,
-                                  stream_info_, {});
+                                  upstream_stream_info_, {});
             response_decoder3 = &decoder;
             return nullptr;
           }));
@@ -987,7 +989,7 @@ TEST_F(AsyncClientImplTest, StreamAndRequest) {
           [&](ResponseDecoder& decoder, ConnectionPool::Callbacks& callbacks,
               const ConnectionPool::Instance::StreamOptions&) -> ConnectionPool::Cancellable* {
             callbacks.onPoolReady(stream_encoder_, cm_.thread_local_cluster_.conn_pool_.host_,
-                                  stream_info_, {});
+                                  upstream_stream_info_, {});
             response_decoder_ = &decoder;
             return nullptr;
           }));
@@ -1008,7 +1010,7 @@ TEST_F(AsyncClientImplTest, StreamAndRequest) {
           [&](ResponseDecoder& decoder, ConnectionPool::Callbacks& callbacks,
               const ConnectionPool::Instance::StreamOptions&) -> ConnectionPool::Cancellable* {
             callbacks.onPoolReady(stream_encoder2, cm_.thread_local_cluster_.conn_pool_.host_,
-                                  stream_info_, {});
+                                  upstream_stream_info_, {});
             response_decoder2 = &decoder;
             return nullptr;
           }));
@@ -1049,7 +1051,7 @@ TEST_F(AsyncClientImplTest, StreamWithTrailers) {
           [&](ResponseDecoder& decoder, ConnectionPool::Callbacks& callbacks,
               const ConnectionPool::Instance::StreamOptions&) -> ConnectionPool::Cancellable* {
             callbacks.onPoolReady(stream_encoder_, cm_.thread_local_cluster_.conn_pool_.host_,
-                                  stream_info_, {});
+                                  upstream_stream_info_, {});
             response_decoder_ = &decoder;
             return nullptr;
           }));
@@ -1085,7 +1087,7 @@ TEST_F(AsyncClientImplTest, Trailers) {
           [&](ResponseDecoder& decoder, ConnectionPool::Callbacks& callbacks,
               const ConnectionPool::Instance::StreamOptions&) -> ConnectionPool::Cancellable* {
             callbacks.onPoolReady(stream_encoder_, cm_.thread_local_cluster_.conn_pool_.host_,
-                                  stream_info_, {});
+                                  upstream_stream_info_, {});
             response_decoder_ = &decoder;
             return nullptr;
           }));
@@ -1110,7 +1112,7 @@ TEST_F(AsyncClientImplTest, ImmediateReset) {
           [&](StreamDecoder&, ConnectionPool::Callbacks& callbacks,
               const ConnectionPool::Instance::StreamOptions&) -> ConnectionPool::Cancellable* {
             callbacks.onPoolReady(stream_encoder_, cm_.thread_local_cluster_.conn_pool_.host_,
-                                  stream_info_, {});
+                                  upstream_stream_info_, {});
             return nullptr;
           }));
 
@@ -1135,7 +1137,7 @@ TEST_F(AsyncClientImplTest, LocalResetAfterStreamStart) {
           [&](ResponseDecoder& decoder, ConnectionPool::Callbacks& callbacks,
               const ConnectionPool::Instance::StreamOptions&) -> ConnectionPool::Cancellable* {
             callbacks.onPoolReady(stream_encoder_, cm_.thread_local_cluster_.conn_pool_.host_,
-                                  stream_info_, {});
+                                  upstream_stream_info_, {});
             response_decoder_ = &decoder;
             return nullptr;
           }));
@@ -1174,7 +1176,7 @@ TEST_F(AsyncClientImplTest, SendDataAfterRemoteClosure) {
           [&](ResponseDecoder& decoder, ConnectionPool::Callbacks& callbacks,
               const ConnectionPool::Instance::StreamOptions&) -> ConnectionPool::Cancellable* {
             callbacks.onPoolReady(stream_encoder_, cm_.thread_local_cluster_.conn_pool_.host_,
-                                  stream_info_, {});
+                                  upstream_stream_info_, {});
             response_decoder_ = &decoder;
             return nullptr;
           }));
@@ -1211,7 +1213,7 @@ TEST_F(AsyncClientImplTest, SendTrailersRemoteClosure) {
           [&](ResponseDecoder& decoder, ConnectionPool::Callbacks& callbacks,
               const ConnectionPool::Instance::StreamOptions&) -> ConnectionPool::Cancellable* {
             callbacks.onPoolReady(stream_encoder_, cm_.thread_local_cluster_.conn_pool_.host_,
-                                  stream_info_, {});
+                                  upstream_stream_info_, {});
             response_decoder_ = &decoder;
             return nullptr;
           }));
@@ -1253,7 +1255,7 @@ TEST_F(AsyncClientImplTest, ResetInOnHeaders) {
           [&](StreamDecoder&, ConnectionPool::Callbacks& callbacks,
               const ConnectionPool::Instance::StreamOptions&) -> ConnectionPool::Cancellable* {
             callbacks.onPoolReady(stream_encoder_, cm_.thread_local_cluster_.conn_pool_.host_,
-                                  stream_info_, {});
+                                  upstream_stream_info_, {});
             return nullptr;
           }));
 
@@ -1292,7 +1294,7 @@ TEST_F(AsyncClientImplTest, RemoteResetAfterStreamStart) {
           [&](ResponseDecoder& decoder, ConnectionPool::Callbacks& callbacks,
               const ConnectionPool::Instance::StreamOptions&) -> ConnectionPool::Cancellable* {
             callbacks.onPoolReady(stream_encoder_, cm_.thread_local_cluster_.conn_pool_.host_,
-                                  stream_info_, {});
+                                  upstream_stream_info_, {});
             response_decoder_ = &decoder;
             return nullptr;
           }));
@@ -1329,7 +1331,7 @@ TEST_F(AsyncClientImplTest, ResetAfterResponseStart) {
           [&](ResponseDecoder& decoder, ConnectionPool::Callbacks& callbacks,
               const ConnectionPool::Instance::StreamOptions&) -> ConnectionPool::Cancellable* {
             callbacks.onPoolReady(stream_encoder_, cm_.thread_local_cluster_.conn_pool_.host_,
-                                  stream_info_, {});
+                                  upstream_stream_info_, {});
             response_decoder_ = &decoder;
             return nullptr;
           }));
@@ -1359,7 +1361,7 @@ TEST_F(AsyncClientImplTest, ResetStream) {
           [&](StreamDecoder&, ConnectionPool::Callbacks& callbacks,
               const ConnectionPool::Instance::StreamOptions&) -> ConnectionPool::Cancellable* {
             callbacks.onPoolReady(stream_encoder_, cm_.thread_local_cluster_.conn_pool_.host_,
-                                  stream_info_, {});
+                                  upstream_stream_info_, {});
             return nullptr;
           }));
 
@@ -1378,7 +1380,7 @@ TEST_F(AsyncClientImplTest, CancelRequest) {
           [&](StreamDecoder&, ConnectionPool::Callbacks& callbacks,
               const ConnectionPool::Instance::StreamOptions&) -> ConnectionPool::Cancellable* {
             callbacks.onPoolReady(stream_encoder_, cm_.thread_local_cluster_.conn_pool_.host_,
-                                  stream_info_, {});
+                                  upstream_stream_info_, {});
             return nullptr;
           }));
 
@@ -1398,7 +1400,7 @@ TEST_F(AsyncClientImplTracingTest, CancelRequest) {
           [&](StreamDecoder&, ConnectionPool::Callbacks& callbacks,
               const ConnectionPool::Instance::StreamOptions&) -> ConnectionPool::Cancellable* {
             callbacks.onPoolReady(stream_encoder_, cm_.thread_local_cluster_.conn_pool_.host_,
-                                  stream_info_, {});
+                                  upstream_stream_info_, {});
             return nullptr;
           }));
 
@@ -1442,7 +1444,7 @@ TEST_F(AsyncClientImplTest, DestroyWithActiveStream) {
           [&](StreamDecoder&, ConnectionPool::Callbacks& callbacks,
               const ConnectionPool::Instance::StreamOptions&) -> ConnectionPool::Cancellable* {
             callbacks.onPoolReady(stream_encoder_, cm_.thread_local_cluster_.conn_pool_.host_,
-                                  stream_info_, {});
+                                  upstream_stream_info_, {});
             return nullptr;
           }));
 
@@ -1459,7 +1461,7 @@ TEST_F(AsyncClientImplTest, DestroyWithActiveRequest) {
           [&](StreamDecoder&, ConnectionPool::Callbacks& callbacks,
               const ConnectionPool::Instance::StreamOptions&) -> ConnectionPool::Cancellable* {
             callbacks.onPoolReady(stream_encoder_, cm_.thread_local_cluster_.conn_pool_.host_,
-                                  stream_info_, {});
+                                  upstream_stream_info_, {});
             return nullptr;
           }));
   EXPECT_CALL(stream_encoder_, encodeHeaders(HeaderMapEqualRef(&message_->headers()), true));
@@ -1486,7 +1488,7 @@ TEST_F(AsyncClientImplTracingTest, DestroyWithActiveRequest) {
           [&](StreamDecoder&, ConnectionPool::Callbacks& callbacks,
               const ConnectionPool::Instance::StreamOptions&) -> ConnectionPool::Cancellable* {
             callbacks.onPoolReady(stream_encoder_, cm_.thread_local_cluster_.conn_pool_.host_,
-                                  stream_info_, {});
+                                  upstream_stream_info_, {});
             return nullptr;
           }));
 
@@ -1583,7 +1585,7 @@ TEST_F(AsyncClientImplTest, StreamTimeout) {
           [&](StreamDecoder&, ConnectionPool::Callbacks& callbacks,
               const ConnectionPool::Instance::StreamOptions&) -> ConnectionPool::Cancellable* {
             callbacks.onPoolReady(stream_encoder_, cm_.thread_local_cluster_.conn_pool_.host_,
-                                  stream_info_, {});
+                                  upstream_stream_info_, {});
             return nullptr;
           }));
 
@@ -1618,7 +1620,7 @@ TEST_F(AsyncClientImplTest, StreamTimeoutHeadReply) {
           [&](StreamDecoder&, ConnectionPool::Callbacks& callbacks,
               const ConnectionPool::Instance::StreamOptions&) -> ConnectionPool::Cancellable* {
             callbacks.onPoolReady(stream_encoder_, cm_.thread_local_cluster_.conn_pool_.host_,
-                                  stream_info_, {});
+                                  upstream_stream_info_, {});
             return nullptr;
           }));
 
@@ -1647,7 +1649,7 @@ TEST_F(AsyncClientImplTest, RequestTimeout) {
           [&](StreamDecoder&, ConnectionPool::Callbacks& callbacks,
               const ConnectionPool::Instance::StreamOptions&) -> ConnectionPool::Cancellable* {
             callbacks.onPoolReady(stream_encoder_, cm_.thread_local_cluster_.conn_pool_.host_,
-                                  stream_info_, {});
+                                  upstream_stream_info_, {});
             return nullptr;
           }));
 
@@ -1680,7 +1682,7 @@ TEST_F(AsyncClientImplTracingTest, RequestTimeout) {
           [&](StreamDecoder&, ConnectionPool::Callbacks& callbacks,
               const ConnectionPool::Instance::StreamOptions&) -> ConnectionPool::Cancellable* {
             callbacks.onPoolReady(stream_encoder_, cm_.thread_local_cluster_.conn_pool_.host_,
-                                  stream_info_, {});
+                                  upstream_stream_info_, {});
             return nullptr;
           }));
 
@@ -1726,7 +1728,7 @@ TEST_F(AsyncClientImplTest, DisableTimer) {
           [&](StreamDecoder&, ConnectionPool::Callbacks& callbacks,
               const ConnectionPool::Instance::StreamOptions&) -> ConnectionPool::Cancellable* {
             callbacks.onPoolReady(stream_encoder_, cm_.thread_local_cluster_.conn_pool_.host_,
-                                  stream_info_, {});
+                                  upstream_stream_info_, {});
             return nullptr;
           }));
 
@@ -1748,7 +1750,7 @@ TEST_F(AsyncClientImplTest, DisableTimerWithStream) {
           [&](StreamDecoder&, ConnectionPool::Callbacks& callbacks,
               const ConnectionPool::Instance::StreamOptions&) -> ConnectionPool::Cancellable* {
             callbacks.onPoolReady(stream_encoder_, cm_.thread_local_cluster_.conn_pool_.host_,
-                                  stream_info_, {});
+                                  upstream_stream_info_, {});
             return nullptr;
           }));
 
@@ -1774,7 +1776,7 @@ TEST_F(AsyncClientImplTest, MultipleDataStream) {
           [&](ResponseDecoder& decoder, ConnectionPool::Callbacks& callbacks,
               const ConnectionPool::Instance::StreamOptions&) -> ConnectionPool::Cancellable* {
             callbacks.onPoolReady(stream_encoder_, cm_.thread_local_cluster_.conn_pool_.host_,
-                                  stream_info_, {});
+                                  upstream_stream_info_, {});
             response_decoder_ = &decoder;
             return nullptr;
           }));
