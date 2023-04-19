@@ -32,6 +32,19 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // Fields describing *upstream* interaction will explicitly include ``upstream``
 // in their name.
 
+enum AccessLogType {
+  NotSet = 0;
+  TcpUpstreamConnected = 1;
+  TcpPeriodic = 2;
+  TcpEnd = 3;
+  DownstreamStart = 4;
+  DownstreamPeriodic = 5;
+  DownstreamEnd = 6;
+  UpstreamStart = 7;
+  UpstreamPeriodic = 8;
+  UpstreamEnd = 9;
+}
+
 message TCPAccessLogEntry {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.data.accesslog.v2.TCPAccessLogEntry";
@@ -78,19 +91,6 @@ message ConnectionProperties {
 
   // Number of bytes sent to downstream.
   uint64 sent_bytes = 2;
-}
-
-enum AccessLogType {
-  NotSet = 0;
-  TcpUpstreamConnected = 1;
-  TcpPeriodic = 2;
-  TcpEnd = 3;
-  DownstreamStart = 4;
-  DownstreamPeriodic = 5;
-  DownstreamEnd = 6;
-  UpstreamStart = 7;
-  UpstreamPeriodic = 8;
-  UpstreamEnd = 9;
 }
 
 // Defines fields that are shared by all Envoy access logs.
