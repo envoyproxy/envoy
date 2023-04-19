@@ -249,15 +249,15 @@ InstanceImpl::ThreadLocalPool::threadLocalActiveClient(Upstream::HostConstShared
   }
   ThreadLocalActiveClientPtr& client = client_map_[host];
   if (!client) {
-    if (!config_->connectionRateLimitEnabled() || rate_limiter->consume(1, false) > 0) {
+    if (config_->connectionRateLimitEnabled() && rate_limiter->consume(1, false) == 0) {
+      redis_cluster_stats_.connection_rate_limited_.inc();
+    } else {
       client = std::make_unique<ThreadLocalActiveClient>(*this);
       client->host_ = host;
       client->redis_client_ =
           client_factory_.create(host, dispatcher_, *config_, redis_command_stats_, *(stats_scope_),
                                  auth_username_, auth_password_, false);
       client->redis_client_->addConnectionCallbacks(*client);
-    } else {
-      redis_cluster_stats_.connection_rate_limited_.inc();
     }
   }
   return client;

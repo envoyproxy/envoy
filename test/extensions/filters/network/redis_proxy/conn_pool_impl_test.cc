@@ -79,6 +79,16 @@ public:
       max_upstream_unknown_connections_reached_.value_++;
     }));
 
+    connection_rate_limited_.value_ = 0;
+    ON_CALL(store_, counter(Eq("connection_rate_limited")))
+        .WillByDefault(ReturnRef(connection_rate_limited_));
+    ON_CALL(connection_rate_limited_, value())
+        .WillByDefault(
+            Invoke([&]() -> uint64_t { return connection_rate_limited_.value_; }));
+    ON_CALL(connection_rate_limited_, inc()).WillByDefault(Invoke([&]() {
+      connection_rate_limited_.value_++;
+    }));
+
     cluster_refresh_manager_ =
         std::make_shared<NiceMock<Extensions::Common::Redis::MockClusterRefreshManager>>();
     auto redis_command_stats =
@@ -217,6 +227,11 @@ public:
     return conn_pool_impl->redis_cluster_stats_.max_upstream_unknown_connections_reached_;
   }
 
+  Stats::Counter& connectionRateLimited() {
+    InstanceImpl* conn_pool_impl = dynamic_cast<InstanceImpl*>(conn_pool_.get());
+    return conn_pool_impl->redis_cluster_stats_.connection_rate_limited_;
+  }
+
   // Common::Redis::Client::ClientFactory
   Common::Redis::Client::ClientPtr create(Upstream::HostConstSharedPtr host, Event::Dispatcher&,
                                           const Common::Redis::Client::Config&,
@@ -313,6 +328,7 @@ public:
           ConnPoolSettings::MASTER;
   NiceMock<Stats::MockCounter> upstream_cx_drained_;
   NiceMock<Stats::MockCounter> max_upstream_unknown_connections_reached_;
+  NiceMock<Stats::MockCounter> connection_rate_limited_;
   std::shared_ptr<NiceMock<Extensions::Common::Redis::MockClusterRefreshManager>>
       cluster_refresh_manager_;
   Common::Redis::Client::NoOpTransaction transaction_;
@@ -432,6 +448,7 @@ TEST_F(RedisConnPoolImplTest, RedisConnectionRateLimited) {
   Common::Redis::Client::PoolRequest* request =
       conn_pool_->makeRequest("hash_key", ConnPool::RespVariant(value), callbacks, transaction_);
   EXPECT_NE(nullptr, request);
+  EXPECT_EQ(connectionRateLimited().value(), 0);
 
   // close local and reconnect, should be rate limited and get null
   EXPECT_CALL(tls_.dispatcher_, deferredDelete_(_));
@@ -450,6 +467,7 @@ TEST_F(RedisConnPoolImplTest, RedisConnectionRateLimited) {
   Common::Redis::Client::PoolRequest* request2 =
       conn_pool_->makeRequest("hash_key", ConnPool::RespVariant(value), callbacks, transaction_);
   EXPECT_EQ(nullptr, request2);
+  EXPECT_EQ(connectionRateLimited().value(), 1);
 
   EXPECT_CALL(active_request, cancel());
   EXPECT_CALL(callbacks, onFailure_());

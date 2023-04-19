@@ -130,6 +130,7 @@ message RedisProxy {
 
     // Ops or connection timeout triggers reconnection to redis server which could result in reconnection
     // storm to busy redis server. This config is a protection to rate limit reconnection rate.
+    // If not set, there will be no rate limiting on the reconnection.
     ConnectionRateLimit connection_rate_limit = 10;
   }
 
