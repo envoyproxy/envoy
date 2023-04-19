@@ -48,6 +48,10 @@ namespace Envoy {
 
 #if defined(__has_feature) && __has_feature(thread_sanitizer)
 #define TSAN_TIMEOUT_FACTOR 3
+#elif defined(__has_feature) && __has_feature(address_sanitizer)
+#define TSAN_TIMEOUT_FACTOR 3
+#elif defined(__has_feature) && __has_feature(memory_sanitizer)
+#define TSAN_TIMEOUT_FACTOR 3
 #elif defined(ENVOY_CONFIG_COVERAGE)
 #define TSAN_TIMEOUT_FACTOR 3
 #else
