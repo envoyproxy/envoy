@@ -167,16 +167,40 @@ Http::FilterDataStatus CacheFilter::encodeData(Buffer::Instance& data, bool end_
   }
   if (insert_) {
     ENVOY_STREAM_LOG(debug, "CacheFilter::encodeData inserting body", *encoder_callbacks_);
-    // TODO(toddmgreer): Wait for the cache if necessary.
+    waiting_for_insert_body_ = true;
     insert_->insertBody(
-        data, [](bool) {}, end_stream);
+        data,
+        [end_stream, self = weak_from_this(),
+         &dispatcher = decoder_callbacks_->dispatcher()](bool ready) {
+          dispatcher.post([self, ready, end_stream]() {
+            auto pthis = self.lock();
+            if (pthis) {
+              pthis->insertBodyCompleted(ready, end_stream);
+            }
+          });
+        },
+        end_stream);
+    return Http::FilterDataStatus::StopIterationAndWatermark;
+  }
+  return Http::FilterDataStatus::Continue;
+}
+
+void CacheFilter::insertBodyCompleted(bool ready, bool end_stream) {
+  if (!waiting_for_insert_body_) {
+    ENVOY_BUG(true, "insertBodyCompleted called while !waiting_for_insert_body_");
+    return;
+  }
+  waiting_for_insert_body_ = false;
+  if (ready) {
     if (end_stream) {
       insert_status_ = InsertStatus::InsertSucceeded;
     }
-    // insert_status_ remains absl::nullopt if end_stream == false, as we have not completed the
-    // insertion yet.
+  } else {
+    insert_->onDestroy();
+    insert_ = nullptr;
+    insert_status_ = InsertStatus::InsertAbortedByCache;
   }
-  return Http::FilterDataStatus::Continue;
+  encoder_callbacks_->continueEncoding();
 }
 
 Http::FilterTrailersStatus CacheFilter::encodeTrailers(Http::ResponseTrailerMap& trailers) {

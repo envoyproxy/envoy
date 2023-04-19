@@ -81,6 +81,9 @@ private:
   void onBody(Buffer::InstancePtr&& body);
   void onTrailers(Http::ResponseTrailerMapPtr&& trailers);
 
+  // Called when an insertBody operation completes.
+  void insertBodyCompleted(bool ready, bool end_stream);
+
   // Set required state in the CacheFilter for handling a cache hit.
   void handleCacheHit();
 
@@ -126,6 +129,7 @@ private:
   // being cancelled.
   InsertStatus insertStatus() const;
 
+  bool waiting_for_insert_body_ = false;
   TimeSource& time_source_;
   OptRef<HttpCache> cache_;
   LookupContextPtr lookup_;

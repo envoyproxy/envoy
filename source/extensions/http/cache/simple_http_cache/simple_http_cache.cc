@@ -94,7 +94,6 @@ public:
                   bool end_stream) override {
     ASSERT(!committed_);
     ASSERT(ready_for_next_chunk || end_stream);
-
     body_.add(chunk);
     if (end_stream) {
       ready_for_next_chunk(commit());

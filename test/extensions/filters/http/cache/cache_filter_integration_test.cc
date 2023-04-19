@@ -76,16 +76,22 @@ public:
     return response_decoder;
   }
 
-  std::function<void()>
-  simulateUpstreamResponse(const Http::TestResponseHeaderMapImpl& headers,
-                           OptRef<const std::string> body,
-                           OptRef<const Http::TestResponseTrailerMapImpl> trailers) {
+  // split_body allows us to test the behavior when encodeData is in more than one part.
+  std::function<void()> simulateUpstreamResponse(
+      const Http::TestResponseHeaderMapImpl& headers, OptRef<const std::string> body,
+      OptRef<const Http::TestResponseTrailerMapImpl> trailers, bool split_body = false) {
     return [this, headers = std::move(headers), body = std::move(body),
-            trailers = std::move(trailers)]() {
+            trailers = std::move(trailers), split_body]() {
       waitForNextUpstreamRequest();
       upstream_request_->encodeHeaders(headers, /*end_stream=*/!body);
       if (body.has_value()) {
-        upstream_request_->encodeData(body.ref(), !trailers.has_value());
+        if (split_body) {
+          upstream_request_->encodeData(body.ref().substr(0, body.ref().size() / 2), false);
+          upstream_request_->encodeData(body.ref().substr(body.ref().size() / 2),
+                                        !trailers.has_value());
+        } else {
+          upstream_request_->encodeData(body.ref(), !trailers.has_value());
+        }
       }
       if (trailers.has_value()) {
         upstream_request_->encodeTrailers(trailers.ref());
@@ -124,10 +130,11 @@ TEST_P(CacheIntegrationTest, MissInsertHit) {
   Http::TestResponseHeaderMapImpl response_headers = httpResponseHeadersForBody(response_body);
 
   // Send first request, and get response from upstream.
+  // use split_body to cover multipart body responses.
   {
     IntegrationStreamDecoderPtr response_decoder = sendHeaderOnlyRequestAwaitResponse(
-        request_headers,
-        simulateUpstreamResponse(response_headers, makeOptRef(response_body), empty_trailers_));
+        request_headers, simulateUpstreamResponse(response_headers, makeOptRef(response_body),
+                                                  empty_trailers_, true));
     EXPECT_THAT(response_decoder->headers(), IsSupersetOfHeaders(response_headers));
     EXPECT_EQ(response_decoder->headers().get(Http::CustomHeaders::get().Age).size(), 0);
     EXPECT_EQ(response_decoder->body(), response_body);
