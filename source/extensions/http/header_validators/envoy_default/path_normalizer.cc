@@ -59,6 +59,9 @@ PathNormalizer::normalizeAndDecodeOctet(std::string::iterator iter,
     return {PercentDecodeResult::Invalid};
   }
 
+  const bool preserve_case =
+      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.uhv_preserve_url_encoded_case");
+
   char ch = '\0';
   // Normalize and decode the octet
   for (int i = 0; i < 2; ++i) {
@@ -74,7 +77,9 @@ PathNormalizer::normalizeAndDecodeOctet(std::string::iterator iter,
 
     // normalize
     nibble = nibble >= 'a' ? nibble ^ 0x20 : nibble;
-    *iter = nibble;
+    if (!preserve_case) {
+      *iter = nibble;
+    }
 
     // decode
     int factor = i == 0 ? 16 : 1;
