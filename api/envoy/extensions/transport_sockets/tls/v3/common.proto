@@ -357,7 +357,7 @@ message CertificateValidationContext {
   // that if a CRL is provided for any certificate authority in a trust chain, a CRL must be
   // provided for all certificate authorities in that chain. Failure to do so will result in
   // verification failure for both revoked and unrevoked certificates from that chain.
-  // The behavior of requiring all certificates to contain CRLs if any do can be altered by
+  // The behavior of requiring all certificates to contain CRLs can be altered by
   // setting :ref:`only_verify_leaf_cert_crl <envoy_v3_api_field_extensions.transport_sockets.tls.v3.CertificateValidationContext.only_verify_leaf_cert_crl>`
   // true. If set to true, only the final certificate in the chain undergoes CRL verification.
   //
