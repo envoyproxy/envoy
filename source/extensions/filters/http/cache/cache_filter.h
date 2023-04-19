@@ -81,7 +81,8 @@ private:
   void onBody(Buffer::InstancePtr&& body);
   void onTrailers(Http::ResponseTrailerMapPtr&& trailers);
 
-  // Called when an insertBody operation completes.
+  // Called with the result of the InsertCallback called by the cache implementation,
+  // and the original end_stream value from the encodeBody.
   void insertBodyCompleted(bool ready, bool end_stream);
 
   // Set required state in the CacheFilter for handling a cache hit.
