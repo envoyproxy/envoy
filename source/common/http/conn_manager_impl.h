@@ -304,6 +304,25 @@ private:
     void requestRouteConfigUpdate(
         Http::RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb) override;
 
+    // Set cached route. This method should never be called directly. This is only called in the
+    // setRoute(), clearRouteCache(), and refreshCachedRoute() methods.
+    void setCachedRoute(absl::optional<Router::RouteConstSharedPtr>&& route);
+    // Block the route cache and clear the snapped route config. By doing this the route cache will
+    // not be updated. And if the route config is updated by the RDS, the snapped route config may
+    // be freed before the stream is destroyed.
+    // This will be called automatically at the end of handle response headers.
+    void blockRouteCache();
+    // Return true if the cached route is blocked.
+    bool routeCacheBlocked() const {
+      ENVOY_BUG(!route_cache_blocked_,
+                "Should never try to refresh or clear the route cache when "
+                "it is blocked! To temporarily ignore this new constraint, "
+                "set runtime flag "
+                "`envoy.reloadable_features.prohibit_route_refresh_after_response_headers_sent` "
+                "to `false`");
+      return route_cache_blocked_;
+    }
+
     absl::optional<Router::ConfigConstSharedPtr> routeConfig();
     void traceRequest();
 
@@ -415,8 +434,6 @@ private:
     // destruction.
     DownstreamFilterManager filter_manager_;
 
-    Router::ConfigConstSharedPtr snapped_route_config_;
-    Router::ScopedConfigConstSharedPtr snapped_scoped_routes_config_;
     Tracing::SpanPtr active_span_;
     ResponseEncoder* response_encoder_{};
     Stats::TimespanPtr request_response_timespan_;
@@ -439,8 +456,37 @@ private:
 
     std::chrono::milliseconds idle_timeout_ms_{};
     State state_;
+
     const bool expand_agnostic_stream_lifetime_;
+
+    // Snapshot of the route configuration at the time of request is started. This is used to ensure
+    // that the same route configuration is used throughout the lifetime of the request. This
+    // snapshot will be cleared when the cached route is blocked. Because after that we will not
+    // refresh the cached route and release this snapshot can help to release the memory when the
+    // route configuration is updated frequently and the request is long-lived.
+    Router::ConfigConstSharedPtr snapped_route_config_;
+    Router::ScopedConfigConstSharedPtr snapped_scoped_routes_config_;
+    // This is used to track the route that has been cached in the request. And we will keep this
+    // route alive until the request is finished.
     absl::optional<Router::RouteConstSharedPtr> cached_route_;
+    // This is used to track whether the route has been blocked. If the route is blocked, we can not
+    // clear it or refresh it.
+    bool route_cache_blocked_{false};
+    // This is used to track routes that have been cleared from the request. By this way, all the
+    // configurations that have been used in the processing of the request will be alive until the
+    // request is finished.
+    // For example, if a filter stored a per-route config in the decoding phase and may try to
+    // use it in the encoding phase, but the route is cleared and refreshed by another decoder
+    // filter, we must keep the per-route config alive to avoid use-after-free.
+    // Note that we assume that the number of routes that have been cleared is small. So we use
+    // inline vector to avoid heap allocation. If this assumption is wrong, we should consider using
+    // a list or other data structures.
+    //
+    // TODO(wbpcode): This is a helpless compromise. To avoid exposing the complexity of the route
+    // lifetime management to every HTTP filter, we do a hack here. But if every filter could manage
+    // the lifetime of the route config by itself easily, we could remove this hack.
+    absl::InlinedVector<Router::RouteConstSharedPtr, 3> cleared_cached_routes_;
+
     absl::optional<Upstream::ClusterInfoConstSharedPtr> cached_cluster_info_;
     const std::string* decorated_operation_{nullptr};
     std::unique_ptr<RdsRouteConfigUpdateRequester> route_config_update_requester_;

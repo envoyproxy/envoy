@@ -123,13 +123,11 @@ TEST_F(FileSystemHttpCacheTestWithNoDefaultCache, InitialStatsAreSetCorrectly) {
   cache_ = std::dynamic_pointer_cast<FileSystemHttpCache>(
       http_cache_factory_->getCache(cacheConfig(cfg), context_));
   waitForEvictionThreadIdle();
-  // Stats validation disabled as stats validation seems to be flaky.
-  // https://github.com/envoyproxy/envoy/issues/26261
-  // EXPECT_EQ(cache_->stats().size_limit_bytes_.value(), max_size);
-  // EXPECT_EQ(cache_->stats().size_limit_count_.value(), max_count);
-  // EXPECT_EQ(cache_->stats().size_bytes_.value(), file_1_contents.size() +
-  // file_2_contents.size()); EXPECT_EQ(cache_->stats().size_count_.value(), 2);
-  // EXPECT_EQ(cache_->stats().eviction_runs_.value(), 0);
+  EXPECT_EQ(cache_->stats().size_limit_bytes_.value(), max_size);
+  EXPECT_EQ(cache_->stats().size_limit_count_.value(), max_count);
+  EXPECT_EQ(cache_->stats().size_bytes_.value(), file_1_contents.size() + file_2_contents.size());
+  EXPECT_EQ(cache_->stats().size_count_.value(), 2);
+  EXPECT_EQ(cache_->stats().eviction_runs_.value(), 0);
 }
 
 TEST_F(FileSystemHttpCacheTestWithNoDefaultCache, EvictsOldestFilesUntilUnderCountLimit) {
@@ -144,20 +142,16 @@ TEST_F(FileSystemHttpCacheTestWithNoDefaultCache, EvictsOldestFilesUntilUnderCou
   cache_ = std::dynamic_pointer_cast<FileSystemHttpCache>(
       http_cache_factory_->getCache(cacheConfig(cfg), context_));
   waitForEvictionThreadIdle();
-  // Stats validation disabled as stats validation seems to be flaky.
-  // https://github.com/envoyproxy/envoy/issues/26261
-  // EXPECT_EQ(cache_->stats().eviction_runs_.value(), 0);
-  // EXPECT_EQ(cache_->stats().size_bytes_.value(), file_contents.size() * 2);
-  // EXPECT_EQ(cache_->stats().size_count_.value(), 2);
+  EXPECT_EQ(cache_->stats().eviction_runs_.value(), 0);
+  EXPECT_EQ(cache_->stats().size_bytes_.value(), file_contents.size() * 2);
+  EXPECT_EQ(cache_->stats().size_count_.value(), 2);
   env_.writeStringToFileForTest(absl::StrCat(cache_path_, "cache-c"), file_contents, true);
   env_.writeStringToFileForTest(absl::StrCat(cache_path_, "cache-d"), file_contents, true);
   cache_->trackFileAdded(file_contents.size());
   cache_->trackFileAdded(file_contents.size());
   waitForEvictionThreadIdle();
-  // Stats validation disabled as stats validation seems to be flaky.
-  // https://github.com/envoyproxy/envoy/issues/26261
-  // EXPECT_EQ(cache_->stats().size_bytes_.value(), file_contents.size() * 2);
-  // EXPECT_EQ(cache_->stats().size_count_.value(), 2);
+  EXPECT_EQ(cache_->stats().size_bytes_.value(), file_contents.size() * 2);
+  EXPECT_EQ(cache_->stats().size_count_.value(), 2);
   EXPECT_FALSE(Filesystem::fileSystemForTest().fileExists(absl::StrCat(cache_path_, "cache-a")));
   EXPECT_FALSE(Filesystem::fileSystemForTest().fileExists(absl::StrCat(cache_path_, "cache-b")));
   EXPECT_TRUE(Filesystem::fileSystemForTest().fileExists(absl::StrCat(cache_path_, "cache-c")));
@@ -165,9 +159,7 @@ TEST_F(FileSystemHttpCacheTestWithNoDefaultCache, EvictsOldestFilesUntilUnderCou
   // There may have been one or two eviction runs here, because there's a race
   // between the eviction and the second file being added. Either amount of runs
   // is valid, as the eventual consistency is achieved either way.
-  // Stats validation disabled as stats validation seems to be flaky.
-  // https://github.com/envoyproxy/envoy/issues/26261
-  // EXPECT_THAT(cache_->stats().eviction_runs_.value(), testing::AnyOf(1, 2));
+  EXPECT_THAT(cache_->stats().eviction_runs_.value(), testing::AnyOf(1, 2));
 }
 
 TEST_F(FileSystemHttpCacheTestWithNoDefaultCache, EvictsOldestFilesUntilUnderSizeLimit) {
@@ -183,20 +175,18 @@ TEST_F(FileSystemHttpCacheTestWithNoDefaultCache, EvictsOldestFilesUntilUnderSiz
   cache_ = std::dynamic_pointer_cast<FileSystemHttpCache>(
       http_cache_factory_->getCache(cacheConfig(cfg), context_));
   waitForEvictionThreadIdle();
-  // Stats expectations disabled as stats validation seems to be flaky.
-  // https://github.com/envoyproxy/envoy/issues/26261
-  // EXPECT_EQ(cache_->stats().eviction_runs_.value(), 0);
+  EXPECT_EQ(cache_->stats().eviction_runs_.value(), 0);
   env_.writeStringToFileForTest(absl::StrCat(cache_path_, "cache-c"), large_file_contents, true);
-  // EXPECT_EQ(cache_->stats().size_bytes_.value(), file_contents.size() * 2);
-  // EXPECT_EQ(cache_->stats().size_count_.value(), 2);
+  EXPECT_EQ(cache_->stats().size_bytes_.value(), file_contents.size() * 2);
+  EXPECT_EQ(cache_->stats().size_count_.value(), 2);
   cache_->trackFileAdded(large_file_contents.size());
   waitForEvictionThreadIdle();
-  // EXPECT_EQ(cache_->stats().size_bytes_.value(), large_file_contents.size());
-  // EXPECT_EQ(cache_->stats().size_count_.value(), 1);
+  EXPECT_EQ(cache_->stats().size_bytes_.value(), large_file_contents.size());
+  EXPECT_EQ(cache_->stats().size_count_.value(), 1);
   EXPECT_FALSE(Filesystem::fileSystemForTest().fileExists(absl::StrCat(cache_path_, "cache-a")));
   EXPECT_FALSE(Filesystem::fileSystemForTest().fileExists(absl::StrCat(cache_path_, "cache-b")));
   EXPECT_TRUE(Filesystem::fileSystemForTest().fileExists(absl::StrCat(cache_path_, "cache-c")));
-  // EXPECT_EQ(cache_->stats().eviction_runs_.value(), 1);
+  EXPECT_EQ(cache_->stats().eviction_runs_.value(), 1);
 }
 
 class FileSystemHttpCacheTest : public FileSystemCacheTestContext, public ::testing::Test {
@@ -217,30 +207,34 @@ MATCHER_P2(IsStatTag, name, value, "") {
 TEST_F(FileSystemHttpCacheTest, StatsAreConstructedCorrectly) {
   std::string cache_path_no_periods = absl::StrReplaceAll(cache_path_, {{".", "_"}});
   // Validate that a gauge has appropriate name and tags.
-  // Stats expectations disabled as stats validation seems to be flaky.
-  // https://github.com/envoyproxy/envoy/issues/26261
-  // EXPECT_EQ(cache_->stats().size_bytes_.tagExtractedName(), "cache.size_bytes");
-  // EXPECT_THAT(cache_->stats().size_bytes_.tags(),
-  //             ::testing::ElementsAre(IsStatTag("cache_path", cache_path_no_periods)));
+  EXPECT_EQ(cache_->stats().size_bytes_.tagExtractedName(), "cache.size_bytes");
+  EXPECT_THAT(cache_->stats().size_bytes_.tags(),
+              ::testing::ElementsAre(IsStatTag("cache_path", cache_path_no_periods)));
   // Validate that a counter has appropriate name and tags.
-  // EXPECT_EQ(cache_->stats().eviction_runs_.tagExtractedName(), "cache.eviction_runs");
-  // EXPECT_THAT(cache_->stats().eviction_runs_.tags(),
-  //             ::testing::ElementsAre(IsStatTag("cache_path", cache_path_no_periods)));
+  EXPECT_EQ(cache_->stats().eviction_runs_.tagExtractedName(), "cache.eviction_runs");
+  EXPECT_THAT(cache_->stats().eviction_runs_.tags(),
+              ::testing::ElementsAre(IsStatTag("cache_path", cache_path_no_periods)));
+  EXPECT_EQ(cache_->stats().cache_hit_.tagExtractedName(), "cache.event");
+  EXPECT_EQ(cache_->stats().cache_miss_.tagExtractedName(), "cache.event");
+  EXPECT_THAT(cache_->stats().cache_hit_.tags(),
+              ::testing::ElementsAre(IsStatTag("cache_path", cache_path_no_periods),
+                                     IsStatTag("event_type", "hit")));
+  EXPECT_THAT(cache_->stats().cache_miss_.tags(),
+              ::testing::ElementsAre(IsStatTag("cache_path", cache_path_no_periods),
+                                     IsStatTag("event_type", "miss")));
 }
 
 TEST_F(FileSystemHttpCacheTest, TrackFileRemovedClampsAtZero) {
   cache_->trackFileAdded(1);
-  // Stats expectations disabled as stats validation seems to be flaky.
-  // https://github.com/envoyproxy/envoy/issues/26261
-  // EXPECT_EQ(cache_->stats().size_bytes_.value(), 1);
-  // EXPECT_EQ(cache_->stats().size_count_.value(), 1);
+  EXPECT_EQ(cache_->stats().size_bytes_.value(), 1);
+  EXPECT_EQ(cache_->stats().size_count_.value(), 1);
   cache_->trackFileRemoved(8);
-  // EXPECT_EQ(cache_->stats().size_bytes_.value(), 0);
-  // EXPECT_EQ(cache_->stats().size_count_.value(), 0);
+  EXPECT_EQ(cache_->stats().size_bytes_.value(), 0);
+  EXPECT_EQ(cache_->stats().size_count_.value(), 0);
   // Remove a second time to ensure that count going below zero also clamps at zero.
   cache_->trackFileRemoved(8);
-  // EXPECT_EQ(cache_->stats().size_bytes_.value(), 0);
-  // EXPECT_EQ(cache_->stats().size_count_.value(), 0);
+  EXPECT_EQ(cache_->stats().size_bytes_.value(), 0);
+  EXPECT_EQ(cache_->stats().size_count_.value(), 0);
 }
 
 TEST_F(FileSystemHttpCacheTest, ExceptionOnTryingToCreateCachesWithDistinctConfigsOnSamePath) {
@@ -529,11 +523,9 @@ TEST_F(FileSystemHttpCacheTestWithMockFiles, InsertWithMultipleChunksBeforeCallb
   mock_async_file_manager_->nextActionCompletes(absl::OkStatus());
   // Should have been 4 callbacks; insertHeaders, insertBody, insertBody, insertTrailers.
   EXPECT_EQ(true_callbacks_called_, 4);
-  // Skipped as stats validation seems to be flaky. https://github.com/envoyproxy/envoy/issues/26261
-  // EXPECT_EQ(cache_->stats().size_bytes_.value(), headers_size_ + body1.size() + body2.size() +
-  //                                                    trailers_size_ +
-  //                                                    CacheFileFixedBlock::size());
-  // EXPECT_EQ(cache_->stats().size_count_.value(), 1);
+  EXPECT_EQ(cache_->stats().size_bytes_.value(), headers_size_ + body1.size() + body2.size() +
+                                                     trailers_size_ + CacheFileFixedBlock::size());
+  EXPECT_EQ(cache_->stats().size_count_.value(), 1);
 }
 
 TEST_F(FileSystemHttpCacheTestWithMockFiles, FailedOpenForReadReturnsMiss) {
@@ -547,16 +539,16 @@ TEST_F(FileSystemHttpCacheTestWithMockFiles, FailedOpenForReadReturnsMiss) {
   // File handle didn't get used but is expected to be closed.
   EXPECT_OK(mock_async_file_handle_->close([](absl::Status) {}));
   EXPECT_EQ(result.cache_entry_status_, CacheEntryStatus::Unusable);
+  EXPECT_EQ(cache_->stats().cache_miss_.value(), 1);
+  EXPECT_EQ(cache_->stats().cache_hit_.value(), 0);
 }
 
 TEST_F(FileSystemHttpCacheTestWithMockFiles, FailedReadOfHeaderBlockInvalidatesTheCacheEntry) {
   // Fake-add two files of size 12345, so we can validate the stats decrease of removing a file.
   cache_->trackFileAdded(12345);
   cache_->trackFileAdded(12345);
-  // Stats validation disabled as stats validation seems to be flaky.
-  // https://github.com/envoyproxy/envoy/issues/26261
-  // EXPECT_EQ(cache_->stats().size_bytes_.value(), 2 * 12345);
-  // EXPECT_EQ(cache_->stats().size_count_.value(), 2);
+  EXPECT_EQ(cache_->stats().size_bytes_.value(), 2 * 12345);
+  EXPECT_EQ(cache_->stats().size_count_.value(), 2);
   auto lookup = testLookupContext();
   absl::Cleanup destroy_lookup([&lookup]() { lookup->onDestroy(); });
   LookupResult result;
@@ -576,14 +568,12 @@ TEST_F(FileSystemHttpCacheTestWithMockFiles, FailedReadOfHeaderBlockInvalidatesT
   // unlink
   mock_async_file_manager_->nextActionCompletes(absl::OkStatus());
   EXPECT_EQ(result.cache_entry_status_, CacheEntryStatus::Unusable);
-  // Stats validation disabled as stats validation seems to be flaky.
-  // https://github.com/envoyproxy/envoy/issues/26261
-  // // Should have deducted the size of the file that got deleted. Since we started at 2 * 12345,
-  // // this should make the value 12345.
-  // EXPECT_EQ(cache_->stats().size_bytes_.value(), 12345);
-  // // Should have deducted one file for the file that got deleted. Since we started at 2,
-  // // this should make the value 1.
-  // EXPECT_EQ(cache_->stats().size_count_.value(), 1);
+  // Should have deducted the size of the file that got deleted. Since we started at 2 * 12345,
+  // this should make the value 12345.
+  EXPECT_EQ(cache_->stats().size_bytes_.value(), 12345);
+  // Should have deducted one file for the file that got deleted. Since we started at 2,
+  // this should make the value 1.
+  EXPECT_EQ(cache_->stats().size_count_.value(), 1);
 }
 
 Buffer::InstancePtr invalidHeaderBlock() {

@@ -303,6 +303,10 @@ extensions/filters/http/oauth2 @derekargueta @snowp
 /*/extensions/health_checkers/grpc @snowp @zuercher
 /*/extensions/health_checkers/http @snowp @zuercher
 /*/extensions/health_checkers/tcp @snowp @zuercher
+# IP Geolocation
+/*/extensions/filters/http/geoip @nezdolik @ravenblackx
+
+/*/extensions/health_checkers/common @snowp @zuercher
 
 # Intentionally exempt (treated as core code)
 /*/extensions/filters/common @UNOWNED @UNOWNED
@@ -316,13 +320,14 @@ extensions/filters/http/oauth2 @derekargueta @snowp
 /*/extensions/clusters/eds/ @UNOWNED @UNOWNED
 /*/source/extensions/listener_managers/listener_manager @UNOWNED @UNOWNED
 /*/source/extensions/listener_managers/validation_listener_manager @UNOWNED @UNOWNED
+/*/source/extensions/config_subscription/ @UNOWNED @UNOWNED
 
 # URL Pattern Match and Rewrite Library
 /*/extensions/path/uri_template_lib @alyssawilk @yanjunxiang-google
 /*/extensions/path/uri_template_lib/proto @alyssawilk @yanjunxiang-google
 
 # mobile
-/mobile/ @jpsim @Augustyniak @RyanTheOptimist @alyssawilk @abeyad
+/mobile/ @RyanTheOptimist @alyssawilk @abeyad
 
 # Contrib
 /contrib/exe/ @mattklein123 @lizan

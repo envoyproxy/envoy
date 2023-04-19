@@ -365,8 +365,78 @@ TEST_P(CustomResponseIntegrationTest, NoRecursion) {
   // gateway_error_response policy
   default_request_headers_.setHost("original.host");
   response = sendRequestAndWaitForResponse(default_request_headers_, 0, gateway_error_response_, 0);
-  // Verify we get status code 401 for fo1.example
-  EXPECT_EQ("401", response->headers().getStatusValue());
+  // Verify we get status code 299 for fo1.example as set by
+  // gateway_error_action and not 499 or 401 which is the response code of the
+  // error service.
+  EXPECT_EQ("299", response->headers().getStatusValue());
+}
+
+// Verify that we get the response code of the original response if an override
+// response code is not specified.
+TEST_P(CustomResponseIntegrationTest, OriginalResponseCode) {
+  // Make the redirect policy response for gateway_error policy return 401
+  config_helper_.addVirtualHost(TestUtility::parseYaml<VirtualHost>(R"EOF(
+    name: fo1
+    domains: ["fo1.example"]
+    routes:
+    - direct_response:
+        status: 401
+        body:
+          inline_string: fo1
+      match:
+        prefix: "/"
+    )EOF"));
+
+  modifyPolicy<RedirectPolicyProto>(custom_response_filter_config_, "gateway_error_action",
+                                    [](RedirectPolicyProto& policy) {
+                                      policy.set_uri("https://fo1.example");
+                                      policy.clear_status_code();
+                                    });
+
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  // Verify that 400_response policy cannot be triggered by the
+  // gateway_error_response policy
+  default_request_headers_.setHost("original.host");
+  auto response =
+      sendRequestAndWaitForResponse(default_request_headers_, 0, gateway_error_response_, 0);
+  // Verify that we get the original response code 502.
+  EXPECT_EQ("502", response->headers().getStatusValue());
+}
+
+// Verify that we get the response code of the original response if an override
+// response code is not specified.
+TEST_P(CustomResponseIntegrationTest, OriginalResponseCodeOverrides200) {
+  // Make the redirect policy response for gateway_error policy return 401
+  config_helper_.addVirtualHost(TestUtility::parseYaml<VirtualHost>(R"EOF(
+    name: fo1
+    domains: ["fo1.example"]
+    routes:
+    - direct_response:
+        status: 200
+        body:
+          inline_string: fo1
+      match:
+        prefix: "/"
+    )EOF"));
+
+  modifyPolicy<RedirectPolicyProto>(custom_response_filter_config_, "gateway_error_action",
+                                    [](RedirectPolicyProto& policy) {
+                                      policy.set_uri("https://fo1.example");
+                                      policy.clear_status_code();
+                                    });
+
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  // Verify that 400_response policy cannot be triggered by the
+  // gateway_error_response policy
+  default_request_headers_.setHost("original.host");
+  auto response = sendRequestAndWaitForResponse(
+      default_request_headers_, 0, gateway_error_response_, 0, 0, std::chrono::seconds(500));
+  // Verify that we get the original response code 502.
+  EXPECT_EQ("502", response->headers().getStatusValue());
 }
 
 // Verify that we can NOT intercept local replies sent during decode
@@ -639,7 +709,9 @@ TEST_P(CustomResponseIntegrationTest, ModifyRequestHeaders) {
       default_request_headers_, 0,
       ::Envoy::Http::TestResponseHeaderMapImpl{{":status", "520"}, {"content-length", "0"}}, 0, 0,
       std::chrono::minutes(20));
-  EXPECT_EQ("220", response->headers().getStatusValue());
+  // Verify that we get the original response code in the absence of an
+  // override.
+  EXPECT_EQ("520", response->headers().getStatusValue());
   EXPECT_EQ("Modify action response body", response->body());
 }
 
