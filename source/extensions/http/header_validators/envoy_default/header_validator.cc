@@ -404,7 +404,7 @@ constexpr std::array<uint32_t, 8> kPathHeaderCharTableWithBackSlashAllowed = {
     0b00000000000000000000000000000000,
     0b00000000000000000000000000000000,
 };
-} //namespace
+} // namespace
 
 HeaderValidator::HeaderValueValidationResult
 HeaderValidator::validatePathHeaderCharacters(const HeaderString& value) {
@@ -419,7 +419,7 @@ HeaderValidator::validatePathHeaderCharacters(const HeaderString& value) {
   const bool allow_backslash =
       Runtime::runtimeFeatureEnabled("envoy.reloadable_features.uhv_translate_backslash_to_slash");
 
-  const std::array<uint32_t, 8> &allowed_path_chracters =
+  const std::array<uint32_t, 8>& allowed_path_chracters =
       allow_backslash ? kPathHeaderCharTableWithBackSlashAllowed : kPathHeaderCharTable;
 
   // Validate the path component of the URI
