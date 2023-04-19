@@ -9,6 +9,11 @@ minor_behavior_changes:
   change: |
     Increase granularity mapping connection pool failures to specific stream failure reasons to make it more transparent why
     the stream is reset when a connection pool's connection fails.
+- area: uhv
+  change: |
+    Preserve case of %-encoded triplets in the default header validator. This behavior can be reverted by setting runtime flag
+    ``envoy.reloadable_features.uhv_preserve_url_encoded_case`` to false, in which case %-encoded triplets are normalized
+    to uppercase characters. This setting is only applicable when the Unversal Header Validator is enabled and has no effect otherwise.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
