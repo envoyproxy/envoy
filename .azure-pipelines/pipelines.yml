@@ -253,7 +253,7 @@ stages:
   jobs:
   - job: release
     timeoutInMinutes: 120
-    pool: x64-large
+    pool: envoy-x64-large
     steps:
     - template: bazel.yml
       parameters:
@@ -268,7 +268,7 @@ stages:
   jobs:
   - job: release
     timeoutInMinutes: 120
-    pool: "arm-large"
+    pool: "envoy-arm-large"
     steps:
     - template: bazel.yml
       parameters:
@@ -316,7 +316,7 @@ stages:
     displayName: "linux_x64"
     dependsOn: []
     timeoutInMinutes: 180
-    pool: "x64-large"
+    pool: "envoy-x64-large"
     strategy:
       maxParallel: 2
       matrix:
@@ -426,7 +426,7 @@ stages:
     displayName: Linux debs (arm64)
     dependsOn: []
     timeoutInMinutes: 120
-    pool: "arm-large"
+    pool: "envoy-arm-large"
     steps:
     - template: bazel.yml
       parameters:
@@ -609,7 +609,7 @@ stages:
     displayName: Verify debs (arm64)
     dependsOn: []
     timeoutInMinutes: 120
-    pool: "arm-large"
+    pool: "envoy-arm-large"
     steps:
     - task: DownloadBuildArtifacts@0
       inputs:
