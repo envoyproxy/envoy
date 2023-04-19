@@ -16,7 +16,7 @@ envoy_cc_library(
         "//envoy/filesystem:filesystem_interface",
         "//envoy/http:header_map_interface",
         "//envoy/stream_info:stream_info_interface",
-        "//source/common/common:empty_string",
         "//source/common/protobuf",
+        "@envoy_api//envoy/data/accesslog/v3:pkg_cc_proto",
     ],
 )

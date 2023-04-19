@@ -17,7 +17,7 @@ public:
       const Http::RequestHeaderMap& request_header, const StreamInfo::StreamInfo& stream_info,
       const envoy::extensions::access_loggers::grpc::v3::CommonGrpcAccessLogConfig&
           filter_states_to_log,
-      AccessLog::AccessLogType access_log_type);
+      AccessLog::AccessLogTypeEnum access_log_type);
 
   static void responseFlagsToAccessLogResponseFlags(
       envoy::data::accesslog::v3::AccessLogCommon& common_access_log,

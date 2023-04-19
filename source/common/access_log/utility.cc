@@ -4,12 +4,10 @@
 
 #include "envoy/access_log/access_log.h"
 
-#include "source/common/common/empty_string.h"
-
 namespace Envoy {
 namespace AccessLog {
 
-const std::string& Utility::getAccessLogTypeString(const AccessLogType access_log_type) {
+const std::string& Utility::getAccessLogTypeString(const AccessLogTypeEnum access_log_type) {
   switch (access_log_type) {
   case AccessLogType::TcpUpstreamConnected:
     return AccessLogTypeStrings::get().TcpUpstreamConnected;
@@ -31,32 +29,6 @@ const std::string& Utility::getAccessLogTypeString(const AccessLogType access_lo
     return AccessLogTypeStrings::get().UpstreamEnd;
   default:
     return AccessLogTypeStrings::get().NotSet;
-  }
-}
-
-AccessLogTypeProto::AccessLogType
-Utility::getAccessLogTypeProto(const AccessLogType access_log_type) {
-  switch (access_log_type) {
-  case AccessLogType::TcpUpstreamConnected:
-    return AccessLogTypeProto::TcpUpstreamConnected;
-  case AccessLogType::TcpPeriodic:
-    return AccessLogTypeProto::TcpPeriodic;
-  case AccessLogType::TcpEnd:
-    return AccessLogTypeProto::TcpEnd;
-  case AccessLogType::DownstreamStart:
-    return AccessLogTypeProto::DownstreamStart;
-  case AccessLogType::DownstreamPeriodic:
-    return AccessLogTypeProto::DownstreamPeriodic;
-  case AccessLogType::DownstreamEnd:
-    return AccessLogTypeProto::DownstreamEnd;
-  case AccessLogType::UpstreamStart:
-    return AccessLogTypeProto::UpstreamStart;
-  case AccessLogType::UpstreamPeriodic:
-    return AccessLogTypeProto::UpstreamPeriodic;
-  case AccessLogType::UpstreamEnd:
-    return AccessLogTypeProto::UpstreamEnd;
-  default:
-    return AccessLogTypeProto::NotSet;
   }
 }
 

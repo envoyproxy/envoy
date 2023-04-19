@@ -26,11 +26,11 @@ public:
   /**
    * Log a completed request if the underlying AccessLog `filter_` allows it.
    */
-  void log(const Http::RequestHeaderMap* request_headers,
-           const Http::ResponseHeaderMap* response_headers,
-           const Http::ResponseTrailerMap* response_trailers,
-           const StreamInfo::StreamInfo& stream_info,
-           AccessLog::AccessLogType access_log_type = AccessLog::AccessLogType::NotSet) override;
+  void
+  log(const Http::RequestHeaderMap* request_headers,
+      const Http::ResponseHeaderMap* response_headers,
+      const Http::ResponseTrailerMap* response_trailers, const StreamInfo::StreamInfo& stream_info,
+      AccessLog::AccessLogTypeEnum access_log_type = AccessLog::AccessLogType::NotSet) override;
 
 private:
   /**
@@ -46,7 +46,7 @@ private:
           const Http::ResponseHeaderMap& response_headers,
           const Http::ResponseTrailerMap& response_trailers,
           const StreamInfo::StreamInfo& stream_info,
-          AccessLog::AccessLogType access_log_type = AccessLog::AccessLogType::NotSet) PURE;
+          AccessLog::AccessLogTypeEnum access_log_type = AccessLog::AccessLogType::NotSet) PURE;
 
   AccessLog::FilterPtr filter_;
 };

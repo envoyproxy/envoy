@@ -73,7 +73,7 @@ public:
 
   void log(const Http::RequestHeaderMap*, const Http::ResponseHeaderMap*,
            const Http::ResponseTrailerMap*, const StreamInfo::StreamInfo& info,
-           AccessLog::AccessLogType) override {
+           AccessLog::AccessLogTypeEnum) override {
     func_(info);
   }
 

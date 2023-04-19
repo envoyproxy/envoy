@@ -33,27 +33,6 @@ TEST(UtilityTest, getAccessLogTypeString) {
             Utility::getAccessLogTypeString(AccessLogType::UpstreamEnd));
 }
 
-TEST(UtilityTest, getAccessLogTypeProto) {
-  EXPECT_EQ(AccessLogTypeProto::NotSet, Utility::getAccessLogTypeProto(AccessLogType::NotSet));
-  EXPECT_EQ(AccessLogTypeProto::TcpUpstreamConnected,
-            Utility::getAccessLogTypeProto(AccessLogType::TcpUpstreamConnected));
-  EXPECT_EQ(AccessLogTypeProto::TcpPeriodic,
-            Utility::getAccessLogTypeProto(AccessLogType::TcpPeriodic));
-  EXPECT_EQ(AccessLogTypeProto::TcpEnd, Utility::getAccessLogTypeProto(AccessLogType::TcpEnd));
-  EXPECT_EQ(AccessLogTypeProto::DownstreamStart,
-            Utility::getAccessLogTypeProto(AccessLogType::DownstreamStart));
-  EXPECT_EQ(AccessLogTypeProto::DownstreamPeriodic,
-            Utility::getAccessLogTypeProto(AccessLogType::DownstreamPeriodic));
-  EXPECT_EQ(AccessLogTypeProto::DownstreamEnd,
-            Utility::getAccessLogTypeProto(AccessLogType::DownstreamEnd));
-  EXPECT_EQ(AccessLogTypeProto::UpstreamStart,
-            Utility::getAccessLogTypeProto(AccessLogType::UpstreamStart));
-  EXPECT_EQ(AccessLogTypeProto::UpstreamPeriodic,
-            Utility::getAccessLogTypeProto(AccessLogType::UpstreamPeriodic));
-  EXPECT_EQ(AccessLogTypeProto::UpstreamEnd,
-            Utility::getAccessLogTypeProto(AccessLogType::UpstreamEnd));
-}
-
 } // namespace
 } // namespace AccessLog
 } // namespace Envoy

@@ -71,7 +71,7 @@ Http::FilterTrailersStatus Filter::encodeTrailers(Http::ResponseTrailerMap& trai
 
 void Filter::log(const Http::RequestHeaderMap*, const Http::ResponseHeaderMap*,
                  const Http::ResponseTrailerMap*, const StreamInfo::StreamInfo&,
-                 AccessLog::AccessLogType) {
+                 AccessLog::AccessLogTypeEnum) {
   if (tapper_ != nullptr && tapper_->onDestroyLog()) {
     config_->stats().rq_tapped_.inc();
   }

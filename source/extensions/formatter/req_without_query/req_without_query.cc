@@ -30,7 +30,7 @@ absl::optional<std::string>
 ReqWithoutQuery::format(const Http::RequestHeaderMap& request, const Http::ResponseHeaderMap&,
                         const Http::ResponseTrailerMap&, const StreamInfo::StreamInfo&,
                         absl::string_view,
-                        AccessLog::AccessLogType = AccessLog::AccessLogType::NotSet) const {
+                        AccessLog::AccessLogTypeEnum = AccessLog::AccessLogType::NotSet) const {
   const Http::HeaderEntry* header = findHeader(request);
   if (!header) {
     return absl::nullopt;
@@ -42,11 +42,10 @@ ReqWithoutQuery::format(const Http::RequestHeaderMap& request, const Http::Respo
   return val;
 }
 
-ProtobufWkt::Value
-ReqWithoutQuery::formatValue(const Http::RequestHeaderMap& request, const Http::ResponseHeaderMap&,
-                             const Http::ResponseTrailerMap&, const StreamInfo::StreamInfo&,
-                             absl::string_view,
-                             AccessLog::AccessLogType = AccessLog::AccessLogType::NotSet) const {
+ProtobufWkt::Value ReqWithoutQuery::formatValue(
+    const Http::RequestHeaderMap& request, const Http::ResponseHeaderMap&,
+    const Http::ResponseTrailerMap&, const StreamInfo::StreamInfo&, absl::string_view,
+    AccessLog::AccessLogTypeEnum = AccessLog::AccessLogType::NotSet) const {
   const Http::HeaderEntry* header = findHeader(request);
   if (!header) {
     return ValueUtil::nullValue();

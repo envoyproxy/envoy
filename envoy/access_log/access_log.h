@@ -4,11 +4,11 @@
 #include <string>
 
 #include "envoy/common/pure.h"
+#include "envoy/data/accesslog/v3/accesslog.pb.h"
 #include "envoy/filesystem/filesystem.h"
 #include "envoy/http/header_map.h"
 #include "envoy/stream_info/stream_info.h"
 
-#include "source/common/common/empty_string.h"
 #include "source/common/protobuf/protobuf.h"
 
 namespace Envoy {
@@ -57,7 +57,7 @@ public:
 using AccessLogManagerPtr = std::unique_ptr<AccessLogManager>;
 
 struct AccessLogTypeStringValues {
-  const std::string NotSet = EMPTY_STRING;
+  const std::string NotSet = "NotSet";
   const std::string TcpUpstreamConnected = "TcpUpstreamConnected";
   const std::string TcpPeriodic = "TcpPeriodic";
   const std::string TcpEnd = "TcpEnd";
@@ -70,19 +70,8 @@ struct AccessLogTypeStringValues {
 };
 
 using AccessLogTypeStrings = ConstSingleton<AccessLogTypeStringValues>;
-
-enum class AccessLogType {
-  NotSet,
-  TcpUpstreamConnected,
-  TcpPeriodic,
-  TcpEnd,
-  DownstreamStart,
-  DownstreamPeriodic,
-  DownstreamEnd,
-  UpstreamStart,
-  UpstreamPeriodic,
-  UpstreamEnd,
-};
+using AccessLogTypeEnum = envoy::data::accesslog::v3::AccessLogCommon::AccessLogType;
+using AccessLogType = envoy::data::accesslog::v3::AccessLogCommon;
 
 /**
  * Interface for access log filters.
@@ -122,7 +111,7 @@ public:
                    const Http::ResponseHeaderMap* response_headers,
                    const Http::ResponseTrailerMap* response_trailers,
                    const StreamInfo::StreamInfo& stream_info,
-                   AccessLogType access_log_type = AccessLogType::NotSet) PURE;
+                   AccessLogTypeEnum access_log_type = AccessLogType::NotSet) PURE;
 };
 
 using InstanceSharedPtr = std::shared_ptr<Instance>;

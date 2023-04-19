@@ -157,7 +157,7 @@ void Utility::extractCommonAccessLogProperties(
     envoy::data::accesslog::v3::AccessLogCommon& common_access_log,
     const Http::RequestHeaderMap& request_header, const StreamInfo::StreamInfo& stream_info,
     const envoy::extensions::access_loggers::grpc::v3::CommonGrpcAccessLogConfig& config,
-    AccessLog::AccessLogType access_log_type) {
+    AccessLog::AccessLogTypeEnum access_log_type) {
   // TODO(mattklein123): Populate sample_rate field.
   if (stream_info.downstreamAddressProvider().remoteAddress() != nullptr) {
     Network::Utility::addressToProtobufAddress(
@@ -340,7 +340,7 @@ void Utility::extractCommonAccessLogProperties(
     common_access_log.set_upstream_wire_bytes_received(bytes_meter->wireBytesReceived());
   }
 
-  common_access_log.set_access_log_type(AccessLog::Utility::getAccessLogTypeProto(access_log_type));
+  common_access_log.set_access_log_type(access_log_type);
 }
 
 } // namespace GrpcCommon

@@ -210,7 +210,7 @@ private:
   void resetPerTryIdleTimer();
   void onPerTryTimeout();
   void onPerTryIdleTimeout();
-  void upstreamLog(AccessLog::AccessLogType access_log_type);
+  void upstreamLog(AccessLog::AccessLogTypeEnum access_log_type);
   void resetUpstreamLogFlushTimer();
 
   RouterFilterInterface& parent_;

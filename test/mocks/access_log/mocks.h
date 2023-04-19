@@ -57,7 +57,7 @@ public:
               (const Http::RequestHeaderMap* request_headers,
                const Http::ResponseHeaderMap* response_headers,
                const Http::ResponseTrailerMap* response_trailers,
-               const StreamInfo::StreamInfo& stream_info, AccessLogType access_log_type));
+               const StreamInfo::StreamInfo& stream_info, AccessLogTypeEnum access_log_type));
 };
 
 } // namespace AccessLog

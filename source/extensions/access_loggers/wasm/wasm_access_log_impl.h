@@ -23,7 +23,7 @@ public:
   void log(const Http::RequestHeaderMap* request_headers,
            const Http::ResponseHeaderMap* response_headers,
            const Http::ResponseTrailerMap* response_trailers,
-           const StreamInfo::StreamInfo& stream_info, AccessLog::AccessLogType) override {
+           const StreamInfo::StreamInfo& stream_info, AccessLog::AccessLogTypeEnum) override {
     if (filter_ && request_headers && response_headers && response_trailers) {
       if (!filter_->evaluate(stream_info, *request_headers, *response_headers,
                              *response_trailers)) {
