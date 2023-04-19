@@ -741,7 +741,26 @@ TEST_F(Http2HeaderValidatorTest, ExtendedAsciiInPathEncoded) {
   }
 }
 
-TEST_F(Http2HeaderValidatorTest, ExtendedAsciiInQueryAllowed) {
+TEST_F(Http2HeaderValidatorTest, ExtendedAsciiInQueryAndFragmentAllowed) {
+  scoped_runtime_.mergeValues(
+      {{"envoy.reloadable_features.uhv_allow_extended_ascii_in_path_for_http2", "true"}});
+  ::Envoy::Http::TestRequestHeaderMapImpl headers{
+      {":scheme", "https"}, {":authority", "envoy.com"}, {":method", "GET"}};
+  auto uhv = createH2(empty_config);
+
+  for (uint32_t extended_ascii = 0x80; extended_ascii < 0x100; ++extended_ascii) {
+    std::string query_with_extended_ascii("/query?with=extended#ascii");
+    query_with_extended_ascii[13] = static_cast<char>(extended_ascii);
+    query_with_extended_ascii[23] = static_cast<char>(extended_ascii);
+    headers.setPath(query_with_extended_ascii);
+    EXPECT_ACCEPT(uhv->validateRequestHeaders(headers));
+    EXPECT_ACCEPT(uhv->transformRequestHeaders(headers));
+    // Extended ASCII in query remains unencoded
+    EXPECT_EQ(headers.path(), query_with_extended_ascii);
+  }
+}
+
+TEST_F(Http2HeaderValidatorTest, ExtendedAsciiInPathQueryAllowed) {
   scoped_runtime_.mergeValues(
       {{"envoy.reloadable_features.uhv_allow_extended_ascii_in_path_for_http2", "true"}});
   ::Envoy::Http::TestRequestHeaderMapImpl headers{
@@ -750,12 +769,15 @@ TEST_F(Http2HeaderValidatorTest, ExtendedAsciiInQueryAllowed) {
 
   for (uint32_t extended_ascii = 0x80; extended_ascii < 0x100; ++extended_ascii) {
     std::string query_with_extended_ascii("/query?with=extended");
+    query_with_extended_ascii[2] = static_cast<char>(extended_ascii);
     query_with_extended_ascii[13] = static_cast<char>(extended_ascii);
     headers.setPath(query_with_extended_ascii);
     EXPECT_ACCEPT(uhv->validateRequestHeaders(headers));
     EXPECT_ACCEPT(uhv->transformRequestHeaders(headers));
-    // Extended ASCII in query remains unencoded
-    EXPECT_EQ(headers.path(), query_with_extended_ascii);
+    std::string expected =
+        absl::StrCat("/q", fmt::format("%{:02X}", extended_ascii), "ery?with=extended");
+    expected[15] = static_cast<char>(extended_ascii);
+    EXPECT_EQ(headers.path(), expected);
   }
 }
 

@@ -124,14 +124,14 @@ void Http2HeaderValidator::encodeExtendedAsciiInPath(::Envoy::Http::RequestHeade
   encoded_path.reserve(path.size());
 
   for (; extended_ascii_position != path.end(); ++extended_ascii_position) {
+    if (*extended_ascii_position == '?' || *extended_ascii_position == '#') {
+      break;
+    }
     if (static_cast<unsigned char>(*extended_ascii_position) >= 0x80) {
       absl::StrAppend(&encoded_path, fmt::format("%{:02X}", static_cast<const unsigned char&>(
                                                                 *extended_ascii_position)));
     } else {
       encoded_path.push_back(*extended_ascii_position);
-    }
-    if (*extended_ascii_position == '?' || *extended_ascii_position == '#') {
-      break;
     }
   }
   // Append query and fragment if present
