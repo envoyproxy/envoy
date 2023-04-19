@@ -1,0 +1,7 @@
+config {
+  name: "envoy.filters.http.wasm"
+  typed_config {
+    type_url: "type.googleapis.com/envoy.extensions.filters.http.wasm.v3.Wasm"
+    value: "\n>\022\004_||_\0326\0322\0220\n\036\n\027envoy.filters.http.rbac\022\0012\032\000\022\001z\032\013\n\t\n\007\010\200\200\200\200\200\001(\001"
+  }
+}

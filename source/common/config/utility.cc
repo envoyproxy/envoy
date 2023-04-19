@@ -314,8 +314,8 @@ JitteredExponentialBackOffStrategyPtr Utility::buildJitteredExponentialBackOffSt
     absl::optional<const uint32_t> default_max_interval_ms) {
   // BackoffStrategy config is specified
   if (backoff != absl::nullopt) {
-    uint32_t base_interval_ms = PROTOBUF_GET_MS_REQUIRED(backoff.value(), base_interval);
-    uint32_t max_interval_ms =
+    uint64_t base_interval_ms = PROTOBUF_GET_MS_REQUIRED(backoff.value(), base_interval);
+    uint64_t max_interval_ms =
         PROTOBUF_GET_MS_OR_DEFAULT(backoff.value(), max_interval, base_interval_ms * 10);
 
     if (max_interval_ms < base_interval_ms) {
