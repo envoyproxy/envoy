@@ -54,7 +54,7 @@ void HttpGrpcAccessLog::emitLog(const Http::RequestHeaderMap& request_headers,
                                 const Http::ResponseHeaderMap& response_headers,
                                 const Http::ResponseTrailerMap& response_trailers,
                                 const StreamInfo::StreamInfo& stream_info,
-                                AccessLog::AccessLogTypeEnum access_log_type) {
+                                AccessLog::AccessLogType access_log_type) {
   // Common log properties.
   // TODO(mattklein123): Populate sample_rate field.
   envoy::data::accesslog::v3::HTTPAccessLogEntry log_entry;

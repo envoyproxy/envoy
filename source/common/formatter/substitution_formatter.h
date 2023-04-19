@@ -145,12 +145,12 @@ public:
                 const std::vector<CommandParserPtr>& command_parsers);
 
   // Formatter::format
-  std::string format(const Http::RequestHeaderMap& request_headers,
-                     const Http::ResponseHeaderMap& response_headers,
-                     const Http::ResponseTrailerMap& response_trailers,
-                     const StreamInfo::StreamInfo& stream_info, absl::string_view local_reply_body,
-                     AccessLog::AccessLogTypeEnum access_log_type =
-                         AccessLog::AccessLogType::NotSet) const override;
+  std::string format(
+      const Http::RequestHeaderMap& request_headers,
+      const Http::ResponseHeaderMap& response_headers,
+      const Http::ResponseTrailerMap& response_trailers, const StreamInfo::StreamInfo& stream_info,
+      absl::string_view local_reply_body,
+      AccessLog::AccessLogType access_log_type = AccessLog::AccessLogType::NotSet) const override;
 
 private:
   const std::string& empty_value_string_;
@@ -177,7 +177,7 @@ public:
          const Http::ResponseHeaderMap& response_headers,
          const Http::ResponseTrailerMap& response_trailers,
          const StreamInfo::StreamInfo& stream_info, absl::string_view local_reply_body,
-         AccessLog::AccessLogTypeEnum access_log_type = AccessLog::AccessLogType::NotSet) const;
+         AccessLog::AccessLogType access_log_type = AccessLog::AccessLogType::NotSet) const;
 
 private:
   struct StructFormatMapWrapper;
@@ -227,7 +227,7 @@ private:
       const Http::ResponseHeaderMap& response_headers,
       const Http::ResponseTrailerMap& response_trailers, const StreamInfo::StreamInfo& stream_info,
       absl::string_view local_reply_body,
-      AccessLog::AccessLogTypeEnum access_log_type = AccessLog::AccessLogType::NotSet) const;
+      AccessLog::AccessLogType access_log_type = AccessLog::AccessLogType::NotSet) const;
   ProtobufWkt::Value
   structFormatMapCallback(const StructFormatter::StructFormatMapWrapper& format_map,
                           const StructFormatMapVisitor& visitor) const;
@@ -254,12 +254,12 @@ public:
       : struct_formatter_(format_mapping, preserve_types, omit_empty_values, commands) {}
 
   // Formatter::format
-  std::string format(const Http::RequestHeaderMap& request_headers,
-                     const Http::ResponseHeaderMap& response_headers,
-                     const Http::ResponseTrailerMap& response_trailers,
-                     const StreamInfo::StreamInfo& stream_info, absl::string_view local_reply_body,
-                     AccessLog::AccessLogTypeEnum access_log_type =
-                         AccessLog::AccessLogType::NotSet) const override;
+  std::string format(
+      const Http::RequestHeaderMap& request_headers,
+      const Http::ResponseHeaderMap& response_headers,
+      const Http::ResponseTrailerMap& response_trailers, const StreamInfo::StreamInfo& stream_info,
+      absl::string_view local_reply_body,
+      AccessLog::AccessLogType access_log_type = AccessLog::AccessLogType::NotSet) const override;
 
 private:
   const StructFormatter struct_formatter_;
@@ -277,11 +277,11 @@ public:
   absl::optional<std::string>
   format(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
          const Http::ResponseTrailerMap&, const StreamInfo::StreamInfo&, absl::string_view,
-         AccessLog::AccessLogTypeEnum = AccessLog::AccessLogType::NotSet) const override;
+         AccessLog::AccessLogType = AccessLog::AccessLogType::NotSet) const override;
   ProtobufWkt::Value
   formatValue(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
               const Http::ResponseTrailerMap&, const StreamInfo::StreamInfo&, absl::string_view,
-              AccessLog::AccessLogTypeEnum = AccessLog::AccessLogType::NotSet) const override;
+              AccessLog::AccessLogType = AccessLog::AccessLogType::NotSet) const override;
 
 private:
   ProtobufWkt::Value str_;
@@ -298,11 +298,11 @@ public:
   absl::optional<std::string>
   format(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
          const Http::ResponseTrailerMap&, const StreamInfo::StreamInfo&, absl::string_view,
-         AccessLog::AccessLogTypeEnum = AccessLog::AccessLogType::NotSet) const override;
+         AccessLog::AccessLogType = AccessLog::AccessLogType::NotSet) const override;
   ProtobufWkt::Value
   formatValue(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
               const Http::ResponseTrailerMap&, const StreamInfo::StreamInfo&, absl::string_view,
-              AccessLog::AccessLogTypeEnum = AccessLog::AccessLogType::NotSet) const override;
+              AccessLog::AccessLogType = AccessLog::AccessLogType::NotSet) const override;
 
 private:
   ProtobufWkt::Value num_;
@@ -320,12 +320,12 @@ public:
   format(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
          const Http::ResponseTrailerMap&, const StreamInfo::StreamInfo&,
          absl::string_view local_reply_body,
-         AccessLog::AccessLogTypeEnum = AccessLog::AccessLogType::NotSet) const override;
+         AccessLog::AccessLogType = AccessLog::AccessLogType::NotSet) const override;
   ProtobufWkt::Value
   formatValue(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
               const Http::ResponseTrailerMap&, const StreamInfo::StreamInfo&,
               absl::string_view local_reply_body,
-              AccessLog::AccessLogTypeEnum = AccessLog::AccessLogType::NotSet) const override;
+              AccessLog::AccessLogType = AccessLog::AccessLogType::NotSet) const override;
 };
 
 /**
@@ -336,16 +336,16 @@ public:
   AccessLogTypeFormatter() = default;
 
   // Formatter::format
-  absl::optional<std::string> format(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
-                                     const Http::ResponseTrailerMap&, const StreamInfo::StreamInfo&,
-                                     absl::string_view local_reply_body,
-                                     AccessLog::AccessLogTypeEnum access_log_type =
-                                         AccessLog::AccessLogType::NotSet) const override;
-  ProtobufWkt::Value formatValue(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
-                                 const Http::ResponseTrailerMap&, const StreamInfo::StreamInfo&,
-                                 absl::string_view local_reply_body,
-                                 AccessLog::AccessLogTypeEnum access_log_type =
-                                     AccessLog::AccessLogType::NotSet) const override;
+  absl::optional<std::string> format(
+      const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
+      const Http::ResponseTrailerMap&, const StreamInfo::StreamInfo&,
+      absl::string_view local_reply_body,
+      AccessLog::AccessLogType access_log_type = AccessLog::AccessLogType::NotSet) const override;
+  ProtobufWkt::Value formatValue(
+      const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
+      const Http::ResponseTrailerMap&, const StreamInfo::StreamInfo&,
+      absl::string_view local_reply_body,
+      AccessLog::AccessLogType access_log_type = AccessLog::AccessLogType::NotSet) const override;
 };
 
 class HeaderFormatter {
@@ -380,13 +380,13 @@ public:
          const Http::ResponseHeaderMap& response_headers,
          const Http::ResponseTrailerMap& response_trailers, const StreamInfo::StreamInfo&,
          absl::string_view,
-         AccessLog::AccessLogTypeEnum = AccessLog::AccessLogType::NotSet) const override;
+         AccessLog::AccessLogType = AccessLog::AccessLogType::NotSet) const override;
   ProtobufWkt::Value
   formatValue(const Http::RequestHeaderMap& request_headers,
               const Http::ResponseHeaderMap& response_headers,
               const Http::ResponseTrailerMap& response_trailers, const StreamInfo::StreamInfo&,
               absl::string_view,
-              AccessLog::AccessLogTypeEnum = AccessLog::AccessLogType::NotSet) const override;
+              AccessLog::AccessLogType = AccessLog::AccessLogType::NotSet) const override;
 
 private:
   uint64_t extractHeadersByteSize(const Http::RequestHeaderMap& request_headers,
@@ -407,11 +407,11 @@ public:
   absl::optional<std::string>
   format(const Http::RequestHeaderMap& request_headers, const Http::ResponseHeaderMap&,
          const Http::ResponseTrailerMap&, const StreamInfo::StreamInfo&, absl::string_view,
-         AccessLog::AccessLogTypeEnum = AccessLog::AccessLogType::NotSet) const override;
+         AccessLog::AccessLogType = AccessLog::AccessLogType::NotSet) const override;
   ProtobufWkt::Value
   formatValue(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
               const Http::ResponseTrailerMap&, const StreamInfo::StreamInfo&, absl::string_view,
-              AccessLog::AccessLogTypeEnum = AccessLog::AccessLogType::NotSet) const override;
+              AccessLog::AccessLogType = AccessLog::AccessLogType::NotSet) const override;
 };
 
 /**
@@ -426,11 +426,11 @@ public:
   absl::optional<std::string>
   format(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap& response_headers,
          const Http::ResponseTrailerMap&, const StreamInfo::StreamInfo&, absl::string_view,
-         AccessLog::AccessLogTypeEnum = AccessLog::AccessLogType::NotSet) const override;
+         AccessLog::AccessLogType = AccessLog::AccessLogType::NotSet) const override;
   ProtobufWkt::Value
   formatValue(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
               const Http::ResponseTrailerMap&, const StreamInfo::StreamInfo&, absl::string_view,
-              AccessLog::AccessLogTypeEnum = AccessLog::AccessLogType::NotSet) const override;
+              AccessLog::AccessLogType = AccessLog::AccessLogType::NotSet) const override;
 };
 
 /**
@@ -446,11 +446,11 @@ public:
   format(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
          const Http::ResponseTrailerMap& response_trailers, const StreamInfo::StreamInfo&,
          absl::string_view,
-         AccessLog::AccessLogTypeEnum = AccessLog::AccessLogType::NotSet) const override;
+         AccessLog::AccessLogType = AccessLog::AccessLogType::NotSet) const override;
   ProtobufWkt::Value
   formatValue(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
               const Http::ResponseTrailerMap&, const StreamInfo::StreamInfo&, absl::string_view,
-              AccessLog::AccessLogTypeEnum = AccessLog::AccessLogType::NotSet) const override;
+              AccessLog::AccessLogType = AccessLog::AccessLogType::NotSet) const override;
 };
 
 class GrpcStatusFormatter : public FormatterProvider, HeaderFormatter {
@@ -469,11 +469,11 @@ public:
   format(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap& response_headers,
          const Http::ResponseTrailerMap& response_trailers, const StreamInfo::StreamInfo&,
          absl::string_view,
-         AccessLog::AccessLogTypeEnum = AccessLog::AccessLogType::NotSet) const override;
+         AccessLog::AccessLogType = AccessLog::AccessLogType::NotSet) const override;
   ProtobufWkt::Value
   formatValue(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
               const Http::ResponseTrailerMap&, const StreamInfo::StreamInfo&, absl::string_view,
-              AccessLog::AccessLogTypeEnum = AccessLog::AccessLogType::NotSet) const override;
+              AccessLog::AccessLogType = AccessLog::AccessLogType::NotSet) const override;
 
   static Format parseFormat(absl::string_view format);
 
@@ -493,11 +493,11 @@ public:
   absl::optional<std::string>
   format(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
          const Http::ResponseTrailerMap&, const StreamInfo::StreamInfo&, absl::string_view,
-         AccessLog::AccessLogTypeEnum = AccessLog::AccessLogType::NotSet) const override;
+         AccessLog::AccessLogType = AccessLog::AccessLogType::NotSet) const override;
   ProtobufWkt::Value
   formatValue(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
               const Http::ResponseTrailerMap&, const StreamInfo::StreamInfo&, absl::string_view,
-              AccessLog::AccessLogTypeEnum = AccessLog::AccessLogType::NotSet) const override;
+              AccessLog::AccessLogType = AccessLog::AccessLogType::NotSet) const override;
 
   class FieldExtractor {
   public:
@@ -540,13 +540,13 @@ public:
   format(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
          const Http::ResponseTrailerMap&, const StreamInfo::StreamInfo& stream_info,
          absl::string_view,
-         AccessLog::AccessLogTypeEnum = AccessLog::AccessLogType::NotSet) const override;
+         AccessLog::AccessLogType = AccessLog::AccessLogType::NotSet) const override;
 
   ProtobufWkt::Value
   formatValue(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
               const Http::ResponseTrailerMap&, const StreamInfo::StreamInfo& stream_info,
               absl::string_view,
-              AccessLog::AccessLogTypeEnum = AccessLog::AccessLogType::NotSet) const override;
+              AccessLog::AccessLogType = AccessLog::AccessLogType::NotSet) const override;
 
 protected:
   absl::optional<std::string>
@@ -603,11 +603,11 @@ public:
   absl::optional<std::string>
   format(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
          const Http::ResponseTrailerMap&, const StreamInfo::StreamInfo&, absl::string_view,
-         AccessLog::AccessLogTypeEnum = AccessLog::AccessLogType::NotSet) const override;
+         AccessLog::AccessLogType = AccessLog::AccessLogType::NotSet) const override;
   ProtobufWkt::Value
   formatValue(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
               const Http::ResponseTrailerMap&, const StreamInfo::StreamInfo&, absl::string_view,
-              AccessLog::AccessLogTypeEnum = AccessLog::AccessLogType::NotSet) const override;
+              AccessLog::AccessLogType = AccessLog::AccessLogType::NotSet) const override;
 
 private:
   const Envoy::StreamInfo::FilterState::Object*
@@ -635,11 +635,11 @@ public:
   absl::optional<std::string>
   format(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
          const Http::ResponseTrailerMap&, const StreamInfo::StreamInfo&, absl::string_view,
-         AccessLog::AccessLogTypeEnum = AccessLog::AccessLogType::NotSet) const override;
+         AccessLog::AccessLogType = AccessLog::AccessLogType::NotSet) const override;
   ProtobufWkt::Value
   formatValue(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
               const Http::ResponseTrailerMap&, const StreamInfo::StreamInfo&, absl::string_view,
-              AccessLog::AccessLogTypeEnum = AccessLog::AccessLogType::NotSet) const override;
+              AccessLog::AccessLogType = AccessLog::AccessLogType::NotSet) const override;
 
 private:
   const Envoy::DateFormatter date_formatter_;
@@ -701,11 +701,11 @@ public:
   absl::optional<std::string>
   format(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
          const Http::ResponseTrailerMap&, const StreamInfo::StreamInfo&, absl::string_view,
-         AccessLog::AccessLogTypeEnum = AccessLog::AccessLogType::NotSet) const override;
+         AccessLog::AccessLogType = AccessLog::AccessLogType::NotSet) const override;
   ProtobufWkt::Value
   formatValue(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
               const Http::ResponseTrailerMap&, const StreamInfo::StreamInfo&, absl::string_view,
-              AccessLog::AccessLogTypeEnum = AccessLog::AccessLogType::NotSet) const override;
+              AccessLog::AccessLogType = AccessLog::AccessLogType::NotSet) const override;
 
 private:
   ProtobufWkt::Value str_;
@@ -725,11 +725,11 @@ public:
   absl::optional<std::string>
   format(const Http::RequestHeaderMap& request_headers, const Http::ResponseHeaderMap&,
          const Http::ResponseTrailerMap&, const StreamInfo::StreamInfo&, absl::string_view,
-         AccessLog::AccessLogTypeEnum = AccessLog::AccessLogType::NotSet) const override;
+         AccessLog::AccessLogType = AccessLog::AccessLogType::NotSet) const override;
   ProtobufWkt::Value
   formatValue(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
               const Http::ResponseTrailerMap&, const StreamInfo::StreamInfo&, absl::string_view,
-              AccessLog::AccessLogTypeEnum = AccessLog::AccessLogType::NotSet) const override;
+              AccessLog::AccessLogType = AccessLog::AccessLogType::NotSet) const override;
 };
 
 } // namespace Formatter

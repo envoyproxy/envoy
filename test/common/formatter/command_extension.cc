@@ -9,7 +9,7 @@ absl::optional<std::string> TestFormatter::format(const Http::RequestHeaderMap&,
                                                   const Http::ResponseHeaderMap&,
                                                   const Http::ResponseTrailerMap&,
                                                   const StreamInfo::StreamInfo&, absl::string_view,
-                                                  AccessLog::AccessLogTypeEnum) const {
+                                                  AccessLog::AccessLogType) const {
   return "TestFormatter";
 }
 
@@ -17,7 +17,7 @@ ProtobufWkt::Value TestFormatter::formatValue(const Http::RequestHeaderMap&,
                                               const Http::ResponseHeaderMap&,
                                               const Http::ResponseTrailerMap&,
                                               const StreamInfo::StreamInfo&, absl::string_view,
-                                              AccessLog::AccessLogTypeEnum) const {
+                                              AccessLog::AccessLogType) const {
   return ValueUtil::stringValue("");
 }
 
@@ -48,14 +48,14 @@ std::string TestCommandFactory::name() const { return "envoy.formatter.TestForma
 absl::optional<std::string>
 AdditionalFormatter::format(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
                             const Http::ResponseTrailerMap&, const StreamInfo::StreamInfo&,
-                            absl::string_view, AccessLog::AccessLogTypeEnum) const {
+                            absl::string_view, AccessLog::AccessLogType) const {
   return "AdditionalFormatter";
 }
 
 ProtobufWkt::Value
 AdditionalFormatter::formatValue(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
                                  const Http::ResponseTrailerMap&, const StreamInfo::StreamInfo&,
-                                 absl::string_view, AccessLog::AccessLogTypeEnum) const {
+                                 absl::string_view, AccessLog::AccessLogType) const {
   return ValueUtil::stringValue("");
 }
 

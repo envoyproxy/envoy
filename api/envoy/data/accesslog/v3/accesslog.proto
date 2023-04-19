@@ -80,24 +80,24 @@ message ConnectionProperties {
   uint64 sent_bytes = 2;
 }
 
+enum AccessLogType {
+  NotSet = 0;
+  TcpUpstreamConnected = 1;
+  TcpPeriodic = 2;
+  TcpEnd = 3;
+  DownstreamStart = 4;
+  DownstreamPeriodic = 5;
+  DownstreamEnd = 6;
+  UpstreamStart = 7;
+  UpstreamPeriodic = 8;
+  UpstreamEnd = 9;
+}
+
 // Defines fields that are shared by all Envoy access logs.
 // [#next-free-field: 34]
 message AccessLogCommon {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.data.accesslog.v2.AccessLogCommon";
-
-  enum AccessLogType {
-    NotSet = 0;
-    TcpUpstreamConnected = 1;
-    TcpPeriodic = 2;
-    TcpEnd = 3;
-    DownstreamStart = 4;
-    DownstreamPeriodic = 5;
-    DownstreamEnd = 6;
-    UpstreamStart = 7;
-    UpstreamPeriodic = 8;
-    UpstreamEnd = 9;
-  }
 
   // [#not-implemented-hide:]
   // This field indicates the rate at which this log entry was sampled.

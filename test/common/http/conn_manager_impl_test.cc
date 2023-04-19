@@ -2132,8 +2132,7 @@ TEST_F(HttpConnectionManagerImplTest, TestAccessLog) {
 
   EXPECT_CALL(*handler, log(_, _, _, _, _))
       .WillOnce(Invoke([&](const HeaderMap*, const HeaderMap*, const HeaderMap*,
-                           const StreamInfo::StreamInfo& stream_info,
-                           AccessLog::AccessLogTypeEnum) {
+                           const StreamInfo::StreamInfo& stream_info, AccessLog::AccessLogType) {
         EXPECT_EQ(&decoder_->streamInfo(), &stream_info);
         EXPECT_TRUE(stream_info.responseCode());
         EXPECT_EQ(stream_info.responseCode().value(), uint32_t(200));
@@ -2199,7 +2198,7 @@ TEST_F(HttpConnectionManagerImplTest, TestFilterCanEnrichAccessLogs) {
 
   EXPECT_CALL(*handler, log(_, _, _, _, _))
       .WillOnce(Invoke([](const HeaderMap*, const HeaderMap*, const HeaderMap*,
-                          const StreamInfo::StreamInfo& stream_info, AccessLog::AccessLogTypeEnum) {
+                          const StreamInfo::StreamInfo& stream_info, AccessLog::AccessLogType) {
         auto dynamic_meta = stream_info.dynamicMetadata().filter_metadata().at("metadata_key");
         EXPECT_EQ("value", dynamic_meta.fields().at("field").string_value());
       }));
@@ -2243,7 +2242,7 @@ TEST_F(HttpConnectionManagerImplTest, TestRemoteDownstreamDisconnectAccessLog) {
 
   EXPECT_CALL(*handler, log(_, _, _, _, _))
       .WillOnce(Invoke([](const HeaderMap*, const HeaderMap*, const HeaderMap*,
-                          const StreamInfo::StreamInfo& stream_info, AccessLog::AccessLogTypeEnum) {
+                          const StreamInfo::StreamInfo& stream_info, AccessLog::AccessLogType) {
         EXPECT_FALSE(stream_info.responseCode());
         EXPECT_TRUE(stream_info.hasAnyResponseFlag());
         EXPECT_TRUE(
@@ -2287,7 +2286,7 @@ TEST_F(HttpConnectionManagerImplTest, TestLocalDownstreamDisconnectAccessLog) {
 
   EXPECT_CALL(*handler, log(_, _, _, _, _))
       .WillOnce(Invoke([](const HeaderMap*, const HeaderMap*, const HeaderMap*,
-                          const StreamInfo::StreamInfo& stream_info, AccessLog::AccessLogTypeEnum) {
+                          const StreamInfo::StreamInfo& stream_info, AccessLog::AccessLogType) {
         EXPECT_EQ("downstream_local_disconnect(reason_for_local_close)",
                   stream_info.responseCodeDetails().value());
       }));
@@ -2329,7 +2328,7 @@ TEST_F(HttpConnectionManagerImplTest, TestAccessLogWithTrailers) {
 
   EXPECT_CALL(*handler, log(_, _, _, _, _))
       .WillOnce(Invoke([](const HeaderMap*, const HeaderMap*, const HeaderMap*,
-                          const StreamInfo::StreamInfo& stream_info, AccessLog::AccessLogTypeEnum) {
+                          const StreamInfo::StreamInfo& stream_info, AccessLog::AccessLogType) {
         EXPECT_TRUE(stream_info.responseCode());
         EXPECT_EQ(stream_info.responseCode().value(), uint32_t(200));
         EXPECT_NE(nullptr, stream_info.downstreamAddressProvider().localAddress());
@@ -2382,7 +2381,7 @@ TEST_F(HttpConnectionManagerImplTest, TestAccessLogWithInvalidRequest) {
 
   EXPECT_CALL(*handler, log(_, _, _, _, _))
       .WillOnce(Invoke([](const HeaderMap*, const HeaderMap*, const HeaderMap*,
-                          const StreamInfo::StreamInfo& stream_info, AccessLog::AccessLogTypeEnum) {
+                          const StreamInfo::StreamInfo& stream_info, AccessLog::AccessLogType) {
         EXPECT_TRUE(stream_info.responseCode());
         EXPECT_EQ(stream_info.responseCode().value(), uint32_t(400));
         EXPECT_EQ("missing_host_header", stream_info.responseCodeDetails().value());
@@ -2429,7 +2428,7 @@ TEST_F(HttpConnectionManagerImplTest, TestAccessLogOnNewRequest) {
   EXPECT_CALL(*handler, log(_, _, _, _, _))
       .WillOnce(Invoke([](const HeaderMap*, const HeaderMap*, const HeaderMap*,
                           const StreamInfo::StreamInfo& stream_info,
-                          AccessLog::AccessLogTypeEnum access_log_type) {
+                          AccessLog::AccessLogType access_log_type) {
         // First call to log() is made when a new HTTP request has been received
         // On the first call it is expected that there is no response code.
         EXPECT_EQ(AccessLog::AccessLogType::DownstreamStart, access_log_type);
@@ -2437,7 +2436,7 @@ TEST_F(HttpConnectionManagerImplTest, TestAccessLogOnNewRequest) {
       }))
       .WillOnce(Invoke([](const HeaderMap*, const HeaderMap*, const HeaderMap*,
                           const StreamInfo::StreamInfo& stream_info,
-                          AccessLog::AccessLogTypeEnum access_log_type) {
+                          AccessLog::AccessLogType access_log_type) {
         // Second call to log() is made when filter is destroyed, so it is expected
         // that the response code is available and matches the response headers.
         EXPECT_EQ(AccessLog::AccessLogType::DownstreamEnd, access_log_type);
@@ -2514,10 +2513,9 @@ TEST_F(HttpConnectionManagerImplTest, TestPeriodicAccessLogging) {
 
   EXPECT_CALL(*handler, log(_, _, _, _, _))
       .Times(2)
-      .WillRepeatedly(
-          Invoke([&](const HeaderMap* request_headers, const HeaderMap* response_headers,
-                     const HeaderMap*, const StreamInfo::StreamInfo& stream_info,
-                     AccessLog::AccessLogTypeEnum access_log_type) {
+      .WillRepeatedly(Invoke(
+          [&](const HeaderMap* request_headers, const HeaderMap* response_headers, const HeaderMap*,
+              const StreamInfo::StreamInfo& stream_info, AccessLog::AccessLogType access_log_type) {
             EXPECT_EQ(AccessLog::AccessLogType::DownstreamPeriodic, access_log_type);
             EXPECT_EQ(&decoder_->streamInfo(), &stream_info);
             EXPECT_THAT(request_headers, testing::NotNull());
@@ -2531,7 +2529,7 @@ TEST_F(HttpConnectionManagerImplTest, TestPeriodicAccessLogging) {
   EXPECT_CALL(*handler, log(_, _, _, _, _))
       .WillOnce(Invoke([&](const HeaderMap* request_headers, const HeaderMap* response_headers,
                            const HeaderMap*, const StreamInfo::StreamInfo& stream_info,
-                           AccessLog::AccessLogTypeEnum access_log_type) {
+                           AccessLog::AccessLogType access_log_type) {
         EXPECT_EQ(AccessLog::AccessLogType::DownstreamEnd, access_log_type);
         EXPECT_EQ(&decoder_->streamInfo(), &stream_info);
         EXPECT_THAT(request_headers, testing::NotNull());
@@ -2645,7 +2643,7 @@ TEST_F(HttpConnectionManagerImplTest, TestAccessLogSsl) {
 
   EXPECT_CALL(*handler, log(_, _, _, _, _))
       .WillOnce(Invoke([](const HeaderMap*, const HeaderMap*, const HeaderMap*,
-                          const StreamInfo::StreamInfo& stream_info, AccessLog::AccessLogTypeEnum) {
+                          const StreamInfo::StreamInfo& stream_info, AccessLog::AccessLogType) {
         EXPECT_TRUE(stream_info.responseCode());
         EXPECT_EQ(stream_info.responseCode().value(), uint32_t(200));
         EXPECT_NE(nullptr, stream_info.downstreamAddressProvider().localAddress());
@@ -2888,7 +2886,7 @@ TEST_F(HttpConnectionManagerImplTest, TestStreamIdleAccessLog) {
 
   EXPECT_CALL(*handler, log(_, _, _, _, _))
       .WillOnce(Invoke([](const HeaderMap*, const HeaderMap*, const HeaderMap*,
-                          const StreamInfo::StreamInfo& stream_info, AccessLog::AccessLogTypeEnum) {
+                          const StreamInfo::StreamInfo& stream_info, AccessLog::AccessLogType) {
         EXPECT_TRUE(stream_info.responseCode());
         EXPECT_TRUE(stream_info.hasAnyResponseFlag());
         EXPECT_TRUE(stream_info.hasResponseFlag(StreamInfo::ResponseFlag::StreamIdleTimeout));

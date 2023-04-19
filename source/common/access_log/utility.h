@@ -18,7 +18,7 @@ public:
    * @param access_log_type supplies the access log type.
    * @return a string representation of the access log type.
    */
-  static const std::string& getAccessLogTypeString(const AccessLogTypeEnum access_log_type);
+  static const std::string& getAccessLogTypeString(const AccessLogType access_log_type);
 };
 
 } // namespace AccessLog

@@ -25,7 +25,7 @@ public:
 private:
   void emitLog(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
                const Http::ResponseTrailerMap&, const StreamInfo::StreamInfo&,
-               AccessLog::AccessLogTypeEnum = AccessLog::AccessLogType::NotSet) override {
+               AccessLog::AccessLogType = AccessLog::AccessLogType::NotSet) override {
     count_++;
   }
 

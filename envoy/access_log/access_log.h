@@ -70,8 +70,7 @@ struct AccessLogTypeStringValues {
 };
 
 using AccessLogTypeStrings = ConstSingleton<AccessLogTypeStringValues>;
-using AccessLogTypeEnum = envoy::data::accesslog::v3::AccessLogCommon::AccessLogType;
-using AccessLogType = envoy::data::accesslog::v3::AccessLogCommon;
+using AccessLogType = envoy::data::accesslog::v3::AccessLogType;
 
 /**
  * Interface for access log filters.
@@ -111,7 +110,7 @@ public:
                    const Http::ResponseHeaderMap* response_headers,
                    const Http::ResponseTrailerMap* response_trailers,
                    const StreamInfo::StreamInfo& stream_info,
-                   AccessLogTypeEnum access_log_type = AccessLogType::NotSet) PURE;
+                   AccessLogType access_log_type = AccessLogType::NotSet) PURE;
 };
 
 using InstanceSharedPtr = std::shared_ptr<Instance>;

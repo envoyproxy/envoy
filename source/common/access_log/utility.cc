@@ -7,8 +7,10 @@
 namespace Envoy {
 namespace AccessLog {
 
-const std::string& Utility::getAccessLogTypeString(const AccessLogTypeEnum access_log_type) {
+const std::string& Utility::getAccessLogTypeString(const AccessLogType access_log_type) {
   switch (access_log_type) {
+  case AccessLogType::NotSet:
+    return AccessLogTypeStrings::get().NotSet;
   case AccessLogType::TcpUpstreamConnected:
     return AccessLogTypeStrings::get().TcpUpstreamConnected;
   case AccessLogType::TcpPeriodic:
