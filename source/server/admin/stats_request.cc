@@ -164,19 +164,27 @@ void StatsRequest::startPhase() {
 void StatsRequest::populateStatsForCurrentPhase(const ScopeVec& scope_vec) {
   switch (phase_) {
   case Phase::TextReadouts:
-    populateStatsFromScopes<Stats::TextReadout>(scope_vec);
-    break;
+    if (params_.type_ == StatsType::TextReadouts ||
+        params_.type_ == StatsType::All) {
+      populateStatsFromScopes<Stats::TextReadout>(scope_vec);
+      break;
+    }
   case Phase::CountersAndGauges:
-    if (params_.type_ != StatsType::Gauges) {
+    if (params_.type_ == StatsType::Counters ||
+        params_.type_ == StatsType::All) {
       populateStatsFromScopes<Stats::Counter>(scope_vec);
     }
-    if (params_.type_ != StatsType::Counters) {
+    if (params_.type_ == StatsType::Gauges ||
+        params_.type_ == StatsType::All) {
       populateStatsFromScopes<Stats::Gauge>(scope_vec);
     }
     break;
   case Phase::Histograms:
-    populateStatsFromScopes<Stats::Histogram>(scope_vec);
-    break;
+    if (params_.type_ == StatsType::Histograms ||
+        params_.type_ == StatsType::All) {
+      populateStatsFromScopes<Stats::Histogram>(scope_vec);
+      break;
+    }
   }
 }
 

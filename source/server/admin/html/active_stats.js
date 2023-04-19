@@ -15,19 +15,13 @@
 //   * json flavor to send hierarchical names to save serialization/deserialization costs
 //   * pause auto-refresh for at least 5 seconds when editng fields.
 //   * don't auto-refresh when there is error -- provide a button to re-retry.
-//   * update URL history after editing params
-//   * erase spurious 'stats' link at lop left
 //   * consider removing histogram mode during active display, and overlay summary graphics
 //   * rename bucket mode "none" to "summary"
 //   * improve graphics
-//   * log Y axis
 //   * integrate interval view.
-//   * Remove empty buckets
-//   * stretchable height
-//   * separate /stats/active-html endpoint w/o 'used only' and 'buckets' choices.
 //   * sort histograms by change-count
 //   * incremental histogram update
-//   * resize histograms
+//   * stretchable height -- resize histograms
 
 /**
  * Maps a stat name to a record containing name, value, and a use-count. This
@@ -60,10 +54,10 @@ let statusDiv = null;
 const paramIdPrefix = 'param-1-stats-';
 
 let postRenderTestHook = null;
-
-let filterValue = null;
-let typeValue = null;
+let currentValues = null;
+let initialValues = null;
 let reloadTimer = null;
+let controls = null;
 
 /**
  * To make testing easier, provide a hook for tests to set, to enable tests
@@ -76,6 +70,22 @@ function setRenderTestHook(hook) { // eslint-disable-line no-unused-vars
     throw new Exception('setRenderTestHook called with hook already pending');
   }
   postRenderTestHook = hook;
+}
+
+function getParamValues() {
+  let values = {};
+  for (key of Object.keys(controls)) {
+    values[key] = controls[key].value;
+  }
+  return values;
+/*
+  return {
+    filter: paramValue('filter'),
+    type: paramValue('type'),
+    max_display_count: loadSettingOrUseDefault('active-max-display-count', 50),
+    update_interval_sec: loadSettingOrUseDefault('active-update-interval', 5)
+  };
+*/
 }
 
 /**
@@ -94,60 +104,120 @@ function initHook() {
   document.body.appendChild(statusDiv);
   document.body.appendChild(activeStatsPreElement);
   document.body.appendChild(activeStatsHistogramsDiv);
-  filterValue = paramValue('filter');
-  typeValue = paramValue('type');
-  findWidget('filter').addEventListener('blur', updateParams);
-  findWidget('type').addEventListener('change', updateParams);
-  document.getElementById('active-max-display-count').addEventListener('blur', updateParams);
-  document.getElementById('active-update-interval').addEventListener('blur', updateParams);
+  controls = {
+    filter: document.getElementById(paramIdPrefix + 'filter'),
+    type: document.getElementById(paramIdPrefix + 'type'),
+    max_display_count: document.getElementById('active-max-display-count'),
+    update_interval_sec: document.getElementById('active-update-interval')
+  };
+  initialValues = currentValues = {
+    filter: '',
+    type: 'All',
+    max_display_count: '50',
+    update_interval_sec: '5',
+  };
+  setControls();
+
+  // The type widget activates immediately on any change, recording history.
+  controls['type'].addEventListener('change', onSubmit);
+
+  // The three text controls reset the auto-refresh timer when there's a change,
+  // and auto-submit on form submit, which gets run when user hits Return when
+  // focus in a text widget. They also auto-submit when the focus shifts out
+  // of them.
+  for (name of ['filter', 'max_display_count', 'update_interval_sec']) {
+    const control = controls[name];
+    control.addEventListener('change', updateParams);
+    control.addEventListener('blur', onSubmit);
+  }
   loadStats();
 }
 
+// Called when anyone edits a type-in field. This doesn't re-execute the stats
+// query from the incremental edit immediately, but it resets the timer. If
+// the timer expires before the user hits return then it auto-confirms the
+// new setting.
 function updateParams() {
-  const newFilterValue = paramValue('filter');
-  const newTypeValue = paramValue('type');
-  if (newFilterValue != filterValue || newTypeValue != typeValue) {
-    filterValue = newFilterValue;
-    typeValue = newTypeValue;
-    history.pushState({filter : filterValue, type : typeValue}, null,
-                      'html-active?filter=' + encodeURIComponent(filterValue) +
-                      '&type=' + encodeURIComponent(typeValue));
-    loadStats();
+  clearTimer();
+  setTimer();
+}
+
+function allValuesEqual(a, b) {
+  const a_keys = Object.keys(a);
+  const b_keys = Object.keys(b);
+  if (a_keys.length != b_keys.length) {
+    return false;
+  }
+  for (key of a_keys) {
+    if (!b.hasOwnProperty(key)) {
+      return false;
+    }
+    if (a[key] != b[key]) {
+      return false;
+    }
+  }
+  return true;
+}
+
+// Called when user hits return in any type-in field, or when someone changes the Type field.
+function onSubmit() {
+  saveState();
+  loadStats();
+  return false;
+}
+
+function saveState() {
+  const newValues = getParamValues();
+  if (allValuesEqual(newValues, currentValues)) {
+    return;
+  }
+  currentValues = newValues;
+  history.pushState(currentValues, null,
+                    'html-active?filter=' + encodeURIComponent(currentValues.filter) +
+                    '&type=' + encodeURIComponent(currentValues.type));
+}
+
+function setControls() {
+  // Set the widgets to the new values.
+  for (key of Object.keys(controls)) {
+    console.log('setting control ' + key + ' to ' + currentValues[key]);
+    controls[key].value = currentValues[key];
   }
 }
 
+// Called when someone presses the back/forward button.
 function navigateHook(event) {
-  const setWidgetValue = (name, defaultValue) => {
-    let value;
-    if (event.state) {
-      value = event.state[name];
-    }
-    findWidget(name).value = value || defaultValue;
-  };
-  setWidgetValue('filter', '');
-  setWidgetValue('type', 'All');
+  if (event.state) {
+    currentValues = event.state;
+  } else {
+    currentValues = initialValues;
+  }
+
+  setControls();
   loadStats();
 }
 
-function findWidget(name) {
-  return document.getElementById(paramIdPrefix + name);
+function clearTimer() {
+  if (reloadTimer != null) {
+    window.clearTimeout(reloadTimer);
+    reloadTimer = null;
+  }
 }
 
-function paramValue(name) {
-  return findWidget(name).value;
+function setTimer() {
+  reloadTimer = window.setTimeout(() => {
+    reloadTimer = null;
+    loadStats();
+  }, 1000*loadSettingOrUseDefault('active-update-interval', 5));
 }
 
 /**
  * Initiates an Ajax request for the stats JSON based on the stats parameters.
  */
 async function loadStats() {
-  // We will call loadStats directly when a user edits a field.
-  if (reloadTimer != null) {
-    window.clearTimeout(reloadTimer);
-    reloadTimer = null;
-  }
+  clearTimer();
 
-  const makeQueryParam = (name) => name + '=' + encodeURIComponent(paramValue(name));
+  const makeQueryParam = (name) => name + '=' + encodeURIComponent(currentValues[name]);
   const params = ['filter', 'type'];
   const url = '/stats?format=json&usedonly&histogram_buckets=detailed&' +
        params.map(makeQueryParam).join('&');
@@ -159,11 +229,10 @@ async function loadStats() {
     statusDiv.textContent = 'Error fetching ' + url + ': ' + e;
   }
 
-  // Update stats every 5 seconds by default.
-  reloadTimer = window.setTimeout(() => {
-    reloadTimer = null;
-    loadStats();
-  }, 1000*loadSettingOrUseDefault('active-update-interval', 5));
+  // Update stats with a minimum of 5 second interval between completing the
+  // previous update and the start of the new one. So if it takes 1 second
+  // to refresh the stats we'll do it every 6 seconds, by default.
+  setTimer();
 }
 
 /**
@@ -223,6 +292,7 @@ function loadSettingOrUseDefault(id, defaultValue) {
  */
 function renderStats(data) {
   sortedStats = [];
+  activeStatsHistogramsDiv.replaceChildren();
   for (stat of data.stats) {
     if (!stat.name) {
       const histograms = stat.histograms;
@@ -280,11 +350,6 @@ function log10(num) {
   return Math.log(num) / log_10;
 }
 
-// https://stackoverflow.com/questions/4059147/check-if-a-variable-is-a-string-in-javascript
-function isString(x) {
-  return Object.prototype.toString.call(x) === "[object String]";
-}
-
 // https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Intl/NumberFormat/NumberFormat
 let format = Intl.NumberFormat('en', {
   notation: 'compact',
@@ -297,7 +362,6 @@ let formatPercent = Intl.NumberFormat('en', {
 }).format;
 
 function renderHistogramDetail(supported_percentiles, detail) {
-  activeStatsHistogramsDiv.replaceChildren();
   for (histogram of detail) {
     const div = document.createElement('div');
     const label = document.createElement('div');
@@ -380,7 +444,7 @@ function renderHistogramDetail(supported_percentiles, detail) {
     // We will not draw percentile lines outside of the bucket values. E.g. we
     // may skip drawing outer percentiles like P0 and P100 etc.
     //
-    // We lay out horzontally based on CSS percentage so users can see the
+    // We lay out horizontally based on CSS percentage so users can see the
     // graphics better if they make the window wider. We do this by inventing
     // arbitrary "virtual pixels" (variables with Vpx suffix) during the
     // computation in JS and converting them to percentages for writing element
