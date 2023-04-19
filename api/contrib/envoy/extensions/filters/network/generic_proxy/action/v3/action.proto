@@ -23,6 +23,9 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 
 // Configuration for the route match action.
 message RouteAction {
+  // The name of the route action.
+  string name = 1 [(validate.rules).string = {min_len: 1}];
+
   oneof cluster_specifier {
     option (validate.required) = true;
 
