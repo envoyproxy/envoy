@@ -433,8 +433,6 @@ public:
                    ProtobufMessage::ValidationVisitor& validation_visitor) PURE;
 
   /**
-   * Calls getObject ObjectSharedPool to get sharedPtr of CommonLbConfig in pool
-   *
    * @param common_lb_config The config field to be stored
    * @return shared_ptr to the CommonLbConfig
    */
