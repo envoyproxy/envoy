@@ -44,27 +44,23 @@ Http::FilterHeadersStatus CustomResponseFilter::encodeHeaders(Http::ResponseHead
     return filter_state->policy->encodeHeaders(headers, end_stream, *this);
   }
 
-  PolicySharedPtr policy;
   // Traverse up route typed per filter hierarchy till we find a matching
-  // policy.
-  bool match_found = false;
+  // policy. Note that since the traversal is least to most specific, we can't
+  // return early when a match is found.
+  PolicySharedPtr policy;
   decoder_callbacks_->traversePerFilterConfig(
-      [&policy, &match_found, &headers, this](const Router::RouteSpecificFilterConfig& config) {
-        if (match_found) {
-          return;
-        }
+      [&policy, &headers, this](const Router::RouteSpecificFilterConfig& config) {
         const FilterConfig* typed_config = dynamic_cast<const FilterConfig*>(&config);
         if (typed_config) {
-          policy = typed_config->getPolicy(headers, encoder_callbacks_->streamInfo());
-          if (policy) {
-            match_found = true;
+          // Check if a match is found first to avoid overwriting policy with an
+          // empty shared_ptr.
+          auto maybe_policy = typed_config->getPolicy(headers, encoder_callbacks_->streamInfo());
+          if (maybe_policy) {
+            policy = maybe_policy;
           }
         }
       });
-  // Check the filter level config if we didn't find a match in the per route
-  // config.
-  if (match_found == false) {
-    ASSERT(!policy);
+  if (!policy) {
     policy = config_->getPolicy(headers, encoder_callbacks_->streamInfo());
   }
 

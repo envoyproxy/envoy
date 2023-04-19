@@ -399,6 +399,34 @@ TEST_P(CustomResponseIntegrationTest, MatcherHierarchy) {
   EXPECT_EQ(0, test_server_->counter("custom_response_redirect_no_route")->value());
 }
 
+TEST_P(CustomResponseIntegrationTest, MostSpecificConfig) {
+  // Create Virtual host with per route and per host config.
+  auto host = config_helper_.createVirtualHost("host.with.route_specific.cer_config");
+  // Add per route typed filter config.
+  auto per_route_config = createCerSinglePredicateConfig("503", 293);
+  host.mutable_routes(0)->mutable_typed_per_filter_config()->insert(
+      MapPair<std::string, Any>("envoy.filters.http.custom_response", per_route_config));
+  // Add per vhost typed filter config.
+  auto per_virtual_host_config = createCerSinglePredicateConfig("503", 291);
+  host.mutable_typed_per_filter_config()->insert(
+      MapPair<std::string, Any>("envoy.filters.http.custom_response", per_virtual_host_config));
+  config_helper_.addVirtualHost(host);
+
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  // Send request where response matches against both route level and vhost
+  // level config.
+  default_request_headers_.setHost("host.with.route_specific.cer_config");
+  auto response = sendRequestAndWaitForResponse(
+      default_request_headers_, 0, {{":status", "503"}, {"content-length", "0"}}, 0, 0);
+  // Verify we get the status code of route level config.
+  EXPECT_EQ("293", response->headers().getStatusValue());
+
+  EXPECT_EQ(0, test_server_->counter("http.config_test.downstream_rq_5xx")->value());
+  EXPECT_EQ(0, test_server_->counter("custom_response_redirect_no_route")->value());
+}
+
 // Verify that we do not provide a custom response for a response that has
 // already been redirected by the custom response filter.
 // Verify that the route specific filter is picked if specified.
