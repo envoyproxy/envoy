@@ -61,7 +61,7 @@ message SinkConfig {
   google.protobuf.BoolValue retry_otlp_retryable_failures = 8;
 
   // If set to true, and ``http_service`` is chosen as the upstream collector protocol,
-  // the OTLP export requests will be encoded in JSON formater, rather than Protobuf. 
+  // the OTLP export requests will be encoded in JSON formater, rather than Protobuf.
   // Default value is false.
   // [#not-implemented-hide:]
   google.protobuf.BoolValue use_http_with_json = 9;
