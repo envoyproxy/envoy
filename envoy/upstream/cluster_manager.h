@@ -435,11 +435,11 @@ public:
   /**
    * Calls getObject ObjectSharedPool to get sharedPtr of CommonLbConfig in pool
    *
-   * @param common_lb_config The config field to be stored in ObjectSharedPool
-   * @return shared_ptr to the CommonLbConfig in ObjectSharedPool
+   * @param common_lb_config The config field to be stored
+   * @return shared_ptr to the CommonLbConfig
    */
  virtual std::shared_ptr<const envoy::config::cluster::v3::Cluster::CommonLbConfig>
- GetCommonLbConfigPtr(const envoy::config::cluster::v3::Cluster::CommonLbConfig common_lb_config) PURE;
+ getCommonLbConfigPtr(const envoy::config::cluster::v3::Cluster::CommonLbConfig &common_lb_config) PURE;
 
 };
 

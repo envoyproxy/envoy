@@ -85,11 +85,8 @@ public:
               (const envoy::config::core::v3::ConfigSource& odcds_config,
                OptRef<xds::core::v3::ResourceLocator> odcds_resources_locator,
                ProtobufMessage::ValidationVisitor& validation_visitor));
-  /*MOCK_METHOD(std::shared_ptr<const envoy::config::cluster::v3::Cluster::CommonLbConfig>,
-              GetCommonLbConfigPtr, (const envoy::config::cluster::v3::Cluster::CommonLbConfig common_lb_config));*/
-
   std::shared_ptr<const envoy::config::cluster::v3::Cluster::CommonLbConfig>
-  GetCommonLbConfigPtr(const envoy::config::cluster::v3::Cluster::CommonLbConfig common_lb_config) override {
+  getCommonLbConfigPtr(const envoy::config::cluster::v3::Cluster::CommonLbConfig &common_lb_config) override {
     return common_lb_config_pool_.getObject(common_lb_config);
   }
 

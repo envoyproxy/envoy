@@ -364,8 +364,14 @@ public:
   // Upstream::MissingClusterNotifier
   void notifyMissingCluster(absl::string_view name) override;
 
+  /*
+   * Return shared_ptr for common_lb_config which is stored in an ObjectSharedPool
+   *
+   * @param common_lb_config The config field to be stored in ObjectSharedPool
+   * @return shared_ptr to the CommonLbConfig in ObjectSharedPool
+  */
   std::shared_ptr<const envoy::config::cluster::v3::Cluster::CommonLbConfig>
-  GetCommonLbConfigPtr(const envoy::config::cluster::v3::Cluster::CommonLbConfig common_lb_config) override {
+  getCommonLbConfigPtr(const envoy::config::cluster::v3::Cluster::CommonLbConfig &common_lb_config) override {
     return common_lb_config_pool_.getObject(common_lb_config);
   }
 

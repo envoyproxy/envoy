@@ -1065,7 +1065,7 @@ ClusterInfoImpl::ClusterInfoImpl(
                           ? std::make_unique<ClusterTypedMetadata>(config.metadata())
                           : nullptr),
       common_lb_config_(
-          factory_context.clusterManager().GetCommonLbConfigPtr(config.common_lb_config())),
+          factory_context.clusterManager().getCommonLbConfigPtr(config.common_lb_config())),
       cluster_type_(config.has_cluster_type()
                         ? std::make_unique<envoy::config::cluster::v3::Cluster::CustomClusterType>(
                               config.cluster_type())
