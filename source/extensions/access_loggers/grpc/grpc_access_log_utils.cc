@@ -339,7 +339,7 @@ void Utility::extractCommonAccessLogProperties(
     common_access_log.set_upstream_wire_bytes_received(bytes_meter->wireBytesReceived());
   }
 
-  common_access_log.set_access_log_type(access_log_type);
+  common_access_log.set_access_log_type(AccessLogType_Name(access_log_type));
 }
 
 } // namespace GrpcCommon

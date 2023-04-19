@@ -318,6 +318,7 @@ tcp_logs:
       downstream_direct_remote_address:
         socket_address:
           address: {}
+      access_log_type: NotSet
     connection_properties:
       received_bytes: 3
       sent_bytes: 5
@@ -472,6 +473,7 @@ tcp_logs:
       downstream_direct_remote_address:
         socket_address:
           address: {}
+      access_log_type: NotSet
     connection_properties:
       received_bytes: 3
       sent_bytes: 5
@@ -538,6 +540,7 @@ tcp_logs:
       downstream_direct_remote_address:
         socket_address:
           address: {}
+      access_log_type: NotSet
     connection_properties:
 )EOF",
                                           Network::Test::getLoopbackAddressString(ipVersion()),
@@ -601,6 +604,7 @@ tcp_logs:
       downstream_direct_remote_address:
         socket_address:
           address: {}
+      access_log_type: NotSet
     connection_properties:
 )EOF",
                                           Network::Test::getLoopbackAddressString(ipVersion()),
@@ -647,6 +651,7 @@ tcp_logs:
         socket_address:
       upstream_local_address:
         socket_address:
+      access_log_type: NotSet
       downstream_direct_remote_address:
         socket_address:
           address: {}
@@ -700,6 +705,7 @@ tcp_logs:
         socket_address:
       upstream_local_address:
         socket_address:
+      access_log_type: NotSet
       downstream_direct_remote_address:
         socket_address:
           address: {}
@@ -753,6 +759,7 @@ tcp_logs:
         socket_address:
       upstream_local_address:
         socket_address:
+      access_log_type: NotSet
       downstream_direct_remote_address:
         socket_address:
           address: {}

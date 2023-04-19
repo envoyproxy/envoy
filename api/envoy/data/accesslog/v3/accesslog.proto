@@ -263,7 +263,7 @@ message AccessLogCommon {
   // values, then the default value will be ``NotSet``.
   // For more information about how access log behaves and when it is being recorded,
   // please refer to :ref:`access logging <arch_overview_access_logs>`.
-  AccessLogType access_log_type = 33;
+  string access_log_type = 33;
 }
 
 // Flags indicating occurrences during request/response processing.
