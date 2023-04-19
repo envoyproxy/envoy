@@ -397,6 +397,9 @@ TEST_F(FileSystemImplTest, CreatePathCreatesDirectoryGivenTrailingSlash) {
 }
 
 TEST_F(FileSystemImplTest, CreatePathReturnsErrorOnNoPermissionToWriteDir) {
+#ifdef WIN32
+  GTEST_SKIP() << "It's hard to not have permission to create a directory on Windows";
+#endif
   const std::string new_dir_path = "/should_fail_to_create_directory_in_root/x/y";
   const Api::IoCallBoolResult result = file_system_.createPath(new_dir_path);
   EXPECT_FALSE(result.return_value_);
