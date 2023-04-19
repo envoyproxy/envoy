@@ -156,6 +156,7 @@ Http::FilterHeadersStatus CacheFilter::encodeHeaders(Http::ResponseHeaderMap& he
 }
 
 Http::FilterDataStatus CacheFilter::encodeData(Buffer::Instance& data, bool end_stream) {
+  ASSERT(!waiting_for_insert_body_);
   if (filter_state_ == FilterState::DecodeServingFromCache) {
     // This call was invoked during decoding by decoder_callbacks_->encodeData because a fresh
     // cached response was found and is being added to the encoding stream -- ignore it.
@@ -186,10 +187,7 @@ Http::FilterDataStatus CacheFilter::encodeData(Buffer::Instance& data, bool end_
 }
 
 void CacheFilter::insertBodyCompleted(bool ready, bool end_stream) {
-  if (!waiting_for_insert_body_) {
-    ENVOY_BUG(true, "insertBodyCompleted called while !waiting_for_insert_body_");
-    return;
-  }
+  ASSERT(waiting_for_insert_body_);
   waiting_for_insert_body_ = false;
   if (ready) {
     if (end_stream) {
