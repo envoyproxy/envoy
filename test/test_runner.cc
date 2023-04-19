@@ -11,7 +11,7 @@
 #include "source/server/backtrace.h"
 
 #include "test/mocks/access_log/mocks.h"
-#include "test/test_common/environment.h"
+#include "test/test_common/common_environment.h"
 #include "test/test_listener.h"
 
 #include "gmock/gmock.h"
@@ -86,11 +86,12 @@ int TestRunner::RunTests(int argc, char** argv) {
   // (https://github.com/google/googletest/blob/master/googletest/docs/advanced.md#logging-additional-information),
   // they are available in the test XML.
   // TODO(htuch): Log these as well?
-  testing::Test::RecordProperty("TemporaryDirectory", TestEnvironment::temporaryDirectory());
+  testing::Test::RecordProperty("TemporaryDirectory", CommonTestEnvironment::temporaryDirectory());
 
-  TestEnvironment::setEnvVar("TEST_UDSDIR", TestEnvironment::unixDomainSocketDirectory(), 1);
+  CommonTestEnvironment::setEnvVar("TEST_UDSDIR",
+                                   CommonTestEnvironment::unixDomainSocketDirectory(), 1);
 
-  // Before letting TestEnvironment latch argv and argc, remove any runtime override flag.
+  // Before letting CommonTestEnvironment latch argv and argc, remove any runtime override flag.
   // This allows doing test overrides of Envoy runtime features without adding
   // test flags to the Envoy production command line.
   const std::regex ENABLE_PATTERN{"--runtime-feature-override-for-tests=(.*)",
@@ -128,10 +129,10 @@ int TestRunner::RunTests(int argc, char** argv) {
   BackwardsTrace::setLogToStderr(true);
 #endif
 
-  TestEnvironment::initializeOptions(argc, argv);
+  CommonTestEnvironment::initializeOptions(argc, argv);
   Thread::MutexBasicLockable lock;
 
-  Server::Options& options = TestEnvironment::getOptions();
+  Server::Options& options = CommonTestEnvironment::getOptions();
   Logger::Context logging_state(options.logLevel(), options.logFormat(), lock, false,
                                 options.enableFineGrainLogging());
 
@@ -140,9 +141,10 @@ int TestRunner::RunTests(int argc, char** argv) {
   std::unique_ptr<Logger::FileSinkDelegate> file_logger;
 
   // Redirect all logs to fake file when --log-path arg is specified in command line.
-  if (!TestEnvironment::getOptions().logPath().empty()) {
-    file_logger = std::make_unique<Logger::FileSinkDelegate>(
-        TestEnvironment::getOptions().logPath(), access_log_manager, Logger::Registry::getSink());
+  if (!CommonTestEnvironment::getOptions().logPath().empty()) {
+    file_logger =
+        std::make_unique<Logger::FileSinkDelegate>(CommonTestEnvironment::getOptions().logPath(),
+                                                   access_log_manager, Logger::Registry::getSink());
   }
 
   // Reset all ENVOY_BUG counters.

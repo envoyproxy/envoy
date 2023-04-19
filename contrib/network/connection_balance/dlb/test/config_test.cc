@@ -3,7 +3,7 @@
 #include "source/common/protobuf/utility.h"
 
 #include "test/mocks/server/factory_context.h"
-#include "test/test_common/environment.h"
+#include "test/test_common/common_environment.h"
 #include "test/test_common/status_utility.h"
 
 #include "contrib/network/connection_balance/dlb/source/connection_balancer_impl.h"
@@ -68,14 +68,14 @@ TEST_F(DlbConnectionBalanceFactoryTest, MockDetectDlbDevice) {
   envoy::extensions::network::connection_balance::dlb::v3alpha::Dlb dlb;
   dlb.set_id(1);
 
-  const std::string& dlb_path = TestEnvironment::temporaryDirectory();
-  TestEnvironment::createPath(dlb_path);
+  const std::string& dlb_path = CommonTestEnvironment::temporaryDirectory();
+  CommonTestEnvironment::createPath(dlb_path);
   const std::ofstream file(dlb_path + "/" + "dlb6");
 
   const auto& result = detectDlbDevice(dlb.id(), dlb_path);
   EXPECT_EQ(true, result.has_value());
   EXPECT_EQ(6, result.value());
-  TestEnvironment::removePath(dlb_path);
+  CommonTestEnvironment::removePath(dlb_path);
 }
 
 #ifndef DLB_DISABLED

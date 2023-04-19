@@ -17,6 +17,8 @@ envoy_cc_test(
     srcs = ["allocator_impl_test.cc"],
     deps = [
         "//source/common/stats:allocator_lib",
+        "//source/common/stats:stats_lib",
+        "//test/mocks/stats:stats_mocks",
         "//test/test_common:logging_lib",
         "//test/test_common:thread_factory_for_test_lib",
     ],
@@ -198,6 +200,7 @@ envoy_cc_fuzz_test(
     srcs = ["utility_fuzz_test.cc"],
     corpus = "utility_corpus",
     deps = [
+        "//source/common/stats:isolated_store_lib",
         "//source/common/stats:utility_lib",
     ],
 )

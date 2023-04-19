@@ -56,11 +56,6 @@ envoy_cc_test(
 envoy_cc_test(
     name = "assert2_test",
     srcs = ["assert2_test.cc"],
-    deps = [
-        "//source/common/common:assert_lib",
-        "//test/test_common:logging_lib",
-        "//test/test_common:utility_lib",
-    ],
 )
 
 envoy_cc_test(
@@ -78,7 +73,10 @@ envoy_cc_fuzz_test(
     corpus = "base64_corpus",
     # Fuzzer is stable, no bugs, simple test target; avoid emitting CO2.
     tags = ["no_fuzz"],
-    deps = ["//source/common/common:base64_lib"],
+    deps = [
+        "//source/common/common:base64_lib",
+        "//test/test_common:environment_lib",
+    ],
 )
 
 envoy_cc_fuzz_test(
@@ -87,14 +85,19 @@ envoy_cc_fuzz_test(
     corpus = "utility_corpus",
     # Fuzzer is stable, no bugs, simple test target; avoid emitting CO2.
     tags = ["no_fuzz"],
-    deps = ["//source/common/common:utility_lib"],
+    deps = [
+        "//source/common/common:utility_lib",
+        "//test/test_common:environment_lib",
+    ],
 )
 
 envoy_cc_fuzz_test(
     name = "hash_fuzz_test",
     srcs = ["hash_fuzz_test.cc"],
     corpus = "hash_corpus",
-    deps = ["//source/common/common:hash_lib"],
+    deps = [
+        "//source/common/common:hash_lib",
+    ],
 )
 
 envoy_cc_test(
@@ -212,6 +215,7 @@ envoy_cc_test(
     srcs = ["logger_test.cc"],
     deps = [
         "//source/common/common:minimal_logger_lib",
+        "//test/test_common:environment_lib",
     ],
 )
 
@@ -221,7 +225,10 @@ envoy_cc_fuzz_test(
     corpus = "logger_corpus",
     # TODO(github.com/envoyproxy/envoy#8893): Re-enable once more fuzz tests are added
     tags = ["no_fuzz"],
-    deps = ["//source/common/common:minimal_logger_lib"],
+    deps = [
+        "//source/common/common:minimal_logger_lib",
+        "//test/test_common:environment_lib",
+    ],
 )
 
 envoy_cc_test(
@@ -473,6 +480,7 @@ envoy_cc_test(
     deps = [
         "//source/common/common:scope_tracked_object_stack",
         "//source/common/common:utility_lib",
+        "//test/test_common:utility_lib",
     ],
 )
 

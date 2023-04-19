@@ -2,7 +2,7 @@
 #include "source/extensions/matching/common_inputs/environment_variable/config.h"
 
 #include "test/mocks/server/factory_context.h"
-#include "test/test_common/environment.h"
+#include "test/test_common/common_environment.h"
 
 #include "gtest/gtest.h"
 
@@ -34,7 +34,7 @@ TEST(ConfigTest, TestConfig) {
     EXPECT_EQ(input_factory()->get(), absl::nullopt);
   }
 
-  TestEnvironment::setEnvVar("foo", "bar", 1);
+  CommonTestEnvironment::setEnvVar("foo", "bar", 1);
   {
     auto input_factory = factory.createCommonProtocolInputFactoryCb(
         *message, ProtobufMessage::getStrictValidationVisitor());
@@ -42,7 +42,7 @@ TEST(ConfigTest, TestConfig) {
     EXPECT_EQ(input_factory()->get(), absl::make_optional("bar"));
   }
 
-  TestEnvironment::unsetEnvVar("foo");
+  CommonTestEnvironment::unsetEnvVar("foo");
 }
 
 } // namespace EnvironmentVariable

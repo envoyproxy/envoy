@@ -20,6 +20,7 @@ envoy_cc_test(
     deps = [
         "//contrib/golang/filters/http/source:config",
         "//test/mocks/server:factory_context_mocks",
+        "//test/test_common:environment_lib",
         "//test/test_common:utility_lib",
     ],
 )
@@ -41,6 +42,7 @@ envoy_cc_test(
         "//test/mocks/ssl:ssl_mocks",
         "//test/mocks/thread_local:thread_local_mocks",
         "//test/mocks/upstream:cluster_manager_mocks",
+        "//test/test_common:environment_lib",
         "//test/test_common:logging_lib",
         "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",

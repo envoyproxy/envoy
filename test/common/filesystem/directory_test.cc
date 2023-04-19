@@ -5,8 +5,8 @@
 
 #include "source/common/filesystem/directory.h"
 
+#include "test/test_common/common_utility.h"
 #include "test/test_common/environment.h"
-#include "test/test_common/utility.h"
 
 #include "absl/container/node_hash_set.h"
 #include "gmock/gmock.h"

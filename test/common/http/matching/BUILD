@@ -16,7 +16,9 @@ envoy_cc_test(
         "//source/common/http/matching:inputs_lib",
         "//source/common/network:address_lib",
         "//source/common/network:socket_lib",
+        "//source/common/stream_info:stream_info_lib",
         "//test/test_common:test_time_lib",
+        "//test/test_common:utility_lib",
     ],
 )
 
@@ -28,6 +30,8 @@ envoy_cc_test(
         "//source/common/http/matching:status_code_input_lib",
         "//source/common/network:address_lib",
         "//source/common/network:socket_lib",
+        "//source/common/stream_info:stream_info_lib",
         "//test/test_common:test_time_lib",
+        "//test/test_common:utility_lib",
     ],
 )

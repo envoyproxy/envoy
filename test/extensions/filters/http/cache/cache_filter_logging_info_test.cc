@@ -1,6 +1,6 @@
 #include "source/extensions/filters/http/cache/cache_filter_logging_info.h"
 
-#include "test/test_common/utility.h"
+#include "test/test_common/common_utility.h"
 
 #include "gtest/gtest.h"
 

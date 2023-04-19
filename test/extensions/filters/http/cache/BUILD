@@ -48,6 +48,7 @@ envoy_extension_cc_test(
     extension_names = ["envoy.filters.http.cache"],
     deps = [
         "//source/extensions/filters/http/cache:cache_entry_utils_lib",
+        "//test/test_common:utility_lib",
     ],
 )
 
@@ -143,6 +144,7 @@ envoy_extension_cc_test(
     extension_names = ["envoy.filters.http.cache"],
     deps = [
         "//source/extensions/filters/http/cache:cache_custom_headers",
+        "//test/test_common:utility_lib",
     ],
 )
 

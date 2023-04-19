@@ -1,7 +1,7 @@
 #include "source/common/network/address_impl.h"
 #include "source/common/network/listen_socket_impl.h"
 
-#include "test/test_common/environment.h"
+#include "test/test_common/common_environment.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"

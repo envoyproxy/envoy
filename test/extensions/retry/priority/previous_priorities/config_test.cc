@@ -8,7 +8,7 @@
 #include "test/mocks/upstream/host.h"
 #include "test/mocks/upstream/host_set.h"
 #include "test/mocks/upstream/priority_set.h"
-#include "test/test_common/utility.h"
+#include "test/test_common/common_utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"

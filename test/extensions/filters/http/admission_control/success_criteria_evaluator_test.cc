@@ -7,7 +7,7 @@
 #include "source/extensions/filters/http/admission_control/admission_control.h"
 #include "source/extensions/filters/http/admission_control/evaluators/success_criteria_evaluator.h"
 
-#include "test/test_common/utility.h"
+#include "test/test_common/common_utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"

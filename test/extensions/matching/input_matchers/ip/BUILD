@@ -27,5 +27,6 @@ envoy_extension_cc_test(
     extension_names = ["envoy.matching.matchers.ip"],
     deps = [
         "//source/extensions/matching/input_matchers/ip:ip_lib",
+        "//test/test_common:utility_lib",
     ],
 )

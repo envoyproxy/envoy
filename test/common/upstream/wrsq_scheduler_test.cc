@@ -1,7 +1,7 @@
 #include "source/common/upstream/wrsq_scheduler.h"
 
 #include "test/mocks/common.h"
-#include "test/test_common/utility.h"
+#include "test/test_common/common_utility.h"
 
 #include "gtest/gtest.h"
 

@@ -19,6 +19,7 @@ envoy_cc_test_library(
     deps = [
         "//source/common/buffer:buffer_lib",
         "//source/common/common:byte_order_lib",
+        "//test/test_common:utility_lib",
     ],
 )
 

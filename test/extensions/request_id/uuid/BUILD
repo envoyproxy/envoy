@@ -17,5 +17,6 @@ envoy_cc_test(
         "//source/extensions/request_id/uuid:config",
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/stream_info:stream_info_mocks",
+        "//test/test_common:utility_lib",
     ],
 )

@@ -4,7 +4,7 @@
 #include "source/common/network/address_impl.h"
 #include "source/common/network/utility.h"
 
-#include "test/test_common/utility.h"
+#include "test/test_common/common_utility.h"
 
 #include "ares.h"
 

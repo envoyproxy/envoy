@@ -6,7 +6,7 @@
 #include "source/common/http/message_impl.h"
 #include "source/common/http/utility.h"
 
-#include "test/test_common/utility.h"
+#include "test/test_common/common_utility.h"
 
 #include "gtest/gtest.h"
 

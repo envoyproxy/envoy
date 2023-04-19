@@ -1,7 +1,7 @@
 #include <algorithm>
 #include <set>
 
-#include "test/test_common/utility.h"
+#include "test/test_common/common_utility.h"
 
 #include "contrib/kafka/filters/network/source/mesh/command_handlers/fetch_record_converter.h"
 #include "gtest/gtest.h"

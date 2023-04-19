@@ -32,6 +32,7 @@ envoy_cc_test(
     srcs = ["cache_file_header_proto_util_test.cc"],
     deps = [
         "//source/extensions/http/cache/file_system_http_cache:cache_file_header_proto_util",
+        "//test/test_common:utility_lib",
     ],
 )
 

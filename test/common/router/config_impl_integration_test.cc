@@ -8,6 +8,7 @@
 #include "source/common/protobuf/protobuf.h"
 
 #include "test/integration/http_integration.h"
+#include "test/test_common/environment.h"
 #include "test/test_common/registry.h"
 
 #include "absl/strings/string_view.h"

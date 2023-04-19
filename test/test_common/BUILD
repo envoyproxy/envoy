@@ -12,6 +12,27 @@ licenses(["notice"])  # Apache 2
 envoy_package()
 
 envoy_cc_test_library(
+    name = "common_environment_lib",
+    srcs = ["common_environment.cc"],
+    hdrs = ["common_environment.h"],
+    external_deps = [
+        "abseil_optional",
+        "abseil_symbolize",
+        "bazel_runfiles",
+    ],
+    deps = [
+        ":common_utility_lib",
+        "//source/common/common:compiler_requirements_lib",
+        "//source/common/filesystem:directory_lib",
+        "//source/common/filesystem:filesystem_lib",
+        "//source/server:options_lib",
+    ] + select({
+        "//bazel:disable_signal_trace": [],
+        "//conditions:default": ["//source/common/signal:sigaction_lib"],
+    }),
+)
+
+envoy_cc_test_library(
     name = "environment_lib",
     srcs = ["environment.cc"],
     hdrs = ["environment.h"],
@@ -21,6 +42,7 @@ envoy_cc_test_library(
         "bazel_runfiles",
     ],
     deps = [
+        ":common_environment_lib",
         ":network_utility_lib",
         "//envoy/server:options_interface",
         "//source/common/common:assert_lib",
@@ -42,7 +64,7 @@ envoy_cc_test_library(
     srcs = ["network_utility.cc"],
     hdrs = ["network_utility.h"],
     deps = [
-        ":utility_lib",
+        ":common_utility_lib",
         "//envoy/network:filter_interface",
         "//source/common/common:assert_lib",
         "//source/common/network:address_lib",
@@ -122,6 +144,22 @@ envoy_cc_test_library(
 )
 
 envoy_cc_test_library(
+    name = "common_utility_lib",
+    srcs = ["common_utility.cc"],
+    hdrs = ["common_utility.h"],
+    external_deps = [
+        "abseil_strings",
+    ],
+    deps = [
+        ":file_system_for_test_lib",
+        ":logging_lib",
+        ":printers_lib",
+        "//source/common/config:decoded_resource_lib",
+        "//source/common/config:opaque_resource_decoder_lib",
+    ],
+)
+
+envoy_cc_test_library(
     name = "utility_lib",
     srcs = ["utility.cc"],
     hdrs = ["utility.h"],
@@ -129,6 +167,7 @@ envoy_cc_test_library(
         "abseil_strings",
     ],
     deps = [
+        ":common_utility_lib",
         ":file_system_for_test_lib",
         ":logging_lib",
         ":printers_lib",

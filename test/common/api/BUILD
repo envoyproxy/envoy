@@ -13,5 +13,6 @@ envoy_cc_test(
     srcs = ["os_sys_calls_test.cc"],
     deps = [
         "//source/common/api:os_sys_calls_lib",
+        "//test/test_common:environment_lib",
     ],
 )

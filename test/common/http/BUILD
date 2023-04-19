@@ -35,6 +35,7 @@ envoy_cc_test(
         "//test/mocks/stats:stats_mocks",
         "//test/mocks/upstream:cluster_manager_mocks",
         "//test/test_common:test_time_lib",
+        "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
     ],
@@ -358,6 +359,7 @@ envoy_cc_test(
     deps = [
         "//source/common/http:header_map_lib",
         "//test/mocks/runtime:runtime_mocks",
+        "//test/test_common:utility_lib",
     ],
 )
 
@@ -434,6 +436,7 @@ envoy_cc_test(
     deps = [
         "//source/common/http:header_map_lib",
         "//source/common/http:path_utility_lib",
+        "//test/test_common:utility_lib",
     ],
 )
 

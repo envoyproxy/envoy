@@ -5,7 +5,7 @@
 #include "source/extensions/key_value/file_based/config.h"
 
 #include "test/mocks/event/mocks.h"
-#include "test/test_common/environment.h"
+#include "test/test_common/common_environment.h"
 #include "test/test_common/file_system_for_test.h"
 #include "test/test_common/simulated_time_system.h"
 
@@ -21,8 +21,8 @@ namespace {
 
 class KeyValueStoreTest : public testing::Test {
 protected:
-  KeyValueStoreTest() : filename_(TestEnvironment::temporaryPath("key_value_store")) {
-    TestEnvironment::removePath(filename_);
+  KeyValueStoreTest() : filename_(CommonTestEnvironment::temporaryPath("key_value_store")) {
+    CommonTestEnvironment::removePath(filename_);
     createStore();
   }
 
@@ -216,7 +216,7 @@ TEST_F(KeyValueStoreTest, ShouldCrashIfIterateCallbackAddsOrUpdatesStore) {
 
 TEST_F(KeyValueStoreTest, HandleBadFile) {
   auto checkBadFile = [this](std::string file, std::string error) {
-    TestEnvironment::writeStringToFileForTest(filename_, file, true);
+    CommonTestEnvironment::writeStringToFileForTest(filename_, file, true);
     EXPECT_LOG_CONTAINS("warn", error, createStore());
 
     // File will be parsed up until error.
@@ -230,7 +230,7 @@ TEST_F(KeyValueStoreTest, HandleBadFile) {
 
 #ifndef WIN32
 TEST_F(KeyValueStoreTest, HandleInvalidFile) {
-  filename_ = TestEnvironment::temporaryPath("some/unlikely/bad/path/bar");
+  filename_ = CommonTestEnvironment::temporaryPath("some/unlikely/bad/path/bar");
   createStore();
   EXPECT_LOG_CONTAINS("error", "Failed to flush cache to file " + filename_, store_->flush());
 }

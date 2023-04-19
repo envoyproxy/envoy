@@ -82,6 +82,8 @@ envoy_cc_test(
         "//test/mocks/server:factory_context_mocks",
         "//test/mocks/tcp:tcp_mocks",
         "//test/mocks/upstream:cluster_manager_mocks",
+        "//test/test_common:environment_lib",
+        "//test/test_common:network_utility_lib",
         "//test/test_common:test_runtime_lib",
     ],
 )

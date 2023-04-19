@@ -67,6 +67,7 @@ envoy_cc_test(
     name = "cidr_range_test",
     srcs = ["cidr_range_test.cc"],
     deps = [
+        "//source/common/json:json_loader_lib",
         "//source/common/network:address_lib",
         "//source/common/network:cidr_range_lib",
     ],
@@ -426,6 +427,8 @@ envoy_cc_test(
         "//source/common/common:utility_lib",
         "//source/common/network:address_lib",
         "//test/mocks/api:api_mocks",
+        "//test/test_common:environment_lib",
+        "//test/test_common:network_utility_lib",
         "//test/test_common:threadsafe_singleton_injector_lib",
         "//test/test_common:utility_lib",
     ],
@@ -440,6 +443,7 @@ envoy_cc_test(
         "//source/common/network:address_lib",
         "//test/mocks/api:api_mocks",
         "//test/mocks/event:event_mocks",
+        "//test/test_common:network_utility_lib",
         "//test/test_common:threadsafe_singleton_injector_lib",
     ],
 )
@@ -451,6 +455,7 @@ envoy_cc_test(
     deps = [
         "//source/common/common:utility_lib",
         "//source/common/network:address_lib",
+        "//source/common/network:listen_socket_lib",
     ],
 )
 

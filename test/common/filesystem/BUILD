@@ -35,5 +35,6 @@ envoy_cc_test(
         "//source/common/event:dispatcher_lib",
         "//source/common/filesystem:watcher_lib",
         "//test/test_common:environment_lib",
+        "//test/test_common:utility_lib",
     ],
 )

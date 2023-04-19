@@ -7,9 +7,9 @@
 #include "source/extensions/path/uri_template_lib/uri_template.h"
 #include "source/extensions/path/uri_template_lib/uri_template_internal.h"
 
+#include "test/test_common/common_utility.h"
 #include "test/test_common/logging.h"
 #include "test/test_common/status_utility.h"
-#include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
 

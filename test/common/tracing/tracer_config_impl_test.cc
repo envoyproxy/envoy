@@ -1,6 +1,6 @@
 #include "source/common/tracing/tracer_config_impl.h"
 
-#include "test/test_common/utility.h"
+#include "test/test_common/common_utility.h"
 
 #include "gtest/gtest.h"
 

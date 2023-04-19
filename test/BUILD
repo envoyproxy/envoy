@@ -25,15 +25,10 @@ envoy_cc_test_library(
     ],
     hdrs = ["test_listener.h"],
     deps = [
-        "//source/common/common:logger_lib",
-        "//source/common/common:thread_lib",
-        "//source/common/event:libevent_lib",
         "//source/exe:process_wide_lib",
         "//source/server:backtrace_lib",
         "//test/mocks/access_log:access_log_mocks",
-        "//test/test_common:environment_lib",
-        "//test/test_common:global_lib",
-        "//test/test_common:printers_lib",
+        "//test/test_common:common_environment_lib",
     ],
 )
 

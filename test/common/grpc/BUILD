@@ -86,6 +86,7 @@ envoy_cc_test(
         "//source/common/http:headers_lib",
         "//test/mocks/upstream:cluster_info_mocks",
         "//test/test_common:global_lib",
+        "//test/test_common:utility_lib",
     ],
 )
 

@@ -22,6 +22,9 @@ envoy_cc_test(
     ],
     deps = [
         ":private_key_provider_proto_cc_proto",
+        "//source/common/common:logger_lib",
+        "//source/common/common:thread_lib",
+        "//source/common/event:libevent_lib",
         "//source/common/secret:sds_api_lib",
         "//source/common/secret:secret_manager_impl_lib",
         "//source/common/ssl:certificate_validation_context_config_impl_lib",

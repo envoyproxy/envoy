@@ -11,6 +11,7 @@ envoy_cc_test(
     deps = [
         "//library/cc:engine_builder_lib",
         "//library/cc:envoy_engine_cc_lib_no_stamp",
+        "@envoy//test/test_common:utility_lib",
         "@envoy_build_config//:extension_registry",
         "@envoy_build_config//:test_extensions",
     ],

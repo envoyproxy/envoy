@@ -3,7 +3,6 @@
 #include "source/extensions/path/match/uri_template/uri_template_match.h"
 
 #include "test/mocks/server/factory_context.h"
-#include "test/test_common/environment.h"
 
 #include "gtest/gtest.h"
 

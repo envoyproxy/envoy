@@ -17,6 +17,7 @@ envoy_cc_test(
     ],
     deps = [
         "//contrib/golang/common/dso:dso_lib",
+        "//test/test_common:environment_lib",
         "//test/test_common:utility_lib",
     ],
 )

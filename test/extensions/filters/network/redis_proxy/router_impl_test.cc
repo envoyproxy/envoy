@@ -14,7 +14,7 @@
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/stream_info/mocks.h"
-#include "test/test_common/environment.h"
+#include "test/test_common/common_environment.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -101,8 +101,8 @@ TEST(PrefixRoutesTest, TestKeyPrefixFormatter) {
   NiceMock<Network::MockReadFilterCallbacks> filter_callbacks;
   NiceMock<Network::MockConnection> connection;
   NiceMock<StreamInfo::MockStreamInfo> stream_info;
-  TestEnvironment::setEnvVar("ENVOY_TEST_ENV", "test", 1);
-  Envoy::Cleanup cleanup([]() { TestEnvironment::unsetEnvVar("ENVOY_TEST_ENV"); });
+  CommonTestEnvironment::setEnvVar("ENVOY_TEST_ENV", "test", 1);
+  Envoy::Cleanup cleanup([]() { CommonTestEnvironment::unsetEnvVar("ENVOY_TEST_ENV"); });
   const std::string format =
       "{%KEY%}-%ENVIRONMENT(ENVOY_TEST_ENV)%-%FILTER_STATE(redisKey)%-{%KEY%}";
 

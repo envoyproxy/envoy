@@ -1,4 +1,4 @@
-#include "test/test_common/environment.h"
+#include "test/test_common/common_environment.h"
 #include "test/tools/schema_validator/validator.h"
 
 #include "gtest/gtest.h"
@@ -8,7 +8,7 @@ namespace Envoy {
 class SchemaValidatorTest : public testing::Test {
 public:
   void run(const std::string& command_line, const std::string& config_file) {
-    const std::string final_command_line = TestEnvironment::runfilesPath(
+    const std::string final_command_line = CommonTestEnvironment::runfilesPath(
         absl::StrCat("test/tools/schema_validator/test/config/", config_file));
     // Splitting on ' ' is not always reliable but works fine for these tests.
     const std::vector<std::string> split_command_line =

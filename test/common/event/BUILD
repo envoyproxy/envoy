@@ -21,6 +21,8 @@ envoy_cc_test(
         "//test/mocks:common_lib",
         "//test/mocks/server:watch_dog_mocks",
         "//test/mocks/stats:stats_mocks",
+        "//test/test_common:environment_lib",
+        "//test/test_common:network_utility_lib",
         "//test/test_common:simulated_time_system_lib",
         "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
@@ -47,7 +49,9 @@ envoy_cc_test(
     srcs = ["scaled_range_timer_manager_impl_test.cc"],
     deps = [
         "//source/common/event:scaled_range_timer_manager_lib",
+        "//test/mocks:common_lib",
         "//test/mocks/event:wrapped_dispatcher",
         "//test/test_common:simulated_time_system_lib",
+        "//test/test_common:utility_lib",
     ],
 )

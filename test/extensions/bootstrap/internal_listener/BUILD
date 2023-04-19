@@ -22,6 +22,7 @@ envoy_extension_cc_test(
         "//source/extensions/io_socket/user_space:io_handle_impl_lib",
         "//test/mocks/event:event_mocks",
         "//test/mocks/thread_local:thread_local_mocks",
+        "//test/test_common:network_utility_lib",
     ],
 )
 
@@ -84,6 +85,7 @@ envoy_extension_cc_test(
         "//test/mocks/access_log:access_log_mocks",
         "//test/mocks/network:network_mocks",
         "//test/server:utility_lib",
+        "//test/test_common:network_utility_lib",
         "//test/test_common:test_runtime_lib",
     ],
 )

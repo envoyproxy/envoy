@@ -15,7 +15,7 @@
 #include "test/extensions/filters/http/cache/common.h"
 #include "test/extensions/filters/http/cache/http_cache_implementation_test_common.h"
 #include "test/mocks/server/factory_context.h"
-#include "test/test_common/environment.h"
+#include "test/test_common/common_environment.h"
 #include "test/test_common/simulated_time_system.h"
 #include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
@@ -99,7 +99,7 @@ protected:
     }
   }
 
-  ::Envoy::TestEnvironment env_;
+  ::Envoy::CommonTestEnvironment env_;
   std::string cache_path_;
   NiceMock<Server::Configuration::MockFactoryContext> context_;
   std::shared_ptr<FileSystemHttpCache> cache_;

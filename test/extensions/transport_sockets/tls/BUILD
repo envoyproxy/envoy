@@ -128,6 +128,7 @@ envoy_cc_test(
         "//test/extensions/transport_sockets/tls/test_data:cert_infos",
         "//test/test_common:environment_lib",
         "//test/test_common:simulated_time_system_lib",
+        "//test/test_common:utility_lib",
     ],
 )
 

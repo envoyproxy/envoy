@@ -1,4 +1,4 @@
-#include "test/test_common/utility.h"
+#include "test/test_common/common_utility.h"
 
 #include "contrib/kafka/filters/network/source/kafka_response_parser.h"
 #include "contrib/kafka/filters/network/test/buffer_based_test.h"
