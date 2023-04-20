@@ -24,7 +24,7 @@ TEST_P(DownstreamUhvIntegrationTest, BackslashInUriPathConversionWithUhvOverride
   // Start the request.
   auto response = codec_client_->makeHeaderOnlyRequest(
       Http::TestRequestHeaderMapImpl{{":method", "GET"},
-                                     {":path", "/path\\with%5cback%5Cslashes"},
+                                     {":path", "/path\\with%5Cback%5Cslashes"},
                                      {":scheme", "http"},
                                      {":authority", "host"}});
 #ifdef ENVOY_ENABLE_UHV
@@ -40,7 +40,7 @@ TEST_P(DownstreamUhvIntegrationTest, BackslashInUriPathConversionWithUhvOverride
 #else
   waitForNextUpstreamRequest();
 
-  EXPECT_EQ(upstream_request_->headers().getPathValue(), "/path/with%5cback%5Cslashes");
+  EXPECT_EQ(upstream_request_->headers().getPathValue(), "/path/with%5Cback%5Cslashes");
 
   // Send a headers only response.
   upstream_request_->encodeHeaders(default_response_headers_, true);
@@ -60,18 +60,66 @@ TEST_P(DownstreamUhvIntegrationTest, BackslashInUriPathConversion) {
   // Start the request.
   auto response = codec_client_->makeHeaderOnlyRequest(
       Http::TestRequestHeaderMapImpl{{":method", "GET"},
-                                     {":path", "/path\\with%5cback%5Cslashes"},
+                                     {":path", "/path\\with%5Cback%5Cslashes"},
+                                     {":scheme", "http"},
+                                     {":authority", "host"}});
+  waitForNextUpstreamRequest();
+
+  EXPECT_EQ(upstream_request_->headers().getPathValue(), "/path/with%5Cback%5Cslashes");
+
+  // Send a headers only response.
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  ASSERT_TRUE(response->waitForEndStream());
+}
+
+// By default the `uhv_preserve_url_encoded_case` == true and UHV behaves just like legacy path
+// normalization.
+TEST_P(DownstreamUhvIntegrationTest, UrlEncodedTripletsCasePreserved) {
+  config_helper_.addConfigModifier(
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             hcm) -> void { hcm.mutable_normalize_path()->set_value(true); });
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  // Start the request.
+  auto response = codec_client_->makeHeaderOnlyRequest(
+      Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                     {":path", "/path/with%3bmixed%5Ccase%Fesequences"},
+                                     {":scheme", "http"},
+                                     {":authority", "host"}});
+  waitForNextUpstreamRequest();
+
+  EXPECT_EQ(upstream_request_->headers().getPathValue(), "/path/with%3bmixed%5Ccase%Fesequences");
+
+  // Send a headers only response.
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  ASSERT_TRUE(response->waitForEndStream());
+}
+
+// Without the `uhv_preserve_url_encoded_case` override UHV changes all percent encoded
+// sequences to use uppercase characters.
+TEST_P(DownstreamUhvIntegrationTest, UrlEncodedTripletsCasePreservedWithUhvOverride) {
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.uhv_preserve_url_encoded_case",
+                                    "false");
+  config_helper_.addConfigModifier(
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             hcm) -> void { hcm.mutable_normalize_path()->set_value(true); });
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  // Start the request.
+  auto response = codec_client_->makeHeaderOnlyRequest(
+      Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                     {":path", "/path/with%3bmixed%5Ccase%Fesequences"},
                                      {":scheme", "http"},
                                      {":authority", "host"}});
   waitForNextUpstreamRequest();
 
 #ifdef ENVOY_ENABLE_UHV
-  // UHV by default changes all % encoded sequences to uppercase
-  EXPECT_EQ(upstream_request_->headers().getPathValue(), "/path/with%5Cback%5Cslashes");
+  EXPECT_EQ(upstream_request_->headers().getPathValue(), "/path/with%3Bmixed%5Ccase%FEsequences");
 #else
-  EXPECT_EQ(upstream_request_->headers().getPathValue(), "/path/with%5cback%5Cslashes");
+  EXPECT_EQ(upstream_request_->headers().getPathValue(), "/path/with%3bmixed%5Ccase%Fesequences");
 #endif
-
   // Send a headers only response.
   upstream_request_->encodeHeaders(default_response_headers_, true);
   ASSERT_TRUE(response->waitForEndStream());

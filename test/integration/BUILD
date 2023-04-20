@@ -219,6 +219,8 @@ envoy_cc_test(
         ":upstream_socket_proto_cc_proto",
         "//source/common/router:string_accessor_lib",
         "//source/extensions/transport_sockets/common:passthrough_lib",
+        "//test/integration/filters:header_to_filter_state_lib",
+        "//test/integration/filters:header_to_filter_state_proto_cc_proto",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/access_loggers/file/v3:pkg_cc_proto",

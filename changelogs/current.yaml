@@ -5,6 +5,11 @@ behavior_changes:
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
+- area: uhv
+  change: |
+    Preserve case of %-encoded triplets in the default header validator. This behavior can be reverted by setting runtime flag
+    ``envoy.reloadable_features.uhv_preserve_url_encoded_case`` to false, in which case %-encoded triplets are normalized
+    to uppercase characters. This setting is only applicable when the Unversal Header Validator is enabled and has no effect otherwise.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
@@ -17,6 +22,11 @@ new_features:
   change: |
     added %ACCESS_LOG_TYPE% substitution string, to help distinguishing between access log records and when they are being
     recorded. Please refer to the access log configuration documentation for more information.
+- area: redis_proxy
+  change: |
+    added new configuration field :ref:`key_formatter
+    <envoy_v3_api_field_extensions.filters.network.redis_proxy.v3.RedisProxy.PrefixRoutes.Route.key_formatter>` to format redis key.
+    The field supports using %KEY% as a formatter command for substituting the redis key as part of the substitution formatter expression.
 
 deprecated:
 - area: access_log
