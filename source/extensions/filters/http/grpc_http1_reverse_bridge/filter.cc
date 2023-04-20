@@ -41,7 +41,7 @@ Grpc::Status::GrpcStatus grpcStatusFromHeaders(Http::ResponseHeaderMap& headers)
   // Notably, we treat an upstream 200 as a successful response. This differs
   // from the standard but is key in being able to transform a successful
   // upstream HTTP response into a gRPC response.
-  if (http_response_status == 200) {
+  if (http_response_status == 200 || http_response_status == 201) {
     return Grpc::Status::WellKnownGrpcStatus::Ok;
   } else {
     return Grpc::Utility::httpToGrpcStatus(http_response_status);
