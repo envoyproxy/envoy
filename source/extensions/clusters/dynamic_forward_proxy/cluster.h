@@ -25,7 +25,7 @@ public:
           Upstream::ClusterFactoryContext& context, Runtime::Loader& runtime,
           Extensions::Common::DynamicForwardProxy::DnsCacheManagerFactory& cache_manager_factory,
           const LocalInfo::LocalInfo& local_info, bool added_via_api);
-  ~Cluster();
+  ~Cluster() override;
 
   // Upstream::Cluster
   Upstream::Cluster::InitializePhase initializePhase() const override {
@@ -56,8 +56,8 @@ public:
 
 private:
   struct ThreadLocalConfig : public ThreadLocal::ThreadLocalObject {
-    ThreadLocalConfig() {}
-    ~ThreadLocalConfig() override{};
+    ThreadLocalConfig() = default;
+    ~ThreadLocalConfig() override = default;
   };
 
   struct ClusterInfo {

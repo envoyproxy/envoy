@@ -78,7 +78,7 @@ ProxyFilterConfig::addDynamicCluster(Upstream::DfpClusterSharedPtr cluster,
 
   if (sub_cluster_pair.second.has_value()) {
     auto cluster = sub_cluster_pair.second.value();
-    // TODO: use version_info from dfp_cluster.
+    // TODO: a meaningful version_info.
     std::string version_info = "";
     ENVOY_LOG(debug, "deliver dynamic cluster {} creation to main thread", cluster_name);
     main_thread_dispatcher_.post([this, cluster, version_info]() {

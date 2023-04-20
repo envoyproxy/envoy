@@ -61,7 +61,6 @@ Cluster::~Cluster() {
     idle_timer_->disableTimer();
     idle_timer_.reset();
   }
-  // Do nothing when server is shutdown.
   if (tls_.isShutdown()) {
     return;
   }
@@ -103,16 +102,16 @@ bool Cluster::touch(const std::string& cluster_name) {
 void Cluster::checkIdleSubCluster() {
   ASSERT(main_thread_dispatcher_.isThreadSafe());
   {
+    // TODO: try read lock first.
     absl::WriterMutexLock lock{&cluster_map_lock_};
     for (auto it = cluster_map_.cbegin(); it != cluster_map_.cend();) {
       if (it->second->checkIdle()) {
         auto cluster_name = it->first;
         ENVOY_LOG(debug, "cluster='{}' removing from cluster_map & cluster manager", cluster_name);
-        cluster_map_.erase(it++);
+        cluster_map_.erase(it);
         cm_.removeCluster(cluster_name);
-      } else {
-        ++it;
       }
+      ++it;
     }
   }
   idle_timer_->enableTimer(sub_cluster_ttl_);

@@ -475,6 +475,33 @@ TEST_F(ProxyFilterTest, DFPClusterIsGone) {
   filter_->onDestroy();
 }
 
+// Sub cluster init timeout
+TEST_F(ProxyFilterTest, SubClusterInitTimeout) {
+  InSequence s;
+
+  EXPECT_CALL(callbacks_, route());
+  EXPECT_CALL(factory_context_.cluster_manager_, getThreadLocalCluster(_));
+  EXPECT_CALL(*transport_socket_factory_, implementsSecureTransport()).WillOnce(Return(false));
+  EXPECT_CALL(callbacks_, route());
+  EXPECT_CALL(*(dfp_cluster_.get()), enableSubCluster()).WillOnce(Return(true));
+  // get DFPCluster, not exists.
+  EXPECT_CALL(factory_context_.cluster_manager_, getThreadLocalCluster(Eq("DFPCluster:foo:80")));
+  // "true" means another thread already created it.
+  EXPECT_CALL(*(dfp_cluster_.get()), createSubClusterConfig(_, _, _))
+      .WillOnce(Return(std::make_pair(true, absl::nullopt)));
+  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
+            filter_->decodeHeaders(request_headers_, false));
+
+  EXPECT_CALL(callbacks_,
+              sendLocalReply(Http::Code::ServiceUnavailable, Eq("Sub cluster warming timeout"), _,
+                             _, Eq("sub_cluster_warming_timeout")));
+  EXPECT_CALL(callbacks_, encodeHeaders_(_, false));
+  EXPECT_CALL(callbacks_, encodeData(_, true));
+
+  filter_->onClusterInitTimeout();
+  filter_->onDestroy();
+}
+
 class UpstreamResolvedHostFilterStateHelper : public ProxyFilterTest {
 public:
   void setupFilter() override {
