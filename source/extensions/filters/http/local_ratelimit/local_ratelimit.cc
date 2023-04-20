@@ -65,7 +65,7 @@ FilterConfig::FilterConfig(
   }
 
   if (!config.custom_response_body().empty()) {
-    customResponseBody_ = config.custom_response_body();
+    custom_response_body_ = config.custom_response_body();
   }
 }
 

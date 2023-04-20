@@ -108,7 +108,7 @@ public:
   envoy::extensions::common::ratelimit::v3::VhRateLimitsOptions virtualHostRateLimits() const {
     return vh_rate_limits_;
   }
-  const std::string& customResponseBody() const { return customResponseBody_; }
+  const std::string& customResponseBody() const { return custom_response_body_; }
 
 private:
   friend class FilterTest;
@@ -123,7 +123,7 @@ private:
     return Http::Code::TooManyRequests;
   }
 
-  std::string customResponseBody_{""};
+  std::string custom_response_body_{""};
   Event::Dispatcher& dispatcher_;
   const Http::Code status_;
   mutable LocalRateLimitStats stats_;
