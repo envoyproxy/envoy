@@ -1184,7 +1184,8 @@ TEST_F(HttpRateLimitFilterTest, DEPRECATED_FEATURE_TEST(ExcludeVirtualHost)) {
       .WillOnce(Return(false));
 
   EXPECT_CALL(*filter_callbacks_.route_, mostSpecificPerFilterConfig(_))
-      .Times(2).WillRepeatedly(Return(&per_route_config_));
+      .Times(2)
+      .WillRepeatedly(Return(&per_route_config_));
 
   EXPECT_CALL(filter_callbacks_.route_->route_entry_.rate_limit_policy_, empty())
       .WillOnce(Return(false));
@@ -1233,7 +1234,8 @@ TEST_F(HttpRateLimitFilterTest, OverrideVHRateLimitOptionWithRouteRateLimitSet) 
       .WillOnce(Return(false));
 
   EXPECT_CALL(*filter_callbacks_.route_, mostSpecificPerFilterConfig(_))
-      .Times(2).WillRepeatedly(Return(&per_route_config_));
+      .Times(2)
+      .WillRepeatedly(Return(&per_route_config_));
 
   EXPECT_CALL(filter_callbacks_.route_->route_entry_.rate_limit_policy_, empty())
       .WillOnce(Return(false));
@@ -1280,7 +1282,8 @@ TEST_F(HttpRateLimitFilterTest, OverrideVHRateLimitOptionWithoutRouteRateLimit) 
       .WillOnce(Return(false));
 
   EXPECT_CALL(*filter_callbacks_.route_, mostSpecificPerFilterConfig(_))
-      .Times(2).WillRepeatedly(Return(&per_route_config_));
+      .Times(2)
+      .WillRepeatedly(Return(&per_route_config_));
 
   EXPECT_CALL(filter_callbacks_.route_->route_entry_.rate_limit_policy_, empty())
       .WillOnce(Return(true));
@@ -1329,7 +1332,8 @@ TEST_F(HttpRateLimitFilterTest, IncludeVHRateLimitOptionWithOnlyVHRateLimitSet) 
       .WillOnce(Return(false));
 
   EXPECT_CALL(*filter_callbacks_.route_, mostSpecificPerFilterConfig(_))
-      .Times(2).WillRepeatedly(Return(&per_route_config_));
+      .Times(2)
+      .WillRepeatedly(Return(&per_route_config_));
 
   EXPECT_CALL(filter_callbacks_.route_->route_entry_.virtual_host_.rate_limit_policy_,
               getApplicableRateLimit(0));
@@ -1377,7 +1381,8 @@ TEST_F(HttpRateLimitFilterTest, IncludeVHRateLimitOptionWithRouteAndVHRateLimitS
       .WillOnce(Return(false));
 
   EXPECT_CALL(*filter_callbacks_.route_, mostSpecificPerFilterConfig(_))
-      .Times(2).WillRepeatedly(Return(&per_route_config_));
+      .Times(2)
+      .WillRepeatedly(Return(&per_route_config_));
 
   EXPECT_CALL(filter_callbacks_.route_->route_entry_.virtual_host_.rate_limit_policy_,
               getApplicableRateLimit(0));
@@ -1425,7 +1430,8 @@ TEST_F(HttpRateLimitFilterTest, IgnoreVHRateLimitOptionWithRouteRateLimitSet) {
       .WillOnce(Return(false));
 
   EXPECT_CALL(*filter_callbacks_.route_, mostSpecificPerFilterConfig(_))
-      .Times(2).WillRepeatedly(Return(&per_route_config_));
+      .Times(2)
+      .WillRepeatedly(Return(&per_route_config_));
 
   EXPECT_CALL(filter_callbacks_.route_->route_entry_.virtual_host_.rate_limit_policy_,
               getApplicableRateLimit(0))
@@ -1503,7 +1509,8 @@ TEST_F(HttpRateLimitFilterTest, PerRouteDomainSet) {
       .WillOnce(Return(false));
 
   EXPECT_CALL(*filter_callbacks_.route_, mostSpecificPerFilterConfig(_))
-      .Times(2).WillRepeatedly(Return(&per_route_config_));
+      .Times(2)
+      .WillRepeatedly(Return(&per_route_config_));
 
   EXPECT_CALL(*client_, limit(_, "bar",
                               testing::ContainerEq(std::vector<RateLimit::Descriptor>{
