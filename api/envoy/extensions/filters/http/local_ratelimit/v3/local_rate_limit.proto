@@ -120,6 +120,6 @@ message LocalRateLimit {
 
   // Specifies a custom HTTP response body for requests that have been rate limited.
   // If not set, the default response body is "local_rate_limited".
-  optional string custom_response_body = 14 [(validate.rules).string = {min_len: 1}];
+  string custom_response_body = 14;
 
 }
