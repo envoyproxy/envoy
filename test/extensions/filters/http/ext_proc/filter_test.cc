@@ -2065,6 +2065,8 @@ TEST_F(HttpFilterTest, ClearRouteCacheDiasallowedHeaderMutation) {
 
   filter_->onDestroy();
 
+  EXPECT_EQ(0, config_->stats().clear_route_cache_ignored_.value());
+  EXPECT_EQ(2, config_->stats().clear_route_cache_disabled_.value());
   EXPECT_EQ(1, config_->stats().streams_started_.value());
   EXPECT_EQ(3, config_->stats().stream_msgs_sent_.value());
   EXPECT_EQ(3, config_->stats().stream_msgs_received_.value());
@@ -2101,6 +2103,8 @@ TEST_F(HttpFilterTest, ClearRouteCacheUnchanged) {
 
   filter_->onDestroy();
 
+  EXPECT_EQ(2, config_->stats().clear_route_cache_ignored_.value());
+  EXPECT_EQ(0, config_->stats().clear_route_cache_disabled_.value());
   EXPECT_EQ(1, config_->stats().streams_started_.value());
   EXPECT_EQ(3, config_->stats().stream_msgs_sent_.value());
   EXPECT_EQ(3, config_->stats().stream_msgs_received_.value());

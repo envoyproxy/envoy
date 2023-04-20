@@ -91,11 +91,21 @@ absl::Status ProcessorState::handleHeadersResponse(const HeadersResponse& respon
         return mut_status;
       }
     }
-    // Only clear the route cache if there is a mutation to the header and clearing is allowed.
-    if (!filter_.config().disableRouteCacheClearing() && common_response.clear_route_cache() &&
-        common_response.has_header_mutation()) {
-      ENVOY_LOG(debug, "ext_proc is clearing route cache");
-      filter_callbacks_->downstreamCallbacks()->clearRouteCache();
+
+    if (common_response.clear_route_cache()) {
+      // Only clear the route cache if there is a mutation to the header and clearing is allowed.
+      if (!filter_.config().disableRouteCacheClearing()) {
+        if (common_response.has_header_mutation()) {
+          ENVOY_LOG(debug, "clearing route cache");
+          filter_callbacks_->downstreamCallbacks()->clearRouteCache();
+        } else {
+          filter_.stats().clear_route_cache_ignored_.inc();
+          ENVOY_LOG(debug, "NOT clearing route cache, no header mutations detected");
+        }
+      } else {
+        filter_.stats().clear_route_cache_disabled_.inc();
+        ENVOY_LOG(debug, "NOT clearing route cache, it is disabled in the config");
+      }
     }
     onFinishProcessorCall(Grpc::Status::Ok);
 
@@ -323,12 +333,23 @@ absl::Status ProcessorState::handleBodyResponse(const BodyResponse& response) {
       // is not an error from grpc.
       onFinishProcessorCall(Grpc::Status::FailedPrecondition);
     }
-    // Only clear the route cache if there is a mutation to the header and clearing is allowed.
-    if (!filter_.config().disableRouteCacheClearing() && common_response.clear_route_cache() &&
-        common_response.has_header_mutation()) {
-      ENVOY_LOG(trace, "ext_proc is clearing route cache");
-      filter_callbacks_->downstreamCallbacks()->clearRouteCache();
+
+    if (common_response.clear_route_cache()) {
+      // Only clear the route cache if there is a mutation to the header and clearing is allowed.
+      if (!filter_.config().disableRouteCacheClearing()) {
+        if (common_response.has_header_mutation()) {
+          ENVOY_LOG(trace, "clearing route cache");
+          filter_callbacks_->downstreamCallbacks()->clearRouteCache();
+        } else {
+          filter_.stats().clear_route_cache_ignored_.inc();
+          ENVOY_LOG(trace, "NOT clearing route cache, no header mutations detected");
+        }
+      } else {
+        filter_.stats().clear_route_cache_disabled_.inc();
+        ENVOY_LOG(trace, "NOT clearing route cache, it is disabled in the config");
+      }
     }
+
     headers_ = nullptr;
 
     if (send_trailers_ && trailers_available_) {
