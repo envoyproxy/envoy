@@ -81,6 +81,20 @@ envoy_cc_test_library(
 )
 
 envoy_cc_test_library(
+    name = "mutable_visitor_lib",
+    srcs = ["mutable_visitor.cc"],
+    hdrs = ["mutable_visitor.h"],
+    deps = [
+        "//source/common/protobuf",
+        "//source/common/protobuf:message_validator_lib",
+        "//source/common/protobuf:utility_lib_header",
+        "//source/common/protobuf:visitor_lib",
+        "@com_github_cncf_udpa//udpa/type/v1:pkg_cc_proto",
+        "@com_github_cncf_udpa//xds/type/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_test_library(
     name = "random_lib",
     hdrs = ["random.h"],
     deps = [

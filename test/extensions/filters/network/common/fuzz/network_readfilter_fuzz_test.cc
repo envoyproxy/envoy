@@ -9,7 +9,7 @@
 #include "test/test_common/test_runtime.h"
 
 // for GenerateValidMessage-Visitor
-#include "source/common/protobuf/visitor.h"
+#include "test/fuzz/mutable_visitor.h"
 #include "source/extensions/http/early_header_mutation/header_mutation/config.h"
 #include "source/extensions/http/header_validators/envoy_default/config.h"
 #include "source/extensions/http/original_ip_detection/custom_header/config.h"
@@ -20,6 +20,7 @@
 #include "source/extensions/matching/input_matchers/ip/config.h"
 #include "source/extensions/request_id/uuid/config.h"
 #include "source/extensions/access_loggers/file/config.h"
+#include "source/common/protobuf/visitor_helper.h"
 #include "envoy/config/route/v3/route_components.pb.h"
 #include "envoy/config/trace/v3/datadog.pb.h"
 #include "external/com_github_cncf_udpa/xds/type/matcher/v3/cel.pb.h"
@@ -37,23 +38,6 @@
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
-
-namespace {
-// Copied from visitor.cc. Remove ones the GenerateValidMessage visitor has
-// been moved there.
-std::unique_ptr<Protobuf::Message> typeUrlToMessage(absl::string_view type_url) {
-  const absl::string_view inner_type_name = TypeUtil::typeUrlToDescriptorFullName(type_url);
-  const Protobuf::Descriptor* inner_descriptor =
-      Protobuf::DescriptorPool::generated_pool()->FindMessageTypeByName(
-          std::string(inner_type_name));
-  if (inner_descriptor == nullptr) {
-    return nullptr;
-  }
-  auto* inner_message_prototype =
-      Protobuf::MessageFactory::generated_factory()->GetPrototype(inner_descriptor);
-  return std::unique_ptr<Protobuf::Message>(inner_message_prototype->New());
-}
-} // namespace
 
 class GenerateValidMessage : public ProtobufMessage::ProtoVisitor, private pgv::BaseValidator {
 #define MYLOGLEV error
@@ -232,7 +216,7 @@ public:
               field_to_typeurls.find(field_name);
           if (field_to_typeurls_cand != any_map_cand->second.end()) {
             auto* any_message = Protobuf::DynamicCastToGenerated<ProtobufWkt::Any>(msg);
-            inner_message = typeUrlToMessage(any_message->type_url());
+            inner_message = ProtobufMessage::Helper::typeUrlToMessage(any_message->type_url());
             if (!inner_message || !any_message->UnpackTo(inner_message.get())) {
               const TypeUrlAndFactory& randomed_typeurl = field_to_typeurls_cand->second.at(
                   random_() % field_to_typeurls_cand->second.size());
@@ -467,7 +451,8 @@ public:
       //                     message_path_[message_path_.size() - 2]);
       //      ENVOY_LOG_MISC(info, "### in class {}", parents.back()->GetDescriptor()->full_name());
       auto* any_message = Protobuf::DynamicCastToGenerated<ProtobufWkt::Any>(&msg);
-      std::unique_ptr<Protobuf::Message> inner_message = typeUrlToMessage(any_message->type_url());
+      std::unique_ptr<Protobuf::Message> inner_message =
+          ProtobufMessage::Helper::typeUrlToMessage(any_message->type_url());
       if (!inner_message || !any_message->UnpackTo(inner_message.get())) {
         any_message->Clear();
       }

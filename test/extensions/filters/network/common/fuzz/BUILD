@@ -80,6 +80,7 @@ envoy_cc_fuzz_test(
         "//source/extensions/access_loggers/file:config",
         "//test/config:utility_lib",
         "//test/test_common:test_runtime_lib",
+        "//test/fuzz:mutable_visitor_lib",
         "//test/fuzz:random_lib",
         "@com_github_google_libprotobuf_mutator//:libprotobuf_mutator",
     ] + envoy_all_network_filters(),

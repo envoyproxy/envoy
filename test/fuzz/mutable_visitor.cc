@@ -1,4 +1,4 @@
-#include "source/common/protobuf/visitor.h"
+#include "test/fuzz/mutable_visitor.h"
 
 #include <vector>
 
@@ -12,10 +12,11 @@ namespace Envoy {
 namespace ProtobufMessage {
 namespace {
 
-void traverseMessageWorker(ConstProtoVisitor& visitor, const Protobuf::Message& message,
-                           std::vector<const Protobuf::Message*>& parents,
-                           bool was_any_or_top_level, bool recurse_into_any) {
-  visitor.onMessage(message, parents, was_any_or_top_level);
+void traverseMessageWorkerExt(ProtoVisitor& visitor, Protobuf::Message& message,
+                              std::vector<const Protobuf::Message*>& parents,
+                              bool was_any_or_top_level, bool recurse_into_any,
+                              absl::string_view const& field_name) {
+  visitor.onEnterMessage(message, parents, was_any_or_top_level, field_name);
 
   // If told to recurse into Any messages, do that here and skip the rest of the function.
   if (recurse_into_any) {
@@ -26,9 +27,9 @@ void traverseMessageWorker(ConstProtoVisitor& visitor, const Protobuf::Message& 
       auto* any_message = Protobuf::DynamicCastToGenerated<ProtobufWkt::Any>(&message);
       inner_message = Helper::typeUrlToMessage(any_message->type_url());
       target_type_url = any_message->type_url();
-      // inner_message must be valid as parsing would have already failed to load if there was an
-      // invalid type_url.
-      MessageUtil::unpackTo(*any_message, *inner_message);
+      if (inner_message) {
+        MessageUtil::unpackTo(*any_message, *inner_message);
+      }
     } else if (message.GetDescriptor()->full_name() == "xds.type.v3.TypedStruct") {
       std::tie(inner_message, target_type_url) =
           Helper::convertTypedStruct<xds::type::v3::TypedStruct>(message);
@@ -40,7 +41,8 @@ void traverseMessageWorker(ConstProtoVisitor& visitor, const Protobuf::Message& 
     if (inner_message != nullptr) {
       // Push the Any message as a wrapper.
       Helper::ScopedMessageParents scoped_parents(parents, message);
-      traverseMessageWorker(visitor, *inner_message, parents, true, recurse_into_any);
+      traverseMessageWorkerExt(visitor, *inner_message, parents, true, recurse_into_any,
+                               absl::string_view());
       return;
     } else if (!target_type_url.empty()) {
       throw EnvoyException(fmt::format("Invalid type_url '{}' during traversal", target_type_url));
@@ -51,7 +53,7 @@ void traverseMessageWorker(ConstProtoVisitor& visitor, const Protobuf::Message& 
   const Protobuf::Reflection* reflection = message.GetReflection();
   for (int i = 0; i < descriptor->field_count(); ++i) {
     const Protobuf::FieldDescriptor* field = descriptor->field(i);
-    visitor.onField(message, *field);
+    visitor.onField(message, *field, parents);
 
     // If this is a message, recurse in to the sub-message.
     if (field->cpp_type() == Protobuf::FieldDescriptor::CPPTYPE_MESSAGE) {
@@ -60,23 +62,23 @@ void traverseMessageWorker(ConstProtoVisitor& visitor, const Protobuf::Message& 
       if (field->is_repeated()) {
         const int size = reflection->FieldSize(message, field);
         for (int j = 0; j < size; ++j) {
-          traverseMessageWorker(visitor, reflection->GetRepeatedMessage(message, field, j), parents,
-                                false, recurse_into_any);
+          traverseMessageWorkerExt(visitor, *reflection->MutableRepeatedMessage(&message, field, j),
+                                   parents, false, recurse_into_any, field->name());
         }
       } else if (reflection->HasField(message, field)) {
-        traverseMessageWorker(visitor, reflection->GetMessage(message, field), parents, false,
-                              recurse_into_any);
+        traverseMessageWorkerExt(visitor, *reflection->MutableMessage(&message, field), parents,
+                                 false, recurse_into_any, field->name());
       }
     }
   }
+  visitor.onLeaveMessage(message, parents, was_any_or_top_level, field_name);
 }
 
 } // namespace
 
-void traverseMessage(ConstProtoVisitor& visitor, const Protobuf::Message& message,
-                     bool recurse_into_any) {
+void traverseMessage(ProtoVisitor& visitor, Protobuf::Message& message, bool recurse_into_any) {
   std::vector<const Protobuf::Message*> parents;
-  traverseMessageWorker(visitor, message, parents, true, recurse_into_any);
+  traverseMessageWorkerExt(visitor, message, parents, true, recurse_into_any, "envoy");
 }
 
 } // namespace ProtobufMessage
