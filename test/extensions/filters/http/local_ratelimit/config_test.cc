@@ -46,6 +46,7 @@ filter_enforced:
   default_value:
     numerator: 100
     denominator: HUNDRED
+custom_response_body: '{"ret_code": 429, "message": "Your request be limited" }'
 response_headers_to_add:
   - append_action: OVERWRITE_IF_EXISTS_OR_ADD
     header:
@@ -105,22 +106,6 @@ stat_prefix: test
                EnvoyException);
 }
 
-TEST(Factory, PerRouteConfigNullResponseBody) {
-  const std::string config_yaml = R"(
-stat_prefix: test
-custom_response_body: ""
-  )";
-
-  LocalRateLimitFilterConfig factory;
-  ProtobufTypes::MessagePtr proto_config = factory.createEmptyRouteConfigProto();
-  TestUtility::loadFromYaml(config_yaml, *proto_config);
-
-  NiceMock<Server::Configuration::MockServerFactoryContext> context;
-  EXPECT_THROW(factory.createRouteSpecificFilterConfig(*proto_config, context,
-                                                       ProtobufMessage::getNullValidationVisitor()),
-               EnvoyException);
-}
-
 TEST(Factory, FillTimerTooLow) {
   const std::string config_yaml = R"(
 stat_prefix: test
@@ -159,6 +144,7 @@ filter_enforced:
   default_value:
     numerator: 100
     denominator: HUNDRED
+custom_response_body: '{"ret_code": 429, "message": "Your request be limited" }'
 response_headers_to_add:
   - append_action: OVERWRITE_IF_EXISTS_OR_ADD
     header:
@@ -204,6 +190,7 @@ filter_enforced:
   default_value:
     numerator: 100
     denominator: HUNDRED
+custom_response_body: '{"ret_code": 429, "message": "Your request be limited" }'
 response_headers_to_add:
   - append_action: OVERWRITE_IF_EXISTS_OR_ADD
     header:
