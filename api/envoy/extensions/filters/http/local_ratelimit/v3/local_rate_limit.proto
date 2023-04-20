@@ -121,5 +121,4 @@ message LocalRateLimit {
   // Specifies a custom HTTP response body for requests that have been rate limited.
   // If not set, the default response body is "local_rate_limited".
   string custom_response_body = 14;
-
 }
