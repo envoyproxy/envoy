@@ -550,7 +550,7 @@ stages:
           REPO_FETCH_TAGS: true
         api:
           CI_TARGET: "bazel.api"
-    timeoutInMinutes: 120
+    timeoutInMinutes: 180
     pool:
       vmImage: "ubuntu-20.04"
     steps:
