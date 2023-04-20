@@ -1488,7 +1488,7 @@ TEST_F(HttpRateLimitFilterTest, IgnoreVHRateLimitOptionWithOutRouteRateLimit) {
       0, filter_callbacks_.clusterInfo()->statsScope().counterFromStatName(ratelimit_ok_).value());
 }
 
-// Tests that the domain is properly overidden when set at the per-route level
+// Tests that the domain is properly overriden when set at the per-route level
 TEST_F(HttpRateLimitFilterTest, PerRouteDomainSet) {
   SetUpTest(filter_config_);
   envoy::extensions::filters::http::ratelimit::v3::RateLimitPerRoute settings;
