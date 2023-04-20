@@ -292,8 +292,6 @@ Http::FilterHeadersStatus ProxyFilter::loadDynamicCluster(Upstream::DfpClusterSh
   const auto host_attributes = Http::Utility::parseAuthority(headers.getHostValue());
   auto host = std::string(host_attributes.host_);
   auto port = host_attributes.port_.value_or(default_port);
-  // TODO: another cluster type when it's an IP.
-  // host_attributes.is_ip_address_;
 
   latchTime(decoder_callbacks_, DNS_START);
 
@@ -353,7 +351,7 @@ void ProxyFilter::addHostAddressToFilterState(
 }
 
 void ProxyFilter::onLoadClusterComplete() {
-  // timer must be enabled.
+  ASSERT(cluster_init_timer_);
   cluster_init_timer_->disableTimer();
   cluster_init_timer_.reset();
 

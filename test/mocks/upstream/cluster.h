@@ -33,7 +33,7 @@ public:
 
 class MockDfpCluster : public DfpCluster {
 public:
-  MockDfpCluster(){};
+  MockDfpCluster() = default;
   ~MockDfpCluster() override = default;
 
   // Upstream::DFPCluster

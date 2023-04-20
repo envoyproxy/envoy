@@ -770,8 +770,30 @@ TEST_P(ProxyFilterIntegrationTest, TestQueueingBasedOnCircuitBreakers) {
   EXPECT_EQ("200", response2->headers().getStatusValue());
 }
 
-// Sub cluster
-TEST_P(ProxyFilterIntegrationTest, SubClusterSimple) {
+TEST_P(ProxyFilterIntegrationTest, SubClusterWithUnknownDomain) {
+  key_value_config_ = "";
+
+  useAccessLog("%RESPONSE_CODE_DETAILS%");
+  initializeWithArgs(1024, 1024, "", "", true);
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  const Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},
+                                                       {":path", "/test/long/url"},
+                                                       {":scheme", "http"},
+                                                       {":authority", "doesnotexist.example.com"}};
+
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("503", response->headers().getStatusValue());
+  EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("no_healthy_upstream"));
+
+  response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("503", response->headers().getStatusValue());
+  EXPECT_THAT(waitForAccessLog(access_log_name_, 1), HasSubstr("no_healthy_upstream"));
+}
+
+// Verify that removed all sub cluster when dfp cluster is removed/updated.
+TEST_P(ProxyFilterIntegrationTest, SubClusterReloadCluster) {
   initializeWithArgs(1024, 1024, "", "", true);
   codec_client_ = makeHttpConnection(lookupPort("http"));
   const Http::TestRequestHeaderMapImpl request_headers{
@@ -784,8 +806,31 @@ TEST_P(ProxyFilterIntegrationTest, SubClusterSimple) {
   auto response =
       sendRequestAndWaitForResponse(request_headers, 1024, default_response_headers_, 1024);
   checkSimpleRequestSuccess(1024, 1024, response.get());
-  // one more cluster
+  // one more sub cluster
   test_server_->waitForCounterEq("cluster_manager.cluster_added", 2);
+  test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 0);
+  test_server_->waitForCounterEq("cluster_manager.cluster_modified", 0);
+  test_server_->waitForCounterEq("cluster_manager.cluster_removed", 0);
+
+  // Cause a cluster reload via CDS.
+  cluster_.mutable_circuit_breakers()->add_thresholds()->mutable_max_connections()->set_value(100);
+  cds_helper_.setCds({cluster_});
+  // sub cluster is removed
+  test_server_->waitForCounterEq("cluster_manager.cluster_added", 2);
+  test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 0);
+  test_server_->waitForCounterEq("cluster_manager.cluster_modified", 1);
+  test_server_->waitForCounterEq("cluster_manager.cluster_removed", 1);
+
+  // We need to wait until the workers have gotten the new cluster update. The only way we can
+  // know this currently is when the connection pools drain and terminate.
+  AssertionResult result = fake_upstream_connection_->waitForDisconnect();
+  RELEASE_ASSERT(result, result.message());
+  fake_upstream_connection_.reset();
+
+  // Now send another request. This should create a new sub cluster.
+  response = sendRequestAndWaitForResponse(request_headers, 512, default_response_headers_, 512);
+  checkSimpleRequestSuccess(512, 512, response.get());
+  test_server_->waitForCounterEq("cluster_manager.cluster_added", 3);
   test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 0);
 }
 
@@ -839,6 +884,30 @@ TEST_P(ProxyFilterIntegrationTest, SubClusterOverflow) {
   response = codec_client_->makeHeaderOnlyRequest(request_headers2);
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_EQ("503", response->headers().getStatusValue());
+}
+
+TEST_P(ProxyFilterIntegrationTest, SubClusterWithIpHost) {
+  upstream_tls_ = true;
+  initializeWithArgs(1024, 1024, "", "", true);
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  const Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "POST"},
+      {":path", "/test/long/url"},
+      {":scheme", "http"},
+      {":authority", fake_upstreams_[0]->localAddress()->asString()}};
+
+  auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
+  waitForNextUpstreamRequest();
+
+  // No SNI for IP hosts.
+  const Extensions::TransportSockets::Tls::SslHandshakerImpl* ssl_socket =
+      dynamic_cast<const Extensions::TransportSockets::Tls::SslHandshakerImpl*>(
+          fake_upstream_connection_->connection().ssl().get());
+  EXPECT_STREQ(nullptr, SSL_get_servername(ssl_socket->ssl(), TLSEXT_NAMETYPE_host_name));
+
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  ASSERT_TRUE(response->waitForEndStream());
+  checkSimpleRequestSuccess(0, 0, response.get());
 }
 
 } // namespace

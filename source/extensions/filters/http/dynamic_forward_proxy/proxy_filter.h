@@ -70,7 +70,7 @@ private:
     LoadClusterEntryCallbacks& callbacks_;
   };
 
-  // Per-thread DNS cache info including pending callbacks.
+  // Per-thread cluster info including pending callbacks.
   struct ThreadLocalClusterInfo : public ThreadLocal::ThreadLocalObject {
     ThreadLocalClusterInfo(ProxyFilterConfig& parent) : parent_{parent} {
       handle_ = parent.addThreadLocalClusterUpdateCallbacks();

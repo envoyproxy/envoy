@@ -25,6 +25,7 @@ public:
           Upstream::ClusterFactoryContext& context, Runtime::Loader& runtime,
           Extensions::Common::DynamicForwardProxy::DnsCacheManagerFactory& cache_manager_factory,
           const LocalInfo::LocalInfo& local_info, bool added_via_api);
+  ~Cluster();
 
   // Upstream::Cluster
   Upstream::Cluster::InitializePhase initializePhase() const override {
@@ -54,6 +55,11 @@ public:
   void checkIdleSubCluster();
 
 private:
+  struct ThreadLocalConfig : public ThreadLocal::ThreadLocalObject {
+    ThreadLocalConfig() {}
+    ~ThreadLocalConfig() override{};
+  };
+
   struct ClusterInfo {
     ClusterInfo(std::string cluster_name, Cluster& parent);
     void touch();
@@ -181,6 +187,9 @@ private:
 
   mutable absl::Mutex cluster_map_lock_;
   ClusterInfoMap cluster_map_ ABSL_GUARDED_BY(cluster_map_lock_);
+
+  // only for isShutdown.
+  ThreadLocal::TypedSlot<ThreadLocalConfig> tls_;
 
   Upstream::ClusterManager& cm_;
   const size_t max_sub_clusters_;

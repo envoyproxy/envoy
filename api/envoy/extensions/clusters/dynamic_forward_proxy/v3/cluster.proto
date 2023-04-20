@@ -79,7 +79,7 @@ message ClusterConfig {
 // [#next-free-field: 6]
 message SubClustersConfig {
   // The :ref:`service discovery type <arch_overview_service_discovery_types>`
-  // to use for resolving a sub cluster. Only STRICT_DNS is supported now.
+  // to use for resolving a sub cluster. Hard code STRICT_DNS now.
   // And we may also support LOGICAL_DNS, when we deprecate the dns_cache_config configuration.
   //
   // [#not-implemented-hide:]
