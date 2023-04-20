@@ -105,7 +105,6 @@ stat_prefix: test
                EnvoyException);
 }
 
-
 TEST(Factory, PerRouteConfigNullResponseBody) {
   const std::string config_yaml = R"(
 stat_prefix: test
@@ -121,8 +120,6 @@ custom_response_body: ""
                                                        ProtobufMessage::getNullValidationVisitor()),
                EnvoyException);
 }
-
-
 
 TEST(Factory, FillTimerTooLow) {
   const std::string config_yaml = R"(

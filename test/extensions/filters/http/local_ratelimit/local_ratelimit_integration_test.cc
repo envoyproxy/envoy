@@ -107,7 +107,6 @@ typed_config:
   local_rate_limit_per_downstream_connection: {}
 )EOF";
 
-
   const std::string filter_config2_ =
       R"EOF(
 name: envoy.filters.http.local_ratelimit
@@ -136,7 +135,6 @@ typed_config:
         value: 'true'
   local_rate_limit_per_downstream_connection: {}
 )EOF";
-
 
   const std::string initial_route_config_ = R"EOF(
 name: basic_routes
