@@ -6,7 +6,7 @@ load(
     "envoy_proto_library",
 )
 
-licenses(["notice"])
+licenses(["notice"])  # Apache 2
 
 envoy_package()
 
@@ -41,6 +41,5 @@ envoy_cc_fuzz_test(
         "//test/extensions/filters/http/common/fuzz:http_filter_fuzzer_lib",
         "//test/mocks/http:http_mocks",
         "//test/mocks/network:network_mocks",
-        "@envoy_api//envoy/extensions/filters/http/ext_proc/v3:pkg_cc_proto",
     ],
 )

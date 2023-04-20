@@ -15,8 +15,8 @@ MockClient::~MockClient() = default;
 MockRequestCallbacks::MockRequestCallbacks() = default;
 MockRequestCallbacks::~MockRequestCallbacks() = default;
 
-}  // namespace UnitTestFuzz
-}  // namespace ExtProc
-}  // namespace HttpFilters
-}  // namespace Extensions
-}  // namespace Envoy
+} // namespace UnitTestFuzz
+} // namespace ExtProc
+} // namespace HttpFilters
+} // namespace Extensions
+} // namespace Envoy

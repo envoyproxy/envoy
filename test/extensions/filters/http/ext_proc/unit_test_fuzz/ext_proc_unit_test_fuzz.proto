@@ -10,11 +10,10 @@ import "validate/validate.proto";
 // We only fuzz a single request per iteration.
 message ExtProcUnitTestCase {
   envoy.extensions.filters.http.ext_proc.v3.ExternalProcessor config = 1
-      [(validate.rules).message = { required: true }];
+      [(validate.rules).message = {required: true}];
   // HTTP request data.
-  test.fuzz.HttpData request = 2
-      [(validate.rules).message = { required: true }];
+  test.fuzz.HttpData request = 2 [(validate.rules).message = {required: true}];
   // ext_proc service response.
   envoy.service.ext_proc.v3.ProcessingResponse response = 3
-      [(validate.rules).message = { required: true }];
+      [(validate.rules).message = {required: true}];
 }
