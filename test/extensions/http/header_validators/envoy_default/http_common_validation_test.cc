@@ -17,39 +17,32 @@ namespace {
 using ::Envoy::Http::Protocol;
 using ::Envoy::Http::TestRequestHeaderMapImpl;
 
-enum class Protocols {
-  Http1,
-  Http2,
-  Http3,
-};
-
 // This test suite runs the same tests against both H/1 and H/2 header validators.
 class HttpCommonValidationTest : public HeaderValidatorTest,
-                                 public testing::TestWithParam<Protocols> {
+                                 public testing::TestWithParam<Protocol> {
 protected:
   ::Envoy::Http::HeaderValidatorPtr createUhv(absl::string_view config_yaml) {
     envoy::extensions::http::header_validators::envoy_default::v3::HeaderValidatorConfig
         typed_config;
     TestUtility::loadFromYaml(std::string(config_yaml), typed_config);
 
-    if (GetParam() == Protocols::Http1) {
+    if (GetParam() == Protocol::Http11) {
       return std::make_unique<Http1HeaderValidator>(typed_config, Protocol::Http11, stats_);
     }
-    return std::make_unique<Http2HeaderValidator>(
-        typed_config, GetParam() == Protocols::Http2 ? Protocol::Http2 : Protocol::Http3, stats_);
+    return std::make_unique<Http2HeaderValidator>(typed_config, GetParam(), stats_);
   }
 
   TestScopedRuntime scoped_runtime_;
 };
 
-std::string protocolTestParamsToString(const ::testing::TestParamInfo<Protocols>& params) {
-  return params.param == Protocols::Http1   ? "Http1"
-         : params.param == Protocols::Http2 ? "Http2"
-                                            : "Http3";
+std::string protocolTestParamsToString(const ::testing::TestParamInfo<Protocol>& params) {
+  return params.param == Protocol::Http11  ? "Http1"
+         : params.param == Protocol::Http2 ? "Http2"
+                                           : "Http3";
 }
 
 INSTANTIATE_TEST_SUITE_P(Protocols, HttpCommonValidationTest,
-                         testing::Values(Protocols::Http1, Protocols::Http2, Protocols::Http3),
+                         testing::Values(Protocol::Http11, Protocol::Http2, Protocol::Http3),
                          protocolTestParamsToString);
 
 TEST_P(HttpCommonValidationTest, MalformedUrlEncodingAllowed) {
