@@ -275,7 +275,7 @@ private:
   FilterFactoriesList filter_factories_;
   std::map<std::string, FilterConfig> upgrade_filter_factories_;
   std::list<AccessLog::InstanceSharedPtr> access_logs_;
-  const bool flush_access_log_on_new_request_;
+  bool flush_access_log_on_new_request_;
   absl::optional<std::chrono::milliseconds> access_log_flush_interval_;
   const std::string stats_prefix_;
   Http::ConnectionManagerStats stats_;

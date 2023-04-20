@@ -31,16 +31,16 @@ Resource configuration example:
 
 .. literalinclude:: _include/gcp-authn-filter-configuration.yaml
    :language: yaml
-   :lines: 37-73
+   :lines: 35-71
    :linenos:
-   :lineno-start: 37
+   :lineno-start: 35
    :caption: :download:`gcp-authn-filter-configuration.yaml <_include/gcp-authn-filter-configuration.yaml>`
 
 HTTP filter configuration example:
 
 .. literalinclude:: _include/gcp-authn-filter-configuration.yaml
    :language: yaml
-   :lines: 8-38
+   :lines: 8-34
    :linenos:
    :lineno-start: 8
    :caption: :download:`gcp-authn-filter-configuration.yaml <_include/gcp-authn-filter-configuration.yaml>`

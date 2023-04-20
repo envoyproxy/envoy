@@ -15,33 +15,41 @@ public:
           config,
       ::Envoy::Http::Protocol protocol, ::Envoy::Http::HeaderValidatorStats& stats);
 
-  ::Envoy::Http::HeaderValidatorBase::HeaderEntryValidationResult
-  validateRequestHeaderEntry(const ::Envoy::Http::HeaderString& key,
-                             const ::Envoy::Http::HeaderString& value);
+  using ValidationResult = ::Envoy::Http::HeaderValidatorBase::ValidationResult;
 
-  ::Envoy::Http::HeaderValidatorBase::HeaderEntryValidationResult
-  validateResponseHeaderEntry(const ::Envoy::Http::HeaderString& key,
-                              const ::Envoy::Http::HeaderString& value);
+  ValidationResult validateRequestHeaders(const ::Envoy::Http::RequestHeaderMap& header_map);
 
-  ::Envoy::Http::HeaderValidatorBase::RequestHeaderMapValidationResult
-  validateRequestHeaderMap(::Envoy::Http::RequestHeaderMap& header_map);
+  ValidationResult validateResponseHeaders(const ::Envoy::Http::ResponseHeaderMap& header_map);
 
-  ::Envoy::Http::HeaderValidatorBase::ResponseHeaderMapValidationResult
-  validateResponseHeaderMap(::Envoy::Http::ResponseHeaderMap& header_map);
+  ValidationResult validateRequestTrailers(const ::Envoy::Http::RequestTrailerMap& trailer_map);
 
-  ::Envoy::Http::HeaderValidatorBase::TrailerValidationResult
-  validateRequestTrailerMap(::Envoy::Http::RequestTrailerMap& trailer_map);
+  ValidationResult validateResponseTrailers(const ::Envoy::Http::ResponseTrailerMap& trailer_map);
 
-  ::Envoy::Http::HeaderValidatorBase::TrailerValidationResult
-  validateResponseTrailerMap(::Envoy::Http::ResponseTrailerMap& trailer_map);
+protected:
+  /**
+   * Checks for presence of both Transfer-Encoding and Content-Length headers and
+   * removes the Content-Length header iff the http1_protocol_options.allow_chunked_length
+   * config options is true.
+   * If the http1_protocol_options.allow_chunked_length is false a request with both
+   * Transfer-Encoding and Content-Length headers is rejected in the validateRequestHeaders method.
+   * Additionally if request is CONNECT and Content-Length is 0, the Content-Length header is
+   * removed.
+   */
+  void sanitizeContentLength(::Envoy::Http::RequestHeaderMap& header_map);
 
+private:
   /*
    * Validate the Transfer-Encoding header.
    */
   HeaderValueValidationResult
   validateTransferEncodingHeader(const ::Envoy::Http::HeaderString& value) const;
 
-private:
+  HeaderEntryValidationResult validateRequestHeaderEntry(const ::Envoy::Http::HeaderString& key,
+                                                         const ::Envoy::Http::HeaderString& value);
+
+  HeaderEntryValidationResult validateResponseHeaderEntry(const ::Envoy::Http::HeaderString& key,
+                                                          const ::Envoy::Http::HeaderString& value);
+
   const HeaderValidatorMap request_header_validator_map_;
 };
 
@@ -54,31 +62,35 @@ public:
       ::Envoy::Http::Protocol protocol, ::Envoy::Http::HeaderValidatorStats& stats)
       : Http1HeaderValidator(config, protocol, stats) {}
 
-  HeaderEntryValidationResult
-  validateRequestHeaderEntry(const ::Envoy::Http::HeaderString& key,
-                             const ::Envoy::Http::HeaderString& value) override {
-    return Http1HeaderValidator::validateRequestHeaderEntry(key, value);
+  ValidationResult
+  validateRequestHeaders(const ::Envoy::Http::RequestHeaderMap& header_map) override {
+    return Http1HeaderValidator::validateRequestHeaders(header_map);
   }
 
-  HeaderEntryValidationResult
-  validateResponseHeaderEntry(const ::Envoy::Http::HeaderString& key,
-                              const ::Envoy::Http::HeaderString& value) override {
-    return Http1HeaderValidator::validateResponseHeaderEntry(key, value);
+  ValidationResult
+  validateResponseHeaders(const ::Envoy::Http::ResponseHeaderMap& header_map) override {
+    return Http1HeaderValidator::validateResponseHeaders(header_map);
   }
 
-  RequestHeaderMapValidationResult
-  validateRequestHeaderMap(::Envoy::Http::RequestHeaderMap& header_map) override {
-    return Http1HeaderValidator::validateRequestHeaderMap(header_map);
+  ValidationResult
+  validateRequestTrailers(const ::Envoy::Http::RequestTrailerMap& trailer_map) override {
+    return Http1HeaderValidator::validateRequestTrailers(trailer_map);
   }
 
-  ConstResponseHeaderMapValidationResult
-  validateResponseHeaderMap(const ::Envoy::Http::ResponseHeaderMap&) override {
-    return {RejectResult::success(), nullptr};
+  ValidationResult
+  validateResponseTrailers(const ::Envoy::Http::ResponseTrailerMap& trailer_map) override {
+    return Http1HeaderValidator::validateResponseTrailers(trailer_map);
   }
 
-  TrailerValidationResult
-  validateRequestTrailerMap(::Envoy::Http::RequestTrailerMap& trailer_map) override {
-    return Http1HeaderValidator::validateRequestTrailerMap(trailer_map);
+  RequestHeadersTransformationResult
+  transformRequestHeaders(::Envoy::Http::RequestHeaderMap& header_map) override;
+
+  TransformationResult
+  transformRequestTrailers(::Envoy::Http::RequestTrailerMap& header_map) override;
+
+  ResponseHeadersTransformationResult
+  transformResponseHeaders(const ::Envoy::Http::ResponseHeaderMap&) override {
+    return ResponseHeadersTransformationResult::success();
   }
 };
 
@@ -91,32 +103,33 @@ public:
       ::Envoy::Http::Protocol protocol, ::Envoy::Http::HeaderValidatorStats& stats)
       : Http1HeaderValidator(config, protocol, stats) {}
 
-  HeaderEntryValidationResult
-  validateRequestHeaderEntry(const ::Envoy::Http::HeaderString& key,
-                             const ::Envoy::Http::HeaderString& value) override {
-    return Http1HeaderValidator::validateRequestHeaderEntry(key, value);
+  ValidationResult
+  validateRequestHeaders(const ::Envoy::Http::RequestHeaderMap& header_map) override {
+    return Http1HeaderValidator::validateRequestHeaders(header_map);
   }
 
-  HeaderEntryValidationResult
-  validateResponseHeaderEntry(const ::Envoy::Http::HeaderString& key,
-                              const ::Envoy::Http::HeaderString& value) override {
-    return Http1HeaderValidator::validateResponseHeaderEntry(key, value);
+  ValidationResult
+  validateResponseHeaders(const ::Envoy::Http::ResponseHeaderMap& header_map) override {
+    return Http1HeaderValidator::validateResponseHeaders(header_map);
   }
 
-  ConstRequestHeaderMapValidationResult
-  validateRequestHeaderMap(const ::Envoy::Http::RequestHeaderMap&) override {
-    // TODO(yanavlasov): Validate request header map before sending it upstream
-    return {RejectResult::success(), nullptr};
+  ValidationResult
+  validateRequestTrailers(const ::Envoy::Http::RequestTrailerMap& trailer_map) override {
+    return Http1HeaderValidator::validateRequestTrailers(trailer_map);
   }
 
-  ResponseHeaderMapValidationResult
-  validateResponseHeaderMap(::Envoy::Http::ResponseHeaderMap& header_map) override {
-    return Http1HeaderValidator::validateResponseHeaderMap(header_map);
+  ValidationResult
+  validateResponseTrailers(const ::Envoy::Http::ResponseTrailerMap& trailer_map) override {
+    return Http1HeaderValidator::validateResponseTrailers(trailer_map);
   }
 
-  TrailerValidationResult
-  validateResponseTrailerMap(::Envoy::Http::ResponseTrailerMap& trailer_map) override {
-    return Http1HeaderValidator::validateResponseTrailerMap(trailer_map);
+  RequestHeadersTransformationResult
+  transformRequestHeaders(const ::Envoy::Http::RequestHeaderMap&) override {
+    return RequestHeadersTransformationResult::success();
+  }
+
+  TransformationResult transformResponseHeaders(::Envoy::Http::ResponseHeaderMap&) override {
+    return TransformationResult::success();
   }
 };
 

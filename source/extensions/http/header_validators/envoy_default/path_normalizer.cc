@@ -4,6 +4,7 @@
 
 #include "source/common/http/header_utility.h"
 #include "source/common/http/headers.h"
+#include "source/common/runtime/runtime_features.h"
 #include "source/extensions/http/header_validators/envoy_default/character_tables.h"
 
 #include "absl/strings/match.h"
@@ -58,6 +59,9 @@ PathNormalizer::normalizeAndDecodeOctet(std::string::iterator iter,
     return {PercentDecodeResult::Invalid};
   }
 
+  const bool preserve_case =
+      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.uhv_preserve_url_encoded_case");
+
   char ch = '\0';
   // Normalize and decode the octet
   for (int i = 0; i < 2; ++i) {
@@ -73,7 +77,9 @@ PathNormalizer::normalizeAndDecodeOctet(std::string::iterator iter,
 
     // normalize
     nibble = nibble >= 'a' ? nibble ^ 0x20 : nibble;
-    *iter = nibble;
+    if (!preserve_case) {
+      *iter = nibble;
+    }
 
     // decode
     int factor = i == 0 ? 16 : 1;
@@ -235,6 +241,11 @@ PathNormalizer::normalizePathUri(RequestHeaderMap& header_map) const {
     redirect |= result.action() == PathNormalizationResult::Action::Redirect;
   }
 
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.uhv_translate_backslash_to_slash")) {
+    translateBackToForwardSlashes(path);
+  }
+
   if (!config_.uri_path_normalization_options().skip_merging_slashes()) {
     // pass 2: merge duplicate slashes (if configured to do so)
     const auto result = mergeSlashesPass(path);
@@ -266,6 +277,14 @@ PathNormalizer::normalizePathUri(RequestHeaderMap& header_map) const {
   }
 
   return PathNormalizationResult::success();
+}
+
+void PathNormalizer::translateBackToForwardSlashes(std::string& path) const {
+  for (char& character : path) {
+    if (character == '\\') {
+      character = '/';
+    }
+  }
 }
 
 PathNormalizer::PathNormalizationResult PathNormalizer::decodePass(std::string& path) const {

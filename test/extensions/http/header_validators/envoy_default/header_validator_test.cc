@@ -133,15 +133,6 @@ TEST_F(BaseHeaderValidatorTest, ValidateGenericHeaderKeyInvalidEmpty) {
                              UhvResponseCodeDetail::get().EmptyHeaderName);
 }
 
-TEST_F(BaseHeaderValidatorTest, ValidateGenericHeaderKeyDropUnderscores) {
-  HeaderString drop_underscore{"x_foo"};
-  auto uhv = createBase(drop_headers_with_underscores_config);
-
-  auto result = uhv->validateGenericHeaderName(drop_underscore);
-  EXPECT_EQ(result.action(), decltype(result)::Action::DropHeader);
-  EXPECT_EQ(result.details(), UhvResponseCodeDetail::get().InvalidUnderscore);
-}
-
 TEST_F(BaseHeaderValidatorTest, ValidateGenericHeaderKeyRejectDropUnderscores) {
   HeaderString invalid_with_underscore{"x_fo<o"};
   auto uhv = createBase(drop_headers_with_underscores_config);

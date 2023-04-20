@@ -62,6 +62,7 @@ envoy_cc_library(
         "//envoy/http:header_validator_interface",
         "//source/common/http:header_utility_lib",
         "//source/common/http:headers_lib",
+        "//source/common/runtime:runtime_features_lib",
         "@envoy_api//envoy/extensions/http/header_validators/envoy_default/v3:pkg_cc_proto",
     ],
 )
@@ -83,6 +84,7 @@ envoy_cc_library(
         "//envoy/http:header_validator_errors",
         "//envoy/http:header_validator_interface",
         "//external:abseil_node_hash_set",
+        "//source/common/http:header_utility_lib",
         "//source/common/http:headers_lib",
         "//source/common/http:utility_lib",
         "@com_google_absl//absl/functional:bind_front",

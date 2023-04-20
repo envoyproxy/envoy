@@ -184,12 +184,14 @@ void CodecClient::onData(Buffer::Instance& data) {
 
 Status CodecClient::ActiveRequest::encodeHeaders(const RequestHeaderMap& headers, bool end_stream) {
   if (header_validator_) {
-    auto result = header_validator_->validateRequestHeaderMap(headers);
+    auto result = header_validator_->transformRequestHeaders(headers);
     if (!result.status.ok()) {
       return absl::InvalidArgumentError(
           absl::StrCat("header validation failed: ", result.status.details()));
     }
     if (result.new_headers) {
+      std::cout << "----------------- New headers: " << std::endl
+                << *result.new_headers << std::endl;
       return RequestEncoderWrapper::encodeHeaders(*result.new_headers, end_stream);
     }
   }
@@ -198,9 +200,15 @@ Status CodecClient::ActiveRequest::encodeHeaders(const RequestHeaderMap& headers
 
 void CodecClient::ActiveRequest::decodeHeaders(ResponseHeaderMapPtr&& headers, bool end_stream) {
   if (header_validator_) {
-    ::Envoy::Http::HeaderValidator::ResponseHeaderMapValidationResult result =
-        header_validator_->validateResponseHeaderMap(*headers);
-    if (!result.ok()) {
+    const ::Envoy::Http::HeaderValidator::ValidationResult validation_result =
+        header_validator_->validateResponseHeaders(*headers);
+    bool failure = !validation_result.ok();
+    if (!failure) {
+      const ::Envoy::Http::ClientHeaderValidator::TransformationResult transformation_result =
+          header_validator_->transformResponseHeaders(*headers);
+      failure = !transformation_result.ok();
+    }
+    if (failure) {
       ENVOY_CONN_LOG(debug, "Response header validation failed\n{}", *parent_.connection_,
                      *headers);
       if ((parent_.codec_->protocol() == Protocol::Http2 &&

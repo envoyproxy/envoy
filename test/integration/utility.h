@@ -94,7 +94,7 @@ public:
     return callbacks_->last_connection_event_;
   }
   // Wait until connected or closed().
-  void waitForConnection();
+  ABSL_MUST_USE_RESULT testing::AssertionResult waitForConnection();
 
   bool closed() { return callbacks_->closed(); }
   bool allBytesSent() const;

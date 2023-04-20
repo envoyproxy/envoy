@@ -186,10 +186,12 @@ public:
       callbacks.addAccessLogHandler(handler);
     };
   }
-  void expectUhvTrailerCheckFail(bool expect_response);
-  void expectHeaderValidation(
-      HeaderValidator::RequestHeaderMapValidationResult request_validation_result,
-      Protocol protocol);
+  void
+  expectUhvHeaderCheck(HeaderValidatorBase::ValidationResult validation_result,
+                       HeaderValidator::RequestHeadersTransformationResult transformation_result);
+  void expectUhvTrailerCheck(HeaderValidator::ValidationResult validation_result,
+                             HeaderValidator::TransformationResult transformation_result,
+                             bool expect_response = true);
 
   Envoy::Event::SimulatedTimeSystem test_time_;
   NiceMock<Router::MockRouteConfigProvider> route_config_provider_;

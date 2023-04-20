@@ -53,29 +53,38 @@ public:
 
   enum class RejectAction { Accept, Reject };
   enum class RejectOrRedirectAction { Accept, Reject, Redirect };
-  enum class RejectOrDropHeaderAction { Accept, Reject, DropHeader };
   using RejectResult = Result<RejectAction>;
   using RejectOrRedirectResult = Result<RejectOrRedirectAction>;
-  using RejectOrDropHeaderResult = Result<RejectOrDropHeaderAction>;
+  using TransformationResult = RejectResult;
 
   /**
-   * Method for validating a request header entry.
-   * Returning the Reject value causes the request to be rejected with the 400 status.
+   * Validate the entire request header map.
+   * Returning the Reject value form this method causes the HTTP request to be rejected with 400
+   * status, and the gRPC request with the INTERNAL (13) error code.
    */
-  using HeaderEntryValidationResult = RejectOrDropHeaderResult;
-  virtual HeaderEntryValidationResult validateRequestHeaderEntry(const HeaderString& key,
-                                                                 const HeaderString& value) PURE;
+  using ValidationResult = RejectResult;
+  virtual ValidationResult validateRequestHeaders(const RequestHeaderMap& header_map) PURE;
 
   /**
-   * Method for validating a response header entry.
-   * Returning the Reject value causes the downstream request to be rejected with the 502 status.
+   * Validate the entire response header map.
+   * Returning the Reject value causes the HTTP request to be rejected with the 502 status,
+   * and the gRPC request with the UNAVAILABLE (14) error code.
    */
-  virtual HeaderEntryValidationResult validateResponseHeaderEntry(const HeaderString& key,
-                                                                  const HeaderString& value) PURE;
+  virtual ValidationResult validateResponseHeaders(const ResponseHeaderMap& header_map) PURE;
 
-  using RequestHeaderMapValidationResult = RejectOrRedirectResult;
-  using ResponseHeaderMapValidationResult = RejectResult;
-  using TrailerValidationResult = RejectResult;
+  /**
+   * Validate the entire request trailer map.
+   * Returning the Reject value causes the HTTP request to be rejected with the 502 status,
+   * and the gRPC request with the UNAVAILABLE (14) error code.
+   * If response headers have already been sent the request is reset.
+   */
+  virtual ValidationResult validateRequestTrailers(const RequestTrailerMap& trailer_map) PURE;
+
+  /**
+   * Validate the entire response trailer map.
+   * Returning the Reject value causes the HTTP request to be reset.
+   */
+  virtual ValidationResult validateResponseTrailers(const ResponseTrailerMap& trailer_map) PURE;
 };
 
 /**
@@ -87,46 +96,43 @@ public:
   ~HeaderValidator() override = default;
 
   /**
-   * Validate the entire request header map.
-   * This method may mutate the header map as well, for example by normalizing URI path.
-   * HTTP/2 and HTTP/3 server header validator also transforms extended CONNECT requests
-   * to HTTP/1 upgrade requests.
+   * Transform the entire request header map.
+   * This method transforms the header map, for example by normalizing URI path, before processing
+   * by the filter chain.
    * Returning the Reject value from this method causes the HTTP request to be rejected with 400
    * status, and the gRPC request with the INTERNAL (13) error code. Returning the Redirect
    * value causes the HTTP request to be redirected to the :path presudo header in the request map.
    * The gRPC request will still be rejected with the INTERNAL (13) error code.
    */
-  virtual RequestHeaderMapValidationResult
-  validateRequestHeaderMap(RequestHeaderMap& header_map) PURE;
+  using RequestHeadersTransformationResult = RejectOrRedirectResult;
+  virtual RequestHeadersTransformationResult
+  transformRequestHeaders(RequestHeaderMap& header_map) PURE;
 
   /**
-   * Validate the entire response header map.
-   * The header map can not be modified in-place as it is immutable after the terminal encoder
-   * filter. However HTTP/2 and HTTP/3 header validators may need to change the status of the
-   * upgrade upstream response to the extended CONNECT downstream response. In this case the new
-   * header map is returned in the `new_headers` member of the returned structure. Returning the
-   * Reject value in the status member causes the HTTP request to be rejected with the 502 status,
-   * and the gRPC request with the UNAVAILABLE (14) error code.
-   */
-  struct ConstResponseHeaderMapValidationResult {
-    RejectResult status;
-    ResponseHeaderMapPtr new_headers;
-  };
-  virtual ConstResponseHeaderMapValidationResult
-  validateResponseHeaderMap(const ResponseHeaderMap& header_map) PURE;
-
-  /**
-   * Validate the entire request trailer map.
+   * Transform the entire request trailer map.
    * Returning the Reject value causes the HTTP request to be rejected with the 502 status,
    * and the gRPC request with the UNAVAILABLE (14) error code.
    * If response headers have already been sent the request is reset.
    */
-  virtual TrailerValidationResult validateRequestTrailerMap(RequestTrailerMap& trailer_map) PURE;
+  virtual TransformationResult transformRequestTrailers(RequestTrailerMap& header_map) PURE;
 
   /**
-   * Note: Response trailers are not validated after they were processed by the encoder filter
-   * chain.
+   * Transform the entire response header map.
+   * HTTP/2 and HTTP/3 server header validator may transform the HTTP/1 upgrade response
+   * to HTTP/2 extended CONNECT response, iff it transformed extended CONNECT to upgrade request
+   * during request validation.
+   * Returning the Reject value causes the HTTP request to be rejected with the 502 status,
+   * and the gRPC request with the UNAVAILABLE (14) error code.
    */
+  struct ResponseHeadersTransformationResult {
+    static ResponseHeadersTransformationResult success() {
+      return ResponseHeadersTransformationResult{RejectResult::success(), nullptr};
+    }
+    RejectResult status;
+    ResponseHeaderMapPtr new_headers;
+  };
+  virtual ResponseHeadersTransformationResult
+  transformResponseHeaders(const ResponseHeaderMap& header_map) PURE;
 };
 
 /**
@@ -137,7 +143,7 @@ public:
   ~ClientHeaderValidator() override = default;
 
   /**
-   * Validate the entire request header map.
+   * Transform the entire request header map.
    * This method can not mutate the header map as it is immutable after the terminal decoder filter.
    * However HTTP/2 and HTTP/3 header validators may need to change the request from the HTTP/1
    * upgrade to to the extended CONNECT. In this case the new header map is returned in the
@@ -145,33 +151,25 @@ public:
    * causes the HTTP request to be rejected with 400 status, and the gRPC request with the INTERNAL
    * (13) error code.
    */
-  struct ConstRequestHeaderMapValidationResult {
+  struct RequestHeadersTransformationResult {
+    static RequestHeadersTransformationResult success() {
+      return RequestHeadersTransformationResult{RejectResult::success(), nullptr};
+    }
     RejectResult status;
     RequestHeaderMapPtr new_headers;
   };
-  virtual ConstRequestHeaderMapValidationResult
-  validateRequestHeaderMap(const RequestHeaderMap& header_map) PURE;
+  virtual RequestHeadersTransformationResult
+  transformRequestHeaders(const RequestHeaderMap& header_map) PURE;
 
   /**
-   * Validate the entire response header map.
-   * HTTP/2 and HTTP/3 server header validator may transform the extended CONNECT response
+   * Transform the entire response header map.
+   * HTTP/2 and HTTP/3 client header validator may transform the extended CONNECT response
    * to HTTP/1 upgrade response, iff it transformed upgrade request to extended CONNECT
    * during request validation.
    * Returning the Reject value causes the HTTP request to be rejected with the 502 status,
    * and the gRPC request with the UNAVAILABLE (14) error code.
    */
-  virtual ResponseHeaderMapValidationResult
-  validateResponseHeaderMap(ResponseHeaderMap& header_map) PURE;
-
-  /**
-   * Note: Request trailers are not validated after they were processed by the decoder filter chain.
-   */
-
-  /**
-   * Validate the entire response trailer map.
-   * Returning the Reject value causes the HTTP request to be reset.
-   */
-  virtual TrailerValidationResult validateResponseTrailerMap(ResponseTrailerMap& trailer_map) PURE;
+  virtual TransformationResult transformResponseHeaders(ResponseHeaderMap& header_map) PURE;
 };
 
 using HeaderValidatorPtr = std::unique_ptr<HeaderValidator>;

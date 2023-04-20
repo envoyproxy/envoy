@@ -51,8 +51,7 @@ void FakeStream::decodeHeaders(Http::RequestHeaderMapSharedPtr&& headers, bool e
   absl::MutexLock lock(&lock_);
   headers_ = std::move(headers);
   if (header_validator_) {
-    // Ignore validation results
-    header_validator_->validateRequestHeaderMap(*headers_);
+    header_validator_->transformRequestHeaders(*headers_);
   }
   setEndStream(end_stream);
 }
@@ -106,7 +105,7 @@ void FakeStream::encodeHeaders(const Http::HeaderMap& headers, bool end_stream) 
 
   if (header_validator_) {
     // Ignore validation results
-    auto result = header_validator_->validateResponseHeaderMap(*headers_copy);
+    auto result = header_validator_->transformResponseHeaders(*headers_copy);
     if (result.new_headers) {
       headers_copy = std::move(result.new_headers);
     }

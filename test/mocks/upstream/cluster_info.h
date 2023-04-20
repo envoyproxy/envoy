@@ -173,7 +173,7 @@ public:
               upstreamHttpProtocolOptions, (), (const));
   MOCK_METHOD(const absl::optional<const envoy::config::core::v3::AlternateProtocolsCacheOptions>&,
               alternateProtocolsCacheOptions, (), (const));
-  MOCK_METHOD(absl::optional<std::string>, edsServiceName, (), (const));
+  MOCK_METHOD(const std::string&, edsServiceName, (), (const));
   MOCK_METHOD(void, createNetworkFilterChain, (Network::Connection&), (const));
   MOCK_METHOD(std::vector<Http::Protocol>, upstreamHttpProtocol, (absl::optional<Http::Protocol>),
               (const));

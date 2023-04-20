@@ -325,13 +325,17 @@ IntegrationUtil::makeHeaderValidationFactory([[maybe_unused]] absl::string_view 
 
 RawConnectionDriver::~RawConnectionDriver() = default;
 
-void RawConnectionDriver::waitForConnection() {
+testing::AssertionResult RawConnectionDriver::waitForConnection() {
   // TODO(mattklein123): Add a timeout and switch to events and waitFor().
   while (!callbacks_->connected() && !callbacks_->closed()) {
     Event::GlobalTimeSystem().timeSystem().realSleepDoNotUseWithoutScrutiny(
         std::chrono::milliseconds(10));
     dispatcher_.run(Event::Dispatcher::RunType::NonBlock);
   }
+  if (!callbacks_->connected()) {
+    return testing::AssertionFailure();
+  }
+  return testing::AssertionSuccess();
 }
 
 testing::AssertionResult RawConnectionDriver::run(Event::Dispatcher::RunType run_type,

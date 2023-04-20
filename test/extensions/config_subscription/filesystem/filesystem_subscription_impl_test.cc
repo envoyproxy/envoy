@@ -3,7 +3,7 @@
 #include "envoy/config/listener/v3/listener.pb.h"
 #include "envoy/config/listener/v3/listener.pb.validate.h"
 
-#include "test/common/config/filesystem_subscription_test_harness.h"
+#include "test/extensions/config_subscription/filesystem/filesystem_subscription_test_harness.h"
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/filesystem/mocks.h"
 #include "test/test_common/logging.h"
@@ -191,7 +191,7 @@ resource:
   entries:
   - inline_entry: {}
   )EOF",
-                  MessageUtil::getJsonStringFromMessageOrDie(inline_entry));
+                  MessageUtil::getJsonStringFromMessageOrError(inline_entry));
   DecodedResourcesWrapper decoded_resources;
   decoded_resources.pushBack(std::make_unique<DecodedResourceImpl>(resource_decoder, inline_entry));
   EXPECT_CALL(callbacks_,
@@ -220,7 +220,7 @@ resource:
   entries:
   - inline_entry: {}
   )EOF",
-                  MessageUtil::getJsonStringFromMessageOrDie(inline_entry_2));
+                  MessageUtil::getJsonStringFromMessageOrError(inline_entry_2));
   {
     DecodedResourcesWrapper decoded_resources_2;
     decoded_resources_2.pushBack(
