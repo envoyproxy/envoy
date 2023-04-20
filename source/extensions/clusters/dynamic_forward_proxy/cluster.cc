@@ -108,10 +108,11 @@ void Cluster::checkIdleSubCluster() {
       if (it->second->checkIdle()) {
         auto cluster_name = it->first;
         ENVOY_LOG(debug, "cluster='{}' removing from cluster_map & cluster manager", cluster_name);
-        cluster_map_.erase(it);
+        cluster_map_.erase(it++);
         cm_.removeCluster(cluster_name);
+      } else {
+        ++it;
       }
-      ++it;
     }
   }
   idle_timer_->enableTimer(sub_cluster_ttl_);
