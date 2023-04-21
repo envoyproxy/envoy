@@ -1,7 +1,6 @@
 #!/bin/bash -e
 
-BAZEL_WORKSPACE="$(bazel info workspace)"
-BAZELRC_FILE="${BAZELRC_FILE:-${BAZEL_WORKSPACE}/clang.bazelrc}"
+BAZELRC_FILE="${BAZELRC_FILE:-./clang.bazelrc}"
 
 LLVM_PREFIX=$1
 

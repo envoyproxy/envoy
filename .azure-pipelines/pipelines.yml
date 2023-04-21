@@ -45,7 +45,9 @@ variables:
   value: v0
 - name: cacheKeyDockerBuild
   value: v0
-- name: cacheKeyRepository
+- name: cacheKeyBazel
+  value: v0
+- name: cacheKeyBazelFiles
   value: './WORKSPACE | **/*.bzl, !mobile/**, !envoy-docs/**'
 
 
