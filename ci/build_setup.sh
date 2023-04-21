@@ -89,6 +89,20 @@ function cleanup() {
 cleanup
 trap cleanup EXIT
 
+# NB: do not use bazel before here to ensure correct directories.
+_bazel="$(which bazel)"
+
+bazel () {
+    BAZEL_STARTUP_OPTIONS=(
+        "--output_user_root=${ENVOY_TEST_TMPDIR}/output"
+        "--output_base=${ENVOY_TEST_TMPDIR}/output/base")
+    "$_bazel" "${BAZEL_STARTUP_OPTIONS[@]}" "$@"
+}
+
+export _bazel
+export BAZEL_STARTUP_OPTIONS
+export -f bazel
+
 if [[ -e "${LLVM_ROOT}" ]]; then
     "$(dirname "$0")/../bazel/setup_clang.sh" "${LLVM_ROOT}"
 else
@@ -126,19 +140,7 @@ if [[ -z "${ENVOY_RBE}" ]]; then
     echo "Setting test_tmpdir to ${ENVOY_TEST_TMPDIR}."
 fi
 
-_bazel="$(which bazel)"
-
-bazel () {
-    BAZEL_STARTUP_OPTIONS=(
-        "--output_user_root=${ENVOY_TEST_TMPDIR}/output")
-    "$_bazel" "${BAZEL_STARTUP_OPTIONS[@]}" "$@"
-}
-
-export _bazel
-export BAZEL_STARTUP_OPTIONS
-export -f bazel
-
-[[ "${BAZEL_EXPUNGE}" == "1" ]] && bazel clean --expunge
+[[ "${BAZEL_EXPUNGE}" == "1" ]] && bazel clean "${BAZEL_BUILD_OPTIONS[@]}" --expunge
 
 # Also setup some space for building Envoy standalone.
 export ENVOY_BUILD_DIR="${BUILD_DIR}"/envoy
@@ -165,8 +167,9 @@ mkdir -p "${ENVOY_BUILD_PROFILE}"
 export BUILDIFIER_BIN="${BUILDIFIER_BIN:-/usr/local/bin/buildifier}"
 export BUILDOZER_BIN="${BUILDOZER_BIN:-/usr/local/bin/buildozer}"
 
+BAZEL_WORKSPACE_PATH="$(bazel info workspace)"
 
-if [[ "${ENVOY_BUILD_FILTER_EXAMPLE}" == "true" ]] && [[ "${ENVOY_SRCDIR}" == "$(bazel info workspace)" ]]; then
+if [[ "${ENVOY_BUILD_FILTER_EXAMPLE}" == "true" ]] && [[ "${ENVOY_SRCDIR}" == "$BAZEL_WORKSPACE_PATH" ]]; then
   # shellcheck source=ci/filter_example_setup.sh
   . "$(dirname "$0")"/filter_example_setup.sh
 else
