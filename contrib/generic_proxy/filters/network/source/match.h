@@ -26,7 +26,8 @@ public:
   Matcher::DataInputGetResult get(const Request& data) const override {
     Matcher::DataInputGetResult result;
     result.data_availability_ = Matcher::DataInputGetResult::DataAvailability::AllDataAvailable;
-    result.data_.emplace(data.host());
+    // result.data_.emplace(data.host());
+    result.data_ = std::string(data.host());
     return result;
   }
 };
@@ -52,7 +53,8 @@ public:
   Matcher::DataInputGetResult get(const Request& data) const override {
     Matcher::DataInputGetResult result;
     result.data_availability_ = Matcher::DataInputGetResult::DataAvailability::AllDataAvailable;
-    result.data_.emplace(data.method());
+    // result.data_.emplace(data.method());
+    result.data_ = std::string(data.method());
     return result;
   }
 };
@@ -84,7 +86,8 @@ public:
     const auto value = data.getByKey(name_);
 
     if (value.has_value()) {
-      result.data_.emplace(value.value());
+      // result.data_.emplace(value.value());
+      result.data_ = std::string(value.value());
     }
     return result;
   }
