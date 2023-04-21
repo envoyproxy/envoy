@@ -76,6 +76,64 @@ stages:
   #
 
   jobs:
+  - job: debug
+    displayName: Debooging
+    dependsOn: []
+    pool:
+      vmImage: "ubuntu-20.04"
+    steps:
+    - task: Cache@2
+      inputs:
+        key: 'format | $(cacheKeyRepository)'
+        path: $(Build.StagingDirectory)/repository_cache
+      continueOnError: true
+
+    - bash: |
+        sudo chgrp -R vsts $(Build.StagingDirectory)/repository_cache
+        find  $(Build.StagingDirectory)/repository_cache -name "*" -type d | xargs chmod +x
+
+    - bash: |
+        # TODO(phlax): move this to a script to ensure proper linting etc
+        set -e
+
+        getent group docker
+
+        echo "================================="
+        echo
+        find  $(Build.StagingDirectory)/repository_cache -name "*" | xargs ls -l
+        echo "================================="
+        echo
+        du -c $(Build.StagingDirectory)/repository_cache
+        echo
+        echo "================================="
+
+    - script: ci/run_envoy_docker.sh 'ci/do_ci.sh format'
+      workingDirectory: $(Build.SourcesDirectory)
+      env:
+        ENVOY_RBE: "true"
+        BAZEL_BUILD_EXTRA_OPTIONS: "--config=remote-ci --jobs=$(RbeJobs)"
+        ENVOY_DOCKER_BUILD_DIR: $(Build.StagingDirectory)
+        BAZEL_REMOTE_CACHE: grpcs://remotebuildexecution.googleapis.com
+        BAZEL_REMOTE_INSTANCE: projects/envoy-ci/instances/default_instance
+        GCP_SERVICE_ACCOUNT_KEY: $(GcpServiceAccountKey)
+        AZP_BRANCH: $(Build.SourceBranch)
+      displayName: "Run format checks"
+
+    - bash: |
+        # TODO(phlax): move this to a script to ensure proper linting etc
+        set -e
+
+        echo "================================="
+        echo
+        find  $(Build.StagingDirectory)/repository_cache -name "*" | xargs ls -l
+        echo "================================="
+        echo
+        du -c $(Build.StagingDirectory)/repository_cache
+        echo
+        echo "================================="
+
+        exit 1
+
   # Warm build image caches
   - job: cache
     displayName: Cache
