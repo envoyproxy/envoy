@@ -23,7 +23,7 @@ class ServerFactoryContext;
 
 namespace Matcher {
 
-using MatchingDataType = absl::variant<std::monostate, std::string, uint32_t>;
+using MatchingDataType = absl::variant<absl::monostate, std::string, uint32_t>;
 
 // This file describes a MatchTree<DataType>, which traverses a tree of matches until it
 // either matches (resulting in either an action or a new tree to traverse) or doesn't match.
