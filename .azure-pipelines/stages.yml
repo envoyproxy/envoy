@@ -87,9 +87,7 @@ stages:
         key: 'format | $(cacheKeyRepository)'
         path: $(Build.StagingDirectory)/repository_cache
       continueOnError: true
-
     - bash: |
-        sudo chgrp -R vsts $(Build.StagingDirectory)/repository_cache
         find  $(Build.StagingDirectory)/repository_cache -name "*" -type d | xargs chmod +x
 
     - bash: |
