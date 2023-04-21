@@ -50,6 +50,7 @@ envoy_cc_library(
     hdrs = ["datasource.h"],
     deps = [
         ":remote_data_fetcher_lib",
+        ":utility_lib",
         "//envoy/api:api_interface",
         "//envoy/init:manager_interface",
         "//envoy/upstream:cluster_manager_interface",
@@ -110,27 +111,6 @@ envoy_cc_library(
         "//source/common/common:token_bucket_impl_lib",
         "//source/common/grpc:common_lib",
         "//source/common/protobuf",
-        "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
-    ],
-)
-
-envoy_cc_library(
-    name = "filesystem_subscription_lib",
-    srcs = ["filesystem_subscription_impl.cc"],
-    hdrs = ["filesystem_subscription_impl.h"],
-    deps = [
-        ":decoded_resource_lib",
-        ":watched_directory_lib",
-        "//envoy/config:subscription_interface",
-        "//envoy/event:dispatcher_interface",
-        "//envoy/filesystem:filesystem_interface",
-        "//source/common/common:minimal_logger_lib",
-        "//source/common/common:utility_lib",
-        "//source/common/config:utility_lib",
-        "//source/common/protobuf",
-        "//source/common/protobuf:message_validator_lib",
-        "//source/common/protobuf:utility_lib",
-        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
     ],
 )
@@ -300,7 +280,6 @@ envoy_cc_library(
     hdrs = ["subscription_factory_impl.h"],
     deps = [
         ":custom_config_validators_lib",
-        ":filesystem_subscription_lib",
         ":grpc_subscription_lib",
         ":new_grpc_mux_lib",
         ":type_to_endpoint_lib",

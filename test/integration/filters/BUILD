@@ -666,6 +666,18 @@ envoy_cc_test_library(
 )
 
 envoy_cc_test_library(
+    name = "metadata_control_filter_lib",
+    srcs = ["metadata_control_filter.cc"],
+    deps = [
+        ":common_lib",
+        "//envoy/http:filter_interface",
+        "//envoy/server:filter_config_interface",
+        "//source/extensions/filters/http/common:pass_through_filter_lib",
+        "//test/extensions/filters/http/common:empty_http_filter_config_lib",
+    ],
+)
+
+envoy_cc_test_library(
     name = "metadata_stop_all_filter_config_lib",
     srcs = [
         "metadata_stop_all_filter.cc",

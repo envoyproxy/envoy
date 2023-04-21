@@ -307,7 +307,6 @@ void ConnectionManagerImpl::doDeferredStreamDestroy(ActiveStream& stream) {
   }
 
   stream.filter_manager_.onStreamComplete();
-  stream.streamInfo().setStreamState(StreamInfo::StreamState::Ended);
 
   // For HTTP/3, skip access logging here and add deferred logging info
   // to stream info for QuicStatsGatherer to use later.
@@ -385,7 +384,6 @@ RequestDecoder& ConnectionManagerImpl::newStream(ResponseEncoder& response_encod
   }
   new_stream->response_encoder_->getStream().setFlushTimeout(new_stream->idle_timeout_ms_);
   new_stream->streamInfo().setDownstreamBytesMeter(response_encoder.getStream().bytesMeter());
-  new_stream->streamInfo().setStreamState(StreamInfo::StreamState::Started);
   // If the network connection is backed up, the stream should be made aware of it on creation.
   // Both HTTP/1.x and HTTP/2 codecs handle this in StreamCallbackHelper::addCallbacksHelper.
   ASSERT(read_callbacks_->connection().aboveHighWatermark() == false ||
@@ -814,15 +812,11 @@ ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connect
   if (connection_manager_.config_.accessLogFlushInterval().has_value()) {
     access_log_flush_timer_ =
         connection_manager.read_callbacks_->connection().dispatcher().createTimer([this]() -> void {
-          if (!streamInfo().streamState() ||
-              streamInfo().streamState() != StreamInfo::StreamState::Ended) {
-            refreshAccessLogFlushTimer();
-          }
-
-          // If the request is not in active state, we shouldn't do the periodic log.
-          if (streamInfo().streamState() &&
-              streamInfo().streamState() == StreamInfo::StreamState::InProgress) {
+          // If the request is complete, we've already done the stream-end access-log, and shouldn't
+          // do the periodic log.
+          if (!streamInfo().requestComplete().has_value()) {
             filter_manager_.log();
+            refreshAccessLogFlushTimer();
           }
         });
     refreshAccessLogFlushTimer();
@@ -944,15 +938,23 @@ uint32_t ConnectionManagerImpl::ActiveStream::localPort() {
 
 bool ConnectionManagerImpl::ActiveStream::validateHeaders() {
   if (header_validator_) {
-    auto validation_result = header_validator_->validateRequestHeaderMap(*request_headers_);
-    if (!validation_result.ok()) {
+    auto validation_result = header_validator_->validateRequestHeaders(*request_headers_);
+    bool failure = !validation_result.ok();
+    bool redirect = false;
+    std::string failure_details(validation_result.details());
+    if (!failure) {
+      auto transformation_result = header_validator_->transformRequestHeaders(*request_headers_);
+      failure = !transformation_result.ok();
+      redirect = transformation_result.action() ==
+                 Http::HeaderValidator::HeadersTransformationResult::Action::Redirect;
+      failure_details = transformation_result.details();
+    }
+    if (failure) {
       std::function<void(ResponseHeaderMap & headers)> modify_headers;
       Code response_code = Code::BadRequest;
       absl::optional<Grpc::Status::GrpcStatus> grpc_status;
       bool is_grpc = Grpc::Common::hasGrpcContentType(*request_headers_);
-      if (validation_result.action() ==
-              Http::HeaderValidator::RequestHeaderMapValidationResult::Action::Redirect &&
-          !is_grpc) {
+      if (redirect && !is_grpc) {
         response_code = Code::TemporaryRedirect;
         modify_headers = [new_path = request_headers_->Path()->value().getStringView()](
                              Http::ResponseHeaderMap& response_headers) -> void {
@@ -965,14 +967,14 @@ bool ConnectionManagerImpl::ActiveStream::validateHeaders() {
       // H/2 codec was resetting requests that were rejected due to headers with underscores,
       // instead of sending 400. Preserving this behavior for now.
       // TODO(#24466): Make H/2 behavior consistent with H/1 and H/3.
-      if (validation_result.details() == UhvResponseCodeDetail::get().InvalidUnderscore &&
+      if (failure_details == UhvResponseCodeDetail::get().InvalidUnderscore &&
           connection_manager_.codec_->protocol() == Protocol::Http2) {
-        filter_manager_.streamInfo().setResponseCodeDetails(validation_result.details());
+        filter_manager_.streamInfo().setResponseCodeDetails(failure_details);
         resetStream();
       } else {
-        sendLocalReply(response_code, "", modify_headers, grpc_status, validation_result.details());
+        sendLocalReply(response_code, "", modify_headers, grpc_status, failure_details);
         if (!response_encoder_->streamErrorOnInvalidHttpMessage()) {
-          connection_manager_.handleCodecError(validation_result.details());
+          connection_manager_.handleCodecError(failure_details);
         }
       }
       return false;
@@ -987,9 +989,14 @@ bool ConnectionManagerImpl::ActiveStream::validateTrailers() {
     return true;
   }
 
-  auto validation_result = header_validator_->validateRequestTrailerMap(*request_trailers_);
+  auto validation_result = header_validator_->validateRequestTrailers(*request_trailers_);
+  std::string failure_details(validation_result.details());
   if (validation_result.ok()) {
-    return true;
+    auto transformation_result = header_validator_->transformRequestTrailers(*request_trailers_);
+    if (transformation_result.ok()) {
+      return true;
+    }
+    failure_details = transformation_result.details();
   }
 
   Code response_code = Code::BadRequest;
@@ -1001,20 +1008,20 @@ bool ConnectionManagerImpl::ActiveStream::validateTrailers() {
   // H/2 codec was resetting requests that were rejected due to headers with underscores,
   // instead of sending 400. Preserving this behavior for now.
   // TODO(#24466): Make H/2 behavior consistent with H/1 and H/3.
-  if (validation_result.details() == UhvResponseCodeDetail::get().InvalidUnderscore &&
+  if (failure_details == UhvResponseCodeDetail::get().InvalidUnderscore &&
       connection_manager_.codec_->protocol() == Protocol::Http2) {
-    filter_manager_.streamInfo().setResponseCodeDetails(validation_result.details());
+    filter_manager_.streamInfo().setResponseCodeDetails(failure_details);
     resetStream();
   } else {
     // TODO(#24735): Harmonize H/2 and H/3 behavior with H/1
     if (connection_manager_.codec_->protocol() < Protocol::Http2) {
-      sendLocalReply(response_code, "", nullptr, grpc_status, validation_result.details());
+      sendLocalReply(response_code, "", nullptr, grpc_status, failure_details);
     } else {
-      filter_manager_.streamInfo().setResponseCodeDetails(validation_result.details());
+      filter_manager_.streamInfo().setResponseCodeDetails(failure_details);
       resetStream();
     }
     if (!response_encoder_->streamErrorOnInvalidHttpMessage()) {
-      connection_manager_.handleCodecError(validation_result.details());
+      connection_manager_.handleCodecError(failure_details);
     }
   }
   return false;
@@ -1136,8 +1143,16 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapSharedPt
     return;
   }
 
-  // Verify header sanity checks which should have been performed by the codec.
-  ASSERT(HeaderUtility::requestHeadersValid(*request_headers_).has_value() == false);
+  // Apply header sanity checks.
+  absl::optional<std::reference_wrapper<const absl::string_view>> error =
+      HeaderUtility::requestHeadersValid(*request_headers_);
+  if (error != absl::nullopt) {
+    sendLocalReply(Code::BadRequest, "", nullptr, absl::nullopt, error.value().get());
+    if (!response_encoder_->streamErrorOnInvalidHttpMessage()) {
+      connection_manager_.handleCodecError(error.value().get());
+    }
+    return;
+  }
 
   // Check for the existence of the :path header for non-CONNECT requests, or present-but-empty
   // :path header for CONNECT requests. We expect the codec to have broken the path into pieces if
@@ -1676,11 +1691,6 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ResponseHeaderMap& heade
 
   ENVOY_STREAM_LOG(debug, "encoding headers via codec (end_stream={}):\n{}", *this, end_stream,
                    headers);
-
-  // According to RFC7231 any 2xx response indicates that the connection is established.
-  if (!end_stream && Http::CodeUtility::is2xx(Http::Utility::getResponseStatus(headers))) {
-    filter_manager_.streamInfo().setStreamState(StreamInfo::StreamState::InProgress);
-  }
 
   // Now actually encode via the codec.
   filter_manager_.streamInfo().downstreamTiming().onFirstDownstreamTxByteSent(

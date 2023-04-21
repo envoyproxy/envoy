@@ -110,6 +110,9 @@ UpstreamRequest::UpstreamRequest(RouterFilterInterface& parent,
     }
   }
   stream_info_.setUpstreamInfo(std::make_shared<StreamInfo::UpstreamInfoImpl>());
+  // Upstream filters may need to set filter state.
+  stream_info_.upstreamInfo()->setUpstreamFilterState(std::make_shared<StreamInfo::FilterStateImpl>(
+      StreamInfo::FilterState::LifeSpan::FilterChain));
   stream_info_.route_ = parent.callbacks()->route();
   parent_.callbacks()->streamInfo().setUpstreamInfo(stream_info_.upstreamInfo());
 
@@ -170,13 +173,20 @@ void UpstreamRequest::cleanUp() {
     // Allows for testing.
     per_try_timeout_->disableTimer();
   }
+
   if (per_try_idle_timeout_ != nullptr) {
     // Allows for testing.
     per_try_idle_timeout_->disableTimer();
   }
+
   if (max_stream_duration_timer_ != nullptr) {
     max_stream_duration_timer_->disableTimer();
   }
+
+  if (upstream_log_flush_timer_ != nullptr) {
+    upstream_log_flush_timer_->disableTimer();
+  }
+
   clearRequestEncoder();
 
   // If desired, fire the per-try histogram when the UpstreamRequest
@@ -206,10 +216,7 @@ void UpstreamRequest::cleanUp() {
   }
 
   stream_info_.onRequestComplete();
-  for (const auto& upstream_log : parent_.config().upstream_logs_) {
-    upstream_log->log(parent_.downstreamHeaders(), upstream_headers_.get(),
-                      upstream_trailers_.get(), stream_info_);
-  }
+  upstreamLog();
 
   while (downstream_data_disabled_ != 0) {
     parent_.callbacks()->onDecoderFilterBelowWriteBufferLowWatermark();
@@ -221,6 +228,13 @@ void UpstreamRequest::cleanUp() {
     // chain. Make sure to not delete them immediately when the stream ends, as the stream often
     // ends during filter chain processing and it causes use-after-free violations.
     parent_.callbacks()->dispatcher().deferredDelete(std::move(filter_manager_callbacks_));
+  }
+}
+
+void UpstreamRequest::upstreamLog() {
+  for (const auto& upstream_log : parent_.config().upstream_logs_) {
+    upstream_log->log(parent_.downstreamHeaders(), upstream_headers_.get(),
+                      upstream_trailers_.get(), stream_info_);
   }
 }
 
@@ -286,6 +300,7 @@ void UpstreamRequest::decodeHeaders(Http::ResponseHeaderMapPtr&& headers, bool e
 
   maybeHandleDeferredReadDisable();
   ASSERT(headers.get());
+
   parent_.onUpstreamHeaders(response_code, std::move(headers), *this, end_stream);
 }
 
@@ -369,21 +384,37 @@ void UpstreamRequest::acceptHeadersFromRouter(bool end_stream) {
   ASSERT(!router_sent_end_stream_);
   router_sent_end_stream_ = end_stream;
 
+  // Make sure that when we are forwarding CONNECT payload we do not do so until
+  // the upstream has accepted the CONNECT request.
+  // This must be done before conn_pool->newStream, as onPoolReady un-pauses for CONNECT
+  // termination.
+  auto* headers = parent_.downstreamHeaders();
+  if (allow_upstream_filters_ &&
+      headers->getMethodValue() == Http::Headers::get().MethodValues.Connect) {
+    paused_for_connect_ = true;
+  }
+
   // Kick off creation of the upstream connection immediately upon receiving headers.
   // In future it may be possible for upstream filters to delay this, or influence connection
   // creation but for now optimize for minimal latency and fetch the connection
   // as soon as possible.
   conn_pool_->newStream(this);
-  if (!allow_upstream_filters_) {
-    return;
+
+  if (parent_.config().upstream_log_flush_interval_.has_value()) {
+    upstream_log_flush_timer_ = parent_.callbacks()->dispatcher().createTimer([this]() -> void {
+      // If the request is complete, we've already done the stream-end upstream log, and shouldn't
+      // do the periodic log.
+      if (!streamInfo().requestComplete().has_value()) {
+        upstreamLog();
+        resetUpstreamLogFlushTimer();
+      }
+    });
+
+    resetUpstreamLogFlushTimer();
   }
 
-  auto* headers = parent_.downstreamHeaders();
-
-  // Make sure that when we are forwarding CONNECT payload we do not do so until
-  // the upstream has accepted the CONNECT request.
-  if (headers->getMethodValue() == Http::Headers::get().MethodValues.Connect) {
-    paused_for_connect_ = true;
+  if (!allow_upstream_filters_) {
+    return;
   }
 
   filter_manager_->requestHeadersInitialized();
@@ -527,6 +558,12 @@ void UpstreamRequest::resetPerTryIdleTimer() {
   }
 }
 
+void UpstreamRequest::resetUpstreamLogFlushTimer() {
+  if (upstream_log_flush_timer_ != nullptr) {
+    upstream_log_flush_timer_->enableTimer(parent_.config().upstream_log_flush_interval_.value());
+  }
+}
+
 void UpstreamRequest::setupPerTryTimeout() {
   ASSERT(!per_try_timeout_);
   if (parent_.timeout().per_try_timeout_.count() > 0) {
@@ -573,19 +610,19 @@ void UpstreamRequest::onPoolFailure(ConnectionPool::PoolFailureReason reason,
                                     absl::string_view transport_failure_reason,
                                     Upstream::HostDescriptionConstSharedPtr host) {
   recordConnectionPoolCallbackLatency();
-  Http::StreamResetReason reset_reason = Http::StreamResetReason::ConnectionFailure;
-  switch (reason) {
-  case ConnectionPool::PoolFailureReason::Overflow:
-    reset_reason = Http::StreamResetReason::Overflow;
-    break;
-  case ConnectionPool::PoolFailureReason::RemoteConnectionFailure:
-    FALLTHRU;
-  case ConnectionPool::PoolFailureReason::LocalConnectionFailure:
-    reset_reason = Http::StreamResetReason::ConnectionFailure;
-    break;
-  case ConnectionPool::PoolFailureReason::Timeout:
-    reset_reason = Http::StreamResetReason::ConnectionFailure;
-  }
+  Http::StreamResetReason reset_reason = [](ConnectionPool::PoolFailureReason reason) {
+    switch (reason) {
+    case ConnectionPool::PoolFailureReason::Overflow:
+      return Http::StreamResetReason::Overflow;
+    case ConnectionPool::PoolFailureReason::RemoteConnectionFailure:
+      return Http::StreamResetReason::RemoteConnectionFailure;
+    case ConnectionPool::PoolFailureReason::LocalConnectionFailure:
+      return Http::StreamResetReason::LocalConnectionFailure;
+    case ConnectionPool::PoolFailureReason::Timeout:
+      return Http::StreamResetReason::ConnectionTimeout;
+    }
+    PANIC_DUE_TO_CORRUPT_ENUM;
+  }(reason);
 
   stream_info_.upstreamInfo()->setUpstreamTransportFailureReason(transport_failure_reason);
 
@@ -597,7 +634,7 @@ void UpstreamRequest::onPoolFailure(ConnectionPool::PoolFailureReason reason,
 void UpstreamRequest::onPoolReady(std::unique_ptr<GenericUpstream>&& upstream,
                                   Upstream::HostDescriptionConstSharedPtr host,
                                   const Network::ConnectionInfoProvider& address_provider,
-                                  StreamInfo::StreamInfo& info,
+                                  StreamInfo::StreamInfo& connection_stream_info,
                                   absl::optional<Http::Protocol> protocol) {
   // This may be called under an existing ScopeTrackerScopeState but it will unwind correctly.
   ScopeTrackerScopeState scope(&parent_.callbacks()->scope(), parent_.callbacks()->dispatcher());
@@ -633,33 +670,35 @@ void UpstreamRequest::onPoolReady(std::unique_ptr<GenericUpstream>&& upstream,
   }
 
   StreamInfo::UpstreamInfo& upstream_info = *stream_info_.upstreamInfo();
-  if (info.upstreamInfo()) {
-    auto& upstream_timing = info.upstreamInfo()->upstreamTiming();
+  if (connection_stream_info.upstreamInfo()) {
+    auto& upstream_timing = connection_stream_info.upstreamInfo()->upstreamTiming();
     upstreamTiming().upstream_connect_start_ = upstream_timing.upstream_connect_start_;
     upstreamTiming().upstream_connect_complete_ = upstream_timing.upstream_connect_complete_;
     upstreamTiming().upstream_handshake_complete_ = upstream_timing.upstream_handshake_complete_;
-    upstream_info.setUpstreamNumStreams(info.upstreamInfo()->upstreamNumStreams());
+    upstream_info.setUpstreamNumStreams(
+        connection_stream_info.upstreamInfo()->upstreamNumStreams());
   }
 
-  // Upstream filters might have already created/set a filter state.
-  const StreamInfo::FilterStateSharedPtr& filter_state = info.filterState();
-  if (!filter_state) {
-    upstream_info.setUpstreamFilterState(
-        std::make_shared<StreamInfo::FilterStateImpl>(StreamInfo::FilterState::LifeSpan::Request));
-  } else {
-    upstream_info.setUpstreamFilterState(filter_state);
-  }
+  // The upstream connection may have filter state created by upstream network filters. This
+  // connection filter state must be an ancestor of the FilterChain upstream filter state.
+  auto filter_state_status =
+      upstream_info.upstreamFilterState()->addAncestor(connection_stream_info.filterState());
+  ENVOY_BUG(filter_state_status.ok(),
+            absl::StrCat("Failed to add connection filter state: ", filter_state_status.message()));
+
   upstream_info.setUpstreamLocalAddress(address_provider.localAddress());
   upstream_info.setUpstreamRemoteAddress(address_provider.remoteAddress());
-  upstream_info.setUpstreamSslConnection(info.downstreamAddressProvider().sslConnection());
+  upstream_info.setUpstreamSslConnection(
+      connection_stream_info.downstreamAddressProvider().sslConnection());
 
-  if (info.downstreamAddressProvider().connectionID().has_value()) {
-    upstream_info.setUpstreamConnectionId(info.downstreamAddressProvider().connectionID().value());
+  if (connection_stream_info.downstreamAddressProvider().connectionID().has_value()) {
+    upstream_info.setUpstreamConnectionId(
+        connection_stream_info.downstreamAddressProvider().connectionID().value());
   }
 
-  if (info.downstreamAddressProvider().interfaceName().has_value()) {
+  if (connection_stream_info.downstreamAddressProvider().interfaceName().has_value()) {
     upstream_info.setUpstreamInterfaceName(
-        info.downstreamAddressProvider().interfaceName().value());
+        connection_stream_info.downstreamAddressProvider().interfaceName().value());
   }
 
   stream_info_.setUpstreamBytesMeter(upstream_->bytesMeter());
@@ -709,6 +748,10 @@ void UpstreamRequest::onPoolReady(std::unique_ptr<GenericUpstream>&& upstream,
   }
 
   stream_info_.setRequestHeaders(*parent_.downstreamHeaders());
+
+  if (parent_.config().flush_upstream_log_on_upstream_stream_) {
+    upstreamLog();
+  }
 
   for (auto* callback : upstream_callbacks_) {
     callback->onUpstreamConnectionEstablished();

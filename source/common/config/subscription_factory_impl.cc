@@ -4,7 +4,6 @@
 #include "envoy/config/xds_resources_delegate.h"
 
 #include "source/common/config/custom_config_validators_impl.h"
-#include "source/common/config/filesystem_subscription_impl.h"
 #include "source/common/config/grpc_mux_impl.h"
 #include "source/common/config/grpc_subscription_impl.h"
 #include "source/common/config/new_grpc_mux_impl.h"
@@ -39,15 +38,13 @@ SubscriptionPtr SubscriptionFactoryImpl::subscriptionFromConfigSource(
   switch (config.config_source_specifier_case()) {
   case envoy::config::core::v3::ConfigSource::ConfigSourceSpecifierCase::kPath: {
     Utility::checkFilesystemSubscriptionBackingPath(config.path(), api_);
-    return std::make_unique<Config::FilesystemSubscriptionImpl>(
-        dispatcher_, makePathConfigSource(config.path()), callbacks, resource_decoder, stats,
-        validation_visitor_, api_);
+    subscription_type = "envoy.config_subscription.filesystem";
+    break;
   }
   case envoy::config::core::v3::ConfigSource::ConfigSourceSpecifierCase::kPathConfigSource: {
     Utility::checkFilesystemSubscriptionBackingPath(config.path_config_source().path(), api_);
-    return std::make_unique<Config::FilesystemSubscriptionImpl>(
-        dispatcher_, config.path_config_source(), callbacks, resource_decoder, stats,
-        validation_visitor_, api_);
+    subscription_type = "envoy.config_subscription.filesystem";
+    break;
   }
   case envoy::config::core::v3::ConfigSource::ConfigSourceSpecifierCase::kApiConfigSource: {
     const envoy::config::core::v3::ApiConfigSource& api_config_source = config.api_config_source();
@@ -73,6 +70,11 @@ SubscriptionPtr SubscriptionFactoryImpl::subscriptionFromConfigSource(
       CustomConfigValidatorsPtr custom_config_validators =
           std::make_unique<CustomConfigValidatorsImpl>(validation_visitor_, server_,
                                                        api_config_source.config_validators());
+
+      JitteredExponentialBackOffStrategyPtr backoff_strategy =
+          Utility::prepareJitteredExponentialBackOffStrategy(
+              api_config_source, api_.randomGenerator(), RetryInitialDelayMs, RetryMaxDelayMs);
+
       const std::string control_plane_id =
           Utility::getGrpcControlPlane(api_config_source).value_or("");
 
@@ -84,7 +86,8 @@ SubscriptionPtr SubscriptionFactoryImpl::subscriptionFromConfigSource(
             dispatcher_, sotwGrpcMethod(type_url), api_.randomGenerator(), scope,
             Utility::parseRateLimitSettings(api_config_source), local_info_,
             api_config_source.set_node_on_first_message_only(), std::move(custom_config_validators),
-            xds_config_tracker_, xds_resources_delegate_, control_plane_id);
+            std::move(backoff_strategy), xds_config_tracker_, xds_resources_delegate_,
+            control_plane_id);
       } else {
         mux = std::make_shared<Config::GrpcMuxImpl>(
             local_info_,
@@ -94,7 +97,8 @@ SubscriptionPtr SubscriptionFactoryImpl::subscriptionFromConfigSource(
             dispatcher_, sotwGrpcMethod(type_url), api_.randomGenerator(), scope,
             Utility::parseRateLimitSettings(api_config_source),
             api_config_source.set_node_on_first_message_only(), std::move(custom_config_validators),
-            xds_config_tracker_, xds_resources_delegate_, control_plane_id);
+            std::move(backoff_strategy), xds_config_tracker_, xds_resources_delegate_,
+            control_plane_id);
       }
       return std::make_unique<GrpcSubscriptionImpl>(
           std::move(mux), callbacks, resource_decoder, stats, type_url, dispatcher_,
@@ -106,6 +110,11 @@ SubscriptionPtr SubscriptionFactoryImpl::subscriptionFromConfigSource(
       CustomConfigValidatorsPtr custom_config_validators =
           std::make_unique<CustomConfigValidatorsImpl>(validation_visitor_, server_,
                                                        api_config_source.config_validators());
+
+      JitteredExponentialBackOffStrategyPtr backoff_strategy =
+          Utility::prepareJitteredExponentialBackOffStrategy(
+              api_config_source, api_.randomGenerator(), RetryInitialDelayMs, RetryMaxDelayMs);
+
       if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.unified_mux")) {
         mux = std::make_shared<Config::XdsMux::GrpcMuxDelta>(
             Utility::factoryForGrpcApiConfigSource(cm_.grpcAsyncClientManager(), api_config_source,
@@ -114,7 +123,7 @@ SubscriptionPtr SubscriptionFactoryImpl::subscriptionFromConfigSource(
             dispatcher_, deltaGrpcMethod(type_url), api_.randomGenerator(), scope,
             Utility::parseRateLimitSettings(api_config_source), local_info_,
             api_config_source.set_node_on_first_message_only(), std::move(custom_config_validators),
-            xds_config_tracker_);
+            std::move(backoff_strategy), xds_config_tracker_);
       } else {
         mux = std::make_shared<Config::NewGrpcMuxImpl>(
             Config::Utility::factoryForGrpcApiConfigSource(cm_.grpcAsyncClientManager(),
@@ -122,7 +131,7 @@ SubscriptionPtr SubscriptionFactoryImpl::subscriptionFromConfigSource(
                 ->createUncachedRawAsyncClient(),
             dispatcher_, deltaGrpcMethod(type_url), api_.randomGenerator(), scope,
             Utility::parseRateLimitSettings(api_config_source), local_info_,
-            std::move(custom_config_validators), xds_config_tracker_);
+            std::move(custom_config_validators), std::move(backoff_strategy), xds_config_tracker_);
       }
       return std::make_unique<GrpcSubscriptionImpl>(
           std::move(mux), callbacks, resource_decoder, stats, type_url, dispatcher_,
@@ -165,9 +174,18 @@ SubscriptionPtr SubscriptionFactoryImpl::collectionSubscriptionFromUrl(
   case xds::core::v3::ResourceLocator::FILE: {
     const std::string path = Http::Utility::localPathFromFilePath(collection_locator.id());
     Utility::checkFilesystemSubscriptionBackingPath(path, api_);
-    return std::make_unique<Config::FilesystemCollectionSubscriptionImpl>(
-        dispatcher_, makePathConfigSource(path), callbacks, resource_decoder, stats,
-        validation_visitor_, api_);
+    envoy::config::core::v3::ConfigSource factory_config;
+    factory_config.set_path(path);
+    const std::string subscription_type = "envoy.config_subscription.filesystem_collection";
+    ConfigSubscriptionFactory* factory =
+        Registry::FactoryRegistry<ConfigSubscriptionFactory>::getFactory(subscription_type);
+    if (factory == nullptr) {
+      throw EnvoyException(fmt::format(
+          "Didn't find a registered config subscription factory implementation for name: '{}'",
+          subscription_type));
+    }
+    return factory->create(local_info_, cm_, dispatcher_, api_, factory_config, "", callbacks,
+                           resource_decoder, stats, validation_visitor_);
   }
   case xds::core::v3::ResourceLocator::XDSTP: {
     if (resource_type != collection_locator.resource_type()) {
@@ -185,6 +203,10 @@ SubscriptionPtr SubscriptionFactoryImpl::collectionSubscriptionFromUrl(
           std::make_unique<CustomConfigValidatorsImpl>(validation_visitor_, server_,
                                                        api_config_source.config_validators());
 
+      JitteredExponentialBackOffStrategyPtr backoff_strategy =
+          Utility::prepareJitteredExponentialBackOffStrategy(
+              api_config_source, api_.randomGenerator(), RetryInitialDelayMs, RetryMaxDelayMs);
+
       SubscriptionOptions options;
       // All Envoy collections currently are xDS resource graph roots and require node context
       // parameters.
@@ -200,7 +222,8 @@ SubscriptionPtr SubscriptionFactoryImpl::collectionSubscriptionFromUrl(
                     ->createUncachedRawAsyncClient(),
                 dispatcher_, deltaGrpcMethod(type_url), api_.randomGenerator(), scope,
                 Utility::parseRateLimitSettings(api_config_source), local_info_,
-                std::move(custom_config_validators), xds_config_tracker_),
+                std::move(custom_config_validators), std::move(backoff_strategy),
+                xds_config_tracker_),
             callbacks, resource_decoder, stats, dispatcher_,
             Utility::configSourceInitialFetchTimeout(config), /*is_aggregated=*/false, options);
       }
