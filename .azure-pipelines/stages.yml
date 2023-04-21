@@ -90,7 +90,10 @@ stages:
       continueOnError: true
     - bash: |
         mkdir -p $(Build.StagingDirectory)/repository_cache/
-        tar xf $(Build.StagingDirectory)/repository_cache_cache/repository_cache.tar.zst -C $(Build.StagingDirectory)/repository_cache/
+
+        tar tfv $(Build.StagingDirectory)/repository_cache_cache/repository_cache.tar.zst
+
+        sudo tar xf $(Build.StagingDirectory)/repository_cache_cache/repository_cache.tar.zst -C $(Build.StagingDirectory)/repository_cache/
       condition: and(not(canceled()), eq(variables.CACHE_RESTORED, 'true'))
 
     - bash: |
