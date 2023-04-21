@@ -271,6 +271,11 @@ stages:
         key: 'format | $(cacheKeyRepository)'
         path: $(Build.StagingDirectory)/repository_cache
       continueOnError: true
+    - bash: |
+        echo "Fix repository_cache permissions ..."
+        find  $(Build.StagingDirectory)/repository_cache -name "*" -type d | xargs chmod +x
+        # TODO(phlax): remove this after fixing GID in run_envoy_docker.sh
+        sudo chgrp -R vsts $(Build.StagingDirectory)/repository_cache
 
     - template: cached.yml
       parameters:
@@ -306,6 +311,11 @@ stages:
         key: 'proto_format | $(cacheKeyRepository)'
         path: $(Build.StagingDirectory)/repository_cache
       continueOnError: true
+    - bash: |
+        echo "Fix repository_cache permissions ..."
+        find  $(Build.StagingDirectory)/repository_cache -name "*" -type d | xargs chmod +x
+        # TODO(phlax): remove this after fixing GID in run_envoy_docker.sh
+        sudo chgrp -R vsts $(Build.StagingDirectory)/repository_cache
 
     - template: cached.yml
       parameters:
@@ -341,6 +351,11 @@ stages:
         key: 'docs | $(cacheKeyRepository)'
         path: $(Build.StagingDirectory)/repository_cache
       continueOnError: true
+    - bash: |
+        echo "Fix repository_cache permissions ..."
+        find  $(Build.StagingDirectory)/repository_cache -name "*" -type d | xargs chmod +x
+        # TODO(phlax): remove this after fixing GID in run_envoy_docker.sh
+        sudo chgrp -R vsts $(Build.StagingDirectory)/repository_cache
 
     - template: cached.yml
       parameters:
@@ -390,6 +405,11 @@ stages:
         key: 'dependencies | $(cacheKeyRepository)'
         path: $(Build.StagingDirectory)/repository_cache
       continueOnError: true
+    - bash: |
+        echo "Fix repository_cache permissions ..."
+        find  $(Build.StagingDirectory)/repository_cache -name "*" -type d | xargs chmod +x
+        # TODO(phlax): remove this after fixing GID in run_envoy_docker.sh
+        sudo chgrp -R vsts $(Build.StagingDirectory)/repository_cache
 
     - template: cached.yml
       parameters:
@@ -814,6 +834,11 @@ stages:
         key: 'docs | $(cacheKeyRepository)'
         path: $(Build.StagingDirectory)/repository_cache
       continueOnError: true
+    - bash: |
+        echo "Fix repository_cache permissions ..."
+        find  $(Build.StagingDirectory)/repository_cache -name "*" -type d | xargs chmod +x
+        # TODO(phlax): remove this after fixing GID in run_envoy_docker.sh
+        sudo chgrp -R vsts $(Build.StagingDirectory)/repository_cache
 
     - script: ci/run_envoy_docker.sh 'ci/do_ci.sh docs'
       workingDirectory: $(Build.SourcesDirectory)

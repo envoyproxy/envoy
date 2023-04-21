@@ -63,6 +63,11 @@ steps:
     key: '"${{ parameters.ciTarget }}" | "${{ parameters.artifactSuffix }}" | $(cacheKeyRepository)'
     path: $(Build.StagingDirectory)/repository_cache
   continueOnError: true
+- bash: |
+    echo "Fix repository_cache permissions ..."
+    find  $(Build.StagingDirectory)/repository_cache -name "*" -type d | xargs chmod +x
+    # TODO(phlax): remove this after fixing GID in run_envoy_docker.sh
+    sudo chgrp -R vsts $(Build.StagingDirectory)/repository_cache
 
 - template: cached.yml
   parameters:
