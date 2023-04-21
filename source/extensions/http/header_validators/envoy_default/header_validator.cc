@@ -23,6 +23,25 @@ std::from_chars_result fromChars(const absl::string_view string_value, IntType& 
   return std::from_chars(string_value.data(), string_value.data() + string_value.size(), value);
 }
 
+// Same table as the kPathHeaderCharTable but with the backslash character allowed
+// This table is used when the "envoy.reloadable_features.uhv_translate_backslash_to_slash"
+// runtime keys is set to "true".
+constexpr std::array<uint32_t, 8> kPathHeaderCharTableWithBackSlashAllowed = {
+    // control characters
+    0b00000000000000000000000000000000,
+    // !"#$%&'()*+,-./0123456789:;<=>?
+    0b01001111111111111111111111110100,
+    //@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\]^_
+    0b11111111111111111111111111101001,
+    //`abcdefghijklmnopqrstuvwxyz{|}~
+    0b01111111111111111111111111100010,
+    // extended ascii
+    0b00000000000000000000000000000000,
+    0b00000000000000000000000000000000,
+    0b00000000000000000000000000000000,
+    0b00000000000000000000000000000000,
+};
+
 } // namespace
 
 using ::envoy::extensions::http::header_validators::envoy_default::v3::HeaderValidatorConfig;
@@ -384,27 +403,6 @@ HeaderValidator::validateHostHeaderRegName(absl::string_view host) {
       port_delimiter != absl::string_view::npos ? host.substr(port_delimiter) : absl::string_view();
   return HostHeaderValidationResult::success(address, port_string);
 }
-
-namespace {
-// Same table as the kPathHeaderCharTable but with the backslash character allowed
-// This table is used when the "envoy.reloadable_features.uhv_translate_backslash_to_slash"
-// runtime keys is set to "true".
-constexpr std::array<uint32_t, 8> kPathHeaderCharTableWithBackSlashAllowed = {
-    // control characters
-    0b00000000000000000000000000000000,
-    // !"#$%&'()*+,-./0123456789:;<=>?
-    0b01001111111111111111111111110100,
-    //@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\]^_
-    0b11111111111111111111111111101001,
-    //`abcdefghijklmnopqrstuvwxyz{|}~
-    0b01111111111111111111111111100010,
-    // extended ascii
-    0b00000000000000000000000000000000,
-    0b00000000000000000000000000000000,
-    0b00000000000000000000000000000000,
-    0b00000000000000000000000000000000,
-};
-} // namespace
 
 HeaderValidator::HeaderValueValidationResult
 HeaderValidator::validatePathHeaderCharacters(const HeaderString& value) {

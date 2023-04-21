@@ -9,7 +9,7 @@
 namespace Envoy {
 namespace Http {
 
-constexpr bool testCharInTable(const std::array<uint32_t, 8>& table, char c) {
+inline constexpr bool testCharInTable(const std::array<uint32_t, 8>& table, char c) {
   // CPU cache friendly version of a lookup in a bit table of size 256.
   // The table is organized as 8 32 bit words.
   // This function looks up a bit from the `table` at the index `c`.
@@ -33,7 +33,7 @@ constexpr bool testCharInTable(const std::array<uint32_t, 8>& table, char c) {
 //                / "+" / "-" / "." / "^" / "_" / "`" / "|" / "~"
 //                / DIGIT / ALPHA
 // SPELLCHECKER(on)
-constexpr std::array<uint32_t, 8> kGenericHeaderNameCharTable = {
+inline constexpr std::array<uint32_t, 8> kGenericHeaderNameCharTable = {
     // control characters
     0b00000000000000000000000000000000,
     // !"#$%&'()*+,-./0123456789:;<=>?
@@ -56,7 +56,7 @@ constexpr std::array<uint32_t, 8> kGenericHeaderNameCharTable = {
 // query       = *( pchar / "/" / "?" )
 // fragment    = *( pchar / "/" / "?" )
 // SPELLCHECKER(on)
-constexpr std::array<uint32_t, 8> kUriQueryAndFragmentCharTable = {
+inline constexpr std::array<uint32_t, 8> kUriQueryAndFragmentCharTable = {
     // control characters
     0b00000000000000000000000000000000,
     // !"#$%&'()*+,-./0123456789:;<=>?

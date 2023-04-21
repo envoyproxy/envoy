@@ -24,7 +24,7 @@ namespace EnvoyDefault {
 // VCHAR          =  %x21-7E
 //                   ; visible (printing) characters
 // SPELLCHECKER(on)
-constexpr std::array<uint32_t, 8> kGenericHeaderValueCharTable = {
+inline constexpr std::array<uint32_t, 8> kGenericHeaderValueCharTable = {
     // control characters
     0b00000000010000000000000000000000,
     // !"#$%&'()*+,-./0123456789:;<=>?
@@ -49,7 +49,7 @@ constexpr std::array<uint32_t, 8> kGenericHeaderValueCharTable = {
 // tchar  = "!" / "#" / "$" / "%" / "&" / "'" / "*" / "+" / "-" / "."
 //        /  "^" / "_" / "`" / "|" / "~" / DIGIT / ALPHA
 // SPELLCHECKER(on)
-constexpr std::array<uint32_t, 8> kMethodHeaderCharTable = {
+inline constexpr std::array<uint32_t, 8> kMethodHeaderCharTable = {
     // control characters
     0b00000000000000000000000000000000,
     // !"#$%&'()*+,-./0123456789:;<=>?
@@ -88,7 +88,7 @@ constexpr std::array<uint32_t, 8> kMethodHeaderCharTable = {
 //
 // pchar         = unreserved / pct-encoded / sub-delims / ":" / "@"
 // SPELLCHECKER(on)
-constexpr std::array<uint32_t, 8> kPathHeaderCharTable = {
+inline constexpr std::array<uint32_t, 8> kPathHeaderCharTable = {
     // control characters
     0b00000000000000000000000000000000,
     // !"#$%&'()*+,-./0123456789:;<=>?
@@ -108,7 +108,7 @@ constexpr std::array<uint32_t, 8> kPathHeaderCharTable = {
 // From RFC 3986: https://datatracker.ietf.org/doc/html/rfc3986#section-2.3
 //
 // unreserved  = ALPHA / DIGIT / "-" / "." / "_" / "~"
-constexpr std::array<uint32_t, 8> kUnreservedCharTable = {
+inline constexpr std::array<uint32_t, 8> kUnreservedCharTable = {
     // control characters
     0b00000000000000000000000000000000,
     // !"#$%&'()*+,-./0123456789:;<=>?
@@ -132,7 +132,7 @@ constexpr std::array<uint32_t, 8> kUnreservedCharTable = {
 // transfer-coding     = token *( OWS ";" OWS transfer-parameter )
 // transfer-parameter  = token BWS "=" BWS ( token / quoted-string )
 // SPELLCHECKER(on)
-constexpr std::array<uint32_t, 8> kTransferEncodingHeaderCharTable = {
+inline constexpr std::array<uint32_t, 8> kTransferEncodingHeaderCharTable = {
     // control characters
     0b00000000010000000000000000000000,
     // !"#$%&'()*+,-./0123456789:;<=>?
@@ -151,7 +151,7 @@ constexpr std::array<uint32_t, 8> kTransferEncodingHeaderCharTable = {
 // An IPv6 address, excluding the surrounding "[" and "]" characters. This is based on RFC 3986,
 // https://www.rfc-editor.org/rfc/rfc3986.html#section-3.2.2, that only allows hex digits and the
 // ":" separator.
-constexpr std::array<uint32_t, 8> kHostIPv6AddressCharTable = {
+inline constexpr std::array<uint32_t, 8> kHostIPv6AddressCharTable = {
     // control characters
     0b00000000000000000000000000000000,
     // !"#$%&'()*+,-./0123456789:;<=>?
@@ -173,7 +173,7 @@ constexpr std::array<uint32_t, 8> kHostIPv6AddressCharTable = {
 // SPELLCHECKER(off)
 // reg-name    = *( unreserved / pct-encoded / sub-delims )
 // SPELLCHECKER(on)
-constexpr std::array<uint32_t, 8> kHostRegNameCharTable = {
+inline constexpr std::array<uint32_t, 8> kHostRegNameCharTable = {
     // control characters
     0b00000000000000000000000000000000,
     // !"#$%&'()*+,-./0123456789:;<=>?
