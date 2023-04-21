@@ -178,3 +178,7 @@ func (s *streamInfo) DynamicMetadata() api.DynamicMetadata {
 func (d *dynamicMetadata) Set(filterName string, key string, value interface{}) {
 	cAPI.HttpSetDynamicMetadata(unsafe.Pointer(d.request.req), filterName, key, value)
 }
+
+func (s *streamInfo) DownstreamLocalAddress() (string, bool) {
+	return cAPI.HttpGetStringValue(unsafe.Pointer(s.request.req), ValueDownstreamLocalAddress)
+}

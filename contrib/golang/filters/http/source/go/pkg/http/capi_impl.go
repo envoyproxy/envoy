@@ -43,12 +43,13 @@ import (
 )
 
 const (
-	ValueRouteName           = 1
-	ValueFilterChainName     = 2
-	ValueProtocol            = 3
-	ValueResponseCode        = 4
-	ValueResponseCodeDetails = 5
-	ValueAttemptCount        = 6
+	ValueRouteName              = 1
+	ValueFilterChainName        = 2
+	ValueProtocol               = 3
+	ValueResponseCode           = 4
+	ValueResponseCodeDetails    = 5
+	ValueAttemptCount           = 6
+	ValueDownstreamLocalAddress = 7
 )
 
 type httpCApiImpl struct{}
