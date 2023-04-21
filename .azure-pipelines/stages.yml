@@ -84,17 +84,19 @@ stages:
     steps:
     - task: Cache@2
       inputs:
-        key: 'format | $(cacheKeyRepository)'
-        path: $(Build.StagingDirectory)/repository_cache
+        key: 'format | v0.dev0 | $(cacheKeyRepository)'
+        path: $(Build.StagingDirectory)/repository_cache_cache
+        cacheHitVar: CACHE_RESTORED
       continueOnError: true
     - bash: |
-        find  $(Build.StagingDirectory)/repository_cache -name "*" -type d | xargs chmod +x
+        tar xf $(Build.StagingDirectory)/repository_cache_cache/repository_cache.tar.zst -C $(Build.StagingDirectory)/repository_cache/
+      condition: and(not(canceled()), eq(variables.CACHE_RESTORED, 'true'))
 
     - bash: |
         # TODO(phlax): move this to a script to ensure proper linting etc
         set -e
 
-        getent group docker
+        mkdir -p $(Build.StagingDirectory)/repository_cache
 
         echo "================================="
         echo
@@ -117,6 +119,11 @@ stages:
         GCP_SERVICE_ACCOUNT_KEY: $(GcpServiceAccountKey)
         AZP_BRANCH: $(Build.SourceBranch)
       displayName: "Run format checks"
+
+    - bash: |
+        mkdir -p $(Build.StagingDirectory)/repository_cache_cache
+        tar cf $(Build.StagingDirectory)/repository_cache_cache/repository_cache.tar.zst -C $(Build.StagingDirectory)/repository_cache/ .
+      condition: and(not(canceled()), ne(variables.CACHE_RESTORED, 'true'))
 
     - bash: |
         # TODO(phlax): move this to a script to ensure proper linting etc
