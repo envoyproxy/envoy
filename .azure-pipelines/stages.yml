@@ -99,7 +99,6 @@ stages:
 
         mkdir -p $(Build.StagingDirectory)/repository_cache
 
-
         echo "================================="
         echo
         find  $(Build.StagingDirectory)/repository_cache -name "*" -type f | xargs ls -l
