@@ -39,7 +39,7 @@ public:
     const auto& address = data.localAddress();
 
     if (address.type() != Network::Address::Type::Ip) {
-      return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::nullopt};
+      return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, std::monostate()};
     }
     return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,
             address.ip()->addressAsString()};
@@ -69,10 +69,9 @@ public:
   Matcher::DataInputGetResult get(const MatchingDataType& data) const override {
     const auto& address = data.localAddress();
     if (address.type() != Network::Address::Type::Ip) {
-      return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::nullopt};
+      return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, std::monostate()};
     }
-    return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,
-            absl::StrCat(address.ip()->port())};
+    return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, address.ip()->port()};
   }
 };
 
@@ -99,7 +98,7 @@ public:
   Matcher::DataInputGetResult get(const MatchingDataType& data) const override {
     const auto& address = data.remoteAddress();
     if (address.type() != Network::Address::Type::Ip) {
-      return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::nullopt};
+      return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, std::monostate()};
     }
     return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,
             address.ip()->addressAsString()};
@@ -128,7 +127,7 @@ public:
   Matcher::DataInputGetResult get(const MatchingDataType& data) const override {
     const auto& address = data.remoteAddress();
     if (address.type() != Network::Address::Type::Ip) {
-      return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::nullopt};
+      return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, std::monostate()};
     }
     return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,
             absl::StrCat(address.ip()->port())};
@@ -157,7 +156,7 @@ public:
   Matcher::DataInputGetResult get(const MatchingDataType& data) const override {
     const auto& address = data.connectionInfoProvider().directRemoteAddress();
     if (address->type() != Network::Address::Type::Ip) {
-      return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::nullopt};
+      return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, std::monostate()};
     }
     return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,
             address->ip()->addressAsString()};
@@ -189,7 +188,7 @@ public:
     if (is_local_connection) {
       return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, "local"};
     }
-    return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::nullopt};
+    return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, std::monostate()};
   }
 };
 
@@ -217,7 +216,7 @@ public:
       return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,
               std::string(server_name)};
     }
-    return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::nullopt};
+    return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, std::monostate()};
   }
 };
 

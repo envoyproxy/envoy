@@ -154,7 +154,15 @@ public:
       return {MatchState::UnableToMatch, absl::nullopt};
     }
 
-    const auto current_match = input_matcher_->match(input.data_);
+    // const auto current_match = input_matcher_->match(input.data_);
+    // if (!input.data_.has_value()) {
+    //   return {MatchState::MatchComplete, false};
+    // }
+
+    if (absl::holds_alternative<std::monostate>(input.data_)) {
+      return {MatchState::MatchComplete, false};
+    }
+    bool current_match = input_matcher_->match(input.data_);
     if (!current_match && input.data_availability_ ==
                               DataInputGetResult::DataAvailability::MoreDataMightBeAvailable) {
       ENVOY_LOG(trace, "No match yet; delaying result as more data might be available.");

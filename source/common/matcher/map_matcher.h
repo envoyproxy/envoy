@@ -27,11 +27,14 @@ public:
       return {MatchState::UnableToMatch, absl::nullopt};
     }
 
-    if (!input.data_) {
+    // if (!input.data_) {
+    //   return {MatchState::MatchComplete, on_no_match_};
+    // }
+    // const auto result = doMatch(*input.data_);
+    if (absl::holds_alternative<std::monostate>(input.data_)) {
       return {MatchState::MatchComplete, on_no_match_};
     }
-
-    const auto result = doMatch(*input.data_);
+    const auto result = doMatch(absl::get<std::string>(input.data_));
     if (result) {
       if (result->matcher_) {
         return result->matcher_->match(data);

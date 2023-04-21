@@ -11,12 +11,20 @@ template <class StringMatcherType> class StringInputMatcher : public InputMatche
 public:
   explicit StringInputMatcher(const StringMatcherType& matcher) : matcher_(matcher) {}
 
-  bool match(absl::optional<absl::string_view> input) override {
-    if (!input) {
-      return false;
-    }
+  // bool match(absl::optional<absl::string_view> input) override {
+  //   if (!input) {
+  //     return false;
+  //   }
 
-    return matcher_.match(*input);
+  //   return matcher_.match(*input);
+  // }
+
+  bool match(const MatchingDataType& input) override {
+    if (absl::holds_alternative<std::string>(input)) {
+      return matcher_.match(absl::get<std::string>(input));
+    }
+    // TODO(tyxia) absl::holds_alternative achieve the same goal!!
+    return false;
   }
 
 private:
