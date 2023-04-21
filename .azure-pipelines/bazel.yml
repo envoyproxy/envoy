@@ -63,6 +63,11 @@ steps:
     key: '"${{ parameters.ciTarget }}" | "${{ parameters.artifactSuffix }}" | $(cacheKeyRepository)'
     path: $(Build.StagingDirectory)/repository_cache
   continueOnError: true
+- task: Cache@2
+  inputs:
+    key: '"${{ parameters.ciTarget }}__external" | $(cacheKeyRepository)'
+    path: $(Build.StagingDirectory)/tmp/output/base/external/
+  continueOnError: true
 
 - template: cached.yml
   parameters:

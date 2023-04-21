@@ -211,7 +211,11 @@ stages:
         key: 'format | $(cacheKeyRepository)'
         path: $(Build.StagingDirectory)/repository_cache
       continueOnError: true
-
+    - task: Cache@2
+      inputs:
+        key: 'format__external | $(cacheKeyRepository)'
+        path: $(Build.StagingDirectory)/tmp/output/base/external/
+      continueOnError: true
     - template: cached.yml
       parameters:
         version: "$(cacheKeyBuildImage)"
@@ -245,6 +249,11 @@ stages:
       inputs:
         key: 'proto_format | $(cacheKeyRepository)'
         path: $(Build.StagingDirectory)/repository_cache
+      continueOnError: true
+    - task: Cache@2
+      inputs:
+        key: 'proto_format__external | $(cacheKeyRepository)'
+        path: $(Build.StagingDirectory)/tmp/output/base/external/
       continueOnError: true
 
     - template: cached.yml
@@ -280,6 +289,11 @@ stages:
       inputs:
         key: 'docs | $(cacheKeyRepository)'
         path: $(Build.StagingDirectory)/repository_cache
+      continueOnError: true
+    - task: Cache@2
+      inputs:
+        key: 'docs__external | $(cacheKeyRepository)'
+        path: $(Build.StagingDirectory)/tmp/output/base/external/
       continueOnError: true
 
     - template: cached.yml
@@ -329,6 +343,11 @@ stages:
       inputs:
         key: 'dependencies | $(cacheKeyRepository)'
         path: $(Build.StagingDirectory)/repository_cache
+      continueOnError: true
+    - task: Cache@2
+      inputs:
+        key: 'dependencies__external | $(cacheKeyRepository)'
+        path: $(Build.StagingDirectory)/tmp/output/base/external/
       continueOnError: true
 
     - template: cached.yml
