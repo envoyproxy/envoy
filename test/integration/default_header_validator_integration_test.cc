@@ -327,4 +327,66 @@ TEST_P(DownstreamUhvIntegrationTest, ExtendedAsciiUriPathRejectedWithOverride) {
 #endif
 }
 
+// Without the `uhv_allow_malformed_url_encoding` override UHV rejects requests with malformed
+// percent encoding.
+TEST_P(DownstreamUhvIntegrationTest, MalformedUrlEncodedTripletsRejectedWithUhvOverride) {
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.uhv_allow_malformed_url_encoding",
+                                    "false");
+  config_helper_.addConfigModifier(
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             hcm) -> void { hcm.mutable_normalize_path()->set_value(true); });
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  // Start the request.
+  auto response = codec_client_->makeHeaderOnlyRequest(
+      Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                     {":path", "/path%Z%30with%XYbad%7Jencoding%A"},
+                                     {":scheme", "http"},
+                                     {":authority", "host"}});
+#ifdef ENVOY_ENABLE_UHV
+  // By default Envoy disconnects connection on protocol errors
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
+  if (downstream_protocol_ != Http::CodecType::HTTP2) {
+    ASSERT_TRUE(response->complete());
+    EXPECT_EQ("400", response->headers().getStatusValue());
+  } else {
+    ASSERT_TRUE(response->reset());
+    EXPECT_EQ(Http::StreamResetReason::ConnectionTermination, response->resetReason());
+  }
+#else
+  waitForNextUpstreamRequest();
+
+  EXPECT_EQ(upstream_request_->headers().getPathValue(), "/path%Z0with%XYbad%7Jencoding%A");
+
+  // Send a headers only response.
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  ASSERT_TRUE(response->waitForEndStream());
+#endif
+}
+
+// By default the `uhv_allow_malformed_url_encoding` == true and UHV behaves just like legacy path
+// normalization.
+TEST_P(DownstreamUhvIntegrationTest, MalformedUrlEncodedTripletsAllowed) {
+  config_helper_.addConfigModifier(
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             hcm) -> void { hcm.mutable_normalize_path()->set_value(true); });
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  // Start the request.
+  auto response = codec_client_->makeHeaderOnlyRequest(
+      Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                     {":path", "/path%Z%30with%XYbad%7Jencoding%"},
+                                     {":scheme", "http"},
+                                     {":authority", "host"}});
+  waitForNextUpstreamRequest();
+
+  EXPECT_EQ(upstream_request_->headers().getPathValue(), "/path%Z0with%XYbad%7Jencoding%");
+
+  // Send a headers only response.
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  ASSERT_TRUE(response->waitForEndStream());
+}
+
 } // namespace Envoy

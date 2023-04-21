@@ -5,11 +5,20 @@ behavior_changes:
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
+- area: connection pool
+  change: |
+    Increase granularity mapping connection pool failures to specific stream failure reasons to make it more transparent why
+    the stream is reset when a connection pool's connection fails.
 - area: uhv
   change: |
     Preserve case of %-encoded triplets in the default header validator. This behavior can be reverted by setting runtime flag
     ``envoy.reloadable_features.uhv_preserve_url_encoded_case`` to false, in which case %-encoded triplets are normalized
     to uppercase characters. This setting is only applicable when the Unversal Header Validator is enabled and has no effect otherwise.
+- area: uhv
+  change: |
+    Allow malformed URL encoded triplets in the default header validator. This behavior can be reverted by setting runtime flag
+    ``envoy.reloadable_features.uhv_allow_malformed_url_encoding`` to false, in which case requests with malformed URL encoded triplets
+    in path are rejected. This setting is only applicable when the Unversal Header Validator is enabled and has no effect otherwise.
 - area: uhv
   change: |
     Allow extended ASCII characters for HTTP/2 only in the default header validator. Extneded ASCII characters are URL encoded in the
@@ -25,5 +34,9 @@ removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
 
 new_features:
-
+- area: redis_proxy
+  change: |
+    added new configuration field :ref:`key_formatter
+    <envoy_v3_api_field_extensions.filters.network.redis_proxy.v3.RedisProxy.PrefixRoutes.Route.key_formatter>` to format redis key.
+    The field supports using %KEY% as a formatter command for substituting the redis key as part of the substitution formatter expression.
 deprecated:

@@ -22,7 +22,7 @@ using ::Envoy::Http::TestRequestTrailerMapImpl;
 using ::Envoy::Http::TestResponseHeaderMapImpl;
 using ::Envoy::Http::UhvResponseCodeDetail;
 
-class Http2HeaderValidatorTest : public HeaderValidatorTest {
+class Http2HeaderValidatorTest : public HeaderValidatorTest, public testing::Test {
 protected:
   Http2HeaderValidatorPtr createH2(absl::string_view config_yaml) {
     envoy::extensions::http::header_validators::envoy_default::v3::HeaderValidatorConfig

@@ -107,7 +107,9 @@ void CodecClient::onEvent(Network::ConnectionEvent event) {
                    active_requests_.size());
     disableIdleTimer();
     idle_timer_.reset();
-    StreamResetReason reason = StreamResetReason::ConnectionFailure;
+    StreamResetReason reason = event == Network::ConnectionEvent::RemoteClose
+                                   ? StreamResetReason::RemoteConnectionFailure
+                                   : StreamResetReason::LocalConnectionFailure;
     if (connected_) {
       reason = StreamResetReason::ConnectionTermination;
       if (protocol_error_) {

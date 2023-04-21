@@ -57,7 +57,7 @@ public:
 
 using BaseHttpHeaderValidatorPtr = std::unique_ptr<BaseHttpHeaderValidator>;
 
-class BaseHeaderValidatorTest : public HeaderValidatorTest {
+class BaseHeaderValidatorTest : public HeaderValidatorTest, public testing::Test {
 protected:
   BaseHttpHeaderValidatorPtr createBase(absl::string_view config_yaml) {
     envoy::extensions::http::header_validators::envoy_default::v3::HeaderValidatorConfig
