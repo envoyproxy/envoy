@@ -38,20 +38,29 @@ else
   DOCKER_USER_ARGS=()
   DOCKER_GROUP_ARGS=()
   DEFAULT_ENVOY_DOCKER_BUILD_DIR=/tmp/envoy-docker-build
+  USER_UID="$(id -u)"
+  USER_GID="$(id -g)"
   if [[ -n "$ENVOY_DOCKER_IN_DOCKER" ]]; then
       ENVOY_DOCKER_OPTIONS+=(-v /var/run/docker.sock:/var/run/docker.sock)
       DOCKER_GID="$(stat -c %g /var/run/docker.sock 2>/dev/null || stat -f %g /var/run/docker.sock)"
       DOCKER_USER_ARGS=(--gid "${DOCKER_GID}")
       DOCKER_GROUP_ARGS=(--gid "${DOCKER_GID}")
+  else
+      DOCKER_GROUP_ARGS+=(--gid "${USER_GID}")
+      DOCKER_USER_ARGS=(--gid "${USER_GID}")
   fi
   BUILD_DIR_MOUNT_DEST=/build
   SOURCE_DIR="${PWD}"
   SOURCE_DIR_MOUNT_DEST=/source
-  START_COMMAND=("/bin/bash" "-lc" "groupadd ${DOCKER_GROUP_ARGS[*]} -f envoygroup && useradd -o --uid $(id -u) ${DOCKER_USER_ARGS[*]} --no-create-home --home-dir /build envoybuild \
-    && usermod -a -G pcap envoybuild \
-    && chown envoybuild:envoygroup /build \
-    && chown envoybuild /proc/self/fd/2 \
-    && sudo -EHs -u envoybuild bash -c 'cd /source && $*'")
+  START_COMMAND=(
+      "/bin/bash"
+      "-lc"
+      "groupadd ${DOCKER_GROUP_ARGS[*]} -f envoygroup \
+          && useradd -o --uid ${USER_UID} ${DOCKER_USER_ARGS[*]} --no-create-home --home-dir /build envoybuild \
+          && usermod -a -G pcap envoybuild \
+          && chown envoybuild:envoygroup /build \
+          && chown envoybuild /proc/self/fd/2 \
+          && sudo -EHs -u envoybuild bash -c 'cd /source && $*'")
 fi
 
 # The IMAGE_ID defaults to the CI hash but can be set to an arbitrary image ID (found with 'docker

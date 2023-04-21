@@ -62,12 +62,12 @@ steps:
   inputs:
     key: '"${{ parameters.ciTarget }}" | "${{ parameters.artifactSuffix }}" | $(cacheKeyRepository)'
     path: $(Build.StagingDirectory)/repository_cache
-  continueOnError: true
+    cacheHitVar: CACHE_RESTORED
+    continueOnError: true
 - bash: |
-    echo "Fix repository_cache permissions ..."
-    find  $(Build.StagingDirectory)/repository_cache -name "*" -type d | xargs chmod +x
-    # TODO(phlax): remove this after fixing GID in run_envoy_docker.sh
-    sudo chgrp -R vsts $(Build.StagingDirectory)/repository_cache
+    mkdir -p $(Build.StagingDirectory)/repository_cache/
+    sudo tar xf $(Build.StagingDirectory)/repository_cache_cache/repository_cache.tar.zst -C $(Build.StagingDirectory)/repository_cache/
+  condition: and(not(canceled()), eq(variables.CACHE_RESTORED, 'true'))
 
 - template: cached.yml
   parameters:
@@ -120,6 +120,11 @@ steps:
       ${{ if ne(variables['Build.Reason'], 'PullRequest') }}:
         BAZEL_REMOTE_INSTANCE_BRANCH: "$(Build.SourceBranchName)"
   displayName: "Run CI script ${{ parameters.ciTarget }}"
+
+- bash: |
+    mkdir -p $(Build.StagingDirectory)/repository_cache_cache
+    tar cf $(Build.StagingDirectory)/repository_cache_cache/repository_cache.tar.zst -C $(Build.StagingDirectory)/repository_cache/ .
+  condition: and(not(canceled()), ne(variables.CACHE_RESTORED, 'true'))
 
 - bash: |
     echo "disk space at end of build:"

@@ -84,15 +84,13 @@ stages:
     steps:
     - task: Cache@2
       inputs:
-        key: 'format | "v0.dev0" | $(cacheKeyRepository)'
+        key: 'format | "v0.dev3" | $(cacheKeyRepository)'
         path: $(Build.StagingDirectory)/repository_cache_cache
         cacheHitVar: CACHE_RESTORED
       continueOnError: true
     - bash: |
         mkdir -p $(Build.StagingDirectory)/repository_cache/
-
         tar tfv $(Build.StagingDirectory)/repository_cache_cache/repository_cache.tar.zst
-
         sudo tar xf $(Build.StagingDirectory)/repository_cache_cache/repository_cache.tar.zst -C $(Build.StagingDirectory)/repository_cache/
       condition: and(not(canceled()), eq(variables.CACHE_RESTORED, 'true'))
 
@@ -140,7 +138,7 @@ stages:
 
     - bash: |
         mkdir -p $(Build.StagingDirectory)/repository_cache_cache
-        tar cf $(Build.StagingDirectory)/repository_cache_cache/repository_cache.tar.zst -C $(Build.StagingDirectory)/repository_cache/ .
+        sudo tar cf $(Build.StagingDirectory)/repository_cache_cache/repository_cache.tar.zst -C $(Build.StagingDirectory)/repository_cache/ .
       condition: and(not(canceled()), ne(variables.CACHE_RESTORED, 'true'))
 
   - job: fail
@@ -287,13 +285,12 @@ stages:
       inputs:
         key: 'format | $(cacheKeyRepository)'
         path: $(Build.StagingDirectory)/repository_cache
+        cacheHitVar: CACHE_RESTORED
       continueOnError: true
     - bash: |
-        echo "Fix repository_cache permissions ..."
-        find  $(Build.StagingDirectory)/repository_cache -name "*" -type d | xargs chmod +x
-        # TODO(phlax): remove this after fixing GID in run_envoy_docker.sh
-        sudo chgrp -R vsts $(Build.StagingDirectory)/repository_cache
-
+        mkdir -p $(Build.StagingDirectory)/repository_cache/
+        sudo tar xf $(Build.StagingDirectory)/repository_cache_cache/repository_cache.tar.zst -C $(Build.StagingDirectory)/repository_cache/
+      condition: and(not(canceled()), eq(variables.CACHE_RESTORED, 'true'))
     - template: cached.yml
       parameters:
         version: "$(cacheKeyBuildImage)"
@@ -309,6 +306,11 @@ stages:
         GCP_SERVICE_ACCOUNT_KEY: $(GcpServiceAccountKey)
         AZP_BRANCH: $(Build.SourceBranch)
       displayName: "Run format checks"
+
+    - bash: |
+        mkdir -p $(Build.StagingDirectory)/repository_cache_cache
+        tar cf $(Build.StagingDirectory)/repository_cache_cache/repository_cache.tar.zst -C $(Build.StagingDirectory)/repository_cache/ .
+      condition: and(not(canceled()), ne(variables.CACHE_RESTORED, 'true'))
     - task: PublishBuildArtifacts@1
       inputs:
         pathtoPublish: "$(Build.StagingDirectory)/fix_format.diff"
@@ -316,6 +318,7 @@ stages:
       timeoutInMinutes: 10
       # not all have fixes so improve condition/handling
       condition: failed()
+
 
   - job: proto_format
     displayName: Protobuf format
@@ -327,12 +330,12 @@ stages:
       inputs:
         key: 'proto_format | $(cacheKeyRepository)'
         path: $(Build.StagingDirectory)/repository_cache
+        cacheHitVar: CACHE_RESTORED
       continueOnError: true
     - bash: |
-        echo "Fix repository_cache permissions ..."
-        find  $(Build.StagingDirectory)/repository_cache -name "*" -type d | xargs chmod +x
-        # TODO(phlax): remove this after fixing GID in run_envoy_docker.sh
-        sudo chgrp -R vsts $(Build.StagingDirectory)/repository_cache
+        mkdir -p $(Build.StagingDirectory)/repository_cache/
+        sudo tar xf $(Build.StagingDirectory)/repository_cache_cache/repository_cache.tar.zst -C $(Build.StagingDirectory)/repository_cache/
+      condition: and(not(canceled()), eq(variables.CACHE_RESTORED, 'true'))
 
     - template: cached.yml
       parameters:
@@ -348,6 +351,11 @@ stages:
         BAZEL_REMOTE_INSTANCE: projects/envoy-ci/instances/default_instance
         GCP_SERVICE_ACCOUNT_KEY: $(GcpServiceAccountKey)
       displayName: "Run check format scripts"
+
+    - bash: |
+        mkdir -p $(Build.StagingDirectory)/repository_cache_cache
+        tar cf $(Build.StagingDirectory)/repository_cache_cache/repository_cache.tar.zst -C $(Build.StagingDirectory)/repository_cache/ .
+      condition: and(not(canceled()), ne(variables.CACHE_RESTORED, 'true'))
 
     - task: PublishBuildArtifacts@1
       inputs:
@@ -367,12 +375,12 @@ stages:
       inputs:
         key: 'docs | $(cacheKeyRepository)'
         path: $(Build.StagingDirectory)/repository_cache
+        cacheHitVar: CACHE_RESTORED
       continueOnError: true
     - bash: |
-        echo "Fix repository_cache permissions ..."
-        find  $(Build.StagingDirectory)/repository_cache -name "*" -type d | xargs chmod +x
-        # TODO(phlax): remove this after fixing GID in run_envoy_docker.sh
-        sudo chgrp -R vsts $(Build.StagingDirectory)/repository_cache
+        mkdir -p $(Build.StagingDirectory)/repository_cache/
+        sudo tar xf $(Build.StagingDirectory)/repository_cache_cache/repository_cache.tar.zst -C $(Build.StagingDirectory)/repository_cache/
+      condition: and(not(canceled()), eq(variables.CACHE_RESTORED, 'true'))
 
     - template: cached.yml
       parameters:
@@ -390,6 +398,11 @@ stages:
         BAZEL_REMOTE_INSTANCE: projects/envoy-ci/instances/default_instance
         GCP_SERVICE_ACCOUNT_KEY: $(GcpServiceAccountKey)
       displayName: "Generate docs"
+
+    - bash: |
+        mkdir -p $(Build.StagingDirectory)/repository_cache_cache
+        tar cf $(Build.StagingDirectory)/repository_cache_cache/repository_cache.tar.zst -C $(Build.StagingDirectory)/repository_cache/ .
+      condition: and(not(canceled()), ne(variables.CACHE_RESTORED, 'true'))
 
     - script: |
         DOCKER_CI_FIX_DIFF=$(Build.StagingDirectory)/fix_docker.diff DOCKER_CI_FIX=1 ci/test_docker_ci.sh
@@ -421,12 +434,12 @@ stages:
       inputs:
         key: 'dependencies | $(cacheKeyRepository)'
         path: $(Build.StagingDirectory)/repository_cache
+        cacheHitVar: CACHE_RESTORED
       continueOnError: true
     - bash: |
-        echo "Fix repository_cache permissions ..."
-        find  $(Build.StagingDirectory)/repository_cache -name "*" -type d | xargs chmod +x
-        # TODO(phlax): remove this after fixing GID in run_envoy_docker.sh
-        sudo chgrp -R vsts $(Build.StagingDirectory)/repository_cache
+        mkdir -p $(Build.StagingDirectory)/repository_cache/
+        sudo tar xf $(Build.StagingDirectory)/repository_cache_cache/repository_cache.tar.zst -C $(Build.StagingDirectory)/repository_cache/
+      condition: and(not(canceled()), eq(variables.CACHE_RESTORED, 'true'))
 
     - template: cached.yml
       parameters:
@@ -443,6 +456,12 @@ stages:
         GCP_SERVICE_ACCOUNT_KEY: $(GcpServiceAccountKey)
         GITHUB_TOKEN: $(GitHubPublicRepoOnlyAccessToken)
       displayName: "Verify dependency information"
+
+    - bash: |
+        mkdir -p $(Build.StagingDirectory)/repository_cache_cache
+        tar cf $(Build.StagingDirectory)/repository_cache_cache/repository_cache.tar.zst -C $(Build.StagingDirectory)/repository_cache/ .
+      condition: and(not(canceled()), ne(variables.CACHE_RESTORED, 'true'))
+
 
   - job: prechecked
     displayName: Prechecked
@@ -850,12 +869,12 @@ stages:
       inputs:
         key: 'docs | $(cacheKeyRepository)'
         path: $(Build.StagingDirectory)/repository_cache
+        cacheHitVar: CACHE_RESTORED
       continueOnError: true
     - bash: |
-        echo "Fix repository_cache permissions ..."
-        find  $(Build.StagingDirectory)/repository_cache -name "*" -type d | xargs chmod +x
-        # TODO(phlax): remove this after fixing GID in run_envoy_docker.sh
-        sudo chgrp -R vsts $(Build.StagingDirectory)/repository_cache
+        mkdir -p $(Build.StagingDirectory)/repository_cache/
+        sudo tar xf $(Build.StagingDirectory)/repository_cache_cache/repository_cache.tar.zst -C $(Build.StagingDirectory)/repository_cache/
+      condition: and(not(canceled()), eq(variables.CACHE_RESTORED, 'true'))
 
     - script: ci/run_envoy_docker.sh 'ci/do_ci.sh docs'
       workingDirectory: $(Build.SourcesDirectory)
@@ -868,6 +887,11 @@ stages:
         BAZEL_REMOTE_INSTANCE: projects/envoy-ci/instances/default_instance
         GCP_SERVICE_ACCOUNT_KEY: $(GcpServiceAccountKey)
       displayName: "Generate docs"
+
+    - bash: |
+        mkdir -p $(Build.StagingDirectory)/repository_cache_cache
+        tar cf $(Build.StagingDirectory)/repository_cache_cache/repository_cache.tar.zst -C $(Build.StagingDirectory)/repository_cache/ .
+      condition: and(not(canceled()), ne(variables.CACHE_RESTORED, 'true'))
 
     - script: |
         bazel run //tools/distribution:update_dockerhub_repository
