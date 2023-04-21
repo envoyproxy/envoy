@@ -20,6 +20,7 @@ using ::Envoy::Http::RequestHeaderMap;
 using ::Envoy::Http::RequestTrailerMap;
 using ::Envoy::Http::ResponseHeaderMap;
 using ::Envoy::Http::ResponseTrailerMap;
+using ::Envoy::Http::testCharInTable;
 using ::Envoy::Http::UhvResponseCodeDetail;
 
 class BaseHttpHeaderValidator : public HeaderValidator {
@@ -153,7 +154,7 @@ TEST_F(BaseHeaderValidatorTest, ValidateGenericHeaderName) {
     setHeaderStringUnvalidated(header_string, name);
 
     auto result = uhv->validateGenericHeaderName(header_string);
-    if (testChar(kGenericHeaderNameCharTable, c)) {
+    if (testCharInTable(::Envoy::Http::kGenericHeaderNameCharTable, c)) {
       EXPECT_ACCEPT(result);
     } else if (c != '_') {
       EXPECT_REJECT_WITH_DETAILS(result, UhvResponseCodeDetail::get().InvalidNameCharacters);
@@ -190,7 +191,7 @@ TEST_F(BaseHeaderValidatorTest, ValidateGenericHeaderValue) {
     setHeaderStringUnvalidated(header_string, name);
 
     auto result = uhv->validateGenericHeaderValue(header_string);
-    if (testChar(kGenericHeaderValueCharTable, c)) {
+    if (testCharInTable(kGenericHeaderValueCharTable, c)) {
       EXPECT_ACCEPT(result);
     } else {
       EXPECT_REJECT_WITH_DETAILS(result, UhvResponseCodeDetail::get().InvalidValueCharacters);
