@@ -100,7 +100,8 @@ stages:
 
         echo "================================="
         echo
-        find  $(Build.StagingDirectory)/repository_cache -name "*" | xargs ls -l
+        find  $(Build.StagingDirectory)/repository_cache -name "*" -type f | xargs ls -l
+        echo
         echo "================================="
         echo
         du -c $(Build.StagingDirectory)/repository_cache
@@ -125,7 +126,8 @@ stages:
 
         echo "================================="
         echo
-        find  $(Build.StagingDirectory)/repository_cache -name "*" | xargs ls -l
+        find  $(Build.StagingDirectory)/repository_cache -name "*" -type f | xargs ls -l
+        echo
         echo "================================="
         echo
         du -c $(Build.StagingDirectory)/repository_cache
