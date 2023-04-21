@@ -93,7 +93,6 @@ stages:
       condition: and(not(canceled()), eq(variables.CACHE_RESTORED, 'true'))
 
     - bash: |
-        # TODO(phlax): move this to a script to ensure proper linting etc
         set -e
 
         mkdir -p $(Build.StagingDirectory)/repository_cache
@@ -121,11 +120,6 @@ stages:
       displayName: "Run format checks"
 
     - bash: |
-        mkdir -p $(Build.StagingDirectory)/repository_cache_cache
-        tar cf $(Build.StagingDirectory)/repository_cache_cache/repository_cache.tar.zst -C $(Build.StagingDirectory)/repository_cache/ .
-      condition: and(not(canceled()), ne(variables.CACHE_RESTORED, 'true'))
-
-    - bash: |
         # TODO(phlax): move this to a script to ensure proper linting etc
         set -e
 
@@ -139,6 +133,19 @@ stages:
         echo
         echo "================================="
 
+    - bash: |
+        mkdir -p $(Build.StagingDirectory)/repository_cache_cache
+        tar cf $(Build.StagingDirectory)/repository_cache_cache/repository_cache.tar.zst -C $(Build.StagingDirectory)/repository_cache/ .
+      condition: and(not(canceled()), ne(variables.CACHE_RESTORED, 'true'))
+
+  - job: fail
+    displayName: Fail
+    dependsOn: ["debug"]
+    pool:
+      vmImage: "ubuntu-20.04"
+    steps:
+    - bash: |
+        set -e
         exit 1
 
   # Warm build image caches
