@@ -27,7 +27,7 @@ Network::FilterFactoryCb ZooKeeperConfigFactory::createFilterFactoryFromProtoTyp
   const std::string stat_prefix = fmt::format("{}.zookeeper", proto_config.stat_prefix());
   const uint32_t max_packet_bytes =
       PROTOBUF_GET_WRAPPED_OR_DEFAULT(proto_config, max_packet_bytes, 1024 * 1024);
-  LatencyThresholdList latency_thresholds = proto_config.latency_thresholds();
+  LatencyThresholdList& latency_thresholds = proto_config.latency_thresholds();
 
   // Check duplicated opcodes in config.
   std::set<envoy::extensions::filters::network::zookeeper_proxy::v3::LatencyThreshold_Opcode>
