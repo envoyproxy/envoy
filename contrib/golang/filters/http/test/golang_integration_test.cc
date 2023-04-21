@@ -244,8 +244,9 @@ typed_config:
     EXPECT_EQ(true,
               upstream_request_->headers().get(Http::LowerCaseString("x-test-header-1")).empty());
 
-    EXPECT_TRUE(absl::StrContains(
-        getHeader(upstream_request_->headers(), "req-downstream-local-address"), "127.0.0.1:"));
+    EXPECT_TRUE(
+        absl::StrContains(getHeader(upstream_request_->headers(), "req-downstream-local-address"),
+                          GetParam() == Network::Address::IpVersion::v4 ? "127.0.0.1:" : "[::1]:"));
 
     // check header value which is appended in golang: existed-header
     auto entries = upstream_request_->headers().get(Http::LowerCaseString("existed-header"));
