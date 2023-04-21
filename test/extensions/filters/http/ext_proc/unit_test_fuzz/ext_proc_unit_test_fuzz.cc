@@ -75,8 +75,7 @@ DEFINE_PROTO_FUZZER(
                               input.response());
                       filter->onReceiveMessage(std::move(response));
                     }));
-            // close is idempotent and only called once per filter
-            EXPECT_CALL(*stream, close()).WillOnce(Return(false));
+            ON_CALL(*stream, close()).WillByDefault(Return(false));
             return stream;
           }));
 
