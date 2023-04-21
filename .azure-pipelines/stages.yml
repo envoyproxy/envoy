@@ -84,7 +84,7 @@ stages:
     steps:
     - task: Cache@2
       inputs:
-        key: 'format | v0.dev0 | $(cacheKeyRepository)'
+        key: 'format | "v0.dev0" | $(cacheKeyRepository)'
         path: $(Build.StagingDirectory)/repository_cache_cache
         cacheHitVar: CACHE_RESTORED
       continueOnError: true
