@@ -38,7 +38,7 @@ TEST(MatchingData, DestinationIPInput) {
     const auto result = input.get(data);
     EXPECT_EQ(result.data_availability_,
               Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
-    EXPECT_TRUE(absl::holds_alternative<std::monostate>(result.data_));
+    EXPECT_TRUE(absl::holds_alternative<absl::monostate>(result.data_));
   }
 }
 
@@ -130,7 +130,7 @@ TEST(MatchingData, DestinationPortInput) {
     const auto result = input.get(data);
     EXPECT_EQ(result.data_availability_,
               Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
-    EXPECT_TRUE(absl::holds_alternative<std::monostate>(result.data_));
+    EXPECT_TRUE(absl::holds_alternative<absl::monostate>(result.data_));
   }
 }
 
@@ -156,7 +156,7 @@ TEST(MatchingData, SourceIPInput) {
     const auto result = input.get(data);
     EXPECT_EQ(result.data_availability_,
               Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
-    EXPECT_TRUE(absl::holds_alternative<std::monostate>(result.data_));
+    EXPECT_TRUE(absl::holds_alternative<absl::monostate>(result.data_));
   }
 }
 
@@ -182,7 +182,7 @@ TEST(MatchingData, SourcePortInput) {
     const auto result = input.get(data);
     EXPECT_EQ(result.data_availability_,
               Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
-    EXPECT_TRUE(absl::holds_alternative<std::monostate>(result.data_));
+    EXPECT_TRUE(absl::holds_alternative<absl::monostate>(result.data_));
   }
 }
 
@@ -208,7 +208,7 @@ TEST(MatchingData, DirectSourceIPInput) {
     const auto result = input.get(data);
     EXPECT_EQ(result.data_availability_,
               Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
-    EXPECT_TRUE(absl::holds_alternative<std::monostate>(result.data_));
+    EXPECT_TRUE(absl::holds_alternative<absl::monostate>(result.data_));
   }
 }
 
@@ -234,7 +234,7 @@ TEST(MatchingData, SourceTypeInput) {
     const auto result = input.get(data);
     EXPECT_EQ(result.data_availability_,
               Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
-    EXPECT_TRUE(absl::holds_alternative<std::monostate>(result.data_));
+    EXPECT_TRUE(absl::holds_alternative<absl::monostate>(result.data_));
   }
 }
 
@@ -249,7 +249,7 @@ TEST(MatchingData, ServerNameInput) {
     const auto result = input.get(data);
     EXPECT_EQ(result.data_availability_,
               Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
-    EXPECT_TRUE(absl::holds_alternative<std::monostate>(result.data_));
+    EXPECT_TRUE(absl::holds_alternative<absl::monostate>(result.data_));
   }
 
   {
@@ -274,7 +274,7 @@ TEST(MatchingData, TransportProtocolInput) {
     const auto result = input.get(data);
     EXPECT_EQ(result.data_availability_,
               Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
-    EXPECT_TRUE(absl::holds_alternative<std::monostate>(result.data_));
+    EXPECT_TRUE(absl::holds_alternative<absl::monostate>(result.data_));
   }
 
   {
@@ -300,7 +300,7 @@ TEST(MatchingData, ApplicationProtocolInput) {
     const auto result = input.get(data);
     EXPECT_EQ(result.data_availability_,
               Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
-    EXPECT_TRUE(absl::holds_alternative<std::monostate>(result.data_));
+    EXPECT_TRUE(absl::holds_alternative<absl::monostate>(result.data_));
   }
 
   {
@@ -339,7 +339,7 @@ TEST(MatchingData, FilterStateInput) {
     const auto result = input.get(data);
     EXPECT_EQ(result.data_availability_,
               Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
-    EXPECT_TRUE(absl::holds_alternative<std::monostate>(result.data_));
+    EXPECT_TRUE(absl::holds_alternative<absl::monostate>(result.data_));
   }
 
   filter_state.setData("unknown_key", std::make_shared<Router::StringAccessorImpl>("some_value"),
@@ -350,7 +350,7 @@ TEST(MatchingData, FilterStateInput) {
     const auto result = input.get(data);
     EXPECT_EQ(result.data_availability_,
               Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
-    EXPECT_TRUE(absl::holds_alternative<std::monostate>(result.data_));
+    EXPECT_TRUE(absl::holds_alternative<absl::monostate>(result.data_));
   }
 
   std::string value = "filter_state_value";
@@ -384,7 +384,7 @@ TEST(UdpMatchingData, UdpDestinationIPInput) {
     const auto result = input.get(data);
     EXPECT_EQ(result.data_availability_,
               Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
-    EXPECT_TRUE(absl::holds_alternative<std::monostate>(result.data_));
+    EXPECT_TRUE(absl::holds_alternative<absl::monostate>(result.data_));
   }
 }
 
@@ -406,7 +406,7 @@ TEST(UdpMatchingData, UdpDestinationPortInput) {
     const auto result = input.get(data);
     EXPECT_EQ(result.data_availability_,
               Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
-    EXPECT_TRUE(absl::holds_alternative<std::monostate>(result.data_));
+    EXPECT_TRUE(absl::holds_alternative<absl::monostate>(result.data_));
   }
 }
 
@@ -428,7 +428,7 @@ TEST(UdpMatchingData, UdpSourceIPInput) {
     const auto result = input.get(data);
     EXPECT_EQ(result.data_availability_,
               Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
-    EXPECT_TRUE(absl::holds_alternative<std::monostate>(result.data_));
+    EXPECT_TRUE(absl::holds_alternative<absl::monostate>(result.data_));
   }
 }
 
@@ -450,7 +450,7 @@ TEST(UdpMatchingData, UdpSourcePortInput) {
     const auto result = input.get(data);
     EXPECT_EQ(result.data_availability_,
               Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
-    EXPECT_TRUE(absl::holds_alternative<std::monostate>(result.data_));
+    EXPECT_TRUE(absl::holds_alternative<absl::monostate>(result.data_));
   }
 }
 

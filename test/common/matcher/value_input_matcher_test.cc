@@ -13,7 +13,7 @@ TEST(ValueInputMatcher, TestMatch) {
 
   EXPECT_TRUE(matcher.match(MatchingDataType("exact")));
   EXPECT_FALSE(matcher.match(MatchingDataType("not")));
-  EXPECT_FALSE(matcher.match(MatchingDataType(std::monostate())));
+  EXPECT_FALSE(matcher.match(MatchingDataType(absl::monostate())));
 }
 
 } // namespace Matcher

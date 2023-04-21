@@ -228,7 +228,7 @@ createSingleMatcher(absl::optional<absl::string_view> input,
   }
 
   return std::make_unique<SingleFieldMatcher<TestData>>(
-      std::make_unique<TestInput>(DataInputGetResult{availability, std::monostate()}),
+      std::make_unique<TestInput>(DataInputGetResult{availability, absl::monostate()}),
       std::make_unique<TestMatcher>(predicate));
 }
 

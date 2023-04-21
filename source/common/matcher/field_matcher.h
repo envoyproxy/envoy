@@ -159,7 +159,7 @@ public:
     //   return {MatchState::MatchComplete, false};
     // }
 
-    if (absl::holds_alternative<std::monostate>(input.data_)) {
+    if (absl::holds_alternative<absl::monostate>(input.data_)) {
       return {MatchState::MatchComplete, false};
     }
     bool current_match = input_matcher_->match(input.data_);

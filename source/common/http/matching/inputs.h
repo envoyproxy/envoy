@@ -26,7 +26,7 @@ public:
     const OptRef<const HeaderType> maybe_headers = headerMap(data);
 
     if (!maybe_headers) {
-      return {Matcher::DataInputGetResult::DataAvailability::NotAvailable, std::monostate()};
+      return {Matcher::DataInputGetResult::DataAvailability::NotAvailable, absl::monostate()};
     }
 
     auto header_string = HeaderUtility::getAllOfHeaderAsString(*maybe_headers, name_, ",");
@@ -36,7 +36,7 @@ public:
               std::string(header_string.result().value())};
     }
 
-    return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, std::monostate()};
+    return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::monostate()};
   }
 
 private:
@@ -153,12 +153,12 @@ public:
     const auto maybe_headers = data.requestHeaders();
 
     if (!maybe_headers) {
-      return {Matcher::DataInputGetResult::DataAvailability::NotAvailable, std::monostate()};
+      return {Matcher::DataInputGetResult::DataAvailability::NotAvailable, absl::monostate()};
     }
 
     const auto ret = maybe_headers->Path();
     if (!ret) {
-      return {Matcher::DataInputGetResult::DataAvailability::NotAvailable, std::monostate()};
+      return {Matcher::DataInputGetResult::DataAvailability::NotAvailable, absl::monostate()};
     }
 
     Utility::QueryParams params =
@@ -166,7 +166,7 @@ public:
 
     auto ItParam = params.find(query_param_);
     if (ItParam == params.end()) {
-      return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, std::monostate()};
+      return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::monostate()};
     }
     return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,
             std::move(ItParam->second)};

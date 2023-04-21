@@ -31,7 +31,7 @@ public:
     //   return {MatchState::MatchComplete, on_no_match_};
     // }
     // const auto result = doMatch(*input.data_);
-    if (absl::holds_alternative<std::monostate>(input.data_)) {
+    if (absl::holds_alternative<absl::monostate>(input.data_)) {
       return {MatchState::MatchComplete, on_no_match_};
     }
     const auto result = doMatch(absl::get<std::string>(input.data_));

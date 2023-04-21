@@ -61,7 +61,7 @@ public:
     Http::Matching::HttpMatchingDataImpl data(info);
     data.onRequestHeaders(headers);
     auto result = data_input_->get(data);
-    if (absl::holds_alternative<std::monostate>(result.data_)) {
+    if (absl::holds_alternative<absl::monostate>(result.data_)) {
       return false;
     }
     auto str = absl::get<std::string>(result.data_);

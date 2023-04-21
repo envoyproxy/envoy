@@ -15,7 +15,7 @@ Matcher::DataInputGetResult TransportProtocolInput::get(const MatchingData& data
     return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,
             std::string(transport_protocol)};
   }
-  return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, std::monostate()};
+  return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::monostate()};
 }
 
 Matcher::DataInputGetResult FilterStateInput::get(const MatchingData& data) const {
@@ -27,11 +27,11 @@ Matcher::DataInputGetResult FilterStateInput::get(const MatchingData& data) cons
     if (str.has_value()) {
       return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, str.value()};
     } else {
-      return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, std::monostate()};
+      return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::monostate()};
     }
   }
 
-  return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, std::monostate()};
+  return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::monostate()};
 }
 
 class DestinationIPInputFactory : public DestinationIPInputBaseFactory<MatchingData> {};

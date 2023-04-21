@@ -46,7 +46,7 @@ TEST(MatchingData, HttpRequestHeadersDataInput) {
     auto result = input.get(data);
     EXPECT_EQ(result.data_availability_,
               Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
-    EXPECT_TRUE(absl::holds_alternative<std::monostate>(result.data_));
+    EXPECT_TRUE(absl::holds_alternative<absl::monostate>(result.data_));
   }
 }
 
@@ -67,7 +67,7 @@ TEST(MatchingData, HttpRequestTrailersDataInput) {
     auto result = input.get(data);
     EXPECT_EQ(result.data_availability_,
               Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
-    EXPECT_TRUE(absl::holds_alternative<std::monostate>(result.data_));
+    EXPECT_TRUE(absl::holds_alternative<absl::monostate>(result.data_));
   }
 }
 
@@ -91,7 +91,7 @@ TEST(MatchingData, HttpResponseHeadersDataInput) {
     auto result = input.get(data);
     EXPECT_EQ(result.data_availability_,
               Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
-    EXPECT_TRUE(absl::holds_alternative<std::monostate>(result.data_));
+    EXPECT_TRUE(absl::holds_alternative<absl::monostate>(result.data_));
   }
 }
 
@@ -115,7 +115,7 @@ TEST(MatchingData, HttpResponseTrailersDataInput) {
     auto result = input.get(data);
     EXPECT_EQ(result.data_availability_,
               Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
-    EXPECT_TRUE(absl::holds_alternative<std::monostate>(result.data_));
+    EXPECT_TRUE(absl::holds_alternative<absl::monostate>(result.data_));
   }
 }
 
@@ -130,7 +130,7 @@ TEST(MatchingData, HttpRequestQueryParamsDataInput) {
     auto result = input.get(data);
     EXPECT_EQ(result.data_availability_,
               Matcher::DataInputGetResult::DataAvailability::NotAvailable);
-    EXPECT_TRUE(absl::holds_alternative<std::monostate>(result.data_));
+    EXPECT_TRUE(absl::holds_alternative<absl::monostate>(result.data_));
   }
 
   {
@@ -158,7 +158,7 @@ TEST(MatchingData, HttpRequestQueryParamsDataInput) {
 
     EXPECT_EQ(result.data_availability_,
               Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
-    EXPECT_TRUE(absl::holds_alternative<std::monostate>(result.data_));
+    EXPECT_TRUE(absl::holds_alternative<absl::monostate>(result.data_));
   }
 
   {
@@ -170,7 +170,7 @@ TEST(MatchingData, HttpRequestQueryParamsDataInput) {
 
     EXPECT_EQ(result.data_availability_,
               Matcher::DataInputGetResult::DataAvailability::NotAvailable);
-    EXPECT_TRUE(absl::holds_alternative<std::monostate>(result.data_));
+    EXPECT_TRUE(absl::holds_alternative<absl::monostate>(result.data_));
   }
 }
 
