@@ -282,7 +282,7 @@ typed_config:
     oauth_response.mutable_access_token()->set_value("bar");
     oauth_response.mutable_expires_in()->set_value(DateUtil::nowToSeconds(api_->timeSource()) + 10);
 
-    Buffer::OwnedImpl buffer(MessageUtil::getJsonStringFromMessageOrDie(oauth_response));
+    Buffer::OwnedImpl buffer(MessageUtil::getJsonStringFromMessageOrError(oauth_response));
     upstream_request_->encodeData(buffer, true);
 
     // We should get an immediate redirect back.

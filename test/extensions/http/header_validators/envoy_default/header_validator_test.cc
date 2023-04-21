@@ -17,7 +17,9 @@ using ::Envoy::Http::HeaderString;
 using ::Envoy::Http::HeaderValidatorStats;
 using ::Envoy::Http::Protocol;
 using ::Envoy::Http::RequestHeaderMap;
+using ::Envoy::Http::RequestTrailerMap;
 using ::Envoy::Http::ResponseHeaderMap;
+using ::Envoy::Http::ResponseTrailerMap;
 using ::Envoy::Http::UhvResponseCodeDetail;
 
 class BaseHttpHeaderValidator : public HeaderValidator {
@@ -28,36 +30,34 @@ public:
       Protocol protocol, HeaderValidatorStats& stats)
       : HeaderValidator(config, protocol, stats) {}
 
-  HeaderEntryValidationResult validateRequestHeaderEntry(const HeaderString&,
-                                                         const HeaderString&) override {
-    return HeaderEntryValidationResult::success();
+  ValidationResult validateRequestHeaders(const RequestHeaderMap&) override {
+    return ValidationResult::success();
   }
 
-  HeaderEntryValidationResult validateResponseHeaderEntry(const HeaderString&,
-                                                          const HeaderString&) override {
-    return HeaderEntryValidationResult::success();
+  HeadersTransformationResult transformRequestHeaders(RequestHeaderMap&) override {
+    return HeadersTransformationResult::success();
   }
 
-  RequestHeaderMapValidationResult validateRequestHeaderMap(RequestHeaderMap&) override {
-    return RequestHeaderMapValidationResult::success();
+  ValidationResult validateResponseHeaders(const ResponseHeaderMap&) override {
+    return ValidationResult::success();
   }
 
-  ResponseHeaderMapValidationResult validateResponseHeaderMap(ResponseHeaderMap&) override {
-    return ResponseHeaderMapValidationResult::success();
+  ValidationResult validateRequestTrailers(const RequestTrailerMap&) override {
+    return ValidationResult::success();
   }
 
-  TrailerValidationResult validateRequestTrailerMap(::Envoy::Http::RequestTrailerMap&) override {
-    return TrailerValidationResult::success();
+  TrailersTransformationResult transformRequestTrailers(RequestTrailerMap&) override {
+    return TrailersTransformationResult::success();
   }
 
-  TrailerValidationResult validateResponseTrailerMap(::Envoy::Http::ResponseTrailerMap&) override {
-    return TrailerValidationResult::success();
+  ValidationResult validateResponseTrailers(const ResponseTrailerMap&) override {
+    return ValidationResult::success();
   }
 };
 
 using BaseHttpHeaderValidatorPtr = std::unique_ptr<BaseHttpHeaderValidator>;
 
-class BaseHeaderValidatorTest : public HeaderValidatorTest {
+class BaseHeaderValidatorTest : public HeaderValidatorTest, public testing::Test {
 protected:
   BaseHttpHeaderValidatorPtr createBase(absl::string_view config_yaml) {
     envoy::extensions::http::header_validators::envoy_default::v3::HeaderValidatorConfig
@@ -169,15 +169,6 @@ TEST_F(BaseHeaderValidatorTest, ValidateGenericHeaderKeyInvalidEmpty) {
 
   EXPECT_REJECT_WITH_DETAILS(uhv->validateGenericHeaderName(invalid_empty),
                              UhvResponseCodeDetail::get().EmptyHeaderName);
-}
-
-TEST_F(BaseHeaderValidatorTest, ValidateGenericHeaderKeyDropUnderscores) {
-  HeaderString drop_underscore{"x_foo"};
-  auto uhv = createBase(drop_headers_with_underscores_config);
-
-  auto result = uhv->validateGenericHeaderName(drop_underscore);
-  EXPECT_EQ(result.action(), decltype(result)::Action::DropHeader);
-  EXPECT_EQ(result.details(), UhvResponseCodeDetail::get().InvalidUnderscore);
 }
 
 TEST_F(BaseHeaderValidatorTest, ValidateGenericHeaderKeyRejectDropUnderscores) {

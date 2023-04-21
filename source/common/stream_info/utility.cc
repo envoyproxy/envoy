@@ -4,7 +4,6 @@
 
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 
-#include "source/common/common/empty_string.h"
 #include "source/common/http/default_server_string.h"
 
 #include "absl/strings/str_format.h"
@@ -171,19 +170,6 @@ Utility::extractDownstreamAddressJustPort(const Network::Address::Instance& addr
     return address.ip()->port();
   }
   return {};
-}
-
-const std::string& Utility::getStreamStateString(const StreamState stream_state) {
-  switch (stream_state) {
-  case StreamState::Started:
-    return StreamStateStrings::get().StreamStarted;
-  case StreamState::InProgress:
-    return StreamStateStrings::get().StreamInProgress;
-  case StreamState::Ended:
-    return StreamStateStrings::get().StreamEnded;
-  }
-
-  return EMPTY_STRING;
 }
 
 const absl::optional<Http::Code>

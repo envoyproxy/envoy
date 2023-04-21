@@ -71,7 +71,7 @@ then
 fi
 
 # Environment setup.
-export TEST_TMPDIR="${TEST_TMPDIR:-$BUILD_DIR/tmp}"
+export ENVOY_TEST_TMPDIR="${ENVOY_TEST_TMPDIR:-$BUILD_DIR/tmp}"
 export LLVM_ROOT="${LLVM_ROOT:-/opt/llvm}"
 export PATH=${LLVM_ROOT}/bin:${PATH}
 export CLANG_FORMAT="${CLANG_FORMAT:-clang-format}"
@@ -89,9 +89,13 @@ function cleanup() {
 cleanup
 trap cleanup EXIT
 
-"$(dirname "$0")"/../bazel/setup_clang.sh "${LLVM_ROOT}"
+if [[ -e "${LLVM_ROOT}" ]]; then
+    "$(dirname "$0")/../bazel/setup_clang.sh" "${LLVM_ROOT}"
+else
+    echo "LLVM_ROOT not found, not setting up llvm."
+fi
 
-if [[ "${BUILD_REASON}" != "PullRequest" ]]; then
+if [[ -n "$BAZEL_NO_CACHE_TEST_RESULTS" ]]; then
     VERSION_DEV="$(cut -d- -f2 "${ENVOY_SRCDIR}/VERSION.txt")"
     # Use uncached test results for non-release commits to a branch.
     if [[ $VERSION_DEV == "dev" ]]; then
@@ -116,6 +120,23 @@ BAZEL_BUILD_OPTIONS=(
 
 [[ "${ENVOY_BUILD_ARCH}" == "aarch64" ]] && BAZEL_BUILD_OPTIONS+=(
   "--test_env=HEAPCHECK=")
+
+if [[ -z "${ENVOY_RBE}" ]]; then
+    export BAZEL_BUILD_OPTIONS+=("--test_tmpdir=${ENVOY_TEST_TMPDIR}")
+    echo "Setting test_tmpdir to ${ENVOY_TEST_TMPDIR}."
+fi
+
+_bazel="$(which bazel)"
+
+bazel () {
+    BAZEL_STARTUP_OPTIONS=(
+        "--output_user_root=${ENVOY_TEST_TMPDIR}/output")
+    "$_bazel" "${BAZEL_STARTUP_OPTIONS[@]}" "$@"
+}
+
+export _bazel
+export BAZEL_STARTUP_OPTIONS
+export -f bazel
 
 [[ "${BAZEL_EXPUNGE}" == "1" ]] && bazel clean --expunge
 

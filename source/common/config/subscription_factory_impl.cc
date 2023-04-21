@@ -70,6 +70,11 @@ SubscriptionPtr SubscriptionFactoryImpl::subscriptionFromConfigSource(
       CustomConfigValidatorsPtr custom_config_validators =
           std::make_unique<CustomConfigValidatorsImpl>(validation_visitor_, server_,
                                                        api_config_source.config_validators());
+
+      JitteredExponentialBackOffStrategyPtr backoff_strategy =
+          Utility::prepareJitteredExponentialBackOffStrategy(
+              api_config_source, api_.randomGenerator(), RetryInitialDelayMs, RetryMaxDelayMs);
+
       const std::string control_plane_id =
           Utility::getGrpcControlPlane(api_config_source).value_or("");
 
@@ -81,7 +86,8 @@ SubscriptionPtr SubscriptionFactoryImpl::subscriptionFromConfigSource(
             dispatcher_, sotwGrpcMethod(type_url), api_.randomGenerator(), scope,
             Utility::parseRateLimitSettings(api_config_source), local_info_,
             api_config_source.set_node_on_first_message_only(), std::move(custom_config_validators),
-            xds_config_tracker_, xds_resources_delegate_, control_plane_id);
+            std::move(backoff_strategy), xds_config_tracker_, xds_resources_delegate_,
+            control_plane_id);
       } else {
         mux = std::make_shared<Config::GrpcMuxImpl>(
             local_info_,
@@ -91,7 +97,8 @@ SubscriptionPtr SubscriptionFactoryImpl::subscriptionFromConfigSource(
             dispatcher_, sotwGrpcMethod(type_url), api_.randomGenerator(), scope,
             Utility::parseRateLimitSettings(api_config_source),
             api_config_source.set_node_on_first_message_only(), std::move(custom_config_validators),
-            xds_config_tracker_, xds_resources_delegate_, control_plane_id);
+            std::move(backoff_strategy), xds_config_tracker_, xds_resources_delegate_,
+            control_plane_id);
       }
       return std::make_unique<GrpcSubscriptionImpl>(
           std::move(mux), callbacks, resource_decoder, stats, type_url, dispatcher_,
@@ -103,6 +110,11 @@ SubscriptionPtr SubscriptionFactoryImpl::subscriptionFromConfigSource(
       CustomConfigValidatorsPtr custom_config_validators =
           std::make_unique<CustomConfigValidatorsImpl>(validation_visitor_, server_,
                                                        api_config_source.config_validators());
+
+      JitteredExponentialBackOffStrategyPtr backoff_strategy =
+          Utility::prepareJitteredExponentialBackOffStrategy(
+              api_config_source, api_.randomGenerator(), RetryInitialDelayMs, RetryMaxDelayMs);
+
       if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.unified_mux")) {
         mux = std::make_shared<Config::XdsMux::GrpcMuxDelta>(
             Utility::factoryForGrpcApiConfigSource(cm_.grpcAsyncClientManager(), api_config_source,
@@ -111,7 +123,7 @@ SubscriptionPtr SubscriptionFactoryImpl::subscriptionFromConfigSource(
             dispatcher_, deltaGrpcMethod(type_url), api_.randomGenerator(), scope,
             Utility::parseRateLimitSettings(api_config_source), local_info_,
             api_config_source.set_node_on_first_message_only(), std::move(custom_config_validators),
-            xds_config_tracker_);
+            std::move(backoff_strategy), xds_config_tracker_);
       } else {
         mux = std::make_shared<Config::NewGrpcMuxImpl>(
             Config::Utility::factoryForGrpcApiConfigSource(cm_.grpcAsyncClientManager(),
@@ -119,7 +131,7 @@ SubscriptionPtr SubscriptionFactoryImpl::subscriptionFromConfigSource(
                 ->createUncachedRawAsyncClient(),
             dispatcher_, deltaGrpcMethod(type_url), api_.randomGenerator(), scope,
             Utility::parseRateLimitSettings(api_config_source), local_info_,
-            std::move(custom_config_validators), xds_config_tracker_);
+            std::move(custom_config_validators), std::move(backoff_strategy), xds_config_tracker_);
       }
       return std::make_unique<GrpcSubscriptionImpl>(
           std::move(mux), callbacks, resource_decoder, stats, type_url, dispatcher_,
@@ -191,6 +203,10 @@ SubscriptionPtr SubscriptionFactoryImpl::collectionSubscriptionFromUrl(
           std::make_unique<CustomConfigValidatorsImpl>(validation_visitor_, server_,
                                                        api_config_source.config_validators());
 
+      JitteredExponentialBackOffStrategyPtr backoff_strategy =
+          Utility::prepareJitteredExponentialBackOffStrategy(
+              api_config_source, api_.randomGenerator(), RetryInitialDelayMs, RetryMaxDelayMs);
+
       SubscriptionOptions options;
       // All Envoy collections currently are xDS resource graph roots and require node context
       // parameters.
@@ -206,7 +222,8 @@ SubscriptionPtr SubscriptionFactoryImpl::collectionSubscriptionFromUrl(
                     ->createUncachedRawAsyncClient(),
                 dispatcher_, deltaGrpcMethod(type_url), api_.randomGenerator(), scope,
                 Utility::parseRateLimitSettings(api_config_source), local_info_,
-                std::move(custom_config_validators), xds_config_tracker_),
+                std::move(custom_config_validators), std::move(backoff_strategy),
+                xds_config_tracker_),
             callbacks, resource_decoder, stats, dispatcher_,
             Utility::configSourceInitialFetchTimeout(config), /*is_aggregated=*/false, options);
       }

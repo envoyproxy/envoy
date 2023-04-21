@@ -63,7 +63,7 @@ public:
 
 class MockStreamInfo : public StreamInfo {
 public:
-  MockStreamInfo();
+  MockStreamInfo(FilterState::LifeSpan life_span = FilterState::LifeSpan::FilterChain);
   ~MockStreamInfo() override;
 
   // StreamInfo::StreamInfo
@@ -92,8 +92,6 @@ public:
               (const absl::optional<std::string>& virtual_cluster_name));
   MOCK_METHOD(const std::string&, getRouteName, (), (const));
   MOCK_METHOD(const absl::optional<std::string>&, virtualClusterName, (), (const));
-  MOCK_METHOD(absl::optional<StreamState>, streamState, (), (const));
-  MOCK_METHOD(void, setStreamState, (StreamState stream_state));
   MOCK_METHOD(absl::optional<Http::Protocol>, protocol, (), (const));
   MOCK_METHOD(void, protocol, (Http::Protocol protocol));
   MOCK_METHOD(absl::optional<uint32_t>, responseCode, (), (const));
@@ -145,7 +143,6 @@ public:
   MonotonicTime start_time_monotonic_;
   absl::optional<std::chrono::nanoseconds> end_time_;
   absl::optional<Http::Protocol> protocol_;
-  absl::optional<StreamState> stream_state_;
   absl::optional<uint32_t> response_code_;
   absl::optional<std::string> response_code_details_;
   absl::optional<std::string> connection_termination_details_;

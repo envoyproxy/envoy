@@ -71,11 +71,11 @@ MockUpstreamInfo::MockUpstreamInfo()
 
 MockUpstreamInfo::~MockUpstreamInfo() = default;
 
-MockStreamInfo::MockStreamInfo()
+MockStreamInfo::MockStreamInfo(FilterState::LifeSpan life_span)
     : start_time_(ts_.systemTime()),
       // upstream
       upstream_info_(std::make_shared<testing::NiceMock<MockUpstreamInfo>>()),
-      filter_state_(std::make_shared<FilterStateImpl>(FilterState::LifeSpan::FilterChain)),
+      filter_state_(std::make_shared<FilterStateImpl>(life_span)),
       downstream_connection_info_provider_(std::make_shared<Network::ConnectionInfoSetterImpl>(
           std::make_shared<Network::Address::Ipv4Instance>("127.0.0.2"),
           std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1"))) {
@@ -123,7 +123,6 @@ MockStreamInfo::MockStreamInfo()
       }));
   ON_CALL(*this, downstreamAddressProvider())
       .WillByDefault(ReturnPointee(downstream_connection_info_provider_));
-  ON_CALL(*this, streamState()).WillByDefault(ReturnPointee(&stream_state_));
   ON_CALL(*this, protocol()).WillByDefault(ReturnPointee(&protocol_));
   ON_CALL(*this, responseCode()).WillByDefault(ReturnPointee(&response_code_));
   ON_CALL(*this, responseCodeDetails()).WillByDefault(ReturnPointee(&response_code_details_));

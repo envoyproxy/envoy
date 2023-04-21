@@ -135,6 +135,25 @@ constexpr uint32_t kPathHeaderCharTable[] = {
     0b00000000000000000000000000000000,
 };
 
+// Same table as above but with the backslash character allowed
+// This table is used when the "envoy.reloadable_features.uhv_translate_backslash_to_slash"
+// runtime keys is set to "true".
+constexpr uint32_t kPathHeaderCharTableWithBackSlashAllowed[] = {
+    // control characters
+    0b00000000000000000000000000000000,
+    // !"#$%&'()*+,-./0123456789:;<=>?
+    0b01001111111111111111111111110100,
+    //@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\]^_
+    0b11111111111111111111111111101001,
+    //`abcdefghijklmnopqrstuvwxyz{|}~
+    0b01111111111111111111111111100010,
+    // extended ascii
+    0b00000000000000000000000000000000,
+    0b00000000000000000000000000000000,
+    0b00000000000000000000000000000000,
+    0b00000000000000000000000000000000,
+};
+
 // Unreserved characters.
 // From RFC 3986: https://datatracker.ietf.org/doc/html/rfc3986#section-2.3
 //
