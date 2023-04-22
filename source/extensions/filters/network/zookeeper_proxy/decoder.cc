@@ -620,7 +620,7 @@ void DecoderImpl::decode(Buffer::Instance& data, DecodeType dtype) {
 }
 
 void DecoderImpl::parseConnectResponse(Buffer::Instance& data, uint64_t& offset, uint32_t len,
-                                       const std::chrono::milliseconds& latency) {
+                                       const std::chrono::milliseconds latency) {
   ensureMinLength(len, PROTOCOL_VERSION_LENGTH + TIMEOUT_LENGTH + SESSION_LENGTH + INT_LENGTH);
 
   const auto timeout = helper_.peekInt32(data, offset);

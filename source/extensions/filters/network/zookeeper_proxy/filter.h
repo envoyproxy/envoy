@@ -148,11 +148,9 @@ struct ZooKeeperProxyStats {
 
 enum class ErrorBudgetResponseType { FAST, SLOW, NONE };
 
-using LatencyThresholdList = const Protobuf::RepeatedPtrField<
-    envoy::extensions::filters::network::zookeeper_proxy::v3::LatencyThreshold>;
-using LatencyThreshold_Opcode =
-    envoy::extensions::filters::network::zookeeper_proxy::v3::LatencyThreshold_Opcode;
-using LatencyThreshold = envoy::extensions::filters::network::zookeeper_proxy::v3::LatencyThreshold;
+using envoy::extensions::filters::network::zookeeper_proxy::v3::LatencyThreshold;
+using envoy::extensions::filters::network::zookeeper_proxy::v3::LatencyThreshold_Opcode;
+using LatencyThresholdList = Protobuf::RepeatedPtrField<LatencyThreshold>;
 
 /**
  * Configuration for the ZooKeeper proxy filter.
@@ -160,7 +158,7 @@ using LatencyThreshold = envoy::extensions::filters::network::zookeeper_proxy::v
 class ZooKeeperFilterConfig {
 public:
   ZooKeeperFilterConfig(const std::string& stat_prefix, uint32_t max_packet_bytes,
-                        LatencyThresholdList& latency_thresholds, Stats::Scope& scope);
+                        const LatencyThresholdList& latency_thresholds, Stats::Scope& scope);
 
   const ZooKeeperProxyStats& stats() { return stats_; }
   uint32_t maxPacketBytes() const { return max_packet_bytes_; }
@@ -189,7 +187,7 @@ public:
   const Stats::StatName unknown_opcode_latency_;
 
   ErrorBudgetResponseType errorBudgetDecision(const OpCodes opcode,
-                                              const std::chrono::milliseconds& latency);
+                                              const std::chrono::milliseconds latency) const;
 
 private:
   void initOpCode(OpCodes opcode, Stats::Counter& resp_counter, Stats::Counter& resp_fast_counter,
@@ -201,9 +199,8 @@ private:
 
   int32_t getOpCodeIndex(LatencyThreshold_Opcode opcode);
   absl::flat_hash_map<int32_t, std::chrono::milliseconds>
-  parseLatencyThresholds(LatencyThresholdList& latency_thresholds);
-  std::chrono::milliseconds getDefaultLatencyThreshold(
-      const absl::flat_hash_map<int32_t, std::chrono::milliseconds> latency_threshold_map);
+  parseLatencyThresholds(const LatencyThresholdList& latency_thresholds);
+  std::chrono::milliseconds getDefaultLatencyThreshold();
 
   // Key: opcode enum value defined in decoder.h, value: latency threshold in millisecond.
   const absl::flat_hash_map<int32_t, std::chrono::milliseconds> latency_threshold_map_;
@@ -256,9 +253,9 @@ public:
   void onCloseRequest() override;
   void onResponseBytes(uint64_t bytes) override;
   void onConnectResponse(int32_t proto_version, int32_t timeout, bool readonly,
-                         const std::chrono::milliseconds& latency) override;
+                         const std::chrono::milliseconds latency) override;
   void onResponse(OpCodes opcode, int32_t xid, int64_t zxid, int32_t error,
-                  const std::chrono::milliseconds& latency) override;
+                  const std::chrono::milliseconds latency) override;
   void onWatchEvent(int32_t event_type, int32_t client_state, const std::string& path, int64_t zxid,
                     int32_t error) override;
 

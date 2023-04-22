@@ -22,7 +22,7 @@ namespace ZooKeeperProxy {
 
 ZooKeeperFilterConfig::ZooKeeperFilterConfig(const std::string& stat_prefix,
                                              const uint32_t max_packet_bytes,
-                                             LatencyThresholdList& latency_thresholds,
+                                             const LatencyThresholdList& latency_thresholds,
                                              Stats::Scope& scope)
     : scope_(scope), max_packet_bytes_(max_packet_bytes), stats_(generateStats(stat_prefix, scope)),
       stat_name_set_(scope.symbolTable().makeSet("Zookeeper")),
@@ -31,7 +31,7 @@ ZooKeeperFilterConfig::ZooKeeperFilterConfig(const std::string& stat_prefix,
       unknown_scheme_rq_(stat_name_set_->add("unknown_scheme_rq")),
       unknown_opcode_latency_(stat_name_set_->add("unknown_opcode_latency")),
       latency_threshold_map_(parseLatencyThresholds(latency_thresholds)),
-      default_latency_threshold_(getDefaultLatencyThreshold(latency_threshold_map_)) {
+      default_latency_threshold_(getDefaultLatencyThreshold()) {
   // https://zookeeper.apache.org/doc/r3.5.4-beta/zookeeperProgrammers.html#sc_BuiltinACLSchemes
   // lists commons schemes: "world", "auth", "digest", "host", "x509", and
   // "ip". These are used in filter.cc by appending "_rq".
@@ -94,7 +94,7 @@ ZooKeeperFilterConfig::ZooKeeperFilterConfig(const std::string& stat_prefix,
 
 ErrorBudgetResponseType
 ZooKeeperFilterConfig::errorBudgetDecision(const OpCodes opcode,
-                                           const std::chrono::milliseconds& latency) {
+                                           const std::chrono::milliseconds latency) const {
   if (latency_threshold_map_.empty()) {
     return ErrorBudgetResponseType::NONE;
   }
@@ -162,7 +162,7 @@ int32_t ZooKeeperFilterConfig::getOpCodeIndex(LatencyThreshold_Opcode opcode) {
 }
 
 absl::flat_hash_map<int32_t, std::chrono::milliseconds>
-ZooKeeperFilterConfig::parseLatencyThresholds(LatencyThresholdList& latency_thresholds) {
+ZooKeeperFilterConfig::parseLatencyThresholds(const LatencyThresholdList& latency_thresholds) {
   absl::flat_hash_map<int32_t, std::chrono::milliseconds> latency_threshold_map;
   for (const auto& threshold : latency_thresholds) {
     latency_threshold_map[getOpCodeIndex(threshold.opcode())] =
@@ -171,15 +171,14 @@ ZooKeeperFilterConfig::parseLatencyThresholds(LatencyThresholdList& latency_thre
   return latency_threshold_map;
 }
 
-std::chrono::milliseconds ZooKeeperFilterConfig::getDefaultLatencyThreshold(
-    const absl::flat_hash_map<int32_t, std::chrono::milliseconds> latency_threshold_map) {
-  if (latency_threshold_map.empty()) {
+std::chrono::milliseconds ZooKeeperFilterConfig::getDefaultLatencyThreshold() {
+  if (latency_threshold_map_.empty()) {
     return std::chrono::milliseconds(0);
   }
 
   std::chrono::milliseconds default_latency_threshold(100);
-  auto it = latency_threshold_map.find(-999);
-  if (it != latency_threshold_map.end()) {
+  auto it = latency_threshold_map_.find(-999);
+  if (it != latency_threshold_map_.end()) {
     default_latency_threshold = it->second;
   }
   return default_latency_threshold;
@@ -407,7 +406,7 @@ void ZooKeeperFilter::onCloseRequest() {
 
 void ZooKeeperFilter::onConnectResponse(const int32_t proto_version, const int32_t timeout,
                                         const bool readonly,
-                                        const std::chrono::milliseconds& latency) {
+                                        const std::chrono::milliseconds latency) {
   config_->stats_.connect_resp_.inc();
 
   switch (config_->errorBudgetDecision(OpCodes::Connect, latency)) {
@@ -434,7 +433,7 @@ void ZooKeeperFilter::onConnectResponse(const int32_t proto_version, const int32
 }
 
 void ZooKeeperFilter::onResponse(const OpCodes opcode, const int32_t xid, const int64_t zxid,
-                                 const int32_t error, const std::chrono::milliseconds& latency) {
+                                 const int32_t error, const std::chrono::milliseconds latency) {
   Stats::StatName opcode_latency = config_->unknown_opcode_latency_;
   std::string opname = "";
   auto iter = config_->op_code_map_.find(opcode);

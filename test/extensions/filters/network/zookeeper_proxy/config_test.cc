@@ -132,6 +132,46 @@ stat_prefix: test_prefix
   cb(connection);
 }
 
+TEST(ZookeeperFilterConfigTest, ConfigWithDefaultLatencyThreshold) {
+  const std::string yaml = R"EOF(
+stat_prefix: test_prefix
+latency_thresholds:
+  - opcode: Default
+    threshold: "0.15s"
+  )EOF";
+
+  ZooKeeperProxyProtoConfig proto_config;
+  TestUtility::loadFromYamlAndValidate(yaml, proto_config);
+
+  testing::NiceMock<Server::Configuration::MockFactoryContext> context;
+  ZooKeeperConfigFactory factory;
+
+  Network::FilterFactoryCb cb = factory.createFilterFactoryFromProto(proto_config, context);
+  Network::MockConnection connection;
+  EXPECT_CALL(connection, addFilter(_));
+  cb(connection);
+}
+
+TEST(ZookeeperFilterConfigTest, ConfigWithConnectLatencyThreshold) {
+  const std::string yaml = R"EOF(
+stat_prefix: test_prefix
+latency_thresholds:
+  - opcode: Connect
+    threshold: "0.151s"
+  )EOF";
+
+  ZooKeeperProxyProtoConfig proto_config;
+  TestUtility::loadFromYamlAndValidate(yaml, proto_config);
+
+  testing::NiceMock<Server::Configuration::MockFactoryContext> context;
+  ZooKeeperConfigFactory factory;
+
+  Network::FilterFactoryCb cb = factory.createFilterFactoryFromProto(proto_config, context);
+  Network::MockConnection connection;
+  EXPECT_CALL(connection, addFilter(_));
+  cb(connection);
+}
+
 TEST(ZookeeperFilterConfigTest, FullConfig) {
   const std::string yaml = R"EOF(
 stat_prefix: test_prefix
