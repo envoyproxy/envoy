@@ -110,7 +110,6 @@ public:
   static Json::ObjectSharedPtr
   jsonLoadFromString(const std::string& json,
                      Network::Address::IpVersion version = Network::Address::IpVersion::v4);
-
 };
 
 } // namespace Envoy

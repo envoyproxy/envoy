@@ -266,6 +266,8 @@ std::string CommonTestEnvironment::readFileToStringForTest(const std::string& fi
   return Filesystem::fileSystemForTest().fileReadToEnd(filename);
 }
 
+// This function is not used for Envoy Mobile tests, and ::system() is not supported on iOS.
+#ifndef TARGET_OS_IOS
 void CommonTestEnvironment::exec(const std::vector<std::string>& args) {
   std::stringstream cmd;
   // Symlinked args[0] can confuse Python when importing module relative, so we let Python know
@@ -280,6 +282,7 @@ void CommonTestEnvironment::exec(const std::vector<std::string>& args) {
     RELEASE_ASSERT(false, "");
   }
 }
+#endif
 
 std::string CommonTestEnvironment::writeStringToFileForTest(const std::string& filename,
                                                             const std::string& contents,
