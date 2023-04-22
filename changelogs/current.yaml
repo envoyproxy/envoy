@@ -35,6 +35,6 @@ new_features:
 - area: ratelimit
   change: |
     added new configuration field :ref:`domain
-    <envoy_v3_api_field_extensions.filters.http.ratelimit.v3.RateLimitPerRoute.domain> to allow for setting rate limit domains on a
+    <envoy_v3_api_field_extensions.filters.http.ratelimit.v3.RateLimitPerRoute.domain>` to allow for setting rate limit domains on a
     per-route basis.
 deprecated:
