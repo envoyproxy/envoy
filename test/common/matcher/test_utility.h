@@ -102,7 +102,7 @@ private:
 struct BoolMatcher : public InputMatcher {
   explicit BoolMatcher(bool value) : value_(value) {}
 
-  bool match(const Matcher::MatchingDataType&) override { return value_; }
+  bool match(const MatchingDataType&) override { return value_; }
 
   const bool value_;
 };
@@ -112,7 +112,10 @@ struct TestMatcher : public InputMatcher {
   explicit TestMatcher(std::function<bool(absl::optional<absl::string_view>)> predicate)
       : predicate_(predicate) {}
 
-  bool match(const Matcher::MatchingDataType& input) override {
+  bool match(const MatchingDataType& input) override {
+    if (absl::holds_alternative<absl::monostate>(input)) {
+      return false;
+    }
     return predicate_(absl::get<std::string>(input));
   }
 
@@ -146,7 +149,7 @@ public:
 // An InputMatcher that always returns false.
 class NeverMatch : public InputMatcher {
 public:
-  bool match(const Matcher::MatchingDataType&) override { return false; }
+  bool match(const MatchingDataType&) override { return false; }
 };
 
 /**
@@ -175,7 +178,7 @@ public:
 class CustomStringMatcher : public InputMatcher {
 public:
   explicit CustomStringMatcher(const std::string& str) : str_value_(str) {}
-  bool match(const Matcher::MatchingDataType& input) override {
+  bool match(const MatchingDataType& input) override {
     return str_value_ == absl::get<std::string>(input);
   }
 
