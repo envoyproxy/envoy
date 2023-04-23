@@ -518,9 +518,9 @@ void OAuth2Filter::onGetAccessTokenSuccess(const std::string& access_code,
 }
 
 void OAuth2Filter::onRefreshAccessTokenSuccess(const std::string& access_code,
-                                              const std::string& id_token,
-                                              const std::string& refresh_token,
-                                              std::chrono::seconds expires_in) {
+                                               const std::string& id_token,
+                                               const std::string& refresh_token,
+                                               std::chrono::seconds expires_in) {
   ASSERT(config_->useRefreshToken());
   updateTokens(access_code, id_token, refresh_token, expires_in);
   finishUpdateAccessTokenFlow();
