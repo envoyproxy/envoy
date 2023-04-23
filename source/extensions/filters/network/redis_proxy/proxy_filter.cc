@@ -88,6 +88,7 @@ void ProxyFilter::initializeReadFilterCallbacks(Network::ReadFilterCallbacks& ca
                                                config_->stats_.downstream_cx_tx_bytes_total_,
                                                config_->stats_.downstream_cx_tx_bytes_buffered_,
                                                nullptr, nullptr});
+  splitter_.setReadFilterCallback(callbacks_);
 }
 
 void ProxyFilter::onRespValue(Common::Redis::RespValuePtr&& value) {

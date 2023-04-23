@@ -918,7 +918,7 @@ TEST_F(OverloadManagerLoadShedPointImplTest, ThrowsIfDuplicateTrigger) {
                           "Duplicate trigger resource for LoadShedPoint .*");
 }
 
-TEST_F(OverloadManagerLoadShedPointImplTest, ShouldWarnIfNonExistentLoadShedPointRequested) {
+TEST_F(OverloadManagerLoadShedPointImplTest, ShouldLogIfNonExistentLoadShedPointRequested) {
   setDispatcherExpectation();
   const std::string config = R"EOF(
     resource_monitors:
@@ -933,7 +933,7 @@ TEST_F(OverloadManagerLoadShedPointImplTest, ShouldWarnIfNonExistentLoadShedPoin
 
   auto manager{createOverloadManager(config)};
   manager->start();
-  EXPECT_LOG_CONTAINS("warn", "LoadShedPoint non_existent_point is not found", {
+  EXPECT_LOG_CONTAINS("trace", "LoadShedPoint non_existent_point is not found", {
     LoadShedPoint* point = manager->getLoadShedPoint("non_existent_point");
     EXPECT_EQ(point, nullptr);
   });
