@@ -905,9 +905,6 @@ CAPIStatus Filter::getStringValue(int id, GoString* value_str) {
     req_->strValue = state.streamInfo().responseCodeDetails().value();
     break;
   case EnvoyValue::DownstreamLocalAddress:
-    if (!state.streamInfo().downstreamAddressProvider().localAddress()) {
-      return CAPIStatus::CAPIValueNotFound;
-    }
     req_->strValue = state.streamInfo().downstreamAddressProvider().localAddress()->asString();
     break;
   default:

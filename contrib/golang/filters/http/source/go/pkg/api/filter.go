@@ -70,7 +70,7 @@ type StreamInfo interface {
 	// Get the dynamic metadata of the request
 	DynamicMetadata() DynamicMetadata
 	// DownstreamLocalAddress return the downstream local address.
-	DownstreamLocalAddress() (string, bool)
+	DownstreamLocalAddress() string
 }
 
 type StreamFilterCallbacks interface {
