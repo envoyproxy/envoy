@@ -178,6 +178,10 @@ class CustomStringMatcher : public InputMatcher {
 public:
   explicit CustomStringMatcher(const std::string& str) : str_value_(str) {}
   bool match(const MatchingDataType& input) override {
+    if (absl::holds_alternative<absl::monostate>(input)) {
+      return false;
+    }
+
     return str_value_ == absl::get<std::string>(input);
   }
 
