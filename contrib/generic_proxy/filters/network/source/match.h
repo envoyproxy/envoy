@@ -74,16 +74,11 @@ public:
   PropertyMatchDataInput(const std::string& property_name) : name_(property_name) {}
 
   Matcher::DataInputGetResult get(const Request& data) const override {
-    Matcher::DataInputGetResult result;
-    result.data_availability_ = Matcher::DataInputGetResult::DataAvailability::AllDataAvailable;
-
     const auto value = data.getByKey(name_);
-
-    if (value.has_value()) {
-      // result.data_.emplace(value.value());
-      result.data_ = std::string(value.value());
-    }
-    return result;
+    Matcher::MatchingDataType matching_data =
+        value.has_value() ? Matcher::MatchingDataType(std::string(value.value()))
+                          : absl::monostate();
+    return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, matching_data};
   }
 
 private:

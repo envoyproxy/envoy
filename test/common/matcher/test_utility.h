@@ -20,7 +20,6 @@ struct TestData {
 struct CommonProtocolTestInput : public CommonProtocolInput {
   explicit CommonProtocolTestInput(const std::string& data) : data_(data) {}
   MatchingDataType get() override { return data_; }
-  // absl::optional<std::string> get() override { return data_; }
 
   const std::string data_;
 };
@@ -220,18 +219,11 @@ createSingleMatcher(absl::optional<absl::string_view> input,
                     std::function<bool(absl::optional<absl::string_view>)> predicate,
                     DataInputGetResult::DataAvailability availability =
                         DataInputGetResult::DataAvailability::AllDataAvailable) {
-  // return std::make_unique<SingleFieldMatcher<TestData>>(
-  //     std::make_unique<TestInput>(DataInputGetResult{
-  //         availability, input ? absl::make_optional(std::string(*input)) : absl::nullopt}),
-  //     std::make_unique<TestMatcher>(predicate));
-  if (input.has_value()) {
-    return std::make_unique<SingleFieldMatcher<TestData>>(
-        std::make_unique<TestInput>(DataInputGetResult{availability, std::string(*input)}),
-        std::make_unique<TestMatcher>(predicate));
-  }
+  MatchingDataType data =
+      input.has_value() ? MatchingDataType(std::string(*input)) : absl::monostate();
 
   return std::make_unique<SingleFieldMatcher<TestData>>(
-      std::make_unique<TestInput>(DataInputGetResult{availability, absl::monostate()}),
+      std::make_unique<TestInput>(DataInputGetResult{availability, std::move(data)}),
       std::make_unique<TestMatcher>(predicate));
 }
 

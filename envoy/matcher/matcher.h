@@ -202,13 +202,11 @@ struct DataInputGetResult {
   };
 
   DataAvailability data_availability_;
-  // The resulting data. This will be absl::nullopt if we don't have sufficient data available (as
-  // per data_availability_) or because no value was extracted. For example, consider a DataInput
-  // which attempts to look a key up in the map: if we don't have access to the map yet, we return
-  // absl::nullopt with NotAvailable. If we have the entire map, but the key doesn't exist in the
-  // map, we return absl::nullopt with AllDataAvailable.
-
-  // absl::optional<Matcher::MatchingDataType> data_;
+  // The resulting data. This will be absl::monostate() if we don't have sufficient data available
+  // (as per data_availability_) or because no value was extracted. For example, consider a
+  // DataInput which attempts to look a key up in the map: if we don't have access to the map yet,
+  // we return absl::monostate() with NotAvailable. If we have the entire map, but the key doesn't
+  // exist in the map, we return absl::monostate() with AllDataAvailable.
   MatchingDataType data_;
 
   // For pretty printing.
@@ -270,13 +268,12 @@ public:
 };
 
 /**
- * Interface for types providing a way to use a string for matching without depending  on protocol
+ * Interface for types providing a way to use a string for matching without depending on protocol
  * data. As a result, these can be used for all protocols.
  */
 class CommonProtocolInput {
 public:
   virtual ~CommonProtocolInput() = default;
-  // virtual absl::optional<std::string> get() PURE;
   virtual MatchingDataType get() PURE;
 };
 using CommonProtocolInputPtr = std::unique_ptr<CommonProtocolInput>;
