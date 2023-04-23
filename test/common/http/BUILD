@@ -50,6 +50,15 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "character_set_validation_test",
+    srcs = ["character_set_validation_test.cc"],
+    deps = [
+        "//source/common/http:character_set_validation_lib",
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "codec_client_test",
     srcs = ["codec_client_test.cc"],
     deps = [

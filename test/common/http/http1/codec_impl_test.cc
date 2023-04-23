@@ -109,15 +109,20 @@ public:
       // This part approximates calling header validation and handling errors, in which case HCM
       // calls sendLocalReply and closes network connection (based on the
       // stream_error_on_invalid_http_message flag, which in this test is assumed to equal false).
-      auto result = header_validator_->validateRequestHeaderMap(*headers);
+      auto result = header_validator_->validateRequestHeaders(*headers);
+      std::string failure_details(result.details());
       if (result.ok()) {
-        MockRequestDecoder::decodeHeaders(std::move(headers), end_stream);
-      } else {
-        sendLocalReply(Http::Code::BadRequest, Http::CodeUtility::toString(Http::Code::BadRequest),
-                       nullptr, absl::nullopt, result.details());
-        response_encoder_->getStream().resetStream(Http::StreamResetReason::LocalReset);
-        connection_.state_ = Network::Connection::State::Closing;
+        auto transformation_result = header_validator_->transformRequestHeaders(*headers);
+        if (transformation_result.ok()) {
+          MockRequestDecoder::decodeHeaders(std::move(headers), end_stream);
+          return;
+        }
+        failure_details = transformation_result.details();
       }
+      sendLocalReply(Http::Code::BadRequest, Http::CodeUtility::toString(Http::Code::BadRequest),
+                     nullptr, absl::nullopt, failure_details);
+      response_encoder_->getStream().resetStream(Http::StreamResetReason::LocalReset);
+      connection_.state_ = Network::Connection::State::Closing;
     } else {
       MockRequestDecoder::decodeHeaders(std::move(headers), end_stream);
     }

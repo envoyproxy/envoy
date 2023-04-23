@@ -49,6 +49,11 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "character_set_validation_lib",
+    hdrs = ["character_set_validation.h"],
+)
+
+envoy_cc_library(
     name = "codec_client_lib",
     srcs = ["codec_client.cc"],
     hdrs = ["codec_client.h"],
@@ -486,6 +491,7 @@ envoy_cc_library(
         "quiche_http2_protocol",
     ],
     deps = [
+        ":character_set_validation_lib",
         ":exception_lib",
         ":header_map_lib",
         ":headers_lib",
@@ -518,6 +524,7 @@ envoy_cc_library(
         "quiche_http2_adapter",
     ],
     deps = [
+        ":character_set_validation_lib",
         ":header_map_lib",
         ":status_lib",
         ":utility_lib",

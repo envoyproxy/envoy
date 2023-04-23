@@ -5,6 +5,7 @@
 #include "envoy/common/pure.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/event/scaled_range_timer_manager.h"
+#include "envoy/server/overload/load_shed_point.h"
 #include "envoy/server/overload/thread_local_overload_state.h"
 
 #include "source/common/singleton/const_singleton.h"
@@ -53,28 +54,12 @@ public:
 using OverloadActionStatsNames = ConstSingleton<OverloadActionStatsNameValues>;
 
 /**
- * A point within the connection or request lifecycle that provides context on
- * whether to shed load at that given stage for the current entity at the point.
- */
-class LoadShedPoint {
-public:
-  virtual ~LoadShedPoint() = default;
-
-  // Whether to shed the load.
-  virtual bool shouldShedLoad() PURE;
-};
-
-using LoadShedPointPtr = std::unique_ptr<LoadShedPoint>;
-
-/**
  * The OverloadManager protects the Envoy instance from being overwhelmed by client
  * requests. It monitors a set of resources and notifies registered listeners if
  * configured thresholds for those resources have been exceeded.
  */
-class OverloadManager {
+class OverloadManager : public LoadShedPointProvider {
 public:
-  virtual ~OverloadManager() = default;
-
   /**
    * Start a recurring timer to monitor resources and notify listeners when overload actions
    * change state.
@@ -98,12 +83,6 @@ public:
    * an alternative to registering a callback for overload action state changes.
    */
   virtual ThreadLocalOverloadState& getThreadLocalOverloadState() PURE;
-
-  /**
-   * Get the load shed point identified by the following string. Returns nullptr
-   * on for non-configured points.
-   */
-  virtual LoadShedPoint* getLoadShedPoint(absl::string_view point_name) PURE;
 
   /**
    * Get a factory for constructing scaled timer managers that respond to overload state.
