@@ -34,8 +34,6 @@
 #include "gtest/gtest.h"
 #include "spdlog/spdlog.h"
 
-using Envoy::Filesystem::Directory;
-using Envoy::Filesystem::DirectoryEntry;
 
 namespace Envoy {
 
