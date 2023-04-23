@@ -20,8 +20,8 @@ namespace EnvoyDefault {
 using ::envoy::extensions::http::header_validators::envoy_default::v3::HeaderValidatorConfig;
 using ::Envoy::Http::HeaderString;
 using ::Envoy::Http::HeaderUtility;
-using ::Envoy::Http::LowerCaseString;
 using ::Envoy::Http::Protocol;
+using ::Envoy::Http::testCharInTable;
 using ::Envoy::Http::UhvResponseCodeDetail;
 using HeaderValidatorFunction1 =
     HeaderValidator::HeaderValueValidationResult (Http2HeaderValidator::*)(const HeaderString&);
@@ -389,7 +389,8 @@ Http2HeaderValidator::validateGenericHeaderName(const HeaderString& name) {
        iter != key_string_view.end() && is_valid && !reject_due_to_underscore; ++iter) {
     c = *iter;
     if (c != '_') {
-      is_valid &= testChar(kGenericHeaderNameCharTable, c) && (c < 'A' || c > 'Z');
+      is_valid &=
+          testCharInTable(::Envoy::Http::kGenericHeaderNameCharTable, c) && (c < 'A' || c > 'Z');
     } else {
       reject_due_to_underscore = reject_header_names_with_underscores;
     }
@@ -421,7 +422,7 @@ Http2HeaderValidator::validateRequestTrailers(const ::Envoy::Http::RequestTraile
 HeaderValidator::TrailersTransformationResult
 Http2HeaderValidator::transformRequestTrailers(::Envoy::Http::RequestTrailerMap& trailer_map) {
   sanitizeHeadersWithUnderscores(trailer_map);
-  return HeadersTransformationResult::success();
+  return TrailersTransformationResult::success();
 }
 
 HeaderValidator::ValidationResult Http2HeaderValidator::validateResponseTrailers(
