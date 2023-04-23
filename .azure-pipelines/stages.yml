@@ -850,11 +850,11 @@ stages:
         # linux/amd64
         tar xf $(Build.StagingDirectory)/bazel.release/release.tar.zst -C ./linux/amd64
         cp -a linux/amd64/envoy "publish/envoy-${VERSION}-linux-x86_64"
-        cp -a linux/arm64/envoy-contrib "publish/envoy-contrib-${VERSION}-linux-x86_64"
+        cp -a linux/amd64/envoy-contrib "publish/envoy-contrib-${VERSION}-linux-x86_64"
 
         # linux/arm64
         tar xf $(Build.StagingDirectory)/bazel.release.arm64/release.tar.zst -C ./linux/arm64
-        cp -a linux/amd64/envoy "publish/envoy-${VERSION}-linux-aarch_64"
+        cp -a linux/arm64/envoy "publish/envoy-${VERSION}-linux-aarch_64"
         cp -a linux/arm64/envoy-contrib "publish/envoy-contrib-${VERSION}-linux-aarch_64"
 
         echo "$MAINTAINER_GPG_KEY_PASSPHRASE" | gpg --batch --yes --passphrase-fd 0 --import "$(MaintainerGPGKey.secureFilePath)"
