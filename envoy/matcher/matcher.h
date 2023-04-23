@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include <memory>
 #include <string>
 
@@ -206,27 +207,20 @@ struct DataInputGetResult {
   // which attempts to look a key up in the map: if we don't have access to the map yet, we return
   // absl::nullopt with NotAvailable. If we have the entire map, but the key doesn't exist in the
   // map, we return absl::nullopt with AllDataAvailable.
-  // absl::optional<std::string> data_;
 
   // absl::optional<Matcher::MatchingDataType> data_;
   MatchingDataType data_;
-  // remove the optional, variant has empty state.
-  // MatchingDataType data_;
 
   // For pretty printing.
   friend std::ostream& operator<<(std::ostream& out, const DataInputGetResult& result) {
-    // if (result.data_.has_value() && absl::holds_alternative<std::string>(result.data_.value())) {
-    //   out << "data input: " << absl::get<std::string>(result.data_.value());
-    // } else {
-    //   out << "n/a";
-    // }
     if (absl::holds_alternative<std::string>(result.data_)) {
       out << "data input: " << absl::get<std::string>(result.data_);
+    } else if (absl::holds_alternative<uint32_t>(result.data_)) {
+      out << "data input: " << absl::StrCat(absl::get<uint32_t>(result.data_));
     } else {
       out << "n/a";
     }
 
-    // out << "data input: " << (result.data_ ? result.data_.value() : "n/a");
     switch (result.data_availability_) {
     case DataInputGetResult::DataAvailability::NotAvailable:
       out << " (not available)";
