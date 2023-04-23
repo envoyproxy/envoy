@@ -164,7 +164,6 @@ public:
    * @param absl::optional<absl::string_view> the value to match on. Will be absl::nullopt if the
    * lookup failed.
    */
-  // virtual bool match(absl::optional<absl::string_view> input) PURE;
   virtual bool match(const Matcher::MatchingDataType& input) PURE;
 };
 

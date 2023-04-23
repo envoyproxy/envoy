@@ -154,10 +154,6 @@ public:
       return {MatchState::UnableToMatch, absl::nullopt};
     }
 
-    // TODO(tyxia) Key to add empty state to cel matcher !!!!!
-    if (absl::holds_alternative<absl::monostate>(input.data_)) {
-    }
-
     bool current_match = input_matcher_->match(input.data_);
     if (!current_match && input.data_availability_ ==
                               DataInputGetResult::DataAvailability::MoreDataMightBeAvailable) {
