@@ -1,15 +1,12 @@
-FROM solsson/websocat@sha256:902f0b3a263fd274fc1acf24e95c7226071075b42775894205285fd894188120
-
+FROM debian:bullseye-slim@sha256:9404b05bd09b57c76eccc0c5505b3c88b5feccac808d9b193a4fbac87bb44745 as websocket-base
 ENV DEBIAN_FRONTEND=noninteractive
-
+RUN apt-get -qq update \
+    && apt-get -qq install --no-install-recommends -y ca-certificates musl wget
+RUN wget -qO /usr/local/bin/websocat https://github.com/vi/websocat/releases/download/v1.11.0/websocat.x86_64-unknown-linux-musl \
+    && echo 'dc5524b9f03a344b88a12c859fb02f8bb56b3373dbc43a6e0c45a2ab52b853d7 /usr/local/bin/websocat' | sha256sum -c - \
+    && chmod +x /usr/local/bin/websocat
 ADD interact.sh /interact.sh
 RUN chmod +x /interact.sh
-
 RUN apt-get -qq update \
-    && apt-get -qq install -qq --no-install-recommends -y expect \
-    && apt-get -qq autoremove -y && apt-get clean \
-    && rm -rf /tmp/* /var/tmp/* \
-    && rm -rf /var/lib/apt/lists/*
-
-
+    && apt-get -qq install --no-install-recommends -y expect
 ENTRYPOINT ["/interact.sh"]
