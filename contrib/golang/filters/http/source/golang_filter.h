@@ -101,6 +101,7 @@ enum class EnvoyValue {
   ResponseCodeDetails,
   AttemptCount,
   DownstreamLocalAddress,
+  DownstreamRemoteAddress,
 };
 
 struct httpRequestInternal;

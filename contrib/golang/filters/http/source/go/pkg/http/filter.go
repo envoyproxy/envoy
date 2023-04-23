@@ -183,3 +183,8 @@ func (s *streamInfo) DownstreamLocalAddress() string {
 	address, _ := cAPI.HttpGetStringValue(unsafe.Pointer(s.request.req), ValueDownstreamLocalAddress)
 	return address
 }
+
+func (s *streamInfo) DownstreamRemoteAddress() string {
+	address, _ := cAPI.HttpGetStringValue(unsafe.Pointer(s.request.req), ValueDownstreamRemoteAddress)
+	return address
+}
