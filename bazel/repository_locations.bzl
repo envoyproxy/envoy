@@ -108,13 +108,13 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         # 2. Open https://chromium.googlesource.com/chromium/src/+/refs/tags/<current_version>/DEPS and note <boringssl_revision>.
         # 3. Find a commit in BoringSSL's "master-with-bazel" branch that merges <boringssl_revision>.
         #
-        # chromium-105.0.5195.37 (linux/beta)
-        version = "098695591f3a2665fccef83a3732ecfc99acdcdd",
-        sha256 = "e141448cf6f686b6e9695f6b6459293fd602c8d51efe118a83106752cf7e1280",
+        # chromium-112.0.5615.39 (linux/beta)
+        version = "88d7a40bd06a34da6ee0d985545755199d047258",
+        sha256 = "1e759891e168c5957f2f4d519929e2b4cef9303b7cf2049601081f4fca95bf21",
         strip_prefix = "boringssl-{version}",
         urls = ["https://github.com/google/boringssl/archive/{version}.tar.gz"],
         use_category = ["controlplane", "dataplane_core"],
-        release_date = "2022-07-19",
+        release_date = "2023-02-14",
         cpe = "cpe:2.3:a:google:boringssl:*",
         license = "Mixed",
         license_url = "https://github.com/google/boringssl/blob/{version}/LICENSE",
@@ -378,6 +378,11 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "ICU Library",
         project_desc = "Development files for International Components for Unicode",
         project_url = "https://github.com/unicode-org/icu",
+        # When this is updated, make sure to update the icu.patch patch file and remove
+        # all remaining Bazel build artifacts (for example WORKSPACE and BUILD.bazel files)
+        # from the icu source code, to prevent Bazel from treating the foreign library
+        # as a Bazel project.
+        # https://github.com/envoyproxy/envoy/issues/26395
         version = "72-1",
         sha256 = "43cbad628d98f37a3f95f6c34579f9144ef4bde60248fa6004a4f006d7487e69",
         strip_prefix = "icu-release-{version}",
@@ -686,8 +691,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "zstd",
         project_desc = "zstd compression library",
         project_url = "https://facebook.github.io/zstd",
-        version = "1.5.4",
-        sha256 = "35ad983197f8f8eb0c963877bf8be50490a0b3df54b4edeb8399ba8a8b2f60a4",
+        version = "1.5.5",
+        sha256 = "98e9c3d949d1b924e28e01eccb7deed865eefebf25c2f21c702e5cd5b63b85e1",
         strip_prefix = "zstd-{version}",
         urls = ["https://github.com/facebook/zstd/archive/v{version}.tar.gz"],
         use_category = ["dataplane_ext"],
@@ -695,7 +700,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
             "envoy.compression.zstd.compressor",
             "envoy.compression.zstd.decompressor",
         ],
-        release_date = "2023-02-10",
+        release_date = "2023-04-04",
         cpe = "cpe:2.3:a:facebook:zstandard:*",
     ),
     com_github_zlib_ng_zlib_ng = dict(
@@ -1030,8 +1035,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "curl",
         project_desc = "Library for transferring data with URLs",
         project_url = "https://curl.haxx.se",
-        version = "7.87.0",
-        sha256 = "8a063d664d1c23d35526b87a2bf15514962ffdd8ef7fd40519191b3c23e39548",
+        version = "8.0.1",
+        sha256 = "5fd29000a4089934f121eff456101f0a5d09e2a3e89da1d714adf06c4be887cb",
         strip_prefix = "curl-{version}",
         urls = ["https://github.com/curl/curl/releases/download/curl-{underscore_version}/curl-{version}.tar.gz"],
         use_category = ["dataplane_ext", "observability_ext"],
@@ -1041,7 +1046,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
             "envoy.grpc_credentials.aws_iam",
             "envoy.tracers.opencensus",
         ],
-        release_date = "2022-12-21",
+        release_date = "2023-03-20",
         cpe = "cpe:2.3:a:haxx:libcurl:*",
         license = "curl",
         license_url = "https://github.com/curl/curl/blob/curl-{underscore_version}/COPYING",
@@ -1079,12 +1084,12 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "QUICHE",
         project_desc = "QUICHE (QUIC, HTTP/2, Etc) is Google‘s implementation of QUIC and related protocols",
         project_url = "https://github.com/google/quiche",
-        version = "47aa4cda28bc7a8b844d6c6e45fbbb3e8976220e",
-        sha256 = "85253094fd17b8b026ddf4948b7073372b51588270468f9c3129c10a67dd02c0",
+        version = "d2d9e7bcc0d196773d736bd022fcc9d7cbf1b316",
+        sha256 = "66cfc69edaf4aa3c5819a922f0ac61688ef5ad6358d99c06e67a1f5611e35f63",
         urls = ["https://github.com/google/quiche/archive/{version}.tar.gz"],
         strip_prefix = "quiche-{version}",
         use_category = ["controlplane", "dataplane_core"],
-        release_date = "2023-03-27",
+        release_date = "2023-04-20",
         cpe = "N/A",
         license = "BSD-3-Clause",
         license_url = "https://github.com/google/quiche/blob/{version}/LICENSE",

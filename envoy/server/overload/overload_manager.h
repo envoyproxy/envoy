@@ -5,6 +5,7 @@
 #include "envoy/common/pure.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/event/scaled_range_timer_manager.h"
+#include "envoy/server/overload/load_shed_point.h"
 #include "envoy/server/overload/thread_local_overload_state.h"
 
 #include "source/common/singleton/const_singleton.h"
@@ -57,10 +58,8 @@ using OverloadActionStatsNames = ConstSingleton<OverloadActionStatsNameValues>;
  * requests. It monitors a set of resources and notifies registered listeners if
  * configured thresholds for those resources have been exceeded.
  */
-class OverloadManager {
+class OverloadManager : public LoadShedPointProvider {
 public:
-  virtual ~OverloadManager() = default;
-
   /**
    * Start a recurring timer to monitor resources and notify listeners when overload actions
    * change state.
