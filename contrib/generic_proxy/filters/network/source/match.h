@@ -24,11 +24,8 @@ using PropertyDataInputProto =
 class ServiceMatchDataInput : public Matcher::DataInput<Request> {
 public:
   Matcher::DataInputGetResult get(const Request& data) const override {
-    Matcher::DataInputGetResult result;
-    result.data_availability_ = Matcher::DataInputGetResult::DataAvailability::AllDataAvailable;
-    // result.data_.emplace(data.host());
-    result.data_ = std::string(data.host());
-    return result;
+    return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,
+            std::string(data.host())};
   }
 };
 
@@ -51,11 +48,8 @@ public:
 class MethodMatchDataInput : public Matcher::DataInput<Request> {
 public:
   Matcher::DataInputGetResult get(const Request& data) const override {
-    Matcher::DataInputGetResult result;
-    result.data_availability_ = Matcher::DataInputGetResult::DataAvailability::AllDataAvailable;
-    // result.data_.emplace(data.method());
-    result.data_ = std::string(data.method());
-    return result;
+    return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,
+            std::string(data.method())};
   }
 };
 
