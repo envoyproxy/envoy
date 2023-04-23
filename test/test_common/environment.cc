@@ -34,7 +34,6 @@
 #include "gtest/gtest.h"
 #include "spdlog/spdlog.h"
 
-
 namespace Envoy {
 
 bool TestEnvironment::shouldRunTestForIpVersion(Network::Address::IpVersion type) {
