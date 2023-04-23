@@ -124,8 +124,8 @@ message OAuth2Config {
   // RFC https://datatracker.ietf.org/doc/html/rfc6749#section-2.3.1
   AuthType auth_type = 11 [(validate.rules).enum = {defined_only: true}];
 
-  Set to true to enable automatic access token refresh using the associated refresh token, provided that the OAuth
-  server supports this feature.
+  // Set to true to enable automatic access token refresh using the associated refresh token, provided that the OAuth
+  // server supports this feature
   bool use_refresh_token = 12;
 }
 
