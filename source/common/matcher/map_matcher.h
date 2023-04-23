@@ -1,5 +1,7 @@
 #pragma once
 
+#include <string>
+
 #include "envoy/matcher/matcher.h"
 
 namespace Envoy {
@@ -34,7 +36,12 @@ public:
     if (absl::holds_alternative<absl::monostate>(input.data_)) {
       return {MatchState::MatchComplete, on_no_match_};
     }
-    const auto result = doMatch(absl::get<std::string>(input.data_));
+    // TODO(tyxia) Should I add the log instead of variant access error??
+    std::string input_str = absl::holds_alternative<std::string>(input.data_)
+                                ? absl::get<std::string>(input.data_)
+                                : std::to_string(absl::get<uint32_t>(input.data_));
+
+    const auto result = doMatch(input_str);
     if (result) {
       if (result->matcher_) {
         return result->matcher_->match(data);
