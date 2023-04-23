@@ -24,7 +24,7 @@ class ServerFactoryContext;
 
 namespace Matcher {
 
-using MatchingDataType = absl::variant<absl::monostate, std::string, uint32_t>;
+using MatchingDataType = absl::variant<absl::monostate, std::string>;
 
 // This file describes a MatchTree<DataType>, which traverses a tree of matches until it
 // either matches (resulting in either an action or a new tree to traverse) or doesn't match.
@@ -213,13 +213,10 @@ struct DataInputGetResult {
 
   // For pretty printing.
   friend std::ostream& operator<<(std::ostream& out, const DataInputGetResult& result) {
-    if (absl::holds_alternative<std::string>(result.data_)) {
-      out << "data input: " << absl::get<std::string>(result.data_);
-    } else if (absl::holds_alternative<uint32_t>(result.data_)) {
-      out << "data input: " << absl::StrCat(absl::get<uint32_t>(result.data_));
-    } else {
-      out << "n/a";
-    }
+    out << "data input: "
+        << (absl::holds_alternative<std::string>(result.data_)
+                ? absl::get<std::string>(result.data_)
+                : "n/a");
 
     switch (result.data_availability_) {
     case DataInputGetResult::DataAvailability::NotAvailable:

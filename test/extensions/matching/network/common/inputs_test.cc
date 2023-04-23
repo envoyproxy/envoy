@@ -65,8 +65,7 @@ TEST(MatchingData, HttpDestinationIPInput) {
     const auto result = input.get(data);
     EXPECT_EQ(result.data_availability_,
               Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
-    // EXPECT_EQ(result.data_, "8080");
-    EXPECT_EQ(absl::get<uint32_t>(result.data_), 8080);
+    EXPECT_EQ(absl::get<std::string>(result.data_), "8080");
   }
   {
     SourceIPInput<Http::HttpMatchingData> input;
@@ -121,7 +120,7 @@ TEST(MatchingData, DestinationPortInput) {
     const auto result = input.get(data);
     EXPECT_EQ(result.data_availability_,
               Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
-    EXPECT_EQ(absl::get<uint32_t>(result.data_), 8080);
+    EXPECT_EQ(absl::get<std::string>(result.data_), "8080");
   }
 
   {
@@ -398,7 +397,7 @@ TEST(UdpMatchingData, UdpDestinationPortInput) {
     const auto result = input.get(data);
     EXPECT_EQ(result.data_availability_,
               Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
-    EXPECT_EQ(absl::get<uint32_t>(result.data_), 8080);
+    EXPECT_EQ(absl::get<std::string>(result.data_), "8080");
   }
 
   {

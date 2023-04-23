@@ -63,6 +63,10 @@ DECLARE_FACTORY(DestinationIPInputFactory);
 DECLARE_FACTORY(UdpDestinationIPInputFactory);
 DECLARE_FACTORY(HttpDestinationIPInputFactory);
 
+// With the support of generic matching API, integer is allowed in inputs such as
+// `DestinationPortInput` and `SourcePortInput`. As a result, there is no longer a need for the
+// redundant conversion of int-to-string. We can change them here once IntInputMatcher (for integer
+// type input) is implemented.
 template <class MatchingDataType>
 class DestinationPortInput : public Matcher::DataInput<MatchingDataType> {
 public:
@@ -71,7 +75,8 @@ public:
     if (address.type() != Network::Address::Type::Ip) {
       return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::monostate()};
     }
-    return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, address.ip()->port()};
+    return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,
+            absl::StrCat(address.ip()->port())};
   }
 };
 

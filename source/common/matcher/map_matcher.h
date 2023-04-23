@@ -29,19 +29,12 @@ public:
       return {MatchState::UnableToMatch, absl::nullopt};
     }
 
-    // if (!input.data_) {
-    //   return {MatchState::MatchComplete, on_no_match_};
-    // }
-    // const auto result = doMatch(*input.data_);
+    // Returns `on_no_match` when input data is empty. (i.e., is absl::monostate).
     if (absl::holds_alternative<absl::monostate>(input.data_)) {
       return {MatchState::MatchComplete, on_no_match_};
     }
-    // TODO(tyxia) Should I add the log instead of variant access error??
-    std::string input_str = absl::holds_alternative<std::string>(input.data_)
-                                ? absl::get<std::string>(input.data_)
-                                : std::to_string(absl::get<uint32_t>(input.data_));
 
-    const auto result = doMatch(input_str);
+    const auto result = doMatch(absl::get<std::string>(input.data_));
     if (result) {
       if (result->matcher_) {
         return result->matcher_->match(data);

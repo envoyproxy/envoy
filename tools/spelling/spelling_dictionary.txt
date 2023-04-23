@@ -294,6 +294,7 @@ OCSP
 OD
 ODCDS
 middlewildcard
+monostate
 mpd
 oghttp
 OID
