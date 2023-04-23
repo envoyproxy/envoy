@@ -15,11 +15,16 @@
  * limitations under the License.
  */
 
-package api
+package http
 
-import "unsafe"
+import (
+	"unsafe"
+
+	"github.com/envoyproxy/envoy/contrib/golang/filters/http/source/go/pkg/api"
+)
 
 type HttpCAPI interface {
+	//TODO: we should switch all the request types to be using `r *httpRequest` for consistency.
 	HttpContinue(r unsafe.Pointer, status uint64)
 	HttpSendLocalReply(r unsafe.Pointer, responseCode int, bodyText string, headers map[string]string, grpcStatus int64, details string)
 
@@ -33,7 +38,7 @@ type HttpCAPI interface {
 	HttpRemoveHeader(r unsafe.Pointer, key *string)
 
 	HttpGetBuffer(r unsafe.Pointer, bufferPtr uint64, value *string, length uint64)
-	HttpSetBufferHelper(r unsafe.Pointer, bufferPtr uint64, value string, action BufferAction)
+	HttpSetBufferHelper(r unsafe.Pointer, bufferPtr uint64, value string, action api.BufferAction)
 
 	HttpCopyTrailers(r unsafe.Pointer, num uint64, bytes uint64) map[string][]string
 	HttpSetTrailer(r unsafe.Pointer, key *string, value *string)
@@ -41,10 +46,10 @@ type HttpCAPI interface {
 	HttpGetStringValue(r unsafe.Pointer, id int) (string, bool)
 	HttpGetIntegerValue(r unsafe.Pointer, id int) (uint64, bool)
 
-	// TODO: HttpGetDynamicMetadata(r unsafe.Pointer, filterName string) map[string]interface{}
+	HttpGetDynamicMetadata(r *httpRequest, filterName string) map[string]interface{}
 	HttpSetDynamicMetadata(r unsafe.Pointer, filterName string, key string, value interface{})
 
-	HttpLog(level LogType, message string)
+	HttpLog(level api.LogType, message string)
 
 	HttpFinalize(r unsafe.Pointer, reason int)
 }

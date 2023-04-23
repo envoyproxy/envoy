@@ -172,6 +172,8 @@ public:
   CAPIStatus setTrailer(absl::string_view key, absl::string_view value);
   CAPIStatus getStringValue(int id, GoString* value_str);
   CAPIStatus getIntegerValue(int id, uint64_t* value);
+
+  CAPIStatus getDynamicMetadata(const std::string& filter_name, GoSlice* bufSlice);
   CAPIStatus setDynamicMetadata(std::string filter_name, std::string key, absl::string_view buf);
 
 private:
@@ -199,6 +201,9 @@ private:
 
   void setDynamicMetadataInternal(ProcessorState& state, std::string filter_name, std::string key,
                                   const absl::string_view& buf);
+
+  void populateSliceWithMetadata(ProcessorState& state, const std::string& filter_name,
+                                 GoSlice* bufSlice);
 
   const FilterConfigSharedPtr config_;
   Dso::HttpFilterDsoPtr dynamic_lib_;

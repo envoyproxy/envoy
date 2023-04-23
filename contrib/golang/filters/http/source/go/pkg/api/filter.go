@@ -91,6 +91,6 @@ type FilterCallbackHandler interface {
 }
 
 type DynamicMetadata interface {
-	// TODO: Get(filterName string) map[string]interface{}
+	Get(filterName string) map[string]interface{}
 	Set(filterName string, key string, value interface{})
 }

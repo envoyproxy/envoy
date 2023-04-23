@@ -33,6 +33,7 @@ package http
 import "C"
 import (
 	"fmt"
+	"sync"
 	"unsafe"
 
 	"github.com/envoyproxy/envoy/contrib/golang/filters/http/source/go/pkg/api"
@@ -57,9 +58,11 @@ type panicInfo struct {
 	details string
 }
 type httpRequest struct {
-	req        *C.httpRequest
-	httpFilter api.StreamFilter
-	pInfo      panicInfo
+	req            *C.httpRequest
+	httpFilter     api.StreamFilter
+	pInfo          panicInfo
+	sema           sync.WaitGroup
+	waitingOnEnvoy int32
 }
 
 func (r *httpRequest) pluginName() string {
@@ -173,6 +176,10 @@ func (s *streamInfo) DynamicMetadata() api.DynamicMetadata {
 	return &dynamicMetadata{
 		request: s.request,
 	}
+}
+
+func (d *dynamicMetadata) Get(filterName string) map[string]interface{} {
+	return cAPI.HttpGetDynamicMetadata(d.request, filterName)
 }
 
 func (d *dynamicMetadata) Set(filterName string, key string, value interface{}) {

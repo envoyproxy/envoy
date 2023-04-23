@@ -109,6 +109,19 @@ func (f *filter) decodeHeaders(header api.RequestHeaderMap, endStream bool) api.
 	if found {
 		md := f.callbacks.StreamInfo().DynamicMetadata()
 		md.Set("filter.go", "foo", "bar")
+		metadata := md.Get("filter.go")
+		if len(metadata) == 0 {
+			return f.fail("Metadata should not be empty")
+		}
+
+		k, ok := metadata["foo"]
+		if !ok {
+			return f.fail("Metadata foo should be found")
+		}
+
+		if fmt.Sprint(k) != "bar" {
+			return f.fail("Metadata foo has unexpected value %v", k)
+		}
 	}
 
 	if strings.Contains(f.localreplay, "decode-header") {

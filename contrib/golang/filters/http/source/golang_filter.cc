@@ -913,6 +913,56 @@ CAPIStatus Filter::getStringValue(int id, GoString* value_str) {
   return CAPIStatus::CAPIOK;
 }
 
+CAPIStatus Filter::getDynamicMetadata(const std::string& filter_name, GoSlice* bufSlice) {
+  Thread::LockGuard lock(mutex_);
+  if (has_destroyed_) {
+    ENVOY_LOG(debug, "golang filter has been destroyed");
+    return CAPIStatus::CAPIFilterIsDestroy;
+  }
+
+  auto& state = getProcessorState();
+  if (!state.isProcessingInGo()) {
+    ENVOY_LOG(debug, "golang filter is not processing Go");
+    return CAPIStatus::CAPINotInGo;
+  }
+
+  auto dlib = Dso::DsoManager<Dso::HttpFilterDsoImpl>::getDsoByID(config_->soId());
+  ASSERT(dlib != nullptr, "load at the config parse phase, so it should not be null");
+  if (!state.isThreadSafe()) {
+    auto weak_ptr = weak_from_this();
+    ENVOY_LOG(debug, "golang filter getDynamicMetadata posting request to dispatcher");
+    state.getDispatcher().post([this, &state, weak_ptr, filter_name, bufSlice, dlib] {
+      ENVOY_LOG(debug, "golang filter getDynamicMetadata request in worker thread");
+      Thread::ReleasableLockGuard lock(mutex_);
+      if (!weak_ptr.expired() && !has_destroyed_) {
+        ASSERT(state.isThreadSafe());
+        populateSliceWithMetadata(state, filter_name, bufSlice);
+        dlib->envoyGoRequestSemaDec(req_);
+      } else {
+        ENVOY_LOG(info, "golang filter has gone or destroyed in getDynamicMetadata");
+      }
+    });
+  } else {
+    ENVOY_LOG(debug, "golang filter getDynamicMetadata replying directly");
+    populateSliceWithMetadata(state, filter_name, bufSlice);
+    dlib->envoyGoRequestSemaDec(req_);
+  }
+
+  return CAPIStatus::CAPIOK;
+}
+
+void Filter::populateSliceWithMetadata(ProcessorState& state, const std::string& filter_name,
+                                       GoSlice* bufSlice) {
+  const auto& metadata = state.streamInfo().dynamicMetadata().filter_metadata();
+  const auto filter_it = metadata.find(filter_name);
+  if (filter_it != metadata.end()) {
+    filter_it->second.SerializeToString(&req_->strValue);
+    bufSlice->data = req_->strValue.data();
+    bufSlice->len = req_->strValue.length();
+    bufSlice->cap = req_->strValue.length();
+  }
+}
+
 CAPIStatus Filter::setDynamicMetadata(std::string filter_name, std::string key,
                                       absl::string_view buf) {
   Thread::LockGuard lock(mutex_);

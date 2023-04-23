@@ -35,6 +35,7 @@ import (
 	"reflect"
 	"runtime"
 	"strings"
+	"sync/atomic"
 	"unsafe"
 
 	"github.com/envoyproxy/envoy/contrib/golang/filters/http/source/go/pkg/api"
@@ -223,6 +224,20 @@ func (c *httpCApiImpl) HttpGetIntegerValue(r unsafe.Pointer, id int) (uint64, bo
 	return value, true
 }
 
+func (c *httpCApiImpl) HttpGetDynamicMetadata(r *httpRequest, filterName string) map[string]interface{} {
+	var buf []byte
+	r.sema.Add(1)
+	res := C.envoyGoFilterHttpGetDynamicMetadata(unsafe.Pointer(r.req), unsafe.Pointer(&filterName), unsafe.Pointer(&buf))
+	handleCApiStatus(res)
+	atomic.AddInt32(&r.waitingOnEnvoy, 1)
+	r.sema.Wait()
+	atomic.AddInt32(&r.waitingOnEnvoy, -11)
+	// copy the memory from c to Go.
+	var meta structpb.Struct
+	proto.Unmarshal(buf, &meta)
+	return meta.AsMap()
+}
+
 func (c *httpCApiImpl) HttpSetDynamicMetadata(r unsafe.Pointer, filterName string, key string, value interface{}) {
 	v, err := structpb.NewValue(value)
 	if err != nil {
@@ -244,9 +259,9 @@ func (c *httpCApiImpl) HttpFinalize(r unsafe.Pointer, reason int) {
 	C.envoyGoFilterHttpFinalize(r, C.int(reason))
 }
 
-var cAPI api.HttpCAPI = &httpCApiImpl{}
+var cAPI HttpCAPI = &httpCApiImpl{}
 
 // SetHttpCAPI for mock cAPI
-func SetHttpCAPI(api api.HttpCAPI) {
+func SetHttpCAPI(api HttpCAPI) {
 	cAPI = api
 }
