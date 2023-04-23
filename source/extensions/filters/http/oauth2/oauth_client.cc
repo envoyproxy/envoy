@@ -172,7 +172,7 @@ void OAuth2ClientImpl::onSuccess(const Http::AsyncClient::Request&,
     parent_->onGetAccessTokenSuccess(access_token, id_token, refresh_token, expires_in);
     break;
   case OAuthState::PendingAccessTokenByRefreshToken:
-    parent_->onUpdateAccessTokenSuccess(access_token, id_token, refresh_token, expires_in);
+    parent_->onRefreshAccessTokenSuccess(access_token, id_token, refresh_token, expires_in);
     break;
   default:
     throw EnvoyException("Malformed oauth client state");

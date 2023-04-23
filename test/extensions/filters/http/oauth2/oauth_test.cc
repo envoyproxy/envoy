@@ -30,7 +30,7 @@ public:
   MOCK_METHOD(void, sendUnauthorizedResponse, ());
   MOCK_METHOD(void, onGetAccessTokenSuccess,
               (const std::string&, const std::string&, const std::string&, std::chrono::seconds));
-  MOCK_METHOD(void, onUpdateAccessTokenSuccess,
+  MOCK_METHOD(void, onRefreshAccessTokenSuccess,
               (const std::string&, const std::string&, const std::string&, std::chrono::seconds));
   MOCK_METHOD(void, onUpdateAccessTokenFailure, ());
 };
@@ -229,7 +229,7 @@ TEST_F(OAuth2ClientTest, RequestUpdateAccessTokenSuccess) {
   client_->setCallbacks(*mock_callbacks_);
   client_->asyncUpdateAccessToken("a", "b", "c");
   EXPECT_EQ(1, callbacks_.size());
-  EXPECT_CALL(*mock_callbacks_, onUpdateAccessTokenSuccess(_, _, _, _));
+  EXPECT_CALL(*mock_callbacks_, onRefreshAccessTokenSuccess(_, _, _, _));
   Http::MockAsyncClientRequest request(&cm_.thread_local_cluster_.async_client_);
   ASSERT_TRUE(popPendingCallback(
       [&](auto* callback) { callback->onSuccess(request, std::move(mock_response)); }));
@@ -270,7 +270,7 @@ TEST_F(OAuth2ClientTest, RequestUpdateAccessTokenSuccessBasicAuthType) {
   client_->setCallbacks(*mock_callbacks_);
   client_->asyncUpdateAccessToken("a", "b", "c", AuthType::BasicAuth);
   EXPECT_EQ(1, callbacks_.size());
-  EXPECT_CALL(*mock_callbacks_, onUpdateAccessTokenSuccess(_, _, _, _));
+  EXPECT_CALL(*mock_callbacks_, onRefreshAccessTokenSuccess(_, _, _, _));
   Http::MockAsyncClientRequest request(&cm_.thread_local_cluster_.async_client_);
   ASSERT_TRUE(popPendingCallback(
       [&](auto* callback) { callback->onSuccess(request, std::move(mock_response)); }));

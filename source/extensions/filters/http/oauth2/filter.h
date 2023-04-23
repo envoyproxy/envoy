@@ -253,7 +253,7 @@ public:
                                const std::string& refresh_token,
                                std::chrono::seconds expires_in) override;
 
-  void onUpdateAccessTokenSuccess(const std::string& access_code, const std::string& id_token,
+  void onRefreshAccessTokenSuccess(const std::string& access_code, const std::string& id_token,
                                   const std::string& refresh_token,
                                   std::chrono::seconds expires_in) override;
 

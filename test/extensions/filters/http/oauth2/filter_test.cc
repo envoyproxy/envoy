@@ -1572,7 +1572,7 @@ TEST_F(OAuth2Test, OAuthTestUpdateAccessTokenByRefreshTokenSuccess) {
   // Check that the redirect includes the escaped parameter characters, '?', '&' and '='.
   EXPECT_CALL(decoder_callbacks_, continueDecoding());
 
-  filter_->onUpdateAccessTokenSuccess("", "", "", std::chrono::seconds(10));
+  filter_->onRefreshAccessTokenSuccess("", "", "", std::chrono::seconds(10));
 
   EXPECT_EQ(1, config_->stats().oauth_refreshtoken_success_.value());
   EXPECT_EQ(1, config_->stats().oauth_success_.value());

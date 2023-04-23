@@ -512,7 +512,7 @@ void OAuth2Filter::onGetAccessTokenSuccess(const std::string& access_code,
   finishGetAccessTokenFlow();
 }
 
-void OAuth2Filter::onUpdateAccessTokenSuccess(const std::string& access_code,
+void OAuth2Filter::onRefreshAccessTokenSuccess(const std::string& access_code,
                                               const std::string& id_token,
                                               const std::string& refresh_token,
                                               std::chrono::seconds expires_in) {
