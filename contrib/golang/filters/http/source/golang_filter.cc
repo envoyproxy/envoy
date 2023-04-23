@@ -913,7 +913,7 @@ CAPIStatus Filter::getStringValue(int id, GoString* value_str) {
   return CAPIStatus::CAPIOK;
 }
 
-CAPIStatus Filter::getDynamicMetadata(const std::string& filter_name, GoSlice* bufSlice) {
+CAPIStatus Filter::getDynamicMetadata(const std::string& filter_name, GoSlice* buf_slice) {
   Thread::LockGuard lock(mutex_);
   if (has_destroyed_) {
     ENVOY_LOG(debug, "golang filter has been destroyed");
@@ -931,12 +931,12 @@ CAPIStatus Filter::getDynamicMetadata(const std::string& filter_name, GoSlice* b
   if (!state.isThreadSafe()) {
     auto weak_ptr = weak_from_this();
     ENVOY_LOG(debug, "golang filter getDynamicMetadata posting request to dispatcher");
-    state.getDispatcher().post([this, &state, weak_ptr, filter_name, bufSlice, dlib] {
+    state.getDispatcher().post([this, &state, weak_ptr, filter_name, buf_slice, dlib] {
       ENVOY_LOG(debug, "golang filter getDynamicMetadata request in worker thread");
       Thread::ReleasableLockGuard lock(mutex_);
       if (!weak_ptr.expired() && !has_destroyed_) {
         ASSERT(state.isThreadSafe());
-        populateSliceWithMetadata(state, filter_name, bufSlice);
+        populateSliceWithMetadata(state, filter_name, buf_slice);
         dlib->envoyGoRequestSemaDec(req_);
       } else {
         ENVOY_LOG(info, "golang filter has gone or destroyed in getDynamicMetadata");
@@ -944,7 +944,7 @@ CAPIStatus Filter::getDynamicMetadata(const std::string& filter_name, GoSlice* b
     });
   } else {
     ENVOY_LOG(debug, "golang filter getDynamicMetadata replying directly");
-    populateSliceWithMetadata(state, filter_name, bufSlice);
+    populateSliceWithMetadata(state, filter_name, buf_slice);
     dlib->envoyGoRequestSemaDec(req_);
   }
 
@@ -952,14 +952,14 @@ CAPIStatus Filter::getDynamicMetadata(const std::string& filter_name, GoSlice* b
 }
 
 void Filter::populateSliceWithMetadata(ProcessorState& state, const std::string& filter_name,
-                                       GoSlice* bufSlice) {
+                                       GoSlice* buf_slice) {
   const auto& metadata = state.streamInfo().dynamicMetadata().filter_metadata();
   const auto filter_it = metadata.find(filter_name);
   if (filter_it != metadata.end()) {
     filter_it->second.SerializeToString(&req_->strValue);
-    bufSlice->data = req_->strValue.data();
-    bufSlice->len = req_->strValue.length();
-    bufSlice->cap = req_->strValue.length();
+    buf_slice->data = req_->strValue.data();
+    buf_slice->len = req_->strValue.length();
+    buf_slice->cap = req_->strValue.length();
   }
 }
 

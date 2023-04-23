@@ -203,7 +203,7 @@ private:
                                   const absl::string_view& buf);
 
   void populateSliceWithMetadata(ProcessorState& state, const std::string& filter_name,
-                                 GoSlice* bufSlice);
+                                 GoSlice* buf_slice);
 
   const FilterConfigSharedPtr config_;
   Dso::HttpFilterDsoPtr dynamic_lib_;
