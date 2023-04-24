@@ -422,7 +422,15 @@ stages:
     - bash: |
         set -e
 
-        sudo apt-get remove -y docker docker-engine docker.io containerd runc
+        # This is necessary as the azp version of Docker (~21.0) can hang when adding tarballs
+        # in a build (https://github.com/moby/buildkit/issues/3801)
+
+        # Update instructions lifted from https://docs.docker.com/engine/install/ubuntu/
+
+        export DEBIAN_FRONTEND=noninteractive
+
+        # This is almost certainly not necessarily but the canonical way
+        sudo apt-get -qq remove -y docker docker-engine docker.io containerd runc
 
         sudo install -m 0755 -d /etc/apt/keyrings
         curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
