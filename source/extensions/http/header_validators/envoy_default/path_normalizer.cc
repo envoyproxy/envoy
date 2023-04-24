@@ -20,6 +20,7 @@ using ::envoy::extensions::http::header_validators::envoy_default::v3::
     HeaderValidatorConfig_UriPathNormalizationOptions;
 using ::Envoy::Http::HeaderUtility;
 using ::Envoy::Http::RequestHeaderMap;
+using ::Envoy::Http::testCharInTable;
 using ::Envoy::Http::UhvResponseCodeDetail;
 
 struct PathNormalizerResponseCodeDetailValues {
@@ -86,7 +87,7 @@ PathNormalizer::normalizeAndDecodeOctet(std::string::iterator iter,
     ch += factor * (nibble >= 'A' ? (nibble - 'A' + 10) : (nibble - '0'));
   }
 
-  if (testChar(kUnreservedCharTable, ch)) {
+  if (testCharInTable(kUnreservedCharTable, ch)) {
     // Based on RFC, only decode characters in the UNRESERVED set.
     return {PercentDecodeResult::Decoded, ch};
   }
@@ -293,6 +294,8 @@ PathNormalizer::PathNormalizationResult PathNormalizer::decodePass(std::string& 
   auto write = std::next(begin);
   auto end = path.end();
   bool redirect = false;
+  const bool allow_invalid_url_encoding =
+      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.uhv_allow_malformed_url_encoding");
 
   while (read != end) {
     if (*read == '%') {
@@ -300,6 +303,12 @@ PathNormalizer::PathNormalizationResult PathNormalizer::decodePass(std::string& 
       // TODO(#23885) - add and honor config to not reject invalid percent-encoded octets.
       switch (decode_result.result()) {
       case PercentDecodeResult::Invalid:
+        if (allow_invalid_url_encoding) {
+          // Write the % character that starts invalid URL encoded sequence and then continue
+          // scanning from the next character.
+          *write++ = *read++;
+          break;
+        }
         ABSL_FALLTHROUGH_INTENDED;
       case PercentDecodeResult::Reject:
         // Reject the request

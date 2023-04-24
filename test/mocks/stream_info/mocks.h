@@ -63,7 +63,7 @@ public:
 
 class MockStreamInfo : public StreamInfo {
 public:
-  MockStreamInfo(FilterState::LifeSpan life_span = FilterState::LifeSpan::FilterChain);
+  MockStreamInfo();
   ~MockStreamInfo() override;
 
   // StreamInfo::StreamInfo
