@@ -19,7 +19,8 @@ namespace GenericProxy {
 
 RouteEntryImpl::RouteEntryImpl(const ProtoRouteAction& route_action,
                                Envoy::Server::Configuration::ServerFactoryContext& context)
-    : cluster_name_(route_action.cluster()), metadata_(route_action.metadata()) {
+    : name_(route_action.name()), cluster_name_(route_action.cluster()),
+      metadata_(route_action.metadata()) {
 
   for (const auto& proto_filter_config : route_action.per_filter_config()) {
     auto& factory = Config::Utility::getAndCheckFactoryByName<NamedFilterConfigFactory>(
@@ -49,6 +50,43 @@ Matcher::ActionFactoryCb RouteMatchActionFactory::createActionFactoryCb(
 }
 REGISTER_FACTORY(RouteMatchActionFactory, Matcher::ActionFactory<RouteActionContext>);
 
+VirtualHostImpl::VirtualHostImpl(const ProtoVirtualHost& virtual_host_config,
+                                 Envoy::Server::Configuration::ServerFactoryContext& context, bool)
+    : name_(virtual_host_config.name()) {
+  RouteActionValidationVisitor validation_visitor;
+  RouteActionContext action_context{context};
+
+  Matcher::MatchTreeFactory<Request, RouteActionContext> factory(action_context, context,
+                                                                 validation_visitor);
+
+  matcher_ = factory.create(virtual_host_config.routes())();
+
+  if (!validation_visitor.errors().empty()) {
+    throw EnvoyException(fmt::format("requirement violation while creating route match tree: {}",
+                                     validation_visitor.errors()[0]));
+  }
+}
+
+RouteEntryConstSharedPtr VirtualHostImpl::routeEntry(const Request& request) const {
+  auto match = Matcher::evaluateMatch<Request>(*matcher_, request);
+
+  if (match.result_) {
+    auto action = match.result_();
+
+    // The only possible action that can be used within the route matching context
+    // is the RouteMatchAction, so this must be true.
+    ASSERT(action->typeUrl() == RouteMatchAction::staticTypeUrl());
+    ASSERT(dynamic_cast<RouteMatchAction*>(action.get()));
+    const RouteMatchAction& route_action = static_cast<const RouteMatchAction&>(*action);
+
+    return route_action.route();
+  }
+
+  ENVOY_LOG(debug, "failed to match incoming request: {}",
+            static_cast<uint32_t>(match.match_state_));
+  return nullptr;
+}
+
 RouteMatcherImpl::RouteMatcherImpl(const ProtoRouteConfiguration& route_config,
                                    Envoy::Server::Configuration::ServerFactoryContext& context,
                                    bool)
@@ -66,6 +104,28 @@ RouteMatcherImpl::RouteMatcherImpl(const ProtoRouteConfiguration& route_config,
     throw EnvoyException(fmt::format("requirement violation while creating route match tree: {}",
                                      validation_visitor.errors()[0]));
   }
+}
+
+const VirtualHostImpl* RouteMatcherImpl::findWildcardVirtualHost(
+    const std::string& host, const RouteMatcher::WildcardVirtualHosts& wildcard_virtual_hosts,
+    RouteMatcher::SubstringFunction substring_function) const {
+  // We do a longest wildcard match against the host that's passed in
+  // (e.g. "foo-bar.baz.com" should match "*-bar.baz.com" before matching "*.baz.com" for suffix
+  // wildcards). This is done by scanning the length => wildcards map looking for every wildcard
+  // whose size is < length.
+  for (const auto& iter : wildcard_virtual_hosts) {
+    const uint32_t wildcard_length = iter.first;
+    const auto& wildcard_map = iter.second;
+    // >= because *.foo.com shouldn't match .foo.com.
+    if (wildcard_length >= host.size()) {
+      continue;
+    }
+    const auto& match = wildcard_map.find(substring_function(host, wildcard_length));
+    if (match != wildcard_map.end()) {
+      return match->second.get();
+    }
+  }
+  return nullptr;
 }
 
 RouteEntryConstSharedPtr RouteMatcherImpl::routeEntry(const Request& request) const {

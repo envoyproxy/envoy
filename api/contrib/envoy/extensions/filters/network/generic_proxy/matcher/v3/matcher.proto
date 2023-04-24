@@ -2,6 +2,8 @@ syntax = "proto3";
 
 package envoy.extensions.filters.network.generic_proxy.matcher.v3;
 
+import "envoy/type/matcher/v3/string.proto";
+
 import "xds/annotations/v3/status.proto";
 
 import "udpa/annotations/status.proto";
