@@ -4,5 +4,5 @@ package envoy;
 
 message Cookie {
   string address = 1;
-  uint32 expires = 2;
+  uint64 expires = 2;
 }
