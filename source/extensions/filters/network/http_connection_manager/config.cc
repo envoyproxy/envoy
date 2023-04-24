@@ -14,7 +14,7 @@
 #include "envoy/filesystem/filesystem.h"
 #include "envoy/registry/registry.h"
 #include "envoy/server/admin.h"
-#include "envoy/tracing/http_tracer.h"
+#include "envoy/tracing/tracer.h"
 #include "envoy/type/tracing/v3/custom_tag.pb.h"
 #include "envoy/type/v3/percent.pb.h"
 
@@ -536,7 +536,7 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
   }
 
   if (config.has_tracing()) {
-    http_tracer_ = tracer_manager.getOrCreateTracer(getPerFilterTracerConfig(config));
+    tracer_ = tracer_manager.getOrCreateTracer(getPerFilterTracerConfig(config));
     tracing_config_ = std::make_unique<Http::TracingConnectionManagerConfig>(context.direction(),
                                                                              config.tracing());
   }
