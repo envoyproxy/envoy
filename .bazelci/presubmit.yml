@@ -15,7 +15,6 @@ tasks:
   coverage:
     name: "Coverage"
     platform: ubuntu2004
-    bazel: "last_green"
     shell_commands:
     - "sudo apt -y update && sudo apt -y install automake autotools-dev cmake libtool m4 ninja-build"
     - "wget https://apt.llvm.org/llvm.sh && sudo bash llvm.sh 14"
