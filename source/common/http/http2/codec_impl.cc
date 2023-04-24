@@ -260,7 +260,6 @@ void ConnectionImpl::StreamImpl::encodeHeadersBase(const HeaderMap& headers, boo
 Status ConnectionImpl::ClientStreamImpl::encodeHeaders(const RequestHeaderMap& headers,
                                                        bool end_stream) {
   parent_.updateActiveStreamsOnEncode(*this);
-
   // Required headers must be present. This can only happen by some erroneous processing after the
   // downstream codecs decode.
   RETURN_IF_ERROR(HeaderUtility::checkRequiredRequestHeaders(headers));

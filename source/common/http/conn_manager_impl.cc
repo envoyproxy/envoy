@@ -1698,7 +1698,8 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ResponseHeaderMap& heade
   if (header_validator_) {
     auto result = header_validator_->transformResponseHeaders(headers);
     if (!result.status.ok()) {
-      // It is possible that the header map is invalid if an filter makes invalid modifications
+      // It is possible that the header map is invalid if an encoder filter makes invalid
+      // modifications
       // TODO(yanavlasov): add handling for this case.
     } else if (result.new_headers) {
       response_encoder_->encodeHeaders(*result.new_headers, end_stream);
