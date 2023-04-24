@@ -252,7 +252,7 @@ void parseFractionValue(SnapshotImpl::Entry& entry, const ProtobufWkt::Struct& v
 
 void setNumberValue(Envoy::Runtime::Snapshot::Entry& entry, double value) {
   entry.double_value_ = value;
-  if (value == static_cast<int>(value)) {
+  if (value < std::numeric_limits<int>::max() && value == static_cast<int>(value)) {
     entry.bool_value_ = value != 0;
   }
   if (entry.double_value_ >= 0 && entry.double_value_ <= std::numeric_limits<uint64_t>::max()) {
