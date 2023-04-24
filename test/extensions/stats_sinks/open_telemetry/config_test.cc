@@ -26,15 +26,6 @@ TEST(OpenTelemetryConfigTest, OpenTelemetrySinkType) {
 
   {
     envoy::extensions::stat_sinks::open_telemetry::v3::SinkConfig sink_config;
-    sink_config.set_http_service("otlp_http_cluster"); // not supported
-    ProtobufTypes::MessagePtr message = factory->createEmptyConfigProto();
-    TestUtility::jsonConvert(sink_config, *message);
-
-    EXPECT_THROW(factory->createStatsSink(*message, server), EnvoyException);
-  }
-
-  {
-    envoy::extensions::stat_sinks::open_telemetry::v3::SinkConfig sink_config;
     sink_config.mutable_grpc_service()->mutable_envoy_grpc()->set_cluster_name("otlp_grpc");
     ProtobufTypes::MessagePtr message = factory->createEmptyConfigProto();
     TestUtility::jsonConvert(sink_config, *message);
