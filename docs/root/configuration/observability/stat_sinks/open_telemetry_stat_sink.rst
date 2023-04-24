@@ -4,4 +4,9 @@ OpenTelemetry Stat Sink
 =========================
 
 The :ref:`OpenTelemetryStatsSink <envoy_v3_api_msg_extensions.stat_sinks.open_telemetry.v3.SinkConfig>` configuration specifies a
-stat sink that emits stats in OTLP format.
+stat sink that emits stats according to `OpenTelemetry Protocol Specification <https://opentelemetry.io/docs/reference/specification/protocol/otlp/>`.
+The export requests of this sink are sent to the collector service according to the Protobuf definition defined in
+`MetricService/Export https://github.com/open-telemetry/opentelemetry-proto/blob/main/opentelemetry/proto/collector/metrics/v1/metrics_service.proto`.
+The metric resources exported are defined in `metrics.proto https://github.com/open-telemetry/opentelemetry-proto/blob/main/opentelemetry/proto/metrics/v1/metrics.proto`.
+Any export request that this sink will contain a single `ResourceMetrics` message, a single `ScopeMetrics` and repeated `MetricRecord`,
+according to the number of metrics collected during the proccess run. ExportMetricsServiceRequest -> (single) ResourceMetrics -> (single) ScopeMetrics -> (repeated) Metric.

@@ -19,50 +19,29 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // Stats configuration proto schema for ``envoy.stat_sinks.open_telemetry`` sink.
 // [#extension: envoy.stat_sinks.open_telemetry]
 
-// [#next-free-field: 10]
+// [#next-free-field: 6]
 message SinkConfig {
   oneof protocol_specifier {
     option (validate.required) = true;
 
     // The upstream gRPC cluster that implements the OTLP/gRPC collector.
     config.core.v3.GrpcService grpc_service = 1 [(validate.rules).message = {required: true}];
-
-    // The upstream cluster that implements the OTLP/HTTP collector.
-    // [#not-implemented-hide:]
-    string http_service = 2;
   }
 
   // If set to true, counters will be emitted as deltas, and the OTLP message will have
   // ``AGGREGATION_TEMPORALITY_DELTA`` set as AggregationTemporality. Default value is false.
-  google.protobuf.BoolValue report_counters_as_deltas = 3;
+  google.protobuf.BoolValue report_counters_as_deltas = 2;
 
   // If set to true, histograms will be emitted as deltas, and the OTLP message will have
   // ``AGGREGATION_TEMPORALITY_DELTA`` set as AggregationTemporality. Default value is false.
-  google.protobuf.BoolValue report_histograms_as_deltas = 4;
+  google.protobuf.BoolValue report_histograms_as_deltas = 3;
 
   // If set to true, metrics will have their tags emitted as OTLP attributes, which may
   // contain values used by the tag extractor or additional tags added during stats creation.
   // Otherwise, no attributes will be associated with the export message. Default value is true.
-  google.protobuf.BoolValue emit_tags_as_attributes = 5;
+  google.protobuf.BoolValue emit_tags_as_attributes = 4;
 
   // If set to true, metric names will be represented as the tag extracted name instead
   // of the full metric name. Default value is true.
-  google.protobuf.BoolValue use_tag_extracted_name = 6;
-
-  // Histograms are being emitted as OTLP Histogram for the metric type. If set to true,
-  // histograms will be emitted as OTLP Summary metric type in addition. Default value is false.
-  // [#not-implemented-hide:]
-  google.protobuf.BoolValue emit_histogram_as_summary = 7;
-
-  // If set to true, failed export request will be retried with exponential backoff strategy,
-  // only if the response status code defined as retryable by the OpenTelemetry Protocol.
-  // Default value is false.
-  // [#not-implemented-hide:]
-  google.protobuf.BoolValue retry_otlp_retryable_failures = 8;
-
-  // If set to true, and ``http_service`` is chosen as the upstream collector protocol,
-  // the OTLP export requests will be encoded in JSON format, rather than Protobuf.
-  // Default value is false.
-  // [#not-implemented-hide:]
-  google.protobuf.BoolValue use_http_with_json = 9;
+  google.protobuf.BoolValue use_tag_extracted_name = 5;
 }
