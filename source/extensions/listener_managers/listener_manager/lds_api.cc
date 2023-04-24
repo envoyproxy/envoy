@@ -4,7 +4,6 @@
 #include "envoy/config/core/v3/config_source.pb.h"
 #include "envoy/config/listener/v3/listener.pb.h"
 #include "envoy/config/route/v3/route.pb.h"
-#include "envoy/config/route/v3/scoped_route.pb.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
 #include "envoy/stats/scope.h"
 
@@ -47,7 +46,6 @@ void LdsApiImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& a
   if (cm_.adsMux()) {
     const std::vector<std::string> paused_xds_types{
         Config::getTypeUrl<envoy::config::route::v3::RouteConfiguration>(),
-        Config::getTypeUrl<envoy::config::route::v3::ScopedRouteConfiguration>(),
         Config::getTypeUrl<envoy::extensions::transport_sockets::tls::v3::Secret>()};
     maybe_resume_rds_sds = cm_.adsMux()->pause(paused_xds_types);
   }
