@@ -28,6 +28,9 @@ removed_config_or_runtime:
 - area: upstream
   change: |
     removed runtime key ``envoy.reloadable_features.fix_hash_key`` and legacy code paths.
+- area: logging
+  change: |
+    removed runtime key ``envoy.reloadable_features.correct_remote_address`` and legacy code paths.
 
 new_features:
 - area: http
