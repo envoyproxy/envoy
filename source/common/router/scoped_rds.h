@@ -12,6 +12,7 @@
 #include "envoy/router/route_config_provider_manager.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
 #include "envoy/stats/scope.h"
+#include "envoy/router/scopes.h"
 
 #include "source/common/config/config_provider_impl.h"
 #include "source/common/config/subscription_base.h"
@@ -33,6 +34,11 @@ Envoy::Config::ConfigProviderPtr create(
     Server::Configuration::ServerFactoryContext& factory_context, Init::Manager& init_manager,
     const std::string& stat_prefix,
     Envoy::Config::ConfigProviderManager& scoped_routes_config_provider_manager);
+
+// If enabled in the HttpConnectionManager config, returns a ConfigProvider for scoped routing
+// configuration.
+ScopeKeyBuilderPtr createScopeKeyBuilder(const envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+        config);
 
 } // namespace ScopedRoutesConfigProviderUtil
 

@@ -158,6 +158,17 @@ ScopedConfigImpl::getRouteConfig(const Http::HeaderMap& headers) const {
   return nullptr;
 }
 
+Router::ConfigConstSharedPtr ScopedConfigImpl::getRouteConfig(const ScopeKeyPtr& scope_key) const {
+  if (scope_key == nullptr) {
+    return nullptr;
+  }
+  auto iter = scoped_route_info_by_key_.find(scope_key->hash());
+  if (iter != scoped_route_info_by_key_.end()) {
+    return iter->second->routeConfig();
+  }
+  return nullptr;
+}
+
 ScopeKeyPtr ScopedConfigImpl::computeScopeKey(const Http::HeaderMap& headers) const {
   ScopeKeyPtr scope_key = scope_key_builder_.computeScopeKey(headers);
   if (scope_key &&

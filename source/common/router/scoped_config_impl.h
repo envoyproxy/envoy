@@ -55,14 +55,14 @@ private:
 /**
  * Base class for ScopeKeyBuilder implementations.
  */
-class ScopeKeyBuilderBase {
+class ScopeKeyBuilderBase : public ScopeKeyBuilder {
 public:
   explicit ScopeKeyBuilderBase(ScopedRoutes::ScopeKeyBuilder&& config)
       : config_(std::move(config)) {}
-  virtual ~ScopeKeyBuilderBase() = default;
+  ~ScopeKeyBuilderBase() override = default;
 
   // Computes scope key for given headers, returns nullptr if a key can't be computed.
-  virtual ScopeKeyPtr computeScopeKey(const Http::HeaderMap& headers) const PURE;
+  ScopeKeyPtr computeScopeKey(const Http::HeaderMap& headers) const override;
 
 protected:
   const ScopedRoutes::ScopeKeyBuilder config_;
@@ -127,6 +127,7 @@ public:
 
   // Envoy::Router::ScopedConfig
   Router::ConfigConstSharedPtr getRouteConfig(const Http::HeaderMap& headers) const override;
+  Router::ConfigConstSharedPtr getRouteConfig(const ScopeKeyPtr& scope_key) const override;
   // The return value is not null only if the scope corresponding to the header exists.
   ScopeKeyPtr computeScopeKey(const Http::HeaderMap& headers) const override;
 

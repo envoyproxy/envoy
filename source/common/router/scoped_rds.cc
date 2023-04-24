@@ -78,6 +78,16 @@ ConfigProviderPtr create(
   PANIC_DUE_TO_CORRUPT_ENUM;
 }
 
+ScopeKeyBuilderPtr createScopeKeyBuilder(
+    const envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+        config) {
+  ASSERT(config.route_specifier_case() ==
+         envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
+             RouteSpecifierCase::kScopedRoutes);
+  auto scope_key_builder = config.scoped_routes().scope_key_builder();
+  return std::make_unique<ScopeKeyBuilderImpl>(std::move(scope_key_builder));
+}
+
 } // namespace ScopedRoutesConfigProviderUtil
 
 namespace {
