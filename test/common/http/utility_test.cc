@@ -1123,8 +1123,12 @@ TEST(HttpUtility, QueryParamsToString) {
 }
 
 TEST(HttpUtility, ResetReasonToString) {
-  EXPECT_EQ("connection failure",
-            Utility::resetReasonToString(Http::StreamResetReason::ConnectionFailure));
+  EXPECT_EQ("local connection failure",
+            Utility::resetReasonToString(Http::StreamResetReason::LocalConnectionFailure));
+  EXPECT_EQ("remote connection failure",
+            Utility::resetReasonToString(Http::StreamResetReason::RemoteConnectionFailure));
+  EXPECT_EQ("connection timeout",
+            Utility::resetReasonToString(Http::StreamResetReason::ConnectionTimeout));
   EXPECT_EQ("connection termination",
             Utility::resetReasonToString(Http::StreamResetReason::ConnectionTermination));
   EXPECT_EQ("local reset", Utility::resetReasonToString(Http::StreamResetReason::LocalReset));
@@ -1837,6 +1841,20 @@ TEST(Utility, isSafeRequest) {
 
   request_headers.removeMethod();
   EXPECT_FALSE(Utility::isSafeRequest(request_headers));
+};
+
+TEST(Utility, isValidRefererValue) {
+  EXPECT_TRUE(Utility::isValidRefererValue(absl::string_view("http://www.example.com")));
+  EXPECT_TRUE(
+      Utility::isValidRefererValue(absl::string_view("http://www.example.com/foo?bar=xyz")));
+  EXPECT_TRUE(Utility::isValidRefererValue(absl::string_view("/resource.html")));
+  EXPECT_TRUE(Utility::isValidRefererValue(absl::string_view("resource.html")));
+  EXPECT_TRUE(Utility::isValidRefererValue(absl::string_view("foo/bar/resource.html")));
+  EXPECT_FALSE(Utility::isValidRefererValue(absl::string_view("mal  formed/path/resource.html")));
+  EXPECT_FALSE(Utility::isValidRefererValue(absl::string_view("htp:/www.malformed.com")));
+  EXPECT_FALSE(
+      Utility::isValidRefererValue(absl::string_view("http://www.example.com/?foo=bar#fragment")));
+  EXPECT_FALSE(Utility::isValidRefererValue(absl::string_view("foo=bar#fragment")));
 };
 
 } // namespace Http

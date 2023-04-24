@@ -186,7 +186,10 @@ public:
       callbacks.addAccessLogHandler(handler);
     };
   }
-  void expectUhvTrailerCheckFail();
+  void expectUhvHeaderCheck(HeaderValidator::ValidationResult validation_result,
+                            HeaderValidator::HeadersTransformationResult transformation_result);
+  void expectUhvTrailerCheck(HeaderValidator::ValidationResult validation_result,
+                             HeaderValidator::TrailersTransformationResult transformation_result);
 
   Envoy::Event::SimulatedTimeSystem test_time_;
   NiceMock<Router::MockRouteConfigProvider> route_config_provider_;
@@ -236,7 +239,6 @@ public:
       std::make_shared<NiceMock<Tracing::MockTracer>>()};
   TracingConnectionManagerConfigPtr tracing_config_;
   SlowDateProviderImpl date_provider_{test_time_.timeSystem()};
-  NiceMock<MockStream> stream_;
   Http::StreamCallbacks* stream_callbacks_{nullptr};
   NiceMock<Upstream::MockClusterManager> cluster_manager_;
   NiceMock<Server::MockOverloadManager> overload_manager_;
@@ -262,7 +264,6 @@ public:
 
   const LocalReply::LocalReplyPtr local_reply_;
 
-  // TODO(mattklein123): Not all tests have been converted over to better setup. Convert the rest.
   NiceMock<MockResponseEncoder> response_encoder_;
   std::vector<MockStreamDecoderFilter*> decoder_filters_;
   std::vector<MockStreamEncoderFilter*> encoder_filters_;

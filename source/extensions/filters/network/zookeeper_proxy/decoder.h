@@ -148,7 +148,7 @@ private:
                                         Buffer::OwnedImpl& zk_filter_buffer);
   void decodeAndBufferHelper(Buffer::Instance& data, DecodeType dtype,
                              Buffer::OwnedImpl& zk_filter_buffer);
-  void decode(Buffer::Instance& data, DecodeType dtype);
+  void decode(Buffer::Instance& data, DecodeType dtype, uint64_t full_packets_len);
   void decodeOnData(Buffer::Instance& data, uint64_t& offset);
   void decodeOnWrite(Buffer::Instance& data, uint64_t& offset);
   void parseConnect(Buffer::Instance& data, uint64_t& offset, uint32_t len);

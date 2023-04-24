@@ -25,6 +25,7 @@
 #include "test/mocks/upstream/cluster_info.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/printers.h"
+#include "test/test_common/simulated_time_system.h"
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
 #include "test/test_common/utility.h"
@@ -200,6 +201,35 @@ TEST(SubstitutionFormatterTest, plainNumberFormatter) {
   EXPECT_THAT(formatter.formatValue(request_headers, response_headers, response_trailers,
                                     stream_info, body),
               ProtoEq(ValueUtil::numberValue(400)));
+}
+
+TEST(SubstitutionFormatterTest, inFlightDuration) {
+  Event::SimulatedTimeSystem time_system;
+  time_system.setSystemTime(std::chrono::milliseconds(0));
+  StreamInfo::StreamInfoImpl stream_info{Http::Protocol::Http2, time_system, nullptr};
+  Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"}, {":path", "/"}};
+  Http::TestResponseHeaderMapImpl response_headers;
+  Http::TestResponseTrailerMapImpl response_trailers;
+  std::string body;
+
+  {
+    time_system.setMonotonicTime(MonotonicTime(std::chrono::milliseconds(100)));
+    StreamInfoFormatter duration_format("DURATION");
+    EXPECT_EQ("100", duration_format.format(request_headers, response_headers, response_trailers,
+                                            stream_info, body));
+  }
+
+  {
+    time_system.setMonotonicTime(MonotonicTime(std::chrono::milliseconds(200)));
+    StreamInfoFormatter duration_format("DURATION");
+    EXPECT_EQ("200", duration_format.format(request_headers, response_headers, response_trailers,
+                                            stream_info, body));
+
+    time_system.setMonotonicTime(MonotonicTime(std::chrono::milliseconds(300)));
+    EXPECT_THAT(duration_format.formatValue(request_headers, response_headers, response_trailers,
+                                            stream_info, body),
+                ProtoEq(ValueUtil::numberValue(300.0)));
+  }
 }
 
 TEST(SubstitutionFormatterTest, streamInfoFormatter) {
@@ -534,7 +564,7 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
   {
     StreamInfoFormatter duration_format("DURATION");
     absl::optional<std::chrono::nanoseconds> dur = std::chrono::nanoseconds(15000000);
-    EXPECT_CALL(stream_info, requestComplete()).WillRepeatedly(Return(dur));
+    EXPECT_CALL(stream_info, currentDuration()).WillRepeatedly(Return(dur));
     EXPECT_EQ("15", duration_format.format(request_headers, response_headers, response_trailers,
                                            stream_info, body));
     EXPECT_THAT(duration_format.formatValue(request_headers, response_headers, response_trailers,

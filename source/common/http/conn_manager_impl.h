@@ -157,6 +157,7 @@ private:
   struct ActiveStream final : LinkedObject<ActiveStream>,
                               public Event::DeferredDeletable,
                               public StreamCallbacks,
+                              public CodecEventCallbacks,
                               public RequestDecoder,
                               public Tracing::Config,
                               public ScopeTrackedObject,
@@ -183,6 +184,10 @@ private:
                        absl::string_view transport_failure_reason) override;
     void onAboveWriteBufferHighWatermark() override;
     void onBelowWriteBufferLowWatermark() override;
+
+    // Http::CodecEventCallbacks
+    void onCodecEncodeComplete() override;
+    void onCodecLowLevelReset() override;
 
     // Http::StreamDecoder
     void decodeData(Buffer::Instance& data, bool end_stream) override;
@@ -267,9 +272,6 @@ private:
     void endStream() override {
       ASSERT(!state_.codec_saw_local_complete_);
       state_.codec_saw_local_complete_ = true;
-      filter_manager_.streamInfo().downstreamTiming().onLastDownstreamTxByteSent(
-          connection_manager_.time_source_);
-      request_response_timespan_->complete();
       connection_manager_.doEndStream(*this);
     }
     void onDecoderFilterBelowWriteBufferLowWatermark() override;
@@ -302,6 +304,25 @@ private:
     void requestRouteConfigUpdate(
         Http::RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb) override;
 
+    // Set cached route. This method should never be called directly. This is only called in the
+    // setRoute(), clearRouteCache(), and refreshCachedRoute() methods.
+    void setCachedRoute(absl::optional<Router::RouteConstSharedPtr>&& route);
+    // Block the route cache and clear the snapped route config. By doing this the route cache will
+    // not be updated. And if the route config is updated by the RDS, the snapped route config may
+    // be freed before the stream is destroyed.
+    // This will be called automatically at the end of handle response headers.
+    void blockRouteCache();
+    // Return true if the cached route is blocked.
+    bool routeCacheBlocked() const {
+      ENVOY_BUG(!route_cache_blocked_,
+                "Should never try to refresh or clear the route cache when "
+                "it is blocked! To temporarily ignore this new constraint, "
+                "set runtime flag "
+                "`envoy.reloadable_features.prohibit_route_refresh_after_response_headers_sent` "
+                "to `false`");
+      return route_cache_blocked_;
+    }
+
     absl::optional<Router::ConfigConstSharedPtr> routeConfig();
     void traceRequest();
 
@@ -320,15 +341,26 @@ private:
     // All state for the stream. Put here for readability.
     struct State {
       State()
-          : codec_saw_local_complete_(false), saw_connection_close_(false),
-            successful_upgrade_(false), is_internally_created_(false), is_tunneling_(false),
-            decorated_propagate_(true) {}
+          : codec_saw_local_complete_(false), codec_encode_complete_(false),
+            on_reset_stream_called_(false), is_zombie_stream_(false), saw_connection_close_(false),
+            successful_upgrade_(false), is_internally_destroyed_(false),
+            is_internally_created_(false), is_tunneling_(false), decorated_propagate_(true) {}
 
-      bool codec_saw_local_complete_ : 1; // This indicates that local is complete as written all
-                                          // the way through to the codec.
+      // It's possibly for the codec to see the completed response but not fully
+      // encode it.
+      bool codec_saw_local_complete_ : 1; // This indicates that local is complete as the completed
+                                          // response has made its way to the codec.
+      bool codec_encode_complete_ : 1;    // This indicates that the codec has
+                                          // completed encoding the response.
+      bool on_reset_stream_called_ : 1;   // Whether the stream has been reset.
+      bool is_zombie_stream_ : 1;         // Whether stream is waiting for signal
+                                          // the underlying codec to be destroyed.
       bool saw_connection_close_ : 1;
       bool successful_upgrade_ : 1;
 
+      // True if this stream was the original externally created stream, but was
+      // destroyed as part of internal redirect.
+      bool is_internally_destroyed_ : 1;
       // True if this stream is internally created. Currently only used for
       // internal redirects or other streams created via recreateStream().
       bool is_internally_created_ : 1;
@@ -339,6 +371,11 @@ private:
 
       bool decorated_propagate_ : 1;
     };
+
+    bool canDestroyStream() const {
+      return state_.on_reset_stream_called_ || state_.codec_encode_complete_ ||
+             state_.is_internally_destroyed_;
+    }
 
     // Per-stream idle timeout callback.
     void onIdleTimeout();
@@ -397,8 +434,6 @@ private:
     // destruction.
     DownstreamFilterManager filter_manager_;
 
-    Router::ConfigConstSharedPtr snapped_route_config_;
-    Router::ScopedConfigConstSharedPtr snapped_scoped_routes_config_;
     Tracing::SpanPtr active_span_;
     ResponseEncoder* response_encoder_{};
     Stats::TimespanPtr request_response_timespan_;
@@ -421,7 +456,37 @@ private:
 
     std::chrono::milliseconds idle_timeout_ms_{};
     State state_;
+
+    const bool expand_agnostic_stream_lifetime_;
+
+    // Snapshot of the route configuration at the time of request is started. This is used to ensure
+    // that the same route configuration is used throughout the lifetime of the request. This
+    // snapshot will be cleared when the cached route is blocked. Because after that we will not
+    // refresh the cached route and release this snapshot can help to release the memory when the
+    // route configuration is updated frequently and the request is long-lived.
+    Router::ConfigConstSharedPtr snapped_route_config_;
+    Router::ScopedConfigConstSharedPtr snapped_scoped_routes_config_;
+    // This is used to track the route that has been cached in the request. And we will keep this
+    // route alive until the request is finished.
     absl::optional<Router::RouteConstSharedPtr> cached_route_;
+    // This is used to track whether the route has been blocked. If the route is blocked, we can not
+    // clear it or refresh it.
+    bool route_cache_blocked_{false};
+    // This is used to track routes that have been cleared from the request. By this way, all the
+    // configurations that have been used in the processing of the request will be alive until the
+    // request is finished.
+    // For example, if a filter stored a per-route config in the decoding phase and may try to
+    // use it in the encoding phase, but the route is cleared and refreshed by another decoder
+    // filter, we must keep the per-route config alive to avoid use-after-free.
+    // Note that we assume that the number of routes that have been cleared is small. So we use
+    // inline vector to avoid heap allocation. If this assumption is wrong, we should consider using
+    // a list or other data structures.
+    //
+    // TODO(wbpcode): This is a helpless compromise. To avoid exposing the complexity of the route
+    // lifetime management to every HTTP filter, we do a hack here. But if every filter could manage
+    // the lifetime of the route config by itself easily, we could remove this hack.
+    absl::InlinedVector<Router::RouteConstSharedPtr, 3> cleared_cached_routes_;
+
     absl::optional<Upstream::ClusterInfoConstSharedPtr> cached_cluster_info_;
     const std::string* decorated_operation_{nullptr};
     std::unique_ptr<RdsRouteConfigUpdateRequester> route_config_update_requester_;

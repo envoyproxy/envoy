@@ -38,9 +38,14 @@ jobs:
           --linkopt=-fuse-ld=lld \
           //:android_dist
     - name: 'Tar artifacts'
-      run: tar -czvf envoy_android_aar_sources.tar.gz bazel-bin/library/kotlin/io/envoyproxy/envoymobile/envoy.aar bazel-bin/library/kotlin/io/envoyproxy/envoymobile/envoy-pom.xml bazel-bin/library/kotlin/io/envoyproxy/envoymobile/envoy-sources.jar bazel-bin/library/kotlin/io/envoyproxy/envoymobile/envoy-javadoc.jar
+      run: |
+        tar -czvf envoy_android_aar_sources.tar.gz \
+            bazel-bin/library/kotlin/io/envoyproxy/envoymobile/envoy.aar \
+            bazel-bin/library/kotlin/io/envoyproxy/envoymobile/envoy-pom.xml \
+            bazel-bin/library/kotlin/io/envoyproxy/envoymobile/envoy-sources.jar \
+            bazel-bin/library/kotlin/io/envoyproxy/envoymobile/envoy-javadoc.jar
       working-directory: mobile
-    - uses: actions/upload-artifact@v2
+    - uses: actions/upload-artifact@v3
       with:
         name: envoy_android_aar_sources
         path: mobile/envoy_android_aar_sources.tar.gz

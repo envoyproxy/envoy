@@ -582,6 +582,7 @@ std::string SubsetLoadBalancer::describeMetadata(const SubsetLoadBalancer::Subse
   }
 
   std::ostringstream buf;
+#ifdef ENVOY_ENABLE_YAML
   bool first = true;
   for (const auto& it : kvs) {
     if (!first) {
@@ -591,9 +592,9 @@ std::string SubsetLoadBalancer::describeMetadata(const SubsetLoadBalancer::Subse
     }
 
     const ProtobufWkt::Value& value = it.second;
-    buf << it.first << "=" << MessageUtil::getJsonStringFromMessageOrDie(value);
+    buf << it.first << "=" << MessageUtil::getJsonStringFromMessageOrError(value);
   }
-
+#endif
   return buf.str();
 }
 

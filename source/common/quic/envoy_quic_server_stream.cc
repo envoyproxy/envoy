@@ -80,6 +80,9 @@ void EnvoyQuicServerStream::encodeHeaders(const Http::ResponseHeaderMap& headers
   }
 
   if (local_end_stream_) {
+    if (codec_callbacks_) {
+      codec_callbacks_->onCodecEncodeComplete();
+    }
     onLocalEndStream();
   }
 }
@@ -137,6 +140,9 @@ void EnvoyQuicServerStream::encodeData(Buffer::Instance& data, bool end_stream) 
   }
 #endif
   if (local_end_stream_) {
+    if (codec_callbacks_) {
+      codec_callbacks_->onCodecEncodeComplete();
+    }
     onLocalEndStream();
   }
 }
@@ -157,6 +163,9 @@ void EnvoyQuicServerStream::encodeTrailers(const Http::ResponseTrailerMap& trail
     size_t bytes_sent = WriteTrailers(envoyHeadersToHttp2HeaderBlock(trailers), nullptr);
     ENVOY_BUG(bytes_sent != 0, "Failed to encode trailers.");
     stats_gatherer_->addBytesSent(bytes_sent, true);
+  }
+  if (codec_callbacks_) {
+    codec_callbacks_->onCodecEncodeComplete();
   }
   onLocalEndStream();
 }
@@ -215,6 +224,7 @@ void EnvoyQuicServerStream::OnInitialHeadersComplete(bool fin, size_t frame_len,
   if (fin) {
     end_stream_decoded_ = true;
   }
+  saw_regular_headers_ = false;
   quic::QuicRstStreamErrorCode rst = quic::QUIC_STREAM_NO_ERROR;
   std::unique_ptr<Http::RequestHeaderMapImpl> headers =
       quicHeadersToEnvoyHeaders<Http::RequestHeaderMapImpl>(
@@ -223,8 +233,9 @@ void EnvoyQuicServerStream::OnInitialHeadersComplete(bool fin, size_t frame_len,
     onStreamError(close_connection_upon_invalid_header_, rst);
     return;
   }
-  if (Http::HeaderUtility::requestHeadersValid(*headers) != absl::nullopt ||
-      Http::HeaderUtility::checkRequiredRequestHeaders(*headers) != Http::okStatus() ||
+
+  if (Http::HeaderUtility::checkRequiredRequestHeaders(*headers) != Http::okStatus() ||
+      Http::HeaderUtility::checkValidRequestHeaders(*headers) != Http::okStatus() ||
       (headers->Protocol() && !spdy_session()->allow_extended_connect())) {
     details_ = Http3ResponseCodeDetailValues::invalid_http_header;
     onStreamError(absl::nullopt);
@@ -302,11 +313,11 @@ void EnvoyQuicServerStream::OnBodyAvailable() {
 void EnvoyQuicServerStream::OnTrailingHeadersComplete(bool fin, size_t frame_len,
                                                       const quic::QuicHeaderList& header_list) {
   mutableBytesMeter()->addHeaderBytesReceived(frame_len);
+  ENVOY_STREAM_LOG(debug, "Received trailers: {}.", *this, received_trailers().DebugString());
+  quic::QuicSpdyServerStreamBase::OnTrailingHeadersComplete(fin, frame_len, header_list);
   if (read_side_closed()) {
     return;
   }
-  ENVOY_STREAM_LOG(debug, "Received trailers: {}.", *this, received_trailers().DebugString());
-  quic::QuicSpdyServerStreamBase::OnTrailingHeadersComplete(fin, frame_len, header_list);
   ASSERT(trailers_decompressed());
   if (session()->connection()->connected() && !rst_sent()) {
     maybeDecodeTrailers();
@@ -462,6 +473,22 @@ EnvoyQuicServerStream::validateHeader(absl::string_view header_name,
       header_name, headers_with_underscores_action_, stats_);
   if (result != Http::HeaderUtility::HeaderValidationResult::ACCEPT) {
     details_ = Http3ResponseCodeDetailValues::invalid_underscore;
+    return result;
+  }
+  ASSERT(!header_name.empty());
+  if (!Http::HeaderUtility::isPseudoHeader(header_name)) {
+    return result;
+  }
+  static const absl::flat_hash_set<std::string> known_pseudo_headers{":authority", ":protocol",
+                                                                     ":path", ":method", ":scheme"};
+  if (header_name == ":path") {
+    if (saw_path_) {
+      // According to RFC9114, :path header should only have one value.
+      return Http::HeaderUtility::HeaderValidationResult::REJECT;
+    }
+    saw_path_ = true;
+  } else if (!known_pseudo_headers.contains(header_name)) {
+    return Http::HeaderUtility::HeaderValidationResult::REJECT;
   }
   return result;
 }

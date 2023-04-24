@@ -40,15 +40,14 @@ class TestStaticClusterFactory : public Event::TestUsingSimulatedTime,
 public:
   TestStaticClusterFactory() : ClusterFactoryImplBase("envoy.clusters.test_static") {}
 
-  std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr> createClusterImpl(
-      Server::Configuration::ServerFactoryContext& server_context,
-      const envoy::config::cluster::v3::Cluster& cluster, ClusterFactoryContext& context,
-      Server::Configuration::TransportSocketFactoryContextImpl& socket_factory_context,
-      Stats::ScopeSharedPtr&& stats_scope) override {
-    return std::make_pair(std::make_shared<CustomStaticCluster>(
-                              server_context, cluster, context.runtime(), socket_factory_context,
-                              std::move(stats_scope), context.addedViaApi(), 1, "127.0.0.1", 80),
-                          nullptr);
+  std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr>
+  createClusterImpl(Server::Configuration::ServerFactoryContext& server_context,
+                    const envoy::config::cluster::v3::Cluster& cluster,
+                    ClusterFactoryContext& context) override {
+    return std::make_pair(
+        std::make_shared<CustomStaticCluster>(server_context, cluster, context, context.runtime(),
+                                              context.addedViaApi(), 1, "127.0.0.1", 80),
+        nullptr);
   }
 };
 

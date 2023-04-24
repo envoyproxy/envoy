@@ -20,6 +20,7 @@
 #include "source/common/router/header_parser.h"
 #include "source/common/stream_info/stream_info_impl.h"
 #include "source/common/upstream/health_checker_impl.h"
+#include "source/extensions/health_checkers/common/health_checker_base_impl.h"
 
 #include "src/proto/grpc/health/v1/health.pb.h"
 

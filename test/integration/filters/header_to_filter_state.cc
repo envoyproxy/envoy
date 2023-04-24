@@ -24,13 +24,13 @@ public:
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers, bool) override {
     const auto entry = headers.get(header_);
     if (!entry.empty()) {
-      auto shared = StreamInfo::FilterState::StreamSharing::None;
+      auto shared = StreamInfo::StreamSharingMayImpactPooling::None;
       switch (shared_) {
       case test::integration::filters::SharingConfig::ONCE:
-        shared = StreamInfo::FilterState::StreamSharing::SharedWithUpstreamConnectionOnce;
+        shared = StreamInfo::StreamSharingMayImpactPooling::SharedWithUpstreamConnectionOnce;
         break;
       case test::integration::filters::SharingConfig::TRANSITIVE:
-        shared = StreamInfo::FilterState::StreamSharing::SharedWithUpstreamConnection;
+        shared = StreamInfo::StreamSharingMayImpactPooling::SharedWithUpstreamConnection;
         break;
       default:
         break;
