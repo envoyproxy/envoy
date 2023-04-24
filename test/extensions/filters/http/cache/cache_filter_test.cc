@@ -276,8 +276,7 @@ TEST_F(CacheFilterTest, CacheMissWithTrailers) {
 
     // Encode response header
     EXPECT_EQ(filter->encodeHeaders(response_headers_, false), Http::FilterHeadersStatus::Continue);
-    EXPECT_EQ(filter->encodeData(body_buffer, false),
-              Http::FilterDataStatus::StopIterationAndWatermark);
+    EXPECT_EQ(filter->encodeData(body_buffer, false), Http::FilterDataStatus::Continue);
     EXPECT_EQ(filter->encodeTrailers(trailers), Http::FilterTrailersStatus::Continue);
 
     filter->onStreamComplete();
@@ -330,7 +329,7 @@ TEST_F(CacheFilterTest, CacheHitWithBody) {
     Buffer::OwnedImpl buffer(body);
     response_headers_.setContentLength(body.size());
     EXPECT_EQ(filter->encodeHeaders(response_headers_, false), Http::FilterHeadersStatus::Continue);
-    EXPECT_EQ(filter->encodeData(buffer, true), Http::FilterDataStatus::StopIterationAndWatermark);
+    EXPECT_EQ(filter->encodeData(buffer, true), Http::FilterDataStatus::Continue);
     // The cache insertBody callback should be posted to the dispatcher.
     // Run events on the dispatcher so that the callback is invoked.
     dispatcher_->run(Event::Dispatcher::RunType::Block);
@@ -394,7 +393,7 @@ TEST_F(CacheFilterTest, CacheInsertAbortedByCache) {
     Buffer::OwnedImpl buffer(body);
     response_headers_.setContentLength(body.size());
     EXPECT_EQ(filter->encodeHeaders(response_headers_, false), Http::FilterHeadersStatus::Continue);
-    EXPECT_EQ(filter->encodeData(buffer, true), Http::FilterDataStatus::StopIterationAndWatermark);
+    EXPECT_EQ(filter->encodeData(buffer, true), Http::FilterDataStatus::Continue);
     // The cache insertBody callback should be posted to the dispatcher.
     // Run events on the dispatcher so that the callback is invoked.
     dispatcher_->run(Event::Dispatcher::RunType::Block);
@@ -426,7 +425,10 @@ TEST_F(CacheFilterTest, SuccessfulValidation) {
     Buffer::OwnedImpl buffer(body);
     response_headers_.setContentLength(body.size());
     EXPECT_EQ(filter->encodeHeaders(response_headers_, false), Http::FilterHeadersStatus::Continue);
-    EXPECT_EQ(filter->encodeData(buffer, true), Http::FilterDataStatus::StopIterationAndWatermark);
+    EXPECT_EQ(filter->encodeData(buffer, true), Http::FilterDataStatus::Continue);
+    // The cache getBody callback should be posted to the dispatcher.
+    // Run events on the dispatcher so that the callback is invoked.
+    dispatcher_->run(Event::Dispatcher::RunType::Block);
 
     filter->onStreamComplete();
     EXPECT_THAT(lookupStatus(), IsOkAndHolds(LookupStatus::CacheMiss));
@@ -514,7 +516,10 @@ TEST_F(CacheFilterTest, UnsuccessfulValidation) {
     Buffer::OwnedImpl buffer(body);
     response_headers_.setContentLength(body.size());
     EXPECT_EQ(filter->encodeHeaders(response_headers_, false), Http::FilterHeadersStatus::Continue);
-    EXPECT_EQ(filter->encodeData(buffer, true), Http::FilterDataStatus::StopIterationAndWatermark);
+    EXPECT_EQ(filter->encodeData(buffer, true), Http::FilterDataStatus::Continue);
+    // The cache getBody callback should be posted to the dispatcher.
+    // Run events on the dispatcher so that the callback is invoked.
+    dispatcher_->run(Event::Dispatcher::RunType::Block);
 
     filter->onStreamComplete();
     EXPECT_THAT(lookupStatus(), IsOkAndHolds(LookupStatus::CacheMiss));
@@ -546,8 +551,7 @@ TEST_F(CacheFilterTest, UnsuccessfulValidation) {
     // The filter should not stop encoding iteration as this is a new response.
     EXPECT_EQ(filter->encodeHeaders(response_headers_, false), Http::FilterHeadersStatus::Continue);
     Buffer::OwnedImpl new_body;
-    EXPECT_EQ(filter->encodeData(new_body, true),
-              Http::FilterDataStatus::StopIterationAndWatermark);
+    EXPECT_EQ(filter->encodeData(new_body, true), Http::FilterDataStatus::Continue);
 
     // The response headers should have the new status.
     EXPECT_THAT(response_headers_, HeaderHasValueRef(Http::Headers::get().Status, "204"));
@@ -583,7 +587,10 @@ TEST_F(CacheFilterTest, SingleSatisfiableRange) {
     Buffer::OwnedImpl buffer(body);
     response_headers_.setContentLength(body.size());
     EXPECT_EQ(filter->encodeHeaders(response_headers_, false), Http::FilterHeadersStatus::Continue);
-    EXPECT_EQ(filter->encodeData(buffer, true), Http::FilterDataStatus::StopIterationAndWatermark);
+    EXPECT_EQ(filter->encodeData(buffer, true), Http::FilterDataStatus::Continue);
+    // The cache getBody callback should be posted to the dispatcher.
+    // Run events on the dispatcher so that the callback is invoked.
+    dispatcher_->run(Event::Dispatcher::RunType::Block);
 
     filter->onStreamComplete();
     EXPECT_THAT(lookupStatus(), IsOkAndHolds(LookupStatus::CacheMiss));
@@ -645,7 +652,10 @@ TEST_F(CacheFilterTest, MultipleSatisfiableRanges) {
     Buffer::OwnedImpl buffer(body);
     response_headers_.setContentLength(body.size());
     EXPECT_EQ(filter->encodeHeaders(response_headers_, false), Http::FilterHeadersStatus::Continue);
-    EXPECT_EQ(filter->encodeData(buffer, true), Http::FilterDataStatus::StopIterationAndWatermark);
+    EXPECT_EQ(filter->encodeData(buffer, true), Http::FilterDataStatus::Continue);
+    // The cache getBody callback should be posted to the dispatcher.
+    // Run events on the dispatcher so that the callback is invoked.
+    dispatcher_->run(Event::Dispatcher::RunType::Block);
 
     filter->onStreamComplete();
     EXPECT_THAT(lookupStatus(), IsOkAndHolds(LookupStatus::CacheMiss));
@@ -703,7 +713,10 @@ TEST_F(CacheFilterTest, NotSatisfiableRange) {
     Buffer::OwnedImpl buffer(body);
     response_headers_.setContentLength(body.size());
     EXPECT_EQ(filter->encodeHeaders(response_headers_, false), Http::FilterHeadersStatus::Continue);
-    EXPECT_EQ(filter->encodeData(buffer, true), Http::FilterDataStatus::StopIterationAndWatermark);
+    EXPECT_EQ(filter->encodeData(buffer, true), Http::FilterDataStatus::Continue);
+    // The cache getBody callback should be posted to the dispatcher.
+    // Run events on the dispatcher so that the callback is invoked.
+    dispatcher_->run(Event::Dispatcher::RunType::Block);
 
     filter->onStreamComplete();
     EXPECT_THAT(lookupStatus(), IsOkAndHolds(LookupStatus::CacheMiss));

@@ -10,6 +10,7 @@
 #include "source/common/common/logger.h"
 #include "source/extensions/filters/http/cache/cache_filter_logging_info.h"
 #include "source/extensions/filters/http/cache/cache_headers_utils.h"
+#include "source/extensions/filters/http/cache/cache_insert_queue.h"
 #include "source/extensions/filters/http/cache/http_cache.h"
 #include "source/extensions/filters/http/common/pass_through_filter.h"
 
@@ -82,8 +83,8 @@ private:
   void onTrailers(Http::ResponseTrailerMapPtr&& trailers);
 
   // Called with the result of the InsertCallback called by the cache implementation,
-  // and the original end_stream value from the encodeBody.
-  void insertBodyCompleted(bool ready, bool end_stream);
+  // and the original end_stream value from the encodeHeaders/encodeBody (true for trailers).
+  void insertChunkCompleted(bool ready, bool end_stream);
 
   // Set required state in the CacheFilter for handling a cache hit.
   void handleCacheHit();
@@ -130,11 +131,12 @@ private:
   // being cancelled.
   InsertStatus insertStatus() const;
 
-  bool waiting_for_insert_body_ = false;
+  std::unique_ptr<CacheInsertQueue> insert_queue_;
+  std::function<void(bool ready)> makeChunkCompleteCallback(bool end_stream);
+  std::function<void(bool ready, bool end_stream)> chunk_complete_callback_;
   TimeSource& time_source_;
   OptRef<HttpCache> cache_;
   LookupContextPtr lookup_;
-  InsertContextPtr insert_;
   LookupResultPtr lookup_result_;
 
   // Tracks what body bytes still need to be read from the cache. This is

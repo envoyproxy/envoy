@@ -42,8 +42,9 @@ void CacheFilter::onDestroy() {
   if (lookup_) {
     lookup_->onDestroy();
   }
-  if (insert_) {
-    insert_->onDestroy();
+  if (insert_queue_) {
+    insert_queue_->takeOwnershipOfYourself(std::move(insert_queue_));
+    insert_queue_.reset();
   }
 }
 
@@ -134,15 +135,27 @@ Http::FilterHeadersStatus CacheFilter::encodeHeaders(Http::ResponseHeaderMap& he
   if (request_allows_inserts_ && !is_head_request_ &&
       CacheabilityUtils::isCacheableResponse(headers, vary_allow_list_)) {
     ENVOY_STREAM_LOG(debug, "CacheFilter::encodeHeaders inserting headers", *encoder_callbacks_);
-    insert_ = cache_->makeInsertContext(std::move(lookup_), *encoder_callbacks_);
-    // Add metadata associated with the cached response. Right now this is only response_time;
-    const ResponseMetadata metadata = {time_source_.systemTime()};
-    // TODO(capoferro): Note that there is currently no way to communicate back to the CacheFilter
-    // that an insert has failed. If an insert fails partway, it's better not to send additional
-    // chunks to the cache if we're already in a failure state and should abort, but we can only do
-    // that if we can communicate failures back to the filter, so we should fix this.
-    insert_->insertHeaders(
-        headers, metadata, [](bool) {}, end_stream);
+    auto insert_context = cache_->makeInsertContext(std::move(lookup_), *encoder_callbacks_);
+    if (insert_context) {
+      // The callbacks passed to CacheInsertQueue are all called through the dispatcher,
+      // so they're thread-safe, and onDestroy will prevent them from being called via
+      // giving the queue ownership of itself, so they're also filter-destruction-safe.
+      insert_queue_ = std::make_unique<CacheInsertQueue>(
+          decoder_callbacks_->dispatcher(), std::move(insert_context),
+          encoder_callbacks_->encoderBufferLimit(), encoder_callbacks_->encoderBufferLimit() / 2,
+          // High watermark callback.
+          [this]() { encoder_callbacks_->onEncoderFilterAboveWriteBufferHighWatermark(); },
+          // Low watermark callback.
+          [this]() { encoder_callbacks_->onEncoderFilterBelowWriteBufferLowWatermark(); },
+          // Cache aborted callback.
+          [this]() {
+            insert_queue_ = nullptr;
+            insert_status_ = InsertStatus::InsertAbortedByCache;
+          });
+      // Add metadata associated with the cached response. Right now this is only response_time;
+      const ResponseMetadata metadata = {time_source_.systemTime()};
+      insert_queue_->insertHeaders(headers, metadata, end_stream);
+    }
     if (end_stream) {
       insert_status_ = InsertStatus::InsertSucceeded;
     }
@@ -156,7 +169,6 @@ Http::FilterHeadersStatus CacheFilter::encodeHeaders(Http::ResponseHeaderMap& he
 }
 
 Http::FilterDataStatus CacheFilter::encodeData(Buffer::Instance& data, bool end_stream) {
-  ASSERT(!waiting_for_insert_body_);
   if (filter_state_ == FilterState::DecodeServingFromCache) {
     // This call was invoked during decoding by decoder_callbacks_->encodeData because a fresh
     // cached response was found and is being added to the encoding stream -- ignore it.
@@ -166,39 +178,17 @@ Http::FilterDataStatus CacheFilter::encodeData(Buffer::Instance& data, bool end_
     // Stop the encoding stream until the cached response is fetched & added to the encoding stream.
     return Http::FilterDataStatus::StopIterationAndBuffer;
   }
-  if (insert_) {
+  if (insert_queue_) {
     ENVOY_STREAM_LOG(debug, "CacheFilter::encodeData inserting body", *encoder_callbacks_);
-    waiting_for_insert_body_ = true;
-    insert_->insertBody(
-        data,
-        [end_stream, self = weak_from_this(),
-         &dispatcher = decoder_callbacks_->dispatcher()](bool ready) {
-          dispatcher.post([self, ready, end_stream]() {
-            auto pthis = self.lock();
-            if (pthis) {
-              pthis->insertBodyCompleted(ready, end_stream);
-            }
-          });
-        },
-        end_stream);
-    return Http::FilterDataStatus::StopIterationAndWatermark;
-  }
-  return Http::FilterDataStatus::Continue;
-}
-
-void CacheFilter::insertBodyCompleted(bool ready, bool end_stream) {
-  ASSERT(waiting_for_insert_body_);
-  waiting_for_insert_body_ = false;
-  if (ready) {
+    insert_queue_->insertBody(data, end_stream);
     if (end_stream) {
+      // We don't actually know if the insert succeeded, but as far as the
+      // filter is concerned it has been fully handed off to the cache
+      // implementation.
       insert_status_ = InsertStatus::InsertSucceeded;
     }
-  } else {
-    insert_->onDestroy();
-    insert_ = nullptr;
-    insert_status_ = InsertStatus::InsertAbortedByCache;
   }
-  encoder_callbacks_->continueEncoding();
+  return Http::FilterDataStatus::Continue;
 }
 
 Http::FilterTrailersStatus CacheFilter::encodeTrailers(Http::ResponseTrailerMap& trailers) {
@@ -212,9 +202,9 @@ Http::FilterTrailersStatus CacheFilter::encodeTrailers(Http::ResponseTrailerMap&
     return Http::FilterTrailersStatus::StopIteration;
   }
   response_has_trailers_ = !trailers.empty();
-  if (insert_) {
+  if (insert_queue_) {
     ENVOY_STREAM_LOG(debug, "CacheFilter::encodeTrailers inserting trailers", *encoder_callbacks_);
-    insert_->insertTrailers(trailers, [](bool) {});
+    insert_queue_->insertTrailers(trailers);
   }
   insert_status_ = InsertStatus::InsertSucceeded;
 
@@ -693,7 +683,7 @@ LookupStatus CacheFilter::lookupStatus() const {
 }
 
 InsertStatus CacheFilter::insertStatus() const {
-  return insert_status_.value_or((insert_ == nullptr)
+  return insert_status_.value_or((insert_queue_ == nullptr)
                                      ? InsertStatus::NoInsertRequestIncomplete
                                      : InsertStatus::InsertAbortedResponseIncomplete);
 }

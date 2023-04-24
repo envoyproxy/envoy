@@ -169,7 +169,7 @@ public:
   // --> RPCInsertContext's destructor and onRpcDone cause a data race in RpcInsertContext.
   // onDestroy() should cancel any outstanding async operations and, if necessary,
   // it should block on that cancellation to avoid data races. InsertContext must not invoke any
-  // callbacks to the CacheFilter after having onDestroy() invoked.
+  // callbacks to the CacheFilter after returning from onDestroy().
   virtual void onDestroy() PURE;
 
   virtual ~InsertContext() = default;
