@@ -63,6 +63,7 @@
 .histogram-percentiles {
   height: 40px;
   position: relative;
+  margin-bottom: 10px;
 }
 
 .histogram-labels {
@@ -77,6 +78,15 @@
   font-weight: bold;
   margin-top: 10px;
   margin-bottom: 8px;
+}
+
+.histogram-no-data {
+  font-family: sans-serif;
+  font-size: 14px;
+  font-style: italic;
+  margin-top: 10px;
+  margin-bottom: 8px;
+  margin-left: 10px;
 }
 
 .histogram-bucket {

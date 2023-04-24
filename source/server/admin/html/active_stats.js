@@ -293,8 +293,8 @@ function loadSettingOrUseDefault(id, defaultValue) {
  */
 function renderStats(histogramDiv, data) {
   sortedStats = [];
-  renderHistograms(histogramDiv, data);
   histogramDiv.replaceChildren();
+  renderHistograms(histogramDiv, data);
   for (stat of data.stats) {
     if (!stat.name) {
       continue;
