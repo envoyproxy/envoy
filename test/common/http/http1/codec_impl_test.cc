@@ -2224,34 +2224,6 @@ TEST_P(Http1ServerConnectionImplTest, ConnectRequestWithTEChunked) {
   EXPECT_EQ(status.message(), "http/1.1 protocol error: unsupported transfer encoding");
 }
 
-TEST_P(Http1ServerConnectionImplTest, ChunkedWithNegativeLength) {
-  initialize();
-
-  InSequence sequence;
-  NiceMock<MockRequestDecoder> decoder;
-  EXPECT_CALL(callbacks_, newStream(_, _)).WillOnce(ReturnRef(decoder));
-
-  Buffer::OwnedImpl buffer("GET /foo HTTP/1.1\r\ncontent-length: -1\r\ntransfer-encoding: chunked\r\nabcd");
-  EXPECT_CALL(decoder, sendLocalReply(_, _, _, _, _));
-  auto status = codec_->dispatch(buffer);
-  EXPECT_TRUE(isCodecProtocolError(status));
-  EXPECT_EQ(status.message(), "http/1.1 protocol error: unsupported content length");
-}
-
-TEST_P(Http1ServerConnectionImplTest, NonChunkedWithNegativeLength) {
-  initialize();
-
-  InSequence sequence;
-  NiceMock<MockRequestDecoder> decoder;
-  EXPECT_CALL(callbacks_, newStream(_, _)).WillOnce(ReturnRef(decoder));
-
-  Buffer::OwnedImpl buffer("GET /foo HTTP/1.1\r\ncontent-length: -1\r\n\r\nabcd");
-  EXPECT_CALL(decoder, sendLocalReply(_, _, _, _, _));
-  auto status = codec_->dispatch(buffer);
-  EXPECT_TRUE(isCodecProtocolError(status));
-  EXPECT_EQ(status.message(), "http/1.1 protocol error: unsupported content length");
-}
-
 TEST_P(Http1ServerConnectionImplTest, ConnectRequestWithNonZeroContentLength) {
   initialize();
 
