@@ -330,6 +330,7 @@ SnapshotImpl::Entry SnapshotImpl::createEntry(const ProtobufWkt::Value& value,
 }
 
 void AdminLayer::mergeValues(const absl::node_hash_map<std::string, std::string>& values) {
+#ifdef ENVOY_ENABLE_YAML
   for (const auto& kv : values) {
     values_.erase(kv.first);
     if (!kv.second.empty()) {
@@ -338,6 +339,11 @@ void AdminLayer::mergeValues(const absl::node_hash_map<std::string, std::string>
     }
   }
   stats_.admin_overrides_active_.set(values_.empty() ? 0 : 1);
+#else
+  IS_ENVOY_BUG("Runtime admin reload requires YAML support");
+  UNREFERENCED_PARAMETER(values);
+  return;
+#endif
 }
 
 DiskLayer::DiskLayer(absl::string_view name, const std::string& path, Api::Api& api)
@@ -397,8 +403,14 @@ void DiskLayer::walkDirectory(const std::string& path, const std::string& prefix
       // Separate erase/insert calls required due to the value type being constant; this prevents
       // the use of the [] operator. Can leverage insert_or_assign in C++17 in the future.
       values_.erase(full_prefix);
+#ifdef ENVOY_ENABLE_YAML
       values_.insert(
           {full_prefix, SnapshotImpl::createEntry(ValueUtil::loadFromYaml(value), value)});
+#else
+  IS_ENVOY_BUG("Runtime admin reload requires YAML support");
+  UNREFERENCED_PARAMETER(value);
+  return;
+#endif
     }
   }
 }
