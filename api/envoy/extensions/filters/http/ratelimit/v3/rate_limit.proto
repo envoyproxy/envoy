@@ -387,5 +387,5 @@ message RateLimitPerRoute {
   repeated RateLimitConfig rate_limits = 3;
 
   // Overrides the domain. If not set, uses the filter-level domain instead.
-  string domain = 4 [(validate.rules).string = {min_len: 1}];
+  string domain = 4;
 }
