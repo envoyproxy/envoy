@@ -149,26 +149,6 @@ def envoy_dependency_imports(go_version = GO_VERSION, jq_version = JQ_VERSION, y
 
 def envoy_download_go_sdks(go_version):
     go_download_sdk(
-        name = "go_linux_amd64",
-        goos = "linux",
-        goarch = "amd64",
-        version = go_version,
-    )
-    go_download_sdk(
-        name = "go_linux_arm64",
-        goos = "linux",
-        goarch = "arm64",
-        version = go_version,
-    )
-    go_download_sdk(
-        name = "go_darwin_amd64",
-        goos = "darwin",
-        goarch = "amd64",
-        version = go_version,
-    )
-    go_download_sdk(
-        name = "go_darwin_arm64",
-        goos = "darwin",
-        goarch = "arm64",
+        name = "go_sdk",
         version = go_version,
     )
