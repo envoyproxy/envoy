@@ -140,6 +140,8 @@ func (f *filter) decodeHeaders(header api.RequestHeaderMap, endStream bool) api.
 	header.Set("test-x-set-header-0", origin)
 	header.Del("x-test-header-1")
 	header.Set("req-route-name", f.callbacks.StreamInfo().GetRouteName())
+	header.Set("req-downstream-local-address", f.callbacks.StreamInfo().DownstreamLocalAddress())
+	header.Set("req-downstream-remote-address", f.callbacks.StreamInfo().DownstreamRemoteAddress())
 	if !endStream && strings.Contains(f.databuffer, "decode-header") {
 		return api.StopAndBuffer
 	}
