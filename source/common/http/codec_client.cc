@@ -192,8 +192,6 @@ Status CodecClient::ActiveRequest::encodeHeaders(const RequestHeaderMap& headers
           absl::StrCat("header validation failed: ", result.status.details()));
     }
     if (result.new_headers) {
-      std::cout << "----------------- New headers: " << std::endl
-                << *result.new_headers << std::endl;
       return RequestEncoderWrapper::encodeHeaders(*result.new_headers, end_stream);
     }
   }
