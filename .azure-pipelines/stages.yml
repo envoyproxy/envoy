@@ -429,7 +429,7 @@ stages:
 
         export DEBIAN_FRONTEND=noninteractive
 
-        # This is almost certainly not necessarily but the canonical way
+        # This is almost certainly not necessary but the canonical way
         sudo apt-get -qq remove -y docker docker-engine docker.io containerd runc
 
         sudo install -m 0755 -d /etc/apt/keyrings
