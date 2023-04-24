@@ -279,8 +279,6 @@ void parseEntryFractionalPercentValue(Envoy::Runtime::Snapshot::Entry& entry) {
   }
   envoy::type::v3::FractionalPercent converted_fractional_percent;
   TRY_ASSERT_MAIN_THREAD {
-    MessageUtil::loadFromYamlAndValidate(entry.raw_string_value_, converted_fractional_percent,
-                                         ProtobufMessage::getStrictValidationVisitor());
     entry.fractional_percent_value_ = converted_fractional_percent;
   }
   END_TRY
