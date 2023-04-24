@@ -885,8 +885,7 @@ ClientConnectionImpl::ClientConnectionImpl(
     const Network::TransportSocketOptionsConstSharedPtr& transport_options)
     : ConnectionImpl(dispatcher, std::move(socket), std::move(transport_socket), stream_info_,
                      false),
-      stream_info_(dispatcher_.timeSource(), socket_->connectionInfoProviderSharedPtr(),
-                   StreamInfo::FilterState::LifeSpan::Connection) {
+      stream_info_(dispatcher_.timeSource(), socket_->connectionInfoProviderSharedPtr()) {
 
   stream_info_.setUpstreamInfo(std::make_shared<StreamInfo::UpstreamInfoImpl>());
 
