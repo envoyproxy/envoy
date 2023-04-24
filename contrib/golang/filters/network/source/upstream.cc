@@ -50,7 +50,7 @@ UpstreamConn::UpstreamConn(std::string addr, Dso::NetworkFilterDsoPtr dynamic_li
     DispatcherStore& store = dispatcherStore();
     Thread::LockGuard guard(store.lock_);
     // load balance among each workers' dispatcher
-    ASSERT(store.dispatchers_.size() != 0);
+    ASSERT(!store.dispatchers_.empty());
     dispatcher_ = &store.dispatchers_[store.dispatcher_idx_++ % store.dispatchers_.size()].get();
   }
   header_map_ = Http::createHeaderMap<Http::RequestHeaderMapImpl>(
