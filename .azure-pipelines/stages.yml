@@ -485,7 +485,7 @@ stages:
   - job: release
     displayName: Build and test
     condition: and(not(canceled()), ne(stageDependencies.env.repo.outputs['changed.mobileOnly'], 'true'), ne(stageDependencies.env.repo.outputs['changed.docsOnly'], 'true'))
-    timeoutInMinutes: 120
+    timeoutInMinutes: 180
     pool: "envoy-arm-large"
     steps:
     - template: bazel.yml
@@ -550,7 +550,7 @@ stages:
           REPO_FETCH_TAGS: true
         api:
           CI_TARGET: "bazel.api"
-    timeoutInMinutes: 120
+    timeoutInMinutes: 180
     pool:
       vmImage: "ubuntu-20.04"
     steps:
@@ -567,7 +567,7 @@ stages:
     dependsOn: []
     # Skip checks if only mobile/ or docs/ have changed.
     condition: and(not(canceled()), or(succeeded(), eq(variables['PostSubmit'], true)), ne(stageDependencies.env.repo.outputs['changed.mobileOnly'], 'true'), ne(stageDependencies.env.repo.outputs['changed.docsOnly'], 'true'), ne(stageDependencies.env.repo.outputs['changed.examplesOnly'], 'true'))
-    timeoutInMinutes: 180
+    timeoutInMinutes: 240
     pool: "envoy-x64-large"
     strategy:
       maxParallel: 2
@@ -844,11 +844,11 @@ stages:
         # linux/amd64
         tar xf $(Build.StagingDirectory)/bazel.release/release.tar.zst -C ./linux/amd64
         cp -a linux/amd64/envoy "publish/envoy-${VERSION}-linux-x86_64"
-        cp -a linux/arm64/envoy-contrib "publish/envoy-contrib-${VERSION}-linux-x86_64"
+        cp -a linux/amd64/envoy-contrib "publish/envoy-contrib-${VERSION}-linux-x86_64"
 
         # linux/arm64
         tar xf $(Build.StagingDirectory)/bazel.release.arm64/release.tar.zst -C ./linux/arm64
-        cp -a linux/amd64/envoy "publish/envoy-${VERSION}-linux-aarch_64"
+        cp -a linux/arm64/envoy "publish/envoy-${VERSION}-linux-aarch_64"
         cp -a linux/arm64/envoy-contrib "publish/envoy-contrib-${VERSION}-linux-aarch_64"
 
         echo "$MAINTAINER_GPG_KEY_PASSPHRASE" | gpg --batch --yes --passphrase-fd 0 --import "$(MaintainerGPGKey.secureFilePath)"
