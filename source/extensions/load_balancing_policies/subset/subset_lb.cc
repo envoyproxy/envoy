@@ -594,7 +594,6 @@ std::string SubsetLoadBalancer::describeMetadata(const SubsetLoadBalancer::Subse
     const ProtobufWkt::Value& value = it.second;
     buf << it.first << "=" << MessageUtil::getJsonStringFromMessageOrError(value);
   }
-
   return buf.str();
 }
 
