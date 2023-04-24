@@ -7,19 +7,19 @@ parameters:
   type: object
   default:
   - env
-  - precheck
+  - prechecks
 - name: macBuildStageDeps
   displayName: "macOS stage dependencies"
   type: object
   default:
   - env
-  - precheck
+  - prechecks
 - name: windowsBuildStageDeps
   displayName: "Windows stage dependencies"
   type: object
   default:
   - env
-  - precheck
+  - prechecks
 - name: checkStageDeps
   displayName: "Check stage dependencies"
   type: object
@@ -30,6 +30,11 @@ parameters:
   displayName: "Check concurrency"
   type: number
   default: 3
+- name: concurrencyPrechecks
+  displayName: "Prechhecks concurrency"
+  type: number
+  default: 10
+
 
 ## Timeouts
 - name: timeoutDockerPublish
@@ -46,316 +51,88 @@ parameters:
 stages:
 - stage: env
   displayName: Environment
-  #
-  # Note to use the outputs created here - this `stage` must be set as a dependency in the relevant stage
-  # eg:
-  #
-  # stage: mystage
-  # dependsOn: ["env"]
-  #
-  # To use a variable as a condition for a `stage` you can specify it as follows:
-  #
-  # condition: and(not(canceled()), succeeded(), ne(dependencies.env.outputs['repo.changed.mobileOnly'], 'true'))
-  #
-  # To use a variable as a condition for a `job` you can specify it as follows:
-  #
-  # job:
-  #   condition: and(not(canceled()), succeeded(), ne(stageDependencies.env.repo.outputs['changed.mobileOnly'], 'true'))
-  #
-  # NB: Avoid using _inclusive_ lists to trigger CI - eg _dont_ only trigger mobile CI if `mobile/` changed.
-  #  Instead use _exclusive_ bools - eg _do_ suppress other CI if only `mobile/` changed
-  #
-  # Note the difference in name resolution when used in stages and jobs.
-  #
-  # Note also, other conditions such as `not(canceled())` are not assumed and so need to be added to
-  # any conditions explicitly.
-  #
-  # To use a variable in a `step` you can specify it as follows:
-  #
-  # stage: my_next_stage
-  #   jobs:
-  #     job: another_job
-  #     variables:
-  #       mobileOnly: $[stageDependencies.env.repo.outputs['changed.mobileOnly']]
-  #     steps:
-  #     - bash: echo $(mobileOnly)
-  #
-
   jobs:
-  # Warm build image caches
-  - job: cache
-    displayName: Cache
-    pool:
-      vmImage: "ubuntu-20.04"
-    steps:
-    - template: cached.yml
-      parameters:
-        version: "$(cacheKeyBuildImage)"
-        prime: true
-  - job: cache_arm
-    dependsOn: []
-    displayName: Cache (arm64)
-    pool:
-      vmImage: "ubuntu-20.04"
-    steps:
-    - template: cached.yml
-      parameters:
-        prime: true
-        arch: .arm64
-        version: "$(cacheKeyBuildImage)"
+  - template: env.yml
 
-  - job: repo
-    dependsOn: []
-    displayName: Repository
-    pool:
-      vmImage: "ubuntu-20.04"
-    steps:
-    - checkout: self
-      fetchDepth: 0
-      fetchTags: true
-    - bash: |
-        # TODO(phlax): move this to a script to ensure proper linting etc
-        set -e
-
-        # Only exclude checks in pull requests.
-        if [[ $(Build.Reason) != "PullRequest" ]]; then
-            echo "##vso[task.setvariable variable=mobileOnly;isoutput=true]false"
-            echo "##vso[task.setvariable variable=docsOnly;isoutput=true]false"
-            echo "##vso[task.setvariable variable=examplesOnly;isoutput=true]false"
-            echo "##vso[task.setvariable variable=requirements;isoutput=true]true"
-            exit 0
-        fi
-
-        CHANGE_TARGET="origin/$(System.PullRequest.TargetBranch)"
-
-        echo "Comparing changes ${CHANGE_TARGET}...HEAD"
-        CHANGED_PATHS="$(git diff --name-only ${CHANGE_TARGET}...HEAD | cut -d/ -f1 | sort -u | jq -sR 'rtrimstr("\n") | split("\n")')"
-        echo "$CHANGED_PATHS" | jq '.'
-        CHANGED_PATH_COUNT=$(echo $CHANGED_PATHS | jq '. | length')
-        CHANGED_MOBILE_ONLY=false
-        CHANGED_DOCS_ONLY=false
-        CHANGED_EXAMPLES_ONLY=false
-
-        CHANGED_MOBILE=$(echo $CHANGED_PATHS | jq '. as $A | "mobile" | IN($A[])')
-        if [[ $CHANGED_MOBILE == true && $CHANGED_PATH_COUNT -eq 1 ]]; then
-            CHANGED_MOBILE_ONLY=true
-        fi
-        CHANGED_DOCS=$(echo $CHANGED_PATHS | jq '. as $A | "docs" | IN($A[])')
-        if [[ $CHANGED_DOCS == true && $CHANGED_PATH_COUNT -eq 1 ]]; then
-            CHANGED_DOCS_ONLY=true
-        fi
-        CHANGED_EXAMPLES=$(echo $CHANGED_PATHS | jq '. as $A | "examples" | IN($A[])')
-        if [[ $CHANGED_EXAMPLES == true && $CHANGED_PATH_COUNT -eq 1 ]]; then
-            CHANGED_EXAMPLES_ONLY=true
-        fi
-
-        echo "##vso[task.setvariable variable=mobileOnly;isoutput=true]${CHANGED_MOBILE_ONLY}"
-        echo "##vso[task.setvariable variable=docsOnly;isoutput=true]${CHANGED_DOCS_ONLY}"
-        echo "##vso[task.setvariable variable=examplesOnly;isoutput=true]${CHANGED_EXAMPLES_ONLY}"
-
-        CHANGED_REQUIREMENT_PATHS="$(git diff --name-only ${CHANGE_TARGET}...HEAD | grep -E '\.*requirements.*\.txt$|go.mod$|\.*\.bzl$|^WORKSPACE$' || echo '')"
-
-        if [[ -n "$CHANGED_REQUIREMENT_PATHS" ]]; then
-            CHANGED_REQUIREMENTS=true
-        else
-            CHANGED_REQUIREMENTS=false
-        fi
-
-        echo "##vso[task.setvariable variable=requirements;isoutput=true]${CHANGED_REQUIREMENTS}"
-
-      displayName: "Detect repo changes"
-      workingDirectory: $(Build.SourcesDirectory)
-      name: changed
-
-    - bash: |
-        set -e
-        VERSION_DEV="$(cat VERSION.txt | cut -d- -f2)"
-        if [[ $VERSION_DEV == "dev" ]]; then
-            echo "##vso[task.setvariable variable=isDev;isoutput=true]true"
-        else
-            if [[ $(Build.Reason) == "PullRequest" ]]; then
-                # Check to make sure that it was this PR that changed the version, otherwise fail
-                # as the branch needs to be reopened first.
-                # NB: this will not stop a PR that has already passed checks from being landed.
-                DIFF_TARGET_BRANCH="origin/$(System.PullRequest.TargetBranch)"
-                DIFF_REF="$(git merge-base HEAD "${DIFF_TARGET_BRANCH}")"
-                CHANGES="$(git diff "$DIFF_REF" HEAD VERSION.txt)"
-                if [[ -z "$CHANGES" ]]; then
-                    echo "VERSION.txt is not a development version. Please re-open the branch before making further changes" >&2
-                    # exit 1
-                fi
-            fi
-            echo "##vso[task.setvariable variable=isDev;isoutput=true]false"
-        fi
-      displayName: Set development/release env
-      name: state
-
-    - bash: |
-        set -e
-
-        echo "env.outputs['changed.mobileOnly']: $(changed.mobileOnly)"
-        echo "env.outputs['changed.docsOnly']: $(changed.docsOnly)"
-        echo "env.outputs['changed.examplesOnly']: $(changed.examplesOnly)"
-        echo
-        echo "env.outputs['changed.requirements']: $(changed.requirements)"
-        echo
-        echo "env.outputs['state.isDev']: $(state.isDev)"
-      displayName: "Print build environment"
-
-- stage: precheck
+- stage: prechecks
   displayName: Prechecks
   dependsOn: ["env"]
   jobs:
-  - job: format
-    displayName: Code format
-    dependsOn: []
+  - job: prechecks
+    displayName: Precheck
+    timeoutInMinutes: 20
     pool:
       vmImage: "ubuntu-20.04"
+    variables:
+      AUTH_GITHUB: ""
+      CI_TARGET: ""
+      CHECK_DEPS: $[eq(stageDependencies.env.repo.outputs['changed.requirements'], true)]
+    strategy:
+      maxParallel: ${{ parameters.concurrencyPrechecks }}
+      matrix:
+        format:
+          CI_TARGET: "format"
+        protobuf:
+          CI_TARGET: "check_and_fix_proto_format"
+        ${{ if eq(variables.CHECK_DEPS, true) }}:
+          dependencies:
+            CI_TARGET: deps
+            AUTH_GITHUB: $(GitHubPublicRepoOnlyAccessToken)
+        publishing:
+          CI_TARGET: docs
     steps:
-    - task: Cache@2
-      inputs:
-        key: 'format | $(cacheKeyRepository)'
-        path: $(Build.StagingDirectory)/repository_cache
-      continueOnError: true
-
-    - template: cached.yml
+    - template: bazel.yml
       parameters:
-        version: "$(cacheKeyBuildImage)"
+        ciTarget: $(CI_TARGET)
+        cacheTestResults: ${{ parameters.cacheTestResults }}
+        cacheVersion: $(cacheKeyBazel)
+        publishEnvoy: false
+        publishTestResults: false
+        authGithub: $(AUTH_GITHUB)
+        stepsPost:
 
-    - script: ci/run_envoy_docker.sh 'ci/do_ci.sh format'
-      workingDirectory: $(Build.SourcesDirectory)
-      env:
-        ENVOY_RBE: "true"
-        BAZEL_BUILD_EXTRA_OPTIONS: "--config=remote-ci --jobs=$(RbeJobs)"
-        ENVOY_DOCKER_BUILD_DIR: $(Build.StagingDirectory)
-        BAZEL_REMOTE_CACHE: grpcs://remotebuildexecution.googleapis.com
-        BAZEL_REMOTE_INSTANCE: projects/envoy-ci/instances/default_instance
-        GCP_SERVICE_ACCOUNT_KEY: $(GcpServiceAccountKey)
-        AZP_BRANCH: $(Build.SourceBranch)
-      displayName: "Run format checks"
-    - task: PublishBuildArtifacts@1
-      inputs:
-        pathtoPublish: "$(Build.StagingDirectory)/fix_format.diff"
-        artifactName: format
-      timeoutInMinutes: 10
-      # not all have fixes so improve condition/handling
-      condition: failed()
+        # Format fixes
+        - task: PublishBuildArtifacts@1
+          inputs:
+            pathtoPublish: "$(Build.StagingDirectory)/fix_format.diff"
+            artifactName: format
+          timeoutInMinutes: 10
+          # not all have fixes so improve condition/handling
+          condition: and(failed(), eq(variables['CI_TARGET'], 'format'))
+        # Protobuf fixes
+        - task: PublishBuildArtifacts@1
+          inputs:
+            pathtoPublish: "$(Build.StagingDirectory)/fix_proto_format.diff"
+            artifactName: format
+          timeoutInMinutes: 10
+          condition: and(failed(), eq(variables['CI_TARGET'], 'protobuf'))
 
-  - job: proto_format
-    displayName: Protobuf format
-    dependsOn: []
-    pool:
-      vmImage: "ubuntu-20.04"
-    steps:
-    - task: Cache@2
-      inputs:
-        key: 'proto_format | $(cacheKeyRepository)'
-        path: $(Build.StagingDirectory)/repository_cache
-      continueOnError: true
+        # Publish docs
+        - script: |
+            ci/run_envoy_docker.sh 'ci/upload_gcs_artifact.sh /source/generated/docs docs'
+          displayName: "Upload Docs to GCS"
+          env:
+            ENVOY_DOCKER_BUILD_DIR: $(Build.StagingDirectory)
+            GCP_SERVICE_ACCOUNT_KEY: $(GcpServiceAccountKey)
+            GCS_ARTIFACT_BUCKET: $(GcsArtifactBucket)
+          condition: eq(variables['CI_TARGET'], 'docs')
 
-    - template: cached.yml
-      parameters:
-        version: "$(cacheKeyBuildImage)"
-
-    - script: ci/run_envoy_docker.sh 'ci/check_and_fix_format.sh'
-      workingDirectory: $(Build.SourcesDirectory)
-      env:
-        ENVOY_RBE: "true"
-        BAZEL_BUILD_EXTRA_OPTIONS: "--config=remote-ci --jobs=$(RbeJobs)"
-        ENVOY_DOCKER_BUILD_DIR: $(Build.StagingDirectory)
-        BAZEL_REMOTE_CACHE: grpcs://remotebuildexecution.googleapis.com
-        BAZEL_REMOTE_INSTANCE: projects/envoy-ci/instances/default_instance
-        GCP_SERVICE_ACCOUNT_KEY: $(GcpServiceAccountKey)
-      displayName: "Run check format scripts"
-
-    - task: PublishBuildArtifacts@1
-      inputs:
-        pathtoPublish: "$(Build.StagingDirectory)/fix_proto_format.diff"
-        artifactName: format
-      timeoutInMinutes: 10
-      condition: failed()
-
-  - job: publishing
-    displayName: Publishing
-    dependsOn: []
-    condition: ne(variables['PostSubmit'], true)
-    pool:
-      vmImage: "ubuntu-20.04"
-    steps:
-    - task: Cache@2
-      inputs:
-        key: 'docs | $(cacheKeyRepository)'
-        path: $(Build.StagingDirectory)/repository_cache
-      continueOnError: true
-
-    - template: cached.yml
-      parameters:
-        version: "$(cacheKeyBuildImage)"
-
-    - script: ci/run_envoy_docker.sh 'ci/do_ci.sh docs'
-      workingDirectory: $(Build.SourcesDirectory)
-      env:
-        ENVOY_RBE: "true"
-        BAZEL_BUILD_EXTRA_OPTIONS: "--config=remote-ci --jobs=$(RbeJobs)"
-        AZP_BRANCH: $(Build.SourceBranch)
-        AZP_COMMIT_SHA: $(system.pullRequest.sourceCommitId)
-        ENVOY_DOCKER_BUILD_DIR: $(Build.StagingDirectory)
-        BAZEL_REMOTE_CACHE: grpcs://remotebuildexecution.googleapis.com
-        BAZEL_REMOTE_INSTANCE: projects/envoy-ci/instances/default_instance
-        GCP_SERVICE_ACCOUNT_KEY: $(GcpServiceAccountKey)
-      displayName: "Generate docs"
-
-    - script: |
-        DOCKER_CI_FIX_DIFF=$(Build.StagingDirectory)/fix_docker.diff DOCKER_CI_FIX=1 ci/test_docker_ci.sh
-      workingDirectory: $(Build.SourcesDirectory)
-      displayName: Docker build regression test
-    - task: PublishBuildArtifacts@1
-      inputs:
-        pathtoPublish: "$(Build.StagingDirectory)/fix_docker.diff"
-        artifactName: "docker_ci"
-        timeoutInMinutes: 10
-      condition: failed()
-
-    - script: |
-        ci/run_envoy_docker.sh 'ci/upload_gcs_artifact.sh /source/generated/docs docs'
-      displayName: "Upload Docs to GCS"
-      env:
-        ENVOY_DOCKER_BUILD_DIR: $(Build.StagingDirectory)
-        GCP_SERVICE_ACCOUNT_KEY: $(GcpServiceAccountKey)
-        GCS_ARTIFACT_BUCKET: $(GcsArtifactBucket)
-
-  - job: dependencies
-    displayName: Dependency checks
-    dependsOn: []
-    condition: and(not(canceled()), eq(stageDependencies.env.repo.outputs['changed.requirements'], 'true'))
-    pool:
-      vmImage: "ubuntu-20.04"
-    steps:
-    - task: Cache@2
-      inputs:
-        key: 'dependencies | $(cacheKeyRepository)'
-        path: $(Build.StagingDirectory)/repository_cache
-      continueOnError: true
-
-    - template: cached.yml
-      parameters:
-        version: "$(cacheKeyBuildImage)"
-
-    - script: ci/run_envoy_docker.sh 'ci/do_ci.sh deps'
-      workingDirectory: $(Build.SourcesDirectory)
-      env:
-        ENVOY_RBE: "true"
-        BAZEL_BUILD_EXTRA_OPTIONS: "--config=remote-ci --jobs=$(RbeJobs)"
-        ENVOY_DOCKER_BUILD_DIR: $(Build.StagingDirectory)
-        BAZEL_REMOTE_CACHE: grpcs://remotebuildexecution.googleapis.com
-        BAZEL_REMOTE_INSTANCE: projects/envoy-ci/instances/default_instance
-        GCP_SERVICE_ACCOUNT_KEY: $(GcpServiceAccountKey)
-        GITHUB_TOKEN: $(GitHubPublicRepoOnlyAccessToken)
-      displayName: "Verify dependency information"
+        # Docker regression tests
+        - script: |
+            DOCKER_CI_FIX_DIFF=$(Build.StagingDirectory)/fix_docker.diff DOCKER_CI_FIX=1 ci/test_docker_ci.sh
+          workingDirectory: $(Build.SourcesDirectory)
+          displayName: Docker build regression test
+          condition: eq(variables['CI_TARGET'], 'docs')
+        - task: PublishBuildArtifacts@1
+          inputs:
+            pathtoPublish: "$(Build.StagingDirectory)/fix_docker.diff"
+            artifactName: "docker_ci"
+          timeoutInMinutes: 10
+          condition: and(failed(), eq(variables['CI_TARGET'], 'docs'))
 
   - job: prechecked
     displayName: Prechecked
-    dependsOn: ["format", "proto_format", "publishing", "dependencies"]
+    dependsOn: ["prechecks"]
     pool:
       vmImage: "ubuntu-20.04"
     # This condition ensures that this (required) job passes if all of
@@ -365,11 +142,7 @@ stages:
     condition: |
       and(
         eq(variables['Build.Reason'], 'PullRequest'),
-        in(dependencies.format.result, 'Succeeded', 'SucceededWithIssues', 'Skipped'),
-        in(dependencies.proto_format.result, 'Succeeded', 'SucceededWithIssues', 'Skipped'),
-        in(dependencies.publishing.result, 'Succeeded', 'SucceededWithIssues', 'Skipped'),
-        in(dependencies.dependencies.result, 'Succeeded', 'SucceededWithIssues', 'Skipped'))
-
+        in(dependencies.prechecks.result, 'Succeeded', 'SucceededWithIssues', 'Skipped'))
     steps:
     - checkout: none
     - bash: |
@@ -466,6 +239,7 @@ stages:
         ciTarget: bazel.release
         bazelBuildExtraOptions: "--sandbox_base=/tmp/sandbox_base"
         cacheTestResults: ${{ parameters.cacheTestResults }}
+        cacheVersion: $(cacheKeyBazel)
 
   - job: released
     displayName: Complete
@@ -530,6 +304,8 @@ stages:
     variables:
       REPO_FETCH_DEPTH: 1
       REPO_FETCH_TAGS: false
+      PUBLISH_TEST_RESULTS: true
+      PUBLISH_ENVOY: true
     strategy:
       maxParallel: ${{ parameters.checksConcurrency }}
       matrix:
@@ -554,6 +330,8 @@ stages:
           CI_TARGET: "bazel.clang_tidy"
           REPO_FETCH_DEPTH: 0
           REPO_FETCH_TAGS: true
+          PUBLISH_TEST_RESULTS: false
+          PUBLISH_ENVOY: false
         api:
           CI_TARGET: "bazel.api"
     timeoutInMinutes: 120
@@ -567,6 +345,17 @@ stages:
         cacheTestResults: ${{ parameters.cacheTestResults }}
         repoFetchDepth: $(REPO_FETCH_DEPTH)
         repoFetchTags: $(REPO_FETCH_TAGS)
+        publishTestResults: $(PUBLISH_TEST_RESULTS)
+        publishEnvoy: $(PUBLISH_ENVOY)
+        stepsPost:
+
+        # TODO(phlax): consolidate "fix" paths/jobs
+        - task: PublishBuildArtifacts@1
+          inputs:
+            pathtoPublish: "$(Build.StagingDirectory)/tmp/lint-fixes"
+            artifactName: "$(CI_TARGET).fixes"
+          timeoutInMinutes: 10
+          condition: and(failed(), eq(variables['CI_TARGET'], 'bazel.clang_tidy'))
 
   - job: coverage
     displayName: "Linux x64"
@@ -757,7 +546,7 @@ stages:
     steps:
     - task: Cache@2
       inputs:
-        key: 'docs | $(cacheKeyRepository)'
+        key: 'docs | $(cacheKeyBazelFiles)'
         path: $(Build.StagingDirectory)/repository_cache
       continueOnError: true
 
@@ -1014,7 +803,7 @@ stages:
     steps:
     - task: Cache@2
       inputs:
-        key: '"windows.release" | $(cacheKeyRepository)'
+        key: '"windows.release" | $(cacheKeyBazelFiles)'
         path: $(Build.StagingDirectory)/repository_cache
       continueOnError: true
     - bash: ci/run_envoy_docker.sh ci/windows_ci_steps.sh
