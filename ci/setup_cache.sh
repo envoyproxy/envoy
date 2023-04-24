@@ -31,6 +31,11 @@ if [[ -n "${BAZEL_REMOTE_CACHE}" ]]; then
     if [[ -n "${BAZEL_REMOTE_INSTANCE_BRANCH}" ]]; then
         # Normalize branches - `release/vX.xx`, `vX.xx`, `vX.xx.x` -> `vX.xx`
         BRANCH_NAME="$(echo "${BAZEL_REMOTE_INSTANCE_BRANCH}" | cut -d/ -f2 | cut -d. -f-2)"
+        if [[ "$BRANCH_NAME" == "merge" ]]; then
+            # Manually run PR commit - there is no easy way of telling which branch
+            # it is, so just set it to `main` - otherwise it tries to cache as `branch/merge`
+            BRANCH_NAME=main
+        fi
         BAZEL_REMOTE_INSTANCE="branch/${BRANCH_NAME}"
     fi
 

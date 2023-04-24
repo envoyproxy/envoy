@@ -170,13 +170,20 @@ void UpstreamRequest::cleanUp() {
     // Allows for testing.
     per_try_timeout_->disableTimer();
   }
+
   if (per_try_idle_timeout_ != nullptr) {
     // Allows for testing.
     per_try_idle_timeout_->disableTimer();
   }
+
   if (max_stream_duration_timer_ != nullptr) {
     max_stream_duration_timer_->disableTimer();
   }
+
+  if (upstream_log_flush_timer_ != nullptr) {
+    upstream_log_flush_timer_->disableTimer();
+  }
+
   clearRequestEncoder();
 
   // If desired, fire the per-try histogram when the UpstreamRequest
@@ -389,6 +396,20 @@ void UpstreamRequest::acceptHeadersFromRouter(bool end_stream) {
   // creation but for now optimize for minimal latency and fetch the connection
   // as soon as possible.
   conn_pool_->newStream(this);
+
+  if (parent_.config().upstream_log_flush_interval_.has_value()) {
+    upstream_log_flush_timer_ = parent_.callbacks()->dispatcher().createTimer([this]() -> void {
+      // If the request is complete, we've already done the stream-end upstream log, and shouldn't
+      // do the periodic log.
+      if (!streamInfo().requestComplete().has_value()) {
+        upstreamLog();
+        resetUpstreamLogFlushTimer();
+      }
+    });
+
+    resetUpstreamLogFlushTimer();
+  }
+
   if (!allow_upstream_filters_) {
     return;
   }
@@ -534,6 +555,12 @@ void UpstreamRequest::resetPerTryIdleTimer() {
   }
 }
 
+void UpstreamRequest::resetUpstreamLogFlushTimer() {
+  if (upstream_log_flush_timer_ != nullptr) {
+    upstream_log_flush_timer_->enableTimer(parent_.config().upstream_log_flush_interval_.value());
+  }
+}
+
 void UpstreamRequest::setupPerTryTimeout() {
   ASSERT(!per_try_timeout_);
   if (parent_.timeout().per_try_timeout_.count() > 0) {
@@ -580,19 +607,19 @@ void UpstreamRequest::onPoolFailure(ConnectionPool::PoolFailureReason reason,
                                     absl::string_view transport_failure_reason,
                                     Upstream::HostDescriptionConstSharedPtr host) {
   recordConnectionPoolCallbackLatency();
-  Http::StreamResetReason reset_reason = Http::StreamResetReason::ConnectionFailure;
-  switch (reason) {
-  case ConnectionPool::PoolFailureReason::Overflow:
-    reset_reason = Http::StreamResetReason::Overflow;
-    break;
-  case ConnectionPool::PoolFailureReason::RemoteConnectionFailure:
-    FALLTHRU;
-  case ConnectionPool::PoolFailureReason::LocalConnectionFailure:
-    reset_reason = Http::StreamResetReason::ConnectionFailure;
-    break;
-  case ConnectionPool::PoolFailureReason::Timeout:
-    reset_reason = Http::StreamResetReason::ConnectionFailure;
-  }
+  Http::StreamResetReason reset_reason = [](ConnectionPool::PoolFailureReason reason) {
+    switch (reason) {
+    case ConnectionPool::PoolFailureReason::Overflow:
+      return Http::StreamResetReason::Overflow;
+    case ConnectionPool::PoolFailureReason::RemoteConnectionFailure:
+      return Http::StreamResetReason::RemoteConnectionFailure;
+    case ConnectionPool::PoolFailureReason::LocalConnectionFailure:
+      return Http::StreamResetReason::LocalConnectionFailure;
+    case ConnectionPool::PoolFailureReason::Timeout:
+      return Http::StreamResetReason::ConnectionTimeout;
+    }
+    PANIC_DUE_TO_CORRUPT_ENUM;
+  }(reason);
 
   stream_info_.upstreamInfo()->setUpstreamTransportFailureReason(transport_failure_reason);
 

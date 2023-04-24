@@ -211,6 +211,7 @@ private:
   void onPerTryTimeout();
   void onPerTryIdleTimeout();
   void upstreamLog();
+  void resetUpstreamLogFlushTimer();
 
   RouterFilterInterface& parent_;
   std::unique_ptr<GenericConnPool> conn_pool_;
@@ -234,6 +235,10 @@ private:
   std::list<Http::UpstreamCallbacks*> upstream_callbacks_;
 
   Event::TimerPtr max_stream_duration_timer_;
+
+  // Per-stream access log flush duration. This timer is enabled once when the stream is created
+  // and will log to all access logs once per trigger.
+  Event::TimerPtr upstream_log_flush_timer_;
 
   std::unique_ptr<UpstreamRequestFilterManagerCallbacks> filter_manager_callbacks_;
   std::unique_ptr<Http::FilterManager> filter_manager_;

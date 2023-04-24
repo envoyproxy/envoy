@@ -43,12 +43,14 @@ import (
 )
 
 const (
-	ValueRouteName           = 1
-	ValueFilterChainName     = 2
-	ValueProtocol            = 3
-	ValueResponseCode        = 4
-	ValueResponseCodeDetails = 5
-	ValueAttemptCount        = 6
+	ValueRouteName               = 1
+	ValueFilterChainName         = 2
+	ValueProtocol                = 3
+	ValueResponseCode            = 4
+	ValueResponseCodeDetails     = 5
+	ValueAttemptCount            = 6
+	ValueDownstreamLocalAddress  = 7
+	ValueDownstreamRemoteAddress = 8
 )
 
 type httpCApiImpl struct{}
@@ -236,8 +238,8 @@ func (c *httpCApiImpl) HttpSetDynamicMetadata(r unsafe.Pointer, filterName strin
 	handleCApiStatus(res)
 }
 
-func (c *httpCApiImpl) HttpLog(r unsafe.Pointer, level api.LogType, message string) {
-	C.envoyGoFilterHttpLog(r, C.uint32_t(level), unsafe.Pointer(&message))
+func (c *httpCApiImpl) HttpLog(level api.LogType, message string) {
+	C.envoyGoFilterHttpLog(C.uint32_t(level), unsafe.Pointer(&message))
 }
 
 func (c *httpCApiImpl) HttpFinalize(r unsafe.Pointer, reason int) {
