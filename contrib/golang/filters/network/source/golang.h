@@ -104,12 +104,12 @@ using FilterWeakPtr = std::weak_ptr<Filter>;
 
 struct FilterWrapper {
 public:
-  FilterWrapper(FilterWeakPtr ptr) : weakPtr(ptr) {}
+  FilterWrapper(FilterWeakPtr ptr) : filter_ptr_(ptr) {}
   ~FilterWrapper() = default;
 
-  FilterWeakPtr weakPtr{};
+  FilterWeakPtr filter_ptr_{};
   // anchor a string temporarily, make sure it won't be freed before copied to Go.
-  std::string strValue;
+  std::string str_value_;
 };
 
 } // namespace Golang

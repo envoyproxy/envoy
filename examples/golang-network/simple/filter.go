@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"net"
 
 	xds "github.com/cncf/xds/go/xds/type/v3"
 	"github.com/envoyproxy/envoy/contrib/golang/filters/go/pkg/api"
@@ -23,7 +24,11 @@ func (f *configFactory) CreateFactoryFromConfig(config interface{}) network.Filt
 	_ = a.UnmarshalTo(configStruct)
 
 	v := configStruct.Value.AsMap()["echo_server_addr"]
-	upAddr := v.(string)
+	addr, err := net.LookupHost(v.(string))
+	if err != nil {
+		fmt.Printf("fail to resolve: %v, err: %v\n", v.(string), err)
+	}
+	upAddr := addr[0] + ":1025"
 
 	return &filterFactory{
 		upAddr: upAddr,
@@ -48,7 +53,7 @@ type downFilter struct {
 }
 
 func (f *downFilter) OnNewConnection() api.FilterStatus {
-	fmt.Printf("OnNewConnection, local: %v, remote: %v\n, connect to: %v", f.cb.LocalAddr(), f.cb.RemoteAddr(), f.upAddr)
+	fmt.Printf("OnNewConnection, local: %v, remote: %v, connect to: %v\n", f.cb.LocalAddr(), f.cb.RemoteAddr(), f.upAddr)
 	f.upFilter = &upFilter{
 		downFilter: f,
 		ch:         make(chan []byte, 1),

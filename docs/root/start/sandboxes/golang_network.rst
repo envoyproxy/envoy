@@ -46,13 +46,12 @@ Start all the containers.
   $ docker compose up --build -d
   $ docker compose ps
 
-        Name                      Command                        State         Ports
-  -----------------------------------------------------------------------------------------------------------------------
-  golang-network_proxy_1         /docker-entrypoint.sh /usr ...   Up      10000/tcp, 0.0.0.0:10000->10000/tcp,:::10000->10000/tcp
-  golang-network_echo_service_1  /bin/echo-server                 Up      8080/tcp
+  NAME                            COMMAND                  SERVICE        STATUS   PORTS
+  golang-network-echo_service-1   "/tcp-echo"              echo_service   Up       0.0.0.0:1025->1025/tcp
+  golang-network-proxy-1          "/docker-entrypoint.…"   proxy          Up       0.0.0.0:10000->10000/tcp
 
-Step 3: Send some data handled by the Go plugin
-***********************************************
+Step 3: Send some data to be handled by the Go plugin
+*****************************************************
 
 The output from the ``nc`` command below should include the "hello, " prefix added by the simple Go plugin.
 

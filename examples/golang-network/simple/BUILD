@@ -17,6 +17,5 @@ go_binary(
         "//contrib/golang/filters/go/pkg/network",
         "@com_github_cncf_xds_go//xds/type/v3:type",
         "@org_golang_google_protobuf//types/known/anypb",
-        "@org_golang_google_protobuf//types/known/structpb",
     ],
 )

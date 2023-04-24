@@ -19,8 +19,8 @@ std::string copyGoString(void* str) {
   if (str == nullptr) {
     return "";
   }
-  auto goStr = reinterpret_cast<GoString*>(str);
-  return std::string{goStr->p, size_t(goStr->n)};
+  auto go_str = reinterpret_cast<GoString*>(str);
+  return std::string{go_str->p, size_t(go_str->n)};
 }
 
 enum class ConnectionInfoType {
@@ -36,7 +36,7 @@ extern "C" {
 
 CAPIStatus envoyGoFilterDownstreamClose(void* f, int close_type) {
   auto* wrapper = reinterpret_cast<FilterWrapper*>(f);
-  FilterWeakPtr& weak_ptr = wrapper->weakPtr;
+  FilterWeakPtr& weak_ptr = wrapper->filter_ptr_;
   if (FilterSharedPtr f = weak_ptr.lock()) {
     f->dispatcher()->post([weak_ptr, close_type] {
       if (FilterSharedPtr filter = weak_ptr.lock()) {
@@ -50,7 +50,7 @@ CAPIStatus envoyGoFilterDownstreamClose(void* f, int close_type) {
 
 CAPIStatus envoyGoFilterDownstreamWrite(void* f, void* buffer_ptr, int buffer_len, int end_stream) {
   auto* wrapper = reinterpret_cast<FilterWrapper*>(f);
-  FilterWeakPtr& weak_ptr = wrapper->weakPtr;
+  FilterWeakPtr& weak_ptr = wrapper->filter_ptr_;
   if (FilterSharedPtr f = weak_ptr.lock()) {
     // should do the copy right now, because the 'data' pointer still point at the go's heap
     Buffer::InstancePtr buffer =
@@ -70,7 +70,7 @@ CAPIStatus envoyGoFilterDownstreamWrite(void* f, void* buffer_ptr, int buffer_le
 void envoyGoFilterDownstreamFinalize(void* f, int reason) {
   UNREFERENCED_PARAMETER(reason);
   auto* wrapper = reinterpret_cast<FilterWrapper*>(f);
-  FilterWeakPtr& weak_ptr = wrapper->weakPtr;
+  FilterWeakPtr& weak_ptr = wrapper->filter_ptr_;
   if (FilterSharedPtr filter = weak_ptr.lock()) {
     // make sure that the deconstructor is also executed by envoy wrk thread.
     filter->dispatcher()->post([wrapper] { delete wrapper; });
@@ -82,21 +82,21 @@ void envoyGoFilterDownstreamFinalize(void* f, int reason) {
 
 CAPIStatus envoyGoFilterDownstreamInfo(void* f, int info_type, void* ret) {
   auto* wrapper = reinterpret_cast<FilterWrapper*>(f);
-  FilterWeakPtr& weak_ptr = wrapper->weakPtr;
+  FilterWeakPtr& weak_ptr = wrapper->filter_ptr_;
   if (FilterSharedPtr filter = weak_ptr.lock()) {
     auto* goStr = reinterpret_cast<GoString*>(ret);
     switch (static_cast<ConnectionInfoType>(info_type)) {
     case ConnectionInfoType::LocalAddr:
-      wrapper->strValue = filter->getLocalAddrStr();
+      wrapper->str_value_ = filter->getLocalAddrStr();
       break;
     case ConnectionInfoType::RemoteAddr:
-      wrapper->strValue = filter->getRemoteAddrStr();
+      wrapper->str_value_ = filter->getRemoteAddrStr();
       break;
     default:
-      ASSERT(false, "invalid connection info type");
+      PANIC_DUE_TO_CORRUPT_ENUM;
     }
-    goStr->p = wrapper->strValue.data();
-    goStr->n = wrapper->strValue.length();
+    goStr->p = wrapper->str_value_.data();
+    goStr->n = wrapper->str_value_.length();
     return CAPIStatus::CAPIOK;
   }
   return CAPIStatus::CAPIFilterIsGone;
@@ -108,35 +108,35 @@ CAPIStatus envoyGoFilterDownstreamInfo(void* f, int info_type, void* ret) {
 
 void* envoyGoFilterUpstreamConnect(void* library_id, void* addr) {
   std::string id = copyGoString(library_id);
-  auto dynamicLib = Dso::DsoManager<Dso::NetworkFilterDsoImpl>::getDsoByID(id);
-  UpstreamConnPtr connPtr = std::make_shared<UpstreamConn>(copyGoString(addr), dynamicLib);
-  UpstreamConnWrapper* wrapper = new UpstreamConnWrapper(connPtr);
-  connPtr->setWrapper(wrapper);
+  auto dynamic_lib = Dso::DsoManager<Dso::NetworkFilterDsoImpl>::getDsoByID(id);
+  UpstreamConnPtr conn_ptr = std::make_shared<UpstreamConn>(copyGoString(addr), dynamic_lib);
+  UpstreamConnWrapper* wrapper = new UpstreamConnWrapper(conn_ptr);
+  conn_ptr->setWrapper(wrapper);
 
-  connPtr->dispatcher()->post([connPtr] { connPtr->connect(); });
+  conn_ptr->dispatcher()->post([conn_ptr] { conn_ptr->connect(); });
 
   return static_cast<void*>(wrapper);
 }
 
 CAPIStatus envoyGoFilterUpstreamWrite(void* u, void* buffer_ptr, int buffer_len, int end_stream) {
   auto* wrapper = reinterpret_cast<UpstreamConnWrapper*>(u);
-  UpstreamConnPtr& upConn = wrapper->sharedPtr;
+  UpstreamConnPtr& conn_ptr = wrapper->conn_ptr_;
   // should do the copy right now, because the 'data' pointer still point at the go's heap
   Buffer::InstancePtr buffer =
       std::make_unique<Buffer::OwnedImpl>(reinterpret_cast<char*>(buffer_ptr), buffer_len);
   // NOLINTNEXTLINE(clang-analyzer-cplusplus.NewDeleteLeaks)
-  upConn->dispatcher()->post([upConn, end_stream, buf_raw_ptr = buffer.release()] {
+  conn_ptr->dispatcher()->post([conn_ptr, end_stream, buf_raw_ptr = buffer.release()] {
     Buffer::InstancePtr buf = absl::WrapUnique(buf_raw_ptr);
-    upConn->write(*buf.get(), end_stream);
+    conn_ptr->write(*buf.get(), end_stream);
   });
   return CAPIOK;
 }
 
 CAPIStatus envoyGoFilterUpstreamClose(void* u, int close_type) {
   auto* wrapper = reinterpret_cast<UpstreamConnWrapper*>(u);
-  UpstreamConnPtr& upConn = wrapper->sharedPtr;
-  upConn->dispatcher()->post([upConn, close_type] {
-    upConn->close(static_cast<Network::ConnectionCloseType>(close_type));
+  UpstreamConnPtr& conn_ptr = wrapper->conn_ptr_;
+  conn_ptr->dispatcher()->post([conn_ptr, close_type] {
+    conn_ptr->close(static_cast<Network::ConnectionCloseType>(close_type));
   });
   return CAPIOK;
 }
@@ -144,27 +144,27 @@ CAPIStatus envoyGoFilterUpstreamClose(void* u, int close_type) {
 void envoyGoFilterUpstreamFinalize(void* u, int reason) {
   UNREFERENCED_PARAMETER(reason);
   auto* wrapper = reinterpret_cast<UpstreamConnWrapper*>(u);
-  UpstreamConnPtr& upConn = wrapper->sharedPtr;
+  UpstreamConnPtr& conn_ptr = wrapper->conn_ptr_;
   // make sure that the deconstructor is also executed by envoy wrk thread
-  upConn->dispatcher()->post([wrapper] { delete wrapper; });
+  conn_ptr->dispatcher()->post([wrapper] { delete wrapper; });
 }
 
 CAPIStatus envoyGoFilterUpstreamInfo(void* u, int info_type, void* ret) {
   auto* wrapper = reinterpret_cast<UpstreamConnWrapper*>(u);
-  UpstreamConnPtr& upConn = wrapper->sharedPtr;
+  UpstreamConnPtr& conn_ptr = wrapper->conn_ptr_;
   auto* goStr = reinterpret_cast<GoString*>(ret);
   switch (static_cast<ConnectionInfoType>(info_type)) {
   case ConnectionInfoType::LocalAddr:
-    wrapper->strValue = upConn->getLocalAddrStr();
+    wrapper->str_value_ = conn_ptr->getLocalAddrStr();
     break;
   case ConnectionInfoType::RemoteAddr:
-    wrapper->strValue = upConn->getRemoteAddrStr();
+    wrapper->str_value_ = conn_ptr->getRemoteAddrStr();
     break;
   default:
-    ASSERT(false, "invalid connection info type");
+    PANIC_DUE_TO_CORRUPT_ENUM;
   }
-  goStr->p = wrapper->strValue.data();
-  goStr->n = wrapper->strValue.length();
+  goStr->p = wrapper->str_value_.data();
+  goStr->n = wrapper->str_value_.length();
   return CAPIStatus::CAPIOK;
 }
 

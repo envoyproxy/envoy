@@ -12,6 +12,7 @@ services:
     - "${PORT_PROXY:-10000}:10000"
 
   echo_service:
-    build:
-      context: ../shared/echo
-    hostname: service1
+    image: cjimti/go-echo
+    ports:
+    - 1025:1025
+    hostname: echo_service

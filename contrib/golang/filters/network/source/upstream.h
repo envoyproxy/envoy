@@ -76,12 +76,25 @@ public:
   std::string getRemoteAddrStr() const { return remote_addr_; };
 
 private:
-  static Thread::MutexBasicLockable lock_;
-  static std::vector<std::reference_wrapper<Event::Dispatcher>> dispatchers_ ABSL_GUARDED_BY(lock_);
-  static int dispatcherIdx_ ABSL_GUARDED_BY(lock_);
-  static ThreadLocal::SlotPtr slot_;
-  // should be the singleton for use by the entire server.
-  static Upstream::ClusterManager* clusterManager_;
+  struct DispatcherStore {
+    std::vector<std::reference_wrapper<Event::Dispatcher>> dispatchers_ ABSL_GUARDED_BY(lock_){};
+    int dispatcher_idx_ ABSL_GUARDED_BY(lock_){0};
+    Thread::MutexBasicLockable lock_{};
+    std::once_flag init_once_{};
+  };
+  static DispatcherStore& dispatcherStore() { MUTABLE_CONSTRUCT_ON_FIRST_USE(DispatcherStore); }
+
+  struct SlotPtrContainer {
+    ThreadLocal::SlotPtr slot_{nullptr};
+  };
+  static SlotPtrContainer& slotPtrContainer() { MUTABLE_CONSTRUCT_ON_FIRST_USE(SlotPtrContainer); }
+
+  struct ClusterManagerContainer {
+    Upstream::ClusterManager* cluster_manager_{nullptr};
+  };
+  static ClusterManagerContainer& clusterManagerContainer() {
+    MUTABLE_CONSTRUCT_ON_FIRST_USE(ClusterManagerContainer);
+  }
 
   Dso::NetworkFilterDsoPtr dynamic_lib_{nullptr};
   UpstreamConnWrapper* wrapper_{nullptr};
@@ -99,14 +112,14 @@ using UpstreamConnPtr = std::shared_ptr<UpstreamConn>;
 
 struct UpstreamConnWrapper {
 public:
-  UpstreamConnWrapper(UpstreamConnPtr ptr) : sharedPtr(ptr) {}
+  UpstreamConnWrapper(UpstreamConnPtr ptr) : conn_ptr_(ptr) {}
   ~UpstreamConnWrapper() = default;
 
   // Must be strong shared_ptr, otherwise the UpstreamConn will be released immediately since we do
   // not have any other place to keep strong reference of the UpstreamConn.
-  UpstreamConnPtr sharedPtr{};
+  UpstreamConnPtr conn_ptr_{};
   // anchor a string temporarily, make sure it won't be freed before copied to Go.
-  std::string strValue;
+  std::string str_value_;
 };
 
 } // namespace Golang

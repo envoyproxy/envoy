@@ -30,7 +30,7 @@ void Filter::close(Network::ConnectionCloseType close_type) {
     ENVOY_CONN_LOG(warn, "connection has closed, addr: {}", read_callbacks_->connection(), addr_);
     return;
   }
-  ENVOY_CONN_LOG(info, "close addr: {}, type: {}", read_callbacks_->connection(), addr_,
+  ENVOY_CONN_LOG(debug, "close addr: {}, type: {}", read_callbacks_->connection(), addr_,
                  static_cast<int>(close_type));
   read_callbacks_->connection().close(close_type);
 }
@@ -46,7 +46,7 @@ void Filter::write(Buffer::Instance& buf, bool end_stream) {
 }
 
 Network::FilterStatus Filter::onNewConnection() {
-  ENVOY_CONN_LOG(info, "onNewConnection, addr: {}, localAddr: {}", read_callbacks_->connection(),
+  ENVOY_CONN_LOG(debug, "onNewConnection, addr: {}, localAddr: {}", read_callbacks_->connection(),
                  addr_, local_addr_);
   wrapper_ = new FilterWrapper(weak_from_this());
 
@@ -56,7 +56,7 @@ Network::FilterStatus Filter::onNewConnection() {
 }
 
 void Filter::onEvent(Network::ConnectionEvent event) {
-  ENVOY_CONN_LOG(info, "onEvent addr: {}, event: {}", read_callbacks_->connection(), addr_,
+  ENVOY_CONN_LOG(debug, "onEvent addr: {}, event: {}", read_callbacks_->connection(), addr_,
                  static_cast<int>(event));
 
   if (event == Network::ConnectionEvent::LocalClose ||
@@ -71,17 +71,17 @@ Network::FilterStatus Filter::onData(Buffer::Instance& data, bool end_stream) {
   ENVOY_CONN_LOG(debug, "onData, addr: {}, len: {}, end: {}", read_callbacks_->connection(), addr_,
                  data.length(), end_stream);
 
-  Buffer::RawSliceVector sliceVector = data.getRawSlices();
-  int sliceNum = sliceVector.size();
-  unsigned long long* slices = new unsigned long long[2 * sliceNum];
-  for (int i = 0; i < sliceNum; i++) {
-    const Buffer::RawSlice& s = sliceVector[i];
+  Buffer::RawSliceVector slice_vector = data.getRawSlices();
+  int slice_num = slice_vector.size();
+  unsigned long long* slices = new unsigned long long[2 * slice_num];
+  for (int i = 0; i < slice_num; i++) {
+    const Buffer::RawSlice& s = slice_vector[i];
     slices[2 * i] = reinterpret_cast<unsigned long long>(s.mem_);
     slices[2 * i + 1] = s.len_;
   }
 
   auto ret = dynamic_lib_->envoyGoFilterOnDownstreamData(
-      wrapper_, data.length(), reinterpret_cast<GoUint64>(slices), sliceNum, end_stream);
+      wrapper_, data.length(), reinterpret_cast<GoUint64>(slices), slice_num, end_stream);
 
   // TODO: do not drain buffer by default
   data.drain(data.length());
@@ -95,17 +95,17 @@ Network::FilterStatus Filter::onWrite(Buffer::Instance& data, bool end_stream) {
   ENVOY_CONN_LOG(debug, "onData, addr: {}, len: {}, end: {}", read_callbacks_->connection(), addr_,
                  data.length(), end_stream);
 
-  Buffer::RawSliceVector sliceVector = data.getRawSlices();
-  int sliceNum = sliceVector.size();
-  unsigned long long* slices = new unsigned long long[2 * sliceNum];
-  for (int i = 0; i < sliceNum; i++) {
-    const Buffer::RawSlice& s = sliceVector[i];
+  Buffer::RawSliceVector slice_vector = data.getRawSlices();
+  int slice_num = slice_vector.size();
+  unsigned long long* slices = new unsigned long long[2 * slice_num];
+  for (int i = 0; i < slice_num; i++) {
+    const Buffer::RawSlice& s = slice_vector[i];
     slices[2 * i] = reinterpret_cast<unsigned long long>(s.mem_);
     slices[2 * i + 1] = s.len_;
   }
 
   auto ret = dynamic_lib_->envoyGoFilterOnDownstreamWrite(
-      wrapper_, data.length(), reinterpret_cast<GoUint64>(slices), sliceNum, end_stream);
+      wrapper_, data.length(), reinterpret_cast<GoUint64>(slices), slice_num, end_stream);
 
   // TODO: do not drain buffer by default
   data.drain(data.length());
