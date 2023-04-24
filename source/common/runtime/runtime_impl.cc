@@ -278,9 +278,7 @@ void parseEntryFractionalPercentValue(Envoy::Runtime::Snapshot::Entry& entry) {
     return;
   }
   envoy::type::v3::FractionalPercent converted_fractional_percent;
-  TRY_ASSERT_MAIN_THREAD {
-    entry.fractional_percent_value_ = converted_fractional_percent;
-  }
+  TRY_ASSERT_MAIN_THREAD { entry.fractional_percent_value_ = converted_fractional_percent; }
   END_TRY
   catch (const ProtoValidationException& ex) {
     return;
@@ -407,9 +405,9 @@ void DiskLayer::walkDirectory(const std::string& path, const std::string& prefix
       values_.insert(
           {full_prefix, SnapshotImpl::createEntry(ValueUtil::loadFromYaml(value), value)});
 #else
-  IS_ENVOY_BUG("Runtime admin reload requires YAML support");
-  UNREFERENCED_PARAMETER(value);
-  return;
+      IS_ENVOY_BUG("Runtime admin reload requires YAML support");
+      UNREFERENCED_PARAMETER(value);
+      return;
 #endif
     }
   }
