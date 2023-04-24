@@ -905,6 +905,12 @@ CAPIStatus Filter::getStringValue(int id, GoString* value_str) {
     }
     req_->strValue = state.streamInfo().responseCodeDetails().value();
     break;
+  case EnvoyValue::DownstreamLocalAddress:
+    req_->strValue = state.streamInfo().downstreamAddressProvider().localAddress()->asString();
+    break;
+  case EnvoyValue::DownstreamRemoteAddress:
+    req_->strValue = state.streamInfo().downstreamAddressProvider().remoteAddress()->asString();
+    break;
   default:
     RELEASE_ASSERT(false, absl::StrCat("invalid string value id: ", id));
   }

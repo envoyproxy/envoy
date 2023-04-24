@@ -386,7 +386,7 @@ Http1HeaderValidator::validateRequestTrailers(const ::Envoy::Http::RequestTraile
 HeaderValidator::TrailersTransformationResult
 Http1HeaderValidator::transformRequestTrailers(::Envoy::Http::RequestTrailerMap& trailer_map) {
   sanitizeHeadersWithUnderscores(trailer_map);
-  return HeadersTransformationResult::success();
+  return TrailersTransformationResult::success();
 }
 
 HeaderValidator::ValidationResult Http1HeaderValidator::validateResponseTrailers(

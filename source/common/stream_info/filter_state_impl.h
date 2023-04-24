@@ -39,8 +39,6 @@ public:
     maybeCreateParent(ParentAccessMode::ReadOnly);
   }
 
-  std::string serializeAsString(int indent_level = 0) const override;
-
   // FilterState
   void setData(
       absl::string_view data_name, std::shared_ptr<Object> data, FilterState::StateType state_type,
@@ -51,7 +49,6 @@ public:
   Object* getDataMutableGeneric(absl::string_view data_name) override;
   std::shared_ptr<Object> getDataSharedMutableGeneric(absl::string_view data_name) override;
   bool hasDataAtOrAboveLifeSpan(FilterState::LifeSpan life_span) const override;
-  absl::Status addAncestor(const FilterStateSharedPtr& ancestor) override;
   FilterState::ObjectsPtr objectsSharedWithUpstreamConnection() const override;
 
   FilterState::LifeSpan lifeSpan() const override { return life_span_; }
