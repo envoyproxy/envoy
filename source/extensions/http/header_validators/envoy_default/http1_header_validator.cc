@@ -22,6 +22,7 @@ using ::Envoy::Http::LowerCaseString;
 using ::Envoy::Http::Protocol;
 using ::Envoy::Http::RequestHeaderMap;
 using ::Envoy::Http::UhvResponseCodeDetail;
+using ValidationResult = ::Envoy::Http::HeaderValidatorBase::ValidationResult;
 
 struct Http1ResponseCodeDetailValues {
   const std::string InvalidTransferEncoding = "uhv.http1.invalid_transfer_encoding";
@@ -98,8 +99,7 @@ Http1HeaderValidator::validateResponseHeaderEntry(const HeaderString& key,
   return validateGenericHeaderValue(value);
 }
 
-Http1HeaderValidator::ValidationResult
-Http1HeaderValidator::validateRequestHeaders(const RequestHeaderMap& header_map) {
+ValidationResult Http1HeaderValidator::validateRequestHeaders(const RequestHeaderMap& header_map) {
   absl::string_view path = header_map.getPathValue();
   absl::string_view host = header_map.getHostValue();
   // Step 1: verify that required pseudo headers are present. HTTP/1.1 requests requires the
@@ -308,7 +308,7 @@ ServerHttp1HeaderValidator::transformRequestHeaders(::Envoy::Http::RequestHeader
   return ::Envoy::Http::HeaderValidator::RequestHeadersTransformationResult::success();
 }
 
-Http1HeaderValidator::ValidationResult
+ValidationResult
 Http1HeaderValidator::validateResponseHeaders(const ::Envoy::Http::ResponseHeaderMap& header_map) {
   // Step 1: verify that required pseudo headers are present
   //
@@ -377,7 +377,7 @@ Http1HeaderValidator::validateTransferEncodingHeader(const HeaderString& value) 
   return HeaderValueValidationResult::success();
 }
 
-Http1HeaderValidator::ValidationResult
+ValidationResult
 Http1HeaderValidator::validateRequestTrailers(const ::Envoy::Http::RequestTrailerMap& trailer_map) {
   return validateTrailers(trailer_map);
 }
@@ -389,7 +389,7 @@ ServerHttp1HeaderValidator::transformRequestTrailers(
   return ::Envoy::Http::HeaderValidator::TransformationResult::success();
 }
 
-Http1HeaderValidator::ValidationResult Http1HeaderValidator::validateResponseTrailers(
+ValidationResult Http1HeaderValidator::validateResponseTrailers(
     const ::Envoy::Http::ResponseTrailerMap& trailer_map) {
   return validateTrailers(trailer_map);
 }

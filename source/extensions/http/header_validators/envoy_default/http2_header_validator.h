@@ -15,15 +15,17 @@ public:
           config,
       ::Envoy::Http::Protocol protocol, ::Envoy::Http::HeaderValidatorStats& stats);
 
-  using ValidationResult = ::Envoy::Http::HeaderValidatorBase::ValidationResult;
+  ::Envoy::Http::HeaderValidatorBase::ValidationResult
+  validateRequestHeaders(const ::Envoy::Http::RequestHeaderMap& header_map);
 
-  ValidationResult validateRequestHeaders(const ::Envoy::Http::RequestHeaderMap& header_map);
+  ::Envoy::Http::HeaderValidatorBase::ValidationResult
+  validateResponseHeaders(const ::Envoy::Http::ResponseHeaderMap& header_map);
 
-  ValidationResult validateResponseHeaders(const ::Envoy::Http::ResponseHeaderMap& header_map);
+  ::Envoy::Http::HeaderValidatorBase::ValidationResult
+  validateRequestTrailers(const ::Envoy::Http::RequestTrailerMap& trailer_map);
 
-  ValidationResult validateRequestTrailers(const ::Envoy::Http::RequestTrailerMap& trailer_map);
-
-  ValidationResult validateResponseTrailers(const ::Envoy::Http::ResponseTrailerMap& trailer_map);
+  ::Envoy::Http::HeaderValidatorBase::ValidationResult
+  validateResponseTrailers(const ::Envoy::Http::ResponseTrailerMap& trailer_map);
 
 private:
   /*

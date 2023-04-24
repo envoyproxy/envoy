@@ -26,6 +26,7 @@ using ::Envoy::Http::HeaderUtility;
 using ::Envoy::Http::LowerCaseString;
 using ::Envoy::Http::Protocol;
 using ::Envoy::Http::UhvResponseCodeDetail;
+using ValidationResult = ::Envoy::Http::HeaderValidatorBase::ValidationResult;
 
 struct Http2ResponseCodeDetailValues {
   const std::string InvalidTE = "uhv.http2.invalid_te";
@@ -96,7 +97,7 @@ Http2HeaderValidator::validateResponseHeaderEntry(const HeaderString& key,
   return validateGenericHeaderValue(value);
 }
 
-Http2HeaderValidator::ValidationResult
+ValidationResult
 Http2HeaderValidator::validateRequestHeaders(const ::Envoy::Http::RequestHeaderMap& header_map) {
   static const absl::node_hash_set<absl::string_view> kAllowedPseudoHeadersForConnect = {
       ":method", ":authority"};
@@ -228,7 +229,7 @@ Http2HeaderValidator::validateRequestHeaders(const ::Envoy::Http::RequestHeaderM
   return ValidationResult::success();
 }
 
-Http2HeaderValidator::ValidationResult
+ValidationResult
 Http2HeaderValidator::validateResponseHeaders(const ::Envoy::Http::ResponseHeaderMap& header_map) {
   // Step 1: verify that required pseudo headers are present
   //
@@ -398,7 +399,7 @@ Http2HeaderValidator::validateGenericHeaderName(const HeaderString& name) {
   return HeaderEntryValidationResult::success();
 }
 
-Http2HeaderValidator::ValidationResult
+ValidationResult
 Http2HeaderValidator::validateRequestTrailers(const ::Envoy::Http::RequestTrailerMap& trailer_map) {
   ValidationResult result = validateTrailers(trailer_map);
   if (!result.ok()) {
@@ -414,9 +415,9 @@ ServerHttp2HeaderValidator::transformRequestTrailers(
   return ::Envoy::Http::HeaderValidator::TransformationResult::success();
 }
 
-Http2HeaderValidator::ValidationResult Http2HeaderValidator::validateResponseTrailers(
+ValidationResult Http2HeaderValidator::validateResponseTrailers(
     const ::Envoy::Http::ResponseTrailerMap& trailer_map) {
-  Http2HeaderValidator::ValidationResult result = validateTrailers(trailer_map);
+  ValidationResult result = validateTrailers(trailer_map);
   if (!result.ok()) {
     stats_.incMessagingError();
   }
