@@ -55,13 +55,14 @@ void StatsHtmlRender::setupStatsPage(const Admin::UrlHandler& url_handler,
   }
   AdminHtmlUtil::renderTableEnd(response);
   std::string buf;
-  response.addFragments(
-      {"<script>\n", AdminHtmlUtil::getResource("histograms.js", buf), "</script>\n"});
   if (active_) {
+    std::string buf2;
     response.addFragments(
-        {"<script>\n", AdminHtmlUtil::getResource("active_stats.js", buf), "</script>\n"});
+        {"<script>\n", AdminHtmlUtil::getResource("histograms.js", buf),
+         AdminHtmlUtil::getResource("active_stats.js", buf2), "</script>\n"});
   } else {
-    response.add("<pre>\n");
+    response.addFragments(
+        {"<script>\n", AdminHtmlUtil::getResource("histograms.js", buf), "</script>\n<pre>\n"});
   }
 }
 
