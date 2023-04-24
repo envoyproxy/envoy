@@ -12,7 +12,7 @@
 //   * alternate sorting criteria, reverse-sort controls, etc.
 //   * detect when user is not looking at page and stop or slow down pinging the server
 //   * hierarchical display
-//   * json flavor to send hierarchical names to save serialization/deserialization costs
+//   * json flavor tao send hierarchical names to save serialization/deserialization costs
 //   * pause auto-refresh for at least 5 seconds when editng fields.
 //   * don't auto-refresh when there is error -- provide a button to re-retry.
 //   * consider removing histogram mode during active display, and overlay summary graphics
@@ -219,8 +219,19 @@ async function loadStats() {
 
   const makeQueryParam = (name) => name + '=' + encodeURIComponent(currentValues[name]);
   const params = ['filter', 'type'];
-  const url = '/stats?format=json&usedonly&histogram_buckets=detailed&' +
-       params.map(makeQueryParam).join('&');
+  const href = window.location.href;
+
+  // Compute the fetch URL prefix based on the current URL, so that the admin
+  // site can be hosted underneath a site-specific URL structure.
+  const stats_pos = href.indexOf('/stats/html-active');
+  if (stats_pos == -1) {
+    statusDiv.textContent = 'Cannot find /stats/html-active in ' + href;
+    return;
+  }
+  const prefix = href.substring(0, stats_pos);
+  const url = prefix + '/stats?format=json&usedonly&histogram_buckets=detailed&' +
+        params.map(makeQueryParam).join('&');
+
   try {
     const response = await fetch(url);
     const data = await response.json();
