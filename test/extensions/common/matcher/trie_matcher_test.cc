@@ -536,7 +536,8 @@ matcher_tree:
   socket.connection_info_provider_->setLocalAddress(
       std::make_shared<Network::Address::Ipv4Instance>("192.168.0.1", 8080));
   StreamInfo::FilterStateImpl filter_state(StreamInfo::FilterState::LifeSpan::Connection);
-  Network::Matching::MatchingDataImpl data(socket, filter_state);
+  envoy::config::core::v3::Metadata metadata;
+  Network::Matching::MatchingDataImpl data(socket, filter_state, metadata);
 
   const auto result = match_tree()->match(data);
   EXPECT_EQ(result.match_state_, MatchState::MatchComplete);

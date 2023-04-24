@@ -170,7 +170,8 @@ void PayloadToMetadataFilter::handleOnPresent(std::string&& value,
                                               const std::vector<uint16_t>& rule_ids) {
   for (uint16_t rule_id : rule_ids) {
     if (matched_rule_ids_.find(rule_id) == matched_rule_ids_.end()) {
-      return;
+      ENVOY_LOG(trace, "rule_id {} is not matched.", rule_id);
+      continue;
     }
     ENVOY_LOG(trace, "handleOnPresent rule_id {}", rule_id);
 
@@ -287,6 +288,7 @@ void PayloadToMetadataFilter::finalizeDynamicMetadata() {
 FilterStatus PayloadToMetadataFilter::messageBegin(MessageMetadataSharedPtr metadata) {
   for (const auto& rule : config_->requestRules()) {
     if (rule.matches(*metadata)) {
+      ENVOY_LOG(trace, "rule_id {} is matched", rule.ruleId());
       matched_rule_ids_.insert(rule.ruleId());
     }
   }

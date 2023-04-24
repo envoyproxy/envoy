@@ -51,8 +51,10 @@ TEST_P(OverloadIntegrationTest, CloseStreamsWhenOverloaded) {
   updateResource(0.9);
   test_server_->waitForGaugeEq("overload.envoy.overload_actions.stop_accepting_requests.active", 1);
 
-  Http::TestRequestHeaderMapImpl request_headers{
-      {":method", "GET"}, {":path", "/test/long/url"}, {":scheme", "http"}, {":authority", "host"}};
+  Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},
+                                                 {":path", "/test/long/url"},
+                                                 {":scheme", "http"},
+                                                 {":authority", "sni.lyft.com"}};
   codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
   auto response = codec_client_->makeRequestWithBody(request_headers, 10);
   ASSERT_TRUE(response->waitForEndStream());
@@ -104,8 +106,10 @@ TEST_P(OverloadIntegrationTest, DisableKeepaliveWhenOverloaded) {
   test_server_->waitForGaugeEq("overload.envoy.overload_actions.disable_http_keepalive.active", 1);
 
   codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
-  Http::TestRequestHeaderMapImpl request_headers{
-      {":method", "GET"}, {":path", "/test/long/url"}, {":scheme", "http"}, {":authority", "host"}};
+  Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},
+                                                 {":path", "/test/long/url"},
+                                                 {":scheme", "http"},
+                                                 {":authority", "sni.lyft.com"}};
   auto response = sendRequestAndWaitForResponse(request_headers, 1, default_response_headers_, 1);
   ASSERT_TRUE(codec_client_->waitForDisconnect());
 
@@ -204,8 +208,10 @@ TEST_P(OverloadScaledTimerIntegrationTest, CloseIdleHttpConnections) {
           min_timeout: 5s
     )EOF"));
 
-  const Http::TestRequestHeaderMapImpl request_headers{
-      {":method", "GET"}, {":path", "/test/long/url"}, {":scheme", "http"}, {":authority", "host"}};
+  const Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},
+                                                       {":path", "/test/long/url"},
+                                                       {":scheme", "http"},
+                                                       {":authority", "sni.lyft.com"}};
 
   // Create an HTTP connection and complete a request.
   codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
@@ -261,8 +267,10 @@ TEST_P(OverloadScaledTimerIntegrationTest, CloseIdleHttpStream) {
           min_timeout: 5s
     )EOF"));
 
-  const Http::TestRequestHeaderMapImpl request_headers{
-      {":method", "GET"}, {":path", "/test/long/url"}, {":scheme", "http"}, {":authority", "host"}};
+  const Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},
+                                                       {":path", "/test/long/url"},
+                                                       {":scheme", "http"},
+                                                       {":authority", "sni.lyft.com"}};
 
   // Create an HTTP connection and start a request.
   codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
@@ -293,6 +301,11 @@ TEST_P(OverloadScaledTimerIntegrationTest, CloseIdleHttpStream) {
 }
 
 TEST_P(OverloadScaledTimerIntegrationTest, TlsHandshakeTimeout) {
+  if (downstreamProtocol() == Http::CodecClient::Type::HTTP3 ||
+      upstreamProtocol() == Http::CodecClient::Type::HTTP3) {
+    // TODO(#26236): Fix this test for H3.
+    return;
+  }
   // Set up the Envoy to expect a TLS connection, with a 20 second timeout that can scale down to 5
   // seconds.
   config_helper_.addSslConfig();
@@ -373,6 +386,60 @@ TEST_P(OverloadScaledTimerIntegrationTest, TlsHandshakeTimeout) {
   // The transport-level connection was never completed, and the connection was closed.
   EXPECT_FALSE(connect_callbacks.connected());
   EXPECT_TRUE(connect_callbacks.closed());
+}
+
+class LoadShedPointIntegrationTest : public BaseOverloadIntegrationTest,
+                                     public HttpProtocolIntegrationTest {
+protected:
+  void initializeOverloadManager(const envoy::config::overload::v3::LoadShedPoint& config) {
+    setupOverloadManagerConfig(config);
+    config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      *bootstrap.mutable_overload_manager() = this->overload_manager_config_;
+    });
+    initialize();
+    updateResource(0);
+  }
+};
+
+INSTANTIATE_TEST_SUITE_P(Protocols, LoadShedPointIntegrationTest,
+                         testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams(
+                             {Http::CodecClient::Type::HTTP1, Http::CodecClient::Type::HTTP2},
+                             {FakeHttpConnection::Type::HTTP1})),
+                         HttpProtocolIntegrationTest::protocolTestParamsToString);
+
+TEST_P(LoadShedPointIntegrationTest, ListenerAcceptShedsLoad) {
+  autonomous_upstream_ = true;
+  initializeOverloadManager(
+      TestUtility::parseYaml<envoy::config::overload::v3::LoadShedPoint>(R"EOF(
+      name: "envoy.load_shed_points.tcp_listener_accept"
+      triggers:
+        - name: "envoy.resource_monitors.testonly.fake_resource_monitor"
+          threshold:
+            value: 0.90
+    )EOF"));
+
+  // Put envoy in overloaded state and check that it rejects the new client connection.
+  updateResource(0.95);
+  test_server_->waitForGaugeEq("overload.envoy.load_shed_points.tcp_listener_accept.scale_percent",
+                               100);
+
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+
+  if (version_ == Network::Address::IpVersion::v4) {
+    test_server_->waitForCounterEq("listener.127.0.0.1_0.downstream_cx_overload_reject", 1);
+  } else {
+    test_server_->waitForCounterEq("listener.[__1]_0.downstream_cx_overload_reject", 1);
+  }
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
+
+  // Disable overload, we should allow connections.
+  updateResource(0.80);
+  test_server_->waitForGaugeEq("overload.envoy.load_shed_points.tcp_listener_accept.scale_percent",
+                               0);
+
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  ASSERT_TRUE(response->waitForEndStream());
 }
 
 } // namespace Envoy

@@ -66,6 +66,13 @@ def envoy_select_envoy_mobile_request_compression(xs, repository = ""):
         "//conditions:default": xs,
     })
 
+# Selects the given values if Envoy Mobile stats reporting is enabled in the current build.
+def envoy_select_envoy_mobile_stats_reporting(xs, repository = ""):
+    return select({
+        repository + "//bazel:disable_envoy_mobile_stats_reporting": [],
+        "//conditions:default": xs,
+    })
+
 # Selects the given values if the Envoy Mobile listener is enabled in the current build.
 def envoy_select_envoy_mobile_listener(xs, repository = ""):
     return select({
@@ -77,6 +84,20 @@ def envoy_select_envoy_mobile_listener(xs, repository = ""):
 def envoy_select_enable_http3(xs, repository = ""):
     return select({
         repository + "//bazel:disable_http3": [],
+        "//conditions:default": xs,
+    })
+
+# Selects the given values if yaml is enabled in the current build.
+def envoy_select_enable_yaml(xs, repository = ""):
+    return select({
+        repository + "//bazel:disable_yaml": [],
+        "//conditions:default": xs,
+    })
+
+# Selects the given values if HTTP datagram support is enabled in the current build.
+def envoy_select_enable_http_datagrams(xs, repository = ""):
+    return select({
+        repository + "//bazel:disable_http_datagrams": [],
         "//conditions:default": xs,
     })
 

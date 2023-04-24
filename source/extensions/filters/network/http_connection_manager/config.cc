@@ -547,9 +547,31 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
     access_logs_.push_back(current_access_log);
   }
 
-  if (config.has_access_log_flush_interval()) {
-    access_log_flush_interval_ = std::chrono::milliseconds(
-        DurationUtil::durationToMilliseconds(config.access_log_flush_interval()));
+  if (config.has_access_log_options()) {
+    if (config.flush_access_log_on_new_request() /* deprecated */) {
+      throw EnvoyException(
+          "Only one of flush_access_log_on_new_request or access_log_options can be specified.");
+    }
+
+    if (config.has_access_log_flush_interval()) {
+      throw EnvoyException(
+          "Only one of access_log_flush_interval or access_log_options can be specified.");
+    }
+
+    flush_access_log_on_new_request_ =
+        config.access_log_options().flush_access_log_on_new_request();
+
+    if (config.access_log_options().has_access_log_flush_interval()) {
+      access_log_flush_interval_ = std::chrono::milliseconds(DurationUtil::durationToMilliseconds(
+          config.access_log_options().access_log_flush_interval()));
+    }
+  } else {
+    flush_access_log_on_new_request_ = config.flush_access_log_on_new_request();
+
+    if (config.has_access_log_flush_interval()) {
+      access_log_flush_interval_ = std::chrono::milliseconds(
+          DurationUtil::durationToMilliseconds(config.access_log_flush_interval()));
+    }
   }
 
   server_transformation_ = config.server_header_transformation();

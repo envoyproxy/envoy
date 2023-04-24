@@ -1,5 +1,3 @@
-version: "3.8"
-
 services:
 
   # Requires the build of the stubs first
@@ -11,8 +9,9 @@ services:
 
   grpc-server-proxy:
     build:
-      context: .
-      dockerfile: Dockerfile-server
+      dockerfile: ../shared/envoy/Dockerfile
+      args:
+        ENVOY_CONFIG: ./server/envoy-proxy.yaml
 
   # Requires the build of the stubs first
   grpc-client:
@@ -20,11 +19,14 @@ services:
       context: client
       dockerfile: ../../shared/python/Dockerfile
       target: python-grpc-client
+      args:
+        PYTHON_REQUIREMENTS_FILE: requirements.txt
     environment:
       CLIENT_PROXY: http://grpc-client-proxy:9911
       PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION: python
 
   grpc-client-proxy:
     build:
-      context: .
-      dockerfile: Dockerfile-client
+      dockerfile: ../shared/envoy/Dockerfile
+      args:
+        ENVOY_CONFIG: ./client/envoy-proxy.yaml

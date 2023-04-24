@@ -299,6 +299,14 @@ extensions/filters/http/oauth2 @derekargueta @snowp
 /*/extensions/matching/network/ @kyessenov @snowp
 # Header mutation
 /*/extensions/filters/http/header_mutation @wbpcode @htuch @soulxu
+# Health checkers
+/*/extensions/health_checkers/grpc @snowp @zuercher
+/*/extensions/health_checkers/http @snowp @zuercher
+/*/extensions/health_checkers/tcp @snowp @zuercher
+# IP Geolocation
+/*/extensions/filters/http/geoip @nezdolik @ravenblackx
+
+/*/extensions/health_checkers/common @snowp @zuercher
 
 # Intentionally exempt (treated as core code)
 /*/extensions/filters/common @UNOWNED @UNOWNED
@@ -312,13 +320,14 @@ extensions/filters/http/oauth2 @derekargueta @snowp
 /*/extensions/clusters/eds/ @UNOWNED @UNOWNED
 /*/source/extensions/listener_managers/listener_manager @UNOWNED @UNOWNED
 /*/source/extensions/listener_managers/validation_listener_manager @UNOWNED @UNOWNED
+/*/source/extensions/config_subscription/ @UNOWNED @UNOWNED
 
 # URL Pattern Match and Rewrite Library
 /*/extensions/path/uri_template_lib @alyssawilk @yanjunxiang-google
 /*/extensions/path/uri_template_lib/proto @alyssawilk @yanjunxiang-google
 
 # mobile
-/mobile/ @jpsim @Augustyniak @RyanTheOptimist @alyssawilk @abeyad
+/mobile/ @RyanTheOptimist @alyssawilk @abeyad
 
 # Contrib
 /contrib/exe/ @mattklein123 @lizan
@@ -333,10 +342,10 @@ extensions/filters/http/oauth2 @derekargueta @snowp
 /contrib/postgres_proxy/ @fabriziomello @cpakulski
 /contrib/sxg/ @cpapazian @alyssawilk
 /contrib/sip_proxy/ @durd07 @nearbyfly @dorisd0102
-/contrib/cryptomb/ @ipuustin @VillePihlava
+/contrib/cryptomb/ @giantcroc @soulxu
 /contrib/vcl/ @florincoras @KfreeZ
 /contrib/hyperscan/ @zhxie @soulxu
 /contrib/language/ @diceride @diceride
 /contrib/dlb/ @mattklein123 @daixiang0
-/contrib/qat/ @ipuustin @VillePihlava
+/contrib/qat/ @giantcroc @soulxu
 /contrib/generic_proxy/ @wbpcode @soulxu @zhaohuabing @rojkov @htuch

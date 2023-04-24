@@ -36,10 +36,11 @@ import (
 	"sync"
 	"sync/atomic"
 
+	"github.com/envoyproxy/envoy/contrib/golang/filters/http/source/go/pkg/api"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 
-	"github.com/envoyproxy/envoy/contrib/golang/filters/http/source/go/pkg/utils"
+	"github.com/envoyproxy/envoy/contrib/golang/common/go/utils"
 )
 
 var (
@@ -55,7 +56,14 @@ func envoyGoFilterNewHttpPluginConfig(configPtr uint64, configLen uint64) uint64
 
 	configNum := atomic.AddUint64(&configNumGenerator, 1)
 	if httpFilterConfigParser != nil {
-		configCache.Store(configNum, httpFilterConfigParser.Parse(&any))
+		parsedConfig, err := httpFilterConfigParser.Parse(&any)
+		if err != nil {
+			cAPI.HttpLog(api.Error, fmt.Sprintf("failed to parse golang plugin config: %v", err))
+			// TODO: we should reject the config in the Envoy side when Go returning 0.
+			// https://github.com/envoyproxy/envoy/issues/25369
+			return 0
+		}
+		configCache.Store(configNum, parsedConfig)
 	} else {
 		configCache.Store(configNum, &any)
 	}

@@ -15,26 +15,25 @@ public:
           config,
       ::Envoy::Http::Protocol protocol, ::Envoy::Http::HeaderValidatorStats& stats);
 
-  HeaderEntryValidationResult
-  validateRequestHeaderEntry(const ::Envoy::Http::HeaderString& key,
-                             const ::Envoy::Http::HeaderString& value) override;
+  ValidationResult
+  validateRequestHeaders(const ::Envoy::Http::RequestHeaderMap& header_map) override;
 
-  HeaderEntryValidationResult
-  validateResponseHeaderEntry(const ::Envoy::Http::HeaderString& key,
-                              const ::Envoy::Http::HeaderString& value) override;
+  HeadersTransformationResult
+  transformRequestHeaders(::Envoy::Http::RequestHeaderMap& header_map) override;
 
-  RequestHeaderMapValidationResult
-  validateRequestHeaderMap(::Envoy::Http::RequestHeaderMap& header_map) override;
+  ValidationResult
+  validateResponseHeaders(const ::Envoy::Http::ResponseHeaderMap& header_map) override;
 
-  ResponseHeaderMapValidationResult
-  validateResponseHeaderMap(::Envoy::Http::ResponseHeaderMap& header_map) override;
+  ValidationResult
+  validateRequestTrailers(const ::Envoy::Http::RequestTrailerMap& trailer_map) override;
 
-  TrailerValidationResult
-  validateRequestTrailerMap(::Envoy::Http::RequestTrailerMap& trailer_map) override;
+  TrailersTransformationResult
+  transformRequestTrailers(::Envoy::Http::RequestTrailerMap& header_map) override;
 
-  TrailerValidationResult
-  validateResponseTrailerMap(::Envoy::Http::ResponseTrailerMap& trailer_map) override;
+  ValidationResult
+  validateResponseTrailers(const ::Envoy::Http::ResponseTrailerMap& trailer_map) override;
 
+private:
   /*
    * Validate the TE header.
    */
@@ -45,10 +44,20 @@ public:
    */
   HeaderValueValidationResult validateAuthorityHeader(const ::Envoy::Http::HeaderString& value);
 
+  /*
+   * Validate the :protocol header.
+   */
+  HeaderValueValidationResult validateProtocolHeader(const ::Envoy::Http::HeaderString& value);
+
   HeaderEntryValidationResult
   validateGenericHeaderName(const ::Envoy::Http::HeaderString& name) override;
 
-private:
+  HeaderEntryValidationResult validateRequestHeaderEntry(const ::Envoy::Http::HeaderString& key,
+                                                         const ::Envoy::Http::HeaderString& value);
+
+  HeaderEntryValidationResult validateResponseHeaderEntry(const ::Envoy::Http::HeaderString& key,
+                                                          const ::Envoy::Http::HeaderString& value);
+
   const HeaderValidatorMap request_header_validator_map_;
 };
 

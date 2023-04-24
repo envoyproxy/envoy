@@ -1,19 +1,17 @@
-version: "3.8"
-
 services:
   go_plugin_compile:
     build:
-      context: ../shared/build
+      context: simple
+      dockerfile: ../../shared/golang/Dockerfile
+      target: golang-base
     command: >
       bash -c "
-      bazel build  //examples/golang/simple:simple.so
-      && cp -a ./bazel-bin/examples/golang/simple/simple.so /output"
-    entrypoint: /source/examples/shared/build/build-entrypoint.sh
-    environment:
-    - BUILD_UID=${UID:-1000}
-    - TEST_TMPDIR=/tmp
+      cd examples/golang/simple
+      && go build -o simple.so -buildmode=c-shared .
+      && cp ./simple.so /output"
     working_dir: /source
+    environment:
+    - GOFLAGS=-buildvcs=false
     volumes:
-    - ${ENVOY_DOCKER_BUILD_DIR:-/tmp/envoy-docker-build}:/tmp
     - ../..:/source
     - ./lib:/output

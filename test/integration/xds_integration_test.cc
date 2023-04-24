@@ -225,18 +225,18 @@ TEST_P(LdsInplaceUpdateTcpProxyIntegrationTest, ReloadConfigDeletingFilterChain)
   initialize();
   std::string response_0;
   auto client_conn_0 = createConnectionAndWrite("alpn0", "hello", response_0);
-  client_conn_0->waitForConnection();
+  ASSERT_TRUE(client_conn_0->waitForConnection());
   FakeRawConnectionPtr fake_upstream_connection_0;
   ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection_0));
 
   std::string response_1;
   auto client_conn_1 = createConnectionAndWrite("alpn1", "dummy", response_1);
-  client_conn_1->waitForConnection();
+  ASSERT_TRUE(client_conn_1->waitForConnection());
   FakeRawConnectionPtr fake_upstream_connection_1;
   ASSERT_TRUE(fake_upstreams_[1]->waitForRawConnection(fake_upstream_connection_1));
 
   ConfigHelper new_config_helper(
-      version_, *api_, MessageUtil::getJsonStringFromMessageOrDie(config_helper_.bootstrap()));
+      version_, *api_, MessageUtil::getJsonStringFromMessageOrError(config_helper_.bootstrap()));
   new_config_helper.addConfigModifier(
       [&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
         auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
@@ -291,12 +291,12 @@ TEST_P(LdsInplaceUpdateTcpProxyIntegrationTest, ReloadConfigAddingFilterChain) {
 
   std::string response_0;
   auto client_conn_0 = createConnectionAndWrite("alpn0", "hello", response_0);
-  client_conn_0->waitForConnection();
+  ASSERT_TRUE(client_conn_0->waitForConnection());
   FakeRawConnectionPtr fake_upstream_connection_0;
   ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection_0));
 
   ConfigHelper new_config_helper(
-      version_, *api_, MessageUtil::getJsonStringFromMessageOrDie(config_helper_.bootstrap()));
+      version_, *api_, MessageUtil::getJsonStringFromMessageOrError(config_helper_.bootstrap()));
   new_config_helper.addConfigModifier(
       [&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
         auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
@@ -330,7 +330,7 @@ TEST_P(LdsInplaceUpdateTcpProxyIntegrationTest, ReloadConfigAddingFilterChain) {
 
   std::string response_2;
   auto client_conn_2 = createConnectionAndWrite("alpn2", "hello2", response_2);
-  client_conn_2->waitForConnection();
+  ASSERT_TRUE(client_conn_2->waitForConnection());
   FakeRawConnectionPtr fake_upstream_connection_2;
   ASSERT_TRUE(fake_upstreams_[1]->waitForRawConnection(fake_upstream_connection_2));
   std::string observed_data_2;
@@ -521,7 +521,7 @@ TEST_P(LdsInplaceUpdateHttpIntegrationTest, ReloadConfigDeletingFilterChain) {
   auto codec_client_default = createHttpCodec("alpndefault");
 
   ConfigHelper new_config_helper(
-      version_, *api_, MessageUtil::getJsonStringFromMessageOrDie(config_helper_.bootstrap()));
+      version_, *api_, MessageUtil::getJsonStringFromMessageOrError(config_helper_.bootstrap()));
   new_config_helper.addConfigModifier(
       [&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
         auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
@@ -560,7 +560,7 @@ TEST_P(LdsInplaceUpdateHttpIntegrationTest, ReloadConfigAddingFilterChain) {
   test_server_->waitForGaugeGe("http.hcm0.downstream_cx_active", 1);
 
   ConfigHelper new_config_helper(
-      version_, *api_, MessageUtil::getJsonStringFromMessageOrDie(config_helper_.bootstrap()));
+      version_, *api_, MessageUtil::getJsonStringFromMessageOrError(config_helper_.bootstrap()));
   new_config_helper.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap)
                                           -> void {
     auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
@@ -605,7 +605,7 @@ TEST_P(LdsInplaceUpdateHttpIntegrationTest, ReloadConfigUpdatingDefaultFilterCha
   auto codec_client_default = createHttpCodec("alpndefault");
   Cleanup cleanup0([c_default = codec_client_default.get()]() { c_default->close(); });
   ConfigHelper new_config_helper(
-      version_, *api_, MessageUtil::getJsonStringFromMessageOrDie(config_helper_.bootstrap()));
+      version_, *api_, MessageUtil::getJsonStringFromMessageOrError(config_helper_.bootstrap()));
   new_config_helper.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap)
                                           -> void {
     auto default_filter_chain =
@@ -633,7 +633,7 @@ TEST_P(LdsInplaceUpdateHttpIntegrationTest, OverlappingFilterChainServesNewConne
   auto codec_client_0 = createHttpCodec("alpn0");
   Cleanup cleanup([c0 = codec_client_0.get()]() { c0->close(); });
   ConfigHelper new_config_helper(
-      version_, *api_, MessageUtil::getJsonStringFromMessageOrDie(config_helper_.bootstrap()));
+      version_, *api_, MessageUtil::getJsonStringFromMessageOrError(config_helper_.bootstrap()));
   new_config_helper.addConfigModifier(
       [&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
         auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
@@ -686,7 +686,7 @@ TEST_P(LdsIntegrationTest, ReloadConfig) {
 
   // Create a new config with HTTP/1.0 proxying.
   ConfigHelper new_config_helper(
-      version_, *api_, MessageUtil::getJsonStringFromMessageOrDie(config_helper_.bootstrap()));
+      version_, *api_, MessageUtil::getJsonStringFromMessageOrError(config_helper_.bootstrap()));
   new_config_helper.addConfigModifier(
       [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
               hcm) {
@@ -718,7 +718,7 @@ TEST_P(LdsIntegrationTest, NewListenerWithBadPostListenSocketOption) {
   auto addr_socket =
       Network::Test::bindFreeLoopbackPort(version_, Network::Socket::Type::Stream, true);
   ConfigHelper new_config_helper(
-      version_, *api_, MessageUtil::getJsonStringFromMessageOrDie(config_helper_.bootstrap()));
+      version_, *api_, MessageUtil::getJsonStringFromMessageOrError(config_helper_.bootstrap()));
   new_config_helper.addConfigModifier(
       [&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
         auto* new_listener = bootstrap.mutable_static_resources()->add_listeners();
@@ -756,9 +756,8 @@ INSTANTIATE_TEST_SUITE_P(
                      testing::Values(false, true)));
 
 // Verify that the listener in place update will accomplish anyway if the listener is removed.
-TEST_P(LdsStsIntegrationTest, TcpListenerRemoveFilterChainCalledAfterListenerIsRemoved) {
-  // For https://github.com/envoyproxy/envoy/issues/22489
-  LogLevelSetter save_levels(spdlog::level::err);
+// https://github.com/envoyproxy/envoy/issues/22489
+TEST_P(LdsStsIntegrationTest, DISABLED_TcpListenerRemoveFilterChainCalledAfterListenerIsRemoved) {
   // The in place listener update takes 2 seconds. We will remove the listener.
   drain_time_ = std::chrono::seconds(2);
   // 1. Start the first in place listener update.
@@ -766,12 +765,12 @@ TEST_P(LdsStsIntegrationTest, TcpListenerRemoveFilterChainCalledAfterListenerIsR
   initialize();
   std::string response_0;
   auto client_conn_0 = createConnectionAndWrite("alpn0", "hello", response_0);
-  client_conn_0->waitForConnection();
+  ASSERT_TRUE(client_conn_0->waitForConnection());
   FakeRawConnectionPtr fake_upstream_connection_0;
   ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection_0));
 
   ConfigHelper new_config_helper(
-      version_, *api_, MessageUtil::getJsonStringFromMessageOrDie(config_helper_.bootstrap()));
+      version_, *api_, MessageUtil::getJsonStringFromMessageOrError(config_helper_.bootstrap()));
   new_config_helper.addConfigModifier(
       [&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
         auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
@@ -782,7 +781,7 @@ TEST_P(LdsStsIntegrationTest, TcpListenerRemoveFilterChainCalledAfterListenerIsR
   // 2. Remove the tcp listener immediately. This listener update should stack in the same poller
   // cycle so that this listener update has the same time stamp as the first update.
   ConfigHelper new_config_helper1(
-      version_, *api_, MessageUtil::getJsonStringFromMessageOrDie(config_helper_.bootstrap()));
+      version_, *api_, MessageUtil::getJsonStringFromMessageOrError(config_helper_.bootstrap()));
   new_config_helper1.addConfigModifier(
       [&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
         bootstrap.mutable_static_resources()->mutable_listeners(0)->Swap(
@@ -799,13 +798,13 @@ TEST_P(LdsStsIntegrationTest, TcpListenerRemoveFilterChainCalledAfterListenerIsR
   while (response_0.find("world") == std::string::npos) {
     ASSERT_TRUE(client_conn_0->run(Event::Dispatcher::RunType::NonBlock));
   }
+  // Wait for the filter chain removal start.
+  test_server_->waitForGaugeEq("listener_manager.total_filter_chains_draining", 1);
+
   client_conn_0->close();
   while (!client_conn_0->closed()) {
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   }
-  // Wait for the filter chain removal start. Ideally we have `drain_time_` to detect the
-  // value 1. Increase the drain_time_ at the beginning of the test if the test is flaky.
-  test_server_->waitForGaugeEq("listener_manager.total_filter_chains_draining", 1);
   // Wait for the filter chain removal at worker thread. When the value drops from 1, all pending
   // removal at the worker is completed. This is the end of the in place update.
   test_server_->waitForGaugeEq("listener_manager.total_filter_chains_draining", 0);

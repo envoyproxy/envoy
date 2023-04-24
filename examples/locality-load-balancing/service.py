@@ -1,3 +1,4 @@
+import logging
 import os
 
 from aiohttp import web
@@ -12,7 +13,7 @@ async def get(request):
     if healthy:
         return web.Response(text=f"Hello from {os.environ['HOST']}!\n")
     else:
-        raise HTTPServiceUnavailable(reason="Unhealthy")
+        raise web.HTTPServiceUnavailable(reason="Unhealthy")
 
 
 @routes.get("/healthy")
@@ -31,5 +32,6 @@ async def unhealthy(request):
 
 if __name__ == "__main__":
     app = web.Application()
+    logging.basicConfig(level=logging.DEBUG)
     app.add_routes(routes)
     web.run_app(app, host='0.0.0.0', port=8080)

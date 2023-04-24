@@ -29,20 +29,22 @@ final class ViewController: UITableViewController {
       // required by DNS cache
       .addKeyValueStore(name: "reserved.platform_store", keyValueStore: UserDefaults.standard)
       .enableInterfaceBinding(true)
+      .enablePlatformCertificateValidation(true)
       .addNativeFilter(
         name: "envoy.filters.http.buffer",
         typedConfig: """
-            {\
-            "@type":"type.googleapis.com/envoy.extensions.filters.http.buffer.v3.Buffer",\
-            "max_request_bytes":5242880\
-            }
-            """
+          {
+            "@type": "type.googleapis.com/envoy.extensions.filters.http.buffer.v3.Buffer",
+            "max_request_bytes": 5242880
+          }
+          """
       )
       .setOnEngineRunning { NSLog("Envoy async internal setup completed") }
       .addStringAccessor(name: "demo-accessor", accessor: { return "PlatformString" })
       .addKeyValueStore(name: "demo-kv-store", keyValueStore: UserDefaults.standard)
       .setEventTracker { NSLog("Envoy event emitted: \($0)") }
       .forceIPv6(true)
+      .enableSwiftBootstrap(true)
       .build()
     self.streamClient = engine.streamClient()
     self.pulseClient = engine.pulseClient()

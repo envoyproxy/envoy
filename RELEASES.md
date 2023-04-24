@@ -93,7 +93,8 @@ deadline of 3 weeks.
 | 1.23.0  | 2022/07/15 | 2022/07/15 |    0 days  | 2023/07/15  |
 | 1.24.0  | 2022/10/15 | 2022/10/19 |   +4 days  | 2023/10/19  |
 | 1.25.0  | 2023/01/15 | 2023/01/18 |   +3 days  | 2024/01/18  |
-| 1.26.0  | 2023/04/15 |            |            |             |
+| 1.26.0  | 2023/04/15 | 2023/04/18 |   +3 days  | 2024/04/18  |
+| 1.27.0  | 2023/07/14 |            |            |             |
 
 ### Cutting a major release
 
@@ -108,7 +109,7 @@ deadline of 3 weeks.
   * Make any needed corrections (grammar, punctuation, formatting, etc.).
   * Check to see if any security/stable version release notes are duplicated in
     the major version release notes. These should not be duplicated.
-  * Switch the repo to "release" mode by running `bazel run //tools/project:release`. See the [project
+  * Switch the repo to "release" mode by running `bazel run @envoy_repo//:release`. See the [project
     tool](tools/project/README.md#bazel-run-toolsprojectrelease) for further information. This tool
     will create a commit with the necessary changes for a release.
   * Update the [RELEASES](RELEASES.md) doc with the relevant dates. Now, or after you cut the
@@ -129,7 +130,7 @@ deadline of 3 weeks.
 * Craft a witty/uplifting email and send it to all the email aliases: envoy-announce@ envoy-users@ envoy-dev@ envoy-maintainers
 * Make sure we tweet the new release: either have Matt do it or email social@cncf.io and ask them to do an Envoy account
   post.
-* Switch the repo back to "dev" mode by running `bazel run //tools/project:dev`. See the [project
+* Switch the repo back to "dev" mode by running `bazel run @envoy_repo//:dev`. See the [project
   tool](tools/project/README.md#bazel-run-toolsprojectdev) for further information. This tool will create a commit with the
   necessary changes to continue development.
 * Create a pull request with commit created by the project tool.

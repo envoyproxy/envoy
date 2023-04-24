@@ -511,11 +511,20 @@ static void ios_track_event(envoy_map map, const void *context) {
     [self registerKeyValueStore:name keyValueStore:config.keyValueStores[name]];
   }
 
-  register_apple_platform_cert_verifier();
+  if (config.enablePlatformCertificateValidation) {
+    register_apple_platform_cert_verifier();
+  }
 }
 
 - (int)runWithConfig:(EnvoyConfiguration *)config logLevel:(NSString *)logLevel {
-  auto bootstrap = [config generateBootstrap];
+  std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> bootstrap;
+  if (config.bootstrapPointer > 0) {
+    bootstrap = absl::WrapUnique(
+        reinterpret_cast<envoy::config::bootstrap::v3::Bootstrap *>(config.bootstrapPointer));
+  } else {
+    bootstrap = [config generateBootstrap];
+  }
+
   if (bootstrap == nullptr) {
     return kEnvoyFailure;
   }

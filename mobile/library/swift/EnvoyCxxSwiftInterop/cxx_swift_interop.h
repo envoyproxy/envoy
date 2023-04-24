@@ -42,6 +42,16 @@ inline BootstrapPtr generateBootstrapPtr(Platform::EngineBuilder builder) {
   return reinterpret_cast<BootstrapPtr>(builder.generateBootstrap().release());
 }
 
+inline std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap>
+bootstrapFromPtr(BootstrapPtr bootstrap_ptr) {
+  return absl::WrapUnique(
+      reinterpret_cast<envoy::config::bootstrap::v3::Bootstrap*>(bootstrap_ptr));
+}
+
+inline std::string bootstrapDebugDescription(BootstrapPtr bootstrap_ptr) {
+  return bootstrapFromPtr(bootstrap_ptr)->ShortDebugString();
+}
+
 /**
  * Run the engine with the provided configuration.
  * @param bootstrap_ptr, the Envoy bootstrap configuration to use.

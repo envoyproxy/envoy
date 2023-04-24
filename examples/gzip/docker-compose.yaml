@@ -1,10 +1,8 @@
-version: "3.8"
 services:
 
   envoy-stats:
     build:
-      context: .
-      dockerfile: Dockerfile-gzip
+      dockerfile: ../shared/envoy/Dockerfile
     depends_on:
       service:
         condition: service_healthy

@@ -30,6 +30,7 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic, assign) BOOL enableDrainPostDnsRefresh;
 @property (nonatomic, assign) BOOL enforceTrustChainVerification;
 @property (nonatomic, assign) BOOL forceIPv6;
+@property (nonatomic, assign) BOOL enablePlatformCertificateValidation;
 @property (nonatomic, assign) UInt32 h2ConnectionKeepaliveIdleIntervalMilliseconds;
 @property (nonatomic, assign) UInt32 h2ConnectionKeepaliveTimeoutSeconds;
 @property (nonatomic, assign) UInt32 maxConnectionsPerHost;
@@ -57,6 +58,11 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic, strong, nullable) NSString *nodeRegion;
 @property (nonatomic, strong, nullable) NSString *nodeZone;
 @property (nonatomic, strong, nullable) NSString *nodeSubZone;
+@property (nonatomic, strong) NSString *cdsResourcesLocator;
+@property (nonatomic, assign) UInt32 cdsTimeoutSeconds;
+@property (nonatomic, assign) BOOL enableCds;
+@property (nonatomic, assign) intptr_t bootstrapPointer;
+
 /**
  Create a new instance of the configuration.
  */
@@ -79,6 +85,7 @@ NS_ASSUME_NONNULL_BEGIN
                         enableDrainPostDnsRefresh:(BOOL)enableDrainPostDnsRefresh
                     enforceTrustChainVerification:(BOOL)enforceTrustChainVerification
                                         forceIPv6:(BOOL)forceIPv6
+              enablePlatformCertificateValidation:(BOOL)enablePlatformCertificateValidation
     h2ConnectionKeepaliveIdleIntervalMilliseconds:
         (UInt32)h2ConnectionKeepaliveIdleIntervalMilliseconds
               h2ConnectionKeepaliveTimeoutSeconds:(UInt32)h2ConnectionKeepaliveTimeoutSeconds
@@ -114,7 +121,10 @@ NS_ASSUME_NONNULL_BEGIN
                                            nodeId:(nullable NSString *)nodeId
                                        nodeRegion:(nullable NSString *)nodeRegion
                                          nodeZone:(nullable NSString *)nodeZone
-                                      nodeSubZone:(nullable NSString *)nodeSubZone;
+                                      nodeSubZone:(nullable NSString *)nodeSubZone
+                              cdsResourcesLocator:(NSString *)cdsResourcesLocator
+                                cdsTimeoutSeconds:(UInt32)cdsTimeoutSeconds
+                                        enableCds:(BOOL)enableCds;
 
 /**
  Generate a string description of the C++ Envoy bootstrap from this configuration.

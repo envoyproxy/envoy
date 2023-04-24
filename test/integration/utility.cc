@@ -28,8 +28,10 @@
 #include "quiche/quic/core/deterministic_connection_id_generator.h"
 #endif
 
+#ifdef ENVOY_ENABLE_YAML
 #include "test/common/upstream/utility.h"
 #include "test/integration/ssl_utility.h"
+#endif
 #include "test/mocks/common.h"
 #include "test/mocks/server/transport_socket_factory_context.h"
 #include "test/mocks/stats/mocks.h"
@@ -126,6 +128,7 @@ private:
   bool connected_{false};
 };
 
+#ifdef ENVOY_ENABLE_YAML
 Network::UpstreamTransportSocketFactoryPtr
 IntegrationUtil::createQuicUpstreamTransportSocketFactory(Api::Api& api, Stats::Store& store,
                                                           Ssl::ContextManager& context_manager,
@@ -256,6 +259,7 @@ IntegrationUtil::makeSingleRequest(uint32_t port, const std::string& method, con
       fmt::format("tcp://{}:{}", Network::Test::getLoopbackAddressUrlString(ip_version), port));
   return makeSingleRequest(addr, method, url, body, type, host, content_type);
 }
+#endif // ENVOY_ENABLE_YAML
 
 RawConnectionDriver::RawConnectionDriver(uint32_t port, Buffer::Instance& request_data,
                                          ReadCallback response_data_callback,
@@ -306,13 +310,17 @@ RawConnectionDriver::RawConnectionDriver(uint32_t port, DoWriteCallback write_re
 
 RawConnectionDriver::~RawConnectionDriver() = default;
 
-void RawConnectionDriver::waitForConnection() {
+testing::AssertionResult RawConnectionDriver::waitForConnection() {
   // TODO(mattklein123): Add a timeout and switch to events and waitFor().
   while (!callbacks_->connected() && !callbacks_->closed()) {
     Event::GlobalTimeSystem().timeSystem().realSleepDoNotUseWithoutScrutiny(
         std::chrono::milliseconds(10));
     dispatcher_.run(Event::Dispatcher::RunType::NonBlock);
   }
+  if (!callbacks_->connected()) {
+    return testing::AssertionFailure();
+  }
+  return testing::AssertionSuccess();
 }
 
 testing::AssertionResult RawConnectionDriver::run(Event::Dispatcher::RunType run_type,
