@@ -79,6 +79,7 @@ stages:
 - ${{ if eq(variables.pipelinePostsubmit, true) }}:
   - template: stages.yml
     parameters:
+      timeoutDockerPublish: 30
       buildStageDeps:
       - env
       checkStageDeps:
