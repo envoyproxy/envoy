@@ -910,14 +910,14 @@ CAPIStatus Filter::getStringValue(int id, GoString* value_str) {
   case EnvoyValue::DownstreamRemoteAddress:
     req_->strValue = state.streamInfo().downstreamAddressProvider().remoteAddress()->asString();
     break;
-  case EnvoyValue::UpstreamHost:
+  case EnvoyValue::UpstreamHostAddress:
     if (state.streamInfo().upstreamInfo() && state.streamInfo().upstreamInfo()->upstreamHost()) {
       req_->strValue = state.streamInfo().upstreamInfo()->upstreamHost()->address()->asString();
     } else {
       return CAPIStatus::CAPIValueNotFound;
     }
     break;
-  case EnvoyValue::UpstreamCluster:
+  case EnvoyValue::UpstreamClusterName:
     if (state.streamInfo().upstreamInfo() && state.streamInfo().upstreamInfo()->upstreamHost()) {
       req_->strValue = state.streamInfo().upstreamInfo()->upstreamHost()->cluster().name();
     } else {

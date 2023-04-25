@@ -212,11 +212,11 @@ func (f *filter) encodeHeaders(header api.ResponseHeaderMap, endStream bool) api
 	if details, ok := f.callbacks.StreamInfo().ResponseCodeDetails(); ok {
 		header.Set("rsp-response-code-details", details)
 	}
-	if upstream_host, ok := f.callbacks.StreamInfo().UpstreamHost(); ok {
-		header.Set("rsp-upstream-host", upstream_host)
+	if upstream_host_address, ok := f.callbacks.StreamInfo().UpstreamHostAddress(); ok {
+		header.Set("rsp-upstream-host", upstream_host_address)
 	}
-	if upstream_cluster, ok := f.callbacks.StreamInfo().UpstreamCluster(); ok {
-		header.Set("rsp-upstream-cluster", upstream_cluster)
+	if upstream_cluster_name, ok := f.callbacks.StreamInfo().UpstreamClusterName(); ok {
+		header.Set("rsp-upstream-cluster", upstream_cluster_name)
 	}
 
 	origin, found := header.Get("x-test-header-0")
