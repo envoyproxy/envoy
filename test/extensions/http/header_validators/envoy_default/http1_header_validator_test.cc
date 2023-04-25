@@ -476,12 +476,11 @@ TEST_F(Http1HeaderValidatorTest, RejectUnderscoreHeadersFromRequestHeadersWhenCo
 TEST_F(Http1HeaderValidatorTest, TransformResponseHeadersServerCodecNoop) {
   ::Envoy::Http::TestResponseHeaderMapImpl headers{
       {":status", "200"}, {"x-foo", "bar"}, {"transfer-encoding", "chunked"}};
-  auto uhv = createH1Client(empty_config);
+  auto uhv = createH1(empty_config);
 
-  EXPECT_ACCEPT(uhv->validateResponseHeaders(headers));
-  EXPECT_ACCEPT(uhv->transformResponseHeaders(headers));
-  EXPECT_EQ(headers, TestResponseHeaderMapImpl(
-                         {{":status", "200"}, {"x-foo", "bar"}, {"transfer-encoding", "chunked"}}));
+  auto result = uhv->transformResponseHeaders(headers);
+  EXPECT_ACCEPT(result.status);
+  EXPECT_EQ(result.new_headers, nullptr);
 }
 
 TEST_F(Http1HeaderValidatorTest, TransformRequestHeadersClientCodecNoop) {
