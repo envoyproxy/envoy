@@ -9,6 +9,9 @@ minor_behavior_changes:
   change: |
     Increase granularity mapping connection pool failures to specific stream failure reasons to make it more transparent why
     the stream is reset when a connection pool's connection fails.
+- area: custom response
+  change: |
+    The filter now traverses matchers from most specific to least specific per filter config till a match is found for the response.
 - area: uhv
   change: |
     Preserve case of %-encoded triplets in the default header validator. This behavior can be reverted by setting runtime flag
@@ -25,12 +28,18 @@ bug_fixes:
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
+- area: http
+  change: |
+    removed runtime key ``envoy.reloadable_features.allow_upstream_filters`` and legacy code paths.
 - area: quic
   change: |
     removed runtime key ``envoy.reloadable_features.quic_defer_send_in_response_to_packet`` and legacy code paths.
 - area: upstream
   change: |
     removed runtime key ``envoy.reloadable_features.fix_hash_key`` and legacy code paths.
+- area: logging
+  change: |
+    removed runtime key ``envoy.reloadable_features.correct_remote_address`` and legacy code paths.
 - area: http
   change: |
     removed runtime key ``envoy.reloadable_features.http_response_half_close`` and legacy code paths.
