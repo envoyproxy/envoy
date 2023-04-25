@@ -31,7 +31,6 @@
 // problem of the bugs being found after the old code path has been removed.
 RUNTIME_GUARD(envoy_reloadable_features_allow_compact_maglev);
 RUNTIME_GUARD(envoy_reloadable_features_append_query_parameters_path_rewriter);
-RUNTIME_GUARD(envoy_reloadable_features_closer_shadow_behavior);
 RUNTIME_GUARD(envoy_reloadable_features_conn_pool_delete_when_idle);
 RUNTIME_GUARD(envoy_reloadable_features_correct_remote_address);
 RUNTIME_GUARD(envoy_reloadable_features_delta_xds_subscription_state_tracking_fix);
