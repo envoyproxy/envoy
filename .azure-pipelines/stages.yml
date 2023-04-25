@@ -74,6 +74,7 @@ stages:
   jobs:
   - template: stage/sync.yml
     parameters:
+      authGCP: $(GcpServiceAccountKey)
       authSSHDataPlaneApiKeyPublic: $(DataPlaneApiPublicKey)
       authSSHDataPlaneApiKey: $(DataPlaneApiPrivateKey)
       authSSHGoControlPlaneKeyPublic: $(GoControlPlanePublicKey)
