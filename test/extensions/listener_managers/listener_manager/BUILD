@@ -1,5 +1,9 @@
 load(
     "//bazel:envoy_build_system.bzl",
+    "envoy_proto_library",
+)
+load(
+    "//bazel:envoy_build_system.bzl",
     "envoy_benchmark_test",
     "envoy_cc_benchmark_binary",
     "envoy_cc_test",
@@ -11,11 +15,17 @@ licenses(["notice"])  # Apache 2
 
 envoy_package()
 
+envoy_proto_library(
+    name = "config",
+    srcs = ["config.proto"],
+)
+
 envoy_cc_test_library(
     name = "listener_manager_impl_test_lib",
     hdrs = ["listener_manager_impl_test.h"],
     data = ["//test/extensions/transport_sockets/tls/test_data:certs"],
     deps = [
+        ":config_cc_proto",
         "//source/common/init:manager_lib",
         "//source/extensions/common/matcher:trie_matcher_lib",
         "//source/extensions/listener_managers/listener_manager:listener_manager_lib",

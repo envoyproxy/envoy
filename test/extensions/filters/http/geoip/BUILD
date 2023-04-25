@@ -1,6 +1,7 @@
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_package",
+    "envoy_proto_library",
 )
 load(
     "//test/extensions:extensions_build_system.bzl",
@@ -13,6 +14,10 @@ licenses(["notice"])  # Apache 2
 
 envoy_package()
 
+envoy_proto_library(
+    name = "dummy",
+    srcs = ["dummy.proto"],
+)
 envoy_extension_cc_test(
     name = "config_test",
     size = "small",
@@ -51,7 +56,10 @@ envoy_extension_cc_mock(
     name = "geoip_mocks",
     hdrs = ["mocks.h"],
     extension_names = ["envoy.filters.http.geoip"],
-    deps = ["//source/extensions/filters/http/geoip:provider_config"],
+    deps = [
+      ":dummy_cc_proto",
+      "//source/extensions/filters/http/geoip:provider_config",
+    ],
 )
 
 envoy_extension_cc_test_library(

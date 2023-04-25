@@ -36,6 +36,8 @@
 #include "test/test_common/registry.h"
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
+#include "test/extensions/listener_managers/listener_manager/config.pb.h"
+#include "test/extensions/listener_managers/listener_manager/config.pb.validate.h"
 
 #include "absl/strings/escaping.h"
 #include "absl/strings/match.h"
@@ -598,18 +600,13 @@ public:
   }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    // Using Struct instead of a custom per-filter empty config proto
-    // This is only allowed in tests.
-    return std::make_unique<Envoy::ProtobufWkt::Struct>();
+    return std::make_unique<test::extensions::listener_managers::listener_manager::NonTerminalFilter>();
   }
 
   std::string name() const override { return "non_terminal"; }
 };
 
 TEST_P(ListenerManagerImplWithRealFiltersTest, TerminalNotLast) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.no_extension_lookup_by_name", "false"}});
-
   NonTerminalFilterFactory filter;
   Registry::InjectFactory<Configuration::NamedNetworkFilterConfigFactory> registered(filter);
 
@@ -621,6 +618,8 @@ address:
 filter_chains:
 - filters:
   - name: non_terminal
+    typed_config:
+      "@type": type.googleapis.com/test.extensions.listener_managers.listener_manager.NonTerminalFilter
   name: foo
   )EOF";
 

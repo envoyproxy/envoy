@@ -94,7 +94,6 @@ MATCHER_P(HasAnonGeoHeadersSize, expected_size, "") {
 
 TEST(GeoipFilterConfigTest, GeoipFilterDefaultValues) {
   TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.no_extension_lookup_by_name", "false"}});
   DummyGeoipProviderFactory dummy_factory;
   Registry::InjectFactory<GeoipProviderFactory> registered(dummy_factory);
   std::string filter_config_yaml = R"EOF(
@@ -102,7 +101,8 @@ TEST(GeoipFilterConfigTest, GeoipFilterDefaultValues) {
       city: "x-geo-city"
     provider:
         name: "envoy.geoip_providers.dummy"
-        typed_config: {}
+        typed_config:
+          "@type": type.googleapis.com/test.extensions.filters.http.geoip.DummyProvider
   )EOF";
   GeoipFilterConfig filter_config;
   TestUtility::loadFromYaml(filter_config_yaml, filter_config);
@@ -120,7 +120,6 @@ TEST(GeoipFilterConfigTest, GeoipFilterDefaultValues) {
 
 TEST(GeoipFilterConfigTest, GeoipFilterConfigWithCorrectProto) {
   TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.no_extension_lookup_by_name", "false"}});
   DummyGeoipProviderFactory dummy_factory;
   Registry::InjectFactory<GeoipProviderFactory> registered(dummy_factory);
   std::string filter_config_yaml = R"EOF(
@@ -132,7 +131,8 @@ TEST(GeoipFilterConfigTest, GeoipFilterConfigWithCorrectProto) {
       anon_vpn: "x-anon-vpn"
     provider:
         name: "envoy.geoip_providers.dummy"
-        typed_config: {}
+        typed_config:
+          "@type": type.googleapis.com/test.extensions.filters.http.geoip.DummyProvider
   )EOF";
   GeoipFilterConfig filter_config;
   TestUtility::loadFromYaml(filter_config_yaml, filter_config);
@@ -151,14 +151,14 @@ TEST(GeoipFilterConfigTest, GeoipFilterConfigWithCorrectProto) {
 
 TEST(GeoipFilterConfigTest, GeoipFilterConfigMissingGeoHeaders) {
   TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.no_extension_lookup_by_name", "false"}});
   DummyGeoipProviderFactory dummy_factory;
   Registry::InjectFactory<GeoipProviderFactory> registered(dummy_factory);
   std::string filter_config_yaml = R"EOF(
     xff_config:
       xff_num_trusted_hops: 0
     provider:
-        name: "envoy.geoip_providers.dummy"
+        typed_config:
+          "@type": type.googleapis.com/test.extensions.filters.http.geoip.DummyProvider
   )EOF";
   GeoipFilterConfig filter_config;
 
@@ -173,7 +173,6 @@ TEST(GeoipFilterConfigTest, GeoipFilterConfigMissingGeoHeaders) {
 
 TEST(GeoipFilterConfigTest, GeoipFilterConfigMissingProvider) {
   TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.no_extension_lookup_by_name", "false"}});
   DummyGeoipProviderFactory dummy_factory;
   Registry::InjectFactory<GeoipProviderFactory> registered(dummy_factory);
   std::string filter_config_yaml = R"EOF(
@@ -194,7 +193,6 @@ TEST(GeoipFilterConfigTest, GeoipFilterConfigMissingProvider) {
 
 TEST(GeoipFilterConfigTest, GeoipFilterConfigUnknownProvider) {
   TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.no_extension_lookup_by_name", "false"}});
   DummyGeoipProviderFactory dummy_factory;
   Registry::InjectFactory<GeoipProviderFactory> registered(dummy_factory);
   std::string filter_config_yaml = R"EOF(
@@ -213,7 +211,7 @@ TEST(GeoipFilterConfigTest, GeoipFilterConfigUnknownProvider) {
   EXPECT_THROW_WITH_MESSAGE(
       factory.createFilterFactoryFromProtoTyped(filter_config, "geoip", context),
       Envoy::EnvoyException,
-      "Didn't find a registered implementation for name: 'envoy.geoip_providers.unknown'");
+      "Didn't find a registered implementation for 'envoy.geoip_providers.unknown' with type URL: ''");
 }
 
 } // namespace
