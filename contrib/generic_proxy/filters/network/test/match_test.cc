@@ -28,6 +28,38 @@ TEST(ServiceMatchDataInputTest, ServiceMatchDataInputTest) {
   EXPECT_EQ("fake_host_as_service", input->get(request).data_.value());
 }
 
+TEST(HostMatchDataInputTest, HostMatchDataInputTest) {
+  NiceMock<Server::Configuration::MockFactoryContext> factory_context;
+  HostMatchDataInputFactory factory;
+  auto proto_config = factory.createEmptyConfigProto();
+  auto input =
+      factory.createDataInputFactoryCb(*proto_config, factory_context.messageValidationVisitor())();
+
+  FakeStreamCodecFactory::FakeRequest request;
+
+  EXPECT_EQ("", input->get(request).data_.value());
+
+  request.host_ = "fake_host_as_service";
+
+  EXPECT_EQ("fake_host_as_service", input->get(request).data_.value());
+}
+
+TEST(PathMatchDataInputTest, PathMatchDataInputTest) {
+  NiceMock<Server::Configuration::MockFactoryContext> factory_context;
+  PathMatchDataInputFactory factory;
+  auto proto_config = factory.createEmptyConfigProto();
+  auto input =
+      factory.createDataInputFactoryCb(*proto_config, factory_context.messageValidationVisitor())();
+
+  FakeStreamCodecFactory::FakeRequest request;
+
+  EXPECT_EQ("", input->get(request).data_.value());
+
+  request.path_ = "fake_path";
+
+  EXPECT_EQ("fake_path", input->get(request).data_.value());
+}
+
 TEST(MethodMatchDataInputTest, MethodMatchDataInputTest) {
   NiceMock<Server::Configuration::MockFactoryContext> factory_context;
   MethodMatchDataInputFactory factory;

@@ -218,54 +218,185 @@ protected:
 
 static const std::string RouteConfigurationYaml = R"EOF(
 name: test_matcher_tree
-routes:
-  matcher_list:
-    matchers:
-    - predicate:
-        and_matcher:
-          predicate:
-          - single_predicate:
-              input:
-                name: envoy.matching.generic_proxy.input.service
-                typed_config:
-                  "@type": type.googleapis.com/envoy.extensions.filters.network.generic_proxy.matcher.v3.ServiceMatchInput
-              value_match:
-                exact: "service_0"
-          - single_predicate:
-              input:
-                name: envoy.matching.generic_proxy.input.method
-                typed_config:
-                  "@type": type.googleapis.com/envoy.extensions.filters.network.generic_proxy.matcher.v3.MethodMatchInput
-              value_match:
-                exact: "method_0"
-          - or_matcher:
-              predicate:
-              - single_predicate:
-                  input:
-                    name: envoy.matching.generic_proxy.input.property
-                    typed_config:
-                      "@type": type.googleapis.com/envoy.extensions.filters.network.generic_proxy.matcher.v3.PropertyMatchInput
-                      property_name: "key_0"
-                  value_match:
-                    exact: "value_0"
-              - single_predicate:
-                  input:
-                    name: envoy.matching.generic_proxy.input.property
-                    typed_config:
-                      "@type": type.googleapis.com/envoy.extensions.filters.network.generic_proxy.matcher.v3.PropertyMatchInput
-                      property_name: "key_1"
-                  value_match:
-                    exact: "value_1"
-      on_match:
-        action:
-          name: envoy.matching.action.generic_proxy.route
-          typed_config:
-            "@type": type.googleapis.com/envoy.extensions.filters.network.generic_proxy.action.v3.RouteAction
-            cluster: "cluster_0"
-            metadata:
-              filter_metadata:
-                mock_filter:
-                  key_0: value_0
+virtual_hosts:
+- name: service
+  hosts:
+  - service_0
+  routes:
+    matcher_list:
+      matchers:
+      - predicate:
+          and_matcher:
+            predicate:
+            - single_predicate:
+                input:
+                  name: envoy.matching.generic_proxy.input.host
+                  typed_config:
+                    "@type": type.googleapis.com/envoy.extensions.filters.network.generic_proxy.matcher.v3.HostMatchInput
+                value_match:
+                  exact: "service_0"
+            - single_predicate:
+                input:
+                  name: envoy.matching.generic_proxy.input.method
+                  typed_config:
+                    "@type": type.googleapis.com/envoy.extensions.filters.network.generic_proxy.matcher.v3.MethodMatchInput
+                value_match:
+                  exact: "method_0"
+            - or_matcher:
+                predicate:
+                - single_predicate:
+                    input:
+                      name: envoy.matching.generic_proxy.input.property
+                      typed_config:
+                        "@type": type.googleapis.com/envoy.extensions.filters.network.generic_proxy.matcher.v3.PropertyMatchInput
+                        property_name: "key_0"
+                    value_match:
+                      exact: "value_0"
+                - single_predicate:
+                    input:
+                      name: envoy.matching.generic_proxy.input.property
+                      typed_config:
+                        "@type": type.googleapis.com/envoy.extensions.filters.network.generic_proxy.matcher.v3.PropertyMatchInput
+                        property_name: "key_1"
+                    value_match:
+                      exact: "value_1"
+        on_match:
+          action:
+            name: envoy.matching.action.generic_proxy.route
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.network.generic_proxy.action.v3.RouteAction
+              cluster: "cluster_0"
+              metadata:
+                filter_metadata:
+                  mock_filter:
+                    match_service: match_service
+- name: prefix
+  hosts:
+  - "prefix*"
+  routes:
+    matcher_list:
+      matchers:
+      - predicate:
+          and_matcher:
+            predicate:
+            - single_predicate:
+                input:
+                  name: envoy.matching.generic_proxy.input.host
+                  typed_config:
+                    "@type": type.googleapis.com/envoy.extensions.filters.network.generic_proxy.matcher.v3.HostMatchInput
+                value_match:
+                  exact: "prefix_service_0"
+            - single_predicate:
+                input:
+                  name: envoy.matching.generic_proxy.input.method
+                  typed_config:
+                    "@type": type.googleapis.com/envoy.extensions.filters.network.generic_proxy.matcher.v3.MethodMatchInput
+                value_match:
+                  exact: "method_0"
+            - or_matcher:
+                predicate:
+                - single_predicate:
+                    input:
+                      name: envoy.matching.generic_proxy.input.property
+                      typed_config:
+                        "@type": type.googleapis.com/envoy.extensions.filters.network.generic_proxy.matcher.v3.PropertyMatchInput
+                        property_name: "key_0"
+                    value_match:
+                      exact: "value_0"
+                - single_predicate:
+                    input:
+                      name: envoy.matching.generic_proxy.input.property
+                      typed_config:
+                        "@type": type.googleapis.com/envoy.extensions.filters.network.generic_proxy.matcher.v3.PropertyMatchInput
+                        property_name: "key_1"
+                    value_match:
+                      exact: "value_1"
+        on_match:
+          action:
+            name: envoy.matching.action.generic_proxy.route
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.network.generic_proxy.action.v3.RouteAction
+              cluster: "cluster_1"
+              metadata:
+                filter_metadata:
+                  mock_filter:
+                    match_prefix: match_prefix
+- name: suffix
+  hosts:
+  - "*suffix"
+  routes:
+    matcher_list:
+      matchers:
+      - predicate:
+          and_matcher:
+            predicate:
+            - single_predicate:
+                input:
+                  name: envoy.matching.generic_proxy.input.host
+                  typed_config:
+                    "@type": type.googleapis.com/envoy.extensions.filters.network.generic_proxy.matcher.v3.HostMatchInput
+                value_match:
+                  exact: "service_0_suffix"
+            - single_predicate:
+                input:
+                  name: envoy.matching.generic_proxy.input.method
+                  typed_config:
+                    "@type": type.googleapis.com/envoy.extensions.filters.network.generic_proxy.matcher.v3.MethodMatchInput
+                value_match:
+                  exact: "method_0"
+            - or_matcher:
+                predicate:
+                - single_predicate:
+                    input:
+                      name: envoy.matching.generic_proxy.input.property
+                      typed_config:
+                        "@type": type.googleapis.com/envoy.extensions.filters.network.generic_proxy.matcher.v3.PropertyMatchInput
+                        property_name: "key_0"
+                    value_match:
+                      exact: "value_0"
+                - single_predicate:
+                    input:
+                      name: envoy.matching.generic_proxy.input.property
+                      typed_config:
+                        "@type": type.googleapis.com/envoy.extensions.filters.network.generic_proxy.matcher.v3.PropertyMatchInput
+                        property_name: "key_1"
+                    value_match:
+                      exact: "value_1"
+        on_match:
+          action:
+            name: envoy.matching.action.generic_proxy.route
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.network.generic_proxy.action.v3.RouteAction
+              cluster: "cluster_2"
+              metadata:
+                filter_metadata:
+                  mock_filter:
+                    match_suffix: match_suffix
+- name: catch_all
+  hosts:
+  - "*"
+  routes:
+    matcher_list:
+      matchers:
+      - predicate:
+          single_predicate:
+            input:
+              name: envoy.matching.generic_proxy.input.property
+              typed_config:
+                "@type": type.googleapis.com/envoy.extensions.filters.network.generic_proxy.matcher.v3.PropertyMatchInput
+                property_name: "catch_all"
+            value_match:
+              exact: "catch_all"
+        on_match:
+          action:
+            name: envoy.matching.action.generic_proxy.route
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.network.generic_proxy.action.v3.RouteAction
+              cluster: "cluster_3"
+              metadata:
+                filter_metadata:
+                  mock_filter:
+                    catch_all: catch_all
 )EOF";
 
 /**
@@ -282,23 +413,89 @@ TEST_F(RouteMatcherImplTest, SimpleNameMethod) {
 TEST_F(RouteMatcherImplTest, RouteMatch) {
   initialize(RouteConfigurationYaml);
 
-  FakeStreamCodecFactory::FakeRequest fake_request_0;
-  fake_request_0.host_ = "service_0";
-  fake_request_0.method_ = "method_0";
-  fake_request_0.data_.insert({"key_0", "value_0"});
+  // Exact host searching.
+  {
+    FakeStreamCodecFactory::FakeRequest fake_request_0;
+    fake_request_0.host_ = "service_0";
+    fake_request_0.method_ = "method_0";
+    fake_request_0.data_.insert({"key_0", "value_0"});
 
-  FakeStreamCodecFactory::FakeRequest fake_request_1;
-  fake_request_1.host_ = "service_0";
-  fake_request_1.method_ = "method_0";
-  fake_request_1.data_.insert({"key_1", "value_1"});
+    FakeStreamCodecFactory::FakeRequest fake_request_1;
+    fake_request_1.host_ = "service_0";
+    fake_request_1.method_ = "method_0";
+    fake_request_1.data_.insert({"key_1", "value_1"});
 
-  auto route_entry_0 = route_matcher_->routeEntry(fake_request_0);
-  auto route_entry_1 = route_matcher_->routeEntry(fake_request_1);
+    auto route_entry_0 = route_matcher_->routeEntry(fake_request_0);
+    auto route_entry_1 = route_matcher_->routeEntry(fake_request_1);
 
-  EXPECT_EQ(route_entry_0.get(), route_entry_1.get());
-  EXPECT_NE(route_entry_0.get(), nullptr);
+    EXPECT_EQ(route_entry_0.get(), route_entry_1.get());
+    EXPECT_NE(route_entry_0.get(), nullptr);
 
-  EXPECT_EQ(route_entry_0->clusterName(), "cluster_0");
+    EXPECT_EQ(route_entry_0->clusterName(), "cluster_0");
+  }
+
+  // Prefix host searching.
+  {
+    FakeStreamCodecFactory::FakeRequest fake_request_0;
+    fake_request_0.host_ = "prefix_service_0";
+    fake_request_0.method_ = "method_0";
+    fake_request_0.data_.insert({"key_0", "value_0"});
+
+    FakeStreamCodecFactory::FakeRequest fake_request_1;
+    fake_request_1.host_ = "prefix_service_0";
+    fake_request_1.method_ = "method_0";
+    fake_request_1.data_.insert({"key_1", "value_1"});
+
+    auto route_entry_0 = route_matcher_->routeEntry(fake_request_0);
+    auto route_entry_1 = route_matcher_->routeEntry(fake_request_1);
+
+    EXPECT_EQ(route_entry_0.get(), route_entry_1.get());
+    EXPECT_NE(route_entry_0.get(), nullptr);
+
+    EXPECT_EQ(route_entry_0->clusterName(), "cluster_1");
+  }
+
+  // Suffix host searching.
+  {
+    FakeStreamCodecFactory::FakeRequest fake_request_0;
+    fake_request_0.host_ = "service_0_suffix";
+    fake_request_0.method_ = "method_0";
+    fake_request_0.data_.insert({"key_0", "value_0"});
+
+    FakeStreamCodecFactory::FakeRequest fake_request_1;
+    fake_request_1.host_ = "service_0_suffix";
+    fake_request_1.method_ = "method_0";
+    fake_request_1.data_.insert({"key_1", "value_1"});
+
+    auto route_entry_0 = route_matcher_->routeEntry(fake_request_0);
+    auto route_entry_1 = route_matcher_->routeEntry(fake_request_1);
+
+    EXPECT_EQ(route_entry_0.get(), route_entry_1.get());
+    EXPECT_NE(route_entry_0.get(), nullptr);
+
+    EXPECT_EQ(route_entry_0->clusterName(), "cluster_2");
+  }
+
+  // Catch all host.
+  {
+    FakeStreamCodecFactory::FakeRequest fake_request_0;
+    fake_request_0.host_ = "any_service";
+    fake_request_0.method_ = "method_0";
+    fake_request_0.data_.insert({"catch_all", "catch_all"});
+
+    FakeStreamCodecFactory::FakeRequest fake_request_1;
+    fake_request_1.host_ = "any_service";
+    fake_request_1.method_ = "method_0";
+    fake_request_1.data_.insert({"catch_all", "catch_all"});
+
+    auto route_entry_0 = route_matcher_->routeEntry(fake_request_0);
+    auto route_entry_1 = route_matcher_->routeEntry(fake_request_1);
+
+    EXPECT_EQ(route_entry_0.get(), route_entry_1.get());
+    EXPECT_NE(route_entry_0.get(), nullptr);
+
+    EXPECT_EQ(route_entry_0->clusterName(), "cluster_3");
+  }
 }
 
 /**
@@ -310,7 +507,7 @@ TEST_F(RouteMatcherImplTest, RouteNotMatch) {
   // Test the service not match.
   {
     FakeStreamCodecFactory::FakeRequest fake_request;
-    fake_request.host_ = "service_x";
+    fake_request.host_ = "prefix_service_1";
     fake_request.method_ = "method_0";
     fake_request.data_.insert({"key_0", "value_0"});
 
@@ -338,34 +535,77 @@ TEST_F(RouteMatcherImplTest, RouteNotMatch) {
 
 static const std::string RouteConfigurationYamlWithUnknownInput = R"EOF(
 name: test_matcher_tree
-routes:
-  matcher_list:
-    matchers:
-    - predicate:
-        and_matcher:
-          predicate:
-          - single_predicate:
-              input:
-                name: envoy.matching.generic_proxy.input.unknown_input
-                typed_config:
-                  "@type": type.googleapis.com/envoy.extensions.filters.network.generic_proxy.v3.UnknownInput
-              value_match:
-                exact: "service_0"
-      on_match:
-        action:
-          name: envoy.matching.action.generic_proxy.route
-          typed_config:
-            "@type": type.googleapis.com/envoy.extensions.filters.network.generic_proxy.v3.RouteAction
-            cluster: "cluster_0"
-            metadata:
-              filter_metadata:
-                mock_filter:
-                  key_0: value_0
+virtual_hosts:
+- hosts:
+  - "*"
+  routes:
+    matcher_list:
+      matchers:
+      - predicate:
+          single_predicate:
+            input:
+              name: envoy.matching.generic_proxy.input.unknown_input
+              typed_config:
+                "@type": type.googleapis.com/envoy.extensions.filters.network.generic_proxy.matcher.v3.UnknownInput
+            value_match:
+              exact: "service_0"
+        on_match:
+          action:
+            name: envoy.matching.action.generic_proxy.route
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.network.generic_proxy.action.v3.RouteAction
+              cluster: "cluster_0"
+              metadata:
+                filter_metadata:
+                  mock_filter:
+                    key_0: value_0
 )EOF";
 
 TEST_F(RouteMatcherImplTest, RouteConfigurationWithUnknownInput) {
   EXPECT_THROW(initialize(RouteConfigurationYamlWithUnknownInput), EnvoyException);
   EXPECT_EQ(nullptr, route_matcher_.get());
+}
+
+static const std::string RouteConfigurationYamlWithoutHost = R"EOF(
+name: test_matcher_tree
+virtual_hosts:
+- hosts:
+  - "service_0"
+  routes:
+    matcher_list:
+      matchers:
+      - predicate:
+          single_predicate:
+            input:
+              name: envoy.matching.generic_proxy.input.host
+              typed_config:
+                "@type": type.googleapis.com/envoy.extensions.filters.network.generic_proxy.matcher.v3.HostMatchInput
+            value_match:
+              exact: "service_0"
+        on_match:
+          action:
+            name: envoy.matching.action.generic_proxy.route
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.network.generic_proxy.action.v3.RouteAction
+              cluster: "cluster_0"
+              metadata:
+                filter_metadata:
+                  mock_filter:
+                    key_0: value_0
+)EOF";
+
+TEST_F(RouteMatcherImplTest, NoHost) {
+  initialize(RouteConfigurationYamlWithoutHost);
+
+  // Test the host not match.
+  {
+    FakeStreamCodecFactory::FakeRequest fake_request;
+    fake_request.host_ = "any_service";
+    fake_request.method_ = "method_0";
+    fake_request.data_.insert({"key_0", "value_0"});
+
+    EXPECT_EQ(nullptr, route_matcher_->routeEntry(fake_request));
+  }
 }
 
 } // namespace

@@ -89,26 +89,51 @@ RouteEntryConstSharedPtr VirtualHostImpl::routeEntry(const Request& request) con
 
 RouteMatcherImpl::RouteMatcherImpl(const ProtoRouteConfiguration& route_config,
                                    Envoy::Server::Configuration::ServerFactoryContext& context,
-                                   bool)
+                                   bool validate_clusters)
     : name_(route_config.name()) {
+  for (const auto& virtual_host_config : route_config.virtual_hosts()) {
+    VirtualHostSharedPtr virtual_host =
+        std::make_shared<VirtualHostImpl>(virtual_host_config, context, validate_clusters);
+    for (const std::string& host_name : virtual_host_config.hosts()) {
+      absl::string_view host_name_view{host_name};
+      bool duplicate_found = false;
+      if ("*" == host_name_view) {
+        if (default_virtual_host_) {
+          throw EnvoyException(fmt::format("Only a single wildcard domain is permitted in route {}",
+                                           route_config.name()));
+        }
+        default_virtual_host_ = virtual_host;
+      } else if (!host_name_view.empty() && '*' == host_name_view[0]) {
+        duplicate_found = !wildcard_virtual_host_suffixes_[host_name_view.size() - 1]
+                               .emplace(host_name_view.substr(1), virtual_host)
+                               .second;
+      } else if (!host_name_view.empty() && '*' == host_name_view[host_name_view.size() - 1]) {
+        duplicate_found =
+            !wildcard_virtual_host_prefixes_[host_name_view.size() - 1]
+                 .emplace(host_name_view.substr(0, host_name_view.size() - 1), virtual_host)
+                 .second;
+      } else {
+        duplicate_found = !virtual_hosts_.emplace(host_name_view, virtual_host).second;
+      }
+      if (duplicate_found) {
+        throw EnvoyException(fmt::format("Only unique values for host are permitted. Duplicate "
+                                         "entry of domain {} in route {}",
+                                         host_name_view, route_config.name()));
+      }
+    }
+  }
 
-  RouteActionValidationVisitor validation_visitor;
-  RouteActionContext action_context{context};
-
-  Matcher::MatchTreeFactory<Request, RouteActionContext> factory(action_context, context,
-                                                                 validation_visitor);
-
-  matcher_ = factory.create(route_config.routes())();
-
-  if (!validation_visitor.errors().empty()) {
-    throw EnvoyException(fmt::format("requirement violation while creating route match tree: {}",
-                                     validation_visitor.errors()[0]));
+  if (default_virtual_host_ == nullptr && route_config.has_routes()) {
+    ProtoVirtualHost proto_virtual_host;
+    proto_virtual_host.mutable_routes()->MergeFrom(route_config.routes());
+    default_virtual_host_ =
+        std::make_shared<VirtualHostImpl>(proto_virtual_host, context, validate_clusters);
   }
 }
 
 const VirtualHostImpl* RouteMatcherImpl::findWildcardVirtualHost(
-    const std::string& host, const RouteMatcher::WildcardVirtualHosts& wildcard_virtual_hosts,
-    RouteMatcher::SubstringFunction substring_function) const {
+    absl::string_view host, const RouteMatcherImpl::WildcardVirtualHosts& wildcard_virtual_hosts,
+    RouteMatcherImpl::SubstringFunction substring_function) const {
   // We do a longest wildcard match against the host that's passed in
   // (e.g. "foo-bar.baz.com" should match "*-bar.baz.com" before matching "*.baz.com" for suffix
   // wildcards). This is done by scanning the length => wildcards map looking for every wildcard
@@ -128,23 +153,45 @@ const VirtualHostImpl* RouteMatcherImpl::findWildcardVirtualHost(
   return nullptr;
 }
 
-RouteEntryConstSharedPtr RouteMatcherImpl::routeEntry(const Request& request) const {
-  auto match = Matcher::evaluateMatch<Request>(*matcher_, request);
+const VirtualHostImpl* RouteMatcherImpl::findVirtualHost(const Request& request) const {
+  absl::string_view host = request.host();
 
-  if (match.result_) {
-    auto action = match.result_();
-
-    // The only possible action that can be used within the route matching context
-    // is the RouteMatchAction, so this must be true.
-    ASSERT(action->typeUrl() == RouteMatchAction::staticTypeUrl());
-    ASSERT(dynamic_cast<RouteMatchAction*>(action.get()));
-    const RouteMatchAction& route_action = static_cast<const RouteMatchAction&>(*action);
-
-    return route_action.route();
+  // Fast path the case where we only have a default virtual host or host property is provided.
+  if (host.empty() || (virtual_hosts_.empty() && wildcard_virtual_host_suffixes_.empty() &&
+                       wildcard_virtual_host_prefixes_.empty())) {
+    return default_virtual_host_.get();
   }
 
-  ENVOY_LOG(debug, "failed to match incoming request: {}",
-            static_cast<uint32_t>(match.match_state_));
+  const auto iter = virtual_hosts_.find(host);
+  if (iter != virtual_hosts_.end()) {
+    return iter->second.get();
+  }
+
+  if (!wildcard_virtual_host_suffixes_.empty()) {
+    const VirtualHostImpl* vhost = findWildcardVirtualHost(
+        host, wildcard_virtual_host_suffixes_,
+        [](absl::string_view h, int l) -> absl::string_view { return h.substr(h.size() - l); });
+    if (vhost != nullptr) {
+      return vhost;
+    }
+  }
+
+  if (!wildcard_virtual_host_prefixes_.empty()) {
+    const VirtualHostImpl* vhost = findWildcardVirtualHost(
+        host, wildcard_virtual_host_prefixes_,
+        [](absl::string_view h, int l) -> absl::string_view { return h.substr(0, l); });
+    if (vhost != nullptr) {
+      return vhost;
+    }
+  }
+  return default_virtual_host_.get();
+}
+
+RouteEntryConstSharedPtr RouteMatcherImpl::routeEntry(const Request& request) const {
+  const auto* virtual_host = findVirtualHost(request);
+  if (virtual_host != nullptr) {
+    return virtual_host->routeEntry(request);
+  }
   return nullptr;
 }
 

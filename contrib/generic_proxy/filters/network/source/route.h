@@ -130,6 +130,8 @@ private:
                                                  const WildcardVirtualHosts& wildcard_virtual_hosts,
                                                  SubstringFunction substring_function) const;
 
+  const VirtualHostImpl* findVirtualHost(const Request& request) const;
+
   std::string name_;
 
   absl::flat_hash_map<std::string, VirtualHostSharedPtr> virtual_hosts_;

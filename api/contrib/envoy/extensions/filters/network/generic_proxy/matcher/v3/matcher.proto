@@ -47,10 +47,16 @@ message PropertyMatchInput {
   string property_name = 1 [(validate.rules).string = {min_len: 1}];
 }
 
+// [#not-implemented-hide:]
+// Used to match an whole generic downstream request.
+message RequestMatchInput {
+}
+
+// [#not-implemented-hide:]
 // Custom matcher to match on the generic downstream request. This is used to match
 // multiple fields of the downstream request and avoid complex combinations of
 // HostMatchInput, PathMatchInput, MethodMatchInput and PropertyMatchInput.
-message CustomMatcher {
+message RequestMatcher {
   // Optional host pattern to match on. If not specified, any host will match.
   type.matcher.v3.StringMatcher host = 1;
 
