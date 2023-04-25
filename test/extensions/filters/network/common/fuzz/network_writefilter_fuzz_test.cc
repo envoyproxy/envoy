@@ -5,6 +5,7 @@
 #include "test/config/utility.h"
 #include "test/extensions/filters/network/common/fuzz/network_writefilter_fuzz.pb.validate.h"
 #include "test/extensions/filters/network/common/fuzz/uber_writefilter.h"
+#include "test/extensions/filters/network/common/fuzz/validated_input_generator_any_map_extensions.h"
 #include "test/fuzz/fuzz_runner.h"
 
 namespace Envoy {
@@ -34,6 +35,9 @@ DEFINE_PROTO_FUZZER(const test::extensions::filters::network::FilterFuzzTestCase
         input->mutable_config()->mutable_typed_config()->set_type_url(
             absl::StrCat("type.googleapis.com/",
                          factory->createEmptyConfigProto()->GetDescriptor()->full_name()));
+        ProtobufMessage::ValidatedInputGenerator generator(
+            seed, ProtobufMessage::compose_filters_any_map());
+        ProtobufMessage::traverseMessage(generator, *input, true);
       }};
   try {
     TestUtility::validate(input);

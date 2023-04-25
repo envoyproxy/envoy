@@ -37,7 +37,7 @@ envoy_proto_library(
 )
 
 envoy_cc_test_library(
-    name = "vig_anymap_ext",
+    name = "vig_anymap_ext_lib",
     srcs = ["validated_input_generator_any_map_extensions.cc"],
     hdrs = ["validated_input_generator_any_map_extensions.h"],
     deps = [
@@ -89,7 +89,7 @@ envoy_cc_fuzz_test(
     # these up via the NamedNetworkFilterConfigFactory.
     deps = [
         ":uber_readfilter_lib",
-        ":vig_anymap_ext",
+        ":vig_anymap_ext_lib",
         "//source/common/config:utility_lib",
         "//test/config:utility_lib",
         "//test/test_common:test_runtime_lib",
@@ -121,6 +121,7 @@ envoy_cc_fuzz_test(
     # these up via the NamedNetworkFilterConfigFactory.
     deps = [
         ":uber_writefilter_lib",
+        ":vig_anymap_ext_lib",
         "//source/common/config:utility_lib",
         "//source/extensions/filters/network/mongo_proxy:config",
         "//source/extensions/filters/network/zookeeper_proxy:config",
