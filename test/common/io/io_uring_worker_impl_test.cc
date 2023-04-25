@@ -405,6 +405,39 @@ TEST(IoUringWorkerImplTest, ServerCloseWithWriteRequestOnly) {
   EXPECT_EQ(0, worker.getSockets().size());
 }
 
+// Make sure that even the socket is disabled, that remote close can be handled.
+TEST(IoUringWorkerImplTest, CloseDetected) {
+  Event::MockDispatcher dispatcher;
+  IoUringPtr io_uring_instance = std::make_unique<MockIoUring>();
+  MockIoUring& mock_io_uring = *dynamic_cast<MockIoUring*>(io_uring_instance.get());
+  EXPECT_CALL(mock_io_uring, registerEventfd());
+  EXPECT_CALL(dispatcher, createFileEvent_(_, _, Event::PlatformDefaultTriggerType,
+                                           Event::FileReadyType::Read));
+  IoUringWorkerTestImpl worker(std::move(io_uring_instance), dispatcher);
+  MockIoUringHandler handler;
+
+  void* read_req = nullptr;
+  EXPECT_CALL(mock_io_uring, prepareReadv(_, _, _, _, _))
+      .WillOnce(DoAll(SaveArg<4>(&read_req), Return<IoUringResult>(IoUringResult::Ok)));
+  EXPECT_CALL(mock_io_uring, submit()).Times(1).RetiresOnSaturation();
+  IoUringServerSocket socket(0, worker, handler, 0, true);
+  socket.disable();
+
+  // Consumes the first read request.
+  void* read_req2 = nullptr;
+  EXPECT_CALL(mock_io_uring, prepareReadv(_, _, _, _, _))
+      .WillOnce(DoAll(SaveArg<4>(&read_req2), Return<IoUringResult>(IoUringResult::Ok)));
+  EXPECT_CALL(mock_io_uring, submit()).Times(1).RetiresOnSaturation();
+  socket.onRead(static_cast<Request*>(read_req), 1, false);
+  // Trigger a further remote close.
+  EXPECT_CALL(handler, onRemoteClose());
+  socket.onRead(nullptr, 0, false);
+
+  EXPECT_CALL(dispatcher, clearDeferredDeleteList());
+  delete static_cast<Request*>(read_req);
+  delete static_cast<Request*>(read_req2);
+}
+
 } // namespace
 } // namespace Io
 } // namespace Envoy

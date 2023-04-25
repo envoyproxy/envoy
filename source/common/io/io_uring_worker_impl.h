@@ -229,7 +229,10 @@ public:
 
 private:
   const uint32_t write_timeout_ms_;
-  // For read.
+  // For read. io_uring socket will read sequentially in the order of buf_ and read_error_. Unless
+  // the buf_ is empty, the read_error_ will not be past to the handler. There is an exception that
+  // when enable_close_event_ is set, the remote close read_error_(0) will always be past to the
+  // handler.
   Request* read_req_{};
   // TODO (soulxu): Add water mark here.
   Buffer::OwnedImpl buf_;

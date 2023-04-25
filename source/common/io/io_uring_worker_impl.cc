@@ -617,11 +617,19 @@ void IoUringServerSocket::onRead(Request* req, int32_t result, bool injected) {
       read_error_.reset();
       return;
     }
-    // The socket may be not readable during handler onRead callback, check it again here.
-    if (status_ == ENABLED || status_ == SHUTDOWN_WRITE || status_ == CLOSE_AFTER_SHUTDOWN_WRITE ||
-        status_ == ALREADY_SHUTDOWN) {
-      // If the read error is zero, it means remote close, then needn't new request.
+    // The socket may be closed during handler onRead callback, check it again here.
+    if (status_ == ENABLED || status_ == SHUTDOWN_WRITE || status_ == ALREADY_SHUTDOWN) {
+      // If there is error, let the handler to decide if the socket should be closed and stop
+      // submitting read request. And if the read error is zero, it means remote close, then
+      // needn't new request.
       if (!read_error_.has_value() || read_error_.value() != 0) {
+        // Submit a read accept request for the next read.
+        submitReadRequest();
+      }
+    } else if (status_ == DISABLED) {
+      // Since error in a disabled socket will not be handled by the handler, stop submit read
+      // request if there is any error.
+      if (!read_error_.has_value()) {
         // Submit a read accept request for the next read.
         submitReadRequest();
       }

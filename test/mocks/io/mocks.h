@@ -60,6 +60,15 @@ class MockIoUringSocket : public IoUringSocket {
   MOCK_METHOD(IoUringWorker&, getIoUringWorker, (), (const));
 };
 
+class MockIoUringHandler : public IoUringHandler {
+public:
+  MOCK_METHOD(void, onAcceptSocket, (AcceptedSocketParam & param));
+  MOCK_METHOD(void, onRead, (ReadParam & param));
+  MOCK_METHOD(void, onWrite, (WriteParam & param));
+  MOCK_METHOD(void, onRemoteClose, ());
+  MOCK_METHOD(void, onLocalClose, ());
+};
+
 class MockIoUringWorker : public IoUringWorker {
 public:
   MOCK_METHOD(IoUringSocket&, addAcceptSocket,

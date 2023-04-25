@@ -810,8 +810,7 @@ TEST_F(IoUringWorkerIntegrationTest, ServerSocketCloseAfterShutdownWrite) {
 }
 
 // This tests the case when the socket disabled, then a remote close happened.
-// In this case, we should deliver this close event if the enable_close_event
-// is true.
+// In this case, we should deliver this close event if the enable_close_event is true.
 TEST_F(IoUringWorkerIntegrationTest, ServerSocketCloseAfterDisabledWithEnableCloseEvent) {
   initialize();
   initializeSockets();
@@ -821,6 +820,30 @@ TEST_F(IoUringWorkerIntegrationTest, ServerSocketCloseAfterDisabledWithEnableClo
   // Waiting for the server socket sending the data.
   socket.disable();
 
+  Api::OsSysCallsSingleton::get().close(client_socket_);
+
+  while (!io_uring_handler_.is_closed) {
+    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  }
+
+  cleanup();
+}
+
+// This tests the case when the socket disabled, then a remote close happened.
+// Different from the previous cast, in the test the client socket will first write and then close.
+TEST_F(IoUringWorkerIntegrationTest, ServerSocketReadAndCloseAfterDisabledWithEnableCloseEvent) {
+  initialize();
+  initializeSockets();
+
+  auto& socket = io_uring_worker_->addServerSocket(server_socket_, io_uring_handler_, true);
+  EXPECT_EQ(io_uring_worker_->getSockets().size(), 1);
+  // Waiting for the server socket sending the data.
+  socket.disable();
+
+  // Write data through client socket.
+  std::string write_data = "hello world";
+  Api::OsSysCallsSingleton::get().write(client_socket_, write_data.data(), write_data.size());
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   Api::OsSysCallsSingleton::get().close(client_socket_);
 
   while (!io_uring_handler_.is_closed) {
