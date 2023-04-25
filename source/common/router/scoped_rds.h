@@ -57,8 +57,6 @@ public:
                                    Server::Configuration::ServerFactoryContext& factory_context,
                                    ScopedRoutesConfigProviderManager& config_provider_manager,
                                    envoy::config::core::v3::ConfigSource rds_config_source,
-                                   envoy::extensions::filters::network::http_connection_manager::
-                                       v3::ScopedRoutes::ScopeKeyBuilder scope_key_builder,
                                    const OptionalHttpFilters& optional_http_filters);
 
   ~InlineScopedRoutesConfigProvider() override = default;
@@ -120,8 +118,6 @@ public:
       const envoy::extensions::filters::network::http_connection_manager::v3::ScopedRds& scoped_rds,
       const OptionalHttpFilters& optional_http_filters, const uint64_t manager_identifier,
       const std::string& name,
-      const envoy::extensions::filters::network::http_connection_manager::v3::ScopedRoutes::
-          ScopeKeyBuilder& scope_key_builder,
       Server::Configuration::ServerFactoryContext& factory_context, const std::string& stat_prefix,
       envoy::config::core::v3::ConfigSource rds_config_source,
       RouteConfigProviderManager& route_config_provider_manager,
@@ -236,8 +232,6 @@ private:
   Stats::ScopeSharedPtr scope_;
   ScopedRdsStats stats_;
   Envoy::Config::SubscriptionPtr subscription_;
-  const envoy::extensions::filters::network::http_connection_manager::v3::ScopedRoutes::
-      ScopeKeyBuilder scope_key_builder_;
   const envoy::config::core::v3::ConfigSource rds_config_source_;
   const std::string stat_prefix_;
   RouteConfigProviderManager& route_config_provider_manager_;
@@ -320,16 +314,12 @@ public:
   ScopedRoutesConfigProviderManagerOptArg(
       std::string scoped_routes_name,
       const envoy::config::core::v3::ConfigSource& rds_config_source,
-      const envoy::extensions::filters::network::http_connection_manager::v3::ScopedRoutes::
-          ScopeKeyBuilder& scope_key_builder,
       const OptionalHttpFilters& optional_http_filters)
       : scoped_routes_name_(std::move(scoped_routes_name)), rds_config_source_(rds_config_source),
-        scope_key_builder_(scope_key_builder), optional_http_filters_(optional_http_filters) {}
+        optional_http_filters_(optional_http_filters) {}
 
   const std::string scoped_routes_name_;
   const envoy::config::core::v3::ConfigSource& rds_config_source_;
-  const envoy::extensions::filters::network::http_connection_manager::v3::ScopedRoutes::
-      ScopeKeyBuilder& scope_key_builder_;
   const OptionalHttpFilters& optional_http_filters_;
 };
 

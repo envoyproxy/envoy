@@ -62,7 +62,7 @@ ConfigProviderPtr create(
         factory_context,
         ScopedRoutesConfigProviderManagerOptArg(
             config.scoped_routes().name(), config.scoped_routes().rds_config_source(),
-            config.scoped_routes().scope_key_builder(), optional_http_filters));
+            optional_http_filters));
   }
   case envoy::extensions::filters::network::http_connection_manager::v3::ScopedRoutes::
       ConfigSpecifierCase::kScopedRds:
@@ -70,7 +70,7 @@ ConfigProviderPtr create(
         config.scoped_routes().scoped_rds(), factory_context, init_manager, stat_prefix,
         ScopedRoutesConfigProviderManagerOptArg(
             config.scoped_routes().name(), config.scoped_routes().rds_config_source(),
-            config.scoped_routes().scope_key_builder(), optional_http_filters));
+            optional_http_filters));
   case envoy::extensions::filters::network::http_connection_manager::v3::ScopedRoutes::
       ConfigSpecifierCase::CONFIG_SPECIFIER_NOT_SET:
     PANIC("not implemented");
@@ -127,8 +127,6 @@ InlineScopedRoutesConfigProvider::InlineScopedRoutesConfigProvider(
     Server::Configuration::ServerFactoryContext& factory_context,
     ScopedRoutesConfigProviderManager& config_provider_manager,
     envoy::config::core::v3::ConfigSource rds_config_source,
-    envoy::extensions::filters::network::http_connection_manager::v3::ScopedRoutes::ScopeKeyBuilder
-        scope_key_builder,
     const OptionalHttpFilters& optional_http_filters)
     : Envoy::Config::ImmutableConfigProviderBase(factory_context, config_provider_manager,
                                                  ConfigProviderInstanceType::Inline,
@@ -136,15 +134,13 @@ InlineScopedRoutesConfigProvider::InlineScopedRoutesConfigProvider(
       name_(std::move(name)),
       scopes_(makeScopedRouteInfos(std::move(config_protos), factory_context,
                                    config_provider_manager, optional_http_filters)),
-      config_(std::make_shared<ScopedConfigImpl>(std::move(scope_key_builder), scopes_)),
+      config_(std::make_shared<ScopedConfigImpl>(scopes_)),
       rds_config_source_(std::move(rds_config_source)) {}
 
 ScopedRdsConfigSubscription::ScopedRdsConfigSubscription(
     const envoy::extensions::filters::network::http_connection_manager::v3::ScopedRds& scoped_rds,
     const OptionalHttpFilters& optional_http_filters, const uint64_t manager_identifier,
     const std::string& name,
-    const envoy::extensions::filters::network::http_connection_manager::v3::ScopedRoutes::
-        ScopeKeyBuilder& scope_key_builder,
     Server::Configuration::ServerFactoryContext& factory_context, const std::string& stat_prefix,
     envoy::config::core::v3::ConfigSource rds_config_source,
     RouteConfigProviderManager& route_config_provider_manager,
@@ -156,7 +152,7 @@ ScopedRdsConfigSubscription::ScopedRdsConfigSubscription(
       factory_context_(factory_context), name_(name),
       scope_(factory_context.scope().createScope(stat_prefix + "scoped_rds." + name + ".")),
       stats_({ALL_SCOPED_RDS_STATS(POOL_COUNTER(*scope_), POOL_GAUGE(*scope_))}),
-      scope_key_builder_(scope_key_builder), rds_config_source_(std::move(rds_config_source)),
+      rds_config_source_(std::move(rds_config_source)),
       stat_prefix_(stat_prefix), route_config_provider_manager_(route_config_provider_manager),
       optional_http_filters_(optional_http_filters) {
   const auto resource_name = getResourceName();
@@ -174,10 +170,8 @@ ScopedRdsConfigSubscription::ScopedRdsConfigSubscription(
             *this, resource_decoder_);
   }
 
-  initialize([scope_key_builder]() -> Envoy::Config::ConfigProvider::ConfigConstSharedPtr {
-    return std::make_shared<ScopedConfigImpl>(
-        envoy::extensions::filters::network::http_connection_manager::v3::ScopedRoutes::
-            ScopeKeyBuilder(scope_key_builder));
+  initialize([]() -> Envoy::Config::ConfigProvider::ConfigConstSharedPtr {
+    return std::make_shared<ScopedConfigImpl>();
   });
 }
 
@@ -627,7 +621,7 @@ ConfigProviderPtr ScopedRoutesConfigProviderManager::createXdsConfigProvider(
                 config_source_proto);
             return std::make_shared<ScopedRdsConfigSubscription>(
                 scoped_rds_config_source, typed_optarg.optional_http_filters_, manager_identifier,
-                typed_optarg.scoped_routes_name_, typed_optarg.scope_key_builder_, factory_context,
+                typed_optarg.scoped_routes_name_, factory_context,
                 stat_prefix, typed_optarg.rds_config_source_,
                 static_cast<ScopedRoutesConfigProviderManager&>(config_provider_manager)
                     .routeConfigProviderManager(),
@@ -644,7 +638,7 @@ ConfigProviderPtr ScopedRoutesConfigProviderManager::createStaticConfigProvider(
   const auto& typed_optarg = static_cast<const ScopedRoutesConfigProviderManagerOptArg&>(optarg);
   return std::make_unique<InlineScopedRoutesConfigProvider>(
       std::move(config_protos), typed_optarg.scoped_routes_name_, factory_context, *this,
-      typed_optarg.rds_config_source_, typed_optarg.scope_key_builder_,
+      typed_optarg.rds_config_source_,
       typed_optarg.optional_http_filters_);
 }
 

@@ -91,7 +91,7 @@ public:
    * @param headers the request headers to match the scoped routing configuration against.
    * @return unique_ptr of the scope key computed from header.
    */
-  virtual ScopeKeyPtr computeScopeKey(const Http::HeaderMap&) const;
+  virtual ScopeKeyPtr computeScopeKey(const Http::HeaderMap&) const PURE;
 };
 
 /**
@@ -102,27 +102,13 @@ public:
   ~ScopedConfig() override = default;
 
   /**
-   * Based on the incoming HTTP request headers, returns the configuration to use for selecting a
-   * target route.
-   * @param headers the request headers to match the scoped routing configuration against.
-   * @return ConfigConstSharedPtr the router's Config matching the request headers.
-   */
-  virtual ConfigConstSharedPtr getRouteConfig(const Http::HeaderMap& headers) const PURE;
-
-  /**
    * Based on the scope key, returns the configuration to use for selecting a target route.
+   * The scope key can be got via ScopeKeyBuilder.
    *
    * @param scope_key the scope key. null config will be returned when null.
    * @return ConfigConstSharedPtr the router's Config matching the request headers.
    */
   virtual ConfigConstSharedPtr getRouteConfig(const ScopeKeyPtr& scope_key) const PURE;
-
-  /**
-   * Based on the incoming HTTP request headers, returns the hash value of its scope key.
-   * @param headers the request headers to match the scoped routing configuration against.
-   * @return unique_ptr of the scope key computed from header.
-   */
-  virtual ScopeKeyPtr computeScopeKey(const Http::HeaderMap&) const { return {}; }
 };
 
 using ScopedConfigConstSharedPtr = std::shared_ptr<const ScopedConfig>;

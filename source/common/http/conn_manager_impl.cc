@@ -759,7 +759,7 @@ ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connect
              connection_manager.config_.scopedRouteConfigProvider() != nullptr) {
     route_config_update_requester_ =
         std::make_unique<ConnectionManagerImpl::RdsRouteConfigUpdateRequester>(
-            connection_manager.config_.scopedRouteConfigProvider(), connection_manager.config_.scopedKeyBuilder(), *this);
+            connection_manager.config_.scopedRouteConfigProvider(), connection_manager.config_.scopeKeyBuilder(), *this);
   }
   ScopeTrackerScopeState scope(this,
                                connection_manager_.read_callbacks_->connection().dispatcher());
@@ -1382,7 +1382,7 @@ void ConnectionManagerImpl::startDrainSequence() {
 void ConnectionManagerImpl::ActiveStream::snapScopedRouteConfig() {
   // NOTE: if a RDS subscription hasn't got a RouteConfiguration back, a Router::NullConfigImpl is
   // returned, in that case we let it pass.
-  auto scope_key = connection_manager_.config_.scopedKeyBuilder()->computeScopeKey(*request_headers_);
+  auto scope_key = connection_manager_.config_.scopeKeyBuilder()->computeScopeKey(*request_headers_);
   snapped_route_config_ = snapped_scoped_routes_config_->getRouteConfig(scope_key);
   if (snapped_route_config_ == nullptr) {
     ENVOY_STREAM_LOG(trace, "can't find SRDS scope.", *this);

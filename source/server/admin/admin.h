@@ -154,6 +154,9 @@ public:
   Config::ConfigProvider* scopedRouteConfigProvider() override {
     return &scoped_route_config_provider_;
   }
+  const Router::ScopeKeyBuilder* scopeKeyBuilder() override {
+    return &scope_key_builder_;
+  }
   const std::string& serverName() const override { return Http::DefaultServerString::get(); }
   const absl::optional<std::string>& schemeToSet() const override { return scheme_; }
   HttpConnectionManagerProto::ServerHeaderTransformation
@@ -301,6 +304,19 @@ private:
 
     Router::ScopedConfigConstSharedPtr config_;
     TimeSource& time_source_;
+  };
+
+  /**
+   * Implementation of ScopeKeyBuilder that returns a null scope key.
+   */
+  struct NullScopeKeyBuilder : public Router::ScopeKeyBuilder {
+    NullScopeKeyBuilder() = default;
+    ~NullScopeKeyBuilder() override = default;
+
+
+    Router::ScopeKeyPtr computeScopeKey(const Http::HeaderMap&) const override {
+      return nullptr;
+    };
   };
 
   /**
@@ -471,6 +487,7 @@ private:
   Http::ConnectionManagerTracingStats tracing_stats_;
   NullRouteConfigProvider route_config_provider_;
   NullScopedRouteConfigProvider scoped_route_config_provider_;
+  NullScopeKeyBuilder scope_key_builder_;
   Server::ClustersHandler clusters_handler_;
   Server::ConfigDumpHandler config_dump_handler_;
   Server::InitDumpHandler init_dump_handler_;

@@ -186,7 +186,7 @@ public:
   Config::ConfigProvider* scopedRouteConfigProvider() override {
     return scoped_routes_config_provider_.get();
   }
-  const Router::ScopeKeyBuilder* scopedKeyBuilder() override {
+  const Router::ScopeKeyBuilder* scopeKeyBuilder() override {
     return scope_key_builder_.get();
   }
   const std::string& serverName() const override { return server_name_; }

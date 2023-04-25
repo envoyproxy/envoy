@@ -342,7 +342,7 @@ public:
    * Pointer ownership is _not_ transferred to the caller of this function. This will return
    * nullptr when scoped routing is not enabled.
    */
-  virtual const Router::ScopeKeyBuilder* scopedKeyBuilder() PURE;
+  virtual const Router::ScopeKeyBuilder* scopeKeyBuilder() PURE;
 
   /**
    * @return const std::string& the server name to write into responses.
