@@ -293,7 +293,7 @@ public:
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
   NiceMock<MockConfig> config_;
   NiceMock<MockDriver>* driver_;
-  TracerSharedPtr tracer_;
+  HttpTracerSharedPtr tracer_;
   std::shared_ptr<NiceMock<Upstream::MockClusterInfo>> cluster_info_{
       std::make_shared<NiceMock<Upstream::MockClusterInfo>>()};
   Upstream::MockHostDescription* host_{new NiceMock<Upstream::MockHostDescription>()};

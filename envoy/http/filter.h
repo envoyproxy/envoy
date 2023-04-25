@@ -16,7 +16,7 @@
 #include "envoy/matcher/matcher.h"
 #include "envoy/router/router.h"
 #include "envoy/ssl/connection.h"
-#include "envoy/tracing/tracer.h"
+#include "envoy/tracing/http_tracer.h"
 #include "envoy/upstream/load_balancer.h"
 #include "envoy/upstream/upstream.h"
 

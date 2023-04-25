@@ -177,7 +177,7 @@ public:
   }
   const Network::Address::Instance& localAddress() override;
   const absl::optional<std::string>& userAgent() override { return user_agent_; }
-  Tracing::TracerSharedPtr tracer() override { return nullptr; }
+  Tracing::HttpTracerSharedPtr tracer() override { return nullptr; }
   const Http::TracingConnectionManagerConfig* tracingConfig() override { return nullptr; }
   Http::ConnectionManagerListenerStats& listenerStats() override { return listener_->stats_; }
   bool proxy100Continue() const override { return false; }
