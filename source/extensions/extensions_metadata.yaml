@@ -1504,19 +1504,43 @@ envoy.config_subscription.rest:
   - envoy.config_subscription
   security_posture: unknown
   status: stable
-  type_urls:
-  - envoy.config.core.v3.RestSubscription
 envoy.config_subscription.filesystem:
   categories:
   - envoy.config_subscription
   security_posture: unknown
   status: stable
-  type_urls:
-  - envoy.config.core.v3.FilesystemSubscription
+envoy.config_subscription.ads_collection:
+  categories:
+  - envoy.config_subscription
+  security_posture: unknown
+  status: stable
+envoy.config_subscription.aggregated_delta_grpc_collection:
+  categories:
+  - envoy.config_subscription
+  security_posture: unknown
+  status: stable
+envoy.config_subscription.aggregated_grpc_collection:
+  categories:
+  - envoy.config_subscription
+  security_posture: unknown
+  status: stable
+envoy.config_subscription.ads:
+  categories:
+  - envoy.config_subscription
+  security_posture: unknown
+  status: stable
+envoy.config_subscription.delta_grpc:
+  categories:
+  - envoy.config_subscription
+  security_posture: unknown
+  status: stable
+envoy.config_subscription.grpc:
+  categories:
+  - envoy.config_subscription
+  security_posture: unknown
+  status: stable
 envoy.config_subscription.filesystem_collection:
   categories:
   - envoy.config_subscription
   security_posture: unknown
   status: stable
-  type_urls:
-  - envoy.config.core.v3.FilesystemCollectionSubscription

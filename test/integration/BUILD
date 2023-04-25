@@ -948,6 +948,8 @@ envoy_cc_test_library(
         "base_integration_test.h",
     ],
     deps = [
+        "//source/extensions/config_subscription/grpc:grpc_subscription_lib",
+        "//source/extensions/config_subscription/grpc:grpc_collection_subscription_lib",
         "//source/extensions/config_subscription/filesystem:filesystem_subscription_lib",
         "//source/server:proto_descriptors_lib",
         "//source/extensions/request_id/uuid:config",
