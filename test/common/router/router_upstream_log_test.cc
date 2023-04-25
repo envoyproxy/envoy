@@ -444,7 +444,7 @@ typed_config:
   EXPECT_EQ(output_.size(), 2U);
   EXPECT_EQ(
       output_.front(),
-      absl::StrCat("cluster_0 ", AccessLogType_Name(AccessLog::AccessLogType::UpstreamStart)));
+      absl::StrCat("cluster_0 ", AccessLogType_Name(AccessLog::AccessLogType::UpstreamPoolReady)));
   EXPECT_EQ(output_.back(),
             absl::StrCat("cluster_0 ", AccessLogType_Name(AccessLog::AccessLogType::UpstreamEnd)));
 }

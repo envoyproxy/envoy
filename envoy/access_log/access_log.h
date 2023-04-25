@@ -90,6 +90,8 @@ public:
    * @param response_trailers supplies response trailers.
    * @param stream_info supplies additional information about the request not
    * contained in the request headers.
+   * @param access_log_type supplies additional information about the type of the
+   * log record, i.e the location in the code which recorded the log.
    */
   virtual void log(const Http::RequestHeaderMap* request_headers,
                    const Http::ResponseHeaderMap* response_headers,

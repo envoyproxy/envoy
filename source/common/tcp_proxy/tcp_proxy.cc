@@ -213,7 +213,8 @@ Filter::~Filter() {
 
   // Flush the final end stream access log entry.
   for (const auto& access_log : config_->accessLogs()) {
-    access_log->log(nullptr, nullptr, nullptr, getStreamInfo(), AccessLog::AccessLogType::TcpEnd);
+    access_log->log(nullptr, nullptr, nullptr, getStreamInfo(),
+                    AccessLog::AccessLogType::TcpConnectionEnd);
   }
 
   ASSERT(generic_conn_pool_ == nullptr);

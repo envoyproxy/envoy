@@ -218,7 +218,7 @@ TEST_P(UpstreamAccessLogTest, Retry) {
   waitForNextUpstreamRequest({}, std::chrono::milliseconds(300000));
 
   // Start of first stream access log - no response status code yet
-  EXPECT_EQ(absl::StrCat("0 ", AccessLogType_Name(AccessLog::AccessLogType::UpstreamStart)),
+  EXPECT_EQ(absl::StrCat("0 ", AccessLogType_Name(AccessLog::AccessLogType::UpstreamPoolReady)),
             waitForAccessLog(log_file, 0, true));
 
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "503"}}, false);
@@ -238,7 +238,7 @@ TEST_P(UpstreamAccessLogTest, Retry) {
   waitForNextUpstreamRequest();
 
   // Start of second stream access log - no response status code yet
-  EXPECT_EQ(absl::StrCat("0 ", AccessLogType_Name(AccessLog::AccessLogType::UpstreamStart)),
+  EXPECT_EQ(absl::StrCat("0 ", AccessLogType_Name(AccessLog::AccessLogType::UpstreamPoolReady)),
             waitForAccessLog(log_file, 2, true));
 
   upstream_request_->encodeHeaders(default_response_headers_, false);

@@ -36,11 +36,11 @@ enum AccessLogType {
   NotSet = 0;
   TcpUpstreamConnected = 1;
   TcpPeriodic = 2;
-  TcpEnd = 3;
+  TcpConnectionEnd = 3;
   DownstreamStart = 4;
   DownstreamPeriodic = 5;
   DownstreamEnd = 6;
-  UpstreamStart = 7;
+  UpstreamPoolReady = 7;
   UpstreamPeriodic = 8;
   UpstreamEnd = 9;
 }

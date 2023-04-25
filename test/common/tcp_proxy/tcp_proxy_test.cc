@@ -978,7 +978,8 @@ TEST_F(TcpProxyTest, IntermediateLogEntry) {
   filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
   filter_.reset();
 
-  EXPECT_EQ(access_log_data_.value(), AccessLogType_Name(AccessLog::AccessLogType::TcpEnd));
+  EXPECT_EQ(access_log_data_.value(),
+            AccessLogType_Name(AccessLog::AccessLogType::TcpConnectionEnd));
 }
 
 TEST_F(TcpProxyTest, TestAccessLogOnUpstreamConnected) {
@@ -999,7 +1000,8 @@ TEST_F(TcpProxyTest, TestAccessLogOnUpstreamConnected) {
   filter_.reset();
 
   EXPECT_EQ(access_log_data_.value(),
-            absl::StrCat("127.0.0.1:80 ", AccessLogType_Name(AccessLog::AccessLogType::TcpEnd)));
+            absl::StrCat("127.0.0.1:80 ",
+                         AccessLogType_Name(AccessLog::AccessLogType::TcpConnectionEnd)));
 }
 
 TEST_F(TcpProxyTest, AccessLogUpstreamSSLConnection) {

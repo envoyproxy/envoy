@@ -596,10 +596,11 @@ TEST_P(TcpProxyIntegrationTest, AccessLogOnUpstreamConnect) {
   tcp_client->waitForDisconnect();
   test_server_.reset();
   log_result = waitForAccessLog(access_log_path);
-  EXPECT_EQ(absl::StrCat("ACCESS_LOG_TYPE=",
-                         AccessLogType_Name(AccessLog::AccessLogType::TcpUpstreamConnected),
-                         "ACCESS_LOG_TYPE=", AccessLogType_Name(AccessLog::AccessLogType::TcpEnd)),
-            log_result);
+  EXPECT_EQ(
+      absl::StrCat(
+          "ACCESS_LOG_TYPE=", AccessLogType_Name(AccessLog::AccessLogType::TcpUpstreamConnected),
+          "ACCESS_LOG_TYPE=", AccessLogType_Name(AccessLog::AccessLogType::TcpConnectionEnd)),
+      log_result);
 }
 
 // Make sure no bytes are logged when no data is sent.
