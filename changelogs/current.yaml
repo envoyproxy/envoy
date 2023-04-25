@@ -25,6 +25,9 @@ bug_fixes:
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
+- area: quic
+  change: |
+    removed runtime key ``envoy.reloadable_features.quic_defer_send_in_response_to_packet`` and legacy code paths.
 - area: upstream
   change: |
     removed runtime key ``envoy.reloadable_features.fix_hash_key`` and legacy code paths.
