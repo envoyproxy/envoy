@@ -14,7 +14,6 @@ namespace EnvoyDefault {
 namespace {
 
 using ::Envoy::Http::HeaderString;
-using ::Envoy::Http::HeaderValidatorBase;
 using ::Envoy::Http::LowerCaseString;
 using ::Envoy::Http::Protocol;
 using ::Envoy::Http::TestRequestHeaderMapImpl;
@@ -474,6 +473,31 @@ TEST_F(Http1HeaderValidatorTest, RejectUnderscoreHeadersFromRequestHeadersWhenCo
                              UhvResponseCodeDetail::get().InvalidUnderscore);
 }
 
+TEST_F(Http1HeaderValidatorTest, TransformResponseHeadersServerCodecNoop) {
+  ::Envoy::Http::TestResponseHeaderMapImpl headers{
+      {":status", "200"}, {"x-foo", "bar"}, {"transfer-encoding", "chunked"}};
+  auto uhv = createH1Client(empty_config);
+
+  EXPECT_ACCEPT(uhv->validateResponseHeaders(headers));
+  EXPECT_ACCEPT(uhv->transformResponseHeaders(headers));
+  EXPECT_EQ(headers, TestResponseHeaderMapImpl(
+                         {{":status", "200"}, {"x-foo", "bar"}, {"transfer-encoding", "chunked"}}));
+}
+
+TEST_F(Http1HeaderValidatorTest, TransformRequestHeadersClientCodecNoop) {
+  auto uhv = createH1Client(empty_config);
+  auto result = uhv->transformRequestHeaders(makeGoodRequestHeaders());
+  EXPECT_ACCEPT(result.status);
+  EXPECT_EQ(result.new_headers, nullptr);
+}
+
+TEST_F(Http1HeaderValidatorTest, TransformResponseHeadersClientCodecNoop) {
+  auto uhv = createH1Client(empty_config);
+  auto headers = makeGoodResponseHeaders();
+  EXPECT_ACCEPT(uhv->transformResponseHeaders(headers));
+  EXPECT_EQ(headers, TestResponseHeaderMapImpl({{":status", "200"}}));
+}
+
 TEST_F(Http1HeaderValidatorTest, ValidateResponseHeaderMapValid) {
   ::Envoy::Http::TestResponseHeaderMapImpl headers{
       {":status", "200"}, {"x-foo", "bar"}, {"transfer-encoding", "chunked"}};
@@ -596,12 +620,46 @@ TEST_F(Http1HeaderValidatorTest, ValidateRequestTrailerMap) {
   EXPECT_TRUE(uhv->validateRequestTrailers(request_trailer_map));
 }
 
+TEST_F(Http1HeaderValidatorTest, ValidateRequestTrailerMapClientCodec) {
+  auto uhv = createH1Client(empty_config);
+  ::Envoy::Http::TestRequestTrailerMapImpl trailer_map{{"trailer1", "value1"},
+                                                       {"trailer2", "values"}};
+  EXPECT_TRUE(uhv->validateRequestTrailers(trailer_map));
+}
+
+TEST_F(Http1HeaderValidatorTest, ValidateResponseTrailerMapServerCodec) {
+  auto uhv = createH1(empty_config);
+  ::Envoy::Http::TestResponseTrailerMapImpl trailer_map{{"trailer1", "value1"},
+                                                        {"trailer2", "values"}};
+  EXPECT_TRUE(uhv->validateResponseTrailers(trailer_map));
+}
+
 TEST_F(Http1HeaderValidatorTest, ValidateInvalidRequestTrailerMap) {
   auto uhv = createH1(empty_config);
-  // H/2 trailers must not contain pseudo headers
+  // Trailers must not contain pseudo headers
   ::Envoy::Http::TestRequestTrailerMapImpl request_trailer_map{{":path", "value1"},
                                                                {"trailer2", "values"}};
   auto result = uhv->validateRequestTrailers(request_trailer_map);
+  EXPECT_FALSE(result);
+  EXPECT_EQ(result.details(), "uhv.invalid_name_characters");
+}
+
+TEST_F(Http1HeaderValidatorTest, ValidateInvalidRequestTrailerMapClientCodec) {
+  auto uhv = createH1Client(empty_config);
+  // Trailers must not contain pseudo headers
+  ::Envoy::Http::TestRequestTrailerMapImpl request_trailer_map{{":path", "value1"},
+                                                               {"trailer2", "values"}};
+  auto result = uhv->validateRequestTrailers(request_trailer_map);
+  EXPECT_FALSE(result);
+  EXPECT_EQ(result.details(), "uhv.invalid_name_characters");
+}
+
+TEST_F(Http1HeaderValidatorTest, ValidateInvalidResponseTrailerMapServerCodec) {
+  auto uhv = createH1(empty_config);
+  // Trailers must not contain pseudo headers
+  ::Envoy::Http::TestResponseTrailerMapImpl trailer_map{{":path", "value1"},
+                                                        {"trailer2", "values"}};
+  auto result = uhv->validateResponseTrailers(trailer_map);
   EXPECT_FALSE(result);
   EXPECT_EQ(result.details(), "uhv.invalid_name_characters");
 }

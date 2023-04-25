@@ -16,7 +16,6 @@ namespace {
 
 using ::Envoy::Extensions::Http::HeaderValidators::EnvoyDefault::Http2HeaderValidator;
 using ::Envoy::Http::HeaderString;
-using ::Envoy::Http::HeaderValidatorBase;
 using ::Envoy::Http::Protocol;
 using ::Envoy::Http::testCharInTable;
 using ::Envoy::Http::TestRequestHeaderMapImpl;
@@ -725,6 +724,16 @@ TEST_F(Http2HeaderValidatorTest, ValidateInvalidRequestTrailerMap) {
   EXPECT_EQ(result.details(), "uhv.invalid_name_characters");
 }
 
+TEST_F(Http2HeaderValidatorTest, ValidateInvalidRequestTrailerMapClientCodec) {
+  auto uhv = createH2ClientUhv(empty_config);
+  // H/2 trailers must not contain pseudo headers
+  ::Envoy::Http::TestRequestTrailerMapImpl request_trailer_map{{":path", "value1"},
+                                                               {"trailer2", "values"}};
+  auto result = uhv->validateRequestTrailers(request_trailer_map);
+  EXPECT_FALSE(result);
+  EXPECT_EQ(result.details(), "uhv.invalid_name_characters");
+}
+
 TEST_F(Http2HeaderValidatorTest, ValidateInvalidValueRequestTrailerMap) {
   auto uhv = createH2ServerUhv(empty_config);
   ::Envoy::Http::TestRequestTrailerMapImpl request_trailer_map{{"trailer1", "value1"},
@@ -783,6 +792,16 @@ TEST_F(Http2HeaderValidatorTest, ValidateInvalidResponseTrailerMap) {
 
 TEST_F(Http2HeaderValidatorTest, ValidateInvalidValueResponseTrailerMap) {
   auto uhv = createH2ClientUhv(empty_config);
+  // The DEL (0x7F) character is illegal in header values
+  ::Envoy::Http::TestResponseTrailerMapImpl response_trailer_map{{"trailer0", "abcd\x7F\\ef"},
+                                                                 {"trailer1", "value1"}};
+  auto result = uhv->validateResponseTrailers(response_trailer_map);
+  EXPECT_FALSE(result);
+  EXPECT_EQ(result.details(), "uhv.invalid_value_characters");
+}
+
+TEST_F(Http2HeaderValidatorTest, ValidateInvalidValueResponseTrailerMapServerCodec) {
+  auto uhv = createH2ServerUhv(empty_config);
   // The DEL (0x7F) character is illegal in header values
   ::Envoy::Http::TestResponseTrailerMapImpl response_trailer_map{{"trailer0", "abcd\x7F\\ef"},
                                                                  {"trailer1", "value1"}};
