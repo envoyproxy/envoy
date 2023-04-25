@@ -25,8 +25,19 @@ bug_fixes:
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
+- area: upstream
+  change: |
+    removed runtime key ``envoy.reloadable_features.fix_hash_key`` and legacy code paths.
+- area: http
+  change: |
+    removed runtime key ``envoy.reloadable_features.http_response_half_close`` and legacy code paths.
 
 new_features:
+- area: http
+  change: |
+    added Runtime feature ``envoy.reloadable_features.max_request_headers_size_kb`` to override the default value of
+    :ref:`max request headers size
+    <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.max_request_headers_kb>`.
 - area: redis_proxy
   change: |
     added new configuration field :ref:`key_formatter
