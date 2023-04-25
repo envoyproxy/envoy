@@ -124,8 +124,12 @@ TEST_P(ShadowPolicyIntegrationTest, Basic) {
 TEST_P(ShadowPolicyIntegrationTest, BasicWithLimits) {
   initialConfigSetup("cluster_1", "");
   config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
-    bootstrap.mutable_static_resources()->mutable_clusters(0)->set_connection_pool_per_downstream_connection(true);
-    bootstrap.mutable_static_resources()->mutable_clusters(1)->set_connection_pool_per_downstream_connection(true);
+    bootstrap.mutable_static_resources()
+        ->mutable_clusters(0)
+        ->set_connection_pool_per_downstream_connection(true);
+    bootstrap.mutable_static_resources()
+        ->mutable_clusters(1)
+        ->set_connection_pool_per_downstream_connection(true);
   });
   initialize();
 

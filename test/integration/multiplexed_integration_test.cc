@@ -2381,9 +2381,11 @@ TEST_P(MultiplexedIntegrationTest, PerTryTimeoutWhileDownstreamStopsReading) {
 }
 
 TEST_P(MultiplexedIntegrationTest, ConnectionPoolPerDownstream) {
-    config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
-          bootstrap.mutable_static_resources()->mutable_clusters(0)->set_connection_pool_per_downstream_connection(true);
-    });
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    bootstrap.mutable_static_resources()
+        ->mutable_clusters(0)
+        ->set_connection_pool_per_downstream_connection(true);
+  });
 
   initialize();
   codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
