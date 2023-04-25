@@ -6,7 +6,6 @@
 
 #include "envoy/http/codes.h"
 
-#include "golang_filter.h"
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/base64.h"
 #include "source/common/common/enum_to_int.h"
