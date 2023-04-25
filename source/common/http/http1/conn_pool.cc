@@ -16,7 +16,7 @@
 #include "source/common/http/header_utility.h"
 #include "source/common/http/headers.h"
 #include "source/common/runtime/runtime_features.h"
-#include "source/common/stats/lazy_init.h"
+#include "source/common/stats/deferred_creation.h"
 
 #include "absl/strings/match.h"
 

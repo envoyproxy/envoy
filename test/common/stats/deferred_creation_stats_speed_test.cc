@@ -1,6 +1,6 @@
 #include "source/common/common/random_generator.h"
+#include "source/common/stats/deferred_creation.h"
 #include "source/common/stats/isolated_store_impl.h"
-#include "source/common/stats/lazy_init.h"
 #include "source/common/stats/symbol_table.h"
 #include "source/common/stats/thread_local_store.h"
 #include "source/common/thread_local/thread_local_impl.h"
@@ -83,10 +83,10 @@ namespace Stats {
 MAKE_STAT_NAMES_STRUCT(AwesomeStatNames, AWESOME_STATS);
 MAKE_STATS_STRUCT(AwesomeStats, AwesomeStatNames, AWESOME_STATS);
 
-class LazyInitStatsBenchmarkBase {
+class DeferredCreationStatsBenchmarkBase {
 public:
-  LazyInitStatsBenchmarkBase(bool lazy, const uint64_t n_clusters, Store& s)
-      : lazy_init_(lazy), num_clusters_(n_clusters), stat_store_(s),
+  DeferredCreationStatsBenchmarkBase(bool lazy, const uint64_t n_clusters, Store& s)
+      : deferred_creation_(lazy), num_clusters_(n_clusters), stat_store_(s),
         stat_names_(stat_store_.symbolTable()) {}
 
   void createStats(bool defer_init) {
@@ -94,8 +94,9 @@ public:
       std::string new_cluster_name = absl::StrCat("cluster_", i);
       ScopeSharedPtr scope = stat_store_.createScope(new_cluster_name);
       scopes_.push_back(scope);
-      auto lazy_stat = std::make_shared<LazyCompatibleStats<AwesomeStats>>(
-          LazyCompatibleStats<AwesomeStats>::create(scope, stat_names_, lazy_init_));
+      auto lazy_stat = std::make_shared<DeferredCreationCompatibleStats<AwesomeStats>>(
+          DeferredCreationCompatibleStats<AwesomeStats>::create(scope, stat_names_,
+                                                                deferred_creation_));
       lazy_stats_.push_back(lazy_stat);
       if (!defer_init) {
         *(*lazy_stat);
@@ -103,60 +104,61 @@ public:
     }
   }
 
-  const bool lazy_init_;
+  const bool deferred_creation_;
   const uint64_t num_clusters_;
   Store& stat_store_;
   std::vector<ScopeSharedPtr> scopes_;
-  std::vector<std::shared_ptr<LazyCompatibleStats<AwesomeStats>>> lazy_stats_;
+  std::vector<std::shared_ptr<DeferredCreationCompatibleStats<AwesomeStats>>> lazy_stats_;
   AwesomeStatNames stat_names_;
 };
 
 // Benchmark no-lazy-init on stats, the lazy init version is much faster since no allocation.
-void benchmarkLazyInitCreation(::benchmark::State& state) {
+void benchmarkDeferredCreationCreation(::benchmark::State& state) {
   if (benchmark::skipExpensiveBenchmarks() && state.range(1) > 2000) {
     state.SkipWithError("Skipping expensive benchmark");
     return;
   }
 
   IsolatedStoreImpl stats_store;
-  LazyInitStatsBenchmarkBase base(state.range(0) == 1, state.range(1), stats_store);
+  DeferredCreationStatsBenchmarkBase base(state.range(0) == 1, state.range(1), stats_store);
 
   for (auto _ : state) { // NOLINT: Silences warning about dead store
     base.createStats(/*defer_init=*/true);
   }
 }
 
-BENCHMARK(benchmarkLazyInitCreation)
+BENCHMARK(benchmarkDeferredCreationCreation)
     ->ArgsProduct({{0, 1}, {1000, 2000, 5000, 10000, 20000}})
     ->Unit(::benchmark::kMillisecond);
 
 // Benchmark lazy-init of stats in same thread, mimics main thread creation.
-void benchmarkLazyInitCreationInstantiateSameThread(::benchmark::State& state) {
+void benchmarkDeferredCreationCreationInstantiateSameThread(::benchmark::State& state) {
   if (benchmark::skipExpensiveBenchmarks() && state.range(1) > 2000) {
     state.SkipWithError("Skipping expensive benchmark");
     return;
   }
 
   IsolatedStoreImpl stats_store;
-  LazyInitStatsBenchmarkBase base(state.range(0) == 1, state.range(1), stats_store);
+  DeferredCreationStatsBenchmarkBase base(state.range(0) == 1, state.range(1), stats_store);
 
   for (auto _ : state) { // NOLINT: Silences warning about dead store
     base.createStats(/*defer_init=*/false);
   }
 }
 
-BENCHMARK(benchmarkLazyInitCreationInstantiateSameThread)
+BENCHMARK(benchmarkDeferredCreationCreationInstantiateSameThread)
     ->ArgsProduct({{0, 1}, {1000, 2000, 5000, 10000, 20000}})
     ->Unit(::benchmark::kMillisecond);
 
-class MultiThreadLazyinitStatsTest : public ThreadLocalRealThreadsMixin,
-                                     public LazyInitStatsBenchmarkBase {
+class MultiThreadDeferredCreationStatsTest : public ThreadLocalRealThreadsMixin,
+                                             public DeferredCreationStatsBenchmarkBase {
 public:
-  MultiThreadLazyinitStatsTest(bool lazy, const uint64_t n_clusters)
+  MultiThreadDeferredCreationStatsTest(bool lazy, const uint64_t n_clusters)
       : ThreadLocalRealThreadsMixin(5),
-        LazyInitStatsBenchmarkBase(lazy, n_clusters, *ThreadLocalRealThreadsMixin::store_) {}
+        DeferredCreationStatsBenchmarkBase(lazy, n_clusters, *ThreadLocalRealThreadsMixin::store_) {
+  }
 
-  ~MultiThreadLazyinitStatsTest() {
+  ~MultiThreadDeferredCreationStatsTest() {
     shutdownThreading();
     // First, wait for the main-dispatcher to initiate the cross-thread TLS cleanup.
     mainDispatchBlock();
@@ -170,14 +172,14 @@ public:
 };
 
 // Benchmark lazy-init stats in different worker threads, mimics worker threads creation.
-void benchmarkLazyInitCreationInstantiateOnWorkerThreads(::benchmark::State& state) {
+void benchmarkDeferredCreationCreationInstantiateOnWorkerThreads(::benchmark::State& state) {
   if (benchmark::skipExpensiveBenchmarks() && state.range(1) > 2000) {
     state.SkipWithError("Skipping expensive benchmark");
     return;
   }
 
   ProcessWide process_wide_; // Process-wide state setup/teardown (excluding grpc).
-  MultiThreadLazyinitStatsTest test(state.range(0) == 1, state.range(1));
+  MultiThreadDeferredCreationStatsTest test(state.range(0) == 1, state.range(1));
 
   for (auto _ : state) {           // NOLINT: Silences warning about dead store
     test.runOnMainBlocking([&]() { // Create stats on main-thread.
@@ -193,7 +195,7 @@ void benchmarkLazyInitCreationInstantiateOnWorkerThreads(::benchmark::State& sta
       for (uint64_t idx = begin; idx < end; ++idx) {
         // Instantiate the actual AwesomeStats objects in worker threads, in batches to avoid
         // possible contention.
-        if (test.lazy_init_) {
+        if (test.deferred_creation_) {
           // Lazy-init on workers happen when the "index"-th stat instance is not created.
           *(*test.lazy_stats_[idx]);
         }
@@ -202,19 +204,19 @@ void benchmarkLazyInitCreationInstantiateOnWorkerThreads(::benchmark::State& sta
   }
 }
 
-BENCHMARK(benchmarkLazyInitCreationInstantiateOnWorkerThreads)
+BENCHMARK(benchmarkDeferredCreationCreationInstantiateOnWorkerThreads)
     ->ArgsProduct({{0, 1}, {1000, 2000, 5000, 10000, 20000}})
     ->Unit(::benchmark::kMillisecond);
 
 // Benchmark mimics that worker threads inc the stats.
-void benchmarkLazyInitStatsAccess(::benchmark::State& state) {
+void benchmarkDeferredCreationStatsAccess(::benchmark::State& state) {
   if (benchmark::skipExpensiveBenchmarks() && state.range(1) > 2000) {
     state.SkipWithError("Skipping expensive benchmark");
     return;
   }
 
   ProcessWide process_wide_; // Process-wide state setup/teardown (excluding grpc).
-  MultiThreadLazyinitStatsTest test(state.range(0) == 1, state.range(1));
+  MultiThreadDeferredCreationStatsTest test(state.range(0) == 1, state.range(1));
 
   for (auto _ : state) {           // NOLINT: Silences warning about dead store
     test.runOnMainBlocking([&]() { // Create stats on main-thread.
@@ -230,7 +232,7 @@ void benchmarkLazyInitStatsAccess(::benchmark::State& state) {
   }
 }
 
-BENCHMARK(benchmarkLazyInitStatsAccess)
+BENCHMARK(benchmarkDeferredCreationStatsAccess)
     ->ArgsProduct({{0, 1}, {1000, 2000, 5000, 10000, 20000}})
     ->Unit(::benchmark::kMillisecond);
 

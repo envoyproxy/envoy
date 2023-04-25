@@ -16,7 +16,7 @@ envoy_extension_cc_test(
     srcs = ["cluster_test.cc"],
     extension_names = ["envoy.clusters.aggregate"],
     deps = [
-        "//source/common/stats:lazy_init",
+        "//source/common/stats:deferred_creation",
         "//source/extensions/clusters/aggregate:cluster",
         "//source/extensions/transport_sockets/raw_buffer:config",
         "//test/common/upstream:utility_lib",

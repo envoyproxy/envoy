@@ -56,8 +56,8 @@
 #include "source/common/init/manager_impl.h"
 #include "source/common/network/utility.h"
 #include "source/common/shared_pool/shared_pool.h"
+#include "source/common/stats/deferred_creation.h"
 #include "source/common/stats/isolated_store_impl.h"
-#include "source/common/stats/lazy_init.h"
 #include "source/common/upstream/load_balancer_impl.h"
 #include "source/common/upstream/resource_manager_impl.h"
 #include "source/common/upstream/transport_socket_match_impl.h"
@@ -776,9 +776,9 @@ public:
                   Stats::ScopeSharedPtr&& stats_scope, bool added_via_api,
                   Server::Configuration::TransportSocketFactoryContext&);
 
-  static LazyCompatibleClusterTrafficStats
+  static DeferredCreationCompatibleClusterTrafficStats
   generateStats(Stats::ScopeSharedPtr scope, const ClusterTrafficStatNames& cluster_stat_names,
-                bool lazyinit);
+                bool deferred_creation);
   static ClusterLoadReportStats
   generateLoadReportStats(Stats::Scope& scope, const ClusterLoadReportStatNames& stat_names);
   static ClusterCircuitBreakersStats
@@ -899,7 +899,9 @@ public:
   }
   ResourceManager& resourceManager(ResourcePriority priority) const override;
   TransportSocketMatcher& transportSocketMatcher() const override { return *socket_matcher_; }
-  LazyCompatibleClusterTrafficStats& trafficStats() const override { return traffic_stats_; }
+  DeferredCreationCompatibleClusterTrafficStats& trafficStats() const override {
+    return traffic_stats_;
+  }
   ClusterConfigUpdateStats& configUpdateStats() const override { return config_update_stats_; }
   ClusterLbStats& lbStats() const override { return lb_stats_; }
   ClusterEndpointStats& endpointStats() const override { return endpoint_stats_; }
@@ -1043,7 +1045,7 @@ private:
   const float peekahead_ratio_;
   TransportSocketMatcherPtr socket_matcher_;
   Stats::ScopeSharedPtr stats_scope_;
-  mutable LazyCompatibleClusterTrafficStats traffic_stats_;
+  mutable DeferredCreationCompatibleClusterTrafficStats traffic_stats_;
   mutable ClusterConfigUpdateStats config_update_stats_;
   mutable ClusterLbStats lb_stats_;
   mutable ClusterEndpointStats endpoint_stats_;

@@ -56,13 +56,13 @@ public:
   bool flushOnAdmin() const override { return flush_on_admin_; }
 
   void addSink(Stats::SinkPtr sink) { sinks_.emplace_back(std::move(sink)); }
-  bool enableLazyInitStats() const override { return enable_lazyinit_stats_; }
+  bool enableDeferredCreationStats() const override { return enable_deferred_creation_stats_; }
 
 private:
   std::list<Stats::SinkPtr> sinks_;
   std::chrono::milliseconds flush_interval_;
   bool flush_on_admin_{false};
-  bool enable_lazyinit_stats_{false};
+  bool enable_deferred_creation_stats_{false};
 };
 
 /**

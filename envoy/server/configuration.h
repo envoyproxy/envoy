@@ -88,7 +88,7 @@ public:
   /**
    * When true, enable lazy-init of stats.
    */
-  virtual bool enableLazyInitStats() const PURE;
+  virtual bool enableDeferredCreationStats() const PURE;
 };
 
 /**

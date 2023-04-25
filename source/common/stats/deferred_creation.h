@@ -1,28 +1,34 @@
 #pragma once
 
+#include "envoy/common/pure.h"
+#include "envoy/stats/scope.h"
+#include "envoy/stats/stats.h"
+
 #include "source/common/common/cleanup.h"
 #include "source/common/common/thread.h"
+#include "source/common/stats/symbol_table.h"
+#include "source/common/stats/utility.h"
 
 namespace Envoy {
 namespace Stats {
 
 template <typename StatsStructType> class DirectStats;
-template <typename StatsStructType> class LazyInit;
+template <typename StatsStructType> class DeferredCreation;
 
 /**
  * Interface for stats lazy initialization.
  * To reduce memory and CPU consumption, Envoy can enable the bootstrap config
- * :ref:`enable_lazyinit_stats
- * <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.enable_lazyinit_stats>`.
+ * :ref:`enable_deferred_creation_stats
+ * <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.enable_deferred_creation_stats>`.
  * A 'StatsStructType' is only created when any of its field is referenced.
  * See more context: https://github.com/envoyproxy/envoy/issues/23575
  */
-template <typename StatsStructType> class LazyCompatibleInterface {
+template <typename StatsStructType> class DeferredCreationCompatibleInterface {
 public:
   // Helper function to get-or-create and return the StatsStructType object.
-  virtual StatsStructType* instantiate() = 0;
+  virtual StatsStructType& instantiate() PURE;
 
-  virtual ~LazyCompatibleInterface() = default;
+  virtual ~DeferredCreationCompatibleInterface() = default;
 };
 
 /**
@@ -31,16 +37,17 @@ public:
  *
  * This class is thread-safe -- instantiations can occur on multiple concurrent threads.
  * This is used when
- * :ref:`enable_lazyinit_stats
- * <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.enable_lazyinit_stats>` is enabled.
+ * :ref:`enable_deferred_creation_stats
+ * <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.enable_deferred_creation_stats>` is enabled.
  */
 template <typename StatsStructType>
-class LazyInit : public LazyCompatibleInterface<StatsStructType> {
+class DeferredCreation : public DeferredCreationCompatibleInterface<StatsStructType> {
 public:
   // Capture the stat names object and the scope with a ctor, that can be used to instantiate a
   // StatsStructType object later.
   // Caller should make sure scope and stat_names outlive this object.
-  LazyInit(const typename StatsStructType::StatNameType& stat_names, Stats::ScopeSharedPtr scope)
+  DeferredCreation(const typename StatsStructType::StatNameType& stat_names,
+                   Stats::ScopeSharedPtr scope)
       : initialized_([&scope]() -> Gauge& {
           Stats::StatNamePool pool(scope->symbolTable());
           return Stats::Utility::gaugeFromElements(
@@ -57,14 +64,14 @@ public:
       instantiate();
     }
   }
-  ~LazyInit() {
+  ~DeferredCreation() {
     if (ctor_ == nullptr) {
       initialized_.dec();
     }
   }
 
 private:
-  inline StatsStructType* instantiate() override { return internal_stats_.get(ctor_); }
+  inline StatsStructType& instantiate() override { return *internal_stats_.get(ctor_); }
 
   // In order to preserve stat value continuity across a config reload, we need to automatically
   // re-instantiate lazy stats when they are constructed, if there is already a live instantiation
@@ -81,58 +88,60 @@ private:
   // To do that we keep an "initialized" gauge in the cluster's scope, which will be associated by
   // name to the previous generation's cluster's lazy-init block. We use the value in this shared
   // gauge to determine whether to instantiate the lazy block on construction.
-  // TODO(stevenzzzz,jmarantz, #26106): See #14610. The initialized_ gauge could be disabled in a
+  // TODO(#26106): See #14610. The initialized_ gauge could be disabled in a
   // corner case where a user disables stats with suffix "initialized". In which case, the
   // initialized_ will be a NullGauge, which breaks the above scenario 2.
-  // TODO(stevenzzzz, jmarantz): Consider hiding this Gauge from being exported, through using the
+  // TODO(#26106): Consider hiding this Gauge from being exported, through using the
   // stats flags mask.
   Gauge& initialized_;
-  // TODO(stevenzzzz, jmarantz): Clean up this ctor_ by moving its ownership to AtomicPtr, and drop
+  // TODO(#26957): Clean up this ctor_ by moving its ownership to AtomicPtr, and drop
   // the setter lambda when the nested object is created.
   std::function<StatsStructType*()> ctor_;
   Thread::AtomicPtr<StatsStructType, Thread::AtomicPtrAllocMode::DeleteOnDestruct>
       internal_stats_{};
 };
 
-// Non-LazyInit wrapper over StatsStructType. This is used when
-// :ref:`enable_lazyinit_stats
-// <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.enable_lazyinit_stats>` is not enabled.
+// Non-DeferredCreation wrapper over StatsStructType. This is used when
+// :ref:`enable_deferred_creation_stats
+// <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.enable_deferred_creation_stats>` is not
+// enabled.
 template <typename StatsStructType>
-class DirectStats : public LazyCompatibleInterface<StatsStructType> {
+class DirectStats : public DeferredCreationCompatibleInterface<StatsStructType> {
 public:
   DirectStats(const typename StatsStructType::StatNameType& stat_names, Stats::Scope& scope)
       : stats_(stat_names, scope) {}
 
 private:
-  inline StatsStructType* instantiate() override { return &stats_; }
+  inline StatsStructType& instantiate() override { return stats_; }
   StatsStructType stats_;
 };
 
 // A helper class for a lazy compatible stats struct type.
-template <typename StatsStructType> class LazyCompatibleStats {
+template <typename StatsStructType> class DeferredCreationCompatibleStats {
 public:
-  static LazyCompatibleStats create(Stats::ScopeSharedPtr scope,
-                                    const typename StatsStructType::StatNameType& stat_names,
-                                    bool lazyinit) {
-    if (lazyinit) {
-      return {std::make_unique<LazyInit<StatsStructType>>(stat_names, scope)};
+  static DeferredCreationCompatibleStats
+  create(Stats::ScopeSharedPtr scope, const typename StatsStructType::StatNameType& stat_names,
+         bool deferred_creation) {
+    if (deferred_creation) {
+      return {std::make_unique<DeferredCreation<StatsStructType>>(stat_names, scope)};
     } else {
       return {std::make_unique<DirectStats<StatsStructType>>(stat_names, *scope)};
     }
   }
 
   // Allows move construct and assign.
-  LazyCompatibleStats& operator=(LazyCompatibleStats&&) = default;
-  LazyCompatibleStats(LazyCompatibleStats&&) = default;
+  DeferredCreationCompatibleStats& operator=(DeferredCreationCompatibleStats&&) = default;
+  DeferredCreationCompatibleStats(DeferredCreationCompatibleStats&&) = default;
 
-  inline StatsStructType* operator->() { return data_->instantiate(); };
-  inline StatsStructType& operator*() { return *data_->instantiate(); };
+  inline StatsStructType* operator->() { return &data_->instantiate(); };
+  inline StatsStructType& operator*() { return data_->instantiate(); };
 
 private:
-  LazyCompatibleStats(std::unique_ptr<LazyCompatibleInterface<StatsStructType>> d)
+  DeferredCreationCompatibleStats(
+      std::unique_ptr<DeferredCreationCompatibleInterface<StatsStructType>> d)
       : data_(std::move(d)) {}
 
-  std::unique_ptr<LazyCompatibleInterface<StatsStructType>> data_;
+  std::unique_ptr<DeferredCreationCompatibleInterface<StatsStructType>> data_;
 };
 
 } // namespace Stats

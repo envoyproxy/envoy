@@ -48,7 +48,7 @@
 #include "source/common/router/config_utility.h"
 #include "source/common/runtime/runtime_features.h"
 #include "source/common/runtime/runtime_impl.h"
-#include "source/common/stats/lazy_init.h"
+#include "source/common/stats/deferred_creation.h"
 #include "source/common/upstream/cluster_factory_impl.h"
 #include "source/common/upstream/health_checker_impl.h"
 #include "source/extensions/filters/network/http_connection_manager/config.h"
@@ -854,10 +854,11 @@ void MainPrioritySetImpl::updateCrossPriorityHostMap(const HostVector& hosts_add
   }
 }
 
-LazyCompatibleClusterTrafficStats
+DeferredCreationCompatibleClusterTrafficStats
 ClusterInfoImpl::generateStats(Stats::ScopeSharedPtr scope,
-                               const ClusterTrafficStatNames& stat_names, bool lazyinit) {
-  return LazyCompatibleClusterTrafficStats::create(scope, stat_names, lazyinit);
+                               const ClusterTrafficStatNames& stat_names, bool deferred_creation) {
+  return DeferredCreationCompatibleClusterTrafficStats::create(scope, stat_names,
+                                                               deferred_creation);
 }
 
 ClusterRequestResponseSizeStats ClusterInfoImpl::generateRequestResponseSizeStats(
@@ -1033,7 +1034,7 @@ ClusterInfoImpl::ClusterInfoImpl(
       socket_matcher_(std::move(socket_matcher)), stats_scope_(std::move(stats_scope)),
       traffic_stats_(generateStats(stats_scope_,
                                    factory_context.clusterManager().clusterStatNames(),
-                                   server_context.statsConfig().enableLazyInitStats())),
+                                   server_context.statsConfig().enableDeferredCreationStats())),
       config_update_stats_(factory_context.clusterManager().clusterConfigUpdateStatNames(),
                            *stats_scope_),
       lb_stats_(factory_context.clusterManager().clusterLbStatNames(), *stats_scope_),

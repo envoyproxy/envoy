@@ -36,7 +36,7 @@
 namespace Envoy {
 
 namespace Stats {
-template <typename StatsStructType> class LazyCompatibleStats;
+template <typename StatsStructType> class DeferredCreationCompatibleStats;
 }
 
 namespace Http {
@@ -772,7 +772,8 @@ MAKE_STATS_STRUCT(ClusterLbStats, ClusterLbStatNames, ALL_CLUSTER_LB_STATS);
  */
 MAKE_STAT_NAMES_STRUCT(ClusterTrafficStatNames, ALL_CLUSTER_TRAFFIC_STATS);
 MAKE_STATS_STRUCT(ClusterTrafficStats, ClusterTrafficStatNames, ALL_CLUSTER_TRAFFIC_STATS);
-using LazyCompatibleClusterTrafficStats = Stats::LazyCompatibleStats<ClusterTrafficStats>;
+using DeferredCreationCompatibleClusterTrafficStats =
+    Stats::DeferredCreationCompatibleStats<ClusterTrafficStats>;
 
 MAKE_STAT_NAMES_STRUCT(ClusterLoadReportStatNames, ALL_CLUSTER_LOAD_REPORT_STATS);
 MAKE_STATS_STRUCT(ClusterLoadReportStats, ClusterLoadReportStatNames,
@@ -1074,7 +1075,7 @@ public:
   /**
    * @return  all traffic related stats for this cluster.
    */
-  virtual LazyCompatibleClusterTrafficStats& trafficStats() const PURE;
+  virtual DeferredCreationCompatibleClusterTrafficStats& trafficStats() const PURE;
   /**
    * @return the stats scope that contains all cluster stats. This can be used to produce dynamic
    *         stats that will be freed when the cluster is removed.

@@ -131,7 +131,7 @@ envoy_cc_library(
         ":connection_lib",
         ":multi_connection_base_impl_lib",
         "//envoy/upstream:upstream_interface",
-        "//source/common/stats:lazy_init",
+        "//source/common/stats:deferred_creation",
     ],
 )
 

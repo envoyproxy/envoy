@@ -227,20 +227,20 @@ envoy_cc_benchmark_binary(
 )
 
 envoy_cc_test(
-    name = "lazyinit_stats_test",
-    srcs = ["lazyinit_stats_test.cc"],
+    name = "deferred_creation_stats_test",
+    srcs = ["deferred_creation_stats_test.cc"],
     deps = [
         "//envoy/stats:stats_interface",
         "//source/common/memory:stats_lib",
-        "//source/common/stats:lazy_init",
+        "//source/common/stats:deferred_creation",
         "//source/common/stats:thread_local_store_lib",
         "//test/test_common:utility_lib",
     ],
 )
 
 envoy_cc_benchmark_binary(
-    name = "lazyinit_stats_benchmark",
-    srcs = ["lazyinit_stats_speed_test.cc"],
+    name = "deferred_creation_stats_benchmark",
+    srcs = ["deferred_creation_stats_speed_test.cc"],
     external_deps = [
         "benchmark",
     ],
@@ -249,17 +249,17 @@ envoy_cc_benchmark_binary(
         "//source/common/common:random_generator_lib",
         "//source/common/common:utility_lib",
         "//source/common/runtime:runtime_lib",
+        "//source/common/stats:deferred_creation",
         "//source/common/stats:isolated_store_lib",
-        "//source/common/stats:lazy_init",
         "//source/common/stats:symbol_table_lib",
         "//source/exe:process_wide_lib",
     ],
 )
 
 envoy_benchmark_test(
-    name = "lazyinit_stats_benchmark_test",
+    name = "deferred_creation_stats_benchmark_test",
     size = "large",
-    benchmark_binary = "lazyinit_stats_benchmark",
+    benchmark_binary = "deferred_creation_stats_benchmark",
 )
 
 envoy_benchmark_test(

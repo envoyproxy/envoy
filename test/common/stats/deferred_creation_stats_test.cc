@@ -2,7 +2,7 @@
 #include "envoy/stats/stats_macros.h"
 
 #include "source/common/common/thread.h"
-#include "source/common/stats/lazy_init.h"
+#include "source/common/stats/deferred_creation.h"
 #include "source/common/stats/thread_local_store.h"
 
 #include "test/test_common/utility.h"
@@ -19,7 +19,7 @@ namespace {
 MAKE_STAT_NAMES_STRUCT(AwesomeStatNames, AWESOME_STATS);
 MAKE_STATS_STRUCT(AwesomeStats, AwesomeStatNames, AWESOME_STATS);
 
-class LazyInitStatsTest : public testing::Test {
+class DeferredCreationStatsTest : public testing::Test {
 public:
   SymbolTableImpl symbol_table_;
   AllocatorImpl allocator_{symbol_table_};
@@ -27,10 +27,10 @@ public:
   AwesomeStatNames stats_names_{symbol_table_};
 };
 
-using MyStats = LazyCompatibleStats<AwesomeStats>;
+using MyStats = DeferredCreationCompatibleStats<AwesomeStats>;
 
 // Tests that non-lazy stats has no "AwesomeStats.initialized" gauge.
-TEST_F(LazyInitStatsTest, NonLazyNoInitializedGauge) {
+TEST_F(DeferredCreationStatsTest, NonLazyNoInitializedGauge) {
   {
     ScopeSharedPtr scope = store_.createScope("bluh");
     MyStats non_lazy_y = MyStats::create(scope, stats_names_, false);
@@ -46,7 +46,7 @@ TEST_F(LazyInitStatsTest, NonLazyNoInitializedGauge) {
 }
 
 // Tests that "AwesomeStats.initialized" gauge equals the number of initiated MyStats instances.
-TEST_F(LazyInitStatsTest, StatsGoneWithScope) {
+TEST_F(DeferredCreationStatsTest, StatsGoneWithScope) {
   {
     ScopeSharedPtr scope = store_.createScope("bluh");
     // No such gauge when there is no lazy init stats instances.
@@ -78,7 +78,7 @@ TEST_F(LazyInitStatsTest, StatsGoneWithScope) {
 
 // Tests that multiple stats struct instances within the same scope has no issue to keep the
 // stats, with removals.
-TEST_F(LazyInitStatsTest, MultipleInstancesSameScopeDynamicallyDestructed) {
+TEST_F(DeferredCreationStatsTest, MultipleInstancesSameScopeDynamicallyDestructed) {
   {
     ScopeSharedPtr scope_1 = store_.createScope("bluh");
     auto x = std::make_unique<MyStats>(MyStats::create(scope_1, stats_names_, true));
@@ -117,7 +117,7 @@ TEST_F(LazyInitStatsTest, MultipleInstancesSameScopeDynamicallyDestructed) {
 }
 
 // Tests that as long as scope lives, stats under the scope won't be lost.
-TEST_F(LazyInitStatsTest, ScopeOutlivesLazyStats) {
+TEST_F(DeferredCreationStatsTest, ScopeOutlivesLazyStats) {
   ScopeSharedPtr scope_1 = store_.createScope("bluh");
   {
     auto x = std::make_unique<MyStats>(MyStats::create(scope_1, stats_names_, true));
@@ -158,7 +158,7 @@ TEST_F(LazyInitStatsTest, ScopeOutlivesLazyStats) {
 
 // Tests that as two AwesomeStats instances of different scope, as long as the scope life-cycle
 // overlaps, still got data kept when the earlier scope got deleted.
-TEST_F(LazyInitStatsTest, WhenScopesOverlapStatsAreAliveAsLongAsThereAre) {
+TEST_F(DeferredCreationStatsTest, WhenScopesOverlapStatsAreAliveAsLongAsThereAre) {
 
   ScopeSharedPtr scope_v1 = store_.createScope("bluh");
   auto x = std::make_unique<MyStats>(MyStats::create(scope_v1, stats_names_, true));

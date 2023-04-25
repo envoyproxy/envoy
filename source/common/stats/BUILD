@@ -37,11 +37,14 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "lazy_init",
-    hdrs = ["lazy_init.h"],
+    name = "deferred_creation",
+    hdrs = ["deferred_creation.h"],
     deps = [
+        "//envoy/stats:stats_interface",
         "//source/common/common:cleanup_lib",
         "//source/common/common:thread_lib",
+        "//source/common/stats:symbol_table_lib",
+        "//source/common/stats:utility_lib",
     ],
 )
 

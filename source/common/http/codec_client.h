@@ -19,7 +19,7 @@
 #include "source/common/http/codec_wrappers.h"
 #include "source/common/network/filter_impl.h"
 #include "source/common/runtime/runtime_features.h"
-#include "source/common/stats/lazy_init.h"
+#include "source/common/stats/deferred_creation.h"
 
 namespace Envoy {
 namespace Http {
