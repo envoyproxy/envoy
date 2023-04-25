@@ -9,9 +9,6 @@ minor_behavior_changes:
   change: |
     Increase granularity mapping connection pool failures to specific stream failure reasons to make it more transparent why
     the stream is reset when a connection pool's connection fails.
-- area: custom response
-  change: |
-    The filter now traverses matchers from most specific to least specific per filter config till a match is found for the response.
 - area: uhv
   change: |
     Preserve case of %-encoded triplets in the default header validator. This behavior can be reverted by setting runtime flag
