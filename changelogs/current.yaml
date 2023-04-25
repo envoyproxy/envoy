@@ -28,6 +28,9 @@ bug_fixes:
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
+- area: http
+  change: |
+    removed runtime key ``envoy.reloadable_features.allow_upstream_filters`` and legacy code paths.
 - area: upstream
   change: |
     removed runtime key ``envoy.reloadable_features.fix_hash_key`` and legacy code paths.
