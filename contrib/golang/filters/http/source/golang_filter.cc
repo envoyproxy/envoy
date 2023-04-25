@@ -6,6 +6,7 @@
 
 #include "envoy/http/codes.h"
 
+#include "golang_filter.h"
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/base64.h"
 #include "source/common/common/enum_to_int.h"
@@ -909,6 +910,20 @@ CAPIStatus Filter::getStringValue(int id, GoString* value_str) {
     break;
   case EnvoyValue::DownstreamRemoteAddress:
     req_->strValue = state.streamInfo().downstreamAddressProvider().remoteAddress()->asString();
+    break;
+  case EnvoyValue::UpstreamHost:
+    if (state.streamInfo().upstreamInfo() && state.streamInfo().upstreamInfo()->upstreamHost()) {
+      req_->strValue = state.streamInfo().upstreamInfo()->upstreamHost()->address()->asString();
+    } else {
+      return CAPIStatus::CAPIValueNotFound;
+    }
+    break;
+  case EnvoyValue::UpstreamCluster:
+    if (state.streamInfo().upstreamInfo() && state.streamInfo().upstreamInfo()->upstreamHost()) {
+      req_->strValue = state.streamInfo().upstreamInfo()->upstreamHost()->cluster().name();
+    } else {
+      return CAPIStatus::CAPIValueNotFound;
+    }
     break;
   default:
     RELEASE_ASSERT(false, absl::StrCat("invalid string value id: ", id));

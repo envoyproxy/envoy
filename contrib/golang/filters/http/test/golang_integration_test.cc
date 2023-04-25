@@ -150,6 +150,11 @@ typed_config:
           hcm.mutable_route_config()->mutable_virtual_hosts(0)->mutable_routes(0)->set_name(
               "test-route-name");
           hcm.mutable_route_config()->mutable_virtual_hosts(0)->set_domains(0, domain);
+          hcm.mutable_route_config()
+              ->mutable_virtual_hosts(0)
+              ->mutable_routes(0)
+              ->mutable_route()
+              ->set_cluster("cluster_0");
         });
     initialize();
   }
@@ -324,6 +329,14 @@ typed_config:
 
     // check response code details in encode phase
     EXPECT_EQ("via_upstream", getHeader(response->headers(), "rsp-response-code-details"));
+
+    // check upstream host in encode phase
+    EXPECT_TRUE(
+        absl::StrContains(getHeader(response->headers(), "rsp-upstream-host"),
+                          GetParam() == Network::Address::IpVersion::v4 ? "127.0.0.1:" : "[::1]:"));
+
+    // check upstream cluster in encode phase
+    EXPECT_EQ("cluster_0", getHeader(response->headers(), "rsp-upstream-cluster"));
 
     // check response attempt count in encode phase
     EXPECT_EQ("1", getHeader(response->headers(), "rsp-attempt-count"));

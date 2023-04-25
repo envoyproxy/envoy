@@ -102,6 +102,8 @@ enum class EnvoyValue {
   AttemptCount,
   DownstreamLocalAddress,
   DownstreamRemoteAddress,
+  UpstreamHost,
+  UpstreamCluster,
 };
 
 struct httpRequestInternal;
