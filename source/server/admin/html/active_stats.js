@@ -29,6 +29,8 @@
  */
 const nameStatsMap = new Map();
 
+const nameHistogramsMap = new Map();
+
 /**
  * The first time this script loads, it will write PRE element at the end of body.
  * This is hooked to the `DOMContentLoaded` event.
@@ -143,6 +145,12 @@ function updateParams() {
 }
 
 function allValuesEqual(a, b) {
+  if (a == b) {
+    return true;
+  } else if (a == null || b == null) {
+    return false;
+  }
+
   const a_keys = Object.keys(a);
   const b_keys = Object.keys(b);
   if (a_keys.length != b_keys.length) {
@@ -152,7 +160,17 @@ function allValuesEqual(a, b) {
     if (!b.hasOwnProperty(key)) {
       return false;
     }
-    if (a[key] != b[key]) {
+    const a_value = a[key];
+    const b_value = b[key];
+    const a_type = typeof a_value;
+    if (a_type != typeof b_value) {
+      return false;
+    }
+    if (a_type == 'object') {
+      if (!allValuesEqual(a_value, b_value)) {
+        return false;
+      }
+    } else if (a_value != b_value) {
       return false;
     }
   }
@@ -276,6 +294,23 @@ function compareStatRecords(a, b) {
   return 0;
 }
 
+function compareHistogramRecords(a, b) {
+  // Sort higher change-counts first.
+  if (a.change_count != b.change_count) {
+    return b.change_count - a.change_count;
+  }
+
+  // Unlike scalar stats, we do not value-sort histograms. For identical change-counts
+  // we just fall back to forward alphabetic sort.
+  if (a.histogram.name < b.histogram.name) {
+    return -1;
+  }
+  if (a.histogram.name > b.histogram.name) {
+    return 1;
+  }
+  return 0;
+}
+
 /**
  * The active display has additional settings for tweaking it -- this helper extracts numeric
  * values from text widgets
@@ -303,11 +338,33 @@ function loadSettingOrUseDefault(id, defaultValue) {
  * @param {!Object} data
  */
 function renderStats(histogramDiv, data) {
-  sortedStats = [];
-  histogramDiv.replaceChildren();
-  renderHistograms(histogramDiv, data);
+  let sortedStats = [];
+  let sortedHistograms = [];
+
+  let supportedPercentiles;
   for (stat of data.stats) {
     if (!stat.name) {
+      const histograms = stat.histograms;
+      if (histograms && histograms.details) {
+        for (histogram of histograms.details) {
+          if (!histogram.name || !histograms.supported_percentiles || !histograms.details) {
+            continue;
+          }
+          supportedPercentiles = histograms.supported_percentiles;
+          let histogramRecord = nameHistogramsMap.get(histogram.name);
+          if (histogramRecord) {
+            if (!allValuesEqual(histogramRecord.histogram.detail, histogram.detail) ||
+                !allValuesEqual(histogramRecord.histogram.percentiles, histogram.percentiles)) {
+              ++histogramRecord.change_count;
+              histogramRecord.histogram = histogram;
+            }
+          } else {
+            histogramRecord = {histogram: histogram, change_count: 0};
+            nameHistogramsMap.set(histogram.name, histogramRecord);
+          }
+          sortedHistograms.push(histogramRecord);
+        }
+      }
       continue;
     }
     let statRecord = nameStatsMap.get(stat.name);
@@ -329,6 +386,7 @@ function renderStats(histogramDiv, data) {
   // of those can be found, but that would bloat this relatively modest amount
   // of code, and compel us to do a better job writing tests.
   sortedStats.sort(compareStatRecords);
+  sortedHistograms.sort(compareHistogramRecords);
 
   const max = loadSettingOrUseDefault('active-max-display-count', 50);
   let index = 0;
@@ -339,9 +397,18 @@ function renderStats(histogramDiv, data) {
     }
     text += `${statRecord.name}: ${statRecord.value} (${statRecord.change_count})\n`;
   }
-  if (activeStatsPreElement) {
-    activeStatsPreElement.textContent = text;
+  activeStatsPreElement.textContent = text;
+
+  histogramDiv.replaceChildren();
+  index = 0;
+  for (histogramRecord of sortedHistograms) {
+    if (++index > max) {
+      break;
+    }
+    renderHistogram(histogramDiv, supportedPercentiles, histogramRecord.histogram,
+                    histogramRecord.change_count);
   }
+
 
   // If a post-render test-hook has been established, call it, but clear
   // the hook first, so that the callee can set a new hook if it wants to.

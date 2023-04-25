@@ -29,15 +29,15 @@ let formatPercent = Intl.NumberFormat('en', {
 
 function renderHistogramDetail(histogramDiv, supported_percentiles, detail) {
   for (histogram of detail) {
-    renderHistogram(histogramDiv, supported_percentiles, histogram);
+    renderHistogram(histogramDiv, supported_percentiles, histogram, null);
   }
 }
 
-function renderHistogram(histogramDiv, supported_percentiles, histogram) {
+function renderHistogram(histogramDiv, supported_percentiles, histogram, changeCount) {
   const div = document.createElement('div');
   const label = document.createElement('span');
   label.className = 'histogram-name';
-  label.textContent = histogram.name;
+  label.textContent = histogram.name + (changeCount == null ? "" : " (" + changeCount + ")");
   div.appendChild(label);
   histogramDiv.appendChild(div);
 
