@@ -14,8 +14,8 @@ namespace UnitTestFuzz {
 
 class MockStream : public ExternalProcessing::ExternalProcessorStream {
 public:
-  MockStream();
-  ~MockStream() override;
+  MockStream() = default;
+  ~MockStream() override = default;
 
   MOCK_METHOD(void, send,
               (envoy::service::ext_proc::v3::ProcessingRequest && request, bool end_stream));
@@ -24,8 +24,8 @@ public:
 
 class MockClient : public ExternalProcessing::ExternalProcessorClient {
 public:
-  MockClient();
-  ~MockClient() override;
+  MockClient() = default;
+  ~MockClient() override = default;
 
   MOCK_METHOD(ExternalProcessing::ExternalProcessorStreamPtr, start,
               (ExternalProcessing::ExternalProcessorCallbacks & callbacks,

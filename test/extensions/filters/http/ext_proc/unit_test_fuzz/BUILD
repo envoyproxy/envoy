@@ -12,7 +12,6 @@ envoy_package()
 
 envoy_cc_mock(
     name = "ext_proc_mocks",
-    srcs = ["mocks.cc"],
     hdrs = ["mocks.h"],
     deps = [
         "//source/extensions/filters/http/ext_proc:client_interface",
