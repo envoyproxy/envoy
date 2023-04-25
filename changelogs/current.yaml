@@ -47,9 +47,14 @@ new_features:
     added Runtime feature ``envoy.reloadable_features.max_request_headers_size_kb`` to override the default value of
     :ref:`max request headers size
     <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.max_request_headers_kb>`.
+- area: stat_sinks
+  change: |
+    Added ``envoy.stat_sinks.open_telemetry`` stats_sink, that supports flushing metrics by the OTLP protocol,
+    for supported Open Telemetry collectors.
 - area: redis_proxy
   change: |
     added new configuration field :ref:`key_formatter
     <envoy_v3_api_field_extensions.filters.network.redis_proxy.v3.RedisProxy.PrefixRoutes.Route.key_formatter>` to format redis key.
     The field supports using %KEY% as a formatter command for substituting the redis key as part of the substitution formatter expression.
+
 deprecated:
