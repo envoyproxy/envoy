@@ -30,6 +30,7 @@
 // ASAP by filing a bug on github. Overriding non-buggy code is strongly discouraged to avoid the
 // problem of the bugs being found after the old code path has been removed.
 RUNTIME_GUARD(envoy_reloadable_features_allow_compact_maglev);
+RUNTIME_GUARD(envoy_reloadable_features_allow_upstream_filters);
 RUNTIME_GUARD(envoy_reloadable_features_append_query_parameters_path_rewriter);
 RUNTIME_GUARD(envoy_reloadable_features_closer_shadow_behavior);
 RUNTIME_GUARD(envoy_reloadable_features_conn_pool_delete_when_idle);

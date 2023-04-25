@@ -1137,9 +1137,11 @@ TEST_F(RouterTest, ResetDuringEncodeHeaders) {
   EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
               putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess,
                         absl::optional<uint64_t>(absl::nullopt)));
+  bool upstream_filters =
+      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.allow_upstream_filters");
   EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
               putResult(Upstream::Outlier::Result::LocalOriginConnectFailed, _))
-      .Times(0);
+      .Times(!upstream_filters);
   // The reset will be converted into a local reply.
   router_->decodeHeaders(headers, true);
   EXPECT_EQ(1U,
@@ -3510,10 +3512,16 @@ TEST_F(RouterTest, Coalesce1xxHeaders) {
     // NOLINTNEXTLINE(clang-analyzer-core.CallAndMessage)
     response_decoder->decode1xxHeaders(std::move(continue_headers));
   }
-  // With the filter manager coalescing, the router only sees 1 100.
-  EXPECT_EQ(
-      1U,
-      cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("upstream_rq_100").value());
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.allow_upstream_filters")) {
+    // With the filter manager coalescing, the router only sees 1 100.
+    EXPECT_EQ(
+        1U,
+        cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("upstream_rq_100").value());
+  } else {
+    EXPECT_EQ(
+        2U,
+        cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("upstream_rq_100").value());
+  }
 
   // Reset stream and cleanup.
   EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
