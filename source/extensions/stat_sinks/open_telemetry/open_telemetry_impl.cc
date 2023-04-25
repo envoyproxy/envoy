@@ -8,10 +8,8 @@ namespace StatSinks {
 namespace OpenTelemetry {
 
 OtlpOptions::OtlpOptions(const SinkConfig& sink_config)
-    : report_counters_as_deltas_(
-          PROTOBUF_GET_WRAPPED_OR_DEFAULT(sink_config, report_counters_as_deltas, false)),
-      report_histograms_as_deltas_(
-          PROTOBUF_GET_WRAPPED_OR_DEFAULT(sink_config, report_histograms_as_deltas, false)),
+    : report_counters_as_deltas_(sink_config.report_counters_as_deltas()),
+      report_histograms_as_deltas_(sink_config.report_histograms_as_deltas()),
       emit_tags_as_attributes_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(sink_config, emit_tags_as_attributes, true)),
       use_tag_extracted_name_(
@@ -24,10 +22,6 @@ OpenTelemetryGrpcMetricsExporterImpl::OpenTelemetryGrpcMetricsExporterImpl(
           "opentelemetry.proto.collector.metrics.v1.MetricsService.Export")) {}
 
 void OpenTelemetryGrpcMetricsExporterImpl::send(MetricsExportRequestPtr&& export_request) {
-  if (export_request == nullptr) {
-    return;
-  }
-
   client_->send(service_method_, *export_request, *this, Tracing::NullSpan::instance(),
                 Http::AsyncClient::RequestOptions());
 }
@@ -35,7 +29,7 @@ void OpenTelemetryGrpcMetricsExporterImpl::send(MetricsExportRequestPtr&& export
 void OpenTelemetryGrpcMetricsExporterImpl::onSuccess(
     Grpc::ResponsePtr<MetricsExportResponse>&& export_response, Tracing::Span&) {
   if (export_response->has_partial_success()) {
-    ENVOY_LOG(warn, "export response with partial success; {} rejected, collector message: {}",
+    ENVOY_LOG(debug, "export response with partial success; {} rejected, collector message: {}",
               export_response->partial_success().rejected_data_points(),
               export_response->partial_success().error_message());
   }
@@ -44,7 +38,7 @@ void OpenTelemetryGrpcMetricsExporterImpl::onSuccess(
 void OpenTelemetryGrpcMetricsExporterImpl::onFailure(Grpc::Status::GrpcStatus response_status,
                                                      const std::string& response_message,
                                                      Tracing::Span&) {
-  ENVOY_LOG(warn, "export failure; status: {}, message: {}", response_status, response_message);
+  ENVOY_LOG(debug, "export failure; status: {}, message: {}", response_status, response_message);
 }
 
 MetricsExportRequestPtr OtlpMetricsFlusherImpl::flush(Stats::MetricSnapshot& snapshot) const {

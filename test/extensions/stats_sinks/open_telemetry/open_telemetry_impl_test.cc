@@ -1,5 +1,6 @@
 #include "envoy/grpc/async_client.h"
 
+#include "source/common/tracing/null_span_impl.h"
 #include "source/extensions/stat_sinks/open_telemetry/open_telemetry_impl.h"
 
 #include "test/mocks/common.h"
@@ -39,8 +40,8 @@ public:
                                          bool emit_tags_as_attributes = true,
                                          bool use_tag_extracted_name = true) {
     envoy::extensions::stat_sinks::open_telemetry::v3::SinkConfig sink_config;
-    sink_config.mutable_report_counters_as_deltas()->set_value(report_counters_as_deltas);
-    sink_config.mutable_report_histograms_as_deltas()->set_value(report_histograms_as_deltas);
+    sink_config.set_report_counters_as_deltas(report_counters_as_deltas);
+    sink_config.set_report_histograms_as_deltas(report_histograms_as_deltas);
     sink_config.mutable_emit_tags_as_attributes()->set_value(emit_tags_as_attributes);
     sink_config.mutable_use_tag_extracted_name()->set_value(use_tag_extracted_name);
 
@@ -118,14 +119,15 @@ public:
   OpenTelemetryGrpcMetricsExporterImplPtr exporter_;
 };
 
-TEST_F(OpenTelemetryGrpcMetricsExporterImplTest, NoExportRequest) {
-  EXPECT_CALL(*async_client_, sendRaw(_, _, _, _, _, _)).Times(0);
-  exporter_->send(nullptr);
-}
-
 TEST_F(OpenTelemetryGrpcMetricsExporterImplTest, SendExportRequest) {
   EXPECT_CALL(*async_client_, sendRaw(_, _, _, _, _, _));
   exporter_->send(std::make_unique<MetricsExportRequest>());
+}
+
+TEST_F(OpenTelemetryGrpcMetricsExporterImplTest, PartialSuccess) {
+  auto response = std::make_unique<MetricsExportResponse>();
+  response->mutable_partial_success()->set_rejected_data_points(1);
+  exporter_->onSuccess(std::move(response), Tracing::NullSpan::instance());
 }
 
 class OtlpMetricsFlusherTests : public OpenTelemetryStatsSinkTests {

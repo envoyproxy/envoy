@@ -29,12 +29,12 @@ message SinkConfig {
   }
 
   // If set to true, counters will be emitted as deltas, and the OTLP message will have
-  // ``AGGREGATION_TEMPORALITY_DELTA`` set as AggregationTemporality. Default value is false.
-  google.protobuf.BoolValue report_counters_as_deltas = 2;
+  // ``AGGREGATION_TEMPORALITY_DELTA`` set as AggregationTemporality.
+  bool report_counters_as_deltas = 2;
 
   // If set to true, histograms will be emitted as deltas, and the OTLP message will have
-  // ``AGGREGATION_TEMPORALITY_DELTA`` set as AggregationTemporality. Default value is false.
-  google.protobuf.BoolValue report_histograms_as_deltas = 3;
+  // ``AGGREGATION_TEMPORALITY_DELTA`` set as AggregationTemporality.
+  bool report_histograms_as_deltas = 3;
 
   // If set to true, metrics will have their tags emitted as OTLP attributes, which may
   // contain values used by the tag extractor or additional tags added during stats creation.
