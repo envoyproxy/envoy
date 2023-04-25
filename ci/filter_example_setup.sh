@@ -28,6 +28,6 @@ ln -sf "${ENVOY_SRCDIR}"/bazel/platform_mappings "${ENVOY_FILTER_EXAMPLE_SRCDIR}
 cp -f "${ENVOY_SRCDIR}"/.bazelrc "${ENVOY_FILTER_EXAMPLE_SRCDIR}"/
 rm -f "${ENVOY_FILTER_EXAMPLE_SRCDIR}"/.bazelversion
 cp -f "${ENVOY_SRCDIR}"/.bazelversion "${ENVOY_FILTER_EXAMPLE_SRCDIR}"/
-cp -f "${ENVOY_SRCDIR}"/*.bazelrc "${ENVOY_FILTER_EXAMPLE_SRCDIR}"/
+cp -f "$(bazel info workspace)"/*.bazelrc "${ENVOY_FILTER_EXAMPLE_SRCDIR}"/
 
 export FILTER_WORKSPACE_SET=1
