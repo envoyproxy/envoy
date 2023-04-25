@@ -95,6 +95,18 @@ envoy_cc_test_library(
 )
 
 envoy_cc_test_library(
+    name = "validated_input_generator_lib",
+    srcs = ["validated_input_generator.cc"],
+    hdrs = ["validated_input_generator.h"],
+    deps = [
+        "//test/fuzz:mutable_visitor_lib",
+        "//test/fuzz:random_lib",
+        "@com_envoyproxy_protoc_gen_validate//validate:cc_validate",
+        "@com_github_google_libprotobuf_mutator//:libprotobuf_mutator",
+    ],
+)
+
+envoy_cc_test_library(
     name = "random_lib",
     hdrs = ["random.h"],
     deps = [

@@ -37,6 +37,27 @@ envoy_proto_library(
 )
 
 envoy_cc_test_library(
+    name = "vig_anymap_ext",
+    srcs = ["validated_input_generator_any_map_extensions.cc"],
+    hdrs = ["validated_input_generator_any_map_extensions.h"],
+    deps = [
+        "//source/extensions/access_loggers/file:config",
+        "//source/extensions/http/early_header_mutation/header_mutation:config",
+        "//source/extensions/http/header_validators/envoy_default:config",
+        "//source/extensions/http/original_ip_detection/custom_header:config",
+        "//source/extensions/http/original_ip_detection/xff:config",
+        "//source/extensions/matching/actions/format_string:config",
+        "//source/extensions/matching/common_inputs/environment_variable:config",
+        "//source/extensions/matching/input_matchers/consistent_hashing:config",
+        "//source/extensions/matching/input_matchers/ip:config",
+        "//source/extensions/request_id/uuid:config",
+        "//test/fuzz:validated_input_generator_lib",
+        "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/trace/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_test_library(
     name = "uber_readfilter_lib",
     srcs = [
         "uber_per_readfilter.cc",
@@ -68,21 +89,10 @@ envoy_cc_fuzz_test(
     # these up via the NamedNetworkFilterConfigFactory.
     deps = [
         ":uber_readfilter_lib",
+        ":vig_anymap_ext",
         "//source/common/config:utility_lib",
-        "//source/extensions/http/early_header_mutation/header_mutation:config",
-        "//source/extensions/http/original_ip_detection/custom_header:config",
-        "//source/extensions/http/original_ip_detection/xff:config",
-        "//source/extensions/matching/actions/format_string:config",
-        "//source/extensions/matching/common_inputs/environment_variable:config",
-        "//source/extensions/matching/input_matchers/consistent_hashing:config",
-        "//source/extensions/matching/input_matchers/ip:config",
-        "//source/extensions/request_id/uuid:config",
-        "//source/extensions/access_loggers/file:config",
         "//test/config:utility_lib",
         "//test/test_common:test_runtime_lib",
-        "//test/fuzz:mutable_visitor_lib",
-        "//test/fuzz:random_lib",
-        "@com_github_google_libprotobuf_mutator//:libprotobuf_mutator",
     ] + envoy_all_network_filters(),
 )
 
