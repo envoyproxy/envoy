@@ -424,6 +424,7 @@ EXTENSIONS = {
     "envoy.load_balancing_policies.round_robin":       "//source/extensions/load_balancing_policies/round_robin:config",
     "envoy.load_balancing_policies.maglev":            "//source/extensions/load_balancing_policies/maglev:config",
     "envoy.load_balancing_policies.ring_hash":       "//source/extensions/load_balancing_policies/ring_hash:config",
+    "envoy.load_balancing_policies.pick_first":        "//source/extensions/load_balancing_policies/pick_first:config",
 
     #
     # HTTP Early Header Mutation
