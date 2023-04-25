@@ -24,16 +24,6 @@ ValidatedInputGenerator::ValidatedInputGenerator(unsigned int seed, AnyMap&& def
   mutator_.Seed(seed);
 }
 
-//  std::string get_full_member_path() const {
-//    std::string retval;
-//    for (const absl::string_view& member : message_path_) {
-//      if (!retval.empty())
-//        retval += '.';
-//      retval += member;
-//    }
-//    return retval;
-//  }
-
 template <typename T, typename R>
 static bool handle_numeric_rules(T& number, const R& number_rules) {
   if (number_rules.has_ignore_empty() && number_rules.ignore_empty()) {
@@ -193,9 +183,6 @@ void ValidatedInputGenerator::handle_any_rules(
             auto prototype = randomed_typeurl.second();
             ASSERT(prototype);
             any_message->PackFrom(*prototype);
-            //              ENVOY_LOG_MISC(info, "!!!! Apply config for any: {}", /* on field {}",
-            //              */
-            //                             randomed_typeurl.first /*, get_full_member_path()*/);
           }
           return;
         }
@@ -417,10 +404,6 @@ void ValidatedInputGenerator::onEnterMessage(Protobuf::Message& msg,
   const Protobuf::Descriptor* descriptor = msg.GetDescriptor();
   message_path_.push_back(field_name);
   if (descriptor->full_name() == kAny) {
-    //      ENVOY_LOG_MISC(info, "### parent of Any is: {}->{}",
-    //                     parents[parents.size() - 2]->GetDescriptor()->full_name(),
-    //                     message_path_[message_path_.size() - 2]);
-    //      ENVOY_LOG_MISC(info, "### in class {}", parents.back()->GetDescriptor()->full_name());
     auto* any_message = Protobuf::DynamicCastToGenerated<ProtobufWkt::Any>(&msg);
     std::unique_ptr<Protobuf::Message> inner_message =
         ProtobufMessage::Helper::typeUrlToMessage(any_message->type_url());
@@ -436,7 +419,6 @@ void ValidatedInputGenerator::onEnterMessage(Protobuf::Message& msg,
       // No required member in one of set, so create one.
       for (int index = 0; index < oneof_desc->field_count(); ++index) {
         const std::string parents_class_name = parents.back()->GetDescriptor()->full_name();
-        //          ENVOY_LOG_MISC(info, "one in class: {}", parents_class_name);
         // Treat matchers special, because in their oneof they reference themself, which may
         // create long chains. Prefer the first alternative, which does not reference itself.
         // Nevertheless do it randomly to allow for some nesting.
