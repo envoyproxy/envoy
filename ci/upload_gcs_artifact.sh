@@ -4,12 +4,7 @@ set -e -o pipefail
 
 if [[ -z "${GCS_ARTIFACT_BUCKET}" ]]; then
     echo "Artifact bucket is not set, not uploading artifacts."
-    exit 1
-fi
-
-if [[ -z "${GCP_SERVICE_ACCOUNT_KEY}" ]]; then
-    echo "GCP key is not set, not uploading artifacts."
-    exit 1
+    exit 0
 fi
 
 # Fail when service account key is not specified
