@@ -9,14 +9,6 @@ licenses(["notice"])  # Apache 2
 envoy_package()
 
 envoy_cc_library(
-    name = "http_tracer_interface",
-    hdrs = ["http_tracer.h"],
-    deps = [
-        ":tracer_interface",
-    ],
-)
-
-envoy_cc_library(
     name = "tracer_interface",
     hdrs = ["tracer.h"],
     deps = [
