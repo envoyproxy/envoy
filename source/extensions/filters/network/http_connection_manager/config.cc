@@ -325,9 +325,7 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
           config.stream_error_on_invalid_http_message(),
           xff_num_trusted_hops_ == 0 && use_remote_address_)),
       max_request_headers_kb_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
-          config, max_request_headers_kb,
-          context.runtime().snapshot().getInteger(Http::MaxRequestHeadersSizeOverrideKey,
-                                                  Http::DEFAULT_MAX_REQUEST_HEADERS_KB))),
+          config, max_request_headers_kb, Http::DEFAULT_MAX_REQUEST_HEADERS_KB)),
       max_request_headers_count_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
           config.common_http_protocol_options(), max_headers_count,
           context.runtime().snapshot().getInteger(Http::MaxRequestHeadersCountOverrideKey,
