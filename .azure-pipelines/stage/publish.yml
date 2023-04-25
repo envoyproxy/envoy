@@ -225,7 +225,7 @@ jobs:
 
   - script: |
       bazel run //tools/distribution:update_dockerhub_repository
-    displayName: "Publish Dockerhub description and README"
+      displayName: "Publish Dockerhub description and README"
     env:
       DOCKERHUB_USERNAME: ${{ parameters.authDockerUser }}
       DOCKERHUB_PASSWORD: ${{ parameters.authDockerPassword }}
