@@ -244,10 +244,12 @@ typed_config:
     EXPECT_EQ(true,
               upstream_request_->headers().get(Http::LowerCaseString("x-test-header-1")).empty());
 
+    // check header value which set in golang: req-downstream-local-address
     EXPECT_TRUE(
         absl::StrContains(getHeader(upstream_request_->headers(), "req-downstream-local-address"),
                           GetParam() == Network::Address::IpVersion::v4 ? "127.0.0.1:" : "[::1]:"));
 
+    // check header value which set in golang: req-downstream-remote-address
     EXPECT_TRUE(
         absl::StrContains(getHeader(upstream_request_->headers(), "req-downstream-remote-address"),
                           GetParam() == Network::Address::IpVersion::v4 ? "127.0.0.1:" : "[::1]:"));
@@ -310,7 +312,7 @@ typed_config:
     // check route name in encode phase
     EXPECT_EQ("test-route-name", getHeader(response->headers(), "rsp-route-name"));
 
-    // check route name in encode phase
+    // check protocol in encode phase
     EXPECT_EQ("HTTP/1.1", getHeader(response->headers(), "rsp-protocol"));
 
     // check filter chain name in encode phase, exists.
@@ -323,7 +325,7 @@ typed_config:
     // check response code details in encode phase
     EXPECT_EQ("via_upstream", getHeader(response->headers(), "rsp-response-code-details"));
 
-    // check response code details in encode phase
+    // check response attempt count in encode phase
     EXPECT_EQ("1", getHeader(response->headers(), "rsp-attempt-count"));
 
     // verify response status
