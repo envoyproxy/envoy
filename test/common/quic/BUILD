@@ -391,6 +391,7 @@ envoy_proto_library(
 envoy_cc_fuzz_test(
     name = "envoy_quic_h3_fuzz_test",
     srcs = ["envoy_quic_h3_fuzz_test.cc"],
+    tags = ["nofips"],
     corpus = "envoy_quic_h3_fuzz_test_corpus",
     deps = [
         ":envoy_quic_h3_fuzz_proto_cc_proto",
