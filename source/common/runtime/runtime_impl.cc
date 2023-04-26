@@ -236,7 +236,13 @@ SnapshotImpl::Entry SnapshotImpl::createEntry(const std::string& value) {
 SnapshotImpl::Entry SnapshotImpl::createEntry(const ProtobufWkt::Value& value) {
   // This isn't the smartest way to do it; we're round-tripping via YAML, this should be optimized
   // if runtime parsing becomes performance sensitive.
+#ifdef ENVOY_ENABLE_YAML
   return createEntry(MessageUtil::getYamlStringFromMessage(value, false, false));
+#else
+  IS_ENVOY_BUG("Runtime loading requires YAML support");
+  UNREFERENCED_PARAMETER(value);
+  return Entry();
+#endif
 }
 
 bool SnapshotImpl::parseEntryBooleanValue(Entry& entry) {
@@ -271,8 +277,10 @@ bool SnapshotImpl::parseEntryDoubleValue(Entry& entry) {
 void SnapshotImpl::parseEntryFractionalPercentValue(Entry& entry) {
   envoy::type::v3::FractionalPercent converted_fractional_percent;
   TRY_ASSERT_MAIN_THREAD {
+#ifdef ENVOY_ENABLE_YAML
     MessageUtil::loadFromYamlAndValidate(entry.raw_string_value_, converted_fractional_percent,
                                          ProtobufMessage::getStrictValidationVisitor());
+#endif
   }
   END_TRY
   catch (const ProtoValidationException& ex) {

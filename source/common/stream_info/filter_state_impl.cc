@@ -1,27 +1,9 @@
-#include "filter_state_impl.h"
 #include "source/common/stream_info/filter_state_impl.h"
 
 #include "envoy/common/exception.h"
 
 namespace Envoy {
 namespace StreamInfo {
-
-std::string FilterStateImpl::serializeAsString(int indent_level) const {
-  std::string out = "";
-  std::string base_indent(2 * indent_level, ' ');
-  absl::StrAppend(&out, base_indent, "At life span ", life_span_, "\n");
-  const std::string indent = "  ";
-  for (const auto& [name, object] : data_storage_) {
-    const auto obj_ser = object->data_->serializeAsString();
-    absl::StrAppend(&out, base_indent, indent, name, ": ", obj_ser.value_or(""), "\n", base_indent,
-                    indent, indent, "shared: ", object->stream_sharing_, "\n", base_indent, indent,
-                    indent, "readOnly: ", object->state_type_ == FilterState::StateType::ReadOnly,
-                    "\n");
-  }
-  std::string parent_value = parent_ ? parent_->serializeAsString() : "";
-  absl::StrAppend(&out, parent_value);
-  return out;
-}
 
 void FilterStateImpl::setData(absl::string_view data_name, std::shared_ptr<Object> data,
                               FilterState::StateType state_type, FilterState::LifeSpan life_span,
@@ -150,8 +132,7 @@ void FilterStateImpl::maybeCreateParent(ParentAccessMode parent_access_mode) {
   }
   if (absl::holds_alternative<FilterStateSharedPtr>(ancestor_)) {
     FilterStateSharedPtr ancestor = absl::get<FilterStateSharedPtr>(ancestor_);
-    if ((ancestor == nullptr && parent_access_mode == ParentAccessMode::ReadWrite) ||
-        (ancestor != nullptr && ancestor->lifeSpan() != life_span_ + 1)) {
+    if (ancestor == nullptr || ancestor->lifeSpan() != life_span_ + 1) {
       parent_ = std::make_shared<FilterStateImpl>(ancestor, FilterState::LifeSpan(life_span_ + 1));
     } else {
       parent_ = ancestor;
@@ -178,40 +159,6 @@ void FilterStateImpl::maybeCreateParent(ParentAccessMode parent_access_mode) {
         std::make_shared<FilterStateImpl>(FilterState::LifeSpan(life_span_ + 1));
   }
   parent_ = lazy_create_ancestor.first;
-}
-
-absl::Status FilterStateImpl::addAncestor(const FilterStateSharedPtr& ancestor) {
-  if (!ancestor) {
-    return absl::OkStatus();
-  }
-  // Make sure that the ancestor has an acceptable life span.
-  if (ancestor->lifeSpan() <= life_span_) {
-    return absl::FailedPreconditionError(absl::StrCat("Ancestor lifespan ", ancestor->lifeSpan(),
-                                                      " must be larger than current lifespan ",
-                                                      life_span_));
-  }
-  // Make sure there's no data conflicts between `this` and the proposed ancestor.
-  for (const auto& [key, _] : data_storage_) {
-    if (ancestor->hasDataWithName(key)) {
-      return absl::FailedPreconditionError(absl::StrCat("Ancestor and this share a key: ", key));
-    }
-  }
-  // Add the ancestor to the pre-existing parent/ancestor.
-  if (parent_) {
-    if (parent_.get() == ancestor.get()) {
-      return absl::OkStatus();
-    }
-    auto status = parent_->addAncestor(ancestor);
-    if (status.ok()) {
-      return status;
-    }
-    return absl::FailedPreconditionError(
-        absl::StrCat("Could not add ancestor to pre-existing ancestor: ", status.message()));
-  }
-  // There are no pre-existing parents/ancestors, so we add it here.
-  ancestor_ = ancestor;
-  maybeCreateParent(ParentAccessMode::ReadOnly);
-  return absl::OkStatus();
 }
 
 } // namespace StreamInfo

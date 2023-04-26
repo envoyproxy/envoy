@@ -43,8 +43,10 @@ public:
                                            ProtobufMessage::getStrictValidationVisitor(), config);
 
     Envoy::Upstream::ClusterFactoryContextImpl factory_context(
-        server_context_, server_context_.cluster_manager_, stats_store_, nullptr,
-        ssl_context_manager_, nullptr, false, validation_visitor_);
+        server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
+        false);
+
+    ON_CALL(server_context_, api()).WillByDefault(testing::ReturnRef(*api_));
 
     if (uses_tls) {
       EXPECT_CALL(ssl_context_manager_, createSslClientContext(_, _));
@@ -54,8 +56,7 @@ public:
     // actually correct. It's possible this will have to change in the future.
     EXPECT_CALL(*dns_cache_manager_->dns_cache_, addUpdateCallbacks_(_))
         .WillOnce(DoAll(SaveArgAddress(&update_callbacks_), Return(nullptr)));
-    cluster_ = std::make_shared<Cluster>(server_context_, cluster_config, config, factory_context,
-                                         runtime_, *this, local_info_, false);
+    cluster_ = std::make_shared<Cluster>(cluster_config, config, factory_context, *this);
     thread_aware_lb_ = std::make_unique<Cluster::ThreadAwareLoadBalancer>(*cluster_);
     lb_factory_ = thread_aware_lb_->factory();
     refreshLb();
@@ -149,12 +150,10 @@ public:
               (const Upstream::HostVector& hosts_added, const Upstream::HostVector& hosts_removed));
 
   NiceMock<Server::Configuration::MockServerFactoryContext> server_context_;
-  Stats::TestUtil::TestStore stats_store_;
-  Ssl::MockContextManager ssl_context_manager_;
-  NiceMock<Runtime::MockLoader> runtime_;
-  NiceMock<LocalInfo::MockLocalInfo> local_info_;
-  NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor_;
+  Stats::TestUtil::TestStore& stats_store_ = server_context_.store_;
   Api::ApiPtr api_{Api::createApiForTest(stats_store_)};
+  Ssl::MockContextManager ssl_context_manager_;
+
   std::shared_ptr<Extensions::Common::DynamicForwardProxy::MockDnsCacheManager> dns_cache_manager_{
       new Extensions::Common::DynamicForwardProxy::MockDnsCacheManager()};
   std::shared_ptr<Cluster> cluster_;
@@ -635,22 +634,20 @@ protected:
     envoy::config::cluster::v3::Cluster cluster_config =
         Upstream::parseClusterFromV3Yaml(yaml_config);
     Upstream::ClusterFactoryContextImpl cluster_factory_context(
-        server_context_, server_context_.cluster_manager_, stats_store_, nullptr,
-        ssl_context_manager_, nullptr, true, validation_visitor_);
+        server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
+        true);
     std::unique_ptr<Upstream::ClusterFactory> cluster_factory = std::make_unique<ClusterFactory>();
 
     std::tie(cluster_, thread_aware_lb_) =
-        cluster_factory->create(server_context_, cluster_config, cluster_factory_context);
+        cluster_factory->create(cluster_config, cluster_factory_context);
   }
 
 private:
   NiceMock<Server::Configuration::MockServerFactoryContext> server_context_;
-  Stats::TestUtil::TestStore stats_store_;
-  NiceMock<Ssl::MockContextManager> ssl_context_manager_;
-  NiceMock<Runtime::MockLoader> runtime_;
-  NiceMock<LocalInfo::MockLocalInfo> local_info_;
-  NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor_;
+  Stats::TestUtil::TestStore& stats_store_ = server_context_.store_;
   Api::ApiPtr api_{Api::createApiForTest(stats_store_)};
+
+  NiceMock<Ssl::MockContextManager> ssl_context_manager_;
   Upstream::ClusterSharedPtr cluster_;
   Upstream::ThreadAwareLoadBalancerPtr thread_aware_lb_;
 };

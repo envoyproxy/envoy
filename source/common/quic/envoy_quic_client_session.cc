@@ -57,8 +57,7 @@ EnvoyQuicClientSession::EnvoyQuicClientSession(
           std::make_shared<QuicSslConnectionInfo>(*this),
           std::make_unique<StreamInfo::StreamInfoImpl>(
               dispatcher.timeSource(),
-              connection->connectionSocket()->connectionInfoProviderSharedPtr(),
-              StreamInfo::FilterState::LifeSpan::Connection)),
+              connection->connectionSocket()->connectionInfoProviderSharedPtr())),
       quic::QuicSpdyClientSession(config, supported_versions, connection.release(), server_id,
                                   crypto_config.get(), push_promise_index),
       crypto_config_(crypto_config), crypto_stream_factory_(crypto_stream_factory),
