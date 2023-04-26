@@ -101,7 +101,6 @@ class EnvoyConfigurationTest {
     filterChain: MutableList<EnvoyNativeFilterConfig> = mutableListOf(EnvoyNativeFilterConfig("buffer_filter_1", "{'@type': 'type.googleapis.com/envoy.extensions.filters.http.buffer.v3.Buffer'}"), EnvoyNativeFilterConfig("buffer_filter_2", "{'@type': 'type.googleapis.com/envoy.extensions.filters.http.buffer.v3.Buffer'}")),
     platformFilterFactories: MutableList<EnvoyHTTPFilterFactory> = mutableListOf(TestEnvoyHTTPFilterFactory("name1"), TestEnvoyHTTPFilterFactory("name2")),
     runtimeGuards: Map<String,Boolean> = emptyMap(),
-    enableSkipDNSLookupForProxiedRequests: Boolean = false,
     statSinks: MutableList<String> = mutableListOf(),
     enablePlatformCertificatesValidation: Boolean = false,
     rtdsLayerName: String = "",
@@ -156,7 +155,6 @@ class EnvoyConfigurationTest {
       emptyMap(),
       statSinks,
       runtimeGuards,
-      enableSkipDNSLookupForProxiedRequests,
       enablePlatformCertificatesValidation,
       rtdsLayerName,
       rtdsTimeoutSeconds,
@@ -238,9 +236,6 @@ class EnvoyConfigurationTest {
     // Cert Validation
     assertThat(resolvedTemplate).contains("trusted_ca:")
 
-    // Proxying
-    assertThat(resolvedTemplate).contains("skip_dns_lookup_for_proxied_requests: false")
-
     // Validate ordering between filters and platform filters
     assertThat(resolvedTemplate).matches(Pattern.compile(".*name1.*name2.*buffer_filter_1.*buffer_filter_2.*", Pattern.DOTALL));
     // Validate that createYaml doesn't change filter order.
@@ -268,7 +263,6 @@ class EnvoyConfigurationTest {
       enableBrotliDecompression = true,
       enableSocketTagging = true,
       enableInterfaceBinding = true,
-      enableSkipDNSLookupForProxiedRequests = true,
       enablePlatformCertificatesValidation = true,
       dnsPreresolveHostnames = mutableListOf(),
       legacyVirtualClusters = mutableListOf(),
@@ -309,9 +303,6 @@ class EnvoyConfigurationTest {
 
     // enableInterfaceBinding = true
     assertThat(resolvedTemplate).contains("enable_interface_binding: true")
-
-    // enableSkipDNSLookupForProxiedRequests = true
-    assertThat(resolvedTemplate).contains("skip_dns_lookup_for_proxied_requests: true")
 
     // enablePlatformCertificatesValidation = true
     assertThat(resolvedTemplate).doesNotContain("trusted_ca:")

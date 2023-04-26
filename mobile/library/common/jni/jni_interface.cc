@@ -1209,8 +1209,7 @@ void configureBuilder(
     jlong per_try_idle_timeout_seconds, jstring app_version, jstring app_id,
     jboolean trust_chain_verification, jobjectArray virtual_clusters_legacy,
     jobjectArray virtual_clusters, jobjectArray filter_chain, jobjectArray stat_sinks,
-    jboolean enable_platform_certificates_validation,
-    jboolean enable_skip_dns_lookup_for_proxied_requests, jobjectArray runtime_guards,
+    jboolean enable_platform_certificates_validation, jobjectArray runtime_guards,
     jstring rtds_layer_name, jlong rtds_timeout_seconds, jstring ads_address, jlong ads_port,
     jstring ads_token, jlong ads_token_lifetime, jstring ads_root_certs, jstring node_id,
     jstring node_region, jstring node_zone, jstring node_sub_zone, jstring cds_resources_locator,
@@ -1248,8 +1247,6 @@ void configureBuilder(
   builder.enforceTrustChainVerification(trust_chain_verification == JNI_TRUE);
   builder.enablePlatformCertificatesValidation(enable_platform_certificates_validation == JNI_TRUE);
   builder.setForceAlwaysUsev6(true);
-  builder.setSkipDnsLookupForProxiedRequests(enable_skip_dns_lookup_for_proxied_requests ==
-                                             JNI_TRUE);
 
   auto guards = javaObjectArrayToStringPairVector(env, runtime_guards);
   for (std::pair<std::string, std::string>& entry : guards) {
@@ -1322,8 +1319,7 @@ extern "C" JNIEXPORT jlong JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibr
     jlong per_try_idle_timeout_seconds, jstring app_version, jstring app_id,
     jboolean trust_chain_verification, jobjectArray virtual_clusters_legacy,
     jobjectArray virtual_clusters, jobjectArray filter_chain, jobjectArray stat_sinks,
-    jboolean enable_platform_certificates_validation,
-    jboolean enable_skip_dns_lookup_for_proxied_requests, jobjectArray runtime_guards,
+    jboolean enable_platform_certificates_validation, jobjectArray runtime_guards,
     jstring rtds_layer_name, jlong rtds_timeout_seconds, jstring ads_address, jlong ads_port,
     jstring ads_token, jlong ads_token_lifetime, jstring ads_root_certs, jstring node_id,
     jstring node_region, jstring node_zone, jstring node_sub_zone, jstring cds_resources_locator,
@@ -1341,10 +1337,10 @@ extern "C" JNIEXPORT jlong JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibr
       max_connections_per_host, stats_flush_seconds, stream_idle_timeout_seconds,
       per_try_idle_timeout_seconds, app_version, app_id, trust_chain_verification,
       virtual_clusters_legacy, virtual_clusters, filter_chain, stat_sinks,
-      enable_platform_certificates_validation, enable_skip_dns_lookup_for_proxied_requests,
-      runtime_guards, rtds_layer_name, rtds_timeout_seconds, ads_address, ads_port, ads_token,
-      ads_token_lifetime, ads_root_certs, node_id, node_region, node_zone, node_sub_zone,
-      cds_resources_locator, cds_timeout_seconds, enable_cds, builder);
+      enable_platform_certificates_validation, runtime_guards, rtds_layer_name,
+      rtds_timeout_seconds, ads_address, ads_port, ads_token, ads_token_lifetime, ads_root_certs,
+      node_id, node_region, node_zone, node_sub_zone, cds_resources_locator, cds_timeout_seconds,
+      enable_cds, builder);
 
   return reinterpret_cast<intptr_t>(builder.generateBootstrap().release());
 }

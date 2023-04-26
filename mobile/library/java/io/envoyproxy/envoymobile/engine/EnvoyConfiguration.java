@@ -65,7 +65,6 @@ public class EnvoyConfiguration {
   public final List<String> statSinks;
   public final Map<String, String> runtimeGuards;
   public final Boolean enablePlatformCertificatesValidation;
-  public final Boolean enableSkipDNSLookupForProxiedRequests;
   public final String rtdsLayerName;
   public final Integer rtdsTimeoutSeconds;
   public final String adsAddress;
@@ -142,8 +141,6 @@ public class EnvoyConfiguration {
    * @param httpPlatformFilterFactories                   the configuration for platform filters.
    * @param stringAccessors                               platform string accessors to register.
    * @param keyValueStores                                platform key-value store implementations.
-   * @param enableSkipDNSLookupForProxiedRequests         whether to skip waiting on DNS response
-   *     for proxied requests.
    * @param enablePlatformCertificatesValidation          whether to use the platform verifier.
    * @param rtdsLayerName                                 the RTDS layer name for this client.
    * @param rtdsTimeoutSeconds                            the timeout for RTDS fetches.
@@ -179,12 +176,11 @@ public class EnvoyConfiguration {
       List<EnvoyHTTPFilterFactory> httpPlatformFilterFactories,
       Map<String, EnvoyStringAccessor> stringAccessors,
       Map<String, EnvoyKeyValueStore> keyValueStores, List<String> statSinks,
-      Map<String, Boolean> runtimeGuards, Boolean enableSkipDNSLookupForProxiedRequests,
-      boolean enablePlatformCertificatesValidation, String rtdsLayerName,
-      Integer rtdsTimeoutSeconds, String adsAddress, Integer adsPort, String adsToken,
-      Integer adsTokenLifetime, String adsRootCerts, String nodeId, String nodeRegion,
-      String nodeZone, String nodeSubZone, String cdsResourcesLocator, Integer cdsTimeoutSeconds,
-      boolean enableCds) {
+      Map<String, Boolean> runtimeGuards, boolean enablePlatformCertificatesValidation,
+      String rtdsLayerName, Integer rtdsTimeoutSeconds, String adsAddress, Integer adsPort,
+      String adsToken, Integer adsTokenLifetime, String adsRootCerts, String nodeId,
+      String nodeRegion, String nodeZone, String nodeSubZone, String cdsResourcesLocator,
+      Integer cdsTimeoutSeconds, boolean enableCds) {
     JniLibrary.load();
     this.adminInterfaceEnabled = adminInterfaceEnabled;
     this.grpcStatsDomain = grpcStatsDomain;
@@ -238,7 +234,6 @@ public class EnvoyConfiguration {
       this.runtimeGuards.put(guardAndValue.getKey(), String.valueOf(guardAndValue.getValue()));
     }
     this.enablePlatformCertificatesValidation = enablePlatformCertificatesValidation;
-    this.enableSkipDNSLookupForProxiedRequests = enableSkipDNSLookupForProxiedRequests;
     this.rtdsLayerName = rtdsLayerName;
     this.rtdsTimeoutSeconds = rtdsTimeoutSeconds;
     this.adsAddress = adsAddress;
@@ -277,10 +272,10 @@ public class EnvoyConfiguration {
         h2ConnectionKeepaliveIdleIntervalMilliseconds, h2ConnectionKeepaliveTimeoutSeconds,
         maxConnectionsPerHost, statsFlushSeconds, streamIdleTimeoutSeconds,
         perTryIdleTimeoutSeconds, appVersion, appId, enforceTrustChainVerification, clusters_legacy,
-        clusters, filter_chain, stats_sinks, enablePlatformCertificatesValidation,
-        enableSkipDNSLookupForProxiedRequests, runtime_guards, rtdsLayerName, rtdsTimeoutSeconds,
-        adsAddress, adsPort, adsToken, adsTokenLifetime, adsRootCerts, nodeId, nodeRegion, nodeZone,
-        nodeSubZone, cdsResourcesLocator, cdsTimeoutSeconds, enableCds);
+        clusters, filter_chain, stats_sinks, enablePlatformCertificatesValidation, runtime_guards,
+        rtdsLayerName, rtdsTimeoutSeconds, adsAddress, adsPort, adsToken, adsTokenLifetime,
+        adsRootCerts, nodeId, nodeRegion, nodeZone, nodeSubZone, cdsResourcesLocator,
+        cdsTimeoutSeconds, enableCds);
   }
 
   static class ConfigurationException extends RuntimeException {
