@@ -185,6 +185,7 @@ void CodecClient::onData(Buffer::Instance& data) {
 }
 
 Status CodecClient::ActiveRequest::encodeHeaders(const RequestHeaderMap& headers, bool end_stream) {
+#ifdef ENVOY_ENABLE_UHV
   if (header_validator_) {
     auto result = header_validator_->transformRequestHeaders(headers);
     if (!result.status.ok()) {
@@ -195,10 +196,12 @@ Status CodecClient::ActiveRequest::encodeHeaders(const RequestHeaderMap& headers
       return RequestEncoderWrapper::encodeHeaders(*result.new_headers, end_stream);
     }
   }
+#endif
   return RequestEncoderWrapper::encodeHeaders(headers, end_stream);
 }
 
 void CodecClient::ActiveRequest::decodeHeaders(ResponseHeaderMapPtr&& headers, bool end_stream) {
+#ifdef ENVOY_ENABLE_UHV
   if (header_validator_) {
     const ::Envoy::Http::HeaderValidator::ValidationResult validation_result =
         header_validator_->validateResponseHeaders(*headers);
@@ -230,6 +233,7 @@ void CodecClient::ActiveRequest::decodeHeaders(ResponseHeaderMapPtr&& headers, b
       return;
     }
   }
+#endif
   ResponseDecoderWrapper::decodeHeaders(std::move(headers), end_stream);
 }
 
