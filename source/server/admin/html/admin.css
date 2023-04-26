@@ -113,6 +113,17 @@
   /* margin-left: -2px; */
 }
 
+.histogram-interval {
+  width: 5px;
+  background-color: #e06844;
+  height: 30%;
+  width: 4px;
+  margin-left: 0.5%;
+  top: 0;
+  position: absolute;
+  /* margin-left: -2px; */
+}
+
 .bucket-label {
   position: absolute;
   bottom: 1%;
