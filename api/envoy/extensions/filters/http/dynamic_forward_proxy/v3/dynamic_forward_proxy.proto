@@ -25,19 +25,21 @@ message FilterConfig {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.http.dynamic_forward_proxy.v2alpha.FilterConfig";
 
-  // The DNS cache configuration that the filter will attach to. Note this configuration must
-  // match that of associated :ref:`dynamic forward proxy cluster configuration
-  // <envoy_v3_api_field_extensions.clusters.dynamic_forward_proxy.v3.ClusterConfig.dns_cache_config>`.
-  common.dynamic_forward_proxy.v3.DnsCacheConfig dns_cache_config = 1;
+  oneof implementation_specifier {
+    // The DNS cache configuration that the filter will attach to. Note this configuration must
+    // match that of associated :ref:`dynamic forward proxy cluster configuration
+    // <envoy_v3_api_field_extensions.clusters.dynamic_forward_proxy.v3.ClusterConfig.dns_cache_config>`.
+    common.dynamic_forward_proxy.v3.DnsCacheConfig dns_cache_config = 1;
+
+    // The timeout used for sub cluster initialization. Defaults to 5s if not set.
+    google.protobuf.Duration cluster_init_timeout = 3 [(validate.rules).duration = {gt {}}];
+  }
 
   // When this flag is set, the filter will add the resolved upstream address in the filter
   // state. The state should be saved with key
   // ``envoy.stream.upstream_address`` (See
   // :repo:`upstream_address.h<source/common/stream_info/upstream_address.h>`).
   bool save_upstream_address = 2;
-
-  // The timeout used for sub cluster initialization. Defaults to 5s if not set.
-  google.protobuf.Duration cluster_init_timeout = 3 [(validate.rules).duration = {gt {}}];
 }
 
 // Per route Configuration for the dynamic forward proxy HTTP filter.

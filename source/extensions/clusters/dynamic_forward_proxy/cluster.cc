@@ -38,10 +38,6 @@ Cluster::Cluster(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.sub_clusters_config(), max_sub_clusters, 1024)),
       sub_cluster_ttl_(
           PROTOBUF_GET_MS_OR_DEFAULT(config.sub_clusters_config(), sub_cluster_ttl, 300000)),
-      // TODO: get type from sub_clusters_config, when we deprecate the dns_cache_config
-      // configuration, and support LOGICAL_DNS in the sub cluster way.
-      sub_cluster_type_(
-          envoy::config::cluster::v3::Cluster_DiscoveryType::Cluster_DiscoveryType_STRICT_DNS),
       sub_cluster_lb_policy_(config.sub_clusters_config().lb_policy()),
       enable_sub_cluster_(config.has_sub_clusters_config()) {
 
@@ -142,8 +138,9 @@ Cluster::createSubClusterConfig(const std::string& cluster_name, const std::stri
   // Overwrite the type.
   config.set_name(cluster_name);
   config.clear_cluster_type();
-  config.set_type(sub_cluster_type_);
   config.set_lb_policy(sub_cluster_lb_policy_);
+  config.set_type(
+      envoy::config::cluster::v3::Cluster_DiscoveryType::Cluster_DiscoveryType_STRICT_DNS);
 
   // Set endpoint.
   auto load_assignments = config.mutable_load_assignment();

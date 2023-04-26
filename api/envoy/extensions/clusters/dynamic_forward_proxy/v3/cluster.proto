@@ -76,28 +76,23 @@ message ClusterConfig {
   bool allow_coalesced_connections = 3;
 }
 
-// [#next-free-field: 6]
+// Configuration for sub clusters. Hard code STRICT_DNS cluster type now.
+// We may also support LOGICAL_DNS, when we deprecate the dns_cache_config configuration.
+// [#next-free-field: 5]
 message SubClustersConfig {
-  // The :ref:`service discovery type <arch_overview_service_discovery_types>`
-  // to use for resolving a sub cluster. Hard code STRICT_DNS now.
-  // And we may also support LOGICAL_DNS, when we deprecate the dns_cache_config configuration.
-  //
-  // [#not-implemented-hide:]
-  config.cluster.v3.Cluster.DiscoveryType type = 1 [(validate.rules).enum = {defined_only: true}];
-
   // The :ref:`load balancer type <arch_overview_load_balancing_types>` to use
   // when picking a host in a sub cluster. Note that CLUSTER_PROVIDED is not allowed here.
-  config.cluster.v3.Cluster.LbPolicy lb_policy = 2 [(validate.rules).enum = {defined_only: true}];
+  config.cluster.v3.Cluster.LbPolicy lb_policy = 1 [(validate.rules).enum = {defined_only: true}];
 
   // The maximum number of sub clusters that the DFP cluster will hold. If not specified defaults to 1024.
-  google.protobuf.UInt32Value max_sub_clusters = 3 [(validate.rules).uint32 = {gt: 0}];
+  google.protobuf.UInt32Value max_sub_clusters = 2 [(validate.rules).uint32 = {gt: 0}];
 
   // The TTL for sub clusters that are unused. Sub clusters that have not been used in the configured time
   // interval will be purged. If not specified defaults to 5m.
-  google.protobuf.Duration sub_cluster_ttl = 4 [(validate.rules).duration = {gt {}}];
+  google.protobuf.Duration sub_cluster_ttl = 3 [(validate.rules).duration = {gt {}}];
 
   // Sub clusters that should be created & warmed upon creation. This might provide a
   // performance improvement, in the form of cache hits, for sub clusters that are going to be
   // warmed during steady state and are known at config load time.
-  repeated config.core.v3.SocketAddress preresolve_clusters = 5;
+  repeated config.core.v3.SocketAddress preresolve_clusters = 4;
 }
