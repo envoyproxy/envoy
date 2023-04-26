@@ -63,7 +63,6 @@ namespace Upstream {
 class TestClusterManagerFactory : public ClusterManagerFactory {
 public:
   TestClusterManagerFactory() : api_(Api::createApiForTest(stats_, random_)) {
-
     ON_CALL(server_context_, api()).WillByDefault(testing::ReturnRef(*api_));
     ON_CALL(*this, clusterFromProto_(_, _, _, _))
         .WillByDefault(Invoke(
@@ -71,9 +70,9 @@ public:
                 Outlier::EventLoggerSharedPtr outlier_event_logger,
                 bool added_via_api) -> std::pair<ClusterSharedPtr, ThreadAwareLoadBalancer*> {
               auto result = ClusterFactoryImplBase::create(
-                  cluster, server_context_, cm,
+                  server_context_, cluster, cm, stats_,
                   [this]() -> Network::DnsResolverSharedPtr { return this->dns_resolver_; },
-                  ssl_context_manager_, outlier_event_logger, added_via_api);
+                  ssl_context_manager_, outlier_event_logger, added_via_api, validation_visitor_);
               // Convert from load balancer unique_ptr -> raw pointer -> unique_ptr.
               return std::make_pair(result.first, result.second.release());
             }));
@@ -138,7 +137,7 @@ public:
   MOCK_METHOD(CdsApi*, createCds_, ());
 
   NiceMock<Server::Configuration::MockServerFactoryContext> server_context_;
-  Stats::TestUtil::TestStore& stats_ = server_context_.store_;
+  Stats::TestUtil::TestStore stats_;
   NiceMock<ThreadLocal::MockInstance>& tls_ = server_context_.thread_local_;
   std::shared_ptr<NiceMock<Network::MockDnsResolver>> dns_resolver_{
       new NiceMock<Network::MockDnsResolver>};

@@ -8,18 +8,20 @@
 namespace Envoy {
 namespace Upstream {
 
-StrictDnsClusterImpl::StrictDnsClusterImpl(const envoy::config::cluster::v3::Cluster& cluster,
-                                           ClusterFactoryContext& context,
-                                           Network::DnsResolverSharedPtr dns_resolver)
-    : BaseDynamicClusterImpl(cluster, context), load_assignment_(cluster.load_assignment()),
-      local_info_(context.serverFactoryContext().localInfo()), dns_resolver_(dns_resolver),
+StrictDnsClusterImpl::StrictDnsClusterImpl(
+    Server::Configuration::ServerFactoryContext& server_context,
+    const envoy::config::cluster::v3::Cluster& cluster, ClusterFactoryContext& context,
+    Runtime::Loader& runtime, Network::DnsResolverSharedPtr dns_resolver, bool added_via_api)
+    : BaseDynamicClusterImpl(server_context, cluster, context, runtime, added_via_api,
+                             context.mainThreadDispatcher().timeSource()),
+      load_assignment_(cluster.load_assignment()), local_info_(context.localInfo()),
+      dns_resolver_(dns_resolver),
       dns_refresh_rate_ms_(
           std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(cluster, dns_refresh_rate, 5000))),
       respect_dns_ttl_(cluster.respect_dns_ttl()) {
   failure_backoff_strategy_ =
       Config::Utility::prepareDnsRefreshStrategy<envoy::config::cluster::v3::Cluster>(
-          cluster, dns_refresh_rate_ms_.count(),
-          context.serverFactoryContext().api().randomGenerator());
+          cluster, dns_refresh_rate_ms_.count(), context.api().randomGenerator());
 
   std::list<ResolveTargetPtr> resolve_targets;
   const auto& locality_lb_endpoints = load_assignment_.endpoints();
@@ -32,9 +34,9 @@ StrictDnsClusterImpl::StrictDnsClusterImpl(const envoy::config::cluster::v3::Clu
         throw EnvoyException("STRICT_DNS clusters must NOT have a custom resolver name set");
       }
 
-      resolve_targets.emplace_back(new ResolveTarget(
-          *this, context.serverFactoryContext().mainThreadDispatcher(), socket_address.address(),
-          socket_address.port_value(), locality_lb_endpoint, lb_endpoint));
+      resolve_targets.emplace_back(
+          new ResolveTarget(*this, context.mainThreadDispatcher(), socket_address.address(),
+                            socket_address.port_value(), locality_lb_endpoint, lb_endpoint));
     }
   }
   resolve_targets_ = std::move(resolve_targets);
@@ -192,12 +194,15 @@ void StrictDnsClusterImpl::ResolveTarget::startResolve() {
 }
 
 std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr>
-StrictDnsClusterFactory::createClusterImpl(const envoy::config::cluster::v3::Cluster& cluster,
-                                           ClusterFactoryContext& context) {
+StrictDnsClusterFactory::createClusterImpl(
+    Server::Configuration::ServerFactoryContext& server_context,
+    const envoy::config::cluster::v3::Cluster& cluster, ClusterFactoryContext& context) {
   auto selected_dns_resolver = selectDnsResolver(cluster, context);
 
   return std::make_pair(
-      std::make_shared<StrictDnsClusterImpl>(cluster, context, selected_dns_resolver), nullptr);
+      std::make_shared<StrictDnsClusterImpl>(server_context, cluster, context, context.runtime(),
+                                             selected_dns_resolver, context.addedViaApi()),
+      nullptr);
 }
 
 /**

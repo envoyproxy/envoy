@@ -33,8 +33,10 @@ namespace Upstream {
  */
 class LogicalDnsCluster : public ClusterImplBase {
 public:
-  LogicalDnsCluster(const envoy::config::cluster::v3::Cluster& cluster,
-                    ClusterFactoryContext& context, Network::DnsResolverSharedPtr dns_resolver);
+  LogicalDnsCluster(Server::Configuration::ServerFactoryContext& server_context,
+                    const envoy::config::cluster::v3::Cluster& cluster,
+                    ClusterFactoryContext& context, Runtime::Loader& runtime,
+                    Network::DnsResolverSharedPtr dns_resolver, bool added_via_api);
 
   ~LogicalDnsCluster() override;
 
@@ -82,7 +84,8 @@ public:
 
 private:
   std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr>
-  createClusterImpl(const envoy::config::cluster::v3::Cluster& cluster,
+  createClusterImpl(Server::Configuration::ServerFactoryContext& server_context,
+                    const envoy::config::cluster::v3::Cluster& cluster,
                     ClusterFactoryContext& context) override;
 };
 

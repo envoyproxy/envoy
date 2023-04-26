@@ -7,7 +7,7 @@
 #include "envoy/grpc/status.h"
 #include "envoy/http/async_client.h"
 #include "envoy/http/header_map.h"
-#include "envoy/tracing/tracer.h"
+#include "envoy/tracing/http_tracer.h"
 
 #include "source/common/common/assert.h"
 #include "source/common/protobuf/protobuf.h"

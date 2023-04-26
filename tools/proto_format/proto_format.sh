@@ -4,8 +4,7 @@
 
 set -e
 
-read -ra BAZEL_STARTUP_OPTIONS <<< "${BAZEL_STARTUP_OPTION_LIST:-}"
-read -ra BAZEL_BUILD_OPTIONS <<< "${BAZEL_BUILD_OPTION_LIST:-}"
+read -ra BAZEL_BUILD_OPTIONS <<< "${BAZEL_BUILD_OPTIONS:-}"
 
 
 # This ensures caches are busted for the local api fileystem when it changes
@@ -22,7 +21,7 @@ PROTO_SYNC_CMD="$1"
 
 # Copy back the FileDescriptorProtos that protoxform emitted to the source tree. This involves
 # pretty-printing to format with protoprint.
-bazel "${BAZEL_STARTUP_OPTIONS[@]}" run "${BAZEL_BUILD_OPTIONS[@]}" \
+bazel run "${BAZEL_BUILD_OPTIONS[@]}" \
     --remote_download_minimal \
     --//tools/api_proto_plugin:default_type_db_target=@envoy_api//:all_protos \
     //tools/proto_format:proto_sync \
@@ -33,5 +32,5 @@ bazel "${BAZEL_STARTUP_OPTIONS[@]}" run "${BAZEL_BUILD_OPTIONS[@]}" \
 if [[ -n "$AZP_BRANCH" ]] || [[ "${FORCE_PROTO_FORMAT}" == "yes" ]]; then
     echo "Run buf tests"
     cd api/ || exit 1
-    bazel "${BAZEL_STARTUP_OPTIONS[@]}" run "${BAZEL_BUILD_OPTIONS[@]}" @com_github_bufbuild_buf//:bin/buf lint
+    bazel run "${BAZEL_BUILD_OPTIONS[@]}" @com_github_bufbuild_buf//:bin/buf lint
 fi

@@ -108,8 +108,7 @@ Network::FilterStatus Filter::onNewConnection() {
                    read_callbacks_->connection());
     read_callbacks_->connection().streamInfo().setResponseFlag(
         StreamInfo::ResponseFlag::UpstreamRetryLimitExceeded);
-    read_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush,
-                                        "local_ratelimit_close_over_limit");
+    read_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
     return Network::FilterStatus::StopIteration;
   }
 

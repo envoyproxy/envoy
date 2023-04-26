@@ -32,7 +32,7 @@ steps:
 - task: Cache@2
   env:
     VSO_DEDUP_REDIRECT_TIMEOUT_IN_SEC: "${{ parameters.cacheTimeoutWorkaround }}"
-  displayName: "Cache/fetch (${{ parameters.name }})"
+  displayName: "Cache/fetch ${{ parameters.name }})"
   inputs:
     key: '${{ parameters.name }} | "${{ parameters.version }}" | "${{ parameters.arch }}" | ${{ parameters.key }}'
     path: "${{ parameters.tmpDirectory }}"
