@@ -188,3 +188,11 @@ func (s *streamInfo) DownstreamRemoteAddress() string {
 	address, _ := cAPI.HttpGetStringValue(unsafe.Pointer(s.request.req), ValueDownstreamRemoteAddress)
 	return address
 }
+
+func (s *streamInfo) UpstreamHostAddress() (string, bool) {
+	return cAPI.HttpGetStringValue(unsafe.Pointer(s.request.req), ValueUpstreamHostAddress)
+}
+
+func (s *streamInfo) UpstreamClusterName() (string, bool) {
+	return cAPI.HttpGetStringValue(unsafe.Pointer(s.request.req), ValueUpstreamClusterName)
+}

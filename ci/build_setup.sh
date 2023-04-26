@@ -122,7 +122,7 @@ BAZEL_BUILD_OPTIONS=(
   "--test_env=HEAPCHECK=")
 
 if [[ -z "${ENVOY_RBE}" ]]; then
-    export BAZEL_BUILD_OPTIONS+=("--test_tmpdir=${ENVOY_TEST_TMPDIR}")
+    BAZEL_BUILD_OPTIONS+=("--test_tmpdir=${ENVOY_TEST_TMPDIR}")
     echo "Setting test_tmpdir to ${ENVOY_TEST_TMPDIR}."
 fi
 
