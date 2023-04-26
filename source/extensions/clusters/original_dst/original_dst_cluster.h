@@ -46,8 +46,9 @@ using HostMultiMapConstSharedPtr = std::shared_ptr<const HostMultiMap>;
  */
 class OriginalDstCluster : public ClusterImplBase {
 public:
-  OriginalDstCluster(const envoy::config::cluster::v3::Cluster& config,
-                     ClusterFactoryContext& context);
+  OriginalDstCluster(Server::Configuration::ServerFactoryContext& server_context,
+                     const envoy::config::cluster::v3::Cluster& config,
+                     ClusterFactoryContext& context, Runtime::Loader& runtime, bool added_via_api);
 
   // Upstream::Cluster
   InitializePhase initializePhase() const override { return InitializePhase::Primary; }
@@ -158,7 +159,8 @@ public:
 
 private:
   std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr>
-  createClusterImpl(const envoy::config::cluster::v3::Cluster& cluster,
+  createClusterImpl(Server::Configuration::ServerFactoryContext& server_context,
+                    const envoy::config::cluster::v3::Cluster& cluster,
                     ClusterFactoryContext& context) override;
 };
 

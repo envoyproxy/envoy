@@ -1,6 +1,6 @@
 #include "span_context_extractor.h"
 
-#include "envoy/tracing/tracer.h"
+#include "envoy/tracing/http_tracer.h"
 
 #include "source/common/http/header_map_impl.h"
 

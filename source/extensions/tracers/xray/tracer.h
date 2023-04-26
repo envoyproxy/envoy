@@ -5,7 +5,7 @@
 #include <vector>
 
 #include "envoy/common/time.h"
-#include "envoy/tracing/tracer.h"
+#include "envoy/tracing/http_tracer.h"
 
 #include "source/common/common/empty_string.h"
 #include "source/common/common/hex.h"

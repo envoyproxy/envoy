@@ -125,7 +125,6 @@ extensions/filters/common/original_src @snowp @klarose
 /*/extensions/stat_sinks/graphite_statsd @vaccarium @mattklein123
 /*/extensions/stat_sinks/hystrix @trabetti @jmarantz
 /*/extensions/stat_sinks/metrics_service @ramaraochavali @jmarantz
-/*/extensions/stat_sinks/open_telemetry @ohadvano @mattklein123
 # webassembly stat-sink extensions
 /*/extensions/stat_sinks/wasm @mpwarres @mathetake @lizan
 /*/extensions/resource_monitors/injected_resource @eziskind @htuch

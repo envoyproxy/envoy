@@ -713,9 +713,11 @@ void InstanceImpl::initialize(Network::Address::InstanceConstSharedPtr local_add
   ssl_context_manager_ = createContextManager("ssl_context_manager", time_source_);
 
   cluster_manager_factory_ = std::make_unique<Upstream::ProdClusterManagerFactory>(
-      serverFactoryContext(), stats_store_, thread_local_, http_context_,
+      serverFactoryContext(), admin(), runtime(), stats_store_, thread_local_,
       [this]() -> Network::DnsResolverSharedPtr { return this->getOrCreateDnsResolver(); },
-      *ssl_context_manager_, *secret_manager_, quic_stat_names_, *this);
+      *ssl_context_manager_, *dispatcher_, *local_info_, *secret_manager_,
+      messageValidationContext(), *api_, http_context_, grpc_context_, router_context_,
+      access_log_manager_, *singleton_manager_, options_, quic_stat_names_, *this);
 
   // Now the configuration gets parsed. The configuration may start setting
   // thread local data per above. See MainImpl::initialize() for why ConfigImpl

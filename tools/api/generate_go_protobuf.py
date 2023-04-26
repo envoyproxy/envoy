@@ -10,9 +10,7 @@ import sys
 import re
 
 # Needed for CI to pass down bazel options.
-BAZEL_BUILD_OPTIONS = shlex.split(os.environ.get('BAZEL_BUILD_OPTION_LIST', ''))
-BAZEL_GLOBAL_OPTIONS = shlex.split(os.environ.get('BAZEL_GLOBAL_OPTION_LIST', ''))
-BAZEL_STARTUP_OPTIONS = shlex.split(os.environ.get('BAZEL_STARTUP_OPTION_LIST', ''))
+BAZEL_BUILD_OPTIONS = shlex.split(os.environ.get('BAZEL_BUILD_OPTIONS', ''))
 
 TARGETS = '@envoy_api//...'
 IMPORT_BASE = 'github.com/envoyproxy/go-control-plane'
@@ -24,14 +22,10 @@ USER_EMAIL = 'go-control-plane@users.noreply.github.com'
 
 
 def generate_protobufs(targets, output, api_repo):
-    bazel_bin = check_output(
-        ['bazel', *BAZEL_STARTUP_OPTIONS, 'info', *BAZEL_BUILD_OPTIONS,
-         'bazel-bin']).decode().strip()
+    bazel_bin = check_output(['bazel', 'info', 'bazel-bin']).decode().strip()
     go_protos = check_output([
         'bazel',
-        *BAZEL_STARTUP_OPTIONS,
         'query',
-        *BAZEL_GLOBAL_OPTIONS,
         'kind("go_proto_library", %s)' % targets,
     ]).split()
 
@@ -40,7 +34,7 @@ def generate_protobufs(targets, output, api_repo):
     # We preserve source info so comments are retained on generated code.
     try:
         check_output([
-            'bazel', *BAZEL_STARTUP_OPTIONS, 'build', '-c', 'fastbuild',
+            'bazel', 'build', '-c', 'fastbuild',
             '--experimental_proto_descriptor_sets_include_source_info'
         ] + BAZEL_BUILD_OPTIONS + go_protos,
                      stderr=STDOUT)
@@ -143,9 +137,7 @@ if __name__ == "__main__":
     parser.add_argument('--api_repo', default="envoy_api")
     args = parser.parse_args()
 
-    workspace = check_output(
-        ['bazel', *BAZEL_STARTUP_OPTIONS, 'info', *BAZEL_BUILD_OPTIONS,
-         'workspace']).decode().strip()
+    workspace = check_output(['bazel', 'info', 'workspace']).decode().strip()
     output = os.path.join(workspace, args.output_base)
     generate_protobufs(args.targets, output, args.api_repo)
     if not args.sync:

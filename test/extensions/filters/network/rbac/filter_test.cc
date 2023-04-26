@@ -319,7 +319,7 @@ TEST_F(RoleBasedAccessControlNetworkFilterTest, Denied) {
   setDestinationPort(456);
   setMetadata();
 
-  EXPECT_CALL(callbacks_.connection_, close(Network::ConnectionCloseType::NoFlush, _)).Times(2);
+  EXPECT_CALL(callbacks_.connection_, close(Network::ConnectionCloseType::NoFlush)).Times(2);
 
   // Call onData() twice, should only increase stats once.
   EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(data_, false));
@@ -424,7 +424,7 @@ TEST_F(RoleBasedAccessControlNetworkFilterTest, MatcherDenied) {
   setDestinationPort(456);
   setMetadata();
 
-  EXPECT_CALL(callbacks_.connection_, close(Network::ConnectionCloseType::NoFlush, _)).Times(2);
+  EXPECT_CALL(callbacks_.connection_, close(Network::ConnectionCloseType::NoFlush)).Times(2);
 
   // Call onData() twice, should only increase stats once.
   EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(data_, false));
