@@ -5,6 +5,7 @@ package envoy.extensions.filters.http.fault.v3;
 import "envoy/config/route/v3/route_components.proto";
 import "envoy/extensions/filters/common/fault/v3/fault.proto";
 import "envoy/type/v3/percent.proto";
+import "envoy/type/metadata/v3/metadata.proto";
 
 import "google/protobuf/wrappers.proto";
 
@@ -55,7 +56,7 @@ message FaultAbort {
   type.v3.FractionalPercent percentage = 3;
 }
 
-// [#next-free-field: 16]
+// [#next-free-field: 17]
 message HTTPFault {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.http.fault.v2.HTTPFault";
@@ -148,4 +149,10 @@ message HTTPFault {
   // If set to false, dynamic stats storage will be allocated for the downstream cluster name.
   // Default value is false.
   bool disable_downstream_cluster_stats = 15;
+  
+  // [#not-implemented-hide:]
+  // The Metadata field can be used to provide additional information
+  // about the fault. It can be used for configuration, stats, and logging.
+  // The metadata should go under the filter namespace that will need it.
+  core.v3.Metadata metadata = 16;
 }
