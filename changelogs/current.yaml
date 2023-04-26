@@ -22,6 +22,10 @@ minor_behavior_changes:
     Allow malformed URL encoded triplets in the default header validator. This behavior can be reverted by setting runtime flag
     ``envoy.reloadable_features.uhv_allow_malformed_url_encoding`` to false, in which case requests with malformed URL encoded triplets
     in path are rejected. This setting is only applicable when the Unversal Header Validator is enabled and has no effect otherwise.
+- area: ext_proc
+  change: |
+    When :ref:`clear_route_cache <envoy_v3_api_field_service.ext_proc.v3.CommonResponse.clear_route_cache>` is set, ext_proc will check for header mutations beforce clearing the route cache.
+    Failures due to this check will be counted under the clear_route_cache_ignored stat.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
@@ -64,4 +68,8 @@ new_features:
     added new configuration field :ref:`domain
     <envoy_v3_api_field_extensions.filters.http.ratelimit.v3.RateLimitPerRoute.domain>` to allow for setting rate limit domains on a
     per-route basis.
+- area: ext_proc
+  change: |
+    added new configuration field :ref:`disable_clear_route_cache <envoy_v3_api_field_service.ext_proc.v3.ExternalProcessor.disable_clear_route_cache>`
+    to force the ext_proc filter from clearing the route cache. Failures to clear from setting this field will be counted under the clear_route_cache_disabled stat.
 deprecated:
