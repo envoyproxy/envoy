@@ -40,7 +40,7 @@ java_library(
         "EnvoyStreamIntelImpl.java",
         "HeaderMatchConfig.java",
         "JniLibrary.java",
-        "JvmBridgeUtility.java",
+        "JniBridgeUtility.java",
         "JvmCallbackContext.java",
         "JvmFilterContext.java",
         "JvmFilterFactoryContext.java",
