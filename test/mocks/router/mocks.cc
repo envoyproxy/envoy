@@ -167,6 +167,15 @@ MockScopedRouteConfigProvider::MockScopedRouteConfigProvider()
 }
 MockScopedRouteConfigProvider::~MockScopedRouteConfigProvider() = default;
 
+MockScopeKeyBuilder::MockScopeKeyBuilder() {
+  ON_CALL(*this, computeScopeKey(_))
+      .WillByDefault(Invoke([](const Http::HeaderMap&) -> ScopeKeyPtr {
+
+        return nullptr;
+  }));
+}
+MockScopeKeyBuilder::~MockScopeKeyBuilder() = default;
+
 MockGenericConnectionPoolCallbacks::MockGenericConnectionPoolCallbacks() {
   ON_CALL(*this, upstreamToDownstream()).WillByDefault(ReturnRef(upstream_to_downstream_));
 }
