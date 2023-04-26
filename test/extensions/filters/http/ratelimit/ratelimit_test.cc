@@ -1497,8 +1497,9 @@ TEST_F(HttpRateLimitFilterTest, IgnoreVHRateLimitOptionWithOutRouteRateLimit) {
 // Tests that the domain is properly overridden when set at the per-route level
 TEST_F(HttpRateLimitFilterTest, PerRouteDomainSet) {
   SetUpTest(filter_config_);
+  const std::string per_route_domain = "bar";
   envoy::extensions::filters::http::ratelimit::v3::RateLimitPerRoute settings;
-  settings.set_domain("bar");
+  settings.set_domain(per_route_domain);
   FilterConfigPerRoute per_route_config_(settings);
 
   EXPECT_CALL(filter_callbacks_.route_->route_entry_.rate_limit_policy_, getApplicableRateLimit(0));
@@ -1512,7 +1513,7 @@ TEST_F(HttpRateLimitFilterTest, PerRouteDomainSet) {
       .Times(2)
       .WillRepeatedly(Return(&per_route_config_));
 
-  EXPECT_CALL(*client_, limit(_, "bar",
+  EXPECT_CALL(*client_, limit(_, per_route_domain,
                               testing::ContainerEq(std::vector<RateLimit::Descriptor>{
                                   {{{"descriptor_key", "descriptor_value"}}}}),
                               _, _))

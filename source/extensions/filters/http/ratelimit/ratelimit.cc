@@ -294,16 +294,12 @@ VhRateLimitOptions Filter::getVirtualHostRateLimitOption(const Router::RouteCons
 }
 
 std::string Filter::getDomain() {
-  std::string domain = config_->domain();
   const auto* specific_per_route_config =
       Http::Utility::resolveMostSpecificPerFilterConfig<FilterConfigPerRoute>(callbacks_);
-  if (specific_per_route_config != nullptr) {
-    std::string per_route_domain = specific_per_route_config->domain();
-    if (!per_route_domain.empty()) {
-      domain = per_route_domain;
-    }
+  if (specific_per_route_config != nullptr && !specific_per_route_config->domain().empty()) {
+    return specific_per_route_config->domain();
   }
-  return domain;
+  return config_->domain();
 }
 
 } // namespace RateLimitFilter
