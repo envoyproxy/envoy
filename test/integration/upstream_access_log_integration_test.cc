@@ -257,4 +257,54 @@ TEST_P(UpstreamAccessLogTest, Retry) {
             waitForAccessLog(log_file, 3, true));
 }
 
+TEST_P(UpstreamAccessLogTest, Periodic) {
+  auto log_file = TestEnvironment::temporaryPath(TestUtility::uniqueFilename());
+
+  config_helper_.addConfigModifier(
+      [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) {
+        auto* typed_config =
+            hcm.mutable_http_filters(hcm.http_filters_size() - 1)->mutable_typed_config();
+
+        envoy::extensions::filters::http::router::v3::Router router_config;
+        router_config.mutable_upstream_log_options()
+            ->mutable_upstream_log_flush_interval()
+            ->set_nanos(100000000); // 0.1 seconds
+
+        auto* upstream_log_config = router_config.add_upstream_log();
+        upstream_log_config->set_name("accesslog");
+        envoy::extensions::access_loggers::file::v3::FileAccessLog access_log_config;
+        access_log_config.set_path(log_file);
+        access_log_config.mutable_log_format()->mutable_text_format_source()->set_inline_string(
+            "%ACCESS_LOG_TYPE%\n");
+        upstream_log_config->mutable_typed_config()->PackFrom(access_log_config);
+        typed_config->PackFrom(router_config);
+      });
+
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  Http::TestRequestHeaderMapImpl headers{
+      {":method", "POST"}, {":path", "/api"}, {":authority", "host"}, {":scheme", "http"}};
+  auto response = codec_client_->makeRequestWithBody(headers, "hello!");
+
+  waitForNextUpstreamRequest({}, std::chrono::milliseconds(300000));
+
+  EXPECT_EQ(AccessLogType_Name(AccessLog::AccessLogType::UpstreamPeriodic),
+            waitForAccessLog(log_file));
+
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_EQ("hello!", upstream_request_->body().toString());
+
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
+  Buffer::OwnedImpl response_data{"greetings"};
+  upstream_request_->encodeData(response_data, true);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  EXPECT_EQ("greetings", response->body());
+}
+
 } // namespace Envoy
