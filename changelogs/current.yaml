@@ -31,7 +31,7 @@ bug_fixes:
     the Epoch, causing cookies to expire in ~53 years. This was fixed an now it is being assinged a value representing
     the number of seconds until the cookie expires.
     This behavioral change can be temporarily reverted by setting runtime guard
-    ``envoy.reloadable_features.oauth_use_url_encoding`` to false.
+    ``envoy.reloadable_features.oauth_use_standard_max_age_value`` to false.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`

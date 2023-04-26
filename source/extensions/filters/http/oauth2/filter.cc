@@ -521,8 +521,7 @@ void OAuth2Filter::addResponseCookies(Http::ResponseHeaderMap& headers,
 
   // We use HTTP Only cookies for the HMAC and Expiry.
   const std::string cookie_tail = fmt::format(CookieTailFormatString, max_age);
-  const std::string cookie_tail_http_only =
-      fmt::format(CookieTailHttpOnlyFormatString, max_age);
+  const std::string cookie_tail_http_only = fmt::format(CookieTailHttpOnlyFormatString, max_age);
 
   const CookieNames& cookie_names = config_->cookieNames();
 
