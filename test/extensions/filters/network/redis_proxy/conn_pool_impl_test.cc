@@ -451,7 +451,6 @@ TEST_F(RedisConnPoolImplTest, RedisConnectionRateLimited) {
   EXPECT_EQ(connectionRateLimited().value(), 0);
 
   // close local and reconnect, should be rate limited and get null
-  EXPECT_CALL(tls_.dispatcher_, deferredDelete_(_));
   client->raiseEvent(Network::ConnectionEvent::LocalClose);
 
   EXPECT_CALL(cm_.thread_local_cluster_.lb_, chooseHost(_))
@@ -464,13 +463,37 @@ TEST_F(RedisConnPoolImplTest, RedisConnectionRateLimited) {
   EXPECT_CALL(*this, create_(_)).Times(0);
   EXPECT_CALL(*cm_.thread_local_cluster_.lb_.host_, address())
       .WillRepeatedly(Return(test_address_));
-  Common::Redis::Client::PoolRequest* request2 =
+  Common::Redis::Client::PoolRequest* rate_limited_request =
       conn_pool_->makeRequest("hash_key", ConnPool::RespVariant(value), callbacks, transaction_);
-  EXPECT_EQ(nullptr, request2);
+  EXPECT_EQ(nullptr, rate_limited_request);
+  EXPECT_EQ(connectionRateLimited().value(), 1);
+
+  // wait for a second and rate limiter should recover
+  tls_.dispatcher_.globalTimeSystem().advanceTimeWait(std::chrono::seconds(1));
+  Common::Redis::Client::MockPoolRequest new_active_request;
+  MockPoolCallbacks new_callbacks;
+  Common::Redis::Client::MockClient* new_client = new NiceMock<Common::Redis::Client::MockClient>();
+  EXPECT_CALL(cm_.thread_local_cluster_.lb_, chooseHost(_))
+      .WillOnce(Invoke([&](Upstream::LoadBalancerContext* context) -> Upstream::HostConstSharedPtr {
+        EXPECT_EQ(context->computeHashKey().value(), MurmurHash::murmurHash2("hash_key"));
+        EXPECT_EQ(context->metadataMatchCriteria(), nullptr);
+        EXPECT_EQ(context->downstreamConnection(), nullptr);
+        return cm_.thread_local_cluster_.lb_.host_;
+      }));
+  EXPECT_CALL(*this, create_(_)).WillOnce(Return(new_client));
+  EXPECT_CALL(*cm_.thread_local_cluster_.lb_.host_, address())
+      .WillRepeatedly(Return(test_address_));
+  EXPECT_CALL(*new_client, makeRequest_(Eq(value), _)).WillOnce(Return(&new_active_request));
+  Common::Redis::Client::PoolRequest* new_request = conn_pool_->makeRequest(
+      "hash_key", ConnPool::RespVariant(value), new_callbacks, transaction_);
+  EXPECT_NE(nullptr, new_request);
   EXPECT_EQ(connectionRateLimited().value(), 1);
 
   EXPECT_CALL(active_request, cancel());
   EXPECT_CALL(callbacks, onFailure_());
+  EXPECT_CALL(new_active_request, cancel());
+  EXPECT_CALL(new_callbacks, onFailure_());
+  EXPECT_CALL(*new_client, close());
   tls_.shutdownThread();
 };
 
