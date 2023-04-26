@@ -46,7 +46,6 @@ java_library(
         "JvmFilterFactoryContext.java",
         "JvmKeyValueStoreContext.java",
         "JvmStringAccessorContext.java",
-        "VirtualClusterConfig.java",
         "//library/java/io/envoyproxy/envoymobile/engine:envoy_base_engine_lib_srcs",
     ],
     visibility = ["//visibility:public"],
