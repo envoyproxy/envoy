@@ -49,12 +49,16 @@ public:
         subscription_stats_(Config::Utility::generateStats(scope_)),
         async_client_(new Grpc::MockAsyncClient()),
         config_validators_(std::make_unique<NiceMock<Config::MockCustomConfigValidators>>()) {
+    auto backoff_strategy = std::make_unique<JitteredExponentialBackOffStrategy>(
+        Config::SubscriptionFactory::RetryInitialDelayMs,
+        Config::SubscriptionFactory::RetryMaxDelayMs, random_);
     if (use_unified_mux_) {
       grpc_mux_.reset(new Config::XdsMux::GrpcMuxSotw(
           std::unique_ptr<Grpc::MockAsyncClient>(async_client_), server_context_.dispatcher_,
           *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
               "envoy.service.endpoint.v3.EndpointDiscoveryService.StreamEndpoints"),
           random_, scope_, {}, local_info_, true, std::move(config_validators_),
+          std::move(backoff_strategy),
           /*xds_config_tracker=*/Config::XdsConfigTrackerOptRef()));
     } else {
       grpc_mux_.reset(new Config::GrpcMuxImpl(
@@ -62,7 +66,7 @@ public:
           server_context_.dispatcher_,
           *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
               "envoy.service.endpoint.v3.EndpointDiscoveryService.StreamEndpoints"),
-          random_, scope_, {}, true, std::move(config_validators_),
+          random_, scope_, {}, true, std::move(config_validators_), std::move(backoff_strategy),
           /*xds_config_tracker=*/Config::XdsConfigTrackerOptRef(),
           /*xds_resources_delegate=*/Config::XdsResourcesDelegateOptRef(),
           /*target_xds_authority=*/""));
@@ -90,14 +94,13 @@ public:
   void resetCluster(const std::string& yaml_config, Cluster::InitializePhase initialize_phase) {
     local_info_.node_.mutable_locality()->set_zone("us-east-1a");
     eds_cluster_ = parseClusterFromV3Yaml(yaml_config);
-    Envoy::Stats::ScopeSharedPtr scope = stats_.rootScope()->createScope(fmt::format(
-        "cluster.{}.",
-        eds_cluster_.alt_stat_name().empty() ? eds_cluster_.name() : eds_cluster_.alt_stat_name()));
-    Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
-        server_context_, ssl_context_manager_, scope_, server_context_.cluster_manager_, stats_,
-        validation_visitor_);
-    cluster_ = std::make_shared<EdsClusterImpl>(server_context_, eds_cluster_, runtime_,
-                                                factory_context, std::move(scope), false);
+
+    Envoy::Upstream::ClusterFactoryContextImpl factory_context(
+        server_context_, server_context_.cluster_manager_, stats_, nullptr, ssl_context_manager_,
+        nullptr, false, validation_visitor_);
+
+    cluster_ = std::make_shared<EdsClusterImpl>(server_context_, eds_cluster_, factory_context,
+                                                runtime_, false);
     EXPECT_EQ(initialize_phase, cluster_->initializePhase());
     eds_callbacks_ = server_context_.cluster_manager_.subscription_factory_.callbacks_;
     subscription_ = std::make_unique<Config::GrpcSubscriptionImpl>(

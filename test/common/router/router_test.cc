@@ -82,7 +82,8 @@ private:
 
 class RouterTest : public RouterTestBase {
 public:
-  RouterTest() : RouterTestBase(false, false, false, Protobuf::RepeatedPtrField<std::string>{}) {
+  RouterTest()
+      : RouterTestBase(false, false, false, false, Protobuf::RepeatedPtrField<std::string>{}) {
     EXPECT_CALL(callbacks_, activeSpan()).WillRepeatedly(ReturnRef(span_));
   };
 
@@ -353,7 +354,7 @@ TEST_F(RouterTest, PoolFailureWithPriority) {
       }));
 
   Http::TestResponseHeaderMapImpl response_headers{
-      {":status", "503"}, {"content-length", "139"}, {"content-type", "text/plain"}};
+      {":status", "503"}, {"content-length", "146"}, {"content-type", "text/plain"}};
   EXPECT_CALL(callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), false));
   EXPECT_CALL(callbacks_, encodeData(_, true));
   EXPECT_CALL(callbacks_.stream_info_,
@@ -366,8 +367,9 @@ TEST_F(RouterTest, PoolFailureWithPriority) {
   // Pool failure, so upstream request was not initiated.
   EXPECT_EQ(0U,
             callbacks_.route_->route_entry_.virtual_cluster_.stats().upstream_rq_total_.value());
-  EXPECT_EQ(callbacks_.details(),
-            "upstream_reset_before_response_started{connection_failure,tls_version_mismatch}");
+  EXPECT_EQ(
+      callbacks_.details(),
+      "upstream_reset_before_response_started{remote_connection_failure,tls_version_mismatch}");
 }
 
 TEST_F(RouterTest, PoolFailureDueToConnectTimeout) {
@@ -399,7 +401,7 @@ TEST_F(RouterTest, PoolFailureDueToConnectTimeout) {
   EXPECT_EQ(0U,
             callbacks_.route_->route_entry_.virtual_cluster_.stats().upstream_rq_total_.value());
   EXPECT_EQ(callbacks_.details(),
-            "upstream_reset_before_response_started{connection_failure,connect_timeout}");
+            "upstream_reset_before_response_started{connection_timeout,connect_timeout}");
 }
 
 TEST_F(RouterTest, Http1Upstream) {
@@ -931,7 +933,7 @@ TEST_F(RouterTest, EnvoyAttemptCountInResponsePresentWithLocalReply) {
       }));
 
   Http::TestResponseHeaderMapImpl response_headers{{":status", "503"},
-                                                   {"content-length", "91"},
+                                                   {"content-length", "98"},
                                                    {"content-type", "text/plain"},
                                                    {"x-envoy-attempt-count", "1"}};
   EXPECT_CALL(callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), false));
@@ -946,7 +948,8 @@ TEST_F(RouterTest, EnvoyAttemptCountInResponsePresentWithLocalReply) {
   EXPECT_EQ(0U,
             callbacks_.route_->route_entry_.virtual_cluster_.stats().upstream_rq_total_.value());
   EXPECT_TRUE(verifyHostUpstreamStats(0, 1));
-  EXPECT_EQ(callbacks_.details(), "upstream_reset_before_response_started{connection_failure}");
+  EXPECT_EQ(callbacks_.details(),
+            "upstream_reset_before_response_started{remote_connection_failure}");
   EXPECT_EQ(1U, callbacks_.stream_info_.attemptCount().value());
 }
 
@@ -1134,11 +1137,9 @@ TEST_F(RouterTest, ResetDuringEncodeHeaders) {
   EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
               putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess,
                         absl::optional<uint64_t>(absl::nullopt)));
-  bool upstream_filters =
-      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.allow_upstream_filters");
   EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
               putResult(Upstream::Outlier::Result::LocalOriginConnectFailed, _))
-      .Times(!upstream_filters);
+      .Times(0);
   // The reset will be converted into a local reply.
   router_->decodeHeaders(headers, true);
   EXPECT_EQ(1U,
@@ -3509,16 +3510,10 @@ TEST_F(RouterTest, Coalesce1xxHeaders) {
     // NOLINTNEXTLINE(clang-analyzer-core.CallAndMessage)
     response_decoder->decode1xxHeaders(std::move(continue_headers));
   }
-  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.allow_upstream_filters")) {
-    // With the filter manager coalescing, the router only sees 1 100.
-    EXPECT_EQ(
-        1U,
-        cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("upstream_rq_100").value());
-  } else {
-    EXPECT_EQ(
-        2U,
-        cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("upstream_rq_100").value());
-  }
+  // With the filter manager coalescing, the router only sees 1 100.
+  EXPECT_EQ(
+      1U,
+      cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("upstream_rq_100").value());
 
   // Reset stream and cleanup.
   EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
