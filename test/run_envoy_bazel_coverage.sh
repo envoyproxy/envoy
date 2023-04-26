@@ -30,9 +30,7 @@ fi
 [[ -z "${FUZZ_COVERAGE}" ]] && FUZZ_COVERAGE=false
 [[ -z "${COVERAGE_THRESHOLD}" ]] && COVERAGE_THRESHOLD=96.1
 COVERAGE_TARGET="${COVERAGE_TARGET:-}"
-read -ra BAZEL_BUILD_OPTIONS <<< "${BAZEL_BUILD_OPTION_LIST:-}"
-read -ra BAZEL_GLOBAL_OPTIONS <<< "${BAZEL_GLOBAL_OPTION_LIST:-}"
-read -ra BAZEL_STARTUP_OPTIONS <<< "${BAZEL_STARTUP_OPTION_LIST:-}"
+read -ra BAZEL_BUILD_OPTIONS <<< "${BAZEL_BUILD_OPTIONS:-}"
 
 echo "Starting run_envoy_bazel_coverage.sh..."
 echo "    PWD=$(pwd)"
@@ -54,7 +52,7 @@ BAZEL_COVERAGE_OPTIONS=()
 
 if [[ "${FUZZ_COVERAGE}" == "true" ]]; then
     # Filter targets to just fuzz tests.
-    _targets=$(bazel "${BAZEL_STARTUP_OPTIONS[@]}" query "${BAZEL_GLOBAL_OPTIONS[@]}" "attr('tags', 'fuzz_target', ${COVERAGE_TARGETS[*]})")
+    _targets=$(bazel query "attr('tags', 'fuzz_target', ${COVERAGE_TARGETS[*]})")
     COVERAGE_TARGETS=()
     while read -r line; do COVERAGE_TARGETS+=("$line"); done \
         <<< "$_targets"
@@ -69,22 +67,21 @@ fi
 
 # Output unusually long logs due to trace logging.
 BAZEL_COVERAGE_OPTIONS+=("--experimental_ui_max_stdouterr_bytes=80000000")
-BAZEL_OUTPUT_BASE="$(bazel "${BAZEL_STARTUP_OPTIONS[@]}" info "${BAZEL_BUILD_OPTIONS[@]}" output_base)"
 
 echo "Running bazel coverage with:"
 echo "  Options: ${BAZEL_BUILD_OPTIONS[*]} ${BAZEL_COVERAGE_OPTIONS[*]}"
 echo "  Targets: ${COVERAGE_TARGETS[*]}"
-bazel "${BAZEL_STARTUP_OPTIONS[@]}" coverage "${BAZEL_BUILD_OPTIONS[@]}" "${BAZEL_COVERAGE_OPTIONS[@]}" "${COVERAGE_TARGETS[@]}"
+bazel coverage "${BAZEL_BUILD_OPTIONS[@]}" "${BAZEL_COVERAGE_OPTIONS[@]}" "${COVERAGE_TARGETS[@]}"
 
 echo "Collecting profile and testlogs"
 if [[ -n "${ENVOY_BUILD_PROFILE}" ]]; then
-    cp -f "$BAZEL_OUTPUT_BASE/command.profile.gz" "${ENVOY_BUILD_PROFILE}/coverage.profile.gz" || true
+    cp -f "$(bazel info output_base)/command.profile.gz" "${ENVOY_BUILD_PROFILE}/coverage.profile.gz" || true
 fi
 
 if [[ -n "${ENVOY_BUILD_DIR}" ]]; then
     find bazel-testlogs/ -name test.log \
         | tar cf - -T - \
-        | bazel "${BAZEL_STARTUP_OPTIONS[@]}" run "${BAZEL_BUILD_OPTIONS[@]}" //tools/zstd -- \
+        | bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/zstd -- \
                 - -T0 -o "${ENVOY_BUILD_DIR}/testlogs.tar.zst"
     echo "Profile/testlogs collected: ${ENVOY_BUILD_DIR}/testlogs.tar.zst"
 fi
@@ -115,12 +112,12 @@ echo "Compressing coveraged data"
 if [[ "${FUZZ_COVERAGE}" == "true" ]]; then
     if [[ -n "${ENVOY_FUZZ_COVERAGE_ARTIFACT}" ]]; then
         tar cf - -C "${COVERAGE_DIR}" --transform 's/^\./fuzz_coverage/' . \
-            | bazel "${BAZEL_STARTUP_OPTIONS[@]}" run "${BAZEL_BUILD_OPTIONS[@]}" //tools/zstd -- \
+            | bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/zstd -- \
                     - -T0 -o "${ENVOY_FUZZ_COVERAGE_ARTIFACT}"
     fi
 elif [[ -n "${ENVOY_COVERAGE_ARTIFACT}" ]]; then
      tar cf - -C "${COVERAGE_DIR}" --transform 's/^\./coverage/' . \
-         | bazel "${BAZEL_STARTUP_OPTIONS[@]}" run "${BAZEL_BUILD_OPTIONS[@]}" //tools/zstd -- \
+         | bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/zstd -- \
                  - -T0 -o "${ENVOY_COVERAGE_ARTIFACT}"
 fi
 

@@ -12,8 +12,7 @@ from pathlib import Path
 def generate_compilation_database(args):
     # We need to download all remote outputs for generated source code. This option lives here to override those
     # specified in bazelrc.
-    bazel_startup_options = shlex.split(os.environ.get("BAZEL_STARTUP_OPTION_LIST", ""))
-    bazel_options = shlex.split(os.environ.get("BAZEL_BUILD_OPTION_LIST", "")) + [
+    bazel_options = shlex.split(os.environ.get("BAZEL_BUILD_OPTIONS", "")) + [
         "--config=compdb",
         "--remote_download_outputs=all",
     ]
@@ -22,14 +21,13 @@ def generate_compilation_database(args):
     if args.exclude_contrib:
         source_dir_targets.remove("//contrib/...")
 
-    subprocess.check_call([args.bazel, *bazel_startup_options, "build"] + bazel_options + [
+    subprocess.check_call([args.bazel, "build"] + bazel_options + [
         "--aspects=@bazel_compdb//:aspects.bzl%compilation_database_aspect",
         "--output_groups=compdb_files,header_files"
     ] + source_dir_targets)
 
-    execroot = subprocess.check_output([
-        args.bazel, *bazel_startup_options, "info", *bazel_options, "execution_root", *bazel_options
-    ]).decode().strip()
+    execroot = subprocess.check_output([args.bazel, "info", "execution_root"]
+                                       + bazel_options).decode().strip()
 
     db_entries = []
     for db in Path(execroot).glob('**/*.compile_commands.json'):
