@@ -77,19 +77,7 @@ async function loadStats() {
   const makeQueryParam = (name) => name + '=' + encodeURIComponent(
       document.getElementById(paramIdPrefix + name).value);
   const params = ['filter', 'type', 'histogram_buckets'];
-  const href = window.location.href;
-
-  // Compute the fetch URL prefix based on the current URL, so that the admin
-  // site can be hosted underneath a site-specific URL structure.
-  const stats_pos = href.indexOf('/stats?');
-  if (stats_pos == -1) {
-    statusDiv.textContent = 'Cannot find /stats? in ' + href;
-    return;
-  }
-  const prefix = href.substring(0, stats_pos);
-  const url = prefix + '/stats?format=json&usedonly&' +
-        params.map(makeQueryParam).join('&');
-
+  const url = '/stats?format=json&usedonly&' + params.map(makeQueryParam).join('&');
   try {
     const response = await fetch(url);
     const data = await response.json();

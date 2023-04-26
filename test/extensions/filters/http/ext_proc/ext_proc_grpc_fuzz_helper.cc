@@ -103,7 +103,10 @@ const grpc::StatusCode GrpcStatusCodes[] = {
     grpc::StatusCode::UNAUTHENTICATED,
 };
 
-ExtProcFuzzHelper::ExtProcFuzzHelper(FuzzedDataProvider* provider) { provider_ = provider; }
+ExtProcFuzzHelper::ExtProcFuzzHelper(FuzzedDataProvider* provider) {
+  provider_ = provider;
+  immediate_resp_sent_ = false;
+}
 
 std::string ExtProcFuzzHelper::consumeRepeatedString() {
   const uint32_t str_len = provider_->ConsumeIntegralInRange<uint32_t>(0, ExtProcFuzzMaxDataSize);
@@ -423,7 +426,7 @@ void ExtProcFuzzHelper::randomizeResponse(ProcessingResponse* resp, const Proces
   // 6. Randomize response_trailers message
   case ResponseType::ResponseTrailers: {
     ENVOY_LOG_MISC(trace, "ProcessingResponse setting response_trailers response");
-    HeaderMutation* header_mutation = resp->mutable_response_trailers()->mutable_header_mutation();
+    HeaderMutation* header_mutation = resp->mutable_request_trailers()->mutable_header_mutation();
     randomizeHeaderMutation(header_mutation, req, true);
     break;
   }
@@ -432,42 +435,22 @@ void ExtProcFuzzHelper::randomizeResponse(ProcessingResponse* resp, const Proces
     ENVOY_LOG_MISC(trace, "ProcessingResponse setting immediate_response response");
     ImmediateResponse* msg = resp->mutable_immediate_response();
     randomizeImmediateResponse(msg, req);
+
+    // Since we are sending an immediate response, envoy will close the
+    // mock connection with the downstream. As a result, the
+    // codec_client_connection will be deleted and if the upstream is still
+    // sending data chunks (e.g., streaming mode) it will cause a crash
+    // Note: At this point provider_lock_ is not held so deadlock is not
+    // possible
+
+    immediate_resp_lock_.lock();
+    immediate_resp_sent_ = true;
+    immediate_resp_lock_.unlock();
     break;
   }
   default:
     RELEASE_ASSERT(false, "ProcessingResponse Action not handled");
   }
-}
-
-grpc::Status ExtProcFuzzHelper::generateResponse(ProcessingRequest& req, ProcessingResponse& resp,
-                                                 bool& immediate_close_grpc) {
-  logRequest(&req);
-  // The following blocks generate random data for the 9 fields of the
-  // ProcessingResponse gRPC message
-
-  // 1 - 7. Randomize response
-  // If true, immediately close the connection with a random Grpc Status.
-  // Otherwise randomize the response
-  if (provider_->ConsumeBool()) {
-    immediate_close_grpc = true;
-    ENVOY_LOG_MISC(trace, "Immediately Closing gRPC connection");
-    return randomGrpcStatusWithMessage();
-  } else {
-    ENVOY_LOG_MISC(trace, "Generating Random ProcessingResponse");
-    randomizeResponse(&resp, &req);
-  }
-
-  // 8. Randomize dynamic_metadata
-  // TODO(ikepolinsky): ext_proc does not support dynamic_metadata
-
-  // 9. Randomize mode_override
-  if (provider_->ConsumeBool()) {
-    ENVOY_LOG_MISC(trace, "Generating Random ProcessingMode Override");
-    ProcessingMode* msg = resp.mutable_mode_override();
-    randomizeOverrideResponse(msg);
-  }
-  ENVOY_LOG_MISC(trace, "Response generated, writing to stream.");
-  return grpc::Status::OK;
 }
 
 } // namespace ExternalProcessing

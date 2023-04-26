@@ -44,7 +44,7 @@ public:
   NiceMock<Config::MockConfigProviderManager> scoped_routes_config_provider_manager_;
   NiceMock<Tracing::MockTracerManager> tracer_manager_;
   Filter::HttpFilterConfigProviderManagerImpl filter_config_provider_manager_;
-  std::shared_ptr<NiceMock<Tracing::MockTracer>> tracer_{
+  std::shared_ptr<NiceMock<Tracing::MockTracer>> http_tracer_{
       std::make_shared<NiceMock<Tracing::MockTracer>>()};
   TestScopedRuntime scoped_runtime_;
   void createHttpConnectionManagerConfig(const std::string& yaml) {

@@ -44,9 +44,7 @@ namespace {
 
 class LogicalDnsClusterTest : public Event::TestUsingSimulatedTime, public testing::Test {
 protected:
-  LogicalDnsClusterTest() : api_(Api::createApiForTest(stats_store_, random_)) {
-    ON_CALL(server_context_, api()).WillByDefault(ReturnRef(*api_));
-  }
+  LogicalDnsClusterTest() : api_(Api::createApiForTest(stats_store_, random_)) {}
 
   void setupFromV3Yaml(const std::string& yaml) {
     ON_CALL(server_context_, api()).WillByDefault(ReturnRef(*api_));
@@ -54,9 +52,10 @@ protected:
     NiceMock<MockClusterManager> cm;
     envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
     Envoy::Upstream::ClusterFactoryContextImpl factory_context(
-        server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
-        false);
-    cluster_ = std::make_shared<LogicalDnsCluster>(cluster_config, factory_context, dns_resolver_);
+        server_context_, server_context_.cluster_manager_, stats_store_, nullptr,
+        ssl_context_manager_, nullptr, false, validation_visitor_);
+    cluster_ = std::make_shared<LogicalDnsCluster>(server_context_, cluster_config, factory_context,
+                                                   runtime_, dns_resolver_, false);
     priority_update_cb_ = cluster_->prioritySet().addPriorityUpdateCb(
         [&](uint32_t, const HostVector&, const HostVector&) -> void {
           membership_updated_.ready();
@@ -199,20 +198,20 @@ protected:
   }
 
   NiceMock<Server::Configuration::MockServerFactoryContext> server_context_;
-  Stats::TestUtil::TestStore& stats_store_ = server_context_.store_;
-  NiceMock<Random::MockRandomGenerator> random_;
-  Api::ApiPtr api_;
+  Stats::TestUtil::TestStore stats_store_;
   Ssl::MockContextManager ssl_context_manager_;
-
   std::shared_ptr<NiceMock<Network::MockDnsResolver>> dns_resolver_{
       new NiceMock<Network::MockDnsResolver>};
   Network::MockActiveDnsQuery active_dns_query_;
+  NiceMock<Random::MockRandomGenerator> random_;
   Network::DnsResolver::ResolveCb dns_callback_;
   Event::MockTimer* resolve_timer_;
   ReadyWatcher membership_updated_;
   ReadyWatcher initialized_;
+  NiceMock<Runtime::MockLoader> runtime_;
   std::shared_ptr<LogicalDnsCluster> cluster_;
   NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor_;
+  Api::ApiPtr api_;
   Common::CallbackHandlePtr priority_update_cb_;
   NiceMock<AccessLog::MockAccessLogManager> access_log_manager_;
 };

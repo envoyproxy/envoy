@@ -204,7 +204,7 @@ public:
   const std::vector<Http::ClientCertDetailsType>& setCurrentClientCertDetails() const override {
     return set_current_client_cert_details_;
   }
-  Tracing::TracerSharedPtr tracer() override { return tracer_; }
+  Tracing::HttpTracerSharedPtr tracer() override { return http_tracer_; }
   const Http::TracingConnectionManagerConfig* tracingConfig() override {
     return tracing_config_.get();
   }
@@ -301,7 +301,7 @@ private:
       HttpConnectionManagerProto::OVERWRITE};
   std::string server_name_;
   absl::optional<std::string> scheme_to_set_;
-  Tracing::TracerSharedPtr tracer_{std::make_shared<Tracing::NullTracer>()};
+  Tracing::HttpTracerSharedPtr http_tracer_{std::make_shared<Tracing::NullTracer>()};
   Http::TracingConnectionManagerConfigPtr tracing_config_;
   absl::optional<std::string> user_agent_;
   const uint32_t max_request_headers_kb_;

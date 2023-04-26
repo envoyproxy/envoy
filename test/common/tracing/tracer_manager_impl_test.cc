@@ -57,10 +57,10 @@ private:
 };
 
 TEST_F(TracerManagerImplTest, ShouldReturnWhenNoTracingProviderHasBeenConfigured) {
-  auto tracer = tracer_manager_.getOrCreateTracer(nullptr);
+  auto http_tracer = tracer_manager_.getOrCreateTracer(nullptr);
 
   // Should return a null object (Tracing::) rather than nullptr.
-  EXPECT_THAT(tracer.get(), WhenDynamicCastTo<Tracing::NullTracer*>(NotNull()));
+  EXPECT_THAT(http_tracer.get(), WhenDynamicCastTo<Tracing::NullTracer*>(NotNull()));
 }
 
 TEST_F(TracerManagerImplTest, ShouldUseProperTracerFactory) {
@@ -69,10 +69,10 @@ TEST_F(TracerManagerImplTest, ShouldUseProperTracerFactory) {
   envoy::config::trace::v3::Tracing_Http tracing_config;
   tracing_config.set_name("envoy.tracers.sample");
 
-  auto tracer = tracer_manager_.getOrCreateTracer(&tracing_config);
+  auto http_tracer = tracer_manager_.getOrCreateTracer(&tracing_config);
 
-  EXPECT_THAT(tracer.get(), WhenDynamicCastTo<TracerImpl*>(NotNull()));
-  auto tracer_impl = dynamic_cast<TracerImpl*>(tracer.get());
+  EXPECT_THAT(http_tracer.get(), WhenDynamicCastTo<TracerImpl*>(NotNull()));
+  auto tracer_impl = dynamic_cast<TracerImpl*>(http_tracer.get());
 
   // Should use proper TracerFactory.
   EXPECT_THAT(tracer_impl->driverForTest().get(), WhenDynamicCastTo<SampleDriver*>(NotNull()));
@@ -84,14 +84,14 @@ TEST_F(TracerManagerImplTest, ShouldCacheAndReuseTracers) {
   tracing_config.mutable_typed_config()->PackFrom(MessageUtil::keyValueStruct("key1", "value1"));
 
   auto http_tracer_one = tracer_manager_.getOrCreateTracer(&tracing_config);
-  // Expect a new Tracer to be added to the cache.
+  // Expect a new HttpTracer to be added to the cache.
   EXPECT_THAT(tracer_manager_.peekCachedTracersForTest(), SizeIs(1));
 
   auto http_tracer_two = tracer_manager_.getOrCreateTracer(&tracing_config);
   // Expect no changes to the cache.
   EXPECT_THAT(tracer_manager_.peekCachedTracersForTest(), SizeIs(1));
 
-  // Should reuse previously created Tracer instance.
+  // Should reuse previously created HttpTracer instance.
   EXPECT_EQ(http_tracer_two, http_tracer_one);
 }
 
@@ -102,7 +102,7 @@ TEST_F(TracerManagerImplTest, ShouldCacheTracersBasedOnFullConfig) {
       MessageUtil::keyValueStruct("key1", "value1"));
 
   auto http_tracer_one = tracer_manager_.getOrCreateTracer(&tracing_config_one);
-  // Expect a new Tracer to be added to the cache.
+  // Expect a new HttpTracer to be added to the cache.
   EXPECT_THAT(tracer_manager_.peekCachedTracersForTest(), SizeIs(1));
 
   envoy::config::trace::v3::Tracing_Http tracing_config_two;
@@ -111,10 +111,10 @@ TEST_F(TracerManagerImplTest, ShouldCacheTracersBasedOnFullConfig) {
       MessageUtil::keyValueStruct("key2", "value2"));
 
   auto http_tracer_two = tracer_manager_.getOrCreateTracer(&tracing_config_two);
-  // Expect a new Tracer to be added to the cache.
+  // Expect a new HttpTracer to be added to the cache.
   EXPECT_THAT(tracer_manager_.peekCachedTracersForTest(), SizeIs(2));
 
-  // Any changes to config must result in a new Tracer instance.
+  // Any changes to config must result in a new HttpTracer instance.
   EXPECT_NE(http_tracer_two, http_tracer_one);
 }
 
@@ -172,7 +172,7 @@ private:
 TEST_F(TracerManagerImplCacheTest, ShouldCacheHttpTracersUsingWeakReferences) {
   Driver* expected_driver = new NiceMock<MockDriver>();
 
-  // Expect HttpTracerManager to create a new Tracer.
+  // Expect HttpTracerManager to create a new HttpTracer.
   EXPECT_CALL(tracer_factory_, createTracerDriver(_, _))
       .WillOnce(InvokeWithoutArgs(
           [expected_driver] { return std::shared_ptr<Driver>(expected_driver); }));
@@ -181,7 +181,7 @@ TEST_F(TracerManagerImplCacheTest, ShouldCacheHttpTracersUsingWeakReferences) {
 
   EXPECT_EQ(dynamic_cast<TracerImpl*>(actual_tracer_one.get())->driverForTest().get(),
             expected_driver);
-  // Expect a new Tracer to be added to the cache.
+  // Expect a new HttpTracer to be added to the cache.
   EXPECT_THAT(tracer_manager_.peekCachedTracersForTest(), SizeIs(1));
 
   // Expect HttpTracerManager to re-use cached value.
@@ -192,9 +192,9 @@ TEST_F(TracerManagerImplCacheTest, ShouldCacheHttpTracersUsingWeakReferences) {
   // Expect no changes to the cache.
   EXPECT_THAT(tracer_manager_.peekCachedTracersForTest(), SizeIs(1));
 
-  // Expect HttpTracerManager to use weak references under the hood and release Tracer as soon
+  // Expect HttpTracerManager to use weak references under the hood and release HttpTracer as soon
   // as it's no longer in use.
-  std::weak_ptr<Tracer> weak_pointer{actual_tracer_one};
+  std::weak_ptr<HttpTracer> weak_pointer{actual_tracer_one};
 
   actual_tracer_one.reset();
   // Expect one strong reference still to be left.
@@ -206,7 +206,7 @@ TEST_F(TracerManagerImplCacheTest, ShouldCacheHttpTracersUsingWeakReferences) {
 
   Driver* expected_other_driver = new NiceMock<MockDriver>();
 
-  // Expect HttpTracerManager to create a new Tracer once again.
+  // Expect HttpTracerManager to create a new HttpTracer once again.
   EXPECT_CALL(tracer_factory_, createTracerDriver(_, _))
       .WillOnce(InvokeWithoutArgs(
           [expected_other_driver] { return std::shared_ptr<Driver>(expected_other_driver); }));
@@ -216,7 +216,7 @@ TEST_F(TracerManagerImplCacheTest, ShouldCacheHttpTracersUsingWeakReferences) {
 
   EXPECT_EQ(dynamic_cast<TracerImpl*>(actual_tracer_three.get())->driverForTest().get(),
             expected_other_driver);
-  // Expect expired cache entries to be removed and a new Tracer to be added to the cache.
+  // Expect expired cache entries to be removed and a new HttpTracer to be added to the cache.
   EXPECT_THAT(tracer_manager_.peekCachedTracersForTest(), SizeIs(1));
 
   // Expect HttpTracerManager to keep the right value in the cache.
