@@ -173,8 +173,8 @@ public:
     uint64_t count_{0};
   };
 
-  virtual std::vector<Bucket> detailedBuckets(uint32_t max_buckets = 0) const PURE;
-  //virtual const std::vector<Bucket> detailedIntervalBuckets() const PURE;
+  virtual std::vector<Bucket> detailedTotalBuckets(uint32_t max_buckets = 0) const PURE;
+  virtual std::vector<Bucket> detailedIntervalBuckets(uint32_t max_buckets = 0) const PURE;
 };
 
 using ParentHistogramSharedPtr = RefcountPtr<ParentHistogram>;

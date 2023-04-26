@@ -12,9 +12,6 @@ constexpr absl::string_view JsonQuoteCloseBrace = "\"}";
 } // namespace
 
 namespace Envoy {
-
-using ProtoMap = Protobuf::Map<std::string, ProtobufWkt::Value>;
-
 namespace Server {
 
 StatsTextRender::StatsTextRender(const StatsParams& params)
@@ -155,23 +152,30 @@ void StatsJsonRender::generate(Buffer::Instance&, const std::string& name,
     break;
   }
   case Utility::HistogramBucketsMode::Detailed: {
-    std::vector<Stats::ParentHistogram::Bucket> buckets = histogram.detailedBuckets(64);
+    std::vector<Stats::ParentHistogram::Bucket> buckets = histogram.detailedTotalBuckets(64);
     ProtobufWkt::Struct histogram_obj;
     ProtoMap& histogram_obj_fields = *histogram_obj.mutable_fields();
     histogram_obj_fields["name"] = ValueUtil::stringValue(histogram.name());
     populateQuantiles(histogram, "supported_percentiles",
                       histogram_obj_fields["percentiles"].mutable_list_value());
-    ProtobufWkt::ListValue* bucket_array = histogram_obj_fields["detail"].mutable_list_value();
-
-    for (const Stats::ParentHistogram::Bucket& bucket : buckets) {
-      ProtobufWkt::Struct bucket_json;
-      ProtoMap& bucket_fields = *bucket_json.mutable_fields();
-      bucket_fields["value"] = ValueUtil::numberValue(bucket.value_);
-      bucket_fields["count"] = ValueUtil::numberValue(bucket.count_);
-      *bucket_array->add_values() = ValueUtil::structValue(bucket_json);
-    }
+    populateDetail("totals", histogram.detailedTotalBuckets(64), histogram_obj_fields);
+    populateDetail("intervals", histogram.detailedIntervalBuckets(64), histogram_obj_fields);
     *histogram_array_->add_values() = ValueUtil::structValue(histogram_obj);
+    break;
   }
+  }
+}
+
+void StatsJsonRender::populateDetail(absl::string_view name,
+                                     const std::vector<Stats::ParentHistogram::Bucket>& buckets,
+                                     ProtoMap& histogram_obj_fields) {
+  ProtobufWkt::ListValue* bucket_array = histogram_obj_fields[name].mutable_list_value();
+  for (const Stats::ParentHistogram::Bucket& bucket : buckets) {
+    ProtobufWkt::Struct bucket_json;
+    ProtoMap& bucket_fields = *bucket_json.mutable_fields();
+    bucket_fields["value"] = ValueUtil::numberValue(bucket.value_);
+    bucket_fields["count"] = ValueUtil::numberValue(bucket.count_);
+    *bucket_array->add_values() = ValueUtil::structValue(bucket_json);
   }
 }
 
@@ -211,8 +215,8 @@ void StatsJsonRender::finalize(Buffer::Instance& response) {
   response.add("]}");
 }
 
-static void populateVector(absl::string_view name, const std::vector<double>& values,
-                           uint32_t multiplier, ProtoMap& histograms_obj_fields) {
+void StatsJsonRender::populateVector(absl::string_view name, const std::vector<double>& values,
+                                     uint32_t multiplier, ProtoMap& histograms_obj_fields) {
   ProtobufWkt::ListValue* array = histograms_obj_fields[name].mutable_list_value();
 
   for (double value : values) {

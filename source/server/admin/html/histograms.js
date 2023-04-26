@@ -3,8 +3,8 @@ function renderHistograms(histogramDiv, data) {
   for (stat of data.stats) {
     const histograms = stat.histograms;
     if (histograms) {
-      if (histograms.supported_percentiles && histograms.details) {
-        renderHistogramDetail(histogramDiv, histograms.supported_percentiles, histograms.details);
+      if (histograms.supported_percentiles && histograms.totals) {
+        renderHistogramDetail(histogramDiv, histograms.supported_percentiles, histograms.totals);
       }
       continue;
     }
@@ -27,8 +27,8 @@ let formatPercent = Intl.NumberFormat('en', {
   maximumFractionDigits: 2
 }).format;
 
-function renderHistogramDetail(histogramDiv, supported_percentiles, detail) {
-  for (histogram of detail) {
+function renderHistogramDetail(histogramDiv, supported_percentiles, details) {
+  for (histogram of details) {
     renderHistogram(histogramDiv, supported_percentiles, histogram, null);
   }
 }
@@ -41,7 +41,7 @@ function renderHistogram(histogramDiv, supported_percentiles, histogram, changeC
   div.appendChild(label);
   histogramDiv.appendChild(div);
 
-  const numBuckets = histogram.detail.length;
+  const numBuckets = histogram.totals.length;
   if (numBuckets == 0) {
     const no_data = document.createElement('span');
     no_data.className = 'histogram-no-data';
@@ -86,7 +86,7 @@ function renderHistogram(histogramDiv, supported_percentiles, histogram, changeC
   let percentileIndex = 0;
   let prevBucket = null;
 
-  for (bucket of histogram.detail) {
+  for (bucket of histogram.totals) {
     maxCount = Math.max(maxCount, bucket.count);
     updateMinMaxValue(bucket.value);
 
@@ -139,8 +139,8 @@ function renderHistogram(histogramDiv, supported_percentiles, histogram, changeC
 
   let leftVpx = marginWidthVpx / 2;
   let prevVpx = 0;
-  for (i = 0; i < histogram.detail.length; ++i) {
-    const bucket = histogram.detail[i];
+  for (i = 0; i < histogram.totals.length; ++i) {
+    const bucket = histogram.totals[i];
 
     if (percentiles && bucket.percentiles && bucket.percentiles.length > 0) {
       // Keep track of where we write each percentile so if the next one is very close,
@@ -155,7 +155,7 @@ function renderHistogram(histogramDiv, supported_percentiles, histogram, changeC
         // the percentiles held underneath a bucket are based on a value that
         // is at most as large as the current bucket.
         let percentileVpx = leftVpx;
-        const prevBucket = histogram.detail[i - 1];
+        const prevBucket = histogram.totals[i - 1];
         const bucketDelta = bucket.value - prevBucket.value;
         if (bucketDelta > 0) {
           const weight = (bucket.value - percentile[1]) / bucketDelta;

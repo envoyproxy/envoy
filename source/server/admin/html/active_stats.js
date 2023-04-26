@@ -12,16 +12,15 @@
 //   * alternate sorting criteria, reverse-sort controls, etc.
 //   * detect when user is not looking at page and stop or slow down pinging the server
 //   * hierarchical display
-//   * json flavor tao send hierarchical names to save serialization/deserialization costs
+//   * json variant to send hierarchical names to save serialization/deserialization costs
 //   * pause auto-refresh for at least 5 seconds when editng fields.
 //   * don't auto-refresh when there is error -- provide a button to re-retry.
 //   * consider removing histogram mode during active display, and overlay summary graphics
 //   * rename bucket mode "none" to "summary"
-//   * improve graphics
 //   * integrate interval view.
-//   * sort histograms by change-count
 //   * incremental histogram update
 //   * stretchable height -- resize histograms
+//   * fix navigation and probably test it somehow.
 
 /**
  * Maps a stat name to a record containing name, value, and a use-count. This
@@ -347,7 +346,7 @@ function renderStats(histogramDiv, data) {
       const histograms = stat.histograms;
       if (histograms && histograms.details) {
         for (histogram of histograms.details) {
-          if (!histogram.name || !histograms.supported_percentiles || !histograms.details) {
+          if (!histogram.name || !histogram.percentiles || !histogram.totals) {
             continue;
           }
           supportedPercentiles = histograms.supported_percentiles;
