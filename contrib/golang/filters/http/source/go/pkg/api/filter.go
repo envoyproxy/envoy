@@ -73,6 +73,10 @@ type StreamInfo interface {
 	DownstreamLocalAddress() string
 	// DownstreamRemoteAddress return the downstream remote address.
 	DownstreamRemoteAddress() string
+	// UpstreamHostAddress return the upstream host address.
+	UpstreamHostAddress() (string, bool)
+	// UpstreamClusterName return the upstream host cluster.
+	UpstreamClusterName() (string, bool)
 }
 
 type StreamFilterCallbacks interface {

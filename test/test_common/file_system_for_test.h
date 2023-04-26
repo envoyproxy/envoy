@@ -42,8 +42,6 @@ public:
 
   Api::IoCallResult<FileInfo> stat(absl::string_view path) override;
 
-  Api::IoCallBoolResult createPath(absl::string_view path) override;
-
 private:
   friend class ScopedUseMemfiles;
 
