@@ -69,6 +69,10 @@ type StreamInfo interface {
 	AttemptCount() uint32
 	// Get the dynamic metadata of the request
 	DynamicMetadata() DynamicMetadata
+	// DownstreamLocalAddress return the downstream local address.
+	DownstreamLocalAddress() string
+	// DownstreamRemoteAddress return the downstream remote address.
+	DownstreamRemoteAddress() string
 }
 
 type StreamFilterCallbacks interface {

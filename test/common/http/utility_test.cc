@@ -1134,8 +1134,12 @@ TEST(HttpUtility, QueryParamsToString) {
 }
 
 TEST(HttpUtility, ResetReasonToString) {
-  EXPECT_EQ("connection failure",
-            Utility::resetReasonToString(Http::StreamResetReason::ConnectionFailure));
+  EXPECT_EQ("local connection failure",
+            Utility::resetReasonToString(Http::StreamResetReason::LocalConnectionFailure));
+  EXPECT_EQ("remote connection failure",
+            Utility::resetReasonToString(Http::StreamResetReason::RemoteConnectionFailure));
+  EXPECT_EQ("connection timeout",
+            Utility::resetReasonToString(Http::StreamResetReason::ConnectionTimeout));
   EXPECT_EQ("connection termination",
             Utility::resetReasonToString(Http::StreamResetReason::ConnectionTermination));
   EXPECT_EQ("local reset", Utility::resetReasonToString(Http::StreamResetReason::LocalReset));

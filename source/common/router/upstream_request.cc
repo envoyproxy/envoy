@@ -607,19 +607,19 @@ void UpstreamRequest::onPoolFailure(ConnectionPool::PoolFailureReason reason,
                                     absl::string_view transport_failure_reason,
                                     Upstream::HostDescriptionConstSharedPtr host) {
   recordConnectionPoolCallbackLatency();
-  Http::StreamResetReason reset_reason = Http::StreamResetReason::ConnectionFailure;
-  switch (reason) {
-  case ConnectionPool::PoolFailureReason::Overflow:
-    reset_reason = Http::StreamResetReason::Overflow;
-    break;
-  case ConnectionPool::PoolFailureReason::RemoteConnectionFailure:
-    FALLTHRU;
-  case ConnectionPool::PoolFailureReason::LocalConnectionFailure:
-    reset_reason = Http::StreamResetReason::ConnectionFailure;
-    break;
-  case ConnectionPool::PoolFailureReason::Timeout:
-    reset_reason = Http::StreamResetReason::ConnectionFailure;
-  }
+  Http::StreamResetReason reset_reason = [](ConnectionPool::PoolFailureReason reason) {
+    switch (reason) {
+    case ConnectionPool::PoolFailureReason::Overflow:
+      return Http::StreamResetReason::Overflow;
+    case ConnectionPool::PoolFailureReason::RemoteConnectionFailure:
+      return Http::StreamResetReason::RemoteConnectionFailure;
+    case ConnectionPool::PoolFailureReason::LocalConnectionFailure:
+      return Http::StreamResetReason::LocalConnectionFailure;
+    case ConnectionPool::PoolFailureReason::Timeout:
+      return Http::StreamResetReason::ConnectionTimeout;
+    }
+    PANIC_DUE_TO_CORRUPT_ENUM;
+  }(reason);
 
   stream_info_.upstreamInfo()->setUpstreamTransportFailureReason(transport_failure_reason);
 

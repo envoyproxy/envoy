@@ -51,6 +51,7 @@ private:
                                 absl::string_view reason_input) override;
   void OnChunkLength(size_t chunk_length) override;
   void OnChunkExtensionInput(absl::string_view input) override;
+  void OnInterimHeaders(quiche::BalsaHeaders headers) override;
   void HeaderDone() override;
   void ContinueHeaderDone() override;
   void MessageDone() override;
