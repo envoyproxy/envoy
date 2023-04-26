@@ -80,7 +80,7 @@ jobs:
     if: github.repository == 'envoyproxy/envoy'
     name: kotlin_build
     runs-on: macos-12
-    timeout-minutes: 90
+    timeout-minutes: 120
     steps:
     - uses: actions/checkout@v3
       with:

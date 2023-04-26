@@ -15,7 +15,7 @@ jobs:
     if: github.repository == 'envoyproxy/envoy'
     name: ios_build
     runs-on: macos-12
-    timeout-minutes: 120
+    timeout-minutes: 180
     steps:
     - uses: actions/checkout@v3
       with:
@@ -41,7 +41,7 @@ jobs:
     name: swift_helloworld
     needs: iosbuild
     runs-on: macos-12
-    timeout-minutes: 50
+    timeout-minutes: 180
     steps:
     - uses: actions/checkout@v3
       with:
@@ -89,7 +89,7 @@ jobs:
     name: swift_baseline_app
     needs: iosbuild
     runs-on: macos-12
-    timeout-minutes: 50
+    timeout-minutes: 180
     steps:
     - uses: actions/checkout@v3
       with:
@@ -137,7 +137,7 @@ jobs:
     name: swift_experimental_app
     needs: iosbuild
     runs-on: macos-12
-    timeout-minutes: 50
+    timeout-minutes: 180
     steps:
     - uses: actions/checkout@v3
       with:
@@ -189,7 +189,7 @@ jobs:
     name: swift_async_await
     needs: iosbuild
     runs-on: macos-12
-    timeout-minutes: 120
+    timeout-minutes: 180
     steps:
     - uses: actions/checkout@v3
       with:
@@ -237,7 +237,7 @@ jobs:
     name: objc_helloworld
     needs: iosbuild
     runs-on: macos-12
-    timeout-minutes: 50
+    timeout-minutes: 180
     steps:
     - uses: actions/checkout@v3
       with:

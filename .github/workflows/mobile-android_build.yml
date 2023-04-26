@@ -15,7 +15,7 @@ jobs:
     if: github.repository == 'envoyproxy/envoy'
     name: android_build
     runs-on: ubuntu-20.04
-    timeout-minutes: 90
+    timeout-minutes: 180
     container:
       image: envoyproxy/envoy-build-ubuntu:mobile-321658b6b50abda6869f89fac275f59bf3b1e757
       env:
@@ -45,7 +45,7 @@ jobs:
     name: java_helloworld
     needs: androidbuild
     runs-on: macos-12
-    timeout-minutes: 50
+    timeout-minutes: 180
     steps:
     - uses: actions/checkout@v3
       with:
@@ -92,7 +92,7 @@ jobs:
     name: kotlin_helloworld
     needs: androidbuild
     runs-on: macos-12
-    timeout-minutes: 50
+    timeout-minutes: 180
     steps:
     - uses: actions/checkout@v3
       with:
@@ -139,7 +139,7 @@ jobs:
     name: kotlin_baseline_app
     needs: androidbuild
     runs-on: macos-12
-    timeout-minutes: 50
+    timeout-minutes: 180
     steps:
     - uses: actions/checkout@v3
       with:
@@ -186,7 +186,7 @@ jobs:
     name: kotlin_experimental_app
     needs: androidbuild
     runs-on: macos-12
-    timeout-minutes: 50
+    timeout-minutes: 180
     steps:
     - uses: actions/checkout@v3
       with:
