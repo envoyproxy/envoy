@@ -172,7 +172,7 @@ message ExternalProcessor {
   // Prevents clearing the route-cache when the
   // :ref:`clear_route_cache <envoy_v3_api_field_service.ext_proc.v3.CommonResponse.clear_route_cache>`
   // field is set in an external processor response.
-  bool disable_route_cache_clearing = 11;
+  bool disable_clear_route_cache = 11;
 }
 
 // Extra settings that may be added to per-route configuration for a

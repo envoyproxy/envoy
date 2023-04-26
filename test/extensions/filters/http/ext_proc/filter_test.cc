@@ -2020,10 +2020,10 @@ TEST_F(HttpFilterTest, ClearRouteCacheHeaderMutation) {
 
   filter_->onDestroy();
 
-  EXPECT_EQ(1, config_->stats().streams_started_.value());
-  EXPECT_EQ(3, config_->stats().stream_msgs_sent_.value());
-  EXPECT_EQ(3, config_->stats().stream_msgs_received_.value());
-  EXPECT_EQ(1, config_->stats().streams_closed_.value());
+  EXPECT_EQ(config_->stats().streams_started_.value(), 1);
+  EXPECT_EQ(config_->stats().stream_msgs_sent_.value(), 3);
+  EXPECT_EQ(config_->stats().stream_msgs_received_.value(), 3);
+  EXPECT_EQ(config_->stats().streams_closed_.value(), 1);
 }
 
 // Verify that the "disable_route_cache_clearing" setting prevents the "clear_route_cache" flag
@@ -2035,7 +2035,7 @@ TEST_F(HttpFilterTest, ClearRouteCacheDiasallowedHeaderMutation) {
       cluster_name: "ext_proc_server"
   processing_mode:
     response_body_mode: "BUFFERED"
-  disable_route_cache_clearing: true
+  disable_clear_route_cache: true
   )EOF");
 
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, true));
@@ -2065,12 +2065,12 @@ TEST_F(HttpFilterTest, ClearRouteCacheDiasallowedHeaderMutation) {
 
   filter_->onDestroy();
 
-  EXPECT_EQ(0, config_->stats().clear_route_cache_ignored_.value());
-  EXPECT_EQ(2, config_->stats().clear_route_cache_disabled_.value());
-  EXPECT_EQ(1, config_->stats().streams_started_.value());
-  EXPECT_EQ(3, config_->stats().stream_msgs_sent_.value());
-  EXPECT_EQ(3, config_->stats().stream_msgs_received_.value());
-  EXPECT_EQ(1, config_->stats().streams_closed_.value());
+  EXPECT_EQ(config_->stats().clear_route_cache_ignored_.value(), 0);
+  EXPECT_EQ(config_->stats().clear_route_cache_disabled_.value(), 2);
+  EXPECT_EQ(config_->stats().streams_started_.value(), 1);
+  EXPECT_EQ(config_->stats().stream_msgs_sent_.value(), 3);
+  EXPECT_EQ(config_->stats().stream_msgs_received_.value(), 3);
+  EXPECT_EQ(config_->stats().streams_closed_.value(), 1);
 }
 
 // Using the default configuration, verify that the "clear_route_cache" flag does not preform
@@ -2103,12 +2103,12 @@ TEST_F(HttpFilterTest, ClearRouteCacheUnchanged) {
 
   filter_->onDestroy();
 
-  EXPECT_EQ(2, config_->stats().clear_route_cache_ignored_.value());
-  EXPECT_EQ(0, config_->stats().clear_route_cache_disabled_.value());
-  EXPECT_EQ(1, config_->stats().streams_started_.value());
-  EXPECT_EQ(3, config_->stats().stream_msgs_sent_.value());
-  EXPECT_EQ(3, config_->stats().stream_msgs_received_.value());
-  EXPECT_EQ(1, config_->stats().streams_closed_.value());
+  EXPECT_EQ(config_->stats().clear_route_cache_ignored_.value(), 2);
+  EXPECT_EQ(config_->stats().clear_route_cache_disabled_.value(), 0);
+  EXPECT_EQ(config_->stats().streams_started_.value(), 1);
+  EXPECT_EQ(config_->stats().stream_msgs_sent_.value(), 3);
+  EXPECT_EQ(config_->stats().stream_msgs_received_.value(), 3);
+  EXPECT_EQ(config_->stats().streams_closed_.value(), 1);
 }
 
 // Using the default configuration, turn a GET into a POST.

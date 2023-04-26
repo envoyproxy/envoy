@@ -76,7 +76,7 @@ public:
                const uint32_t max_message_timeout_ms, Stats::Scope& scope,
                const std::string& stats_prefix)
       : failure_mode_allow_(config.failure_mode_allow()),
-        disable_route_cache_clearing_(config.disable_route_cache_clearing()),
+        disable_clear_route_cache_(config.disable_clear_route_cache()),
         message_timeout_(message_timeout), max_message_timeout_ms_(max_message_timeout_ms),
         stats_(generateStats(stats_prefix, config.stat_prefix(), scope)),
         processing_mode_(config.processing_mode()), mutation_checker_(config.mutation_rules()) {}
@@ -97,7 +97,7 @@ public:
     return mutation_checker_;
   }
 
-  bool disableRouteCacheClearing() const { return disable_route_cache_clearing_; }
+  bool disableClearRouteCache() const { return disable_clear_route_cache_; }
 
 private:
   ExtProcFilterStats generateStats(const std::string& prefix,
@@ -107,7 +107,7 @@ private:
   }
 
   const bool failure_mode_allow_;
-  const bool disable_route_cache_clearing_;
+  const bool disable_clear_route_cache_;
   const std::chrono::milliseconds message_timeout_;
   const uint32_t max_message_timeout_ms_;
 
