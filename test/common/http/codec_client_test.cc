@@ -91,7 +91,9 @@ public:
   Upstream::HostDescriptionConstSharedPtr host_{
       Upstream::makeTestHostDescription(cluster_, "tcp://127.0.0.1:80", simTime())};
   NiceMock<StreamInfo::MockStreamInfo> stream_info_;
+#ifdef ENVOY_ENABLE_UHV
   NiceMock<MockClientHeaderValidator>* header_validator_{new NiceMock<MockClientHeaderValidator>};
+#endif
 };
 
 TEST_F(CodecClientTest, NotCallDetectEarlyCloseWhenReadDiabledUsingHttp3) {
