@@ -133,6 +133,7 @@ message RedisProxy {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.config.filter.network.redis_proxy.v2.RedisProxy.PrefixRoutes";
 
+    // [#next-free-field: 6]
     message Route {
       option (udpa.annotations.versioning).previous_message_type =
           "envoy.config.filter.network.redis_proxy.v2.RedisProxy.PrefixRoutes.Route";
@@ -174,6 +175,10 @@ message RedisProxy {
 
       // Indicates that the route has a request mirroring policy.
       repeated RequestMirrorPolicy request_mirror_policy = 4;
+
+      // Indicates how redis key should be formatted. To substitute redis key into the formatting
+      // expression, use %KEY% as a string replacement command.
+      string key_formatter = 5;
     }
 
     reserved 3;

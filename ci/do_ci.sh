@@ -225,7 +225,9 @@ if [[ "$CI_TARGET" == "bazel.release" ]]; then
   bazel_with_collection test "${BAZEL_BUILD_OPTIONS[@]}" --remote_download_minimal -c opt "${TEST_TARGETS[@]}"
 
   # Build release binaries
-  bazel build "${BAZEL_BUILD_OPTIONS[@]}" //distribution/binary:release
+  # As the binary build package enforces `-c opt`, adding here to ensure the distribution build reuses
+  # any already compiled artefacts, the bundle itself will always be compiled `-c opt`
+  bazel build "${BAZEL_BUILD_OPTIONS[@]}" -c opt //distribution/binary:release
 
   # Copy release binaries to binary export directory
   cp -a "bazel-bin/distribution/binary/release.tar.zst" "${ENVOY_BINARY_DIR}/release.tar.zst"
@@ -385,6 +387,7 @@ elif [[ "$CI_TARGET" == "bazel.dev.contrib" ]]; then
 elif [[ "$CI_TARGET" == "bazel.compile_time_options" ]]; then
   # Right now, none of the available compile-time options conflict with each other. If this
   # changes, this build type may need to be broken up.
+
   COMPILE_TIME_OPTIONS=(
     "--define" "admin_html=disabled"
     "--define" "signal_trace=disabled"
@@ -462,12 +465,13 @@ elif [[ "$CI_TARGET" == "bazel.api_compat" ]]; then
   exit 0
 elif [[ "$CI_TARGET" == "bazel.coverage" || "$CI_TARGET" == "bazel.fuzz_coverage" ]]; then
   setup_clang_toolchain
+
   echo "${CI_TARGET} build with tests ${COVERAGE_TEST_TARGETS[*]}"
 
   [[ "$CI_TARGET" == "bazel.fuzz_coverage" ]] && export FUZZ_COVERAGE=true
 
   # We use custom BAZEL_BUILD_OPTIONS here to cover profiler's code.
-  BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS[*]} --define tcmalloc=gperftools" "${ENVOY_SRCDIR}"/test/run_envoy_bazel_coverage.sh "${COVERAGE_TEST_TARGETS[@]}"
+  BAZEL_BUILD_OPTION_LIST="${BAZEL_BUILD_OPTIONS[*]} --define tcmalloc=gperftools" "${ENVOY_SRCDIR}"/test/run_envoy_bazel_coverage.sh "${COVERAGE_TEST_TARGETS[@]}"
   collect_build_profile coverage
   exit 0
 elif [[ "$CI_TARGET" == "bazel.clang_tidy" ]]; then
@@ -475,12 +479,12 @@ elif [[ "$CI_TARGET" == "bazel.clang_tidy" ]]; then
   ENVOY_STDLIB="libstdc++"
   setup_clang_toolchain
 
-  export CLANG_TIDY_FIX_DIFF="${TEST_TMPDIR}/lint-fixes/clang-tidy-fixed.diff"
-  export FIX_YAML="${TEST_TMPDIR}/lint-fixes/clang-tidy-fixes.yaml"
+  export CLANG_TIDY_FIX_DIFF="${ENVOY_TEST_TMPDIR}/lint-fixes/clang-tidy-fixed.diff"
+  export FIX_YAML="${ENVOY_TEST_TMPDIR}/lint-fixes/clang-tidy-fixes.yaml"
   export CLANG_TIDY_APPLY_FIXES=1
-  mkdir -p "${TEST_TMPDIR}/lint-fixes"
+  mkdir -p "${ENVOY_TEST_TMPDIR}/lint-fixes"
   BAZEL_BUILD_OPTIONS+=(--remote_download_minimal)
-  BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS[*]}" NUM_CPUS=$NUM_CPUS "${ENVOY_SRCDIR}"/ci/run_clang_tidy.sh "$@" || {
+  NUM_CPUS=$NUM_CPUS "${ENVOY_SRCDIR}"/ci/run_clang_tidy.sh "$@" || {
       if [[ -s "$FIX_YAML" ]]; then
           echo >&2
           echo "Diff/yaml files with (some) fixes will be uploaded. Please check the artefacts for this PR run in the azure pipeline." >&2
@@ -500,23 +504,27 @@ elif [[ "$CI_TARGET" == "bazel.fuzz" ]]; then
   exit 0
 elif [[ "$CI_TARGET" == "format" ]]; then
   setup_clang_toolchain
-  BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS[*]}" "${ENVOY_SRCDIR}"/ci/format_pre.sh
+  "${ENVOY_SRCDIR}"/ci/format_pre.sh
 elif [[ "$CI_TARGET" == "fix_proto_format" ]]; then
   # proto_format.sh needs to build protobuf.
   setup_clang_toolchain
-  BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS[*]}" "${ENVOY_SRCDIR}/tools/proto_format/proto_format.sh" fix
+  "${ENVOY_SRCDIR}/tools/proto_format/proto_format.sh" fix
   exit 0
 elif [[ "$CI_TARGET" == "check_proto_format" ]]; then
   setup_clang_toolchain
   echo "Check proto format ..."
-  BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS[*]}" "${ENVOY_SRCDIR}/tools/proto_format/proto_format.sh" check
+  "${ENVOY_SRCDIR}/tools/proto_format/proto_format.sh" check
+  exit 0
+elif [[ "$CI_TARGET" == "check_and_fix_proto_format" ]]; then
+  setup_clang_toolchain
+  echo "Check and fix proto format ..."
+  "${ENVOY_SRCDIR}/ci/check_and_fix_format.sh"
   exit 0
 elif [[ "$CI_TARGET" == "docs" ]]; then
   setup_clang_toolchain
-
   echo "generating docs..."
   # Build docs.
-  BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS[*]}" "${ENVOY_SRCDIR}"/docs/build.sh
+  "${ENVOY_SRCDIR}"/docs/build.sh
   exit 0
 elif [[ "$CI_TARGET" == "deps" ]]; then
   setup_clang_toolchain
@@ -563,14 +571,16 @@ elif [[ "$CI_TARGET" == "publish" ]]; then
     # create the tag/release from here
     version="$(cat VERSION.txt)"
     patch_version="$(echo "$version" | rev | cut -d. -f1)"
-    if [[ "$AZP_BRANCH" != "main" && "$patch_version" -eq 0 ]]; then
-        echo "Not creating a tag/release for ${version}"
-        exit 0
+    if [[ "$AZP_BRANCH" == "main" || "$AZP_BRANCH" == "refs/heads/main" ]]; then
+        if [[ "$patch_version" -eq 0 ]]; then
+            # It can take some time to get here in CI so the branch may have changed - create the release
+            # from the current commit (as this only happens on non-PRs we are safe from merges)
+            BUILD_SHA="$(git rev-parse HEAD)"
+            bazel run "${BAZEL_BUILD_OPTIONS[@]}" @envoy_repo//:publish -- --publish-commitish="$BUILD_SHA"
+            exit 0
+        fi
     fi
-    # It can take some time to get here in CI so the branch may have changed - create the release
-    # from the current commit (as this only happens on non-PRs we are safe from merges)
-    BUILD_SHA="$(git rev-parse HEAD)"
-    bazel run "${BAZEL_BUILD_OPTIONS[@]}" @envoy_repo//:publish -- --publish-commitish="$BUILD_SHA"
+    echo "Not creating a tag/release for ${version} from ${AZP_BRANCH}"
     exit 0
 else
   echo "Invalid do_ci.sh target, see ci/README.md for valid targets."

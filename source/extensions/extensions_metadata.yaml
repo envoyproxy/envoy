@@ -238,6 +238,13 @@ envoy.filters.http.cdn_loop:
   status: alpha
   type_urls:
   - envoy.extensions.filters.http.cdn_loop.v3.CdnLoopConfig
+envoy.filters.http.geoip:
+  categories:
+  - envoy.filters.http
+  security_posture: unknown
+  status: wip
+  type_urls:
+  - envoy.extensions.filters.http.geoip.v3.Geoip
 envoy.filters.http.upstream_codec:
   categories:
   - envoy.filters.http.upstream
@@ -1019,6 +1026,13 @@ envoy.stat_sinks.metrics_service:
   status: stable
   type_urls:
   - envoy.config.metrics.v3.MetricsServiceConfig
+envoy.stat_sinks.open_telemetry:
+  categories:
+  - envoy.stats_sinks
+  security_posture: data_plane_agnostic
+  status: alpha
+  type_urls:
+  - envoy.extensions.stat_sinks.open_telemetry.v3.SinkConfig
 envoy.stat_sinks.statsd:
   categories:
   - envoy.stats_sinks

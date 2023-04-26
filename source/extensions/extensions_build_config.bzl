@@ -127,6 +127,7 @@ EXTENSIONS = {
     "envoy.filters.http.fault":                         "//source/extensions/filters/http/fault:config",
     "envoy.filters.http.file_system_buffer":            "//source/extensions/filters/http/file_system_buffer:config",
     "envoy.filters.http.gcp_authn":                     "//source/extensions/filters/http/gcp_authn:config",
+    "envoy.filters.http.geoip":                     "//source/extensions/filters/http/geoip:config",
     "envoy.filters.http.grpc_http1_bridge":             "//source/extensions/filters/http/grpc_http1_bridge:config",
     "envoy.filters.http.grpc_http1_reverse_bridge":     "//source/extensions/filters/http/grpc_http1_reverse_bridge:config",
     "envoy.filters.http.grpc_json_transcoder":          "//source/extensions/filters/http/grpc_json_transcoder:config",
@@ -213,6 +214,7 @@ EXTENSIONS = {
     "envoy.stat_sinks.graphite_statsd":                 "//source/extensions/stat_sinks/graphite_statsd:config",
     "envoy.stat_sinks.hystrix":                         "//source/extensions/stat_sinks/hystrix:config",
     "envoy.stat_sinks.metrics_service":                 "//source/extensions/stat_sinks/metrics_service:config",
+    "envoy.stat_sinks.open_telemetry":                  "//source/extensions/stat_sinks/open_telemetry:config",
     "envoy.stat_sinks.statsd":                          "//source/extensions/stat_sinks/statsd:config",
     "envoy.stat_sinks.wasm":                            "//source/extensions/stat_sinks/wasm:config",
 
