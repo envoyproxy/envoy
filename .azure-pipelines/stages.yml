@@ -40,6 +40,10 @@ parameters:
   displayName: "Timout Docker publish"
   type: number
   default: 10
+- name: timeoutDockerBuild
+  displayName: "Timout Docker build"
+  type: number
+  default: 400
 
 ## Build settings
 - name: cacheTestResults
@@ -146,6 +150,7 @@ stages:
       authSSHDocsKey: $(DocsPrivateKey)
       authSSHKeyPassphrase: $(SshDeployKeyPassphrase)
       bucketGCP: $(GcsArtifactBucket)
+      timeoutDockerBuild: ${{ parameters.timeoutDockerBuild }}
       timeoutDockerPublish: ${{ parameters.timeoutDockerPublish }}
       runDocker: variables['RUN_DOCKER']
       runPackaging: variables['RUN_PACKAGING']
